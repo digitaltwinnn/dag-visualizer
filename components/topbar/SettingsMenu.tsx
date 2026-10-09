@@ -50,7 +50,7 @@ export default function SettingsMenu({ onAboutView }: { onAboutView?: () => void
             // px + chevron trimmed on phone: the gear is the one addition the phone bar
             // absorbed from the consolidation, and the filter face is the first thing a
             // squeezed row starves (measured 2026-08-21, the network face's old lesson).
-            "group flex flex-none items-center gap-1 h-9 py-1.5 px-2.5 max-[700px]:px-1.5 rounded-btn! pointer-coarse:min-h-11",
+            "group flex flex-none items-center gap-1 h-9 py-1.5 px-2.5 max-[700px]:px-1.5 rounded-btn! touch:min-h-11",
             "bg-transparent border-0 text-muted-foreground hover:text-foreground hover:bg-wash-soft",
           )}
         >

@@ -49,7 +49,7 @@ export interface Crumb {
 // The chevron: a 7px arrow tip on the right and, past the first step, a 7px notch on the left that
 // the previous step's tip sits in. Steps overlap by 5px, so a 2px seam of the plate's own colour
 // runs between them. (Literal class strings — Tailwind's scanner reads no template.)
-const STEP = "inline-flex h-[24px] pointer-coarse:h-10 min-w-0 max-w-full items-center gap-1.5 whitespace-nowrap";
+const STEP = "inline-flex h-[24px] touch:h-10 min-w-0 max-w-full items-center gap-1.5 whitespace-nowrap";
 const SHAPE_FIRST = "rounded-l-[5px] [clip-path:polygon(0_0,calc(100%-7px)_0,100%_50%,calc(100%-7px)_100%,0_100%)]";
 const SHAPE_MID = "[clip-path:polygon(0_0,calc(100%-7px)_0,100%_50%,calc(100%-7px)_100%,0_100%,7px_50%)]";
 const SHAPE_LAST = "rounded-r-[5px] [clip-path:polygon(0_0,100%_0,100%_100%,0_100%,7px_50%)]";
@@ -74,6 +74,11 @@ export default function ExplorerPath({ crumbs, hint, placeholder, className }: {
           const shape = first && last ? "rounded-[5px]" : first ? SHAPE_FIRST : last ? SHAPE_LAST : SHAPE_MID;
           // Padding follows the shape: room for the notch on the left, for the tip on the right.
           const pad = cn(first ? "pl-2" : "pl-[13px]", last ? "pr-2" : "pr-[11px]");
+          // THE HOUSE HAS A FLOOR (user, 2026-10-09: "the home button is sometimes a bit thin"): a
+          // 14px glyph in the step's own padding made a 28px step at the root and, as an ancestor
+          // with the tip clipped off its right, a sliver. The root step is at least as wide as it
+          // is tall at the touch height, the glyph centred in it, whatever its shape.
+          const root = c.root ? "min-w-9 justify-center" : "";
           return (
             <BreadcrumbItem
               key={c.key}
@@ -98,7 +103,7 @@ export default function ExplorerPath({ crumbs, hint, placeholder, className }: {
                 // "YOU ARE HERE" IS A LABEL, NOT TEXT (user, 2026-10-07: "the mouse pointer is |"): its
                 // list is already on screen, so it takes no click — the default cursor and no text
                 // selection keep it from reading as a broken link beside the steps that do.
-                <BreadcrumbPage className={cn(STEP, shape, pad, "cursor-default select-none bg-wash-strong text-foreground", !c.root && "w-full")}>
+                <BreadcrumbPage className={cn(STEP, shape, pad, root, "cursor-default select-none bg-wash-strong text-foreground", !c.root && "w-full")}>
                   {/* THE ROOT AS THE PAGE IS THE HOUSE ALONE (user, 2026-10-07): its word is the card's
                       title one line above, so printing it here said the same thing twice. The word
                       stays the step's accessible name; the bar gains a name once a level is opened. */}
@@ -120,6 +125,7 @@ export default function ExplorerPath({ crumbs, hint, placeholder, className }: {
                     STEP,
                     shape,
                     pad,
+                    root,
                     "group cursor-pointer bg-wash-soft text-foreground-dim hover:bg-wash-hover hover:text-foreground",
                     "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
                   )}

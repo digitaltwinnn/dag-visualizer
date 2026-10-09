@@ -203,12 +203,12 @@ export default function SectionShell({
           // The coarse-pointer arms grow the 24px ghost to the 44px touch floor AND re-anchor it
           // (top-4→1.5, right-3→0.5) so the × GLYPH stays where the fine-pointer one sits — grown
           // in place, the box's centre drifted 10px down-left onto the table header's AGE cell.
-          className="absolute top-4 right-3 z-20 text-muted-foreground hover:text-foreground pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-coarse:top-1.5 pointer-coarse:right-0.5"
+          className="absolute top-4 right-3 z-20 text-muted-foreground hover:text-foreground touch:min-h-11 touch:min-w-11 touch:top-1.5 touch:right-0.5"
           onClick={() => useStore.getState().setSection("scene")}
         >
           {/* A close glyph is 18px on touch (user, 2026-10-07: "on mobile the X icon is tiny") —
               the 44px target alone does not make the mark findable. */}
-          <X aria-hidden className="size-3 pointer-coarse:size-[18px]" />
+          <X aria-hidden className="size-3 touch:size-[18px]" />
         </Button>
       </section>
 

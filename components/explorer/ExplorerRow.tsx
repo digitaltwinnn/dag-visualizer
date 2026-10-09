@@ -157,7 +157,7 @@ export default function ExplorerRow({
         // row ends in one — sat hard on the wash's right edge and wanted air.
         // 44px on a touch pointer: these rows are the explorer's whole surface and measured 29px on a
         // phone, a third under the floor with 2px between them (test pass, 2026-10-03).
-        "nb-row group grid items-center gap-x-[5px] w-[calc(100%+12px)] -mx-1.5 pl-1.5 pr-2.5 py-1 pointer-coarse:min-h-11 rounded-[5px] text-left text-body",
+        "nb-row group grid items-center gap-x-[5px] w-[calc(100%+12px)] -mx-1.5 pl-1.5 pr-2.5 py-1 touch:min-h-11 rounded-[5px] text-left text-body",
         "border border-transparent bg-transparent transition-[background] duration-150",
         onClick && "cursor-pointer hover:bg-wash-hover",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
@@ -225,12 +225,20 @@ export default function ExplorerRow({
       {/* A TEXT tag ellipsises; a flex container cannot do that for a bare string (its
           `text-overflow` has no inline box to act on), so "Falkenstein" was cut to "Falkens" with
           no mark that anything was missing. Chips and dots stay direct children. */}
-      <span className="min-w-0 truncate flex items-center gap-1 text-label text-muted-foreground">
+      {/* A PINNED row's tag is a CAPTION ON ITS OWN LINE (user, 2026-10-09: the DAG row says "sum of
+          the networks below" — a sentence, which a chip beside the name ellipsised at the rail's
+          264px floor). It takes the second grid row from the name's column to the figure's edge,
+          in the tag home's own muted label; the name, bar and figure keep the first row. */}
+      <span className={cn("min-w-0 truncate flex items-center gap-1 text-label text-muted-foreground", plain && tag != null && (glyphW !== 0 ? "col-start-2" : "col-start-1"), plain && tag != null && "col-end-[-1] row-start-2 -mt-0.5")}>
         {typeof tag === "string" ? <span className="min-w-0 truncate">{tag}</span> : tag}
       </span>
       {hasFigure && (
         <>
-          <span className={cn("h-[5px] rounded-[3px] overflow-hidden", !plain && "bg-wash-faint")}>
+          {/* With the caption on row 2 the bar and the figure name their columns: auto-placement
+              would otherwise slide them left into the tag's freed column and the 0px bar column.
+              Counted from the END (review, 2026-10-09): a glyph-less level has one column fewer,
+              and `col-start-4/5` would then place the figure outside the template. */}
+          <span className={cn("h-[5px] rounded-[3px] overflow-hidden", !plain && "bg-wash-faint", plain && tag != null && "col-start-[-3] row-start-1")}>
             {bar && (
               <span
                 className="block h-full rounded-[3px]"
@@ -238,7 +246,7 @@ export default function ExplorerRow({
               />
             )}
           </span>
-          <span className={cn("min-w-0 truncate text-right font-mono text-body tabular-nums", nested ? "text-foreground-dim" : "text-foreground")}>
+          <span className={cn("min-w-0 truncate text-right font-mono text-body tabular-nums", nested ? "text-foreground-dim" : "text-foreground", plain && tag != null && "col-start-[-2] row-start-1")}>
             {/* An inline box, so its width is the figure's own — what the Explorer measures. */}
             <span data-fit-fig="">{figure}</span>
           </span>

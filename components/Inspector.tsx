@@ -21,7 +21,7 @@ import RailDock from "@/components/RailDock";
 import RailPager from "@/components/RailPager";
 import HeightEase from "@/components/HeightEase";
 import { useBreakpoint } from "@/components/useBreakpoint";
-import { usePointerCoarse } from "@/components/usePointerCoarse";
+import { useTouch } from "@/components/useTouch";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { detailsCards, ladderSlotIds, type RailCard } from "@/components/railCards";
 import { CHILD_OF, childStep, type SiblingStep } from "@/components/railSiblings";
@@ -416,7 +416,7 @@ export default function Inspector() {
   // stays ALWAYS-mounted below (via <ContextCard/>, which self-nulls on "all") so its EdgePulse
   // survives the dossier ⇄ nothing swap; the manifest only decides its tray-icon presence.
   const selNodes = useStore((s) => s.selNodes);
-  const coarse = usePointerCoarse();
+  const coarse = useTouch();
   const trendCursorMs = useStore((s) => s.trendCursorMs);
   const trendRange = useStore((s) => s.trendRange);
   const trendFocus = useStore((s) => s.trendFocus);

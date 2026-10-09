@@ -989,6 +989,25 @@ inline in the return would quietly restore the bug for every consumer at once.
 
 ### Responsive shell
 
+- **THE TOUCH TIER IS ONE RULE** (2026-10-09): `touch:` in `globals.css` = a coarse pointer on the
+  phone or tablet tier, and `useTouch` answers the same two media queries (`touchTierBoundary.test.ts`
+  pins them). It replaced Tailwind's pointer-only `pointer-coarse:` after a touch laptop's DESKTOP
+  rail grew 44px rows and a History list that ran off the viewport (user: "look like mobile
+  controls on normal view"). The desktop tier is a mouse layout whatever the primary pointer says;
+  an iPad Pro in landscape is wide enough for it and loses the floor there — the accepted edge.
+  Written as two nested `@media` blocks (a coarse pointer, then `not all and (min-width: 1100px)`
+  — the arm `useBreakpoint` uses), and the hook reads the same two strings. (Tailwind already
+  compiles every `max-[…]` arm to the Level-4 `not (min-width: …)`, so this is one rule written
+  one way, not browser support.)
+- **The filter strip is chips above 700px and rows on the phone** (user, 2026-10-09, after design
+  A1 had made every tier rows): one element list in `FilterPicker` wearing both through the 700
+  arms — a vertical bar between chip groups, a hairline across the phone's column.
+- **History's cards take a SWIPE on touch** (2026-10-09, `domain/planeSwipe.ts`): a flick along one
+  axis — down brings the card forward, up on the front card brings the one behind it forward
+  (`planeBehind`), left/right step the measure (the ↑/↓ keys' steps). The plot's HORIZONTAL drag
+  stays the brush; a vertical-dominant gesture on the plot is the plane's and never brushes
+  (`onTouchMoveCapture`/`onTouchEndCapture` stop it reaching the chart).
+
 Only the rails restructure; everything else holds the four-zone shape. Desktop (≥1100px) has both rails
 inline with their `RailThread` siblings; tablet (700–1099px) collapses them to edge tabs opening
 **non-modal** sheets (both can be open, orbit still works behind them — the sheets OVERLAY the
@@ -1017,7 +1036,7 @@ later, the portal trap), fits its content live, and shrinks back on a
 render-phase-derived exit. Dismissing a sheet only collapses it — it does not clear the selection.
 On phone the Explore card opens EXPANDED like everywhere else (2026-09-28 — it opened collapsed
 while the About card shared the sheet, as a two-head chooser; one card has nothing to choose
-between), and the teaching copy says the pointer's own word (`usePointerCoarse` — Tap/Click, one
+between), and the teaching copy says the pointer's own word (`useTouch` — Tap/Click, one
 home; geo's node ghost alone advertises the long-press preview).
 
 **No auto-open, ever** (global): a pick never opens a sheet or dock. The dock's icon tray announces it;
@@ -1331,6 +1350,30 @@ Every rail card leads with `CardHead`: eyebrow / title / inset hairline / body.
 
 ### Selection & pairing
 
+- **ONE SELECTION, EVERY SURFACE** (user, 2026-10-09 — "a consistent behaviour and clear design
+  principle"). The app has one committed subject, written only through the decision table; no
+  surface owns a selection of its own. Each surface SHOWS the committed subject at the rung it has,
+  in its own vocabulary: the scene frames it, the explorer washes its row, the card boxes, the raw
+  layer washes its row and opens its pane, History brings its network's plane forward. "Pinned" is
+  only Snapshots' word for a committed tick held against the live stream; Hyper and Geo have no
+  stream (the committed node is simply the focus) and neither does History (the committed network
+  IS the plane in front). Three corollaries carry the code:
+  · **A door carries context, and only what the gesture named is committed.** A card's snapshot door
+    names a snapshot already committed; a Range door scoped to a network lands on and commits that
+    network's row at the span's edge; an UNSCOPED Range door (All) marks its landing row and commits
+    nothing — `AnchorLogTable`'s `landScoped`, and a door spends the layer's first-row arm
+    (`doorSeen`, which survives StrictMode's second effect pass). The Unlisted set is a scope the
+    log takes from a door or its own picker, through the lens the Unlisted filter already gives it.
+  · **Returning from the raw layer carries the commit back at the source view's rung.** Closing a
+    log a door opened brings forward the network of the snapshot committed in it
+    (`store.setSection` → `focusOnReturn` + `planeOfChain`, domain), else the plane that was in
+    front — and takes the reader's OWN date search as the committed range (`store.logCut`, written
+    by the log's `cutIsOwn` mirror; a door's span never writes it, it came from History). Snapshots
+    needs nothing: a raw row click pins, and the explorer and card show the pin.
+  · **State marks are one species.** `LiveDot` + "live", `PinMark` + "pinned" (StateAtoms, 14px),
+    on the explorer's tick row, the Global snapshot card's control, the scene callout, the raw log's
+    selected row and the raw pane's head.
+
 - **`SELECTED_ROW`** is the one committed-selection language for list rows: the wash plus a 1px inset
   ring **as a single box-shadow** — deliberate, because the transient states it composes with are
   background-based and box-shadow is an independent property. **No ✓** (user, 2026-10-07: "obsolete
@@ -1342,6 +1385,9 @@ Every rail card leads with `CardHead`: eyebrow / title / inset hairline / body.
 - **`IdentityDot`** is the shared flat identity-hue dot, no glow.
 
 ### State atoms & timing
+
+- **`PinMark`** is the one pinned glyph (2026-10-09), `LiveDot` its live counterpart — see
+  "one selection, every surface" above. Never a hollow dot or bare text for either state.
 
 `components/state/StateAtoms.tsx` builds empty and loading states from the app's own marks, so an absent feed reads as part of the instrument rather than a spinner. The
 sonar ring is remounted per retry, so the animation IS the retry.

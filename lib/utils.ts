@@ -25,10 +25,11 @@ export function cn(...inputs: ClassValue[]) {
  *  tablet"). The app's icon controls are 24px by design — the rail is dense and a pointer is
  *  precise — but a fingertip needs about 44. Rather than swell the glyphs and re-compose every row
  *  they sit in, a coarse pointer gets an invisible pseudo 10px larger on each side: the control
- *  LOOKS the same and catches a thumb. `pointer-coarse:` keys on the pointer, not the width, so a
- *  touch laptop gets it and a narrow desktop window does not. Rows are different — they have the
- *  room, so they simply grow (`pointer-coarse:min-h-11`).
+ *  LOOKS the same and catches a thumb. `touch:` is the TOUCH TIER (globals.css, 2026-10-09): a
+ *  coarse pointer on the phone or tablet tier — so a phone gets it, a touch laptop's desktop rail
+ *  does not, and a narrow desktop window under a mouse does not either. Rows are different — they
+ *  have the room, so they simply grow (`touch:min-h-11`).
  *  ⚠️ The host must not already use `::after`, and neighbours closer than 20px will overlap their
  *  hit areas — the later one in DOM order wins the shared strip, which is acceptable for a pair. */
 export const TOUCH_HIT =
-  "pointer-coarse:relative pointer-coarse:after:absolute pointer-coarse:after:-inset-2.5 pointer-coarse:after:content-['']";
+  "touch:relative touch:after:absolute touch:after:-inset-2.5 touch:after:content-['']";

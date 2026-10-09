@@ -10,6 +10,7 @@ import { SELECTED_ROW, selectionHue } from "@/components/selection";
 import { spanOfWindow } from "@/components/trendDoors";
 import RecordsDoor from "@/components/inspector/RecordsDoor";
 import useTrendRoster from "@/components/useTrendRoster";
+import { UNLISTED_ID } from "@/src/data/unlisted";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { cn } from "@/lib/utils";
@@ -85,9 +86,15 @@ export default function TrendInstantPane({
   const note = cursorMs == null ? null : instantNote(placeInstant(cursorMs, buckets, roster.rawBuckets, stepMs), stepMs);
 
   const subject = subjectOf(focus, filter, ranked, (id) => id !== "dag" && rows.has(id));
+  // THE UNLISTED CHANNELS READ HERE TOO (user, 2026-10-09: "unlisted is not shown in the Moment
+  // card while it is present and the explorer has selected it"). The roster keeps them out of the
+  // RANK on purpose — the Networks list appends them after the ranked networks — so this list
+  // takes the same roster row the explorer and the stack draw, after the ranked ones; `orderAt`
+  // then sorts every row by its reading at the instant.
+  const listed = roster.unlisted && filter === "all" ? [...ranked, UNLISTED_ID] : ranked;
   // Every network's reading at the cursor, in ONE pass — the rank, the order and the rows all read
   // this array, so they cannot describe different instants.
-  const readings = ranked.map((id) => ({
+  const readings = listed.map((id) => ({
     id,
     value: cursorMs != null ? valueAt(rows.get(id)?.series.points ?? [], buckets, stepMs, cursorMs) : null,
   }));
@@ -130,7 +137,7 @@ export default function TrendInstantPane({
   // roster, so without ownership its unmount would wipe a Networks row's live hover on the way out:
   // hover a row here, move onto the rail, close the card. The returned setter is what makes the
   // difference — the hook sees this card's writes and releases nothing else.
-  const setHover = useHoverRelease(hoverFilter, ranked, setHoverFilter);
+  const setHover = useHoverRelease(hoverFilter, listed, setHoverFilter);
 
   return (
     <RailPane entry={collapsed}>
@@ -198,7 +205,7 @@ export default function TrendInstantPane({
                   Ordered by the reading itself (`orderAt` — nulls last, ties stable), so the list
                   IS the ranking the lead states. Each row pairs and clicks exactly like a Network breakdown
                   row: the same channel, the same builder. */}
-              {ranked.length > 1 && (
+              {listed.length > 1 && (
                 <>
                   {/* WHAT THE LIST IS ABOUT, said once (design A): these are readings AT THE
                       INSTANT, in the bucket's own unit — the Networks list beside it averages a

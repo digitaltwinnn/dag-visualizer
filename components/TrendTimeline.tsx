@@ -7,7 +7,7 @@ import { ScalePill, WindowPicker } from "@/components/trendPickers";
 import useTrendRoster from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import useTrendsWindow from "@/components/useTrendsWindow";
-import { usePointerCoarse } from "@/components/usePointerCoarse";
+import { useTouch } from "@/components/useTouch";
 import { metricCaption, stepFor } from "@/src/data/trendSeries";
 import { leadingTrim } from "@/src/data/trendWindow";
 import { useStore } from "@/src/store/store";
@@ -117,7 +117,7 @@ export default function TrendTimeline() {
   // THE HINT, until the band has been used once this session (design round 2026-09-29, option B —
   // "one quiet line of instruction … that fades once you've used it"). A range or a picked moment
   // is proof the gestures are known; the pointer's own word says tap or click.
-  const coarse = usePointerCoarse();
+  const coarse = useTouch();
   if (range != null || cursorMs != null) hintSpent = true;
   const showHint = !hintSpent;
 

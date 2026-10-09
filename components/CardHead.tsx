@@ -416,9 +416,9 @@ function keepFocusOnRung(el: HTMLElement): void {
           onClick={onClose}
           // `after:` hit area on touch, written out rather than `TOUCH_HIT`: this button is already
           // `absolute`, and the shared recipe's `relative` would un-pin it.
-          className="absolute top-[8px] right-[10px] z-10 size-auto rounded-md py-1 px-2 leading-none text-muted-foreground pointer-coarse:after:absolute pointer-coarse:after:-inset-2 pointer-coarse:after:content-['']"
+          className="absolute top-[8px] right-[10px] z-10 size-auto rounded-md py-1 px-2 leading-none text-muted-foreground touch:after:absolute touch:after:-inset-2 touch:after:content-['']"
         >
-          <X aria-hidden className="size-4 pointer-coarse:size-[18px]" />
+          <X aria-hidden className="size-4 touch:size-[18px]" />
         </Button>
       )}
       <div className={cn(onToggle && "relative group")}>

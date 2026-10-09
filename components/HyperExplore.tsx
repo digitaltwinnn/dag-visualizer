@@ -201,7 +201,7 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
       id="hyperexplore"
       title="Networks"
       hint={null}
-      placeholder="Open one for its node roles"
+      placeholder="Select a network to view its composition."
       levels={levels}
       defaultCollapsed={defaultCollapsed}
       onLeave={() => {

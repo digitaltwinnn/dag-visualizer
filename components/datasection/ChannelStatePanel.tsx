@@ -52,7 +52,9 @@ import { Check, ChevronRight, ChevronsDownUp, ChevronsUpDown, Minus } from "luci
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DEEP_GIVE_UP_MS } from "@/components/RawSnapshotBridge";
 import { useStore } from "@/src/store/store";
-import { usePointerCoarse } from "@/components/usePointerCoarse";
+import LiveDot from "@/components/LiveDot";
+import { PinMark } from "@/components/state/StateAtoms";
+import { useTouch } from "@/components/useTouch";
 import { metaSnapDeepKey } from "@/src/data/types";
 import type { NodeRow } from "@/src/data/types";
 import { getNetwork, metagraphById, shortHash, SIGNER_GROUPS, SIGNER_UNKNOWN, signerRoster } from "@/src/data/network";
@@ -297,7 +299,7 @@ function RawSection({
               className={cn(
                 "flex-none inline-flex items-center justify-center size-4 -my-0.5 rounded-xs cursor-pointer",
                 "text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
-                "opacity-0 pointer-coarse:opacity-75 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100",
+                "opacity-0 touch:opacity-75 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100",
               )}
               onClick={() => setCmd({ mode: nextMode, epoch: (cmd?.epoch ?? 0) + 1 })}
             >
@@ -387,7 +389,7 @@ function SignerRoster({ dataIds, proofIds, metaId, selNodes }: { dataIds: string
             const w = r.res.known ? null : SIGNER_UNKNOWN[r.res.reason];
             const id = r.res.known ? r.res.row.id : null;
             return (
-              <TableRow key={r.key} className="pointer-coarse:h-11">
+              <TableRow key={r.key} className="touch:h-11">
                 <TableCell className="text-label">
                   {r.res.known ? (
                     <span className="group/copy flex items-center gap-1.5 min-w-0">
@@ -432,7 +434,7 @@ function SignerRoster({ dataIds, proofIds, metaId, selNodes }: { dataIds: string
 }
 
 export function ChannelStatePanel() {
-  const coarse = usePointerCoarse(); // the invitation names the gesture — Tap on touch
+  const coarse = useTouch(); // the invitation names the gesture — Tap on touch
   const sel = useStore((s) => s.metaSnap);
   // The foot's hash budgets on PHONE: the line is `LABEL  hash  [copy]` in ~290px, so the budget is
   // what the label leaves — the desktop 46 cut the tail off, and the tail identifies a hash.
@@ -534,6 +536,13 @@ export function ChannelStatePanel() {
           <span className="tabular-nums">{sel.ordinal.toLocaleString()}</span>
           {/* The ordinal is the title; the network qualifies it — the one ticker chip. */}
           <TickerChip text={ticker} hue={hue} />
+          {/* LIVE OR PINNED, as the card head says it (user, 2026-10-09: the pinned snapshot
+              "should show that also in the details pane"): the same two marks and words, a state
+              line rather than a control — the switch stays the Global snapshot card's. */}
+          <span className="ml-auto inline-flex items-center gap-1.5 text-label font-normal text-muted-foreground">
+            {following ? <LiveDot /> : <PinMark className="text-muted-foreground" />}
+            {following ? "live" : "pinned"}
+          </span>
         </span>
       </div>
 

@@ -4,6 +4,7 @@ import { ArrowUpRight } from "lucide-react";
 import { Area, CartesianGrid, ComposedChart, Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { cn } from "@/lib/utils";
 import { NodeStars } from "@/components/state/StateAtoms";
+import { RoleChips } from "@/components/inspector/parts";
 import { bucketAt, cursorFraction, heldZoom } from "@/src/data/trendWindow";
 import { bucketStamp } from "@/src/util/localTime";
 import { compactNumber } from "@/src/util/format";
@@ -39,11 +40,32 @@ export interface TrendLine {
 export interface TrendBand {
   label: string;
   points: (number | null)[];
+  /** A STABLE identity when two bands may share a label (two hybrid make-ups are both "Hybrid"):
+   *  the data key and the React key, so one band can never overwrite another's column. Defaults
+   *  to the label. */
+  key?: string;
+  /** The LAYER CODES that make the band up ("L0", "cL1", "dL1"), shown as the app's role pills
+   *  beside the label where there is more than one (user, 2026-10-09: "hybrid L0+cL1+dL1 can look
+   *  nicer by using the L0, L1 pills instead of + and text"). */
+  codes?: string[];
 }
+/** A band's name as the legend and the tooltip print it: the word, then its layer pills. */
+function BandName({ b }: { b: TrendBand }) {
+  return (
+    <>
+      {b.label}
+      {b.codes && b.codes.length > 1 && <RoleChips compact codes={b.codes} />}
+    </>
+  );
+}
+/** The row/data key a band's points are filed under. */
+const bandKey = (b: TrendBand): string => `s:${b.key ?? b.label}`;
 /** A stack is ONE hue, so its bands are told apart by opacity — the donut's own device for
  *  adjacent parts of one colour — base band strongest. Every band is also NAMED (legend, tooltip),
- *  so the step is never the only channel. */
-const STACK_STEPS = [0.36, 0.2, 0.11, 0.06, 0.03];
+ *  so the step is never the only channel. The ramp FLOORS at a readable step (user, 2026-10-09:
+ *  "are they truly stacked? I feel the overlap" — the fourth band, Data at 14 of DOR's 17 nodes,
+ *  sat at 6% and read as the card's own tint, so the stack looked like one area with a sliver). */
+const STACK_STEPS = [0.6, 0.44, 0.32, 0.22, 0.15];
 
 const PLOT_H = 120;
 const AXIS_H = 18;
@@ -433,18 +455,23 @@ export default function TrendChart({
           </button>
         )}
         {/* The pair legend — only when there IS a pair (one series needs no legend, its name is
-            the title). */}
+            the title). `gap-x-3`, not 2 (user, 2026-10-09: "the legend is too tight"). */}
         {(lines.length > 1 || (stack?.length ?? 0) > 0) && (
-          <span className="ml-auto inline-flex items-center gap-2 text-label text-muted-foreground">
+          <span className="ml-auto inline-flex items-center gap-x-3 text-label text-muted-foreground">
             {stack?.map((b, i) => (
-              <span key={`s:${b.label}`} className="inline-flex items-center gap-1">
+              <span key={bandKey(b)} className="inline-flex items-center gap-1">
                 <svg width="10" height="10" aria-hidden>
                   <rect x="0.5" y="0.5" width="9" height="9" rx="2" fill={lines[0]?.hue ?? "var(--primary)"} fillOpacity={STACK_STEPS[i % STACK_STEPS.length]} stroke={lines[0]?.hue ?? "var(--primary)"} strokeOpacity={0.5} />
                 </svg>
-                {b.label}
+                <BandName b={b} />
               </span>
             ))}
-            {lines.map((l) => (
+            {/* UNDER A STACK THE LINE IS THE BANDS' TOP EDGE, so it needs no entry of its own (user,
+                2026-10-09: "do we need the nodes line? if stacked it will already be at that
+                height") — the bands name every part, and the title names the whole. The entry
+                returns only where the plot draws the total over buckets no band is recorded in
+                (the gap line below) — then it names the one line that IS on screen. */}
+            {(stack?.length && !(lines[0] && lines[0].points.some((v, i) => v != null && !stack.some((b) => b.points[i] != null))) ? [] : lines).map((l) => (
               <span key={l.label} className="inline-flex items-center gap-1">
                 <svg width="14" height="4" aria-hidden>
                   <line x1="0" y1="2" x2="14" y2="2" stroke={l.hue ?? hue0} strokeWidth="2" strokeDasharray={typeof l.dash === "string" ? l.dash : l.dash ? "3 3" : undefined} />
@@ -743,10 +770,25 @@ const TrendPlot = memo(function TrendPlot({
   const ownMax = Math.max(1e-9, ...lines.flatMap((l) => l.points.filter((v): v is number => v != null)));
   const max = (scaleMax != null && scaleMax > 0 ? scaleMax : ownMax) * 1.12;
 
+  // THE TOTAL WHERE THE STACK HAS NOTHING (2026-10-09). Under a stack the first line is not drawn —
+  // the top band's edge is the total — but the bands exist only where the composition was
+  // recorded (node types since 2026-09-29), while the total reaches further back. Hiding the line
+  // outright emptied the plot before that day. So the total is drawn ONLY over the buckets no
+  // band is recorded in: bands where the make-up is known, the plain line where only the whole
+  // is — never both, never neither (rule 10).
+  const gapPoints: (number | null)[] =
+    stack?.length && lines[0]
+      ? lines[0].points.map((v, i) => (stack.some((b) => b.points[i] != null) ? null : v))
+      : [];
+  const hasGap = gapPoints.some((v) => v != null);
+  const gapLine: TrendLine | null = hasGap && lines[0] ? { label: `${lines[0].label} (total)`, points: gapPoints, hue: lines[0].hue } : null;
+  const GAP_KEY = "s:total-gap";
+
   const rows = buckets.map((ts, i) => {
     const row: Record<string, number | null> = { ts };
     for (const l of lines) row[l.label] = l.points[i];
-    for (const b of stack ?? []) row[`s:${b.label}`] = b.points[i];
+    for (const b of stack ?? []) row[bandKey(b)] = b.points[i];
+    if (gapLine) row[GAP_KEY] = gapPoints[i];
     return row;
   });
 
@@ -983,12 +1025,12 @@ const TrendPlot = memo(function TrendPlot({
                   its hue at one opacity step with a faint edge, no dots, gaps kept open. */}
               {stack?.map((b, i) => (
                 <Area
-                  key={`s:${b.label}`}
-                  dataKey={`s:${b.label}`}
+                  key={bandKey(b)}
+                  dataKey={bandKey(b)}
                   stackId="parts"
                   type="linear"
                   stroke={hue0}
-                  strokeOpacity={0.45}
+                  strokeOpacity={0.7}
                   strokeWidth={1}
                   fill={hue0}
                   fillOpacity={STACK_STEPS[i % STACK_STEPS.length]}
@@ -1019,10 +1061,10 @@ const TrendPlot = memo(function TrendPlot({
                         );
                       })}
                       {stack?.map((b) => {
-                        const v = payload.find((e) => e.dataKey === `s:${b.label}`)?.value;
+                        const v = payload.find((e) => e.dataKey === bandKey(b))?.value;
                         return v == null ? null : (
-                          <span key={`s:${b.label}`}>
-                            <span className="ml-2 text-muted-foreground">{b.label} </span>
+                          <span key={bandKey(b)}>
+                            <span className="ml-2 inline-flex items-center gap-1 text-muted-foreground"><BandName b={b} /> </span>
                             {format(Number(v))}
                           </span>
                         );
@@ -1031,12 +1073,16 @@ const TrendPlot = memo(function TrendPlot({
                   );
                 }}
               />
-              {lines.map((l) => (
+              {lines.map((l, li) => (
                 <Line
                   key={l.label}
                   dataKey={l.label}
                   type="linear"
-                  stroke={l.hue ?? hue0}
+                  // UNDER A STACK THE FIRST LINE IS NOT DRAWN (user, 2026-10-09: "do we need the
+                  // total line? the legend removed it but it's still drawn") — the top band's own
+                  // edge is the total. The series stays MOUNTED, stroke-less, because the tooltip
+                  // reads the total from its payload and the hover cursor snaps to it.
+                  stroke={li === 0 && stack?.length ? "none" : (l.hue ?? hue0)}
                   strokeWidth={lineWidth}
                   strokeDasharray={typeof l.dash === "string" ? l.dash : l.dash ? "4 4" : undefined}
                   connectNulls={false}
@@ -1044,13 +1090,31 @@ const TrendPlot = memo(function TrendPlot({
                   // ⚠️ ONLY A LINE THAT HAS ONE gets the dot renderer (measured 2026-09-29: ~300ms of a
                   // window change). Given a function, recharts builds a dot element for EVERY point —
                   // 720 hourly buckets × five planes of empty `<g>`s — to draw the rare isolated one.
-                  dot={!l.points.some((_, i) => isolated(l, i)) ? false : (props: { key?: React.Key | null; index?: number; cx?: number; cy?: number }) => {
+                  dot={(li === 0 && stack?.length) || !l.points.some((_, i) => isolated(l, i)) ? false : (props: { key?: React.Key | null; index?: number; cx?: number; cy?: number }) => {
                     const { key, index, cx, cy } = props;
                     if (index == null || cx == null || cy == null || !isolated(l, index)) return <g key={key ?? undefined} />;
                     return <circle key={key ?? undefined} cx={cx} cy={cy} r={2.5} fill={l.hue ?? hue0} />;
                   }}
                 />
               ))}
+              {gapLine && (
+                <Line
+                  dataKey={GAP_KEY}
+                  type="linear"
+                  stroke={gapLine.hue ?? hue0}
+                  strokeWidth={lineWidth}
+                  connectNulls={false}
+                  isAnimationActive={false}
+                  legendType="none"
+                  tooltipType="none"
+                  activeDot={false}
+                  dot={!gapLine.points.some((_, i) => isolated(gapLine, i)) ? false : (props: { key?: React.Key | null; index?: number; cx?: number; cy?: number }) => {
+                    const { key, index, cx, cy } = props;
+                    if (index == null || cx == null || cy == null || !isolated(gapLine, index)) return <g key={key ?? undefined} />;
+                    return <circle key={key ?? undefined} cx={cx} cy={cy} r={2.5} fill={gapLine.hue ?? hue0} />;
+                  }}
+                />
+              )}
             </Chart>
           </ResponsiveContainer>
           {/* The y scale's one number, with its ROLE said (user, 2026-09-09: a bare number

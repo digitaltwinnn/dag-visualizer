@@ -60,6 +60,7 @@ import { relativeAge } from "@/src/util/relativeAge";
 import { CALLOUT_OFF_X, CALLOUT_OFF_Y, CALLOUT_LEG_INSET, CALLOUT_PHONE_K, CALLOUT_HANG_K } from "@/src/engine/domain/calloutPlacement";
 import type { GeoInfo } from "@/src/data/types";
 import LiveDot from "@/components/LiveDot";
+import { PinMark } from "@/components/state/StateAtoms";
 import { IDENT_INK } from "@/components/identInk";
 import { ledgerNetwork } from "@/src/engine/domain/tickNet";
 
@@ -87,7 +88,7 @@ export interface CalloutModel {
   eyebrow: string;
   title: string;
   /** `chip` is a second, separate fact beside the state — an age — never a clause after a dot. */
-  aside?: { text: string; hue?: string; live?: boolean; chip?: string };
+  aside?: { text: string; hue?: string; live?: boolean; pinned?: boolean; chip?: string };
   ring: string;
   /** THE MARK THE SUBJECT'S CARD WEARS before its title (user, 2026-10-03 — suggestion 4 of
    *  `docs/superpowers/design/2026-10-03-callout-cards`): the cube, the stacked cubes, the globe,
@@ -132,24 +133,7 @@ const geoOf = (p: { kind: string }): GeoInfo | undefined =>
  *  which wraps it in its own cursor-follow box instead of the Engine-anchored `.co-panel`. */
 export function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; className?: string; onDismiss?: () => void }) {
   return (
-    <div key={m.key} className={cn("roll-in whitespace-nowrap", SCENE_GLASS, onDismiss && "pr-9", className)}>
-      {/* THE ×, TOP-RIGHT (user, 2026-10-04: "put the callout x button at the top right", then
-          "always"): hides this label for its view until that view's subject changes. The one
-          control on a pointer-inert label, so it opts back into the pointer; out of the tab order
-          because the label is aria-hidden — it mirrors the card, which keyboard and screen-reader
-          users have whole. A thumb-sized hit area around a quiet glyph. */}
-      {onDismiss && (
-        <button
-          type="button"
-          tabIndex={-1}
-          onClick={onDismiss}
-          // Live only while the label is ON: a faded-out label keeps its place on screen, and an
-          // invisible × there would swallow a click on the scene (review, 2026-10-04).
-          className="pointer-events-auto [[data-on='0']_&]:pointer-events-none absolute top-1.5 right-1.5 flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-wash-hover hover:text-foreground after:absolute after:-inset-2 after:content-['']"
-        >
-          <X aria-hidden className="size-3.5 pointer-coarse:size-[18px]" />
-        </button>
-      )}
+    <div key={m.key} className={cn("roll-in whitespace-nowrap", SCENE_GLASS, className)}>
       {/* The identity EDGE SPINE (user, 2026-08-15 — "the rails/hairline effect on the left
           side, attached", then "let it fade into the corners"): the sheets' single-identity-
           cue language at callout scale, as the shared `.edge-spine` recipe (globals.css) — a
@@ -160,7 +144,32 @@ export function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; cla
       {/* The card eyebrow's own ink (CardHead: EYEBROW + text-primary-ink), not a muted caption —
           this is the same slot noun the rail card wears (user, 2026-08-15). It follows the card
           to the accent's INK (2026-10-02): the bare accent measured 4.2:1 here on paper. */}
-      <div className="text-label font-bold tracking-[0.1em] uppercase leading-none text-primary-ink mb-1.5">{m.eyebrow}</div>
+      {/* THE × RIDES THE EYEBROW ROW (user, 2026-10-09: "on the same row as its header, make space
+          for content to go to the right side of the card"). It stood absolute at the top-right with
+          a 36px reserve down the whole panel, so the title row and the lead ended short of the
+          edge. Now the eyebrow and the × share one row — the button's box overhangs the 12px line
+          by 6px each way into the glass's own 8px padding, so the row keeps its height — and the
+          rows beneath run the panel's full width.
+          THE ×'s RULE (user, 2026-10-04: "put the callout x button at the top right", then
+          "always"): hides this label for its view until that view's subject changes. The one
+          control on a pointer-inert label, so it opts back into the pointer; out of the tab order
+          because the label is aria-hidden — it mirrors the card, which keyboard and screen-reader
+          users have whole. A thumb-sized hit area around a quiet glyph. */}
+      <div className="flex items-center justify-between gap-3 mb-1.5">
+        <div className="text-label font-bold tracking-[0.1em] uppercase leading-none text-primary-ink">{m.eyebrow}</div>
+        {onDismiss && (
+          <button
+            type="button"
+            tabIndex={-1}
+            onClick={onDismiss}
+            // Live only while the label is ON: a faded-out label keeps its place on screen, and an
+            // invisible × there would swallow a click on the scene (review, 2026-10-04).
+            className="pointer-events-auto [[data-on='0']_&]:pointer-events-none relative -my-1.5 -mr-1.5 flex size-6 flex-none items-center justify-center rounded-md text-muted-foreground hover:bg-wash-hover hover:text-foreground after:absolute after:-inset-2 after:content-['']"
+          >
+            <X aria-hidden className="size-3.5 touch:size-[18px]" />
+          </button>
+        )}
+      </div>
       {/* No identity dot here (user, 2026-08-15): the hued aside already carries the identity
           on this row, and the anchor ring is the subject mark at the scene end of the tie. */}
       <div className="flex items-center gap-[7px]">
@@ -175,6 +184,7 @@ export function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; cla
           <span className="inline-flex items-center gap-1.5 text-label text-muted-foreground ml-1">
             {m.aside.chip && <QualifierChip className="mr-0.5 tabular-nums">{m.aside.chip}</QualifierChip>}
             {m.aside.live && <LiveDot />}
+            {m.aside.pinned && <PinMark />}
             {m.aside.text}
           </span>
         ) : null}
@@ -465,7 +475,7 @@ export default function SceneCallout() {
           ? liveFeed
             ? { text: "live", live: true, chip: rel || undefined }
             : { text: "no signal" }
-          : { text: "pinned", chip: rel || undefined },
+          : { text: "pinned", pinned: true, chip: rel || undefined },
         // Unneted the ring marks the whole bar (core cyan); under a filter the anchor
         // points at the committed network's own SEGMENT, so the ring takes its accent
         // (user, 2026-08-16 — "if filter, select the correct segment of the byte bar").

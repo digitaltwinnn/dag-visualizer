@@ -1,6 +1,5 @@
 "use client";
 
-import { Pin } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ledgerNetwork } from "@/src/engine/domain/tickNet";
 
@@ -39,6 +38,7 @@ import { followToggleActions, metaSnapSelectActions, nodeSelectActions, sameMeta
 import { heldTicks, nextHoldTop } from "@/src/data/ledgerHold";
 import { CLOSED_PATH, pathViewChanged, syncLedgerPath, type LedgerPath, type LedgerPathView } from "@/src/data/ledgerPath";
 import LiveDot from "@/components/LiveDot";
+import { PinMark } from "@/components/state/StateAtoms";
 import { identityHudCss } from "@/src/palette/identity";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
@@ -276,7 +276,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   // carries the pill or its hover preview.
 
   // The shown tick's state mark (see the tick rows): the card's live dot while following, a pin while pinned.
-  const followMark = following ? <LiveDot /> : <Pin aria-hidden className="size-3 text-muted-foreground" />;
+  const followMark = following ? <LiveDot /> : <PinMark className="text-muted-foreground" />;
 
   // ---- level 0: the ticks, paged, measured by the heading's pick -------------------------------
   const tickValues = pagedSnaps.map((d) => tickMeasureValue(ledgerMeasure, d, snapshotExact[d.ordinal]));
@@ -592,7 +592,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
       title="Snapshots"
       // The sentence is the path's own placeholder now (user, 2026-10-08): one line beside the house.
       hint={null}
-      placeholder="Open one for its networks"
+      placeholder="Select a snapshot to view its anchors."
       levels={levels}
       defaultCollapsed={defaultCollapsed}
       onLeave={() => {

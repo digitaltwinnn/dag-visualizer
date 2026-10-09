@@ -11,7 +11,11 @@ import type { ThemePref, Theme } from "@/src/theme/resolve";
 // (src/data/trendWindow.ts, read by the document's picker and by the stack), and a type-only
 // import keeps the store from holding a data-layer VALUE.
 import type { ZoomId } from "@/src/data/trendWindow";
-import { scrollToKeep } from "@/src/engine/domain/trendStack";
+import { focusOnReturn, planeOfChain, scrollToKeep } from "@/src/engine/domain/trendStack";
+// The catalog and the unlisted id, for the one fold the return path needs (`planeOfChain`): both
+// are static data — `src/net/current` reads config, `unlistedId` is the import-free leaf.
+import { METAGRAPHS } from "@/src/net/current";
+import { UNLISTED_ID } from "@/src/data/unlistedId";
 
 // The active view. `hyper`/`geo`/`ledger`/`trend` all drive the 3D scene (every switch among
 // them runs the gather choreography); `soon` is THE one flat placeholder view (consolidated
@@ -208,6 +212,12 @@ interface AppState {
   /** A door's hand-off to the anchor log: a span to land in, or — with `snapshot` — one metagraph
    *  snapshot to find (its card's "Show the raw data", 2026-10-04). */
   logSeek: { metaId: string | null; fromMs: number; toMs: number; snapshot?: number; label?: string } | null;
+  /** THE SPAN THE RAW LOG IS CUT TO BY THE READER'S OWN DATE SEARCH (2026-10-09) — the reverse of
+   *  `logSeek`: the log writes it, and closing a log a History door opened takes it back as the
+   *  committed RANGE, the way a committed network comes back as the plane in front (one selection,
+   *  every surface; user: "when we close the raw page I would expect the range to be updated").
+   *  A door's own span never writes it — that span came FROM History. `toMs` null = open to now. */
+  logCut: { fromMs: number; toMs: number | null } | null;
   // The doc overlay's STAGE-READY signal, written by the Engine (the one clock that knows the
   // choreography's real boundary — frame-driven, so ?slowmo and low FPS stretch it correctly,
   // where a wall-clock wait in the HUD desynced). DEFAULT TRUE so a document never waits on a
@@ -424,6 +434,7 @@ interface AppState {
   setMode: (mode: Mode) => void;
   setDocPage: (docPage: "about" | null) => void;
   setLogSeek: (logSeek: { metaId: string | null; fromMs: number; toMs: number; snapshot?: number; label?: string } | null) => void;
+  setLogCut: (logCut: { fromMs: number; toMs: number | null } | null) => void;
   setDocStageReady: (ready: boolean) => void;
   setDocClosing: (closing: boolean) => void;
   setFilter: (filter: string) => void;
@@ -519,6 +530,7 @@ export const useStore = create<AppState>((set) => ({
   mode: "hyper",
   docPage: null,
   logSeek: null,
+  logCut: null,
   docStageReady: true,
   docClosing: false,
   filter: "all",
@@ -616,6 +628,7 @@ export const useStore = create<AppState>((set) => ({
   setDocStageReady: (docStageReady) => set({ docStageReady }),
   setDocClosing: (docClosing) => set({ docClosing }),
   setLogSeek: (logSeek) => set({ logSeek }),
+  setLogCut: (logCut) => set({ logCut }),
   // Committing a network IS a user gesture (user, 2026-08-14 — changing the filter or paging
   // the dossier left the snapshot card as the box): it bumps the recency stack like every
   // other selection, so the facts rail focuses the metagraph card. "all" clears the entry.
@@ -735,15 +748,26 @@ export const useStore = create<AppState>((set) => ({
   setSection: (section) =>
     set((s) => {
       const back = section === "scene" ? s.rawReturnMode : null;
+      // THE COMMIT MADE IN THE LOG COMES BACK AS THE PLANE IN FRONT (2026-10-09, `focusOnReturn`):
+      // one selection, every surface — the snapshot picked in the raw log is the app's commit, and
+      // History shows a committed network as its focus. Read BEFORE the mode flips: the Engine's
+      // view switch clears the ledger-scoped snapshot and tick-network on the way out.
+      const focus = focusOnReturn(s.metaSnap?.metaId ?? s.tickNet?.metaId ?? null, s.rawReturnFocus, (id) => planeOfChain(id, METAGRAPHS, UNLISTED_ID));
+      // …AND THE SPAN THE READER SEARCHED IN THE LOG COMES BACK AS THE RANGE (`logCut`, the same
+      // rule): snapped exactly as a brush is (`setTrendRange`), an open end closing at now. With no
+      // search of the reader's own, the range is left as it was.
+      const now = Date.now();
+      const range = s.logCut ? snapRange({ fromMs: s.logCut.fromMs, toMs: s.logCut.toMs ?? now }, now) : s.trendRange;
       return back != null && back !== s.mode
         ? {
             section,
             mode: back,
             rawReturnMode: null,
             // The plane that was in front comes back with the view, as the card it names.
-            trendFocus: s.rawReturnFocus,
+            trendFocus: focus,
+            trendRange: range,
             rawReturnFocus: null,
-            selStack: s.rawReturnFocus != null ? bumpStack(s.selStack, "network", true) : s.selStack,
+            selStack: focus != null ? bumpStack(s.selStack, "network", true) : s.selStack,
             motionCause: { kind: "view", from: s.mode, to: back },
           }
         : { section, rawReturnMode: section === "scene" ? null : s.rawReturnMode };

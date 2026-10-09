@@ -1,7 +1,6 @@
 "use client";
 
 import { useStore } from "@/src/store/store";
-import { UNLISTED_ID } from "@/src/data/unlisted";
 
 // THE MEASURED HISTORY'S TWO DOORS — ONE HOME (2026-09-19).
 //
@@ -59,13 +58,12 @@ export function openRecords(metaId: string | null, span: RecordSpan | null): voi
   // metagraphs (`searchNets` skips the root) and the ledger lens already treats a committed DAG
   // as every network. Handing "dag" through left the chain picker empty and the seek waiting
   // forever (review, 2026-09-26).
-  // …and so are the UNLISTED channels (user, 2026-10-08: "is it possible to see the actual snapshot
-  // — in the past I was able to see what's inside"). They have no chain the log can page, so a
-  // scoped seek waited forever for a walk that never starts — the reason this door was dead for
-  // them. Unscoped, the log is every chain merged by time — the unlisted chains among the
-  // catalog's since 2026-10-08 (only them under the Unlisted filter's lens) — cut to the span, and
-  // a row opens its snapshot's contents like any other.
-  const scoped = metaId && metaId !== "dag" && metaId !== UNLISTED_ID ? metaId : null;
+  // …while the UNLISTED channels ARE a scope (2026-10-09, user: History's Unlisted plane "should be
+  // focused and passed as search-filter to the raw page"). They were unscoped from 2026-10-08 —
+  // they have no ONE chain the log can walk, so a scoped seek waited forever — but the log's
+  // Unlisted LENS pages every unlisted chain merged by time, exactly as the app's Unlisted filter
+  // does, and the door now hands that lens over (AnchorLogTable's `scopeMeta`), never the filter.
+  const scoped = metaId && metaId !== "dag" ? metaId : null;
   // ⚠️ THE DOOR NEVER WRITES THE APP FILTER (user, 2026-10-04: "it sets the global filter, that
   // should not happen; only set the filter in the raw list / search section"). It hands the network
   // to the log, which scopes ITSELF to it (AnchorLogTable's `searchMeta`) — the top bar, the scene

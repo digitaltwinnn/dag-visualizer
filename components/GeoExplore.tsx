@@ -240,7 +240,7 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
       id="geoexplore"
       title="Countries"
       hint={null}
-      placeholder={quietEmpty ? undefined : "Open one for its cities"}
+      placeholder={quietEmpty ? undefined : "Select a country to view its hosting providers and cities."}
       levels={levels}
       defaultCollapsed={defaultCollapsed}
       onLeave={() => {

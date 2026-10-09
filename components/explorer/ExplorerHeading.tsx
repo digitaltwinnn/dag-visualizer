@@ -61,7 +61,7 @@ export function MeasureMenu({ measure }: { measure: MeasureControl | null }) {
         // A padded box like the setting pill's, so the two are one control species; the open
         // state takes the wash.
         className={cn(
-          "inline-flex items-center gap-1 rounded-sm px-1.5 -mr-1.5 py-[3px] min-h-6 pointer-coarse:min-h-10 text-label tracking-caps uppercase text-foreground select-none cursor-pointer",
+          "inline-flex items-center gap-1 rounded-sm px-1.5 -mr-1.5 py-[3px] min-h-6 touch:min-h-10 text-label tracking-caps uppercase text-foreground select-none cursor-pointer",
           "hover:bg-wash-hover data-[state=open]:bg-wash-soft",
           "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
         )}

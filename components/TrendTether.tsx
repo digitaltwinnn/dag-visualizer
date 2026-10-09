@@ -84,7 +84,12 @@ export default function TrendTether() {
   useEffect(() => {
     const el = svg.current;
     if (!el) return;
-    let last = "";
+    // ⚠️ NOT "" (found 2026-10-09 under the ALL window, user: "the dotted lines are not placed
+    // correctly"): ALL draws no brush — the absence is the statement — so the first measure of
+    // this run answers "" and, against a detector that STARTED at "", read as no change: the legs
+    // of the previous window stayed on screen, pointing at a brush that was gone. A run begins
+    // knowing nothing, so its first answer is always written — including "hide".
+    let last: string | null = null;
     let raf = 0;
     const measure = () => {
       const brush = document.querySelector<SVGRectElement>("[data-brush]");

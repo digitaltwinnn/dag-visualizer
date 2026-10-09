@@ -523,3 +523,43 @@ export function cardNetwork(filter: string, focus: string | null, front: string 
 export function frontPlane(ids: readonly string[], scroll: number): string | null {
   return ids.length ? (ids[clampScroll(ids.length, scroll)] ?? null) : null;
 }
+
+/** THE PLANE A CHAIN BELONGS TO — the id History keys a plane by. A snapshot's `metaId` is a chain
+ *  address: a catalog network's current id, one of its FORMER ids (a retired chain, re-registered
+ *  since), or an uncataloged channel's address. The plane is the network's current id for the first
+ *  two and the unlisted set for the third — the same fold the roster applies when it draws them. The
+ *  catalog is a parameter so this stays pure. */
+export function planeOfChain(
+  chainId: string,
+  catalog: readonly { id: string; formerIds?: readonly string[] }[],
+  unlistedId: string,
+): string {
+  return catalog.find((m) => m.id === chainId || m.formerIds?.includes(chainId))?.id ?? unlistedId;
+}
+
+/** THE FOCUS HISTORY RETURNS TO when the raw layer a door opened is closed (2026-10-09 — user, on
+ *  selecting a BioFi snapshot in the log after a Range door: "the selected metagraph might still be
+ *  'pinned', as in selected and become the front card"). One selection, every surface: a commit in
+ *  the log is the app's commit, and History shows a committed NETWORK as the plane in front. So the
+ *  snapshot committed in the log (its tick-network failing that) brings its network's plane forward
+ *  on return; with nothing committed there, the plane that was in front when the door opened comes
+ *  back, as before. The chain → plane fold is `planeOfChain`'s. */
+export function focusOnReturn(
+  committedChain: string | null,
+  saved: string | null,
+  planeOf: (chainId: string) => string,
+): string | null {
+  return committedChain != null ? planeOf(committedChain) : saved;
+}
+
+/** THE CARD BEHIND THE FRONT ONE (2026-10-09 — a swipe up on the front card "sends it back", which
+ *  a single focus can only say as "bring the next one forward"). The front is the focus when one
+ *  stands (re-dealt to slot 0, `stackPoses`), else the window's first card; behind it is the first
+ *  card of the window that is not the front. Null for a lone card. */
+export function planeBehind(ids: readonly string[], scroll: number, focus: string | null): string | null {
+  if (ids.length < 2) return null;
+  const front = focus && ids.includes(focus) ? focus : frontPlane(ids, scroll);
+  const from = clampScroll(ids.length, scroll);
+  for (let i = from; i < ids.length; i++) if (ids[i] !== front) return ids[i]!;
+  return null;
+}

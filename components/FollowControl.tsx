@@ -2,7 +2,7 @@
 
 import LiveDot from "@/components/LiveDot";
 import { selectedRow, selectionHue } from "@/components/selection";
-import { NoSignalDot } from "@/components/state/StateAtoms";
+import { NoSignalDot, PinMark } from "@/components/state/StateAtoms";
 import { useNowTick } from "@/components/useNowTick";
 import { filterAccent } from "@/src/data/network";
 import { followToggleActions } from "@/src/engine/domain/pickActions";
@@ -84,11 +84,9 @@ export default function FollowControl({ className }: { className?: string }) {
       )}
       style={washed ? selectionHue(filterAccent(filter)) : undefined}
     >
-      {following ? (
-        <LiveDot />
-      ) : (
-        <span className={cn("flex-none w-2 h-2 rounded-full border", washed ? "border-primary/80" : "border-muted-foreground/70")} />
-      )}
+      {/* The one PIN mark (`PinMark`): the explorer row, the callout and the raw layer say
+          pinned with the same glyph — a hollow dot here read as a third state (user, 2026-10-09). */}
+      {following ? <LiveDot /> : <PinMark className={washed ? "text-foreground" : "text-muted-foreground"} />}
       <span className={cn("text-label", washed ? "text-foreground" : "text-muted-foreground")}>{label}</span>
     </button>
     </span>
