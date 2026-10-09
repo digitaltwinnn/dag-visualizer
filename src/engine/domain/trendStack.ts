@@ -523,3 +523,31 @@ export function cardNetwork(filter: string, focus: string | null, front: string 
 export function frontPlane(ids: readonly string[], scroll: number): string | null {
   return ids.length ? (ids[clampScroll(ids.length, scroll)] ?? null) : null;
 }
+
+/** THE PLANE A CHAIN BELONGS TO — the id History keys a plane by. A snapshot's `metaId` is a chain
+ *  address: a catalog network's current id, one of its FORMER ids (a retired chain, re-registered
+ *  since), or an uncataloged channel's address. The plane is the network's current id for the first
+ *  two and the unlisted set for the third — the same fold the roster applies when it draws them. The
+ *  catalog is a parameter so this stays pure. */
+export function planeOfChain(
+  chainId: string,
+  catalog: readonly { id: string; formerIds?: readonly string[] }[],
+  unlistedId: string,
+): string {
+  return catalog.find((m) => m.id === chainId || m.formerIds?.includes(chainId))?.id ?? unlistedId;
+}
+
+/** THE FOCUS HISTORY RETURNS TO when the raw layer a door opened is closed (2026-10-09 — user, on
+ *  selecting a BioFi snapshot in the log after a Range door: "the selected metagraph might still be
+ *  'pinned', as in selected and become the front card"). One selection, every surface: a commit in
+ *  the log is the app's commit, and History shows a committed NETWORK as the plane in front. So the
+ *  snapshot committed in the log (its tick-network failing that) brings its network's plane forward
+ *  on return; with nothing committed there, the plane that was in front when the door opened comes
+ *  back, as before. The chain → plane fold is `planeOfChain`'s. */
+export function focusOnReturn(
+  committedChain: string | null,
+  saved: string | null,
+  planeOf: (chainId: string) => string,
+): string | null {
+  return committedChain != null ? planeOf(committedChain) : saved;
+}

@@ -194,9 +194,6 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   const setHoverSnapOrd = useStore((s) => s.setHoverSnapOrd);
   const net = getNetwork();
   const snapshotExact = useStore((s) => s.snapshotExact);
-  const lens = ledgerLens(filter);
-  // The network the COMMITTED FILTER names, if any (the lens already maps DAG → "all").
-  const lensNet = lens !== "all" && lens !== UNLISTED_ID && metagraphById(lens) ? lens : null;
   // The log's OWN scope under "all": the network picked in its search, or handed in by a door
   // (user, 2026-10-04: "in the moment card, go to raw snapshot sets the global filter — that should
   // not happen; only set the filter in the raw list / search section"). See `searchMeta` below.
@@ -211,6 +208,15 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     setDoorFilter(filter);
     if (doorMeta) setDoorMeta(null);
   }
+  // THE UNLISTED SET IS A SCOPE THE LOG CAN TAKE FROM A DOOR OR ITS OWN PICKER (user, 2026-10-09:
+  // History's Unlisted plane "should be focused and passed as search-filter to the raw page"). It
+  // is the lens the app's Unlisted FILTER already gives this table — every unlisted chain merged by
+  // time — so the door's and the picker's scope ride the same lens the filter does, and nothing
+  // below learns a new case. The app filter itself is never written (the door's rule).
+  const scopeMeta = doorMeta ?? searchMeta;
+  const lens = scopeMeta === UNLISTED_ID ? UNLISTED_ID : ledgerLens(filter);
+  // The network the COMMITTED FILTER names, if any (the lens already maps DAG → "all").
+  const lensNet = lens !== "all" && lens !== UNLISTED_ID && metagraphById(lens) ? lens : null;
   // HISTORY mode: the chain this table pages — a door's network, else the committed filter's (under
   // a commit the table IS that network's chain), else the log's own pick.
   const histNet =
@@ -631,8 +637,15 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // leads the explorer's live page by construction).
   const section = useStore((s) => s.section);
   const armed = useRef(false);
+  /** A DOOR ARRIVED ON THIS OPENING of the layer (2026-10-09). The re-arm below runs on every
+   *  section edge — and in dev's StrictMode twice per mount, the second pass AFTER the door's seek
+   *  was consumed — so a door's spend of the arm has to survive the re-arm: this ref does, and is
+   *  cleared only when the layer closes. Found live: the History door's "all networks" range landed
+   *  with the newest DED row committed, by the arm, a pass after the door had spent it. */
+  const doorSeen = useRef(false);
   useEffect(() => {
-    armed.current = section === "data";
+    if (section !== "data") doorSeen.current = false;
+    armed.current = section === "data" && !doorSeen.current;
   }, [section]);
   const windowFirst = (() => {
     if (!net) return null;
@@ -1090,8 +1103,23 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   const landCommit = useRef<number | null>(null);
   /** A snapshot search a door armed, run once the chain it counts on is the one in hand. */
   const pendingSnap = useRef(false);
+  /** Whether the door that armed the standing search NAMED A NETWORK — the one case its landing row
+   *  is committed (below). */
+  const landScoped = useRef(false);
   useEffect(() => {
     if (!logSeek) return;
+    // A DOOR SPENDS THE ARM (2026-10-09). The "opens on a subject" arm above skips while a door's
+    // seek is pending, but its deps re-run it on the next live tick, when `logSeek` is already
+    // consumed — and it committed the newest row under a History door that had asked for a span
+    // (user: "it automatically opens the details pane for a DOR metagraph snapshot; it shouldn't").
+    // A door names what the layer opens on; the arm is for the bare RAW toggle alone.
+    armed.current = false;
+    doorSeen.current = true;
+    // ONLY WHAT THE GESTURE NAMED IS COMMITTED (the same ruling). A door scoped to a network lands
+    // on that network's row at the span's edge and commits it — the door's own subject (2026-10-04).
+    // An UNSCOPED door — the Range card under All — names no network, so its landing row is marked
+    // and nothing is committed: the pane's own empty state is the honest answer for "all networks".
+    landScoped.current = !!logSeek.metaId;
     // ONE SNAPSHOT (a metagraph-snapshot card's door, 2026-10-04): the exact address — the most
     // specific search there is — so the dates stay empty and the snapshot field takes the number.
     // It pages ITS network's chain, whatever the filter or an earlier scope (`doorMeta`).
@@ -1201,6 +1229,10 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       seen.add(m.id);
       out.push({ id: m.id, label: `${m.ticker || m.name} (retired)` });
     }
+    // …and the UNLISTED set, as the explorer and the filter list it (2026-10-09): picked, the log is
+    // every unlisted chain merged by time (the `lens` above). An ordinal typed against it still
+    // routes to the "pick which chain" teaching — the set has no one chain to address.
+    out.push({ id: UNLISTED_ID, label: displayNetwork(UNLISTED_ID)?.ticker ?? UNLISTED_ID });
     return out;
   }, [metaList]);
 
@@ -1431,7 +1463,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   useEffect(() => {
     if (arriving && !seeking && marked != null && rows.length > 0) {
       setArriving(false);
-      landCommit.current = marked;
+      landCommit.current = landScoped.current ? marked : null;
     }
     // …and the pane opens on the row the arrival landed on — the door's own subject. An arrival
     // is a deliberate gesture, so it takes the arrival builder (no toggle, never the filter), the

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  focusOnReturn,
+  planeOfChain,
   cardNetwork,
   clampScroll,
   frontPlane,
@@ -691,5 +693,32 @@ describe("frontPlane — the first slot of the shown window", () => {
   });
   it("is null for an empty roster", () => {
     expect(frontPlane([], 0)).toBeNull();
+  });
+});
+
+describe("planeOfChain — the plane a snapshot's chain belongs to", () => {
+  const catalog = [{ id: "dor" }, { id: "biofi", formerIds: ["DAGoldbiofi"] }];
+  it("a catalog network's current id is its own plane", () => {
+    expect(planeOfChain("dor", catalog, "unlisted")).toBe("dor");
+  });
+  it("a retired chain's address folds into the network it was re-registered as", () => {
+    expect(planeOfChain("DAGoldbiofi", catalog, "unlisted")).toBe("biofi");
+  });
+  it("an uncataloged channel is the unlisted set's plane", () => {
+    expect(planeOfChain("DAGsomeoneelse", catalog, "unlisted")).toBe("unlisted");
+  });
+});
+
+describe("focusOnReturn — closing the log brings forward what was committed in it", () => {
+  const planeOf = (id: string) => (id === "DAGx" ? "unlisted" : id);
+  it("the committed snapshot's network becomes the plane in front", () => {
+    expect(focusOnReturn("biofi", "dor", planeOf)).toBe("biofi");
+  });
+  it("an unlisted channel's snapshot brings the Unlisted plane forward", () => {
+    expect(focusOnReturn("DAGx", "dor", planeOf)).toBe("unlisted");
+  });
+  it("nothing committed in the log: the plane that was in front comes back", () => {
+    expect(focusOnReturn(null, "dor", planeOf)).toBe("dor");
+    expect(focusOnReturn(null, null, planeOf)).toBeNull();
   });
 });

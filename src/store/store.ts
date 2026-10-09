@@ -11,7 +11,11 @@ import type { ThemePref, Theme } from "@/src/theme/resolve";
 // (src/data/trendWindow.ts, read by the document's picker and by the stack), and a type-only
 // import keeps the store from holding a data-layer VALUE.
 import type { ZoomId } from "@/src/data/trendWindow";
-import { scrollToKeep } from "@/src/engine/domain/trendStack";
+import { focusOnReturn, planeOfChain, scrollToKeep } from "@/src/engine/domain/trendStack";
+// The catalog and the unlisted id, for the one fold the return path needs (`planeOfChain`): both
+// are static data — `src/net/current` reads config, `unlistedId` is the import-free leaf.
+import { METAGRAPHS } from "@/src/net/current";
+import { UNLISTED_ID } from "@/src/data/unlistedId";
 
 // The active view. `hyper`/`geo`/`ledger`/`trend` all drive the 3D scene (every switch among
 // them runs the gather choreography); `soon` is THE one flat placeholder view (consolidated
@@ -735,15 +739,20 @@ export const useStore = create<AppState>((set) => ({
   setSection: (section) =>
     set((s) => {
       const back = section === "scene" ? s.rawReturnMode : null;
+      // THE COMMIT MADE IN THE LOG COMES BACK AS THE PLANE IN FRONT (2026-10-09, `focusOnReturn`):
+      // one selection, every surface — the snapshot picked in the raw log is the app's commit, and
+      // History shows a committed network as its focus. Read BEFORE the mode flips: the Engine's
+      // view switch clears the ledger-scoped snapshot and tick-network on the way out.
+      const focus = focusOnReturn(s.metaSnap?.metaId ?? s.tickNet?.metaId ?? null, s.rawReturnFocus, (id) => planeOfChain(id, METAGRAPHS, UNLISTED_ID));
       return back != null && back !== s.mode
         ? {
             section,
             mode: back,
             rawReturnMode: null,
             // The plane that was in front comes back with the view, as the card it names.
-            trendFocus: s.rawReturnFocus,
+            trendFocus: focus,
             rawReturnFocus: null,
-            selStack: s.rawReturnFocus != null ? bumpStack(s.selStack, "network", true) : s.selStack,
+            selStack: focus != null ? bumpStack(s.selStack, "network", true) : s.selStack,
             motionCause: { kind: "view", from: s.mode, to: back },
           }
         : { section, rawReturnMode: section === "scene" ? null : s.rawReturnMode };
