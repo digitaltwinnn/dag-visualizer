@@ -58,32 +58,50 @@ export default function FilterPicker({ onPicked }: { onPicked?: () => void }) {
     onPicked?.();
   };
 
+  // CHIPS IN A ROW ABOVE 700px, ROWS IN A COLUMN ON THE PHONE (user, 2026-10-09: "the dropdown
+  // makes sense on phone, but in normal and tablet mode keep it as before, just put them after each
+  // other horizontally"). Design A1 (2026-10-08) had made every tier a grid of 300px row columns;
+  // the chip strip is back for the wide tiers — one chip after another, wrapping, the three groups
+  // split by a vertical bar — and the phone keeps the one-column rows under a hairline, half the
+  // screen, the rest scrolling. ONE element list wears both: the arms below name the shell's own
+  // 700 boundary (CSS trap 8), never two renders of the same networks.
   const rowClass = (active: boolean, off: boolean) =>
     cn(
-      // The dot centres on the row; name and count share a BASELINE inside their own full-width
-      // group (user, 2026-10-03: "the numbers in the filter don't seem to align well with the
-      // text" — two faces at two sizes, centred, line up their boxes, not their letters).
-      "flex items-center gap-2 min-w-0 h-9 px-2.5 rounded-btn border-0 bg-transparent cursor-pointer",
+      // The chip (user, 2026-08-14: tightened one step each — py-1, px-2, gap 6). The dot centres;
+      // name and count share a BASELINE inside their own group (user, 2026-10-03: two faces at two
+      // sizes, centred, line up their boxes, not their letters).
+      "flex items-center gap-1.5 py-1 px-2 min-w-0 rounded-btn border-0 bg-transparent cursor-pointer",
+      // The phone's ROW: taller, roomier, the count on the right edge (NAME_COUNT).
+      "max-[700px]:h-9 max-[700px]:py-0 max-[700px]:px-2.5 max-[700px]:gap-2",
       "text-left whitespace-nowrap transition-[background] duration-150",
       "hover:bg-wash-hover",
       "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
-      // The 44px tap minimum keys on the POINTER, not the width (user, 2026-08-14).
+      // The 44px tap floor on the touch tier (`touch:`, one home).
       "touch:min-h-11",
       active && SELECTED_ROW,
       off && "opacity-65",
     );
-  /** A row's name and count: one full-width baseline group, the count on the right edge. */
-  const NAME_COUNT = "flex flex-1 min-w-0 items-baseline justify-between gap-2";
-  const Rule = () => <span className="col-span-full h-px bg-border/70 my-0.5" aria-hidden />;
+  /** A name and its count: one baseline group — beside each other in a chip, the count on the row's
+   *  right edge on the phone. */
+  const NAME_COUNT = "inline-flex items-baseline gap-1.5 max-[700px]:flex max-[700px]:flex-1 max-[700px]:min-w-0 max-[700px]:justify-between max-[700px]:gap-2";
+  /** THE GROUP DIVIDER (user, 2026-08-13: networks with nodes | the catalog's without | unlisted) —
+   *  a vertical bar between chips, a hairline across the phone's column. `phone` false draws the bar
+   *  alone: the rows carry no rule after "All". */
+  const Divider = ({ phone = true }: { phone?: boolean }) => (
+    <>
+      <span className="w-px self-stretch bg-foreground/25 my-1.5 mx-1 max-[700px]:hidden" aria-hidden />
+      {phone && <span className="hidden max-[700px]:block col-span-full h-px bg-border/70 my-0.5" aria-hidden />}
+    </>
+  );
 
   return (
     <div
       className={cn(
-        "grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-x-2 gap-y-0.5 mx-2 px-1.5 pb-1.5 pt-1 border-t border-border/60",
+        "flex flex-wrap items-center gap-1 mx-2 px-1.5 pb-1.5 pt-1 border-t border-border/60",
         // PHONE: one column, about half the screen, the rest scrolls (`.slim-scroll` = the shared
         // slim scrollbar; overscroll-contain keeps the flick off the page). The strip stays a bar
         // expansion, not a takeover.
-        "max-[700px]:grid-cols-1 max-[700px]:max-h-[50vh] max-[700px]:overflow-y-auto max-[700px]:overscroll-contain slim-scroll",
+        "max-[700px]:grid max-[700px]:grid-cols-1 max-[700px]:gap-x-2 max-[700px]:gap-y-0.5 max-[700px]:max-h-[50vh] max-[700px]:overflow-y-auto max-[700px]:overscroll-contain slim-scroll",
       )}
       onMouseLeave={() => setHoverFilter(null)}
     >
@@ -102,11 +120,12 @@ export default function FilterPicker({ onPicked }: { onPicked?: () => void }) {
           <span className="font-mono text-label text-muted-foreground tabular-nums">{totalNodes}</span>
         </span>
       </button>
+      <Divider phone={false} />
       {rows.map((m, i) => {
         const off = (m.located ?? 0) === 0;
         return (
           <Fragment key={m.id}>
-            {i === firstZero && i > 0 && <Rule />}
+            {i === firstZero && i > 0 && <Divider />}
             <button
               type="button"
               aria-pressed={filter === m.id}
@@ -133,7 +152,7 @@ export default function FilterPicker({ onPicked }: { onPicked?: () => void }) {
           identity hue can speak for a mixed set. Behind its own rule, with NO count (2026-08-13):
           its machines are unknowable rather than absent, so neither a 0 nor a placeholder is a
           reading — the title carries the fact. */}
-      <Rule />
+      <Divider />
       <button
         type="button"
         aria-pressed={filter === UNLISTED_ID}
