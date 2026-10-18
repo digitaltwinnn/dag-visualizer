@@ -443,7 +443,13 @@ export default function Inspector() {
   // The focus rung comes from the shared derivation the EXPLORE rail reads too (`focusSlotId`),
   // so the row emphasis over there and the collapse/halo over here can't disagree.
   const focusId = useLadderFocus();
-  const autoCollapsed = (id: string) => ladderIds.includes(id) && presentOf(id) && id !== focusId;
+  // NO BOX OPEN IS NOT A REST ANY MORE (user, 2026-10-18: "snapshot is collapsed but it is no
+  // longer supported (no − icon etc)"). With nothing committed the live Global snapshot card —
+  // a slot with no rung, so never the focus — sat folded above three ghosts on every tier, and
+  // since the box lost its minimize (2026-09-11) a folded card with no box beside it is a state
+  // nothing else can produce. With no focus rung the FIRST present ladder card opens by default.
+  const openDefault = focusId ?? ladderIds.find(presentOf) ?? null;
+  const autoCollapsed = (id: string) => ladderIds.includes(id) && presentOf(id) && id !== openDefault;
   const effCollapsed = (id: string) => railCollapse[id] ?? autoCollapsed(id);
   // Publish which slot is the BOX (store.boxedCard) — the same `present && !effCollapsed` that
   // renders it, so channel and render can't disagree (the data-tier lesson). The subject
@@ -579,9 +585,14 @@ export default function Inspector() {
       // Open = "is a PRESENT box right now" — a not-yet-present slot's autoCollapsed is
       // false (ghosts aren't collapsed), so a bare effCollapsed snapshot pinned the arriving
       // ancestor slots OPEN and the re-derive materialized three boxes at once (measured).
+      // PRESENT slots only (2026-10-18): an ABSENT slot pinned shut here stayed shut when its card
+      // arrived — the live Global snapshot lands a tick after the view, and its ordinal is kept
+      // out of the selection key on purpose (heartbeats must not reset the +/− overrides), so
+      // nothing ever dropped the pin and the only populated card sat folded above three ghosts.
+      // An absent slot keeps no override and the auto rule (`openDefault`) governs its arrival.
       setRailCollapseMany({
         ...staleNulls,
-        ...Object.fromEntries(ladderIds.map((id) => [id, !(presentOf(id) && !effCollapsed(id))])),
+        ...Object.fromEntries(ladderIds.filter(presentOf).map((id) => [id, effCollapsed(id)])),
       });
       return;
     }
