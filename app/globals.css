@@ -1159,8 +1159,11 @@
      stage beside a card still truncating "Dor Technolog…". The floor is the old width and holds
      to ~1650px; the ceiling is a third up. The explorer row's name column rides the same token
      (ExplorerRow.tsx), so the gain untruncates names rather than widening the tag home alone. */
-  --rail-w: clamp(264px, 16vw, 340px);     /* left control rail width */
   --detail-w: clamp(320px, 18vw, 400px);   /* right details rail width */
+  /* The left rail is the SAME width (user, 2026-10-18: "the left cards and the right cards do
+     not have the same width"): one token, so the two columns can never drift apart again. It was
+     clamp(264px, 16vw, 340px) — 56px narrower at 1400px. */
+  --rail-w: var(--detail-w);
   /* THE ACCENT, like the wash ladder (review, 2026-09-26): these were the cyan spelled out, so on
      a network whose `--primary` is violet or magenta the committed row stayed cyan beside a
      violet path plate — two accents on one card. `--primary` is light-dark() already. */
