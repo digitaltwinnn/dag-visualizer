@@ -1,5 +1,6 @@
 "use client";
 import { useEffect } from "react";
+import { track } from "@vercel/analytics";
 import { useStore } from "@/src/store/store";
 import {
   DOC_PATHS,
@@ -66,6 +67,10 @@ export default function RouteSync() {
         : (modePath ?? (docForPath(location.pathname) ? lastViewPath : null));
       if (path && path !== location.pathname) {
         history.pushState(null, "", path + location.search);
+        // ONE custom event per in-app switch (2026-10-18): Web Analytics counts the pushState as a
+        // page view but has no sessions, so "how many visitors ever leave /" was unanswerable.
+        // A no-op off Vercel, like the pageview itself.
+        track("view-switch", { to: path });
       }
     });
 
