@@ -100,7 +100,20 @@ export function usePulseWindow(key: unknown): { pulse: number; live: boolean } {
 /** How much of the phone's viewport the BOTTOM SECTION may take — the dock bar and the sheet
  *  above it, together (user, 2026-10-04: "don't make the bottom section any larger than let's
  *  say 60% of the view so that there is always room for the scene to show"). */
-const SECTION_MAX = 0.6;
+const SECTION_MAX = 0.5; // 0.6 → 0.5 (user, 2026-10-18: "use only 50% of the view for the bottom panel")
+/** THE FULL DETENT (user, 2026-10-18: "swipe down closes it; can we swipe up to use the full
+ *  screen?"). A flick up, or a release past the midpoint between the resting fit and the top,
+ *  stands the sheet up to the command bar's bottom edge — the bar stays, so the view switch and
+ *  the layer toggles are never out of reach. A taller card then scrolls inside the full sheet
+ *  exactly as it does inside the resting one. Pulling it back down lands on the resting fit; a
+ *  flick down, or a pull well below the fit, dismisses as before. */
+function fullPx(sheet: HTMLElement | null): number {
+  const dock = (sheet ? parseFloat(getComputedStyle(sheet).bottom) : NaN) || 56;
+  const barBottom = document.getElementById("topbar")?.getBoundingClientRect().bottom ?? 0;
+  return Math.round(window.innerHeight - dock - barBottom - 8);
+}
+/** The sheet's velocity (px/ms, positive = down) that counts as a throw. */
+const FLICK = 0.5;
 /** The tallest the phone sheet may stand: the section's share of the viewport, less the dock bar
  *  the sheet sits on. The bar's height is read back from the sheet's own `bottom` (it is anchored
  *  at `--phone-dock-h`, which carries the safe-area inset and so has no number to restate here);
@@ -529,7 +542,7 @@ export default function RailDock({
     if (Math.abs(dy) > 6) d.moved = true;
     if (!d.moved) return;
     const raw = d.startH + dy;
-    const max = sectionCeilingPx(d.el);
+    const max = fullPx(d.el);
     const h = raw > max ? max + rubber(raw - max, RUBBER_PX) : raw < MIN_PX ? MIN_PX - rubber(MIN_PX - raw, RUBBER_PX) : raw;
     onSheetPx?.(Math.round(h));
     d.samples.push({ t: performance.now(), y: e.clientY });
@@ -557,10 +570,17 @@ export default function RailDock({
     // (~160ms of release velocity carried forward), not where the finger stopped. The hard
     // flick-dismiss rule stays on top: a genuine throw down closes from anywhere.
     const hp = h - vy * 160;
-    if (vy > 0.5 || hp < rest * 0.55) {
+    if (vy > FLICK || hp < rest * 0.55) {
       // Fast flick down, or projected to land well below where it rested → dismiss (same as retap).
       onSheetPx?.(null);
       handleOpenChange(false);
+      return;
+    }
+    const full = fullPx(d.el);
+    if (vy < -FLICK || hp > (rest + full) / 2) {
+      // A throw up, or a release past the midpoint → the FULL detent (the note at `fullPx`).
+      armSnap();
+      onSheetPx?.(full);
       return;
     }
     // Not a dismiss: let go, and the sheet springs back to its content's fit.
