@@ -352,7 +352,7 @@ function RawSection({
  *  layer says exactly what the metagraph-snapshot card and the ledger explorer say about the same
  *  id. No click affordance: an unknown machine has no card to open, and the raw layer's signer list
  *  is a reading surface, not a browse target. */
-const SIGNER_PAGE = 3; // rows per page — the consensus MINIMUM, so one page is one quorum (user)
+const SIGNER_PAGE = 10; // rows per page (user, 2026-10-18: "make it 10 per page" — it was 3, one quorum, from 2026-08)
 /** THE SIGNERS AS ONE ROSTER (user, 2026-10-08, design D1 — `docs/superpowers/design/2026-10-08-
  *  mobile-tuning/d-signers.html`). It was two `Node | Signer id` tables, one per producing layer, and
  *  on a normal snapshot both held the same three nodes beside a signer id that was the node id's
