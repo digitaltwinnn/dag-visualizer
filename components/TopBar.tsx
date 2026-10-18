@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { ABOUT_ICON as AboutIcon, VIEW_ICONS } from "@/components/icons";
 import { useStore } from "@/src/store/store";
 import { displayNetwork } from "@/src/data/unlisted";
@@ -146,6 +146,32 @@ export default function TopBar() {
   // NEXT real tap (found live: the gear stopped opening after one swipe).
   const swipedAt = useRef(0);
   const LISTED_IDS = LISTED_VIEWS.map((v) => v.id);
+  // ‹ › FLANK THE PHONE FACE (2026-10-18 — Vercel analytics: ~76% of visitors are on a phone and
+  // most never leave "/"; the bar's swipe and the pip row were the only hints that other views
+  // exist, and neither reads as a control). Two real steps through the same `stepView` the swipe
+  // runs, clamped at the ends (a dimmed chevron, never a vanishing one — the plank's rule), hidden
+  // from 700px up where the segmented switch names every view. `dir` is the finger's: −1 = ‹.
+  const viewChevron = (dir: -1 | 1) => {
+    const target = stepView(LISTED_IDS, mode, dir === -1 ? 1 : -1);
+    const name = target ? VIEWS.find((v) => v.id === target)?.name : null;
+    const Glyph = dir === -1 ? ChevronLeft : ChevronRight;
+    return (
+      <button
+        type="button"
+        disabled={!target || !!doc}
+        aria-label={name ? `${name} view` : dir === -1 ? "First view" : "Last view"}
+        onClick={() => { if (target) { setStrip(null); setMode(target); } }}
+        className={cn(
+          "hidden max-[700px]:inline-flex items-center justify-center size-11 rounded-btn bg-transparent border-0 cursor-pointer",
+          "text-muted-foreground hover:text-foreground hover:bg-wash-soft",
+          "disabled:opacity-35 disabled:cursor-default disabled:hover:bg-transparent",
+          "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
+        )}
+      >
+        <Glyph aria-hidden className="size-5" />
+      </button>
+    );
+  };
   const onSwipeDown = (e: React.PointerEvent) => {
     swipedAt.current = 0;
     if (bp !== "phone" || doc || e.pointerType === "mouse") return;
@@ -381,7 +407,14 @@ export default function TopBar() {
             Both stay in the DOM and CSS picks, so SSR and the first client render agree (the
             useBreakpoint-at-first-render hydration trap, ExplorerShell's note). The wrapper is a plain
             flex box, not `contents`, so the grid still sees one middle item. */}
-        <div className="flex justify-center min-w-0">
+        <div className="flex justify-center items-center min-w-0">
+        {/* ‹ › FLANK THE PHONE FACE (2026-10-18 — Vercel analytics: ~76% of visitors are on a
+            phone and most never leave "/"; the bar's swipe and the pip row were the only hints
+            that other views exist, and neither reads as a control). Two real steps through the
+            same `stepView` the swipe runs, clamped at the ends (a dimmed chevron, never a
+            vanishing one — the plank's rule), hidden from 700px up where the segmented switch
+            names every view. */}
+        {viewChevron(-1)}
         <button
           type="button"
           aria-expanded={strip === "views"}
@@ -429,6 +462,7 @@ export default function TopBar() {
           </span>
           <span className="sr-only"> — switch view (or swipe the bar)</span>
         </button>
+        {viewChevron(1)}
         <ToggleGroup
           type="single"
           value={mode}
