@@ -4,7 +4,7 @@ import { INSTANT_ICON } from "@/components/icons";
 
 import CardHead, { RailPane } from "@/components/CardHead";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { Lead, FactGroup, UnitMarks, CUT_ROW, figWidth } from "@/components/inspector/parts";
+import { Lead, FactGroup, QualifierChip, UnitMarks, CUT_ROW, figWidth } from "@/components/inspector/parts";
 import { Separator } from "@/components/ui/separator";
 import { SELECTED_ROW, selectionHue } from "@/components/selection";
 import { spanOfWindow } from "@/components/trendDoors";
@@ -53,6 +53,13 @@ function subjectOf(focus: string | null, filter: string, ranked: readonly string
   // Unlisted row included.
   if (focus && (ranked.includes(focus) || has(focus))) return focus;
   return ranked.includes(filter) || has(filter) ? filter : null;
+}
+
+/** The cadence as a word for the head's chip: "5-min", "1-hour", "1-day". */
+function bucketWord(stepMs: number): string {
+  if (stepMs >= 86_400_000) return `${Math.round(stepMs / 86_400_000)}-day`;
+  if (stepMs >= 3_600_000) return `${Math.round(stepMs / 3_600_000)}-hour`;
+  return `${Math.round(stepMs / 60_000)}-min`;
 }
 
 export default function TrendInstantPane({
@@ -161,9 +168,12 @@ export default function TrendInstantPane({
           )
         }
         titleKey={bucket ?? cursorMs ?? undefined}
-        // HOW LONG AGO the moment was, not the cadence (user, 2026-09-26): the reader is placing an
-        // instant, and "3 months ago" places it; "daily" only said what the charts are cut in,
-        // which the note below already says where it matters. Measured from the bucket's start.
+        // THE CARD IS A BUCKET, said in the head (user, 2026-10-18: a swipe on this card "keeps the
+        // same subject and affects the less obvious dataset" — the plank steps buckets, and nothing
+        // named the thing being stepped). One chip in the cadence's own words, so the lead's "in
+        // those 5 minutes" and the pager's squares read as one thing. (An age chip sat here until
+        // 2026-09-26 and left: the title already dates the moment.)
+        aside={bucket != null ? <QualifierChip>{bucketWord(stepMs)} bucket</QualifierChip> : undefined}
         onClose={onClose}
         collapsed={collapsed}
         onToggle={onToggle}
