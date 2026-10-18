@@ -241,7 +241,12 @@ decisions inside them are design, not detail:
   (`src/data/ledgerPath.ts`). The LIVE/PINNED
   control rides the CARD HEAD's eyebrow row with the shown snapshot's ticking age (2026-09-28 —
   it rode the heading row as the level's setting, design decision 15, until then), and the pager
-  states the TIME the rows span ("last 11 min") rather than "52 recent". Each level shows
+  states the TIME the rows span ("last 11 min") rather than "52 recent". **The ticks that arrived
+  behind a pin are the list's FIRST ROW** (user, 2026-10-18: "fits better as the top row inside
+  the explorer, similar to the scene, which animates the extra thin bar at the front when new
+  snapshots arrive"): a live-dot row, "12 newer", sliding in from the top (`ExplorerRowSpec.
+  className`), its click the follow switch through the one executor — it rode the heading as a
+  setting-style button until then. Each level shows
   the ONE vocabulary minus what it cannot state (ticks fees · anchors · metagraphs · size, a network
   in a tick fees · anchors · size, a snapshot fees · size), and ONE pick serves every level: a level
   shows it where it applies and its own first measure where it doesn't, without overwriting it
@@ -338,6 +343,14 @@ dossier, country, provider, composition, then the snapshot chain (global snapsho
 snapshot it anchors), then node. `components/railCards.ts` is the manifest and
 `components/railCards.test.ts` pins the order, the availability and every hint.
 
+**History ARRIVES as a deal and a swiped measure rolls SIDEWAYS** (2026-10-18): each plane card
+falls into its slot a beat after the one in front (`planeDrop` in globals.css, keyed off the
+layer's `data-on`, staggered by the depth rank React writes as `--slot` — `transform` only, so the
+anchor's matrix and the card's own `translate` are untouched; the leave stays the layer's fade),
+and a left/right swipe sends the plots out the way the finger went with the next measure's
+arriving from the other side (`swipeAxis` in `TrendStack`, the roll's x offsets; a picked or keyed
+measure keeps the vertical roll).
+
 **History's lane is the network dossier, the RANGE, then the MOMENT** (the Range since 2026-10-07 —
 user: "range -> moment is also a logical parent - child relation"). The Range card is the brushed
 `trendRange` as a committed subject: a slot with no rung (the Moment's precedent, `selStack`
@@ -349,6 +362,24 @@ already IS that list over the span. Under a range the Moment's ‹ › steps the
 the executor's `trendCursor` action, and the Range's next ghost opens its first moment. The Moment's
 lead is the same sentence shape for one bucket (`momentPhrase`: "DED anchored 7 snapshots in those
 5 minutes" — never a rate, never a rank).
+
+**The Metagraph card is the committed subject's network, in every view** (2026-10-18, one rule
+after the user asked for Geography's node to "also populate the dossier card"): Snapshots' is the
+network inside the tick (`tickNet`), History's the plane brought forward (`cardNetwork`), and
+Geography's the committed NODE's network while the filter is All (`metagraphCardNetwork` reads
+`inspect` — a geo node never writes the filter, so the card had stayed a ghost under a committed
+node). It carries no × there (the node card's × releases the node), its ghost hint names the node
+route, and a machine on two networks — UP's nodes also validate the DAG — pages between them
+(`siblingSet("context")`, "This node's networks": each step is the same node select the row's
+click runs, so the place and provider are re-committed and the filter untouched). Hypergraph
+needs nothing: its node commits the filter by policy.
+
+**The Range card steps the WINDOWS while it stands on one** (user, 2026-10-18): with no range
+brushed its siblings are the six window pills, in the picker's order — a SETTING step
+(`SiblingStep.setting`, the pager writes `setTrendWindow` as the picker does, never a selection
+through the executor). A brushed range is one span and pages nothing. **The Moment card's head
+says it is a bucket** (same day — a chip in the cadence's own words, "5-min bucket", so the
+plank's squares read as stepping buckets, not changing the subject).
 
 **The Metagraph card stands on the plane brought forward** (user, 2026-10-07: "if we click a
 network in explorer, should we set the metagraph card accordingly? (not the global filter
