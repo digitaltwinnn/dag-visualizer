@@ -155,13 +155,23 @@ function ChainChoice({ addr, idx, on, onPick }: { addr: string; idx: number; on:
  *  make the segment a menu of them, each named by the months it ran, and the pressed segment then
  *  says which months are being paged. */
 function ChainControl({ lineage, chainIdx, onPick }: { lineage: readonly string[]; chainIdx: number; onPick: (idx: number) => void }) {
-  const chosen = chainMonths(useChainSpan(chainIdx > 0 ? (lineage[chainIdx] ?? null) : null));
   const several = lineage.length > 2;
+  // The months of the earlier chain in play: the picked one from the menu, or the only one.
+  const earlier = chainMonths(useChainSpan(several ? (chainIdx > 0 ? (lineage[chainIdx] ?? null) : null) : (lineage[1] ?? null)));
+  const chosen = chainIdx > 0 ? earlier : null;
   return (
+    // WHY THE CONTROL EXISTS, IN FOUR WORDS (user, 2026-10-18: "Biofi's 'earlier' dropdown needs
+    // short explanation"). It appears only for a network that registered more than once, and
+    // "Current | Earlier" alone did not say what was being chosen between. No hover text (the
+    // tooltip rule) — the words stand beside the control.
+    <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+      <span className="text-label text-muted-foreground">re-registered — which chain</span>
     <span className="inline-flex items-center gap-0.5 p-0.5 rounded-btn border border-border" role="group" aria-label="Which of this network's chains to page">
       <ChainSegment label="Current" on={chainIdx === 0} onPick={() => onPick(0)} />
       {!several ? (
-        <ChainSegment label="Earlier" on={chainIdx === 1} onPick={() => onPick(1)} />
+        // The lone earlier chain names its months too (the 2026-10-08 ask, "show also the date
+        // range", only ever reached the menu).
+        <ChainSegment label={earlier ? `Earlier · ${earlier}` : "Earlier"} on={chainIdx === 1} onPick={() => onPick(1)} />
       ) : (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -177,6 +187,7 @@ function ChainControl({ lineage, chainIdx, onPick }: { lineage: readonly string[
           </DropdownMenuContent>
         </DropdownMenu>
       )}
+    </span>
     </span>
   );
 }
