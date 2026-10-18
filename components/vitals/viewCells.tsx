@@ -174,7 +174,7 @@ export function HyperCells({ accent }: { accent: string }) {
           so their sum is the fleet size — the donut's hole was already printing the very number
           the neighbouring card printed, twice on one row. The card that keeps it is the one that
           also says how it splits. */}
-      <BandCard label="Node composition"
+      <BandCard label="Nodes"
         lead={<DonutTotal counts={counts} accent={accent} total={Object.values(counts).reduce((a, b) => a + b, 0)} />}>
         {/* Geo's treatment, adopted here (user, 2026-08-31: "in hyper view, geo looks better"):
             the dot legend named each slice but said nothing about SIZE, so the ring carried the
