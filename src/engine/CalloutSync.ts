@@ -192,8 +192,13 @@ export class CalloutSync {
     // the callout does not have: at 900px with both sheets open a geo node's panel rendered
     // as a ~25px fragment in the strip between them. `sceneCoverL`/`sceneCoverR` are what the
     // open sheets measured off themselves (0 on desktop and phone, so this is a no-op there).
-    const bandL = r.left + this.st.sceneCoverL;
-    const bandR = r.right - this.st.sceneCoverR;
+    // …AND NOT UNDER THE DESKTOP RAILS EITHER (2026-10-18): the columns are fixed over the same
+    // viewport-sized canvas, so the band is pulled in by their inner edges while they are on
+    // screen (`ChromeBounds.railL/railR`) — and keeps the whole canvas when the SCENE toggle has
+    // slid them away.
+    const chrome = this.h.chrome.read();
+    const bandL = Math.max(r.left + this.st.sceneCoverL, chrome.railL);
+    const bandR = Math.min(r.right - this.st.sceneCoverR, chrome.railR);
     if (phone) return this._placePhone(el, x, y, r, bandL, bandR);
     if (el.dataset.phone != null) delete el.dataset.phone;
     // THE GLOBAL SNAPSHOT'S LABEL HANGS (`calloutHangs`, with its test): below-left of the bar,
@@ -203,7 +208,13 @@ export class CalloutSync {
     let flip = true;
     let drop = true;
     if (!hang) {
-      const p = calloutPlacement(x, y, bandL, bandR, Math.max(r.top, this._freeTop()));
+      // The panel's REAL reach where it has been measured (the phone's cadence, below), and a
+      // SOFT band where the rails — not the sheets — pulled it in (`calloutPlacement`'s note).
+      this._measurePanel(el);
+      const p = calloutPlacement(x, y, bandL, bandR, Math.max(r.top, this._freeTop()), {
+        reachX: this._ppW ? CALLOUT_OFF_X + this._ppW : undefined,
+        overrun: this.st.sceneCoverL === 0 && this.st.sceneCoverR === 0,
+      });
       if (!p.show) return false;
       flip = p.flip;
       drop = p.drop;
@@ -232,7 +243,9 @@ export class CalloutSync {
   /** The phone's placement: straight above (or below) the anchor, centred and clamped into the
    *  band, between the command bar and the open sheet. The panel's size is measured — its content
    *  varies by subject — and re-read on the bounds clock, not per frame. */
-  private _placePhone(el: HTMLElement, x: number, y: number, r: DOMRect, bandL: number, bandR: number): boolean {
+  /** The panel's size, re-read on the bounds clock rather than per frame (its content varies by
+   *  subject). Shared by the phone placement and the desktop fit test since 2026-10-18. */
+  private _measurePanel(el: HTMLElement): void {
     if (this._ppEl !== el || this._ppIn-- <= 0) {
       const panel = el.querySelector<HTMLElement>(".co-panel");
       this._ppEl = el;
@@ -240,6 +253,9 @@ export class CalloutSync {
       this._ppW = panel ? panel.offsetWidth : 0;
       this._ppH = panel ? panel.offsetHeight : 0;
     }
+  }
+  private _placePhone(el: HTMLElement, x: number, y: number, r: DOMRect, bandL: number, bandR: number): boolean {
+    this._measurePanel(el);
     if (!this._ppW) return false;
     const bottom = this._phoneBottom() - this.st.sceneCoverB;
     const p = calloutPhonePlacement(x, y, bandL, bandR, Math.max(r.top, this._freeTop()), bottom, this._ppW, this._ppH);
