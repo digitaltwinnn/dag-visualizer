@@ -54,6 +54,9 @@ export interface ArchiveTarget {
 }
 export interface ArchiveEntry {
   ip: string;
+  /** The node's public L0 port, for a global entry — so the snapshot fallback can ask the nodes
+   *  whose floor covers an ordinal (`fetchGlobal.ts`, 2026-10-18), not only the archival ones. */
+  port?: number;
   /** "global" for the DAG's own chain; a metagraph id for its currency chain. */
   chain: string;
   kind: "genesis" | "deep" | "window";
@@ -255,9 +258,10 @@ async function probeArchive(net: NetworkId): Promise<ArchiveInfo> {
     }),
   );
 
+  for (const e of entries) if (e.chain === "global") e.port = portByIp.get(e.ip) ?? 9000;
   const archival = entries
     .filter((e) => e.chain === "global" && e.kind !== "window")
-    .map((e) => ({ ip: e.ip, port: portByIp.get(e.ip) ?? 9000 }));
+    .map((e) => ({ ip: e.ip, port: e.port ?? 9000 }));
   return { archival, entries, total: globalNodes.length };
 }
 

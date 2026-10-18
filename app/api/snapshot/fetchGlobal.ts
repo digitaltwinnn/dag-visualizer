@@ -58,8 +58,20 @@ export async function fetchGlobalJson(net: NetworkId, ordinal: number): Promise<
   // one of nine — largely shared holes, so they synced from a common source), and coverage
   // differs at the margins. A node missing an ordinal answers 404 in well under a second, so
   // walking the whole list is cheap; the timeout only bites on an unreachable node.
-  const targets = (info?.archival ?? []).slice();
-  for (let i = targets.length - 1; i > 0; i--) {
+  // THE NODES WHOSE MEASURED FLOOR COVERS THIS ORDINAL (user, 2026-10-18: "we do know the depth a
+  // node serves, it's shown on the node card — can't we query the nodes we know actually have the
+  // snapshot?"). The census records every global node's floor..latest; the "archival" list is the
+  // subset reaching the 2023 era floor, and on a day no node reaches it (2026-10-18: archivalCount
+  // 0 while three nodes served from Aug 2024) the fallback had nothing to try — so a year-old
+  // snapshot failed although nodes held it. SHALLOWEST sufficient floor first, so the few long
+  // archives are not asked for what every node still has; the archival list, shuffled, stays as
+  // the last resort for a census with no per-node entries.
+  const covering = (info?.entries ?? [])
+    .filter((e) => e.chain === "global" && e.floor <= ordinal && ordinal <= e.latest)
+    .sort((a, b) => b.floor - a.floor)
+    .map((e) => ({ ip: e.ip, port: e.port ?? 9000 }));
+  const targets = covering.length ? covering : (info?.archival ?? []).slice();
+  for (let i = covering.length ? 0 : targets.length - 1; i > 0; i--) {
     const k = Math.floor(Math.random() * (i + 1));
     [targets[i], targets[k]] = [targets[k], targets[i]];
   }
