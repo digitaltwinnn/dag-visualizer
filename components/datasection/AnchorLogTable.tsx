@@ -7,7 +7,7 @@ import type { CSSProperties } from "react";
 import { useStore } from "@/src/store/store";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { getNetwork, metagraphById } from "@/src/data/network";
-import { buildAnchorLog, sortAnchorLog, type AnchorLogRow, type AnchorLogSortKey } from "@/src/data/anchorLog";
+import { buildAnchorLog, snapsAtTick, sortAnchorLog, type AnchorLogRow, type AnchorLogSortKey } from "@/src/data/anchorLog";
 import { displayNetwork, unlistedLog, UNLISTED_ID } from "@/src/data/unlisted";
 import { ledgerLens } from "@/src/data/ledgerStory";
 import { metaSnapHoverKey, type GlobalSnapshot } from "@/src/data/types";
@@ -824,12 +824,14 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
    *  case the reader already has two working routes to: the Snapshot column pages the entire chain,
    *  and the date range reaches any point in it. So an unserved ordinal is simply SAID, and the
    *  message names the route that does work. */
-  const seekTick = async () => {
+  // `tick` defaults to the typed field; the Global menu's pick passes its ordinal straight in (a
+  // state write would not be readable in the same call).
+  const seekTick = async (tick: string = qTick) => {
     // One search at a time: a global snapshot replaces a snapshot number or a date range.
     setBound(null); setSnapCut(false); setTimeCut(null); setDoorLabel(null); setDoorSpan(null);
     setQSnapshot(""); setQFrom(""); setQTo("");
-    setApplied({ snapshot: "", tick: qTick, from: "", to: "", doorLabel: null });
-    const n = Number(qTick.replace(/[^\d]/g, ""));
+    setApplied({ snapshot: "", tick, from: "", to: "", doorLabel: null });
+    const n = Number(tick.replace(/[^\d]/g, ""));
     if (!Number.isFinite(n) || n < 1) return;
     setJumpMiss(null);
     // UNDER ALL a global snapshot is exactly the snapshots it carries — its own manifest, one read —
@@ -1304,6 +1306,22 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
 
   // Built ONCE and rendered by BOTH branches below — a seek swaps the table into its loading state
   // while a page is fetched, and unmounting the controls mid-seek loses what was typed.
+  // THE GLOBAL MENU'S ROWS: the retained window, newest first, with the explorer's own age words;
+  // under a scope (the filter's network, a door's, or the bar's own pick) only the ticks that
+  // network anchored into (`snapsAtTick`, the join every ledger surface uses).
+  // Per render, no memo: a few dozen globals against one network's records, and the table already
+  // re-renders on every tick and every second (the ages).
+  const tickOptions = (() => {
+    if (!net) return [];
+    const scope = histNet;
+    const t = Date.now();
+    return [...net.globalSnapshots]
+      .reverse()
+      .filter((g) => !scope || snapsAtTick(net.metaSnaps, scope, g.timestamp).length > 0)
+      .slice(0, 40)
+      .map((g) => ({ ordinal: g.ordinal, age: relativeAge(t - Date.parse(g.timestamp)) }));
+  })();
+
   const search = !searchOpen ? null : (
     <LogSearchBar
       networks={searchNets}
@@ -1334,6 +1352,8 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       onFrom={(v) => { setDoorLabel(null); setDoorSpan(null); setQFrom(v); }}
       onTo={(v) => { setDoorLabel(null); setDoorSpan(null); setQTo(v); }}
       onSubmit={onSubmit}
+      ticks={tickOptions}
+      onTickPick={(n) => { landCommit.current = null; setQTick(String(n)); void seekTick(String(n)); }}
       onClose={() => setSearchOpen(false)}
     />
   );

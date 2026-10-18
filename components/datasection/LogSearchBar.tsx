@@ -1,6 +1,7 @@
 "use client";
 
-import { Loader2, Search, X } from "lucide-react";
+import { ChevronDown, Loader2, Search, X } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 import DateRange from "@/components/datasection/DateRange";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -50,6 +51,8 @@ export default function LogSearchBar({
   onTo,
   onSubmit,
   onClose,
+  ticks,
+  onTickPick,
 }: {
   /** The chains that can be searched, in the order the explorer lists them. */
   networks: { id: string; label: string }[];
@@ -74,6 +77,14 @@ export default function LogSearchBar({
   onSubmit: () => void;
   /** Escape folds the bar away — the same key that dismisses every other transient surface here. */
   onClose: () => void;
+  /** THE RECENT GLOBAL SNAPSHOTS AS A MENU (user, 2026-10-18: "easy to add a dropdown for global
+   *  snapshot? If also filter on metagraph is selected show only those that are applicable"): the
+   *  retained window, newest first, each with its age — and under a scope only the ticks that
+   *  network anchored into, so a pick can never be a miss. The typed field stays for any ordinal
+   *  in the chain; the menu is the window the explorer already lists. */
+  ticks?: { ordinal: number; age: string }[];
+  /** A pick runs the search at once — the menu is a choice, not a draft. */
+  onTickPick?: (ordinal: number) => void;
 }) {
   // ⚠️ TOUCH RAISES EVERY CONTROL IN THE BAR TOGETHER (user, 2026-09-02: "the search snapshot
   // field height is too small"). 24px was tuned for a pointer; on a coarse pointer all five
@@ -239,14 +250,37 @@ export default function LogSearchBar({
       {/* ── GLOBAL SNAPSHOT — no hint inside the box; the label is the hint ──────────────────── */}
       <span className={criterion}>
         <span className={label}>Global</span>
-        <input
-          type="text"
-          inputMode="numeric"
-          value={tick}
-          aria-label="Global snapshot ordinal"
-          onChange={(e) => onTick(e.target.value)}
-          className={cn(field, "w-[148px] max-[700px]:w-full text-right")}
-        />
+        <span className="inline-flex items-stretch max-[700px]:w-full">
+          <input
+            type="text"
+            inputMode="numeric"
+            value={tick}
+            aria-label="Global snapshot ordinal"
+            onChange={(e) => onTick(e.target.value)}
+            className={cn(field, "w-[148px] max-[700px]:w-auto max-[700px]:flex-1 text-right", ticks?.length && "rounded-r-none")}
+          />
+          {!!ticks?.length && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="Pick a recent global snapshot"
+                  className={cn(field, "w-8 touch:w-11 px-0 rounded-l-none border-l-0 inline-flex items-center justify-center cursor-pointer text-muted-foreground hover:text-foreground")}
+                >
+                  <ChevronDown aria-hidden className="size-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" sideOffset={4} className="max-h-[50vh] overflow-y-auto slim-scroll">
+                {ticks.map((t) => (
+                  <DropdownMenuItem key={t.ordinal} onSelect={() => onTickPick?.(t.ordinal)} className="gap-3 text-label tabular-nums">
+                    <span className="font-mono">{t.ordinal.toLocaleString()}</span>
+                    <span className="ml-auto text-muted-foreground">{t.age}</span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </span>
       </span>
 
       {/* ── DATE RANGE — the calendar ───────────────────────────────────────────────────────── */}
