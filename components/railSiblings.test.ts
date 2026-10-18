@@ -712,6 +712,15 @@ describe("siblingSet — context in Geography, standing on a node (2026-10-18)",
   });
 });
 
+describe("the Range card's next ghost — the span's first moment (2026-10-18)", () => {
+  it("opens the first bucket of the WINDOW when no range is brushed, and none for All", () => {
+    const step = childStep("range", base({ mode: "trend", trendRange: null, trendWindow: "7d" }));
+    expect(step).not.toBeNull();
+    expect(step!.actions).toEqual([{ kind: "trendCursor", ms: expect.any(Number) }]);
+    expect(childStep("range", base({ mode: "trend", trendRange: null, trendWindow: "all" }))).toBeNull();
+  });
+});
+
 describe("siblingSet — range (the windows, while no range stands)", () => {
   it("steps the six window pills in the picker's order, the shown window current", () => {
     const set = siblingSet("range", base({ mode: "trend", trendWindow: "30d" }))!;

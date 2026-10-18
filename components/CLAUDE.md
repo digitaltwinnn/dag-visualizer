@@ -375,7 +375,11 @@ route, and a machine on two networks — UP's nodes also validate the DAG — pa
 click runs, so the place and provider are re-committed and the filter untouched). Hypergraph
 needs nothing: its node commits the filter by policy.
 
-**The Range card steps the WINDOWS while it stands on one** (user, 2026-10-18): with no range
+**The Range card's next ghost opens the first bucket of the SPAN it stands on — the brushed range,
+else the window's** (user, 2026-10-18: "with a range the Moment card does not open the first
+entry" — the card read "last 30 days" and its step read only a brushed range; `spanOf` in
+`railSiblings`, the Moment's pager steps the same span, captioned "Window" then). **The Range
+card steps the WINDOWS while it stands on one** (user, 2026-10-18): with no range
 brushed its siblings are the six window pills, in the picker's order — a SETTING step
 (`SiblingStep.setting`, the pager writes `setTrendWindow` as the picker does, never a selection
 through the executor). A brushed range is one span and pages nothing. **The Moment card's head

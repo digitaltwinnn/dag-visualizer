@@ -52,7 +52,7 @@ import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { snapshotSignerRows } from "@/src/data/network";
 import { UNLISTED_ID } from "@/src/data/unlisted";
 import type { RailCardKind } from "@/components/railCards";
-import { rangeBuckets, ZOOMS, type ZoomId } from "@/src/data/trendWindow";
+import { rangeBuckets, windowSpan, ZOOMS, type ZoomId } from "@/src/data/trendWindow";
 import { stampInstant } from "@/src/data/trendTimeline";
 import { cohortsLevel, countriesLevel, countryNodes, machinesOf, networksLevel, nodeOrder, nodesByCountry, type Cohort, type TickNetwork, type TickSnap } from "@/src/data/ladderLevels";
 import type { GeoMeasure } from "@/src/data/geoMeasure";
@@ -461,10 +461,13 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
     // buckets, oldest → newest. No range, or a cursor outside it, is no set — the Moment then has
     // no committed parent to step within.
     case "instant": {
-      if (!s.trendRange || s.trendCursorMs == null) return null;
-      const { buckets, stepMs } = rangeBuckets(s.trendRange);
+      // …and the window's span when no range is brushed (2026-10-18), the same span the step
+      // above opens the first bucket of.
+      const span = spanOf(s);
+      if (!span || s.trendCursorMs == null) return null;
+      const { buckets, stepMs } = rangeBuckets(span);
       const cur = s.trendCursorMs;
-      return finish(slot, momentItems(buckets, stepMs), buckets.findIndex((b) => cur >= b && cur < b + stepMs), "Range");
+      return finish(slot, momentItems(buckets, stepMs), buckets.findIndex((b) => cur >= b && cur < b + stepMs), s.trendRange ? "Range" : "Window");
     }
 
     // About and the tool card never focus, so they never page.
@@ -507,10 +510,19 @@ function momentItems(buckets: readonly number[], stepMs: number): SiblingStep[] 
   return buckets.map((b) => ({ key: String(b), label: stampInstant(b, stepMs), actions: [{ kind: "trendCursor", ms: b }] }));
 }
 
-/** trend: the range's first moment. */
+/** THE SPAN THE RANGE CARD STANDS ON: the brushed range, else the window's own span (user,
+ *  2026-10-18: "with a range the Moment card does not open the first entry" — the card said
+ *  "last 30 days" and its next ghost had no step, because the step read only a brushed range).
+ *  Null for the All window, which has no trailing span to bucket. */
+function spanOf(s: SiblingState): { fromMs: number; toMs: number } | null {
+  return s.trendRange ?? windowSpan(s.trendWindow, null, Date.now());
+}
+
+/** trend: the span's first moment. */
 const momentOfRangeChildren = (s: SiblingState, n: number): SiblingStep[] => {
-  if (!s.trendRange) return [];
-  const { buckets, stepMs } = rangeBuckets(s.trendRange);
+  const span = spanOf(s);
+  if (!span) return [];
+  const { buckets, stepMs } = rangeBuckets(span);
   return momentItems(buckets.slice(0, n), stepMs);
 };
 

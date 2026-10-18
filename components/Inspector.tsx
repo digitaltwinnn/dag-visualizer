@@ -475,10 +475,14 @@ export default function Inspector() {
   // ancestry), and read as "the deepest" it left the Global snapshot card with no step down to
   // the tick's networks (user, 2026-10-18: "we can't navigate the rung down from the snapshot card
   // to the metagraph card, lower in the rung there is the node card").
+  // …starting at the FIRST present card, not the top slot (user, 2026-10-18, the same evening:
+  // "with a range the Moment card does not open the first entry" — History's Metagraph card is a
+  // reading that can be absent, and a run that had to begin at slot 0 left the Range card below a
+  // gap with no step). The run begins at the first present card and ends at the first gap after it.
   let deepestId: string | null = null;
   for (const id of ladderIds) {
-    if (!presentOf(id)) break;
-    deepestId = id;
+    if (presentOf(id)) deepestId = id;
+    else if (deepestId !== null) break;
   }
   const deepestKind = deepestId ? (manifest.find((c) => c.id === deepestId)?.kind ?? null) : null;
   const siblingState = useSiblingState(deepestKind);
