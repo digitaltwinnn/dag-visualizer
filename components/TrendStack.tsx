@@ -628,7 +628,7 @@ export default function TrendStack() {
                     onClick={(e) => { e.stopPropagation(); stepMeasure(dir); }}
                     className={cn(
                       "absolute top-1/2 -translate-y-1/2 z-10 inline-flex size-8 touch:size-11 items-center justify-center rounded-full cursor-pointer",
-                      "border border-border bg-[var(--panel-solid)] text-primary-ink shadow-none",
+                      "border border-border bg-[var(--panel-solid)] text-primary-ink",
                       "hover:bg-wash-soft disabled:opacity-30 disabled:cursor-default disabled:hover:bg-[var(--panel-solid)]",
                       "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
                       dir === -1 ? "-left-4 touch:-left-5" : "-right-4 touch:-right-5",
