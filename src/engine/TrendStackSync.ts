@@ -54,7 +54,7 @@ export interface TrendPlaneEl {
 /** The `#trend-stack` root, as narrowly as this module needs it: one attribute the CSS fades on,
  *  plus the liveness flag that makes writing it idempotent against a REMOUNT. */
 export interface TrendRootEl {
-  dataset: { on?: string };
+  dataset: { on?: string; deal?: string };
   isConnected: boolean;
 }
 
@@ -95,6 +95,9 @@ interface Slot {
   el: TrendPlaneEl | null;
   vis: boolean;
 }
+
+/** How long the arrival deal may run: the roll tempo plus the deepest slot's stagger, with air. */
+const DEAL_MS = 1400;
 
 export class TrendStackSync {
   private readonly h: TrendStackHost;
@@ -409,6 +412,19 @@ export class TrendStackSync {
     }
     if (this._on === on) return;
     root.dataset.on = on ? "1" : "0";
+    // THE DEAL IS ONE SHOT (review, 2026-10-18): the planes' arrival drop keys on `data-deal`, set
+    // for the beat the stack reveals and cleared after it, so a plane mounting later (paged in,
+    // re-ranked in, the DAG plane joining on focus) never drops from invisible and a re-rank can
+    // never shift a running delay. event-time: the flip, never a frame.
+    if (this._dealTimer) clearTimeout(this._dealTimer);
+    if (on) {
+      root.dataset.deal = "1";
+      this._dealTimer = setTimeout(() => { delete root.dataset.deal; this._dealTimer = null; }, DEAL_MS);
+    } else {
+      delete root.dataset.deal;
+      this._dealTimer = null;
+    }
     this._on = on;
   }
+  private _dealTimer: ReturnType<typeof setTimeout> | null = null;
 }

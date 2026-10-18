@@ -115,7 +115,9 @@ export function staggerCentre(n: number): number {
  *  movement. ONE number for the cards (`TrendStackSync`) and the floor under them
  *  (`scene/views/TrendsView`): two rates would slide a rung out from under its own card for the
  *  length of every move. */
-export const STACK_EASE_K = 8;
+// 8 → 5 (user, 2026-10-18: a flick up "animates way too fast" — the next card has only one slot to
+// travel, so at 8 it arrived in a blink). 5 still settles inside a second (the test's floor).
+export const STACK_EASE_K = 5;
 
 /** How many planes the visible window holds for a roster of `total` — the count `stackPoses`
  *  returns, stated without building the poses. The ground (`scene/views/TrendsView`) draws one

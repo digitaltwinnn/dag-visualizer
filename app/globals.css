@@ -1830,16 +1830,17 @@
    this once). Subtle rise+fade on the navigation clock's fast end; reduced motion is guarded at
    the call site (`motion-reduce:animate-none`). */
 /* HISTORY'S PLANES DROP IN ONE AFTER ANOTHER (2026-10-18): the layer's `data-on` is the view's
-   arrival (TrendStackSync), and each card falls into its slot a beat after the one in front —
-   the `--slot` React writes is its depth rank. `transform` only: the anchor's matrix3d and the
+   arrival (TrendStackSync, which also sets `data-deal` for that beat alone — a plane mounting later
+   never drops in), and each card falls into its slot a beat after the one in front — the `--slot`
+   React writes is its depth rank. `transform` only: the anchor's matrix3d and the
    card's own `translate` utility are untouched. The leave stays the layer's fade — the gather
    choreography carries the exit. */
-#trend-stack[data-on="1"] .plane-card {
+#trend-stack[data-deal="1"] .plane-card {
   animation: planeDrop var(--tempo-roll) var(--ease-roll) both;
   animation-delay: calc(var(--slot, 0) * 90ms);
 }
 @keyframes planeDrop { from { opacity: 0; transform: translateY(-22px); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { #trend-stack[data-on="1"] .plane-card { animation: none; } }
+@media (prefers-reduced-motion: reduce) { #trend-stack[data-deal="1"] .plane-card { animation: none; } }
 @keyframes cardMaterialize { from { opacity: 0; transform: translateY(5px) scale(0.985); } to { opacity: 1; transform: none; } }
 @theme inline {
   --animate-sheet-in-left:   sheetInLeft   0.28s cubic-bezier(0.22, 1, 0.36, 1);

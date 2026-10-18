@@ -387,18 +387,18 @@ export default function TrendStack() {
   // axis, recognised in `onPointerUp` by `domain/planeSwipe.ts` — and the plot's horizontal axis
   // stays the brush's. The rail's heading control and the keys remain the mouse's routes.
   const [swipeAxis, setSwipeAxis] = useState<"x" | "y">("y");
-  // Released on the roll's SETTLE (the settled flag's false→true edge), never while it is still
-  // true from before the change: the axis is set in the same batch as the measure write, a beat
-  // before the staged hook has even started the roll.
-  const wasSettled = useRef(true);
+  // The axis belongs to ONE measure change: a swipe arms it just before its own write, and every
+  // other change of the measure — the heading picker, the keys, a view entry — reads as vertical
+  // (review: a settle-edge release never fired under reduced motion and latched the sideways roll).
+  const swiped = useRef(false);
   useEffect(() => {
-    if (!wasSettled.current && staged.settled) setSwipeAxis("y");
-    wasSettled.current = staged.settled;
-  }, [staged.settled]);
+    setSwipeAxis(swiped.current ? "x" : "y");
+    swiped.current = false;
+  }, [metric]);
   const stepMeasure = (dir: -1 | 1, axis: "x" | "y" = "y") => {
     const next = stepMetric(useStore.getState().trendMetric, dir);
     if (!next) return;
-    setSwipeAxis(axis);
+    swiped.current = axis === "x";
     setMetric(next);
   };
   // ONE write path (rule 2): the table decides what a plane click means, the executor applies it.
@@ -611,6 +611,9 @@ export default function TrendStack() {
             {p && (
               <TrendChart
                 name={row.name}
+                // No touch brush on a plane (2026-10-18): the band's timeline is the one touch range
+                // control, and a horizontal flick here steps the measure.
+                touchBrush={false}
                 // ITS OWN SYNC GROUP (2026-09-19). recharts syncs hover across every chart sharing
                 // a `syncId`, and the stack stays MOUNTED behind the raw layer's document — so on
                 // the document's shared group a hover there re-rendered these five hidden plots.

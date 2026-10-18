@@ -267,4 +267,5 @@ async function probeArchive(net: NetworkId): Promise<ArchiveInfo> {
 
 // Archival membership changes on operator timescales, not tick timescales — 6h is generous.
 export const getArchiveInfo = (net: NetworkId): Promise<ArchiveInfo> =>
-  unstable_cache(() => probeArchive(net), ["archive-probe-v2", net], { revalidate: 21600 })();
+  // v3: global entries carry `port` (2026-10-18) — the key moves with the field set.
+  unstable_cache(() => probeArchive(net), ["archive-probe-v3", net], { revalidate: 21600 })();

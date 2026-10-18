@@ -1309,10 +1309,10 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // THE GLOBAL MENU'S ROWS: the retained window, newest first, with the explorer's own age words;
   // under a scope (the filter's network, a door's, or the bar's own pick) only the ticks that
   // network anchored into (`snapsAtTick`, the join every ledger surface uses).
-  // Per render, no memo: a few dozen globals against one network's records, and the table already
-  // re-renders on every tick and every second (the ages).
+  // Only while the bar is open (review: it was built on every one-second re-render for a menu
+  // nobody could see); then per render, a few dozen globals against one network's records.
   const tickOptions = (() => {
-    if (!net) return [];
+    if (!net || !searchOpen) return [];
     const scope = histNet;
     const t = Date.now();
     return [...net.globalSnapshots]
@@ -1390,14 +1390,17 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
    *  still resolving (`wanted`). `rowSel` is whether the row is already the selection. */
   const commitRow = (r: ViewRow, rowSel: boolean) => {
     const seam = r.metaId == null;
+    // A commit withdraws any still-anchoring row's request (review: the deferred commit could land
+    // seconds later over a row the reader had since chosen).
+    setWanted(null);
     // PHONE: the list and the snapshot are two pages (design 2026-10-02, option B), so a tap on
     // the ALREADY-selected row opens its page rather than deselecting it — there the toggle would
     // close the very thing the reader asked to read.
     if (onOpen && rowSel) return onOpen();
     if (onOpen && !seam) queueMicrotask(onOpen);
-    if (seam || r.metaId == null) {
-      // Nothing anchored here, so the only subject is the TICK — commit it alone rather than
-      // inventing a metagraph snapshot the row does not have (rule 10).
+    if (r.metaId == null) {
+      // A seam: nothing anchored here, so the only subject is the TICK — commit it alone rather
+      // than inventing a metagraph snapshot the row does not have (rule 10).
       applyClickActions(
         metaSnapArrivalActions(null, { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot }),
       );

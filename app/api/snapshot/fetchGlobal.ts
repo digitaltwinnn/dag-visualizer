@@ -38,6 +38,15 @@ async function tryLb(net: NetworkId, ordinal: number): Promise<{ ok: true; json:
   }
 }
 
+/** Fisher–Yates, in place. */
+function shuffle<T>(a: T[]): T[] {
+  for (let i = a.length - 1; i > 0; i--) {
+    const k = Math.floor(Math.random() * (i + 1));
+    [a[i], a[k]] = [a[k]!, a[i]!];
+  }
+  return a;
+}
+
 export async function fetchGlobalJson(net: NetworkId, ordinal: number): Promise<unknown> {
   let lb: string;
   const skipping = (lbSkipUntil.get(net) ?? 0) > Date.now();
@@ -63,18 +72,17 @@ export async function fetchGlobalJson(net: NetworkId, ordinal: number): Promise<
   // snapshot?"). The census records every global node's floor..latest; the "archival" list is the
   // subset reaching the 2023 era floor, and on a day no node reaches it (2026-10-18: archivalCount
   // 0 while three nodes served from Aug 2024) the fallback had nothing to try — so a year-old
-  // snapshot failed although nodes held it. SHALLOWEST sufficient floor first, so the few long
-  // archives are not asked for what every node still has; the archival list, shuffled, stays as
-  // the last resort for a census with no per-node entries.
-  const covering = (info?.entries ?? [])
-    .filter((e) => e.chain === "global" && e.floor <= ordinal && ordinal <= e.latest)
-    .sort((a, b) => b.floor - a.floor)
+  // snapshot failed although nodes held it. FLOOR ONLY: a node serves floor..now, and the census's
+  // `latest` is the tip at probe time, hours stale (review, 2026-10-18 — bounded by it, every live
+  // ordinal matched no entry). Shallowest sufficient floor first, in BUCKETS of ~half a year with
+  // a random order inside each, so the few long archives are not asked for what every node still
+  // has and no single node takes every read (the loop below shares the load the same way for the
+  // archival list, the last resort for a census with no per-node entries).
+  const BUCKET = 500_000;
+  const covering = shuffle((info?.entries ?? []).filter((e) => e.chain === "global" && e.floor <= ordinal))
+    .sort((a, b) => Math.floor(b.floor / BUCKET) - Math.floor(a.floor / BUCKET))
     .map((e) => ({ ip: e.ip, port: e.port ?? 9000 }));
-  const targets = covering.length ? covering : (info?.archival ?? []).slice();
-  for (let i = covering.length ? 0 : targets.length - 1; i > 0; i--) {
-    const k = Math.floor(Math.random() * (i + 1));
-    [targets[i], targets[k]] = [targets[k], targets[i]];
-  }
+  const targets = covering.length ? covering : shuffle((info?.archival ?? []).slice());
   for (const t of targets) {
     try {
       const a = await fetch(`http://${t.ip}:${t.port}/global-snapshots/${ordinal}`, {

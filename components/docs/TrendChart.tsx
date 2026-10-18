@@ -117,6 +117,7 @@ export default function TrendChart({
   sampled,
   gaps,
   onRange,
+  touchBrush = true,
   inspect,
   readout,
   scaleMax,
@@ -174,6 +175,9 @@ export default function TrendChart({
    *  selection drives the whole column (the shared-axis rule), so this chart never cuts
    *  itself. Omitted (or a coarse pointer), the plot is read-only as before. */
   onRange?: (fromMs: number, toMs: number) => void;
+  /** Whether a TOUCH drag across the plot brushes a range (the document's charts); the stack's
+   *  planes decline it (2026-10-18) — their horizontal flick is the measure step. */
+  touchBrush?: boolean;
   /** One step down the ladder: "open these buckets as records". Rendered as a small action in
    *  the head — the page passes it only while a range is active and the chart knows its chain. */
   inspect?: () => void;
@@ -571,6 +575,7 @@ export default function TrendChart({
                 sampled={sampled}
                 gaps={gaps}
                 onRange={onRange}
+                touchBrush={touchBrush}
                 fill={fill}
                 stack={stack}
                 plotH={plotHeight}
@@ -666,6 +671,7 @@ const TrendPlot = memo(function TrendPlot({
   sampled,
   gaps,
   onRange,
+  touchBrush = true,
   fill,
   stack,
   plotH,
@@ -683,6 +689,7 @@ const TrendPlot = memo(function TrendPlot({
   sampled?: (number | null)[];
   gaps?: (number | null)[];
   onRange?: (fromMs: number, toMs: number) => void;
+  touchBrush?: boolean;
   /** See the outer component's prop — a plain boolean, so it holds the memo still. */
   fill?: boolean;
   /** See the outer component's prop. */
@@ -741,16 +748,24 @@ const TrendPlot = memo(function TrendPlot({
         // phone). The plate's `touch-pan-y` splits the gestures: a horizontal drag selects,
         // a vertical swipe still scrolls the document. Touchstart may fire before recharts
         // has a coordinate, so the drag begins lazily on the first labelled event.
+        // …BUT NOT ON THE STACK'S PLANES (user, 2026-10-18: "I can swipe the chart and that looks
+        // like it's selecting a range, but it only works in the vitals selector … most sense is
+        // not to allow it in the card, so that it's clear the control in vitals is meant for it"):
+        // a plane passes `touchBrush={false}`, its horizontal flick steps the measure instead, and
+        // the band's timeline is the one touch range control.
         onTouchStart: (e: { activeLabel?: string | number }) => {
+          if (!touchBrush) return;
           const ts = Number(e?.activeLabel);
           if (Number.isFinite(ts)) setDrag({ a: ts, b: ts });
         },
         onTouchMove: (e: { activeLabel?: string | number }) => {
+          if (!touchBrush) return;
           const ts = Number(e?.activeLabel);
           if (!Number.isFinite(ts)) return;
           setDrag((d) => (d ? { a: d.a, b: ts } : { a: ts, b: ts }));
         },
         onTouchEnd: () => {
+          if (!touchBrush) return;
           // The closure's `drag`, like onMouseUp — committing inside a setState updater
           // would double-fire under Strict Mode (updaters must stay pure).
           if (drag) {
