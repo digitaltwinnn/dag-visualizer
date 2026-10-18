@@ -300,27 +300,31 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
         onRelease: () => setPath(CLOSED_PATH),
       },
       measure: { options: LEDGER_MEASURE_OPTIONS, value: ledgerMeasure, onPick: (id) => setLedgerMeasure(id as LedgerMeasure) },
-      // The held list's ONE control: how many ticks arrived behind the pin, and the way back to
-      // them. It is the follow switch (`followToggleActions` through the one executor) — the same
-      // write the card's own pill makes — shown here only while there is something to resume to.
-      setting:
-        held.newer > 0 && snap ? (
-          <button
-            type="button"
-            onClick={() => applyClickActions(followToggleActions(snap, false))}
-            className="inline-flex items-center gap-1.5 rounded-sm px-1.5 -mr-1.5 py-[3px] min-h-6 text-label text-foreground whitespace-nowrap cursor-pointer select-none hover:bg-wash-hover focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
-          >
-            <LiveDot />
-            <span className="tabular-nums">{held.newer}</span> newer
-          </button>
-        ) : undefined,
       hasFigure: true,
       // A 4-decimal fee ("0.0680") needs the wider figure column; the width holds across the
       // level's measures so the columns never shift when the heading's pick changes.
       figureW: 48,
       // "Waiting" is a promise; a network that has never answered gets the honest state instead.
       empty: dead ? NO_SIGNAL_COPY : "Waiting for snapshots…",
-      rows: pagedSnaps.map((d, i): ExplorerRowSpec => {
+      // THE TICKS THAT ARRIVED BEHIND THE PIN ARE THE LIST'S FIRST ROW (user, 2026-10-18: "fits
+      // better as the top row inside the explorer, similar to the scene, which animates the extra
+      // thin bar at the front when new snapshots arrive while it keeps the pinned one visible"). It
+      // rode the heading as a setting-style button until then. A live-dot row, "3 newer", sliding
+      // in from the top as the scene's front bar does; its click is the follow switch
+      // (`followToggleActions` through the one executor) — the same write the card's pill makes.
+      rows: (held.newer > 0 && snap
+        ? [
+            {
+              key: "newer",
+              glyph: <LiveDot />,
+              name: <span><span className="tabular-nums">{held.newer}</span> newer</span>,
+              hue: "var(--primary)",
+              className: "animate-in fade-in slide-in-from-top-2 duration-300 motion-reduce:animate-none",
+              onClick: () => applyClickActions(followToggleActions(snap, false)),
+            } as ExplorerRowSpec,
+          ]
+        : ([] as ExplorerRowSpec[])
+      ).concat(pagedSnaps.map((d, i): ExplorerRowSpec => {
         const count = tickFilterCount(d);
         const v = tickValues[i];
         const globalPick = { kind: "snapshot", title: `Global snapshot #${d.ordinal}`, data: d } as const;
@@ -376,7 +380,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           },
           pair: subjectPairing(hoverSnapOrd, d.ordinal, setHoverSnapOrd, accent),
         };
-      }),
+      })),
       pager:
         live && orderedSnaps.length > 0 ? (
           <TablePager

@@ -59,6 +59,8 @@ export interface ExplorerRowSpec {
   rung?: string;
   /** A real-but-empty subject: present, dimmed. */
   faint?: boolean;
+  /** Extra classes on the row root — an arrival animation, never geometry. */
+  className?: string;
   onClick?: () => void;
   /** The scene↔HUD hover pairing (`useSubjectPairing.subjectPairing`), when the subject has one. */
   pair?: {
@@ -278,6 +280,7 @@ export default function Explorer({ id, title, hint, placeholder, levels: selecte
                     on={r.on}
                     hue={r.hue}
                     faint={r.faint}
+                    className={r.className}
                     onClick={r.on && r.rung && r.onClick ? () => openOrToggle(r.rung!, r.onClick!) : r.onClick}
                     pair={r.pair}
                   />
