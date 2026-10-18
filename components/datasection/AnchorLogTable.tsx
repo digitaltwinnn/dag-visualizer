@@ -330,6 +330,12 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // "I looked this up" is not "I committed this" — the mark carries no card, no scene subject and
   // no store write, and a real selection still paints over it.
   const [marked, setMarked] = useState<number | null>(null);
+  // A ROW CLICKED WHILE ITS GLOBAL WAS STILL RESOLVING (user, 2026-10-18: a just-arrived snapshot
+  // clicked in the live log "does not automatically decompress"). Such a row was inert — half a
+  // (snapshot, tick) pair must not commit — and nothing said so, so the click read as a failed
+  // decompress. The click is now a REQUEST: the row is remembered here, wears the landing outline,
+  // and commits itself the moment its anchor lands (the effect beside `commitRow`).
+  const [wanted, setWanted] = useState<{ metaId: string; ordinal: number } | null>(null);
   const [jumpMiss, setJumpMiss] = useState<string | null>(null);
   // ⚠️ SEARCHING IS ASKED FOR, NOT ALWAYS ON (user, 2026-09-01: "can we make the search a more
   // deliberate action? … it now kinda looks like the search row is actually part of the data, and
@@ -1349,6 +1355,43 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
    *
    *  ⚠️ Rendered by BOTH branches, like the row itself: a seek swaps the table into its loading
    *  state, and a toolbar that vanishes mid-seek takes the only way out with it. */
+  /** A ROW'S COMMIT — the click's, and the deferred one of a row clicked while its global was
+   *  still resolving (`wanted`). `rowSel` is whether the row is already the selection. */
+  const commitRow = (r: ViewRow, rowSel: boolean) => {
+    const seam = r.metaId == null;
+    // PHONE: the list and the snapshot are two pages (design 2026-10-02, option B), so a tap on
+    // the ALREADY-selected row opens its page rather than deselecting it — there the toggle would
+    // close the very thing the reader asked to read.
+    if (onOpen && rowSel) return onOpen();
+    if (onOpen && !seam) queueMicrotask(onOpen);
+    if (seam || r.metaId == null) {
+      // Nothing anchored here, so the only subject is the TICK — commit it alone rather than
+      // inventing a metagraph snapshot the row does not have (rule 10).
+      applyClickActions(
+        metaSnapArrivalActions(null, { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot }),
+      );
+      return;
+    }
+    applyClickActions(
+      metaSnapSelectActions(
+        { metaId: r.metaId, ordinal: r.ordinal, hash: r.hash, globalOrdinal: r.global.ordinal, ts: r.ts },
+        { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot },
+        { metaSnap, following, inspect: useStore.getState().inspect },
+      ),
+    );
+  };
+  // The deferred commit: once the wanted row's anchor has landed it commits exactly as a click
+  // would; a row that left the page (a page turn, a search) drops the request. Every render, on
+  // purpose — `rows` is built per render and the find is a page's worth of rows.
+  useEffect(() => {
+    if (!wanted) return;
+    const r = rows.find((x) => x.metaId === wanted.metaId && x.ordinal === wanted.ordinal);
+    if (!r) { setWanted(null); return; }
+    if (r.pending) return;
+    setWanted(null);
+    commitRow(r, false);
+  });
+
   const toolbar = (
     // `pb-2` — the same 8px the box below it keeps to the table, so the search block sits in an
     // even rhythm instead of being pinched against its own trigger (user, 2026-09-01).
@@ -1675,30 +1718,16 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                   <Empty why="Not read yet. The size is measured from the global snapshot this one anchored into — open the row to read it." />
                 );
               const commit = () => {
-                if (pending) return; // half a (snapshot, tick) pair must not commit
-                // PHONE: the list and the snapshot are two pages (design 2026-10-02, option B), so
-                // a tap on the ALREADY-selected row opens its page rather than deselecting it —
-                // there the toggle would close the very thing the reader asked to read.
-                if (onOpen && rowSel) return onOpen();
-                if (onOpen && !seam) queueMicrotask(onOpen);
-                if (seam || r.metaId == null) {
-                  // Nothing anchored here, so the only subject is the TICK — commit it alone rather
-                  // than inventing a metagraph snapshot the row does not have (rule 10).
-                  applyClickActions(
-                    metaSnapArrivalActions(
-                      null,
-                      { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot },
-                    ),
-                  );
+                if (pending) {
+                  // Half a (snapshot, tick) pair must not commit — but the click is kept as a
+                  // request and lands with the anchor (`wanted`, its effect beside `commitRow`).
+                  if (r.metaId != null) {
+                    setWanted({ metaId: r.metaId, ordinal: r.ordinal });
+                    setMarked(r.ordinal);
+                  }
                   return;
                 }
-                applyClickActions(
-                  metaSnapSelectActions(
-                    { metaId: r.metaId, ordinal: r.ordinal, hash: r.hash, globalOrdinal: r.global.ordinal, ts: r.ts },
-                    { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot },
-                    { metaSnap, following, inspect: useStore.getState().inspect },
-                  ),
-                );
+                commitRow(r, rowSel);
               };
               return (
                 <Fragment key={r.metaId == null ? `tick:${r.global.ordinal}` : `${r.metaId}:${r.ordinal}`}>
@@ -1787,7 +1816,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                     grouped
                       ? "max-[700px]:items-center max-[700px]:[&>td]:py-2"
                       : "max-[700px]:items-baseline max-[700px]:[&>td]:pb-0 max-[700px]:[&>td:last-child]:pb-2",
-                    pending ? "cursor-default" : "cursor-pointer",
+                    pending ? "cursor-progress" : "cursor-pointer",
                     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                     rowSel && "bg-[var(--sel-bg)] text-foreground",
                     // The jump's landing mark — an OUTLINE, never a wash: the two washes above are
