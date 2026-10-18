@@ -163,12 +163,14 @@ export default function TopBar() {
         onClick={() => { if (target) { setStrip(null); setMode(target); } }}
         className={cn(
           "hidden max-[700px]:inline-flex items-center justify-center size-11 rounded-btn bg-transparent border-0 cursor-pointer",
-          "text-muted-foreground hover:text-foreground hover:bg-wash-soft",
-          "disabled:opacity-35 disabled:cursor-default disabled:hover:bg-transparent",
+          // In the ACCENT (user, 2026-10-18: muted they "look a bit boring/blend"): a control that
+          // moves the view wears the control colour, dimmed at an end.
+          "text-primary-ink hover:bg-wash-soft",
+          "disabled:opacity-30 disabled:cursor-default disabled:hover:bg-transparent",
           "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
         )}
       >
-        <Glyph aria-hidden className="size-5" />
+        <Glyph aria-hidden className="size-6" strokeWidth={2.25} />
       </button>
     );
   };
@@ -448,17 +450,8 @@ export default function TopBar() {
                 {doc ? DOC_PAGES[doc].label : VIEWS.find((v) => v.id === mode)?.name}
               </span>
             </span>
-            <span aria-hidden className={cn("flex items-center gap-1", doc && "invisible")}>
-              {LISTED_VIEWS.map((v) => (
-                <span
-                  key={v.id}
-                  className={cn(
-                    "h-[4px] rounded-full transition-[width,background-color] duration-200 motion-reduce:transition-none",
-                    v.id === mode ? "w-3 bg-primary" : "w-[4px] bg-muted-foreground/45",
-                  )}
-                />
-              ))}
-            </span>
+            {/* The pip row that sat here (2026-10-08) retired with the chevrons (user, 2026-10-18:
+                "has both … the <> is more intuitive"): two position cues were one too many. */}
           </span>
           <span className="sr-only"> — switch view (or swipe the bar)</span>
         </button>

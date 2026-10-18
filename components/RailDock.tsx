@@ -570,6 +570,18 @@ export default function RailDock({
     // (~160ms of release velocity carried forward), not where the finger stopped. The hard
     // flick-dismiss rule stays on top: a genuine throw down closes from anywhere.
     const hp = h - vy * 160;
+    // FROM FULL, THE FIRST DETENT DOWN IS THE REST (user, 2026-10-18: "it goes straight to
+    // collapsed a bit too quickly, it's too sensitive"): a flick or a pull from the top lands on
+    // the resting fit, and only a pull that leaves the sheet below half the rest — by position,
+    // not projection — dismisses from there. The flick-dismiss keeps its word from the rest.
+    const fromFull = d.startH > rest + 8;
+    if (fromFull) {
+      armSnap();
+      if (h < rest * 0.55) { onSheetPx?.(null); handleOpenChange(false); return; }
+      if (vy < -FLICK || hp > (rest + fullPx(d.el)) / 2) { onSheetPx?.(fullPx(d.el)); return; }
+      onSheetPx?.(null);
+      return;
+    }
     if (vy > FLICK || hp < rest * 0.55) {
       // Fast flick down, or projected to land well below where it rested → dismiss (same as retap).
       onSheetPx?.(null);
