@@ -464,7 +464,16 @@ export default function Inspector() {
   // below the deepest committed card is a STEP — clicking it commits that card's first child
   // (`childStep`, the explorer's own first row), so stepping down happens where the level is drawn.
   // The rail's state is read by the pager's own builder, so the step and the pager cannot disagree.
-  const deepestId = presentLadderIds[presentLadderIds.length - 1] ?? null;
+  // …the deepest rung of the UNBROKEN run from the top, not the deepest present card: a node
+  // carried in from another view stands below a gap in Snapshots (its ladder gives a node no
+  // ancestry), and read as "the deepest" it left the Global snapshot card with no step down to
+  // the tick's networks (user, 2026-10-18: "we can't navigate the rung down from the snapshot card
+  // to the metagraph card, lower in the rung there is the node card").
+  let deepestId: string | null = null;
+  for (const id of ladderIds) {
+    if (!presentOf(id)) break;
+    deepestId = id;
+  }
   const deepestKind = deepestId ? (manifest.find((c) => c.id === deepestId)?.kind ?? null) : null;
   const siblingState = useSiblingState(deepestKind);
   const nextStep = useMemo(() => {
