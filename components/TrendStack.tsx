@@ -74,7 +74,7 @@ import { headWord, metricCaption, sharedCeiling, stepMetric } from "@/src/data/t
 import { swipeIntent, swipeOf } from "@/src/engine/domain/planeSwipe";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import {
-  frontPlane, MORE_ID, moreCount, morePose, planeFormat, stackPoses, planeBehind } from "@/src/engine/domain/trendStack";
+  frontPlane, MORE_ID, moreCount, morePose, planeFormat, stackPoses } from "@/src/engine/domain/trendStack";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -350,13 +350,13 @@ export default function TrendStack() {
     stopVerticalTouch(e);
     vertical.current = false;
   };
-  const onPointerUp = (e: React.PointerEvent, id: string) => {
+  const onPointerUp = (e: React.PointerEvent) => {
     const d = down.current;
     down.current = null;
     dragged.current = dragged.current || (!!d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > DRAG_SLOP);
     // A SWIPE ON A CARD (user, 2026-10-09; `domain/planeSwipe.ts` has the rules): a finger's flick
-    // along one axis — down brings this card forward, up on the front card sends it back (the card
-    // behind comes forward), left and right step the measure, the keys' own steps. Touch only; the
+    // along one axis — up sends the front card back (the next comes forward), down brings the
+    // previous one back, wrapping, so the stack rotates; left and right step the measure. Touch only; the
     // plot keeps its horizontal drag for the brush, so only its vertical answers. The click the
     // browser synthesises after the release is dropped by `dragged` above, so a swipe never also
     // lands as a tap. Read through the ONE write path and the ONE setter the keys use (rule 2).
@@ -365,9 +365,10 @@ export default function TrendStack() {
     if (!dir) return;
     const st = useStore.getState();
     // The front as the STACK has it: the focus only while the window still holds it (a paged-away
-    // or re-ranked-out focus is nobody's front — `planeBehind` applies the same guard).
+    // or re-ranked-out focus is nobody's front). Up/down walk the whole roster from there
+    // (`planeStep`, 2026-10-18) — the executor pages the window after the step.
     const focus = st.trendFocus && order.includes(st.trendFocus) ? st.trendFocus : null;
-    const intent = swipeIntent(dir, id, { front: focus ?? frontPlane(order, st.trendScroll), behind: planeBehind(order, st.trendScroll, st.trendFocus), focus: st.trendFocus });
+    const intent = swipeIntent(dir, { order, front: focus ?? frontPlane(order, st.trendScroll) });
     if (!intent) return;
     if (intent.kind === "measure") stepMeasure(intent.step);
     else applyClickActions(trendPlaneActions(intent.id, st.trendFocus));
@@ -522,7 +523,7 @@ export default function TrendStack() {
             )}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
-            onPointerUp={(e) => onPointerUp(e, pose.id)}
+            onPointerUp={onPointerUp}
             onTouchMoveCapture={stopVerticalTouch}
             onTouchEndCapture={onTouchEndCapture}
             // THE INTERACTIVE PLANE'S WHOLE BODY is a target too — it is the one plane a click
