@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import { ledgerCardNetwork } from "@/src/engine/domain/tickNet";
+import { pickNetId } from "@/src/engine/domain/pickActions";
 import { cardNetwork } from "@/src/engine/domain/trendStack";
 import type { TickNetSel } from "@/src/data/types";
 import { EXPLORE_ICON, INSTANT_ICON, RANGE_ICON, iconForPick } from "@/components/icons";
@@ -289,6 +290,7 @@ function contextHint(s: RailManifestState): string | null {
   // The filter IS set, and its card stood down: this tick holds nothing of that network.
   if (s.mode === "ledger" && s.filter !== "all" && s.snap && s.tickHasFilter === false && s.filterLabel)
     return `${s.filterLabel} did not anchor into this snapshot.`;
+  if (s.mode === "geo") return "Pick one in the top-bar filter, or select a node.";
   return "Pick one in the top-bar filter.";
 }
 function nodeHint(s: RailManifestState): string | null {
@@ -374,10 +376,18 @@ export function metagraphCardNetwork(s: {
   tickHasFilter?: boolean;
   trendFocus?: string | null;
   trendFront?: string | null;
+  inspect?: PickDescriptor | null;
 }): string {
   if (s.mode === "ledger")
     return ledgerCardNetwork({ filter: s.filter, tickNet: s.tickNet ?? null, snapOrdinal: s.snap?.data.ordinal ?? null, tickHasFilter: s.tickHasFilter });
   if (s.mode === "trend") return cardNetwork(s.filter, s.trendFocus ?? null, s.trendFront ?? null);
+  // IN GEOGRAPHY it is the committed NODE's network while the filter is All (2026-10-18, user:
+  // "click a node: it should also populate the dossier card"). A geo node never writes the filter
+  // (the view's own rule), so the card had stayed a ghost under a committed node; it now stands on
+  // the node's network the way Snapshots' stands on the tick's — ONE rule across the views: the
+  // Metagraph card is the committed subject's network. A machine on two networks pages between
+  // them (`siblingSet("context")`).
+  if (s.mode === "geo" && s.filter === "all" && s.inspect) return pickNetId(s.inspect) ?? s.filter;
   return s.filter;
 }
 

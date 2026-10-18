@@ -43,6 +43,7 @@ import {
   metaSnapSelectActions,
   tickNetSelectActions,
   nodeSelectActions,
+  pickNetId,
   sameCohort,
   snapshotSelectActions,
 } from "@/src/engine/domain/pickActions";
@@ -51,7 +52,7 @@ import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { snapshotSignerRows } from "@/src/data/network";
 import { UNLISTED_ID } from "@/src/data/unlisted";
 import type { RailCardKind } from "@/components/railCards";
-import { rangeBuckets } from "@/src/data/trendWindow";
+import { rangeBuckets, ZOOMS, type ZoomId } from "@/src/data/trendWindow";
 import { stampInstant } from "@/src/data/trendTimeline";
 import { cohortsLevel, countriesLevel, countryNodes, machinesOf, networksLevel, nodeOrder, nodesByCountry, type Cohort, type TickNetwork, type TickSnap } from "@/src/data/ladderLevels";
 import type { GeoMeasure } from "@/src/data/geoMeasure";
@@ -99,6 +100,8 @@ export interface SiblingState {
   tickNets: TickNetwork[] | null;
   /** History's brushed range and time cursor — the Range card and the Moment under it. */
   trendRange: { fromMs: number; toMs: number } | null;
+  /** The window the stack shows while no range stands — the Range card's own set (`siblingSet`). */
+  trendWindow: ZoomId;
   trendCursorMs: number | null;
   /** History's plane focus — the network its Metagraph card stands on when set. */
   trendFocus?: string | null;
@@ -108,6 +111,11 @@ export interface SiblingStep {
   key: string;
   label: string;
   actions: ClickAction[];
+  /** A SETTING step, not a selection (2026-10-18): the Range card standing on a window steps the
+   *  WINDOW pills (user: "when it's the default range, makes sense to swipe left/right and set the
+   *  different default ranges"). A window is the stack's setting, written by its own setter like
+   *  the picker writes it — so the pager applies this instead of `actions`, which stay empty. */
+  setting?: { trendWindow: ZoomId };
 }
 
 export interface SiblingSet {
@@ -123,6 +131,10 @@ export interface SiblingSet {
 }
 
 // ---------------------------------------------------------------------------
+
+/** The machine behind a pick — its IP, the one thing a validator row and a metagraph-node row of
+ *  the same box share (their ids are per layer). */
+const machineIp = (p: PickDescriptor): string | null => ("node" in p && p.node && "ip" in p.node ? ((p.node as { ip?: string }).ip ?? null) : null);
 
 const networkLabel = (s: SiblingState): string =>
   s.filter === "all" ? "All networks" : (s.metaList.find((m) => m.id === s.filter)?.name ?? s.filter);
@@ -222,6 +234,29 @@ const cohortsIn = (s: SiblingState, cc: string) => cohortsLevel(countryNodes(cc,
 export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | null {
   switch (slot) {
     case "context": {
+      // GEOGRAPHY, STANDING ON A NODE (2026-10-18): the card is the committed node's network, so
+      // its siblings are THAT MACHINE's other networks — a hybrid validating the DAG and running a
+      // metagraph is two rows at one IP — each step the same node select the row's click runs
+      // (place and provider re-committed, the filter untouched). One network is no set.
+      if (s.mode === "geo" && s.filter === "all" && s.inspect) {
+        const ip = machineIp(s.inspect);
+        const cur = pickNetId(s.inspect);
+        if (!ip || !cur) return null;
+        const seen = new Set<string>();
+        const rows = s.allNodes.filter((r) => {
+          const n = pickNetId(r.pick);
+          if (!n || machineIp(r.pick) !== ip || seen.has(n)) return false;
+          seen.add(n);
+          return true;
+        });
+        if (rows.length < 2) return null;
+        const items = rows.map((r) => ({
+          key: pickNetId(r.pick)!,
+          label: s.metaList.find((m) => m.id === pickNetId(r.pick))?.name ?? pickNetId(r.pick)!,
+          actions: nodeSelectActions(r.pick, { mode: "geo", currentFilter: s.filter }),
+        }));
+        return finish(slot, items, rows.findIndex((r) => pickNetId(r.pick) === cur), "This node's networks");
+      }
       // The card's subject: the app filter — or, in the ledger, the network the chamber resolves
       // against (the tick-local commit wins inside its tick).
       const net = netOf(s);
@@ -411,6 +446,15 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
       // A pin that has aged out of the retained window can't be located, so it gets no pager
       // rather than a plank whose "adjacent" tick would be a guess (finish's index rule).
       return finish(slot, items, s.ticks.findIndex((t) => t.data.ordinal === cur.data.ordinal), "Snapshot stream", true);
+    }
+
+    // THE WINDOWS (user, 2026-10-18): while the Range card stands on a window — no range brushed —
+    // its siblings are the six window pills, in the picker's order, so a swipe on the card steps
+    // what the pills step. Under a brushed range the card is that one span and pages nothing.
+    case "range": {
+      if (s.trendRange) return null;
+      const items: SiblingStep[] = ZOOMS.map((z) => ({ key: z.id, label: z.label, actions: [], setting: { trendWindow: z.id } }));
+      return finish(slot, items, ZOOMS.findIndex((z) => z.id === s.trendWindow), "Time windows");
     }
 
     // THE MOMENTS OF THE RANGE (user, 2026-10-07): under a brushed range the Moment card steps its

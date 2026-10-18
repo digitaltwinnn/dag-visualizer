@@ -51,7 +51,11 @@ export default function ContextCard({
   // so there is nothing for an × to clear, and the head shows none.
   const trendFocus = useStore((s) => s.trendFocus);
   const chartStack = useStore((s) => VIEW_POLICIES[s.mode].chartStack);
-  const clearable = filter === appFilter || !chartStack || trendFocus != null;
+  // …and in GEOGRAPHY a card standing on the committed node's network has nothing of its own to
+  // clear: the node card's × releases the node (2026-10-18).
+  const mode = useStore((s) => s.mode);
+  const onNode = mode === "geo" && filter !== appFilter;
+  const clearable = !onNode && (filter === appFilter || !chartStack || trendFocus != null);
   const close = () => {
     const st = useStore.getState();
     applyClickActions(
