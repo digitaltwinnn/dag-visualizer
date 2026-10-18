@@ -70,7 +70,8 @@ import useTrendsSlice from "@/components/useTrendsSlice";
 import useStagedMeasure, { ROLL_CLASS, useHeldOrder } from "@/components/useStagedMeasure";
 import { cn } from "@/lib/utils";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
-import { headWord, metricCaption, sharedCeiling, stepMetric } from "@/src/data/trendSeries";
+import { headWord, metricCaption, sharedCeiling, stepMetric, METRIC_LABELS } from "@/src/data/trendSeries";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { swipeIntent, swipeOf } from "@/src/engine/domain/planeSwipe";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import {
@@ -606,6 +607,37 @@ export default function TrendStack() {
                   : {}),
               }}
             >
+            {/* ‹ › ON THE FRONT CARD'S EDGES (user, 2026-10-18: "it's unclear that the trend cards can
+                scroll left/right, add a nicely looking <> here as well, also in regular view") — the
+                measure step the keys and the heading control run, as a carousel's own idiom: a round
+                accent button on each side edge, dimmed at the list's ends. The plane's click and
+                swipe must not hear it, so the press stops at the button. Front card only: the rear
+                cards are inert and the step is the whole stack's. */}
+            {pose.interactive &&
+              ([-1, 1] as const).map((dir) => {
+                const target = stepMetric(metric, dir);
+                const Glyph = dir === -1 ? ChevronLeft : ChevronRight;
+                return (
+                  <button
+                    key={dir}
+                    type="button"
+                    disabled={!target}
+                    aria-label={target ? `Measure: ${METRIC_LABELS[target]}` : dir === -1 ? "First measure" : "Last measure"}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onPointerUp={(e) => e.stopPropagation()}
+                    onClick={(e) => { e.stopPropagation(); stepMeasure(dir); }}
+                    className={cn(
+                      "absolute top-1/2 -translate-y-1/2 z-10 inline-flex size-8 touch:size-11 items-center justify-center rounded-full cursor-pointer",
+                      "border border-border bg-[var(--panel-solid)] text-primary-ink shadow-none",
+                      "hover:bg-wash-soft disabled:opacity-30 disabled:cursor-default disabled:hover:bg-[var(--panel-solid)]",
+                      "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
+                      dir === -1 ? "-left-4 touch:-left-5" : "-right-4 touch:-right-5",
+                    )}
+                  >
+                    <Glyph aria-hidden className="size-5" strokeWidth={2.25} />
+                  </button>
+                );
+              })}
             {/* QUIET WHILE STALE — the plot only; the header, the card and its pairing hold. */}
             <div className="[transition:opacity_200ms_ease] group-data-[stale]/stack:opacity-45 motion-reduce:!transition-none">
             {p && (
