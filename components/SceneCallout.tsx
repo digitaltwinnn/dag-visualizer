@@ -178,7 +178,11 @@ export function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; cla
         {/* A hued aside is a TICKER beside a title, so it is the card head's own chip
             (`TickerChip`, 2026-10-02); the un-hued one is a state line and stays text. */}
         {m.aside && m.aside.hue ? (
-          <TickerChip text={m.aside.text} hue={m.aside.hue} className="ml-1" />
+          <span className="ml-1 inline-flex items-center gap-1.5">
+            {m.aside.live && <LiveDot />}
+            {m.aside.pinned && <PinMark />}
+            <TickerChip text={m.aside.text} hue={m.aside.hue} />
+          </span>
         ) : m.aside ? (
           // Age, then state — the order the card's own head reads (2026-10-03).
           <span className="inline-flex items-center gap-1.5 text-label text-muted-foreground ml-1">
@@ -410,7 +414,9 @@ export default function SceneCallout() {
         key: following ? `ms|${metaSnap.metaId}|live` : `ms|${metaSnap.metaId}|${metaSnap.ordinal}`,
         eyebrow: "Metagraph snapshot",
         title: metaSnap.ordinal.toLocaleString(),
-        aside: nnet ? { text: nnet.ticker, hue: nnet.hue } : undefined,
+        // The state mark the global's label carries (user, 2026-10-18: "pinned is not shown on the
+        // metagraph snapshot, that's also pinned") — a committed pair is live or pinned together.
+        aside: nnet ? { text: nnet.ticker, hue: nnet.hue, live: following, pinned: !following } : undefined,
         ring: nnet?.hue ?? "var(--primary)",
         mark: { icon: iconForPick("metaSnap"), hue: nnet?.hue ?? "var(--primary)" },
       };
