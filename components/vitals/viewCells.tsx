@@ -216,12 +216,13 @@ export function HyperCells({ accent }: { accent: string }) {
 // geo — the footprint cells (3): the fleet total, then two MERGED readings that each carry their
 // own total in a donut hole — countries over nodes-by-country, providers over top-providers.
 // Single hue — one measure per chart, magnitude only.
+const MUTED_RING = { other: "var(--muted-foreground)", unplaced: "var(--muted-foreground)" };
+
 export function GeoCells({ accent }: { accent: string }) {
   const lb = useStore((s) => s.leaderboard);
   const selNodes = useStore((s) => s.selNodes);
   const filter = useStore((s) => s.filter);
   const countries = lb?.countries ?? [];
-  const total = selNodes.length;
   const { ispCounts, topIsps, byRegion } = useMemo(() => {
     const ispCounts = new Map<string, number>();
     for (const r of selNodes) {
@@ -252,6 +253,16 @@ export function GeoCells({ accent }: { accent: string }) {
   // only the top three would draw them as the whole population — three slices summing to 100%
   // while a third of the nodes sit outside the chart. `other` carries them at the faintest step,
   // and its presence is what makes the visible slices' proportions true.
+  // The regions ring: the named rows, the folded remainder and the unplaced, so it partitions
+  // the whole selection like the two rings beside it.
+  const regionRows = [
+    ...byRegion.rows.slice(0, byRegion.rows.length > 4 ? 3 : 4).map((c) => ({ key: c.region, label: c.region, count: c.count })),
+    ...(byRegion.rows.length > 4
+      ? [{ key: "other", label: "other", count: byRegion.rows.slice(3).reduce((n, c) => n + c.count, 0), hue: "var(--muted-foreground)" }]
+      : []),
+    ...(byRegion.unplaced > 0 ? [{ key: "unplaced", label: "unplaced", count: byRegion.unplaced, hue: "var(--muted-foreground)" }] : []),
+  ];
+  const regionRing: Record<string, number> = Object.fromEntries(regionRows.map((r) => [r.key, r.count]));
   const countryRing: Record<string, number> = Object.fromEntries(topCountries.map((c) => [c.cc, c.count]));
   if (restC > 0) countryRing.other = restC;
   const ispRing: Record<string, number> = Object.fromEntries(topIsps);
@@ -275,15 +286,15 @@ export function GeoCells({ accent }: { accent: string }) {
           first, the band's four-row height kept by folding the rest into a muted `other`.
           `unplaced` is a row only while it is not zero: an instrument state worth stating, never a
           standing "0". */}
-      <BandCard label="Nodes"
-        lead={<span className="font-mono font-bold text-xl text-foreground tabular-nums"><Odometer int value={total || null} /></span>}>
-        <MicroBars accent={accent} labelW={120} rows={[
-          ...byRegion.rows.slice(0, byRegion.rows.length > 4 ? 3 : 4).map((c) => ({ key: c.region, label: c.region, count: c.count })),
-          ...(byRegion.rows.length > 4
-            ? [{ key: "other", label: "other", count: byRegion.rows.slice(3).reduce((n, c) => n + c.count, 0), hue: "var(--muted-foreground)" }]
-            : []),
-          ...(byRegion.unplaced > 0 ? [{ key: "unplaced", label: "unplaced", count: byRegion.unplaced, hue: "var(--muted-foreground)" }] : []),
-        ]} />
+      {/* ONE SHAPE WITH ITS NEIGHBOURS (user, 2026-10-18: "the large number shows the total node
+          count but the breakdown counts by sub region; keep consistent with the others, so it
+          should show the sub region count"): the hole counts REGIONS as the next card's counts
+          countries, the ring spreads the nodes across them, the rows name the top ones. The fleet
+          total left the band with it — the explorer's Countries head and the Hypergraph's
+          composition donut still state it. */}
+      <BandCard label="Top regions"
+        lead={<DonutTotal counts={regionRing} accent={accent} total={byRegion.rows.length} hues={MUTED_RING} />}>
+        <MicroBars accent={accent} labelW={120} rows={regionRows} />
       </BandCard>
       {/* "Top countries", not "Nodes by country" (user, 2026-09-01): the card shows the top three
           plus an `other` remainder, so the old name promised the whole distribution and the row
