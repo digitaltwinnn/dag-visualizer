@@ -180,7 +180,8 @@ previews the dim, picking closes it), **on phone the view switch is ONE face —
 icon and name, FLANKED BY ‹ › since 2026-10-18 (Vercel analytics: three quarters of visitors on a
 phone and most never leaving "/"; the swipe and the pip row were the only hints that other views
 exist, and neither reads as a control — the chevrons step through the same `stepView`, dimmed at
-the ends) — that opens the view list as a strip tenant** (`topbar/ViewPicker.tsx`, 2026-09-28: a
+the ends; in the ACCENT, and the pip row retired with them the same evening — "has both … the <> is
+more intuitive") — that opens the view list as a strip tenant** (`topbar/ViewPicker.tsx`, 2026-09-28: a
 row of 44px icons cannot scale with the view count — History made it five and the filter ran under
 the first tab — and hiding entries per tier is a patch the next view undoes; the segmented switch
 stays from 700px up, both presentations live in the DOM and CSS picks, and the hanging caption
@@ -1070,7 +1071,12 @@ inline in the return would quietly restore the bug for every consumer at once.
 - **The filter strip is chips above 700px and rows on the phone** (user, 2026-10-09, after design
   A1 had made every tier rows): one element list in `FilterPicker` wearing both through the 700
   arms — a vertical bar between chip groups, a hairline across the phone's column.
-- **History's cards take a SWIPE on touch** (2026-10-09, `domain/planeSwipe.ts`): a flick along one
+- **History's cards take a SWIPE on touch** (2026-10-09, `domain/planeSwipe.ts`; **the plane's touch
+  drag no longer brushes** since 2026-10-18 — user: it "looks like it's selecting a range, but it
+  only works in the vitals selector … so that it's clear the control in vitals is meant for it";
+  `TrendChart touchBrush={false}` on a plane, the band's timeline is the one touch range control,
+  a horizontal flick anywhere on the card steps the measure, and **‹ › on the front card's side
+  edges step it on every tier**, a carousel's idiom, dimmed at the list's ends): a flick along one
   axis — up/down WALK THE WHOLE STACK (2026-10-18, user: "it should rotate up or down through the
   whole stack"; `planeStep` — one step along the roster from the front, wrapping, whatever card
   the finger was on; the first cut stepped to "the card behind the front", which after a re-deal
@@ -1098,7 +1104,11 @@ it; can we swipe up to use the full screen?" — the ~80% detent retired on 2026
 the whole free height): a throw up on the grabber, or a release past the midpoint, stands the
 sheet up to the command bar's bottom edge (`fullPx` — the bar stays, so the view switch and the
 layer toggles are never out of reach); from full a pull past the midpoint lands on the rest, and
-a flick down or a pull well below the rest dismisses from anywhere. **An open sheet
+a flick down or a pull well below the rest dismisses from anywhere. **From full the first detent down is the rest** (user, same evening: it "goes
+straight to collapsed a bit too quickly, it's too sensitive"): a flick or a pull from the top lands
+on the resting fit, and only a pull that leaves the sheet below half the rest — by position, never
+projected — dismisses from there. A dock EXCHANGE drops the held height (`setPhoneDock`), so the
+other sheet opens at its own fit. **An open sheet
 shifts the scene up into the band above it** (2026-09-28): the dock publishes its target height as
 a bottom cover (`sceneCoverBExplore` / `sceneCoverBDetails` / `sceneCoverBVitals`, one per dock because their exits lag)
 and the Engine eases a projection offset — `camera.setViewOffset`, never a camera move, so every
@@ -1448,7 +1458,8 @@ Every rail card leads with `CardHead`: eyebrow / title / inset hairline / body.
     needs nothing: a raw row click pins, and the explorer and card show the pin.
   · **State marks are one species.** `LiveDot` + "live", `PinMark` + "pinned" (StateAtoms, 14px),
     on the explorer's tick row, the Global snapshot card's control, the scene callout, the raw log's
-    selected row and the raw pane's head.
+    selected row and the raw pane's head. Since 2026-10-18 the METAGRAPH snapshot's label and card head
+    carry them too (user: "that's also pinned") — a committed pair is live or pinned together.
 
 - **`SELECTED_ROW`** is the one committed-selection language for list rows: the wash plus a 1px inset
   ring **as a single box-shadow** — deliberate, because the transient states it composes with are
