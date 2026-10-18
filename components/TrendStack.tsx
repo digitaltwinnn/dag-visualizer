@@ -62,7 +62,7 @@
 // no orbit (2026-09-26; `viewPolicy.rotate` is false): a drag across the FRONT chart's plot is the
 // range BRUSH (`onRange`), and the wheel still zooms through the canvas.
 
-import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import TrendChart, { type TrendBand, type TrendLine } from "@/components/docs/TrendChart";
 import useTrendRoster from "@/components/useTrendRoster";
@@ -370,7 +370,7 @@ export default function TrendStack() {
     const focus = st.trendFocus && order.includes(st.trendFocus) ? st.trendFocus : null;
     const intent = swipeIntent(dir, { order, front: focus ?? frontPlane(order, st.trendScroll) });
     if (!intent) return;
-    if (intent.kind === "measure") stepMeasure(intent.step);
+    if (intent.kind === "measure") stepMeasure(intent.step, "x");
     else applyClickActions(trendPlaneActions(intent.id, st.trendFocus));
   };
   // UP / DOWN IS THE VIEW'S THIRD AXIS (user, 2026-09-19). Left/right on the timeline is WHEN, the
@@ -386,9 +386,20 @@ export default function TrendStack() {
   // because one gesture cannot mean both. It is back as a DIFFERENT gesture — fast and short, one
   // axis, recognised in `onPointerUp` by `domain/planeSwipe.ts` — and the plot's horizontal axis
   // stays the brush's. The rail's heading control and the keys remain the mouse's routes.
-  const stepMeasure = (dir: -1 | 1) => {
+  const [swipeAxis, setSwipeAxis] = useState<"x" | "y">("y");
+  // Released on the roll's SETTLE (the settled flag's false→true edge), never while it is still
+  // true from before the change: the axis is set in the same batch as the measure write, a beat
+  // before the staged hook has even started the roll.
+  const wasSettled = useRef(true);
+  useEffect(() => {
+    if (!wasSettled.current && staged.settled) setSwipeAxis("y");
+    wasSettled.current = staged.settled;
+  }, [staged.settled]);
+  const stepMeasure = (dir: -1 | 1, axis: "x" | "y" = "y") => {
     const next = stepMetric(useStore.getState().trendMetric, dir);
-    if (next) setMetric(next);
+    if (!next) return;
+    setSwipeAxis(axis);
+    setMetric(next);
   };
   // ONE write path (rule 2): the table decides what a plane click means, the executor applies it.
   // Read the focus from the store at ACTIVATION time rather than closing over the render's value —
@@ -455,10 +466,24 @@ export default function TrendStack() {
       // The previous window standing in while the new one loads (`useTrendsSlice`'s hold): the
       // plots quiet, so the stale lines never read as the new range's.
       data-stale={slice.stale ? "" : undefined}
-      style={{
-        ["--roll-out-y" as string]: staged.dir === "next" ? "-10px" : "10px",
-        ["--roll-in-y" as string]: staged.dir === "next" ? "14px" : "-14px",
-      }}
+      // A SWIPED measure rolls SIDEWAYS (user, 2026-10-18: "when we swipe left/right can we have the
+      // same animation as the right rail cards — show the new card incoming"): the plots leave the
+      // way the finger went and the next measure's plots arrive from the other side, the rail
+      // pager's own travel; a picked or keyed measure keeps the vertical roll. `swipeAxis` is set
+      // by the swipe and released once the roll has settled.
+      style={
+        swipeAxis === "x"
+          ? {
+              ["--roll-out-y" as string]: "0px",
+              ["--roll-in-y" as string]: "0px",
+              ["--roll-out-x" as string]: staged.dir === "next" ? "-40px" : "40px",
+              ["--roll-in-x" as string]: staged.dir === "next" ? "56px" : "-56px",
+            }
+          : {
+              ["--roll-out-y" as string]: staged.dir === "next" ? "-10px" : "10px",
+              ["--roll-in-y" as string]: staged.dir === "next" ? "14px" : "-14px",
+            }
+      }
       className="group/stack absolute inset-0 pointer-events-none z-[4] opacity-0 [transition:opacity_var(--tempo-nav)_ease] data-[on='1']:opacity-100 motion-reduce:!transition-none"
     >
       {/* THE TETHER from the band's span to the front chart's time axis — inside this layer so it
@@ -564,8 +589,14 @@ export default function TrendStack() {
                 app's `.subject-paired` glow is a box-shadow, which a transformed plane may not
                 carry (see NO BLUR, NO SHADOW above). */}
             <div
-              className="absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border p-2 [background:linear-gradient(var(--panel-solid),var(--panel-solid)),var(--scene-ground)] [transition:border-color_0.16s_ease] motion-reduce:!transition-none"
+              // `plane-card` + `--slot`: the ARRIVAL drop (globals.css `planeDrop`, 2026-10-18 — user:
+              // "when we enter/leave trend view, I expect an animation like for all other views:
+              // perhaps drop the cards one after each other"). Keyed off the layer's `data-on`, so it
+              // plays once as the room reveals and never on a re-rank; staggered by depth rank, front
+              // first. On `transform`, which composes with the utilities' `translate`.
+              className="plane-card absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border p-2 [background:linear-gradient(var(--panel-solid),var(--panel-solid)),var(--scene-ground)] [transition:border-color_0.16s_ease] motion-reduce:!transition-none"
               style={{
+                ["--slot" as string]: depthRank,
                 width: fmt.pxW,
                 ...(pair.paired
                   ? {
