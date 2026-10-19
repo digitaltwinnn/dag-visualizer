@@ -34,6 +34,24 @@ own hairline box: measured, the toolbar, the fields and the table header sat at 
 and the criteria read as more table chrome. Outline only, no fill — the fields carry `--panel-plate`
 and a plate on a plate flattens them.
 
+**The Global field carries a MENU of the retained global snapshots** (2026-10-18, user: "easy to
+add a dropdown for global snapshot? If also filter on metagraph is selected show only those that
+are applicable"): newest first with its age, and under a scope only the ticks that network
+anchored into (`snapsAtTick`), so a pick is never a miss; a pick runs the search at once
+(`seekTick(ordinal)`). The typed field stays for any ordinal in the chain. **Both ordinal fields carry one
+`RecentMenu`** (2026-10-19, user: the first trigger "is smaller than the text box it relates to
+and hover is standard"): the trigger stretches to the field's height and joins its right edge, the
+rows wear the explorer's wash on hover, and under a scope the Metagraph field lists that chain's
+recent snapshots too (`snapshotOptions`). **The applied chips name their record kind** — "Global
+snapshot: N", "Metagraph snapshot: DOR N" (same day: "'in global' → 'global snapshot:'").
+**An EARLIER chain says what it is above the table** (same day — the words beside the Current |
+Earlier toggle went back off): the explorer's hint plate, "A previous registration of BIOFI, Sep
+2026 — a chain of its own, with its own snapshot numbers.", only while an earlier chain is paged.
+**The signer roster's row is the NODE ID alone** (2026-10-19, two rounds: "signed as c9a1…" became
+"other layer's key c9a1…" in the morning, and by noon "what 'key'? … just show the node id"): a peer
+id belongs to a LAYER, the app's node id is the L0 layer's, and a hybrid's dL1 signing key under it
+read as a second identity — `signerRoster`'s note in `src/data/network.ts` says why it is gone.
+
 ⚠️ **ONE BUTTON, AND ALL THREE CRITERIA VISIBLE.** A submit beside every field was rejected ("I want
 a search button"), and so was a "search by" chooser that hid two criteria to make one button
 unambiguous ("no 'search by'"). A reader wants to see everything they can search by, with one thing
@@ -170,8 +188,14 @@ footer's About link is their one door. One state survives on the trigger by rule
 network CODE in the live accent off mainnet — "which chain am I looking at" never goes missing.
 One mount at every width; the filter strip's second row, the trio's old phone home, retired with it). The bar has **one grow-downward slot with four tenants** (a which-strip enum makes
 them mutually exclusive by construction): the FILTER button opens the network-chip strip (hovering
-previews the dim, picking closes it), **on phone the view switch is ONE face — the current view's
-icon and name — that opens the view list as a strip tenant** (`topbar/ViewPicker.tsx`, 2026-09-28: a
+previews the dim, picking closes it), **The phone face's name is a step up (title size) and SLIDES SIDEWAYS on a ‹ › press or a swipe**
+(user, 2026-10-19: "the text has the odometer effect while here it should animate horizontally") —
+`faceFrom` in TopBar; a pick from the list keeps the roll-in. **on phone the view switch is ONE face — the current view's
+icon and name, FLANKED BY ‹ › since 2026-10-18 (Vercel analytics: three quarters of visitors on a
+phone and most never leaving "/"; the swipe and the pip row were the only hints that other views
+exist, and neither reads as a control — the chevrons step through the same `stepView`, dimmed at
+the ends; in the ACCENT, and the pip row retired with them the same evening — "has both … the <> is
+more intuitive") — that opens the view list as a strip tenant** (`topbar/ViewPicker.tsx`, 2026-09-28: a
 row of 44px icons cannot scale with the view count — History made it five and the filter ran under
 the first tab — and hiding entries per tier is a patch the next view undoes; the segmented switch
 stays from 700px up, both presentations live in the DOM and CSS picks, and the hanging caption
@@ -195,7 +219,8 @@ measured with the vitals cluster aboard and died with it. The presentation contr
 on the store's own axes (2026-08-30): a SCENE⇄HUD toggle over `railsHidden` (one button that
 flips, desktop-only) beside a RAW pressed-toggle over `section` — popping out of RAW restores
 whichever presentation you had. **The bar's remaining narrow-width thresholds are MEASURED, not
-guessed**: the view-switch labels drop at `max-[1299px]`, the dividers plus the "soon" views at
+guessed**: the view-switch labels are the body step from 1340px and the label step below it
+(2026-10-19 — at 1300px the body labels squeezed the filter face to "A…"), they drop at `max-[1299px]`, the dividers plus the "soon" views at
 `max-[820px]` — re-measure any threshold when content moves in or out of the bar (the vitals'
 departure is what freed the wordmark). When the labels go, the ACTIVE view's name reappears as a
 caption strip under the bar (`aria-hidden`, non-interactive).
@@ -232,7 +257,13 @@ decisions inside them are design, not detail:
   (`src/data/ledgerPath.ts`). The LIVE/PINNED
   control rides the CARD HEAD's eyebrow row with the shown snapshot's ticking age (2026-09-28 —
   it rode the heading row as the level's setting, design decision 15, until then), and the pager
-  states the TIME the rows span ("last 11 min") rather than "52 recent". Each level shows
+  states the TIME the rows span ("last 11 min cache" — the word "cache" joined it on 2026-10-19 at
+  the user's ask) rather than "52 recent". **The ticks that arrived
+  behind a pin are the list's FIRST ROW** (user, 2026-10-18: "fits better as the top row inside
+  the explorer, similar to the scene, which animates the extra thin bar at the front when new
+  snapshots arrive"): a live-dot row, "12 newer", sliding in from the top (`ExplorerRowSpec.
+  className`), its click the follow switch through the one executor — it rode the heading as a
+  setting-style button until then. Each level shows
   the ONE vocabulary minus what it cannot state (ticks fees · anchors · metagraphs · size, a network
   in a tick fees · anchors · size, a snapshot fees · size), and ONE pick serves every level: a level
   shows it where it applies and its own first measure where it doesn't, without overwriting it
@@ -256,7 +287,9 @@ decisions inside them are design, not detail:
   range, and stands down under a committed filter where the stack is one plane. Neither the
   metric nor the scale is a selection, so both write their setters directly
   (`selectionBoundary`'s own scope note says why, and why the plane FOCUS is in the table instead).
-  A row click applies the SAME `trendPlaneActions` the plane's header strip runs. No scope mark in
+  A row click applies the SAME `trendPlaneActions` the plane's header strip runs. **The highlighted
+  row is the Metagraph card's network** (user, 2026-10-18: "should be in sync always"): `on` reads
+  `cardNetwork` — the focus, else the filter, else the plane in front — not the focus alone. No scope mark in
   the head at all (2026-09-26): the top bar's filter names the committed network and is the one
   place to clear it. **The whole roster lists and nothing pages** (user, 2026-09-28: "other
   views just expand the card; only Snapshots pages, because that number is huge" — a dozen
@@ -327,6 +360,35 @@ dossier, country, provider, composition, then the snapshot chain (global snapsho
 snapshot it anchors), then node. `components/railCards.ts` is the manifest and
 `components/railCards.test.ts` pins the order, the availability and every hint.
 
+**History ARRIVES as a deal, LEAVES as one, and a swiped measure rolls SIDEWAYS** (2026-10-18/19,
+user: the entry "looks faster than the other views" and "the leaving animation is still
+missing"): the stack rides the choreography's own clock — the deal is paced to the IN phase's node
+placement (260ms a slot, `DEAL_MS` in TrendStackSync), and on a switch away the layer LINGERS for
+`DUR_OUT` (TrendStack) while the projector keeps placing the cards and they drop out back-of-deck
+first (`data-leave="1"` holds the layer, `"2"` lets it fade; the next deal clears it). **And the
+cards keep their CHARTS while they linger** (2026-10-19, second round — user: it "still does not
+look good"; a screencast showed the slice was asked for only while the policy was on, so the frame
+the view changed every plot unmounted and the cards collapsed into thin empty strips with the ‹ ›
+pills floating on them, and only those strips dropped — `useTrendsSlice(on || lingering …)`). The
+deploy was current; it was never a cache. Originally: each plane card
+falls into its slot a beat after the one in front (`planeDrop` in globals.css, keyed off the
+layer's `data-on`, staggered by the depth rank React writes as `--slot` — `transform` only, so the
+anchor's matrix and the card's own `translate` are untouched; the leave stays the layer's fade),
+and a left/right swipe sends the plots out the way the finger went with the next measure's
+arriving from the other side (`swipeAxis` in `TrendStack`, the roll's x offsets; a picked or keyed
+measure keeps the vertical roll).
+
+**A RANGE OR WINDOW CHANGE FADES THE NEW AXIS IN** (2026-10-19, user: a widened range "scrambled"
+the lines and a shortened one slid them in from the right — "make it consistent and smooth"). The
+held picture stays exactly where it was drawn under the stack's `data-stale` dim, and the plot
+that renders for the new axis starts transparent and eases to full over the measure roll's own
+320ms (`TrendChart held`, its layout effect) — the same arrival whether the new series landed
+after a hold (another tier fetched) or in the same render as the press (a window hop inside one
+payload). It replaced two transforms: the held-picture ZOOM to the span being loaded (`heldZoom`,
+2026-09-29, deleted) and the FLIP that ran the same move backwards on a hop. Opacity only; nothing
+in the plot scales or slides on a range change any more. The explorer's node row sets its
+TICKER(S) in semibold (same day — "it should have the ticker(s) in bold").
+
 **History's lane is the network dossier, the RANGE, then the MOMENT** (the Range since 2026-10-07 —
 user: "range -> moment is also a logical parent - child relation"). The Range card is the brushed
 `trendRange` as a committed subject: a slot with no rung (the Moment's precedent, `selStack`
@@ -338,6 +400,50 @@ already IS that list over the span. Under a range the Moment's ‹ › steps the
 the executor's `trendCursor` action, and the Range's next ghost opens its first moment. The Moment's
 lead is the same sentence shape for one bucket (`momentPhrase`: "DED anchored 7 snapshots in those
 5 minutes" — never a rate, never a rank).
+
+**The Metagraph card is the committed subject's network, in every view** (2026-10-18, one rule
+after the user asked for Geography's node to "also populate the dossier card"): Snapshots' is the
+network inside the tick (`tickNet`), History's the plane brought forward (`cardNetwork`), and
+Geography's the committed NODE's network while the filter is All (`metagraphCardNetwork` reads
+`inspect` — a geo node never writes the filter, so the card had stayed a ghost under a committed
+node). It carries no × there (the node card's × releases the node), its ghost hint names the node
+route, and a machine on two networks — UP's nodes also validate the DAG — pages between them
+(`siblingSet("context")`, "This node's networks": each step is the same node select the row's
+click runs, so the place and provider are re-committed and the filter untouched). Hypergraph
+needs nothing: its node commits the filter by policy. **Which subject the card stands on is a
+policy row, `viewPolicy.metagraphCard`** (PR review, 2026-10-19 — it had become three
+`mode === "geo"` compares): `railCards.metagraphCardNetwork` resolves it, and the card's × and
+the slot's hint read the same row.
+
+**The plane's head is NETWORK · MEASURE · READINGS — on the FRONT card; a rear card's head is the
+NETWORK ALONE** (user, 2026-10-19, later the same day: the title and values "repeated on each
+background card" were "quite duplicate" — `TrendChart nameOnly`, passed for every non-interactive
+plane; the front card states the measure and its readings for the whole deck, and the legend stays
+on a rear card because it keys bands that are drawn). The front card's head (user, 2026-10-19): the network at the left,
+the measure's name centred as the card's title (`TrendChart heading` — the unit caption and the
+plot's "peak" corner went), and at the right the peak beside the daily average in one label-then-
+value group ("make one visually designed place and keep them together"). With a heading the head
+is a THREE-COLUMN GRID (`minmax(0,1fr) auto minmax(0,1fr)`), so the title sits on the card's centre
+whatever the network's name weighs (user: it "depends on the text size of the metagraph but it
+shouldn't"); the readings are plain label-then-value text, not pills — a pill here reads as a
+tag or a control — and the pair wraps onto a second line on the phone's 360px card. **The peak is
+on the readout's own unit** (same day — "average is higher than peak, can't be": the plot's
+busiest HOURLY bucket stood beside an average PER DAY): over a span it is the busiest DAY
+(`peakReading`, a counter's day summed, a gauge's averaged), under a day the busiest bucket named
+by its cadence ("peak 5 min"). The word is "average", not "daily average" (user: shorter); the
+explorer's heading still says "Average per day". The ‹ › pills say their
+word in the plain label step, not caps (the caps read "way too large").
+
+**The Range card's next ghost opens the first bucket of the SPAN it stands on — the brushed range,
+else the window's** (user, 2026-10-18: "with a range the Moment card does not open the first
+entry" — the card read "last 30 days" and its step read only a brushed range; `spanOf` in
+`railSiblings`, the Moment's pager steps the same span, captioned "Window" then). **The Range
+card steps the WINDOWS while it stands on one** (user, 2026-10-18): with no range
+brushed its siblings are the six window pills, in the picker's order — a SETTING step
+(`SiblingStep.setting`, the pager writes `setTrendWindow` as the picker does, never a selection
+through the executor). A brushed range is one span and pages nothing. **The Moment card's head
+says it is a bucket** (same day — a chip in the cadence's own words, "5-min bucket", so the
+plank's squares read as stepping buckets, not changing the subject).
 
 **The Metagraph card stands on the plane brought forward** (user, 2026-10-07: "if we click a
 network in explorer, should we set the metagraph card accordingly? (not the global filter
@@ -621,6 +727,18 @@ The request rides one store channel, `focusRung: { level } | null` (an OBJECT, s
 rung is a fresh reference the Engine's `!==` bridge sees), and `Engine._resolveFocus(from?)` starts its
 existing ladder walk at that named rung instead of the finest. No second camera path.
 
+**NO BOX OPEN IS NOT A REST** (user, 2026-10-18: "snapshot is collapsed but it is no longer
+supported (no − icon etc)"). With nothing committed the live Global snapshot card — a slot with no
+rung, never the focus — sat folded above three ghosts on every tier: the mode-entry collapse
+pinned the ABSENT slot shut, and the live ordinal is kept out of the selection key on purpose
+(heartbeats must not reset the +/− overrides), so nothing ever dropped the pin. Two rules now:
+the mode-entry snapshot writes overrides for PRESENT slots only, and with no focus rung the
+FIRST present ladder card is the box (`openDefault` in `Inspector.tsx`).
+**And the step ghost hangs off the UNBROKEN committed run from the top** (same day): a node
+carried into Snapshots from another view stands below a gap (its ladder gives a node no
+ancestry), and read as "the deepest" it left the Global snapshot card with no step down to the
+tick's networks.
+
 **Expanded state survives a view switch** (user, 2026-09-04 — reversing 2026-08-08's scene-first
 collapse: with rung heights easing, the collapse-and-reopen cycle WAS the "card size jumps between
 views"): a switch is arrival machinery, not a selection moment, so the +/− overrides hold through
@@ -639,6 +757,17 @@ the number is then the only thing saying which global this snapshot landed in. I
 from a body row on 2026-08-10 — a join is not a fact ABOUT the snapshot, it is the relation the aside
 already names — and the metagraph TICKER that shared that row went with it under the pile rule, since
 the METAGRAPH card sits directly above and this card's own mark already carries the hue.
+
+**THE RAW PANE IS ONE SCROLLING DOCUMENT ON EVERY TIER** (user, 2026-10-18: "a scroll on the whole
+panel, so tabs always fully visible without their own scroll and height/sub-height etc only
+appears when scrolled to the bottom"). It was the phone's shape alone since 2026-10-08; the
+desktop pane handed the lane's leftover height to one inner scroller with the foot pinned under
+it. `RecordsSurface`'s pane wrapper scrolls, the tabs' box and the JSON well take their natural
+height (`ChannelStatePanel`), the foot is the document's last block; the pane is 42% of the layer
+(was 36 — "the snapshot column is very wide"), and the signers page ten rows. **On the phone's
+snapshot page the × is the PAGE's** (same day): it returns to the list beside "‹ Snapshots", and
+the layer's × hides while the page is up (`data-raw-detail`, read by `SectionShell`) — the layer's
+× there closed the whole raw layer while it read as the pane's close.
 
 **ONE RULE FOR EVERY DATE: a day is a UTC day; a clock time is the reader's and names its zone**
 (user, 2026-10-07: "Instead of saying UTC, can we show all the dates in the actual locale?", then
@@ -676,6 +805,14 @@ honest variant naming that fact; but "all" with 0 nodes is boot, so that ghost s
 flashing a false invite. A populated card renders in any 3D view; the ghost only appears where the view
 can actually produce the card.
 
+**A hairline divides the lane from the cards that are not this view's rungs** (user, 2026-10-19 —
+History with a node carried in from Geography: "when a card is not part of the rung, show a
+divider"): a populated card below the lane is a subject the view did not produce, and adjacency
+is the slab's word for containment. Only above PRESENT trailing cards; the trailing ghosts are the
+view's own possibility space. **And the Snapshots explorer's held head is the PIN itself** (same
+day: "put it on the 1st row and directly show x newer") — it froze at the newest tick on screen
+from 2026-10-02; `src/data/ledgerHold.ts`.
+
 **The placeholder views host NO facts cards at all** — `detailsCards` returns `[]` outside the 3D
 views (user, 2026-08-10). A live node card, status pill and real ids beside a `preview · in development`
 wireframe is exactly the mixed signal rule 10 exists to prevent, and it arrived half-formed anyway: with
@@ -710,7 +847,10 @@ row reads the snapshot feed ONCE and passes it down.
 The cells are per-view and ordered by the user (2026-08-30): hyper coarse→fine (METAGRAPHS with a
 by-type breakdown — `networkKind` is the type's one home, icons from `METATYPE_ICONS` on the
 filtered face — then NODES, the NODE COMPOSITION donut, NETWORK LAYERS as RoleChips micro-bars);
-geo pairs each total with its breakdown (NODES · TOP COUNTRIES · TOP PROVIDERS — the first two
+geo is three cards of ONE shape since 2026-10-18 (TOP REGIONS · TOP COUNTRIES · TOP PROVIDERS —
+the regions card was NODES, a fleet total over a sub-region breakdown, until the user asked for
+it to count regions in its hole like its neighbours count countries and providers); before that
+geo paired each total with its breakdown (NODES · TOP COUNTRIES · TOP PROVIDERS — the first two
 renamed/reshaped 2026-09-01: NODES gained a located/unplaced split, because a card with no breakdown
 is the boring case by construction and that split is the one breakdown belonging to THIS view rather
 than its neighbours — a node the lookup could not place sits in no country ring and no provider ring,
@@ -1002,9 +1142,18 @@ inline in the return would quietly restore the bug for every consumer at once.
 - **The filter strip is chips above 700px and rows on the phone** (user, 2026-10-09, after design
   A1 had made every tier rows): one element list in `FilterPicker` wearing both through the 700
   arms — a vertical bar between chip groups, a hairline across the phone's column.
-- **History's cards take a SWIPE on touch** (2026-10-09, `domain/planeSwipe.ts`): a flick along one
-  axis — down brings the card forward, up on the front card brings the one behind it forward
-  (`planeBehind`), left/right step the measure (the ↑/↓ keys' steps). The plot's HORIZONTAL drag
+- **History's cards take a SWIPE on touch** (2026-10-09, `domain/planeSwipe.ts`; **the plane's touch
+  drag no longer brushes** since 2026-10-18 — user: it "looks like it's selecting a range, but it
+  only works in the vitals selector … so that it's clear the control in vitals is meant for it";
+  `TrendChart touchBrush={false}` on a plane, the band's timeline is the one touch range control,
+  a horizontal flick anywhere on the card steps the measure, and **‹ › on the front card's side
+  edges step it on every tier** — pills that NAME the measure they step to ("‹ SNAPSHOTS", "FEES ›",
+  user 2026-10-19), a dimmed bare chevron at an end): a flick along one
+  axis — up/down WALK THE WHOLE STACK (2026-10-18, user: "it should rotate up or down through the
+  whole stack"; `planeStep` — one step along the roster from the front, wrapping, whatever card
+  the finger was on; the first cut stepped to "the card behind the front", which after a re-deal
+  is always the rank-0 card, so two cards toggled), left/right step the measure (the ↑/↓ keys'
+  steps). The plot's HORIZONTAL drag
   stays the brush; a vertical-dominant gesture on the plot is the plane's and never brushes
   (`onTouchMoveCapture`/`onTouchEndCapture` stop it reaching the chart).
 
@@ -1019,10 +1168,19 @@ An unseen card update colours the chevron in that card's hue rather than adding 
 (<700px) has a persistent bottom bar — Explore | Vitals | Details thirds where the view has a
 vitals lane, halves elsewhere (`barGeom`; the icon trays compact to one unseen-update dot at
 thirds) — and ONE sheet at a time, with a grabber that drags and flick-dismisses. **The bottom
-section (dock bar + sheet) never takes more than 60% of the viewport** (user, 2026-10-04 — "so
-that there is always room for the scene to show"; `RailDock`'s `sectionCeilingPx`): the sheet has
-ONE resting height, its content's fit under that ceiling, a taller card scrolls inside it, and a
-drag that does not dismiss springs back — the ~80% expanded detent is retired. **An open sheet
+section (dock bar + sheet) RESTS at no more than 50% of the viewport** (user, 2026-10-04 — "so
+that there is always room for the scene to show", 60% then; 50% since 2026-10-18; `RailDock`'s
+`sectionCeilingPx`): the sheet's resting height is its content's fit under that ceiling, a taller
+card scrolls inside it. **And it has a FULL detent again** (user, 2026-10-18: "swipe down closes
+it; can we swipe up to use the full screen?" — the ~80% detent retired on 2026-10-04 is back as
+the whole free height): a throw up on the grabber, or a release past the midpoint, stands the
+sheet up to the command bar's bottom edge (`fullPx` — the bar stays, so the view switch and the
+layer toggles are never out of reach); from full a pull past the midpoint lands on the rest, and
+a flick down or a pull well below the rest dismisses from anywhere. **From full the first detent down is the rest** (user, same evening: it "goes
+straight to collapsed a bit too quickly, it's too sensitive"): a flick or a pull from the top lands
+on the resting fit, and only a pull that leaves the sheet below half the rest — by position, never
+projected — dismisses from there. A dock EXCHANGE drops the held height (`setPhoneDock`), so the
+other sheet opens at its own fit. **An open sheet
 shifts the scene up into the band above it** (2026-09-28): the dock publishes its target height as
 a bottom cover (`sceneCoverBExplore` / `sceneCoverBDetails` / `sceneCoverBVitals`, one per dock because their exits lag)
 and the Engine eases a projection offset — `camera.setViewOffset`, never a camera move, so every
@@ -1063,7 +1221,8 @@ no aliases**, and component code doesn't re-derive paddings, radii or cyan tints
 mirrors the thread literals in code because an SVG stroke attribute can't resolve `var()` — keep the
 two in sync.
 
-**The HUD type scale is THREE steps, FLUID, plus the documents' prose step** (2026-10-02, two
+**The HUD type scale is THREE steps, FLUID, plus the FIGURE step for the vitals band's headline
+numbers (`text-figure`, 2026-10-19 — it was a static `text-xl`) and the documents' prose step** (2026-10-02, two
 rounds: "the fonts are tiny while there is a lot of empty space", then "the filter text is still
 smaller"). `--text-label/body/title` are `clamp()`s — 12/14/16 hold to a 1440px viewport, a linear
 ramp lands at 13.5/16/18.5 by 2560px — at least 2px apart, because the retired `micro` step sat
@@ -1142,7 +1301,7 @@ In one line: **thread = resting identity cue; card edge = purely transient signa
   **never opens the sheet**, and a pure deselect announces nothing.
 - **Calm tempo.** The heartbeat family beats at 1.5s and transient signals run around 1.2s, debounced
   so a 4s-tick live feed never reads as a strobe. **Navigation moves on its own, slower clock** — the
-  depth change is 0.55s and the view choreography ~3.9s — because that's the user's own gesture
+  depth change is 0.55s and the view choreography ~3.3s — because that's the user's own gesture
   resolving, not the instrument speaking.
 - **Reduced motion is guarded on every animation**: theme-var animations carry
   `motion-reduce:animate-none` at the call site, CSS recipes carry their own media override. The edge
@@ -1372,7 +1531,8 @@ Every rail card leads with `CardHead`: eyebrow / title / inset hairline / body.
     needs nothing: a raw row click pins, and the explorer and card show the pin.
   · **State marks are one species.** `LiveDot` + "live", `PinMark` + "pinned" (StateAtoms, 14px),
     on the explorer's tick row, the Global snapshot card's control, the scene callout, the raw log's
-    selected row and the raw pane's head.
+    selected row and the raw pane's head. Since 2026-10-18 the METAGRAPH snapshot's label and card head
+    carry them too (user: "that's also pinned") — a committed pair is live or pinned together.
 
 - **`SELECTED_ROW`** is the one committed-selection language for list rows: the wash plus a 1px inset
   ring **as a single box-shadow** — deliberate, because the transient states it composes with are
@@ -1439,7 +1599,10 @@ and `none` are different facts** — haven't looked vs looked and found nothing.
 "encrypted"/"decrypt" (it is brotli-compressed public JSON — no key, no cipher, and it says the
 opposite of the one thing that matters, since this read is gated *because* one channel publishes
 personal records in the clear) and "uncompress" (true, but it puts the cost on local bytes when the
-cost is the ~2.5 MB fetch).
+cost is the ~2.5 MB fetch). **The raw pane's invitation states the WAIT, not a download** (2026-10-19,
+user: "is this still true? … is this really another extra and costly call?"): the reader never
+downloads the global — the server reads it from the L0 nodes — and since that day a tick the
+exact read just pulled is served from that pull (`fetchGlobal.ts`'s recent-global keep).
 
 **One control position, two tiers**, because there are two costs and the card charges the second only
 once the first is paid: `Read this snapshot` runs the deep read and states the SHAPE in place;
@@ -1650,6 +1813,13 @@ hued ticker, the anchor ring and the `.edge-spine`). The design rules the test c
   ("3 of 5 snapshots") and the size as a chip on the right ("8.9 of 15 KB"), because the band its
   ring points at is drawn in BYTES. The size is the exact read's or absent — never estimated.
   Its aside reads age, then state, the order the card's head uses.
+- **The desktop rails pull the band in, and Scene mode gives it all back** (user, 2026-10-18: the
+  label "is sometimes placed behind the right rail cards"; "in scene mode it could use the entire
+  space"). `ChromeBounds.railL/railR` are the two columns' inner edges while they are on screen
+  (slid away under the SCENE toggle they free their side); the band is the canvas pulled in by
+  them, and the placement tests the panel's MEASURED reach. Where neither side holds it the rails'
+  band is SOFT — the panel takes the roomier side — because a hub framed at the centre of a
+  1400px viewport is under the widest reach on both; the sheets' band keeps rule 2 (hidden).
 - **The free band starts under the command bar.** The canvas runs behind the bar, so "near the
   top" was measured from y = 0 and a label stood up into it; `CalloutSync` hands
   `calloutPlacement` the bar's bottom edge as `top`.

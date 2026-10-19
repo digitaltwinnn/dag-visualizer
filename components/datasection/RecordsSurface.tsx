@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, X } from "lucide-react";
 import { useStore } from "@/src/store/store";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import AnchorLogTable from "@/components/datasection/AnchorLogTable";
@@ -71,7 +71,10 @@ export default function RecordsSurface() {
           </div>
           <div
             className={
-              "w-[36%] max-w-[520px] flex-none min-w-0 flex flex-col border-l border-border/50 pl-5 " +
+              // 36% → 42% (user, 2026-10-18: "the list section can have less horizontal space …
+              // that could give the details panel a bit more room"): the log's four columns fit
+              // comfortably in the rest, the pane's JSON and signer tables were the cramped side.
+              "w-[42%] max-w-[600px] flex-none min-w-0 flex flex-col border-l border-border/50 pl-5 " +
               // Phone: the pane is its own PAGE (see above) — the whole panel while open, absent
               // while the list is up.
               (phone && !onDetail ? "max-[700px]:hidden " : "") +
@@ -79,28 +82,45 @@ export default function RecordsSurface() {
             }
           >
             {onDetail && (
-              <button
-                type="button"
-                onClick={() => setPage("list")}
-                className="flex-none self-start inline-flex items-center gap-1 h-11 -ml-1 pr-3 text-body text-primary-ink cursor-pointer bg-transparent border-0 focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
-              >
-                <ChevronLeft aria-hidden className="size-4" />
-                Snapshots
-              </button>
+              // THE PAGE'S HEAD ROW: the way back on the left and a × on the right, BOTH returning
+              // to the list (user, 2026-10-18: the layer's × here closed the whole raw page while
+              // it read as this pane's close). The layer's own × hides while this page is up
+              // (`data-raw-detail`, SectionShell), so the one × on screen does what it looks like.
+              <div data-raw-detail className="flex-none flex items-center">
+                <button
+                  type="button"
+                  onClick={() => setPage("list")}
+                  className="inline-flex items-center gap-1 h-11 -ml-1 pr-3 text-body text-primary-ink cursor-pointer bg-transparent border-0 focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
+                >
+                  <ChevronLeft aria-hidden className="size-4" />
+                  Snapshots
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPage("list")}
+                  aria-label="Back to the snapshot list"
+                  className="ml-auto -mr-2 inline-flex size-11 items-center justify-center rounded-xs cursor-pointer bg-transparent border-0 text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
+                >
+                  <X aria-hidden className="size-[18px]" />
+                </button>
+              </div>
             )}
-            {/* THE PHONE PAGE SCROLLS BELOW ITS HEAD ROW (user, 2026-10-08: "the x button
-                overlaps the scrollbar"). The whole pane scrolled, so its bar ran up the right edge
-                beneath the layer's ×; the back control and the × now share a row that stays put,
-                and the document scrolls under it. At desktop the wrapper is `contents` — the
-                pane's own height chain is untouched. */}
+            {/* THE PANE IS ONE SCROLLING DOCUMENT ON EVERY TIER (user, 2026-10-18: "I want to
+                have a scroll on the whole panel, so tabs always fully visible without their own
+                scroll and height/sub-height etc only appears when scrolled to the bottom"). It was
+                the phone's shape alone since 2026-10-08 ("the x button overlaps the scrollbar" —
+                the head row stays put, the document scrolls under it), while desktop handed the
+                lane's leftover height to one inner scroller with the foot pinned beneath it. Now
+                every tier scrolls here: the tabs' box and the JSON well take their natural height
+                (ChannelStatePanel's arms), and the foot is the document's last block. */}
             <div
               className={
-                "contents max-[700px]:block max-[700px]:flex-1 max-[700px]:min-h-0 " +
+                "block flex-1 min-h-0 " +
                 // pr-2: the value column's right edge sat against the scrollbar (user, 2026-09-02).
-                "max-[700px]:pr-2 " +
+                "pr-2 " +
                 // DOWN only: 2px of a full-bleed plate's overhang drew a horizontal scrollbar along
                 // its bottom (2026-10-07, the raw phone pass).
-                "max-[700px]:overflow-y-auto max-[700px]:overflow-x-hidden slim-scroll"
+                "overflow-y-auto overflow-x-hidden slim-scroll"
               }
             >
               <ChannelStatePanel />

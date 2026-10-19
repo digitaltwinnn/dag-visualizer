@@ -13,16 +13,19 @@
 
 /** The ordinal the list's head is frozen at, or null while it follows live.
  *
- *  It freezes at the NEWEST tick on screen at the moment of the pin — not at the pin — so nothing
- *  the reader could see disappears; the list only stops growing. It rises when the pin itself
- *  steps above it (the pager's › past the held head), and releasing the pin releases it. */
+ *  THE HEAD IS THE PIN ITSELF (user, 2026-10-19: "if we select the 3rd in the list, the scene moves
+ *  it to the front while the explorer stays on the 3rd row; put it on the 1st row and directly
+ *  show 'x newer'"). From 2026-10-02 it froze at the newest tick on screen at the moment of the
+ *  pin, so nothing visible disappeared — but the scene holds the pinned row at the FRONT, and the
+ *  list now says the same: the pinned tick is row one, and everything newer — the ticks that stood
+ *  above it when it was pinned and every one that arrives after — is the count behind the "newer"
+ *  row. A pin that moves (the pager's ‹ ›, another row) moves the head with it; releasing the pin
+ *  releases the hold. */
 export function nextHoldTop(current: number | null, pinnedOrdinal: number | null, newestOrdinal: number | null): number | null {
   if (pinnedOrdinal == null) return null;
-  // No list yet (the feed seeds a render after mount): wait rather than freeze at the pin, which
-  // would hide every newer tick the reader had on screen.
+  // No list yet (the feed seeds a render after mount): wait for it.
   if (newestOrdinal == null) return current;
-  if (current == null) return Math.max(newestOrdinal, pinnedOrdinal);
-  return Math.max(current, pinnedOrdinal);
+  return pinnedOrdinal;
 }
 
 /** The ticks the explorer lists under a hold, in the caller's own order, and how many newer ones

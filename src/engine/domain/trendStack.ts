@@ -115,7 +115,9 @@ export function staggerCentre(n: number): number {
  *  movement. ONE number for the cards (`TrendStackSync`) and the floor under them
  *  (`scene/views/TrendsView`): two rates would slide a rung out from under its own card for the
  *  length of every move. */
-export const STACK_EASE_K = 8;
+// 8 → 5 (user, 2026-10-18: a flick up "animates way too fast" — the next card has only one slot to
+// travel, so at 8 it arrived in a blink). 5 still settles inside a second (the test's floor).
+export const STACK_EASE_K = 5;
 
 /** How many planes the visible window holds for a roster of `total` — the count `stackPoses`
  *  returns, stated without building the poses. The ground (`scene/views/TrendsView`) draws one
@@ -238,6 +240,11 @@ export function planeFormat(phone: boolean): PlaneFormat {
  *  the card's left edge 11px off the canvas, because the global aspect lever is a √ compromise for
  *  3D volumes and a card has an exact pixel width (user, 2026-09-26). */
 export const PLANE_FIT = 0.92;
+/** The railed tiers' fit (user, 2026-10-19: "give the trend scene a bit more space so the ‹ › don't
+ *  overlap the rail cards on a laptop"): the measure pills hang 16px outside the card, so the card
+ *  leaves room for them and a little air before the rail cards' edges. The phone keeps `PLANE_FIT`
+ *  — its card is drawn at scale 1 so the type is the type (`planeFormat`). */
+export const PLANE_FIT_RAILED = 0.88;
 
 /** The camera DISTANCE (along the view axis, to the front card's depth) at which the front card
  *  spans `PLANE_FIT` of `freeWidthPx`. The projector's own expression, inverted: a card
@@ -249,7 +256,7 @@ export const PLANE_FIT = 0.92;
  *  width is a known number. */
 export function fitDistance(freeWidthPx: number, viewHeightPx: number, fovDeg: number, phone = false): number {
   const pxPerUnitAt1 = Math.max(1, viewHeightPx) / (2 * Math.tan((fovDeg * Math.PI) / 360));
-  const byWidth = (PLANE_WORLD_W * pxPerUnitAt1) / (PLANE_FIT * Math.max(1, freeWidthPx));
+  const byWidth = (PLANE_WORLD_W * pxPerUnitAt1) / ((phone ? PLANE_FIT : PLANE_FIT_RAILED) * Math.max(1, freeWidthPx));
   // The card's own height for this tier — the phone card is squarer (`planeFormat`).
   const byHeight = (planeFormat(phone).worldH * pxPerUnitAt1) / (CARD_FIT_H * Math.max(1, viewHeightPx));
   return Math.max(byWidth, byHeight);
@@ -550,16 +557,4 @@ export function focusOnReturn(
   planeOf: (chainId: string) => string,
 ): string | null {
   return committedChain != null ? planeOf(committedChain) : saved;
-}
-
-/** THE CARD BEHIND THE FRONT ONE (2026-10-09 — a swipe up on the front card "sends it back", which
- *  a single focus can only say as "bring the next one forward"). The front is the focus when one
- *  stands (re-dealt to slot 0, `stackPoses`), else the window's first card; behind it is the first
- *  card of the window that is not the front. Null for a lone card. */
-export function planeBehind(ids: readonly string[], scroll: number, focus: string | null): string | null {
-  if (ids.length < 2) return null;
-  const front = focus && ids.includes(focus) ? focus : frontPlane(ids, scroll);
-  const from = clampScroll(ids.length, scroll);
-  for (let i = from; i < ids.length; i++) if (ids[i] !== front) return ids[i]!;
-  return null;
 }

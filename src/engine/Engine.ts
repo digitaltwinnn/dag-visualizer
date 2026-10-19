@@ -31,6 +31,7 @@ import { liveArrivals } from "./domain/arrivals";
 import { SHEET_SHIFT_K, chromeShiftPx, sheetShiftPx } from "./domain/sheetShift";
 import { ChromeBounds } from "./ChromeBounds";
 import { FOCI, nodeFraming, cohortFraming, ledgerCommitTilt, trendFocusPush, trendFit } from "./domain/cameraRig";
+import { elevationCap, isDrag, orbitAbout, orbitAllowed, orbitAngles } from "./domain/subjectOrbit";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { ledgerNetwork } from "./domain/tickNet";
@@ -215,7 +216,72 @@ export class Engine {
   private pointer = new THREE.Vector2();
   private canvas: HTMLCanvasElement;
   private onClick = (e: MouseEvent) => this._handleClick(e);
-  private onMove = (e: MouseEvent) => this._handleMove(e);
+  private onMove = (e: MouseEvent) => {
+    this._globeDragMove(e);
+    this._handleMove(e);
+  };
+  // ── A DRAG ORBITS THE SUBJECT (domain/subjectOrbit.ts has the design; viewPolicy
+  // .dragOrbitsSubject the gate). OrbitControls' rotate is OFF in that view, so the one-pointer
+  // drag is this: armed on a solo press while no flight runs, a drag once it travels past the
+  // slop, each move's delta a rigid turn of the camera's (pos, target) pair about the committed
+  // subject's own position — the node's chip, the cohort's centroid, the country's — else the
+  // globe centre. The pair moves as OrbitControls would move it, so `_freeOrbit` claims the camera
+  // exactly as its `start` did, `sceneDragging` and the hint's cause ride it, and `_handleClick`'s
+  // travel gate keeps the release from picking. A second pointer is a pinch and ends it;
+  // OrbitControls still dollies the pinch and the wheel toward the (moved) target.
+  private _gDrag: { x: number; y: number; on: boolean } | null = null;
+  private readonly _pivot = new THREE.Vector3();
+  private readonly _oPos = new THREE.Vector3();
+  private readonly _oTgt = new THREE.Vector3();
+  private _ccPivot: { cc: string; ok: boolean; dir: THREE.Vector3 } = { cc: "", ok: false, dir: new THREE.Vector3() };
+  private _globeDragMove(e: MouseEvent): void {
+    const g = this._gDrag;
+    if (!g) return;
+    if (e.buttons === 0) { this._globeDragEnd(); return; }
+    if (!g.on) {
+      if (!isDrag(e.clientX - this._downX, e.clientY - this._downY)) return;
+      g.on = true;
+      this._freeOrbit = true; // the hand holds the camera (the SCENE⇄HUD toggle then leaves it)
+      const st = useStore.getState();
+      if (!st.sceneDragging) {
+        st.setSceneDragging(true);
+        st.setMotionCause({ kind: "orbit" });
+      }
+    }
+    this._dragPivot(this._pivot);
+    const cam = this.ctx.camera, tgt = this.ctx.controls.target;
+    orbitAbout(cam.position, tgt, this._pivot, orbitAngles(e.clientX - g.x, e.clientY - g.y, this.canvas.clientHeight), this._oPos, this._oTgt);
+    const pol = VIEW_POLICIES[this.mode];
+    if (orbitAllowed(this._oPos, this._oTgt, pol.minCamAlt, elevationCap(pol.minPolarAngle))) {
+      cam.position.copy(this._oPos);
+      tgt.copy(this._oTgt);
+    }
+    g.x = e.clientX;
+    g.y = e.clientY;
+  }
+  private _globeDragEnd(): void {
+    const g = this._gDrag;
+    this._gDrag = null;
+    if (!g?.on) return;
+    useStore.getState().setSceneDragging(false);
+  }
+  /** The drag's pivot, in WORLD space: the finest committed subject's own anchor — the same
+   *  resolution the subject callout points at — else the globe centre. */
+  private _dragPivot(out: THREE.Vector3): void {
+    const st = useStore.getState();
+    const p = st.inspect;
+    const lift = GEO_R + LAND_H;
+    let ok = false;
+    if (p && "geo" in p && this.globe.selectedNodeAnchor(out)) ok = true;
+    else if (st.cohort && this.globe.cohortAnchorDir) { out.copy(this.globe.cohortAnchorDir).multiplyScalar(lift); ok = true; }
+    else if (this.country != null) {
+      const c = this._ccPivot;
+      if (c.cc !== this.country) { c.cc = this.country; c.ok = this.globe.countryAnchorDir(this.country, c.dir); } // event-time
+      if (c.ok) { out.copy(c.dir).multiplyScalar(lift); ok = true; }
+    }
+    if (!ok) { out.set(0, 0, 0); return; }
+    this.globe.group.localToWorld(out); // the globe's aim, read for a gesture's pivot. render-state OK
+  }
   // Leaving the canvas (onto a card/rail) stops pointermoves, so transient hovers would
   // otherwise linger — clear them all at the boundary.
   private onLeave = () => this._clearHover();
@@ -230,6 +296,11 @@ export class Engine {
     this._ptrDown++;
     // A stale eat-flag would swallow the NEXT real click, so every gesture starts clean.
     this._eatClick = false;
+    // The subject orbit arms on a SOLO primary press (above); a second pointer ends it.
+    if (this._ptrDown > 1) this._globeDragEnd();
+    else if (VIEW_POLICIES[this.mode].dragOrbitsSubject && (e.pointerType !== "mouse" || e.button === 0) && !this.transition.active() && !this.cam.flying) {
+      this._gDrag = { x: e.clientX, y: e.clientY, on: false };
+    }
     // ── Long-press = touch's hover (domain/tapZoom's LONG_PRESS_MS — its note has the design).
     // Armed only for a SOLO touch; a second finger, travel past the fingertip slop (checked in
     // _handleMove, where the moves arrive) or the release disarms it. On fire it runs the one
@@ -277,6 +348,7 @@ export class Engine {
     this._lpFired = false;
   };
   private onUp = (e: PointerEvent) => {
+    this._globeDragEnd();
     const solo = this._ptrDown === 1; // a pinch's two ups are not two taps
     this._ptrDown = Math.max(0, this._ptrDown - 1);
     this._lpCancel();
@@ -363,6 +435,7 @@ export class Engine {
   // has already cleared the timer and this is correctly a no-op. Only a gesture that really ended
   // leaves a timer standing.
   private _onPointerRelease = () => {
+    this._globeDragEnd(); // a release off the canvas ends the globe drag too
     if (this._dragEndT === undefined) return;
     clearTimeout(this._dragEndT);
     this._dragEndT = undefined;
@@ -2261,6 +2334,7 @@ export class Engine {
       // 0.06 → 0.12 → 0.08 rad/s (user, 2026-09-28, two rounds: "too slow", then "slower the
       // hyper rotation; the node rings can be a bit faster" — the rings' own orbit took the speed,
       // see HyperView's m.orbit): one turn in ~78s.
+      // 0.08 rad/s — tried 0.11 on 2026-10-19 and reverted the same hour (user).
       if (this.filter === "all" && !zoomedIn) this._hyperSpinY += dt * 0.08;
       // Ease the shared structure tilt: near-flat while a metagraph is committed so its discs
       // read horizontal from the plain side-on hub framing (user, 2026-07-17 — the structure

@@ -24,7 +24,7 @@ import { metagraphById } from "@/src/data/network";
 export type TrendScope = "all" | "network" | "empty-dag" | "empty-unlisted";
 
 /** The scopes with nothing measured to draw. */
-export type EmptyScope = Extract<TrendScope, "empty-dag" | "empty-unlisted">;
+type EmptyScope = Extract<TrendScope, "empty-dag" | "empty-unlisted">;
 
 /** The networks the charts draw under this filter, in catalog order — every catalog metagraph at
  *  "all", the committed one alone under a commit, and NOTHING for the two empty scopes. The

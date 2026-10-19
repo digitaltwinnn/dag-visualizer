@@ -12,7 +12,7 @@ import { useStore } from "@/src/store/store";
 // network's identity hue, else the filter accent (cyan under "all").
 
 /** The live hue under the committed filter — shared so a caller can tint a ring or wash alike. */
-export function liveHue(filter: string): string {
+function liveHue(filter: string): string {
   return displayNetwork(filter)?.hue ?? filterAccent(filter);
 }
 

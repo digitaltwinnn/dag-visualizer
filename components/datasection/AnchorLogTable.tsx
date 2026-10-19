@@ -7,7 +7,7 @@ import type { CSSProperties } from "react";
 import { useStore } from "@/src/store/store";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { getNetwork, metagraphById } from "@/src/data/network";
-import { buildAnchorLog, sortAnchorLog, type AnchorLogRow, type AnchorLogSortKey } from "@/src/data/anchorLog";
+import { buildAnchorLog, snapsAtTick, sortAnchorLog, type AnchorLogRow, type AnchorLogSortKey } from "@/src/data/anchorLog";
 import { displayNetwork, unlistedLog, UNLISTED_ID } from "@/src/data/unlisted";
 import { ledgerLens } from "@/src/data/ledgerStory";
 import { metaSnapHoverKey, type GlobalSnapshot } from "@/src/data/types";
@@ -155,13 +155,20 @@ function ChainChoice({ addr, idx, on, onPick }: { addr: string; idx: number; on:
  *  make the segment a menu of them, each named by the months it ran, and the pressed segment then
  *  says which months are being paged. */
 function ChainControl({ lineage, chainIdx, onPick }: { lineage: readonly string[]; chainIdx: number; onPick: (idx: number) => void }) {
-  const chosen = chainMonths(useChainSpan(chainIdx > 0 ? (lineage[chainIdx] ?? null) : null));
   const several = lineage.length > 2;
+  // The months of the earlier chain in play: the picked one from the menu, or the only one.
+  const earlier = chainMonths(useChainSpan(several ? (chainIdx > 0 ? (lineage[chainIdx] ?? null) : null) : (lineage[1] ?? null)));
+  const chosen = chainIdx > 0 ? earlier : null;
   return (
+    // The words came off the control again (user, 2026-10-19: "just say network as before") — the
+    // explanation is the note above the table while an earlier chain is paged (`chainNote`).
+    <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
     <span className="inline-flex items-center gap-0.5 p-0.5 rounded-btn border border-border" role="group" aria-label="Which of this network's chains to page">
       <ChainSegment label="Current" on={chainIdx === 0} onPick={() => onPick(0)} />
       {!several ? (
-        <ChainSegment label="Earlier" on={chainIdx === 1} onPick={() => onPick(1)} />
+        // The lone earlier chain names its months too (the 2026-10-08 ask, "show also the date
+        // range", only ever reached the menu).
+        <ChainSegment label={earlier ? `Earlier · ${earlier}` : "Earlier"} on={chainIdx === 1} onPick={() => onPick(1)} />
       ) : (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -177,6 +184,7 @@ function ChainControl({ lineage, chainIdx, onPick }: { lineage: readonly string[
           </DropdownMenuContent>
         </DropdownMenu>
       )}
+    </span>
     </span>
   );
 }
@@ -330,6 +338,12 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // "I looked this up" is not "I committed this" — the mark carries no card, no scene subject and
   // no store write, and a real selection still paints over it.
   const [marked, setMarked] = useState<number | null>(null);
+  // A ROW CLICKED WHILE ITS GLOBAL WAS STILL RESOLVING (user, 2026-10-18: a just-arrived snapshot
+  // clicked in the live log "does not automatically decompress"). Such a row was inert — half a
+  // (snapshot, tick) pair must not commit — and nothing said so, so the click read as a failed
+  // decompress. The click is now a REQUEST: the row is remembered here, wears the landing outline,
+  // and commits itself the moment its anchor lands (the effect beside `commitRow`).
+  const [wanted, setWanted] = useState<{ metaId: string; ordinal: number } | null>(null);
   const [jumpMiss, setJumpMiss] = useState<string | null>(null);
   // ⚠️ SEARCHING IS ASKED FOR, NOT ALWAYS ON (user, 2026-09-01: "can we make the search a more
   // deliberate action? … it now kinda looks like the search row is actually part of the data, and
@@ -755,13 +769,13 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   };
 
   /** SNAPSHOT — pure arithmetic, one request. */
-  const seekSnapshot = () => {
+  const seekSnapshot = (snapshot: string = qSnapshot) => {
     // ONE SEARCH AT A TIME (the tester pass, 2026-10-07: a global search with a date range applied
     // showed both chips while only one was in force). An exact address replaces the other criteria.
     setBound(null); setSnapCut(false); setTimeCut(null); setGlobalSpans(null); setDoorLabel(null); setDoorSpan(null);
     setQTick(""); setQFrom(""); setQTo("");
-    setApplied({ snapshot: qSnapshot, tick: "", from: "", to: "", doorLabel: null });
-    const n = Number(qSnapshot.replace(/[^\d]/g, ""));
+    setApplied({ snapshot, tick: "", from: "", to: "", doorLabel: null });
+    const n = Number(snapshot.replace(/[^\d]/g, ""));
     if (!Number.isFinite(n) || n < 1) return;
     setJumpMiss(null);
     if (!histNet) {
@@ -807,12 +821,14 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
    *  case the reader already has two working routes to: the Snapshot column pages the entire chain,
    *  and the date range reaches any point in it. So an unserved ordinal is simply SAID, and the
    *  message names the route that does work. */
-  const seekTick = async () => {
+  // `tick` defaults to the typed field; the Global menu's pick passes its ordinal straight in (a
+  // state write would not be readable in the same call).
+  const seekTick = async (tick: string = qTick) => {
     // One search at a time: a global snapshot replaces a snapshot number or a date range.
     setBound(null); setSnapCut(false); setTimeCut(null); setDoorLabel(null); setDoorSpan(null);
     setQSnapshot(""); setQFrom(""); setQTo("");
-    setApplied({ snapshot: "", tick: qTick, from: "", to: "", doorLabel: null });
-    const n = Number(qTick.replace(/[^\d]/g, ""));
+    setApplied({ snapshot: "", tick, from: "", to: "", doorLabel: null });
+    const n = Number(tick.replace(/[^\d]/g, ""));
     if (!Number.isFinite(n) || n < 1) return;
     setJumpMiss(null);
     // UNDER ALL a global snapshot is exactly the snapshots it carries — its own manifest, one read —
@@ -1287,6 +1303,32 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
 
   // Built ONCE and rendered by BOTH branches below — a seek swaps the table into its loading state
   // while a page is fetched, and unmounting the controls mid-seek loses what was typed.
+  // THE GLOBAL MENU'S ROWS: the retained window, newest first, with the explorer's own age words;
+  // under a scope (the filter's network, a door's, or the bar's own pick) only the ticks that
+  // network anchored into (`snapsAtTick`, the join every ledger surface uses).
+  // Only while the bar is open (review: it was built on every one-second re-render for a menu
+  // nobody could see); then per render, a few dozen globals against one network's records.
+  // THE SCOPED NETWORK'S RECENT SNAPSHOTS (2026-10-19): the live buffer's newest first, with their
+  // age — the Metagraph field's menu; nothing under All, where no one chain is in force.
+  const snapshotOptions = (() => {
+    if (!net || !searchOpen || !histNet) return [];
+    const t = Date.now();
+    return [...(net.metaSnaps.get(histNet) ?? [])]
+      .sort((a, b) => b.ordinal - a.ordinal)
+      .slice(0, 40)
+      .map((r) => ({ ordinal: r.ordinal, age: relativeAge(t - Date.parse(r.ts)) }));
+  })();
+  const tickOptions = (() => {
+    if (!net || !searchOpen) return [];
+    const scope = histNet;
+    const t = Date.now();
+    return [...net.globalSnapshots]
+      .reverse()
+      .filter((g) => !scope || snapsAtTick(net.metaSnaps, scope, g.timestamp).length > 0)
+      .slice(0, 40)
+      .map((g) => ({ ordinal: g.ordinal, age: relativeAge(t - Date.parse(g.timestamp)) }));
+  })();
+
   const search = !searchOpen ? null : (
     <LogSearchBar
       networks={searchNets}
@@ -1317,6 +1359,10 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       onFrom={(v) => { setDoorLabel(null); setDoorSpan(null); setQFrom(v); }}
       onTo={(v) => { setDoorLabel(null); setDoorSpan(null); setQTo(v); }}
       onSubmit={onSubmit}
+      ticks={tickOptions}
+      onTickPick={(n) => { landCommit.current = null; setQTick(String(n)); void seekTick(String(n)); }}
+      snapshots={snapshotOptions}
+      onSnapshotPick={(n) => { landCommit.current = null; setQSnapshot(String(n)); seekSnapshot(String(n)); }}
       onClose={() => setSearchOpen(false)}
     />
   );
@@ -1349,6 +1395,59 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
    *
    *  ⚠️ Rendered by BOTH branches, like the row itself: a seek swaps the table into its loading
    *  state, and a toolbar that vanishes mid-seek takes the only way out with it. */
+  /** A ROW'S COMMIT — the click's, and the deferred one of a row clicked while its global was
+   *  still resolving (`wanted`). `rowSel` is whether the row is already the selection. */
+  const commitRow = (r: ViewRow, rowSel: boolean) => {
+    const seam = r.metaId == null;
+    // A commit withdraws any still-anchoring row's request (review: the deferred commit could land
+    // seconds later over a row the reader had since chosen).
+    setWanted(null);
+    // PHONE: the list and the snapshot are two pages (design 2026-10-02, option B), so a tap on
+    // the ALREADY-selected row opens its page rather than deselecting it — there the toggle would
+    // close the very thing the reader asked to read.
+    if (onOpen && rowSel) return onOpen();
+    if (onOpen && !seam) queueMicrotask(onOpen);
+    if (r.metaId == null) {
+      // A seam: nothing anchored here, so the only subject is the TICK — commit it alone rather
+      // than inventing a metagraph snapshot the row does not have (rule 10).
+      applyClickActions(
+        metaSnapArrivalActions(null, { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot }),
+      );
+      return;
+    }
+    applyClickActions(
+      metaSnapSelectActions(
+        { metaId: r.metaId, ordinal: r.ordinal, hash: r.hash, globalOrdinal: r.global.ordinal, ts: r.ts },
+        { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot },
+        { metaSnap, following, inspect: useStore.getState().inspect },
+      ),
+    );
+  };
+  // The deferred commit: once the wanted row's anchor has landed it commits exactly as a click
+  // would; a row that left the page (a page turn, a search) drops the request. Every render, on
+  // purpose — `rows` is built per render and the find is a page's worth of rows.
+  useEffect(() => {
+    if (!wanted) return;
+    const r = rows.find((x) => x.metaId === wanted.metaId && x.ordinal === wanted.ordinal);
+    if (!r) { setWanted(null); return; }
+    if (r.pending) return;
+    setWanted(null);
+    commitRow(r, false);
+  });
+
+  // THE EARLIER CHAIN SAYS WHAT IT IS, above the table (user, 2026-10-19: "when we click 'earlier'
+  // add a top section to say these are 'previous registrations', same as the hint section we have
+  // in the explorer"): the explorer's own hint plate, one sentence, only while an earlier chain is
+  // paged. It replaced the words beside the Current | Earlier toggle (2026-10-18).
+  const earlierMonths = chainMonths(useChainSpan(chainIdx > 0 ? histAddr : null));
+  const chainNote =
+    chainIdx > 0 && histNet ? (
+      <p className="flex-none mb-2 rounded-md bg-wash-faint px-2.5 py-1.5 text-label leading-snug text-muted-foreground">
+        A previous registration of {displayNetwork(histNet)?.ticker ?? histNet}
+        {earlierMonths ? `, ${earlierMonths}` : ""} — a chain of its own, with its own snapshot numbers.
+      </p>
+    ) : null;
+
   const toolbar = (
     // `pb-2` — the same 8px the box below it keeps to the table, so the search block sits in an
     // even rhythm instead of being pinched against its own trigger (user, 2026-09-01).
@@ -1518,6 +1617,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     return (
       <>
         {toolbar}
+        {chainNote}
         {search}
         {/* The span in the card's own words when a door brought it, else the day the reader typed. */}
         {waiting(`Finding the snapshots ${doorLabel ? `in ${doorLabel}` : qFrom ? `from ${dayWords(qFrom)}` : "you asked for"}…`)}
@@ -1528,6 +1628,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     return (
       <>
         {toolbar}
+        {chainNote}
         {search}
         {merged.error ? (
           <p className="m-auto flex items-center gap-3 text-label text-muted-foreground">
@@ -1548,6 +1649,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     return (
       <>
         {toolbar}
+        {chainNote}
         {search}
         {waiting("Reading the snapshots…")}
       </>
@@ -1557,6 +1659,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     return (
       <>
         {toolbar}
+        {chainNote}
         {search}
         <p className="m-auto text-label text-muted-foreground">
           {!live ? "NO SIGNAL" : lens === UNLISTED_ID && !timeCut && !mergedMode ? `No unlisted snapshots among the latest global snapshots. ${unlistedLastSeen}` : timeCut || globalSpans ? "No snapshots in that range" : mergedMode ? "No snapshots here" : histNet && bound?.addr === histAddr ? "No snapshots in that range" : histNet ? (histErr ? "history unavailable — the explorer read failed; paging again retries" : "reading the chain…") : "Waiting for anchored metagraph snapshots…"}
@@ -1569,6 +1672,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   return (
     <>
       {toolbar}
+      {chainNote}
       {search}
       {/* A PAGE THAT FAILED TO READ says so beside the rows still on screen, with its retry (the
           branch review's I1: the table sat dimmed with no word). */}
@@ -1675,30 +1779,16 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                   <Empty why="Not read yet. The size is measured from the global snapshot this one anchored into — open the row to read it." />
                 );
               const commit = () => {
-                if (pending) return; // half a (snapshot, tick) pair must not commit
-                // PHONE: the list and the snapshot are two pages (design 2026-10-02, option B), so
-                // a tap on the ALREADY-selected row opens its page rather than deselecting it —
-                // there the toggle would close the very thing the reader asked to read.
-                if (onOpen && rowSel) return onOpen();
-                if (onOpen && !seam) queueMicrotask(onOpen);
-                if (seam || r.metaId == null) {
-                  // Nothing anchored here, so the only subject is the TICK — commit it alone rather
-                  // than inventing a metagraph snapshot the row does not have (rule 10).
-                  applyClickActions(
-                    metaSnapArrivalActions(
-                      null,
-                      { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot },
-                    ),
-                  );
+                if (pending) {
+                  // Half a (snapshot, tick) pair must not commit — but the click is kept as a
+                  // request and lands with the anchor (`wanted`, its effect beside `commitRow`).
+                  if (r.metaId != null) {
+                    setWanted({ metaId: r.metaId, ordinal: r.ordinal });
+                    setMarked(r.ordinal);
+                  }
                   return;
                 }
-                applyClickActions(
-                  metaSnapSelectActions(
-                    { metaId: r.metaId, ordinal: r.ordinal, hash: r.hash, globalOrdinal: r.global.ordinal, ts: r.ts },
-                    { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot },
-                    { metaSnap, following, inspect: useStore.getState().inspect },
-                  ),
-                );
+                commitRow(r, rowSel);
               };
               return (
                 <Fragment key={r.metaId == null ? `tick:${r.global.ordinal}` : `${r.metaId}:${r.ordinal}`}>
@@ -1787,7 +1877,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                     grouped
                       ? "max-[700px]:items-center max-[700px]:[&>td]:py-2"
                       : "max-[700px]:items-baseline max-[700px]:[&>td]:pb-0 max-[700px]:[&>td:last-child]:pb-2",
-                    pending ? "cursor-default" : "cursor-pointer",
+                    pending ? "cursor-progress" : "cursor-pointer",
                     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                     rowSel && "bg-[var(--sel-bg)] text-foreground",
                     // The jump's landing mark — an OUTLINE, never a wash: the two washes above are

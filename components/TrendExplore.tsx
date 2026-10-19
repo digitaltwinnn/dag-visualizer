@@ -11,6 +11,7 @@ import { scopeEmptyCopy } from "@/src/data/trendScope";
 import { GLOBAL_READING, METRIC_LABELS, METRIC_ORDER, metricUnit, spanWord } from "@/src/data/trendSeries";
 import { spanPhrase } from "@/src/data/trendWindow";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
+import { cardNetwork } from "@/src/engine/domain/trendStack";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore, type TrendMetric } from "@/src/store/store";
 import { NodeStars } from "@/components/state/StateAtoms";
@@ -55,6 +56,14 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
   const filter = useStore((s) => s.filter);
   const metric = useStore((s) => s.trendMetric);
   const focus = useStore((s) => s.trendFocus);
+  const front = useStore((s) => s.trendFront);
+  // THE HIGHLIGHTED ROW IS THE METAGRAPH CARD'S NETWORK (user, 2026-10-18: "front card exists and
+  // dossier and range card are opened: show the row in explorer as selected — should be in sync
+  // always"). One rule, `cardNetwork` — the focus, else the filter, else the plane in front — read
+  // by the manifest, the card and now this list, so the row the rail describes is the row that
+  // reads as selected. A click on the front (unfocused) plane's row still focuses it; only a
+  // focused row's click releases (`trendPlaneActions` toggles on the FOCUS, not on this mark).
+  const cardNet = cardNetwork(filter, focus, front);
   const windowId = useStore((s) => s.trendWindow);
   const range = useStore((s) => s.trendRange);
   const hoverFilter = useStore((s) => s.hoverFilter);
@@ -143,7 +152,7 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
           // joins the front of the deck while it is the focus (`TrendStack`), so this is the same
           // plane focus the other rows run. It NEVER sets the page filter (same day: "don't set the page filter") —
           // the first cut did, and re-scoped the whole app from a row that states one number.
-          on: focus === "dag",
+          on: cardNet === "dag",
           onClick: () => applyClickActions(trendPlaneActions("dag", focus)),
           pair: subjectPairing(hoverFilter, "dag", setHover, total.hue),
         }
@@ -174,7 +183,7 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
       : ranked.flatMap((id) => {
           const row = rows.get(id);
           if (!row) return [];
-          const on = focus === id;
+          const on = cardNet === id;
           const retiredAt = metagraphById(id)?.retiredAt;
           return [
             {
@@ -217,7 +226,7 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
                   hue: roster.unlisted.hue,
                   faint: false,
                   figure: slice.stale ? <NodeStars count={3} /> : roster.unlisted.head != null ? format(roster.unlisted.head) : <span className="text-muted-foreground" aria-label={NO_READING}>—</span>,
-                  on: focus === UNLISTED_ID,
+                  on: cardNet === UNLISTED_ID,
                   onClick: () => applyClickActions(trendPlaneActions(UNLISTED_ID, focus)),
                   pair: subjectPairing(hoverFilter, UNLISTED_ID, setHover, roster.unlisted.hue),
                 },

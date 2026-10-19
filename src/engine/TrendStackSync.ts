@@ -54,7 +54,7 @@ export interface TrendPlaneEl {
 /** The `#trend-stack` root, as narrowly as this module needs it: one attribute the CSS fades on,
  *  plus the liveness flag that makes writing it idempotent against a REMOUNT. */
 export interface TrendRootEl {
-  dataset: { on?: string };
+  dataset: { on?: string; deal?: string; leave?: string };
   isConnected: boolean;
 }
 
@@ -68,6 +68,8 @@ export interface TrendStackHost {
   height(): number;
   /** Frame delta in seconds, already clamped by the Engine. */
   dt(): number;
+  /** The wall clock the leave beat is measured on; `performance.now` unless a test supplies one. */
+  now?(): number;
   /** Resolve a plane's element by network id, or null while React has not mounted it yet. */
   plane(id: string): TrendPlaneEl | null;
   /** The stack's root, for the entrance fade's one attribute. */
@@ -95,6 +97,18 @@ interface Slot {
   el: TrendPlaneEl | null;
   vis: boolean;
 }
+
+/** THE STACK RIDES THE VIEW CHOREOGRAPHY'S OWN CLOCK (user, 2026-10-19: the entry "looks faster
+ *  than the other views" and "the leaving animation is still missing"). Elsewhere the nodes keep
+ *  arriving for the IN phase's `DUR_IN` after the furniture is lit at `FURN_IN`, and leave over the
+ *  OUT phase's `DUR_OUT`; the cards do the same — dealt one after another across the same window
+ *  (`planeDrop`, globals.css), and dropped out across the OUT phase while the room darkens
+ *  (`planeLeave`), the projector still placing them through that beat. */
+/** How long the arrival deal runs: five slots' stagger plus the last drop, with air — the IN
+ *  phase's node placement after the furniture (DUR_IN − FURN_IN ≈ 1.4s) with the drop's tail. */
+const DEAL_MS = 2200;
+/** How long the cards keep their place while leaving: the OUT phase (`DUR_OUT`, 0.9s). */
+const LEAVE_MS = 900;
 
 export class TrendStackSync {
   private readonly h: TrendStackHost;
@@ -156,12 +170,30 @@ export class TrendStackSync {
    *  because every number here is derived from the camera's final pose for this frame. */
   sync(st: TrendStackState): void {
     if (!this.h.active()) {
-      if (this._wasActive) this._hideAll();
-      this._wasActive = false;
-      this._announce(false);
-      return;
+      // THE LEAVE BEAT: the first inactive frame after an active one starts it — the layer is
+      // told off (the cards' leave animation keys on `data-leave`) and the projector keeps
+      // placing the cards for `LEAVE_MS`, so they drop out of a room that is still there.
+      const now = this.h.now ? this.h.now() : performance.now();
+      if (this._wasActive && !this._leaving) {
+        this._leaving = true;
+        this._leaveUntil = now + LEAVE_MS;
+        this._announce(false);
+      }
+      if (!this._leaving || now >= this._leaveUntil) {
+        if (this._wasActive) this._hideAll();
+        this._wasActive = false;
+        if (this._leaving) {
+          this._leaving = false;
+          this._announceLeft();
+        }
+        this._announce(false);
+        return;
+      }
+      // leaving: fall through and keep projecting through the beat
+    } else {
+      this._leaving = false;
+      this._announce(true);
     }
-    this._announce(true);
 
     // The camera settled in the Engine's CAMERA phase, but `matrixWorld` is only recomputed by the
     // renderer — which runs AFTER the scene writes. Deriving it here costs one invert and makes a
@@ -408,7 +440,34 @@ export class TrendStackSync {
       return;
     }
     if (this._on === on) return;
+    const wasOn = this._on === true;
     root.dataset.on = on ? "1" : "0";
+    // THE DEAL IS ONE SHOT (review, 2026-10-18): the planes' arrival drop keys on `data-deal`, set
+    // for the beat the stack reveals and cleared after it, so a plane mounting later (paged in,
+    // re-ranked in, the DAG plane joining on focus) never drops from invisible and a re-rank can
+    // never shift a running delay. event-time: the flip, never a frame.
+    // THE LEAVE (2026-10-19): going off from on sets `data-leave="1"` — the layer holds its
+    // opacity while the cards drop out — and `_announceLeft` turns it to "2" once the beat is
+    // over, so the layer fades and the cards stay at their left state until the next deal
+    // removes the attribute. Off from never-on (a cold start, a view with no stack) sets nothing.
+    if (this._dealTimer) clearTimeout(this._dealTimer);
+    if (on) {
+      delete root.dataset.leave;
+      root.dataset.deal = "1";
+      this._dealTimer = setTimeout(() => { delete root.dataset.deal; this._dealTimer = null; }, DEAL_MS);
+    } else {
+      delete root.dataset.deal;
+      this._dealTimer = null;
+      if (wasOn) root.dataset.leave = "1";
+    }
     this._on = on;
   }
+  /** The leave beat is over: the layer may fade (`data-leave="2"`), the cards stay left. */
+  private _announceLeft(): void {
+    const root = this.h.root();
+    if (root && root.dataset.leave === "1") root.dataset.leave = "2";
+  }
+  private _dealTimer: ReturnType<typeof setTimeout> | null = null;
+  private _leaving = false;
+  private _leaveUntil = 0;
 }

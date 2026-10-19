@@ -27,8 +27,7 @@ import { anchorClause, anchorSeries, headWord, lastSeen, momentPhrase, rangePhra
   placeInstant,
   sharedCeiling,
   stepFor,
-  tierWord,
-} from "./trendSeries";
+  tierWord, peakReading } from "./trendSeries";
 
 // The per-network series maths, as a specification (rule 4 — dataExportCoverage enforces this
 // sibling). Everything here decides what a chart ASSERTS, so the honesty cases are the ones
@@ -600,7 +599,7 @@ describe("spanAverage", () => {
 describe("headWord", () => {
   it("names the head reading: the day, or the span's average", () => {
     expect(headWord("snapshots", "day")).toBe("latest full day");
-    expect(headWord("snapshots", "span")).toBe("daily average");
+    expect(headWord("snapshots", "span")).toBe("average");
     expect(headWord("nodes", "span")).toBe("average");
   });
 });
@@ -772,3 +771,43 @@ describe("anchorSeries / anchorClause (the second cadence)", () => {
     expect(anchorClause(1).after).toBe("time");
   });
 });
+
+describe("peakReading — the peak on the head's own unit (2026-10-19)", () => {
+  const H = 3_600_000;
+  const day0 = Date.UTC(2026, 9, 1);
+  it("over a span: the busiest DAY, a counter's hours summed", () => {
+    const buckets = Array.from({ length: 48 }, (_, i) => day0 + i * H);
+    const points = buckets.map((_, i) => (i < 24 ? 10 : 20)); // day 1: 240, day 2: 480
+    expect(peakReading(points, buckets, H, "snapshots", "span")).toEqual({ word: "peak", value: 480 });
+  });
+  it("over a span: a gauge's day is its average, not its sum", () => {
+    const buckets = Array.from({ length: 48 }, (_, i) => day0 + i * H);
+    const points = buckets.map((_, i) => (i < 24 ? 100 : 110));
+    expect(peakReading(points, buckets, H, "nodes", "span")).toEqual({ word: "peak", value: 110 });
+  });
+  it("only WHOLE UTC days count: a 24-hour window across midnight has no busiest day, and a counter's day with a hole is no day", () => {
+    // 06:00 → 06:00 the next day: an 18-hour day and a 6-hour one — both floors, neither a day.
+    const buckets = Array.from({ length: 24 }, (_, i) => day0 + 6 * H + i * H);
+    expect(peakReading(buckets.map(() => 100), buckets, H, "snapshots", "span")).toBeNull();
+    // Two whole days, the second with one unmeasured hour: the first is the only day.
+    const two = Array.from({ length: 48 }, (_, i) => day0 + i * H);
+    const holed = two.map((_, i) => (i === 30 ? null : i < 24 ? 10 : 20));
+    expect(peakReading(holed, two, H, "snapshots", "span")).toEqual({ word: "peak", value: 240 });
+    // A gauge's day survives a hole (its mean is over what was measured).
+    expect(peakReading(holed, two, H, "nodes", "span")).toEqual({ word: "peak", value: 20 });
+  });
+  it("continuity's day folds by its weights, as the span does", () => {
+    const buckets = Array.from({ length: 48 }, (_, i) => day0 + i * H);
+    // Day 1: 10s spacing at weight 1; day 2: one 100s outlier at weight 1 among 23 10s at weight 10.
+    const points = buckets.map((_, i) => (i === 30 ? 100 : 10));
+    const weights = buckets.map((_, i) => (i < 24 || i === 30 ? 1 : 10));
+    const r = peakReading(points, buckets, H, "continuity", "span", weights);
+    expect(r?.value).toBeCloseTo((100 + 23 * 100) / (1 + 230), 6); // weighted, ~10.4 — not the plain 13.75
+  });
+  it("under a day: the busiest bucket, named by its cadence; nothing measured is null", () => {
+    const buckets = Array.from({ length: 12 }, (_, i) => day0 + i * 300_000);
+    expect(peakReading(buckets.map((_, i) => i), buckets, 300_000, "snapshots", "day")).toEqual({ word: "peak 5 min", value: 11 });
+    expect(peakReading(buckets.map(() => null), buckets, 300_000, "snapshots", "day")).toBeNull();
+  });
+});
+

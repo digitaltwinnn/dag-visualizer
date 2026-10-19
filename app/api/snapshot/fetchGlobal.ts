@@ -21,6 +21,46 @@ import { NETWORKS, type NetworkId } from "@/src/engine/config";
 // Per network and per server instance — a cold function simply starts by asking the LB.
 export const LB_BACKOFF_MS = 10 * 60_000;
 const lbSkipUntil = new Map<NetworkId, number>();
+/** How many fallback nodes one read asks at most, and how long the walk may take in all. */
+export const WALK_MAX = 12;
+const WALK_BUDGET_MS = 24_000;
+
+// ONE PULL SERVES BOTH ROUTES (user, 2026-10-19: "I feel we're always pulling the snapshots
+// already … or is this really another extra and costly call?"). It was: the exact read
+// (`/api/snapshot/[ordinal]`) pulls the whole ~2.5 MB global for every live tick, and the deep
+// read (`…/channel/[address]`) pulled the SAME global again to decode one entry — the data cache
+// cannot hold the parsed global (its entry limit is below the payload), so nothing between the
+// two routes remembered it. This keeps the last few parsed globals in the function instance for
+// a short while and shares an in-flight pull, so a deep read on a tick the exact read just
+// pulled — the live one, the one a reader just pinned — costs no second trip to the L0 nodes.
+// Per instance and best-effort: under Fluid Compute the two requests usually land on the same
+// instance, and when they do not the read simply pulls as before. Small on purpose (a parsed
+// global is tens of MB of objects): the live tick and a pinned one are the whole use case.
+export const GLOBAL_KEEP_MS = 2 * 60_000;
+const GLOBAL_KEEP_MAX = 4;
+const recentGlobals = new Map<string, { at: number; json: Promise<unknown> }>();
+/** Tests only: the keep is module state, and the breaker tests reuse one ordinal. */
+export function forgetRecentGlobals(): void {
+  recentGlobals.clear();
+}
+
+export async function fetchGlobalJson(net: NetworkId, ordinal: number): Promise<unknown> {
+  const key = `${net}:${ordinal}`;
+  const now = Date.now();
+  const kept = recentGlobals.get(key);
+  if (kept && now - kept.at < GLOBAL_KEEP_MS) return kept.json;
+  const json = pullGlobalJson(net, ordinal);
+  recentGlobals.set(key, { at: now, json });
+  // A failed pull is forgotten at once — the callers' no-cache-on-throw contract retries it.
+  json.catch(() => {
+    if (recentGlobals.get(key)?.json === json) recentGlobals.delete(key);
+  });
+  for (const [k, v] of recentGlobals) {
+    if (recentGlobals.size <= GLOBAL_KEEP_MAX && now - v.at < GLOBAL_KEEP_MS) break;
+    if (k !== key) recentGlobals.delete(k);
+  }
+  return json;
+}
 
 /** One attempt at the LB: the parsed snapshot, or why not. The BODY is read inside the try — a
  *  body that stalls or fails to parse is a failing LB like any other (review, 2026-10-04). */
@@ -38,7 +78,16 @@ async function tryLb(net: NetworkId, ordinal: number): Promise<{ ok: true; json:
   }
 }
 
-export async function fetchGlobalJson(net: NetworkId, ordinal: number): Promise<unknown> {
+/** Fisher–Yates, in place. */
+function shuffle<T>(a: T[]): T[] {
+  for (let i = a.length - 1; i > 0; i--) {
+    const k = Math.floor(Math.random() * (i + 1));
+    [a[i], a[k]] = [a[k]!, a[i]!];
+  }
+  return a;
+}
+
+async function pullGlobalJson(net: NetworkId, ordinal: number): Promise<unknown> {
   let lb: string;
   const skipping = (lbSkipUntil.get(net) ?? 0) > Date.now();
   if (skipping) {
@@ -58,12 +107,32 @@ export async function fetchGlobalJson(net: NetworkId, ordinal: number): Promise<
   // one of nine — largely shared holes, so they synced from a common source), and coverage
   // differs at the margins. A node missing an ordinal answers 404 in well under a second, so
   // walking the whole list is cheap; the timeout only bites on an unreachable node.
-  const targets = (info?.archival ?? []).slice();
-  for (let i = targets.length - 1; i > 0; i--) {
-    const k = Math.floor(Math.random() * (i + 1));
-    [targets[i], targets[k]] = [targets[k], targets[i]];
-  }
+  // THE NODES WHOSE MEASURED FLOOR COVERS THIS ORDINAL (user, 2026-10-18: "we do know the depth a
+  // node serves, it's shown on the node card — can't we query the nodes we know actually have the
+  // snapshot?"). The census records every global node's floor..latest; the "archival" list is the
+  // subset reaching the 2023 era floor, and on a day no node reaches it (2026-10-18: archivalCount
+  // 0 while three nodes served from Aug 2024) the fallback had nothing to try — so a year-old
+  // snapshot failed although nodes held it. FLOOR ONLY: a node serves floor..now, and the census's
+  // `latest` is the tip at probe time, hours stale (review, 2026-10-18 — bounded by it, every live
+  // ordinal matched no entry). Shallowest sufficient floor first, in BUCKETS of ~half a year with
+  // a random order inside each, so the few long archives are not asked for what every node still
+  // has and no single node takes every read (the loop below shares the load the same way for the
+  // archival list, the last resort for a census with no per-node entries).
+  const BUCKET = 500_000;
+  const covering = shuffle((info?.entries ?? []).filter((e) => e.chain === "global" && e.floor <= ordinal))
+    .sort((a, b) => Math.floor(b.floor / BUCKET) - Math.floor(a.floor / BUCKET))
+    .map((e) => ({ ip: e.ip, port: e.port ?? 9000 }));
+  // …AND THE WALK IS CAPPED AND BUDGETED (PR review, 2026-10-19). The covering list is every
+  // global node whose floor reaches the ordinal — ~150 for a recent one — and a sequential walk
+  // at 4s a timeout over an unreachable subset would spend the route's whole `maxDuration` before
+  // reaching a node that has it, and never reach the after-backoff LB retry below. The first
+  // `WALK_MAX` targets (shallowest buckets first, shuffled within) and `WALK_BUDGET_MS` of wall
+  // clock bound it; a node missing the ordinal still answers 404 in well under a second.
+  const all = covering.length ? covering : shuffle((info?.archival ?? []).slice());
+  const targets = all.slice(0, WALK_MAX);
+  const walkStart = Date.now();
   for (const t of targets) {
+    if (Date.now() - walkStart > WALK_BUDGET_MS) break;
     try {
       const a = await fetch(`http://${t.ip}:${t.port}/global-snapshots/${ordinal}`, {
         headers: { Accept: "application/json" },

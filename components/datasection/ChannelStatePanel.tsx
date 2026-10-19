@@ -268,7 +268,7 @@ function RawSection({
       // `schemaBox`), the two compete for a squeezed pane — and a default `flex-shrink: 1` here
       // would let a tall schema compress the `raw JSON` row itself. The schema is the part with
       // somewhere to go: it has its own scroller.
-      className={cn("group/copy flex flex-col gap-1 mt-1.5", open ? "min-h-0 flex-1 max-[700px]:flex-none" : "flex-none")}
+      className="group/copy flex flex-col gap-1 mt-1.5 flex-none"
     >
       <div className="flex items-center justify-between gap-2">
         <CollapsibleTrigger
@@ -333,7 +333,7 @@ function RawSection({
         // whatever its siblings above it don't. So the chain is measured instead: the box no
         // longer scrolls (overflow-hidden, a flex column), the schema block keeps its natural
         // height, and the well takes the rest — one bar, and it belongs to the tree.
-        <div className="min-h-[7rem] flex-1 overflow-auto slim-scroll rounded-md border border-border/50 bg-[var(--background)] px-2.5 py-2 max-[700px]:flex-none max-[700px]:max-h-none">
+        <div className="min-h-[7rem] flex-none overflow-x-auto slim-scroll rounded-md border border-border/50 bg-[var(--background)] px-2.5 py-2">
           <JsonTree data={data} cmd={cmd} />
         </div>
       )}
@@ -352,15 +352,15 @@ function RawSection({
  *  layer says exactly what the metagraph-snapshot card and the ledger explorer say about the same
  *  id. No click affordance: an unknown machine has no card to open, and the raw layer's signer list
  *  is a reading surface, not a browse target. */
-const SIGNER_PAGE = 3; // rows per page — the consensus MINIMUM, so one page is one quorum (user)
+const SIGNER_PAGE = 10; // rows per page (user, 2026-10-18: "make it 10 per page" — it was 3, one quorum, from 2026-08)
 /** THE SIGNERS AS ONE ROSTER (user, 2026-10-08, design D1 — `docs/superpowers/design/2026-10-08-
  *  mobile-tuning/d-signers.html`). It was two `Node | Signer id` tables, one per producing layer, and
  *  on a normal snapshot both held the same three nodes beside a signer id that was the node id's
  *  first 8 characters. Now: a row per node, a column per LAYER in production order (dL1 then L0,
  *  their codes from SIGNER_GROUPS, the one home), a check where that node signed
- *  and a dash where it did not — one mark style, the column heads are the key. The signer id
- *  survives only where it is news: a hybrid that signed with a key its node id does not repeat
- *  says "signed as …" under its id (`signerRoster.otherKeys`). */
+ *  and a dash where it did not — one mark style, the column heads are the key. The row is the
+ *  NODE ID alone (user, 2026-10-19: "what 'key'? … just show the node id"): a hybrid's dL1 signing
+ *  key is not shown under it — `signerRoster`'s note says why. */
 function SignerRoster({ dataIds, proofIds, metaId, selNodes }: { dataIds: string[]; proofIds: string[]; metaId: string; selNodes: NodeRow[] }) {
   const rows = useMemo(() => signerRoster(selNodes, metaId, dataIds, proofIds), [selNodes, metaId, dataIds, proofIds]);
   const [page, setPage] = useState(1);
@@ -395,11 +395,6 @@ function SignerRoster({ dataIds, proofIds, metaId, selNodes }: { dataIds: string
                     <span className="group/copy flex items-center gap-1.5 min-w-0">
                       <span className="min-w-0 flex flex-col">
                         <span className="font-mono truncate">{id ? shortHash(id) : r.res.row.label}</span>
-                        {r.otherKeys.length > 0 && (
-                          <span className="font-mono text-muted-foreground truncate">
-                            signed as {r.otherKeys.join(", ")}
-                          </span>
-                        )}
                       </span>
                       {id && <CopyButton value={id} subject="node id" />}
                     </span>
@@ -527,7 +522,9 @@ export function ChannelStatePanel() {
     // scroll, which past a screenful put a bar INSIDE the scrolling pane: two scrollbars, user
     // 2026-09-03; uncapped, a huge tree is just a long document, and the well's only remaining
     // scroll is sideways, for wide lines the pane cannot offer). All arms are max-[700px].
-    <div className="flex flex-col gap-3 min-h-0 h-full max-[700px]:h-auto max-[700px]:min-h-fit">
+    // ONE DOCUMENT ON EVERY TIER since 2026-10-18 (RecordsSurface scrolls it): the arms that were
+    // the phone's — natural heights, no inner scroller — are now the only arms.
+    <div className="flex flex-col gap-3 h-auto min-h-fit">
       {/* The pane's subject head — same grammar as a card head: eyebrow + identity + ordinal. */}
       <div className="flex flex-col gap-1 flex-none">
         <span className="text-label tracking-caps uppercase text-muted-foreground">Metagraph snapshot</span>
@@ -560,7 +557,11 @@ export function ChannelStatePanel() {
           {/* One verb family with the card: compressed → decompress → decompressing
               (user, 2026-08-13). */}
           {following
-            ? `${coarse ? "Tap" : "Click"} this snapshot's row in the anchor log to decompress its payload. It is a ~2.5 MB fetch, so it runs only when you ask.`
+            // The cost is the WAIT, stated as such (user, 2026-10-19: "is this still true? … is this
+            // really another extra and costly call?"): the reader never downloads the global — the
+            // server reads it from the L0 nodes, a few seconds on a deep ordinal — and since the
+            // same day a tick the exact read just pulled is served from that pull.
+            ? `${coarse ? "Tap" : "Click"} this snapshot's row in the anchor log to decompress its payload. The read takes a few seconds, so it runs only when you ask.`
             : gaveUp
               ? "decompression failed. Reselect the row to retry: old snapshots are served by only some of the chain\u2019s nodes, so another attempt can land."
               : "decompressing…"}
@@ -630,7 +631,7 @@ export function ChannelStatePanel() {
               onValueChange={(v) => { if (v) setWant(v as LaneId); }}
               // The shadcn root ships `flex flex-col gap-2`; this axis owns the pane's remaining
               // height and its tabs sit flush on the box, so both are overridden here.
-              className="min-h-0 flex-1 gap-0 max-[700px]:flex-none"
+              className="flex-none gap-0"
             >
               {/* The lane axis. Same segmented-control recipe as the command bar's presentation
                   toggle, one size down; the hairline under it is the tab underline and spans the
@@ -691,7 +692,7 @@ export function ChannelStatePanel() {
                   from the content"), so the active tab visibly opens INTO the bounded panel
                   (its panel-solid fill already bridges the baseline). Same border weight as the
                   tabs' own (border/50); bottom corners pick up the pane radius. */}
-              <div className={cn(CABINET_BODY, "min-h-0 flex-1 flex flex-col overflow-hidden pt-2 pb-2 max-[700px]:flex-none max-[700px]:overflow-visible")}>
+              <div className={cn(CABINET_BODY, "flex-none flex flex-col overflow-visible pt-2 pb-2")}>
                 {/* ⚠️ EVERY LANE'S PANEL MUST CARRY THE FLEX CHAIN THE PLAIN DIV DID. `TabsContent`
                     inserts a layer between the bordered box and the lane body, so `min-h-0 flex
                     flex-col` has to continue through it — the raw-JSON well below sizes against
@@ -730,7 +731,7 @@ export function ChannelStatePanel() {
                     )}
                     {dataTx != null && <RawSection open={raw} onToggle={() => setRaw((o) => !o)} data={dataTx} />}
                 </TabsContent>
-                <TabsContent value="signers" className="min-h-0 flex flex-col gap-3 overflow-auto slim-scroll max-[700px]:overflow-visible">
+                <TabsContent value="signers" className="min-h-0 flex flex-col gap-3 overflow-visible">
                     {/* dL1 FIRST, L0 AFTER (user, 2026-08-14): the production order — the data
                         blocks are signed by their dL1 producers before the L0 cluster seals the
                         snapshot around them, so the lane reads in the order the signatures were
@@ -766,7 +767,7 @@ export function ChannelStatePanel() {
             // horizontal scroll axis. Un-bled, the plate's inner padding matches the tab box's
             // own inset, so the values still share an edge — the tab box's, which is the pane's
             // visible frame on that tier.
-            <div className="flex-none flex flex-col gap-1 rounded-md bg-[var(--panel-plate)] px-2.5 -mx-2.5 py-2 max-[700px]:mx-0">
+            <div className="flex-none flex flex-col gap-1 rounded-md bg-[var(--panel-plate)] px-2.5 py-2">
               {/* CHAIN POSITION first, then the hashes, a subtle hairline between the two kinds
                   (user, 2026-10-08, C1). Positions are values, not references to carry out, so
                   they take no copy control. */}

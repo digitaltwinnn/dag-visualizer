@@ -63,6 +63,7 @@ import {
 } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { applyClickActions } from "@/src/store/applyClickActions";
+import { useStore } from "@/src/store/store";
 import { positionMarks, siblingSet } from "@/components/railSiblings";
 import { useSiblingState } from "@/components/useSiblingState";
 import { Button } from "@/components/ui/button";
@@ -218,7 +219,10 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
 
   const step = (dir: -1 | 1) => {
     const it = set?.items[set.index + dir];
-    if (it) applyClickActions(it.actions);
+    // A SETTING step (the Range card's windows) writes the setter the picker writes; every other
+    // step is a selection through the one executor (rule 2).
+    if (it?.setting) useStore.getState().setTrendWindow(it.setting.trendWindow);
+    else if (it) applyClickActions(it.actions);
   };
 
   // THE ACCORDION (user, 2026-08-16 — "draw the new card already next to the old and move it";

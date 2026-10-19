@@ -14,7 +14,7 @@ const LAYERS: Array<[string, string]> = [
   ["cl1", "cl1"],
 ];
 
-export interface MetaNode { ip: string; state: string; layer: string; roles: string[]; id: string; ids: string[] }
+interface MetaNode { ip: string; state: string; layer: string; roles: string[]; id: string; ids: string[] }
 export interface Metagraph {
   id: string; name: string; symbol: string; description: string;
   siteUrl: string; iconUrl: string; nodes: MetaNode[];

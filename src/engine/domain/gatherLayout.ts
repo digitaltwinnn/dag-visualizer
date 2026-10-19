@@ -55,12 +55,15 @@ export interface GatherExtent {
 // cancels out and the rails' top is `--rail-top` in CANVAS-local pixels whatever the bar does.
 const RAIL_TOP = 90; //        --rail-top: top of both rails, i.e. the top of the first card
 const RAIL_GUTTER = 26; //     both rails' outer margin
-// The rails are FLUID since 2026-10-02 (`--rail-w: clamp(264px, 16vw, 340px)`, `--detail-w:
-// clamp(320px, 18vw, 400px)`), so the mirror is the same clamp over the viewport width — as fixed
-// 264/320 the band ran under the right rail on a wide screen and History's free gap was overstated.
+// The rails are FLUID since 2026-10-02 and ONE WIDTH since 2026-10-18 (`--rail-w: var(--detail-w)`,
+// `--detail-w: clamp(320px, 18vw, 400px)`), so the mirror is that clamp over the viewport width for
+// both — as fixed 264/320 the band ran under the right rail on a wide screen and History's free gap
+// was overstated, and with the left mirror still at 264/16vw after the rails were made equal the
+// History fit overstated its band by ~100px at 1400px and the front card's ‹ › ran under both rails
+// (user, 2026-10-19). ⚠️ Change these WITH the tokens in globals.css.
 const clampPx = (min: number, v: number, max: number) => Math.min(max, Math.max(min, v));
-const leftRailW = (viewW: number) => clampPx(264, viewW * 0.16, 340); //  --rail-w
 const rightRailW = (viewW: number) => clampPx(320, viewW * 0.18, 400); // --detail-w
+const leftRailW = rightRailW; //                                           --rail-w = --detail-w
 const BOTTOM_RESERVE = 130; // --bottom-reserve at its LEDGER value — the LiveStrip lane. Kept as a
 //                            constant rather than read per view: the lane only mounts in ledger, so
 //                            in hyper/geo this reserves ~130px the band could have used. Measured,

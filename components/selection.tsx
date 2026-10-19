@@ -30,7 +30,7 @@ export const SELECTED_ROW =
 // three equally loud selections and none of them reads as "you are here". Same two inset layers,
 // so it composes with the cursor/pairing washes exactly like the full-strength mark; the row's own
 // rest text colour is left alone (only the focused row brightens to `text-foreground`).
-export const SELECTED_ROW_ANCESTOR =
+const SELECTED_ROW_ANCESTOR =
   "shadow-[inset_0_0_0_1px_var(--sel-border-dim),inset_0_0_0_9999px_var(--sel-bg-dim)]";
 
 /** The committed-row mark at the strength this rung has earned — full for the focus rung, the

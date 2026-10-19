@@ -3,11 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // The LB is first, the archival nodes are the fallback — and the fallback answers EVERY way the LB
 // can fail, not only its 404 (2026-10-04: the LB's CDN answered 403 "Request blocked" to one
 // source IP while an archival node served the same ordinal; the old 404-only rule failed the read).
+const h = vi.hoisted(() => ({ info: { archival: [{ ip: "10.0.0.1", port: 9000 }] } as { archival: { ip: string; port: number }[] } }));
 vi.mock("../archive/probe", () => ({
-  getArchiveInfo: async () => ({ archival: [{ ip: "10.0.0.1", port: 9000 }] }),
+  getArchiveInfo: async () => h.info,
 }));
 
-import { fetchGlobalJson, LB_BACKOFF_MS } from "./fetchGlobal";
+import { fetchGlobalJson, forgetRecentGlobals, GLOBAL_KEEP_MS, LB_BACKOFF_MS, WALK_MAX } from "./fetchGlobal";
 
 const LB = "l0-lb-mainnet";
 const ok = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
@@ -27,6 +28,46 @@ beforeEach(() => {
   clock += 3_600_000;
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(clock);
+  forgetRecentGlobals();
+});
+
+describe("the fallback walk is capped", () => {
+  it("asks at most WALK_MAX nodes before giving up, however many could serve the ordinal", async () => {
+    const saved = h.info;
+    h.info = { archival: Array.from({ length: 40 }, (_, i) => ({ ip: `10.1.0.${i}`, port: 9000 })) };
+    try {
+      const calls = stub(() => Promise.resolve(new Response("", { status: 404 })), () => Promise.resolve(new Response("", { status: 404 })));
+      await expect(fetchGlobalJson("mainnet", 5)).rejects.toThrow();
+      expect(calls.filter((u) => !u.includes(LB))).toHaveLength(WALK_MAX);
+    } finally {
+      h.info = saved;
+    }
+  });
+});
+
+describe("the recent-global keep", () => {
+  it("pulls one ordinal once for both routes, and shares a pull still in flight", async () => {
+    const calls = stub(() => Promise.resolve(ok({ from: "lb" })), () => Promise.resolve(ok({ from: "archive" })));
+    const [a, b] = await Promise.all([fetchGlobalJson("mainnet", 5), fetchGlobalJson("mainnet", 5)]);
+    expect(a).toEqual({ from: "lb" });
+    expect(b).toEqual({ from: "lb" });
+    expect(await fetchGlobalJson("mainnet", 5)).toEqual({ from: "lb" });
+    expect(calls).toHaveLength(1);
+  });
+  it("forgets a failed pull at once, and a kept one after its while", async () => {
+    let fail = true;
+    const calls = stub(
+      () => Promise.resolve(fail ? new Response("blocked", { status: 403 }) : ok({ from: "lb" })),
+      () => Promise.resolve(new Response("", { status: 404 })),
+    );
+    await expect(fetchGlobalJson("mainnet", 5)).rejects.toThrow();
+    fail = false;
+    expect(await fetchGlobalJson("mainnet", 6)).toEqual({ from: "lb" }); // backing off → archives fail → LB after all
+    const n = calls.length;
+    vi.setSystemTime(clock + GLOBAL_KEEP_MS + 1);
+    expect(await fetchGlobalJson("mainnet", 6)).toEqual({ from: "lb" });
+    expect(calls.length).toBeGreaterThan(n);
+  });
 });
 afterEach(() => {
   vi.unstubAllGlobals();

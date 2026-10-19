@@ -19,7 +19,7 @@ import { lastPageSize, mergePage, type ChainSpan, type LogRow } from "@/src/data
 //  - While a page is read the PREVIOUS rows stay (the caller dims them), so a page turn never
 //    blanks the table.
 
-export const MERGED_PAGE = 25;
+const MERGED_PAGE = 25;
 /** How many chain pages the hook keeps (oldest out). */
 const RUNS_MAX = 600;
 /** How often the newest page follows the live tips (ms). */

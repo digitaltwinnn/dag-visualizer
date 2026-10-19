@@ -201,6 +201,7 @@ export default function useTrendRoster(
           points,
           sampled: s.sampled && cut(s.sampled),
           gaps: s.gaps && cut(s.gaps),
+          weights,
         },
         rawPoints: s.points,
         // Each band keyed by its stored type (two hybrid make-ups are both "Hybrid" — found live as a

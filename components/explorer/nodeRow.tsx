@@ -37,7 +37,7 @@ import { IDENT_INK } from "@/components/identInk";
 /** The state as a dot in its bucket colour — and in its SHAPE: ready is a filled disc, any other
  *  state a hollow ring, so the mark is never colour alone (review, 2026-09-26). The word is the
  *  dot's accessible name and its hover. */
-export function StateDot({ state }: { state?: string | null }) {
+function StateDot({ state }: { state?: string | null }) {
   const s = nodeStatus(state);
   const ready = s.bucket === "ready";
   return (
@@ -109,7 +109,9 @@ export function nodeRowSpec(args: {
   return {
     key: args.key,
     glyph: (
-      <span className="min-w-0 truncate text-label font-medium">
+      // BOLD (user, 2026-10-19: "it should have the ticker(s) in bold") — the ticker is the row's
+      // one identity word, and at medium it sat level with the mono id beside it.
+      <span className="min-w-0 truncate text-label font-semibold">
         <span className={IDENT_INK} style={{ color: hue }}>{ticker}</span>
         {also.map((m) => (
           <span key={m.id} className={IDENT_INK} style={{ color: identityHudCss(m.id) }}> {tickerOf(m.id)}</span>

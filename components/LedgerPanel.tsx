@@ -181,9 +181,10 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   // ⚠️ …AND IT HOLDS STILL WHILE A TICK IS PINNED (user, 2026-10-02 — `src/data/ledgerHold.ts`).
   // Newest-first, every live tick pushed each row down a place, so a pinned row walked off the
   // page while it was being read; the scene already holds its pinned row at the front. The head
-  // freezes at the newest tick on screen at the moment of the pin, the ticks that arrive meanwhile
-  // are COUNTED rather than listed, and one control on the heading row resumes live. The frozen
-  // head is state derived during render, so it lands in the same commit as the pin.
+  // is the PIN itself since 2026-10-19 (it froze at the newest tick on screen until then): the
+  // pinned tick is row one, as it is the scene's front row, and everything newer — above it at
+  // pin time or arriving after — is COUNTED in the "newer" row that resumes live. The frozen head
+  // is state derived during render, so it lands in the same commit as the pin.
   // A pin the rolling buffer has evicted holds nothing (`heldTicks` lets go there), so the frozen
   // head is released WITH it — kept, a later pin would inherit a stale head and cut the list.
   const pinnedOrd = !following && snap && snaps.some((x) => x.ordinal === snap.data.ordinal) ? snap.data.ordinal : null;
@@ -287,7 +288,8 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   // The span ALONE (user, 2026-10-03: "remove the explanatory text section"): the word was a
   // button opening a sentence about how many snapshots the explorer keeps — the cache again, which
   // is ours to know and not the reader's (his ruling on the raw phone panel's title, 2026-10-02).
-  const spanScope = { word: spanWords(orderedSnaps) };
+  // "last 8 min cache" (user, 2026-10-19): the word names what the span IS — the retained window.
+  const spanScope = { word: `${spanWords(orderedSnaps)} cache` };
   const spanFooter =
     live && orderedSnaps.length > 0 ? (
       <TablePager page={1} pages={1} from={1} to={orderedSnaps.length} total={orderedSnaps.length} compact scope={spanScope} onPage={() => {}} />
@@ -300,27 +302,36 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
         onRelease: () => setPath(CLOSED_PATH),
       },
       measure: { options: LEDGER_MEASURE_OPTIONS, value: ledgerMeasure, onPick: (id) => setLedgerMeasure(id as LedgerMeasure) },
-      // The held list's ONE control: how many ticks arrived behind the pin, and the way back to
-      // them. It is the follow switch (`followToggleActions` through the one executor) — the same
-      // write the card's own pill makes — shown here only while there is something to resume to.
-      setting:
-        held.newer > 0 && snap ? (
-          <button
-            type="button"
-            onClick={() => applyClickActions(followToggleActions(snap, false))}
-            className="inline-flex items-center gap-1.5 rounded-sm px-1.5 -mr-1.5 py-[3px] min-h-6 text-label text-foreground whitespace-nowrap cursor-pointer select-none hover:bg-wash-hover focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
-          >
-            <LiveDot />
-            <span className="tabular-nums">{held.newer}</span> newer
-          </button>
-        ) : undefined,
       hasFigure: true,
       // A 4-decimal fee ("0.0680") needs the wider figure column; the width holds across the
       // level's measures so the columns never shift when the heading's pick changes.
       figureW: 48,
       // "Waiting" is a promise; a network that has never answered gets the honest state instead.
       empty: dead ? NO_SIGNAL_COPY : "Waiting for snapshots…",
-      rows: pagedSnaps.map((d, i): ExplorerRowSpec => {
+      // THE TICKS THAT ARRIVED BEHIND THE PIN ARE THE LIST'S FIRST ROW (user, 2026-10-18: "fits
+      // better as the top row inside the explorer, similar to the scene, which animates the extra
+      // thin bar at the front when new snapshots arrive while it keeps the pinned one visible"). It
+      // rode the heading as a setting-style button until then. A live-dot row, "3 newer", sliding
+      // in from the top as the scene's front bar does; its click is the follow switch
+      // (`followToggleActions` through the one executor) — the same write the card's pill makes.
+      rows: (held.newer > 0 && snap
+        ? [
+            {
+              key: "newer",
+              // The mark AFTER the words, as the pin follows the pinned row's ordinal (user, 2026-10-19).
+              name: (
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="tabular-nums">{held.newer}</span> newer
+                  <LiveDot />
+                </span>
+              ),
+              hue: "var(--primary)",
+              className: "animate-in fade-in slide-in-from-top-2 duration-300 motion-reduce:animate-none",
+              onClick: () => applyClickActions(followToggleActions(snap, false)),
+            } as ExplorerRowSpec,
+          ]
+        : ([] as ExplorerRowSpec[])
+      ).concat(pagedSnaps.map((d, i): ExplorerRowSpec => {
         const count = tickFilterCount(d);
         const v = tickValues[i];
         const globalPick = { kind: "snapshot", title: `Global snapshot #${d.ordinal}`, data: d } as const;
@@ -376,7 +387,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           },
           pair: subjectPairing(hoverSnapOrd, d.ordinal, setHoverSnapOrd, accent),
         };
-      }),
+      })),
       pager:
         live && orderedSnaps.length > 0 ? (
           <TablePager

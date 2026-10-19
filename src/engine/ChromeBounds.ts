@@ -25,6 +25,15 @@ export class ChromeBounds {
    *  floor: the footer row is chrome too, and a label dropped to "just above the dock" landed on its
    *  links (2026-10-07). */
   dockTop = 0;
+  /** The DESKTOP rails' inner edges — the right edge of `#leftcol` and the left edge of
+   *  `#rightcol` — while a column is on screen; 0 / +∞ while it is not (narrower tiers hide the
+   *  columns, and the SCENE toggle slides them away). The callout's band is pulled in by them
+   *  (2026-10-18, user: the label "is sometimes placed behind the right rail cards … when a
+   *  metagraph on the right side of the panels is chosen"; and "in scene mode it could use the
+   *  entire space as no cards are shown"). Measured here, not published by the rails: the
+   *  `sceneCover*` channel is the tablet sheets' and single-publisher by rule. */
+  railL = 0;
+  railR = Infinity;
 
   private _in = 0;
 
@@ -44,6 +53,19 @@ export class ChromeBounds {
     this.dockTop = dr && dr.height > 0 ? dr.top : h;
     const foot = document.getElementById("sitefoot")?.getBoundingClientRect();
     if (dr && dr.height > 0 && foot && foot.height > 0 && foot.top < this.dockTop) this.dockTop = foot.top;
+    const w = window.innerWidth;
+    const col = (id: string) => {
+      const el = document.getElementById(id);
+      if (!el) return null;
+      const cr = el.getBoundingClientRect();
+      // Off screen (slid away, hidden by a tier) or invisible counts as absent.
+      if (cr.width <= 0 || cr.right <= 0 || cr.left >= w || getComputedStyle(el).visibility === "hidden") return null;
+      return cr;
+    };
+    const lc = col("leftcol");
+    const rc = col("rightcol");
+    this.railL = lc ? lc.right : 0;
+    this.railR = rc ? rc.left : Infinity;
     return this;
   }
 }

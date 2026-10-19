@@ -56,7 +56,7 @@ describe("appliedChips — what the toolbar says is in force", () => {
   const day = (d: string) => (d === "2026-09-08" ? "Sep 8" : d === "2026-10-07" ? "Oct 7" : d);
   it("names the chain beside a snapshot number and a date range, as the fields do", () => {
     expect(appliedChips({ snapshot: "2617537", tick: "", from: "", to: "", chain: "DAGded", doorLabel: null }, ticker, day)).toEqual([
-      { key: "snapshot", text: "DED 2,617,537" },
+      { key: "snapshot", text: "Metagraph snapshot: DED 2,617,537" },
     ]);
     expect(appliedChips({ snapshot: "", tick: "", from: "2026-09-08", to: "2026-10-07", chain: "DAGded", doorLabel: null }, ticker, day)).toEqual([
       { key: "date", text: "DED Sep 8 – Oct 7" },
@@ -72,7 +72,7 @@ describe("appliedChips — what the toolbar says is in force", () => {
   });
   it("a global snapshot reads as the global it is", () => {
     expect(appliedChips({ snapshot: "", tick: "6700000", from: "", to: "", chain: null, doorLabel: null }, ticker, day)).toEqual([
-      { key: "tick", text: "in global 6,700,000" },
+      { key: "tick", text: "Global snapshot: 6,700,000" },
     ]);
   });
 });

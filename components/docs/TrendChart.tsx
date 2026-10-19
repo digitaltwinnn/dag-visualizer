@@ -5,7 +5,7 @@ import { Area, CartesianGrid, ComposedChart, Line, LineChart, ReferenceArea, Res
 import { cn } from "@/lib/utils";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { RoleChips } from "@/components/inspector/parts";
-import { bucketAt, cursorFraction, heldZoom } from "@/src/data/trendWindow";
+import { bucketAt, cursorFraction } from "@/src/data/trendWindow";
 import { bucketStamp } from "@/src/util/localTime";
 import { compactNumber } from "@/src/util/format";
 
@@ -80,6 +80,9 @@ const AXIS_H = 18;
 // the 3D plane's projected scale for free.
 // ⚠️ The margin must be READ from here by the chart too, never restated at the call site: the
 // overlay's x is only right while the two agree.
+/** How long a freshly rendered axis takes to fade in — the measure roll's own IN length
+ *  (`useStagedMeasure`), so a range change and a measure change arrive at one tempo. */
+const AXIS_FADE_MS = 320;
 const PLOT_MARGIN = { top: 10, right: 2, bottom: 4, left: 2 } as const;
 /** The plot box's horizontal inset, both sides together — what a 100% width must give back. */
 const PLOT_INSET_X = PLOT_MARGIN.left + PLOT_MARGIN.right;
@@ -117,20 +120,24 @@ export default function TrendChart({
   sampled,
   gaps,
   onRange,
+  touchBrush = true,
   inspect,
   readout,
+  nameOnly,
   scaleMax,
   cursorMs,
   onPick,
   fill,
   plotHeight = PLOT_H,
   rollClassName,
-  zoomTo,
+  held,
   stack,
   note,
   syncId = "trends",
   compact = false,
   unitInPlot = false,
+  heading,
+  peak,
   lineWidth = 2,
   className,
   headClassName,
@@ -174,6 +181,9 @@ export default function TrendChart({
    *  selection drives the whole column (the shared-axis rule), so this chart never cuts
    *  itself. Omitted (or a coarse pointer), the plot is read-only as before. */
   onRange?: (fromMs: number, toMs: number) => void;
+  /** Whether a TOUCH drag across the plot brushes a range (the document's charts); the stack's
+   *  planes decline it (2026-10-18) — their horizontal flick is the measure step. */
+  touchBrush?: boolean;
   /** One step down the ladder: "open these buckets as records". Rendered as a small action in
    *  the head — the page passes it only while a range is active and the chart knows its chain. */
   inspect?: () => void;
@@ -232,16 +242,18 @@ export default function TrendChart({
    *  and five recharts plots mounting in the animation's first frames WAS the stutter. Absent,
    *  there is no wrapper at all and the document's DOM is what it always was. */
   rollClassName?: string;
-  /** THE HELD PLOT ZOOMS TO THE SPAN BEING LOADED (user, 2026-09-29). While the caller is showing
-   *  a PREVIOUS window in place of one still in flight, it names the span it asked for, and the
-   *  plot slides and scales (`heldZoom`) so the old buckets stand where the new axis will draw
-   *  them; when the new data lands the caller passes `null`, the transform snaps back as the new
-   *  series replaces the old in the same frame, and the caller's own fade is the crossfade.
-   *  `undefined` (the document) renders no wrapper at all. `null` keeps the wrapper at identity,
-   *  which is what lets the NEXT hold animate out of it rather than jump. The axis labels and the
-   *  cursor stand down while zoomed: stretched text reads as broken, and the cursor is placed on
-   *  the new axis's buckets, which this picture is not. */
-  zoomTo?: { fromMs: number; toMs: number } | null;
+  /** THE PLOT IS A STAND-IN — the caller is showing a PREVIOUS window in place of one still in
+   *  flight (the slice's hold). The held picture stays exactly where it was drawn, quiet under the
+   *  caller's own dim, and the cursor stands down (it is placed on the new axis's buckets, which
+   *  this picture is not). When the new data lands the caller passes `false` and the new plot
+   *  FADES IN (below). `undefined` (the document) renders no wrapper at all.
+   *  Until 2026-10-19 the held picture ZOOMED to the span being loaded (`heldZoom`, 2026-09-29:
+   *  scale + slide so the old buckets stood where the new axis would draw them), and a window
+   *  hop inside one payload ran the same move the other way as a FLIP. Measured against the
+   *  reader it was two different motions — a widened range squeezed the lines into a sliver
+   *  ("some scramble"), a shortened one stretched them in from the right — so both went for the
+   *  one fade (user: "make it consistent and smooth"). */
+  held?: boolean;
   /** PARTS OF THE FIRST LINE, STACKED beneath it (2026-09-29, the per-network node chart: its
    *  types). Only for parts that PARTITION the line — they must sum to it, or the stack claims
    *  more than exists. A bucket null in every band is left open (not recorded). */
@@ -271,6 +283,19 @@ export default function TrendChart({
    *  card in front. The unit is the same on every card of a stack, so it is said once, on the
    *  one plot that is visible: "Snapshots per hour · peak 1,717". The document never passes it. */
   unitInPlot?: boolean;
+  /** The measure's name, centred in the head as the card's title (2026-10-19); with it the unit
+   *  caption is not drawn. (`heading`, not `title` — a `title` prop reads as hover text to the
+   *  tooltip boundary.) */
+  heading?: string;
+  /** THE HEAD IS THE NAME ALONE (user, 2026-10-19: "the title repeated on each background card
+   *  is quite duplicate — keep only the metagraph on those older cards and drop title and
+   *  values"). The stack's rear planes pass it: the front card states the measure and its
+   *  readings for the whole deck, and a rear card is a network's picture behind it, named and
+   *  nothing more. The legend stays — it keys the bands that ARE drawn. The caller still hands
+   *  the readout in, because the plot's tooltip reads it. */
+  nameOnly?: boolean;
+  /** The peak beside the readout, on the readout's own unit (see `peakReading`). */
+  peak?: { word: string; value: number } | null;
   /** The series line's stroke, in CSS px at scale 1. The document's small charts draw at 2; a
    *  History card is drawn LARGER than authored (scale ~1.3 on a desktop), so the same 2 landed
    *  at 2.6px and read as heavy (user, 2026-10-03: "the trend card lines are too thick") — the
@@ -314,13 +339,14 @@ export default function TrendChart({
 }) {
   const n = buckets.length;
   const measured = lines.some((l) => l.points.some((v) => v != null));
-  // THE AXIS CHANGED WITH NO HOLD IN BETWEEN — a window hop inside one payload (30D → 7D both
-  // read the hourly tier), so the new series lands in the same render and there is no held
-  // picture for `zoomTo` to move. The same motion runs the other way round (FLIP): the NEW plot
-  // starts where the OLD axis would have drawn it and eases to its own. Real data throughout,
-  // only its placement moves. Skipped right after a hold, which already made the move, and
-  // under reduced motion.
-  const zoomEl = useRef<HTMLDivElement>(null);
+  // A NEW AXIS FADES IN (2026-10-19). Whether the new series lands after a hold (another tier
+  // fetched, the stale picture standing in meanwhile) or in the same render as the press (a
+  // window hop inside one payload — 30D → 7D both read the hourly tier), the arrival is the same
+  // gesture: the plot that just rendered starts transparent and eases to full. Opacity only —
+  // nothing is scaled or slid, so a wider span and a narrower one read alike — and the caller's
+  // own dim on the held picture releases in the same beat, which is the crossfade. Skipped under
+  // reduced motion. It replaced a held-picture zoom plus a FLIP (see `held`).
+  const fadeEl = useRef<HTMLDivElement>(null);
   const tapFrom = useRef<{ x: number; y: number } | null>(null);
   const tapAt = useRef(-Infinity);
   /** The plot box is PLOT_MARGIN over the plate at any width (the overlay's rule), so the
@@ -337,27 +363,24 @@ export default function TrendChart({
   const axisTo = n ? buckets[n - 1]! : 0;
   useLayoutEffect(() => {
     const prev = lastAxis.current;
-    lastAxis.current = { from: axisFrom, to: axisTo, held: !!zoomTo };
-    const el = zoomEl.current;
-    if (!el || zoomTo || !prev || prev.held || n < 2) return;
-    if (prev.from === axisFrom && prev.to === axisTo) return;
+    lastAxis.current = { from: axisFrom, to: axisTo, held: !!held };
+    const el = fadeEl.current;
+    // A first render, a held picture, or the same axis as before (a refresh) is not an arrival.
+    if (!el || held || !prev || n < 1) return;
+    if (!prev.held && prev.from === axisFrom && prev.to === axisTo) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const z = heldZoom(axisFrom, axisTo, { fromMs: prev.from, toMs: prev.to });
-    if (!z) return;
     el.style.transition = "none";
-    el.style.transform = `scaleX(${z.s}) translateX(calc(${-z.f0} * (100% - ${PLOT_INSET_X}px)))`;
-    el.dataset.flip = "";
-    void el.offsetWidth;
-    el.style.transition = "transform 420ms var(--ease-roll)";
-    el.style.transform = "";
+    el.style.opacity = "0";
+    void el.offsetWidth; // commit the transparent state so the transition has a "from"
+    el.style.transition = `opacity ${AXIS_FADE_MS}ms var(--ease-roll)`;
+    el.style.opacity = "";
     const done = () => {
       el.style.transition = "";
-      delete el.dataset.flip;
     };
     el.addEventListener("transitionend", done, { once: true });
-    const t = window.setTimeout(done, 600);
+    const t = window.setTimeout(done, AXIS_FADE_MS + 200);
     return () => window.clearTimeout(t);
-  }, [axisFrom, axisTo, zoomTo, n]);
+  }, [axisFrom, axisTo, held, n]);
 
   // The cursor's bucket on THIS chart's own axis — the chart owns its scale, so the lookup runs
   // against the buckets it was actually handed (a counter series trims its partial edges, so the
@@ -390,7 +413,14 @@ export default function TrendChart({
           backstop: a name longer than the whole row still truncates inside the group rather
           than overflowing it. Nothing changes at any width where the row already fit. */}
       <div
-        className={cn("flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-1", headClassName)}
+        className={cn(
+          // A HEADING MAKES THE HEAD THREE COLUMNS (user, 2026-10-19: the title "is not always fully
+          // centred, it depends on the text size of the metagraph"): name | title | readings on
+          // `1fr auto 1fr`, so the middle sits on the card's centre whatever its neighbours weigh.
+          // Without one the head is the wrapping row it always was.
+          heading ? "grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-baseline gap-x-2 mb-1" : "flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-1",
+          headClassName,
+        )}
         {...headHover}
         {...(headAction && {
           role: "button",
@@ -433,11 +463,17 @@ export default function TrendChart({
           },
         })}
       >
-        <span className="inline-flex items-baseline gap-2 min-w-0 max-w-full flex-none">
+        <span className={cn("inline-flex items-baseline gap-2 min-w-0 max-w-full", heading ? "justify-self-start" : "flex-none")}>
           <span className="inline-block w-2 h-2 rounded-full flex-none" style={{ background: hue0 }} aria-hidden />
           <span className="text-label font-semibold text-foreground truncate">{name}</span>
-          {unit && !unitInPlot && <span className="text-label text-muted-foreground whitespace-nowrap">{unit}</span>}
+          {unit && !unitInPlot && !heading && !nameOnly && <span className="text-label text-muted-foreground whitespace-nowrap">{unit}</span>}
         </span>
+        {/* THE MEASURE AS A CENTRED TITLE (user, 2026-10-19: "instead of right side 'snapshots per
+            5 min', centre it and make it like a title just saying 'snapshots'"): the card's one
+            word for WHAT it plots, between the network at the left and the reading at the right;
+            the cadence lives in the explorer's measure heading. */}
+        {heading && <span className="min-w-0 text-center text-label font-semibold text-foreground-dim truncate">{heading}</span>}
+        <span className={cn("inline-flex items-baseline flex-wrap min-w-0", heading ? "justify-self-end justify-end gap-x-3" : "contents")}>
         {/* One rung down the ladder (convention 12): only offered while a range is active,
             because the destination — the anchor log's date search — receives that range. */}
         {inspect && (
@@ -484,16 +520,28 @@ export default function TrendChart({
         {/* One line states its own reading; a MULTI-line chart only a reading its caller names
             (the per-network Nodes panels' total, 2026-09-29) — which line a bare number
             belonged to would otherwise be a guess. */}
-        {(lines.length === 1 || readout != null) && last != null && (
+        {!nameOnly && (lines.length === 1 || readout != null) && last != null && (
           // The readout NAMES ITS RELATION to the window (user, 2026-09-09, third round of
           // this head: a number and a time still read as two facts — the words now say what
           // the number IS, "latest full day/hour/5 min", and the exact stamp lives on hover.
           // "Full" because partial edges are trimmed. ("Newest" was tried for one round on a
           // staleness nuance too thin to carry — user: "'newest' not 'latest'?" — the hover
           // stamp and the gray band are what actually say when the reading lags the clock.)
-          <span
-            className="ml-auto inline-flex items-baseline gap-1.5 whitespace-nowrap"
-          >
+          // The two readings may WRAP onto a second line — each stays one piece (nowrap), the pair
+          // does not — so the phone's 360px card keeps the centred title and both numbers
+          // (2026-10-19: on one line they ran under the title).
+          <span className={cn("inline-flex flex-wrap justify-end items-baseline gap-x-3", !heading && "ml-auto")}>
+            {/* THE PEAK SITS WITH THE READOUT (user, 2026-10-19: "make one visually designed place
+                and keep them together") — on the READOUT'S OWN UNIT (`peakReading`: the busiest day
+                beside the daily average; the plot's hourly maximum beside a per-day average read
+                "average higher than peak, can't be"). */}
+            {!compact && peak && (
+              <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap">
+                <span className="text-label text-muted-foreground">{peak.word}</span>
+                <span className="text-label text-foreground-dim tabular-nums">{format(peak.value)}</span>
+              </span>
+            )}
+            <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap">
             {/* A null readout value is ACQUIRING — the daily tier behind "latest full day" is still in
                 flight — so the slot holds its place (NodeStars) rather than show a finer bucket
                 under the day's word, or a number that isn't the day's. */}
@@ -505,11 +553,16 @@ export default function TrendChart({
             <span className="text-label text-muted-foreground">
               {readout ? readout.word : `latest full ${stepMs >= 86400000 ? "day" : stepMs >= 3600000 ? "hour" : "5 min"}`}
             </span>
-            <span className="text-label font-medium text-foreground tabular-nums">
+            {/* Additional information, not a title (user, 2026-10-19: "not so prominent"): the dim
+                ink at regular weight — the scale has no smaller step than the label, so weight and
+                ink carry the hierarchy. */}
+            <span className="text-label text-foreground-dim tabular-nums">
               {readout ? (readout.value != null ? format(readout.value) : readout.pending === false ? "—" : <NodeStars count={3} />) : format(last)}
+            </span>
             </span>
           </span>
         )}
+        </span>
       </div>
       {note || !measured ? (
         // THE EMPTY STATE TAKES THE PLOT'S OWN HEIGHT (user, 2026-10-07: "BIOFI is missing while it
@@ -561,7 +614,6 @@ export default function TrendChart({
               <TrendPlot
                 compact={compact}
                 lineWidth={lineWidth}
-                plotUnit={unitInPlot ? unit : undefined}
                 syncId={syncId}
                 lines={lines}
                 buckets={buckets}
@@ -571,6 +623,7 @@ export default function TrendChart({
                 sampled={sampled}
                 gaps={gaps}
                 onRange={onRange}
+                touchBrush={touchBrush}
                 fill={fill}
                 stack={stack}
                 plotH={plotHeight}
@@ -581,19 +634,13 @@ export default function TrendChart({
             // absolute descendants whether it asked to or not. A plain template string, NOT `cn()`:
             // the roll recipe carries several `[transition:…]` values under different variants and
             // twMerge must not be given the chance to "resolve" them.
-            const zoom = zoomTo && n > 1 ? heldZoom(buckets[0]!, buckets[n - 1]!, zoomTo) : null;
+            // The fade's element (above): `relative`, so the plot's absolutely-placed readout keeps
+            // the box it had. The document (`held` undefined) renders no wrapper at all.
             const framed =
-              zoomTo === undefined ? (
+              held === undefined ? (
                 plot
               ) : (
-                <div
-                  ref={zoomEl}
-                  className={`relative ${zoom ? "[transition:transform_420ms_var(--ease-roll)] [&_.recharts-cartesian-axis-tick]:opacity-0 motion-reduce:!transition-none" : "data-[flip]:[&_.recharts-cartesian-axis-tick]:opacity-0"}`}
-                  style={{
-                    transformOrigin: `${PLOT_MARGIN.left}px 0`,
-                    transform: zoom ? `scaleX(${zoom.s}) translateX(calc(${-zoom.f0} * (100% - ${PLOT_INSET_X}px)))` : undefined,
-                  }}
-                >
+                <div ref={fadeEl} className="relative">
                   {plot}
                 </div>
               );
@@ -615,7 +662,7 @@ export default function TrendChart({
               what lets it ride the 3D plane's projected scale.
               Structural accent, one hairline, no animation, no pointer events: it is a POSITION,
               and a position that eases in lags the gesture that set it. */}
-          {cursorX != null && !zoomTo && (
+          {cursorX != null && !held && (
             <div
               aria-hidden
               className="absolute w-px bg-[var(--primary)] pointer-events-none"
@@ -666,12 +713,12 @@ const TrendPlot = memo(function TrendPlot({
   sampled,
   gaps,
   onRange,
+  touchBrush = true,
   fill,
   stack,
   plotH,
   compact = false,
   lineWidth = 2,
-  plotUnit,
 }: {
   /** See the outer component's prop — a STRING, so it holds the memo still. */
   syncId: string;
@@ -683,6 +730,7 @@ const TrendPlot = memo(function TrendPlot({
   sampled?: (number | null)[];
   gaps?: (number | null)[];
   onRange?: (fromMs: number, toMs: number) => void;
+  touchBrush?: boolean;
   /** See the outer component's prop — a plain boolean, so it holds the memo still. */
   fill?: boolean;
   /** See the outer component's prop. */
@@ -691,8 +739,6 @@ const TrendPlot = memo(function TrendPlot({
   plotH: number;
   /** See the outer component's prop — a plain boolean, so it holds the memo still. */
   compact?: boolean;
-  /** The unit to lead the peak caption with — see the chart's `unitInPlot`. */
-  plotUnit?: string;
   lineWidth?: number;
 }) {
   const n = buckets.length;
@@ -741,16 +787,24 @@ const TrendPlot = memo(function TrendPlot({
         // phone). The plate's `touch-pan-y` splits the gestures: a horizontal drag selects,
         // a vertical swipe still scrolls the document. Touchstart may fire before recharts
         // has a coordinate, so the drag begins lazily on the first labelled event.
+        // …BUT NOT ON THE STACK'S PLANES (user, 2026-10-18: "I can swipe the chart and that looks
+        // like it's selecting a range, but it only works in the vitals selector … most sense is
+        // not to allow it in the card, so that it's clear the control in vitals is meant for it"):
+        // a plane passes `touchBrush={false}`, its horizontal flick steps the measure instead, and
+        // the band's timeline is the one touch range control.
         onTouchStart: (e: { activeLabel?: string | number }) => {
+          if (!touchBrush) return;
           const ts = Number(e?.activeLabel);
           if (Number.isFinite(ts)) setDrag({ a: ts, b: ts });
         },
         onTouchMove: (e: { activeLabel?: string | number }) => {
+          if (!touchBrush) return;
           const ts = Number(e?.activeLabel);
           if (!Number.isFinite(ts)) return;
           setDrag((d) => (d ? { a: d.a, b: ts } : { a: ts, b: ts }));
         },
         onTouchEnd: () => {
+          if (!touchBrush) return;
           // The closure's `drag`, like onMouseUp — committing inside a setState updater
           // would double-fire under Strict Mode (updaters must stay pure).
           if (drag) {
@@ -1117,15 +1171,6 @@ const TrendPlot = memo(function TrendPlot({
               )}
             </Chart>
           </ResponsiveContainer>
-          {/* The y scale's one number, with its ROLE said (user, 2026-09-09: a bare number
-              top-left beside the head's readout top-right was two unexplained values) — it
-              is the window's peak, and the baseline is 0 by construction. */}
-          {!compact && (
-            <span aria-hidden className="absolute top-1 left-1.5 text-label text-muted-foreground pointer-events-none tabular-nums">
-              {/* Two facts, a gap between them — the unit, then the scale's one number. */}
-              {plotUnit && <span className="mr-2.5">{plotUnit}</span>}peak {format(ownMax)}
-            </span>
-          )}
     </>
   );
 });

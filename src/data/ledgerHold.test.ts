@@ -10,19 +10,19 @@ describe("nextHoldTop (where the list's head freezes while a tick is pinned)", (
     expect(nextHoldTop(105, null, 110)).toBeNull(); // releasing the pin releases the hold
   });
 
-  it("freezes at the NEWEST tick on screen at the moment of the pin, not at the pin itself", () => {
-    // Pinning 105 while 110 is the head keeps 106…110 in the list: nothing the reader could see
-    // disappears, the list only stops GROWING.
-    expect(nextHoldTop(null, 105, 110)).toBe(110);
+  it("freezes at the PIN itself — the pinned tick is the first row, like the scene's front row (2026-10-19)", () => {
+    // Pinning 105 while 110 is the head puts 105 first and counts 106…110 as "newer": the list
+    // says what the scene says — the pinned row is the front row.
+    expect(nextHoldTop(null, 105, 110)).toBe(105);
   });
 
   it("holds through later live ticks", () => {
-    expect(nextHoldTop(110, 105, 117)).toBe(110);
+    expect(nextHoldTop(105, 105, 117)).toBe(105);
   });
 
-  it("rises only when the pin itself steps above it (the pager's › past the held head)", () => {
-    expect(nextHoldTop(110, 112, 117)).toBe(112);
-    expect(nextHoldTop(110, 108, 117)).toBe(110);
+  it("follows the pin wherever it moves — up by the pager's ›, down onto an older row", () => {
+    expect(nextHoldTop(105, 112, 117)).toBe(112);
+    expect(nextHoldTop(110, 108, 117)).toBe(108);
   });
 });
 
@@ -32,11 +32,11 @@ describe("heldTicks (the rows the explorer lists, and how many newer ones wait)"
     expect(heldTicks(snaps, null, null)).toEqual({ ticks: snaps, newer: 0 });
   });
 
-  it("hides the ticks newer than the hold and counts them", () => {
+  it("hides the ticks newer than the hold and counts them — the ones above the pin at pin time included", () => {
     const snaps = buffer(100, 117);
-    const h = heldTicks(snaps, 110, 105);
-    expect(h.ticks.map((t) => t.ordinal)).toEqual(buffer(100, 110).map((t) => t.ordinal));
-    expect(h.newer).toBe(7);
+    const h = heldTicks(snaps, 105, 105);
+    expect(h.ticks.map((t) => t.ordinal)).toEqual(buffer(100, 105).map((t) => t.ordinal));
+    expect(h.newer).toBe(12);
   });
 
   it("keeps the caller's order (oldest → newest in, the same out)", () => {
@@ -56,6 +56,6 @@ describe("heldTicks (the rows the explorer lists, and how many newer ones wait)"
 describe("the hold waits for a list", () => {
   it("does not freeze at the pin before the feed has seeded", () => {
     expect(nextHoldTop(null, 100, null)).toBeNull();
-    expect(nextHoldTop(null, 100, 140)).toBe(140);
+    expect(nextHoldTop(null, 100, 140)).toBe(100);
   });
 });

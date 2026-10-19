@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { track } from "@vercel/analytics";
 import { useStore } from "@/src/store/store";
 import { parseThemePref, resolveTheme, THEME_KEY, type ThemePref } from "@/src/theme/resolve";
 
@@ -30,6 +31,9 @@ export default function ThemeController() {
     let stored: string | null = null;
     try { stored = localStorage.getItem(THEME_KEY); } catch { /* storage unavailable */ }
     applyThemePref(parseThemePref(stored));
+    // ONE event per load (user, 2026-10-18: "a custom event to see what mode users are in"): the
+    // resolved theme and whether it was chosen or followed. A no-op off Vercel.
+    track("theme", { theme: useStore.getState().theme, pref: useStore.getState().themePref });
     const m = mq();
     // OS flips only matter while following the system — resolve against the CURRENT pref.
     const onChange = () => {

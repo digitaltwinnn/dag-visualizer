@@ -2,7 +2,6 @@ import {
   Orbit,
   Globe,
   Layers,
-  Layers2,
   CircleDashed,
   Info,
   Compass,
@@ -72,11 +71,6 @@ export const EXPLORE_ICON: LucideIcon = Compass;
 // layer cards near-identical at a glance (user feedback).
 export const SNAPSHOT_ICON: LucideIcon = Box;
 
-// A settlement-stack LAYER's mark (the Snapshots·Explore panel's click subject). NOT a view icon —
-// distinct from VIEW_ICONS.ledger (the whole stack) and SNAPSHOT_ICON (the block): a two-plane
-// glyph from the Layers family reads "one stratum of the stack". Named like ABOUT_ICON/
-// EXPLORE_ICON: dedicated non-view marks get a constant here, view subjects borrow VIEW_ICONS.
-export const LAYER_ICON: LucideIcon = Layers2;
 
 // A metagraph SNAPSHOT's mark (spec 2026-08-04 — a tile on the ledger's upper floor, its own card
 // slot): a metagraph snapshot is one of the many sealed states a single global tick carries, so it

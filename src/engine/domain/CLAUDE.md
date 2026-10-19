@@ -13,7 +13,7 @@ Every switch among the four 3D views runs the same staged **gather choreography*
 staggered, to per-network staging grids on a camera-anchored plane while its furniture fades; one
 invisible boundary frame where the nodes are gathered, the destination layout snaps in and the camera
 tween starts; then the to-view's furniture builds back in fast while its nodes disperse over a longer
-window into the already-drawn view. ~3.9s in total.
+window into the already-drawn view. ~3.3s in total (DUR_IN 3.0 → 2.4 on 2026-10-19, user: "a little bit" faster).
 
 **The slow placement reads as staging rather than loading *because* the destination is complete
 first.** `morph` and `ledgerT` are boundary-applied layout parameters, not eased flight blends.

@@ -75,6 +75,12 @@ export default function AboutDoc() {
         Network as a living 3D scene. It connects to the network&apos;s public APIs and renders
         what is actually happening right now: real nodes, real locations, real activity.
       </p>
+      {/* The making-of, one line (user, 2026-10-18: "mention also that the site has been built and
+          designed using Constellation's own product called Gate AI"). A fact about the site, not a
+          claim about the network, so it sits under the lead and outside the live-data panel. */}
+      <p className="mt-3 text-prose text-muted-foreground">
+        The site itself was designed and built with Gate AI, Constellation&apos;s own AI product.
+      </p>
 
       {/* The live-data promise, stated POSITIVELY (user, 2026-09-04: "nothing is made up"
           answers an assumption no reader arrived with — just say we use live data) — and merged

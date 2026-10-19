@@ -143,7 +143,11 @@ export async function GET(req: Request, ctx: { params: Promise<{ ordinal: string
   try {
     const data = await cachedExact(net, n);
     return NextResponse.json(data, {
-      headers: { "Cache-Control": "public, max-age=86400, immutable" },
+      // `s-maxage` too (2026-10-18): the live tip and the cold-load backfill ask every visitor for
+      // the SAME ordinals, and with `max-age` alone only each browser kept them — the CDN missed
+      // 96% of the week's 5,233 calls and every one reached the load balancer. An ordinal is
+      // immutable, so the edge may keep it as long as the browser does; a 404 carries no header.
+      headers: { "Cache-Control": "public, max-age=86400, s-maxage=86400, immutable" },
     });
   } catch {
     // Transiently unavailable (not yet finalized / upstream blip) — client keeps the polled floor.

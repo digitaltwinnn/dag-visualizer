@@ -89,17 +89,3 @@ function PulseSpan({ rail }: { rail: "left" | "right" }) {
     </span>
   );
 }
-
-// Convenience — hook + view in one, for a card that stays mounted across its subject changes
-// (the right-rail detail panes, keyed per slot). Where the subject spans a branch swap, call
-// `useEdgePulse` at the component top and render `<PulseEdge>` instead.
-export default function EdgePulse({
-  subjectKey,
-  rail = "left",
-}: {
-  subjectKey: unknown;
-  rail?: "left" | "right";
-}) {
-  const pulseKey = useEdgePulse(subjectKey);
-  return <PulseEdge pulseKey={pulseKey} rail={rail} />;
-}

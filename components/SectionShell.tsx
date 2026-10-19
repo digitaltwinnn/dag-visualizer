@@ -49,7 +49,7 @@ const SCENE_DIM = 0.26;
  *  Exported for any surface inside the layer that has to outlive the store write that closed it
  *  (unmounting the instant `section` flips would blank the layer while it is still receding). One
  *  number, read by the timeline below and by whoever has to wait for it. */
-export const RAW_EXIT_S = 0.3;
+const RAW_EXIT_S = 0.3;
 
 export default function SectionShell({
   scene,
@@ -203,7 +203,11 @@ export default function SectionShell({
           // The coarse-pointer arms grow the 24px ghost to the 44px touch floor AND re-anchor it
           // (top-4→1.5, right-3→0.5) so the × GLYPH stays where the fine-pointer one sits — grown
           // in place, the box's centre drifted 10px down-left onto the table header's AGE cell.
-          className="absolute top-4 right-3 z-20 text-muted-foreground hover:text-foreground touch:min-h-11 touch:min-w-11 touch:top-1.5 touch:right-0.5"
+          // ⚠️ ON THE PHONE'S SNAPSHOT PAGE THIS × STANDS DOWN (user, 2026-10-18: "it feels like the x
+          // will close this details pane … but the entire raw page is closed"). RecordsSurface's
+          // detail page marks itself `data-raw-detail` and carries its own × beside "‹ Snapshots",
+          // which returns to the list; the layer's exit is then the list page's ×.
+          className="absolute top-4 right-3 z-20 text-muted-foreground hover:text-foreground touch:min-h-11 touch:min-w-11 touch:top-1.5 touch:right-0.5 max-[700px]:[:has([data-raw-detail])_&]:hidden"
           onClick={() => useStore.getState().setSection("scene")}
         >
           {/* A close glyph is 18px on touch (user, 2026-10-07: "on mobile the X icon is tiny") —

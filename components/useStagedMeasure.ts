@@ -53,9 +53,9 @@ export type RollPhase = "idle" | "out" | "pre";
 export const ROLL_CLASS =
   "[transition:opacity_320ms_var(--ease-roll),transform_320ms_var(--ease-roll)] " +
   "group-data-[roll=out]/stack:[transition:opacity_140ms_ease-in,transform_140ms_ease-in] " +
-  "group-data-[roll=out]/stack:opacity-0 group-data-[roll=out]/stack:[transform:translateY(var(--roll-out-y))] " +
+  "group-data-[roll=out]/stack:opacity-0 group-data-[roll=out]/stack:[transform:translate(var(--roll-out-x,0px),var(--roll-out-y))] " +
   "group-data-[roll=pre]/stack:[transition:none] " +
-  "group-data-[roll=pre]/stack:opacity-0 group-data-[roll=pre]/stack:[transform:translateY(var(--roll-in-y))] " +
+  "group-data-[roll=pre]/stack:opacity-0 group-data-[roll=pre]/stack:[transform:translate(var(--roll-in-x,0px),var(--roll-in-y))] " +
   "motion-reduce:![transition:none]";
 
 const reducedMotion = (): boolean =>

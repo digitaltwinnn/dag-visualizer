@@ -234,7 +234,7 @@ Gotchas worth knowing before you burn time on them:
   inspect mid-flight states.
 - ⚠️ **Every scene clock is FRAME-driven off a `dt` clamped to 0.05s, so a slow renderer stretches it
   in WALL-CLOCK time** — and the HUD, being React, does not ride that clock. Below 20 FPS the clamp
-  bites and the ~3.9s view choreography takes `3.9 / 0.05 / fps` seconds: at SwiftShader's 2–6 FPS,
+  bites and the ~3.3s view choreography takes `3.3 / 0.05 / fps` seconds: at SwiftShader's 2–6 FPS,
   13–40s. So a headless screenshot taken 15s after a view switch catches the transition still
   running, and the panels beside it are already populated — **a bare ledger floor next to an explorer
   full of measured ticks is the renderer, not the feed** (chased as a data bug for most of a session,
@@ -458,6 +458,13 @@ a resting pose, whose subject runs wide, and a crop at a deep rung, whose subjec
 a hub's shells) is height-bound. `restOrbit(view)` reads the resting orbit out of `FOCI`, so re-tuning
 a resting pose re-tunes the ramp with it, and `RAILS_HIDDEN_DOLLY` stays the one lever — it is what
 "full lean" means, not a second knob.
+
+**In Geography a drag orbits the SUBJECT** (2026-10-19; `domain/subjectOrbit.ts`,
+`viewPolicy.dragOrbitsSubject`, the geo section of `src/engine/scene/CLAUDE.md`): the view's poses
+look at a composed sky point rather than at the subject, so the stock orbit swung the node out of
+the frame. The camera pair turns rigidly about the committed node, cohort or country's own anchor,
+else the globe centre, and the subject keeps its place in the frame. The other 3D views keep the
+stock orbit: their poses look AT the subject (a hub, the chamber), so orbiting is already about it.
 
 ⚠️ **Three's raycaster ignores `object.visible`.** Hiding a group does not stop it being picked — it
 has to be left out of `pickSources`.

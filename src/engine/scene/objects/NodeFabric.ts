@@ -80,14 +80,14 @@ const chipPaperCalm = (chipShare: number, fw: number): number =>
 // dark emissive look keeps it subtle) and is re-applied through the theme fan-out
 // (Globe.setColors → setEnvIntensity below).
 let _env: THREE.Texture | null = null;
-export const ENV_INT = { dark: 0.3, paper: 0.65 } as const;
+const ENV_INT = { dark: 0.3, paper: 0.65 } as const;
 // The room's bright region sits at its zenith, which only a straight-down camera mirrors off a
 // flat cap — the STANDARD poses (elevated front orbit) reflected the dim walls instead, while a
 // bottom-front dive caught the lamps at grazing angle and bloomed (user, 2026-08-30: "move that
 // light [to] the standard view pose, and probably can be tuned down"). This stock
 // `material.envMapRotation` tilts the env so the lit ceiling mirrors into a ~40° camera; the
 // intensities above are tuned DOWN to match, since the sheen now lands where it is actually seen.
-export const ENV_ROT = new THREE.Euler(0.9, 0, 0);
+const ENV_ROT = new THREE.Euler(0.9, 0, 0);
 // Per-VIEW gain on the sheen (viewPolicy.chipEnv, set by the Engine on a view change) — module
 // level like _paper: one value, both write paths below read it, so a material built later and a
 // re-apply cannot disagree. The applied intensity is always ENV_INT[ground] × this.

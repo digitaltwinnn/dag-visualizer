@@ -174,7 +174,7 @@ export function HyperCells({ accent }: { accent: string }) {
           so their sum is the fleet size — the donut's hole was already printing the very number
           the neighbouring card printed, twice on one row. The card that keeps it is the one that
           also says how it splits. */}
-      <BandCard label="Node composition"
+      <BandCard label="Nodes"
         lead={<DonutTotal counts={counts} accent={accent} total={Object.values(counts).reduce((a, b) => a + b, 0)} />}>
         {/* Geo's treatment, adopted here (user, 2026-08-31: "in hyper view, geo looks better"):
             the dot legend named each slice but said nothing about SIZE, so the ring carried the
@@ -205,7 +205,7 @@ export function HyperCells({ accent }: { accent: string }) {
           // vocabulary of one that does — a `3` that visibly settles would claim it had just been
           // measured. Plain text says "this is what the protocol IS", and the bars beside it say
           // how the fleet fills it, which is exactly the lead/detail grammar.
-          lead={<span className="font-mono font-bold text-xl text-foreground tabular-nums">{layerRows.length}</span>}>
+          lead={<span className="font-mono font-bold text-figure text-foreground tabular-nums">{layerRows.length}</span>}>
           <MicroBars accent={accent} labelW={34} rows={layerRows} />
         </BandCard>
       )}
@@ -216,12 +216,13 @@ export function HyperCells({ accent }: { accent: string }) {
 // geo — the footprint cells (3): the fleet total, then two MERGED readings that each carry their
 // own total in a donut hole — countries over nodes-by-country, providers over top-providers.
 // Single hue — one measure per chart, magnitude only.
+const MUTED_RING = { other: "var(--muted-foreground)", unplaced: "var(--muted-foreground)" };
+
 export function GeoCells({ accent }: { accent: string }) {
   const lb = useStore((s) => s.leaderboard);
   const selNodes = useStore((s) => s.selNodes);
   const filter = useStore((s) => s.filter);
   const countries = lb?.countries ?? [];
-  const total = selNodes.length;
   const { ispCounts, topIsps, byRegion } = useMemo(() => {
     const ispCounts = new Map<string, number>();
     for (const r of selNodes) {
@@ -252,6 +253,16 @@ export function GeoCells({ accent }: { accent: string }) {
   // only the top three would draw them as the whole population — three slices summing to 100%
   // while a third of the nodes sit outside the chart. `other` carries them at the faintest step,
   // and its presence is what makes the visible slices' proportions true.
+  // The regions ring: the named rows, the folded remainder and the unplaced, so it partitions
+  // the whole selection like the two rings beside it.
+  const regionRows = [
+    ...byRegion.rows.slice(0, byRegion.rows.length > 4 ? 3 : 4).map((c) => ({ key: c.region, label: c.region, count: c.count })),
+    ...(byRegion.rows.length > 4
+      ? [{ key: "other", label: "other", count: byRegion.rows.slice(3).reduce((n, c) => n + c.count, 0), hue: "var(--muted-foreground)" }]
+      : []),
+    ...(byRegion.unplaced > 0 ? [{ key: "unplaced", label: "unplaced", count: byRegion.unplaced, hue: "var(--muted-foreground)" }] : []),
+  ];
+  const regionRing: Record<string, number> = Object.fromEntries(regionRows.map((r) => [r.key, r.count]));
   const countryRing: Record<string, number> = Object.fromEntries(topCountries.map((c) => [c.cc, c.count]));
   if (restC > 0) countryRing.other = restC;
   const ispRing: Record<string, number> = Object.fromEntries(topIsps);
@@ -275,15 +286,15 @@ export function GeoCells({ accent }: { accent: string }) {
           first, the band's four-row height kept by folding the rest into a muted `other`.
           `unplaced` is a row only while it is not zero: an instrument state worth stating, never a
           standing "0". */}
-      <BandCard label="Nodes"
-        lead={<span className="font-mono font-bold text-xl text-foreground tabular-nums"><Odometer int value={total || null} /></span>}>
-        <MicroBars accent={accent} labelW={120} rows={[
-          ...byRegion.rows.slice(0, byRegion.rows.length > 4 ? 3 : 4).map((c) => ({ key: c.region, label: c.region, count: c.count })),
-          ...(byRegion.rows.length > 4
-            ? [{ key: "other", label: "other", count: byRegion.rows.slice(3).reduce((n, c) => n + c.count, 0), hue: "var(--muted-foreground)" }]
-            : []),
-          ...(byRegion.unplaced > 0 ? [{ key: "unplaced", label: "unplaced", count: byRegion.unplaced, hue: "var(--muted-foreground)" }] : []),
-        ]} />
+      {/* ONE SHAPE WITH ITS NEIGHBOURS (user, 2026-10-18: "the large number shows the total node
+          count but the breakdown counts by sub region; keep consistent with the others, so it
+          should show the sub region count"): the hole counts REGIONS as the next card's counts
+          countries, the ring spreads the nodes across them, the rows name the top ones. The fleet
+          total left the band with it — the explorer's Countries head and the Hypergraph's
+          composition donut still state it. */}
+      <BandCard label="Top regions"
+        lead={<DonutTotal counts={regionRing} accent={accent} total={byRegion.rows.length} hues={MUTED_RING} />}>
+        <MicroBars accent={accent} labelW={120} rows={regionRows} />
       </BandCard>
       {/* "Top countries", not "Nodes by country" (user, 2026-09-01): the card shows the top three
           plus an `other` remainder, so the old name promised the whole distribution and the row
@@ -629,7 +640,7 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
           label={label}
           lead={
             <span className="flex flex-col items-start">
-              <span className="font-mono font-bold text-xl text-muted-foreground tabular-nums whitespace-nowrap">—</span>
+              <span className="font-mono font-bold text-figure text-muted-foreground tabular-nums whitespace-nowrap">—</span>
               <span className="text-label text-muted-foreground leading-none">{spark.unit}</span>
             </span>
           }
@@ -705,7 +716,7 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
               dash "doesn't say it's working on it") — the acquiring rule's slot form: a
               real number is arriving into this slot, and the stars hold its width; the
               label and unit line already name what is coming. */}
-          <span className="font-mono font-bold text-xl text-foreground tabular-nums whitespace-nowrap">
+          <span className="font-mono font-bold text-figure text-foreground tabular-nums whitespace-nowrap">
             {spark.value != null ? <Odometer value={spark.value} /> : <NodeStars count={3} />}
           </span>
           <span className="text-label text-muted-foreground leading-none">{spark.unit}</span>
@@ -842,7 +853,7 @@ function AnchoringNetworks({ windowed, snaps, filter }: { windowed: TrendsWindow
     // collects around the roster rather than stretching it.
     <BandCard
       label="Metagraphs anchoring"
-      lead={<span className="font-mono font-bold text-xl text-foreground tabular-nums"><Odometer int value={list.length || null} /></span>}
+      lead={<span className="font-mono font-bold text-figure text-foreground tabular-nums"><Odometer int value={list.length || null} /></span>}
     >
       {/* ⚠️ THE LENS DIMS, IT DOES NOT EDIT (user, 2026-09-01: "if we filter, should we then also
           dim the filtered bullets?"). Yes — this roster was the one surface in the band ignoring the

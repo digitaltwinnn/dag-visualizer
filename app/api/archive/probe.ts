@@ -23,7 +23,7 @@ import { CATALOG, NETWORKS, type NetworkId } from "@/src/engine/config";
 
 // DOR's genesis anchor — 62 ordinals above the global archive floor, ~24 KB. Served by every
 // node that keeps deep history, 404 on every pruned one, and immutable so it never goes stale.
-export const DEEP_PROBE_ORDINAL = 766780;
+const DEEP_PROBE_ORDINAL = 766780;
 
 // What the global chain's "deep" reaches back to — the archive floor's own date (the
 // 2023-11-13 upgrade restart), a network-wide fact, not per node.
@@ -48,12 +48,15 @@ export function isPublicNodeIp(ip: string): boolean {
 const clampPort = (p: unknown): number =>
   typeof p === "number" && Number.isInteger(p) && p >= 1024 && p <= 65535 ? p : 9000;
 
-export interface ArchiveTarget {
+interface ArchiveTarget {
   ip: string;
   port: number;
 }
 export interface ArchiveEntry {
   ip: string;
+  /** The node's public L0 port, for a global entry — so the snapshot fallback can ask the nodes
+   *  whose floor covers an ordinal (`fetchGlobal.ts`, 2026-10-18), not only the archival ones. */
+  port?: number;
   /** "global" for the DAG's own chain; a metagraph id for its currency chain. */
   chain: string;
   kind: "genesis" | "deep" | "window";
@@ -255,12 +258,14 @@ async function probeArchive(net: NetworkId): Promise<ArchiveInfo> {
     }),
   );
 
+  for (const e of entries) if (e.chain === "global") e.port = portByIp.get(e.ip) ?? 9000;
   const archival = entries
     .filter((e) => e.chain === "global" && e.kind !== "window")
-    .map((e) => ({ ip: e.ip, port: portByIp.get(e.ip) ?? 9000 }));
+    .map((e) => ({ ip: e.ip, port: e.port ?? 9000 }));
   return { archival, entries, total: globalNodes.length };
 }
 
 // Archival membership changes on operator timescales, not tick timescales — 6h is generous.
 export const getArchiveInfo = (net: NetworkId): Promise<ArchiveInfo> =>
-  unstable_cache(() => probeArchive(net), ["archive-probe-v2", net], { revalidate: 21600 })();
+  // v3: global entries carry `port` (2026-10-18) — the key moves with the field set.
+  unstable_cache(() => probeArchive(net), ["archive-probe-v3", net], { revalidate: 21600 })();

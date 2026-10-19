@@ -72,7 +72,7 @@ export function joinBloom(o: THREE.Object3D): void {
  * time. Members should set `toneMapped = false`: the composer's OutputPass tone-maps the scene,
  * and this render goes around it.
  */
-export const OVERLAY_LAYER = 2;
+const OVERLAY_LAYER = 2;
 // The members, so the pass can skip itself when none is showing (the legend is visible only
 // through a gather) — a full-scene render every frame to draw nothing is the cost it avoids.
 const overlayMembers = new Set<THREE.Object3D>();
@@ -163,7 +163,7 @@ const SEL_MIX_SHADER = {
 
 // @types/three types BokehPass.uniforms as a bare `object`; the engine reads
 // uniforms.focus/maxblur .value, so refine just those.
-export type DofPass = BokehPass & {
+type DofPass = BokehPass & {
   uniforms: Record<"focus" | "maxblur", { value: number }>;
 };
 

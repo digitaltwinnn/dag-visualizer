@@ -163,8 +163,25 @@ describe("the trends view is registered and inert", () => {
   // line ever ran, and `hyper` is true because that line did run for it — even though its camera
   // does not in fact orbit, `CameraDirector.focusFilter` having switched it off a moment later.
   // Measured in the browser after the change: camera drift over 1.5s idle is 0 in all four views.
-  it("switches the pointer orbit off ONLY in trend — its billboard deck moves by the focus re-deal, and zoom stays", () => {
-    for (const m of MODES) expect(VIEW_POLICIES[m].rotate).toBe(m !== "trend");
+  it("switches the pointer orbit off in trend (its billboard deck moves by the focus re-deal) and in geo (the drag orbits the subject); zoom stays", () => {
+    for (const m of MODES) expect(VIEW_POLICIES[m].rotate).toBe(m !== "trend" && m !== "geo");
+  });
+  // A DRAG ORBITS THE SUBJECT IN GEOGRAPHY ALONE (2026-10-19, `domain/subjectOrbit.ts`), and a
+  // view that does never also runs the stock orbit — two movers under one pointer would fight.
+  // THE METAGRAPH CARD STANDS ON EACH VIEW'S OWN SUBJECT (2026-10-19): the node's network in geo,
+  // the tick's in the ledger, the plane in front in History, the filter elsewhere.
+  it("names what the Metagraph card stands on, per view", () => {
+    expect(VIEW_POLICIES.geo.metagraphCard).toBe("node");
+    expect(VIEW_POLICIES.ledger.metagraphCard).toBe("tickNet");
+    expect(VIEW_POLICIES.trend.metagraphCard).toBe("plane");
+    expect(VIEW_POLICIES.hyper.metagraphCard).toBe("filter");
+    expect(VIEW_POLICIES.soon.metagraphCard).toBe("filter");
+  });
+  it("the subject orbit is geo's alone, and never alongside the stock camera orbit", () => {
+    for (const m of MODES) {
+      expect(VIEW_POLICIES[m].dragOrbitsSubject).toBe(m === "geo");
+      expect(VIEW_POLICIES[m].dragOrbitsSubject && VIEW_POLICIES[m].rotate).toBe(false);
+    }
   });
 
   // ⚠️ A NODE COMMITS ITS NETWORK ONLY IN HYPER (user, 2026-09-26 for geo, 2026-09-29 for the

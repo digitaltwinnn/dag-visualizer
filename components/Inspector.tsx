@@ -308,7 +308,7 @@ const GHOST_EYEBROW: Record<string, string> = {
  *  open state is the same per-selection `railCollapse` override (false = open), so a new selection
  *  folds every ghost back. `.rail-entry` keeps it in the thread's query and `data-ghost` keeps its
  *  dot hollow, open or folded. */
-export function GhostCard({ card, open = false, onToggle, step }: { card: RailCard; open?: boolean; onToggle?: () => void; step?: SiblingStep }) {
+function GhostCard({ card, open = false, onToggle, step }: { card: RailCard; open?: boolean; onToggle?: () => void; step?: SiblingStep }) {
   const Icon = card.icon;
   const label = GHOST_EYEBROW[card.id] ?? card.id;
   return (
@@ -443,7 +443,13 @@ export default function Inspector() {
   // The focus rung comes from the shared derivation the EXPLORE rail reads too (`focusSlotId`),
   // so the row emphasis over there and the collapse/halo over here can't disagree.
   const focusId = useLadderFocus();
-  const autoCollapsed = (id: string) => ladderIds.includes(id) && presentOf(id) && id !== focusId;
+  // NO BOX OPEN IS NOT A REST ANY MORE (user, 2026-10-18: "snapshot is collapsed but it is no
+  // longer supported (no − icon etc)"). With nothing committed the live Global snapshot card —
+  // a slot with no rung, so never the focus — sat folded above three ghosts on every tier, and
+  // since the box lost its minimize (2026-09-11) a folded card with no box beside it is a state
+  // nothing else can produce. With no focus rung the FIRST present ladder card opens by default.
+  const openDefault = focusId ?? ladderIds.find(presentOf) ?? null;
+  const autoCollapsed = (id: string) => ladderIds.includes(id) && presentOf(id) && id !== openDefault;
   const effCollapsed = (id: string) => railCollapse[id] ?? autoCollapsed(id);
   // Publish which slot is the BOX (store.boxedCard) — the same `present && !effCollapsed` that
   // renders it, so channel and render can't disagree (the data-tier lesson). The subject
@@ -464,7 +470,20 @@ export default function Inspector() {
   // below the deepest committed card is a STEP — clicking it commits that card's first child
   // (`childStep`, the explorer's own first row), so stepping down happens where the level is drawn.
   // The rail's state is read by the pager's own builder, so the step and the pager cannot disagree.
-  const deepestId = presentLadderIds[presentLadderIds.length - 1] ?? null;
+  // …the deepest rung of the UNBROKEN run from the top, not the deepest present card: a node
+  // carried in from another view stands below a gap in Snapshots (its ladder gives a node no
+  // ancestry), and read as "the deepest" it left the Global snapshot card with no step down to
+  // the tick's networks (user, 2026-10-18: "we can't navigate the rung down from the snapshot card
+  // to the metagraph card, lower in the rung there is the node card").
+  // …starting at the FIRST present card, not the top slot (user, 2026-10-18, the same evening:
+  // "with a range the Moment card does not open the first entry" — History's Metagraph card is a
+  // reading that can be absent, and a run that had to begin at slot 0 left the Range card below a
+  // gap with no step). The run begins at the first present card and ends at the first gap after it.
+  let deepestId: string | null = null;
+  for (const id of ladderIds) {
+    if (presentOf(id)) deepestId = id;
+    else if (deepestId !== null) break;
+  }
   const deepestKind = deepestId ? (manifest.find((c) => c.id === deepestId)?.kind ?? null) : null;
   const siblingState = useSiblingState(deepestKind);
   const nextStep = useMemo(() => {
@@ -570,9 +589,14 @@ export default function Inspector() {
       // Open = "is a PRESENT box right now" — a not-yet-present slot's autoCollapsed is
       // false (ghosts aren't collapsed), so a bare effCollapsed snapshot pinned the arriving
       // ancestor slots OPEN and the re-derive materialized three boxes at once (measured).
+      // PRESENT slots only (2026-10-18): an ABSENT slot pinned shut here stayed shut when its card
+      // arrived — the live Global snapshot lands a tick after the view, and its ordinal is kept
+      // out of the selection key on purpose (heartbeats must not reset the +/− overrides), so
+      // nothing ever dropped the pin and the only populated card sat folded above three ghosts.
+      // An absent slot keeps no override and the auto rule (`openDefault`) governs its arrival.
       setRailCollapseMany({
         ...staleNulls,
-        ...Object.fromEntries(ladderIds.map((id) => [id, !(presentOf(id) && !effCollapsed(id))])),
+        ...Object.fromEntries(ladderIds.filter(presentOf).map((id) => [id, effCollapsed(id)])),
       });
       return;
     }
@@ -734,6 +758,12 @@ export default function Inspector() {
   const trailingGhosts = nonLadder
     .filter((c) => !c.present && c.hint != null)
     .map((c) => <GhostCard key={`${c.id}-ghost`} card={c} {...ghostCx(c.id)} />);
+  // A DIVIDER BEFORE THE CARDS THAT ARE NOT THIS VIEW'S RUNGS (user, 2026-10-19 — History with a
+  // node carried in from another view: "when a card is not part of the rung, show a divider"). A
+  // populated card below the lane is a subject the view did not produce, and adjacency is the
+  // slab's word for containment, so one hairline says the pile ends here. Only above PRESENT
+  // cards: the trailing ghosts are the view's own possibility space.
+  const trailingDivider = trailingPanes.length > 0 ? <div key="trailing-divider" aria-hidden className="h-px flex-none mx-[18px] bg-border" /> : null;
 
 
 
@@ -782,6 +812,7 @@ export default function Inspector() {
   const content = (
     <>
       {ladderLane}
+      {trailingDivider}
       {trailingPanes}
       {trailingGhosts}
     </>
@@ -805,6 +836,7 @@ export default function Inspector() {
         >
           <RailShade>
             {ladderLane}
+            {trailingDivider}
             {trailingPanes}
             {trailingGhosts}
           </RailShade>

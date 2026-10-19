@@ -1159,8 +1159,11 @@
      stage beside a card still truncating "Dor Technolog…". The floor is the old width and holds
      to ~1650px; the ceiling is a third up. The explorer row's name column rides the same token
      (ExplorerRow.tsx), so the gain untruncates names rather than widening the tag home alone. */
-  --rail-w: clamp(264px, 16vw, 340px);     /* left control rail width */
   --detail-w: clamp(320px, 18vw, 400px);   /* right details rail width */
+  /* The left rail is the SAME width (user, 2026-10-18: "the left cards and the right cards do
+     not have the same width"): one token, so the two columns can never drift apart again. It was
+     clamp(264px, 16vw, 340px) — 56px narrower at 1400px. */
+  --rail-w: var(--detail-w);
   /* THE ACCENT, like the wash ladder (review, 2026-09-26): these were the cyan spelled out, so on
      a network whose `--primary` is violet or magenta the committed row stayed cyan beside a
      violet path plate — two accents on one card. `--primary` is light-dark() already. */
@@ -1614,6 +1617,12 @@
   --text-body--line-height: 1.45;
   --text-title: clamp(16px, 12.79px + 0.223vw, 18.5px);
   --text-title--line-height: 1.2;
+  /* THE FIGURE — the vitals band's headline number, the one HUD size above the title step. It
+     rode Tailwind's static `text-xl` (20px) on five cards until 2026-10-19 (housekeeping pass:
+     "do we adhere to the agreed 3-4 sizes?" — it is the fourth, so it is a token and rides the
+     same fluid ramp: 20px to a 1440px viewport, 22.5px by 2560px). Figures only — never a word. */
+  --text-figure: clamp(20px, 16.79px + 0.223vw, 22.5px);
+  --text-figure--line-height: 1;
   /* DOCUMENT PROSE — the fourth step, for the doc overlay's paragraphs only (/about, /design, the
      History document). A paragraph is read, not scanned: the HUD's label step in a 700px column
      ran 115 characters a line at 11.5px, which is a footnote, not a page. 15px over a 1.65
@@ -1826,6 +1835,29 @@
    becoming THE materialized card (RailPane's entry→box swap remounts the Card subtree, replaying
    this once). Subtle rise+fade on the navigation clock's fast end; reduced motion is guarded at
    the call site (`motion-reduce:animate-none`). */
+/* HISTORY'S PLANES DROP IN ONE AFTER ANOTHER (2026-10-18): the layer's `data-on` is the view's
+   arrival (TrendStackSync, which also sets `data-deal` for that beat alone — a plane mounting later
+   never drops in), and each card falls into its slot a beat after the one in front — the `--slot`
+   React writes is its depth rank, the stagger paced to the IN phase's node placement so the stack
+   arrives over the same window the other views' nodes do. `transform` only: the anchor's matrix3d
+   and the card's own `translate` utility are untouched. */
+#trend-stack[data-deal="1"] .plane-card {
+  animation: planeDrop 0.9s var(--ease-roll) both;
+  animation-delay: calc(var(--slot, 0) * 260ms);
+}
+@keyframes planeDrop { from { opacity: 0; transform: translateY(-22px); } to { opacity: 1; transform: none; } }
+/* THE LEAVE (2026-10-19): the projector holds the layer (`data-leave="1"`) for the OUT phase while
+   the cards drop out, back of the deck first, and then lets the layer fade (`data-leave="2"`); the
+   cards keep their left state until the next deal removes the attribute. */
+#trend-stack[data-leave="1"] { opacity: 1; }
+#trend-stack[data-leave] .plane-card {
+  animation: planeLeave 0.45s ease-in forwards;
+  animation-delay: max(0ms, calc((4 - var(--slot, 0)) * 120ms));
+}
+@keyframes planeLeave { to { opacity: 0; transform: translateY(26px); } }
+@media (prefers-reduced-motion: reduce) {
+  #trend-stack[data-deal="1"] .plane-card, #trend-stack[data-leave] .plane-card { animation: none; }
+}
 @keyframes cardMaterialize { from { opacity: 0; transform: translateY(5px) scale(0.985); } to { opacity: 1; transform: none; } }
 @theme inline {
   --animate-sheet-in-left:   sheetInLeft   0.28s cubic-bezier(0.22, 1, 0.36, 1);

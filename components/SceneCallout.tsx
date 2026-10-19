@@ -81,7 +81,7 @@ import { ledgerNetwork } from "@/src/engine/domain/tickNet";
 // What the panel says — one model, filled per view/rung so the JSX below stays single-sourced.
 // `aside.hue` absent = muted (the country card's ISO-code rule: a place carries no identity);
 // `aside.live` prepends the beating live dot (the global card's aside state, mirrored).
-export interface CalloutModel {
+interface CalloutModel {
   /** The title is an id (a node's), set in the mono register ids wear everywhere else. */
   titleMono?: boolean;
   key: string;
@@ -131,7 +131,7 @@ const geoOf = (p: { kind: string }): GeoInfo | undefined =>
 /** The callout PANEL alone — the eyebrow / title+aside / lead grammar on SCENE_GLASS — shared
  *  with the LiveStrip's bar hover (user, 2026-08-16: "fully re-use the one from the scene"),
  *  which wraps it in its own cursor-follow box instead of the Engine-anchored `.co-panel`. */
-export function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; className?: string; onDismiss?: () => void }) {
+function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; className?: string; onDismiss?: () => void }) {
   return (
     <div key={m.key} className={cn("roll-in whitespace-nowrap", SCENE_GLASS, className)}>
       {/* The identity EDGE SPINE (user, 2026-08-15 — "the rails/hairline effect on the left
@@ -178,7 +178,11 @@ export function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; cla
         {/* A hued aside is a TICKER beside a title, so it is the card head's own chip
             (`TickerChip`, 2026-10-02); the un-hued one is a state line and stays text. */}
         {m.aside && m.aside.hue ? (
-          <TickerChip text={m.aside.text} hue={m.aside.hue} className="ml-1" />
+          <span className="ml-1 inline-flex items-center gap-1.5">
+            {m.aside.live && <LiveDot />}
+            {m.aside.pinned && <PinMark />}
+            <TickerChip text={m.aside.text} hue={m.aside.hue} />
+          </span>
         ) : m.aside ? (
           // Age, then state — the order the card's own head reads (2026-10-03).
           <span className="inline-flex items-center gap-1.5 text-label text-muted-foreground ml-1">
@@ -410,7 +414,9 @@ export default function SceneCallout() {
         key: following ? `ms|${metaSnap.metaId}|live` : `ms|${metaSnap.metaId}|${metaSnap.ordinal}`,
         eyebrow: "Metagraph snapshot",
         title: metaSnap.ordinal.toLocaleString(),
-        aside: nnet ? { text: nnet.ticker, hue: nnet.hue } : undefined,
+        // The state mark the global's label carries (user, 2026-10-18: "pinned is not shown on the
+        // metagraph snapshot, that's also pinned") — a committed pair is live or pinned together.
+        aside: nnet ? { text: nnet.ticker, hue: nnet.hue, live: following, pinned: !following } : undefined,
         ring: nnet?.hue ?? "var(--primary)",
         mark: { icon: iconForPick("metaSnap"), hue: nnet?.hue ?? "var(--primary)" },
       };

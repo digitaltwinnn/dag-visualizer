@@ -118,7 +118,7 @@ function landingCause(cause: MotionCause, st: ReturnType<typeof useStore.getStat
 }
 
 /** The cause the hint names for a click — the finest action's, or null for a click that moves nothing. */
-export function motionCauseOf(actions: readonly ClickAction[]): MotionCause | null {
+function motionCauseOf(actions: readonly ClickAction[]): MotionCause | null {
   for (let i = actions.length - 1; i >= 0; i--) {
     const a = actions[i]!;
     switch (a.kind) {

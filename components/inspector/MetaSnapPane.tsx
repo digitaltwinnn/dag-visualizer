@@ -6,6 +6,8 @@
 // Like the global snapshot card this is a card SLOT, not a focus-ladder rung: it has its own
 // store channel (`store.metaSnap`) and a fixed rail slot, and appears in no ladder.
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import LiveDot from "@/components/LiveDot";
+import { PinMark } from "@/components/state/StateAtoms";
 import CardHead, { RailPane } from "@/components/CardHead";
 import { DEEP_GIVE_UP_MS } from "@/components/RawSnapshotBridge";
 import { subjectPairing } from "@/components/useSubjectPairing";
@@ -198,6 +200,14 @@ export default function MetaSnapPane({
                   this card is about one metagraph even when the filter is "all". */}
               <METASNAP_ICON aria-hidden className={KIND_MARK_CLASS} style={{ color: hue } as CSSProperties} />
               <span className="truncate font-mono tabular-nums">{sel.ordinal.toLocaleString()}</span>
+            </span>
+          }
+          // LIVE OR PINNED, as the global card and the raw pane say it (user, 2026-10-18) — a state
+          // line, never a control: the switch stays the Global snapshot card's.
+          aside={
+            <span className="inline-flex items-center gap-1.5 text-label font-normal text-muted-foreground">
+              {following ? <LiveDot /> : <PinMark className="text-muted-foreground" />}
+              {following ? "live" : "pinned"}
             </span>
           }
           titleKey={`${sel.metaId}:${sel.ordinal}`}

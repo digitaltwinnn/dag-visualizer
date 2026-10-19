@@ -71,13 +71,30 @@ export function calloutPlacement(
   bandL: number,
   bandR: number,
   top: number,
+  opts: {
+    /** The panel's MEASURED reach (standoff + its real width) where the caller has one; the
+     *  widest-panel constant otherwise. */
+    reachX?: number;
+    /** THE DESKTOP RAILS' BAND IS SOFT (2026-10-18). Below 1100px the band is what the SHEETS leave,
+     *  and a panel that fits on neither side is hidden (rule 2) because the covering sheet carries
+     *  the box itself. On desktop the band is pulled in by the two rail COLUMNS, and a subject
+     *  framed at the centre of a 1400px viewport sits ~340px from each — under the widest reach on
+     *  both sides, where hiding the label would answer the ordinary case with nothing. So the
+     *  caller says the band may be overrun: the panel then takes the roomier side and may run a
+     *  little way under a rail, which is the lesser wrong. */
+    overrun?: boolean;
+  } = {},
 ): CalloutPlacement {
   if (!(bandR > bandL)) return HIDDEN; // no band at all (both sheets meeting, or worse)
   if (x < bandL || x > bandR) return HIDDEN;
 
-  const fitR = x + CALLOUT_REACH_X <= bandR;
-  const fitL = x - CALLOUT_REACH_X >= bandL;
-  if (!fitR && !fitL) return HIDDEN;
+  const reach = opts.reachX ?? CALLOUT_REACH_X;
+  const fitR = x + reach <= bandR;
+  const fitL = x - reach >= bandL;
+  if (!fitR && !fitL) {
+    if (!opts.overrun) return HIDDEN;
+    return { show: true, flip: x - bandL > bandR - x, drop: y < top + CALLOUT_REACH_Y };
+  }
 
   // The vertical band is unaffected by the sheets — they are full-height, so they take width and
   // never height. Near the top the panel drops below the anchor instead.

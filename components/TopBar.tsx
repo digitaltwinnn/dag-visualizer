@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { ABOUT_ICON as AboutIcon, VIEW_ICONS } from "@/components/icons";
 import { useStore } from "@/src/store/store";
 import { displayNetwork } from "@/src/data/unlisted";
@@ -146,6 +146,42 @@ export default function TopBar() {
   // NEXT real tap (found live: the gear stopped opening after one swipe).
   const swipedAt = useRef(0);
   const LISTED_IDS = LISTED_VIEWS.map((v) => v.id);
+  // ‹ › FLANK THE PHONE FACE (2026-10-18 — Vercel analytics: ~76% of visitors are on a phone and
+  // most never leave "/"; the bar's swipe and the pip row were the only hints that other views
+  // exist, and neither reads as a control). Two real steps through the same `stepView` the swipe
+  // runs, clamped at the ends (a dimmed chevron, never a vanishing one — the plank's rule), hidden
+  // from 700px up where the segmented switch names every view. `dir` is the finger's: −1 = ‹.
+  // WHERE THE NAME ARRIVES FROM (user, 2026-10-19: "the text has the odometer effect while here it
+  // should animate horizontally"): a › press or a leftward swipe brings the next view's name in
+  // from the right, ‹ from the left; a pick from the list keeps the roll-in.
+  // The slide belongs to ONE switch (PR review, 2026-10-19): keyed by the mode it was armed for,
+  // so a later change from anywhere else — a footer link, the browser's back — rolls in as usual
+  // instead of sliding from a stale side.
+  const [faceSlide, setFaceSlide] = useState<{ mode: Mode; from: "left" | "right" } | null>(null);
+  const faceFrom = faceSlide && faceSlide.mode === mode ? faceSlide.from : null;
+  const viewChevron = (dir: -1 | 1) => {
+    const target = stepView(LISTED_IDS, mode, dir === -1 ? 1 : -1);
+    const name = target ? VIEWS.find((v) => v.id === target)?.name : null;
+    const Glyph = dir === -1 ? ChevronLeft : ChevronRight;
+    return (
+      <button
+        type="button"
+        disabled={!target || !!doc}
+        aria-label={name ? `${name} view` : dir === -1 ? "First view" : "Last view"}
+        onClick={() => { if (target) { setStrip(null); setFaceSlide({ mode: target, from: dir === 1 ? "right" : "left" }); setMode(target); } }}
+        className={cn(
+          "hidden max-[700px]:inline-flex items-center justify-center size-11 rounded-btn bg-transparent border-0 cursor-pointer",
+          // In the ACCENT (user, 2026-10-18: muted they "look a bit boring/blend"): a control that
+          // moves the view wears the control colour, dimmed at an end.
+          "text-primary-ink hover:bg-wash-soft",
+          "disabled:opacity-30 disabled:cursor-default disabled:hover:bg-transparent",
+          "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
+        )}
+      >
+        <Glyph aria-hidden className="size-6" strokeWidth={2.25} />
+      </button>
+    );
+  };
   const onSwipeDown = (e: React.PointerEvent) => {
     swipedAt.current = 0;
     if (bp !== "phone" || doc || e.pointerType === "mouse") return;
@@ -161,6 +197,7 @@ export default function TopBar() {
     const next = stepView(LISTED_IDS, mode, dir);
     if (next) {
       setStrip(null);
+      setFaceSlide({ mode: next, from: dir === -1 ? "right" : "left" });
       setMode(next);
     }
   };
@@ -381,7 +418,14 @@ export default function TopBar() {
             Both stay in the DOM and CSS picks, so SSR and the first client render agree (the
             useBreakpoint-at-first-render hydration trap, ExplorerShell's note). The wrapper is a plain
             flex box, not `contents`, so the grid still sees one middle item. */}
-        <div className="flex justify-center min-w-0">
+        <div className="flex justify-center items-center min-w-0">
+        {/* ‹ › FLANK THE PHONE FACE (2026-10-18 — Vercel analytics: ~76% of visitors are on a
+            phone and most never leave "/"; the bar's swipe and the pip row were the only hints
+            that other views exist, and neither reads as a control). Two real steps through the
+            same `stepView` the swipe runs, clamped at the ends (a dimmed chevron, never a
+            vanishing one — the plank's rule), hidden from 700px up where the segmented switch
+            names every view. */}
+        {viewChevron(-1)}
         <button
           type="button"
           aria-expanded={strip === "views"}
@@ -403,7 +447,13 @@ export default function TopBar() {
               The 2026-09-28 "VIEW" word went with it: it named the control's role because the
               centred cell had 74px, and A1 freed the room by moving About out of the bar. */}
           <span className="flex flex-col items-center gap-[3px]">
-            <span key={doc ?? mode} className="roll-in flex items-center gap-1.5">
+            <span
+              key={doc ?? mode}
+              className={cn(
+                "flex items-center gap-1.5",
+                faceFrom ? cn("animate-in fade-in duration-300 motion-reduce:animate-none", faceFrom === "right" ? "slide-in-from-right-4" : "slide-in-from-left-4") : "roll-in",
+              )}
+            >
               {(() => {
                 const Icon = VIEW_ICONS[mode];
                 return <Icon aria-hidden className="size-4 flex-none text-primary" />;
@@ -411,24 +461,18 @@ export default function TopBar() {
               {/* While a DOC covers the scene the face names the DOC (the review's find, 2026-10-08):
                   the hanging caption that used to say so stands down on the phone, so the bar is the
                   one place left to name what is on screen. */}
-              <span className={cn("text-body font-semibold leading-none", strip === "views" ? "text-primary-ink" : "text-foreground")}>
+              {/* One step up to the title size (user, 2026-10-19: "a bit larger font?") — on the phone
+                  this name is the only thing saying what is on screen. */}
+              <span className={cn("text-title font-semibold leading-none", strip === "views" ? "text-primary-ink" : "text-foreground")}>
                 {doc ? DOC_PAGES[doc].label : VIEWS.find((v) => v.id === mode)?.name}
               </span>
             </span>
-            <span aria-hidden className={cn("flex items-center gap-1", doc && "invisible")}>
-              {LISTED_VIEWS.map((v) => (
-                <span
-                  key={v.id}
-                  className={cn(
-                    "h-[4px] rounded-full transition-[width,background-color] duration-200 motion-reduce:transition-none",
-                    v.id === mode ? "w-3 bg-primary" : "w-[4px] bg-muted-foreground/45",
-                  )}
-                />
-              ))}
-            </span>
+            {/* The pip row that sat here (2026-10-08) retired with the chevrons (user, 2026-10-18:
+                "has both … the <> is more intuitive"): two position cues were one too many. */}
           </span>
           <span className="sr-only"> — switch view (or swipe the bar)</span>
         </button>
+        {viewChevron(1)}
         <ToggleGroup
           type="single"
           value={mode}
@@ -473,7 +517,11 @@ export default function TopBar() {
               )}
             >
               <Icon aria-hidden className="size-4 group-data-[state=on]:text-primary" />
-              <span className="text-label max-[1299px]:hidden">{v.name}</span>
+              {/* One step up with the phone face (user, 2026-10-19: "same applies to normal and
+                  tablet") — the body step from 1340px, MEASURED: at 1300px the body labels squeezed
+                  the filter face to "A…", at 1340 nothing truncates; the labels stand down below
+                  1300 as before. */}
+              <span className="text-body max-[1340px]:text-label max-[1299px]:hidden">{v.name}</span>
             </ToggleGroupItem>
           );
           })}
@@ -553,7 +601,7 @@ export default function TopBar() {
             {shownStrip === "pulse" ? (
               <PulseStrip />
             ) : shownStrip === "views" ? (
-              <ViewPicker onPicked={() => setStrip(null)} />
+              <ViewPicker onPicked={() => { setStrip(null); }} />
             ) : shownStrip === "about" ? (
               <AboutStrip onClose={() => setStrip(null)} />
             ) : (

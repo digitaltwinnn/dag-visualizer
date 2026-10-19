@@ -89,6 +89,7 @@ const base = (over: Partial<SiblingState>): SiblingState => ({
   allNodes: [deA, deB, deC, fiA],
   tickNets: null,
   trendRange: null,
+  trendWindow: "7d",
   trendCursorMs: null,
   ...over,
 });
@@ -694,6 +695,45 @@ describe("one list per level — the rail steps the explorer's own lists", () =>
 // relation … swipe through the moments within the range"). The Moment card's ‹ › steps the range's
 // buckets, oldest → newest, at the tier the range's charts are cut in (`rangeBuckets`), and the
 // Range card's next ghost opens the first of them.
+describe("siblingSet — context in Geography, standing on a node (2026-10-18)", () => {
+  // One machine at 1.2.3.4 that validates the DAG and runs UP: two rows, one IP.
+  const dagRow = { ...deA, pick: { kind: "l0", title: "n", node: { id: "dagid", ip: "1.2.3.4" } } as unknown as PickDescriptor };
+  const upRow = { ...deB, pick: { kind: "metanode", title: "n", meta: { id: "up" }, node: { id: "upid", ip: "1.2.3.4" } } as unknown as PickDescriptor };
+  const metaList = [{ id: "up", name: "The Upsider AI" }] as unknown as SiblingState["metaList"];
+  it("steps the machine's networks, the committed row current, without the filter", () => {
+    const set = siblingSet("context", base({ mode: "geo", filter: "all", inspect: dagRow.pick, allNodes: [dagRow, upRow, deC], metaList }))!;
+    expect(set.items.map((i) => i.key)).toEqual(["dag", "up"]);
+    expect(set.index).toBe(0);
+    expect(set.items[1]!.actions.some((a) => a.kind === "filter")).toBe(false);
+    expect(set.items[1]!.actions.some((a) => a.kind === "inspect")).toBe(true);
+  });
+  it("one network is no set", () => {
+    expect(siblingSet("context", base({ mode: "geo", filter: "all", inspect: dagRow.pick, allNodes: [dagRow, deC], metaList }))).toBeNull();
+  });
+});
+
+describe("the Range card's next ghost — the span's first moment (2026-10-18)", () => {
+  it("opens the first bucket of the WINDOW when no range is brushed, and none for All", () => {
+    const step = childStep("range", base({ mode: "trend", trendRange: null, trendWindow: "7d" }));
+    expect(step).not.toBeNull();
+    expect(step!.actions).toEqual([{ kind: "trendCursor", ms: expect.any(Number) }]);
+    expect(childStep("range", base({ mode: "trend", trendRange: null, trendWindow: "all" }))).toBeNull();
+  });
+});
+
+describe("siblingSet — range (the windows, while no range stands)", () => {
+  it("steps the six window pills in the picker's order, the shown window current", () => {
+    const set = siblingSet("range", base({ mode: "trend", trendWindow: "30d" }))!;
+    expect(set.items.map((i) => i.key)).toEqual(["1h", "24h", "7d", "30d", "1y", "all"]);
+    expect(set.index).toBe(3);
+    expect(set.items[0]!.setting).toEqual({ trendWindow: "1h" });
+    expect(set.items[0]!.actions).toEqual([]);
+  });
+  it("a brushed range is one span: no set", () => {
+    expect(siblingSet("range", base({ mode: "trend", trendRange: { fromMs: 0, toMs: 3_600_000 } }))).toBeNull();
+  });
+});
+
 describe("siblingSet — instant (a moment inside the committed range)", () => {
   const H = 3_600_000;
   const R = { fromMs: Date.UTC(2026, 8, 10), toMs: Date.UTC(2026, 8, 13) }; // 3 days: the hourly tier

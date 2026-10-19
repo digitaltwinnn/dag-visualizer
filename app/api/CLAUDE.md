@@ -73,9 +73,21 @@ them — but the Next Node server can.
   (immutable; a transient upstream failure throws so it retries). The pull (`fetchGlobal.ts`) tries the L0 LB first and falls back to the archival nodes on ANY LB failure — a 404, a CDN block, a 5xx or a timeout (2026-10-04: the LB's CDN 403'd one source IP while the archives served) — and after a non-404 failure skips the LB for `LB_BACKOFF_MS` (10 min), so a blocked source stops knocking on the shut door every tick. It's called for the live and
   selected tick only — never the whole chain, never a poll loop — plus a one-time paced backfill on a
   cold load, because the trail otherwise opens with its unmeasured rows drawing no bars. Each ordinal
-  is immutable and cached, so the backfill costs at most once per ordinal ever.
+  is immutable and cached, so the backfill costs at most once per ordinal ever. **The fallback asks
+  the nodes whose MEASURED FLOOR covers the ordinal** (2026-10-18, user: "we do know the depth a
+  node serves … can't we query the nodes that we know actually have the snapshot?"): the census
+  (`/api/archive`) records every global node's floor..latest, and the fallback used only its
+  "archival" subset — on a day no node reached the 2023 floor (archivalCount 0 while three nodes
+  served from Aug 2024) a year-old snapshot failed although nodes held it. Shallowest sufficient
+  floor first; the shuffled archival list is the last resort. The route also sends `s-maxage` now:
+  the live tip and the backfill are the same ordinals for every visitor.
 - **`/api/snapshot/[ordinal]/channel/[address]`** is the deep read behind the metagraph-snapshot card's
-  third tier: it re-downloads the same ~2.5 MB global to reach ONE channel entry. The cost is accepted
+  third tier: it reads the same ~2.5 MB global to reach ONE channel entry. **The pull is shared with
+  the exact read** (2026-10-19, user: "I feel we're always pulling the snapshots already"): the data
+  cache cannot hold the parsed global, so `fetchGlobal.ts` keeps the last few per instance for two
+  minutes (`GLOBAL_KEEP_MS`) and shares an in-flight pull — a deep read on the live or just-pinned
+  tick costs no second trip to the L0 nodes when it lands on the instance that pulled it; a failed
+  pull is forgotten at once. Beyond that the cost is accepted
   deliberately — cached immutably and run only from the two surfaces that ask for it (the card's
   `Read this snapshot` button, and arrival in the raw layer), never on a
   poll, never across the chain. The key includes **the snapshot's own ordinal**, because a fast

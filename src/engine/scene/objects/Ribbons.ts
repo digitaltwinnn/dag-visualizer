@@ -41,14 +41,14 @@ import { snapBright } from "../../domain/dimModel";
 // lead's ribbon follows its row back one slot and fades, instead of vanishing the frame the
 // row stops being the lead (user: "the ribbon and snapshot selection effect disappear
 // immediate"). LedgerView owns the handoff timing; this row is just one more sheet.
-export const RIBBON_ROWS = 4;
+const RIBBON_ROWS = 4;
 /** Trail slots a thread can be drawn for — the retained window, so every visible row can carry one. */
 const MAX_THREADS = 64;
 /** Subdivisions per thread, and the LineSegments vertex count that follows (two per segment). */
 const THREAD_SEG = 12;
 const VERTS_PER_THREAD = THREAD_SEG * 2;
 /** Vertical subdivisions per ribbon — enough for the eased sweep to read as a curve. */
-export const RIBBON_SEG = 16;
+const RIBBON_SEG = 16;
 const PER_ROW = METAGRAPHS.length + 1;
 const VERTS_PER_RIBBON = RIBBON_SEG * 6; // two triangles per segment
 

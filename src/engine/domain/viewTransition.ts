@@ -26,9 +26,9 @@ export const DUR_OUT = 0.9; //         teardown + gather, incl. the stagger spre
 // The IN phase DECOUPLES its two ramps (user, 2026-07-17): the furniture builds fast
 // (FURN_IN — the room is fully lit early) while the node placement takes its time
 // (DUR_IN, 3× the original 1.0s — nodes keep arriving into the already-drawn view).
-// Total switch ≈ DUR_OUT + DUR_IN ≈ 3.9s; the wait reads as staging, not loading,
+// Total switch ≈ DUR_OUT + DUR_IN ≈ 3.3s (3.9 until 2026-10-19); the wait reads as staging, not loading,
 // because the destination view is complete long before the last node lands.
-export const DUR_IN = 3.0; //          node placement (phase length), incl. the stagger spread
+export const DUR_IN = 2.4; //          node placement (phase length), incl. the stagger spread — 3.0 until 2026-10-19 (user: "speed up the view entering animation a little bit")
 export const FURN_IN = 1.0; //         the to-view's furniture build, inside the IN phase
 // THE DOC OVERLAY'S ROLL (2026-09-04): one clock for the document's text rolling in/out
 // (DocLayer) AND the parked fleet's stage fade (NodeFabric.tickFleetFade), so the two read as

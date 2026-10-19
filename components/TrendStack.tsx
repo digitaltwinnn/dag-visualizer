@@ -62,7 +62,7 @@
 // no orbit (2026-09-26; `viewPolicy.rotate` is false): a drag across the FRONT chart's plot is the
 // range BRUSH (`onRange`), and the wheel still zooms through the canvas.
 
-import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import TrendChart, { type TrendBand, type TrendLine } from "@/components/docs/TrendChart";
 import useTrendRoster from "@/components/useTrendRoster";
@@ -70,18 +70,19 @@ import useTrendsSlice from "@/components/useTrendsSlice";
 import useStagedMeasure, { ROLL_CLASS, useHeldOrder } from "@/components/useStagedMeasure";
 import { cn } from "@/lib/utils";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
-import { headWord, metricCaption, sharedCeiling, stepMetric } from "@/src/data/trendSeries";
+import { headWord, metricCaption, peakReading, sharedCeiling, stepMetric, METRIC_LABELS } from "@/src/data/trendSeries";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { DUR_OUT } from "@/src/engine/domain/viewTransition";
 import { swipeIntent, swipeOf } from "@/src/engine/domain/planeSwipe";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import {
-  frontPlane, MORE_ID, moreCount, morePose, planeFormat, stackPoses, planeBehind } from "@/src/engine/domain/trendStack";
+  frontPlane, MORE_ID, moreCount, morePose, planeFormat, stackPoses, VISIBLE_PLANES } from "@/src/engine/domain/trendStack";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 import TrendTether from "@/components/TrendTether";
 import { useBreakpoint } from "@/components/useBreakpoint";
-import { WINDOW_MS } from "@/src/data/trendTimeline";
 import { UNLISTED_ID } from "@/src/data/unlisted";
 
 /** The empty roster, as ONE frozen reference. Publishing a fresh `[]` would be a content-free
@@ -98,6 +99,16 @@ export default function TrendStack() {
   // `mode === "trend"` comparison, which is a deny-list that grows a line per view.
   const mode = useStore((s) => s.mode);
   const on = VIEW_POLICIES[mode].chartStack;
+  // THE LAYER LINGERS THROUGH THE OUT PHASE (user, 2026-10-19: "the leaving animation is still
+  // missing"): unmounted the frame the view changed, the cards had no room to drop out of. It
+  // stays for `DUR_OUT` after the policy turns off — the projector's leave beat places the cards
+  // while they fall (`data-leave`, TrendStackSync) — and only then returns null.
+  const [lingering, setLingering] = useState(on);
+  useEffect(() => {
+    if (on) { setLingering(true); return; }
+    const t = setTimeout(() => setLingering(false), DUR_OUT * 1000 + 50);
+    return () => clearTimeout(t);
+  }, [on]);
   // SUBSCRIBED, not read once: picking a chip in the bar's filter strip must cut the stack under
   // the reader's eyes, exactly as it cuts the document's per-network columns.
   const filter = useStore((s) => s.filter);
@@ -141,7 +152,11 @@ export default function TrendStack() {
   // vitals rim and the document either way.
   const windowId = useStore((s) => s.trendWindow);
   const range = useStore((s) => s.trendRange);
-  const slice = useTrendsSlice(on ? windowId : null, range);
+  // …AND KEEPS ITS CHARTS WHILE IT LINGERS (2026-10-19, second round — user: "leaving trend view
+  // animation still does not look good"; a screencast showed why: the slice was asked for only
+  // while `on`, so the frame the view changed every plot unmounted and the cards collapsed into
+  // thin empty strips with the ‹ › pills floating on them, and only those strips dropped).
+  const slice = useTrendsSlice(on || lingering ? windowId : null, range);
   const { p, error } = slice;
 
   // ⚠️ ONE ROSTER PASS, SHARED WITH BOTH RAILS (2026-09-19). Which networks, in what order, drawn
@@ -151,19 +166,6 @@ export default function TrendStack() {
   // counter EDGE TRIM too, so a rail can never quote a number no chart on screen agrees with.
   const roster = useTrendRoster(slice, filter, shown);
   const { ranked, rows, buckets: axis, stepMs: step, pending } = roster;
-  // THE SPAN BEING LOADED, while the previous window stands in (`slice.stale`): every plot zooms
-  // its held picture to it (`TrendChart`'s `zoomTo`), so a range change reads as the SAME lines
-  // moving to their new places, then the new window replacing them. A pill's span runs back from
-  // the held axis's own newest instant — the payload's clock, never the client's — and `all`
-  // names no span, so it only dims.
-  const zoomTo = useMemo(() => {
-    if (!slice.stale) return null;
-    if (range) return { fromMs: range.fromMs, toMs: range.toMs };
-    const ms = WINDOW_MS[windowId];
-    if (ms == null || !axis.length) return null;
-    const toMs = axis[axis.length - 1]! + step;
-    return { fromMs: toMs - ms, toMs };
-  }, [slice.stale, range, windowId, axis, step]);
   // THE ORDER ON SCREEN — the ranking once settled, the HELD order while a measure change is in
   // flight, so the plots land before the cards move. Poses, the hover backstop and the engine's
   // `trendIds` all read THIS, never `ranked`: the projector and React must agree on the order.
@@ -236,9 +238,12 @@ export default function TrendStack() {
   // review — a stale front for one commit remounted the card twice).
   const setTrendFront = useStore((s) => s.setTrendFront);
   useLayoutEffect(() => {
-    setTrendIds(on ? order : NO_IDS);
+    // The ids stay published through the LINGER (PR review, 2026-10-19): emptied in the same commit
+    // that turned the policy off, the projector's first inactive frame retargeted to nothing and
+    // its leave beat placed no card — the drop ran on frozen matrices and the final hide hid none.
+    setTrendIds(on || lingering ? order : NO_IDS);
     setTrendFront(on ? frontPlane(order, useStore.getState().trendScroll) : null);
-  }, [on, order, setTrendIds, setTrendFront]);
+  }, [on, lingering, order, setTrendIds, setTrendFront]);
   // …and again when the PAGER moves the scroll on its own (the publish above does not re-run).
   const storeScroll = useStore((s) => s.trendScroll);
   useEffect(() => {
@@ -350,13 +355,13 @@ export default function TrendStack() {
     stopVerticalTouch(e);
     vertical.current = false;
   };
-  const onPointerUp = (e: React.PointerEvent, id: string) => {
+  const onPointerUp = (e: React.PointerEvent) => {
     const d = down.current;
     down.current = null;
     dragged.current = dragged.current || (!!d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > DRAG_SLOP);
     // A SWIPE ON A CARD (user, 2026-10-09; `domain/planeSwipe.ts` has the rules): a finger's flick
-    // along one axis — down brings this card forward, up on the front card sends it back (the card
-    // behind comes forward), left and right step the measure, the keys' own steps. Touch only; the
+    // along one axis — up sends the front card back (the next comes forward), down brings the
+    // previous one back, wrapping, so the stack rotates; left and right step the measure. Touch only; the
     // plot keeps its horizontal drag for the brush, so only its vertical answers. The click the
     // browser synthesises after the release is dropped by `dragged` above, so a swipe never also
     // lands as a tap. Read through the ONE write path and the ONE setter the keys use (rule 2).
@@ -365,11 +370,12 @@ export default function TrendStack() {
     if (!dir) return;
     const st = useStore.getState();
     // The front as the STACK has it: the focus only while the window still holds it (a paged-away
-    // or re-ranked-out focus is nobody's front — `planeBehind` applies the same guard).
+    // or re-ranked-out focus is nobody's front). Up/down walk the whole roster from there
+    // (`planeStep`, 2026-10-18) — the executor pages the window after the step.
     const focus = st.trendFocus && order.includes(st.trendFocus) ? st.trendFocus : null;
-    const intent = swipeIntent(dir, id, { front: focus ?? frontPlane(order, st.trendScroll), behind: planeBehind(order, st.trendScroll, st.trendFocus), focus: st.trendFocus });
+    const intent = swipeIntent(dir, { order, front: focus ?? frontPlane(order, st.trendScroll) });
     if (!intent) return;
-    if (intent.kind === "measure") stepMeasure(intent.step);
+    if (intent.kind === "measure") stepMeasure(intent.step, "x");
     else applyClickActions(trendPlaneActions(intent.id, st.trendFocus));
   };
   // UP / DOWN IS THE VIEW'S THIRD AXIS (user, 2026-09-19). Left/right on the timeline is WHEN, the
@@ -385,9 +391,24 @@ export default function TrendStack() {
   // because one gesture cannot mean both. It is back as a DIFFERENT gesture — fast and short, one
   // axis, recognised in `onPointerUp` by `domain/planeSwipe.ts` — and the plot's horizontal axis
   // stays the brush's. The rail's heading control and the keys remain the mouse's routes.
-  const stepMeasure = (dir: -1 | 1) => {
+  const [swipeAxis, setSwipeAxis] = useState<"x" | "y">("y");
+  // The axis belongs to ONE measure change: a swipe arms it just before its own write, and every
+  // other change of the measure — the heading picker, the keys, a view entry — reads as vertical
+  // (review: a settle-edge release never fired under reduced motion and latched the sideways roll).
+  const swiped = useRef(false);
+  // A swipe writes its axis IN THE SAME BATCH as the measure (PR review, 2026-10-19: landed from an
+  // effect, the roll's first painted frame ran on the vertical offsets and twitched before the
+  // sideways roll took over); the effect only resets a change that no swipe armed.
+  useEffect(() => {
+    if (!swiped.current) setSwipeAxis("y");
+    swiped.current = false;
+  }, [metric]);
+  const stepMeasure = (dir: -1 | 1, axis: "x" | "y" = "y") => {
     const next = stepMetric(useStore.getState().trendMetric, dir);
-    if (next) setMetric(next);
+    if (!next) return;
+    swiped.current = axis === "x";
+    if (axis === "x") setSwipeAxis("x");
+    setMetric(next);
   };
   // ONE write path (rule 2): the table decides what a plane click means, the executor applies it.
   // Read the focus from the store at ACTIVATION time rather than closing over the render's value —
@@ -407,7 +428,7 @@ export default function TrendStack() {
     applyClickActions(trendPlaneActions(id, useStore.getState().trendFocus));
   };
 
-  if (!on) return null;
+  if (!on && !lingering) return null;
 
   // A SCOPE WITH NOTHING TO DRAW SAYS SO, IN THE CANVAS CENTRE (2026-09-19). A `dag` or unlisted
   // commit leaves the roster empty, and an empty stage would read as a broken view rather than as
@@ -454,10 +475,24 @@ export default function TrendStack() {
       // The previous window standing in while the new one loads (`useTrendsSlice`'s hold): the
       // plots quiet, so the stale lines never read as the new range's.
       data-stale={slice.stale ? "" : undefined}
-      style={{
-        ["--roll-out-y" as string]: staged.dir === "next" ? "-10px" : "10px",
-        ["--roll-in-y" as string]: staged.dir === "next" ? "14px" : "-14px",
-      }}
+      // A SWIPED measure rolls SIDEWAYS (user, 2026-10-18: "when we swipe left/right can we have the
+      // same animation as the right rail cards — show the new card incoming"): the plots leave the
+      // way the finger went and the next measure's plots arrive from the other side, the rail
+      // pager's own travel; a picked or keyed measure keeps the vertical roll. `swipeAxis` is set
+      // by the swipe and released once the roll has settled.
+      style={
+        swipeAxis === "x"
+          ? {
+              ["--roll-out-y" as string]: "0px",
+              ["--roll-in-y" as string]: "0px",
+              ["--roll-out-x" as string]: staged.dir === "next" ? "-40px" : "40px",
+              ["--roll-in-x" as string]: staged.dir === "next" ? "56px" : "-56px",
+            }
+          : {
+              ["--roll-out-y" as string]: staged.dir === "next" ? "-10px" : "10px",
+              ["--roll-in-y" as string]: staged.dir === "next" ? "14px" : "-14px",
+            }
+      }
       className="group/stack absolute inset-0 pointer-events-none z-[4] opacity-0 [transition:opacity_var(--tempo-nav)_ease] data-[on='1']:opacity-100 motion-reduce:!transition-none"
     >
       {/* THE TETHER from the band's span to the front chart's time axis — inside this layer so it
@@ -476,8 +511,10 @@ export default function TrendStack() {
           style={{ opacity: more.opacity, zIndex: Math.round(100 + more.z) }}
         >
           <div
-            className="absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border p-2 [background:linear-gradient(var(--panel-solid),var(--panel-solid)),var(--scene-ground)]"
-            style={{ width: fmt.pxW, height: fmt.pxH }}
+            // `plane-card` + the slot behind the deck: the "N more" card deals in and drops out with
+            // the others (user, 2026-10-19: it "does not play along").
+            className="plane-card absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border p-2 [background:linear-gradient(var(--panel-solid),var(--panel-solid)),var(--scene-ground)]"
+            style={{ ["--slot" as string]: VISIBLE_PLANES, width: fmt.pxW, height: fmt.pxH }}
           >
             <div className="px-2 py-1 text-label text-muted-foreground select-none">
               {behind} more
@@ -522,7 +559,7 @@ export default function TrendStack() {
             )}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
-            onPointerUp={(e) => onPointerUp(e, pose.id)}
+            onPointerUp={onPointerUp}
             onTouchMoveCapture={stopVerticalTouch}
             onTouchEndCapture={onTouchEndCapture}
             // THE INTERACTIVE PLANE'S WHOLE BODY is a target too — it is the one plane a click
@@ -563,8 +600,14 @@ export default function TrendStack() {
                 app's `.subject-paired` glow is a box-shadow, which a transformed plane may not
                 carry (see NO BLUR, NO SHADOW above). */}
             <div
-              className="absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border p-2 [background:linear-gradient(var(--panel-solid),var(--panel-solid)),var(--scene-ground)] [transition:border-color_0.16s_ease] motion-reduce:!transition-none"
+              // `plane-card` + `--slot`: the ARRIVAL drop (globals.css `planeDrop`, 2026-10-18 — user:
+              // "when we enter/leave trend view, I expect an animation like for all other views:
+              // perhaps drop the cards one after each other"). Keyed off the layer's `data-on`, so it
+              // plays once as the room reveals and never on a re-rank; staggered by depth rank, front
+              // first. On `transform`, which composes with the utilities' `translate`.
+              className="plane-card absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border p-2 [background:linear-gradient(var(--panel-solid),var(--panel-solid)),var(--scene-ground)] [transition:border-color_0.16s_ease] motion-reduce:!transition-none"
               style={{
+                ["--slot" as string]: depthRank,
                 width: fmt.pxW,
                 ...(pair.paired
                   ? {
@@ -574,11 +617,54 @@ export default function TrendStack() {
                   : {}),
               }}
             >
+            {/* ‹ › ON THE FRONT CARD'S EDGES (user, 2026-10-18: "it's unclear that the trend cards can
+                scroll left/right, add a nicely looking <> here as well, also in regular view") — the
+                measure step the keys and the heading control run, as a carousel's own idiom: a round
+                accent button on each side edge, dimmed at the list's ends. The plane's click and
+                swipe must not hear it, so the press stops at the button. Front card only: the rear
+                cards are inert and the step is the whole stack's. */}
+            {pose.interactive &&
+              ([-1, 1] as const).map((dir) => {
+                const target = stepMetric(metric, dir);
+                const Glyph = dir === -1 ? ChevronLeft : ChevronRight;
+                return (
+                  // THE PILL NAMES THE MEASURE IT STEPS TO (user, 2026-10-19: "add a text label to
+                  // indicate that the next/previous chart shows blocks, fees, snapshots …"): chevron
+                  // and word, the word on the inside, so the two edges read "‹ SNAPSHOTS" and
+                  // "FEES ›". An end keeps the dimmed chevron alone — there is nothing to name.
+                  <button
+                    key={dir}
+                    type="button"
+                    disabled={!target}
+                    aria-label={target ? `Measure: ${METRIC_LABELS[target]}` : dir === -1 ? "First measure" : "Last measure"}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onPointerUp={(e) => e.stopPropagation()}
+                    onClick={(e) => { e.stopPropagation(); stepMeasure(dir); }}
+                    className={cn(
+                      "absolute top-1/2 -translate-y-1/2 z-10 inline-flex h-7 touch:h-11 min-w-7 touch:min-w-11 items-center justify-center gap-0.5 rounded-full cursor-pointer",
+                      // The word in the label step, plain case (user, 2026-10-19: the caps read "way too
+                      // large" beside the chevron) — a quiet name, not an eyebrow.
+                      "border border-border bg-[var(--panel-solid)] text-primary-ink text-label font-medium whitespace-nowrap",
+                      "hover:bg-wash-soft disabled:opacity-30 disabled:cursor-default disabled:hover:bg-[var(--panel-solid)]",
+                      "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
+                      target ? (dir === -1 ? "pl-1 pr-2.5" : "pl-2.5 pr-1") : "px-0",
+                      dir === -1 ? "-left-4 touch:-left-3" : "-right-4 touch:-right-3",
+                    )}
+                  >
+                    {dir === 1 && target && <span>{METRIC_LABELS[target]}</span>}
+                    <Glyph aria-hidden className="size-4 flex-none" strokeWidth={2.25} />
+                    {dir === -1 && target && <span>{METRIC_LABELS[target]}</span>}
+                  </button>
+                );
+              })}
             {/* QUIET WHILE STALE — the plot only; the header, the card and its pairing hold. */}
             <div className="[transition:opacity_200ms_ease] group-data-[stale]/stack:opacity-45 motion-reduce:!transition-none">
             {p && (
               <TrendChart
                 name={row.name}
+                // No touch brush on a plane (2026-10-18): the band's timeline is the one touch range
+                // control, and a horizontal flick here steps the measure.
+                touchBrush={false}
                 // ITS OWN SYNC GROUP (2026-09-19). recharts syncs hover across every chart sharing
                 // a `syncId`, and the stack stays MOUNTED behind the raw layer's document — so on
                 // the document's shared group a hover there re-rendered these five hidden plots.
@@ -592,9 +678,14 @@ export default function TrendStack() {
                 // THE CARD NAMES ITS MEASURE, not just its unit — it can be stepped from right here,
                 // so the card has to say what it turned into.
                 unit={caption}
+                // THE FRONT CARD STATES THE MEASURE AND ITS READINGS FOR THE DECK; a rear card is the
+                // network's name over its picture (user, 2026-10-19: the repeated title and values
+                // on every background card were "quite duplicate").
+                heading={pose.interactive ? METRIC_LABELS[shown] : undefined}
+                nameOnly={!pose.interactive}
                 // PHONE: the card is too narrow for name + measure + reading on one line, so the
                 // measure rides the front plot's caption instead (`unitInPlot`).
-                unitInPlot={fmt === planeFormat(true)}
+                unitInPlot={false}
                 // A finer line: the card is drawn larger than authored, so the chart's own 2px
                 // landed at 2.6 (see `lineWidth`).
                 lineWidth={1.25}
@@ -607,10 +698,14 @@ export default function TrendStack() {
                   word: headWord(metric, roster.headKind),
                   pending: slice.stale || (roster.headKind === "day" ? roster.dayPending : roster.pending),
                 }}
+                peak={slice.stale || !pose.interactive ? null : peakReading(row.series.points, axis, step, metric, roster.headKind, row.series.weights)}
                 format={roster.format}
                 note={pending ? "reading the hourly samples…" : undefined}
                 buckets={axis}
-                zoomTo={zoomTo}
+                // THE HELD PICTURE STAYS PUT, dimmed by the stack's `data-stale` rule, and the new
+                // axis fades in when it lands (`TrendChart held`, 2026-10-19 — the zoom-to-span
+                // it replaced read as a scramble one way and a slide the other).
+                held={slice.stale}
                 stepMs={step}
                 sampled={row.series.sampled}
                 gaps={row.series.gaps}

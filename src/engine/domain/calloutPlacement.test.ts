@@ -102,6 +102,19 @@ describe("calloutPlacement against an overlaying sheet", () => {
     expect(p.flip).toBe(false); // 450 + 360 = 810 fits right; flipping would land at 90, under the sheet
   });
 
+  it("on the desktop rails' SOFT band a panel that fits on neither side takes the roomier side", () => {
+    // 1400px viewport, rails pulling the band to 345..1030, a hub framed at the centre.
+    const rails = { l: 345, r: 1030 };
+    expect(at(700, rails).show).toBe(false); // the sheets' rule: hidden
+    const soft = calloutPlacement(700, 500, rails.l, rails.r, 0, { overrun: true });
+    expect(soft).toMatchObject({ show: true, flip: true }); // 355 of room left vs 330 right
+    expect(calloutPlacement(600, 500, rails.l, rails.r, 0, { overrun: true })).toMatchObject({ show: true, flip: false });
+    // A measured panel narrower than the widest one fits where the constant did not.
+    expect(calloutPlacement(700, 500, rails.l, rails.r, 0, { reachX: 100 + 220 })).toMatchObject({ show: true, flip: false });
+    // Outside the band is still nothing, soft or not.
+    expect(calloutPlacement(200, 500, rails.l, rails.r, 0, { overrun: true }).show).toBe(false);
+  });
+
   it("declines when the sheets leave no band at all", () => {
     expect(calloutPlacement(450, 500, 600, 300, 0).show).toBe(false);
     expect(calloutPlacement(450, 500, 450, 450, 0).show).toBe(false);

@@ -33,6 +33,9 @@ export interface MetricSeries {
   /** The chain's own per-bucket WIDEST gap, which scales the amber band to this chain's rhythm
    *  (TrendChart's `gaps`). Continuity only. */
   gaps?: (number | null)[];
+  /** Continuity's WEIGHTS — the snapshots each bucket's spacing was measured over — so a day's
+   *  reading (`peakReading`) folds exactly as the span's (`spanAverage`). Continuity only. */
+  weights?: (number | null)[];
 }
 
 export interface MetricSpec {
@@ -85,9 +88,6 @@ export const TREND_METRICS: Record<TrendMetric, MetricSpec> = {
  *  rows) yet has no row of its own, so the two ideas must not share one name. */
 export type StoredMetric = Exclude<TrendMetric, "continuity">;
 
-/** The metrics that are one stored COUNTER row — the four a per-network counter panel can serve.
- *  `nodes` is a gauge and `continuity` is derived, so neither belongs. */
-export type CounterMetric = Exclude<StoredMetric, "nodes">;
 
 /** The stored row a metric reads for one network, or null where it is derived from several. The
  *  overload is what lets a caller that already knows it holds a stored metric skip the null
@@ -272,9 +272,69 @@ export function spanAverage(
  *  hover: the latest full day, or the span's average. */
 export function headWord(metric: TrendMetric, kind: "span" | "day"): string {
   if (kind === "day") return "latest full day";
-  // Whole words, and no leading mark: the word is a LABEL that precedes its number
-  // ("daily average 26,573") — it was "avg per day" after a mid-dot (user, 2026-10-03).
-  return spanWord(metric) === "Average per day" ? "daily average" : "average";
+  // Whole words, and no leading mark: the word is a LABEL that precedes its number — it was
+  // "avg per day" after a mid-dot (user, 2026-10-03), then "daily average" until 2026-10-19
+  // (user: "shorten it by saying 'average'"); the explorer's heading still says "Average per day".
+  void metric;
+  return "average";
+}
+
+/** THE PEAK ON THE HEAD'S OWN UNIT (user, 2026-10-19: "average is higher than peak, can't be" —
+ *  the plot's peak was its busiest HOURLY bucket beside an average PER DAY). Over a span of a day
+ *  or more the peak is the busiest DAY: the buckets grouped by UTC day, a counter's day summed, a
+ *  gauge's averaged, the largest returned — the same basis as the span's daily average. Under a
+ *  day (`kind === "day"`, the head reads "latest full day") the plot is sub-day buckets and the
+ *  peak is the busiest bucket, named by its cadence ("peak hour", "peak 5 min"). Null with nothing
+ *  measured. */
+export function peakReading(
+  points: readonly (number | null)[],
+  buckets: readonly number[],
+  stepMs: number,
+  metric: TrendMetric,
+  kind: "span" | "day",
+  weights?: readonly (number | null)[],
+): { word: string; value: number } | null {
+  if (kind === "day") {
+    let max: number | null = null;
+    for (const v of points) if (v != null && (max == null || v > max)) max = v;
+    const cadence = stepMs >= 3_600_000 ? "hour" : "5 min";
+    return max == null ? null : { word: `peak ${cadence}`, value: max };
+  }
+  // WHOLE UTC DAYS ONLY (PR review, 2026-10-19). A 24-hour window starting at 06:00 holds an
+  // 18-hour day and a 6-hour one; summed as days they are both floors, and the "peak" landed
+  // BELOW the span's average per day — the very reading this function exists to keep honest.
+  // A day counts when every one of its buckets is on the axis, and for a counter when every
+  // one is measured (a day with a hole is a floor, not a day). A span with no whole day in it
+  // has no busiest day to name, so it names none. Continuity folds by its weights, exactly as
+  // `spanAverage` does, so the two readings share one basis.
+  const counter = TREND_METRICS[metric].kind === "counter" && metric !== "continuity";
+  const perDay = Math.round(86_400_000 / stepMs);
+  const days = new Map<string, { have: number; sum: number; n: number; num: number; den: number }>();
+  for (let i = 0; i < points.length && i < buckets.length; i++) {
+    const key = new Date(buckets[i]!).toISOString().slice(0, 10);
+    let d = days.get(key);
+    if (!d) days.set(key, (d = { have: 0, sum: 0, n: 0, num: 0, den: 0 }));
+    d.have += 1;
+    const v = points[i];
+    if (v == null) continue;
+    if (metric === "continuity") {
+      const w = weights?.[i];
+      if (w != null && w > 0) { d.num += v * w; d.den += w; }
+    } else {
+      d.sum += v;
+      d.n += 1;
+    }
+  }
+  let max: number | null = null;
+  for (const d of days.values()) {
+    if (d.have < perDay) continue; // a partial day
+    let v: number;
+    if (metric === "continuity") { if (!(d.den > 0)) continue; v = d.num / d.den; }
+    else if (counter) { if (d.n < d.have) continue; v = d.sum; }
+    else { if (d.n === 0) continue; v = d.sum / d.n; }
+    if (max == null || v > max) max = v;
+  }
+  return max == null ? null : { word: "peak", value: max };
 }
 
 /** The words a span reading carries: a rate is an average PER DAY, anything else an average. */

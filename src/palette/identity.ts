@@ -69,7 +69,7 @@ export function configPins(): Record<string, number> {
 // baked by Task 3's extraction script. Empty ({}) until a bake runs, which keeps this whole
 // overlay a no-op (identityPins() === configPins()).
 let _brandPins: Record<string, number> | null = null;
-export function brandPins(): Record<string, number> {
+function brandPins(): Record<string, number> {
   if (_brandPins) return _brandPins;
   const out: Record<string, number> = {};
   for (const [id, v] of Object.entries(brandHues as Record<string, { hueDeg: number }>)) out[id] = v.hueDeg;
@@ -173,4 +173,3 @@ export function identitySceneHex(id: string, theme: Theme = "dark"): string {
   return hex;
 }
 export function identityHudNumber(id: string): number { return parseInt(identityHudHex(id).slice(1), 16); }
-export function identitySceneNumber(id: string): number { return parseInt(identitySceneHex(id).slice(1), 16); }

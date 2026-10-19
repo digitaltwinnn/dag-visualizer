@@ -224,10 +224,6 @@ export interface SignerRosterRow {
   data: string | null;
   /** The signer prefix this node signed the SNAPSHOT with (L0), or null where it did not. */
   proof: string | null;
-  /** Signer prefixes that are NOT the node id's own prefix — a hybrid signs one layer with a
-   *  different key, the one fact the old Signer id column existed to show. Empty when every
-   *  signature repeats the node id. */
-  otherKeys: string[];
 }
 
 /** THE SIGNERS AS ONE ROSTER (user, 2026-10-08, design D1): the raw pane listed the dL1 and L0
@@ -236,7 +232,14 @@ export interface SignerRosterRow {
  *  four times. A row per NODE, a mark per LAYER, and a signer id only where it differs. Rows key
  *  on the resolved node (its id), so a node that signed both layers is one row; an unresolved
  *  signer keys on its prefix (the same prefix in both layers is the same unknown machine). Order is
- *  the production order, as before: the data signers first, then any snapshot-only signer. */
+ *  the production order, as before: the data signers first, then any snapshot-only signer.
+ *  THE ROW IS THE NODE ID AND NOTHING ELSE (user, 2026-10-19). A peer id belongs to a LAYER
+ *  (app/api/CLAUDE.md): a hybrid signs its data blocks with its dL1 key and the snapshot with its
+ *  L0 key, and the app's "node id" everywhere — the explorer's row, the node card — is the L0
+ *  layer's. The roster said the dL1 key under the id for a day ("signed as …", then "other
+ *  layer's key …") and both wordings read as a second, unexplained identity; the one matcher has
+ *  already resolved it to the node, and the key itself is in the proofs' JSON for anyone who
+ *  wants it. */
 export function signerRoster(
   selNodes: NodeRow[],
   metaId: string,
@@ -248,12 +251,8 @@ export function signerRoster(
     const res = resolveSigner(selNodes, metaId, prefix);
     const key = res.known && res.row.id ? res.row.id : `?${prefix}`;
     let row = rows.get(key);
-    if (!row) rows.set(key, (row = { key, res, data: null, proof: null, otherKeys: [] }));
+    if (!row) rows.set(key, (row = { key, res, data: null, proof: null }));
     row[lane] ??= prefix;
-    // "Own" = the node id itself carries the prefix — asked through the ONE matcher, handed the
-    // node id alone (signerMatchBoundary: no second prefix comparison anywhere).
-    const own = res.known && res.row.id ? carriesSigner({ id: res.row.id }, prefix) : true;
-    if (!own && !row.otherKeys.includes(prefix)) row.otherKeys.push(prefix);
   };
   for (const p of dataIds) add(p, "data");
   for (const p of proofIds) add(p, "proof");
@@ -395,11 +394,6 @@ export function filterAccent(filter: string): string {
   return "var(--primary)";
 }
 
-// The publicly listed metagraphs (config). Node counts / disabled "(0)" chips return
-// when the globe's metaList is ported.
-export function allMetagraphs(): MetagraphConfig[] {
-  return METAGRAPHS as MetagraphConfig[];
-}
 
 export interface MetagraphConfig {
   id: string;

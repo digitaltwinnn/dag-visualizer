@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils";
 // 2026-09-04: the rail's stack-level swap made "things that always exist disappear and
 // re-appear") — the explore rail keeps its About instance and keys only its body and its tool
 // card; see ExploreRail. `travel` (default true) adds the 8px rise.
-export const SWAP_OUT_MS = 200; // ⚠️ paired with the duration-[200ms] utility below — one file, keep together
+const SWAP_OUT_MS = 200; // ⚠️ paired with the duration-[200ms] utility below — one file, keep together
 
 // THE ARRIVAL EASE — the same rule for content that LANDS inside a persistent frame (an async
 // read resolving into rows, a live list gaining an entry, a reveal replacing an acquiring
