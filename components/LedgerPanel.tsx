@@ -288,7 +288,8 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   // The span ALONE (user, 2026-10-03: "remove the explanatory text section"): the word was a
   // button opening a sentence about how many snapshots the explorer keeps — the cache again, which
   // is ours to know and not the reader's (his ruling on the raw phone panel's title, 2026-10-02).
-  const spanScope = { word: spanWords(orderedSnaps) };
+  // "last 8 min cache" (user, 2026-10-19): the word names what the span IS — the retained window.
+  const spanScope = { word: `${spanWords(orderedSnaps)} cache` };
   const spanFooter =
     live && orderedSnaps.length > 0 ? (
       <TablePager page={1} pages={1} from={1} to={orderedSnaps.length} total={orderedSnaps.length} compact scope={spanScope} onPage={() => {}} />
