@@ -160,12 +160,9 @@ function ChainControl({ lineage, chainIdx, onPick }: { lineage: readonly string[
   const earlier = chainMonths(useChainSpan(several ? (chainIdx > 0 ? (lineage[chainIdx] ?? null) : null) : (lineage[1] ?? null)));
   const chosen = chainIdx > 0 ? earlier : null;
   return (
-    // WHY THE CONTROL EXISTS, IN FOUR WORDS (user, 2026-10-18: "Biofi's 'earlier' dropdown needs
-    // short explanation"). It appears only for a network that registered more than once, and
-    // "Current | Earlier" alone did not say what was being chosen between. No hover text (the
-    // tooltip rule) — the words stand beside the control.
+    // The words came off the control again (user, 2026-10-19: "just say network as before") — the
+    // explanation is the note above the table while an earlier chain is paged (`chainNote`).
     <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
-      <span className="text-label text-muted-foreground">re-registered — which chain</span>
     <span className="inline-flex items-center gap-0.5 p-0.5 rounded-btn border border-border" role="group" aria-label="Which of this network's chains to page">
       <ChainSegment label="Current" on={chainIdx === 0} onPick={() => onPick(0)} />
       {!several ? (
@@ -772,13 +769,13 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   };
 
   /** SNAPSHOT — pure arithmetic, one request. */
-  const seekSnapshot = () => {
+  const seekSnapshot = (snapshot: string = qSnapshot) => {
     // ONE SEARCH AT A TIME (the tester pass, 2026-10-07: a global search with a date range applied
     // showed both chips while only one was in force). An exact address replaces the other criteria.
     setBound(null); setSnapCut(false); setTimeCut(null); setGlobalSpans(null); setDoorLabel(null); setDoorSpan(null);
     setQTick(""); setQFrom(""); setQTo("");
-    setApplied({ snapshot: qSnapshot, tick: "", from: "", to: "", doorLabel: null });
-    const n = Number(qSnapshot.replace(/[^\d]/g, ""));
+    setApplied({ snapshot, tick: "", from: "", to: "", doorLabel: null });
+    const n = Number(snapshot.replace(/[^\d]/g, ""));
     if (!Number.isFinite(n) || n < 1) return;
     setJumpMiss(null);
     if (!histNet) {
@@ -1311,6 +1308,16 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // network anchored into (`snapsAtTick`, the join every ledger surface uses).
   // Only while the bar is open (review: it was built on every one-second re-render for a menu
   // nobody could see); then per render, a few dozen globals against one network's records.
+  // THE SCOPED NETWORK'S RECENT SNAPSHOTS (2026-10-19): the live buffer's newest first, with their
+  // age — the Metagraph field's menu; nothing under All, where no one chain is in force.
+  const snapshotOptions = (() => {
+    if (!net || !searchOpen || !histNet) return [];
+    const t = Date.now();
+    return [...(net.metaSnaps.get(histNet) ?? [])]
+      .sort((a, b) => b.ordinal - a.ordinal)
+      .slice(0, 40)
+      .map((r) => ({ ordinal: r.ordinal, age: relativeAge(t - Date.parse(r.ts)) }));
+  })();
   const tickOptions = (() => {
     if (!net || !searchOpen) return [];
     const scope = histNet;
@@ -1354,6 +1361,8 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       onSubmit={onSubmit}
       ticks={tickOptions}
       onTickPick={(n) => { landCommit.current = null; setQTick(String(n)); void seekTick(String(n)); }}
+      snapshots={snapshotOptions}
+      onSnapshotPick={(n) => { landCommit.current = null; setQSnapshot(String(n)); seekSnapshot(String(n)); }}
       onClose={() => setSearchOpen(false)}
     />
   );
@@ -1425,6 +1434,19 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     setWanted(null);
     commitRow(r, false);
   });
+
+  // THE EARLIER CHAIN SAYS WHAT IT IS, above the table (user, 2026-10-19: "when we click 'earlier'
+  // add a top section to say these are 'previous registrations', same as the hint section we have
+  // in the explorer"): the explorer's own hint plate, one sentence, only while an earlier chain is
+  // paged. It replaced the words beside the Current | Earlier toggle (2026-10-18).
+  const earlierMonths = chainMonths(useChainSpan(chainIdx > 0 ? histAddr : null));
+  const chainNote =
+    chainIdx > 0 && histNet ? (
+      <p className="flex-none mb-2 rounded-md bg-wash-faint px-2.5 py-1.5 text-label leading-snug text-muted-foreground">
+        A previous registration of {displayNetwork(histNet)?.ticker ?? histNet}
+        {earlierMonths ? `, ${earlierMonths}` : ""} — a chain of its own, with its own snapshot numbers.
+      </p>
+    ) : null;
 
   const toolbar = (
     // `pb-2` — the same 8px the box below it keeps to the table, so the search block sits in an
@@ -1595,6 +1617,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     return (
       <>
         {toolbar}
+        {chainNote}
         {search}
         {/* The span in the card's own words when a door brought it, else the day the reader typed. */}
         {waiting(`Finding the snapshots ${doorLabel ? `in ${doorLabel}` : qFrom ? `from ${dayWords(qFrom)}` : "you asked for"}…`)}
@@ -1605,6 +1628,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     return (
       <>
         {toolbar}
+        {chainNote}
         {search}
         {merged.error ? (
           <p className="m-auto flex items-center gap-3 text-label text-muted-foreground">
@@ -1625,6 +1649,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     return (
       <>
         {toolbar}
+        {chainNote}
         {search}
         {waiting("Reading the snapshots…")}
       </>
@@ -1634,6 +1659,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     return (
       <>
         {toolbar}
+        {chainNote}
         {search}
         <p className="m-auto text-label text-muted-foreground">
           {!live ? "NO SIGNAL" : lens === UNLISTED_ID && !timeCut && !mergedMode ? `No unlisted snapshots among the latest global snapshots. ${unlistedLastSeen}` : timeCut || globalSpans ? "No snapshots in that range" : mergedMode ? "No snapshots here" : histNet && bound?.addr === histAddr ? "No snapshots in that range" : histNet ? (histErr ? "history unavailable — the explorer read failed; paging again retries" : "reading the chain…") : "Waiting for anchored metagraph snapshots…"}
@@ -1646,6 +1672,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   return (
     <>
       {toolbar}
+      {chainNote}
       {search}
       {/* A PAGE THAT FAILED TO READ says so beside the rows still on screen, with its retry (the
           branch review's I1: the table sat dimmed with no word). */}

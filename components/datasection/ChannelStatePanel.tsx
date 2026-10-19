@@ -396,8 +396,11 @@ function SignerRoster({ dataIds, proofIds, metaId, selNodes }: { dataIds: string
                       <span className="min-w-0 flex flex-col">
                         <span className="font-mono truncate">{id ? shortHash(id) : r.res.row.label}</span>
                         {r.otherKeys.length > 0 && (
-                          <span className="font-mono text-muted-foreground truncate">
-                            signed as {r.otherKeys.join(", ")}
+                          // A peer id belongs to a LAYER (app/api/CLAUDE.md): a hybrid signs one layer
+                          // with a key its node id does not repeat. Said as what it is (user,
+                          // 2026-10-19: "what does 'signed as c9a1bdca' mean?").
+                          <span className="text-muted-foreground truncate">
+                            other layer&apos;s key <span className="font-mono">{r.otherKeys.join(", ")}</span>
                           </span>
                         )}
                       </span>

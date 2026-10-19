@@ -60,8 +60,10 @@ export function appliedChips(
 ): { key: Criterion; text: string }[] {
   const on = q.chain ? `${ticker(q.chain)} ` : "";
   const out: { key: Criterion; text: string }[] = [];
-  if (q.snapshot) out.push({ key: "snapshot", text: `${on}${ord(q.snapshot)}` });
-  if (q.tick) out.push({ key: "tick", text: `in global ${ord(q.tick)}` });
+  // EACH CHIP NAMES ITS RECORD KIND (user, 2026-10-19: "'in global' → 'global snapshot:', same for
+  // metagraph snapshot"): the kind, a colon, then the chain (where one is in force) and the number.
+  if (q.snapshot) out.push({ key: "snapshot", text: `Metagraph snapshot: ${on}${ord(q.snapshot)}` });
+  if (q.tick) out.push({ key: "tick", text: `Global snapshot: ${ord(q.tick)}` });
   if (q.from || q.to) {
     const days = q.from && q.to ? (q.from === q.to ? day(q.from) : `${day(q.from)} – ${day(q.to)}`) : q.from ? `from ${day(q.from)}` : `to ${day(q.to)}`;
     out.push({ key: "date", text: `${on}${q.doorLabel ?? days}` });

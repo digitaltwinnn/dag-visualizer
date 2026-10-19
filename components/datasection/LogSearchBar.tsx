@@ -34,6 +34,43 @@ import { cn } from "@/lib/utils";
  *  and nothing outside this file ever sees it. */
 const ANY_NET = "__any";
 
+/** ONE RECENT-RECORDS MENU for both ordinal fields (user, 2026-10-19: the first cut's trigger
+ *  "is smaller than the text box it relates to and hover is standard"): the trigger stretches to
+ *  the field's own height and joins its right edge, and the rows wear the explorer's hover — the
+ *  wash, never the primitive's accent plate. Each row is the ordinal and its age. */
+function RecentMenu({ label, items, onPick }: { label: string; items: { ordinal: number; age: string }[]; onPick: (ordinal: number) => void }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={label}
+          className={cn(
+            "self-stretch inline-flex w-8 touch:w-11 max-[700px]:w-11 items-center justify-center flex-none cursor-pointer",
+            "bg-[var(--panel-plate)] border border-border/70 border-l-0 rounded-r-xs max-[700px]:rounded-r-btn",
+            "text-muted-foreground hover:text-foreground hover:bg-wash-soft data-[state=open]:bg-wash-soft data-[state=open]:text-foreground",
+            "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] transition-colors",
+          )}
+        >
+          <ChevronDown aria-hidden className="size-3.5" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" sideOffset={4} className="min-w-[11rem] max-h-[50vh] overflow-y-auto slim-scroll p-1.5">
+        {items.map((t) => (
+          <DropdownMenuItem
+            key={t.ordinal}
+            onSelect={() => onPick(t.ordinal)}
+            className="flex items-center justify-between gap-4 rounded-md px-2.5 py-1.5 text-label cursor-pointer text-muted-foreground focus:text-foreground focus:bg-wash-soft tabular-nums"
+          >
+            <span className="font-mono text-foreground">{t.ordinal.toLocaleString()}</span>
+            <span>{t.age}</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export default function LogSearchBar({
   networks,
   metaId,
@@ -53,6 +90,8 @@ export default function LogSearchBar({
   onClose,
   ticks,
   onTickPick,
+  snapshots,
+  onSnapshotPick,
 }: {
   /** The chains that can be searched, in the order the explorer lists them. */
   networks: { id: string; label: string }[];
@@ -85,6 +124,9 @@ export default function LogSearchBar({
   ticks?: { ordinal: number; age: string }[];
   /** A pick runs the search at once — the menu is a choice, not a draft. */
   onTickPick?: (ordinal: number) => void;
+  /** The scoped network's recent snapshots (2026-10-19), the same shape; absent under All. */
+  snapshots?: { ordinal: number; age: string }[];
+  onSnapshotPick?: (ordinal: number) => void;
 }) {
   // ⚠️ TOUCH RAISES EVERY CONTROL IN THE BAR TOGETHER (user, 2026-09-02: "the search snapshot
   // field height is too small"). 24px was tuned for a pointer; on a coarse pointer all five
@@ -242,8 +284,12 @@ export default function LogSearchBar({
           value={snapshot}
           aria-label="Metagraph snapshot ordinal"
           onChange={(e) => onSnapshot(e.target.value)}
-          className={cn(field, "w-[148px] max-[700px]:w-auto max-[700px]:flex-1 rounded-l-none max-[700px]:rounded-l-none text-right")}
+          className={cn(field, "w-[148px] max-[700px]:w-auto max-[700px]:flex-1 rounded-l-none max-[700px]:rounded-l-none text-right", snapshots?.length && "rounded-r-none")}
         />
+        {/* THE RECENT METAGRAPH SNAPSHOTS under a scope (user, 2026-10-19: "add a dropdown for
+            metagraph snapshot when filter is applied") — the live buffer's newest, the same menu
+            the Global field carries. Under All there is no chain to list. */}
+        {!!snapshots?.length && <RecentMenu label="Pick a recent metagraph snapshot" items={snapshots} onPick={(n) => onSnapshotPick?.(n)} />}
         </span>
       </span>
 
@@ -259,27 +305,7 @@ export default function LogSearchBar({
             onChange={(e) => onTick(e.target.value)}
             className={cn(field, "w-[148px] max-[700px]:w-auto max-[700px]:flex-1 text-right", ticks?.length && "rounded-r-none")}
           />
-          {!!ticks?.length && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  aria-label="Pick a recent global snapshot"
-                  className={cn(field, "w-8 touch:w-11 px-0 rounded-l-none border-l-0 inline-flex items-center justify-center cursor-pointer text-muted-foreground hover:text-foreground")}
-                >
-                  <ChevronDown aria-hidden className="size-3.5" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" sideOffset={4} className="max-h-[50vh] overflow-y-auto slim-scroll">
-                {ticks.map((t) => (
-                  <DropdownMenuItem key={t.ordinal} onSelect={() => onTickPick?.(t.ordinal)} className="gap-3 text-label tabular-nums">
-                    <span className="font-mono">{t.ordinal.toLocaleString()}</span>
-                    <span className="ml-auto text-muted-foreground">{t.age}</span>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+          {!!ticks?.length && <RecentMenu label="Pick a recent global snapshot" items={ticks} onPick={(n) => onTickPick?.(n)} />}
         </span>
       </span>
 
