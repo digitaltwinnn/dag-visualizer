@@ -667,7 +667,11 @@ export default function TrendStack() {
                 // THE CARD NAMES ITS MEASURE, not just its unit — it can be stepped from right here,
                 // so the card has to say what it turned into.
                 unit={caption}
-                heading={METRIC_LABELS[shown]}
+                // THE FRONT CARD STATES THE MEASURE AND ITS READINGS FOR THE DECK; a rear card is the
+                // network's name over its picture (user, 2026-10-19: the repeated title and values
+                // on every background card were "quite duplicate").
+                heading={pose.interactive ? METRIC_LABELS[shown] : undefined}
+                nameOnly={!pose.interactive}
                 // PHONE: the card is too narrow for name + measure + reading on one line, so the
                 // measure rides the front plot's caption instead (`unitInPlot`).
                 unitInPlot={false}
@@ -683,7 +687,7 @@ export default function TrendStack() {
                   word: headWord(metric, roster.headKind),
                   pending: slice.stale || (roster.headKind === "day" ? roster.dayPending : roster.pending),
                 }}
-                peak={slice.stale ? null : peakReading(row.series.points, axis, step, metric, roster.headKind)}
+                peak={slice.stale || !pose.interactive ? null : peakReading(row.series.points, axis, step, metric, roster.headKind)}
                 format={roster.format}
                 note={pending ? "reading the hourly samples…" : undefined}
                 buckets={axis}

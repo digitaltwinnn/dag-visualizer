@@ -404,7 +404,11 @@ route, and a machine on two networks — UP's nodes also validate the DAG — pa
 click runs, so the place and provider are re-committed and the filter untouched). Hypergraph
 needs nothing: its node commits the filter by policy.
 
-**The plane's head is NETWORK · MEASURE · READINGS** (user, 2026-10-19): the network at the left,
+**The plane's head is NETWORK · MEASURE · READINGS — on the FRONT card; a rear card's head is the
+NETWORK ALONE** (user, 2026-10-19, later the same day: the title and values "repeated on each
+background card" were "quite duplicate" — `TrendChart nameOnly`, passed for every non-interactive
+plane; the front card states the measure and its readings for the whole deck, and the legend stays
+on a rear card because it keys bands that are drawn). The front card's head (user, 2026-10-19): the network at the left,
 the measure's name centred as the card's title (`TrendChart heading` — the unit caption and the
 plot's "peak" corner went), and at the right the peak beside the daily average in one label-then-
 value group ("make one visually designed place and keep them together"). With a heading the head

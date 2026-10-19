@@ -123,6 +123,7 @@ export default function TrendChart({
   touchBrush = true,
   inspect,
   readout,
+  nameOnly,
   scaleMax,
   cursorMs,
   onPick,
@@ -286,6 +287,13 @@ export default function TrendChart({
    *  caption is not drawn. (`heading`, not `title` — a `title` prop reads as hover text to the
    *  tooltip boundary.) */
   heading?: string;
+  /** THE HEAD IS THE NAME ALONE (user, 2026-10-19: "the title repeated on each background card
+   *  is quite duplicate — keep only the metagraph on those older cards and drop title and
+   *  values"). The stack's rear planes pass it: the front card states the measure and its
+   *  readings for the whole deck, and a rear card is a network's picture behind it, named and
+   *  nothing more. The legend stays — it keys the bands that ARE drawn. The caller still hands
+   *  the readout in, because the plot's tooltip reads it. */
+  nameOnly?: boolean;
   /** The peak beside the readout, on the readout's own unit (see `peakReading`). */
   peak?: { word: string; value: number } | null;
   /** The series line's stroke, in CSS px at scale 1. The document's small charts draw at 2; a
@@ -458,7 +466,7 @@ export default function TrendChart({
         <span className={cn("inline-flex items-baseline gap-2 min-w-0 max-w-full", heading ? "justify-self-start" : "flex-none")}>
           <span className="inline-block w-2 h-2 rounded-full flex-none" style={{ background: hue0 }} aria-hidden />
           <span className="text-label font-semibold text-foreground truncate">{name}</span>
-          {unit && !unitInPlot && !heading && <span className="text-label text-muted-foreground whitespace-nowrap">{unit}</span>}
+          {unit && !unitInPlot && !heading && !nameOnly && <span className="text-label text-muted-foreground whitespace-nowrap">{unit}</span>}
         </span>
         {/* THE MEASURE AS A CENTRED TITLE (user, 2026-10-19: "instead of right side 'snapshots per
             5 min', centre it and make it like a title just saying 'snapshots'"): the card's one
@@ -512,7 +520,7 @@ export default function TrendChart({
         {/* One line states its own reading; a MULTI-line chart only a reading its caller names
             (the per-network Nodes panels' total, 2026-09-29) — which line a bare number
             belonged to would otherwise be a guess. */}
-        {(lines.length === 1 || readout != null) && last != null && (
+        {!nameOnly && (lines.length === 1 || readout != null) && last != null && (
           // The readout NAMES ITS RELATION to the window (user, 2026-09-09, third round of
           // this head: a number and a time still read as two facts — the words now say what
           // the number IS, "latest full day/hour/5 min", and the exact stamp lives on hover.
