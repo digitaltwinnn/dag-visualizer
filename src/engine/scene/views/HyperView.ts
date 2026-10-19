@@ -98,6 +98,13 @@ const HUB_BODY_SOFT = 0.58;
 // Anchor-packet stream tuning: each anchored snapshot launches one packet hub→core; a burst of N
 // streams out staggered, reusing a small pool (which naturally throttles very large bursts).
 const PKT_TRAVEL = 0.85; // seconds hub → core
+/** THE CORE STAYS OPEN WHILE PACKETS FLY (user, 2026-10-19: "expand the pulse, keep it open as the
+ *  snapshots animate across the lines, and only then close it — show when it's open to anchor from
+ *  metagraphs"). The flash a global landing sets decays on its own clock; while any metagraph's
+ *  packets are pending or in flight the flash is held at least here, so the core reads as the
+ *  open anchor the packets are arriving into, and it closes on the usual decay once the last one
+ *  has landed. */
+const CORE_OPEN_HOLD = 0.6;
 /** The committed hub's own emissive, as a share of the resting level — see the hub loop. */
 const HUB_FOCUS_GLOW = 0.5;
 const PKT_STAGGER = 0.07; // seconds between launches within a burst
@@ -214,6 +221,7 @@ export class HyperView implements SceneView {
   coreGroup!: THREE.Group;
   core!: THREE.Mesh;
   coreFlash?: number;
+  private _flightSeen = false;
   private _coreRings: THREE.LineLoop[] = []; // the DAG core's cyan "sun" hoops (rebuilt on node load)
   private _coreFills: THREE.Mesh[] = []; // the DAG core's shell rim-fill disks (same as a metagraph's)
   /** The snapshot ripple pool (RIPPLE_GEO's note): `age` counts from the flash, `delay` holds the
@@ -805,6 +813,9 @@ export class HyperView implements SceneView {
     const coreFillOp = (paper ? FILL_OP_PAPER * coreOffMul : inkPresence(FILL_OP * coreOffMul, paper)) * coreReveal;
     for (const f of this._coreFills) (f.material as THREE.MeshBasicMaterial).opacity = coreFillOp * this._fades.alpha;
     if (this.coreFlash) this.coreFlash = Math.max(0, this.coreFlash - dt * 1.6);
+    // …held open while the previous frame saw packets pending or in flight (`_flightSeen`, written
+    // by the metas loop below — one frame of lag, invisible at any frame rate).
+    if (this._flightSeen) this.coreFlash = Math.max(this.coreFlash || 0, CORE_OPEN_HOLD);
 
     // The ripples (RIPPLE_GEO's note). The core group hangs straight off the scene, so its own
     // quaternion is its world turn: the camera's, expressed in that frame, faces every ring at it.
@@ -842,6 +853,7 @@ export class HyperView implements SceneView {
     if (!this._tetherEntryHold && this._tetherEntryT < 1)
       this._tetherEntryT = Math.min(1, this._tetherEntryT + dt / 0.7);
     let hubIdx = -1;
+    let anyFlight = false;
     for (const m of this.metas) {
       hubIdx++;
       // Per-hub eased sweep, staggered so the tethers reach their hubs one after another.
@@ -909,6 +921,7 @@ export class HyperView implements SceneView {
         m.glow = 1;
       }
       m.glow = Math.max(0, m.glow - dt * 1.4);
+      if (m.pending > 0 || m.packets.length > 0) anyFlight = true;
       for (let pi = m.packets.length - 1; pi >= 0; pi--) {
         const pk = m.packets[pi];
         pk.t += dt / PKT_TRAVEL;
@@ -936,6 +949,7 @@ export class HyperView implements SceneView {
       // `_pos` scratch is overwritten per hub).
       if (m.cfg.id === this.focusId) this._spotPos.copy(m.group.position);
     }
+    this._flightSeen = anyFlight;
 
     // Focus SPOTLIGHT: stage a white key above the focused subject — and the subject is THE FINEST
     // RUNG THE SCENE CAN POINT AT, the same coarse→fine ladder every other emphasis in the app
