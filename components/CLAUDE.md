@@ -370,6 +370,17 @@ and a left/right swipe sends the plots out the way the finger went with the next
 arriving from the other side (`swipeAxis` in `TrendStack`, the roll's x offsets; a picked or keyed
 measure keeps the vertical roll).
 
+**A RANGE OR WINDOW CHANGE FADES THE NEW AXIS IN** (2026-10-19, user: a widened range "scrambled"
+the lines and a shortened one slid them in from the right — "make it consistent and smooth"). The
+held picture stays exactly where it was drawn under the stack's `data-stale` dim, and the plot
+that renders for the new axis starts transparent and eases to full over the measure roll's own
+320ms (`TrendChart held`, its layout effect) — the same arrival whether the new series landed
+after a hold (another tier fetched) or in the same render as the press (a window hop inside one
+payload). It replaced two transforms: the held-picture ZOOM to the span being loaded (`heldZoom`,
+2026-09-29, deleted) and the FLIP that ran the same move backwards on a hop. Opacity only; nothing
+in the plot scales or slides on a range change any more. The explorer's node row sets its
+TICKER(S) in semibold (same day — "it should have the ticker(s) in bold").
+
 **History's lane is the network dossier, the RANGE, then the MOMENT** (the Range since 2026-10-07 —
 user: "range -> moment is also a logical parent - child relation"). The Range card is the brushed
 `trendRange` as a committed subject: a slot with no rung (the Moment's precedent, `selStack`
@@ -1572,7 +1583,10 @@ and `none` are different facts** — haven't looked vs looked and found nothing.
 "encrypted"/"decrypt" (it is brotli-compressed public JSON — no key, no cipher, and it says the
 opposite of the one thing that matters, since this read is gated *because* one channel publishes
 personal records in the clear) and "uncompress" (true, but it puts the cost on local bytes when the
-cost is the ~2.5 MB fetch).
+cost is the ~2.5 MB fetch). **The raw pane's invitation states the WAIT, not a download** (2026-10-19,
+user: "is this still true? … is this really another extra and costly call?"): the reader never
+downloads the global — the server reads it from the L0 nodes — and since that day a tick the
+exact read just pulled is served from that pull (`fetchGlobal.ts`'s recent-global keep).
 
 **One control position, two tiers**, because there are two costs and the card charges the second only
 once the first is paid: `Read this snapshot` runs the deep read and states the SHAPE in place;

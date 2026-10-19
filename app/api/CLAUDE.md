@@ -82,7 +82,12 @@ them — but the Next Node server can.
   floor first; the shuffled archival list is the last resort. The route also sends `s-maxage` now:
   the live tip and the backfill are the same ordinals for every visitor.
 - **`/api/snapshot/[ordinal]/channel/[address]`** is the deep read behind the metagraph-snapshot card's
-  third tier: it re-downloads the same ~2.5 MB global to reach ONE channel entry. The cost is accepted
+  third tier: it reads the same ~2.5 MB global to reach ONE channel entry. **The pull is shared with
+  the exact read** (2026-10-19, user: "I feel we're always pulling the snapshots already"): the data
+  cache cannot hold the parsed global, so `fetchGlobal.ts` keeps the last few per instance for two
+  minutes (`GLOBAL_KEEP_MS`) and shares an in-flight pull — a deep read on the live or just-pinned
+  tick costs no second trip to the L0 nodes when it lands on the instance that pulled it; a failed
+  pull is forgotten at once. Beyond that the cost is accepted
   deliberately — cached immutably and run only from the two surfaces that ask for it (the card's
   `Read this snapshot` button, and arrival in the raw layer), never on a
   poll, never across the chain. The key includes **the snapshot's own ordinal**, because a fast
