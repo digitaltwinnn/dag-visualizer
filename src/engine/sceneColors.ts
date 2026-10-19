@@ -34,7 +34,7 @@ export interface SceneColors {
   //                               for in-scene text that states a reading rather than a name)
 }
 
-export type SceneColorVar = "--primary" | "--core" | "--background" | "--scene-ground" | "--border" | "--panel" | "--muted-foreground" | "--foreground";
+type SceneColorVar = "--primary" | "--core" | "--background" | "--scene-ground" | "--border" | "--panel" | "--muted-foreground" | "--foreground";
 
 // Resolve one CSS colour expression (e.g. "var(--primary)") to a packed 0xRRGGBB. Two steps, because
 // the computed-colour STRING format varies by browser (a token authored in oklch resolves to
@@ -68,7 +68,7 @@ function resolveCssColor(expr: string): number | null {
 // against config.COLORS in dev (see Engine constructor). Client-only: the Engine (the sole caller)
 // never constructs without a DOM + the applied stylesheet, so a null return is a genuine
 // misconfiguration — it throws rather than silently substituting an off-palette colour.
-export function readColorToken(name: SceneColorVar): number {
+function readColorToken(name: SceneColorVar): number {
   const v = resolveCssColor(`var(${name})`);
   if (v == null) throw new Error(`sceneColors: CSS token ${name} did not resolve (is globals.css applied?)`);
   return v;

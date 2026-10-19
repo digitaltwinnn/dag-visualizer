@@ -88,9 +88,6 @@ export const TREND_METRICS: Record<TrendMetric, MetricSpec> = {
  *  rows) yet has no row of its own, so the two ideas must not share one name. */
 export type StoredMetric = Exclude<TrendMetric, "continuity">;
 
-/** The metrics that are one stored COUNTER row — the four a per-network counter panel can serve.
- *  `nodes` is a gauge and `continuity` is derived, so neither belongs. */
-export type CounterMetric = Exclude<StoredMetric, "nodes">;
 
 /** The stored row a metric reads for one network, or null where it is derived from several. The
  *  overload is what lets a caller that already knows it holds a stored metric skip the null

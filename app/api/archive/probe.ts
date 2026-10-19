@@ -23,7 +23,7 @@ import { CATALOG, NETWORKS, type NetworkId } from "@/src/engine/config";
 
 // DOR's genesis anchor — 62 ordinals above the global archive floor, ~24 KB. Served by every
 // node that keeps deep history, 404 on every pruned one, and immutable so it never goes stale.
-export const DEEP_PROBE_ORDINAL = 766780;
+const DEEP_PROBE_ORDINAL = 766780;
 
 // What the global chain's "deep" reaches back to — the archive floor's own date (the
 // 2023-11-13 upgrade restart), a network-wide fact, not per node.
@@ -48,7 +48,7 @@ export function isPublicNodeIp(ip: string): boolean {
 const clampPort = (p: unknown): number =>
   typeof p === "number" && Number.isInteger(p) && p >= 1024 && p <= 65535 ? p : 9000;
 
-export interface ArchiveTarget {
+interface ArchiveTarget {
   ip: string;
   port: number;
 }

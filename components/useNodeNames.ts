@@ -61,18 +61,3 @@ export function nodeName(
   }
   return null;
 }
-
-/** Whether any of the node's layer ids has a registry ENTRY — the delegated-staking opt-in
- *  (user, 2026-08-16: an entry means the operator registered as a candidate; the whitelist
- *  that admits a validator to the cluster is a separate, independent gate). Presence-keyed,
- *  not name-keyed, so a nameless registration still answers Yes. */
-export function nodeRegistered(
-  names: Record<string, string> | null,
-  node: { id?: string | null; ids?: string[] } | null | undefined,
-): boolean {
-  if (!names || !node) return false;
-  for (const id of node.ids?.length ? node.ids : node.id ? [node.id] : []) {
-    if (id in names) return true;
-  }
-  return false;
-}

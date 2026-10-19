@@ -107,7 +107,7 @@ const POOL_SHADE_OP = 0.72;
 // fit scales both by one factor, so air is fixed and this number is purely the staged SIZE.
 // Raising it never widens the row where the WIDTH binds (the fit divides it straight back out) —
 // it spends the same band on fewer, bigger pixels, packed deeper.
-export const GATHER_CELL = 0.62;
+const GATHER_CELL = 0.62;
 
 // The ledger's whole-view orientation (tilt ∘ rotY), baked into every node's ledger position so the
 // nodes match the LedgerView group's transform. Scale is applied separately (uniform).

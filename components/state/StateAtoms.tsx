@@ -43,19 +43,6 @@ export function SonarRing() {
   );
 }
 
-// STANDBY — a single live node glowing with the same expanding halo a real node gets on hover (the
-// pick invitation), among a few faint static peers.
-export function StandbyHalo() {
-  return (
-    <span className="relative inline-block w-11 h-[26px] align-middle" aria-hidden>
-      <span className="absolute w-[5px] h-[5px] rounded-full bg-muted-foreground opacity-15 left-[26px] top-1" />
-      <span className="absolute w-[5px] h-[5px] rounded-full bg-muted-foreground opacity-15 left-[34px] top-[15px]" />
-      <span className="absolute w-[5px] h-[5px] rounded-full bg-muted-foreground opacity-15 left-6 top-[18px]" />
-      <span className="absolute left-2 top-1/2 -mt-[4.5px] w-[9px] h-[9px] rounded-full border border-primary animate-st-standby-halo motion-reduce:animate-none motion-reduce:opacity-0" />
-      <span className="absolute left-2 top-1/2 -mt-[4.5px] w-[9px] h-[9px] rounded-full bg-primary animate-st-standby-node motion-reduce:animate-none" />
-    </span>
-  );
-}
 
 // PINNED — the Snapshots view's word for a committed tick held against the live stream, as ONE
 // mark everywhere it is said (user, 2026-10-09: "sometimes it's present differently … keep it

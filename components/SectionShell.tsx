@@ -49,7 +49,7 @@ const SCENE_DIM = 0.26;
  *  Exported for any surface inside the layer that has to outlive the store write that closed it
  *  (unmounting the instant `section` flips would blank the layer while it is still receding). One
  *  number, read by the timeline below and by whoever has to wait for it. */
-export const RAW_EXIT_S = 0.3;
+const RAW_EXIT_S = 0.3;
 
 export default function SectionShell({
   scene,

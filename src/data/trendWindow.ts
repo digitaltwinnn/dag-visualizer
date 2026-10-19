@@ -338,13 +338,13 @@ export interface TrendRange {
 }
 
 /** How a fetched payload becomes the window on screen. */
-export type TrendCut =
+type TrendCut =
   | { kind: "none" }
   | { kind: "slice"; ms: number }
   | { kind: "range"; fromMs: number; toMs: number };
 
 /** One payload to fetch and its cut: an API WINDOW or a TILE request, never both. */
-export interface TrendFetchLeg {
+interface TrendFetchLeg {
   window: TrendApiWindow | null;
   tiles: { tier: "5m" | "1h"; fromMs: number; toMs: number } | null;
   cut: TrendCut;

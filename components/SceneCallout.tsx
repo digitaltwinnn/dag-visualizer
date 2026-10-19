@@ -81,7 +81,7 @@ import { ledgerNetwork } from "@/src/engine/domain/tickNet";
 // What the panel says — one model, filled per view/rung so the JSX below stays single-sourced.
 // `aside.hue` absent = muted (the country card's ISO-code rule: a place carries no identity);
 // `aside.live` prepends the beating live dot (the global card's aside state, mirrored).
-export interface CalloutModel {
+interface CalloutModel {
   /** The title is an id (a node's), set in the mono register ids wear everywhere else. */
   titleMono?: boolean;
   key: string;
@@ -131,7 +131,7 @@ const geoOf = (p: { kind: string }): GeoInfo | undefined =>
 /** The callout PANEL alone — the eyebrow / title+aside / lead grammar on SCENE_GLASS — shared
  *  with the LiveStrip's bar hover (user, 2026-08-16: "fully re-use the one from the scene"),
  *  which wraps it in its own cursor-follow box instead of the Engine-anchored `.co-panel`. */
-export function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; className?: string; onDismiss?: () => void }) {
+function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; className?: string; onDismiss?: () => void }) {
   return (
     <div key={m.key} className={cn("roll-in whitespace-nowrap", SCENE_GLASS, className)}>
       {/* The identity EDGE SPINE (user, 2026-08-15 — "the rails/hairline effect on the left

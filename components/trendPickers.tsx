@@ -41,14 +41,14 @@ import { rangeDays } from "@/src/util/localTime";
 // controls" — the `--wash-*` tokens are the accent now): the group's plate is the faint wash under
 // a hairline of the strong one, a pill lifts to the hover wash, and the pressed pill keeps the
 // committed-selection language — the same ladder the explorer's path wears.
-export const PICKER_GROUP =
+const PICKER_GROUP =
   "inline-flex items-center rounded-lg border border-wash-strong bg-wash-faint p-[3px] max-[700px]:flex max-[700px]:justify-center max-[700px]:[&>button]:flex-1";
 
 /** ONE PILL. Compact throughout (h-6/px-2/text-label — the h-7 pills stopped fitting one line
  *  beside the section tabs once ALL and the range joined; user, 2026-09-09), and the PRESSED
  *  register is the app's own committed-selection language, `SELECTED_ROW`: a window is a
  *  committed selection, not a tab. */
-export const zoomBtn = (pressed: boolean) =>
+const zoomBtn = (pressed: boolean) =>
   cn(
     "h-6 px-1.5 rounded-md text-label tracking-caps uppercase",
     pressed ? cn("font-bold text-foreground", SELECTED_ROW) : "text-muted-foreground hover:text-foreground hover:bg-wash-hover",

@@ -24,7 +24,7 @@ import type { FolderApi, Pane } from "tweakpane";
 /** One knob's presentation. `reload: true` marks a value baked into geometry at construction — the
  *  panel still offers it, but it only takes effect after a page reload (persistence makes that a
  *  workable loop: set it, reload, the panel restores it). */
-export interface TuneKnob {
+interface TuneKnob {
   min: number;
   max: number;
   step?: number;
@@ -134,7 +134,7 @@ export function savePersisted(groups: TuneGroup[]): void {
 }
 
 /** Reset a group (or every group) back to its shipped defaults. */
-export function resetGroup(g: TuneGroup): void {
+function resetGroup(g: TuneGroup): void {
   for (const key of Object.keys(g.schema)) {
     const d = (g.defaults as Record<string, unknown>)[key];
     if (typeof d === "number") (g.values as Record<string, number>)[key] = d;
@@ -146,7 +146,7 @@ export function resetGroup(g: TuneGroup): void {
 /** Format a group's current values as a paste-ready TS object literal, shaped like the defaults
  *  constant it came from. The whole point of the panel is that chosen numbers get BAKED, so the
  *  bake step is a copy-paste rather than transcription from a screenshot. */
-export function exportGroup(g: TuneGroup): string {
+function exportGroup(g: TuneGroup): string {
   const keys = Object.keys(g.schema);
   const body = keys
     .map((k) => {

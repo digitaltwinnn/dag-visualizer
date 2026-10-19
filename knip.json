@@ -1,0 +1,25 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "app/**/{page,layout,route,sitemap,manifest,opengraph-image,robots}.{ts,tsx}",
+    "scripts/*.ts",
+    "postcss/*.mjs"
+  ],
+  "project": [
+    "app/**",
+    "components/**",
+    "src/**",
+    "lib/**",
+    "scripts/**",
+    "postcss/**"
+  ],
+  "ignore": [
+    "lib/mgVars.tsx"
+  ],
+  "ignoreDependencies": [
+    "tsx",
+    "shadcn",
+    "@tweakpane/core"
+  ],
+  "ignoreExportsUsedInFile": true
+}

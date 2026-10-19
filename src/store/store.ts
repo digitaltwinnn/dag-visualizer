@@ -28,7 +28,6 @@ export type Mode = "hyper" | "geo" | "ledger" | "trend" | "soon";
 import type { LedgerMeasure } from "@/src/data/ledgerMeasure";
 import type { GeoMeasure } from "@/src/data/geoMeasure";
 import type { HyperMeasure } from "@/src/data/hyperMeasure";
-export type { LedgerMeasure };
 // WHY the scene is moving — the motion hint's cause (2026-09-26), stamped by the gesture's owner
 // and read by `components/MotionHint` through `domain/motionHint.ts`, which turns it into words.
 // DATA about the gesture, never copy. Defined here, beside its channel, because the domain module
@@ -75,7 +74,6 @@ function bumpStack(stack: SelSlot[], slot: SelSlot, active: boolean): SelSlot[] 
 // hand-copied duplicate of the data layer's interface and drifted the moment a field was added
 // there (2026-08-12) — the store's own copy silently kept the old shape, so a component reading
 // the new field type-errored against a type that no longer described the value it held.
-export type { Activity } from "@/src/data/api";
 import type { Activity } from "@/src/data/api";
 import { snapRange } from "@/src/data/trendWindow";
 

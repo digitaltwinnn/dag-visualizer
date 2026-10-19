@@ -24,7 +24,7 @@ import type { NetworkId } from "@/src/engine/config";
 
 const GUARD = 16;
 const BASE_GUARDS = [25, 90, 165, 265, 300];
-export const ACCENT_HUE: Record<NetworkId, number> = { mainnet: 195, integrationnet: 300, testnet: 327 };
+const ACCENT_HUE: Record<NetworkId, number> = { mainnet: 195, integrationnet: 300, testnet: 327 };
 export const SLOT_STEP = 8;
 
 export function guardsFor(net: NetworkId): number[] {

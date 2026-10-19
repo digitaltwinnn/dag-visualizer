@@ -394,11 +394,6 @@ export function filterAccent(filter: string): string {
   return "var(--primary)";
 }
 
-// The publicly listed metagraphs (config). Node counts / disabled "(0)" chips return
-// when the globe's metaList is ported.
-export function allMetagraphs(): MetagraphConfig[] {
-  return METAGRAPHS as MetagraphConfig[];
-}
 
 export interface MetagraphConfig {
   id: string;

@@ -37,7 +37,7 @@ import { IDENT_INK } from "@/components/identInk";
 /** The state as a dot in its bucket colour — and in its SHAPE: ready is a filled disc, any other
  *  state a hollow ring, so the mark is never colour alone (review, 2026-09-26). The word is the
  *  dot's accessible name and its hover. */
-export function StateDot({ state }: { state?: string | null }) {
+function StateDot({ state }: { state?: string | null }) {
   const s = nodeStatus(state);
   const ready = s.bucket === "ready";
   return (

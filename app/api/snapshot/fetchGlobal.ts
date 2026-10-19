@@ -23,7 +23,7 @@ export const LB_BACKOFF_MS = 10 * 60_000;
 const lbSkipUntil = new Map<NetworkId, number>();
 /** How many fallback nodes one read asks at most, and how long the walk may take in all. */
 export const WALK_MAX = 12;
-export const WALK_BUDGET_MS = 24_000;
+const WALK_BUDGET_MS = 24_000;
 
 // ONE PULL SERVES BOTH ROUTES (user, 2026-10-19: "I feel we're always pulling the snapshots
 // already … or is this really another extra and costly call?"). It was: the exact read

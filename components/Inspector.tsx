@@ -308,7 +308,7 @@ const GHOST_EYEBROW: Record<string, string> = {
  *  open state is the same per-selection `railCollapse` override (false = open), so a new selection
  *  folds every ghost back. `.rail-entry` keeps it in the thread's query and `data-ghost` keeps its
  *  dot hollow, open or folded. */
-export function GhostCard({ card, open = false, onToggle, step }: { card: RailCard; open?: boolean; onToggle?: () => void; step?: SiblingStep }) {
+function GhostCard({ card, open = false, onToggle, step }: { card: RailCard; open?: boolean; onToggle?: () => void; step?: SiblingStep }) {
   const Icon = card.icon;
   const label = GHOST_EYEBROW[card.id] ?? card.id;
   return (
