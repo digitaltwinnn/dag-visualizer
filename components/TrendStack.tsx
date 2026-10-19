@@ -152,7 +152,11 @@ export default function TrendStack() {
   // vitals rim and the document either way.
   const windowId = useStore((s) => s.trendWindow);
   const range = useStore((s) => s.trendRange);
-  const slice = useTrendsSlice(on ? windowId : null, range);
+  // …AND KEEPS ITS CHARTS WHILE IT LINGERS (2026-10-19, second round — user: "leaving trend view
+  // animation still does not look good"; a screencast showed why: the slice was asked for only
+  // while `on`, so the frame the view changed every plot unmounted and the cards collapsed into
+  // thin empty strips with the ‹ › pills floating on them, and only those strips dropped).
+  const slice = useTrendsSlice(on || lingering ? windowId : null, range);
   const { p, error } = slice;
 
   // ⚠️ ONE ROSTER PASS, SHARED WITH BOTH RAILS (2026-09-19). Which networks, in what order, drawn

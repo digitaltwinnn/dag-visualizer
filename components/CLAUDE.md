@@ -365,7 +365,12 @@ user: the entry "looks faster than the other views" and "the leaving animation i
 missing"): the stack rides the choreography's own clock — the deal is paced to the IN phase's node
 placement (260ms a slot, `DEAL_MS` in TrendStackSync), and on a switch away the layer LINGERS for
 `DUR_OUT` (TrendStack) while the projector keeps placing the cards and they drop out back-of-deck
-first (`data-leave="1"` holds the layer, `"2"` lets it fade; the next deal clears it). Originally: each plane card
+first (`data-leave="1"` holds the layer, `"2"` lets it fade; the next deal clears it). **And the
+cards keep their CHARTS while they linger** (2026-10-19, second round — user: it "still does not
+look good"; a screencast showed the slice was asked for only while the policy was on, so the frame
+the view changed every plot unmounted and the cards collapsed into thin empty strips with the ‹ ›
+pills floating on them, and only those strips dropped — `useTrendsSlice(on || lingering …)`). The
+deploy was current; it was never a cache. Originally: each plane card
 falls into its slot a beat after the one in front (`planeDrop` in globals.css, keyed off the
 layer's `data-on`, staggered by the depth rank React writes as `--slot` — `transform` only, so the
 anchor's matrix and the card's own `translate` are untouched; the leave stays the layer's fade),
