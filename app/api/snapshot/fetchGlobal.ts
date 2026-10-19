@@ -22,6 +22,43 @@ import { NETWORKS, type NetworkId } from "@/src/engine/config";
 export const LB_BACKOFF_MS = 10 * 60_000;
 const lbSkipUntil = new Map<NetworkId, number>();
 
+// ONE PULL SERVES BOTH ROUTES (user, 2026-10-19: "I feel we're always pulling the snapshots
+// already … or is this really another extra and costly call?"). It was: the exact read
+// (`/api/snapshot/[ordinal]`) pulls the whole ~2.5 MB global for every live tick, and the deep
+// read (`…/channel/[address]`) pulled the SAME global again to decode one entry — the data cache
+// cannot hold the parsed global (its entry limit is below the payload), so nothing between the
+// two routes remembered it. This keeps the last few parsed globals in the function instance for
+// a short while and shares an in-flight pull, so a deep read on a tick the exact read just
+// pulled — the live one, the one a reader just pinned — costs no second trip to the L0 nodes.
+// Per instance and best-effort: under Fluid Compute the two requests usually land on the same
+// instance, and when they do not the read simply pulls as before. Small on purpose (a parsed
+// global is tens of MB of objects): the live tick and a pinned one are the whole use case.
+export const GLOBAL_KEEP_MS = 2 * 60_000;
+const GLOBAL_KEEP_MAX = 4;
+const recentGlobals = new Map<string, { at: number; json: Promise<unknown> }>();
+/** Tests only: the keep is module state, and the breaker tests reuse one ordinal. */
+export function forgetRecentGlobals(): void {
+  recentGlobals.clear();
+}
+
+export async function fetchGlobalJson(net: NetworkId, ordinal: number): Promise<unknown> {
+  const key = `${net}:${ordinal}`;
+  const now = Date.now();
+  const kept = recentGlobals.get(key);
+  if (kept && now - kept.at < GLOBAL_KEEP_MS) return kept.json;
+  const json = pullGlobalJson(net, ordinal);
+  recentGlobals.set(key, { at: now, json });
+  // A failed pull is forgotten at once — the callers' no-cache-on-throw contract retries it.
+  json.catch(() => {
+    if (recentGlobals.get(key)?.json === json) recentGlobals.delete(key);
+  });
+  for (const [k, v] of recentGlobals) {
+    if (recentGlobals.size <= GLOBAL_KEEP_MAX && now - v.at < GLOBAL_KEEP_MS) break;
+    if (k !== key) recentGlobals.delete(k);
+  }
+  return json;
+}
+
 /** One attempt at the LB: the parsed snapshot, or why not. The BODY is read inside the try — a
  *  body that stalls or fails to parse is a failing LB like any other (review, 2026-10-04). */
 async function tryLb(net: NetworkId, ordinal: number): Promise<{ ok: true; json: unknown } | { ok: false; why: string; trip: boolean }> {
@@ -47,7 +84,7 @@ function shuffle<T>(a: T[]): T[] {
   return a;
 }
 
-export async function fetchGlobalJson(net: NetworkId, ordinal: number): Promise<unknown> {
+async function pullGlobalJson(net: NetworkId, ordinal: number): Promise<unknown> {
   let lb: string;
   const skipping = (lbSkipUntil.get(net) ?? 0) > Date.now();
   if (skipping) {

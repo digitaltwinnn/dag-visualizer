@@ -565,7 +565,11 @@ export function ChannelStatePanel() {
           {/* One verb family with the card: compressed → decompress → decompressing
               (user, 2026-08-13). */}
           {following
-            ? `${coarse ? "Tap" : "Click"} this snapshot's row in the anchor log to decompress its payload. It is a ~2.5 MB fetch, so it runs only when you ask.`
+            // The cost is the WAIT, stated as such (user, 2026-10-19: "is this still true? … is this
+            // really another extra and costly call?"): the reader never downloads the global — the
+            // server reads it from the L0 nodes, a few seconds on a deep ordinal — and since the
+            // same day a tick the exact read just pulled is served from that pull.
+            ? `${coarse ? "Tap" : "Click"} this snapshot's row in the anchor log to decompress its payload. The read takes a few seconds, so it runs only when you ask.`
             : gaveUp
               ? "decompression failed. Reselect the row to retry: old snapshots are served by only some of the chain\u2019s nodes, so another attempt can land."
               : "decompressing…"}
