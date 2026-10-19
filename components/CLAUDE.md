@@ -396,7 +396,11 @@ needs nothing: its node commits the filter by policy.
 **The plane's head is NETWORK · MEASURE · READINGS** (user, 2026-10-19): the network at the left,
 the measure's name centred as the card's title (`TrendChart heading` — the unit caption and the
 plot's "peak" corner went), and at the right the peak beside the daily average in one label-then-
-value group ("make one visually designed place and keep them together"). The ‹ › pills say their
+value group ("make one visually designed place and keep them together"). With a heading the head
+is a THREE-COLUMN GRID (`minmax(0,1fr) auto minmax(0,1fr)`), so the title sits on the card's centre
+whatever the network's name weighs (user: it "depends on the text size of the metagraph but it
+shouldn't"); the readings are plain label-then-value text, not pills — a pill here reads as a
+tag or a control — and the pair wraps onto a second line on the phone's 360px card. The ‹ › pills say their
 word in the plain label step, not caps (the caps read "way too large").
 
 **The Range card's next ghost opens the first bucket of the SPAN it stands on — the brushed range,

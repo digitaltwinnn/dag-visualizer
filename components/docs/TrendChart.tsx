@@ -404,7 +404,14 @@ export default function TrendChart({
           backstop: a name longer than the whole row still truncates inside the group rather
           than overflowing it. Nothing changes at any width where the row already fit. */}
       <div
-        className={cn("flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-1", headClassName)}
+        className={cn(
+          // A HEADING MAKES THE HEAD THREE COLUMNS (user, 2026-10-19: the title "is not always fully
+          // centred, it depends on the text size of the metagraph"): name | title | readings on
+          // `1fr auto 1fr`, so the middle sits on the card's centre whatever its neighbours weigh.
+          // Without one the head is the wrapping row it always was.
+          heading ? "grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-baseline gap-x-2 mb-1" : "flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-1",
+          headClassName,
+        )}
         {...headHover}
         {...(headAction && {
           role: "button",
@@ -447,7 +454,7 @@ export default function TrendChart({
           },
         })}
       >
-        <span className="inline-flex items-baseline gap-2 min-w-0 max-w-full flex-none">
+        <span className={cn("inline-flex items-baseline gap-2 min-w-0 max-w-full", heading ? "justify-self-start" : "flex-none")}>
           <span className="inline-block w-2 h-2 rounded-full flex-none" style={{ background: hue0 }} aria-hidden />
           <span className="text-label font-semibold text-foreground truncate">{name}</span>
           {unit && !unitInPlot && !heading && <span className="text-label text-muted-foreground whitespace-nowrap">{unit}</span>}
@@ -456,7 +463,8 @@ export default function TrendChart({
             5 min', centre it and make it like a title just saying 'snapshots'"): the card's one
             word for WHAT it plots, between the network at the left and the reading at the right;
             the cadence lives in the explorer's measure heading. */}
-        {heading && <span className="flex-1 min-w-0 text-center text-label font-semibold text-foreground-dim truncate">{heading}</span>}
+        {heading && <span className="min-w-0 text-center text-label font-semibold text-foreground-dim truncate">{heading}</span>}
+        <span className={cn("inline-flex items-baseline flex-wrap min-w-0", heading ? "justify-self-end justify-end gap-x-3" : "contents")}>
         {/* One rung down the ladder (convention 12): only offered while a range is active,
             because the destination — the anchor log's date search — receives that range. */}
         {inspect && (
@@ -510,14 +518,17 @@ export default function TrendChart({
           // "Full" because partial edges are trimmed. ("Newest" was tried for one round on a
           // staleness nuance too thin to carry — user: "'newest' not 'latest'?" — the hover
           // stamp and the gray band are what actually say when the reading lags the clock.)
-          <span className="ml-auto inline-flex items-baseline gap-x-3 whitespace-nowrap">
+          // The two readings may WRAP onto a second line — each stays one piece (nowrap), the pair
+          // does not — so the phone's 360px card keeps the centred title and both numbers
+          // (2026-10-19: on one line they ran under the title).
+          <span className={cn("inline-flex flex-wrap justify-end items-baseline gap-x-3", !heading && "ml-auto")}>
             {!compact && peak > 0 && (
-              <span className="inline-flex items-baseline gap-1.5">
+              <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap">
                 <span className="text-label text-muted-foreground">peak</span>
                 <span className="text-label font-medium text-foreground tabular-nums">{format(peak)}</span>
               </span>
             )}
-            <span className="inline-flex items-baseline gap-1.5">
+            <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap">
             {/* A null readout value is ACQUIRING — the daily tier behind "latest full day" is still in
                 flight — so the slot holds its place (NodeStars) rather than show a finer bucket
                 under the day's word, or a number that isn't the day's. */}
@@ -535,6 +546,7 @@ export default function TrendChart({
             </span>
           </span>
         )}
+        </span>
       </div>
       {note || !measured ? (
         // THE EMPTY STATE TAKES THE PLOT'S OWN HEIGHT (user, 2026-10-07: "BIOFI is missing while it
