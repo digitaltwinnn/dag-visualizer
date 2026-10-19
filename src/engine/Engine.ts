@@ -30,7 +30,8 @@ import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
 import { liveArrivals } from "./domain/arrivals";
 import { SHEET_SHIFT_K, chromeShiftPx, sheetShiftPx } from "./domain/sheetShift";
 import { ChromeBounds } from "./ChromeBounds";
-import { FOCI, nodeFraming, cohortFraming, ledgerCommitTilt, trendFocusPush, trendFit } from "./domain/cameraRig";
+import { FOCI, nodeFraming, cohortFraming, ledgerCommitTilt, trendFocusPush, trendFit, restOrbit } from "./domain/cameraRig";
+import { dragTurn, isDrag } from "./domain/globeDrag";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { ledgerNetwork } from "./domain/tickNet";
@@ -215,7 +216,44 @@ export class Engine {
   private pointer = new THREE.Vector2();
   private canvas: HTMLCanvasElement;
   private onClick = (e: MouseEvent) => this._handleClick(e);
-  private onMove = (e: MouseEvent) => this._handleMove(e);
+  private onMove = (e: MouseEvent) => {
+    this._globeDragMove(e);
+    this._handleMove(e);
+  };
+  // ── A DRAG TURNS THE GLOBE (domain/globeDrag.ts has the design; viewPolicy.dragTurnsGlobe the
+  // gate). OrbitControls' rotate is OFF in that view, so the one-pointer drag is this: armed on
+  // a solo press, a drag once it travels past the slop, each move's delta handed to the Globe as
+  // a yaw + lean at the altitude's rate. The camera never moves, so `_freeOrbit` is untouched; the
+  // store's `sceneDragging` and the hint's cause ride it exactly as the orbit's did (the motion
+  // dim, the hint), and `_handleClick`'s travel gate keeps the release from picking. A second
+  // pointer is a pinch and ends it; OrbitControls still dollies the pinch and the wheel.
+  private _gDrag: { x: number; y: number; on: boolean } | null = null;
+  private _globeDragMove(e: MouseEvent): void {
+    const g = this._gDrag;
+    if (!g) return;
+    if (e.buttons === 0) { this._globeDragEnd(); return; }
+    if (!g.on) {
+      if (!isDrag(e.clientX - this._downX, e.clientY - this._downY)) return;
+      g.on = true;
+      this.globe.holdIdle(true);
+      const st = useStore.getState();
+      if (!st.sceneDragging) {
+        st.setSceneDragging(true);
+        st.setMotionCause({ kind: "orbit" });
+      }
+    }
+    const t = dragTurn(e.clientX - g.x, e.clientY - g.y, this.canvas.clientHeight, this.ctx.camera.position.length(), restOrbit("geo"));
+    this.globe.turnBy(t.yaw, t.lean);
+    g.x = e.clientX;
+    g.y = e.clientY;
+  }
+  private _globeDragEnd(): void {
+    const g = this._gDrag;
+    this._gDrag = null;
+    if (!g?.on) return;
+    this.globe.holdIdle(false);
+    useStore.getState().setSceneDragging(false);
+  }
   // Leaving the canvas (onto a card/rail) stops pointermoves, so transient hovers would
   // otherwise linger — clear them all at the boundary.
   private onLeave = () => this._clearHover();
@@ -230,6 +268,11 @@ export class Engine {
     this._ptrDown++;
     // A stale eat-flag would swallow the NEXT real click, so every gesture starts clean.
     this._eatClick = false;
+    // The globe-turning drag arms on a SOLO primary press (above); a second pointer ends it.
+    if (this._ptrDown > 1) this._globeDragEnd();
+    else if (VIEW_POLICIES[this.mode].dragTurnsGlobe && (e.pointerType !== "mouse" || e.button === 0) && !this.transition.active()) {
+      this._gDrag = { x: e.clientX, y: e.clientY, on: false };
+    }
     // ── Long-press = touch's hover (domain/tapZoom's LONG_PRESS_MS — its note has the design).
     // Armed only for a SOLO touch; a second finger, travel past the fingertip slop (checked in
     // _handleMove, where the moves arrive) or the release disarms it. On fire it runs the one
@@ -277,6 +320,7 @@ export class Engine {
     this._lpFired = false;
   };
   private onUp = (e: PointerEvent) => {
+    this._globeDragEnd();
     const solo = this._ptrDown === 1; // a pinch's two ups are not two taps
     this._ptrDown = Math.max(0, this._ptrDown - 1);
     this._lpCancel();
@@ -363,6 +407,7 @@ export class Engine {
   // has already cleared the timer and this is correctly a no-op. Only a gesture that really ended
   // leaves a timer standing.
   private _onPointerRelease = () => {
+    this._globeDragEnd(); // a release off the canvas ends the globe drag too
     if (this._dragEndT === undefined) return;
     clearTimeout(this._dragEndT);
     this._dragEndT = undefined;

@@ -459,6 +459,13 @@ a hub's shells) is height-bound. `restOrbit(view)` reads the resting orbit out o
 a resting pose re-tunes the ramp with it, and `RAILS_HIDDEN_DOLLY` stays the one lever — it is what
 "full lean" means, not a second knob.
 
+**In Geography a drag turns the GLOBE, not the camera** (2026-10-19; `domain/globeDrag.ts`,
+`viewPolicy.dragTurnsGlobe`, the geo section of `src/engine/scene/CLAUDE.md`): the view's subjects
+are brought to the front by the globe turning while the camera holds a fixed pose per rung, so the
+free orbit — about a sky point at the node pose — was the one gesture that moved the camera, and
+it read as "counter intuitive" there. The other 3D views keep the orbit: their poses look AT the
+subject (a hub, the chamber), so orbiting is about the thing framed.
+
 ⚠️ **Three's raycaster ignores `object.visible`.** Hiding a group does not stop it being picked — it
 has to be left out of `pickSources`.
 

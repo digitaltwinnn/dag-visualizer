@@ -50,6 +50,19 @@ isolates and dims, refreshes the leaderboard, and rotates the globe so the dense
 selection faces the camera (Y rotation only — north stays up). A metagraph frames deliberately wider
 than the country pose so drilling still reads as a zoom.
 
+**A DRAG TURNS THE GLOBE, NEVER THE CAMERA** (2026-10-19, user: with a node selected "dragging
+across the view feels very counter intuitive … it keeps the globe centre as reference while the
+camera has a very specific position for this layer"). Every rung brings its subject to the front by
+turning the globe (`_aimAt`'s yaw + lean) while the camera flies to a fixed pose, and the free orbit
+was the one gesture still moving the camera — about OrbitControls' look-at, which at the node and
+cohort poses is a composed point in the sky. `viewPolicy.dragTurnsGlobe` switches the orbit off
+for this view and the Engine hands each pointer move to `Globe.turnBy` as the yaw and lean
+`domain/globeDrag.dragTurn` answers: the orbit's own rate at the resting pose (indistinguishable
+from before there), scaled by the altitude above the plateau so the surface keeps the same multiple
+of the finger's travel as the camera closes in. The idle spin waits while the hand is on the globe
+(`holdIdle`), a lean the reader set holds until the next aim or deselect (`_leanHeld`), the wheel
+and the pinch still dolly, and the release picks nothing (`_handleClick`'s travel gate).
+
 **The country drill is a lens, not a filter**: it flies to the country, draws its border, firms the
 land glass and marks the row, but the other nodes stay fully visible, pickable and fanned. The drill is
 shape-driven — the globe spins to the polygon centroid and every country is viewed at the same surface
