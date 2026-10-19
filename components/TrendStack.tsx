@@ -618,6 +618,10 @@ export default function TrendStack() {
                 const target = stepMetric(metric, dir);
                 const Glyph = dir === -1 ? ChevronLeft : ChevronRight;
                 return (
+                  // THE PILL NAMES THE MEASURE IT STEPS TO (user, 2026-10-19: "add a text label to
+                  // indicate that the next/previous chart shows blocks, fees, snapshots …"): chevron
+                  // and word, the word on the inside, so the two edges read "‹ SNAPSHOTS" and
+                  // "FEES ›". An end keeps the dimmed chevron alone — there is nothing to name.
                   <button
                     key={dir}
                     type="button"
@@ -627,14 +631,17 @@ export default function TrendStack() {
                     onPointerUp={(e) => e.stopPropagation()}
                     onClick={(e) => { e.stopPropagation(); stepMeasure(dir); }}
                     className={cn(
-                      "absolute top-1/2 -translate-y-1/2 z-10 inline-flex size-8 touch:size-11 items-center justify-center rounded-full cursor-pointer",
-                      "border border-border bg-[var(--panel-solid)] text-primary-ink",
+                      "absolute top-1/2 -translate-y-1/2 z-10 inline-flex h-8 touch:h-11 min-w-8 touch:min-w-11 items-center justify-center gap-1 rounded-full cursor-pointer",
+                      "border border-border bg-[var(--panel-solid)] text-primary-ink text-label font-semibold uppercase tracking-caps whitespace-nowrap",
                       "hover:bg-wash-soft disabled:opacity-30 disabled:cursor-default disabled:hover:bg-[var(--panel-solid)]",
                       "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
+                      target ? (dir === -1 ? "pl-1.5 pr-3" : "pl-3 pr-1.5") : "px-0",
                       dir === -1 ? "-left-4 touch:-left-5" : "-right-4 touch:-right-5",
                     )}
                   >
-                    <Glyph aria-hidden className="size-5" strokeWidth={2.25} />
+                    {dir === 1 && target && <span>{METRIC_LABELS[target]}</span>}
+                    <Glyph aria-hidden className="size-5 flex-none" strokeWidth={2.25} />
+                    {dir === -1 && target && <span>{METRIC_LABELS[target]}</span>}
                   </button>
                 );
               })}

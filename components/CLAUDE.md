@@ -746,6 +746,14 @@ honest variant naming that fact; but "all" with 0 nodes is boot, so that ghost s
 flashing a false invite. A populated card renders in any 3D view; the ghost only appears where the view
 can actually produce the card.
 
+**A hairline divides the lane from the cards that are not this view's rungs** (user, 2026-10-19 —
+History with a node carried in from Geography: "when a card is not part of the rung, show a
+divider"): a populated card below the lane is a subject the view did not produce, and adjacency
+is the slab's word for containment. Only above PRESENT trailing cards; the trailing ghosts are the
+view's own possibility space. **And the Snapshots explorer's held head is the PIN itself** (same
+day: "put it on the 1st row and directly show x newer") — it froze at the newest tick on screen
+from 2026-10-02; `src/data/ledgerHold.ts`.
+
 **The placeholder views host NO facts cards at all** — `detailsCards` returns `[]` outside the 3D
 views (user, 2026-08-10). A live node card, status pill and real ids beside a `preview · in development`
 wireframe is exactly the mixed signal rule 10 exists to prevent, and it arrived half-formed anyway: with
@@ -1080,7 +1088,8 @@ inline in the return would quietly restore the bug for every consumer at once.
   only works in the vitals selector … so that it's clear the control in vitals is meant for it";
   `TrendChart touchBrush={false}` on a plane, the band's timeline is the one touch range control,
   a horizontal flick anywhere on the card steps the measure, and **‹ › on the front card's side
-  edges step it on every tier**, a carousel's idiom, dimmed at the list's ends): a flick along one
+  edges step it on every tier** — pills that NAME the measure they step to ("‹ SNAPSHOTS", "FEES ›",
+  user 2026-10-19), a dimmed bare chevron at an end): a flick along one
   axis — up/down WALK THE WHOLE STACK (2026-10-18, user: "it should rotate up or down through the
   whole stack"; `planeStep` — one step along the roster from the front, wrapping, whatever card
   the finger was on; the first cut stepped to "the card behind the front", which after a re-deal

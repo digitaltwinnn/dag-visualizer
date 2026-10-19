@@ -758,6 +758,12 @@ export default function Inspector() {
   const trailingGhosts = nonLadder
     .filter((c) => !c.present && c.hint != null)
     .map((c) => <GhostCard key={`${c.id}-ghost`} card={c} {...ghostCx(c.id)} />);
+  // A DIVIDER BEFORE THE CARDS THAT ARE NOT THIS VIEW'S RUNGS (user, 2026-10-19 — History with a
+  // node carried in from another view: "when a card is not part of the rung, show a divider"). A
+  // populated card below the lane is a subject the view did not produce, and adjacency is the
+  // slab's word for containment, so one hairline says the pile ends here. Only above PRESENT
+  // cards: the trailing ghosts are the view's own possibility space.
+  const trailingDivider = trailingPanes.length > 0 ? <div key="trailing-divider" aria-hidden className="h-px flex-none mx-[18px] bg-border" /> : null;
 
 
 
@@ -806,6 +812,7 @@ export default function Inspector() {
   const content = (
     <>
       {ladderLane}
+      {trailingDivider}
       {trailingPanes}
       {trailingGhosts}
     </>
@@ -829,6 +836,7 @@ export default function Inspector() {
         >
           <RailShade>
             {ladderLane}
+            {trailingDivider}
             {trailingPanes}
             {trailingGhosts}
           </RailShade>
