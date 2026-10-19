@@ -181,9 +181,10 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   // ⚠️ …AND IT HOLDS STILL WHILE A TICK IS PINNED (user, 2026-10-02 — `src/data/ledgerHold.ts`).
   // Newest-first, every live tick pushed each row down a place, so a pinned row walked off the
   // page while it was being read; the scene already holds its pinned row at the front. The head
-  // freezes at the newest tick on screen at the moment of the pin, the ticks that arrive meanwhile
-  // are COUNTED rather than listed, and one control on the heading row resumes live. The frozen
-  // head is state derived during render, so it lands in the same commit as the pin.
+  // is the PIN itself since 2026-10-19 (it froze at the newest tick on screen until then): the
+  // pinned tick is row one, as it is the scene's front row, and everything newer — above it at
+  // pin time or arriving after — is COUNTED in the "newer" row that resumes live. The frozen head
+  // is state derived during render, so it lands in the same commit as the pin.
   // A pin the rolling buffer has evicted holds nothing (`heldTicks` lets go there), so the frozen
   // head is released WITH it — kept, a later pin would inherit a stale head and cut the list.
   const pinnedOrd = !following && snap && snaps.some((x) => x.ordinal === snap.data.ordinal) ? snap.data.ordinal : null;
