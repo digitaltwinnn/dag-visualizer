@@ -317,8 +317,13 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
         ? [
             {
               key: "newer",
-              glyph: <LiveDot />,
-              name: <span><span className="tabular-nums">{held.newer}</span> newer</span>,
+              // The mark AFTER the words, as the pin follows the pinned row's ordinal (user, 2026-10-19).
+              name: (
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="tabular-nums">{held.newer}</span> newer
+                  <LiveDot />
+                </span>
+              ),
               hue: "var(--primary)",
               className: "animate-in fade-in slide-in-from-top-2 duration-300 motion-reduce:animate-none",
               onClick: () => applyClickActions(followToggleActions(snap, false)),
