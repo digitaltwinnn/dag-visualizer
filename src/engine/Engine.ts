@@ -2261,8 +2261,8 @@ export class Engine {
       // 0.06 → 0.12 → 0.08 rad/s (user, 2026-09-28, two rounds: "too slow", then "slower the
       // hyper rotation; the node rings can be a bit faster" — the rings' own orbit took the speed,
       // see HyperView's m.orbit): one turn in ~78s.
-      // 0.08 → 0.11 rad/s (user, 2026-10-19: "rotate the nodes/spheres a little bit faster").
-      if (this.filter === "all" && !zoomedIn) this._hyperSpinY += dt * 0.11;
+      // 0.08 rad/s — tried 0.11 on 2026-10-19 and reverted the same hour (user).
+      if (this.filter === "all" && !zoomedIn) this._hyperSpinY += dt * 0.08;
       // Ease the shared structure tilt: near-flat while a metagraph is committed so its discs
       // read horizontal from the plain side-on hub framing (user, 2026-07-17 — the structure
       // moves, not the camera); back to the resting overview tilt otherwise.
