@@ -1832,15 +1832,26 @@
 /* HISTORY'S PLANES DROP IN ONE AFTER ANOTHER (2026-10-18): the layer's `data-on` is the view's
    arrival (TrendStackSync, which also sets `data-deal` for that beat alone — a plane mounting later
    never drops in), and each card falls into its slot a beat after the one in front — the `--slot`
-   React writes is its depth rank. `transform` only: the anchor's matrix3d and the
-   card's own `translate` utility are untouched. The leave stays the layer's fade — the gather
-   choreography carries the exit. */
+   React writes is its depth rank, the stagger paced to the IN phase's node placement so the stack
+   arrives over the same window the other views' nodes do. `transform` only: the anchor's matrix3d
+   and the card's own `translate` utility are untouched. */
 #trend-stack[data-deal="1"] .plane-card {
-  animation: planeDrop var(--tempo-roll) var(--ease-roll) both;
-  animation-delay: calc(var(--slot, 0) * 90ms);
+  animation: planeDrop 0.9s var(--ease-roll) both;
+  animation-delay: calc(var(--slot, 0) * 260ms);
 }
 @keyframes planeDrop { from { opacity: 0; transform: translateY(-22px); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { #trend-stack[data-deal="1"] .plane-card { animation: none; } }
+/* THE LEAVE (2026-10-19): the projector holds the layer (`data-leave="1"`) for the OUT phase while
+   the cards drop out, back of the deck first, and then lets the layer fade (`data-leave="2"`); the
+   cards keep their left state until the next deal removes the attribute. */
+#trend-stack[data-leave="1"] { opacity: 1; }
+#trend-stack[data-leave] .plane-card {
+  animation: planeLeave 0.45s ease-in forwards;
+  animation-delay: max(0ms, calc((4 - var(--slot, 0)) * 120ms));
+}
+@keyframes planeLeave { to { opacity: 0; transform: translateY(26px); } }
+@media (prefers-reduced-motion: reduce) {
+  #trend-stack[data-deal="1"] .plane-card, #trend-stack[data-leave] .plane-card { animation: none; }
+}
 @keyframes cardMaterialize { from { opacity: 0; transform: translateY(5px) scale(0.985); } to { opacity: 1; transform: none; } }
 @theme inline {
   --animate-sheet-in-left:   sheetInLeft   0.28s cubic-bezier(0.22, 1, 0.36, 1);

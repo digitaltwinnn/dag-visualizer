@@ -72,6 +72,7 @@ import { cn } from "@/lib/utils";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
 import { headWord, metricCaption, sharedCeiling, stepMetric, METRIC_LABELS } from "@/src/data/trendSeries";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { DUR_OUT } from "@/src/engine/domain/viewTransition";
 import { swipeIntent, swipeOf } from "@/src/engine/domain/planeSwipe";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import {
@@ -99,6 +100,16 @@ export default function TrendStack() {
   // `mode === "trend"` comparison, which is a deny-list that grows a line per view.
   const mode = useStore((s) => s.mode);
   const on = VIEW_POLICIES[mode].chartStack;
+  // THE LAYER LINGERS THROUGH THE OUT PHASE (user, 2026-10-19: "the leaving animation is still
+  // missing"): unmounted the frame the view changed, the cards had no room to drop out of. It
+  // stays for `DUR_OUT` after the policy turns off — the projector's leave beat places the cards
+  // while they fall (`data-leave`, TrendStackSync) — and only then returns null.
+  const [lingering, setLingering] = useState(on);
+  useEffect(() => {
+    if (on) { setLingering(true); return; }
+    const t = setTimeout(() => setLingering(false), DUR_OUT * 1000 + 50);
+    return () => clearTimeout(t);
+  }, [on]);
   // SUBSCRIBED, not read once: picking a chip in the bar's filter strip must cut the stack under
   // the reader's eyes, exactly as it cuts the document's per-network columns.
   const filter = useStore((s) => s.filter);
@@ -420,7 +431,7 @@ export default function TrendStack() {
     applyClickActions(trendPlaneActions(id, useStore.getState().trendFocus));
   };
 
-  if (!on) return null;
+  if (!on && !lingering) return null;
 
   // A SCOPE WITH NOTHING TO DRAW SAYS SO, IN THE CANVAS CENTRE (2026-09-19). A `dag` or unlisted
   // commit leaves the roster empty, and an empty stage would read as a broken view rather than as
@@ -631,16 +642,18 @@ export default function TrendStack() {
                     onPointerUp={(e) => e.stopPropagation()}
                     onClick={(e) => { e.stopPropagation(); stepMeasure(dir); }}
                     className={cn(
-                      "absolute top-1/2 -translate-y-1/2 z-10 inline-flex h-8 touch:h-11 min-w-8 touch:min-w-11 items-center justify-center gap-1 rounded-full cursor-pointer",
-                      "border border-border bg-[var(--panel-solid)] text-primary-ink text-label font-semibold uppercase tracking-caps whitespace-nowrap",
+                      "absolute top-1/2 -translate-y-1/2 z-10 inline-flex h-7 touch:h-11 min-w-7 touch:min-w-11 items-center justify-center gap-0.5 rounded-full cursor-pointer",
+                      // The word in the label step, plain case (user, 2026-10-19: the caps read "way too
+                      // large" beside the chevron) — a quiet name, not an eyebrow.
+                      "border border-border bg-[var(--panel-solid)] text-primary-ink text-label font-medium whitespace-nowrap",
                       "hover:bg-wash-soft disabled:opacity-30 disabled:cursor-default disabled:hover:bg-[var(--panel-solid)]",
                       "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
-                      target ? (dir === -1 ? "pl-1.5 pr-3" : "pl-3 pr-1.5") : "px-0",
+                      target ? (dir === -1 ? "pl-1 pr-2.5" : "pl-2.5 pr-1") : "px-0",
                       dir === -1 ? "-left-4 touch:-left-5" : "-right-4 touch:-right-5",
                     )}
                   >
                     {dir === 1 && target && <span>{METRIC_LABELS[target]}</span>}
-                    <Glyph aria-hidden className="size-5 flex-none" strokeWidth={2.25} />
+                    <Glyph aria-hidden className="size-4 flex-none" strokeWidth={2.25} />
                     {dir === -1 && target && <span>{METRIC_LABELS[target]}</span>}
                   </button>
                 );
@@ -666,9 +679,10 @@ export default function TrendStack() {
                 // THE CARD NAMES ITS MEASURE, not just its unit — it can be stepped from right here,
                 // so the card has to say what it turned into.
                 unit={caption}
+                heading={METRIC_LABELS[shown]}
                 // PHONE: the card is too narrow for name + measure + reading on one line, so the
                 // measure rides the front plot's caption instead (`unitInPlot`).
-                unitInPlot={fmt === planeFormat(true)}
+                unitInPlot={false}
                 // A finer line: the card is drawn larger than authored, so the chart's own 2px
                 // landed at 2.6 (see `lineWidth`).
                 lineWidth={1.25}

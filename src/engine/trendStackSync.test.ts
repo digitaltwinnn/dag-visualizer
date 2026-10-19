@@ -30,12 +30,14 @@ function fakeHost(opts: { pos?: THREE.Vector3; target?: THREE.Vector3 } = {}) {
   const els = new Map<string, TrendPlaneEl>();
   let active = true;
   let dt = 1 / 60;
+  let clock = 0;
   let root: TrendRootEl | null = { dataset: {}, isConnected: true };
   const host = {
     camera,
     width: () => 1500,
     height: () => 1000,
     dt: () => dt,
+    now: () => clock,
     // Lazily minted, so every id the projector asks for resolves — the Engine's own cache does
     // the same thing against the real DOM.
     plane: (id: string): TrendPlaneEl | null => {
@@ -52,6 +54,7 @@ function fakeHost(opts: { pos?: THREE.Vector3; target?: THREE.Vector3 } = {}) {
     get root() { return root; },
     setActive: (v: boolean) => { active = v; },
     setDt: (v: number) => { dt = v; },
+    advance: (ms: number) => { clock += ms; },
     /** React's remount, as the projector sees it: the old node detaches, a fresh one arrives. */
     remountRoot: () => {
       if (root) root.isConnected = false;
@@ -217,8 +220,21 @@ describe("TrendStackSync", () => {
     expect(h.root!.dataset.on).toBe("1");
     h.setActive(false);
     sync.sync(state());
+    // THE LEAVE BEAT (2026-10-19): told off at once, but held and still placed for the OUT phase
+    // while the cards drop out (`data-leave="1"`); hidden once the beat is over (`"2"`).
     expect(h.root!.dataset.on).toBe("0");
+    expect(h.root!.dataset.leave).toBe("1");
+    expect(h.els.get("a")!.style.visibility).not.toBe("hidden");
+    h.advance(1000);
+    sync.sync(state());
+    expect(h.root!.dataset.leave).toBe("2");
     expect(h.els.get("a")!.style.visibility).toBe("hidden");
+    // Back on: the leave mark goes, the deal plays.
+    h.setActive(true);
+    sync.sync(state());
+    expect(h.root!.dataset.on).toBe("1");
+    expect(h.root!.dataset.leave).toBeUndefined();
+    expect(h.root!.dataset.deal).toBe("1");
   });
 
   it("re-announces onto a root that REMOUNTED while the view stayed live", () => {

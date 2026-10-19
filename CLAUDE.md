@@ -234,7 +234,7 @@ Gotchas worth knowing before you burn time on them:
   inspect mid-flight states.
 - ⚠️ **Every scene clock is FRAME-driven off a `dt` clamped to 0.05s, so a slow renderer stretches it
   in WALL-CLOCK time** — and the HUD, being React, does not ride that clock. Below 20 FPS the clamp
-  bites and the ~3.9s view choreography takes `3.9 / 0.05 / fps` seconds: at SwiftShader's 2–6 FPS,
+  bites and the ~3.3s view choreography takes `3.3 / 0.05 / fps` seconds: at SwiftShader's 2–6 FPS,
   13–40s. So a headless screenshot taken 15s after a view switch catches the transition still
   running, and the panels beside it are already populated — **a bare ledger floor next to an explorer
   full of measured ticks is the renderer, not the feed** (chased as a data bug for most of a session,
