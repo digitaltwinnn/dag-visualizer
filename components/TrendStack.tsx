@@ -76,7 +76,7 @@ import { DUR_OUT } from "@/src/engine/domain/viewTransition";
 import { swipeIntent, swipeOf } from "@/src/engine/domain/planeSwipe";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import {
-  frontPlane, MORE_ID, moreCount, morePose, planeFormat, stackPoses } from "@/src/engine/domain/trendStack";
+  frontPlane, MORE_ID, moreCount, morePose, planeFormat, stackPoses, VISIBLE_PLANES } from "@/src/engine/domain/trendStack";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -514,8 +514,10 @@ export default function TrendStack() {
           style={{ opacity: more.opacity, zIndex: Math.round(100 + more.z) }}
         >
           <div
-            className="absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border p-2 [background:linear-gradient(var(--panel-solid),var(--panel-solid)),var(--scene-ground)]"
-            style={{ width: fmt.pxW, height: fmt.pxH }}
+            // `plane-card` + the slot behind the deck: the "N more" card deals in and drops out with
+            // the others (user, 2026-10-19: it "does not play along").
+            className="plane-card absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border p-2 [background:linear-gradient(var(--panel-solid),var(--panel-solid)),var(--scene-ground)]"
+            style={{ ["--slot" as string]: VISIBLE_PLANES, width: fmt.pxW, height: fmt.pxH }}
           >
             <div className="px-2 py-1 text-label text-muted-foreground select-none">
               {behind} more
@@ -649,7 +651,7 @@ export default function TrendStack() {
                       "hover:bg-wash-soft disabled:opacity-30 disabled:cursor-default disabled:hover:bg-[var(--panel-solid)]",
                       "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
                       target ? (dir === -1 ? "pl-1 pr-2.5" : "pl-2.5 pr-1") : "px-0",
-                      dir === -1 ? "-left-4 touch:-left-5" : "-right-4 touch:-right-5",
+                      dir === -1 ? "-left-4 touch:-left-3" : "-right-4 touch:-right-3",
                     )}
                   >
                     {dir === 1 && target && <span>{METRIC_LABELS[target]}</span>}

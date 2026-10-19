@@ -240,6 +240,11 @@ export function planeFormat(phone: boolean): PlaneFormat {
  *  the card's left edge 11px off the canvas, because the global aspect lever is a √ compromise for
  *  3D volumes and a card has an exact pixel width (user, 2026-09-26). */
 export const PLANE_FIT = 0.92;
+/** The railed tiers' fit (user, 2026-10-19: "give the trend scene a bit more space so the ‹ › don't
+ *  overlap the rail cards on a laptop"): the measure pills hang 16px outside the card, so the card
+ *  leaves room for them and a little air before the rail cards' edges. The phone keeps `PLANE_FIT`
+ *  — its card is drawn at scale 1 so the type is the type (`planeFormat`). */
+export const PLANE_FIT_RAILED = 0.88;
 
 /** The camera DISTANCE (along the view axis, to the front card's depth) at which the front card
  *  spans `PLANE_FIT` of `freeWidthPx`. The projector's own expression, inverted: a card
@@ -251,7 +256,7 @@ export const PLANE_FIT = 0.92;
  *  width is a known number. */
 export function fitDistance(freeWidthPx: number, viewHeightPx: number, fovDeg: number, phone = false): number {
   const pxPerUnitAt1 = Math.max(1, viewHeightPx) / (2 * Math.tan((fovDeg * Math.PI) / 360));
-  const byWidth = (PLANE_WORLD_W * pxPerUnitAt1) / (PLANE_FIT * Math.max(1, freeWidthPx));
+  const byWidth = (PLANE_WORLD_W * pxPerUnitAt1) / ((phone ? PLANE_FIT : PLANE_FIT_RAILED) * Math.max(1, freeWidthPx));
   // The card's own height for this tier — the phone card is squarer (`planeFormat`).
   const byHeight = (planeFormat(phone).worldH * pxPerUnitAt1) / (CARD_FIT_H * Math.max(1, viewHeightPx));
   return Math.max(byWidth, byHeight);

@@ -527,7 +527,7 @@ export default function TrendChart({
             {!compact && peak && (
               <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap">
                 <span className="text-label text-muted-foreground">{peak.word}</span>
-                <span className="text-label font-medium text-foreground tabular-nums">{format(peak.value)}</span>
+                <span className="text-label text-foreground-dim tabular-nums">{format(peak.value)}</span>
               </span>
             )}
             <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap">
@@ -542,7 +542,10 @@ export default function TrendChart({
             <span className="text-label text-muted-foreground">
               {readout ? readout.word : `latest full ${stepMs >= 86400000 ? "day" : stepMs >= 3600000 ? "hour" : "5 min"}`}
             </span>
-            <span className="text-label font-medium text-foreground tabular-nums">
+            {/* Additional information, not a title (user, 2026-10-19: "not so prominent"): the dim
+                ink at regular weight — the scale has no smaller step than the label, so weight and
+                ink carry the hierarchy. */}
+            <span className="text-label text-foreground-dim tabular-nums">
               {readout ? (readout.value != null ? format(readout.value) : readout.pending === false ? "—" : <NodeStars count={3} />) : format(last)}
             </span>
             </span>

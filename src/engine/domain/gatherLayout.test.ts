@@ -344,11 +344,11 @@ describe("spare width has nowhere to go but the shape", () => {
 });
 
 describe("railGapShiftPx — where the gap between the rails is centred", () => {
-  it("sits LEFT of the screen centre, by half the rails' width difference", () => {
+  it("sits ON the screen centre since the rails became one width (2026-10-18) — half of a zero difference", () => {
     // --rail-w 264 against --detail-w 320: the right rail reaches 56px further in, so the gap's
     // centre is 28px left. A subject standing alone in the gap centres THERE.
-    expect(railGapShiftPx(1500, false)).toBe(-28);
-    expect(railGapShiftPx(1100, false)).toBe(-28);
+    expect(railGapShiftPx(1500, false)).toBe(0);
+    expect(railGapShiftPx(1100, false)).toBe(0);
   });
 
   it("is ZERO wherever the rails are not inline columns", () => {
@@ -359,8 +359,8 @@ describe("railGapShiftPx — where the gap between the rails is centred", () => 
 });
 
 describe("railGapPx — the width of the free band a card is fitted to", () => {
-  it("is the viewport less both inline rails and their gutters (1500 → 864, measured live 2026-09-26)", () => {
-    expect(railGapPx(1500, false)).toBe(864);
+  it("is the viewport less both inline rails and their gutters (1500 → 808 with two 320px rails; 864 while the left was 264)", () => {
+    expect(railGapPx(1500, false)).toBe(808);
   });
 
   it("is the whole viewport where the rails are hidden or are sheets (below the rails tier)", () => {
@@ -369,19 +369,19 @@ describe("railGapPx — the width of the free band a card is fitted to", () => {
     expect(railGapPx(390, false)).toBe(390);
   });
 
-  it("agrees with railGapShiftPx about whether there is a gap at all", () => {
-    for (const w of [390, 700, 1099, 1100, 1500]) {
-      const railed = railGapPx(w, false) !== w;
-      expect(railGapShiftPx(w, false) !== 0).toBe(railed);
-    }
+  it("is narrower than the viewport exactly where the rails are inline columns", () => {
+    // (It used to be checked against `railGapShiftPx` being non-zero; with equal rails the shift
+    // is zero everywhere, so the gap's own predicate is the one to test.)
+    for (const w of [390, 700, 1099]) expect(railGapPx(w, false)).toBe(w);
+    for (const w of [1100, 1500]) expect(railGapPx(w, false)).toBeLessThan(w);
   });
 });
 
 describe("the rail mirror is fluid", () => {
   it("the free gap narrows with the rails on a wide screen", () => {
-    // 2560: rails clamp to 340 + 400, gutters 26 each side.
-    expect(railGapPx(2560, false)).toBe(2560 - 52 - 340 - 400);
-    // 1440: both rails at their floors.
-    expect(railGapPx(1440, false)).toBe(1440 - 52 - 264 - 320);
+    // 2560: both rails clamp to 400, gutters 26 each side.
+    expect(railGapPx(2560, false)).toBe(2560 - 52 - 400 - 400);
+    // 1440: both rails at their 320 floor.
+    expect(railGapPx(1440, false)).toBe(1440 - 52 - 320 - 320);
   });
 });

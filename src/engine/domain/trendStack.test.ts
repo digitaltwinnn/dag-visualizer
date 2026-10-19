@@ -36,6 +36,7 @@ import {
   fitDistance,
   planeFormat,
   PLANE_FIT,
+  PLANE_FIT_RAILED,
   CARD_FIT_H,
 } from "./trendStack";
 
@@ -589,17 +590,20 @@ describe("fitDistance — the front card spans PLANE_FIT of the free band", () =
   const pxPerUnitAt1 = (h: number) => h / (2 * Math.tan((FOV * Math.PI) / 360));
   const cardPx = (d: number, h: number) => (PLANE_WORLD_W * pxPerUnitAt1(h)) / d;
 
-  it("is the projector's expression inverted: at the answered distance the card is exactly PLANE_FIT × free width", () => {
+  it("is the projector's expression inverted: at the answered distance the card is exactly the tier's fit × free width", () => {
     for (const [free, h] of [[864, 1000], [820, 1180], [390, 844]] as const) {
       const d = fitDistance(free, h, FOV);
-      expect(cardPx(d, h)).toBeCloseTo(PLANE_FIT * free, 6);
+      expect(cardPx(d, h)).toBeCloseTo(PLANE_FIT_RAILED * free, 6);
     }
+    // The phone keeps the tighter fit — its card is drawn at scale 1.
+    expect(cardPx(fitDistance(390, 844, FOV, true), 844)).toBeCloseTo(PLANE_FIT * 390, 6);
   });
 
-  it("reproduces the desktop pose the user tuned by eye (798px of an 864px gap at 1500×1000)", () => {
+  it("reproduces the desktop pose the user tuned by eye — 798px of an 864px gap at 1500×1000 until 2026-10-19, 760 since (PLANE_FIT_RAILED, air for the edge pills)", () => {
     const d = fitDistance(864, 1000, FOV);
-    expect(cardPx(d, 1000)).toBeGreaterThan(790);
-    expect(cardPx(d, 1000)).toBeLessThan(806);
+    expect(cardPx(d, 1000)).toBeGreaterThan(752);
+    expect(cardPx(d, 1000)).toBeLessThan(768);
+    expect(PLANE_FIT_RAILED).toBeLessThan(PLANE_FIT);
   });
 
   it("scales with height over width — a portrait canvas stands the camera further back, a wider band closer", () => {
@@ -616,10 +620,10 @@ describe("fitDistance — the front card spans PLANE_FIT of the free band", () =
     const d = fitDistance(1028, 606, FOV);
     const cardH = (PLANE_WORLD_H * pxPerUnitAt1(606)) / d;
     expect(cardH).toBeCloseTo(CARD_FIT_H * 606, 6);
-    expect(cardPx(d, 606)).toBeLessThan(PLANE_FIT * 1028);
+    expect(cardPx(d, 606)).toBeLessThan(PLANE_FIT_RAILED * 1028);
     // And inert on the tuned desktop pose: the width fit still decides there.
     const dd = fitDistance(864, 1000, FOV);
-    expect(cardPx(dd, 1000)).toBeCloseTo(PLANE_FIT * 864, 6);
+    expect(cardPx(dd, 1000)).toBeCloseTo(PLANE_FIT_RAILED * 864, 6);
     expect((PLANE_WORLD_H * pxPerUnitAt1(1000)) / dd).toBeLessThan(CARD_FIT_H * 1000);
   });
 
