@@ -299,7 +299,7 @@ export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key
 /** The ring alone — the number that totals it is `DonutTotal`'s, standing outside at headline
  *  size. Segment opacities come from DONUT_STEPS in entry order, which is also the order the
  *  bar rows beside it are built in — order and label are what key a slice to its row. */
-export function Donut({ counts, accent, hues }: { counts: Record<string, number>; accent: string; hues?: Record<string, string> }) {
+function Donut({ counts, accent, hues }: { counts: Record<string, number>; accent: string; hues?: Record<string, string> }) {
   // ⚠️ ENTRY ORDER, NEVER SORTED BY SIZE — and the ring is only half the reason. Sorting was
   // tried on 2026-09-01 and withdrawn the same minute: "it does not make sense for structural
   // items like metagraph type and composition; it will look strange when they switch when swiping
@@ -359,7 +359,7 @@ export function DonutTotal({ counts, accent, total, className, hues }: { counts:
           the ring's 44px is what the breakdown's labels need. The total and its named rows stay —
           the ring was the redundant encoding of the three. */}
       <span className="contents min-[700px]:max-[1100px]:hidden"><Donut counts={counts} accent={accent} hues={hues} /></span>
-      <span className="font-mono font-bold text-xl text-foreground tabular-nums leading-none">
+      <span className="font-mono font-bold text-figure text-foreground tabular-nums leading-none">
         <Odometer int value={total || null} />
       </span>
     </span>

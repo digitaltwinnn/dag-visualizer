@@ -1221,7 +1221,8 @@ no aliases**, and component code doesn't re-derive paddings, radii or cyan tints
 mirrors the thread literals in code because an SVG stroke attribute can't resolve `var()` — keep the
 two in sync.
 
-**The HUD type scale is THREE steps, FLUID, plus the documents' prose step** (2026-10-02, two
+**The HUD type scale is THREE steps, FLUID, plus the FIGURE step for the vitals band's headline
+numbers (`text-figure`, 2026-10-19 — it was a static `text-xl`) and the documents' prose step** (2026-10-02, two
 rounds: "the fonts are tiny while there is a lot of empty space", then "the filter text is still
 smaller"). `--text-label/body/title` are `clamp()`s — 12/14/16 hold to a 1440px viewport, a linear
 ramp lands at 13.5/16/18.5 by 2560px — at least 2px apart, because the retired `micro` step sat
