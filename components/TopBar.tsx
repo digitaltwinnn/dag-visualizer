@@ -151,6 +151,10 @@ export default function TopBar() {
   // exist, and neither reads as a control). Two real steps through the same `stepView` the swipe
   // runs, clamped at the ends (a dimmed chevron, never a vanishing one — the plank's rule), hidden
   // from 700px up where the segmented switch names every view. `dir` is the finger's: −1 = ‹.
+  // WHERE THE NAME ARRIVES FROM (user, 2026-10-19: "the text has the odometer effect while here it
+  // should animate horizontally"): a › press or a leftward swipe brings the next view's name in
+  // from the right, ‹ from the left; a pick from the list keeps the roll-in.
+  const [faceFrom, setFaceFrom] = useState<"left" | "right" | null>(null);
   const viewChevron = (dir: -1 | 1) => {
     const target = stepView(LISTED_IDS, mode, dir === -1 ? 1 : -1);
     const name = target ? VIEWS.find((v) => v.id === target)?.name : null;
@@ -160,7 +164,7 @@ export default function TopBar() {
         type="button"
         disabled={!target || !!doc}
         aria-label={name ? `${name} view` : dir === -1 ? "First view" : "Last view"}
-        onClick={() => { if (target) { setStrip(null); setMode(target); } }}
+        onClick={() => { if (target) { setStrip(null); setFaceFrom(dir === 1 ? "right" : "left"); setMode(target); } }}
         className={cn(
           "hidden max-[700px]:inline-flex items-center justify-center size-11 rounded-btn bg-transparent border-0 cursor-pointer",
           // In the ACCENT (user, 2026-10-18: muted they "look a bit boring/blend"): a control that
@@ -189,6 +193,7 @@ export default function TopBar() {
     const next = stepView(LISTED_IDS, mode, dir);
     if (next) {
       setStrip(null);
+      setFaceFrom(dir === -1 ? "right" : "left");
       setMode(next);
     }
   };
@@ -438,7 +443,13 @@ export default function TopBar() {
               The 2026-09-28 "VIEW" word went with it: it named the control's role because the
               centred cell had 74px, and A1 freed the room by moving About out of the bar. */}
           <span className="flex flex-col items-center gap-[3px]">
-            <span key={doc ?? mode} className="roll-in flex items-center gap-1.5">
+            <span
+              key={doc ?? mode}
+              className={cn(
+                "flex items-center gap-1.5",
+                faceFrom ? cn("animate-in fade-in duration-300 motion-reduce:animate-none", faceFrom === "right" ? "slide-in-from-right-4" : "slide-in-from-left-4") : "roll-in",
+              )}
+            >
               {(() => {
                 const Icon = VIEW_ICONS[mode];
                 return <Icon aria-hidden className="size-4 flex-none text-primary" />;
@@ -446,7 +457,9 @@ export default function TopBar() {
               {/* While a DOC covers the scene the face names the DOC (the review's find, 2026-10-08):
                   the hanging caption that used to say so stands down on the phone, so the bar is the
                   one place left to name what is on screen. */}
-              <span className={cn("text-body font-semibold leading-none", strip === "views" ? "text-primary-ink" : "text-foreground")}>
+              {/* One step up to the title size (user, 2026-10-19: "a bit larger font?") — on the phone
+                  this name is the only thing saying what is on screen. */}
+              <span className={cn("text-title font-semibold leading-none", strip === "views" ? "text-primary-ink" : "text-foreground")}>
                 {doc ? DOC_PAGES[doc].label : VIEWS.find((v) => v.id === mode)?.name}
               </span>
             </span>
@@ -580,7 +593,7 @@ export default function TopBar() {
             {shownStrip === "pulse" ? (
               <PulseStrip />
             ) : shownStrip === "views" ? (
-              <ViewPicker onPicked={() => setStrip(null)} />
+              <ViewPicker onPicked={() => { setFaceFrom(null); setStrip(null); }} />
             ) : shownStrip === "about" ? (
               <AboutStrip onClose={() => setStrip(null)} />
             ) : (
