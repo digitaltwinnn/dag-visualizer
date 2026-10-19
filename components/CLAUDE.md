@@ -38,7 +38,16 @@ and a plate on a plate flattens them.
 add a dropdown for global snapshot? If also filter on metagraph is selected show only those that
 are applicable"): newest first with its age, and under a scope only the ticks that network
 anchored into (`snapsAtTick`), so a pick is never a miss; a pick runs the search at once
-(`seekTick(ordinal)`). The typed field stays for any ordinal in the chain.
+(`seekTick(ordinal)`). The typed field stays for any ordinal in the chain. **Both ordinal fields carry one
+`RecentMenu`** (2026-10-19, user: the first trigger "is smaller than the text box it relates to
+and hover is standard"): the trigger stretches to the field's height and joins its right edge, the
+rows wear the explorer's wash on hover, and under a scope the Metagraph field lists that chain's
+recent snapshots too (`snapshotOptions`). **The applied chips name their record kind** — "Global
+snapshot: N", "Metagraph snapshot: DOR N" (same day: "'in global' → 'global snapshot:'").
+**An EARLIER chain says what it is above the table** (same day — the words beside the Current |
+Earlier toggle went back off): the explorer's hint plate, "A previous registration of BIOFI, Sep
+2026 — a chain of its own, with its own snapshot numbers.", only while an earlier chain is paged.
+The signer roster's second line reads "other layer's key c9a1…" (was "signed as").
 
 ⚠️ **ONE BUTTON, AND ALL THREE CRITERIA VISIBLE.** A submit beside every field was rejected ("I want
 a search button"), and so was a "search by" chooser that hid two criteria to make one button
@@ -176,7 +185,9 @@ footer's About link is their one door. One state survives on the trigger by rule
 network CODE in the live accent off mainnet — "which chain am I looking at" never goes missing.
 One mount at every width; the filter strip's second row, the trio's old phone home, retired with it). The bar has **one grow-downward slot with four tenants** (a which-strip enum makes
 them mutually exclusive by construction): the FILTER button opens the network-chip strip (hovering
-previews the dim, picking closes it), **on phone the view switch is ONE face — the current view's
+previews the dim, picking closes it), **The phone face's name is a step up (title size) and SLIDES SIDEWAYS on a ‹ › press or a swipe**
+(user, 2026-10-19: "the text has the odometer effect while here it should animate horizontally") —
+`faceFrom` in TopBar; a pick from the list keeps the roll-in. **on phone the view switch is ONE face — the current view's
 icon and name, FLANKED BY ‹ › since 2026-10-18 (Vercel analytics: three quarters of visitors on a
 phone and most never leaving "/"; the swipe and the pip row were the only hints that other views
 exist, and neither reads as a control — the chevrons step through the same `stepView`, dimmed at
@@ -242,7 +253,8 @@ decisions inside them are design, not detail:
   (`src/data/ledgerPath.ts`). The LIVE/PINNED
   control rides the CARD HEAD's eyebrow row with the shown snapshot's ticking age (2026-09-28 —
   it rode the heading row as the level's setting, design decision 15, until then), and the pager
-  states the TIME the rows span ("last 11 min") rather than "52 recent". **The ticks that arrived
+  states the TIME the rows span ("last 11 min cache" — the word "cache" joined it on 2026-10-19 at
+  the user's ask) rather than "52 recent". **The ticks that arrived
   behind a pin are the list's FIRST ROW** (user, 2026-10-18: "fits better as the top row inside
   the explorer, similar to the scene, which animates the extra thin bar at the front when new
   snapshots arrive"): a live-dot row, "12 newer", sliding in from the top (`ExplorerRowSpec.
@@ -344,7 +356,12 @@ dossier, country, provider, composition, then the snapshot chain (global snapsho
 snapshot it anchors), then node. `components/railCards.ts` is the manifest and
 `components/railCards.test.ts` pins the order, the availability and every hint.
 
-**History ARRIVES as a deal and a swiped measure rolls SIDEWAYS** (2026-10-18): each plane card
+**History ARRIVES as a deal, LEAVES as one, and a swiped measure rolls SIDEWAYS** (2026-10-18/19,
+user: the entry "looks faster than the other views" and "the leaving animation is still
+missing"): the stack rides the choreography's own clock — the deal is paced to the IN phase's node
+placement (260ms a slot, `DEAL_MS` in TrendStackSync), and on a switch away the layer LINGERS for
+`DUR_OUT` (TrendStack) while the projector keeps placing the cards and they drop out back-of-deck
+first (`data-leave="1"` holds the layer, `"2"` lets it fade; the next deal clears it). Originally: each plane card
 falls into its slot a beat after the one in front (`planeDrop` in globals.css, keyed off the
 layer's `data-on`, staggered by the depth rank React writes as `--slot` — `transform` only, so the
 anchor's matrix and the card's own `translate` are untouched; the leave stays the layer's fade),
@@ -374,6 +391,12 @@ route, and a machine on two networks — UP's nodes also validate the DAG — pa
 (`siblingSet("context")`, "This node's networks": each step is the same node select the row's
 click runs, so the place and provider are re-committed and the filter untouched). Hypergraph
 needs nothing: its node commits the filter by policy.
+
+**The plane's head is NETWORK · MEASURE · READINGS** (user, 2026-10-19): the network at the left,
+the measure's name centred as the card's title (`TrendChart heading` — the unit caption and the
+plot's "peak" corner went), and at the right the peak beside the daily average in one label-then-
+value group ("make one visually designed place and keep them together"). The ‹ › pills say their
+word in the plain label step, not caps (the caps read "way too large").
 
 **The Range card's next ghost opens the first bucket of the SPAN it stands on — the brushed range,
 else the window's** (user, 2026-10-18: "with a range the Moment card does not open the first
