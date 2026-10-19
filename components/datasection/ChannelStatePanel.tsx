@@ -358,9 +358,9 @@ const SIGNER_PAGE = 10; // rows per page (user, 2026-10-18: "make it 10 per page
  *  on a normal snapshot both held the same three nodes beside a signer id that was the node id's
  *  first 8 characters. Now: a row per node, a column per LAYER in production order (dL1 then L0,
  *  their codes from SIGNER_GROUPS, the one home), a check where that node signed
- *  and a dash where it did not — one mark style, the column heads are the key. The signer id
- *  survives only where it is news: a hybrid that signed with a key its node id does not repeat
- *  says "signed as …" under its id (`signerRoster.otherKeys`). */
+ *  and a dash where it did not — one mark style, the column heads are the key. The row is the
+ *  NODE ID alone (user, 2026-10-19: "what 'key'? … just show the node id"): a hybrid's dL1 signing
+ *  key is not shown under it — `signerRoster`'s note says why. */
 function SignerRoster({ dataIds, proofIds, metaId, selNodes }: { dataIds: string[]; proofIds: string[]; metaId: string; selNodes: NodeRow[] }) {
   const rows = useMemo(() => signerRoster(selNodes, metaId, dataIds, proofIds), [selNodes, metaId, dataIds, proofIds]);
   const [page, setPage] = useState(1);
@@ -395,14 +395,6 @@ function SignerRoster({ dataIds, proofIds, metaId, selNodes }: { dataIds: string
                     <span className="group/copy flex items-center gap-1.5 min-w-0">
                       <span className="min-w-0 flex flex-col">
                         <span className="font-mono truncate">{id ? shortHash(id) : r.res.row.label}</span>
-                        {r.otherKeys.length > 0 && (
-                          // A peer id belongs to a LAYER (app/api/CLAUDE.md): a hybrid signs one layer
-                          // with a key its node id does not repeat. Said as what it is (user,
-                          // 2026-10-19: "what does 'signed as c9a1bdca' mean?").
-                          <span className="text-muted-foreground truncate">
-                            other layer&apos;s key <span className="font-mono">{r.otherKeys.join(", ")}</span>
-                          </span>
-                        )}
                       </span>
                       {id && <CopyButton value={id} subject="node id" />}
                     </span>

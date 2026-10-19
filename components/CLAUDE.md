@@ -47,7 +47,10 @@ snapshot: N", "Metagraph snapshot: DOR N" (same day: "'in global' → 'global sn
 **An EARLIER chain says what it is above the table** (same day — the words beside the Current |
 Earlier toggle went back off): the explorer's hint plate, "A previous registration of BIOFI, Sep
 2026 — a chain of its own, with its own snapshot numbers.", only while an earlier chain is paged.
-The signer roster's second line reads "other layer's key c9a1…" (was "signed as").
+**The signer roster's row is the NODE ID alone** (2026-10-19, two rounds: "signed as c9a1…" became
+"other layer's key c9a1…" in the morning, and by noon "what 'key'? … just show the node id"): a peer
+id belongs to a LAYER, the app's node id is the L0 layer's, and a hybrid's dL1 signing key under it
+read as a second identity — `signerRoster`'s note in `src/data/network.ts` says why it is gone.
 
 ⚠️ **ONE BUTTON, AND ALL THREE CRITERIA VISIBLE.** A submit beside every field was rejected ("I want
 a search button"), and so was a "search by" chooser that hid two criteria to make one button
