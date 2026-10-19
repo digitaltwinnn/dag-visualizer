@@ -30,8 +30,8 @@ import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
 import { liveArrivals } from "./domain/arrivals";
 import { SHEET_SHIFT_K, chromeShiftPx, sheetShiftPx } from "./domain/sheetShift";
 import { ChromeBounds } from "./ChromeBounds";
-import { FOCI, nodeFraming, cohortFraming, ledgerCommitTilt, trendFocusPush, trendFit, restOrbit } from "./domain/cameraRig";
-import { dragTurn, isDrag } from "./domain/globeDrag";
+import { FOCI, nodeFraming, cohortFraming, ledgerCommitTilt, trendFocusPush, trendFit } from "./domain/cameraRig";
+import { isDrag, orbitAbout, orbitAllowed, orbitAngles } from "./domain/subjectOrbit";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { ledgerNetwork } from "./domain/tickNet";
@@ -220,14 +220,20 @@ export class Engine {
     this._globeDragMove(e);
     this._handleMove(e);
   };
-  // ── A DRAG TURNS THE GLOBE (domain/globeDrag.ts has the design; viewPolicy.dragTurnsGlobe the
-  // gate). OrbitControls' rotate is OFF in that view, so the one-pointer drag is this: armed on
-  // a solo press, a drag once it travels past the slop, each move's delta handed to the Globe as
-  // a yaw + lean at the altitude's rate. The camera never moves, so `_freeOrbit` is untouched; the
-  // store's `sceneDragging` and the hint's cause ride it exactly as the orbit's did (the motion
-  // dim, the hint), and `_handleClick`'s travel gate keeps the release from picking. A second
-  // pointer is a pinch and ends it; OrbitControls still dollies the pinch and the wheel.
+  // ── A DRAG ORBITS THE SUBJECT (domain/subjectOrbit.ts has the design; viewPolicy
+  // .dragOrbitsSubject the gate). OrbitControls' rotate is OFF in that view, so the one-pointer
+  // drag is this: armed on a solo press while no flight runs, a drag once it travels past the
+  // slop, each move's delta a rigid turn of the camera's (pos, target) pair about the committed
+  // subject's own position — the node's chip, the cohort's centroid, the country's — else the
+  // globe centre. The pair moves as OrbitControls would move it, so `_freeOrbit` claims the camera
+  // exactly as its `start` did, `sceneDragging` and the hint's cause ride it, and `_handleClick`'s
+  // travel gate keeps the release from picking. A second pointer is a pinch and ends it;
+  // OrbitControls still dollies the pinch and the wheel toward the (moved) target.
   private _gDrag: { x: number; y: number; on: boolean } | null = null;
+  private readonly _pivot = new THREE.Vector3();
+  private readonly _oPos = new THREE.Vector3();
+  private readonly _oTgt = new THREE.Vector3();
+  private _ccPivot: { cc: string; ok: boolean; dir: THREE.Vector3 } = { cc: "", ok: false, dir: new THREE.Vector3() };
   private _globeDragMove(e: MouseEvent): void {
     const g = this._gDrag;
     if (!g) return;
@@ -235,15 +241,20 @@ export class Engine {
     if (!g.on) {
       if (!isDrag(e.clientX - this._downX, e.clientY - this._downY)) return;
       g.on = true;
-      this.globe.holdIdle(true);
+      this._freeOrbit = true; // the hand holds the camera (the SCENE⇄HUD toggle then leaves it)
       const st = useStore.getState();
       if (!st.sceneDragging) {
         st.setSceneDragging(true);
         st.setMotionCause({ kind: "orbit" });
       }
     }
-    const t = dragTurn(e.clientX - g.x, e.clientY - g.y, this.canvas.clientHeight, this.ctx.camera.position.length(), restOrbit("geo"));
-    this.globe.turnBy(t.yaw, t.lean);
+    this._dragPivot(this._pivot);
+    const cam = this.ctx.camera, tgt = this.ctx.controls.target;
+    orbitAbout(cam.position, tgt, this._pivot, orbitAngles(e.clientX - g.x, e.clientY - g.y, this.canvas.clientHeight), this._oPos, this._oTgt);
+    if (orbitAllowed(this._oPos, this._oTgt, VIEW_POLICIES[this.mode].minCamAlt)) {
+      cam.position.copy(this._oPos);
+      tgt.copy(this._oTgt);
+    }
     g.x = e.clientX;
     g.y = e.clientY;
   }
@@ -251,8 +262,24 @@ export class Engine {
     const g = this._gDrag;
     this._gDrag = null;
     if (!g?.on) return;
-    this.globe.holdIdle(false);
     useStore.getState().setSceneDragging(false);
+  }
+  /** The drag's pivot, in WORLD space: the finest committed subject's own anchor — the same
+   *  resolution the subject callout points at — else the globe centre. */
+  private _dragPivot(out: THREE.Vector3): void {
+    const st = useStore.getState();
+    const p = st.inspect;
+    const lift = GEO_R + LAND_H;
+    let ok = false;
+    if (p && "geo" in p && this.globe.selectedNodeAnchor(out)) ok = true;
+    else if (st.cohort && this.globe.cohortAnchorDir) { out.copy(this.globe.cohortAnchorDir).multiplyScalar(lift); ok = true; }
+    else if (this.country != null) {
+      const c = this._ccPivot;
+      if (c.cc !== this.country) { c.cc = this.country; c.ok = this.globe.countryAnchorDir(this.country, c.dir); } // event-time
+      if (c.ok) { out.copy(c.dir).multiplyScalar(lift); ok = true; }
+    }
+    if (!ok) { out.set(0, 0, 0); return; }
+    this.globe.group.localToWorld(out); // the globe's aim, read for a gesture's pivot. render-state OK
   }
   // Leaving the canvas (onto a card/rail) stops pointermoves, so transient hovers would
   // otherwise linger — clear them all at the boundary.
@@ -268,9 +295,9 @@ export class Engine {
     this._ptrDown++;
     // A stale eat-flag would swallow the NEXT real click, so every gesture starts clean.
     this._eatClick = false;
-    // The globe-turning drag arms on a SOLO primary press (above); a second pointer ends it.
+    // The subject orbit arms on a SOLO primary press (above); a second pointer ends it.
     if (this._ptrDown > 1) this._globeDragEnd();
-    else if (VIEW_POLICIES[this.mode].dragTurnsGlobe && (e.pointerType !== "mouse" || e.button === 0) && !this.transition.active()) {
+    else if (VIEW_POLICIES[this.mode].dragOrbitsSubject && (e.pointerType !== "mouse" || e.button === 0) && !this.transition.active() && !this.cam.flying) {
       this._gDrag = { x: e.clientX, y: e.clientY, on: false };
     }
     // ── Long-press = touch's hover (domain/tapZoom's LONG_PRESS_MS — its note has the design).

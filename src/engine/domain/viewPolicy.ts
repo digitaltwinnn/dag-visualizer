@@ -72,13 +72,13 @@ export interface ViewPolicy {
   // coming to the front — is already the focus RE-DEAL. Zoom stays (a dolly toward the front
   // card, the pose's target). A BOUNDED orbit (±35° / ±11°) was built and removed the same day.
   rotate: boolean;
-  // Does a one-pointer drag TURN THE GLOBE instead of orbiting the camera? (2026-10-19,
-  // `domain/globeDrag.ts` has the design.) Geography's subjects are brought to the front by the
-  // globe turning while the camera holds a fixed pose per rung, and the free orbit was the one
-  // gesture still moving the camera — about the globe centre at rest and about a sky point at
-  // the node and cohort poses, which is where it read as "counter intuitive" (user). A view that
-  // answers true also answers `rotate: false`: the two would otherwise both move.
-  dragTurnsGlobe: boolean;
+  // Does a one-pointer drag orbit the camera about the committed SUBJECT (the node, the cohort,
+  // the country — else the globe centre) instead of about OrbitControls' look-at? (2026-10-19,
+  // `domain/subjectOrbit.ts` has the design.) Geography's poses look at a composed point in the
+  // sky rather than at the subject, so the stock orbit swung the node out of the frame there
+  // ("counter intuitive", user). A view that answers true also answers `rotate: false`: the two
+  // would otherwise both move.
+  dragOrbitsSubject: boolean;
   // Does this view publish the selection's flat node list (`store.selNodes`) for its explorer
   // card? geo (Country breakdown) + hyper (Network breakdown); elsewhere the list empties so the
   // browsers stay quiet.
@@ -202,7 +202,7 @@ const FLAT: ViewPolicy = {
   minCamAlt: null,
   minPolarAngle: 0.25,
   rotate: true,
-  dragTurnsGlobe: false,
+  dragOrbitsSubject: false,
   nodeList: false,
   vitalsLane: false,
   bandContent: "vitals",
@@ -251,7 +251,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     minPolarAngle: 0.25, // standard clamp: the structure is TILTED (HYPER_TILT), not the camera —
     // so hyper shares the overview pose with the other views and never needs the pole-crossing relax
     rotate: true,
-    dragTurnsGlobe: false,
+    dragOrbitsSubject: false,
     nodeList: true,
     vitalsLane: true,
     bandContent: "vitals",
@@ -284,8 +284,8 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     minCamDist: 12,
     minCamAlt: 18, // above the land plateau (R 16 + LAND_H 1.0) + chip stacks — no zooming inside
     minPolarAngle: 0.25,
-    rotate: false, // the drag turns the globe (next line); two movers would fight
-    dragTurnsGlobe: true,
+    rotate: false, // the drag orbits the subject (next line); two movers would fight
+    dragOrbitsSubject: true,
     nodeList: true,
     vitalsLane: true,
     bandContent: "vitals",
@@ -327,7 +327,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     minCamAlt: null,
     minPolarAngle: 0.25,
     rotate: true,
-    dragTurnsGlobe: false,
+    dragOrbitsSubject: false,
     // The Snapshots node browser (LedgerPanel's floor disclosures) reads store.selNodes.
     nodeList: true,
     vitalsLane: true,
@@ -367,7 +367,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     minCamAlt: null,
     minPolarAngle: 0.25,
     rotate: false,
-    dragTurnsGlobe: false,
+    dragOrbitsSubject: false,
     nodeList: false,
     // The band is MOUNTED but its content is this view's TIMELINE, not the vitals cells — the
     // reserve it publishes is the same either way, which is why the two are separate rows.

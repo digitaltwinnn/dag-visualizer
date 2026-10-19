@@ -50,18 +50,22 @@ isolates and dims, refreshes the leaderboard, and rotates the globe so the dense
 selection faces the camera (Y rotation only — north stays up). A metagraph frames deliberately wider
 than the country pose so drilling still reads as a zoom.
 
-**A DRAG TURNS THE GLOBE, NEVER THE CAMERA** (2026-10-19, user: with a node selected "dragging
-across the view feels very counter intuitive … it keeps the globe centre as reference while the
-camera has a very specific position for this layer"). Every rung brings its subject to the front by
-turning the globe (`_aimAt`'s yaw + lean) while the camera flies to a fixed pose, and the free orbit
-was the one gesture still moving the camera — about OrbitControls' look-at, which at the node and
-cohort poses is a composed point in the sky. `viewPolicy.dragTurnsGlobe` switches the orbit off
-for this view and the Engine hands each pointer move to `Globe.turnBy` as the yaw and lean
-`domain/globeDrag.dragTurn` answers: the orbit's own rate at the resting pose (indistinguishable
-from before there), scaled by the altitude above the plateau so the surface keeps the same multiple
-of the finger's travel as the camera closes in. The idle spin waits while the hand is on the globe
-(`holdIdle`), a lean the reader set holds until the next aim or deselect (`_leanHeld`), the wheel
-and the pinch still dolly, and the release picks nothing (`_handleClick`'s travel gate).
+**A DRAG ORBITS THE SUBJECT** (2026-10-19, two rounds — user: with a node selected "dragging across
+the view feels very counter intuitive … it keeps the globe centre as reference while the camera has
+a very specific position for this layer"; then, of a first cut that turned the globe under a fixed
+camera, "now the selection rotates out of the view"). Every rung brings its subject to the front by
+turning the globe (`_aimAt`'s yaw + lean) while the camera flies to a pose that looks at a composed
+point in the sky rather than at the subject, so the stock orbit — about OrbitControls' look-at —
+swung the node out of the frame. `viewPolicy.dragOrbitsSubject` switches the stock orbit off for
+this view and the Engine turns the camera's (pos, target) pair RIGIDLY about the finest committed
+subject's own anchor — the node's chip, the cohort's centroid, the country's, the same resolution the
+callout points at (`Engine._dragPivot`), else the globe centre — through `domain/subjectOrbit.ts`:
+OrbitControls' own rate, yaw about the world up (north stays up), pitch about the camera's right,
+a step under the altitude floor or past the zenith declined rather than clamped. The subject keeps
+its exact place in the frame while the ground around it swings (measured: the callout anchor held
+its pixel through a drag); at the resting pose the pivot is the centre and it is the orbit that was
+always there. The release picks nothing (`_handleClick`'s travel gate), the wheel and the pinch
+still dolly toward the moved target, and a drag mid-flight is ignored rather than fought.
 
 **The country drill is a lens, not a filter**: it flies to the country, draws its border, firms the
 land glass and marks the row, but the other nodes stay fully visible, pickable and fanned. The drill is

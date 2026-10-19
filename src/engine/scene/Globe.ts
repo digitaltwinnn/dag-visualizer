@@ -36,7 +36,6 @@ import { ccToNumeric, countryCcAt, countryLean, geometryRings, mainPolygonRings,
 import { makeTextLabel, disposeTextLabel } from "./objects/TextLabel";
 import { joinOverlay, leaveOverlay } from "./SceneContext";
 import { closeness, NODE_RAISE } from "../domain/cameraRig";
-import { clampLean } from "../domain/globeDrag";
 import type { CohortSel } from "../domain/focusLadder";
 import { ancestryGlow } from "../domain/dimModel";
 import { NodeFabric, GATHER_SCALE, type FrameCtx } from "./objects/NodeFabric";
@@ -207,12 +206,6 @@ export class Globe implements GeoViewHost {
   private simArcs = true;
   private _arcsWereEnabled = false; // the settle edge's memory (see the arc gate in update)
   private simSpin = true;
-  // A DRAG'S TURN (Engine ← domain/globeDrag): `_idleHold` pauses the idle spin while the hand is
-  // on the globe (OrbitControls pauses its auto-rotate the same way), `_leanHeld` keeps a lean the
-  // reader set from easing back to level while the globe idles — released by the next aim or
-  // focusDensest, so a deselect still eases the lean back exactly as before.
-  private _idleHold = false;
-  private _leanHeld = false;
   countryFilter: string | null = null; // the drilled country (a LENS: border/framing only, no node filter)
   l0Count = 0;
   l1Count = 0;
@@ -1448,21 +1441,7 @@ export class Globe implements GeoViewHost {
   }
 
   // Aim the globe so a unit direction `dir` swings to the front (see js/globe.js:730-737).
-  /** Turn the globe by a drag's yaw and lean (domain/globeDrag's `dragTurn`): cancels a running
-   *  aim — the hand has taken over — and holds the lean where the reader leaves it. */
-  turnBy(yaw: number, lean: number): void {
-    this.spin = null;
-    this._leanHeld = true;
-    this.group.rotation.y += yaw;
-    this.group.rotation.x = clampLean(this.group.rotation.x + lean);
-  }
-  /** The hand is on the globe: the idle spin waits. */
-  holdIdle(on: boolean): void {
-    this._idleHold = on;
-  }
-
   private _aimAt(dir: THREE.Vector3, maxTilt: number, raise = 0): void {
-    this._leanHeld = false;
     const fromY = this.group.rotation.y;
     let dy = -Math.atan2(dir.x, dir.z) - fromY;
     dy = Math.atan2(Math.sin(dy), Math.cos(dy)); // shortest way round
@@ -1474,7 +1453,6 @@ export class Globe implements GeoViewHost {
   // Aim the globe so the densest part of the current filter's located nodes faces the camera.
   // Returns the selection's concentration R = |mean of node dirs| (0..1), or null.
   focusDensest(on: boolean): number | null {
-    this._leanHeld = false;
     if (!on) { this.spin = null; return null; }
     const mean = new THREE.Vector3();
     let count = 0;
@@ -1832,12 +1810,12 @@ export class Globe implements GeoViewHost {
         this.group.rotation.y = s.from + (s.to - s.from) * e;
         this.group.rotation.x = (s.fromX || 0) + ((s.toX || 0) - (s.fromX || 0)) * e;
       }
-    } else if (this.simSpin && !this._idleHold) {
+    } else if (this.simSpin) {
       // Idle spin (gated by the view policy's globeSpin). 0.03 → 0.06 rad/s (user, 2026-09-28:
       // "the globe is rotating too slow"): one turn in ~1m45s rather than ~3m30s.
       this.group.rotation.y += dt * 0.06;
-      // Ease any focus tilt back to level when idling — unless the reader's own drag set it.
-      if (this.group.rotation.x && !this._leanHeld) this.group.rotation.x += (0 - this.group.rotation.x) * Math.min(1, dt * 2.2);
+      // Ease any focus tilt back to level when idling.
+      if (this.group.rotation.x) this.group.rotation.x += (0 - this.group.rotation.x) * Math.min(1, dt * 2.2);
     }
   }
 

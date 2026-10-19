@@ -163,15 +163,15 @@ describe("the trends view is registered and inert", () => {
   // line ever ran, and `hyper` is true because that line did run for it — even though its camera
   // does not in fact orbit, `CameraDirector.focusFilter` having switched it off a moment later.
   // Measured in the browser after the change: camera drift over 1.5s idle is 0 in all four views.
-  it("switches the pointer orbit off in trend (its billboard deck moves by the focus re-deal) and in geo (the drag turns the globe); zoom stays", () => {
+  it("switches the pointer orbit off in trend (its billboard deck moves by the focus re-deal) and in geo (the drag orbits the subject); zoom stays", () => {
     for (const m of MODES) expect(VIEW_POLICIES[m].rotate).toBe(m !== "trend" && m !== "geo");
   });
-  // A DRAG TURNS THE GLOBE IN GEOGRAPHY ALONE (2026-10-19, `domain/globeDrag.ts`), and a view
-  // that turns the globe never also orbits the camera — two movers under one pointer would fight.
-  it("the globe-turning drag is geo's alone, and never alongside the camera orbit", () => {
+  // A DRAG ORBITS THE SUBJECT IN GEOGRAPHY ALONE (2026-10-19, `domain/subjectOrbit.ts`), and a
+  // view that does never also runs the stock orbit — two movers under one pointer would fight.
+  it("the subject orbit is geo's alone, and never alongside the stock camera orbit", () => {
     for (const m of MODES) {
-      expect(VIEW_POLICIES[m].dragTurnsGlobe).toBe(m === "geo");
-      expect(VIEW_POLICIES[m].dragTurnsGlobe && VIEW_POLICIES[m].rotate).toBe(false);
+      expect(VIEW_POLICIES[m].dragOrbitsSubject).toBe(m === "geo");
+      expect(VIEW_POLICIES[m].dragOrbitsSubject && VIEW_POLICIES[m].rotate).toBe(false);
     }
   });
 
