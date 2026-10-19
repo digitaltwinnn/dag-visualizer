@@ -70,7 +70,7 @@ import useTrendsSlice from "@/components/useTrendsSlice";
 import useStagedMeasure, { ROLL_CLASS, useHeldOrder } from "@/components/useStagedMeasure";
 import { cn } from "@/lib/utils";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
-import { headWord, metricCaption, sharedCeiling, stepMetric, METRIC_LABELS } from "@/src/data/trendSeries";
+import { headWord, metricCaption, peakReading, sharedCeiling, stepMetric, METRIC_LABELS } from "@/src/data/trendSeries";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { DUR_OUT } from "@/src/engine/domain/viewTransition";
 import { swipeIntent, swipeOf } from "@/src/engine/domain/planeSwipe";
@@ -695,6 +695,7 @@ export default function TrendStack() {
                   word: headWord(metric, roster.headKind),
                   pending: slice.stale || (roster.headKind === "day" ? roster.dayPending : roster.pending),
                 }}
+                peak={slice.stale ? null : peakReading(row.series.points, axis, step, metric, roster.headKind)}
                 format={roster.format}
                 note={pending ? "reading the hourly samples…" : undefined}
                 buckets={axis}

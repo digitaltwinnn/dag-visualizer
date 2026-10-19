@@ -400,7 +400,12 @@ value group ("make one visually designed place and keep them together"). With a 
 is a THREE-COLUMN GRID (`minmax(0,1fr) auto minmax(0,1fr)`), so the title sits on the card's centre
 whatever the network's name weighs (user: it "depends on the text size of the metagraph but it
 shouldn't"); the readings are plain label-then-value text, not pills — a pill here reads as a
-tag or a control — and the pair wraps onto a second line on the phone's 360px card. The ‹ › pills say their
+tag or a control — and the pair wraps onto a second line on the phone's 360px card. **The peak is
+on the readout's own unit** (same day — "average is higher than peak, can't be": the plot's
+busiest HOURLY bucket stood beside an average PER DAY): over a span it is the busiest DAY
+(`peakReading`, a counter's day summed, a gauge's averaged), under a day the busiest bucket named
+by its cadence ("peak 5 min"). The word is "average", not "daily average" (user: shorter); the
+explorer's heading still says "Average per day". The ‹ › pills say their
 word in the plain label step, not caps (the caps read "way too large").
 
 **The Range card's next ghost opens the first bucket of the SPAN it stands on — the brushed range,

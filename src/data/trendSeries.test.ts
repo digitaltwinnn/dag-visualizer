@@ -27,8 +27,7 @@ import { anchorClause, anchorSeries, headWord, lastSeen, momentPhrase, rangePhra
   placeInstant,
   sharedCeiling,
   stepFor,
-  tierWord,
-} from "./trendSeries";
+  tierWord, peakReading } from "./trendSeries";
 
 // The per-network series maths, as a specification (rule 4 — dataExportCoverage enforces this
 // sibling). Everything here decides what a chart ASSERTS, so the honesty cases are the ones
@@ -600,7 +599,7 @@ describe("spanAverage", () => {
 describe("headWord", () => {
   it("names the head reading: the day, or the span's average", () => {
     expect(headWord("snapshots", "day")).toBe("latest full day");
-    expect(headWord("snapshots", "span")).toBe("daily average");
+    expect(headWord("snapshots", "span")).toBe("average");
     expect(headWord("nodes", "span")).toBe("average");
   });
 });
@@ -772,3 +771,24 @@ describe("anchorSeries / anchorClause (the second cadence)", () => {
     expect(anchorClause(1).after).toBe("time");
   });
 });
+
+describe("peakReading — the peak on the head's own unit (2026-10-19)", () => {
+  const H = 3_600_000;
+  const day0 = Date.UTC(2026, 9, 1);
+  it("over a span: the busiest DAY, a counter's hours summed", () => {
+    const buckets = Array.from({ length: 48 }, (_, i) => day0 + i * H);
+    const points = buckets.map((_, i) => (i < 24 ? 10 : 20)); // day 1: 240, day 2: 480
+    expect(peakReading(points, buckets, H, "snapshots", "span")).toEqual({ word: "peak", value: 480 });
+  });
+  it("over a span: a gauge's day is its average, not its sum", () => {
+    const buckets = Array.from({ length: 48 }, (_, i) => day0 + i * H);
+    const points = buckets.map((_, i) => (i < 24 ? 100 : 110));
+    expect(peakReading(points, buckets, H, "nodes", "span")).toEqual({ word: "peak", value: 110 });
+  });
+  it("under a day: the busiest bucket, named by its cadence; nothing measured is null", () => {
+    const buckets = Array.from({ length: 12 }, (_, i) => day0 + i * 300_000);
+    expect(peakReading(buckets.map((_, i) => i), buckets, 300_000, "snapshots", "day")).toEqual({ word: "peak 5 min", value: 11 });
+    expect(peakReading(buckets.map(() => null), buckets, 300_000, "snapshots", "day")).toBeNull();
+  });
+});
+

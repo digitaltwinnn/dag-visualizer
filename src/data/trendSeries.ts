@@ -272,9 +272,50 @@ export function spanAverage(
  *  hover: the latest full day, or the span's average. */
 export function headWord(metric: TrendMetric, kind: "span" | "day"): string {
   if (kind === "day") return "latest full day";
-  // Whole words, and no leading mark: the word is a LABEL that precedes its number
-  // ("daily average 26,573") — it was "avg per day" after a mid-dot (user, 2026-10-03).
-  return spanWord(metric) === "Average per day" ? "daily average" : "average";
+  // Whole words, and no leading mark: the word is a LABEL that precedes its number — it was
+  // "avg per day" after a mid-dot (user, 2026-10-03), then "daily average" until 2026-10-19
+  // (user: "shorten it by saying 'average'"); the explorer's heading still says "Average per day".
+  void metric;
+  return "average";
+}
+
+/** THE PEAK ON THE HEAD'S OWN UNIT (user, 2026-10-19: "average is higher than peak, can't be" —
+ *  the plot's peak was its busiest HOURLY bucket beside an average PER DAY). Over a span of a day
+ *  or more the peak is the busiest DAY: the buckets grouped by UTC day, a counter's day summed, a
+ *  gauge's averaged, the largest returned — the same basis as the span's daily average. Under a
+ *  day (`kind === "day"`, the head reads "latest full day") the plot is sub-day buckets and the
+ *  peak is the busiest bucket, named by its cadence ("peak hour", "peak 5 min"). Null with nothing
+ *  measured. */
+export function peakReading(
+  points: readonly (number | null)[],
+  buckets: readonly number[],
+  stepMs: number,
+  metric: TrendMetric,
+  kind: "span" | "day",
+): { word: string; value: number } | null {
+  if (kind === "day") {
+    let max: number | null = null;
+    for (const v of points) if (v != null && (max == null || v > max)) max = v;
+    const cadence = stepMs >= 3_600_000 ? "hour" : "5 min";
+    return max == null ? null : { word: `peak ${cadence}`, value: max };
+  }
+  const counter = TREND_METRICS[metric].kind === "counter" && metric !== "continuity";
+  const days = new Map<string, { sum: number; n: number }>();
+  for (let i = 0; i < points.length && i < buckets.length; i++) {
+    const v = points[i];
+    if (v == null) continue;
+    const key = new Date(buckets[i]!).toISOString().slice(0, 10);
+    const d = days.get(key) ?? { sum: 0, n: 0 };
+    d.sum += v;
+    d.n += 1;
+    days.set(key, d);
+  }
+  let max: number | null = null;
+  for (const d of days.values()) {
+    const v = counter ? d.sum : d.sum / d.n;
+    if (max == null || v > max) max = v;
+  }
+  return max == null ? null : { word: "peak", value: max };
 }
 
 /** The words a span reading carries: a rate is an average PER DAY, anything else an average. */

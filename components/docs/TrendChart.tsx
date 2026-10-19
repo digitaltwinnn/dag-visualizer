@@ -133,6 +133,7 @@ export default function TrendChart({
   compact = false,
   unitInPlot = false,
   heading,
+  peak,
   lineWidth = 2,
   className,
   headClassName,
@@ -280,6 +281,8 @@ export default function TrendChart({
    *  caption is not drawn. (`heading`, not `title` — a `title` prop reads as hover text to the
    *  tooltip boundary.) */
   heading?: string;
+  /** The peak beside the readout, on the readout's own unit (see `peakReading`). */
+  peak?: { word: string; value: number } | null;
   /** The series line's stroke, in CSS px at scale 1. The document's small charts draw at 2; a
    *  History card is drawn LARGER than authored (scale ~1.3 on a desktop), so the same 2 landed
    *  at 2.6px and read as heavy (user, 2026-10-03: "the trend card lines are too thick") — the
@@ -385,11 +388,6 @@ export default function TrendChart({
     if (lines[0].points[i] != null) { lastIdx = i; break; }
   }
   const last = lastIdx >= 0 ? lines[0].points[lastIdx] : null;
-  // THE PEAK SITS WITH THE READOUT (user, 2026-10-19: "it mentions 'peak' left in the chart while
-  // daily average is right top: make one visually designed place and keep them together"). The
-  // same number the plot's y scale is drawn to (`ownMax` in TrendPlot — the chart's own, whatever
-  // the shared scale), said once, in the readout's own label-then-value grammar.
-  const peak = Math.max(0, ...lines.flatMap((l) => l.points.filter((v): v is number => v != null)));
 
   return (
     <div className={className ? `min-w-0 select-none ${className}` : "min-w-0 select-none"}>
@@ -522,10 +520,14 @@ export default function TrendChart({
           // does not — so the phone's 360px card keeps the centred title and both numbers
           // (2026-10-19: on one line they ran under the title).
           <span className={cn("inline-flex flex-wrap justify-end items-baseline gap-x-3", !heading && "ml-auto")}>
-            {!compact && peak > 0 && (
+            {/* THE PEAK SITS WITH THE READOUT (user, 2026-10-19: "make one visually designed place
+                and keep them together") — on the READOUT'S OWN UNIT (`peakReading`: the busiest day
+                beside the daily average; the plot's hourly maximum beside a per-day average read
+                "average higher than peak, can't be"). */}
+            {!compact && peak && (
               <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap">
-                <span className="text-label text-muted-foreground">peak</span>
-                <span className="text-label font-medium text-foreground tabular-nums">{format(peak)}</span>
+                <span className="text-label text-muted-foreground">{peak.word}</span>
+                <span className="text-label font-medium text-foreground tabular-nums">{format(peak.value)}</span>
               </span>
             )}
             <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap">
