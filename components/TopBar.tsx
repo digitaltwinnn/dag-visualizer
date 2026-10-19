@@ -513,7 +513,11 @@ export default function TopBar() {
               )}
             >
               <Icon aria-hidden className="size-4 group-data-[state=on]:text-primary" />
-              <span className="text-label max-[1299px]:hidden">{v.name}</span>
+              {/* One step up with the phone face (user, 2026-10-19: "same applies to normal and
+                  tablet") — the body step from 1340px, MEASURED: at 1300px the body labels squeezed
+                  the filter face to "A…", at 1340 nothing truncates; the labels stand down below
+                  1300 as before. */}
+              <span className="text-body max-[1340px]:text-label max-[1299px]:hidden">{v.name}</span>
             </ToggleGroupItem>
           );
           })}

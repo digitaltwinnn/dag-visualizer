@@ -216,7 +216,8 @@ measured with the vitals cluster aboard and died with it. The presentation contr
 on the store's own axes (2026-08-30): a SCENE⇄HUD toggle over `railsHidden` (one button that
 flips, desktop-only) beside a RAW pressed-toggle over `section` — popping out of RAW restores
 whichever presentation you had. **The bar's remaining narrow-width thresholds are MEASURED, not
-guessed**: the view-switch labels drop at `max-[1299px]`, the dividers plus the "soon" views at
+guessed**: the view-switch labels are the body step from 1340px and the label step below it
+(2026-10-19 — at 1300px the body labels squeezed the filter face to "A…"), they drop at `max-[1299px]`, the dividers plus the "soon" views at
 `max-[820px]` — re-measure any threshold when content moves in or out of the bar (the vitals'
 departure is what freed the wordmark). When the labels go, the ACTIVE view's name reappears as a
 caption strip under the bar (`aria-hidden`, non-interactive).
