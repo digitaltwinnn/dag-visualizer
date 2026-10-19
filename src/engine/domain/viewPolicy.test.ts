@@ -168,6 +168,15 @@ describe("the trends view is registered and inert", () => {
   });
   // A DRAG ORBITS THE SUBJECT IN GEOGRAPHY ALONE (2026-10-19, `domain/subjectOrbit.ts`), and a
   // view that does never also runs the stock orbit — two movers under one pointer would fight.
+  // THE METAGRAPH CARD STANDS ON EACH VIEW'S OWN SUBJECT (2026-10-19): the node's network in geo,
+  // the tick's in the ledger, the plane in front in History, the filter elsewhere.
+  it("names what the Metagraph card stands on, per view", () => {
+    expect(VIEW_POLICIES.geo.metagraphCard).toBe("node");
+    expect(VIEW_POLICIES.ledger.metagraphCard).toBe("tickNet");
+    expect(VIEW_POLICIES.trend.metagraphCard).toBe("plane");
+    expect(VIEW_POLICIES.hyper.metagraphCard).toBe("filter");
+    expect(VIEW_POLICIES.soon.metagraphCard).toBe("filter");
+  });
   it("the subject orbit is geo's alone, and never alongside the stock camera orbit", () => {
     for (const m of MODES) {
       expect(VIEW_POLICIES[m].dragOrbitsSubject).toBe(m === "geo");

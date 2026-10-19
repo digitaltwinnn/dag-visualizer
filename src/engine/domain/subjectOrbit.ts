@@ -20,8 +20,15 @@ import * as THREE from "three";
 export const DRAG_SLOP_PX = 4;
 /** OrbitControls' rotate rate: one full turn per viewport height. */
 export const TURN_PER_VIEWPORT = 2 * Math.PI;
-/** The look may not tip past this elevation (±83°) — past it the yaw reads backwards. */
-export const MAX_ELEVATION = 1.45;
+/** The look may not tip past the POLAR CLAMP OrbitControls applies every frame about its target
+ *  (`viewPolicy.minPolarAngle`, 0.25 from either pole): a step admitted past it would be written
+ *  and then snapped back by the controls' own update — a jitter at the limit, about the target
+ *  rather than the pivot (PR review, 2026-10-19). The cap is the clamp less a hair. */
+export function elevationCap(minPolarAngle: number): number {
+  return Math.PI / 2 - minPolarAngle - 0.02;
+}
+/** The default cap — the views' standard 0.25 clamp. */
+export const MAX_ELEVATION = elevationCap(0.25);
 
 export interface OrbitAngles {
   /** About the world up through the pivot. Negative for a rightward drag: the camera goes left
@@ -74,10 +81,10 @@ export function orbitAbout(
 
 /** May the camera take this pose? Not under the view's altitude floor (a distance from the globe
  *  centre; null = no floor), and not looking past the zenith or the nadir. */
-export function orbitAllowed(pos: THREE.Vector3, target: THREE.Vector3, minCamAlt: number | null): boolean {
+export function orbitAllowed(pos: THREE.Vector3, target: THREE.Vector3, minCamAlt: number | null, maxElevation = MAX_ELEVATION): boolean {
   if (minCamAlt != null && pos.length() < minCamAlt) return false;
   _fwd.subVectors(target, pos);
   const len = _fwd.length();
   if (len < 1e-9) return false;
-  return Math.abs(Math.asin(THREE.MathUtils.clamp(_fwd.y / len, -1, 1))) <= MAX_ELEVATION;
+  return Math.abs(Math.asin(THREE.MathUtils.clamp(_fwd.y / len, -1, 1))) <= maxElevation;
 }

@@ -410,7 +410,10 @@ node). It carries no × there (the node card's × releases the node), its ghost 
 route, and a machine on two networks — UP's nodes also validate the DAG — pages between them
 (`siblingSet("context")`, "This node's networks": each step is the same node select the row's
 click runs, so the place and provider are re-committed and the filter untouched). Hypergraph
-needs nothing: its node commits the filter by policy.
+needs nothing: its node commits the filter by policy. **Which subject the card stands on is a
+policy row, `viewPolicy.metagraphCard`** (PR review, 2026-10-19 — it had become three
+`mode === "geo"` compares): `railCards.metagraphCardNetwork` resolves it, and the card's × and
+the slot's hint read the same row.
 
 **The plane's head is NETWORK · MEASURE · READINGS — on the FRONT card; a rear card's head is the
 NETWORK ALONE** (user, 2026-10-19, later the same day: the title and values "repeated on each

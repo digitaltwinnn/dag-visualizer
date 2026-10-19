@@ -33,6 +33,9 @@ export interface MetricSeries {
   /** The chain's own per-bucket WIDEST gap, which scales the amber band to this chain's rhythm
    *  (TrendChart's `gaps`). Continuity only. */
   gaps?: (number | null)[];
+  /** Continuity's WEIGHTS — the snapshots each bucket's spacing was measured over — so a day's
+   *  reading (`peakReading`) folds exactly as the span's (`spanAverage`). Continuity only. */
+  weights?: (number | null)[];
 }
 
 export interface MetricSpec {
@@ -292,6 +295,7 @@ export function peakReading(
   stepMs: number,
   metric: TrendMetric,
   kind: "span" | "day",
+  weights?: readonly (number | null)[],
 ): { word: string; value: number } | null {
   if (kind === "day") {
     let max: number | null = null;
@@ -299,20 +303,38 @@ export function peakReading(
     const cadence = stepMs >= 3_600_000 ? "hour" : "5 min";
     return max == null ? null : { word: `peak ${cadence}`, value: max };
   }
+  // WHOLE UTC DAYS ONLY (PR review, 2026-10-19). A 24-hour window starting at 06:00 holds an
+  // 18-hour day and a 6-hour one; summed as days they are both floors, and the "peak" landed
+  // BELOW the span's average per day — the very reading this function exists to keep honest.
+  // A day counts when every one of its buckets is on the axis, and for a counter when every
+  // one is measured (a day with a hole is a floor, not a day). A span with no whole day in it
+  // has no busiest day to name, so it names none. Continuity folds by its weights, exactly as
+  // `spanAverage` does, so the two readings share one basis.
   const counter = TREND_METRICS[metric].kind === "counter" && metric !== "continuity";
-  const days = new Map<string, { sum: number; n: number }>();
+  const perDay = Math.round(86_400_000 / stepMs);
+  const days = new Map<string, { have: number; sum: number; n: number; num: number; den: number }>();
   for (let i = 0; i < points.length && i < buckets.length; i++) {
+    const key = new Date(buckets[i]!).toISOString().slice(0, 10);
+    let d = days.get(key);
+    if (!d) days.set(key, (d = { have: 0, sum: 0, n: 0, num: 0, den: 0 }));
+    d.have += 1;
     const v = points[i];
     if (v == null) continue;
-    const key = new Date(buckets[i]!).toISOString().slice(0, 10);
-    const d = days.get(key) ?? { sum: 0, n: 0 };
-    d.sum += v;
-    d.n += 1;
-    days.set(key, d);
+    if (metric === "continuity") {
+      const w = weights?.[i];
+      if (w != null && w > 0) { d.num += v * w; d.den += w; }
+    } else {
+      d.sum += v;
+      d.n += 1;
+    }
   }
   let max: number | null = null;
   for (const d of days.values()) {
-    const v = counter ? d.sum : d.sum / d.n;
+    if (d.have < perDay) continue; // a partial day
+    let v: number;
+    if (metric === "continuity") { if (!(d.den > 0)) continue; v = d.num / d.den; }
+    else if (counter) { if (d.n < d.have) continue; v = d.sum; }
+    else { if (d.n === 0) continue; v = d.sum / d.n; }
     if (max == null || v > max) max = v;
   }
   return max == null ? null : { word: "peak", value: max };

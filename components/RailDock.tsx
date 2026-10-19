@@ -561,7 +561,10 @@ export default function RailDock({
     }
     const h = d.el.getBoundingClientRect().height;
     // The height the sheet rested at when the finger took it — what "well below" is measured from.
-    const rest = Math.min(d.startH, sectionCeilingPx(d.el));
+    // From FULL the sheet started well above its fit, so the fit itself is the rest (PR review,
+    // 2026-10-19: measured as the start height, "rest" was the ceiling, and a pull released above
+    // a short card's own fit still dismissed).
+    const rest = Math.min(fitPx ?? d.startH, d.startH, sectionCeilingPx(d.el));
     // Downward flick velocity (px/ms, positive = down) over the last ~120ms of the gesture.
     const now = performance.now();
     const past = d.samples.find((s) => now - s.t <= 120) ?? d.samples[0]!;

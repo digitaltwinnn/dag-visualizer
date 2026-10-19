@@ -3,11 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // The LB is first, the archival nodes are the fallback — and the fallback answers EVERY way the LB
 // can fail, not only its 404 (2026-10-04: the LB's CDN answered 403 "Request blocked" to one
 // source IP while an archival node served the same ordinal; the old 404-only rule failed the read).
+const h = vi.hoisted(() => ({ info: { archival: [{ ip: "10.0.0.1", port: 9000 }] } as { archival: { ip: string; port: number }[] } }));
 vi.mock("../archive/probe", () => ({
-  getArchiveInfo: async () => ({ archival: [{ ip: "10.0.0.1", port: 9000 }] }),
+  getArchiveInfo: async () => h.info,
 }));
 
-import { fetchGlobalJson, forgetRecentGlobals, GLOBAL_KEEP_MS, LB_BACKOFF_MS } from "./fetchGlobal";
+import { fetchGlobalJson, forgetRecentGlobals, GLOBAL_KEEP_MS, LB_BACKOFF_MS, WALK_MAX } from "./fetchGlobal";
 
 const LB = "l0-lb-mainnet";
 const ok = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
@@ -28,6 +29,20 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(clock);
   forgetRecentGlobals();
+});
+
+describe("the fallback walk is capped", () => {
+  it("asks at most WALK_MAX nodes before giving up, however many could serve the ordinal", async () => {
+    const saved = h.info;
+    h.info = { archival: Array.from({ length: 40 }, (_, i) => ({ ip: `10.1.0.${i}`, port: 9000 })) };
+    try {
+      const calls = stub(() => Promise.resolve(new Response("", { status: 404 })), () => Promise.resolve(new Response("", { status: 404 })));
+      await expect(fetchGlobalJson("mainnet", 5)).rejects.toThrow();
+      expect(calls.filter((u) => !u.includes(LB))).toHaveLength(WALK_MAX);
+    } finally {
+      h.info = saved;
+    }
+  });
 });
 
 describe("the recent-global keep", () => {

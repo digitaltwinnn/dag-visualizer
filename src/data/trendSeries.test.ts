@@ -785,6 +785,25 @@ describe("peakReading — the peak on the head's own unit (2026-10-19)", () => {
     const points = buckets.map((_, i) => (i < 24 ? 100 : 110));
     expect(peakReading(points, buckets, H, "nodes", "span")).toEqual({ word: "peak", value: 110 });
   });
+  it("only WHOLE UTC days count: a 24-hour window across midnight has no busiest day, and a counter's day with a hole is no day", () => {
+    // 06:00 → 06:00 the next day: an 18-hour day and a 6-hour one — both floors, neither a day.
+    const buckets = Array.from({ length: 24 }, (_, i) => day0 + 6 * H + i * H);
+    expect(peakReading(buckets.map(() => 100), buckets, H, "snapshots", "span")).toBeNull();
+    // Two whole days, the second with one unmeasured hour: the first is the only day.
+    const two = Array.from({ length: 48 }, (_, i) => day0 + i * H);
+    const holed = two.map((_, i) => (i === 30 ? null : i < 24 ? 10 : 20));
+    expect(peakReading(holed, two, H, "snapshots", "span")).toEqual({ word: "peak", value: 240 });
+    // A gauge's day survives a hole (its mean is over what was measured).
+    expect(peakReading(holed, two, H, "nodes", "span")).toEqual({ word: "peak", value: 20 });
+  });
+  it("continuity's day folds by its weights, as the span does", () => {
+    const buckets = Array.from({ length: 48 }, (_, i) => day0 + i * H);
+    // Day 1: 10s spacing at weight 1; day 2: one 100s outlier at weight 1 among 23 10s at weight 10.
+    const points = buckets.map((_, i) => (i === 30 ? 100 : 10));
+    const weights = buckets.map((_, i) => (i < 24 || i === 30 ? 1 : 10));
+    const r = peakReading(points, buckets, H, "continuity", "span", weights);
+    expect(r?.value).toBeCloseTo((100 + 23 * 100) / (1 + 230), 6); // weighted, ~10.4 — not the plain 13.75
+  });
   it("under a day: the busiest bucket, named by its cadence; nothing measured is null", () => {
     const buckets = Array.from({ length: 12 }, (_, i) => day0 + i * 300_000);
     expect(peakReading(buckets.map((_, i) => i), buckets, 300_000, "snapshots", "day")).toEqual({ word: "peak 5 min", value: 11 });

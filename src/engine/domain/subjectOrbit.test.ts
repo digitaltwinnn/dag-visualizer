@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
-import { DRAG_SLOP_PX, isDrag, MAX_ELEVATION, orbitAbout, orbitAllowed, orbitAngles, TURN_PER_VIEWPORT } from "./subjectOrbit";
+import { DRAG_SLOP_PX, elevationCap, isDrag, MAX_ELEVATION, orbitAbout, orbitAllowed, orbitAngles, TURN_PER_VIEWPORT } from "./subjectOrbit";
 
 const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 
@@ -56,6 +56,11 @@ describe("orbitAllowed — declines the altitude floor and the zenith", () => {
     expect(orbitAllowed(v(0, 0, 17), v(0, 0, 0), 18)).toBe(false);
     expect(orbitAllowed(v(0, 0, 19), v(0, 0, 0), 18)).toBe(true);
     expect(orbitAllowed(v(0, 0, 1), v(0, 0, 0), null)).toBe(true);
+  });
+  it("the cap sits inside OrbitControls' polar clamp, so an admitted step is never snapped back", () => {
+    expect(elevationCap(0.25)).toBeLessThan(Math.PI / 2 - 0.25);
+    expect(MAX_ELEVATION).toBe(elevationCap(0.25));
+    expect(orbitAllowed(v(0, 0, 0), v(0, Math.tan(Math.PI / 2 - 0.25 - 0.01), 1), null, elevationCap(0.25))).toBe(false);
   });
   it("looking past the zenith is declined", () => {
     const steep = Math.tan(MAX_ELEVATION + 0.05);

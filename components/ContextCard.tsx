@@ -53,15 +53,15 @@ export default function ContextCard({
   const chartStack = useStore((s) => VIEW_POLICIES[s.mode].chartStack);
   // …and in GEOGRAPHY a card standing on the committed node's network has nothing of its own to
   // clear: the node card's × releases the node (2026-10-18).
-  const mode = useStore((s) => s.mode);
-  const onNode = mode === "geo" && filter !== appFilter;
+  const cardFrom = useStore((s) => VIEW_POLICIES[s.mode].metagraphCard);
+  const onNode = cardFrom === "node" && filter !== appFilter;
   const clearable = !onNode && (filter === appFilter || !chartStack || trendFocus != null);
   const close = () => {
     const st = useStore.getState();
     applyClickActions(
       filter === appFilter
         ? [{ kind: "filter", id: "all" }]
-        : st.mode === "trend"
+        : VIEW_POLICIES[st.mode].metagraphCard === "plane"
           ? [{ kind: "trendFocus", id: null }]
           : tickNetClearActions({ metaSnap: st.metaSnap, hasInspect: !!st.inspect }),
     );

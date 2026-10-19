@@ -79,6 +79,14 @@ export interface ViewPolicy {
   // ("counter intuitive", user). A view that answers true also answers `rotate: false`: the two
   // would otherwise both move.
   dragOrbitsSubject: boolean;
+  // WHAT THE METAGRAPH CARD STANDS ON (PR review, 2026-10-19 — it was three `mode === "geo"`
+  // compares, against convention 7): the top-bar filter; the committed NODE's network while the
+  // filter is All (Geography — a node there never writes the filter); the network committed
+  // inside the pinned tick (Snapshots, `tickNet`); the plane brought forward (History,
+  // `cardNetwork`). One rule across the views — the Metagraph card is the committed subject's
+  // network — and each view names its subject here. `railCards.metagraphCardNetwork` resolves
+  // it; the card's × and the slot's hint read the same row.
+  metagraphCard: "filter" | "node" | "tickNet" | "plane";
   // Does this view publish the selection's flat node list (`store.selNodes`) for its explorer
   // card? geo (Country breakdown) + hyper (Network breakdown); elsewhere the list empties so the
   // browsers stay quiet.
@@ -203,6 +211,7 @@ const FLAT: ViewPolicy = {
   minPolarAngle: 0.25,
   rotate: true,
   dragOrbitsSubject: false,
+  metagraphCard: "filter",
   nodeList: false,
   vitalsLane: false,
   bandContent: "vitals",
@@ -252,6 +261,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     // so hyper shares the overview pose with the other views and never needs the pole-crossing relax
     rotate: true,
     dragOrbitsSubject: false,
+    metagraphCard: "filter",
     nodeList: true,
     vitalsLane: true,
     bandContent: "vitals",
@@ -286,6 +296,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     minPolarAngle: 0.25,
     rotate: false, // the drag orbits the subject (next line); two movers would fight
     dragOrbitsSubject: true,
+    metagraphCard: "node",
     nodeList: true,
     vitalsLane: true,
     bandContent: "vitals",
@@ -328,6 +339,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     minPolarAngle: 0.25,
     rotate: true,
     dragOrbitsSubject: false,
+    metagraphCard: "tickNet",
     // The Snapshots node browser (LedgerPanel's floor disclosures) reads store.selNodes.
     nodeList: true,
     vitalsLane: true,
@@ -368,6 +380,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     minPolarAngle: 0.25,
     rotate: false,
     dragOrbitsSubject: false,
+    metagraphCard: "plane",
     nodeList: false,
     // The band is MOUNTED but its content is this view's TIMELINE, not the vitals cells — the
     // reserve it publishes is the same either way, which is why the two are separate rows.

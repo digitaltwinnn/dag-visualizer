@@ -31,7 +31,7 @@ import { liveArrivals } from "./domain/arrivals";
 import { SHEET_SHIFT_K, chromeShiftPx, sheetShiftPx } from "./domain/sheetShift";
 import { ChromeBounds } from "./ChromeBounds";
 import { FOCI, nodeFraming, cohortFraming, ledgerCommitTilt, trendFocusPush, trendFit } from "./domain/cameraRig";
-import { isDrag, orbitAbout, orbitAllowed, orbitAngles } from "./domain/subjectOrbit";
+import { elevationCap, isDrag, orbitAbout, orbitAllowed, orbitAngles } from "./domain/subjectOrbit";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { ledgerNetwork } from "./domain/tickNet";
@@ -251,7 +251,8 @@ export class Engine {
     this._dragPivot(this._pivot);
     const cam = this.ctx.camera, tgt = this.ctx.controls.target;
     orbitAbout(cam.position, tgt, this._pivot, orbitAngles(e.clientX - g.x, e.clientY - g.y, this.canvas.clientHeight), this._oPos, this._oTgt);
-    if (orbitAllowed(this._oPos, this._oTgt, VIEW_POLICIES[this.mode].minCamAlt)) {
+    const pol = VIEW_POLICIES[this.mode];
+    if (orbitAllowed(this._oPos, this._oTgt, pol.minCamAlt, elevationCap(pol.minPolarAngle))) {
       cam.position.copy(this._oPos);
       tgt.copy(this._oTgt);
     }

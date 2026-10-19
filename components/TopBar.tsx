@@ -154,7 +154,11 @@ export default function TopBar() {
   // WHERE THE NAME ARRIVES FROM (user, 2026-10-19: "the text has the odometer effect while here it
   // should animate horizontally"): a › press or a leftward swipe brings the next view's name in
   // from the right, ‹ from the left; a pick from the list keeps the roll-in.
-  const [faceFrom, setFaceFrom] = useState<"left" | "right" | null>(null);
+  // The slide belongs to ONE switch (PR review, 2026-10-19): keyed by the mode it was armed for,
+  // so a later change from anywhere else — a footer link, the browser's back — rolls in as usual
+  // instead of sliding from a stale side.
+  const [faceSlide, setFaceSlide] = useState<{ mode: Mode; from: "left" | "right" } | null>(null);
+  const faceFrom = faceSlide && faceSlide.mode === mode ? faceSlide.from : null;
   const viewChevron = (dir: -1 | 1) => {
     const target = stepView(LISTED_IDS, mode, dir === -1 ? 1 : -1);
     const name = target ? VIEWS.find((v) => v.id === target)?.name : null;
@@ -164,7 +168,7 @@ export default function TopBar() {
         type="button"
         disabled={!target || !!doc}
         aria-label={name ? `${name} view` : dir === -1 ? "First view" : "Last view"}
-        onClick={() => { if (target) { setStrip(null); setFaceFrom(dir === 1 ? "right" : "left"); setMode(target); } }}
+        onClick={() => { if (target) { setStrip(null); setFaceSlide({ mode: target, from: dir === 1 ? "right" : "left" }); setMode(target); } }}
         className={cn(
           "hidden max-[700px]:inline-flex items-center justify-center size-11 rounded-btn bg-transparent border-0 cursor-pointer",
           // In the ACCENT (user, 2026-10-18: muted they "look a bit boring/blend"): a control that
@@ -193,7 +197,7 @@ export default function TopBar() {
     const next = stepView(LISTED_IDS, mode, dir);
     if (next) {
       setStrip(null);
-      setFaceFrom(dir === -1 ? "right" : "left");
+      setFaceSlide({ mode: next, from: dir === -1 ? "right" : "left" });
       setMode(next);
     }
   };
@@ -597,7 +601,7 @@ export default function TopBar() {
             {shownStrip === "pulse" ? (
               <PulseStrip />
             ) : shownStrip === "views" ? (
-              <ViewPicker onPicked={() => { setFaceFrom(null); setStrip(null); }} />
+              <ViewPicker onPicked={() => { setStrip(null); }} />
             ) : shownStrip === "about" ? (
               <AboutStrip onClose={() => setStrip(null)} />
             ) : (

@@ -238,9 +238,12 @@ export default function TrendStack() {
   // review — a stale front for one commit remounted the card twice).
   const setTrendFront = useStore((s) => s.setTrendFront);
   useLayoutEffect(() => {
-    setTrendIds(on ? order : NO_IDS);
+    // The ids stay published through the LINGER (PR review, 2026-10-19): emptied in the same commit
+    // that turned the policy off, the projector's first inactive frame retargeted to nothing and
+    // its leave beat placed no card — the drop ran on frozen matrices and the final hide hid none.
+    setTrendIds(on || lingering ? order : NO_IDS);
     setTrendFront(on ? frontPlane(order, useStore.getState().trendScroll) : null);
-  }, [on, order, setTrendIds, setTrendFront]);
+  }, [on, lingering, order, setTrendIds, setTrendFront]);
   // …and again when the PAGER moves the scroll on its own (the publish above does not re-run).
   const storeScroll = useStore((s) => s.trendScroll);
   useEffect(() => {
@@ -393,14 +396,18 @@ export default function TrendStack() {
   // other change of the measure — the heading picker, the keys, a view entry — reads as vertical
   // (review: a settle-edge release never fired under reduced motion and latched the sideways roll).
   const swiped = useRef(false);
+  // A swipe writes its axis IN THE SAME BATCH as the measure (PR review, 2026-10-19: landed from an
+  // effect, the roll's first painted frame ran on the vertical offsets and twitched before the
+  // sideways roll took over); the effect only resets a change that no swipe armed.
   useEffect(() => {
-    setSwipeAxis(swiped.current ? "x" : "y");
+    if (!swiped.current) setSwipeAxis("y");
     swiped.current = false;
   }, [metric]);
   const stepMeasure = (dir: -1 | 1, axis: "x" | "y" = "y") => {
     const next = stepMetric(useStore.getState().trendMetric, dir);
     if (!next) return;
     swiped.current = axis === "x";
+    if (axis === "x") setSwipeAxis("x");
     setMetric(next);
   };
   // ONE write path (rule 2): the table decides what a plane click means, the executor applies it.
@@ -691,7 +698,7 @@ export default function TrendStack() {
                   word: headWord(metric, roster.headKind),
                   pending: slice.stale || (roster.headKind === "day" ? roster.dayPending : roster.pending),
                 }}
-                peak={slice.stale || !pose.interactive ? null : peakReading(row.series.points, axis, step, metric, roster.headKind)}
+                peak={slice.stale || !pose.interactive ? null : peakReading(row.series.points, axis, step, metric, roster.headKind, row.series.weights)}
                 format={roster.format}
                 note={pending ? "reading the hourly samples…" : undefined}
                 buckets={axis}

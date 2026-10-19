@@ -21,6 +21,9 @@ import { NETWORKS, type NetworkId } from "@/src/engine/config";
 // Per network and per server instance — a cold function simply starts by asking the LB.
 export const LB_BACKOFF_MS = 10 * 60_000;
 const lbSkipUntil = new Map<NetworkId, number>();
+/** How many fallback nodes one read asks at most, and how long the walk may take in all. */
+export const WALK_MAX = 12;
+export const WALK_BUDGET_MS = 24_000;
 
 // ONE PULL SERVES BOTH ROUTES (user, 2026-10-19: "I feel we're always pulling the snapshots
 // already … or is this really another extra and costly call?"). It was: the exact read
@@ -119,8 +122,17 @@ async function pullGlobalJson(net: NetworkId, ordinal: number): Promise<unknown>
   const covering = shuffle((info?.entries ?? []).filter((e) => e.chain === "global" && e.floor <= ordinal))
     .sort((a, b) => Math.floor(b.floor / BUCKET) - Math.floor(a.floor / BUCKET))
     .map((e) => ({ ip: e.ip, port: e.port ?? 9000 }));
-  const targets = covering.length ? covering : shuffle((info?.archival ?? []).slice());
+  // …AND THE WALK IS CAPPED AND BUDGETED (PR review, 2026-10-19). The covering list is every
+  // global node whose floor reaches the ordinal — ~150 for a recent one — and a sequential walk
+  // at 4s a timeout over an unreachable subset would spend the route's whole `maxDuration` before
+  // reaching a node that has it, and never reach the after-backoff LB retry below. The first
+  // `WALK_MAX` targets (shallowest buckets first, shuffled within) and `WALK_BUDGET_MS` of wall
+  // clock bound it; a node missing the ordinal still answers 404 in well under a second.
+  const all = covering.length ? covering : shuffle((info?.archival ?? []).slice());
+  const targets = all.slice(0, WALK_MAX);
+  const walkStart = Date.now();
   for (const t of targets) {
+    if (Date.now() - walkStart > WALK_BUDGET_MS) break;
     try {
       const a = await fetch(`http://${t.ip}:${t.port}/global-snapshots/${ordinal}`, {
         headers: { Accept: "application/json" },
