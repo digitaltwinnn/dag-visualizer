@@ -1,7 +1,9 @@
 "use client";
 
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
+
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 import {
   DropdownMenu,
@@ -36,12 +38,59 @@ export interface MeasureOption {
   label: string;
   /** The figure's unit, shown muted beside the label in the list ("DAG", "count", "KB"). */
   unit?: string;
+  /** The measure's mark, drawn on its tile (`tiles` presentation only). */
+  icon?: LucideIcon;
 }
 
 export interface MeasureControl {
   options: readonly MeasureOption[];
   value: string;
   onPick: (id: string) => void;
+  /** TILES, not a menu (user, 2026-10-23, History): every measure named at once in a grid under
+   *  the head, the one on screen washed — the card SAYS it has six readings instead of hiding
+   *  them behind a caret, and the control leaves the title row's aside, where it stacked 6px
+   *  under the − toggle. A level with two or three honest figures keeps the menu. */
+  tiles?: true;
+}
+
+/** THE MEASURE TILES — design A of the explorer-measure mock (user, 2026-10-23: the dropdown
+ *  "sits so close to the − button" and "doesn't clearly say … there is a lot of different data
+ *  here to visualize"). A 3-column grid of glyph + word, one tile per measure, the current one
+ *  in the app's committed-selection language (the view switch's on-state, so the two read as one
+ *  species of radio). It is the list's column heading made visible, so it sits in the BODY under
+ *  the head rule, first — the figure beneath every row is the tile that is lit. */
+export function MeasureTiles({ measure }: { measure: MeasureControl }) {
+  return (
+    <ToggleGroup
+      type="single"
+      value={measure.value}
+      aria-label="Measure"
+      onValueChange={(v) => { if (v) measure.onPick(v); }}
+      className="grid w-auto grid-cols-3 gap-1 mb-2"
+    >
+      {measure.options.map((o) => {
+        const Icon = o.icon;
+        return (
+          <ToggleGroupItem
+            key={o.id}
+            value={o.id}
+            aria-label={o.unit && o.unit.toLowerCase() !== o.label.toLowerCase() ? `${o.label}, ${o.unit}` : o.label}
+            className={cn(
+              "group flex min-w-0 items-center justify-start gap-1.5 h-7 px-1.5 rounded-btn! text-label",
+              "text-muted-foreground bg-transparent border-0",
+              "hover:text-foreground hover:bg-wash-soft",
+              "data-[state=on]:text-foreground data-[state=on]:bg-[var(--sel-bg)]",
+              "data-[state=on]:shadow-[inset_0_0_0_1px_var(--sel-border)]",
+              "touch:min-h-10",
+            )}
+          >
+            {Icon && <Icon aria-hidden className="size-3.5 flex-none group-data-[state=on]:text-primary" />}
+            <span className="truncate">{o.label}</span>
+          </ToggleGroupItem>
+        );
+      })}
+    </ToggleGroup>
+  );
 }
 
 /** THE MEASURE CONTROL — the figure column's heading, rendered in the card HEAD's aside slot

@@ -2,6 +2,9 @@ import {
   Orbit,
   Globe,
   Layers,
+  HardDrive,
+  Hexagon,
+  Timer,
   CircleDashed,
   Info,
   Compass,
@@ -25,7 +28,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { NetworkId } from "@/src/engine/config";
-import type { Mode } from "@/src/store/store";
+import type { Mode, TrendMetric } from "@/src/store/store";
 import type { PickDescriptor } from "@/src/data/types";
 
 // ONE source of truth for the interface's VOCABULARY glyphs — each view kind → its lucide icon.
@@ -174,3 +177,20 @@ export function iconForPick(
       return VIEW_ICONS.hyper;
   }
 }
+
+/** HISTORY'S MEASURES, ONE MARK EACH (user, 2026-10-23, design A of the explorer-measure mock: the
+ *  measure dropdown "doesn't actually clearly say to the user there is a lot of different data
+ *  here to visualize" — the six are now TILES on the explorer card, so each needs a glyph the
+ *  reader can tell apart at 14px). Reused where the app already has the mark: snapshots wear the
+ *  Snapshots VIEW's layers, blocks the data lane's blocks, fees the currency coin. Data (bytes)
+ *  is the drive, not the state lane's database; nodes the honeycomb's hexagon — the geo view
+ *  stacks them as cells — never the provider's server (a node is not its host). Continuity is
+ *  the timer: seconds between snapshots. */
+export const METRIC_ICONS: Record<TrendMetric, LucideIcon> = {
+  snapshots: Layers,
+  blocks: Blocks,
+  fees: Coins,
+  kb: HardDrive,
+  nodes: Hexagon,
+  continuity: Timer,
+};

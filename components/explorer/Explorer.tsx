@@ -3,7 +3,7 @@
 import { useCallback, useLayoutEffect, useRef, type CSSProperties, type ReactNode } from "react";
 
 import ExplorerShell from "@/components/ExplorerShell";
-import ExplorerHeading, { MeasureMenu, type MeasureControl } from "@/components/explorer/ExplorerHeading";
+import ExplorerHeading, { MeasureMenu, MeasureTiles, type MeasureControl } from "@/components/explorer/ExplorerHeading";
 import ExplorerPath, { type Crumb } from "@/components/explorer/ExplorerPath";
 import ExplorerRow from "@/components/explorer/ExplorerRow";
 import { useStore } from "@/src/store/store";
@@ -218,17 +218,20 @@ export default function Explorer({ id, title, hint, placeholder, levels: selecte
       defaultCollapsed={defaultCollapsed}
       // The card head's aside: a view's card-level state, then THE MEASURE CONTROL (A2) — the
       // figure column's heading, right of the title where the eye finds the list's one setting.
+      // …unless the level presents its measures as TILES (History, 2026-10-23): those are the
+      // body's first block, and the aside holds the card-level state alone.
       aside={
-        aside != null || measure ? (
+        aside != null || (measure && !measure.tiles) ? (
           <span className="inline-flex items-center gap-1.5">
             {aside}
-            <MeasureMenu measure={measure} />
+            {measure && !measure.tiles && <MeasureMenu measure={measure} />}
           </span>
         ) : undefined
       }
     >
       {current && (
         <>
+          {measure?.tiles && <MeasureTiles measure={measure} />}
           <ExplorerHeading hint={hint} setting={current.setting} />
           <ExplorerPath crumbs={crumbs} hint={current.meaning} placeholder={placeholder} />
           {/* Inside a level the list HANGS FROM THE PATH on a spine in the path's own accent (user,

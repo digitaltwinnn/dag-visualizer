@@ -8,6 +8,7 @@ import useTrendsSlice from "@/components/useTrendsSlice";
 import TablePager from "@/components/datasection/TablePager";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
+import { METRIC_ICONS } from "@/components/icons";
 import { GLOBAL_READING, METRIC_LABELS, METRIC_ORDER, metricUnit, spanWord } from "@/src/data/trendSeries";
 import { spanPhrase } from "@/src/data/trendWindow";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
@@ -161,10 +162,14 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
   const level: ExplorerLevelSpec = {
     key: "networks",
     crumb: { label: "Networks" },
+    // TILES, every measure named at once (user, 2026-10-23 — design A of the explorer-measure
+    // mock; `MeasureTiles` has the argument): this is the one explorer whose figure can be six
+    // different readings, and a caret said nothing of it.
     measure: {
-      options: METRIC_ORDER.map((m) => ({ id: m, label: METRIC_LABELS[m], unit: metricUnit(m, 86_400_000) })),
+      options: METRIC_ORDER.map((m) => ({ id: m, label: METRIC_LABELS[m], unit: metricUnit(m, 86_400_000), icon: METRIC_ICONS[m] })),
       value: metric,
       onPick: (id) => setTrendMetric(id as TrendMetric),
+      tiles: true,
     },
     hasFigure: true,
     // The span, under the list (`foot` above).
