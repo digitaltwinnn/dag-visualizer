@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CHILD_OF, childStep, positionMarks, siblingSet, type SiblingState } from "@/components/railSiblings";
 import {
   cohortToggleActions,
@@ -721,16 +721,27 @@ describe("the Range card's next ghost — the span's first moment (2026-10-18)",
   });
 });
 
-describe("siblingSet — range (the windows, while no range stands)", () => {
-  it("steps the six window pills in the picker's order, the shown window current", () => {
+describe("siblingSet — range (the same span paged through time)", () => {
+  const NOW = Date.UTC(2026, 9, 23, 17, 0);
+  beforeEach(() => { vi.spyOn(Date, "now").mockReturnValue(NOW); });
+  afterEach(() => { vi.restoreAllMocks(); });
+  it("on a live window: an open set — the previous span behind, nothing ahead", () => {
     const set = siblingSet("range", base({ mode: "trend", trendWindow: "30d" }))!;
-    expect(set.items.map((i) => i.key)).toEqual(["1h", "24h", "7d", "30d", "1y", "all"]);
-    expect(set.index).toBe(3);
-    expect(set.items[0]!.setting).toEqual({ trendWindow: "1h" });
+    expect(set.open).toBe(true);
+    expect(set.index).toBe(1);
+    expect(set.items).toHaveLength(2);
+    expect(set.items[0]!.setting).toEqual({ trendRange: { fromMs: Date.UTC(2026, 7, 24), toMs: Date.UTC(2026, 8, 23) } });
     expect(set.items[0]!.actions).toEqual([]);
+    expect(set.items[1]!.label).toBe("last 30 days");
   });
-  it("a brushed range is one span: no set", () => {
-    expect(siblingSet("range", base({ mode: "trend", trendRange: { fromMs: 0, toMs: 3_600_000 } }))).toBeNull();
+  it("on the stepped-back span: › is the release back to the live window", () => {
+    const set = siblingSet("range", base({ mode: "trend", trendWindow: "30d", trendRange: { fromMs: Date.UTC(2026, 7, 24), toMs: Date.UTC(2026, 8, 23) } }))!;
+    expect(set.items[2]!.setting).toEqual({ trendRange: null });
+    expect(set.items[2]!.label).toBe("last 30 days");
+    expect(set.items[0]!.setting).toEqual({ trendRange: { fromMs: Date.UTC(2026, 6, 25), toMs: Date.UTC(2026, 7, 24) } });
+  });
+  it("the All window has no span, so no plank", () => {
+    expect(siblingSet("range", base({ mode: "trend", trendWindow: "all" }))).toBeNull();
   });
 });
 

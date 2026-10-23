@@ -507,6 +507,42 @@ export function spanPhrase(zoom: ZoomId, range: { fromMs: number; toMs: number }
   return rangeDays(range.fromMs, range.toMs);
 }
 
+/** THE RANGE CARD'S ‹ › PAGE THE SAME SPAN THROUGH TIME (user, 2026-10-23: "keep the range and just
+ *  select the next/previous window … Sept–Oct (30 days) instead of changing the range itself" —
+ *  the card stepped the six window PILLS from 2026-10-18 until then). One span length, walked
+ *  back and forward: ‹ is the same length ending where this span begins, › the same length
+ *  starting where it ends. Three rules carry it:
+ *  · A span of two days or more walks the UTC DAY GRID (the `snapRange` threshold, so a stepped
+ *    span is exactly the days its label names): the live "last 30 days" starts mid-day, and its
+ *    previous span is the 30 whole days ending where that day begins.
+ *  · A step that REACHES THE PRESENT — the next span would end inside the last day (or, for a
+ *    sub-day span, its last quarter: the reader took a minute between presses) — lands on the
+ *    live window itself when the span is the window's own length (`"live"`, a release of the
+ *    range), else commits the same length ending now. So one step back and one forward is the
+ *    live window again, never a committed copy of it.
+ *  · A span already ending now has no forward step; the chain back is open (the measured history
+ *    runs out before it does, and an empty range states "No reading", rule 10). */
+export type SpanStep = { kind: "range"; range: { fromMs: number; toMs: number } } | { kind: "live" };
+export function spanStep(span: { fromMs: number; toMs: number }, dir: -1 | 1, zoom: ZoomId, nowMs: number): SpanStep | null {
+  const D = 86_400_000;
+  const L = span.toMs - span.fromMs;
+  if (!(L > 0)) return null;
+  const daily = L >= 2 * D;
+  const len = daily ? Math.round(L / D) * D : L;
+  const tol = daily ? D : L / 4;
+  if (dir === -1) {
+    const start = daily ? Math.floor(span.fromMs / D) * D : span.fromMs;
+    return { kind: "range", range: { fromMs: start - len, toMs: start } };
+  }
+  if (span.toMs >= nowMs - tol) return null;
+  const end = daily ? Math.ceil(span.toMs / D) * D : span.toMs;
+  const next = { fromMs: end, toMs: end + len };
+  if (next.toMs < nowMs - tol) return { kind: "range", range: next };
+  const live = windowSpan(zoom, null, nowMs);
+  if (live && Math.abs(live.toMs - live.fromMs - len) <= tol) return { kind: "live" };
+  return { kind: "range", range: { fromMs: nowMs - len, toMs: nowMs } };
+}
+
 /** A DAY-NAMED RANGE IS WHOLE DAYS (the tester pass, 2026-10-07): a range of two days or more is
  *  labelled by its UTC days (`rangeDays`), so it snaps OUTWARD to UTC midnights — "May 21 – May 31"
  *  then means exactly those days. A shorter range keeps its exact instants; its card states them as

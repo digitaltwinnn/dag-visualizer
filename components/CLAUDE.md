@@ -440,11 +440,17 @@ word in the plain label step, not caps (the caps read "way too large").
 **The Range card's next ghost opens the first bucket of the SPAN it stands on — the brushed range,
 else the window's** (user, 2026-10-18: "with a range the Moment card does not open the first
 entry" — the card read "last 30 days" and its step read only a brushed range; `spanOf` in
-`railSiblings`, the Moment's pager steps the same span, captioned "Window" then). **The Range
-card steps the WINDOWS while it stands on one** (user, 2026-10-18): with no range
-brushed its siblings are the six window pills, in the picker's order — a SETTING step
-(`SiblingStep.setting`, the pager writes `setTrendWindow` as the picker does, never a selection
-through the executor). A brushed range is one span and pages nothing. **The Moment card's head
+`railSiblings`, the Moment's pager steps the same span, captioned "Window" then). **The Range card's ‹ › page the SAME SPAN through time** (user, 2026-10-23: "keep the range and
+just select the next/previous window … Sept–Oct (30 days) instead of changing the range itself";
+from 2026-10-18 until then they stepped the six window pills — a change of the range itself): ‹
+is the span of this length ending where this one begins, › the one starting where it ends, and the
+step that reaches the present is the LIVE window again, a release of the range — so one back and
+one forward is "last 30 days" once more, never a committed copy of it. Day-long spans walk the UTC
+day grid (`snapRange`'s own threshold), so a stepped span is exactly the days its title names. The
+rules are pure and tested in `src/data/trendWindow.ts` (`spanStep`); it is a SETTING step
+(`SiblingStep.setting`, the pager writes `setTrendRange` as the timeline does, never a selection
+through the executor), an OPEN set like the global snapshot's (no n / N — the chain back has no
+end), and the All window has no span, so no plank. A brushed range pages by its own length. **The Moment card's head
 says it is a bucket** (same day — a chip in the cadence's own words, "5-min bucket", so the
 plank's squares read as stepping buckets, not changing the subject).
 
