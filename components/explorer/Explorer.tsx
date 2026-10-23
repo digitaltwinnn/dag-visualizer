@@ -3,7 +3,7 @@
 import { useCallback, useLayoutEffect, useRef, type CSSProperties, type ReactNode } from "react";
 
 import ExplorerShell from "@/components/ExplorerShell";
-import ExplorerHeading, { MeasureMenu, MeasureTiles, type MeasureControl } from "@/components/explorer/ExplorerHeading";
+import ExplorerHeading, { MeasureLabel, MeasureTiles, type MeasureControl } from "@/components/explorer/ExplorerHeading";
 import ExplorerPath, { type Crumb } from "@/components/explorer/ExplorerPath";
 import ExplorerRow from "@/components/explorer/ExplorerRow";
 import { useStore } from "@/src/store/store";
@@ -214,24 +214,38 @@ export default function Explorer({ id, title, hint, placeholder, levels: selecte
       // in three of four views. The shell's own hint line stays only for the no-level case.
       hint={current ? null : hint}
       onLeave={onLeave}
-      // The card head's aside: a view's card-level state, then THE MEASURE CONTROL (A2) — the
-      // figure column's heading, right of the title where the eye finds the list's one setting.
-      // …unless the level presents its measures as TILES (History, 2026-10-23): those are the
-      // body's first block, and the aside holds the card-level state alone.
+      // The card head's aside: a view's card-level state, and a SINGLE measure's label (a level
+      // with several measures shows them as TILES, the body's first block — 2026-10-23).
       aside={
-        aside != null || (measure && !measure.tiles) ? (
+        aside != null || (measure && measure.options.length <= 1) ? (
           <span className="inline-flex items-center gap-1.5">
             {aside}
-            {measure && !measure.tiles && <MeasureMenu measure={measure} />}
+            {measure && measure.options.length <= 1 && measure.options[0] && <MeasureLabel label={measure.options[0].label} />}
           </span>
         ) : undefined
       }
     >
       {current && (
         <>
-          {measure?.tiles && <MeasureTiles measure={measure} />}
+          {/* THE CONTROL BAND (design B of the brainstorm's explorer-sections mock, user 2026-10-23:
+              the card "reads like lots and lots of buttons, lines and values … all the same
+              padding"): ONE full-bleed plate under the head holding what the reader SETS — the
+              measure tiles, a hairline, the path — then the list on the glass, then the span on
+              the plate foot. Sections by surface, the device the right-rail foot already uses, no
+              extra words. The path rides the band bare (it wore its own accent-tinted plate, a
+              third surface in a second tint — user: "does its colour look off?"), the house its
+              one accent mark. Full-bleed by the body's own inset (ExplorerShell: `pt-1.5 px-[14px]`). */}
+          <div className="-mt-1.5 -mx-[14px] mb-2 px-[14px] pt-2 pb-2 bg-[var(--panel-plate)] border-b border-border flex flex-col gap-2">
+            {measure && measure.options.length > 1 && <MeasureTiles measure={measure} />}
+            <ExplorerPath
+              bare
+              className={cn(measure && measure.options.length > 1 && "border-t border-border/60 pt-2")}
+              crumbs={crumbs}
+              hint={current.meaning}
+              placeholder={placeholder}
+            />
+          </div>
           <ExplorerHeading hint={hint} setting={current.setting} />
-          <ExplorerPath crumbs={crumbs} hint={current.meaning} placeholder={placeholder} />
           {/* Inside a level the list HANGS FROM THE PATH on a spine in the path's own accent (user,
               2026-09-26: "a vertical line on the left side to show that the section underneath
               belongs to it"). The spine starts at the plate's left edge, under the house step. */}
@@ -288,7 +302,14 @@ export default function Explorer({ id, title, hint, placeholder, levels: selecte
                 ))}
               </div>
             )}
-            {current.pager}
+            {/* THE FOOT IS A PLATE (design B, 2026-10-23): the right-rail foot's ground, full-bleed
+                to the card's bottom edge by the body's own inset, so the span or the page a level
+                states reads as the card's last section rather than one more inset row. */}
+            {current.pager != null && (
+              <div className="-mx-[14px] -mb-2 mt-1.5 px-[14px] pt-1.5 pb-2 bg-[var(--panel-plate)] rounded-b-[calc(var(--radius)-1px)]">
+                {current.pager}
+              </div>
+            )}
           </div>
         </>
       )}

@@ -28,7 +28,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { NetworkId } from "@/src/engine/config";
-import type { Mode, TrendMetric } from "@/src/store/store";
+import type { Mode } from "@/src/store/store";
 import type { PickDescriptor } from "@/src/data/types";
 
 // ONE source of truth for the interface's VOCABULARY glyphs — each view kind → its lucide icon.
@@ -178,19 +178,34 @@ export function iconForPick(
   }
 }
 
-/** HISTORY'S MEASURES, ONE MARK EACH (user, 2026-10-23, design A of the explorer-measure mock: the
- *  measure dropdown "doesn't actually clearly say to the user there is a lot of different data
- *  here to visualize" — the six are now TILES on the explorer card, so each needs a glyph the
- *  reader can tell apart at 14px). Reused where the app already has the mark: snapshots wear the
- *  Snapshots VIEW's layers, blocks the data lane's blocks, fees the currency coin. Data (bytes)
- *  is the drive, not the state lane's database; nodes the honeycomb's hexagon — the geo view
- *  stacks them as cells — never the provider's server (a node is not its host). Continuity is
- *  the timer: seconds between snapshots. */
-export const METRIC_ICONS: Record<TrendMetric, LucideIcon> = {
+/** EVERY EXPLORER'S MEASURES, ONE MARK EACH (user, 2026-10-23: the measure dropdown "doesn't
+ *  actually clearly say to the user there is a lot of different data here to visualize" — the
+ *  measures are TILES on every explorer card now, design B of the explorer-sections mock, so each
+ *  needs a glyph the reader can tell apart at 14px). Keyed by the measure ids the four measure
+ *  modules declare (`src/data/{hyper,geo,ledger}Measure.ts`, `trendSeries`). Reused where the app
+ *  already has the mark: snapshots the Snapshots VIEW's layers, blocks the data lane's blocks,
+ *  fees the currency coin, a layer count the ledger stack's one stratum, metagraphs the
+ *  Hypergraph subject's orbit, providers the provider card's server, anchors the metagraph
+ *  snapshot's boxes. Data and size (bytes) are the drive, not the state lane's database; nodes
+ *  the honeycomb's hexagon — the geo view stacks them as cells — never the provider's server (a
+ *  node is not its host). Continuity is the timer: seconds between snapshots. */
+export const MEASURE_ICONS: Readonly<Record<string, LucideIcon>> = {
+  // History (`TrendMetric`)
   snapshots: Layers,
   blocks: Blocks,
   fees: Coins,
   kb: HardDrive,
   nodes: Hexagon,
   continuity: Timer,
+  // Hypergraph (`HyperMeasure`): nodes above, then the three layers
+  l0: Layers,
+  cl1: Layers,
+  dl1: Layers,
+  // Geography (`GeoMeasure`): nodes above, then
+  metagraphs: Orbit,
+  providers: Server,
+  // Snapshots (`LedgerMeasure`): metagraphs above, then
+  fee: Coins,
+  anchors: Boxes,
+  size: HardDrive,
 };

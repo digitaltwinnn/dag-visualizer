@@ -283,8 +283,8 @@ decisions inside them are design, not detail:
   states the SAME number — the roster's one `head` (user, same day: "keep it consistent"). Under a
   day's window (1H, a short brush) there is no measured day to average, so the list and the
   headline both say the latest full day instead. The Moment card is the one INSTANT — crosshair, time headline, "At
-  that moment" over its list — so the two lists never read as copies. The METRIC is the heading control (the figure column's own
-  heading, a radio list of `METRIC_ORDER` with units at the current cadence); `Same scale` left
+  that moment" over its list — so the two lists never read as copies. The METRIC is the explorer's MEASURE TILES (since 2026-10-23 — the figure column's
+  heading was a radio list behind a caret until then); `Same scale` left
   the heading on 2026-09-28 for the band's pill group — it draws the planes and never changed a
   row here (user), so it sits with the stack's other stack-wide settings, the window and the
   range, and stands down under a committed filter where the stack is one plane. Neither the
@@ -326,6 +326,23 @@ decisions inside them are design, not detail:
   the cursor card all read it, counter EDGE TRIM included. A surface reading the payload directly
   is one bucket out of step with the axis, which is exactly how the cursor card briefly quoted
   yesterday's number; `components/trendRailBoundary.test.ts` pins all three "one home" rules.
+
+**EVERY EXPLORER CARD IS FOUR SECTIONS BY SURFACE: head · CONTROL BAND · list · plate foot**
+(user, 2026-10-23, design B of the brainstorm's `explorer-sections.html` — the card "reads like
+lots and lots of buttons, lines and values … all the same padding and no very clear distinction";
+and "what about design consistency??" when the first cut was History's alone). The CONTROL BAND
+is one full-bleed `--panel-plate` under the head holding what the reader SETS: the MEASURE TILES
+(`MeasureTiles` — every measure of the level named at once, glyph and word, the current one in
+the view switch's on-state; four sit two by two, two/three/six in three columns; `MEASURE_ICONS`
+in `components/icons.tsx` is the one glyph map, keyed by measure id across the four measure
+modules), a hairline, then the PATH, bare (`ExplorerPath bare` — its own accent-tinted plate under
+the band was a third surface in a second tint; the house keeps its wash as the band's one accent
+mark). The list sits on the glass. The pager or span sits on the PLATE FOOT, full-bleed to the
+card's bottom edge, the right-rail foot's own device. No section labels: "Networks" would be said
+twice. The dropdown the tiles replaced (`MeasureMenu`, 2026-09-26 → 2026-10-23) hid the breadth
+behind a caret and stacked 6px under the card's − toggle, which left the same day (user: "don't
+need it"). The path plate stays on every explorer, History's one-level card included (user, same
+day: "where did the breadcrumb go?" — a cut had dropped it there as a plate that never shows a path).
 
 **Naming and copy rules:** the ABOUT row states the view's point of view ("How the network is built"); the tool
 card says what you BROWSE — by the AXIS the rows break the network down along, never by the
