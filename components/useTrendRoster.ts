@@ -13,6 +13,7 @@ import {
   metricSeries,
   metricUnit,
   rankByLast,
+  rankOrder,
   spanAverage,
   stepFor,
   trimCounterEdges,
@@ -218,10 +219,17 @@ export default function useTrendRoster(
       return r;
     };
     for (const id of ids) rows.set(id, rowOf(id));
-    const ranked = rankByLast(ids, (id) => {
-      const r = rows.get(id)!;
-      return [r.head ?? r.day ?? r.last];
-    });
+    // RANK BY THE FIGURE THE ROW SHOWS (user, 2026-10-23: under Continuity a row with "—" sat
+    // between measured ones — it ranked by an older last value while its span average was null),
+    // in the metric's own direction (`rankOrder`: a shorter snapshot spacing is the busier chain).
+    const ranked = rankByLast(
+      ids,
+      (id) => {
+        const r = rows.get(id)!;
+        return [headKind === "span" ? r.head : (r.day ?? r.last)];
+      },
+      rankOrder(metric),
+    );
     // The pinned row's NODES are the DAG's own (`f.nodes.dag`), not the fleet the global series
     // carries: beside rows that each state their own nodes, the fleet read as one more "all
     // nodes". Every other measure is the global series as it stands.

@@ -13,6 +13,7 @@ import { anchorClause, anchorSeries, headWord, lastSeen, momentPhrase, rangePhra
   metricUnit,
   perPhrase,
   rankByLast,
+  rankOrder,
   seriesKey,
   trimCounterEdges,
   METRIC_LABELS,
@@ -64,6 +65,10 @@ describe("the metric table", () => {
     expect(TREND_METRICS.nodes.format).toBeUndefined();
     expect(formatMb(3.25)).toBe("3.3 MB");
     expect(formatSeconds(42.4)).toBe("42s");
+    expect(formatSeconds(272)).toBe("4.5m");
+    expect(formatSeconds(11_520)).toBe("3.2h");
+    expect(formatSeconds(1_937_037)).toBe("22d");
+    expect(formatSeconds(86_400 * 365)).toBe("365d");
     // Under 10 DAG keeps two decimals, above it none — a fee is read at two very different scales.
     expect(formatDag(1.234)).toBe("1.23");
     expect(formatDag(12.34)).toBe("12");
@@ -93,7 +98,7 @@ describe("the unit word", () => {
 
   it("is cadence-free where the quantity is not a rate", () => {
     expect(metricUnit("nodes", DAY)).toBe("nodes");
-    expect(metricUnit("continuity", 300000)).toBe("seconds");
+    expect(metricUnit("continuity", 300000)).toBe("between snapshots");
   });
 });
 
@@ -183,6 +188,10 @@ describe("the busiest-first ranking", () => {
       d: [2],
     };
     expect(rankByLast(["a", "b", "c", "d"], (id) => rows[id])).toEqual(["c", "a", "d", "b"]);
+    // Continuity ranks the SHORTEST gap first — the busier chain — with nothing measured still last.
+    expect(rankByLast(["a", "b", "c", "d"], (id) => rows[id], "asc")).toEqual(["a", "d", "c", "b"]);
+    expect(rankOrder("continuity")).toBe("asc");
+    expect(rankOrder("snapshots")).toBe("desc");
   });
 });
 
@@ -526,7 +535,7 @@ describe("metricCaption — what a card says it is showing", () => {
   });
   it("sets off a unit that carries its own noun", () => {
     expect(metricCaption("fees", DAY)).toBe("Fees in DAG per day");
-    expect(metricCaption("continuity", DAY)).toBe("Continuity in seconds");
+    expect(metricCaption("continuity", DAY)).toBe("Continuity between snapshots");
   });
   it("drops a unit that only repeats the name", () => {
     expect(metricCaption("nodes", DAY)).toBe("Nodes");
