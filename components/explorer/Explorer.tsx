@@ -3,7 +3,7 @@
 import { useCallback, useLayoutEffect, useRef, type CSSProperties, type ReactNode } from "react";
 
 import ExplorerShell from "@/components/ExplorerShell";
-import ExplorerHeading, { MeasureLabel, MeasureTiles, type MeasureControl } from "@/components/explorer/ExplorerHeading";
+import ExplorerHeading, { MeasureLabel, MeasureTiles, type MeasureControl, type MeasureOption } from "@/components/explorer/ExplorerHeading";
 import ExplorerPath, { type Crumb } from "@/components/explorer/ExplorerPath";
 import ExplorerRow from "@/components/explorer/ExplorerRow";
 import { useStore } from "@/src/store/store";
@@ -198,11 +198,24 @@ export default function Explorer({ id, title, hint, placeholder, levels: selecte
     root: i === 0,
     ...(i < levels.length - 1 ? { onSelect: l.crumb.onRelease } : {}),
   }));
+  // THE BAND SHOWS THE EXPLORER'S WHOLE MEASURE SET — the ROOT's — on every level (user,
+  // 2026-10-23: "instead of removing the control band when there is nothing to show, can we just
+  // make them inactive? I don't like it just disappears"). A level names the measures it can
+  // show (its own `measure.options`, a subset of the root's); the rest are drawn inactive, and a
+  // node level — no figure at all — shows every tile inactive with none lit. The pick and the
+  // setter are the level's own where it has one.
+  const rootMeasure = levels[0]?.measure;
+  const rootOptions: readonly MeasureOption[] | null =
+    rootMeasure ? ("options" in rootMeasure ? rootMeasure.options : [{ id: "one", label: rootMeasure.label }]) : null;
+  const levelMeasure = current?.measure && "options" in current.measure ? current.measure : null;
   const measure: MeasureControl | null =
-    current && current.measure
-      ? "options" in current.measure
-        ? current.measure
-        : { options: [{ id: "one", label: current.measure.label }], value: "one", onPick: () => {} }
+    current && rootOptions
+      ? {
+          options: rootOptions,
+          value: levelMeasure?.value ?? "",
+          onPick: levelMeasure?.onPick ?? (() => {}),
+          inactive: new Set(rootOptions.filter((o) => !levelMeasure?.options.some((l) => l.id === o.id)).map((o) => o.id)),
+        }
       : null;
   return (
     <ExplorerShell

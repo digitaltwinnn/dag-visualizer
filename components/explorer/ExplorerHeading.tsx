@@ -35,6 +35,11 @@ export interface MeasureControl {
   options: readonly MeasureOption[];
   value: string;
   onPick: (id: string) => void;
+  /** Measures the level on screen cannot show — drawn INACTIVE, never dropped (user, 2026-10-23:
+   *  "instead of removing the control band when there is nothing to show, can we just make them
+   *  inactive? I don't like it just disappears" — the plank's rule, an exhausted control dims).
+   *  The band always shows the explorer's whole set; a node level shows every tile inactive. */
+  inactive?: ReadonlySet<string>;
 }
 
 /** A single measure: the caps word, muted, in the head's aside — a label, not a control. */
@@ -64,6 +69,7 @@ export function MeasureTiles({ measure }: { measure: MeasureControl }) {
             key={o.id}
             value={o.id}
             aria-label={o.unit && o.unit.toLowerCase() !== o.label.toLowerCase() ? `${o.label}, ${o.unit}` : o.label}
+            disabled={measure.inactive?.has(o.id)}
             className={cn(
               "group flex min-w-0 items-center justify-start gap-1.5 h-7 px-1.5 rounded-btn! text-label",
               "text-muted-foreground bg-transparent border-0",
@@ -71,6 +77,7 @@ export function MeasureTiles({ measure }: { measure: MeasureControl }) {
               "data-[state=on]:text-foreground data-[state=on]:bg-[var(--sel-bg)]",
               "data-[state=on]:shadow-[inset_0_0_0_1px_var(--sel-border)]",
               "touch:min-h-10",
+              "disabled:opacity-30 disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-muted-foreground",
             )}
           >
             {Icon && <Icon aria-hidden className="size-3.5 flex-none group-data-[state=on]:text-primary" />}
