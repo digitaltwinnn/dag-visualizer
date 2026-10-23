@@ -198,7 +198,7 @@ the ends; the pip row retired with them the same evening — "has both … the <
 more intuitive". **Since 2026-10-23 they are the rail pager's chevron species, flush to the face**
 (user: the 44px accent pair was "too wide and don't look related to the actual view switcher";
 design A of the brainstorm mock — a 24px box, 16px muted glyph, `TOUCH_HIT`'s pad, measured: the
-centre cell 213px → 173px, which ended the left zone's clip of the filter face to "A" at 360–390px)) — that opens the view list as a strip tenant** (`topbar/ViewPicker.tsx`, 2026-09-28: a
+centre cell 213px → 161px with the face at `px-0.5` and the brand's width floor swapped for the pad, which ended the left zone's clip of the filter face to "A" at 360–390px; the filter KEEPS its `touch:min-w-11` — without it the zone's shrink cut "All" to "Al…")) — that opens the view list as a strip tenant** (`topbar/ViewPicker.tsx`, 2026-09-28: a
 row of 44px icons cannot scale with the view count — History made it five and the filter ran under
 the first tab — and hiding entries per tier is a patch the next view undoes; the segmented switch
 stays from 700px up, both presentations live in the DOM and CSS picks, and the hanging caption

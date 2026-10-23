@@ -219,27 +219,32 @@ export default function TopBar() {
       // Two failure shapes since the grid promotion: the ROW overflowing its box, and a ZONE
       // being crushed below its content (the left zone's min-w-0 lets the grid shrink it, so
       // the row's own scrollWidth stays clean while the brand/filter get clipped inside it).
-      // Overflow is measured from the CHILDREN'S boxes, not scrollWidth (2026-10-23): the phone
-      // chevrons wear `TOUCH_HIT`, whose invisible pseudo reaches 10px past its host on the touch
-      // tier and counts toward scrollable overflow — so scrollWidth reported a 10px clip where
-      // nothing visible was clipped. Real controls have boxes; a hit pad has none. The RIGHT
-      // edge only: every zone lays its content out from its left edge, so a crush always spills
-      // rightward, while a child's own negative left margin (the brand's `-mx-1`) is design.
+      // The failure is a CONTROL UNDER A CONTROL (2026-10-23) — measured as the overlap of
+      // consecutive visible controls' boxes across the three zones, plus the last one past the
+      // row's edge. It read scrollWidth until then, which the phone's `TOUCH_HIT` pads (an
+      // invisible pseudo 10px past its host) and the brand's own `-mx-1` both inflated, and a
+      // zone's box is the wrong edge too: a control spilling into the grid GAP touches nothing.
       const rowRight = el.getBoundingClientRect().right;
-      let over = 0;
+      const ctrls: { box: DOMRect; name: string }[] = [];
+      const nameOf = (c: HTMLElement) => (c.getAttribute("aria-label") ?? c.textContent ?? "").trim().slice(0, 24) || c.tagName.toLowerCase();
       for (const zone of el.children) {
         if (!(zone instanceof HTMLElement)) continue;
-        const zoneRight = zone.getBoundingClientRect().right;
-        over = Math.max(over, Math.round(zoneRight - rowRight));
         for (const child of zone.children) {
-          if (!(child instanceof HTMLElement) || !child.offsetWidth) continue;
-          over = Math.max(over, Math.round(child.getBoundingClientRect().right - zoneRight));
+          if (child instanceof HTMLElement && child.offsetWidth) ctrls.push({ box: child.getBoundingClientRect(), name: nameOf(child) });
         }
       }
+      let over = 0;
+      let pair = "";
+      for (let i = 1; i < ctrls.length; i++) {
+        const o = Math.round(ctrls[i - 1].box.right - ctrls[i].box.left);
+        if (o > over) { over = o; pair = `"${ctrls[i - 1].name}" under "${ctrls[i].name}"`; }
+      }
+      const last = ctrls[ctrls.length - 1];
+      if (last && Math.round(last.box.right - rowRight) > over) { over = Math.round(last.box.right - rowRight); pair = `"${last.name}" past the bar's edge`; }
       if (over > 0)
         console.warn(
-          `[TopBar] the command bar overflows by ${over}px at ${window.innerWidth}px — ` +
-            "a control is being clipped. Raise a breakpoint in components/TopBar.tsx.",
+          `[TopBar] command bar controls overlap by ${over}px at ${window.innerWidth}px (${pair}). ` +
+            "Trim a control or raise a breakpoint in components/TopBar.tsx.",
         );
     };
     check();
@@ -346,9 +351,13 @@ export default function TopBar() {
             // 44 touch floor on a coarse one — controls of different heights read as controls of
             // different rank.
             "h-9 rounded-btn -mx-1 px-1 py-0.5 bg-transparent border-0 cursor-pointer text-left",
-            // The same pointer-keyed 44px touch floor as the filter button beside it (its note
-            // has the rationale) — the ECG mark alone measured 42×28 on phone.
-            "touch:min-h-11 touch:min-w-11",
+            // The touch HEIGHT floor as the filter button beside it; the WIDTH floor went on
+            // 2026-10-23 (user: "trim") for `TOUCH_HIT`'s invisible pad — the mark is 34px wide
+            // and the 44px box it was padded to was the left zone's overrun at phone widths
+            // (the stepper note on `viewChevron` has the measurements). The pad still catches a
+            // thumb; the box stops asking the zone for room it does not draw.
+            "touch:min-h-11",
+            TOUCH_HIT,
             "hover:bg-wash-soft transition-colors duration-150 motion-reduce:transition-none",
             strip === "pulse" && "bg-wash-soft",
             "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
@@ -390,7 +399,9 @@ export default function TopBar() {
             // ticker ellipsizes inside its own column instead of overlapping the neighbour.
             // …but never below the touch floor's WIDTH either (user, 2026-09-03: the "All" face
             // measured 35px). The coarse floor beats the shrink for short faces; long tickers
-            // still truncate — 44px is a floor, not a width.
+            // still truncate — 44px is a floor, not a width. ⚠️ It is the floor that keeps "All"
+            // whole at 360px: swapped for `TOUCH_HIT`'s pad on 2026-10-23 (the brand took it the
+            // same day), the zone's flex shrink cut the face to 36px and the label to "Al…".
             "min-w-0 touch:min-w-11 max-[700px]:px-1 max-[700px]:py-1.5 max-[700px]:gap-[4px]",
           )}
         >
@@ -458,7 +469,11 @@ export default function TopBar() {
           onKeyDown={(e) => { if (e.key === "Escape") setStrip(null); }}
           className={cn(
             // The filter face's own recipe — a face plus its open-state wash — at the touch floor.
-            "hidden max-[700px]:flex items-center justify-center gap-1.5 h-9 py-1.5 px-2 rounded-btn",
+            // `px-0.5`, not the filter face's `px-2` (2026-10-23, the "trim" round): the chevrons sit
+            // flush on both sides and their own 4px glyph inset is the air; the face's box is what
+            // the centre cell costs, and at 360px every 2px of it ran the filter's touch floor under
+            // the ‹ (the row's gap is no lever — the centre is centred, so only the two contents are).
+            "hidden max-[700px]:flex items-center justify-center gap-1.5 h-9 py-1.5 px-0.5 rounded-btn",
             "bg-transparent border-0 cursor-pointer whitespace-nowrap",
             "hover:bg-wash-soft touch:min-h-11 touch:min-w-11",
             strip === "views" && "bg-wash-soft",
