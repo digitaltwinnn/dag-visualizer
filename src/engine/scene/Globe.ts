@@ -33,12 +33,6 @@ import { buildGeoView, geoBlend, retintGeoView, setCountryBorder, setCountryFill
 import { BaseRing } from "./objects/BaseRing";
 import { ringLevels, type RingMachine, type RingNet } from "../domain/baseRing";
 
-/** A located machine for the base rings: its place and host as the geo lookup reports them, or
- *  null where the lookup could not say (an UNKNOWN sub-arc, never a guess). */
-function ringMachine(ip: string, geoMap: GeoMap): RingMachine {
-  const g = geoMap[ip];
-  return { ip, cc: g?.cc || null, isp: g?.isp || null };
-}
 import type { StageLight } from "./objects/StageLight";
 import { STAGE_LIGHTS } from "../domain/stageLight";
 import { ccToNumeric, countryCcAt, countryLean, geometryRings, mainPolygonRings, ringsAngularRadius, ringsCentroid, type Ring } from "../domain/countryShape";
@@ -225,10 +219,6 @@ export class Globe implements GeoViewHost {
   // CSS token in the constructor. Never identity-tinted (structural scene lane).
   geoColor = 0x000000;
   readonly baseRing: BaseRing;
-  /** The located machines per network the base ring counts — the metagraphs from the last
-   *  `setMetagraphs`, the DAG from the last `setNodes`; rebuilt from either arrival. */
-  private _ringMetas: RingNet[] = [];
-  private _ringDag: RingMachine[] = [];
   private _ringHoverCc: string | null = null;
   private _dagCore = 0x000000;
   _edgeColor = new THREE.Color();
@@ -565,10 +555,7 @@ export class Globe implements GeoViewHost {
 
     this.fabric.buildValidators(this.nodes);
     this.pickables = this.fabric.pickables;
-    // The DAG's located machines for the base ring (objects/BaseRing.ts): every validator with a
-    // place on the globe, by IP — the ring's partition counts each machine once (domain/baseRing).
-    this._ringDag = this.nodes.flatMap((u) => (u.geoDir && u.nodeId ? [ringMachine(u.nodeId, geoMap)] : []));
-    this._rebuildBaseRing();
+    this._rebuildBaseRing(); // the base rings read the validators (objects/BaseRing.ts)
     this.setSelectedNode(this._selectedNodeId); // re-resolve the spotlight's record on fresh data
     this.setSelectedCohort(this._selCohort); // re-resolve the cohort membership/centroid too
 
@@ -792,7 +779,6 @@ export class Globe implements GeoViewHost {
     this.fabric.invalidateBases();
     const metaHex = (id: string) => this.sceneColors?.[id] ?? this.geoColor;
     for (const m of this.metaList) m.color = metaHex(m.id);
-    for (const n of this._ringMetas) n.color = metaHex(n.id);
     this._rebuildBaseRing();
     // The metagraph loop re-bakes its own buffer from `r.color` every frame — no invalidation.
     for (const r of this.metaNodes) r.color.setHex(metaHex(r.metaId));
@@ -811,9 +797,26 @@ export class Globe implements GeoViewHost {
 
   // `list` is /api/metagraphs; geoMap supplies each node's location. Only metagraphs with at least
   // one locatable node are kept.
-  /** Event-time: the base ring from the located fleet — the metagraphs' machines and the DAG's. */
+  /** Event-time: the base rings from the SAME records the Countries list tallies
+   *  (`geoStats.countryTallies`): every `geoPrimary` validator under the DAG, every `geoPrimary`
+   *  metagraph node under its network — a node is a participant, not a machine. */
   private _rebuildBaseRing(): void {
-    const nets: RingNet[] = [...this._ringMetas, { id: "dag", color: this.geoColor, machines: this._ringDag }];
+    const byMeta = new Map<string, RingMachine[]>();
+    for (const r of this.metaNodes) {
+      if (!(r.geoPrimary ?? true) || !r.metaId) continue;
+      const g = "geo" in r.pick ? r.pick.geo : undefined;
+      (byMeta.get(r.metaId) ?? byMeta.set(r.metaId, []).get(r.metaId)!).push({ ip: r.nodeId, cc: g?.cc || null, isp: g?.isp || null });
+    }
+    const nets: RingNet[] = this.metaList.map((m) => ({ id: m.id, color: m.color, machines: byMeta.get(m.id) ?? [] }));
+    nets.push({
+      id: "dag",
+      color: this.geoColor,
+      machines: this.nodes.flatMap((u) => {
+        if (u.noGeo || !u.geoPrimary || !u.nodeId) return [];
+        const g = "geo" in u.pick ? u.pick.geo : undefined;
+        return [{ ip: u.nodeId, cc: g?.cc || null, isp: g?.isp || null }];
+      }),
+    });
     this.baseRing.setLevels(ringLevels(nets, "dag"));
   }
 
@@ -861,8 +864,6 @@ export class Globe implements GeoViewHost {
       const machines = new Set(located.map((node) => node.ip)).size;
       if (machines) metaMachineCounts.set(m.id, machines);
     }
-    this._ringMetas = withNodes.map((m) => ({ id: m.id, color: m.color, machines: (locatedByMeta.get(m.id) ?? []).map((n) => ringMachine(n.ip, geoMap)) }));
-    this._rebuildBaseRing();
     const metaSpecs = metaTrayLayout(metaMachineCounts, LANE_IDS);
     this._contSpecs.meta = [...metaSpecs.values()];
     const metaContSlot = new Map<string, number>(); // next free chip slot per metagraph tray

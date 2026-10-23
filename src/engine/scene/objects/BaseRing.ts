@@ -26,13 +26,13 @@ import { FOCUS_TUNE } from "../../domain/dimModel";
  *  own ladder, denser toward the centre (user, 2026-10-23). They nest just OUTSIDE the globe's
  *  silhouette: the base plane under the globe itself is hidden, so a ring at less than R would
  *  never be seen. */
-export const RING_RADII = [R * 1.13, R * 1.065, R * 1.0] as const;
+export const RING_RADII = [R * 1.08, R * 1.02, R * 0.96] as const;
 export const RING_WIDTHS = [R * 0.02, R * 0.016, R * 0.013] as const;
 /** A STAND under the globe, not a hoop through its base (user, 2026-10-23: at the rest pose "it
  *  looks like our angle is a bit unusual or the circle is strangely positioned" — the base
  *  plane's ellipse centred on the silhouette's bottom edge and cut it). Dropped so the ellipse
  *  sits below the globe, its far edge passing behind the body. */
-export const RING_Y = -(R + LAND_H + 3);
+export const RING_Y = -(R + LAND_H + 1.8);
 /** Resting presence: the furniture tier (the graticule rests at 0.045, the compass dial at
  *  0.09–0.24) — a first cut at 0.55 bloomed into a neon band under the additive blend, and 0.2
  *  still pulled the eye off the globe (user, 2026-10-23: "a bit more transparent in normal mode,

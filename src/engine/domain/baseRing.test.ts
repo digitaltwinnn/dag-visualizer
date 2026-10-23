@@ -4,20 +4,20 @@ import { ringLevels, ringPresence, RING_GAP, RING_SUB_GAP, type RingNet, type Ri
 const m = (ip: string, cc: string | null = "US", isp: string | null = "Hetzner"): RingMachine => ({ ip, cc, isp });
 const nets: RingNet[] = [
   { id: "dor", color: 0xff7a2f, machines: [m("1", "US", "Amazon"), m("2", "US", "Amazon"), m("3", "DE"), m("4", null, null)] },
-  { id: "up", color: 0x3b8bff, machines: [m("5", "FI"), m("6", "FI"), m("1", "US")] }, // "1" also runs DOR: counted once, under DOR (first in the list)
-  { id: "dag", color: 0x2af5ff, machines: [m("1"), m("5"), m("7", "DE"), m("8", "DE", "IONOS"), m("9", "US")] }, // the DAG core: its own validators are the remainder
+  { id: "up", color: 0x3b8bff, machines: [m("5", "FI"), m("6", "FI")] },
+  { id: "dag", color: 0x2af5ff, machines: [m("1"), m("5"), m("7", "DE"), m("8", "DE", "IONOS"), m("9", "US")] }, // the DAG core: a machine that also runs a metagraph is a second node here, as in the Countries list
 ];
 const lv = ringLevels(nets, "dag");
 
 describe("ringLevels — the located fleet by country, then provider, then network", () => {
-  it("every level partitions the same fleet, each machine once", () => {
+  it("every level partitions the same participants (11: a machine on two networks is two nodes, as the Countries list counts)", () => {
     for (const level of [lv.countries, lv.providers, lv.networks]) {
-      expect(level.reduce((n, s) => n + s.count, 0)).toBe(9);
+      expect(level.reduce((n, s) => n + s.count, 0)).toBe(11);
       expect(level.reduce((n, s) => n + s.share, 0)).toBeCloseTo(1, 9);
     }
   });
   it("the outer ring is the countries, biggest first, the unknown last, tiling the circle with one gap each", () => {
-    expect(lv.countries.map((c) => [c.cc, c.count])).toEqual([["US", 3], ["DE", 3], ["FI", 2], [null, 1]]);
+    expect(lv.countries.map((c) => [c.cc, c.count])).toEqual([["US", 5], ["DE", 3], ["FI", 2], [null, 1]]);
     for (let i = 0; i < lv.countries.length; i++) {
       const s = lv.countries[i]!, next = lv.countries[(i + 1) % lv.countries.length]!;
       expect(s.to).toBeGreaterThan(s.from);
@@ -43,9 +43,9 @@ describe("ringLevels — the located fleet by country, then provider, then netwo
     expect(ns[0]!.from).toBeCloseTo(hz.from, 9);
     expect(ns[1]!.to).toBeCloseTo(hz.to, 9);
   });
-  it("a machine on two networks is counted once, under the first in the list", () => {
+  it("a machine on two networks is a node under each — the explorer's unit", () => {
     const us = lv.networks.filter((n) => n.cc === "US");
-    expect(us.map((n) => [n.isp, n.net, n.count])).toEqual([["Amazon", "dor", 2], ["Hetzner", "dag", 1]]);
+    expect(us.map((n) => [n.isp, n.net, n.count])).toEqual([["Hetzner", "dag", 3], ["Amazon", "dor", 2]]); // providers biggest first, then their networks
   });
   it("an empty fleet is no ring", () => {
     expect(ringLevels([], "dag")).toEqual({ countries: [], providers: [], networks: [] });

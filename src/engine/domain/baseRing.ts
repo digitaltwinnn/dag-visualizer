@@ -13,14 +13,15 @@
 // rather than redrawing them. Pure arithmetic over plain objects; `scene/objects/BaseRing.ts`
 // draws it.
 //
-// THE PARTITION IS HONEST BY CONSTRUCTION (the vitals band's donut rule: "the ring must PARTITION
-// the population"): every located MACHINE is counted exactly once, at every level. A machine can
-// run several networks — UP's nodes also validate the DAG — so for the network level the
-// metagraphs take their machines in list order and the DAG core, last, takes what no metagraph
-// claimed: its OWN validators are the neutral remainder, never the fleet. This is the globe's own
-// placement rule (`Globe.setMetagraphs` marks the first network to place a machine as its
-// `geoPrimary`), read as counts. A machine whose country or provider the lookup could not name is
-// an UNKNOWN sub-arc, never dropped and never guessed (rule 10).
+// THE UNIT IS THE EXPLORER'S: A NODE IS A NETWORK PARTICIPANT, NOT A MACHINE (`geoStats.
+// countryTallies` — "the five mainnet machines that run both a validator and a metagraph node are
+// two nodes here, exactly as they are two chips on the globe"). A first cut deduplicated machines
+// across networks and its Finland arc did not match the Countries list's fifth (user, 2026-10-23:
+// "finland (20 nodes out of almost 100 total) should have 1/5 of the whole circle but doesn't").
+// Every level partitions the same participants — the ring the vitals band's donut rule asks for —
+// the DAG core listed last so its validators read as the neutral remainder. A participant whose
+// country or provider the lookup could not name is an UNKNOWN sub-arc, never dropped and never
+// guessed (rule 10).
 
 export interface RingMachine {
   ip: string;
@@ -34,8 +35,8 @@ export interface RingNet {
   id: string;
   /** The network's scene-lane colour (`MetaLayout.color`), carried through for the adapter. */
   color: number;
-  /** Its LOCATED machines (`geoMap[ip]` resolved) — a machine listed twice within one network is
-   *  the same machine on several layers and counts once. */
+  /** Its LOCATED participants, each once — the caller (the Globe) hands the `geoPrimary` records
+   *  the Countries list counts, so a hybrid on several layers is one node here as there. */
   machines: readonly RingMachine[];
 }
 
@@ -79,19 +80,13 @@ export type RingTier = "rest" | "lit" | "dim";
 
 interface Owned extends RingMachine { net: string; color: number | null }
 
-/** Every located machine once, owned by the first network in list order that places it, the DAG
- *  core last (the partition above). */
+/** Every participant tagged with its network, the DAG core's last (the unit above). */
 function ownMachines(nets: readonly RingNet[], dagId: string): Owned[] {
-  const seen = new Set<string>();
   const out: Owned[] = [];
   const metas = nets.filter((n) => n.id !== dagId);
   const dag = nets.find((n) => n.id === dagId);
   for (const n of [...metas, ...(dag ? [dag] : [])]) {
-    for (const m of n.machines) {
-      if (seen.has(m.ip)) continue;
-      seen.add(m.ip);
-      out.push({ ...m, net: n.id, color: n.id === dagId ? null : n.color });
-    }
+    for (const m of n.machines) out.push({ ...m, net: n.id, color: n.id === dagId ? null : n.color });
   }
   return out;
 }

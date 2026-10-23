@@ -21,9 +21,12 @@ describe("FOCI", () => {
     expect(FOCI.dag.target).toEqual(new THREE.Vector3(0, 1, 0));
     // Pulled back once more (×1.08 around the target, user 2026-08-09) — the composition is
     // preserved because pos is scaled about the target, only the fit changes.
-    expect(FOCI.geo.pos).toEqual(new THREE.Vector3(0, 13.5, 44.8));
-    // Geo targets the globe CENTRE (manual orbits stay concentric — no wobble).
-    expect(FOCI.geo.target).toEqual(new THREE.Vector3(0, 0, 0));
+    // The target sits under the globe since 2026-10-23 (the base rings are part of the body); the
+    // pos − target delta is (0, 13.5, 44.8) × 1.055, so the pitch is the one the rig rows were tuned on.
+    expect(FOCI.geo.pos).toEqual(new THREE.Vector3(0, 9.7, 47.3));
+    expect(FOCI.geo.target).toEqual(new THREE.Vector3(0, -4.5, 0));
+    // (It targeted the globe CENTRE until then, for concentric manual orbits — moot since the geo
+    // drag orbits the SUBJECT about its own anchor, else the globe centre, never about the target.)
     // Metagraph pose sits between the overview (z 36) and the country framing (z 29..25).
     expect(FOCI.geoNetwork.pos).toEqual(new THREE.Vector3(0, 5, 33));
   });
