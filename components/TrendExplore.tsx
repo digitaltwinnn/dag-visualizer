@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import Explorer, { type ExplorerLevelSpec } from "@/components/explorer/Explorer";
-import { IdentityDot, QualifierChip } from "@/components/inspector/parts";
+import { QualifierChip } from "@/components/inspector/parts";
 import useTrendRoster, { NO_READING } from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import TablePager from "@/components/datasection/TablePager";
@@ -139,7 +139,9 @@ export default function TrendExplore() {
     total && !empty
       ? {
           key: "dag-total",
-          glyph: <IdentityDot hue={total.hue} />,
+          // No dot on the lead either (user, 2026-10-23: "just drop the whole column for the
+          // metagraph row"): with no glyph in the level the Explorer collapses the column.
+          glyph: undefined,
           name: "DAG",
           // A sentence, so a caption under the name rather than a chip beside it (ExplorerRow's
           // plain-row rule).
@@ -189,7 +191,10 @@ export default function TrendExplore() {
           return [
             {
               key: id,
-              glyph: <IdentityDot hue={row.hue} />,
+              // NO DOT ON A ROW THAT CARRIES ITS HUE IN THE BAR (user, 2026-10-23: "do we need colored
+              // pill and the colored bar? Bar should be clear enough and less busy"): one hue carrier
+              // per row — the bar where there is one, the dot where there is none (the DAG lead).
+              glyph: undefined,
               name: row.name,
               share: row.head != null ? row.head / maxLast : undefined,
               hue: row.hue,
@@ -221,7 +226,7 @@ export default function TrendExplore() {
             ? [
                 {
                   key: UNLISTED_ID,
-                  glyph: <IdentityDot hue={roster.unlisted.hue} />,
+                  glyph: undefined,
                   name: roster.unlisted.name,
                   share: roster.unlisted.head != null ? roster.unlisted.head / maxLast : undefined,
                   hue: roster.unlisted.hue,

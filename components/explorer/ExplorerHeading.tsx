@@ -71,13 +71,23 @@ export function MeasureTiles({ measure }: { measure: MeasureControl }) {
             aria-label={o.unit && o.unit.toLowerCase() !== o.label.toLowerCase() ? `${o.label}, ${o.unit}` : o.label}
             disabled={measure.inactive?.has(o.id)}
             className={cn(
-              "group flex min-w-0 items-center justify-start gap-1.5 h-7 px-1.5 rounded-btn! text-label",
-              "text-muted-foreground bg-transparent border-0",
+              // `gap-1 px-1`: three columns of a 320px card give a tile ~61px of text beside its glyph at
+              // 1.5/1.5, and "Metagraphs" (wide letters) clipped where "Continuity" fit — 6px back
+              // seats every label the four measure modules declare (measured 2026-10-23).
+              "group flex min-w-0 items-center justify-start gap-1 h-7 px-1 rounded-btn! text-label",
+              // EVERY TILE IS A BOUNDED BUTTON (user, 2026-10-23: unlit, "they are just texts on the
+              // same plane"): a hairline ring on each, the lit one's in the selection pair — the
+              // band's plate is one surface, so a text-only tile had nothing to say it was pressable.
+              // `!` on both rings (CSS trap 4): the toggle-group primitive's `data-[spacing=0]:shadow-none`
+              // is class+attribute and outranked the plain ring; both important, the on-state's
+              // variant wins by its own specificity.
+              "text-muted-foreground bg-transparent border-0 shadow-[inset_0_0_0_1px_var(--border)]!",
               "hover:text-foreground hover:bg-wash-soft",
               "data-[state=on]:text-foreground data-[state=on]:bg-[var(--sel-bg)]",
-              "data-[state=on]:shadow-[inset_0_0_0_1px_var(--sel-border)]",
+              "data-[state=on]:shadow-[inset_0_0_0_1px_var(--sel-border)]!",
               "touch:min-h-10",
-              "disabled:opacity-30 disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-muted-foreground",
+              // Inactive keeps its ring: a dimmed button, not dimmed text.
+              "disabled:opacity-45 disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-muted-foreground",
             )}
           >
             {Icon && <Icon aria-hidden className="size-3.5 flex-none group-data-[state=on]:text-primary" />}

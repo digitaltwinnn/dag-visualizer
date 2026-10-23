@@ -315,15 +315,16 @@ export default function Explorer({ id, title, hint, placeholder, levels: selecte
                 ))}
               </div>
             )}
-            {/* THE FOOT IS A PLATE (design B, 2026-10-23): the right-rail foot's ground, full-bleed
-                to the card's bottom edge by the body's own inset, so the span or the page a level
-                states reads as the card's last section rather than one more inset row. */}
-            {current.pager != null && (
-              <div className="-mx-[14px] -mb-2 mt-1.5 px-[14px] pt-1.5 pb-2 bg-[var(--panel-plate)] rounded-b-[calc(var(--radius)-1px)]">
-                {current.pager}
-              </div>
-            )}
           </div>
+          {/* THE FOOT IS A PLATE (design B, 2026-10-23): the right-rail foot's ground, full-bleed
+              to the card's bottom edge by the body's own inset, so the span or the page a level
+              states reads as the card's last section rather than one more inset row. OUTSIDE the
+              list wrapper: inside it, a nested level's spine ran down the plate's edge. */}
+          {current.pager != null && (
+            <div className="-mx-[14px] -mb-2 mt-1.5 px-[14px] pt-1.5 pb-2 bg-[var(--panel-plate)] rounded-b-[calc(var(--radius)-1px)]">
+              {current.pager}
+            </div>
+          )}
         </>
       )}
     </ExplorerShell>

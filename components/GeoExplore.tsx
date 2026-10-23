@@ -3,6 +3,7 @@
 import { cohortLabel } from "@/components/railSiblings";
 import { useMemo } from "react";
 
+import LiveFoot from "@/components/explorer/LiveFoot";
 import Explorer, { type ExplorerLevelSpec } from "@/components/explorer/Explorer";
 import { NODE_GLYPH_W, nodeRowSpec } from "@/components/explorer/nodeRow";
 import { subjectPairing } from "@/components/useSubjectPairing";
@@ -110,6 +111,8 @@ export default function GeoExplore() {
       crumb: { label: "Countries", onRelease: () => (country ? drill(country) : undefined) },
       measure: { options: GEO_MEASURE_OPTIONS, value: geoMeasure, onPick: (id) => setGeoMeasure(id as GeoMeasure) },
       hasFigure: true,
+      // The live foot on every level (components/explorer/LiveFoot.tsx has the argument).
+      pager: <LiveFoot />,
       // No tags at this level, so the name takes the tag home's room.
       nameW: 128,
       // Quiet-empty (a real metagraph with no locatable nodes): one honest message, no rows.
@@ -158,6 +161,8 @@ export default function GeoExplore() {
       meaning: "Where the nodes sit, and who hosts them",
       measure: { options: COHORT_MEASURE_OPTIONS, value: cohortPick, onPick: (id) => setGeoMeasure(id as GeoMeasure) },
       hasFigure: true,
+      // The live foot on every level (components/explorer/LiveFoot.tsx has the argument).
+      pager: <LiveFoot />,
       nameW: 76,
       empty: "No locatable nodes here yet.",
       rows: cohorts.map((ch) => {
@@ -217,6 +222,8 @@ export default function GeoExplore() {
       glyphW: NODE_GLYPH_W,
       measure: null,
       hasFigure: false,
+      // The live foot on every level (components/explorer/LiveFoot.tsx has the argument).
+      pager: <LiveFoot />,
       // The one node row (`explorer/nodeRow.tsx`), ticker included, as in every explorer.
       rows: openCohort.rows.map((r, i) => {
         const on = nodeOn(r);

@@ -450,7 +450,8 @@ export default function LedgerPanel() {
         const lensedOut = outOfLens(filter, n.id);
         return {
           key: n.id,
-          glyph: <IdentityDot hue={n.hue} />,
+          // No dot beside a hued bar (user, 2026-10-23) — one hue carrier per row.
+          glyph: undefined,
           name: n.italic ? <span className="italic">{n.name}</span> : n.name,
           share: m.value != null ? m.value / maxNet : undefined,
           hue: n.hue,

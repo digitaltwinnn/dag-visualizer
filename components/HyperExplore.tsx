@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 
+import LiveFoot from "@/components/explorer/LiveFoot";
 import Explorer, { type ExplorerLevelSpec } from "@/components/explorer/Explorer";
 import { NODE_GLYPH_W, nodeRowSpec } from "@/components/explorer/nodeRow";
 import { IdentityDot, RoleChips } from "@/components/inspector/parts";
@@ -87,6 +88,8 @@ export default function HyperExplore() {
       crumb: { label: "Networks", onRelease: () => toggleNetwork(filter) },
       measure: { options: HYPER_MEASURE_OPTIONS, value: hyperMeasure, onPick: (id) => setHyperMeasure(id as HyperMeasure) },
       hasFigure: true,
+      // The live foot on every level (components/explorer/LiveFoot.tsx has the argument).
+      pager: <LiveFoot />,
       // No tags at this level, so the name takes the tag home's room (the longest catalog name
       // fits without an ellipsis).
       nameW: 128,
@@ -96,7 +99,8 @@ export default function HyperExplore() {
         const hue = identityHudCss(m.id);
         return {
           key: m.id,
-          glyph: <IdentityDot hue={hue} />,
+          // No dot beside a hued bar (user, 2026-10-23) — one hue carrier per row.
+          glyph: undefined,
           name,
           share: v / maxV,
           hue,
@@ -131,6 +135,8 @@ export default function HyperExplore() {
       meaning: "Which layers each node runs",
       measure: { options: HYPER_MEASURE_OPTIONS, value: hyperMeasure, onPick: (id) => setHyperMeasure(id as HyperMeasure) },
       hasFigure: true,
+      // The live foot on every level (components/explorer/LiveFoot.tsx has the argument).
+      pager: <LiveFoot />,
       nameW: 52,
       // Honest instrument state — mirrors the 3D: a metagraph with no reported nodes renders a
       // hub and nothing else.
@@ -179,6 +185,8 @@ export default function HyperExplore() {
       glyphW: NODE_GLYPH_W,
       measure: null,
       hasFigure: false,
+      // The live foot on every level (components/explorer/LiveFoot.tsx has the argument).
+      pager: <LiveFoot />,
       // The one node row (`explorer/nodeRow.tsx`), led by its network's ticker.
       rows: openGroup.rows.map((r, i) => {
         const on = selIp != null && "node" in r.pick && r.pick.node?.ip === selIp;

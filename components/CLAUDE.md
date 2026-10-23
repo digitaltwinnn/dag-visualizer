@@ -338,8 +338,22 @@ in `components/icons.tsx` is the one glyph map, keyed by measure id across the f
 modules), a hairline, then the PATH, bare (`ExplorerPath bare` — its own accent-tinted plate under
 the band was a third surface in a second tint; the house keeps its wash as the band's one accent
 mark). The list sits on the glass. The pager or span sits on the PLATE FOOT, full-bleed to the
-card's bottom edge, the right-rail foot's own device. No section labels: "Networks" would be said
-twice. The dropdown the tiles replaced (`MeasureMenu`, 2026-09-26 → 2026-10-23) hid the breadth
+card's bottom edge, the right-rail foot's own device — and EVERY card ends in one: Hypergraph's
+and Geography's lists are the live poll, so their foot is the live atom (`explorer/LiveFoot.tsx`,
+`LiveDot` + "live"); Snapshots keeps "last N min cache" because there "live" is a SELECTION state
+(live vs pinned, on the tick row and the card head) and the foot's word would collide with it.
+No section labels: "Networks" would be said twice. Four rules the same day finished it: **every
+tile is a bounded button** (a hairline ring, the lit one's in the selection pair, both `!` — the
+toggle primitive's `data-[spacing=0]:shadow-none` outranked the plain ring; user: unlit "they are
+just texts on the same plane"); **the band shows the explorer's WHOLE measure set on every level**,
+the measures a level cannot show INACTIVE at reduced strength, a node level all of them (user:
+"instead of removing the control band … just make them inactive? I don't like it just
+disappears" — the plank's rule); **a row with a hued bar carries no identity dot**, and the glyph
+column collapses with it on the network levels, the DAG lead included (user: "do we need colored
+pill and the colored bar? … just drop the whole column"); and **on Print the plate is the faint
+WASH, not a grey** (`--panel-plate` light = `--wash-faint`; user: the band and foot "a bit too gray
+in light mode … the Snapshot records link section for example is a light blue instead" — dark keeps
+its neutral white lift, where a tinted lift would read as selected). The dropdown the tiles replaced (`MeasureMenu`, 2026-09-26 → 2026-10-23) hid the breadth
 behind a caret and stacked 6px under the card's − toggle, which left the same day (user: "don't
 need it"). The path plate stays on every explorer, History's one-level card included (user, same
 day: "where did the breadcrumb go?" — a cut had dropped it there as a plate that never shows a path).
