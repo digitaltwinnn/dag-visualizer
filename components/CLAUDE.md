@@ -1498,7 +1498,7 @@ Every rail card leads with `CardHead`: eyebrow / title / inset hairline / body.
   stretched toggle, required for touch) — but the BOX carries **no minimize** (user, 2026-09-11:
   "hardly used"; the − on the eyebrow line and the whole-head collapse toggle both went): the box
   moves by expanding another entry (or an explorer row's re-box), never by collapsing into
-  nothing. The LEFT rail's explore cards keep their collapse toggle. The × and the aside float
+  nothing. The LEFT rail's explore card lost its +/− too on 2026-10-23 (user: "don't need it" — the view's one tool card, in a rail that scrolls). The × and the aside float
   above the entry overlay so closing and links keep working. ⚠️ **Floating above it means
   `pointer-events-none` on the wrapper and `pointer-events-auto` on its own links/buttons**
   (`[&_a]:pointer-events-auto`, `[&_button]:pointer-events-auto`) — a `z-index` alone leaves the

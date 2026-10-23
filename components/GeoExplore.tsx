@@ -44,7 +44,7 @@ import { UNLISTED_ID } from "@/src/data/unlisted";
 // Rule 9: every row previews on its subject's own channel (`hoverCountry` for a country, `hoverGroup`
 // + `hoverCohort` for a cohort, `hoverNodeId` for a node), and none commits.
 
-export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: boolean } = {}) {
+export default function GeoExplore() {
   const dead = useNoSignal();
   const lb = useStore((s) => s.leaderboard);
   const country = useStore((s) => s.country);
@@ -242,7 +242,6 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
       hint={null}
       placeholder={quietEmpty ? undefined : "Select a country to view its hosting providers and cities."}
       levels={levels}
-      defaultCollapsed={defaultCollapsed}
       onLeave={() => {
         setHoverNodeId(null);
         setHoverCountry(null);

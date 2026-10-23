@@ -121,7 +121,6 @@ export interface ExplorerProps {
   /** The open levels, root first; the last is on screen. */
   levels: readonly ExplorerLevelSpec[];
   onLeave?: () => void;
-  defaultCollapsed?: boolean;
   /** The card head's right-aligned slot — a CARD-level state that holds on every level (the
    *  snapshot explorer's LIVE/PINNED, since 2026-09-28), as opposed to a level's own `setting`. */
   aside?: ReactNode;
@@ -136,7 +135,7 @@ function openOrToggle(rung: string, click: () => void): void {
   openRailCard(rung, [boxed]);
 }
 
-export default function Explorer({ id, title, hint, placeholder, levels: selected, onLeave, defaultCollapsed, aside }: ExplorerProps) {
+export default function Explorer({ id, title, hint, placeholder, levels: selected, onLeave, aside }: ExplorerProps) {
   // The view hands every level its selection opens; the OPEN CARD decides how deep the path stands.
   const boxed = useStore((s) => s.boxedCard);
   const levels = levelsForBox(selected, boxed);
@@ -215,7 +214,6 @@ export default function Explorer({ id, title, hint, placeholder, levels: selecte
       // in three of four views. The shell's own hint line stays only for the no-level case.
       hint={current ? null : hint}
       onLeave={onLeave}
-      defaultCollapsed={defaultCollapsed}
       // The card head's aside: a view's card-level state, then THE MEASURE CONTROL (A2) — the
       // figure column's heading, right of the title where the eye finds the list's one setting.
       // …unless the level presents its measures as TILES (History, 2026-10-23): those are the

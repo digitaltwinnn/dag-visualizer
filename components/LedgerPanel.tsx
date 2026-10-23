@@ -127,7 +127,7 @@ function spanWords(ordered: readonly GlobalSnapshot[]): string {
   return min < 90 ? `last ${min} min` : `last ${Math.round(min / 60)} h`;
 }
 
-export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: boolean } = {}) {
+export default function LedgerPanel() {
   const filter = useStore((s) => s.filter);
   const mode = useStore((s) => s.mode);
   const hoverFilter = useStore((s) => s.hoverFilter);
@@ -605,7 +605,6 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
       hint={null}
       placeholder="Select a snapshot to view its anchors."
       levels={levels}
-      defaultCollapsed={defaultCollapsed}
       onLeave={() => {
         // Container-level hover backstop: leaving the card clears every channel its rows write.
         setHoverFilter(null);

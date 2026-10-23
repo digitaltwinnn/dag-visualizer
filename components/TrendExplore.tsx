@@ -53,7 +53,7 @@ import { UNLISTED_ID } from "@/src/data/unlisted";
 // washes this row. Nothing about the pose moves: a preview that re-staggered the stack would read
 // as a commit.
 
-export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: boolean } = {}) {
+export default function TrendExplore() {
   const filter = useStore((s) => s.filter);
   const metric = useStore((s) => s.trendMetric);
   const focus = useStore((s) => s.trendFocus);
@@ -258,7 +258,6 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
       // The plate placeholder every explorer carries (user, 2026-10-09): what selecting a row does.
       placeholder={empty ? undefined : "Select a network to view the chart."}
       levels={[level]}
-      defaultCollapsed={defaultCollapsed}
       onLeave={() => setHover(null)}
     />
   );

@@ -33,7 +33,7 @@ import { networksLevel } from "@/src/data/ladderLevels";
 // for a network, `hoverGroup` + `hoverCohort` for a composition, `hoverNodeId` for a node), and
 // none of them commits.
 
-export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: boolean } = {}) {
+export default function HyperExplore() {
   const dead = useNoSignal();
   const metaList = useStore((s) => s.metaList);
   const filter = useStore((s) => s.filter);
@@ -203,7 +203,6 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
       hint={null}
       placeholder="Select a network to view its composition."
       levels={levels}
-      defaultCollapsed={defaultCollapsed}
       onLeave={() => {
         setHoverFilter(null);
         setHoverNodeId(null);
