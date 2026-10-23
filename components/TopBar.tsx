@@ -5,7 +5,7 @@ import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { ABOUT_ICON as AboutIcon, VIEW_ICONS } from "@/components/icons";
 import { useStore } from "@/src/store/store";
 import { displayNetwork } from "@/src/data/unlisted";
-import { cn } from "@/lib/utils";
+import { cn, TOUCH_HIT } from "@/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import FilterPicker from "@/components/topbar/FilterPicker";
 import PulseStrip from "@/components/topbar/PulseStrip";
@@ -170,15 +170,25 @@ export default function TopBar() {
         aria-label={name ? `${name} view` : dir === -1 ? "First view" : "Last view"}
         onClick={() => { if (target) { setStrip(null); setFaceSlide({ mode: target, from: dir === 1 ? "right" : "left" }); setMode(target); } }}
         className={cn(
-          "hidden max-[700px]:inline-flex items-center justify-center size-11 rounded-btn bg-transparent border-0 cursor-pointer",
-          // In the ACCENT (user, 2026-10-18: muted they "look a bit boring/blend"): a control that
-          // moves the view wears the control colour, dimmed at an end.
-          "text-primary-ink hover:bg-wash-soft",
-          "disabled:opacity-30 disabled:cursor-default disabled:hover:bg-transparent",
+          // THE PLANK CHEVRON SPECIES, FLUSH TO THE NAME (user, 2026-10-23, design A of
+          // `.superpowers/brainstorm/…/phone-topbar-stepper.html`: the pair was "too wide and
+          // don't look related to the actual view switcher"). They were 44px boxes with a 24px
+          // accent glyph, 10px clear of the name each side — the heaviest marks in the bar, and
+          // the centre cell they made (213px) left each side zone 65px for the left's 92px of
+          // content, so the filter face clipped to "A" on every phone load. Now they are the
+          // rail pager's chevron exactly: a 24px box, a 16px glyph in muted ink, dimmed at an
+          // end, with `TOUCH_HIT`'s invisible pad for a thumb — and no gap to the face, so the
+          // arrows read as the name's own, the way a date stepper does. The accent they wore
+          // from 2026-10-18 ("muted they look a bit boring") went with the size: at 16px beside
+          // a title-step name the muted ink is the quiet furniture the name needs around it.
+          "hidden max-[700px]:inline-flex items-center justify-center size-6 rounded-btn bg-transparent border-0 cursor-pointer",
+          "text-muted-foreground hover:text-foreground hover:bg-wash-soft",
+          "disabled:opacity-30 disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-muted-foreground",
           "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
+          TOUCH_HIT,
         )}
       >
-        <Glyph aria-hidden className="size-6" strokeWidth={2.25} />
+        <Glyph aria-hidden className="size-4" />
       </button>
     );
   };
@@ -209,9 +219,22 @@ export default function TopBar() {
       // Two failure shapes since the grid promotion: the ROW overflowing its box, and a ZONE
       // being crushed below its content (the left zone's min-w-0 lets the grid shrink it, so
       // the row's own scrollWidth stays clean while the brand/filter get clipped inside it).
-      let over = el.scrollWidth - el.clientWidth;
+      // Overflow is measured from the CHILDREN'S boxes, not scrollWidth (2026-10-23): the phone
+      // chevrons wear `TOUCH_HIT`, whose invisible pseudo reaches 10px past its host on the touch
+      // tier and counts toward scrollable overflow — so scrollWidth reported a 10px clip where
+      // nothing visible was clipped. Real controls have boxes; a hit pad has none. The RIGHT
+      // edge only: every zone lays its content out from its left edge, so a crush always spills
+      // rightward, while a child's own negative left margin (the brand's `-mx-1`) is design.
+      const rowRight = el.getBoundingClientRect().right;
+      let over = 0;
       for (const zone of el.children) {
-        if (zone instanceof HTMLElement) over = Math.max(over, zone.scrollWidth - zone.clientWidth);
+        if (!(zone instanceof HTMLElement)) continue;
+        const zoneRight = zone.getBoundingClientRect().right;
+        over = Math.max(over, Math.round(zoneRight - rowRight));
+        for (const child of zone.children) {
+          if (!(child instanceof HTMLElement) || !child.offsetWidth) continue;
+          over = Math.max(over, Math.round(child.getBoundingClientRect().right - zoneRight));
+        }
       }
       if (over > 0)
         console.warn(
@@ -424,7 +447,8 @@ export default function TopBar() {
             that other views exist, and neither reads as a control). Two real steps through the
             same `stepView` the swipe runs, clamped at the ends (a dimmed chevron, never a
             vanishing one — the plank's rule), hidden from 700px up where the segmented switch
-            names every view. */}
+            names every view. Since 2026-10-23 they are the plank's own chevron, flush to the
+            face (`viewChevron` has the measurements). */}
         {viewChevron(-1)}
         <button
           type="button"

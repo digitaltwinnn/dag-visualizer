@@ -194,8 +194,11 @@ previews the dim, picking closes it), **The phone face's name is a step up (titl
 icon and name, FLANKED BY ‹ › since 2026-10-18 (Vercel analytics: three quarters of visitors on a
 phone and most never leaving "/"; the swipe and the pip row were the only hints that other views
 exist, and neither reads as a control — the chevrons step through the same `stepView`, dimmed at
-the ends; in the ACCENT, and the pip row retired with them the same evening — "has both … the <> is
-more intuitive") — that opens the view list as a strip tenant** (`topbar/ViewPicker.tsx`, 2026-09-28: a
+the ends; the pip row retired with them the same evening — "has both … the <> is
+more intuitive". **Since 2026-10-23 they are the rail pager's chevron species, flush to the face**
+(user: the 44px accent pair was "too wide and don't look related to the actual view switcher";
+design A of the brainstorm mock — a 24px box, 16px muted glyph, `TOUCH_HIT`'s pad, measured: the
+centre cell 213px → 173px, which ended the left zone's clip of the filter face to "A" at 360–390px)) — that opens the view list as a strip tenant** (`topbar/ViewPicker.tsx`, 2026-09-28: a
 row of 44px icons cannot scale with the view count — History made it five and the filter ran under
 the first tab — and hiding entries per tier is a patch the next view undoes; the segmented switch
 stays from 700px up, both presentations live in the DOM and CSS picks, and the hanging caption
