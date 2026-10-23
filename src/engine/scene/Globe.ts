@@ -29,7 +29,16 @@ import { armillaryFrame, ringFramePos, ringNormal, armillaryRings, armillaryPos,
 import { surfFade, extrasFade } from "../domain/morph";
 import { ArcSim, type ArcEndpoint } from "../domain/arcSim";
 import type { MetaNodeRecord, ValidatorRecord } from "../domain/records";
-import { buildGeoView, retintGeoView, setCountryBorder, setCountryFillMask, HOVER_MASK_BOOST, SUN_TUNE, BORDER_LEVELS, BORDER_LEVELS_PAPER, type GeoViewHost } from "./views/GeoView";
+import { buildGeoView, geoBlend, retintGeoView, setCountryBorder, setCountryFillMask, HOVER_MASK_BOOST, SUN_TUNE, BORDER_LEVELS, BORDER_LEVELS_PAPER, type GeoViewHost } from "./views/GeoView";
+import { BaseRing } from "./objects/BaseRing";
+import { ringLevels, type RingMachine, type RingNet } from "../domain/baseRing";
+
+/** A located machine for the base rings: its place and host as the geo lookup reports them, or
+ *  null where the lookup could not say (an UNKNOWN sub-arc, never a guess). */
+function ringMachine(ip: string, geoMap: GeoMap): RingMachine {
+  const g = geoMap[ip];
+  return { ip, cc: g?.cc || null, isp: g?.isp || null };
+}
 import type { StageLight } from "./objects/StageLight";
 import { STAGE_LIGHTS } from "../domain/stageLight";
 import { ccToNumeric, countryCcAt, countryLean, geometryRings, mainPolygonRings, ringsAngularRadius, ringsCentroid, type Ring } from "../domain/countryShape";
@@ -156,6 +165,7 @@ export class Globe implements GeoViewHost {
   private layers: HyperView | null;
   private camera: THREE.Camera | null;
   private _camN = new THREE.Vector3(); // camera direction in this group's local frame
+  private _camL = new THREE.Vector3(0, 0, 60); // camera POSITION in this group's local frame (the arcs' occlusion test)
   private _hasCam = false;
 
   pickables: THREE.Object3D[] = [];
@@ -214,6 +224,12 @@ export class Globe implements GeoViewHost {
   // for the land grid + sea graticule; _edgeColor is the (eased) coastal-wall colour. Set from the
   // CSS token in the constructor. Never identity-tinted (structural scene lane).
   geoColor = 0x000000;
+  readonly baseRing: BaseRing;
+  /** The located machines per network the base ring counts — the metagraphs from the last
+   *  `setMetagraphs`, the DAG from the last `setNodes`; rebuilt from either arrival. */
+  private _ringMetas: RingNet[] = [];
+  private _ringDag: RingMachine[] = [];
+  private _ringHoverCc: string | null = null;
   private _dagCore = 0x000000;
   _edgeColor = new THREE.Color();
   private _edgeTarget = new THREE.Color();
@@ -327,6 +343,16 @@ export class Globe implements GeoViewHost {
   constructor(scene: THREE.Scene, layers: HyperView | null, camera: THREE.Camera | null, colors: SceneColors, stage: StageLight) {
     this.group = new THREE.Group();
     scene.add(this.group);
+    // THE BASE RING — the located fleet by network under the globe (objects/BaseRing.ts has the
+    // design). A sibling of `group`, not a child: it must not turn with the globe.
+    this.baseRing = new BaseRing({
+      geoFades: this.geoFades,
+      geoBlends: this.geoBlends,
+      geoTints: this.geoTints,
+      blending: () => geoBlend(this),
+      accent: () => this.geoColor,
+    });
+    scene.add(this.baseRing.group);
     // Node-pick stage light: tight cone over one chip stack (radius ≈ 6·tan(0.36) ≈ 2.3), claimed
     // per frame in update().
     this.stage = stage;
@@ -383,7 +409,7 @@ export class Globe implements GeoViewHost {
     // hence after it): the hologram has no opaque body sphere, so nothing depth-occludes a comet
     // flying over the far hemisphere — it has to fade itself, exactly like the walls and the
     // graticule do (user, 2026-08-01: "arcs are visible through the globe").
-    this.arcs.setFacing(this.facingUniform, this.closeUniform);
+    this.arcs.setFacing(this.facingUniform, this.closeUniform, { value: this._camL });
     this.arcs.setColors(this._colorsRef);
   }
 
@@ -539,6 +565,10 @@ export class Globe implements GeoViewHost {
 
     this.fabric.buildValidators(this.nodes);
     this.pickables = this.fabric.pickables;
+    // The DAG's located machines for the base ring (objects/BaseRing.ts): every validator with a
+    // place on the globe, by IP — the ring's partition counts each machine once (domain/baseRing).
+    this._ringDag = this.nodes.flatMap((u) => (u.geoDir && u.nodeId ? [ringMachine(u.nodeId, geoMap)] : []));
+    this._rebuildBaseRing();
     this.setSelectedNode(this._selectedNodeId); // re-resolve the spotlight's record on fresh data
     this.setSelectedCohort(this._selCohort); // re-resolve the cohort membership/centroid too
 
@@ -762,6 +792,8 @@ export class Globe implements GeoViewHost {
     this.fabric.invalidateBases();
     const metaHex = (id: string) => this.sceneColors?.[id] ?? this.geoColor;
     for (const m of this.metaList) m.color = metaHex(m.id);
+    for (const n of this._ringMetas) n.color = metaHex(n.id);
+    this._rebuildBaseRing();
     // The metagraph loop re-bakes its own buffer from `r.color` every frame — no invalidation.
     for (const r of this.metaNodes) r.color.setHex(metaHex(r.metaId));
     // The density pools are tagged with their network at build time (userData.net), so they retint
@@ -779,6 +811,12 @@ export class Globe implements GeoViewHost {
 
   // `list` is /api/metagraphs; geoMap supplies each node's location. Only metagraphs with at least
   // one locatable node are kept.
+  /** Event-time: the base ring from the located fleet — the metagraphs' machines and the DAG's. */
+  private _rebuildBaseRing(): void {
+    const nets: RingNet[] = [...this._ringMetas, { id: "dag", color: this.geoColor, machines: this._ringDag }];
+    this.baseRing.setLevels(ringLevels(nets, "dag"));
+  }
+
   setMetagraphs(list: RouteMetagraph[], geoMap: GeoMap): void {
     this.fabric.disposeMeta();
     this.metaNodes = [];
@@ -823,6 +861,8 @@ export class Globe implements GeoViewHost {
       const machines = new Set(located.map((node) => node.ip)).size;
       if (machines) metaMachineCounts.set(m.id, machines);
     }
+    this._ringMetas = withNodes.map((m) => ({ id: m.id, color: m.color, machines: (locatedByMeta.get(m.id) ?? []).map((n) => ringMachine(n.ip, geoMap)) }));
+    this._rebuildBaseRing();
     const metaSpecs = metaTrayLayout(metaMachineCounts, LANE_IDS);
     this._contSpecs.meta = [...metaSpecs.values()];
     const metaContSlot = new Map<string, number>(); // next free chip slot per metagraph tray
@@ -1017,6 +1057,7 @@ export class Globe implements GeoViewHost {
   // a WHO-is-in-scope statement, so it lives here at the TARGET (the view rows keep saying how
   // MUCH); applyLedgerLayout re-derives it when the flag flips, and the ease carries the change.
   private _applyDim(sel: string): void {
+    this.baseRing.setSubject(sel);
     const dagLit = sel === "all" || sel === "dag" || this.ledger;
     this.dimTarget = dagLit ? 0 : 1;
     for (const r of this.metaNodes) r.dimTarget = (sel === "all" || sel === r.metaId) ? 0 : 1;
@@ -1027,12 +1068,15 @@ export class Globe implements GeoViewHost {
   // OTHER nodes stay visible, pickable and fanned exactly as before, so no relayout here.
   setCountry(cc: string | null): void {
     this.countryFilter = cc || null;
+    this.baseRing.setCountry(this._ringHoverCc ?? this.countryFilter);
     this._updateCountryBorder();
   }
 
   // Transient border PREVIEW (explorer country-row hover): shows the country's outline at a
   // whisper level without committing the drill. The committed drill always wins.
   setHoverCountry(cc: string | null): void {
+    this._ringHoverCc = cc || null;
+    this.baseRing.setCountry(this._ringHoverCc ?? this.countryFilter);
     this._hoverCountryCc = cc || null;
     this._updateCountryBorder();
   }
@@ -1562,7 +1606,9 @@ export class Globe implements GeoViewHost {
     this._hasCam = !!this.camera;
     if (!this._hasCam) return;
     this._camN.copy(this.camera!.position);
-    this.group.worldToLocal(this._camN).normalize();
+    this.group.worldToLocal(this._camN);
+    this._camL.copy(this._camN);
+    this._camN.normalize();
   }
 
   // Write this frame's values into the persistent FrameCtx (`this._ctx`, built once in the
@@ -1822,6 +1868,7 @@ export class Globe implements GeoViewHost {
   update(dt: number): void {
     // The doc overlay's fleet fade eases here — once per frame, before the pools write.
     this.fabric.tickFleetFade(dt);
+    this.baseRing.update(dt, this.camera ? this.camera.position : null);
     this._placeGatherLabels();
     // Advance the arrival beat (see beginEntry) — parked at 1 in steady state.
     if (!this._glowEntryHold && this._glowEntryT < 1) this._glowEntryT = Math.min(1, this._glowEntryT + dt / 0.7);

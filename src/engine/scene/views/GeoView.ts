@@ -169,7 +169,7 @@ function buildOcean(globe: GeoViewHost) {
 
 /** The blend mode the globe's furniture draws with on the current ground — see GeoViewHost.geoPaper.
  *  Additive light on paper is invisible, so on a light ground the same ink draws NORMALLY. */
-function geoBlend(globe: GeoViewHost): THREE.Blending {
+export function geoBlend(globe: GeoViewHost): THREE.Blending {
   return globe.geoPaper ? THREE.NormalBlending : THREE.AdditiveBlending;
 }
 

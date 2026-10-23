@@ -14,6 +14,7 @@
 // `color`/`base` for the comet tint.
 
 import * as THREE from "three";
+import { R, LAND_H } from "../../domain/geoLayout";
 import { ARC_TAIL, ARC_TAIL_FRAC, type ArcAgent, type ArcSim } from "../../domain/arcSim";
 import { glowBlend, isLightGround, type SceneColors } from "../../sceneColors";
 import { joinBloom } from "../SceneContext";
@@ -98,6 +99,9 @@ export class Arcs {
   // hands them over once). See setFacing.
   private _camN: { value: THREE.Vector3 } = { value: new THREE.Vector3(0, 0, 1) };
   private _close: { value: number } = { value: 0 };
+  /** The camera's POSITION in the globe's local frame (the Globe's `_camL`, shared by reference) —
+   *  the line-of-sight occlusion below needs where the eye is, not only which way it faces. */
+  private _camL: { value: THREE.Vector3 } = { value: new THREE.Vector3(0, 0, 60) };
   hasArcs = false;
 
   /** The gate's VISIBILITY half (user, 2026-09-04): while the view-in choreography runs, the
@@ -175,9 +179,10 @@ export class Arcs {
   // body sphere, so there is nothing to depth-occlude an arc — additive lines on the back side
   // otherwise draw at full strength straight through the planet (user, 2026-08-01). Called once,
   // right after buildGeoView; the material picks the refs up when it is next (re)built.
-  setFacing(camN?: { value: THREE.Vector3 }, close?: { value: number }): void {
+  setFacing(camN?: { value: THREE.Vector3 }, close?: { value: number }, camL?: { value: THREE.Vector3 }): void {
     if (camN) this._camN = camN;
     if (close) this._close = close;
+    if (camL) this._camL = camL;
   }
 
   // js/globe.js:359-427 (`_buildArcs`) minus the agent seeding (that's ArcSim.rebuild). Sizes the
@@ -239,27 +244,44 @@ export class Arcs {
         uM: { value: 0 }, // morph fade-in (geography view)
         uCamN: this._camN, // shared with the graticule/walls — see setFacing
         uClose: this._close,
+        uCamL: this._camL,
         uInk: { value: this._paper ? 1 : 0 }, // 0 = additive glow, 1 = ink on paper (_stageTrail)
       },
       vertexShader: `
         attribute float aTail; attribute vec3 aColor;
-        varying float vB; varying vec3 vColor; varying vec3 vDir;
+        varying float vB; varying vec3 vColor; varying vec3 vDir; varying vec3 vPos;
         void main() {
           vB = 1.0 - aTail;                 // bright (1) at the head -> 0 at the tail tip
           vColor = aColor;
-          vDir = normalize(position);       // direction from the globe centre (group-local)
+          vDir = normalize(position); vPos = position;       // direction from the globe centre (group-local)
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }`,
       fragmentShader: `
-        uniform float uM; uniform vec3 uCamN; uniform float uClose; uniform float uInk;
-        varying float vB; varying vec3 vColor; varying vec3 vDir;
+        uniform float uM; uniform vec3 uCamN; uniform float uClose; uniform float uInk; uniform vec3 uCamL;
+        varying float vB; varying vec3 vColor; varying vec3 vDir; varying vec3 vPos;
         void main() {
           // FACING dim, the surface's own recipe (GeoView's graticule/walls): a comet over the
           // far hemisphere stays faintly present — the hologram reads through — but clearly
           // BEHIND, and damps to near-nothing as the camera closes in, where seeing through the
           // globe was pure noise. The arc apex rises above the surface, so the smoothstep window
           // is what keeps a comet crossing the limb from popping.
-          float facing = mix(mix(0.22, 0.03, uClose), 1.0, smoothstep(-0.25, 0.12, dot(vDir, uCamN)));
+          // OCCLUDED BY THE GLOBE, EXACTLY (2026-10-23, user: the base ring must "fade when the globe
+          // sits in front … also an issue with the arc animation"): the hemisphere facing dim it
+          // replaced (dot(vDir, uCamN), floors 0.22/0.03) kept a packet behind the planet faintly
+          // visible by design (2026-08-01) and read as drawing through it. Now the fragment asks
+          // whether its line of sight to the eye passes through the plateau sphere — the closest
+          // approach of the eye→fragment segment to the centre against R + LAND_H, soft over a
+          // short rim so a comet crossing the limb never pops. objects/BaseRing.ts runs the same
+          // test in world space.
+          float facing;
+          {
+            vec3 d = vPos - uCamL;
+            float L = length(d);
+            vec3 dir = d / max(L, 1e-5);
+            float t = clamp(dot(-uCamL, dir), 0.0, L);
+            float dist = length(uCamL + dir * t);
+            facing = smoothstep(${(R + LAND_H - 0.9).toFixed(2)}, ${(R + LAND_H + 0.4).toFixed(2)}, dist);
+          }
           // The comet falloff, themed: quadratic where the mark ADDS light, linear where it lays
           // ink. See _stageTrail for why the two grounds cannot share one curve.
           float a = mix(vB * vB, vB, uInk) * uM * facing;
@@ -295,6 +317,7 @@ export class Arcs {
         uM: { value: 0 },
         uCamN: this._camN,
         uClose: this._close,
+        uCamL: this._camL,
         uSize: { value: t.size },
         uWhite: { value: t.white },
         uInk: { value: this._paper ? 1 : 0 }, // 0 = additive spark, 1 = ink on paper (_stageHead)
@@ -303,10 +326,10 @@ export class Arcs {
       vertexShader: `
         attribute vec3 aColor;
         uniform float uSize; uniform float uPx;
-        varying vec3 vColor; varying vec3 vDir;
+        varying vec3 vColor; varying vec3 vDir; varying vec3 vPos;
         void main() {
           vColor = aColor;
-          vDir = normalize(position);
+          vDir = normalize(position); vPos = position;
           vec4 mv = modelViewMatrix * vec4(position, 1.0);
           // Attenuated, then CLAMPED at both ends: a spark that shrinks to a speck when the globe
           // is framed whole has stopped being an accent, and one that swells to a blob up close has
@@ -315,13 +338,29 @@ export class Arcs {
           gl_Position = projectionMatrix * mv;
         }`,
       fragmentShader: `
-        uniform float uM; uniform vec3 uCamN; uniform float uClose; uniform float uWhite;
+        uniform float uM; uniform vec3 uCamN; uniform float uClose; uniform float uWhite; uniform vec3 uCamL;
         uniform float uInk;
-        varying vec3 vColor; varying vec3 vDir;
+        varying vec3 vColor; varying vec3 vDir; varying vec3 vPos;
         void main() {
           // The same FACING dim the trail and the globe surface run, so a head crossing the limb
           // goes behind the hologram with its own tail rather than popping off it.
-          float facing = mix(mix(0.22, 0.03, uClose), 1.0, smoothstep(-0.25, 0.12, dot(vDir, uCamN)));
+          // OCCLUDED BY THE GLOBE, EXACTLY (2026-10-23, user: the base ring must "fade when the globe
+          // sits in front … also an issue with the arc animation"): the hemisphere facing dim it
+          // replaced (dot(vDir, uCamN), floors 0.22/0.03) kept a packet behind the planet faintly
+          // visible by design (2026-08-01) and read as drawing through it. Now the fragment asks
+          // whether its line of sight to the eye passes through the plateau sphere — the closest
+          // approach of the eye→fragment segment to the centre against R + LAND_H, soft over a
+          // short rim so a comet crossing the limb never pops. objects/BaseRing.ts runs the same
+          // test in world space.
+          float facing;
+          {
+            vec3 d = vPos - uCamL;
+            float L = length(d);
+            vec3 dir = d / max(L, 1e-5);
+            float t = clamp(dot(-uCamL, dir), 0.0, L);
+            float dist = length(uCamL + dir * t);
+            facing = smoothstep(${(R + LAND_H - 0.9).toFixed(2)}, ${(R + LAND_H + 0.4).toFixed(2)}, dist);
+          }
           float d = length(gl_PointCoord - vec2(0.5)) * 2.0;
           if (d >= 1.0) discard;
           float f = 1.0 - d;

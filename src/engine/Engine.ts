@@ -1904,7 +1904,9 @@ export class Engine {
     const out = this._pickBuf;
     out.length = 0;
     for (const src of VIEW_POLICIES[this.mode].pickSources) {
-      if (src === "globe") out.push(...this.globe.pickables);
+      // The base ring's arcs pick as the hubs do (`kind: "meta"`): a hover previews the network
+      // through hoverFilter, a click commits it through the table's filter arm.
+      if (src === "globe") out.push(...this.globe.pickables, ...this.globe.baseRing.pickables);
       else if (src === "layers") out.push(...this.layers.pickables);
       else if (src === "ledger") out.push(...this.ledger.pickables);
     }
@@ -1931,6 +1933,13 @@ export class Engine {
       const pick: PickDescriptor | undefined = h.object.userData.picks
         ? h.object.userData.picks[h.instanceId as number]
         : h.object.userData.pick;
+      // A COUNTRY-tagged object (the base ring's outer arcs) is a hit with no descriptor: the
+      // hover and click paths read `_hitObj.userData.country` where they would otherwise resolve
+      // the land under the cursor.
+      if (!pick && h.object.userData.country) {
+        this._hitObj = h.object;
+        return null;
+      }
       if (!pick || !pickActive(pick, this.mode, this.filter, this._activeMetaIds)) continue;
       this._hitObj = h.object;
       return pick;
@@ -2015,6 +2024,8 @@ export class Engine {
     if (VIEW_POLICIES[this.mode].countryHover && this.morph > 0.9) {
       if (p && (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode")) {
         countryCc = p.geo?.cc ?? null;
+      } else if (!p && this._hitObj?.userData.country) {
+        countryCc = this._hitObj.userData.country as string; // the base ring's outer arc
       } else if (!p) {
         const hit = this.raycaster.ray.intersectSphere(this._landSphere, this._landHit);
         if (hit) countryCc = this.globe.countryCcAtPoint(hit);
@@ -2067,8 +2078,9 @@ export class Engine {
     // land-sphere hit is analytic; the Globe resolves WHICH country in its rotated frame).
     let countryCc: string | null = null;
     if (!p && VIEW_POLICIES[this.mode].countryHover && this.morph > 0.9) {
-      const hit = this.raycaster.ray.intersectSphere(this._landSphere, this._landHit);
-      countryCc = hit ? this.globe.countryCcAtPoint(hit) : null;
+      const arcCc = this._hitObj?.userData.country as string | undefined; // the base ring's outer arc
+      const hit = arcCc ? null : this.raycaster.ray.intersectSphere(this._landSphere, this._landHit);
+      countryCc = arcCc ?? (hit ? this.globe.countryCcAtPoint(hit) : null);
     }
     // The SEMANTICS live in the pure, tested decision table (domain/pickActions) — what a
     // click means per view × pick kind, including the ordering contracts. This handler only
@@ -2486,6 +2498,8 @@ export class Engine {
     // false — but the parked staging grids live in this group too, so the active/staged machine
     // keeps it visible through a transition and the fleet shows above the Blueprint.
     this.globe.group.visible = show.globeSurface || this.transition.active();
+    // The base ring is the globe's sibling (it must not spin with it) and shows with its surface.
+    this.globe.baseRing.group.visible = this.globe.group.visible;
     // The geo SURFACE subtree hard-hides as one unit whenever its fades are fully out (settled
     // ledger/hyper/flat) — the structural fix for the invisible-but-depth-writing furniture class
     // (2026-08-07): opacity handles the transitions, visibility handles the OFF state. The Engine

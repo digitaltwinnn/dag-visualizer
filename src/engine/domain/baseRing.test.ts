@@ -1,0 +1,73 @@
+import { describe, it, expect } from "vitest";
+import { ringLevels, ringPresence, RING_GAP, RING_SUB_GAP, type RingNet, type RingMachine } from "./baseRing";
+
+const m = (ip: string, cc: string | null = "US", isp: string | null = "Hetzner"): RingMachine => ({ ip, cc, isp });
+const nets: RingNet[] = [
+  { id: "dor", color: 0xff7a2f, machines: [m("1", "US", "Amazon"), m("2", "US", "Amazon"), m("3", "DE"), m("4", null, null)] },
+  { id: "up", color: 0x3b8bff, machines: [m("5", "FI"), m("6", "FI"), m("1", "US")] }, // "1" also runs DOR: counted once, under DOR (first in the list)
+  { id: "dag", color: 0x2af5ff, machines: [m("1"), m("5"), m("7", "DE"), m("8", "DE", "IONOS"), m("9", "US")] }, // the DAG core: its own validators are the remainder
+];
+const lv = ringLevels(nets, "dag");
+
+describe("ringLevels — the located fleet by country, then provider, then network", () => {
+  it("every level partitions the same fleet, each machine once", () => {
+    for (const level of [lv.countries, lv.providers, lv.networks]) {
+      expect(level.reduce((n, s) => n + s.count, 0)).toBe(9);
+      expect(level.reduce((n, s) => n + s.share, 0)).toBeCloseTo(1, 9);
+    }
+  });
+  it("the outer ring is the countries, biggest first, the unknown last, tiling the circle with one gap each", () => {
+    expect(lv.countries.map((c) => [c.cc, c.count])).toEqual([["US", 3], ["DE", 3], ["FI", 2], [null, 1]]);
+    for (let i = 0; i < lv.countries.length; i++) {
+      const s = lv.countries[i]!, next = lv.countries[(i + 1) % lv.countries.length]!;
+      expect(s.to).toBeGreaterThan(s.from);
+      const gap = ((next.from - s.to) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+      expect(gap).toBeCloseTo(RING_GAP, 9);
+    }
+    for (const c of lv.countries) expect(c.color).toBeNull();
+  });
+  it("a country's providers tile its arc and carry every network under them", () => {
+    const de = lv.countries.find((c) => c.cc === "DE")!;
+    const ps = lv.providers.filter((p) => p.cc === "DE");
+    expect(ps.map((p) => [p.isp, p.count])).toEqual([["Hetzner", 2], ["IONOS", 1]]);
+    expect(ps[0]!.from).toBeCloseTo(de.from, 9);
+    expect(ps[ps.length - 1]!.to).toBeCloseTo(de.to, 9);
+    expect(ps[1]!.from - ps[0]!.to).toBeCloseTo(RING_SUB_GAP, 9);
+    expect(ps[0]!.nets.sort()).toEqual(["dag", "dor"]);
+    expect(de.nets.sort()).toEqual(["dag", "dor"]);
+  });
+  it("a provider's networks tile its arc in the network's hue, the DAG remainder neutral and last", () => {
+    const hz = lv.providers.find((p) => p.cc === "DE" && p.isp === "Hetzner")!;
+    const ns = lv.networks.filter((n) => n.cc === "DE" && n.isp === "Hetzner");
+    expect(ns.map((n) => [n.net, n.count, n.color])).toEqual([["dor", 1, 0xff7a2f], ["dag", 1, null]]);
+    expect(ns[0]!.from).toBeCloseTo(hz.from, 9);
+    expect(ns[1]!.to).toBeCloseTo(hz.to, 9);
+  });
+  it("a machine on two networks is counted once, under the first in the list", () => {
+    const us = lv.networks.filter((n) => n.cc === "US");
+    expect(us.map((n) => [n.isp, n.net, n.count])).toEqual([["Amazon", "dor", 2], ["Hetzner", "dag", 1]]);
+  });
+  it("an empty fleet is no ring", () => {
+    expect(ringLevels([], "dag")).toEqual({ countries: [], providers: [], networks: [] });
+    expect(ringLevels([{ id: "x", color: 1, machines: [] }], "dag").countries).toEqual([]);
+  });
+});
+
+describe("ringPresence — the hover previews, the filter and the drill commit, through one dim", () => {
+  it("under All with no drill every arc on every level RESTS — nothing is the subject", () => {
+    for (const level of [lv.countries, lv.providers, lv.networks]) expect(level.every((s) => ringPresence(s, null, "all") === "rest")).toBe(true);
+  });
+  it("a committed network lights the arcs that hold one of its machines on every level; a hover previews over it", () => {
+    expect(lv.countries.map((c) => ringPresence(c, null, "up"))).toEqual(["dim", "dim", "lit", "dim"]); // "1" runs UP too but DOR owns it
+    expect(lv.networks.filter((n) => n.net === "dor").every((n) => ringPresence(n, null, "dor") === "lit")).toBe(true);
+    expect(lv.networks.filter((n) => n.net !== "dor").every((n) => ringPresence(n, null, "dor") === "dim")).toBe(true);
+    expect(lv.countries.map((c) => ringPresence(c, "dor", "up"))).toEqual(["lit", "lit", "dim", "lit"]);
+  });
+  it("a country lights its own arc and everything nested in it, and dims the other countries", () => {
+    expect(lv.countries.map((c) => ringPresence(c, null, "all", "DE"))).toEqual(["dim", "lit", "dim", "dim"]);
+    expect(lv.providers.filter((p) => p.cc === "DE").every((p) => ringPresence(p, null, "all", "DE") === "lit")).toBe(true);
+    expect(lv.providers.filter((p) => p.cc !== "DE").every((p) => ringPresence(p, null, "all", "DE") === "dim")).toBe(true);
+    // …and a committed network narrows it further
+    expect(ringPresence(lv.networks.find((n) => n.cc === "DE" && n.net === "dag")!, null, "dor", "DE")).toBe("dim");
+  });
+});
