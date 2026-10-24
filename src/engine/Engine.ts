@@ -1443,6 +1443,14 @@ export class Engine {
     }
     if (!carries("cohort") && st0.cohort != null) st0.setCohort(null);
     if (!carries("composition") && st0.composition != null) st0.setComposition(null);
+    // …AND THE DESTINATION'S OWN ANCESTRY LANDS NOW, not at the boundary (user, 2026-10-24: with a
+    // node selected "the explorer flashes and then goes to the node rung, it could go directly").
+    // The clears above empty the carried node's parent rungs at the click, and the boundary's
+    // re-derive put them back a second later, so the explorer stood on its root for the whole OUT
+    // phase. The same table, the same executor, one tick earlier; the boundary's call then finds
+    // every rung already committed and writes nothing new. Camera reframes a HUD commit asks for
+    // are held through the OUT phase anyway (the boundary re-derives the pose).
+    if (dest3D) this._commitViewEntryAncestry(mode);
     // The snapshot card is LEDGER-SCOPED too (spec 2026-08-01): the pin no longer carries out
     // of the view — leaving ledger clears it. `following` stays with the FollowController,
     // whose mode effect already flips it false outside ledger (no fight: with `following`
