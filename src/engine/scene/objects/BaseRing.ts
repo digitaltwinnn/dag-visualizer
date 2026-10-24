@@ -172,15 +172,23 @@ export class BaseRing {
   private _entryHold = false;
   private _entryTotal = 1;
   private _ticksMul = 1;
-  private readonly _ticks: THREE.LineSegments;
-  private readonly _tickFade: FadeEntry;
+  private _ticks: THREE.LineSegments | null = null;
+  private _tickFade: FadeEntry | null = null;
   /** The camera's world position, shared by every arc's shader; written per frame in `update`. */
   private readonly uCam = new THREE.Vector3(0, 0, 1);
 
   constructor(private readonly host: RingHost) {
     this.group.position.y = RING_Y;
     this.group.rotation.x = -Math.PI / 2; // RingGeometry lies in XY; the base plane is XZ
-    // The ruler's ticks: one static LineSegments at the outer radius, furniture like the rings.
+  }
+
+  /** The ruler's ticks: one static LineSegments at the outer radius, furniture like the rings.
+   *  Built on the FIRST data arrival, not in the constructor (2026-10-24, user: the ruler was
+   *  "only visible in dark when I go to light and then back to dark"): the Globe constructs this
+   *  before its structure ink and ground are set, so a tick material born there took a black
+   *  colour and the wrong blend, and only the theme flip's retint pass ever corrected it. */
+  private ensureTicks(): void {
+    if (this._ticks) return;
     const pts: number[] = [];
     const r0 = RING_RADII[0];
     const n = Math.round((Math.PI * 2) / TICK_PITCH);
@@ -191,13 +199,14 @@ export class BaseRing {
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
-    const mat = new THREE.LineBasicMaterial({ color: host.accent(), transparent: true, opacity: 0, depthWrite: false });
-    mat.blending = host.blending();
-    host.geoBlends.push(mat);
-    host.geoTints.push(mat.color);
-    this._tickFade = { mat, base: RULER_PRESENCE_DARK, paperBase: RULER_PRESENCE_PAPER };
-    host.geoFades.push(this._tickFade);
+    const mat = new THREE.LineBasicMaterial({ color: this.host.accent(), transparent: true, opacity: 0, depthWrite: false });
+    mat.blending = this.host.blending();
+    this.host.geoBlends.push(mat);
+    this.host.geoTints.push(mat.color);
+    this._tickFade = { mat, base: RULER_PRESENCE_DARK * this._ticksMul, paperBase: RULER_PRESENCE_PAPER * this._ticksMul };
+    this.host.geoFades.push(this._tickFade);
     this._ticks = new THREE.LineSegments(geo, mat);
+    this._ticks.position.z = this._entryT < 1 ? RING_ENTRY_H : 0;
     this.group.add(this._ticks);
   }
 
@@ -223,8 +232,8 @@ export class BaseRing {
       a.entryMul = step.fade;
     }
     const t = entryStep(tSec, 0);
-    this._ticks.position.z = RING_ENTRY_H * t.drop;
     this._ticksMul = t.fade;
+    if (this._ticks) this._ticks.position.z = RING_ENTRY_H * t.drop;
   }
 
   /** Event-time: a data arrival or a retint rebuilds every arc on every level. */
@@ -237,6 +246,7 @@ export class BaseRing {
   }
 
   private setSegments(entries: readonly { seg: RingSegment; level: number }[]): void {
+    this.ensureTicks();
     // PRESENCE CARRIES ACROSS A REBUILD (2026-10-24, measured: the data poll rebuilds the rings
     // every few seconds, and every arc restarted from dark and eased back up — a dip on every poll
     // that read as "less bright than at rest" whenever it coincided with a hover). An arc that
@@ -370,8 +380,10 @@ export class BaseRing {
         this._entryT = Math.min(1, this._entryT + dt / this._entryTotal);
       }
       this.applyEntry(this._entryT * this._entryTotal);
-      this._tickFade.base = RULER_PRESENCE_DARK * this._ticksMul;
-      this._tickFade.paperBase = RULER_PRESENCE_PAPER * this._ticksMul;
+      if (this._tickFade) {
+        this._tickFade.base = RULER_PRESENCE_DARK * this._ticksMul;
+        this._tickFade.paperBase = RULER_PRESENCE_PAPER * this._ticksMul;
+      }
     }
     const k = 1 - Math.exp(-RING_EASE * dt);
     for (const a of this.arcs) {
