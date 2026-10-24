@@ -197,6 +197,13 @@ export default function TrendStack() {
   // The sentences are `src/data/trendScope.ts`'s, shared with the document so the two registers of
   // this rung cannot say different things about the same commit.
   const empty = scopeEmptyCopy(roster.scope, "view");
+  // THE FIRST PAYLOAD IS STILL IN FLIGHT: no window at all, no failure — the planes mount on the
+  // catalog's roster and say `acquiring…` in the plot's place (user, 2026-10-24: "when trend is not
+  // loading it shows an empty card, it should say something like 'acquiring' like the bottom
+  // vitals does"). The WORD is the band's (components/Sparkline.tsx, the acquiring-state note in
+  // components/CLAUDE.md): "haven't looked yet", never "no measurements", which is the other
+  // fact. A held window is not this — `stale` keeps its picture dimmed instead.
+  const acquiring = !p && !error && !slice.stale;
 
   // THE CARD'S FORMAT IS THE TIER'S (`trendStack.planeFormat`, 2026-10-03): on a phone the card is
   // authored narrower and squarer, so it is drawn at about scale 1 and its type is legible. The
@@ -661,7 +668,7 @@ export default function TrendStack() {
               })}
             {/* QUIET WHILE STALE — the plot only; the header, the card and its pairing hold. */}
             <div className="[transition:opacity_200ms_ease] group-data-[stale]/stack:opacity-45 motion-reduce:!transition-none">
-            {p && (
+            {(p || acquiring) && (
               <TrendChart
                 name={row.name}
                 // No touch brush on a plane (2026-10-18): the band's timeline is the one touch range
@@ -698,11 +705,11 @@ export default function TrendStack() {
                   // A held window's head is the PREVIOUS span's — it waits for the new one.
                   value: slice.stale ? null : row.head,
                   word: headWord(metric, roster.headKind),
-                  pending: slice.stale || (roster.headKind === "day" ? roster.dayPending : roster.pending),
+                  pending: acquiring || slice.stale || (roster.headKind === "day" ? roster.dayPending : roster.pending),
                 }}
-                peak={slice.stale || !pose.interactive ? null : peakReading(row.series.points, axis, step, metric, roster.headKind, row.series.weights)}
+                peak={acquiring || slice.stale || !pose.interactive ? null : peakReading(row.series.points, axis, step, metric, roster.headKind, row.series.weights)}
                 format={roster.format}
-                note={pending ? "reading the hourly samples…" : undefined}
+                note={acquiring ? "acquiring…" : pending ? "reading the hourly samples…" : undefined}
                 buckets={axis}
                 // THE HELD PICTURE STAYS PUT, dimmed by the stack's `data-stale` rule, and the new
                 // axis fades in when it lands (`TrendChart held`, 2026-10-19 — the zoom-to-span

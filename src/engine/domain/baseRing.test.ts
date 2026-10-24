@@ -39,7 +39,7 @@ describe("ringLevels — the located fleet by country, then provider, then netwo
   it("a provider's networks tile its arc in the network's hue, the DAG remainder neutral and last", () => {
     const hz = lv.providers.find((p) => p.cc === "DE" && p.isp === "Hetzner")!;
     const ns = lv.networks.filter((n) => n.cc === "DE" && n.isp === "Hetzner");
-    expect(ns.map((n) => [n.net, n.count, n.color])).toEqual([["dor", 1, 0xff7a2f], ["dag", 1, null]]);
+    expect(ns.map((n) => [n.net, n.count, n.color])).toEqual([["dor", 1, 0xff7a2f], ["dag", 1, 0x2af5ff]]);
     expect(ns[0]!.from).toBeCloseTo(hz.from, 9);
     expect(ns[1]!.to).toBeCloseTo(hz.to, 9);
   });

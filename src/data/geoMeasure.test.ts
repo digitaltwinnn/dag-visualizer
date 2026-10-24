@@ -9,7 +9,6 @@ import {  COHORT_MEASURE_OPTIONS,
   countryMeasure,
   networkOfRow,
   providerOfRow,
-  GEO_MEASURE_ADDITIVE,
 } from "./geoMeasure";
 
 // The Geography explorer's country-row figure, as a vocabulary (2026-09-26): nodes, distinct
@@ -70,11 +69,5 @@ describe("networkOfRow", () => {
   it("names a metagraph node's network and the DAG for a core node", () => {
     expect(networkOfRow({ pick: { kind: "metanode", meta: { id: "dor" } } } as unknown as NodeRow)).toBe("dor");
     expect(networkOfRow({ pick: { kind: "l0", node: {} } } as unknown as NodeRow)).toBe("dag");
-  });
-});
-
-describe("GEO_MEASURE_ADDITIVE", () => {
-  it("every geo measure totals across rows — the foot sums what is on screen (user, 2026-10-24)", () => {
-    expect(GEO_MEASURE_ADDITIVE).toEqual({ nodes: true, metagraphs: true, providers: true });
   });
 });

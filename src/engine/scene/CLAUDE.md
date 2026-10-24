@@ -144,7 +144,22 @@ constructs the ring before its ink and ground are set, and a material born then 
 a theme flip retinted it. The arrival beat lifts each RING as one piece, outer to inner
 (`RING_ENTRY_STAG`), not arc by arc (user: "too detailed, just animate each circle"). The
 density pools (`_densityGlow`) follow the same selector the chips follow — a hover preview hides
-the off-selector pools exactly as a commit does.
+the off-selector pools exactly as a commit does, and the PACKETS take the same isolate
+(`Arcs.setSelector`: a packet with an endpoint off the selector is written at the centre, where the
+exact occlusion hides it — the pool itself is only rebuilt by a commit, since rebuilding restarts
+every packet). **Each packet also draws its whole hop as a PATH TRACE** (same day): a second
+LineSegments through the trail's own material, flagged by `aTail > 1` so the shader gives it one
+brightness per ground (`PATH_B_DARK` under the quadratic additive falloff, `PATH_B_PAPER` under the
+linear ink), rewritten only on a retarget or a selector change.
+
+**The pie, second pass** (later the same day): it RESTS visible (`WEDGE_REST_MUL` of the hover
+presence on the level naming the subject, `WEDGE_DIM_MUL` for a dimmed slice), a hover brings one
+slice up, a commit holds the disc at `WEDGE_COMMIT_MUL`; the wedges are PICKABLE with their arc's
+route (the country's on the outer level, the network's on the inner — the country wedge sits
+highest so the interior answers as the outer ring does). The DAG's inner arcs wear the DAG's own
+scene hue (`sceneColors.dag`, blue on paper) rather than the structure ink (user: "same as the node
+and arc colour"); the rulers stay structure. `STRUCT_INK_MIX` went 0.5 → 0.7 for the globe's own
+paper ink (user: "a bit more cyan").
 
 **EXACT OCCLUSION BY THE GLOBE** (same day — user: "fade it when the globe sits in front? I
 believe this is also an issue with the arc animation"): the hologram globe is additive and writes

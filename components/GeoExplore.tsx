@@ -12,7 +12,8 @@ import {
   GEO_MEASURE_OPTIONS,
   cohortMeasure,
   COHORT_MEASURES,
-  type GeoMeasure, GEO_MEASURE_ADDITIVE } from "@/src/data/geoMeasure";
+  countryMeasure,
+  type GeoMeasure } from "@/src/data/geoMeasure";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { filterAccent, metagraphById } from "@/src/data/network";
 import type { NodeRow } from "@/src/data/types";
@@ -111,7 +112,11 @@ export default function GeoExplore() {
       measure: { options: GEO_MEASURE_OPTIONS, value: geoMeasure, onPick: (id) => setGeoMeasure(id as GeoMeasure) },
       hasFigure: true,
       // The live foot on every level (components/explorer/LiveFoot.tsx has the argument).
-      pager: <LiveFoot reading={listReading(measured.map(({ v }) => v), GEO_MEASURE_ADDITIVE[geoMeasure])} />,
+      // THE FOOT IS THE FLEET'S OWN COUNT, the one the vitals band's holes state (user, 2026-10-24:
+      // "explorer says total 15 providers … while vitals says 11"): nodes add up across countries,
+      // but a network or host in several countries is ONE, so those two are the distinct count over
+      // the whole selection — the same `countryMeasure` over every selected node — never the rows' sum.
+      pager: <LiveFoot reading={geoMeasure === "nodes" ? listReading(measured.map(({ v }) => v), true) : { word: "total", value: countryMeasure(geoMeasure, selNodes.length, selNodes) }} />,
       // No tags at this level, so the name takes the tag home's room.
       nameW: 128,
       // Quiet-empty (a real metagraph with no locatable nodes): one honest message, no rows.
@@ -161,7 +166,7 @@ export default function GeoExplore() {
       measure: { options: COHORT_MEASURE_OPTIONS, value: cohortPick, onPick: (id) => setGeoMeasure(id as GeoMeasure) },
       hasFigure: true,
       // The live foot on every level (components/explorer/LiveFoot.tsx has the argument).
-      pager: <LiveFoot reading={listReading(cohorts.map((ch) => cohortMeasure(cohortPick, ch.rows)), GEO_MEASURE_ADDITIVE[cohortPick])} />,
+      pager: <LiveFoot reading={cohortPick === "nodes" ? listReading(cohorts.map((ch) => ch.rows.length), true) : { word: "total", value: cohortMeasure(cohortPick, drilledRows) }} />,
       nameW: 76,
       empty: "No locatable nodes here yet.",
       rows: cohorts.map((ch) => {

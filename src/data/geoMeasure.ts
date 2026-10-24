@@ -28,12 +28,11 @@ export const GEO_MEASURE_LABELS: Readonly<Record<GeoMeasure, string>> = {
   providers: "Providers",
 };
 
-/** Whether a measure's rows ADD UP across the list (`explorerMeasure.listReading`). Every geo
- *  measure TOTALS (user, 2026-10-24: "also total for metagraphs and providers, not average"): a
- *  network or host that sits in several countries is counted in each, so the foot's total is the
- *  sum of the rows on screen — the list's own arithmetic, which an average read as a claim about
- *  a typical country that nobody asked. */
-export const GEO_MEASURE_ADDITIVE: Readonly<Record<GeoMeasure, boolean>> = { nodes: true, metagraphs: true, providers: true };
+// The explorer foot's TOTAL for a geo measure (user, 2026-10-24: "total for metagraphs and
+// providers, not average"; then "explorer says 15 providers while vitals says 11"): nodes are
+// summed over the rows, and the two distinct measures are `countryMeasure` over the WHOLE selection
+// (components/GeoExplore.tsx) — one host in several countries is one host, the number the vitals
+// band's hole states. No additive flag: a summed distinct count was the 15.
 
 /** The heading control's list — each measure with the unit its figure is in. */
 export const GEO_MEASURE_OPTIONS: readonly { id: GeoMeasure; label: string; unit: string }[] = GEO_MEASURE_ORDER.map((id) => ({

@@ -86,7 +86,7 @@ function ownMachines(nets: readonly RingNet[], dagId: string): Owned[] {
   const metas = nets.filter((n) => n.id !== dagId);
   const dag = nets.find((n) => n.id === dagId);
   for (const n of [...metas, ...(dag ? [dag] : [])]) {
-    for (const m of n.machines) out.push({ ...m, net: n.id, color: n.id === dagId ? null : n.color });
+    for (const m of n.machines) out.push({ ...m, net: n.id, color: n.color });
   }
   return out;
 }

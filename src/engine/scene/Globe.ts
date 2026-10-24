@@ -810,7 +810,10 @@ export class Globe implements GeoViewHost {
     const nets: RingNet[] = this.metaList.map((m) => ({ id: m.id, color: m.color, machines: byMeta.get(m.id) ?? [] }));
     nets.push({
       id: "dag",
-      color: this.geoColor,
+      // The DAG's arcs wear the DAG's own scene hue — the colour of its chips and packets, blue on
+      // paper — not the structure ink (user, 2026-10-24: "the circle for day should be blue not
+      // cyan, same as the node and arc colour"). The rulers above stay structure.
+      color: this.sceneColors?.dag ?? this.geoColor,
       machines: this.nodes.flatMap((u) => {
         if (u.noGeo || !u.geoPrimary || !u.nodeId) return [];
         const g = "geo" in u.pick ? u.pick.geo : undefined;
@@ -1036,6 +1039,7 @@ export class Globe implements GeoViewHost {
   private _applyGlowFilter(): void {
     const sel = this._hoverSel || this.filter;
     for (const m of this._densityGlow) m.visible = sel === "all" || m.userData.net === sel;
+    this.arcs.setSelector(sel); // the packets take the same isolate (objects/Arcs.ts)
   }
 
   // Isolate one network on the globe and dim the rest.

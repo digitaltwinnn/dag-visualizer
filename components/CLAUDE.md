@@ -1818,6 +1818,14 @@ surface point stands for it and the rung used to show nothing. `SceneCallout`'s 
 through to `netModel()` exactly where `CalloutSync` falls through to the ring (the mirrored
 order the boundary test's rule 2 expects).
 
+**The geo explorer's foot states the FLEET's count, not the rows' sum** (2026-10-24): nodes add up
+across countries, but a network or host in several countries is one, so Metagraphs and Providers
+read `countryMeasure` over the whole selection — the same number the vitals band's donut holes
+state (user: "explorer says total 15 providers while vitals says 11"). **History's planes say
+`acquiring…` while the first payload is in flight** (`TrendStack`'s `acquiring`, the band's own
+word): the chart mounts on the catalog roster with its plot replaced by the note, never an empty
+card and never "no measurements", which is the other fact.
+
 **`components/calloutBoundary.test.ts` pins the contracts**: `#callout` has exactly two homes (React
 renders + owns content, `CalloutSync` writes transform + `data-on` per frame — the Tooltip
 discipline); BOTH owners consult `store.boxedCard`; and `SCENE_GLASS` is the one container the hover

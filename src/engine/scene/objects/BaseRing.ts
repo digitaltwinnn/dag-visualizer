@@ -61,9 +61,14 @@ export const RULER_PRESENCE_PAPER = 0.85; // 0.4 was "almost invisible" on Print
  *  it (user, 2026-10-24: "more visible when hover, and less visible when the filter is active" —
  *  a committed network re-partitions the whole ring, so its wedge is the whole disc and reads
  *  as a floor rather than a slice; a hover's slice is the reading, and it had been too faint). */
-export const WEDGE_PRESENCE_DARK = 0.05;
-export const WEDGE_PRESENCE_PAPER = 0.11;
+export const WEDGE_PRESENCE_DARK = 0.14; // 0.05 → 0.14 (user, same day: "still too mute when hovered, for light also")
+export const WEDGE_PRESENCE_PAPER = 0.22;
 export const WEDGE_COMMIT_MUL = 0.4;
+/** The pie is READABLE AT REST too (user, 2026-10-24: "when at rest the pie is not very visible"):
+ *  every slice of the level naming the subject sits at this fraction, a dim slice lower still, so
+ *  a hover reads as one slice coming up out of a quiet pie rather than appearing from nothing. */
+export const WEDGE_REST_MUL = 0.3;
+export const WEDGE_DIM_MUL = 0.12;
 
 /** THE ARRIVAL DROP (user, 2026-10-24: the rings "appear staggered and with the same timing as
  *  the snapshot view's actual snapshots"): every arc is held this high and dark through the
@@ -338,6 +343,18 @@ export class BaseRing {
       this.host.geoFades.push(wedgeFade);
       const wedge = new THREE.Mesh(new THREE.RingGeometry(0.001, radius - width, Math.max(4, Math.ceil(span * SEGMENTS_PER_RAD)), 1, seg.from, span), wedgeMat);
       wedge.position.z = -0.01 * (level + 1); // under the arcs, the outer wedge lowest so the three stack
+      // THE DISC PICKS AS ITS SLICE (user, 2026-10-24: "when we hover the section within the circle
+      // it should hover the pie chart section and the related sections on the circle"): the
+      // country wedge carries the country's route, the network wedge the network's, and the
+      // raycaster's nearest hit is the country's (its wedge sits highest of the three), so the
+      // interior answers as the outer ring does — which is the explorer's own root level.
+      if (level === 0 && seg.cc) {
+        wedge.userData.country = seg.cc;
+        this.pickables.push(wedge);
+      } else if (cfg) {
+        wedge.userData.pick = { kind: "meta", cfg };
+        this.pickables.push(wedge);
+      }
       this.group.add(wedge);
       const prev = keep.get(arcKey(level, seg));
       if (prev) {
@@ -396,7 +413,8 @@ export class BaseRing {
     // A HOVER on either selector is a preview (user, 2026-10-24: hovering a country row under a
     // committed filter must light its slice at hover strength, not the committed disc's floor).
     const preview = this.selPreview || this.ccPreview;
-    a.wedgeOn = tier === "lit" && (netSel ? a.level === 2 : a.level === 0) ? (preview ? 1 : WEDGE_COMMIT_MUL) : 0;
+    const pieLevel = netSel ? a.level === 2 : a.level === 0;
+    a.wedgeOn = !pieLevel ? 0 : tier === "lit" ? (preview ? 1 : WEDGE_COMMIT_MUL) : tier === "dim" ? WEDGE_DIM_MUL : WEDGE_REST_MUL;
     a.paperTarget = paperPresence(tier, a.level === 2);
     return Math.min(0.62, tierPresence(tier) * (a.level === 2 ? NET_RING_BOOST : 1));
   }
