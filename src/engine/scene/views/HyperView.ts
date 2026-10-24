@@ -858,6 +858,10 @@ export class HyperView implements SceneView {
     // orbits off (hubOrbits) — the two freezes are independent but drive the same hold.
     const frozen = this.focusId != null || !this.hubOrbits;
     const tetherOp = this.tetherTune.restOp; // hoisted: one property load per frame, not per hub
+    // The preview dims the others only where a COMMIT would (review, 2026-10-24): a commit sets
+    // `focusId` only for an id with a hub, so a hovered DAG or unlisted chip — which commits to
+    // no hub at all — must not promise a dim the click will not deliver. One scan per frame.
+    const previewHub = this.previewId != null && this.previewId !== "all" && this.metas.some((x) => x.cfg.id === this.previewId) ? this.previewId : null;
     // The arrival beat's clock (see beginEntry) — parked at 1 in steady state.
     if (!this._tetherEntryHold && this._tetherEntryT < 1)
       this._tetherEntryT = Math.min(1, this._tetherEntryT + dt / 0.7);
@@ -892,7 +896,7 @@ export class HyperView implements SceneView {
       // out-of-focus push (DoF + camera focus already carry most of the emphasis).
       const focusOther =
         (this.focusId != null && m.cfg.id !== this.focusId) ||
-        (this.previewId != null && this.previewId !== "all" && m.cfg.id !== this.previewId);
+        (previewHub != null && m.cfg.id !== previewHub);
       const fdim = focusOther ? hubOffMul : 1; // glow / tether
       // Inactive (node-less) metagraphs read as present-but-quiet — dimmer than active, but NOT
       // buried (user: decrease the inactive dim); their rings are all-dotted (setHoopPresence).

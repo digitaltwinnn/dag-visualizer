@@ -65,6 +65,9 @@ describe("the metric table", () => {
     expect(TREND_METRICS.nodes.format).toBeUndefined();
     expect(formatMb(3.25)).toBe("3.3 MB");
     expect(formatSeconds(42.4)).toBe("42s");
+    expect(formatSeconds(59.7)).toBe("1m"); // rounds into the unit first, never "60s"
+    expect(formatSeconds(3_599.6)).toBe("1h");
+    expect(formatSeconds(86_399)).toBe("1d");
     expect(formatSeconds(272)).toBe("4.5m");
     expect(formatSeconds(11_520)).toBe("3.2h");
     expect(formatSeconds(1_937_037)).toBe("22d");

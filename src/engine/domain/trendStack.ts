@@ -525,8 +525,6 @@ export function cardNetwork(filter: string, focus: string | null, front: string 
   return focus ?? (filter !== "all" ? filter : (front ?? filter));
 }
 
-/** THE PLANE IN FRONT with no focus re-deal: the first slot of the window the scroll shows
- *  (`stackPoses`' own arithmetic — slot 0 is `ids[clampScroll(…)]`). Null for an empty roster. */
 /** THE DECK ROTATED (user, 2026-10-24: a swipe "all the way to the back of the stack, right?" —
  *  the walk it replaced focused the next card and the re-deal slid the old front back ONE slot,
  *  which read as a shuffle rather than a flick). `r` is the store's `trendRotation`, any integer:
@@ -540,6 +538,8 @@ export function rotateOrder(ids: readonly string[], r: number): readonly string[
   return k === 0 ? ids : [...ids.slice(k), ...ids.slice(0, k)];
 }
 
+/** THE PLANE IN FRONT with no focus re-deal: the first slot of the window the scroll shows
+ *  (`stackPoses`' own arithmetic — slot 0 is `ids[clampScroll(…)]`). Null for an empty roster. */
 export function frontPlane(ids: readonly string[], scroll: number): string | null {
   return ids.length ? (ids[clampScroll(ids.length, scroll)] ?? null) : null;
 }

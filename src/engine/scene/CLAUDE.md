@@ -111,9 +111,10 @@ the located fleet by COUNTRY, the next in each country's arc by PROVIDER, the in
 provider's arc by NETWORK in the identity hues — denser toward the centre. One fixed picture of the
 whole fleet, read at the rest pose (the base plane leaves the frame at the deeper poses, which is
 why a ring that re-dealt per rung was not built); the committed or hovered subject LIGHTS its arcs
-on every level. `domain/baseRing.ts` is the arithmetic (every located MACHINE counted once per
-level — the metagraphs take theirs in list order, the DAG core takes the remainder, unknown place
-or host is an UNKNOWN sub-arc; tested), `objects/BaseRing.ts` the meshes (furniture: `geoFades`
+on every level. `domain/baseRing.ts` is the arithmetic (every PARTICIPANT counted once per level —
+a node is a participant, so a machine running a validator and a metagraph node is two, exactly as
+the Countries list counts; the metagraphs take theirs in list order, the DAG core last, unknown
+place or host is an UNKNOWN sub-arc; tested), `objects/BaseRing.ts` the meshes (furniture: `geoFades`
 for presence × morph × ground, `geoBlends` for the ground's blend, the DAG remainder and the two
 outer levels in the structural accent through `geoTints`), `Globe` the feed (machines with their
 `cc`/`isp` from the geo map at both arrivals) and the selectors (`_applyDim`'s network selector,
@@ -134,7 +135,8 @@ when hover, and less visible when the filter is active" — a committed network 
 whole ring, so its wedge is the whole disc and must read as a floor). `setSubject`/`setCountry`
 take the `preview` flag from `Globe`'s own hover-vs-commit knowledge; the tiers do not change.
 And the committed NETWORK's subject callout anchors on the ring (`BaseRing.networkAnchor`: the
-midpoint of its largest inner arc, ring-local; `CalloutSync._geoCalloutAnchor`'s last fallthrough)
+point of its inner arcs nearest the ring's RIGHT side, clear of the globe's silhouette, ring-local;
+`CalloutSync._geoCalloutAnchor`'s last fallthrough)
 — the one object that stands for a fleet spread across the globe, where no surface point could
 (user: "a nice place to anchor the metagraph callout which is missing in this view"). The
 network POSE therefore keeps the rings in frame (`FOCI.geoNetwork`, a short step in from rest

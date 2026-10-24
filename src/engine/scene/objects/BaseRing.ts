@@ -200,6 +200,9 @@ export interface RingHost {
   accent: () => number;
 }
 
+/** An angle folded into (−π, π], so its distance to 0 is its magnitude. Module-scope: read per frame. */
+const wrapAngle = (x: number): number => Math.atan2(Math.sin(x), Math.cos(x));
+
 const arcKey = (level: number, seg: RingSegment): string => `${level}|${seg.cc ?? ""}|${seg.isp ?? ""}|${seg.net ?? ""}`;
 
 interface Arc {
@@ -360,6 +363,7 @@ export class BaseRing {
           new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false, side: THREE.DoubleSide }),
         );
         strip.userData.country = seg.cc;
+        strip.visible = false; // never drawn (the raycaster ignores `visible` — CLAUDE.md's own warning, used here on purpose)
         this.group.add(strip);
         this.pickables.push(strip);
         this.strips.push(strip);
@@ -436,13 +440,11 @@ export class BaseRing {
     let bestDist = Infinity;
     for (const a of this.arcs) {
       if (a.level !== 2 || a.seg.net !== id) continue;
-      // The angle of this arc nearest 0 on the circle: 0 itself when the arc spans it, else the
-      // nearer end. Arcs are authored from −π/2 upward, so the ends are compared modulo 2π.
-      const wrap = (x: number) => Math.atan2(Math.sin(x), Math.cos(x)); // → (−π, π], distance to 0 is |·|
-      const f = wrap(a.seg.from), t = wrap(a.seg.to);
-      const spans0 = a.seg.to - a.seg.from >= Math.PI * 2 - 1e-6 || (f <= 0 && t >= 0) || (f > t && (f <= 0 || t >= 0));
-      const ang = spans0 ? 0 : Math.abs(f) < Math.abs(t) ? a.seg.from : a.seg.to;
-      const dist = Math.abs(wrap(ang));
+      // The angle of this arc nearest 0 on the circle: 0 itself when the arc spans it (arcs are
+      // authored from −π/2 upward, so a span over 0 is simply from ≤ 0 ≤ to), else the nearer end.
+      const spans0 = a.seg.to - a.seg.from >= Math.PI * 2 - 1e-6 || (a.seg.from <= 0 && a.seg.to >= 0);
+      const ang = spans0 ? 0 : Math.abs(wrapAngle(a.seg.from)) < Math.abs(wrapAngle(a.seg.to)) ? a.seg.from : a.seg.to;
+      const dist = Math.abs(wrapAngle(ang));
       if (dist < bestDist) { bestDist = dist; bestAngle = ang; best = a; }
     }
     if (!best) return false;

@@ -91,7 +91,7 @@ describe("VIEW_POLICIES", () => {
 
   it("resolves pick sources per the pick registry", () => {
     expect(VIEW_POLICIES.hyper.pickSources).toEqual(["globe", "layers"]);
-    expect(VIEW_POLICIES.geo.pickSources).toEqual(["globe"]);
+    expect(VIEW_POLICIES.geo.pickSources).toEqual(["globe", "baseRing"]); // the rings pick only where they are drawn
     expect(VIEW_POLICIES.ledger.pickSources).toEqual(["ledger", "globe"]);
   });
 

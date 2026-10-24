@@ -1446,10 +1446,10 @@ export class Engine {
     // …AND THE DESTINATION'S OWN ANCESTRY LANDS NOW, not at the boundary (user, 2026-10-24: with a
     // node selected "the explorer flashes and then goes to the node rung, it could go directly").
     // The clears above empty the carried node's parent rungs at the click, and the boundary's
-    // re-derive put them back a second later, so the explorer stood on its root for the whole OUT
-    // phase. The same table, the same executor, one tick earlier; the boundary's call then finds
-    // every rung already committed and writes nothing new. Camera reframes a HUD commit asks for
-    // are held through the OUT phase anyway (the boundary re-derives the pose).
+    // re-derive used to put them back a second later, so the explorer stood on its root for the
+    // whole OUT phase. The same table, the same executor, one tick earlier — and the ONE call
+    // (the boundary's `_applyDestLayout` no longer repeats it). Camera reframes a HUD commit asks
+    // for are held through the OUT phase anyway (the boundary re-derives the pose).
     if (dest3D) this._commitViewEntryAncestry(mode);
     // The snapshot card is LEDGER-SCOPED too (spec 2026-08-01): the pin no longer carries out
     // of the view — leaving ledger clears it. `following` stays with the FollowController,
@@ -1603,9 +1603,8 @@ export class Engine {
     this.ctx.controls.autoRotate = VIEW_POLICIES[mode].autoRotate;
     this.applyFilter(false); // apply the filter's visuals, but leave the camera to _resolveFocus
     // The carried node's ancestry for THIS view (country + provider in geo, the composition
-    // group in hyper) — committed before the focus walk, so the finer node rung still wins the
-    // camera and every parent card is on the rail.
-    this._commitViewEntryAncestry(mode);
+    // group in hyper) was committed at the click (`setMode`, 2026-10-24), so the focus walk below
+    // already sees every parent rung and the finer node rung wins the camera.
     // A selection's camera position carries across view switches: frame the selected node in the
     // new view (geo → its globe spot, hyper → its shell point), else the filter's default framing.
     this._resolveFocus();
@@ -1915,9 +1914,12 @@ export class Engine {
     const out = this._pickBuf;
     out.length = 0;
     for (const src of VIEW_POLICIES[this.mode].pickSources) {
+      if (src === "globe") out.push(...this.globe.pickables);
       // The base ring's arcs pick as the hubs do (`kind: "meta"`): a hover previews the network
-      // through hoverFilter, a click commits it through the table's filter arm.
-      if (src === "globe") out.push(...this.globe.pickables, ...this.globe.baseRing.pickables);
+      // through hoverFilter, a click commits it through the table's filter arm. Its own source
+      // (review, 2026-10-24): the fleet's "globe" pool is picked in every 3D view, but the rings
+      // are drawn only in Geography, and the raycaster does not read `visible`.
+      else if (src === "baseRing") out.push(...this.globe.baseRing.pickables);
       else if (src === "layers") out.push(...this.layers.pickables);
       else if (src === "ledger") out.push(...this.ledger.pickables);
     }
@@ -2509,8 +2511,11 @@ export class Engine {
     // false — but the parked staging grids live in this group too, so the active/staged machine
     // keeps it visible through a transition and the fleet shows above the Blueprint.
     this.globe.group.visible = show.globeSurface || this.transition.active();
-    // The base ring is the globe's sibling (it must not spin with it) and shows with its surface.
-    this.globe.baseRing.group.visible = this.globe.group.visible;
+    // The base ring is the globe's sibling (it must not spin with it) and HARD-HIDES with the geo
+    // SURFACE below, not with the fleet's group — the group stays visible in every 3D view for the
+    // shared nodes, and the rings at opacity 0 were still ~3 draw calls per arc there (review,
+    // 2026-10-24). `surfaceAlpha` is the same gate the surface subtree reads, one statement on.
+    this.globe.baseRing.group.visible = this.globe.surfaceAlpha > 0.001;
     // The geo SURFACE subtree hard-hides as one unit whenever its fades are fully out (settled
     // ledger/hyper/flat) — the structural fix for the invisible-but-depth-writing furniture class
     // (2026-08-07): opacity handles the transitions, visibility handles the OFF state. The Engine

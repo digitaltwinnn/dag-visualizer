@@ -228,7 +228,7 @@ describe("ArcSim.step — travel -> arrival -> pause (js/globe.js:987-999 verbat
     const sim = new ArcSim();
     const from = endpoint(1, 0, 0, 0);
     const to = endpoint(0, 1, 0, 1);
-    const ag: ArcAgent = { from, to, curve: [], vstart: 0, t: 0.2, speed: 0.5, state: "travel", pause: 0 };
+    const ag: ArcAgent = { from, to, curve: [], vstart: 0, t: 0.2, speed: 0.5, state: "travel", pause: 0, hop: 0 };
     sim.agents = [ag];
     sim.pool = [from, to];
     sim.step(0.1, true);
@@ -241,7 +241,7 @@ describe("ArcSim.step — travel -> arrival -> pause (js/globe.js:987-999 verbat
     const sim = new ArcSim();
     const from = endpoint(1, 0, 0, 0);
     const to = endpoint(0, 1, 0, 7);
-    const ag: ArcAgent = { from, to, curve: [], vstart: 0, t: 0.98, speed: 1, state: "travel", pause: 0 };
+    const ag: ArcAgent = { from, to, curve: [], vstart: 0, t: 0.98, speed: 1, state: "travel", pause: 0, hop: 0 };
     sim.agents = [ag];
     sim.pool = [from, to];
 
@@ -261,7 +261,7 @@ describe("ArcSim.step — travel -> arrival -> pause (js/globe.js:987-999 verbat
     const sim = new ArcSim();
     const from = endpoint(1, 0, 0, 0);
     const to = endpoint(0, 1, 0, 1);
-    const ag: ArcAgent = { from, to, curve: [], vstart: 0, t: 1, speed: 1, state: "pause", pause: 0.5 };
+    const ag: ArcAgent = { from, to, curve: [], vstart: 0, t: 1, speed: 1, state: "pause", pause: 0.5, hop: 0 };
     sim.agents = [ag];
     sim.pool = [from, to];
     const result = sim.step(0.2, true);
@@ -281,7 +281,7 @@ describe("ArcSim.step — pause -> retarget (js/globe.js:1000-1009 verbatim)", (
     const ag: ArcAgent = {
       from: a, to: b,
       curve: Array.from({ length: ARC_SAMPLES }, () => new THREE.Vector3()),
-      vstart: 0, t: 1, speed: 0.5, state: "pause", pause: 0.05,
+      vstart: 0, t: 1, speed: 0.5, state: "pause", pause: 0.05, hop: 0,
     };
     sim.agents = [ag];
     sim.pool = [a, b, c];
@@ -296,6 +296,7 @@ describe("ArcSim.step — pause -> retarget (js/globe.js:1000-1009 verbatim)", (
     expect(ag.to).toBe(c);
     expect(ag.t).toBe(0);
     expect(ag.state).toBe("travel");
+    expect(ag.hop).toBe(1); // the hop count moves with the curve, so an adapter can rewrite only this packet's path
     expect(result.retargeted).toBe(true);
     expect(sim.flashCount).toBe(0); // retargeting itself is not an arrival
   });
@@ -306,7 +307,7 @@ describe("ArcSim.step — pause -> retarget (js/globe.js:1000-1009 verbatim)", (
     const b = endpoint(0, 1, 0, 1);
     const c = endpoint(0, 0, 1, 2);
     const curve = Array.from({ length: ARC_SAMPLES }, () => new THREE.Vector3());
-    const ag: ArcAgent = { from: a, to: b, curve, vstart: 0, t: 1, speed: 0.5, state: "pause", pause: 0.05 };
+    const ag: ArcAgent = { from: a, to: b, curve, vstart: 0, t: 1, speed: 0.5, state: "pause", pause: 0.05, hop: 0 };
     sim.agents = [ag];
     sim.pool = [a, b, c];
 
@@ -327,7 +328,7 @@ describe("ArcSim.step — pause -> retarget (js/globe.js:1000-1009 verbatim)", (
     const ag: ArcAgent = {
       from: a, to: b,
       curve: Array.from({ length: ARC_SAMPLES }, () => new THREE.Vector3()),
-      vstart: 0, t: 1, speed: 0.5, state: "pause", pause: 0.05,
+      vstart: 0, t: 1, speed: 0.5, state: "pause", pause: 0.05, hop: 0,
     };
     sim.agents = [ag];
     sim.pool = [a, b]; // only 2 nodes: from (b, the old `to`) and a
@@ -346,11 +347,11 @@ describe("ArcSim.step — pause -> retarget (js/globe.js:1000-1009 verbatim)", (
     const a = endpoint(1, 0, 0, 0);
     const b = endpoint(0, 1, 0, 1);
     const c = endpoint(0, 0, 1, 2);
-    const traveling: ArcAgent = { from: a, to: b, curve: [], vstart: 0, t: 0.1, speed: 0.2, state: "travel", pause: 0 };
+    const traveling: ArcAgent = { from: a, to: b, curve: [], vstart: 0, t: 0.1, speed: 0.2, state: "travel", pause: 0, hop: 0 };
     const pausing: ArcAgent = {
       from: a, to: c,
       curve: Array.from({ length: ARC_SAMPLES }, () => new THREE.Vector3()),
-      vstart: 8, t: 1, speed: 0.5, state: "pause", pause: 0.01,
+      vstart: 8, t: 1, speed: 0.5, state: "pause", pause: 0.01, hop: 0,
     };
     sim.agents = [traveling, pausing];
     sim.pool = [a, b, c];

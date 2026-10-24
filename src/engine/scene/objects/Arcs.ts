@@ -117,6 +117,8 @@ export class Arcs {
   private pathCol: Float32Array = new Float32Array(0);
   private pathPosAttr: THREE.BufferAttribute | null = null;
   private pathColAttr: THREE.BufferAttribute | null = null;
+  /** Each agent's hop count as last written to its path — only a changed one is rewritten. */
+  private pathHop: Int32Array = new Int32Array(0);
   // The globe surface's shared camera-facing + closeness uniforms (GeoView builds them; Globe
   // hands them over once). See setFacing.
   private _camN: { value: THREE.Vector3 } = { value: new THREE.Vector3(0, 0, 1) };
@@ -143,14 +145,21 @@ export class Arcs {
    *  a hover must not rebuild the pool, which would restart every packet. */
   setSelector(sel: string): void {
     this._sel = sel;
-    if (this._sim) this._writePaths(this._sim); // event-time
+    if (this._sim) this._writePaths(this._sim, true); // event-time: every path answers the new selector
   }
   private _hidden(ag: ArcAgent): boolean {
     return this._sel !== "all" && (this._netOf(ag.from) !== this._sel || this._netOf(ag.to) !== this._sel);
   }
-  private _writePaths(sim: ArcSim): void {
+  private _writePaths(sim: ArcSim, all = false): void {
     if (!this.pathPosAttr) return;
-    for (const ag of sim.agents) this._writePath(ag);
+    let wrote = false;
+    for (const ag of sim.agents) {
+      const idx = ag.vstart / ((ARC_TAIL - 1) * 2);
+      if (!all && this.pathHop[idx] === ag.hop) continue;
+      this._writePath(ag);
+      wrote = true;
+    }
+    if (!wrote) return;
     this.pathPosAttr.needsUpdate = true;
     if (this.pathColAttr) this.pathColAttr.needsUpdate = true;
   }
@@ -160,6 +169,7 @@ export class Arcs {
     const idx = ag.vstart / ((ARC_TAIL - 1) * 2);
     const base = idx * PATH_VERTS * 3;
     const pos = this.pathPos, col = this.pathCol;
+    if (idx < this.pathHop.length) this.pathHop[idx] = ag.hop;
     if (this._hidden(ag)) {
       pos.fill(0, base, base + PATH_VERTS * 3);
       return;
@@ -372,6 +382,7 @@ export class Arcs {
     this.pathPos = new Float32Array(pathVerts * 3);
     this.pathCol = new Float32Array(pathVerts * 3);
     const pathTail = new Float32Array(pathVerts).fill(PATH_TAIL);
+    this.pathHop = new Int32Array(agents.length).fill(-1);
     for (const ag of agents) this._writePath(ag);
     const pGeo = new THREE.BufferGeometry();
     const pPosAttr = new THREE.BufferAttribute(this.pathPos, 3); pPosAttr.setUsage(THREE.DynamicDrawUsage);
@@ -497,7 +508,7 @@ export class Arcs {
       for (const ag of sim.agents) this._colorAgent(ag); // take on the new destination's colour
       if (this.arcColAttr) this.arcColAttr.needsUpdate = true;
       if (this.headColAttr) this.headColAttr.needsUpdate = true;
-      this._writePaths(sim); // the hops that changed are redrawn with their packets
+      this._writePaths(sim); // only the packets whose hop count moved are redrawn
     }
   }
 

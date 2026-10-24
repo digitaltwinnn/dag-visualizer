@@ -71,11 +71,17 @@ export const formatMb = (v: number) => `${v.toLocaleString(undefined, { maximumF
  *  tells the reader something (under ten of the unit). */
 export const formatSeconds = (v: number): string => {
   if (!Number.isFinite(v)) return "—";
-  const f = (n: number, unit: string) => `${n < 10 ? n.toFixed(1).replace(/\.0$/, "") : Math.round(n).toLocaleString()}${unit}`;
-  if (v < 60) return `${Math.round(v)}s`;
-  if (v < 3_600) return f(v / 60, "m");
-  if (v < 86_400) return f(v / 3_600, "h");
-  return f(v / 86_400, "d");
+  // Round INTO the unit first, then pick the unit from the rounded value (review, 2026-10-24:
+  // 59.7s rounded to "60s" and 3599.6s to "60m" — a reading no clock says).
+  const r = (n: number) => (n < 10 ? Number(n.toFixed(1)) : Math.round(n));
+  const f = (n: number, unit: string) => `${n < 10 ? n.toFixed(1).replace(/\.0$/, "") : n.toLocaleString()}${unit}`;
+  const s = Math.round(v);
+  if (s < 60) return `${s}s`;
+  const m = r(v / 60);
+  if (m < 60) return f(m, "m");
+  const h = r(v / 3_600);
+  if (h < 24) return f(h, "h");
+  return f(r(v / 86_400), "d");
 };
 
 const rate = (per: string) => per;

@@ -52,8 +52,6 @@ import { useStore } from "@/src/store/store";
 // geometry it MEASURES ITSELF and nothing here has those numbers. Every decision a pointer makes
 // is pure and tested in `src/data/trendTimeline.ts`, which is what keeps both halves thin.
 
-/** Whether the gesture hint has done its job this session — a range or a picked moment proves it. */
-
 export default function TrendTimeline() {
   const metric = useStore((s) => s.trendMetric);
   const windowId = useStore((s) => s.trendWindow);

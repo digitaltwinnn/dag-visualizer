@@ -43,7 +43,7 @@ export interface ViewPolicy {
   show: { hyperFurniture: boolean; globeSurface: boolean; ledger: boolean; trendGround: boolean };
   // Which mesh pools this view raycasts — resolved to `THREE.Object3D[]` by `Engine._pickablesFor`.
   // Unlisted = pick nothing. Order is immaterial (the raycaster sorts hits by distance).
-  pickSources: Array<"globe" | "layers" | "ledger">;
+  pickSources: Array<"globe" | "baseRing" | "layers" | "ledger">;
   // May depth-of-field run here at all? (Still ANDs with a single metagraph being selected +
   // the morph window.) Only hyper.
   dofEligible: boolean;
@@ -288,7 +288,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     morph: "toGeo",
     sims: { arcs: true, hubOrbits: false, globeSpin: true },
     show: { hyperFurniture: true, globeSurface: true, ledger: false, trendGround: false },
-    pickSources: ["globe"],
+    pickSources: ["globe", "baseRing"], // the rings under the globe pick only where they are drawn (the raycaster ignores `visible`)
     dofEligible: false,
     countryHover: true, // pointer over a drillable country previews its border (pairs both ways)
     minCamDist: 12,

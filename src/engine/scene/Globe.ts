@@ -219,7 +219,6 @@ export class Globe implements GeoViewHost {
   // CSS token in the constructor. Never identity-tinted (structural scene lane).
   geoColor = 0x000000;
   readonly baseRing: BaseRing;
-  private _ringHoverCc: string | null = null;
   private _dagCore = 0x000000;
   _edgeColor = new THREE.Color();
   private _edgeTarget = new THREE.Color();
@@ -1085,16 +1084,15 @@ export class Globe implements GeoViewHost {
   // OTHER nodes stay visible, pickable and fanned exactly as before, so no relayout here.
   setCountry(cc: string | null): void {
     this.countryFilter = cc || null;
-    this.baseRing.setCountry(this._ringHoverCc ?? this.countryFilter, !!this._ringHoverCc);
+    this.baseRing.setCountry(this._hoverCountryCc ?? this.countryFilter, !!this._hoverCountryCc);
     this._updateCountryBorder();
   }
 
   // Transient border PREVIEW (explorer country-row hover): shows the country's outline at a
   // whisper level without committing the drill. The committed drill always wins.
   setHoverCountry(cc: string | null): void {
-    this._ringHoverCc = cc || null;
-    this.baseRing.setCountry(this._ringHoverCc ?? this.countryFilter, !!this._ringHoverCc);
-    this._hoverCountryCc = cc || null;
+    this._hoverCountryCc = cc || null; // ONE field for the explorer's hovered country: the border preview and the ring read it alike
+    this.baseRing.setCountry(this._hoverCountryCc ?? this.countryFilter, !!this._hoverCountryCc);
     this._updateCountryBorder();
   }
 

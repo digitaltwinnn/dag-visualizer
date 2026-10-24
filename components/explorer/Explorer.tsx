@@ -208,6 +208,10 @@ export default function Explorer({ id, title, hint, placeholder, levels: selecte
   const rootOptions: readonly MeasureOption[] | null =
     rootMeasure ? ("options" in rootMeasure ? rootMeasure.options : [{ id: "one", label: rootMeasure.label }]) : null;
   const levelMeasure = current?.measure && "options" in current.measure ? current.measure : null;
+  // A level that states ONE honest figure (the `{ label }` form) under a multi-measure root keeps
+  // the band — every tile inactive — and names its figure in the head's aside, where a one-measure
+  // explorer names its own (review, 2026-10-24: the label was otherwise never shown).
+  const levelLabel = current?.measure && !("options" in current.measure) && rootOptions && rootOptions.length > 1 ? current.measure.label : null;
   const measure: MeasureControl | null =
     current && rootOptions
       ? {
@@ -230,10 +234,10 @@ export default function Explorer({ id, title, hint, placeholder, levels: selecte
       // The card head's aside: a view's card-level state, and a SINGLE measure's label (a level
       // with several measures shows them as TILES, the body's first block — 2026-10-23).
       aside={
-        aside != null || (measure && measure.options.length <= 1) ? (
+        aside != null || levelLabel || (measure && measure.options.length <= 1) ? (
           <span className="inline-flex items-center gap-1.5">
             {aside}
-            {measure && measure.options.length <= 1 && measure.options[0] && <MeasureLabel label={measure.options[0].label} />}
+            {levelLabel ? <MeasureLabel label={levelLabel} /> : measure && measure.options.length <= 1 && measure.options[0] && <MeasureLabel label={measure.options[0].label} />}
           </span>
         ) : undefined
       }

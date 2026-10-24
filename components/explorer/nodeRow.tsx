@@ -114,7 +114,11 @@ export function nodeRowSpec(args: {
   // node "doesn't show them in the same order for each row"): the DAG first, then the catalog's
   // order — a co-located machine reads "DAG UP" under both its rows, and the row's own network
   // keeps its hue rather than its place.
-  const rank = (id: string) => (id === "dag" ? -1 : args.metaList.findIndex((m) => m.id === id));
+  const rank = (id: string) => {
+    if (id === "dag") return -1;
+    const i = args.metaList.findIndex((m) => m.id === id);
+    return i < 0 ? Number.POSITIVE_INFINITY : i; // an uncataloged network sorts last, never beside the DAG
+  };
   const tickers = [netId, ...also.map((m) => m.id)].sort((a, b) => rank(a) - rank(b));
   const id = row.id ?? row.label;
   const codes = layerCodesOf([row]);

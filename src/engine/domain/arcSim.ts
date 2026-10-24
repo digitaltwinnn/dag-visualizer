@@ -53,6 +53,9 @@ export interface ArcAgent {
   speed: number;
   state: "travel" | "pause";
   pause: number;
+  /** How many hops this packet has made — bumped on every retarget, so an adapter can tell WHICH
+   *  packets' curves changed (the path trace rewrites only those; review 2026-10-24). */
+  hop: number;
 }
 
 // Scratch vectors for arcCurve's bezier evaluation — never handed out, only read from into `out`.
@@ -118,7 +121,7 @@ export class ArcSim {
       const curve = Array.from({ length: ARC_SAMPLES }, () => new THREE.Vector3());
       arcCurve(from.dir, to.dir, curve);
       this.agents.push({
-        from, to, curve, vstart: i * vertsPer,
+        from, to, curve, vstart: i * vertsPer, hop: 0,
         t: Math.random(), // spread the swarm along their hops
         speed: 0.15 + Math.random() * 0.20, // hop progress per second — calm drift (user-tuned)
         state: "travel",
@@ -159,6 +162,7 @@ export class ArcSim {
           arcCurve(ag.from.dir, ag.to.dir, ag.curve);
           ag.t = 0;
           ag.state = "travel";
+          ag.hop++;
           retargeted = true;
         }
       }
