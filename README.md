@@ -9,17 +9,25 @@ can understand how it works and why it's powerful.
 ## Features
 
 - Live data from the public Constellation block-explorer API — no API key, and no backend for the 3D views.
-- **Views** using ThreeJs to drive the 3D scene
+- Four **3D views** of one network, each a real URL: the **Hypergraph** (the base ledger's core with
+  every metagraph orbiting it), **Geography** (every node on a globe at its real location, with a
+  stand of three rings under it reading the same fleet by country, hosting provider and network),
+  **Snapshots** (the anchoring chamber, one plane per metagraph over the global ledger) and
+  **History** (the measured past as a deck of chart cards).
 - A per-view **About** row in the command bar explains what each view shows
-- Hover any element for a tooltip; **click** for an inspector with real on-chain values and other details alongside **live
-  activity** cards
+- Hover any element for a tooltip (on a phone, press and hold); **click** for an inspector with real
+  on-chain values and other details alongside **live activity** cards
+- One **explorer card** per view: its measures as tiles, a breadcrumb path down the view's own
+  ladder (countries → providers → nodes, networks → compositions → nodes, ticks → networks →
+  snapshots → signers), and a live foot stating the list's total
 - A bottom **vitals band** carries each view's own instruments — donut, micro-bars,
   sparklines and the snapshot bar-chart — and the top-bar heartbeat opens a **pulse strip**
   showing every data feed's last successful poll.
 - The **History** view (`/trends`) shows the network's measured history as the scene itself —
   one chart plane per network, receding into depth, with a shared time cursor reading every
   chain at the same moment and a scrubbable timeline along the bottom. Brush a range and its
-  card states the span; click an instant and its card reads every network at that moment.
+  card states the span; click an instant and its card reads every network at that moment. On
+  touch, flick a card up or down to turn the deck and left or right to step the measure.
   Daily, hourly and 5-minute buckets, all
   reaching the same mid-2025 floor (`TIER_SINCE` in `src/data/trendWindow.ts`), summed from
   the chain's own records into an Upstash Redis timeseries by a 15-minute cron (the other
@@ -180,12 +188,12 @@ absent data reads as an instrument state (NO SIGNAL, acquiring), never as fabric
 | Path | Purpose |
 |------|---------|
 | `app/` | Next App Router — `page.tsx` (mounts panels + canvas), `[view]/` (the routed views: `/hypergraph`, `/geography`, `/snapshots`, `/trends`, `/soon`), `about/` (the doc overlay), `globals.css`, `api/*` (server-side data routes) |
-| `components/` | React panels (SceneCanvas, `TopBar` (heartbeat/pulse strip + filter + view switch + presentation), ExploreRail, Inspector, ContextCard, Tooltip, FollowController, …); `CardHead` (the shared card header), `BottomStream` + `VitalsBand` (the bottom per-view instrument band) + `useSnapshotFeed` (shared live feed), `GeoExplore` (geo country→nodes explorer), `Blueprint` (scaffolded-view schematics); `components/inspector/` holds the inspector cards |
+| `components/` | React panels (SceneCanvas, `TopBar` (heartbeat/pulse strip + filter + view switch + presentation), ExploreRail, Inspector, ContextCard, Tooltip, FollowController, …); `CardHead` (the shared card header), `BottomStream` + `VitalsBand` (the bottom per-view instrument band) + `useSnapshotFeed` (shared live feed), `TrendStack` (History's DOM chart planes), `Blueprint` (scaffolded-view schematics); `components/explorer/` is the ONE explorer card every view's tool (`GeoExplore`, `HyperExplore`, `LedgerPanel`, `TrendExplore`) describes itself to; `components/inspector/` holds the inspector cards; `components/docs/` the About overlay and the one chart |
 | `src/store/store.ts` | Zustand store (the React↔engine command/state bridge) |
 | `src/data/` | `api.ts` (the live `NetworkData` singleton), `network.ts` (its accessors), `follow.ts`, `types.ts`, and the pure row builders and rules — the explorer's levels, the raw log's merge and search, the History windows and series |
 | `src/net/` | The three networks (`?net=`), the catalog's address lineage and network retirement |
 | `src/util/` | Shared formatters — `hex` (colour), `fmtDag` (fee) — and `localTime.ts` (day-only labels are UTC days; clock times are local with a zone tag) |
-| `src/engine/` | `Engine.ts` (imperative Three.js engine: render loop, morph, camera focus, DoF, picking — the one store bridge) over `domain/` (pure, unit-tested layout/sim/policy logic) and `scene/` (the Three.js adapters: globe, hyper furniture, ledger chamber, node meshes) |
+| `src/engine/` | `Engine.ts` (imperative Three.js engine: render loop, morph, camera focus, DoF, picking) with `CalloutSync.ts` and `TrendStackSync.ts` beside it — together the one store bridge — over `domain/` (pure, unit-tested layout/sim/policy logic) and `scene/` (the Three.js adapters: globe, base rings, packet arcs, hyper furniture, ledger chamber, node meshes) |
 
 ---
 
