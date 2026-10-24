@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ringLevels, ringPresence, RING_GAP, RING_SUB_GAP, type RingNet, type RingMachine } from "./baseRing";
+import { ringLevels, ringPresence, type RingNet, type RingMachine } from "./baseRing";
 
 const m = (ip: string, cc: string | null = "US", isp: string | null = "Hetzner"): RingMachine => ({ ip, cc, isp });
 const nets: RingNet[] = [
@@ -16,13 +16,13 @@ describe("ringLevels — the located fleet by country, then provider, then netwo
       expect(level.reduce((n, s) => n + s.share, 0)).toBeCloseTo(1, 9);
     }
   });
-  it("the outer ring is the countries, biggest first, the unknown last, tiling the circle with one gap each", () => {
+  it("the outer ring is the countries, biggest first, the unknown last, tiling the circle contiguously (the gap is the adapter's)", () => {
     expect(lv.countries.map((c) => [c.cc, c.count])).toEqual([["US", 5], ["DE", 3], ["FI", 2], [null, 1]]);
     for (let i = 0; i < lv.countries.length; i++) {
       const s = lv.countries[i]!, next = lv.countries[(i + 1) % lv.countries.length]!;
       expect(s.to).toBeGreaterThan(s.from);
       const gap = ((next.from - s.to) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
-      expect(gap).toBeCloseTo(RING_GAP, 9);
+      expect(gap).toBeCloseTo(0, 9);
     }
     for (const c of lv.countries) expect(c.color).toBeNull();
   });
@@ -32,7 +32,7 @@ describe("ringLevels — the located fleet by country, then provider, then netwo
     expect(ps.map((p) => [p.isp, p.count])).toEqual([["Hetzner", 2], ["IONOS", 1]]);
     expect(ps[0]!.from).toBeCloseTo(de.from, 9);
     expect(ps[ps.length - 1]!.to).toBeCloseTo(de.to, 9);
-    expect(ps[1]!.from - ps[0]!.to).toBeCloseTo(RING_SUB_GAP, 9);
+    expect(ps[1]!.from - ps[0]!.to).toBeCloseTo(0, 9);
     expect(ps[0]!.nets.sort()).toEqual(["dag", "dor"]);
     expect(de.nets.sort()).toEqual(["dag", "dor"]);
   });

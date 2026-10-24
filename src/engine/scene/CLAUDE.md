@@ -159,7 +159,12 @@ route (the country's on the outer level, the network's on the inner — the coun
 highest so the interior answers as the outer ring does). The DAG's inner arcs wear the DAG's own
 scene hue (`sceneColors.dag`, blue on paper) rather than the structure ink (user: "same as the node
 and arc colour"); the rulers stay structure. `STRUCT_INK_MIX` went 0.5 → 0.7 for the globe's own
-paper ink (user: "a bit more cyan").
+paper ink (user: "a bit more cyan"). **The gaps are STRIPES of constant width** (`RING_GAP_W`,
+`arcGeometry`): the domain's arcs are contiguous (a share is an angle), and the adapter insets
+every arc by half a gap width at each radius, so the gap's edges run parallel through the three
+rings and the pie and a slice closes where the stripe is all of it — an angular gap tapered and
+"angled to the centre" (user, same day). Under a committed network the inner ring is one arc per
+COUNTRY (the per-provider split only repeated the ring above), and a lone arc is a whole circle.
 
 **EXACT OCCLUSION BY THE GLOBE** (same day — user: "fade it when the globe sits in front? I
 believe this is also an issue with the arc animation"): the hologram globe is additive and writes

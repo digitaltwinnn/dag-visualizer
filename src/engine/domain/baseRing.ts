@@ -67,10 +67,10 @@ export interface RingLevels {
   networks: RingSegment[];
 }
 
-/** The gap between two arcs of the outer ring, radians — one hairline at the ring's radius; the
- *  inner levels keep half of it between siblings so a parent's span stays readable as one. */
-export const RING_GAP = 0.05; // 0.02 → 0.05 (user, 2026-10-24: "the gaps between sections bigger")
-export const RING_SUB_GAP = RING_GAP / 2;
+// THE ARCS ARE CONTIGUOUS — a share is an angle, nothing else. The gap between two arcs is the
+// adapter's (objects/BaseRing.ts, a constant WIDTH at every radius, so the gap lines run parallel
+// through the three rings and the pie); an angular gap here tapered toward the centre and
+// "angled to the centre instead of normal lines" (user, 2026-10-24).
 /** An arc's tier under the selectors: `rest` while nothing is selected (every arc at the ring's
  *  resting presence), `lit` for the subject's arcs, `dim` for the rest. The adapter turns the tier
  *  into presence with the geo view's OWN focus row (`dimModel.FOCUS_TUNE.geo` — boost and back, the
@@ -105,15 +105,12 @@ export function ringLevels(nets: readonly RingNet[], dagId: string, filter: stri
   const netsOf = (items: readonly Owned[]) => [...new Set(items.map((m) => m.net))];
 
   const byCc = groupBy(owned, (m) => m.cc);
-  // One arc is a whole circle, not a circle with one gap (user, 2026-10-24: "if the circle has
-  // only 1 segment, we don't need the empty space between segments"); the sub-levels already tile
-  // with `groups − 1` gaps, so a lone child spans its parent.
-  const sweep = Math.PI * 2 - (byCc.length > 1 ? RING_GAP * byCc.length : 0);
+  const sweep = Math.PI * 2;
   let a = -Math.PI / 2;
   for (const c of byCc) {
     const from = a;
     const to = a + (c.items.length / total) * sweep;
-    a = to + RING_GAP;
+    a = to;
     out.countries.push({ cc: c.key, nets: netsOf(c.items), count: c.items.length, share: c.items.length / total, from, to, color: null });
 
     tile(groupBy(c.items, (m) => m.isp), from, to, (isp, pm, pf, pt) => {
@@ -148,7 +145,7 @@ function groupBy<T extends RingMachine>(items: readonly T[], key: (m: T) => stri
     .sort((x, y) => (x.key == null ? 1 : 0) - (y.key == null ? 1 : 0) || y.items.length - x.items.length);
 }
 
-/** Lay `groups` along [from, to) with `RING_SUB_GAP` between siblings, proportional to size. */
+/** Lay `groups` along [from, to) contiguously, proportional to size. */
 function tile<T extends RingMachine>(
   groups: readonly { key: string | null; items: T[] }[],
   from: number,
@@ -156,12 +153,12 @@ function tile<T extends RingMachine>(
   emit: (key: string | null, items: T[], f: number, t: number) => void,
 ): void {
   const n = groups.reduce((s, g) => s + g.items.length, 0);
-  const sweep = Math.max(0, to - from - RING_SUB_GAP * (groups.length - 1));
+  const sweep = Math.max(0, to - from);
   let a = from;
   for (const g of groups) {
     const f = a;
     const t = a + (g.items.length / n) * sweep;
-    a = t + RING_SUB_GAP;
+    a = t;
     emit(g.key, g.items, f, t);
   }
 }

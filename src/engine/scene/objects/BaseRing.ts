@@ -118,6 +118,41 @@ function paperPresence(t: RingTier, band: boolean): number {
 /** How fast an arc's presence follows its target (per second, exponential). */
 export const RING_EASE = 7;
 const SEGMENTS_PER_RAD = 10;
+/** THE GAP IS A STRIPE OF CONSTANT WIDTH (user, 2026-10-24: the angular gaps looked "angled to the
+ *  centre instead of normal lines"): the domain's arcs are contiguous, and every arc is inset by
+ *  half this width AT EACH RADIUS (an angle of (w/2)/r), so the gap's two edges run parallel through
+ *  the three rings and the pie, and a pie slice closes at the radius where the gap is all of it. */
+export const RING_GAP_W = 0.55;
+
+/** An annular sector [r0, r1] × [from, to] in the XY plane, inset by `gapW/2` at every radius —
+ *  `rows` radial subdivisions follow the 1/r inset (two suffice for a band, a pie slice takes
+ *  more). A full circle takes no inset. Event-time; a plain indexed BufferGeometry. */
+function arcGeometry(r0: number, r1: number, from: number, to: number, gapW: number, rows: number): THREE.BufferGeometry {
+  const span = to - from;
+  const full = span >= Math.PI * 2 - 1e-6;
+  const cols = Math.max(4, Math.ceil(span * SEGMENTS_PER_RAD));
+  const pos: number[] = [];
+  const idx: number[] = [];
+  for (let i = 0; i <= rows; i++) {
+    const r = r0 + ((r1 - r0) * i) / rows;
+    const ins = full ? 0 : Math.min(span / 2, (gapW / 2) / Math.max(r, 1e-4));
+    const f = from + ins, t = to - ins;
+    for (let j = 0; j <= cols; j++) {
+      const a = f + ((t - f) * j) / cols;
+      pos.push(Math.cos(a) * r, Math.sin(a) * r, 0);
+    }
+  }
+  for (let i = 0; i < rows; i++) {
+    for (let j = 0; j < cols; j++) {
+      const a = i * (cols + 1) + j, b = a + cols + 1;
+      idx.push(a, b, a + 1, b, b + 1, a + 1);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  return g;
+}
 /** The occluding body: the globe's plateau radius, with a soft rim either side. */
 const OCCLUDER_R = R + LAND_H;
 const OCCLUDER_SOFT_IN = 0.9;
@@ -299,7 +334,7 @@ export class BaseRing {
       if (!(span > 0)) continue;
       const radius = RING_RADII[level] ?? RING_RADII[2];
       const width = RING_WIDTHS[level] ?? RING_WIDTHS[2];
-      const geo = new THREE.RingGeometry(radius - width, radius, Math.max(4, Math.ceil(span * SEGMENTS_PER_RAD)), 1, seg.from, span);
+      const geo = arcGeometry(radius - width, radius, seg.from, seg.to, RING_GAP_W, 2);
       const mat = new THREE.MeshBasicMaterial({
         color: seg.color ?? this.host.accent(),
         transparent: true,
@@ -321,7 +356,7 @@ export class BaseRing {
       // explorer's cohort rows are its door), so it does not pick.
       if (level === 0 && seg.cc) {
         const strip = new THREE.Mesh(
-          new THREE.RingGeometry(radius - RING_PICK_HALF, radius + RING_PICK_HALF, Math.max(4, Math.ceil(span * SEGMENTS_PER_RAD)), 1, seg.from, span),
+          arcGeometry(radius - RING_PICK_HALF, radius + RING_PICK_HALF, seg.from, seg.to, RING_GAP_W, 2),
           new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false, side: THREE.DoubleSide }),
         );
         strip.userData.country = seg.cc;
@@ -343,7 +378,8 @@ export class BaseRing {
       if (seg.color == null) this.host.geoTints.push(wedgeMat.color);
       const wedgeFade: FadeEntry = { mat: wedgeMat, base: 0, paperBase: 0 };
       this.host.geoFades.push(wedgeFade);
-      const wedge = new THREE.Mesh(new THREE.RingGeometry(0.001, radius - width, Math.max(4, Math.ceil(span * SEGMENTS_PER_RAD)), 1, seg.from, span), wedgeMat);
+      // The slice closes where the stripe is all of it: r = gapW / span, never the centre.
+      const wedge = new THREE.Mesh(arcGeometry(Math.min(radius - width, Math.max(0.01, RING_GAP_W / span)), radius - width, seg.from, seg.to, RING_GAP_W, 12), wedgeMat);
       wedge.position.z = -0.01 * (level + 1); // under the arcs, the outer wedge lowest so the three stack
       // THE DISC PICKS AS ITS SLICE (user, 2026-10-24: "when we hover the section within the circle
       // it should hover the pie chart section and the related sections on the circle"): the
