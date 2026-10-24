@@ -54,7 +54,7 @@ export interface MetricSpec {
   unit: (per: string) => string;
   /** Undefined = TrendChart's own default number format is right for this metric. */
   format?: (v: number) => string;
-  /** The unit JOINS the label in a caption ("Continuity between snapshots") instead of following
+  /** The unit JOINS the label in a caption ("Cadence between snapshots") instead of following
    *  "in" ("Fees in DAG per day") — asked of the spec, as `metricCaption` asks everything. */
   joinUnit?: true;
 }
@@ -527,7 +527,9 @@ export const METRIC_LABELS: Record<TrendMetric, string> = {
   fees: "Fees",
   kb: "Data",
   nodes: "Nodes",
-  continuity: "Continuity",
+  // "Cadence", not "Continuity" (user, 2026-10-24: "continuity = cadence? it does show outages, but
+  // ideally there is not and cadence is what the user sees"). The id stays `continuity`.
+  continuity: "Cadence",
 };
 
 /** THE MEASURES' ONE ORDER — the explorer heading's list top-to-bottom and the cards' ↑/↓ keys

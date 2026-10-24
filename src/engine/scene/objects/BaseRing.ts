@@ -51,6 +51,15 @@ export const TICK_MAJOR = R * 0.026;
 export const RULER_PRESENCE_DARK = 0.45;
 export const RULER_PRESENCE_PAPER = 0.85; // 0.4 was "almost invisible" on Print (user, 2026-10-24)
 
+/** THE PIE FILL (user, 2026-10-24: "when we hover or select a subject, can we show the selected
+ *  section of the rings by making it look like a pie-chart? … that part of the circle also with a
+ *  subtle fill"): a LIT arc fills the wedge from the centre to its ring, in the arc's own hue on the
+ *  network level and the accent on the two rulers, at a faint presence; at rest and dimmed the
+ *  wedge is nothing. The three levels' wedges stack, so a subject reads as a pie slice that
+ *  brightens toward the centre where its three readings agree. */
+export const WEDGE_PRESENCE_DARK = 0.03;
+export const WEDGE_PRESENCE_PAPER = 0.07;
+
 /** THE ARRIVAL DROP (user, 2026-10-24: the rings "appear staggered and with the same timing as
  *  the snapshot view's actual snapshots"): every arc is held this high and dark through the
  *  choreography and falls to the stand on the chamber's own beat (`domain/entryBeat.ts`), one arc
@@ -60,7 +69,7 @@ export const RING_ENTRY_H = 2.4;
 /** The network ring's presence over the rulers' — it is a bloomed mark AT REST, not only when a
  *  subject lights it (user, 2026-10-24: "more bloom also at rest not only focus"); the dim tier
  *  still steps it back by the geo row's own dim-back. */
-export const NET_RING_BOOST = 4.5;
+export const NET_RING_BOOST = 3.4; // 4.5 washed the hues toward white under the additive blend (user, 2026-10-24: "not color-coded to metagraph anymore")
 /** A STAND under the globe, not a hoop through its base (user, 2026-10-23: at the rest pose "it
  *  looks like our angle is a bit unusual or the circle is strangely positioned" — the base
  *  plane's ellipse centred on the silhouette's bottom edge and cut it). Dropped so the ellipse
@@ -143,7 +152,11 @@ export interface RingHost {
 
 const arcKey = (level: number, seg: RingSegment): string => `${level}|${seg.cc ?? ""}|${seg.isp ?? ""}|${seg.net ?? ""}`;
 
-interface Arc { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; seg: RingSegment; level: number; fade: FadeEntry; target: number; paperTarget: number; entryMul: number }
+interface Arc {
+  mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; seg: RingSegment; level: number; fade: FadeEntry; target: number; paperTarget: number; entryMul: number;
+  /** The pie wedge under the arc and its own fade entry; `wedgeOn` is 1 while the arc is lit. */
+  wedge: THREE.Mesh; wedgeFade: FadeEntry; wedgeOn: number;
+}
 
 export class BaseRing {
   readonly group = new THREE.Group();
@@ -231,15 +244,17 @@ export class BaseRing {
     const keep = new Map<string, Arc>();
     for (const a of this.arcs) keep.set(arcKey(a.level, a.seg), a);
     for (const a of this.arcs) {
-      this.group.remove(a.mesh);
-      a.mesh.geometry.dispose();
-      a.mat.dispose();
-      const fi = this.host.geoFades.indexOf(a.fade);
-      if (fi >= 0) this.host.geoFades.splice(fi, 1);
-      const bi = this.host.geoBlends.indexOf(a.mat);
-      if (bi >= 0) this.host.geoBlends.splice(bi, 1);
-      const ti = this.host.geoTints.indexOf(a.mat.color);
-      if (ti >= 0) this.host.geoTints.splice(ti, 1);
+      for (const [mesh, mat, fade] of [[a.mesh, a.mat, a.fade], [a.wedge, a.wedge.material as THREE.MeshBasicMaterial, a.wedgeFade]] as const) {
+        this.group.remove(mesh);
+        mesh.geometry.dispose();
+        mat.dispose();
+        const fi = this.host.geoFades.indexOf(fade);
+        if (fi >= 0) this.host.geoFades.splice(fi, 1);
+        const bi = this.host.geoBlends.indexOf(mat);
+        if (bi >= 0) this.host.geoBlends.splice(bi, 1);
+        const ti = this.host.geoTints.indexOf(mat.color);
+        if (ti >= 0) this.host.geoTints.splice(ti, 1);
+      }
     }
     this.arcs = [];
     for (const s of this.strips) {
@@ -291,13 +306,25 @@ export class BaseRing {
       }
       if (level === 2) joinBloom(mesh); // the identity reading glows like the chips it counts
       this.group.add(mesh);
+      // The wedge: centre → the ring's inner edge, same arc, same hue, its own faint fade.
+      const wedgeMat = new THREE.MeshBasicMaterial({ color: seg.color ?? this.host.accent(), transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+      wedgeMat.blending = this.host.blending();
+      this.host.geoBlends.push(wedgeMat);
+      if (seg.color == null) this.host.geoTints.push(wedgeMat.color);
+      const wedgeFade: FadeEntry = { mat: wedgeMat, base: 0, paperBase: 0 };
+      this.host.geoFades.push(wedgeFade);
+      const wedge = new THREE.Mesh(new THREE.RingGeometry(0.001, radius - width, Math.max(4, Math.ceil(span * SEGMENTS_PER_RAD)), 1, seg.from, span), wedgeMat);
+      wedge.position.z = -0.01 * (level + 1); // under the arcs, the outer wedge lowest so the three stack
+      this.group.add(wedge);
       const prev = keep.get(arcKey(level, seg));
       if (prev) {
         fade.base = prev.fade.base;
         fade.paperBase = prev.fade.paperBase;
         mesh.position.z = prev.mesh.position.z;
+        wedgeFade.base = prev.wedgeFade.base;
+        wedgeFade.paperBase = prev.wedgeFade.paperBase;
       }
-      this.arcs.push({ mesh, mat, seg, level, fade, target: 0, paperTarget: 0, entryMul: prev ? prev.entryMul : this._entryT >= 1 ? 1 : 0 });
+      this.arcs.push({ mesh, mat, seg, level, fade, target: 0, paperTarget: 0, entryMul: prev ? prev.entryMul : this._entryT >= 1 ? 1 : 0, wedge, wedgeFade, wedgeOn: 0 });
       this.arcs[this.arcs.length - 1]!.target = this.targetOf(this.arcs[this.arcs.length - 1]!);
     }
   }
@@ -318,8 +345,13 @@ export class BaseRing {
     // The bloomed band is capped: lit × boost ran past 1 under a committed filter, where every
     // arc is the subject, and the additive blend blew the ring out to a white-hot band.
     const tier = ringPresence(a.seg, null, this.sel, this.cc);
+    // The wedge belongs to the LEVEL THAT NAMES THE SUBJECT: a network's band when a network is
+    // the selector, else the country's ruler — a first cut filled every lit level and a network
+    // hover painted its whole countries' wedges in the accent, which was not subtle.
+    const netSel = this.sel !== "all";
+    a.wedgeOn = tier === "lit" && (netSel ? a.level === 2 : a.level === 0) ? 1 : 0;
     a.paperTarget = paperPresence(tier, a.level === 2);
-    return Math.min(0.75, tierPresence(tier) * (a.level === 2 ? NET_RING_BOOST : 1));
+    return Math.min(0.62, tierPresence(tier) * (a.level === 2 ? NET_RING_BOOST : 1));
   }
 
   private retarget(): void {
@@ -346,6 +378,10 @@ export class BaseRing {
       a.fade.base += (a.target * a.entryMul - a.fade.base) * k;
       const pt = a.paperTarget * a.entryMul;
       a.fade.paperBase = (a.fade.paperBase ?? pt) + (pt - (a.fade.paperBase ?? pt)) * k;
+      const w = a.wedgeOn * a.entryMul;
+      a.wedgeFade.base += (WEDGE_PRESENCE_DARK * w - a.wedgeFade.base) * k;
+      const wp = WEDGE_PRESENCE_PAPER * w;
+      a.wedgeFade.paperBase = (a.wedgeFade.paperBase ?? wp) + (wp - (a.wedgeFade.paperBase ?? wp)) * k;
     }
   }
 
