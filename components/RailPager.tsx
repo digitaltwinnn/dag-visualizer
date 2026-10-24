@@ -219,10 +219,12 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
 
   const step = (dir: -1 | 1) => {
     const it = set?.items[set.index + dir];
-    // A SETTING step (the Range card's windows) writes the setter the picker writes; every other
-    // step is a selection through the one executor (rule 2).
-    if (it?.setting) useStore.getState().setTrendWindow(it.setting.trendWindow);
-    else if (it) applyClickActions(it.actions);
+    // A SETTING step (the Range card's spans) writes the setter the timeline and the pickers
+    // write; every other step is a selection through the one executor (rule 2).
+    if (it?.setting) {
+      if ("trendWindow" in it.setting) useStore.getState().setTrendWindow(it.setting.trendWindow);
+      else useStore.getState().setTrendRange(it.setting.trendRange);
+    } else if (it) applyClickActions(it.actions);
   };
 
   // THE ACCORDION (user, 2026-08-16 — "draw the new card already next to the old and move it";

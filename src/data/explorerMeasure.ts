@@ -30,3 +30,11 @@ export function levelOptions<M extends string, L extends M>(
 export function levelMeasure<L extends string>(applies: readonly L[], pick: string): L {
   return (applies as readonly string[]).includes(pick) ? (pick as L) : applies[0];
 }
+
+/** THE FOOT'S TOTAL of a list's figures (user, 2026-10-24: "total for metagraphs and providers,
+ *  not average"). Where a row's members overlap across rows a sum would count one thing twice, so
+ *  such a measure states a DISTINCT count instead — the caller's own arithmetic over the whole
+ *  selection (`geoMeasure.footTotal`), never this sum. Null for an empty list — nothing to read. */
+export function listTotal(values: readonly number[]): number | null {
+  return values.length === 0 ? null : values.reduce((a, v) => a + v, 0);
+}

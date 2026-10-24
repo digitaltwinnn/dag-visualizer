@@ -1112,7 +1112,7 @@
      on any ground — so the foot reads as its own tier everywhere. Keep it NEUTRAL: the --wash-*
      family is accent-hued and IS the selection language, so a blue-tinted lift here would read as
      selected, which for look-up data is backwards. */
-  --panel-plate: light-dark(rgba(10, 20, 60, 0.05), rgba(255, 255, 255, 0.045));
+  --panel-plate: light-dark(var(--wash-faint), rgba(255, 255, 255, 0.045)); /* LIGHT IS THE FAINT WASH, NOT A GREY (2026-10-23, user: the explorer's control band and foot looked "a bit too gray in light mode … the Snapshot records link section for example is a light blue instead; in dark the color does not bother me"): on Print an ink lift is a grey, and the door's wash is what reads as a section of the same sheet. Dark keeps the neutral white lift — the foot rule's "keep it neutral" argument is a dark-ground one (a tinted lift there reads as selected); --wash-faint is the ladder's lowest rung, well under the 12% selection wash. */
 
   /* Chrome surfaces that were raw literals in JSX (the old rule-3 allowlist): themed here so the
      theme reaches them; trap 3 — the gradient token is consumed as [background:var()], never

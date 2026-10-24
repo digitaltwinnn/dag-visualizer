@@ -76,7 +76,7 @@ import { DUR_OUT } from "@/src/engine/domain/viewTransition";
 import { swipeIntent, swipeOf } from "@/src/engine/domain/planeSwipe";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import {
-  frontPlane, MORE_ID, moreCount, morePose, planeFormat, stackPoses, VISIBLE_PLANES } from "@/src/engine/domain/trendStack";
+  frontPlane, MORE_ID, moreCount, morePose, planeFormat, rotateOrder, stackPoses, VISIBLE_PLANES } from "@/src/engine/domain/trendStack";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -189,7 +189,12 @@ export default function TrendStack() {
           : ranked,
     [ranked, roster.total, roster.unlisted, focus],
   );
-  const order = useHeldOrder(deck, staged.settled);
+  // THE DECK TURNED by the swipes so far (`rotateOrder`, store `trendRotation`): the rotation sits
+  // UNDER the held order and the focus re-deal — a focus still brings its card forward, a swipe
+  // releases the focus first so the two never fight over slot one.
+  const rotation = useStore((s) => s.trendRotation);
+  const rotated = useMemo(() => rotateOrder(deck, rotation), [deck, rotation]);
+  const order = useHeldOrder(rotated, staged.settled);
   // What a card says it shows.
   const caption = metricCaption(shown, step);
   // THE SCOPE WITH NOTHING TO DRAW (2026-09-19): a `dag` or unlisted commit
@@ -197,6 +202,13 @@ export default function TrendStack() {
   // The sentences are `src/data/trendScope.ts`'s, shared with the document so the two registers of
   // this rung cannot say different things about the same commit.
   const empty = scopeEmptyCopy(roster.scope, "view");
+  // THE FIRST PAYLOAD IS STILL IN FLIGHT: no window at all, no failure — the planes mount on the
+  // catalog's roster and say `acquiring…` in the plot's place (user, 2026-10-24: "when trend is not
+  // loading it shows an empty card, it should say something like 'acquiring' like the bottom
+  // vitals does"). The WORD is the band's (components/Sparkline.tsx, the acquiring-state note in
+  // components/CLAUDE.md): "haven't looked yet", never "no measurements", which is the other
+  // fact. A held window is not this — `stale` keeps its picture dimmed instead.
+  const acquiring = !p && !error && !slice.stale;
 
   // THE CARD'S FORMAT IS THE TIER'S (`trendStack.planeFormat`, 2026-10-03): on a phone the card is
   // authored narrower and squarer, so it is drawn at about scale 1 and its type is legible. The
@@ -360,23 +372,24 @@ export default function TrendStack() {
     down.current = null;
     dragged.current = dragged.current || (!!d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > DRAG_SLOP);
     // A SWIPE ON A CARD (user, 2026-10-09; `domain/planeSwipe.ts` has the rules): a finger's flick
-    // along one axis — up sends the front card back (the next comes forward), down brings the
-    // previous one back, wrapping, so the stack rotates; left and right step the measure. Touch only; the
-    // plot keeps its horizontal drag for the brush, so only its vertical answers. The click the
-    // browser synthesises after the release is dropped by `dragged` above, so a swipe never also
-    // lands as a tap. Read through the ONE write path and the ONE setter the keys use (rule 2).
+    // along one axis — up TURNS THE DECK: the front card goes all the way to the back and the next
+    // comes forward; down turns it the other way (user, 2026-10-24 — the roster walk it replaced
+    // slid the old front back one slot, "counterintuitive"); left and right step the measure.
+    // Touch only; the plot keeps its horizontal drag for the brush, so only its vertical answers.
+    // The click the browser synthesises after the release is dropped by `dragged` above, so a
+    // swipe never also lands as a tap. A rotation is a VIEW SETTING like the scroll (its own
+    // setter, out of the selection boundary); a standing focus is released first through the one
+    // write path (rule 2), and the window rewinds to its first card, so the deck's front IS the
+    // rotation's.
     if (!d?.touch) return;
     const dir = swipeOf(e.clientX - d.x, e.clientY - d.y, performance.now() - d.at, { horizontal: !d.onPlot });
     if (!dir) return;
-    const st = useStore.getState();
-    // The front as the STACK has it: the focus only while the window still holds it (a paged-away
-    // or re-ranked-out focus is nobody's front). Up/down walk the whole roster from there
-    // (`planeStep`, 2026-10-18) — the executor pages the window after the step.
-    const focus = st.trendFocus && order.includes(st.trendFocus) ? st.trendFocus : null;
-    const intent = swipeIntent(dir, { order, front: focus ?? frontPlane(order, st.trendScroll) });
-    if (!intent) return;
-    if (intent.kind === "measure") stepMeasure(intent.step, "x");
-    else applyClickActions(trendPlaneActions(intent.id, st.trendFocus));
+    const intent = swipeIntent(dir);
+    if (intent.kind === "measure") {
+      stepMeasure(intent.step, "x");
+      return;
+    }
+    turnDeck(intent.step);
   };
   // UP / DOWN IS THE VIEW'S THIRD AXIS (user, 2026-09-19). Left/right on the timeline is WHEN, the
   // depth of the stack is WHO, and the measure — WHAT — had no gesture on the canvas. The control
@@ -403,6 +416,14 @@ export default function TrendStack() {
     if (!swiped.current) setSwipeAxis("y");
     swiped.current = false;
   }, [metric]);
+  // TURN THE DECK (the swipe's and the keys' one action): a standing focus is released through
+  // the table first and the window rewinds, so the deck's front is the rotation's.
+  const turnDeck = (step: 1 | -1) => {
+    const st = useStore.getState();
+    if (st.trendFocus) applyClickActions(trendPlaneActions(st.trendFocus, st.trendFocus));
+    if (st.trendScroll) st.setTrendScroll(0);
+    st.setTrendRotation(st.trendRotation + step);
+  };
   const stepMeasure = (dir: -1 | 1, axis: "x" | "y" = "y") => {
     const next = stepMetric(useStore.getState().trendMetric, dir);
     if (!next) return;
@@ -569,11 +590,14 @@ export default function TrendStack() {
             // two never fire for one press.
             onClick={pose.interactive ? () => activate(pose.id, false) : undefined}
             // ↑ / ↓ STEP THE MEASURE from anywhere inside a card (its head strip is the focusable
-            // part). The default is taken so an arrow never scrolls a rail or the page under it.
+            // part); SHIFT + ↑ / ↓ TURN THE DECK — the swipe's keyboard twin (review, 2026-10-24: a
+            // desktop reader had no way to rotate the deck but the rows). The default is taken so
+            // an arrow never scrolls a rail or the page under it.
             onKeyDown={(e) => {
               if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
               e.preventDefault();
-              stepMeasure(e.key === "ArrowDown" ? 1 : -1);
+              if (e.shiftKey) turnDeck(e.key === "ArrowUp" ? 1 : -1);
+              else stepMeasure(e.key === "ArrowDown" ? 1 : -1);
             }}
             style={{
               // Every card is opaque at every depth (see the header) — `pose.opacity` is 1 across
@@ -644,8 +668,10 @@ export default function TrendStack() {
                       "absolute top-1/2 -translate-y-1/2 z-10 inline-flex h-7 touch:h-11 min-w-7 touch:min-w-11 items-center justify-center gap-0.5 rounded-full cursor-pointer",
                       // The word in the label step, plain case (user, 2026-10-19: the caps read "way too
                       // large" beside the chevron) — a quiet name, not an eyebrow.
-                      "border border-border bg-[var(--panel-solid)] text-primary-ink text-label font-medium whitespace-nowrap",
-                      "hover:bg-wash-soft disabled:opacity-30 disabled:cursor-default disabled:hover:bg-[var(--panel-solid)]",
+                      // In the plain muted ink, not the accent (user, 2026-10-24: the pills were "cyan and a
+                      // bit too strong"); the hover brings the word up to full ink like the plank's chevrons.
+                      "border border-border bg-[var(--panel-solid)] text-muted-foreground text-label font-medium whitespace-nowrap",
+                      "hover:bg-wash-soft hover:text-foreground disabled:opacity-30 disabled:cursor-default disabled:hover:bg-[var(--panel-solid)] disabled:hover:text-muted-foreground",
                       "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
                       target ? (dir === -1 ? "pl-1 pr-2.5" : "pl-2.5 pr-1") : "px-0",
                       dir === -1 ? "-left-4 touch:-left-3" : "-right-4 touch:-right-3",
@@ -659,7 +685,7 @@ export default function TrendStack() {
               })}
             {/* QUIET WHILE STALE — the plot only; the header, the card and its pairing hold. */}
             <div className="[transition:opacity_200ms_ease] group-data-[stale]/stack:opacity-45 motion-reduce:!transition-none">
-            {p && (
+            {(p || acquiring) && (
               <TrendChart
                 name={row.name}
                 // No touch brush on a plane (2026-10-18): the band's timeline is the one touch range
@@ -696,11 +722,11 @@ export default function TrendStack() {
                   // A held window's head is the PREVIOUS span's — it waits for the new one.
                   value: slice.stale ? null : row.head,
                   word: headWord(metric, roster.headKind),
-                  pending: slice.stale || (roster.headKind === "day" ? roster.dayPending : roster.pending),
+                  pending: acquiring || slice.stale || (roster.headKind === "day" ? roster.dayPending : roster.pending),
                 }}
-                peak={slice.stale || !pose.interactive ? null : peakReading(row.series.points, axis, step, metric, roster.headKind, row.series.weights)}
+                peak={acquiring || slice.stale || !pose.interactive ? null : peakReading(row.series.points, axis, step, metric, roster.headKind, row.series.weights)}
                 format={roster.format}
-                note={pending ? "reading the hourly samples…" : undefined}
+                note={acquiring ? "acquiring…" : pending ? "reading the hourly samples…" : undefined}
                 buckets={axis}
                 // THE HELD PICTURE STAYS PUT, dimmed by the stack's `data-stale` rule, and the new
                 // axis fades in when it lands (`TrendChart held`, 2026-10-19 — the zoom-to-span

@@ -170,12 +170,13 @@ export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
         // single class on stylesheet order alone (CSS trap 4).
         "[transition:opacity_180ms_ease-out,transform_300ms_ease,left_300ms_ease-out,right_300ms_ease-out,clip-path_300ms_ease-out]",
         "motion-reduce:!transition-none",
-        // THE CONTROL STRIP'S FRAME (design round 2026-09-29): when the band holds the History
-        // TIMELINE it is a control, and controls take the accent (the design rule — containers
-        // stay hairlines, so this is the ONE plate that wears it): an accent hairline and a faint
-        // accent lift at its top edge. Keyed on the policy row, never a mode compare.
-        VIEW_POLICIES[mode].bandContent === "timeline" &&
-          "border-primary/40 [background:linear-gradient(color-mix(in_oklch,var(--primary)_7%,transparent),transparent_70%),var(--topbar-glass)]",
+        // ONE PLATE ON EVERY VIEW (2026-10-24, user: the History band "has a different color design
+        // as the other vitals section and the semi-transparency looks a bit off"). From 2026-09-29
+        // the band wore an accent hairline and a faint accent lift while it held the TIMELINE —
+        // "controls take the accent". The timeline's own track, cursor and brushed span already say
+        // it is a control; the frame said it a second time, in a tint the other three bands never
+        // wear, and the lift over the glass read as a different translucency. The policy row still
+        // decides what the band HOLDS; it no longer decides what the plate looks like.
         yielding && "opacity-40 duration-300",
         !live && "saturate-[.45]",
       )}

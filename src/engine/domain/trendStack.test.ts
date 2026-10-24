@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  rotateOrder,
   focusOnReturn,
   planeOfChain,
   cardNetwork,
@@ -724,5 +725,20 @@ describe("focusOnReturn — closing the log brings forward what was committed in
   it("nothing committed in the log: the plane that was in front comes back", () => {
     expect(focusOnReturn(null, "dor", planeOf)).toBe("dor");
     expect(focusOnReturn(null, null, planeOf)).toBeNull();
+  });
+});
+
+describe("rotateOrder — the deck a swipe turns (user, 2026-10-24)", () => {
+  const ids = ["a", "b", "c", "d"];
+  it("+1 sends the front to the back, −1 brings the back to the front", () => {
+    expect(rotateOrder(ids, 1)).toEqual(["b", "c", "d", "a"]);
+    expect(rotateOrder(ids, -1)).toEqual(["d", "a", "b", "c"]);
+  });
+  it("wraps modulo the roster and hands the same array back when nothing moves", () => {
+    expect(rotateOrder(ids, 4)).toBe(ids);
+    expect(rotateOrder(ids, 5)).toEqual(["b", "c", "d", "a"]);
+    expect(rotateOrder(ids, -5)).toEqual(["d", "a", "b", "c"]);
+    expect(rotateOrder(["a"], 3)).toEqual(["a"]);
+    expect(rotateOrder([], 1)).toEqual([]);
   });
 });

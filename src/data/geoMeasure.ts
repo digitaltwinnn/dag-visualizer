@@ -28,6 +28,17 @@ export const GEO_MEASURE_LABELS: Readonly<Record<GeoMeasure, string>> = {
   providers: "Providers",
 };
 
+/** THE EXPLORER FOOT'S TOTAL for a geo measure (user, 2026-10-24: "total for metagraphs and
+ *  providers, not average"; then "explorer says 15 providers while vitals says 11"): nodes are
+ *  the rows' sum, and the two distinct measures are `countryMeasure` over the WHOLE selection —
+ *  one host in several countries is one host, the number the vitals band's hole states (a summed
+ *  distinct count was the 15). `rows` is the list's own figures, `all` every node of the
+ *  selection the list partitions. Null for an empty list. */
+export function footTotal(m: GeoMeasure, rows: readonly number[], all: readonly Pick<NodeRow, "pick">[]): number | null {
+  if (rows.length === 0) return null;
+  return m === "nodes" ? rows.reduce((a, v) => a + v, 0) : countryMeasure(m, all.length, all);
+}
+
 /** The heading control's list — each measure with the unit its figure is in. */
 export const GEO_MEASURE_OPTIONS: readonly { id: GeoMeasure; label: string; unit: string }[] = GEO_MEASURE_ORDER.map((id) => ({
   id,

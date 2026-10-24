@@ -52,7 +52,7 @@ import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { snapshotSignerRows } from "@/src/data/network";
 import { UNLISTED_ID } from "@/src/data/unlisted";
 import type { RailCardKind } from "@/components/railCards";
-import { rangeBuckets, windowSpan, ZOOMS, type ZoomId } from "@/src/data/trendWindow";
+import { rangeBuckets, spanPhrase, spanStep, windowSpan, type SpanStep, type ZoomId } from "@/src/data/trendWindow";
 import { stampInstant } from "@/src/data/trendTimeline";
 import { cohortsLevel, countriesLevel, countryNodes, machinesOf, networksLevel, nodeOrder, nodesByCountry, type Cohort, type TickNetwork, type TickSnap } from "@/src/data/ladderLevels";
 import type { GeoMeasure } from "@/src/data/geoMeasure";
@@ -111,11 +111,12 @@ export interface SiblingStep {
   key: string;
   label: string;
   actions: ClickAction[];
-  /** A SETTING step, not a selection (2026-10-18): the Range card standing on a window steps the
-   *  WINDOW pills (user: "when it's the default range, makes sense to swipe left/right and set the
-   *  different default ranges"). A window is the stack's setting, written by its own setter like
-   *  the picker writes it — so the pager applies this instead of `actions`, which stay empty. */
-  setting?: { trendWindow: ZoomId };
+  /** A SETTING step, not a selection (2026-10-18): the Range card's steps write the stack's own
+   *  setters, as the pickers and the timeline do — so the pager applies this instead of `actions`,
+   *  which stay empty. It stepped the WINDOW pills (`trendWindow`) until 2026-10-23; now it pages
+   *  the SAME SPAN through time (`trendRange` — a span behind or ahead, or `null` for the live
+   *  window, `spanStep`'s "live"). The window arm stays in the type for the setter it names. */
+  setting?: { trendWindow: ZoomId } | { trendRange: { fromMs: number; toMs: number } | null };
 }
 
 export interface SiblingSet {
@@ -448,13 +449,26 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
       return finish(slot, items, s.ticks.findIndex((t) => t.data.ordinal === cur.data.ordinal), "Snapshot stream", true);
     }
 
-    // THE WINDOWS (user, 2026-10-18): while the Range card stands on a window — no range brushed —
-    // its siblings are the six window pills, in the picker's order, so a swipe on the card steps
-    // what the pills step. Under a brushed range the card is that one span and pages nothing.
+    // THE SAME SPAN, PAGED THROUGH TIME (user, 2026-10-23: "keep the range and just select the
+    // next/previous window … Sept–Oct (30 days)"): ‹ is the span of this length ending where
+    // this one begins, › the one starting where it ends, and the step that reaches the present
+    // is the live window again (`spanStep`, src/data/trendWindow.ts, has the three rules). An
+    // OPEN set, like the global snapshot's: the chain back has no end to count, so no n / N.
+    // The All window has no span, so no plank. (From 2026-10-18 until then the card stepped the
+    // six window pills instead — "change the range itself", which the user did not want.)
     case "range": {
-      if (s.trendRange) return null;
-      const items: SiblingStep[] = ZOOMS.map((z) => ({ key: z.id, label: z.label, actions: [], setting: { trendWindow: z.id } }));
-      return finish(slot, items, ZOOMS.findIndex((z) => z.id === s.trendWindow), "Time windows");
+      const span = spanOf(s);
+      if (!span) return null;
+      const now = Date.now();
+      const item = (st: SpanStep): SiblingStep =>
+        st.kind === "live"
+          ? { key: "live", label: spanPhrase(s.trendWindow, null), actions: [], setting: { trendRange: null } }
+          : { key: `${st.range.fromMs}-${st.range.toMs}`, label: spanPhrase(s.trendWindow, st.range), actions: [], setting: { trendRange: st.range } };
+      const cur = item(s.trendRange ? { kind: "range", range: s.trendRange } : { kind: "live" });
+      const prev = spanStep(span, -1, s.trendWindow, now);
+      const next = spanStep(span, 1, s.trendWindow, now);
+      const items = [...(prev ? [item(prev)] : []), cur, ...(next ? [item(next)] : [])];
+      return finish(slot, items, prev ? 1 : 0, "earlier and later spans", true);
     }
 
     // THE MOMENTS OF THE RANGE (user, 2026-10-07): under a brushed range the Moment card steps its

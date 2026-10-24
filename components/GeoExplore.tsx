@@ -3,6 +3,7 @@
 import { cohortLabel } from "@/components/railSiblings";
 import { useMemo } from "react";
 
+import LiveFoot from "@/components/explorer/LiveFoot";
 import Explorer, { type ExplorerLevelSpec } from "@/components/explorer/Explorer";
 import { NODE_GLYPH_W, nodeRowSpec } from "@/components/explorer/nodeRow";
 import { subjectPairing } from "@/components/useSubjectPairing";
@@ -11,8 +12,8 @@ import {
   GEO_MEASURE_OPTIONS,
   cohortMeasure,
   COHORT_MEASURES,
-  type GeoMeasure,
-} from "@/src/data/geoMeasure";
+  footTotal,
+  type GeoMeasure } from "@/src/data/geoMeasure";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { filterAccent, metagraphById } from "@/src/data/network";
 import type { NodeRow } from "@/src/data/types";
@@ -44,7 +45,7 @@ import { UNLISTED_ID } from "@/src/data/unlisted";
 // Rule 9: every row previews on its subject's own channel (`hoverCountry` for a country, `hoverGroup`
 // + `hoverCohort` for a cohort, `hoverNodeId` for a node), and none commits.
 
-export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: boolean } = {}) {
+export default function GeoExplore() {
   const dead = useNoSignal();
   const lb = useStore((s) => s.leaderboard);
   const country = useStore((s) => s.country);
@@ -110,6 +111,9 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
       crumb: { label: "Countries", onRelease: () => (country ? drill(country) : undefined) },
       measure: { options: GEO_MEASURE_OPTIONS, value: geoMeasure, onPick: (id) => setGeoMeasure(id as GeoMeasure) },
       hasFigure: true,
+      // The live foot on every level (components/explorer/LiveFoot.tsx has the argument).
+      // THE FOOT IS THE FLEET'S OWN COUNT, the one the vitals band's holes state (`footTotal`).
+      pager: <LiveFoot total={footTotal(geoMeasure, measured.map(({ v }) => v), selNodes)} />,
       // No tags at this level, so the name takes the tag home's room.
       nameW: 128,
       // Quiet-empty (a real metagraph with no locatable nodes): one honest message, no rows.
@@ -158,6 +162,8 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
       meaning: "Where the nodes sit, and who hosts them",
       measure: { options: COHORT_MEASURE_OPTIONS, value: cohortPick, onPick: (id) => setGeoMeasure(id as GeoMeasure) },
       hasFigure: true,
+      // The live foot on every level (components/explorer/LiveFoot.tsx has the argument).
+      pager: <LiveFoot total={footTotal(cohortPick, cohorts.map((ch) => ch.rows.length), drilledRows)} />,
       nameW: 76,
       empty: "No locatable nodes here yet.",
       rows: cohorts.map((ch) => {
@@ -217,6 +223,8 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
       glyphW: NODE_GLYPH_W,
       measure: null,
       hasFigure: false,
+      // The live foot on every level (components/explorer/LiveFoot.tsx has the argument).
+      pager: <LiveFoot />,
       // The one node row (`explorer/nodeRow.tsx`), ticker included, as in every explorer.
       rows: openCohort.rows.map((r, i) => {
         const on = nodeOn(r);
@@ -242,7 +250,6 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
       hint={null}
       placeholder={quietEmpty ? undefined : "Select a country to view its hosting providers and cities."}
       levels={levels}
-      defaultCollapsed={defaultCollapsed}
       onLeave={() => {
         setHoverNodeId(null);
         setHoverCountry(null);

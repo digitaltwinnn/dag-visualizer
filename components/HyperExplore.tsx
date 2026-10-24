@@ -2,6 +2,8 @@
 
 import { useMemo } from "react";
 
+import LiveFoot from "@/components/explorer/LiveFoot";
+import { listTotal } from "@/src/data/explorerMeasure";
 import Explorer, { type ExplorerLevelSpec } from "@/components/explorer/Explorer";
 import { NODE_GLYPH_W, nodeRowSpec } from "@/components/explorer/nodeRow";
 import { IdentityDot, RoleChips } from "@/components/inspector/parts";
@@ -33,7 +35,7 @@ import { networksLevel } from "@/src/data/ladderLevels";
 // for a network, `hoverGroup` + `hoverCohort` for a composition, `hoverNodeId` for a node), and
 // none of them commits.
 
-export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: boolean } = {}) {
+export default function HyperExplore() {
   const dead = useNoSignal();
   const metaList = useStore((s) => s.metaList);
   const filter = useStore((s) => s.filter);
@@ -87,6 +89,8 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
       crumb: { label: "Networks", onRelease: () => toggleNetwork(filter) },
       measure: { options: HYPER_MEASURE_OPTIONS, value: hyperMeasure, onPick: (id) => setHyperMeasure(id as HyperMeasure) },
       hasFigure: true,
+      // The live foot on every level (components/explorer/LiveFoot.tsx has the argument).
+      pager: <LiveFoot total={listTotal(measured.map(({ v }) => v))} />,
       // No tags at this level, so the name takes the tag home's room (the longest catalog name
       // fits without an ellipsis).
       nameW: 128,
@@ -96,7 +100,8 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
         const hue = identityHudCss(m.id);
         return {
           key: m.id,
-          glyph: <IdentityDot hue={hue} />,
+          // No dot beside a hued bar (user, 2026-10-23) — one hue carrier per row.
+          glyph: undefined,
           name,
           share: v / maxV,
           hue,
@@ -131,6 +136,8 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
       meaning: "Which layers each node runs",
       measure: { options: HYPER_MEASURE_OPTIONS, value: hyperMeasure, onPick: (id) => setHyperMeasure(id as HyperMeasure) },
       hasFigure: true,
+      // The live foot on every level (components/explorer/LiveFoot.tsx has the argument).
+      pager: <LiveFoot total={listTotal(groupValues)} />,
       nameW: 52,
       // Honest instrument state — mirrors the 3D: a metagraph with no reported nodes renders a
       // hub and nothing else.
@@ -179,6 +186,8 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
       glyphW: NODE_GLYPH_W,
       measure: null,
       hasFigure: false,
+      // The live foot on every level (components/explorer/LiveFoot.tsx has the argument).
+      pager: <LiveFoot />,
       // The one node row (`explorer/nodeRow.tsx`), led by its network's ticker.
       rows: openGroup.rows.map((r, i) => {
         const on = selIp != null && "node" in r.pick && r.pick.node?.ip === selIp;
@@ -203,7 +212,6 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
       hint={null}
       placeholder="Select a network to view its composition."
       levels={levels}
-      defaultCollapsed={defaultCollapsed}
       onLeave={() => {
         setHoverFilter(null);
         setHoverNodeId(null);

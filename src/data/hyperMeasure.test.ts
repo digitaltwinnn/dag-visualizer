@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MetaInfo, NodeRow } from "@/src/data/types";
-import {
-  HYPER_MEASURE_LABELS,
+import {  HYPER_MEASURE_LABELS,
   HYPER_MEASURE_OPTIONS,
   HYPER_MEASURE_ORDER,
   groupMeasure,
@@ -50,3 +49,4 @@ describe("groupMeasure — a composition row's figure, the network level's pick 
     expect(groupMeasure("dl1", rows)).toBe(1);
   });
 });
+

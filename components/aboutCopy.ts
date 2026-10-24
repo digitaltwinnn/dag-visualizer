@@ -312,7 +312,7 @@ export const ABOUT: Record<Mode, { title: string; eyebrow: string; text: string;
     title: "Where the network runs",
     eyebrow: "About",
     text:
-      "Every node is placed by its IP address, and that lookup also tells us its city, its country and the provider hosting it. Hosts range from the big clouds down to single regional providers, and each network chooses its own placement for whatever matters to its business: close to the data it serves, with a provider it prefers or needs, or spread across the globe.",
+      "Every node is placed by its IP address, and that lookup also tells us its city, its country and the provider hosting it. Hosts range from the big clouds down to single regional providers, and each network chooses its own placement for whatever matters to its business: close to the data it serves, with a provider it prefers or needs, or spread across the globe. The rings under the globe read the same nodes three ways: by country, by hosting provider, and by network.",
   },
   ledger: {
     title: "When the network anchors",

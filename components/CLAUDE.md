@@ -194,8 +194,11 @@ previews the dim, picking closes it), **The phone face's name is a step up (titl
 icon and name, FLANKED BY ‹ › since 2026-10-18 (Vercel analytics: three quarters of visitors on a
 phone and most never leaving "/"; the swipe and the pip row were the only hints that other views
 exist, and neither reads as a control — the chevrons step through the same `stepView`, dimmed at
-the ends; in the ACCENT, and the pip row retired with them the same evening — "has both … the <> is
-more intuitive") — that opens the view list as a strip tenant** (`topbar/ViewPicker.tsx`, 2026-09-28: a
+the ends; the pip row retired with them the same evening — "has both … the <> is
+more intuitive". **Since 2026-10-23 they are the rail pager's chevron species, flush to the face**
+(user: the 44px accent pair was "too wide and don't look related to the actual view switcher";
+design A of the brainstorm mock — a 24px box, 16px muted glyph, `TOUCH_HIT`'s pad, measured: the
+centre cell 213px → 161px with the face at `px-0.5` and the brand's width floor swapped for the pad, which ended the left zone's clip of the filter face to "A" at 360–390px; the filter KEEPS its `touch:min-w-11` — without it the zone's shrink cut "All" to "Al…")) — that opens the view list as a strip tenant** (`topbar/ViewPicker.tsx`, 2026-09-28: a
 row of 44px icons cannot scale with the view count — History made it five and the filter ran under
 the first tab — and hiding entries per tier is a patch the next view undoes; the segmented switch
 stays from 700px up, both presentations live in the DOM and CSS picks, and the hanging caption
@@ -280,8 +283,8 @@ decisions inside them are design, not detail:
   states the SAME number — the roster's one `head` (user, same day: "keep it consistent"). Under a
   day's window (1H, a short brush) there is no measured day to average, so the list and the
   headline both say the latest full day instead. The Moment card is the one INSTANT — crosshair, time headline, "At
-  that moment" over its list — so the two lists never read as copies. The METRIC is the heading control (the figure column's own
-  heading, a radio list of `METRIC_ORDER` with units at the current cadence); `Same scale` left
+  that moment" over its list — so the two lists never read as copies. The METRIC is the explorer's MEASURE TILES (since 2026-10-23 — the figure column's
+  heading was a radio list behind a caret until then); `Same scale` left
   the heading on 2026-09-28 for the band's pill group — it draws the planes and never changed a
   row here (user), so it sits with the stack's other stack-wide settings, the window and the
   range, and stands down under a committed filter where the stack is one plane. Neither the
@@ -324,6 +327,37 @@ decisions inside them are design, not detail:
   is one bucket out of step with the axis, which is exactly how the cursor card briefly quoted
   yesterday's number; `components/trendRailBoundary.test.ts` pins all three "one home" rules.
 
+**EVERY EXPLORER CARD IS FOUR SECTIONS BY SURFACE: head · CONTROL BAND · list · plate foot**
+(user, 2026-10-23, design B of the brainstorm's `explorer-sections.html` — the card "reads like
+lots and lots of buttons, lines and values … all the same padding and no very clear distinction";
+and "what about design consistency??" when the first cut was History's alone). The CONTROL BAND
+is one full-bleed `--panel-plate` under the head holding what the reader SETS: the MEASURE TILES
+(`MeasureTiles` — every measure of the level named at once, glyph and word, the current one in
+the view switch's on-state; four sit two by two, two/three/six in three columns; `MEASURE_ICONS`
+in `components/icons.tsx` is the one glyph map, keyed by measure id across the four measure
+modules), a hairline, then the PATH, bare (`ExplorerPath bare` — its own accent-tinted plate under
+the band was a third surface in a second tint; the house keeps its wash as the band's one accent
+mark). The list sits on the glass. The pager or span sits on the PLATE FOOT, full-bleed to the
+card's bottom edge, the right-rail foot's own device — and EVERY card ends in one: Hypergraph's
+and Geography's lists are the live poll, so their foot is the live atom (`explorer/LiveFoot.tsx`,
+`LiveDot` + "live"); Snapshots keeps "last N min cache" because there "live" is a SELECTION state
+(live vs pinned, on the tick row and the card head) and the foot's word would collide with it.
+No section labels: "Networks" would be said twice. Four rules the same day finished it: **every
+tile is a bounded button** (a hairline ring, the lit one's in the selection pair, both `!` — the
+toggle primitive's `data-[spacing=0]:shadow-none` outranked the plain ring; user: unlit "they are
+just texts on the same plane"); **the band shows the explorer's WHOLE measure set on every level**,
+the measures a level cannot show INACTIVE at reduced strength, a node level all of them (user:
+"instead of removing the control band … just make them inactive? I don't like it just
+disappears" — the plank's rule); **a row with a hued bar carries no identity dot**, and the glyph
+column collapses with it on the network levels, the DAG lead included (user: "do we need colored
+pill and the colored bar? … just drop the whole column"); and **on Print the plate is the faint
+WASH, not a grey** (`--panel-plate` light = `--wash-faint`; user: the band and foot "a bit too gray
+in light mode … the Snapshot records link section for example is a light blue instead" — dark keeps
+its neutral white lift, where a tinted lift would read as selected). The dropdown the tiles replaced (`MeasureMenu`, 2026-09-26 → 2026-10-23) hid the breadth
+behind a caret and stacked 6px under the card's − toggle, which left the same day (user: "don't
+need it"). The path plate stays on every explorer, History's one-level card included (user, same
+day: "where did the breadcrumb go?" — a cut had dropped it there as a plate that never shows a path).
+
 **Naming and copy rules:** the ABOUT row states the view's point of view ("How the network is built"); the tool
 card says what you BROWSE — by the AXIS the rows break the network down along, never by the
 figure they show, as a PLURAL NOUN ("Networks", "Countries", "Snapshots", and History's "Networks" —
@@ -359,6 +393,10 @@ tick in the explorer's own path state.
 dossier, country, provider, composition, then the snapshot chain (global snapshot ABOVE the metagraph
 snapshot it anchors), then node. `components/railCards.ts` is the manifest and
 `components/railCards.test.ts` pins the order, the availability and every hint.
+
+**A vertical swipe TURNS THE DECK, and so does Shift + ↑/↓ from inside a card** (2026-10-24; `src/engine/domain/CLAUDE.md` has the rule): the
+rotation (`trendRotation`) sits under the held order and the focus re-deal in `TrendStack`, and a
+swipe releases a standing focus and rewinds the window first, so the deck's front is the rotation's.
 
 **History ARRIVES as a deal, LEAVES as one, and a swiped measure rolls SIDEWAYS** (2026-10-18/19,
 user: the entry "looks faster than the other views" and "the leaving animation is still
@@ -437,11 +475,17 @@ word in the plain label step, not caps (the caps read "way too large").
 **The Range card's next ghost opens the first bucket of the SPAN it stands on — the brushed range,
 else the window's** (user, 2026-10-18: "with a range the Moment card does not open the first
 entry" — the card read "last 30 days" and its step read only a brushed range; `spanOf` in
-`railSiblings`, the Moment's pager steps the same span, captioned "Window" then). **The Range
-card steps the WINDOWS while it stands on one** (user, 2026-10-18): with no range
-brushed its siblings are the six window pills, in the picker's order — a SETTING step
-(`SiblingStep.setting`, the pager writes `setTrendWindow` as the picker does, never a selection
-through the executor). A brushed range is one span and pages nothing. **The Moment card's head
+`railSiblings`, the Moment's pager steps the same span, captioned "Window" then). **The Range card's ‹ › page the SAME SPAN through time** (user, 2026-10-23: "keep the range and
+just select the next/previous window … Sept–Oct (30 days) instead of changing the range itself";
+from 2026-10-18 until then they stepped the six window pills — a change of the range itself): ‹
+is the span of this length ending where this one begins, › the one starting where it ends, and the
+step that reaches the present is the LIVE window again, a release of the range — so one back and
+one forward is "last 30 days" once more, never a committed copy of it. Day-long spans walk the UTC
+day grid (`snapRange`'s own threshold), so a stepped span is exactly the days its title names. The
+rules are pure and tested in `src/data/trendWindow.ts` (`spanStep`); it is a SETTING step
+(`SiblingStep.setting`, the pager writes `setTrendRange` as the timeline does, never a selection
+through the executor), an OPEN set like the global snapshot's (no n / N — the chain back has no
+end), and the All window has no span, so no plank. A brushed range pages by its own length. **The Moment card's head
 says it is a bucket** (same day — a chip in the cadence's own words, "5-min bucket", so the
 plank's squares read as stepping buckets, not changing the subject).
 
@@ -1149,10 +1193,11 @@ inline in the return would quietly restore the bug for every consumer at once.
   a horizontal flick anywhere on the card steps the measure, and **‹ › on the front card's side
   edges step it on every tier** — pills that NAME the measure they step to ("‹ SNAPSHOTS", "FEES ›",
   user 2026-10-19), a dimmed bare chevron at an end): a flick along one
-  axis — up/down WALK THE WHOLE STACK (2026-10-18, user: "it should rotate up or down through the
-  whole stack"; `planeStep` — one step along the roster from the front, wrapping, whatever card
-  the finger was on; the first cut stepped to "the card behind the front", which after a re-deal
-  is always the rank-0 card, so two cards toggled), left/right step the measure (the ↑/↓ keys'
+  axis — up/down TURN THE DECK (2026-10-24, `trendStack.rotateOrder`, store `trendRotation`:
+  the front card goes all the way to the back, or the back card comes to the front, whatever
+  card the finger was on; the roster walk it replaced focused the next card and the re-deal slid
+  the old front back one slot, which read as a shuffle — the rule is in
+  `src/engine/domain/CLAUDE.md`), left/right step the measure (the ↑/↓ keys'
   steps). The plot's HORIZONTAL drag
   stays the brush; a vertical-dominant gesture on the plot is the plane's and never brushes
   (`onTouchMoveCapture`/`onTouchEndCapture` stop it reaching the chart).
@@ -1489,7 +1534,7 @@ Every rail card leads with `CardHead`: eyebrow / title / inset hairline / body.
   stretched toggle, required for touch) — but the BOX carries **no minimize** (user, 2026-09-11:
   "hardly used"; the − on the eyebrow line and the whole-head collapse toggle both went): the box
   moves by expanding another entry (or an explorer row's re-box), never by collapsing into
-  nothing. The LEFT rail's explore cards keep their collapse toggle. The × and the aside float
+  nothing. The LEFT rail's explore card lost its +/− too on 2026-10-23 (user: "don't need it" — the view's one tool card, in a rail that scrolls). The × and the aside float
   above the entry overlay so closing and links keep working. ⚠️ **Floating above it means
   `pointer-events-none` on the wrapper and `pointer-events-auto` on its own links/buttons**
   (`[&_a]:pointer-events-auto`, `[&_button]:pointer-events-auto`) — a `z-index` alone leaves the
@@ -1770,6 +1815,21 @@ CSS2DRenderer was evaluated and declined — the node chips are InstancedMesh in
 anchor resolution must live in the Engine either way; the renderer would only replace the final
 projection while adding its container, render pass and a React-portal handshake. Contained swap if
 callouts ever multiply.
+
+**Geography's ladder has a callout on every rung since 2026-10-24**: node > provider cohort >
+country > the committed NETWORK, the last anchored on the network's own arc of the base ring
+under the globe (`BaseRing.networkAnchor`) — a filtered fleet is spread across the globe, so no
+surface point stands for it and the rung used to show nothing. `SceneCallout`'s geo branch falls
+through to `netModel()` exactly where `CalloutSync` falls through to the ring (the mirrored
+order the boundary test's rule 2 expects).
+
+**The geo explorer's foot states the FLEET's count, not the rows' sum** (2026-10-24): nodes add up
+across countries, but a network or host in several countries is one, so Metagraphs and Providers
+read `countryMeasure` over the whole selection — the same number the vitals band's donut holes
+state (user: "explorer says total 15 providers while vitals says 11"). **History's planes say
+`acquiring…` while the first payload is in flight** (`TrendStack`'s `acquiring`, the band's own
+word): the chart mounts on the catalog roster with its plot replaced by the note, never an empty
+card and never "no measurements", which is the other fact.
 
 **`components/calloutBoundary.test.ts` pins the contracts**: `#callout` has exactly two homes (React
 renders + owns content, `CalloutSync` writes transform + `data-on` per frame — the Tooltip

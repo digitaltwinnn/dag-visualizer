@@ -10,7 +10,7 @@ import RecordsDoor from "@/components/inspector/RecordsDoor";
 import useTrendRoster from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { metagraphById } from "@/src/data/network";
-import { rangePhrase, sumMeasured, TREND_METRICS } from "@/src/data/trendSeries";
+import { GLOBAL_READING, rangePhrase, sumMeasured, TREND_METRICS } from "@/src/data/trendSeries";
 import { spanPhrase, windowSpan } from "@/src/data/trendWindow";
 import { ageWords } from "@/src/util/relativeAge";
 import { useStore } from "@/src/store/store";
@@ -72,7 +72,14 @@ export default function TrendRangePane({
   const pulseKey = useEdgePulse(spanKey);
 
   const subject = subjectOf(focus, filter, ranked, (id) => id !== "dag" && rows.has(id));
-  const who = subject ? metagraphById(subject)?.ticker || rows.get(subject)?.name || subject : "All networks";
+  // THE UNSCOPED SUBJECT IS NAMED BY WHAT THE FIGURE IS (user, 2026-10-24: "'all networks created
+  // a snapshot every 13s on average', is it really 'all networks'?"): for the three measures whose
+  // total IS the networks added up (`GLOBAL_READING` — snapshots, fees, data) it is all networks;
+  // for the hypergraph's OWN readings — its nodes, its blocks, its snapshot spacing — it is the
+  // hypergraph, the same split the explorer's pinned DAG row makes with its "total" tag.
+  const who = subject
+    ? metagraphById(subject)?.ticker || rows.get(subject)?.name || subject
+    : GLOBAL_READING[metric] === "total" ? "All networks" : "The hypergraph";
   // THE TOTAL IS SUMMED OVER EXACTLY [start, end) from the payload itself (the branch review's I8):
   // the drawn series drop a counter's partial EDGE buckets, which for a range snapped to whole days
   // dropped its whole first day. A snapped range's edges are whole, so nothing is trimmed here; a

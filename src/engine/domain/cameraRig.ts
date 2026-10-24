@@ -38,12 +38,23 @@ export const FOCI = {
   // Pulled back again (41.5 → 44.8, user 2026-08-09: "the globe view at rest needs to zoom out a
   // little"): pos is scaled AROUND the target (×1.08), so the composition — the downward tilt and
   // the globe's screen-centre — is preserved exactly and only the fit changes.
-  geo: { pos: new THREE.Vector3(0, 13.5, 44.8), target: new THREE.Vector3(0, 0, 0) },
+  // The rest pose looks at the GLOBE + ITS BASE RINGS as one body (2026-10-23, user: "move the
+  // whole scene or objects a bit up so not only the globe but the globe + bottom circle are well
+  // positioned in the view center"): the target sits below the globe's centre and the orbit is
+  // 5.5% longer so the taller body keeps headroom under the bar; the pitch is the old one (the
+  // pos − target delta is (0, 13.5, 44.8) scaled about the target).
+  geo: { pos: new THREE.Vector3(0, 11, 47.3), target: new THREE.Vector3(0, -3.2, 0) },
   // Metagraph-selection pose: rotated-to-densest at a WIDE distance — deliberately farther out
   // than the country framing (geoFraming z 29..25) so the country drill reads as a real zoom-in.
   // Camera held LOW (near the equator plane, like the country/node poses) — a higher camera
   // stacked on the densest-cluster lean read as "viewing the globe from the north" (user).
-  geoNetwork: { pos: new THREE.Vector3(0, 5, 33), target: new THREE.Vector3(0, 2, 0) },
+  // A SHORT step in from the rest pose, not the old dive (user, 2026-10-24: "zoom in but a bit
+  // less so that the circle still stays visible and does not hide beneath the bottom vitals
+  // section"): the base rings are where the committed network's callout now anchors, so the
+  // pose keeps their front edge above the vitals band — the orbit is ~8% shorter than rest and
+  // the target a little lower, which lifts the body in the frame; the globe's crown may tuck
+  // under the top bar, the rings may not go under the band.
+  geoNetwork: { pos: new THREE.Vector3(0, 8, 44), target: new THREE.Vector3(0, -4.5, 0) },
   // The Snapshots RESTING pose (user, 2026-08-07 — it used to share `overview`): FRONTAL and
   // zoomed in, straight onto the chamber's camera-side face, so the ribbon sheets (which span
   // the lane field) and the node trays (which face +Z) present flat-on. Slightly elevated,

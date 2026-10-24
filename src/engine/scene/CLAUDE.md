@@ -99,6 +99,87 @@ flight. Hovering an explorer node row glows that node and nothing else; a countr
 border at a whisper level; a cohort row glows the whole stack and lights its country border. A hover
 always cleans up after itself.
 
+## Geography's base rings and the exact occlusion
+
+**THE BASE RINGS** (2026-10-23, user: "think of a graphic / data visualization to put under the
+globe? Like some subtle circle/circles representing the metagraphs / nodes / providers"): three
+nested rings on a plane a little below the globe — a STAND, not a hoop through its base (the first
+cut on the base plane centred its ellipse on the silhouette's bottom edge; user: "our angle is a
+bit unusual or the circle is strangely positioned"). They follow the Geography explorer's OWN
+LADDER (user: "Country should be the outer layer? … use the rung functionality"): the outer ring
+the located fleet by COUNTRY, the next in each country's arc by PROVIDER, the innermost each
+provider's arc by NETWORK in the identity hues — denser toward the centre. One fixed picture of the
+whole fleet, read at the rest pose (the base plane leaves the frame at the deeper poses, which is
+why a ring that re-dealt per rung was not built); the committed or hovered subject LIGHTS its arcs
+on every level. `domain/baseRing.ts` is the arithmetic (every PARTICIPANT counted once per level —
+a node is a participant, so a machine running a validator and a metagraph node is two, exactly as
+the Countries list counts; the metagraphs take theirs in list order, the DAG core last, unknown
+place or host is an UNKNOWN sub-arc; tested), `objects/BaseRing.ts` the meshes (furniture: `geoFades`
+for presence × morph × ground, `geoBlends` for the ground's blend, the DAG remainder and the two
+outer levels in the structural accent through `geoTints`), `Globe` the feed (machines with their
+`cc`/`isp` from the geo map at both arrivals) and the selectors (`_applyDim`'s network selector,
+`setCountry`/`setHoverCountry`'s country). The tiers come from the geo FOCUS ROW
+(`dimModel.FOCUS_TUNE.geo`: lit = base × (1 + boost), dim = base × (1 − back)) — no dim of the
+ring's own (user: "be careful with one-off deviations if there is a clear standard"). The group is
+the Globe's SIBLING in the scene, never a child: it must not turn with the globe. The outer arcs
+pick as the COUNTRY (`userData.country` — the Engine's pick loop keeps a country-tagged hit with no
+descriptor, and the hover and click paths read it where they would resolve the land under the
+cursor, so an arc commits exactly what the explorer's country row commits), the inner arcs as the
+NETWORK through the hub's `kind: "meta"` descriptor; a provider arc has no route yet.
+
+**The pie slice and the two things the ring is for** (2026-10-24). Under a lit arc a WEDGE (centre
+→ the arc's inner edge, its hue) fills on the level that NAMES the subject — the network band under
+a network selector, the country ruler otherwise — and it is weighted by the selector's KIND: a
+HOVER's slice at `WEDGE_PRESENCE_*`, a COMMIT rests it like any other slice (user: "more visible
+when hover, and less visible when the filter is active" — a committed network re-partitions the
+whole ring, so its wedge is the whole disc and must read as a floor). `setSubject`/`setCountry`
+take the `preview` flag from `Globe`'s own hover-vs-commit knowledge; the tiers do not change.
+And the committed NETWORK's subject callout anchors on the ring (`BaseRing.networkAnchor`: the
+point of its inner arcs nearest the ring's RIGHT side, clear of the globe's silhouette, ring-local;
+`CalloutSync._geoCalloutAnchor`'s last fallthrough)
+— the one object that stands for a fleet spread across the globe, where no surface point could
+(user: "a nice place to anchor the metagraph callout which is missing in this view"). The
+network POSE therefore keeps the rings in frame (`FOCI.geoNetwork`, a short step in from rest
+rather than the old dive): the globe's crown may tuck under the top bar, the rings never under
+the vitals band. The ruler is built on the FIRST `setLevels`, not in the constructor — the Globe
+constructs the ring before its ink and ground are set, and a material born then was black until
+a theme flip retinted it. The arrival beat lifts each RING as one piece, outer to inner
+(`RING_ENTRY_STAG`), not arc by arc (user: "too detailed, just animate each circle"). The
+density pools (`_densityGlow`) follow the same selector the chips follow — a hover preview hides
+the off-selector pools exactly as a commit does, and the PACKETS take the same isolate
+(`Arcs.setSelector`: a packet with an endpoint off the selector is written at the centre, where the
+exact occlusion hides it — the pool itself is only rebuilt by a commit, since rebuilding restarts
+every packet). **Each packet also draws its whole hop as a PATH TRACE** (same day): a second
+LineSegments through the trail's own material, flagged by `aTail > 1` so the shader gives it one
+brightness per ground (`PATH_B_DARK` under the quadratic additive falloff, `PATH_B_PAPER` under the
+linear ink), rewritten only on a retarget or a selector change.
+
+**The pie, second pass** (later the same day): it RESTS visible (`WEDGE_REST_MUL` of the hover
+presence on the level naming the subject, `WEDGE_DIM_MUL` for a dimmed slice), a hover brings one
+slice up, a commit RESTS the pie (a commit is not a third state; only a hover raises a slice); the wedges are PICKABLE with their arc's
+route (the country's on the outer level, the network's on the inner — the country wedge sits
+highest so the interior answers as the outer ring does). The DAG's inner arcs wear the DAG's own
+scene hue (`sceneColors.dag`, blue on paper) rather than the structure ink (user: "same as the node
+and arc colour"); the rulers stay structure. `STRUCT_INK_MIX` went 0.5 → 0.7 for the globe's own
+paper ink (user: "a bit more cyan"). **The gaps are STRIPES of constant width** (`RING_GAP_W`,
+`arcGeometry`): the domain's arcs are contiguous (a share is an angle), and the adapter insets
+every arc by half a gap width at each radius, so the gap's edges run parallel through the three
+rings and the pie and a slice closes where the stripe is all of it — an angular gap tapered and
+"angled to the centre" (user, same day). Under a committed network the inner ring is one arc per
+COUNTRY (the per-provider split only repeated the ring above), and a lone arc is a whole circle.
+
+**EXACT OCCLUSION BY THE GLOBE** (same day — user: "fade it when the globe sits in front? I
+believe this is also an issue with the arc animation"): the hologram globe is additive and writes
+no depth, so nothing behind it was ever depth-occluded. The rings and BOTH arc shaders
+(`objects/Arcs.ts`) now ask the exact question per fragment — does the line of sight from the eye
+pass through the plateau sphere (closest approach of the eye→fragment segment to the centre
+against R + LAND_H, smoothed over a short rim so a comet crossing the limb never pops). The arcs
+had a hemisphere FACING dim (`dot(vDir, uCamN)`, floors 0.22/0.03 — "the hologram reads through",
+2026-08-01) which the user reversed. The test needs the eye's POSITION, not its direction:
+`Globe._camL` (the camera in the group's local frame, unnormalised, written beside `_camN`) is
+shared with the arcs by reference; the ring, a world-space object, copies the camera's world
+position per frame.
+
 ## The Snapshots view
 
 A 3D anchoring chamber on the shared canvas, composing four adapters over the pure modules

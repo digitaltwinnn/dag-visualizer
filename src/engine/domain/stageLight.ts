@@ -58,7 +58,9 @@ export const STAGE_LIGHTS: Record<StagedView, StageLightRow> = {
     // own emissive washed the committed network to peach with near-white caps, and those pixels
     // cleared the bloom threshold, so every sphere wore a soft halo — the "fuzzy focus". The
     // same move geo took on 2026-09-28. Paper's level holds (the lamp rule: no bloom there).
-    angle: 0.9, distance: 40, intensity: 0.6, intensityPaper: 5.5, penumbra: 0.25,
+    // 0.6 → 0.45 (user, 2026-10-24: the committed metagraph "pops" too much — "bright is fine but
+    // this feels too bright"), beside a softer off-filter dim in `dimModel`; paper holds again.
+    angle: 0.9, distance: 40, intensity: 0.45, intensityPaper: 5.5, penumbra: 0.25,
     height: 9, heightDag: 17, heightNode: 3.2, angleNode: 0.5,
   },
   // geo: intensity 1.5 → 0.9 and height 6 → 8 (2026-09-28, user: "geo, DAG, Falkenstein provider

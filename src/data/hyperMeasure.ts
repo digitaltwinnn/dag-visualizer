@@ -29,6 +29,7 @@ export const HYPER_MEASURE_LABELS: Readonly<Record<HyperMeasure, string>> = {
   dl1: ROLE_SHORT.dl1,
 };
 
+
 /** The heading control's list — every measure counts nodes. */
 export const HYPER_MEASURE_OPTIONS: readonly { id: HyperMeasure; label: string; unit: string }[] = HYPER_MEASURE_ORDER.map((id) => ({
   id,

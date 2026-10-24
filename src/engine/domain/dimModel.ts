@@ -152,6 +152,17 @@ export const GROUP_FOCUS = 0.20; // share of focusBoost a group member gets (FOC
 export const focusWeightOf = (primary: boolean, group: boolean): number =>
   primary ? 1 : group ? FOCUS_SHARED.groupShare : 0;
 
+// THE SIZE CHANNEL RANKS ITS OWN WAY (user, 2026-10-24: hovering a composition group in the
+// Hypergraph "does not do the size tricks for light mode like it does for a single node hover").
+// The glow share above is tuned for DARK, where 20% of the boost on a dense stack already sums to
+// a white column — but the swell is the channel that survives a crowd AND the paper ground, where
+// a fifth of the grow is a change nobody sees. A group member therefore swells by `groupGrow` of
+// the primary's swell, a far larger share than it glows: size says MEMBERSHIP, brightness still
+// ranks the primary over its group. Eased on the record beside `fw` (`growW`).
+export const GROUP_GROW = 0.75;
+export const growWeightOf = (primary: boolean, group: boolean): number =>
+  primary ? 1 : group ? FOCUS_SHARED.groupGrow : 0;
+
 // A committed ANCESTRY rung borrows its members' glow only while it is the FINEST rung in play
 // (user, 2026-08-11). The group rungs — geo's provider cohort, hyper's composition group — are the
 // only rungs with no 3D counterpart: you can click a hub, a border or a chip, but there is no
@@ -211,6 +222,8 @@ export interface FocusRow {
 export interface FocusShared {
   /** Share of the boost a GROUP member gets, vs. the primary subject's full 1. */
   groupShare: number;
+  /** Share of the SWELL a group member gets (`growWeightOf`) — larger than its glow share. */
+  groupGrow: number;
   /** How far a COMMITTED network's own snapshots are held ABOVE the trail's resting weight —
    *  see snapBright. A multiplier on `rest`, not an additive boost, so it can never collide with
    *  the focused row's `boost`. */
@@ -238,7 +251,7 @@ export const FOCUS_TUNE_DEFAULTS: Readonly<Record<View3D, Readonly<FocusRow>>> =
   // wanted app-wide. Values: hyper pulled 0.45 → 0.28 (was "a bit too much"); geo/ledger
   // smaller still — their chips sit in dense stacks/trays where a large swell collides
   // with neighbours.
-  hyper: { dim: 0.32, hide: 0, elem: 0.38, back: 0.41, boost: 1.1, grow: 0.28 },
+  hyper: { dim: 0.42, hide: 0, elem: 0.44, back: 0.41, boost: 1.1, grow: 0.28 }, // dim 0.32 → 0.5 → 0.42, elem 0.38 → 0.5 → 0.44 (user, 2026-10-24: a hovered or committed network's others were "not very clear"; then the committed one "pops" too much against the darker field — a step back, beside a dimmer stage light)
   geo: { dim: 1.0, hide: 1, elem: 0, back: 0.65, boost: 0.7, grow: 0.24 }, // 0.16 → 0.24 (user, 2026-08-30: "same as hyper" — the old value was below noticing in a stack); hyper stays loudest
   ledger: { dim: 0.67, hide: 0, elem: 0, back: 0.55, boost: 0.7, grow: 0.24 }, // dim 0.5 → 0.67 (user export, 2026-08-30): a deeper coloured dim on the other lanes, paired with the DAG core never dimming here at all (Globe._applyDim's ledger rule)
   // trend: no shared nodes reach this view at all (the fleet parks), so the row is inert in
@@ -253,7 +266,7 @@ export const FOCUS_TUNE_DEFAULTS: Readonly<Record<View3D, Readonly<FocusRow>>> =
 // legible and still comfortably behind the focused row. The lane tiles rest at 0.10 and land at
 // ~0.38 from the same number, which is why this is ONE knob rather than a per-surface constant.
 export const SNAP_HOLD = 3.75;
-export const FOCUS_SHARED_DEFAULTS: Readonly<FocusShared> = { groupShare: GROUP_FOCUS, snapHold: SNAP_HOLD };
+export const FOCUS_SHARED_DEFAULTS: Readonly<FocusShared> = { groupShare: GROUP_FOCUS, groupGrow: GROUP_GROW, snapHold: SNAP_HOLD };
 
 export const FOCUS_TUNE: Record<View3D, FocusRow> = {
   hyper: { ...FOCUS_TUNE_DEFAULTS.hyper },
@@ -281,6 +294,7 @@ export const FOCUS_ROW_SCHEMA: TuneSchema<FocusRow> = {
 
 export const FOCUS_SHARED_SCHEMA: TuneSchema<FocusShared> = {
   groupShare: { min: 0, max: 1, label: "group share" },
+  groupGrow: { min: 0, max: 1, label: "group swell share" },
   snapHold: { min: 1, max: 8, step: 0.05, label: "committed hold ×" },
 };
 

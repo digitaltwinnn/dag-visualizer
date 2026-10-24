@@ -2,8 +2,8 @@
 
 import { useCallback, useLayoutEffect, useRef, type CSSProperties, type ReactNode } from "react";
 
-import ExplorerShell from "@/components/ExplorerShell";
-import ExplorerHeading, { MeasureMenu, type MeasureControl } from "@/components/explorer/ExplorerHeading";
+import ExplorerShell, { SHELL_BLEED_X, SHELL_INSET_X } from "@/components/ExplorerShell";
+import ExplorerHeading, { MeasureLabel, MeasureTiles, type MeasureControl, type MeasureOption } from "@/components/explorer/ExplorerHeading";
 import ExplorerPath, { type Crumb } from "@/components/explorer/ExplorerPath";
 import ExplorerRow from "@/components/explorer/ExplorerRow";
 import { useStore } from "@/src/store/store";
@@ -121,7 +121,6 @@ export interface ExplorerProps {
   /** The open levels, root first; the last is on screen. */
   levels: readonly ExplorerLevelSpec[];
   onLeave?: () => void;
-  defaultCollapsed?: boolean;
   /** The card head's right-aligned slot — a CARD-level state that holds on every level (the
    *  snapshot explorer's LIVE/PINNED, since 2026-09-28), as opposed to a level's own `setting`. */
   aside?: ReactNode;
@@ -136,7 +135,7 @@ function openOrToggle(rung: string, click: () => void): void {
   openRailCard(rung, [boxed]);
 }
 
-export default function Explorer({ id, title, hint, placeholder, levels: selected, onLeave, defaultCollapsed, aside }: ExplorerProps) {
+export default function Explorer({ id, title, hint, placeholder, levels: selected, onLeave, aside }: ExplorerProps) {
   // The view hands every level its selection opens; the OPEN CARD decides how deep the path stands.
   const boxed = useStore((s) => s.boxedCard);
   const levels = levelsForBox(selected, boxed);
@@ -199,11 +198,28 @@ export default function Explorer({ id, title, hint, placeholder, levels: selecte
     root: i === 0,
     ...(i < levels.length - 1 ? { onSelect: l.crumb.onRelease } : {}),
   }));
+  // THE BAND SHOWS THE EXPLORER'S WHOLE MEASURE SET — the ROOT's — on every level (user,
+  // 2026-10-23: "instead of removing the control band when there is nothing to show, can we just
+  // make them inactive? I don't like it just disappears"). A level names the measures it can
+  // show (its own `measure.options`, a subset of the root's); the rest are drawn inactive, and a
+  // node level — no figure at all — shows every tile inactive with none lit. The pick and the
+  // setter are the level's own where it has one.
+  const rootMeasure = levels[0]?.measure;
+  const rootOptions: readonly MeasureOption[] | null =
+    rootMeasure ? ("options" in rootMeasure ? rootMeasure.options : [{ id: "one", label: rootMeasure.label }]) : null;
+  const levelMeasure = current?.measure && "options" in current.measure ? current.measure : null;
+  // A level that states ONE honest figure (the `{ label }` form) under a multi-measure root keeps
+  // the band — every tile inactive — and names its figure in the head's aside, where a one-measure
+  // explorer names its own (review, 2026-10-24: the label was otherwise never shown).
+  const levelLabel = current?.measure && !("options" in current.measure) && rootOptions && rootOptions.length > 1 ? current.measure.label : null;
   const measure: MeasureControl | null =
-    current && current.measure
-      ? "options" in current.measure
-        ? current.measure
-        : { options: [{ id: "one", label: current.measure.label }], value: "one", onPick: () => {} }
+    current && rootOptions
+      ? {
+          options: rootOptions,
+          value: levelMeasure?.value ?? "",
+          onPick: levelMeasure?.onPick ?? (() => {}),
+          inactive: new Set(rootOptions.filter((o) => !levelMeasure?.options.some((l) => l.id === o.id)).map((o) => o.id)),
+        }
       : null;
   return (
     <ExplorerShell
@@ -215,22 +231,38 @@ export default function Explorer({ id, title, hint, placeholder, levels: selecte
       // in three of four views. The shell's own hint line stays only for the no-level case.
       hint={current ? null : hint}
       onLeave={onLeave}
-      defaultCollapsed={defaultCollapsed}
-      // The card head's aside: a view's card-level state, then THE MEASURE CONTROL (A2) — the
-      // figure column's heading, right of the title where the eye finds the list's one setting.
+      // The card head's aside: a view's card-level state, and a SINGLE measure's label (a level
+      // with several measures shows them as TILES, the body's first block — 2026-10-23).
       aside={
-        aside != null || measure ? (
+        aside != null || levelLabel || (measure && measure.options.length <= 1) ? (
           <span className="inline-flex items-center gap-1.5">
             {aside}
-            <MeasureMenu measure={measure} />
+            {levelLabel ? <MeasureLabel label={levelLabel} /> : measure && measure.options.length <= 1 && measure.options[0] && <MeasureLabel label={measure.options[0].label} />}
           </span>
         ) : undefined
       }
     >
       {current && (
         <>
+          {/* THE CONTROL BAND (design B of the brainstorm's explorer-sections mock, user 2026-10-23:
+              the card "reads like lots and lots of buttons, lines and values … all the same
+              padding"): ONE full-bleed plate under the head holding what the reader SETS — the
+              measure tiles, a hairline, the path — then the list on the glass, then the span on
+              the plate foot. Sections by surface, the device the right-rail foot already uses, no
+              extra words. The path rides the band bare (it wore its own accent-tinted plate, a
+              third surface in a second tint — user: "does its colour look off?"), the house its
+              one accent mark. Full-bleed by the body's own inset (ExplorerShell: `pt-1.5 px-[14px]`). */}
+          <div className={cn("-mt-1.5 mb-2 pt-2 pb-2 bg-[var(--panel-plate)] border-b border-border flex flex-col gap-2", SHELL_BLEED_X, SHELL_INSET_X)}>
+            {measure && measure.options.length > 1 && <MeasureTiles measure={measure} />}
+            <ExplorerPath
+              bare
+              className={cn(measure && measure.options.length > 1 && "border-t border-border/60 pt-2")}
+              crumbs={crumbs}
+              hint={current.meaning}
+              placeholder={placeholder}
+            />
+          </div>
           <ExplorerHeading hint={hint} setting={current.setting} />
-          <ExplorerPath crumbs={crumbs} hint={current.meaning} placeholder={placeholder} />
           {/* Inside a level the list HANGS FROM THE PATH on a spine in the path's own accent (user,
               2026-09-26: "a vertical line on the left side to show that the section underneath
               belongs to it"). The spine starts at the plate's left edge, under the house step. */}
@@ -287,8 +319,16 @@ export default function Explorer({ id, title, hint, placeholder, levels: selecte
                 ))}
               </div>
             )}
-            {current.pager}
           </div>
+          {/* THE FOOT IS A PLATE (design B, 2026-10-23): the right-rail foot's ground, full-bleed
+              to the card's bottom edge by the body's own inset, so the span or the page a level
+              states reads as the card's last section rather than one more inset row. OUTSIDE the
+              list wrapper: inside it, a nested level's spine ran down the plate's edge. */}
+          {current.pager != null && (
+            <div className={cn("-mb-2 mt-1.5 pt-1.5 pb-2 bg-[var(--panel-plate)] rounded-b-[calc(var(--radius)-1px)]", SHELL_BLEED_X, SHELL_INSET_X)}>
+              {current.pager}
+            </div>
+          )}
         </>
       )}
     </ExplorerShell>

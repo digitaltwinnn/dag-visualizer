@@ -57,8 +57,9 @@ function StateDot({ state }: { state?: string | null }) {
 }
 
 /** The node level's glyph column — room for two short tickers ("DAG UP") or one long one
- *  ("USDC.dag") at the tag size; anything longer truncates. */
-export const NODE_GLYPH_W = 56;
+ *  ("USDC.dag") at the tag size, plus a clear step before the id (user, 2026-10-24: the id "sits
+ *  close to those tickers while it has plenty of space to the right"); anything longer truncates. */
+export const NODE_GLYPH_W = 82; // 56 → 74 → 82 (user, 2026-10-24: "give it more left margin")
 
 /** A network's ticker — the DAG core's is "DAG". Shared with the raw node roster. */
 export const tickerOf = (id: string): string => metagraphById(id)?.ticker ?? (id === "dag" ? "DAG" : id);
@@ -70,6 +71,11 @@ export const NODE_ID_GLYPHS = 12;
 /** The id's SHORT form, for a cell too narrow for the twelve — a row with three layer pills in a
  *  rail at its narrowest. */
 const NODE_ID_GLYPHS_SHORT = 8;
+/** …and its LONG form, where the cell has the room (user, 2026-10-24: "use a bit more space to
+ *  the right also, big empty space there" — the rails grew to the detail width on 2026-10-18 and
+ *  the twelve left a third of the cell blank). The container query below picks the tier, so a
+ *  phone sheet still reads the twelve or the eight. */
+const NODE_ID_GLYPHS_LONG = 16;
 
 /** THE ID IS CUT ONCE, WHATEVER ITS CELL (2026-10-03). `midHash` cuts the id in the middle; a cell
  *  narrower than that form then cut it AGAIN at the end ("c54ccbe……"), which lost the tail the
@@ -81,7 +87,8 @@ const NODE_ID_GLYPHS_SHORT = 8;
 function NodeId({ id }: { id: string }) {
   return (
     <span className="@container block w-full">
-      <span className="hidden @[12.5ch]:inline">{midHash(id, NODE_ID_GLYPHS)}</span>
+      <span className="hidden @[17ch]:inline">{midHash(id, NODE_ID_GLYPHS_LONG)}</span>
+      <span className="hidden @[12.5ch]:inline @[17ch]:hidden">{midHash(id, NODE_ID_GLYPHS)}</span>
       <span className="@[12.5ch]:hidden">{midHash(id, NODE_ID_GLYPHS_SHORT)}</span>
     </span>
   );
@@ -101,9 +108,18 @@ export function nodeRowSpec(args: {
 }): ExplorerRowSpec {
   const { row, hue } = args;
   const netId = row.pick.kind === "metanode" && row.pick.meta ? row.pick.meta.id : "dag";
-  const ticker = tickerOf(netId);
   const ip = "node" in row.pick ? (row.pick as { node?: { ip?: string | null } }).node?.ip : null;
   const also = coLocatedNetworks(ip, netId, args.metaList);
+  // ONE ORDER FOR A MACHINE'S TICKERS, whichever network's row this is (user, 2026-10-24: a dual
+  // node "doesn't show them in the same order for each row"): the DAG first, then the catalog's
+  // order — a co-located machine reads "DAG UP" under both its rows, and the row's own network
+  // keeps its hue rather than its place.
+  const rank = (id: string) => {
+    if (id === "dag") return -1;
+    const i = args.metaList.findIndex((m) => m.id === id);
+    return i < 0 ? Number.POSITIVE_INFINITY : i; // an uncataloged network sorts last, never beside the DAG
+  };
+  const tickers = [netId, ...also.map((m) => m.id)].sort((a, b) => rank(a) - rank(b));
   const id = row.id ?? row.label;
   const codes = layerCodesOf([row]);
   return {
@@ -112,9 +128,8 @@ export function nodeRowSpec(args: {
       // BOLD (user, 2026-10-19: "it should have the ticker(s) in bold") — the ticker is the row's
       // one identity word, and at medium it sat level with the mono id beside it.
       <span className="min-w-0 truncate text-label font-semibold">
-        <span className={IDENT_INK} style={{ color: hue }}>{ticker}</span>
-        {also.map((m) => (
-          <span key={m.id} className={IDENT_INK} style={{ color: identityHudCss(m.id) }}> {tickerOf(m.id)}</span>
+        {tickers.map((id, i) => (
+          <span key={id} className={IDENT_INK} style={{ color: id === netId ? hue : identityHudCss(id) }}>{i > 0 ? " " : ""}{tickerOf(id)}</span>
         ))}
       </span>
     ),

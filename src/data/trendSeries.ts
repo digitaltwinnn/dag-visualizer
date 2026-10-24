@@ -54,6 +54,9 @@ export interface MetricSpec {
   unit: (per: string) => string;
   /** Undefined = TrendChart's own default number format is right for this metric. */
   format?: (v: number) => string;
+  /** The unit JOINS the label in a caption ("Cadence between snapshots") instead of following
+   *  "in" ("Fees in DAG per day") — asked of the spec, as `metricCaption` asks everything. */
+  joinUnit?: true;
 }
 
 // THE VALUE FORMATTERS, one home — exported because the DOCUMENT's global (`g.*`) charts read
@@ -62,7 +65,24 @@ export interface MetricSpec {
 /** DAG: two decimals under 10, none above — a fee is read at two very different scales. */
 export const formatDag = (v: number) => compactDag(v); // "0.05", "12", "4.3K" (user, 2026-10-07)
 export const formatMb = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: 1 })} MB`;
-export const formatSeconds = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}s`;
+/** A duration, SHORT (chart units stay short): seconds under a minute, then minutes, hours, days —
+ *  "22d", never "1,937,037s" (user, 2026-10-23: "the values should be shortened" — a chain that
+ *  sealed one snapshot in a month showed its gap in seconds). One decimal only where it still
+ *  tells the reader something (under ten of the unit). */
+export const formatSeconds = (v: number): string => {
+  if (!Number.isFinite(v)) return "—";
+  // Round INTO the unit first, then pick the unit from the rounded value (review, 2026-10-24:
+  // 59.7s rounded to "60s" and 3599.6s to "60m" — a reading no clock says).
+  const r = (n: number) => (n < 10 ? Number(n.toFixed(1)) : Math.round(n));
+  const f = (n: number, unit: string) => `${n < 10 ? n.toFixed(1).replace(/\.0$/, "") : n.toLocaleString()}${unit}`;
+  const s = Math.round(v);
+  if (s < 60) return `${s}s`;
+  const m = r(v / 60);
+  if (m < 60) return f(m, "m");
+  const h = r(v / 3_600);
+  if (h < 24) return f(h, "h");
+  return f(r(v / 86_400), "d");
+};
 
 const rate = (per: string) => per;
 
@@ -80,7 +100,7 @@ export const TREND_METRICS: Record<TrendMetric, MetricSpec> = {
   // MEAN SPACING = gapSum ÷ snaps per bucket. A day÷snaps approximation was rejected: for a
   // batching chain (dozens of snapshots in one tick, then idle) it reads as spacing that never
   // existed. It divides two COUNTER rows, so its edge buckets are exactly as partial as theirs.
-  continuity: { kind: "counter", key: null, scale: 1, unit: () => "seconds", format: formatSeconds },
+  continuity: { kind: "counter", key: null, scale: 1, unit: () => "between snapshots", format: formatSeconds, joinUnit: true },
 };
 
 /** A metric that IS one stored row — everything but the derived `continuity`. Narrower than
@@ -348,11 +368,22 @@ export function spanWord(metric: TrendMetric): string {
 export function rankByLast(
   ids: readonly string[],
   seriesOf: (id: string) => readonly (number | null)[],
+  order: "desc" | "asc" = "desc",
 ): string[] {
+  const sign = order === "asc" ? -1 : 1;
   return ids
     .map((id) => ({ id, last: lastMeasured(seriesOf(id)) }))
-    .sort((a, b) => (b.last ?? -1) - (a.last ?? -1))
+    // Nothing measured sorts last in either order.
+    .sort((a, b) => (a.last == null ? 1 : 0) - (b.last == null ? 1 : 0) || sign * ((b.last ?? 0) - (a.last ?? 0)))
     .map((x) => x.id);
+}
+
+/** Which way "busiest first" runs for a metric: a bigger count, fee, size or fleet is busier —
+ *  but CONTINUITY is the spacing between snapshots, where a SHORTER gap is the busier chain
+ *  (user, 2026-10-23: under Continuity "PacaSwap is a huge number" sat on top, ranked as if its
+ *  22-day gap were the most activity). */
+export function rankOrder(metric: TrendMetric): "desc" | "asc" {
+  return metric === "continuity" ? "asc" : "desc";
 }
 
 // ── THE OVERVIEW REGISTER (2026-09-18, the vitals band's timeline) ───────────────────────────
@@ -502,7 +533,9 @@ export const METRIC_LABELS: Record<TrendMetric, string> = {
   fees: "Fees",
   kb: "Data",
   nodes: "Nodes",
-  continuity: "Continuity",
+  // "Cadence", not "Continuity" (user, 2026-10-24: "continuity = cadence? it does show outages, but
+  // ideally there is not and cadence is what the user sees"). The id stays `continuity`.
+  continuity: "Cadence",
 };
 
 /** THE MEASURES' ONE ORDER — the explorer heading's list top-to-bottom and the cards' ↑/↓ keys
@@ -619,7 +652,8 @@ export function metricCaption(metric: TrendMetric, stepMs: number): string {
   if (!unit || unit.toLowerCase() === label.toLowerCase()) return label;
   // Asked of the SPEC, not sniffed off the string: a unit is a bare rate exactly when its row uses
   // this module's own `rate`, and the words "per …" are that function's business, not this one's.
-  return TREND_METRICS[metric].unit === rate ? `${label} ${unit}` : `${label} in ${unit}`;
+  const spec = TREND_METRICS[metric];
+  return spec.unit === rate || spec.joinUnit ? `${label} ${unit}` : `${label} in ${unit}`;
 }
 
 // ── WHY A MOMENT HAS NO CHART (2026-09-19) ──────────────────────────────────────────────────

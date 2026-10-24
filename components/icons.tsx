@@ -2,6 +2,9 @@ import {
   Orbit,
   Globe,
   Layers,
+  HardDrive,
+  Hexagon,
+  Timer,
   CircleDashed,
   Info,
   Compass,
@@ -27,6 +30,10 @@ import {
 import type { NetworkId } from "@/src/engine/config";
 import type { Mode } from "@/src/store/store";
 import type { PickDescriptor } from "@/src/data/types";
+import type { TrendMetric } from "@/src/store/store";
+import type { HyperMeasure } from "@/src/data/hyperMeasure";
+import type { GeoMeasure } from "@/src/data/geoMeasure";
+import type { LedgerMeasure } from "@/src/data/ledgerMeasure";
 
 // ONE source of truth for the interface's VOCABULARY glyphs — each view kind → its lucide icon.
 // Consumed by the top-bar view switch (TopBar), the card-head kind marks (inspector/cards.tsx),
@@ -88,12 +95,19 @@ export const INSTANT_ICON: LucideIcon = Crosshair;
 // parent, so a calendar span beside the crosshair's single point.
 export const RANGE_ICON: LucideIcon = CalendarRange;
 
+// The NODE's mark — card head, ghost, callout, dock tray, and the explorers' Nodes measure tile:
+// the honeycomb's HEXAGON, the cell the Geography view stacks a node as. It was the Globe (the
+// Geography VIEW's own mark) until 2026-10-24 (user: the node card "is actually showing a sphere
+// now which is incorrect … use the same" as the explorer control) — a view mark says WHERE the
+// subject lives, a hexagon says WHAT it is, and one node must wear one glyph everywhere.
+export const NODE_ICON: LucideIcon = Hexagon;
+
 // The COUNTRY drill's mark (the geo focus ladder's country rung — card head, ghost, dock tray):
-// a place pin — distinct from VIEW_ICONS.geo (the whole globe) and the node's Globe mark.
+// a place pin — distinct from VIEW_ICONS.geo (the whole globe) and the node's hexagon (NODE_ICON).
 export const COUNTRY_ICON: LucideIcon = MapPin;
 
 // The PROVIDER (internal id: cohort — city × hosting-provider rung) mark: a server rack, reading
-// as "hosting infrastructure" — distinct from the country pin and the node's Globe mark.
+// as "hosting infrastructure" — distinct from the country pin and the node's hexagon (NODE_ICON).
 export const PROVIDER_ICON: LucideIcon = Server;
 
 // The COMPOSITION group's mark (hyper's make-up rung — the machines in a network that run the
@@ -103,7 +117,7 @@ export const PROVIDER_ICON: LucideIcon = Server;
 export const COMPOSITION_ICON: LucideIcon = Component;
 
 // The ONE size every card-head/title KIND MARK renders at — About's Info, the tool cards'
-// Compass, the node card's Globe, the snapshot card's Box (CardHead's panel `icon` + the inspector
+// Compass, the node card's hexagon, the snapshot card's Box (CardHead's panel `icon` + the inspector
 // titles in inspector/cards.tsx). 16px (`size-4`): the old 14px read timid next to the 15px
 // text-title headline (user follow-up on Task 23). Single-sourced here so the heads can't drift;
 // the dock TRAYS and the top-bar view switch deliberately keep their own sizes (this constant is
@@ -147,7 +161,7 @@ export const NET_ICONS: Record<NetworkId, LucideIcon> = {
 };
 
 // The inspector card KINDS map onto one glyph set shared with the dock icon trays: the metagraph
-// dossier is the Hypergraph subject (Orbit), a node is the Geography subject (Globe), a snapshot
+// dossier is the Hypergraph subject (Orbit), a node is the honeycomb's cell (NODE_ICON), a snapshot
 // is the BLOCK (SNAPSHOT_ICON), a layer is one stratum (LAYER_ICON).
 export function iconForPick(
   kind: PickDescriptor["kind"] | "l0" | "l1" | "metanode" | "country" | "cohort" | "composition",
@@ -168,9 +182,48 @@ export function iconForPick(
     case "l0":
     case "l1":
     case "metanode":
-      return VIEW_ICONS.geo;
+      return NODE_ICON; // the hexagon, the same mark the explorers' Nodes tile wears
     case "meta":
     default:
       return VIEW_ICONS.hyper;
   }
 }
+
+/** EVERY EXPLORER'S MEASURES, ONE MARK EACH (user, 2026-10-23: the measure dropdown "doesn't
+ *  actually clearly say to the user there is a lot of different data here to visualize" — the
+ *  measures are TILES on every explorer card now, design B of the explorer-sections mock, so each
+ *  needs a glyph the reader can tell apart at 14px). Keyed by the measure ids the four measure
+ *  modules declare (`src/data/{hyper,geo,ledger}Measure.ts`, `trendSeries`). Reused where the app
+ *  already has the mark: snapshots the Snapshots VIEW's layers, blocks the data lane's blocks,
+ *  fees the currency coin, a layer count the ledger stack's one stratum, metagraphs the
+ *  Hypergraph subject's orbit, providers the provider card's server, anchors the metagraph
+ *  snapshot's boxes. Data and size (bytes) are the drive, not the state lane's database; nodes
+ *  the honeycomb's hexagon — the geo view stacks them as cells — never the provider's server (a
+ *  node is not its host). Continuity is the timer: seconds between snapshots. */
+export type MeasureId = TrendMetric | HyperMeasure | GeoMeasure | LedgerMeasure;
+/** Typed on the four measure vocabularies (review, 2026-10-24), so a new measure id without a glyph
+ *  is a compile error here — the tune-schema idiom — while `measureIcon` keeps the lookup by the
+ *  option's string id lenient for the tiles. */
+export const MEASURE_ICONS: Readonly<Record<MeasureId, LucideIcon>> = {
+  // History (`TrendMetric`)
+  snapshots: Layers,
+  blocks: Blocks,
+  fees: Coins,
+  kb: HardDrive,
+  nodes: NODE_ICON,
+  continuity: Timer,
+  // Hypergraph (`HyperMeasure`): nodes above, then the three layers
+  l0: Layers,
+  cl1: Layers,
+  dl1: Layers,
+  // Geography (`GeoMeasure`): nodes above, then
+  metagraphs: Orbit,
+  providers: Server,
+  // Snapshots (`LedgerMeasure`): metagraphs above, then
+  fee: Coins,
+  anchors: Boxes,
+  size: HardDrive,
+};
+
+/** A measure option's glyph by its id — undefined for an id no vocabulary declares. */
+export const measureIcon = (id: string): LucideIcon | undefined => (MEASURE_ICONS as Readonly<Record<string, LucideIcon | undefined>>)[id];

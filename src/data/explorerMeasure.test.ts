@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { levelMeasure, levelOptions } from "@/src/data/explorerMeasure";
+import { levelMeasure, levelOptions, listTotal } from "@/src/data/explorerMeasure";
 
 // ONE VOCABULARY PER EXPLORER, EACH LEVEL A SUBSET OF IT (user, 2026-09-29: "I would expect the
 // values to be exactly the same for each level, but to only exclude the ones not relevant for that
@@ -19,5 +19,12 @@ describe("levelOptions / levelMeasure", () => {
   it("a level shows the view's pick where it can state it, and its own first measure where it cannot", () => {
     expect(levelMeasure(["fee", "anchors", "size"] as const, "size")).toBe("size");
     expect(levelMeasure(["fee", "anchors", "size"] as const, "metagraphs")).toBe("fee");
+  });
+});
+
+describe("listTotal — the explorer foot's total", () => {
+  it("sums the rows and reads nothing from an empty list", () => {
+    expect(listTotal([37, 36, 20, 2, 1])).toBe(96);
+    expect(listTotal([])).toBeNull();
   });
 });

@@ -5,7 +5,7 @@ import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { ABOUT_ICON as AboutIcon, VIEW_ICONS } from "@/components/icons";
 import { useStore } from "@/src/store/store";
 import { displayNetwork } from "@/src/data/unlisted";
-import { cn } from "@/lib/utils";
+import { cn, TOUCH_HIT } from "@/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import FilterPicker from "@/components/topbar/FilterPicker";
 import PulseStrip from "@/components/topbar/PulseStrip";
@@ -170,15 +170,25 @@ export default function TopBar() {
         aria-label={name ? `${name} view` : dir === -1 ? "First view" : "Last view"}
         onClick={() => { if (target) { setStrip(null); setFaceSlide({ mode: target, from: dir === 1 ? "right" : "left" }); setMode(target); } }}
         className={cn(
-          "hidden max-[700px]:inline-flex items-center justify-center size-11 rounded-btn bg-transparent border-0 cursor-pointer",
-          // In the ACCENT (user, 2026-10-18: muted they "look a bit boring/blend"): a control that
-          // moves the view wears the control colour, dimmed at an end.
-          "text-primary-ink hover:bg-wash-soft",
-          "disabled:opacity-30 disabled:cursor-default disabled:hover:bg-transparent",
+          // THE PLANK CHEVRON SPECIES, FLUSH TO THE NAME (user, 2026-10-23, design A of
+          // `.superpowers/brainstorm/…/phone-topbar-stepper.html`: the pair was "too wide and
+          // don't look related to the actual view switcher"). They were 44px boxes with a 24px
+          // accent glyph, 10px clear of the name each side — the heaviest marks in the bar, and
+          // the centre cell they made (213px) left each side zone 65px for the left's 92px of
+          // content, so the filter face clipped to "A" on every phone load. Now they are the
+          // rail pager's chevron exactly: a 24px box, a 16px glyph in muted ink, dimmed at an
+          // end, with `TOUCH_HIT`'s invisible pad for a thumb — and no gap to the face, so the
+          // arrows read as the name's own, the way a date stepper does. The accent they wore
+          // from 2026-10-18 ("muted they look a bit boring") went with the size: at 16px beside
+          // a title-step name the muted ink is the quiet furniture the name needs around it.
+          "hidden max-[700px]:inline-flex items-center justify-center size-6 rounded-btn bg-transparent border-0 cursor-pointer",
+          "text-muted-foreground hover:text-foreground hover:bg-wash-soft",
+          "disabled:opacity-30 disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-muted-foreground",
           "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
+          TOUCH_HIT,
         )}
       >
-        <Glyph aria-hidden className="size-6" strokeWidth={2.25} />
+        <Glyph aria-hidden className="size-4" />
       </button>
     );
   };
@@ -209,14 +219,32 @@ export default function TopBar() {
       // Two failure shapes since the grid promotion: the ROW overflowing its box, and a ZONE
       // being crushed below its content (the left zone's min-w-0 lets the grid shrink it, so
       // the row's own scrollWidth stays clean while the brand/filter get clipped inside it).
-      let over = el.scrollWidth - el.clientWidth;
+      // The failure is a CONTROL UNDER A CONTROL (2026-10-23) — measured as the overlap of
+      // consecutive visible controls' boxes across the three zones, plus the last one past the
+      // row's edge. It read scrollWidth until then, which the phone's `TOUCH_HIT` pads (an
+      // invisible pseudo 10px past its host) and the brand's own `-mx-1` both inflated, and a
+      // zone's box is the wrong edge too: a control spilling into the grid GAP touches nothing.
+      const rowRight = el.getBoundingClientRect().right;
+      const ctrls: { box: DOMRect; name: string }[] = [];
+      const nameOf = (c: HTMLElement) => (c.getAttribute("aria-label") ?? c.textContent ?? "").trim().slice(0, 24) || c.tagName.toLowerCase();
       for (const zone of el.children) {
-        if (zone instanceof HTMLElement) over = Math.max(over, zone.scrollWidth - zone.clientWidth);
+        if (!(zone instanceof HTMLElement)) continue;
+        for (const child of zone.children) {
+          if (child instanceof HTMLElement && child.offsetWidth) ctrls.push({ box: child.getBoundingClientRect(), name: nameOf(child) });
+        }
       }
+      let over = 0;
+      let pair = "";
+      for (let i = 1; i < ctrls.length; i++) {
+        const o = Math.round(ctrls[i - 1].box.right - ctrls[i].box.left);
+        if (o > over) { over = o; pair = `"${ctrls[i - 1].name}" under "${ctrls[i].name}"`; }
+      }
+      const last = ctrls[ctrls.length - 1];
+      if (last && Math.round(last.box.right - rowRight) > over) { over = Math.round(last.box.right - rowRight); pair = `"${last.name}" past the bar's edge`; }
       if (over > 0)
         console.warn(
-          `[TopBar] the command bar overflows by ${over}px at ${window.innerWidth}px — ` +
-            "a control is being clipped. Raise a breakpoint in components/TopBar.tsx.",
+          `[TopBar] command bar controls overlap by ${over}px at ${window.innerWidth}px (${pair}). ` +
+            "Trim a control or raise a breakpoint in components/TopBar.tsx.",
         );
     };
     check();
@@ -323,9 +351,13 @@ export default function TopBar() {
             // 44 touch floor on a coarse one — controls of different heights read as controls of
             // different rank.
             "h-9 rounded-btn -mx-1 px-1 py-0.5 bg-transparent border-0 cursor-pointer text-left",
-            // The same pointer-keyed 44px touch floor as the filter button beside it (its note
-            // has the rationale) — the ECG mark alone measured 42×28 on phone.
-            "touch:min-h-11 touch:min-w-11",
+            // The touch HEIGHT floor as the filter button beside it; the WIDTH floor went on
+            // 2026-10-23 (user: "trim") for `TOUCH_HIT`'s invisible pad — the mark is 34px wide
+            // and the 44px box it was padded to was the left zone's overrun at phone widths
+            // (the stepper note on `viewChevron` has the measurements). The pad still catches a
+            // thumb; the box stops asking the zone for room it does not draw.
+            "touch:min-h-11",
+            TOUCH_HIT,
             "hover:bg-wash-soft transition-colors duration-150 motion-reduce:transition-none",
             strip === "pulse" && "bg-wash-soft",
             "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
@@ -367,7 +399,9 @@ export default function TopBar() {
             // ticker ellipsizes inside its own column instead of overlapping the neighbour.
             // …but never below the touch floor's WIDTH either (user, 2026-09-03: the "All" face
             // measured 35px). The coarse floor beats the shrink for short faces; long tickers
-            // still truncate — 44px is a floor, not a width.
+            // still truncate — 44px is a floor, not a width. ⚠️ It is the floor that keeps "All"
+            // whole at 360px: swapped for `TOUCH_HIT`'s pad on 2026-10-23 (the brand took it the
+            // same day), the zone's flex shrink cut the face to 36px and the label to "Al…".
             "min-w-0 touch:min-w-11 max-[700px]:px-1 max-[700px]:py-1.5 max-[700px]:gap-[4px]",
           )}
         >
@@ -424,7 +458,8 @@ export default function TopBar() {
             that other views exist, and neither reads as a control). Two real steps through the
             same `stepView` the swipe runs, clamped at the ends (a dimmed chevron, never a
             vanishing one — the plank's rule), hidden from 700px up where the segmented switch
-            names every view. */}
+            names every view. Since 2026-10-23 they are the plank's own chevron, flush to the
+            face (`viewChevron` has the measurements). */}
         {viewChevron(-1)}
         <button
           type="button"
@@ -434,7 +469,11 @@ export default function TopBar() {
           onKeyDown={(e) => { if (e.key === "Escape") setStrip(null); }}
           className={cn(
             // The filter face's own recipe — a face plus its open-state wash — at the touch floor.
-            "hidden max-[700px]:flex items-center justify-center gap-1.5 h-9 py-1.5 px-2 rounded-btn",
+            // `px-0.5`, not the filter face's `px-2` (2026-10-23, the "trim" round): the chevrons sit
+            // flush on both sides and their own 4px glyph inset is the air; the face's box is what
+            // the centre cell costs, and at 360px every 2px of it ran the filter's touch floor under
+            // the ‹ (the row's gap is no lever — the centre is centred, so only the two contents are).
+            "hidden max-[700px]:flex items-center justify-center gap-1.5 h-9 py-1.5 px-0.5 rounded-btn",
             "bg-transparent border-0 cursor-pointer whitespace-nowrap",
             "hover:bg-wash-soft touch:min-h-11 touch:min-w-11",
             strip === "views" && "bg-wash-soft",

@@ -14,13 +14,26 @@
 // `color`/`base` for the comet tint.
 
 import * as THREE from "three";
-import { ARC_TAIL, ARC_TAIL_FRAC, type ArcAgent, type ArcSim } from "../../domain/arcSim";
+import { ARC_SAMPLES, ARC_TAIL, ARC_TAIL_FRAC, TRAIL_VERTS, type ArcAgent, type ArcSim, type ArcEndpoint } from "../../domain/arcSim";
 import { glowBlend, isLightGround, type SceneColors } from "../../sceneColors";
 import { joinBloom } from "../SceneContext";
+import { occlusionGlsl } from "../occlusion";
+
+/** The path trace's `aTail` FLAG (see the field note): above 1 marks a path vertex, and the shader
+ *  then takes `PATH_B_*` as its brightness instead of the comet falloff — one value per ground,
+ *  because the falloff is quadratic on dark (vB² of additive light) and linear on paper (ink):
+ *  0.45² ≈ 20% of the head's light on dark, 25% of its ink on paper. */
+const PATH_TAIL = 2;
+const PATH_B_DARK = 0.45;
+const PATH_B_PAPER = 0.25;
+/** Vertices per path: one segment (two vertices) between each pair of curve samples. */
+const PATH_VERTS = (ARC_SAMPLES - 1) * 2;
 
 // A node record the flash is applied back onto (validator or metagraph node).
 interface FlashRec {
   _flash?: number;
+  /** The record's network — a metagraph node's id; absent on a validator, which is the DAG's. */
+  metaId?: string;
 }
 
 /**
@@ -94,10 +107,23 @@ export class Arcs {
   private _cometPts: THREE.Vector3[] | null = null;
   private _sim: ArcSim | null = null;
   private _poolRecs: FlashRec[] = [];
+  /** THE PATH TRACE (user, 2026-10-24: "keep the animation but also show the path that it
+   *  traverses using a slightly more subtle effect"): every packet's whole hop, drawn once as a
+   *  faint line in the packet's colour through the SAME trail material — its `aTail` is held at
+   *  `PATH_TAIL`, so the shader's comet falloff lands it at a fraction of the head's presence on
+   *  either ground and the exact occlusion hides it behind the planet like the comet. Rewritten
+   *  only when a packet retargets (its curve changed) or the selector moves (`setSelector`). */
+  private pathPos: Float32Array = new Float32Array(0);
+  private pathCol: Float32Array = new Float32Array(0);
+  private pathPosAttr: THREE.BufferAttribute | null = null;
+  private pathColAttr: THREE.BufferAttribute | null = null;
+  /** Each agent's hop count as last written to its path — only a changed one is rewritten. */
+  private pathHop: Int32Array = new Int32Array(0);
   // The globe surface's shared camera-facing + closeness uniforms (GeoView builds them; Globe
   // hands them over once). See setFacing.
-  private _camN: { value: THREE.Vector3 } = { value: new THREE.Vector3(0, 0, 1) };
-  private _close: { value: number } = { value: 0 };
+  /** The camera's POSITION in the globe's local frame (the Globe's `_camL`, shared by reference) —
+   *  the line-of-sight occlusion below needs where the eye is, not only which way it faces. */
+  private _camL: { value: THREE.Vector3 } = { value: new THREE.Vector3(0, 0, 60) };
   hasArcs = false;
 
   /** The gate's VISIBILITY half (user, 2026-09-04): while the view-in choreography runs, the
@@ -106,6 +132,60 @@ export class Arcs {
    *  opens. */
   setVisible(v: boolean): void {
     if (this.arcGroup) this.arcGroup.visible = v;
+  }
+
+  /** The chips' selector — the hover preview when there is one, else the committed filter — so
+   *  the packets answer it the way geo answers a filter, the ISOLATE (user, 2026-10-24: "apply the
+   *  same to the colored arcs … they don't respond to the filter"): a packet with an endpoint off
+   *  the selector is written at the globe's centre, where the exact occlusion hides it, and comes
+   *  back on its own curve when the selector releases it. The committed filter already narrows the
+   *  POOL (the Globe rebuilds the sim from the filter-active nodes), so this is the hover's half;
+   *  a hover must not rebuild the pool, which would restart every packet. */
+  setSelector(sel: string): void {
+    this._sel = sel;
+    if (this._sim) this._writePaths(this._sim, true); // event-time: every path answers the new selector
+  }
+  private _hidden(ag: ArcAgent): boolean {
+    return this._sel !== "all" && (this._netOf(ag.from) !== this._sel || this._netOf(ag.to) !== this._sel);
+  }
+  private _writePaths(sim: ArcSim, all = false): void {
+    if (!this.pathPosAttr) return;
+    let wrote = false;
+    for (const ag of sim.agents) {
+      const idx = ag.vstart / (TRAIL_VERTS);
+      if (!all && this.pathHop[idx] === ag.hop) continue;
+      this._writePath(ag);
+      wrote = true;
+    }
+    if (!wrote) return;
+    this.pathPosAttr.needsUpdate = true;
+    if (this.pathColAttr) this.pathColAttr.needsUpdate = true;
+  }
+  /** One packet's whole hop as segments between its baked curve samples, in its colour; at the
+   *  centre (occluded) while the selector hides it. Agent index = vstart / the trail's verts. */
+  private _writePath(ag: ArcAgent): void {
+    const idx = ag.vstart / (TRAIL_VERTS);
+    const base = idx * PATH_VERTS * 3;
+    const pos = this.pathPos, col = this.pathCol;
+    if (idx < this.pathHop.length) this.pathHop[idx] = ag.hop;
+    if (this._hidden(ag)) {
+      pos.fill(0, base, base + PATH_VERTS * 3);
+      return;
+    }
+    const c = ag.to.node.color || ag.to.node.base;
+    for (let j = 0; j < ARC_SAMPLES - 1; j++) {
+      const vi = base + j * 6, A = ag.curve[j]!, B = ag.curve[j + 1]!;
+      pos[vi] = A.x; pos[vi + 1] = A.y; pos[vi + 2] = A.z;
+      pos[vi + 3] = B.x; pos[vi + 4] = B.y; pos[vi + 5] = B.z;
+      if (c) {
+        col[vi] = c.r; col[vi + 1] = c.g; col[vi + 2] = c.b;
+        col[vi + 3] = c.r; col[vi + 4] = c.g; col[vi + 5] = c.b;
+      }
+    }
+  }
+  private _sel = "all";
+  private _netOf(ep: ArcEndpoint): string {
+    return this._poolRecs[ep.node.index]?.metaId ?? "dag";
   }
   // The travelling packets are additive GLOW on the dark ground and normal-blended INK on paper —
   // additive over a 0.965-L background saturates to white and draws nothing. Held as a field
@@ -175,9 +255,8 @@ export class Arcs {
   // body sphere, so there is nothing to depth-occlude an arc — additive lines on the back side
   // otherwise draw at full strength straight through the planet (user, 2026-08-01). Called once,
   // right after buildGeoView; the material picks the refs up when it is next (re)built.
-  setFacing(camN?: { value: THREE.Vector3 }, close?: { value: number }): void {
-    if (camN) this._camN = camN;
-    if (close) this._close = close;
+  setCamera(camL: { value: THREE.Vector3 }): void {
+    this._camL = camL;
   }
 
   // js/globe.js:359-427 (`_buildArcs`) minus the agent seeding (that's ArcSim.rebuild). Sizes the
@@ -201,7 +280,7 @@ export class Arcs {
     const agents = sim.agents;
     if (agents.length === 0) return;
 
-    const vertsPer = (ARC_TAIL - 1) * 2; // LineSegments: one span = two vertices
+    const vertsPer = TRAIL_VERTS; // LineSegments: one span = two vertices
     const total = agents.length * vertsPer;
     const positions = new Float32Array(total * 3);
     const aTail = new Float32Array(total);
@@ -237,29 +316,32 @@ export class Arcs {
       transparent: true, depthWrite: false, blending: this._blend,
       uniforms: {
         uM: { value: 0 }, // morph fade-in (geography view)
-        uCamN: this._camN, // shared with the graticule/walls — see setFacing
-        uClose: this._close,
+        uCamL: this._camL,
         uInk: { value: this._paper ? 1 : 0 }, // 0 = additive glow, 1 = ink on paper (_stageTrail)
       },
       vertexShader: `
-        attribute float aTail; attribute vec3 aColor;
-        varying float vB; varying vec3 vColor; varying vec3 vDir;
+        attribute float aTail; attribute vec3 aColor; uniform float uInk;
+        varying float vB; varying vec3 vColor; varying vec3 vPos;
         void main() {
-          vB = 1.0 - aTail;                 // bright (1) at the head -> 0 at the tail tip
+          // A PATH vertex is flagged by aTail > 1 (PATH_TAIL) and takes its own brightness per
+          // ground: the comet's falloff is quadratic on dark, so the trace needs a higher vB there
+          // to read at all (user, 2026-10-24: "stays visible in light but not in dark mode").
+          float path = step(1.5, aTail);
+          vB = mix(1.0 - aTail, mix(${PATH_B_DARK.toFixed(2)}, ${PATH_B_PAPER.toFixed(2)}, uInk), path); // bright (1) at the head -> 0 at the tail tip
           vColor = aColor;
-          vDir = normalize(position);       // direction from the globe centre (group-local)
+          vPos = position; // group-local, the frame the eye is given in (setCamera)
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }`,
       fragmentShader: `
-        uniform float uM; uniform vec3 uCamN; uniform float uClose; uniform float uInk;
-        varying float vB; varying vec3 vColor; varying vec3 vDir;
+        uniform float uM; uniform float uInk; uniform vec3 uCamL;
+        varying float vB; varying vec3 vColor; varying vec3 vPos;
         void main() {
-          // FACING dim, the surface's own recipe (GeoView's graticule/walls): a comet over the
-          // far hemisphere stays faintly present — the hologram reads through — but clearly
-          // BEHIND, and damps to near-nothing as the camera closes in, where seeing through the
-          // globe was pure noise. The arc apex rises above the surface, so the smoothstep window
-          // is what keeps a comet crossing the limb from popping.
-          float facing = mix(mix(0.22, 0.03, uClose), 1.0, smoothstep(-0.25, 0.12, dot(vDir, uCamN)));
+          // OCCLUDED BY THE GLOBE, EXACTLY (2026-10-23, user: the base ring must "fade when the globe
+          // sits in front … also an issue with the arc animation"): the hemisphere facing dim it
+          // replaced kept a packet behind the planet faintly visible by design (2026-08-01) and read
+          // as drawing through it. One test, one home — scene/occlusion.ts.
+          float facing;
+          ${occlusionGlsl("uCamL", "vPos", "facing")}
           // The comet falloff, themed: quadratic where the mark ADDS light, linear where it lays
           // ink. See _stageTrail for why the two grounds cannot share one curve.
           float a = mix(vB * vB, vB, uInk) * uM * facing;
@@ -272,6 +354,23 @@ export class Arcs {
         }`,
     });
     this.arcGroup.add(new THREE.LineSegments(geo, this.mat));
+
+    // ── The path traces ─────────────────────────────────────────────────────────────────────
+    const pathVerts = agents.length * PATH_VERTS;
+    this.pathPos = new Float32Array(pathVerts * 3);
+    this.pathCol = new Float32Array(pathVerts * 3);
+    const pathTail = new Float32Array(pathVerts).fill(PATH_TAIL);
+    this.pathHop = new Int32Array(agents.length).fill(-1);
+    for (const ag of agents) this._writePath(ag);
+    const pGeo = new THREE.BufferGeometry();
+    const pPosAttr = new THREE.BufferAttribute(this.pathPos, 3); pPosAttr.setUsage(THREE.DynamicDrawUsage);
+    const pColAttr = new THREE.BufferAttribute(this.pathCol, 3); pColAttr.setUsage(THREE.DynamicDrawUsage);
+    pGeo.setAttribute("position", pPosAttr);
+    pGeo.setAttribute("aTail", new THREE.BufferAttribute(pathTail, 1));
+    pGeo.setAttribute("aColor", pColAttr);
+    this.pathPosAttr = pPosAttr;
+    this.pathColAttr = pColAttr;
+    this.arcGroup.add(new THREE.LineSegments(pGeo, this.mat));
 
     // ── The heads ───────────────────────────────────────────────────────────────────────────────
     const hGeo = new THREE.BufferGeometry();
@@ -293,8 +392,7 @@ export class Arcs {
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
       uniforms: {
         uM: { value: 0 },
-        uCamN: this._camN,
-        uClose: this._close,
+        uCamL: this._camL,
         uSize: { value: t.size },
         uWhite: { value: t.white },
         uInk: { value: this._paper ? 1 : 0 }, // 0 = additive spark, 1 = ink on paper (_stageHead)
@@ -303,10 +401,10 @@ export class Arcs {
       vertexShader: `
         attribute vec3 aColor;
         uniform float uSize; uniform float uPx;
-        varying vec3 vColor; varying vec3 vDir;
+        varying vec3 vColor; varying vec3 vPos;
         void main() {
           vColor = aColor;
-          vDir = normalize(position);
+          vPos = position;
           vec4 mv = modelViewMatrix * vec4(position, 1.0);
           // Attenuated, then CLAMPED at both ends: a spark that shrinks to a speck when the globe
           // is framed whole has stopped being an accent, and one that swells to a blob up close has
@@ -315,13 +413,14 @@ export class Arcs {
           gl_Position = projectionMatrix * mv;
         }`,
       fragmentShader: `
-        uniform float uM; uniform vec3 uCamN; uniform float uClose; uniform float uWhite;
+        uniform float uM; uniform float uWhite; uniform vec3 uCamL;
         uniform float uInk;
-        varying vec3 vColor; varying vec3 vDir;
+        varying vec3 vColor; varying vec3 vPos;
         void main() {
-          // The same FACING dim the trail and the globe surface run, so a head crossing the limb
-          // goes behind the hologram with its own tail rather than popping off it.
-          float facing = mix(mix(0.22, 0.03, uClose), 1.0, smoothstep(-0.25, 0.12, dot(vDir, uCamN)));
+          // The same exact occlusion the trail runs (scene/occlusion.ts), so a head crossing the
+          // limb goes behind the hologram with its own tail rather than popping off it.
+          float facing;
+          ${occlusionGlsl("uCamL", "vPos", "facing")}
           float d = length(gl_PointCoord - vec2(0.5)) * 2.0;
           if (d >= 1.0) discard;
           float f = 1.0 - d;
@@ -370,6 +469,7 @@ export class Arcs {
       for (const ag of sim.agents) this._colorAgent(ag); // take on the new destination's colour
       if (this.arcColAttr) this.arcColAttr.needsUpdate = true;
       if (this.headColAttr) this.headColAttr.needsUpdate = true;
+      this._writePaths(sim); // only the packets whose hop count moved are redrawn
     }
   }
 
@@ -378,7 +478,7 @@ export class Arcs {
     const c = ag.to.node.color || ag.to.node.base; // metanode .color / validator .base
     if (!c) return;
     const col = this.arcCol;
-    const vertsPer = (ARC_TAIL - 1) * 2;
+    const vertsPer = TRAIL_VERTS;
     for (let v = 0; v < vertsPer; v++) {
       const ci = (ag.vstart + v) * 3;
       col[ci] = c.r; col[ci + 1] = c.g; col[ci + 2] = c.b;
@@ -392,6 +492,14 @@ export class Arcs {
   private _writeAgent(ag: ArcAgent): void {
     if (!this._sim) return;
     const pos = this.arcPos, p = this._cometPts!;
+    if (this._hidden(ag)) {
+      // Off the selector: every vertex at the centre, behind the plateau for any eye (see setSelector).
+      const vertsPer = TRAIL_VERTS;
+      pos.fill(0, ag.vstart * 3, (ag.vstart + vertsPer) * 3);
+      const hi = (ag.vstart / vertsPer) * 3;
+      this.headPos[hi] = 0; this.headPos[hi + 1] = 0; this.headPos[hi + 2] = 0;
+      return;
+    }
     const step = ARC_TAIL_FRAC / (ARC_TAIL - 1);
     const collapsed = ag.state === "pause";
     for (let j = 0; j < ARC_TAIL; j++) {
@@ -404,7 +512,7 @@ export class Arcs {
     }
     // The head rides p[0] — the same sample the trail's bright end already uses, so the spark can
     // never drift off the comet it leads.
-    const hi = (ag.vstart / ((ARC_TAIL - 1) * 2)) * 3, H = p[0];
+    const hi = (ag.vstart / (TRAIL_VERTS)) * 3, H = p[0];
     this.headPos[hi] = H.x; this.headPos[hi + 1] = H.y; this.headPos[hi + 2] = H.z;
   }
 }

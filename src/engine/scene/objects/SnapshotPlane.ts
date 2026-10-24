@@ -169,7 +169,7 @@ export interface SnapshotPlaneOpts {
 }
 
 export class SnapshotPlane {
-  /** The glass surface — a pick BLOCKER (Engine._pickAt returns null on a glass hit). */
+  /** The glass surface — a pick BLOCKER (Picking returns null on a glass hit). */
   readonly fill: THREE.Mesh;
   /** The edge label, when the plane is named — the caller registers it with its FadeSet. */
   readonly label: THREE.Mesh | null;

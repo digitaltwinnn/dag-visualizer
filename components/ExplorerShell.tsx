@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import type { ReactNode } from "react";
 import CardHead from "@/components/CardHead";
 import { Card } from "@/components/ui/card";
 import { EXPLORE_ICON } from "@/components/icons";
@@ -16,8 +16,8 @@ import { EXPLORE_ICON } from "@/components/icons";
 // verbatim from GeoExplore's pre-extraction JSX. The shell owns:
 //   - the Card frame (`sig-right` edge signal + the filter-accent spine var, `flex-none` +
 //     no inner overflow so the RAIL scrolls, not the card — geo's treatment, now everyone's),
-//   - CardHead (panel layout, the `EXPLORE_ICON` mark, the bare "Explore" eyebrow, the +/−
-//     collapse state — the shell owns `collapsed`, not the caller),
+//   - CardHead (panel layout, the `EXPLORE_ICON` mark, the bare "Explore" eyebrow; the +/−
+//     collapse it carried left on 2026-10-23 — user: "don't need it"),
 //   - the leading usage-hint line (title-leads-the-card idiom; `hint` is the copy prop — pass
 //     `null` to suppress it, e.g. GeoExplore's quiet-empty state),
 //   - the padded body: `flex flex-col` + geo's inset (`pt-1.5 px-[14px] pb-2`), whose direct
@@ -34,12 +34,19 @@ import { EXPLORE_ICON } from "@/components/icons";
 // file is chrome only — a `components/explorerShell.test.ts` grep asserts every explorer renders
 // `<Explorer` and that only `Explorer.tsx` renders this shell, so a future explorer can't
 // hand-roll its own chrome silently.
+/** The body's horizontal inset, and the bleed a full-width block inside it uses to cancel it (the
+ *  explorer's control band and plate foot) — ONE number, `--shell-inset`, set on the shell's root
+ *  and read by both utilities, so the pair cannot drift (review, 2026-10-24, twice). Static
+ *  strings: Tailwind reads them as written. */
+export const SHELL_INSET_VAR = "[--shell-inset:14px]"; // the ONE number, set on the body
+export const SHELL_INSET_X = "px-[var(--shell-inset)]";
+export const SHELL_BLEED_X = "-mx-[var(--shell-inset)]";
+
 export default function ExplorerShell({
   id,
   title,
   hint,
   onLeave,
-  defaultCollapsed = false,
   aside,
   children,
 }: {
@@ -62,27 +69,16 @@ export default function ExplorerShell({
   // Container-level hover cleanup — see the file comment. Optional: most explorers' committed
   // rows stay rendered after a click (no self-unmount hazard), so most callers omit it.
   onLeave?: () => void;
-  /** Start collapsed. No caller passes it since 2026-09-28 — the phone opened the explorer
-   *  collapsed from 2026-09-03 so the Explore sheet read as a compact two-head chooser beside the
-   *  About card, and that reason left with the card. It stays a PROP rather than a `window` read
-   *  here — THE HYDRATION LESSON (first paid by the retired About card): this component
-   *  also SSRs in the desktop rail (CSS-hidden on phone, but hydrated), and a window read at
-   *  first render made server and client disagree about which chevron to draw, a real hydration
-   *  error caught live. The phone sheet mounts client-only after `useBreakpoint` has resolved
-   *  (Radix portals the sheet content on open), so the initializer is stable for the one
-   *  instance that takes it. */
-  defaultCollapsed?: boolean;
   /** Passed to the head's TITLE row, right-aligned (CardHead's panel `aside`) — where the right
    *  rail's cards put theirs. It rode the eyebrow row for a round while the titles were
    *  "X breakdown" and too wide to share the row (2026-09-28). */
   aside?: ReactNode;
   children: ReactNode;
 }) {
-  const [collapsed, setCollapsed] = useState(defaultCollapsed);
   return (
     <Card
       asChild
-      className="sig-right flex flex-col flex-none gap-0 p-0 [--spine:var(--filter-accent,var(--primary))]"
+      className={cn("sig-right flex flex-col flex-none gap-0 p-0 [--spine:var(--filter-accent,var(--primary))]", SHELL_INSET_VAR)}
     >
       <aside id={id}>
         <CardHead
@@ -91,14 +87,12 @@ export default function ExplorerShell({
           title={title}
           eyebrow="Explore"
           aside={aside}
-          collapsed={collapsed}
-          onToggle={() => setCollapsed((c) => !c)}
         />
-        <div className={cn("flex flex-col", collapsed && "hidden")}>
+        <div className="flex flex-col">
           {hint != null && (
-            <div className="pt-2 px-4 pb-1 text-label text-muted-foreground">{hint}</div>
+            <div className={cn("pt-2 pb-1 text-label text-muted-foreground", SHELL_INSET_X)}>{hint}</div>
           )}
-          <div className="flex flex-col pt-1.5 px-[14px] pb-2" onMouseLeave={onLeave}>
+          <div className={cn("flex flex-col pt-1.5 pb-2", SHELL_INSET_X)} onMouseLeave={onLeave}>
             {children}
           </div>
         </div>

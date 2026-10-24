@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { NodeRow } from "@/src/data/types";
-import {
-  COHORT_MEASURE_OPTIONS,
+import {  COHORT_MEASURE_OPTIONS,
   COHORT_MEASURES,
   GEO_MEASURE_LABELS,
   GEO_MEASURE_OPTIONS,
   GEO_MEASURE_ORDER,
   cohortMeasure,
   countryMeasure,
+  footTotal,
   networkOfRow,
   providerOfRow,
 } from "./geoMeasure";
@@ -70,5 +70,16 @@ describe("networkOfRow", () => {
   it("names a metagraph node's network and the DAG for a core node", () => {
     expect(networkOfRow({ pick: { kind: "metanode", meta: { id: "dor" } } } as unknown as NodeRow)).toBe("dor");
     expect(networkOfRow({ pick: { kind: "l0", node: {} } } as unknown as NodeRow)).toBe("dag");
+  });
+});
+
+describe("footTotal — the foot states the fleet's count, not the rows' sum", () => {
+  const node = (net: string, isp: string) => ({ pick: { kind: "metanode", meta: { id: net }, geo: { isp } } }) as unknown as Pick<NodeRow, "pick">;
+  const all = [node("a", "Hetzner"), node("a", "Amazon"), node("b", "Hetzner")];
+  it("sums nodes, counts providers and networks once across every country, reads nothing from an empty list", () => {
+    expect(footTotal("nodes", [2, 1], all)).toBe(3);
+    expect(footTotal("providers", [2, 1], all)).toBe(2); // Hetzner sits in two countries' rows, counted once
+    expect(footTotal("metagraphs", [2, 1], all)).toBe(2);
+    expect(footTotal("providers", [], all)).toBeNull();
   });
 });

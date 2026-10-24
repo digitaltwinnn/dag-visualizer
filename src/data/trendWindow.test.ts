@@ -4,7 +4,7 @@
 // as "no leading gap"; the client clock judging a CDN-cached payload's newest bucket; the
 // leading partial month drawn whole while the trailing one was trimmed).
 import { describe, expect, it } from "vitest";
-import { assembleTrendSlice, bucketAt, spanPhrase, cursorFraction, cutRange, leadingTrim, monthlySum, pickRangeTier, planTrendFetch, rangeBuckets, snapRange, sliceWindow, stitchWindows, TIER_SINCE, tilesFor, trimNewestPartial, windowSpan, ZOOMS, type TrendsWindowData } from "./trendWindow";
+import { assembleTrendSlice, bucketAt, spanPhrase, spanStep, cursorFraction, cutRange, leadingTrim, monthlySum, pickRangeTier, planTrendFetch, rangeBuckets, snapRange, sliceWindow, stitchWindows, TIER_SINCE, tilesFor, trimNewestPartial, windowSpan, ZOOMS, type TrendsWindowData } from "./trendWindow";
 import { rangeDays } from "@/src/util/localTime";
 
 const HOUR = 3_600_000;
@@ -520,5 +520,41 @@ describe("snapRange — a long range is whole UTC days", () => {
     expect(snapRange(short)).toEqual(short);
     const whole = { fromMs: Date.UTC(2026, 4, 1), toMs: Date.UTC(2026, 4, 1) + 10 * D };
     expect(snapRange(whole)).toEqual(whole);
+  });
+});
+
+// THE RANGE CARD'S ‹ › PAGE THE SAME SPAN THROUGH TIME (user, 2026-10-23: "keep the range and just
+// select the next/previous window … Sept–Oct (30 days) instead of changing the range itself").
+describe("spanStep", () => {
+  const D = 86_400_000;
+  const NOW = Date.UTC(2026, 9, 23, 17, 0); // Oct 23 2026 17:00 UTC
+  it("steps a live day window back one whole span on the UTC day grid", () => {
+    const live = windowSpan("30d", null, NOW)!;
+    expect(spanStep(live, -1, "30d", NOW)).toEqual({ kind: "range", range: { fromMs: Date.UTC(2026, 7, 24), toMs: Date.UTC(2026, 8, 23) } });
+  });
+  it("a live window has no forward step — it already ends now", () => {
+    expect(spanStep(windowSpan("30d", null, NOW)!, 1, "30d", NOW)).toBeNull();
+    expect(spanStep(windowSpan("1h", null, NOW)!, 1, "1h", NOW)).toBeNull();
+  });
+  it("one step back then forward lands on the LIVE window again, not a committed copy of it", () => {
+    const back = spanStep(windowSpan("30d", null, NOW)!, -1, "30d", NOW)!;
+    expect(back.kind).toBe("range");
+    expect(spanStep((back as { range: { fromMs: number; toMs: number } }).range, 1, "30d", NOW)).toEqual({ kind: "live" });
+  });
+  it("a brushed range pages by ITS OWN length, and reaching the present commits a range ending now when the window's length differs", () => {
+    const r = { fromMs: Date.UTC(2026, 9, 1), toMs: Date.UTC(2026, 9, 11) }; // 10 days, ended 12 days ago
+    expect(spanStep(r, -1, "30d", NOW)).toEqual({ kind: "range", range: { fromMs: Date.UTC(2026, 8, 21), toMs: Date.UTC(2026, 9, 1) } });
+    expect(spanStep(r, 1, "30d", NOW)).toEqual({ kind: "range", range: { fromMs: Date.UTC(2026, 9, 11), toMs: Date.UTC(2026, 9, 21) } });
+    const last = { fromMs: Date.UTC(2026, 9, 11), toMs: Date.UTC(2026, 9, 21) };
+    expect(spanStep(last, 1, "30d", NOW)).toEqual({ kind: "range", range: { fromMs: NOW - 10 * D, toMs: NOW } });
+    expect(spanStep({ fromMs: NOW - 10 * D, toMs: NOW }, 1, "30d", NOW)).toBeNull();
+  });
+  it("a sub-day span steps exactly, with no day snapping", () => {
+    const live = windowSpan("1h", null, NOW)!;
+    expect(spanStep(live, -1, "1h", NOW)).toEqual({ kind: "range", range: { fromMs: NOW - 2 * 3_600_000, toMs: NOW - 3_600_000 } });
+    expect(spanStep({ fromMs: NOW - 2 * 3_600_000, toMs: NOW - 3_600_000 }, 1, "1h", NOW + 5 * 60_000)).toEqual({ kind: "live" });
+  });
+  it("is null for a degenerate span", () => {
+    expect(spanStep({ fromMs: NOW, toMs: NOW }, -1, "30d", NOW)).toBeNull();
   });
 });

@@ -31,9 +31,9 @@
 //   the subject, exactly as the camera answers it (`store.boxedCard`, published by Inspector).
 // - hyper: the committed NODE's own bead, else the network's hub or the DAG core. `unlisted`
 //   has no anchor — honest absence, no callout.
-// - geo: node (its own chip in the stack) > provider cohort > country. The network rung
-//   deliberately shows nothing: a filtered fleet is spread across the globe, and a single
-//   anchor would lie about where it is.
+// - geo: node (its own chip in the stack) > provider cohort > country > the committed NETWORK,
+//   anchored on its arc of the base ring under the globe (2026-10-24 — a filtered fleet is
+//   spread across the globe, so no surface point stands for it; the ring does).
 // - ledger: the pinned metagraph snapshot's own tile (rewind included), else the committed
 //   global tick's byte-bar lead.
 import { useState, type CSSProperties } from "react";
@@ -394,7 +394,8 @@ export default function SceneCallout() {
       (boxedCard === "country" ? countryModel() : null) ??
       geoNodeModel() ??
       cohortModel() ??
-      countryModel();
+      countryModel() ??
+      netModel();
   } else if (mode === "ledger") {
     // The pinned SNAPSHOT — metagraph snapshot over the global tick (the finer subject wins,
     // like the rail's slot order) — unless the GLOBAL card is the box. Titles are bare

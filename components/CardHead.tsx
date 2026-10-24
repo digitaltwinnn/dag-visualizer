@@ -2,7 +2,7 @@
 
 import type { CSSProperties, MutableRefObject, ReactNode } from "react";
 import { createContext, useContext, useLayoutEffect, useRef } from "react";
-import { Plus, Minus, X, type LucideIcon } from "lucide-react";
+import { X, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { Button } from "@/components/ui/button";
@@ -257,12 +257,12 @@ export default function CardHead({
 
   if (panel) {
     const Icon = icon;
-    // Collapsible heads follow the WAI-ARIA disclosure pattern: the HEADING wraps a real toggle
-    // <button> (aria-expanded), and the button's hit area is stretched over the ENTIRE head row
-    // (after:inset-0 against the head's `relative`) — the whole bar is the tap target (≥44px on
-    // touch, where hunting for a 20px "−" was the pain point). The +/− stays as the state
-    // INDICATOR only: decorative, aria-hidden, brightening on head hover via `group`.
-    const toggleable = !!onToggle;
+    // NOT A TOGGLE (2026-10-23, user: "can also remove the − from the card, don't need it"). The
+    // panel head carried the explorer card's +/− from the start — the heading wrapped a real
+    // disclosure button stretched over the whole row, with the mark as its indicator — and the
+    // right rail's box had already lost its minimize on 2026-09-11 ("hardly used"). The explore
+    // card is the view's one tool and the rail scrolls, so folding it bought nothing a reader
+    // asked for. `onToggle`/`collapsed` remain the INSPECTOR layout's (the entry tier below).
     const titleRow = (
       <>
         {Icon && (
@@ -284,7 +284,6 @@ export default function CardHead({
             // and at 3px they overlapped by 3 — their two hover washes ran into each other (user:
             // "the explorer control overlaps a bit with the minimize button").
             "flex flex-col gap-1.5 py-[var(--panel-pad-y)] px-[var(--panel-pad-x)]",
-            toggleable && "relative group",
           )}
         >
           {/* ⚠️ The caption + indicator cluster sits on the EYEBROW's row, NOT beside the whole
@@ -293,33 +292,19 @@ export default function CardHead({
               12px tall narrowed the title's lane from ~180px to ~145px two lines below itself and
               wrapped titles that fit the card perfectly well. One head anatomy, both layouts: the
               inspector layout below has always stacked these as rows. */}
-          {(eyebrow || caption != null || toggleable) && (
+          {(eyebrow || caption != null) && (
             <div className="flex items-start justify-between gap-2">
               {/* `data-eyebrow` — same read as the entry layout below: RailThread ties every
                   populated mark in at its card's EYEBROW height. Without it the thread silently
                   falls back to the card MIDDLE, which on a tall explorer card drops the mark
                   hundreds of px below its own header. One connector anatomy, both layouts. */}
               {eyebrow ? <span data-eyebrow="" className={cn("block", eyebrowClass)}>{eyebrow}</span> : <span />}
-              {/* Caption + the +/− INDICATOR — both decoration over the title button's stretched
-                  `after:inset-0` pseudo, and they paint above it by DOM order. Transparent to the
-                  pointer for the same reason the inspector layout's aside is: the head is one
-                  gesture, so its right end must not read as dead space. Controls inside opt back
-                  in. `-my` keeps the 18px glyph box from setting this row's height and pushing the
-                  title down — the row measures the eyebrow, as it did when they were siblings. */}
+              {/* The caption rides the eyebrow row's right end (the +/− indicator rode beside it
+                  until 2026-10-23). `-my` keeps a glyph-tall box from setting this row's height
+                  and pushing the title down — the row measures the eyebrow. */}
               <div className="flex items-center gap-1.5 flex-none -my-[3px] pt-px pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
                 {caption != null && (
                   <span className="text-label text-muted-foreground text-right tabular-nums">{caption}</span>
-                )}
-                {toggleable && (
-                  <span
-                    aria-hidden
-                    // The mark lights with the HEAD, which is the toggle — but not while the pointer is
-                    // on the aside's own control: a press there does not collapse the card, so the
-                    // minimize mark must not answer it.
-                    className="inline-flex items-center justify-center size-6 -my-[3px] leading-none rounded-md text-muted-foreground group-hover:text-foreground group-hover:bg-wash-hover group-has-[[data-head-aside]_:hover]:!text-muted-foreground group-has-[[data-head-aside]_:hover]:!bg-transparent"
-                  >
-                    {collapsed ? <Plus className="size-3.5" /> : <Minus className="size-3.5" />}
-                  </span>
                 )}
               </div>
             </div>
@@ -329,20 +314,7 @@ export default function CardHead({
               slot, only the inspector layout below. Same rule as the eyebrow row's cluster: it floats above the
               title button's stretched pseudo and hands the pointer back only on its own control. */}
           <div className="flex items-center justify-between gap-2 min-w-0">
-            <h2 className={cn(TITLE, "inline-flex items-center gap-2 min-w-0")}>
-              {toggleable ? (
-                <button
-                  type="button"
-                  aria-expanded={!collapsed}
-                  onClick={onToggle}
-                  className="appearance-none bg-transparent border-0 p-0 m-0 [font:inherit] text-inherit text-left inline-flex items-center gap-2 min-w-0 rounded-sm focus-visible:outline-1 focus-visible:outline-ring/60 after:absolute after:inset-0 after:cursor-pointer after:content-['']"
-                >
-                  {titleRow}
-                </button>
-              ) : (
-                titleRow
-              )}
-            </h2>
+            <h2 className={cn(TITLE, "inline-flex items-center gap-2 min-w-0")}>{titleRow}</h2>
             {aside != null && (
               <span data-head-aside="" className="relative z-[1] flex-none flex items-center pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
                 {aside}

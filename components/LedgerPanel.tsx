@@ -6,6 +6,7 @@ import { ledgerNetwork } from "@/src/engine/domain/tickNet";
 import Explorer, { type ExplorerLevelSpec, type ExplorerRowSpec } from "@/components/explorer/Explorer";
 import { NODE_GLYPH_W, nodeRowSpec, unknownNodeRowSpec } from "@/components/explorer/nodeRow";
 import TablePager from "@/components/datasection/TablePager";
+import ExplorerFoot from "@/components/explorer/ExplorerFoot";
 import { pageHolding, pageOnResize } from "@/components/explorer/fitRows";
 import useFitRows from "@/components/explorer/useFitRows";
 import { useBreakpoint } from "@/components/useBreakpoint";
@@ -127,7 +128,7 @@ function spanWords(ordered: readonly GlobalSnapshot[]): string {
   return min < 90 ? `last ${min} min` : `last ${Math.round(min / 60)} h`;
 }
 
-export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: boolean } = {}) {
+export default function LedgerPanel() {
   const filter = useStore((s) => s.filter);
   const mode = useStore((s) => s.mode);
   const hoverFilter = useStore((s) => s.hoverFilter);
@@ -276,8 +277,18 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   // `components/FollowControl.tsx`); the scene callout mirrors it and this explorer no longer
   // carries the pill or its hover preview.
 
-  // The shown tick's state mark (see the tick rows): the card's live dot while following, a pin while pinned.
+  // The shown tick's state mark (see the tick rows): the card's live dot while following, a pin
+  // while pinned — the one state species the Global snapshot card's control and the callout
+  // already spell out. The MARK ALONE, CENTRED in the room the name column leaves after the
+  // ordinal (user, 2026-10-24: "center the live bullet / pinned icon in the column, it sits too
+  // close to the left edge; remove the text" — a word beside it had been tried the same day).
   const followMark = following ? <LiveDot /> : <PinMark className="text-muted-foreground" />;
+  const tickName = (ordinal: number, on: boolean) => (
+    <span className="flex items-center tabular-nums">
+      {ordinal.toLocaleString()}
+      {on && <span className="flex-1 flex justify-center">{followMark}</span>}
+    </span>
+  );
 
   // ---- level 0: the ticks, paged, measured by the heading's pick -------------------------------
   const tickValues = pagedSnaps.map((d) => tickMeasureValue(ledgerMeasure, d, snapshotExact[d.ordinal]));
@@ -292,7 +303,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   const spanScope = { word: `${spanWords(orderedSnaps)} cache` };
   const spanFooter =
     live && orderedSnaps.length > 0 ? (
-      <TablePager page={1} pages={1} from={1} to={orderedSnaps.length} total={orderedSnaps.length} compact scope={spanScope} onPage={() => {}} />
+      <ExplorerFoot left={spanScope.word} />
     ) : undefined;
   const levels: ExplorerLevelSpec[] = [
     {
@@ -342,12 +353,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           // snapshot card — the one control, B1 — sits in the other sheet, so the explorer gave no
           // indication at all). A quiet STATE MARK on the highlighted row, never a second control:
           // the card's beating live dot while following, a pin while pinned.
-          name: (
-            <span className="inline-flex items-center gap-1.5 tabular-nums">
-              {d.ordinal.toLocaleString()}
-              {on && followMark}
-            </span>
-          ),
+          name: tickName(d.ordinal, on),
           // THE LENS IS THE BAR'S COLOUR, not a number beside it (user, 2026-10-04: "remove the
           // added '1' and instead use the colour"). The bar always measures the whole tick, as it
           // does unfiltered, so it keeps the default cyan; a tick the committed network anchored
@@ -450,7 +456,8 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
         const lensedOut = outOfLens(filter, n.id);
         return {
           key: n.id,
-          glyph: <IdentityDot hue={n.hue} />,
+          // No dot beside a hued bar (user, 2026-10-23) — one hue carrier per row.
+          glyph: undefined,
           name: n.italic ? <span className="italic">{n.name}</span> : n.name,
           share: m.value != null ? m.value / maxNet : undefined,
           hue: n.hue,
@@ -603,9 +610,12 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
       title="Snapshots"
       // The sentence is the path's own placeholder now (user, 2026-10-08): one line beside the house.
       hint={null}
-      placeholder="Select a snapshot to view its anchors."
+      // The sentence names the NEXT LEVEL, never a measure (user, 2026-10-24: "the hint in the
+      // breadcrumb always refers to anchors, it should refer to the selected control button" —
+      // "anchors" is also a tile's name, so under Fees it read as stale; the networks that
+      // anchored are what a snapshot row opens whatever the figure column shows).
+      placeholder="Select a snapshot to view the networks that anchored into it."
       levels={levels}
-      defaultCollapsed={defaultCollapsed}
       onLeave={() => {
         // Container-level hover backstop: leaving the card clears every channel its rows write.
         setHoverFilter(null);

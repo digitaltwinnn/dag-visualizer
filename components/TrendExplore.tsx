@@ -2,10 +2,10 @@
 
 import { useMemo } from "react";
 import Explorer, { type ExplorerLevelSpec } from "@/components/explorer/Explorer";
-import { IdentityDot, QualifierChip } from "@/components/inspector/parts";
+import { QualifierChip } from "@/components/inspector/parts";
 import useTrendRoster, { NO_READING } from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
-import TablePager from "@/components/datasection/TablePager";
+import ExplorerFoot from "@/components/explorer/ExplorerFoot";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
 import { GLOBAL_READING, METRIC_LABELS, METRIC_ORDER, metricUnit, spanWord } from "@/src/data/trendSeries";
@@ -52,7 +52,7 @@ import { UNLISTED_ID } from "@/src/data/unlisted";
 // washes this row. Nothing about the pose moves: a preview that re-staggered the stack would read
 // as a commit.
 
-export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: boolean } = {}) {
+export default function TrendExplore() {
   const filter = useStore((s) => s.filter);
   const metric = useStore((s) => s.trendMetric);
   const focus = useStore((s) => s.trendFocus);
@@ -93,9 +93,9 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
   // stand — so the heading hairline runs straight into the plate.
   const foot =
     roster.headKind === "span" ? (
-      <TablePager page={1} pages={1} from={1} to={ranked.length} total={ranked.length} compact scope={{ word: spanWord(metric) }} aside={<QualifierChip className="flex-none">{spanPhrase(windowId, range)}</QualifierChip>} onPage={() => {}} />
+      <ExplorerFoot left={spanWord(metric)} right={<QualifierChip className="flex-none">{spanPhrase(windowId, range)}</QualifierChip>} />
     ) : (
-      <TablePager page={1} pages={1} from={1} to={ranked.length} total={ranked.length} compact scope={{ word: "Latest full day" }} onPage={() => {}} />
+      <ExplorerFoot left="Latest full day" />
     );
   const empty = scopeEmptyCopy(roster.scope, "view");
 
@@ -139,7 +139,9 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
     total && !empty
       ? {
           key: "dag-total",
-          glyph: <IdentityDot hue={total.hue} />,
+          // No dot on the lead either (user, 2026-10-23: "just drop the whole column for the
+          // metagraph row"): with no glyph in the level the Explorer collapses the column.
+          glyph: undefined,
           name: "DAG",
           // A sentence, so a caption under the name rather than a chip beside it (ExplorerRow's
           // plain-row rule).
@@ -161,6 +163,7 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
   const level: ExplorerLevelSpec = {
     key: "networks",
     crumb: { label: "Networks" },
+    // Six measures, shown as the explorer's tiles like every level's (`MeasureTiles`).
     measure: {
       options: METRIC_ORDER.map((m) => ({ id: m, label: METRIC_LABELS[m], unit: metricUnit(m, 86_400_000) })),
       value: metric,
@@ -188,7 +191,10 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
           return [
             {
               key: id,
-              glyph: <IdentityDot hue={row.hue} />,
+              // NO DOT ON A ROW THAT CARRIES ITS HUE IN THE BAR (user, 2026-10-23: "do we need colored
+              // pill and the colored bar? Bar should be clear enough and less busy"): one hue carrier
+              // per row — the bar where there is one, the dot where there is none (the DAG lead).
+              glyph: undefined,
               name: row.name,
               share: row.head != null ? row.head / maxLast : undefined,
               hue: row.hue,
@@ -220,7 +226,7 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
             ? [
                 {
                   key: UNLISTED_ID,
-                  glyph: <IdentityDot hue={roster.unlisted.hue} />,
+                  glyph: undefined,
                   name: roster.unlisted.name,
                   share: roster.unlisted.head != null ? roster.unlisted.head / maxLast : undefined,
                   hue: roster.unlisted.hue,
@@ -251,9 +257,11 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
       // highlight under the pointer already say they can be picked.
       hint={null}
       // The plate placeholder every explorer carries (user, 2026-10-09): what selecting a row does.
+      // It STAYS on this one-level explorer (user, 2026-10-23, "where did the breadcrumb go?" —
+      // the sections pass had dropped it here as a plate that never shows a path): one card
+      // anatomy on every view, the path plate included.
       placeholder={empty ? undefined : "Select a network to view the chart."}
       levels={[level]}
-      defaultCollapsed={defaultCollapsed}
       onLeave={() => setHover(null)}
     />
   );

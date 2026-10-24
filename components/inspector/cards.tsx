@@ -16,7 +16,7 @@ import Odometer from "@/components/Odometer";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { SonarRing, NodeStars } from "@/components/state/StateAtoms";
-import { VIEW_ICONS, SNAPSHOT_ICON, COUNTRY_ICON, PROVIDER_ICON, COMPOSITION_ICON, KIND_MARK_CLASS } from "@/components/icons";
+import { NODE_ICON, SNAPSHOT_ICON, COUNTRY_ICON, PROVIDER_ICON, COMPOSITION_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
 import { useArchive, archiveFactState, archiveReach, archiveSchedule, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
@@ -173,7 +173,7 @@ export function GeoLiveTitle() {
   const id = node.node?.id;
   const title = id ? midHash(id, NODE_ID_GLYPHS) : node.node?.ip || "Node";
   const color = node.kind === "metanode" ? (node.meta ? identityHudCss(node.meta.id) : undefined) : identityHudCss("dag");
-  const Mark = VIEW_ICONS.geo;
+  const Mark = NODE_ICON; // the node's one mark (icons.tsx) — it read the Geography VIEW's globe until 2026-10-24, so the open card disagreed with its own folded head
   return (
     <span className="inline-flex items-center gap-2 min-w-0">
       {color && <Mark className={KIND_MARK_CLASS} style={{ color }} aria-hidden />}

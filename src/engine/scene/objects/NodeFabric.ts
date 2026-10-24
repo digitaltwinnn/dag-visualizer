@@ -17,7 +17,7 @@ import { DOC_ROLL } from "../../domain/viewTransition";
 import { LEDGER } from "../../domain/ledgerLayout";
 import { HEX_H } from "../../domain/geoLayout";
 import { discFall, lerp, smooth } from "../../domain/nodeLayout";
-import { nodeDim, nodeEmissive, focusWeightOf, focusGrow, hideFrac, gatherRaw, emphasisK } from "../../domain/dimModel";
+import { nodeDim, nodeEmissive, focusWeightOf, growWeightOf, focusGrow, hideFrac, gatherRaw, emphasisK } from "../../domain/dimModel";
 import type { DimContext } from "../../domain/dimModel";
 import type { MetaNodeRecord, ValidatorRecord } from "../../domain/records";
 import type { ViewTransition } from "../../domain/viewTransition";
@@ -623,7 +623,7 @@ export class NodeFabric {
       // (wEff; noGeo nodes keep the plain morph squash — they have no geo chip to become).
       _qSpin.setFromAxisAngle(u.spinAxis, u.spinPhase + t * u.spinSpeed);
       _dummy.quaternion.copy(_qSpin);
-      _dummy.scale.setScalar(u.hyperSize * (1 + grow * u.fw) * (1 - (u.noGeo ? w : wEff)) * (u.noGeo ? 1 - e : 1) * show);
+      _dummy.scale.setScalar(u.hyperSize * (1 + grow * u.growW) * (1 - (u.noGeo ? w : wEff)) * (u.noGeo ? 1 - e : 1) * show);
       this._applyGather(ctx, u, gw, prim);
       _dummy.updateMatrix();
       this.instSphere.setMatrixAt(u.index, _dummy.matrix);
@@ -639,7 +639,7 @@ export class NodeFabric {
       // dimModel.focusGrow reaches the CHIP too (user, 2026-08-30 — the 2026-08-28 "every view
       // grows" was wired on the sphere matrices alone, so geo never actually swelled). DIAMETER
       // only: a stacked chip that grew in height would push into the chip above it.
-      const gN = 1 + grow * u.fw;
+      const gN = 1 + grow * u.growW;
       _dummy.scale.set(u.geoSize * gV * gN, HEX_H * gV, u.geoSize * gV * gN);
       this._applyGather(ctx, u, gw, prim);
       _dummy.updateMatrix();
@@ -704,10 +704,10 @@ export class NodeFabric {
       // COMMITTED group yields the channel to a committed node (Globe._frameCtx), so this tier
       // now ranks a group that is either hovered or the finest committed rung — the case it was
       // written for, hovering a node inside a lit cohort, is unchanged.
-      const fw = focusWeightOf(
-        u.nodeId === c.hoverNodeId || u.nodeId === c.selectedNodeId,
-        !!u.nodeId && !!c.hoverCohort?.has(u.nodeId),
-      );
+      const uPrimary = u.nodeId === c.hoverNodeId || u.nodeId === c.selectedNodeId;
+      const uGroup = !!u.nodeId && !!c.hoverCohort?.has(u.nodeId);
+      const fw = focusWeightOf(uPrimary, uGroup);
+      u.growW += (growWeightOf(uPrimary, uGroup) - u.growW) * ek; // the size channel's own share (dimModel.growWeightOf)
       // The SIZE channel's state (dimModel.focusGrow), eased on the record so the swell and the
       // glow move as one. placeValidators runs earlier in the frame and so reads this a frame
       // behind — one frame at the easing rate is not a visible lag, and keeping the tier ranked
@@ -790,10 +790,10 @@ export class NodeFabric {
       const vis = 1 - hideFrac(c, rawEff);
       // NO FILTER LIFT (hubMatchBoost retired 2026-08-30 — see the validator loop and dimModel).
       // Tiered focus, same ranking as the validator loop (dimModel.focusWeightOf).
-      const fw = focusWeightOf(
-        r.nodeId === c.hoverNodeId || r.nodeId === c.selectedNodeId,
-        !!c.hoverCohort?.has(r.nodeId),
-      );
+      const rPrimary = r.nodeId === c.hoverNodeId || r.nodeId === c.selectedNodeId;
+      const rGroup = !!c.hoverCohort?.has(r.nodeId);
+      const fw = focusWeightOf(rPrimary, rGroup);
+      r.growW += (growWeightOf(rPrimary, rGroup) - r.growW) * ek; // the size channel's own share
       r.fw += (fw - r.fw) * ek; // the size channel's eased state — see the validator loop
       const flRaw = r._flash || 0; // brief flash when an arc pulse reaches this node
       // dimModel.nodeEmissive: composes glow + arc flash, then the hover/selection focus
@@ -855,7 +855,7 @@ export class NodeFabric {
       // shrink fully out on the globe and stay full-size (just muted) in hyper — `vis`, above.
       _qSpin.setFromAxisAngle(r.spinAxis, r.spinPhase + clock * r.spinSpeed);
       _dummy.quaternion.copy(_qSpin);
-      _dummy.scale.setScalar(r.hyperSize * (1 + grow * r.fw) * (1 - wEff) * vis);
+      _dummy.scale.setScalar(r.hyperSize * (1 + grow * r.growW) * (1 - wEff) * vis);
       this._applyGather(ctx, r, gw, prim);
       _dummy.updateMatrix();
       this.metaSphere.setMatrixAt(r.index, _dummy.matrix);
@@ -865,7 +865,7 @@ export class NodeFabric {
       _qRadial.setFromUnitVectors(Y_AXIS, r.geoDir);
       _dummy.quaternion.copy(_qRadial);
       const gM = wEff * (fall + (1 - fall) * gw) * vis; // fall lifts with gw (see validators)
-      const gN2 = 1 + grow * r.fw; // the chip's grow — diameter only, see the validator loop
+      const gN2 = 1 + grow * r.growW; // the chip's grow — diameter only, see the validator loop
       _dummy.scale.set(r.geoSize * gM * gN2, HEX_H * gM, r.geoSize * gM * gN2);
       this._applyGather(ctx, r, gw, prim);
       _dummy.updateMatrix();

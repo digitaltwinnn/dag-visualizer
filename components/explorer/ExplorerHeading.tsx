@@ -1,40 +1,33 @@
 "use client";
 
-import { ChevronDown } from "lucide-react";
 import type { ReactNode } from "react";
 
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { SELECTED_ROW } from "@/components/selection";
+import { measureIcon } from "@/components/icons";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 
 // THE EXPLORER'S HEADING ROW AND THE MEASURE CONTROL (design session 2026-09-26, `docs/superpowers/
 // design/2026-09-26-explorer-card/measure-control.html` A and `level-measures.html` A; split
-// 2026-10-02, `docs/superpowers/design/2026-10-02-heading-pin-foot` A2). A hairline over the list
-// carrying the hint and the view's one SETTING (Same scale); THE FIGURE COLUMN'S HEADING now sits
-// in the card head's aside slot — it is a control exactly when the level on screen has more than
-// one honest figure to show:
+// 2026-10-02, `docs/superpowers/design/2026-10-02-heading-pin-foot` A2; TILES since 2026-10-23,
+// design B of the brainstorm's `explorer-sections.html`). THE FIGURE COLUMN'S HEADING is a
+// control exactly when the level on screen has more than one honest figure to show:
 //
-//   · several measures → the caps word with a caret; click opens a radio list of THIS LEVEL's
-//     measures with their units (the reader sees the whole list before choosing — the stepper it
-//     replaced walked a list nobody could see);
-//   · one measure     → the same word, muted, no caret: a label, not a control;
-//   · no figure       → nothing; the hairline alone.
+//   · several measures → TILES: every measure named at once, glyph and word, in a grid on a plate
+//     band under the head — the card SAYS it has four or six readings instead of hiding them
+//     behind a caret (user, 2026-10-23: the dropdown "doesn't actually clearly say to the user
+//     there is a lot of different data here to visualize", and it "sits so close to the −
+//     button" in the title row's aside). The lit tile is the figure beneath every row;
+//   · one measure     → the caps word, muted, in the head's aside: a label, not a control;
+//   · no figure       → nothing.
 //
-// REGULAR WEIGHT in every state (user: "normal"): the control differs from the label by full ink
-// and the caret, never by weight — the card keeps one rule for bold (the title). The heading is
-// computed from the rows beneath it, so it can never name a figure they don't carry: that was the
-// whole failure of one stepper over a tree of levels.
+// The heading is computed from the rows beneath it, so it can never name a figure they don't
+// carry: that was the whole failure of one stepper over a tree of levels. The dropdown it
+// replaced (2026-09-26 → 2026-10-23) walked the same list behind a caret.
 
 export interface MeasureOption {
   id: string;
   label: string;
-  /** The figure's unit, shown muted beside the label in the list ("DAG", "count", "KB"). */
+  /** The figure's unit, read to assistive tech with the tile's name ("DAG", "count", "KB"). */
   unit?: string;
 }
 
@@ -42,58 +35,67 @@ export interface MeasureControl {
   options: readonly MeasureOption[];
   value: string;
   onPick: (id: string) => void;
+  /** Measures the level on screen cannot show — drawn INACTIVE, never dropped (user, 2026-10-23:
+   *  "instead of removing the control band when there is nothing to show, can we just make them
+   *  inactive? I don't like it just disappears" — the plank's rule, an exhausted control dims).
+   *  The band always shows the explorer's whole set; a node level shows every tile inactive. */
+  inactive?: ReadonlySet<string>;
 }
 
-/** THE MEASURE CONTROL — the figure column's heading, rendered in the card HEAD's aside slot
- *  (A2, user 2026-10-02): right of the title, where a card-level state sits, so the hint beneath
- *  runs the full width. Several measures → the caps word with a caret opening a radio list of THIS
- *  LEVEL's measures with their units; one measure → the same word, muted, no caret; no figure →
- *  nothing. */
-export function MeasureMenu({ measure }: { measure: MeasureControl | null }) {
-  const current = measure?.options.find((o) => o.id === measure.value) ?? measure?.options[0];
-  if (!measure || !current) return null;
-  if (measure.options.length <= 1) {
-    return <span className="text-label tracking-caps uppercase text-muted-foreground select-none">{current.label}</span>;
-  }
+/** A single measure: the caps word, muted, in the head's aside — a label, not a control. */
+export function MeasureLabel({ label }: { label: string }) {
+  return <span className="text-label tracking-caps uppercase text-muted-foreground select-none">{label}</span>;
+}
+
+/** THE MEASURE TILES — a grid of glyph + word, one tile per measure, the current one in the
+ *  app's committed-selection language (the view switch's on-state, so the two read as one species
+ *  of radio). They ride the explorer's CONTROL BAND (`Explorer.tsx` draws it — the plate under
+ *  the head that also holds the path), so this is the grid alone. Four measures sit two by two
+ *  (a 65px tile cannot hold "Metagraphs" beside its mark); two, three and six take three columns. */
+export function MeasureTiles({ measure }: { measure: MeasureControl }) {
+  const n = measure.options.length;
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        // A padded box like the setting pill's, so the two are one control species; the open
-        // state takes the wash.
-        className={cn(
-          "inline-flex items-center gap-1 rounded-sm px-1.5 -mr-1.5 py-[3px] min-h-6 touch:min-h-10 text-label tracking-caps uppercase text-foreground select-none cursor-pointer",
-          "hover:bg-wash-hover data-[state=open]:bg-wash-soft",
-          "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
-        )}
-        aria-label={`Measure: ${current.label}. Pick another`}
-      >
-        {current.label}
-        <ChevronDown aria-hidden className="size-3 text-muted-foreground" />
-      </DropdownMenuTrigger>
-      {/* The Settings menu's own popover recipe (`topbar/SettingsMenu.tsx`): rows at
-          `text-label`, muted until hovered, and the CURRENT one in the app's one committed-
-          selection language (`SELECTED_ROW`) rather than shadcn's radio bullet — the bullet
-          and its 32px gutter were the stock look the user caught (2026-09-26). */}
-      <DropdownMenuContent align="end" sideOffset={6} className="min-w-[10.5rem] p-1.5">
-        <DropdownMenuRadioGroup value={measure.value} onValueChange={measure.onPick}>
-          {measure.options.map((o) => (
-            <DropdownMenuRadioItem
-              key={o.id}
-              value={o.id}
-              className={cn(
-                "flex items-center justify-between gap-4 rounded-md px-2.5 py-1.5 pl-2.5 text-label cursor-pointer",
-                "text-muted-foreground focus:text-foreground focus:bg-wash-soft [&>span:first-child]:hidden",
-                o.id === measure.value && SELECTED_ROW,
-              )}
-            >
-              <span>{o.label}</span>
-              {/* A unit that only repeats the label is left out ("Nodes", never "Nodes nodes"). */}
-              {o.unit && o.unit.toLowerCase() !== o.label.toLowerCase() && <span className="text-label text-muted-foreground">{o.unit}</span>}
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <ToggleGroup
+      type="single"
+      value={measure.value}
+      aria-label="Measure"
+      onValueChange={(v) => { if (v) measure.onPick(v); }}
+      className={cn("grid w-auto gap-1 rounded-none", n === 4 ? "grid-cols-2" : "grid-cols-3")}
+    >
+      {measure.options.map((o) => {
+        const Icon = measureIcon(o.id);
+        return (
+          <ToggleGroupItem
+            key={o.id}
+            value={o.id}
+            aria-label={o.unit && o.unit.toLowerCase() !== o.label.toLowerCase() ? `${o.label}, ${o.unit}` : o.label}
+            disabled={measure.inactive?.has(o.id)}
+            className={cn(
+              // `gap-1 px-1`: three columns of a 320px card give a tile ~61px of text beside its glyph at
+              // 1.5/1.5, and "Metagraphs" (wide letters) clipped where "Continuity" fit — 6px back
+              // seats every label the four measure modules declare (measured 2026-10-23).
+              "group flex min-w-0 items-center justify-start gap-1 h-7 px-1 rounded-btn! text-label",
+              // EVERY TILE IS A BOUNDED BUTTON (user, 2026-10-23: unlit, "they are just texts on the
+              // same plane"): a hairline ring on each, the lit one's in the selection pair — the
+              // band's plate is one surface, so a text-only tile had nothing to say it was pressable.
+              // `!` on both rings (CSS trap 4): the toggle-group primitive's `data-[spacing=0]:shadow-none`
+              // is class+attribute and outranked the plain ring; both important, the on-state's
+              // variant wins by its own specificity.
+              "text-muted-foreground bg-transparent border-0 shadow-[inset_0_0_0_1px_var(--border)]!",
+              "hover:text-foreground hover:bg-wash-soft",
+              "data-[state=on]:text-foreground data-[state=on]:bg-[var(--sel-bg)]",
+              "data-[state=on]:shadow-[inset_0_0_0_1px_var(--sel-border)]!",
+              "touch:min-h-10",
+              // Inactive keeps its ring: a dimmed button, not dimmed text.
+              "disabled:opacity-45 disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-muted-foreground",
+            )}
+          >
+            {Icon && <Icon aria-hidden className="size-3.5 flex-none group-data-[state=on]:text-primary" />}
+            <span className="truncate">{o.label}</span>
+          </ToggleGroupItem>
+        );
+      })}
+    </ToggleGroup>
   );
 }
 

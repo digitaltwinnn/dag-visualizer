@@ -54,19 +54,23 @@ const SHAPE_FIRST = "rounded-l-[5px] [clip-path:polygon(0_0,calc(100%-7px)_0,100
 const SHAPE_MID = "[clip-path:polygon(0_0,calc(100%-7px)_0,100%_50%,calc(100%-7px)_100%,0_100%,7px_50%)]";
 const SHAPE_LAST = "rounded-r-[5px] [clip-path:polygon(0_0,100%_0,100%_100%,0_100%,7px_50%)]";
 
-export default function ExplorerPath({ crumbs, hint, placeholder, className }: { crumbs: readonly Crumb[]; hint?: string;
+export default function ExplorerPath({ crumbs, hint, placeholder, className, bare }: { crumbs: readonly Crumb[]; hint?: string;
   /** THE ROOT'S PLACEHOLDER (user, 2026-10-08: the explorer's sentence "inside the control next to
    *  the home icon as a placeholder … short, one line, related to the control"): what opening a row
    *  does, in the plate's empty field beside the house — like a search field's placeholder, it is
    *  the control explaining itself, and it goes the moment a step is taken. One line, truncated. */
-  placeholder?: string; className?: string }) {
+  placeholder?: string; className?: string;
+  /** BARE: no plate of its own (design B, 2026-10-23 — the path rides the explorer's control band,
+   *  which is the plate; its own wash under that plate was a third surface in a second tint). The
+   *  steps keep their washes: the house is the band's one accent mark. */
+  bare?: boolean }) {
   if (crumbs.length === 0) return null;
   const atRoot = crumbs.length === 1 && !!crumbs[0]!.root;
   return (
     // The plate takes the ROWS' outset (6px each side, `ExplorerRow`'s box), not the heading's inset:
     // the rows' wash boxes are what the reader sees the plate against, and 6px of overhang on the
     // right read as misalignment (user, 2026-09-26).
-    <Breadcrumb className={cn("w-[calc(100%+12px)] -mx-1.5 rounded-md bg-wash-faint p-1", className)}>
+    <Breadcrumb className={cn(bare ? "w-full" : "w-[calc(100%+12px)] -mx-1.5 rounded-md bg-wash-faint p-1", className)}>
       <BreadcrumbList className="flex-nowrap gap-0 text-body text-muted-foreground sm:gap-0">
         {crumbs.map((c, i) => {
           const first = i === 0;

@@ -8,24 +8,48 @@ import { FOCI, hubFraming, HUB_CLOSE, geoFraming, REST_ASPECT, aspectFit, ledger
 // were tried and all five are retired; the ⚠️ note in cameraRig.ts is the record of why, and the
 // reason this comment exists is so a future test doesn't re-pin numbers for a sixth.
 
+// THE COMPOSITION IS PINNED, NOT THE COORDINATES (review, 2026-10-24): a pose is retuned on screen
+// and the number is the user's; what this file guards is what each pose IS — frontal, which way it
+// looks, how it ranks against its neighbours on the zoom ladder.
 describe("FOCI", () => {
-  it("carries the camera presets (ledger gained its own frontal resting pose, 2026-08-07)", () => {
-    // The Snapshots view rests FRONTAL and zoomed (user) — straight onto the chamber's face.
-    // Lowered by a uniform 4.5 on BOTH pos.y and target.y (user, 2026-08-09): a pure frustum
-    // translation, so the ~6° pitch is untouched and the chamber centres in the HUD's band.
-    expect(FOCI.ledger.pos).toEqual(new THREE.Vector3(0, -1, 54));
-    expect(FOCI.ledger.target).toEqual(new THREE.Vector3(0, -7, 0));
-    expect(FOCI.overview.pos).toEqual(new THREE.Vector3(0, 21, 80)); // pulled back again with META_ORBIT 29 (user: whole ring visible unselected, clear of the LiveStrip band)
-    expect(FOCI.overview.target).toEqual(new THREE.Vector3(0, 2, 0));
-    expect(FOCI.dag.pos).toEqual(new THREE.Vector3(0, 9, 38));
-    expect(FOCI.dag.target).toEqual(new THREE.Vector3(0, 1, 0));
-    // Pulled back once more (×1.08 around the target, user 2026-08-09) — the composition is
-    // preserved because pos is scaled about the target, only the fit changes.
-    expect(FOCI.geo.pos).toEqual(new THREE.Vector3(0, 13.5, 44.8));
-    // Geo targets the globe CENTRE (manual orbits stay concentric — no wobble).
-    expect(FOCI.geo.target).toEqual(new THREE.Vector3(0, 0, 0));
-    // Metagraph pose sits between the overview (z 36) and the country framing (z 29..25).
-    expect(FOCI.geoNetwork.pos).toEqual(new THREE.Vector3(0, 5, 33));
+  const pitchDeg = (p: { pos: THREE.Vector3; target: THREE.Vector3 }) => {
+    const d = p.pos.clone().sub(p.target);
+    return (Math.asin(d.y / d.length()) * 180) / Math.PI;
+  };
+  const dist = (p: { pos: THREE.Vector3; target: THREE.Vector3 }) => p.pos.distanceTo(p.target);
+
+  it("every resting pose is FRONTAL (no sideways offset) and looks at the structure's axis", () => {
+    for (const [name, p] of Object.entries(FOCI)) {
+      expect(p.pos.x, `${name} pos.x`).toBe(0);
+      expect(p.target.x, `${name} target.x`).toBe(0);
+      expect(p.target.z, `${name} target.z`).toBe(0);
+    }
+  });
+
+  it("the Snapshots pose is nearly level — straight onto the chamber's face — and looks between the floors", () => {
+    expect(pitchDeg(FOCI.ledger)).toBeGreaterThan(0);
+    expect(pitchDeg(FOCI.ledger)).toBeLessThan(12);
+    expect(FOCI.ledger.target.y).toBeLessThan(0);
+  });
+
+  it("the Hypergraph's overview stands farther out than its DAG pose, both looking down on the ring", () => {
+    expect(dist(FOCI.overview)).toBeGreaterThan(dist(FOCI.dag));
+    expect(pitchDeg(FOCI.overview)).toBeGreaterThan(10);
+    expect(pitchDeg(FOCI.dag)).toBeGreaterThan(10);
+  });
+
+  it("the Geography rest looks at the globe + its base rings as one body (a target under the centre), low on the equator", () => {
+    expect(FOCI.geo.target.y).toBeLessThan(0);
+    expect(pitchDeg(FOCI.geo)).toBeGreaterThan(10);
+    expect(pitchDeg(FOCI.geo)).toBeLessThan(25);
+  });
+
+  it("the Geography network pose steps in from rest — nearer than rest, farther than the country framing — keeping the rings in frame", () => {
+    expect(dist(FOCI.geoNetwork)).toBeLessThan(dist(FOCI.geo));
+    const country = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
+    geoFraming(1, country);
+    expect(dist(FOCI.geoNetwork)).toBeGreaterThan(dist(country));
+    expect(FOCI.geoNetwork.target.y).toBeLessThan(0); // the body, rings included, not the globe's centre
   });
 });
 
