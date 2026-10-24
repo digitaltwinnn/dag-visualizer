@@ -47,29 +47,39 @@ const ctx = (overrides: Partial<DimContext> = {}): DimContext => ({
 // metagraph's nodes read the same number. The old `metaDimScale` sibling, pinned to 0 in hyper,
 // is gone; see the module header for why that 0 was an accident of a baked-in resting look rather
 // than a design decision.
+// THE ROWS ARE READ, THE RELATIONS PINNED (review, 2026-10-24): a retune of a view's `dim` is a
+// design decision this file must not veto — what it guards is how the rows COMPOSE (the morph
+// ramp, the ledger's flat row, hover = commit) and the design facts about them (hyper mutes in
+// place, geo isolates outright). `FOCUS_TUNE_DEFAULTS` is the shipped look, never the live knobs.
+const HYPER_DIM = FOCUS_TUNE_DEFAULTS.hyper.dim;
+const GEO_DIM = FOCUS_TUNE_DEFAULTS.geo.dim;
+const LEDGER_DIM = FOCUS_TUNE_DEFAULTS.ledger.dim;
+
 describe("nodeDimScale", () => {
-  // js/globe.js:830-833 verbatim
-  it("is the hyper floor (the row's dim, 0.42 since 2026-10-24) at morph=0", () => {
-    expect(nodeDimScale(ctx({ morph: 0 }))).toBeCloseTo(0.42, 10);
+  it("is the hyper row's dim at morph=0 — a mute in place, never a full dim", () => {
+    expect(nodeDimScale(ctx({ morph: 0 }))).toBeCloseTo(HYPER_DIM, 10);
+    expect(HYPER_DIM).toBeGreaterThan(0);
+    expect(HYPER_DIM).toBeLessThan(1);
   });
 
-  it("ramps linearly to the geo ceiling 1.0 at morph=1", () => {
-    expect(nodeDimScale(ctx({ morph: 1 }))).toBeCloseTo(1.0, 10);
+  it("ramps linearly to the geo row's dim at morph=1 — the isolate's full 1", () => {
+    expect(nodeDimScale(ctx({ morph: 1 }))).toBeCloseTo(GEO_DIM, 10);
+    expect(GEO_DIM).toBe(1);
   });
 
   it("is hyper + (geo − hyper)·morph at a midpoint", () => {
-    expect(nodeDimScale(ctx({ morph: 0.5 }))).toBeCloseTo(0.42 + 0.5 * (1 - 0.42), 10);
+    expect(nodeDimScale(ctx({ morph: 0.5 }))).toBeCloseTo(HYPER_DIM + 0.5 * (GEO_DIM - HYPER_DIM), 10);
   });
 
   it("hover-preview dims at the same strength as a committed filter (the forced 0.85 is gone)", () => {
-    expect(nodeDimScale(ctx({ hoverFilterActive: true, morph: 0 }))).toBeCloseTo(0.42, 9);
-    expect(nodeDimScale(ctx({ hoverFilterActive: true, morph: 1 }))).toBeCloseTo(1, 9);
+    expect(nodeDimScale(ctx({ hoverFilterActive: true, morph: 0 }))).toBeCloseTo(HYPER_DIM, 9);
+    expect(nodeDimScale(ctx({ hoverFilterActive: true, morph: 1 }))).toBeCloseTo(GEO_DIM, 9);
   });
 
   // Morph is frozen in the ledger, so the ramp can't apply — the row's own flat value does.
-  it("is the ledger row's flat 0.67 in the Snapshots view, whatever the morph", () => {
-    expect(nodeDimScale(ctx({ morph: 0, ledger: true }))).toBeCloseTo(0.67, 10);
-    expect(nodeDimScale(ctx({ morph: 1, ledger: true }))).toBeCloseTo(0.67, 10);
+  it("is the ledger row's flat dim in the Snapshots view, whatever the morph", () => {
+    expect(nodeDimScale(ctx({ morph: 0, ledger: true }))).toBeCloseTo(LEDGER_DIM, 10);
+    expect(nodeDimScale(ctx({ morph: 1, ledger: true }))).toBeCloseTo(LEDGER_DIM, 10);
   });
 });
 
@@ -183,8 +193,10 @@ describe("offNetMul (the off-filter dim for a view's own FURNITURE, not its data
   // RIBBON_DIM rode here too until the chamber's bands, tiles and ribbons were recognised as DATA
   // and moved onto the node's own `dim` (snapBright, below) — so hyper is now the only view that
   // actually draws per-network furniture.
-  it("is one minus the hyper row's elem (0.56 since 2026-10-24; 0.62 was the pre-knob look)", () => {
-    expect(offNetMul("hyper")).toBeCloseTo(0.56, 10);
+  it("is one minus the hyper row's elem — some light survives, never all of it", () => {
+    expect(offNetMul("hyper")).toBeCloseTo(1 - FOCUS_TUNE_DEFAULTS.hyper.elem, 10);
+    expect(offNetMul("hyper")).toBeGreaterThan(0);
+    expect(offNetMul("hyper")).toBeLessThan(1);
   });
 
   // Both zeros are honest readings, not unset fields: the globe's off-filter answer is the nodes
@@ -494,7 +506,7 @@ describe("nodeDim", () => {
   it("applies in hyper too — an off-filter metagraph node mutes there instead of resting dim", () => {
     // The old metaNodeDim returned 0 here whatever the dim target, which is what made the `hide`
     // knob look like it only touched the DAG core.
-    expect(nodeDim(ctx({ morph: 0 }), 1, null)).toBeCloseTo(0.42, 10);
+    expect(nodeDim(ctx({ morph: 0 }), 1, null)).toBeCloseTo(HYPER_DIM, 10);
   });
 
   it("raises the dim to countryMix when the node is outside the drilled country", () => {
@@ -521,7 +533,7 @@ describe("nodeDim", () => {
 
   it("takes the ledger row's flat multiplier, ignoring the morph", () => {
     const c = ctx({ morph: 0, ledger: true });
-    expect(nodeDim(c, 0.5, null)).toBeCloseTo(0.67 * 0.5, 10);
+    expect(nodeDim(c, 0.5, null)).toBeCloseTo(LEDGER_DIM * 0.5, 10);
   });
 });
 

@@ -16,21 +16,28 @@ describe("STAGE_LIGHTS", () => {
   // Hyper stages THREE subjects at three scales out of one row — the DAG core, a metagraph hub and
   // a single node (the follow-spot). The node's own height AND cone are what make the pool read as
   // emphasis on one bead rather than as a wash over its whole shell, so both are pinned.
-  it("pins hyper's row, including its per-subject stages (core, hub, node)", () => {
-    expect(STAGE_LIGHT_DEFAULTS.hyper).toEqual({
-      angle: 0.9, distance: 40, intensity: 0.45, intensityPaper: 5.5, penumbra: 0.25,
-      height: 9, heightDag: 17, heightNode: 3.2, angleNode: 0.5,
-    });
-    // The ladder in numbers: the finer the subject, the lower and tighter its stage.
-    expect(STAGE_LIGHT_DEFAULTS.hyper.heightNode!).toBeLessThan(STAGE_LIGHT_DEFAULTS.hyper.height);
-    expect(STAGE_LIGHT_DEFAULTS.hyper.height).toBeLessThan(STAGE_LIGHT_DEFAULTS.hyper.heightDag!);
-    expect(STAGE_LIGHT_DEFAULTS.hyper.angleNode!).toBeLessThan(STAGE_LIGHT_DEFAULTS.hyper.angle);
+  // THE RELATIONS ARE PINNED, NOT THE NUMBERS (review, 2026-10-24): a retune is a design decision
+  // the user makes on screen; what this file guards is the SHAPE of each row and the ladder in it.
+  it("hyper's row stages three subjects at three scales — the finer the subject, the lower and tighter its stage", () => {
+    const h = STAGE_LIGHT_DEFAULTS.hyper;
+    expect(h.heightNode).toBeDefined();
+    expect(h.heightDag).toBeDefined();
+    expect(h.angleNode).toBeDefined();
+    expect(h.heightNode!).toBeLessThan(h.height);
+    expect(h.height).toBeLessThan(h.heightDag!);
+    expect(h.angleNode!).toBeLessThan(h.angle);
   });
 
-  it("pins geo's row (moved verbatim from Globe.ts; intensity and height retuned 2026-09-28)", () => {
-    expect(STAGE_LIGHT_DEFAULTS.geo).toEqual({
-      angle: 0.36, distance: 22, intensity: 0.9, intensityPaper: 3.4, height: 8,
-    });
+  it("every row is a live lamp: a positive cone, distance, intensity and height, the cone inside a hemisphere", () => {
+    for (const [view, row] of Object.entries(STAGE_LIGHT_DEFAULTS)) {
+      for (const [k, v] of Object.entries(row)) expect(v, `${view}.${k}`).toBeGreaterThan(0);
+      expect(row.angle, `${view} cone`).toBeLessThan(Math.PI / 2);
+    }
+  });
+
+  it("geo's lamp is tighter and closer than hyper's — one dense stack, not a ring of hubs", () => {
+    expect(STAGE_LIGHT_DEFAULTS.geo.angle).toBeLessThan(STAGE_LIGHT_DEFAULTS.hyper.angle);
+    expect(STAGE_LIGHT_DEFAULTS.geo.distance).toBeLessThan(STAGE_LIGHT_DEFAULTS.hyper.distance);
   });
 
   // A lamp is not the same instrument on both grounds: dark blooms the wash it lays on an emissive
@@ -47,10 +54,11 @@ describe("STAGE_LIGHTS", () => {
     expect(STAGE_LIGHT_DEFAULTS.ledger.intensityPaper).toBeUndefined();
   });
 
-  it("pins the ledger's row (the day glass's movable highlight)", () => {
-    expect(STAGE_LIGHT_DEFAULTS.ledger).toEqual({
-      angle: 0.7, distance: 60, intensity: 0.32, penumbra: 0.6, height: 5,
-    });
+  it("the ledger's row is the day glass's LOW highlight: staged under hyper's hub height, with no node or core stage", () => {
+    const l = STAGE_LIGHT_DEFAULTS.ledger;
+    expect(l.height).toBeLessThan(STAGE_LIGHT_DEFAULTS.hyper.height);
+    expect(l.heightNode).toBeUndefined();
+    expect(l.heightDag).toBeUndefined();
   });
 
   it("starts live == defaults, so an untouched panel changes nothing", () => {
