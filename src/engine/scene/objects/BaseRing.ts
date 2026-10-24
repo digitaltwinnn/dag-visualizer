@@ -68,6 +68,10 @@ export const WEDGE_COMMIT_MUL = 0.4;
  *  every slice of the level naming the subject sits at this fraction, a dim slice lower still, so
  *  a hover reads as one slice coming up out of a quiet pie rather than appearing from nothing. */
 export const WEDGE_REST_MUL = 0.3;
+/** …but the DARK ground rests lower: additive light over black reads at a fraction of the ink the
+ *  same weight lays on paper (user, 2026-10-24: "while normal ok for light but in dark its too
+ *  much now"). The hover and commit weights are shared; only the quiet pie differs by ground. */
+export const WEDGE_REST_MUL_DARK = 0.1;
 export const WEDGE_DIM_MUL = 0.12;
 
 /** THE ARRIVAL DROP (user, 2026-10-24: the rings "appear staggered and with the same timing as
@@ -168,7 +172,7 @@ const arcKey = (level: number, seg: RingSegment): string => `${level}|${seg.cc ?
 interface Arc {
   mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; seg: RingSegment; level: number; fade: FadeEntry; target: number; paperTarget: number; entryMul: number;
   /** The pie wedge under the arc and its own fade entry; `wedgeOn` is 1 while the arc is lit. */
-  wedge: THREE.Mesh; wedgeFade: FadeEntry; wedgeOn: number;
+  wedge: THREE.Mesh; wedgeFade: FadeEntry; wedgeOn: number; wedgeOnDark: number;
 }
 
 export class BaseRing {
@@ -364,7 +368,7 @@ export class BaseRing {
         wedgeFade.base = prev.wedgeFade.base;
         wedgeFade.paperBase = prev.wedgeFade.paperBase;
       }
-      this.arcs.push({ mesh, mat, seg, level, fade, target: 0, paperTarget: 0, entryMul: prev ? prev.entryMul : this._entryT >= 1 ? 1 : 0, wedge, wedgeFade, wedgeOn: 0 });
+      this.arcs.push({ mesh, mat, seg, level, fade, target: 0, paperTarget: 0, entryMul: prev ? prev.entryMul : this._entryT >= 1 ? 1 : 0, wedge, wedgeFade, wedgeOn: 0, wedgeOnDark: 0 });
       this.arcs[this.arcs.length - 1]!.target = this.targetOf(this.arcs[this.arcs.length - 1]!);
     }
   }
@@ -414,7 +418,9 @@ export class BaseRing {
     // committed filter must light its slice at hover strength, not the committed disc's floor).
     const preview = this.selPreview || this.ccPreview;
     const pieLevel = netSel ? a.level === 2 : a.level === 0;
-    a.wedgeOn = !pieLevel ? 0 : tier === "lit" ? (preview ? 1 : WEDGE_COMMIT_MUL) : tier === "dim" ? WEDGE_DIM_MUL : WEDGE_REST_MUL;
+    const lit = !pieLevel ? 0 : tier === "lit" ? (preview ? 1 : WEDGE_COMMIT_MUL) : tier === "dim" ? WEDGE_DIM_MUL : -1;
+    a.wedgeOn = lit < 0 ? WEDGE_REST_MUL : lit;
+    a.wedgeOnDark = lit < 0 ? WEDGE_REST_MUL_DARK : lit;
     a.paperTarget = paperPresence(tier, a.level === 2);
     return Math.min(0.62, tierPresence(tier) * (a.level === 2 ? NET_RING_BOOST : 1));
   }
@@ -445,9 +451,9 @@ export class BaseRing {
       a.fade.base += (a.target * a.entryMul - a.fade.base) * k;
       const pt = a.paperTarget * a.entryMul;
       a.fade.paperBase = (a.fade.paperBase ?? pt) + (pt - (a.fade.paperBase ?? pt)) * k;
-      const w = a.wedgeOn * a.entryMul;
+      const w = a.wedgeOnDark * a.entryMul;
       a.wedgeFade.base += (WEDGE_PRESENCE_DARK * w - a.wedgeFade.base) * k;
-      const wp = WEDGE_PRESENCE_PAPER * w;
+      const wp = WEDGE_PRESENCE_PAPER * a.wedgeOn * a.entryMul;
       a.wedgeFade.paperBase = (a.wedgeFade.paperBase ?? wp) + (wp - (a.wedgeFade.paperBase ?? wp)) * k;
     }
   }
