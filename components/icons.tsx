@@ -91,12 +91,19 @@ export const INSTANT_ICON: LucideIcon = Crosshair;
 // parent, so a calendar span beside the crosshair's single point.
 export const RANGE_ICON: LucideIcon = CalendarRange;
 
+// The NODE's mark — card head, ghost, callout, dock tray, and the explorers' Nodes measure tile:
+// the honeycomb's HEXAGON, the cell the Geography view stacks a node as. It was the Globe (the
+// Geography VIEW's own mark) until 2026-10-24 (user: the node card "is actually showing a sphere
+// now which is incorrect … use the same" as the explorer control) — a view mark says WHERE the
+// subject lives, a hexagon says WHAT it is, and one node must wear one glyph everywhere.
+export const NODE_ICON: LucideIcon = Hexagon;
+
 // The COUNTRY drill's mark (the geo focus ladder's country rung — card head, ghost, dock tray):
-// a place pin — distinct from VIEW_ICONS.geo (the whole globe) and the node's Globe mark.
+// a place pin — distinct from VIEW_ICONS.geo (the whole globe) and the node's hexagon (NODE_ICON).
 export const COUNTRY_ICON: LucideIcon = MapPin;
 
 // The PROVIDER (internal id: cohort — city × hosting-provider rung) mark: a server rack, reading
-// as "hosting infrastructure" — distinct from the country pin and the node's Globe mark.
+// as "hosting infrastructure" — distinct from the country pin and the node's hexagon (NODE_ICON).
 export const PROVIDER_ICON: LucideIcon = Server;
 
 // The COMPOSITION group's mark (hyper's make-up rung — the machines in a network that run the
@@ -106,7 +113,7 @@ export const PROVIDER_ICON: LucideIcon = Server;
 export const COMPOSITION_ICON: LucideIcon = Component;
 
 // The ONE size every card-head/title KIND MARK renders at — About's Info, the tool cards'
-// Compass, the node card's Globe, the snapshot card's Box (CardHead's panel `icon` + the inspector
+// Compass, the node card's hexagon, the snapshot card's Box (CardHead's panel `icon` + the inspector
 // titles in inspector/cards.tsx). 16px (`size-4`): the old 14px read timid next to the 15px
 // text-title headline (user follow-up on Task 23). Single-sourced here so the heads can't drift;
 // the dock TRAYS and the top-bar view switch deliberately keep their own sizes (this constant is
@@ -150,7 +157,7 @@ export const NET_ICONS: Record<NetworkId, LucideIcon> = {
 };
 
 // The inspector card KINDS map onto one glyph set shared with the dock icon trays: the metagraph
-// dossier is the Hypergraph subject (Orbit), a node is the Geography subject (Globe), a snapshot
+// dossier is the Hypergraph subject (Orbit), a node is the honeycomb's cell (NODE_ICON), a snapshot
 // is the BLOCK (SNAPSHOT_ICON), a layer is one stratum (LAYER_ICON).
 export function iconForPick(
   kind: PickDescriptor["kind"] | "l0" | "l1" | "metanode" | "country" | "cohort" | "composition",
@@ -171,7 +178,7 @@ export function iconForPick(
     case "l0":
     case "l1":
     case "metanode":
-      return VIEW_ICONS.geo;
+      return NODE_ICON; // the hexagon, the same mark the explorers' Nodes tile wears
     case "meta":
     default:
       return VIEW_ICONS.hyper;
@@ -195,7 +202,7 @@ export const MEASURE_ICONS: Readonly<Record<string, LucideIcon>> = {
   blocks: Blocks,
   fees: Coins,
   kb: HardDrive,
-  nodes: Hexagon,
+  nodes: NODE_ICON,
   continuity: Timer,
   // Hypergraph (`HyperMeasure`): nodes above, then the three layers
   l0: Layers,

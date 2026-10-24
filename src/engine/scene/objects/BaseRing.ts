@@ -122,7 +122,7 @@ const SEGMENTS_PER_RAD = 10;
  *  centre instead of normal lines"): the domain's arcs are contiguous, and every arc is inset by
  *  half this width AT EACH RADIUS (an angle of (w/2)/r), so the gap's two edges run parallel through
  *  the three rings and the pie, and a pie slice closes at the radius where the gap is all of it. */
-export const RING_GAP_W = 0.28; // 0.55 → 0.28 (user, 2026-10-24: "make the gaps smaller, like 1/2")
+export const RING_GAP_W = 0.18; // 0.55 → 0.28 → 0.18 (user, 2026-10-24: "smaller, like 1/2", then "even thinner")
 
 /** An annular sector [r0, r1] × [from, to] in the XY plane, inset by `gapW/2` at every radius —
  *  `rows` radial subdivisions follow the 1/r inset (two suffice for a band, a pie slice takes
@@ -422,21 +422,32 @@ export class BaseRing {
     this.retarget();
   }
 
-  /** The committed network's place on the inner ring, ring-LOCAL: the midpoint of its largest
-   *  arc at the band's outer edge. The subject callout's geo network anchor (CalloutSync) —
-   *  a filtered fleet is spread across the globe, so the ring is the one honest point that
-   *  stands for the whole network. False while the ring holds no arc of it (no located
-   *  participants, the unlisted set, data not yet in). No allocation: a scan over the arcs. */
+  /** The committed network's place on the inner ring, ring-LOCAL: the point of its arcs nearest
+   *  the ring's RIGHT SIDE (local angle 0 — the side as the resting camera sees it, clear of the
+   *  globe's silhouette; user, 2026-10-24: the midpoint of the largest arc "connects to the back
+   *  of the ring which is behind the globe, connect to the side instead"), at the band's outer
+   *  edge. The subject callout's geo network anchor (CalloutSync) — a filtered fleet is spread
+   *  across the globe, so the ring is the one honest point that stands for the whole network.
+   *  False while the ring holds no arc of it (no located participants, the unlisted set, data not
+   *  yet in). No allocation: a scan over the arcs. */
   networkAnchor(id: string, out: THREE.Vector3): boolean {
     let best: Arc | null = null;
+    let bestAngle = 0;
+    let bestDist = Infinity;
     for (const a of this.arcs) {
       if (a.level !== 2 || a.seg.net !== id) continue;
-      if (!best || a.seg.to - a.seg.from > best.seg.to - best.seg.from) best = a;
+      // The angle of this arc nearest 0 on the circle: 0 itself when the arc spans it, else the
+      // nearer end. Arcs are authored from −π/2 upward, so the ends are compared modulo 2π.
+      const wrap = (x: number) => Math.atan2(Math.sin(x), Math.cos(x)); // → (−π, π], distance to 0 is |·|
+      const f = wrap(a.seg.from), t = wrap(a.seg.to);
+      const spans0 = a.seg.to - a.seg.from >= Math.PI * 2 - 1e-6 || (f <= 0 && t >= 0) || (f > t && (f <= 0 || t >= 0));
+      const ang = spans0 ? 0 : Math.abs(f) < Math.abs(t) ? a.seg.from : a.seg.to;
+      const dist = Math.abs(wrap(ang));
+      if (dist < bestDist) { bestDist = dist; bestAngle = ang; best = a; }
     }
     if (!best) return false;
-    const mid = (best.seg.from + best.seg.to) / 2;
     const r = RING_RADII[2];
-    out.set(Math.cos(mid) * r, Math.sin(mid) * r, best.mesh.position.z);
+    out.set(Math.cos(bestAngle) * r, Math.sin(bestAngle) * r, best.mesh.position.z);
     return true;
   }
 
