@@ -105,7 +105,10 @@ export function ringLevels(nets: readonly RingNet[], dagId: string, filter: stri
   const netsOf = (items: readonly Owned[]) => [...new Set(items.map((m) => m.net))];
 
   const byCc = groupBy(owned, (m) => m.cc);
-  const sweep = Math.PI * 2 - RING_GAP * byCc.length;
+  // One arc is a whole circle, not a circle with one gap (user, 2026-10-24: "if the circle has
+  // only 1 segment, we don't need the empty space between segments"); the sub-levels already tile
+  // with `groups − 1` gaps, so a lone child spans its parent.
+  const sweep = Math.PI * 2 - (byCc.length > 1 ? RING_GAP * byCc.length : 0);
   let a = -Math.PI / 2;
   for (const c of byCc) {
     const from = a;

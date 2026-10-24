@@ -58,6 +58,13 @@ describe("ringLevels — the located fleet by country, then provider, then netwo
     expect(ringLevels([], "dag")).toEqual({ countries: [], providers: [], networks: [] });
     expect(ringLevels([{ id: "x", color: 1, machines: [] }], "dag").countries).toEqual([]);
   });
+  it("a lone country is a whole circle — no gap for a single segment (user, 2026-10-24)", () => {
+    const lv = ringLevels([{ id: "x", color: 1, machines: [m("1", "FI", "Hetzner"), m("2", "FI", "Hetzner")] }], "dag");
+    expect(lv.countries).toHaveLength(1);
+    expect(lv.countries[0]!.to - lv.countries[0]!.from).toBeCloseTo(Math.PI * 2, 9);
+    expect(lv.providers[0]!.to - lv.providers[0]!.from).toBeCloseTo(Math.PI * 2, 9);
+    expect(lv.networks[0]!.to - lv.networks[0]!.from).toBeCloseTo(Math.PI * 2, 9);
+  });
 });
 
 describe("ringPresence — the hover previews, the filter and the drill commit, through one dim", () => {
