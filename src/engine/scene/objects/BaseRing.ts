@@ -122,7 +122,7 @@ const SEGMENTS_PER_RAD = 10;
  *  centre instead of normal lines"): the domain's arcs are contiguous, and every arc is inset by
  *  half this width AT EACH RADIUS (an angle of (w/2)/r), so the gap's two edges run parallel through
  *  the three rings and the pie, and a pie slice closes at the radius where the gap is all of it. */
-export const RING_GAP_W = 0.55;
+export const RING_GAP_W = 0.28; // 0.55 → 0.28 (user, 2026-10-24: "make the gaps smaller, like 1/2")
 
 /** An annular sector [r0, r1] × [from, to] in the XY plane, inset by `gapW/2` at every radius —
  *  `rows` radial subdivisions follow the 1/r inset (two suffice for a band, a pie slice takes
