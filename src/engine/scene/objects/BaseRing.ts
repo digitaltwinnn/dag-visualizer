@@ -27,22 +27,28 @@ import { joinBloom } from "../SceneContext";
  *  own ladder, denser toward the centre (user, 2026-10-23). They nest just OUTSIDE the globe's
  *  silhouette: the base plane under the globe itself is hidden, so a ring at less than R would
  *  never be seen. */
-export const RING_RADII = [R * 1.0, R * 0.945, R * 0.89] as const; // 1.08/1.02/0.96 → (user, 2026-10-24: "a bit smaller")
+export const RING_RADII = [R * 0.85, R * 0.815, R * 0.78] as const; // 15% smaller again and the rings closer (user, 2026-10-24)
 /** HAIRLINES for the country and provider rings, a BAND for the network ring (user, 2026-10-24:
  *  "add the hairline effect (like left / right rails sections). Also the metagraph circle needs
  *  to be more bright and bloom (like the nodes and arcs)"): the two outer levels are rulers, the
  *  inner one is the identity reading, so it alone is a bloomed band at the nodes' own weight. */
-export const RING_WIDTHS = [R * 0.005, R * 0.014, R * 0.03] as const; // the OUTER ring alone is the hairline (user, 2026-10-24); the provider ring is a thin band
-/** The country ring's hit strip: a hairline cannot be aimed at, so an invisible band under it picks. */
-export const RING_PICK_WIDTH = R * 0.05;
+export const RING_WIDTHS = [R * 0.005, R * 0.011, R * 0.02] as const; // the inner band thinner (user, 2026-10-24) // the OUTER ring alone is the hairline (user, 2026-10-24); the provider ring is a thin band
+/** The country ring's hit strip: a hairline cannot be aimed at, so an invisible band ABOUT it picks —
+ *  narrow and symmetric, so it never reaches the provider ring inside it (user, 2026-10-24: "the
+ *  inner 2 rings have finger pointer" — the first strip ran inward over the provider ring). */
+export const RING_PICK_HALF = R * 0.014;
 /** THE RULER'S TICKS on the outer hairline — the rails' own ruler recipe (`RailThread`: a 1px
  *  rule, 1px ticks every 13px, every fourth longer, the lines at 60% of the marks' presence; user,
  *  2026-10-24: "by hairline I meant also the ruler"). An angular pitch that lands near 13px at the
  *  rest distance, ticks reaching OUTWARD so the countries' arcs stay the inner edge. */
-export const TICK_PITCH = 0.085;
-export const TICK_MINOR = R * 0.022;
-export const TICK_MAJOR = R * 0.05;
-export const RULER_PRESENCE = 0.6;
+export const TICK_PITCH = 0.07;
+export const TICK_MINOR = R * 0.011; // half the first cut (user, 2026-10-24: "make the ruler smaller")
+export const TICK_MAJOR = R * 0.026;
+/** The ticks' presence on each ground: on dark the additive blend needs far more than the rails'
+ *  60% to read at all (user, 2026-10-24: the ruler "only shows in light mode"); on paper the mask
+ *  blend lays ink, so the rails' own level holds. */
+export const RULER_PRESENCE_DARK = 0.45;
+export const RULER_PRESENCE_PAPER = 0.4;
 
 /** The network ring's presence over the rulers' — it is a bloomed mark AT REST, not only when a
  *  subject lights it (user, 2026-10-24: "more bloom also at rest not only focus"); the dim tier
@@ -52,7 +58,7 @@ export const NET_RING_BOOST = 4.5;
  *  looks like our angle is a bit unusual or the circle is strangely positioned" — the base
  *  plane's ellipse centred on the silhouette's bottom edge and cut it). Dropped so the ellipse
  *  sits below the globe, its far edge passing behind the body. */
-export const RING_Y = -(R + LAND_H + 1.8);
+export const RING_Y = -(R + LAND_H + 0.8); // closer to the sphere (user, 2026-10-24)
 /** Resting presence: the furniture tier (the graticule rests at 0.045, the compass dial at
  *  0.09–0.24) — a first cut at 0.55 bloomed into a neon band under the additive blend, and 0.2
  *  still pulled the eye off the globe (user, 2026-10-23: "a bit more transparent in normal mode,
@@ -66,6 +72,17 @@ export const RING_BASE = 0.13;
 function tierPresence(t: RingTier): number {
   const row = FOCUS_TUNE.geo;
   return RING_BASE * (t === "lit" ? 1 + row.boost : t === "dim" ? 1 - row.back : 1);
+}
+
+/** ON PAPER THE TIERS ARE STATED, NOT DERIVED (user, 2026-10-24: in light mode "the hover effect is
+ *  not clear on the circle"): `inkPresence` maps a dark presence to ink through a gamma that
+ *  compresses the step from rest to lit, so the same three multipliers read as one weight. The
+ *  paper levels are the ink the rails' own ladder uses — a resting mark, the subject in full ink,
+ *  the rest well back — and the fade loop takes `paperBase` as the opacity outright. */
+const PAPER_REST = 0.72; // 0.5 read "a bit too dim in normal mode" on Print (user, 2026-10-24)
+function paperPresence(t: RingTier, band: boolean): number {
+  const rest = band ? PAPER_REST : PAPER_REST * 0.8;
+  return t === "lit" ? Math.min(1, rest * 1.8) : t === "dim" ? rest * 0.3 : rest;
 }
 /** How fast an arc's presence follows its target (per second, exponential). */
 export const RING_EASE = 7;
@@ -117,7 +134,7 @@ export interface RingHost {
   accent: () => number;
 }
 
-interface Arc { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; seg: RingSegment; level: number; fade: FadeEntry; target: number }
+interface Arc { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; seg: RingSegment; level: number; fade: FadeEntry; target: number; paperTarget: number }
 
 export class BaseRing {
   readonly group = new THREE.Group();
@@ -150,7 +167,7 @@ export class BaseRing {
     mat.blending = host.blending();
     host.geoBlends.push(mat);
     host.geoTints.push(mat.color);
-    host.geoFades.push({ mat, base: RING_BASE * RULER_PRESENCE });
+    host.geoFades.push({ mat, base: RULER_PRESENCE_DARK, paperBase: RULER_PRESENCE_PAPER });
     this.group.add(new THREE.LineSegments(geo, mat));
   }
 
@@ -200,7 +217,7 @@ export class BaseRing {
       hookOcclusion(mat, this.uCam);
       this.host.geoBlends.push(mat);
       if (seg.color == null) this.host.geoTints.push(mat.color);
-      const fade: FadeEntry = { mat, base: 0 };
+      const fade: FadeEntry = { mat, base: 0, paperBase: 0 };
       this.host.geoFades.push(fade);
       const mesh = new THREE.Mesh(geo, mat);
       // The outer ring picks as the COUNTRY (`userData.country`, the Engine routes it through the
@@ -210,7 +227,7 @@ export class BaseRing {
       // explorer's cohort rows are its door), so it does not pick.
       if (level === 0 && seg.cc) {
         const strip = new THREE.Mesh(
-          new THREE.RingGeometry(radius - RING_PICK_WIDTH, radius + RING_PICK_WIDTH * 0.3, Math.max(4, Math.ceil(span * SEGMENTS_PER_RAD)), 1, seg.from, span),
+          new THREE.RingGeometry(radius - RING_PICK_HALF, radius + RING_PICK_HALF, Math.max(4, Math.ceil(span * SEGMENTS_PER_RAD)), 1, seg.from, span),
           new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false, side: THREE.DoubleSide }),
         );
         strip.userData.country = seg.cc;
@@ -225,7 +242,7 @@ export class BaseRing {
       }
       if (level === 2) joinBloom(mesh); // the identity reading glows like the chips it counts
       this.group.add(mesh);
-      this.arcs.push({ mesh, mat, seg, level, fade, target: 0 });
+      this.arcs.push({ mesh, mat, seg, level, fade, target: 0, paperTarget: 0 });
       this.arcs[this.arcs.length - 1]!.target = this.targetOf(this.arcs[this.arcs.length - 1]!);
     }
   }
@@ -245,7 +262,9 @@ export class BaseRing {
   private targetOf(a: Arc): number {
     // The bloomed band is capped: lit × boost ran past 1 under a committed filter, where every
     // arc is the subject, and the additive blend blew the ring out to a white-hot band.
-    return Math.min(0.75, tierPresence(ringPresence(a.seg, null, this.sel, this.cc)) * (a.level === 2 ? NET_RING_BOOST : 1));
+    const tier = ringPresence(a.seg, null, this.sel, this.cc);
+    a.paperTarget = paperPresence(tier, a.level === 2);
+    return Math.min(0.75, tierPresence(tier) * (a.level === 2 ? NET_RING_BOOST : 1));
   }
 
   private retarget(): void {
@@ -257,7 +276,10 @@ export class BaseRing {
   update(dt: number, cameraWorldPos: THREE.Vector3 | null): void {
     if (cameraWorldPos) this.uCam.copy(cameraWorldPos);
     const k = 1 - Math.exp(-RING_EASE * dt);
-    for (const a of this.arcs) a.fade.base += (a.target - a.fade.base) * k;
+    for (const a of this.arcs) {
+      a.fade.base += (a.target - a.fade.base) * k;
+      a.fade.paperBase = (a.fade.paperBase ?? a.paperTarget) + (a.paperTarget - (a.fade.paperBase ?? a.paperTarget)) * k;
+    }
   }
 
 }
