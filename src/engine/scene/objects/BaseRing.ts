@@ -27,7 +27,7 @@ import { joinBloom } from "../SceneContext";
  *  own ladder, denser toward the centre (user, 2026-10-23). They nest just OUTSIDE the globe's
  *  silhouette: the base plane under the globe itself is hidden, so a ring at less than R would
  *  never be seen. */
-export const RING_RADII = [R * 1.08, R * 1.02, R * 0.96] as const;
+export const RING_RADII = [R * 1.0, R * 0.945, R * 0.89] as const; // 1.08/1.02/0.96 → (user, 2026-10-24: "a bit smaller")
 /** HAIRLINES for the country and provider rings, a BAND for the network ring (user, 2026-10-24:
  *  "add the hairline effect (like left / right rails sections). Also the metagraph circle needs
  *  to be more bright and bloom (like the nodes and arcs)"): the two outer levels are rulers, the
@@ -35,6 +35,15 @@ export const RING_RADII = [R * 1.08, R * 1.02, R * 0.96] as const;
 export const RING_WIDTHS = [R * 0.005, R * 0.014, R * 0.03] as const; // the OUTER ring alone is the hairline (user, 2026-10-24); the provider ring is a thin band
 /** The country ring's hit strip: a hairline cannot be aimed at, so an invisible band under it picks. */
 export const RING_PICK_WIDTH = R * 0.05;
+/** THE RULER'S TICKS on the outer hairline — the rails' own ruler recipe (`RailThread`: a 1px
+ *  rule, 1px ticks every 13px, every fourth longer, the lines at 60% of the marks' presence; user,
+ *  2026-10-24: "by hairline I meant also the ruler"). An angular pitch that lands near 13px at the
+ *  rest distance, ticks reaching OUTWARD so the countries' arcs stay the inner edge. */
+export const TICK_PITCH = 0.085;
+export const TICK_MINOR = R * 0.022;
+export const TICK_MAJOR = R * 0.05;
+export const RULER_PRESENCE = 0.6;
+
 /** The network ring's presence over the rulers' — it is a bloomed mark AT REST, not only when a
  *  subject lights it (user, 2026-10-24: "more bloom also at rest not only focus"); the dim tier
  *  still steps it back by the geo row's own dim-back. */
@@ -126,6 +135,23 @@ export class BaseRing {
   constructor(private readonly host: RingHost) {
     this.group.position.y = RING_Y;
     this.group.rotation.x = -Math.PI / 2; // RingGeometry lies in XY; the base plane is XZ
+    // The ruler's ticks: one static LineSegments at the outer radius, furniture like the rings.
+    const pts: number[] = [];
+    const r0 = RING_RADII[0];
+    const n = Math.round((Math.PI * 2) / TICK_PITCH);
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const len = i % 4 === 0 ? TICK_MAJOR : TICK_MINOR;
+      pts.push(Math.cos(a) * r0, Math.sin(a) * r0, 0, Math.cos(a) * (r0 + len), Math.sin(a) * (r0 + len), 0);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
+    const mat = new THREE.LineBasicMaterial({ color: host.accent(), transparent: true, opacity: 0, depthWrite: false });
+    mat.blending = host.blending();
+    host.geoBlends.push(mat);
+    host.geoTints.push(mat.color);
+    host.geoFades.push({ mat, base: RING_BASE * RULER_PRESENCE });
+    this.group.add(new THREE.LineSegments(geo, mat));
   }
 
   /** Event-time: a data arrival or a retint rebuilds every arc on every level. */
@@ -217,7 +243,9 @@ export class BaseRing {
   }
 
   private targetOf(a: Arc): number {
-    return tierPresence(ringPresence(a.seg, null, this.sel, this.cc)) * (a.level === 2 ? NET_RING_BOOST : 1);
+    // The bloomed band is capped: lit × boost ran past 1 under a committed filter, where every
+    // arc is the subject, and the additive blend blew the ring out to a white-hot band.
+    return Math.min(0.75, tierPresence(ringPresence(a.seg, null, this.sel, this.cc)) * (a.level === 2 ? NET_RING_BOOST : 1));
   }
 
   private retarget(): void {

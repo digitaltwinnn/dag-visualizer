@@ -817,7 +817,7 @@ export class Globe implements GeoViewHost {
         return [{ ip: u.nodeId, cc: g?.cc || null, isp: g?.isp || null }];
       }),
     });
-    this.baseRing.setLevels(ringLevels(nets, "dag"));
+    this.baseRing.setLevels(ringLevels(nets, "dag", this.filter));
   }
 
   setMetagraphs(list: RouteMetagraph[], geoMap: GeoMap): void {
@@ -1042,6 +1042,7 @@ export class Globe implements GeoViewHost {
     this._applyDim(sel);
     this._relayoutGeo();
     this._applyGlowFilter(); // just show/hide the matching pools — no recluster
+    this._rebuildBaseRing(); // the rings re-partition over the filtered fleet (domain/baseRing)
   }
 
   // Transient PREVIEW dim (filter-chip / hub hover): same dim TARGETS as setFilter, but does

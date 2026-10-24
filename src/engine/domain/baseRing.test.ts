@@ -47,6 +47,13 @@ describe("ringLevels — the located fleet by country, then provider, then netwo
     const us = lv.networks.filter((n) => n.cc === "US");
     expect(us.map((n) => [n.isp, n.net, n.count])).toEqual([["Hetzner", "dag", 3], ["Amazon", "dor", 2]]); // providers biggest first, then their networks
   });
+  it("a committed filter partitions that network's participants alone", () => {
+    const up = ringLevels(nets, "dag", "up");
+    expect(up.countries.map((c) => [c.cc, c.count])).toEqual([["FI", 2]]);
+    expect(up.networks.every((n) => n.net === "up")).toBe(true);
+    expect(up.countries.reduce((n, s) => n + s.share, 0)).toBeCloseTo(1, 9);
+    expect(ringLevels(nets, "dag", "dag").countries.map((c) => [c.cc, c.count])).toEqual([["US", 3], ["DE", 2]]);
+  });
   it("an empty fleet is no ring", () => {
     expect(ringLevels([], "dag")).toEqual({ countries: [], providers: [], networks: [] });
     expect(ringLevels([{ id: "x", color: 1, machines: [] }], "dag").countries).toEqual([]);
