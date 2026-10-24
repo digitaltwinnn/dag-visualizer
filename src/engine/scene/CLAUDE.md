@@ -154,7 +154,7 @@ linear ink), rewritten only on a retarget or a selector change.
 
 **The pie, second pass** (later the same day): it RESTS visible (`WEDGE_REST_MUL` of the hover
 presence on the level naming the subject, `WEDGE_DIM_MUL` for a dimmed slice), a hover brings one
-slice up, a commit holds the disc at `WEDGE_COMMIT_MUL`; the wedges are PICKABLE with their arc's
+slice up, a commit RESTS the pie (a commit is not a third state; only a hover raises a slice); the wedges are PICKABLE with their arc's
 route (the country's on the outer level, the network's on the inner — the country wedge sits
 highest so the interior answers as the outer ring does). The DAG's inner arcs wear the DAG's own
 scene hue (`sceneColors.dag`, blue on paper) rather than the structure ink (user: "same as the node

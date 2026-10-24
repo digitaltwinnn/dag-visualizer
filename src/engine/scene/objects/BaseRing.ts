@@ -57,13 +57,11 @@ export const RULER_PRESENCE_PAPER = 0.85; // 0.4 was "almost invisible" on Print
  *  network level and the accent on the two rulers, at a faint presence; at rest and dimmed the
  *  wedge is nothing. The three levels' wedges stack, so a subject reads as a pie slice that
  *  brightens toward the centre where its three readings agree. */
-/** The pie wedge's presence under a HOVERED subject; a COMMITTED one takes `WEDGE_COMMIT_MUL` of
- *  it (user, 2026-10-24: "more visible when hover, and less visible when the filter is active" —
- *  a committed network re-partitions the whole ring, so its wedge is the whole disc and reads
- *  as a floor rather than a slice; a hover's slice is the reading, and it had been too faint). */
+/** The pie wedge's presence under a HOVERED subject (user, 2026-10-24: "more visible when hover,
+ *  and less visible when the filter is active" — a committed network re-partitions the whole ring,
+ *  so its wedge is the whole disc; it rests, see `targetOf`). */
 export const WEDGE_PRESENCE_DARK = 0.14; // 0.05 → 0.14 (user, same day: "still too mute when hovered, for light also")
 export const WEDGE_PRESENCE_PAPER = 0.22;
-export const WEDGE_COMMIT_MUL = 0.4;
 /** The pie is READABLE AT REST too (user, 2026-10-24: "when at rest the pie is not very visible"):
  *  every slice of the level naming the subject sits at this fraction, a dim slice lower still, so
  *  a hover reads as one slice coming up out of a quiet pie rather than appearing from nothing. */
@@ -418,7 +416,10 @@ export class BaseRing {
     // committed filter must light its slice at hover strength, not the committed disc's floor).
     const preview = this.selPreview || this.ccPreview;
     const pieLevel = netSel ? a.level === 2 : a.level === 0;
-    const lit = !pieLevel ? 0 : tier === "lit" ? (preview ? 1 : WEDGE_COMMIT_MUL) : tier === "dim" ? WEDGE_DIM_MUL : -1;
+    // A COMMIT is not a third state for the pie (user, 2026-10-24: "use resting for the pie also
+    // when filtered but keep the circle effect as is"): the arcs take the lit/dim tiers, the pie
+    // under a committed subject rests — only a HOVER raises a slice.
+    const lit = !pieLevel ? 0 : tier === "lit" ? (preview ? 1 : -1) : tier === "dim" ? WEDGE_DIM_MUL : -1;
     a.wedgeOn = lit < 0 ? WEDGE_REST_MUL : lit;
     a.wedgeOnDark = lit < 0 ? WEDGE_REST_MUL_DARK : lit;
     a.paperTarget = paperPresence(tier, a.level === 2);
