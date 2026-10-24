@@ -380,6 +380,10 @@ interface AppState {
   /** The plane brought forward (5b). View-scoped: it clears on leaving the view, like the other
    *  view-scoped ladder levels. */
   trendFocus: string | null;
+  /** How many cards a vertical swipe has turned the deck by (`trendStack.rotateOrder`): a VIEW
+   *  SETTING like `trendScroll`, not a selection — the front card is simply whichever the rotation
+   *  puts first. Clears with the focus on leaving the view. */
+  trendRotation: number;
   /** ONE SCALE OR EACH ITS OWN — the Trends document's 2026-09-14 rule, carried into the view.
    *  A column of per-network charts that each autoscale answers "how did THIS network's week go?"
    *  beautifully and "which of these is bigger?" with a flat lie: a chain anchoring three a day and
@@ -494,6 +498,7 @@ interface AppState {
   setHyperMeasure: (measure: HyperMeasure) => void;
   setTrendScroll: (offset: number) => void;
   setTrendFocus: (id: string | null) => void;
+  setTrendRotation: (r: number) => void;
   setTrendScale: (scale: "shared" | "own") => void;
   /** Pick the stack's window. It CLEARS any committed range — a window IS a range statement, the
    *  Trends document's own rule for its zoom pills. */
@@ -578,6 +583,7 @@ export const useStore = create<AppState>((set) => ({
   hyperMeasure: "nodes",
   trendScroll: 0,
   trendFocus: null,
+  trendRotation: 0,
   trendScale: "shared",
   // 30 days by default (user, 2026-09-29): recent enough to read day by day, long enough to show a
   // trend. The pills reach back to ALL.
@@ -612,7 +618,7 @@ export const useStore = create<AppState>((set) => ({
   // view-scoped, like the other ladder levels; `trendCursorMs` does NOT (an instant is a
   // universal subject and carries, the way `node` and `network` do in `LEVEL_CARRY`).
   // A view switch stamps its own motion cause (the hint says what it builds).
-  setMode: (mode) => set((s) => ({ mode, navQuiet: false, docPage: null, docClosing: s.docPage != null || s.docClosing, trendFocus: null, rawReturnMode: null, motionCause: { kind: "view", from: s.mode, to: mode } })),
+  setMode: (mode) => set((s) => ({ mode, navQuiet: false, docPage: null, docClosing: s.docPage != null || s.docClosing, trendFocus: null, trendRotation: 0, rawReturnMode: null, motionCause: { kind: "view", from: s.mode, to: mode } })),
   // Opening a doc also SURFACES THE SCENE POSE: the overlay sits at z-8, under the raw layer's
   // z-9 — a doc opened from the RAW pose rendered beneath the still-interactive table, with the
   // RAW toggle that could exit it hidden by the doc's own control gating (review find,
@@ -842,6 +848,7 @@ export const useStore = create<AppState>((set) => ({
   // bumps the network slot as a filter commit does — the card it opens becomes the active one. A
   // release leaves the stack alone: the filter may still hold the card.
   setTrendFocus: (id) => set((s) => ({ trendFocus: id, selStack: id != null ? bumpStack(s.selStack, "network", true) : s.selStack })),
+  setTrendRotation: (r) => set({ trendRotation: r, motionCause: { kind: "page" } }),
   setTrendScale: (scale) => set({ trendScale: scale }),
   // A window and a range are the SAME statement about what is on screen, so picking one retires
   // the other (the document's zoom pills do exactly this).

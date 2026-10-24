@@ -76,7 +76,7 @@ import { DUR_OUT } from "@/src/engine/domain/viewTransition";
 import { swipeIntent, swipeOf } from "@/src/engine/domain/planeSwipe";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import {
-  frontPlane, MORE_ID, moreCount, morePose, planeFormat, stackPoses, VISIBLE_PLANES } from "@/src/engine/domain/trendStack";
+  frontPlane, MORE_ID, moreCount, morePose, planeFormat, rotateOrder, stackPoses, VISIBLE_PLANES } from "@/src/engine/domain/trendStack";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -189,7 +189,12 @@ export default function TrendStack() {
           : ranked,
     [ranked, roster.total, roster.unlisted, focus],
   );
-  const order = useHeldOrder(deck, staged.settled);
+  // THE DECK TURNED by the swipes so far (`rotateOrder`, store `trendRotation`): the rotation sits
+  // UNDER the held order and the focus re-deal — a focus still brings its card forward, a swipe
+  // releases the focus first so the two never fight over slot one.
+  const rotation = useStore((s) => s.trendRotation);
+  const rotated = useMemo(() => rotateOrder(deck, rotation), [deck, rotation]);
+  const order = useHeldOrder(rotated, staged.settled);
   // What a card says it shows.
   const caption = metricCaption(shown, step);
   // THE SCOPE WITH NOTHING TO DRAW (2026-09-19): a `dag` or unlisted commit
@@ -367,23 +372,27 @@ export default function TrendStack() {
     down.current = null;
     dragged.current = dragged.current || (!!d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > DRAG_SLOP);
     // A SWIPE ON A CARD (user, 2026-10-09; `domain/planeSwipe.ts` has the rules): a finger's flick
-    // along one axis — up sends the front card back (the next comes forward), down brings the
-    // previous one back, wrapping, so the stack rotates; left and right step the measure. Touch only; the
-    // plot keeps its horizontal drag for the brush, so only its vertical answers. The click the
-    // browser synthesises after the release is dropped by `dragged` above, so a swipe never also
-    // lands as a tap. Read through the ONE write path and the ONE setter the keys use (rule 2).
+    // along one axis — up TURNS THE DECK: the front card goes all the way to the back and the next
+    // comes forward; down turns it the other way (user, 2026-10-24 — the roster walk it replaced
+    // slid the old front back one slot, "counterintuitive"); left and right step the measure.
+    // Touch only; the plot keeps its horizontal drag for the brush, so only its vertical answers.
+    // The click the browser synthesises after the release is dropped by `dragged` above, so a
+    // swipe never also lands as a tap. A rotation is a VIEW SETTING like the scroll (its own
+    // setter, out of the selection boundary); a standing focus is released first through the one
+    // write path (rule 2), and the window rewinds to its first card, so the deck's front IS the
+    // rotation's.
     if (!d?.touch) return;
     const dir = swipeOf(e.clientX - d.x, e.clientY - d.y, performance.now() - d.at, { horizontal: !d.onPlot });
     if (!dir) return;
     const st = useStore.getState();
-    // The front as the STACK has it: the focus only while the window still holds it (a paged-away
-    // or re-ranked-out focus is nobody's front). Up/down walk the whole roster from there
-    // (`planeStep`, 2026-10-18) — the executor pages the window after the step.
-    const focus = st.trendFocus && order.includes(st.trendFocus) ? st.trendFocus : null;
-    const intent = swipeIntent(dir, { order, front: focus ?? frontPlane(order, st.trendScroll) });
-    if (!intent) return;
-    if (intent.kind === "measure") stepMeasure(intent.step, "x");
-    else applyClickActions(trendPlaneActions(intent.id, st.trendFocus));
+    const intent = swipeIntent(dir);
+    if (intent.kind === "measure") {
+      stepMeasure(intent.step, "x");
+      return;
+    }
+    if (st.trendFocus) applyClickActions(trendPlaneActions(st.trendFocus, st.trendFocus));
+    if (st.trendScroll) st.setTrendScroll(0);
+    st.setTrendRotation(st.trendRotation + intent.step);
   };
   // UP / DOWN IS THE VIEW'S THIRD AXIS (user, 2026-09-19). Left/right on the timeline is WHEN, the
   // depth of the stack is WHO, and the measure — WHAT — had no gesture on the canvas. The control

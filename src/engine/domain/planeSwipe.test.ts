@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { planeStep, SWIPE_MAX_MS, SWIPE_MIN_PX, swipeIntent, swipeOf } from "./planeSwipe";
+import { SWIPE_MAX_MS, SWIPE_MIN_PX, swipeIntent, swipeOf } from "./planeSwipe";
 
 // A SWIPE ON A HISTORY CARD (user, 2026-10-09: "swipe the chart cards up/down … moves from/to the
 // back of the stack; swipe left/right changes what the chart displays"). A flick, never a drag:
@@ -25,42 +25,13 @@ describe("swipeOf — a flick along one axis", () => {
   });
 });
 
-describe("planeStep — one step along the roster from the front, wrapping", () => {
-  const order = ["a", "b", "c", "d"];
-  it("up brings the NEXT card forward, down the PREVIOUS — from the resting front", () => {
-    expect(planeStep(order, "a", "up")).toBe("b");
-    expect(planeStep(order, "a", "down")).toBe("d");
-  });
-  it("walks from a focused card by rank, not from the re-dealt slot behind it", () => {
-    expect(planeStep(order, "c", "up")).toBe("d");
-    expect(planeStep(order, "c", "down")).toBe("b");
-  });
-  it("wraps at both ends, so repeated swipes visit every card", () => {
-    expect(planeStep(order, "d", "up")).toBe("a");
-    let f: string | null = "a";
-    const seen: string[] = [];
-    for (let i = 0; i < 4; i++) { f = planeStep(order, f, "up"); seen.push(f!); }
-    expect(seen).toEqual(["b", "c", "d", "a"]);
-  });
-  it("an unknown front counts as the first card; a lone card has nowhere to go", () => {
-    expect(planeStep(order, null, "up")).toBe("b");
-    expect(planeStep(order, "zz", "down")).toBe("d");
-    expect(planeStep(["a"], "a", "up")).toBeNull();
-    expect(planeStep([], null, "up")).toBeNull();
-  });
-});
-
 describe("swipeIntent — what a swipe asks for", () => {
-  const deck = { order: ["a", "b", "c"], front: "a" };
-  it("up and down are the deck's walk, whatever card the finger was on", () => {
-    expect(swipeIntent("up", deck)).toEqual({ kind: "forward", id: "b" });
-    expect(swipeIntent("down", deck)).toEqual({ kind: "forward", id: "c" });
-  });
-  it("a lone card asks nothing vertically", () => {
-    expect(swipeIntent("up", { order: ["a"], front: "a" })).toBeNull();
+  it("up turns the deck forward (the front to the back), down turns it back — whatever card the finger was on", () => {
+    expect(swipeIntent("up")).toEqual({ kind: "rotate", step: 1 });
+    expect(swipeIntent("down")).toEqual({ kind: "rotate", step: -1 });
   });
   it("left is the next measure, right the previous — the keys' own steps", () => {
-    expect(swipeIntent("left", deck)).toEqual({ kind: "measure", step: 1 });
-    expect(swipeIntent("right", deck)).toEqual({ kind: "measure", step: -1 });
+    expect(swipeIntent("left")).toEqual({ kind: "measure", step: 1 });
+    expect(swipeIntent("right")).toEqual({ kind: "measure", step: -1 });
   });
 });

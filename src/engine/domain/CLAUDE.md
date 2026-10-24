@@ -151,6 +151,13 @@ The design rules behind the table, which the tests pin but don't explain:
   because it is a committed subject written by a click AND it carries a consequence beyond its own
   channel: a focus on an off-window plane pages that plane into view first, in the executor, where
   every caller inherits it.
+- **A History SWIPE turns the deck, it selects nothing** (2026-10-24). Up sends the front card all
+  the way to the back and the next comes forward, down brings the back card to the front
+  (`planeSwipe.swipeIntent` → `trendStack.rotateOrder`, store `trendRotation`): a VIEW SETTING
+  like the scroll, written by its own setter outside the selection boundary. The roster walk it
+  replaced committed the next card as the FOCUS, and the focus re-deal slid the old front back one
+  slot, which read as a shuffle (user: "counterintuitive"). A standing focus is released through
+  the table first, so the focus and the rotation never fight over slot one.
 - **New click/select semantics go in the table with a test**, their effects in the executor, never
   inline. `components/selectionBoundary.test.ts` enforces this — and note the rule is **write**-based,
   so read-only facts cards cost nothing and every future explorer card inherits the table.
