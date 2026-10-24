@@ -129,7 +129,7 @@ NETWORK through the hub's `kind: "meta"` descriptor; a provider arc has no route
 **The pie slice and the two things the ring is for** (2026-10-24). Under a lit arc a WEDGE (centre
 → the arc's inner edge, its hue) fills on the level that NAMES the subject — the network band under
 a network selector, the country ruler otherwise — and it is weighted by the selector's KIND: a
-HOVER's slice at `WEDGE_PRESENCE_*`, a COMMIT at `WEDGE_COMMIT_MUL` of it (user: "more visible
+HOVER's slice at `WEDGE_PRESENCE_*`, a COMMIT rests it like any other slice (user: "more visible
 when hover, and less visible when the filter is active" — a committed network re-partitions the
 whole ring, so its wedge is the whole disc and must read as a floor). `setSubject`/`setCountry`
 take the `preview` flag from `Globe`'s own hover-vs-commit knowledge; the tiers do not change.
