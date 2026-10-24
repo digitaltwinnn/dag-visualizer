@@ -57,8 +57,9 @@ function StateDot({ state }: { state?: string | null }) {
 }
 
 /** The node level's glyph column — room for two short tickers ("DAG UP") or one long one
- *  ("USDC.dag") at the tag size; anything longer truncates. */
-export const NODE_GLYPH_W = 56;
+ *  ("USDC.dag") at the tag size, plus a clear step before the id (user, 2026-10-24: the id "sits
+ *  close to those tickers while it has plenty of space to the right"); anything longer truncates. */
+export const NODE_GLYPH_W = 74;
 
 /** A network's ticker — the DAG core's is "DAG". Shared with the raw node roster. */
 export const tickerOf = (id: string): string => metagraphById(id)?.ticker ?? (id === "dag" ? "DAG" : id);
@@ -101,9 +102,14 @@ export function nodeRowSpec(args: {
 }): ExplorerRowSpec {
   const { row, hue } = args;
   const netId = row.pick.kind === "metanode" && row.pick.meta ? row.pick.meta.id : "dag";
-  const ticker = tickerOf(netId);
   const ip = "node" in row.pick ? (row.pick as { node?: { ip?: string | null } }).node?.ip : null;
   const also = coLocatedNetworks(ip, netId, args.metaList);
+  // ONE ORDER FOR A MACHINE'S TICKERS, whichever network's row this is (user, 2026-10-24: a dual
+  // node "doesn't show them in the same order for each row"): the DAG first, then the catalog's
+  // order — a co-located machine reads "DAG UP" under both its rows, and the row's own network
+  // keeps its hue rather than its place.
+  const rank = (id: string) => (id === "dag" ? -1 : args.metaList.findIndex((m) => m.id === id));
+  const tickers = [netId, ...also.map((m) => m.id)].sort((a, b) => rank(a) - rank(b));
   const id = row.id ?? row.label;
   const codes = layerCodesOf([row]);
   return {
@@ -112,9 +118,8 @@ export function nodeRowSpec(args: {
       // BOLD (user, 2026-10-19: "it should have the ticker(s) in bold") — the ticker is the row's
       // one identity word, and at medium it sat level with the mono id beside it.
       <span className="min-w-0 truncate text-label font-semibold">
-        <span className={IDENT_INK} style={{ color: hue }}>{ticker}</span>
-        {also.map((m) => (
-          <span key={m.id} className={IDENT_INK} style={{ color: identityHudCss(m.id) }}> {tickerOf(m.id)}</span>
+        {tickers.map((id, i) => (
+          <span key={id} className={IDENT_INK} style={{ color: id === netId ? hue : identityHudCss(id) }}>{i > 0 ? " " : ""}{tickerOf(id)}</span>
         ))}
       </span>
     ),
