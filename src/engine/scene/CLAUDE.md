@@ -126,6 +126,23 @@ descriptor, and the hover and click paths read it where they would resolve the l
 cursor, so an arc commits exactly what the explorer's country row commits), the inner arcs as the
 NETWORK through the hub's `kind: "meta"` descriptor; a provider arc has no route yet.
 
+**The pie slice and the two things the ring is for** (2026-10-24). Under a lit arc a WEDGE (centre
+→ the arc's inner edge, its hue) fills on the level that NAMES the subject — the network band under
+a network selector, the country ruler otherwise — and it is weighted by the selector's KIND: a
+HOVER's slice at `WEDGE_PRESENCE_*`, a COMMIT at `WEDGE_COMMIT_MUL` of it (user: "more visible
+when hover, and less visible when the filter is active" — a committed network re-partitions the
+whole ring, so its wedge is the whole disc and must read as a floor). `setSubject`/`setCountry`
+take the `preview` flag from `Globe`'s own hover-vs-commit knowledge; the tiers do not change.
+And the committed NETWORK's subject callout anchors on the ring (`BaseRing.networkAnchor`: the
+midpoint of its largest inner arc, ring-local; `CalloutSync._geoCalloutAnchor`'s last fallthrough)
+— the one object that stands for a fleet spread across the globe, where no surface point could
+(user: "a nice place to anchor the metagraph callout which is missing in this view"). The
+network POSE therefore keeps the rings in frame (`FOCI.geoNetwork`, a short step in from rest
+rather than the old dive): the globe's crown may tuck under the top bar, the rings never under
+the vitals band. The ruler is built on the FIRST `setLevels`, not in the constructor — the Globe
+constructs the ring before its ink and ground are set, and a material born then was black until
+a theme flip retinted it.
+
 **EXACT OCCLUSION BY THE GLOBE** (same day — user: "fade it when the globe sits in front? I
 believe this is also an issue with the arc animation"): the hologram globe is additive and writes
 no depth, so nothing behind it was ever depth-occluded. The rings and BOTH arc shaders

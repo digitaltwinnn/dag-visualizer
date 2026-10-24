@@ -57,8 +57,13 @@ export const RULER_PRESENCE_PAPER = 0.85; // 0.4 was "almost invisible" on Print
  *  network level and the accent on the two rulers, at a faint presence; at rest and dimmed the
  *  wedge is nothing. The three levels' wedges stack, so a subject reads as a pie slice that
  *  brightens toward the centre where its three readings agree. */
-export const WEDGE_PRESENCE_DARK = 0.03;
-export const WEDGE_PRESENCE_PAPER = 0.07;
+/** The pie wedge's presence under a HOVERED subject; a COMMITTED one takes `WEDGE_COMMIT_MUL` of
+ *  it (user, 2026-10-24: "more visible when hover, and less visible when the filter is active" —
+ *  a committed network re-partitions the whole ring, so its wedge is the whole disc and reads
+ *  as a floor rather than a slice; a hover's slice is the reading, and it had been too faint). */
+export const WEDGE_PRESENCE_DARK = 0.05;
+export const WEDGE_PRESENCE_PAPER = 0.11;
+export const WEDGE_COMMIT_MUL = 0.4;
 
 /** THE ARRIVAL DROP (user, 2026-10-24: the rings "appear staggered and with the same timing as
  *  the snapshot view's actual snapshots"): every arc is held this high and dark through the
@@ -167,7 +172,9 @@ export class BaseRing {
   /** The country ring's invisible hit strips, disposed with the arcs. */
   private strips: THREE.Mesh[] = [];
   private sel = "all";
+  private selPreview = false;
   private cc: string | null = null;
+  private ccPreview = false;
   private _entryT = 1;
   private _entryHold = false;
   private _entryTotal = 1;
@@ -339,16 +346,37 @@ export class BaseRing {
     }
   }
 
-  /** The chips' own selector — the hover when there is one, else the committed filter. */
-  setSubject(sel: string): void {
+  /** The chips' own selector — the hover when there is one, else the committed filter.
+   *  `preview` says which: the tiers are the same either way, only the wedge's weight differs. */
+  setSubject(sel: string, preview = false): void {
     this.sel = sel;
+    this.selPreview = preview;
     this.retarget();
   }
 
   /** The country selector — the hover when there is one, else the committed drill, else null. */
-  setCountry(cc: string | null): void {
+  setCountry(cc: string | null, preview = false): void {
     this.cc = cc;
+    this.ccPreview = preview;
     this.retarget();
+  }
+
+  /** The committed network's place on the inner ring, ring-LOCAL: the midpoint of its largest
+   *  arc at the band's outer edge. The subject callout's geo network anchor (CalloutSync) —
+   *  a filtered fleet is spread across the globe, so the ring is the one honest point that
+   *  stands for the whole network. False while the ring holds no arc of it (no located
+   *  participants, the unlisted set, data not yet in). No allocation: a scan over the arcs. */
+  networkAnchor(id: string, out: THREE.Vector3): boolean {
+    let best: Arc | null = null;
+    for (const a of this.arcs) {
+      if (a.level !== 2 || a.seg.net !== id) continue;
+      if (!best || a.seg.to - a.seg.from > best.seg.to - best.seg.from) best = a;
+    }
+    if (!best) return false;
+    const mid = (best.seg.from + best.seg.to) / 2;
+    const r = RING_RADII[2];
+    out.set(Math.cos(mid) * r, Math.sin(mid) * r, best.mesh.position.z);
+    return true;
   }
 
   private targetOf(a: Arc): number {
@@ -359,7 +387,8 @@ export class BaseRing {
     // the selector, else the country's ruler — a first cut filled every lit level and a network
     // hover painted its whole countries' wedges in the accent, which was not subtle.
     const netSel = this.sel !== "all";
-    a.wedgeOn = tier === "lit" && (netSel ? a.level === 2 : a.level === 0) ? 1 : 0;
+    const preview = netSel ? this.selPreview : this.ccPreview;
+    a.wedgeOn = tier === "lit" && (netSel ? a.level === 2 : a.level === 0) ? (preview ? 1 : WEDGE_COMMIT_MUL) : 0;
     a.paperTarget = paperPresence(tier, a.level === 2);
     return Math.min(0.62, tierPresence(tier) * (a.level === 2 ? NET_RING_BOOST : 1));
   }

@@ -407,12 +407,15 @@ export class CalloutSync {
     return true;
   }
 
-  // GEO anchors the finest committed rung with a POINT to point at — node > cohort > country.
-  // The network rung deliberately has none: a filtered fleet is spread across the globe, and a
-  // single anchor would lie about where it is (the component agrees and renders nothing).
-  // Anchors are globe-LOCAL surface points lifted just above the land, carried into world
-  // space through the rotating globe group each frame — a render-path label read, the same
-  // justification as the hyper anchors above.
+  // GEO anchors the finest committed rung with a POINT to point at — node > cohort > country >
+  // network. The network rung had none until 2026-10-24 (a filtered fleet is spread across the
+  // globe, and a single surface point would lie about where it is); it now points at the
+  // network's own arc on the BASE RING under the globe (user: "currently it's a nice place to
+  // anchor the metagraph callout which is missing in this view") — the one object that stands
+  // for the whole network rather than one of its places. Surface anchors are globe-LOCAL points
+  // lifted just above the land, carried into world space through the rotating globe group each
+  // frame — a render-path label read, the same justification as the hyper anchors above; the
+  // ring anchor is ring-local and rides the ring group, which does not spin.
   private _geoCalloutAnchor(v: THREE.Vector3): boolean {
     const st = this.st;
         const lift = GEO_R + LAND_H + 0.5;
@@ -425,8 +428,12 @@ export class CalloutSync {
       this._geoAnchorNode(st, v, lift) ||
       this._geoAnchorCohort(st, v, lift) ||
       this._geoAnchorCountry(st, v, lift);
-    if (!ok) return false;
-    this.h.globe.group.localToWorld(v); // the rendered globe rotation — a label read. render-state OK
+    if (ok) {
+      this.h.globe.group.localToWorld(v); // the rendered globe rotation — a label read. render-state OK
+      return true;
+    }
+    if (this.h.filter === "all" || !this.h.globe.baseRing.networkAnchor(this.h.filter, v)) return false;
+    this.h.globe.baseRing.group.localToWorld(v); // the ring's base-plane pose — a label read. render-state OK
     return true;
   }
 

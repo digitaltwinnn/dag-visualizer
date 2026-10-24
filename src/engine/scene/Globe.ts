@@ -1039,7 +1039,7 @@ export class Globe implements GeoViewHost {
     this.countryFilter = null; // switching network clears the country drill-down
     this._activeCcsCache = null; // the drillable-country set follows the filter
     this._updateCountryBorder();
-    this._applyDim(this._hoverSel || sel); // a live hover preview survives a data rebuild's re-apply
+    this._applyDim(this._hoverSel || sel, !!this._hoverSel); // a live hover preview survives a data rebuild's re-apply
     this._relayoutGeo();
     this._applyGlowFilter(); // just show/hide the matching pools — no recluster
     this._rebuildBaseRing(); // the rings re-partition over the filtered fleet (domain/baseRing)
@@ -1049,7 +1049,7 @@ export class Globe implements GeoViewHost {
   // NOT commit `this.filter` or relayout geo — and the same per-view dim STRENGTH too.
   setHoverFilter(sel: string | null): void {
     this._hoverSel = sel;
-    this._applyDim(sel || this.filter);
+    this._applyDim(sel || this.filter, !!sel);
   }
   /** The live hover preview's selector, so a data rebuild's own `setFilter` re-asserts it instead
    *  of the committed filter (2026-10-24, measured: every poll reset the rings' subject to "all"
@@ -1063,8 +1063,8 @@ export class Globe implements GeoViewHost {
   // committed story, and the L0 validators under it show at rest whatever the filter says. This is
   // a WHO-is-in-scope statement, so it lives here at the TARGET (the view rows keep saying how
   // MUCH); applyLedgerLayout re-derives it when the flag flips, and the ease carries the change.
-  private _applyDim(sel: string): void {
-    this.baseRing.setSubject(sel);
+  private _applyDim(sel: string, preview = false): void {
+    this.baseRing.setSubject(sel, preview);
     const dagLit = sel === "all" || sel === "dag" || this.ledger;
     this.dimTarget = dagLit ? 0 : 1;
     for (const r of this.metaNodes) r.dimTarget = (sel === "all" || sel === r.metaId) ? 0 : 1;
@@ -1075,7 +1075,7 @@ export class Globe implements GeoViewHost {
   // OTHER nodes stay visible, pickable and fanned exactly as before, so no relayout here.
   setCountry(cc: string | null): void {
     this.countryFilter = cc || null;
-    this.baseRing.setCountry(this._ringHoverCc ?? this.countryFilter);
+    this.baseRing.setCountry(this._ringHoverCc ?? this.countryFilter, !!this._ringHoverCc);
     this._updateCountryBorder();
   }
 
@@ -1083,7 +1083,7 @@ export class Globe implements GeoViewHost {
   // whisper level without committing the drill. The committed drill always wins.
   setHoverCountry(cc: string | null): void {
     this._ringHoverCc = cc || null;
-    this.baseRing.setCountry(this._ringHoverCc ?? this.countryFilter);
+    this.baseRing.setCountry(this._ringHoverCc ?? this.countryFilter, !!this._ringHoverCc);
     this._hoverCountryCc = cc || null;
     this._updateCountryBorder();
   }

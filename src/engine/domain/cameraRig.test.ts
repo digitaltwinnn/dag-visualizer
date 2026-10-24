@@ -28,7 +28,7 @@ describe("FOCI", () => {
     // (It targeted the globe CENTRE until then, for concentric manual orbits — moot since the geo
     // drag orbits the SUBJECT about its own anchor, else the globe centre, never about the target.)
     // Metagraph pose sits between the overview (z 36) and the country framing (z 29..25).
-    expect(FOCI.geoNetwork.pos).toEqual(new THREE.Vector3(0, 5, 33));
+    expect(FOCI.geoNetwork.pos).toEqual(new THREE.Vector3(0, 8, 44));
   });
 });
 

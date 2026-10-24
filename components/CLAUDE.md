@@ -1811,6 +1811,13 @@ anchor resolution must live in the Engine either way; the renderer would only re
 projection while adding its container, render pass and a React-portal handshake. Contained swap if
 callouts ever multiply.
 
+**Geography's ladder has a callout on every rung since 2026-10-24**: node > provider cohort >
+country > the committed NETWORK, the last anchored on the network's own arc of the base ring
+under the globe (`BaseRing.networkAnchor`) — a filtered fleet is spread across the globe, so no
+surface point stands for it and the rung used to show nothing. `SceneCallout`'s geo branch falls
+through to `netModel()` exactly where `CalloutSync` falls through to the ring (the mirrored
+order the boundary test's rule 2 expects).
+
 **`components/calloutBoundary.test.ts` pins the contracts**: `#callout` has exactly two homes (React
 renders + owns content, `CalloutSync` writes transform + `data-on` per frame — the Tooltip
 discipline); BOTH owners consult `store.boxedCard`; and `SCENE_GLASS` is the one container the hover
