@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ringLevels, ringPresence, type RingNet, type RingMachine } from "./baseRing";
+import { ringLevels, ringPresence, ringWedge, type RingNet, type RingMachine } from "./baseRing";
 
 const m = (ip: string, cc: string | null = "US", isp: string | null = "Hetzner"): RingMachine => ({ ip, cc, isp });
 const nets: RingNet[] = [
@@ -92,5 +92,22 @@ describe("ringPresence — the hover previews, the filter and the drill commit, 
     expect(lv.providers.filter((p) => p.cc !== "DE").every((p) => ringPresence(p, null, "all", "DE") === "dim")).toBe(true);
     // …and a committed network narrows it further
     expect(ringPresence(lv.networks.find((n) => n.cc === "DE" && n.net === "dag")!, null, "dor", "DE")).toBe("dim");
+  });
+});
+
+describe("ringWedge — the pie fills the level that names the subject (user, 2026-10-24)", () => {
+  it("at rest the country level fills, under a network selector the network level does, the others are off", () => {
+    expect(ringWedge(0, "rest", false, false)).toBe("rest");
+    expect(ringWedge(1, "rest", false, false)).toBe("off");
+    expect(ringWedge(2, "rest", false, false)).toBe("off");
+    expect(ringWedge(2, "lit", true, false)).toBe("rest");
+    expect(ringWedge(0, "lit", true, false)).toBe("off");
+  });
+  it("only a HOVER raises a slice; a commit rests it, and a dimmed slice drops", () => {
+    expect(ringWedge(0, "lit", false, true)).toBe("hover");
+    expect(ringWedge(0, "lit", false, false)).toBe("rest");
+    expect(ringWedge(0, "dim", false, true)).toBe("dim");
+    expect(ringWedge(2, "lit", true, true)).toBe("hover");
+    expect(ringWedge(2, "dim", true, false)).toBe("dim");
   });
 });

@@ -175,3 +175,18 @@ export function ringPresence(seg: RingSegment, hover: string | null, filter: str
   const ccLit = cc == null || seg.cc === cc;
   return netLit && ccLit ? "lit" : "dim";
 }
+
+/** WHAT A WEDGE IS under the selectors (the pie fill, user 2026-10-24, three rounds). The pie belongs
+ *  to the LEVEL THAT NAMES THE SUBJECT — the network band when a network is the selector, else the
+ *  country ruler — and every other level's wedges are `off`. On that level a slice `rest`s (a
+ *  readable quiet pie), a HOVERED subject's slice comes up to `hover`, a `dim`med slice drops, and a
+ *  COMMITTED subject is not a third state: its lit slices rest ("use resting for the pie also when
+ *  filtered but keep the circle effect as is"). `preview` is whether either selector is a hover;
+ *  the adapter turns the state into a presence per ground. */
+export type WedgeState = "off" | "rest" | "dim" | "hover";
+export function ringWedge(level: number, tier: RingTier, netSel: boolean, preview: boolean): WedgeState {
+  const pieLevel = netSel ? level === 2 : level === 0;
+  if (!pieLevel) return "off";
+  if (tier === "lit") return preview ? "hover" : "rest";
+  return tier === "dim" ? "dim" : "rest";
+}

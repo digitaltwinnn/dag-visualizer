@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { METAGRAPHS } from "@/src/net/current";
 import { R, LAND_H } from "../../domain/geoLayout";
-import { ringPresence, type RingLevels, type RingSegment, type RingTier } from "../../domain/baseRing";
+import { ringPresence, ringWedge, type RingLevels, type RingSegment, type RingTier, type WedgeState } from "../../domain/baseRing";
 import { FOCUS_TUNE } from "../../domain/dimModel";
 import { joinBloom } from "../SceneContext";
 import { entryStep, entryTotal } from "../../domain/entryBeat";
@@ -71,6 +71,9 @@ export const WEDGE_PRESENCE_PAPER = 0.12; // 0.22 → 0.16 → 0.12, the same st
 export const WEDGE_REST_DARK = 0.02;
 export const WEDGE_REST_PAPER = 0.066;
 export const WEDGE_DIM_MUL = 0.12;
+/** A wedge state's weight on the hover presence, given the ground's resting weight. */
+const wedgeWeight = (state: WedgeState, rest: number): number =>
+  state === "off" ? 0 : state === "hover" ? 1 : state === "dim" ? WEDGE_DIM_MUL : rest;
 
 /** THE ARRIVAL DROP (user, 2026-10-24: the rings "appear staggered and with the same timing as
  *  the snapshot view's actual snapshots"): every ring is held this high and dark through the
@@ -170,8 +173,11 @@ const arcKey = (level: number, seg: RingSegment): string => `${level}|${seg.cc ?
 
 interface Arc {
   mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; seg: RingSegment; level: number; fade: FadeEntry; target: number; paperTarget: number; entryMul: number;
-  /** The pie wedge under the arc and its own fade entry; `wedgeOn` is 1 while the arc is lit. */
+  /** The pie wedge under the arc and its own fade entry; `wedgeOn`/`wedgeOnDark` are the state's
+   *  weight per ground (`ringWedge` → `wedgeWeight`). */
   wedge: THREE.Mesh; wedgeFade: FadeEntry; wedgeOn: number; wedgeOnDark: number;
+  /** The country ring's invisible hit strip, kept with its arc across a rebuild. */
+  strip: THREE.Mesh | null;
 }
 
 export class BaseRing {
@@ -180,8 +186,6 @@ export class BaseRing {
    *  the Engine's pick gathering. */
   readonly pickables: THREE.Object3D[] = [];
   private arcs: Arc[] = [];
-  /** The country ring's invisible hit strips, disposed with the arcs. */
-  private strips: THREE.Mesh[] = [];
   private sel = "all";
   private selPreview = false;
   private cc: string | null = null;
@@ -267,96 +271,112 @@ export class BaseRing {
 
   private setSegments(entries: readonly { seg: RingSegment; level: number }[]): void {
     this.ensureTicks();
-    // PRESENCE CARRIES ACROSS A REBUILD (2026-10-24, measured: the data poll rebuilds the rings
-    // every few seconds, and every arc restarted from dark and eased back up — a dip on every poll
-    // that read as "less bright than at rest" whenever it coincided with a hover). An arc that
-    // exists on both sides keeps its eased presence and its place in the arrival beat.
-    const keep = new Map<string, Arc>();
-    for (const a of this.arcs) keep.set(arcKey(a.level, a.seg), a);
-    for (const a of this.arcs) {
-      for (const [mesh, mat, fade] of [[a.mesh, a.mat, a.fade], [a.wedge, a.wedge.material as THREE.MeshBasicMaterial, a.wedgeFade]] as const) {
-        this.group.remove(mesh);
-        mesh.geometry.dispose();
-        mat.dispose();
-        const fi = this.host.geoFades.indexOf(fade);
-        if (fi >= 0) this.host.geoFades.splice(fi, 1);
-        const bi = this.host.geoBlends.indexOf(mat);
-        if (bi >= 0) this.host.geoBlends.splice(bi, 1);
-        const ti = this.host.geoTints.indexOf(mat.color);
-        if (ti >= 0) this.host.geoTints.splice(ti, 1);
-      }
-    }
-    this.arcs = [];
-    for (const s of this.strips) {
-      this.group.remove(s);
-      s.geometry.dispose();
-      (s.material as THREE.Material).dispose();
-    }
-    this.strips = [];
-    this.pickables.length = 0;
+    this._anchorFor = null; // the callout's cached anchor re-resolves against the new arcs
+    // A REBUILD IS A DIFF (review, 2026-10-24 — the first cut disposed and recreated every arc on
+    // every data poll and carried presence across by key): an arc whose level, angles and hue are
+    // unchanged KEEPS its meshes, materials, fade entries and eased presence; only an arc that
+    // moved, appeared or vanished is built or disposed. The entry beat and the hover carry over
+    // for free, because nothing restarts.
+    const prevByKey = new Map<string, Arc>();
+    for (const a of this.arcs) prevByKey.set(arcKey(a.level, a.seg), a);
+    const next: Arc[] = [];
+    const kept = new Set<Arc>();
     for (const { seg, level } of entries) {
       const span = seg.to - seg.from;
       if (!(span > 0)) continue;
-      const radius = RING_RADII[level] ?? RING_RADII[2];
-      const width = RING_WIDTHS[level] ?? RING_WIDTHS[2];
-      const geo = arcGeometry(radius - width, radius, seg.from, seg.to, RING_GAP_W, 2);
-      const mat = this._furnitureMat(seg.color);
-      const fade: FadeEntry = { mat, base: 0, paperBase: 0 };
-      this.host.geoFades.push(fade);
-      const mesh = new THREE.Mesh(geo, mat);
-      // The outer ring picks as the COUNTRY (`userData.country`, the Engine routes it through the
-      // same hover channel and click arm the land under the cursor takes) — on an INVISIBLE strip
-      // under the hairline, since a hairline cannot be aimed at; the inner ring as the NETWORK,
-      // through the hub's own descriptor. A provider arc has no route of its own yet (the
-      // explorer's cohort rows are its door), so it does not pick.
-      if (level === 0 && seg.cc) {
-        const strip = new THREE.Mesh(
-          arcGeometry(radius - RING_PICK_HALF, radius + RING_PICK_HALF, seg.from, seg.to, RING_GAP_W, 2),
-          new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false, side: THREE.DoubleSide }),
-        );
-        strip.userData.country = seg.cc;
-        strip.visible = false; // never drawn (the raycaster ignores `visible` — CLAUDE.md's own warning, used here on purpose)
-        this.group.add(strip);
-        this.pickables.push(strip);
-        this.strips.push(strip);
+      const prev = prevByKey.get(arcKey(level, seg));
+      if (prev && prev.seg.from === seg.from && prev.seg.to === seg.to && prev.seg.color === seg.color) {
+        prev.seg = seg; // counts and shares may have moved; the picture has not
+        kept.add(prev);
+        next.push(prev);
+        continue;
       }
-      const cfg = level === 2 && seg.net ? METAGRAPHS.find((c) => c.id === seg.net) : undefined;
-      if (cfg) {
-        mesh.userData.pick = { kind: "meta", cfg };
-        this.pickables.push(mesh);
-      }
-      if (level === 2) joinBloom(mesh); // the identity reading glows like the chips it counts
-      this.group.add(mesh);
-      // The wedge: centre → the ring's inner edge, same arc, same hue, its own faint fade.
-      const wedgeMat = this._furnitureMat(seg.color);
-      const wedgeFade: FadeEntry = { mat: wedgeMat, base: 0, paperBase: 0 };
-      this.host.geoFades.push(wedgeFade);
-      // The slice closes where the stripe is all of it: r = gapW / span, never the centre.
-      const wedge = new THREE.Mesh(arcGeometry(Math.min(radius - width, Math.max(0.01, RING_GAP_W / span)), radius - width, seg.from, seg.to, RING_GAP_W, 12), wedgeMat);
-      wedge.position.z = -0.01 * (level + 1); // under the arcs, the outer wedge lowest so the three stack
-      // THE DISC PICKS AS ITS SLICE (user, 2026-10-24: "when we hover the section within the circle
-      // it should hover the pie chart section and the related sections on the circle"): the
-      // country wedge carries the country's route, the network wedge the network's, and the
-      // raycaster's nearest hit is the country's (its wedge sits highest of the three), so the
-      // interior answers as the outer ring does — which is the explorer's own root level.
-      if (level === 0 && seg.cc) {
-        wedge.userData.country = seg.cc;
-        this.pickables.push(wedge);
-      } else if (cfg) {
-        wedge.userData.pick = { kind: "meta", cfg };
-        this.pickables.push(wedge);
-      }
-      this.group.add(wedge);
-      const prev = keep.get(arcKey(level, seg));
+      const arc = this._buildArc(seg, level);
       if (prev) {
-        fade.base = prev.fade.base;
-        fade.paperBase = prev.fade.paperBase;
-        mesh.position.z = prev.mesh.position.z;
-        wedgeFade.base = prev.wedgeFade.base;
-        wedgeFade.paperBase = prev.wedgeFade.paperBase;
+        // The same subject at a new angle: its presence and its place in the beat carry over.
+        arc.fade.base = prev.fade.base;
+        arc.fade.paperBase = prev.fade.paperBase;
+        arc.mesh.position.z = prev.mesh.position.z;
+        arc.wedgeFade.base = prev.wedgeFade.base;
+        arc.wedgeFade.paperBase = prev.wedgeFade.paperBase;
+        arc.entryMul = prev.entryMul;
       }
-      this.arcs.push({ mesh, mat, seg, level, fade, target: 0, paperTarget: 0, entryMul: prev ? prev.entryMul : this._entryT >= 1 ? 1 : 0, wedge, wedgeFade, wedgeOn: 0, wedgeOnDark: 0 });
-      this.arcs[this.arcs.length - 1]!.target = this.targetOf(this.arcs[this.arcs.length - 1]!);
+      next.push(arc);
+    }
+    for (const a of this.arcs) if (!kept.has(a)) this._disposeArc(a);
+    this.arcs = next;
+    this.pickables.length = 0;
+    for (const a of this.arcs) {
+      if (a.strip) this.pickables.push(a.strip);
+      if (a.mesh.userData.pick) this.pickables.push(a.mesh);
+      if (a.wedge.userData.country || a.wedge.userData.pick) this.pickables.push(a.wedge);
+    }
+    this.retarget();
+  }
+
+  /** One arc, its wedge and (on the country ring) its hit strip — built, added, not yet targeted. */
+  private _buildArc(seg: RingSegment, level: number): Arc {
+    const span = seg.to - seg.from;
+    const radius = RING_RADII[level] ?? RING_RADII[2];
+    const width = RING_WIDTHS[level] ?? RING_WIDTHS[2];
+    const mat = this._furnitureMat(seg.color);
+    const fade: FadeEntry = { mat, base: 0, paperBase: 0 };
+    this.host.geoFades.push(fade);
+    const mesh = new THREE.Mesh(arcGeometry(radius - width, radius, seg.from, seg.to, RING_GAP_W, 2), mat);
+    // The outer ring picks as the COUNTRY (`userData.country`, the Engine routes it through the
+    // same hover channel and click arm the land under the cursor takes) — on an INVISIBLE strip
+    // under the hairline, since a hairline cannot be aimed at; the inner ring as the NETWORK,
+    // through the hub's own descriptor. A provider arc has no route of its own yet (the
+    // explorer's cohort rows are its door), so it does not pick.
+    let strip: THREE.Mesh | null = null;
+    if (level === 0 && seg.cc) {
+      strip = new THREE.Mesh(
+        arcGeometry(radius - RING_PICK_HALF, radius + RING_PICK_HALF, seg.from, seg.to, RING_GAP_W, 2),
+        new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false, side: THREE.DoubleSide }),
+      );
+      strip.userData.country = seg.cc;
+      strip.visible = false; // never drawn (the raycaster ignores `visible` — CLAUDE.md's own warning, used here on purpose)
+      this.group.add(strip);
+    }
+    const cfg = level === 2 && seg.net ? METAGRAPHS.find((c) => c.id === seg.net) : undefined;
+    if (cfg) mesh.userData.pick = { kind: "meta", cfg };
+    if (level === 2) joinBloom(mesh); // the identity reading glows like the chips it counts
+    this.group.add(mesh);
+    // The wedge: centre → the ring's inner edge, same arc, same hue, its own faint fade.
+    const wedgeMat = this._furnitureMat(seg.color);
+    const wedgeFade: FadeEntry = { mat: wedgeMat, base: 0, paperBase: 0 };
+    this.host.geoFades.push(wedgeFade);
+    // The slice closes where the stripe is all of it: r = gapW / span, never the centre.
+    const wedge = new THREE.Mesh(arcGeometry(Math.min(radius - width, Math.max(0.01, RING_GAP_W / span)), radius - width, seg.from, seg.to, RING_GAP_W, 12), wedgeMat);
+    wedge.position.z = -0.01 * (level + 1); // under the arcs, the outer wedge lowest so the three stack
+    // THE DISC PICKS AS ITS SLICE (user, 2026-10-24: "when we hover the section within the circle
+    // it should hover the pie chart section and the related sections on the circle"): the
+    // country wedge carries the country's route, the network wedge the network's, and the
+    // raycaster's nearest hit is the country's (its wedge sits highest of the three), so the
+    // interior answers as the outer ring does — which is the explorer's own root level.
+    if (level === 0 && seg.cc) wedge.userData.country = seg.cc;
+    else if (cfg) wedge.userData.pick = { kind: "meta", cfg };
+    this.group.add(wedge);
+    return { mesh, mat, seg, level, fade, target: 0, paperTarget: 0, entryMul: this._entryT >= 1 ? 1 : 0, wedge, wedgeFade, wedgeOn: 0, wedgeOnDark: 0, strip };
+  }
+
+  /** Remove an arc's meshes, materials and fade entries. */
+  private _disposeArc(a: Arc): void {
+    for (const [mesh, mat, fade] of [[a.mesh, a.mat, a.fade], [a.wedge, a.wedge.material as THREE.MeshBasicMaterial, a.wedgeFade]] as const) {
+      this.group.remove(mesh);
+      mesh.geometry.dispose();
+      mat.dispose();
+      const fi = this.host.geoFades.indexOf(fade);
+      if (fi >= 0) this.host.geoFades.splice(fi, 1);
+      const bi = this.host.geoBlends.indexOf(mat);
+      if (bi >= 0) this.host.geoBlends.splice(bi, 1);
+      const ti = this.host.geoTints.indexOf(mat.color);
+      if (ti >= 0) this.host.geoTints.splice(ti, 1);
+    }
+    if (a.strip) {
+      this.group.remove(a.strip);
+      a.strip.geometry.dispose();
+      (a.strip.material as THREE.Material).dispose();
     }
   }
 
@@ -395,6 +415,21 @@ export class BaseRing {
    *  False while the ring holds no arc of it (no located participants, the unlisted set, data not
    *  yet in). No allocation: a scan over the arcs. */
   networkAnchor(id: string, out: THREE.Vector3): boolean {
+    // Cached per rebuild and id (review, 2026-10-24): the scan below ran every frame a network was
+    // committed; the arcs only change in setSegments, which clears the cache.
+    if (this._anchorFor === id) {
+      if (this._anchorOk) out.copy(this._anchor);
+      return this._anchorOk;
+    }
+    this._anchorFor = id;
+    this._anchorOk = this._resolveAnchor(id, this._anchor);
+    if (this._anchorOk) out.copy(this._anchor);
+    return this._anchorOk;
+  }
+  private _anchorFor: string | null = null;
+  private _anchorOk = false;
+  private readonly _anchor = new THREE.Vector3();
+  private _resolveAnchor(id: string, out: THREE.Vector3): boolean {
     let best: Arc | null = null;
     let bestAngle = 0;
     let bestDist = Infinity;
@@ -417,20 +452,12 @@ export class BaseRing {
     // The bloomed band is capped: lit × boost ran past 1 under a committed filter, where every
     // arc is the subject, and the additive blend blew the ring out to a white-hot band.
     const tier = ringPresence(a.seg, null, this.sel, this.cc);
-    // The wedge belongs to the LEVEL THAT NAMES THE SUBJECT: a network's band when a network is
-    // the selector, else the country's ruler — a first cut filled every lit level and a network
-    // hover painted its whole countries' wedges in the accent, which was not subtle.
-    const netSel = this.sel !== "all";
-    // A HOVER on either selector is a preview (user, 2026-10-24: hovering a country row under a
-    // committed filter must light its slice at hover strength, not the committed disc's floor).
-    const preview = this.selPreview || this.ccPreview;
-    const pieLevel = netSel ? a.level === 2 : a.level === 0;
-    // A COMMIT is not a third state for the pie (user, 2026-10-24: "use resting for the pie also
-    // when filtered but keep the circle effect as is"): the arcs take the lit/dim tiers, the pie
-    // under a committed subject rests — only a HOVER raises a slice.
-    const lit = !pieLevel ? 0 : tier === "lit" ? (preview ? 1 : -1) : tier === "dim" ? WEDGE_DIM_MUL : -1;
-    a.wedgeOn = lit < 0 ? WEDGE_REST_PAPER / WEDGE_PRESENCE_PAPER : lit;
-    a.wedgeOnDark = lit < 0 ? WEDGE_REST_DARK / WEDGE_PRESENCE_DARK : lit;
+    // The pie's decision table is the domain's (`ringWedge`, tested); this turns its state into a
+    // weight per ground. A HOVER on either selector is a preview (user, 2026-10-24: hovering a
+    // country row under a committed filter lights its slice at hover strength).
+    const state = ringWedge(a.level, tier, this.sel !== "all", this.selPreview || this.ccPreview);
+    a.wedgeOn = wedgeWeight(state, WEDGE_REST_PAPER / WEDGE_PRESENCE_PAPER);
+    a.wedgeOnDark = wedgeWeight(state, WEDGE_REST_DARK / WEDGE_PRESENCE_DARK);
     a.paperTarget = paperPresence(tier, a.level === 2);
     return Math.min(0.62, tierPresence(tier) * (a.level === 2 ? NET_RING_BOOST : 1));
   }
