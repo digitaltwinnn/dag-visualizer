@@ -118,10 +118,18 @@ export function ringLevels(nets: readonly RingNet[], dagId: string, filter: stri
 
     tile(groupBy(c.items, (m) => m.isp), from, to, (isp, pm, pf, pt) => {
       out.providers.push({ cc: c.key, isp, nets: netsOf(pm), count: pm.length, share: pm.length / total, from: pf, to: pt, color: null });
+      // UNDER A COMMITTED NETWORK the inner ring is one arc per COUNTRY (user, 2026-10-24: "why are
+      // there some extra sections while DOR only has 2 countries?"): every inner arc is the same
+      // network, so splitting it again by provider only repeated the ring above it.
+      if (filter !== "all") return;
       tile(groupBy(pm, (m) => m.net), pf, pt, (net, nm, nf, nt) => {
         out.networks.push({ cc: c.key, isp, net: net!, nets: [net!], count: nm.length, share: nm.length / total, from: nf, to: nt, color: nm[0]!.color });
       });
     });
+    if (filter !== "all") {
+      const net = c.items[0]!.net;
+      out.networks.push({ cc: c.key, net, nets: [net], count: c.items.length, share: c.items.length / total, from, to, color: c.items[0]!.color });
+    }
   }
   return out;
 }

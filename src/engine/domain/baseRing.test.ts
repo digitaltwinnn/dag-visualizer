@@ -58,6 +58,15 @@ describe("ringLevels — the located fleet by country, then provider, then netwo
     expect(ringLevels([], "dag")).toEqual({ countries: [], providers: [], networks: [] });
     expect(ringLevels([{ id: "x", color: 1, machines: [] }], "dag").countries).toEqual([]);
   });
+  it("under a committed network the inner ring is one arc per country, spanning the country's arc (user, 2026-10-24)", () => {
+    const lv = ringLevels(nets, "dag", "dor");
+    expect(lv.countries.map((c) => c.cc)).toEqual(["US", "DE", null]);
+    expect(lv.networks.map((n) => [n.cc, n.net, n.count, n.isp])).toEqual([["US", "dor", 2, undefined], ["DE", "dor", 1, undefined], [null, "dor", 1, undefined]]);
+    for (let i = 0; i < lv.countries.length; i++) {
+      expect(lv.networks[i]!.from).toBe(lv.countries[i]!.from);
+      expect(lv.networks[i]!.to).toBe(lv.countries[i]!.to);
+    }
+  });
   it("a lone country is a whole circle — no gap for a single segment (user, 2026-10-24)", () => {
     const lv = ringLevels([{ id: "x", color: 1, machines: [m("1", "FI", "Hetzner"), m("2", "FI", "Hetzner")] }], "dag");
     expect(lv.countries).toHaveLength(1);
