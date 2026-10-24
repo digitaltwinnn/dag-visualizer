@@ -60,16 +60,16 @@ export const RULER_PRESENCE_PAPER = 0.85; // 0.4 was "almost invisible" on Print
 /** The pie wedge's presence under a HOVERED subject (user, 2026-10-24: "more visible when hover,
  *  and less visible when the filter is active" — a committed network re-partitions the whole ring,
  *  so its wedge is the whole disc; it rests, see `targetOf`). */
-export const WEDGE_PRESENCE_DARK = 0.09; // 0.14 → 0.09 (user: the hover "too strong")
-export const WEDGE_PRESENCE_PAPER = 0.16; // 0.22 → 0.16, the same step
+export const WEDGE_PRESENCE_DARK = 0.065; // 0.14 → 0.09 → 0.065 (user: the hover "too strong", then "reduce it a bit more")
+export const WEDGE_PRESENCE_PAPER = 0.12; // 0.22 → 0.16 → 0.12, the same steps
 /** The pie is READABLE AT REST too (user, 2026-10-24: "when at rest the pie is not very visible"):
  *  every slice of the level naming the subject sits at this fraction, a dim slice lower still, so
  *  a hover reads as one slice coming up out of a quiet pie rather than appearing from nothing. */
-export const WEDGE_REST_MUL = 0.41; // 0.3 → 0.41 with the hover step down, so the resting pie keeps its 0.066 ink
+export const WEDGE_REST_MUL = 0.55; // re-derived with each hover step so the resting pie keeps its 0.066 ink
 /** …but the DARK ground rests lower: additive light over black reads at a fraction of the ink the
  *  same weight lays on paper (user, 2026-10-24: "while normal ok for light but in dark its too
  *  much now"). The hover and commit weights are shared; only the quiet pie differs by ground. */
-export const WEDGE_REST_MUL_DARK = 0.22; // 0.14 → 0.22 with the hover step down, so the resting pie keeps its 0.02 light (user: "increase rest fill just a bit", then the hover "too strong")
+export const WEDGE_REST_MUL_DARK = 0.3; // re-derived with each hover step so the resting pie keeps its 0.02 light (user: "increase rest fill just a bit")
 export const WEDGE_DIM_MUL = 0.12;
 
 /** THE ARRIVAL DROP (user, 2026-10-24: the rings "appear staggered and with the same timing as
