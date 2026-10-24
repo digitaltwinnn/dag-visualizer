@@ -227,7 +227,7 @@ Gotchas worth knowing before you burn time on them:
 
 - **Two dev handles on `window`** (2026-10-24, dev builds only): `__dagStore` is the Zustand store
   (`getState()`, every setter — the fastest way to put the app in a state from a headless probe)
-  and `__dagEngine` the running Engine (`globe`, `ctx.camera`, `transition`, `_pickablesFor()`).
+  and `__dagEngine` the running Engine (`globe`, `ctx.camera`, `transition`, `picking.pickablesFor()`).
   A probe that drives the store this way reproduces what a click does only when it calls the same
   setters the executor would; to test a real gesture, dispatch real pointer events.
 
@@ -313,7 +313,8 @@ gathers to the staging grids and fades on the doc overlay's own clock (`fleetFad
 | `components/ui/` | The adopted shadcn/Radix primitives. |
 | `src/store/store.ts` | The Zustand store — mode, filter, selection, hover channels, `section`, phone UI state. |
 | `src/data/` | The live network data layer (`api.ts`'s typed `NetworkData` singleton, `network.ts`'s accessors), the pure row builders, the display vocabularies. No simulation. |
-| `src/engine/Engine.ts` | The imperative engine and the one store bridge: render loop, morph, camera, picking, focus resolution, command bridge. |
+| `src/engine/Engine.ts` | The imperative engine and the store bridge's main file: render loop, morph, camera, focus resolution, command bridge. |
+| `src/engine/Picking.ts` | Engine-layer, beside `CalloutSync`: the raycast, the hover channels and the click's decision table, behind the Engine's own gates (2026-10-24). |
 | `src/engine/TrendStackSync.ts` | Engine-layer, alongside `CalloutSync`: projects History's plane poses through the camera and writes each `[data-plane]`'s `matrix3d` per frame (above). |
 | `src/engine/config.ts` | **Pure static data only** — endpoints, the `COLORS` mirror, the `METAGRAPHS` catalog, poll tuning. No math, no derived tables, no UI copy. |
 | `src/engine/domain/` | Pure logic + data (below). |

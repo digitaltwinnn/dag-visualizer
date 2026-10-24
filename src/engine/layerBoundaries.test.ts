@@ -87,7 +87,8 @@ describe("engine layer boundaries", () => {
   // CalloutSync already take it). What this catches is a NEW engine file quietly reaching for
   // `useStore` because it was convenient, which is how one bridge becomes three.
   const STORE_BRIDGE = new Set([
-    "Engine.ts", // the render loop, picking, the command bridge
+    "Engine.ts", // the render loop, the command bridge
+    "Picking.ts", // the raycast, the hover channels and the click's table (split out 2026-10-24)
   ]);
 
   it("only the named engine-layer files hold store VALUES", () => {

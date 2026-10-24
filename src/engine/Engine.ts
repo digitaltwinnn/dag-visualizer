@@ -7,7 +7,7 @@ import { ledgerLens } from "@/src/data/ledgerStory";
 import { reportPoll, touchPoll } from "@/src/data/api";
 import { STALE_FACTOR } from "@/src/data/pollStatus";
 import { UNLISTED_ID, UNLISTED_SCENE_HEX_BY_THEME, unlistedLog } from "@/src/data/unlisted";
-import { countrySubject, hoverKeyOf, tooltipSubject } from "@/src/data/hoverSubject";
+import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { identityMap, identitySceneHex } from "@/src/palette/identity";
 import { createScene, type SceneCtx } from "./scene/SceneContext";
 import { HyperView, type MetaHubRec } from "./scene/views/HyperView";
@@ -35,18 +35,19 @@ import { elevationCap, isDrag, orbitAbout, orbitAllowed, orbitAngles } from "./d
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { ledgerNetwork } from "./domain/tickNet";
-import { clickActions, pickActive, pickNetId, viewEntryActions, metaSnapSelectActions, bandSelectActions } from "./domain/pickActions";
+import { pickNetId, viewEntryActions } from "./domain/pickActions";
 import { ViewTransition, is3D, fleetFaded, fleetHolder, type FleetPlacement } from "./domain/viewTransition";
 import { gatherBand, railGapPx, railGapShiftPx, type GatherBand } from "./domain/gatherLayout";
 import { LADDERS, LEVEL_CARRY, hasLevel, type CohortSel, type CompositionSel, type FocusLevel, type SelectionSnapshot, type ResolverKey } from "./domain/focusLadder";
 import { compositionGroups, compositionKey, compositionRows } from "@/src/data/composition";
-import { metaSnapDeepKey, metaSnapHoverKey } from "@/src/data/types";
+import { metaSnapDeepKey } from "@/src/data/types";
 import { snapsAtTick } from "@/src/data/anchorLog";
 // The tap RECOGNIZER stays here — it is input plumbing. The step it triggers is the
 // CameraDirector's (see its header).
 import { type Tap, DOUBLE_TAP_SLOP, LONG_PRESS_MS, LONG_PRESS_LINGER_MS, isDoubleTap } from "./domain/tapZoom";
 import { auditInstances, findingKey, type InstanceFinding } from "./scene/instanceAudit";
 import { CalloutSync, type CalloutState } from "./CalloutSync";
+import { Picking } from "./Picking";
 import { TrendStackSync, type TrendStackState } from "./TrendStackSync";
 import { fitDistance, focusDepth, loneShiftPx, windowCount } from "./domain/trendStack";
 import { stackRoster } from "@/src/data/trendScope";
@@ -109,6 +110,8 @@ const resolveGeo = resolveMissing;
 export class Engine {
   /** The subject callout's per-frame placement — see CalloutSync. */
   private callout!: CalloutSync;
+  /** The raycast, the hover channels and the click's table — see Picking. */
+  private picking!: Picking;
   /** The trend view's chart planes, projected per frame — see TrendStackSync. */
   private trendStack!: TrendStackSync;
   /** This frame's clamped delta (slowmo applied) — read by the DOM-side projectors. */
@@ -168,7 +171,6 @@ export class Engine {
   // Some ledger subjects carry a second fact on the hit object itself rather than in the descriptor
   // — a byte-bar band's `userData.bandKey` beside its tick `userData.pick` — and the click handler
   // needs both. Event-time only; never read from the render loop.
-  private _hitObj: THREE.Object3D | null = null;
   private _hyperSpinY = 0; // shared hyper-structure spin angle (globe group + root + core, in lockstep)
   // The shared structure TILT, eased per frame: HYPER_TILT at rest → HYPER_TILT_FOCUS while a
   // metagraph is committed (the structure flattens so the side-on hub pose sees horizontal discs).
@@ -208,12 +210,8 @@ export class Engine {
   private _dofMeta: MetaHubRec | null = null;
   private _warnedUnbaked = false;
 
-  private raycaster = new THREE.Raycaster();
   // Land-sphere hit scratch for the scene country hover/click (ray→sphere analytically —
   // the sphere is rotation-invariant, so no mesh raycast is needed).
-  private _landSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), GEO_R + LAND_H);
-  private _landHit = new THREE.Vector3();
-  private pointer = new THREE.Vector2();
   private canvas: HTMLCanvasElement;
   private onClick = (e: MouseEvent) => this._handleClick(e);
   private onMove = (e: MouseEvent) => {
@@ -284,7 +282,7 @@ export class Engine {
   }
   // Leaving the canvas (onto a card/rail) stops pointermoves, so transient hovers would
   // otherwise linger — clear them all at the boundary.
-  private onLeave = () => this._clearHover();
+  private onLeave = () => this.picking.clearHover();
   // DRAG SUPPRESSION: a "click" that ends a camera-orbit drag must pick NOTHING (with the floor
   // planes pickable, almost every orbit would otherwise end by committing a layer + a camera
   // flight). Record where the pointer went down; _handleClick ignores clicks that travelled
@@ -361,7 +359,7 @@ export class Engine {
       this._eatClick = true;
       this._lastTap = null;
       if (this._lpLinger !== undefined) clearTimeout(this._lpLinger);
-      this._lpLinger = setTimeout(() => this._clearHover(), LONG_PRESS_LINGER_MS);
+      this._lpLinger = setTimeout(() => this.picking.clearHover(), LONG_PRESS_LINGER_MS);
       return;
     }
     // A tap is a touch that didn't travel — same fingertip tolerance the pair itself gets.
@@ -381,9 +379,7 @@ export class Engine {
     }
     this._lastTap = now;
   };
-  private _hoverKey: string | null = null;
   // Reused pickables buffer (never re-allocated) — `_pickablesFor` runs on every pointermove.
-  private _pickBuf: THREE.Object3D[] = [];
 
   private unsub: Array<() => void> = [];
   private metaTimer: ReturnType<typeof setInterval> | undefined;
@@ -627,6 +623,20 @@ export class Engine {
     const engineSelf = this;
     // Bound ONCE (rule 5: nothing per frame). The host carries the stable view refs plus getters
     // for the few values that change, so `sync` allocates nothing.
+    this.picking = new Picking({
+      canvas: this.canvas,
+      ctx: this.ctx,
+      globe: this.globe,
+      layers: this.layers,
+      ledger: this.ledger,
+      get mode() { return engineSelf.mode; },
+      get filter() { return engineSelf.filter; },
+      get morph() { return engineSelf.morph; },
+      get activeMetaIds() { return engineSelf._activeMetaIds; },
+      get cohortSel() { return engineSelf.cohortSel; },
+      ledgerNet: () => this._ledgerNet(),
+      compositionOf: (p) => this._compositionOf(p),
+    });
     this.callout = new CalloutSync({
       ctx: this.ctx,
       chrome: this._chrome,
@@ -1413,7 +1423,7 @@ export class Engine {
     // A view switch re-lays the scene under a stationary pointer, so any in-flight hover
     // (tooltip + the hover channels) would linger re-projected at a wrong screen position
     // until the next pointermove — clear it as part of the switch.
-    this._clearHover();
+    this.picking.clearHover();
     const policy = VIEW_POLICIES[mode];
     // View-derived sim gates → the scene modules (the render loop reads the rest of the policy).
     // These + the filter dim / country clear apply IMMEDIATELY (the choreography defers only the
@@ -1908,70 +1918,12 @@ export class Engine {
     useStore.getState().setLeaderboard({ countries });
   }
 
-  /** THE COUNTRY UNDER THE CURSOR with nothing picked (one home for the hover and the click,
-   *  review 2026-10-24): the base ring's country arc or wedge when the hit object carries one,
-   *  else the land under the ray — the sphere hit is analytic, and the Globe resolves WHICH
-   *  country in its rotated frame. Reads the raycaster as the pick left it. */
-  private _countryUnderCursor(): string | null {
-    const arcCc = this._hitObj?.userData.country as string | undefined;
-    if (arcCc) return arcCc;
-    const hit = this.raycaster.ray.intersectSphere(this._landSphere, this._landHit);
-    return hit ? this.globe.countryCcAtPoint(hit) : null;
-  }
-
-  // ---- picking (ports ui.js _pick / _pickablesFor / _onClick) ----
-  // Resolve the view policy's pick sources to the actual mesh pools. Unlisted sources / flat views
-  // (empty pickSources) raycast nothing. Order is immaterial — the raycaster sorts hits by distance.
-  private _pickablesFor(): THREE.Object3D[] {
-    const out = this._pickBuf;
-    out.length = 0;
-    for (const src of VIEW_POLICIES[this.mode].pickSources) {
-      if (src === "globe") out.push(...this.globe.pickables);
-      // The base ring's arcs pick as the hubs do (`kind: "meta"`): a hover previews the network
-      // through hoverFilter, a click commits it through the table's filter arm. Its own source
-      // (review, 2026-10-24): the fleet's "globe" pool is picked in every 3D view, but the rings
-      // are drawn only in Geography, and the raycaster does not read `visible`.
-      else if (src === "baseRing") out.push(...this.globe.baseRing.pickables);
-      else if (src === "layers") out.push(...this.layers.pickables);
-      else if (src === "ledger") out.push(...this.ledger.pickables);
-    }
-    return out;
-  }
-
-  private _pickAt(e: MouseEvent): PickDescriptor | null {
-    const r = this.canvas.getBoundingClientRect();
-    this.pointer.x = ((e.clientX - r.left) / r.width) * 2 - 1;
-    this.pointer.y = -((e.clientY - r.top) / r.height) * 2 + 1;
-    const list = this._pickablesFor();
-    if (!list.length) return null;
-    this.raycaster.setFromCamera(this.pointer, this.ctx.camera);
-    const hits = this.raycaster.intersectObjects(list, false);
-    // Return the first hit that's part of the current selection — nodes filtered out of the
-    // geo view are hidden, so they shouldn't be clickable/hoverable either (Three's raycaster
-    // ignores scale/visibility, so the inactive ones must be skipped explicitly).
-    this._hitObj = null;
-    for (const h of hits) {
-      // A BLOCKER (the ledger's floor glass) is a normal surface: the ray stops here, and the
-      // glass itself is no subject — content underneath must not pick through it (user,
-      // 2026-08-07). Hits are distance-sorted, so anything before the glass already returned.
-      if (h.object.userData.blocker) return null;
-      const pick: PickDescriptor | undefined = h.object.userData.picks
-        ? h.object.userData.picks[h.instanceId as number]
-        : h.object.userData.pick;
-      // A COUNTRY-tagged object (the base ring's outer arcs) is a hit with no descriptor: the
-      // hover and click paths read `_hitObj.userData.country` where they would otherwise resolve
-      // the land under the cursor.
-      if (!pick && h.object.userData.country) {
-        this._hitObj = h.object;
-        return null;
-      }
-      if (!pick || !pickActive(pick, this.mode, this.filter, this._activeMetaIds)) continue;
-      this._hitObj = h.object;
-      return pick;
-    }
-    return null;
-  }
-
+  // ---- picking → src/engine/Picking.ts (the split, review 2026-10-24) ----
+  // The Engine keeps the GATES a pick runs behind — the long-press disarm, the mid-drag skip, the
+  // transition's misleading window, a double-tap's eaten click, a drag's drift — and hands a
+  // pick that passes them to `Picking`, which owns the raycast, the hover channels and the click's
+  // decision table. `_pickSuppressed` stays here because the render loop and the tap recogniser
+  // read it too.
   // The stable per-machine id of a node pick (a validator by its node id, a metagraph node by
   // its ip) — keys the persistent selection glow, matching the hover-pairing in _handleMove.
   private _pickNodeId(p: PickDescriptor | null): string | null {
@@ -1980,29 +1932,6 @@ export class Engine {
     if (p.kind === "metanode") return p.node?.ip ?? null;
     return null;
   }
-
-  // The network (filter id) a node pick belongs to: its metagraph, or the DAG core for a
-  // validator. Clicking a node sets the global filter to this, consistently in every view.
-  // Drop every transient hover: the tooltip subject + all four hover channels (each store
-  // write also resets its 3D effect via the command-bridge subscription). Event-driven only
-  // (view switch) — never on the per-frame path.
-  private _clearHover() {
-    const st = useStore.getState();
-    if (st.hoverNodeId != null) st.setHoverNodeId(null);
-    if (st.hoverSnapOrd != null) st.setHoverSnapOrd(null);
-    if (st.hoverMetaSnap != null) st.setHoverMetaSnap(null);
-    if (st.hoverFilter != null) st.setHoverFilter(null);
-    if (st.hoverCountry != null) st.setHoverCountry(null);
-    if (st.hoverCohort != null) st.setHoverCohort(null);
-    if (this._hoverKey != null || st.hover != null) {
-      this._hoverKey = null;
-      st.setHover(null);
-    }
-    this.canvas.style.cursor = "grab";
-  }
-
-  // Hover tooltip: only writes the store when the hovered target changes (not per
-  // pixel); the Tooltip component positions itself from the pointer.
 
   // Picking stays suppressed while the transition MISLEADS — but not a moment longer (user,
   // 2026-08-16: "when I arrive in hyper I can't click a node ... at some moment it starts to
@@ -2026,48 +1955,7 @@ export class Engine {
     // layer highlight across the stack while the user is just navigating.
     if (e.buttons !== 0) return;
     if (this._pickSuppressed()) return; // early flight only — see the note on _pickSuppressed
-    const p = this._pickAt(e);
-    this.canvas.style.cursor = p ? "pointer" : "grab";
-    const st = useStore.getState();
-
-    // Route the hovered subject to ITS channel (each already drives a 3D effect + now the paired
-    // card/row). Only the channel for the hovered kind is set; the others clear — so exactly one
-    // subject is "hovered" at a time. Write only on change (mousemove is high-frequency).
-    const nodeKey = hoverKeyOf(p);                                   // node → globe shell glow
-    // snapshot → its ledger row. A metagraph-snapshot TILE routes to the SNAPSHOT channel instead
-    // (user, 2026-08-09): it is one snapshot, not its tick, so hovering it must not light every
-    // sibling that anchored into the same global tick — in the scene OR in the explorer/raw rows.
-    const snapOrd = p?.kind === "snapshot" ? p.data.ordinal : null;
-    const metaSnapKey = p?.kind === "metaSnap" ? metaSnapHoverKey(p.sel.metaId, p.sel.ordinal) : null;
-    const metaId = p?.kind === "meta" ? p.cfg?.id ?? null : null;    // hub → metagraph dim preview
-    // Country under the cursor (policy-gated): the SCENE side of the bidirectional country
-    // pairing — writes the same hoverCountry channel the explorer rows use, so the border
-    // preview + the row wash light from either end. Hovering a NODE hovers its country too
-    // (user); with no object hit, the land point under the cursor resolves analytically
-    // (ray→sphere — the sphere is rotation-invariant; the Globe resolves WHICH country).
-    let countryCc: string | null = null;
-    if (VIEW_POLICIES[this.mode].countryHover && this.morph > 0.9) {
-      if (p && (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode")) {
-        countryCc = p.geo?.cc ?? null;
-      } else if (!p) {
-        countryCc = this._countryUnderCursor();
-      }
-    }
-    if (countryCc) this.canvas.style.cursor = "pointer"; // the border preview invites the drill
-    if (nodeKey !== st.hoverNodeId) st.setHoverNodeId(nodeKey);
-    if (snapOrd !== st.hoverSnapOrd) st.setHoverSnapOrd(snapOrd);
-    if (metaSnapKey !== st.hoverMetaSnap) st.setHoverMetaSnap(metaSnapKey);
-    if (metaId !== st.hoverFilter) st.setHoverFilter(metaId);
-    if (countryCc !== st.hoverCountry) st.setHoverCountry(countryCc);
-
-    // The lean tooltip label — re-write the store only when the subject's identity changes so
-    // following the cursor never re-renders React.
-    // Land with nothing on it still names itself: the country whose border the pointer lit.
-    const subj = tooltipSubject(p) ?? (countryCc ? countrySubject(countryCc) : null);
-    const key = subj ? `${subj.kind}|${subj.ident}|${subj.name}|${subj.color}` : null;
-    if (key === this._hoverKey) return;
-    this._hoverKey = key;
-    st.setHover(subj);
+    this.picking.move(e);
   }
 
   private _handleClick(e: MouseEvent) {
@@ -2088,64 +1976,7 @@ export class Engine {
       say("SUPPRESSED — view transition still misleading", { phase: this.transition.phase });
       return;
     }
-    const p = this._pickAt(e);
-    // The pick's NETWORK matters as much as its kind here: "the node spheres are not clickable"
-    // could mean nothing picks, or that the ray keeps reaching PAST the committed network onto
-    // somebody else's nodes — two different bugs that look identical from the outside.
-    say(p ? `PICKED ${p.kind}` : "NO HIT — the ray met nothing pickable here", {
-      pickables: this._pickBuf.length,
-      net: p ? (p.kind === "metanode" ? p.meta?.id : p.kind === "l0" || p.kind === "l1" ? "dag" : p.kind === "meta" ? p.cfg.id : undefined) : undefined,
-    });
-    // With nothing picked, resolve the drillable country under the cursor (geo only — the
-    // land-sphere hit is analytic; the Globe resolves WHICH country in its rotated frame).
-    let countryCc: string | null = null;
-    if (!p && VIEW_POLICIES[this.mode].countryHover && this.morph > 0.9) countryCc = this._countryUnderCursor();
-    // The SEMANTICS live in the pure, tested decision table (domain/pickActions) — what a
-    // click means per view × pick kind, including the ordering contracts. This handler only
-    // resolves inputs above and executes the actions below.
-    const st = useStore.getState();
-    // The two Snapshots subjects that resolve to a PAIR (a metagraph + a tick) have their own
-    // builders in the same table, because a single descriptor can't express both halves.
-    // A metagraph-snapshot TILE: commit the tile AND pin the global tick it anchored into.
-    if (p?.kind === "metaSnap") {
-      applyClickActions(
-        metaSnapSelectActions(p.sel, p.global, { metaSnap: st.metaSnap, following: st.following, inspect: st.inspect }),
-      );
-      return;
-    }
-    // A byte-bar BAND: the tick descriptor rides `userData.pick`, the band's metagraph key rides
-    // `userData.bandKey` on the same mesh (a band is a slice of a tick, not a subject of its own).
-    const bandKey = this._hitObj?.userData.bandKey as string | undefined;
-    if (p?.kind === "snapshot" && bandKey) {
-      applyClickActions(
-        bandSelectActions(bandKey, p, {
-          metaSnap: st.metaSnap,
-          hasInspect: st.inspect != null,
-          net: this._ledgerNet(),
-        }),
-      );
-      return;
-    }
-    applyClickActions(
-      clickActions({
-        mode: this.mode,
-        pick: p,
-        countryCc,
-        // Hyper's node ancestry (FULL-ANCESTRY rule): a node click commits the composition group
-        // it belongs to. The group is derivable from the node itself — its make-up IS the group
-        // key — so no list lookup.
-        compositionSel: this._compositionOf(p),
-        current: {
-          filter: st.filter,
-          country: st.country,
-          hasInspect: !!st.inspect,
-          cohort: this.cohortSel,
-          pinnedOrdinal: !st.following ? st.snap?.data?.ordinal ?? null : null,
-          metaSnap: st.metaSnap,
-          tickNet: st.tickNet,
-        },
-      }),
-    );
+    this.picking.click(e, say);
   }
 
   /** The network the LEDGER resolves against — `domain/tickNet.ledgerNetwork`, one home. */
