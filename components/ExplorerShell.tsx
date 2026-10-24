@@ -35,10 +35,12 @@ import { EXPLORE_ICON } from "@/components/icons";
 // `<Explorer` and that only `Explorer.tsx` renders this shell, so a future explorer can't
 // hand-roll its own chrome silently.
 /** The body's horizontal inset, and the bleed a full-width block inside it uses to cancel it (the
- *  explorer's control band and plate foot) — one pair, so the two can never drift (review,
- *  2026-10-24). Static strings: Tailwind reads them as written. */
-export const SHELL_INSET_X = "px-[14px]";
-export const SHELL_BLEED_X = "-mx-[14px]";
+ *  explorer's control band and plate foot) — ONE number, `--shell-inset`, set on the shell's root
+ *  and read by both utilities, so the pair cannot drift (review, 2026-10-24, twice). Static
+ *  strings: Tailwind reads them as written. */
+export const SHELL_INSET_VAR = "[--shell-inset:14px]"; // the ONE number, set on the body
+export const SHELL_INSET_X = "px-[var(--shell-inset)]";
+export const SHELL_BLEED_X = "-mx-[var(--shell-inset)]";
 
 export default function ExplorerShell({
   id,
@@ -76,7 +78,7 @@ export default function ExplorerShell({
   return (
     <Card
       asChild
-      className="sig-right flex flex-col flex-none gap-0 p-0 [--spine:var(--filter-accent,var(--primary))]"
+      className={cn("sig-right flex flex-col flex-none gap-0 p-0 [--spine:var(--filter-accent,var(--primary))]", SHELL_INSET_VAR)}
     >
       <aside id={id}>
         <CardHead
@@ -88,7 +90,7 @@ export default function ExplorerShell({
         />
         <div className="flex flex-col">
           {hint != null && (
-            <div className="pt-2 px-4 pb-1 text-label text-muted-foreground">{hint}</div>
+            <div className={cn("pt-2 pb-1 text-label text-muted-foreground", SHELL_INSET_X)}>{hint}</div>
           )}
           <div className={cn("flex flex-col pt-1.5 pb-2", SHELL_INSET_X)} onMouseLeave={onLeave}>
             {children}

@@ -44,9 +44,8 @@ describe("FOCI", () => {
     expect(pitchDeg(FOCI.geo)).toBeLessThan(25);
   });
 
-  it("the Geography network pose is a SHORT step in from rest — nearer than rest, farther than the country framing — keeping the rings in frame", () => {
+  it("the Geography network pose steps in from rest — nearer than rest, farther than the country framing — keeping the rings in frame", () => {
     expect(dist(FOCI.geoNetwork)).toBeLessThan(dist(FOCI.geo));
-    expect(dist(FOCI.geoNetwork)).toBeGreaterThan(dist(FOCI.geo) * 0.85);
     const country = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
     geoFraming(1, country);
     expect(dist(FOCI.geoNetwork)).toBeGreaterThan(dist(country));

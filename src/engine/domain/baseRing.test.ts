@@ -111,3 +111,12 @@ describe("ringWedge — the pie fills the level that names the subject (user, 20
     expect(ringWedge(2, "dim", true, false)).toBe("dim");
   });
 });
+
+describe("ringLevels is deterministic — the adapter's rebuild diff keeps an arc whose angles did not move", () => {
+  it("the same input yields the same angles, exactly", () => {
+    const a = ringLevels(nets, "dag"), b = ringLevels(nets, "dag");
+    for (const level of ["countries", "providers", "networks"] as const) {
+      expect(a[level].map((s) => [s.from, s.to])).toEqual(b[level].map((s) => [s.from, s.to]));
+    }
+  });
+});

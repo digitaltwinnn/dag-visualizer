@@ -169,6 +169,10 @@ export interface RingHost {
 /** An angle folded into (−π, π], so its distance to 0 is its magnitude. Module-scope: read per frame. */
 const wrapAngle = (x: number): number => Math.atan2(Math.sin(x), Math.cos(x));
 
+/** Two angles the eye cannot tell apart — the rebuild diff's "unchanged" test, so float noise in
+ *  a partition can never silently fall back to a full dispose-and-rebuild. */
+const near = (a: number, b: number): boolean => Math.abs(a - b) < 1e-6;
+
 const arcKey = (level: number, seg: RingSegment): string => `${level}|${seg.cc ?? ""}|${seg.isp ?? ""}|${seg.net ?? ""}`;
 
 interface Arc {
@@ -272,6 +276,7 @@ export class BaseRing {
   private setSegments(entries: readonly { seg: RingSegment; level: number }[]): void {
     this.ensureTicks();
     this._anchorFor = null; // the callout's cached anchor re-resolves against the new arcs
+    this._anchorArc = null;
     // A REBUILD IS A DIFF (review, 2026-10-24 — the first cut disposed and recreated every arc on
     // every data poll and carried presence across by key): an arc whose level, angles and hue are
     // unchanged KEEPS its meshes, materials, fade entries and eased presence; only an arc that
@@ -285,7 +290,7 @@ export class BaseRing {
       const span = seg.to - seg.from;
       if (!(span > 0)) continue;
       const prev = prevByKey.get(arcKey(level, seg));
-      if (prev && prev.seg.from === seg.from && prev.seg.to === seg.to && prev.seg.color === seg.color) {
+      if (prev && near(prev.seg.from, seg.from) && near(prev.seg.to, seg.to) && prev.seg.color === seg.color) {
         prev.seg = seg; // counts and shares may have moved; the picture has not
         kept.add(prev);
         next.push(prev);
@@ -415,21 +420,24 @@ export class BaseRing {
    *  False while the ring holds no arc of it (no located participants, the unlisted set, data not
    *  yet in). No allocation: a scan over the arcs. */
   networkAnchor(id: string, out: THREE.Vector3): boolean {
-    // Cached per rebuild and id (review, 2026-10-24): the scan below ran every frame a network was
-    // committed; the arcs only change in setSegments, which clears the cache.
-    if (this._anchorFor === id) {
-      if (this._anchorOk) out.copy(this._anchor);
-      return this._anchorOk;
+    // The ARC and its ANGLE are cached per rebuild and id (review, 2026-10-24: the scan ran every
+    // frame a network was committed); the arc's lift is read LIVE, because the arrival beat moves
+    // it every frame and a cached height left the leader floating until the next poll (follow-up
+    // review, same day). setSegments clears the cache when the arcs change.
+    if (this._anchorFor !== id) {
+      this._anchorFor = id;
+      this._anchorArc = this._resolveAnchor(id);
     }
-    this._anchorFor = id;
-    this._anchorOk = this._resolveAnchor(id, this._anchor);
-    if (this._anchorOk) out.copy(this._anchor);
-    return this._anchorOk;
+    const a = this._anchorArc;
+    if (!a) return false;
+    const r = RING_RADII[2];
+    out.set(Math.cos(this._anchorAngle) * r, Math.sin(this._anchorAngle) * r, a.mesh.position.z);
+    return true;
   }
   private _anchorFor: string | null = null;
-  private _anchorOk = false;
-  private readonly _anchor = new THREE.Vector3();
-  private _resolveAnchor(id: string, out: THREE.Vector3): boolean {
+  private _anchorArc: Arc | null = null;
+  private _anchorAngle = 0;
+  private _resolveAnchor(id: string): Arc | null {
     let best: Arc | null = null;
     let bestAngle = 0;
     let bestDist = Infinity;
@@ -442,10 +450,8 @@ export class BaseRing {
       const dist = Math.abs(wrapAngle(ang));
       if (dist < bestDist) { bestDist = dist; bestAngle = ang; best = a; }
     }
-    if (!best) return false;
-    const r = RING_RADII[2];
-    out.set(Math.cos(bestAngle) * r, Math.sin(bestAngle) * r, best.mesh.position.z);
-    return true;
+    this._anchorAngle = bestAngle;
+    return best;
   }
 
   private targetOf(a: Arc): number {

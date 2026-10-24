@@ -28,10 +28,14 @@ describe("STAGE_LIGHTS", () => {
     expect(h.angleNode!).toBeLessThan(h.angle);
   });
 
-  it("every row is a live lamp: a positive cone, distance, intensity and height, the cone inside a hemisphere", () => {
+  it("every row is a live lamp: a positive cone, distance, intensity and height, the cone inside a hemisphere, a penumbra in [0, 1]", () => {
     for (const [view, row] of Object.entries(STAGE_LIGHT_DEFAULTS)) {
-      for (const [k, v] of Object.entries(row)) expect(v, `${view}.${k}`).toBeGreaterThan(0);
+      for (const k of ["angle", "distance", "intensity", "height"] as const) expect(row[k], `${view}.${k}`).toBeGreaterThan(0);
       expect(row.angle, `${view} cone`).toBeLessThan(Math.PI / 2);
+      if (row.penumbra != null) {
+        expect(row.penumbra, `${view} penumbra`).toBeGreaterThanOrEqual(0); // 0 is a hard edge, a legitimate lamp
+        expect(row.penumbra, `${view} penumbra`).toBeLessThanOrEqual(1);
+      }
     }
   });
 

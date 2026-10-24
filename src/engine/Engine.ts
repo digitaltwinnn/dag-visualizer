@@ -167,10 +167,6 @@ export class Engine {
   // reads it for camera resolution).
   private cohortSel: CohortSel | null = null;
   private morph = 0; // 0 = hypergraph, 1 = globe (eased each frame)
-  // The mesh that produced the LAST pick returned by `_pickAt` (null when nothing was picked).
-  // Some ledger subjects carry a second fact on the hit object itself rather than in the descriptor
-  // — a byte-bar band's `userData.bandKey` beside its tick `userData.pick` — and the click handler
-  // needs both. Event-time only; never read from the render loop.
   private _hyperSpinY = 0; // shared hyper-structure spin angle (globe group + root + core, in lockstep)
   // The shared structure TILT, eased per frame: HYPER_TILT at rest → HYPER_TILT_FOCUS while a
   // metagraph is committed (the structure flattens so the side-on hub pose sees horizontal discs).
@@ -379,7 +375,6 @@ export class Engine {
     }
     this._lastTap = now;
   };
-  // Reused pickables buffer (never re-allocated) — `_pickablesFor` runs on every pointermove.
 
   private unsub: Array<() => void> = [];
   private metaTimer: ReturnType<typeof setInterval> | undefined;

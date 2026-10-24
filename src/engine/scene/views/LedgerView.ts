@@ -245,7 +245,7 @@ export class LedgerView implements SceneView {
 
   // ── floors (visual aid since 2026-08-06 — never pick SUBJECTS, but since 2026-08-07 they are
   // pick BLOCKERS: a normal surface swallows the ray, so a bar under the metagraph floor can't
-  // be hovered/clicked through the glass — see Engine._pickAt's `userData.blocker` rule).
+  // be hovered/clicked through the glass — see Picking's `userData.blocker` rule).
   // `minHalf` clamps the rim width on the narrow gutter piece so the band can't swallow the
   // whole plane.
   private _floorBlockers: THREE.Object3D[] = [];
