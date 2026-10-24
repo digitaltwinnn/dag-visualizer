@@ -3,6 +3,7 @@ import { METAGRAPHS } from "@/src/net/current";
 import { R, LAND_H } from "../../domain/geoLayout";
 import { ringPresence, type RingLevels, type RingSegment, type RingTier } from "../../domain/baseRing";
 import { FOCUS_TUNE } from "../../domain/dimModel";
+import { joinBloom } from "../SceneContext";
 
 // THE BASE RING ADAPTER — one flat arc mesh per network on the globe's base plane, the located
 // fleet's share by network (`domain/baseRing.ts` does the arithmetic; this file owns the meshes).
@@ -27,7 +28,15 @@ import { FOCUS_TUNE } from "../../domain/dimModel";
  *  silhouette: the base plane under the globe itself is hidden, so a ring at less than R would
  *  never be seen. */
 export const RING_RADII = [R * 1.08, R * 1.02, R * 0.96] as const;
-export const RING_WIDTHS = [R * 0.02, R * 0.016, R * 0.013] as const;
+/** HAIRLINES for the country and provider rings, a BAND for the network ring (user, 2026-10-24:
+ *  "add the hairline effect (like left / right rails sections). Also the metagraph circle needs
+ *  to be more bright and bloom (like the nodes and arcs)"): the two outer levels are rulers, the
+ *  inner one is the identity reading, so it alone is a bloomed band at the nodes' own weight. */
+export const RING_WIDTHS = [R * 0.005, R * 0.005, R * 0.03] as const;
+/** The country ring's hit strip: a hairline cannot be aimed at, so an invisible band under it picks. */
+export const RING_PICK_WIDTH = R * 0.05;
+/** The network ring's presence over the hairlines' — it is a bloomed mark, the others are rulers. */
+export const NET_RING_BOOST = 2.6;
 /** A STAND under the globe, not a hoop through its base (user, 2026-10-23: at the rest pose "it
  *  looks like our angle is a bit unusual or the circle is strangely positioned" — the base
  *  plane's ellipse centred on the silhouette's bottom edge and cut it). Dropped so the ellipse
@@ -97,7 +106,7 @@ export interface RingHost {
   accent: () => number;
 }
 
-interface Arc { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; seg: RingSegment; fade: FadeEntry; target: number }
+interface Arc { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; seg: RingSegment; level: number; fade: FadeEntry; target: number }
 
 export class BaseRing {
   readonly group = new THREE.Group();
@@ -105,6 +114,8 @@ export class BaseRing {
    *  the Engine's pick gathering. */
   readonly pickables: THREE.Object3D[] = [];
   private arcs: Arc[] = [];
+  /** The country ring's invisible hit strips, disposed with the arcs. */
+  private strips: THREE.Mesh[] = [];
   private sel = "all";
   private cc: string | null = null;
   /** The camera's world position, shared by every arc's shader; written per frame in `update`. */
@@ -137,6 +148,12 @@ export class BaseRing {
       if (ti >= 0) this.host.geoTints.splice(ti, 1);
     }
     this.arcs = [];
+    for (const s of this.strips) {
+      this.group.remove(s);
+      s.geometry.dispose();
+      (s.material as THREE.Material).dispose();
+    }
+    this.strips = [];
     this.pickables.length = 0;
     for (const { seg, level } of entries) {
       const span = seg.to - seg.from;
@@ -159,20 +176,29 @@ export class BaseRing {
       this.host.geoFades.push(fade);
       const mesh = new THREE.Mesh(geo, mat);
       // The outer ring picks as the COUNTRY (`userData.country`, the Engine routes it through the
-      // same hover channel and click arm the land under the cursor takes); the inner ring as the
-      // NETWORK, through the hub's own descriptor. A provider arc has no route of its own yet (the
+      // same hover channel and click arm the land under the cursor takes) — on an INVISIBLE strip
+      // under the hairline, since a hairline cannot be aimed at; the inner ring as the NETWORK,
+      // through the hub's own descriptor. A provider arc has no route of its own yet (the
       // explorer's cohort rows are its door), so it does not pick.
       if (level === 0 && seg.cc) {
-        mesh.userData.country = seg.cc;
-        this.pickables.push(mesh);
+        const strip = new THREE.Mesh(
+          new THREE.RingGeometry(radius - RING_PICK_WIDTH, radius + RING_PICK_WIDTH * 0.3, Math.max(4, Math.ceil(span * SEGMENTS_PER_RAD)), 1, seg.from, span),
+          new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false, side: THREE.DoubleSide }),
+        );
+        strip.userData.country = seg.cc;
+        this.group.add(strip);
+        this.pickables.push(strip);
+        this.strips.push(strip);
       }
       const cfg = level === 2 && seg.net ? METAGRAPHS.find((c) => c.id === seg.net) : undefined;
       if (cfg) {
         mesh.userData.pick = { kind: "meta", cfg };
         this.pickables.push(mesh);
       }
+      if (level === 2) joinBloom(mesh); // the identity reading glows like the chips it counts
       this.group.add(mesh);
-      this.arcs.push({ mesh, mat, seg, fade, target: tierPresence(ringPresence(seg, null, this.sel, this.cc)) });
+      this.arcs.push({ mesh, mat, seg, level, fade, target: 0 });
+      this.arcs[this.arcs.length - 1]!.target = this.targetOf(this.arcs[this.arcs.length - 1]!);
     }
   }
 
@@ -188,8 +214,12 @@ export class BaseRing {
     this.retarget();
   }
 
+  private targetOf(a: Arc): number {
+    return tierPresence(ringPresence(a.seg, null, this.sel, this.cc)) * (a.level === 2 ? NET_RING_BOOST : 1);
+  }
+
   private retarget(): void {
-    for (const a of this.arcs) a.target = tierPresence(ringPresence(a.seg, null, this.sel, this.cc));
+    for (const a of this.arcs) a.target = this.targetOf(a);
   }
 
   /** Per frame: ease each arc's presence toward its target. The Globe's fade loop turns `base`

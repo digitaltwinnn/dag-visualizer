@@ -604,7 +604,11 @@ export default function LedgerPanel() {
       title="Snapshots"
       // The sentence is the path's own placeholder now (user, 2026-10-08): one line beside the house.
       hint={null}
-      placeholder="Select a snapshot to view its anchors."
+      // The sentence names the NEXT LEVEL, never a measure (user, 2026-10-24: "the hint in the
+      // breadcrumb always refers to anchors, it should refer to the selected control button" —
+      // "anchors" is also a tile's name, so under Fees it read as stale; the networks that
+      // anchored are what a snapshot row opens whatever the figure column shows).
+      placeholder="Select a snapshot to view the networks that anchored into it."
       levels={levels}
       onLeave={() => {
         // Container-level hover backstop: leaving the card clears every channel its rows write.
