@@ -894,9 +894,10 @@ export class HyperView implements SceneView {
       // fainter tether — present in the architecture, but clearly not live.
       // When a metagraph is selected (focusId), dim the OTHER hubs *subtly* — a gentle
       // out-of-focus push (DoF + camera focus already carry most of the emphasis).
-      const focusOther =
-        (this.focusId != null && m.cfg.id !== this.focusId) ||
-        (previewHub != null && m.cfg.id !== previewHub);
+      // The hover WINS over the commit, as the chips' selector does (Globe._selector): a hovered B
+      // under a committed A lights B and dims A, never both.
+      const other = previewHub ?? this.focusId;
+      const focusOther = other != null && m.cfg.id !== other;
       const fdim = focusOther ? hubOffMul : 1; // glow / tether
       // Inactive (node-less) metagraphs read as present-but-quiet — dimmer than active, but NOT
       // buried (user: decrease the inactive dim); their rings are all-dotted (setHoopPresence).

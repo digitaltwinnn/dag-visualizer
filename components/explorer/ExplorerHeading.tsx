@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 
-import { MEASURE_ICONS } from "@/components/icons";
+import { measureIcon } from "@/components/icons";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 
@@ -63,7 +63,7 @@ export function MeasureTiles({ measure }: { measure: MeasureControl }) {
       className={cn("grid w-auto gap-1 rounded-none", n === 4 ? "grid-cols-2" : "grid-cols-3")}
     >
       {measure.options.map((o) => {
-        const Icon = MEASURE_ICONS[o.id];
+        const Icon = measureIcon(o.id);
         return (
           <ToggleGroupItem
             key={o.id}

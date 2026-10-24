@@ -4,10 +4,12 @@ import { R, LAND_H } from "../../domain/geoLayout";
 import { ringPresence, type RingLevels, type RingSegment, type RingTier } from "../../domain/baseRing";
 import { FOCUS_TUNE } from "../../domain/dimModel";
 import { joinBloom } from "../SceneContext";
-import { ENTRY_FALL, entryStep } from "../../domain/entryBeat";
+import { entryStep, entryTotal } from "../../domain/entryBeat";
+import { hookOcclusion } from "../occlusion";
 
-// THE BASE RING ADAPTER — one flat arc mesh per network on the globe's base plane, the located
-// fleet's share by network (`domain/baseRing.ts` does the arithmetic; this file owns the meshes).
+// THE BASE RING ADAPTER — three nested rings of flat arcs on a plane under the globe, the located
+// fleet by country, provider and network (`domain/baseRing.ts` does the arithmetic; this file owns
+// the meshes, the pie wedges under them, the ruler's ticks and the arrival beat).
 // Design A of the brainstorm's `globe-ring.html` (user, 2026-10-23). Three decisions carry it:
 //   · IT DOES NOT SPIN WITH THE GLOBE. The globe's `group` turns to face a selection; a chart that
 //     turned with it would read as geography. The ring's group is the Globe's sibling in the
@@ -18,22 +20,22 @@ import { ENTRY_FALL, entryStep } from "../../domain/entryBeat";
 //     mask on Print), exactly like the compass rose and the graticule. The DAG remainder wears the
 //     structural accent through `geoTints`, so a theme flip retints it with the rest.
 //   · HOVER PREVIEWS, THE FILTER COMMITS, through the channels the chips already read: the Globe's
-//     `_applyDim` hands the ring the same selector it hands the chips, and each arc carries the
-//     hub's own pick descriptor (`kind: "meta"`), so hovering an arc writes `hoverFilter` and a
-//     click runs the filter commit the decision table already has — no new channel, no new arm.
+//     `_applyDim` hands the ring the same selector it hands the chips; a network arc (and its
+//     wedge) carries the hub's own pick descriptor (`kind: "meta"`), a country arc's hit strip
+//     (and wedge) the country code, so hovering an arc writes the channel its row would write and
+//     a click runs the commit the decision table already has — no new channel, no new arm.
 // Event-time rebuilds (a data arrival, a retint) dispose and rebuild the meshes; the per-frame
 // `update` only eases each entry's `base` toward its presence target — no allocation.
 
 /** THREE NESTED RINGS, outer to inner: countries, providers, networks — the Geography explorer's
- *  own ladder, denser toward the centre (user, 2026-10-23). They nest just OUTSIDE the globe's
- *  silhouette: the base plane under the globe itself is hidden, so a ring at less than R would
- *  never be seen. */
+ *  own ladder, denser toward the centre (user, 2026-10-23). A stand a little below the globe
+ *  (`RING_Y`), so the whole disc is in view and its far half passes behind the body. */
 export const RING_RADII = [R * 0.85, R * 0.815, R * 0.78] as const; // 15% smaller again and the rings closer (user, 2026-10-24)
 /** HAIRLINES for the country and provider rings, a BAND for the network ring (user, 2026-10-24:
  *  "add the hairline effect (like left / right rails sections). Also the metagraph circle needs
  *  to be more bright and bloom (like the nodes and arcs)"): the two outer levels are rulers, the
  *  inner one is the identity reading, so it alone is a bloomed band at the nodes' own weight. */
-export const RING_WIDTHS = [R * 0.005, R * 0.011, R * 0.02] as const; // the inner band thinner (user, 2026-10-24) // the OUTER ring alone is the hairline (user, 2026-10-24); the provider ring is a thin band
+export const RING_WIDTHS = [R * 0.005, R * 0.011, R * 0.02] as const; // hairline, thin band, band (user, 2026-10-24)
 /** The country ring's hit strip: a hairline cannot be aimed at, so an invisible band ABOUT it picks —
  *  narrow and symmetric, so it never reaches the provider ring inside it (user, 2026-10-24: "the
  *  inner 2 rings have finger pointer" — the first strip ran inward over the provider ring). */
@@ -53,32 +55,31 @@ export const RULER_PRESENCE_PAPER = 0.85; // 0.4 was "almost invisible" on Print
 
 /** THE PIE FILL (user, 2026-10-24: "when we hover or select a subject, can we show the selected
  *  section of the rings by making it look like a pie-chart? … that part of the circle also with a
- *  subtle fill"): a LIT arc fills the wedge from the centre to its ring, in the arc's own hue on the
- *  network level and the accent on the two rulers, at a faint presence; at rest and dimmed the
- *  wedge is nothing. The three levels' wedges stack, so a subject reads as a pie slice that
- *  brightens toward the centre where its three readings agree. */
+ *  subtle fill"): the level naming the subject fills its wedges from the centre to its ring — in
+ *  the arc's own hue on the network level, the accent on the country ruler — resting faint, a
+ *  hovered slice brighter, a dimmed slice fainter still. */
 /** The pie wedge's presence under a HOVERED subject (user, 2026-10-24: "more visible when hover,
  *  and less visible when the filter is active" — a committed network re-partitions the whole ring,
  *  so its wedge is the whole disc; it rests, see `targetOf`). */
 export const WEDGE_PRESENCE_DARK = 0.065; // 0.14 → 0.09 → 0.065 (user: the hover "too strong", then "reduce it a bit more")
 export const WEDGE_PRESENCE_PAPER = 0.12; // 0.22 → 0.16 → 0.12, the same steps
-/** The pie is READABLE AT REST too (user, 2026-10-24: "when at rest the pie is not very visible"):
- *  every slice of the level naming the subject sits at this fraction, a dim slice lower still, so
- *  a hover reads as one slice coming up out of a quiet pie rather than appearing from nothing. */
-export const WEDGE_REST_MUL = 0.55; // re-derived with each hover step so the resting pie keeps its 0.066 ink
-/** …but the DARK ground rests lower: additive light over black reads at a fraction of the ink the
- *  same weight lays on paper (user, 2026-10-24: "while normal ok for light but in dark its too
- *  much now"). The hover and commit weights are shared; only the quiet pie differs by ground. */
-export const WEDGE_REST_MUL_DARK = 0.3; // re-derived with each hover step so the resting pie keeps its 0.02 light (user: "increase rest fill just a bit")
+/** The pie is READABLE AT REST too (user, 2026-10-24: "when at rest the pie is not very visible"),
+ *  and the RESTING PRESENCE is the invariant — stated per ground, because additive light over
+ *  black reads at a fraction of the ink the same number lays on paper (user: "ok for light but in
+ *  dark it's too much"; then "increase rest fill just a bit"). A hover retune leaves these alone;
+ *  `targetOf` derives the resting weight as rest / hover. A dimmed slice is a share of the hover. */
+export const WEDGE_REST_DARK = 0.02;
+export const WEDGE_REST_PAPER = 0.066;
 export const WEDGE_DIM_MUL = 0.12;
 
 /** THE ARRIVAL DROP (user, 2026-10-24: the rings "appear staggered and with the same timing as
- *  the snapshot view's actual snapshots"): every arc is held this high and dark through the
- *  choreography and falls to the stand on the chamber's own beat (`domain/entryBeat.ts`), one arc
- *  after another around the ring, the outer ruler first and the bloomed network band last. */
+ *  the snapshot view's actual snapshots"): every ring is held this high and dark through the
+ *  choreography and falls to the stand on the chamber's own beat (`domain/entryBeat.ts`), outer
+ *  ring first and the bloomed network band last, every arc of a ring together. */
 /** The arrival beat's stagger between the three rings, outer to inner — three beats, not one per
  *  arc (see `applyEntry`). */
 export const RING_ENTRY_STAG = 0.12;
+const RING_ENTRY_TOTAL = entryTotal(RING_RADII.length, RING_ENTRY_STAG);
 export const RING_ENTRY_H = 2.4;
 
 /** The network ring's presence over the rulers' — it is a bloomed mark AT REST, not only when a
@@ -153,44 +154,6 @@ function arcGeometry(r0: number, r1: number, from: number, to: number, gapW: num
   g.setIndex(idx);
   return g;
 }
-/** The occluding body: the globe's plateau radius, with a soft rim either side. */
-const OCCLUDER_R = R + LAND_H;
-const OCCLUDER_SOFT_IN = 0.9;
-const OCCLUDER_SOFT_OUT = 0.4;
-
-/** FADED WHERE THE GLOBE STANDS IN FRONT (user, 2026-10-23: "can you fade it when the globe sits
- *  in front? I believe this is also an issue with the arc animation"). The hologram globe is
- *  additive and never writes depth, so nothing behind it is depth-occluded; a hemisphere "facing"
- *  fade (the arcs' `uCamN`) is wrong for a ring that lies OUTSIDE the sphere — a point on the far
- *  side is still in plain view beside the silhouette. So the fragment asks the exact question: does
- *  the line of sight from the camera to this fragment pass through the globe? The closest approach
- *  of that segment to the globe's centre (the origin) against the plateau radius, smoothed over a
- *  short rim, is the fragment's alpha. One uniform, the camera's world position, copied per frame. */
-function hookOcclusion(mat: THREE.Material, uCam: THREE.Vector3): void {
-  mat.onBeforeCompile = (sh) => {
-    sh.uniforms.uCam = { value: uCam };
-    sh.uniforms.uOccR = { value: OCCLUDER_R };
-    sh.vertexShader = sh.vertexShader
-      .replace("#include <common>", "varying vec3 vWorld;\n#include <common>")
-      .replace("#include <project_vertex>", "#include <project_vertex>\nvWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;");
-    sh.fragmentShader = sh.fragmentShader
-      .replace("#include <common>", "uniform vec3 uCam; uniform float uOccR; varying vec3 vWorld;\n#include <common>")
-      .replace(
-        "#include <alphamap_fragment>",
-        `#include <alphamap_fragment>
-{
-  vec3 d = vWorld - uCam;
-  float L = length(d);
-  vec3 dir = d / max(L, 1e-5);
-  float t = clamp(dot(-uCam, dir), 0.0, L);
-  float dist = length(uCam + dir * t);
-  diffuseColor.a *= smoothstep(uOccR - ${OCCLUDER_SOFT_IN.toFixed(2)}, uOccR + ${OCCLUDER_SOFT_OUT.toFixed(2)}, dist);
-}`,
-      );
-  };
-  mat.customProgramCacheKey = () => "baseRing-occluded";
-}
-
 interface FadeEntry { mat: THREE.Material & { opacity: number }; base: number; paperBase?: number }
 export interface RingHost {
   geoFades: FadeEntry[];
@@ -225,7 +188,6 @@ export class BaseRing {
   private ccPreview = false;
   private _entryT = 1;
   private _entryHold = false;
-  private _entryTotal = 1;
   private _ticksMul = 1;
   private _ticks: THREE.LineSegments | null = null;
   private _tickFade: FadeEntry | null = null;
@@ -338,17 +300,7 @@ export class BaseRing {
       const radius = RING_RADII[level] ?? RING_RADII[2];
       const width = RING_WIDTHS[level] ?? RING_WIDTHS[2];
       const geo = arcGeometry(radius - width, radius, seg.from, seg.to, RING_GAP_W, 2);
-      const mat = new THREE.MeshBasicMaterial({
-        color: seg.color ?? this.host.accent(),
-        transparent: true,
-        opacity: 0,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      });
-      mat.blending = this.host.blending();
-      hookOcclusion(mat, this.uCam);
-      this.host.geoBlends.push(mat);
-      if (seg.color == null) this.host.geoTints.push(mat.color);
+      const mat = this._furnitureMat(seg.color);
       const fade: FadeEntry = { mat, base: 0, paperBase: 0 };
       this.host.geoFades.push(fade);
       const mesh = new THREE.Mesh(geo, mat);
@@ -376,10 +328,7 @@ export class BaseRing {
       if (level === 2) joinBloom(mesh); // the identity reading glows like the chips it counts
       this.group.add(mesh);
       // The wedge: centre → the ring's inner edge, same arc, same hue, its own faint fade.
-      const wedgeMat = new THREE.MeshBasicMaterial({ color: seg.color ?? this.host.accent(), transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
-      wedgeMat.blending = this.host.blending();
-      this.host.geoBlends.push(wedgeMat);
-      if (seg.color == null) this.host.geoTints.push(wedgeMat.color);
+      const wedgeMat = this._furnitureMat(seg.color);
       const wedgeFade: FadeEntry = { mat: wedgeMat, base: 0, paperBase: 0 };
       this.host.geoFades.push(wedgeFade);
       // The slice closes where the stripe is all of it: r = gapW / span, never the centre.
@@ -409,6 +358,17 @@ export class BaseRing {
       this.arcs.push({ mesh, mat, seg, level, fade, target: 0, paperTarget: 0, entryMul: prev ? prev.entryMul : this._entryT >= 1 ? 1 : 0, wedge, wedgeFade, wedgeOn: 0, wedgeOnDark: 0 });
       this.arcs[this.arcs.length - 1]!.target = this.targetOf(this.arcs[this.arcs.length - 1]!);
     }
+  }
+
+  /** One recipe for every arc and wedge (review, 2026-10-24): the ground's blend, the exact
+   *  occlusion, the structural accent through `geoTints` where the segment has no hue of its own. */
+  private _furnitureMat(color: number | null | undefined): THREE.MeshBasicMaterial {
+    const mat = new THREE.MeshBasicMaterial({ color: color ?? this.host.accent(), transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+    mat.blending = this.host.blending();
+    hookOcclusion(mat, this.uCam);
+    this.host.geoBlends.push(mat);
+    if (color == null) this.host.geoTints.push(mat.color);
+    return mat;
   }
 
   /** The chips' own selector — the hover when there is one, else the committed filter.
@@ -469,8 +429,8 @@ export class BaseRing {
     // when filtered but keep the circle effect as is"): the arcs take the lit/dim tiers, the pie
     // under a committed subject rests — only a HOVER raises a slice.
     const lit = !pieLevel ? 0 : tier === "lit" ? (preview ? 1 : -1) : tier === "dim" ? WEDGE_DIM_MUL : -1;
-    a.wedgeOn = lit < 0 ? WEDGE_REST_MUL : lit;
-    a.wedgeOnDark = lit < 0 ? WEDGE_REST_MUL_DARK : lit;
+    a.wedgeOn = lit < 0 ? WEDGE_REST_PAPER / WEDGE_PRESENCE_PAPER : lit;
+    a.wedgeOnDark = lit < 0 ? WEDGE_REST_DARK / WEDGE_PRESENCE_DARK : lit;
     a.paperTarget = paperPresence(tier, a.level === 2);
     return Math.min(0.62, tierPresence(tier) * (a.level === 2 ? NET_RING_BOOST : 1));
   }
@@ -486,11 +446,8 @@ export class BaseRing {
     // The arrival beat (see beginEntry): held while the transition runs, then the staggered drop;
     // parked at 1 in steady state, where this block costs nothing.
     if (this._entryT < 1) {
-      if (!this._entryHold) {
-        this._entryTotal = ENTRY_FALL + RING_ENTRY_STAG * (RING_RADII.length - 1);
-        this._entryT = Math.min(1, this._entryT + dt / this._entryTotal);
-      }
-      this.applyEntry(this._entryT * this._entryTotal);
+      if (!this._entryHold) this._entryT = Math.min(1, this._entryT + dt / RING_ENTRY_TOTAL);
+      this.applyEntry(this._entryT * RING_ENTRY_TOTAL);
       if (this._tickFade) {
         this._tickFade.base = RULER_PRESENCE_DARK * this._ticksMul;
         this._tickFade.paperBase = RULER_PRESENCE_PAPER * this._ticksMul;

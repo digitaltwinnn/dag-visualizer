@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { levelMeasure, levelOptions, listReading } from "@/src/data/explorerMeasure";
+import { levelMeasure, levelOptions, listTotal } from "@/src/data/explorerMeasure";
 
 // ONE VOCABULARY PER EXPLORER, EACH LEVEL A SUBSET OF IT (user, 2026-09-29: "I would expect the
 // values to be exactly the same for each level, but to only exclude the ones not relevant for that
@@ -22,10 +22,9 @@ describe("levelOptions / levelMeasure", () => {
   });
 });
 
-describe("listReading — the explorer foot's total or average", () => {
-  it("totals rows that add up, averages rows that overlap, and reads nothing from an empty list", () => {
-    expect(listReading([37, 36, 20, 2, 1], true)).toEqual({ word: "total", value: 96 });
-    expect(listReading([3, 2, 1], false)).toEqual({ word: "average", value: 2 });
-    expect(listReading([], true)).toBeNull();
+describe("listTotal — the explorer foot's total", () => {
+  it("sums the rows and reads nothing from an empty list", () => {
+    expect(listTotal([37, 36, 20, 2, 1])).toBe(96);
+    expect(listTotal([])).toBeNull();
   });
 });

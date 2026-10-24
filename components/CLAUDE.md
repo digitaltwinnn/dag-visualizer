@@ -1193,10 +1193,11 @@ inline in the return would quietly restore the bug for every consumer at once.
   a horizontal flick anywhere on the card steps the measure, and **‹ › on the front card's side
   edges step it on every tier** — pills that NAME the measure they step to ("‹ SNAPSHOTS", "FEES ›",
   user 2026-10-19), a dimmed bare chevron at an end): a flick along one
-  axis — up/down WALK THE WHOLE STACK (2026-10-18, user: "it should rotate up or down through the
-  whole stack"; `planeStep` — one step along the roster from the front, wrapping, whatever card
-  the finger was on; the first cut stepped to "the card behind the front", which after a re-deal
-  is always the rank-0 card, so two cards toggled), left/right step the measure (the ↑/↓ keys'
+  axis — up/down TURN THE DECK (2026-10-24, `trendStack.rotateOrder`, store `trendRotation`:
+  the front card goes all the way to the back, or the back card comes to the front, whatever
+  card the finger was on; the roster walk it replaced focused the next card and the re-deal slid
+  the old front back one slot, which read as a shuffle — the rule is in
+  `src/engine/domain/CLAUDE.md`), left/right step the measure (the ↑/↓ keys'
   steps). The plot's HORIZONTAL drag
   stays the brush; a vertical-dominant gesture on the plot is the plane's and never brushes
   (`onTouchMoveCapture`/`onTouchEndCapture` stop it reaching the chart).

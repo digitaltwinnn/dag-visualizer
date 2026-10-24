@@ -1907,6 +1907,17 @@ export class Engine {
     useStore.getState().setLeaderboard({ countries });
   }
 
+  /** THE COUNTRY UNDER THE CURSOR with nothing picked (one home for the hover and the click,
+   *  review 2026-10-24): the base ring's country arc or wedge when the hit object carries one,
+   *  else the land under the ray — the sphere hit is analytic, and the Globe resolves WHICH
+   *  country in its rotated frame. Reads the raycaster as the pick left it. */
+  private _countryUnderCursor(): string | null {
+    const arcCc = this._hitObj?.userData.country as string | undefined;
+    if (arcCc) return arcCc;
+    const hit = this.raycaster.ray.intersectSphere(this._landSphere, this._landHit);
+    return hit ? this.globe.countryCcAtPoint(hit) : null;
+  }
+
   // ---- picking (ports ui.js _pick / _pickablesFor / _onClick) ----
   // Resolve the view policy's pick sources to the actual mesh pools. Unlisted sources / flat views
   // (empty pickSources) raycast nothing. Order is immaterial — the raycaster sorts hits by distance.
@@ -2037,11 +2048,8 @@ export class Engine {
     if (VIEW_POLICIES[this.mode].countryHover && this.morph > 0.9) {
       if (p && (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode")) {
         countryCc = p.geo?.cc ?? null;
-      } else if (!p && this._hitObj?.userData.country) {
-        countryCc = this._hitObj.userData.country as string; // the base ring's outer arc
       } else if (!p) {
-        const hit = this.raycaster.ray.intersectSphere(this._landSphere, this._landHit);
-        if (hit) countryCc = this.globe.countryCcAtPoint(hit);
+        countryCc = this._countryUnderCursor();
       }
     }
     if (countryCc) this.canvas.style.cursor = "pointer"; // the border preview invites the drill
@@ -2090,11 +2098,7 @@ export class Engine {
     // With nothing picked, resolve the drillable country under the cursor (geo only — the
     // land-sphere hit is analytic; the Globe resolves WHICH country in its rotated frame).
     let countryCc: string | null = null;
-    if (!p && VIEW_POLICIES[this.mode].countryHover && this.morph > 0.9) {
-      const arcCc = this._hitObj?.userData.country as string | undefined; // the base ring's outer arc
-      const hit = arcCc ? null : this.raycaster.ray.intersectSphere(this._landSphere, this._landHit);
-      countryCc = arcCc ?? (hit ? this.globe.countryCcAtPoint(hit) : null);
-    }
+    if (!p && VIEW_POLICIES[this.mode].countryHover && this.morph > 0.9) countryCc = this._countryUnderCursor();
     // The SEMANTICS live in the pure, tested decision table (domain/pickActions) — what a
     // click means per view × pick kind, including the ordering contracts. This handler only
     // resolves inputs above and executes the actions below.

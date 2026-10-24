@@ -6,16 +6,17 @@
 // `entryBeatBoundary.test.ts`); this says HOW a row falls once released: a gravity-eased drop
 // (p², accelerating into the plane — a drop, not a float), its brightness arriving early in its
 // own fall, rows staggered `ENTRY_STAG` apart. The chamber tuned the numbers on 2026-08-16; the
-// rings read the same ones, so the two instruments land to one beat.
+// rings share the fall and bring their own stagger (three rings, not fifty arcs), so the two
+// instruments land to one beat at one tempo.
 
 /** One row's fall, seconds. */
 export const ENTRY_FALL = 0.45;
 /** Between one row's start and the next's, seconds. */
 export const ENTRY_STAG = 0.04;
 
-/** The whole beat for `rows` staggered rows. */
-export function entryTotal(rows: number): number {
-  return ENTRY_FALL + ENTRY_STAG * Math.max(0, rows - 1);
+/** The whole beat for `rows` rows staggered `stag` apart. */
+export function entryTotal(rows: number, stag: number = ENTRY_STAG): number {
+  return ENTRY_FALL + stag * Math.max(0, rows - 1);
 }
 
 /** A row's state at `tSec` into the beat, its fall starting at `start`: `drop` is the share of the

@@ -29,9 +29,6 @@ export const HYPER_MEASURE_LABELS: Readonly<Record<HyperMeasure, string>> = {
   dl1: ROLE_SHORT.dl1,
 };
 
-/** Every Hypergraph measure adds up across rows: each is a count of participants (a machine on two
- *  networks is a node under each, the explorer's own unit), so the foot states the list's total. */
-export const HYPER_MEASURE_ADDITIVE: Readonly<Record<HyperMeasure, boolean>> = { nodes: true, l0: true, cl1: true, dl1: true };
 
 /** The heading control's list — every measure counts nodes. */
 export const HYPER_MEASURE_OPTIONS: readonly { id: HyperMeasure; label: string; unit: string }[] = HYPER_MEASURE_ORDER.map((id) => ({

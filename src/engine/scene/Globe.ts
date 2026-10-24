@@ -398,7 +398,7 @@ export class Globe implements GeoViewHost {
     // hence after it): the hologram has no opaque body sphere, so nothing depth-occludes a comet
     // flying over the far hemisphere — it has to fade itself, exactly like the walls and the
     // graticule do (user, 2026-08-01: "arcs are visible through the globe").
-    this.arcs.setFacing(this.facingUniform, this.closeUniform, { value: this._camL });
+    this.arcs.setCamera({ value: this._camL });
     this.arcs.setColors(this._colorsRef);
   }
 
@@ -800,11 +800,14 @@ export class Globe implements GeoViewHost {
    *  (`geoStats.countryTallies`): every `geoPrimary` validator under the DAG, every `geoPrimary`
    *  metagraph node under its network — a node is a participant, not a machine. */
   private _rebuildBaseRing(): void {
+    const machineOf = (pick: PickDescriptor, ip: string): RingMachine => {
+      const g = "geo" in pick ? pick.geo : undefined;
+      return { ip, cc: g?.cc || null, isp: g?.isp || null };
+    };
     const byMeta = new Map<string, RingMachine[]>();
     for (const r of this.metaNodes) {
       if (!(r.geoPrimary ?? true) || !r.metaId) continue;
-      const g = "geo" in r.pick ? r.pick.geo : undefined;
-      (byMeta.get(r.metaId) ?? byMeta.set(r.metaId, []).get(r.metaId)!).push({ ip: r.nodeId, cc: g?.cc || null, isp: g?.isp || null });
+      (byMeta.get(r.metaId) ?? byMeta.set(r.metaId, []).get(r.metaId)!).push(machineOf(r.pick, r.nodeId));
     }
     const nets: RingNet[] = this.metaList.map((m) => ({ id: m.id, color: m.color, machines: byMeta.get(m.id) ?? [] }));
     nets.push({
@@ -813,11 +816,7 @@ export class Globe implements GeoViewHost {
       // paper — not the structure ink (user, 2026-10-24: "the circle for day should be blue not
       // cyan, same as the node and arc colour"). The rulers above stay structure.
       color: this.sceneColors?.dag ?? this.geoColor,
-      machines: this.nodes.flatMap((u) => {
-        if (u.noGeo || !u.geoPrimary || !u.nodeId) return [];
-        const g = "geo" in u.pick ? u.pick.geo : undefined;
-        return [{ ip: u.nodeId, cc: g?.cc || null, isp: g?.isp || null }];
-      }),
+      machines: this.nodes.flatMap((u) => (u.noGeo || !u.geoPrimary || !u.nodeId ? [] : [machineOf(u.pick, u.nodeId)])),
     });
     this.baseRing.setLevels(ringLevels(nets, "dag", this.filter));
   }
@@ -1036,9 +1035,18 @@ export class Globe implements GeoViewHost {
   // node-coloured plane sitting on top of the sphere") — and answer it the way geo answers a
   // filter, the isolate (`hide`): an off-selector pool is gone, not dimmed.
   private _applyGlowFilter(): void {
-    const sel = this._hoverSel || this.filter;
+    const sel = this._selector();
     for (const m of this._densityGlow) m.visible = sel === "all" || m.userData.net === sel;
     this.arcs.setSelector(sel); // the packets take the same isolate (objects/Arcs.ts)
+  }
+
+  /** THE LIVE SELECTOR, one reading (review, 2026-10-24 — it was spelled in three places): the
+   *  hover preview while there is one, else the committed filter. `_previewing()` says which. */
+  private _selector(): string {
+    return this._hoverSel || this.filter;
+  }
+  private _previewing(): boolean {
+    return this._hoverSel != null;
   }
 
   // Isolate one network on the globe and dim the rest.
@@ -1047,7 +1055,7 @@ export class Globe implements GeoViewHost {
     this.countryFilter = null; // switching network clears the country drill-down
     this._activeCcsCache = null; // the drillable-country set follows the filter
     this._updateCountryBorder();
-    this._applyDim(this._hoverSel || sel, !!this._hoverSel); // a live hover preview survives a data rebuild's re-apply
+    this._applyDim(this._selector(), this._previewing()); // a live hover preview survives a data rebuild's re-apply
     this._relayoutGeo();
     this._applyGlowFilter(); // just show/hide the matching pools — no recluster
     this._rebuildBaseRing(); // the rings re-partition over the filtered fleet (domain/baseRing)
@@ -1057,7 +1065,7 @@ export class Globe implements GeoViewHost {
   // NOT commit `this.filter` or relayout geo — and the same per-view dim STRENGTH too.
   setHoverFilter(sel: string | null): void {
     this._hoverSel = sel;
-    this._applyDim(sel || this.filter, !!sel);
+    this._applyDim(this._selector(), this._previewing());
     this._applyGlowFilter(); // the density pools preview with the chips
   }
   /** The live hover preview's selector, so a data rebuild's own `setFilter` re-asserts it instead

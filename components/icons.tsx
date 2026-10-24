@@ -30,6 +30,10 @@ import {
 import type { NetworkId } from "@/src/engine/config";
 import type { Mode } from "@/src/store/store";
 import type { PickDescriptor } from "@/src/data/types";
+import type { TrendMetric } from "@/src/store/store";
+import type { HyperMeasure } from "@/src/data/hyperMeasure";
+import type { GeoMeasure } from "@/src/data/geoMeasure";
+import type { LedgerMeasure } from "@/src/data/ledgerMeasure";
 
 // ONE source of truth for the interface's VOCABULARY glyphs — each view kind → its lucide icon.
 // Consumed by the top-bar view switch (TopBar), the card-head kind marks (inspector/cards.tsx),
@@ -196,7 +200,11 @@ export function iconForPick(
  *  snapshot's boxes. Data and size (bytes) are the drive, not the state lane's database; nodes
  *  the honeycomb's hexagon — the geo view stacks them as cells — never the provider's server (a
  *  node is not its host). Continuity is the timer: seconds between snapshots. */
-export const MEASURE_ICONS: Readonly<Record<string, LucideIcon>> = {
+export type MeasureId = TrendMetric | HyperMeasure | GeoMeasure | LedgerMeasure;
+/** Typed on the four measure vocabularies (review, 2026-10-24), so a new measure id without a glyph
+ *  is a compile error here — the tune-schema idiom — while `measureIcon` keeps the lookup by the
+ *  option's string id lenient for the tiles. */
+export const MEASURE_ICONS: Readonly<Record<MeasureId, LucideIcon>> = {
   // History (`TrendMetric`)
   snapshots: Layers,
   blocks: Blocks,
@@ -216,3 +224,6 @@ export const MEASURE_ICONS: Readonly<Record<string, LucideIcon>> = {
   anchors: Boxes,
   size: HardDrive,
 };
+
+/** A measure option's glyph by its id — undefined for an id no vocabulary declares. */
+export const measureIcon = (id: string): LucideIcon | undefined => (MEASURE_ICONS as Readonly<Record<string, LucideIcon | undefined>>)[id];

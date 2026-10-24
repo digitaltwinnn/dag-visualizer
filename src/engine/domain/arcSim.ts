@@ -34,6 +34,9 @@ import { R, LAND_H } from "./geoLayout";
 
 // Travelling-packet arcs: each is a short comet that hops node -> node (js/globe.js:35-38).
 export const ARC_TAIL = 14; // points making up each comet (longer, smoother tail — user)
+/** Vertices one comet's trail takes in the shared LineSegments buffer: one span (two vertices)
+ *  between each pair of its points — the stride `vstart` steps by. */
+export const TRAIL_VERTS = (ARC_TAIL - 1) * 2;
 export const ARC_TAIL_FRAC = 0.42; // comet length as a fraction of its current arc (user-tuned)
 export const ARC_SAMPLES = 24; // bezier samples baked per hop
 
@@ -113,7 +116,7 @@ export class ArcSim {
     if (pts.length < 2) return;
 
     const N = Math.min(maxAgents, Math.max(6, Math.round(pts.length * 0.8)));
-    const vertsPer = (ARC_TAIL - 1) * 2; // LineSegments: one span = two vertices
+    const vertsPer = TRAIL_VERTS; // LineSegments: one span = two vertices
 
     for (let i = 0; i < N; i++) {
       const from = pts[(Math.random() * pts.length) | 0];

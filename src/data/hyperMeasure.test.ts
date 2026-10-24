@@ -5,7 +5,6 @@ import {  HYPER_MEASURE_LABELS,
   HYPER_MEASURE_ORDER,
   groupMeasure,
   networkMeasure,
-  HYPER_MEASURE_ADDITIVE,
 } from "./hyperMeasure";
 
 // The Hypergraph explorer's network-row figure (user, 2026-10-07 — the view is the architecture,
@@ -51,8 +50,3 @@ describe("groupMeasure — a composition row's figure, the network level's pick 
   });
 });
 
-describe("HYPER_MEASURE_ADDITIVE", () => {
-  it("every measure is a participant count, so every one adds up", () => {
-    expect(Object.values(HYPER_MEASURE_ADDITIVE).every(Boolean)).toBe(true);
-  });
-});

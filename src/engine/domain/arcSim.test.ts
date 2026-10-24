@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { ArcSim, arcCurve, ARC_SAMPLES, ARC_TAIL, ARC_TAIL_FRAC, type ArcAgent, type ArcEndpoint } from "./arcSim";
+import { ArcSim, arcCurve, ARC_SAMPLES, ARC_TAIL, ARC_TAIL_FRAC, type ArcAgent, type ArcEndpoint, TRAIL_VERTS } from "./arcSim";
 import { R, LAND_H } from "./geoLayout";
 
 function endpoint(x: number, y: number, z: number, index: number): ArcEndpoint {
@@ -9,6 +9,12 @@ function endpoint(x: number, y: number, z: number, index: number): ArcEndpoint {
 
 afterEach(() => {
   vi.restoreAllMocks();
+});
+
+describe("TRAIL_VERTS (the comet's stride in the shared LineSegments buffer)", () => {
+  it("is one span of two vertices between each pair of the comet's points", () => {
+    expect(TRAIL_VERTS).toBe((ARC_TAIL - 1) * 2);
+  });
 });
 
 describe("ARC_TAIL_FRAC (comet length as a fraction of its current hop; consumed by scene/objects/Arcs.ts's per-vertex step = ARC_TAIL_FRAC / (ARC_TAIL - 1))", () => {

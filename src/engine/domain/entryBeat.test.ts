@@ -16,5 +16,6 @@ describe("entryBeat — the arrival drop's shape, shared by the chamber and the 
   it("the whole beat is one fall plus the stagger of every row after the first", () => {
     expect(entryTotal(1)).toBe(ENTRY_FALL);
     expect(entryTotal(21)).toBeCloseTo(ENTRY_FALL + ENTRY_STAG * 20, 9);
+    expect(entryTotal(3, 0.12)).toBeCloseTo(ENTRY_FALL + 0.24, 9); // an instrument's own stagger (the rings)
   });
 });
