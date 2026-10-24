@@ -32,11 +32,13 @@ export const RING_RADII = [R * 1.08, R * 1.02, R * 0.96] as const;
  *  "add the hairline effect (like left / right rails sections). Also the metagraph circle needs
  *  to be more bright and bloom (like the nodes and arcs)"): the two outer levels are rulers, the
  *  inner one is the identity reading, so it alone is a bloomed band at the nodes' own weight. */
-export const RING_WIDTHS = [R * 0.005, R * 0.005, R * 0.03] as const;
+export const RING_WIDTHS = [R * 0.005, R * 0.014, R * 0.03] as const; // the OUTER ring alone is the hairline (user, 2026-10-24); the provider ring is a thin band
 /** The country ring's hit strip: a hairline cannot be aimed at, so an invisible band under it picks. */
 export const RING_PICK_WIDTH = R * 0.05;
-/** The network ring's presence over the hairlines' — it is a bloomed mark, the others are rulers. */
-export const NET_RING_BOOST = 2.6;
+/** The network ring's presence over the rulers' — it is a bloomed mark AT REST, not only when a
+ *  subject lights it (user, 2026-10-24: "more bloom also at rest not only focus"); the dim tier
+ *  still steps it back by the geo row's own dim-back. */
+export const NET_RING_BOOST = 4.5;
 /** A STAND under the globe, not a hoop through its base (user, 2026-10-23: at the rest pose "it
  *  looks like our angle is a bit unusual or the circle is strangely positioned" — the base
  *  plane's ellipse centred on the silhouette's bottom edge and cut it). Dropped so the ellipse

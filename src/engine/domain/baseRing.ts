@@ -69,7 +69,7 @@ export interface RingLevels {
 
 /** The gap between two arcs of the outer ring, radians — one hairline at the ring's radius; the
  *  inner levels keep half of it between siblings so a parent's span stays readable as one. */
-export const RING_GAP = 0.02;
+export const RING_GAP = 0.05; // 0.02 → 0.05 (user, 2026-10-24: "the gaps between sections bigger")
 export const RING_SUB_GAP = RING_GAP / 2;
 /** An arc's tier under the selectors: `rest` while nothing is selected (every arc at the ring's
  *  resting presence), `lit` for the subject's arcs, `dim` for the rest. The adapter turns the tier
