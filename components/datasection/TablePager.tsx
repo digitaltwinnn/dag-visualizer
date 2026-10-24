@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { cn, TOUCH_HIT } from "@/lib/utils";
 import { fmtCount } from "@/src/util/format";
 import { NodeStars } from "@/components/state/StateAtoms";
+import ExplorerFoot from "@/components/explorer/ExplorerFoot";
 
 // The raw layer's ONE table pager (user, 2026-08-14 — "add a bottom row with pagination", the
 // anchor log and the signer groups alike): a quiet flex-none strip under a table, range left,
@@ -80,67 +81,67 @@ export default function TablePager({
   // The chevrons are shadcn `Button`s on the ghost recipe — the one hover every icon control shares
   // (button.tsx) — so this names only what is local: the box and the muted rest ink.
   const btn = cn("size-6 rounded-xs text-muted-foreground disabled:opacity-30", TOUCH_HIT);
-  return (
-    <div className="flex-none pt-1.5">
-      <div className="flex items-center justify-between gap-2">
-      <span className="min-w-0 truncate text-label tracking-caps uppercase tabular-nums text-muted-foreground">
-        {/* A compact pager WITH a scope states the scope alone (2026-09-28, user on the snapshot
-            explorer's "52 · last 11 min": "remove the 52 — the time is what matters, 52 has no real
-            meaning here"). The count stays wherever it is the statement (the full pager's range). */}
-        {compact && scope ? null : totalPending ? (
-          <span className="inline-flex items-center gap-1.5">{compact ? null : `${from}–${to} of `}<NodeStars count={3} /></span>
-        ) : compact ? fmtCount(total) : exact ? `${from.toLocaleString()}–${to.toLocaleString()} of ${floor ? "at least " : ""}${total.toLocaleString()}` : `${from}–${to} of ${fmtCount(total)}`}
-        {scope ? (
-          <>
-            {compact ? null : " "}
-            {!scope.title ? (
-              <span className="inline-flex items-center min-h-6">{scope.word}</span>
-            ) : (
-            <button
-              type="button"
-              aria-expanded={explain}
-              onClick={() => setExplain((e) => !e)}
-              className="inline-flex items-center min-h-6 underline decoration-dotted decoration-border underline-offset-2 cursor-pointer uppercase tracking-caps text-label text-muted-foreground hover:text-foreground p-0 bg-transparent border-0"
-            >
-              {scope.word}
-            </button>
-            )}
-          </>
-        ) : null}
-      </span>
-      {/* A single page has nothing to navigate, so the cluster is ABSENT rather than a dead
-          ‹ 1 / 1 › (the plank's rule: permanently dead chrome is not a control); the span stays. */}
-      {pages <= 1 && aside}
-      {pages > 1 && (
+  // THE ROW IS THE PLATE FOOT'S ONE RECIPE (`ExplorerFoot`, review 2026-10-24): the range and scope
+  // at the left; at the right the page cluster, or — on a single page, which has nothing to
+  // navigate (the plank's rule: permanently dead chrome is not a control) — the caller's aside.
+  const left = (
+    <span className="min-w-0 truncate tabular-nums">
+      {/* A compact pager WITH a scope states the scope alone (2026-09-28, user on the snapshot
+          explorer's "52 · last 11 min": "remove the 52 — the time is what matters, 52 has no real
+          meaning here"). The count stays wherever it is the statement (the full pager's range). */}
+      {compact && scope ? null : totalPending ? (
+        <span className="inline-flex items-center gap-1.5">{compact ? null : `${from}–${to} of `}<NodeStars count={3} /></span>
+      ) : compact ? fmtCount(total) : exact ? `${from.toLocaleString()}–${to.toLocaleString()} of ${floor ? "at least " : ""}${total.toLocaleString()}` : `${from}–${to} of ${fmtCount(total)}`}
+      {scope ? (
+        <>
+          {compact ? null : " "}
+          {!scope.title ? (
+            <span className="inline-flex items-center min-h-6">{scope.word}</span>
+          ) : (
+          <button
+            type="button"
+            aria-expanded={explain}
+            onClick={() => setExplain((e) => !e)}
+            className="inline-flex items-center min-h-6 underline decoration-dotted decoration-border underline-offset-2 cursor-pointer uppercase tracking-caps text-label text-muted-foreground hover:text-foreground p-0 bg-transparent border-0"
+          >
+            {scope.word}
+          </button>
+          )}
+        </>
+      ) : null}
+    </span>
+  );
+  const cluster = pages > 1 ? (
       <span className="inline-flex flex-none items-center gap-1">
-        {/* First/last jumps (user, 2026-08-14 — "I want to see the genesis block; now I have to
-            go page by page"): the standard « ‹ › » cluster. The last page IS genesis in the
-            history mode, one jump deep now that pages are ordinal-addressed. */}
-        {!compact && (
-          <Button variant="ghost" size="icon-xs" className={btn} aria-label="First page" disabled={page <= 1} onClick={() => onPage(1)}>
-            <ChevronsLeft aria-hidden className="size-4" />
-          </Button>
-        )}
-        <Button variant="ghost" size="icon-xs" className={btn} aria-label="Previous page" disabled={page <= 1} onClick={() => onPage(page - 1)}>
-          <ChevronLeft aria-hidden className="size-4" />
+      {/* First/last jumps (user, 2026-08-14 — "I want to see the genesis block; now I have to
+          go page by page"): the standard « ‹ › » cluster. The last page IS genesis in the
+          history mode, one jump deep now that pages are ordinal-addressed. */}
+      {!compact && (
+        <Button variant="ghost" size="icon-xs" className={btn} aria-label="First page" disabled={page <= 1} onClick={() => onPage(1)}>
+          <ChevronsLeft aria-hidden className="size-4" />
         </Button>
-        <span className={cn("text-label tabular-nums text-muted-foreground whitespace-nowrap")}>
-          {exact ? `${page.toLocaleString()} / ${pages.toLocaleString()}` : `${page} / ${fmtCount(pages)}`}
-        </span>
-        <Button variant="ghost" size="icon-xs" className={btn} aria-label="Next page" disabled={page >= pages} onClick={() => onPage(page + 1)}>
-          <ChevronRight aria-hidden className="size-4" />
-        </Button>
-        {!compact && (
-          <Button variant="ghost" size="icon-xs" className={btn} aria-label="Last page" disabled={page >= pages} onClick={() => onPage(pages)}>
-            <ChevronsRight aria-hidden className="size-4" />
-          </Button>
-        )}
+      )}
+      <Button variant="ghost" size="icon-xs" className={btn} aria-label="Previous page" disabled={page <= 1} onClick={() => onPage(page - 1)}>
+        <ChevronLeft aria-hidden className="size-4" />
+      </Button>
+      <span className={cn("text-label tabular-nums text-muted-foreground whitespace-nowrap")}>
+        {exact ? `${page.toLocaleString()} / ${pages.toLocaleString()}` : `${page} / ${fmtCount(pages)}`}
       </span>
+      <Button variant="ghost" size="icon-xs" className={btn} aria-label="Next page" disabled={page >= pages} onClick={() => onPage(page + 1)}>
+        <ChevronRight aria-hidden className="size-4" />
+      </Button>
+      {!compact && (
+        <Button variant="ghost" size="icon-xs" className={btn} aria-label="Last page" disabled={page >= pages} onClick={() => onPage(pages)}>
+          <ChevronsRight aria-hidden className="size-4" />
+        </Button>
       )}
-      </div>
-      {explain && scope?.title && (
-        <p className="m-0 pt-1 text-label text-muted-foreground max-w-[52ch]">{scope.title}</p>
-      )}
-    </div>
+    </span>
+  ) : aside;
+  return (
+    <ExplorerFoot
+      left={left}
+      right={cluster}
+      below={explain && scope?.title ? <p className="m-0 pt-1 text-label text-muted-foreground max-w-[52ch]">{scope.title}</p> : undefined}
+    />
   );
 }

@@ -394,7 +394,7 @@ dossier, country, provider, composition, then the snapshot chain (global snapsho
 snapshot it anchors), then node. `components/railCards.ts` is the manifest and
 `components/railCards.test.ts` pins the order, the availability and every hint.
 
-**A vertical swipe TURNS THE DECK** (2026-10-24; `src/engine/domain/CLAUDE.md` has the rule): the
+**A vertical swipe TURNS THE DECK, and so does Shift + ↑/↓ from inside a card** (2026-10-24; `src/engine/domain/CLAUDE.md` has the rule): the
 rotation (`trendRotation`) sits under the held order and the focus re-deal in `TrendStack`, and a
 swipe releases a standing focus and rewinds the window first, so the deck's front is the rotation's.
 

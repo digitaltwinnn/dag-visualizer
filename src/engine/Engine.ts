@@ -744,6 +744,9 @@ export class Engine {
     window.addEventListener("pointerup", this._onPointerRelease);
     window.addEventListener("pointercancel", this._onPointerRelease);
 
+    // THE ENGINE'S DEV HANDLE, the store's gate (`__dagStore`, store.ts): headless verification reads
+    // what the scene holds. Never in a production bundle.
+    if (process.env.NODE_ENV !== "production") (window as unknown as { __dagEngine?: unknown }).__dagEngine = this;
     const showStats =
       process.env.NODE_ENV === "development" ||
       /stats/.test(window.location.search + window.location.hash);
@@ -769,8 +772,6 @@ export class Engine {
       // Edge perf spike): three's own render counters for the last frame, and the live pixel
       // ratio. Dev chrome, same gate as the meter — never reached by a real user, and it only
       // reads what the renderer already counts.
-      // …and the engine itself, for headless verification to read what the scene holds (2026-10-24).
-      (window as unknown as { __dagEngine?: unknown }).__dagEngine = this;
       (window as unknown as { __dagPerf?: unknown }).__dagPerf = {
         // ONE WHOLE FRAME's counters. three resets `info.render` on every `render()` call, and a
         // composed frame is several (the scene pass, the bloom's mips, the output quad), so a

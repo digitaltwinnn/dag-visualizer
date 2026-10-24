@@ -2,7 +2,7 @@
 
 import { useCallback, useLayoutEffect, useRef, type CSSProperties, type ReactNode } from "react";
 
-import ExplorerShell from "@/components/ExplorerShell";
+import ExplorerShell, { SHELL_BLEED_X, SHELL_INSET_X } from "@/components/ExplorerShell";
 import ExplorerHeading, { MeasureLabel, MeasureTiles, type MeasureControl, type MeasureOption } from "@/components/explorer/ExplorerHeading";
 import ExplorerPath, { type Crumb } from "@/components/explorer/ExplorerPath";
 import ExplorerRow from "@/components/explorer/ExplorerRow";
@@ -252,7 +252,7 @@ export default function Explorer({ id, title, hint, placeholder, levels: selecte
               extra words. The path rides the band bare (it wore its own accent-tinted plate, a
               third surface in a second tint — user: "does its colour look off?"), the house its
               one accent mark. Full-bleed by the body's own inset (ExplorerShell: `pt-1.5 px-[14px]`). */}
-          <div className="-mt-1.5 -mx-[14px] mb-2 px-[14px] pt-2 pb-2 bg-[var(--panel-plate)] border-b border-border flex flex-col gap-2">
+          <div className={cn("-mt-1.5 mb-2 pt-2 pb-2 bg-[var(--panel-plate)] border-b border-border flex flex-col gap-2", SHELL_BLEED_X, SHELL_INSET_X)}>
             {measure && measure.options.length > 1 && <MeasureTiles measure={measure} />}
             <ExplorerPath
               bare
@@ -325,7 +325,7 @@ export default function Explorer({ id, title, hint, placeholder, levels: selecte
               states reads as the card's last section rather than one more inset row. OUTSIDE the
               list wrapper: inside it, a nested level's spine ran down the plate's edge. */}
           {current.pager != null && (
-            <div className="-mx-[14px] -mb-2 mt-1.5 px-[14px] pt-1.5 pb-2 bg-[var(--panel-plate)] rounded-b-[calc(var(--radius)-1px)]">
+            <div className={cn("-mb-2 mt-1.5 pt-1.5 pb-2 bg-[var(--panel-plate)] rounded-b-[calc(var(--radius)-1px)]", SHELL_BLEED_X, SHELL_INSET_X)}>
               {current.pager}
             </div>
           )}

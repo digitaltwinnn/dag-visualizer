@@ -384,15 +384,12 @@ export default function TrendStack() {
     if (!d?.touch) return;
     const dir = swipeOf(e.clientX - d.x, e.clientY - d.y, performance.now() - d.at, { horizontal: !d.onPlot });
     if (!dir) return;
-    const st = useStore.getState();
     const intent = swipeIntent(dir);
     if (intent.kind === "measure") {
       stepMeasure(intent.step, "x");
       return;
     }
-    if (st.trendFocus) applyClickActions(trendPlaneActions(st.trendFocus, st.trendFocus));
-    if (st.trendScroll) st.setTrendScroll(0);
-    st.setTrendRotation(st.trendRotation + intent.step);
+    turnDeck(intent.step);
   };
   // UP / DOWN IS THE VIEW'S THIRD AXIS (user, 2026-09-19). Left/right on the timeline is WHEN, the
   // depth of the stack is WHO, and the measure — WHAT — had no gesture on the canvas. The control
@@ -419,6 +416,14 @@ export default function TrendStack() {
     if (!swiped.current) setSwipeAxis("y");
     swiped.current = false;
   }, [metric]);
+  // TURN THE DECK (the swipe's and the keys' one action): a standing focus is released through
+  // the table first and the window rewinds, so the deck's front is the rotation's.
+  const turnDeck = (step: 1 | -1) => {
+    const st = useStore.getState();
+    if (st.trendFocus) applyClickActions(trendPlaneActions(st.trendFocus, st.trendFocus));
+    if (st.trendScroll) st.setTrendScroll(0);
+    st.setTrendRotation(st.trendRotation + step);
+  };
   const stepMeasure = (dir: -1 | 1, axis: "x" | "y" = "y") => {
     const next = stepMetric(useStore.getState().trendMetric, dir);
     if (!next) return;
@@ -585,11 +590,14 @@ export default function TrendStack() {
             // two never fire for one press.
             onClick={pose.interactive ? () => activate(pose.id, false) : undefined}
             // ↑ / ↓ STEP THE MEASURE from anywhere inside a card (its head strip is the focusable
-            // part). The default is taken so an arrow never scrolls a rail or the page under it.
+            // part); SHIFT + ↑ / ↓ TURN THE DECK — the swipe's keyboard twin (review, 2026-10-24: a
+            // desktop reader had no way to rotate the deck but the rows). The default is taken so
+            // an arrow never scrolls a rail or the page under it.
             onKeyDown={(e) => {
               if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
               e.preventDefault();
-              stepMeasure(e.key === "ArrowDown" ? 1 : -1);
+              if (e.shiftKey) turnDeck(e.key === "ArrowUp" ? 1 : -1);
+              else stepMeasure(e.key === "ArrowDown" ? 1 : -1);
             }}
             style={{
               // Every card is opaque at every depth (see the header) — `pose.opacity` is 1 across

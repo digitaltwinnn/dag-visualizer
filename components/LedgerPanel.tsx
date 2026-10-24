@@ -6,6 +6,7 @@ import { ledgerNetwork } from "@/src/engine/domain/tickNet";
 import Explorer, { type ExplorerLevelSpec, type ExplorerRowSpec } from "@/components/explorer/Explorer";
 import { NODE_GLYPH_W, nodeRowSpec, unknownNodeRowSpec } from "@/components/explorer/nodeRow";
 import TablePager from "@/components/datasection/TablePager";
+import ExplorerFoot from "@/components/explorer/ExplorerFoot";
 import { pageHolding, pageOnResize } from "@/components/explorer/fitRows";
 import useFitRows from "@/components/explorer/useFitRows";
 import { useBreakpoint } from "@/components/useBreakpoint";
@@ -302,7 +303,7 @@ export default function LedgerPanel() {
   const spanScope = { word: `${spanWords(orderedSnaps)} cache` };
   const spanFooter =
     live && orderedSnaps.length > 0 ? (
-      <TablePager page={1} pages={1} from={1} to={orderedSnaps.length} total={orderedSnaps.length} compact scope={spanScope} onPage={() => {}} />
+      <ExplorerFoot left={spanScope.word} />
     ) : undefined;
   const levels: ExplorerLevelSpec[] = [
     {

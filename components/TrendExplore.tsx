@@ -5,7 +5,7 @@ import Explorer, { type ExplorerLevelSpec } from "@/components/explorer/Explorer
 import { QualifierChip } from "@/components/inspector/parts";
 import useTrendRoster, { NO_READING } from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
-import TablePager from "@/components/datasection/TablePager";
+import ExplorerFoot from "@/components/explorer/ExplorerFoot";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
 import { GLOBAL_READING, METRIC_LABELS, METRIC_ORDER, metricUnit, spanWord } from "@/src/data/trendSeries";
@@ -93,9 +93,9 @@ export default function TrendExplore() {
   // stand — so the heading hairline runs straight into the plate.
   const foot =
     roster.headKind === "span" ? (
-      <TablePager page={1} pages={1} from={1} to={ranked.length} total={ranked.length} compact scope={{ word: spanWord(metric) }} aside={<QualifierChip className="flex-none">{spanPhrase(windowId, range)}</QualifierChip>} onPage={() => {}} />
+      <ExplorerFoot left={spanWord(metric)} right={<QualifierChip className="flex-none">{spanPhrase(windowId, range)}</QualifierChip>} />
     ) : (
-      <TablePager page={1} pages={1} from={1} to={ranked.length} total={ranked.length} compact scope={{ word: "Latest full day" }} onPage={() => {}} />
+      <ExplorerFoot left="Latest full day" />
     );
   const empty = scopeEmptyCopy(roster.scope, "view");
 

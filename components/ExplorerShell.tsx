@@ -1,5 +1,6 @@
 "use client";
 
+import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
 import CardHead from "@/components/CardHead";
 import { Card } from "@/components/ui/card";
@@ -33,6 +34,12 @@ import { EXPLORE_ICON } from "@/components/icons";
 // file is chrome only — a `components/explorerShell.test.ts` grep asserts every explorer renders
 // `<Explorer` and that only `Explorer.tsx` renders this shell, so a future explorer can't
 // hand-roll its own chrome silently.
+/** The body's horizontal inset, and the bleed a full-width block inside it uses to cancel it (the
+ *  explorer's control band and plate foot) — one pair, so the two can never drift (review,
+ *  2026-10-24). Static strings: Tailwind reads them as written. */
+export const SHELL_INSET_X = "px-[14px]";
+export const SHELL_BLEED_X = "-mx-[14px]";
+
 export default function ExplorerShell({
   id,
   title,
@@ -83,7 +90,7 @@ export default function ExplorerShell({
           {hint != null && (
             <div className="pt-2 px-4 pb-1 text-label text-muted-foreground">{hint}</div>
           )}
-          <div className="flex flex-col pt-1.5 px-[14px] pb-2" onMouseLeave={onLeave}>
+          <div className={cn("flex flex-col pt-1.5 pb-2", SHELL_INSET_X)} onMouseLeave={onLeave}>
             {children}
           </div>
         </div>
