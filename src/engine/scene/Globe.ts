@@ -1029,8 +1029,13 @@ export class Globe implements GeoViewHost {
 
   // Show only the pools of the committed network ("all" shows every pool) — a cheap visibility
   // toggle, so a filter change never re-clusters the light pools (just drops the other planes).
+  // The pools follow the SELECTOR the chips follow — the hover preview when there is one, else the
+  // committed filter (user, 2026-10-24: "not only the other nodes should be affected but also the
+  // node-coloured plane sitting on top of the sphere") — and answer it the way geo answers a
+  // filter, the isolate (`hide`): an off-selector pool is gone, not dimmed.
   private _applyGlowFilter(): void {
-    for (const m of this._densityGlow) m.visible = this.filter === "all" || m.userData.net === this.filter;
+    const sel = this._hoverSel || this.filter;
+    for (const m of this._densityGlow) m.visible = sel === "all" || m.userData.net === sel;
   }
 
   // Isolate one network on the globe and dim the rest.
@@ -1050,6 +1055,7 @@ export class Globe implements GeoViewHost {
   setHoverFilter(sel: string | null): void {
     this._hoverSel = sel;
     this._applyDim(sel || this.filter, !!sel);
+    this._applyGlowFilter(); // the density pools preview with the chips
   }
   /** The live hover preview's selector, so a data rebuild's own `setFilter` re-asserts it instead
    *  of the committed filter (2026-10-24, measured: every poll reset the rings' subject to "all"

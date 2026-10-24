@@ -141,7 +141,10 @@ network POSE therefore keeps the rings in frame (`FOCI.geoNetwork`, a short step
 rather than the old dive): the globe's crown may tuck under the top bar, the rings never under
 the vitals band. The ruler is built on the FIRST `setLevels`, not in the constructor — the Globe
 constructs the ring before its ink and ground are set, and a material born then was black until
-a theme flip retinted it.
+a theme flip retinted it. The arrival beat lifts each RING as one piece, outer to inner
+(`RING_ENTRY_STAG`), not arc by arc (user: "too detailed, just animate each circle"). The
+density pools (`_densityGlow`) follow the same selector the chips follow — a hover preview hides
+the off-selector pools exactly as a commit does.
 
 **EXACT OCCLUSION BY THE GLOBE** (same day — user: "fade it when the globe sits in front? I
 believe this is also an issue with the arc animation"): the hologram globe is additive and writes

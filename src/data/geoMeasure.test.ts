@@ -74,7 +74,7 @@ describe("networkOfRow", () => {
 });
 
 describe("GEO_MEASURE_ADDITIVE", () => {
-  it("nodes add up across rows; the networks and providers in a country overlap", () => {
-    expect(GEO_MEASURE_ADDITIVE).toEqual({ nodes: true, metagraphs: false, providers: false });
+  it("every geo measure totals across rows — the foot sums what is on screen (user, 2026-10-24)", () => {
+    expect(GEO_MEASURE_ADDITIVE).toEqual({ nodes: true, metagraphs: true, providers: true });
   });
 });

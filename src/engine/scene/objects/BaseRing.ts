@@ -4,7 +4,7 @@ import { R, LAND_H } from "../../domain/geoLayout";
 import { ringPresence, type RingLevels, type RingSegment, type RingTier } from "../../domain/baseRing";
 import { FOCUS_TUNE } from "../../domain/dimModel";
 import { joinBloom } from "../SceneContext";
-import { ENTRY_STAG, entryStep, entryTotal } from "../../domain/entryBeat";
+import { ENTRY_FALL, entryStep } from "../../domain/entryBeat";
 
 // THE BASE RING ADAPTER — one flat arc mesh per network on the globe's base plane, the located
 // fleet's share by network (`domain/baseRing.ts` does the arithmetic; this file owns the meshes).
@@ -69,12 +69,15 @@ export const WEDGE_COMMIT_MUL = 0.4;
  *  the snapshot view's actual snapshots"): every arc is held this high and dark through the
  *  choreography and falls to the stand on the chamber's own beat (`domain/entryBeat.ts`), one arc
  *  after another around the ring, the outer ruler first and the bloomed network band last. */
+/** The arrival beat's stagger between the three rings, outer to inner — three beats, not one per
+ *  arc (see `applyEntry`). */
+export const RING_ENTRY_STAG = 0.12;
 export const RING_ENTRY_H = 2.4;
 
 /** The network ring's presence over the rulers' — it is a bloomed mark AT REST, not only when a
  *  subject lights it (user, 2026-10-24: "more bloom also at rest not only focus"); the dim tier
  *  still steps it back by the geo row's own dim-back. */
-export const NET_RING_BOOST = 3.4; // 4.5 washed the hues toward white under the additive blend (user, 2026-10-24: "not color-coded to metagraph anymore")
+export const NET_RING_BOOST = 2.6; // 4.5 washed the hues toward white under the additive blend (user, 2026-10-24: "not color-coded to metagraph anymore"); 3.4 was "a little bit too present in the scene" at rest (user, same day) — dark only, the paper tiers are their own numbers
 /** A STAND under the globe, not a hoop through its base (user, 2026-10-23: at the rest pose "it
  *  looks like our angle is a bit unusual or the circle is strangely positioned" — the base
  *  plane's ellipse centred on the silhouette's bottom edge and cut it). Dropped so the ellipse
@@ -84,7 +87,7 @@ export const RING_Y = -(R + LAND_H + 0.8); // closer to the sphere (user, 2026-1
  *  0.09–0.24) — a first cut at 0.55 bloomed into a neon band under the additive blend, and 0.2
  *  still pulled the eye off the globe (user, 2026-10-23: "a bit more transparent in normal mode,
  *  so they don't distract too much from the globe"). */
-export const RING_BASE = 0.13;
+export const RING_BASE = 0.12; // 0.13 → 0.12 with the network boost's step down (user, 2026-10-24: "slightly more subtle, mostly the metagraph ring")
 
 /** A tier's presence, from the geo view's OWN focus row: the subject's arcs take the chips' boost,
  *  the rest drop by the chips' dim-back — brighter and dimmer by the app's standard, not the
@@ -229,12 +232,15 @@ export class BaseRing {
     this._entryHold = false;
   }
 
-  /** One moment of the beat: each arc's lift and its presence multiplier, the ruler with the first
-   *  arc. Per frame while the beat runs, nothing once it has parked at 1. */
+  /** One moment of the beat: each RING's lift and presence multiplier — the three levels fall in
+   *  one after another, outer first, every arc of a ring together (user, 2026-10-24: "too
+   *  detailed, just animate each circle but not the sections"; a per-arc stagger read as a
+   *  flicker of fifty pieces). The ruler falls with the outer ring. Per frame while the beat
+   *  runs, nothing once it has parked at 1. */
   private applyEntry(tSec: number): void {
     for (let i = 0; i < this.arcs.length; i++) {
       const a = this.arcs[i]!;
-      const step = entryStep(tSec, i * ENTRY_STAG);
+      const step = entryStep(tSec, a.level * RING_ENTRY_STAG);
       a.mesh.position.z = RING_ENTRY_H * step.drop;
       a.entryMul = step.fade;
     }
@@ -387,7 +393,9 @@ export class BaseRing {
     // the selector, else the country's ruler — a first cut filled every lit level and a network
     // hover painted its whole countries' wedges in the accent, which was not subtle.
     const netSel = this.sel !== "all";
-    const preview = netSel ? this.selPreview : this.ccPreview;
+    // A HOVER on either selector is a preview (user, 2026-10-24: hovering a country row under a
+    // committed filter must light its slice at hover strength, not the committed disc's floor).
+    const preview = this.selPreview || this.ccPreview;
     a.wedgeOn = tier === "lit" && (netSel ? a.level === 2 : a.level === 0) ? (preview ? 1 : WEDGE_COMMIT_MUL) : 0;
     a.paperTarget = paperPresence(tier, a.level === 2);
     return Math.min(0.62, tierPresence(tier) * (a.level === 2 ? NET_RING_BOOST : 1));
@@ -405,7 +413,7 @@ export class BaseRing {
     // parked at 1 in steady state, where this block costs nothing.
     if (this._entryT < 1) {
       if (!this._entryHold) {
-        this._entryTotal = entryTotal(this.arcs.length);
+        this._entryTotal = ENTRY_FALL + RING_ENTRY_STAG * (RING_RADII.length - 1);
         this._entryT = Math.min(1, this._entryT + dt / this._entryTotal);
       }
       this.applyEntry(this._entryT * this._entryTotal);

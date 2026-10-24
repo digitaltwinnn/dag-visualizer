@@ -277,13 +277,15 @@ export default function LedgerPanel() {
   // carries the pill or its hover preview.
 
   // The shown tick's state mark (see the tick rows): the card's live dot while following, a pin
-  // while pinned — WITH ITS WORD (user, 2026-10-24: the bullet "sits close to the left column and
-  // has lots of room to the right, makes sense to add 'live' or 'pinned'"), the one state species
-  // the Global snapshot card's control and the callout already spell out.
-  const followMark = (
-    <span className="inline-flex items-center gap-1 text-label tracking-caps uppercase text-muted-foreground">
-      {following ? <LiveDot /> : <PinMark className="text-muted-foreground" />}
-      {following ? "live" : "pinned"}
+  // while pinned — the one state species the Global snapshot card's control and the callout
+  // already spell out. The MARK ALONE, CENTRED in the room the name column leaves after the
+  // ordinal (user, 2026-10-24: "center the live bullet / pinned icon in the column, it sits too
+  // close to the left edge; remove the text" — a word beside it had been tried the same day).
+  const followMark = following ? <LiveDot /> : <PinMark className="text-muted-foreground" />;
+  const tickName = (ordinal: number, on: boolean) => (
+    <span className="flex items-center tabular-nums">
+      {ordinal.toLocaleString()}
+      {on && <span className="flex-1 flex justify-center">{followMark}</span>}
     </span>
   );
 
@@ -350,12 +352,7 @@ export default function LedgerPanel() {
           // snapshot card — the one control, B1 — sits in the other sheet, so the explorer gave no
           // indication at all). A quiet STATE MARK on the highlighted row, never a second control:
           // the card's beating live dot while following, a pin while pinned.
-          name: (
-            <span className="inline-flex items-center gap-1.5 tabular-nums">
-              {d.ordinal.toLocaleString()}
-              {on && followMark}
-            </span>
-          ),
+          name: tickName(d.ordinal, on),
           // THE LENS IS THE BAR'S COLOUR, not a number beside it (user, 2026-10-04: "remove the
           // added '1' and instead use the colour"). The bar always measures the whole tick, as it
           // does unfiltered, so it keeps the default cyan; a tick the committed network anchored
