@@ -1095,11 +1095,13 @@ export class Globe implements GeoViewHost {
   beginEntry(): void {
     this._glowEntryT = 0;
     this._glowEntryHold = true;
+    this.baseRing.beginEntry(); // the rings drop on the same beat (objects/BaseRing.ts)
   }
 
   /** The choreography settled — the glow breathes in as the closing beat. */
   releaseEntry(): void {
     this._glowEntryHold = false;
+    this.baseRing.releaseEntry();
   }
 
   /** The committed provider cohort's anchor: the members' centroid as a unit, globe-LOCAL

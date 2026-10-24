@@ -35,7 +35,7 @@ const RESERVE = 112; // --vitals-h (104px, globals.css) + 8px clearance above th
  *  2026-09-29, above again since 2026-10-03 — `TrendTimeline` has the three reasons): a 32px
  *  group plus its 12px gap, which the rails must clear too, or a tall right rail's last card sits
  *  under it. Reserved only while the band holds the timeline — a policy row, not a mode compare. */
-const PILLS_ABOVE = 44;
+const PILLS_ABOVE = 48; // 44 → 48 with the pill group's `mb-4` (2026-10-24)
 /** The same for a vitals band's shared-window chip: a 22px chip plus its 8px gap. */
 const CHIP_ABOVE = 30;
 

@@ -148,7 +148,7 @@ export default function TrendTimeline() {
           `right-0` left the group 7px short of the plate's edge (user: "should align with the
           bottom section"). The offset is that inset, measured — the group's right edge IS the
           band's. */}
-      <div data-tether-avoid className="absolute bottom-full -right-[7px] mb-3 z-[1] flex items-center rounded-lg p-1 [background:var(--topbar-glass)] backdrop-blur-sm max-[700px]:static max-[700px]:order-last max-[700px]:mb-0 max-[700px]:p-0 max-[700px]:[background:none] max-[700px]:backdrop-blur-none">
+      <div data-tether-avoid className="absolute bottom-full -right-[7px] mb-4 z-[1] flex items-center rounded-lg p-1 [background:var(--topbar-glass)] backdrop-blur-sm max-[700px]:static max-[700px]:order-last max-[700px]:mb-0 max-[700px]:p-0 max-[700px]:[background:none] max-[700px]:backdrop-blur-none">
         <div className="flex items-center gap-1.5 max-[700px]:flex-1">
           <WindowPicker
             className="bg-transparent max-[700px]:flex-1"
@@ -164,7 +164,9 @@ export default function TrendTimeline() {
       {/* ON THE PHONE the track is a TOUCH target in a sheet with room to spare (user, 2026-09-29:
           "the range selector is too small (height) on the mobile phone" — it measured 42px with its
           month labels, the plot under 30). 110px gives the brush and its grips a thumb's worth. */}
-      <div className="flex-1 min-w-0 flex flex-col max-[700px]:min-h-[110px]">
+      {/* `pt-1.5` (2026-10-24, user: the chart "too close to the control" above): the track's peaks
+          touched the plate's top edge; with the caption row gone the room is there to spend. */}
+      <div className="flex-1 min-w-0 flex flex-col pt-1.5 max-[700px]:min-h-[110px]">
         <div className="flex-1 min-h-0 flex flex-col justify-center">
         {/* HONESTY STATES (rule 10). THREE facts, not two — the third was a review find: an
             ARRIVED payload with nothing measured in it. `leadingTrim` answers that case with a

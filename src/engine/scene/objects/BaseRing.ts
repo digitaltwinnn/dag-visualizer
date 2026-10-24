@@ -4,6 +4,7 @@ import { R, LAND_H } from "../../domain/geoLayout";
 import { ringPresence, type RingLevels, type RingSegment, type RingTier } from "../../domain/baseRing";
 import { FOCUS_TUNE } from "../../domain/dimModel";
 import { joinBloom } from "../SceneContext";
+import { ENTRY_STAG, entryStep, entryTotal } from "../../domain/entryBeat";
 
 // THE BASE RING ADAPTER — one flat arc mesh per network on the globe's base plane, the located
 // fleet's share by network (`domain/baseRing.ts` does the arithmetic; this file owns the meshes).
@@ -49,6 +50,12 @@ export const TICK_MAJOR = R * 0.026;
  *  blend lays ink, so the rails' own level holds. */
 export const RULER_PRESENCE_DARK = 0.45;
 export const RULER_PRESENCE_PAPER = 0.4;
+
+/** THE ARRIVAL DROP (user, 2026-10-24: the rings "appear staggered and with the same timing as
+ *  the snapshot view's actual snapshots"): every arc is held this high and dark through the
+ *  choreography and falls to the stand on the chamber's own beat (`domain/entryBeat.ts`), one arc
+ *  after another around the ring, the outer ruler first and the bloomed network band last. */
+export const RING_ENTRY_H = 2.4;
 
 /** The network ring's presence over the rulers' — it is a bloomed mark AT REST, not only when a
  *  subject lights it (user, 2026-10-24: "more bloom also at rest not only focus"); the dim tier
@@ -134,7 +141,7 @@ export interface RingHost {
   accent: () => number;
 }
 
-interface Arc { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; seg: RingSegment; level: number; fade: FadeEntry; target: number; paperTarget: number }
+interface Arc { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; seg: RingSegment; level: number; fade: FadeEntry; target: number; paperTarget: number; entryMul: number }
 
 export class BaseRing {
   readonly group = new THREE.Group();
@@ -146,6 +153,12 @@ export class BaseRing {
   private strips: THREE.Mesh[] = [];
   private sel = "all";
   private cc: string | null = null;
+  private _entryT = 1;
+  private _entryHold = false;
+  private _entryTotal = 1;
+  private _ticksMul = 1;
+  private readonly _ticks: THREE.LineSegments;
+  private readonly _tickFade: FadeEntry;
   /** The camera's world position, shared by every arc's shader; written per frame in `update`. */
   private readonly uCam = new THREE.Vector3(0, 0, 1);
 
@@ -167,8 +180,36 @@ export class BaseRing {
     mat.blending = host.blending();
     host.geoBlends.push(mat);
     host.geoTints.push(mat.color);
-    host.geoFades.push({ mat, base: RULER_PRESENCE_DARK, paperBase: RULER_PRESENCE_PAPER });
-    this.group.add(new THREE.LineSegments(geo, mat));
+    this._tickFade = { mat, base: RULER_PRESENCE_DARK, paperBase: RULER_PRESENCE_PAPER };
+    host.geoFades.push(this._tickFade);
+    this._ticks = new THREE.LineSegments(geo, mat);
+    this.group.add(this._ticks);
+  }
+
+  /** Arm the drop — the arcs held high and dark until `releaseEntry` (the Engine's contract). */
+  beginEntry(): void {
+    this._entryT = 0;
+    this._entryHold = true;
+    this.applyEntry(0);
+  }
+
+  /** The choreography settled — the arcs fall in, staggered. */
+  releaseEntry(): void {
+    this._entryHold = false;
+  }
+
+  /** One moment of the beat: each arc's lift and its presence multiplier, the ruler with the first
+   *  arc. Per frame while the beat runs, nothing once it has parked at 1. */
+  private applyEntry(tSec: number): void {
+    for (let i = 0; i < this.arcs.length; i++) {
+      const a = this.arcs[i]!;
+      const step = entryStep(tSec, i * ENTRY_STAG);
+      a.mesh.position.z = RING_ENTRY_H * step.drop;
+      a.entryMul = step.fade;
+    }
+    const t = entryStep(tSec, 0);
+    this._ticks.position.z = RING_ENTRY_H * t.drop;
+    this._ticksMul = t.fade;
   }
 
   /** Event-time: a data arrival or a retint rebuilds every arc on every level. */
@@ -242,7 +283,7 @@ export class BaseRing {
       }
       if (level === 2) joinBloom(mesh); // the identity reading glows like the chips it counts
       this.group.add(mesh);
-      this.arcs.push({ mesh, mat, seg, level, fade, target: 0, paperTarget: 0 });
+      this.arcs.push({ mesh, mat, seg, level, fade, target: 0, paperTarget: 0, entryMul: this._entryT >= 1 ? 1 : 0 });
       this.arcs[this.arcs.length - 1]!.target = this.targetOf(this.arcs[this.arcs.length - 1]!);
     }
   }
@@ -275,10 +316,22 @@ export class BaseRing {
    *  into opacity under the morph and the ground. No allocation. */
   update(dt: number, cameraWorldPos: THREE.Vector3 | null): void {
     if (cameraWorldPos) this.uCam.copy(cameraWorldPos);
+    // The arrival beat (see beginEntry): held while the transition runs, then the staggered drop;
+    // parked at 1 in steady state, where this block costs nothing.
+    if (this._entryT < 1) {
+      if (!this._entryHold) {
+        this._entryTotal = entryTotal(this.arcs.length);
+        this._entryT = Math.min(1, this._entryT + dt / this._entryTotal);
+      }
+      this.applyEntry(this._entryT * this._entryTotal);
+      this._tickFade.base = RULER_PRESENCE_DARK * this._ticksMul;
+      this._tickFade.paperBase = RULER_PRESENCE_PAPER * this._ticksMul;
+    }
     const k = 1 - Math.exp(-RING_EASE * dt);
     for (const a of this.arcs) {
-      a.fade.base += (a.target - a.fade.base) * k;
-      a.fade.paperBase = (a.fade.paperBase ?? a.paperTarget) + (a.paperTarget - (a.fade.paperBase ?? a.paperTarget)) * k;
+      a.fade.base += (a.target * a.entryMul - a.fade.base) * k;
+      const pt = a.paperTarget * a.entryMul;
+      a.fade.paperBase = (a.fade.paperBase ?? pt) + (pt - (a.fade.paperBase ?? pt)) * k;
     }
   }
 

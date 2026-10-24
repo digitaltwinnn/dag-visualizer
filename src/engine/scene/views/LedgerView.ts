@@ -63,6 +63,7 @@ import {
   horizonAt,
   liveEdgePhase,
 } from "../../domain/ledgerModel";
+import { ENTRY_STAG, entryStep, entryTotal } from "../../domain/entryBeat";
 import { makeBarSpec, fillBarSpec, UNLISTED_KEY, RIBBON_LANE_HALF, type BarSpec } from "../../domain/ledgerBands";
 import type { ContainerSpec } from "../../domain/ledgerRails";
 import type {
@@ -200,9 +201,9 @@ export const TILE_TUNE_SCHEMA: TuneSchema<TileTune> = {
 // The view-entry drop's shape (see the VIEW-ENTRY DROP note in the class): fall height and
 // per-slot timing. The TOTAL is derived so _entryT in [0,1] maps onto real seconds.
 const ENTRY_H = 6.5;
-const ENTRY_FALL = 0.45;
-const ENTRY_STAG = 0.04;
-const ENTRY_TOTAL = ENTRY_FALL + ENTRY_STAG * (SLOT_N - 1);
+// The fall and the stagger live in `domain/entryBeat.ts` (2026-10-24) — the Geography base rings
+// drop on the same beat, so the numbers have one home.
+const ENTRY_TOTAL = entryTotal(SLOT_N);
 
 export class LedgerView implements SceneView {
   group: THREE.Group;
@@ -1217,10 +1218,9 @@ export class LedgerView implements SceneView {
       const tSec = this._entryT * ENTRY_TOTAL;
       for (let si = 0; si < SLOT_N; si++) {
         const start = (SLOT_N - 1 - si) * ENTRY_STAG; // reversed: the lead (slot 0) falls last
-        const p = Math.min(1, Math.max(0, (tSec - start) / ENTRY_FALL));
-        const e = p * p; // gravity: accelerate into the plane
-        this._entryDrop[si] = ENTRY_H * (1 - e);
-        this._entryFade[si] = Math.min(1, p * 1.6); // visible early in its own fall
+        const step = entryStep(tSec, start); // gravity into the plane, visible early in its own fall
+        this._entryDrop[si] = ENTRY_H * step.drop;
+        this._entryFade[si] = step.fade;
       }
       this._bar.setEntryDrop(this._entryDrop, this._entryFade);
       if (this._entryT >= 1) this._bar.setEntryDrop(null, null); // park — steady frames write nothing

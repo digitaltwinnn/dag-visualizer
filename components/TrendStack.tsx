@@ -644,8 +644,10 @@ export default function TrendStack() {
                       "absolute top-1/2 -translate-y-1/2 z-10 inline-flex h-7 touch:h-11 min-w-7 touch:min-w-11 items-center justify-center gap-0.5 rounded-full cursor-pointer",
                       // The word in the label step, plain case (user, 2026-10-19: the caps read "way too
                       // large" beside the chevron) — a quiet name, not an eyebrow.
-                      "border border-border bg-[var(--panel-solid)] text-primary-ink text-label font-medium whitespace-nowrap",
-                      "hover:bg-wash-soft disabled:opacity-30 disabled:cursor-default disabled:hover:bg-[var(--panel-solid)]",
+                      // In the plain muted ink, not the accent (user, 2026-10-24: the pills were "cyan and a
+                      // bit too strong"); the hover brings the word up to full ink like the plank's chevrons.
+                      "border border-border bg-[var(--panel-solid)] text-muted-foreground text-label font-medium whitespace-nowrap",
+                      "hover:bg-wash-soft hover:text-foreground disabled:opacity-30 disabled:cursor-default disabled:hover:bg-[var(--panel-solid)] disabled:hover:text-muted-foreground",
                       "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
                       target ? (dir === -1 ? "pl-1 pr-2.5" : "pl-2.5 pr-1") : "px-0",
                       dir === -1 ? "-left-4 touch:-left-3" : "-right-4 touch:-right-3",
