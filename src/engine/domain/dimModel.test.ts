@@ -10,6 +10,8 @@ import {
   focusBoost,
   focusGrow,
   focusWeightOf,
+  growWeightOf,
+  GROUP_GROW,
   ancestryGlow,
   GROUP_FOCUS,
   FOCUS_TUNE,
@@ -399,6 +401,16 @@ describe("focusWeightOf / GROUP_FOCUS (the focus ranking)", () => {
     expect(focusWeightOf(false, false)).toBe(0);
     expect(GROUP_FOCUS).toBeGreaterThan(0);
     expect(GROUP_FOCUS).toBeLessThan(1);
+  });
+
+  it("the SIZE channel gives a group member a far larger share than its glow (user, 2026-10-24: the swell is what reads on paper)", () => {
+    expect(growWeightOf(true, false)).toBe(1);
+    expect(growWeightOf(true, true)).toBe(1);
+    expect(growWeightOf(false, true)).toBe(GROUP_GROW);
+    expect(growWeightOf(false, false)).toBe(0);
+    expect(GROUP_GROW).toBeGreaterThan(GROUP_FOCUS);
+    expect(GROUP_GROW).toBeLessThan(1); // the primary still stands out of its group by size too
+    expect(FOCUS_SHARED_DEFAULTS.groupGrow).toBe(GROUP_GROW);
   });
 
   it("the emissive function scales the boost by the weight, so the subject outshines its group", () => {

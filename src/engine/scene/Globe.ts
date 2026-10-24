@@ -528,7 +528,7 @@ export class Globe implements GeoViewHost {
           azimuth: Math.atan2(hyperPos.z, hyperPos.x),
           spinAxis: new THREE.Vector3(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1).normalize(),
           spinSpeed: 0.3 + Math.random() * 0.5, spinPhase: Math.random() * 6.2831,
-          pick, fw: 0,
+          pick, fw: 0, growW: 0,
           gU: 0, gV: 0, gRank: 0, gCount: 0, gS: 0,
         };
         this.nodes.push(u);
@@ -920,7 +920,7 @@ export class Globe implements GeoViewHost {
             spinAxis: new THREE.Vector3(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1).normalize(),
             spinSpeed: 0.3 + Math.random() * 0.5, spinPhase: Math.random() * 6.2831,
             dim: 0, dimTarget: 0,
-            pick, fill: nodeFillOf(node.state), fw: 0,
+            pick, fill: nodeFillOf(node.state), fw: 0, growW: 0,
             gU: 0, gV: 0, gRank: 0, gCount: 0, gS: 0,
           });
         });
