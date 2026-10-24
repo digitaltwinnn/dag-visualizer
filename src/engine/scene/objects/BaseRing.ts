@@ -71,7 +71,7 @@ export const WEDGE_REST_MUL = 0.3;
 /** …but the DARK ground rests lower: additive light over black reads at a fraction of the ink the
  *  same weight lays on paper (user, 2026-10-24: "while normal ok for light but in dark its too
  *  much now"). The hover and commit weights are shared; only the quiet pie differs by ground. */
-export const WEDGE_REST_MUL_DARK = 0.1;
+export const WEDGE_REST_MUL_DARK = 0.14; // 0.1 → 0.14 (user: "increase rest fill just a bit")
 export const WEDGE_DIM_MUL = 0.12;
 
 /** THE ARRIVAL DROP (user, 2026-10-24: the rings "appear staggered and with the same timing as
