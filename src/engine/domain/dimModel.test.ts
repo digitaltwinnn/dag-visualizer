@@ -47,8 +47,8 @@ const ctx = (overrides: Partial<DimContext> = {}): DimContext => ({
 // than a design decision.
 describe("nodeDimScale", () => {
   // js/globe.js:830-833 verbatim
-  it("is the hyper floor (the row's dim, 0.5 since 2026-10-24) at morph=0", () => {
-    expect(nodeDimScale(ctx({ morph: 0 }))).toBeCloseTo(0.5, 10);
+  it("is the hyper floor (the row's dim, 0.42 since 2026-10-24) at morph=0", () => {
+    expect(nodeDimScale(ctx({ morph: 0 }))).toBeCloseTo(0.42, 10);
   });
 
   it("ramps linearly to the geo ceiling 1.0 at morph=1", () => {
@@ -56,11 +56,11 @@ describe("nodeDimScale", () => {
   });
 
   it("is hyper + (geo − hyper)·morph at a midpoint", () => {
-    expect(nodeDimScale(ctx({ morph: 0.5 }))).toBeCloseTo(0.5 + 0.5 * 0.5, 10);
+    expect(nodeDimScale(ctx({ morph: 0.5 }))).toBeCloseTo(0.42 + 0.5 * (1 - 0.42), 10);
   });
 
   it("hover-preview dims at the same strength as a committed filter (the forced 0.85 is gone)", () => {
-    expect(nodeDimScale(ctx({ hoverFilterActive: true, morph: 0 }))).toBeCloseTo(0.5, 9);
+    expect(nodeDimScale(ctx({ hoverFilterActive: true, morph: 0 }))).toBeCloseTo(0.42, 9);
     expect(nodeDimScale(ctx({ hoverFilterActive: true, morph: 1 }))).toBeCloseTo(1, 9);
   });
 
@@ -181,8 +181,8 @@ describe("offNetMul (the off-filter dim for a view's own FURNITURE, not its data
   // RIBBON_DIM rode here too until the chamber's bands, tiles and ribbons were recognised as DATA
   // and moved onto the node's own `dim` (snapBright, below) — so hyper is now the only view that
   // actually draws per-network furniture.
-  it("is one minus the hyper row's elem (0.5 since 2026-10-24; 0.62 was the pre-knob look)", () => {
-    expect(offNetMul("hyper")).toBeCloseTo(0.5, 10);
+  it("is one minus the hyper row's elem (0.56 since 2026-10-24; 0.62 was the pre-knob look)", () => {
+    expect(offNetMul("hyper")).toBeCloseTo(0.56, 10);
   });
 
   // Both zeros are honest readings, not unset fields: the globe's off-filter answer is the nodes
@@ -482,7 +482,7 @@ describe("nodeDim", () => {
   it("applies in hyper too — an off-filter metagraph node mutes there instead of resting dim", () => {
     // The old metaNodeDim returned 0 here whatever the dim target, which is what made the `hide`
     // knob look like it only touched the DAG core.
-    expect(nodeDim(ctx({ morph: 0 }), 1, null)).toBeCloseTo(0.5, 10);
+    expect(nodeDim(ctx({ morph: 0 }), 1, null)).toBeCloseTo(0.42, 10);
   });
 
   it("raises the dim to countryMix when the node is outside the drilled country", () => {
