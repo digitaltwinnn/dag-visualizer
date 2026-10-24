@@ -3,13 +3,14 @@
 import { useMemo } from "react";
 
 import LiveFoot from "@/components/explorer/LiveFoot";
+import { listReading } from "@/src/data/explorerMeasure";
 import Explorer, { type ExplorerLevelSpec } from "@/components/explorer/Explorer";
 import { NODE_GLYPH_W, nodeRowSpec } from "@/components/explorer/nodeRow";
 import { IdentityDot, RoleChips } from "@/components/inspector/parts";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { compositionClause, compositionGroups } from "@/src/data/composition";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
-import { HYPER_MEASURE_OPTIONS, groupMeasure, type HyperMeasure } from "@/src/data/hyperMeasure";
+import { HYPER_MEASURE_OPTIONS, groupMeasure, type HyperMeasure, HYPER_MEASURE_ADDITIVE } from "@/src/data/hyperMeasure";
 import { metagraphById } from "@/src/data/network";
 import type { NodeRow } from "@/src/data/types";
 import { compositionToggleActions, filterToggleActions, nodeSelectActions } from "@/src/engine/domain/pickActions";
@@ -89,7 +90,7 @@ export default function HyperExplore() {
       measure: { options: HYPER_MEASURE_OPTIONS, value: hyperMeasure, onPick: (id) => setHyperMeasure(id as HyperMeasure) },
       hasFigure: true,
       // The live foot on every level (components/explorer/LiveFoot.tsx has the argument).
-      pager: <LiveFoot />,
+      pager: <LiveFoot reading={listReading(measured.map(({ v }) => v), HYPER_MEASURE_ADDITIVE[hyperMeasure])} />,
       // No tags at this level, so the name takes the tag home's room (the longest catalog name
       // fits without an ellipsis).
       nameW: 128,
@@ -136,7 +137,7 @@ export default function HyperExplore() {
       measure: { options: HYPER_MEASURE_OPTIONS, value: hyperMeasure, onPick: (id) => setHyperMeasure(id as HyperMeasure) },
       hasFigure: true,
       // The live foot on every level (components/explorer/LiveFoot.tsx has the argument).
-      pager: <LiveFoot />,
+      pager: <LiveFoot reading={listReading(groupValues, HYPER_MEASURE_ADDITIVE[hyperMeasure])} />,
       nameW: 52,
       // Honest instrument state — mirrors the 3D: a metagraph with no reported nodes renders a
       // hub and nothing else.

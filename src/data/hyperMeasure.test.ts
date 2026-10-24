@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { MetaInfo, NodeRow } from "@/src/data/types";
-import {
-  HYPER_MEASURE_LABELS,
+import {  HYPER_MEASURE_LABELS,
   HYPER_MEASURE_OPTIONS,
   HYPER_MEASURE_ORDER,
   groupMeasure,
   networkMeasure,
+  HYPER_MEASURE_ADDITIVE,
 } from "./hyperMeasure";
 
 // The Hypergraph explorer's network-row figure (user, 2026-10-07 — the view is the architecture,
@@ -48,5 +48,11 @@ describe("groupMeasure — a composition row's figure, the network level's pick 
     expect(groupMeasure("nodes", rows)).toBe(4);
     expect(groupMeasure("l0", rows)).toBe(2);
     expect(groupMeasure("dl1", rows)).toBe(1);
+  });
+});
+
+describe("HYPER_MEASURE_ADDITIVE", () => {
+  it("every measure is a participant count, so every one adds up", () => {
+    expect(Object.values(HYPER_MEASURE_ADDITIVE).every(Boolean)).toBe(true);
   });
 });

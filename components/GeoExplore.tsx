@@ -12,8 +12,7 @@ import {
   GEO_MEASURE_OPTIONS,
   cohortMeasure,
   COHORT_MEASURES,
-  type GeoMeasure,
-} from "@/src/data/geoMeasure";
+  type GeoMeasure, GEO_MEASURE_ADDITIVE } from "@/src/data/geoMeasure";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { filterAccent, metagraphById } from "@/src/data/network";
 import type { NodeRow } from "@/src/data/types";
@@ -24,7 +23,7 @@ import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 import { NO_SIGNAL_COPY, useNoSignal } from "@/components/useNoSignal";
 import { ccMark } from "@/src/util/format";
-import { levelMeasure } from "@/src/data/explorerMeasure";
+import { levelMeasure, listReading } from "@/src/data/explorerMeasure";
 import { cohortsLevel, countriesLevel, countryNodes, nodesByCountry } from "@/src/data/ladderLevels";
 import { UNLISTED_ID } from "@/src/data/unlisted";
 
@@ -112,7 +111,7 @@ export default function GeoExplore() {
       measure: { options: GEO_MEASURE_OPTIONS, value: geoMeasure, onPick: (id) => setGeoMeasure(id as GeoMeasure) },
       hasFigure: true,
       // The live foot on every level (components/explorer/LiveFoot.tsx has the argument).
-      pager: <LiveFoot />,
+      pager: <LiveFoot reading={listReading(measured.map(({ v }) => v), GEO_MEASURE_ADDITIVE[geoMeasure])} />,
       // No tags at this level, so the name takes the tag home's room.
       nameW: 128,
       // Quiet-empty (a real metagraph with no locatable nodes): one honest message, no rows.
@@ -162,7 +161,7 @@ export default function GeoExplore() {
       measure: { options: COHORT_MEASURE_OPTIONS, value: cohortPick, onPick: (id) => setGeoMeasure(id as GeoMeasure) },
       hasFigure: true,
       // The live foot on every level (components/explorer/LiveFoot.tsx has the argument).
-      pager: <LiveFoot />,
+      pager: <LiveFoot reading={listReading(cohorts.map((ch) => cohortMeasure(cohortPick, ch.rows)), GEO_MEASURE_ADDITIVE[cohortPick])} />,
       nameW: 76,
       empty: "No locatable nodes here yet.",
       rows: cohorts.map((ch) => {

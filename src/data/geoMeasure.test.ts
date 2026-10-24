@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { NodeRow } from "@/src/data/types";
-import {
-  COHORT_MEASURE_OPTIONS,
+import {  COHORT_MEASURE_OPTIONS,
   COHORT_MEASURES,
   GEO_MEASURE_LABELS,
   GEO_MEASURE_OPTIONS,
@@ -10,6 +9,7 @@ import {
   countryMeasure,
   networkOfRow,
   providerOfRow,
+  GEO_MEASURE_ADDITIVE,
 } from "./geoMeasure";
 
 // The Geography explorer's country-row figure, as a vocabulary (2026-09-26): nodes, distinct
@@ -70,5 +70,11 @@ describe("networkOfRow", () => {
   it("names a metagraph node's network and the DAG for a core node", () => {
     expect(networkOfRow({ pick: { kind: "metanode", meta: { id: "dor" } } } as unknown as NodeRow)).toBe("dor");
     expect(networkOfRow({ pick: { kind: "l0", node: {} } } as unknown as NodeRow)).toBe("dag");
+  });
+});
+
+describe("GEO_MEASURE_ADDITIVE", () => {
+  it("nodes add up across rows; the networks and providers in a country overlap", () => {
+    expect(GEO_MEASURE_ADDITIVE).toEqual({ nodes: true, metagraphs: false, providers: false });
   });
 });

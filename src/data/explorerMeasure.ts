@@ -30,3 +30,15 @@ export function levelOptions<M extends string, L extends M>(
 export function levelMeasure<L extends string>(applies: readonly L[], pick: string): L {
   return (applies as readonly string[]).includes(pick) ? (pick as L) : applies[0];
 }
+
+/** THE LIST'S READING FOR ITS FOOT (user, 2026-10-24: "use the bottom section in the explorer
+ *  that says 'live' to also show a total/avg of the list that is displayed"). Where the rows ADD
+ *  UP to a whole — nodes per country, per provider, per network, per layer — the foot states the
+ *  TOTAL; where they overlap across rows (the networks or providers in each country: one network
+ *  sits in several) a sum would count the same thing twice, so it states the AVERAGE per row
+ *  instead (rule 10). Null for an empty list — nothing to read. */
+export function listReading(values: readonly number[], additive: boolean): { word: "total" | "average"; value: number } | null {
+  if (values.length === 0) return null;
+  const sum = values.reduce((a, v) => a + v, 0);
+  return additive ? { word: "total", value: sum } : { word: "average", value: sum / values.length };
+}
