@@ -49,7 +49,7 @@ export const TICK_MAJOR = R * 0.026;
  *  60% to read at all (user, 2026-10-24: the ruler "only shows in light mode"); on paper the mask
  *  blend lays ink, so the rails' own level holds. */
 export const RULER_PRESENCE_DARK = 0.45;
-export const RULER_PRESENCE_PAPER = 0.4;
+export const RULER_PRESENCE_PAPER = 0.85; // 0.4 was "almost invisible" on Print (user, 2026-10-24)
 
 /** THE ARRIVAL DROP (user, 2026-10-24: the rings "appear staggered and with the same timing as
  *  the snapshot view's actual snapshots"): every arc is held this high and dark through the
@@ -141,6 +141,8 @@ export interface RingHost {
   accent: () => number;
 }
 
+const arcKey = (level: number, seg: RingSegment): string => `${level}|${seg.cc ?? ""}|${seg.isp ?? ""}|${seg.net ?? ""}`;
+
 interface Arc { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; seg: RingSegment; level: number; fade: FadeEntry; target: number; paperTarget: number; entryMul: number }
 
 export class BaseRing {
@@ -222,6 +224,12 @@ export class BaseRing {
   }
 
   private setSegments(entries: readonly { seg: RingSegment; level: number }[]): void {
+    // PRESENCE CARRIES ACROSS A REBUILD (2026-10-24, measured: the data poll rebuilds the rings
+    // every few seconds, and every arc restarted from dark and eased back up — a dip on every poll
+    // that read as "less bright than at rest" whenever it coincided with a hover). An arc that
+    // exists on both sides keeps its eased presence and its place in the arrival beat.
+    const keep = new Map<string, Arc>();
+    for (const a of this.arcs) keep.set(arcKey(a.level, a.seg), a);
     for (const a of this.arcs) {
       this.group.remove(a.mesh);
       a.mesh.geometry.dispose();
@@ -283,7 +291,13 @@ export class BaseRing {
       }
       if (level === 2) joinBloom(mesh); // the identity reading glows like the chips it counts
       this.group.add(mesh);
-      this.arcs.push({ mesh, mat, seg, level, fade, target: 0, paperTarget: 0, entryMul: this._entryT >= 1 ? 1 : 0 });
+      const prev = keep.get(arcKey(level, seg));
+      if (prev) {
+        fade.base = prev.fade.base;
+        fade.paperBase = prev.fade.paperBase;
+        mesh.position.z = prev.mesh.position.z;
+      }
+      this.arcs.push({ mesh, mat, seg, level, fade, target: 0, paperTarget: 0, entryMul: prev ? prev.entryMul : this._entryT >= 1 ? 1 : 0 });
       this.arcs[this.arcs.length - 1]!.target = this.targetOf(this.arcs[this.arcs.length - 1]!);
     }
   }

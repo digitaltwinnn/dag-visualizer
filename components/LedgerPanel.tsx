@@ -276,8 +276,16 @@ export default function LedgerPanel() {
   // `components/FollowControl.tsx`); the scene callout mirrors it and this explorer no longer
   // carries the pill or its hover preview.
 
-  // The shown tick's state mark (see the tick rows): the card's live dot while following, a pin while pinned.
-  const followMark = following ? <LiveDot /> : <PinMark className="text-muted-foreground" />;
+  // The shown tick's state mark (see the tick rows): the card's live dot while following, a pin
+  // while pinned — WITH ITS WORD (user, 2026-10-24: the bullet "sits close to the left column and
+  // has lots of room to the right, makes sense to add 'live' or 'pinned'"), the one state species
+  // the Global snapshot card's control and the callout already spell out.
+  const followMark = (
+    <span className="inline-flex items-center gap-1 text-label tracking-caps uppercase text-muted-foreground">
+      {following ? <LiveDot /> : <PinMark className="text-muted-foreground" />}
+      {following ? "live" : "pinned"}
+    </span>
+  );
 
   // ---- level 0: the ticks, paged, measured by the heading's pick -------------------------------
   const tickValues = pagedSnaps.map((d) => tickMeasureValue(ledgerMeasure, d, snapshotExact[d.ordinal]));

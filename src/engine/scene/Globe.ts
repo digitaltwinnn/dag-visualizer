@@ -1039,7 +1039,7 @@ export class Globe implements GeoViewHost {
     this.countryFilter = null; // switching network clears the country drill-down
     this._activeCcsCache = null; // the drillable-country set follows the filter
     this._updateCountryBorder();
-    this._applyDim(sel);
+    this._applyDim(this._hoverSel || sel); // a live hover preview survives a data rebuild's re-apply
     this._relayoutGeo();
     this._applyGlowFilter(); // just show/hide the matching pools — no recluster
     this._rebuildBaseRing(); // the rings re-partition over the filtered fleet (domain/baseRing)
@@ -1048,8 +1048,13 @@ export class Globe implements GeoViewHost {
   // Transient PREVIEW dim (filter-chip / hub hover): same dim TARGETS as setFilter, but does
   // NOT commit `this.filter` or relayout geo — and the same per-view dim STRENGTH too.
   setHoverFilter(sel: string | null): void {
+    this._hoverSel = sel;
     this._applyDim(sel || this.filter);
   }
+  /** The live hover preview's selector, so a data rebuild's own `setFilter` re-asserts it instead
+   *  of the committed filter (2026-10-24, measured: every poll reset the rings' subject to "all"
+   *  mid-hover, and the chips' dim targets with it — "the hover effect is not very clear"). */
+  private _hoverSel: string | null = null;
 
   // Set the dim TARGETS for a selection (the dim itself eases each frame).
   // ⚠️ In the LEDGER the DAG core is ALWAYS lit (user, 2026-08-30: "the DAG nodes should never be
