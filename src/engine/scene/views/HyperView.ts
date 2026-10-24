@@ -214,6 +214,13 @@ export class HyperView implements SceneView {
   private _tetherEntryHold = false;
   clock: number;
   focusId: string | null;
+  /** THE HOVER PREVIEW (2026-10-24, user: "the hover effect when we hover the filter metagraph is
+   *  often also not very clear … only snapshots view does that great"): the filter chips' hover
+   *  wrote `hoverFilter`, the Globe dimmed the NODES by the hyper row's `dim`, but the hubs — the
+   *  furniture that carries this view's emphasis (`elem`) — keyed on `focusId` alone, which only a
+   *  COMMIT sets (it also freezes the orbits, flattens the tilt and flies the camera, none of which
+   *  a hover may do). The preview dims the other hubs exactly as a commit does and nothing else. */
+  previewId: string | null = null;
   ledger: boolean;
   // View-derived gate from VIEW_POLICIES: when false the hub constellation holds still (folds into
   // `frozen` in update, alongside — but independent of — the focusId freeze). Only hyper leaves it on.
@@ -883,7 +890,9 @@ export class HyperView implements SceneView {
       // fainter tether — present in the architecture, but clearly not live.
       // When a metagraph is selected (focusId), dim the OTHER hubs *subtly* — a gentle
       // out-of-focus push (DoF + camera focus already carry most of the emphasis).
-      const focusOther = this.focusId != null && m.cfg.id !== this.focusId;
+      const focusOther =
+        (this.focusId != null && m.cfg.id !== this.focusId) ||
+        (this.previewId != null && this.previewId !== "all" && m.cfg.id !== this.previewId);
       const fdim = focusOther ? hubOffMul : 1; // glow / tether
       // Inactive (node-less) metagraphs read as present-but-quiet — dimmer than active, but NOT
       // buried (user: decrease the inactive dim); their rings are all-dotted (setHoopPresence).

@@ -866,3 +866,10 @@ export const useStore = create<AppState>((set) => ({
   setTrendFront: (trendFront) => set((s) => (s.trendFront === trendFront ? s : { trendFront })),
   setTheme: (pref, resolved) => set({ themePref: pref, theme: resolved }),
 }));
+
+// A DEV HANDLE on the store (2026-10-24), the `__dagPerf` idiom: headless verification drives the
+// real UI and needs to read what a gesture wrote (a hover channel, the committed filter) without
+// reaching into React internals. Never in a production bundle.
+if (process.env.NODE_ENV !== "production" && typeof window !== "undefined") {
+  (window as unknown as { __dagStore?: unknown }).__dagStore = useStore;
+}

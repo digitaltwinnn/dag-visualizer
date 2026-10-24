@@ -1098,6 +1098,7 @@ export class Engine {
         if (st.hoverFilter !== prev.hoverFilter) {
           this._hoverFilter = st.hoverFilter;
           this.globe.setHoverFilter(st.hoverFilter);
+          this.layers.previewId = st.hoverFilter; // the hubs preview the dim too (HyperView.previewId)
           // Through the ledger's own lens (ledgerLens): a hovered DAG chip previews the whole
           // chamber, exactly what committing it means there (user, 2026-08-13).
           this.ledger.setHoverFilter(st.hoverFilter == null ? null : ledgerLens(st.hoverFilter));

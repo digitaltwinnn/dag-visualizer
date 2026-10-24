@@ -43,7 +43,7 @@ export const FOCI = {
   // positioned in the view center"): the target sits below the globe's centre and the orbit is
   // 5.5% longer so the taller body keeps headroom under the bar; the pitch is the old one (the
   // pos − target delta is (0, 13.5, 44.8) scaled about the target).
-  geo: { pos: new THREE.Vector3(0, 9.7, 47.3), target: new THREE.Vector3(0, -4.5, 0) },
+  geo: { pos: new THREE.Vector3(0, 11, 47.3), target: new THREE.Vector3(0, -3.2, 0) },
   // Metagraph-selection pose: rotated-to-densest at a WIDE distance — deliberately farther out
   // than the country framing (geoFraming z 29..25) so the country drill reads as a real zoom-in.
   // Camera held LOW (near the equator plane, like the country/node poses) — a higher camera

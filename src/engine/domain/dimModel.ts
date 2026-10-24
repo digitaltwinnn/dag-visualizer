@@ -238,7 +238,7 @@ export const FOCUS_TUNE_DEFAULTS: Readonly<Record<View3D, Readonly<FocusRow>>> =
   // wanted app-wide. Values: hyper pulled 0.45 → 0.28 (was "a bit too much"); geo/ledger
   // smaller still — their chips sit in dense stacks/trays where a large swell collides
   // with neighbours.
-  hyper: { dim: 0.32, hide: 0, elem: 0.38, back: 0.41, boost: 1.1, grow: 0.28 },
+  hyper: { dim: 0.5, hide: 0, elem: 0.5, back: 0.41, boost: 1.1, grow: 0.28 }, // dim 0.32 → 0.5, elem 0.38 → 0.5 (user, 2026-10-24: a hovered or committed network's others were "not very clear" — 68% of their light was below noticing)
   geo: { dim: 1.0, hide: 1, elem: 0, back: 0.65, boost: 0.7, grow: 0.24 }, // 0.16 → 0.24 (user, 2026-08-30: "same as hyper" — the old value was below noticing in a stack); hyper stays loudest
   ledger: { dim: 0.67, hide: 0, elem: 0, back: 0.55, boost: 0.7, grow: 0.24 }, // dim 0.5 → 0.67 (user export, 2026-08-30): a deeper coloured dim on the other lanes, paired with the DAG core never dimming here at all (Globe._applyDim's ledger rule)
   // trend: no shared nodes reach this view at all (the fleet parks), so the row is inert in
