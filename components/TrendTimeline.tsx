@@ -7,8 +7,7 @@ import { ScalePill, WindowPicker } from "@/components/trendPickers";
 import useTrendRoster from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import useTrendsWindow from "@/components/useTrendsWindow";
-import { useTouch } from "@/components/useTouch";
-import { metricCaption, stepFor } from "@/src/data/trendSeries";
+import { stepFor } from "@/src/data/trendSeries";
 import { leadingTrim } from "@/src/data/trendWindow";
 import { useStore } from "@/src/store/store";
 
@@ -54,7 +53,6 @@ import { useStore } from "@/src/store/store";
 // is pure and tested in `src/data/trendTimeline.ts`, which is what keeps both halves thin.
 
 /** Whether the gesture hint has done its job this session — a range or a picked moment proves it. */
-let hintSpent = false;
 
 export default function TrendTimeline() {
   const metric = useStore((s) => s.trendMetric);
@@ -114,12 +112,6 @@ export default function TrendTimeline() {
   // object — so presence alone cannot be the gate for drawing a track.
   const measured = overview != null && overview.buckets.length > 0;
 
-  // THE HINT, until the band has been used once this session (design round 2026-09-29, option B —
-  // "one quiet line of instruction … that fades once you've used it"). A range or a picked moment
-  // is proof the gestures are known; the pointer's own word says tap or click.
-  const coarse = useTouch();
-  if (range != null || cursorMs != null) hintSpent = true;
-  const showHint = !hintSpent;
 
   return (
     // THE ONE `pointer-events-auto` (see the header). Everything else in the band stays inert.
@@ -204,20 +196,13 @@ export default function TrendTimeline() {
           />
         )}
         </div>
-        {/* THE CAPTION SITS UNDER THE TRACK (user, 2026-10-07: the dotted tethers from the charts land
-            on the track's top edge, and a caption above it covered them — "move those to the bottom
-            so that dotted lines are visually linked to the slider"). */}
-        {/* …and stands down on the PHONE (user, 2026-10-08): the hint is hidden there, and the
-            caption restated what the front chart's own title already says. */}
-        <div className="flex items-baseline justify-between gap-3 pt-1 leading-none max-[700px]:hidden">
-          <span className="text-label text-muted-foreground truncate">{metricCaption(metric, 86_400_000)} across all networks</span>
-          {/* …and only over a track there is something to drag on. */}
-          {showHint && measured && (
-            <span className="flex-none text-label text-foreground-dim max-[700px]:hidden">
-              Drag to set a range, {coarse ? "tap" : "click"} to mark a moment
-            </span>
-          )}
-        </div>
+        {/* NO CAPTION ROW (2026-10-24, user: the band "needs a bit more margin at the top, I think
+            best is to just remove the text at the bottom of the section; control should be self
+            explanatory"). It carried the overview's unit ("Snapshots per day across all networks",
+            under the track since 2026-10-07 so the charts' tethers could land on its top edge) and
+            the gesture hint ("Drag to set a range, click to mark a moment"); the phone had already
+            dropped both on 2026-10-08. The front card's title names the measure, the track's own
+            cursor and brushed span show the two gestures, and the row's height goes to the track. */}
       </div>
     </div>
   );
