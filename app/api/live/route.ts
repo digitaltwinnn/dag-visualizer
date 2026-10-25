@@ -8,6 +8,7 @@ import { assembleWithUnlisted } from "./assemble";
 import { LIVE_GLOBALS } from "./limit";
 import { quietSetFor } from "./quiet";
 import { memo, readChain, readGlobals } from "./upstream";
+import { SNAPSHOT_WINDOW, cacheControl } from "./windows";
 
 // The shared live answer: 12 globals + each chain's tail, one upstream fan-out per ~4 s per instance,
 // edge-cached so every viewer shares it. A failed globals read is an honest 503 and is never cached.
@@ -18,7 +19,7 @@ export async function GET(req: Request) {
   const net = netOf(req);
   const be = NETWORKS[net].be;
   try {
-    const { value, ageMs } = await memo(`live:${net}`, 4000, async () => {
+    const { value, ageMs } = await memo(`live:${net}`, SNAPSHOT_WINDOW.memoMs, async () => {
       return assembleWithUnlisted(
         { globals: () => readGlobals(be, LIVE_GLOBALS), chain: (id) => readChain(be, id, POLL.metaSnapTail) },
         sampledIds(net),
@@ -28,7 +29,7 @@ export async function GET(req: Request) {
     });
     const body: LiveAnswer = { ...value, memoAgeMs: ageMs };
     return NextResponse.json(body, {
-      headers: { "Cache-Control": "public, s-maxage=4, stale-while-revalidate=2" },
+      headers: { "Cache-Control": cacheControl(SNAPSHOT_WINDOW) },
     });
   } catch (e) {
     console.error("live: globals read failed", e);

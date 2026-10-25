@@ -5,6 +5,7 @@ import { isTracked } from "@/src/net/lineage";
 import { unlistedChains } from "../../../network/unlistedChains";
 import { META_LADDER, clampLimit } from "../../limit";
 import { memo, readChain } from "../../upstream";
+import { SNAPSHOT_WINDOW, cacheControl } from "../../windows";
 
 // One chain's newest snapshots (catch-up and self-heal), the limit rounded up to `META_LADDER`. The
 // id must be a tracked chain or a listed unlisted one, so the route is not an open proxy to the
@@ -31,10 +32,10 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   }
 
   try {
-    const { value, ageMs } = await memo(`meta:${net}:${id}:${limit}`, 4000, () => readChain(NETWORKS[net].be, id, limit));
+    const { value, ageMs } = await memo(`meta:${net}:${id}:${limit}`, SNAPSHOT_WINDOW.memoMs, () => readChain(NETWORKS[net].be, id, limit));
     return NextResponse.json(
       { snapshots: value, memoAgeMs: ageMs },
-      { headers: { "Cache-Control": "public, s-maxage=4, stale-while-revalidate=2" } },
+      { headers: { "Cache-Control": cacheControl(SNAPSHOT_WINDOW) } },
     );
   } catch (e) {
     console.error("live/meta: read failed", e);

@@ -25,8 +25,12 @@ them — but the Next Node server can.
   `public, s-maxage=4, stale-while-revalidate=2`; `/globals` and `/meta/[id]` are the catch-up reads at
   the same header; `/clusters` is the L0 + L1 node lists at `s-maxage=25, stale-while-revalidate=5`.
   Each body carries `memoAgeMs`, which with the edge `Age` header dates the data (the client's
-  `dataTime`). Each route holds a **module-level memo** (`upstream.ts`, per network, 4 s; 25 s for
-  clusters) that checks its own timestamp and shares one in-flight promise between concurrent misses;
+  `dataTime`). **Every window is derived from the client's poll in ONE home**, `windows.ts`
+  (2026-10-25 — the routes held a second copy of the cadence, and the cluster poll moved 25 → 30s
+  under them): the edge a little under the poll (4s for the 5s feeds, 25s for the 30s one), the
+  memo at most 5s, because the two caches STACK — the oldest answer a tab can get is memo + edge +
+  stale-while-revalidate, 10s and 35s today (`worstAgeMs`, tested). Each route holds a **module-level memo** (`upstream.ts`, per network) that checks its own
+  timestamp and shares one in-flight promise between concurrent misses;
   never `unstable_cache`, whose revalidate is too coarse for a 4 s window. The memo drops an expired
   entry when it is read and sweeps expired entries once it holds more than 256. **`?limit=` rounds UP
   to a fixed ladder** (`limit.ts`'s `clampLimit` — the client's own limits, `META_LADDER` derived from
