@@ -28,7 +28,6 @@
 import NetLink from "@/components/NetLink";
 import FooterViewLinks from "@/components/FooterViewLinks";
 import { useStore } from "@/src/store/store";
-import { metagraphById } from "@/src/data/network";
 import { DOC_PATHS, type DocPage } from "@/components/views";
 import { cn } from "@/lib/utils";
 
@@ -69,17 +68,12 @@ function DocToggle({ page, href, children }: { page: DocPage; href: string; chil
 }
 
 export default function SiteFooter() {
-  // The DAG core's one-home config: the official site URL and the $DAG brand mark the
-  // Constellation link below wears (same record the dossier avatar reads).
-  const dag = metagraphById("dag");
-  // SCENE mode takes the strip FULL-BLEED (user, 2026-09-14: "expand the footer to full width —
-  // the vitals it attached to is no longer there"). The `--bar-margin` inset is not a margin for
-  // its own sake: it exists so this row's edges line up with the two BARS and the rail cards
-  // above them. Presentation mode sends the rails out through their own edges and the vitals lane
-  // down through this one, so the alignment has nothing left to align TO — and an inset veil under
-  // an empty scene reads as a strip that failed to reach the screen, the same misread the phone
-  // arm below already fixes for the dock. The top bar keeps its inset: it is still on screen, so
-  // it is still the thing an inset would answer to.
+  // SCENE MODE SENDS THE STRIP OUT THROUGH THE BOTTOM EDGE (user, 2026-10-25: "Scene mode, hide
+  // also the footer and the bar"). It is the rails' own exit — each piece of chrome leaves by the
+  // edge it lives against (`#leftcol`/`#rightcol` in globals.css) — so the whole HUD steps aside
+  // in one gesture and the scene is the only thing left on screen; the one way back is the
+  // floating control PresentationToggle keeps at the bar's corner. From 2026-09-14 until then the
+  // strip stayed and went full-bleed (the bars it aligned with were gone).
   const railsHidden = useStore((s) => s.railsHidden);
   return (
     // pointer-events-none on the band, auto on the links: an orbit drag started along the bottom
@@ -95,12 +89,10 @@ export default function SiteFooter() {
         "fixed bottom-0 z-10 flex items-stretch pointer-events-none",
         // ⚠️ THE SHADE RECIPE'S TWO TEMPOS, because this is the same gesture as the rails' exit:
         // 0.3s away, 0.18s back (the HUD returns faster than it steps aside — the return answers a
-        // gesture already finished). Named as `left,right` rather than `all`: this row also carries
+        // gesture already finished). Named as `transform` rather than `all`: this row also carries
         // a `height` change on the phone/doc arms, and a blanket transition would animate that too.
-        "transition-[left,right] duration-[180ms] ease-out motion-reduce:transition-none",
-        railsHidden
-          ? "inset-x-0 duration-300 ease-[ease]"
-          : "inset-x-[var(--bar-margin)]",
+        "inset-x-[var(--bar-margin)] transition-transform duration-[180ms] ease-out motion-reduce:transition-none",
+        railsHidden && "translate-y-full duration-300 ease-[ease]",
         // The +min(10px, --bottom-reserve) TUCK (user, 2026-09-04): the vitals band's rounded
         // bottom corners left notches of bare scene where they met this strip's square top.
         // The strip reaches ~10px up BEHIND the band (later in the DOM at the same z, so the
@@ -135,14 +127,13 @@ export default function SiteFooter() {
           "pt-[min(10px,var(--bottom-reserve,0px))]",
         )}
       >
-        {/* THE ROW IS THREE GROUPS, ONE SEPARATOR (user, 2026-09-04, two rounds): app
-            navigation, the off-scene doc pages, then the external world. Group hairlines were
-            tried and pulled the same day — with the tuck they ran the strip's full height and
-            "cut the whole section in half" — so the mid-dot is the row's ONE separator species,
-            and what sets the external group apart is its brand marks, not a divider. Home
-            retired with the standalone pages: closing the doc is what every view link and the
-            brand already do. Phone drops the view group (the header's… the BAR's own switch
-            carries the views there). */}
+        {/* THE ROW IS TWO GROUPS, ONE SEPARATOR (user, 2026-09-04, two rounds; the external
+            group left on 2026-10-25, see below): app navigation, then the off-scene doc page.
+            Group hairlines were tried and pulled the same day — with the tuck they ran the
+            strip's full height and "cut the whole section in half" — so the mid-dot is the row's
+            ONE separator species. Home retired with the standalone pages: closing the doc is what
+            every view link and the brand already do. Phone drops the view group (the BAR's own
+            switch carries the views there). */}
         <FooterViewLinks />
         {/* The two doc pages, named directly rather than mapped: the row's ORDER and its
             mid-dot are typography, not registry data. The measured history is not among them —
@@ -151,37 +142,11 @@ export default function SiteFooter() {
         <DocToggle page="about" href={DOC_PATHS.about}>
           About
         </DocToggle>
-        <span aria-hidden className="w-px h-3.5 self-center bg-muted-foreground/35" />
-        <a
-          href={GITHUB}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1 hover:text-foreground transition-colors"
-        >
-          <GithubMark />
-          Source code
-        </a>
-        <span aria-hidden className="w-px h-3.5 self-center bg-muted-foreground/35" />
-        {/* The repo and the official site stay clearly TWO things — one is this project's, the
-            other is the network's (the affiliation boundary /about states in words) — told apart
-            by each link's own brand mark (the one-separator rule above). The Constellation link
-            wears the official $DAG mark from the app's own catalog config (metagraphById("dag")
-            — the same one-home record the dossier avatar and this href's siteUrl read),
-            identifying, not claiming. */}
-        <a
-          href={dag?.siteUrl ?? CONSTELLATION}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1 hover:text-foreground transition-colors"
-        >
-          {dag?.iconUrl && (
-            // A 12px brand dot: plain <img>, round like every brand icon (the dossier avatar's
-            // own rule) — Radix Avatar's load machinery is a client concern this static row
-            // doesn't need.
-            <img src={dag.iconUrl} alt="" width={14} height={14} className="rounded-full flex-none" />
-          )}
-          Constellation
-        </a>
+        {/* THE EXTERNAL LINKS LEFT THE ROW (user, 2026-10-25: the source link "takes place and
+            is not very useful but more distracting", and Constellation "is also already in the
+            about page"). Both stay one step away — /about carries them, and the phone's ⚙ menu
+            still lists them (it imports the constants and the mark from here) — so the row is
+            the app's own navigation and the one statement below, nothing external. */}
         {/* THE DISCLAIMER IS A STATEMENT, NOT A LINK (user, 2026-09-04, two rounds): caps-micro
             behind its own hairline so it can't read as a fifth destination; non-interactive —
             the full disclosure is one click away behind About. The amber advisory register was

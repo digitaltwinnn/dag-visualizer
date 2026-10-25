@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Focus, Table2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
@@ -50,6 +51,17 @@ export default function PresentationToggle() {
   useEffect(() => {
     if (bp !== "desktop" && railsHidden) setRailsHidden(false);
   }, [bp, railsHidden, setRailsHidden]);
+  // THE ONE WAY BACK FROM SCENE MODE (user, 2026-10-25: "hide also the footer and the bar, but
+  // keep the button somewhere to toggle back"). The bar leaves the screen with the rest of the
+  // chrome (TopBar's wrapper), so the Scene toggle inside it is unreachable while it is pressed;
+  // this is the SAME control — same state, same writer, same glyph and wash — kept at the bar's
+  // top-right corner, where the reader's hand already is. Portalled to the body so the bar's
+  // wrapper transform (CSS trap 2) cannot carry it off screen too; mounted only once the client
+  // has a document (SSR renders the bar's own button alone), and only while hidden. Escape is
+  // deliberately NOT wired: it already closes the strips, the doc and the raw layer, and a key
+  // that sometimes also returned the HUD would make those exits ambiguous.
+  const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
+  useEffect(() => setPortalHost(document.body), []);
   return (
     <div className="flex items-center gap-0.5" role="group" aria-label="How the information is presented">
       {/* SCENE ⇄ HUD — ONE toggle button (user, 2026-08-30, round 2: the two-segment group
@@ -71,6 +83,32 @@ export default function PresentationToggle() {
         <Focus aria-hidden className="size-4" />
         <span className="text-label tracking-caps uppercase max-[1649px]:hidden">Scene</span>
       </button>
+      {railsHidden &&
+        portalHost &&
+        createPortal(
+          // The bar's own glass, at the bar's own corner and inset — one control's worth of the
+          // bar left standing, so it reads as the bar's remainder rather than a new element. It
+          // arrives after the bar has left (the 0.3s away tempo) and goes at once on the way back.
+          <div
+            className={cn(
+              "fixed top-[14px] right-[var(--bar-margin)] z-40 p-1",
+              "border border-border rounded-lg backdrop-blur-md [background:var(--topbar-glass)] [box-shadow:var(--card-ambient)]",
+              "animate-in fade-in duration-200 delay-300 fill-mode-backwards motion-reduce:animate-none",
+            )}
+          >
+            <button
+              type="button"
+              aria-pressed
+              aria-label="Show the info cards"
+              onClick={() => setRailsHidden(false)}
+              className={SEG}
+            >
+              <Focus aria-hidden className="size-4" />
+              <span className="text-label tracking-caps uppercase max-[1649px]:hidden">Scene</span>
+            </button>
+          </div>,
+          portalHost,
+        )}
       {/* RAW — the layer toggle. aria-pressed, not a radio segment: it pushes a different
           surface in and pops it out, and the pair to its left survives the round trip. */}
       <button

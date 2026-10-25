@@ -49,6 +49,7 @@ export default function TopBar() {
   // whole ordinary face over it, filter included, exactly as it does over the anchor log. The
   // exception had no second user, so it left with the doc (views.ts records the flags' removal).
   const doc = useStore((s) => s.docPage);
+  const railsHidden = useStore((s) => s.railsHidden);
   const filterOff = doc != null;
   // The presentation pair is VIEW-SCOPED (SCENE⇄HUD and RAW act on the 3D view under the bar),
   // so it stands down wherever there is no such view: a doc overlay, or the flat "soon" view
@@ -266,7 +267,19 @@ export default function TopBar() {
       {/* --bar-margin, not two literals: the vitals band mirrors this inset exactly (user,
           2026-09-01 — "the bottom bar should be the same exactly as the top bar"), and the token
           carries the 1100px step so neither bar can drift from the other. */}
-      <div className="fixed top-[14px] inset-x-[var(--bar-margin)] z-40 pointer-events-none">
+      <div
+        className={cn(
+          "fixed top-[14px] inset-x-[var(--bar-margin)] z-40 pointer-events-none",
+          // SCENE MODE TAKES THE BAR TOO (user, 2026-10-25: "hide also the footer and the bar, but
+          // keep the button somewhere to toggle back"): the bar leaves through the top edge on the
+          // rails' own two tempos (0.3s away, 0.18s back — the `.rail-shade` recipe), the caption
+          // strip riding with it, and PresentationToggle keeps its one control floating at the
+          // bar's corner. The transform sits on this wrapper, never on `#topbar` itself: the bar
+          // is `overflow-hidden` and a transform there would also re-anchor nothing it owns.
+          "transition-transform duration-[180ms] ease-out motion-reduce:transition-none",
+          railsHidden && "-translate-y-[calc(100%+14px)] duration-300 ease-[ease]",
+        )}
+      >
       <div
         id="topbar"
         className={cn(
