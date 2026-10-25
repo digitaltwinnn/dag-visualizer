@@ -146,17 +146,22 @@ export default function PulseStrip() {
                         "absolute -translate-x-1/2 rounded-[1px]",
                         // Widths 3 / 4 / 5px (user, 2026-10-25: "make the bars a bit wider" — they
                         // were 2 / 3 / 3): an ok poll, a failed one, and the lone tick of a slow feed.
-                        b.ok ? "bg-[var(--success)] opacity-80" : "bg-[var(--destructive)] w-[4px]",
+                        // Full ink and 14px tall (user, 2026-10-25, light mode: "a bit vague overall" —
+                        // at 80% and 10px a lane read as specks across an empty track).
+                        b.ok ? "bg-[var(--success)]" : "bg-[var(--destructive)] w-[4px]",
                         b.ok && "w-[3px]",
-                        (r.tempoMs == null || r.tempoMs >= 60_000) ? "top-[3px] bottom-[3px] w-[5px]" : "top-[6px] bottom-[6px]",
+                        (r.tempoMs == null || r.tempoMs >= 60_000) ? "top-[3px] bottom-[3px] w-[5px]" : "top-[4px] bottom-[4px]",
                       )}
                       style={{ left: pct(b.x) }}
                     />
                   ))}
+                  {/* The due mark and the now line take full ink on PAPER (measured 2026-10-25: the
+                      60% dashed hairline and the 70% accent line read 2.x : 1 there, under the
+                      3 : 1 a mark needs); dark keeps its softer values, where they already read. */}
                   {lane.dueX != null && (
-                    <span aria-hidden className="absolute top-1 bottom-1 border-l border-dashed border-muted-foreground/60" style={{ left: pct(lane.dueX) }} />
+                    <span aria-hidden className="absolute top-1 bottom-1 border-l border-dashed border-[color:light-dark(var(--foreground-dim),color-mix(in_oklch,var(--muted-foreground)_60%,transparent))]" style={{ left: pct(lane.dueX) }} />
                   )}
-                  <span aria-hidden className="absolute top-0 bottom-0 w-px bg-primary/70" style={{ left: pct(lane.nowX) }} />
+                  <span aria-hidden className="absolute top-0 bottom-0 w-px bg-[light-dark(var(--primary-ink),color-mix(in_oklch,var(--primary)_70%,transparent))]" style={{ left: pct(lane.nowX) }} />
                 </span>
                 <span className={cn("text-right font-mono text-label tabular-nums pr-1", AGE_INK[status])}>
                   {/* "1m ago", not the bare "1m" (user, 2026-10-25: "its not clear what it
