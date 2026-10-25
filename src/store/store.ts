@@ -844,10 +844,16 @@ export const useStore = create<AppState>((set) => ({
   setGeoMeasure: (measure) => set({ geoMeasure: measure }),
   setHyperMeasure: (measure) => set({ hyperMeasure: measure }),
   setTrendScroll: (offset) => set({ trendScroll: offset, motionCause: { kind: "page" } }),
-  // A plane focus names History's Metagraph card (`trendStack.cardNetwork`, 2026-10-07), so it
-  // bumps the network slot as a filter commit does — the card it opens becomes the active one. A
-  // release leaves the stack alone: the filter may still hold the card.
-  setTrendFocus: (id) => set((s) => ({ trendFocus: id, selStack: id != null ? bumpStack(s.selStack, "network", true) : s.selStack })),
+  // A plane focus OPENS THE RANGE CARD (user, 2026-10-25: a row click "focuses on the metagraph
+  // card, makes sense but in this situation the range is more interesting"). The rule is the one
+  // every commit follows — a selection opens its own card — and the focused plane's own card is
+  // the Range: a plane IS its network's chart over the span on screen, which is exactly what the
+  // Range card states (its lead names the network the deck stands on, `trendStack.cardNetwork`).
+  // The Metagraph card still names that network — it stands above the Range as its parent, an
+  // entry one click away — so nothing is lost and no view compare is added: this setter is
+  // History's own. From 2026-10-07 until then the focus bumped the network slot instead. A
+  // release leaves the stack alone: the filter may still hold the dossier.
+  setTrendFocus: (id) => set((s) => ({ trendFocus: id, selStack: id != null ? bumpStack(s.selStack, "range", true) : s.selStack })),
   setTrendRotation: (r) => set({ trendRotation: r, motionCause: { kind: "page" } }),
   setTrendScale: (scale) => set({ trendScale: scale }),
   // A window and a range are the SAME statement about what is on screen, so picking one retires

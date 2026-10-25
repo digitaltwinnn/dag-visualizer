@@ -492,9 +492,19 @@ plank's squares read as stepping buckets, not changing the subject).
 **The Metagraph card stands on the plane brought forward** (user, 2026-10-07: "if we click a
 network in explorer, should we set the metagraph card accordingly? (not the global filter
 though)"): `trendStack.cardNetwork` — the focus, else the filter — read by the manifest and the
-card, the Snapshots tick-local network's precedent. A focus bumps the network slot so the card it
-opens is the box; its × releases the focus, never the filter; and it carries no ‹ › while it stands
-on a focus (a filter step would write the top bar, and the stack's order lives only in React).
+card, the Snapshots tick-local network's precedent; its × releases the focus, never the filter; and
+it carries no ‹ › while it stands on a focus (a filter step would write the top bar, and the stack's
+order lives only in React). **A focus OPENS THE RANGE CARD, not the dossier** (user, 2026-10-25: a
+row click "focuses on the metagraph card, makes sense but in this situation the range is more
+interesting" — asked for "without breaking any rules or creating exceptions"): the rule every
+commit follows is that a selection opens its own card, and the focused plane's own card is the
+Range — a plane IS its network's chart over the span on screen, which is what the Range card
+states. So `setTrendFocus` bumps the `range` slot (it bumped `network` from 2026-10-07), the
+dossier stands above it as a parent entry, and nothing is view-compared: the setter is History's
+own. **And the Range and Moment leads name the network the deck stands on** — `cardNetwork`, the
+focus, else the filter, else the plane in FRONT — the same rule the dossier and the explorer's
+highlighted row read (same day: under All the explorer highlighted the front plane's row while the
+Range card said "All networks"; one subject, every surface).
 
 **History's lane was the network dossier, then the MOMENT** (2026-09-19; named "Instant" until 2026-09-26) — the cursor card, a slot
 with NO focus rung, exactly as the two snapshot slots are. Its subject is `trendCursorMs`, which the

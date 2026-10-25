@@ -444,7 +444,8 @@ describe("the Metagraph card in History follows the plane focus", () => {
     expect(c.present).toBe(true);
     expect(c.subjectKey).toBe("dor");
   });
-  it("is the focus slot after a plane click", () => {
+  it("the RANGE is the focus slot after a plane click (the store bumps the range slot, 2026-10-25); the dossier when the network slot leads", () => {
+    expect(focusSlotId({ ...trend({ trendFocus: "dor" }), selStack: ["range"] })).toBe("range");
     expect(focusSlotId({ ...trend({ trendFocus: "dor" }), selStack: ["network"] })).toBe("context");
   });
   it("no focus and no filter stands on the plane in front, and is the ghost only while no stack is mounted", () => {

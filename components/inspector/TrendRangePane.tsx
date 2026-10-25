@@ -13,6 +13,7 @@ import { metagraphById } from "@/src/data/network";
 import { GLOBAL_READING, rangePhrase, sumMeasured, TREND_METRICS } from "@/src/data/trendSeries";
 import { spanPhrase, windowSpan } from "@/src/data/trendWindow";
 import { ageWords } from "@/src/util/relativeAge";
+import { cardNetwork } from "@/src/engine/domain/trendStack";
 import { useStore } from "@/src/store/store";
 
 // THE RANGE CARD (user, 2026-10-07) — History's brushed span as a committed subject, the PARENT of
@@ -31,12 +32,16 @@ import { useStore } from "@/src/store/store";
 // ⚠️ IT READS THE SAME ROSTER PASS THE PLANES DRAW FROM (`useTrendRoster`), edge trim included, so
 // its total is the sum of exactly the buckets the chart above draws.
 
-/** How the LEAD names its subject: the focused plane, else the committed network, else nobody. */
-function subjectOf(focus: string | null, filter: string, ranked: readonly string[], has: (id: string) => boolean): string | null {
-  // The focused plane, else the committed filter — any row the roster draws, the unranked
-  // Unlisted row included.
-  if (focus && (ranked.includes(focus) || has(focus))) return focus;
-  return ranked.includes(filter) || has(filter) ? filter : null;
+/** How the LEAD names its subject. */
+function subjectOf(filter: string, focus: string | null, front: string | null, ranked: readonly string[], has: (id: string) => boolean): string | null {
+  // THE NETWORK THE DECK STANDS ON — `cardNetwork`, the one rule the Metagraph card, the explorer's
+  // highlighted row and this lead all read (user, 2026-10-25: "the range talks about all networks
+  // but the DOR row in explorer is selected and chart displayed — it should always be in sync with
+  // the selection"): the focused plane, else the committed filter, else the plane in FRONT. Any row
+  // the roster draws counts, the unranked Unlisted row included; the DAG's own plane (and All, with
+  // no stack mounted) answers null, and the lead states the hypergraph's reading.
+  const net = cardNetwork(filter, focus, front);
+  return net !== "all" && (ranked.includes(net) || has(net)) ? net : null;
 }
 
 export default function TrendRangePane({
@@ -53,6 +58,7 @@ export default function TrendRangePane({
   const filter = useStore((s) => s.filter);
   const metric = useStore((s) => s.trendMetric);
   const focus = useStore((s) => s.trendFocus);
+  const front = useStore((s) => s.trendFront);
   const windowId = useStore((s) => s.trendWindow);
 
   const roster = useTrendRoster(useTrendsSlice(windowId, range), filter, metric);
@@ -71,7 +77,7 @@ export default function TrendRangePane({
   const spanKey = range ? `${range.fromMs}-${range.toMs}` : `window:${windowId}`;
   const pulseKey = useEdgePulse(spanKey);
 
-  const subject = subjectOf(focus, filter, ranked, (id) => id !== "dag" && rows.has(id));
+  const subject = subjectOf(filter, focus, front, ranked, (id) => id !== "dag" && rows.has(id));
   // THE UNSCOPED SUBJECT IS NAMED BY WHAT THE FIGURE IS (user, 2026-10-24: "'all networks created
   // a snapshot every 13s on average', is it really 'all networks'?"): for the three measures whose
   // total IS the networks added up (`GLOBAL_READING` — snapshots, fees, data) it is all networks;
