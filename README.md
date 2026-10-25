@@ -100,8 +100,9 @@ npm run dev      # http://localhost:3000
 **Vercel** is the intended host (any Node host works — `npm run build` / `npm start`).
 
 The `/api/metagraphs` and `/api/geo` routes run server-side (the
-Node server reaches the no-CORS metagraph cluster endpoints a browser can't); the
-block-explorer API is polled directly from the browser. No CDN dependencies.
+Node server reaches the no-CORS metagraph cluster endpoints a browser can't). The browser
+polls the app's own edge-cached `/api/live*` routes for snapshots and node lists, and those
+read the Constellation block explorer once for every open tab. No CDN dependencies.
 
 `/api/metagraphs` caches its live fetch for 5 min (`unstable_cache`) with a `maxDuration`
 budget and a concurrent cluster fan-out, answering an honest 503 if the upstreams are down
@@ -118,9 +119,10 @@ traffic grows).
 ## How the data flows
 
 ```
-Browser ──poll──> Constellation block explorer API   (snapshots / clusters)
-   │                                                       │ events
-   │                                                       v
+Browser ──poll──> /api/live* (edge-cached) ──> Constellation block explorer + L0/L1
+   │                     │   one upstream read serves every open tab
+   │                     │ events
+   │                     v
    │   NetworkData ──┬─► Engine (vanilla Three.js, 60fps, never re-rendered by React)
    │                 └─► Zustand store ──► React panels (header, ribbon, filter, inspector…)
    │

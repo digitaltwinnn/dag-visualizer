@@ -26,12 +26,15 @@ so the upstream sees one read per cache window however many tabs are open. A bea
 the time its data was true — receipt time less the edge `Age` and the body's `memoAgeMs` — not the
 time the response arrived.
 
-**The live poll never drops a global** (2026-10-25). Each poll asks for the NEWEST global only, and
-two landing inside one poll interval used to lose the first — rare at the 5s poll, routine at any
-longer one. When the newest ordinal jumps by more than one, the poll reads the recent list once and
-appends every missed global in order (`missedGlobals`, tested). The metagraph feed already
-self-heals the same way (its catch-up limit, below), so the poll interval is now a latency choice
-only, never a completeness one.
+**The live poll never drops a global** (2026-10-25). Each poll reads the shared answer's window of
+the 12 newest globals and appends every one after the newest this tab holds, in order
+(`globalsToAppend`, tested). A tab that fell behind that window (a sleeping laptop, a stalled
+poll) reads `/api/live/globals` once for the whole retained buffer and appends every missed global
+(`missedGlobals`, tested); a failed catch-up keeps the window's append. The metagraph feed
+self-heals the same way (its catch-up limit, below), so the poll interval is a latency choice only,
+never a completeness one. **One tick runs at a time** — a tick that finds one in flight returns —
+and a global at or below the newest held is never appended, so an overlap can never push an ordinal
+twice.
 
 **A global snapshot's real work is settlement, not blocks.** Most carry zero (mainnet: ~1 in 50), so
 block count is the wrong activity signal. The meaningful field is **`metagraphSnapshotCount`** — how

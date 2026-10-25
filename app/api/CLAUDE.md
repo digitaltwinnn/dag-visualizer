@@ -27,7 +27,14 @@ them — but the Next Node server can.
   Each body carries `memoAgeMs`, which with the edge `Age` header dates the data (the client's
   `dataTime`). Each route holds a **module-level memo** (`upstream.ts`, per network, 4 s; 25 s for
   clusters) that checks its own timestamp and shares one in-flight promise between concurrent misses;
-  never `unstable_cache`, whose revalidate is too coarse for a 4 s window. An upstream failure of the
+  never `unstable_cache`, whose revalidate is too coarse for a 4 s window. The memo drops an expired
+  entry when it is read and sweeps expired entries once it holds more than 256. **`?limit=` rounds UP
+  to a fixed ladder** (`limit.ts`'s `clampLimit` — the client's own limits, `META_LADDER` derived from
+  `POLL` and the catch-up's growth, `GLOBALS_LADDER` = {12, `POLL.maxSnapshots`}), so an odd caller
+  costs a few extra records, never a fresh upstream read and a memo entry of its own. **A miss runs
+  its reads in parallel** — globals, the unlisted list and the listed chains at once, the unlisted
+  chains as soon as their list lands — so its worst case is two 4 s upstream timeouts, under the
+  client's 10 s abort. An upstream failure of the
   global read (or an empty cluster list) is a **503 with `no-store`**, so a blip is never cached; a
   failed chain read leaves the answer 200 and lists the chain in `failed`, and a failed unlisted-list
   read marks it with the `"@unlisted"` entry. `/api/live/meta/[id]` is **not an open proxy**: the id

@@ -1,11 +1,10 @@
 // Pure merge of the shared live answer into the browser's global buffer (no imports of the NetworkData singleton).
 
-/** THE GLOBAL SNAPSHOTS A POLL MISSED (2026-10-25). Each poll asks for the NEWEST global snapshot
- *  only, and globals land irregularly (measured 4.6–114.8s apart), so two inside one poll interval
- *  used to drop the first from the live buffer — a hole in the chamber, the tick bars and the
- *  pager. When the newest ordinal jumps past `prev + 1`, the poll reads the recent list once and
- *  this picks what to append: every snapshot after `prev`, oldest first, each ordinal once. With
- *  no `prev` (boot) nothing is back-filled here — the seed read covers it. */
+/** THE GLOBAL SNAPSHOTS A POLL MISSED (2026-10-25). Each poll reads the shared answer's window of
+ *  the 12 newest globals, and globals land irregularly (measured 4.6–114.8s apart). This picks what
+ *  to append from a recent list — the shared window, or the window plus the catch-up read when the
+ *  tab fell behind it: every snapshot after `prev`, oldest first, each ordinal once. With no `prev`
+ *  (boot) nothing is back-filled here — the seed read covers it. */
 export function missedGlobals<T extends { ordinal: number }>(prev: number | null, recent: readonly T[]): T[] {
   if (prev == null) return [];
   const seen = new Set<number>();

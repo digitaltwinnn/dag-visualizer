@@ -1,6 +1,7 @@
 // Data layer: reads live snapshots through the app's own edge-cached routes (`/api/live*`), which
-// read the Constellation block explorer once for every tab. No simulation — if the feed is unreachable the app shows a "no data" state and
-// keeps polling, recovering on its own once it responds again (`live` reflects this).
+// read the Constellation block explorer once for every tab. No simulation — if the feed is
+// unreachable the app shows a "no data" state and keeps polling, recovering on its own once it
+// responds again (`live` reflects this).
 
 import { dataTime } from "./liveAge";
 import { META_CATCHUP_MAX, chainNeedsCatchUp, chainToRecord, globalsToAppend, missedGlobals, nextCatchUpLimit } from "./liveMerge";
@@ -625,7 +626,7 @@ export class NetworkData {
   // ⚠️ THE WINDOW IS MEASURED, NEVER ASSUMED, and the UI states it. POLL.maxSnapshots ticks
   // is a duration only once you know the cadence, and the cadence is not what a reading of
   // the poll interval suggests: measured 2026-08-12 over 60 live ticks, mainnet's global L0
-  // averages ~28 s between ticks (we poll every 4s to catch each one promptly), so 52 ticks
+  // averages ~28 s between ticks (the tab polls every POLL.pollMs to catch each one promptly), so 52 ticks
   // is a ~24-MINUTE window and a /hr figure is a ×2.5 extrapolation, not a leap. But that is
   // today's chain, not a law — and it is not even a STEADY cadence today: those same 60 ticks
   // ran 4.6 s to 115 s apart. That variance is exactly why `spanHr` and `samples` ride the
