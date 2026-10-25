@@ -579,20 +579,25 @@ export default function TrendChart({
           data-plot=""
           role="img"
           aria-label={`${name} — ${stepMs >= 86400000 ? "daily" : stepMs >= 3600000 ? "hourly" : "5-minute"} buckets, ${n} of them`}
-          // ⚠️ A FINGER PICKS ON RELEASE, NOT ON CLICK (user, 2026-09-29: "on mobile, clicking the
-          // chart still has to be on the exact dot"). The brush runs through recharts' TOUCH
-          // handlers, and a handled touch sequence gets no synthesised click — so on a phone only
-          // the active dot's own handler ever answered. A touch or pen press that did not travel
-          // past a tap's slop is a pick, decided at pointerup; a press that travelled is the
-          // brush's. The click a browser may still synthesise afterwards is swallowed so one tap
-          // is one pick.
+          // ⚠️ EVERY POINTER PICKS ON RELEASE, NOT ON CLICK. First the finger (user, 2026-09-29: "on
+          // mobile, clicking the chart still has to be on the exact dot" — the brush runs through
+          // recharts' TOUCH handlers, and a handled touch sequence gets no synthesised click), and
+          // since 2026-10-25 the MOUSE too (user: a Moment opened from "the chart line" but not
+          // "the chart inner section", then the reverse — reproduced with a real mouse in headless
+          // Chrome: a press on the bare SVG surface picked, a press on the area path or the line did
+          // not). The click a browser synthesises needs the pressed node to survive to `mouseup`,
+          // and a press on a recharts path re-renders the plot under the pointer (the brush's own
+          // `mousedown` → `setDrag`), so the click was never dispatched there. A press that did
+          // not travel past a tap's slop is a pick, decided at pointerup — a brush needs more
+          // travel than that (its own pixel floor below), so the two cannot both answer one press;
+          // the click that may still follow is swallowed so one press is one pick.
           onPointerDown={onPick ? (e) => { tapFrom.current = { x: e.clientX, y: e.clientY }; } : undefined}
           onPointerUp={
             onPick && n > 0
               ? (e) => {
                   const t = tapFrom.current;
                   tapFrom.current = null;
-                  if (e.pointerType === "mouse" || !t || Math.hypot(e.clientX - t.x, e.clientY - t.y) > TAP_SLOP) return;
+                  if (!t || Math.hypot(e.clientX - t.x, e.clientY - t.y) > TAP_SLOP) return;
                   pickAt(e.currentTarget, e.clientX);
                   tapAt.current = performance.now();
                 }
