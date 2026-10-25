@@ -92,7 +92,7 @@ export function MetaTitle({ cfg }: { cfg: MetaCfg }) {
   const monogram = (cfg.ticker || cfg.name).slice(0, 3).toUpperCase();
   const kind = networkKind(cfg.id, mg?.nodes || []);
   return (
-    <span className="inline-flex items-center gap-2.5 min-w-0">
+    <span data-titlerow="" className="inline-flex items-center gap-2.5 min-w-0">
       {/* The logo shows as a clean circular mark — no squared tile (brand icons are round);
           30px matches the two-line name+ticker block (was 38 — bottom-padded the collapsed
           card, user). The head keeps its TWO lines even collapsed: a one-line compact variant

@@ -46,8 +46,11 @@ const EYEBROW = "text-label font-bold tracking-[0.1em] uppercase leading-none";
 const TITLE = "m-0 text-title font-semibold";
 // An ENTRY's title shares its row with the eyebrow, so a two-line title node (the dossier's name
 // over its type, the node's id over its chips) lays its lines out INLINE there: the second line
-// becomes muted text after the first, nothing is dropped and the entry stays one row.
-const ENTRY_TITLE = "[&_[data-titleblock]]:flex-row [&_[data-titleblock]]:items-baseline [&_[data-titleblock]]:gap-2 [&_[data-titleblock]]:min-w-0 [&_[data-titleblock]>:first-child]:truncate [&_[data-avatar]]:size-5";
+// becomes muted text after the first, nothing is dropped and the entry stays one row. The
+// dossier's avatar takes the KIND MARK's size and gap there (user, 2026-10-25: the metagraph entry
+// "is not fully horizontally aligned like the others" — measured 20px + 10px against 16 + 8, so
+// its name started 7px further right than Country's and Provider's).
+const ENTRY_TITLE = "[&_[data-titleblock]]:flex-row [&_[data-titleblock]]:items-baseline [&_[data-titleblock]]:gap-2 [&_[data-titleblock]]:min-w-0 [&_[data-titleblock]>:first-child]:truncate [&_[data-avatar]]:size-4 [&_[data-titlerow]]:gap-2";
 
 /** The title, rolled ONLY when its arrival is worth announcing. The roll's gate is the
  *  store's `navQuiet` provenance (user, 2026-09-11 — "solve it structurally", ending a
