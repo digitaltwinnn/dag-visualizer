@@ -48,13 +48,16 @@ export const FOCI = {
   // than the country framing (geoFraming z 29..25) so the country drill reads as a real zoom-in.
   // Camera held LOW (near the equator plane, like the country/node poses) — a higher camera
   // stacked on the densest-cluster lean read as "viewing the globe from the north" (user).
-  // A SHORT step in from the rest pose, not the old dive (user, 2026-10-24: "zoom in but a bit
-  // less so that the circle still stays visible and does not hide beneath the bottom vitals
-  // section"): the base rings are where the committed network's callout now anchors, so the
-  // pose keeps their front edge above the vitals band — the orbit is ~8% shorter than rest and
-  // the target a little lower, which lifts the body in the frame; the globe's crown may tuck
-  // under the top bar, the rings may not go under the band.
-  geoNetwork: { pos: new THREE.Vector3(0, 8, 44), target: new THREE.Vector3(0, -4.5, 0) },
+  // NOT a step in any more (user, 2026-10-24: "zoom in but a bit less so that the circle still
+  // stays visible and does not hide beneath the bottom vitals section"; then 2026-10-25, on a
+  // tablet in landscape: "the top part of the sphere is covered by the topbar, make it fit better
+  // on screen and zoom out a bit more"): the base rings are where the committed network's callout
+  // anchors, so the WHOLE body — crown to the rings' front edge — has to sit inside the lane
+  // between the bar and the vitals band. The orbit is the rest pose's LENGTH (measured at
+  // 1400×876: the crown cleared the bar by 4px at the old ~8%-shorter orbit); what still says
+  // "network" is the pitch — the camera held low, so the rotated-to-densest hemisphere presents
+  // face-on — and the target a little under the rest's, lifting the rings off the band.
+  geoNetwork: { pos: new THREE.Vector3(0, 9.85, 47.5), target: new THREE.Vector3(0, -3.65, 0) },
   // The Snapshots RESTING pose (user, 2026-08-07 — it used to share `overview`): FRONTAL and
   // zoomed in, straight onto the chamber's camera-side face, so the ribbon sheets (which span
   // the lane field) and the node trays (which face +Z) present flat-on. Slightly elevated,

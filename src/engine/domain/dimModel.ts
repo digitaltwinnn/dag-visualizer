@@ -318,8 +318,12 @@ export function nodeDim(c: DimContext, raw: number, geoCc: string | null): numbe
 // neon/bloom, but the colours feel a bit saturated") — 0.47 → 0.40 and 0.37 → 0.31, beside the
 // scene lane's chroma step in `palette/identity.ts`. The bloom rows are untouched: the halo is
 // the look he likes, and it is the resting emissive feeding it that ran hot.
+// THE GLOBE EASED AGAIN, ALONE (2026-10-25, user: "nodes are too bright in dark mode for geo
+// view") — 0.31 → 0.26. Dark-only in effect: on paper the chips' ink rides `inkPresence`'s RATIO
+// branch against this same resting value (NodeFabric's `restRef`), so a resting chip there reads
+// as full ink whatever the base is, and only the dark ground's glow and its bloom feed come down.
 const BASE_HYPER = 0.40;
-const BASE_GLOBE = 0.31;
+const BASE_GLOBE = 0.26;
 
 // A node's glow before the floor and the focus terms — the dim's own suppression of the base.
 // Exported for its own spec (the resting base both pools share); nodeEmissive composes on it.

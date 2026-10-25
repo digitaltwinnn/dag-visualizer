@@ -347,8 +347,12 @@ export class BaseRing {
     if (cfg) mesh.userData.pick = { kind: "meta", cfg };
     if (level === 2) joinBloom(mesh); // the identity reading glows like the chips it counts
     this.group.add(mesh);
-    // The wedge: centre → the ring's inner edge, same arc, same hue, its own faint fade.
-    const wedgeMat = this._furnitureMat(seg.color);
+    // The wedge: centre → the ring's inner edge, same arc, its own faint fade — and the NEUTRAL
+    // accent on every level (user, 2026-10-25: "the pie fill … can be the neutral color also when
+    // filter is active"): the arc above it carries the network's hue, the fill below it is the
+    // structural wash the country ruler's slices already wear, so a committed network's whole-disc
+    // fill reads as the same instrument lit, not as a second colour field under the hued ring.
+    const wedgeMat = this._furnitureMat(null);
     const wedgeFade: FadeEntry = { mat: wedgeMat, base: 0, paperBase: 0 };
     this.host.geoFades.push(wedgeFade);
     // The slice closes where the stripe is all of it: r = gapW / span, never the centre.
