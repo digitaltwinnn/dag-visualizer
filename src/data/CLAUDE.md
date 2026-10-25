@@ -19,6 +19,13 @@ keeps separate on purpose:
   snapshots keep it flat for long stretches. Real mainnet behaviour, not a bug.
 - **`subHeight`** — orders snapshots sharing a height.
 
+**The three live feeds (global snapshots, metagraph snapshots, node lists) are shared, not per-tab**
+(2026-10-25; `docs/superpowers/specs/2026-10-25-shared-live-feed-design.md`). A tab never calls
+Constellation for them: it polls our own edge-cached `/api/live*` routes (`NetworkData._fetchLive`),
+so the upstream sees one read per cache window however many tabs are open. A beat is stamped with
+the time its data was true — receipt time less the edge `Age` and the body's `memoAgeMs` — not the
+time the response arrived.
+
 **The live poll never drops a global** (2026-10-25). Each poll asks for the NEWEST global only, and
 two landing inside one poll interval used to lose the first — rare at the 5s poll, routine at any
 longer one. When the newest ordinal jumps by more than one, the poll reads the recent list once and

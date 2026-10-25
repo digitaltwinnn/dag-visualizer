@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { staleTickKeys, isGlobalActivityScope, shortHash, fanOut, cycleOk, touchPoll, reportPoll, pollHealthRows, BEAT_CAP, BEAT_KEEP_MS, missedGlobals } from "./api";
+import { staleTickKeys, isGlobalActivityScope, shortHash, fanOut, cycleOk, touchPoll, reportPoll, pollHealthRows, BEAT_CAP, BEAT_KEEP_MS, missedGlobals, NetworkData } from "./api";
 import { vi, afterEach } from "vitest";
 
 // api.ts is exempt from dataExportCoverage (it IS the live feed). These cover the PURE parts only
@@ -206,5 +206,28 @@ describe("missedGlobals (the poll's gap fill)", () => {
   });
   it("back-fills nothing at boot (no snapshot held yet)", () => {
     expect(missedGlobals(null, [g(5), g(4)])).toEqual([]);
+  });
+});
+
+describe("_fetchClusters (the shared node lists)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it("reads our own /api/live/clusters, never a load balancer's cluster/info", async () => {
+    const urls: string[] = [];
+    vi.stubGlobal("fetch", async (u: string) => {
+      urls.push(String(u));
+      return new Response(JSON.stringify({ l0: [{ id: "a" }], l1: [{ id: "b" }], memoAgeMs: 0 }), { status: 200 });
+    });
+    const nd = new NetworkData();
+    await nd._fetchClusters();
+    expect(urls.length).toBe(1);
+    expect(urls[0]).toMatch(/\/api\/live\/clusters(\?|$)/);
+    expect(urls.some((u) => u.includes("cluster/info"))).toBe(false);
+    expect(nd.clusters.l0.length).toBe(1);
+  });
+  it("an empty list is a failure, keeping what is held", async () => {
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify({ l0: [], l1: [{ id: "b" }] }), { status: 200 }));
+    const nd = new NetworkData();
+    await nd._fetchClusters();
+    expect(nd.clusters.l0.length).toBe(0);
   });
 });

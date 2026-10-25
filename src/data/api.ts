@@ -5,7 +5,7 @@
 import { dataTime } from "./liveAge";
 import { chainNeedsCatchUp, chainToRecord, globalsToAppend, missedGlobals } from "./liveMerge";
 import type { LiveAnswerShape } from "@/src/data/types";
-import { METAGRAPHS, NET_DEF, netUrl } from "@/src/net/current";
+import { METAGRAPHS, netUrl } from "@/src/net/current";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
 import { COLORS, POLL } from "@/src/engine/config";
 import type { Anchor, ClusterNode, DagCore, GlobalSnapshot, RawMetaSnapshot } from "@/src/data/types";
@@ -291,17 +291,6 @@ export class NetworkData {
     fanOut(this.listeners[evt], payload, evt);
   }
 
-  private async _fetchJson(url: string): Promise<any> {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 7000);
-    try {
-      const res = await fetch(url, { signal: ctrl.signal });
-      if (!res.ok) throw new Error(String(res.status));
-      return await res.json();
-    } finally {
-      clearTimeout(t);
-    }
-  }
   /** One shared-live read: the body plus the time its DATA was true (edge Age + memo age). */
   async _fetchLive(path: string): Promise<{ json: any; at: number }> {
     const ctrl = new AbortController();
@@ -358,15 +347,14 @@ export class NetworkData {
   // ---- validator membership (the real ~160-node clusters) ----
   async _fetchClusters(): Promise<void> {
     try {
-      const [l0, l1] = await Promise.all([
-        this._fetchJson(NET_DEF.l0 + "/cluster/info"),
-        this._fetchJson(NET_DEF.l1 + "/cluster/info"),
-      ]);
+      const { json, at } = await this._fetchLive("/api/live/clusters");
+      const l0 = json?.l0;
+      const l1 = json?.l1;
       if (Array.isArray(l0) && Array.isArray(l1) && l0.length && l1.length) {
         this.clusters = { l0, l1 };
         this.dagCore = this._buildDagCore(l0, l1);
         this._emit("cluster", { l0, l1, dag: this.dagCore });
-        reportPoll("clusters", true);
+        reportPoll("clusters", true, at);
         return;
       }
       reportPoll("clusters", false);
