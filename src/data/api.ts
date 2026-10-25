@@ -3,12 +3,16 @@
 // keeps polling, recovering on its own once it responds again (`live` reflects this).
 
 import { dataTime } from "./liveAge";
+import { globalsToAppend, missedGlobals } from "./liveMerge";
+import type { LiveAnswerShape } from "@/src/data/types";
 import { METAGRAPHS, NET_DEF, netUrl } from "@/src/net/current";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
 import { COLORS, POLL } from "@/src/engine/config";
 import type { Anchor, ClusterNode, DagCore, GlobalSnapshot, RawMetaSnapshot } from "@/src/data/types";
 import { activeRows } from "@/src/net/lineage";
 import { RETIRE_QUIET_DAYS } from "@/src/net/retire";
+
+export { missedGlobals }; // lives in liveMerge (pure); re-exported for existing callers
 
 
 /** How often the unlisted chain list is re-read (the route caches it for an hour). */
@@ -141,20 +145,6 @@ export function fanOut<T>(listeners: ReadonlyArray<(p: T) => void>, payload: T, 
   }
 }
 
-/** THE GLOBAL SNAPSHOTS A POLL MISSED (2026-10-25). Each poll asks for the NEWEST global snapshot
- *  only, and globals land irregularly (measured 4.6–114.8s apart), so two inside one poll interval
- *  used to drop the first from the live buffer — a hole in the chamber, the tick bars and the
- *  pager. When the newest ordinal jumps past `prev + 1`, the poll reads the recent list once and
- *  this picks what to append: every snapshot after `prev`, oldest first, each ordinal once. With
- *  no `prev` (boot) nothing is back-filled here — the seed read covers it. */
-export function missedGlobals<T extends { ordinal: number }>(prev: number | null, recent: readonly T[]): T[] {
-  if (prev == null) return [];
-  const seen = new Set<number>();
-  return [...recent]
-    .filter((s) => s.ordinal > prev && !seen.has(s.ordinal) && (seen.add(s.ordinal), true))
-    .sort((a, b) => a.ordinal - b.ordinal);
-}
-
 /** Did a whole metagraph refresh CYCLE succeed? One row per FEED means the row must answer for the
  *  feed, not for whichever member reported last: reporting per metagraph let a single persistently
  *  failing one hide behind its healthy siblings refreshing `lastOkAt` in the same cycle. A settled
@@ -262,6 +252,11 @@ export class NetworkData {
   // "cL1" by the UI (it has no data-L1). Same shape metagraphs use → treat it as a core.
   dagCore: DagCore | null;
   private listeners: ListenerMap;
+  /** The last shared answer; Task 6 reads the metagraph tails from it. */
+  private _lastLive: LiveAnswerShape | null = null;
+  get lastLive(): LiveAnswerShape | null {
+    return this._lastLive;
+  }
   private _timer: ReturnType<typeof setInterval> | null;
   private _clusterTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -325,13 +320,13 @@ export class NetworkData {
   // ---- bootstrap: seed the spine with recent history ----
   async init(): Promise<void> {
     try {
-      const json = await this._get(`/global-snapshots?limit=${POLL.maxSnapshots}`);
-      const list: GlobalSnapshot[] = (json.data || []).slice().reverse(); // oldest -> newest
+      const { json, at } = await this._fetchLive(`/api/live/globals?limit=${POLL.maxSnapshots}`);
+      const list: GlobalSnapshot[] = ((json.globals || []) as GlobalSnapshot[]).slice().reverse(); // oldest -> newest
       if (!list.length) throw new Error("empty");
       this.globalSnapshots = list;
       this.latest = list[list.length - 1];
       this._setLive(true, Date.now());
-      reportPoll("global", true);
+      reportPoll("global", true, at);
     } catch (e) {
       // No simulation — a real site stays factual. Show "no data" and recover on a
       // later poll once the API responds again.
@@ -439,26 +434,24 @@ export class NetworkData {
     // Always attempt the live fetch (even while "down"), so the app recovers on its
     // own when the API comes back — no simulation in between.
     try {
-      const json = await this._get(`/global-snapshots/latest`);
-      const snap: GlobalSnapshot = json.data;
-      if (snap && (!this.latest || snap.ordinal > this.latest.ordinal)) {
-        // A JUMP means globals landed between polls: read the recent list once and append every
-        // one this buffer has not seen, in order (`missedGlobals`). A failed fill keeps the newest
-        // alone — the old behaviour — rather than failing the tick.
-        const prev = this.latest?.ordinal ?? null;
-        const gap = prev == null ? 0 : snap.ordinal - prev;
-        let push: GlobalSnapshot[] = [snap];
-        if (gap > 1) {
-          try {
-            const list = await this._get(`/global-snapshots?limit=${Math.min(gap, POLL.maxSnapshots)}`);
-            const filled = missedGlobals(prev, (list.data ?? []) as GlobalSnapshot[]);
-            if (filled.length) push = filled;
-          } catch { /* keep the newest alone */ }
-        }
-        for (const s of push) this._pushGlobal(s);
+      const { json, at } = await this._fetchLive(`/api/live`);
+      const live = json as LiveAnswerShape;
+      if (!live.globals?.length) throw new Error("no globals");
+      this._lastLive = live;
+      // The shared window is newest-first. A tab that fell behind it reads the cached catch-up list
+      // once; a failed catch-up keeps the shared append rather than failing the tick.
+      const prev = this.latest?.ordinal ?? null;
+      let { append, needCatchUp } = globalsToAppend(prev, live.globals);
+      if (needCatchUp != null) {
+        try {
+          const c = await this._fetchLive(`/api/live/globals?limit=${Math.min(needCatchUp, POLL.maxSnapshots)}`);
+          const filled = missedGlobals(prev, (c.json.globals ?? []) as GlobalSnapshot[]);
+          if (filled.length) append = filled;
+        } catch { /* keep the shared append */ }
       }
+      for (const s of append) this._pushGlobal(s);
       this._setLive(true, Date.now());
-      reportPoll("global", true);
+      reportPoll("global", true, at);
       // Pull each metagraph's newest snapshots EVERY tick (was every other tick) — together with
       // the deeper tail, this keeps up with high-throughput metagraphs (Dor) so their snapshots
       // are all attributed correctly instead of leaking into the "unlisted" count.

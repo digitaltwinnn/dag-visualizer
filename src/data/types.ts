@@ -305,3 +305,13 @@ export interface RawMetaSnapshot {
   blocks?: unknown[];
   epochProgress?: number;
 }
+
+/** The shared live answer (`/api/live`) as the browser reads it — a structural mirror of the route's
+ *  `LiveAnswer` (app/api/live/assemble.ts), declared here because src/data never imports from app/. */
+export type LiveAnswerShape = {
+  globals: GlobalSnapshot[];
+  metas: Record<string, RawMetaSnapshot[]>;
+  unlisted: string[];
+  failed: string[];
+  memoAgeMs: number;
+};
