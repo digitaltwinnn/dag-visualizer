@@ -844,6 +844,23 @@ from a body row on 2026-08-10 — a join is not a fact ABOUT the snapshot, it is
 already names — and the metagraph TICKER that shared that row went with it under the pile rule, since
 the METAGRAPH card sits directly above and this card's own mark already carries the hue.
 
+**THE RAW LISTS ARE GROUPED, AND A GROUP PLATE HAS TWO SHAPES** (user, 2026-10-25, a run of rounds).
+Every raw list groups on every tier — Snapshots by global snapshot, Geography by country (whenever
+the order is the country's; another header sort flattens it), Hypergraph's phone roster by network,
+History's records by UTC day. One component draws every plate (`datasection/GroupToggle.tsx`,
+shadcn's data-table pattern: a native button with `aria-expanded`, since Radix Collapsible cannot
+wrap table rows). A plate whose group is a SUBJECT the raw layer may commit — the global snapshot
+— selects and releases it on a click and folds on its chevron; every other plate (country,
+network, day) ONLY folds. ⚠️ **A plate never reloads its own list**: History's day plate committed
+the day as the range for an hour, which re-read the records at a finer tier under the click
+("the whole dataset changes … looks different from what I clicked on"). Groups fold by default
+on the phone and stand open on the wider tiers, except that a group holding the committed or
+landed row always starts open. A selected subject says LIVE or PINNED in mark AND word, right
+after the number it qualifies, on plate and row alike; ages count on the one shared
+`useNowTick` clock. History's records page by whole DAYS ("1–7 of 31 days"), and the Snapshots
+log's newest page leads with the live buffer's newer rows (on top, never cutting a merged row to
+no page), because its own tips re-read only every 30s.
+
 **THE RAW PANE IS ONE SCROLLING DOCUMENT ON EVERY TIER** (user, 2026-10-18: "a scroll on the whole
 panel, so tabs always fully visible without their own scroll and height/sub-height etc only
 appears when scrolled to the bottom"). It was the phone's shape alone since 2026-10-08; the

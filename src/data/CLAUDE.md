@@ -24,7 +24,12 @@ keeps separate on purpose:
 Constellation for them: it polls our own edge-cached `/api/live*` routes (`NetworkData._fetchLive`),
 so the upstream sees one read per cache window however many tabs are open. A beat is stamped with
 the time its data was true — receipt time less the edge `Age` and the body's `memoAgeMs` — not the
-time the response arrived.
+time the response arrived. ⚠️ **TWO CLOCKS, AND EACH HAS ONE JOB** (learned the same day, twice): the
+beats and the ages read the DATA's time; everything about THIS TAB's polling — the "next poll due"
+mark, failing vs ok, stale, the late stretch — reads the tab's own wall clock (`lastAttemptAt`,
+`lastWasOk`, `lastOkWallAt`). Mixing them drew the due mark seconds early (an out-of-sync cadence)
+and read a recovered feed as failing, because an ok carrying a cache window's age sat before the
+failure it followed.
 
 **The live poll never drops a global** (2026-10-25). Each poll reads the shared answer's window of
 the 12 newest globals and appends every one after the newest this tab holds, in order
