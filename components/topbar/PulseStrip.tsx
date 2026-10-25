@@ -1,44 +1,57 @@
 "use client";
 
-import { pollHealthRows, RECENT_OUTCOMES, type PollHealth } from "@/src/data/api";
-import { pollStatusOf, type PollStatus } from "@/src/data/pollStatus";
+import { pollHealthRows, type PollHealth } from "@/src/data/api";
+import { pollStatusOf, pulseLane, pulseOrder, pulseVerdict, PULSE_AHEAD_MS, PULSE_WINDOW_MS, type PollStatus, type VerdictTone } from "@/src/data/pollStatus";
 import { relativeAge } from "@/src/util/relativeAge";
-import { BandCard } from "@/components/vitals/bandParts";
 import { useNowTick } from "@/components/useNowTick";
 import { cn } from "@/lib/utils";
-import { okShare } from "@/src/data/pollShare";
 import { Timer } from "lucide-react";
+
 // THE PULSE STRIP — the heartbeat's own row (user, 2026-08-30: clicking the ECG "should show a
 // bottom section (like the filter) with relevant information about the liveliness of the app —
 // when did it last poll successfully? which polls do we have?"). The filter strip's exact
-// grow-downward mechanism, one cell per FEED from the poll-health registry (src/data/api.ts):
-// last success ticking live, the feed's own cadence, ok·err counts. Read-only measured facts —
-// the status MEANING lives in src/data/pollStatus.ts (rule 10 wants it testable, not buried in
-// JSX), the plate is the vitals band's own BandCard (one band-card recipe app-wide), and the
-// age words are relativeAge, the app's one age grammar.
+// grow-downward mechanism, one LANE per FEED from the poll-health registry (src/data/api.ts).
 //
-// ⚠️ A CELL NAMES THE FEED, NEVER ITS SOURCE (user, 2026-09-13: "no need to provide info to
-// users about the source"). Each cell carried a third row naming the upstream — "block
-// explorer", "cluster info (via app)" — which answered a question the strip is not for: this
-// row exists to say whether the numbers above it are CURRENT, and an upstream's name is
-// plumbing the reader can do nothing with. The `target` field retired from the FEEDS table
-// with it, so there is no unused descriptor waiting to drift.
+// RHYTHM LANES since 2026-10-25 (design pass in the brainstorm companion — user picked "B3 with
+// B4's next due"): ONE real time axis, the last two minutes with now near the right edge, a lane
+// per feed, each poll a tick where it LANDED. A feed's cadence is its rhythm and a stall is a gap
+// you can see; a scheduled feed draws a dashed mark where its next poll is due, so "late" is a lane
+// whose last answer sits behind that mark — and the overdue stretch is drawn, amber dashes from the
+// due mark (or the last good answer, when failing) to now. Lanes run fastest first, which is why
+// the strip needs no group headers. One sentence above them answers "is it live?".
+//
+// It replaced six equal cards whose run of 24 marks drew a 4-second feed and a 5-minute feed as
+// the same picture, so lateness could only be read off a number. Every decision a pixel depends on
+// is pure and tested in src/data/pollStatus.ts (the order, the lane geometry, the verdict); this is
+// the shell.
+//
+// ⚠️ A LANE NAMES THE FEED, NEVER ITS SOURCE (user, 2026-09-13: "no need to provide info to users
+// about the source") — the strip says whether the numbers above it are CURRENT.
 
-// The status inks the READING itself (user, 2026-09-10, after the head dot retired: "tint
-// the age value") — the same derived states the dot spoke, on the value they qualify: a
-// stale age goes advisory amber, a failing one destructive; ok stays the plain foreground.
+// The status inks the age READING (user, 2026-09-10: "tint the age value"): late goes advisory
+// amber, failing destructive, ok the plain foreground.
 const AGE_INK: Record<PollStatus, string> = {
   ok: "text-foreground",
   stale: "text-[var(--warn-soft)]",
   failing: "text-[var(--destructive)]",
   acquiring: "text-muted-foreground",
 };
+const DOT: Record<PollStatus, string> = {
+  ok: "bg-[var(--success)]",
+  stale: "bg-[var(--warn-soft)]",
+  failing: "bg-[var(--destructive)]",
+  acquiring: "bg-muted-foreground/50",
+};
+const VERDICT_DOT: Record<VerdictTone, string> = {
+  ok: "bg-[var(--success)]",
+  warn: "bg-[var(--warn-soft)]",
+  bad: "bg-[var(--destructive)]",
+  acquiring: "bg-muted-foreground/50",
+};
 
-// The cadence chip says the DURATION, the timer glyph says "scheduled" (user, 2026-09-11 —
-// "can't we say 5 mins with an icon?"): a fixed-cadence feed wears the glyph + the bare
-// duration. A feed with no fixed cadence wears its `when` words instead — the honest trigger
-// ("page load" for the boot-loaded geo map, "each tick" for the snapshot reads), because "on demand"
-// claimed a user gesture neither feed answers to (same user round).
+// The cadence chip says the DURATION with the timer glyph for "scheduled" (user, 2026-09-11 —
+// "can't we say 5 mins with an icon?"); a feed with no fixed cadence wears its honest trigger
+// words instead ("page load", "each tick").
 const cadenceWord = (r: PollHealth): string =>
   r.everyMs != null
     ? r.everyMs >= 60_000
@@ -46,98 +59,112 @@ const cadenceWord = (r: PollHealth): string =>
       : `${Math.round(r.everyMs / 1000)}s`
     : (r.when ?? "—");
 
+const pct = (x: number) => `${(x * 100).toFixed(3)}%`;
+// The axis labels, as ms before now. "now" is the cursor line's own label.
+const SPAN = PULSE_WINDOW_MS + PULSE_AHEAD_MS;
+const AXIS: { ago: number; label: string }[] = [
+  { ago: PULSE_WINDOW_MS, label: "2 min ago" },
+  { ago: 60_000, label: "1 min" },
+  { ago: 30_000, label: "30s" },
+  { ago: 0, label: "now" },
+];
+
 export default function PulseStrip() {
   const now = useNowTick(1000);
-  const rows = pollHealthRows();
+  const rows = pulseOrder(pollHealthRows());
+  const verdict = pulseVerdict(rows, now);
   return (
-    // THE CARDS WRAP — NO SIDEWAYS SCROLL (user, 2026-10-03: "the network info has a horizontal
-    // scrollbar; is there another way to show these cards? I don't think anywhere else we have
-    // such scrollbars by design"). It was one scrolling row with touch snap (2026-09-03, two
-    // rounds chasing half-visible cards) — a row that hides feeds off its end, in a strip whose
-    // whole job is to show every feed at once. A grid of as many 150px-or-wider columns as fit:
-    // one row on a desktop, two columns on a phone with an odd last card spanning both. The strip
-    // is a layout participant (TopBar publishes its height), so growing a row costs the rails a
-    // card's height and nothing else.
-    <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] items-stretch gap-2 mx-2 px-2 pb-2 pt-1.5 border-t border-border/60 max-[700px]:grid-cols-2 max-[700px]:[&>*]:min-w-0 max-[700px]:[&>*:last-child:nth-child(odd)]:col-span-full">
-      {rows.length === 0 && (
-        <span className="text-label text-muted-foreground self-center px-1">acquiring — no polls have completed yet</span>
-      )}
-      {rows.map((r) => {
-        const status = pollStatusOf(r, now);
-        return (
-          // No head mark (user, 2026-09-10: "the bullet doesn't add anything and elsewhere
-          // we don't do it" — the band's cards carry bare labels). The status still reads:
-          // a failing feed says the word and shows its failed count, and a stale one wears
-          // the growing age beside its own cadence chip.
-          <BandCard key={r.id} label={r.label} className="min-w-[150px]">
-            <span className="flex flex-col gap-1 min-w-0">
-              {/* The band's STACKED-LEAD grammar (user, 2026-09-10, two rounds): the bare
-                  bold reading, and the CADENCE as a chip in the taxonomy-chrome recipe —
-                  RoleChips' own squared pill (faint wash, hairline, muted ink; chrome, not
-                  identity) — instead of plain words. No "ago": the ticking value under a
-                  liveliness dot carries it. */}
-              <span className="flex items-center gap-1.5 whitespace-nowrap">
-                <span className={cn("font-mono font-bold text-label tabular-nums leading-tight", AGE_INK[status])}>
+    <div className="mx-2 px-2 pb-2 pt-1.5 border-t border-border/60">
+      {/* THE VERDICT — the strip's one sentence, on the band's plate so it reads as the answer
+          the lanes below evidence. */}
+      <div role="status" className="flex items-baseline gap-2 flex-wrap rounded-md bg-[var(--panel-plate)] px-2.5 py-1.5 mb-1.5">
+        <span aria-hidden className={cn("size-2 rounded-full self-center flex-none", VERDICT_DOT[verdict.tone])} />
+        <span className="text-body font-semibold text-foreground">{verdict.title}</span>
+        <span className="text-label text-muted-foreground">{verdict.detail}</span>
+      </div>
+      {rows.length > 0 && (
+        <div
+          className={cn(
+            // name · lane · age. The name column holds the longest label and its chip; the phone
+            // drops the chip (the lane's rhythm already says the tempo) and narrows the column.
+            "grid grid-cols-[minmax(0,15.5rem)_minmax(0,1fr)_3.25rem] items-center",
+            "max-[700px]:grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)_2.5rem]",
+          )}
+        >
+          {rows.map((r) => {
+            const status = pollStatusOf(r, now);
+            const lane = pulseLane(r, now);
+            const okN = lane.beats.filter((b) => b.ok).length;
+            const errN = lane.beats.length - okN;
+            return (
+              <div key={r.id} className="contents">
+                <span className="flex items-center gap-2 min-w-0 h-[22px] pl-1 text-label text-foreground-dim">
+                  <span aria-hidden className={cn("size-1.5 rounded-full flex-none", DOT[status])} />
+                  <span className="truncate">{r.label}</span>
+                  {cadenceWord(r).split(" · ").map((part, i) => (
+                    <span
+                      key={part}
+                      className="inline-flex flex-none items-center gap-1 rounded-xs border border-border bg-wash-faint px-1.5 py-[2px] text-label leading-none text-muted-foreground max-[700px]:hidden"
+                    >
+                      {i === 0 && r.everyMs != null && <Timer aria-hidden className="size-3 flex-none" />}
+                      {part}
+                    </span>
+                  ))}
+                </span>
+                {/* THE LANE. Ticks are spans placed by percentage — no measurement, so the lane
+                    rides any width. A once-per-visit or slow feed's tick is taller: it is the only
+                    mark its lane will show for minutes. */}
+                <span
+                  role="img"
+                  aria-label={`${r.label}: ${okN} answered${errN ? `, ${errN} failed` : ""} in the last 2 minutes`}
+                  className="relative block h-[22px] border-b border-dashed border-border/40"
+                >
+                  {lane.lateX != null && (
+                    <span
+                      aria-hidden
+                      className="absolute top-1/2 -translate-y-1/2 h-[2px] [background:repeating-linear-gradient(90deg,var(--warn-soft)_0_4px,transparent_4px_7px)]"
+                      style={{ left: pct(lane.lateX), width: pct(Math.max(0, lane.nowX - lane.lateX)) }}
+                    />
+                  )}
+                  {lane.beats.map((b, i) => (
+                    <span
+                      key={i}
+                      aria-hidden
+                      className={cn(
+                        "absolute -translate-x-1/2 rounded-[1px]",
+                        b.ok ? "bg-[var(--success)] opacity-80" : "bg-[var(--destructive)] w-[3px]",
+                        b.ok && "w-[2px]",
+                        (r.tempoMs == null || r.tempoMs >= 60_000) ? "top-[3px] bottom-[3px] w-[3px]" : "top-[6px] bottom-[6px]",
+                      )}
+                      style={{ left: pct(b.x) }}
+                    />
+                  ))}
+                  {lane.dueX != null && (
+                    <span aria-hidden className="absolute top-1 bottom-1 border-l border-dashed border-muted-foreground/60" style={{ left: pct(lane.dueX) }} />
+                  )}
+                  <span aria-hidden className="absolute top-0 bottom-0 w-px bg-primary/70" style={{ left: pct(lane.nowX) }} />
+                </span>
+                <span className={cn("text-right font-mono text-label tabular-nums pr-1", AGE_INK[status])}>
                   {r.lastOkAt != null ? relativeAge(now - r.lastOkAt, true) : status === "failing" ? "failing" : "—"}
                 </span>
-                {/* A touch roomier than RoleChips' full pill (px 5→6, py 2→3) and a 12px glyph:
-                    at the compact py-px the icon-bearing chip read cramped and the glyph sat
-                    optically high beside the 10px text (user, 2026-09-11 — "padding … they look
-                    small and text icon alignment feels a bit off"). */}
-                {/* ONE CHIP PER FACT (user, 2026-10-03, on the mid-dots): registry words carrying
-                    a cadence and a condition are split on their own separator into two chips. */}
-                {cadenceWord(r).split(" · ").map((part, i) => (
-                  <span key={part} className="inline-flex items-center gap-1 rounded-xs border border-border bg-wash-faint px-1.5 py-[3px] text-label leading-none text-muted-foreground">
-                    {i === 0 && r.everyMs != null && <Timer aria-hidden className="size-3 flex-none" />}
-                    {part}
-                  </span>
-                ))}
-              </span>
-              {/* THE RECENT RUN (user, 2026-10-04: "show a nice chart for each card there,
-                  green=ok red=fail"): one mark per outcome, oldest left, newest right — the last
-                  RECENT_OUTCOMES of them, in the two status tones. It replaces the hairline ratio
-                  bar, which only appeared once something had failed and could not say WHEN: a run
-                  shows a blip as a blip and an outage as a wall of red at the right end. The slots
-                  a young feed has not filled stay as faint marks, so every card's run is one width.
-                  Identity is never colour-alone: the share reading beside it keeps its word, and
-                  the exact counts are on hover. */}
-              {r.recent.length > 0 && (
-                <span className="flex items-center gap-2 whitespace-nowrap">
-                  <span
-                    role="img"
-                    aria-label={`Last ${r.recent.length} outcomes: ${r.recent.filter(Boolean).length} ok, ${r.recent.filter((x) => !x).length} failed`}
-                    className="flex h-2.5 flex-none items-end gap-px"
-                  >
-                    {Array.from({ length: RECENT_OUTCOMES }, (_, i) => {
-                      const o = r.recent[i - (RECENT_OUTCOMES - r.recent.length)];
-                      return (
-                        <span
-                          key={i}
-                          className={cn(
-                            "w-[3px] rounded-[1px]",
-                            o === undefined ? "h-1 bg-border/60" : o ? "h-full bg-[var(--success)] opacity-70" : "h-full bg-[var(--destructive)]",
-                          )}
-                        />
-                      );
-                    })}
-                  </span>
-                  {/* ONE READING, no mid-dot (user, 2026-10-03): the share that succeeded, shown
-                      only when something failed — "100% ok" would restate the green run. Never
-                      "100%" while anything failed; one decimal from 99 up, capped at 99.9. The bare
-                      share, no word (user, 2026-10-08): beside a green-and-red run a percentage
-                      can only mean the green part. It recounts every second the strip is open
-                      (`useNowTick`) from the registry, so a poll that lands while it is open moves it. */}
-                  {r.err > 0 && (
-                    <span className="text-label tabular-nums text-muted-foreground">
-                      {okShare(r.ok, r.err)}
-                    </span>
-                  )}
+              </div>
+            );
+          })}
+          <span />
+          <span aria-hidden className="relative block h-5 text-label text-muted-foreground">
+            {AXIS.map((a) => {
+              const x = (PULSE_WINDOW_MS - a.ago) / SPAN;
+              return (
+                // The phone's lane is ~130px: only the two ends of the axis keep their words.
+                <span key={a.label} className={cn("absolute top-1 whitespace-nowrap", a.ago === PULSE_WINDOW_MS ? "" : "-translate-x-1/2", a.ago !== 0 && a.ago !== PULSE_WINDOW_MS && "max-[700px]:hidden")} style={{ left: pct(x) }}>
+                  {a.label}
                 </span>
-              )}
-            </span>
-          </BandCard>
-        );
-      })}
+              );
+            })}
+          </span>
+          <span />
+        </div>
+      )}
     </div>
   );
 }

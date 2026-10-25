@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { staleTickKeys, isGlobalActivityScope, shortHash, fanOut, cycleOk, touchPoll, reportPoll, pollHealthRows, RECENT_OUTCOMES } from "./api";
+import { staleTickKeys, isGlobalActivityScope, shortHash, fanOut, cycleOk, touchPoll, reportPoll, pollHealthRows, BEAT_CAP, BEAT_KEEP_MS } from "./api";
 import { vi, afterEach } from "vitest";
 
 // api.ts is exempt from dataExportCoverage (it IS the live feed). These cover the PURE parts only
@@ -155,19 +155,32 @@ describe("touchPoll", () => {
   });
 });
 
-describe("reportPoll's recent outcomes", () => {
-  // The pulse strip draws each feed's recent history as a run of marks — green ok, red failed
-  // (user, 2026-10-04) — so the registry keeps the outcomes themselves, newest last, capped.
-  it("keeps the last RECENT_OUTCOMES outcomes in order, oldest first", () => {
-    for (let i = 0; i < RECENT_OUTCOMES + 5; i++) reportPoll("exact", i % 3 !== 0);
+describe("reportPoll's beats", () => {
+  // The pulse strip draws each poll where it LANDED on one time axis (2026-10-25, rhythm lanes),
+  // so the registry keeps each outcome with its time, oldest first, bounded by age and count.
+  it("keeps each outcome with the time it landed, oldest first, at most BEAT_CAP", () => {
+    for (let i = 0; i < BEAT_CAP + 5; i++) reportPoll("exact", i % 3 !== 0);
     const row = pollHealthRows().find((r) => r.id === "exact")!;
-    expect(row.recent).toHaveLength(RECENT_OUTCOMES);
-    const all = Array.from({ length: RECENT_OUTCOMES + 5 }, (_, i) => i % 3 !== 0);
-    expect(row.recent).toEqual(all.slice(-RECENT_OUTCOMES));
+    expect(row.beats).toHaveLength(BEAT_CAP);
+    const all = Array.from({ length: BEAT_CAP + 5 }, (_, i) => i % 3 !== 0);
+    expect(row.beats.map((b) => b.ok)).toEqual(all.slice(-BEAT_CAP));
+    expect(row.beats.every((b, i, a) => i === 0 || b.at >= a[i - 1]!.at)).toBe(true);
   });
 
-  it("a touched row has an empty history, not a claimed one", () => {
+  it("drops beats older than BEAT_KEEP_MS", () => {
+    const t0 = Date.now();
+    const spy = vi.spyOn(Date, "now");
+    spy.mockReturnValue(t0);
+    reportPoll("metasnaps", true);
+    spy.mockReturnValue(t0 + BEAT_KEEP_MS + 1);
+    reportPoll("metasnaps", true);
+    spy.mockRestore();
+    const row = pollHealthRows().find((r) => r.id === "metasnaps")!;
+    expect(row.beats.every((b) => b.at > t0)).toBe(true);
+  });
+
+  it("a touched row has no beats, not a claimed one", () => {
     touchPoll("api-trends");
-    expect(pollHealthRows().find((r) => r.id === "api-trends")!.recent).toEqual([]);
+    expect(pollHealthRows().find((r) => r.id === "api-trends")!.beats).toEqual([]);
   });
 });

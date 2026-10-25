@@ -207,11 +207,16 @@ button opens the ABOUT row** (`topbar/AboutStrip.tsx`, 2026-09-28 — the per-vi
 that used to lead the left rail as a card; user: "the static about card is a bit out-of-place on the
 left column … about belongs where?" — the four zones are instruments and prose is documentation,
 whose one home is /about, so the in-view door sits beside the ECG's "how live is this app" strip,
-closed by default, view-scoped like Scene and Raw), and the ECG opens the **pulse strip** — one read-only cell
-per data FEED from the poll-health registry (`src/data/api.ts` `reportPoll`/`pollHealthRows`; the
-five real fetch sites report their own outcomes), each with a derived status dot (ok / stale past
-~2.5× its own cadence / error — never fabricated, rule 10), the last success ticking, the cadence
-and target in words. Either strip is a **layout participant, not a popup** — TopBar publishes its
+closed by default, view-scoped like Scene and Raw), and the ECG opens the **pulse strip** — RHYTHM LANES since 2026-10-25
+(design pass, user picked the compact lanes with a "next due" mark): one sentence answering "is it
+live?" (`pulseVerdict`), then one lane per data FEED from the poll-health registry
+(`src/data/api.ts` `reportPoll`/`pollHealthRows`, each outcome kept WITH ITS TIME), fastest
+first, on one real two-minute axis: each poll a tick where it landed, a dashed mark where a
+scheduled feed's next poll is due, an amber dashed stretch where a feed is overdue, the age on
+the right inked by status (ok / stale past ~2.5× its own cadence / failing — never fabricated,
+rule 10). The order, the lane geometry and the verdict are pure in `src/data/pollStatus.ts`. It
+replaced six equal cards whose run of marks drew a 4-second feed and a 5-minute feed as the same
+picture. Either strip is a **layout participant, not a popup** — TopBar publishes its
 height and both the rails and the canvas add it to their `top`, a pure position shift that keeps
 the buffer viewport-sized so nothing distorts and the engine never resizes.
 

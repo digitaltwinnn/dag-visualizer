@@ -31,47 +31,59 @@ export interface PollHealth {
   lastErrAt: number | null;
   ok: number;
   err: number;
-  /** The last `RECENT_OUTCOMES` outcomes, oldest first — true ok, false failed. The pulse strip
-   *  draws them as a run of marks (user, 2026-10-04: "show a nice chart for each card there,
-   *  green=ok red=fail"). Empty until the feed has an outcome. */
-  recent: boolean[];
+  /** How fast this feed answers when it is healthy — the pulse strip's ORDER (fastest first), so
+   *  the lanes read as tempo from top to bottom. The cadence where there is one; the tick for the
+   *  per-tick reads; null for once-per-visit, which sorts last. */
+  tempoMs: number | null;
+  /** Each outcome WITH THE TIME IT LANDED, oldest first — the pulse strip draws them on one real
+   *  time axis (2026-10-25, rhythm lanes: a run of equal marks drew a 4-second feed and a 5-minute
+   *  feed as the same picture, so "late" could only be read off a number). Kept for
+   *  `BEAT_KEEP_MS` and at most `BEAT_CAP` entries. Empty until the feed has an outcome. */
+  beats: { at: number; ok: boolean }[];
 }
-/** How many outcomes each feed's history keeps — the pulse strip's mark count. */
-export const RECENT_OUTCOMES = 24;
+/** How long each feed's beats are kept — a little over the strip's two-minute window, so the
+ *  oldest visible beat never blinks out at the edge. */
+export const BEAT_KEEP_MS = 150_000;
+/** The most beats any feed keeps, whatever its rate — a per-tick feed in a burst cannot grow it. */
+export const BEAT_CAP = 120;
 // THE FEEDS TABLE — the one home for each feed's descriptor (2026-08-30, same-day structural
 // fix): the first cut passed (label, interval) at every reportPoll call site, which is
 // the two-homes drift class this repo keeps re-catching — change a label at the success site
 // and not its error twin and the registry silently grows two rows. Call sites pass the ID alone.
 const FEEDS = {
-  global: { label: "Global snapshots", everyMs: POLL.pollMs, when: null },
-  metasnaps: { label: "Metagraph snapshots", everyMs: POLL.pollMs, when: null },
-  clusters: { label: "DAG nodes", everyMs: POLL.clusterMs, when: null },
-  "api-metagraphs": { label: "Metagraph directory", everyMs: POLL.metaRefreshMs, when: null },
+  global: { label: "Global snapshots", everyMs: POLL.pollMs, when: null, tempoMs: POLL.pollMs },
+  metasnaps: { label: "Metagraph snapshots", everyMs: POLL.pollMs, when: null, tempoMs: POLL.pollMs },
+  clusters: { label: "DAG nodes", everyMs: POLL.clusterMs, when: null, tempoMs: POLL.clusterMs },
+  "api-metagraphs": { label: "Metagraph directory", everyMs: POLL.metaRefreshMs, when: null, tempoMs: POLL.metaRefreshMs },
   // Loaded ONCE per page load (Engine._loadData at boot), then localStorage fills misses —
   // nothing the user does re-fires it, so the chip must not say "on demand" (user, 2026-09-11;
   // "page load" is the user's own clearer word for it, same day).
-  "api-geo": { label: "Validator geo map", everyMs: null, when: "page load" },
+  "api-geo": { label: "Validator geo map", everyMs: null, when: "page load", tempoMs: null },
   // everyMs null on purpose: the feed polls POLL.trendsMs only WHILE a consumer is mounted
   // (the ledger band's cards, the /trends doc) — a fixed cadence here would derive STALE in
   // every other view. The chip states the cadence alone: its "while shown" condition was
   // dropped (user, 2026-10-04: "not very relevant").
-  "api-trends": { label: "Trends history", everyMs: null, when: `${Math.round(POLL.trendsMs / 60_000)} min` },
+  "api-trends": { label: "Trends history", everyMs: null, when: `${Math.round(POLL.trendsMs / 60_000)} min`, tempoMs: POLL.trendsMs },
   // The exact read behind the snapshot card's breakdown (/api/snapshot/[ordinal]) — once per live
   // tick and per pinned one, so it has no cadence of its own (2026-10-04: a run of failed reads
   // showed on the card while every row here still read healthy, because this feed had no row).
-  exact: { label: "Snapshot reads", everyMs: null, when: "each tick" },
+  exact: { label: "Snapshot reads", everyMs: null, when: "each tick", tempoMs: POLL.pollMs },
 } as const;
 export type FeedId = keyof typeof FEEDS;
 const POLL_HEALTH = new Map<string, PollHealth>();
 /** Report one fetch outcome into the registry — exported for the two fetch sites outside this
  *  module (/api/metagraphs in Engine.refreshMeta, /api/geo in geoResolve). */
 export function reportPoll(id: FeedId, ok: boolean): void {
-  const d = FEEDS[id];
   let r = POLL_HEALTH.get(id);
-  if (!r) { r = { id, label: d.label, everyMs: d.everyMs, when: d.when, lastOkAt: null, lastErrAt: null, ok: 0, err: 0, recent: [] }; POLL_HEALTH.set(id, r); }
-  if (ok) { r.lastOkAt = Date.now(); r.ok++; } else { r.lastErrAt = Date.now(); r.err++; }
-  r.recent.push(ok);
-  if (r.recent.length > RECENT_OUTCOMES) r.recent.shift();
+  if (!r) { r = freshRow(id); POLL_HEALTH.set(id, r); }
+  const at = Date.now();
+  if (ok) { r.lastOkAt = at; r.ok++; } else { r.lastErrAt = at; r.err++; }
+  r.beats.push({ at, ok });
+  while (r.beats.length > BEAT_CAP || (r.beats.length && at - r.beats[0]!.at > BEAT_KEEP_MS)) r.beats.shift();
+}
+function freshRow(id: FeedId): PollHealth {
+  const d = FEEDS[id];
+  return { id, label: d.label, everyMs: d.everyMs, when: d.when, tempoMs: d.tempoMs, lastOkAt: null, lastErrAt: null, ok: 0, err: 0, beats: [] };
 }
 /** Ensure a feed has a ROW without recording an outcome.
  *
@@ -81,10 +93,7 @@ export function reportPoll(id: FeedId, ok: boolean): void {
  *  is simply absent from the panel: the same silent denial this registry exists to prevent, one
  *  level up. */
 export function touchPoll(id: FeedId): void {
-  const d = FEEDS[id];
-  if (!POLL_HEALTH.has(id)) {
-    POLL_HEALTH.set(id, { id, label: d.label, everyMs: d.everyMs, when: d.when, lastOkAt: null, lastErrAt: null, ok: 0, err: 0, recent: [] });
-  }
+  if (!POLL_HEALTH.has(id)) POLL_HEALTH.set(id, freshRow(id));
 }
 
 /** The registry, in stable insertion order — the pulse strip's one read. */
