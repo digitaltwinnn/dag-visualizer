@@ -1,0 +1,43 @@
+import { NextResponse } from "next/server";
+import { NETWORKS } from "@/src/engine/config";
+import { netOf } from "@/src/net/request";
+import { isTracked } from "@/src/net/lineage";
+import { unlistedChains } from "../../../network/unlistedChains";
+import { memo, readChain } from "../../upstream";
+
+// One chain's newest snapshots (catch-up and self-heal). The id must be a tracked chain or a listed
+// unlisted one, so the route is not an open proxy to the explorer. If the unlisted list cannot be
+// read, an untracked id cannot be verified and gets a 503.
+export const runtime = "nodejs";
+export const maxDuration = 30;
+
+const NO_STORE = { "Cache-Control": "no-store" };
+
+export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const { id } = await ctx.params;
+  const net = netOf(req);
+  const raw = Number(new URL(req.url).searchParams.get("limit"));
+  const limit = Math.min(600, Math.max(1, Number.isFinite(raw) ? Math.floor(raw) : 1));
+
+  if (!isTracked(net, id)) {
+    let unlisted: string[];
+    try {
+      unlisted = await unlistedChains(net);
+    } catch (e) {
+      console.error("live/meta: cannot verify chain id", e);
+      return NextResponse.json({ error: "cannot verify chain" }, { status: 503, headers: NO_STORE });
+    }
+    if (!unlisted.includes(id)) return NextResponse.json({ error: "unknown chain" }, { status: 404 });
+  }
+
+  try {
+    const { value, ageMs } = await memo(`meta:${net}:${id}:${limit}`, 4000, () => readChain(NETWORKS[net].be, id, limit));
+    return NextResponse.json(
+      { snapshots: value, memoAgeMs: ageMs },
+      { headers: { "Cache-Control": "public, s-maxage=4, stale-while-revalidate=2" } },
+    );
+  } catch (e) {
+    console.error("live/meta: read failed", e);
+    return NextResponse.json({ error: "live feed unavailable" }, { status: 503, headers: NO_STORE });
+  }
+}
