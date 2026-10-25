@@ -721,9 +721,14 @@ export default function Inspector() {
         // keying on `[data-focus]` here had the same bug the tier marker fixed above — and it also
         // shut out the two SNAPSHOT slots, which are lane members with no focus rung at all
         // (`railLadderBoundary.test.ts` asserts rung → slot, never the reverse). RailPager renders
-        // children untouched when the rung has no sibling set.
+        // children in a plain shell when the rung has no sibling set or is not the box.
         const focused = id === focusId;
-        const wrapped = boxed ? <RailPager slot={card.kind} >{body}</RailPager> : body;
+        // ⚠️ ALWAYS THROUGH RailPager, boxed or not (user, 2026-10-25: the dossier "shows a flash
+        // when I click it"): wrapping only the box put the two tiers at different tree positions,
+        // so an entry→box swap REMOUNTED the card — the title re-created, the avatar back to its
+        // fallback for a frame. The pager renders the same element shape on both tiers and is a
+        // plain pass-through while `active` is off; the plank and the gesture come with the box.
+        const wrapped = <RailPager slot={card.kind} active={boxed}>{body}</RailPager>;
         return (
           // The distance-dim rides a VAR, not wrapper opacity (2026-08-08): the entry itself
           // applies `opacity-[var(--entry-dim,1)]` and RELEASES it on hover (the materialize

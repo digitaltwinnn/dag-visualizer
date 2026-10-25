@@ -82,11 +82,15 @@ describe("rail pager boundary — the plank rides the boxed tier", () => {
   });
 
   it("its gate and the tier marker are the same condition", () => {
-    // `const boxed = ...` feeds BOTH the `data-tier` value and the pager wrap, so a card can never
-    // be a `box` to the CSS and un-pagered to the pager (or the reverse).
+    // `const boxed = ...` feeds BOTH the `data-tier` value and the pager's `active`, so a card can
+    // never be a `box` to the CSS and un-pagered to the pager (or the reverse). Every rung renders
+    // THROUGH the pager since 2026-10-25 (one element shape on both tiers — the dossier avatar
+    // flashed its fallback on every entry→box swap while only the box was wrapped), so the gate
+    // is the `active` prop, not a conditional wrap.
     const gate = inspector.match(/^.*<RailPager.*$/m)?.[0];
     expect(gate, "RailPager is no longer rendered in Inspector.tsx").toBeTruthy();
-    expect(gate!, "gate the pager on `boxed` — the tier's own condition").toMatch(/\bboxed\s*\?/);
+    expect(gate!, "gate the pager on `boxed` — the tier's own condition").toMatch(/active=\{boxed\}/);
+    expect(gate!, "the pager wraps EVERY rung; a conditional wrap remounts the card on a tier change").not.toMatch(/\?\s*<RailPager/);
     expect(gate!, "the pager must NOT key on the focus rung: single-open lets the box be any rung").not.toMatch(
       /focus/i
     );
@@ -121,5 +125,20 @@ describe("rail tier boundary — the arrival is HeightEase's, not the stylesheet
     for (const [, name, body] of frames) {
       expect(`${name}: ${body}`).not.toMatch(/opacity/);
     }
+  });
+});
+
+// THE PANE IS ONE ELEMENT ON BOTH TIERS (2026-10-25): RailPane applies the Card primitive's
+// baseline class to its own <aside> instead of rendering the box through <Card asChild>, so an
+// entry→box swap no longer remounts the card (the dossier avatar flashed its fallback). The
+// baseline string lives in two files by necessity; this keeps them one.
+describe("RailPane's Card baseline mirrors components/ui/card.tsx", () => {
+  it("CARD_BASE is the primitive's base class, verbatim", () => {
+    const head = readFileSync(join(__dirname, "CardHead.tsx"), "utf8");
+    const card = readFileSync(join(__dirname, "ui/card.tsx"), "utf8");
+    const base = head.match(/const CARD_BASE = "([^"]+)"/)?.[1];
+    expect(base, "CardHead lost CARD_BASE").toBeTruthy();
+    expect(card.includes(`"${base}",`), "ui/card.tsx's base class no longer matches RailPane's CARD_BASE").toBe(true);
+    expect(/^\s*<Card asChild/m.test(head), "RailPane must not render through <Card asChild> — the tiers would be two element types again").toBe(false);
   });
 });

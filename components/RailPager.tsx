@@ -190,7 +190,7 @@ const FLICK_MS = 90; // velocity is measured over this trailing window, never of
 /** A plank chevron: 24px to the eye, a thumb-sized target on touch (`TOUCH_HIT`). */
 const PLANK_BTN = cn("size-6 disabled:opacity-30", TOUCH_HIT);
 
-export default function RailPager({ slot, children }: { slot: RailCardKind; children: ReactNode }) {
+export default function RailPager({ slot, active, children }: { slot: RailCardKind; /** This rung is the BOX — the plank and the swipe apply. Off, the wrapper is a plain shell of the same element shape (Inspector's note). */ active: boolean; children: ReactNode }) {
   // The rail's state, read by the ONE builder the next ghost's quick picks share (`useSiblingState`).
   const state = useSiblingState(slot);
   // The card's hover handlers, registered by its RailPane (CardHead's `RailHoverHost`) and fired by
@@ -450,7 +450,19 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
       }, ms),
     );
   };
-  if (!set) return <>{children}</>;
+  // THE SAME ELEMENT SHAPE WHETHER OR NOT THE PLANK IS LIVE (2026-10-25): div › div › the hover
+  // host provider › the card. An entry (not `active`) and a box with no siblings both render it
+  // bare — no classes, no handlers, no host (a null provider sends the pane's hover handlers back
+  // to the pane) — so the card beneath keeps its DOM identity when the rung's tier changes.
+  if (!set || !active) {
+    return (
+      <div>
+        <div>
+          <RailHoverHost.Provider value={null}>{children}</RailHoverHost.Provider>
+        </div>
+      </div>
+    );
+  }
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
