@@ -44,6 +44,10 @@ import { KIND_MARK_CLASS } from "@/components/icons";
 const EYEBROW = "text-label font-bold tracking-[0.1em] uppercase leading-none";
 // The ONE title standard every card head uses (panel h2 and inspector h3 alike).
 const TITLE = "m-0 text-title font-semibold";
+// An ENTRY's title shares its row with the eyebrow, so a two-line title node (the dossier's name
+// over its type, the node's id over its chips) lays its lines out INLINE there: the second line
+// becomes muted text after the first, nothing is dropped and the entry stays one row.
+const ENTRY_TITLE = "[&_[data-titleblock]]:flex-row [&_[data-titleblock]]:items-baseline [&_[data-titleblock]]:gap-2 [&_[data-titleblock]]:min-w-0 [&_[data-titleblock]>:first-child]:truncate [&_[data-avatar]]:size-5";
 
 /** The title, rolled ONLY when its arrival is worth announcing. The roll's gate is the
  *  store's `navQuiet` provenance (user, 2026-09-11 — "solve it structurally", ending a
@@ -278,49 +282,25 @@ export default function CardHead({
     return (
       <>
         <div
-          className={cn(
-            // 6px between the eyebrow row and the title row (was 3 until 2026-10-03): the minimize
-            // mark and the title row's aside control are both 24px boxes hanging off shorter rows,
-            // and at 3px they overlapped by 3 — their two hover washes ran into each other (user:
-            // "the explorer control overlaps a bit with the minimize button").
-            "flex flex-col gap-1.5 py-[var(--panel-pad-y)] px-[var(--panel-pad-x)]",
-          )}
+          // ONE ROW (design pass, 2026-10-25 — the same fold the right rail's entries took, so a
+          // head that is not the open box costs a line): the eyebrow leads, the marked title
+          // follows on the same baseline, the caption and the aside sit at the right end. The
+          // eyebrow row and the title row were stacked at a 6px gap until then (2026-10-03's
+          // note on the overlapping washes went with the toggle it was about).
+          className="flex items-center gap-2.5 min-w-0 py-[var(--panel-pad-y)] px-[var(--panel-pad-x)]"
         >
-          {/* ⚠️ The caption + indicator cluster sits on the EYEBROW's row, NOT beside the whole
-              left column (user, 2026-08-12 — "the todo views text is a bit too long sometimes").
-              As a column sibling it reserved its width on EVERY line of the head, so a `SOON` tag
-              12px tall narrowed the title's lane from ~180px to ~145px two lines below itself and
-              wrapped titles that fit the card perfectly well. One head anatomy, both layouts: the
-              inspector layout below has always stacked these as rows. */}
-          {(eyebrow || caption != null) && (
-            <div className="flex items-start justify-between gap-2">
-              {/* `data-eyebrow` — same read as the entry layout below: RailThread ties every
-                  populated mark in at its card's EYEBROW height. Without it the thread silently
-                  falls back to the card MIDDLE, which on a tall explorer card drops the mark
-                  hundreds of px below its own header. One connector anatomy, both layouts. */}
-              {eyebrow ? <span data-eyebrow="" className={cn("block", eyebrowClass)}>{eyebrow}</span> : <span />}
-              {/* The caption rides the eyebrow row's right end (the +/− indicator rode beside it
-                  until 2026-10-23). `-my` keeps a glyph-tall box from setting this row's height
-                  and pushing the title down — the row measures the eyebrow. */}
-              <div className="flex items-center gap-1.5 flex-none -my-[3px] pt-px pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
-                {caption != null && (
-                  <span className="text-label text-muted-foreground text-right tabular-nums">{caption}</span>
-                )}
-              </div>
-            </div>
+          {/* `data-eyebrow` — same read as the entry layout below: RailThread ties every
+              populated mark in at its card's EYEBROW height. Without it the thread silently
+              falls back to the card MIDDLE, which on a tall explorer card drops the mark
+              hundreds of px below its own header. One connector anatomy, both layouts. */}
+          {eyebrow ? <span data-eyebrow="" className={cn("block flex-none", eyebrowClass)}>{eyebrow}</span> : null}
+          <h2 className={cn(TITLE, "inline-flex items-center gap-2 min-w-0 truncate")}>{titleRow}</h2>
+          {(caption != null || aside != null) && (
+            <span data-head-aside="" className="ml-auto relative z-[1] flex-none flex items-center gap-1.5 pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
+              {caption != null && <span className="text-label text-muted-foreground text-right tabular-nums">{caption}</span>}
+              {aside}
+            </span>
           )}
-          {/* The title row carries the ASIDE on its right (2026-09-26 — built for the explorer
-              card's scope mark, since retired; the slot stays): the panel layout had no aside
-              slot, only the inspector layout below. Same rule as the eyebrow row's cluster: it floats above the
-              title button's stretched pseudo and hands the pointer back only on its own control. */}
-          <div className="flex items-center justify-between gap-2 min-w-0">
-            <h2 className={cn(TITLE, "inline-flex items-center gap-2 min-w-0")}>{titleRow}</h2>
-            {aside != null && (
-              <span data-head-aside="" className="relative z-[1] flex-none flex items-center pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
-                {aside}
-              </span>
-            )}
-          </div>
         </div>
         {/* The head hairline is INSET by the panel's own horizontal padding (user, 2026-08-09) —
             the same weight the slab's resting seam carries, so every division that is simply THERE
@@ -408,7 +388,28 @@ function keepFocusOnRung(el: HTMLElement): void {
             <span className="sr-only">Expand</span>
           </button>
         )}
-        {(eyebrow || caption != null) && (
+        {entryMode ? (
+          // AN ENTRY IS ONE ROW (design pass, 2026-10-25 — user: the right rail "is pretty dense
+          // with all the header displayed. I don't want to lose info"): eyebrow, title and aside on
+          // one line, so a committed ancestor costs a line rather than a head, and nothing it said
+          // is dropped — the slot noun, the name and the chip all stay. The box keeps the two-row
+          // head below: it is the one materialized card, and depth is what the pile's tiers carry.
+          // `data-eyebrow` stays the thread's tie, at the same 18px from the entry's top as the
+          // box's eyebrow, so the header holds still across the tier swap (RAIL_ENTRY's note).
+          <div className="flex items-center gap-2.5 min-w-0">
+            {/* The eyebrow takes one COLUMN width ("METAGRAPH", the longest slot noun, sets it) so
+                every entry's title starts on the same x and the pile reads as a ladder, not as
+                three ragged lines. Stated in em against the label step (the type scale is fluid). */}
+            {eyebrow ? <span data-eyebrow="" className={cn("block flex-none min-w-[7em]", eyebrowClass)}>{eyebrow}</span> : null}
+            {title != null && <h3 className={cn("m-0 text-body font-semibold text-foreground min-w-0 truncate", ENTRY_TITLE)}>{rolled}</h3>}
+            {(caption != null || aside != null) && (
+              <span className="ml-auto flex-none flex items-center gap-1.5 relative z-10 pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
+                {caption != null && <span className="text-label text-muted-foreground text-right tabular-nums">{caption}</span>}
+                {aside}
+              </span>
+            )}
+          </div>
+        ) : (eyebrow || caption != null) && (
           <div className={cn("flex items-start justify-between gap-2 mb-2", onClose && !entryMode && "pr-[30px]")}>
             {/* `data-eyebrow` is RailThread's read: on an unboxed ENTRY the thread runs its
                 depth-reach connector at the EYEBROW's height (user, 2026-08-08 — the entry's
@@ -427,7 +428,7 @@ function keepFocusOnRung(el: HTMLElement): void {
             )}
           </div>
         )}
-        {title != null && (
+        {title != null && !entryMode && (
           <>
             <div className="flex items-center gap-2 min-w-0">
               <h3 className={cn(TITLE, "text-foreground min-w-0")}>{rolled}</h3>

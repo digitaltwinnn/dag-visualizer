@@ -99,11 +99,14 @@ export function MetaTitle({ cfg }: { cfg: MetaCfg }) {
           was tried and rejected (2026-07-12 — the kind text truncated into the site link);
           the dossier's collapsed height runs a few px taller than the other cards' by
           deliberate trade (all the identity info stays). */}
-      <Avatar className="size-[30px] flex-none">
+      <Avatar data-avatar="" className="size-[30px] flex-none">
         {iconUrl && <AvatarImage src={iconUrl} alt="" />}
         <AvatarFallback className={IDENT_INK} style={{ color: hue }}>{monogram}</AvatarFallback>
       </Avatar>
-      <span className="flex flex-col gap-px min-w-0">
+      {/* `data-titleblock`: a folded ENTRY lays these two lines out on one baseline (CardHead's
+          ENTRY_TITLE), name then kind — the one-line form rejected on 2026-07-12 truncated the
+          kind INTO the site link, which has lived in the body since 2026-08-08. */}
+      <span data-titleblock="" className="flex flex-col gap-px min-w-0">
         <span className="leading-[1.1]">{cfg.name}</span>
         {/* The TICKER left this line for the title-row ASIDE (user, 2026-08-08 — MetaTickerAside,
             taking the slot the site link held; the link moved into the body as a labelled row).

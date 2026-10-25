@@ -601,6 +601,17 @@ floor; geometry shows the fall, the rail states the containment.) The snapshot c
 ride the lane **without being focus rungs** — `railLadderBoundary.test.ts` asserts rung → slot, not the
 reverse, so a slot without a rung is fine and a rung without a slot is not.
 
+**A HEAD THAT IS NOT THE OPEN BOX IS ONE ROW** (design pass, 2026-10-25 — user: the right rail
+"is pretty dense with all the header displayed. I don't want to lose info"): a folded ENTRY lays
+its eyebrow, its title and its aside on one line (`CardHead`'s entry branch — the eyebrow takes
+one column width so the pile's titles align; a two-line title node marks its block
+`data-titleblock` and its lines go inline, so the dossier's kind and the node's chips are kept,
+not dropped), and the explorer card's head does the same (the panel layout: EXPLORE · mark ·
+title · aside). The BOX keeps the two-row head — it is the one materialized card, and the tiers
+carry the depth. Measured at 1600×950 with three ancestors committed: the pile 175 → 143px, the
+explorer head 60 → 44. (A one-line dossier head was rejected once, 2026-07-12, when the kind text
+truncated into the site link; the link has lived in the body since 2026-08-08.)
+
 **The card grammar: ONE materialized box, unboxed entries, tucked into a SLAB.** Only the expanded rung
 renders as a glass panel; every other committed rung sheds its frame into an unboxed `.rail-entry` —
 solid glass, no border, chrome-less, the whole entry one stretched toggle, distance-dimmed toward the box
