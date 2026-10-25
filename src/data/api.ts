@@ -439,13 +439,16 @@ export class NetworkData {
       if (!live.globals?.length) throw new Error("no globals");
       this._lastLive = live;
       // The shared window is newest-first. A tab that fell behind it reads the cached catch-up list
-      // once; a failed catch-up keeps the shared append rather than failing the tick.
+      // once; a failed catch-up keeps the shared append rather than failing the tick. The catch-up
+      // MERGES with the shared window: its own cache can lag the shared answer by a poll, and a
+      // replace would drop the newest shared snapshot for that tick.
       const prev = this.latest?.ordinal ?? null;
-      let { append, needCatchUp } = globalsToAppend(prev, live.globals);
+      const { needCatchUp, append: shared } = globalsToAppend(prev, live.globals);
+      let append = shared;
       if (needCatchUp != null) {
         try {
           const c = await this._fetchLive(`/api/live/globals?limit=${Math.min(needCatchUp, POLL.maxSnapshots)}`);
-          const filled = missedGlobals(prev, (c.json.globals ?? []) as GlobalSnapshot[]);
+          const filled = missedGlobals(prev, [...((c.json.globals ?? []) as GlobalSnapshot[]), ...live.globals]);
           if (filled.length) append = filled;
         } catch { /* keep the shared append */ }
       }

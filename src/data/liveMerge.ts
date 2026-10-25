@@ -14,7 +14,6 @@ export function missedGlobals<T extends { ordinal: number }>(prev: number | null
     .sort((a, b) => a.ordinal - b.ordinal);
 }
 
-
 /** What a poll appends from the shared window (newest-first, as upstream returns it), and whether
  *  the tab fell BEHIND that window: the oldest shared ordinal sits above `prev + 1`, so the gap
  *  (`newest - prev`) needs one cached catch-up read. First read (`prev` null) takes the newest only. */
