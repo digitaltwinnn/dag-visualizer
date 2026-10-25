@@ -73,7 +73,10 @@ const AXIS: { ago: number; label: string }[] = [
 export default function PulseStrip() {
   const now = useNowTick(1000);
   const rows = pulseOrder(pollHealthRows());
-  const verdict = pulseVerdict(rows, now);
+  // The sentence judges the feeds THIS VIEW reads; a feed nothing here reads (perhaps never fetched
+  // yet) still shows its lane, dimmed, but cannot hold the verdict on "connecting".
+  const inView = rows.filter((r) => feedReaders(r.id as Parameters<typeof feedReaders>[0]).length > 0);
+  const verdict = inView.length ? pulseVerdict(inView, now, true) : pulseVerdict(rows, now);
   return (
     <div className="mx-2 px-2 pb-2 pt-1.5 border-t border-border/60">
       {/* THE VERDICT — the strip's one sentence, on the band's plate so it reads as the answer

@@ -98,9 +98,12 @@ export function touchPoll(id: FeedId): void {
   if (!POLL_HEALTH.has(id)) POLL_HEALTH.set(id, freshRow(id));
 }
 
-/** The registry, in stable insertion order — the pulse strip's one read. */
+/** EVERY FEED, in the FEEDS table's order — the pulse strip's one read (user, 2026-10-25: "show all
+ *  apis by default … it won't show trends history on hyper view because it doesn't even know it
+ *  exists"). A feed with no outcome yet reads as a fresh row (status "acquiring", no beats) without
+ *  being registered, so listing it claims nothing. */
 export function pollHealthRows(): PollHealth[] {
-  return [...POLL_HEALTH.values()];
+  return (Object.keys(FEEDS) as FeedId[]).map((id) => POLL_HEALTH.get(id) ?? freshRow(id));
 }
 
 /** The anchor-index keys to drop when it is over `max`: the CHRONOLOGICALLY oldest, which is not

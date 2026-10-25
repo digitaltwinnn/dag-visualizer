@@ -95,3 +95,10 @@ describe("pulseVerdict (the strip's one sentence)", () => {
     expect(pulseVerdict([ok("a"), row({ id: "b" })], NOW).detail).toBe("1 feed answered on time. 1 still connecting.");
   });
 });
+
+describe("pulseVerdict in a view", () => {
+  it("says the count is this view's", () => {
+    const ok = (id: string) => row({ id, label: id, lastOkAt: NOW - 1000, ok: 1 });
+    expect(pulseVerdict([ok("a"), ok("b")], NOW, true).detail).toBe("All 2 feeds in this view answered on time.");
+  });
+});

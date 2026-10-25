@@ -88,12 +88,16 @@ export interface PulseVerdict {
 
 /** THE STRIP'S ONE SENTENCE — is the app live, and if not, which feed and since when. Failing
  *  outranks late; the feeds still connecting are counted, never claimed live. */
-export function pulseVerdict(rows: readonly PollHealth[], now: number): PulseVerdict {
+/** `inView` narrows the sentence to the feeds the current view reads (the strip passes only those):
+ *  a feed nothing here reads — possibly never fetched in this session — must not hold the verdict
+ *  on "connecting", and the words say the count is this view's. */
+export function pulseVerdict(rows: readonly PollHealth[], now: number, inView = false): PulseVerdict {
+  const here = inView ? " in this view" : "";
   if (rows.length === 0) return { tone: "acquiring", title: "Connecting", detail: "No feed has answered yet." };
   const by = (s: PollStatus) => rows.filter((r) => pollStatusOf(r, now) === s);
   const failing = by("failing"), stale = by("stale"), acquiring = by("acquiring");
   const live = rows.length - failing.length - stale.length - acquiring.length;
-  const others = (n: number) => (n === 0 ? "" : n === 1 ? " The other feed is live." : ` The other ${n} feeds are live.`);
+  const others = (n: number) => (n === 0 ? "" : n === 1 ? ` The other feed${here} is live.` : ` The other ${n} feeds${here} are live.`);
   const since = (r: PollHealth) => (r.lastOkAt != null ? `Last good answer ${relativeAge(now - r.lastOkAt, true)} ago.` : "No good answer yet.");
   if (failing.length || stale.length) {
     const bad = failing.length > 0;
@@ -106,5 +110,5 @@ export function pulseVerdict(rows: readonly PollHealth[], now: number): PulseVer
   const feeds = (n: number) => (n === 1 ? "1 feed" : `${n} feeds`);
   if (live === 0) return { tone: "acquiring", title: "Connecting", detail: `${feeds(acquiring.length)} still connecting.` };
   const tail = acquiring.length ? ` ${acquiring.length} still connecting.` : "";
-  return { tone: "ok", title: "Live", detail: live === rows.length ? `All ${live} feeds answered on time.` : `${feeds(live)} answered on time.${tail}` };
+  return { tone: "ok", title: "Live", detail: live === rows.length ? `All ${live} feeds${here} answered on time.` : `${feeds(live)}${here} answered on time.${tail}` };
 }
