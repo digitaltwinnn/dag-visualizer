@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GlobalSnapshot, RawMetaSnapshot } from "@/src/data/types";
-import { assembleLive } from "./assemble";
+import { assembleLive, assembleWithUnlisted } from "./assemble";
 
 const g = [{ ordinal: 1 }] as unknown as GlobalSnapshot[];
 const fresh = [{ timestamp: new Date().toISOString() }] as RawMetaSnapshot[];
@@ -32,5 +32,27 @@ describe("assembleLive", () => {
   it("keeps a listed chain with an empty list as []", async () => {
     const r = await assembleLive({ globals: async () => g, chain: async () => [] }, ["A"], []);
     expect(r.metas.A).toEqual([]);
+  });
+});
+
+describe("assembleWithUnlisted", () => {
+  it("reports a failed unlisted list as @unlisted, keeping globals and listed metas", async () => {
+    const r = await assembleWithUnlisted(
+      { globals: async () => g, chain: async () => fresh },
+      ["A"],
+      async () => { throw new Error("list"); },
+      new Set(),
+    );
+    expect(r.failed).toContain("@unlisted");
+    expect(r.globals).toBe(g);
+    expect(r.metas.A).toBe(fresh);
+  });
+  it("remembers a quiet unlisted chain and skips it next time", async () => {
+    const quiet = new Set<string>();
+    const asked: string[] = [];
+    const read = { globals: async () => g, chain: async (id: string) => { asked.push(id); return old; } };
+    await assembleWithUnlisted(read, [], async () => ["Q"], quiet);
+    await assembleWithUnlisted(read, [], async () => ["Q"], quiet);
+    expect(asked).toEqual(["Q"]);
   });
 });
