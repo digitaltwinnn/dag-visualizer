@@ -2,6 +2,7 @@
 // No simulation — if the API is unreachable the app shows a "no data" state and
 // keeps polling, recovering on its own once it responds again (`live` reflects this).
 
+import { dataTime } from "./liveAge";
 import { METAGRAPHS, NET_DEF, netUrl } from "@/src/net/current";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
 import { COLORS, POLL } from "@/src/engine/config";
@@ -75,13 +76,17 @@ export type FeedId = keyof typeof FEEDS;
 const POLL_HEALTH = new Map<string, PollHealth>();
 /** Report one fetch outcome into the registry — exported for the two fetch sites outside this
  *  module (/api/metagraphs in Engine.refreshMeta, /api/geo in geoResolve). */
-export function reportPoll(id: FeedId, ok: boolean): void {
+export function reportPoll(id: FeedId, ok: boolean, at: number = Date.now()): void {
   let r = POLL_HEALTH.get(id);
   if (!r) { r = freshRow(id); POLL_HEALTH.set(id, r); }
-  const at = Date.now();
-  if (ok) { r.lastOkAt = at; r.ok++; } else { r.lastErrAt = at; r.err++; }
-  r.beats.push({ at, ok });
-  while (r.beats.length > BEAT_CAP || (r.beats.length && at - r.beats[0]!.at > BEAT_KEEP_MS)) r.beats.shift();
+  // `at` may be the data's own (older) time, so a late beat never moves an age backwards and the
+  // list stays sorted; trimming is against the NEWEST beat, not the incoming one.
+  if (ok) { r.lastOkAt = Math.max(r.lastOkAt ?? at, at); r.ok++; } else { r.lastErrAt = Math.max(r.lastErrAt ?? at, at); r.err++; }
+  let i = r.beats.length;
+  while (i > 0 && r.beats[i - 1]!.at > at) i--;
+  r.beats.splice(i, 0, { at, ok });
+  const newest = r.beats[r.beats.length - 1]!.at;
+  while (r.beats.length > BEAT_CAP || (r.beats.length && newest - r.beats[0]!.at > BEAT_KEEP_MS)) r.beats.shift();
 }
 function freshRow(id: FeedId): PollHealth {
   const d = FEEDS[id];
@@ -296,6 +301,19 @@ export class NetworkData {
       const res = await fetch(url, { signal: ctrl.signal });
       if (!res.ok) throw new Error(String(res.status));
       return await res.json();
+    } finally {
+      clearTimeout(t);
+    }
+  }
+  /** One shared-live read: the body plus the time its DATA was true (edge Age + memo age). */
+  async _fetchLive(path: string): Promise<{ json: any; at: number }> {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 7000);
+    try {
+      const res = await fetch(netUrl(path), { signal: ctrl.signal });
+      if (!res.ok) throw new Error(String(res.status));
+      const json = await res.json();
+      return { json, at: dataTime(Date.now(), res.headers.get("age"), json?.memoAgeMs) };
     } finally {
       clearTimeout(t);
     }

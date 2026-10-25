@@ -179,6 +179,17 @@ describe("reportPoll's beats", () => {
     expect(row.beats.every((b) => b.at > t0)).toBe(true);
   });
 
+  it("takes the data's own time: a late older beat sorts in and never moves lastOkAt back", () => {
+    const t0 = Date.now() - 1_000_000;
+    const spy = vi.spyOn(Date, "now").mockReturnValue(t0 + 2000);
+    reportPoll("global", true, t0 + 1000);
+    reportPoll("global", true, t0);
+    spy.mockRestore();
+    const row = pollHealthRows().find((r) => r.id === "global")!;
+    expect(row.beats.map((b) => b.at)).toEqual([t0, t0 + 1000]);
+    expect(row.lastOkAt).toBe(t0 + 1000);
+  });
+
   it("a touched row has no beats, not a claimed one", () => {
     touchPoll("api-trends");
     expect(pollHealthRows().find((r) => r.id === "api-trends")!.beats).toEqual([]);
