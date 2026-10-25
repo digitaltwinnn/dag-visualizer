@@ -16,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { cn } from "@/lib/utils";
 import { SELECTED_ROW } from "@/components/selection";
 import GroupPlate from "@/components/datasection/GroupToggle";
+import { useBreakpoint } from "@/components/useBreakpoint";
 
 // HISTORY'S RAW IS THE STORED BUCKETS (user, 2026-10-08: "its raw page should just show upstash
 // records, not the raw page for snapshots, should work with the app filter as well"). The measured
@@ -66,11 +67,12 @@ export default function TrendBucketsSurface() {
   // reloads its list). It still WEARS a committed range that is exactly that day.
   const cursorMs = useStore((s) => s.trendCursorMs);
   const setTrendCursor = useStore((s) => s.setTrendCursor);
-  // Folded days — OPEN BY DEFAULT ON EVERY TIER here (user, 2026-10-25: "maybe expand by default,
-  // then it makes sense"): a page is a week of days, and a page of folded headers showed no record
-  // at all. The other raw lists still fold on the phone.
+  // Folded days, toggled away from the tier's default — folded on the phone, open on the wider
+  // tiers, as every raw list (user, 2026-10-25: opened on every tier while a page held two days;
+  // with a page of a week, "now you can close the days by default also").
+  const phone = useBreakpoint() === "phone";
   const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set());
-  const isFolded = (k: string) => folded.has(k);
+  const isFolded = (k: string) => folded.has(k) !== phone;
   const toggleFold = (k: string) =>
     setFolded((f) => {
       const n = new Set(f);
