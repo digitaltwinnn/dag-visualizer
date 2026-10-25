@@ -629,9 +629,16 @@ export default function TrendStack() {
               // perhaps drop the cards one after each other"). Keyed off the layer's `data-on`, so it
               // plays once as the room reveals and never on a re-rank; staggered by depth rank, front
               // first. On `transform`, which composes with the utilities' `translate`.
-              className="plane-card absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border p-2 [background:linear-gradient(var(--panel-solid),var(--panel-solid)),var(--scene-ground)] [transition:border-color_0.16s_ease] motion-reduce:!transition-none"
+              className="plane-card absolute left-0 top-0 -translate-x-1/2 translate-y-[calc(var(--plane-h)/-2)] rounded-lg border border-border p-2 [background:linear-gradient(var(--panel-solid),var(--panel-solid)),var(--scene-ground)] [transition:border-color_0.16s_ease] motion-reduce:!transition-none"
+              // THE TOP EDGE IS PINNED, NOT THE CENTRE (user, 2026-10-25, phone: "the upsider has more
+              // of the card show at the top than the card DED sitting in front of it"). A card is
+              // nominally `pxH` tall, but the front card's head wraps its readings onto a second line
+              // on the phone; centred on its anchor, half that growth rose over the card behind and
+              // ate its name strip. Offset by the NOMINAL half-height, any extra height runs DOWN,
+              // toward the viewer, and every strip is exactly the slot's up-step.
               style={{
                 ["--slot" as string]: depthRank,
+                ["--plane-h" as string]: `${fmt.pxH}px`,
                 width: fmt.pxW,
                 ...(pair.paired
                   ? {
