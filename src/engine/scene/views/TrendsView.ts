@@ -126,10 +126,10 @@ const groundY = (centre: number, f: PlaneFormat): number => PLANE_Y - centre * f
  *  ink, and this ground is a 0.88-L page). */
 // Paper was 0.2 until 2026-10-03: at that level the bands under the deck read as two grey SMUDGES
 // on the page rather than as a floor (light-theme pass; user: "fix it"). 0.11 keeps the footprint
-// legible — still above dark's number, for the reason given above — without the dirt. 0.26 since
+// legible — still above dark's number, for the reason given above — without the dirt. 0.34 since
 // 2026-10-25 (user: "light mode should have a shadow too … for those cards"): at 0.11 the cards
 // stood on almost nothing on paper, while dark's bands read plainly under its deck.
-const GROUND_PRESENCE = { dark: 0.07, paper: 0.26 } as const;
+const GROUND_PRESENCE = { dark: 0.07, paper: 0.34 } as const;
 
 /** The shadow band's height in world units — how far below the floor line the soft falloff runs.
  *  A little over a tenth of the card: enough to read as a shadow's spread, not a second card. */
