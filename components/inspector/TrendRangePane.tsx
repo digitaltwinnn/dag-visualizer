@@ -10,7 +10,7 @@ import RecordsDoor from "@/components/inspector/RecordsDoor";
 import useTrendRoster from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { metagraphById } from "@/src/data/network";
-import { GLOBAL_READING, rangePhrase, sumMeasured, TREND_METRICS } from "@/src/data/trendSeries";
+import { GLOBAL_READING, rangePhrase, spanWord, sumMeasured, TREND_METRICS } from "@/src/data/trendSeries";
 import { spanPhrase, windowSpan } from "@/src/data/trendWindow";
 import { ageWords } from "@/src/util/relativeAge";
 import { cardNetwork } from "@/src/engine/domain/trendStack";
@@ -107,6 +107,15 @@ export default function TrendRangePane({
   // clarity"): a span of two days or more is named by its UTC days, with the year (a day-only label
   // is a UTC day); a shorter one by its clock times, drawn by `Stamp` with the zone as a tag.
   const longSpan = span ? span.toMs - span.fromMs >= 2 * 86_400_000 : false;
+  // THE EXPLORER'S OWN FIGURE, AS A ROW (user, 2026-10-25: "add one line to the range card saying
+  // the average per day — basically the exact same figure that is shown in the explorer bottom
+  // section"): the subject row's `head` from the ONE roster pass the Networks list reads, in the
+  // same formatter, under the same word the list's foot states (`spanWord`) — so the card and the
+  // list cannot quote two numbers. Unscoped, it is the pinned DAG row's figure, the reading the
+  // lead's "All networks" / "The hypergraph" names. Under a window shorter than a day the head is
+  // the latest full day (the roster's `headKind`), exactly as the list's then is.
+  const headRow = subject ? rows.get(subject) : roster.total;
+  const headValue = headRow?.head ?? null;
   const edge = (ms: number) =>
     longSpan ? new Date(ms).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" }) : <Stamp ms={ms} />;
 
@@ -149,6 +158,11 @@ export default function TrendRangePane({
                 window ends now, and says so rather than printing a clock that drifts each poll. */}
             <Fact label="End">{range ? edge(longSpan ? span.toMs - 1 : span.toMs) : "now"}</Fact>
             <Fact label="Length">{ageWords(span.toMs - span.fromMs)}</Fact>
+            {headValue != null && (
+              <Fact label={spanWord(metric)}>
+                <span className="tabular-nums">{format(headValue)}</span>
+              </Fact>
+            )}
           </FactGroup>
           <RecordsDoor subject={subject} span={{ ...span, label: spanPhrase(windowId, range) }} />
         </div>
