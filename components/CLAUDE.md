@@ -1387,7 +1387,7 @@ In one line: **thread = resting identity cue; card edge = purely transient signa
   is closed goes vivid in its identity hue, still — colour alone since 2026-09-28 — until the sheet opens — purely visual, it
   **never opens the sheet**, and a pure deselect announces nothing.
 - **Calm tempo.** The heartbeat family beats at 1.5s and transient signals run around 1.2s, debounced
-  so a 4s-tick live feed never reads as a strobe. **Navigation moves on its own, slower clock** — the
+  so a 5s-poll live feed never reads as a strobe. **Navigation moves on its own, slower clock** — the
   depth change is 0.55s and the view choreography ~3.3s — because that's the user's own gesture
   resolving, not the instrument speaking.
 - **Reduced motion is guarded on every animation**: theme-var animations carry
