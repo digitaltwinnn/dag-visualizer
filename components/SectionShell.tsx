@@ -141,6 +141,11 @@ export default function SectionShell({
   // (both are full of real controls — rails and canvas up here, a sortable table down there).
   // The STRIP is deliberately in NEITHER boundary: the live lane stays live in both poses.
   const section = useStore((s) => s.section);
+  // An open phone sheet PUSHES the raw pane up rather than covering it (user, 2026-10-25: "not
+  // overlay, but push it up like we do for scene also, same principle"): the pane's bottom rides
+  // the sheet's top edge, from the same bottom covers the scene's shift reads. Zero on the wider
+  // tiers, where nothing publishes a bottom cover.
+  const rawCover = useStore((s) => Math.max(s.sceneCoverBExplore, s.sceneCoverBDetails, s.sceneCoverBVitals));
 
   return (
     <>
@@ -185,9 +190,9 @@ export default function SectionShell({
           // The dock bar STAYS on the raw page since 2026-10-25 (user: "keep the bottom bar … the same
           // way as the regular scene"), so the pane ends 6px above it; `--phone-dock-h` carries the
           // safe-area inset already.
-          "max-[700px]:left-1.5 max-[700px]:right-1.5 max-[700px]:bottom-[calc(var(--phone-dock-h)+6px)]"
+          "max-[700px]:left-1.5 max-[700px]:right-1.5 max-[700px]:bottom-[calc(var(--phone-dock-h)+6px+var(--raw-cover,0px))] max-[700px]:[transition:bottom_380ms_cubic-bezier(0.32,0.72,0,1)] motion-reduce:![transition:none]"
         }
-        style={{ visibility: "hidden", willChange: "transform, opacity" }}
+        style={{ visibility: "hidden", willChange: "transform, opacity", ["--raw-cover" as string]: `${rawCover}px` }}
       >
         {raw}
         {/* The layer's own dismiss — the third way back (the command bar's RAW switch and Escape

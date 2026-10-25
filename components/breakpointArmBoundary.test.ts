@@ -66,6 +66,6 @@ describe("responsive tier arms name the boundary itself", () => {
     const foot = readFileSync(join("components", "SiteFooter.tsx"), "utf8");
     expect(foot).toContain('"max-[700px]:hidden"');
     const shell = readFileSync(join("components", "SectionShell.tsx"), "utf8");
-    expect(shell).toContain("max-[700px]:bottom-[calc(var(--phone-dock-h)+6px)]");
+    expect(shell).toContain("max-[700px]:bottom-[calc(var(--phone-dock-h)+6px+var(--raw-cover,0px))]");
   });
 });
