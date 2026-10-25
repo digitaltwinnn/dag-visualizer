@@ -2382,7 +2382,11 @@ export class Engine {
     // policy allows it (hyper). Without a hub (the unlisted set, a network with no live nodes) the
     // blur had nothing in focus and smeared the whole scene (the Unlisted audit, 2026-10-07).
     const metaSel = this.filter !== "all" && this.filter !== "dag" && this._dofMeta != null;
-    const dofMix = THREE.MathUtils.clamp(1 - (this.morph - 0.4) / 0.2, 0, 1);
+    // …AND ONLY ONCE THE SUBJECT HAS ARRIVED (user, 2026-10-25): the morph is written to 0 at the
+    // boundary, so the blur used to cover the fleet while it still stood on the staging grids.
+    // The mix rides hyper's subject-arrival beat (`entryProgress` — held through the choreography,
+    // the tethers' sweep after it), the same stage the hubs' tethers reach their hubs on.
+    const dofMix = THREE.MathUtils.clamp(1 - (this.morph - 0.4) / 0.2, 0, 1) * this.layers.entryProgress();
     this.ctx.dof.enabled = policy.dofEligible && metaSel && dofMix > 0.001;
     if (this.ctx.dof.enabled) {
       const meta = this._dofMeta;

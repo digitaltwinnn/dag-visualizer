@@ -705,6 +705,15 @@ export class HyperView implements SceneView {
     this._tetherEntryHold = false;
   }
 
+  /** THE SUBJECT-ARRIVAL BEAT'S PROGRESS, 0..1 — 0 while the beat is held through the choreography,
+   *  the tethers' own 0.7s sweep after the release, 1 at rest. The Engine's depth-of-field rides it
+   *  (user, 2026-10-25: entering hyper "already when nodes are at the staging area it looks like the
+   *  fuzzy effect applies … use one of the timed stages"): the blur exists to set the subject hub
+   *  apart, so it arrives with the subject, on the beat the view already keeps for that. */
+  entryProgress(): number {
+    return this._tetherEntryHold ? 0 : this._tetherEntryT;
+  }
+
   buildCoreRings(shells: { radius: number; numRings: number; tilt: number; code: string }[]) {
     for (const h of this._coreRings) {
       this.coreGroup.remove(h);
