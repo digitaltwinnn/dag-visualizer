@@ -254,7 +254,7 @@ export default function TrendBucketsSurface() {
                           const items = r.vals.map((v, c) => ({ k: byChain ? `m${cellKeys[c]}` : shortKey(cellKeys[c]!, scope, UNLISTED_ID), v, key: cellKeys[c]! }));
                           // Split by FAMILY where the scope has two (g. the global stream, f./u. the
                           // fleet and the unlisted set), else in half.
-                          const gs = items.filter((x) => x.k.startsWith("g."));
+                          const gs = items.filter((x) => x.k.split(".")[0] === "g");
                           const half = gs.length > 0 && gs.length < items.length ? gs.length : Math.ceil(items.length / 2);
                           const col = (xs: typeof items) => (
                             <span className="grid grid-cols-[auto_auto] items-baseline gap-x-3 gap-y-0.5 content-start">
