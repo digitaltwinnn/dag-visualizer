@@ -252,11 +252,13 @@ export default function Explorer({ id, title, hint, placeholder, levels: selecte
               extra words. The path rides the band bare (it wore its own accent-tinted plate, a
               third surface in a second tint — user: "does its colour look off?"), the house its
               one accent mark. Full-bleed by the body's own inset (ExplorerShell: `pt-1.5 px-[14px]`). */}
-          <div className={cn("-mt-1.5 mb-2 pt-2 pb-2 bg-[var(--panel-plate)] border-b border-border flex flex-col gap-2", SHELL_BLEED_X, SHELL_INSET_X)}>
+          {/* TIGHTER since 2026-10-25 (design pass, proposal C): no hairline between the control and
+              the path — the segmented control's own frame already bounds it — and a 6px rhythm
+              (was 8). 15px shorter, the same three pieces. */}
+          <div className={cn("-mt-1.5 mb-2 pt-1.5 pb-1.5 bg-[var(--panel-plate)] border-b border-border flex flex-col gap-1.5", SHELL_BLEED_X, SHELL_INSET_X)}>
             {measure && measure.options.length > 1 && <MeasureTiles measure={measure} />}
             <ExplorerPath
               bare
-              className={cn(measure && measure.options.length > 1 && "border-t border-border/60 pt-2")}
               crumbs={crumbs}
               hint={current.meaning}
               placeholder={placeholder}

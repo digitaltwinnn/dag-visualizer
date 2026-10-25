@@ -47,20 +47,25 @@ export function MeasureLabel({ label }: { label: string }) {
   return <span className="text-label tracking-caps uppercase text-muted-foreground select-none">{label}</span>;
 }
 
-/** THE MEASURE TILES — a grid of glyph + word, one tile per measure, the current one in the
- *  app's committed-selection language (the view switch's on-state, so the two read as one species
- *  of radio). They ride the explorer's CONTROL BAND (`Explorer.tsx` draws it — the plate under
- *  the head that also holds the path), so this is the grid alone. Four measures sit two by two
- *  (a 65px tile cannot hold "Metagraphs" beside its mark); two, three and six take three columns. */
+/** THE MEASURE TILES — ONE SEGMENTED CONTROL of glyph + word, one segment per measure, the current
+ *  one in the app's committed-selection language (the view switch's on-state, so the two read as
+ *  one species of radio). They ride the explorer's CONTROL BAND (`Explorer.tsx` draws it — the
+ *  plate under the head that also holds the path), so this is the grid alone. Four measures sit
+ *  two by two (a 65px cell cannot hold "Metagraphs" beside its mark); two, three and six take
+ *  three columns. SEGMENTED since 2026-10-25 (design pass, proposal A — user: the card "reads
+ *  like lots and lots of buttons"): one hairline frame around the set, a divider between the
+ *  columns and a hairline between the rows, the lit cell filled — one setting, not N buttons.
+ *  The separate bounded tiles (2026-10-23) had each worn their own ring. */
 export function MeasureTiles({ measure }: { measure: MeasureControl }) {
   const n = measure.options.length;
+  const cols = n === 4 ? 2 : 3;
   return (
     <ToggleGroup
       type="single"
       value={measure.value}
       aria-label="Measure"
       onValueChange={(v) => { if (v) measure.onPick(v); }}
-      className={cn("grid w-auto gap-1 rounded-none", n === 4 ? "grid-cols-2" : "grid-cols-3")}
+      className={cn("grid w-auto gap-0 rounded-btn shadow-[inset_0_0_0_1px_var(--border)] overflow-hidden", cols === 2 ? "grid-cols-2" : "grid-cols-3")}
     >
       {measure.options.map((o) => {
         const Icon = measureIcon(o.id);
@@ -75,13 +80,20 @@ export function MeasureTiles({ measure }: { measure: MeasureControl }) {
               // 1.5/1.5, and "Metagraphs" (wide letters) clipped where "Continuity" fit — 6px back
               // seats every label the four measure modules declare (measured 2026-10-23).
               "group flex min-w-0 items-center justify-start gap-1 h-7 px-1 rounded-btn! text-label",
-              // EVERY TILE IS A BOUNDED BUTTON (user, 2026-10-23: unlit, "they are just texts on the
-              // same plane"): a hairline ring on each, the lit one's in the selection pair — the
-              // band's plate is one surface, so a text-only tile had nothing to say it was pressable.
-              // `!` on both rings (CSS trap 4): the toggle-group primitive's `data-[spacing=0]:shadow-none`
-              // is class+attribute and outranked the plain ring; both important, the on-state's
-              // variant wins by its own specificity.
-              "text-muted-foreground bg-transparent border-0 shadow-[inset_0_0_0_1px_var(--border)]!",
+              // THE SET IS BOUNDED, NOT EACH CELL (user, 2026-10-23: unlit, "they are just texts on
+              // the same plane" — so a frame says the set is pressable; 2026-10-25: one frame for
+              // the set rather than a ring per tile, so it reads as one control).
+              // The muted ink unlit and the 12% selection fill lit — both offered one step up on
+              // 2026-10-25 (the unlit word brighter; the lit cell on the strong wash) and declined:
+              // "A+C as is is fine".
+              "text-muted-foreground bg-transparent border-0 rounded-none! shadow-none!",
+              // The frame is the group's; each cell draws only the divider on its LEFT edge (not the
+              // first of a row) and, from the second row on, a hairline TOP. `!` on the shadows (CSS
+              // trap 4): the toggle-group primitive's `data-[spacing=0]:shadow-none` is
+              // class+attribute and would outrank a plain ring; the on-state's variant then wins by
+              // its own specificity.
+              cols === 2 ? "[&:nth-child(2n)]:shadow-[inset_1px_0_0_0_var(--border)]!" : "[&:not(:nth-child(3n+1))]:shadow-[inset_1px_0_0_0_var(--border)]!",
+              cols === 2 ? "[&:nth-child(n+3)]:border-t [&:nth-child(n+3)]:border-border" : "[&:nth-child(n+4)]:border-t [&:nth-child(n+4)]:border-border",
               "hover:text-foreground hover:bg-wash-soft",
               "data-[state=on]:text-foreground data-[state=on]:bg-[var(--sel-bg)]",
               "data-[state=on]:shadow-[inset_0_0_0_1px_var(--sel-border)]!",
