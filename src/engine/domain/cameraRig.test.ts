@@ -44,12 +44,11 @@ describe("FOCI", () => {
     expect(pitchDeg(FOCI.geo)).toBeLessThan(25);
   });
 
-  it("the Geography network pose steps in from rest — nearer than rest, farther than the country framing — keeping the rings in frame", () => {
-    expect(dist(FOCI.geoNetwork)).toBeLessThan(dist(FOCI.geo));
+  it("the Geography network rung has NO pose of its own (user, 2026-10-25: one angle on the globe; the spin + the nudge say \"this network\") — the country framing is the first step in from rest", () => {
+    expect("geoNetwork" in FOCI).toBe(false);
     const country = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
     geoFraming(1, country);
-    expect(dist(FOCI.geoNetwork)).toBeGreaterThan(dist(country));
-    expect(FOCI.geoNetwork.target.y).toBeLessThan(0); // the body, rings included, not the globe's centre
+    expect(dist(country)).toBeLessThan(dist(FOCI.geo));
   });
 });
 
@@ -301,10 +300,10 @@ describe("cohortFraming (the geo COHORT/provider pose)", () => {
     const cohortDist = out.pos.length();
     nodeFraming(out);
     const nodeDist = out.pos.length();
-    // Wider than the node pose, tighter than the country framing floor (countryShape dist ≥ 4.3
-    // from R≈15-based math — assert against the node pose + the geoNetwork preset instead).
+    // Wider than the node pose, tighter than the rest orbit (the country framing floor is
+    // countryShape's R-based math — assert against the node pose + the rest pose instead).
     expect(cohortDist).toBeGreaterThan(nodeDist);
-    expect(cohortDist).toBeLessThan(FOCI.geoNetwork.pos.length());
+    expect(cohortDist).toBeLessThan(FOCI.geo.pos.distanceTo(FOCI.geo.target));
   });
 });
 

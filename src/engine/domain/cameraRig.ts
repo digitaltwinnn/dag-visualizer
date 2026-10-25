@@ -44,20 +44,15 @@ export const FOCI = {
   // 5.5% longer so the taller body keeps headroom under the bar; the pitch is the old one (the
   // pos − target delta is (0, 13.5, 44.8) scaled about the target).
   geo: { pos: new THREE.Vector3(0, 11, 47.3), target: new THREE.Vector3(0, -3.2, 0) },
-  // Metagraph-selection pose: rotated-to-densest at a WIDE distance — deliberately farther out
-  // than the country framing (geoFraming z 29..25) so the country drill reads as a real zoom-in.
-  // Camera held LOW (near the equator plane, like the country/node poses) — a higher camera
-  // stacked on the densest-cluster lean read as "viewing the globe from the north" (user).
-  // NOT a step in any more (user, 2026-10-24: "zoom in but a bit less so that the circle still
-  // stays visible and does not hide beneath the bottom vitals section"; then 2026-10-25, on a
-  // tablet in landscape: "the top part of the sphere is covered by the topbar, make it fit better
-  // on screen and zoom out a bit more"): the base rings are where the committed network's callout
-  // anchors, so the WHOLE body — crown to the rings' front edge — has to sit inside the lane
-  // between the bar and the vitals band. The orbit is the rest pose's LENGTH (measured at
-  // 1400×876: the crown cleared the bar by 4px at the old ~8%-shorter orbit); what still says
-  // "network" is the pitch — the camera held low, so the rotated-to-densest hemisphere presents
-  // face-on — and the target a little under the rest's, lifting the rings off the band.
-  geoNetwork: { pos: new THREE.Vector3(0, 9.85, 47.5), target: new THREE.Vector3(0, -3.65, 0) },
+  // THE NETWORK RUNG HAS NO POSE OF ITS OWN (user, 2026-10-25: "it makes little sense to have two
+  // different angles, pick the most logical/common angle to a globe. The globe rotation effect is
+  // sufficient to communicate a change, maybe add a subtle zoom in/out effect"). A `geoNetwork`
+  // entry stood here from the first ladder until that day — a dive, then a wide low pose, then a
+  // short step in — and each cut was a second angle on the same globe. The rung inherits the REST
+  // pose (principle 2: a rung without a pose of its own inherits its parent's), the globe spins to
+  // the network's densest cluster, and the camera's answer is the same-pose NUDGE (principle 3):
+  // a 0.55s push toward the globe and back, which is the subtle zoom in/out asked for, with the
+  // HUD dim riding it because the structure moves (`tweenTo`'s `structureMoves` gate).
   // The Snapshots RESTING pose (user, 2026-08-07 — it used to share `overview`): FRONTAL and
   // zoomed in, straight onto the chamber's camera-side face, so the ribbon sheets (which span
   // the lane field) and the node trays (which face +Z) present flat-on. Slightly elevated,

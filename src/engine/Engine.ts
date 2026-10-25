@@ -1722,10 +1722,10 @@ export class Engine {
     geoNetwork: () => {
       const R = this.globe.focusDensest(true);
       if (R == null) return false;
-      // Three zoom LEVELS (user design): metagraph = a WIDE network pose (rotated to the
-      // densest cluster, held clearly farther out than the country pose so the country drill
-      // still reads as a zoom). structureMoves: one fixed pose over the spin-to-densest.
-      this.cam.focus("geoNetwork", true);
+      // ONE ANGLE ON THE GLOBE (user, 2026-10-25): the network rung inherits the REST pose — the
+      // globe's spin to the densest cluster says "this network", and the camera's answer is the
+      // same-pose nudge, which `structureMoves` lets dim the HUD (cameraRig's FOCI note).
+      this.cam.focus("geo", true);
       return true;
     },
     geoOverview: () => {

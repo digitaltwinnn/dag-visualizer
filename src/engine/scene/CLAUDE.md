@@ -139,9 +139,10 @@ point of its inner arcs nearest the ring's RIGHT side, clear of the globe's silh
 `CalloutSync._geoCalloutAnchor`'s last fallthrough)
 — the one object that stands for a fleet spread across the globe, where no surface point could
 (user: "a nice place to anchor the metagraph callout which is missing in this view"). The
-network POSE therefore keeps the rings in frame (`FOCI.geoNetwork`, a short step in from rest
-rather than the old dive): the globe's crown may tuck under the top bar, the rings never under
-the vitals band. The ruler is built on the FIRST `setLevels`, not in the constructor — the Globe
+network rung therefore keeps the rings in frame by having NO pose of its own (user, 2026-10-25:
+"it makes little sense to have two different angles" — `FOCI.geoNetwork` was a dive, then a wide
+pose, then a short step in, and left that day): it inherits the rest pose, the globe spins to the
+network, and the camera answers with the same-pose nudge, a subtle zoom in and back. The ruler is built on the FIRST `setLevels`, not in the constructor — the Globe
 constructs the ring before its ink and ground are set, and a material born then was black until
 a theme flip retinted it. The arrival beat lifts each RING as one piece, outer to inner
 (`RING_ENTRY_STAG`), not arc by arc (user: "too detailed, just animate each circle"). The
