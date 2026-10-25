@@ -210,10 +210,15 @@ export default function TrendBucketsSurface() {
                           setTrendCursor(sel ? null : ms);
                         }
                       }}
-                      className={cn("cursor-pointer max-[700px]:grid-cols-1 max-[700px]:py-1", sel && SELECTED_ROW)}
+                      className={cn(
+                        "cursor-pointer hover:bg-[color-mix(in_oklch,var(--primary)_7%,transparent)] max-[700px]:grid-cols-1 max-[700px]:py-2",
+                        sel && SELECTED_ROW,
+                      )}
                     >
                       {/* A day bucket is a UTC day; a finer one is a clock time with its zone (the date rule). */}
-                      <TableCell className="whitespace-nowrap text-label text-foreground-dim tabular-nums">
+                      {/* The bucket's time in full ink at the body step — the row's name; on the phone
+                          it heads the card of readings below it. */}
+                      <TableCell className="whitespace-nowrap text-body text-foreground tabular-nums max-[700px]:pb-1">
                         {daily
                           ? utcDayKey(ms)
                           : <>
@@ -227,18 +232,23 @@ export default function TrendBucketsSurface() {
                       </TableCell>
                       {r.addr != null && <TableCell className={cn("font-mono text-label text-foreground-dim", PHONE_HIDDEN)}>{shortAddr(r.addr)}</TableCell>}
                       {r.vals.map((v, c) => (
-                        <TableCell key={cellKeys[c]} className={cn("text-right font-mono text-label tabular-nums px-1.5", PHONE_HIDDEN)}>
+                        <TableCell key={cellKeys[c]} className={cn("text-right font-mono text-label tabular-nums px-1.5", v === 0 ? "text-muted-foreground" : "text-foreground", PHONE_HIDDEN)}>
                           {v == null ? <Dash /> : fmt(v)}
                         </TableCell>
                       ))}
-                      {/* PHONE: the fields wrap under the bucket as "name value" pairs — no sideways scroll. */}
+                      {/* PHONE: the readings as a TWO-COLUMN SHEET under the time — each field its code at
+                          the left and its value at the right of its cell, so the values line up down
+                          both columns (user, 2026-10-25: "make the row look a bit nicer especially on
+                          phone"; it was one ragged wrap of "code value" pairs). No sideways scroll. */}
                       <TableCell className="min-[700px]:hidden whitespace-normal pt-0">
-                        <span className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-label tabular-nums">
-                          {r.addr != null && <span className="text-foreground-dim">{shortAddr(r.addr)}</span>}
+                        {r.addr != null && <span className="block mb-1 font-mono text-label text-foreground-dim">{shortAddr(r.addr)}</span>}
+                        <span className="grid grid-cols-2 grid-flow-row-dense gap-x-5 gap-y-0.5 font-mono text-label tabular-nums">
                           {r.vals.map((v, c) => (
-                            <span key={cellKeys[c]} className="inline-flex items-baseline gap-1">
-                              <span className="text-muted-foreground">{byChain ? `m${cellKeys[c]}` : shortKey(cellKeys[c]!, scope, UNLISTED_ID)}</span>
-                              {v == null ? <Dash /> : fmt(v)}
+                            // A value too long for half the width (a fee floor in datum) takes the
+                            // whole line, so no code is ever cut; the dense flow back-fills.
+                            <span key={cellKeys[c]} className={cn("flex items-baseline justify-between gap-2 min-w-0", v != null && fmt(v).length > 8 && "col-span-2")}>
+                              <span className="truncate text-muted-foreground">{byChain ? `m${cellKeys[c]}` : shortKey(cellKeys[c]!, scope, UNLISTED_ID)}</span>
+                              <span className={v === 0 ? "text-muted-foreground" : "text-foreground"}>{v == null ? <Dash /> : fmt(v)}</span>
                             </span>
                           ))}
                         </span>
