@@ -11,7 +11,7 @@ import { buildAnchorLog, snapsAtTick, sortAnchorLog, type AnchorLogRow, type Anc
 import { displayNetwork, unlistedLog, UNLISTED_ID } from "@/src/data/unlisted";
 import { ledgerLens } from "@/src/data/ledgerStory";
 import { metaSnapHoverKey, type GlobalSnapshot } from "@/src/data/types";
-import { metaSnapArrivalActions, metaSnapSelectActions } from "@/src/engine/domain/pickActions";
+import { metaSnapArrivalActions, metaSnapSelectActions, snapshotSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { fmtDag, fmtKB } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
@@ -19,6 +19,7 @@ import { Empty, IdentityDot } from "@/components/inspector/parts";
 import { selectionHue } from "@/components/selection";
 import { cn } from "@/lib/utils";
 import GroupPlate from "@/components/datasection/GroupToggle";
+import { useBreakpoint } from "@/components/useBreakpoint";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import TablePager from "@/components/datasection/TablePager";
@@ -204,6 +205,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // A row IS one metagraph snapshot, so its hover rides the snapshot channel, not the tick's
   // (user, 2026-08-09). Same channel the explorer's leaf rows and the scene's tiles use.
   const setHoverMetaSnap = useStore((s) => s.setHoverMetaSnap);
+  const setHoverSnapOrd = useStore((s) => s.setHoverSnapOrd);
   const net = getNetwork();
   const snapshotExact = useStore((s) => s.snapshotExact);
   // The log's OWN scope under "all": the network picked in its search, or handed in by a door
@@ -337,7 +339,12 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // A global snapshot's group the reader folded (user, 2026-10-25: "give the option to collapse and
   // expand a group"), keyed by the group's ordinal (or "anchoring"); open by default. The header
   // stays — it is a target of its own — and only the rows under it stand down.
+  // FOLDED BY DEFAULT ON THE PHONE (user, 2026-10-25: "collapse by default on phone? less space"):
+  // `folded` holds the groups the reader TOGGLED away from the tier's default — open on the wider
+  // tiers, folded on the phone, where a list of headers is the overview and a tap opens one.
+  const phoneTier = useBreakpoint() === "phone";
   const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set());
+  const isFolded = (k: string) => folded.has(k) !== phoneTier;
   const toggleFold = (k: string) =>
     setFolded((f) => {
       const n = new Set(f);
@@ -1812,7 +1819,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                   // (rule 10), and nothing to click until it lands.
                   <TableRow className="hover:bg-transparent border-border max-[700px]:block">
                     <TableCell colSpan={columns.length} className="pt-3 pb-1 max-[700px]:block">
-                      <GroupPlate open={!folded.has("anchoring")} onToggle={() => toggleFold("anchoring")} className="text-label text-muted-foreground hover:text-foreground">
+                      <GroupPlate open={!isFolded("anchoring")} onToggle={() => toggleFold("anchoring")} className="text-label text-muted-foreground hover:text-foreground">
                         <span className="uppercase tracking-caps">Global</span>
                         {/* A chain row IS anchored — only its global's number is still being read,
                             so the number's slot twinkles; a live row is genuinely still anchoring. */}
@@ -1823,12 +1830,11 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                 )}
                 {groupHead && !r.pending && (
                   // THE GLOBAL SNAPSHOT'S OWN ROW: its number and its age, each as label + value. The
-                  // whole plate FOLDS its group (user, 2026-10-25: "make the whole section clickable to
-                  // collapse/expand … not just the >"); it selected that global snapshot until then,
-                  // which the explorer's row, the scene's bar and the global card's pager all still
-                  // do. Rule 9 — a surface hovers what its click commits — so with nothing to commit
-                  // the plate no longer previews the global in the scene; it still WEARS the
-                  // selection when its global is the committed one.
+                  // plate SELECTS that global snapshot and a second click RELEASES it, the explorer
+                  // tick row's toggle (`snapshotSelectActions`); its CHEVRON folds the group (user,
+                  // 2026-10-25 — "collapse / expand the row and also deselect/select the subject at
+                  // the same time"; `GroupPlate` has the two shapes). Hovering the plate lights the
+                  // global in the scene (rule 9: hover what a click commits).
                   <TableRow className="max-[700px]:block border-0 hover:bg-transparent">
                     <TableCell colSpan={columns.length} className="p-0 pt-2.5 max-[700px]:px-0 max-[700px]:block">
                       {/* THE HEADER IS A PLATE (user, 2026-10-08, design B1): accent-tinted band +
@@ -1837,8 +1843,20 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                           cell's inner block, not the row: a <tr> takes neither margin nor radius, and
                           the gap ABOVE it is what separates two groups. "17s ago" names itself. */}
                       <GroupPlate
-                        open={!folded.has(String(r.global.ordinal))}
+                        open={!isFolded(String(r.global.ordinal))}
                         onToggle={() => toggleFold(String(r.global.ordinal))}
+                        selected={inSelGroup && !following}
+                        onSelect={() => {
+                          const st = useStore.getState();
+                          applyClickActions(
+                            snapshotSelectActions(
+                              { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot },
+                              getNetwork()?.latest?.ordinal === r.global.ordinal,
+                              { pinnedOrdinal: !st.following && st.snap ? st.snap.data.ordinal : null, metaSnap: st.metaSnap, tickNet: st.tickNet },
+                            ),
+                          );
+                        }}
+                        onHover={(on) => setHoverSnapOrd(on ? r.global.ordinal : null)}
                         className={cn(
                           // px matches the rows' own cell inset, so "GLOBAL" stands on the identity dots' edge.
                           "h-[34px] px-2 max-[700px]:px-1.5 rounded-t-md border-b text-label transition-colors",
@@ -1854,7 +1872,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                     </TableCell>
                   </TableRow>
                 )}
-                {!(grouped && folded.has(String(groupKey(r)))) && (
+                {!(grouped && isFolded(String(groupKey(r)))) && (
                 <TableRow
                   // ⚠️ A SEAM has no metaId and no ordinal, so every seam would key `null:0` —
                   // React then treats a whole page of them as one repeated child and reuses the

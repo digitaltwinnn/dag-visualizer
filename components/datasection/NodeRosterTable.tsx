@@ -94,7 +94,11 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
   const hyperPhone = phone && mode === "hyper";
   const cols = geoPhone && !phone ? COLS.geo.filter((c) => c.key !== "country") : COLS[mode];
   // A group the reader folded (both list kinds), keyed by its plate; open by default.
+  // FOLDED BY DEFAULT ON THE PHONE (user, 2026-10-25: "collapse by default on phone? less space"):
+  // `folded` holds the groups the reader TOGGLED away from the tier's default — open on the wider
+  // tiers, folded on the phone, where a list of headers is the overview and a tap opens one.
   const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set());
+  const isFolded = (k: string) => folded.has(k) !== phone;
   const toggleFold = (k: string) =>
     setFolded((f) => {
       const n = new Set(f);
@@ -107,11 +111,11 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
     | { net: { netId: string; count: number } }
     | { row: RosterRow; rec?: NodeRow; recs?: NodeRow[]; roles?: string[]; netId?: string };
   const items: Item[] = geoPhone
-    ? groupRosterByCountry(rows).flatMap((g) => [{ head: g }, ...(folded.has(`cc:${g.key}`) ? [] : g.rows.map((row) => ({ row })))])
+    ? groupRosterByCountry(rows).flatMap((g) => [{ head: g }, ...(isFolded(`cc:${g.key}`) ? [] : g.rows.map((row) => ({ row })))])
     : hyperPhone
       ? groupRosterByNetwork(rows).flatMap((g) => [
           { net: { netId: g.netId, count: g.entries.length } },
-          ...(folded.has(`net:${g.netId}`) ? [] : g.entries.map((e) => ({ row: e.row, rec: e.rec, recs: e.recs, roles: e.roles, netId: g.netId }))),
+          ...(isFolded(`net:${g.netId}`) ? [] : g.entries.map((e) => ({ row: e.row, rec: e.rec, recs: e.recs, roles: e.roles, netId: g.netId }))),
         ])
       : rows.map((row) => ({ row }));
 
@@ -240,7 +244,7 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
               return (
                 <TableRow key={`cc:${g.key}`} className="border-0 hover:bg-transparent">
                   <TableCell colSpan={cols.length} className="p-0 pt-2.5 max-[700px]:px-0">
-                    <GroupPlate open={!folded.has(`cc:${g.key}`)} onToggle={() => toggleFold(`cc:${g.key}`)} className={PLATE}>
+                    <GroupPlate open={!isFolded(`cc:${g.key}`)} onToggle={() => toggleFold(`cc:${g.key}`)} className={PLATE}>
                       <span className="text-body font-medium text-foreground">{g.country ?? "Unlocated"}</span>
                       <span className="ml-auto text-label tabular-nums text-foreground-dim">{g.rows.length}</span>
                     </GroupPlate>
@@ -255,7 +259,7 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
               return (
                 <TableRow key={`net:${netId}`} className="border-0 hover:bg-transparent">
                   <TableCell colSpan={cols.length} className="p-0 pt-2.5 max-[700px]:px-0">
-                    <GroupPlate open={!folded.has(`net:${netId}`)} onToggle={() => toggleFold(`net:${netId}`)} className={PLATE}>
+                    <GroupPlate open={!isFolded(`net:${netId}`)} onToggle={() => toggleFold(`net:${netId}`)} className={PLATE}>
                       <IdentityDot hue={filterAccent(netId)} />
                       <span className="text-body font-medium text-foreground truncate">{metagraphById(netId)?.name ?? (netId === "dag" ? "DAG" : tickerOf(netId))}</span>
                       <span className="ml-auto text-label tabular-nums text-foreground-dim">{count}</span>
