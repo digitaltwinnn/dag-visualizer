@@ -62,5 +62,10 @@ export function RailShade({ children }: { children: ReactNode }) {
 export function useSceneYield(opts?: { flight?: boolean }): boolean {
   const dragging = useStore((s) => s.sceneDragging);
   const flying = useStore((s) => s.cameraFlying);
-  return dragging || (!!opts?.flight && flying);
+  // ONLY WHILE THE SCENE IS ON SCREEN (user, 2026-10-25: on the phone's raw page a row click left
+  // "the bottom section transparent for the duration of the (scene) animation"). The dim exists
+  // so the view underneath can be seen moving; under the raw layer the scene has receded behind
+  // the pane, and the dock — which stays on the raw page — was fading for nothing.
+  const sceneShown = useStore((s) => s.section === "scene");
+  return sceneShown && (dragging || (!!opts?.flight && flying));
 }
