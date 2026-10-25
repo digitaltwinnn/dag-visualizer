@@ -147,8 +147,10 @@ because exact reads are too heavy across many ticks:
   shared `/api/live` answer, which also carries the unlisted chain ids and leaves out the chains the
   server found quiet. When a chain's shared tail starts past the newest ordinal this tab holds
   (`chainNeedsCatchUp`, tested), the tab reads `/api/live/meta/[id]` and grows its limit until the
-  batch reaches back to that ordinal — provably no gap regardless of burst size. A fixed tail
-  silently drops DOR-sized bursts and mislabels them "unlisted".
+  batch reaches back to that ordinal; the shared tail is then taken only if that batch also reaches
+  up to it (`chainToRecord` — the two caches age independently), else it waits a poll — provably
+  no gap regardless of burst size. A fixed tail silently drops DOR-sized bursts and mislabels them
+  "unlisted".
 - **Polled floor**: what was identified; the gap is a lower bound, shown only on old ticks.
 
 `api.ts` keeps rolling per-metagraph snapshot buffers plus an anchor index keyed by global timestamp,

@@ -42,3 +42,24 @@ export function chainNeedsCatchUp(heldNewest: number, shared: readonly { ordinal
   const oldest = shared.reduce((a, b) => (b.ordinal < a.ordinal ? b : a));
   return oldest.ordinal > heldNewest + 1;
 }
+
+/** What one chain's cycle appends: the catch-up list (`null` when none ran) and the shared tail,
+ *  each ordinal once. The two come from independent caches, so the catch-up can PREDATE the tail;
+ *  the tail is taken only when what is held after the catch-up reaches its oldest ordinal − 1
+ *  (or the buffer is cold and nothing is held at all). Otherwise the tail waits for the next poll,
+ *  where `chainNeedsCatchUp` re-triggers against a fresher cache — recording it now would push the
+ *  buffer's newest past ordinals no read has delivered, and they would never be filled. */
+export function chainToRecord<T extends { ordinal: number }>(
+  heldNewest: number,
+  catchUp: readonly T[] | null,
+  shared: readonly T[] | undefined,
+): T[] {
+  const reach = (catchUp ?? []).reduce((m, s) => Math.max(m, s.ordinal), heldNewest);
+  const out = [...(catchUp ?? [])];
+  if (shared?.length) {
+    const oldest = shared.reduce((m, s) => Math.min(m, s.ordinal), Infinity);
+    if (reach < 0 || oldest <= reach + 1) out.push(...shared);
+  }
+  const seen = new Set<number>();
+  return out.filter((s) => !seen.has(s.ordinal) && (seen.add(s.ordinal), true));
+}

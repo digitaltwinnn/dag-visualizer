@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chainNeedsCatchUp, globalsToAppend, missedGlobals } from "./liveMerge";
+import { chainNeedsCatchUp, chainToRecord, globalsToAppend, missedGlobals } from "./liveMerge";
 import type { GlobalSnapshot, RawMetaSnapshot } from "./types";
 
 const snap = (ordinal: number) => ({ ordinal }) as GlobalSnapshot;
@@ -53,5 +53,39 @@ describe("chainNeedsCatchUp", () => {
   it("never catches up a chain whose shared tail is empty, even cold", () => {
     expect(chainNeedsCatchUp(-1, [])).toBe(false);
     expect(chainNeedsCatchUp(200, [])).toBe(false);
+  });
+});
+
+describe("chainToRecord", () => {
+  const run = (hi: number, lo: number) =>
+    Array.from({ length: hi - lo + 1 }, (_, i) => ({ ordinal: hi - i })); // newest first
+  const ords = (r: { ordinal: number }[]) => r.map((s) => s.ordinal).sort((a, b) => a - b);
+  it("records the catch-up and the shared tail when the catch-up reaches the tail", () => {
+    expect(ords(chainToRecord(100, run(160, 101), run(200, 151)))).toEqual(
+      [...new Set([...ords(run(160, 101)), ...ords(run(200, 151))])],
+    );
+  });
+  it("records the catch-up alone when it stops short of the shared tail", () => {
+    expect(ords(chainToRecord(100, run(140, 101), run(200, 151)))).toEqual(ords(run(140, 101)));
+  });
+  it("accepts a catch-up that ends exactly one below the tail", () => {
+    expect(ords(chainToRecord(100, run(150, 101), run(200, 151)))).toEqual(ords(run(200, 101)));
+  });
+  it("records a contiguous shared tail when no catch-up ran", () => {
+    expect(ords(chainToRecord(150, null, run(200, 151)))).toEqual(ords(run(200, 151)));
+    expect(ords(chainToRecord(160, null, run(200, 151)))).toEqual(ords(run(200, 151)));
+  });
+  it("records nothing from a shared tail that leaves a gap with no catch-up", () => {
+    expect(chainToRecord(100, null, run(200, 151))).toEqual([]);
+  });
+  it("on a cold buffer takes the shared tail whole, or the seed plus a tail it reaches", () => {
+    expect(ords(chainToRecord(-1, null, run(200, 151)))).toEqual(ords(run(200, 151)));
+    expect(ords(chainToRecord(-1, [], run(200, 151)))).toEqual(ords(run(200, 151)));
+    expect(ords(chainToRecord(-1, run(190, 131), run(200, 151)))).toEqual(ords(run(200, 131)));
+    expect(ords(chainToRecord(-1, run(140, 81), run(200, 151)))).toEqual(ords(run(140, 81)));
+  });
+  it("records the catch-up when there is no shared tail", () => {
+    expect(ords(chainToRecord(100, run(120, 101), undefined))).toEqual(ords(run(120, 101)));
+    expect(chainToRecord(100, null, [])).toEqual([]);
   });
 });

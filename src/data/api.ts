@@ -1,9 +1,9 @@
-// Data layer: pulls live snapshots from the Constellation block explorer API.
-// No simulation — if the API is unreachable the app shows a "no data" state and
+// Data layer: reads live snapshots through the app's own edge-cached routes (`/api/live*`), which
+// read the Constellation block explorer once for every tab. No simulation — if the feed is unreachable the app shows a "no data" state and
 // keeps polling, recovering on its own once it responds again (`live` reflects this).
 
 import { dataTime } from "./liveAge";
-import { chainNeedsCatchUp, globalsToAppend, missedGlobals } from "./liveMerge";
+import { chainNeedsCatchUp, chainToRecord, globalsToAppend, missedGlobals } from "./liveMerge";
 import type { LiveAnswerShape } from "@/src/data/types";
 import { METAGRAPHS, NET_DEF, netUrl } from "@/src/net/current";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
@@ -230,11 +230,11 @@ export class NetworkData {
   // global snapshot timestamp -> aggregate of the metagraph snapshots anchored into that tick
   // (from the catalog's chains AND the polled unlisted ones, the latter under `UNLISTED_ID`). The
   // authoritative anchored COUNT is the global snapshot's own `metagraphSnapshotCount`; `count`
-  // here is how many of those WE identified (the rest = a chain the hourly list has not caught,
-  // or a poll still catching up). To keep `count` accurate even
-  // when a fast metagraph (Dor) batches 20+ snapshots into one tick, the live poll fetches a
-  // deep tail every tick (POLL.metaSnapTail) — a too-shallow tail used to drop them and inflate
-  // the "unlisted" gap. The summed fee is "from tracked metagraphs".
+  // here is how many of those WE identified (the rest = a chain the server's hourly unlisted list
+  // has not caught, or a poll still catching up). To keep `count` accurate even when a fast
+  // metagraph (Dor) batches 20+ snapshots into one tick, the shared answer carries a deep tail per
+  // chain (POLL.metaSnapTail) and a gap past it is read through the per-chain catch-up — a
+  // too-shallow tail used to drop them and inflate the "unlisted" gap. The summed fee is "from tracked metagraphs".
   anchorIndex: Map<string, Anchor>; // ts -> { fee (datum), count, metaIds:Set, metaCounts:Map(id->n) }
   // THE UNLISTED CHAINS, POLLED LIKE THE CATALOG'S (user, 2026-10-08: "why treat it differently?").
   // The shared answer's `unlisted` (the explorer's chain list less every tracked address, less the
@@ -441,8 +441,10 @@ export class NetworkData {
       const { json, at } = await this._fetchLive(`/api/live`);
       const live = json as LiveAnswerShape;
       if (!live.globals?.length) throw new Error("no globals");
-      this._lastLive = live;
-      this._lastLiveAt = at;
+      // An answer without `metas` keeps the last good one: the meta refresh skips this tick rather
+      // than sending every chain to the per-chain route.
+      const hasMetas = !!live.metas && typeof live.metas === "object";
+      if (hasMetas) { this._lastLive = live; this._lastLiveAt = at; }
       // The shared window is newest-first. A tab that fell behind it reads the cached catch-up list
       // once; a failed catch-up keeps the shared append rather than failing the tick. The catch-up
       // MERGES with the shared window: its own cache can lag the shared answer by a poll, and a
@@ -460,10 +462,8 @@ export class NetworkData {
       for (const s of append) this._pushGlobal(s);
       this._setLive(true, Date.now());
       reportPoll("global", true, at);
-      // Pull each metagraph's newest snapshots EVERY tick (was every other tick) — together with
-      // the deeper tail, this keeps up with high-throughput metagraphs (Dor) so their snapshots
-      // are all attributed correctly instead of leaking into the "unlisted" count.
-      this._refreshMeta();
+      // Every metagraph's newest snapshots ride the same shared answer, every tick.
+      if (hasMetas) this._refreshMeta();
     } catch (e) {
       this._setLive(false);
       reportPoll("global", false);
@@ -517,6 +517,7 @@ export class NetworkData {
     const have = (unlisted ? this.unlistedSnaps : this.metaSnaps).get(id);
     const haveTo = have && have.length ? have[have.length - 1].ordinal : -1;
 
+    let catchUp: RawMetaSnapshot[] | null = null;
     if (chainNeedsCatchUp(haveTo, shared)) {
       // SELF-HEALING CATCH-UP. A fast metagraph (Dor) can dump dozens of snapshots into one global
       // tick — more than any fixed tail. So instead of trusting a magic number, we GROW the read
@@ -524,9 +525,7 @@ export class NetworkData {
       // no gap. An uncounted gap is exactly what mislabels listed anchors as "unlisted", so this
       // makes the anchored count correct regardless of burst size. Capped (and stops when the
       // route returns fewer than asked = nothing more to get, or on a cold buffer where the seed
-      // limit is enough). It is recorded BEFORE the shared tail: the buffer only takes ordinals
-      // above its newest, so recording the tail first would close the gap over the missing ones.
-      // A failed catch-up records nothing — the gap stays open for the next poll to fill.
+      // limit is enough). A failed catch-up records nothing — the gap stays open for the next poll.
       let lim = haveTo < 0 ? POLL.metaSnapSeed : POLL.metaSnapTail;
       let list: RawMetaSnapshot[] = [];
       for (let i = 0; i < 6; i++) {
@@ -542,9 +541,12 @@ export class NetworkData {
         if (haveTo < 0 || oldest <= haveTo + 1 || list.length < lim || lim >= 600) break;
         lim = Math.min(600, lim * 3); // gap not yet covered — read deeper and retry
       }
-      if (list.length) this._recordMetaSnaps(id, unlisted, list.map(metaSnapRecord));
+      catchUp = list;
     }
-    if (shared?.length) this._recordMetaSnaps(id, unlisted, shared.map(metaSnapRecord));
+    // The catch-up comes from its own cache and can predate the shared tail: the tail is taken
+    // only when the two meet, else it waits a poll (`chainToRecord`) — never a silent gap.
+    const records = chainToRecord(haveTo, catchUp, shared);
+    if (records.length) this._recordMetaSnaps(id, unlisted, records.map(metaSnapRecord));
     return true;
   }
 
