@@ -230,6 +230,7 @@ export default function Explorer({ id, title, hint, placeholder, levels: selecte
       // so the hint has the row's full width: at 307px the control left it 199px, three lines
       // in three of four views. The shell's own hint line stays only for the no-level case.
       hint={current ? null : hint}
+      banded={!!current}
       onLeave={onLeave}
       // The card head's aside: a view's card-level state, and a SINGLE measure's label (a level
       // with several measures shows them as TILES, the body's first block — 2026-10-23).

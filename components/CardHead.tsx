@@ -243,6 +243,7 @@ export default function CardHead({
   aside,
   subtitle,
   panel = false,
+  rule = true,
   icon,
   caption,
   collapsed,
@@ -267,6 +268,11 @@ export default function CardHead({
   // a consumer component may render null (e.g. no-location fallback) and the empty block is inert.
   subtitle?: ReactNode;
   panel?: boolean;
+  /** Panel layout: draw the inset head hairline. Off where the next section CHANGES GROUND (the
+   *  explorer's full-bleed control band, 2026-10-25 — user: the line "does not extend to the
+   *  edges, why and is it needed?"): an inset rule over an edge-to-edge plate read as a line that
+   *  failed to reach the sides, and a ground change already divides — the foot's own rule. */
+  rule?: boolean;
   caption?: ReactNode;
   collapsed?: boolean;
   onToggle?: () => void;
@@ -335,7 +341,7 @@ export default function CardHead({
             Still a separate element so the inset doesn't fight the head's padding box.
             ⚠️ COLLAPSED it must not render: with no body it falls on the card's own bottom edge,
             with nothing to divide. Same `!collapsed` gate the inspector layout below applies. */}
-        {!collapsed && <div className="border-b border-border mx-[var(--panel-pad-x)]" aria-hidden />}
+        {!collapsed && rule && <div className="border-b border-border mx-[var(--panel-pad-x)]" aria-hidden />}
       </>
     );
   }
