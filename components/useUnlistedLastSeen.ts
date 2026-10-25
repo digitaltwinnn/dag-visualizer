@@ -8,7 +8,7 @@ import { bucketStamp } from "@/src/util/localTime";
 /** WHEN AN UNLISTED CHANNEL LAST ANCHORED, as a sentence — the raw log's unlisted lens states it.
  *  Reads the whole measured history (daily) only while `on`. */
 export function useUnlistedLastSeen(on: boolean): string {
-  const slice = useTrendsSlice(on ? "all" : null, null);
+  const slice = useTrendsSlice(on ? "all" : null, null, "Snapshot log");
   const series = slice.p?.series;
   const last = series ? lastSeen(series[`m.${UNLISTED_ID}.snaps`] ?? [], slice.buckets) : undefined;
   if (slice.error && last === undefined) return "When one last anchored could not be read.";

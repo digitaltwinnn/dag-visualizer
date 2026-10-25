@@ -74,6 +74,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CABINET_BODY, CABINET_LIST, CABINET_TRIGGER } from "@/components/cabinetTabs";
 import { cn } from "@/lib/utils";
 import Stamp from "@/components/Stamp";
+import { useFeedRead } from "@/components/useFeedRead";
 
 /** Whether a decoded payload carries anything at all — `{}`, `[]` and `""` do NOT open a lane. */
 function nonEmpty(v: unknown): boolean {
@@ -429,6 +430,9 @@ function SignerRoster({ dataIds, proofIds, metaId, selNodes }: { dataIds: string
 }
 
 export function ChannelStatePanel() {
+  // The raw layer is mounted behind the scene; it reads for the reader only while it is open.
+  const rawOpen = useStore((s) => s.section === "data");
+  useFeedRead(["global", "clusters", "api-geo", "exact"], "ChannelStatePanel", rawOpen);
   const coarse = useTouch(); // the invitation names the gesture — Tap on touch
   const sel = useStore((s) => s.metaSnap);
   // The foot's hash budgets on PHONE: the line is `LABEL  hash  [copy]` in ~290px, so the budget is

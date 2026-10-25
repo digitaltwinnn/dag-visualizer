@@ -657,7 +657,7 @@ export default function TopBar() {
             ) : shownStrip === "about" ? (
               <AboutStrip onClose={() => setStrip(null)} />
             ) : (
-              <FilterPicker onPicked={() => setStrip(null)} />
+              <FilterPicker onPicked={() => setStrip(null)} shown={open && strip === "filter"} />
             )}
             {/* PHONE: the vitals ride the SAME strip as a second row (user, 2026-08-15) — one
                 dropdown control on the filter face instead of a separate 44px toggle starving

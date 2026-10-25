@@ -27,6 +27,7 @@ import { ccMark } from "@/src/util/format";
 import { levelMeasure } from "@/src/data/explorerMeasure";
 import { cohortsLevel, countriesLevel, countryNodes, nodesByCountry } from "@/src/data/ladderLevels";
 import { UNLISTED_ID } from "@/src/data/unlisted";
+import { useFeedRead } from "@/components/useFeedRead";
 
 // THE GEOGRAPHY'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session
 // 2026-09-26; read `docs/superpowers/design/2026-09-26-explorer-card/README.md` first). This file
@@ -46,6 +47,7 @@ import { UNLISTED_ID } from "@/src/data/unlisted";
 // + `hoverCohort` for a cohort, `hoverNodeId` for a node), and none commits.
 
 export default function GeoExplore() {
+  useFeedRead(["clusters", "api-metagraphs", "api-geo"], "GeoExplore");
   const dead = useNoSignal();
   const lb = useStore((s) => s.leaderboard);
   const country = useStore((s) => s.country);

@@ -70,7 +70,7 @@ export default function TrendExplore() {
   const setHoverFilter = useStore((s) => s.setHoverFilter);
   const setTrendMetric = useStore((s) => s.setTrendMetric);
 
-  const slice = useTrendsSlice(windowId, range);
+  const slice = useTrendsSlice(windowId, range, "History explorer");
   const roster = useTrendRoster(slice, filter, metric);
   // THE LIST FOLLOWS THE RANGE (design A, 2026-09-29 — "it is not clear that the explorer is a
   // fixed value based on today"). Each figure is the network's `head` — its `span` reading over the window on

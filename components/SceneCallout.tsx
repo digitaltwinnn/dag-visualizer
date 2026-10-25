@@ -63,6 +63,7 @@ import LiveDot from "@/components/LiveDot";
 import { PinMark } from "@/components/state/StateAtoms";
 import { IDENT_INK } from "@/components/identInk";
 import { ledgerNetwork } from "@/src/engine/domain/tickNet";
+import { useFeedRead } from "@/components/useFeedRead";
 
 // The panel's standoff from the anchor lives in `src/engine/domain/calloutPlacement.ts`, with the
 // reach thresholds derived from it and the placement rules that read them. It used to be a local
@@ -258,6 +259,13 @@ export default function SceneCallout() {
   const exact = useStore((s) => (s.snap ? s.snapshotExact[s.snap.data.ordinal] : undefined));
   const following = useStore((s) => s.following);
   const liveFeed = useStore((s) => s.live);
+  // Holds only while a callout can SHOW — the view's policy allows one, the scene layer is up and
+  // something is committed for it to name (mounted in every view, it reads nothing at rest).
+  useFeedRead(
+    ["metasnaps", "clusters", "api-metagraphs", "api-geo", "exact"],
+    "SceneCallout",
+    VIEW_POLICIES[mode].callout && section === "scene" && (filter !== "all" || !!inspect || !!cohort || !!country || !!snap || !!metaSnap || !!tickNet),
+  );
   // THE BOX LEADS (user, 2026-08-15 — clicking a committed node's hub re-boxes the metagraph
   // card and "nothing happens in the scene"): the box is the subject (it gets the camera), so
   // the callout mirrors it. Inspector publishes the boxed slot; the Engine's anchor resolvers

@@ -32,8 +32,10 @@ import { cn } from "@/lib/utils";
 import { useMemo } from "react";
 import { unlistedUnmeasured } from "@/src/data/trendSeries";
 import { nodesBySubregion } from "@/src/data/subregions";
+import { useFeedRead } from "@/components/useFeedRead";
 
 export function HyperCells({ accent }: { accent: string }) {
+  useFeedRead(["api-metagraphs"], "HyperCells");
   const filter = useStore((s) => s.filter);
   const metaList = useStore((s) => s.metaList);
   // No `selNodes` subscription any more: the NODES card was its only reader, and dropping it also
@@ -219,6 +221,7 @@ export function HyperCells({ accent }: { accent: string }) {
 const MUTED_RING = { other: "var(--muted-foreground)", unplaced: "var(--muted-foreground)" };
 
 export function GeoCells({ accent }: { accent: string }) {
+  useFeedRead(["clusters", "api-geo"], "GeoCells");
   const lb = useStore((s) => s.leaderboard);
   const selNodes = useStore((s) => s.selNodes);
   const filter = useStore((s) => s.filter);
@@ -489,6 +492,7 @@ function StackBars({ accent, isMeta, filter, data, down }: { accent: string; isM
 // scope exactly as the bar's vitals did: filtered, "anchors" would be a different quantity, so
 // the network's DAG fees show instead), and the tick chart as one wide card.
 export function LedgerCells({ accent, filter, paused }: { accent: string; filter: string; paused: boolean }) {
+  useFeedRead(["global"], "LedgerCells");
   const activity = useStore((s) => s.activity);
   // ONE feed subscription for the whole row (review, 2026-08-31) — the roster's live
   // fallback still reads it while the store hasn't answered.
@@ -515,7 +519,7 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
   // `paused` while the HUD is stepped aside (2026-09-13): the band stays MOUNTED through the
   // SCENE toggle so it can slide out, and a mounted-but-hidden band that kept polling would
   // make the pulse strip's last-success age a lie about this feed.
-  const t7 = useTrendsWindow(paused ? null : "7d");
+  const t7 = useTrendsWindow(paused ? null : "7d", "Snapshots vitals");
   const windowed = useMemo<TrendsWindowData | null>(
     // trimNewestPartial FIRST (the payload's own clock drops the still-filling bucket — the
     // CDN finding), then the window cut.
@@ -821,6 +825,7 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
 // index), with no window words — the honest silence. A committed filter stays a LENS: the
 // count is the window's whole truth, the dim says which network you are looking through.
 function AnchoringNetworks({ windowed, snaps, filter }: { windowed: TrendsWindowData | null; snaps: Snaps; filter: string }) {
+  useFeedRead(["metasnaps"], "AnchoringNetworks");
   // Memoized on the payload: the ranking's input changes per 5-minute fetch while the
   // component re-renders on every activity tick (review's efficiency pass).
   const ranked = useMemo(() => {

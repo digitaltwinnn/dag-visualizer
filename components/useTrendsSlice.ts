@@ -44,13 +44,13 @@ export interface TrendsSlice extends TrendSlice {
 
 /** The window on screen for one zoom (and an optional committed range), fetched and cut.
  *  `zoom: null` fetches nothing — see the header. */
-export default function useTrendsSlice(zoom: ZoomId | null, range: TrendRange | null): TrendsSlice {
+export default function useTrendsSlice(zoom: ZoomId | null, range: TrendRange | null, who: string): TrendsSlice {
   const plan = planTrendFetch(zoom, range);
-  const main = useTrendsWindow(plan.main.window);
-  const mainTiles = useTrendsRange(plan.main.tiles);
-  const fleet = useTrendsWindow(plan.fleet.window);
-  const fleetTiles = useTrendsRange(plan.fleet.tiles);
-  const daily = useTrendsWindow(plan.daily);
+  const main = useTrendsWindow(plan.main.window, who);
+  const mainTiles = useTrendsRange(plan.main.tiles, who);
+  const fleet = useTrendsWindow(plan.fleet.window, who);
+  const fleetTiles = useTrendsRange(plan.fleet.tiles, who);
+  const daily = useTrendsWindow(plan.daily, who);
 
   const mainData = plan.main.tiles ? mainTiles.data : main.data;
   const fleetData = plan.fleet.tiles ? fleetTiles.data : fleet.data;

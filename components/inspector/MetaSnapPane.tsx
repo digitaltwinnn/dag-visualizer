@@ -36,6 +36,7 @@ import { METASNAP_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { metaSnapSelectActions, netKeyOf } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { cn } from "@/lib/utils";
+import { useFeedRead } from "@/components/useFeedRead";
 
 // The body's row grammar and its three weights live in ./parts (`Fact` / `FactGroup` / `Foot`)
 // — shared with every other rail card, so this one can't drift into a dialect of its own. The
@@ -51,6 +52,7 @@ export default function MetaSnapPane({
   collapsed?: boolean;
   onToggle?: () => void;
 }) {
+  useFeedRead(["global", "exact"], "MetaSnapPane");
   const sel = useStore((s) => s.metaSnap);
   const exact = useStore((s) => (sel ? s.snapshotExact[sel.globalOrdinal] : undefined));
   // The tick's exact read FAILED (RawSnapshotBridge records the miss) — the give-up signal the

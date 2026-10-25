@@ -11,6 +11,7 @@ import { SceneMark, type SceneMarkSpec } from "@/components/SceneMark";
 import { iconForPick } from "@/components/icons";
 import { metagraphById } from "@/src/data/network";
 import type { HoverSubject } from "@/src/data/hoverSubject";
+import { useFeedRead } from "@/components/useFeedRead";
 
 // The country's display name: the one its nodes carry (what the country card is titled with),
 // else the platform's English name for the code.
@@ -35,6 +36,8 @@ const countryName = (cc: string, known: string | undefined): string => {
 // thing making the tooltip read as a different species from the callout beside it.
 export default function Tooltip() {
   const hover = useStore((s) => s.hover);
+  // Holds only while a tooltip is SHOWING — mounted in every view, it reads nothing at rest.
+  useFeedRead(["clusters", "api-metagraphs", "api-geo"], "Tooltip", hover != null);
   const metaList = useStore((s) => s.metaList);
   const selNodes = useStore((s) => s.selNodes);
   const ref = useRef<HTMLDivElement>(null);

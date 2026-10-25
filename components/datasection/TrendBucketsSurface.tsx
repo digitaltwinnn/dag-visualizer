@@ -51,7 +51,7 @@ export default function TrendBucketsSurface() {
   const focus = useStore((s) => s.trendFocus);
   // Read only while the layer is open; the payload is the stack's own cached one, so opening is instant.
   const rawOpen = useStore((s) => s.section === "data");
-  const slice = useTrendsSlice(rawOpen ? windowId : null, range);
+  const slice = useTrendsSlice(rawOpen ? windowId : null, range, "History records");
   const p = slice.p;
   const scope = cardNetwork(filter, focus);
   const columns = useMemo(() => bucketColumns(p ? Object.keys(p.series) : [], scope, UNLISTED_SCOPE), [p, scope]);

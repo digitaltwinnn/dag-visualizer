@@ -11,6 +11,7 @@ import { useStore } from "@/src/store/store";
 import { relativeAge } from "@/src/util/relativeAge";
 import { cn } from "@/lib/utils";
 import { QualifierChip } from "@/components/inspector/parts";
+import { useFeedRead } from "@/components/useFeedRead";
 
 // THE LIVE / PINNED SWITCH — one component (user, 2026-09-29: "if a snapshot is pinned, it shows in
 // the explorer but not in the snapshot card; … it should show pinned in both"). The Snapshots
@@ -40,6 +41,7 @@ function Age({ ts }: { ts: string }) {
 }
 
 export default function FollowControl({ className }: { className?: string }) {
+  useFeedRead(["global"], "FollowControl");
   const live = useStore((s) => s.live);
   const following = useStore((s) => s.following);
   const snap = useStore((s) => s.snap);

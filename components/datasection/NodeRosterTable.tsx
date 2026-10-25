@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useFeedRead } from "@/components/useFeedRead";
 
 // The hyper/geo data table (spec 2026-08-01): the NODE ROSTER — a flat, sortable, denser
 // projection of the same `selNodes` the explorers browse (complementary, not a replacement).
@@ -57,6 +58,9 @@ const COLS: Record<"hyper" | "geo", { key: RosterSortKey; label: string; phone?:
 };
 
 export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
+  // The raw layer is mounted behind the scene; it reads for the reader only while it is open.
+  const rawOpen = useStore((s) => s.section === "data");
+  useFeedRead(["clusters", "api-metagraphs", "api-geo"], "NodeRosterTable", rawOpen);
   const selNodes = useStore((s) => s.selNodes);
   const metaList = useStore((s) => s.metaList);
   const filter = useStore((s) => s.filter);

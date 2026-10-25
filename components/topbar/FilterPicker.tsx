@@ -8,6 +8,7 @@ import { identityHudCss } from "@/src/palette/identity";
 import { cn } from "@/lib/utils";
 import { SELECTED_ROW, selectionHue } from "@/components/selection";
 import { IdentityDot } from "@/components/inspector/parts";
+import { useFeedRead } from "@/components/useFeedRead";
 
 // The expanded filter body — a list of NETWORK ROWS on the command bar's own surface (rows since
 // 2026-10-08, design A1; chips before that). Originally a horizontal CHIP STRIP (user,
@@ -24,7 +25,8 @@ import { IdentityDot } from "@/components/inspector/parts";
 // networks" rule: the hover preview already covers browsing without committing, and the open
 // strip pushed the whole layout down over the scene you just filtered). TopBar owns the open
 // state, so the close arrives as `onPicked`.
-export default function FilterPicker({ onPicked }: { onPicked?: () => void }) {
+export default function FilterPicker({ onPicked, shown = true }: { onPicked?: () => void; /** The strip is open on THIS tenant — it stays mounted (invisible) while closed, and a closed strip reads nothing to anyone (src/data/feedUse.ts). */ shown?: boolean }) {
+  useFeedRead(["api-metagraphs"], "FilterPicker", shown);
   const filter = useStore((s) => s.filter);
   const setHoverFilter = useStore((s) => s.setHoverFilter);
   const metaList = useStore((s) => s.metaList);

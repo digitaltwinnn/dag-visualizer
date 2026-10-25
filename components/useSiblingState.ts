@@ -11,6 +11,7 @@ import { LISTED_IDS } from "@/src/data/unlisted";
 import { tickInStory } from "@/src/data/ledgerStory";
 import { POLL } from "@/src/engine/config";
 import type { RailCardKind } from "@/components/railCards";
+import { useFeedRead } from "@/components/useFeedRead";
 
 const EMPTY_SNAPS: never[] = []; // stable ref — the non-snap slots' tick placeholder
 
@@ -20,6 +21,12 @@ const EMPTY_SNAPS: never[] = []; // stable ref — the non-snap slots' tick plac
  *  story rule) are made only for the slot that uses them: the tick window is the snapshot slot's
  *  alone, so only it re-derives on a feed tick. */
 export function useSiblingState(slot: RailCardKind | null): SiblingState {
+  // The feeds a SLOT's sibling set is made of, held only for that slot (src/data/feedUse.ts): the
+  // snapshot chain steps the global window, the metagraph snapshot its tick's reads, the place
+  // and node rungs the located fleet.
+  useFeedRead(["global", "metasnaps", "exact"], "Card pager", slot === "snap");
+  useFeedRead(["metasnaps", "exact"], "Card pager", slot === "metaSnap");
+  useFeedRead(["clusters", "api-metagraphs", "api-geo"], "Card pager", slot === "context" || slot === "country" || slot === "cohort" || slot === "composition" || slot === "node");
   const mode = useStore((s) => s.mode);
   const filter = useStore((s) => s.filter);
   const country = useStore((s) => s.country);

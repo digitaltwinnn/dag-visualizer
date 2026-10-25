@@ -192,7 +192,8 @@ const PLANK_BTN = cn("size-6 disabled:opacity-30", TOUCH_HIT);
 
 export default function RailPager({ slot, active, children }: { slot: RailCardKind; /** This rung is the BOX — the plank and the swipe apply. Off, the wrapper is a plain shell of the same element shape (Inspector's note). */ active: boolean; children: ReactNode }) {
   // The rail's state, read by the ONE builder the next ghost's quick picks share (`useSiblingState`).
-  const state = useSiblingState(slot);
+  // Only the BOX pages, so only the box asks for its siblings (an entry holds no feed).
+  const state = useSiblingState(active ? slot : null);
   // The card's hover handlers, registered by its RailPane (CardHead's `RailHoverHost`) and fired by
   // this wrapper, which holds the panel AND the plank — one hover surface for the whole card.
   const hover = useRef<RailHoverHandlers>({});

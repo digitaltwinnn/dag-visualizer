@@ -216,7 +216,15 @@ scheduled feed's next poll is due, an amber dashed stretch where a feed is overd
 the right inked by status (ok / stale past ~2.5× its own cadence / failing — never fabricated,
 rule 10). The order, the lane geometry and the verdict are pure in `src/data/pollStatus.ts`. It
 replaced six equal cards whose run of marks drew a 4-second feed and a 5-minute feed as the same
-picture. Either strip is a **layout participant, not a popup** — TopBar publishes its
+picture. **Each lane says whether the current view reads that feed** (same day — user: "consistent by
+code, not an assumption"): measured at the READ, never the fetch (most feeds are fetched by
+background timers in every view, and one fetch serves several surfaces). A HUD reader holds its
+feeds while it is mounted AND showing them (`useFeedRead`, fenced by
+`components/feedReadBoundary.test.ts`; the trends hooks REQUIRE a reader argument); the scene holds
+the feeds its current view draws, derived from the view-policy flags that switch the drawing on
+(`domain/sceneFeeds.ts`). A lane nothing reads dims and says "idle here"; the feed keeps running,
+because the app keeps one live model so a view switch needs no reload. Each lane carries its
+readers' names in `data-readers` for debugging. Either strip is a **layout participant, not a popup** — TopBar publishes its
 height and both the rails and the canvas add it to their `top`, a pure position shift that keeps
 the buffer viewport-sized so nothing distorts and the engine never resizes.
 

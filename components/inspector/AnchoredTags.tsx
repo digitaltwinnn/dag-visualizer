@@ -11,6 +11,7 @@ import { useMinHold } from "@/components/useMinHold";
 import { CONTENT_EASE } from "@/components/RollSwap";
 import { Lead, SectionLabel, UnitMarks, CUT_ROW, countable, figWidth } from "@/components/inspector/parts";
 import { Separator } from "@/components/ui/separator";
+import { useFeedRead } from "@/components/useFeedRead";
 
 // The anchored block on the snapshot card: a ranked breakdown of the metagraph snapshots this
 // global tick anchored — the breakdown table's `name · count · squares` rows, sorted desc, ALL of
@@ -33,6 +34,7 @@ export default function AnchoredTags({
   anchored: number | null;
   awaiting?: boolean;
 }) {
+  useFeedRead(["exact"], "AnchoredTags");
   // The highlighted row is the network the chamber resolves against: the one picked INSIDE this
   // tick, else the filter (`ledgerNetwork`).
   const filter = useStore((s) => ledgerNetwork({ filter: s.filter, tickNet: s.tickNet, snapOrdinal: ordinal }));

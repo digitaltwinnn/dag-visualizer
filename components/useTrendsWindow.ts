@@ -1,4 +1,5 @@
 "use client";
+import { useFeedRead } from "@/components/useFeedRead";
 import { withUnlisted } from "@/src/data/trendSeries";
 import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 
@@ -65,8 +66,11 @@ function fresh(url: string): TrendsWindowData | null {
 
 /** The measured window plus the failure signal. A null `window` skips the fetch entirely —
  *  for consumers whose need is conditional, since a hook cannot be called conditionally. */
-export default function useTrendsWindow(window: TrendApiWindow | null): TrendsWindowState {
+export default function useTrendsWindow(window: TrendApiWindow | null, who: string): TrendsWindowState {
   const url = window ? netUrl(`/api/trends?window=${window}`) : null;
+  // The reader holds the feed while it asks for data (src/data/feedUse.ts) — required, so no
+  // surface can read the measured history without the pulse strip knowing it is in use.
+  useFeedRead(["api-trends"], who, url != null);
   const [state, setState] = useState<TrendsWindowState>(() => ({
     data: url ? (cache.get(url)?.data ?? null) : null,
     error: false,
@@ -112,8 +116,10 @@ export default function useTrendsWindow(window: TrendApiWindow | null): TrendsWi
  *  costs the browser cache at most), stitched into one window for the page to cut. */
 export function useTrendsRange(
   req: { tier: "5m" | "1h"; fromMs: number; toMs: number } | null,
+  who: string,
 ): TrendsWindowState {
   const key = req ? `${req.tier}:${tilesFor(req.tier, req.fromMs, req.toMs).join(",")}` : null;
+  useFeedRead(["api-trends"], who, key != null);
   const [state, setState] = useState<TrendsWindowState>({ data: null, error: false });
   useEffect(() => {
     if (!key) {

@@ -75,7 +75,7 @@ exemptions. `src/data/` holds the live singleton and the geo cache alongside the
 growing: a mechanical purity classifier was tried and rejected (its regex matched the words
 "window" and "fetch" inside this repo's own comments), and the header records why.
 
-Sixteen narrower boundary tests work the same way: `components/unlistedBoundary.test.ts` (the `"unlisted"`
+Seventeen narrower boundary tests work the same way: `components/feedReadBoundary.test.ts` (every HUD read of a feed's data holds that feed, so the pulse strip's "in use here" is measured, not declared — `src/data/feedUse.ts`), `components/unlistedBoundary.test.ts` (the `"unlisted"`
 id literal has exactly two homes), `components/railLadderBoundary.test.ts` (every committable focus
 rung maps to a hinted rail card slot), `components/railTierBoundary.test.ts` (`data-focus` has two
 homes and the slab's geometry — the pager included — keys on `data-tier`),
@@ -107,8 +107,8 @@ on any HUD element — the UI explains itself on its surface, or not at all) and
 `components/touchTierBoundary.test.ts` (the touch tier has ONE query — a coarse pointer on the
 phone or tablet tier — named once by the stylesheet's `touch:` variant and once by `useTouch`, and
 no utility rides Tailwind's pointer-only variant: a touch laptop's desktop rail is a mouse layout).
-`ls **/*Boundary.test.ts` is the live count: seventeen files, of which
-`components/selectionBoundary.test.ts` is rule 2's and the other sixteen are these.
+`ls **/*Boundary.test.ts` is the live count: eighteen files, of which
+`components/selectionBoundary.test.ts` is rule 2's and the other seventeen are these.
 
 Each of these files opens with a header comment giving the rationale, the scope and every exemption
 with its reason. **That header is the rule's authoritative statement** — read it rather than inferring

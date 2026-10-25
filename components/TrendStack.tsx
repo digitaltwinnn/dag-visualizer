@@ -156,7 +156,7 @@ export default function TrendStack() {
   // animation still does not look good"; a screencast showed why: the slice was asked for only
   // while `on`, so the frame the view changed every plot unmounted and the cards collapsed into
   // thin empty strips with the ‹ › pills floating on them, and only those strips dropped).
-  const slice = useTrendsSlice(on || lingering ? windowId : null, range);
+  const slice = useTrendsSlice(on || lingering ? windowId : null, range, "History charts");
   const { p, error } = slice;
 
   // ⚠️ ONE ROSTER PASS, SHARED WITH BOTH RAILS (2026-09-19). Which networks, in what order, drawn

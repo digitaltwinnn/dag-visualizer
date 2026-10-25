@@ -61,7 +61,7 @@ export default function TrendRangePane({
   const front = useStore((s) => s.trendFront);
   const windowId = useStore((s) => s.trendWindow);
 
-  const roster = useTrendRoster(useTrendsSlice(windowId, range), filter, metric);
+  const roster = useTrendRoster(useTrendsSlice(windowId, range, "Range card"), filter, metric);
   const { ranked, rows, format, stepMs } = roster;
   // THE WINDOW STANDS WHEN NOTHING IS BRUSHED (user, 2026-10-08): the card is the span on screen —
   // the brushed range, else the pill's trailing span ending now, else (ALL, which has no fixed

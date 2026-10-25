@@ -19,6 +19,7 @@ import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 import { useNoSignal } from "@/components/useNoSignal";
 import { networksLevel } from "@/src/data/ladderLevels";
+import { useFeedRead } from "@/components/useFeedRead";
 
 // THE HYPERGRAPH'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session
 // 2026-09-26; read `docs/superpowers/design/2026-09-26-explorer-card/README.md` first). This file
@@ -36,6 +37,7 @@ import { networksLevel } from "@/src/data/ladderLevels";
 // none of them commits.
 
 export default function HyperExplore() {
+  useFeedRead(["clusters", "api-metagraphs", "api-geo"], "HyperExplore");
   const dead = useNoSignal();
   const metaList = useStore((s) => s.metaList);
   const filter = useStore((s) => s.filter);

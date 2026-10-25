@@ -5,6 +5,7 @@ import { applyClickActions } from "@/src/store/applyClickActions";
 import { metagraphById, initNetwork, getNetwork, getAnchor, DEFAULT_META_COLOR, resolveSignerIps } from "@/src/data/network";
 import { ledgerLens } from "@/src/data/ledgerStory";
 import { reportPoll, touchPoll } from "@/src/data/api";
+import { holdFeed } from "@/src/data/feedUse";
 import { STALE_FACTOR } from "@/src/data/pollStatus";
 import { UNLISTED_ID, UNLISTED_SCENE_HEX_BY_THEME, unlistedLog } from "@/src/data/unlisted";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
@@ -27,6 +28,7 @@ import { readSceneColors, type SceneColors, LIGHT_TUNE } from "./sceneColors";
 import { setNodeDimTarget, setNodeEnv } from "./scene/objects/NodeFabric";
 import { THEME_KEY, parseThemePref, resolveTheme, type Theme } from "@/src/theme/resolve";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
+import { sceneFeeds } from "./domain/sceneFeeds";
 import { liveArrivals } from "./domain/arrivals";
 import { SHEET_SHIFT_K, chromeShiftPx, sheetShiftPx } from "./domain/sheetShift";
 import { ChromeBounds } from "./ChromeBounds";
@@ -202,6 +204,7 @@ export class Engine {
   // EMPTY until the live directory answers, never null ("all active"): before data no hub is
   // clickable, and none is drawn (`setMetaPresent`, 2026-10-25 — the real data decides).
   private _activeMetaIds: Set<string> | null = new Set();
+  private _sceneFeedHolds: (() => void)[] = [];
   private _lastFlashOrdinal = -1; // de-dupes the core flash to genuinely new global snapshots
   // The focused metagraph's hub record, cached on filter/mode change — kills the per-frame
   // `metas.find` the DoF read used to do every frame (Task 15 allocation fix).
@@ -1416,6 +1419,10 @@ export class Engine {
   setMode(mode: Mode) {
     const prevMode = this.mode; // capture BEFORE the reassignment — the choreography branches on it
     this.mode = mode;
+    // THE SCENE'S READS FOR THE PULSE STRIP (src/data/feedUse.ts): the feeds this view draws, from
+    // the same policy flags that switch the drawing on (`domain/sceneFeeds.ts`).
+    for (const r of this._sceneFeedHolds) r();
+    this._sceneFeedHolds = sceneFeeds(VIEW_POLICIES[mode]).map((f) => holdFeed(f, "3D scene"));
     // A view switch lands the camera on the destination's own pose (the boundary re-derive),
     // so a pre-switch free orbit no longer holds it — see _onControlsStart.
     this._freeOrbit = false;
@@ -2529,6 +2536,8 @@ export class Engine {
 
 
   dispose() {
+    for (const r of this._sceneFeedHolds) r();
+    this._sceneFeedHolds = [];
     this.disposed = true;
     if (this.metaTimer) clearInterval(this.metaTimer);
     this.canvas.removeEventListener("click", this.onClick);

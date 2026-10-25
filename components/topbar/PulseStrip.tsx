@@ -1,6 +1,7 @@
 "use client";
 
 import { pollHealthRows, type PollHealth } from "@/src/data/api";
+import { feedReaders } from "@/src/data/feedUse";
 import { pollStatusOf, pulseLane, pulseOrder, pulseVerdict, PULSE_AHEAD_MS, PULSE_WINDOW_MS, type PollStatus, type VerdictTone } from "@/src/data/pollStatus";
 import { relativeAge } from "@/src/util/relativeAge";
 import { useNowTick } from "@/components/useNowTick";
@@ -87,7 +88,7 @@ export default function PulseStrip() {
           className={cn(
             // name · lane · age. The name column holds the longest label and its chip; the phone
             // drops the chip (the lane's rhythm already says the tempo) and narrows the column.
-            "grid grid-cols-[minmax(0,15.5rem)_minmax(0,1fr)_5rem] items-center",
+            "grid grid-cols-[minmax(0,19rem)_minmax(0,1fr)_5rem] items-center",
             "max-[700px]:grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)_4.25rem]",
           )}
         >
@@ -95,12 +96,19 @@ export default function PulseStrip() {
             const status = pollStatusOf(r, now);
             const lane = pulseLane(r, now);
             const okN = lane.beats.filter((b) => b.ok).length;
+            // IN USE HERE — something in the current view reads this feed now: a HUD surface that is
+            // mounted and showing it, or the 3D scene drawing it (src/data/feedUse.ts; fenced by
+            // components/feedReadBoundary.test.ts). An idle lane steps back and says so; the feed
+            // still runs, because the app keeps one live model so a view switch needs no reload.
+            const readers = feedReaders(r.id as Parameters<typeof feedReaders>[0]);
+            const used = readers.length > 0;
             const errN = lane.beats.length - okN;
             return (
-              <div key={r.id} className="contents">
+              <div key={r.id} className={cn("contents", !used && "[&>*]:opacity-45")} data-idle={used ? undefined : ""} data-readers={readers.join(", ")}>
                 <span className="flex items-center gap-2 min-w-0 h-[22px] pl-1 text-label text-foreground-dim">
                   <span aria-hidden className={cn("size-1.5 rounded-full flex-none", DOT[status])} />
                   <span className="truncate">{r.label}</span>
+                  {!used && <span className="flex-none text-label text-muted-foreground max-[700px]:hidden">idle here</span>}
                   {cadenceWord(r).split(" · ").map((part, i) => (
                     <span
                       key={part}

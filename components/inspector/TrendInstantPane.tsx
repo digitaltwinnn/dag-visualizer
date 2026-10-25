@@ -86,7 +86,7 @@ export default function TrendInstantPane({
   const hoverFilter = useStore((s) => s.hoverFilter);
   const setHoverFilter = useStore((s) => s.setHoverFilter);
 
-  const roster = useTrendRoster(useTrendsSlice(windowId, range), filter, metric);
+  const roster = useTrendRoster(useTrendsSlice(windowId, range, "Moment card"), filter, metric);
   const { ranked, rows, buckets, stepMs, unit, format } = roster;
 
   // THE BUCKET, not the instant, is this card's subject: two pointer positions inside one bucket

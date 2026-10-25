@@ -37,6 +37,7 @@ import LiveDot from "@/components/LiveDot";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { NodeStars, PinMark } from "@/components/state/StateAtoms";
 import { isRetired } from "@/src/net/lineage";
+import { useFeedRead } from "@/components/useFeedRead";
 
 // The retained global window the log joins against — the same buffer the strip's bars plot,
 // one row per anchored metagraph snapshot inside it.
@@ -190,6 +191,9 @@ function ChainControl({ lineage, chainIdx, onPick }: { lineage: readonly string[
 }
 
 export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens the snapshot's own page (RecordsSurface) — see the row's `commit`. */ onOpen?: () => void } = {}) {
+  // The raw layer is mounted behind the scene; it reads for the reader only while it is open.
+  const rawOpen = useStore((s) => s.section === "data");
+  useFeedRead(["global", "exact"], "AnchorLogTable", rawOpen);
   useSnapshotFeed(MAX); // re-render driver: global + anchor events (the buffers below refresh)
   const filter = useStore((s) => s.filter);
   const live = useStore((s) => s.live);
@@ -258,7 +262,6 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // ⚠️ READ ONLY WHILE THE RAW LAYER IS OPEN: this table stays mounted behind the scene, and an
   // ungated merge read every network's chain on every Snapshots page load (measured: 28 requests
   // with RAW closed). Its caches survive closing, so reopening is instant.
-  const rawOpen = useStore((s) => s.section === "data");
   // …AND UNDER ALL (user, 2026-10-08: "can't see unlisted in the raw snapshot list — I came from a
   // range in History that does show it anchoring"): unlisted is a network like any other, so the
   // unscoped log merges the unlisted chains with the catalog's once their list is in hand. Under
