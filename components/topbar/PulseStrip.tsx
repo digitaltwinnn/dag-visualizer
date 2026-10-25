@@ -98,7 +98,7 @@ export default function PulseStrip() {
             const okN = lane.beats.filter((b) => b.ok).length;
             // IN USE HERE — something in the current view reads this feed now: a HUD surface that is
             // mounted and showing it, or the 3D scene drawing it (src/data/feedUse.ts; fenced by
-            // components/feedReadBoundary.test.ts). An idle lane steps back and says so; the feed
+            // components/feedReadBoundary.test.ts). An idle lane steps back (dimmed, no words — user, 2026-10-25: "remove the 'idle here' text"); the feed
             // still runs, because the app keeps one live model so a view switch needs no reload.
             const readers = feedReaders(r.id as Parameters<typeof feedReaders>[0]);
             const used = readers.length > 0;
@@ -108,7 +108,6 @@ export default function PulseStrip() {
                 <span className="flex items-center gap-2 min-w-0 h-[22px] pl-1 text-label text-foreground-dim">
                   <span aria-hidden className={cn("size-1.5 rounded-full flex-none", DOT[status])} />
                   <span className="truncate">{r.label}</span>
-                  {!used && <span className="flex-none text-label text-muted-foreground max-[700px]:hidden">idle here</span>}
                   {cadenceWord(r).split(" · ").map((part, i) => (
                     <span
                       key={part}
