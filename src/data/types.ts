@@ -291,3 +291,17 @@ export type PickDescriptor =
   // the selection payload plus the GLOBAL tick descriptor it anchored into, so the click table
   // can commit the pair (tile + its tick) without a second lookup.
   | (PickBase & { kind: "metaSnap"; sel: MetaSnapSel; global: Extract<PickDescriptor, { kind: "snapshot" }> });
+
+// Raw shape of a `/currency/{id}/snapshots` list entry (only the fields we read).
+export interface RawMetaSnapshot {
+  ordinal: number;
+  hash: string;
+  lastSnapshotHash: string;
+  timestamp: string;
+  fee?: number;
+  sizeInKB?: number;
+  height?: number;
+  subHeight?: number;
+  blocks?: unknown[];
+  epochProgress?: number;
+}

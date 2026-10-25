@@ -5,7 +5,7 @@
 import { METAGRAPHS, NET_DEF, netUrl } from "@/src/net/current";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
 import { COLORS, POLL } from "@/src/engine/config";
-import type { Anchor, ClusterNode, DagCore, GlobalSnapshot } from "@/src/data/types";
+import type { Anchor, ClusterNode, DagCore, GlobalSnapshot, RawMetaSnapshot } from "@/src/data/types";
 import { activeRows } from "@/src/net/lineage";
 import { RETIRE_QUIET_DAYS } from "@/src/net/retire";
 
@@ -177,20 +177,6 @@ export interface MetaSnapRecord {
   subHeight: number;     // orders snapshots that share a height
   blocks: number;        // rare on mainnet; an honest 0 beats omitting it
   epochProgress: number;
-}
-
-// Raw shape of a `/currency/{id}/snapshots` list entry (only the fields we read).
-interface RawMetaSnapshot {
-  ordinal: number;
-  hash: string;
-  lastSnapshotHash: string;
-  timestamp: string;
-  fee?: number;
-  sizeInKB?: number;
-  height?: number;
-  subHeight?: number;
-  blocks?: unknown[];
-  epochProgress?: number;
 }
 
 export interface Activity {
