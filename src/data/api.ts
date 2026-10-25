@@ -11,8 +11,6 @@ import { COLORS, POLL } from "@/src/engine/config";
 import type { Anchor, ClusterNode, DagCore, GlobalSnapshot, RawMetaSnapshot } from "@/src/data/types";
 import { activeRows } from "@/src/net/lineage";
 
-export { missedGlobals }; // lives in liveMerge (pure); re-exported for existing callers
-
 
 // ── POLL HEALTH — the pulse strip's read (user, 2026-08-30: clicking the heartbeat should show
 // "when did it last poll successfully? which polls do we have?"). One row per FEED, updated by
@@ -300,7 +298,9 @@ export class NetworkData {
   /** One shared-live read: the body plus the time its DATA was true (edge Age + memo age). */
   async _fetchLive(path: string): Promise<{ json: any; at: number }> {
     const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 7000);
+    // 10 s: past the route's own worst miss (its parallel reads time out at 4 s, the unlisted
+    // chains a round trip after their list), so a slow upstream answers late rather than flapping.
+    const t = setTimeout(() => ctrl.abort(), 10_000);
     try {
       const res = await fetch(netUrl(path), { signal: ctrl.signal });
       if (!res.ok) throw new Error(String(res.status));
@@ -343,6 +343,16 @@ export class NetworkData {
       try {
         const { json, at } = await this._fetchLive(`/api/live`);
         if (json && typeof json === "object" && json.metas) { this._lastLive = json as LiveAnswer; this._lastLiveAt = at; }
+        // A failed globals seed takes the shared answer's window (newest-first) rather than
+        // sitting on "no data" until the first tick.
+        const shared = (json?.globals ?? []) as GlobalSnapshot[];
+        if (!this.globalSnapshots.length && shared.length) {
+          this.globalSnapshots = shared.slice().reverse(); // oldest -> newest
+          this.latest = this.globalSnapshots[this.globalSnapshots.length - 1];
+          this._setLive(true, Date.now());
+          reportPoll("global", true, at);
+          this._emit("global", { reset: true, snapshots: this.globalSnapshots, latest: this.latest });
+        }
       } catch { /* the first tick seeds */ }
       if (this._lastLive) await this._refreshMeta();
     } finally {
@@ -428,7 +438,13 @@ export class NetworkData {
     this._clusterTimer = null;
   }
 
+  /** A tick in flight. The next one finding it set returns at once (another is a poll away):
+   *  two overlapping ticks would compute their appends from the same `latest` and push twice. */
+  private _ticking = false;
+
   private async _tick(): Promise<void> {
+    if (this._ticking) return;
+    this._ticking = true;
     // Always attempt the live fetch (even while "down"), so the app recovers on its
     // own when the API comes back — no simulation in between.
     try {
@@ -440,7 +456,8 @@ export class NetworkData {
       const hasMetas = !!live.metas && typeof live.metas === "object";
       if (hasMetas) { this._lastLive = live; this._lastLiveAt = at; }
       // The shared window is newest-first. A tab that fell behind it reads the cached catch-up list
-      // once; a failed catch-up keeps the shared append rather than failing the tick. The catch-up
+      // once — the whole retained buffer, the route's one catch-up rung; a failed catch-up keeps
+      // the shared append rather than failing the tick. The catch-up
       // MERGES with the shared window: its own cache can lag the shared answer by a poll, and a
       // replace would drop the newest shared snapshot for that tick.
       const prev = this.latest?.ordinal ?? null;
@@ -448,7 +465,7 @@ export class NetworkData {
       let append = shared;
       if (needCatchUp != null) {
         try {
-          const c = await this._fetchLive(`/api/live/globals?limit=${Math.min(needCatchUp, POLL.maxSnapshots)}`);
+          const c = await this._fetchLive(`/api/live/globals?limit=${POLL.maxSnapshots}`);
           const filled = missedGlobals(prev, [...((c.json.globals ?? []) as GlobalSnapshot[]), ...live.globals]);
           if (filled.length) append = filled;
         } catch { /* keep the shared append */ }
@@ -461,10 +478,15 @@ export class NetworkData {
     } catch (e) {
       this._setLive(false);
       reportPoll("global", false);
+      // One request carries both feeds: a failed answer is a failed metagraph cycle too.
+      reportPoll("metasnaps", false);
+    } finally {
+      this._ticking = false;
     }
   }
 
   private _pushGlobal(snap: GlobalSnapshot): void {
+    if (this.latest && snap.ordinal <= this.latest.ordinal) return; // never twice, never backwards
     this.latest = snap;
     this.globalSnapshots.push(snap);
     if (this.globalSnapshots.length > POLL.maxSnapshots) this.globalSnapshots.shift();
