@@ -87,8 +87,8 @@ export default function PulseStrip() {
           className={cn(
             // name · lane · age. The name column holds the longest label and its chip; the phone
             // drops the chip (the lane's rhythm already says the tempo) and narrows the column.
-            "grid grid-cols-[minmax(0,15.5rem)_minmax(0,1fr)_3.25rem] items-center",
-            "max-[700px]:grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)_2.5rem]",
+            "grid grid-cols-[minmax(0,15.5rem)_minmax(0,1fr)_5rem] items-center",
+            "max-[700px]:grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)_4.25rem]",
           )}
         >
           {rows.map((r) => {
@@ -149,7 +149,9 @@ export default function PulseStrip() {
                   <span aria-hidden className="absolute top-0 bottom-0 w-px bg-primary/70" style={{ left: pct(lane.nowX) }} />
                 </span>
                 <span className={cn("text-right font-mono text-label tabular-nums pr-1", AGE_INK[status])}>
-                  {r.lastOkAt != null ? relativeAge(now - r.lastOkAt, true) : status === "failing" ? "failing" : "—"}
+                  {/* "1m ago", not the bare "1m" (user, 2026-10-25: "its not clear what it
+                      represents") — the age of the feed's last good answer. */}
+                  {r.lastOkAt != null ? relativeAge(now - r.lastOkAt) : status === "failing" ? "failing" : "—"}
                 </span>
               </div>
             );
