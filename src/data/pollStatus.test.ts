@@ -4,7 +4,7 @@ import type { PollHealth } from "./api";
 
 const row = (p: Partial<PollHealth>): PollHealth => ({
   id: "global", label: "Global snapshots", everyMs: 4000,
-  when: null, tempoMs: 4000, lastOkAt: null, lastErrAt: null, lastAttemptAt: null, ok: 0, err: 0, beats: [], ...p,
+  when: null, tempoMs: 4000, lastOkAt: null, lastErrAt: null, lastAttemptAt: null, lastWasOk: null, lastOkWallAt: null, ok: 0, err: 0, beats: [], ...p,
 });
 const NOW = 1_000_000;
 
@@ -56,6 +56,16 @@ describe("pulseLane (the axis geometry)", () => {
     const l = pulseLane(row({ lastOkAt: NOW - 1000, ok: 1 }), NOW);
     expect(l.dueX).toBeCloseTo((PULSE_WINDOW_MS + 3000) / span, 6);
     expect(l.lateX).toBeNull();
+  });
+  it("a recovered feed is ok though its backdated data time sits before the failure", () => {
+    // Failed at −6s; the next poll at −1s succeeded with data 7s old (an edge + memo age).
+    const r = row({ lastErrAt: NOW - 6000, lastOkAt: NOW - 8000, lastAttemptAt: NOW - 1000, lastWasOk: true, lastOkWallAt: NOW - 1000, ok: 2, err: 1 });
+    expect(pollStatusOf(r, NOW)).toBe("ok");
+  });
+  it("a healthy feed is not late because its data carries a cache window's age", () => {
+    // Answered 4s ago with data 9s older than that: 13s > 2.5 × 4s, but the tab heard on time.
+    const r = row({ everyMs: 4000, lastOkAt: NOW - 13_000, lastAttemptAt: NOW - 4000, lastWasOk: true, lastOkWallAt: NOW - 4000, ok: 3 });
+    expect(pollStatusOf(r, NOW)).toBe("ok");
   });
   it("anchors the due mark to the tab's own attempt, not the backdated data time", () => {
     // The data was 4s old when it landed 1s ago: the tick sits at −5s, the next poll is still 5s after the attempt.

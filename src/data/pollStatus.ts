@@ -20,10 +20,15 @@ export type PollStatus = "ok" | "stale" | "failing" | "acquiring";
 export const STALE_FACTOR = 2.5;
 
 export function pollStatusOf(r: PollHealth, now: number): PollStatus {
-  const errLast = r.lastErrAt != null && (r.lastOkAt == null || r.lastErrAt > r.lastOkAt);
+  // The tab's own outcomes on its own clock where recorded (`lastWasOk`, `lastOkWallAt`); the
+  // stamps otherwise (a touched row, older callers). The beats' DATA times never decide status.
+  const errLast = r.lastWasOk != null
+    ? !r.lastWasOk
+    : r.lastErrAt != null && (r.lastOkAt == null || r.lastErrAt > r.lastOkAt);
   if (errLast) return "failing";
   if (r.lastOkAt == null) return "acquiring";
-  if (r.everyMs != null && now - r.lastOkAt > r.everyMs * STALE_FACTOR) return "stale";
+  const okAt = r.lastOkWallAt ?? r.lastOkAt;
+  if (r.everyMs != null && now - okAt > r.everyMs * STALE_FACTOR) return "stale";
   return "ok";
 }
 
@@ -74,7 +79,7 @@ export function pulseLane(r: PollHealth, now: number): PulseLane {
   const dueX = due != null && due >= start && due <= start + span ? xOf(due) : null;
   let lateX: number | null = null;
   if (status === "failing") lateX = xOf(Math.max(start, r.lastOkAt ?? start));
-  else if (status === "stale" && r.everyMs != null && r.lastOkAt != null) lateX = xOf(Math.max(start, r.lastOkAt + r.everyMs));
+  else if (status === "stale" && r.everyMs != null && r.lastOkAt != null) lateX = xOf(Math.max(start, (r.lastOkWallAt ?? r.lastOkAt) + r.everyMs));
   return { beats, dueX, lateX, nowX };
 }
 
