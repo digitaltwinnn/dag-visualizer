@@ -1867,16 +1867,16 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                       >
                         <span className={cn("uppercase tracking-caps", inSelGroup ? "text-primary-ink" : "text-[color-mix(in_oklch,var(--primary-ink)_80%,var(--muted-foreground))]")}>Global</span>
                         <span className={cn("font-mono tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground")}>{r.global.ordinal.toLocaleString()}</span>
-                        {/* LIVE OR PINNED on the selected global's plate (user, 2026-10-25), the raw
-                            pane head's own marks and words: the plate is the subject a click there
-                            committed, so it states which way the selection is held. */}
+                        {/* The mark FOLLOWS THE NUMBER IT QUALIFIES, as the row's pin follows its
+                            snapshot number (user, same day: the plate's sat at the right edge while
+                            the row's sat by its number). */}
                         {inSelGroup && (
-                          <span className="ml-auto inline-flex items-center gap-1.5 text-label normal-case tracking-normal text-muted-foreground">
+                          <span className="inline-flex items-center gap-1.5 text-label normal-case tracking-normal text-muted-foreground">
                             {following ? <LiveDot /> : <PinMark className="text-muted-foreground" />}
                             {following ? "live" : "pinned"}
                           </span>
                         )}
-                        <span className={cn(!inSelGroup && "ml-auto", "tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground-dim")}>{relativeAge(now - Date.parse(r.ts))}</span>
+                        <span className={cn("ml-auto tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground-dim")}>{relativeAge(now - Date.parse(r.ts))}</span>
                       </GroupPlate>
                     </TableCell>
                   </TableRow>
