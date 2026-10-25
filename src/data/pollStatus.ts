@@ -32,9 +32,12 @@ export function pollStatusOf(r: PollHealth, now: number): PollStatus {
 // draws where its NEXT poll is due, so "late" is a lane whose last answer is behind that mark.
 // Everything a pixel depends on is decided here, pure, so the strip is a shell over it.
 
-/** The axis: the last two minutes, plus a little room past now for the due marks. */
+/** The axis: the last two minutes, plus a little room past now for the due marks. The room was
+ *  30s (now at 80% of the lane) until the same day (user: "move the 'now' much more to the right");
+ *  at 10s now sits at ~92%. A slow feed's due mark appears once it is within that room; the
+ *  overdue stretch never needs it, since it lies before now. */
 export const PULSE_WINDOW_MS = 120_000;
-export const PULSE_AHEAD_MS = 30_000;
+export const PULSE_AHEAD_MS = 10_000;
 
 /** Fastest first — the lanes read as tempo from top to bottom. Once-per-visit (no tempo) last;
  *  ties keep the registry's order. */

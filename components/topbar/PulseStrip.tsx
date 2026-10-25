@@ -51,7 +51,7 @@ const VERDICT_DOT: Record<VerdictTone, string> = {
 
 // The cadence chip says the DURATION with the timer glyph for "scheduled" (user, 2026-09-11 —
 // "can't we say 5 mins with an icon?"); a feed with no fixed cadence wears its honest trigger
-// words instead ("page load", "each tick").
+// words instead ("page load", "per snapshot").
 const cadenceWord = (r: PollHealth): string =>
   r.everyMs != null
     ? r.everyMs >= 60_000
@@ -104,7 +104,9 @@ export default function PulseStrip() {
                   {cadenceWord(r).split(" · ").map((part, i) => (
                     <span
                       key={part}
-                      className="inline-flex flex-none items-center gap-1 rounded-xs border border-border bg-wash-faint px-1.5 py-[2px] text-label leading-none text-muted-foreground max-[700px]:hidden"
+                      // RIGHT-ALIGNED against the lane (user, 2026-10-25): the pills form one column
+                      // at the name cell's end, so the tempos read down the strip as a list.
+                      className="ml-auto mr-3 last:mr-3 inline-flex flex-none items-center gap-1 rounded-xs border border-border bg-wash-faint px-1.5 py-[2px] text-label leading-none text-muted-foreground max-[700px]:hidden"
                     >
                       {i === 0 && r.everyMs != null && <Timer aria-hidden className="size-3 flex-none" />}
                       {part}
@@ -132,9 +134,11 @@ export default function PulseStrip() {
                       aria-hidden
                       className={cn(
                         "absolute -translate-x-1/2 rounded-[1px]",
-                        b.ok ? "bg-[var(--success)] opacity-80" : "bg-[var(--destructive)] w-[3px]",
-                        b.ok && "w-[2px]",
-                        (r.tempoMs == null || r.tempoMs >= 60_000) ? "top-[3px] bottom-[3px] w-[3px]" : "top-[6px] bottom-[6px]",
+                        // Widths 3 / 4 / 5px (user, 2026-10-25: "make the bars a bit wider" — they
+                        // were 2 / 3 / 3): an ok poll, a failed one, and the lone tick of a slow feed.
+                        b.ok ? "bg-[var(--success)] opacity-80" : "bg-[var(--destructive)] w-[4px]",
+                        b.ok && "w-[3px]",
+                        (r.tempoMs == null || r.tempoMs >= 60_000) ? "top-[3px] bottom-[3px] w-[5px]" : "top-[6px] bottom-[6px]",
                       )}
                       style={{ left: pct(b.x) }}
                     />

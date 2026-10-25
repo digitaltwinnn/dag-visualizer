@@ -67,7 +67,9 @@ const FEEDS = {
   // The exact read behind the snapshot card's breakdown (/api/snapshot/[ordinal]) — once per live
   // tick and per pinned one, so it has no cadence of its own (2026-10-04: a run of failed reads
   // showed on the card while every row here still read healthy, because this feed had no row).
-  exact: { label: "Snapshot reads", everyMs: null, when: "each tick", tempoMs: POLL.pollMs },
+  // "per snapshot", not "each tick" (user, 2026-10-25: "what does 'each tick' mean?") — the read
+  // fires once for every new global snapshot, and "tick" is code vocabulary no reader sees.
+  exact: { label: "Snapshot reads", everyMs: null, when: "per snapshot", tempoMs: POLL.pollMs },
 } as const;
 export type FeedId = keyof typeof FEEDS;
 const POLL_HEALTH = new Map<string, PollHealth>();
