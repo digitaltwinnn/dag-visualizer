@@ -19,6 +19,7 @@ import { Empty, IdentityDot } from "@/components/inspector/parts";
 import { selectionHue } from "@/components/selection";
 import { cn } from "@/lib/utils";
 import GroupPlate from "@/components/datasection/GroupToggle";
+import { useNowTick } from "@/components/useNowTick";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -190,6 +191,14 @@ function ChainControl({ lineage, chainIdx, onPick }: { lineage: readonly string[
     </span>
     </span>
   );
+}
+
+/** An age that COUNTS, as the cards' do (user, 2026-10-25: "in raw the x s ago is fixed but in
+ *  the card its actively counting") — its own one-second tick, so only the age re-renders, never
+ *  the table around it. */
+function LiveAge({ ts, short = false }: { ts: string; short?: boolean }) {
+  const now = useNowTick(1000);
+  return <>{relativeAge(now - Date.parse(ts), short)}</>;
 }
 
 export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens the snapshot's own page (RecordsSurface) — see the row's `commit`. */ onOpen?: () => void } = {}) {
@@ -616,8 +625,26 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
         pending: !g,
       };
     });
-    allRows = rows;
     total = merged.total ?? 0;
+    // THE NEWEST PAGE LEADS WITH THE LIVE BUFFER (user, 2026-10-25, phone: "the global snapshot card
+    // is already on 7154272 while the raw is lagging behind"). The merged pages re-read their tips
+    // at most every TIP_REFRESH_MS (30s — a faster re-read cancelled itself on every poll), while
+    // the cards follow the 5s poll; so on page 1 of the whole-chain log, the snapshots the app
+    // already holds that are NEWER than the page's newest record go on top, their global resolved
+    // from the buffer. The 30s read stays the authority and absorbs them when it lands.
+    if (net && merged.page === 1 && mergedScope.kind === "all" && rows.length) {
+      const newest = Math.max(...rows.map((r) => Date.parse(r.ts)));
+      const live = [
+        ...(lens === UNLISTED_ID ? [] : buildAnchorLog(net.metaSnaps, net.globalSnapshots, "all")),
+        ...(lens === "all" || lens === UNLISTED_ID ? unlistedLog(net.globalSnapshots, snapshotExact, net.unlistedSnaps) : []),
+      ].filter((r) => r.metaId != null && Date.parse(r.ts) > newest);
+      if (live.length) {
+        const fresh = sortAnchorLog(live, "age", 1, (id) => displayNetwork(id)?.ticker ?? id) as ViewRow[];
+        rows = [...fresh, ...rows].slice(0, PAGE);
+        total += fresh.length;
+      }
+    }
+    allRows = rows;
     pages = merged.pages;
     from = merged.from;
     to = merged.to;
@@ -1688,7 +1715,6 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       </>
     );
 
-  const now = Date.now();
 
   return (
     <>
@@ -1876,7 +1902,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                             {following ? "live" : "pinned"}
                           </span>
                         )}
-                        <span className={cn("ml-auto tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground-dim")}>{relativeAge(now - Date.parse(r.ts))}</span>
+                        <span className={cn("ml-auto tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground-dim")}><LiveAge ts={r.ts} /></span>
                       </GroupPlate>
                     </TableCell>
                   </TableRow>
@@ -1995,8 +2021,8 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                       {/* Phone drops the " ago" (the bare register — relativeAge's own note): the
                           AGE header names the quantity, and the suffix's width was the last thing
                           holding this table in sideways scroll. */}
-                      <span className="max-[700px]:hidden">{relativeAge(now - Date.parse(r.ts))}</span>
-                      <span className="min-[700px]:hidden">{relativeAge(now - Date.parse(r.ts), true)}</span>
+                      <span className="max-[700px]:hidden"><LiveAge ts={r.ts} /></span>
+                      <span className="min-[700px]:hidden"><LiveAge ts={r.ts} short /></span>
                     </TableCell>
                   )}
                   {/* The phone row's SECOND LINE — where it anchored and how big it was. One muted
