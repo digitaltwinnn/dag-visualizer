@@ -759,13 +759,22 @@ const TrendPlot = memo(function TrendPlot({
   // The in-flight drag, as bucket instants — preview only; the committed range lives on the
   // page (one selection, every chart). Cleared on release or when the pointer leaves.
   const [drag, setDrag] = useState<{ a: number; b: number } | null>(null);
+  // ⚠️ A BRUSH IS TRAVEL IN PIXELS, NOT ONLY IN BUCKETS (user, 2026-10-25: a Moment could be
+  // picked "only on the actual line", the rest of the chart seemed dead). The one-bucket floor
+  // below was the whole click-vs-brush test, and on a dense plot a bucket is UNDER a pixel —
+  // 720 hourly buckets across a ~600px tablet card is 1.2 buckets per px — so the wobble every
+  // real press has between down and up read as a one-bucket range, the plate's pick was then
+  // the range's and swallowed, and only a press that happened not to move picked. The press's
+  // own x is kept from the native event and a range needs the tap slop of travel as well.
+  const brushFromX = useRef<number | null>(null);
   const dragProps = onRange
     ? {
-        onMouseDown: (e: { activeLabel?: string | number }, ev?: { preventDefault?: () => void }) => {
+        onMouseDown: (e: { activeLabel?: string | number }, ev?: { preventDefault?: () => void; clientX?: number }) => {
           // preventDefault kills the NATIVE selection at its source: select-none only covers
           // the chart, and a drag that crossed its edge started selecting the page text
           // beyond it (user, 2026-09-09, round 2 of the selectable-chart bug).
           ev?.preventDefault?.();
+          brushFromX.current = typeof ev?.clientX === "number" ? ev.clientX : null;
           const ts = Number(e?.activeLabel);
           if (Number.isFinite(ts)) setDrag({ a: ts, b: ts });
         },
@@ -773,13 +782,17 @@ const TrendPlot = memo(function TrendPlot({
           const ts = Number(e?.activeLabel);
           if (drag && Number.isFinite(ts)) setDrag({ a: drag.a, b: ts });
         },
-        onMouseUp: () => {
+        onMouseUp: (_e: unknown, ev?: { clientX?: number }) => {
           if (drag) {
             const lo = Math.min(drag.a, drag.b);
             const hi = Math.max(drag.a, drag.b);
-            // A click (no travel) is not a range — require at least one full bucket.
-            if (hi - lo >= stepMs) onRange(lo, hi + stepMs);
+            // A click (no travel) is not a range — at least one full bucket AND the tap slop of
+            // pixels (a press whose x the event did not carry is judged by the bucket alone).
+            const from = brushFromX.current;
+            const travelled = from != null && typeof ev?.clientX === "number" ? Math.abs(ev.clientX - from) : Infinity;
+            if (hi - lo >= stepMs && travelled > TAP_SLOP) onRange(lo, hi + stepMs);
           }
+          brushFromX.current = null;
           setDrag(null);
         },
         onMouseLeave: () => setDrag(null),
