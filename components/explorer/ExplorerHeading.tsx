@@ -87,6 +87,14 @@ export function MeasureTiles({ measure }: { measure: MeasureControl }) {
               // 2026-10-25 (the unlit word brighter; the lit cell on the strong wash) and declined:
               // "A+C as is is fine".
               "text-muted-foreground bg-transparent border-0 rounded-none! shadow-none!",
+              // THE CORNER CELLS TAKE THE FRAME'S RADIUS ON THEIR OUTER CORNERS (user, 2026-10-25: "the
+              // left selection curved edges don't look good" — the frame is rounded and clipped, the
+              // lit cell's inset ring was square, so the curve cut a notch out of the ring). An inset
+              // shadow follows the element's own radius, so the ring now rounds with the frame; the
+              // inner corners stay square. First cell, last of the first row, first of the last row,
+              // last cell — by column count, since the last row of a two-row grid is a different cell.
+              "first:rounded-tl-btn! last:rounded-br-btn!",
+              cols === 2 ? "[&:nth-child(2)]:rounded-tr-btn! [&:nth-last-child(2)]:rounded-bl-btn!" : "[&:nth-child(3)]:rounded-tr-btn! [&:nth-last-child(3)]:rounded-bl-btn!",
               // The frame is the group's; each cell draws only the divider on its LEFT edge (not the
               // first of a row) and, from the second row on, a hairline TOP. `!` on the shadows (CSS
               // trap 4): the toggle-group primitive's `data-[spacing=0]:shadow-none` is
