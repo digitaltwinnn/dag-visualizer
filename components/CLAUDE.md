@@ -278,8 +278,8 @@ decisions inside them are design, not detail:
   (`src/data/ledgerPath.ts`). The LIVE/PINNED
   control rides the CARD HEAD's eyebrow row with the shown snapshot's ticking age (2026-09-28 —
   it rode the heading row as the level's setting, design decision 15, until then), and the pager
-  states the TIME the rows span ("last 11 min cache" — the word "cache" joined it on 2026-10-19 at
-  the user's ask) rather than "52 recent". **The ticks that arrived
+  states the TIME the rows span ("last 11 min" — the word "cache" rode it from 2026-10-19 until
+  the user dropped it on 2026-10-25: "avoid cache") rather than "52 recent". **The ticks that arrived
   behind a pin are the list's FIRST ROW** (user, 2026-10-18: "fits better as the top row inside
   the explorer, similar to the scene, which animates the extra thin bar at the front when new
   snapshots arrive"): a live-dot row, "12 newer", sliding in from the top (`ExplorerRowSpec.
@@ -361,7 +361,7 @@ rhythm tightened 8 → 6px; `ExplorerPath bare` — its own accent-tinted plate 
 third surface in a second tint; the house keeps its wash as the band's one accent mark). The list sits on the glass. The pager or span sits on the PLATE FOOT, full-bleed to the
 card's bottom edge, the right-rail foot's own device — and EVERY card ends in one: Hypergraph's
 and Geography's lists are the live poll, so their foot is the live atom (`explorer/LiveFoot.tsx`,
-`LiveDot` + "live"); Snapshots keeps "last N min cache" because there "live" is a SELECTION state
+`LiveDot` + "live"); Snapshots keeps "last N min" because there "live" is a SELECTION state
 (live vs pinned, on the tick row and the card head) and the foot's word would collide with it.
 No section labels: "Networks" would be said twice. Four rules the same day finished it: **the
 measure set is bounded** (a hairline ring per tile then, the one frame since 2026-10-25; the lit
