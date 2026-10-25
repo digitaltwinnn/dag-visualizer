@@ -1,22 +1,31 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { lineageIds } from "@/src/net/lineage";
 
 vi.mock("../network/unlistedChains", () => ({ unlistedChains: vi.fn() }));
 
-import { unlistedChains } from "../network/unlistedChains";
-import { GET as globalsGET } from "./globals/route";
-import { GET as metaGET } from "./meta/[id]/route";
-import { GET as clustersGET } from "./clusters/route";
-import { lineageIds } from "@/src/net/lineage";
+// Each test loads the routes fresh (vi.resetModules), so `upstream.ts`'s module-level memo and
+// `quiet.ts`'s sets never carry an answer from one test into the next.
+let unlistedChains: ReturnType<typeof vi.fn>;
+let liveGET: (req: Request) => Promise<Response>;
+let globalsGET: (req: Request) => Promise<Response>;
+let metaGET: (req: Request, ctx: { params: Promise<{ id: string }> }) => Promise<Response>;
+let clustersGET: (req: Request) => Promise<Response>;
 
 const ok = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
 const req = (path: string) => new Request(`http://localhost${path}`);
 const idParams = (id: string) => ({ params: Promise.resolve({ id }) });
 
 let fetchMock: ReturnType<typeof vi.fn>;
-beforeEach(() => {
+beforeEach(async () => {
+  vi.resetModules();
+  unlistedChains = vi.mocked((await import("../network/unlistedChains")).unlistedChains);
+  unlistedChains.mockReset(); // the mock factory's fn survives resetModules
+  ({ GET: liveGET } = await import("./route"));
+  ({ GET: globalsGET } = await import("./globals/route"));
+  ({ GET: metaGET } = await import("./meta/[id]/route"));
+  ({ GET: clustersGET } = await import("./clusters/route"));
   fetchMock = vi.fn(async () => ok({ data: [] }));
   vi.stubGlobal("fetch", fetchMock);
-  vi.mocked(unlistedChains).mockReset();
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 afterEach(() => {
@@ -33,9 +42,11 @@ describe("/api/live/globals", () => {
     expect(await res.json()).toMatchObject({ globals: [], memoAgeMs: 0 });
   });
 
-  it("clamps a low or junk limit to 1", async () => {
+  it("rounds a low or junk limit to the smallest rung (12), and a mid one up to 52", async () => {
     await globalsGET(req("/api/live/globals?limit=0&net=testnet"));
-    expect(String(fetchMock.mock.calls[0][0])).toContain("limit=1");
+    expect(String(fetchMock.mock.calls[0][0])).toContain("limit=12");
+    await globalsGET(req("/api/live/globals?limit=13&net=testnet"));
+    expect(String(fetchMock.mock.calls[1][0])).toContain("limit=52");
   });
 
   it("503 no-store on upstream failure", async () => {
@@ -64,11 +75,19 @@ describe("/api/live/meta/[id]", () => {
     expect(await res.json()).toMatchObject({ snapshots: [], memoAgeMs: 0 });
   });
 
-  it("serves an unlisted id", async () => {
+  it("serves an unlisted id, rounding its limit up to the ladder", async () => {
     vi.mocked(unlistedChains).mockResolvedValue(["DAGunl"]);
     const res = await metaGET(req("/api/live/meta/x?limit=7"), idParams("DAGunl"));
     expect(res.status).toBe(200);
-    expect(String(fetchMock.mock.calls[0][0])).toContain("/currency/DAGunl/snapshots?limit=7");
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/currency/DAGunl/snapshots?limit=50");
+  });
+
+  it("two limits on one rung share one memo entry — one upstream read", async () => {
+    const a = await metaGET(req("/api/live/meta/x?limit=7"), idParams(tracked));
+    const b = await metaGET(req("/api/live/meta/x?limit=8"), idParams(tracked));
+    expect(a.status).toBe(200);
+    expect(b.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("503 no-store when the unlisted list cannot verify an untracked id", async () => {
@@ -97,5 +116,32 @@ describe("/api/live/clusters", () => {
     );
     expect(res.headers.get("Cache-Control")).toBe("public, s-maxage=25, stale-while-revalidate=5");
     expect(await res.json()).toMatchObject({ l0: [{ id: "a" }], l1: [{ id: "a" }], memoAgeMs: 0 });
+  });
+});
+
+describe("/api/live", () => {
+  it("200 with the shared header, the assembled answer and memoAgeMs", async () => {
+    vi.mocked(unlistedChains).mockResolvedValue([]);
+    fetchMock.mockImplementation(async (u: string) =>
+      ok({ data: String(u).includes("/global-snapshots") ? [{ ordinal: 2 }, { ordinal: 1 }] : [] }),
+    );
+    const res = await liveGET(req("/api/live"));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Cache-Control")).toBe("public, s-maxage=4, stale-while-revalidate=2");
+    const body = await res.json();
+    expect(body).toMatchObject({ globals: [{ ordinal: 2 }, { ordinal: 1 }], unlisted: [], failed: [], memoAgeMs: 0 });
+    expect(fetchMock.mock.calls.map((c) => String(c[0]))).toContain(
+      "https://be-mainnet.constellationnetwork.io/global-snapshots?limit=12",
+    );
+  });
+
+  it("503 no-store when the globals read fails", async () => {
+    vi.mocked(unlistedChains).mockResolvedValue([]);
+    fetchMock.mockImplementation(async (u: string) =>
+      String(u).includes("/global-snapshots") ? new Response("x", { status: 500 }) : ok({ data: [] }),
+    );
+    const res = await liveGET(req("/api/live"));
+    expect(res.status).toBe(503);
+    expect(res.headers.get("Cache-Control")).toBe("no-store");
   });
 });

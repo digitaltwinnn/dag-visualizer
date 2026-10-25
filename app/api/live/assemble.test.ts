@@ -56,3 +56,64 @@ describe("assembleWithUnlisted", () => {
     expect(asked).toEqual(["Q"]);
   });
 });
+
+describe("the miss path runs its reads in parallel", () => {
+  // A deferred promise the test resolves by hand, to order the reads.
+  const later = <T>() => {
+    let resolve!: (v: T) => void, reject!: (e: unknown) => void;
+    const promise = new Promise<T>((a, b) => ((resolve = a), (reject = b)));
+    return { promise, resolve, reject };
+  };
+
+  it("starts the listed chains and the unlisted list before globals resolve, and still answers once", async () => {
+    const gl = later<GlobalSnapshot[]>();
+    const started: string[] = [];
+    const p = assembleWithUnlisted(
+      { globals: () => { started.push("globals"); return gl.promise; }, chain: async (id) => { started.push(id); return fresh; } },
+      ["A", "B"],
+      async () => { started.push("list"); return ["U"]; },
+      new Set(),
+    );
+    await new Promise((r) => setTimeout(r, 0)); // let every started read settle except globals
+    expect(started).toEqual(expect.arrayContaining(["globals", "A", "B", "list", "U"]));
+    gl.resolve(g);
+    const r = await p;
+    expect(r.globals).toBe(g);
+    expect(r.metas.A).toBe(fresh);
+    expect(r.unlisted).toEqual(["U"]);
+    expect(r.failed).toEqual([]);
+  });
+
+  it("starts the unlisted chains as soon as the list lands, not after the listed chains", async () => {
+    const slowA = later<RawMetaSnapshot[]>();
+    const started: string[] = [];
+    const p = assembleWithUnlisted(
+      { globals: async () => g, chain: (id) => { started.push(id); return id === "A" ? slowA.promise : Promise.resolve(fresh); } },
+      ["A"],
+      async () => ["U"],
+      new Set(),
+    );
+    await new Promise((r) => setTimeout(r, 0));
+    expect(started).toContain("U");
+    slowA.resolve(fresh);
+    expect((await p).unlisted).toEqual(["U"]);
+  });
+
+  it("a globals rejection still fails the answer, even after the chains landed", async () => {
+    const gl = later<GlobalSnapshot[]>();
+    const p = assembleWithUnlisted({ globals: () => gl.promise, chain: async () => fresh }, ["A"], async () => [], new Set());
+    await new Promise((r) => setTimeout(r, 0));
+    gl.reject(new Error("g"));
+    await expect(p).rejects.toThrow("g");
+  });
+
+  it("keeps the failed order: listed, then unlisted, then @unlisted", async () => {
+    const r = await assembleWithUnlisted(
+      { globals: async () => g, chain: async (id) => { if (id !== "ok") throw new Error(id); return fresh; } },
+      ["L1", "ok"],
+      async () => ["U1"],
+      new Set(),
+    );
+    expect(r.failed).toEqual(["L1", "U1"]);
+  });
+});

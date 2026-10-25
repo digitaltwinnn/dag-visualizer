@@ -63,3 +63,26 @@ export function chainToRecord<T extends { ordinal: number }>(
   const seen = new Set<number>();
   return out.filter((s) => !seen.has(s.ordinal) && (seen.add(s.ordinal), true));
 }
+
+/** The per-chain catch-up's deepest read (`/api/live/meta/[id]`'s cap too). */
+export const META_CATCHUP_MAX = 600;
+
+/** The catch-up's next, deeper limit: ×3, capped at `META_CATCHUP_MAX`. */
+export function nextCatchUpLimit(lim: number): number {
+  return Math.min(META_CATCHUP_MAX, lim * 3);
+}
+
+/** Every limit the per-chain catch-up can send, ascending: each start grown by `nextCatchUpLimit`
+ *  to the cap. The meta route rounds a request UP to this ladder, so its memo holds one entry per
+ *  rung however odd the caller. */
+export function metaLimitLadder(starts: readonly number[]): number[] {
+  const out = new Set<number>();
+  for (let lim of starts) {
+    for (;;) {
+      out.add(lim);
+      if (lim >= META_CATCHUP_MAX) break;
+      lim = nextCatchUpLimit(lim);
+    }
+  }
+  return [...out].sort((a, b) => a - b);
+}

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { memo, readChain, readClusters, readGlobals } from "./upstream";
+import { MEMO_SWEEP_AT, memo, memoSize, readChain, readClusters, readGlobals } from "./upstream";
 
 const ok = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
 
@@ -71,5 +71,28 @@ describe("upstream readers", () => {
     await expect(readClusters("https://l0", "https://l1")).rejects.toThrow();
     vi.stubGlobal("fetch", async (u: string) => ok(u.startsWith("https://l0") ? [{ id: "a" }] : []));
     await expect(readClusters("https://l0", "https://l1")).rejects.toThrow();
+  });
+});
+
+describe("memo eviction", () => {
+  it("deletes an expired entry when it is read", async () => {
+    let t = 0;
+    await memo("e1", 1000, async () => "v", () => t);
+    const before = memoSize();
+    t = 5000;
+    let release!: () => void;
+    const p = memo("e1", 1000, () => new Promise<string>((r) => (release = () => r("w"))), () => t);
+    expect(memoSize()).toBe(before - 1); // the stale entry is gone while the fresh read is in flight
+    release();
+    expect((await p).value).toBe("w");
+  });
+
+  it("sweeps expired entries once the map grows past MEMO_SWEEP_AT", async () => {
+    let t = 0;
+    for (let i = 0; i < MEMO_SWEEP_AT + 10; i++) await memo(`s${i}`, 1000, async () => i, () => t);
+    expect(memoSize()).toBeGreaterThan(MEMO_SWEEP_AT);
+    t = 10_000;
+    await memo("s-fresh", 1000, async () => 0, () => t);
+    expect(memoSize()).toBe(1); // every earlier entry has expired by now; only the fresh one survives
   });
 });

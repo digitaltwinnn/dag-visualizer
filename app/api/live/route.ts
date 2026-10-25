@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
-import { NETWORKS } from "@/src/engine/config";
+import { NETWORKS, POLL } from "@/src/engine/config";
+import type { LiveAnswer } from "@/src/data/types";
 import { netOf } from "@/src/net/request";
 import { sampledIds } from "@/src/net/lineage";
 import { unlistedChains } from "../network/unlistedChains";
-import { assembleWithUnlisted, type LiveAnswer } from "./assemble";
+import { assembleWithUnlisted } from "./assemble";
+import { LIVE_GLOBALS } from "./limit";
 import { quietSetFor } from "./quiet";
 import { memo, readChain, readGlobals } from "./upstream";
 
@@ -12,16 +14,13 @@ import { memo, readChain, readGlobals } from "./upstream";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
-const GLOBALS = 12;
-const TAIL = 50; // POLL.metaSnapTail
-
 export async function GET(req: Request) {
   const net = netOf(req);
   const be = NETWORKS[net].be;
   try {
     const { value, ageMs } = await memo(`live:${net}`, 4000, async () => {
       return assembleWithUnlisted(
-        { globals: () => readGlobals(be, GLOBALS), chain: (id) => readChain(be, id, TAIL) },
+        { globals: () => readGlobals(be, LIVE_GLOBALS), chain: (id) => readChain(be, id, POLL.metaSnapTail) },
         sampledIds(net),
         () => unlistedChains(net),
         quietSetFor(net),

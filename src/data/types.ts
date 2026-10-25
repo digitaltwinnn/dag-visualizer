@@ -306,9 +306,9 @@ export interface RawMetaSnapshot {
   epochProgress?: number;
 }
 
-/** The shared live answer (`/api/live`) as the browser reads it — a structural mirror of the route's
- *  `LiveAnswer` (app/api/live/assemble.ts), declared here because src/data never imports from app/. */
-export type LiveAnswerShape = {
+/** The shared live answer (`/api/live`): one type for the route that assembles it
+ *  (app/api/live/assemble.ts) and the browser that reads it (`NetworkData`). */
+export type LiveAnswer = {
   globals: GlobalSnapshot[];
   metas: Record<string, RawMetaSnapshot[]>;
   unlisted: string[];

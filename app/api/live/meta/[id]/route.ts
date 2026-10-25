@@ -3,11 +3,12 @@ import { NETWORKS } from "@/src/engine/config";
 import { netOf } from "@/src/net/request";
 import { isTracked } from "@/src/net/lineage";
 import { unlistedChains } from "../../../network/unlistedChains";
+import { META_LADDER, clampLimit } from "../../limit";
 import { memo, readChain } from "../../upstream";
 
-// One chain's newest snapshots (catch-up and self-heal). The id must be a tracked chain or a listed
-// unlisted one, so the route is not an open proxy to the explorer. If the unlisted list cannot be
-// read, an untracked id cannot be verified and gets a 503.
+// One chain's newest snapshots (catch-up and self-heal), the limit rounded up to `META_LADDER`. The
+// id must be a tracked chain or a listed unlisted one, so the route is not an open proxy to the
+// explorer. If the unlisted list cannot be read, an untracked id cannot be verified and gets a 503.
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
@@ -16,8 +17,7 @@ const NO_STORE = { "Cache-Control": "no-store" };
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const net = netOf(req);
-  const raw = Number(new URL(req.url).searchParams.get("limit"));
-  const limit = Math.min(600, Math.max(1, Number.isFinite(raw) ? Math.floor(raw) : 1));
+  const limit = clampLimit(new URL(req.url).searchParams.get("limit"), META_LADDER);
 
   if (!isTracked(net, id)) {
     let unlisted: string[];

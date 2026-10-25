@@ -5,9 +5,22 @@ import type { GlobalSnapshot, RawMetaSnapshot } from "@/src/data/types";
 
 const TIMEOUT_MS = 4000;
 
-type Entry = { at: number; value: unknown };
+type Entry = { at: number; ttlMs: number; value: unknown };
 const done = new Map<string, Entry>();
 const inflight = new Map<string, Promise<unknown>>();
+
+/** Past this many entries, a write first drops every expired one. The keys are bounded (per network,
+ *  per chain, per quantized limit), so this is a backstop, not the working set. */
+export const MEMO_SWEEP_AT = 256;
+
+/** How many answers the memo holds (expired ones included until a read or a sweep drops them). */
+export function memoSize(): number {
+  return done.size;
+}
+
+function sweep(t: number): void {
+  for (const [k, e] of done) if (t - e.at >= e.ttlMs) done.delete(k);
+}
 
 export async function memo<T>(
   key: string,
@@ -17,12 +30,17 @@ export async function memo<T>(
 ): Promise<{ value: T; ageMs: number }> {
   const hit = done.get(key);
   const t = now();
-  if (hit && t - hit.at < ttlMs) return { value: hit.value as T, ageMs: t - hit.at };
+  if (hit) {
+    if (t - hit.at < ttlMs) return { value: hit.value as T, ageMs: t - hit.at };
+    done.delete(key); // expired: never retained past its window
+  }
   let p = inflight.get(key) as Promise<T> | undefined;
   if (!p) {
     p = read().then(
       (v) => {
-        done.set(key, { at: now(), value: v });
+        const at = now();
+        if (done.size >= MEMO_SWEEP_AT) sweep(at);
+        done.set(key, { at, ttlMs, value: v });
         inflight.delete(key);
         return v;
       },

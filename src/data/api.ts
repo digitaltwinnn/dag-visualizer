@@ -3,8 +3,8 @@
 // keeps polling, recovering on its own once it responds again (`live` reflects this).
 
 import { dataTime } from "./liveAge";
-import { chainNeedsCatchUp, chainToRecord, globalsToAppend, missedGlobals } from "./liveMerge";
-import type { LiveAnswerShape } from "@/src/data/types";
+import { META_CATCHUP_MAX, chainNeedsCatchUp, chainToRecord, globalsToAppend, missedGlobals, nextCatchUpLimit } from "./liveMerge";
+import type { LiveAnswer } from "@/src/data/types";
 import { METAGRAPHS, netUrl } from "@/src/net/current";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
 import { COLORS, POLL } from "@/src/engine/config";
@@ -260,9 +260,9 @@ export class NetworkData {
   private listeners: ListenerMap;
   /** The last shared answer — the metagraph tails and the unlisted ids come from it — and the time
    *  its DATA was true (the metasnaps beat's stamp). */
-  private _lastLive: LiveAnswerShape | null = null;
+  private _lastLive: LiveAnswer | null = null;
   private _lastLiveAt = 0;
-  get lastLive(): LiveAnswerShape | null {
+  get lastLive(): LiveAnswer | null {
     return this._lastLive;
   }
   private _timer: ReturnType<typeof setInterval> | null;
@@ -342,7 +342,7 @@ export class NetworkData {
       // route (`_refreshOneMeta`). If it fails, the first tick seeds them instead.
       try {
         const { json, at } = await this._fetchLive(`/api/live`);
-        if (json && typeof json === "object" && json.metas) { this._lastLive = json as LiveAnswerShape; this._lastLiveAt = at; }
+        if (json && typeof json === "object" && json.metas) { this._lastLive = json as LiveAnswer; this._lastLiveAt = at; }
       } catch { /* the first tick seeds */ }
       if (this._lastLive) await this._refreshMeta();
     } finally {
@@ -433,7 +433,7 @@ export class NetworkData {
     // own when the API comes back — no simulation in between.
     try {
       const { json, at } = await this._fetchLive(`/api/live`);
-      const live = json as LiveAnswerShape;
+      const live = json as LiveAnswer;
       if (!live.globals?.length) throw new Error("no globals");
       // An answer without `metas` keeps the last good one: the meta refresh skips this tick rather
       // than sending every chain to the per-chain route.
@@ -532,8 +532,8 @@ export class NetworkData {
         list = json?.snapshots || [];
         if (!list.length) break;
         const oldest = list[list.length - 1].ordinal; // newest-first → last is oldest
-        if (haveTo < 0 || oldest <= haveTo + 1 || list.length < lim || lim >= 600) break;
-        lim = Math.min(600, lim * 3); // gap not yet covered — read deeper and retry
+        if (haveTo < 0 || oldest <= haveTo + 1 || list.length < lim || lim >= META_CATCHUP_MAX) break;
+        lim = nextCatchUpLimit(lim); // gap not yet covered — read deeper and retry (every limit is a rung of the route's ladder)
       }
       catchUp = list;
     }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chainNeedsCatchUp, chainToRecord, globalsToAppend, missedGlobals } from "./liveMerge";
+import { META_CATCHUP_MAX, chainNeedsCatchUp, chainToRecord, globalsToAppend, metaLimitLadder, missedGlobals, nextCatchUpLimit } from "./liveMerge";
 import type { GlobalSnapshot, RawMetaSnapshot } from "./types";
 
 const snap = (ordinal: number) => ({ ordinal }) as GlobalSnapshot;
@@ -87,5 +87,17 @@ describe("chainToRecord", () => {
   it("records the catch-up when there is no shared tail", () => {
     expect(ords(chainToRecord(100, run(120, 101), undefined))).toEqual(ords(run(120, 101)));
     expect(chainToRecord(100, null, [])).toEqual([]);
+  });
+});
+
+describe("the catch-up's limits", () => {
+  it("nextCatchUpLimit grows ×3 and caps at META_CATCHUP_MAX", () => {
+    expect(nextCatchUpLimit(50)).toBe(150);
+    expect(nextCatchUpLimit(450)).toBe(META_CATCHUP_MAX);
+    expect(META_CATCHUP_MAX).toBe(600);
+  });
+  it("metaLimitLadder lists every limit each start can reach, ascending, once", () => {
+    expect(metaLimitLadder([50, 60])).toEqual([50, 60, 150, 180, 450, 540, 600]);
+    expect(metaLimitLadder([600, 600])).toEqual([600]);
   });
 });
