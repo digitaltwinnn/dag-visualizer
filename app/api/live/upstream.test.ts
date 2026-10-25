@@ -38,10 +38,12 @@ describe("memo", () => {
     expect(read).toHaveBeenCalledTimes(1);
   });
 
-  it("does not cache a rejection", async () => {
+  it("holds a rejection for its window, then retries", async () => {
     const read = vi.fn<() => Promise<string>>().mockRejectedValueOnce(new Error("x")).mockResolvedValue("v");
     await expect(memo("d", 4000, read, () => 0)).rejects.toThrow("x");
-    expect((await memo("d", 4000, read, () => 0)).value).toBe("v");
+    await expect(memo("d", 4000, read, () => 1000)).rejects.toThrow("x");
+    expect(read).toHaveBeenCalledTimes(1);
+    expect((await memo("d", 4000, read, () => 4000)).value).toBe("v");
     expect(read).toHaveBeenCalledTimes(2);
   });
 });

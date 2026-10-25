@@ -591,7 +591,9 @@ export default function TrendChart({
           // not travel past a tap's slop is a pick, decided at pointerup — a brush needs more
           // travel than that (its own pixel floor below), so the two cannot both answer one press;
           // the click that may still follow is swallowed so one press is one pick.
-          onPointerDown={onPick ? (e) => { tapFrom.current = { x: e.clientX, y: e.clientY }; } : undefined}
+          // Primary button only (review, 2026-10-25): a right- or middle-click is a context menu or a
+          // paste, never a Moment.
+          onPointerDown={onPick ? (e) => { tapFrom.current = e.button === 0 ? { x: e.clientX, y: e.clientY } : null; } : undefined}
           onPointerUp={
             onPick && n > 0
               ? (e) => {

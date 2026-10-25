@@ -22,6 +22,12 @@ function sweep(t: number): void {
   for (const [k, e] of done) if (t - e.at >= e.ttlMs) done.delete(k);
 }
 
+/** A failed read is HELD for the same window a success is (review, 2026-10-25): with no hold,
+ *  every tab's poll during an upstream outage re-ran the whole fan-out (globals + every chain)
+ *  exactly while the upstream was struggling. Server-side only — the route still answers 503
+ *  no-store, so the edge caches nothing and the next window retries. */
+const failedAt = new Map<string, { at: number; ttlMs: number; err: unknown }>();
+
 export async function memo<T>(
   key: string,
   ttlMs: number,
@@ -33,6 +39,11 @@ export async function memo<T>(
   if (hit) {
     if (t - hit.at < ttlMs) return { value: hit.value as T, ageMs: t - hit.at };
     done.delete(key); // expired: never retained past its window
+  }
+  const miss = failedAt.get(key);
+  if (miss) {
+    if (t - miss.at < miss.ttlMs) throw miss.err;
+    failedAt.delete(key);
   }
   let p = inflight.get(key) as Promise<T> | undefined;
   if (!p) {
@@ -46,6 +57,7 @@ export async function memo<T>(
       },
       (e) => {
         inflight.delete(key);
+        failedAt.set(key, { at: now(), ttlMs, err: e });
         throw e;
       },
     );

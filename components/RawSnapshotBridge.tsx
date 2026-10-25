@@ -170,7 +170,13 @@ export default function RawSnapshotBridge() {
   const backfillTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
     // Re-arms each time the feed goes idle, so the NEXT reader gets its own backfill.
-    if (!wanted) { backfilled.current = false; return; }
+    // Idle stops the queue too (review, 2026-10-25): resetting the flag alone left a running
+    // backfill reading the rest of its ordinals after the reader left.
+    if (!wanted) {
+      backfilled.current = false;
+      if (backfillTimer.current) { clearInterval(backfillTimer.current); backfillTimer.current = null; }
+      return;
+    }
     if (backfilled.current || liveOrd == null) return;
     backfilled.current = true;
     if (backfillTimer.current) clearInterval(backfillTimer.current);
