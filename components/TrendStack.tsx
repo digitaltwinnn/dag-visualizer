@@ -672,7 +672,12 @@ export default function TrendStack() {
                     onPointerUp={(e) => e.stopPropagation()}
                     onClick={(e) => { e.stopPropagation(); stepMeasure(dir); }}
                     className={cn(
-                      "absolute top-full mt-2 touch:mt-1.5 z-10 inline-flex h-7 touch:h-11 min-w-7 touch:min-w-11 items-center justify-center gap-0.5 rounded-full cursor-pointer",
+                      "absolute top-full mt-2 z-10 inline-flex h-7 touch:h-8 min-w-7 touch:min-w-8 items-center justify-center gap-0.5 rounded-full cursor-pointer",
+                      // A 32px pill with an invisible 6px pad all round on touch — the 44px target without
+                      // the 44px look (user, 2026-10-25: "is the <> control too big?" — standing alone under
+                      // the card the full-size pill read as heavy as the card's own head). `TOUCH_HIT`'s
+                      // recipe written out: its `relative` would undo this pill's `absolute`.
+                      "touch:after:absolute touch:after:-inset-1.5 touch:after:content-['']",
                       // The word in the label step, plain case (user, 2026-10-19: the caps read "way too
                       // large" beside the chevron) — a quiet name, not an eyebrow.
                       // In the plain muted ink, not the accent (user, 2026-10-24: the pills were "cyan and a
