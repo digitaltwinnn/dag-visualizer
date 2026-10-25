@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { holdFeed, feedReaders } from "./feedUse";
+import { holdFeed, feedReaders, feedInUse, onFeedUse } from "./feedUse";
 
 describe("holdFeed / feedReaders", () => {
   it("lists a reader while it holds the feed, and drops it on release", () => {
@@ -30,5 +30,23 @@ describe("holdFeed / feedReaders", () => {
     expect(feedReaders("clusters")).toEqual(["a", "b"]);
     r1();
     r2();
+  });
+});
+
+describe("feedInUse / onFeedUse", () => {
+  it("tells a fetcher when a feed gains its first reader and loses its last", () => {
+    let calls = 0;
+    const off = onFeedUse(() => calls++);
+    expect(feedInUse("metasnaps")).toBe(false);
+    const a = holdFeed("metasnaps", "A");
+    const b = holdFeed("metasnaps", "B");
+    expect(feedInUse("metasnaps")).toBe(true);
+    expect(calls).toBe(1); // only the idle → used edge
+    a();
+    expect(calls).toBe(1);
+    b();
+    expect(feedInUse("metasnaps")).toBe(false);
+    expect(calls).toBe(2); // the used → idle edge
+    off();
   });
 });

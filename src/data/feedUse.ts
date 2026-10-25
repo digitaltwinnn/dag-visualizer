@@ -16,13 +16,30 @@ import type { FeedId } from "./api";
 // never drops someone else's hold.
 
 const HOLDS = new Map<FeedId, Map<string, number>>();
+// Notified when a feed gains its first reader or loses its last — the fetchers that gate on use
+// (the snapshot reads, 2026-10-25) subscribe here rather than poll.
+const LISTENERS = new Set<() => void>();
+const notify = () => { for (const l of LISTENERS) l(); };
+
+/** Subscribe to "a feed went from idle to used, or back" (useSyncExternalStore's shape). */
+export function onFeedUse(listener: () => void): () => void {
+  LISTENERS.add(listener);
+  return () => LISTENERS.delete(listener);
+}
+
+/** Does anything read `feed` now? */
+export function feedInUse(feed: FeedId): boolean {
+  return (HOLDS.get(feed)?.size ?? 0) > 0;
+}
 
 /** Hold `feed` on behalf of `who` (the reader's own words, e.g. "History charts"). Returns the
  *  release; calling it twice is harmless. */
 export function holdFeed(feed: FeedId, who: string): () => void {
   let byWho = HOLDS.get(feed);
   if (!byWho) HOLDS.set(feed, (byWho = new Map()));
+  const wasUsed = byWho.size > 0;
   byWho.set(who, (byWho.get(who) ?? 0) + 1);
+  if (!wasUsed) notify();
   let done = false;
   return () => {
     if (done) return;
@@ -32,6 +49,7 @@ export function holdFeed(feed: FeedId, who: string): () => void {
     if (!m) return;
     if (n > 0) m.set(who, n);
     else m.delete(who);
+    if (m.size === 0) notify();
   };
 }
 

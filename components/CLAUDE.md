@@ -224,7 +224,12 @@ feeds while it is mounted AND showing them (`useFeedRead`, fenced by
 the feeds its current view draws, derived from the view-policy flags that switch the drawing on
 (`domain/sceneFeeds.ts`). A lane nothing reads dims (no label — the "idle here" words left the same day); the feed keeps running,
 because the app keeps one live model so a view switch needs no reload. Each lane carries its
-readers' names in `data-readers` for debugging. Either strip is a **layout participant, not a popup** — TopBar publishes its
+readers' names in `data-readers` for debugging. **And a fetcher may gate on it**: the snapshot reads fetch only while
+something holds that feed (`RawSnapshotBridge` via `feedInUse`/`onFeedUse`, user, same day: "why is
+it reading while nobody is looking?"), re-running the BACKFILL_N backfill on each idle → used edge —
+measured, 0 reads in Geography, ~10 on entering Snapshots, then one per tick. The metagraph
+snapshots stay always on: the anchor index is the Snapshots chamber's recent HISTORY, and a reader
+arriving later could not recover the stretch it was away for. Either strip is a **layout participant, not a popup** — TopBar publishes its
 height and both the rails and the canvas add it to their `top`, a pure position shift that keeps
 the buffer viewport-sized so nothing distorts and the engine never resizes.
 
