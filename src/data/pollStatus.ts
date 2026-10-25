@@ -67,8 +67,9 @@ export function pulseLane(r: PollHealth, now: number): PulseLane {
   const nowX = xOf(now);
   const beats = r.beats.filter((b) => b.at >= start && b.at <= now).map((b) => ({ x: xOf(b.at), ok: b.ok }));
   const status = pollStatusOf(r, now);
-  // The next poll is due one cadence after the last ATTEMPT — an error is still the poll firing.
-  const last = Math.max(r.lastOkAt ?? -Infinity, r.lastErrAt ?? -Infinity);
+  // The next poll is due one cadence after the last ATTEMPT — an error is still the poll firing —
+  // on the tab's own clock: the beats carry the data's (older) time, the timer does not.
+  const last = r.lastAttemptAt ?? Math.max(r.lastOkAt ?? -Infinity, r.lastErrAt ?? -Infinity);
   const due = r.everyMs != null && Number.isFinite(last) ? last + r.everyMs : null;
   const dueX = due != null && due >= start && due <= start + span ? xOf(due) : null;
   let lateX: number | null = null;

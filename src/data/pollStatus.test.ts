@@ -4,7 +4,7 @@ import type { PollHealth } from "./api";
 
 const row = (p: Partial<PollHealth>): PollHealth => ({
   id: "global", label: "Global snapshots", everyMs: 4000,
-  when: null, tempoMs: 4000, lastOkAt: null, lastErrAt: null, ok: 0, err: 0, beats: [], ...p,
+  when: null, tempoMs: 4000, lastOkAt: null, lastErrAt: null, lastAttemptAt: null, ok: 0, err: 0, beats: [], ...p,
 });
 const NOW = 1_000_000;
 
@@ -56,6 +56,11 @@ describe("pulseLane (the axis geometry)", () => {
     const l = pulseLane(row({ lastOkAt: NOW - 1000, ok: 1 }), NOW);
     expect(l.dueX).toBeCloseTo((PULSE_WINDOW_MS + 3000) / span, 6);
     expect(l.lateX).toBeNull();
+  });
+  it("anchors the due mark to the tab's own attempt, not the backdated data time", () => {
+    // The data was 4s old when it landed 1s ago: the tick sits at −5s, the next poll is still 5s after the attempt.
+    const l = pulseLane(row({ everyMs: 5000, lastOkAt: NOW - 5000, lastAttemptAt: NOW - 1000, ok: 1 }), NOW);
+    expect(l.dueX).toBeCloseTo((PULSE_WINDOW_MS + 4000) / span, 6);
   });
   it("an unscheduled feed has no due mark", () => {
     expect(pulseLane(row({ everyMs: null, lastOkAt: NOW - 1000, ok: 1 }), NOW).dueX).toBeNull();

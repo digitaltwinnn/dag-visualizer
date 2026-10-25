@@ -30,6 +30,11 @@ export interface PollHealth {
   when: string | null;
   lastOkAt: number | null;
   lastErrAt: number | null;
+  /** When THIS TAB last polled, on its own clock — the anchor of the strip's "next poll due" mark.
+   *  Apart from `lastOkAt`/`lastErrAt` because those carry the DATA's time (edge Age + memo age),
+   *  which runs up to a cache period behind the tab's timer: a due mark drawn from the data's time
+   *  sat seconds early and the cadence read out of sync (user, 2026-10-25). */
+  lastAttemptAt: number | null;
   ok: number;
   err: number;
   /** How fast this feed answers when it is healthy — the pulse strip's ORDER (fastest first), so
@@ -81,6 +86,7 @@ export function reportPoll(id: FeedId, ok: boolean, at: number = Date.now()): vo
   if (!r) { r = freshRow(id); POLL_HEALTH.set(id, r); }
   // `at` may be the data's own (older) time, so a late beat never moves an age backwards and the
   // list stays sorted; trimming is against the NEWEST beat, not the incoming one.
+  r.lastAttemptAt = Date.now();
   if (ok) { r.lastOkAt = Math.max(r.lastOkAt ?? at, at); r.ok++; } else { r.lastErrAt = Math.max(r.lastErrAt ?? at, at); r.err++; }
   let i = r.beats.length;
   while (i > 0 && r.beats[i - 1]!.at > at) i--;
@@ -90,7 +96,7 @@ export function reportPoll(id: FeedId, ok: boolean, at: number = Date.now()): vo
 }
 function freshRow(id: FeedId): PollHealth {
   const d = FEEDS[id];
-  return { id, label: d.label, everyMs: d.everyMs, when: d.when, tempoMs: d.tempoMs, lastOkAt: null, lastErrAt: null, ok: 0, err: 0, beats: [] };
+  return { id, label: d.label, everyMs: d.everyMs, when: d.when, tempoMs: d.tempoMs, lastOkAt: null, lastErrAt: null, lastAttemptAt: null, ok: 0, err: 0, beats: [] };
 }
 /** Ensure a feed has a ROW without recording an outcome.
  *

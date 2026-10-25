@@ -188,6 +188,8 @@ describe("reportPoll's beats", () => {
     const row = pollHealthRows().find((r) => r.id === "global")!;
     expect(row.beats.map((b) => b.at)).toEqual([t0, t0 + 1000]);
     expect(row.lastOkAt).toBe(t0 + 1000);
+    // The attempt is the tab's own wall time, whatever age the data carried.
+    expect(row.lastAttemptAt).toBe(t0 + 2000);
   });
 
   it("a touched row has no beats, not a claimed one", () => {
