@@ -41,3 +41,15 @@ export function sheetShiftPx(coverPx: number, viewHeightPx: number): number {
 export function chromeShiftPx(topPx: number, bottomPx: number): number {
   return (Math.max(0, bottomPx) - Math.max(0, topPx)) / 2;
 }
+
+/** THE TOP ROW'S PUSH (user, 2026-10-25: "should the topbar push the scene down (like the bottom
+ *  bar pushes it up)? … always have the scene visible, sandwiched between top and bottom
+ *  sections"). An open top-bar row (filter, network health, about, views) grows down over the
+ *  canvas; the framing centre moves DOWN by half its height — the bottom sheet's rule mirrored, the
+ *  same projection offset, so with both open the scene centres in the band between them. Negative
+ *  = down. Desktop and tablet need none: there the chrome shift measures the bar's bottom edge,
+ *  row included. */
+export function stripShiftPx(stripPx: number, viewHeightPx: number): number {
+  const strip = Math.min(Math.max(0, stripPx), Math.max(0, viewHeightPx));
+  return strip === 0 ? 0 : -strip / 2;
+}

@@ -14,6 +14,9 @@ const EVERY = 30;
 export class ChromeBounds {
   /** The command bar's bottom edge (any open strip included), or 0 with no bar. */
   top = 0;
+  /** The height of the command bar's open grow-down row (`#filter-strip`), 0 while folded —
+   *  eased with the row's own grid-rows transition, so the push rides it. */
+  strip = 0;
   /** The vitals band's top edge while it is IN the lane — on screen and visible — else the
    *  viewport's bottom (the phone, where its vitals ride the dock; the SCENE toggle, which slides it
    *  away). */
@@ -44,6 +47,9 @@ export class ChromeBounds {
     const h = window.innerHeight;
     const bar = document.getElementById("topbar");
     this.top = bar ? bar.getBoundingClientRect().bottom : 0;
+    const row = document.getElementById("filter-strip");
+    const rr = row?.getBoundingClientRect();
+    this.strip = rr && rr.bottom > 0 ? rr.height : 0; // a bar slid away (SCENE) pushes nothing
     const band = document.getElementById("vitalsband");
     const br = band?.getBoundingClientRect();
     this.bandOn = !!br && br.height > 0 && br.top < h && getComputedStyle(band!).visibility !== "hidden";

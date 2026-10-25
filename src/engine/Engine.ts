@@ -30,7 +30,7 @@ import { THEME_KEY, parseThemePref, resolveTheme, type Theme } from "@/src/theme
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
 import { sceneFeeds } from "./domain/sceneFeeds";
 import { liveArrivals } from "./domain/arrivals";
-import { SHEET_SHIFT_K, chromeShiftPx, sheetShiftPx } from "./domain/sheetShift";
+import { SHEET_SHIFT_K, chromeShiftPx, sheetShiftPx, stripShiftPx } from "./domain/sheetShift";
 import { ChromeBounds } from "./ChromeBounds";
 import { FOCI, nodeFraming, cohortFraming, ledgerCommitTilt, trendFocusPush, trendFit } from "./domain/cameraRig";
 import { elevationCap, isDrag, orbitAbout, orbitAllowed, orbitAngles } from "./domain/subjectOrbit";
@@ -473,7 +473,9 @@ export class Engine {
   private _chrome = new ChromeBounds();
   private _chromeShift(): number {
     const c = this._chrome.read();
-    return c.bandOn ? chromeShiftPx(c.top, window.innerHeight - c.bandTop) : 0;
+    // With the band in the lane the bar's bottom edge already includes an open row; without it
+    // (the phone) the row pushes on its own — the bottom sheet's rule, mirrored.
+    return c.bandOn ? chromeShiftPx(c.top, window.innerHeight - c.bandTop) : stripShiftPx(c.strip, window.innerHeight);
   }
   private _sheetShiftW = 0;
   private _sheetShiftH = 0;

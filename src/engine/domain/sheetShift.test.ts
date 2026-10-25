@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SHEET_SHIFT_K, chromeShiftPx, sheetShiftPx } from "./sheetShift";
+import { SHEET_SHIFT_K, chromeShiftPx, sheetShiftPx, stripShiftPx } from "./sheetShift";
 
 // The phone sheet's projection shift — the module header carries the design; this pins the
 // arithmetic the Engine hands to `camera.setViewOffset`.
@@ -31,5 +31,21 @@ describe("chromeShiftPx — centre the frame in the band the bars leave", () => 
   it("is zero when the two bars are even, and never reads a negative edge", () => {
     expect(chromeShiftPx(80, 80)).toBe(0);
     expect(chromeShiftPx(-5, 0)).toBe(0);
+  });
+});
+
+describe("stripShiftPx — an open top-bar row pushes the frame down by half its height", () => {
+  it("is zero with no row open, and never pushes up", () => {
+    expect(stripShiftPx(0, 844)).toBe(0);
+    expect(stripShiftPx(-20, 844)).toBe(0);
+  });
+  it("moves the framing centre DOWN (negative) by half the row", () => {
+    expect(stripShiftPx(180, 844)).toBe(-90);
+  });
+  it("sandwiches with a bottom sheet: the two halves add", () => {
+    expect(sheetShiftPx(400, 844) + stripShiftPx(180, 844)).toBe(110);
+  });
+  it("clamps a row taller than the viewport", () => {
+    expect(stripShiftPx(2000, 844)).toBe(-422);
   });
 });
