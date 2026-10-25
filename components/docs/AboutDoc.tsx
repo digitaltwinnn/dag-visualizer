@@ -89,9 +89,11 @@ export default function AboutDoc() {
       <Panel className="mt-6 py-4 px-5">
         <Eyebrow>Live data</Eyebrow>
         <p className="mt-2 text-lg text-foreground leading-relaxed">
-          Every number on screen is live — read straight from the Constellation Network&apos;s
-          own public endpoints, the global snapshot stream, each metagraph&apos;s cluster and
-          each node&apos;s status, and drawn as it comes in.
+          Every number on screen is live — read from the Constellation Network&apos;s own public
+          endpoints, the global snapshot stream, each metagraph&apos;s cluster and each
+          node&apos;s status, and drawn as it comes in. Built for many visitors at once: this site
+          asks the network once every few seconds and shares that answer with everyone watching,
+          so a busy day never adds load to the network itself.
         </p>
         <p className="mt-2 text-prose text-muted-foreground">
           Node locations come from their public internet addresses, so they are accurate to a
