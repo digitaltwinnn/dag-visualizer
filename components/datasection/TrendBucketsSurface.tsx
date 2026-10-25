@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 
 import { useStore } from "@/src/store/store";
 import useTrendsSlice from "@/components/useTrendsSlice";
@@ -242,16 +242,31 @@ export default function TrendBucketsSurface() {
                           phone"; it was one ragged wrap of "code value" pairs). No sideways scroll. */}
                       <TableCell className="min-[700px]:hidden whitespace-normal pt-0">
                         {r.addr != null && <span className="block mb-1 font-mono text-label text-foreground-dim">{shortAddr(r.addr)}</span>}
-                        <span className="grid grid-cols-2 grid-flow-row-dense gap-x-5 gap-y-0.5 font-mono text-label tabular-nums">
-                          {r.vals.map((v, c) => (
-                            // A value too long for half the width (a fee floor in datum) takes the
-                            // whole line, so no code is ever cut; the dense flow back-fills.
-                            <span key={cellKeys[c]} className={cn("flex items-baseline justify-between gap-2 min-w-0", v != null && fmt(v).length > 8 && "col-span-2")}>
-                              <span className="truncate text-muted-foreground">{byChain ? `m${cellKeys[c]}` : shortKey(cellKeys[c]!, scope, UNLISTED_ID)}</span>
-                              <span className={v === 0 ? "text-muted-foreground" : "text-foreground"}>{v == null ? <Dash /> : fmt(v)}</span>
+                        {/* TWO COLUMNS, EACH SIZED TO ITS OWN CONTENT: the first half of the fields at the
+                            left, the rest at the right (column-major), every value right-aligned beside
+                            its own code — a long stored value (a fee floor in datum) widens only its
+                            column instead of breaking out of the grid (user, same day: the full-width
+                            line "looks strange"). */}
+                        {(() => {
+                          const items = r.vals.map((v, c) => ({ k: byChain ? `m${cellKeys[c]}` : shortKey(cellKeys[c]!, scope, UNLISTED_ID), v, key: cellKeys[c]! }));
+                          const half = Math.ceil(items.length / 2);
+                          const col = (xs: typeof items) => (
+                            <span className="grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5 content-start">
+                              {xs.map((x) => (
+                                <Fragment key={x.key}>
+                                  <span className="text-muted-foreground">{x.k}</span>
+                                  <span className={cn("text-right", x.v === 0 ? "text-muted-foreground" : "text-foreground")}>{x.v == null ? <Dash /> : fmt(x.v)}</span>
+                                </Fragment>
+                              ))}
                             </span>
-                          ))}
-                        </span>
+                          );
+                          return (
+                            <span className="flex justify-between gap-4 font-mono text-label tabular-nums">
+                              {col(items.slice(0, half))}
+                              {col(items.slice(half))}
+                            </span>
+                          );
+                        })()}
                       </TableCell>
                     </TableRow>
                   ));
