@@ -59,12 +59,12 @@ export default function TrendBucketsSurface() {
   // THE COMMITTED MOMENT AND RANGE (user, 2026-10-25 — the raw page joins "one selection, every
   // surface"): a row IS a bucket, which is what a Moment is, so the Moment's bucket wears the
   // selection and a row click picks it exactly as a click on the chart does (`setTrendCursor`, the
-  // chart's own setter); a second click releases it. A DAY plate commits that UTC day as the range
-  // (`setTrendRange`, the timeline's own setter) and a second click releases it — the records then
-  // re-read at the day's finer tier, which is the drill.
+  // chart's own setter); a second click releases it. A DAY plate only FOLDS (user, same day: it
+  // committed the day as the range, which re-read the whole list at a finer tier under the click —
+  // "the whole dataset changes … looks different from what I clicked on"; no other raw plate
+  // reloads its list). It still WEARS a committed range that is exactly that day.
   const cursorMs = useStore((s) => s.trendCursorMs);
   const setTrendCursor = useStore((s) => s.setTrendCursor);
-  const setTrendRange = useStore((s) => s.setTrendRange);
   const phone = useBreakpoint() === "phone";
   // Folded groups, toggled away from the tier's default (open; folded on the phone).
   const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set());
@@ -147,8 +147,6 @@ export default function TrendBucketsSurface() {
                         <GroupPlate
                           open={!isFolded(day)}
                           onToggle={() => toggleFold(day)}
-                          selected={daySel}
-                          onSelect={() => setTrendRange(daySel ? null : { fromMs: dayStart, toMs: dayStart + 86_400_000 })}
                           className={cn(
                             "h-[34px] px-2 max-[700px]:px-1.5 rounded-t-md border-b text-label transition-colors",
                             daySel
