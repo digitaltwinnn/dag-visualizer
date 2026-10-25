@@ -1867,7 +1867,16 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                       >
                         <span className={cn("uppercase tracking-caps", inSelGroup ? "text-primary-ink" : "text-[color-mix(in_oklch,var(--primary-ink)_80%,var(--muted-foreground))]")}>Global</span>
                         <span className={cn("font-mono tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground")}>{r.global.ordinal.toLocaleString()}</span>
-                        <span className={cn("ml-auto tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground-dim")}>{relativeAge(now - Date.parse(r.ts))}</span>
+                        {/* LIVE OR PINNED on the selected global's plate (user, 2026-10-25), the raw
+                            pane head's own marks and words: the plate is the subject a click there
+                            committed, so it states which way the selection is held. */}
+                        {inSelGroup && (
+                          <span className="ml-auto inline-flex items-center gap-1.5 text-label normal-case tracking-normal text-muted-foreground">
+                            {following ? <LiveDot /> : <PinMark className="text-muted-foreground" />}
+                            {following ? "live" : "pinned"}
+                          </span>
+                        )}
+                        <span className={cn(!inSelGroup && "ml-auto", "tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground-dim")}>{relativeAge(now - Date.parse(r.ts))}</span>
                       </GroupPlate>
                     </TableCell>
                   </TableRow>
