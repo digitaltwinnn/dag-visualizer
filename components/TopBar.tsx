@@ -160,6 +160,10 @@ export default function TopBar() {
   // instead of sliding from a stale side.
   const [faceSlide, setFaceSlide] = useState<{ mode: Mode; from: "left" | "right" } | null>(null);
   const faceFrom = faceSlide && faceSlide.mode === mode ? faceSlide.from : null;
+  // A VIEW STEP KEEPS THE GROWN STRIP (user, 2026-10-25: "if expanded keep it that way (same as
+  // for bottom bar basically)"): the ‹ › and the swipe change the view, not the bar, so an open
+  // filter, pulse, about or views row stays open and simply reads the new view — as an open
+  // dock sheet does. A pick from the views list still closes that list: the pick was its job.
   const viewChevron = (dir: -1 | 1) => {
     const target = stepView(LISTED_IDS, mode, dir === -1 ? 1 : -1);
     const name = target ? VIEWS.find((v) => v.id === target)?.name : null;
@@ -169,7 +173,7 @@ export default function TopBar() {
         type="button"
         disabled={!target || !!doc}
         aria-label={name ? `${name} view` : dir === -1 ? "First view" : "Last view"}
-        onClick={() => { if (target) { setStrip(null); setFaceSlide({ mode: target, from: dir === 1 ? "right" : "left" }); setMode(target); } }}
+        onClick={() => { if (target) { setFaceSlide({ mode: target, from: dir === 1 ? "right" : "left" }); setMode(target); } }}
         className={cn(
           // THE PLANK CHEVRON SPECIES, FLUSH TO THE NAME (user, 2026-10-23, design A of
           // `.superpowers/brainstorm/…/phone-topbar-stepper.html`: the pair was "too wide and
@@ -207,7 +211,6 @@ export default function TopBar() {
     swipedAt.current = e.timeStamp;
     const next = stepView(LISTED_IDS, mode, dir);
     if (next) {
-      setStrip(null);
       setFaceSlide({ mode: next, from: dir === -1 ? "right" : "left" });
       setMode(next);
     }
