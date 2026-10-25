@@ -128,7 +128,9 @@ export default function RecordsSurface() {
           </div>
         </div>
       ) : mode === "hyper" || mode === "geo" ? (
-        <NodeRosterTable mode={mode} />
+        // Keyed by view: the table mounts behind the scene at boot (Hypergraph), and unkeyed it
+        // carried that view's sort — Network — into Geography, whose order is the country's.
+        <NodeRosterTable key={mode} mode={mode} />
       ) : (
         <p className="m-auto text-label text-muted-foreground uppercase tracking-caps">preview, in development</p>
       )}

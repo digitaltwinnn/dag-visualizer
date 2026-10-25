@@ -20,6 +20,7 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useFeedRead } from "@/components/useFeedRead";
+import GroupPlate from "@/components/datasection/GroupToggle";
 
 // The hyper/geo data table (spec 2026-08-01): the NODE ROSTER — a flat, sortable, denser
 // projection of the same `selNodes` the explorers browse (complementary, not a replacement).
@@ -37,6 +38,10 @@ import { useFeedRead } from "@/components/useFeedRead";
 // architecture (network, id, layer). Provider and the off-lens locations are facts
 // ABOUT the node, stated in full on the same card. `phone` is per-view because the lens is:
 // geo's layer is hyper's identity column and vice versa.
+/** The group plate's look (design B1, shared with the Snapshots log's global plate): an
+ *  accent-tinted band over an accent hairline; the hover lifts the tint like the log's. */
+const PLATE =
+  "h-[34px] px-1.5 rounded-t-md border-b border-[color-mix(in_oklch,var(--primary)_35%,transparent)] bg-[color-mix(in_oklch,var(--primary)_9%,var(--panel-plate))] hover:bg-[color-mix(in_oklch,var(--primary)_14%,var(--panel-plate))] text-muted-foreground transition-colors";
 const PHONE_HIDDEN = "max-[700px]:hidden"; // one class on head + body cells, so a column can never half-hide
 const COLS: Record<"hyper" | "geo", { key: RosterSortKey; label: string; phone?: false }[]> = {
   geo: [
@@ -79,19 +84,34 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
   // HYPERGRAPH ON PHONE IS GROUPED BY NETWORK, layers first (design F1, same day): a machine on two
   // networks is a row under each, carrying THAT network's record — what its click commits, what
   // its hover glows, and the roles its row states.
+  // …AND GEOGRAPHY IS GROUPED BY COUNTRY ON EVERY TIER (user, 2026-10-25: "I like the grouping on
+  // phone for geo … can't we do exactly the same for normal and tablet view?"), whenever the
+  // order is the country's — the Snapshots log's rule exactly: grouped, the Country column steps
+  // aside (the plate says it once); a click on another header sorts the flat table, and the
+  // Country header is the way back to the groups.
   const phone = useBreakpoint() === "phone";
-  const geoPhone = phone && mode === "geo";
+  const geoPhone = mode === "geo" && (phone || sort.key === "country");
   const hyperPhone = phone && mode === "hyper";
+  const cols = geoPhone && !phone ? COLS.geo.filter((c) => c.key !== "country") : COLS[mode];
+  // A group the reader folded (both list kinds), keyed by its plate; open by default.
+  const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set());
+  const toggleFold = (k: string) =>
+    setFolded((f) => {
+      const n = new Set(f);
+      if (n.has(k)) n.delete(k);
+      else n.add(k);
+      return n;
+    });
   type Item =
     | { head: RosterCountryGroup }
     | { net: { netId: string; count: number } }
     | { row: RosterRow; rec?: NodeRow; recs?: NodeRow[]; roles?: string[]; netId?: string };
   const items: Item[] = geoPhone
-    ? groupRosterByCountry(rows).flatMap((g) => [{ head: g }, ...g.rows.map((row) => ({ row }))])
+    ? groupRosterByCountry(rows).flatMap((g) => [{ head: g }, ...(folded.has(`cc:${g.key}`) ? [] : g.rows.map((row) => ({ row })))])
     : hyperPhone
       ? groupRosterByNetwork(rows).flatMap((g) => [
           { net: { netId: g.netId, count: g.entries.length } },
-          ...g.entries.map((e) => ({ row: e.row, rec: e.rec, recs: e.recs, roles: e.roles, netId: g.netId })),
+          ...(folded.has(`net:${g.netId}`) ? [] : g.entries.map((e) => ({ row: e.row, rec: e.rec, recs: e.recs, roles: e.roles, netId: g.netId }))),
         ])
       : rows.map((row) => ({ row }));
 
@@ -191,7 +211,7 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
       <Table className="max-[700px]:block max-[700px]:[&_tbody]:block max-[700px]:[&_tr]:grid">
         <TableHeader className="sticky top-0 z-10 bg-[var(--panel-solid)] backdrop-blur-md max-[700px]:hidden">
           <TableRow className="border-border">
-            {COLS[mode].map((c) => (
+            {cols.map((c) => (
               <TableHead
                 key={c.key}
                 className={cn(c.phone === false && PHONE_HIDDEN)}
@@ -219,11 +239,11 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
               // a header that committed it would be a second way to write it from the raw layer.
               return (
                 <TableRow key={`cc:${g.key}`} className="border-0 hover:bg-transparent">
-                  <TableCell className="p-0 pt-2.5 max-[700px]:px-0">
-                    <span className="flex items-center gap-2 h-[34px] px-1.5 rounded-t-md border-b border-[color-mix(in_oklch,var(--primary)_35%,transparent)] bg-[color-mix(in_oklch,var(--primary)_9%,var(--panel-plate))]">
+                  <TableCell colSpan={cols.length} className="p-0 pt-2.5 max-[700px]:px-0">
+                    <GroupPlate open={!folded.has(`cc:${g.key}`)} onToggle={() => toggleFold(`cc:${g.key}`)} className={PLATE}>
                       <span className="text-body font-medium text-foreground">{g.country ?? "Unlocated"}</span>
                       <span className="ml-auto text-label tabular-nums text-foreground-dim">{g.rows.length}</span>
-                    </span>
+                    </GroupPlate>
                   </TableCell>
                 </TableRow>
               );
@@ -234,12 +254,12 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
               // snapshot list's (B1). Not a target: committing a network is the top bar's alone.
               return (
                 <TableRow key={`net:${netId}`} className="border-0 hover:bg-transparent">
-                  <TableCell className="p-0 pt-2.5 max-[700px]:px-0">
-                    <span className="flex items-center gap-2 h-[34px] px-1.5 rounded-t-md border-b border-[color-mix(in_oklch,var(--primary)_35%,transparent)] bg-[color-mix(in_oklch,var(--primary)_9%,var(--panel-plate))]">
+                  <TableCell colSpan={cols.length} className="p-0 pt-2.5 max-[700px]:px-0">
+                    <GroupPlate open={!folded.has(`net:${netId}`)} onToggle={() => toggleFold(`net:${netId}`)} className={PLATE}>
                       <IdentityDot hue={filterAccent(netId)} />
                       <span className="text-body font-medium text-foreground truncate">{metagraphById(netId)?.name ?? (netId === "dag" ? "DAG" : tickerOf(netId))}</span>
                       <span className="ml-auto text-label tabular-nums text-foreground-dim">{count}</span>
-                    </span>
+                    </GroupPlate>
                   </TableCell>
                 </TableRow>
               );
@@ -292,7 +312,7 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
                 }}
                 onClick={commit}
               >
-                {COLS[mode].map((c) => (
+                {cols.map((c) => (
                   <TableCell key={c.key} className={PHONE_HIDDEN}>{cell(r, c.key)}</TableCell>
                 ))}
                 {hyperPhone ? (

@@ -18,6 +18,7 @@ import { relativeAge } from "@/src/util/relativeAge";
 import { Empty, IdentityDot } from "@/components/inspector/parts";
 import { selectionHue } from "@/components/selection";
 import { cn } from "@/lib/utils";
+import GroupPlate from "@/components/datasection/GroupToggle";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import TablePager from "@/components/datasection/TablePager";
@@ -203,7 +204,6 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // A row IS one metagraph snapshot, so its hover rides the snapshot channel, not the tick's
   // (user, 2026-08-09). Same channel the explorer's leaf rows and the scene's tiles use.
   const setHoverMetaSnap = useStore((s) => s.setHoverMetaSnap);
-  const setHoverSnapOrd = useStore((s) => s.setHoverSnapOrd);
   const net = getNetwork();
   const snapshotExact = useStore((s) => s.snapshotExact);
   // The log's OWN scope under "all": the network picked in its search, or handed in by a door
@@ -334,6 +334,17 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // across it"). Grouped is newest first; sorted by anything else the two columns come back, and
   // their Age header is the way back to the groups.
   const grouped = sort.key === "age" || sort.key === "tick";
+  // A global snapshot's group the reader folded (user, 2026-10-25: "give the option to collapse and
+  // expand a group"), keyed by the group's ordinal (or "anchoring"); open by default. The header
+  // stays — it is a target of its own — and only the rows under it stand down.
+  const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set());
+  const toggleFold = (k: string) =>
+    setFolded((f) => {
+      const n = new Set(f);
+      if (n.has(k)) n.delete(k);
+      else n.add(k);
+      return n;
+    });
   const columns = grouped ? COLUMNS.filter((c) => c.key !== "tick" && c.key !== "age") : COLUMNS;
   // THE JUMP'S LANDING MARK. A jump that only changed the page would leave the reader hunting the
   // ordinal they just typed among 25 near-identical rows, so the row is marked when it arrives.
@@ -1801,64 +1812,49 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                   // (rule 10), and nothing to click until it lands.
                   <TableRow className="hover:bg-transparent border-border max-[700px]:block">
                     <TableCell colSpan={columns.length} className="pt-3 pb-1 max-[700px]:block">
-                      <span className="flex items-baseline gap-2 text-label text-muted-foreground">
+                      <GroupPlate open={!folded.has("anchoring")} onToggle={() => toggleFold("anchoring")} className="text-label text-muted-foreground hover:text-foreground">
                         <span className="uppercase tracking-caps">Global</span>
                         {/* A chain row IS anchored — only its global's number is still being read,
                             so the number's slot twinkles; a live row is genuinely still anchoring. */}
                         {histNet || mergedMode ? <NodeStars count={3} /> : <span className="italic">anchoring…</span>}
-                      </span>
+                      </GroupPlate>
                     </TableCell>
                   </TableRow>
                 )}
                 {groupHead && !r.pending && (
-                  // THE GLOBAL SNAPSHOT'S OWN ROW: its number and its age, each as label + value, and
-                  // a click selects THAT global snapshot alone (no metagraph snapshot — the pane
-                  // then has nothing to read, honestly), as an explorer row does; hovering it lights
-                  // the snapshot in the scene on its own channel (rule 9: hover what a click commits).
-                  <TableRow
-                    className={cn(
-                      // THE HEADER IS A PLATE (user, 2026-10-08, design B1: "the header in the
-                      // snapshot list is not clearly distinguishable from the body rows"). The plate
-                      // lives on the cell's inner block, not the row: a <tr> takes neither margin
-                      // nor radius, and the gap ABOVE the plate is what separates two groups.
-                      "group/gh cursor-pointer max-[700px]:block border-0 hover:bg-transparent",
-                      "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
-                    )}
-                    tabIndex={0}
-                    onClick={() => {
-                      applyClickActions(metaSnapArrivalActions(null, { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot }));
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        applyClickActions(metaSnapArrivalActions(null, { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot }));
-                      }
-                    }}
-                    onMouseEnter={() => setHoverSnapOrd(r.global.ordinal)}
-                    onMouseLeave={() => setHoverSnapOrd(null)}
-                    onFocus={() => setHoverSnapOrd(r.global.ordinal)}
-                    onBlur={() => setHoverSnapOrd(null)}
-                  >
+                  // THE GLOBAL SNAPSHOT'S OWN ROW: its number and its age, each as label + value. The
+                  // whole plate FOLDS its group (user, 2026-10-25: "make the whole section clickable to
+                  // collapse/expand … not just the >"); it selected that global snapshot until then,
+                  // which the explorer's row, the scene's bar and the global card's pager all still
+                  // do. Rule 9 — a surface hovers what its click commits — so with nothing to commit
+                  // the plate no longer previews the global in the scene; it still WEARS the
+                  // selection when its global is the committed one.
+                  <TableRow className="max-[700px]:block border-0 hover:bg-transparent">
                     <TableCell colSpan={columns.length} className="p-0 pt-2.5 max-[700px]:px-0 max-[700px]:block">
-                      {/* Accent-tinted band + accent hairline; the SELECTED global deepens to the
-                          selection accent — the group's head carries that selection, never its rows.
-                          The age needs no "Age" label: "17s ago" names itself. */}
-                      <span
+                      {/* THE HEADER IS A PLATE (user, 2026-10-08, design B1): accent-tinted band +
+                          accent hairline; the SELECTED global deepens to the selection accent — the
+                          group's head carries that selection, never its rows. The plate lives on the
+                          cell's inner block, not the row: a <tr> takes neither margin nor radius, and
+                          the gap ABOVE it is what separates two groups. "17s ago" names itself. */}
+                      <GroupPlate
+                        open={!folded.has(String(r.global.ordinal))}
+                        onToggle={() => toggleFold(String(r.global.ordinal))}
                         className={cn(
                           // px matches the rows' own cell inset, so "GLOBAL" stands on the identity dots' edge.
-                          "flex items-center gap-2 h-[34px] px-2 max-[700px]:px-1.5 rounded-t-md border-b text-label transition-colors",
+                          "h-[34px] px-2 max-[700px]:px-1.5 rounded-t-md border-b text-label transition-colors",
                           inSelGroup
-                            ? "bg-[color-mix(in_oklch,var(--primary)_20%,transparent)] border-[var(--primary)]"
-                            : "bg-[color-mix(in_oklch,var(--primary)_9%,var(--panel-plate))] border-[color-mix(in_oklch,var(--primary)_35%,transparent)] group-hover/gh:bg-[color-mix(in_oklch,var(--primary)_14%,var(--panel-plate))]",
+                            ? "bg-[color-mix(in_oklch,var(--primary)_20%,transparent)] border-[var(--primary)] text-primary-ink"
+                            : "bg-[color-mix(in_oklch,var(--primary)_9%,var(--panel-plate))] border-[color-mix(in_oklch,var(--primary)_35%,transparent)] hover:bg-[color-mix(in_oklch,var(--primary)_14%,var(--panel-plate))] text-muted-foreground",
                         )}
                       >
                         <span className={cn("uppercase tracking-caps", inSelGroup ? "text-primary-ink" : "text-[color-mix(in_oklch,var(--primary-ink)_80%,var(--muted-foreground))]")}>Global</span>
                         <span className={cn("font-mono tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground")}>{r.global.ordinal.toLocaleString()}</span>
                         <span className={cn("ml-auto tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground-dim")}>{relativeAge(now - Date.parse(r.ts))}</span>
-                      </span>
+                      </GroupPlate>
                     </TableCell>
                   </TableRow>
                 )}
+                {!(grouped && folded.has(String(groupKey(r)))) && (
                 <TableRow
                   // ⚠️ A SEAM has no metaId and no ordinal, so every seam would key `null:0` —
                   // React then treats a whole page of them as one repeated child and reuses the
@@ -1994,6 +1990,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                     </span>
                   </TableCell>
                 </TableRow>
+                )}
                 </Fragment>
               );
             })}
