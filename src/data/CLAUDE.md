@@ -19,6 +19,13 @@ keeps separate on purpose:
   snapshots keep it flat for long stretches. Real mainnet behaviour, not a bug.
 - **`subHeight`** — orders snapshots sharing a height.
 
+**The live poll never drops a global** (2026-10-25). Each poll asks for the NEWEST global only, and
+two landing inside one poll interval used to lose the first — rare at the 5s poll, routine at any
+longer one. When the newest ordinal jumps by more than one, the poll reads the recent list once and
+appends every missed global in order (`missedGlobals`, tested). The metagraph feed already
+self-heals the same way (its catch-up limit, below), so the poll interval is now a latency choice
+only, never a completeness one.
+
 **A global snapshot's real work is settlement, not blocks.** Most carry zero (mainnet: ~1 in 50), so
 block count is the wrong activity signal. The meaningful field is **`metagraphSnapshotCount`** — how
 many metagraph snapshots this global anchored, typically 1–24 and sometimes 100+. So the strip bars

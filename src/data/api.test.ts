@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { staleTickKeys, isGlobalActivityScope, shortHash, fanOut, cycleOk, touchPoll, reportPoll, pollHealthRows, BEAT_CAP, BEAT_KEEP_MS } from "./api";
+import { staleTickKeys, isGlobalActivityScope, shortHash, fanOut, cycleOk, touchPoll, reportPoll, pollHealthRows, BEAT_CAP, BEAT_KEEP_MS, missedGlobals } from "./api";
 import { vi, afterEach } from "vitest";
 
 // api.ts is exempt from dataExportCoverage (it IS the live feed). These cover the PURE parts only
@@ -182,5 +182,18 @@ describe("reportPoll's beats", () => {
   it("a touched row has no beats, not a claimed one", () => {
     touchPoll("api-trends");
     expect(pollHealthRows().find((r) => r.id === "api-trends")!.beats).toEqual([]);
+  });
+});
+
+describe("missedGlobals (the poll's gap fill)", () => {
+  const g = (ordinal: number) => ({ ordinal });
+  it("appends every snapshot after the last one held, oldest first", () => {
+    expect(missedGlobals(100, [g(103), g(102), g(101), g(100), g(99)]).map((s) => s.ordinal)).toEqual([101, 102, 103]);
+  });
+  it("lists each ordinal once", () => {
+    expect(missedGlobals(10, [g(12), g(11), g(12)]).map((s) => s.ordinal)).toEqual([11, 12]);
+  });
+  it("back-fills nothing at boot (no snapshot held yet)", () => {
+    expect(missedGlobals(null, [g(5), g(4)])).toEqual([]);
   });
 });
