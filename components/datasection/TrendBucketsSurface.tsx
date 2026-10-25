@@ -72,7 +72,9 @@ export default function TrendBucketsSurface() {
   // with a page of a week, "now you can close the days by default also").
   const phone = useBreakpoint() === "phone";
   const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set());
-  const isFolded = (k: string) => folded.has(k) !== phone;
+  // The committed Moment's day starts open (review, same day): folded, its row sat hidden.
+  const cursorDay = cursorMs != null ? utcDayKey(cursorMs) : null;
+  const isFolded = (k: string) => folded.has(k) !== (phone && k !== cursorDay);
   const toggleFold = (k: string) =>
     setFolded((f) => {
       const n = new Set(f);

@@ -353,7 +353,11 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // tiers, folded on the phone, where a list of headers is the overview and a tap opens one.
   const phoneTier = useBreakpoint() === "phone";
   const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set());
-  const isFolded = (k: string) => folded.has(k) !== phoneTier;
+  // …BUT A GROUP HOLDING WHAT THE READER IS ON STARTS OPEN (review, same day): the committed
+  // snapshot's global and a search's landing row — folded, the layer's own first commit or a jump
+  // landed on a row nobody could see. Filled once the rows are known (below), read at render.
+  const autoOpen = new Set<string>();
+  const isFolded = (k: string) => folded.has(k) !== (phoneTier && !autoOpen.has(k));
   const toggleFold = (k: string) =>
     setFolded((f) => {
       const n = new Set(f);
@@ -640,14 +644,17 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       ].filter((r) => r.metaId != null && Date.parse(r.ts) > newest);
       if (live.length) {
         const fresh = sortAnchorLog(live, "age", 1, (id) => displayNetwork(id)?.ticker ?? id) as ViewRow[];
-        rows = [...fresh, ...rows].slice(0, PAGE);
+        // ON TOP, NEVER INSTEAD (review, same day): cutting page 1 back to PAGE pushed its oldest
+        // merged rows onto no page, since page 2's cursor starts after the merged page. Page 1
+        // runs a few rows long until the tip re-read absorbs them, and the range says so.
+        rows = [...fresh, ...rows];
         total += fresh.length;
       }
     }
     allRows = rows;
     pages = merged.pages;
     from = merged.from;
-    to = merged.to;
+    to = merged.to + (rows.length - (merged.rows?.length ?? 0));
   } else if (!histNet) {
     const listedRows = net ? buildAnchorLog(net.metaSnaps, net.globalSnapshots, filter) : [];
     const unlistedRows = net && (lens === "all" || lens === UNLISTED_ID) ? unlistedLog(net.globalSnapshots, snapshotExact, net.unlistedSnaps) : [];
@@ -809,6 +816,11 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
    *  nothing, since every seek rejects an ordinal below 1. So a seam is marked by its TICK, which is
    *  the only number it has and the very thing that was searched for. */
   const markOf = (row: AnchorLogRow) => (row.metaId == null ? row.global.ordinal : row.ordinal);
+  if (snap) autoOpen.add(String(snap.data.ordinal));
+  if (marked != null) {
+    const hit = rows.find((r) => markOf(r) === marked);
+    if (hit) autoOpen.add(hit.pending ? "anchoring" : String(hit.global.ordinal));
+  }
 
   const landOn = (ordinal: number) => {
     if (histNet && latest) hist.current.latest = latest;

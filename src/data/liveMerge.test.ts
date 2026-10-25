@@ -16,9 +16,9 @@ describe("globalsToAppend", () => {
     expect(r.needCatchUp).toBe(32);
     expect(r.append).toHaveLength(12);
   });
-  it("appends only the newest on the first read", () => {
+  it("takes the whole shared window, oldest first, into an empty buffer", () => {
     const r = globalsToAppend(null, shared(112, 101));
-    expect(r.append.map((s) => s.ordinal)).toEqual([112]);
+    expect(r.append.map((s) => s.ordinal)).toEqual([101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112]);
     expect(r.needCatchUp).toBeNull();
   });
   it("appends nothing when already current, and nothing for an empty window", () => {

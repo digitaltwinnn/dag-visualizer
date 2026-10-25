@@ -506,9 +506,15 @@ export class NetworkData {
   // Every chain's newest snapshots come from the SHARED answer (`_lastLive.metas`, one edge-cached
   // read for every tab); a chain whose tail leaves a gap in this tab's buffer reads its own cached
   // catch-up through `/api/live/meta/[id]`.
+  /** One metagraph cycle at a time (review, 2026-10-25): `_tick` fires the cycle unawaited, so a
+   *  slow catch-up overlapped the next tick's, repeating its reads from the same stale buffer and
+   *  reporting outcomes out of order. A cycle that finds one in flight skips; the next tick runs. */
+  private _metaRefreshing = false;
   private async _refreshMeta(): Promise<void> {
     const live = this._lastLive;
-    if (!live) return;
+    if (!live || this._metaRefreshing) return;
+    this._metaRefreshing = true;
+    try {
     const at = this._lastLiveAt;
     const metas = live.metas ?? {};
     // allSettled, NOT all: `_refreshOneMeta` catches its own fetch, but it can still throw on
@@ -531,6 +537,9 @@ export class NetworkData {
       ...(live.unlisted ?? []).map((id) => this._refreshOneMeta(id, metas[id], true)),
     ]);
     reportPoll("metasnaps", cycleOk(results) && !live.failed?.length, at);
+    } finally {
+      this._metaRefreshing = false;
+    }
   }
 
   /** One chain's cycle: the shared tail, plus a per-chain catch-up when that tail leaves a gap.
@@ -551,7 +560,9 @@ export class NetworkData {
       // makes the anchored count correct regardless of burst size. Capped (and stops when the
       // route returns fewer than asked = nothing more to get, or on a cold buffer where the seed
       // limit is enough). A failed catch-up records nothing — the gap stays open for the next poll.
-      let lim = haveTo < 0 ? POLL.metaSnapSeed : POLL.metaSnapTail;
+      // A warm chain starts ONE RUNG PAST the shared tail (review, same day): the gap exists because
+      // that tail did not reach back far enough, so asking for the same depth again is wasted.
+      let lim = haveTo < 0 ? POLL.metaSnapSeed : nextCatchUpLimit(POLL.metaSnapTail);
       let list: RawMetaSnapshot[] = [];
       for (let i = 0; i < 6; i++) {
         let json;

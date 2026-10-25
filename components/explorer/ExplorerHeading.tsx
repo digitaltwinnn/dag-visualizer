@@ -58,16 +58,18 @@ export function MeasureLabel({ label }: { label: string }) {
  *  The separate bounded tiles (2026-10-23) had each worn their own ring. */
 export function MeasureTiles({ measure }: { measure: MeasureControl }) {
   const n = measure.options.length;
-  const cols = n === 4 ? 2 : 3;
+  // Four sit two by two; fewer than three take a column each, never an empty column in the frame.
+  const cols = n === 4 ? 2 : Math.min(3, n);
+  const lastRowStart = cols * (Math.ceil(n / cols) - 1);
   return (
     <ToggleGroup
       type="single"
       value={measure.value}
       aria-label="Measure"
       onValueChange={(v) => { if (v) measure.onPick(v); }}
-      className={cn("grid w-auto gap-0 rounded-btn shadow-[inset_0_0_0_1px_var(--border)] overflow-hidden", cols === 2 ? "grid-cols-2" : "grid-cols-3")}
+      className={cn("grid w-auto gap-0 rounded-btn shadow-[inset_0_0_0_1px_var(--border)] overflow-hidden", cols === 1 ? "grid-cols-1" : cols === 2 ? "grid-cols-2" : "grid-cols-3")}
     >
-      {measure.options.map((o) => {
+      {measure.options.map((o, i) => {
         const Icon = measureIcon(o.id);
         return (
           <ToggleGroupItem
@@ -93,15 +95,20 @@ export function MeasureTiles({ measure }: { measure: MeasureControl }) {
               // shadow follows the element's own radius, so the ring now rounds with the frame; the
               // inner corners stay square. First cell, last of the first row, first of the last row,
               // last cell — by column count, since the last row of a two-row grid is a different cell.
-              "first:rounded-tl-btn! last:rounded-br-btn!",
-              cols === 2 ? "[&:nth-child(2)]:rounded-tr-btn! [&:nth-last-child(2)]:rounded-bl-btn!" : "[&:nth-child(3)]:rounded-tr-btn! [&:nth-last-child(3)]:rounded-bl-btn!",
+              // By INDEX, not selector (review, 2026-10-25: two options in three columns, or a part
+              // last row, left the corners square): the first cell, the end of the first row, the
+              // start of the last row, the last cell.
+              i === 0 && "rounded-tl-btn!",
+              i === Math.min(cols, n) - 1 && "rounded-tr-btn!",
+              i === lastRowStart && "rounded-bl-btn!",
+              i === n - 1 && "rounded-br-btn!",
               // The frame is the group's; each cell draws only the divider on its LEFT edge (not the
               // first of a row) and, from the second row on, a hairline TOP. `!` on the shadows (CSS
               // trap 4): the toggle-group primitive's `data-[spacing=0]:shadow-none` is
               // class+attribute and would outrank a plain ring; the on-state's variant then wins by
               // its own specificity.
-              cols === 2 ? "[&:nth-child(2n)]:shadow-[inset_1px_0_0_0_var(--border)]!" : "[&:not(:nth-child(3n+1))]:shadow-[inset_1px_0_0_0_var(--border)]!",
-              cols === 2 ? "[&:nth-child(n+3)]:border-t [&:nth-child(n+3)]:border-border" : "[&:nth-child(n+4)]:border-t [&:nth-child(n+4)]:border-border",
+              i % cols !== 0 && "shadow-[inset_1px_0_0_0_var(--border)]!",
+              i >= cols && "border-t border-border",
               "hover:text-foreground hover:bg-wash-soft",
               "data-[state=on]:text-foreground data-[state=on]:bg-[var(--sel-bg)]",
               "data-[state=on]:shadow-[inset_0_0_0_1px_var(--sel-border)]!",

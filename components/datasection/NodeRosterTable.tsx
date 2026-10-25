@@ -98,7 +98,12 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
   // `folded` holds the groups the reader TOGGLED away from the tier's default — open on the wider
   // tiers, folded on the phone, where a list of headers is the overview and a tap opens one.
   const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set());
-  const isFolded = (k: string) => folded.has(k) !== phone;
+  // A group holding the committed node starts open (review, 2026-10-25): folded, the row the scene
+  // just committed sat hidden under its plate.
+  const inspectedKey = hoverKeyOf(inspect);
+  const selRow = inspectedKey == null ? undefined : rows.find((r) => r.recs.some((x) => hoverKeyOf(x.pick) === inspectedKey));
+  const autoOpen = new Set<string>(selRow ? [`cc:${selRow.node.country || "unlocated"}`, ...selRow.nets.map((id) => `net:${id}`)] : []);
+  const isFolded = (k: string) => folded.has(k) !== (phone && !autoOpen.has(k));
   const toggleFold = (k: string) =>
     setFolded((f) => {
       const n = new Set(f);

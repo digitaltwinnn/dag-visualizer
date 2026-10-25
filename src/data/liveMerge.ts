@@ -15,14 +15,17 @@ export function missedGlobals<T extends { ordinal: number }>(prev: number | null
 
 /** What a poll appends from the shared window (newest-first, as upstream returns it), and whether
  *  the tab fell BEHIND that window: the oldest shared ordinal sits above `prev + 1`, so the gap
- *  (`newest - prev`) needs one cached catch-up read. First read (`prev` null) takes the newest only. */
+ *  (`newest - prev`) needs one cached catch-up read. First read (`prev` null) takes the whole window. */
 export function globalsToAppend<T extends { ordinal: number }>(
   prev: number | null,
   shared: readonly T[],
 ): { append: T[]; needCatchUp: number | null } {
   if (!shared.length) return { append: [], needCatchUp: null };
   const newest = shared.reduce((a, b) => (b.ordinal > a.ordinal ? b : a));
-  if (prev == null) return { append: [newest], needCatchUp: null };
+  // An empty buffer takes the WHOLE shared window, oldest first (review, 2026-10-25): it took the
+  // newest alone on the belief the boot seed had run, which is false when the seed failed, and
+  // the strip and the rates then refilled one global a tick.
+  if (prev == null) return { append: [...shared].sort((a, b) => a.ordinal - b.ordinal), needCatchUp: null };
   const oldest = shared.reduce((a, b) => (b.ordinal < a.ordinal ? b : a));
   const append = missedGlobals(prev, shared);
   const behind = append.length > 0 && oldest.ordinal > prev + 1;

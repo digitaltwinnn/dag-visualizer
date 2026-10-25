@@ -78,7 +78,9 @@ export function pulseLane(r: PollHealth, now: number): PulseLane {
   const due = r.everyMs != null && Number.isFinite(last) ? last + r.everyMs : null;
   const dueX = due != null && due >= start && due <= start + span ? xOf(due) : null;
   let lateX: number | null = null;
-  if (status === "failing") lateX = xOf(Math.max(start, r.lastOkAt ?? start));
+  // The overdue stretch runs from the tab's last SUCCESS on its own clock, like the status (review,
+  // same day — the data's backdated time started it a cache window early).
+  if (status === "failing") lateX = xOf(Math.max(start, r.lastOkWallAt ?? r.lastOkAt ?? start));
   else if (status === "stale" && r.everyMs != null && r.lastOkAt != null) lateX = xOf(Math.max(start, (r.lastOkWallAt ?? r.lastOkAt) + r.everyMs));
   return { beats, dueX, lateX, nowX };
 }
