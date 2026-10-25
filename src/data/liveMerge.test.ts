@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { globalsToAppend, missedGlobals } from "./liveMerge";
-import type { GlobalSnapshot } from "./types";
+import { chainNeedsCatchUp, globalsToAppend, missedGlobals } from "./liveMerge";
+import type { GlobalSnapshot, RawMetaSnapshot } from "./types";
 
 const snap = (ordinal: number) => ({ ordinal }) as GlobalSnapshot;
 const shared = (hi: number, lo: number) => Array.from({ length: hi - lo + 1 }, (_, i) => snap(hi - i)); // newest first
@@ -32,5 +32,26 @@ describe("missedGlobals", () => {
   it("returns unseen ordinals oldest first, once each, and nothing without a prev", () => {
     expect(missedGlobals(10, [snap(13), snap(12), snap(12), snap(9)]).map((s) => s.ordinal)).toEqual([12, 13]);
     expect(missedGlobals(null, [snap(1)])).toEqual([]);
+  });
+});
+
+describe("chainNeedsCatchUp", () => {
+  const metas = (hi: number, lo: number) =>
+    Array.from({ length: hi - lo + 1 }, (_, i) => ({ ordinal: hi - i }) as RawMetaSnapshot); // newest first
+  it("catches up a cold buffer that the shared tail has snapshots for", () => {
+    expect(chainNeedsCatchUp(-1, metas(250, 201))).toBe(true);
+  });
+  it("needs nothing when the shared tail reaches the held newest + 1", () => {
+    expect(chainNeedsCatchUp(200, metas(250, 201))).toBe(false);
+  });
+  it("catches up when the shared tail starts past the held newest + 1", () => {
+    expect(chainNeedsCatchUp(200, metas(300, 260))).toBe(true);
+  });
+  it("catches up a chain the shared answer did not carry", () => {
+    expect(chainNeedsCatchUp(200, undefined)).toBe(true);
+  });
+  it("never catches up a chain whose shared tail is empty, even cold", () => {
+    expect(chainNeedsCatchUp(-1, [])).toBe(false);
+    expect(chainNeedsCatchUp(200, [])).toBe(false);
   });
 });

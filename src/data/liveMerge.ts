@@ -29,3 +29,16 @@ export function globalsToAppend<T extends { ordinal: number }>(
   const behind = append.length > 0 && oldest.ordinal > prev + 1;
   return { append, needCatchUp: behind ? newest.ordinal - prev : null };
 }
+
+/** Whether one chain's shared tail (newest-first) leaves a GAP this tab must read through the
+ *  per-chain route. A chain the answer did not carry → yes; an empty tail → no, even cold (a chain
+ *  with nothing would otherwise cost a per-chain read every poll); a cold buffer with snapshots →
+ *  yes (the seed is deeper than the tail); otherwise yes iff the tail's oldest ordinal sits above
+ *  `heldNewest + 1` — an uncounted gap mislabels listed anchors as "unlisted". */
+export function chainNeedsCatchUp(heldNewest: number, shared: readonly { ordinal: number }[] | undefined): boolean {
+  if (shared === undefined) return true;
+  if (!shared.length) return false;
+  if (heldNewest < 0) return true;
+  const oldest = shared.reduce((a, b) => (b.ordinal < a.ordinal ? b : a));
+  return oldest.ordinal > heldNewest + 1;
+}

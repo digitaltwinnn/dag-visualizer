@@ -143,9 +143,12 @@ a hang — the acquiring give-up rule above).
 Two mechanisms back the polled fallback, which is used for old ticks, the strip and activity rates
 because exact reads are too heavy across many ticks:
 
-- **Self-healing catch-up**: the poll grows its limit until the batch reaches back to the newest
-  ordinal already held — provably no gap regardless of burst size. A fixed tail silently drops
-  DOR-sized bursts and mislabels them "unlisted".
+- **Self-healing catch-up**: each chain's newest snapshots, listed and unlisted, arrive in the
+  shared `/api/live` answer, which also carries the unlisted chain ids and leaves out the chains the
+  server found quiet. When a chain's shared tail starts past the newest ordinal this tab holds
+  (`chainNeedsCatchUp`, tested), the tab reads `/api/live/meta/[id]` and grows its limit until the
+  batch reaches back to that ordinal — provably no gap regardless of burst size. A fixed tail
+  silently drops DOR-sized bursts and mislabels them "unlisted".
 - **Polled floor**: what was identified; the gap is a lower bound, shown only on old ticks.
 
 `api.ts` keeps rolling per-metagraph snapshot buffers plus an anchor index keyed by global timestamp,
