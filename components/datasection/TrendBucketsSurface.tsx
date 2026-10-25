@@ -93,6 +93,9 @@ export default function TrendBucketsSurface() {
   const cellKeys = byChain ? tails.map((t) => `.${t}`) : columns;
   const count = p?.buckets.length ?? 0;
   const daily = (p?.stepMs ?? 0) >= 86_400_000;
+  // The first column of a new FAMILY (g. → f. → u.) carries a hairline at its left edge.
+  const fam = (k: string) => (byChain ? "m" : shortKey(k, scope, UNLISTED_ID).split(".")[0]);
+  const familyEdge = (c: number) => c > 0 && fam(cellKeys[c]!) !== fam(cellKeys[c - 1]!);
   // PAGED BY DAY below the day tier (user, 2026-10-25: "last 30 days shows 2 rows, with paging
   // saying 1-25 of 721? makes no sense"): the list is day groups, so a page is DAYS_PER_PAGE whole
   // days and the pager counts days. Day buckets themselves page as rows.
@@ -149,8 +152,8 @@ export default function TrendBucketsSurface() {
                 <TableRow className="border-border">
                   <TableHead className="text-label uppercase tracking-caps text-muted-foreground">Bucket</TableHead>
                   {byChain && <TableHead className="text-label uppercase tracking-caps text-muted-foreground">Chain</TableHead>}
-                  {cellKeys.map((k) => (
-                    <TableHead key={k} className="text-right px-1.5">
+                  {cellKeys.map((k, c) => (
+                    <TableHead key={k} className={cn("text-right px-1.5", familyEdge(c) && "border-l border-border")}>
                       <span className="font-mono text-label text-muted-foreground">{byChain ? `m${k}` : shortKey(k, scope, UNLISTED_ID)}</span>
                     </TableHead>
                   ))}
@@ -232,7 +235,7 @@ export default function TrendBucketsSurface() {
                       </TableCell>
                       {r.addr != null && <TableCell className={cn("font-mono text-label text-foreground-dim", PHONE_HIDDEN)}>{shortAddr(r.addr)}</TableCell>}
                       {r.vals.map((v, c) => (
-                        <TableCell key={cellKeys[c]} className={cn("text-right font-mono text-label tabular-nums px-1.5", v === 0 ? "text-muted-foreground" : "text-foreground", PHONE_HIDDEN)}>
+                        <TableCell key={cellKeys[c]} className={cn("text-right text-label tabular-nums px-1.5", familyEdge(c) && "border-l border-border", v === 0 ? "text-muted-foreground" : "text-foreground font-medium", PHONE_HIDDEN)}>
                           {v == null ? <Dash /> : fmt(v)}
                         </TableCell>
                       ))}
@@ -249,20 +252,25 @@ export default function TrendBucketsSurface() {
                             line "looks strange"). */}
                         {(() => {
                           const items = r.vals.map((v, c) => ({ k: byChain ? `m${cellKeys[c]}` : shortKey(cellKeys[c]!, scope, UNLISTED_ID), v, key: cellKeys[c]! }));
-                          const half = Math.ceil(items.length / 2);
+                          // Split by FAMILY where the scope has two (g. the global stream, f./u. the
+                          // fleet and the unlisted set), else in half.
+                          const gs = items.filter((x) => x.k.startsWith("g."));
+                          const half = gs.length > 0 && gs.length < items.length ? gs.length : Math.ceil(items.length / 2);
                           const col = (xs: typeof items) => (
-                            <span className="grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5 content-start">
+                            <span className="grid grid-cols-[auto_auto] items-baseline gap-x-3 gap-y-0.5 content-start">
                               {xs.map((x) => (
                                 <Fragment key={x.key}>
-                                  <span className="text-muted-foreground">{x.k}</span>
-                                  <span className={cn("text-right", x.v === 0 ? "text-muted-foreground" : "text-foreground")}>{x.v == null ? <Dash /> : fmt(x.v)}</span>
+                                  <span className="font-mono text-muted-foreground">{x.k}</span>
+                                  <span className={cn("text-right", x.v === 0 ? "text-muted-foreground" : "text-foreground font-medium")}>{x.v == null ? <Dash /> : fmt(x.v)}</span>
                                 </Fragment>
                               ))}
                             </span>
                           );
                           return (
-                            <span className="flex justify-between gap-4 font-mono text-label tabular-nums">
+                            <span className="flex justify-between gap-4 text-label tabular-nums">
                               {col(items.slice(0, half))}
+                              {/* One quiet hairline between the families. */}
+                              <span aria-hidden className="w-px self-stretch bg-border" />
                               {col(items.slice(half))}
                             </span>
                           );
