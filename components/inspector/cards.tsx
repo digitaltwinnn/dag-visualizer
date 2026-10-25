@@ -111,7 +111,12 @@ export function MetaTitle({ cfg }: { cfg: MetaCfg }) {
         {/* The TICKER left this line for the title-row ASIDE (user, 2026-08-08 — MetaTickerAside,
             taking the slot the site link held; the link moved into the body as a labelled row).
             The kind descriptor keeps the second line alone. */}
-        <span className="text-label font-normal text-muted-foreground truncate">{kind}</span>
+        {/* The kind, in two forms the head's tier picks between (CardHead's ENTRY_TITLE, 2026-10-25):
+            the box reads the full phrase; the one-row ENTRY, whose eyebrow already says METAGRAPH,
+            reads the qualifier alone ("currency", "data and currency") — the word it dropped is
+            the word beside it. The hypergraph and a bare "metagraph" have no qualifier to keep. */}
+        <span data-kind-full="" className="text-label font-normal text-muted-foreground truncate">{kind}</span>
+        <span data-kind-short="" className="hidden text-label font-normal text-muted-foreground truncate">{kind.replace(/ metagraph$/, "")}</span>
       </span>
     </span>
   );
@@ -696,6 +701,10 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
 // at the same 11px/hue treatment it had under the name, right-aligned like every head aside.
 export function MetaTickerAside({ cfg }: { cfg: MetaCfg }) {
   if (!cfg.ticker) return null;
+  // A HEAD MUST NOT SAY THE SAME THING TWICE (CountryAside's rule): where the ticker IS the name
+  // (USDC.dag), the chip would repeat the title beside it — and in the one-row entry it took the
+  // room the kind needed (user, 2026-10-25: "no space for the metagraph type").
+  if (cfg.name.toLowerCase() === cfg.ticker.toLowerCase()) return null;
   return (
     // The one ticker chip (`TickerChip`). Unlisted stays neutral — same guard as MetaTitle above.
     <TickerChip text={cfg.ticker} hue={cfg.id === UNLISTED_ID ? UNLISTED_HUE : identityHudCss(cfg.id)} />

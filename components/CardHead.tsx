@@ -50,7 +50,24 @@ const TITLE = "m-0 text-title font-semibold";
 // dossier's avatar takes the KIND MARK's size and gap there (user, 2026-10-25: the metagraph entry
 // "is not fully horizontally aligned like the others" — measured 20px + 10px against 16 + 8, so
 // its name started 7px further right than Country's and Provider's).
-const ENTRY_TITLE = "[&_[data-titleblock]]:flex-row [&_[data-titleblock]]:items-baseline [&_[data-titleblock]]:gap-2 [&_[data-titleblock]]:min-w-0 [&_[data-titleblock]>:first-child]:truncate [&_[data-avatar]]:size-4 [&_[data-titlerow]]:gap-2";
+// The KIND yields first, the name last (the kind's flex-shrink is a thousand times the name's, so
+// it collapses to nothing before the name loses a glyph; the name then ellipsizes) — the name is
+// what tells the entry from its siblings; the kind is read in full on the open box. On a 320px
+// rail a long name beside its ticker chip leaves the kind no room at all (Dor Technologies), a
+// short one keeps it (USDC.dag, with its repeated-ticker chip gone). The kind's short form stands
+// in for the full one here, and both lines inherit the h3's line box so every entry is one height.
+// The title's own row (`[data-titlerow]`, else the h3's first span) is `flex`, not inline-flex:
+// inline-flex is shrink-to-fit, so it overflowed the h3, which then clipped the kind under the
+// aside. (Baseline alignment of the outer row was tried and measured wrong by 2.4px per item on
+// the Country entry: the truncating spans' flex baselines are SYNTHESISED from their boxes, so
+// each title shape landed somewhere else. The row centres instead, and the eyebrow and chip are
+// given the title's line box — `ENTRY_LINE` — so centring IS the baseline to under a pixel.)
+const ENTRY_TITLE = "[&>span]:flex [&>span]:max-w-full [&_[data-titlerow]]:flex [&_[data-titlerow]]:max-w-full [&_[data-titlerow]]:gap-2 [&_[data-avatar]]:size-4 [&_[data-titleblock]]:flex-row [&_[data-titleblock]]:items-baseline [&_[data-titleblock]]:gap-2 [&_[data-titleblock]]:min-w-0 [&_[data-titleblock]>*]:leading-[inherit] [&_[data-titleblock]>:first-child]:shrink [&_[data-titleblock]>:first-child]:truncate [&_[data-kind-full]]:hidden [&_[data-kind-short]]:block [&_[data-kind-short]]:min-w-0 [&_[data-kind-short]]:[flex-shrink:1000]";
+// The body step's line box in absolute terms (its fluid size × its unitless leading), for the
+// entry's eyebrow and chip: a 12px caps label on a `leading-none` box centred against a 21px
+// title box put its baseline ~1.5px below the title's (user, 2026-10-25: the eyebrow and the name
+// "does not look aligned yet"); on the same box the two baselines meet to ~0.9px.
+const ENTRY_LINE = "leading-[calc(var(--text-body)*var(--text-body--line-height))]";
 
 /** The title, rolled ONLY when its arrival is worth announcing. The roll's gate is the
  *  store's `navQuiet` provenance (user, 2026-09-11 — "solve it structurally", ending a
@@ -400,13 +417,17 @@ function keepFocusOnRung(el: HTMLElement): void {
           // `data-eyebrow` stays the thread's tie, at the same 18px from the entry's top as the
           // box's eyebrow, so the header holds still across the tier swap (RAIL_ENTRY's note).
           <div className="flex items-center gap-2.5 min-w-0">
+            {/* Centred on ONE line box (user, 2026-10-25: "'metagraph' and 'USDC.dag' does not look
+                aligned yet"): the eyebrow and the chip take the title's line box (`ENTRY_LINE`),
+                so centring the boxes centres the text lines too — see ENTRY_TITLE's note for why
+                baseline alignment was not the answer here. */}
             {/* The eyebrow takes one COLUMN width ("METAGRAPH", the longest slot noun, sets it) so
                 every entry's title starts on the same x and the pile reads as a ladder, not as
                 three ragged lines. Stated in em against the label step (the type scale is fluid). */}
-            {eyebrow ? <span data-eyebrow="" className={cn("block flex-none min-w-[7em]", eyebrowClass)}>{eyebrow}</span> : null}
+            {eyebrow ? <span data-eyebrow="" className={cn("block flex-none min-w-[7em]", eyebrowClass, ENTRY_LINE)}>{eyebrow}</span> : null}
             {title != null && <h3 className={cn("m-0 text-body font-semibold text-foreground min-w-0 truncate", ENTRY_TITLE)}>{rolled}</h3>}
             {(caption != null || aside != null) && (
-              <span className="ml-auto flex-none flex items-center gap-1.5 relative z-10 pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
+              <span className={cn("ml-auto flex-none inline-flex items-center gap-1.5 relative z-10 pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto", ENTRY_LINE)}>
                 {caption != null && <span className="text-label text-muted-foreground text-right tabular-nums">{caption}</span>}
                 {aside}
               </span>
