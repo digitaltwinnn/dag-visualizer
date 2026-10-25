@@ -16,7 +16,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { cn } from "@/lib/utils";
 import { SELECTED_ROW } from "@/components/selection";
 import GroupPlate from "@/components/datasection/GroupToggle";
-import { useBreakpoint } from "@/components/useBreakpoint";
 
 // HISTORY'S RAW IS THE STORED BUCKETS (user, 2026-10-08: "its raw page should just show upstash
 // records, not the raw page for snapshots, should work with the app filter as well"). The measured
@@ -33,6 +32,8 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 // still opens the log for their span — those are the snapshots; this is the measurement.
 
 const PAGE = 25;
+/** Whole days per page when the list is grouped by day. */
+const DAYS_PER_PAGE = 7;
 /** An instant's LOCAL day in the same words `bucketStamp` gives a UTC day — to tell when the two differ. */
 const localDay = (ms: number) => new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 const PHONE_HIDDEN = "max-[700px]:hidden";
@@ -65,10 +66,11 @@ export default function TrendBucketsSurface() {
   // reloads its list). It still WEARS a committed range that is exactly that day.
   const cursorMs = useStore((s) => s.trendCursorMs);
   const setTrendCursor = useStore((s) => s.setTrendCursor);
-  const phone = useBreakpoint() === "phone";
-  // Folded groups, toggled away from the tier's default (open; folded on the phone).
+  // Folded days — OPEN BY DEFAULT ON EVERY TIER here (user, 2026-10-25: "maybe expand by default,
+  // then it makes sense"): a page is a week of days, and a page of folded headers showed no record
+  // at all. The other raw lists still fold on the phone.
   const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set());
-  const isFolded = (k: string) => folded.has(k) !== phone;
+  const isFolded = (k: string) => folded.has(k);
   const toggleFold = (k: string) =>
     setFolded((f) => {
       const n = new Set(f);
@@ -88,12 +90,34 @@ export default function TrendBucketsSurface() {
   const tails = byChain ? [...new Set(byChain.flatMap((g) => g.tails))] : [];
   const cellKeys = byChain ? tails.map((t) => `.${t}`) : columns;
   const count = p?.buckets.length ?? 0;
-  const pages = Math.max(1, Math.ceil(count / PAGE));
+  const daily = (p?.stepMs ?? 0) >= 86_400_000;
+  // PAGED BY DAY below the day tier (user, 2026-10-25: "last 30 days shows 2 rows, with paging
+  // saying 1-25 of 721? makes no sense"): the list is day groups, so a page is DAYS_PER_PAGE whole
+  // days and the pager counts days. Day buckets themselves page as rows.
+  const days = useMemo(() => {
+    if (!p || daily) return [];
+    const out: number[][] = [];
+    for (let i = count - 1; i >= 0; i--) {
+      const k = utcDayKey(p.buckets[i]!);
+      const last = out[out.length - 1];
+      if (last && utcDayKey(p.buckets[last[0]!]!) === k) last.push(i);
+      else out.push([i]);
+    }
+    return out;
+  }, [p, daily, count]);
+  const units = daily ? count : days.length;
+  const per = daily ? PAGE : DAYS_PER_PAGE;
+  const pages = Math.max(1, Math.ceil(units / per));
   const [page, setPage] = useState(1);
   // A new scope or span is a new list: back to its newest page.
   useEffect(() => setPage(1), [scope, windowId, range?.fromMs, range?.toMs]);
-  const pg = bucketPage(count, Math.min(page, pages), PAGE);
-  const daily = (p?.stepMs ?? 0) >= 86_400_000;
+  const cur = Math.min(page, pages);
+  const pg = daily
+    ? bucketPage(count, cur, PAGE)
+    : (() => {
+        const slice = days.slice((cur - 1) * per, cur * per);
+        return { idx: slice.flat(), from: slice.length ? (cur - 1) * per + 1 : 0, to: (cur - 1) * per + slice.length };
+      })();
   const who = scope === "all" ? "All networks" : (displayNetwork(scope)?.ticker ?? (scope === "dag" ? "DAG" : scope));
   // A finer bucket is a clock time (the date rule); its zone is said ONCE in the head, not on
   // every row — fourteen numeric columns need the width a per-row chip took.
@@ -140,7 +164,7 @@ export default function TrendBucketsSurface() {
                   const dayStart = Date.parse(`${day}T00:00:00Z`);
                   const head = !daily && (n === 0 || utcDayKey(p.buckets[pg.idx[n - 1]!]!) !== day);
                   const daySel = !!range && range.fromMs === dayStart && range.toMs === dayStart + 86_400_000;
-                  const dayCount = pg.idx.filter((j) => utcDayKey(p.buckets[j]!) === day).length;
+                  const dayCount = days.find((d) => utcDayKey(p.buckets[d[0]!]!) === day)?.length ?? 0;
                   const plate = head ? (
                     <TableRow key={`day:${day}`} className="border-0 hover:bg-transparent max-[700px]:block">
                       <TableCell colSpan={1 + (byChain ? 1 : 0) + cellKeys.length + 1} className="p-0 pt-2.5 max-[700px]:block">
@@ -224,7 +248,7 @@ export default function TrendBucketsSurface() {
               </TableBody>
             </Table>
           </ScrollArea>
-          <TablePager page={Math.min(page, pages)} pages={pages} from={pg.from} to={pg.to} total={count} exact onPage={setPage} />
+          <TablePager page={cur} pages={pages} from={pg.from} to={pg.to} total={units} unit={daily ? undefined : units === 1 ? "day" : "days"} exact onPage={setPage} />
         </>
       )}
     </div>

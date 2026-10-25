@@ -26,6 +26,7 @@ export default function TablePager({
   compact = false,
   exact = false,
   totalPending = false,
+  unit,
   floor = false,
   aside,
   onPage,
@@ -39,6 +40,8 @@ export default function TablePager({
   from: number; // 1-based row range of the current slice
   to: number;
   total: number;
+  /** What a counted item IS, when it is not a row ("of 31 days") — said after the total. */
+  unit?: string;
   /** The honest scope of a windowed count, as ONE dotted-underlined word after the total whose
    *  `title` carries the explanation (user, 2026-09-02: the spelled-out "in window — pick a
    *  network…" line was "too long text" standing under the table on every render — the scope is
@@ -91,7 +94,7 @@ export default function TablePager({
           meaning here"). The count stays wherever it is the statement (the full pager's range). */}
       {compact && scope ? null : totalPending ? (
         <span className="inline-flex items-center gap-1.5">{compact ? null : `${from}–${to} of `}<NodeStars count={3} /></span>
-      ) : compact ? fmtCount(total) : exact ? `${from.toLocaleString()}–${to.toLocaleString()} of ${floor ? "at least " : ""}${total.toLocaleString()}` : `${from}–${to} of ${fmtCount(total)}`}
+      ) : compact ? fmtCount(total) : exact ? `${from.toLocaleString()}–${to.toLocaleString()} of ${floor ? "at least " : ""}${total.toLocaleString()}${unit ? ` ${unit}` : ""}` : `${from}–${to} of ${fmtCount(total)}`}
       {scope ? (
         <>
           {compact ? null : " "}
