@@ -1974,7 +1974,13 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                         explorer's own state mark on its highlighted row, the same two glyphs. */}
                     <span className="inline-flex items-center gap-1.5">
                       {seam ? <Dash /> : r.ordinal.toLocaleString()}
-                      {rowSel && !seam && (following ? <LiveDot /> : <PinMark className="text-muted-foreground" />)}
+                      {/* Mark AND word, as the global plate says it (user, 2026-10-25). */}
+                      {rowSel && !seam && (
+                        <span className="inline-flex items-center gap-1.5 font-sans text-label text-muted-foreground">
+                          {following ? <LiveDot /> : <PinMark className="text-muted-foreground" />}
+                          {following ? "live" : "pinned"}
+                        </span>
+                      )}
                     </span>
                   </TableCell>
                   <TableCell className={cn("text-right tabular-nums", PHONE_HIDDEN)}>{seam ? <Dash /> : fmtDag(r.fee)}</TableCell>
