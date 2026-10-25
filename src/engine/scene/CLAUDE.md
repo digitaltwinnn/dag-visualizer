@@ -84,6 +84,15 @@ around the internal `setFilter`, and `Engine.applyFilter`'s geo branch re-assert
 otherwise the background cluster poll silently clears the border seconds after every drill. A real
 filter *switch* still clears it by design.
 
+**THE LIVE DIRECTORY DECIDES WHICH HUBS EXIST** (2026-10-25, user: "the real data should always
+lead and decide"). Hyper's hubs are pre-allocated one per catalog entry, because the catalog index
+is each hub's stable layout slot, but a hub is drawn, tethered, pulsed and pickable only once
+`/api/metagraphs` lists it (`MetaHubRec.present`, set by the Engine's `_publishMetaList`); the
+active set starts EMPTY, never null. Before the answer the scene is the DAG core alone, like the
+HUD. A directory entry missing from the catalog still gets no hub (it has no slot) — the Engine's
+"bake them" warning is that case. The Snapshots chamber's lanes are still one per catalog entry;
+moving them onto the live list is a separate piece of work.
+
 **Hypergraph** — committing a metagraph eases the whole structure's shared tilt to near-flat (the
 structure moves, the camera never rolls) and flies to the hub using its **local/unscaled** position:
 the root is morph-scaled, so a world position would aim at the origin mid-morph. The hub's orbit pauses

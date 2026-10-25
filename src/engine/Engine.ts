@@ -199,7 +199,9 @@ export class Engine {
   private dagCore: DagCore | null = null;
   private metaData: RouteMetagraph[] | null = null;
   // Metagraph ids with locatable nodes (selectable hubs); null until counts load (all allowed).
-  private _activeMetaIds: Set<string> | null = null;
+  // EMPTY until the live directory answers, never null ("all active"): before data no hub is
+  // clickable, and none is drawn (`setMetaPresent`, 2026-10-25 — the real data decides).
+  private _activeMetaIds: Set<string> | null = new Set();
   private _lastFlashOrdinal = -1; // de-dupes the core flash to genuinely new global snapshots
   // The focused metagraph's hub record, cached on filter/mode change — kills the per-frame
   // `metas.find` the DoF read used to do every frame (Task 15 allocation fix).
@@ -1360,6 +1362,8 @@ export class Engine {
     // dim + inactive; the engine also skips their picks (see _isPickActive).
     this._activeMetaIds = new Set(list.filter((m) => m.located > 0).map((m) => m.id));
     this.layers.setMetaActive(this._activeMetaIds);
+    // The live list decides which hubs EXIST in the Hypergraph (see MetaHubRec.present).
+    this.layers.setMetaPresent(new Set(list.map((m) => m.id)));
   }
 
   // Re-read the ledger's live tick from the Global L0 buffer + the per-tick anchor index. Cheap

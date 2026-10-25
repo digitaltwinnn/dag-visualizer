@@ -185,6 +185,13 @@ export interface MetaHubRec {
   group: THREE.Group;
   hub: THREE.Mesh;
   cfg: MetaConfig;
+  /** THE LIVE LIST SAYS THIS NETWORK EXISTS (2026-10-25, user: "the real data should always lead
+   *  and decide"). The hubs are pre-allocated one per catalog entry — the catalog is the stable
+   *  LAYOUT slot, so a hub never jumps when the directory reorders — but a hub is drawn, tethered,
+   *  pulsed and lit only once `/api/metagraphs` lists it (`setMetaPresent`). Before that answer,
+   *  or for a catalog entry the directory no longer lists, there is no hub: the scene shows the
+   *  DAG core alone, exactly as the HUD does. */
+  present: boolean;
   state: null;
   tether: THREE.Line;
   // Anchor "packets": one travels hub→core per snapshot the metagraph anchored into a tick (same
@@ -428,7 +435,7 @@ export class HyperView implements SceneView {
   pulseMeta(metaId: string, count = 1) {
     if (this.ledger) return; // the hubs are hidden in ledger — don't accumulate unrendered packets
     const m = this.metas.find((x) => x.cfg.id === metaId);
-    if (m) m.pending += Math.max(1, count);
+    if (m && m.present) m.pending += Math.max(1, count);
   }
 
   // ---------------------------------------------------------------- Metagraphs
@@ -512,7 +519,7 @@ export class HyperView implements SceneView {
       }
 
       this.root.add(group);
-      this.metas.push({ group, hub, cfg, state: null, tether, packets: [], pool, pending: 0, lastLaunch: 0, glow: 0, anchor: pos.clone(), orbit: an.a, radius: an.radius, incl: an.incl, spin: 0.3 + Math.random() * 0.5, active: true, hoops, fills });
+      this.metas.push({ group, hub, cfg, present: false, state: null, tether, packets: [], pool, pending: 0, lastLaunch: 0, glow: 0, anchor: pos.clone(), orbit: an.a, radius: an.radius, incl: an.incl, spin: 0.3 + Math.random() * 0.5, active: true, hoops, fills });
     });
   }
 
@@ -610,6 +617,15 @@ export class HyperView implements SceneView {
   // (e.g. before the node counts have loaded).
   setMetaActive(ids: Set<string> | null) {
     for (const m of this.metas) m.active = !ids || ids.has(m.cfg.id);
+  }
+
+  /** Which catalog hubs the LIVE directory lists (see `MetaHubRec.present`). A hub that leaves the
+   *  list drops its queued packets with it. */
+  setMetaPresent(ids: ReadonlySet<string>) {
+    for (const m of this.metas) {
+      m.present = ids.has(m.cfg.id);
+      if (!m.present) m.pending = 0;
+    }
   }
 
   // Spin the hub + core structure about its own vertical axis by `y`, keeping the HYPER_TILT (Euler
@@ -870,7 +886,7 @@ export class HyperView implements SceneView {
     // The preview dims the others only where a COMMIT would (review, 2026-10-24): a commit sets
     // `focusId` only for an id with a hub, so a hovered DAG or unlisted chip — which commits to
     // no hub at all — must not promise a dim the click will not deliver. One scan per frame.
-    const previewHub = this.previewId != null && this.previewId !== "all" && this.metas.some((x) => x.cfg.id === this.previewId) ? this.previewId : null;
+    const previewHub = this.previewId != null && this.previewId !== "all" && this.metas.some((x) => x.present && x.cfg.id === this.previewId) ? this.previewId : null;
     // The arrival beat's clock (see beginEntry) — parked at 1 in steady state.
     if (!this._tetherEntryHold && this._tetherEntryT < 1)
       this._tetherEntryT = Math.min(1, this._tetherEntryT + dt / 0.7);
@@ -897,7 +913,7 @@ export class HyperView implements SceneView {
       // registered with the (non-spinning) node rings Globe places at the same radii. Frozen when a
       // hub is focused OR the camera is zoomed in (spinFrozen).
       if (!frozen && !spinFrozen) m.hub.rotation.y += dt * m.spin;
-      m.group.visible = hubFade > 0.001;
+      m.group.visible = m.present && hubFade > 0.001;
       if (!frozen && !spinFrozen) m.hub.rotation.x += dt * 0.5;
       // Registered-but-node-less hubs read as inactive: faded body, near-zero glow,
       // fainter tether — present in the architecture, but clearly not live.
@@ -925,8 +941,9 @@ export class HyperView implements SceneView {
         tetherPos.setXYZ(j, _pos.x * f, _pos.y * f, _pos.z * f);
       }
       tetherPos.needsUpdate = true;
-      (m.tether.material as THREE.LineBasicMaterial).opacity =
-        inkPresence(tetherOp * (m.active ? 1 : 0.6) * fdim, paper) * metaF * this._fades.alpha;
+      (m.tether.material as THREE.LineBasicMaterial).opacity = m.present
+        ? inkPresence(tetherOp * (m.active ? 1 : 0.6) * fdim, paper) * metaF * this._fades.alpha
+        : 0;
       // The cyan layer hoops fade with the hubs on the morph, dim on inactive / out-of-focus hubs.
       const hoopOp = inkPresence(HOOP_OP * (m.active ? 1 : 0.7) * fdim, paper) * metaF;
       for (const h of m.hoops) (h.material as THREE.LineBasicMaterial).opacity = hoopOp * this._fades.alpha;
@@ -989,7 +1006,7 @@ export class HyperView implements SceneView {
     // two claims would decide hyper's light by call order and claim weight instead of by the
     // ladder. The view that stages the light picks the subject.
     const row = STAGE_LIGHTS.hyper;
-    const spotMeta = this.focusId != null && this.metas.some((m) => m.cfg.id === this.focusId);
+    const spotMeta = this.focusId != null && this.metas.some((m) => m.present && m.cfg.id === this.focusId);
     if (this._stageNodeOn) {
       this._spotN.set(0, 1, 0).applyEuler(this.root.rotation); // the ring-plane normal (world)
       // No fade of its own: a hovered or committed node is fully present the moment it exists, and

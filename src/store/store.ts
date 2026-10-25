@@ -95,7 +95,6 @@ interface AppState {
   // data is flowing. It routes the overlay to a distinct "3D unavailable" state instead of a wedge.
   engineFailed: boolean;
   nodes: { l0: number; l1: number };
-  metagraphs: number;
   latestSnapshot: GlobalSnapshot | null;
   activity: Activity | null;
   // Baked metagraphs (with engine-computed country counts) — for filter chips + pane.
@@ -430,7 +429,6 @@ interface AppState {
   setSceneReady: (v: boolean) => void;
   setEngineFailed: (v: boolean) => void;
   setNodes: (l0: number, l1: number) => void;
-  setMetagraphs: (n: number) => void;
   setLatestSnapshot: (snap: GlobalSnapshot | null) => void;
   setActivity: (activity: Activity | null) => void;
   setMode: (mode: Mode) => void;
@@ -527,7 +525,6 @@ export const useStore = create<AppState>((set) => ({
   sceneReady: false,
   engineFailed: false,
   nodes: { l0: 0, l1: 0 },
-  metagraphs: 0,
   latestSnapshot: null,
   activity: null,
   mode: "hyper",
@@ -606,7 +603,6 @@ export const useStore = create<AppState>((set) => ({
   setSceneReady: (sceneReady) => set({ sceneReady }),
   setEngineFailed: (engineFailed) => set({ engineFailed }),
   setNodes: (l0, l1) => set({ nodes: { l0, l1 } }),
-  setMetagraphs: (metagraphs) => set({ metagraphs }),
   setLatestSnapshot: (latestSnapshot) => set({ latestSnapshot }),
   setActivity: (activity) => set({ activity }),
   // A view switch CLOSES any open doc overlay: the switch is a statement of where you want to
