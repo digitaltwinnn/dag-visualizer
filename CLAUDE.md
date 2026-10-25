@@ -453,7 +453,10 @@ its claim is paper-only, so its one `intensity` already is its paper number.
    target and back out, contributing exactly 0 at `t=1` so the tween still lands on the committed pose.
    It does **not** raise `cameraFlying` — that dim exists so the scene can be seen changing, and here it
    isn't. A node commit is answered in **every** 3D view, gated on the canvas allow-list (convention 7),
-   never a list of modes.
+   never a list of modes. **Where the STRUCTURE turns to the subject, the camera holds** (user,
+   2026-10-25: "rotation is enough") — a resolver passing `structureMoves` (geo's spin to a network,
+   a cohort, a node) gets no nudge on a same pose; the turn is the acknowledgement, and the HUD dim
+   rides the held window.
 
 ⚠️ **The three global camera levers share one exemption, and one of them RAMPS** (user, 2026-08-13;
 the third lever 2026-09-02). `dollyBack`, `railsLean` and `aspectFit` (the portrait fit — √ of the

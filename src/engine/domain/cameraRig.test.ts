@@ -44,7 +44,7 @@ describe("FOCI", () => {
     expect(pitchDeg(FOCI.geo)).toBeLessThan(25);
   });
 
-  it("the Geography network rung has NO pose of its own (user, 2026-10-25: one angle on the globe; the spin + the nudge say \"this network\") — the country framing is the first step in from rest", () => {
+  it("the Geography network rung has NO pose of its own (user, 2026-10-25: one angle on the globe; the spin alone says \"this network\") — the country framing is the first step in from rest", () => {
     expect("geoNetwork" in FOCI).toBe(false);
     const country = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
     geoFraming(1, country);

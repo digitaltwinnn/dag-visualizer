@@ -54,7 +54,7 @@ than the country pose so drilling still reads as a zoom.
 the view feels very counter intuitive … it keeps the globe centre as reference while the camera has
 a very specific position for this layer"; then, of a first cut that turned the globe under a fixed
 camera, "now the selection rotates out of the view"). Every rung brings its subject to the front by
-turning the globe (`_aimAt`'s yaw + lean) while the camera flies to a pose that looks at a composed
+turning the globe (`_aimAt`'s yaw, plus a lean on the country/node/cohort rungs only — the network aim keeps the axis upright, 2026-10-25) while the camera flies to a pose that looks at a composed
 point in the sky rather than at the subject, so the stock orbit — about OrbitControls' look-at —
 swung the node out of the frame. `viewPolicy.dragOrbitsSubject` switches the stock orbit off for
 this view and the Engine turns the camera's (pos, target) pair RIGIDLY about the finest committed

@@ -50,9 +50,10 @@ export const FOCI = {
   // entry stood here from the first ladder until that day — a dive, then a wide low pose, then a
   // short step in — and each cut was a second angle on the same globe. The rung inherits the REST
   // pose (principle 2: a rung without a pose of its own inherits its parent's), the globe spins to
-  // the network's densest cluster, and the camera's answer is the same-pose NUDGE (principle 3):
-  // a 0.55s push toward the globe and back, which is the subtle zoom in/out asked for, with the
-  // HUD dim riding it because the structure moves (`tweenTo`'s `structureMoves` gate).
+  // the network's densest cluster, axis upright, and the camera HOLDS — the spin is the
+  // acknowledgement (principle 3's structural exception, `tweenTo`'s `structureMoves`: a same-pose
+  // nudge on top of the spin was "no need … rotation is enough", user, same day), with the HUD
+  // dim riding the held window.
   // The Snapshots RESTING pose (user, 2026-08-07 — it used to share `overview`): FRONTAL and
   // zoomed in, straight onto the chamber's camera-side face, so the ribbon sheets (which span
   // the lane field) and the node trays (which face +Z) present flat-on. Slightly elevated,

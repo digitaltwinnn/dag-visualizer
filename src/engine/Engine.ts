@@ -1723,8 +1723,8 @@ export class Engine {
       const R = this.globe.focusDensest(true);
       if (R == null) return false;
       // ONE ANGLE ON THE GLOBE (user, 2026-10-25): the network rung inherits the REST pose — the
-      // globe's spin to the densest cluster says "this network", and the camera's answer is the
-      // same-pose nudge, which `structureMoves` lets dim the HUD (cameraRig's FOCI note).
+      // globe's spin to the densest cluster says "this network", and the camera holds —
+      // `structureMoves` skips the nudge and dims the HUD for the turn (cameraRig's FOCI note).
       this.cam.focus("geo", true);
       return true;
     },
