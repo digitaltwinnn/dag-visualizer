@@ -1529,8 +1529,14 @@ export class Globe implements GeoViewHost {
     for (const r of this.metaNodes) if ((r.geoPrimary ?? true) && this._nodeActive(r.metaId, geoOf(r.pick))) { mean.add(r.trueDir); count++; }
     if (!count || mean.lengthSq() < 1e-6) { this.spin = null; return null; }
     const conc = mean.length() / count;
-    this._aimAt(mean.clone().normalize(), 0.32); // ≤18° lean (was 32° — a northern cluster tipped
-    // the globe so far the view read as 'from the north', user; the pose looks ACROSS instead)
+    // YAW ONLY — THE AXIS STAYS UPRIGHT (user, 2026-10-25: "'all' still has a different
+    // angle/rotation of the globe, why? and is that a common angle to look at globes?"). The lean
+    // toward the cluster's latitude (32°, then ≤18° after a northern cluster read as 'from the
+    // north') was the second angle: every located cluster sits north of the equator, so a
+    // network tipped the globe toward the viewer while All eased it back level. The common way
+    // to look at a globe is axis upright, slightly from above — which the camera's own pitch
+    // already gives — so the only thing a network changes is which hemisphere faces the camera.
+    this._aimAt(mean.clone().normalize(), 0);
     return conc;
   }
 

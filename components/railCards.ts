@@ -100,9 +100,10 @@ const DISPLAY_LANE: Partial<Record<Mode, readonly string[]>> = {
   // focus rung — the two snapshot slots' precedent, and `railLadderBoundary.test.ts` asserts
   // rung → slot rather than the reverse. It sits UNDER the dossier because the lane is a
   // containment claim read coarse→fine: a network is the subject, and the cursor is one moment of
-  // it. (A focused PLANE gets no card of its own: a plane IS its network's chart, so the dossier
-  // stands on it — `trendStack.cardNetwork`, the focus else the filter, 2026-10-07 — which is also
-  // why it is no ladder rung.)
+  // it. (A focused PLANE's own card is the RANGE (user, 2026-10-25): a plane IS its network's
+  // chart over the span on screen, which is what the Range card states — so the store's focus
+  // bumps the `range` slot and the dossier stands above it, on the same network
+  // (`trendStack.cardNetwork`). It is no ladder rung either way.)
   // The RANGE sits between them (user, 2026-10-07: "range -> moment is also a logical parent -
   // child relation"): a brushed span of the network, and the cursor one moment inside it. Like
   // `instant`, a card slot with no rung.

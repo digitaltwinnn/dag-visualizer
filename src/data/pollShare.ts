@@ -1,17 +1,6 @@
-// The share of a feed's polls that succeeded, as a reader would say it — the pulse strip's one
-// health reading (user, 2026-10-03: "'237 ok · 2 failed' — perhaps a percentage is better?").
-//
-// Two honesty rules (rule 10): it never says "100%" while anything failed, and it keeps one decimal
-// from 99 up, where the whole-number reading would hide the very failures the card exists to show.
-// FLOORED there, never rounded: 2 failures in 2,000 is 99.9%, not "100.0%".
-export function okShare(ok: number, err: number): string {
-  const total = ok + err;
-  if (!(total > 0)) return "—";
-  if (err <= 0) return "100%";
-  const pct = (ok / total) * 100;
-  if (pct >= 99) return `${Math.min(99.9, Math.floor(pct * 10) / 10).toFixed(1)}%`;
-  return `${Math.round(pct)}%`;
-}
+// Whether the network has ever answered — read off the poll-health registry. (The share of a
+// feed's polls that succeeded, `okShare`, lived here too until the pulse strip's rhythm lanes,
+// 2026-10-25: the lanes draw each failure where it happened, so the percentage had no reader.)
 
 /** HAS THE NETWORK EVER ANSWERED? True only when the global-snapshot feed has FAILED at least once
  *  and never succeeded — a dead network met on a cold start (found on TestNet during its outage,

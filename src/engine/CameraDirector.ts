@@ -133,9 +133,16 @@ export class CameraDirector {
     // they belong to, so committing one lands exactly where the camera already is. A dead 1.4s
     // no-op reads as a broken click; the nudge is the acknowledgement, and it ends on this same
     // committed pose, so nothing is lost by taking it.
-    tw.nudge = isSamePose(tw.fromPos, tw.fromTgt, tw.toPos, tw.toTgt);
+    // …UNLESS THE STRUCTURE MOVES (user, 2026-10-25: "in geo no need for the zoom in/out effect when
+    // changing filter, rotation is enough"). The nudge exists for the commit nothing else answers;
+    // where the resolver says the structure itself turns to the subject — the globe's spin to a
+    // network, a cohort, a node — that turn IS the acknowledgement, and a camera push on top of it
+    // is a second voice. The camera then HOLDS for the nudge's window, and the HUD dim still rides
+    // it (the gate below), so the one visible answer is the structure's.
+    const same = isSamePose(tw.fromPos, tw.fromTgt, tw.toPos, tw.toTgt);
+    tw.nudge = same && !structureMoves;
     tw.t = 0;
-    tw.dur = tw.nudge ? NUDGE_DUR : 1.4;
+    tw.dur = same ? NUDGE_DUR : 1.4;
     tw.active = true;
     // The HUD yields while this flight runs (store.cameraFlying — see its comment): a commit made
     // from a card is a request to LOOK at what was committed, so the cards step back out of the
@@ -149,7 +156,7 @@ export class CameraDirector {
     // are ONE fixed pose by design, so every sibling swipe is a nudge over a real structural
     // move. `structureMoves` is the resolver saying so; the dim rides the nudge's own window and
     // clears with it at the tween's end, like any flight's.
-    if ((!tw.nudge || structureMoves) && !this.h.transition.active() && !this.h.flyingNow()) this.h.setFlying(true);
+    if ((!same || structureMoves) && !this.h.transition.active() && !this.h.flyingNow()) this.h.setFlying(true);
   }
 
 

@@ -6,7 +6,6 @@ import { X, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { KIND_MARK_CLASS } from "@/components/icons";
 
 // The ONE HUD card header — every rail card leads with this shared grammar so the whole HUD
@@ -44,6 +43,30 @@ import { KIND_MARK_CLASS } from "@/components/icons";
 const EYEBROW = "text-label font-bold tracking-[0.1em] uppercase leading-none";
 // The ONE title standard every card head uses (panel h2 and inspector h3 alike).
 const TITLE = "m-0 text-title font-semibold";
+// An ENTRY's title shares its row with the eyebrow, so a two-line title node (the dossier's name
+// over its type, the node's id over its chips) lays its lines out INLINE there: the second line
+// becomes muted text after the first, nothing is dropped and the entry stays one row. The
+// dossier's avatar takes the KIND MARK's size and gap there (user, 2026-10-25: the metagraph entry
+// "is not fully horizontally aligned like the others" — measured 20px + 10px against 16 + 8, so
+// its name started 7px further right than Country's and Provider's).
+// The KIND yields first, the name last (the kind's flex-shrink is a thousand times the name's, so
+// it collapses to nothing before the name loses a glyph; the name then ellipsizes) — the name is
+// what tells the entry from its siblings; the kind is read in full on the open box. On a 320px
+// rail a long name beside its ticker chip leaves the kind no room at all (Dor Technologies), a
+// short one keeps it (USDC.dag, with its repeated-ticker chip gone). The kind's short form stands
+// in for the full one here, and both lines inherit the h3's line box so every entry is one height.
+// The title's own row (`[data-titlerow]`, else the h3's first span) is `flex`, not inline-flex:
+// inline-flex is shrink-to-fit, so it overflowed the h3, which then clipped the kind under the
+// aside. (Baseline alignment of the outer row was tried and measured wrong by 2.4px per item on
+// the Country entry: the truncating spans' flex baselines are SYNTHESISED from their boxes, so
+// each title shape landed somewhere else. The row centres instead, and the eyebrow and chip are
+// given the title's line box — `ENTRY_LINE` — so centring IS the baseline to under a pixel.)
+const ENTRY_TITLE = "[&>span]:flex [&>span]:max-w-full [&_[data-titlerow]]:flex [&_[data-titlerow]]:max-w-full [&_[data-titlerow]]:gap-2 [&_[data-avatar]]:size-4 [&_[data-titleblock]]:flex-row [&_[data-titleblock]]:items-baseline [&_[data-titleblock]]:gap-2 [&_[data-titleblock]]:min-w-0 [&_[data-titleblock]>*]:leading-[inherit] [&_[data-titleblock]>:first-child]:shrink [&_[data-titleblock]>:first-child]:truncate [&_[data-kind-full]]:hidden [&_[data-kind-short]]:block [&_[data-kind-short]]:min-w-0 [&_[data-kind-short]]:[flex-shrink:1000]";
+// The body step's line box in absolute terms (its fluid size × its unitless leading), for the
+// entry's eyebrow and chip: a 12px caps label on a `leading-none` box centred against a 21px
+// title box put its baseline ~1.5px below the title's (user, 2026-10-25: the eyebrow and the name
+// "does not look aligned yet"); on the same box the two baselines meet to ~0.9px.
+const ENTRY_LINE = "leading-[calc(var(--text-body)*var(--text-body--line-height))]";
 
 /** The title, rolled ONLY when its arrival is worth announcing. The roll's gate is the
  *  store's `navQuiet` provenance (user, 2026-09-11 — "solve it structurally", ending a
@@ -182,29 +205,36 @@ export function RailPane({
       host.current = {};
     };
   });
-  if (entry) {
-    return (
-      <aside id={id} className={cn(RAIL_ENTRY, "sig-left", className)} style={style} onMouseEnter={onMouseEnter} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave} onFocus={onFocus} onBlur={onBlur}>
-        {children}
-      </aside>
-    );
-  }
+  // ⚠️ ONE ELEMENT FOR BOTH TIERS (user, 2026-10-25: the dossier "shows a flash when I click it").
+  // The box used to render through `<Card asChild>` and the entry as a bare `<aside>` — two
+  // different React types at the same position, so every entry→box swap REMOUNTED the card's whole
+  // subtree: the title re-created, the Radix avatar back to its monogram fallback for a frame, the
+  // `roll-in` keyed titles replaying. The same `<aside>` now carries either face — the Card
+  // baseline's exact classes (components/ui/card.tsx, `ig-panel` leading so RailThread's
+  // `:scope > .ig-panel` still finds the box) merged with RIGHT_CARD, or RAIL_ENTRY — and the
+  // children keep their identity across the click. The pager host rule holds: a BOX inside a host
+  // hands its pointer handlers to the host; an entry never sits in one.
   return (
-    <Card asChild className={cn(RIGHT_CARD, "sig-left", className)}>
-      <aside
-        id={id}
-        style={style}
-        onMouseEnter={hosted ? undefined : onMouseEnter}
-        onMouseMove={hosted ? undefined : onMouseMove}
-        onMouseLeave={hosted ? undefined : onMouseLeave}
-        onFocus={onFocus}
-        onBlur={onBlur}
-      >
-        {children}
-      </aside>
-    </Card>
+    <aside
+      id={id}
+      data-slot={entry ? undefined : "card"}
+      className={entry ? cn(RAIL_ENTRY, "sig-left", className) : cn(CARD_BASE, RIGHT_CARD, "sig-left", className)}
+      style={style}
+      onMouseEnter={hosted ? undefined : onMouseEnter}
+      onMouseMove={hosted ? undefined : onMouseMove}
+      onMouseLeave={hosted ? undefined : onMouseLeave}
+      onFocus={onFocus}
+      onBlur={onBlur}
+    >
+      {children}
+    </aside>
   );
 }
+/** The Card primitive's baseline class, verbatim (components/ui/card.tsx) — RailPane applies it
+ *  to its own `<aside>` rather than rendering through `<Card asChild>`, so the box and the entry
+ *  are one element (see RailPane). Kept beside the import so a change to the primitive is a
+ *  change here too; `railTierBoundary.test.ts` asserts the two strings agree. */
+const CARD_BASE = "ig-panel text-card-foreground flex flex-col gap-4 py-4 pl-5 pr-4";
 
 export default function CardHead({
   eyebrow,
@@ -213,6 +243,7 @@ export default function CardHead({
   aside,
   subtitle,
   panel = false,
+  rule = true,
   icon,
   caption,
   collapsed,
@@ -237,6 +268,11 @@ export default function CardHead({
   // a consumer component may render null (e.g. no-location fallback) and the empty block is inert.
   subtitle?: ReactNode;
   panel?: boolean;
+  /** Panel layout: draw the inset head hairline. Off where the next section CHANGES GROUND (the
+   *  explorer's full-bleed control band, 2026-10-25 — user: the line "does not extend to the
+   *  edges, why and is it needed?"): an inset rule over an edge-to-edge plate read as a line that
+   *  failed to reach the sides, and a ground change already divides — the foot's own rule. */
+  rule?: boolean;
   caption?: ReactNode;
   collapsed?: boolean;
   onToggle?: () => void;
@@ -278,49 +314,25 @@ export default function CardHead({
     return (
       <>
         <div
-          className={cn(
-            // 6px between the eyebrow row and the title row (was 3 until 2026-10-03): the minimize
-            // mark and the title row's aside control are both 24px boxes hanging off shorter rows,
-            // and at 3px they overlapped by 3 — their two hover washes ran into each other (user:
-            // "the explorer control overlaps a bit with the minimize button").
-            "flex flex-col gap-1.5 py-[var(--panel-pad-y)] px-[var(--panel-pad-x)]",
-          )}
+          // ONE ROW (design pass, 2026-10-25 — the same fold the right rail's entries took, so a
+          // head that is not the open box costs a line): the eyebrow leads, the marked title
+          // follows on the same baseline, the caption and the aside sit at the right end. The
+          // eyebrow row and the title row were stacked at a 6px gap until then (2026-10-03's
+          // note on the overlapping washes went with the toggle it was about).
+          className="flex items-center gap-2.5 min-w-0 py-[var(--panel-pad-y)] px-[var(--panel-pad-x)]"
         >
-          {/* ⚠️ The caption + indicator cluster sits on the EYEBROW's row, NOT beside the whole
-              left column (user, 2026-08-12 — "the todo views text is a bit too long sometimes").
-              As a column sibling it reserved its width on EVERY line of the head, so a `SOON` tag
-              12px tall narrowed the title's lane from ~180px to ~145px two lines below itself and
-              wrapped titles that fit the card perfectly well. One head anatomy, both layouts: the
-              inspector layout below has always stacked these as rows. */}
-          {(eyebrow || caption != null) && (
-            <div className="flex items-start justify-between gap-2">
-              {/* `data-eyebrow` — same read as the entry layout below: RailThread ties every
-                  populated mark in at its card's EYEBROW height. Without it the thread silently
-                  falls back to the card MIDDLE, which on a tall explorer card drops the mark
-                  hundreds of px below its own header. One connector anatomy, both layouts. */}
-              {eyebrow ? <span data-eyebrow="" className={cn("block", eyebrowClass)}>{eyebrow}</span> : <span />}
-              {/* The caption rides the eyebrow row's right end (the +/− indicator rode beside it
-                  until 2026-10-23). `-my` keeps a glyph-tall box from setting this row's height
-                  and pushing the title down — the row measures the eyebrow. */}
-              <div className="flex items-center gap-1.5 flex-none -my-[3px] pt-px pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
-                {caption != null && (
-                  <span className="text-label text-muted-foreground text-right tabular-nums">{caption}</span>
-                )}
-              </div>
-            </div>
+          {/* `data-eyebrow` — same read as the entry layout below: RailThread ties every
+              populated mark in at its card's EYEBROW height. Without it the thread silently
+              falls back to the card MIDDLE, which on a tall explorer card drops the mark
+              hundreds of px below its own header. One connector anatomy, both layouts. */}
+          {eyebrow ? <span data-eyebrow="" className={cn("block flex-none", eyebrowClass)}>{eyebrow}</span> : null}
+          <h2 className={cn(TITLE, "inline-flex items-center gap-2 min-w-0 truncate")}>{titleRow}</h2>
+          {(caption != null || aside != null) && (
+            <span data-head-aside="" className="ml-auto relative z-[1] flex-none flex items-center gap-1.5 pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
+              {caption != null && <span className="text-label text-muted-foreground text-right tabular-nums">{caption}</span>}
+              {aside}
+            </span>
           )}
-          {/* The title row carries the ASIDE on its right (2026-09-26 — built for the explorer
-              card's scope mark, since retired; the slot stays): the panel layout had no aside
-              slot, only the inspector layout below. Same rule as the eyebrow row's cluster: it floats above the
-              title button's stretched pseudo and hands the pointer back only on its own control. */}
-          <div className="flex items-center justify-between gap-2 min-w-0">
-            <h2 className={cn(TITLE, "inline-flex items-center gap-2 min-w-0")}>{titleRow}</h2>
-            {aside != null && (
-              <span data-head-aside="" className="relative z-[1] flex-none flex items-center pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
-                {aside}
-              </span>
-            )}
-          </div>
         </div>
         {/* The head hairline is INSET by the panel's own horizontal padding (user, 2026-08-09) —
             the same weight the slab's resting seam carries, so every division that is simply THERE
@@ -329,7 +341,7 @@ export default function CardHead({
             Still a separate element so the inset doesn't fight the head's padding box.
             ⚠️ COLLAPSED it must not render: with no body it falls on the card's own bottom edge,
             with nothing to divide. Same `!collapsed` gate the inspector layout below applies. */}
-        {!collapsed && <div className="border-b border-border mx-[var(--panel-pad-x)]" aria-hidden />}
+        {!collapsed && rule && <div className="border-b border-border mx-[var(--panel-pad-x)]" aria-hidden />}
       </>
     );
   }
@@ -393,7 +405,15 @@ function keepFocusOnRung(el: HTMLElement): void {
           <X aria-hidden className="size-4 touch:size-[18px]" />
         </Button>
       )}
-      <div className={cn(onToggle && "relative group")}>
+      {/* ONE DOM SHAPE FOR BOTH TIERS (user, 2026-10-25: the dossier "shows a flash when I click
+          it" — the one-row entry had its own subtree, so expanding re-created the title and the
+          Radix avatar showed its monogram fallback for a frame before the logo). The eyebrow row
+          and the title row keep their places in the tree on both tiers; folded, they are
+          `display: contents`, so the eyebrow, the h3 and the aside join this wrapper's one flex
+          row (`order` is not needed — the source order IS the row's order), and only the caption
+          moves into the aside's cluster, which is text. The h3 and everything inside it are the
+          same nodes before and after the click. */}
+      <div className={cn(onToggle && "relative group", entryMode && "flex items-center gap-2.5 min-w-0")}>
         {entryMode && (
           <button
             type="button"
@@ -408,19 +428,28 @@ function keepFocusOnRung(el: HTMLElement): void {
             <span className="sr-only">Expand</span>
           </button>
         )}
-        {(eyebrow || caption != null) && (
-          <div className={cn("flex items-start justify-between gap-2 mb-2", onClose && !entryMode && "pr-[30px]")}>
+        {(eyebrow || (caption != null && !entryMode)) && (
+          <div className={entryMode ? "contents" : cn("flex items-start justify-between gap-2 mb-2", onClose && "pr-[30px]")}>
             {/* `data-eyebrow` is RailThread's read: on an unboxed ENTRY the thread runs its
                 depth-reach connector at the EYEBROW's height (user, 2026-08-08 — the entry's
-                vertical centre put the line through the title-row aside's space). */}
-            {eyebrow ? <span data-eyebrow="" className={cn("block", eyebrowClass)}>{eyebrow}</span> : <span />}
+                vertical centre put the line through the title-row aside's space). FOLDED it takes
+                one COLUMN width ("METAGRAPH", the longest slot noun, sets it) so every entry's
+                title starts on the same x and the pile reads as a ladder — stated in em against
+                the label step, since the type scale is fluid — and the title's line box
+                (`ENTRY_LINE`), so centring the row aligns the baselines. */}
+            {eyebrow ? (
+              <span data-eyebrow="" className={cn("block", eyebrowClass, entryMode && cn("flex-none min-w-[7em]", ENTRY_LINE))}>{eyebrow}</span>
+            ) : (
+              <span />
+            )}
             {/* The right cluster — the caption, on the eyebrow's own line. ⚠️ It belongs HERE
                 and not in the title row's aside (user, 2026-08-12 — "the network view collapse
                 is broken in the card"): About's collapsed entry passed `SOON` as the aside, so
                 a title that fits the expanded card's 202px lane ran straight THROUGH it in the
                 narrower entry, and since nothing bounds an unbounded inline-flex title it
-                couldn't truncate either. */}
-            {caption != null && (
+                couldn't truncate either. (Folded, the whole head is one row and the caption
+                rides the aside's cluster at the row's end instead — below.) */}
+            {caption != null && !entryMode && (
               <div className="flex items-center gap-1.5 flex-none pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
                 <span className="text-label text-muted-foreground text-right tabular-nums">{caption}</span>
               </div>
@@ -429,8 +458,8 @@ function keepFocusOnRung(el: HTMLElement): void {
         )}
         {title != null && (
           <>
-            <div className="flex items-center gap-2 min-w-0">
-              <h3 className={cn(TITLE, "text-foreground min-w-0")}>{rolled}</h3>
+            <div className={entryMode ? "contents" : "flex items-center gap-2 min-w-0"}>
+              <h3 className={cn(TITLE, "text-foreground min-w-0", entryMode && cn("text-body truncate", ENTRY_TITLE))}>{rolled}</h3>
               {/* The aside is DECORATION over a stretched toggle, so it must not swallow the
                   gesture. z-10 lifts it above the head's overlay (a site link has to stay
                   clickable), and that alone made the title row's right end dead: the ticker /
@@ -438,13 +467,14 @@ function keepFocusOnRung(el: HTMLElement): void {
                   cursor fell back to the default arrow over an otherwise-clickable entry (user,
                   2026-08-09). So the WRAPPER is transparent and only real controls inside it opt
                   back in — text falls through to the toggle, links and buttons keep working. */}
-              {aside != null && (
-                <span className="ml-auto flex-none relative z-10 pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
+              {(aside != null || (entryMode && caption != null)) && (
+                <span className={cn("ml-auto flex-none relative z-10 pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto", entryMode && cn("inline-flex items-center gap-1.5", ENTRY_LINE))}>
+                  {entryMode && caption != null && <span className="text-label text-muted-foreground text-right tabular-nums">{caption}</span>}
                   {aside}
                 </span>
               )}
             </div>
-            {subtitle != null && (
+            {subtitle != null && !entryMode && (
               // No leading-none here: the node card's subtitle carries bordered code pills
               // (RoleChips) that need the natural line box — a collapsed line + overflow-hidden
               // clipped their borders.

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { staleTickKeys, isGlobalActivityScope, shortHash, fanOut, cycleOk, touchPoll, reportPoll, pollHealthRows, RECENT_OUTCOMES } from "./api";
+import { staleTickKeys, isGlobalActivityScope, shortHash, fanOut, cycleOk, touchPoll, reportPoll, pollHealthRows, BEAT_CAP, BEAT_KEEP_MS, NetworkData } from "./api";
 import { vi, afterEach } from "vitest";
 
 // api.ts is exempt from dataExportCoverage (it IS the live feed). These cover the PURE parts only
@@ -155,19 +155,166 @@ describe("touchPoll", () => {
   });
 });
 
-describe("reportPoll's recent outcomes", () => {
-  // The pulse strip draws each feed's recent history as a run of marks — green ok, red failed
-  // (user, 2026-10-04) — so the registry keeps the outcomes themselves, newest last, capped.
-  it("keeps the last RECENT_OUTCOMES outcomes in order, oldest first", () => {
-    for (let i = 0; i < RECENT_OUTCOMES + 5; i++) reportPoll("exact", i % 3 !== 0);
+describe("reportPoll's beats", () => {
+  // The pulse strip draws each poll where it LANDED on one time axis (2026-10-25, rhythm lanes),
+  // so the registry keeps each outcome with its time, oldest first, bounded by age and count.
+  it("keeps each outcome with the time it landed, oldest first, at most BEAT_CAP", () => {
+    for (let i = 0; i < BEAT_CAP + 5; i++) reportPoll("exact", i % 3 !== 0);
     const row = pollHealthRows().find((r) => r.id === "exact")!;
-    expect(row.recent).toHaveLength(RECENT_OUTCOMES);
-    const all = Array.from({ length: RECENT_OUTCOMES + 5 }, (_, i) => i % 3 !== 0);
-    expect(row.recent).toEqual(all.slice(-RECENT_OUTCOMES));
+    expect(row.beats).toHaveLength(BEAT_CAP);
+    const all = Array.from({ length: BEAT_CAP + 5 }, (_, i) => i % 3 !== 0);
+    expect(row.beats.map((b) => b.ok)).toEqual(all.slice(-BEAT_CAP));
+    expect(row.beats.every((b, i, a) => i === 0 || b.at >= a[i - 1]!.at)).toBe(true);
   });
 
-  it("a touched row has an empty history, not a claimed one", () => {
+  it("drops beats older than BEAT_KEEP_MS", () => {
+    const t0 = Date.now();
+    const spy = vi.spyOn(Date, "now");
+    spy.mockReturnValue(t0);
+    reportPoll("metasnaps", true);
+    spy.mockReturnValue(t0 + BEAT_KEEP_MS + 1);
+    reportPoll("metasnaps", true);
+    spy.mockRestore();
+    const row = pollHealthRows().find((r) => r.id === "metasnaps")!;
+    expect(row.beats.every((b) => b.at > t0)).toBe(true);
+  });
+
+  it("takes the data's own time: a late older beat sorts in and never moves lastOkAt back", () => {
+    const t0 = Date.now() - 1_000_000;
+    const spy = vi.spyOn(Date, "now").mockReturnValue(t0 + 2000);
+    reportPoll("global", true, t0 + 1000);
+    reportPoll("global", true, t0);
+    spy.mockRestore();
+    const row = pollHealthRows().find((r) => r.id === "global")!;
+    expect(row.beats.map((b) => b.at)).toEqual([t0, t0 + 1000]);
+    expect(row.lastOkAt).toBe(t0 + 1000);
+    // The attempt is the tab's own wall time, whatever age the data carried.
+    expect(row.lastAttemptAt).toBe(t0 + 2000);
+  });
+
+  it("a touched row has no beats, not a claimed one", () => {
     touchPoll("api-trends");
-    expect(pollHealthRows().find((r) => r.id === "api-trends")!.recent).toEqual([]);
+    expect(pollHealthRows().find((r) => r.id === "api-trends")!.beats).toEqual([]);
+  });
+});
+
+describe("_fetchClusters (the shared node lists)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it("reads our own /api/live/clusters, never a load balancer's cluster/info", async () => {
+    const urls: string[] = [];
+    vi.stubGlobal("fetch", async (u: string) => {
+      urls.push(String(u));
+      return new Response(JSON.stringify({ l0: [{ id: "a" }], l1: [{ id: "b" }], memoAgeMs: 0 }), { status: 200 });
+    });
+    const nd = new NetworkData();
+    await nd._fetchClusters();
+    expect(urls.length).toBe(1);
+    expect(urls[0]).toMatch(/\/api\/live\/clusters(\?|$)/);
+    expect(urls.some((u) => u.includes("cluster/info"))).toBe(false);
+    expect(nd.clusters.l0.length).toBe(1);
+  });
+  it("an empty list is a failure, keeping what is held", async () => {
+    const nd = new NetworkData();
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify({ l0: [{ id: "a" }], l1: [{ id: "b" }], memoAgeMs: 0 }), { status: 200 }));
+    await nd._fetchClusters();
+    const held = nd.clusters;
+    const errBefore = row("clusters").err;
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify({ l0: [], l1: [{ id: "b" }] }), { status: 200 }));
+    await nd._fetchClusters();
+    expect(nd.clusters).toBe(held);
+    expect(nd.clusters.l0).toEqual([{ id: "a" }]);
+    expect(row("clusters").err).toBe(errBefore + 1);
+  });
+  it("the ok report carries the data's own time (receipt less memoAgeMs)", async () => {
+    const T = Date.now() + 10_000_000; // later than any beat an earlier test left
+    const spy = vi.spyOn(Date, "now").mockReturnValue(T);
+    vi.stubGlobal("fetch", async () => new Response(JSON.stringify({ l0: [{ id: "a" }], l1: [{ id: "b" }], memoAgeMs: 3000 }), { status: 200 }));
+    await new NetworkData()._fetchClusters();
+    spy.mockRestore();
+    expect(row("clusters").lastOkAt).toBe(T - 3000);
+    expect(row("clusters").beats.at(-1)).toEqual({ at: T - 3000, ok: true });
+  });
+});
+
+const row = (id: string) => pollHealthRows().find((r) => r.id === id)!;
+const desc = (hi: number, lo: number) => Array.from({ length: hi - lo + 1 }, (_, i) => ({ ordinal: hi - i, timestamp: "2026-10-25T00:00:00.000Z" }));
+const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
+
+// `_tick` is private: the poll is driven the way the interval drives it, over a stubbed fetch.
+// Answers here carry no `metas`, so the meta refresh stays out of the way.
+const tick = (nd: NetworkData) => (nd as unknown as { _tick(): Promise<void> })._tick();
+const seedLatest = (nd: NetworkData, ordinal: number) => {
+  const s = { ordinal, timestamp: "2026-10-25T00:00:00.000Z" } as never;
+  nd.latest = s;
+  nd.globalSnapshots = [s];
+};
+
+describe("_tick (the shared poll)", () => {
+  afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+
+  it("a failed catch-up keeps the shared append", async () => {
+    const nd = new NetworkData();
+    seedLatest(nd, 80); // behind the shared window 101..112
+    const urls: string[] = [];
+    vi.stubGlobal("fetch", async (u: string) => {
+      urls.push(String(u));
+      return String(u).includes("/api/live/globals") ? json({ error: "x" }, 503) : json({ globals: desc(112, 101), memoAgeMs: 0 });
+    });
+    await tick(nd);
+    expect(urls.some((u) => u.includes("/api/live/globals"))).toBe(true);
+    expect(nd.globalSnapshots.map((s) => s.ordinal)).toEqual([80, ...Array.from({ length: 12 }, (_, i) => 101 + i)]);
+    expect(nd.live).toBe(true);
+  });
+
+  it("two overlapping ticks append each ordinal once", async () => {
+    // Both ticks fall behind the window and await a catch-up: without a guard, each computes its
+    // append from the same `latest` and the second pushes every ordinal again.
+    const nd = new NetworkData();
+    seedLatest(nd, 80);
+    const pending: Array<() => void> = [];
+    vi.stubGlobal("fetch", (u: string) =>
+      new Promise<Response>((r) =>
+        pending.push(() => r(String(u).includes("/api/live/globals")
+          ? json({ globals: desc(112, 61), memoAgeMs: 0 })
+          : json({ globals: desc(112, 101), memoAgeMs: 0 }))),
+      ),
+    );
+    const a = tick(nd);
+    const b = tick(nd);
+    for (let i = 0; i < 4; i++) {
+      await new Promise((r) => setTimeout(r, 0));
+      pending.splice(0).forEach((go) => go());
+    }
+    await Promise.all([a, b]);
+    expect(nd.globalSnapshots.map((s) => s.ordinal)).toEqual(Array.from({ length: 33 }, (_, i) => 80 + i));
+  });
+
+  it("an /api/live failure fails the metasnaps lane too — one request carries both feeds", async () => {
+    const nd = new NetworkData();
+    const before = row("metasnaps").err;
+    vi.stubGlobal("fetch", async () => json({ error: "x" }, 503));
+    await tick(nd);
+    expect(row("metasnaps").err).toBe(before + 1);
+    expect(nd.live).toBe(false);
+  });
+});
+
+describe("init (the seed)", () => {
+  afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+
+  it("seeds the globals from the shared answer when the globals seed fails", async () => {
+    const nd = new NetworkData();
+    vi.stubGlobal("fetch", async (u: string) => {
+      const url = String(u);
+      if (url.includes("/api/live/globals")) return json({ error: "x" }, 503);
+      if (url.includes("/api/live/clusters")) return json({ error: "x" }, 503);
+      if (url.includes("/api/live/meta/")) return json({ snapshots: [], memoAgeMs: 0 });
+      return json({ globals: desc(112, 101), metas: {}, unlisted: [], failed: [], memoAgeMs: 0 });
+    });
+    await nd.init();
+    nd.stop();
+    expect(nd.globalSnapshots.map((s) => s.ordinal)).toEqual(Array.from({ length: 12 }, (_, i) => 101 + i));
+    expect(nd.latest?.ordinal).toBe(112);
+    expect(nd.live).toBe(true);
   });
 });

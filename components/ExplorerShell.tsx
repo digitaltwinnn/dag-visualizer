@@ -48,6 +48,7 @@ export default function ExplorerShell({
   hint,
   onLeave,
   aside,
+  banded = false,
   children,
 }: {
   id: string;
@@ -73,6 +74,9 @@ export default function ExplorerShell({
    *  rail's cards put theirs. It rode the eyebrow row for a round while the titles were
    *  "X breakdown" and too wide to share the row (2026-09-28). */
   aside?: ReactNode;
+  /** A full-bleed control band follows the head (Explorer: whenever a level is open), so the head
+   *  draws no hairline — the plate's ground change is the division (CardHead's `rule`). */
+  banded?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -87,6 +91,7 @@ export default function ExplorerShell({
           title={title}
           eyebrow="Explore"
           aside={aside}
+          rule={!banded}
         />
         <div className="flex flex-col">
           {hint != null && (

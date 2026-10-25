@@ -156,7 +156,7 @@ export default function TrendStack() {
   // animation still does not look good"; a screencast showed why: the slice was asked for only
   // while `on`, so the frame the view changed every plot unmounted and the cards collapsed into
   // thin empty strips with the ‹ › pills floating on them, and only those strips dropped).
-  const slice = useTrendsSlice(on || lingering ? windowId : null, range);
+  const slice = useTrendsSlice(on || lingering ? windowId : null, range, "History charts");
   const { p, error } = slice;
 
   // ⚠️ ONE ROSTER PASS, SHARED WITH BOTH RAILS (2026-09-19). Which networks, in what order, drawn
@@ -629,9 +629,16 @@ export default function TrendStack() {
               // perhaps drop the cards one after each other"). Keyed off the layer's `data-on`, so it
               // plays once as the room reveals and never on a re-rank; staggered by depth rank, front
               // first. On `transform`, which composes with the utilities' `translate`.
-              className="plane-card absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border p-2 [background:linear-gradient(var(--panel-solid),var(--panel-solid)),var(--scene-ground)] [transition:border-color_0.16s_ease] motion-reduce:!transition-none"
+              className="plane-card absolute left-0 top-0 -translate-x-1/2 translate-y-[calc(var(--plane-h)/-2)] rounded-lg border border-border p-2 [background:linear-gradient(var(--panel-solid),var(--panel-solid)),var(--scene-ground)] [transition:border-color_0.16s_ease] motion-reduce:!transition-none"
+              // THE TOP EDGE IS PINNED, NOT THE CENTRE (user, 2026-10-25, phone: "the upsider has more
+              // of the card show at the top than the card DED sitting in front of it"). A card is
+              // nominally `pxH` tall, but the front card's head wraps its readings onto a second line
+              // on the phone; centred on its anchor, half that growth rose over the card behind and
+              // ate its name strip. Offset by the NOMINAL half-height, any extra height runs DOWN,
+              // toward the viewer, and every strip is exactly the slot's up-step.
               style={{
                 ["--slot" as string]: depthRank,
+                ["--plane-h" as string]: `${fmt.pxH}px`,
                 width: fmt.pxW,
                 ...(pair.paired
                   ? {
@@ -665,7 +672,12 @@ export default function TrendStack() {
                     onPointerUp={(e) => e.stopPropagation()}
                     onClick={(e) => { e.stopPropagation(); stepMeasure(dir); }}
                     className={cn(
-                      "absolute top-1/2 -translate-y-1/2 z-10 inline-flex h-7 touch:h-11 min-w-7 touch:min-w-11 items-center justify-center gap-0.5 rounded-full cursor-pointer",
+                      "absolute top-full mt-2 z-10 inline-flex h-7 touch:h-8 min-w-7 touch:min-w-8 items-center justify-center gap-0.5 rounded-full cursor-pointer",
+                      // A 32px pill with an invisible 6px pad all round on touch — the 44px target without
+                      // the 44px look (user, 2026-10-25: "is the <> control too big?" — standing alone under
+                      // the card the full-size pill read as heavy as the card's own head). `TOUCH_HIT`'s
+                      // recipe written out: its `relative` would undo this pill's `absolute`.
+                      "touch:after:absolute touch:after:-inset-1.5 touch:after:content-['']",
                       // The word in the label step, plain case (user, 2026-10-19: the caps read "way too
                       // large" beside the chevron) — a quiet name, not an eyebrow.
                       // In the plain muted ink, not the accent (user, 2026-10-24: the pills were "cyan and a
@@ -674,7 +686,10 @@ export default function TrendStack() {
                       "hover:bg-wash-soft hover:text-foreground disabled:opacity-30 disabled:cursor-default disabled:hover:bg-[var(--panel-solid)] disabled:hover:text-muted-foreground",
                       "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
                       target ? (dir === -1 ? "pl-1 pr-2.5" : "pl-2.5 pr-1") : "px-0",
-                      dir === -1 ? "-left-4 touch:-left-3" : "-right-4 touch:-right-3",
+                      // UNDER THE CARD, flush to its edges (user, 2026-10-25: "should we have the <> below the
+                      // card and left/right aligned so they don't obfuscate part of the card?") — on the
+                      // card's sides they sat over the plot, and on the phone over its first and last days.
+                      dir === -1 ? "left-0" : "right-0",
                     )}
                   >
                     {dir === 1 && target && <span>{METRIC_LABELS[target]}</span>}

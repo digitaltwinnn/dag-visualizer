@@ -141,6 +141,11 @@ export default function SectionShell({
   // (both are full of real controls — rails and canvas up here, a sortable table down there).
   // The STRIP is deliberately in NEITHER boundary: the live lane stays live in both poses.
   const section = useStore((s) => s.section);
+  // An open phone sheet PUSHES the raw pane up rather than covering it (user, 2026-10-25: "not
+  // overlay, but push it up like we do for scene also, same principle"): the pane's bottom rides
+  // the sheet's top edge, from the same bottom covers the scene's shift reads. Zero on the wider
+  // tiers, where nothing publishes a bottom cover.
+  const rawCover = useStore((s) => Math.max(s.sceneCoverBExplore, s.sceneCoverBDetails, s.sceneCoverBVitals));
 
   return (
     <>
@@ -179,15 +184,15 @@ export default function SectionShell({
           // Phone adds the FOOTER ROW's own height: the row floats over the scene's bottom edge by
           // design (--footer-h zeroes on phone), but this layer is a DATA pane — measured, the
           // lozenge sat on the channel pane's hash rows. One token, shared with SiteFooter.
-          // …and NOT the dock's (2026-10-02, the phone pass): the dock fades out with the HUD while
-          // this layer is up, and reserving its 56px left a blank strip under the footer. The footer
-          // drops to the screen edge in the same state (SiteFooter), so the pane ends just above it.
           // THE PHONE FRAME IS TIGHT (user, 2026-10-07 — the raw phone pass, option B): 6px from the
           // screen's edges, and down to the safe area, since the footer row stands down while RAW
           // is open (SiteFooter). A 16px margin plus the panel's own padding left rows ~310px wide.
-          "max-[700px]:left-1.5 max-[700px]:right-1.5 max-[700px]:bottom-[calc(env(safe-area-inset-bottom,0px)+6px)]"
+          // The dock bar STAYS on the raw page since 2026-10-25 (user: "keep the bottom bar … the same
+          // way as the regular scene"), so the pane ends 6px above it; `--phone-dock-h` carries the
+          // safe-area inset already.
+          "max-[700px]:left-1.5 max-[700px]:right-1.5 max-[700px]:bottom-[calc(var(--phone-dock-h)+6px+var(--raw-cover,0px))] max-[700px]:[transition:bottom_380ms_cubic-bezier(0.32,0.72,0,1)] motion-reduce:![transition:none]"
         }
-        style={{ visibility: "hidden", willChange: "transform, opacity" }}
+        style={{ visibility: "hidden", willChange: "transform, opacity", ["--raw-cover" as string]: `${rawCover}px` }}
       >
         {raw}
         {/* The layer's own dismiss — the third way back (the command bar's RAW switch and Escape

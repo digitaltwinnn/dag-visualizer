@@ -207,8 +207,10 @@ export const CATALOG: Record<NetworkId, MetaConfig[]> = {
 export const POLL = {
   maxSnapshots: 52,        // how many global snapshots to keep in the stream (also caps the
                            // LiveStrip bar count — the strip fills with this whole retained window)
-  pollMs: 4000,            // how often to poll for new snapshots
-  clusterMs: 25000,        // how often to refresh validator membership
+  pollMs: 5000,            // how often to poll for new snapshots — 4000 until 2026-10-25 (user:
+                           // "5s and 30s … are more common values"); global snapshots land every
+                           // ~4–30s, so a poll is at most 5s behind the newest
+  clusterMs: 30000,        // how often to refresh validator membership — 25000 until the same day
   metaRefreshMs: 5 * 60_000, // /api/metagraphs re-pull — matches the route's 5-min revalidate.
                            // ONE home (2026-08-31): Engine.metaTimer and the pulse strip's FEEDS
                            // row both read it, so a cadence retune can't leave the liveliness

@@ -5,6 +5,7 @@ import { applyClickActions } from "@/src/store/applyClickActions";
 import { metagraphById, initNetwork, getNetwork, getAnchor, DEFAULT_META_COLOR, resolveSignerIps } from "@/src/data/network";
 import { ledgerLens } from "@/src/data/ledgerStory";
 import { reportPoll, touchPoll } from "@/src/data/api";
+import { holdFeed } from "@/src/data/feedUse";
 import { STALE_FACTOR } from "@/src/data/pollStatus";
 import { UNLISTED_ID, UNLISTED_SCENE_HEX_BY_THEME, unlistedLog } from "@/src/data/unlisted";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
@@ -27,8 +28,9 @@ import { readSceneColors, type SceneColors, LIGHT_TUNE } from "./sceneColors";
 import { setNodeDimTarget, setNodeEnv } from "./scene/objects/NodeFabric";
 import { THEME_KEY, parseThemePref, resolveTheme, type Theme } from "@/src/theme/resolve";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
+import { sceneFeeds } from "./domain/sceneFeeds";
 import { liveArrivals } from "./domain/arrivals";
-import { SHEET_SHIFT_K, chromeShiftPx, sheetShiftPx } from "./domain/sheetShift";
+import { SHEET_SHIFT_K, chromeShiftPx, sheetShiftPx, stripShiftPx } from "./domain/sheetShift";
 import { ChromeBounds } from "./ChromeBounds";
 import { FOCI, nodeFraming, cohortFraming, ledgerCommitTilt, trendFocusPush, trendFit } from "./domain/cameraRig";
 import { elevationCap, isDrag, orbitAbout, orbitAllowed, orbitAngles } from "./domain/subjectOrbit";
@@ -199,7 +201,10 @@ export class Engine {
   private dagCore: DagCore | null = null;
   private metaData: RouteMetagraph[] | null = null;
   // Metagraph ids with locatable nodes (selectable hubs); null until counts load (all allowed).
-  private _activeMetaIds: Set<string> | null = null;
+  // EMPTY until the live directory answers, never null ("all active"): before data no hub is
+  // clickable, and none is drawn (`setMetaPresent`, 2026-10-25 — the real data decides).
+  private _activeMetaIds: Set<string> | null = new Set();
+  private _sceneFeedHolds: (() => void)[] = [];
   private _lastFlashOrdinal = -1; // de-dupes the core flash to genuinely new global snapshots
   // The focused metagraph's hub record, cached on filter/mode change — kills the per-frame
   // `metas.find` the DoF read used to do every frame (Task 15 allocation fix).
@@ -468,7 +473,9 @@ export class Engine {
   private _chrome = new ChromeBounds();
   private _chromeShift(): number {
     const c = this._chrome.read();
-    return c.bandOn ? chromeShiftPx(c.top, window.innerHeight - c.bandTop) : 0;
+    // With the band in the lane the bar's bottom edge already includes an open row; without it
+    // (the phone) the row pushes on its own — the bottom sheet's rule, mirrored.
+    return c.bandOn ? chromeShiftPx(c.top, window.innerHeight - c.bandTop) : stripShiftPx(c.strip, window.innerHeight);
   }
   private _sheetShiftW = 0;
   private _sheetShiftH = 0;
@@ -1360,6 +1367,8 @@ export class Engine {
     // dim + inactive; the engine also skips their picks (see _isPickActive).
     this._activeMetaIds = new Set(list.filter((m) => m.located > 0).map((m) => m.id));
     this.layers.setMetaActive(this._activeMetaIds);
+    // The live list decides which hubs EXIST in the Hypergraph (see MetaHubRec.present).
+    this.layers.setMetaPresent(new Set(list.map((m) => m.id)));
   }
 
   // Re-read the ledger's live tick from the Global L0 buffer + the per-tick anchor index. Cheap
@@ -1412,6 +1421,10 @@ export class Engine {
   setMode(mode: Mode) {
     const prevMode = this.mode; // capture BEFORE the reassignment — the choreography branches on it
     this.mode = mode;
+    // THE SCENE'S READS FOR THE PULSE STRIP (src/data/feedUse.ts): the feeds this view draws, from
+    // the same policy flags that switch the drawing on (`domain/sceneFeeds.ts`).
+    for (const r of this._sceneFeedHolds) r();
+    this._sceneFeedHolds = sceneFeeds(VIEW_POLICIES[mode]).map((f) => holdFeed(f, "3D scene"));
     // A view switch lands the camera on the destination's own pose (the boundary re-derive),
     // so a pre-switch free orbit no longer holds it — see _onControlsStart.
     this._freeOrbit = false;
@@ -1722,10 +1735,10 @@ export class Engine {
     geoNetwork: () => {
       const R = this.globe.focusDensest(true);
       if (R == null) return false;
-      // Three zoom LEVELS (user design): metagraph = a WIDE network pose (rotated to the
-      // densest cluster, held clearly farther out than the country pose so the country drill
-      // still reads as a zoom). structureMoves: one fixed pose over the spin-to-densest.
-      this.cam.focus("geoNetwork", true);
+      // ONE ANGLE ON THE GLOBE (user, 2026-10-25): the network rung inherits the REST pose — the
+      // globe's spin to the densest cluster says "this network", and the camera holds —
+      // `structureMoves` skips the nudge and dims the HUD for the turn (cameraRig's FOCI note).
+      this.cam.focus("geo", true);
       return true;
     },
     geoOverview: () => {
@@ -2382,7 +2395,11 @@ export class Engine {
     // policy allows it (hyper). Without a hub (the unlisted set, a network with no live nodes) the
     // blur had nothing in focus and smeared the whole scene (the Unlisted audit, 2026-10-07).
     const metaSel = this.filter !== "all" && this.filter !== "dag" && this._dofMeta != null;
-    const dofMix = THREE.MathUtils.clamp(1 - (this.morph - 0.4) / 0.2, 0, 1);
+    // …AND ONLY ONCE THE SUBJECT HAS ARRIVED (user, 2026-10-25): the morph is written to 0 at the
+    // boundary, so the blur used to cover the fleet while it still stood on the staging grids.
+    // The mix rides hyper's subject-arrival beat (`entryProgress` — held through the choreography,
+    // the tethers' sweep after it), the same stage the hubs' tethers reach their hubs on.
+    const dofMix = THREE.MathUtils.clamp(1 - (this.morph - 0.4) / 0.2, 0, 1) * this.layers.entryProgress();
     this.ctx.dof.enabled = policy.dofEligible && metaSel && dofMix > 0.001;
     if (this.ctx.dof.enabled) {
       const meta = this._dofMeta;
@@ -2521,6 +2538,8 @@ export class Engine {
 
 
   dispose() {
+    for (const r of this._sceneFeedHolds) r();
+    this._sceneFeedHolds = [];
     this.disposed = true;
     if (this.metaTimer) clearInterval(this.metaTimer);
     this.canvas.removeEventListener("click", this.onClick);

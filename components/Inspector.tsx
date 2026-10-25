@@ -38,6 +38,7 @@ import type { TabSignal } from "@/components/RailDock";
 import type { PickDescriptor } from "@/src/data/types";
 import type { Mode } from "@/src/store/store";
 import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder";
+import { useFeedRead } from "@/components/useFeedRead";
 
 // Luminance stepping (card-redesign 2026-08-08): unboxed ancestor entries dim with their distance
 // from the materialized box — the nearest parent is almost lit, the coarsest faintest — so the
@@ -155,6 +156,7 @@ function CountryPane({ cc, onClose, collapsed, onToggle }: { cc: string; onClose
 }
 
 function ProviderPane({ sel, onClose, collapsed, onToggle }: { sel: CohortSel; onClose: () => void; collapsed: boolean; onToggle: () => void }) {
+  useFeedRead(["clusters", "api-geo"], "ProviderPane");
   const selNodes = useStore((s) => s.selNodes);
   const setHoverCohort = useStore((s) => s.setHoverCohort);
   const hoverGroup = useStore((s) => s.hoverGroup);
@@ -221,6 +223,7 @@ function ProviderPane({ sel, onClose, collapsed, onToggle }: { sel: CohortSel; o
 // not a PickDescriptor), and the same two-channel hover coupling — `hoverCohort` carries the
 // member ids for the 3D glow, `hoverGroup` the scalar key the row pairing compares.
 function CompositionPane({ sel, onClose, collapsed, onToggle }: { sel: CompositionSel; onClose: () => void; collapsed: boolean; onToggle: () => void }) {
+  useFeedRead(["clusters", "api-geo"], "CompositionPane");
   const selNodes = useStore((s) => s.selNodes);
   const setHoverCohort = useStore((s) => s.setHoverCohort);
   const hoverGroup = useStore((s) => s.hoverGroup);
@@ -396,6 +399,9 @@ export default function Inspector() {
   const composition = useStore((s) => s.composition);
   const filter = useStore((s) => s.filter);
   const mode = useStore((s) => s.mode) as Mode;
+  // The rail's node hints count the located fleet — only where the view publishes one (the policy's
+  // own `nodeList` flag, the same one that gates `selNodes`).
+  useFeedRead(["clusters", "api-geo"], "Details rail", VIEW_POLICIES[mode].nodeList);
 
   const phoneDock = useStore((s) => s.phoneDock);
   const setPhoneDock = useStore((s) => s.setPhoneDock);
@@ -721,9 +727,14 @@ export default function Inspector() {
         // keying on `[data-focus]` here had the same bug the tier marker fixed above — and it also
         // shut out the two SNAPSHOT slots, which are lane members with no focus rung at all
         // (`railLadderBoundary.test.ts` asserts rung → slot, never the reverse). RailPager renders
-        // children untouched when the rung has no sibling set.
+        // children in a plain shell when the rung has no sibling set or is not the box.
         const focused = id === focusId;
-        const wrapped = boxed ? <RailPager slot={card.kind} >{body}</RailPager> : body;
+        // ⚠️ ALWAYS THROUGH RailPager, boxed or not (user, 2026-10-25: the dossier "shows a flash
+        // when I click it"): wrapping only the box put the two tiers at different tree positions,
+        // so an entry→box swap REMOUNTED the card — the title re-created, the avatar back to its
+        // fallback for a frame. The pager renders the same element shape on both tiers and is a
+        // plain pass-through while `active` is off; the plank and the gesture come with the box.
+        const wrapped = <RailPager slot={card.kind} active={boxed}>{body}</RailPager>;
         return (
           // The distance-dim rides a VAR, not wrapper opacity (2026-08-08): the entry itself
           // applies `opacity-[var(--entry-dim,1)]` and RELEASES it on hover (the materialize

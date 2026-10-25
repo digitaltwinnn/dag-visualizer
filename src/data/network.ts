@@ -24,10 +24,9 @@ export function initNetwork(): NetworkData | null {
   if (net) return net;
 
   net = new NetworkData();
-  const { setLive, setNodes, setMetagraphs, setLatestSnapshot, setActivity } =
+  const { setLive, setNodes, setLatestSnapshot, setActivity } =
     useStore.getState();
 
-  setMetagraphs(METAGRAPHS.length); // publicly listed metagraphs we track
 
   // Activity is scoped to the current filter — a metagraph reads its own snapshot stream,
   // "all"/"dag" the global L0 ledger. Recompute on new snapshots, on anchor-index updates

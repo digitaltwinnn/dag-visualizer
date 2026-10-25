@@ -3,6 +3,7 @@
 import { useStore } from "@/src/store/store";
 import { getAnchor } from "@/src/data/network";
 import { tickInStory } from "@/src/data/ledgerStory";
+import { useFeedRead } from "@/components/useFeedRead";
 
 // Did the FILTERED network anchor into the global snapshot on screen? One home for the rail's
 // Metagraph card (`domain/tickNet.ledgerCardNetwork`): the card, the manifest and the focus
@@ -11,6 +12,8 @@ import { tickInStory } from "@/src/data/ledgerStory";
 export function useTickHasFilter(): boolean | undefined {
   const filter = useStore((s) => s.filter);
   const snap = useStore((s) => s.snap);
+  // It reads the tick's anchors and exact read only with a tick pinned under a filter.
+  useFeedRead(["metasnaps", "exact"], "Snapshot filter check", snap != null && filter !== "all");
   const exact = useStore((s) => (s.snap ? s.snapshotExact[s.snap.data.ordinal] : undefined));
   if (!snap || filter === "all") return undefined;
   return tickInStory(filter, getAnchor(snap.data.timestamp), exact);

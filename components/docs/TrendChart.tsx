@@ -579,20 +579,27 @@ export default function TrendChart({
           data-plot=""
           role="img"
           aria-label={`${name} — ${stepMs >= 86400000 ? "daily" : stepMs >= 3600000 ? "hourly" : "5-minute"} buckets, ${n} of them`}
-          // ⚠️ A FINGER PICKS ON RELEASE, NOT ON CLICK (user, 2026-09-29: "on mobile, clicking the
-          // chart still has to be on the exact dot"). The brush runs through recharts' TOUCH
-          // handlers, and a handled touch sequence gets no synthesised click — so on a phone only
-          // the active dot's own handler ever answered. A touch or pen press that did not travel
-          // past a tap's slop is a pick, decided at pointerup; a press that travelled is the
-          // brush's. The click a browser may still synthesise afterwards is swallowed so one tap
-          // is one pick.
-          onPointerDown={onPick ? (e) => { tapFrom.current = { x: e.clientX, y: e.clientY }; } : undefined}
+          // ⚠️ EVERY POINTER PICKS ON RELEASE, NOT ON CLICK. First the finger (user, 2026-09-29: "on
+          // mobile, clicking the chart still has to be on the exact dot" — the brush runs through
+          // recharts' TOUCH handlers, and a handled touch sequence gets no synthesised click), and
+          // since 2026-10-25 the MOUSE too (user: a Moment opened from "the chart line" but not
+          // "the chart inner section", then the reverse — reproduced with a real mouse in headless
+          // Chrome: a press on the bare SVG surface picked, a press on the area path or the line did
+          // not). The click a browser synthesises needs the pressed node to survive to `mouseup`,
+          // and a press on a recharts path re-renders the plot under the pointer (the brush's own
+          // `mousedown` → `setDrag`), so the click was never dispatched there. A press that did
+          // not travel past a tap's slop is a pick, decided at pointerup — a brush needs more
+          // travel than that (its own pixel floor below), so the two cannot both answer one press;
+          // the click that may still follow is swallowed so one press is one pick.
+          // Primary button only (review, 2026-10-25): a right- or middle-click is a context menu or a
+          // paste, never a Moment.
+          onPointerDown={onPick ? (e) => { tapFrom.current = e.button === 0 ? { x: e.clientX, y: e.clientY } : null; } : undefined}
           onPointerUp={
             onPick && n > 0
               ? (e) => {
                   const t = tapFrom.current;
                   tapFrom.current = null;
-                  if (e.pointerType === "mouse" || !t || Math.hypot(e.clientX - t.x, e.clientY - t.y) > TAP_SLOP) return;
+                  if (!t || Math.hypot(e.clientX - t.x, e.clientY - t.y) > TAP_SLOP) return;
                   pickAt(e.currentTarget, e.clientX);
                   tapAt.current = performance.now();
                 }
@@ -759,13 +766,22 @@ const TrendPlot = memo(function TrendPlot({
   // The in-flight drag, as bucket instants — preview only; the committed range lives on the
   // page (one selection, every chart). Cleared on release or when the pointer leaves.
   const [drag, setDrag] = useState<{ a: number; b: number } | null>(null);
+  // ⚠️ A BRUSH IS TRAVEL IN PIXELS, NOT ONLY IN BUCKETS (user, 2026-10-25: a Moment could be
+  // picked "only on the actual line", the rest of the chart seemed dead). The one-bucket floor
+  // below was the whole click-vs-brush test, and on a dense plot a bucket is UNDER a pixel —
+  // 720 hourly buckets across a ~600px tablet card is 1.2 buckets per px — so the wobble every
+  // real press has between down and up read as a one-bucket range, the plate's pick was then
+  // the range's and swallowed, and only a press that happened not to move picked. The press's
+  // own x is kept from the native event and a range needs the tap slop of travel as well.
+  const brushFromX = useRef<number | null>(null);
   const dragProps = onRange
     ? {
-        onMouseDown: (e: { activeLabel?: string | number }, ev?: { preventDefault?: () => void }) => {
+        onMouseDown: (e: { activeLabel?: string | number }, ev?: { preventDefault?: () => void; clientX?: number }) => {
           // preventDefault kills the NATIVE selection at its source: select-none only covers
           // the chart, and a drag that crossed its edge started selecting the page text
           // beyond it (user, 2026-09-09, round 2 of the selectable-chart bug).
           ev?.preventDefault?.();
+          brushFromX.current = typeof ev?.clientX === "number" ? ev.clientX : null;
           const ts = Number(e?.activeLabel);
           if (Number.isFinite(ts)) setDrag({ a: ts, b: ts });
         },
@@ -773,13 +789,17 @@ const TrendPlot = memo(function TrendPlot({
           const ts = Number(e?.activeLabel);
           if (drag && Number.isFinite(ts)) setDrag({ a: drag.a, b: ts });
         },
-        onMouseUp: () => {
+        onMouseUp: (_e: unknown, ev?: { clientX?: number }) => {
           if (drag) {
             const lo = Math.min(drag.a, drag.b);
             const hi = Math.max(drag.a, drag.b);
-            // A click (no travel) is not a range — require at least one full bucket.
-            if (hi - lo >= stepMs) onRange(lo, hi + stepMs);
+            // A click (no travel) is not a range — at least one full bucket AND the tap slop of
+            // pixels (a press whose x the event did not carry is judged by the bucket alone).
+            const from = brushFromX.current;
+            const travelled = from != null && typeof ev?.clientX === "number" ? Math.abs(ev.clientX - from) : Infinity;
+            if (hi - lo >= stepMs && travelled > TAP_SLOP) onRange(lo, hi + stepMs);
           }
+          brushFromX.current = null;
           setDrag(null);
         },
         onMouseLeave: () => setDrag(null),

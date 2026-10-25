@@ -75,7 +75,7 @@ exemptions. `src/data/` holds the live singleton and the geo cache alongside the
 growing: a mechanical purity classifier was tried and rejected (its regex matched the words
 "window" and "fetch" inside this repo's own comments), and the header records why.
 
-Sixteen narrower boundary tests work the same way: `components/unlistedBoundary.test.ts` (the `"unlisted"`
+Seventeen narrower boundary tests work the same way: `components/feedReadBoundary.test.ts` (every HUD read of a feed's data holds that feed, so the pulse strip's "in use here" is measured, not declared — `src/data/feedUse.ts`), `components/unlistedBoundary.test.ts` (the `"unlisted"`
 id literal has exactly two homes), `components/railLadderBoundary.test.ts` (every committable focus
 rung maps to a hinted rail card slot), `components/railTierBoundary.test.ts` (`data-focus` has two
 homes and the slab's geometry — the pager included — keys on `data-tier`),
@@ -107,8 +107,8 @@ on any HUD element — the UI explains itself on its surface, or not at all) and
 `components/touchTierBoundary.test.ts` (the touch tier has ONE query — a coarse pointer on the
 phone or tablet tier — named once by the stylesheet's `touch:` variant and once by `useTouch`, and
 no utility rides Tailwind's pointer-only variant: a touch laptop's desktop rail is a mouse layout).
-`ls **/*Boundary.test.ts` is the live count: seventeen files, of which
-`components/selectionBoundary.test.ts` is rule 2's and the other sixteen are these.
+`ls **/*Boundary.test.ts` is the live count: eighteen files, of which
+`components/selectionBoundary.test.ts` is rule 2's and the other seventeen are these.
 
 Each of these files opens with a header comment giving the rationale, the scope and every exemption
 with its reason. **That header is the rule's authoritative statement** — read it rather than inferring
@@ -453,7 +453,10 @@ its claim is paper-only, so its one `intensity` already is its paper number.
    target and back out, contributing exactly 0 at `t=1` so the tween still lands on the committed pose.
    It does **not** raise `cameraFlying` — that dim exists so the scene can be seen changing, and here it
    isn't. A node commit is answered in **every** 3D view, gated on the canvas allow-list (convention 7),
-   never a list of modes.
+   never a list of modes. **Where the STRUCTURE turns to the subject, the camera holds** (user,
+   2026-10-25: "rotation is enough") — a resolver passing `structureMoves` (geo's spin to a network,
+   a cohort, a node) gets no nudge on a same pose; the turn is the acknowledgement, and the HUD dim
+   rides the held window.
 
 ⚠️ **The three global camera levers share one exemption, and one of them RAMPS** (user, 2026-08-13;
 the third lever 2026-09-02). `dollyBack`, `railsLean` and `aspectFit` (the portrait fit — √ of the

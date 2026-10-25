@@ -207,11 +207,29 @@ button opens the ABOUT row** (`topbar/AboutStrip.tsx`, 2026-09-28 — the per-vi
 that used to lead the left rail as a card; user: "the static about card is a bit out-of-place on the
 left column … about belongs where?" — the four zones are instruments and prose is documentation,
 whose one home is /about, so the in-view door sits beside the ECG's "how live is this app" strip,
-closed by default, view-scoped like Scene and Raw), and the ECG opens the **pulse strip** — one read-only cell
-per data FEED from the poll-health registry (`src/data/api.ts` `reportPoll`/`pollHealthRows`; the
-five real fetch sites report their own outcomes), each with a derived status dot (ok / stale past
-~2.5× its own cadence / error — never fabricated, rule 10), the last success ticking, the cadence
-and target in words. Either strip is a **layout participant, not a popup** — TopBar publishes its
+closed by default, view-scoped like Scene and Raw), and the ECG opens the **pulse strip** — RHYTHM LANES since 2026-10-25
+(design pass, user picked the compact lanes with a "next due" mark): one sentence answering "is it
+live?" (`pulseVerdict`), then one lane per data FEED from the poll-health registry
+(`src/data/api.ts` `reportPoll`/`pollHealthRows`, each outcome kept WITH ITS TIME), fastest
+first, on one real two-minute axis: each poll a tick where it landed, a dashed mark where a
+scheduled feed's next poll is due, an amber dashed stretch where a feed is overdue, the age on
+the right inked by status (ok / stale past ~2.5× its own cadence / failing — never fabricated,
+rule 10). The order, the lane geometry and the verdict are pure in `src/data/pollStatus.ts`. It
+replaced six equal cards whose run of marks drew a 4-second feed and a 5-minute feed as the same
+picture. **Each lane says whether the current view reads that feed** (same day — user: "consistent by
+code, not an assumption"): measured at the READ, never the fetch (most feeds are fetched by
+background timers in every view, and one fetch serves several surfaces). A HUD reader holds its
+feeds while it is mounted AND showing them (`useFeedRead`, fenced by
+`components/feedReadBoundary.test.ts`; the trends hooks REQUIRE a reader argument); the scene holds
+the feeds its current view draws, derived from the view-policy flags that switch the drawing on
+(`domain/sceneFeeds.ts`). A lane nothing reads dims (no label — the "idle here" words left the same day); the feed keeps running,
+because the app keeps one live model so a view switch needs no reload. Each lane carries its
+readers' names in `data-readers` for debugging. **And a fetcher may gate on it**: the snapshot reads fetch only while
+something holds that feed (`RawSnapshotBridge` via `feedInUse`/`onFeedUse`, user, same day: "why is
+it reading while nobody is looking?"), re-running the BACKFILL_N backfill on each idle → used edge —
+measured, 0 reads in Geography, ~10 on entering Snapshots, then one per tick. The metagraph
+snapshots stay always on: the anchor index is the Snapshots chamber's recent HISTORY, and a reader
+arriving later could not recover the stretch it was away for. Either strip is a **layout participant, not a popup** — TopBar publishes its
 height and both the rails and the canvas add it to their `top`, a pure position shift that keeps
 the buffer viewport-sized so nothing distorts and the engine never resizes.
 
@@ -260,8 +278,8 @@ decisions inside them are design, not detail:
   (`src/data/ledgerPath.ts`). The LIVE/PINNED
   control rides the CARD HEAD's eyebrow row with the shown snapshot's ticking age (2026-09-28 —
   it rode the heading row as the level's setting, design decision 15, until then), and the pager
-  states the TIME the rows span ("last 11 min cache" — the word "cache" joined it on 2026-10-19 at
-  the user's ask) rather than "52 recent". **The ticks that arrived
+  states the TIME the rows span ("last 11 min" — the word "cache" rode it from 2026-10-19 until
+  the user dropped it on 2026-10-25: "avoid cache") rather than "52 recent". **The ticks that arrived
   behind a pin are the list's FIRST ROW** (user, 2026-10-18: "fits better as the top row inside
   the explorer, similar to the scene, which animates the extra thin bar at the front when new
   snapshots arrive"): a live-dot row, "12 newer", sliding in from the top (`ExplorerRowSpec.
@@ -331,21 +349,24 @@ decisions inside them are design, not detail:
 (user, 2026-10-23, design B of the brainstorm's `explorer-sections.html` — the card "reads like
 lots and lots of buttons, lines and values … all the same padding and no very clear distinction";
 and "what about design consistency??" when the first cut was History's alone). The CONTROL BAND
-is one full-bleed `--panel-plate` under the head holding what the reader SETS: the MEASURE TILES
-(`MeasureTiles` — every measure of the level named at once, glyph and word, the current one in
-the view switch's on-state; four sit two by two, two/three/six in three columns; `MEASURE_ICONS`
-in `components/icons.tsx` is the one glyph map, keyed by measure id across the four measure
-modules), a hairline, then the PATH, bare (`ExplorerPath bare` — its own accent-tinted plate under
-the band was a third surface in a second tint; the house keeps its wash as the band's one accent
-mark). The list sits on the glass. The pager or span sits on the PLATE FOOT, full-bleed to the
+is one full-bleed `--panel-plate` under the head holding what the reader SETS: the MEASURE
+CONTROL (`MeasureTiles` — every measure of the level named at once, glyph and word, the current
+one in the view switch's on-state; four sit two by two, two/three/six in three columns;
+`MEASURE_ICONS` in `components/icons.tsx` is the one glyph map, keyed by measure id across the
+four measure modules — **ONE SEGMENTED CONTROL since 2026-10-25**, design pass: one hairline
+frame around the set, dividers between columns, a hairline between rows, the lit cell filled;
+user: the card "reads like lots and lots of buttons"), then the PATH, bare, directly beneath (the
+hairline between them left the same day — the control's frame already bounds it, and the band's
+rhythm tightened 8 → 6px; `ExplorerPath bare` — its own accent-tinted plate under the band was a
+third surface in a second tint; the house keeps its wash as the band's one accent mark). The list sits on the glass. The pager or span sits on the PLATE FOOT, full-bleed to the
 card's bottom edge, the right-rail foot's own device — and EVERY card ends in one: Hypergraph's
 and Geography's lists are the live poll, so their foot is the live atom (`explorer/LiveFoot.tsx`,
-`LiveDot` + "live"); Snapshots keeps "last N min cache" because there "live" is a SELECTION state
+`LiveDot` + "live"); Snapshots keeps "last N min" because there "live" is a SELECTION state
 (live vs pinned, on the tick row and the card head) and the foot's word would collide with it.
-No section labels: "Networks" would be said twice. Four rules the same day finished it: **every
-tile is a bounded button** (a hairline ring, the lit one's in the selection pair, both `!` — the
-toggle primitive's `data-[spacing=0]:shadow-none` outranked the plain ring; user: unlit "they are
-just texts on the same plane"); **the band shows the explorer's WHOLE measure set on every level**,
+No section labels: "Networks" would be said twice. Four rules the same day finished it: **the
+measure set is bounded** (a hairline ring per tile then, the one frame since 2026-10-25; the lit
+cell's ring in the selection pair, both `!` — the toggle primitive's `data-[spacing=0]:shadow-none`
+outranked the plain ring; user: unlit "they are just texts on the same plane"); **the band shows the explorer's WHOLE measure set on every level**,
 the measures a level cannot show INACTIVE at reduced strength, a node level all of them (user:
 "instead of removing the control band … just make them inactive? I don't like it just
 disappears" — the plank's rule); **a row with a hued bar carries no identity dot**, and the glyph
@@ -492,9 +513,19 @@ plank's squares read as stepping buckets, not changing the subject).
 **The Metagraph card stands on the plane brought forward** (user, 2026-10-07: "if we click a
 network in explorer, should we set the metagraph card accordingly? (not the global filter
 though)"): `trendStack.cardNetwork` — the focus, else the filter — read by the manifest and the
-card, the Snapshots tick-local network's precedent. A focus bumps the network slot so the card it
-opens is the box; its × releases the focus, never the filter; and it carries no ‹ › while it stands
-on a focus (a filter step would write the top bar, and the stack's order lives only in React).
+card, the Snapshots tick-local network's precedent; its × releases the focus, never the filter; and
+it carries no ‹ › while it stands on a focus (a filter step would write the top bar, and the stack's
+order lives only in React). **A focus OPENS THE RANGE CARD, not the dossier** (user, 2026-10-25: a
+row click "focuses on the metagraph card, makes sense but in this situation the range is more
+interesting" — asked for "without breaking any rules or creating exceptions"): the rule every
+commit follows is that a selection opens its own card, and the focused plane's own card is the
+Range — a plane IS its network's chart over the span on screen, which is what the Range card
+states. So `setTrendFocus` bumps the `range` slot (it bumped `network` from 2026-10-07), the
+dossier stands above it as a parent entry, and nothing is view-compared: the setter is History's
+own. **And the Range and Moment leads name the network the deck stands on** — `cardNetwork`, the
+focus, else the filter, else the plane in FRONT — the same rule the dossier and the explorer's
+highlighted row read (same day: under All the explorer highlighted the front plane's row while the
+Range card said "All networks"; one subject, every surface).
 
 **History's lane was the network dossier, then the MOMENT** (2026-09-19; named "Instant" until 2026-09-26) — the cursor card, a slot
 with NO focus rung, exactly as the two snapshot slots are. Its subject is `trendCursorMs`, which the
@@ -590,6 +621,17 @@ adjacency as containment. (The chamber's storeys are the other way round — rib
 floor; geometry shows the fall, the rail states the containment.) The snapshot cards are slots that
 ride the lane **without being focus rungs** — `railLadderBoundary.test.ts` asserts rung → slot, not the
 reverse, so a slot without a rung is fine and a rung without a slot is not.
+
+**A HEAD THAT IS NOT THE OPEN BOX IS ONE ROW** (design pass, 2026-10-25 — user: the right rail
+"is pretty dense with all the header displayed. I don't want to lose info"): a folded ENTRY lays
+its eyebrow, its title and its aside on one line (`CardHead`'s entry branch — the eyebrow takes
+one column width so the pile's titles align; a two-line title node marks its block
+`data-titleblock` and its lines go inline, so the dossier's kind and the node's chips are kept,
+not dropped), and the explorer card's head does the same (the panel layout: EXPLORE · mark ·
+title · aside). The BOX keeps the two-row head — it is the one materialized card, and the tiers
+carry the depth. Measured at 1600×950 with three ancestors committed: the pile 175 → 143px, the
+explorer head 60 → 44. (A one-line dossier head was rejected once, 2026-07-12, when the kind text
+truncated into the site link; the link has lived in the body since 2026-08-08.)
 
 **The card grammar: ONE materialized box, unboxed entries, tucked into a SLAB.** Only the expanded rung
 renders as a glass panel; every other committed rung sheds its frame into an unboxed `.rail-entry` —
@@ -801,6 +843,23 @@ the number is then the only thing saying which global this snapshot landed in. I
 from a body row on 2026-08-10 — a join is not a fact ABOUT the snapshot, it is the relation the aside
 already names — and the metagraph TICKER that shared that row went with it under the pile rule, since
 the METAGRAPH card sits directly above and this card's own mark already carries the hue.
+
+**THE RAW LISTS ARE GROUPED, AND A GROUP PLATE HAS TWO SHAPES** (user, 2026-10-25, a run of rounds).
+Every raw list groups on every tier — Snapshots by global snapshot, Geography by country (whenever
+the order is the country's; another header sort flattens it), Hypergraph's phone roster by network,
+History's records by UTC day. One component draws every plate (`datasection/GroupToggle.tsx`,
+shadcn's data-table pattern: a native button with `aria-expanded`, since Radix Collapsible cannot
+wrap table rows). A plate whose group is a SUBJECT the raw layer may commit — the global snapshot
+— selects and releases it on a click and folds on its chevron; every other plate (country,
+network, day) ONLY folds. ⚠️ **A plate never reloads its own list**: History's day plate committed
+the day as the range for an hour, which re-read the records at a finer tier under the click
+("the whole dataset changes … looks different from what I clicked on"). Groups fold by default
+on the phone and stand open on the wider tiers, except that a group holding the committed or
+landed row always starts open. A selected subject says LIVE or PINNED in mark AND word, right
+after the number it qualifies, on plate and row alike; ages count on the one shared
+`useNowTick` clock. History's records page by whole DAYS ("1–7 of 31 days"), and the Snapshots
+log's newest page leads with the live buffer's newer rows (on top, never cutting a merged row to
+no page), because its own tips re-read only every 30s.
 
 **THE RAW PANE IS ONE SCROLLING DOCUMENT ON EVERY TIER** (user, 2026-10-18: "a scroll on the whole
 panel, so tabs always fully visible without their own scroll and height/sub-height etc only
@@ -1345,7 +1404,7 @@ In one line: **thread = resting identity cue; card edge = purely transient signa
   is closed goes vivid in its identity hue, still — colour alone since 2026-09-28 — until the sheet opens — purely visual, it
   **never opens the sheet**, and a pure deselect announces nothing.
 - **Calm tempo.** The heartbeat family beats at 1.5s and transient signals run around 1.2s, debounced
-  so a 4s-tick live feed never reads as a strobe. **Navigation moves on its own, slower clock** — the
+  so a 5s-poll live feed never reads as a strobe. **Navigation moves on its own, slower clock** — the
   depth change is 0.55s and the view choreography ~3.3s — because that's the user's own gesture
   resolving, not the instrument speaking.
 - **Reduced motion is guarded on every animation**: theme-var animations carry

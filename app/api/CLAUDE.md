@@ -18,6 +18,32 @@ them — but the Next Node server can.
   `unstable_cache` at a 5-minute revalidate (was 10 — halved 2026-08-14: a node-set restart read as "unknown node" for most of a cycle) (throwing on an empty result keeps a blip from being
   cached). A `maxDuration` and a per-fetch timeout keep a slow cluster LB from blowing the function
   budget.
+- **`/api/live`, `/api/live/globals`, `/api/live/meta/[id]`, `/api/live/clusters`** (2026-10-25) are the
+  shared live feed: one upstream read serves every tab (design:
+  `docs/superpowers/specs/2026-10-25-shared-live-feed-design.md`). `/api/live` is the assembled
+  answer (12 globals, each chain's newest `POLL.metaSnapTail`, the unlisted chain ids, `failed`) at
+  `public, s-maxage=4, stale-while-revalidate=2`; `/globals` and `/meta/[id]` are the catch-up reads at
+  the same header; `/clusters` is the L0 + L1 node lists at `s-maxage=25, stale-while-revalidate=5`.
+  Each body carries `memoAgeMs`, which with the edge `Age` header dates the data (the client's
+  `dataTime`). **Every window is derived from the client's poll in ONE home**, `windows.ts`
+  (2026-10-25 — the routes held a second copy of the cadence, and the cluster poll moved 25 → 30s
+  under them): the edge a little under the poll (4s for the 5s feeds, 25s for the 30s one), the
+  memo at most 5s, because the two caches STACK — the oldest answer a tab can get is memo + edge +
+  stale-while-revalidate, 10s and 35s today (`worstAgeMs`, tested). Each route holds a **module-level memo** (`upstream.ts`, per network) that checks its own
+  timestamp and shares one in-flight promise between concurrent misses;
+  never `unstable_cache`, whose revalidate is too coarse for a 4 s window. The memo drops an expired
+  entry when it is read and sweeps expired entries once it holds more than 256. **`?limit=` rounds UP
+  to a fixed ladder** (`limit.ts`'s `clampLimit` — the client's own limits, `META_LADDER` derived from
+  `POLL` and the catch-up's growth, `GLOBALS_LADDER` = {12, `POLL.maxSnapshots`}), so an odd caller
+  costs a few extra records, never a fresh upstream read and a memo entry of its own. **A miss runs
+  its reads in parallel** — globals, the unlisted list and the listed chains at once, the unlisted
+  chains as soon as their list lands — so its worst case is two 4 s upstream timeouts, under the
+  client's 10 s abort. An upstream failure of the
+  global read (or an empty cluster list) is a **503 with `no-store`**, so a blip is never cached; a
+  failed chain read leaves the answer 200 and lists the chain in `failed`, and a failed unlisted-list
+  read marks it with the `"@unlisted"` entry. `/api/live/meta/[id]` is **not an open proxy**: the id
+  must be a tracked chain or a listed unlisted one, else 404 with no upstream read (503 when the
+  unlisted list itself cannot be read).
 - **`/api/geo`** serves the validator IP→geo map live (cached 1h, 503 on failure) so the globe plots
   from one request; the client-side resolver fills any misses.
 - **`/api/trends`** serves tiered timeseries windows (`?window=24h|7d|30d|1y|all`) assembled
@@ -119,7 +145,7 @@ ever, since they're immutable. (The LB's serving depth varies per request — se
 note above — so the band is no cost bound.) Re-tighten here when the plan changes.
 - The client fetches `/api/metagraphs` on mount **and re-pulls every 5 min** — Vercel never restarts
   and ISR only freshens the *server* cache, so an idle tab must re-pull. Snapshot and cluster feeds are
-  live client polling.
+  polled by the client through the `/api/live*` routes above.
 
 ⚠️ **Adding geo FIELDS does not invalidate `unstable_cache`/localStorage** — bump the cache keys when
 the field set changes.

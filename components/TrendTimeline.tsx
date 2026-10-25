@@ -76,7 +76,7 @@ export default function TrendTimeline() {
   // document read, so the track costs no request the page was not already making. Leading-trimmed
   // for the page's own rule: a window that opens months before measuring began would draw a long
   // runway of hole nobody dug.
-  const ov = useTrendsWindow("all");
+  const ov = useTrendsWindow("all", "History timeline");
   // ⚠️ MEMOISED, AND THE REVIEW'S REASON IS THE WHOLE POINT (2026-09-18, round 2). `leadingTrim`
   // returns its input unchanged ONLY when there is no leading gap; in the `all` window's normal
   // production state it cuts, allocating a fresh `buckets` array and `series` object every call.
@@ -98,7 +98,7 @@ export default function TrendTimeline() {
   // here made this band the one roster consumer that did not: it quantised, keyboard-stepped and
   // stamped at five minutes over charts drawn in hours, so 11 of 12 ArrowRight presses moved
   // nothing visible and the band's stamp disagreed with the card's title.
-  const slice = useTrendsSlice(windowId, range);
+  const slice = useTrendsSlice(windowId, range, "History timeline");
   const stepMs = stepFor(slice, metric);
   // The Same scale gate reads the ROSTER'S width (review, 2026-09-28): the switch is for a column
   // of planes to share one ceiling, so it shows exactly when the stack holds more than one — the

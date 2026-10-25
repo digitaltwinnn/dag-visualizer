@@ -31,6 +31,7 @@ import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder"
 import FollowControl from "@/components/FollowControl";
 import { NODE_ID_GLYPHS } from "@/components/explorer/nodeRow";
 import { IDENT_INK } from "@/components/identInk";
+import { useFeedRead } from "@/components/useFeedRead";
 
 type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: K }>;
 
@@ -82,6 +83,7 @@ export function SnapshotAside(_: { data: GlobalSnapshot }) {
 // from (`networkKind`, in ./parts), just folded into the ticker row instead of its own line.
 // Rolls as a whole via InspectorCard's `titleKey` (keyed on the name, synced with the edge pulse).
 export function MetaTitle({ cfg }: { cfg: MetaCfg }) {
+  useFeedRead(["api-metagraphs"], "MetaTitle");
   const metaList = useStore((s) => s.metaList);
   const mg = metaList.find((x) => x.id === cfg.id) || null;
   // The unlisted pseudo-network keeps its mandated neutral — identityHudCss would hash-assign a
@@ -92,23 +94,31 @@ export function MetaTitle({ cfg }: { cfg: MetaCfg }) {
   const monogram = (cfg.ticker || cfg.name).slice(0, 3).toUpperCase();
   const kind = networkKind(cfg.id, mg?.nodes || []);
   return (
-    <span className="inline-flex items-center gap-2.5 min-w-0">
+    <span data-titlerow="" className="inline-flex items-center gap-2.5 min-w-0">
       {/* The logo shows as a clean circular mark — no squared tile (brand icons are round);
           30px matches the two-line name+ticker block (was 38 — bottom-padded the collapsed
           card, user). The head keeps its TWO lines even collapsed: a one-line compact variant
           was tried and rejected (2026-07-12 — the kind text truncated into the site link);
           the dossier's collapsed height runs a few px taller than the other cards' by
           deliberate trade (all the identity info stays). */}
-      <Avatar className="size-[30px] flex-none">
+      <Avatar data-avatar="" className="size-[30px] flex-none">
         {iconUrl && <AvatarImage src={iconUrl} alt="" />}
         <AvatarFallback className={IDENT_INK} style={{ color: hue }}>{monogram}</AvatarFallback>
       </Avatar>
-      <span className="flex flex-col gap-px min-w-0">
+      {/* `data-titleblock`: a folded ENTRY lays these two lines out on one baseline (CardHead's
+          ENTRY_TITLE), name then kind — the one-line form rejected on 2026-07-12 truncated the
+          kind INTO the site link, which has lived in the body since 2026-08-08. */}
+      <span data-titleblock="" className="flex flex-col gap-px min-w-0">
         <span className="leading-[1.1]">{cfg.name}</span>
         {/* The TICKER left this line for the title-row ASIDE (user, 2026-08-08 — MetaTickerAside,
             taking the slot the site link held; the link moved into the body as a labelled row).
             The kind descriptor keeps the second line alone. */}
-        <span className="text-label font-normal text-muted-foreground truncate">{kind}</span>
+        {/* The kind, in two forms the head's tier picks between (CardHead's ENTRY_TITLE, 2026-10-25):
+            the box reads the full phrase; the one-row ENTRY, whose eyebrow already says METAGRAPH,
+            reads the qualifier alone ("currency", "data and currency") — the word it dropped is
+            the word beside it. The hypergraph and a bare "metagraph" have no qualifier to keep. */}
+        <span data-kind-full="" className="text-label font-normal text-muted-foreground truncate">{kind}</span>
+        <span data-kind-short="" className="hidden text-label font-normal text-muted-foreground truncate">{kind.replace(/ metagraph$/, "")}</span>
       </span>
     </span>
   );
@@ -135,6 +145,7 @@ function useSignedSelected(
   node: { id?: string | null; ids?: string[] } | undefined | null,
   netId: string | null,
 ): { ordinal: number; signed: boolean } | null {
+  useFeedRead(["exact"], "useSignedSelected");
   const metaSnap = useStore((s) => s.metaSnap);
   const deepMap = useStore((s) => s.metaSnapDeep);
   const exact = useStore((s) => s.snapshotExact);
@@ -200,6 +211,7 @@ export function GeoLiveAside() {
 // A clicked Global L0 snapshot: what it anchored and what it settled (fees/size/rewards). Its
 // place in the DAG (the Layers mark + ordinal + live/age) is the card HEAD now (SnapshotTitle/SnapshotAside).
 export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
+  useFeedRead(["exact"], "SnapshotCard");
   // EXACT totals from the raw L0 snapshot (via RawSnapshotBridge) are the ONLY source for the fee
   // + anchored breakdown — authoritative (the true total, incl. unlisted). If they aren't here yet
   // the tick is "reading…" (ACQUIRING); there is no polled-floor fallback. A FAILED read records
@@ -484,6 +496,7 @@ function ArchivalAcquiring() {
 // make-up rows, website. Its live/economic counterpart is the top-bar vitals (filter-aware
 // "live activity"), so the dossier stays a stable identity card.
 export function MetaCard({ cfg }: { cfg: MetaCfg }) {
+  useFeedRead(["global", "api-metagraphs", "exact"], "MetaCard");
   const metaList = useStore((s) => s.metaList);
   const mg = metaList.find((x) => x.id === cfg.id) || null;
   // THE RELATION TO THE CARD ABOVE (user, 2026-10-07: "should the metagraph card, when not the 1st
@@ -693,6 +706,10 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
 // at the same 11px/hue treatment it had under the name, right-aligned like every head aside.
 export function MetaTickerAside({ cfg }: { cfg: MetaCfg }) {
   if (!cfg.ticker) return null;
+  // A HEAD MUST NOT SAY THE SAME THING TWICE (CountryAside's rule): where the ticker IS the name
+  // (USDC.dag), the chip would repeat the title beside it — and in the one-row entry it took the
+  // room the kind needed (user, 2026-10-25: "no space for the metagraph type").
+  if (cfg.name.toLowerCase() === cfg.ticker.toLowerCase()) return null;
   return (
     // The one ticker chip (`TickerChip`). Unlisted stays neutral — same guard as MetaTitle above.
     <TickerChip text={cfg.ticker} hue={cfg.id === UNLISTED_ID ? UNLISTED_HUE : identityHudCss(cfg.id)} />
@@ -779,6 +796,7 @@ export function GeoLiveCard() {
 // above it uses, so the two can't disagree about who owns the host, and it keeps the mono face
 // the provider card's own ASN row carries.
 function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
+  useFeedRead(["api-metagraphs"], "GeoLiveNode");
   // The SIGNED relation owns the head aside while it exists (GeoLiveAside) — the status the
   // head normally carries moves down here as the first body row, so no fact is lost, only
   // redistributed (the pile rule's redistribution idea, applied within one card).
@@ -1000,6 +1018,7 @@ function countryDisplayName(cc: string, selNodes: ReturnType<typeof useStore.get
 // Head title: the country mark + display name (rolls via titleKey=cc, synced with the
 // edge pulse) — same "kind mark leads the title" grammar as every other card head.
 export function CountryTitle({ cc }: { cc: string }) {
+  useFeedRead(["clusters", "api-geo"], "CountryTitle");
   const selNodes = useStore((s) => s.selNodes);
   const name = countryDisplayName(cc, selNodes) ?? cc;
   const Mark = COUNTRY_ICON;
@@ -1018,6 +1037,7 @@ export function CountryTitle({ cc }: { cc: string }) {
 // Suppressed when the display name is unknown — the title has then already fallen back to the code
 // itself, and a head must not say the same thing twice (the same rule the pile follows).
 export function CountryAside({ cc }: { cc: string }) {
+  useFeedRead(["clusters", "api-geo"], "CountryAside");
   const selNodes = useStore((s) => s.selNodes);
   if (!countryDisplayName(cc, selNodes)) return null;
   // A QUALIFIER CHIP, like every head's (the card skeleton, 2026-10-02) — still muted, still the
@@ -1070,6 +1090,7 @@ function providerParts(rows: { pick: PickDescriptor }[]): SchedulePart[] {
 }
 
 export function CountryCard({ cc }: { cc: string }) {
+  useFeedRead(["clusters", "api-geo"], "CountryCard");
   const selNodes = useStore((s) => s.selNodes);
   const rows = useMemo(() => selNodes.filter((r) => r.cc === cc), [selNodes, cc]);
   const parts = useMemo(() => providerParts(rows), [rows]);
@@ -1125,6 +1146,7 @@ export function CompositionAside({ sel }: { sel: CompositionSel }) {
 }
 
 export function CompositionCard({ sel }: { sel: CompositionSel }) {
+  useFeedRead(["clusters", "api-geo"], "CompositionCard");
   const selNodes = useStore((s) => s.selNodes);
   const groups = useMemo(() => compositionGroups(selNodes), [selNodes]);
   const members = groups.find((g) => g.key === sel.key)?.rows ?? [];
@@ -1188,6 +1210,7 @@ export function ProviderAside({ sel }: { sel: CohortSel }) {
 }
 
 export function ProviderCard({ sel }: { sel: CohortSel }) {
+  useFeedRead(["clusters", "api-geo"], "ProviderCard");
   const selNodes = useStore((s) => s.selNodes);
   const members = useMemo(
     () =>

@@ -116,7 +116,7 @@ export function windowNote(a: Activity | null | undefined, unit: string): string
  *  only refuses to disappear.
  *
  *  Either segment may stand alone: lead-only (geo's NODES), detail-only (NETWORK LAYERS, and
- *  PulseStrip's poll cards, which pass no lead). The divider draws only when both are present. */
+ *  the band's detail-only cards, which pass no lead). The divider draws only when both are present. */
 export function BandCard({ label, children, className, mark, lead, aside }: { label: string; children?: React.ReactNode; className?: string; mark?: React.ReactNode; lead?: React.ReactNode; aside?: React.ReactNode }) {
   return (
     <div className={cn(

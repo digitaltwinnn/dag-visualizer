@@ -20,6 +20,7 @@ import { stampInstant } from "@/src/data/trendTimeline";
 import { bucketAt, spanPhrase } from "@/src/data/trendWindow";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
+import { cardNetwork } from "@/src/engine/domain/trendStack";
 import { useStore } from "@/src/store/store";
 import Stamp from "@/components/Stamp";
 
@@ -47,12 +48,16 @@ import Stamp from "@/components/Stamp";
 // fields and share `useTrendsSlice`'s module-level cache, so this card costs one extra React
 // subtree per bucket change and no extra request.
 
-/** How the LEAD names its subject: the focused plane, else the committed network, else nobody. */
-function subjectOf(focus: string | null, filter: string, ranked: readonly string[], has: (id: string) => boolean): string | null {
-  // The focused plane, else the committed filter — any row the roster draws, the unranked
-  // Unlisted row included.
-  if (focus && (ranked.includes(focus) || has(focus))) return focus;
-  return ranked.includes(filter) || has(filter) ? filter : null;
+/** How the LEAD names its subject. */
+function subjectOf(filter: string, focus: string | null, front: string | null, ranked: readonly string[], has: (id: string) => boolean): string | null {
+  // THE NETWORK THE DECK STANDS ON — `cardNetwork`, the one rule the Metagraph card, the explorer's
+  // highlighted row and this lead all read (user, 2026-10-25: "the range talks about all networks
+  // but the DOR row in explorer is selected and chart displayed — it should always be in sync with
+  // the selection"): the focused plane, else the committed filter, else the plane in FRONT. Any row
+  // the roster draws counts, the unranked Unlisted row included; the DAG's own plane (and All, with
+  // no stack mounted) answers null, and the lead states the hypergraph's reading.
+  const net = cardNetwork(filter, focus, front);
+  return net !== "all" && (ranked.includes(net) || has(net)) ? net : null;
 }
 
 /** The cadence as a word for the head's chip: "5-min", "1-hour", "1-day". */
@@ -75,12 +80,13 @@ export default function TrendInstantPane({
   const filter = useStore((s) => s.filter);
   const metric = useStore((s) => s.trendMetric);
   const focus = useStore((s) => s.trendFocus);
+  const front = useStore((s) => s.trendFront);
   const windowId = useStore((s) => s.trendWindow);
   const range = useStore((s) => s.trendRange);
   const hoverFilter = useStore((s) => s.hoverFilter);
   const setHoverFilter = useStore((s) => s.setHoverFilter);
 
-  const roster = useTrendRoster(useTrendsSlice(windowId, range), filter, metric);
+  const roster = useTrendRoster(useTrendsSlice(windowId, range, "Moment card"), filter, metric);
   const { ranked, rows, buckets, stepMs, unit, format } = roster;
 
   // THE BUCKET, not the instant, is this card's subject: two pointer positions inside one bucket
@@ -92,7 +98,7 @@ export default function TrendInstantPane({
   // then and this card does not render at all.
   const note = cursorMs == null ? null : instantNote(placeInstant(cursorMs, buckets, roster.rawBuckets, stepMs), stepMs);
 
-  const subject = subjectOf(focus, filter, ranked, (id) => id !== "dag" && rows.has(id));
+  const subject = subjectOf(filter, focus, front, ranked, (id) => id !== "dag" && rows.has(id));
   // THE UNLISTED CHANNELS READ HERE TOO (user, 2026-10-09: "unlisted is not shown in the Moment
   // card while it is present and the explorer has selected it"). The roster keeps them out of the
   // RANK on purpose — the Networks list appends them after the ranked networks — so this list

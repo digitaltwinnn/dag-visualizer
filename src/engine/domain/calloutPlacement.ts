@@ -16,9 +16,12 @@
 // of itself in the strip between them, while the Details sheet behind it showed the whole node
 // card anyway. The caller passes the band the sheets leave, and everything here measures that.
 
-/** Panel standoff from the anchor: up and to the right. The leader spans exactly this diagonal. */
-export const CALLOUT_OFF_X = 100;
-export const CALLOUT_OFF_Y = 140;
+/** Panel standoff from the anchor: up and to the right. The leader spans exactly this diagonal.
+ *  100/140 from 2026-08-18 (the card sat on its subject at 62/92 — SceneCallout's note) until
+ *  2026-10-25 (user: "make the hairline from the callout a bit shorter, it's too long"): the same
+ *  1.4 slope, ~16% shorter, and the tie still clears the panel's own height. */
+export const CALLOUT_OFF_X = 84;
+export const CALLOUT_OFF_Y = 118;
 /** Where the leader INK actually ends, inset from the panel corner — the point the multi-leader
  *  legs must fan from so leader and legs meet exactly. Shared by SceneCallout's primary leader
  *  (y2) and CalloutSync's multi-leader (the fan corner); it was retuned once already (8 → 2) with
@@ -30,8 +33,8 @@ export const CALLOUT_LEG_INSET = 2;
  * panel the callout renders. These are what a placement is tested against, so they move with the
  * standoff above and never on their own.
  */
-export const CALLOUT_REACH_X = 360;
-export const CALLOUT_REACH_Y = 220;
+export const CALLOUT_REACH_X = 344;
+export const CALLOUT_REACH_Y = 198;
 
 export type CalloutPlacement = {
   /** False when the callout must not render at all — the band can't hold it honestly. */

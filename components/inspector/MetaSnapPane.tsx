@@ -36,6 +36,8 @@ import { METASNAP_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { metaSnapSelectActions, netKeyOf } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { cn } from "@/lib/utils";
+import { selectedRow, selectionHue } from "@/components/selection";
+import { useFeedRead } from "@/components/useFeedRead";
 
 // The body's row grammar and its three weights live in ./parts (`Fact` / `FactGroup` / `Foot`)
 // — shared with every other rail card, so this one can't drift into a dialect of its own. The
@@ -51,6 +53,7 @@ export default function MetaSnapPane({
   collapsed?: boolean;
   onToggle?: () => void;
 }) {
+  useFeedRead(["global", "exact"], "MetaSnapPane");
   const sel = useStore((s) => s.metaSnap);
   const exact = useStore((s) => (sel ? s.snapshotExact[sel.globalOrdinal] : undefined));
   // The tick's exact read FAILED (RawSnapshotBridge records the miss) — the give-up signal the
@@ -202,11 +205,19 @@ export default function MetaSnapPane({
               <span className="truncate font-mono tabular-nums">{sel.ordinal.toLocaleString()}</span>
             </span>
           }
-          // LIVE OR PINNED, as the global card and the raw pane say it (user, 2026-10-18) — a state
-          // line, never a control: the switch stays the Global snapshot card's.
+          // LIVE OR PINNED, as the global card and the raw pane say it (user, 2026-10-18) — a state,
+          // never a control: the switch stays the Global snapshot card's. It wears THAT card's chip
+          // (user, 2026-10-25: the global's "pinned" is a tag, this one was bare text) — one box in
+          // both states, the selection wash when pinned, here in this snapshot's own hue.
           aside={
-            <span className="inline-flex items-center gap-1.5 text-label font-normal text-muted-foreground">
-              {following ? <LiveDot /> : <PinMark className="text-muted-foreground" />}
+            <span
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-sm px-1.5 py-[3px] border border-transparent whitespace-nowrap text-label font-normal",
+                following ? "text-muted-foreground" : cn(selectedRow(true), "text-foreground"),
+              )}
+              style={following ? undefined : selectionHue(hue)}
+            >
+              {following ? <LiveDot /> : <PinMark className="text-foreground" />}
               {following ? "live" : "pinned"}
             </span>
           }

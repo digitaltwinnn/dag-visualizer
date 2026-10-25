@@ -19,6 +19,28 @@ keeps separate on purpose:
   snapshots keep it flat for long stretches. Real mainnet behaviour, not a bug.
 - **`subHeight`** — orders snapshots sharing a height.
 
+**The three live feeds (global snapshots, metagraph snapshots, node lists) are shared, not per-tab**
+(2026-10-25; `docs/superpowers/specs/2026-10-25-shared-live-feed-design.md`). A tab never calls
+Constellation for them: it polls our own edge-cached `/api/live*` routes (`NetworkData._fetchLive`),
+so the upstream sees one read per cache window however many tabs are open. A beat is stamped with
+the time its data was true — receipt time less the edge `Age` and the body's `memoAgeMs` — not the
+time the response arrived. ⚠️ **TWO CLOCKS, AND EACH HAS ONE JOB** (learned the same day, twice): the
+beats and the ages read the DATA's time; everything about THIS TAB's polling — the "next poll due"
+mark, failing vs ok, stale, the late stretch — reads the tab's own wall clock (`lastAttemptAt`,
+`lastWasOk`, `lastOkWallAt`). Mixing them drew the due mark seconds early (an out-of-sync cadence)
+and read a recovered feed as failing, because an ok carrying a cache window's age sat before the
+failure it followed.
+
+**The live poll never drops a global** (2026-10-25). Each poll reads the shared answer's window of
+the 12 newest globals and appends every one after the newest this tab holds, in order
+(`globalsToAppend`, tested). A tab that fell behind that window (a sleeping laptop, a stalled
+poll) reads `/api/live/globals` once for the whole retained buffer and appends every missed global
+(`missedGlobals`, tested); a failed catch-up keeps the window's append. The metagraph feed
+self-heals the same way (its catch-up limit, below), so the poll interval is a latency choice only,
+never a completeness one. **One tick runs at a time** — a tick that finds one in flight returns —
+and a global at or below the newest held is never appended, so an overlap can never push an ordinal
+twice.
+
 **A global snapshot's real work is settlement, not blocks.** Most carry zero (mainnet: ~1 in 50), so
 block count is the wrong activity signal. The meaningful field is **`metagraphSnapshotCount`** — how
 many metagraph snapshots this global anchored, typically 1–24 and sometimes 100+. So the strip bars
@@ -136,9 +158,14 @@ a hang — the acquiring give-up rule above).
 Two mechanisms back the polled fallback, which is used for old ticks, the strip and activity rates
 because exact reads are too heavy across many ticks:
 
-- **Self-healing catch-up**: the poll grows its limit until the batch reaches back to the newest
-  ordinal already held — provably no gap regardless of burst size. A fixed tail silently drops
-  DOR-sized bursts and mislabels them "unlisted".
+- **Self-healing catch-up**: each chain's newest snapshots, listed and unlisted, arrive in the
+  shared `/api/live` answer, which also carries the unlisted chain ids and leaves out the chains the
+  server found quiet. When a chain's shared tail starts past the newest ordinal this tab holds
+  (`chainNeedsCatchUp`, tested), the tab reads `/api/live/meta/[id]` and grows its limit until the
+  batch reaches back to that ordinal; the shared tail is then taken only if that batch also reaches
+  up to it (`chainToRecord` — the two caches age independently), else it waits a poll — provably
+  no gap regardless of burst size. A fixed tail silently drops DOR-sized bursts and mislabels them
+  "unlisted".
 - **Polled floor**: what was identified; the gap is a lower bound, shown only on old ticks.
 
 `api.ts` keeps rolling per-metagraph snapshot buffers plus an anchor index keyed by global timestamp,

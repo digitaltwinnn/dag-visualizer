@@ -1914,17 +1914,19 @@
   .ig-sheet-edge[data-side="left"]::after  { left: 4px; }
   .ig-sheet-edge[data-side="right"]::after { right: 4px; transform: scaleX(-1); }
 
-  /* Bottom-sheet (phone) instrument ruler on its TOP edge — painted OUTSIDE the sheet (the sheet
-     is overflow-visible; scroll lives on the inner body), ticks combing UP into the scene. Same
-     shared --thread-* rhythm as the rails + bar-chart axis. */
+  /* Bottom-sheet (phone) instrument ruler on its TOP edge, its ticks hanging DOWN INTO the sheet
+     (user, 2026-10-25: "instead of the ruler pointing outwards can you point it inwards?") — they
+     combed up into the scene until then, and with the raw pane now standing right above the sheet
+     they reached into its foot. The rails' own direction: a ruler's marks face the content it
+     measures. Same shared --thread-* rhythm as the rails + bar-chart axis. */
   .ig-sheet-topruler::before {
-    content: ""; position: absolute; top: -8px; left: 0; right: 0; height: 8px; pointer-events: none;
+    content: ""; position: absolute; top: 0; left: 0; right: 0; height: 8px; pointer-events: none;
     background:
-      linear-gradient(var(--thread-line), var(--thread-line)) left bottom / 100% 1px no-repeat,
+      linear-gradient(var(--thread-line), var(--thread-line)) left top / 100% 1px no-repeat,
       repeating-linear-gradient(to right, var(--thread-tick-major) 0, var(--thread-tick-major) 1px,
-        transparent 1px, transparent calc(var(--thread-tick-pitch) * 4)) left bottom / 100% 8px no-repeat,
+        transparent 1px, transparent calc(var(--thread-tick-pitch) * 4)) left top / 100% 8px no-repeat,
       repeating-linear-gradient(to right, var(--thread-tick) 0, var(--thread-tick) 1px,
-        transparent 1px, transparent var(--thread-tick-pitch)) left bottom / 100% 5px no-repeat;
+        transparent 1px, transparent var(--thread-tick-pitch)) left top / 100% 5px no-repeat;
     -webkit-mask-image: linear-gradient(to right, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%);
             mask-image: linear-gradient(to right, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%);
   }

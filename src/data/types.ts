@@ -291,3 +291,27 @@ export type PickDescriptor =
   // the selection payload plus the GLOBAL tick descriptor it anchored into, so the click table
   // can commit the pair (tile + its tick) without a second lookup.
   | (PickBase & { kind: "metaSnap"; sel: MetaSnapSel; global: Extract<PickDescriptor, { kind: "snapshot" }> });
+
+// Raw shape of a `/currency/{id}/snapshots` list entry (only the fields we read).
+export interface RawMetaSnapshot {
+  ordinal: number;
+  hash: string;
+  lastSnapshotHash: string;
+  timestamp: string;
+  fee?: number;
+  sizeInKB?: number;
+  height?: number;
+  subHeight?: number;
+  blocks?: unknown[];
+  epochProgress?: number;
+}
+
+/** The shared live answer (`/api/live`): one type for the route that assembles it
+ *  (app/api/live/assemble.ts) and the browser that reads it (`NetworkData`). */
+export type LiveAnswer = {
+  globals: GlobalSnapshot[];
+  metas: Record<string, RawMetaSnapshot[]>;
+  unlisted: string[];
+  failed: string[];
+  memoAgeMs: number;
+};

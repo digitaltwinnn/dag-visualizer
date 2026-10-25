@@ -1,7 +1,8 @@
 "use client";
 
 import { netUrl } from "@/src/net/current";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
+import { feedInUse, onFeedUse } from "@/src/data/feedUse";
 import { useStore } from "@/src/store/store";
 import type { SnapshotExact, ChannelSnapDeep } from "@/src/data/types";
 import { metaSnapDeepKey } from "@/src/data/types";
@@ -146,6 +147,12 @@ function ensure(ordinal: number | null | undefined, retry = false) {
 }
 
 export default function RawSnapshotBridge() {
+  // ⚠️ READ ONLY WHILE SOMETHING READS (2026-10-25 — user: "why is it reading while nobody is
+  // looking?"). The live tick's exact read used to fire every ~4s in every view as a prefetch for
+  // the Snapshots chamber. It now fires only while a reader holds the feed (src/data/feedUse.ts:
+  // the chamber, a snapshot card, the log), and the backfill re-runs on each idle → used edge, so
+  // arriving in Snapshots measures the last BACKFILL_N ticks (~30s of chain) in a few seconds.
+  const wanted = useSyncExternalStore(onFeedUse, () => feedInUse("exact"), () => false);
   const liveOrd = useStore((s) => s.latestSnapshot?.ordinal ?? null);
   const selOrd = useStore((s) => s.snap?.data.ordinal ?? null);
   const deepSel = useStore((s) => s.metaSnap);
@@ -154,7 +161,7 @@ export default function RawSnapshotBridge() {
   const deepWanted = useStore((s) => s.deepWanted);
   const backfilled = useRef(false);
 
-  useEffect(() => ensure(liveOrd), [liveOrd]);
+  useEffect(() => { if (wanted) ensure(liveOrd); }, [liveOrd, wanted]);
   useEffect(() => ensure(selOrd), [selOrd]);
 
   // One-shot, on the first live tick. The timer lives in a ref and is NOT cleaned per dep
@@ -162,8 +169,17 @@ export default function RawSnapshotBridge() {
   // so a dep-scoped cleanup routinely truncated the backfill and left trail rows unmeasured.
   const backfillTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
+    // Re-arms each time the feed goes idle, so the NEXT reader gets its own backfill.
+    // Idle stops the queue too (review, 2026-10-25): resetting the flag alone left a running
+    // backfill reading the rest of its ordinals after the reader left.
+    if (!wanted) {
+      backfilled.current = false;
+      if (backfillTimer.current) { clearInterval(backfillTimer.current); backfillTimer.current = null; }
+      return;
+    }
     if (backfilled.current || liveOrd == null) return;
     backfilled.current = true;
+    if (backfillTimer.current) clearInterval(backfillTimer.current);
     const queue = backfillOrdinals(liveOrd, useStore.getState().snapshotExact);
     let i = 0;
     backfillTimer.current = setInterval(() => {
@@ -174,7 +190,7 @@ export default function RawSnapshotBridge() {
       }
       ensure(queue[i++], true); // backfill misses retry; the live/selected ones do not
     }, BACKFILL_GAP_MS);
-  }, [liveOrd]);
+  }, [liveOrd, wanted]);
   useEffect(
     () => () => {
       if (backfillTimer.current) clearInterval(backfillTimer.current);

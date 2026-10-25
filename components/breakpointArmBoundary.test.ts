@@ -59,13 +59,13 @@ describe("responsive tier arms name the boundary itself", () => {
     // `max-[700px]` arm (user, 2026-10-08, design A1 — its About and links moved into the ⚙
     // menu; it rode above the dock as overlay chrome before). Two homes for one boundary, so they
     // are pinned together: this is the pair that was once off by one and left --footer-h
-    // reserving 26px the layout wasn't using. The raw pane runs to the safe area and reserves no
-    // footer row.
+    // reserving 26px the layout wasn't using. The raw pane reserves no footer row; it ends above
+    // the dock bar, which stays on the raw page (2026-10-25).
     const css = readFileSync(join("app", "globals.css"), "utf8");
     expect(css).toMatch(/@media not \(min-width: 700px\) \{\s*:root \{ --footer-h: 0px; \}/);
     const foot = readFileSync(join("components", "SiteFooter.tsx"), "utf8");
     expect(foot).toContain('"max-[700px]:hidden"');
     const shell = readFileSync(join("components", "SectionShell.tsx"), "utf8");
-    expect(shell).toContain("max-[700px]:bottom-[calc(env(safe-area-inset-bottom,0px)+6px)]");
+    expect(shell).toContain("max-[700px]:bottom-[calc(var(--phone-dock-h)+6px+var(--raw-cover,0px))]");
   });
 });

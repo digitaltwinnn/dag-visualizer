@@ -33,10 +33,11 @@ describe("callout standoff", () => {
     expect(CALLOUT_REACH_Y).toBeGreaterThan(CALLOUT_OFF_Y);
   });
 
-  it("mirrors the standoff app/globals.css hardcodes", () => {
-    // #callout .co-panel { left: 100px; bottom: 140px } — CSS can't import a const, so this is
-    // the mirror's one executable reminder. Change both or neither.
-    expect([CALLOUT_OFF_X, CALLOUT_OFF_Y]).toEqual([100, 140]);
+  it("the standoff is the approved pair, on the 1.4 slope the leader was tuned at", () => {
+    // The stylesheet reads it as `--co-off-x/y` (SceneCallout writes the variables), so this pins
+    // the VALUE the user approved (2026-10-25: "a bit shorter" than 100/140) and its slope.
+    expect([CALLOUT_OFF_X, CALLOUT_OFF_Y]).toEqual([84, 118]);
+    expect(CALLOUT_OFF_Y / CALLOUT_OFF_X).toBeCloseTo(1.4, 1);
   });
 });
 
@@ -57,8 +58,8 @@ describe("calloutPlacement on desktop", () => {
 
   it("measures drop against the canvas top, not the viewport's", () => {
     // The canvas sits under the command bar (and its filter strip, when open), so `top` moves.
-    expect(at(700, DESKTOP, 210, 0).drop).toBe(true);
-    expect(at(700, DESKTOP, 210, 0 - CALLOUT_REACH_Y).drop).toBe(false);
+    expect(at(700, DESKTOP, CALLOUT_REACH_Y - 10, 0).drop).toBe(true);
+    expect(at(700, DESKTOP, CALLOUT_REACH_Y - 10, 0 - CALLOUT_REACH_Y).drop).toBe(false);
   });
 
   it("shows everywhere across a desktop band — the tier never declines on width", () => {
@@ -103,14 +104,15 @@ describe("calloutPlacement against an overlaying sheet", () => {
   });
 
   it("on the desktop rails' SOFT band a panel that fits on neither side takes the roomier side", () => {
-    // 1400px viewport, rails pulling the band to 345..1030, a hub framed at the centre.
-    const rails = { l: 345, r: 1030 };
+    // 1400px viewport, rails pulling the band to 360..1030, a hub framed at the centre — a band
+    // the full reach (344) clears on neither side.
+    const rails = { l: 360, r: 1030 };
     expect(at(700, rails).show).toBe(false); // the sheets' rule: hidden
     const soft = calloutPlacement(700, 500, rails.l, rails.r, 0, { overrun: true });
-    expect(soft).toMatchObject({ show: true, flip: true }); // 355 of room left vs 330 right
+    expect(soft).toMatchObject({ show: true, flip: true }); // 340 of room left vs 330 right
     expect(calloutPlacement(600, 500, rails.l, rails.r, 0, { overrun: true })).toMatchObject({ show: true, flip: false });
     // A measured panel narrower than the widest one fits where the constant did not.
-    expect(calloutPlacement(700, 500, rails.l, rails.r, 0, { reachX: 100 + 220 })).toMatchObject({ show: true, flip: false });
+    expect(calloutPlacement(700, 500, rails.l, rails.r, 0, { reachX: CALLOUT_OFF_X + 220 })).toMatchObject({ show: true, flip: false });
     // Outside the band is still nothing, soft or not.
     expect(calloutPlacement(200, 500, rails.l, rails.r, 0, { overrun: true }).show).toBe(false);
   });
@@ -186,8 +188,8 @@ describe("calloutPhonePlacement — the label in the free strip above or below i
     expect(p).toEqual({ show: true, drop: false, left: -PW / 2, leader: 200 - (TOP + AIR + PH) });
   });
   it("drops the panel just above the dock when the bottom edge is nearer", () => {
-    const p = place(195, 340);
-    expect(p).toMatchObject({ show: true, drop: true, leader: BOTTOM - AIR - PH - 340 });
+    const p = place(195, 350);
+    expect(p).toMatchObject({ show: true, drop: true, leader: BOTTOM - AIR - PH - 350 });
   });
   it("…but never further than twice the old standoff — the label stays attached", () => {
     const p = calloutPhonePlacement(195, 300, 0, W, TOP, 900, PW, PH);

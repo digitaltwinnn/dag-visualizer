@@ -49,6 +49,7 @@ export default function TopBar() {
   // whole ordinary face over it, filter included, exactly as it does over the anchor log. The
   // exception had no second user, so it left with the doc (views.ts records the flags' removal).
   const doc = useStore((s) => s.docPage);
+  const railsHidden = useStore((s) => s.railsHidden);
   const filterOff = doc != null;
   // The presentation pair is VIEW-SCOPED (SCENE⇄HUD and RAW act on the 3D view under the bar),
   // so it stands down wherever there is no such view: a doc overlay, or the flat "soon" view
@@ -159,6 +160,10 @@ export default function TopBar() {
   // instead of sliding from a stale side.
   const [faceSlide, setFaceSlide] = useState<{ mode: Mode; from: "left" | "right" } | null>(null);
   const faceFrom = faceSlide && faceSlide.mode === mode ? faceSlide.from : null;
+  // A VIEW STEP KEEPS THE GROWN STRIP (user, 2026-10-25: "if expanded keep it that way (same as
+  // for bottom bar basically)"): the ‹ › and the swipe change the view, not the bar, so an open
+  // filter, pulse, about or views row stays open and simply reads the new view — as an open
+  // dock sheet does. A pick from the views list still closes that list: the pick was its job.
   const viewChevron = (dir: -1 | 1) => {
     const target = stepView(LISTED_IDS, mode, dir === -1 ? 1 : -1);
     const name = target ? VIEWS.find((v) => v.id === target)?.name : null;
@@ -168,7 +173,7 @@ export default function TopBar() {
         type="button"
         disabled={!target || !!doc}
         aria-label={name ? `${name} view` : dir === -1 ? "First view" : "Last view"}
-        onClick={() => { if (target) { setStrip(null); setFaceSlide({ mode: target, from: dir === 1 ? "right" : "left" }); setMode(target); } }}
+        onClick={() => { if (target) { setFaceSlide({ mode: target, from: dir === 1 ? "right" : "left" }); setMode(target); } }}
         className={cn(
           // THE PLANK CHEVRON SPECIES, FLUSH TO THE NAME (user, 2026-10-23, design A of
           // `.superpowers/brainstorm/…/phone-topbar-stepper.html`: the pair was "too wide and
@@ -206,7 +211,6 @@ export default function TopBar() {
     swipedAt.current = e.timeStamp;
     const next = stepView(LISTED_IDS, mode, dir);
     if (next) {
-      setStrip(null);
       setFaceSlide({ mode: next, from: dir === -1 ? "right" : "left" });
       setMode(next);
     }
@@ -266,7 +270,19 @@ export default function TopBar() {
       {/* --bar-margin, not two literals: the vitals band mirrors this inset exactly (user,
           2026-09-01 — "the bottom bar should be the same exactly as the top bar"), and the token
           carries the 1100px step so neither bar can drift from the other. */}
-      <div className="fixed top-[14px] inset-x-[var(--bar-margin)] z-40 pointer-events-none">
+      <div
+        className={cn(
+          "fixed top-[14px] inset-x-[var(--bar-margin)] z-40 pointer-events-none",
+          // SCENE MODE TAKES THE BAR TOO (user, 2026-10-25: "hide also the footer and the bar, but
+          // keep the button somewhere to toggle back"): the bar leaves through the top edge on the
+          // rails' own two tempos (0.3s away, 0.18s back — the `.rail-shade` recipe), the caption
+          // strip riding with it, and PresentationToggle keeps its one control floating at the
+          // bar's corner. The transform sits on this wrapper, never on `#topbar` itself: the bar
+          // is `overflow-hidden` and a transform there would also re-anchor nothing it owns.
+          "transition-transform duration-[180ms] ease-out motion-reduce:transition-none",
+          railsHidden && "-translate-y-[calc(100%+14px)] duration-300 ease-[ease]",
+        )}
+      >
       <div
         id="topbar"
         className={cn(
@@ -644,7 +660,7 @@ export default function TopBar() {
             ) : shownStrip === "about" ? (
               <AboutStrip onClose={() => setStrip(null)} />
             ) : (
-              <FilterPicker onPicked={() => setStrip(null)} />
+              <FilterPicker onPicked={() => setStrip(null)} shown={open && strip === "filter"} />
             )}
             {/* PHONE: the vitals ride the SAME strip as a second row (user, 2026-08-15) — one
                 dropdown control on the filter face instead of a separate 44px toggle starving

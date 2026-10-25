@@ -45,8 +45,10 @@ export interface PlanePose {
 /** How many planes the stack shows at once — the paging window's width. */
 export const VISIBLE_PLANES = 5;
 
-/** World-unit depth between adjacent slots. */
-export const PLANE_GAP = 9;
+/** World-unit depth between adjacent slots. 6 since 2026-10-25 (was 9 — user: "not the correct
+ *  ratio of suggested distance to front vs size of card"): at 9 against a ~69-unit view distance
+ *  the back card stood 1.5× as far as the front, and the near steps read nearly twice the far ones. */
+export const PLANE_GAP = 6;
 
 /** The stack's resting height — the centre the slot stagger is measured from. */
 export const PLANE_Y = 2;

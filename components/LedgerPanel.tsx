@@ -47,6 +47,7 @@ import { NO_SIGNAL_COPY, useNoSignal } from "@/components/useNoSignal";
 import { levelMeasure } from "@/src/data/explorerMeasure";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { tickNetworksLevel, tickPolledRows } from "@/src/data/ladderLevels";
+import { useFeedRead } from "@/components/useFeedRead";
 
 // THE SNAPSHOTS VIEW'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session
 // 2026-09-26; read `docs/superpowers/design/2026-09-26-explorer-card/README.md` first). This file
@@ -129,6 +130,7 @@ function spanWords(ordered: readonly GlobalSnapshot[]): string {
 }
 
 export default function LedgerPanel() {
+  useFeedRead(["global", "metasnaps", "clusters", "api-metagraphs", "api-geo", "exact"], "LedgerPanel");
   const filter = useStore((s) => s.filter);
   const mode = useStore((s) => s.mode);
   const hoverFilter = useStore((s) => s.hoverFilter);
@@ -299,8 +301,9 @@ export default function LedgerPanel() {
   // The span ALONE (user, 2026-10-03: "remove the explanatory text section"): the word was a
   // button opening a sentence about how many snapshots the explorer keeps — the cache again, which
   // is ours to know and not the reader's (his ruling on the raw phone panel's title, 2026-10-02).
-  // "last 8 min cache" (user, 2026-10-19): the word names what the span IS — the retained window.
-  const spanScope = { word: `${spanWords(orderedSnaps)} cache` };
+  // The span alone, "last 8 min" (user, 2026-10-25: "avoid cache" — the word joined on 2026-10-19
+  // and left with the About page's copy; how the site holds data is not the reader's vocabulary).
+  const spanScope = { word: spanWords(orderedSnaps) };
   const spanFooter =
     live && orderedSnaps.length > 0 ? (
       <ExplorerFoot left={spanScope.word} />

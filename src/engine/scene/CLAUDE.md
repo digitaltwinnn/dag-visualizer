@@ -54,7 +54,7 @@ than the country pose so drilling still reads as a zoom.
 the view feels very counter intuitive … it keeps the globe centre as reference while the camera has
 a very specific position for this layer"; then, of a first cut that turned the globe under a fixed
 camera, "now the selection rotates out of the view"). Every rung brings its subject to the front by
-turning the globe (`_aimAt`'s yaw + lean) while the camera flies to a pose that looks at a composed
+turning the globe (`_aimAt`'s yaw, plus a lean on the country/node/cohort rungs only — the network aim keeps the axis upright, 2026-10-25) while the camera flies to a pose that looks at a composed
 point in the sky rather than at the subject, so the stock orbit — about OrbitControls' look-at —
 swung the node out of the frame. `viewPolicy.dragOrbitsSubject` switches the stock orbit off for
 this view and the Engine turns the camera's (pos, target) pair RIGIDLY about the finest committed
@@ -83,6 +83,15 @@ canvas and pointer moves stop at their edge.
 around the internal `setFilter`, and `Engine.applyFilter`'s geo branch re-asserts `this.country` —
 otherwise the background cluster poll silently clears the border seconds after every drill. A real
 filter *switch* still clears it by design.
+
+**THE LIVE DIRECTORY DECIDES WHICH HUBS EXIST** (2026-10-25, user: "the real data should always
+lead and decide"). Hyper's hubs are pre-allocated one per catalog entry, because the catalog index
+is each hub's stable layout slot, but a hub is drawn, tethered, pulsed and pickable only once
+`/api/metagraphs` lists it (`MetaHubRec.present`, set by the Engine's `_publishMetaList`); the
+active set starts EMPTY, never null. Before the answer the scene is the DAG core alone, like the
+HUD. A directory entry missing from the catalog still gets no hub (it has no slot) — the Engine's
+"bake them" warning is that case. The Snapshots chamber's lanes are still one per catalog entry;
+moving them onto the live list is a separate piece of work.
 
 **Hypergraph** — committing a metagraph eases the whole structure's shared tilt to near-flat (the
 structure moves, the camera never rolls) and flies to the hub using its **local/unscaled** position:
@@ -139,9 +148,10 @@ point of its inner arcs nearest the ring's RIGHT side, clear of the globe's silh
 `CalloutSync._geoCalloutAnchor`'s last fallthrough)
 — the one object that stands for a fleet spread across the globe, where no surface point could
 (user: "a nice place to anchor the metagraph callout which is missing in this view"). The
-network POSE therefore keeps the rings in frame (`FOCI.geoNetwork`, a short step in from rest
-rather than the old dive): the globe's crown may tuck under the top bar, the rings never under
-the vitals band. The ruler is built on the FIRST `setLevels`, not in the constructor — the Globe
+network rung therefore keeps the rings in frame by having NO pose of its own (user, 2026-10-25:
+"it makes little sense to have two different angles" — `FOCI.geoNetwork` was a dive, then a wide
+pose, then a short step in, and left that day): it inherits the rest pose, the globe spins to the
+network, and the camera answers with the same-pose nudge, a subtle zoom in and back. The ruler is built on the FIRST `setLevels`, not in the constructor — the Globe
 constructs the ring before its ink and ground are set, and a material born then was black until
 a theme flip retinted it. The arrival beat lifts each RING as one piece, outer to inner
 (`RING_ENTRY_STAG`), not arc by arc (user: "too detailed, just animate each circle"). The

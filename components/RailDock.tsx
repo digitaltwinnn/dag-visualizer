@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { useBootStage } from "@/components/useBootStage";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -210,8 +212,17 @@ export default function RailDock({
   // rides the scene layer and fades with it); the internal open state is kept, so returning to
   // the scene restores what was open. The tablet edge TAB fades with the HUD — no gate needed.
   const section = useStore((s) => s.section);
-  const shellVisible = section === "scene";
   const isBarHalf = trigger === "bottom-bar-half"; // = the PHONE branch (ExploreRail/Inspector)
+  // THE PHONE DOCK STAYS ON THE RAW PAGE (user, 2026-10-25: "keep the bottom bar when we have the
+  // raw page? It could/should behave the same way as the regular scene"): its bar portals to the
+  // body — outside the scene layer that recedes and goes inert — and its sheets open over the raw
+  // pane exactly as over the scene, so a row picked there commits and the table follows. The
+  // tablet and desktop rails still step aside with the scene.
+  const shellVisible = section === "scene" || isBarHalf;
+  // Out of the shell it is out of its `BootFade` too, so it keeps that zone's boot gate itself.
+  const bootStage = useBootStage();
+  const [portalReady, setPortalReady] = useState(false);
+  useEffect(() => setPortalReady(true), []);
   // PHONE ONLY takes the commit-flight half of the yield (`flight`). The tablet edge-tab sheet is
   // dismissed by the same tab that opened it and the scene keeps full width behind it, so that
   // tier has its own step-aside exactly as desktop has SCENE mode; the phone sheet is 60vh of a
@@ -680,6 +691,7 @@ export default function RailDock({
         // Each half is its own group (the two halves live in two separate RailDock instances —
         // ExploreRail's and Inspector's); their mutual exclusion stays where it was, in the shared
         // controlled `open` (`store.phoneDock`), which RailDock never owned anyway.
+        portalReady && bootStage >= 2 && createPortal(
         <ToggleGroup
           // The phone callout's floor (CalloutSync reads this bar's top edge).
           data-phone-dock=""
@@ -692,12 +704,6 @@ export default function RailDock({
             // above it rather than centring into the indicator's strip. Zero on flat bottoms.
             "fixed z-[42] bottom-0 h-[var(--phone-dock-h)] pb-[env(safe-area-inset-bottom,0px)] hidden max-[700px]:flex rounded-none",
             barGeom ?? (side === "left" ? "w-1/2 left-0" : "w-1/2 right-0"),
-            // The raw data layer is presented: the dock belongs to the scene shell (RailDock
-            // renders inside it), which has receded and dimmed behind the layer — so the bar
-            // would sit under the raw table pointing at a hidden rail.
-            // Overrides the phone-breakpoint `max-[700px]:flex` above (same twMerge group+variant,
-            // so the later class wins) — a bare `hidden` wouldn't, the variant would still show it.
-            !shellVisible && "max-[700px]:hidden",
           )}
         >
           <ToggleGroupItem
@@ -748,6 +754,7 @@ export default function RailDock({
             )}
           </ToggleGroupItem>
         </ToggleGroup>
+        , document.body)
       ) : (
         // Tablet edge tab (700–1099px only; hidden on desktop AND phone): ONE CHEVRON, and the
         // sheet's one control (see the header — option C2). Closed it sits on the screen edge

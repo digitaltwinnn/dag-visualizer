@@ -11,13 +11,16 @@ import { buildAnchorLog, snapsAtTick, sortAnchorLog, type AnchorLogRow, type Anc
 import { displayNetwork, unlistedLog, UNLISTED_ID } from "@/src/data/unlisted";
 import { ledgerLens } from "@/src/data/ledgerStory";
 import { metaSnapHoverKey, type GlobalSnapshot } from "@/src/data/types";
-import { metaSnapArrivalActions, metaSnapSelectActions } from "@/src/engine/domain/pickActions";
+import { metaSnapArrivalActions, metaSnapSelectActions, snapshotSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { fmtDag, fmtKB } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { Empty, IdentityDot } from "@/components/inspector/parts";
 import { selectionHue } from "@/components/selection";
 import { cn } from "@/lib/utils";
+import GroupPlate from "@/components/datasection/GroupToggle";
+import { useNowTick } from "@/components/useNowTick";
+import { useBreakpoint } from "@/components/useBreakpoint";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import TablePager from "@/components/datasection/TablePager";
@@ -37,6 +40,7 @@ import LiveDot from "@/components/LiveDot";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { NodeStars, PinMark } from "@/components/state/StateAtoms";
 import { isRetired } from "@/src/net/lineage";
+import { useFeedRead } from "@/components/useFeedRead";
 
 // The retained global window the log joins against — the same buffer the strip's bars plot,
 // one row per anchored metagraph snapshot inside it.
@@ -189,7 +193,18 @@ function ChainControl({ lineage, chainIdx, onPick }: { lineage: readonly string[
   );
 }
 
+/** An age that COUNTS, as the cards' do (user, 2026-10-25: "in raw the x s ago is fixed but in
+ *  the card its actively counting") — its own one-second tick, so only the age re-renders, never
+ *  the table around it. */
+function LiveAge({ ts, short = false }: { ts: string; short?: boolean }) {
+  const now = useNowTick(1000);
+  return <>{relativeAge(now - Date.parse(ts), short)}</>;
+}
+
 export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens the snapshot's own page (RecordsSurface) — see the row's `commit`. */ onOpen?: () => void } = {}) {
+  // The raw layer is mounted behind the scene; it reads for the reader only while it is open.
+  const rawOpen = useStore((s) => s.section === "data");
+  useFeedRead(["global", "exact"], "AnchorLogTable", rawOpen);
   useSnapshotFeed(MAX); // re-render driver: global + anchor events (the buffers below refresh)
   const filter = useStore((s) => s.filter);
   const live = useStore((s) => s.live);
@@ -258,7 +273,6 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // ⚠️ READ ONLY WHILE THE RAW LAYER IS OPEN: this table stays mounted behind the scene, and an
   // ungated merge read every network's chain on every Snapshots page load (measured: 28 requests
   // with RAW closed). Its caches survive closing, so reopening is instant.
-  const rawOpen = useStore((s) => s.section === "data");
   // …AND UNDER ALL (user, 2026-10-08: "can't see unlisted in the raw snapshot list — I came from a
   // range in History that does show it anchoring"): unlisted is a network like any other, so the
   // unscoped log merges the unlisted chains with the catalog's once their list is in hand. Under
@@ -331,6 +345,26 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // across it"). Grouped is newest first; sorted by anything else the two columns come back, and
   // their Age header is the way back to the groups.
   const grouped = sort.key === "age" || sort.key === "tick";
+  // A global snapshot's group the reader folded (user, 2026-10-25: "give the option to collapse and
+  // expand a group"), keyed by the group's ordinal (or "anchoring"); open by default. The header
+  // stays — it is a target of its own — and only the rows under it stand down.
+  // FOLDED BY DEFAULT ON THE PHONE (user, 2026-10-25: "collapse by default on phone? less space"):
+  // `folded` holds the groups the reader TOGGLED away from the tier's default — open on the wider
+  // tiers, folded on the phone, where a list of headers is the overview and a tap opens one.
+  const phoneTier = useBreakpoint() === "phone";
+  const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set());
+  // …BUT A GROUP HOLDING WHAT THE READER IS ON STARTS OPEN (review, same day): the committed
+  // snapshot's global and a search's landing row — folded, the layer's own first commit or a jump
+  // landed on a row nobody could see. Filled once the rows are known (below), read at render.
+  const autoOpen = new Set<string>();
+  const isFolded = (k: string) => folded.has(k) !== (phoneTier && !autoOpen.has(k));
+  const toggleFold = (k: string) =>
+    setFolded((f) => {
+      const n = new Set(f);
+      if (n.has(k)) n.delete(k);
+      else n.add(k);
+      return n;
+    });
   const columns = grouped ? COLUMNS.filter((c) => c.key !== "tick" && c.key !== "age") : COLUMNS;
   // THE JUMP'S LANDING MARK. A jump that only changed the page would leave the reader hunting the
   // ordinal they just typed among 25 near-identical rows, so the row is marked when it arrives.
@@ -595,11 +629,32 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
         pending: !g,
       };
     });
-    allRows = rows;
     total = merged.total ?? 0;
+    // THE NEWEST PAGE LEADS WITH THE LIVE BUFFER (user, 2026-10-25, phone: "the global snapshot card
+    // is already on 7154272 while the raw is lagging behind"). The merged pages re-read their tips
+    // at most every TIP_REFRESH_MS (30s — a faster re-read cancelled itself on every poll), while
+    // the cards follow the 5s poll; so on page 1 of the whole-chain log, the snapshots the app
+    // already holds that are NEWER than the page's newest record go on top, their global resolved
+    // from the buffer. The 30s read stays the authority and absorbs them when it lands.
+    if (net && merged.page === 1 && mergedScope.kind === "all" && rows.length) {
+      const newest = Math.max(...rows.map((r) => Date.parse(r.ts)));
+      const live = [
+        ...(lens === UNLISTED_ID ? [] : buildAnchorLog(net.metaSnaps, net.globalSnapshots, "all")),
+        ...(lens === "all" || lens === UNLISTED_ID ? unlistedLog(net.globalSnapshots, snapshotExact, net.unlistedSnaps) : []),
+      ].filter((r) => r.metaId != null && Date.parse(r.ts) > newest);
+      if (live.length) {
+        const fresh = sortAnchorLog(live, "age", 1, (id) => displayNetwork(id)?.ticker ?? id) as ViewRow[];
+        // ON TOP, NEVER INSTEAD (review, same day): cutting page 1 back to PAGE pushed its oldest
+        // merged rows onto no page, since page 2's cursor starts after the merged page. Page 1
+        // runs a few rows long until the tip re-read absorbs them, and the range says so.
+        rows = [...fresh, ...rows];
+        total += fresh.length;
+      }
+    }
+    allRows = rows;
     pages = merged.pages;
     from = merged.from;
-    to = merged.to;
+    to = merged.to + (rows.length - (merged.rows?.length ?? 0));
   } else if (!histNet) {
     const listedRows = net ? buildAnchorLog(net.metaSnaps, net.globalSnapshots, filter) : [];
     const unlistedRows = net && (lens === "all" || lens === UNLISTED_ID) ? unlistedLog(net.globalSnapshots, snapshotExact, net.unlistedSnaps) : [];
@@ -761,6 +816,11 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
    *  nothing, since every seek rejects an ordinal below 1. So a seam is marked by its TICK, which is
    *  the only number it has and the very thing that was searched for. */
   const markOf = (row: AnchorLogRow) => (row.metaId == null ? row.global.ordinal : row.ordinal);
+  if (snap) autoOpen.add(String(snap.data.ordinal));
+  if (marked != null) {
+    const hit = rows.find((r) => markOf(r) === marked);
+    if (hit) autoOpen.add(hit.pending ? "anchoring" : String(hit.global.ordinal));
+  }
 
   const landOn = (ordinal: number) => {
     if (histNet && latest) hist.current.latest = latest;
@@ -1667,7 +1727,6 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       </>
     );
 
-  const now = Date.now();
 
   return (
     <>
@@ -1798,64 +1857,69 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                   // (rule 10), and nothing to click until it lands.
                   <TableRow className="hover:bg-transparent border-border max-[700px]:block">
                     <TableCell colSpan={columns.length} className="pt-3 pb-1 max-[700px]:block">
-                      <span className="flex items-baseline gap-2 text-label text-muted-foreground">
+                      <GroupPlate open={!isFolded("anchoring")} onToggle={() => toggleFold("anchoring")} className="text-label text-muted-foreground hover:text-foreground">
                         <span className="uppercase tracking-caps">Global</span>
                         {/* A chain row IS anchored — only its global's number is still being read,
                             so the number's slot twinkles; a live row is genuinely still anchoring. */}
                         {histNet || mergedMode ? <NodeStars count={3} /> : <span className="italic">anchoring…</span>}
-                      </span>
+                      </GroupPlate>
                     </TableCell>
                   </TableRow>
                 )}
                 {groupHead && !r.pending && (
-                  // THE GLOBAL SNAPSHOT'S OWN ROW: its number and its age, each as label + value, and
-                  // a click selects THAT global snapshot alone (no metagraph snapshot — the pane
-                  // then has nothing to read, honestly), as an explorer row does; hovering it lights
-                  // the snapshot in the scene on its own channel (rule 9: hover what a click commits).
-                  <TableRow
-                    className={cn(
-                      // THE HEADER IS A PLATE (user, 2026-10-08, design B1: "the header in the
-                      // snapshot list is not clearly distinguishable from the body rows"). The plate
-                      // lives on the cell's inner block, not the row: a <tr> takes neither margin
-                      // nor radius, and the gap ABOVE the plate is what separates two groups.
-                      "group/gh cursor-pointer max-[700px]:block border-0 hover:bg-transparent",
-                      "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
-                    )}
-                    tabIndex={0}
-                    onClick={() => {
-                      applyClickActions(metaSnapArrivalActions(null, { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot }));
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        applyClickActions(metaSnapArrivalActions(null, { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot }));
-                      }
-                    }}
-                    onMouseEnter={() => setHoverSnapOrd(r.global.ordinal)}
-                    onMouseLeave={() => setHoverSnapOrd(null)}
-                    onFocus={() => setHoverSnapOrd(r.global.ordinal)}
-                    onBlur={() => setHoverSnapOrd(null)}
-                  >
+                  // THE GLOBAL SNAPSHOT'S OWN ROW: its number and its age, each as label + value. The
+                  // plate SELECTS that global snapshot and a second click RELEASES it, the explorer
+                  // tick row's toggle (`snapshotSelectActions`); its CHEVRON folds the group (user,
+                  // 2026-10-25 — "collapse / expand the row and also deselect/select the subject at
+                  // the same time"; `GroupPlate` has the two shapes). Hovering the plate lights the
+                  // global in the scene (rule 9: hover what a click commits).
+                  <TableRow className="max-[700px]:block border-0 hover:bg-transparent">
                     <TableCell colSpan={columns.length} className="p-0 pt-2.5 max-[700px]:px-0 max-[700px]:block">
-                      {/* Accent-tinted band + accent hairline; the SELECTED global deepens to the
-                          selection accent — the group's head carries that selection, never its rows.
-                          The age needs no "Age" label: "17s ago" names itself. */}
-                      <span
+                      {/* THE HEADER IS A PLATE (user, 2026-10-08, design B1): accent-tinted band +
+                          accent hairline; the SELECTED global deepens to the selection accent — the
+                          group's head carries that selection, never its rows. The plate lives on the
+                          cell's inner block, not the row: a <tr> takes neither margin nor radius, and
+                          the gap ABOVE it is what separates two groups. "17s ago" names itself. */}
+                      <GroupPlate
+                        open={!isFolded(String(r.global.ordinal))}
+                        onToggle={() => toggleFold(String(r.global.ordinal))}
+                        selected={inSelGroup && !following}
+                        onSelect={() => {
+                          const st = useStore.getState();
+                          applyClickActions(
+                            snapshotSelectActions(
+                              { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot },
+                              getNetwork()?.latest?.ordinal === r.global.ordinal,
+                              { pinnedOrdinal: !st.following && st.snap ? st.snap.data.ordinal : null, metaSnap: st.metaSnap, tickNet: st.tickNet },
+                            ),
+                          );
+                        }}
+                        onHover={(on) => setHoverSnapOrd(on ? r.global.ordinal : null)}
                         className={cn(
                           // px matches the rows' own cell inset, so "GLOBAL" stands on the identity dots' edge.
-                          "flex items-center gap-2 h-[34px] px-2 max-[700px]:px-1.5 rounded-t-md border-b text-label transition-colors",
+                          "h-[34px] px-2 max-[700px]:px-1.5 rounded-t-md border-b text-label transition-colors",
                           inSelGroup
-                            ? "bg-[color-mix(in_oklch,var(--primary)_20%,transparent)] border-[var(--primary)]"
-                            : "bg-[color-mix(in_oklch,var(--primary)_9%,var(--panel-plate))] border-[color-mix(in_oklch,var(--primary)_35%,transparent)] group-hover/gh:bg-[color-mix(in_oklch,var(--primary)_14%,var(--panel-plate))]",
+                            ? "bg-[color-mix(in_oklch,var(--primary)_20%,transparent)] border-[var(--primary)] text-primary-ink"
+                            : "bg-[color-mix(in_oklch,var(--primary)_9%,var(--panel-plate))] border-[color-mix(in_oklch,var(--primary)_35%,transparent)] hover:bg-[color-mix(in_oklch,var(--primary)_14%,var(--panel-plate))] text-muted-foreground",
                         )}
                       >
                         <span className={cn("uppercase tracking-caps", inSelGroup ? "text-primary-ink" : "text-[color-mix(in_oklch,var(--primary-ink)_80%,var(--muted-foreground))]")}>Global</span>
                         <span className={cn("font-mono tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground")}>{r.global.ordinal.toLocaleString()}</span>
-                        <span className={cn("ml-auto tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground-dim")}>{relativeAge(now - Date.parse(r.ts))}</span>
-                      </span>
+                        {/* The mark FOLLOWS THE NUMBER IT QUALIFIES, as the row's pin follows its
+                            snapshot number (user, same day: the plate's sat at the right edge while
+                            the row's sat by its number). */}
+                        {inSelGroup && (
+                          <span className="inline-flex items-center gap-1.5 text-label normal-case tracking-normal text-muted-foreground">
+                            {following ? <LiveDot /> : <PinMark className="text-muted-foreground" />}
+                            {following ? "live" : "pinned"}
+                          </span>
+                        )}
+                        <span className={cn("ml-auto tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground-dim")}><LiveAge ts={r.ts} /></span>
+                      </GroupPlate>
                     </TableCell>
                   </TableRow>
                 )}
+                {!(grouped && isFolded(String(groupKey(r)))) && (
                 <TableRow
                   // ⚠️ A SEAM has no metaId and no ordinal, so every seam would key `null:0` —
                   // React then treats a whole page of them as one repeated child and reuses the
@@ -1948,7 +2012,13 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                         explorer's own state mark on its highlighted row, the same two glyphs. */}
                     <span className="inline-flex items-center gap-1.5">
                       {seam ? <Dash /> : r.ordinal.toLocaleString()}
-                      {rowSel && !seam && (following ? <LiveDot /> : <PinMark className="text-muted-foreground" />)}
+                      {/* Mark AND word, as the global plate says it (user, 2026-10-25). */}
+                      {rowSel && !seam && (
+                        <span className="inline-flex items-center gap-1.5 font-sans text-label text-muted-foreground">
+                          {following ? <LiveDot /> : <PinMark className="text-muted-foreground" />}
+                          {following ? "live" : "pinned"}
+                        </span>
+                      )}
                     </span>
                   </TableCell>
                   <TableCell className={cn("text-right tabular-nums", PHONE_HIDDEN)}>{seam ? <Dash /> : fmtDag(r.fee)}</TableCell>
@@ -1963,8 +2033,8 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                       {/* Phone drops the " ago" (the bare register — relativeAge's own note): the
                           AGE header names the quantity, and the suffix's width was the last thing
                           holding this table in sideways scroll. */}
-                      <span className="max-[700px]:hidden">{relativeAge(now - Date.parse(r.ts))}</span>
-                      <span className="min-[700px]:hidden">{relativeAge(now - Date.parse(r.ts), true)}</span>
+                      <span className="max-[700px]:hidden"><LiveAge ts={r.ts} /></span>
+                      <span className="min-[700px]:hidden"><LiveAge ts={r.ts} short /></span>
                     </TableCell>
                   )}
                   {/* The phone row's SECOND LINE — where it anchored and how big it was. One muted
@@ -1991,6 +2061,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                     </span>
                   </TableCell>
                 </TableRow>
+                )}
                 </Fragment>
               );
             })}

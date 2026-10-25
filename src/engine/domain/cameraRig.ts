@@ -44,17 +44,16 @@ export const FOCI = {
   // 5.5% longer so the taller body keeps headroom under the bar; the pitch is the old one (the
   // pos − target delta is (0, 13.5, 44.8) scaled about the target).
   geo: { pos: new THREE.Vector3(0, 11, 47.3), target: new THREE.Vector3(0, -3.2, 0) },
-  // Metagraph-selection pose: rotated-to-densest at a WIDE distance — deliberately farther out
-  // than the country framing (geoFraming z 29..25) so the country drill reads as a real zoom-in.
-  // Camera held LOW (near the equator plane, like the country/node poses) — a higher camera
-  // stacked on the densest-cluster lean read as "viewing the globe from the north" (user).
-  // A SHORT step in from the rest pose, not the old dive (user, 2026-10-24: "zoom in but a bit
-  // less so that the circle still stays visible and does not hide beneath the bottom vitals
-  // section"): the base rings are where the committed network's callout now anchors, so the
-  // pose keeps their front edge above the vitals band — the orbit is ~8% shorter than rest and
-  // the target a little lower, which lifts the body in the frame; the globe's crown may tuck
-  // under the top bar, the rings may not go under the band.
-  geoNetwork: { pos: new THREE.Vector3(0, 8, 44), target: new THREE.Vector3(0, -4.5, 0) },
+  // THE NETWORK RUNG HAS NO POSE OF ITS OWN (user, 2026-10-25: "it makes little sense to have two
+  // different angles, pick the most logical/common angle to a globe. The globe rotation effect is
+  // sufficient to communicate a change, maybe add a subtle zoom in/out effect"). A `geoNetwork`
+  // entry stood here from the first ladder until that day — a dive, then a wide low pose, then a
+  // short step in — and each cut was a second angle on the same globe. The rung inherits the REST
+  // pose (principle 2: a rung without a pose of its own inherits its parent's), the globe spins to
+  // the network's densest cluster, axis upright, and the camera HOLDS — the spin is the
+  // acknowledgement (principle 3's structural exception, `tweenTo`'s `structureMoves`: a same-pose
+  // nudge on top of the spin was "no need … rotation is enough", user, same day), with the HUD
+  // dim riding the held window.
   // The Snapshots RESTING pose (user, 2026-08-07 — it used to share `overview`): FRONTAL and
   // zoomed in, straight onto the chamber's camera-side face, so the ribbon sheets (which span
   // the lane field) and the node trays (which face +Z) present flat-on. Slightly elevated,
