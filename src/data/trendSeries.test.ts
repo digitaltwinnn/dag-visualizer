@@ -18,6 +18,7 @@ import { anchorClause, anchorSeries, headWord, lastSeen, momentPhrase, rangePhra
   trimCounterEdges,
   METRIC_LABELS,
   METRIC_ORDER,
+  metricLabel,
   holdOrder,
   metricCaption,
   stepMetric,
@@ -723,6 +724,13 @@ describe("the global snapshots measure (2026-10-26 — dagscan's figure beside o
     expect(`DOR ${m.verb} 9 ${m.rest}`).toBe("DOR was part of 9 global snapshots in those 5 minutes");
     const h = momentPhrase("globals", DAY, true);
     expect(`The hypergraph ${h.verb} 5,203 ${h.rest}`).toBe("The hypergraph created 5,203 global snapshots on that day");
+  });
+  it("is named from its subject: the DAG CREATES global snapshots, a network is IN them", () => {
+    expect(metricLabel("globals", "dag")).toBe("Global snapshots");
+    expect(metricLabel("globals", "dor")).toBe("In global snapshots");
+    expect(metricLabel("globals", null)).toBe("In global snapshots");
+    expect(metricCaption("globals", DAY, "dag")).toBe("Global snapshots per day");
+    for (const m of METRIC_ORDER.filter((x) => x !== "globals")) expect(metricLabel(m, "dag")).toBe(METRIC_LABELS[m]);
   });
   it("the subject flag changes no other measure's sentence", () => {
     for (const m of METRIC_ORDER.filter((x) => x !== "globals")) {

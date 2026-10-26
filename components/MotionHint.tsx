@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 
 import { VIEWS } from "@/components/views";
-import { METRIC_LABELS } from "@/src/data/trendSeries";
+import { metricLabel } from "@/src/data/trendSeries";
 import { ZOOMS } from "@/src/data/trendWindow";
 import { displayNetwork } from "@/src/data/unlisted";
 import { motionHint, type HintNames } from "@/src/engine/domain/motionHint";
+import { cardNetwork } from "@/src/engine/domain/trendStack";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { useStore } from "@/src/store/store";
 import { cn } from "@/lib/utils";
@@ -73,12 +74,16 @@ export default function MotionHint() {
   const filter = useStore((s) => s.filter);
   const inspect = useStore((s) => s.inspect);
   const country = useStore((s) => s.country);
+  // The measure is named from the deck's subject, as the explorer's tile names it (`metricLabel`).
+  const trendFocus = useStore((s) => s.trendFocus);
+  const trendFront = useStore((s) => s.trendFront);
+  const deck = cardNetwork(filter, trendFocus, trendFront);
   const names: HintNames = {
     view: (m) => VIEWS.find((v) => v.id === m)?.name ?? m,
     network: (id) => displayNetwork(id)?.name ?? id,
     country: countryName,
     window: (id) => ZOOMS.find((z) => z.id === id)?.label ?? id,
-    measure: (id) => METRIC_LABELS[id],
+    measure: (id) => metricLabel(id, deck),
     rung: (level) => {
       switch (level) {
         case "network": return filter !== "all" ? (displayNetwork(filter)?.name ?? filter) : "every network";

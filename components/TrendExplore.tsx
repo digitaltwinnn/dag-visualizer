@@ -8,7 +8,7 @@ import useTrendsSlice from "@/components/useTrendsSlice";
 import ExplorerFoot from "@/components/explorer/ExplorerFoot";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
-import { GLOBAL_READING, METRIC_LABELS, METRIC_ORDER, metricUnit, spanWord } from "@/src/data/trendSeries";
+import { GLOBAL_READING, METRIC_ORDER, metricLabel, metricUnit, spanWord } from "@/src/data/trendSeries";
 import { spanPhrase } from "@/src/data/trendWindow";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import { cardNetwork } from "@/src/engine/domain/trendStack";
@@ -163,9 +163,10 @@ export default function TrendExplore() {
   const level: ExplorerLevelSpec = {
     key: "networks",
     crumb: { label: "Networks" },
-    // Seven measures, shown as the explorer's tiles like every level's (`MeasureTiles`, 2 · 3 · 2).
+    // Seven measures, shown as the explorer's tiles like every level's (`MeasureTiles`, 2 · 3 · 2),
+    // each named from the deck's subject (`metricLabel` — on the DAG, "Global snapshots").
     measure: {
-      options: METRIC_ORDER.map((m) => ({ id: m, label: METRIC_LABELS[m], unit: metricUnit(m, 86_400_000) })),
+      options: METRIC_ORDER.map((m) => ({ id: m, label: metricLabel(m, cardNet), unit: metricUnit(m, 86_400_000) })),
       value: metric,
       onPick: (id) => setTrendMetric(id as TrendMetric),
     },

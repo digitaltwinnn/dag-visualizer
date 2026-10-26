@@ -555,6 +555,15 @@ export const METRIC_LABELS: Record<TrendMetric, string> = {
   continuity: "Cadence",
 };
 
+/** A MEASURE'S NAME, SEEN FROM ITS SUBJECT (user, 2026-10-26: "for DAG you can say global
+ *  snapshots, that is a valid exception because we're looking at it from either side"). The DAG
+ *  CREATES the global snapshots, so on its chart the measure is "Global snapshots"; a network's
+ *  snapshots ride in them — "In global snapshots". Every other measure has one name. `subject` is
+ *  whose chart (a plane) or whose deck (the explorer's tiles, the hint: `cardNetwork`). */
+export function metricLabel(metric: TrendMetric, subject: string | null): string {
+  return metric === "globals" && subject === "dag" ? "Global snapshots" : METRIC_LABELS[metric];
+}
+
 /** THE MEASURES' ONE ORDER — the explorer heading's list top-to-bottom and the cards' ↑/↓ keys
  *  are the same sequence, read from here, so stepping down from the third entry always lands on
  *  the fourth. */
@@ -673,8 +682,8 @@ export function sumMeasured(points: readonly (number | null)[]): { sum: number; 
  *  day"); a unit with its own noun is joined by "in" ("Fees in DAG per day" — it was set off with a
  *  mid-dot until 2026-10-03, the separator the user asked out of reader copy); and a unit that only repeats
  *  the name is dropped ("Nodes", never "Nodes · nodes"). */
-export function metricCaption(metric: TrendMetric, stepMs: number): string {
-  const label = METRIC_LABELS[metric];
+export function metricCaption(metric: TrendMetric, stepMs: number, subject: string | null = null): string {
+  const label = metricLabel(metric, subject);
   const unit = metricUnit(metric, stepMs);
   if (!unit || unit.toLowerCase() === label.toLowerCase()) return label;
   // Asked of the SPEC, not sniffed off the string: a unit is a bare rate exactly when its row uses
