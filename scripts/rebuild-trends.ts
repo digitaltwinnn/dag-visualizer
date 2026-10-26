@@ -7,6 +7,7 @@
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --recompute-from=2026-09-06
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --recompute-from=2026-09-06 --resume
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --backfill-gaps=2026-01-01
+//   npx tsx scripts/rebuild-trends.ts --net=mainnet --backfill-gaps=2025-07-01 --gaps-from-chain=DAG7fwxZJp
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --backfill-blocks=2025-07-01
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --backfill-unlisted
 //
@@ -100,9 +101,9 @@ function loadEnvLocal(): void {
   }
 }
 
-interface Args { net: "mainnet" | "integrationnet" | "testnet"; days: number; wipeOnly: boolean; extendToMs: number | null; recomputeFromMs: number | null; gapsFromMs: number | null; blocksFromMs: number | null; unlisted: boolean; resume: "no" | "yes" | "force" }
+interface Args { net: "mainnet" | "integrationnet" | "testnet"; days: number; wipeOnly: boolean; extendToMs: number | null; recomputeFromMs: number | null; gapsFromMs: number | null; gapsFromChain: string | null; blocksFromMs: number | null; unlisted: boolean; resume: "no" | "yes" | "force" }
 function parseArgs(): Args {
-  const a: Args = { net: "mainnet", days: 90, wipeOnly: false, extendToMs: null, recomputeFromMs: null, gapsFromMs: null, blocksFromMs: null, unlisted: false, resume: "no" };
+  const a: Args = { net: "mainnet", days: 90, wipeOnly: false, extendToMs: null, recomputeFromMs: null, gapsFromMs: null, gapsFromChain: null, blocksFromMs: null, unlisted: false, resume: "no" };
   for (const arg of process.argv.slice(2)) {
     if (arg === "--wipe-only") a.wipeOnly = true;
     else if (arg === "--backfill-unlisted") a.unlisted = true;
@@ -130,12 +131,14 @@ function parseArgs(): Args {
       if (m) a.gapsFromMs = Date.UTC(+m[1], +m[2] - 1, +m[3]);
       else { console.error("--backfill-gaps wants YYYY-MM-DD (UTC)"); process.exit(1); }
     }
+    else if (arg.startsWith("--gaps-from-chain=")) a.gapsFromChain = arg.slice(18);
     else { console.error(`unknown arg ${arg}`); process.exit(1); }
   }
   if (!["mainnet", "integrationnet", "testnet"].includes(a.net) || !(a.days > 0 && a.days <= 400)) {
     console.error("usage: --net=... --days=1..400 [--wipe-only] [--extend-to=YYYY-MM-DD]");
     process.exit(1);
   }
+  if (a.gapsFromChain != null && a.gapsFromMs == null) { console.error("--gaps-from-chain needs --backfill-gaps"); process.exit(1); }
   if (a.extendToMs != null && a.wipeOnly) { console.error("--extend-to and --wipe-only are exclusive"); process.exit(1); }
   if (a.resume !== "no" && a.recomputeFromMs == null && a.extendToMs == null) {
     console.error("--resume only applies to --recompute-from and --extend-to (the checkpointed walks)");
@@ -194,15 +197,17 @@ async function seekBoundary(
 // ---- explorer paging (the probed `meta.next` cursor walk) ------------------------------------
 interface Page<T> { data?: T[]; meta?: { next?: string } }
 async function getPage<T>(url: string): Promise<Page<T>> {
-  // Backoff reaches ~1.5 min cumulative: a multi-hour walk must survive a transient DNS or
-  // network blip (one killed a 3-hour gaps walk at 83%, 2026-09-08 — EAI_AGAIN).
+  // Backoff reaches ~15 min cumulative (21 attempts, 20s timeouts, waits capped at 30s): a multi-hour walk must survive a transient DNS or
+  // network blip (one killed a 3-hour gaps walk at 83%, 2026-09-08 — EAI_AGAIN) AND a short
+  // explorer outage (2026-10-26: 20s timeouts past the old ~1.5-min budget killed a 2025-07-01
+  // gaps walk seven hours in).
   for (let attempt = 0; ; attempt++) {
     try {
       const r = await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(20000) });
       if (!r.ok) throw new Error(`${r.status}`);
       return (await r.json()) as Page<T>;
     } catch (e) {
-      if (attempt >= 6) throw e;
+      if (attempt >= 20) throw e;
       await new Promise((res) => setTimeout(res, Math.min(30000, 1000 * 2 ** attempt)));
     }
   }
@@ -245,7 +250,7 @@ class Abort extends Error {}
 
 async function main(): Promise<void> {
   loadEnvLocal();
-  const { net, days, wipeOnly, extendToMs, recomputeFromMs, gapsFromMs, blocksFromMs, unlisted, resume } = parseArgs();
+  const { net, days, wipeOnly, extendToMs, recomputeFromMs, gapsFromMs, gapsFromChain, blocksFromMs, unlisted, resume } = parseArgs();
 
   // Deferred imports: store.ts reads env at construction, so env must be loaded first.
   const { Redis } = await import("@upstash/redis");
@@ -662,7 +667,18 @@ async function main(): Promise<void> {
       // so nothing is skipped (2026-09-10, the keep-forever flip).
       const fresh5m = TTL_S["5m"] == null ? "" : slotOf(net, "5m", Date.now() - TTL_S["5m"] * 1000).key;
     let fields = 0;
-    for (const id of lineageIds(net)) {
+    // RESUMING A DIED WALK (2026-10-26 — an explorer outage past the retry window killed a 2025-07-01
+    // run seven hours in, nine chains already written): each chain writes whole when its walk ends,
+    // so a rerun may start at the chain that died. `--gaps-from-chain=<id prefix>` skips the
+    // catalog-order chains before it; an unmatched prefix is an error, never a silent full run.
+    let ids = lineageIds(net);
+    if (gapsFromChain != null) {
+      const at = ids.findIndex((id) => id.startsWith(gapsFromChain));
+      if (at < 0) { console.error(`--gaps-from-chain: no chain starts with ${gapsFromChain}`); process.exit(1); }
+      console.log(`  resuming at ${ids[at]!.slice(0, 10)} — skipping ${at} chain(s) already written`);
+      ids = ids.slice(at);
+    }
+    for (const id of ids) {
       // Timestamps only — the walk's records are otherwise discarded, and the two gap
       // fields plus the anchoring count are the only things this mode may write. Each chain WRITES as soon as its
       // walk ends (complete-day HSET recomputations are idempotent), so a crash mid-run
