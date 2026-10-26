@@ -34,7 +34,8 @@
 // kept record timestamps, so measuring gaps retroactively means re-walking each chain — but ONLY
 // the timestamps are collected, only those three fields are written (complete-day recomputations, HSET overwrite), TODAY is
 // excluded (the live sampler's accruing bucket must not be double-counted), and every other
-// field is untouched. Runs under the sampler lock like everything else here.
+// field is untouched. It is the one mode that takes NO sampler lock (2026-10-26): its writes are
+// disjoint from the cron's, so production keeps sampling — the fleet gauges included — beside it.
 //
 // --recompute-from REPAIRS RECENT DAYS (2026-09-07, found live the day it was needed): a
 // sampler catch-up that runs past the pager's 600-record cap ACCEPTS a gap — honest, but the
@@ -286,7 +287,13 @@ async function main(): Promise<void> {
   // below the store's oldest day — so once the lock lapses the cron resumes live sampling
   // (the fleet gauges return) while the walk keeps flushing history. Released in finally.
   const lockStore = (await import("../app/api/trends/store")).writeStore();
-  if (!(await lockStore.acquireLock(lockKeyOf(net), 21600))) {
+  // ⚠️ …EXCEPT --backfill-gaps, WHICH RUNS BESIDE THE CRON (2026-10-26 — its 6-hour lock paused
+  // production sampling twice in one day, and the FLEET gauges, read live only, lost those hours
+  // for good). It cannot collide: it HSETs only gapSum/gapMax/ticks of whole days before its
+  // launch's UTC today, while the cron writes only the buckets of NEW records (today's) — disjoint
+  // fields, and HSET sets only the fields it names. So it takes no lock and releases none.
+  const holdsLock = gapsFromMs == null;
+  if (holdsLock && !(await lockStore.acquireLock(lockKeyOf(net), 21600))) {
     // A killed walk leaves its lock standing (up to 6 h) — which would block its own
     // --resume. Take it over ONLY on evidence: a resume was asked for, a checkpoint on disk
     // proves a rebuild died mid-walk, and the TTL says rebuild-class lock (a cron run's
@@ -322,9 +329,11 @@ async function main(): Promise<void> {
     const release = redis.ttl(lockKeyOf(net)).then((ttl) => (ttl > 900 ? lockStore.releaseLock(lockKeyOf(net)) : undefined));
     Promise.race([release, new Promise((r) => setTimeout(r, 5000))]).finally(() => process.exit(code));
   };
-  process.once("SIGINT", () => releaseOnSignal("SIGINT", 130));
-  process.once("SIGTERM", () => releaseOnSignal("SIGTERM", 143));
-  process.once("SIGHUP", () => releaseOnSignal("SIGHUP", 129));
+  if (holdsLock) {
+    process.once("SIGINT", () => releaseOnSignal("SIGINT", 130));
+    process.once("SIGTERM", () => releaseOnSignal("SIGTERM", 143));
+    process.once("SIGHUP", () => releaseOnSignal("SIGHUP", 129));
+  }
   try {
 
   const be0 = NETWORKS[net].be;
@@ -921,7 +930,7 @@ async function main(): Promise<void> {
   console.log("done — the 15-min cron resumes from here.");
 
   } finally {
-    await lockStore.releaseLock(lockKeyOf(net));
+    if (holdsLock) await lockStore.releaseLock(lockKeyOf(net));
   }
 }
 
