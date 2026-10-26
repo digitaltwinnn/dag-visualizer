@@ -287,12 +287,14 @@ async function main(): Promise<void> {
   // below the store's oldest day — so once the lock lapses the cron resumes live sampling
   // (the fleet gauges return) while the walk keeps flushing history. Released in finally.
   const lockStore = (await import("../app/api/trends/store")).writeStore();
-  // ⚠️ …EXCEPT --backfill-gaps, WHICH RUNS BESIDE THE CRON (2026-10-26 — its 6-hour lock paused
-  // production sampling twice in one day, and the FLEET gauges, read live only, lost those hours
-  // for good). It cannot collide: it HSETs only gapSum/gapMax/ticks of whole days before its
-  // launch's UTC today, while the cron writes only the buckets of NEW records (today's) — disjoint
-  // fields, and HSET sets only the fields it names. So it takes no lock and releases none.
-  const holdsLock = gapsFromMs == null;
+  // ⚠️ …EXCEPT --backfill-gaps AND --extend-to, WHICH RUN BESIDE THE CRON (2026-10-26 — the gaps
+  // walk's 6-hour lock paused production sampling twice in one day, and the FLEET gauges, read live
+  // only, lost those hours for good). Neither can collide: the gaps walk HSETs only
+  // gapSum/gapMax/ticks of whole days before its launch's UTC today, and the extension writes only
+  // days at or before the store's OLDEST covered day (its cursor untouched), while the cron writes
+  // only the buckets of NEW records (today's) — disjoint fields, and HSET sets only the fields it
+  // names. So they take no lock and release none.
+  const holdsLock = gapsFromMs == null && extendToMs == null;
   if (holdsLock && !(await lockStore.acquireLock(lockKeyOf(net), 21600))) {
     // A killed walk leaves its lock standing (up to 6 h) — which would block its own
     // --resume. Take it over ONLY on evidence: a resume was asked for, a checkpoint on disk
