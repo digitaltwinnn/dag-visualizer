@@ -330,7 +330,7 @@ describe("METRIC_LABELS — the reader's word for each metric", () => {
     expect(METRIC_LABELS.kb).toBe("Data");
     // Two snapshot measures, so each says which (user, 2026-10-26).
     expect(METRIC_LABELS.snapshots).toBe("Snapshots anchored");
-    expect(METRIC_LABELS.globals).toBe("Global snapshots");
+    expect(METRIC_LABELS.globals).toBe("In global snapshots");
   });
 });
 
@@ -541,7 +541,7 @@ describe("metricCaption — what a card says it is showing", () => {
   const HOUR = 3_600_000;
   it("reads a bare rate as part of the name, at the tier's own grain", () => {
     expect(metricCaption("snapshots", DAY)).toBe("Snapshots anchored per day");
-    expect(metricCaption("globals", DAY)).toBe("Global snapshots per day");
+    expect(metricCaption("globals", DAY)).toBe("In global snapshots per day");
     expect(metricCaption("blocks", HOUR)).toBe("Blocks per hour");
   });
   it("sets off a unit that carries its own noun", () => {

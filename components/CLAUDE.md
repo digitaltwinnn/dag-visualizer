@@ -346,7 +346,8 @@ decisions inside them are design, not detail:
   its row, plane, Metagraph and Range cards all stand on the DAG; a committed filter arrives as itself.
   **Two snapshot measures, because the DAG has two snapshot counts** (user, 2026-10-26 — dagscan's
   1Y "snapshots" read ~10× below ours): **Snapshots anchored** (`snapshots`) is each network's own
-  snapshots, the DAG row their sum (`g.anchors`, tagged); **Global snapshots** (`globals`) is the
+  snapshots, the DAG row their sum (`g.anchors`, tagged); **In global snapshots** (`globals` — "In" because a bare "Global snapshots" read as a network's own;
+  "Part of …" and "Anchored into …" fail on the DAG row, which creates them) is the
   DAG's OWN count (`g.ticks`, one per global tick — dagscan's figure, untagged) and, per network,
   the global snapshots that CARRIED it (`anchorSeries`). Never "L1 snapshots": a metagraph's
   snapshots come from its own L0, and its L1s make the Blocks. The leads say it by subject — "The

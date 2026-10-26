@@ -539,10 +539,13 @@ export function orderAt(readings: readonly { id: string; value: number | null }[
  *  chain's snapshots. The internal ids stay what they are — one concept, two registers, the
  *  `cohort`/provider rule. */
 export const METRIC_LABELS: Record<TrendMetric, string> = {
-  // "Snapshots anchored" beside "Global snapshots" (user, 2026-10-26): with both on the list a bare
-  // "Snapshots" no longer says which.
+  // "Snapshots anchored" beside "In global snapshots" (user, 2026-10-26): with both on the list a bare
+  // "Snapshots" no longer says which. IN, because a bare "Global snapshots" read as the network's
+  // own (user: "a bit confusing" — a network creates none); one definition holds on every row:
+  // the global snapshots the subject is IN — a network's, those its snapshots rode; the DAG's,
+  // every one, since each carries the DAG's own.
   snapshots: "Snapshots anchored",
-  globals: "Global snapshots",
+  globals: "In global snapshots",
   blocks: "Blocks",
   fees: "Fees",
   kb: "Data",

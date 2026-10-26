@@ -8,7 +8,7 @@ const NAMES: HintNames = {
   network: (id) => (id === "dor" ? "Dor Technologies" : id),
   country: (cc) => (cc === "DE" ? "Germany" : cc),
   window: (id) => id.toUpperCase(),
-  measure: (id) => ({ snapshots: "Snapshots", globals: "Global snapshots", blocks: "Blocks", fees: "Fees", kb: "Data", nodes: "Nodes", continuity: "Continuity" })[id],
+  measure: (id) => ({ snapshots: "Snapshots", globals: "In global snapshots", blocks: "Blocks", fees: "Fees", kb: "Data", nodes: "Nodes", continuity: "Continuity" })[id],
   rung: (level) => (level === "network" ? "Dor Technologies" : `the ${level}`),
 };
 
