@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 
 import { measureIcon } from "@/components/icons";
+import { tileCells } from "@/components/explorer/tileRows";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 
@@ -51,26 +52,27 @@ export function MeasureLabel({ label }: { label: string }) {
  *  one in the app's committed-selection language (the view switch's on-state, so the two read as
  *  one species of radio). They ride the explorer's CONTROL BAND (`Explorer.tsx` draws it — the
  *  plate under the head that also holds the path), so this is the grid alone. Four measures sit
- *  two by two (a 65px cell cannot hold "Metagraphs" beside its mark); two, three and six take
- *  three columns. SEGMENTED since 2026-10-25 (design pass, proposal A — user: the card "reads
+ *  two by two (a 65px cell cannot hold "Metagraphs" beside its mark); seven sit 2 · 3 · 2; two, three
+ *  and six take three columns — the row plan is `tileRows`. SEGMENTED since 2026-10-25 (design pass, proposal A — user: the card "reads
  *  like lots and lots of buttons"): one hairline frame around the set, a divider between the
  *  columns and a hairline between the rows, the lit cell filled — one setting, not N buttons.
  *  The separate bounded tiles (2026-10-23) had each worn their own ring. */
 export function MeasureTiles({ measure }: { measure: MeasureControl }) {
-  const n = measure.options.length;
-  // Four sit two by two; fewer than three take a column each, never an empty column in the frame.
-  const cols = n === 4 ? 2 : Math.min(3, n);
-  const lastRowStart = cols * (Math.ceil(n / cols) - 1);
+  // THE ROW PLAN (`tileRows`): four two by two, seven 2 · 3 · 2, else rows of three, on a six-column
+  // grid — so the corner and divider rules below read each cell's ROW, not one fixed column count.
+  const cells = tileCells(measure.options.length);
+  const SPAN: Record<number, string> = { 1: "col-span-6", 2: "col-span-3", 3: "col-span-2" };
   return (
     <ToggleGroup
       type="single"
       value={measure.value}
       aria-label="Measure"
       onValueChange={(v) => { if (v) measure.onPick(v); }}
-      className={cn("grid w-auto gap-0 rounded-btn shadow-[inset_0_0_0_1px_var(--border)] overflow-hidden", cols === 1 ? "grid-cols-1" : cols === 2 ? "grid-cols-2" : "grid-cols-3")}
+      className="grid w-auto grid-cols-6 gap-0 rounded-btn shadow-[inset_0_0_0_1px_var(--border)] overflow-hidden"
     >
       {measure.options.map((o, i) => {
         const Icon = measureIcon(o.id);
+        const c = cells[i]!;
         return (
           <ToggleGroupItem
             key={o.id}
@@ -98,17 +100,18 @@ export function MeasureTiles({ measure }: { measure: MeasureControl }) {
               // By INDEX, not selector (review, 2026-10-25: two options in three columns, or a part
               // last row, left the corners square): the first cell, the end of the first row, the
               // start of the last row, the last cell.
-              i === 0 && "rounded-tl-btn!",
-              i === Math.min(cols, n) - 1 && "rounded-tr-btn!",
-              i === lastRowStart && "rounded-bl-btn!",
-              i === n - 1 && "rounded-br-btn!",
+              SPAN[c.rowSize],
+              c.row === 0 && c.first && "rounded-tl-btn!",
+              c.row === 0 && c.last && "rounded-tr-btn!",
+              c.row === c.rows - 1 && c.first && "rounded-bl-btn!",
+              c.row === c.rows - 1 && c.last && "rounded-br-btn!",
               // The frame is the group's; each cell draws only the divider on its LEFT edge (not the
               // first of a row) and, from the second row on, a hairline TOP. `!` on the shadows (CSS
               // trap 4): the toggle-group primitive's `data-[spacing=0]:shadow-none` is
               // class+attribute and would outrank a plain ring; the on-state's variant then wins by
               // its own specificity.
-              i % cols !== 0 && "shadow-[inset_1px_0_0_0_var(--border)]!",
-              i >= cols && "border-t border-border",
+              !c.first && "shadow-[inset_1px_0_0_0_var(--border)]!",
+              c.row > 0 && "border-t border-border",
               "hover:text-foreground hover:bg-wash-soft",
               "data-[state=on]:text-foreground data-[state=on]:bg-[var(--sel-bg)]",
               "data-[state=on]:shadow-[inset_0_0_0_1px_var(--sel-border)]!",

@@ -206,7 +206,10 @@ export type MeasureId = TrendMetric | HyperMeasure | GeoMeasure | LedgerMeasure;
  *  option's string id lenient for the tiles. */
 export const MEASURE_ICONS: Readonly<Record<MeasureId, LucideIcon>> = {
   // History (`TrendMetric`)
-  snapshots: Layers,
+  // The metagraph snapshots ANCHORED — the Snapshots view's own `anchors` boxes; the GLOBAL
+  // snapshots are that view's strata, the global ledger's layers.
+  snapshots: Boxes,
+  globals: Layers,
   blocks: Blocks,
   fees: Coins,
   kb: HardDrive,

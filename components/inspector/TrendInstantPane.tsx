@@ -127,7 +127,7 @@ export default function TrendInstantPane({
   const who = subject
     ? metagraphById(subject)?.ticker || rows.get(subject)?.name || subject
     : GLOBAL_READING[metric] === "total" ? "All networks" : "The hypergraph";
-  const phrase = momentPhrase(metric, stepMs);
+  const phrase = momentPhrase(metric, stepMs, !subject);
   // The SECOND CADENCE beside the spacing (2026-10-08): how many global snapshots carried this
   // chain in the moment. Only a network has it (the global row IS the ticks), and only where the
   // store measured it — the sampler writes it since that day; before, the clause is simply absent.

@@ -163,7 +163,7 @@ export default function TrendExplore() {
   const level: ExplorerLevelSpec = {
     key: "networks",
     crumb: { label: "Networks" },
-    // Six measures, shown as the explorer's tiles like every level's (`MeasureTiles`).
+    // Seven measures, shown as the explorer's tiles like every level's (`MeasureTiles`, 2 · 3 · 2).
     measure: {
       options: METRIC_ORDER.map((m) => ({ id: m, label: METRIC_LABELS[m], unit: metricUnit(m, 86_400_000) })),
       value: metric,

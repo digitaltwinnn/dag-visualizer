@@ -50,7 +50,10 @@ export type MotionCause =
   | { kind: "orbit" }
   // A rail card asking to be framed (`requestFocusRung`): the ladder rung, named by the reader.
   | { kind: "rung"; level: FocusLevel };
-export type TrendMetric = "snapshots" | "blocks" | "fees" | "kb" | "nodes" | "continuity";
+// `globals` = the GLOBAL snapshots (2026-10-26): the DAG's own L0 count (dagscan's "snapshots"), and
+// per network the global snapshots that carried its snapshots. `snapshots` stays the metagraph
+// snapshots anchored — the two differ ~10× on the DAG row, which is why both are measures.
+export type TrendMetric = "snapshots" | "globals" | "blocks" | "fees" | "kb" | "nodes" | "continuity";
 
 // One slot in the right-rail card stack (extend with future card types — e.g. "tx").
 export type SelSlot = "network" | "node" | "snap" | "metaSnap" | "country" | "cohort" | "composition" | "range" | "instant";

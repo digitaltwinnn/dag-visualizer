@@ -340,6 +340,13 @@ decisions inside them are design, not detail:
   the resting stack is unchanged and the row runs the same plane focus every other row does.
   (Parked at the back of the deck it paged the stack to its tail on focus.) It stays out of the
   RANK and off the shared ceiling: it is what the layers add up to.
+  **Two snapshot measures, because the DAG has two snapshot counts** (user, 2026-10-26 — dagscan's
+  1Y "snapshots" read ~10× below ours): **Snapshots anchored** (`snapshots`) is each network's own
+  snapshots, the DAG row their sum (`g.anchors`, tagged); **Global snapshots** (`globals`) is the
+  DAG's OWN count (`g.ticks`, one per global tick — dagscan's figure, untagged) and, per network,
+  the global snapshots that CARRIED it (`anchorSeries`). Never "L1 snapshots": a metagraph's
+  snapshots come from its own L0, and its L1s make the Blocks. The leads say it by subject — "The
+  hypergraph created …", "DOR was carried by …" (`rangePhrase`/`momentPhrase`'s `hypergraph` flag).
   ⚠️ **The roster is computed ONCE, in `components/useTrendRoster.ts`** — the planes, this list and
   the cursor card all read it, counter EDGE TRIM included. A surface reading the payload directly
   is one bucket out of step with the axis, which is exactly how the cursor card briefly quoted
@@ -351,7 +358,7 @@ lots and lots of buttons, lines and values … all the same padding and no very 
 and "what about design consistency??" when the first cut was History's alone). The CONTROL BAND
 is one full-bleed `--panel-plate` under the head holding what the reader SETS: the MEASURE
 CONTROL (`MeasureTiles` — every measure of the level named at once, glyph and word, the current
-one in the view switch's on-state; four sit two by two, two/three/six in three columns;
+one in the view switch's on-state; four sit two by two, seven 2 · 3 · 2 (`explorer/tileRows.ts`), two/three/six in three columns;
 `MEASURE_ICONS` in `components/icons.tsx` is the one glyph map, keyed by measure id across the
 four measure modules — **ONE SEGMENTED CONTROL since 2026-10-25**, design pass: one hairline
 frame around the set, dividers between columns, a hairline between rows, the lit cell filled;
