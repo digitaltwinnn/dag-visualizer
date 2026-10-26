@@ -12,7 +12,7 @@
 //
 // This lives in domain/ (pure data, no THREE / no scene / no store VALUE import) so it stays
 // testable and side-effect-free; it only imports the `Mode` string-union TYPE from the store.
-import type { Mode } from "@/src/store/store";
+import type { Mode } from "@/src/store/mode";
 
 export interface ViewPolicy {
   // Is the 3D canvas shown at all? false = a flat placeholder view (Blueprint schematic); the
@@ -170,6 +170,14 @@ export interface ViewPolicy {
   // Does this view mount the DOM chart-plane stack (`components/TrendStack.tsx` gates on this —
   // convention 7: gate on the view a behaviour is FOR, never `mode === "x"`)?
   chartStack: boolean;
+  // The PLANE a chart-stack view brings forward ON ARRIVAL, as its plane focus (user, 2026-10-26:
+  // "when we enter the view, set DAG the default in explorer (and thereby also the charts, cards
+  // etc)"). History opens on the hypergraph's own chart — the whole network, the reading that
+  // answers "how is the DAG doing" before any one network is picked — and its row, Metagraph card
+  // and Range card follow from the focus like any row click's. Applied only under the All filter
+  // (`trendStack.entryFocus`): a committed filter already scopes the stack to its network. Null =
+  // the view arrives with nothing brought forward.
+  entryPlane: string | null;
   // Does the camera idle-ORBIT in this view (OrbitControls.autoRotate)? A row rather than the
   // `mode !== "geo"` deny-list the Engine carried until 2026-09-18 — which is exactly the shape
   // convention 7 exists to prevent, and it had already gone wrong: the fourth view inherited
@@ -223,6 +231,7 @@ const FLAT: ViewPolicy = {
   rawSurface: "records",
   explorerDepth: "follow",
   chartStack: false,
+  entryPlane: null,
   // Never read today — a flat view PARKS the fleet and applies no destination layout, so it is
   // the only row nothing consults. It keeps the value the old `mode !== "geo"` line would have
   // given it, so wiring one up later changes nothing by accident.
@@ -274,6 +283,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     rawSurface: "records",
     explorerDepth: "follow",
     chartStack: false,
+    entryPlane: null,
     // TRUE, which is what the old `mode !== "geo"` line gave it — and it stays the row's answer
     // even though hyper's camera does not in fact idle-orbit today: `CameraDirector.focusFilter`
     // switches it off for EVERY filter, "all" included, because the structure spins itself
@@ -318,6 +328,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     rawSurface: "records",
     explorerDepth: "follow",
     chartStack: false,
+    entryPlane: null,
     // OFF: the globe does its own spinning (sims.globeSpin) and it turns to face a selection —
     // a camera orbiting a spinning globe is two rotations fighting over one subject.
     autoRotate: false,
@@ -352,6 +363,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     rawSurface: "records",
     explorerDepth: "axis",
     chartStack: false,
+    entryPlane: null,
     // OFF, and it always was: the chamber's branch in `_applyDestLayout` returns before the
     // generic line, so `mode !== "geo"` never reached it. The trail reads as a TIME axis running
     // away from the reader, and an orbit turns that axis into a shape being inspected.
@@ -396,6 +408,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     rawSurface: "buckets",
     explorerDepth: "follow",
     chartStack: true,
+    entryPlane: "dag",
     // ⚠️ OFF, and this row is why the field exists (2026-09-18). The planes are TEXT — a chart you
     // are reading has to hold still, and an idle orbit slid the whole stack sideways forever. It
     // also defeats `TrendStackSync`'s idle skip outright: a camera that never stops moving means

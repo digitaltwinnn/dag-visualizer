@@ -714,13 +714,13 @@ describe("the global snapshots measure (2026-10-26 — dagscan's figure beside o
     expect(TREND_METRICS.globals.kind).toBe("counter");
     expect(spanWord("globals")).toBe("Average per day");
   });
-  it("the hypergraph CREATES them; a network ANCHORS INTO them", () => {
+  it("the hypergraph CREATES them; a network is PART OF them", () => {
     const r = rangePhrase("globals", false, true);
     expect(`The hypergraph ${r.verb} 5,203 ${r.rest}`).toBe("The hypergraph created 5,203 global snapshots in this range");
     const n = rangePhrase("globals", true);
-    expect(`DOR ${n.verb} 2,880 ${n.rest}`).toBe("DOR anchored into at least 2,880 global snapshots in this range");
+    expect(`DOR ${n.verb} 2,880 ${n.rest}`).toBe("DOR was part of at least 2,880 global snapshots in this range");
     const m = momentPhrase("globals", 300_000);
-    expect(`DOR ${m.verb} 9 ${m.rest}`).toBe("DOR anchored into 9 global snapshots in those 5 minutes");
+    expect(`DOR ${m.verb} 9 ${m.rest}`).toBe("DOR was part of 9 global snapshots in those 5 minutes");
     const h = momentPhrase("globals", DAY, true);
     expect(`The hypergraph ${h.verb} 5,203 ${h.rest}`).toBe("The hypergraph created 5,203 global snapshots on that day");
   });

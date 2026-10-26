@@ -151,6 +151,9 @@ describe("the trends view is registered and inert", () => {
   // on the view a behaviour is FOR, never `mode === "x"`).
   it("mounts the chart-plane stack only in trend", () => {
     expect(VIEW_POLICIES.trend.chartStack).toBe(true);
+    // History arrives on the DAG's own plane; nothing else has a plane to bring forward.
+    expect(VIEW_POLICIES.trend.entryPlane).toBe("dag");
+    for (const m of ["hyper", "geo", "ledger", "soon"] as const) expect(VIEW_POLICIES[m].entryPlane).toBeNull();
     expect(VIEW_POLICIES.hyper.chartStack).toBe(false);
   });
 

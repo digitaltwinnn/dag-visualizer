@@ -566,6 +566,16 @@ export function planeOfChain(
  *  snapshot committed in the log (its tick-network failing that) brings its network's plane forward
  *  on return; with nothing committed there, the plane that was in front when the door opened comes
  *  back, as before. The chain → plane fold is `planeOfChain`'s. */
+/** THE PLANE A VIEW ARRIVES ON (2026-10-26 — `viewPolicy.entryPlane`, user: "when we enter the
+ *  view, set DAG the default in explorer"). The view's own entry plane, but only under the All
+ *  filter: there the stack is every network and something has to stand in front, while a committed
+ *  filter (a network, the DAG, the unlisted set) already IS the subject — a focus over it would
+ *  name a second one. The store's view switch writes the answer, so arriving and clicking the row
+ *  land on the same state. */
+export function entryFocus(entryPlane: string | null, filter: string): string | null {
+  return filter === "all" ? entryPlane : null;
+}
+
 export function focusOnReturn(
   committedChain: string | null,
   saved: string | null,

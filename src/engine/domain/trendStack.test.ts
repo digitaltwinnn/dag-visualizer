@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   rotateOrder,
+  entryFocus,
   focusOnReturn,
   planeOfChain,
   cardNetwork,
@@ -711,6 +712,20 @@ describe("planeOfChain — the plane a snapshot's chain belongs to", () => {
   });
   it("an uncataloged channel is the unlisted set's plane", () => {
     expect(planeOfChain("DAGsomeoneelse", catalog, "unlisted")).toBe("unlisted");
+  });
+});
+
+describe("entryFocus — the plane a view arrives on (2026-10-26)", () => {
+  it("brings the view's entry plane forward under All", () => {
+    expect(entryFocus("dag", "all")).toBe("dag");
+  });
+  it("brings nothing forward under a committed filter — the filter already is the subject", () => {
+    expect(entryFocus("dag", "DAG0CyySf35ftDQDQBnd1bdQ9aPyUdacMghpnCuM")).toBeNull();
+    expect(entryFocus("dag", "dag")).toBeNull();
+    expect(entryFocus("dag", "unlisted")).toBeNull();
+  });
+  it("a view with no entry plane arrives with nothing forward", () => {
+    expect(entryFocus(null, "all")).toBeNull();
   });
 });
 

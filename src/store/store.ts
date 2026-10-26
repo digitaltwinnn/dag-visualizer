@@ -11,7 +11,8 @@ import type { ThemePref, Theme } from "@/src/theme/resolve";
 // (src/data/trendWindow.ts, read by the document's picker and by the stack), and a type-only
 // import keeps the store from holding a data-layer VALUE.
 import type { ZoomId } from "@/src/data/trendWindow";
-import { focusOnReturn, planeOfChain, scrollToKeep } from "@/src/engine/domain/trendStack";
+import { entryFocus, focusOnReturn, planeOfChain, scrollToKeep } from "@/src/engine/domain/trendStack";
+import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 // The catalog and the unlisted id, for the one fold the return path needs (`planeOfChain`): both
 // are static data — `src/net/current` reads config, `unlistedId` is the import-free leaf.
 import { METAGRAPHS } from "@/src/net/current";
@@ -22,7 +23,8 @@ import { UNLISTED_ID } from "@/src/data/unlistedId";
 // 2026-09-04 — three separate soon modes said the same nothing three times; the Blueprint
 // gallery inside it still previews each coming feature). `trend` (2026-09-18) is the measured
 // history view — chart planes as the scene, convention 12's MEASURED HISTORY rung made a view.
-export type Mode = "hyper" | "geo" | "ledger" | "trend" | "soon";
+import type { Mode } from "@/src/store/mode";
+export type { Mode };
 
 // The stored metric every trend plane draws — one picker, one column (see `trendMetric` below).
 import type { LedgerMeasure } from "@/src/data/ledgerMeasure";
@@ -613,11 +615,22 @@ export const useStore = create<AppState>((set) => ({
   // Closing (either route) arms `docClosing` — the doc's exit animation is its OUT phase, and
   // the engine waits on it before entering the destination view.
   // A view switch is a LOUD navigation (the no-pop rule rolls view-scoped content on arrival),
-  // so it clears any standing quiet mark from a rail gesture. `trendFocus` clears with it — it's
-  // view-scoped, like the other ladder levels; `trendCursorMs` does NOT (an instant is a
+  // so it clears any standing quiet mark from a rail gesture. `trendFocus` clears with it (to the
+  // destination's entry plane, below) — it's view-scoped, like the other ladder levels; `trendCursorMs` does NOT (an instant is a
   // universal subject and carries, the way `node` and `network` do in `LEVEL_CARRY`).
   // A view switch stamps its own motion cause (the hint says what it builds).
-  setMode: (mode) => set((s) => ({ mode, navQuiet: false, docPage: null, docClosing: s.docPage != null || s.docClosing, trendFocus: null, trendRotation: 0, rawReturnMode: null, motionCause: { kind: "view", from: s.mode, to: mode } })),
+  // …AND ARRIVES ON THE VIEW'S ENTRY PLANE (2026-10-26, `viewPolicy.entryPlane`): History opens with
+  // the DAG's chart brought forward under All — the same focus a click on its row commits, so its
+  // Range card opens with it (`setTrendFocus`'s own stack bump).
+  setMode: (mode) =>
+    set((s) => {
+      const focus = entryFocus(VIEW_POLICIES[mode].entryPlane, s.filter);
+      return {
+        mode, navQuiet: false, docPage: null, docClosing: s.docPage != null || s.docClosing, trendFocus: focus, trendRotation: 0, rawReturnMode: null,
+        selStack: focus != null ? bumpStack(s.selStack, "range", true) : s.selStack,
+        motionCause: { kind: "view", from: s.mode, to: mode },
+      };
+    }),
   // Opening a doc also SURFACES THE SCENE POSE: the overlay sits at z-8, under the raw layer's
   // z-9 — a doc opened from the RAW pose rendered beneath the still-interactive table, with the
   // RAW toggle that could exit it hidden by the doc's own control gating (review find,

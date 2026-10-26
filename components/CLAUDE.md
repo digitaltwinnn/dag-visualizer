@@ -339,14 +339,18 @@ decisions inside them are design, not detail:
   deck at the FRONT while it is the focus (`TrendStack`'s `deck`) and leaves when released, so
   the resting stack is unchanged and the row runs the same plane focus every other row does.
   (Parked at the back of the deck it paged the stack to its tail on focus.) It stays out of the
-  RANK and off the shared ceiling: it is what the layers add up to.
+  RANK and off the shared ceiling: it is what the layers add up to. **History ARRIVES on it**
+  (user, 2026-10-26: "set DAG the default in explorer (and thereby also the charts, cards etc)"):
+  under All, the view switch commits the DAG's plane focus (`viewPolicy.entryPlane`, applied by
+  `trendStack.entryFocus` inside the store's `setMode`) — the same state its row's click makes, so
+  its row, plane, Metagraph and Range cards all stand on the DAG; a committed filter arrives as itself.
   **Two snapshot measures, because the DAG has two snapshot counts** (user, 2026-10-26 — dagscan's
   1Y "snapshots" read ~10× below ours): **Snapshots anchored** (`snapshots`) is each network's own
   snapshots, the DAG row their sum (`g.anchors`, tagged); **Global snapshots** (`globals`) is the
   DAG's OWN count (`g.ticks`, one per global tick — dagscan's figure, untagged) and, per network,
   the global snapshots that CARRIED it (`anchorSeries`). Never "L1 snapshots": a metagraph's
   snapshots come from its own L0, and its L1s make the Blocks. The leads say it by subject — "The
-  hypergraph created …", "DOR anchored into …" (`rangePhrase`/`momentPhrase`'s `hypergraph` flag).
+  hypergraph created …", "DOR was part of …" (user: a network does not create them) (`rangePhrase`/`momentPhrase`'s `hypergraph` flag).
   ⚠️ **The roster is computed ONCE, in `components/useTrendRoster.ts`** — the planes, this list and
   the cursor card all read it, counter EDGE TRIM included. A surface reading the payload directly
   is one bucket out of step with the axis, which is exactly how the cursor card briefly quoted
