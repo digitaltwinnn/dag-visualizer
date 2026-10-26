@@ -262,7 +262,7 @@ async function main(): Promise<void> {
   const { fetchChainIds } = await import("../app/api/network/chainList");
   const { TIER_SINCE } = await import("../src/data/trendWindow");
   const { TTL_S, slotOf, cursorKeyOf, lockKeyOf } = await import("../app/api/trends/keys");
-  const { bucketGlobals, bucketMetas, addInc, markUnlistedCoverage } = await import("../app/api/trends/bucketing");
+  const { bucketGlobals, bucketMetas, addInc, markUnlistedCoverage, finalDays, stampRun } = await import("../app/api/trends/bucketing");
   const addIncGap = (inc: import("../app/api/trends/bucketing").IncMap, n: string, tsMs: number, id: string, gap: number) => {
     addInc(inc, n, tsMs, `m.${id}.gapSum`, gap);
     addInc(inc, n, tsMs, `m.${id}.gapMax`, gap);
@@ -676,38 +676,7 @@ async function main(): Promise<void> {
       // so nothing is skipped (2026-09-10, the keep-forever flip).
       const fresh5m = TTL_S["5m"] == null ? "" : slotOf(net, "5m", Date.now() - TTL_S["5m"] * 1000).key;
     let fields = 0;
-    // RESUMING A DIED WALK (2026-10-26 — an explorer outage past the retry window killed a 2025-07-01
-    // run seven hours in, nine chains already written): each chain writes whole when its walk ends,
-    // so a rerun may start at the chain that died. `--gaps-from-chain=<id prefix>` skips the
-    // catalog-order chains before it; an unmatched prefix is an error, never a silent full run.
-    let ids = lineageIds(net);
-    if (gapsFromChain != null) {
-      const at = ids.findIndex((id) => id.startsWith(gapsFromChain));
-      if (at < 0) { console.error(`--gaps-from-chain: no chain starts with ${gapsFromChain}`); process.exit(1); }
-      console.log(`  resuming at ${ids[at]!.slice(0, 10)} — skipping ${at} chain(s) already written`);
-      ids = ids.slice(at);
-    }
-    for (const id of ids) {
-      // Timestamps only — the walk's records are otherwise discarded, and the two gap
-      // fields plus the anchoring count are the only things this mode may write. Each chain WRITES as soon as its
-      // walk ends (complete-day HSET recomputations are idempotent), so a crash mid-run
-      // loses one chain's walk, not the whole night's (learned at 83% of DOR, 2026-09-08).
-      const stamps: number[] = [];
-      await walkChain<{ timestamp: string }>(`${NETWORKS[net].be}/currency/${id}/snapshots`, gapsFromMs, (recs) => {
-        for (const r of recs) {
-          const t = Date.parse(r.timestamp);
-          if (t < todayStartMs) stamps.push(t);
-        }
-      }, id.slice(0, 10));
-      stamps.sort((a, b) => a - b);
-      const inc: IncMap = new Map();
-      for (let i = 1; i < stamps.length; i++) {
-        const gap = Math.max(0, Math.round((stamps[i] - stamps[i - 1]) / 1000));
-        addIncGap(inc, net, stamps[i], id, gap);
-      }
-      // …and the anchoring count from the same sorted stamps (2026-10-08): this mode is its
-      // backfill route too — a distinct stamp is one global tick that carried the chain.
-      for (let i = 0; i < stamps.length; i++) if (i === 0 || stamps[i] !== stamps[i - 1]) addInc(inc, net, stamps[i], `m.${id}.ticks`, 1);
+    const writeInc = async (inc: IncMap) => {
       for (const [key, map] of inc) {
         const tier = tierOf(key);
         if (tier === "5m" && key < fresh5m) continue;
@@ -717,7 +686,79 @@ async function main(): Promise<void> {
         }
         fields += entries.length;
       }
+    };
+    // A batch of COMPLETE days as gap and anchoring fields (`stampRun` — the whole-chain arithmetic).
+    const writeRun = async (id: string, run: number[], pred: number | null) => {
+      if (!run.length) return;
+      const inc: IncMap = new Map();
+      stampRun(run, pred, (t, gap) => addIncGap(inc, net, t, id, gap), (t) => addInc(inc, net, t, `m.${id}.ticks`, 1));
+      await writeInc(inc);
+    };
+    // WRITTEN DAY BY DAY, RESUMABLE MID-CHAIN (2026-10-26 — user: "why save it in one go … to avoid
+    // it fails at the very end and you need to start all over?"; an explorer outage had already
+    // killed one 2025-07-01 run seven hours in). The walk runs newest→oldest, so each UTC day is
+    // complete once a stamp older than it arrives (`finalDays`) and is written then — HSET of whole
+    // days, idempotent on a replay. After each write the walk's place is CHECKPOINTED: the chain,
+    // the explorer's next-page cursor and the stamps of the day still being read. A rerun of the same
+    // `--backfill-gaps=` date picks the checkpoint up by itself and loses at most one day's pages.
+    // `--gaps-from-chain=<id prefix>` still starts at a named chain, from its tip (an unmatched prefix
+    // is an error, never a silent full run), and overrides a checkpoint.
+    const GAPS_CKPT = join(process.cwd(), ".rebuild-trends-ckpt", `gaps-${net}.json`);
+    interface GapsCkpt { fromMs: number; chain: string; cursor: string | null; pending: number[] }
+    const saveCkpt = (c: GapsCkpt) => {
+      mkdirSync(join(process.cwd(), ".rebuild-trends-ckpt"), { recursive: true });
+      writeFileSync(GAPS_CKPT + ".tmp", JSON.stringify(c));
+      renameSync(GAPS_CKPT + ".tmp", GAPS_CKPT); // atomic — a kill mid-write keeps the old file
+    };
+    let ckpt: GapsCkpt | null = null;
+    try { ckpt = JSON.parse(readFileSync(GAPS_CKPT, "utf8")) as GapsCkpt; } catch { /* none */ }
+    if (ckpt && ckpt.fromMs !== gapsFromMs) {
+      console.error(`a gaps checkpoint from ${new Date(ckpt.fromMs).toISOString().slice(0, 10)} exists (${GAPS_CKPT}) — rerun with that date to resume, or delete it to start over`);
+      process.exit(1);
     }
+    let ids = lineageIds(net);
+    if (gapsFromChain != null) {
+      const at = ids.findIndex((id) => id.startsWith(gapsFromChain));
+      if (at < 0) { console.error(`--gaps-from-chain: no chain starts with ${gapsFromChain}`); process.exit(1); }
+      console.log(`  starting at ${ids[at]!.slice(0, 10)} — skipping ${at} chain(s)`);
+      ids = ids.slice(at);
+      ckpt = null;
+    } else if (ckpt) {
+      const at = ids.indexOf(ckpt.chain);
+      if (at < 0) { console.error(`the gaps checkpoint names ${ckpt.chain}, which the catalog no longer lists`); process.exit(1); }
+      console.log(`  resuming the checkpoint at ${ckpt.chain.slice(0, 10)}${ckpt.cursor ? " mid-chain" : ""} — skipping ${at} chain(s) already written`);
+      ids = ids.slice(at);
+    }
+    for (const id of ids) {
+      const resumed = ckpt && ckpt.chain === id ? ckpt : null;
+      let pending: number[] = resumed ? [...resumed.pending] : [];
+      saveCkpt({ fromMs: gapsFromMs, chain: id, cursor: resumed?.cursor ?? null, pending });
+      await walkChain<{ timestamp: string }>(
+        `${NETWORKS[net].be}/currency/${id}/snapshots`,
+        gapsFromMs,
+        (recs) => {
+          for (const r of recs) {
+            const t = Date.parse(r.timestamp);
+            if (t < todayStartMs) pending.push(t);
+          }
+        },
+        id.slice(0, 10),
+        resumed?.cursor ?? undefined,
+        async (nextCursor) => {
+          const { batch, pred, rest } = finalDays(pending);
+          if (!batch.length) return;
+          await writeRun(id, batch, pred);
+          pending = rest;
+          saveCkpt({ fromMs: gapsFromMs, chain: id, cursor: nextCursor, pending });
+        },
+      );
+      // The walk's oldest day: its first stamp opens the window, with no gap before it.
+      await writeRun(id, pending.sort((a, b) => a - b), null);
+      const next = ids[ids.indexOf(id) + 1];
+      if (next) saveCkpt({ fromMs: gapsFromMs, chain: next, cursor: null, pending: [] });
+      ckpt = null;
+    }
+    rmSync(GAPS_CKPT, { force: true });
     console.log(`  ${fields} gap fields; every other field and the cursor untouched.`);
     return;
   }

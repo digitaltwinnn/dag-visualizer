@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { addInc, bucketGlobals, bucketMetas, bucketFleet, type IncMap } from "./bucketing";
+import { addInc, bucketGlobals, bucketMetas, bucketFleet, finalDays, stampRun, type IncMap } from "./bucketing";
 import { slotOf, fieldOf } from "./keys";
 
 const ts = (h: number, m: number, s = 0) => new Date(Date.UTC(2026, 8, 6, h, m, s)).toISOString();
@@ -224,5 +224,65 @@ describe("bucketMetas blocks", () => {
     ]);
     const k = slotOf("mainnet", "1h", Date.parse("2026-09-11T10:00:00Z"));
     expect(inc.get(k.key)?.get(fieldOf(k.bucket, "m.up.blocks"))).toBe(2);
+  });
+});
+
+describe("finalDays / stampRun — the gaps backfill, written day by day (2026-10-26)", () => {
+  const D = 86_400_000;
+  const day0 = Date.UTC(2026, 6, 1);
+  // A chain's stamps across five days, with a repeated stamp (two snapshots in one global) and a
+  // stamp exactly on a day boundary.
+  const stamps = [
+    day0 + 5_000, day0 + 65_000, day0 + 65_000, day0 + D - 1_000,
+    day0 + D, day0 + D + 30_000,
+    day0 + 2 * D + 7_000,
+    day0 + 3 * D + 1_000, day0 + 3 * D + 1_000, day0 + 4 * D - 2,
+    day0 + 4 * D + 500,
+  ];
+  const whole = () => {
+    const gaps: [number, number][] = [];
+    const ticks: number[] = [];
+    stampRun([...stamps].sort((a, b) => a - b), null, (t, g) => gaps.push([t, g]), (t) => ticks.push(t));
+    return { gaps, ticks };
+  };
+  const incremental = (pageSize: number) => {
+    const gaps: [number, number][] = [];
+    const ticks: number[] = [];
+    const desc = [...stamps].sort((a, b) => b - a);
+    let pending: number[] = [];
+    for (let i = 0; i < desc.length; i += pageSize) {
+      pending.push(...desc.slice(i, i + pageSize));
+      const { batch, pred, rest } = finalDays(pending);
+      stampRun(batch, pred, (t, g) => gaps.push([t, g]), (t) => ticks.push(t));
+      pending = rest;
+    }
+    stampRun(pending.sort((a, b) => a - b), null, (t, g) => gaps.push([t, g]), (t) => ticks.push(t));
+    const byT = (a: [number, number], b: [number, number]) => a[0] - b[0];
+    return { gaps: gaps.sort(byT), ticks: ticks.sort((a, b) => a - b) };
+  };
+
+  it("writing complete days as the walk passes them gives exactly the whole-chain answer, at any page size", () => {
+    const want = whole();
+    for (const size of [1, 2, 3, 4, 600]) expect(incremental(size)).toEqual(want);
+  });
+
+  it("a day is final only once the walk holds a stamp older than it", () => {
+    const { batch, pred, rest } = finalDays([day0 + 2 * D + 7_000, day0 + D + 30_000]);
+    expect(batch).toEqual([day0 + 2 * D + 7_000]);
+    expect(pred).toBe(day0 + D + 30_000);
+    expect(rest).toEqual([day0 + D + 30_000]);
+  });
+
+  it("holds everything while the walk is still inside its first day", () => {
+    expect(finalDays([day0 + 9_000, day0 + 5_000])).toEqual({ batch: [], pred: day0 + 9_000, rest: [day0 + 9_000, day0 + 5_000] });
+    expect(finalDays([])).toEqual({ batch: [], pred: null, rest: [] });
+  });
+
+  it("stampRun opens the chain at a null predecessor, and a repeated stamp is one anchoring", () => {
+    const gaps: number[] = [];
+    const ticks: number[] = [];
+    stampRun([10_000, 10_000, 40_000], null, (_, g) => gaps.push(g), (t) => ticks.push(t));
+    expect(gaps).toEqual([0, 30]);
+    expect(ticks).toEqual([10_000, 40_000]);
   });
 });
