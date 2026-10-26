@@ -89,6 +89,11 @@ const rate = (per: string) => per;
 /** One row per stored metric — the whole mapping, readable in one screen. */
 export const TREND_METRICS: Record<TrendMetric, MetricSpec> = {
   snapshots: { kind: "counter", key: (id) => `m.${id}.snaps`, scale: 1, unit: rate },
+  // GLOBAL SNAPSHOTS (2026-10-26 — user: dagscan's 1Y "snapshots" is the global L0's count, ours
+  // was the metagraph snapshots anchored; "I want to show both"). Per network: the global
+  // snapshots that CARRIED its snapshots (`anchorSeries` — derived, since a zero beside snapshots
+  // is the field's absence before 2026-10-08, so it has no single key). The DAG's own is `g.ticks`.
+  globals: { kind: "counter", key: null, scale: 1, unit: rate },
   blocks: { kind: "counter", key: (id) => `m.${id}.blocks`, scale: 1, unit: rate },
   // Stored in DATUMS, the chain's own integer unit; read in DAG.
   fees: { kind: "counter", key: (id) => `m.${id}.fee`, scale: 1e-8, unit: (per) => `DAG ${per}`, format: formatDag },
@@ -103,10 +108,11 @@ export const TREND_METRICS: Record<TrendMetric, MetricSpec> = {
   continuity: { kind: "counter", key: null, scale: 1, unit: () => "between snapshots", format: formatSeconds, joinUnit: true },
 };
 
-/** A metric that IS one stored row — everything but the derived `continuity`. Narrower than
- *  `kind: "counter"` and deliberately so: continuity is counter-TRIMMED (it divides two counter
- *  rows) yet has no row of its own, so the two ideas must not share one name. */
-export type StoredMetric = Exclude<TrendMetric, "continuity">;
+/** A metric that IS one stored row — everything but the derived `continuity` and `globals`. Narrower
+ *  than `kind: "counter"` and deliberately so: both are counter-TRIMMED yet have no row of their
+ *  own (continuity divides two counter rows; globals reads `ticks` through `snaps`' coverage), so
+ *  the two ideas must not share one name. */
+export type StoredMetric = Exclude<TrendMetric, "continuity" | "globals">;
 
 
 /** The stored row a metric reads for one network, or null where it is derived from several. The
@@ -216,6 +222,7 @@ export function metricSeries(
       gaps: (series[`m.${id}.gapMax`] ?? []).slice(),
     };
   }
+  if (metric === "globals") return { points: anchorSeries(id, series) };
   const spec = TREND_METRICS[metric];
   const key = spec.key?.(id);
   const raw = (key != null ? series[key] : undefined) ?? [];
@@ -404,6 +411,8 @@ export const GLOBAL_METRIC_ROWS: Record<TrendMetric, { key: string | null; scale
   // The whole network's snapshot activity is what it ANCHORED — `g.ticks` counts global
   // snapshots, which is the hypergraph's own cadence, not the chains' production.
   snapshots: { key: "g.anchors", scale: 1 },
+  // The hypergraph's OWN snapshots — one per global tick (dagscan's figure).
+  globals: { key: "g.ticks", scale: 1 },
   blocks: { key: "g.blocks", scale: 1 },
   // The WHOLE totals (`withUnlisted`): the catalog floor plus the unlisted chains where measured.
   fees: { key: "g.fee", scale: 1e-8 },
@@ -425,6 +434,8 @@ export const GLOBAL_METRIC_ROWS: Record<TrendMetric, { key: string | null; scale
  *  count, through the same `metricSeries` every row uses. */
 export const GLOBAL_READING: Record<TrendMetric, "total" | "own"> = {
   snapshots: "total",
+  // Its own snapshots, not the rows added up: a global snapshot carries many networks at once.
+  globals: "own",
   fees: "total",
   kb: "total",
   nodes: "own",
@@ -528,7 +539,13 @@ export function orderAt(readings: readonly { id: string; value: number | null }[
  *  chain's snapshots. The internal ids stay what they are — one concept, two registers, the
  *  `cohort`/provider rule. */
 export const METRIC_LABELS: Record<TrendMetric, string> = {
-  snapshots: "Snapshots",
+  // "Snapshots anchored" beside "In global snapshots" (user, 2026-10-26): with both on the list a bare
+  // "Snapshots" no longer says which. IN, because a bare "Global snapshots" read as the network's
+  // own (user: "a bit confusing" — a network creates none); one definition holds on every row:
+  // the global snapshots the subject is IN — a network's, those its snapshots rode; the DAG's,
+  // every one, since each carries the DAG's own.
+  snapshots: "Snapshots anchored",
+  globals: "In global snapshots",
   blocks: "Blocks",
   fees: "Fees",
   kb: "Data",
@@ -538,13 +555,22 @@ export const METRIC_LABELS: Record<TrendMetric, string> = {
   continuity: "Cadence",
 };
 
+/** A MEASURE'S NAME, SEEN FROM ITS SUBJECT (user, 2026-10-26: "for DAG you can say global
+ *  snapshots, that is a valid exception because we're looking at it from either side"). The DAG
+ *  CREATES the global snapshots, so on its chart the measure is "Global snapshots"; a network's
+ *  snapshots ride in them — "In global snapshots". Every other measure has one name. `subject` is
+ *  whose chart (a plane) or whose deck (the explorer's tiles, the hint: `cardNetwork`). */
+export function metricLabel(metric: TrendMetric, subject: string | null): string {
+  return metric === "globals" && subject === "dag" ? "Global snapshots" : METRIC_LABELS[metric];
+}
+
 /** THE MEASURES' ONE ORDER — the explorer heading's list top-to-bottom and the cards' ↑/↓ keys
  *  are the same sequence, read from here, so stepping down from the third entry always lands on
  *  the fourth. */
 export const METRIC_ORDER = Object.keys(METRIC_LABELS) as TrendMetric[];
 
 /** The measure one step from `metric` (`+1` = the next in `METRIC_ORDER`, `-1` = the previous),
- *  or `null` at either end. It does NOT wrap: six measures are a short list with a first and a
+ *  or `null` at either end. It does NOT wrap: seven measures are a short list with a first and a
  *  last, and the app's steppers say "this direction is exhausted" by going inactive (the rail
  *  plank's rule) rather than by looping — a loop hides where you are in the list. */
 export function stepMetric(metric: TrendMetric, dir: -1 | 1): TrendMetric | null {
@@ -579,16 +605,25 @@ export function holdOrder(held: readonly string[], ranked: readonly string[]): s
  *  which is CREATED (user, 2026-10-08: "I think they created one every 3s, but anchored it to global
  *  only occurs ~30sec"): the gap is between the chain's own snapshots, not between the global
  *  snapshots that carried them, and the anchoring cadence is not a stored series. */
-export function momentPhrase(metric: TrendMetric, stepMs: number): { verb: string; rest: string } {
+export function momentPhrase(metric: TrendMetric, stepMs: number, hypergraph = false): { verb: string; rest: string } {
   const inBucket = stepMs >= 86400000 ? "on that day" : stepMs >= 3600000 ? "in that hour" : "in those 5 minutes";
   switch (metric) {
     case "snapshots": return { verb: "anchored", rest: `snapshots ${inBucket}` };
+    case "globals": return { verb: globalsVerb(hypergraph, ""), rest: `global snapshots ${inBucket}` };
     case "blocks": return { verb: "produced", rest: `blocks ${inBucket}` };
     case "fees": return { verb: "paid", rest: `DAG in fees ${inBucket}` };
     case "kb": return { verb: "anchored", rest: `of data ${inBucket}` };
     case "nodes": return { verb: "ran", rest: "nodes" };
     case "continuity": return { verb: "created a snapshot every", rest: inBucket };
   }
+}
+
+/** THE ONE MEASURE WHOSE VERB DEPENDS ON THE SUBJECT (2026-10-26): the hypergraph CREATES its global
+ *  snapshots, a network is PART OF them — "DOR was part of 2,880 global snapshots" (user: "it's not
+ *  the one who actually creates them"; "was carried by", then "anchored into", came first), never
+ *  "DOR created" (it created its own, which is the other measure). `floor` is " at least" or "". */
+function globalsVerb(hypergraph: boolean, floor: string): string {
+  return hypergraph ? `created${floor}` : `was part of${floor}`;
 }
 
 /** HOW MANY GLOBAL SNAPSHOTS CARRIED A CHAIN, per bucket (`m.<id>.ticks`, sampled since
@@ -616,12 +651,13 @@ export function anchorClause(n: number): { before: string; after: string } {
  *  snapshots in this range") — what a reader asks of a range — and a total that skipped an
  *  unmeasured bucket is a floor and says so ("at least", rule 10). A gauge and the spacing have no
  *  total, so they are the span's average and say that instead. */
-export function rangePhrase(metric: TrendMetric, partial: boolean): { verb: string; rest: string } {
+export function rangePhrase(metric: TrendMetric, partial: boolean, hypergraph = false): { verb: string; rest: string } {
   // The span is the card's own Start / End / Length rows, so the sentence points at it.
   const over = "in this range";
   const floor = partial ? " at least" : "";
   switch (metric) {
     case "snapshots": return { verb: `anchored${floor}`, rest: `snapshots ${over}` };
+    case "globals": return { verb: globalsVerb(hypergraph, floor), rest: `global snapshots ${over}` };
     case "blocks": return { verb: `produced${floor}`, rest: `blocks ${over}` };
     case "fees": return { verb: `paid${floor}`, rest: `DAG in fees ${over}` };
     case "kb": return { verb: `anchored${floor}`, rest: `of data ${over}` };
@@ -646,8 +682,8 @@ export function sumMeasured(points: readonly (number | null)[]): { sum: number; 
  *  day"); a unit with its own noun is joined by "in" ("Fees in DAG per day" — it was set off with a
  *  mid-dot until 2026-10-03, the separator the user asked out of reader copy); and a unit that only repeats
  *  the name is dropped ("Nodes", never "Nodes · nodes"). */
-export function metricCaption(metric: TrendMetric, stepMs: number): string {
-  const label = METRIC_LABELS[metric];
+export function metricCaption(metric: TrendMetric, stepMs: number, subject: string | null = null): string {
+  const label = metricLabel(metric, subject);
   const unit = metricUnit(metric, stepMs);
   if (!unit || unit.toLowerCase() === label.toLowerCase()) return label;
   // Asked of the SPEC, not sniffed off the string: a unit is a bare rate exactly when its row uses
@@ -773,7 +809,11 @@ export function typeBands(id: string, series: Readonly<Record<string, (number | 
  *  explorer timestamp skew broke (2026-09-29: 38 phantom unlisted snapshots).
  *
  *  `isListed` is the catalog's judgement (current and former ids), passed in so this stays pure. */
-const UNLISTED_FIELDS = ["snaps", "fee", "kb", "blocks", "gapSum", "gapMax", "ticks"] as const;
+// NOT `ticks` (PR review, 2026-10-26): it counts the DISTINCT global snapshots that carried a chain,
+// and two unlisted chains riding the same global snapshot would count it twice — a sum of
+// per-chain counts is no count of the set (rule 10). The set has no stored distinct count, so it
+// shows no "In global snapshots" reading rather than an invented one.
+const UNLISTED_FIELDS = ["snaps", "fee", "kb", "blocks", "gapSum", "gapMax"] as const;
 
 export function withUnlisted(
   series: Readonly<Record<string, (number | null)[]>>,

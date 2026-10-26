@@ -18,6 +18,7 @@ import { anchorClause, anchorSeries, headWord, lastSeen, momentPhrase, rangePhra
   trimCounterEdges,
   METRIC_LABELS,
   METRIC_ORDER,
+  metricLabel,
   holdOrder,
   metricCaption,
   stepMetric,
@@ -40,7 +41,7 @@ const DAY = 86400000;
 describe("the metric table", () => {
   it("covers every stored metric, and only fees and bytes rescale", () => {
     expect(Object.keys(TREND_METRICS).sort()).toEqual(
-      ["blocks", "continuity", "fees", "kb", "nodes", "snapshots"],
+      ["blocks", "continuity", "fees", "globals", "kb", "nodes", "snapshots"],
     );
     // Fees are stored in datums (1e-8 DAG) and sizes in KB — the two places the stored unit is
     // not the unit a reader is shown.
@@ -57,6 +58,8 @@ describe("the metric table", () => {
     expect(seriesKey("nodes", "dor")).toBe("f.nodes.dor");
     // Derived from two stored rows, so there is no single key to hand a readout builder.
     expect(seriesKey("continuity", "dor")).toBeNull();
+    // `ticks` read through `snaps`' coverage (anchorSeries) — derived too.
+    expect(seriesKey("globals", "dor")).toBeNull();
   });
 
   it("formats only where TrendChart's own default is wrong", () => {
@@ -205,6 +208,8 @@ describe("the busiest-first ranking", () => {
 describe("the global (whole-network) series", () => {
   it("names one stored row per stored metric, with the unit the reader is shown", () => {
     expect(GLOBAL_METRIC_ROWS.snapshots).toEqual({ key: "g.anchors", scale: 1 });
+    // The hypergraph's own snapshots: one per global tick — dagscan's "snapshots".
+    expect(GLOBAL_METRIC_ROWS.globals).toEqual({ key: "g.ticks", scale: 1 });
     expect(GLOBAL_METRIC_ROWS.blocks).toEqual({ key: "g.blocks", scale: 1 });
     expect(GLOBAL_METRIC_ROWS.fees).toEqual({ key: "g.fee", scale: 1e-8 });
     expect(GLOBAL_METRIC_ROWS.kb).toEqual({ key: "g.kb", scale: 1 / 1024 });
@@ -324,7 +329,9 @@ describe("METRIC_LABELS — the reader's word for each metric", () => {
     expect(Object.keys(METRIC_LABELS).sort()).toEqual(Object.keys(TREND_METRICS).sort());
     // `kb` is stored in bytes and read as DATA — the reader's word, never the stored unit.
     expect(METRIC_LABELS.kb).toBe("Data");
-    expect(METRIC_LABELS.snapshots).toBe("Snapshots");
+    // Two snapshot measures, so each says which (user, 2026-10-26).
+    expect(METRIC_LABELS.snapshots).toBe("Snapshots anchored");
+    expect(METRIC_LABELS.globals).toBe("In global snapshots");
   });
 });
 
@@ -512,8 +519,9 @@ describe("stepping the measure from a card", () => {
   });
 
   it("steps to the neighbour in either direction", () => {
-    expect(stepMetric("snapshots", 1)).toBe("blocks");
-    expect(stepMetric("blocks", -1)).toBe("snapshots");
+    expect(stepMetric("snapshots", 1)).toBe("globals");
+    expect(stepMetric("globals", 1)).toBe("blocks");
+    expect(stepMetric("blocks", -1)).toBe("globals");
     expect(stepMetric("nodes", 1)).toBe("continuity");
   });
 
@@ -533,7 +541,8 @@ describe("metricCaption — what a card says it is showing", () => {
   const DAY = 86_400_000;
   const HOUR = 3_600_000;
   it("reads a bare rate as part of the name, at the tier's own grain", () => {
-    expect(metricCaption("snapshots", DAY)).toBe("Snapshots per day");
+    expect(metricCaption("snapshots", DAY)).toBe("Snapshots anchored per day");
+    expect(metricCaption("globals", DAY)).toBe("In global snapshots per day");
     expect(metricCaption("blocks", HOUR)).toBe("Blocks per hour");
   });
   it("sets off a unit that carries its own noun", () => {
@@ -650,6 +659,8 @@ describe("GLOBAL_READING — what the DAG's pinned row is beside the rows below 
     expect(GLOBAL_READING.nodes).toBe("own");
     expect(GLOBAL_READING.blocks).toBe("own");
     expect(GLOBAL_READING.continuity).toBe("own");
+    // A global snapshot carries many networks at once, so its count is no sum of the rows.
+    expect(GLOBAL_READING.globals).toBe("own");
     expect(new Set(Object.values(GLOBAL_READING))).toEqual(new Set(["total", "own"]));
   });
 
@@ -681,6 +692,60 @@ describe("momentPhrase — a moment's reading as a sentence about its network (u
     expect(say("kb", DAY, "1.2 MB")).toBe("DED anchored 1.2 MB of data on that day");
     expect(say("nodes", DAY, "12")).toBe("DED ran 12 nodes");
     expect(say("continuity", DAY, "28s")).toBe("DED created a snapshot every 28s on that day");
+  });
+});
+
+describe("the global snapshots measure (2026-10-26 — dagscan's figure beside ours)", () => {
+  const series = {
+    "g.ticks": [5, 4, 6],
+    "g.anchors": [50, 40, 60],
+    "m.dor.snaps": [9, 0, 7],
+    // Before the field existed the read route zero-fills it: a 0 beside snapshots is NOT measured.
+    "m.dor.ticks": [0, 0, 3],
+  };
+  it("the DAG's own row is g.ticks — never the anchored metagraph snapshots", () => {
+    expect(globalSeries("globals", series)).toEqual([5, 4, 6]);
+    expect(globalSeries("snapshots", series)).toEqual([50, 40, 60]);
+  });
+  it("a network reads the global snapshots that carried it, a pre-field zero beside snapshots as null", () => {
+    expect(metricSeries("globals", "dor", series).points).toEqual([null, 0, 3]);
+    expect(metricSeries("globals", "nope", series).points).toEqual([]);
+  });
+  it("is a counter: an average per day over a span, partial edges trimmed", () => {
+    expect(TREND_METRICS.globals.kind).toBe("counter");
+    expect(spanWord("globals")).toBe("Average per day");
+  });
+  it("the hypergraph CREATES them; a network is PART OF them", () => {
+    const r = rangePhrase("globals", false, true);
+    expect(`The hypergraph ${r.verb} 5,203 ${r.rest}`).toBe("The hypergraph created 5,203 global snapshots in this range");
+    const n = rangePhrase("globals", true);
+    expect(`DOR ${n.verb} 2,880 ${n.rest}`).toBe("DOR was part of at least 2,880 global snapshots in this range");
+    const m = momentPhrase("globals", 300_000);
+    expect(`DOR ${m.verb} 9 ${m.rest}`).toBe("DOR was part of 9 global snapshots in those 5 minutes");
+    const h = momentPhrase("globals", DAY, true);
+    expect(`The hypergraph ${h.verb} 5,203 ${h.rest}`).toBe("The hypergraph created 5,203 global snapshots on that day");
+  });
+  it("is named from its subject: the DAG CREATES global snapshots, a network is IN them", () => {
+    expect(metricLabel("globals", "dag")).toBe("Global snapshots");
+    expect(metricLabel("globals", "dor")).toBe("In global snapshots");
+    expect(metricLabel("globals", null)).toBe("In global snapshots");
+    expect(metricCaption("globals", DAY, "dag")).toBe("Global snapshots per day");
+    for (const m of METRIC_ORDER.filter((x) => x !== "globals")) expect(metricLabel(m, "dag")).toBe(METRIC_LABELS[m]);
+  });
+  it("the subject flag changes no other measure's sentence", () => {
+    for (const m of METRIC_ORDER.filter((x) => x !== "globals")) {
+      expect(rangePhrase(m, false, true)).toEqual(rangePhrase(m, false));
+      expect(momentPhrase(m, DAY, true)).toEqual(momentPhrase(m, DAY));
+    }
+  });
+});
+
+describe("the unlisted set has no In-global-snapshots reading (PR review, 2026-10-26)", () => {
+  it("never sums its chains' anchorings — two chains in one global snapshot would count it twice", () => {
+    const out = withUnlisted({ "g.ticks": [3], "u.cov": [0], "m.A.snaps": [5], "m.A.ticks": [3], "m.B.snaps": [4], "m.B.ticks": [3] }, () => false, "unl");
+    expect(out["m.unl.ticks"]).toBeUndefined();
+    expect(metricSeries("globals", "unl", out).points).toEqual([]);
+    expect(out["m.unl.snaps"]).toEqual([9]);
   });
 });
 

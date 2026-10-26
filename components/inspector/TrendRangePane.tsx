@@ -102,7 +102,7 @@ export default function TrendRangePane({
   // "keep the N months ago on the range").
   const endAge = span ? Date.now() - span.toMs : null;
   const aside = endAge == null ? undefined : endAge < stepMs ? "until now" : `${ageWords(endAge)} ago`;
-  const phrase = span ? rangePhrase(metric, total?.partial ?? false) : null;
+  const phrase = span ? rangePhrase(metric, total?.partial ?? false, !subject) : null;
   // THE SPAN'S OWN ROWS (user, 2026-10-07: "Start and end date should be in the card I think for
   // clarity"): a span of two days or more is named by its UTC days, with the year (a day-only label
   // is a UTC day); a shorter one by its clock times, drawn by `Stamp` with the zone as a tag.

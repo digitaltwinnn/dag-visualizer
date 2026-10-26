@@ -4,7 +4,7 @@ import {
   Layers,
   HardDrive,
   Hexagon,
-  Timer,
+  HeartPulse,
   CircleDashed,
   Info,
   Compass,
@@ -194,24 +194,29 @@ export function iconForPick(
  *  measures are TILES on every explorer card now, design B of the explorer-sections mock, so each
  *  needs a glyph the reader can tell apart at 14px). Keyed by the measure ids the four measure
  *  modules declare (`src/data/{hyper,geo,ledger}Measure.ts`, `trendSeries`). Reused where the app
- *  already has the mark: snapshots the Snapshots VIEW's layers, blocks the data lane's blocks,
+ *  already has the mark: the snapshots anchored the Snapshots view's anchor boxes, the global
+ *  snapshots its layers (the global ledger's strata), blocks the data lane's blocks,
  *  fees the currency coin, a layer count the ledger stack's one stratum, metagraphs the
  *  Hypergraph subject's orbit, providers the provider card's server, anchors the metagraph
  *  snapshot's boxes. Data and size (bytes) are the drive, not the state lane's database; nodes
  *  the honeycomb's hexagon — the geo view stacks them as cells — never the provider's server (a
- *  node is not its host). Continuity is the timer: seconds between snapshots. */
+ *  node is not its host). Cadence (`continuity`) is a heartbeat: the chain's rhythm. */
 export type MeasureId = TrendMetric | HyperMeasure | GeoMeasure | LedgerMeasure;
 /** Typed on the four measure vocabularies (review, 2026-10-24), so a new measure id without a glyph
  *  is a compile error here — the tune-schema idiom — while `measureIcon` keeps the lookup by the
  *  option's string id lenient for the tiles. */
 export const MEASURE_ICONS: Readonly<Record<MeasureId, LucideIcon>> = {
   // History (`TrendMetric`)
-  snapshots: Layers,
+  // The metagraph snapshots ANCHORED — the Snapshots view's own `anchors` boxes; the GLOBAL
+  // snapshots are that view's strata, the global ledger's layers.
+  snapshots: Boxes,
+  globals: Layers,
   blocks: Blocks,
   fees: Coins,
   kb: HardDrive,
   nodes: NODE_ICON,
-  continuity: Timer,
+  // A HEARTBEAT (user, 2026-10-26): cadence is the chain's rhythm — the timer read as a duration.
+  continuity: HeartPulse,
   // Hypergraph (`HyperMeasure`): nodes above, then the three layers
   l0: Layers,
   cl1: Layers,

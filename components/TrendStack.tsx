@@ -70,7 +70,7 @@ import useTrendsSlice from "@/components/useTrendsSlice";
 import useStagedMeasure, { ROLL_CLASS, useHeldOrder } from "@/components/useStagedMeasure";
 import { cn } from "@/lib/utils";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
-import { headWord, metricCaption, peakReading, sharedCeiling, stepMetric, METRIC_LABELS } from "@/src/data/trendSeries";
+import { headWord, metricCaption, metricLabel, peakReading, sharedCeiling, stepMetric } from "@/src/data/trendSeries";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { DUR_OUT } from "@/src/engine/domain/viewTransition";
 import { swipeIntent, swipeOf } from "@/src/engine/domain/planeSwipe";
@@ -195,8 +195,9 @@ export default function TrendStack() {
   const rotation = useStore((s) => s.trendRotation);
   const rotated = useMemo(() => rotateOrder(deck, rotation), [deck, rotation]);
   const order = useHeldOrder(rotated, staged.settled);
-  // What a card says it shows.
-  const caption = metricCaption(shown, step);
+  // What a card says it shows — named from its OWN network (`metricLabel`: the DAG's chart is
+  // "Global snapshots", a network's "In global snapshots").
+  const caption = (id: string) => metricCaption(shown, step, id);
   // THE SCOPE WITH NOTHING TO DRAW (2026-09-19): a `dag` or unlisted commit
   // leaves the roster EMPTY, because the trends store keeps one series set per LISTED metagraph.
   // The sentences are `src/data/trendScope.ts`'s, shared with the document so the two registers of
@@ -667,7 +668,7 @@ export default function TrendStack() {
                     key={dir}
                     type="button"
                     disabled={!target}
-                    aria-label={target ? `Measure: ${METRIC_LABELS[target]}` : dir === -1 ? "First measure" : "Last measure"}
+                    aria-label={target ? `Measure: ${metricLabel(target, pose.id)}` : dir === -1 ? "First measure" : "Last measure"}
                     onPointerDown={(e) => e.stopPropagation()}
                     onPointerUp={(e) => e.stopPropagation()}
                     onClick={(e) => { e.stopPropagation(); stepMeasure(dir); }}
@@ -692,9 +693,9 @@ export default function TrendStack() {
                       dir === -1 ? "left-0" : "right-0",
                     )}
                   >
-                    {dir === 1 && target && <span>{METRIC_LABELS[target]}</span>}
+                    {dir === 1 && target && <span>{metricLabel(target, pose.id)}</span>}
                     <Glyph aria-hidden className="size-4 flex-none" strokeWidth={2.25} />
-                    {dir === -1 && target && <span>{METRIC_LABELS[target]}</span>}
+                    {dir === -1 && target && <span>{metricLabel(target, pose.id)}</span>}
                   </button>
                 );
               })}
@@ -718,11 +719,11 @@ export default function TrendStack() {
                 // misstate every reading by a factor of 24 (the document's own rule).
                 // THE CARD NAMES ITS MEASURE, not just its unit — it can be stepped from right here,
                 // so the card has to say what it turned into.
-                unit={caption}
+                unit={caption(pose.id)}
                 // THE FRONT CARD STATES THE MEASURE AND ITS READINGS FOR THE DECK; a rear card is the
                 // network's name over its picture (user, 2026-10-19: the repeated title and values
                 // on every background card were "quite duplicate").
-                heading={pose.interactive ? METRIC_LABELS[shown] : undefined}
+                heading={pose.interactive ? metricLabel(shown, pose.id) : undefined}
                 nameOnly={!pose.interactive}
                 // PHONE: the card is too narrow for name + measure + reading on one line, so the
                 // measure rides the front plot's caption instead (`unitInPlot`).
@@ -808,7 +809,7 @@ export default function TrendStack() {
                   // opens with the strip's own visible words — the network and its unit — and then
                   // says what the press does. "Dor Technologies per day — bring forward".
                   // …and then the axis a reader cannot see from here: ↑/↓ steps the measure.
-                  label: `${row.name} ${caption} — ${
+                  label: `${row.name} ${caption(pose.id)} — ${
                     focus === pose.id ? "send back" : "bring forward"
                   }. Up and down arrows change the measure`,
                 }}

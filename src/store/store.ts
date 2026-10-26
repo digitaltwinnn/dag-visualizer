@@ -11,7 +11,8 @@ import type { ThemePref, Theme } from "@/src/theme/resolve";
 // (src/data/trendWindow.ts, read by the document's picker and by the stack), and a type-only
 // import keeps the store from holding a data-layer VALUE.
 import type { ZoomId } from "@/src/data/trendWindow";
-import { focusOnReturn, planeOfChain, scrollToKeep } from "@/src/engine/domain/trendStack";
+import { entryFocus, focusOnReturn, planeOfChain, scrollToKeep } from "@/src/engine/domain/trendStack";
+import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 // The catalog and the unlisted id, for the one fold the return path needs (`planeOfChain`): both
 // are static data — `src/net/current` reads config, `unlistedId` is the import-free leaf.
 import { METAGRAPHS } from "@/src/net/current";
@@ -22,7 +23,8 @@ import { UNLISTED_ID } from "@/src/data/unlistedId";
 // 2026-09-04 — three separate soon modes said the same nothing three times; the Blueprint
 // gallery inside it still previews each coming feature). `trend` (2026-09-18) is the measured
 // history view — chart planes as the scene, convention 12's MEASURED HISTORY rung made a view.
-export type Mode = "hyper" | "geo" | "ledger" | "trend" | "soon";
+import type { Mode } from "@/src/store/mode";
+export type { Mode };
 
 // The stored metric every trend plane draws — one picker, one column (see `trendMetric` below).
 import type { LedgerMeasure } from "@/src/data/ledgerMeasure";
@@ -50,7 +52,10 @@ export type MotionCause =
   | { kind: "orbit" }
   // A rail card asking to be framed (`requestFocusRung`): the ladder rung, named by the reader.
   | { kind: "rung"; level: FocusLevel };
-export type TrendMetric = "snapshots" | "blocks" | "fees" | "kb" | "nodes" | "continuity";
+// `globals` = the GLOBAL snapshots (2026-10-26): the DAG's own L0 count (dagscan's "snapshots"), and
+// per network the global snapshots that carried its snapshots. `snapshots` stays the metagraph
+// snapshots anchored — the two differ ~10× on the DAG row, which is why both are measures.
+export type TrendMetric = "snapshots" | "globals" | "blocks" | "fees" | "kb" | "nodes" | "continuity";
 
 // One slot in the right-rail card stack (extend with future card types — e.g. "tx").
 export type SelSlot = "network" | "node" | "snap" | "metaSnap" | "country" | "cohort" | "composition" | "range" | "instant";
@@ -518,6 +523,13 @@ interface AppState {
 const EXACT_MAX = 120;
 const DEEP_MAX = 24;
 
+/** A PLANE FOCUS, AS STATE — one home for what committing it writes (PR review, 2026-10-26): the
+ *  focus and, for a subject, its Range card brought up the stack. `setTrendFocus` and the view
+ *  switch's arrival both write it, so arriving on a plane and clicking its row cannot drift. */
+function focusPatch(s: { selStack: SelSlot[] }, id: string | null): { trendFocus: string | null; selStack: SelSlot[] } {
+  return { trendFocus: id, selStack: id != null ? bumpStack(s.selStack, "range", true) : s.selStack };
+}
+
 export const useStore = create<AppState>((set) => ({
   live: false,
   lastGoodAt: null,
@@ -610,11 +622,23 @@ export const useStore = create<AppState>((set) => ({
   // Closing (either route) arms `docClosing` — the doc's exit animation is its OUT phase, and
   // the engine waits on it before entering the destination view.
   // A view switch is a LOUD navigation (the no-pop rule rolls view-scoped content on arrival),
-  // so it clears any standing quiet mark from a rail gesture. `trendFocus` clears with it — it's
-  // view-scoped, like the other ladder levels; `trendCursorMs` does NOT (an instant is a
+  // so it clears any standing quiet mark from a rail gesture. `trendFocus` clears with it (to the
+  // destination's entry plane, below) — it's view-scoped, like the other ladder levels; `trendCursorMs` does NOT (an instant is a
   // universal subject and carries, the way `node` and `network` do in `LEVEL_CARRY`).
   // A view switch stamps its own motion cause (the hint says what it builds).
-  setMode: (mode) => set((s) => ({ mode, navQuiet: false, docPage: null, docClosing: s.docPage != null || s.docClosing, trendFocus: null, trendRotation: 0, rawReturnMode: null, motionCause: { kind: "view", from: s.mode, to: mode } })),
+  // …AND ARRIVES ON THE VIEW'S ENTRY PLANE (2026-10-26, `viewPolicy.entryPlane`): History opens with
+  // the DAG's chart brought forward under All — the same focus a click on its row commits, so its
+  // Range card opens with it (`setTrendFocus`'s own stack bump).
+  // The arrival starts at the TOP of the deck (`trendScroll: 0`, beside the rotation's reset —
+  // PR review, 2026-10-26): the entry plane joins the stack at its front, and a window paged down
+  // on an earlier visit would hold it out of sight. A switch to the view you are ALREADY in (the
+  // footer's link, Back from /about) is no arrival: it keeps the deck exactly as it stands.
+  setMode: (mode) =>
+    set((s) => {
+      const nav = { mode, navQuiet: false, docPage: null, docClosing: s.docPage != null || s.docClosing, rawReturnMode: null, motionCause: { kind: "view" as const, from: s.mode, to: mode } };
+      if (mode === s.mode) return nav;
+      return { ...nav, trendRotation: 0, trendScroll: 0, ...focusPatch(s, entryFocus(VIEW_POLICIES[mode].entryPlane, s.filter)) };
+    }),
   // Opening a doc also SURFACES THE SCENE POSE: the overlay sits at z-8, under the raw layer's
   // z-9 — a doc opened from the RAW pose rendered beneath the still-interactive table, with the
   // RAW toggle that could exit it hidden by the doc's own control gating (review find,
@@ -849,7 +873,7 @@ export const useStore = create<AppState>((set) => ({
   // entry one click away — so nothing is lost and no view compare is added: this setter is
   // History's own. From 2026-10-07 until then the focus bumped the network slot instead. A
   // release leaves the stack alone: the filter may still hold the dossier.
-  setTrendFocus: (id) => set((s) => ({ trendFocus: id, selStack: id != null ? bumpStack(s.selStack, "range", true) : s.selStack })),
+  setTrendFocus: (id) => set((s) => focusPatch(s, id)),
   setTrendRotation: (r) => set({ trendRotation: r, motionCause: { kind: "page" } }),
   setTrendScale: (scale) => set({ trendScale: scale }),
   // A window and a range are the SAME statement about what is on screen, so picking one retires

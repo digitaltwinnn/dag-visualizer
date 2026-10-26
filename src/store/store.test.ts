@@ -137,11 +137,39 @@ describe("the trends view's channels", () => {
   });
 
   it("leaving the trends view clears the focus but keeps the cursor", () => {
+    useStore.getState().setMode("trend");
     useStore.getState().setTrendCursor(1_700_000_000_000);
     useStore.getState().setTrendFocus("dor-metagraph");
     useStore.getState().setMode("hyper");
     expect(useStore.getState().trendFocus).toBeNull();
     expect(useStore.getState().trendCursorMs).toBe(1_700_000_000_000);
+  });
+});
+
+describe("History arrives on the DAG's plane (2026-10-26)", () => {
+  // Each test ARRIVES, so each starts outside History with nothing focused.
+  beforeEach(() => useStore.setState({ mode: "hyper", trendFocus: null, trendScroll: 0, trendRotation: 0 }));
+  it("entering under All commits the DAG's focus, opens its Range card and starts at the top of the deck", () => {
+    useStore.setState({ filter: "all", trendScroll: 4, selStack: [] });
+    useStore.getState().setMode("trend");
+    const s = useStore.getState();
+    expect(s.trendFocus).toBe("dag");
+    expect(s.trendScroll).toBe(0);
+    expect(s.selStack[s.selStack.length - 1]).toBe("range");
+  });
+  it("a committed filter arrives as itself", () => {
+    useStore.setState({ filter: "DAG0CyySf35ftDQDQBnd1bdQ9aPyUdacMghpnCuM" });
+    useStore.getState().setMode("trend");
+    expect(useStore.getState().trendFocus).toBeNull();
+  });
+  it("a switch to the view you are already in keeps the deck as it stands (the footer link, Back from /about)", () => {
+    useStore.setState({ filter: "all" });
+    useStore.getState().setMode("trend");
+    useStore.getState().setTrendFocus("dor-metagraph");
+    useStore.setState({ trendScroll: 3, trendRotation: 2 });
+    useStore.getState().setMode("trend");
+    const s = useStore.getState();
+    expect([s.trendFocus, s.trendScroll, s.trendRotation]).toEqual(["dor-metagraph", 3, 2]);
   });
 });
 

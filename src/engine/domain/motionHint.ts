@@ -91,7 +91,9 @@ export function motionHint(cause: MotionCause, mode: Mode, names: HintNames, pha
       return cause.id === "all" ? "Showing the whole measured history" : `Showing the last ${names.window(cause.id)}`;
     case "measure":
       // A measure step re-ranks the stack busiest-first by the new measure.
-      return mode === "trend" ? `Reordering by ${names.measure(cause.id).toLowerCase()}, busiest network first` : null;
+      // The measure as a NAME, not lowercased into the clause (PR review, 2026-10-26: "Reordering
+      // by in global snapshots" — a label that starts with a preposition reads as broken grammar).
+      return mode === "trend" ? `Reordering by ${names.measure(cause.id)}, busiest network first` : null;
     case "page":
       return "Paging the stack";
     case "rung":
