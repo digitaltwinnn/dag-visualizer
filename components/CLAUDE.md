@@ -346,7 +346,7 @@ decisions inside them are design, not detail:
   DAG's OWN count (`g.ticks`, one per global tick — dagscan's figure, untagged) and, per network,
   the global snapshots that CARRIED it (`anchorSeries`). Never "L1 snapshots": a metagraph's
   snapshots come from its own L0, and its L1s make the Blocks. The leads say it by subject — "The
-  hypergraph created …", "DOR was carried by …" (`rangePhrase`/`momentPhrase`'s `hypergraph` flag).
+  hypergraph created …", "DOR anchored into …" (`rangePhrase`/`momentPhrase`'s `hypergraph` flag).
   ⚠️ **The roster is computed ONCE, in `components/useTrendRoster.ts`** — the planes, this list and
   the cursor card all read it, counter EDGE TRIM included. A surface reading the payload directly
   is one bucket out of step with the axis, which is exactly how the cursor card briefly quoted

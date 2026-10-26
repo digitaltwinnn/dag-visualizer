@@ -607,10 +607,11 @@ export function momentPhrase(metric: TrendMetric, stepMs: number, hypergraph = f
 }
 
 /** THE ONE MEASURE WHOSE VERB DEPENDS ON THE SUBJECT (2026-10-26): the hypergraph CREATES its global
- *  snapshots, a network is CARRIED by them — "DOR was carried by 2,880 global snapshots", never
- *  "DOR created" (it created its own, which is the other measure). `floor` is " at least" or "". */
+ *  snapshots, a network ANCHORS INTO them — "DOR anchored into 2,880 global snapshots" (the app's
+ *  word for the relation, the raw search's "Anchored into"; user: not "was carried by"), never "DOR
+ *  created" (it created its own, which is the other measure). `floor` is " at least" or "". */
 function globalsVerb(hypergraph: boolean, floor: string): string {
-  return hypergraph ? `created${floor}` : `was carried by${floor}`;
+  return hypergraph ? `created${floor}` : `anchored into${floor}`;
 }
 
 /** HOW MANY GLOBAL SNAPSHOTS CARRIED A CHAIN, per bucket (`m.<id>.ticks`, sampled since
