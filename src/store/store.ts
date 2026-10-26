@@ -523,6 +523,13 @@ interface AppState {
 const EXACT_MAX = 120;
 const DEEP_MAX = 24;
 
+/** A PLANE FOCUS, AS STATE — one home for what committing it writes (PR review, 2026-10-26): the
+ *  focus and, for a subject, its Range card brought up the stack. `setTrendFocus` and the view
+ *  switch's arrival both write it, so arriving on a plane and clicking its row cannot drift. */
+function focusPatch(s: { selStack: SelSlot[] }, id: string | null): { trendFocus: string | null; selStack: SelSlot[] } {
+  return { trendFocus: id, selStack: id != null ? bumpStack(s.selStack, "range", true) : s.selStack };
+}
+
 export const useStore = create<AppState>((set) => ({
   live: false,
   lastGoodAt: null,
@@ -622,14 +629,15 @@ export const useStore = create<AppState>((set) => ({
   // …AND ARRIVES ON THE VIEW'S ENTRY PLANE (2026-10-26, `viewPolicy.entryPlane`): History opens with
   // the DAG's chart brought forward under All — the same focus a click on its row commits, so its
   // Range card opens with it (`setTrendFocus`'s own stack bump).
+  // The arrival starts at the TOP of the deck (`trendScroll: 0`, beside the rotation's reset —
+  // PR review, 2026-10-26): the entry plane joins the stack at its front, and a window paged down
+  // on an earlier visit would hold it out of sight. A switch to the view you are ALREADY in (the
+  // footer's link, Back from /about) is no arrival: it keeps the deck exactly as it stands.
   setMode: (mode) =>
     set((s) => {
-      const focus = entryFocus(VIEW_POLICIES[mode].entryPlane, s.filter);
-      return {
-        mode, navQuiet: false, docPage: null, docClosing: s.docPage != null || s.docClosing, trendFocus: focus, trendRotation: 0, rawReturnMode: null,
-        selStack: focus != null ? bumpStack(s.selStack, "range", true) : s.selStack,
-        motionCause: { kind: "view", from: s.mode, to: mode },
-      };
+      const nav = { mode, navQuiet: false, docPage: null, docClosing: s.docPage != null || s.docClosing, rawReturnMode: null, motionCause: { kind: "view" as const, from: s.mode, to: mode } };
+      if (mode === s.mode) return nav;
+      return { ...nav, trendRotation: 0, trendScroll: 0, ...focusPatch(s, entryFocus(VIEW_POLICIES[mode].entryPlane, s.filter)) };
     }),
   // Opening a doc also SURFACES THE SCENE POSE: the overlay sits at z-8, under the raw layer's
   // z-9 — a doc opened from the RAW pose rendered beneath the still-interactive table, with the
@@ -865,7 +873,7 @@ export const useStore = create<AppState>((set) => ({
   // entry one click away — so nothing is lost and no view compare is added: this setter is
   // History's own. From 2026-10-07 until then the focus bumped the network slot instead. A
   // release leaves the stack alone: the filter may still hold the dossier.
-  setTrendFocus: (id) => set((s) => ({ trendFocus: id, selStack: id != null ? bumpStack(s.selStack, "range", true) : s.selStack })),
+  setTrendFocus: (id) => set((s) => focusPatch(s, id)),
   setTrendRotation: (r) => set({ trendRotation: r, motionCause: { kind: "page" } }),
   setTrendScale: (scale) => set({ trendScale: scale }),
   // A window and a range are the SAME statement about what is on screen, so picking one retires

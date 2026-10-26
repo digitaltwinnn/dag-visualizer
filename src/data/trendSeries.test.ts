@@ -740,6 +740,15 @@ describe("the global snapshots measure (2026-10-26 — dagscan's figure beside o
   });
 });
 
+describe("the unlisted set has no In-global-snapshots reading (PR review, 2026-10-26)", () => {
+  it("never sums its chains' anchorings — two chains in one global snapshot would count it twice", () => {
+    const out = withUnlisted({ "g.ticks": [3], "u.cov": [0], "m.A.snaps": [5], "m.A.ticks": [3], "m.B.snaps": [4], "m.B.ticks": [3] }, () => false, "unl");
+    expect(out["m.unl.ticks"]).toBeUndefined();
+    expect(metricSeries("globals", "unl", out).points).toEqual([]);
+    expect(out["m.unl.snaps"]).toEqual([9]);
+  });
+});
+
 describe("rangePhrase — a range's reading as a sentence about its network (2026-10-07)", () => {
   // The span itself is the card's Start / End / Length rows (user: "Start and end date should be in
   // the card"), so the sentence says "in this range" rather than restating the length.

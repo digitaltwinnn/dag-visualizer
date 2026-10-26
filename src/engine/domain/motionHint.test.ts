@@ -46,7 +46,9 @@ describe("motionHint", () => {
   });
 
   it("a measure step re-orders the History stack; elsewhere it moves nothing and says nothing", () => {
-    expect(motionHint({ kind: "measure", id: "fees" }, "trend", NAMES)).toBe("Reordering by fees, busiest network first");
+    expect(motionHint({ kind: "measure", id: "fees" }, "trend", NAMES)).toBe("Reordering by Fees, busiest network first");
+    // A label is a NAME — never lowercased into the clause ("by in global snapshots").
+    expect(motionHint({ kind: "measure", id: "globals" }, "trend", NAMES)).toBe("Reordering by In global snapshots, busiest network first");
     expect(motionHint({ kind: "measure", id: "fees" }, "ledger", NAMES)).toBeNull();
   });
 

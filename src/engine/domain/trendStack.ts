@@ -559,13 +559,6 @@ export function planeOfChain(
   return catalog.find((m) => m.id === chainId || m.formerIds?.includes(chainId))?.id ?? unlistedId;
 }
 
-/** THE FOCUS HISTORY RETURNS TO when the raw layer a door opened is closed (2026-10-09 — user, on
- *  selecting a BioFi snapshot in the log after a Range door: "the selected metagraph might still be
- *  'pinned', as in selected and become the front card"). One selection, every surface: a commit in
- *  the log is the app's commit, and History shows a committed NETWORK as the plane in front. So the
- *  snapshot committed in the log (its tick-network failing that) brings its network's plane forward
- *  on return; with nothing committed there, the plane that was in front when the door opened comes
- *  back, as before. The chain → plane fold is `planeOfChain`'s. */
 /** THE PLANE A VIEW ARRIVES ON (2026-10-26 — `viewPolicy.entryPlane`, user: "when we enter the
  *  view, set DAG the default in explorer"). The view's own entry plane, but only under the All
  *  filter: there the stack is every network and something has to stand in front, while a committed
@@ -576,6 +569,13 @@ export function entryFocus(entryPlane: string | null, filter: string): string | 
   return filter === "all" ? entryPlane : null;
 }
 
+/** THE FOCUS HISTORY RETURNS TO when the raw layer a door opened is closed (2026-10-09 — user, on
+ *  selecting a BioFi snapshot in the log after a Range door: "the selected metagraph might still be
+ *  'pinned', as in selected and become the front card"). One selection, every surface: a commit in
+ *  the log is the app's commit, and History shows a committed NETWORK as the plane in front. So the
+ *  snapshot committed in the log (its tick-network failing that) brings its network's plane forward
+ *  on return; with nothing committed there, the plane that was in front when the door opened comes
+ *  back, as before. The chain → plane fold is `planeOfChain`'s. */
 export function focusOnReturn(
   committedChain: string | null,
   saved: string | null,

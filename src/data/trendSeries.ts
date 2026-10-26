@@ -809,7 +809,11 @@ export function typeBands(id: string, series: Readonly<Record<string, (number | 
  *  explorer timestamp skew broke (2026-09-29: 38 phantom unlisted snapshots).
  *
  *  `isListed` is the catalog's judgement (current and former ids), passed in so this stays pure. */
-const UNLISTED_FIELDS = ["snaps", "fee", "kb", "blocks", "gapSum", "gapMax", "ticks"] as const;
+// NOT `ticks` (PR review, 2026-10-26): it counts the DISTINCT global snapshots that carried a chain,
+// and two unlisted chains riding the same global snapshot would count it twice — a sum of
+// per-chain counts is no count of the set (rule 10). The set has no stored distinct count, so it
+// shows no "In global snapshots" reading rather than an invented one.
+const UNLISTED_FIELDS = ["snaps", "fee", "kb", "blocks", "gapSum", "gapMax"] as const;
 
 export function withUnlisted(
   series: Readonly<Record<string, (number | null)[]>>,
