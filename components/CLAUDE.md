@@ -632,7 +632,8 @@ commit, the cards are opaque so there is no opacity to lift, and `.subject-paire
 box-shadow, which a transformed plane may not carry.
 
 The chain runs coarse→fine like every other rung: a lane whose committed cards abut as one body reads
-adjacency as containment. (The chamber's storeys are the other way round — ribbons fall INTO the global
+adjacency as containment (the AI notes card, which tops the pile, is the one member that contains
+nothing below it — see THE AI NOTES SLOT). (The chamber's storeys are the other way round — ribbons fall INTO the global
 floor; geometry shows the fall, the rail states the containment.) The snapshot cards are slots that
 ride the lane **without being focus rungs** — `railLadderBoundary.test.ts` asserts rung → slot, not the
 reverse, so a slot without a rung is fine and a rung without a slot is not.
@@ -663,7 +664,9 @@ it keeps its full radius on all four corners and its own hairline all the way ro
 opens around it. Its border is NOT handed to a seam the way an entry↔entry joint is — a rounded border
 curves in at each corner, so it never draws the full-width division the inset-seam rule exists to
 prevent; it reads as the box cut into the pile. **The stack carries DEPTH, the thread carries STATE**;
-adjacency is what reads as containment, which is why the snapshot chain runs coarse→fine above. Ghosts
+adjacency is what reads as containment, which is why the snapshot chain runs coarse→fine above — among
+SUBJECT cards. The AI notes card abuts the top of the pile and contains neither the tick nor the
+dossier under it: it is written context about the pile, not a rung of it. Ghosts
 stay outside the slab. The block's GEOMETRY never animates (seams, corners, washes) — but since
 2026-09-04 every rung's HEIGHT eases (`HeightEase` on the Inspector rung wrappers; the no-pop bullet
 below carries the rules). Reduced motion snaps, so the no-op guarantee holds there.
@@ -833,12 +836,28 @@ supported (no − icon etc)"). With nothing committed the live Global snapshot c
 rung, never the focus — sat folded above three ghosts on every tier: the mode-entry collapse
 pinned the ABSENT slot shut, and the live ordinal is kept out of the selection key on purpose
 (heartbeats must not reset the +/− overrides), so nothing ever dropped the pin. Two rules now:
-the mode-entry snapshot writes overrides for PRESENT slots only, and with no focus rung the
-FIRST present ladder card is the box (`openDefault` in `Inspector.tsx`).
-**And the step ghost hangs off the UNBROKEN committed run from the top** (same day): a node
-carried into Snapshots from another view stands below a gap (its ladder gives a node no
-ancestry), and read as "the deepest" it left the Global snapshot card with no step down to the
-tick's networks.
+the mode-entry snapshot pins PRESENT SUBJECT slots only (`overridesOnViewEntry`), and with no
+focus rung the FIRST present ladder card is the box (`openDefaultOf`). Both live in
+**`components/railCollapse.ts`, the one home of the open/fold decision** — which card is the box,
+what a view switch pins, what a selection moment drops — with `railCollapse.test.ts` as its
+specification, driven by outcome (exactly one box); Inspector asks it and renders the answer.
+**And the step ghost hangs off the UNBROKEN run of SUBJECT cards from the top** (same day,
+`subjectRunEnd`): a node carried into Snapshots from another view stands below a gap (its ladder
+gives a node no ancestry), and read as "the deepest" it left the Global snapshot card with no
+step down to the tick's networks. The AI notes slot neither starts that run nor breaks it.
+
+**THE AI NOTES SLOT** (2026-10-27, R57). Every view that has a note (`viewPolicy.aiNotes`) leads its
+display lane with the `notes` slot (`DISPLAY_LANE` in `railCards.ts`), and the manifest leads with it
+too. It is **not a rung**: no ladder level, no camera pose, never in `selStack`, a static subject
+key so a view switch never lights the tray, and `isSubjectSlot` says no. So it is the FOCUS only at
+rest — with no subject card standing it is the lane's only present card and the box; the moment any
+subject card stands, that card is the focus and the note folds to an ENTRY above the subject box.
+It has **no ghost**: an absent note is no card at all (`noteCardAbsent` — no request, `none` or
+`unavailable`; R67, so a degraded model never owns the resting box), while a first fetch in flight
+stands, reading. And it is **outside every subject rule** of `railCollapse.ts`: a view switch never
+pins it, and pins nothing at all when it is the departing box (else every subject card arrived
+folded beside an unpinned note: no box); the step ghost's run skips it. History and Snapshots almost
+always hold a subject (the range, the live tick), so there the note is an entry by default.
 
 **Expanded state survives a view switch** (user, 2026-09-04 — reversing 2026-08-08's scene-first
 collapse: with rung heights easing, the collapse-and-reopen cycle WAS the "card size jumps between
@@ -903,9 +922,10 @@ channel pane head, the pager's step labels, the ledger explorer's tooltips and t
 noise in all of them: the label beside it already says what the number is. Internal `PickDescriptor.title`
 strings still read `Global snapshot #N`, but nothing renders that field for a snapshot.
 
-Every card the current view CAN produce is always visible — populated when its subject is selected,
-else a **ghost card** — so the rail shows the view's whole possibility space and a deselect returns
-its slot to the ghost in place. A ghost is a card like every other (user, 2026-10-04 — option A of
+Every SUBJECT card the current view CAN produce is always visible — populated when its subject is
+selected, else a **ghost card** — so the rail shows the view's whole possibility space and a deselect
+returns its slot to the ghost in place. (The AI notes slot is no subject card and has no ghost: an
+absent note is no card.) A ghost is a card like every other (user, 2026-10-04 — option A of
 `docs/superpowers/design/2026-10-04-ghost-cards`, "the structure is always present, but the visual
 and content differ"): FOLDED it is the rung's name alone, one quiet line; OPEN it is a dashed,
 glassless box whose body is the hint. It opens on its own, outside the single-open accordion — it

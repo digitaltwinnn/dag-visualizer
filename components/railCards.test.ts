@@ -89,13 +89,15 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
     const notes = detailsCards(details({ mode: "hyper", noteAbsent: true })).find((c) => c.id === "notes")!;
     expect(notes.present).toBe(false);
   });
-  it("the AI note is absent with no request or `none`; a first fetch in flight is present, reading", () => {
+  it("the AI note is absent with no request, `none` or `unavailable`; a first fetch in flight is present, reading", () => {
     expect(noteCardAbsent(false, { state: "pending" })).toBe(true);
     expect(noteCardAbsent(false, null)).toBe(true);
     // The card stands while its first answer is read (user, 2026-10-27), never popping in late.
     expect(noteCardAbsent(true, null)).toBe(false);
     expect(noteCardAbsent(true, { state: "none" })).toBe(true);
-    for (const res of [{ state: "pending" }, { state: "unavailable" }, { state: "request" }] as const)
+    // A degraded model never owns the resting box (R67): `unavailable` stands the slot down too.
+    expect(noteCardAbsent(true, { state: "unavailable" })).toBe(true);
+    for (const res of [{ state: "pending" }, { state: "request" }] as const)
       expect(noteCardAbsent(true, res)).toBe(false);
     expect(noteCardAbsent(true, { state: "ok", text: "t", writtenAt: 0, spanFrom: 0, spanTo: 1, days: [] })).toBe(false);
   });

@@ -124,7 +124,7 @@ export function ladderSlotIds(mode: Mode): string[] {
 }
 
 /** The lane slot the AI notes card stands in (R57). */
-export const NOTES_SLOT = "notes";
+const NOTES_SLOT = "notes";
 /** The lane slots that are NOT SUBJECT CARDS — written context, not a subject anything committed
  *  or the live follow put there. One home (convention 8) for every rule that reads the pile as a
  *  run of subjects: the next-rung step's run (`subjectRunEnd`), and the view-entry pin, which keeps
@@ -441,14 +441,17 @@ export function parentHolds(s: Pick<RailManifestState, "snap" | "metaSnap" | "co
   return !s.country || !s.cohort || s.country === s.cohort.cc;
 }
 
-/** IS THE AI NOTE ABSENT? — no request (the view's subject has no note), or the server's `none`.
+/** IS THE AI NOTE ABSENT? — no request (the view's subject has no note), the server's `none`, or
+ *  `unavailable` (R67: the notes card is the resting focus in Hypergraph and Geography, so a missing
+ *  key, a Gate outage or a cold store's failure hold would otherwise make "unavailable" the first
+ *  open box a visitor sees; the loader never caches it, so the next subject change asks again).
  *  A first fetch still in flight is PRESENT, reading (user, 2026-10-27: the card "is missing and
  *  then suddenly appears — it should use the reading animation"; this retires ruling R36). The
  *  flash R36 guarded against was off mainnet, where every subject answers `none`: there
  *  `useAiNote` asks nothing, so there is no request and no card. On mainnet `none` is rare (a
  *  subject with nothing measured), and "writing…" stays the server's own `pending`. */
 export function noteCardAbsent(hasRequest: boolean, res: NoteResponse | null): boolean {
-  return !hasRequest || res?.state === "none";
+  return !hasRequest || res?.state === "none" || res?.state === "unavailable";
 }
 
 export function detailsCards(s: RailManifestState): RailCard[] {

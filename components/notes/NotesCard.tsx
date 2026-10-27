@@ -202,7 +202,8 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
         <div>
           {/* No answer yet is READING (the manifest's `noteCardAbsent`): the card stands from the
               moment its subject is known. "writing…" is the server's own `pending`, a note being
-              written — a GET's as soon as the loader hears it (M3), or a POST's. */}
+              written — a GET's as soon as the loader hears it (M3), or a POST's. `none` and
+              `unavailable` never reach here: the slot stands down (R67). */}
           {res == null ? (
             <p className="m-0 flex items-center gap-2 text-body text-muted-foreground">
               <NodeStars />
@@ -213,8 +214,6 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
               <NodeStars />
               writing…
             </p>
-          ) : res.state === "unavailable" ? (
-            <p className="m-0 text-body text-muted-foreground">Notes unavailable — try again later</p>
           ) : res.state === "request" ? (
             // The on-request kinds (the 1H pill, a brushed range): written only on the reader's ask.
             <div className={DOOR_RUN}>
