@@ -366,6 +366,9 @@ describe("checkNote — a past value needs its current figure in the same senten
     expect(r("Global snapshots rose to 49,512 per day from 41,200.").ok).toBe(true);
     expect(r("Global snapshots rose from 41.2K to 45K a day.").ok).toBe(false);
     expect(r("Global snapshots rose by 20% to 49,512 a day.").ok).toBe(true);
+    expect(r("Global snapshots rose from 41.2 to 49.5K a day.")).toEqual({ ok: true }); // the shared K (N2)
+    expect(r("Global snapshots rose from 41.2 and then to 49.5K a day.").ok).toBe(false); // joined by more than a word: 41.2 stays bare
+    expect(r("Global snapshots rose from 40 to 49.5K a day.").ok).toBe(false); // 40K is not 41,200
     expect(r("The spacing widened from 20 to 45 seconds.")).toEqual({ ok: true });
     expect(r("The spacing widened from 20s to 45s.")).toEqual({ ok: true });
     expect(r("The spacing widened from 20 seconds to 30 seconds.").ok).toBe(false);

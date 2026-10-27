@@ -16,8 +16,8 @@ import type { Fact } from "@/src/data/noteTypes";
 //     change, and the sentence must also state that pair's `to` end ("173 is a past value; its
 //     current figure 86 is not in the sentence"). The live failure "fell from 173 a month ago to
 //     9" fails because 86 is absent, whatever words sit between; no sentence form is parsed. A
-//     bare number joined by to / and / or / a dash to a number with a duration or `%` unit takes
-//     that unit ("from 20 to 45 seconds", "38 to 36%");
+//     bare number joined by to / and / or / a dash to a number with a duration, `%` or K / M / B
+//     unit takes that unit ("from 20 to 45 seconds", "38 to 36%", "41.2 to 49.5K");
 //   · a plain number that is a citable ratio fact's own text, exactly ("a ratio of 0.98");
 //   · ratio words (doubled, tripled, quadrupled, halved, twice — "more than" tightens) against the
 //     ratio facts. A sentence that NAMES a network is held to that network's own ratio fact:
@@ -190,13 +190,15 @@ function pastReason(t: Tok, toks: readonly Tok[], facts: readonly Fact[], ratios
   return now ? `${t.raw} is a past value; its current figure ${now.text} is not in the sentence` : `${t.raw} is a past value with no current figure`;
 }
 
-// A SHARED UNIT. "from 20 to 45 seconds" and "38 to 36%" write the unit once: a bare number joined
-// by to / and / or / a dash to a number with a duration or `%` unit takes that unit.
+// A SHARED UNIT. "from 20 to 45 seconds", "38 to 36%" and "41.2 to 49.5K" write the unit once: a
+// bare number joined by to / and / or / a dash to a number with a duration, `%` or K / M / B unit
+// takes that unit (N2: the magnitude too).
 const JOIN_RE = /^\s*(?:to|and|or|–|-)\s*$/i;
+const UNIT_GIVER = (u: Tok) => u.cls === "dur" || u.cls === "pct" || (u.cls === "plain" && u.scale !== 1);
 function sharedUnits(s: string, toks: readonly Tok[]): Tok[] {
   return toks.map((t, i) => {
     const u = toks[i + 1];
-    if (!u || t.cls !== "plain" || !/^[\d,.]+$/.test(t.raw) || (u.cls !== "dur" && u.cls !== "pct")) return t;
+    if (!u || t.cls !== "plain" || !/^[\d,.]+$/.test(t.raw) || !UNIT_GIVER(u)) return t;
     if (!JOIN_RE.test(s.slice(t.end, u.at))) return t;
     return { ...t, cls: u.cls, value: t.value * u.scale, tol: t.tol * u.scale, scale: u.scale };
   });
