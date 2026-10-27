@@ -9,7 +9,7 @@ import { capKeyOf, rateKeyOf } from "./keys";
 import { isLimitedSpan, parseNoteParams, parseNoteRequest } from "./params";
 import { factsFor, readGeoDays } from "./sources";
 import { notesStore } from "./store";
-import { executePass, latestCountries, planPass, warmCandidates, warmKeyOf } from "./warm";
+import { executePass, latestCountries, pacedChat, planPass, warmCandidates, warmKeyOf } from "./warm";
 
 // THE NOTE ROUTES' BODIES — `app/api/notes/route.ts` (read), `request/route.ts` and `warm/route.ts`
 // each hand their request to one of these with a deps THUNK, so the tests run them against an
@@ -22,7 +22,9 @@ import { executePass, latestCountries, planPass, warmCandidates, warmKeyOf } fro
 // LIMITS (the global constraints): only a BRUSHED RANGE is limited (`isLimitedSpan`), since it is
 // the one unbounded key space. Per visitor 20 an hour, keyed by the first 16 hex characters of
 // sha256(ip) (the raw address is never stored or logged); globally 2,000 a UTC day, a tripwire
-// counted as stats `capped`. Every other kind is bounded by its key and the singleflight lock.
+// counted as stats `capped`. Only a MISS is counted: a cached brush, or a subject no note exists
+// for, is answered without touching either counter. Every other kind is bounded by its key and the
+// singleflight lock.
 
 const NET = "mainnet";
 export const RATE_PER_HOUR = 20;
@@ -31,7 +33,10 @@ const RATE_TTL_S = 2 * 3600;
 const CAP_TTL_S = 2 * 86_400;
 /** The warm route's `maxDuration` is 300 s: no new item starts after this. */
 export const WARM_BUDGET_MS = 240_000;
-export const WARM_CONCURRENCY = 4;
+/** One item at a time, and the Gate calls spaced (`pacedChat`): the free model 429'd at about five
+ *  calls in 15 s (2026-10-27, R32). */
+export const WARM_CONCURRENCY = 1;
+export const WARM_SPACING_MS = 3_500;
 
 const PUBLIC = "public, s-maxage=300, stale-while-revalidate=600";
 const NO_STORE = "no-store";
@@ -81,10 +86,14 @@ export async function requestNote(req: Request, deps: () => GenerateDeps): Promi
   const parsed = parseNoteRequest(body, now);
   if ("error" in parsed) return json({ error: parsed.error }, NO_STORE, 400);
   if (!d) return json(UNAVAILABLE, NO_STORE);
-  const net = netOf(req);
-  // Notes exist for mainnet only: another network is `none` before anything is counted.
-  if (net !== NET) return json({ state: "none" } satisfies NoteResponse, NO_STORE);
+  const note = { net: netOf(req), ...parsed };
+  const { net } = note;
   try {
+    // ONLY A MISS IS COUNTED. A read answers first: `none` for a note that does not exist (another
+    // network, a subject the view has no note for: `noteSupported`), the cached note when there is
+    // one; `request` means a miss, and only then do the limits count and the model write.
+    const cached = await generateNote(note, d, "read");
+    if (cached.state !== "request") return json(cached, NO_STORE);
     if (isLimitedSpan(parsed.span)) {
       if ((await d.store.incr(rateKeyOf(net, visitorHash(req), isoHour(now)), RATE_TTL_S)) > RATE_PER_HOUR)
         return json(UNAVAILABLE, NO_STORE, 429);
@@ -93,7 +102,7 @@ export async function requestNote(req: Request, deps: () => GenerateDeps): Promi
         return json(UNAVAILABLE, NO_STORE);
       }
     }
-    return json(await generateNote({ net, ...parsed }, d, "request"), NO_STORE);
+    return json(await generateNote(note, d, "request"), NO_STORE);
   } catch {
     return json(UNAVAILABLE, NO_STORE);
   }
@@ -104,6 +113,7 @@ export interface WarmDeps extends GenerateDeps {
   countries(nowMs: number): Promise<string[]>;
   /** The current networks-with-nodes key (the hyper digest's own `setKey`); null when unknown. */
   setKey(nowMs: number): Promise<string | null>;
+  sleep(ms: number): Promise<void>;
 }
 
 const D = 86_400_000;
@@ -116,6 +126,7 @@ export function liveWarmDeps(): WarmDeps {
     countries: async (nowMs) => latestCountries((await readGeoDays(NET, nowMs - 2 * D, nowMs)).geoDays),
     // The digest's own builder decides which networks have nodes, so the two keys cannot disagree.
     setKey: async (nowMs) => (await factsFor(NET, "hyper", "all", "day", nowMs))?.setKey ?? null,
+    sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   };
 }
 
@@ -129,7 +140,7 @@ export async function warmNotes(req: Request, deps: () => WarmDeps): Promise<Res
   }
   try {
     const d = deps();
-    const now = d.now();
+    const now = d.now(); // the budget's clock starts here: the prefetch spends it too
     const subjects = ["all", "dag", ...sampledIds(NET)];
     const [countries, setKey] = await Promise.all([
       d.countries(now).catch(() => [] as string[]),
@@ -145,11 +156,12 @@ export async function warmNotes(req: Request, deps: () => WarmDeps): Promise<Res
       if (rec) records.set(keys[i]!, rec);
     });
     const plan = planPass(now, subjects, countries, setKey, (k) => records.get(k) ?? null);
-    const result = await executePass(plan, (item) => generateNote({ net: NET, ...item }, d, "warm"), {
-      now: d.now,
-      budgetMs: WARM_BUDGET_MS,
-      concurrency: WARM_CONCURRENCY,
-    });
+    const paced = { ...d, chat: pacedChat(d.chat, WARM_SPACING_MS, d.now, d.sleep) };
+    const result = await executePass(
+      plan,
+      (item) => generateNote({ net: NET, ...item }, paced, "warm", { seenWrittenAt: records.get(warmKeyOf(item))?.writtenAt ?? null }),
+      { now: d.now, start: now, budgetMs: WARM_BUDGET_MS, concurrency: WARM_CONCURRENCY },
+    );
     return json(result, NO_STORE);
   } catch {
     return json(UNAVAILABLE, NO_STORE);

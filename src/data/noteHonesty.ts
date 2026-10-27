@@ -11,6 +11,7 @@ import type { Fact } from "@/src/data/noteTypes";
 // WHAT IT CHECKS, in the order the code does it:
 //   · numeric tokens (12,159 · 12.2K · 1.5M · 37% · 2.5x / 2.5 times · 22 hours / 22h / 3 days / 45s)
 //     and number words (one … twenty, "a dozen") against the facts' values;
+//   · a plain number that is a citable ratio fact's own text, exactly ("a ratio of 0.98");
 //   · ratio words (doubled, tripled, quadrupled, halved, twice — "more than" tightens) against the
 //     ratio facts. A sentence that NAMES a network is held to that network's own ratio fact:
 //     "BioFi more than doubled" is false while "USDC.dag more than doubled" is true;
@@ -138,6 +139,9 @@ function backed(t: Tok, facts: readonly Fact[], ratios: readonly Fact[], dir: Di
   // A WRITTEN ZERO says "none", which only a measured zero backs: its half-unit tolerance would
   // otherwise let 0 pass against a quiet network's 0.03 a day.
   const zero = t.cls === "plain" && t.value === 0;
+  // A RATIO QUOTED AS WRITTEN ("a ratio of 0.98"): a plain number backs itself only when it IS the
+  // text of a ratio fact this sentence may cite, character for character (R33).
+  if (t.cls === "plain" && ratios.some((f) => f.text === t.raw)) return true;
   return facts.some((f) =>
     candidates(f, t.cls, ratios, dir).some((v) => (zero ? v === 0 : Math.abs(v - t.value) <= t.tol + 1e-9 * Math.max(1, Math.abs(v)))));
 }

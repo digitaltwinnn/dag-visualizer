@@ -69,6 +69,13 @@ export interface GenerateDeps {
  *  network set, so whatever is cached is rewritten); "request": the request route (writes on a miss). */
 export type GenerateMode = "read" | "warm" | "request";
 
+export interface GenerateOptions {
+  /** Warm only: the record's `writtenAt` when the pass planned this item (null: there was none).
+   *  A record found with ANOTHER `writtenAt`, before or once the lock is held, was just written by
+   *  someone else (an overlapping pass, a visitor's read): it is served, not rewritten. */
+  seenWrittenAt?: number | null;
+}
+
 const NONE: NoteResponse = { state: "none" };
 const PENDING: NoteResponse = { state: "pending" };
 const UNAVAILABLE: NoteResponse = { state: "unavailable" };
@@ -144,9 +151,15 @@ async function write(
   return { ok: false, stat: "gateFail" };
 }
 
-export async function generateNote(req: NoteRequest, deps: GenerateDeps, mode: GenerateMode): Promise<NoteResponse> {
+export async function generateNote(
+  req: NoteRequest, deps: GenerateDeps, mode: GenerateMode, opts: GenerateOptions = {},
+): Promise<NoteResponse> {
   const { net, view, subject, span } = req;
   const { store } = deps;
+  const seen = opts.seenWrittenAt;
+  /** Warm: a record other than the one planned (see `GenerateOptions`). */
+  const writtenSincePlan = (r: NoteRecord | null): r is NoteRecord =>
+    mode === "warm" && seen !== undefined && r != null && r.writtenAt !== seen;
 
   // 1. A note exists only for mainnet and the view's own, listed subjects.
   if (net !== "mainnet" || !noteSupported(view, subject, span, net)) return NONE;
@@ -155,7 +168,7 @@ export async function generateNote(req: NoteRequest, deps: GenerateDeps, mode: G
   const timing = timingOf(view, span);
   const now = deps.now();
 
-  // 2. Cached: served, unless the warm pass planned its rewrite.
+  // 2. Cached: served, unless the warm pass planned its rewrite (and nobody has done it since).
   let cached: NoteRecord | null;
   try {
     cached = parseRecord(await store.get(key));
@@ -164,7 +177,7 @@ export async function generateNote(req: NoteRequest, deps: GenerateDeps, mode: G
     await countStat(store, net, now, "store");
     return UNAVAILABLE;
   }
-  if (cached && mode !== "warm") return okOf(cached);
+  if (cached && (mode !== "warm" || writtenSincePlan(cached))) return okOf(cached);
 
   // 3. An on-request kind (the 1h pill, a brushed range) is written only when asked for.
   if (!cached && timing.refreshMs == null && mode === "read") return REQUEST;
@@ -180,6 +193,20 @@ export async function generateNote(req: NoteRequest, deps: GenerateDeps, mode: G
   }
 
   try {
+    // 4b. Warm: the lock may have been taken just after another writer released it, so the record
+    // is read again under the lock; one written since the plan is served, never paid for twice.
+    if (mode === "warm" && seen !== undefined) {
+      let held: NoteRecord | null;
+      try {
+        held = parseRecord(await store.get(key));
+      } catch {
+        warn(req, "store");
+        await countStat(store, net, now, "store");
+        return UNAVAILABLE;
+      }
+      if (writtenSincePlan(held)) return okOf(held);
+    }
+
     // 5. The facts. Nothing to describe: nothing stored, no model call.
     let input: Awaited<ReturnType<typeof factsFor>>;
     try {

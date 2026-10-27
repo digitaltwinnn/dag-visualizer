@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CATALOG } from "@/src/engine/config";
 import { noteKeyOf } from "./keys";
-import { executePass, latestCountries, planPass, warmCandidates, WARM_SLACK_MS, type WarmItem } from "./warm";
+import { executePass, latestCountries, pacedChat, planPass, warmCandidates, WARM_SLACK_MS, type WarmItem } from "./warm";
 
 const H = 3_600_000;
 const NOW = Date.UTC(2026, 9, 27, 12, 7);
@@ -99,7 +99,7 @@ describe("executePass", () => {
       running--;
       if (i.subject === "s3") throw new Error("boom");
       return i.subject === "s4" ? { state: "unavailable" } : i.subject === "s5" ? { state: "none" } : { state: "ok", text: "", writtenAt: 0, spanFrom: 0, spanTo: 0, days: [] };
-    }, { now: () => 0, budgetMs: 240_000, concurrency: 4 });
+    }, { now: () => 0, start: 0, budgetMs: 240_000, concurrency: 4 });
     expect(peak).toBe(4);
     expect(res).toEqual({ planned: 10, done: 8, failed: 2 });
   });
@@ -111,8 +111,40 @@ describe("executePass", () => {
       started.push(i.subject);
       t += 100_000;
       return { state: "ok", text: "", writtenAt: 0, spanFrom: 0, spanTo: 0, days: [] };
-    }, { now: () => t, budgetMs: 240_000, concurrency: 1 });
+    }, { now: () => t, start: 0, budgetMs: 240_000, concurrency: 1 });
     expect(started).toEqual(["s0", "s1", "s2"]);
     expect(res).toEqual({ planned: 10, done: 3, failed: 0 });
+  });
+
+  it("the budget counts from the handler's start, not the executor's", async () => {
+    const started: string[] = [];
+    let t = 230_000; // the prefetch and planning took 230 s
+    const res = await executePass(items(10), async (i) => {
+      started.push(i.subject);
+      t += 6_000;
+      return { state: "ok", text: "", writtenAt: 0, spanFrom: 0, spanTo: 0, days: [] };
+    }, { now: () => t, start: 0, budgetMs: 240_000, concurrency: 1 });
+    expect(started).toEqual(["s0", "s1"]);
+    expect(res.done).toBe(2);
+  });
+});
+
+describe("pacedChat", () => {
+  it("waits out the spacing since the previous call's start, and only then", async () => {
+    let t = 0;
+    const waits: number[] = [];
+    const sleep = async (ms: number) => {
+      waits.push(ms);
+      t += ms;
+    };
+    const chat = pacedChat(async (x: string) => x.toUpperCase(), 3500, () => t, sleep);
+    expect(await chat("a")).toBe("A");
+    expect(waits).toEqual([]);
+    t += 1000;
+    await chat("b");
+    expect(waits).toEqual([2500]);
+    t += 5000;
+    await chat("c");
+    expect(waits).toEqual([2500]);
   });
 });

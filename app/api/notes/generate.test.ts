@@ -252,6 +252,38 @@ describe("generateNote", () => {
     expect(d.chat).toHaveBeenCalledTimes(1);
   });
 
+  it("a warm item whose record changed since the plan is served, not rewritten (another pass wrote it)", async () => {
+    await store.set(KEY, record({ writtenAt: NOW - 10 * 60_000 }), 3600);
+    const d = deps();
+    const seen = NOW - 25 * H;
+    expect(await generateNote(REQ, d, "warm", { seenWrittenAt: seen })).toMatchObject({ state: "ok", writtenAt: NOW - 10 * 60_000 });
+    // Planned as missing, found written: served too.
+    expect(await generateNote(REQ, d, "warm", { seenWrittenAt: null })).toMatchObject({ state: "ok", writtenAt: NOW - 10 * 60_000 });
+    expect(d.chat).not.toHaveBeenCalled();
+  });
+
+  it("a warm item re-reads its record once it holds the lock: a write that landed in between is served", async () => {
+    const seen = NOW - 25 * H;
+    await store.set(KEY, record({ writtenAt: seen }), 3600);
+    const lock = store.lock.bind(store);
+    vi.spyOn(store, "lock").mockImplementation(async (k, ttl) => {
+      await store.set(KEY, record({ writtenAt: NOW - 1000 }), 3600); // the other writer finished first
+      return lock(k, ttl);
+    });
+    const d = deps();
+    expect(await generateNote(REQ, d, "warm", { seenWrittenAt: seen })).toMatchObject({ state: "ok", writtenAt: NOW - 1000 });
+    expect(d.chat).not.toHaveBeenCalled();
+    expect(await lockFree()).toBe(true);
+  });
+
+  it("a warm item whose record is still the one planned is rewritten", async () => {
+    const seen = NOW - 25 * H;
+    await store.set(KEY, record({ writtenAt: seen }), 3600);
+    const d = deps();
+    expect(await generateNote(REQ, d, "warm", { seenWrittenAt: seen })).toMatchObject({ state: "ok", writtenAt: NOW });
+    expect(d.chat).toHaveBeenCalledTimes(1);
+  });
+
   it("a read serves a fresh record without a model call", async () => {
     await store.set(KEY, record({ writtenAt: NOW - 2 * H }), 3600);
     const d = deps();

@@ -180,3 +180,17 @@ describe("checkNote — a nameless sentence cites only unattributed ratios", () 
     expect(w("BioFi rose by 37% against the span before.")).toBe(true);
   });
 });
+
+describe("checkNote — a ratio quoted as written (R33)", () => {
+  const usual = F("Global snapshots per hour, ratio of recent to usual", 0.98, "ratio", "0.98");
+  it("lets a plain number back itself when it IS an own ratio fact's text", () => {
+    expect(checkNote("Global snapshots ran at a ratio of 0.98 to the usual rate.", [usual], names).ok).toBe(true);
+  });
+  it("a different decimal still fails", () => {
+    expect(checkNote("Global snapshots ran at a ratio of 0.97 to the usual rate.", [usual], names).ok).toBe(false);
+  });
+  it("a named network's ratio text never backs a nameless sentence", () => {
+    expect(ok("Global snapshots ran at a ratio of 1.37 to the span before.")).toBe(false);
+    expect(ok("BioFi ran at a ratio of 1.37 to the span before.")).toBe(true);
+  });
+});

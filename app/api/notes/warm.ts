@@ -12,6 +12,10 @@ import { noteSupported } from "./sources";
 // cron is hourly and a pass takes minutes: a ledger note written at 10:09 is 58 minutes old at the
 // 11:07 pass, and an exact one-hour refresh would leave it standing until 12:07.
 //
+// PACING: one item at a time, and at least `WARM_SPACING_MS` between Gate calls (`pacedChat`),
+// because the free model's burst limit is far below its stated per-minute one; an item whose
+// record another writer refreshed since the plan is served, not rewritten (`seenWrittenAt`).
+//
 // Order: the HOURLY kinds first (ledger, History's 24h), so a pass cut short by its time budget
 // still refreshes what goes stale fastest; then the daily kinds (hyper, Geography and its
 // countries, History's 7d / 30d / 1y / all). Only what a note exists for is planned
@@ -86,14 +90,15 @@ export interface PassResult {
 }
 
 /** Run the plan with at most `concurrency` items at once, starting no new item once `budgetMs`
- *  has passed since the pass began (the route's 300 s limit; an item already running finishes).
- *  Items never started are neither done nor failed: the next pass plans them again. */
+ *  has passed since `start` (the HANDLER's start: the prefetch and planning spend the same 300 s
+ *  as the items; an item already running finishes). Items never started are neither done nor
+ *  failed: the next pass plans them again. */
 export async function executePass(
   items: WarmItem[],
   run: (item: WarmItem) => Promise<NoteResponse>,
-  opts: { now: () => number; budgetMs: number; concurrency: number },
+  opts: { now: () => number; start: number; budgetMs: number; concurrency: number },
 ): Promise<PassResult> {
-  const start = opts.now();
+  const { start } = opts;
   let next = 0;
   let done = 0;
   let failed = 0;
@@ -111,4 +116,22 @@ export async function executePass(
   };
   await Promise.all(Array.from({ length: Math.min(opts.concurrency, items.length) }, worker));
   return { planned: items.length, done, failed };
+}
+
+/** A model call that keeps at least `spacingMs` between the STARTS of consecutive calls (the Gate
+ *  answered 429 at about five calls in 15 s on the free model, 2026-10-27). Only a call that
+ *  reaches the model waits, so a cached or empty item costs no time. For a serial caller: the
+ *  warm pass runs one item at a time. */
+export function pacedChat<A extends unknown[], R>(
+  chat: (...args: A) => Promise<R>, spacingMs: number, now: () => number, sleep: (ms: number) => Promise<void>,
+): (...args: A) => Promise<R> {
+  let last: number | null = null;
+  return async (...args: A) => {
+    if (last != null) {
+      const wait = last + spacingMs - now();
+      if (wait > 0) await sleep(wait);
+    }
+    last = now();
+    return chat(...args);
+  };
 }
