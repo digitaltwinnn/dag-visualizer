@@ -140,6 +140,9 @@ interface AppState {
   hoverCountry: string | null;
   // Node ids of a hovered explorer COHORT row — the whole 3D honeycomb stack glows together.
   hoverCohort: string[] | null;
+  // The UTC day (ms) of a hovered AI-note day — a caption on the note card or a diamond on the
+  // History timeline. The pair previews each other and neither commits (convention 9). null = none.
+  hoverNoteDay: number | null;
   // The hovered GROUP RUNG's identity, as a scalar key — the pairing twin of `hoverCohort`
   // (which carries member ids for the 3D glow and can't be compared by `subjectPairing`).
   // Both group rungs share this ONE channel because no view shows both: geo's provider cohort
@@ -458,6 +461,7 @@ interface AppState {
   setHoverNodeId: (id: string | null) => void;
   setHoverCountry: (cc: string | null) => void;
   setHoverCohort: (ids: string[] | null) => void;
+  setHoverNoteDay: (dayMs: number | null) => void;
   setHoverGroup: (key: string | null) => void;
   setFollowing: (following: boolean) => void;
   setHover: (hover: HoverSubject | null) => void;
@@ -558,6 +562,7 @@ export const useStore = create<AppState>((set) => ({
   hoverNodeId: null,
   hoverCountry: null,
   hoverCohort: null,
+  hoverNoteDay: null,
   hoverGroup: null,
   following: false,
   hover: null,
@@ -708,6 +713,7 @@ export const useStore = create<AppState>((set) => ({
   setHoverNodeId: (hoverNodeId) => set({ hoverNodeId }),
   setHoverCountry: (hoverCountry) => set({ hoverCountry }),
   setHoverCohort: (hoverCohort) => set({ hoverCohort }),
+  setHoverNoteDay: (hoverNoteDay) => set({ hoverNoteDay }),
   setHoverGroup: (hoverGroup) => set({ hoverGroup }),
   setFollowing: (following) => set({ following }),
   setHover: (hover) => set({ hover }),
