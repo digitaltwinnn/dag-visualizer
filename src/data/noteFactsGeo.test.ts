@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { geoFacts, type GeoFactsInput } from "@/src/data/noteFactsGeo";
+import { fleetCountries, geoFacts, type GeoFactsInput } from "@/src/data/noteFactsGeo";
 import { checkNote } from "@/src/data/noteHonesty";
 import { pairsOf } from "@/src/data/testkit/notePairs";
 
@@ -484,5 +484,35 @@ describe("geoFacts states ONE figure per quantity: countries and the fleet from 
     expect(gate("The United States fell from 58 to 29.")).toEqual({ ok: true });
     expect(gate("The United States fell from 58 to 27.").ok).toBe(false);
     expect(gate("The fleet locates 86 nodes, 33 of them in Germany.")).toEqual({ ok: true });
+  });
+});
+
+// M5: the warm pass plans its country notes from `fleetCountries`, so it plans exactly the countries
+// a country note states: the same reading `geoFacts` takes its country figures from (R58).
+describe("fleetCountries: the countries a country note exists for", () => {
+  const countries = { DE: "Germany", US: "United States", FR: "France", SE: "Sweden" };
+  const geoToday = day({ cc: { DE: 33, US: 27, FR: 2 }, isp: {} });
+  const tiersToday = { "f.cc.DE": 33, "f.cc.US": 29, "f.cc.SE": 4 };
+  const noteFor = (cc: string, ccDays: GeoFactsInput["ccDays"]) =>
+    geoFacts({ subject: { cc }, geoDays: { "2026-10-27": geoToday }, ccDays, providerNames: {}, countryNames: countries, names: NAMES });
+
+  it("reads the tiers while they are current: a country only there is listed, one only in the geo family is not", () => {
+    const ccDays = { "2026-10-27": tiersToday };
+    const listed = fleetCountries({ geoDays: { "2026-10-27": geoToday }, ccDays });
+    expect(listed).toEqual(["DE", "SE", "US"]);
+    for (const cc of listed) expect(noteFor(cc, ccDays), cc).not.toBeNull();
+    expect(noteFor("FR", ccDays)).toBeNull();
+  });
+
+  it("falls back to the geo family's countries with the facts, when the tiers' newest day is older", () => {
+    const ccDays = { "2026-10-26": tiersToday };
+    const listed = fleetCountries({ geoDays: { "2026-10-27": geoToday }, ccDays });
+    expect(listed).toEqual(["DE", "FR", "US"]);
+    for (const cc of listed) expect(noteFor(cc, ccDays), cc).not.toBeNull();
+    expect(noteFor("SE", ccDays)).toBeNull();
+  });
+
+  it("lists nothing with no measured geo day: no country note exists then", () => {
+    expect(fleetCountries({ geoDays: {}, ccDays: { "2026-10-27": tiersToday } })).toEqual([]);
   });
 });

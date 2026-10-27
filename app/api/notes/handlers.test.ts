@@ -2,7 +2,7 @@ import { createHash, createHmac } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fact } from "@/src/data/noteFacts";
 import { sampledIds } from "@/src/net/lineage";
-import { readNote, requestNote, WARM_BUDGET_MS, WARM_SPACING_MS, warmNotes, type WarmDeps } from "./handlers";
+import { liveDeps, readNote, requestNote, WARM_BUDGET_MS, WARM_SPACING_MS, warmNotes, type WarmDeps } from "./handlers";
 import { GateError } from "./gate";
 import { capKeyOf, lockKeyOf, noteKeyOf, rateKeyOf, statsKeyOf } from "./keys";
 import type { NoteFacts } from "./sources";
@@ -34,6 +34,7 @@ function deps(over: Partial<WarmDeps> = {}): WarmDeps {
     facts: vi.fn(async (_n: string, view: string, subject: string) => ({ ...FACTS, ...(view === "hyper" && subject === "all" ? { setKey: "DAGa,dag" } : {}) })),
     chat: vi.fn(async () => CLEAN),
     now: () => NOW,
+    writable: true,
     countries: async () => ["DE"],
     setKey: async () => "DAGa,dag",
     sleep: vi.fn(async () => {}),
@@ -282,7 +283,7 @@ describe("the visitor hash is keyed when the server holds a secret", () => {
 describe("the warm budget leaves the worst item room inside maxDuration 300 s", () => {
   it("is 210 s: two paced Gate attempts at their 20 s timeout and the reads still finish before 300 s", () => {
     expect(WARM_BUDGET_MS).toBe(210_000);
-    expect(WARM_BUDGET_MS + 2 * (WARM_SPACING_MS + 20_000)).toBeLessThan(300_000);
+    expect(WARM_BUDGET_MS + WARM_SPACING_MS + 2 * 20_000).toBeLessThan(300_000);
   });
 
   it("spaces the Gate calls 8 s: 3.5 s still drew 429s from the free model (2026-10-27)", () => {
@@ -412,5 +413,60 @@ describe("GET /api/notes/warm (cron)", () => {
     });
     expect(await res.json()).toEqual({ state: "unavailable" });
     expect(res.headers.get("Cache-Control")).toBe("no-store");
+  });
+});
+
+// R66: PREVIEWS NEVER WRITE NOTES. A PR preview shares production's Upstash store (the marketplace
+// env vars span every scope), so a miss there would write notes from the preview's code, draw on
+// the Gate's quota and count into production's go/no-go stats. Generation runs only where
+// `notesWritable()` holds (store.ts); elsewhere a cached note is served and a miss is `none`.
+describe("a preview deployment writes no notes (R66)", () => {
+  it("the live deps carry `notesWritable()`: false on a preview", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("NOTES_STORE", "memory");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    expect(liveDeps().writable).toBe(false);
+    vi.stubEnv("VERCEL_ENV", "production");
+    expect(liveDeps().writable).toBe(true);
+  });
+
+  it("GET: a missing warmable note is `none`, with no model call and nothing stored", async () => {
+    const d = deps({ writable: false });
+    const res = await readNote(get("view=trend&subject=dag&span=7d"), () => d);
+    expect(await res.json()).toEqual({ state: "none" });
+    expect(d.chat).not.toHaveBeenCalled();
+    expect(await store.get(noteKeyOf("mainnet", "trend", "dag", "7d"))).toBeNull();
+    expect(await stats()).toEqual({});
+  });
+
+  it("GET: an on-request kind is `none`, not `request` (the request route would not write it)", async () => {
+    const res = await readNote(get(`view=trend&subject=dag&from=${RANGE.fromMs}&to=${RANGE.toMs}`), () => deps({ writable: false }));
+    expect(await res.json()).toEqual({ state: "none" });
+  });
+
+  it("GET: a cached note is still served", async () => {
+    await deps().store.set(noteKeyOf("mainnet", "trend", "dag", "7d"), JSON.stringify({ text: "Cached.", writtenAt: NOW - H, spanFrom: NOW - 7 * D, spanTo: NOW, days: [] }), 3600);
+    const res = await readNote(get("view=trend&subject=dag&span=7d"), () => deps({ writable: false }));
+    expect(await res.json()).toMatchObject({ state: "ok", text: "Cached." });
+  });
+
+  it("POST: the request route answers `none` and counts no limit", async () => {
+    const d = deps({ writable: false });
+    const incr = vi.spyOn(store, "incr");
+    for (const body of [{ view: "trend", subject: "dag", span: "1h" }, { view: "trend", subject: "dag", ...RANGE }]) {
+      const res = await requestNote(post(body, { "x-forwarded-for": "1.2.3.4" }), () => d);
+      expect(await res.json()).toEqual({ state: "none" });
+    }
+    expect(incr).not.toHaveBeenCalled();
+    expect(d.chat).not.toHaveBeenCalled();
+  });
+
+  it("warm: even an authorised pass writes nothing", async () => {
+    vi.stubEnv("CRON_SECRET", "s3cret");
+    const d = deps({ writable: false });
+    const res = await warmNotes(new Request("http://localhost/api/notes/warm", { headers: { authorization: "Bearer s3cret" } }), () => d);
+    expect(await res.json()).toEqual({ state: "none" });
+    expect(d.chat).not.toHaveBeenCalled();
+    expect(await store.get(noteKeyOf("mainnet", "hyper", "all", "day"))).toBeNull();
   });
 });

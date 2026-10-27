@@ -96,6 +96,25 @@ export async function readGeoDays(
   return { geoDays, providerNames };
 }
 
+/** GEOGRAPHY'S READ — the geo family's days and the tiers' daily fleet `f.cc` (`ccDays`, pivoted by
+ *  day) over `GEO_READ_MS`. The geo note's facts and the warm pass's country plan both read through
+ *  it, so the countries warmed are the countries a note states (M5). */
+export async function geoInputs(net: string, nowMs: number, reads: NoteReads): Promise<GeoDaysRead & { ccDays: Record<string, Record<string, number>> }> {
+  const from = nowMs - GEO_READ_MS;
+  const [{ geoDays, providerNames }, tiers] = await Promise.all([
+    reads.geoDays(net, from, nowMs),
+    reads.span(net, "1d", from, nowMs),
+  ]);
+  const ccDays: Record<string, Record<string, number>> = {};
+  tiers.buckets.forEach((b, i) => {
+    for (const [k, pts] of Object.entries(tiers.series)) {
+      const v = pts[i];
+      if (k.startsWith("f.cc.") && v != null) (ccDays[iso(b)] ??= {})[k] = v;
+    }
+  });
+  return { geoDays, providerNames, ccDays };
+}
+
 /** The default reads for ONE note: the trends store's read client, each hash read at most once (a
  *  History note reads the same daily year-hash for its span, the span before and its days). */
 export function storeReads(nowMs: number, store: HashReader = readStore()): NoteReads {
@@ -295,18 +314,7 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
     },
     whole: (subject) => subject === "all",
     async read({ net, subject, nowMs, reads, names }) {
-      const from = nowMs - GEO_READ_MS;
-      const [{ geoDays, providerNames }, tiers] = await Promise.all([
-        reads.geoDays(net, from, nowMs),
-        reads.span(net, "1d", from, nowMs),
-      ]);
-      const ccDays: Record<string, Record<string, number>> = {};
-      tiers.buckets.forEach((b, i) => {
-        for (const [k, pts] of Object.entries(tiers.series)) {
-          const v = pts[i];
-          if (k.startsWith("f.cc.") && v != null) (ccDays[iso(b)] ??= {})[k] = v;
-        }
-      });
+      const { geoDays, providerNames, ccDays } = await geoInputs(net, nowMs, reads);
       const ccs = new Set<string>();
       for (const day of [...Object.values(geoDays), ...Object.values(ccDays)])
         for (const k of Object.keys(day)) if (k.startsWith("f.cc.")) ccs.add(k.slice(k.lastIndexOf(".") + 1));

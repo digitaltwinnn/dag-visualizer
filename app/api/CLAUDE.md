@@ -122,11 +122,15 @@ them — but the Next Node server can.
   is set (the raw address and the secret are never stored or logged; on Vercel
   `x-forwarded-for` is set by the platform, which is why the hash can be trusted there), and a
   2,000 a day tripwire; a cached range is served without counting. Every other kind is bounded by
-  its key and a singleflight lock. **The warm pass is paced**: one item at a time, at least 3.5 s
+  its key and a singleflight lock. **The warm pass is paced**: one item at a time, at least 8 s
   between Gate calls, no new item after 210 s (the worst item, two attempts at the 20 s timeout,
   still ends inside the 300 s `maxDuration`), because the free model answered 429 at about five
-  calls in 15 s on 2026-10-27. The cron fails closed without `CRON_SECRET`, like the sampler (and
-  a preview has none). `NOTES_STORE=memory` (dev only, ignored in production) keeps a local dev
+  calls in 15 s on 2026-10-27, and still refused 20 of 71 at 3.5 s. The cron fails closed without
+  `CRON_SECRET`, like the sampler (and a preview has none). ⚠️ **Notes are written by production
+  only** (R66, `notesWritable()` in `notes/store.ts`, tested per `VERCEL_ENV`): a preview shares the
+  store, so there every route serves what is cached and answers a miss `none` — no note, no
+  failure hold, no stats, and the warm pass writes nothing even with the secret. A local server (no
+  `VERCEL_ENV`) writes. `NOTES_STORE=memory` (dev only, ignored in production) keeps a local dev
   server's notes out of the shared store. **Each UTC day's outcomes are counted** in
   `ai:mainnet:stats:{day}` (`NOTE_STATS` in `generate.ts`: `ok`, `gateFail`, `rate`, `http`,
   `timeout`, `empty`, `nokey`, `store`, `error`, `capped`, then the volumes `calls`, every Gate

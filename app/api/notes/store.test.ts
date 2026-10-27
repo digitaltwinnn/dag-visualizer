@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { memoryNotesStore, notesStore } from "./store";
+import { memoryNotesStore, notesStore, notesWritable } from "./store";
 
 beforeEach(() => vi.useFakeTimers({ now: 1_000_000 }));
 afterEach(() => vi.useRealTimers());
@@ -80,5 +80,25 @@ describe("notesStore — the dev-only memory switch", () => {
     vi.stubEnv("UPSTASH_KV_REST_API_URL", "");
     vi.stubEnv("UPSTASH_KV_REST_API_TOKEN", "");
     expect(() => notesStore()).toThrow("Upstash env missing");
+  });
+});
+
+// R66: NOTES ARE WRITTEN BY PRODUCTION ONLY. A preview shares production's store, so it serves the
+// cache and writes nothing; a local server (no VERCEL_ENV) writes, into its memory store in dev.
+describe("notesWritable — where notes may be written", () => {
+  afterEach(() => vi.unstubAllEnvs());
+  it.each([
+    ["production", true],
+    ["preview", false],
+    ["development", false],
+    ["", true],
+  ])("VERCEL_ENV=%j: %s", (env, writable) => {
+    vi.stubEnv("VERCEL_ENV", env);
+    expect(notesWritable()).toBe(writable);
+  });
+  it("unset (a local server): writable", () => {
+    vi.stubEnv("VERCEL_ENV", undefined);
+    expect(process.env.VERCEL_ENV).toBeUndefined();
+    expect(notesWritable()).toBe(true);
   });
 });

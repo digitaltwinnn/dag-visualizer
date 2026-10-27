@@ -19,6 +19,9 @@ import type { NotesStore } from "./store";
 //   · nothing to describe (a builder's null) stores nothing and answers `none`, without a model call;
 //   · a store outage, the trends reads or this cache, answers `unavailable` and is counted
 //     (`store`): an instrument state, never a guess and never an error dump.
+//
+// A PREVIEW WRITES NOTHING (R66): `deps.writable` (`notesWritable()`, store.ts) is false there, and
+// every mode then serves the cache and answers a miss `none` — no note, hold, lock or stats.
 //     Anything else that throws once the lock is taken answers the same, counted as `error`; the
 //     lock is released in every case.
 //
@@ -54,10 +57,13 @@ export type NoteStat = (typeof NOTE_STATS)[number];
 /** How long a day's counters are kept: the go/no-go script reads the last 14 days. */
 export const STATS_TTL_S = 30 * 86_400;
 
-/** The singleflight lock's TTL: two Gate attempts at their 20-second timeout plus the reads, with
- *  room to spare. The unlock is unconditional, so a writer that outlived its lock would free the
- *  next writer's (R30). */
-export const LOCK_TTL_S = 60;
+/** The singleflight lock's TTL. A warm item's paced wait runs INSIDE the lock (`pacedChat` wraps
+ *  the chat this generator calls), so the worst writer holds it for the facts reads, a paced wait
+ *  of up to 8 s, two Gate attempts at their 20-second timeout (pacing is start to start, so there
+ *  is no wait after a 20 s first call) and the set: 48 s plus the reads. 90 s leaves the reads about
+ *  40 s. The unlock is unconditional, so a writer that outlived its lock would free the next
+ *  writer's (R30). */
+export const LOCK_TTL_S = 90;
 
 /** How long a failed read or request holds its key (see the header): long enough that a burst of
  *  visitors, or a 429 run, costs one attempt per key, short enough that a passing outage heals. */
@@ -75,6 +81,9 @@ export interface GenerateDeps {
   facts: typeof factsFor;
   chat: typeof gateChat;
   now: () => number;
+  /** `notesWritable()` (store.ts): false on a preview, where every mode serves what is cached and
+   *  answers a miss `none`, writing nothing (no note, hold, lock or stats) into the shared store. */
+  writable: boolean;
 }
 
 /** "read": a visitor's read (an on-request kind is not written here); "warm": one item the cron
@@ -193,10 +202,13 @@ export async function generateNote(
     cached = parseRecord(await store.get(key));
   } catch {
     warn(req, "store");
-    await countStat(store, net, now, "store");
+    if (deps.writable) await countStat(store, net, now, "store");
     return UNAVAILABLE;
   }
   if (cached && (mode !== "warm" || writtenSincePlan(cached))) return okOf(cached);
+
+  // 2a. A read-only deployment (a preview, R66) serves the cache and writes nothing, in every mode.
+  if (!deps.writable) return cached ? okOf(cached) : NONE;
 
   // 2b. A recent failure holds the key: no model call until it expires (reads and requests only).
   const failKey = failKeyOf(key);

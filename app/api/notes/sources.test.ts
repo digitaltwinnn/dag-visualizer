@@ -16,7 +16,7 @@ const { trendFacts } = await import("@/src/data/noteFactsTrend");
 const { ledgerFacts } = await import("@/src/data/noteFactsLedger");
 const { hyperFacts } = await import("@/src/data/noteFactsHyper");
 const { geoFacts } = await import("@/src/data/noteFactsGeo");
-const { cleanBlurb, factsFor, noteSupported, readGeoDays, readSpan, storeReads } = await import("./sources");
+const { cleanBlurb, factsFor, geoInputs, noteSupported, readGeoDays, readSpan, storeReads } = await import("./sources");
 const realGeo = await vi.importActual<typeof import("@/src/data/noteFactsGeo")>("@/src/data/noteFactsGeo");
 
 const H = 3_600_000;
@@ -257,6 +257,18 @@ describe("factsFor — the per-view read table", () => {
     expect(out!.label).toBe("Germany");
     expect(out!.spanFrom).toBe(NOW - 30 * D);
     expect(out!.facts).toContainEqual(expect.objectContaining({ label: "Span length", value: 2_592_000 }));
+  });
+
+  it("geoInputs is the geo note's own read, so the warm pass plans its countries from the same reading (M5)", async () => {
+    const day = Date.UTC(2026, 9, 26);
+    const tiers = { buckets: [day - D, day], stepMs: D, now: NOW, series: { "f.cc.DE": [4, null], "f.cc.US": [2, 3], "g.ticks": [1, 1] } };
+    const r = fakeReads({ async span(_n, tier, from, to) { r.calls.push({ tier, from, to }); return tiers; } });
+    const got = await geoInputs("mainnet", NOW, r);
+    expect(r.geoCalls).toEqual([{ from: NOW - 41 * D, to: NOW }]);
+    expect(r.calls).toEqual([{ tier: "1d", from: NOW - 41 * D, to: NOW }]);
+    expect(got.ccDays).toEqual({ "2026-10-25": { "f.cc.DE": 4, "f.cc.US": 2 }, "2026-10-26": { "f.cc.US": 3 } });
+    expect(got.geoDays).toEqual({ "2026-10-27": { "f.cc.DE": 3, "f.cc.dag.FR": 1 } });
+    expect(got.providerNames).toEqual({ hetzner: "Hetzner" });
   });
 
   it("geo, through the real builder: a partial outage 30 days back is never the month-ago anchor (R29)", async () => {

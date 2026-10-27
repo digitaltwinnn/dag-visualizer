@@ -60,6 +60,17 @@ function wrap(r: Redis): NotesStore {
   };
 }
 
+/** WHERE NOTES MAY BE WRITTEN (ruling R66) — the one predicate. Production writes, and so does a
+ *  local server (no `VERCEL_ENV`; in dev it writes into the memory store above). A PREVIEW does
+ *  not: it shares production's Upstash store (the marketplace env vars span every scope), so a miss
+ *  there would write notes from the preview's code, spend the Gate's quota and count into
+ *  production's go/no-go stats. Read-only, it serves what is cached and answers a miss `none`.
+ *  `development` (`vercel dev`) is read-only too: only an unset env is a local server. */
+export function notesWritable(): boolean {
+  const env = process.env.VERCEL_ENV;
+  return !env || env === "production";
+}
+
 /** The notes client: the WRITE token (the generator writes, and reads its own cache).
  *
  *  ⚠️ THE DEV-ONLY SWITCH (ruling R35): `NOTES_STORE=memory` on a non-production server answers

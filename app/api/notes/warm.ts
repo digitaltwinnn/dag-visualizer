@@ -11,7 +11,9 @@ import { noteSupported } from "./sources";
 // `all` only) written for a different set of networks with nodes. The slack exists because a pass
 // takes minutes: a ledger note written at 10:09 is 58 minutes old at the 11:07 pass, and an exact
 // one-hour refresh would leave it standing until 11:22. It stays under the 15-minute cron step, so
-// the 10:52 pass (43 minutes) does not rewrite it early.
+// a note written early in the 10:07 pass is not rewritten by the 10:52 one (45 minutes old, under
+// the 50 that make it due), even one that starts late: equal to the step, a :52 run a few seconds
+// late would rewrite it, and an item could settle into a 45-minute cycle.
 //
 // PACING: one item at a time, and at least `WARM_SPACING_MS` between Gate calls (`pacedChat`),
 // because the free model's burst limit is far below its stated per-minute one. A pass is bounded
@@ -25,8 +27,9 @@ import { noteSupported } from "./sources";
 // On-request kinds (the 1h pill, a brushed range) are never warmed.
 
 const NET = "mainnet";
-/** How early a warmed note is due: more than a pass's length, well under its shortest refresh. */
-export const WARM_SLACK_MS = 15 * 60_000;
+/** How early a warmed note is due: more than a pass's length (300 s at most), and under the
+ *  15-minute cron step (see the header), so its shortest refresh is never cut a step short. */
+export const WARM_SLACK_MS = 10 * 60_000;
 
 export interface WarmItem {
   view: NoteView;
@@ -66,21 +69,6 @@ export function planPass(
     if (refreshMs != null && nowMs - rec.writtenAt > refreshMs - WARM_SLACK_MS) return true;
     return item.view === "hyper" && item.subject === "all" && setKey != null && rec.setKey !== setKey;
   });
-}
-
-const COUNTRY_RE = /^f\.cc\.([A-Z]{2})$/;
-
-/** The whole fleet's countries on the newest measured geo day (`readGeoDays`' `geoDays`): the
- *  `f.cc.<cc>` fields above zero, never a network's own `f.cc.<id>.<cc>`. */
-export function latestCountries(geoDays: Record<string, Record<string, number>>): string[] {
-  const latest = Object.keys(geoDays).sort().at(-1);
-  if (!latest) return [];
-  const out: string[] = [];
-  for (const [field, n] of Object.entries(geoDays[latest]!)) {
-    const cc = COUNTRY_RE.exec(field)?.[1];
-    if (cc && n > 0) out.push(cc);
-  }
-  return out.sort();
 }
 
 export interface PassResult {

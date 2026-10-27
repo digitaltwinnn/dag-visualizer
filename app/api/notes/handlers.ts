@@ -1,5 +1,6 @@
 import { createHash, createHmac } from "node:crypto";
 import { NextResponse } from "next/server";
+import { fleetCountries } from "@/src/data/noteFactsGeo";
 import type { NoteResponse } from "@/src/data/noteTypes";
 import { sampledIds } from "@/src/net/lineage";
 import { netOf } from "@/src/net/request";
@@ -7,9 +8,9 @@ import { countStat, generateNote, type GenerateDeps } from "./generate";
 import { gateChat } from "./gate";
 import { capKeyOf, rateKeyOf } from "./keys";
 import { isLimitedSpan, parseNoteParams, parseNoteRequest } from "./params";
-import { factsFor, readGeoDays } from "./sources";
-import { notesStore } from "./store";
-import { executePass, latestCountries, pacedChat, planPass, warmCandidates, warmKeyOf } from "./warm";
+import { factsFor, geoInputs, storeReads } from "./sources";
+import { notesStore, notesWritable } from "./store";
+import { executePass, pacedChat, planPass, warmCandidates, warmKeyOf } from "./warm";
 
 // THE NOTE ROUTES' BODIES — `app/api/notes/route.ts` (read), `request/route.ts` and `warm/route.ts`
 // each hand their request to one of these with a deps THUNK, so the tests run them against an
@@ -22,6 +23,10 @@ import { executePass, latestCountries, pacedChat, planPass, warmCandidates, warm
 // MAINNET ONLY, answered FIRST: off mainnet both routes answer `none` before parsing the subject,
 // because the subject is checked against mainnet's catalog and a testnet network would otherwise
 // be a 400 the card reads as "unavailable".
+//
+// PREVIEWS WRITE NOTHING (R66): the deps carry `notesWritable()` (store.ts), and where it is false
+// a cached note is still served, a miss (warmable or on request) is `none`, and the warm pass
+// answers `none` without planning.
 //
 // LIMITS (the global constraints): only a BRUSHED RANGE is limited (`isLimitedSpan`), since it is
 // the one unbounded key space. Per visitor 20 an hour, keyed by the first 16 hex characters of
@@ -37,9 +42,10 @@ export const RATE_PER_HOUR = 20;
 export const CAP_PER_DAY = 2_000;
 const RATE_TTL_S = 2 * 3600;
 const CAP_TTL_S = 2 * 86_400;
-/** The warm route's `maxDuration` is 300 s: no new item starts after this. The worst item is two
- *  paced Gate attempts at their 20 s timeout (8 + 20 + 8 + 20 s) plus its reads, so 210 s
- *  leaves it room to finish — and holds a pass to about 26 Gate calls. */
+/** The warm route's `maxDuration` is 300 s: no new item starts after this. The worst item is a
+ *  paced wait and two Gate attempts at their 20 s timeout (8 + 20 + 20 s: pacing is start to
+ *  start, so a 20 s first call leaves no wait before the second) plus its reads, so 210 s leaves
+ *  it room to finish — and holds a pass to about 26 Gate calls. */
 export const WARM_BUDGET_MS = 210_000;
 /** One item at a time, and the Gate calls spaced (`pacedChat`): the free model 429'd at about five
  *  calls in 15 s (2026-10-27, R32), and at 3.5 s spacing still refused 20 of 71 in one pass (R40). */
@@ -56,9 +62,10 @@ const json = (body: unknown, cache: string, status = 200) =>
 const isoHour = (ms: number) => new Date(ms).toISOString().slice(0, 13);
 const isoDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
-/** The live dependencies: the write-token notes store, the trends store's reads, the Gate. */
+/** The live dependencies: the write-token notes store, the trends store's reads, the Gate, and
+ *  whether this deployment may write notes at all (`notesWritable`: never on a preview, R66). */
 export function liveDeps(): GenerateDeps {
-  return { store: notesStore(), facts: factsFor, chat: gateChat, now: Date.now };
+  return { store: notesStore(), facts: factsFor, chat: gateChat, now: Date.now, writable: notesWritable() };
 }
 
 /** GET /api/notes?view=…&subject=…&span=… (or &from=…&to=… for a brushed range). */
@@ -124,21 +131,20 @@ export async function requestNote(req: Request, deps: () => GenerateDeps): Promi
 }
 
 export interface WarmDeps extends GenerateDeps {
-  /** The whole fleet's countries on the newest measured geo day. */
+  /** The countries a country note exists for now (`fleetCountries`, over the geo note's own read). */
   countries(nowMs: number): Promise<string[]>;
   /** The current networks-with-nodes key (the hyper digest's own `setKey`); null when unknown. */
   setKey(nowMs: number): Promise<string | null>;
   sleep(ms: number): Promise<void>;
 }
 
-const D = 86_400_000;
-
 export function liveWarmDeps(): WarmDeps {
   const base = liveDeps();
   return {
     ...base,
-    // Two days, so a pass run before today's first hourly geo sample still finds yesterday's.
-    countries: async (nowMs) => latestCountries((await readGeoDays(NET, nowMs - 2 * D, nowMs)).geoDays),
+    // The geo note's own read and reading (M5): the countries planned are the countries stated, so
+    // none is generated unpaced by a visitor and none is planned only to answer `none`.
+    countries: async (nowMs) => fleetCountries(await geoInputs(NET, nowMs, storeReads(nowMs))),
     // The digest's own builder decides which networks have nodes, so the two keys cannot disagree.
     setKey: async (nowMs) => (await factsFor(NET, "hyper", "all", "day", nowMs))?.setKey ?? null,
     sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
@@ -155,6 +161,7 @@ export async function warmNotes(req: Request, deps: () => WarmDeps): Promise<Res
   }
   try {
     const d = deps();
+    if (!d.writable) return json(NONE, NO_STORE); // a preview holding the secret still writes nothing (R66)
     const now = d.now(); // the budget's clock starts here: the prefetch spends it too
     const subjects = ["all", "dag", ...sampledIds(NET)];
     const [countries, setKey] = await Promise.all([

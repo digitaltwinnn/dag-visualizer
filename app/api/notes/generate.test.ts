@@ -36,11 +36,11 @@ const KEY = noteKeyOf("mainnet", "trend", "dag", "7d");
 
 let store: NotesStore;
 
-function deps(over: { facts?: typeof factsFor; chat?: (m: GateMessage[]) => Promise<string>; answers?: string[] } = {}) {
+function deps(over: { facts?: typeof factsFor; chat?: (m: GateMessage[]) => Promise<string>; answers?: string[]; writable?: boolean } = {}) {
   const answers = [...(over.answers ?? [CLEAN])];
   const chat = vi.fn(over.chat ?? (async () => answers.shift() ?? CLEAN));
   const facts = vi.fn(over.facts ?? (async () => structuredClone(FACTS)));
-  return { store, facts, chat, now: () => NOW };
+  return { store, facts, chat, now: () => NOW, writable: over.writable ?? true };
 }
 
 async function stats(): Promise<Record<string, number>> {
@@ -167,11 +167,14 @@ describe("generateNote", () => {
     expect(await lockFree()).toBe(true);
   });
 
-  it("takes the singleflight lock for 60 s (two Gate attempts and the reads fit, R30)", async () => {
+  it("takes the singleflight lock for 90 s: the warm's paced wait and two Gate attempts run inside it, with room for the reads (R30, M3)", async () => {
     const lock = vi.spyOn(store, "lock");
     await generateNote(REQ, deps(), "read");
-    expect(LOCK_TTL_S).toBe(60);
-    expect(lock).toHaveBeenCalledWith(lockKeyOf(KEY), 60);
+    expect(LOCK_TTL_S).toBe(90);
+    // In the lock, at worst: an 8 s paced wait, two attempts at the Gate's 20 s timeout (pacing is
+    // start to start, so no wait after a 20 s first call), the reads and the set.
+    expect(LOCK_TTL_S * 1000 - (8_000 + 2 * 20_000)).toBeGreaterThanOrEqual(40_000);
+    expect(lock).toHaveBeenCalledWith(lockKeyOf(KEY), 90);
   });
 
   it("a failed note write: unavailable, counted as store, the lock released", async () => {
@@ -439,5 +442,45 @@ describe("a nameless sentence speaks of the subject (R39), wired from the facts"
     const d = deps({ facts: async () => structuredClone(own), answers: ["NOTE: Its snapshots anchored rose by 37% on the span before."] });
     expect((await generateNote({ ...REQ, subject: "dag" }, d, "read")).state).toBe("ok");
     expect(d.chat).toHaveBeenCalledTimes(1);
+  });
+});
+
+// R66: a preview never writes. `notesWritable()` (store.ts) is false on a preview deployment, and the
+// deps carry it: every mode then serves what is cached and answers `none` for a miss, writing no
+// note, no hold, no lock and no stats into the store every deployment shares.
+describe("a read-only deployment serves the cache and writes nothing (R66)", () => {
+  const ALL_SPANS = [REQ, { ...REQ, span: "1h" as const }, { ...REQ, span: `r${NOW - 2 * D}-${NOW - D}` as const }];
+
+  it("a miss is `none` in every mode, with no model call and nothing written", async () => {
+    const set = vi.spyOn(store, "set");
+    const lock = vi.spyOn(store, "lock");
+    const hincr = vi.spyOn(store, "hincr");
+    for (const mode of ["read", "request", "warm"] as const) {
+      for (const req of ALL_SPANS) {
+        const d = deps({ writable: false });
+        expect(await generateNote(req, d, mode, mode === "warm" ? { seenWrittenAt: null } : {})).toEqual({ state: "none" });
+        expect(d.chat).not.toHaveBeenCalled();
+        expect(d.facts).not.toHaveBeenCalled();
+      }
+    }
+    expect(set).not.toHaveBeenCalled();
+    expect(lock).not.toHaveBeenCalled();
+    expect(hincr).not.toHaveBeenCalled();
+  });
+
+  it("a cached note is still served, in every mode", async () => {
+    await store.set(KEY, record(), 3600);
+    for (const mode of ["read", "request", "warm"] as const) {
+      const d = deps({ writable: false });
+      expect(await generateNote(REQ, d, mode, mode === "warm" ? { seenWrittenAt: NOW - H } : {})).toMatchObject({ state: "ok", text: "A cached note." });
+      expect(d.chat).not.toHaveBeenCalled();
+    }
+  });
+
+  it("a store outage is `unavailable` and counts nothing: preview traffic never reaches production's stats", async () => {
+    const hincr = vi.spyOn(store, "hincr");
+    vi.spyOn(store, "get").mockRejectedValue(new Error("down"));
+    expect(await generateNote(REQ, deps({ writable: false }), "read")).toEqual({ state: "unavailable" });
+    expect(hincr).not.toHaveBeenCalled();
   });
 });

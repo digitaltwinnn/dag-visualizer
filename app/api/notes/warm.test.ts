@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CATALOG } from "@/src/engine/config";
 import { noteKeyOf } from "./keys";
-import { executePass, latestCountries, pacedChat, planPass, warmCandidates, WARM_SLACK_MS, type WarmItem } from "./warm";
+import { executePass, pacedChat, planPass, warmCandidates, WARM_SLACK_MS, type WarmItem } from "./warm";
 
 const H = 3_600_000;
 const NOW = Date.UTC(2026, 9, 27, 12, 7);
@@ -54,6 +54,16 @@ describe("planPass", () => {
     expect(fresh).toEqual([]);
   });
 
+  it("the slack stays under the cron step: a note written at :07 is not due at :52, even late, but is at the next :07 (M2)", () => {
+    expect(WARM_SLACK_MS).toBeLessThan(15 * 60_000);
+    const writtenAt = NOW - H + 5_000; // the first item of the previous :07 pass, 5 s in
+    const ledgerOf = (at: number) => planPass(at, SUBJECTS, [], SET, cacheOf(allCached(SUBJECTS, [], writtenAt))).filter((i) => i.view === "ledger");
+    const at52 = NOW - 15 * 60_000;
+    expect(ledgerOf(at52)).toEqual([]);
+    expect(ledgerOf(at52 + 5 * 60_000)).toEqual([]); // a :52 run that starts five minutes late
+    expect(ledgerOf(NOW)).toHaveLength(2);
+  });
+
   it("a daily record is due a day later, within the same slack", () => {
     const plan = planPass(NOW, SUBJECTS, [], SET, cacheOf(allCached(SUBJECTS, [], NOW - 24 * H + 4 * 60_000)));
     expect(plan.some((i) => i.view === "hyper")).toBe(true);
@@ -77,17 +87,6 @@ describe("planPass", () => {
     ]);
     // An unknown current set (its read failed) compares nothing.
     expect(planPass(NOW, subjects, [], null, cacheOf(records)).some((i) => i.view === "hyper")).toBe(false);
-  });
-});
-
-describe("latestCountries", () => {
-  it("reads the whole fleet's countries from the newest measured day", () => {
-    const days = {
-      "2026-10-26": { "f.cc.FR": 3, "f.cc.DE": 1 },
-      "2026-10-27": { "f.cc.US": 4, "f.cc.DE": 2, "f.cc.DAGabc.DE": 1, "f.isp.hetzner": 3, "f.cc.NL": 0 },
-    };
-    expect(latestCountries(days)).toEqual(["DE", "US"]);
-    expect(latestCountries({})).toEqual([]);
   });
 });
 

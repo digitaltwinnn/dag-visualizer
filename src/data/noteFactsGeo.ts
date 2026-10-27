@@ -187,6 +187,25 @@ function providersOf(isp: Counts, providerNames: Record<string, string>): Map<st
 const ranked = <T extends { count: number }>(xs: Iterable<T>, tie: (x: T) => string): T[] =>
   [...xs].sort((a, b) => b.count - a.count || tie(a).localeCompare(tie(b)));
 
+/** THE FLEET'S COUNTRY READING on `now` (R58): the tiers' newest day while it is measured and no
+ *  older than `now`, else `now`'s own geo-family counts. One home, so the facts and the warm pass's
+ *  country plan (`fleetCountries`) cannot read two sources. */
+function fleetReading(tierDays: readonly Day[], now: Day): { tiers: Day | null; tierMeasured: Day[]; fleetCc: Counts } {
+  const tierMeasured = measuredDays(tierDays, (d) => sum(d.cc));
+  const tierNewest = tierDays[tierDays.length - 1];
+  const tiers = tierNewest && tierNewest.ms >= now.ms && tierMeasured.includes(tierNewest) ? tierNewest : null;
+  return { tiers, tierMeasured, fleetCc: tiers ? tiers.cc : now.cc };
+}
+
+/** The countries a COUNTRY note exists for, sorted: those the fleet's country reading counts nodes
+ *  in, on the newest measured fleet day (the warm pass plans its `cc:` notes from this, M5). None
+ *  when no geo day is measured, as `geoFacts` then has nothing to say about place. */
+export function fleetCountries(input: Pick<GeoFactsInput, "geoDays" | "ccDays">): string[] {
+  const now = measuredDays(parseAll(input.geoDays), (d) => sum(d.cc)).pop();
+  if (!now) return [];
+  return [...fleetReading(parseAll(input.ccDays), now).fleetCc.keys()].sort();
+}
+
 export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[] } | null {
   const { subject, providerNames, countryNames, names: catalog } = input;
   const nameOf = (id: string) => catalog[id] ?? id;
@@ -234,12 +253,8 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
   // that reaches a month back, so it states EVERY country and fleet figure, now and a month ago,
   // when its newest day is measured and no older than the geo reading; else the geo family's
   // counts stand alone and no month-ago figure is stated. A network's own note never reads it.
-  const tierDays = parseAll(input.ccDays);
-  const tierMeasured = measuredDays(tierDays, (d) => sum(d.cc));
-  const tierNewest = tierDays[tierDays.length - 1];
-  const tiers = tierNewest && tierNewest.ms >= now.ms && tierMeasured.includes(tierNewest) ? tierNewest : null;
+  const { tiers, tierMeasured, fleetCc } = fleetReading(parseAll(input.ccDays), now);
   const tiersThen = tiers ? monthBefore(tierMeasured, tiers) : null;
-  const fleetCc: Counts = tiers ? tiers.cc : now.cc;
 
   const locatedFleet = sum(fleetCc);
   const countries = ranked([...fleetCc].map(([cc, count]) => ({ cc, count })), (c) => c.cc);
