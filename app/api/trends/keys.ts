@@ -32,6 +32,23 @@ export function slotOf(net: string, tier: Tier, tsMs: number): { key: string; bu
   return { key: `t:${net}:1d:${y}`, bucket: `${mo}-${da}` };
 }
 
+/** THE GEO FAMILY (2026-10-27) — where the fleet runs, one bucket per UTC day: `geo:{net}:{YYYY}`,
+ *  fields `MM-DD|f.cc.<cc>`, `f.cc.<id>.<cc>`, `f.isp.<key>`, `f.isp.<id>.<key>` (`fleetGeo.ts`).
+ *  OUTSIDE the `t:{net}:*` tiers on purpose, twice over: a rebuild WIPES that prefix
+ *  (`scripts/rebuild-trends.ts`), and a gauge can never be re-derived — where nodes ran on a past
+ *  day least of all; and `/api/trends` ships every series a tier hash holds, so History's payload
+ *  would carry ~150 series it never draws. Keeps forever, like every tier. */
+export function geoSlotOf(net: string, tsMs: number): { key: string; bucket: string } {
+  const { bucket } = slotOf(net, "1d", tsMs);
+  return { key: `geo:${net}:${new Date(tsMs).getUTCFullYear()}`, bucket };
+}
+
+/** provider key → the lookup's provider name (`fleetGeo.ts` `providerNames`), one hash per
+ *  network, so a reader can name a host whose nodes have since gone. */
+export function ispNamesKeyOf(net: string): string {
+  return `geo:${net}:isp`;
+}
+
 export function fieldOf(bucket: string, series: string): string {
   return `${bucket}|${series}`;
 }
