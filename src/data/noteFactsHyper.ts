@@ -1,5 +1,5 @@
 import { ROLE_SHORT, roleKeyLabel } from "@/src/data/composition";
-import { fact, gaugeChange, heldLevel, networksAnchored } from "@/src/data/noteFacts";
+import { fact, gaugeChange, heldLevel, networksAnchored, observedLevel } from "@/src/data/noteFacts";
 import { notableDays } from "@/src/data/notableDays";
 import type { Fact } from "@/src/data/noteTypes";
 import { anchorSeries, typeBands, withUnlisted } from "@/src/data/trendSeries";
@@ -46,7 +46,8 @@ import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 //   · the sampler writes layer and combination rows only for the roles / types PRESENT, and a
 //     failed cluster fetch drops a role's row while `f.nodes.<id>` HOLDS (the lists merge by IP, so
 //     a hybrid is still counted through its other layer). So each layer and combination is a HELD
-//     LEVEL at each end, read exactly where `gaugeChange` reads the node count: the MEDIAN over the
+//     LEVEL at each end, read exactly where `gaugeChange` reads the node count: the MEDIAN (an
+//     observed sample, R52 — never a half node) over the
 //     gauge's first (start) / last (end) six measured samples, of those whose `f.nodes.<id>` is
 //     within 10% of the gauge's level at that end — one bad hour can neither make nor hide a
 //     change, and the start never wanders mid-span. Fewer than three agreeing samples at either
@@ -115,12 +116,6 @@ const RANK_WORD = ["", "second ", "third "] as const;
 type Points = readonly (number | null)[];
 
 const mean = (xs: readonly number[]): number => xs.reduce((a, v) => a + v, 0) / xs.length;
-
-function median(xs: readonly number[]): number {
-  const s = xs.slice().sort((a, b) => a - b);
-  const m = s.length >> 1;
-  return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2;
-}
 
 /** A gauge's change over the span, or null when it has none or began after the span did. */
 function spanChange(points: Points): { from: number; to: number; firstIndex: number } | null {
@@ -302,11 +297,12 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
       const startAt = measured.slice(0, SHAPE_SAMPLES).filter((i) => agrees(i, ch.from));
       const endAt = measured.slice(-SHAPE_SAMPLES).filter((i) => agrees(i, ch.to));
       if (startAt.length >= SHAPE_MIN_SAMPLES && endAt.length >= SHAPE_MIN_SAMPLES && startAt[startAt.length - 1]! < endAt[0]!) {
-        /** The median of a reading over an end's samples, the unread (null) ones left out; null
+        /** The observed median (`observedLevel`, R52: a whole count) of a reading over an end's
+         *  samples, the unread (null) ones left out; null
          *  when fewer than SHAPE_MIN_SAMPLES were read. */
         const held = (at: readonly number[], read: (i: number) => number | null): number | null => {
           const xs = at.map(read).filter((v): v is number => v != null);
-          return xs.length >= SHAPE_MIN_SAMPLES ? median(xs) : null;
+          return xs.length >= SHAPE_MIN_SAMPLES ? observedLevel(xs) : null;
         };
         const roles = Object.keys(ROLE_SHORT);
         const rows = roles.map((role) => fleet.series[`f.layer.${subject}.${role}`] ?? []);
