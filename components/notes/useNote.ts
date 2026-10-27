@@ -41,7 +41,11 @@ export default function useNote(req: NoteReq | null): NoteState {
   useEffect(() => {
     if (!view || !subject || key == null) return;
     let dead = false;
-    void loader.get({ view, subject, span }).then((r) => {
+    // A GET that answers `pending` is a note being written: say so while the loader polls (M3).
+    const onPending = () => {
+      if (!dead) setState({ key, res: { state: "pending" } });
+    };
+    void loader.get({ view, subject, span }, onPending).then((r) => {
       if (!dead) setState({ key, res: r });
     });
     return () => {

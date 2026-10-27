@@ -6,7 +6,7 @@ const OK: NoteResponse = { state: "ok", text: "Two sentences.", writtenAt: 1, sp
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 const REQ: NoteReq = { view: "trend", subject: "dag", span: "1h" };
 
-function rig(answers: Array<Response | Error>) {
+function rig(answers: Array<Response | Error>, wait?: (ms: number) => Promise<void>) {
   const calls: { url: string; init?: RequestInit }[] = [];
   const sleeps: number[] = [];
   let clock = 1_000;
@@ -21,6 +21,7 @@ function rig(answers: Array<Response | Error>) {
     },
     sleep: async (ms) => {
       sleeps.push(ms);
+      if (wait) await wait(ms);
     },
     now: () => clock,
   });
@@ -63,6 +64,43 @@ describe("loadNote", () => {
     expect(await loader.get(REQ)).toEqual(OK);
     expect(calls).toHaveLength(3);
     expect(sleeps).toEqual([RETRY_MS, RETRY_MS]);
+  });
+
+  it("a GET answering pending tells its asker a note is being written, before the note lands (M3)", async () => {
+    const log: string[] = [];
+    const { loader } = rig([reply({ state: "pending" }), reply({ state: "pending" }), reply(OK)]);
+    const r = await loader.get(REQ, () => log.push("pending"));
+    log.push("done");
+    expect(r).toEqual(OK);
+    expect(log).toEqual(["pending", "done"]); // once, however many polls
+  });
+
+  it("a GET that answers at once never says pending", async () => {
+    const log: string[] = [];
+    const { loader } = rig([reply(OK)]);
+    await loader.get(REQ, () => log.push("pending"));
+    expect(log).toEqual([]);
+  });
+
+  it("a second asker joining a write already in flight hears pending at once", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const { loader, calls } = rig([reply({ state: "pending" }), reply(OK)], () => gate);
+    const first: string[] = [];
+    const p1 = loader.get(REQ, () => first.push("pending"));
+    for (let i = 0; i < 10 && first.length === 0; i++) await Promise.resolve();
+    expect(first).toEqual(["pending"]);
+    const second: string[] = [];
+    const p2 = loader.get(REQ, () => second.push("pending"));
+    expect(second).toEqual(["pending"]);
+    release();
+    expect(await p1).toEqual(OK);
+    expect(await p2).toEqual(OK);
+    expect(calls).toHaveLength(2);
+    // Settled: a later ask is answered from the cache, and is not told it is pending.
+    const third: string[] = [];
+    await loader.get(REQ, () => third.push("pending"));
+    expect(third).toEqual([]);
   });
 
   it("pending forever gives up as unavailable after four re-fetches, and is not held", async () => {

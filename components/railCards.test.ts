@@ -65,7 +65,7 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
     const ids = detailsCards(details({ filter: "dor", inspect: nodePick, snap: snapPick })).map((c) => c.id);
     expect(ids).toEqual(["notes", "snap", "context", "range", "instant", "country", "cohort", "composition", "metaSnap", "node"]);
   });
-  // THE AI NOTES CARD (2026-10-27): its own card, last, in every view whose policy opts in
+  // THE AI NOTES CARD (2026-10-27): its own card, first, in every view whose policy opts in
   // (`aiNotes`) — present unless the note is absent (no subject, or the server answered `none`).
   it.each(["hyper", "geo", "ledger", "trend"] as const)("%s hosts a present AI notes card, first", (mode) => {
     const cards = detailsCards(details({ mode, noteAbsent: undefined }));

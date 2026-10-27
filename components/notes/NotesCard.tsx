@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import CardHead, { RailPane } from "@/components/CardHead";
 import { AI_NOTES_ICON, KIND_MARK_CLASS } from "@/components/icons";
-import { Door, Fact, FactGroup, foldLabel, SectionLabel } from "@/components/inspector/parts";
+import { Door, Fact, FactGroup, foldLabel } from "@/components/inspector/parts";
 import { metagraphCardNetwork } from "@/components/railCards";
 import { NodeStars } from "@/components/state/StateAtoms";
+import { useNet } from "@/components/topbar/useNet";
 import Stamp from "@/components/Stamp";
 import { useFeedRead } from "@/components/useFeedRead";
 import { useTickHasFilter } from "@/components/useTickHasFilter";
@@ -78,8 +79,14 @@ export function useAiNote(): { subject: NoteSubject | null; req: NoteReq | null;
   const span = subject?.view === "trend" ? (trendRange ? `r${trendRange.fromMs}-${trendRange.toMs}` : trendWindow) : null;
   // Notes are written for mainnet only (the routes answer `none` everywhere else), so off mainnet
   // nothing is asked and no card stands — never a card that reads, then vanishes.
-  const req: NoteReq | null = subject && NET === "mainnet" ? { view: subject.view, subject: subject.subject, span } : null;
-  return { subject, req, note: useNote(req) };
+  // ⚠️ HYDRATION (I2): the server always renders mainnet, so the card's presence reads the network
+  // through `useNet()` — mainnet until mounted, on the client too — and server and client agree on
+  // the first render (a mismatch makes React 19 regenerate the tree and strip <html data-net>). The
+  // FETCH reads the real network, so a dev network's one mainnet-faced frame asks nothing: its card
+  // reads for that frame, under the boot overlay, then stands down.
+  const net = useNet();
+  const req: NoteReq | null = subject && net === "mainnet" ? { view: subject.view, subject: subject.subject, span } : null;
+  return { subject, req, note: useNote(NET === net ? req : null) };
 }
 
 /** What the note read, as one value: a span of two days or more by its UTC days (the app's one
@@ -138,18 +145,29 @@ function DayRow({ day }: { day: NoteDay }) {
  *  subject by the caller, so a new subject starts folded. */
 function NotableDays({ days }: { days: NoteDay[] }) {
   const [open, setOpen] = useState(false);
+  const panel = useId();
   return (
     <>
+      {/* THE APP'S FOLD (ScheduleGroup's recipe, `inspector/cards.tsx`): one CONTROL that selects
+          nothing, a keyboard-only focus outline, the touch tier's tap height, the label lifting to
+          full ink on hover and when open. Phrasing content only inside a <button>: no <div>. */}
       <button
         type="button"
         aria-expanded={open}
+        aria-controls={panel}
         onClick={() => setOpen((o) => !o)}
-        className={cn("group block w-full cursor-pointer border-0 bg-transparent p-0 text-left mt-3", open ? "mb-1.5" : "mb-0")}
+        className={cn(
+          "group mt-3 flex w-full items-center justify-between gap-2.5 touch:min-h-10 cursor-pointer select-none border-0 bg-transparent p-0 text-left outline-none focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
+          open ? "mb-1.5" : "mb-0",
+        )}
       >
-        <SectionLabel label={<span className={foldLabel(open)}>Notable days</span>} total={days.length} />
+        <span className={cn("min-w-0 truncate text-label tracking-caps uppercase", open ? "text-foreground" : "text-muted-foreground group-hover:text-foreground", foldLabel(open))}>
+          Notable days
+        </span>
+        <span className="flex-none font-mono text-body font-bold tabular-nums text-foreground">{days.length}</span>
       </button>
       {open && (
-        <div className={DOOR_RUN}>
+        <div id={panel} className={DOOR_RUN}>
           {/* Not keyed by day alone: one day can be two notables (a network's low and its pause;
               two networks' first day on the DAG). */}
           {days.map((d) => (
@@ -203,7 +221,8 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
       {!collapsed && (
         <div>
           {/* No answer yet is READING (the manifest's `noteCardAbsent`): the card stands from the
-              moment its subject is known. "writing…" is the server's own `pending`, a note being written. */}
+              moment its subject is known. "writing…" is the server's own `pending`, a note being
+              written — a GET's as soon as the loader hears it (M3), or a POST's. */}
           {res == null ? (
             <p className="m-0 flex items-center gap-2 text-body text-muted-foreground">
               <NodeStars />

@@ -10,6 +10,9 @@ import type { NoteResponse, NoteView } from "@/src/data/noteTypes";
 //   · GET first. It answers `ok` / `none` / `request` (cached) or `pending` / `unavailable`.
 //   · `pending` means a note is being written: re-fetch after RETRY_MS, at most MAX_RETRIES times,
 //     then give up as `unavailable` — never an endless "writing" (the acquiring give-up rule).
+//     A GET's asker passes `onPending` to HEAR that while the poll runs (M3), so the card says
+//     "writing…" for a note being written rather than "reading…" for the whole poll; an asker
+//     joining a write already in flight hears it at once.
 //   · A network error, a non-2xx (the POST's 429 included) or an unreadable body is `unavailable`,
 //     and is NOT cached, so the next ask tries again.
 //   · `request()` POSTs only on the reader's gesture. The POST's own answer is used and stored
@@ -69,6 +72,15 @@ async function readAnswer(r: Response): Promise<NoteResponse> {
 export function createNoteLoader(deps: NoteLoaderDeps) {
   const cache = new Map<string, { at: number; res: NoteResponse }>();
   const inflight = new Map<string, Promise<NoteResponse>>();
+  /** The GET keys whose in-flight answer is a write being polled, and who to tell when one is. */
+  const writing = new Set<string>();
+  const listeners = new Map<string, Set<() => void>>();
+
+  const announce = (key: string) => {
+    if (writing.has(key)) return;
+    writing.add(key);
+    for (const f of listeners.get(key) ?? []) f();
+  };
 
   const store = (key: string, res: NoteResponse) => {
     // An instrument state that is not a note's own is never held: ask again next time.
@@ -87,11 +99,12 @@ export function createNoteLoader(deps: NoteLoaderDeps) {
 
   /** Poll the GET while the answer is still a write in flight. `firstPending` starts the clock
    *  when the caller already has a pending answer in hand (the POST's). */
-  async function settle(key: string, first: NoteResponse, stalePendingRequest: boolean): Promise<NoteResponse> {
+  async function settle(key: string, first: NoteResponse, stalePendingRequest: boolean, onWaiting?: () => void): Promise<NoteResponse> {
     let res = first;
     for (let tries = 0; ; tries++) {
       const waiting = res.state === "pending" || (stalePendingRequest && res.state === "request");
       if (!waiting) return res;
+      onWaiting?.();
       if (tries >= MAX_RETRIES) return UNAVAILABLE;
       await deps.sleep(RETRY_MS);
       res = await getOnce(key);
@@ -107,17 +120,30 @@ export function createNoteLoader(deps: NoteLoaderDeps) {
     /** The held answer, if one is fresh. */
     peek: (req: NoteReq): NoteResponse | null => fresh(queryOf(req)),
 
-    /** The note for a request: held, or fetched (one fetch for any number of askers). */
-    get(req: NoteReq): Promise<NoteResponse> {
+    /** The note for a request: held, or fetched (one fetch for any number of askers).
+     *  `onPending` is called once if the answer is a write still being polled. */
+    get(req: NoteReq, onPending?: () => void): Promise<NoteResponse> {
       const key = queryOf(req);
       const hit = fresh(key);
       if (hit) return Promise.resolve(hit);
+      if (onPending) {
+        if (writing.has(key)) onPending();
+        else {
+          let set = listeners.get(key);
+          if (!set) listeners.set(key, (set = new Set()));
+          set.add(onPending);
+        }
+      }
       let p = inflight.get(key);
       if (!p) {
         p = getOnce(key)
-          .then((first) => settle(key, first, false))
+          .then((first) => settle(key, first, false, () => announce(key)))
           .then((res) => store(key, res))
-          .finally(() => inflight.delete(key));
+          .finally(() => {
+            inflight.delete(key);
+            writing.delete(key);
+            listeners.delete(key);
+          });
         inflight.set(key, p);
       }
       return p;

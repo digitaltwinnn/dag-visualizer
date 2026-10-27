@@ -431,7 +431,8 @@ export default function Inspector() {
   const trendWindow = useStore((s) => s.trendWindow);
   const tickHasFilter = useTickHasFilter();
   // The AI note on screen (the card shares this fetch): its card stands down when the view's
-  // subject has no note, while no answer has landed, or when the server answered `none`.
+  // subject has no note (off mainnet none has) or when the server answered `none`; while its first
+  // answer is read it stands, reading (`noteCardAbsent`).
   const aiNote = useAiNote();
   const manifest = detailsCards({
     mode, filter, tickNet, tickHasFilter, inspect, snap, country, cohort, composition, metaSnap, coarse, trendCursorMs, trendRange, trendFocus, trendFront, trendWindow,
