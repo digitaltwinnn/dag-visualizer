@@ -149,13 +149,15 @@ export default function AboutDoc() {
           in the scene follows whichever card you open, just as the camera does.
         </p>
         {/* The AI notes card, said once in the page's own register (2026-10-27; the user approves
-            the wording live). It states the two promises the feature rests on: the numbers are
+            the wording live). One card per view, at the top of the cards, leading with what
+            changed (review M4). It states the two promises the feature rests on: the numbers are
             the view's own, and a note the figures cannot back never shows. */}
         <p>
-          Some cards are marked <strong>AI notes</strong>. A language model reads the same
-          measured figures the view shows and writes two or three sentences on what stands out.
-          A note with a number the figures cannot back is thrown away, and the notes are always
-          marked as AI so they never pass for a measurement.
+          Each view also has one <strong>AI notes</strong> card, at the top of the cards on the
+          right. A language model reads the same measured figures the view shows and says, in a
+          few sentences, what changed and by how much. A note with a number the figures
+          can&apos;t back is thrown away, and the card is always marked as AI so it never passes
+          for a measurement.
         </p>
         {/* One selection across the views, and RAW as the one step down (user, 2026-10-09:
             the "three depths" paragraph this replaces called History a depth below the scene,
