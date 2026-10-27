@@ -75,6 +75,10 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
     expect(notes.hint).toBeNull(); // no ghost: an absent note is no card at all
     expect(cards[0]!.id).toBe("notes");
   });
+  it.each(["hyper", "geo", "ledger", "trend"] as const)("%s: the AI notes card is the TOP slot of the lane, not a rung", (mode) => {
+    expect(ladderSlotIds(mode)[0]).toBe("notes");
+    expect(ladderLevelOfSlot("notes")).toBeNull();
+  });
   it("an absent note (no subject, or `none`) stands the AI notes card down", () => {
     const notes = detailsCards(details({ mode: "hyper", noteAbsent: true })).find((c) => c.id === "notes")!;
     expect(notes.present).toBe(false);
@@ -222,7 +226,7 @@ describe("the instant slot — History's cursor card", () => {
   const trend = (over: Partial<RailManifestState> = {}) => details({ mode: "trend", ...over });
 
   it("sits under the network dossier in History's lane, and is not a rung", () => {
-    expect(ladderSlotIds("trend")).toEqual(["context", "range", "instant"]);
+    expect(ladderSlotIds("trend")).toEqual(["notes", "context", "range", "instant"]);
     expect(ladderLevelOfSlot("instant")).toBeNull();
   });
 
@@ -284,8 +288,9 @@ describe("the range slot — History's brushed span", () => {
 
 describe("ladderSlotIds — the descent-spine lane (display order = reversed rung order)", () => {
   it("mirrors focusLadder.LADDERS coarsest→coarsest per 3D view", () => {
-    expect(ladderSlotIds("geo")).toEqual(["context", "country", "cohort", "node"]);
-    expect(ladderSlotIds("hyper")).toEqual(["context", "composition", "node"]);
+    // Every note view's lane is topped by the AI notes card (R57) — a slot, not a rung.
+    expect(ladderSlotIds("geo")).toEqual(["notes", "context", "country", "cohort", "node"]);
+    expect(ladderSlotIds("hyper")).toEqual(["notes", "context", "composition", "node"]);
     // Ledger: the SNAPSHOT CHAIN rides the display lane between the network and the node —
     // GLOBAL SNAPSHOT ABOVE the metagraph snapshot it anchors (user, 2026-08-08, settled with
     // the slab): once the lane's committed cards abut as ONE body, adjacency reads as
@@ -296,7 +301,7 @@ describe("ladderSlotIds — the descent-spine lane (display order = reversed run
     // a tick at least contains the network's ANCHOR, and its card already lists exactly that;
     // the old lane asserted that a network contains a global tick. It also opens with a card
     // that speaks, since the tick follows live without any commit. Card slots, not focus rungs.
-    expect(ladderSlotIds("ledger")).toEqual(["snap", "context", "metaSnap", "node"]);
+    expect(ladderSlotIds("ledger")).toEqual(["notes", "snap", "context", "metaSnap", "node"]);
   });
   it("flat views have no ladder", () => {
     expect(ladderSlotIds("soon")).toEqual([]);
@@ -322,12 +327,14 @@ describe("ladderLevelOfSlot — the inverse read (which RUNG does a slot stand f
     expect(ladderLevelOfSlot("snap")).toBeNull();
     expect(ladderLevelOfSlot("metaSnap")).toBeNull();
     expect(ladderLevelOfSlot("tool")).toBeNull();
+    // …and the AI notes card, which tops the lane without being a subject: opening it asks no pose.
+    expect(ladderLevelOfSlot("notes")).toBeNull();
   });
   it("every lane slot either names a rung or is a known non-rung slot", () => {
     for (const view of ["geo", "hyper", "ledger", "trend"] as const)
       for (const slot of ladderSlotIds(view)) {
         const level = ladderLevelOfSlot(slot);
-        if (!level) expect(["snap", "metaSnap", "range", "instant"]).toContain(slot);
+        if (!level) expect(["notes", "snap", "metaSnap", "range", "instant"]).toContain(slot);
         else expect(LADDERS[view].some((r) => r.level === level)).toBe(true);
       }
   });
@@ -453,9 +460,10 @@ describe("ghost hints — the copy rule", () => {
 // suppressed the leading ghost instead; it was retired here rather than kept, because a second
 // mechanism for a problem the order already solves is what convention 8 forbids.
 describe("the ledger lane leads with the tick", () => {
-  it("at 'all' with a live tick, the head card is populated and no ghost sits above it", () => {
+  it("at 'all' with a live tick, the head SUBJECT card is populated and no ghost sits above it", () => {
     const cards = detailsCards(details({ mode: "ledger", filter: "all", snap: snapPick }));
-    const lane = ladderSlotIds("ledger");
+    // The AI notes card tops every note view's lane (R57) but is no subject; the tick leads the subjects.
+    const lane = ladderSlotIds("ledger").filter((id) => id !== "notes");
     expect(lane[0]).toBe("snap");
     expect(cards.find((c) => c.id === "snap")!.present).toBe(true);
   });
@@ -467,8 +475,8 @@ describe("the ledger lane leads with the tick", () => {
   });
 
   it("hyper and geo are untouched — their coarsest subject still needs a commit", () => {
-    expect(ladderSlotIds("hyper")[0]).toBe("context");
-    expect(ladderSlotIds("geo")[0]).toBe("context");
+    expect(ladderSlotIds("hyper")[1]).toBe("context");
+    expect(ladderSlotIds("geo")[1]).toBe("context");
   });
 });
 
@@ -490,5 +498,29 @@ describe("the Metagraph card in History follows the plane focus", () => {
     expect(c.present).toBe(true);
     expect(c.subjectKey).toBe("ded");
     expect(detailsCards(trend({ filter: "up", trendFront: "ded" })).find((x) => x.id === "context")!.subjectKey).toBe("up");
+  });
+});
+
+// ── THE AI NOTES CARD IN THE PILE (R57, user 2026-10-27: "a top card, part of the stack … if there
+// is a true subject card … by default that will have the focus still, with the AI card header
+// subtly sitting on top") ─────────────────────────────────────────────────────────────────────
+describe("focusSlotId with the AI notes card on top of the lane", () => {
+  const withNote = (over: Partial<RailManifestState>) => details({ ...over, noteAbsent: false });
+  it.each(["hyper", "geo"] as const)("%s at rest: the notes card is the focus — the one box", (mode) => {
+    expect(focusSlotId(withNote({ mode }))).toBe("notes");
+  });
+  it("a subject card takes the focus the moment it is present; the notes card rests above it", () => {
+    expect(focusSlotId(withNote({ mode: "hyper", filter: "dor" }))).toBe("context");
+    expect(focusSlotId(withNote({ mode: "geo", filter: "dag", country: "DE" }))).toBe("country");
+    expect(focusSlotId({ ...withNote({ mode: "geo", filter: "dag", country: "DE", inspect: nodePick }), selStack: ["node", "country"] })).toBe("node");
+    // Snapshots: the live tick is a subject card, so it keeps the box with the note on top.
+    expect(focusSlotId(withNote({ mode: "ledger", snap: snapPick }))).toBe("snap");
+    expect(focusSlotId(withNote({ mode: "ledger" }))).toBe("notes");
+    // History: the dossier and the range stand on the plane in front and the window.
+    expect(focusSlotId(withNote({ mode: "trend", trendFront: "dag" }))).toBe("range");
+  });
+  it("no note request, no notes slot — the focus is what it always was", () => {
+    expect(focusSlotId(details({ mode: "hyper" }))).toBeNull();
+    expect(detailsCards(details({ mode: "geo" })).find((c) => c.id === "notes")!.present).toBe(false);
   });
 });

@@ -5,34 +5,38 @@ import { useEffect, useId, useRef, useState } from "react";
 import CardHead, { RailPane } from "@/components/CardHead";
 import { AI_NOTES_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { Door, Fact, FactGroup, foldLabel } from "@/components/inspector/parts";
-import { metagraphCardNetwork } from "@/components/railCards";
 import { NodeStars } from "@/components/state/StateAtoms";
-import { useNet } from "@/components/topbar/useNet";
 import Stamp from "@/components/Stamp";
 import { useFeedRead } from "@/components/useFeedRead";
-import { useTickHasFilter } from "@/components/useTickHasFilter";
 import { cn } from "@/lib/utils";
 import type { NoteDay, NoteView } from "@/src/data/noteTypes";
 import { spanPhrase } from "@/src/data/trendWindow";
-import { displayNetwork, UNLISTED_ID } from "@/src/data/unlisted";
-import { NET } from "@/src/net/current";
-import { cardNetwork } from "@/src/engine/domain/trendStack";
+import { displayNetwork } from "@/src/data/unlisted";
 import { useStore } from "@/src/store/store";
 import { rangeDays } from "@/src/util/localTime";
 import { ageWords } from "@/src/util/relativeAge";
-import { noteSubjectOf, type NoteSubject } from "./noteSubject";
-import type { NoteReq } from "./noteLoader";
-import useNote, { type NoteState } from "./useNote";
+import { useAiNote } from "./useAiNote";
 
 // THE AI NOTES CARD (2026-10-27) — a few sentences a model wrote about what the view is showing,
 // for the subject the view stands on (`noteSubjectOf`: the network, the country, the plane), and
 // for History a few notable days that each commit their own day as the range.
 //
-// It is CONTEXT, not a reading: the one card in the rail whose words no instrument measured. So it
-// is marked as such everywhere it stands — the iridescent edge and eyebrow (`--ai-edge` /
-// `--ai-ink`, globals.css), the sparkles mark, its own place FIRST in the rail, above the ladder it
-// briefs and outside every lane (user, 2026-10-27: the old details card's place) — and it never
-// sits in the slab's pile, whose adjacency means containment.
+// It is CONTEXT, not a reading: the one card in the rail whose words no instrument measured, marked
+// as such — the `--ai-ink` eyebrow and the sparkles mark on both tiers, and the iridescent
+// `--ai-edge` outline on the open box.
+//
+// ⚠️ A TOP CARD, PART OF THE STACK — NOT A SUBJECT CARD (user, 2026-10-27, R57: "a top card, part
+// of the stack. Not as a so-called subject card, so if there is a true subject card (metagraph,
+// snapshot, whatever) by default that will have the focus still, with the AI card header subtly
+// sitting on top as per current stack design"). It is the FIRST slot of every note view's lane
+// (`railCards.DISPLAY_LANE`, no ladder rung): in the slab, on the thread, under the rail's
+// single-open accordion like every card. At rest — no subject card present — it is the focus and
+// the one open box; once a subject card stands, the focus is that card's (`focusSlotId`) and this
+// one rests as the pile's top ENTRY, its eyebrow and title only, dimmed with distance like any
+// committed ancestor. Clicking the entry opens it the way any entry opens. (Two earlier homes were
+// rejected the same day: a card leading the rail outside the lane — "not part of [the ladder] (no
+// rung), so the relationship feels a bit off" — and the note inside whichever subject card was on
+// top — "it shows up in various cards is not logical for a user".)
 //
 // ⚠️ MODEL TEXT IS UNTRUSTED. It renders as React text, nothing else: no `dangerouslySetInnerHTML`,
 // no markdown. The server's honesty gate checked its numbers before it was stored; nothing here
@@ -52,42 +56,6 @@ const RESTING_TITLE: Record<NoteView, string> = {
   ledger: "The anchoring rhythm",
   trend: "What changed",
 };
-
-/** THE NOTE ON SCREEN, one derivation for the card and the rail's manifest: the subject the view
- *  stands on, the request for its note, and the answer. Two callers share one fetch (the loader's
- *  cache and in-flight map are module-level). */
-export function useAiNote(): { subject: NoteSubject | null; req: NoteReq | null; note: NoteState } {
-  const mode = useStore((s) => s.mode);
-  const filter = useStore((s) => s.filter);
-  const tickNet = useStore((s) => s.tickNet);
-  const snap = useStore((s) => s.snap);
-  const inspect = useStore((s) => s.inspect);
-  const country = useStore((s) => s.country);
-  const trendFocus = useStore((s) => s.trendFocus);
-  const trendFront = useStore((s) => s.trendFront);
-  const trendWindow = useStore((s) => s.trendWindow);
-  const trendRange = useStore((s) => s.trendRange);
-  const tickHasFilter = useTickHasFilter();
-
-  const subject = noteSubjectOf(mode, {
-    metagraphNetwork: metagraphCardNetwork({ mode, filter, tickNet, snap, tickHasFilter, trendFocus, trendFront, inspect }),
-    country,
-    trendCard: cardNetwork(filter, trendFocus, trendFront),
-    unlisted: (id) => id === UNLISTED_ID,
-  });
-  // History's note is over the span on screen: the brushed range, else the window pill.
-  const span = subject?.view === "trend" ? (trendRange ? `r${trendRange.fromMs}-${trendRange.toMs}` : trendWindow) : null;
-  // Notes are written for mainnet only (the routes answer `none` everywhere else), so off mainnet
-  // nothing is asked and no card stands — never a card that reads, then vanishes.
-  // ⚠️ HYDRATION (I2): the server always renders mainnet, so the card's presence reads the network
-  // through `useNet()` — mainnet until mounted, on the client too — and server and client agree on
-  // the first render (a mismatch makes React 19 regenerate the tree and strip <html data-net>). The
-  // FETCH reads the real network, so a dev network's one mainnet-faced frame asks nothing: its card
-  // reads for that frame, under the boot overlay, then stands down.
-  const net = useNet();
-  const req: NoteReq | null = subject && net === "mainnet" ? { view: subject.view, subject: subject.subject, span } : null;
-  return { subject, req, note: useNote(NET === net ? req : null) };
-}
 
 /** What the note read, as one value: a span of two days or more by its UTC days (the app's one
  *  span label), a shorter one by its length. */
@@ -139,8 +107,8 @@ function DayRow({ day }: { day: NoteDay }) {
   );
 }
 
-/** THE NOTABLE DAYS, FOLDED (user, 2026-10-27): the card leads the rail, so a run of days open by
- *  default would push History's range card down the rail. The fold is marked on its label
+/** THE NOTABLE DAYS, FOLDED (user, 2026-10-27): the card tops the lane, so a run of days open by
+ *  default would push History's subject cards down the rail. The fold is marked on its label
  *  (`foldLabel`, the app's there-is-more affordance), the count on the right edge. Keyed on the
  *  subject by the caller, so a new subject starts folded. */
 function NotableDays({ days }: { days: NoteDay[] }) {
@@ -199,12 +167,18 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
   return (
     <RailPane
       entry={collapsed}
-      // THE IRIDESCENT EDGE: a 1px transparent border with three background layers — the card's own
-      // fill and, under it, the opaque page ground, both clipped to the padding box, over the
-      // `--ai-edge` sweep clipped to the border box, so the sweep shows only in the border ring.
+      // THE IRIDESCENT EDGE — on the open BOX only: the resting entry stays as subtle as every
+      // ancestor entry, its AI-ink eyebrow mark enough (R57). A 1px transparent border with three
+      // background layers — the card's own fill and, under it, the opaque page ground, both clipped
+      // to the padding box, over the `--ai-edge` sweep clipped to the border box, so the sweep
+      // shows only in the border ring.
       // The ground is load-bearing: `--panel-solid` is translucent, and without it the sweep tinted
       // the whole fill (user, 2026-10-27: "I like the outline but fill is too much AI color").
-      className="border border-transparent [background:linear-gradient(var(--panel-solid),var(--panel-solid))_padding-box,linear-gradient(var(--background),var(--background))_padding-box,var(--ai-edge)_border-box]"
+      className={
+        collapsed
+          ? undefined
+          : "border border-transparent [background:linear-gradient(var(--panel-solid),var(--panel-solid))_padding-box,linear-gradient(var(--background),var(--background))_padding-box,var(--ai-edge)_border-box]"
+      }
     >
       <CardHead
         eyebrow={EYEBROW}

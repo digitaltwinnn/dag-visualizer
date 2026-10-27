@@ -8,7 +8,7 @@ import type { NoteDay } from "@/src/data/noteTypes";
 import { type TrackGeom, xAtMs } from "@/src/data/trendTimeline";
 import { useStore } from "@/src/store/store";
 import { rangeDays } from "@/src/util/localTime";
-import { useAiNote } from "./NotesCard";
+import { useAiNote } from "./useAiNote";
 
 // THE NOTABLE DAYS ON THE TIMELINE (2026-10-27) — the AI note's notable days, one iridescent
 // diamond each, on the History band's track. The same days the AI notes card lists as rows; the

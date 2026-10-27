@@ -177,10 +177,9 @@ export default function RailThread({
       // one's middle. NB the query is DEPTH-AGNOSTIC (2026-08-02): the facts rail nests its
       // ladder rungs in a lane, so `:scope >` matched nothing and the thread silently lost every
       // card dot. Nested panels (a card inside a card) would double-count, so only outermost ones
-      // count. A card under `[data-thread-off]` (the AI notes briefing that leads the facts rail)
-      // is not a rung and gets no dot: the spine starts at the ladder below it.
+      // count.
       const cards = Array.from(rail.querySelectorAll<HTMLElement>(".ig-panel, .rail-entry")).filter(
-        (c) => !c.parentElement?.closest(".ig-panel") && !c.closest("[data-thread-off]"),
+        (c) => !c.parentElement?.closest(".ig-panel"),
       );
       const raw = cards
         .map((c) => {

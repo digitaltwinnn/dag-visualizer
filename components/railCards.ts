@@ -81,9 +81,16 @@ export function ladderLevelOfSlot(id: string): FocusLevel | null {
  *  Members with no rung are card slots only (the ledger's two snapshot slots) — display hierarchy,
  *  no camera pose, no deselect step. `ladderLevelOfSlot` is the inverse read and stays the one
  *  place a slot can name a rung. */
+// ⚠️ THE AI NOTES CARD TOPS EVERY NOTE VIEW'S LANE (user, 2026-10-27, R57: "a top card, part of
+// the stack. Not as a so-called subject card, so if there is a true subject card … by default that
+// will have the focus still, with the AI card header subtly sitting on top as per current stack
+// design"). A lane slot with no rung — the snapshot slots' precedent — so it joins the slab and the
+// thread like any card, takes the focus only while no subject card stands (`focusSlotId` needs no
+// case for it: it is the coarsest slot and never in `selStack`), and otherwise rests as the pile's
+// top entry. It has no ghost: a view with no note has no slot (`detailsCards`' `notes`).
 const DISPLAY_LANE: Partial<Record<Mode, readonly string[]>> = {
-  hyper: ["context", "composition", "node"],
-  geo: ["context", "country", "cohort", "node"],
+  hyper: ["notes", "context", "composition", "node"],
+  geo: ["notes", "context", "country", "cohort", "node"],
   // ⚠️ THE TICK LEADS (user, 2026-09-15). The lane is a containment claim — the slab abuts
   // committed cards into one body, and adjacency is what says what holds what — so the question is
   // which claim is least wrong. Neither order is literally true: a tick does not contain a network,
@@ -96,7 +103,8 @@ const DISPLAY_LANE: Partial<Record<Mode, readonly string[]>> = {
   // commit — the tick follows live by itself — so the lane opens speaking rather than inviting.
   // (The chamber's storeys are unchanged: geometry still shows ribbons falling INTO the global
   // floor; the rail states the reading order.)
-  ledger: ["snap", "context", "metaSnap", "node"],
+  // (The AI notes card sits above the tick — the one slot above it, and not a subject.)
+  ledger: ["notes", "snap", "context", "metaSnap", "node"],
   // HISTORY: the network dossier, then the INSTANT (2026-09-19). `instant` is a card slot with no
   // focus rung — the two snapshot slots' precedent, and `railLadderBoundary.test.ts` asserts
   // rung → slot rather than the reverse. It sits UNDER the dossier because the lane is a
@@ -108,7 +116,7 @@ const DISPLAY_LANE: Partial<Record<Mode, readonly string[]>> = {
   // The RANGE sits between them (user, 2026-10-07: "range -> moment is also a logical parent -
   // child relation"): a brushed span of the network, and the cursor one moment inside it. Like
   // `instant`, a card slot with no rung.
-  trend: ["context", "range", "instant"],
+  trend: ["notes", "context", "range", "instant"],
 };
 
 export function ladderSlotIds(mode: Mode): string[] {
@@ -119,7 +127,7 @@ export function ladderSlotIds(mode: Mode): string[] {
  *  inputs (which can't change a slot's presence). */
 export type LadderState = Pick<
   RailManifestState,
-  "mode" | "filter" | "tickNet" | "tickHasFilter" | "inspect" | "snap" | "metaSnap" | "country" | "cohort" | "composition" | "trendCursorMs" | "trendRange" | "trendFocus"
+  "mode" | "filter" | "tickNet" | "tickHasFilter" | "inspect" | "snap" | "metaSnap" | "country" | "cohort" | "composition" | "trendCursorMs" | "trendRange" | "trendFocus" | "noteAbsent"
 > & {
   /** The store's selection recency (most-recent-FIRST) — the collapse rule reads it (item 8):
    *  the most recently selected present card is the ACTIVE one; the rest rest collapsed. */
@@ -137,6 +145,9 @@ export function focusSlotId(s: LadderState): string | null {
   const lane = ladderSlotIds(s.mode);
   const present = lane.filter((id) => cards.find((c) => c.id === id)?.present);
   if (!present.length) return null;
+  // THE AI NOTES CARD is the lane's COARSEST slot and never in the stack, so the two reads below
+  // already give it the focus only when it stands alone — at rest — and hand it to any subject card
+  // the moment one is present (R57). No case of its own, on purpose.
   // The ACTIVE card is the most recently selected present one (store.selStack, item 8 —
   // "keep the active card open, collapse the others"); the slot ids match the SelSlot names
   // except the ladder's node slot. Falls back to the finest present slot (e.g. only the
@@ -533,8 +544,8 @@ export function detailsCards(s: RailManifestState): RailCard[] {
     hint: snapHint(s),
   };
   // THE AI NOTES CARD (2026-10-27) — written context about the view's subject, not a subject of
-  // its own: no ladder rung, no ghost (an absent note is no card at all), and LAST, below every
-  // card the selection produces. Gated on the view it is FOR (`aiNotes`, convention 7).
+  // its own: the TOP slot of the lane (R57), no ladder rung, no ghost (an absent note is no card
+  // at all). Gated on the view it is FOR (`aiNotes`, convention 7).
   // ⚠️ A STATIC subject key, the tool card's precedent: the note follows the selection and the
   // view, so keying the tray on its subject would light the dock on every view switch and every
   // filter change — announcing the selection a second time, through a card that is not it.
@@ -550,8 +561,7 @@ export function detailsCards(s: RailManifestState): RailCard[] {
   // desktop lane above: tick → dossier → the tick's own metagraph snapshot → node. History's
   // `instant` sits directly under the dossier, which is exactly where its own lane puts it —
   // every slot between them is unreachable in that view, so the two orders agree. The notes card
-  // is in no lane: it LEADS the rail on every tier (user, 2026-10-27 — the old details card's
-  // place), above the ladder it briefs.
+  // leads both: it is the top slot of every note view's lane (R57).
   return [notes, snap, context, range, instant, country, cohort, composition, metaSnap, node];
 }
 

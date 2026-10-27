@@ -34,7 +34,8 @@ import { CountryTitle, CountryAside, CountryCard, ProviderTitle, ProviderCard, P
 import MetaSnapPane from "@/components/inspector/MetaSnapPane";
 import TrendRangePane from "@/components/inspector/TrendRangePane";
 import TrendInstantPane from "@/components/inspector/TrendInstantPane";
-import NotesCard, { useAiNote } from "@/components/notes/NotesCard";
+import NotesCard from "@/components/notes/NotesCard";
+import { useAiNote } from "@/components/notes/useAiNote";
 import type { TabSignal } from "@/components/RailDock";
 import type { PickDescriptor } from "@/src/data/types";
 import type { Mode } from "@/src/store/store";
@@ -430,13 +431,14 @@ export default function Inspector() {
   const trendFront = useStore((s) => s.trendFront);
   const trendWindow = useStore((s) => s.trendWindow);
   const tickHasFilter = useTickHasFilter();
-  // The AI note on screen (the card shares this fetch): its card stands down when the view's
-  // subject has no note (off mainnet none has) or when the server answered `none`; while its first
-  // answer is read it stands, reading (`noteCardAbsent`).
+  // The AI note on screen (the card shares this fetch): its card — the top slot of the lane —
+  // stands down when the view's subject has no note (off mainnet none has) or when the server
+  // answered `none`; while its first answer is read it stands, reading (`noteCardAbsent`).
   const aiNote = useAiNote();
+  const noteAbsent = noteCardAbsent(aiNote.req != null, aiNote.note.res);
   const manifest = detailsCards({
     mode, filter, tickNet, tickHasFilter, inspect, snap, country, cohort, composition, metaSnap, coarse, trendCursorMs, trendRange, trendFocus, trendFront, trendWindow,
-    noteAbsent: noteCardAbsent(aiNote.req != null, aiNote.note.res),
+    noteAbsent,
     selNodesCount: selNodes.length,
     filterLabel: displayNetwork(filter)?.ticker ?? null, // one lookup — catalog + the unlisted pseudo-network
   });
@@ -454,7 +456,8 @@ export default function Inspector() {
   const presentOf = (id: string) => manifest.find((c) => c.id === id)?.present ?? false;
   // The focus rung comes from the shared derivation the EXPLORE rail reads too (`focusSlotId`),
   // so the row emphasis over there and the collapse/halo over here can't disagree.
-  const focusId = useLadderFocus();
+  // …with the AI notes slot's presence, so at rest the notes card is the focus (R57).
+  const focusId = useLadderFocus(noteAbsent);
   // NO BOX OPEN IS NOT A REST ANY MORE (user, 2026-10-18: "snapshot is collapsed but it is no
   // longer supported (no − icon etc)"). With nothing committed the live Global snapshot card —
   // a slot with no rung, so never the focus — sat folded above three ghosts on every tier, and
@@ -491,8 +494,11 @@ export default function Inspector() {
   // "with a range the Moment card does not open the first entry" — History's Metagraph card is a
   // reading that can be absent, and a run that had to begin at slot 0 left the Range card below a
   // gap with no step). The run begins at the first present card and ends at the first gap after it.
+  // …and the run is a run of SUBJECT cards: the AI notes card tops the lane (R57) but is no
+  // subject, so it neither starts the run nor leaves a gap that ends it.
   let deepestId: string | null = null;
   for (const id of ladderIds) {
+    if (id === "notes") continue;
     if (presentOf(id)) deepestId = id;
     else if (deepestId !== null) break;
   }
@@ -606,9 +612,13 @@ export default function Inspector() {
       // out of the selection key on purpose (heartbeats must not reset the +/− overrides), so
       // nothing ever dropped the pin and the only populated card sat folded above three ghosts.
       // An absent slot keeps no override and the auto rule (`openDefault`) governs its arrival.
+      // ⚠️ …and THE AI NOTES CARD IS NEVER PINNED (R57, found live in Snapshots): it is the open box
+      // exactly while no subject card stands, and at a view's entry it usually stands alone — the
+      // live tick lands a beat later — so a pinned-open note sat as a SECOND box above the tick.
+      // Left to the auto rule it yields the box to whatever subject arrives, as it does at rest.
       setRailCollapseMany({
         ...staleNulls,
-        ...Object.fromEntries(ladderIds.filter(presentOf).map((id) => [id, effCollapsed(id)])),
+        ...Object.fromEntries(ladderIds.filter((id) => id !== "notes" && presentOf(id)).map((id) => [id, effCollapsed(id)])),
       });
       return;
     }
@@ -672,7 +682,8 @@ export default function Inspector() {
     metaSnap: metaSnap ? (
       <MetaSnapPane key="metaSnap" onClose={() => applyClickActions([{ kind: "metaSnap", sel: null }])} {...cx("metaSnap")} />
     ) : null,
-    // The AI notes card: no rung, no ×, no ghost — it renders while the manifest says a note stands.
+    // The AI notes card: the lane's top slot, no rung, no ×, no ghost — it renders while the
+    // manifest says a note stands.
     notes: <NotesCard key="notes" {...cx("notes")} />,
   };
 
@@ -772,8 +783,7 @@ export default function Inspector() {
   );
   // Cards that AREN'T ladder rungs (the snapshot slot in every 3D view) render below the lane —
   // present card first, else its ghost — plus, in flat/placeholder views (no ladder), everything.
-  // (The AI notes card is not among them: it leads the rail, on its own — see `notesPane`.)
-  const nonLadder = manifest.filter((c) => c.kind !== "context" && c.kind !== "notes" && !ladderIds.includes(c.id));
+  const nonLadder = manifest.filter((c) => c.kind !== "context" && !ladderIds.includes(c.id));
   const trailingPanes = nonLadder.filter((c) => c.present).map((c) => detailPane[c.id]);
   const trailingGhosts = nonLadder
     .filter((c) => !c.present && c.hint != null)
@@ -784,20 +794,6 @@ export default function Inspector() {
   // slab's word for containment, so one hairline says the pile ends here. Only above PRESENT
   // cards: the trailing ghosts are the view's own possibility space.
   const trailingDivider = trailingPanes.length > 0 ? <div key="trailing-divider" aria-hidden className="h-px flex-none mx-[18px] bg-border" /> : null;
-  // THE AI NOTES CARD LEADS the rail, above the ladder (user, 2026-10-27 — the old details card's
-  // place), with NO divider of its own: the divider means "a subject the view did not produce", and
-  // the note is not a subject at all — it is written context about the one the view stands on, a
-  // briefing read before the rungs. Its iridescent edge already sets it apart from the pile.
-  // `data-thread-off`: the thread ties in the rungs it walks, and the briefing is not one — the
-  // spine starts below it (RailThread's card query skips this subtree).
-  const notesPane = presentOf("notes") ? (
-    <div key="notes-lead" data-thread-off>
-      {detailPane.notes}
-    </div>
-  ) : null;
-
-
-
   // The tablet/phone sheets host the SAME LADDER LANE as the desktop rail (card-redesign
   // 2026-08-08 — sheets used to keep a flat populated-first/ghosts-last stack; with ghosts now
   // one-line entries the scroll-cost rationale is gone, and the lane brings the entry
@@ -842,7 +838,6 @@ export default function Inspector() {
   // Tablet + phone host the same ladder-lane `content` (see the note above the lane).
   const content = (
     <>
-      {notesPane}
       {ladderLane}
       {trailingDivider}
       {trailingPanes}
@@ -867,7 +862,6 @@ export default function Inspector() {
           style={accent}
         >
           <RailShade>
-            {notesPane}
             {ladderLane}
             {trailingDivider}
             {trailingPanes}
