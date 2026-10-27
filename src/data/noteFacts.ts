@@ -1,4 +1,4 @@
-import type { Fact } from "@/src/data/noteTypes";
+import type { Fact, FactPair } from "@/src/data/noteTypes";
 import { formatSeconds, trimCounterEdges } from "@/src/data/trendSeries";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
 
@@ -39,8 +39,15 @@ function countText(v: number): string {
 /** One fact. `kind` picks the notation: count (12,159), amount (one decimal at most, two
  *  significant digits under 1), share (a rounded %), ratio (2 decimals), duration
  *  (`formatSeconds`, seconds in), date (UTC "Oct 19", epoch ms in). `format` replaces an amount's
- *  notation with the chart's own formatter (fees are written by `formatDag`). */
-export function fact(label: string, value: number, kind: Fact["kind"], format?: (v: number) => string): Fact {
+ *  notation with the chart's own formatter (fees are written by `formatDag`). `pair` marks the fact
+ *  as one end of a measured change (`Fact.pair`, R54); a fact with none carries no `pair` key. */
+export function fact(
+  label: string,
+  value: number,
+  kind: Fact["kind"],
+  format?: (v: number) => string,
+  pair?: FactPair,
+): Fact {
   let text: string;
   switch (kind) {
     case "count": text = countText(value); break;
@@ -56,7 +63,7 @@ export function fact(label: string, value: number, kind: Fact["kind"], format?: 
       break;
     }
   }
-  return { label, value, kind, text };
+  return pair ? { label, value, kind, text, pair: { ...pair } } : { label, value, kind, text };
 }
 
 /** HOW MANY NETWORKS ANCHORED, counting the unlisted ones honestly. `listed` is the catalog networks

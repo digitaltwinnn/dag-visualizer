@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { geoFacts, type GeoFactsInput } from "@/src/data/noteFactsGeo";
 import { checkNote } from "@/src/data/noteHonesty";
+import type { Fact } from "@/src/data/noteTypes";
 
 const NAMES = { dag: "Constellation", usdc: "USDC.dag", bio: "BioFi" };
 const COUNTRIES = { DE: "Germany", US: "United States", FR: "France", NL: "Netherlands" };
@@ -354,5 +355,89 @@ describe("geoFacts as a gate-passing source", () => {
     const r = geoFacts(input({ subject: "usdc", geoDays, ccDays: ccOf(geoDays) }))!;
     expect(checkNote("USDC.dag has 30 located nodes, doubled from 15 a month ago.", r.facts, r.names)).toEqual({ ok: true });
     expect(checkNote("USDC.dag has 30 located nodes, up from 16 a month ago.", r.facts, r.names).ok).toBe(false);
+  });
+});
+
+describe("geoFacts tags each change as a pair (R54)", () => {
+  /** key → [from label, from value, to label, to value]; each key has exactly one of each end. */
+  function pairsOf(facts: readonly Fact[]): Map<string, [string, number, string, number]> {
+    const ends = new Map<string, Partial<Record<"from" | "to", Fact>>>();
+    for (const f of facts) {
+      if (!f.pair) continue;
+      const e = ends.get(f.pair.key) ?? {};
+      expect(e[f.pair.end], `${f.pair.key}: two ${f.pair.end} ends`).toBeUndefined();
+      ends.set(f.pair.key, { ...e, [f.pair.end]: f });
+    }
+    const out = new Map<string, [string, number, string, number]>();
+    for (const [k, { from, to }] of ends) {
+      expect(from && to, `${k}: one end only`).toBeTruthy();
+      out.set(k, [from!.label, from!.value, to!.label, to!.value]);
+    }
+    return out;
+  }
+
+  it("keys the fleet, each top country and each top provider, a month ago to now, the standing fact as the now end", () => {
+    const geoDays = { "2026-09-27": day(scaled(0.5)), "2026-10-27": day(NOW) };
+    const r = geoFacts(input({ geoDays, ccDays: ccOf(geoDays) }))!;
+    expect([...pairsOf(r.facts).values()]).toEqual([
+      ["Located nodes in the fleet a month ago", 51, "Located nodes in the fleet", 100],
+      ["Germany, nodes a month ago", 25, "Germany, nodes (biggest country)", 50],
+      ["United States, nodes a month ago", 15, "United States, nodes (second biggest country)", 30],
+      ["France, nodes a month ago", 8, "France, nodes (third biggest country)", 15],
+      ["Hetzner Online, nodes a month ago", 25, "Hetzner Online, nodes (biggest provider)", 50],
+      ["Amazon.com, nodes a month ago", 10, "Amazon.com, nodes (second biggest provider)", 20],
+      ["OVH, nodes a month ago", 5, "OVH, nodes (third biggest provider)", 10],
+    ]);
+  });
+
+  it("keys a network's located nodes and its countries, and a country's own nodes", () => {
+    const back = scaled(0.5, { ...NOW, net: { ...NOW.net, usdc: { cc: { DE: 20 }, isp: { "hetzner-online-ag": 20 } } } });
+    const geoDays = { "2026-09-27": day(back), "2026-10-27": day(NOW) };
+    const net = geoFacts(input({ subject: "usdc", geoDays, ccDays: ccOf(geoDays) }))!;
+    expect([...pairsOf(net.facts).values()]).toEqual([
+      ["USDC.dag, located nodes a month ago", 10, "USDC.dag, located nodes", 30],
+      ["USDC.dag, countries with nodes a month ago", 1, "USDC.dag, countries with nodes", 2],
+    ]);
+    const cc = geoFacts(input({ subject: { cc: "DE" }, geoDays, ccDays: ccOf(geoDays) }))!;
+    expect([...pairsOf(cc.facts).values()]).toEqual([["Germany, nodes a month ago", 25, "Germany, nodes", 50]]);
+  });
+});
+
+describe("geoFacts states a change from ONE reading (R54)", () => {
+  // The live dump of 2026-10-27: the geo family locates 80 nodes today while the tiers' history,
+  // the only source of "a month ago" (173), counts 86 (173 → 0.50). Germany is 33 in both; the
+  // United States reads 29 in the tiers, 27 in the geo family.
+  const providers = { hetzner: "Hetzner Online GmbH", amazon: "Amazon.com, Inc.", ionos: "IONOS SE" };
+  const countries = { DE: "Germany", US: "United States", FI: "Finland", NL: "Netherlands" };
+  const geoToday = { cc: { DE: 33, US: 27, FI: 17, NL: 3 }, isp: { hetzner: 51, amazon: 9, ionos: 9 } };
+  const tiersToday = { "f.cc.DE": 33, "f.cc.US": 29, "f.cc.FI": 17, "f.cc.NL": 7 };
+  const tiersThen = { "f.cc.DE": 67, "f.cc.US": 58, "f.cc.FI": 41, "f.cc.NL": 7 };
+  const dump = () =>
+    geoFacts({
+      subject: "all",
+      geoDays: { "2026-10-27": day(geoToday) },
+      ccDays: { "2026-09-27": tiersThen, "2026-10-27": tiersToday },
+      providerNames: providers,
+      countryNames: countries,
+      names: NAMES,
+    })!;
+
+  it("pairs the month-ago count with the tiers' own count now, and the ratio is that pair's", () => {
+    const r = dump();
+    expect(one(r, /^Located nodes in the fleet$/)).toMatchObject({ value: 80 });
+    expect(one(r, /^Located nodes in the fleet$/).pair).toBeUndefined();
+    const now = one(r, /^Located nodes in the fleet now, counted as a month ago was$/);
+    expect([now.value, now.pair]).toEqual([86, { key: expect.any(String), end: "to" }]);
+    expect(one(r, /^Located nodes in the fleet a month ago$/).pair).toEqual({ key: now.pair!.key, end: "from" });
+    expect(one(r, /^Located nodes in the fleet, now against a month ago$/).value).toBeCloseTo(86 / 173);
+  });
+
+  it("does the same per country: a matching count is the now end, a differing one gets the tiers' own", () => {
+    const r = dump();
+    expect(one(r, /^Germany, nodes \(biggest country\)$/).pair?.end).toBe("to");
+    expect(find(r, /^Germany, nodes now, counted as/)).toHaveLength(0);
+    expect(one(r, /^United States, nodes \(second biggest country\)$/).pair).toBeUndefined();
+    expect(one(r, /^United States, nodes now, counted as a month ago was$/)).toMatchObject({ value: 29, pair: { end: "to" } });
+    expect(one(r, /^United States, nodes now against a month ago$/).value).toBeCloseTo(29 / 58);
   });
 });

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { ledgerFacts, type LedgerFactsInput } from "@/src/data/noteFactsLedger";
 import { checkNote } from "@/src/data/noteHonesty";
 import { formatSeconds } from "@/src/data/trendSeries";
+import type { Fact } from "@/src/data/noteTypes";
 import type { TrendsWindowData } from "@/src/data/trendWindow";
 
 const MIN = 60_000;
@@ -178,5 +179,57 @@ describe("ledgerFacts as a gate-passing source", () => {
     const n = ledgerFacts(input({ subject: "usdc" }))!;
     expect(checkNote("USDC.dag was part of 50% of the global snapshots.", n.facts, n.names).ok).toBe(true);
     expect(checkNote("USDC.dag was part of 80% of the global snapshots.", n.facts, n.names).ok).toBe(false);
+  });
+});
+
+describe("ledgerFacts tags each change as a pair (R54)", () => {
+  /** key → [from label, from value, to label, to value]; each key has exactly one of each end. */
+  function pairsOf(facts: readonly Fact[]): Map<string, [string, number, string, number]> {
+    const ends = new Map<string, Partial<Record<"from" | "to", Fact>>>();
+    for (const f of facts) {
+      if (!f.pair) continue;
+      const e = ends.get(f.pair.key) ?? {};
+      expect(e[f.pair.end], `${f.pair.key}: two ${f.pair.end} ends`).toBeUndefined();
+      ends.set(f.pair.key, { ...e, [f.pair.end]: f });
+    }
+    const out = new Map<string, [string, number, string, number]>();
+    for (const [k, { from, to }] of ends) {
+      expect(from && to, `${k}: one end only`).toBeTruthy();
+      out.set(k, [from!.label, from!.value, to!.label, to!.value]);
+    }
+    return out;
+  }
+
+  it("keys the usual and the recent reading of each rate, spacing, fee and data figure of the chamber", () => {
+    const r = ledgerFacts(input())!;
+    const p = pairsOf(r.facts);
+    expect([...p.keys()]).toEqual([
+      "Global snapshots per hour",
+      "Mean spacing between global snapshots",
+      "Fees in DAG per hour",
+      "Data in MB per hour",
+    ]);
+    expect(p.get("Global snapshots per hour")).toEqual(["Global snapshots per hour, usual", 120, "Global snapshots per hour, recent", 240]);
+    for (const [k, [from, fv, to, tv]] of p) {
+      expect([from, to], k).toEqual([`${k}, usual`, `${k}, recent`]);
+      expect(fv, k).toBe(find(r, new RegExp(`^${k}, usual$`))[0]!.value);
+      expect(tv, k).toBe(find(r, new RegExp(`^${k}, recent$`))[0]!.value);
+    }
+  });
+
+  it("never keys a floor: fees and data with an unmeasured unlisted channel are no pair", () => {
+    const r = ledgerFacts(input({ recent: side(74, 5 * MIN, 20, { "u.cov": row(74, () => null) }) }))!;
+    expect([...pairsOf(r.facts).keys()]).toEqual(["Global snapshots per hour", "Mean spacing between global snapshots"]);
+  });
+
+  it("keys a network's own rate and spacing", () => {
+    const p = pairsOf(ledgerFacts(input({ subject: "usdc" }))!.facts);
+    expect(p.get("USDC.dag snapshots anchored per hour")).toEqual([
+      "USDC.dag snapshots anchored per hour, usual", 30, "USDC.dag snapshots anchored per hour, recent", 60,
+    ]);
+    expect(p.get("USDC.dag mean spacing between snapshots")).toEqual([
+      "USDC.dag mean spacing between snapshots, usual", 20, "USDC.dag mean spacing between snapshots, recent", 20,
+    ]);
+    expect(p.size).toBe(2);
   });
 });

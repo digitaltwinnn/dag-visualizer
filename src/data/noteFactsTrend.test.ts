@@ -3,6 +3,7 @@ import { trendFacts, type TrendFactsInput } from "@/src/data/noteFactsTrend";
 import { formatDag } from "@/src/data/trendSeries";
 import { checkNote } from "@/src/data/noteHonesty";
 import { factsBlock } from "@/src/data/noteFacts";
+import type { Fact } from "@/src/data/noteTypes";
 import type { TrendsWindowData } from "@/src/data/trendWindow";
 
 const DAY = 86_400_000;
@@ -60,6 +61,23 @@ function input(patch: Partial<TrendFactsInput> = {}): TrendFactsInput {
 
 const find = (r: NonNullable<ReturnType<typeof trendFacts>>, re: RegExp, kind?: string) =>
   r.facts.filter((f) => re.test(f.label) && (!kind || f.kind === kind));
+
+/** The pairs a facts list tags (R54), by key: each key has exactly one `from` and one `to`. */
+function pairsOf(facts: readonly Fact[]): Map<string, { from: Fact; to: Fact }> {
+  const ends = new Map<string, Partial<Record<"from" | "to", Fact>>>();
+  for (const f of facts) {
+    if (!f.pair) continue;
+    const e = ends.get(f.pair.key) ?? {};
+    expect(e[f.pair.end], `${f.pair.key}: two ${f.pair.end} ends`).toBeUndefined();
+    ends.set(f.pair.key, { ...e, [f.pair.end]: f });
+  }
+  const out = new Map<string, { from: Fact; to: Fact }>();
+  for (const [k, e] of ends) {
+    expect(e.from && e.to, `${k}: one end only`).toBeTruthy();
+    out.set(k, { from: e.from!, to: e.to! });
+  }
+  return out;
+}
 
 describe("trendFacts on the hypergraph", () => {
   it("states the snapshots-anchored ratio as cur over prev, per day", () => {
@@ -122,6 +140,32 @@ describe("trendFacts on the hypergraph", () => {
     // A network's own ratio is attributed by name.
     expect(checkNote("USDC.dag more than doubled its snapshots.", r.facts, r.names).ok).toBe(false);
     expect(checkNote("USDC.dag doubled its snapshots.", r.facts, r.names)).toEqual({ ok: true });
+  });
+});
+
+describe("trendFacts tags each change as a pair (R54)", () => {
+  it("keys a counter's previous span and this span as one quantity's two ends, never a floor", () => {
+    const p = pairsOf(trendFacts(input())!.facts);
+    const snaps = p.get("Snapshots anchored, per day")!;
+    expect([snaps.from.label, snaps.from.value]).toEqual(["Snapshots anchored, per day, previous span", 100]);
+    expect([snaps.to.label, snaps.to.value]).toEqual(["Snapshots anchored, per day, this span", 200]);
+    for (const [k, { from, to }] of p) {
+      expect(from.label.startsWith(k) && /previous span$/.test(from.label), k).toBe(true);
+      expect(to.label.startsWith(k) && /this span$/.test(to.label), k).toBe(true);
+    }
+    const floored = trendFacts(input({ cur: win(7, week(2, { "u.cov": row(7, (i) => (i === 3 ? null : 0)) })) }))!;
+    for (const f of floored.facts.filter((x) => /^(Fees|Data),/.test(x.label))) expect(f.pair, f.label).toBeUndefined();
+    expect(pairsOf(floored.facts).has("Snapshots anchored, per day")).toBe(true);
+  });
+
+  it("keys a gauge's start and end, and a late-starting gauge's lone end not at all", () => {
+    const long = (nodes: (number | null)[]) =>
+      win(nodes.length, { "g.ticks": row(nodes.length, () => 288), "g.anchors": row(nodes.length, () => 100), "f.nodes.dag": nodes }, T0 - 100 * DAY);
+    const at = (nodes: (number | null)[]) =>
+      trendFacts(input({ zoom: "1y", span: { fromMs: T0 - 100 * DAY, toMs: T0 }, cur: long(nodes), prev: null }))!.facts;
+    const nodes = pairsOf(at(row(100, (i) => (i < 50 ? 140 : 120)))).get("Nodes")!;
+    expect([nodes.from.label, nodes.from.value, nodes.to.label, nodes.to.value]).toEqual(["Nodes at the start of the span", 140, "Nodes at the end of the span", 120]);
+    expect(pairsOf(at(row(100, (i) => (i < 80 ? null : 120)))).has("Nodes")).toBe(false);
   });
 });
 

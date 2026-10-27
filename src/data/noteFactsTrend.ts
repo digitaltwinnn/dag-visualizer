@@ -33,7 +33,10 @@ import type { TrendMetric } from "@/src/store/store";
 //   · a gauge that began after the span did (the fleet's series starts the day the sampler first
 //     ran) states only its current level, never a "start" that is not the span's;
 //   · a span SHORTER than a day states counters as the span's total, not "per day" (×288 of five
-//     minutes is a rate nobody measured); ratios are the same either way.
+//     minutes is a rate nobody measured); ratios are the same either way;
+//   · A CHANGE IS A PAIR (R54): a gauge's start and end, and a counter's previous span and this
+//     span, carry `pair` (`from` / `to`, keyed by the measure's label), so the gate holds "from A
+//     to B" to one measure's two ends. A floor (", at least") is never an end.
 //
 // WHICH ZOOMS GET NOTABLE DAYS: 7d, 30d, 1y and all (`NOTABLE_CAPS`). A 1h, 24h or custom-range
 // note describes a stretch too short for "a day that stood out".
@@ -164,8 +167,8 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
         facts.push(fact(`${label} at the end of the span`, ch.to, "count"));
         continue;
       }
-      facts.push(fact(`${label} at the start of the span`, ch.from, "count"));
-      facts.push(fact(`${label} at the end of the span`, ch.to, "count"));
+      facts.push(fact(`${label} at the start of the span`, ch.from, "count", undefined, { key: label, end: "from" }));
+      facts.push(fact(`${label} at the end of the span`, ch.to, "count", undefined, { key: label, end: "to" }));
       if (ch.from > 0 && ch.to !== ch.from) facts.push(fact(`${label}, ratio end to start`, ch.to / ch.from, "ratio"));
       continue;
     }
@@ -182,11 +185,17 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
     if (now == null) continue;
     const read = (d: TrendsWindowData) => (total ? spanTotal(metric, subject, d) : spanValue(metric, subject, d));
     const shown = read(cur);
-    if (shown != null) facts.push(fact(`${label}${unit}, this span${curFloor ? ", at least" : ""}`, shown, kind, format));
     const before = prev ? spanValue(metric, subject, prev) : null;
+    const shownBefore = before != null ? read(prev!) : null;
+    // ONE CHANGE (R54): the previous span and this one are the `from` and `to` of one quantity
+    // when both are stated and neither is a floor (a floor beside a figure is no measured change).
+    const paired = shown != null && shownBefore != null && !curFloor && !prevFloor;
+    const key = `${label}${unit}`;
+    if (shown != null)
+      facts.push(fact(`${label}${unit}, this span${curFloor ? ", at least" : ""}`, shown, kind, format, paired ? { key, end: "to" } : undefined));
     if (before == null) continue;
-    const shownBefore = read(prev!);
-    if (shownBefore != null) facts.push(fact(`${label}${unit}, previous span${prevFloor ? ", at least" : ""}`, shownBefore, kind, format));
+    if (shownBefore != null)
+      facts.push(fact(`${label}${unit}, previous span${prevFloor ? ", at least" : ""}`, shownBefore, kind, format, paired ? { key, end: "from" } : undefined));
     if (before > 0 && !curFloor && !prevFloor) facts.push(fact(`${label}, ratio to previous span`, now / before, "ratio"));
   }
 

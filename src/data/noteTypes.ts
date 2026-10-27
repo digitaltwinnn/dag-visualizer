@@ -13,6 +13,16 @@ export interface Fact {
   value: number;
   kind: "count" | "amount" | "ratio" | "share" | "duration" | "date";
   text: string;
+  /** THE PAIR (R54): this fact is the earlier (`from`) or later (`to`) reading of ONE quantity,
+   *  and `key` names that quantity — the same key on both ends, unique to it within one facts
+   *  list. The gate holds a change written "from A to B" to one key's two ends; the model never
+   *  sees the key (`factsBlock` prints `label: text`). */
+  pair?: FactPair;
+}
+
+export interface FactPair {
+  key: string;
+  end: "from" | "to";
 }
 
 export type NotableKind = "high" | "low" | "first" | "last" | "pause";

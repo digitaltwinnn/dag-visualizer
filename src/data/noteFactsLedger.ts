@@ -1,5 +1,5 @@
 import { fact, networksAnchored } from "@/src/data/noteFacts";
-import type { Fact } from "@/src/data/noteTypes";
+import type { Fact, FactPair } from "@/src/data/noteTypes";
 import { anchorSeries, formatDag, globalSeries, metricSeries, spanAverage, trimCounterEdges, unlistedUnmeasured, withUnlisted } from "@/src/data/trendSeries";
 import type { TrendsWindowData } from "@/src/data/trendWindow";
 import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
@@ -31,6 +31,9 @@ import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 //   · a spacing is stated only where a bucket held snapshots (no division by an absence);
 //   · "was part of" is the network's share of the global snapshots over `recent`, over the buckets
 //     where both were measured, and the whole is never smaller than the part;
+//   · A CHANGE IS A PAIR (R54): the usual and the recent reading of one rate, spacing, fee or
+//     data figure carry `pair` (`from` / `to`, keyed by its label) when both are stated and
+//     neither is a floor, so the gate holds "from A to B" to one figure's two readings;
 //   · null when `recent` holds no measured bucket: nothing to describe, so no model call.
 //
 // Pure: no store values, react or I/O (the colocated test is the specification — rule 4).
@@ -70,6 +73,10 @@ function longestGap(gapMax: Points, d: TrendsWindowData): number | null {
 
 /** Σ numerator ÷ Σ denominator over the buckets where BOTH were measured and the denominator held
  *  something. Null where no bucket qualifies. */
+/** THE PAIR (R54) of one quantity read usual and recent: the ends' `pair` when BOTH were stated,
+ *  else none (a lone end is no change). */
+const ends = (key: string, both: boolean) => (end: FactPair["end"]): FactPair | undefined => (both ? { key, end } : undefined);
+
 function pairedSums(num: Points, den: Points, d: TrendsWindowData): { n: number; d: number } | null {
   const a = trimmed(num, d);
   const b = trimmed(den, d);
@@ -110,10 +117,11 @@ export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: st
   ) => {
     const now = perHour(metric, pick(recent), recent);
     if (now == null) return;
-    facts.push(fact(`${label}, recent`, now, "count"));
     const usual = weekCovered ? perHour(metric, pick(week), week) : null;
+    const end = ends(label, usual != null);
+    facts.push(fact(`${label}, recent`, now, "count", undefined, end("to")));
     if (usual == null) return;
-    facts.push(fact(`${label}, usual`, usual, "count"));
+    facts.push(fact(`${label}, usual`, usual, "count", undefined, end("from")));
     if (usual > 0) facts.push(fact(ratioLabel, now / usual, "ratio"));
   };
 
@@ -125,9 +133,10 @@ export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: st
     const spacing = (d: TrendsWindowData) =>
       spanAverage("continuity", trimmed(globalSeries("continuity", d.series), d), d.stepMs, trimmed(d.series["g.ticks"] ?? [], d));
     const mean = spacing(recent);
-    if (mean != null) facts.push(fact("Mean spacing between global snapshots, recent", mean, "duration"));
     const usualMean = weekCovered ? spacing(week) : null;
-    if (usualMean != null) facts.push(fact("Mean spacing between global snapshots, usual", usualMean, "duration"));
+    const spaced = ends("Mean spacing between global snapshots", mean != null && usualMean != null);
+    if (mean != null) facts.push(fact("Mean spacing between global snapshots, recent", mean, "duration", undefined, spaced("to")));
+    if (usualMean != null) facts.push(fact("Mean spacing between global snapshots, usual", usualMean, "duration", undefined, spaced("from")));
     const widest = longestGap(recent.series["g.gapMax"] ?? [], recent);
     if (widest != null) facts.push(fact("Longest gap between global snapshots, recent", widest, "duration"));
 
@@ -136,13 +145,15 @@ export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: st
     if (carried) facts.push(fact("Snapshots anchored per global snapshot, recent", carried.n / carried.d, "amount"));
 
     // FEES AND DATA, per hour. The whole totals are only a floor where the unlisted channels were
-    // not measured: labelled so, and given no ratio.
+    // not measured: labelled so, and given no ratio and no pair.
     for (const [metric, word, format] of [["fees", "Fees in DAG", formatDag], ["kb", "Data in MB", undefined]] as const) {
-      for (const [side, d] of [["recent", recent], ["usual", week]] as const) {
-        if (side === "usual" && !weekCovered) continue;
-        const v = perHour(metric, globalSeries(metric, d.series), d);
-        if (v != null) facts.push(fact(`${word} per hour, ${side}${floorOnly(d) ? ", at least" : ""}`, v, "amount", format));
-      }
+      const label = `${word} per hour`;
+      const sides = ([["recent", recent], ["usual", week]] as const)
+        .filter(([side]) => side === "recent" || weekCovered)
+        .map(([side, d]) => ({ side, v: perHour(metric, globalSeries(metric, d.series), d), floor: floorOnly(d) }));
+      const end = ends(label, sides.length === 2 && sides.every((x) => x.v != null && !x.floor));
+      for (const { side, v, floor } of sides)
+        if (v != null) facts.push(fact(`${label}, ${side}${floor ? ", at least" : ""}`, v, "amount", format, end(side === "recent" ? "to" : "from")));
     }
 
     // HOW MANY NETWORKS: those of the catalog that created or were carried by a snapshot.
@@ -163,9 +174,10 @@ export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: st
       return spanAverage("continuity", trimmed(s.points, d), d.stepMs, trimmed(own(d), d));
     };
     const mean = spacing(recent);
-    if (mean != null) facts.push(fact(`${name} mean spacing between snapshots, recent`, mean, "duration"));
     const usualMean = weekCovered ? spacing(week) : null;
-    if (usualMean != null) facts.push(fact(`${name} mean spacing between snapshots, usual`, usualMean, "duration"));
+    const spaced = ends(`${name} mean spacing between snapshots`, mean != null && usualMean != null);
+    if (mean != null) facts.push(fact(`${name} mean spacing between snapshots, recent`, mean, "duration", undefined, spaced("to")));
+    if (usualMean != null) facts.push(fact(`${name} mean spacing between snapshots, usual`, usualMean, "duration", undefined, spaced("from")));
     const widest = longestGap(metricSeries("continuity", subject, recent.series).gaps ?? [], recent);
     if (widest != null) facts.push(fact(`${name} longest gap between snapshots, recent`, widest, "duration"));
 

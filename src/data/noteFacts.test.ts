@@ -41,6 +41,13 @@ describe("fact", () => {
     expect(checkNote("X anchored 0.03 snapshots a day.", facts, ["X"])).toEqual({ ok: true });
   });
 
+  it("carries a pair end only when handed one (R54)", () => {
+    expect(fact("Germany, nodes a month ago", 67, "count", undefined, { key: "cc:DE", end: "from" })).toEqual({
+      label: "Germany, nodes a month ago", value: 67, kind: "count", text: "67", pair: { key: "cc:DE", end: "from" },
+    });
+    expect("pair" in fact("Germany, nodes", 33, "count")).toBe(false);
+  });
+
   it("reads a date in UTC, whatever the zone", () => {
     expect(fact("x", Date.UTC(2026, 0, 1, 23, 59), "date").text).toBe("Jan 1");
   });

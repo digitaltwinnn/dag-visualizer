@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { hyperFacts, type HyperFactsInput } from "@/src/data/noteFactsHyper";
 import { checkNote } from "@/src/data/noteHonesty";
+import type { Fact } from "@/src/data/noteTypes";
 import type { TrendsWindowData } from "@/src/data/trendWindow";
 
 const HOUR = 3_600_000;
@@ -65,6 +66,24 @@ function input(patch: Partial<HyperFactsInput> = {}): HyperFactsInput {
 
 const find = (r: NonNullable<ReturnType<typeof hyperFacts>>, re: RegExp, kind?: string) =>
   r.facts.filter((f) => re.test(f.label) && (!kind || f.kind === kind));
+
+/** The pairs a facts list tags (R54), by key, as [from label, from value, to label, to value];
+ *  each key has exactly one `from` and one `to`. */
+function pairsOf(facts: readonly Fact[]): Map<string, [string, number, string, number]> {
+  const ends = new Map<string, Partial<Record<"from" | "to", Fact>>>();
+  for (const f of facts) {
+    if (!f.pair) continue;
+    const e = ends.get(f.pair.key) ?? {};
+    expect(e[f.pair.end], `${f.pair.key}: two ${f.pair.end} ends`).toBeUndefined();
+    ends.set(f.pair.key, { ...e, [f.pair.end]: f });
+  }
+  const out = new Map<string, [string, number, string, number]>();
+  for (const [k, { from, to }] of ends) {
+    expect(from && to, `${k}: one end only`).toBeTruthy();
+    out.set(k, [from!.label, from!.value, to!.label, to!.value]);
+  }
+  return out;
+}
 
 describe("hyperFacts on all", () => {
   it("counts the networks with nodes: four networks, one without, make three", () => {
@@ -564,5 +583,39 @@ describe("hyperFacts as a gate-passing source", () => {
     const N = 720;
     const r = hyperFacts(input({ subject: "bio", fleet: fleet({ "f.layer.bio.l0": row(N, () => 10) }) }))!;
     expect(checkNote("BioFi held 10 nodes over the span, and 0 layers changed.", r.facts, r.names)).toEqual({ ok: true });
+  });
+});
+
+describe("hyperFacts tags each change as a pair (R54)", () => {
+  const N = 720;
+  it("keys a network's node count, changed layer, changed combination and activity, start to end", () => {
+    const fl = fleet({
+      "f.nodes.dor": row(N, (i) => (i < N / 2 ? 3 : 5)),
+      "f.layer.dor.l0": row(N, () => 3),
+      "f.layer.dor.cl1": row(N, () => 3),
+      "f.layer.dor.dl1": row(N, (i) => (i < N / 2 ? 3 : 5)),
+      "f.type.dor.l0+cl1+dl1": row(N, () => 3),
+      "f.type.dor.dl1": row(N, (i) => (i < N / 2 ? 0 : 2)),
+    });
+    const d = daily({ "m.dor.ticks": row(60, (i) => (i >= 53 ? 60 : 40)), "m.dor.snaps": row(60, () => 5) });
+    const p = pairsOf(hyperFacts(input({ subject: "dor", fleet: fl, daily: d }))!.facts);
+    expect([...p.values()]).toEqual([
+      ["Dor nodes at the start of the span", 3, "Dor nodes at the end of the span", 5],
+      ["Dor nodes on the dL1 layer at the start of the span", 3, "Dor nodes on the dL1 layer at the end of the span", 5],
+      ["Dor nodes running only dL1 at the start of the span", 0, "Dor nodes running only dL1 at the end of the span", 2],
+      ["Dor global snapshots it was part of per day, the weeks before", 40, "Dor global snapshots it was part of per day, last week", 60],
+    ]);
+  });
+
+  it("keys each mover, the total node count and the whole network's activity on the digest", () => {
+    const fl = fleet({ "f.nodes.dor": row(N, (i) => (i < N / 2 ? 0 : 5)) });
+    const d = daily({ "g.ticks": row(60, (i) => (i >= 53 ? 30_000 : 24_000)) });
+    const p = pairsOf(hyperFacts(input({ fleet: fl, daily: d }))!.facts);
+    expect([...p.values()]).toEqual([
+      ["USDC.dag nodes at the start of the span", 10, "USDC.dag nodes at the end of the span", 30],
+      ["Dor nodes at the start of the span", 0, "Dor nodes at the end of the span", 5],
+      ["Nodes across all networks at the start of the span", 120, "Nodes across all networks at the end of the span", 140],
+      ["Global snapshots per day, the weeks before", 24_000, "Global snapshots per day, last week", 30_000],
+    ]);
   });
 });

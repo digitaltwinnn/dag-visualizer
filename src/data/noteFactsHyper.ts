@@ -68,6 +68,9 @@ import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 //     unlisted activity makes the count a floor (", at least");
 //   · "started" and "stopped" are Task 2's `first` / `last` read for every id, with the 30-day
 //     lead-in marked via `from` so a network that merely resumed is not a start;
+//   · A CHANGE IS A PAIR (R54): every start / end (node counts, movers, layers, combinations) and
+//     every weeks-before / last-week reading carries `pair`, keyed by the quantity's label, so the
+//     gate holds "from A to B" to one quantity's two ends;
 //   · null when the fleet has no measured sample (and, for a network, none of its own).
 //
 // Pure: no store values, react or I/O (the colocated test is the specification — rule 4).
@@ -194,8 +197,8 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
       facts.push(fact(`${label} at the end of the span`, ch.to, "count"));
       return;
     }
-    facts.push(fact(`${label} at the start of the span`, ch.from, "count"));
-    facts.push(fact(`${label} at the end of the span`, ch.to, "count"));
+    facts.push(fact(`${label} at the start of the span`, ch.from, "count", undefined, { key: label, end: "from" }));
+    facts.push(fact(`${label} at the end of the span`, ch.to, "count", undefined, { key: label, end: "to" }));
     if (ch.from > 0 && ch.to !== ch.from) facts.push(fact(`${label}, ratio end to start`, ch.to / ch.from, "ratio"));
   };
 
@@ -203,10 +206,10 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
    *  are above 0 and differ. `lastWeek` null states nothing; the prior needs its measured days. */
   const activityChange = (label: string, lastWeek: number | null, points: Points): void => {
     if (lastWeek == null) return;
-    facts.push(fact(`${label}, last week`, lastWeek, "count"));
     const before = priorMean(points);
+    facts.push(fact(`${label}, last week`, lastWeek, "count", undefined, before == null ? undefined : { key: label, end: "to" }));
     if (before == null) return;
-    facts.push(fact(`${label}, the weeks before`, before, "count"));
+    facts.push(fact(`${label}, the weeks before`, before, "count", undefined, { key: label, end: "from" }));
     if (lastWeek > 0 && before > 0 && lastWeek !== before)
       facts.push(fact(`${label}, ratio last week to the weeks before`, lastWeek / before, "ratio"));
   };
@@ -249,8 +252,9 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
       .forEach(({ id, ch }) => {
         named.push(id);
         const name = mention(id);
-        facts.push(fact(`${name} nodes at the start of the span`, ch.from, "count"));
-        facts.push(fact(`${name} nodes at the end of the span`, ch.to, "count"));
+        const key = `${name} nodes`;
+        facts.push(fact(`${key} at the start of the span`, ch.from, "count", undefined, { key, end: "from" }));
+        facts.push(fact(`${key} at the end of the span`, ch.to, "count", undefined, { key, end: "to" }));
       });
 
     gaugeFacts("Nodes across all networks", total);
@@ -316,16 +320,18 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
           facts.push(fact(`${name} layers whose node count changed over the span`, moved.length, "count"));
           for (const role of moved) {
             const k = roles.indexOf(role);
-            facts.push(fact(`${name} nodes on the ${ROLE_SHORT[role]} layer at the start of the span`, was[k]!, "count"));
-            facts.push(fact(`${name} nodes on the ${ROLE_SHORT[role]} layer at the end of the span`, is[k]!, "count"));
+            const key = `${name} nodes on the ${ROLE_SHORT[role]} layer`;
+            facts.push(fact(`${key} at the start of the span`, was[k]!, "count", undefined, { key, end: "from" }));
+            facts.push(fact(`${key} at the end of the span`, is[k]!, "count", undefined, { key, end: "to" }));
           }
         }
         for (const band of typeBands(subject, fleet.series)) {
           const from = held(startAt, (i) => band.points[i] ?? null); // null: no type recorded at that sample
           const to = held(endAt, (i) => band.points[i] ?? null);
           if (from == null || to == null || from === to) continue;
-          facts.push(fact(`${name} nodes ${comboWords(band.key)} at the start of the span`, from, "count"));
-          facts.push(fact(`${name} nodes ${comboWords(band.key)} at the end of the span`, to, "count"));
+          const key = `${name} nodes ${comboWords(band.key)}`;
+          facts.push(fact(`${key} at the start of the span`, from, "count", undefined, { key, end: "from" }));
+          facts.push(fact(`${key} at the end of the span`, to, "count", undefined, { key, end: "to" }));
         }
       }
     }
