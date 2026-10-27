@@ -45,8 +45,8 @@ export function capKeyOf(net: string, dayIso: string): string {
 export type NoteKind = "hyper" | "geo" | "ledger" | "trend24h" | "trendDaily" | "trend1h" | "range";
 
 const H = 3_600_000;
-/** Freshness per kind: `refreshMs` is how old a note may be before a read regenerates it (null =
- *  only when asked), `ttlS` how long the store keeps it. */
+/** Freshness per kind: `refreshMs` is how old a note may be before the warm pass rewrites it
+ *  (`warm.ts`, null = never warmed: written only when asked), `ttlS` how long the store keeps it. */
 export const KIND_TIMING: Record<NoteKind, { refreshMs: number | null; ttlS: number }> = {
   hyper: { refreshMs: 24 * H, ttlS: 72 * 3600 },
   geo: { refreshMs: 24 * H, ttlS: 72 * 3600 },

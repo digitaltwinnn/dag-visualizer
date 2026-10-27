@@ -64,8 +64,9 @@ export interface GenerateDeps {
   now: () => number;
 }
 
-/** "read": a visitor's read (an on-request kind is not written here); "warm": the cron pass (a
- *  record older than its refresh is rewritten); "request": the request route (writes on a miss). */
+/** "read": a visitor's read (an on-request kind is not written here); "warm": one item the cron
+ *  pass PLANNED (`warm.ts`'s `planPass` already judged the cached record due, by age or by the
+ *  network set, so whatever is cached is rewritten); "request": the request route (writes on a miss). */
 export type GenerateMode = "read" | "warm" | "request";
 
 const NONE: NoteResponse = { state: "none" };
@@ -154,7 +155,7 @@ export async function generateNote(req: NoteRequest, deps: GenerateDeps, mode: G
   const timing = timingOf(view, span);
   const now = deps.now();
 
-  // 2. Cached: served, unless the warm pass finds it older than its refresh.
+  // 2. Cached: served, unless the warm pass planned its rewrite.
   let cached: NoteRecord | null;
   try {
     cached = parseRecord(await store.get(key));
@@ -163,8 +164,7 @@ export async function generateNote(req: NoteRequest, deps: GenerateDeps, mode: G
     await countStat(store, net, now, "store");
     return UNAVAILABLE;
   }
-  const stale = cached != null && mode === "warm" && timing.refreshMs != null && now - cached.writtenAt > timing.refreshMs;
-  if (cached && !stale) return okOf(cached);
+  if (cached && mode !== "warm") return okOf(cached);
 
   // 3. An on-request kind (the 1h pill, a brushed range) is written only when asked for.
   if (!cached && timing.refreshMs == null && mode === "read") return REQUEST;

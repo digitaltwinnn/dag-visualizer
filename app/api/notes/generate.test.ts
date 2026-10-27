@@ -245,10 +245,18 @@ describe("generateNote", () => {
     expect(d.chat).toHaveBeenCalledTimes(1);
   });
 
-  it("a fresh record is not rewritten by a warm pass", async () => {
+  it("a warm pass rewrites the record it was planned for, fresh or not (the planner judges, warm.ts)", async () => {
     await store.set(KEY, record({ writtenAt: NOW - 2 * H }), 3600);
     const d = deps();
-    expect(await generateNote(REQ, d, "warm")).toMatchObject({ state: "ok", writtenAt: NOW - 2 * H });
+    expect(await generateNote(REQ, d, "warm")).toMatchObject({ state: "ok", writtenAt: NOW });
+    expect(d.chat).toHaveBeenCalledTimes(1);
+  });
+
+  it("a read serves a fresh record without a model call", async () => {
+    await store.set(KEY, record({ writtenAt: NOW - 2 * H }), 3600);
+    const d = deps();
+    expect(await generateNote(REQ, d, "read")).toMatchObject({ state: "ok", writtenAt: NOW - 2 * H });
+    expect(await generateNote(REQ, d, "request")).toMatchObject({ state: "ok", writtenAt: NOW - 2 * H });
     expect(d.chat).not.toHaveBeenCalled();
   });
 

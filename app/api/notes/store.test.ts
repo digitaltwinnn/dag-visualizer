@@ -37,4 +37,13 @@ describe("memoryNotesStore", () => {
     await s.hincr("h", "rejected", 60);
     expect(JSON.parse((await s.get("h"))!)).toEqual({ generated: 2, rejected: 1 });
   });
+
+  it("reads many values at once with mget, null for a missing or expired one", async () => {
+    const s = memoryNotesStore();
+    expect(await s.mget([])).toEqual([]);
+    await s.set("a", "1", 10);
+    await s.set("b", "2", 1);
+    vi.advanceTimersByTime(1_001);
+    expect(await s.mget(["a", "b", "c"])).toEqual(["1", null, null]);
+  });
 });

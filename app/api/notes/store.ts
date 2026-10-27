@@ -7,6 +7,8 @@ import { Redis } from "@upstash/redis";
 
 export interface NotesStore {
   get(key: string): Promise<string | null>;
+  /** MGET: many values in ONE command (the warm pass's prefetch), null where absent. */
+  mget(keys: string[]): Promise<(string | null)[]>;
   set(key: string, value: string, ttlS: number): Promise<void>;
   /** SET NX EX: true when this caller took the lock. */
   lock(key: string, ttlS: number): Promise<boolean>;
@@ -28,6 +30,10 @@ function wrap(r: Redis): NotesStore {
   return {
     async get(key) {
       return (await r.get<string>(key)) ?? null;
+    },
+    async mget(keys) {
+      if (!keys.length) return [];
+      return (await r.mget<(string | null)[]>(...keys)).map((v) => v ?? null);
     },
     async set(key, value, ttlS) {
       await r.set(key, value, { ex: ttlS });
@@ -80,6 +86,9 @@ export function memoryNotesStore(): NotesStore {
       if (v) return v.v;
       const h = live(hashes, key);
       return h ? JSON.stringify(h.h) : null;
+    },
+    async mget(keys) {
+      return keys.map((k) => live(values, k)?.v ?? null);
     },
     async set(key, value, ttlS) {
       values.set(key, { v: value, exp: expiry(ttlS) });
