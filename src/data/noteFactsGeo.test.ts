@@ -440,4 +440,19 @@ describe("geoFacts states a change from ONE reading (R54)", () => {
     expect(one(r, /^United States, nodes now, counted as a month ago was$/)).toMatchObject({ value: 29, pair: { end: "to" } });
     expect(one(r, /^United States, nodes now against a month ago$/).value).toBeCloseTo(29 / 58);
   });
+
+  it("is the gate's source for the live failure: a provider's 9 and the geo family's 80 are no end of 173", () => {
+    const r = dump();
+    const gate = (t: string) => checkNote(t, r.facts, r.names);
+    const live = gate("Located nodes fell from 173 a month ago to 9. Germany dropped from 67 to 33.");
+    expect(live.ok).toBe(false);
+    if (!live.ok) expect(live.reasons).toEqual(["173 and 9 are not one measured change"]);
+    expect(gate("Located nodes fell from 173 a month ago to 80.").ok).toBe(false); // two readings
+    expect(gate("Located nodes fell from 173 a month ago to 86.")).toEqual({ ok: true });
+    expect(gate("Germany dropped from 67 to 33.")).toEqual({ ok: true });
+    expect(gate("Germany dropped from 67 to 27.").ok).toBe(false); // the US's count
+    expect(gate("The United States fell from 58 to 29.")).toEqual({ ok: true });
+    expect(gate("The United States fell from 58 to 27.").ok).toBe(false);
+    expect(gate("The fleet locates 80 nodes, 33 of them in Germany.")).toEqual({ ok: true });
+  });
 });

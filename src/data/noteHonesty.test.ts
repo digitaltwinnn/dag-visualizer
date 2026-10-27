@@ -267,3 +267,111 @@ describe("checkNote — ordinal rank words need a matching rank fact", () => {
     expect(checkNote("BioFi anchored for a second straight span.", [], ["BioFi"]).ok).toBe(true);
   });
 });
+
+describe("checkNote — a change written from A to B is ONE measured pair (R54)", () => {
+  type End = "from" | "to";
+  const Pf = (label: string, value: number, kind: Fact["kind"], text: string, key?: string, end?: End): Fact =>
+    key && end ? { label, value, kind, text, pair: { key, end } } : { label, value, kind, text };
+  // The facts behind the first live note under "say how much" (2026-10-27), one per line as the
+  // model saw them; 9 is Amazon's (and IONOS's) node count, not the fleet's.
+  const dump: Fact[] = [
+    Pf("Located nodes in the fleet", 80, "count", "80", "fleet", "to"),
+    Pf("Germany, nodes (biggest country)", 33, "count", "33", "cc:DE", "to"),
+    Pf("United States, nodes (second biggest country)", 27, "count", "27", "cc:US", "to"),
+    Pf("Finland, nodes (third biggest country)", 17, "count", "17", "cc:FI", "to"),
+    Pf("Hetzner Online, nodes (biggest provider)", 51, "count", "51"),
+    Pf("Amazon.com, nodes (second biggest provider)", 9, "count", "9"),
+    Pf("IONOS, nodes (third biggest provider)", 9, "count", "9"),
+    Pf("Located nodes in the fleet a month ago", 173, "count", "173", "fleet", "from"),
+    Pf("Located nodes in the fleet, now against a month ago", 80 / 173, "ratio", "0.46"),
+    Pf("Germany, nodes a month ago", 67, "count", "67", "cc:DE", "from"),
+    Pf("Germany, nodes now against a month ago", 33 / 67, "ratio", "0.49"),
+    Pf("United States, nodes a month ago", 58, "count", "58", "cc:US", "from"),
+    Pf("Finland, nodes a month ago", 41, "count", "41", "cc:FI", "from"),
+    Pf("Span length", 2_592_000, "duration", "30d"),
+  ];
+  const geoNames = ["Constellation", "USDC.dag", "Germany", "United States", "Finland", "Hetzner Online", "Hetzner", "Amazon.com", "IONOS"];
+  const gate = (t: string) => checkNote(t, dump, geoNames);
+
+  it("rejects the live failure: 173 and 9 each exist, but are not one change", () => {
+    const r = gate("Located nodes fell from 173 a month ago to 9. Germany dropped from 67 to 33.");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reasons).toEqual(["173 and 9 are not one measured change"]);
+  });
+
+  it("accepts the change the facts hold, and a country's own pair", () => {
+    expect(gate("Located nodes fell from 173 a month ago to 80.")).toEqual({ ok: true });
+    expect(gate("Germany dropped from 67 to 33.")).toEqual({ ok: true });
+  });
+
+  it("rejects a pair whose end belongs to another quantity (the US's count)", () => {
+    const r = gate("Germany dropped from 67 to 27.");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reasons).toEqual(["67 and 27 are not one measured change"]);
+  });
+
+  it("rejects the ends swapped: the earlier reading is not the later one", () => {
+    expect(gate("Located nodes rose from 80 to 173.").ok).toBe(false);
+  });
+
+  it("does not read a from-phrase as a change when its 'to' belongs to a later verb", () => {
+    expect(gate("Nodes from 9 providers grew to 51.")).toEqual({ ok: true });
+    expect(gate("Nodes from 9 providers grew to 52.").ok).toBe(false); // 52 is still checked alone
+  });
+
+  it("keeps today's rule for a number outside a change construction", () => {
+    expect(gate("Amazon.com runs 9 nodes, and the fleet fell from 173 to 80.")).toEqual({ ok: true });
+    expect(gate("Germany hosts 33 of the 80 located nodes.")).toEqual({ ok: true });
+    expect(gate("Amazon.com runs 12 nodes.").ok).toBe(false);
+  });
+
+  // ONE TEST PER FORM the model writes.
+  const rates: Fact[] = [
+    Pf("Global snapshots per day, the weeks before", 41_200, "count", "41,200", "g", "from"),
+    Pf("Global snapshots per day, last week", 49_512, "count", "49,512", "g", "to"),
+    Pf("Global snapshots per day, ratio last week to the weeks before", 49_512 / 41_200, "ratio", "1.20"),
+    Pf("USDC.dag nodes at the start of the span", 18, "count", "18", "usdc", "from"),
+    Pf("USDC.dag nodes at the end of the span", 8, "count", "8", "usdc", "to"),
+    Pf("BioFi nodes at the end of the span", 45_000, "count", "45,000"),
+    Pf("Mean spacing between global snapshots, usual", 20, "duration", "20s", "spacing", "from"),
+    Pf("Mean spacing between global snapshots, recent", 45, "duration", "45s", "spacing", "to"),
+  ];
+  const r = (t: string) => checkNote(t, rates, ["USDC.dag", "BioFi"]);
+
+  it("form: from A <words> to B", () => {
+    expect(r("Global snapshots went from 41,200 a day in the weeks before to 49,512.").ok).toBe(true);
+    expect(r("Global snapshots went from 41,200 a day in the weeks before to 45,000.").ok).toBe(false);
+  });
+
+  it("form: <verb> from A to B", () => {
+    expect(r("USDC.dag fell from 18 to 8 nodes.").ok).toBe(true);
+    expect(r("USDC.dag fell from eighteen to eight nodes.").ok).toBe(true);
+    expect(r("USDC.dag fell from 18 to 9 nodes.").ok).toBe(false);
+  });
+
+  it("form: <verb> to B <words> from A", () => {
+    expect(r("Global snapshots rose to 49,512 per day from 41,200.").ok).toBe(true);
+    expect(r("Global snapshots rose to 49,512 per day, up from 41,200.").ok).toBe(true);
+    expect(r("Global snapshots rose to 45,000 per day from 41,200.").ok).toBe(false);
+    expect(r("Global snapshots rose to 41,200 per day from 49,512.").ok).toBe(false);
+  });
+
+  it("form: <verb> A to B", () => {
+    expect(r("USDC.dag dropped 18 to 8 nodes.").ok).toBe(true);
+    expect(r("USDC.dag dropped 18 to 9 nodes.").ok).toBe(false);
+  });
+
+  it("holds each end at its written precision, and reads durations as pairs too", () => {
+    expect(r("Global snapshots rose from 41.2K to 49.5K a day.").ok).toBe(true);
+    expect(r("Global snapshots rose from 41K to 50K a day.").ok).toBe(true);
+    expect(r("Global snapshots rose from 40K to 50K a day.").ok).toBe(false);
+    expect(r("The spacing widened from 20s to 45s.").ok).toBe(true);
+    expect(r("The spacing widened from 20 seconds to 45 seconds.").ok).toBe(true);
+    expect(r("The spacing widened from 45s to 20s.").ok).toBe(false);
+  });
+
+  it("is not a change construction when a percentage or a ratio sits on either side", () => {
+    expect(r("Global snapshots rose by 20% to 49,512 a day.").ok).toBe(true);
+    expect(r("Global snapshots rose 20% to 49,512 a day.").ok).toBe(true);
+  });
+});
