@@ -222,6 +222,12 @@ describe("geoFacts on a network", () => {
     expect(geoFacts(input({ subject: "bio", geoDays, ccDays: ccOf(geoDays) }))).not.toBeNull();
   });
 
+  it("returns null for a network with only provider fields on the newest fleet day", () => {
+    const geoDays = run("2026-10-26", 6, () => NOW);
+    geoDays["2026-10-27"] = { ...day({ ...NOW, net: { dag: NOW.net!.dag!, bio: NOW.net!.bio! } }), "f.isp.usdc.hetzner-online-ag": 20 };
+    expect(geoFacts(input({ subject: "usdc", geoDays, ccDays: ccOf(geoDays) }))).toBeNull();
+  });
+
   it("states no fleet-relative fact on a day the fleet's own list was an outage", () => {
     const geoDays = run("2026-10-26", 6, () => NOW);
     geoDays["2026-10-27"] = day({ cc: { DE: 3 }, isp: { "ovh-sas": 1 }, net: { usdc: NOW.net!.usdc! } }); // validator fetch failed
@@ -251,7 +257,14 @@ describe("geoFacts on a country", () => {
     const r = geoFacts(input({ subject: { cc: "DE" }, geoDays, ccDays: ccOf(geoDays) }))!;
     expect(find(r, /^USDC\.dag/)).toHaveLength(0);
     expect(one(r, /^Constellation, nodes in Germany/).value).toBe(30);
-    expect(one(r, /^Networks with nodes in Germany$/).value).toBe(1);
+    expect(one(r, /^Networks with nodes in Germany, at least$/).value).toBe(1); // a floor: USDC.dag was dropped
+    expect(find(r, /^Networks with nodes in Germany$/)).toHaveLength(0);
+  });
+
+  it("states the plain count when no network was dropped", () => {
+    const r = geoFacts(input({ subject: { cc: "DE" } }))!;
+    expect(find(r, /at least/)).toHaveLength(0);
+    expect(one(r, /^Networks with nodes in Germany$/).value).toBe(2);
   });
 
   it("states the country's nodes, share of the fleet and rank", () => {

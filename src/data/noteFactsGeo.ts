@@ -186,7 +186,7 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
   // its reading is then the newest day its OWN total holds, among the days it is present. No such
   // day, nothing to say about place.
   const newestFleet = fleetDays[fleetDays.length - 1];
-  const listed = (d: Day, id: string) => d.netCc.has(id) || d.netIsp.has(id);
+  const listed = (d: Day, id: string) => d.netCc.has(id); // a node list means country fields, providers alone are not one
   let now: Day | undefined = newestFleet;
   if (subjectNet) {
     now = newestFleet && listed(newestFleet, subjectNet) ? measuredDays(geo, (d) => sum(d.netCc.get(subjectNet))).pop() : undefined;
@@ -266,14 +266,19 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     facts.push(fact(`${name}, share of the fleet's located nodes`, here / locatedFleet, "share"));
     facts.push(fact(`${name}, rank by nodes`, 1 + countries.filter((c) => c.count > here).length, "count"));
     facts.push(fact("Countries hosting nodes", countries.length, "count"));
+    let dropped = false; // a network there whose own list collapsed: the count below is a floor
     const hosted = ranked(
       [...now.netCc]
-        .filter(([id]) => ownMeasured(id).includes(now!)) // a network whose own list collapsed that day is not read
+        .filter(([id, m]) => {
+          const ok = ownMeasured(id).includes(now!); // a network whose own list collapsed that day is not read
+          if (!ok && (m.get(subjectCc) ?? 0) > 0) dropped = true;
+          return ok;
+        })
         .map(([id, m]) => ({ id, count: m.get(subjectCc) ?? 0, of: sum(m) }))
         .filter((h) => h.count > 0),
       (h) => nameOf(h.id),
     );
-    facts.push(fact(`Networks with nodes in ${name}`, hosted.length, "count"));
+    facts.push(fact(`Networks with nodes in ${name}${dropped ? ", at least" : ""}`, hosted.length, "count"));
     for (const h of hosted.slice(0, NETWORK_TOP)) {
       facts.push(fact(`${nameOf(h.id)}, nodes in ${name}`, h.count, "count"));
       facts.push(fact(`${nameOf(h.id)}, share of its nodes in ${name}`, h.count / h.of, "share"));
