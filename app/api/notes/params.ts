@@ -6,7 +6,7 @@ import { KIND_TIMING, snapSpan, timingOf, type NoteSpan } from "./keys";
 // route and the CDN all see the same shapes. Bad input is an ERROR with a short fixed message,
 // never an echo of what was sent.
 //
-// A subject is `all`, `dag`, a network the catalog tracks (a FORMER address answers as its network's
+// A subject is `all`, `dag` (the ledger's is `all`: one whole network, one note), a network the catalog tracks (a FORMER address answers as its network's
 // current id, so a re-registered network keeps one note), or a country `cc:XX` for Geography. The
 // span is fixed by the view except History's: a pill, or a brushed `from`/`to` snapped by `snapSpan`
 // so near-identical brushes share one key. Notes exist for mainnet only, so the catalog asked is
@@ -27,11 +27,16 @@ export interface NoteParams {
   subject: string;
   span: NoteSpan;
 }
-type Parsed = NoteParams | { error: string };
+/** `none`: a well-formed brush with no span in it (empty, shorter than one bucket, or in the
+ *  future once snapped). Not an error: the reader's brush is legitimate, there is just no note for
+ *  it, so the route answers `none` and the card stays away rather than reading "unavailable". */
+type Parsed = NoteParams | { error: string } | { none: true };
 
 function subjectOf(view: NoteView, raw: string | null): string | null {
   if (raw == null) return null;
-  if (raw === "all" || raw === "dag") return raw;
+  if (raw === "all") return raw;
+  // The ledger reads `dag` as the whole network, the same facts as `all`: ONE subject, one note.
+  if (raw === "dag") return view === "ledger" ? "all" : raw;
   if (CC_RE.test(raw)) return view === "geo" ? raw : null;
   if (!isTracked(NET, raw)) return null;
   const current = currentIdOf(NET, raw);
@@ -54,8 +59,9 @@ export function parseNoteParams(sp: URLSearchParams, nowMs: number): Parsed {
     return span != null && PILLS.includes(span as NoteSpan) ? { view, subject, span: span as NoteSpan } : { error: "bad span" };
   }
   if (span != null || from == null || to == null || !MS_RE.test(from) || !MS_RE.test(to)) return { error: "bad span" };
+  if (Number(to) < Number(from)) return { error: "bad span" }; // reversed: no brush draws that
   const snapped = snapSpan(Number(from), Number(to), nowMs);
-  return snapped ? { view, subject, span: `r${snapped.fromMs}-${snapped.toMs}` } : { error: "bad span" };
+  return snapped ? { view, subject, span: `r${snapped.fromMs}-${snapped.toMs}` } : { none: true };
 }
 
 /** The body of `POST /api/notes/request`: `{ view: "trend", subject, span: "1h" }` or

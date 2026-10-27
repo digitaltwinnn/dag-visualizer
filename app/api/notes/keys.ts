@@ -26,13 +26,21 @@ export function lockKeyOf(noteKey: string): string {
   return `${noteKey}:lock`;
 }
 
+/** A recent FAILURE of one note key (R38): a read or request whose write failed holds the key for
+ *  `FAIL_TTL_S` (generate.ts), so the next reader is answered `unavailable` from the store instead
+ *  of paying for another model call. A sibling of the note, in the same family. */
+export function failKeyOf(noteKey: string): string {
+  return `${noteKey}:fail`;
+}
+
 /** The day's counters (a hash: generated, rejected, capped, ...), by UTC day `YYYY-MM-DD`. */
 export function statsKeyOf(net: string, dayIso: string): string {
   return `ai:${net}:stats:${dayIso}`;
 }
 
 /** One visitor's brushed-range count for one UTC hour (`YYYY-MM-DDTHH`); `ipHash` is the first
- *  16 hex characters of sha256(ip). The raw IP is never a key. */
+ *  16 hex characters of HMAC-SHA256(CRON_SECRET, ip), or sha256(ip) with no secret. The raw IP
+ *  is never a key. */
 export function rateKeyOf(net: string, ipHash: string, hourIso: string): string {
   return `ai:${net}:rate:${ipHash}:${hourIso}`;
 }

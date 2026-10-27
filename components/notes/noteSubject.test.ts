@@ -22,7 +22,12 @@ describe("noteSubjectOf", () => {
     }
   });
 
-  it("geo stands on the country first, then the network, then everything", () => {
+  it("the ledger's whole network is one subject: the DAG core is `all` there", () => {
+    expect(noteSubjectOf("ledger", s({ metagraphNetwork: "dag" }))).toEqual({ view: "ledger", subject: "all" });
+    expect(noteSubjectOf("hyper", s({ metagraphNetwork: "dag" }))).toEqual({ view: "hyper", subject: "dag" });
+  });
+
+    it("geo stands on the country first, then the network, then everything", () => {
     expect(noteSubjectOf("geo", s({ country: "DE", metagraphNetwork: "DAG123" }))).toEqual({ view: "geo", subject: "cc:DE" });
     expect(noteSubjectOf("geo", s({ metagraphNetwork: "DAG123" }))).toEqual({ view: "geo", subject: "DAG123" });
     expect(noteSubjectOf("geo", s({}))).toEqual({ view: "geo", subject: "all" });

@@ -10,8 +10,9 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 //
 // The ladder is the views' own: Geography's finest committed rung is the country (a note about
 // that country's nodes), else the network, else everything; Hypergraph and Snapshots stand on the
-// network, else everything; History stands on the plane the metagraph card stands on, where
-// "all" and the core are one subject ("dag" — the plane the stack opens on). The unlisted
+// network, else everything (Snapshots' DAG core IS everything: `all`, one note); History stands on
+// the plane the metagraph card stands on, where "all" and the core are one subject ("dag" — the
+// plane the stack opens on). The unlisted
 // network is a pseudo-network with no measured history of its own, so it has no note.
 
 export interface NoteSubjectState {
@@ -40,5 +41,7 @@ export function noteSubjectOf(mode: Mode, s: NoteSubjectState): NoteSubject | nu
   }
   if (view === "geo" && s.country) return { view, subject: `cc:${s.country}` };
   const net = s.metagraphNetwork ?? "all";
+  // The ledger's DAG core is its whole network: one subject, `all` (the routes fold it the same way).
+  if (view === "ledger" && net === "dag") return { view, subject: "all" };
   return s.unlisted(net) ? null : { view, subject: net };
 }

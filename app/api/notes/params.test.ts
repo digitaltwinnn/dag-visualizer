@@ -30,7 +30,9 @@ describe("parseNoteParams", () => {
   it("a tracked network, all and dag are subjects; hyper's span is the day, the ledger's the hours", () => {
     expect(parseNoteParams(sp(`view=hyper&subject=${anId}`), NOW)).toEqual({ view: "hyper", subject: anId, span: "day" });
     expect(parseNoteParams(sp("view=ledger&subject=all"), NOW)).toEqual({ view: "ledger", subject: "all", span: "hours" });
-    expect(parseNoteParams(sp("view=ledger&subject=dag&span=hours"), NOW)).toEqual({ view: "ledger", subject: "dag", span: "hours" });
+    // The ledger's whole network is one subject: `dag` there IS `all` (identical facts, one note).
+    expect(parseNoteParams(sp("view=ledger&subject=dag&span=hours"), NOW)).toEqual({ view: "ledger", subject: "all", span: "hours" });
+    expect(parseNoteParams(sp("view=hyper&subject=dag&span=day"), NOW)).toEqual({ view: "hyper", subject: "dag", span: "day" });
   });
 
   it("a fixed-span view refuses any other span", () => {
@@ -73,6 +75,14 @@ describe("parseNoteParams", () => {
     expect(parseNoteParams(sp(`view=trend&subject=dag&from=-5&to=${NOW}`), NOW)).toHaveProperty("error");
     expect(parseNoteParams(sp(`view=trend&subject=dag&from=${NOW - D}`), NOW)).toHaveProperty("error");
     expect(parseNoteParams(sp(`view=trend&subject=dag&span=7d&from=${NOW - D}&to=${NOW}`), NOW)).toHaveProperty("error");
+  });
+
+  it("a well-formed brush with no span in it is no note, not an error (too short, empty, in the future)", () => {
+    expect(parseNoteParams(sp(`view=trend&subject=dag&from=${NOW - D}&to=${NOW - D}`), NOW)).toEqual({ none: true });
+    // inside the still-filling bucket at the live edge: nothing whole to describe once clamped
+    expect(parseNoteParams(sp(`view=trend&subject=dag&from=${NOW}&to=${NOW + 1000}`), NOW)).toEqual({ none: true });
+    expect(parseNoteParams(sp(`view=trend&subject=dag&from=${NOW + D}&to=${NOW + 2 * D}`), NOW)).toEqual({ none: true });
+    expect(parseNoteRequest({ view: "trend", subject: "dag", fromMs: NOW - D, toMs: NOW - D }, NOW)).toEqual({ none: true });
   });
 
   it("an error never echoes the raw input", () => {

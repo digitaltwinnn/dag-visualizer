@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { NextResponse } from "next/server";
 import type { NoteResponse } from "@/src/data/noteTypes";
 import { sampledIds } from "@/src/net/lineage";
@@ -19,9 +19,15 @@ import { executePass, latestCountries, pacedChat, planPass, warmCandidates, warm
 // Every answer that is not a note's own (`pending`, `unavailable`, a 400, a 429) is `no-store`,
 // so the CDN never holds an instrument state past the moment. Only the read route is public.
 //
+// MAINNET ONLY, answered FIRST: off mainnet both routes answer `none` before parsing the subject,
+// because the subject is checked against mainnet's catalog and a testnet network would otherwise
+// be a 400 the card reads as "unavailable".
+//
 // LIMITS (the global constraints): only a BRUSHED RANGE is limited (`isLimitedSpan`), since it is
 // the one unbounded key space. Per visitor 20 an hour, keyed by the first 16 hex characters of
-// sha256(ip) (the raw address is never stored or logged); globally 2,000 a UTC day, a tripwire
+// HMAC-SHA256(CRON_SECRET, ip) — plain sha256(ip) where no secret is set (a local server) — so a
+// stored key cannot be reversed by hashing the IPv4 space (the raw address and the secret are never
+// stored or logged); globally 2,000 a UTC day, a tripwire
 // counted as stats `capped`. Only a MISS is counted: a cached brush, or a subject no note exists
 // for, is answered without touching either counter. Every other kind is bounded by its key and the
 // singleflight lock.
@@ -31,8 +37,10 @@ export const RATE_PER_HOUR = 20;
 export const CAP_PER_DAY = 2_000;
 const RATE_TTL_S = 2 * 3600;
 const CAP_TTL_S = 2 * 86_400;
-/** The warm route's `maxDuration` is 300 s: no new item starts after this. */
-export const WARM_BUDGET_MS = 240_000;
+/** The warm route's `maxDuration` is 300 s: no new item starts after this. The worst item is two
+ *  paced Gate attempts at their 20 s timeout (3.5 + 20 + 3.5 + 20 s) plus its reads, so 210 s
+ *  leaves it room to finish. */
+export const WARM_BUDGET_MS = 210_000;
 /** One item at a time, and the Gate calls spaced (`pacedChat`): the free model 429'd at about five
  *  calls in 15 s (2026-10-27, R32). */
 export const WARM_CONCURRENCY = 1;
@@ -41,6 +49,7 @@ export const WARM_SPACING_MS = 3_500;
 const PUBLIC = "public, s-maxage=300, stale-while-revalidate=600";
 const NO_STORE = "no-store";
 const UNAVAILABLE: NoteResponse = { state: "unavailable" };
+const NONE: NoteResponse = { state: "none" };
 
 const json = (body: unknown, cache: string, status = 200) =>
   NextResponse.json(body, { status, headers: { "Cache-Control": cache } });
@@ -54,9 +63,11 @@ export function liveDeps(): GenerateDeps {
 
 /** GET /api/notes?view=…&subject=…&span=… (or &from=…&to=… for a brushed range). */
 export async function readNote(req: Request, deps: () => GenerateDeps): Promise<Response> {
+  if (netOf(req) !== NET) return json(NONE, PUBLIC);
   const d = settle(deps);
   const parsed = parseNoteParams(new URL(req.url).searchParams, d ? d.now() : Date.now());
   if ("error" in parsed) return json({ error: parsed.error }, NO_STORE, 400);
+  if ("none" in parsed) return json(NONE, PUBLIC);
   if (!d) return json(UNAVAILABLE, NO_STORE);
   try {
     const res = await generateNote({ net: netOf(req), ...parsed }, d, "read");
@@ -70,11 +81,14 @@ export async function readNote(req: Request, deps: () => GenerateDeps): Promise<
 /** The visitor, as the limits count it: the first `x-forwarded-for` entry, else `x-real-ip`. */
 function visitorHash(req: Request): string {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip")?.trim() || "unknown";
-  return createHash("sha256").update(ip).digest("hex").slice(0, 16);
+  const secret = process.env.CRON_SECRET;
+  const h = secret ? createHmac("sha256", secret) : createHash("sha256");
+  return h.update(ip).digest("hex").slice(0, 16);
 }
 
 /** POST /api/notes/request — History's on-request kinds: the 1h pill and a brushed range. */
 export async function requestNote(req: Request, deps: () => GenerateDeps): Promise<Response> {
+  if (netOf(req) !== NET) return json(NONE, NO_STORE);
   let body: unknown;
   try {
     body = await req.json();
@@ -85,6 +99,7 @@ export async function requestNote(req: Request, deps: () => GenerateDeps): Promi
   const now = d ? d.now() : Date.now();
   const parsed = parseNoteRequest(body, now);
   if ("error" in parsed) return json({ error: parsed.error }, NO_STORE, 400);
+  if ("none" in parsed) return json(NONE, NO_STORE);
   if (!d) return json(UNAVAILABLE, NO_STORE);
   const note = { net: netOf(req), ...parsed };
   const { net } = note;

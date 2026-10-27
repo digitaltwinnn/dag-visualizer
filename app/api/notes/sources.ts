@@ -197,6 +197,10 @@ interface ViewSource {
   accepts(net: string, subject: string, span: NoteSpan): boolean;
   /** The prompt's subject label. */
   label(subject: string, names: Record<string, string>): string;
+  /** Is this subject the whole network? Its own ratios are then the unattributed ones; any other
+   *  subject's carry its name (R39). Hyper and Geography read `dag` as the DAG core, a network;
+   *  the ledger and History read it as the whole. */
+  whole(subject: string): boolean;
   read(c: Ctx): Promise<Read | null>;
 }
 
@@ -264,6 +268,7 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
   hyper: {
     accepts: (net, subject, span) => span === "day" && (subject === "all" || isNetwork(net, subject)),
     label: (subject, names) => (subject === "all" ? WHOLE : (names[subject] ?? subject)),
+    whole: (subject) => subject === "all",
     async read({ net, subject, nowMs, reads, names, blurbs }) {
       const span = { fromMs: nowMs - 30 * D, toMs: nowMs };
       const [fleet, daily] = await Promise.all([
@@ -288,6 +293,7 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
       const cc = CC_RE.exec(subject)?.[1];
       return subject === "all" ? WHOLE : cc ? countryName(cc) : (names[subject] ?? subject);
     },
+    whole: (subject) => subject === "all",
     async read({ net, subject, nowMs, reads, names }) {
       const from = nowMs - GEO_READ_MS;
       const [{ geoDays, providerNames }, tiers] = await Promise.all([
@@ -314,8 +320,11 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
   },
   // WHEN (live): the last six hours of the 5-minute tier against the last week of the hourly one.
   ledger: {
-    accepts: (net, subject, span) => span === "hours" && (subject === "all" || isNetwork(net, subject)),
-    label: (subject, names) => (subject === "all" || subject === "dag" ? WHOLE : (names[subject] ?? subject)),
+    // Its whole network is `all` alone: `dag` here would be the same facts under a second key, so a
+    // second identical note an hour (the routes and the client fold `dag` into `all`).
+    accepts: (net, subject, span) => span === "hours" && (subject === "all" || (subject !== "dag" && isNetwork(net, subject))),
+    label: (subject, names) => (subject === "all" ? WHOLE : (names[subject] ?? subject)),
+    whole: (subject) => subject === "all",
     async read({ net, subject, nowMs, reads, names }) {
       const recentFrom = nowMs - 6 * H;
       const weekFrom = nowMs - 7 * D;
@@ -337,6 +346,7 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
   trend: {
     accepts: (net, subject, span) => (isPill(span) || span === "all" || rangeOf(span) != null) && isNetwork(net, subject),
     label: (subject, names) => (subject === "dag" ? "the hypergraph" : (names[subject] ?? subject)),
+    whole: (subject) => subject === "dag",
     read: readTrend,
   },
 };
@@ -358,6 +368,9 @@ export interface NoteFacts {
   spanTo: number;
   /** The prompt's subject label ("the whole network", "the hypergraph", a network or a country). */
   label: string;
+  /** The subject's display name when it is one network or one country, absent for the whole
+   *  network: the gate reads a sentence naming no one as speaking of it (R39). */
+  subjectName?: string;
   /** Hyper `all` only: the networks with nodes (the warmer rewrites the digest when it changes). */
   setKey?: string;
 }
@@ -382,6 +395,7 @@ export async function factsFor(
     spanFrom: r.spanFrom,
     spanTo: r.spanTo,
     label: row.label(subject, names),
+    ...(row.whole(subject) ? {} : { subjectName: row.label(subject, names) }),
     ...(built.setKey != null ? { setKey: built.setKey } : {}),
   };
 }

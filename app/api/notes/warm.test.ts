@@ -34,6 +34,11 @@ describe("planPass", () => {
     expect(plan.filter((i) => i.view === "hyper").map((i) => i.subject)).toEqual(["all", "dag"]);
   });
 
+  it("the ledger's whole network is warmed once, as `all` (its `dag` is the same note)", () => {
+    const plan = planPass(NOW, ["all", "dag", ...SUBJECTS], [], SET, () => null);
+    expect(plan.filter((i) => i.view === "ledger").map((i) => i.subject)).toEqual(["all", ...SUBJECTS]);
+  });
+
   it("a hyper record written 2 h ago is not re-planned; a ledger one is", () => {
     const plan = planPass(NOW, SUBJECTS, [], SET, cacheOf(allCached(SUBJECTS, [], NOW - 2 * H)));
     expect(plan.some((i) => i.view === "hyper")).toBe(false);

@@ -82,6 +82,29 @@ describe("noteSupported", () => {
   });
 });
 
+describe("factsFor — the subject's display name for the gate (R39)", () => {
+  it("names one network or one country; the whole network has none", async () => {
+    const name = async (view: "hyper" | "geo" | "ledger" | "trend", subject: string, span: "day" | "hours" | "7d") =>
+      (await factsFor("mainnet", view, subject, span, NOW, fakeReads()))!.subjectName;
+    expect(await name("trend", "dag", "7d")).toBeUndefined();
+    expect(await name("trend", USDC, "7d")).toBe("USDC.dag");
+    expect(await name("hyper", "all", "day")).toBeUndefined();
+    expect(await name("hyper", "dag", "day")).toBe("DAG"); // the DAG core is a network in hyper
+    expect(await name("geo", "all", "day")).toBeUndefined();
+    expect(await name("geo", "cc:DE", "day")).toBe("Germany");
+    expect(await name("geo", USDC, "day")).toBe("USDC.dag");
+    expect(await name("ledger", "all", "hours")).toBeUndefined();
+    expect(await name("ledger", USDC, "hours")).toBe("USDC.dag");
+  });
+});
+
+describe("noteSupported — the ledger's whole network is ONE subject", () => {
+  it("ledger dag is not a second copy of ledger all (identical facts, two notes an hour)", () => {
+    expect(noteSupported("ledger", "dag", "hours")).toBe(false);
+    expect(noteSupported("ledger", "all", "hours")).toBe(true);
+  });
+});
+
 describe("factsFor — the per-view read table", () => {
   it("trend 7d: 1h for the span and the one before, 1d with a 30-day lead-in for the days", async () => {
     const r = fakeReads();

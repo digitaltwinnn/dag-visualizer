@@ -95,31 +95,41 @@ them — but the Next Node server can.
   consumer.
 - **`/api/notes`, `/api/notes/request`, `/api/notes/warm`** (2026-10-27) are the AI notes: a few
   sentences a free model (the Constellation Gate, `GATE_API_KEY`, `GATE_MODEL`) writes about the
-  figures a view is showing. **Mainnet only**; any other `?net=` answers `none`. Notes live in
+  figures a view is showing. **Mainnet only**; any other `?net=` answers `none`, before the subject
+  is parsed (it is checked against mainnet's catalog, so a testnet network would otherwise 400). Notes live in
   their OWN key family, `ai:{net}:v{NOTES_VERSION}:{view}:{subject}:{span}` (`keys.ts`), never under
   `t:` (a rebuild wipes that prefix) or `geo:`: a note is a losable cache entry, and the families
   must not share a fate. ⚠️ **A prompt or a facts change bumps `NOTES_VERSION`**, which orphans every
   stored note at once (their TTLs reap them). Timing is `KIND_TIMING` in `keys.ts`: hyper and
   geography refresh daily (3-day TTL), the ledger and History's 24-hour note hourly (6 hours),
   History's daily pills daily, the 1-hour pill and a brushed range only when asked (15 minutes and
-  30 days). `GET /api/notes` reads (`public, s-maxage=300` for a note, `no-store` for every
-  instrument state), `POST /api/notes/request` writes the two on-request kinds, and
+  30 days). `GET /api/notes` reads: `ok`, `none` and `request` are `public, s-maxage=300,
+  stale-while-revalidate=600`; `pending`, `unavailable` and a 400 are `no-store` (a well-formed
+  brush with no whole bucket in it is `none`, not a 400). The ledger's `dag` is folded into `all`
+  (the same facts: one note). `POST /api/notes/request` writes the two on-request kinds, and
   `GET /api/notes/warm` is the hourly cron. **The honesty gate (rule 10) is mechanical**
   (`src/data/noteHonesty.ts`, the colocated test is its specification): every number the note
   states must match a fact the model was shown, within the precision it was written to, and a
   failing note is asked for once more with the reasons, then dropped and counted. Nothing is ever
-  stored unchecked, and the model's text is untrusted (a plain string, never markup). **Limits
+  stored unchecked, and the model's text is untrusted (a plain string, never markup). **A failure
+  holds its key** (`failKeyOf`, `FAIL_TTL_S` = 15 minutes): a read or request whose write failed
+  leaves a marker, and the next read or request of that key answers `unavailable` without a model
+  call, so a cache-buster or a 429 run cannot turn visitors into unbounded calls; the warm pass
+  ignores the marker and never writes one. **Limits
   apply to brushed ranges only** (the one unbounded key space): 20 an hour per visitor, keyed by
-  the first 16 hex characters of sha256(ip) (the raw address is never stored or logged; on Vercel
+  the first 16 hex characters of HMAC-SHA256(`CRON_SECRET`, ip), plain sha256(ip) where no secret
+  is set (the raw address and the secret are never stored or logged; on Vercel
   `x-forwarded-for` is set by the platform, which is why the hash can be trusted there), and a
   2,000 a day tripwire; a cached range is served without counting. Every other kind is bounded by
   its key and a singleflight lock. **The warm pass is paced**: one item at a time, at least 3.5 s
-  between Gate calls, no new item after 240 s, because the free model answered 429 at about five
+  between Gate calls, no new item after 210 s (the worst item, two attempts at the 20 s timeout,
+  still ends inside the 300 s `maxDuration`), because the free model answered 429 at about five
   calls in 15 s on 2026-10-27. The cron fails closed without `CRON_SECRET`, like the sampler (and
   a preview has none). `NOTES_STORE=memory` (dev only, ignored in production) keeps a local dev
   server's notes out of the shared store. **Each UTC day's outcomes are counted** in
   `ai:mainnet:stats:{day}` (`NOTE_STATS` in `generate.ts`: `ok`, `gateFail`, `rate`, `http`,
-  `timeout`, `empty`, `nokey`, `store`, `error`, `capped`), and
+  `timeout`, `empty`, `nokey`, `store`, `error`, `capped`, then the volumes `calls`, every Gate
+  call, and `retried`, every note that needed its second attempt), and
   `npx tsx scripts/notes-stats.ts` prints the last 14 days on the read-only token: it is the
   go/no-go instrument for keeping the free model.
 - **`/api/global/at?ts=`** binary-searches ~23 tiny per-ordinal records to find the global carrying

@@ -3,7 +3,7 @@ import { fact } from "@/src/data/noteFacts";
 import { checkNote } from "@/src/data/noteHonesty";
 import type { NotableDay } from "@/src/data/noteTypes";
 import type { TrendsWindowData } from "@/src/data/trendWindow";
-import { generateNote, LOCK_TTL_S, NOTE_STATS, type NoteRecord } from "./generate";
+import { FAIL_TTL_S, generateNote, LOCK_TTL_S, NOTE_STATS, type NoteRecord } from "./generate";
 import { GateError, type GateMessage } from "./gate";
 import { KIND_TIMING, lockKeyOf, noteKeyOf, statsKeyOf } from "./keys";
 import { factsFor, type NoteFacts, type NoteReads } from "./sources";
@@ -95,7 +95,7 @@ describe("generateNote", () => {
     const write = set.mock.calls.find(([k]) => k === KEY)!;
     expect(write[2]).toBe(KIND_TIMING.trendDaily.ttlS);
     expect(JSON.parse(write[1])).toEqual({ text: res.state === "ok" && res.text, writtenAt: NOW, spanFrom: NOW - 7 * D, spanTo: NOW, days: [] });
-    expect(await stats()).toEqual({ ok: 1 });
+    expect(await stats()).toEqual({ ok: 1, calls: 1 });
     expect(await lockFree()).toBe(true);
   });
 
@@ -132,7 +132,7 @@ describe("generateNote", () => {
     expect(await generateNote(REQ, d, "read")).toEqual({ state: "unavailable" });
     expect(d.chat).toHaveBeenCalledTimes(2);
     expect(await store.get(KEY)).toBeNull();
-    expect(await stats()).toEqual({ gateFail: 1 });
+    expect(await stats()).toEqual({ gateFail: 1, calls: 2, retried: 1 });
     expect(await lockFree()).toBe(true);
   });
 
@@ -140,7 +140,7 @@ describe("generateNote", () => {
     const d = deps({ chat: async () => { throw new GateError("rate"); } });
     expect(await generateNote(REQ, d, "read")).toEqual({ state: "unavailable" });
     expect(d.chat).toHaveBeenCalledTimes(1);
-    expect(await stats()).toEqual({ rate: 1 });
+    expect(await stats()).toEqual({ rate: 1, calls: 1 });
     expect(await lockFree()).toBe(true);
   });
 
@@ -148,7 +148,7 @@ describe("generateNote", () => {
     const answers = [BAD];
     const d = deps({ chat: async () => { const a = answers.shift(); if (a) return a; throw new GateError("timeout"); } });
     expect(await generateNote(REQ, d, "read")).toEqual({ state: "unavailable" });
-    expect(await stats()).toEqual({ timeout: 1 });
+    expect(await stats()).toEqual({ timeout: 1, calls: 2, retried: 1 });
   });
 
   it("no facts: none, no model call, nothing stored", async () => {
@@ -178,7 +178,7 @@ describe("generateNote", () => {
     vi.spyOn(store, "set").mockRejectedValueOnce(new Error("down"));
     const d = deps();
     expect(await generateNote(REQ, d, "read")).toEqual({ state: "unavailable" });
-    expect(await stats()).toEqual({ store: 1 });
+    expect(await stats()).toEqual({ store: 1, calls: 1 });
     expect(await lockFree()).toBe(true);
   });
 
@@ -186,13 +186,14 @@ describe("generateNote", () => {
     // A non-string answer makes `parseAnswer` throw: not the Gate's fault and not the store's.
     const d = deps({ chat: async () => undefined as unknown as string });
     expect(await generateNote(REQ, d, "read")).toEqual({ state: "unavailable" });
-    expect(await stats()).toEqual({ error: 1 });
+    expect(await stats()).toEqual({ error: 1, calls: 1 });
     expect(await lockFree()).toBe(true);
 
+    // Another key: the first failure holds REQ's (R38).
     const d2 = deps({ chat: async () => { throw new TypeError("a bug"); } });
-    expect(await generateNote(REQ, d2, "read")).toEqual({ state: "unavailable" });
+    expect(await generateNote({ ...REQ, span: "30d" }, d2, "read")).toEqual({ state: "unavailable" });
     expect(d2.chat).toHaveBeenCalledTimes(1);
-    expect(await stats()).toEqual({ error: 2 });
+    expect(await stats()).toEqual({ error: 2, calls: 1 });
     expect(await lockFree()).toBe(true);
   });
 
@@ -205,7 +206,7 @@ describe("generateNote", () => {
   });
 
   it("counts every outcome in one known list", () => {
-    expect([...NOTE_STATS]).toEqual(["ok", "gateFail", "rate", "http", "timeout", "empty", "nokey", "store", "error", "capped"]);
+    expect([...NOTE_STATS]).toEqual(["ok", "gateFail", "rate", "http", "timeout", "empty", "nokey", "store", "error", "capped", "calls", "retried"]);
   });
 
   it("the notes cache itself failing is a store outage too", async () => {
@@ -350,5 +351,93 @@ describe("the span length reaches the model and backs its window (R20)", () => {
     expect(d.chat).toHaveBeenCalledTimes(1);
     const shown = await factsFor("mainnet", "trend", "dag", "7d", NOW, reads);
     expect(checkNote("Over the last 7 days the hypergraph held its pace.", shown!.facts, shown!.names)).toEqual({ ok: true });
+  });
+});
+
+describe("a failed note holds its key for a while (no unbounded model calls, R38)", () => {
+  const FAIL = `${KEY}:fail`;
+  it("a failing read, then a second read: one model attempt in all, both unavailable", async () => {
+    const d = deps({ chat: async () => { throw new GateError("rate"); } });
+    expect(await generateNote(REQ, d, "read")).toEqual({ state: "unavailable" });
+    expect(await generateNote(REQ, d, "read")).toEqual({ state: "unavailable" });
+    expect(d.chat).toHaveBeenCalledTimes(1);
+    expect(d.facts).toHaveBeenCalledTimes(1);
+    expect(await store.get(FAIL)).not.toBeNull();
+  });
+
+  it("a gate failure holds the key too: two answers rejected, then no third call", async () => {
+    const d = deps({ answers: [BAD, BAD, BAD] });
+    await generateNote(REQ, d, "read");
+    expect(await generateNote(REQ, d, "read")).toEqual({ state: "unavailable" });
+    expect(d.chat).toHaveBeenCalledTimes(2);
+  });
+
+  it("the hold is short: once it expires, a read asks the model again", async () => {
+    const set = vi.spyOn(store, "set");
+    const d = deps({ answers: [BAD, BAD, CLEAN] });
+    await generateNote(REQ, d, "read");
+    expect(set.mock.calls.find(([k]) => k === FAIL)![2]).toBe(FAIL_TTL_S);
+    expect(FAIL_TTL_S).toBe(15 * 60);
+    vi.setSystemTime(NOW + FAIL_TTL_S * 1000 + 1);
+    expect((await generateNote(REQ, d, "read")).state).toBe("ok");
+    expect(d.chat).toHaveBeenCalledTimes(3);
+  });
+
+  it("a request (the 1h pill) holds its key, and a read of it then answers unavailable", async () => {
+    const d = deps({ chat: async () => { throw new GateError("http"); } });
+    const req = { ...REQ, span: "1h" as const };
+    expect(await generateNote(req, d, "request")).toEqual({ state: "unavailable" });
+    expect(await generateNote(req, d, "request")).toEqual({ state: "unavailable" });
+    expect(await generateNote(req, d, "read")).toEqual({ state: "unavailable" });
+    expect(d.chat).toHaveBeenCalledTimes(1);
+  });
+
+  it("the warm pass ignores the hold and writes (it is the scheduled writer)", async () => {
+    await store.set(FAIL, "1", FAIL_TTL_S);
+    const d = deps();
+    expect((await generateNote(REQ, d, "warm", { seenWrittenAt: null })).state).toBe("ok");
+    expect(d.chat).toHaveBeenCalledTimes(1);
+    // and a warm failure writes no hold: the next pass, or a reader, is not kept out by it
+    const k2 = noteKeyOf("mainnet", "trend", "dag", "30d");
+    const bad = deps({ chat: async () => { throw new GateError("rate"); } });
+    await generateNote({ ...REQ, span: "30d" }, bad, "warm", { seenWrittenAt: null });
+    expect(await store.get(`${k2}:fail`)).toBeNull();
+  });
+
+  it("a cached note is served even while a hold stands", async () => {
+    await store.set(KEY, record(), 3600);
+    await store.set(FAIL, "1", FAIL_TTL_S);
+    expect((await generateNote(REQ, deps(), "read")).state).toBe("ok");
+  });
+});
+
+describe("stats count model calls as well as outcomes", () => {
+  it("one clean answer: one call", async () => {
+    await generateNote(REQ, deps(), "read");
+    expect(await stats()).toEqual({ ok: 1, calls: 1 });
+  });
+  it("a retried note: two calls, one retried", async () => {
+    await generateNote(REQ, deps({ answers: [BAD, CLEAN] }), "read");
+    expect(await stats()).toEqual({ ok: 1, calls: 2, retried: 1 });
+  });
+  it("a Gate error is a call; a missing key is not", async () => {
+    await generateNote(REQ, deps({ chat: async () => { throw new GateError("timeout"); } }), "read");
+    expect(await stats()).toEqual({ timeout: 1, calls: 1 });
+    await generateNote({ ...REQ, span: "30d" }, deps({ chat: async () => { throw new GateError("nokey"); } }), "read");
+    expect(await stats()).toEqual({ timeout: 1, calls: 1, nokey: 1 });
+  });
+});
+
+describe("a nameless sentence speaks of the subject (R39), wired from the facts", () => {
+  it("a network subject's pronoun sentence cites its own ratio", async () => {
+    const own: NoteFacts = {
+      ...FACTS,
+      facts: [fact("USDC.dag snapshots anchored, ratio to previous span", 1.37, "ratio"), fact("BioFi snapshots anchored, ratio to previous span", 1.5, "ratio")],
+      label: "USDC.dag",
+      subjectName: "USDC.dag",
+    };
+    const d = deps({ facts: async () => structuredClone(own), answers: ["NOTE: Its snapshots anchored rose by 37% on the span before."] });
+    expect((await generateNote({ ...REQ, subject: "dag" }, d, "read")).state).toBe("ok");
+    expect(d.chat).toHaveBeenCalledTimes(1);
   });
 });

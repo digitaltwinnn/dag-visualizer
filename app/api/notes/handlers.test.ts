@@ -1,8 +1,9 @@
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fact } from "@/src/data/noteFacts";
 import { sampledIds } from "@/src/net/lineage";
-import { readNote, requestNote, WARM_SPACING_MS, warmNotes, type WarmDeps } from "./handlers";
+import { readNote, requestNote, WARM_BUDGET_MS, WARM_SPACING_MS, warmNotes, type WarmDeps } from "./handlers";
+import { GateError } from "./gate";
 import { capKeyOf, lockKeyOf, noteKeyOf, rateKeyOf, statsKeyOf } from "./keys";
 import type { NoteFacts } from "./sources";
 import { memoryNotesStore, type NotesStore } from "./store";
@@ -54,6 +55,7 @@ async function stats(): Promise<Record<string, number>> {
 
 beforeEach(() => {
   vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
+  vi.stubEnv("CRON_SECRET", ""); // the plain-hash tests must not depend on the shell's env
   store = memoryNotesStore();
   vi.spyOn(console, "warn").mockImplementation(() => {});
 });
@@ -206,6 +208,83 @@ describe("POST /api/notes/request", () => {
   });
 });
 
+describe("off mainnet, every note request is `none` (no card), never a 400 (R38)", () => {
+  it("a testnet network id is `none`, publicly cacheable, though mainnet's catalog does not track it", async () => {
+    const d = deps();
+    for (const subject of ["DAGnotTrackedOnMainnet0000000000000000", "dag", "all"]) {
+      const res = await readNote(get(`view=hyper&subject=${subject}&net=testnet`), () => d);
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ state: "none" });
+      expect(res.headers.get("Cache-Control")).toBe(PUBLIC);
+    }
+    expect(d.facts).not.toHaveBeenCalled();
+  });
+  it("the request route answers `none` off mainnet before reading the body's subject", async () => {
+    const res = await requestNote(post({ view: "trend", subject: "DAGnotTrackedOnMainnet0000000000000000", span: "1h" }, {}, "?net=integrationnet"), () => deps());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ state: "none" });
+  });
+});
+
+describe("a brush with no span in it is `none`, not a 400 (no card)", () => {
+  it("GET: a brush inside the still-filling bucket at the live edge", async () => {
+    const res = await readNote(get(`view=trend&subject=dag&from=${NOW}&to=${NOW + 1000}`), () => deps());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ state: "none" });
+    expect(res.headers.get("Cache-Control")).toBe(PUBLIC);
+  });
+  it("POST: counts nothing and calls nothing", async () => {
+    const d = deps();
+    const incr = vi.spyOn(store, "incr");
+    const res = await requestNote(post({ view: "trend", subject: "dag", fromMs: NOW - D, toMs: NOW - D }), () => d);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ state: "none" });
+    expect(incr).not.toHaveBeenCalled();
+    expect(d.chat).not.toHaveBeenCalled();
+  });
+  it("a malformed brush is still a 400", async () => {
+    const res = await readNote(get(`view=trend&subject=dag&from=abc&to=${NOW}`), () => deps());
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("a failed note is not retried by every visitor (R38)", () => {
+  it("two reads of a failing note, a cache-buster on the second: one model attempt", async () => {
+    const d = deps({ chat: vi.fn(async () => { throw new GateError("rate"); }) });
+    expect(await (await readNote(get("view=trend&subject=dag&span=7d"), () => d)).json()).toEqual({ state: "unavailable" });
+    const again = await readNote(get("view=trend&subject=dag&span=7d&x=1"), () => d);
+    expect(await again.json()).toEqual({ state: "unavailable" });
+    expect(again.headers.get("Cache-Control")).toBe("no-store");
+    expect(d.chat).toHaveBeenCalledTimes(1);
+  });
+  it("the 1h pill's POST, repeated after a failure: one model attempt", async () => {
+    const d = deps({ chat: vi.fn(async () => { throw new GateError("http"); }) });
+    for (let i = 0; i < 3; i++) {
+      const res = await requestNote(post({ view: "trend", subject: "dag", span: "1h" }), () => d);
+      expect(await res.json()).toEqual({ state: "unavailable" });
+    }
+    expect(d.chat).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("the visitor hash is keyed when the server holds a secret", () => {
+  it("HMAC-SHA256 with CRON_SECRET, first 16 hex characters; the raw address never appears", async () => {
+    vi.stubEnv("CRON_SECRET", "s3cret");
+    const incr = vi.spyOn(store, "incr");
+    await requestNote(post({ view: "trend", subject: "dag", ...RANGE }, { "x-forwarded-for": "1.2.3.4" }), () => deps());
+    const keyed = createHmac("sha256", "s3cret").update("1.2.3.4").digest("hex").slice(0, 16);
+    expect(incr.mock.calls[0]![0]).toBe(rateKeyOf("mainnet", keyed, "2026-10-27T12"));
+    expect(keyed).not.toBe(hash16("1.2.3.4"));
+    expect(incr.mock.calls.flat().join(" ")).not.toContain("1.2.3.4");
+  });
+});
+
+describe("the warm budget leaves the worst item room inside maxDuration 300 s", () => {
+  it("is 210 s: two paced Gate attempts at their 20 s timeout and the reads still finish before 300 s", () => {
+    expect(WARM_BUDGET_MS).toBe(210_000);
+  });
+});
+
 describe("GET /api/notes/warm (cron)", () => {
   const warmReq = (auth?: string) => new Request("http://localhost/api/notes/warm", { headers: auth ? { authorization: auth } : {} });
 
@@ -311,7 +390,7 @@ describe("GET /api/notes/warm (cron)", () => {
     const d = deps({
       now: () => t,
       countries: async () => {
-        t += 241_000; // a slow geo read
+        t += 211_000; // a slow geo read
         return ["DE"];
       },
     });

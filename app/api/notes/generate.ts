@@ -2,7 +2,7 @@ import { factsBlock } from "@/src/data/noteFacts";
 import { checkNote } from "@/src/data/noteHonesty";
 import type { NoteDay, NoteResponse, NoteView } from "@/src/data/noteTypes";
 import { GateError, type gateChat, type GateErrorKind } from "./gate";
-import { lockKeyOf, noteKeyOf, statsKeyOf, timingOf, type NoteSpan } from "./keys";
+import { failKeyOf, lockKeyOf, noteKeyOf, statsKeyOf, timingOf, type NoteSpan } from "./keys";
 import { buildMessages, parseAnswer } from "./prompts";
 import { noteSupported, type factsFor } from "./sources";
 import type { NotesStore } from "./store";
@@ -22,6 +22,13 @@ import type { NotesStore } from "./store";
 //     Anything else that throws once the lock is taken answers the same, counted as `error`; the
 //     lock is released in every case.
 //
+// A FAILURE HOLDS ITS KEY (R38). Nothing failed is stored as a note, so without a hold every later
+// read of that key would ask the model again: a cache-buster, or a 429 storm, would turn visitors
+// into unbounded model calls and starve the warm pass. So a read or a request that took the lock
+// and did not write leaves `failKeyOf(key)` for `FAIL_TTL_S`, and a read or request that finds it
+// answers `unavailable` before the lock, with no model call. The WARM pass ignores the hold and
+// leaves none: it is the scheduled writer, already paced and budgeted.
+//
 // The model's text is UNTRUSTED: it is stored and returned as a plain string, never markup.
 // SECRETS: nothing here sees the Gate key; a log line carries the view, subject, span and an error
 // KIND, never a message or a model answer.
@@ -37,10 +44,12 @@ export interface NoteRecord {
   setKey?: string;
 }
 
-/** The day's counters (`statsKeyOf`): one field per outcome. `store` is an Upstash read or write
- *  that failed, `error` anything else that threw after the lock was taken (a bug, never the model's
- *  fault); `capped` is the request route's. */
-export const NOTE_STATS = ["ok", "gateFail", "rate", "http", "timeout", "empty", "nokey", "store", "error", "capped"] as const;
+/** The day's counters (`statsKeyOf`): one field per outcome, then two volumes. `store` is an
+ *  Upstash read or write that failed, `error` anything else that threw after the lock was taken (a
+ *  bug, never the model's fault); `capped` is the request route's. `calls` is every request that
+ *  reached the Gate (a retry is one more; a missing key is none), `retried` every note that needed
+ *  its second attempt: the go/no-go reads call volume, not only outcomes. */
+export const NOTE_STATS = ["ok", "gateFail", "rate", "http", "timeout", "empty", "nokey", "store", "error", "capped", "calls", "retried"] as const;
 export type NoteStat = (typeof NOTE_STATS)[number];
 /** How long a day's counters are kept: the go/no-go script reads the last 14 days. */
 export const STATS_TTL_S = 30 * 86_400;
@@ -49,6 +58,10 @@ export const STATS_TTL_S = 30 * 86_400;
  *  room to spare. The unlock is unconditional, so a writer that outlived its lock would free the
  *  next writer's (R30). */
 export const LOCK_TTL_S = 60;
+
+/** How long a failed read or request holds its key (see the header): long enough that a burst of
+ *  visitors, or a 429 run, costs one attempt per key, short enough that a passing outage heals. */
+export const FAIL_TTL_S = 15 * 60;
 
 export interface NoteRequest {
   net: string;
@@ -119,22 +132,28 @@ async function write(
   req: NoteRequest,
   input: NonNullable<Awaited<ReturnType<typeof factsFor>>>,
   chat: typeof gateChat,
+  count: (field: NoteStat) => Promise<void>,
 ): Promise<Written> {
   const block = factsBlock(input.facts, input.blurbs);
   const days = input.days.length ? input.days : null;
+  // A sentence naming no one speaks of the subject (R39): absent for the whole network.
+  const subject = input.subjectName;
   let reasons: string[] | undefined;
   for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) await count("retried");
     let answer: string;
     try {
       answer = await chat(buildMessages(req.view, input.label, block, days, reasons));
+      await count("calls");
     } catch (e) {
       if (!(e instanceof GateError)) throw e; // not the Gate's: `generateNote` counts it as `error`
       const kind: GateErrorKind = e.kind;
+      if (kind !== "nokey") await count("calls"); // a missing key never reached the Gate
       warn(req, kind);
       return { ok: false, stat: kind };
     }
     const { note, captions } = parseAnswer(answer);
-    const check = checkNote(note, input.facts, input.names, { maxSentences: 3 });
+    const check = checkNote(note, input.facts, input.names, { maxSentences: 3, subject });
     if (!check.ok) {
       reasons = check.reasons;
       continue;
@@ -142,7 +161,7 @@ async function write(
     const kept: NoteDay[] = [];
     for (const d of input.days) {
       const caption = captions.get(isoDay(d.dayMs));
-      if (caption && checkNote(caption, input.facts, input.names, { maxSentences: 1 }).ok)
+      if (caption && checkNote(caption, input.facts, input.names, { maxSentences: 1, subject }).ok)
         kept.push({ dayMs: d.dayMs, kind: d.kind, networkId: d.networkId, caption });
     }
     return { ok: true, text: note, days: kept };
@@ -179,6 +198,27 @@ export async function generateNote(
   }
   if (cached && (mode !== "warm" || writtenSincePlan(cached))) return okOf(cached);
 
+  // 2b. A recent failure holds the key: no model call until it expires (reads and requests only).
+  const failKey = failKeyOf(key);
+  if (mode !== "warm") {
+    try {
+      if ((await store.get(failKey)) != null) return UNAVAILABLE;
+    } catch {
+      warn(req, "store");
+      await countStat(store, net, now, "store");
+      return UNAVAILABLE;
+    }
+  }
+  /** Leave the hold after a failed read or request. Best effort: a failed write changes nothing. */
+  const hold = async (): Promise<void> => {
+    if (mode === "warm") return;
+    try {
+      await store.set(failKey, "1", FAIL_TTL_S);
+    } catch {
+      // The store is down; the answer already says so.
+    }
+  };
+
   // 3. An on-request kind (the 1h pill, a brushed range) is written only when asked for.
   if (!cached && timing.refreshMs == null && mode === "read") return REQUEST;
 
@@ -214,14 +254,16 @@ export async function generateNote(
     } catch {
       warn(req, "store");
       await countStat(store, net, now, "store");
+      await hold();
       return UNAVAILABLE;
     }
     if (!input) return NONE;
 
     // 6–7. The model, held to the facts.
-    const written = await write(req, input, deps.chat);
+    const written = await write(req, input, deps.chat, (field) => countStat(store, net, now, field));
     if (!written.ok) {
       await countStat(store, net, now, written.stat);
+      await hold();
       return UNAVAILABLE;
     }
 
@@ -239,6 +281,7 @@ export async function generateNote(
     } catch {
       warn(req, "store");
       await countStat(store, net, now, "store");
+      await hold();
       return UNAVAILABLE;
     }
     await countStat(store, net, now, "ok");
@@ -247,6 +290,7 @@ export async function generateNote(
     // Anything else that threw once the lock was taken: an instrument state, counted, never a dump.
     warn(req, "error");
     await countStat(store, net, now, "error");
+    await hold();
     return UNAVAILABLE;
   } finally {
     try {
