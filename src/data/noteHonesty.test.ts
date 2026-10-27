@@ -273,9 +273,10 @@ describe("checkNote — a change written from A to B is ONE measured pair (R54)"
   const Pf = (label: string, value: number, kind: Fact["kind"], text: string, key?: string, end?: End): Fact =>
     key && end ? { label, value, kind, text, pair: { key, end } } : { label, value, kind, text };
   // The facts behind the first live note under "say how much" (2026-10-27), one per line as the
-  // model saw them; 9 is Amazon's (and IONOS's) node count, not the fleet's.
+  // model saw them, with the fleet's one figure the tiers' 86 (R58: the geo family's 80 was a
+  // second figure for the same quantity); 9 is Amazon's (and IONOS's) node count, not the fleet's.
   const dump: Fact[] = [
-    Pf("Located nodes in the fleet", 80, "count", "80", "fleet", "to"),
+    Pf("Located nodes in the fleet", 86, "count", "86", "fleet", "to"),
     Pf("Germany, nodes (biggest country)", 33, "count", "33", "cc:DE", "to"),
     Pf("United States, nodes (second biggest country)", 27, "count", "27", "cc:US", "to"),
     Pf("Finland, nodes (third biggest country)", 17, "count", "17", "cc:FI", "to"),
@@ -283,7 +284,7 @@ describe("checkNote — a change written from A to B is ONE measured pair (R54)"
     Pf("Amazon.com, nodes (second biggest provider)", 9, "count", "9"),
     Pf("IONOS, nodes (third biggest provider)", 9, "count", "9"),
     Pf("Located nodes in the fleet a month ago", 173, "count", "173", "fleet", "from"),
-    Pf("Located nodes in the fleet, now against a month ago", 80 / 173, "ratio", "0.46"),
+    Pf("Located nodes in the fleet, now against a month ago", 86 / 173, "ratio", "0.50"),
     Pf("Germany, nodes a month ago", 67, "count", "67", "cc:DE", "from"),
     Pf("Germany, nodes now against a month ago", 33 / 67, "ratio", "0.49"),
     Pf("United States, nodes a month ago", 58, "count", "58", "cc:US", "from"),
@@ -300,7 +301,7 @@ describe("checkNote — a change written from A to B is ONE measured pair (R54)"
   });
 
   it("accepts the change the facts hold, and a country's own pair", () => {
-    expect(gate("Located nodes fell from 173 a month ago to 80.")).toEqual({ ok: true });
+    expect(gate("Located nodes fell from 173 a month ago to 86.")).toEqual({ ok: true });
     expect(gate("Germany dropped from 67 to 33.")).toEqual({ ok: true });
   });
 
@@ -311,7 +312,7 @@ describe("checkNote — a change written from A to B is ONE measured pair (R54)"
   });
 
   it("rejects the ends swapped: the earlier reading is not the later one", () => {
-    expect(gate("Located nodes rose from 80 to 173.").ok).toBe(false);
+    expect(gate("Located nodes rose from 86 to 173.").ok).toBe(false);
   });
 
   it("does not read a from-phrase as a change when its 'to' belongs to a later verb", () => {
@@ -320,8 +321,8 @@ describe("checkNote — a change written from A to B is ONE measured pair (R54)"
   });
 
   it("keeps today's rule for a number outside a change construction", () => {
-    expect(gate("Amazon.com runs 9 nodes, and the fleet fell from 173 to 80.")).toEqual({ ok: true });
-    expect(gate("Germany hosts 33 of the 80 located nodes.")).toEqual({ ok: true });
+    expect(gate("Amazon.com runs 9 nodes, and the fleet fell from 173 to 86.")).toEqual({ ok: true });
+    expect(gate("Germany hosts 33 of the 86 located nodes.")).toEqual({ ok: true });
     expect(gate("Amazon.com runs 12 nodes.").ok).toBe(false);
   });
 
