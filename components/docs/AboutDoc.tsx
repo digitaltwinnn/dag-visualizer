@@ -93,14 +93,18 @@ export default function AboutDoc() {
           endpoints, the global snapshot stream, each metagraph&apos;s cluster and each
           node&apos;s status, and drawn as it comes in. Built for many visitors at once: this site
           asks the network once every few seconds and shares that answer with everyone watching,
-          so a busy day never adds load to the network itself.
+          so a busy day never adds load to the network itself. The one exception is an AI note,
+          which is written from those same figures a little earlier and shows when it was written.
         </p>
         <p className="mt-2 text-prose text-muted-foreground">
           Node locations come from their public internet addresses, so they are accurate to a
-          city and a hosting provider, not to a street. The only thing stored behind this site
-          is the network&apos;s own public history — activity totals summed from the chain for
-          the History view. Nothing about you: the page keeps a short memory of recent
-          snapshots while it is open, and forgets it when you close the tab.
+          city and a hosting provider, not to a street. What is stored behind this site is the
+          network&apos;s own public history — activity totals summed from the chain for the
+          History view — and the short AI notes written about it. Nothing about you: the page
+          keeps a short memory of recent snapshots while it is open, and forgets it when you
+          close the tab. The one trace is when you ask for a note on a range you brush: a
+          count kept for two hours under a scrambled form of your address, so no single visitor
+          can ask for too many.
         </p>
         <p className="mt-2 text-prose text-muted-foreground">
           When something can&apos;t be reached for a moment, the screen simply says so —
@@ -143,6 +147,15 @@ export default function AboutDoc() {
           while a snapshot is pinned and its card leads with how the two are related; a fact
           already stated by the card above it isn&apos;t repeated below; and the label floating
           in the scene follows whichever card you open, just as the camera does.
+        </p>
+        {/* The AI notes card, said once in the page's own register (2026-10-27; the user approves
+            the wording live). It states the two promises the feature rests on: the numbers are
+            the view's own, and a note the figures cannot back never shows. */}
+        <p>
+          Some cards are marked <strong>AI notes</strong>. A language model reads the same
+          measured figures the view shows and writes two or three sentences on what stands out.
+          A note with a number the figures cannot back is thrown away, and the notes are always
+          marked as AI so they never pass for a measurement.
         </p>
         {/* One selection across the views, and RAW as the one step down (user, 2026-10-09:
             the "three depths" paragraph this replaces called History a depth below the scene,

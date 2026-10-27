@@ -93,6 +93,35 @@ them — but the Next Node server can.
   network's new address) is read back to its FIRST snapshot within the same depth
   (`fetchSince.ts`), not just its newest page. The History view (`/trends`) is the read route's
   consumer.
+- **`/api/notes`, `/api/notes/request`, `/api/notes/warm`** (2026-10-27) are the AI notes: a few
+  sentences a free model (the Constellation Gate, `GATE_API_KEY`, `GATE_MODEL`) writes about the
+  figures a view is showing. **Mainnet only**; any other `?net=` answers `none`. Notes live in
+  their OWN key family, `ai:{net}:v{NOTES_VERSION}:{view}:{subject}:{span}` (`keys.ts`), never under
+  `t:` (a rebuild wipes that prefix) or `geo:`: a note is a losable cache entry, and the families
+  must not share a fate. ⚠️ **A prompt or a facts change bumps `NOTES_VERSION`**, which orphans every
+  stored note at once (their TTLs reap them). Timing is `KIND_TIMING` in `keys.ts`: hyper and
+  geography refresh daily (3-day TTL), the ledger and History's 24-hour note hourly (6 hours),
+  History's daily pills daily, the 1-hour pill and a brushed range only when asked (15 minutes and
+  30 days). `GET /api/notes` reads (`public, s-maxage=300` for a note, `no-store` for every
+  instrument state), `POST /api/notes/request` writes the two on-request kinds, and
+  `GET /api/notes/warm` is the hourly cron. **The honesty gate (rule 10) is mechanical**
+  (`src/data/noteHonesty.ts`, the colocated test is its specification): every number the note
+  states must match a fact the model was shown, within the precision it was written to, and a
+  failing note is asked for once more with the reasons, then dropped and counted. Nothing is ever
+  stored unchecked, and the model's text is untrusted (a plain string, never markup). **Limits
+  apply to brushed ranges only** (the one unbounded key space): 20 an hour per visitor, keyed by
+  the first 16 hex characters of sha256(ip) (the raw address is never stored or logged; on Vercel
+  `x-forwarded-for` is set by the platform, which is why the hash can be trusted there), and a
+  2,000 a day tripwire; a cached range is served without counting. Every other kind is bounded by
+  its key and a singleflight lock. **The warm pass is paced**: one item at a time, at least 3.5 s
+  between Gate calls, no new item after 240 s, because the free model answered 429 at about five
+  calls in 15 s on 2026-10-27. The cron fails closed without `CRON_SECRET`, like the sampler (and
+  a preview has none). `NOTES_STORE=memory` (dev only, ignored in production) keeps a local dev
+  server's notes out of the shared store. **Each UTC day's outcomes are counted** in
+  `ai:mainnet:stats:{day}` (`NOTE_STATS` in `generate.ts`: `ok`, `gateFail`, `rate`, `http`,
+  `timeout`, `empty`, `nokey`, `store`, `error`, `capped`), and
+  `npx tsx scripts/notes-stats.ts` prints the last 14 days on the read-only token: it is the
+  go/no-go instrument for keeping the free model.
 - **`/api/global/at?ts=`** binary-searches ~23 tiny per-ordinal records to find the global carrying
   that exact stamp (the anchor join is timestamp EQUALITY — which has exceptions: see the
   timestamp note in `src/data/CLAUDE.md`; such a row answers 404 here, honestly). Its one consumer is the anchor log's

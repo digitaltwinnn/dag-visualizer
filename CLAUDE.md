@@ -123,7 +123,8 @@ scope from the table.
    click semantics → `domain/pickActions.ts`, the unlisted network → `src/data/unlisted.ts`, the stage
    light → `scene/objects/StageLight.ts`. Don't grow a second copy in the Engine or a component.
 9. **The scene↔HUD hover pairing is sacrosanct.** The shared store channels (`hoverFilter`,
-   `hoverNodeId`, `hoverSnapOrd`, `hoverMetaSnap`, `hoverCountry`, `hoverCohort`), `.subject-paired`
+   `hoverNodeId`, `hoverSnapOrd`, `hoverMetaSnap`, `hoverCountry`, `hoverCohort`, `hoverNoteDay`),
+   `.subject-paired`
    and the marker classes survive every refactor. Hovers preview, never commit. **A surface hovers the
    subject it would COMMIT** — `hoverSnapOrd` is a global tick, `hoverMetaSnap` one metagraph
    snapshot (keyed by `metaSnapHoverKey(metaId, ordinal)`), so the anchor-log row, the explorer's leaf
@@ -494,16 +495,18 @@ not through `_tweenTo`, which would compose `dollyBack` and `railsLean` in a sec
 ## Deploying (Vercel)
 
 Target host is Vercel; any Node host works. The trends backend needs `CRON_SECRET` and the Upstash
-Redis tokens as env vars — the rest of the app needs none.
+Redis tokens as env vars; the AI notes add `GATE_API_KEY` (the Constellation Gate, free model) and
+optionally `GATE_MODEL` — the rest of the app needs none.
 
 Enabled now, on the **Pro plan** (upgraded 2026-09-06 for the trends cron): a clean `next build` with
 the route caching above; **security headers** in `next.config.mjs` (a moderate CSP — inline
 script/style for the Next runtime, `img https:` for logos, `connect https:` since the Constellation
 host set is open, plus telemetry; dev adds `unsafe-eval`/`ws:`/`http:`), added for reputation-scanner
 posture after a scanner NRD-isolated the fresh domain; Speed Insights + Analytics in the layout, both
-no-op off Vercel; and a 15-minute Vercel Cron (`vercel.json`) hitting `/api/trends/sample`, which
-merge-writes into Upstash Redis (the Vercel-native marketplace integration) holding the trends
-timeseries — see `app/api/CLAUDE.md`.
+no-op off Vercel; and two Vercel Crons (`vercel.json`): a 15-minute one hitting `/api/trends/sample`,
+which merge-writes into Upstash Redis (the Vercel-native marketplace integration) holding the trends
+timeseries, and an hourly one (`7 * * * *`) hitting `/api/notes/warm`, which rewrites the AI notes
+that are due, under the same `CRON_SECRET` — see `app/api/CLAUDE.md`.
 
 ⚠️ **Crons fire on the PRODUCTION deployment only — a PR preview is not production.** The preview
 deploys the trends routes against the SAME Upstash store (the marketplace env vars span all three
