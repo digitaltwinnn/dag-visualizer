@@ -128,6 +128,7 @@ describe("geoFacts before history exists", () => {
     expect(de.value).toBeCloseTo(2);
     expect(one(r, /^Germany, nodes a month ago/).value).toBe(25);
     expect(one(r, /^Located nodes in the fleet, now against a month ago/).value).toBeCloseTo(100 / 51); // the halved fleet rounds to 51
+    expect(one(r, /^Located nodes in the fleet a month ago$/).value).toBe(51);
     expect(find(r, /^(Hetzner|OVH|Amazon).*month ago/)).toHaveLength(0);
   });
 

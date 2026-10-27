@@ -14,6 +14,7 @@ import type { NoteView, NotableDay } from "@/src/data/noteTypes";
 export const VOICE = [
   "You write one short note about a live network dashboard: the reader can see the numbers; say what stands out, in two or three plain sentences.",
   "Lead with what changed. Do not restate a breakdown the reader can already see on screen, such as how many nodes run each layer, unless it changed.",
+  "When something rose or fell, say by how much: give the earlier figure and the current one as the facts state them (from 14 a month ago to 9), never only the direction.",
   "",
   "Rules:",
   "Plain, present tense, no hype, no advice. No meta-commentary: never mention the facts, the data, the note or yourself.",

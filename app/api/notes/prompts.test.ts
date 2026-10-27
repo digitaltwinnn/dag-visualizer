@@ -22,6 +22,10 @@ describe("VOICE", () => {
     );
   });
 
+  it("asks for how much a figure moved, never only the direction (user, 2026-10-27)", () => {
+    expect(VOICE).toContain("say by how much: give the earlier figure and the current one");
+  });
+
   it("steers the model toward what the honesty gate accepts", () => {
     expect(VOICE).toMatch(/exactly as the facts give them/);
     expect(VOICE).toMatch(/never round a small figure to zero/i);

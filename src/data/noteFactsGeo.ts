@@ -314,7 +314,12 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     // CHANGE. Countries from the tiers' history; providers from the geo family, both ends measured.
     const nowTotal = ccNow ? sum(ccNow.cc) : 0;
     const thenTotal = ccThen ? sum(ccThen.cc) : 0;
-    if (nowTotal > 0 && thenTotal > 0) facts.push(fact("Located nodes in the fleet, now against a month ago", nowTotal / thenTotal, "ratio"));
+    // The earlier count beside the ratio, as every other "a month ago" here: a note says how much
+    // it moved (from … to …), never only the direction (user, 2026-10-27).
+    if (nowTotal > 0 && thenTotal > 0) {
+      facts.push(fact("Located nodes in the fleet a month ago", thenTotal, "count"));
+      facts.push(fact("Located nodes in the fleet, now against a month ago", nowTotal / thenTotal, "ratio"));
+    }
     for (const c of countries.slice(0, TOP)) countryChange(c.cc);
     if (geoThen) {
       const was = providersOf(geoThen.isp, providerNames);

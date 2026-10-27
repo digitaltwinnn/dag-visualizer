@@ -297,7 +297,7 @@ describe("factsFor — the per-view read table", () => {
     expect(changes.length).toBeGreaterThan(0);
     for (const f of changes) {
       if (f.label.endsWith("now against a month ago")) expect(f.value).toBe(1);
-      else expect([NORMAL.DE, NORMAL.US]).toContain(f.value);
+      else expect([NORMAL.DE, NORMAL.US, NORMAL.DE + NORMAL.US]).toContain(f.value); // a country, or the fleet's located total
     }
   });
 
