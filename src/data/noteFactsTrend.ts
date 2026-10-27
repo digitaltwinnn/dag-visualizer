@@ -1,7 +1,8 @@
 import { fact, gaugeChange } from "@/src/data/noteFacts";
 import { NOTABLE_CAPS, notableDays } from "@/src/data/notableDays";
 import type { Fact, NotableDay } from "@/src/data/noteTypes";
-import { globalSeries, METRIC_ORDER, metricLabel, metricSeries, spanAverage, trimCounterEdges, TREND_METRICS } from "@/src/data/trendSeries";
+import { formatDag, globalSeries, METRIC_ORDER, metricLabel, metricSeries, spanAverage, trimCounterEdges, TREND_METRICS, unlistedUnmeasured, withUnlisted } from "@/src/data/trendSeries";
+import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 import { trimNewestPartial, type TrendsWindowData } from "@/src/data/trendWindow";
 import type { TrendMetric } from "@/src/store/store";
 
@@ -24,19 +25,29 @@ import type { TrendMetric } from "@/src/store/store";
 //     trimmed (`trimCounterEdges`); the nodes are a gauge and go through `gaugeChange`;
 //   · a payload with no covered bucket (`g.ticks`, the store's one coverage marker) yields null;
 //   · the still-filling newest day never reaches `notableDays` (`trimNewestPartial`);
-//   · shares are of what the networks anchored, and the denominator is never smaller than their sum.
+//   · shares are of what the networks anchored, and the denominator is never smaller than their sum;
+//   · THE STORE'S PAYLOAD IS FOLDED HERE (`withUnlisted`): the store holds `g.feeFloor` / `g.kbFloor`
+//     and the hypergraph's fee and data totals exist only after the fold. Where a bucket of the
+//     trimmed span has no unlisted coverage (`unlistedUnmeasured`), that total is only its catalog
+//     floor: the fact is labelled ", at least" and gets no ratio (a floor over a floor is no ratio);
+//   · a gauge that began after the span did (the fleet's series starts the day the sampler first
+//     ran) states only its current level, never a "start" that is not the span's;
+//   · a span SHORTER than a day states counters as the span's total, not "per day" (×288 of five
+//     minutes is a rate nobody measured); ratios are the same either way.
 //
 // WHICH ZOOMS GET NOTABLE DAYS: 7d, 30d, 1y and all (`NOTABLE_CAPS`). A 1h, 24h or custom-range
 // note describes a stretch too short for "a day that stood out".
 //
 // Pure: no store values, react or I/O (the colocated test is the specification — rule 4).
 
+/** `cur`, `prev` and `daily` are the STORE's payload (what the tile route assembles), UNFOLDED:
+ *  `trendFacts` folds each with `withUnlisted` itself. */
 export interface TrendFactsInput {
   subject: "dag" | string; // "dag" = the whole hypergraph
   zoom: "1h" | "24h" | "7d" | "30d" | "1y" | "all" | "range";
   span: { fromMs: number; toMs: number };
-  cur: TrendsWindowData; // the span's own payload
-  prev: TrendsWindowData | null; // the equal span before it (null for "all")
+  cur: TrendsWindowData; // the span's own payload (store, unfolded)
+  prev: TrendsWindowData | null; // the equal span before it (null for "all"; store, unfolded)
   /** Daily buckets for the notable days: ~30 days of LEAD-IN before the span (they feed each
    *  series' level) through the span's end. Null for 1h / 24h / short ranges. */
   daily: TrendsWindowData | null;
@@ -47,26 +58,35 @@ export interface TrendFactsInput {
 export interface TrendFacts {
   facts: Fact[];
   days: NotableDay[];
-  /** Every display name a fact or blurb mentions — what the gate strips and scopes by. */
+  /** EVERY catalog display name, not only those the facts mention: the gate strips and scopes by
+   *  these, and a network named in the note but absent from the facts must still count as NAMED
+   *  (else it reads as nameless and borrows the hypergraph's own ratio). */
   names: string[];
   /** "<name> is: <blurb>" lines for the networks a first / last day on the hypergraph names. */
   blurbs: string[];
 }
 
 const TOP_NETWORKS = 3;
+/** A gauge whose first measured sample falls later than this fraction of the span's buckets began
+ *  after the span did. */
+const LATE_START = 0.1;
 
-/** The words after the label that say what a value is, per measure. */
-const UNIT_PHRASE: Record<TrendMetric, string> = {
-  snapshots: "per day",
-  globals: "per day",
-  blocks: "per day",
-  fees: "DAG per day",
-  kb: "MB per day",
-  nodes: "",
-  continuity: "between snapshots",
+/** The words after the label that say what a value is, per measure: a counter's average PER DAY
+ *  or, on a span under a day, its TOTAL. */
+const UNIT_PHRASE: Record<TrendMetric, { day: string; total: string }> = {
+  snapshots: { day: "per day", total: "" },
+  globals: { day: "per day", total: "" },
+  blocks: { day: "per day", total: "" },
+  fees: { day: "DAG per day", total: "DAG" },
+  kb: { day: "MB per day", total: "MB" },
+  nodes: { day: "", total: "" },
+  continuity: { day: "between snapshots", total: "between snapshots" },
 };
+const DAY_MS = 86_400_000;
 
 const valueKind = (m: TrendMetric): Fact["kind"] => (m === "continuity" ? "duration" : m === "fees" || m === "kb" ? "amount" : "count");
+/** A fee is written by the chart's own formatter. */
+const valueFormat = (m: TrendMetric): ((v: number) => string) | undefined => (m === "fees" ? formatDag : undefined);
 
 /** One measure of one subject across a window: the points and, for cadence, the weights it was
  *  measured over. The hypergraph reads its global rows — except its NODES, which are its own
@@ -87,11 +107,30 @@ function spanValue(metric: TrendMetric, id: string, data: TrendsWindowData): num
   return spanAverage(metric, cut(points), data.stepMs, weights && cut(weights));
 }
 
+/** A counter's TOTAL over the (edge-trimmed) span: the sum of its buckets. Null unless EVERY
+ *  bucket was measured — a sum that skipped a hole would understate and read as the span's. */
+function spanTotal(metric: TrendMetric, id: string, data: TrendsWindowData): number | null {
+  const pts = trimCounterEdges(pointsOf(metric, id, data).points, data.stepMs);
+  if (!pts.length || pts.some((v) => v == null)) return null;
+  return pts.reduce<number>((a, v) => a + v!, 0);
+}
+
+/** Whether the unlisted channels went unmeasured in any bucket of the trimmed span, which makes
+ *  the hypergraph's fee and data totals their catalog floor there. */
+function floorOnly(data: TrendsWindowData): boolean {
+  return trimCounterEdges(unlistedUnmeasured(data.series), data.stepMs).some(Boolean);
+}
+
 const dayMeasured = (d: NotableDay): "count" | "duration" => (d.kind === "pause" ? "duration" : "count");
 
 export function trendFacts(input: TrendFactsInput): TrendFacts | null {
-  const { subject, zoom, span, cur, prev, names: catalog, blurbs: blurbOf } = input;
+  const { subject, zoom, span, names: catalog, blurbs: blurbOf } = input;
+  const isListed = (id: string) => LISTED_IDS.has(id) || id in catalog;
+  const fold = (d: TrendsWindowData): TrendsWindowData => ({ ...d, series: withUnlisted(d.series, isListed, UNLISTED_ID) });
+  const cur = fold(input.cur);
+  const prev = input.prev && fold(input.prev);
   if (!(cur.series["g.ticks"] ?? []).some((v) => v != null)) return null;
+  const perDay = span.toMs - span.fromMs >= DAY_MS;
 
   const dag = subject === "dag";
   const nameOf = (id: string) => catalog[id] ?? id;
@@ -116,26 +155,44 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
     if (TREND_METRICS[metric].kind === "gauge") {
       // A gauge is a level, not a rate: its start and end, read through outages. No previous-span
       // comparison — the change inside the span is what a level has to say.
-      const ch = gaugeChange(pointsOf(metric, subject, cur).points);
+      const gauge = pointsOf(metric, subject, cur).points;
+      const ch = gaugeChange(gauge);
       if (!ch) continue;
+      // A gauge that began well after the span did has no start of the span's: state only where it
+      // stands now.
+      if (ch.firstIndex > LATE_START * gauge.length) {
+        facts.push(fact(`${label} at the end of the span`, ch.to, "count"));
+        continue;
+      }
       facts.push(fact(`${label} at the start of the span`, ch.from, "count"));
       facts.push(fact(`${label} at the end of the span`, ch.to, "count"));
       if (ch.from > 0 && ch.to !== ch.from) facts.push(fact(`${label}, ratio end to start`, ch.to / ch.from, "ratio"));
       continue;
     }
+    const total = !perDay && metric !== "continuity";
+    const phrase = UNIT_PHRASE[metric][total ? "total" : "day"];
+    const unit = phrase ? `, ${phrase}` : "";
+    const kind = valueKind(metric);
+    const format = valueFormat(metric);
+    // The hypergraph's fee and data totals are only a floor where the unlisted channels were not measured.
+    const isTotalRow = subject === "dag" && (metric === "fees" || metric === "kb");
+    const curFloor = isTotalRow && floorOnly(cur);
+    const prevFloor = isTotalRow && !!prev && floorOnly(prev);
     const now = spanValue(metric, subject, cur);
     if (now == null) continue;
-    const unit = UNIT_PHRASE[metric];
-    const kind = valueKind(metric);
-    facts.push(fact(`${label}, ${unit}, this span`, now, kind));
+    const read = (d: TrendsWindowData) => (total ? spanTotal(metric, subject, d) : spanValue(metric, subject, d));
+    const shown = read(cur);
+    if (shown != null) facts.push(fact(`${label}${unit}, this span${curFloor ? ", at least" : ""}`, shown, kind, format));
     const before = prev ? spanValue(metric, subject, prev) : null;
     if (before == null) continue;
-    facts.push(fact(`${label}, ${unit}, previous span`, before, kind));
-    if (before > 0) facts.push(fact(`${label}, ratio to previous span`, now / before, "ratio"));
+    const shownBefore = read(prev!);
+    if (shownBefore != null) facts.push(fact(`${label}${unit}, previous span${prevFloor ? ", at least" : ""}`, shownBefore, kind, format));
+    if (before > 0 && !curFloor && !prevFloor) facts.push(fact(`${label}, ratio to previous span`, now / before, "ratio"));
   }
 
   if (dag) {
     // THE NETWORKS BEHIND THE TOTAL: who anchored most, their shares, how many anchored at all.
+    const dayWord = perDay ? ", per day" : "";
     const avg = new Map<string, number>();
     for (const id of ids) {
       const v = spanValue("snapshots", id, cur);
@@ -148,14 +205,16 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
       const denom = Math.max(spanValue("snapshots", "dag", cur) ?? 0, sum);
       for (const [id, v] of ranked.slice(0, TOP_NETWORKS)) {
         const n = mention(id);
-        facts.push(fact(`${n} snapshots anchored, per day, this span`, v, "count"));
+        const own = perDay ? v : spanTotal("snapshots", id, cur);
+        if (own != null) facts.push(fact(`${n} snapshots anchored${dayWord}, this span`, own, "count"));
         facts.push(fact(`${n} share of snapshots anchored, this span`, v / denom, "share"));
         const before = prev ? spanValue("snapshots", id, prev) : null;
         if (before != null && before > 0) facts.push(fact(`${n} snapshots anchored, ratio to previous span`, v / before, "ratio"));
       }
       facts.push(fact("Networks that anchored snapshots, this span", ranked.length, "count"));
       const [quietId, quietV] = ranked[ranked.length - 1]!;
-      facts.push(fact(`Quietest active network ${mention(quietId)}, snapshots anchored per day, this span`, quietV, "count"));
+      const quietOwn = perDay ? quietV : spanTotal("snapshots", quietId, cur);
+      if (quietOwn != null) facts.push(fact(`Quietest active network ${mention(quietId)}, snapshots anchored${dayWord}, this span`, quietOwn, "count"));
     }
   }
 
@@ -197,5 +256,5 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
     });
   }
 
-  return { facts, days, names: [...mentioned], blurbs };
+  return { facts, days, names: [...new Set([...Object.values(catalog), ...mentioned])], blurbs };
 }

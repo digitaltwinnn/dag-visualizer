@@ -19,22 +19,33 @@ import { formatSeconds } from "@/src/data/trendSeries";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
 
-/** A count is an integer, so it is written whole — except a per-day AVERAGE under ten, where
- *  rounding 0.4 to "0" would state that nothing happened. */
+/** A value under 1 is written to 2 SIGNIFICANT digits (0.034, 0.04), never rounded to a "0" that
+ *  would state nothing happened: the gate backs a written zero by this text, and a quiet network
+ *  anchors a few snapshots a month (0.03 a day), not none. */
+function belowOne(v: number): string {
+  return v.toLocaleString("en-US", { maximumSignificantDigits: 2 });
+}
+
+/** A count is an integer, so it is written whole — except a per-day AVERAGE under ten, which keeps
+ *  a decimal (see `belowOne` for a value under 1). */
 function countText(v: number): string {
+  if (v !== 0 && Math.abs(v) < 1) return belowOne(v);
   return Math.abs(v) >= 10 || Number.isInteger(v)
     ? Math.round(v).toLocaleString("en-US")
     : v.toLocaleString("en-US", { maximumFractionDigits: 1 });
 }
 
-/** One fact. `kind` picks the notation: count (12,159), amount (one decimal at most), share (a
- *  rounded %), ratio (2 decimals), duration (`formatSeconds`, seconds in), date (UTC "Oct 19",
- *  epoch ms in). */
-export function fact(label: string, value: number, kind: Fact["kind"]): Fact {
+/** One fact. `kind` picks the notation: count (12,159), amount (one decimal at most, two
+ *  significant digits under 1), share (a rounded %), ratio (2 decimals), duration
+ *  (`formatSeconds`, seconds in), date (UTC "Oct 19", epoch ms in). `format` replaces an amount's
+ *  notation with the chart's own formatter (fees are written by `formatDag`). */
+export function fact(label: string, value: number, kind: Fact["kind"], format?: (v: number) => string): Fact {
   let text: string;
   switch (kind) {
     case "count": text = countText(value); break;
-    case "amount": text = value.toLocaleString("en-US", { maximumFractionDigits: 1 }); break;
+    case "amount":
+      text = format ? format(value) : value !== 0 && Math.abs(value) < 1 ? belowOne(value) : value.toLocaleString("en-US", { maximumFractionDigits: 1 });
+      break;
     case "share": text = `${Math.round(value * 100)}%`; break;
     case "ratio": text = value.toFixed(2); break;
     case "duration": text = formatSeconds(value); break;
@@ -64,15 +75,17 @@ const HOLD_TOLERANCE = 0.1;
  *  samples never touches either end) and through a one-sample spike. The end level is stated only
  *  if it HOLDS: the median of the final quarter of the samples must sit within 10% of it, else
  *  the span ended mid-move and no honest "to" exists. Null samples are not measured and are left
- *  out; fewer than 12 measured samples is too few to call a level. */
-export function gaugeChange(points: readonly (number | null)[]): { from: number; to: number } | null {
+ *  out; fewer than 12 measured samples is too few to call a level. `firstIndex` is where the first
+ *  measured sample sits in `points`: a gauge that began late (the fleet's series starts the day the
+ *  sampler first ran) has a `from` that is not the span's start, and the caller decides. */
+export function gaugeChange(points: readonly (number | null)[]): { from: number; to: number; firstIndex: number } | null {
   const xs = points.filter((v): v is number => v != null);
   if (xs.length < MIN_SAMPLES) return null;
   const from = median(xs.slice(0, LEVEL_SAMPLES));
   const to = median(xs.slice(-LEVEL_SAMPLES));
   const quarter = median(xs.slice(-Math.ceil(xs.length / 4)));
   if (Math.abs(quarter - to) > HOLD_TOLERANCE * Math.abs(to)) return null;
-  return { from, to };
+  return { from, to, firstIndex: points.findIndex((v) => v != null) };
 }
 
 /** The facts as the model is shown them: one `label: text` line each, then the ready-made

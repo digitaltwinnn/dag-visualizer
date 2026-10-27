@@ -56,6 +56,14 @@ describe("checkNote — numbers must be backed by a fact", () => {
   });
 });
 
+describe("checkNote — a written zero needs a measured zero", () => {
+  const f = (v: number): Fact[] => [{ label: "X snapshots anchored, per day", value: v, kind: "count", text: String(v) }];
+  it("is not backed by a small non-zero value", () => {
+    expect(checkNote("X anchored 0 snapshots a day.", f(0.03), ["X"]).ok).toBe(false);
+    expect(checkNote("X anchored 0 snapshots a day.", f(0), ["X"])).toEqual({ ok: true });
+  });
+});
+
 describe("checkNote — ratio words need a ratio fact of that size", () => {
   it("holds a named network to its own ratio", () => {
     expect(ok("BioFi more than doubled its pace.")).toBe(false); // 1.37 < 2, even though USDC.dag's 2.48 exists

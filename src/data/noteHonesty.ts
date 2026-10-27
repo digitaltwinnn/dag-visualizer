@@ -120,8 +120,11 @@ function candidates(f: Fact, cls: Cls, ratios: readonly Fact[], dir: Dir): numbe
 }
 
 function backed(t: Tok, facts: readonly Fact[], ratios: readonly Fact[], dir: Dir): boolean {
+  // A WRITTEN ZERO says "none", which only a measured zero backs: its half-unit tolerance would
+  // otherwise let 0 pass against a quiet network's 0.03 a day.
+  const zero = t.cls === "plain" && t.value === 0;
   return facts.some((f) =>
-    candidates(f, t.cls, ratios, dir).some((v) => Math.abs(v - t.value) <= t.tol + 1e-9 * Math.max(1, Math.abs(v))));
+    candidates(f, t.cls, ratios, dir).some((v) => (zero ? v === 0 : Math.abs(v - t.value) <= t.tol + 1e-9 * Math.max(1, Math.abs(v)))));
 }
 
 // RATIO WORDS. `ok` is the bare word's floor; `more` is "more than <word>", which must clear the

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { trendFacts, type TrendFactsInput } from "@/src/data/noteFactsTrend";
+import { formatDag } from "@/src/data/trendSeries";
 import { checkNote } from "@/src/data/noteHonesty";
 import { factsBlock } from "@/src/data/noteFacts";
 import type { TrendsWindowData } from "@/src/data/trendWindow";
@@ -23,8 +24,11 @@ function week(k: number, over: Record<string, (number | null)[]> = {}): Record<s
     "g.ticks": row(7, () => 288),
     "g.anchors": row(7, () => 100 * k),
     "g.blocks": row(7, () => 40 * k),
-    "g.fee": row(7, () => 5e8 * k),
-    "g.kb": row(7, () => 2048 * k),
+    // The STORE's fields: the floors, and the unlisted coverage. `g.fee` / `g.kb` do not exist
+    // until `withUnlisted` folds them.
+    "g.feeFloor": row(7, () => 5e8 * k),
+    "g.kbFloor": row(7, () => 2048 * k),
+    "u.cov": row(7, () => 0),
     "g.gapSum": row(7, () => 288 * 30 * k),
     "f.nodes": row(7, () => 167),
     "f.nodes.dag": row(7, () => 135),
@@ -131,7 +135,8 @@ describe("trendFacts on a network", () => {
     for (const f of ratios) expect(f.label.startsWith("USDC.dag ")).toBe(true);
     const snaps = ratios.find((f) => /snapshots anchored/.test(f.label))!;
     expect(snaps.value).toBeCloseTo(2, 9);
-    expect(r.names).toEqual(["USDC.dag"]);
+    // The full catalog, so a note naming a network the facts omit still counts as naming one.
+    expect(r.names).toEqual(["USDC.dag", "BioFi", "Dor"]);
   });
 
   it("states a measure whose previous side is not measured, but no previous value or ratio for it", () => {
@@ -250,5 +255,98 @@ describe("trendFacts notable days", () => {
     const v = r.facts.find((f) => /Notable day 1 pause, longest wait between snapshots/.test(f.label))!;
     expect(v.kind).toBe("duration");
     expect(v.text).toBe("2h");
+  });
+});
+
+describe("trendFacts reads the STORE payload and folds it (fees and data)", () => {
+  it("a store-shaped fixture (floors + per-network fields + u.cov) yields Fees and Data facts, the fee in the chart's notation", () => {
+    const r = trendFacts(input())!;
+    const fee = r.facts.find((f) => f.label === "Fees, DAG per day, this span")!;
+    expect(fee.value).toBeCloseTo(10, 9); // 5e8 datums x 2 = 10 DAG a day
+    expect(fee.text).toBe(formatDag(fee.value));
+    const data = r.facts.find((f) => f.label === "Data, MB per day, this span")!;
+    expect(data.value).toBeCloseTo(4, 9); // 2048 KB x 2 = 4 MB
+    expect(r.facts.find((f) => f.label === "Fees, ratio to previous span")!.value).toBeCloseTo(2, 9);
+    expect(r.facts.find((f) => f.label === "Data, ratio to previous span")!.value).toBeCloseTo(2, 9);
+  });
+
+  it("a bucket without u.cov makes the totals floors: labelled 'at least', no fee or data ratio", () => {
+    const r = trendFacts(input({ cur: win(7, week(2, { "u.cov": row(7, (i) => (i === 3 ? null : 0)) })) }))!;
+    expect(r.facts.some((f) => f.label === "Fees, DAG per day, this span, at least")).toBe(true);
+    expect(r.facts.some((f) => f.label === "Data, MB per day, this span, at least")).toBe(true);
+    expect(r.facts.some((f) => f.label === "Fees, DAG per day, previous span")).toBe(true);
+    expect(r.facts.some((f) => f.kind === "ratio" && /^(Fees|Data)/.test(f.label))).toBe(false);
+    // Everything else still compares.
+    expect(r.facts.some((f) => f.label === "Blocks, ratio to previous span")).toBe(true);
+  });
+
+  it("an uncovered EDGE bucket is trimmed away and does not make a floor", () => {
+    const r = trendFacts(input({ cur: win(7, week(2, { "u.cov": row(7, (i) => (i === 0 || i === 6 ? null : 0)) })) }))!;
+    expect(r.facts.some((f) => /at least/.test(f.label))).toBe(false);
+  });
+
+  it("a network's own fees are never floors", () => {
+    const r = trendFacts(input({ subject: "usdc", cur: win(7, week(2, { "u.cov": row(7, () => null) })) }))!;
+    expect(r.facts.some((f) => /at least/.test(f.label))).toBe(false);
+    expect(r.facts.some((f) => f.kind === "ratio" && /fees/.test(f.label))).toBe(true);
+  });
+});
+
+describe("trendFacts: a gauge that began after the span did", () => {
+  const long = (nodes: (number | null)[]) =>
+    win(nodes.length, { "g.ticks": row(nodes.length, () => 288), "g.anchors": row(nodes.length, () => 100), "f.nodes.dag": nodes }, T0 - 100 * DAY);
+  const at = (nodes: (number | null)[]) =>
+    trendFacts(input({ zoom: "1y", span: { fromMs: T0 - 100 * DAY, toMs: T0 }, cur: long(nodes), prev: null }))!.facts.filter((f) => /^Nodes/.test(f.label));
+
+  it("null for its first 80% states only the current level", () => {
+    const facts = at(row(100, (i) => (i < 80 ? null : 120 + (i % 2))));
+    expect(facts.map((f) => f.label)).toEqual(["Nodes at the end of the span"]);
+    expect(facts[0]!.value).toBeGreaterThanOrEqual(120);
+  });
+
+  it("measured from the start states start, end and their ratio", () => {
+    const facts = at(row(100, (i) => (i < 50 ? 140 : 120)));
+    expect(facts.map((f) => f.label)).toEqual(["Nodes at the start of the span", "Nodes at the end of the span", "Nodes, ratio end to start"]);
+  });
+});
+
+describe("trendFacts: a span shorter than a day states totals", () => {
+  const MIN5 = 300_000;
+  const h1 = (): TrendFactsInput => {
+    const n = 13;
+    const cur: TrendsWindowData = {
+      buckets: row(n, (i) => T0 + i * MIN5) as number[],
+      stepMs: MIN5,
+      series: { "g.ticks": row(n, () => 10), "g.anchors": row(n, () => 3), "g.blocks": row(n, () => 1), "u.cov": row(n, () => 0), "m.usdc.snaps": row(n, () => 2) },
+      now: T0 + n * MIN5 + 1000,
+    };
+    const prev = { ...cur, buckets: cur.buckets.map((b) => b - n * MIN5), series: { ...cur.series, "g.anchors": row(n, () => 1.5) } };
+    return input({ zoom: "1h", span: { fromMs: T0, toMs: T0 + 3_600_000 }, cur, prev });
+  };
+
+  it("labels counters 'this span' with the summed buckets, and never 'per day'", () => {
+    const r = trendFacts(h1())!;
+    expect(r.facts.some((f) => /per day/.test(f.label))).toBe(false);
+    const snaps = r.facts.find((f) => f.label === "Snapshots anchored, this span")!;
+    expect(snaps.value).toBe(36); // 12 complete five-minute buckets x 3
+    expect(r.facts.find((f) => f.label === "Snapshots anchored, previous span")!.value).toBe(18);
+    expect(r.facts.find((f) => f.label === "Snapshots anchored, ratio to previous span")!.value).toBeCloseTo(2, 9);
+  });
+
+  it("a day or more stays per day", () => {
+    const r = trendFacts(input({ zoom: "24h", span: { fromMs: T0, toMs: T0 + DAY } }))!;
+    expect(r.facts.some((f) => /per day/.test(f.label))).toBe(true);
+  });
+});
+
+describe("trendFacts names: the whole catalog", () => {
+  it("a network in the catalog but absent from the facts still counts as named", () => {
+    const withAbsent = { ...NAMES, zeta: "Zeta Chain" };
+    const r = trendFacts(input({ names: withAbsent }))!;
+    expect(r.names).toContain("Zeta Chain");
+    expect(r.facts.some((f) => f.label.includes("Zeta Chain"))).toBe(false);
+    expect(checkNote("Zeta Chain doubled.", r.facts, r.names).ok).toBe(false);
+    // The hypergraph's own ratio is still citable by a nameless sentence.
+    expect(checkNote("Snapshots anchored doubled.", r.facts, r.names)).toEqual({ ok: true });
   });
 });
