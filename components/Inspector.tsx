@@ -771,7 +771,7 @@ export default function Inspector() {
   );
   // Cards that AREN'T ladder rungs (the snapshot slot in every 3D view) render below the lane —
   // present card first, else its ghost — plus, in flat/placeholder views (no ladder), everything.
-  // (The AI notes card is not among them: it renders last, on its own — see `notesPane`.)
+  // (The AI notes card is not among them: it leads the rail, on its own — see `notesPane`.)
   const nonLadder = manifest.filter((c) => c.kind !== "context" && c.kind !== "notes" && !ladderIds.includes(c.id));
   const trailingPanes = nonLadder.filter((c) => c.present).map((c) => detailPane[c.id]);
   const trailingGhosts = nonLadder
@@ -783,10 +783,17 @@ export default function Inspector() {
   // slab's word for containment, so one hairline says the pile ends here. Only above PRESENT
   // cards: the trailing ghosts are the view's own possibility space.
   const trailingDivider = trailingPanes.length > 0 ? <div key="trailing-divider" aria-hidden className="h-px flex-none mx-[18px] bg-border" /> : null;
-  // THE AI NOTES CARD trails everything, with NO divider of its own: the divider means "a subject
-  // the view did not produce", and the note is not a subject at all — it is written context about
-  // the one the view stands on. Its iridescent edge already sets it apart from the pile.
-  const notesPane = presentOf("notes") ? detailPane.notes : null;
+  // THE AI NOTES CARD LEADS the rail, above the ladder (user, 2026-10-27 — the old details card's
+  // place), with NO divider of its own: the divider means "a subject the view did not produce", and
+  // the note is not a subject at all — it is written context about the one the view stands on, a
+  // briefing read before the rungs. Its iridescent edge already sets it apart from the pile.
+  // `data-thread-off`: the thread ties in the rungs it walks, and the briefing is not one — the
+  // spine starts below it (RailThread's card query skips this subtree).
+  const notesPane = presentOf("notes") ? (
+    <div key="notes-lead" data-thread-off>
+      {detailPane.notes}
+    </div>
+  ) : null;
 
 
 
@@ -834,11 +841,11 @@ export default function Inspector() {
   // Tablet + phone host the same ladder-lane `content` (see the note above the lane).
   const content = (
     <>
+      {notesPane}
       {ladderLane}
       {trailingDivider}
       {trailingPanes}
       {trailingGhosts}
-      {notesPane}
     </>
   );
 
@@ -859,11 +866,11 @@ export default function Inspector() {
           style={accent}
         >
           <RailShade>
+            {notesPane}
             {ladderLane}
             {trailingDivider}
             {trailingPanes}
             {trailingGhosts}
-            {notesPane}
           </RailShade>
         </div>
       </>

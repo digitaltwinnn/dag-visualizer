@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import CardHead, { RailPane } from "@/components/CardHead";
 import { AI_NOTES_ICON, KIND_MARK_CLASS } from "@/components/icons";
-import { Door, Fact, FactGroup, SectionLabel } from "@/components/inspector/parts";
+import { Door, Fact, FactGroup, foldLabel, SectionLabel } from "@/components/inspector/parts";
 import { metagraphCardNetwork } from "@/components/railCards";
 import { NodeStars } from "@/components/state/StateAtoms";
 import Stamp from "@/components/Stamp";
@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import type { NoteDay, NoteView } from "@/src/data/noteTypes";
 import { spanPhrase } from "@/src/data/trendWindow";
 import { displayNetwork, UNLISTED_ID } from "@/src/data/unlisted";
+import { NET } from "@/src/net/current";
 import { cardNetwork } from "@/src/engine/domain/trendStack";
 import { useStore } from "@/src/store/store";
 import { rangeDays } from "@/src/util/localTime";
@@ -28,8 +29,9 @@ import useNote, { type NoteState } from "./useNote";
 //
 // It is CONTEXT, not a reading: the one card in the rail whose words no instrument measured. So it
 // is marked as such everywhere it stands — the iridescent edge and eyebrow (`--ai-edge` /
-// `--ai-ink`, globals.css), the sparkles mark, its own place LAST in the rail, outside every lane —
-// and it never sits in the slab's pile, whose adjacency means containment.
+// `--ai-ink`, globals.css), the sparkles mark, its own place FIRST in the rail, above the ladder it
+// briefs and outside every lane (user, 2026-10-27: the old details card's place) — and it never
+// sits in the slab's pile, whose adjacency means containment.
 //
 // ⚠️ MODEL TEXT IS UNTRUSTED. It renders as React text, nothing else: no `dangerouslySetInnerHTML`,
 // no markdown. The server's honesty gate checked its numbers before it was stored; nothing here
@@ -74,7 +76,9 @@ export function useAiNote(): { subject: NoteSubject | null; req: NoteReq | null;
   });
   // History's note is over the span on screen: the brushed range, else the window pill.
   const span = subject?.view === "trend" ? (trendRange ? `r${trendRange.fromMs}-${trendRange.toMs}` : trendWindow) : null;
-  const req: NoteReq | null = subject ? { view: subject.view, subject: subject.subject, span } : null;
+  // Notes are written for mainnet only (the routes answer `none` everywhere else), so off mainnet
+  // nothing is asked and no card stands — never a card that reads, then vanishes.
+  const req: NoteReq | null = subject && NET === "mainnet" ? { view: subject.view, subject: subject.subject, span } : null;
   return { subject, req, note: useNote(req) };
 }
 
@@ -128,6 +132,35 @@ function DayRow({ day }: { day: NoteDay }) {
   );
 }
 
+/** THE NOTABLE DAYS, FOLDED (user, 2026-10-27): the card leads the rail, so a run of days open by
+ *  default would push History's range card down the rail. The fold is marked on its label
+ *  (`foldLabel`, the app's there-is-more affordance), the count on the right edge. Keyed on the
+ *  subject by the caller, so a new subject starts folded. */
+function NotableDays({ days }: { days: NoteDay[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className={cn("group block w-full cursor-pointer border-0 bg-transparent p-0 text-left mt-3", open ? "mb-1.5" : "mb-0")}
+      >
+        <SectionLabel label={<span className={foldLabel(open)}>Notable days</span>} total={days.length} />
+      </button>
+      {open && (
+        <div className={DOOR_RUN}>
+          {/* Not keyed by day alone: one day can be two notables (a network's low and its pause;
+              two networks' first day on the DAG). */}
+          {days.map((d) => (
+            <DayRow key={`${d.dayMs}:${d.kind}:${d.networkId ?? ""}`} day={d} />
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const { subject, req, note } = useAiNote();
   const trendWindow = useStore((s) => s.trendWindow);
@@ -169,9 +202,14 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
       />
       {!collapsed && (
         <div>
-          {/* No answer yet is no card (the manifest's `noteCardAbsent`, ruling R36): "writing…" is
-              the server's own `pending`, never a first fetch still in flight. */}
-          {res == null ? null : res.state === "pending" ? (
+          {/* No answer yet is READING (the manifest's `noteCardAbsent`): the card stands from the
+              moment its subject is known. "writing…" is the server's own `pending`, a note being written. */}
+          {res == null ? (
+            <p className="m-0 flex items-center gap-2 text-body text-muted-foreground">
+              <NodeStars />
+              reading…
+            </p>
+          ) : res.state === "pending" ? (
             <p className="m-0 flex items-center gap-2 text-body text-muted-foreground">
               <NodeStars />
               writing…
@@ -194,18 +232,7 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
                 </Fact>
                 <Fact label="Span">{spanWords(res.spanFrom, res.spanTo)}</Fact>
               </FactGroup>
-              {res.days.length > 0 && (
-                <>
-                  <SectionLabel label="Notable days" className="mt-3 mb-1.5" />
-                  <div className={DOOR_RUN}>
-                    {/* Not keyed by day alone: one day can be two notables (a network's low and its
-                        pause; two networks' first day on the DAG). */}
-                    {res.days.map((d) => (
-                      <DayRow key={`${d.dayMs}:${d.kind}:${d.networkId ?? ""}`} day={d} />
-                    ))}
-                  </div>
-                </>
-              )}
+              {res.days.length > 0 && <NotableDays key={titleKey} days={res.days} />}
             </>
           ) : null}
         </div>

@@ -414,13 +414,14 @@ export function parentHolds(s: Pick<RailManifestState, "snap" | "metaSnap" | "co
   return !s.country || !s.cohort || s.country === s.cohort.cc;
 }
 
-/** IS THE AI NOTE ABSENT? (ruling R36) — no request (the view's subject has no note), no answer
- *  yet, or the server's `none`. A first fetch still in flight is ABSENT, not "writing…": off
- *  mainnet every subject answers `none`, and a card mounted for the wait would flash in and out and
- *  pulse the dock tray (a newly present card is an update) on every uncached subject change.
- *  "writing…" is the server's own `pending`, a note genuinely being written. */
+/** IS THE AI NOTE ABSENT? — no request (the view's subject has no note), or the server's `none`.
+ *  A first fetch still in flight is PRESENT, reading (user, 2026-10-27: the card "is missing and
+ *  then suddenly appears — it should use the reading animation"; this retires ruling R36). The
+ *  flash R36 guarded against was off mainnet, where every subject answers `none`: there
+ *  `useAiNote` asks nothing, so there is no request and no card. On mainnet `none` is rare (a
+ *  subject with nothing measured), and "writing…" stays the server's own `pending`. */
 export function noteCardAbsent(hasRequest: boolean, res: NoteResponse | null): boolean {
-  return !hasRequest || res == null || res.state === "none";
+  return !hasRequest || res?.state === "none";
 }
 
 export function detailsCards(s: RailManifestState): RailCard[] {
@@ -549,7 +550,8 @@ export function detailsCards(s: RailManifestState): RailCard[] {
   // desktop lane above: tick → dossier → the tick's own metagraph snapshot → node. History's
   // `instant` sits directly under the dossier, which is exactly where its own lane puts it —
   // every slot between them is unreachable in that view, so the two orders agree. The notes card
-  // is in no lane: it trails the rail on every tier.
-  return [snap, context, range, instant, country, cohort, composition, metaSnap, node, notes];
+  // is in no lane: it LEADS the rail on every tier (user, 2026-10-27 — the old details card's
+  // place), above the ladder it briefs.
+  return [notes, snap, context, range, instant, country, cohort, composition, metaSnap, node];
 }
 

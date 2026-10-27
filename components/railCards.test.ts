@@ -63,26 +63,27 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
     // metagraph snapshot → node (user, 2026-09-15). This order also drives the phone flat stack
     // and the tray icons, so the two can never disagree.
     const ids = detailsCards(details({ filter: "dor", inspect: nodePick, snap: snapPick })).map((c) => c.id);
-    expect(ids).toEqual(["snap", "context", "range", "instant", "country", "cohort", "composition", "metaSnap", "node", "notes"]);
+    expect(ids).toEqual(["notes", "snap", "context", "range", "instant", "country", "cohort", "composition", "metaSnap", "node"]);
   });
   // THE AI NOTES CARD (2026-10-27): its own card, last, in every view whose policy opts in
   // (`aiNotes`) — present unless the note is absent (no subject, or the server answered `none`).
-  it.each(["hyper", "geo", "ledger", "trend"] as const)("%s hosts a present AI notes card, last", (mode) => {
+  it.each(["hyper", "geo", "ledger", "trend"] as const)("%s hosts a present AI notes card, first", (mode) => {
     const cards = detailsCards(details({ mode, noteAbsent: undefined }));
     const notes = cards.find((c) => c.id === "notes")!;
     expect(notes.present).toBe(true);
     expect(notes.kind).toBe("notes");
     expect(notes.hint).toBeNull(); // no ghost: an absent note is no card at all
-    expect(cards[cards.length - 1]!.id).toBe("notes");
+    expect(cards[0]!.id).toBe("notes");
   });
   it("an absent note (no subject, or `none`) stands the AI notes card down", () => {
     const notes = detailsCards(details({ mode: "hyper", noteAbsent: true })).find((c) => c.id === "notes")!;
     expect(notes.present).toBe(false);
   });
-  it("the AI note is absent with no request, no answer yet, or `none` (ruling R36)", () => {
+  it("the AI note is absent with no request or `none`; a first fetch in flight is present, reading", () => {
     expect(noteCardAbsent(false, { state: "pending" })).toBe(true);
-    // A first fetch in flight is no card — never a false "writing…" that flashes and pulses the tray.
-    expect(noteCardAbsent(true, null)).toBe(true);
+    expect(noteCardAbsent(false, null)).toBe(true);
+    // The card stands while its first answer is read (user, 2026-10-27), never popping in late.
+    expect(noteCardAbsent(true, null)).toBe(false);
     expect(noteCardAbsent(true, { state: "none" })).toBe(true);
     for (const res of [{ state: "pending" }, { state: "unavailable" }, { state: "request" }] as const)
       expect(noteCardAbsent(true, res)).toBe(false);
