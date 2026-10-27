@@ -12,8 +12,9 @@ in two or three sentences. The user wants that text, clearly separated from the 
 to separate real facts from AI's interpretation, not to mix things up" **(user)**.
 
 Model: Constellation Gate AI, `constellation/qwen3-8-flash-free` (free, 1M context, 131K output)
-**(user)**, through `https://gateway.constellationgate.ai` (Anthropic Messages shape at
-`/v1/messages`, or OpenAI shape at `/v1/chat/completions`), authenticated by a Gate key `sk-gw-…`.
+**(user)**, through `https://gateway.constellationgate.ai/v1/chat/completions` (OpenAI shape,
+`Authorization: Bearer sk-gw-…`). **The Anthropic `/v1/messages` route refuses this model**
+("does not support the Anthropic Messages API"), despite Gate's own example — found in the spike.
 It is an experiment: "let's see if it holds up over time and this is workable" **(user)**.
 **Free model or nothing** **(user, 2026-10-27)**: if the free tier cannot sustain the load (rate
 limits, or too many notes failing the honesty gate), the experiment stops — no paid fallback. So
@@ -23,11 +24,25 @@ gate after the spike and again after a few days of real running.
 ## Goals
 
 1. **One AI card per 3D view, whose subject is the current selection** **(user: placement C, "its own
-   card")**. Three states of the same card, not three features:
-   - **Nothing selected** → the **daily digest** ("Today on the Hypergraph").
-   - **A network selected** → that network's **lately** note (recent pace against its own past,
-     its share against the others).
-   - **History, a window pill** (24H, 7D, 30D, 1Y, All — the pills in `src/data/trendWindow.ts`'s
+   card")**. One card species, one generator — but **each view gets its own prompt and its own
+   facts, because each view asks its own question** (CLAUDE.md: hyper = who/what, geo = where,
+   ledger = when, trend = how it changed) **(user, 2026-10-27: "each view will have its own card and
+   AI prompt")**. A note never answers another view's question: Geography's note talks about
+   *where*, never about this week's pace.
+
+   | View | Its question | Nothing selected | A network selected | Finer rung | Facts from | Refreshed |
+   |---|---|---|---|---|---|---|
+   | **Hypergraph** | who / what | **The hypergraph today** — the digest (#5): how many networks, which are active or quiet, the biggest by nodes and by activity, anything that started or stopped | **Who this network is** — its catalog `blurb` in one clause, its shape (L0 / currency L1 / data L1 node counts), how it ranks among the networks | a node → its network's note | `/api/metagraphs` (structure, node lists), `/api/trends` (activity level) | daily, plus when the network set changes |
+   | **Geography** | where | **Where the network runs** — how many countries and providers, how concentrated (the top countries' and top provider's shares), the decentralisation picture in plain words | **That network's footprint** — its countries and providers, and how concentrated it is against the whole | **a country → what that country hosts** (which networks, which providers, its share); a cohort → its network's note | `/api/metagraphs` + `/api/geo` (the geolocated node set) | daily (nodes move rarely) |
+   | **Snapshots** | when (live) | **The anchoring rhythm** — the global snapshot cadence lately, how many networks each one typically carries, fee and data volume, quiet or busy against the usual | **That network's rhythm** — how regularly it anchors, its longest gaps, its share of the global snapshots it was part of | a snapshot → its network's note | `/api/trends` 5m / 1h tiers (the last hours) | hourly |
+   | **History** | how it changed | **What changed** for the window pill, subject = the Range card's (below) | the same, for that network's plane | — | `/api/trends` | per pill: 24H hourly, the rest daily |
+
+   The **live** views' notes describe recent hours, not this instant: a note is written ahead and
+   cached, so "right now" belongs to the measured cards beside it, never to the AI card. Each
+   note's "written" stamp says which span it read.
+
+   **History's states in detail:**
+   - **A window pill** (24H, 7D, 30D, 1Y, All — the pills in `src/data/trendWindow.ts`'s
      `ZOOMS`) → **what changed** over that window, for the card's subject. The subject is exactly
      the Range card's (`cardNetwork(filter, trendFocus, trendFront)` via `subjectOf`), so the two
      cards can never disagree (the user's 2026-10-25 ruling: cards stay in sync with the selection).
@@ -35,13 +50,14 @@ gate after the spike and again after a few days of real running.
      hypergraph (all networks); a network plane gets that network's note. A deck swipe changes the
      subject and the card follows; every pill × subject note is cached, so that costs nothing
      **(my call, from the codebase)**.
-   - **History, a range brushed by hand** → a **"Write notes for this range" control**; the result
+   - **A range brushed by hand** → a **"Write notes for this range" control**; the result
      is cached for that span **(user: option C, on request)**.
-   - **History, the 1H pill** → treated like a brushed range: the same request control, cached for
+   - **The 1H pill** → treated like a brushed range: the same request control, cached for
      one sampler step (15 min). Keeping a 1H note warm would cost ~13 × 96 calls a day for a window
      that changes every quarter hour **(my call)**.
-   - A rung finer than a network (node, country, cohort, snapshot) shows its network's note; a rung
-     with no note of its own inherits its parent's, like the camera ladder **(my call)**.
+   - Across the views, a rung without a note of its own (a node, a cohort, a snapshot) inherits its
+     parent's — its network's — like the camera ladder; Geography's country is the exception,
+     because *where* is that view's question and a country is a where **(my call)**.
 2. **Notable days on History's timeline** (bonus #4) **(user: A + popover + section)**:
    - Code picks the days from measured buckets; the model only writes each day's one-line caption.
    - Each day is an iridescent **diamond on the bottom timeline band**. Hover shows a **popover**
@@ -79,15 +95,18 @@ gate after the spike and again after a few days of real running.
 
 ### One generator, one cache, a warmer
 
-- **One server function** turns a *subject* into a note: `{ kind: "digest" | "lately" | "window" |
-  "range", net, scope, fromMs, toMs }` → facts → prompt → model → honesty gate → stored note.
+- **One server function** turns a *subject* into a note: `{ view, subject, span }` → that view's
+  facts builder → that view's prompt → model → honesty gate → stored note. The per-view parts (facts
+  builder + prompt) are a table keyed by view, like `viewPolicy`, so adding a view is one row, not a
+  branch in the generator.
 - **One cache** in the existing Upstash Redis (a separate key family, e.g. `ai:{net}:{kind}:…`,
   with a TTL fitted to the subject: a 24h window's note goes stale within hours, the 1y note
   barely in a day) **(my call on keys and TTLs; the builder sizes them)**.
 - **A cron warmer** (a second entry in `vercel.json`, daily plus a more frequent pass for the short
-  windows) pre-writes the digest, every listed network's lately note, and every window pill × scope,
-  so a visitor almost never waits. The warmed pills are 24H, 7D, 30D, 1Y and All (`ZOOMS`; the
-  store's 90d/180d windows have no pill and get no note) — about 5 × 13 ≈ 65 notes per pass.
+  windows) pre-writes every view's notes on the refresh the table above gives it, so a visitor
+  almost never waits. Per pass, roughly: Hypergraph 1 + 13, Geography 1 + 13 + the countries that
+  host nodes, Snapshots 1 + 13, History 5 pills × 13 subjects (`ZOOMS`; the store's 90d/180d
+  windows have no pill and get no note). Well under Gate's measured limit of 6,000 requests a minute.
 - **Read path:** a GET route answers from the cache; a miss on a pre-written kind generates once
   (singleflight via a short Redis lock so ten visitors don't trigger ten calls).
 - **Write-on-request path** (brushed ranges only): a POST route, behind a **per-visitor rate limit**
@@ -96,10 +115,12 @@ gate after the spike and again after a few days of real running.
 
 ### Facts, not buckets
 
-The model never sees raw buckets. Code computes a small, labelled facts object from the trends store
-(the same reads `assemble`/`assembleSpan` make): per scope the span's totals, the previous equal span's
-totals, the change, the share of the whole, the busiest and quietest networks, node counts where the
-store has them, and the notable days with their measured values. Measure names follow the app's
+The model never sees raw buckets or raw node lists. Each view's facts builder computes a small,
+labelled facts object from that view's server-side sources (table above): totals, the previous
+equal span's totals, **the ratios and percentages pre-computed**, shares of the whole, the
+busiest and quietest, node and country counts, the notable days with their measured values. The
+spike showed why the ratios go in: given only raw counts the model either lists every figure back,
+or derives its own percentages, which the gate then has to verify. Measure names follow the app's
 vocabulary (`METRIC_LABELS`, `metricLabel` in `src/data/trendSeries.ts`: "Snapshots anchored",
 "Global snapshots" for the DAG, "was part of" for networks; never "L1 snapshots").
 
@@ -107,7 +128,9 @@ vocabulary (`METRIC_LABELS`, `metricLabel` in `src/data/trendSeries.ts`: "Snapsh
 
 Before a note is stored, every number in its text must match a number in the facts object it was
 written from (allowing for the formatting the facts state, e.g. `12,159` or `12.2K`, and simple
-ratios the facts also carry, e.g. "more than doubled" ↔ a stated ratio ≥ 2). A note that fails is
+ratios the facts also carry, e.g. "more than doubled" ↔ a stated ratio ≥ 2, and the plain
+conversions of a stated ratio: the spike's "rose by 37%" came from a ratio of 1.37, which is honest
+but not literally in the facts). A note that fails is
 retried once with the failure named; a second failure stores nothing and the card shows its
 "unavailable" state. This makes rule 10 executable for this card instead of trusting the prompt.
 The gate is pure logic and lands in `domain/` or `src/data/` with its colocated test (rule 4).
@@ -139,8 +162,7 @@ behaviour is an allow-list row (convention 7): a new `viewPolicy` field opts eac
 than `mode === …` guards. The History states read the existing store channels (`trendWindow`,
 `trendRange`, `trendFocus`, `filter`); clicking a diamond or a Notable-days row sets the range
 exactly as a brush does (`setTrendRange` — a range is not a selection setter, so rule 2's executor
-is not involved). In Geography a country selected without a network sits above the network on
-that view's ladder, so it shows the digest.
+is not involved). In Geography a country gets its own note (*where* is that view's question).
 
 Each note carries a quiet "written" stamp (when, from what span) as a chip or row, never a mid-dot
 sentence (design taste). The text is two or three sentences; Notable days captions are one line.
@@ -157,7 +179,6 @@ sentence (design taste). The text is two or three sentences; Notable days captio
 
 - Exact prompt wording and the facts object's shape (keep both versioned; a prompt change should
   not need a cache flush by hand — include a version in the cache key).
-- Whether to strip or disable the model's reasoning output (it is a reasoning model).
 - Cache TTLs, the warmer's schedule, rate-limit and cap numbers (start conservative; the user will
   watch how the free model holds up).
 - Notable-day thresholds.
@@ -172,5 +193,8 @@ sentence (design taste). The text is two or three sentences; Notable days captio
 - Live, in the running app, both grounds, desktop + tablet + phone: each card state, the hover
   pairing diamond↔row, click-to-range, the request control under the rate limit and with the model
   unreachable.
-- A first spike call to Gate before building anything else, to confirm the response shape, latency
-  and whether reasoning text arrives.
+- The spike is done (2026-10-27): HTTP 200 in ~2.8 s, no reasoning text in the answer (nothing to
+  strip), `x-ratelimit-limit: 6000`, and Gate's own cache answered an identical repeat in 0.35 s.
+  Every number in both test notes was correct; the first prompt listed every figure back, the
+  second ("the reader can see the numbers — say what stands out") gave the note we want, with one
+  clumsy phrase ("a ratio of 2.48") left to prompt tuning.
