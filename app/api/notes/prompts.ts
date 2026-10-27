@@ -9,12 +9,15 @@ import type { NoteView, NotableDay } from "@/src/data/noteTypes";
 //
 // Changing any wording here changes what notes say: bump `NOTES_VERSION` (keys.ts).
 //
+// NO DIGITS IN AN EXAMPLE (R59): the model echoes them. "(from 14 a month ago to 9)" here was
+// followed by a note ending "to 9" on facts where 9 was a provider's count; examples are words.
+//
 // The model's text is UNTRUSTED. Nothing here renders it; `parseAnswer` only splits it.
 
 export const VOICE = [
   "You write one short note about a live network dashboard: the reader can see the numbers; say what stands out, in two or three plain sentences.",
   "Lead with what changed. Do not restate a breakdown the reader can already see on screen, such as how many nodes run each layer, unless it changed.",
-  "When something rose or fell, say by how much: give the earlier figure and the current one as the facts state them (from 14 a month ago to 9), never only the direction.",
+  "When something rose or fell, say by how much: write it from the earlier figure to the current one, both as the facts state them for that same thing, never only the direction.",
   "",
   "Rules:",
   "Plain, present tense, no hype, no advice. No meta-commentary: never mention the facts, the data, the note or yourself.",

@@ -23,7 +23,11 @@ describe("VOICE", () => {
   });
 
   it("asks for how much a figure moved, never only the direction (user, 2026-10-27)", () => {
-    expect(VOICE).toContain("say by how much: give the earlier figure and the current one");
+    expect(VOICE).toContain("say by how much: write it from the earlier figure to the current one");
+  });
+
+  it("holds no digit a facts list could also hold, layer names aside (R59: an example's 9 became a note's 9)", () => {
+    expect(VOICE.replace(/\b[cd]?L[01]\b/g, "")).not.toMatch(/\d/);
   });
 
   it("steers the model toward what the honesty gate accepts", () => {
