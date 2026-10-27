@@ -12,8 +12,8 @@ import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 // is the daily digest of the whole network — how many networks have nodes, which anchored lately
 // and which were quiet, the biggest by nodes and the most active, the up-to-three MOVERS (the
 // networks whose node count changed most over the span, start and end), anything that started or
-// stopped, how the node count moved, and global snapshots per day last week against the three
-// weeks before. A network's note says who that network is (its catalog blurb, a non-numeric line),
+// stopped, how the node count moved, and global snapshots per day last week against the weeks
+// before. A network's note says who that network is (its catalog blurb, a non-numeric line),
 // how its SHAPE CHANGED (the layers and node combinations whose count differs between the span's
 // start and its end, both ends stated, plus how many layers changed — an exact 0 when the shape
 // held), how its node count moved, how its activity compares with the weeks before, and how
@@ -43,21 +43,26 @@ import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 //   · node counts go through `gaugeChange`; a gauge that began after the span did (`firstIndex`
 //     beyond 10% of the buckets) states only its current level, never a start of the span's, and is
 //     never a mover. A gauge whose start and end levels are equal is no mover either;
-//   · the sampler writes layer and combination rows only for the roles / types PRESENT, so the
-//     shape's END is read at the NEWEST sample whose `f.nodes.<id>` was measured and within 10% of
-//     `gaugeChange`'s end level, and its START at the OLDEST sample within 10% of its start level
-//     (a sample from a partial outage is skipped, never read as a change of shape). No change of
-//     node count to read (null, late start, either level 0) or no agreeing sample at either end:
-//     no shape facts at all. At a sample a role with no row is a measured 0, unless the sample
-//     recorded no role at all (no reading: no layer facts, no changed-layers count); a combination
-//     band null at a sample (no type recorded) is unknown and states nothing. Only the layers and
+//   · the sampler writes layer and combination rows only for the roles / types PRESENT, and a
+//     failed cluster fetch drops a role's row while `f.nodes.<id>` HOLDS (the lists merge by IP, so
+//     a hybrid is still counted through its other layer). So each layer and combination is a HELD
+//     LEVEL at each end, read exactly where `gaugeChange` reads the node count: the MEDIAN over the
+//     gauge's first (start) / last (end) six measured samples, of those whose `f.nodes.<id>` is
+//     within 10% of the gauge's level at that end — one bad hour can neither make nor hide a
+//     change, and the start never wanders mid-span. Fewer than three agreeing samples at either
+//     end, or no change of node count to read (null, late start, either level 0): no shape facts
+//     at all. At a sample a role with no row is a measured 0, unless the sample recorded no role
+//     at all (unread); a combination band null at a sample (no type recorded) is unread; a level
+//     read from fewer than three samples is unknown and states nothing. Only the layers and
 //     combinations whose count DIFFERS are stated; an unchanged breakdown is the card's, not news;
 //   · activity is the global snapshots a network WAS PART OF per day (`m.<id>.ticks` through
 //     `anchorSeries`, which reads a pre-2026-10-08 zero as "not measured") over the last week of
-//     COMPLETE days; "anchored" reads `m.<id>.snaps`. A network with no row is not ranked. "The
+//     COMPLETE days, at least 4 of them measured, else no last-week reading, comparison or rank;
+//     "anchored" reads `m.<id>.snaps`. A network with no row is not ranked. "The
 //     weeks before" is the mean over the 21 complete days before that week, measured days
 //     only and at least 7 of them, else no fact; the ratio is stated only when both are above 0
-//     and differ. The whole network's is `g.ticks` (one per global snapshot), covered days only;
+//     and differ. The whole network's is `g.ticks` (one per global snapshot), covered days only,
+//     under the same floors;
 //   · HOW MANY NETWORKS ANCHORED goes through `networksAnchored` on the folded series, so measured
 //     unlisted activity makes the count a floor (", at least");
 //   · "started" and "stopped" are Task 2's `first` / `last` read for every id, with the 30-day
@@ -98,11 +103,24 @@ const WEEK_DAYS = 7;
 const PRIOR_DAYS = 21;
 /** The fewest measured days the weeks before are read from at all. */
 const PRIOR_MIN_DAYS = 7;
+/** The fewest measured days "last week" is read from at all (M7): a per-day rate set beside the
+ *  weeks before must rest on more than a day or two. */
+const WEEK_MIN_DAYS = 4;
+/** A shape's level at either end is read from the gauge's first / last this-many measured samples
+ *  (`gaugeChange`'s own LEVEL_SAMPLES), and needs at least SHAPE_MIN_SAMPLES of them to agree. */
+const SHAPE_SAMPLES = 6;
+const SHAPE_MIN_SAMPLES = 3;
 const RANK_WORD = ["", "second ", "third "] as const;
 
 type Points = readonly (number | null)[];
 
 const mean = (xs: readonly number[]): number => xs.reduce((a, v) => a + v, 0) / xs.length;
+
+function median(xs: readonly number[]): number {
+  const s = xs.slice().sort((a, b) => a - b);
+  const m = s.length >> 1;
+  return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2;
+}
 
 /** A gauge's change over the span, or null when it has none or began after the span did. */
 function spanChange(points: Points): { from: number; to: number; firstIndex: number } | null {
@@ -167,7 +185,7 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
   const activity = new Map<string, number>();
   for (const id of ids) {
     const vals = anchorSeries(id, d.series).slice(weekFrom).filter((v): v is number => v != null);
-    if (vals.length) activity.set(id, mean(vals));
+    if (vals.length >= WEEK_MIN_DAYS) activity.set(id, mean(vals));
   }
   const byActivity = [...activity].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 
@@ -245,7 +263,7 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
     // THE WHOLE NETWORK'S ACTIVITY: global snapshots per day (`g.ticks` counts them, one per
     // global snapshot), covered days only — an uncovered day is null.
     const lastWeek = covered.slice(weekFrom).filter((v): v is number => v != null);
-    activityChange("Global snapshots per day", lastWeek.length ? mean(lastWeek) : null, covered);
+    activityChange("Global snapshots per day", lastWeek.length >= WEEK_MIN_DAYS ? mean(lastWeek) : null, covered);
 
     // STARTED AND STOPPED: Task 2's first / last for every id, the 30-day lead-in before the span
     // marked via `from` so a network that began earlier, or merely resumed, is not a start.
@@ -273,28 +291,31 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
     gaugeFacts(`${name} nodes`, nodePoints);
 
     // THE CHANGE OF SHAPE: nodes per layer and per combination at the span's start and its end,
-    // each read at a sample whose own node count agrees with the gauge's level there (see the
-    // header). Only what changed is stated, beside how many layers changed.
+    // each a HELD level like the node count's own (see the header). Only what changed is stated,
+    // beside how many layers changed.
     const ch = spanChange(nodePoints);
     if (ch && ch.from > 0 && ch.to > 0) {
-      const agrees = (i: number, level: number) => {
-        const v = nodePoints[i];
-        return v != null && Math.abs(v - level) <= SHAPE_TOLERANCE * level;
-      };
-      let end = -1;
-      for (let i = nodePoints.length - 1; i >= 0 && end < 0; i--) if (agrees(i, ch.to)) end = i;
-      const start = nodePoints.findIndex((_, i) => agrees(i, ch.from));
-      if (start >= 0 && end > start) {
-        const roles = Object.keys(ROLE_SHORT);
-        // The layers at a sample: a role with no row is a measured 0 — unless the sample recorded
-        // no role at all, which is no reading.
-        const layersAt = (i: number): number[] | null => {
-          const rows = roles.map((role) => fleet.series[`f.layer.${subject}.${role}`]?.[i] ?? null);
-          return rows.some((v) => v != null) ? rows.map((v) => v ?? 0) : null;
+      const agrees = (i: number, level: number) => Math.abs(nodePoints[i]! - level) <= SHAPE_TOLERANCE * level;
+      const measured = nodePoints.flatMap((v, i) => (v != null ? [i] : []));
+      // The samples each end is read from: the gauge's own opening / closing samples, those that
+      // agree with its level there (a partial-outage hour is left out).
+      const startAt = measured.slice(0, SHAPE_SAMPLES).filter((i) => agrees(i, ch.from));
+      const endAt = measured.slice(-SHAPE_SAMPLES).filter((i) => agrees(i, ch.to));
+      if (startAt.length >= SHAPE_MIN_SAMPLES && endAt.length >= SHAPE_MIN_SAMPLES && startAt[startAt.length - 1]! < endAt[0]!) {
+        /** The median of a reading over an end's samples, the unread (null) ones left out; null
+         *  when fewer than SHAPE_MIN_SAMPLES were read. */
+        const held = (at: readonly number[], read: (i: number) => number | null): number | null => {
+          const xs = at.map(read).filter((v): v is number => v != null);
+          return xs.length >= SHAPE_MIN_SAMPLES ? median(xs) : null;
         };
-        const was = layersAt(start);
-        const is = layersAt(end);
-        if (was && is) {
+        const roles = Object.keys(ROLE_SHORT);
+        const rows = roles.map((role) => fleet.series[`f.layer.${subject}.${role}`] ?? []);
+        // A role with no row at a sample is a measured 0 — unless the sample recorded no role at
+        // all, which is no reading.
+        const layerAt = (k: number) => (i: number) => (rows.some((r) => r[i] != null) ? (rows[k]![i] ?? 0) : null);
+        const was = roles.map((_, k) => held(startAt, layerAt(k)));
+        const is = roles.map((_, k) => held(endAt, layerAt(k)));
+        if (was.every((v) => v != null) && is.every((v) => v != null)) {
           const moved = roles.filter((_, k) => was[k] !== is[k]);
           facts.push(fact(`${name} layers whose node count changed over the span`, moved.length, "count"));
           for (const role of moved) {
@@ -304,8 +325,8 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
           }
         }
         for (const band of typeBands(subject, fleet.series)) {
-          const from = band.points[start]; // null: no type was recorded at that sample
-          const to = band.points[end];
+          const from = held(startAt, (i) => band.points[i] ?? null); // null: no type recorded at that sample
+          const to = held(endAt, (i) => band.points[i] ?? null);
           if (from == null || to == null || from === to) continue;
           facts.push(fact(`${name} nodes ${comboWords(band.key)} at the start of the span`, from, "count"));
           facts.push(fact(`${name} nodes ${comboWords(band.key)} at the end of the span`, to, "count"));

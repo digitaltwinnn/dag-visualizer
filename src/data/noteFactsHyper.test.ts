@@ -371,6 +371,48 @@ describe("hyperFacts on a network: the change of shape", () => {
     expect(find(r, /^Dor nodes at the end of the span$/)[0]!.value).toBe(5);
   });
 
+  it("reads each layer and combination through a held level: one hour's failed role fetch is no change (I1)", () => {
+    // USDC.dag: 20 nodes run L0 and cL1, the rest only L0, growing 28 to 30. In one hour the cL1
+    // fetch fails: every hybrid is still counted through its L0 entry, so `f.nodes` holds, while the
+    // cL1 row is not written and the hybrids read as L0-only. That hour is at the end, then at the start.
+    const at = (hour: number) =>
+      fleet({
+        "f.nodes.usdc": row(N, (i) => (i < N / 2 ? 28 : 30)),
+        "f.layer.usdc.l0": row(N, (i) => (i < N / 2 ? 28 : 30)),
+        "f.layer.usdc.cl1": row(N, (i) => (i === hour ? null : 20)),
+        "f.layer.usdc.dl1": row(N, () => null),
+        "f.type.usdc.l0+cl1": row(N, (i) => (i === hour ? null : 20)),
+        "f.type.usdc.l0": row(N, (i) => (i === hour ? (i < N / 2 ? 28 : 30) : i < N / 2 ? 8 : 10)),
+      });
+    for (const hour of [N - 1, 0]) {
+      const r = hyperFacts(input({ subject: "usdc", fleet: at(hour) }))!;
+      expect(find(r, /cL1 layer/), `hour ${hour}`).toEqual([]);
+      expect(find(r, /running L0 and cL1/), `hour ${hour}`).toEqual([]);
+      expect(find(r, /^USDC\.dag nodes running only L0 at the start of the span$/)[0]!.value).toBe(8);
+      expect(find(r, /^USDC\.dag nodes running only L0 at the end of the span$/)[0]!.value).toBe(10);
+      expect(find(r, /^USDC\.dag nodes on the L0 layer at the end of the span$/)[0]!.value).toBe(30);
+      expect(find(r, /^USDC\.dag layers whose node count changed over the span$/)[0]!.value).toBe(1);
+      expect(checkNote("USDC.dag dropped its cL1 layer, from 20 nodes to 0.", r.facts, r.names).ok).toBe(false);
+    }
+  });
+
+  it("reads the start only from the span's opening samples, never from an outage hour mid-span (M1)", () => {
+    // The opening six hours read 3, 3, 3, 5, 5, 5: their median, 4, was never measured there. Hour
+    // 600 is a partial outage that happens to read 4, with one L0 node: never "the start of the span".
+    const r = hyperFacts(
+      input({
+        subject: "dor",
+        fleet: dor({
+          "f.nodes.dor": row(N, (i) => (i === 600 ? 4 : i < 3 ? 3 : 5)),
+          "f.layer.dor.l0": row(N, (i) => (i === 600 ? 1 : 3)),
+          "f.layer.dor.dl1": row(N, (i) => (i === 600 ? 4 : i < 3 ? 3 : 5)),
+        }),
+      }),
+    )!;
+    expect(find(r, /layer/)).toEqual([]);
+    expect(find(r, /nodes running/)).toEqual([]);
+  });
+
   it("states no change of shape when the layers were not recorded at the start", () => {
     const blank = (v: number) => row(N, (i) => (i < 100 ? null : v));
     const r = hyperFacts(
@@ -402,6 +444,23 @@ describe("hyperFacts on a network: the change of activity", () => {
     const r = hyperFacts(input({ subject: "usdc", daily: d }))!;
     expect(find(r, /weeks before/)).toEqual([]);
     expect(find(r, /per day, last week$/)[0]!.value).toBe(60);
+  });
+});
+
+describe("hyperFacts: a last week needs four measured days (M7)", () => {
+  it("states no last-week activity, comparison or rank for a network measured on three days of it", () => {
+    // Days 53..56 read 0 beside created snapshots: the field's absence (anchorSeries), not none.
+    const d = daily({ "m.usdc.ticks": row(60, (i) => (i >= 57 ? 60 : i >= 53 ? 0 : 40)) });
+    const r = hyperFacts(input({ subject: "usdc", daily: d }))!;
+    expect(find(r, /global snapshots it was part of/)).toEqual([]);
+    const four = hyperFacts(input({ subject: "usdc", daily: daily({ "m.usdc.ticks": row(60, (i) => (i >= 56 ? 60 : i >= 53 ? 0 : 40)) }) }))!;
+    expect(find(four, /^USDC\.dag global snapshots it was part of per day, last week$/)[0]!.value).toBe(60);
+    expect(find(four, /ratio last week/, "ratio")[0]!.value).toBeCloseTo(1.5, 9);
+  });
+
+  it("states no whole-network last week from three covered days", () => {
+    const r = hyperFacts(input({ daily: daily({ "g.ticks": row(60, (i) => (i >= 57 || i < 53 ? 28_800 : null)) }) }))!;
+    expect(find(r, /^Global snapshots per day/)).toEqual([]);
   });
 });
 
