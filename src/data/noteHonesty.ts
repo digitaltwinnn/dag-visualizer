@@ -25,8 +25,8 @@ import type { Fact } from "@/src/data/noteTypes";
 //
 // DIRECTION: a sentence with a falling verb (fell, dropped, down, slowed ...) reads a `%` against a
 // ratio as (1-r)*100 only; a rising verb (rose, grew, up, climbed ...) as (r-1)*100 or r*100; with
-// neither, or both, all three stay allowed. A `%` against a ratio also needs the sentence to NAME
-// the network (else only a share fact can back it).
+// neither, or both, all three stay allowed. A sentence that names networks cites only
+// their ratio facts; one that names none cites only ratio facts whose label names no network.
 //
 // KNOWN LIMITS, stated rather than hidden: direction is read from the sentence's verbs, not from
 // which number the verb governs, and a duration is matched only against `duration`
@@ -208,18 +208,16 @@ export function checkNote(
     let s = stripNames(sentence).replace(LAYER_RE, " ");
     for (const re of dates) s = s.replace(re, " ");
 
-    // A sentence that names a network may cite only THAT network's ratio facts, for ratio words and
-    // for `x`/`%` tokens alike. One that names none may cite any ratio for `x` and a ratio word, but
-    // a bare `%` there is a share or nothing: it cannot borrow an unrelated network's ratio.
-    const own = named.length
-      ? ratios.filter((f) => named.some((n) => f.label.toLowerCase().includes(n.toLowerCase())))
-      : ratios;
-    const pctRatios = named.length ? own : [];
+    // ONE RULE for `%`, `x` and ratio words: a sentence that names networks may cite only the ratio
+    // facts whose label names one of them; a sentence that names none may cite only the ratio facts
+    // whose label names NO network (the subject's own, unattributed ratios), never a named one's.
+    const labelHas = (f: Fact, ns: readonly string[]) => ns.some((n) => n.trim() && f.label.toLowerCase().includes(n.toLowerCase()));
+    const own = named.length ? ratios.filter((f) => labelHas(f, named)) : ratios.filter((f) => !labelHas(f, names));
     const dir = direction(s);
 
     const digits = s.replace(NUMBER_WORD_RE, (w) => ` ${NUMBER_WORDS[w.toLowerCase()]} `);
     for (const t of tokens(digits))
-      if (!backed(t, facts, t.cls === "pct" ? pctRatios : own, dir)) reasons.push(`"${t.raw}" is not backed by any measured fact`);
+      if (!backed(t, facts, own, dir)) reasons.push(`"${t.raw}" is not backed by any measured fact`);
 
     for (const m of s.matchAll(RATIO_WORD_RE)) {
       const rule = RATIO_WORDS[m[2].toLowerCase()];

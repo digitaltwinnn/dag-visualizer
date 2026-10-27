@@ -63,8 +63,9 @@ describe("checkNote — ratio words need a ratio fact of that size", () => {
     expect(ok("USDC.dag doubled its pace.")).toBe(true);
     expect(ok("USDC.dag tripled.")).toBe(false); // 2.48 < 2.95
   });
-  it("takes any ratio fact when no network is named", () => {
-    expect(ok("The pace doubled.")).toBe(true);
+  it("takes an unattributed ratio fact when no network is named", () => {
+    expect(ok("The pace doubled.")).toBe(false); // only named networks' ratios exist; a nameless sentence cannot borrow one
+    expect(checkNote("The pace doubled.", [F("Snapshots anchored, ratio to previous span", 2.1, "ratio", "2.1")], names).ok).toBe(true);
     expect(ok("The pace quadrupled.")).toBe(false);
     expect(ok("The pace halved.")).toBe(false);
   });
@@ -145,5 +146,21 @@ describe("checkNote — a percentage is read in the direction the sentence says"
   });
   it("leaves all three readings with no direction verb", () => {
     expect(ok("BioFi moved by 37%.")).toBe(true);
+  });
+});
+
+describe("checkNote — a nameless sentence cites only unattributed ratios", () => {
+  const whole = [...facts, F("Snapshots anchored, ratio to previous span", 1.37, "ratio", "1.37")];
+  const w = (t: string) => checkNote(t, whole, names).ok;
+  it("lets a whole-network ratio back a %, an x and a ratio word", () => {
+    expect(w("Snapshots anchored rose by 37% against the week before.")).toBe(true);
+    expect(w("Global snapshots ran at 1.37x the usual pace.")).toBe(true);
+    expect(w("Global snapshots doubled.")).toBe(false); // 1.37 is no doubling, and 2.48 is USDC.dag's
+  });
+  it("never borrows a named network's ratio", () => {
+    expect(ok("Global snapshots ran at 2.5x the usual pace.")).toBe(false);
+    expect(w("Global snapshots ran at 2.5x the usual pace.")).toBe(false);
+    expect(ok("Hetzner carries 37% of the nodes.")).toBe(false);
+    expect(w("BioFi rose by 37% against the span before.")).toBe(true);
   });
 });
