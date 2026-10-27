@@ -116,6 +116,16 @@ describe("ledgerFacts on the whole chamber", () => {
     expect(ledgerFacts(input({ recent: win(0, 5 * MIN, {}) }))).toBeNull();
   });
 
+  it("counts unlisted chains as a floor: one more network, labelled at least", () => {
+    const plain = ledgerFacts(input())!;
+    expect(find(plain, /^Networks that anchored snapshots, recent$/)[0]!.value).toBe(2);
+    const r = ledgerFacts(input({ recent: side(74, 5 * MIN, 20, { "m.xyz.snaps": row(74, () => 3) }) }))!;
+    const [n] = find(r, /^Networks that anchored snapshots, recent, at least$/);
+    expect(n!.value).toBe(3);
+    expect(find(r, /^Networks that anchored snapshots, recent$/)).toHaveLength(0);
+    expect(r.facts.some((f) => /listed/i.test(f.label))).toBe(false);
+  });
+
   it("returns the full catalog in names", () => {
     expect(ledgerFacts(input())!.names).toEqual(expect.arrayContaining(["USDC.dag", "BioFi", "Dor"]));
   });

@@ -173,6 +173,16 @@ describe("trendFacts honesty", () => {
     expect(r.facts.some((f) => /^Blocks, per day, previous span/.test(f.label))).toBe(true);
   });
 
+  it("counts unlisted chains as a floor: one more network, labelled at least", () => {
+    const plain = trendFacts(input())!;
+    expect(find(plain, /^Networks that anchored snapshots, this span$/)[0]!.value).toBe(3);
+    const r = trendFacts(input({ cur: win(7, week(2, { "m.xyz.snaps": row(7, () => 4) })) }))!;
+    const [n] = find(r, /^Networks that anchored snapshots, this span, at least$/);
+    expect(n!.value).toBe(4);
+    expect(find(r, /^Networks that anchored snapshots, this span$/)).toHaveLength(0);
+    expect(r.facts.some((f) => /listed/i.test(f.label))).toBe(false);
+  });
+
   it("does not turn an unmeasured network into a zero", () => {
     const r = trendFacts(input({ cur: win(7, week(2, { "m.dor.snaps": row(7, () => null) })) }))!;
     expect(r.facts.some((f) => f.label.startsWith("Dor"))).toBe(false);

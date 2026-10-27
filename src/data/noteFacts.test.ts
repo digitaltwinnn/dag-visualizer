@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fact, factsBlock, gaugeChange } from "@/src/data/noteFacts";
+import { fact, factsBlock, gaugeChange, networksAnchored } from "@/src/data/noteFacts";
 import { checkNote } from "@/src/data/noteHonesty";
 import { formatDag } from "@/src/data/trendSeries";
 
@@ -96,5 +96,21 @@ describe("factsBlock", () => {
     expect(factsBlock(facts)).toBe("Global snapshots: 12,159\nShare: 50%");
     expect(factsBlock(facts, ["BioFi is: a lending app"])).toBe("Global snapshots: 12,159\nShare: 50%\nBioFi is: a lending app");
     expect(factsBlock([])).toBe("");
+  });
+});
+
+describe("networksAnchored", () => {
+  const DAY = 86_400_000;
+  it("is the plain count when the unlisted channel is silent or unmeasured", () => {
+    expect(networksAnchored(3, {}, DAY)).toEqual({ count: 3, atLeast: false });
+    expect(networksAnchored(3, { "m.unlisted.snaps": [null, 0, 0, null] }, DAY)).toEqual({ count: 3, atLeast: false });
+  });
+
+  it("is one more, as a floor, when unlisted chains anchored inside the trimmed span", () => {
+    expect(networksAnchored(3, { "m.unlisted.snaps": [0, 0, 5, 0] }, DAY)).toEqual({ count: 4, atLeast: true });
+  });
+
+  it("does not count activity in a partial edge bucket", () => {
+    expect(networksAnchored(3, { "m.unlisted.snaps": [9, 0, 0, 9] }, DAY)).toEqual({ count: 3, atLeast: false });
   });
 });

@@ -1,4 +1,4 @@
-import { fact, gaugeChange } from "@/src/data/noteFacts";
+import { fact, gaugeChange, networksAnchored } from "@/src/data/noteFacts";
 import { NOTABLE_CAPS, notableDays } from "@/src/data/notableDays";
 import type { Fact, NotableDay } from "@/src/data/noteTypes";
 import { formatDag, globalSeries, METRIC_ORDER, metricLabel, metricSeries, spanAverage, trimCounterEdges, TREND_METRICS, unlistedUnmeasured, withUnlisted } from "@/src/data/trendSeries";
@@ -211,7 +211,8 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
         const before = prev ? spanValue("snapshots", id, prev) : null;
         if (before != null && before > 0) facts.push(fact(`${n} snapshots anchored, ratio to previous span`, v / before, "ratio"));
       }
-      facts.push(fact("Networks that anchored snapshots, this span", ranked.length, "count"));
+      const anchored = networksAnchored(ranked.length, cur.series, cur.stepMs);
+      facts.push(fact(`Networks that anchored snapshots, this span${anchored.atLeast ? ", at least" : ""}`, anchored.count, "count"));
       const [quietId, quietV] = ranked[ranked.length - 1]!;
       const quietOwn = perDay ? quietV : spanTotal("snapshots", quietId, cur);
       if (quietOwn != null) facts.push(fact(`Quietest active network ${mention(quietId)}, snapshots anchored${dayWord}, this span`, quietOwn, "count"));

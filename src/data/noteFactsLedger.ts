@@ -1,4 +1,4 @@
-import { fact } from "@/src/data/noteFacts";
+import { fact, networksAnchored } from "@/src/data/noteFacts";
 import type { Fact } from "@/src/data/noteTypes";
 import { anchorSeries, formatDag, globalSeries, metricSeries, spanAverage, trimCounterEdges, unlistedUnmeasured, withUnlisted } from "@/src/data/trendSeries";
 import type { TrendsWindowData } from "@/src/data/trendWindow";
@@ -151,7 +151,8 @@ export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: st
       const carriedBy = trimmed(anchorSeries(id, recent.series), recent);
       return [...snaps, ...carriedBy].some((v) => v != null && v > 0);
     });
-    facts.push(fact("Networks that anchored snapshots, recent", active.length, "count"));
+    const anchored = networksAnchored(active.length, recent.series, recent.stepMs);
+    facts.push(fact(`Networks that anchored snapshots, recent${anchored.atLeast ? ", at least" : ""}`, anchored.count, "count"));
   } else {
     const name = catalog[subject] ?? subject;
     const own = (d: TrendsWindowData) => metricSeries("snapshots", subject, d.series).points;

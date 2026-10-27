@@ -1,5 +1,6 @@
 import type { Fact } from "@/src/data/noteTypes";
-import { formatSeconds } from "@/src/data/trendSeries";
+import { formatSeconds, trimCounterEdges } from "@/src/data/trendSeries";
+import { UNLISTED_ID } from "@/src/data/unlistedId";
 
 // THE SHARED HELPERS OF EVERY VIEW'S FACTS BUILDER — one home. A builder (History's is
 // `noteFactsTrend.ts`) turns measured data into a short list of labelled `Fact`s with the ratios
@@ -56,6 +57,20 @@ export function fact(label: string, value: number, kind: Fact["kind"], format?: 
     }
   }
   return { label, value, kind, text };
+}
+
+/** HOW MANY NETWORKS ANCHORED, counting the unlisted ones honestly. `listed` is the catalog networks
+ *  that anchored; `series` is the FOLDED payload (`withUnlisted`), whose `m.unlisted.snaps` is the
+ *  sum of every chain outside the catalog. Unlisted is at least one chain and how many is unknown,
+ *  so measured activity there makes the count a floor: `listed + 1`, `atLeast` true (the label then
+ *  says ", at least"). Zero or unmeasured activity leaves the plain count. */
+export function networksAnchored(
+  listed: number,
+  series: Readonly<Record<string, readonly (number | null)[]>>,
+  stepMs: number,
+): { count: number; atLeast: boolean } {
+  const active = trimCounterEdges(series[`m.${UNLISTED_ID}.snaps`] ?? [], stepMs).some((v) => v != null && v > 0);
+  return active ? { count: listed + 1, atLeast: true } : { count: listed, atLeast: false };
 }
 
 function median(xs: readonly number[]): number {
