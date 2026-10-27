@@ -33,7 +33,7 @@ gate after the spike and again after a few days of real running.
    | View | Its question | Nothing selected | A network selected | Finer rung | Facts from | Refreshed |
    |---|---|---|---|---|---|---|
    | **Hypergraph** | who / what | **The hypergraph today** — the digest (#5): how many networks, which are active or quiet, the biggest by nodes and by activity, anything that started or stopped, how the node count moved | **Who this network is** — its catalog `blurb` in one clause, its shape (how many nodes run L0 / currency L1 / data L1, and which combinations), how that moved lately, how it ranks among the networks | a node → its network's note | live: `/api/metagraphs`. Stored: the **fleet** series `f.nodes`, `f.nodes.<id>`, `f.layer.<id>.<layer>`, `f.type.<id>.<combo>`; activity rank from `m.<id>.ticks` | daily, plus when the network set changes |
-   | **Geography** | where | **Where the network runs** — how many countries and providers, which ones carry the most nodes, the range of hosts | **That network's footprint** — its countries and providers, against the whole fleet | **a country → what that country hosts** (which networks, which providers, its share); a cohort → its network's note | live: `/api/metagraphs` + `/api/geo`. Stored: **no location history exists** (see *Geography has no past yet*); `f.nodes.<id>` may give a node count's movement as context | daily (nodes move rarely) |
+   | **Geography** | where | **Where the network runs** — how many countries and providers, which ones carry the most nodes, the range of hosts | **That network's footprint** — its countries and providers, against the whole fleet | **a country → what that country hosts** (which networks, which providers, its share); a cohort → its network's note | live: `/api/metagraphs` + `/api/geo`. Stored: the fleet by country `f.cc.<cc>` since 2026-09-07; fleet and per network by country and provider in the `geo:` family from 2026-10-27 (see *Geography's past*); `f.nodes.<id>` for node-count movement | daily (nodes move rarely) |
    | **Snapshots** | when (live) | **The anchoring rhythm** — the global snapshot pace lately, how many networks each one carries, fee and data volume, quiet or busy against the usual | **That network's rhythm** — how regularly it anchors, its longest gaps, its share of the global snapshots it was part of | a snapshot → its network's note | Stored, 5m / 1h tiers, last hours against the last week: `g.ticks`, `g.anchors`, `g.gapSum`/`g.gapMax` (global spacing), `g.feeFloor`/`g.kbFloor`; per network `m.<id>.ticks`, `.snaps`, `.gapSum`/`.gapMax`, `.fee`, `.kb` | hourly |
    | **History** | how it changed | **What changed** for the window pill, subject = the Range card's (below) | the same, for that network's plane | — | Stored: every measure History charts | per pill: 24H hourly, the rest daily |
 
@@ -145,11 +145,15 @@ low count (30 days of `f.nodes` run 177 → 90 with a minimum of 32). A facts bu
 the model an outage as "nodes left": it reads a gauge's level from covered buckets only (the same
 coverage History's own reading uses), and states a drop only when it holds across the span's end.
 
-### Geography has no past yet
+### Geography's past
 
-Every other view has stored history to compare against; Geography does not. The sampler stores how
-many nodes each network runs (`f.nodes.<id>`), never where. So Geography's notes are present tense
-(where the nodes are now), with node-count movement as the only change they can state.
+The tiers have held the whole fleet's node count per country, daily, since 2026-09-07 (`f.cc.<cc>`
+in `t:{net}:1d:{YYYY}`). From `feat/geo-history` (2026-10-27) the sampler also stores the whole
+fleet and each network by country and by hosting provider, daily, in its own `geo:{net}:{YYYY}`
+family (`app/api/trends/fleetGeo.ts`, provider names in `geo:{net}:isp`). So Geography's notes can
+state change (a provider gaining nodes, a network reaching a new country) as far back as those
+start, and must stay present tense before them. Six networks publish no node list, so they have
+no location at all; their notes say nothing about place rather than guess.
 
 ### Facts, not buckets
 
