@@ -92,9 +92,8 @@ function parseDay(date: string, fields: Record<string, number>): Day {
   const d: Day = { ms: Date.parse(`${date}T00:00:00Z`), cc: new Map(), isp: new Map(), netCc: new Map(), netIsp: new Map() };
   for (const [key, n] of Object.entries(fields)) {
     if (!Number.isFinite(n) || n <= 0) continue;
-    // `slice` + compare, not a prefix call: a peer-id prefix comparison has one home (`network.ts`).
-    if (key.slice(0, 5) === "f.cc.") place(key.slice(5), d.cc, d.netCc, n);
-    else if (key.slice(0, 6) === "f.isp.") place(key.slice(6), d.isp, d.netIsp, n);
+    if (key.startsWith("f.cc.")) place(key.slice(5), d.cc, d.netCc, n);
+    else if (key.startsWith("f.isp.")) place(key.slice(6), d.isp, d.netIsp, n);
   }
   return d;
 }
@@ -182,12 +181,25 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
   const subjectNet = typeof subject === "string" && subject !== "all" ? subject : null;
   const subjectCc = typeof subject === "object" ? subject.cc : null;
 
-  // THE CURRENT READING. A network's is the newest day its OWN total holds; the fleet's the newest
-  // day the fleet's does. No such day, nothing to say about place.
-  let now: Day | undefined;
-  if (subjectNet) now = measuredDays(geo, (d) => sum(d.netCc.get(subjectNet))).pop();
-  else now = fleetDays[fleetDays.length - 1];
+  // THE CURRENT READING. The fleet's is the newest measured fleet day. A network must have a node
+  // list ON that day (one that stopped publishing is silent, never described by an old footprint);
+  // its reading is then the newest day its OWN total holds, among the days it is present. No such
+  // day, nothing to say about place.
+  const newestFleet = fleetDays[fleetDays.length - 1];
+  const listed = (d: Day, id: string) => d.netCc.has(id) || d.netIsp.has(id);
+  let now: Day | undefined = newestFleet;
+  if (subjectNet) {
+    now = newestFleet && listed(newestFleet, subjectNet) ? measuredDays(geo, (d) => sum(d.netCc.get(subjectNet))).pop() : undefined;
+  }
   if (!now) return null;
+  /** The fleet's figures on `now` are usable as a denominator only if `now` is a measured fleet day. */
+  const fleetMeasured = fleetDays.includes(now);
+  const geoMeasuredFor = new Map<string, Day[]>();
+  const ownMeasured = (id: string): Day[] => {
+    let m = geoMeasuredFor.get(id);
+    if (!m) geoMeasuredFor.set(id, (m = measuredDays(geo, (d) => sum(d.netCc.get(id)))));
+    return m;
+  };
 
   const mentionedCountries = new Set<string>();
   const mentionedProviders = new Map<string, Provider>();
@@ -230,7 +242,7 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
 
     facts.push(fact(`${name}, located nodes`, located, "count"));
     facts.push(fact(`${name}, countries with nodes`, own.length, "count"));
-    if (locatedFleet > 0 && located <= locatedFleet) facts.push(fact(`${name}, share of the fleet's located nodes`, located / locatedFleet, "share"));
+    if (fleetMeasured && locatedFleet > 0 && located <= locatedFleet) facts.push(fact(`${name}, share of the fleet's located nodes`, located / locatedFleet, "share"));
     own.slice(0, TOP).forEach((c, i) => {
       facts.push(fact(`${name}, nodes in ${cn(c.cc)} (${RANK_WORD[i]}biggest country)`, c.count, "count"));
       facts.push(fact(`${name}, share of its nodes in ${cn(c.cc)}`, c.count / located, "share"));
@@ -238,7 +250,7 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     // ITS SHARE OF THE FLEET in the country it is biggest in.
     const top = own[0];
     const fleetThere = top ? (now.cc.get(top.cc) ?? 0) : 0;
-    if (top && fleetThere >= top.count) facts.push(fact(`${name}, share of the fleet's nodes in ${cn(top.cc)}`, top.count / fleetThere, "share"));
+    if (fleetMeasured && top && fleetThere >= top.count) facts.push(fact(`${name}, share of the fleet's nodes in ${cn(top.cc)}`, top.count / fleetThere, "share"));
     if (ownProv.length) {
       facts.push(fact(`${name}, providers with nodes`, ownProv.length, "count"));
       ownProv.slice(0, TOP).forEach((p, i) => {
@@ -255,7 +267,10 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     facts.push(fact(`${name}, rank by nodes`, 1 + countries.filter((c) => c.count > here).length, "count"));
     facts.push(fact("Countries hosting nodes", countries.length, "count"));
     const hosted = ranked(
-      [...now.netCc].map(([id, m]) => ({ id, count: m.get(subjectCc) ?? 0, of: sum(m) })).filter((h) => h.count > 0),
+      [...now.netCc]
+        .filter(([id]) => ownMeasured(id).includes(now!)) // a network whose own list collapsed that day is not read
+        .map(([id, m]) => ({ id, count: m.get(subjectCc) ?? 0, of: sum(m) }))
+        .filter((h) => h.count > 0),
       (h) => nameOf(h.id),
     );
     facts.push(fact(`Networks with nodes in ${name}`, hosted.length, "count"));

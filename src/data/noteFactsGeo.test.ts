@@ -215,6 +215,21 @@ describe("geoFacts on a network", () => {
     expect(one(r, /^USDC\.dag, nodes in Germany/).value).toBe(20);
   });
 
+  it("returns null for a network that stopped publishing its list on the newest measured fleet day", () => {
+    const geoDays = run("2026-10-26", 6, () => NOW);
+    geoDays["2026-10-27"] = day({ ...NOW, net: { dag: NOW.net!.dag!, bio: NOW.net!.bio! } }); // usdc absent, fleet measured
+    expect(geoFacts(input({ subject: "usdc", geoDays, ccDays: ccOf(geoDays) }))).toBeNull();
+    expect(geoFacts(input({ subject: "bio", geoDays, ccDays: ccOf(geoDays) }))).not.toBeNull();
+  });
+
+  it("states no fleet-relative fact on a day the fleet's own list was an outage", () => {
+    const geoDays = run("2026-10-26", 6, () => NOW);
+    geoDays["2026-10-27"] = day({ cc: { DE: 3 }, isp: { "ovh-sas": 1 }, net: { usdc: NOW.net!.usdc! } }); // validator fetch failed
+    const r = geoFacts(input({ subject: "usdc", geoDays, ccDays: ccOf(geoDays) }))!;
+    expect(one(r, /^USDC\.dag, nodes in Germany/).value).toBe(20);
+    expect(find(r, /share of the fleet/)).toHaveLength(0);
+  });
+
   it("names the network and no other in its ratio-bearing labels", () => {
     const r = geoFacts(input({ subject: "usdc" }))!;
     for (const f of r.facts.filter((x) => x.kind === "ratio")) expect(f.label).toContain("USDC.dag");
@@ -228,6 +243,15 @@ describe("geoFacts on a country", () => {
     expect(one(r, /^Constellation, nodes in Germany/).value).toBe(30);
     expect(find(r, /^BioFi/)).toHaveLength(0);
     expect(one(r, /^Networks with nodes in Germany$/).value).toBe(2);
+  });
+
+  it("leaves out a network whose own list collapsed that day", () => {
+    const geoDays = run("2026-10-26", 6, () => NOW);
+    geoDays["2026-10-27"] = day({ ...NOW, net: { ...NOW.net, usdc: { cc: { DE: 1 }, isp: { "hetzner-online-ag": 1 } } } });
+    const r = geoFacts(input({ subject: { cc: "DE" }, geoDays, ccDays: ccOf(geoDays) }))!;
+    expect(find(r, /^USDC\.dag/)).toHaveLength(0);
+    expect(one(r, /^Constellation, nodes in Germany/).value).toBe(30);
+    expect(one(r, /^Networks with nodes in Germany$/).value).toBe(1);
   });
 
   it("states the country's nodes, share of the fleet and rank", () => {
