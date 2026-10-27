@@ -15,8 +15,8 @@ export interface Fact {
   text: string;
   /** THE PAIR (R54): this fact is the earlier (`from`) or later (`to`) reading of ONE quantity,
    *  and `key` names that quantity — the same key on both ends, unique to it within one facts
-   *  list. The gate holds a change written "from A to B" to one key's two ends; the model never
-   *  sees the key (`factsBlock` prints `label: text`). */
+   *  list. The gate lets a value only a `from` end holds appear only beside its key's `to` end
+   *  (R60); the model never sees the key (`factsBlock` prints `label: text`). */
   pair?: FactPair;
 }
 

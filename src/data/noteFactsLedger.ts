@@ -33,7 +33,8 @@ import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 //     where both were measured, and the whole is never smaller than the part;
 //   · A CHANGE IS A PAIR (R54): the usual and the recent reading of one rate, spacing, fee or
 //     data figure carry `pair` (`from` / `to`, keyed by its label) when both are stated and
-//     neither is a floor, so the gate holds "from A to B" to one figure's two readings;
+//     neither is a floor, so the gate states the usual figure only beside its own recent one
+//     (R60);
 //   · null when `recent` holds no measured bucket: nothing to describe, so no model call.
 //
 // Pure: no store values, react or I/O (the colocated test is the specification — rule 4).

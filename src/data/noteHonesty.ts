@@ -11,11 +11,13 @@ import type { Fact } from "@/src/data/noteTypes";
 // WHAT IT CHECKS, in the order the code does it:
 //   · numeric tokens (12,159 · 12.2K · 1.5M · 37% · 2.5x / 2.5 times · 22 hours / 22h / 3 days / 45s)
 //     and number words (one … twenty, "a dozen") against the facts' values;
-//   · a CHANGE written as a pair ("fell from 173 a month ago to 80", "rose to 49,512 per day from
-//     41,200", "dropped 67 to 33"): its two numbers must be the `from` and `to` ends of ONE
-//     quantity (`Fact.pair`, the same key), each at the precision it was written to — two numbers
-//     that each exist somewhere in the facts are not a change (R54: "fell from 173 to 9" passed on
-//     a provider's 9). Every number outside such a construction is held to a fact of its own;
+//   · A PAST VALUE NEEDS ITS CURRENT FIGURE (R60). A number backed ONLY by a pair's `from` end
+//     (`Fact.pair`: no other fact holds it at its written precision) is the earlier side of a
+//     change, and the sentence must also state that pair's `to` end ("173 is a past value; its
+//     current figure 86 is not in the sentence"). The live failure "fell from 173 a month ago to
+//     9" fails because 86 is absent, whatever words sit between; no sentence form is parsed. A
+//     bare number joined by to / and / or / a dash to a number with a duration or `%` unit takes
+//     that unit ("from 20 to 45 seconds", "38 to 36%");
 //   · a plain number that is a citable ratio fact's own text, exactly ("a ratio of 0.98");
 //   · ratio words (doubled, tripled, quadrupled, halved, twice — "more than" tightens) against the
 //     ratio facts. A sentence that NAMES a network is held to that network's own ratio fact:
@@ -39,10 +41,11 @@ import type { Fact } from "@/src/data/noteTypes";
 //
 // KNOWN LIMITS, stated rather than hidden: direction is read from the sentence's verbs, not from
 // which number the verb governs, and a duration is matched only against `duration`
-// facts, so a count of days has to arrive as seconds. A change is recognised only in the three
-// from / to forms (`changePairs`); written any other way ("173 a month ago, 80 now") its numbers
-// fall back to the one-fact rule. A pair's verb is not held to its direction ("rose from 173 to
-// 80" passes on a measured fall).
+// facts, so a count of days has to arrive as seconds. A CURRENT figure is not bound to its
+// quantity (the parked single-number limit): a past value is held to its own pair's current
+// figure, but a current figure may sit beside the wrong past value's quantity, the ends may be
+// swapped ("rose from 86 to 173"), and a "from 38% to 11%" of two current figures has no past
+// value to hold. A past value that coincides with some other current fact is read as current.
 
 export type NoteCheck = { ok: true } | { ok: false; reasons: string[] };
 
@@ -95,8 +98,9 @@ const TOKEN_RE =
   /(?<![\w.])(\d+(?:,\d{3})*(?:\.\d+)?)(?:(%|×|(?:x|[hdms]|[kb])(?![a-z]))|\s*percent\b|\s+(times|hours?|hrs?|days?|minutes?|mins?|seconds?|secs?)\b)?/gi;
 
 type Cls = "plain" | "pct" | "x" | "dur";
-/** A written number: its text, class, value and half-unit tolerance, and where it sits (`at`, `end`). */
-interface Tok { raw: string; cls: Cls; value: number; tol: number; at: number; end: number }
+/** A written number: its text, class, value and half-unit tolerance, what its unit multiplies by
+ *  (`scale`: seconds for a duration, a magnitude for K / M / B, else 1), and where it sits. */
+interface Tok { raw: string; cls: Cls; value: number; tol: number; scale: number; at: number; end: number }
 
 const UNIT_SECONDS: Record<string, number> = { h: 3600, d: 86400, m: 60, s: 1 };
 const MAGNITUDE: Record<string, number> = { k: 1e3, K: 1e3, M: 1e6, b: 1e9, B: 1e9 };
@@ -111,13 +115,13 @@ function tokens(s: string): Tok[] {
     const unit = m[2] ?? m[3] ?? (/percent/i.test(m[0]) ? "%" : "");
     const raw = m[0].trim();
     const pos = { at: m.index, end: m.index + m[0].length };
-    if (unit === "%" || /^percent$/i.test(unit)) out.push({ raw, cls: "pct", value: n, tol: half, ...pos });
-    else if (unit === "×" || /^(x|times)$/i.test(unit)) out.push({ raw, cls: "x", value: n, tol: half, ...pos });
-    else if (MAGNITUDE[unit]) out.push({ raw, cls: "plain", value: n * MAGNITUDE[unit], tol: half * MAGNITUDE[unit], ...pos });
+    if (unit === "%" || /^percent$/i.test(unit)) out.push({ raw, cls: "pct", value: n, tol: half, scale: 1, ...pos });
+    else if (unit === "×" || /^(x|times)$/i.test(unit)) out.push({ raw, cls: "x", value: n, tol: half, scale: 1, ...pos });
+    else if (MAGNITUDE[unit]) out.push({ raw, cls: "plain", value: n * MAGNITUDE[unit], tol: half * MAGNITUDE[unit], scale: MAGNITUDE[unit], ...pos });
     else if (unit) {
       const secs = UNIT_SECONDS[unit.toLowerCase().charAt(0)];
-      out.push({ raw, cls: "dur", value: n * secs, tol: half * secs, ...pos });
-    } else out.push({ raw, cls: "plain", value: n, tol: half, ...pos });
+      out.push({ raw, cls: "dur", value: n * secs, tol: half * secs, scale: secs, ...pos });
+    } else out.push({ raw, cls: "plain", value: n, tol: half, scale: 1, ...pos });
   }
   return out;
 }
@@ -160,53 +164,42 @@ function backed(t: Tok, facts: readonly Fact[], ratios: readonly Fact[], dir: Di
   // A RATIO QUOTED AS WRITTEN ("a ratio of 0.98"): a plain number backs itself only when it IS the
   // text of a ratio fact this sentence may cite, character for character (R33).
   if (t.cls === "plain" && ratios.some((f) => f.text === t.raw)) return true;
-  return facts.some((f) => candidates(f, t.cls, ratios, dir).some((v) => near(t, v)));
+  return facts.some((f) => says(t, f, ratios, dir));
 }
 
-// A CHANGE WRITTEN AS A PAIR (R54). The forms the model writes, read over the sentence once names,
-// layers and dates are blanked and number words are digits:
-//   · from A <words> to B   "fell from 173 a month ago to 80", "went from 18 to 8"
-//   · to B <words> from A   "rose to 49,512 per day from 41,200", "to 80, down from 173"
-//   · <verb> A to B         "dropped 67 to 33" (a rise / fall verb right before A)
-// Only counts, amounts and durations pair: a `%` or an `x` beside "to" is a size of the move
-// ("rose 20% to 49,512"), not one of its ends. The <words> between are few, hold no other number,
-// no clause break and no verb of their own, so neither "from 67 while the US grew to 27" nor "data
-// from 3 networks rose to 5 MB" is read as one change ("up" / "down" may sit there: "to 80, down
-// from 173").
-const PAIRABLE = (t: Tok) => t.cls === "plain" || t.cls === "dur";
-const GAP_MAX = 48;
-const MOVE_VERBS = "fell|dropped|declined|decreased|slid|shrank|slowed|rose|grew|increased|climbed|jumped|went|moved";
-const MOVE_VERB_RE = new RegExp(`\\b(?:${MOVE_VERBS})\\s+$`, "i");
-const GAP_BREAK_RE = new RegExp(`[;:]|\\b(?:and|while|but|whereas|or|${MOVE_VERBS})\\b`, "i");
-const GAP_OK = (g: string) => g.length <= GAP_MAX && !GAP_BREAK_RE.test(g);
+// A PAST VALUE NEEDS ITS CURRENT FIGURE (R60). A number the facts back ONLY as a pair's `from`
+// end (no fact other than a `from` end holds it at its written precision) is the earlier side of a
+// change, and may appear only in a sentence that also states that pair's `to` end. The sentence
+// form is not parsed: "fell from 173 to just 86", "86, down from 173" and "from 173 over 30 days
+// to 86" are all one rule, and "from 173 a month ago to 9" fails on 9's absence of 86, whatever
+// sits between them.
 
-/** The change constructions in `s` as [earlier, later] token pairs, each token in at most one. */
-function changePairs(s: string, toks: readonly Tok[]): [Tok, Tok][] {
-  const out: [Tok, Tok][] = [];
-  for (let i = 0; i + 1 < toks.length; i++) {
-    const a = toks[i]!;
-    const b = toks[i + 1]!;
-    if (!PAIRABLE(a) || !PAIRABLE(b)) continue;
-    const before = s.slice(0, a.at);
-    const mid = s.slice(a.end, b.at);
-    const fwd = /\bfrom\s+$/i.test(before) && /^(.*?)\bto\s+$/is.exec(mid);
-    const rev = /\bto\s+$/i.test(before) && /^(.*?)\bfrom\s+$/is.exec(mid);
-    if (fwd && GAP_OK(fwd[1]!)) out.push([a, b]);
-    else if (rev && GAP_OK(rev[1]!)) out.push([b, a]);
-    else if (MOVE_VERB_RE.test(before) && /^\s+to\s+$/i.test(mid)) out.push([a, b]);
-    else continue;
-    i++; // b is spent
-  }
-  return out;
+/** Does the written number `t` say what fact `f` holds (the one-fact rule's comparison)? */
+function says(t: Tok, f: Fact, ratios: readonly Fact[], dir: Dir): boolean {
+  return candidates(f, t.cls, ratios, dir).some((v) => near(t, v));
 }
 
-/** Are `from` and `to` the two ends of ONE measured quantity — a `from` fact and a `to` fact of
- *  the same `pair.key`, each matching its written number? */
-function pairBacked(from: Tok, to: Tok, facts: readonly Fact[]): boolean {
-  const says = (t: Tok, f: Fact) => candidates(f, t.cls, [], "none").some((v) => near(t, v));
-  return facts.some((f) =>
-    f.pair?.end === "from" && says(from, f)
-    && facts.some((g) => g.pair?.key === f.pair!.key && g.pair.end === "to" && says(to, g)));
+/** Why `t`, backed by no current fact, fails — or null when it is a past value whose current
+ *  figure another number of the sentence states. */
+function pastReason(t: Tok, toks: readonly Tok[], facts: readonly Fact[], ratios: readonly Fact[], dir: Dir): string | null {
+  const past = facts.filter((f) => f.pair?.end === "from" && says(t, f, ratios, dir));
+  if (!past.length) return `"${t.raw}" is not backed by any measured fact`;
+  const nows = past.map((f) => facts.find((g) => g.pair?.key === f.pair!.key && g.pair.end === "to"));
+  if (nows.some((g) => g && toks.some((u) => u !== t && says(u, g, ratios, dir)))) return null;
+  const now = nows.find((g) => g);
+  return now ? `${t.raw} is a past value; its current figure ${now.text} is not in the sentence` : `${t.raw} is a past value with no current figure`;
+}
+
+// A SHARED UNIT. "from 20 to 45 seconds" and "38 to 36%" write the unit once: a bare number joined
+// by to / and / or / a dash to a number with a duration or `%` unit takes that unit.
+const JOIN_RE = /^\s*(?:to|and|or|–|-)\s*$/i;
+function sharedUnits(s: string, toks: readonly Tok[]): Tok[] {
+  return toks.map((t, i) => {
+    const u = toks[i + 1];
+    if (!u || t.cls !== "plain" || !/^[\d,.]+$/.test(t.raw) || (u.cls !== "dur" && u.cls !== "pct")) return t;
+    if (!JOIN_RE.test(s.slice(t.end, u.at))) return t;
+    return { ...t, cls: u.cls, value: t.value * u.scale, tol: t.tol * u.scale, scale: u.scale };
+  });
 }
 
 // RATIO WORDS. `ok` is the bare word's floor; `more` is "more than <word>", which must clear the
@@ -345,15 +338,15 @@ export function checkNote(
     const dir = direction(s);
 
     const digits = s.replace(NUMBER_WORD_RE, (w) => ` ${NUMBER_WORDS[w.toLowerCase()]} `);
-    const toks = tokens(digits);
-    // A change written from A to B is held to one quantity's two ends (R54); every other number
-    // to a fact of its own.
-    const pairs = changePairs(digits, toks);
-    const inPair = new Set(pairs.flat());
-    for (const [a, b] of pairs)
-      if (!pairBacked(a, b, facts)) reasons.push(`${a.raw} and ${b.raw} are not one measured change`);
-    for (const t of toks)
-      if (!inPair.has(t) && !backed(t, facts, own, dir)) reasons.push(`"${t.raw}" is not backed by any measured fact`);
+    const toks = sharedUnits(digits, tokens(digits));
+    // Every number to a CURRENT fact (any fact but a pair's `from` end); one that only a `from` end
+    // backs is a past value, and needs its pair's `to` end in this sentence (R60).
+    const current = facts.filter((f) => f.pair?.end !== "from");
+    for (const t of toks) {
+      if (backed(t, current, own, dir)) continue;
+      const why = pastReason(t, toks, facts, own, dir);
+      if (why) reasons.push(why);
+    }
     for (const m of digits.matchAll(ORDINAL_RE)) {
       if (m[1]!.toLowerCase() === "second" && A_SECOND_RE.test(digits.slice(0, m.index))) continue;
       if (!rankBacked(m[1]!, facts)) reasons.push(`"${m[1]}" is not backed by a rank fact`);

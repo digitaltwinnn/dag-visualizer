@@ -70,7 +70,7 @@ import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 //     lead-in marked via `from` so a network that merely resumed is not a start;
 //   · A CHANGE IS A PAIR (R54): every start / end (node counts, movers, layers, combinations) and
 //     every weeks-before / last-week reading carries `pair`, keyed by the quantity's label, so the
-//     gate holds "from A to B" to one quantity's two ends;
+//     gate states an earlier figure only beside its own current one (R60);
 //   · null when the fleet has no measured sample (and, for a network, none of its own).
 //
 // Pure: no store values, react or I/O (the colocated test is the specification — rule 4).

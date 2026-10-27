@@ -268,13 +268,13 @@ describe("checkNote — ordinal rank words need a matching rank fact", () => {
   });
 });
 
-describe("checkNote — a change written from A to B is ONE measured pair (R54)", () => {
+describe("checkNote — a past value needs its current figure in the same sentence (R60)", () => {
   type End = "from" | "to";
   const Pf = (label: string, value: number, kind: Fact["kind"], text: string, key?: string, end?: End): Fact =>
     key && end ? { label, value, kind, text, pair: { key, end } } : { label, value, kind, text };
   // The facts behind the first live note under "say how much" (2026-10-27), one per line as the
-  // model saw them, with the fleet's one figure the tiers' 86 (R58: the geo family's 80 was a
-  // second figure for the same quantity); 9 is Amazon's (and IONOS's) node count, not the fleet's.
+  // model saw them, with the fleet's one figure the tiers' 86 (R58); 9 is Amazon's (and IONOS's)
+  // node count, not the fleet's.
   const dump: Fact[] = [
     Pf("Located nodes in the fleet", 86, "count", "86", "fleet", "to"),
     Pf("Germany, nodes (biggest country)", 33, "count", "33", "cc:DE", "to"),
@@ -293,86 +293,94 @@ describe("checkNote — a change written from A to B is ONE measured pair (R54)"
   ];
   const geoNames = ["Constellation", "USDC.dag", "Germany", "United States", "Finland", "Hetzner Online", "Hetzner", "Amazon.com", "IONOS"];
   const gate = (t: string) => checkNote(t, dump, geoNames);
+  const reasons = (t: string) => {
+    const r = gate(t);
+    return r.ok ? [] : r.reasons;
+  };
 
-  it("rejects the live failure: 173 and 9 each exist, but are not one change", () => {
-    const r = gate("Located nodes fell from 173 a month ago to 9. Germany dropped from 67 to 33.");
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reasons).toEqual(["173 and 9 are not one measured change"]);
+  it("rejects the live failure, naming the past value and its missing current figure", () => {
+    expect(reasons("Located nodes fell from 173 a month ago to 9. Germany dropped from 67 to 33.")).toEqual([
+      "173 is a past value; its current figure 86 is not in the sentence",
+    ]);
   });
 
-  it("accepts the change the facts hold, and a country's own pair", () => {
-    expect(gate("Located nodes fell from 173 a month ago to 86.")).toEqual({ ok: true });
-    expect(gate("Germany dropped from 67 to 33.")).toEqual({ ok: true });
+  it("rejects every rewording the review found, whatever sits between the numbers", () => {
+    for (const t of [
+      "Located nodes fell from 173 a month ago to just 9.",
+      "Located nodes fell from 173 over 30 days to 9.",
+      "Located nodes stand at 9, down from 173 a month ago.",
+    ])
+      expect(reasons(t), t).toEqual(["173 is a past value; its current figure 86 is not in the sentence"]);
+    expect(reasons("Germany dropped from 67 to 33 and the United States 58 to 9.")).toEqual([
+      "58 is a past value; its current figure 27 is not in the sentence",
+    ]);
+    expect(reasons("Germany and the United States fell from 67 and 58 to 33 and 9.")).toEqual([
+      "58 is a past value; its current figure 27 is not in the sentence",
+    ]);
   });
 
-  it("rejects a pair whose end belongs to another quantity (the US's count)", () => {
-    const r = gate("Germany dropped from 67 to 27.");
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.reasons).toEqual(["67 and 27 are not one measured change"]);
+  it("rejects a past value stated alone: the earlier figure comes with the current one", () => {
+    expect(reasons("A month ago the fleet located 173 nodes.")).toEqual(["173 is a past value; its current figure 86 is not in the sentence"]);
   });
 
-  it("rejects the ends swapped: the earlier reading is not the later one", () => {
-    expect(gate("Located nodes rose from 86 to 173.").ok).toBe(false);
+  it("accepts a change whose current figure the sentence states, however it is worded", () => {
+    for (const t of [
+      "Located nodes fell from 173 a month ago to 86.",
+      "Germany dropped from 67 to 33.",
+      "The fleet has 86 nodes, down from 173.",
+      "Located nodes fell from 173 over 30 days to just 86.",
+    ])
+      expect(gate(t), t).toEqual({ ok: true });
   });
 
-  it("does not read a from-phrase as a change when its 'to' belongs to a later verb", () => {
-    expect(gate("Nodes from 9 providers grew to 51.")).toEqual({ ok: true });
-    expect(gate("Nodes from 9 providers grew to 52.").ok).toBe(false); // 52 is still checked alone
+  it("holds numbers that are no past value to the one-fact rule, a range included", () => {
+    expect(gate("The biggest countries range from 33 in Germany to 17 in Finland.")).toEqual({ ok: true });
+    expect(gate("Amazon.com runs 9 nodes, and Hetzner Online 51.")).toEqual({ ok: true });
+    expect(reasons("Amazon.com runs 12 nodes.")).toEqual(['"12" is not backed by any measured fact']);
   });
 
-  it("keeps today's rule for a number outside a change construction", () => {
-    expect(gate("Amazon.com runs 9 nodes, and the fleet fell from 173 to 86.")).toEqual({ ok: true });
-    expect(gate("Germany hosts 33 of the 86 located nodes.")).toEqual({ ok: true });
-    expect(gate("Amazon.com runs 12 nodes.").ok).toBe(false);
+  it("holds a past percentage to its current one too", () => {
+    const shares: Fact[] = [
+      Pf("Germany, share of the fleet's located nodes a month ago", 0.38, "share", "38%", "share:DE", "from"),
+      Pf("Germany, share of the fleet's located nodes", 0.36, "share", "36%", "share:DE", "to"),
+      Pf("Amazon.com, share of the fleet's nodes with a known provider", 0.11, "share", "11%"),
+    ];
+    const r = checkNote("Germany's share fell from 38% to 11%.", shares, geoNames);
+    expect(r).toEqual({ ok: false, reasons: ["38% is a past value; its current figure 36% is not in the sentence"] });
+    expect(checkNote("Germany's share fell from 38% to 36%.", shares, geoNames)).toEqual({ ok: true });
+    expect(checkNote("Germany's share fell from 38 to 36%.", shares, geoNames)).toEqual({ ok: true }); // the shared unit
   });
 
-  // ONE TEST PER FORM the model writes.
+  // The rates and spacing of the other builders: their pairs read the same way.
   const rates: Fact[] = [
     Pf("Global snapshots per day, the weeks before", 41_200, "count", "41,200", "g", "from"),
     Pf("Global snapshots per day, last week", 49_512, "count", "49,512", "g", "to"),
     Pf("Global snapshots per day, ratio last week to the weeks before", 49_512 / 41_200, "ratio", "1.20"),
-    Pf("USDC.dag nodes at the start of the span", 18, "count", "18", "usdc", "from"),
-    Pf("USDC.dag nodes at the end of the span", 8, "count", "8", "usdc", "to"),
-    Pf("BioFi nodes at the end of the span", 45_000, "count", "45,000"),
     Pf("Mean spacing between global snapshots, usual", 20, "duration", "20s", "spacing", "from"),
     Pf("Mean spacing between global snapshots, recent", 45, "duration", "45s", "spacing", "to"),
   ];
-  const r = (t: string) => checkNote(t, rates, ["USDC.dag", "BioFi"]);
+  const r = (t: string) => checkNote(t, rates, []);
 
-  it("form: from A <words> to B", () => {
-    expect(r("Global snapshots went from 41,200 a day in the weeks before to 49,512.").ok).toBe(true);
-    expect(r("Global snapshots went from 41,200 a day in the weeks before to 45,000.").ok).toBe(false);
-  });
-
-  it("form: <verb> from A to B", () => {
-    expect(r("USDC.dag fell from 18 to 8 nodes.").ok).toBe(true);
-    expect(r("USDC.dag fell from eighteen to eight nodes.").ok).toBe(true);
-    expect(r("USDC.dag fell from 18 to 9 nodes.").ok).toBe(false);
-  });
-
-  it("form: <verb> to B <words> from A", () => {
-    expect(r("Global snapshots rose to 49,512 per day from 41,200.").ok).toBe(true);
-    expect(r("Global snapshots rose to 49,512 per day, up from 41,200.").ok).toBe(true);
-    expect(r("Global snapshots rose to 45,000 per day from 41,200.").ok).toBe(false);
-    expect(r("Global snapshots rose to 41,200 per day from 49,512.").ok).toBe(false);
-  });
-
-  it("form: <verb> A to B", () => {
-    expect(r("USDC.dag dropped 18 to 8 nodes.").ok).toBe(true);
-    expect(r("USDC.dag dropped 18 to 9 nodes.").ok).toBe(false);
-  });
-
-  it("holds each end at its written precision, and reads durations as pairs too", () => {
+  it("reads a pair at each number's written precision, and a bare number with the unit it is joined to", () => {
     expect(r("Global snapshots rose from 41.2K to 49.5K a day.").ok).toBe(true);
-    expect(r("Global snapshots rose from 41K to 50K a day.").ok).toBe(true);
-    expect(r("Global snapshots rose from 40K to 50K a day.").ok).toBe(false);
-    expect(r("The spacing widened from 20s to 45s.").ok).toBe(true);
-    expect(r("The spacing widened from 20 seconds to 45 seconds.").ok).toBe(true);
-    expect(r("The spacing widened from 45s to 20s.").ok).toBe(false);
+    expect(r("Global snapshots rose to 49,512 per day from 41,200.").ok).toBe(true);
+    expect(r("Global snapshots rose from 41.2K to 45K a day.").ok).toBe(false);
+    expect(r("Global snapshots rose by 20% to 49,512 a day.").ok).toBe(true);
+    expect(r("The spacing widened from 20 to 45 seconds.")).toEqual({ ok: true });
+    expect(r("The spacing widened from 20s to 45s.")).toEqual({ ok: true });
+    expect(r("The spacing widened from 20 seconds to 30 seconds.").ok).toBe(false);
   });
 
-  it("is not a change construction when a percentage or a ratio sits on either side", () => {
-    expect(r("Global snapshots rose by 20% to 49,512 a day.").ok).toBe(true);
-    expect(r("Global snapshots rose 20% to 49,512 a day.").ok).toBe(true);
+  it("KNOWN LIMITS, pinned so a change to them is deliberate", () => {
+    // A current figure is not bound to its quantity: the ends may be swapped, or both may be
+    // current figures of other quantities (no past value, no co-occurrence to check).
+    expect(gate("Located nodes rose from 86 to 173.")).toEqual({ ok: true });
+    const current: Fact[] = [
+      Pf("Germany, share of the fleet's located nodes", 0.38, "share", "38%"),
+      Pf("Amazon.com, share of the fleet's nodes with a known provider", 0.11, "share", "11%"),
+    ];
+    expect(checkNote("Germany's share fell from 38% to 11%.", current, geoNames)).toEqual({ ok: true });
+    // A past value that coincides with some other current fact is read as current.
+    expect(checkNote("The fleet fell from 9 to 51.", [...dump, Pf("X, nodes a month ago", 9, "count", "9", "x", "from")], geoNames)).toEqual({ ok: true });
   });
 });

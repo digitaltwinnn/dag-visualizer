@@ -35,8 +35,8 @@ import type { TrendMetric } from "@/src/store/store";
 //   · a span SHORTER than a day states counters as the span's total, not "per day" (×288 of five
 //     minutes is a rate nobody measured); ratios are the same either way;
 //   · A CHANGE IS A PAIR (R54): a gauge's start and end, and a counter's previous span and this
-//     span, carry `pair` (`from` / `to`, keyed by the measure's label), so the gate holds "from A
-//     to B" to one measure's two ends. A floor (", at least") is never an end.
+//     span, carry `pair` (`from` / `to`, keyed by the measure's label), so the gate states an
+//     earlier figure only beside its own current one (R60). A floor (", at least") is never an end.
 //
 // WHICH ZOOMS GET NOTABLE DAYS: 7d, 30d, 1y and all (`NOTABLE_CAPS`). A 1h, 24h or custom-range
 // note describes a stretch too short for "a day that stood out".
