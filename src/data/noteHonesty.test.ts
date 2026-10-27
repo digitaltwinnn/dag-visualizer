@@ -194,3 +194,76 @@ describe("checkNote — a ratio quoted as written (R33)", () => {
     expect(ok("BioFi ran at a ratio of 1.37 to the span before.")).toBe(true);
   });
 });
+
+describe("checkNote — the DAG currency is a unit, not a network, and labels match whole words", () => {
+  const hgNames = ["DAG", "USDC.dag", "BioFi", "Niger", "Nigeria"];
+  const fees = (hg: number, usdc: number): Fact[] => [
+    F("Fees, ratio to previous span", hg, "ratio", hg.toFixed(2)),
+    F("USDC.dag fees, ratio to previous span", usdc, "ratio", usdc.toFixed(2)),
+    F("Fees, per day, this span", 1200, "amount", "1.2K"),
+  ];
+  const probe = "Fees fell by 40% to 1.2K DAG per day.";
+  it("passes History's commonest note: the hypergraph's own fall, priced in DAG", () => {
+    expect(checkNote(probe, fees(0.6, 0.9), hgNames).ok).toBe(true);
+  });
+  it("never lets the unit borrow USDC.dag's ratio (substring 'dag')", () => {
+    expect(checkNote(probe, fees(0.9, 0.6), hgNames).ok).toBe(false);
+  });
+  it("a network named in the sentence still names it, the unit aside", () => {
+    expect(checkNote("USDC.dag fees fell by 40% to 1.2K DAG per day.", fees(0.9, 0.6), hgNames).ok).toBe(true);
+    expect(checkNote("USDC.dag fees fell by 40% to 1.2K DAG per day.", fees(0.6, 0.9), hgNames).ok).toBe(false);
+  });
+  it("a name inside a longer word is not that name (Niger in Nigeria)", () => {
+    const geo = [F("Nigeria, nodes now against a month ago", 1.5, "ratio", "1.50"), F("Niger, nodes now against a month ago", 1.2, "ratio", "1.20")];
+    expect(checkNote("Niger grew by 20% in a month.", geo, hgNames).ok).toBe(true);
+    expect(checkNote("Niger grew by 50% in a month.", geo, hgNames).ok).toBe(false);
+  });
+});
+
+describe("checkNote — a nameless sentence cites the SUBJECT's own ratios (R39)", () => {
+  const nf = [
+    F("USDC.dag snapshots anchored, ratio to previous span", 1.37, "ratio", "1.37"),
+    F("BioFi snapshots anchored, ratio to previous span", 1.5, "ratio", "1.50"),
+    F("Located nodes in the fleet, now against a month ago", 1.1, "ratio", "1.10"),
+  ];
+  const nn = ["USDC.dag", "BioFi"];
+  it("a pronoun sentence passes on a network subject, citing its own ratio", () => {
+    expect(checkNote("Its snapshots anchored rose by 37%.", nf, nn, { subject: "USDC.dag" }).ok).toBe(true);
+  });
+  it("still cannot borrow ANOTHER network's ratio", () => {
+    expect(checkNote("Its snapshots anchored rose by 50%.", nf, nn, { subject: "USDC.dag" }).ok).toBe(false);
+  });
+  it("on a network subject an unattributed ratio is not its own", () => {
+    expect(checkNote("Its nodes rose by 10%.", nf, nn, { subject: "USDC.dag" }).ok).toBe(false);
+  });
+  it("without a subject (the whole network), the unattributed ratios stay citable", () => {
+    expect(checkNote("Located nodes rose by 10%.", nf, nn).ok).toBe(true);
+    expect(checkNote("Its snapshots anchored rose by 37%.", nf, nn).ok).toBe(false);
+  });
+  it("works for a country subject by its display name", () => {
+    const geo = [F("Germany, nodes now against a month ago", 1.2, "ratio", "1.20"), F("France, nodes now against a month ago", 1.4, "ratio", "1.40")];
+    const g = ["Germany", "France"];
+    expect(checkNote("Its nodes grew by 20% in a month.", geo, g, { subject: "Germany" }).ok).toBe(true);
+    expect(checkNote("Its nodes grew by 40% in a month.", geo, g, { subject: "Germany" }).ok).toBe(false);
+  });
+});
+
+describe("checkNote — ordinal rank words need a matching rank fact", () => {
+  const ranks = [
+    F("BioFi rank by nodes", 2, "count", "2"),
+    F("USDC.dag, nodes (second biggest network)", 40, "count", "40"),
+  ];
+  const r = (t: string) => checkNote(t, ranks, ["BioFi", "USDC.dag"]).ok;
+  it("passes an ordinal a rank fact holds", () => {
+    expect(r("BioFi is the second biggest network by nodes.")).toBe(true);
+    expect(r("USDC.dag is the second biggest network.")).toBe(true);
+  });
+  it("rejects an ordinal no rank fact holds", () => {
+    expect(r("BioFi is the third biggest network by nodes.")).toBe(false);
+    expect(checkNote("BioFi is the second biggest network.", [F("Networks with nodes", 5, "count", "5")], ["BioFi"]).ok).toBe(false);
+  });
+  it("leaves a time unit and an indefinite 'a second' alone", () => {
+    expect(checkNote("Fees ran at 1 second a snapshot.", [F("Mean spacing", 1, "duration", "1s")], []).ok).toBe(true);
+    expect(checkNote("BioFi anchored for a second straight span.", [], ["BioFi"]).ok).toBe(true);
+  });
+});

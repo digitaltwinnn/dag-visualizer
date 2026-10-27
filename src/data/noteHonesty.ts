@@ -15,11 +15,13 @@ import type { Fact } from "@/src/data/noteTypes";
 //   · ratio words (doubled, tripled, quadrupled, halved, twice — "more than" tightens) against the
 //     ratio facts. A sentence that NAMES a network is held to that network's own ratio fact:
 //     "BioFi more than doubled" is false while "USDC.dag more than doubled" is true;
+//   · ordinal rank words (second … tenth) against the rank facts;
 //   · the house vocabulary (no machine / tick / L1 snapshot / feeless / decentrali-) and the dash
 //     rule (no em dash, no spaced en dash or hyphen);
 //   · the sentence count.
 //
-// WHAT IT STRIPS FIRST, so it is never read as a number: the names it is handed (they carry dots
+// WHAT IT STRIPS FIRST: the currency unit after a number ("1.2K DAG"), so it is never read as the
+// DAG network; then, so they are never read as numbers: the names it is handed (they carry dots
 // and digits), the layer tokens (L0, L1, cL1, dL1, L0s), and any date phrase a `date` fact holds
 // ("Oct 19", "October 19, 2026", "19 Oct", "2026-10-19"). A date NO fact holds is left in, and its
 // day-of-month then has to back itself as a number — which it cannot.
@@ -27,7 +29,8 @@ import type { Fact } from "@/src/data/noteTypes";
 // DIRECTION: a sentence with a falling verb (fell, dropped, down, slowed ...) reads a `%` against a
 // ratio as (1-r)*100 only; a rising verb (rose, grew, up, climbed ...) as (r-1)*100 or r*100; with
 // neither, or both, all three stay allowed. A sentence that names networks cites only
-// their ratio facts; one that names none cites only ratio facts whose label names no network.
+// their ratio facts; one that names none cites the subject's own (`subject`, R39), or, for the
+// whole network, only ratio facts whose label names no network. Names match as whole tokens.
 //
 // KNOWN LIMITS, stated rather than hidden: direction is read from the sentence's verbs, not from
 // which number the verb governs, and a duration is matched only against `duration`
@@ -160,10 +163,39 @@ const RATIO_WORD_RE = /\b(more than )?(doubled|tripled|quadrupled|halved|twice)\
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** One regex for every name, longest first so "Hetzner Online GmbH" wins over "Hetzner". Lookarounds
- *  instead of `\b`, because a name may start or end on a non-word character. */
+ *  instead of `\b`, because a name may start or end on a non-word character. A name is a whole
+ *  TOKEN: a dot joins words the way a letter does ("dag" is not named inside "USDC.dag"), and a
+ *  name never matches inside a longer word ("Niger" is not "Nigeria"). */
 function nameRe(names: readonly string[]): RegExp | null {
   const live = names.filter((n) => n.trim()).sort((a, b) => b.length - a.length).map(escape);
-  return live.length ? new RegExp(`(?<![\\w])(?:${live.join("|")})(?![\\w])`, "gi") : null;
+  return live.length ? new RegExp(`(?<![\\w.])(?:${live.join("|")})(?![\\w]|\\.\\w)`, "gi") : null;
+}
+
+/** Does `text` name `name`, as a whole token (case-insensitive)? The one test for both a sentence
+ *  naming a network and a fact's label carrying it. */
+function hasName(text: string, name: string): boolean {
+  const re = name.trim() ? nameRe([name]) : null;
+  return re ? new RegExp(re.source, "i").test(text) : false;
+}
+
+// THE CURRENCY. "1.2K DAG per day" prices an amount: DAG after a number is the UNIT, not the
+// network, so it is dropped (the number stays) before any name is read. Left in, it named the DAG
+// core, and a sentence about the hypergraph's own fees could cite no ratio of its own.
+const DAG_UNIT_RE = /(\d(?:[\d,.]*\d)?(?:\s*[kKMB](?![a-z]))?)\s*\$?DAG\b/g;
+
+// ORDINAL RANK WORDS ("the third biggest network") are numbers too: each must match a rank fact
+// (a count whose label says "rank") or a fact whose label carries the same word ("(second biggest
+// country)"). "first" is not read: it is the notable-day sense ("its first snapshot") far more than
+// a rank, and rank one is written "biggest". A time unit ("1 second", "per second") and the
+// indefinite "a second" (another) are not ranks.
+const ORDINALS: Record<string, number> = {
+  second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, seventh: 7, eighth: 8, ninth: 9, tenth: 10,
+};
+const ORDINAL_RE = new RegExp(`(?<!\\d\\s*|\\bper\\s+)\\b(${Object.keys(ORDINALS).join("|")})\\b`, "gi");
+const A_SECOND_RE = /\ba\s+$/i;
+function rankBacked(word: string, facts: readonly Fact[]): boolean {
+  const n = ORDINALS[word.toLowerCase()];
+  return facts.some((f) => (f.kind === "count" && /\brank\b/i.test(f.label) && f.value === n) || hasName(f.label, word));
 }
 
 function datePhrases(facts: readonly Fact[]): RegExp[] {
@@ -201,14 +233,26 @@ function sentences(text: string, nameRegex: RegExp | null): string[] {
   return out.map((s) => s.trim()).filter(Boolean);
 }
 
+export interface CheckOptions {
+  /** At most this many sentences (default 3). */
+  maxSentences?: number;
+  /** The SUBJECT's display name when it is one network or one country (R39): a sentence naming
+   *  no one ("Its snapshots rose by 37%") speaks of the subject, so it cites the ratio facts whose
+   *  label carries this name. Absent for the whole network (`all` / `dag`), whose own ratios are
+   *  the unattributed ones. */
+  subject?: string;
+}
+
 export function checkNote(
-  text: string,
+  written: string,
   facts: readonly Fact[],
   names: readonly string[],
-  opts?: { maxSentences?: number },
+  opts?: CheckOptions,
 ): NoteCheck {
   const reasons: string[] = [];
   const maxSentences = opts?.maxSentences ?? 3;
+  const subject = opts?.subject?.trim() ? opts.subject : null;
+  const text = written.replace(DAG_UNIT_RE, "$1");
   const nameRegex = nameRe(names);
   const stripNames = (s: string) => (nameRegex ? s.replace(nameRegex, " ") : s);
   const dates = datePhrases(facts);
@@ -226,20 +270,27 @@ export function checkNote(
   const ratios = facts.filter((f) => f.kind === "ratio");
   for (const sentence of parts) {
     // Names first: the ratio words below are held to the networks the sentence names.
-    const named = names.filter((n) => n.trim() && new RegExp(nameRe([n])!.source, "i").test(sentence));
+    const named = names.filter((n) => hasName(sentence, n));
     let s = stripNames(sentence).replace(LAYER_RE, " ");
     for (const re of dates) s = s.replace(re, " ");
 
     // ONE RULE for `%`, `x` and ratio words: a sentence that names networks may cite only the ratio
-    // facts whose label names one of them; a sentence that names none may cite only the ratio facts
-    // whose label names NO network (the subject's own, unattributed ratios), never a named one's.
-    const labelHas = (f: Fact, ns: readonly string[]) => ns.some((n) => n.trim() && f.label.toLowerCase().includes(n.toLowerCase()));
-    const own = named.length ? ratios.filter((f) => labelHas(f, named)) : ratios.filter((f) => !labelHas(f, names));
+    // facts whose label names one of them; a sentence that names none speaks of the SUBJECT (R39):
+    // a network's or a country's own ratios carry its name, the whole network's are the ones whose
+    // label names no one. Never a ratio of a network the sentence does not mean.
+    const labelHas = (f: Fact, ns: readonly string[]) => ns.some((n) => hasName(f.label, n));
+    const own = named.length ? ratios.filter((f) => labelHas(f, named))
+      : subject ? ratios.filter((f) => labelHas(f, [subject]))
+      : ratios.filter((f) => !labelHas(f, names));
     const dir = direction(s);
 
     const digits = s.replace(NUMBER_WORD_RE, (w) => ` ${NUMBER_WORDS[w.toLowerCase()]} `);
     for (const t of tokens(digits))
       if (!backed(t, facts, own, dir)) reasons.push(`"${t.raw}" is not backed by any measured fact`);
+    for (const m of digits.matchAll(ORDINAL_RE)) {
+      if (m[1]!.toLowerCase() === "second" && A_SECOND_RE.test(digits.slice(0, m.index))) continue;
+      if (!rankBacked(m[1]!, facts)) reasons.push(`"${m[1]}" is not backed by a rank fact`);
+    }
 
     for (const m of s.matchAll(RATIO_WORD_RE)) {
       const rule = RATIO_WORDS[m[2].toLowerCase()];
