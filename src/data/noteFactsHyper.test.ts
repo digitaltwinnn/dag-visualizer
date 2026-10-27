@@ -178,7 +178,7 @@ describe("hyperFacts on all", () => {
 
 describe("hyperFacts reads nodes through an outage-robust level", () => {
   const N = 720;
-  const patched = (id: string, base: number, bad: number | null, k = 1) =>
+  const patched = (_id: string, base: number, bad: number | null, k = 1) =>
     row(N, (i) => (i >= N - k ? bad : base));
   const digest = (fl: TrendsWindowData) => {
     const r = hyperFacts(input({ fleet: fl }))!;
