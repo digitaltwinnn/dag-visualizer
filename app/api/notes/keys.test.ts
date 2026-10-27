@@ -56,10 +56,25 @@ describe("keys", () => {
       expect(snapSpan(from, to, NOW)).toEqual({ fromMs: Date.UTC(2026, 9, 1, 7), toMs: Date.UTC(2026, 9, 8, 4) });
     });
 
-    it("clamps the end to now", () => {
+    it("clamps the end to the last whole bucket before now, so a brush ending now keeps one key", () => {
       const from = Date.UTC(2026, 9, 27, 9, 0);
-      const s = snapSpan(from, NOW + 6 * 3_600_000, NOW)!;
-      expect(s.toMs).toBe(NOW);
+      const now1 = NOW + 1 * MIN; // mid-bucket
+      const now2 = NOW + 3 * MIN; // same bucket, later
+      const a = snapSpan(from, now1, now1)!;
+      expect(a.toMs).toBe(Math.floor(now1 / (5 * MIN)) * 5 * MIN);
+      expect(a.toMs).toBe(NOW);
+      expect(snapSpan(from, now2 + 10 * MIN, now2)).toEqual(a);
+      expect(snapSpan(from, now2, now2)).toEqual(a);
+    });
+
+    it("re-snaps to itself, also when snapping carries a range across a tier boundary", () => {
+      const from = Date.UTC(2026, 9, 20, 10, 1);
+      const to = from + 2 * DAY; // exactly 2 days: the 5m tier
+      const x = snapSpan(from, to, NOW)!;
+      expect(x).toEqual({ fromMs: Date.UTC(2026, 9, 20, 10, 0), toMs: Date.UTC(2026, 9, 22, 11, 0) }); // now hourly
+      expect(snapSpan(x.fromMs, x.toMs, NOW)).toEqual(x);
+      const d = snapSpan(Date.UTC(2025, 2, 1, 7, 30), Date.UTC(2025, 2, 11, 3, 15), NOW)!;
+      expect(snapSpan(d.fromMs, d.toMs, NOW)).toEqual(d);
     });
 
     it("refuses a span under one 5-minute bucket after snapping", () => {

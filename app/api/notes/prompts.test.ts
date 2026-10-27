@@ -117,6 +117,13 @@ describe("parseAnswer", () => {
     expect(r.note).toBe("Final.");
   });
 
+  it("drops an unclosed reasoning block instead of making it the note", () => {
+    expect(parseAnswer("<think>\nThe user wants a note. Let me count the networks").note).toBe("");
+    const r = parseAnswer("NOTE: Final.\nDAY 2026-10-19: Busy.\n<think>and then I kept going");
+    expect(r.note).toBe("Final.");
+    expect([...r.captions]).toEqual([["2026-10-19", "Busy."]]);
+  });
+
   it("returns an empty note for empty text", () => {
     expect(parseAnswer("  \n").note).toBe("");
   });

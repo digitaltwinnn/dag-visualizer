@@ -77,13 +77,14 @@ export function buildMessages(
   ];
 }
 
-const THINK_RE = /<think>[\s\S]*?<\/think>/gi;
+// A closed block, or an UNCLOSED one running to the end (the model reasoned until max_tokens).
+const THINK_RE = /<think>[\s\S]*?(?:<\/think>|$)/gi;
 const NOTE_RE = /^\s*NOTE:\s*(.*)$/i;
 const DAY_RE = /^\s*DAY\s+(\d{4}-\d{2}-\d{2})\s*:\s*(.*)$/i;
 
 /** READ THE ANSWER BACK: `NOTE: …` then one `DAY YYYY-MM-DD: …` line per day. Tolerant by design,
  *  because the model sometimes wraps its output or reasons first: whitespace and any lines before
- *  `NOTE:` are ignored, and a leaked `<think>` block is dropped. A note may run over several lines
+ *  `NOTE:` are ignored, and a leaked `<think>` block, closed or cut off, is dropped. A note may run over several lines
  *  up to the first DAY line. With no `NOTE:` line at all the whole trimmed text is the note, and
  *  there are no captions. */
 export function parseAnswer(text: string): { note: string; captions: Map<string, string> } {

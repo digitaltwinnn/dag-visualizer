@@ -58,7 +58,7 @@ export const KIND_TIMING: Record<NoteKind, { refreshMs: number | null; ttlS: num
 };
 
 export function timingOf(view: NoteView, span: NoteSpan): { refreshMs: number | null; ttlS: number } {
-  if (/^r\d/.test(span)) return KIND_TIMING.range;
+  if (span.startsWith("r")) return KIND_TIMING.range;
   if (view === "hyper") return KIND_TIMING.hyper;
   if (view === "geo") return KIND_TIMING.geo;
   if (view === "ledger") return KIND_TIMING.ledger;
@@ -72,14 +72,26 @@ const MIN_SPAN_MS = STEP_MS["5m"];
 
 /** A BRUSHED RANGE, SNAPPED so that near-identical brushes share one note (the key space is
  *  otherwise unbounded). It snaps OUTWARD to a whole bucket of the tier the range is charted at
- *  (`pickRangeTier`), then clamps the end to `nowMs`. Null for a range that is not one: reversed or
- *  empty, starting in the future, or shorter than one 5-minute bucket after snapping. */
+ *  (`pickRangeTier`), then clamps the end to the last WHOLE bucket before `nowMs` (a raw `nowMs`
+ *  would give a brush ending now a new key on every call). Snapping outward can carry a range
+ *  across a tier boundary (10:01 to 10:01 + 2 days is 5m, but 10:00 to 10:05 + 2 days is 1h), so
+ *  the tier is picked again on the snapped span and, if it got coarser, the span snaps again: a
+ *  snapped span re-snaps to itself. Null for a range that is not one: reversed or empty, starting in
+ *  the future, or shorter than one 5-minute bucket after snapping. */
 export function snapSpan(fromMs: number, toMs: number, nowMs: number): { fromMs: number; toMs: number } | null {
   if (!Number.isFinite(fromMs) || !Number.isFinite(toMs)) return null;
   if (toMs <= fromMs || fromMs > nowMs) return null;
-  const step = STEP_MS[pickRangeTier(fromMs, toMs)];
-  const from = Math.floor(fromMs / step) * step;
-  const to = Math.min(Math.ceil(toMs / step) * step, nowMs);
+  let from = fromMs;
+  let to = toMs;
+  let step = 0;
+  for (let i = 0; i < 3; i++) {
+    const next = STEP_MS[pickRangeTier(from, to)];
+    if (next <= step) break;
+    step = next;
+    from = Math.floor(from / step) * step;
+    to = Math.ceil(to / step) * step;
+  }
+  to = Math.min(to, Math.floor(nowMs / step) * step);
   if (to - from < MIN_SPAN_MS) return null;
   return { fromMs: from, toMs: to };
 }

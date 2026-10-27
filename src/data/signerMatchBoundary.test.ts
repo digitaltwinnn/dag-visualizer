@@ -22,6 +22,7 @@ const HOME = "src/data/network.ts";
 const EXEMPT: Record<string, string> = {
   "app/api/trends/merge.ts": "series prefix matching (f./g.) for merge-op routing, domain-specific not signer-matching",
   "src/data/trendSeries.ts": "series-name prefix matching (f.type.{id}.) to collect a network's node-type rows, not signer-matching",
+  "app/api/notes/keys.ts": "note-span prefix (r<from>-<to>) to tell a brushed range from a pill, not signer-matching",
   "src/data/noteFactsGeo.ts": "series-name prefix matching (f.cc./f.isp.) to split the geo family's fields, not signer-matching",
   "src/data/trendBuckets.ts": "series-name prefix matching (g./m.{id}./f.layer.{id}.) to pick a scope's stored fields, not signer-matching",
 };

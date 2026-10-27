@@ -67,7 +67,11 @@ export async function gateChat(
       const name = (e as { name?: string } | null)?.name;
       throw new GateError(name === "AbortError" ? "timeout" : "http");
     }
-    const content = (body as { choices?: { message?: { content?: unknown } }[] } | null)?.choices?.[0]?.message?.content;
+    const choice = (body as { choices?: { message?: { content?: unknown }; finish_reason?: unknown }[] } | null)?.choices?.[0];
+    // Cut off at max_tokens (a reasoning model that never reached its answer): a truncated answer
+    // is no answer, whatever text it holds.
+    if (choice?.finish_reason === "length") throw new GateError("empty");
+    const content = choice?.message?.content;
     if (typeof content !== "string" || !content.trim()) throw new GateError("empty");
     return content;
   } finally {

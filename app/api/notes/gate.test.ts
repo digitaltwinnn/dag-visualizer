@@ -97,6 +97,15 @@ describe("gateChat", () => {
     expect((await kindOf(gateChat(MSGS, { fetchImpl: noChoices }))).kind).toBe("empty");
   });
 
+  it("treats an answer cut off at max_tokens as empty, whatever text it holds", async () => {
+    const cut = (async () =>
+      new Response(JSON.stringify({ choices: [{ message: { content: "<think>still reasoning" }, finish_reason: "length" }] }), { status: 200 })) as unknown as typeof fetch;
+    expect((await kindOf(gateChat(MSGS, { fetchImpl: cut }))).kind).toBe("empty");
+    const done = (async () =>
+      new Response(JSON.stringify({ choices: [{ message: { content: "NOTE: Fine." }, finish_reason: "stop" }] }), { status: 200 })) as unknown as typeof fetch;
+    await expect(gateChat(MSGS, { fetchImpl: done })).resolves.toBe("NOTE: Fine.");
+  });
+
   it("never carries the key or headers in an error message, whatever the cause said", async () => {
     const leaky = [
       (async () => { throw new Error(`connect failed, Authorization: Bearer ${FAKE_KEY}`); }) as unknown as typeof fetch,
