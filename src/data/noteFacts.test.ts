@@ -56,23 +56,38 @@ describe("fact", () => {
 const flat = (n: number, v: number, patch: Record<number, number | null> = {}): (number | null)[] =>
   Array.from({ length: n }, (_, i) => (i in patch ? patch[i]! : v));
 
-describe("observedLevel (R52)", () => {
-  it("is the median when the count is odd, and on an even count the MORE RECENT of the two middle readings (R55)", () => {
-    expect(observedLevel([8, 8, 8, 9, 9, 9])).toBe(9);
-    expect(observedLevel([9, 8, 9, 8, 9, 8])).toBe(8);
-    expect(observedLevel([17, 18])).toBe(18);
-    expect(observedLevel([18, 17])).toBe(17);
-    expect(observedLevel([5, 1, 3])).toBe(3);
-    expect(observedLevel([4])).toBe(4);
+describe("observedLevel (R52, R61)", () => {
+  it("is the median when the count is odd, whichever edge is read", () => {
+    for (const edge of ["start", "end"] as const) {
+      expect(observedLevel([5, 1, 3], edge)).toBe(3);
+      expect(observedLevel([4], edge)).toBe(4);
+    }
   });
 
-  it("reads a network that has just come up at its new level, and one that just went down at 0 (R55)", () => {
-    expect(observedLevel([0, 0, 0, 5, 5, 5])).toBe(5);
-    expect(observedLevel([5, 5, 5, 0, 0, 0])).toBe(0);
+  it("at the END of a span takes the MORE RECENT of the two middle readings on an even count", () => {
+    expect(observedLevel([8, 8, 8, 9, 9, 9], "end")).toBe(9);
+    expect(observedLevel([9, 8, 9, 8, 9, 8], "end")).toBe(8);
+    expect(observedLevel([17, 18], "end")).toBe(18);
+    expect(observedLevel([18, 17], "end")).toBe(17);
+  });
+
+  it("at the START of a span takes the EARLIER of the two middle readings on an even count", () => {
+    expect(observedLevel([8, 8, 8, 9, 9, 9], "start")).toBe(8);
+    expect(observedLevel([9, 8, 9, 8, 9, 8], "start")).toBe(9);
+    expect(observedLevel([17, 18], "start")).toBe(17);
+    expect(observedLevel([18, 17], "start")).toBe(18);
+  });
+
+  it("reads 0, 0, 0, 5, 5, 5 as 0 at a span's start and 5 at its end: a network that came up in the span changed", () => {
+    expect(observedLevel([0, 0, 0, 5, 5, 5], "start")).toBe(0);
+    expect(observedLevel([0, 0, 0, 5, 5, 5], "end")).toBe(5);
+    expect(observedLevel([5, 5, 5, 0, 0, 0], "start")).toBe(5);
+    expect(observedLevel([5, 5, 5, 0, 0, 0], "end")).toBe(0);
   });
 
   it("is always a sample the sampler made, never a mean of two", () => {
-    for (const xs of [[8, 8, 8, 9, 9, 9], [0, 0, 0, 5, 5, 5], [17, 18], [1, 2, 3, 4]]) expect(xs).toContain(observedLevel(xs));
+    for (const xs of [[8, 8, 8, 9, 9, 9], [0, 0, 0, 5, 5, 5], [17, 18], [1, 2, 3, 4]])
+      for (const edge of ["start", "end"] as const) expect(xs).toContain(observedLevel(xs, edge));
   });
 });
 
@@ -102,9 +117,13 @@ describe("heldLevel", () => {
 });
 
 describe("gaugeChange", () => {
-  it("states whole levels at both ends: an even split reads its more recent observed sample (R52, R55)", () => {
+  it("states whole levels at both ends: an even split reads the sample nearer its edge (R52, R61)", () => {
     const pts = [17, 17, 17, 18, 18, 18, ...flat(10, 20), 21, 21, 21, 20, 20, 20];
-    expect(gaugeChange(pts)).toMatchObject({ from: 18, to: 20 });
+    expect(gaugeChange(pts)).toMatchObject({ from: 17, to: 20 });
+  });
+
+  it("states a network that came up in the span's first hours as a change, 0 to 5 (R61)", () => {
+    expect(gaugeChange([0, 0, 0, 5, 5, 5, ...flat(12, 5)])).toMatchObject({ from: 0, to: 5 });
   });
 
   it("reads through an interior outage: no drop is stated", () => {

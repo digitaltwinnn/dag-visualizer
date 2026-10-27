@@ -427,12 +427,12 @@ describe("hyperFacts on a network: the change of shape", () => {
   });
 
   it("reads the start only from the span's opening samples, never from an outage hour mid-span (M1)", () => {
-    // The opening six hours read 2, 3, 4, 6, 7, 8: only one of them agrees with their level, 6
-    // (the more recent middle, R55).
-    // Hour 600 is a partial outage that happens to read 6, with one L0 node: never "the start of
+    // The opening six hours read 2, 3, 4, 6, 7, 8: only one of them agrees with their level, 4
+    // (the earlier middle, read at the span's start, R61).
+    // Hour 600 is a partial outage that happens to read 4, with one L0 node: never "the start of
     // the span", so no shape is stated at all.
     const opening = [2, 3, 4, 6, 7, 8];
-    const nodes = (i: number) => (i < 6 ? opening[i]! : i === 600 ? 6 : 5);
+    const nodes = (i: number) => (i < 6 ? opening[i]! : i === 600 ? 4 : 5);
     const r = hyperFacts(
       input({
         subject: "dor",

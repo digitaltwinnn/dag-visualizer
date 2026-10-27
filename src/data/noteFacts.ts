@@ -90,21 +90,25 @@ function median(xs: readonly number[]): number {
  *  but on an even count one of the two middle values rather than their mean, so a held node count
  *  is always a reading the sampler made and a note can never say "17.5 nodes".
  *
- *  WHICH MIDDLE (R55): the one read MORE RECENTLY, i.e. the value whose last sample comes later.
- *  An even split is a gauge caught between two levels, and the newer one is where it stands now:
- *  0, 0, 0, 5, 5, 5 is a network that has just come up with 5 nodes and reads 5 ("with nodes",
- *  ranked, in `setKey`); 5, 5, 5, 0, 0, 0 has just gone down and reads 0. The lower middle (R52's
- *  first rule) read the first as 0, keeping it out of every count for hours after it came up.
+ *  WHICH MIDDLE (R55, R61): the one NEARER THE EDGE BEING DESCRIBED. An even split is a gauge
+ *  caught between two levels, and the edge says which level it stood at there: at the span's
+ *  `end` the value read more recently (its last sample comes later), at its `start` the value read
+ *  earlier (its first sample comes sooner). So 0, 0, 0, 5, 5, 5 reads 0 at a start and 5 at an
+ *  end: a network that came up in the span's first hours is a change from 0 to 5, and one that
+ *  came up in its last hours stands at 5 ("with nodes", ranked, in `setKey`). Either fixed choice
+ *  hid one of those (the lower middle, R52's first rule, kept the second at 0 for hours).
  *
- *  Every level a builder STATES goes through this (`heldLevel`, `gaugeChange`'s ends, Hypergraph's
- *  layer and combination ends); a median used only as a tolerance check (the hold test below,
- *  geo's day totals) is not a stated level and stays the plain median. */
-export function observedLevel(xs: readonly number[]): number {
+ *  Every level a builder STATES goes through this (`heldLevel` and `gaugeChange`'s `to` at the
+ *  end, `gaugeChange`'s `from` at the start, Hypergraph's layer and combination ends); a median
+ *  used only as a tolerance check (the hold test below, geo's day totals) is not a stated level
+ *  and stays the plain median. */
+export function observedLevel(xs: readonly number[], edge: "start" | "end"): number {
   const s = xs.slice().sort((a, b) => a - b);
   if (s.length % 2) return s[s.length >> 1]!;
   const lo = s[s.length / 2 - 1]!;
   const hi = s[s.length / 2]!;
-  return xs.lastIndexOf(hi) > xs.lastIndexOf(lo) ? hi : lo;
+  if (edge === "end") return xs.lastIndexOf(hi) > xs.lastIndexOf(lo) ? hi : lo;
+  return xs.indexOf(hi) < xs.indexOf(lo) ? hi : lo;
 }
 
 /** Samples a level is read from at either end, and the fewest a gauge needs to be read at all. */
@@ -119,7 +123,7 @@ const HOLD_TOLERANCE = 0.1;
  *  median of those it has. */
 export function heldLevel(points: readonly (number | null)[]): number | null {
   const xs = points.filter((v): v is number => v != null);
-  return xs.length ? observedLevel(xs.slice(-LEVEL_SAMPLES)) : null;
+  return xs.length ? observedLevel(xs.slice(-LEVEL_SAMPLES), "end") : null;
 }
 
 /** WHAT A GAUGE DID OVER A SPAN: the level at the start and at the end, each the MEDIAN of the
@@ -134,7 +138,7 @@ export function heldLevel(points: readonly (number | null)[]): number | null {
 export function gaugeChange(points: readonly (number | null)[]): { from: number; to: number; firstIndex: number } | null {
   const xs = points.filter((v): v is number => v != null);
   if (xs.length < MIN_SAMPLES) return null;
-  const from = observedLevel(xs.slice(0, LEVEL_SAMPLES));
+  const from = observedLevel(xs.slice(0, LEVEL_SAMPLES), "start");
   const to = heldLevel(points)!;
   const quarter = median(xs.slice(-Math.ceil(xs.length / 4)));
   if (Math.abs(quarter - to) > HOLD_TOLERANCE * Math.abs(to)) return null;

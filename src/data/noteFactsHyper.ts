@@ -43,18 +43,18 @@ import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 //   · node counts go through `gaugeChange`; a gauge that began after the span did (`firstIndex`
 //     beyond 10% of the buckets) states only its current level, never a start of the span's, and is
 //     never a mover. A gauge whose start and end levels are equal is no mover either;
-//   · the sampler writes layer and combination rows only for the roles / types PRESENT, and a
-//     failed cluster fetch drops a role's row while `f.nodes.<id>` HOLDS (the lists merge by IP, so
-//     a hybrid is still counted through its other layer). So each layer and combination is a HELD
+//   · the sampler writes layer and combination rows only for the roles / types PRESENT, and a failed
+//     cluster fetch drops a role's row while `f.nodes.<id>` HOLDS (the lists merge by IP, so a
+//     hybrid is still counted through its other layer). So each layer and combination is a HELD
 //     LEVEL at each end, read exactly where `gaugeChange` reads the node count: the MEDIAN (an
-//     observed sample, never a half node: R52, the more recent middle on an even count: R55) over
-//     the gauge's first (start) / last (end) six measured samples, of those whose `f.nodes.<id>`
-//     is within 10% of the gauge's level at that end — one bad hour can neither make nor hide a
-//     change, and the start never wanders mid-span. Fewer than three agreeing samples at either
-//     end, or no change of node count to read (null, late start, either level 0): no shape facts
-//     at all. At a sample a role with no row is a measured 0, unless the sample recorded no role
-//     at all (unread); a combination band null at a sample (no type recorded) is unread; a level
-//     read from fewer than three samples is unknown and states nothing. Only the layers and
+//     observed sample, never a half node, R52; on an even count the middle nearer that edge, R61)
+//     over the gauge's first (start) / last (end) six measured samples, of those whose
+//     `f.nodes.<id>` is within 10% of the gauge's level at that end — one bad hour can neither make
+//     nor hide a change, and the start never wanders mid-span. Fewer than three agreeing samples at
+//     either end, or no change of node count to read (null, late start, either level 0): no shape
+//     facts at all. At a sample a role with no row is a measured 0, unless the sample recorded no
+//     role at all (unread); a combination band null at a sample (no type recorded) is unread; a
+//     level read from fewer than three samples is unknown and states nothing. Only the layers and
 //     combinations whose count DIFFERS are stated; an unchanged breakdown is the card's, not news;
 //   · activity is the global snapshots a network WAS PART OF per day (`m.<id>.ticks` through
 //     `anchorSeries`, which reads a pre-2026-10-08 zero as "not measured") over the last week of
@@ -301,20 +301,20 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
       const startAt = measured.slice(0, SHAPE_SAMPLES).filter((i) => agrees(i, ch.from));
       const endAt = measured.slice(-SHAPE_SAMPLES).filter((i) => agrees(i, ch.to));
       if (startAt.length >= SHAPE_MIN_SAMPLES && endAt.length >= SHAPE_MIN_SAMPLES && startAt[startAt.length - 1]! < endAt[0]!) {
-        /** The observed median (`observedLevel`, R52: a whole count) of a reading over an end's
-         *  samples, the unread (null) ones left out; null when fewer than SHAPE_MIN_SAMPLES were
-         *  read. */
-        const held = (at: readonly number[], read: (i: number) => number | null): number | null => {
+        /** The observed median (`observedLevel`, R52: a whole count, the split read toward `edge`,
+         *  R61) of a reading over an end's samples, the unread (null) ones left out; null when
+         *  fewer than SHAPE_MIN_SAMPLES were read. */
+        const held = (at: readonly number[], edge: "start" | "end", read: (i: number) => number | null): number | null => {
           const xs = at.map(read).filter((v): v is number => v != null);
-          return xs.length >= SHAPE_MIN_SAMPLES ? observedLevel(xs) : null;
+          return xs.length >= SHAPE_MIN_SAMPLES ? observedLevel(xs, edge) : null;
         };
         const roles = Object.keys(ROLE_SHORT);
         const rows = roles.map((role) => fleet.series[`f.layer.${subject}.${role}`] ?? []);
         // A role with no row at a sample is a measured 0 — unless the sample recorded no role at
         // all, which is no reading.
         const layerAt = (k: number) => (i: number) => (rows.some((r) => r[i] != null) ? (rows[k]![i] ?? 0) : null);
-        const was = roles.map((_, k) => held(startAt, layerAt(k)));
-        const is = roles.map((_, k) => held(endAt, layerAt(k)));
+        const was = roles.map((_, k) => held(startAt, "start", layerAt(k)));
+        const is = roles.map((_, k) => held(endAt, "end", layerAt(k)));
         if (was.every((v) => v != null) && is.every((v) => v != null)) {
           const moved = roles.filter((_, k) => was[k] !== is[k]);
           facts.push(fact(`${name} layers whose node count changed over the span`, moved.length, "count"));
@@ -326,8 +326,8 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
           }
         }
         for (const band of typeBands(subject, fleet.series)) {
-          const from = held(startAt, (i) => band.points[i] ?? null); // null: no type recorded at that sample
-          const to = held(endAt, (i) => band.points[i] ?? null);
+          const from = held(startAt, "start", (i) => band.points[i] ?? null); // null: no type recorded at that sample
+          const to = held(endAt, "end", (i) => band.points[i] ?? null);
           if (from == null || to == null || from === to) continue;
           const key = `${name} nodes ${comboWords(band.key)}`;
           facts.push(fact(`${key} at the start of the span`, from, "count", undefined, { key, end: "from" }));
