@@ -15,8 +15,8 @@ import type { Fact } from "@/src/data/noteTypes";
 //     pair's `from` end (`Fact.pair`: no other fact holds it at its written precision) is the
 //     earlier side of a change, and its NEIGHBOUR must be that pair's `to` end: the first number
 //     after it that is no other past value and no size or span (a duration, `%` or `x`, unless it
-//     is one itself), else the nearest such number before it. "fell from 173 over 30 days to just
-//     86" and "86, down from 173" pass; "from 173 a month ago to 9" fails ("173 is a past value;
+//     is one itself), else ANY such number before it (R65). "fell from 173 over 30 days to just
+//     86", "86, down from 173" and "86 nodes in 12 countries, down from 173" pass; "from 173 a month ago to 9" fails ("173 is a past value;
 //     the figure beside it, 9, is not its current figure 86"), and so does a current figure dealt
 //     to the wrong change in a sentence listing several. No sentence form is parsed. A bare
 //     number joined by to / and / or / a dash to a number with a duration, `%` or K / M / B unit
@@ -49,10 +49,14 @@ import type { Fact } from "@/src/data/noteTypes";
 // Germany's pair), the verb's direction ("rose from 66 to 33") and the order of the ends ("rose
 // from 86 to 173": 173's neighbour is 86) are not checked. A sentence of two CURRENT figures
 // ("from 38% to 11%") has no past value to hold, and a past value that coincides with some other
-// current fact is read as current. Adjacency also costs some honest forms a retry: ends written
-// "respectively" ("fell to 33 and 27, from 67 and 58"), coordinated ("from 67 and 58 to 33 and
-// 27"), or a past value followed by a number of another clause ("fell to 86, from 173; Germany
-// has 33").
+// current fact is read as current. The BACKWARD scan is weaker than the forward one (R65): a past
+// value with nothing current after it is satisfied by its current figure anywhere before it, so a
+// figure standing between the two may read as the one that changed ("the fleet has 86 nodes and
+// Germany 33, down from 173" passes on the fleet's pair), and a current figure two pairs share
+// satisfies either ("Germany has 19 nodes, the US 33, down from 66" with both at 33). Adjacency
+// still costs some honest forms a retry: ends coordinated ("from 67 and 58 to 33 and 27"), a pair
+// written current-first followed by another ("to 33 from 67, and the US to 27 from 58"), or a past
+// value followed by a number of another clause ("fell to 86, from 173; Germany has 33").
 
 export type NoteCheck = { ok: true } | { ok: false; reasons: string[] };
 
@@ -178,8 +182,8 @@ function backed(t: Tok, facts: readonly Fact[], ratios: readonly Fact[], dir: Di
 // pair's `from` end (no fact other than a `from` end holds it at its written precision) is the
 // earlier side of a change. Its NEIGHBOUR must be that pair's `to` end: the first number after it
 // that is neither another past value nor a size or span (a duration, a `%`, an `x`, unless the
-// past value is one itself), else, when none follows, the nearest such number before it ("86
-// nodes, down from 173"). No sentence form is parsed: "fell from 173 over 30 days to just 86"
+// past value is one itself), else, when none follows, ANY such number before it (R65: "86 nodes
+// in 12 countries, down from 173"; "to 33 and 27, from 67 and 58"). No sentence form is parsed: "fell from 173 over 30 days to just 86"
 // passes and "from 173 a month ago to 9" fails on 9, whatever words sit between. Co-occurrence
 // alone (R60) let any current figure in the sentence satisfy any past value, so a sentence
 // listing several changes could deal the current figures to the wrong ones (re-review N1).
@@ -200,11 +204,13 @@ function pastReason(i: number, toks: readonly Tok[], past: readonly boolean[], f
   if (!now) return `${t.raw} is a past value with no current figure`;
   // A size or a span is no end: "down 50%" or "over 30 days" between the two is skipped.
   const qualifies = (u: Tok, k: number) => k !== i && !past[k] && (u.cls === t.cls || u.cls === "plain");
-  let j = toks.findIndex((u, k) => k > i && qualifies(u, k));
-  if (j < 0) for (let k = i - 1; k >= 0 && j < 0; k--) if (qualifies(toks[k]!, k)) j = k;
-  if (j < 0) return `${t.raw} is a past value; its current figure ${now.text} is not in the sentence`;
-  const u = toks[j]!;
-  return nows.some((g) => g && says(u, g, ratios, dir)) ? "" : `${t.raw} is a past value; the figure beside it, ${u.raw}, is not its current figure ${now.text}`;
+  const isNow = (u: Tok) => nows.some((g) => g && says(u, g, ratios, dir));
+  const after = toks.findIndex((u, k) => k > i && qualifies(u, k));
+  // Nothing current follows: its current figure may stand ANYWHERE before it (R65), and the reason
+  // names the nearest figure there.
+  const ends = after >= 0 ? [after] : toks.map((_, k) => i - 1 - k).filter((k) => k >= 0 && qualifies(toks[k]!, k));
+  if (!ends.length) return `${t.raw} is a past value; its current figure ${now.text} is not in the sentence`;
+  return ends.some((k) => isNow(toks[k]!)) ? "" : `${t.raw} is a past value; the figure beside it, ${toks[ends[0]!]!.raw}, is not its current figure ${now.text}`;
 }
 
 // A SHARED UNIT. "from 20 to 45 seconds", "38 to 36%" and "41.2 to 49.5K" write the unit once: a

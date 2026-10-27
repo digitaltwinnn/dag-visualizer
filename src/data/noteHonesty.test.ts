@@ -334,6 +334,22 @@ describe("checkNote — a past value stands beside its own current figure (R60, 
       expect(gate(t), t).toEqual({ ok: true });
   });
 
+  it("accepts the current figure anywhere before a past value nothing current follows (R65)", () => {
+    // "Countries hosting nodes" stands between the fleet's 86 and its 173: the backward scan reads
+    // past it to the pair's own current figure.
+    const withCountries = [...dump, Pf("Countries hosting nodes", 12, "count", "12")];
+    expect(gate("The fleet locates 86 nodes in 12 countries, down from 173 a month ago.", withCountries)).toEqual({ ok: true });
+    // The ends written "respectively": each past value finds its own current figure before it.
+    expect(gate("Germany fell to 33 and the United States to 27, from 67 and 58.")).toEqual({ ok: true });
+    // Still held: no current figure of its own anywhere before, and the after rule is unchanged.
+    expect(reasons("The fleet locates 9 nodes in 12 countries, down from 173.", withCountries)).toEqual([
+      "173 is a past value; the figure beside it, 12, is not its current figure 86",
+    ]);
+    expect(reasons("Germany fell to 33 from 67, and the United States to 27 from 58.")).toEqual([
+      "67 is a past value; the figure beside it, 27, is not its current figure 33",
+    ]);
+  });
+
   it("holds numbers that are no past value to the one-fact rule, a range included", () => {
     expect(gate("The biggest countries range from 33 in Germany to 17 in Finland.")).toEqual({ ok: true });
     expect(gate("Amazon.com runs 9 nodes, and Hetzner Online 51.")).toEqual({ ok: true });
@@ -426,9 +442,16 @@ describe("checkNote — a past value stands beside its own current figure (R60, 
     expect(checkNote("Germany's share fell from 38% to 11%.", current, geoNames)).toEqual({ ok: true });
     // A past value that coincides with some other current fact is read as current.
     expect(checkNote("The fleet fell from 9 to 51.", [...dump, Pf("X, nodes a month ago", 9, "count", "9", "x", "from")], geoNames)).toEqual({ ok: true });
+    // The backward scan (R65) reads past other current figures to the pair's own: a past value with
+    // nothing current after it binds to its current figure ANYWHERE before, so a figure between
+    // the two may read as the one that changed ("Germany 33, down from 173" on the fleet's pair),
+    // and a current figure two pairs share satisfies either ("Germany has 19 nodes, the US 33, down
+    // from 66" with Germany and the United States both at 33: the shared-current class).
+    expect(gate("The fleet has 86 nodes and Germany 33, down from 173.")).toEqual({ ok: true });
+    expect(gate("Germany has 19 nodes, the US 33, down from 66.", live)).toEqual({ ok: true });
     // Adjacency's cost: honest forms whose ends do not sit side by side fail, and the model retries.
-    expect(gate("Germany fell to 33 and the United States to 27, from 67 and 58.").ok).toBe(false); // "respectively"
     expect(gate("Germany and the United States fell from 67 and 58 to 33 and 27.").ok).toBe(false); // coordinated ends
+    expect(gate("Germany fell to 33 from 67, and the United States to 27 from 58.").ok).toBe(false); // a later pair's figure follows
     expect(gate("Located nodes fell to 86, from 173; Germany has 33.").ok).toBe(false); // a later clause's number follows
   });
 });
