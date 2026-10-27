@@ -176,6 +176,61 @@ describe("hyperFacts on all", () => {
   });
 });
 
+describe("hyperFacts reads nodes through an outage-robust level", () => {
+  const N = 720;
+  const patched = (id: string, base: number, bad: number | null, k = 1) =>
+    row(N, (i) => (i >= N - k ? bad : base));
+  const digest = (fl: TrendsWindowData) => {
+    const r = hyperFacts(input({ fleet: fl }))!;
+    return {
+      withNodes: find(r, /^Networks with nodes$/)[0]!.value,
+      biggest: r.facts.filter((f) => /biggest network\)$/.test(f.label)).map((f) => [f.label, f.value]),
+      setKey: r.setKey,
+    };
+  };
+  const base = digest(fleet());
+
+  it("an hour that reads 0 for one network changes nothing", () => {
+    expect(digest(fleet({ "f.nodes.usdc": patched("usdc", 30, 0) }))).toEqual({ ...base });
+  });
+
+  it("an hour that reads a partial low count changes nothing", () => {
+    expect(digest(fleet({ "f.nodes.usdc": patched("usdc", 30, 4) }))).toEqual(base);
+    const r = hyperFacts(input({ subject: "usdc", fleet: fleet({ "f.nodes.usdc": patched("usdc", 30, 4) }) }))!;
+    expect(find(r, /^USDC\.dag rank by nodes$/)[0]!.value).toBe(2);
+  });
+
+  it("a network that genuinely emptied leaves the set and states no shape", () => {
+    const emptied = fleet({ "f.nodes.usdc": patched("usdc", 30, 0, 8), "f.layer.usdc.l0": row(N, (i) => (i < N - 8 ? 30 : null)) });
+    const d = digest(emptied);
+    expect(d.withNodes).toBe(2);
+    expect(d.setKey).toBe("bio,dag");
+    const r = hyperFacts(input({ subject: "usdc", fleet: emptied }))!;
+    expect(find(r, /layer$/)).toEqual([]);
+    expect(find(r, /nodes running/)).toEqual([]);
+    expect(find(r, /rank by nodes/)).toEqual([]);
+  });
+
+  it("reads the shape at the last agreeing sample when a layer's roles vanish for an hour", () => {
+    // The last hour: nodes low (the cL1 fetch failed) and its role / type rows absent.
+    const r = hyperFacts(
+      input({
+        subject: "usdc",
+        fleet: fleet({
+          "f.nodes.usdc": patched("usdc", 30, 10),
+          "f.layer.usdc.l0": row(N, (i) => (i < N - 1 ? 30 : 10)),
+          "f.layer.usdc.cl1": row(N, (i) => (i < N - 1 ? 20 : null)),
+          "f.type.usdc.l0+cl1": row(N, (i) => (i < N - 1 ? 20 : null)),
+          "f.type.usdc.l0": row(N, (i) => (i < N - 1 ? 10 : 10)),
+        }),
+      }),
+    )!;
+    expect(find(r, /^USDC\.dag nodes on the L0 layer$/)[0]!.value).toBe(30);
+    expect(find(r, /^USDC\.dag nodes on the cL1 layer$/)[0]!.value).toBe(20);
+    expect(find(r, /^USDC\.dag nodes running L0 and cL1$/)[0]!.value).toBe(20);
+  });
+});
+
 describe("hyperFacts on a network", () => {
   const usdc = () => hyperFacts(input({ subject: "usdc" }))!;
 

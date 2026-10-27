@@ -85,6 +85,14 @@ const MIN_SAMPLES = 12;
 /** The end level must also hold over the final quarter of the span, within this fraction. */
 const HOLD_TOLERANCE = 0.1;
 
+/** A GAUGE'S CURRENT LEVEL: the median of its last six MEASURED samples (`gaugeChange`'s own `to`),
+ *  so one bad hour — a failed fetch stored as 0 or a partial low count — never becomes "now". Null
+ *  when the gauge has no measured sample; with fewer than six it is the median of those it has. */
+export function heldLevel(points: readonly (number | null)[]): number | null {
+  const xs = points.filter((v): v is number => v != null);
+  return xs.length ? median(xs.slice(-LEVEL_SAMPLES)) : null;
+}
+
 /** WHAT A GAUGE DID OVER A SPAN: the level at the start and at the end, each the MEDIAN of the
  *  first / last six measured samples. A median reads through an outage (an interior run of low
  *  samples never touches either end) and through a one-sample spike. The end level is stated only
@@ -97,7 +105,7 @@ export function gaugeChange(points: readonly (number | null)[]): { from: number;
   const xs = points.filter((v): v is number => v != null);
   if (xs.length < MIN_SAMPLES) return null;
   const from = median(xs.slice(0, LEVEL_SAMPLES));
-  const to = median(xs.slice(-LEVEL_SAMPLES));
+  const to = heldLevel(points)!;
   const quarter = median(xs.slice(-Math.ceil(xs.length / 4)));
   if (Math.abs(quarter - to) > HOLD_TOLERANCE * Math.abs(to)) return null;
   return { from, to, firstIndex: points.findIndex((v) => v != null) };

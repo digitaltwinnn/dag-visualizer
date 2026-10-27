@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fact, factsBlock, gaugeChange, networksAnchored } from "@/src/data/noteFacts";
+import { fact, factsBlock, gaugeChange, heldLevel, networksAnchored } from "@/src/data/noteFacts";
 import { checkNote } from "@/src/data/noteHonesty";
 import { formatDag } from "@/src/data/trendSeries";
 
@@ -48,6 +48,26 @@ describe("fact", () => {
 
 const flat = (n: number, v: number, patch: Record<number, number | null> = {}): (number | null)[] =>
   Array.from({ length: n }, (_, i) => (i in patch ? patch[i]! : v));
+
+describe("heldLevel", () => {
+  it("is the median of the last six measured samples: one bad final hour does not move it", () => {
+    expect(heldLevel(flat(30, 177, { 29: 0 }))).toBe(177);
+    expect(heldLevel(flat(30, 177, { 29: 90 }))).toBe(177);
+    expect(heldLevel(flat(30, 177, { 28: null, 29: null }))).toBe(177);
+  });
+
+  it("follows a real change once it has held, and is null with nothing measured", () => {
+    expect(heldLevel(flat(30, 177, { 24: 0, 25: 0, 26: 0, 27: 0, 28: 0, 29: 0 }))).toBe(0);
+    expect(heldLevel([3, null, 5])).toBe(4);
+    expect(heldLevel([null, null])).toBeNull();
+    expect(heldLevel([])).toBeNull();
+  });
+
+  it("is gaugeChange's own end level", () => {
+    const pts = Array.from({ length: 30 }, (_, i) => (i < 15 ? 177 : 120));
+    expect(heldLevel(pts)).toBe(gaugeChange(pts)!.to);
+  });
+});
 
 describe("gaugeChange", () => {
   it("reads through an interior outage: no drop is stated", () => {

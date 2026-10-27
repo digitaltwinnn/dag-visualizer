@@ -1,8 +1,8 @@
 import { ROLE_SHORT, roleKeyLabel } from "@/src/data/composition";
-import { fact, gaugeChange, networksAnchored } from "@/src/data/noteFacts";
+import { fact, gaugeChange, heldLevel, networksAnchored } from "@/src/data/noteFacts";
 import { notableDays } from "@/src/data/notableDays";
 import type { Fact } from "@/src/data/noteTypes";
-import { anchorSeries, lastMeasured, typeBands, withUnlisted } from "@/src/data/trendSeries";
+import { anchorSeries, typeBands, withUnlisted } from "@/src/data/trendSeries";
 import { trimNewestPartial, type TrendsWindowData } from "@/src/data/trendWindow";
 import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 
@@ -27,14 +27,19 @@ import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 // model is not invited to write a figure no fact holds.
 //
 // HONESTY (rule 10):
-//   · "networks" are the catalog's, the DAG's own core included (the unified node model): a network
-//     has nodes when its count at the fleet's newest sample is above 0; one with no value at that
-//     sample is not counted, not read as 0;
+//   · "networks" are the catalog's, the DAG's own core included (the unified node model). A network's
+//     node count NOW is its HELD LEVEL (`heldLevel`: the median of its last six measured
+//     `f.nodes.<id>` samples, the same reading as `gaugeChange`'s end), because the sampler stores a
+//     failed fetch as 0 or a partial count and one bad hour must not move a network in or out of
+//     "has nodes", the ranks, the biggest list or `setKey`. It has nodes when that level is above 0;
+//     every count in one facts object comes from it, so they agree;
 //   · node counts go through `gaugeChange`; a gauge that began after the span did (`firstIndex`
 //     beyond 10% of the buckets) states only its current level, never a start of the span's;
-//   · the layer and combination tallies are written only for the roles / types PRESENT, so they are
-//     read at the newest sample that recorded any, with an absent one a measured 0 there (a stale
-//     older count of a role that has since gone is never reported as current);
+//   · the sampler writes layer and combination rows only for the roles / types PRESENT, so they are
+//     read at the NEWEST sample whose `f.nodes.<id>` was measured and within 10% of the held level
+//     (a sample from a partial outage is skipped, never read as a change of shape), never falling
+//     back further; a held level of 0, or no agreeing sample, states no shape. At that sample a role
+//     with no row is a measured 0;
 //   · activity is the global snapshots a network WAS PART OF per day (`m.<id>.ticks` through
 //     `anchorSeries`, which reads a pre-2026-10-08 zero as "not measured") over the last week of
 //     COMPLETE days; "anchored" reads `m.<id>.snaps`. A network with no row is not ranked;
@@ -71,6 +76,8 @@ export interface HyperFacts {
 const TOP = 3;
 /** A gauge whose first measured sample falls later than this fraction of the span's buckets began after the span did. */
 const LATE_START = 0.1;
+/** A sample's node count agrees with the held level within this fraction. */
+const SHAPE_TOLERANCE = 0.1;
 const WEEK_DAYS = 7;
 const RANK_WORD = ["", "second ", "third "] as const;
 
@@ -109,10 +116,10 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
   };
   const named: string[] = []; // ids in the order the facts name them, for the blurbs
 
-  // Nodes per network at the newest fleet sample; an absent value is not a count.
-  const nodesAt = (id: string): number | null => fleet.series[`f.nodes.${id}`]?.[latest] ?? null;
-  const withNodes = ids.filter((id) => (nodesAt(id) ?? 0) > 0);
-  const byNodes = withNodes.slice().sort((a, b) => nodesAt(b)! - nodesAt(a)! || a.localeCompare(b));
+  // Nodes per network NOW: the held level, outage-robust. No measured sample is not a count.
+  const levelOf = (id: string): number | null => heldLevel(fleet.series[`f.nodes.${id}`] ?? []);
+  const withNodes = ids.filter((id) => (levelOf(id) ?? 0) > 0);
+  const byNodes = withNodes.slice().sort((a, b) => levelOf(b)! - levelOf(a)! || a.localeCompare(b));
 
   // THE DAILY TIER, folded, the still-filling newest day cut.
   const isListed = (id: string) => LISTED_IDS.has(id) || id in catalog;
@@ -167,7 +174,7 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
 
     byNodes.slice(0, TOP).forEach((id, i) => {
       named.push(id);
-      facts.push(fact(`${mention(id)}, nodes (${RANK_WORD[i]}biggest network)`, nodesAt(id)!, "count"));
+      facts.push(fact(`${mention(id)}, nodes (${RANK_WORD[i]}biggest network)`, levelOf(id)!, "count"));
     });
     byActivity.slice(0, TOP).forEach(([id, v], i) => {
       named.push(id);
@@ -200,24 +207,35 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
     named.push(subject);
     gaugeFacts(`${name} nodes`, fleet.series[`f.nodes.${subject}`] ?? []);
 
-    // THE SHAPE: nodes per layer and per combination, at the newest sample that recorded any.
-    const layerRows = Object.keys(ROLE_SHORT).map((role) => ({ role, points: fleet.series[`f.layer.${subject}.${role}`] ?? [] }));
-    const at = layerRows.reduce<number>((acc, { points }) => points.reduce<number>((a, v, i) => (v != null ? Math.max(a, i) : a), acc), -1);
-    if (at >= 0) {
-      for (const { role, points } of layerRows) {
-        const count = points[at] ?? 0;
-        if (count > 0) facts.push(fact(`${name} nodes on the ${ROLE_SHORT[role]} layer`, count, "count"));
+    // THE SHAPE: nodes per layer and per combination, at the newest sample whose own node count
+    // agrees with the held level (see the header). Held level 0 or no such sample: no shape.
+    const nodePoints = fleet.series[`f.nodes.${subject}`] ?? [];
+    const level = heldLevel(nodePoints);
+    let at = -1;
+    if (level != null && level > 0) {
+      for (let i = nodePoints.length - 1; i >= 0; i--) {
+        const v = nodePoints[i];
+        if (v != null && Math.abs(v - level) <= SHAPE_TOLERANCE * level) {
+          at = i;
+          break;
+        }
       }
     }
-    for (const band of typeBands(subject, fleet.series)) {
-      const count = lastMeasured(band.points) ?? 0;
-      if (count > 0) facts.push(fact(`${name} nodes ${comboWords(band.key)}`, count, "count"));
+    if (at >= 0) {
+      for (const role of Object.keys(ROLE_SHORT)) {
+        const count = fleet.series[`f.layer.${subject}.${role}`]?.[at] ?? 0;
+        if (count > 0) facts.push(fact(`${name} nodes on the ${ROLE_SHORT[role]} layer`, count, "count"));
+      }
+      for (const band of typeBands(subject, fleet.series)) {
+        const count = band.points[at]; // null: no type was recorded at that sample
+        if (count != null && count > 0) facts.push(fact(`${name} nodes ${comboWords(band.key)}`, count, "count"));
+      }
     }
 
     // THE RANKS, among the networks that have the thing being ranked.
-    const own = nodesAt(subject);
+    const own = levelOf(subject);
     if (own != null && own > 0) {
-      facts.push(fact(`${name} rank by nodes`, 1 + byNodes.filter((id) => nodesAt(id)! > own).length, "count"));
+      facts.push(fact(`${name} rank by nodes`, 1 + byNodes.filter((id) => levelOf(id)! > own).length, "count"));
       facts.push(fact("Networks with nodes", withNodes.length, "count"));
     }
     const mine = activity.get(subject);
