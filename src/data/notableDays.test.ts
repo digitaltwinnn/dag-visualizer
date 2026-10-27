@@ -306,3 +306,73 @@ describe("notableDays: determinism", () => {
     expect(anchors).toEqual(copy);
   });
 });
+
+describe("notableDays: a pause then a resume (series break)", () => {
+  // 50 a day, 0 on days 15–26, 50 again from day 27: the reviewer's probe.
+  const N = 40;
+  const pauseResume = () => Array.from({ length: N }, (_, i): number => (i >= 15 && i <= 26 ? 0 : 50));
+
+  it("the stop is ONE low (its first day), not a run of eight", () => {
+    const { days, covered } = span(N);
+    const out = notableDays({ days, covered, series: { "m.a.snaps": pauseResume() }, subject: "a", ids: ["a"], cap: 9 });
+    const lows = out.filter((d) => d.kind === "low");
+    expect(lows.map((d) => d.dayMs)).toEqual([days[15]]);
+  });
+
+  it("after the resume the level is read from the resumed days only: no false high", () => {
+    const { days, covered } = span(N);
+    const out = notableDays({ days, covered, series: { "m.a.snaps": pauseResume() }, subject: "a", ids: ["a"], cap: 9 });
+    expect(out.filter((d) => d.kind === "high")).toEqual([]);
+  });
+
+  it("the resumed level needs its own 7 covered days: a spike on the 7th day after is not judged, the 8th is", () => {
+    const { days, covered } = span(N);
+    const early = pauseResume();
+    early[33] = 200; // 27..32 is six days of history
+    expect(notableDays({ days, covered, series: { "m.a.snaps": early }, subject: "a", ids: ["a"], cap: 9 }).filter((d) => d.kind === "high")).toEqual([]);
+    const late = pauseResume();
+    late[34] = 200; // 27..33 is seven
+    const highs = notableDays({ days, covered, series: { "m.a.snaps": late }, subject: "a", ids: ["a"], cap: 9 }).filter((d) => d.kind === "high");
+    expect(highs).toEqual([expect.objectContaining({ dayMs: days[34], value: 200, level: 50 })]);
+  });
+
+  it("with the 30D cap of 5, one pause fills one slot, not all five", () => {
+    const { days, covered } = span(N);
+    const out = notableDays({ days, covered, series: { "m.a.snaps": pauseResume() }, subject: "a", ids: ["a"], cap: 5 });
+    expect(out.length).toBeLessThanOrEqual(1);
+  });
+
+  it("a zero run shorter than the quiet days is no break: each low still dedups to its strongest", () => {
+    const { days, covered } = span(30);
+    const snaps = flat(30, 100, { 20: 10, 21: 5 }) as number[];
+    const out = notableDays({ days, covered, series: { "m.a.snaps": snaps }, subject: "a", ids: ["a"], cap: 9 });
+    expect(out.map((d) => [d.kind, d.dayMs, d.value])).toEqual([["low", days[21], 5]]);
+  });
+});
+
+describe("notableDays: consecutive days of one kind are one event", () => {
+  it("a three-day spike keeps its strongest day", () => {
+    const { days, covered } = span(30);
+    const out = notableDays({ days, covered, series: { "g.anchors": flat(30, 100, { 20: 250, 21: 400, 22: 300 }) }, subject: "dag", ids: [], cap: 5 });
+    expect(out.map((d) => [d.kind, d.dayMs, d.value])).toEqual([["high", days[21], 400]]);
+  });
+
+  it("an uncovered day inside the run does not split it", () => {
+    const { days, covered } = span(30, [21]);
+    const out = notableDays({ days, covered, series: { "g.anchors": flat(30, 100, { 20: 250, 22: 300 }) }, subject: "dag", ids: [], cap: 5 });
+    expect(out.map((d) => [d.kind, d.dayMs])).toEqual([["high", days[22]]]);
+  });
+
+  it("an ordinary day between two spikes keeps both", () => {
+    const { days, covered } = span(30);
+    const out = notableDays({ days, covered, series: { "g.anchors": flat(30, 100, { 20: 250, 22: 300 }) }, subject: "dag", ids: [], cap: 5 });
+    expect(out.map((d) => d.dayMs).sort()).toEqual([days[20], days[22]]);
+  });
+
+  it("consecutive pause days keep the widest", () => {
+    const { days, covered } = span(30);
+    const series = { "m.a.snaps": flat(30, 40), "m.a.gapMax": flat(30, 900, { 12: 7200, 13: 9000 }) };
+    const out = notableDays({ days, covered, series, subject: "a", ids: ["a"], cap: 5 });
+    expect(out.map((d) => [d.kind, d.dayMs, d.value])).toEqual([["pause", days[13], 9000]]);
+  });
+});
