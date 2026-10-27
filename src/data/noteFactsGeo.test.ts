@@ -236,8 +236,38 @@ describe("geoFacts on a network", () => {
     expect(find(r, /share of the fleet/)).toHaveLength(0);
   });
 
+  it("states where it stood a month ago when its own day a month back is measured", () => {
+    const back = scaled(0.5, { ...NOW, net: { ...NOW.net, usdc: { cc: { DE: 20 }, isp: { "hetzner-online-ag": 20 } } } });
+    const geoDays = { "2026-09-27": day(back), "2026-10-27": day(NOW) };
+    const r = geoFacts(input({ subject: "usdc", geoDays, ccDays: ccOf(geoDays) }))!;
+    expect(one(r, /^USDC\.dag, located nodes a month ago$/).value).toBe(10);
+    expect(one(r, /^USDC\.dag, countries with nodes a month ago$/).value).toBe(1);
+    const ratio = one(r, /^USDC\.dag, located nodes now against a month ago$/);
+    expect(ratio.kind).toBe("ratio");
+    expect(ratio.value).toBeCloseTo(30 / 10);
+  });
+
+  it("states no ratio when the located count is the same as a month ago", () => {
+    const geoDays = { "2026-09-27": day(NOW), "2026-10-27": day(NOW) };
+    const r = geoFacts(input({ subject: "usdc", geoDays, ccDays: ccOf(geoDays) }))!;
+    expect(one(r, /^USDC\.dag, located nodes a month ago$/).value).toBe(30);
+    expect(find(r, /now against a month ago/)).toHaveLength(0);
+  });
+
+  it("states nothing about a month ago without a measured day of its own there", () => {
+    expect(find(geoFacts(input({ subject: "usdc" }))!, /month ago/)).toHaveLength(0);
+    // The fleet was measured a month back but the network had no list of its own that day.
+    const geoDays = { "2026-09-27": day({ ...NOW, net: { dag: NOW.net!.dag! } }), "2026-10-27": day(NOW) };
+    expect(find(geoFacts(input({ subject: "usdc", geoDays, ccDays: ccOf(geoDays) }))!, /month ago/)).toHaveLength(0);
+    // Its nearest earlier day is nowhere near a month back.
+    const near = { "2026-10-20": day(scaled(0.5)), "2026-10-27": day(NOW) };
+    expect(find(geoFacts(input({ subject: "usdc", geoDays: near, ccDays: ccOf(near) }))!, /month ago/)).toHaveLength(0);
+  });
+
   it("names the network and no other in its ratio-bearing labels", () => {
-    const r = geoFacts(input({ subject: "usdc" }))!;
+    const geoDays = { "2026-09-27": day(scaled(0.5)), "2026-10-27": day(NOW) };
+    const r = geoFacts(input({ subject: "usdc", geoDays, ccDays: ccOf(geoDays) }))!;
+    expect(r.facts.some((x) => x.kind === "ratio")).toBe(true);
     for (const f of r.facts.filter((x) => x.kind === "ratio")) expect(f.label).toContain("USDC.dag");
   });
 });
@@ -316,5 +346,12 @@ describe("geoFacts as a gate-passing source", () => {
     const ccDays = { ...ccOf(geoDays), "2026-09-27": ccOf({ x: day(scaled(0.5)) }).x! };
     const r = geoFacts(input({ geoDays, ccDays }))!;
     expect(checkNote("Germany doubled its nodes since a month ago, from 25 to 50.", r.facts, r.names)).toEqual({ ok: true });
+  });
+
+  it("accepts a network's growth since a month ago and rejects a wrong earlier count", () => {
+    const geoDays = { "2026-09-27": day(scaled(0.5)), "2026-10-27": day(NOW) };
+    const r = geoFacts(input({ subject: "usdc", geoDays, ccDays: ccOf(geoDays) }))!;
+    expect(checkNote("USDC.dag has 30 located nodes, doubled from 15 a month ago.", r.facts, r.names)).toEqual({ ok: true });
+    expect(checkNote("USDC.dag has 30 located nodes, up from 16 a month ago.", r.facts, r.names).ok).toBe(false);
   });
 });

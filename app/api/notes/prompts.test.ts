@@ -16,6 +16,12 @@ describe("VOICE", () => {
     expect(VOICE).toMatch(/feeless/);
   });
 
+  it("leads with what changed and does not restate a breakdown the reader can see", () => {
+    expect(VOICE).toContain(
+      "Lead with what changed. Do not restate a breakdown the reader can already see on screen, such as how many nodes run each layer, unless it changed.",
+    );
+  });
+
   it("steers the model toward what the honesty gate accepts", () => {
     expect(VOICE).toMatch(/exactly as the facts give them/);
     expect(VOICE).toMatch(/never round a small figure to zero/i);
@@ -45,6 +51,20 @@ describe("PROMPTS", () => {
     expect(PROMPTS.ledger.question).toMatch(/anchoring/i);
     expect(PROMPTS.ledger.question).toMatch(/hours/i);
     expect(PROMPTS.trend.question).toMatch(/changed/i);
+  });
+
+  it("asks Hypergraph and Geography what changed; the ledger and History keep their questions", () => {
+    expect(PROMPTS.hyper.question).toBe(
+      "Say what changed in who and what is on the network over the span: networks or layers that gained or lost nodes, networks that started or stopped anchoring, how much more or less active they were. If nothing changed, say in one sentence that it held, with the level.",
+    );
+    expect(PROMPTS.geo.question).toBe(
+      "Say how the places the nodes run have shifted: countries and hosting providers that gained or lost nodes. Where the facts hold no change, say briefly where the nodes are now. Say nothing about activity or speed.",
+    );
+    expect(PROMPTS.geo.system("x")).toContain("Stay on where the nodes are located and who hosts them, and nothing else.");
+    expect(PROMPTS.ledger.question).toBe(
+      "Say what the anchoring rhythm looks like over the recent hours: how steadily snapshots are being anchored and which networks are doing it.",
+    );
+    expect(PROMPTS.trend.question).toBe("Say what changed over the span: what rose, what fell and when, as the numbers show it.");
   });
 
   it("keeps its own copy free of dashes", () => {

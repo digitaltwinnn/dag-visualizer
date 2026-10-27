@@ -13,6 +13,7 @@ import type { NoteView, NotableDay } from "@/src/data/noteTypes";
 
 export const VOICE = [
   "You write one short note about a live network dashboard: the reader can see the numbers; say what stands out, in two or three plain sentences.",
+  "Lead with what changed. Do not restate a breakdown the reader can already see on screen, such as how many nodes run each layer, unless it changed.",
   "",
   "Rules:",
   "Plain, present tense, no hype, no advice. No meta-commentary: never mention the facts, the data, the note or yourself.",
@@ -29,12 +30,12 @@ export const VOICE = [
 
 export const PROMPTS: Record<NoteView, { question: string; system: (subjectLabel: string) => string }> = {
   hyper: {
-    question: "Say who and what is on the network: which networks there are and how they are made up. Describe structure, not activity.",
+    question: "Say what changed in who and what is on the network over the span: networks or layers that gained or lost nodes, networks that started or stopped anchoring, how much more or less active they were. If nothing changed, say in one sentence that it held, with the level.",
     system: (subjectLabel) =>
       `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${PROMPTS.hyper.question}`,
   },
   geo: {
-    question: "Say where the nodes are: which countries and hosting providers hold the most, and how that has shifted if the facts show a shift. Say nothing about activity or speed.",
+    question: "Say how the places the nodes run have shifted: countries and hosting providers that gained or lost nodes. Where the facts hold no change, say briefly where the nodes are now. Say nothing about activity or speed.",
     system: (subjectLabel) =>
       `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${PROMPTS.geo.question}\nStay on where the nodes are located and who hosts them, and nothing else.`,
   },

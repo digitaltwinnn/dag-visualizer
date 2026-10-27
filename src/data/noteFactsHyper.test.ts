@@ -126,8 +126,8 @@ describe("hyperFacts on all", () => {
     const late = fleet({ "f.nodes": row(720, (i) => (i < 400 ? null : 140)) });
     const r = hyperFacts(input({ fleet: late }))!;
     expect(find(r, /^Nodes across all networks at the end of the span$/)[0]!.value).toBe(140);
-    expect(find(r, /at the start of the span$/)).toEqual([]);
-    expect(find(r, /ratio end to start$/)).toEqual([]);
+    expect(find(r, /^Nodes across all networks at the start of the span$/)).toEqual([]);
+    expect(find(r, /^Nodes across all networks, ratio end to start$/)).toEqual([]);
   });
 
   it("reports a network that started and one that stopped inside the span, not ones already running or resumed", () => {
@@ -206,28 +206,31 @@ describe("hyperFacts reads nodes through an outage-robust level", () => {
     expect(d.withNodes).toBe(2);
     expect(d.setKey).toBe("bio,dag");
     const r = hyperFacts(input({ subject: "usdc", fleet: emptied }))!;
-    expect(find(r, /layer$/)).toEqual([]);
+    expect(find(r, /layer/)).toEqual([]);
     expect(find(r, /nodes running/)).toEqual([]);
     expect(find(r, /rank by nodes/)).toEqual([]);
   });
 
-  it("reads the shape at the last agreeing sample when a layer's roles vanish for an hour", () => {
-    // The last hour: nodes low (the cL1 fetch failed) and its role / type rows absent.
+  it("reads the end of the span's shape at the last agreeing sample when a layer's roles vanish for an hour", () => {
+    // The last hour: nodes low (the cL1 fetch failed) and its role / type rows absent. L0 grew
+    // from 25 to 30 early in the span; the bad hour's 10 and its missing cL1 row are never read.
     const r = hyperFacts(
       input({
         subject: "usdc",
         fleet: fleet({
           "f.nodes.usdc": patched("usdc", 30, 10),
-          "f.layer.usdc.l0": row(N, (i) => (i < N - 1 ? 30 : 10)),
+          "f.layer.usdc.l0": row(N, (i) => (i < 10 ? 25 : i < N - 1 ? 30 : 10)),
           "f.layer.usdc.cl1": row(N, (i) => (i < N - 1 ? 20 : null)),
           "f.type.usdc.l0+cl1": row(N, (i) => (i < N - 1 ? 20 : null)),
           "f.type.usdc.l0": row(N, (i) => (i < N - 1 ? 10 : 10)),
         }),
       }),
     )!;
-    expect(find(r, /^USDC\.dag nodes on the L0 layer$/)[0]!.value).toBe(30);
-    expect(find(r, /^USDC\.dag nodes on the cL1 layer$/)[0]!.value).toBe(20);
-    expect(find(r, /^USDC\.dag nodes running L0 and cL1$/)[0]!.value).toBe(20);
+    expect(find(r, /^USDC\.dag nodes on the L0 layer at the start of the span$/)[0]!.value).toBe(25);
+    expect(find(r, /^USDC\.dag nodes on the L0 layer at the end of the span$/)[0]!.value).toBe(30);
+    expect(find(r, /cL1 layer/)).toEqual([]);
+    expect(find(r, /nodes running/)).toEqual([]);
+    expect(find(r, /^USDC\.dag layers whose node count changed over the span$/)[0]!.value).toBe(1);
   });
 });
 
@@ -241,17 +244,11 @@ describe("hyperFacts on a network", () => {
     expect(find(r, /^USDC\.dag nodes, ratio end to start$/, "ratio")[0]!.value).toBeCloseTo(3, 9);
   });
 
-  it("states a layer fact for each non-zero layer, and none for a layer of zero", () => {
+  it("states no current-only breakdown: a shape that held is no layer or combination row", () => {
     const r = usdc();
-    expect(find(r, /^USDC\.dag nodes on the L0 layer$/)[0]!.value).toBe(30);
-    expect(find(r, /^USDC\.dag nodes on the cL1 layer$/)[0]!.value).toBe(20);
-    expect(find(r, /dL1 layer/)).toEqual([]);
-  });
-
-  it("states each node combination in the app's words", () => {
-    const r = usdc();
-    expect(find(r, /^USDC\.dag nodes running L0 and cL1$/)[0]!.value).toBe(20);
-    expect(find(r, /^USDC\.dag nodes running only L0$/)[0]!.value).toBe(10);
+    expect(find(r, /layer at the/)).toEqual([]);
+    expect(find(r, /nodes running/)).toEqual([]);
+    expect(find(r, /^USDC\.dag nodes on the L0 layer$/)).toEqual([]);
   });
 
   it("reads a role the sampler stopped writing as 0 at the latest recorded sample, never its stale count", () => {
@@ -265,7 +262,10 @@ describe("hyperFacts on a network", () => {
         }),
       }),
     )!;
-    expect(find(r, /dL1 layer/)).toEqual([]);
+    expect(find(r, /^USDC\.dag nodes on the dL1 layer at the start of the span$/)[0]!.value).toBe(4);
+    const [end] = find(r, /^USDC\.dag nodes on the dL1 layer at the end of the span$/);
+    expect(end!.value).toBe(0);
+    expect(end!.text).toBe("0");
   });
 
   it("ranks the network by nodes and by activity among the networks", () => {
@@ -299,6 +299,162 @@ describe("hyperFacts on a network", () => {
   });
 });
 
+describe("hyperFacts on a network: the change of shape", () => {
+  const N = 720;
+  /** Dor: three nodes running every layer, then two more running only dL1 half way through. */
+  const dor = (over: Record<string, (number | null)[]> = {}) =>
+    fleet({
+      "f.nodes.dor": row(N, (i) => (i < N / 2 ? 3 : 5)),
+      "f.layer.dor.l0": row(N, () => 3),
+      "f.layer.dor.cl1": row(N, () => 3),
+      "f.layer.dor.dl1": row(N, (i) => (i < N / 2 ? 3 : 5)),
+      "f.type.dor.l0+cl1+dl1": row(N, () => 3),
+      "f.type.dor.dl1": row(N, (i) => (i < N / 2 ? null : 2)),
+      ...over,
+    });
+
+  it("states a changed layer at both ends, counts the changed layers, and leaves an unchanged layer out", () => {
+    const r = hyperFacts(input({ subject: "dor", fleet: dor() }))!;
+    expect(find(r, /^Dor nodes on the dL1 layer at the start of the span$/)[0]!.value).toBe(3);
+    expect(find(r, /^Dor nodes on the dL1 layer at the end of the span$/)[0]!.value).toBe(5);
+    expect(find(r, /L0 layer|cL1 layer/)).toEqual([]);
+    const [changed] = find(r, /^Dor layers whose node count changed over the span$/, "count");
+    expect(changed!.value).toBe(1);
+  });
+
+  it("states a changed combination at both ends, a type absent at a recorded sample a measured 0", () => {
+    const r = hyperFacts(input({ subject: "dor", fleet: dor() }))!;
+    const [from] = find(r, /^Dor nodes running only dL1 at the start of the span$/);
+    expect(from!.value).toBe(0);
+    expect(find(r, /^Dor nodes running only dL1 at the end of the span$/)[0]!.value).toBe(2);
+    expect(find(r, /running L0, cL1 and dL1/)).toEqual([]);
+  });
+
+  it("states a combination unknown at the start (no type recorded) not at all", () => {
+    const r = hyperFacts(
+      input({ subject: "dor", fleet: dor({ "f.type.dor.l0+cl1+dl1": row(N, (i) => (i < 5 ? null : 3)) }) }),
+    )!;
+    expect(find(r, /nodes running/)).toEqual([]);
+    expect(find(r, /^Dor layers whose node count changed over the span$/)[0]!.value).toBe(1);
+  });
+
+  it("states the count 0 and no layer rows for a shape that held", () => {
+    const r = hyperFacts(input({ subject: "bio", fleet: fleet({ "f.layer.bio.l0": row(N, () => 10), "f.type.bio.l0": row(N, () => 10) }) }))!;
+    const [changed] = find(r, /^BioFi layers whose node count changed over the span$/);
+    expect(changed!.value).toBe(0);
+    expect(changed!.text).toBe("0");
+    expect(find(r, /layer at the/)).toEqual([]);
+    expect(find(r, /nodes running/)).toEqual([]);
+  });
+
+  it("reads the start at the OLDEST sample that agrees with the span's starting level, skipping an outage hour", () => {
+    // The first hour read 1 node with one dL1 row: a partial fetch, never the start of the shape.
+    const r = hyperFacts(
+      input({
+        subject: "dor",
+        fleet: dor({
+          "f.nodes.dor": row(N, (i) => (i === 0 ? 1 : i < N / 2 ? 3 : 5)),
+          "f.layer.dor.l0": row(N, (i) => (i === 0 ? null : 3)),
+          "f.layer.dor.cl1": row(N, (i) => (i === 0 ? null : 3)),
+          "f.layer.dor.dl1": row(N, (i) => (i === 0 ? 1 : i < N / 2 ? 3 : 5)),
+        }),
+      }),
+    )!;
+    expect(find(r, /^Dor nodes on the dL1 layer at the start of the span$/)[0]!.value).toBe(3);
+    expect(find(r, /L0 layer|cL1 layer/)).toEqual([]);
+  });
+
+  it("states no change of shape for a gauge that began after the span did", () => {
+    const r = hyperFacts(input({ subject: "dor", fleet: dor({ "f.nodes.dor": row(N, (i) => (i < 400 ? null : 5)) }) }))!;
+    expect(find(r, /layer/)).toEqual([]);
+    expect(find(r, /nodes running/)).toEqual([]);
+    expect(find(r, /^Dor nodes at the end of the span$/)[0]!.value).toBe(5);
+  });
+
+  it("states no change of shape when the layers were not recorded at the start", () => {
+    const blank = (v: number) => row(N, (i) => (i < 100 ? null : v));
+    const r = hyperFacts(
+      input({ subject: "dor", fleet: dor({ "f.layer.dor.l0": blank(3), "f.layer.dor.cl1": blank(3), "f.layer.dor.dl1": row(N, (i) => (i < 100 ? null : i < N / 2 ? 3 : 5)) }) }),
+    )!;
+    expect(find(r, /layer/)).toEqual([]);
+  });
+});
+
+describe("hyperFacts on a network: the change of activity", () => {
+  it("states the three weeks before beside the last week, and their ratio when they differ", () => {
+    const d = daily({ "m.usdc.ticks": row(60, (i) => (i >= 53 ? 60 : 40)) });
+    const r = hyperFacts(input({ subject: "usdc", daily: d }))!;
+    expect(find(r, /^USDC\.dag global snapshots it was part of per day, last week$/)[0]!.value).toBe(60);
+    expect(find(r, /^USDC\.dag global snapshots it was part of per day, the three weeks before$/)[0]!.value).toBe(40);
+    const [ratio] = find(r, /^USDC\.dag global snapshots it was part of per day, ratio last week to the three weeks before$/, "ratio");
+    expect(ratio!.value).toBeCloseTo(1.5, 9);
+  });
+
+  it("states no ratio when the two are equal", () => {
+    const r = hyperFacts(input({ subject: "usdc" }))!;
+    expect(find(r, /the three weeks before$/)[0]!.value).toBe(50);
+    expect(find(r, /ratio last week/)).toEqual([]);
+  });
+
+  it("states nothing for the three weeks before with fewer than seven measured days", () => {
+    // Days 32..46 read 0 beside created snapshots: the field's absence, not none (anchorSeries).
+    const d = daily({ "m.usdc.ticks": row(60, (i) => (i >= 53 ? 60 : i >= 47 ? 40 : 0)) });
+    const r = hyperFacts(input({ subject: "usdc", daily: d }))!;
+    expect(find(r, /three weeks before/)).toEqual([]);
+    expect(find(r, /per day, last week$/)[0]!.value).toBe(60);
+  });
+});
+
+describe("hyperFacts on all: the movers and the whole network's activity", () => {
+  const N = 720;
+  const names = { ...NAMES, ext: "Ext", late: "Late" };
+
+  it("names the up-to-three networks whose node count changed most, unchanged and late-starting ones left out", () => {
+    const fl = fleet({
+      "f.nodes.dor": row(N, (i) => (i < N / 2 ? 0 : 5)), // +5
+      "f.nodes.bio": row(N, (i) => (i < N / 2 ? 10 : 12)), // +2: fourth, out
+      "f.nodes.ext": row(N, (i) => (i < N / 2 ? 50 : 44)), // −6
+      "f.nodes.late": row(N, (i) => (i < 400 ? null : 100)), // began after the span: out
+    });
+    const r = hyperFacts(input({ fleet: fl, names }))!;
+    const movers = r.facts.filter((f) => /^\S+ nodes at the (start|end) of the span$/.test(f.label));
+    expect(movers.map((f) => [f.label, f.value])).toEqual([
+      ["USDC.dag nodes at the start of the span", 10],
+      ["USDC.dag nodes at the end of the span", 30],
+      ["Ext nodes at the start of the span", 50],
+      ["Ext nodes at the end of the span", 44],
+      ["Dor nodes at the start of the span", 0],
+      ["Dor nodes at the end of the span", 5],
+    ]);
+    expect(find(r, /^(Constellation|BioFi|Late) nodes at the/)).toEqual([]);
+    expect(r.blurbs).toEqual(expect.arrayContaining(["Dor is: a data marketplace"]));
+  });
+
+  it("names no mover when no network's count changed", () => {
+    const r = hyperFacts(input({ fleet: fleet({ "f.nodes.usdc": row(N, () => 30) }) }))!;
+    expect(r.facts.filter((f) => /^\S+ nodes at the (start|end) of the span$/.test(f.label))).toEqual([]);
+  });
+
+  it("states global snapshots per day, last week against the three weeks before, naming no network", () => {
+    const r = hyperFacts(input({ daily: daily({ "g.ticks": row(60, (i) => (i >= 53 ? 30_000 : 24_000)) }) }))!;
+    expect(find(r, /^Global snapshots per day, last week$/)[0]!.value).toBe(30_000);
+    expect(find(r, /^Global snapshots per day, the three weeks before$/)[0]!.value).toBe(24_000);
+    const [ratio] = find(r, /^Global snapshots per day, ratio last week to the three weeks before$/, "ratio");
+    expect(ratio!.value).toBeCloseTo(1.25, 9);
+    for (const n of Object.values(NAMES)) expect(ratio!.label).not.toContain(n);
+  });
+
+  it("reads covered days only, and states nothing for the three weeks before under seven of them", () => {
+    const r = hyperFacts(input({ daily: daily({ "g.ticks": row(60, (i) => (i >= 53 ? 30_000 : i >= 47 ? 24_000 : null)) }) }))!;
+    expect(find(r, /^Global snapshots per day, last week$/)[0]!.value).toBe(30_000);
+    expect(find(r, /^Global snapshots per day, the three weeks before$/)).toEqual([]);
+    expect(find(r, /^Global snapshots per day, ratio/)).toEqual([]);
+    const same = hyperFacts(input())!;
+    expect(find(same, /^Global snapshots per day, the three weeks before$/)[0]!.value).toBe(28_800);
+    expect(find(same, /^Global snapshots per day, ratio/)).toEqual([]);
+  });
+});
+
 describe("hyperFacts as a gate-passing source", () => {
   it("accepts an honest digest sentence and rejects one with a number the facts do not hold", () => {
     const r = hyperFacts(input())!;
@@ -314,5 +470,25 @@ describe("hyperFacts as a gate-passing source", () => {
     expect(checkNote("USDC.dag has 30 nodes on the L0 layer, ranking second of 3 by nodes.", r.facts, r.names)).toEqual({ ok: true });
     expect(checkNote("USDC.dag grew about threefold.", r.facts, r.names).ok).toBe(false);
     expect(checkNote("USDC.dag has 31 nodes on the L0 layer.", r.facts, r.names).ok).toBe(false);
+  });
+
+  it("accepts an honest change-of-shape sentence and rejects a wrong start count", () => {
+    const N = 720;
+    const fl = fleet({
+      "f.nodes.dor": row(N, (i) => (i < N / 2 ? 3 : 5)),
+      "f.layer.dor.l0": row(N, () => 3),
+      "f.layer.dor.cl1": row(N, () => 3),
+      "f.layer.dor.dl1": row(N, (i) => (i < N / 2 ? 3 : 5)),
+    });
+    const r = hyperFacts(input({ subject: "dor", fleet: fl }))!;
+    expect(checkNote("Dor grew from 3 to 5 nodes, and one layer changed: dL1 went from 3 to 5.", r.facts, r.names)).toEqual({ ok: true });
+    expect(checkNote("Dor had 6 nodes on the dL1 layer at the start of the span.", r.facts, r.names).ok).toBe(false);
+    expect(checkNote("Dor grew from 3 to 5 nodes, and two layers changed.", r.facts, r.names).ok).toBe(false);
+  });
+
+  it("accepts a sentence saying the shape held", () => {
+    const N = 720;
+    const r = hyperFacts(input({ subject: "bio", fleet: fleet({ "f.layer.bio.l0": row(N, () => 10) }) }))!;
+    expect(checkNote("BioFi held 10 nodes over the span, and 0 layers changed.", r.facts, r.names)).toEqual({ ok: true });
   });
 });

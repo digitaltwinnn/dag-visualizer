@@ -3,8 +3,8 @@ import type { Fact } from "@/src/data/noteTypes";
 
 // GEOGRAPHY'S FACTS BUILDER — what the Geography note's model is shown. Geography answers WHERE:
 // the default note (subject `all`) says how many countries and providers host the fleet and which
-// carry the most nodes; a network's note gives its footprint against the fleet; a country's says
-// what that country hosts. SHARES AND COUNTS ONLY: no label grades the spread (the gate also bans
+// carry the most nodes; a network's note gives its footprint against the fleet and where it stood
+// a month ago; a country's says what that country hosts. SHARES AND COUNTS ONLY: no label grades the spread (the gate also bans
 // "decentrali-"), so the model has nothing to editorialise from.
 //
 // It reads the STORED geo family (`app/api/trends/bucketing.ts` `bucketFleetGeo`), one day bucket
@@ -23,7 +23,10 @@ import type { Fact } from "@/src/data/noteTypes";
 //     day nearest to 30 days earlier, and only if that day is within 5 days of the mark: a
 //     neighbour from yesterday is not "a month ago". No such day, no change fact;
 //   · present tense before history: a country's change reads `ccDays`; a provider's reads
-//     `geoDays` and only when BOTH ends are measured; a network states no change at all;
+//     `geoDays` and only when BOTH ends are measured; a network's reads its OWN measured days in
+//     `geoDays` (its located nodes and countries a month ago, and the located ratio when both are
+//     above 0 and differ). The geo family began 2026-10-27, so a network states no change until a
+//     month of it exists — honest absence, never a substitute series;
 //   · a share's denominator is what was located: countries against the fleet's LOCATED nodes,
 //     providers against the nodes with a KNOWN provider (a node can have a country and no
 //     provider), each labelled so;
@@ -257,6 +260,17 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
         facts.push(fact(`${name}, nodes with ${pn(p)} (${RANK_WORD[i]}biggest provider)`, p.count, "count"));
         facts.push(fact(`${name}, share of its nodes with a known provider with ${pn(p)}`, p.count / known, "share"));
       });
+    }
+    // A MONTH AGO, from its own measured day nearest a month back in the geo family (no such day,
+    // no fact — the family is young, and no other series holds a network's place).
+    const then = monthBefore(ownMeasured(subjectNet), now);
+    if (then) {
+      const was = then.netCc.get(subjectNet)!;
+      const locatedThen = sum(was);
+      facts.push(fact(`${name}, located nodes a month ago`, locatedThen, "count"));
+      facts.push(fact(`${name}, countries with nodes a month ago`, was.size, "count"));
+      if (located > 0 && locatedThen > 0 && located !== locatedThen)
+        facts.push(fact(`${name}, located nodes now against a month ago`, located / locatedThen, "ratio"));
     }
   } else if (subjectCc) {
     const here = now.cc.get(subjectCc);
