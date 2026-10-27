@@ -102,6 +102,28 @@ describe("runSample", () => {
     expect(fleetCalls).toBe(1);
     expect(store.data.get("t:mainnet:1h:2026-09")!.get("06-14|f.nodes")).toBe("5");
   });
+  it("writes where the fleet runs into the geo family, keep-forever, with its provider names", async () => {
+    const store = memStore();
+    const geo = {
+      countries: { DE: 5 }, providers: { "hetzner-online-gmbh": 5 },
+      perNetCountries: { dag: { DE: 5 } }, perNetProviders: { dag: { "hetzner-online-gmbh": 5 } },
+      providerNames: { "hetzner-online-gmbh": "Hetzner Online GmbH" },
+    };
+    await runSample(deps(store, { fleet: async () => ({ total: 5, perNet: { dag: 5 }, layers: {}, countries: { DE: 5 }, geo }) }));
+    const day = store.data.get("geo:mainnet:2026")!;
+    expect(day.get("09-06|f.cc.DE")).toBe("5");
+    expect(day.get("09-06|f.isp.dag.hetzner-online-gmbh")).toBe("5");
+    expect(store.data.get("geo:mainnet:isp")!.get("hetzner-online-gmbh")).toBe("Hetzner Online GmbH");
+    expect(store.ttls.has("geo:mainnet:2026")).toBe(false);
+    expect(store.ttls.has("geo:mainnet:isp")).toBe(false);
+    // The tiers' own country gauge is unchanged: the deployed History reader still finds it.
+    expect(store.data.get("t:mainnet:1d:2026")!.get("09-06|f.cc.DE")).toBe("5");
+  });
+  it("a fleet read without a geo tally writes nothing to the geo family", async () => {
+    const store = memStore();
+    await runSample(deps(store));
+    expect([...store.data.keys()].some((k) => k.startsWith("geo:"))).toBe(false);
+  });
   it("a failed metagraph leaves its cursor unmoved and is reported", async () => {
     const store = memStore();
     const res = await runSample(deps(store, { pageMeta: async () => { throw new Error("503"); } }));
