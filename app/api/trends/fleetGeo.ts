@@ -1,4 +1,4 @@
-// WHERE THE FLEET RUNS, as counts (2026-10-27) — the tally every sampler run (each 15 minutes) stores into
+// WHERE THE FLEET RUNS, as counts (2026-10-27) — the tally the sampler stores once an hour into
 // the geo family (`keys.ts` `geoSlotOf`), so Geography gets a past: by country and by hosting
 // provider, for the whole fleet and for each network. Pure: the route hands it the same cached
 // geo maps `/api/geo` and `/api/metagraphs` serve, so it costs no upstream read.
