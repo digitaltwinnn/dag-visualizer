@@ -83,22 +83,35 @@ describe("notesStore — the dev-only memory switch", () => {
   });
 });
 
-// R66: NOTES ARE WRITTEN BY PRODUCTION ONLY. A preview shares production's store, so it serves the
-// cache and writes nothing; a local server (no VERCEL_ENV) writes, into its memory store in dev.
-describe("notesWritable — where notes may be written", () => {
+// R66/R69: NOTES ARE WRITTEN BY PRODUCTION, OR BY A LOCAL DEV SERVER ON THE MEMORY STORE — nothing
+// else. A preview shares production's store; a local `next start` or plain `next dev` would write
+// into it with `.env.local`'s token; an unknown Vercel environment is not production.
+describe("notesWritable — where notes may be written (fails closed)", () => {
   afterEach(() => vi.unstubAllEnvs());
   it.each([
     ["production", true],
     ["preview", false],
     ["development", false],
-    ["", true],
-  ])("VERCEL_ENV=%j: %s", (env, writable) => {
+  ])("on Vercel, VERCEL_ENV=%j: %s", (env, writable) => {
+    vi.stubEnv("VERCEL", "1");
     vi.stubEnv("VERCEL_ENV", env);
     expect(notesWritable()).toBe(writable);
   });
-  it("unset (a local server): writable", () => {
+  it("on Vercel with no VERCEL_ENV: read-only", () => {
+    vi.stubEnv("VERCEL", "1");
     vi.stubEnv("VERCEL_ENV", undefined);
-    expect(process.env.VERCEL_ENV).toBeUndefined();
-    expect(notesWritable()).toBe(true);
+    expect(notesWritable()).toBe(false);
+  });
+  it.each([
+    ["development", "memory", true],
+    ["development", undefined, false],
+    ["production", "memory", false],
+    ["production", undefined, false],
+  ])("locally, NODE_ENV=%s NOTES_STORE=%s: %s", (nodeEnv, store, writable) => {
+    vi.stubEnv("VERCEL", undefined);
+    vi.stubEnv("VERCEL_ENV", undefined);
+    vi.stubEnv("NODE_ENV", nodeEnv);
+    vi.stubEnv("NOTES_STORE", store);
+    expect(notesWritable()).toBe(writable);
   });
 });

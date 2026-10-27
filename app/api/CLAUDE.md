@@ -127,11 +127,12 @@ them — but the Next Node server can.
   still ends inside the 300 s `maxDuration`), because the free model answered 429 at about five
   calls in 15 s on 2026-10-27, and still refused 20 of 71 at 3.5 s. The cron fails closed without
   `CRON_SECRET`, like the sampler (and a preview has none). ⚠️ **Notes are written by production
-  only** (R66, `notesWritable()` in `notes/store.ts`, tested per `VERCEL_ENV`): a preview shares the
+  only** (R66/R69, `notesWritable()` in `notes/store.ts` — it fails closed): a preview shares the
   store, so there every route serves what is cached and answers a miss `none` — no note, no
-  failure hold, no stats, and the warm pass writes nothing even with the secret. A local server (no
-  `VERCEL_ENV`) writes. `NOTES_STORE=memory` (dev only, ignored in production) keeps a local dev
-  server's notes out of the shared store. **Each UTC day's outcomes are counted** in
+  failure hold, no stats, and the warm pass writes nothing even with the secret. The one other
+  writer is a local `next dev` with `NOTES_STORE=memory`, which writes into its own process memory;
+  a plain `next dev`, a local `next start` and a Vercel deployment with no `VERCEL_ENV` are all
+  read-only, because `.env.local`'s token would otherwise write into the shared store. **Each UTC day's outcomes are counted** in
   `ai:mainnet:stats:{day}` (`NOTE_STATS` in `generate.ts`: `ok`, `gateFail`, `rate`, `http`,
   `timeout`, `empty`, `nokey`, `store`, `error`, `capped`, then the volumes `calls`, every Gate
   call, and `retried`, every note that needed its second attempt), and

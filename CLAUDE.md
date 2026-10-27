@@ -515,7 +515,8 @@ deploys the trends routes against the SAME Upstash store (the marketplace env va
 scopes), so its History view shows real history — and that token CAN write, so two rules keep a
 preview out of the store. `CRON_SECRET` is deliberately absent from the Preview scope and the trends
 sampler FAILS CLOSED without it; don't "fix" a preview's 401 by adding the secret there. And **AI
-notes are written by production only** (`notesWritable()`, `app/api/notes/store.ts`): a preview
+notes are written by production only** (`notesWritable()`, `app/api/notes/store.ts`, failing closed —
+locally only `next dev` with `NOTES_STORE=memory` writes, into memory): a preview
 serves the notes already cached and answers a miss with no card, so its visitors never write notes
 from unmerged code, spend the model's quota or count into production's note stats. Deploys and downtime self-heal:
 the cursor lives in Redis, and the next production run catches up to 30K records per chain (~a day
