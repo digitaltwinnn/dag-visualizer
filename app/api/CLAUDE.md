@@ -59,7 +59,7 @@ them — but the Next Node server can.
   merge-writes 5m/1h/1d hash tiers. It also samples the UNLISTED chains — the explorer's `/currency`
   list less every tracked address — for their own counts, outside the fee/size floors, marking the
   buckets it measured them in with `u.cov` (History's unlisted figure is measured, not derived).
-  **Where the fleet runs has its own key family** (2026-10-27): on every run, beside the fleet
+  **Where the fleet runs has its own key family** (2026-10-27): once an hour, beside the fleet
   gauges, the sampler stores the whole fleet and each network by country and by hosting provider
   into `geo:{net}:{YYYY}` (day buckets, `f.cc.*` / `f.isp.*`, `fleetGeo.ts`), with provider names
   in `geo:{net}:isp`. ⚠️ **It lives outside `t:{net}:*` on purpose:** a rebuild wipes that prefix

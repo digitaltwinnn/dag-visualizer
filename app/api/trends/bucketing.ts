@@ -130,7 +130,7 @@ export function bucketFleet(inc: IncMap, net: string, tsMs: number, fleet: Fleet
   for (const [cc, n] of Object.entries(fleet.countries)) addInc(inc, net, tsMs, `f.cc.${cc}`, n, ["1d"]);
 }
 
-/** The geo family's daily gauges (`keys.ts` `geoSlotOf`): the day's LAST reading (one per 15-minute run), as
+/** The geo family's daily gauges (`keys.ts` `geoSlotOf`): the day's LAST hourly reading, as
  *  every `f.*` gauge merges ("set"). Written beside, not instead of, the tiers' `f.cc.<cc>`. */
 export function bucketFleetGeo(inc: IncMap, net: string, tsMs: number, geo: FleetGeo): void {
   const { key, bucket } = geoSlotOf(net, tsMs);
