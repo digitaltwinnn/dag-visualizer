@@ -60,8 +60,19 @@ function wrap(r: Redis): NotesStore {
   };
 }
 
-/** The notes client: the WRITE token (the generator writes, and reads its own cache). */
+/** The notes client: the WRITE token (the generator writes, and reads its own cache).
+ *
+ *  ⚠️ THE DEV-ONLY SWITCH (ruling R35): `NOTES_STORE=memory` on a non-production server answers
+ *  ONE process-wide memory store, so a local dev server's live check never writes notes into the
+ *  shared production Upstash store (every deployment reads the same one). Held on `globalThis`,
+ *  not in a module variable: Next bundles each route (`/api/notes`, `/request`, `/warm`) as its
+ *  own module instance, and a module-level store would give each route its own memory. A
+ *  production NODE_ENV ignores the switch outright. */
 export function notesStore(): NotesStore {
+  if (process.env.NOTES_STORE === "memory" && process.env.NODE_ENV !== "production") {
+    const g = globalThis as { __devNotesStore?: NotesStore };
+    return (g.__devNotesStore ??= memoryNotesStore());
+  }
   return wrap(client());
 }
 

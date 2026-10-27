@@ -34,6 +34,7 @@ import { CountryTitle, CountryAside, CountryCard, ProviderTitle, ProviderCard, P
 import MetaSnapPane from "@/components/inspector/MetaSnapPane";
 import TrendRangePane from "@/components/inspector/TrendRangePane";
 import TrendInstantPane from "@/components/inspector/TrendInstantPane";
+import NotesCard, { useAiNote } from "@/components/notes/NotesCard";
 import type { TabSignal } from "@/components/RailDock";
 import type { PickDescriptor } from "@/src/data/types";
 import type { Mode } from "@/src/store/store";
@@ -429,8 +430,12 @@ export default function Inspector() {
   const trendFront = useStore((s) => s.trendFront);
   const trendWindow = useStore((s) => s.trendWindow);
   const tickHasFilter = useTickHasFilter();
+  // The AI note on screen (the card shares this fetch): its card stands down when the view's
+  // subject has no note, or the server answered `none`.
+  const aiNote = useAiNote();
   const manifest = detailsCards({
     mode, filter, tickNet, tickHasFilter, inspect, snap, country, cohort, composition, metaSnap, coarse, trendCursorMs, trendRange, trendFocus, trendFront, trendWindow,
+    noteAbsent: aiNote.req == null || aiNote.note.res?.state === "none",
     selNodesCount: selNodes.length,
     filterLabel: displayNetwork(filter)?.ticker ?? null, // one lookup — catalog + the unlisted pseudo-network
   });
@@ -666,6 +671,8 @@ export default function Inspector() {
     metaSnap: metaSnap ? (
       <MetaSnapPane key="metaSnap" onClose={() => applyClickActions([{ kind: "metaSnap", sel: null }])} {...cx("metaSnap")} />
     ) : null,
+    // The AI notes card: no rung, no ×, no ghost — it renders while the manifest says a note stands.
+    notes: <NotesCard key="notes" {...cx("notes")} />,
   };
 
   // ── The desktop LADDER LANE + the flat tablet/phone stack ────────────────────────────────────
@@ -764,7 +771,8 @@ export default function Inspector() {
   );
   // Cards that AREN'T ladder rungs (the snapshot slot in every 3D view) render below the lane —
   // present card first, else its ghost — plus, in flat/placeholder views (no ladder), everything.
-  const nonLadder = manifest.filter((c) => c.kind !== "context" && !ladderIds.includes(c.id));
+  // (The AI notes card is not among them: it renders last, on its own — see `notesPane`.)
+  const nonLadder = manifest.filter((c) => c.kind !== "context" && c.kind !== "notes" && !ladderIds.includes(c.id));
   const trailingPanes = nonLadder.filter((c) => c.present).map((c) => detailPane[c.id]);
   const trailingGhosts = nonLadder
     .filter((c) => !c.present && c.hint != null)
@@ -775,6 +783,10 @@ export default function Inspector() {
   // slab's word for containment, so one hairline says the pile ends here. Only above PRESENT
   // cards: the trailing ghosts are the view's own possibility space.
   const trailingDivider = trailingPanes.length > 0 ? <div key="trailing-divider" aria-hidden className="h-px flex-none mx-[18px] bg-border" /> : null;
+  // THE AI NOTES CARD trails everything, with NO divider of its own: the divider means "a subject
+  // the view did not produce", and the note is not a subject at all — it is written context about
+  // the one the view stands on. Its iridescent edge already sets it apart from the pile.
+  const notesPane = presentOf("notes") ? detailPane.notes : null;
 
 
 
@@ -826,6 +838,7 @@ export default function Inspector() {
       {trailingDivider}
       {trailingPanes}
       {trailingGhosts}
+      {notesPane}
     </>
   );
 
@@ -850,6 +863,7 @@ export default function Inspector() {
             {trailingDivider}
             {trailingPanes}
             {trailingGhosts}
+            {notesPane}
           </RailShade>
         </div>
       </>

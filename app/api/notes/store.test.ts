@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { memoryNotesStore } from "./store";
+import { memoryNotesStore, notesStore } from "./store";
 
 beforeEach(() => vi.useFakeTimers({ now: 1_000_000 }));
 afterEach(() => vi.useRealTimers());
@@ -45,5 +45,40 @@ describe("memoryNotesStore", () => {
     await s.set("b", "2", 1);
     vi.advanceTimersByTime(1_001);
     expect(await s.mget(["a", "b", "c"])).toEqual(["1", null, null]);
+  });
+});
+
+// THE DEV-ONLY STORE SWITCH (ruling R35): `NOTES_STORE=memory` makes a dev server write its notes
+// into one process-wide memory store instead of the shared production Upstash store. Production
+// ignores the switch, so a stray env var can never take a deployment off its real store.
+describe("notesStore — the dev-only memory switch", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("answers ONE process-wide memory store when NOTES_STORE=memory outside production", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("NOTES_STORE", "memory");
+    vi.stubEnv("UPSTASH_KV_REST_API_URL", "");
+    vi.stubEnv("UPSTASH_KV_REST_API_TOKEN", "");
+    const a = notesStore();
+    const b = notesStore();
+    expect(a).toBe(b);
+    await a.set("k", "v", 10);
+    expect(await b.get("k")).toBe("v");
+  });
+
+  it("a production NODE_ENV ignores the switch and asks for Upstash", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NOTES_STORE", "memory");
+    vi.stubEnv("UPSTASH_KV_REST_API_URL", "");
+    vi.stubEnv("UPSTASH_KV_REST_API_TOKEN", "");
+    expect(() => notesStore()).toThrow("Upstash env missing");
+  });
+
+  it("without the switch it asks for Upstash", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("NOTES_STORE", "");
+    vi.stubEnv("UPSTASH_KV_REST_API_URL", "");
+    vi.stubEnv("UPSTASH_KV_REST_API_TOKEN", "");
+    expect(() => notesStore()).toThrow("Upstash env missing");
   });
 });

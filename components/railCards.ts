@@ -3,7 +3,7 @@ import { ledgerCardNetwork } from "@/src/engine/domain/tickNet";
 import { pickNetId } from "@/src/engine/domain/pickActions";
 import { cardNetwork } from "@/src/engine/domain/trendStack";
 import type { TickNetSel } from "@/src/data/types";
-import { EXPLORE_ICON, INSTANT_ICON, RANGE_ICON, iconForPick } from "@/components/icons";
+import { AI_NOTES_ICON, EXPLORE_ICON, INSTANT_ICON, RANGE_ICON, iconForPick } from "@/components/icons";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import type { Mode } from "@/src/store/store";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
@@ -33,7 +33,7 @@ import { is3D } from "@/src/engine/domain/viewTransition";
 // Hue + active-flag stay with the tray builders (per-rail presentation), not here.
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-export type RailCardKind = "tool" | "context" | "range" | "instant" | "metaSnap" | "country" | "cohort" | "composition" | "node" | "snap";
+export type RailCardKind = "tool" | "context" | "range" | "instant" | "metaSnap" | "country" | "cohort" | "composition" | "node" | "snap" | "notes";
 
 // ── The rail LADDER lane (Inspector's descent spine, variant-A redesign 2026-07-19) ──────────
 // Which facts-rail slot stands for each FOCUS-LADDER rung. The lane's ORDER lives in
@@ -218,6 +218,11 @@ export interface RailManifestState {
    *  ladder rung. Optional: the ladder derivation (`LadderState`) and its callers never carry
    *  this field, so `detailsCards` treats an absent key the same as `null`. */
   metaSnap?: MetaSnapSel | null;
+  /** THE AI NOTE IS ABSENT (2026-10-27): the view's subject has no note (`noteSubjectOf` answered
+   *  null — the unlisted network) or the server answered `none` (not mainnet). The note itself is
+   *  fetched in React (`useNote`), so the caller states the answer, as it states `tickHasFilter`.
+   *  Optional: undefined reads as "a note stands", which is the card's own default while it asks. */
+  noteAbsent?: boolean;
 }
 
 const isNodePick = (p: PickDescriptor | null): boolean =>
@@ -516,10 +521,25 @@ export function detailsCards(s: RailManifestState): RailCard[] {
     present: !!s.snap,
     hint: snapHint(s),
   };
+  // THE AI NOTES CARD (2026-10-27) — written context about the view's subject, not a subject of
+  // its own: no ladder rung, no ghost (an absent note is no card at all), and LAST, below every
+  // card the selection produces. Gated on the view it is FOR (`aiNotes`, convention 7).
+  // ⚠️ A STATIC subject key, the tool card's precedent: the note follows the selection and the
+  // view, so keying the tray on its subject would light the dock on every view switch and every
+  // filter change — announcing the selection a second time, through a card that is not it.
+  const notes: RailCard = {
+    id: "notes",
+    kind: "notes",
+    icon: AI_NOTES_ICON,
+    subjectKey: "notes",
+    present: VIEW_POLICIES[s.mode].aiNotes && !s.noteAbsent,
+    hint: null,
+  };
   // The manifest order drives the tablet/phone flat stack + tray icons and MUST agree with the
   // desktop lane above: tick → dossier → the tick's own metagraph snapshot → node. History's
   // `instant` sits directly under the dossier, which is exactly where its own lane puts it —
-  // every slot between them is unreachable in that view, so the two orders agree.
-  return [snap, context, range, instant, country, cohort, composition, metaSnap, node];
+  // every slot between them is unreachable in that view, so the two orders agree. The notes card
+  // is in no lane: it trails the rail on every tier.
+  return [snap, context, range, instant, country, cohort, composition, metaSnap, node, notes];
 }
 

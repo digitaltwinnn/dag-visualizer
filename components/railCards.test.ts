@@ -23,6 +23,9 @@ const details = (over: Partial<RailManifestState>): RailManifestState => ({
   composition: null,
   selNodesCount: 10,
   filterLabel: null,
+  // The AI notes card stands in every note view by default; the selection cases below are about
+  // the ladder's own slots, so the fixture states no note unless a case asks for one.
+  noteAbsent: true,
   ...over,
 });
 
@@ -60,7 +63,30 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
     // metagraph snapshot → node (user, 2026-09-15). This order also drives the phone flat stack
     // and the tray icons, so the two can never disagree.
     const ids = detailsCards(details({ filter: "dor", inspect: nodePick, snap: snapPick })).map((c) => c.id);
-    expect(ids).toEqual(["snap", "context", "range", "instant", "country", "cohort", "composition", "metaSnap", "node"]);
+    expect(ids).toEqual(["snap", "context", "range", "instant", "country", "cohort", "composition", "metaSnap", "node", "notes"]);
+  });
+  // THE AI NOTES CARD (2026-10-27): its own card, last, in every view whose policy opts in
+  // (`aiNotes`) — present unless the note is absent (no subject, or the server answered `none`).
+  it.each(["hyper", "geo", "ledger", "trend"] as const)("%s hosts a present AI notes card, last", (mode) => {
+    const cards = detailsCards(details({ mode, noteAbsent: undefined }));
+    const notes = cards.find((c) => c.id === "notes")!;
+    expect(notes.present).toBe(true);
+    expect(notes.kind).toBe("notes");
+    expect(notes.hint).toBeNull(); // no ghost: an absent note is no card at all
+    expect(cards[cards.length - 1]!.id).toBe("notes");
+  });
+  it("an absent note (no subject, or `none`) stands the AI notes card down", () => {
+    const notes = detailsCards(details({ mode: "hyper", noteAbsent: true })).find((c) => c.id === "notes")!;
+    expect(notes.present).toBe(false);
+  });
+  it("the placeholder hosts no AI notes card", () => {
+    expect(detailsCards(details({ mode: "soon", noteAbsent: undefined })).some((c) => c.id === "notes")).toBe(false);
+  });
+  it("the AI notes card keeps one subject key, so a view switch never lights the tray", () => {
+    const keys = (["hyper", "geo", "ledger", "trend"] as const).map(
+      (mode) => detailsCards(details({ mode, filter: "dor", noteAbsent: undefined })).find((c) => c.id === "notes")!.subjectKey,
+    );
+    expect(new Set(keys).size).toBe(1);
   });
   it("ledger ghosts: snapshot + context + metaSnap + node invites (nodes pick in the chamber too)", () => {
     expect(ghostIds(detailsCards(details({})))).toEqual(["snap", "context", "metaSnap", "node"]);
