@@ -398,6 +398,25 @@ describe("hyperFacts on a network: the change of shape", () => {
     }
   });
 
+  it("states a layer and a combination START that splits evenly as the earlier observed sample (R61, N3)", () => {
+    // The node count holds at 3 over the opening six hours while dL1 and the all-layers
+    // combination read 2, 2, 2, 3, 3, 3 (a median of 2.5): the start is 2, the level read first.
+    // Read at the end edge it would be 3, the combination's end, and no change would be stated.
+    const opening = (i: number) => (i < 3 ? 2 : 3);
+    const r = hyperFacts(
+      input({
+        subject: "dor",
+        fleet: dor({
+          "f.layer.dor.dl1": row(N, (i) => (i < 6 ? opening(i) : i < N / 2 ? 3 : 5)),
+          "f.type.dor.l0+cl1+dl1": row(N, (i) => (i < 6 ? opening(i) : 3)),
+        }),
+      }),
+    )!;
+    expect(find(r, /^Dor nodes on the dL1 layer at the start of the span$/)[0]!.value).toBe(2);
+    expect(find(r, /^Dor nodes running L0, cL1 and dL1 at the start of the span$/)[0]!.value).toBe(2);
+    expect(find(r, /^Dor nodes running L0, cL1 and dL1 at the end of the span$/)[0]!.value).toBe(3);
+  });
+
   it("states a layer end that splits evenly as a whole count, the more recent observed sample (R52, R55)", () => {
     // The node count holds at 5 while the closing six hours read dL1 at 4, 4, 4, 5, 5, 5 (a
     // median of 4.5): stated as 5, the level it read last.
