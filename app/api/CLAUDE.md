@@ -107,7 +107,8 @@ them — but the Next Node server can.
   stale-while-revalidate=600`; `pending`, `unavailable` and a 400 are `no-store` (a well-formed
   brush with no whole bucket in it is `none`, not a 400). The ledger's `dag` is folded into `all`
   (the same facts: one note). `POST /api/notes/request` writes the two on-request kinds, and
-  `GET /api/notes/warm` is the hourly cron. **The honesty gate (rule 10) is mechanical**
+  `GET /api/notes/warm` is the quarter-hourly cron (about 26 Gate calls a pass, spaced 8 s — the free
+  model's burst limit, measured 2026-10-27). **The honesty gate (rule 10) is mechanical**
   (`src/data/noteHonesty.ts`, the colocated test is its specification): every number the note
   states must match a fact the model was shown, within the precision it was written to, and a
   failing note is asked for once more with the reasons, then dropped and counted. Nothing is ever

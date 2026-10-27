@@ -282,6 +282,11 @@ describe("the visitor hash is keyed when the server holds a secret", () => {
 describe("the warm budget leaves the worst item room inside maxDuration 300 s", () => {
   it("is 210 s: two paced Gate attempts at their 20 s timeout and the reads still finish before 300 s", () => {
     expect(WARM_BUDGET_MS).toBe(210_000);
+    expect(WARM_BUDGET_MS + 2 * (WARM_SPACING_MS + 20_000)).toBeLessThan(300_000);
+  });
+
+  it("spaces the Gate calls 8 s: 3.5 s still drew 429s from the free model (2026-10-27)", () => {
+    expect(WARM_SPACING_MS).toBe(8_000);
   });
 });
 

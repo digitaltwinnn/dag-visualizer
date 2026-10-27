@@ -505,7 +505,7 @@ host set is open, plus telemetry; dev adds `unsafe-eval`/`ws:`/`http:`), added f
 posture after a scanner NRD-isolated the fresh domain; Speed Insights + Analytics in the layout, both
 no-op off Vercel; and two Vercel Crons (`vercel.json`): a 15-minute one hitting `/api/trends/sample`,
 which merge-writes into Upstash Redis (the Vercel-native marketplace integration) holding the trends
-timeseries, and an hourly one (`7 * * * *`) hitting `/api/notes/warm`, which rewrites the AI notes
+timeseries, and a quarter-hourly one (`7,22,37,52 * * * *`) hitting `/api/notes/warm`, which rewrites the AI notes
 that are due, under the same `CRON_SECRET` — see `app/api/CLAUDE.md`.
 
 ⚠️ **Crons fire on the PRODUCTION deployment only — a PR preview is not production.** The preview

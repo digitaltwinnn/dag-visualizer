@@ -2,18 +2,20 @@ import type { NoteResponse, NoteView } from "@/src/data/noteTypes";
 import { noteKeyOf, timingOf, type NoteSpan } from "./keys";
 import { noteSupported } from "./sources";
 
-// THE WARM PASS — what the hourly cron (`/api/notes/warm`, vercel.json `7 * * * *`) rewrites, as
+// THE WARM PASS — what the quarter-hourly cron (`/api/notes/warm`, vercel.json `7,22,37,52 * * * *`) rewrites, as
 // pure planning plus one bounded executor. The PLANNER is the one place that decides a warmed note
 // is due: the route prefetches every candidate's record, `planPass` picks the due ones, and the
 // generator rewrites each planned item unconditionally (`generateNote(…, "warm")`).
 //
 // A note is due when it is missing, older than its kind's refresh less `WARM_SLACK_MS`, or (hyper
-// `all` only) written for a different set of networks with nodes. The slack exists because the
-// cron is hourly and a pass takes minutes: a ledger note written at 10:09 is 58 minutes old at the
-// 11:07 pass, and an exact one-hour refresh would leave it standing until 12:07.
+// `all` only) written for a different set of networks with nodes. The slack exists because a pass
+// takes minutes: a ledger note written at 10:09 is 58 minutes old at the 11:07 pass, and an exact
+// one-hour refresh would leave it standing until 11:22. It stays under the 15-minute cron step, so
+// the 10:52 pass (43 minutes) does not rewrite it early.
 //
 // PACING: one item at a time, and at least `WARM_SPACING_MS` between Gate calls (`pacedChat`),
-// because the free model's burst limit is far below its stated per-minute one; an item whose
+// because the free model's burst limit is far below its stated per-minute one. A pass is bounded
+// (about 26 calls), so a backlog — a cold store, a version bump — drains over several runs; an item whose
 // record another writer refreshed since the plan is served, not rewritten (`seenWrittenAt`).
 //
 // Order: the HOURLY kinds first (ledger, History's 24h), so a pass cut short by its time budget

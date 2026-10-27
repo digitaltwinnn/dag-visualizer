@@ -38,13 +38,13 @@ export const CAP_PER_DAY = 2_000;
 const RATE_TTL_S = 2 * 3600;
 const CAP_TTL_S = 2 * 86_400;
 /** The warm route's `maxDuration` is 300 s: no new item starts after this. The worst item is two
- *  paced Gate attempts at their 20 s timeout (3.5 + 20 + 3.5 + 20 s) plus its reads, so 210 s
- *  leaves it room to finish. */
+ *  paced Gate attempts at their 20 s timeout (8 + 20 + 8 + 20 s) plus its reads, so 210 s
+ *  leaves it room to finish — and holds a pass to about 26 Gate calls. */
 export const WARM_BUDGET_MS = 210_000;
 /** One item at a time, and the Gate calls spaced (`pacedChat`): the free model 429'd at about five
- *  calls in 15 s (2026-10-27, R32). */
+ *  calls in 15 s (2026-10-27, R32), and at 3.5 s spacing still refused 20 of 71 in one pass (R40). */
 export const WARM_CONCURRENCY = 1;
-export const WARM_SPACING_MS = 3_500;
+export const WARM_SPACING_MS = 8_000;
 
 const PUBLIC = "public, s-maxage=300, stale-while-revalidate=600";
 const NO_STORE = "no-store";
@@ -145,7 +145,7 @@ export function liveWarmDeps(): WarmDeps {
   };
 }
 
-/** GET /api/notes/warm — the hourly cron (vercel.json `7 * * * *`). */
+/** GET /api/notes/warm — the quarter-hourly cron (vercel.json `7,22,37,52 * * * *`). */
 export async function warmNotes(req: Request, deps: () => WarmDeps): Promise<Response> {
   // ⚠️ `!process.env.CRON_SECRET` is load-bearing: without it, an unset secret turns the
   // template literal into the literal string "Bearer undefined" and authenticates anyone
