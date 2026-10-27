@@ -37,6 +37,11 @@ gate after the spike and again after a few days of real running.
    | **Snapshots** | when (live) | **The anchoring rhythm** — the global snapshot pace lately, how many networks each one carries, fee and data volume, quiet or busy against the usual | **That network's rhythm** — how regularly it anchors, its longest gaps, its share of the global snapshots it was part of | a snapshot → its network's note | Stored, 5m / 1h tiers, last hours against the last week: `g.ticks`, `g.anchors`, `g.gapSum`/`g.gapMax` (global spacing), `g.feeFloor`/`g.kbFloor`; per network `m.<id>.ticks`, `.snaps`, `.gapSum`/`.gapMax`, `.fee`, `.kb` | hourly |
    | **History** | how it changed | **What changed** for the window pill, subject = the Range card's (below) | the same, for that network's plane | — | Stored: every measure History charts | per pill: 24H hourly, the rest daily |
 
+   **Every view has a default note** — the *Nothing selected* column — and each is that view's own
+   daily summary, answering only its own question **(user, 2026-10-27: "each view to have a default
+   note")**. The digest (#5) is not a separate surface: it is the Hypergraph's default note, because
+   that view's question is the whole network's who/what.
+
    The **live** views' notes describe recent hours, not this instant: a note is written ahead and
    cached, so "right now" belongs to the measured cards beside it, never to the AI card. Each
    note's "written" stamp says which span it read.
