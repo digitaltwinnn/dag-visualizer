@@ -381,26 +381,26 @@ describe("hyperFacts on a network: the change of shape", () => {
 });
 
 describe("hyperFacts on a network: the change of activity", () => {
-  it("states the three weeks before beside the last week, and their ratio when they differ", () => {
+  it("states the weeks before beside the last week, and their ratio when they differ", () => {
     const d = daily({ "m.usdc.ticks": row(60, (i) => (i >= 53 ? 60 : 40)) });
     const r = hyperFacts(input({ subject: "usdc", daily: d }))!;
     expect(find(r, /^USDC\.dag global snapshots it was part of per day, last week$/)[0]!.value).toBe(60);
-    expect(find(r, /^USDC\.dag global snapshots it was part of per day, the three weeks before$/)[0]!.value).toBe(40);
-    const [ratio] = find(r, /^USDC\.dag global snapshots it was part of per day, ratio last week to the three weeks before$/, "ratio");
+    expect(find(r, /^USDC\.dag global snapshots it was part of per day, the weeks before$/)[0]!.value).toBe(40);
+    const [ratio] = find(r, /^USDC\.dag global snapshots it was part of per day, ratio last week to the weeks before$/, "ratio");
     expect(ratio!.value).toBeCloseTo(1.5, 9);
   });
 
   it("states no ratio when the two are equal", () => {
     const r = hyperFacts(input({ subject: "usdc" }))!;
-    expect(find(r, /the three weeks before$/)[0]!.value).toBe(50);
+    expect(find(r, /the weeks before$/)[0]!.value).toBe(50);
     expect(find(r, /ratio last week/)).toEqual([]);
   });
 
-  it("states nothing for the three weeks before with fewer than seven measured days", () => {
+  it("states nothing for the weeks before with fewer than seven measured days", () => {
     // Days 32..46 read 0 beside created snapshots: the field's absence, not none (anchorSeries).
     const d = daily({ "m.usdc.ticks": row(60, (i) => (i >= 53 ? 60 : i >= 47 ? 40 : 0)) });
     const r = hyperFacts(input({ subject: "usdc", daily: d }))!;
-    expect(find(r, /three weeks before/)).toEqual([]);
+    expect(find(r, /weeks before/)).toEqual([]);
     expect(find(r, /per day, last week$/)[0]!.value).toBe(60);
   });
 });
@@ -435,22 +435,22 @@ describe("hyperFacts on all: the movers and the whole network's activity", () =>
     expect(r.facts.filter((f) => /^\S+ nodes at the (start|end) of the span$/.test(f.label))).toEqual([]);
   });
 
-  it("states global snapshots per day, last week against the three weeks before, naming no network", () => {
+  it("states global snapshots per day, last week against the weeks before, naming no network", () => {
     const r = hyperFacts(input({ daily: daily({ "g.ticks": row(60, (i) => (i >= 53 ? 30_000 : 24_000)) }) }))!;
     expect(find(r, /^Global snapshots per day, last week$/)[0]!.value).toBe(30_000);
-    expect(find(r, /^Global snapshots per day, the three weeks before$/)[0]!.value).toBe(24_000);
-    const [ratio] = find(r, /^Global snapshots per day, ratio last week to the three weeks before$/, "ratio");
+    expect(find(r, /^Global snapshots per day, the weeks before$/)[0]!.value).toBe(24_000);
+    const [ratio] = find(r, /^Global snapshots per day, ratio last week to the weeks before$/, "ratio");
     expect(ratio!.value).toBeCloseTo(1.25, 9);
     for (const n of Object.values(NAMES)) expect(ratio!.label).not.toContain(n);
   });
 
-  it("reads covered days only, and states nothing for the three weeks before under seven of them", () => {
+  it("reads covered days only, and states nothing for the weeks before under seven of them", () => {
     const r = hyperFacts(input({ daily: daily({ "g.ticks": row(60, (i) => (i >= 53 ? 30_000 : i >= 47 ? 24_000 : null)) }) }))!;
     expect(find(r, /^Global snapshots per day, last week$/)[0]!.value).toBe(30_000);
-    expect(find(r, /^Global snapshots per day, the three weeks before$/)).toEqual([]);
+    expect(find(r, /^Global snapshots per day, the weeks before$/)).toEqual([]);
     expect(find(r, /^Global snapshots per day, ratio/)).toEqual([]);
     const same = hyperFacts(input())!;
-    expect(find(same, /^Global snapshots per day, the three weeks before$/)[0]!.value).toBe(28_800);
+    expect(find(same, /^Global snapshots per day, the weeks before$/)[0]!.value).toBe(28_800);
     expect(find(same, /^Global snapshots per day, ratio/)).toEqual([]);
   });
 });

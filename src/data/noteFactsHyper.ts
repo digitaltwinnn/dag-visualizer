@@ -16,7 +16,7 @@ import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 // weeks before. A network's note says who that network is (its catalog blurb, a non-numeric line),
 // how its SHAPE CHANGED (the layers and node combinations whose count differs between the span's
 // start and its end, both ends stated, plus how many layers changed — an exact 0 when the shape
-// held), how its node count moved, how its activity compares with the three weeks before, and how
+// held), how its node count moved, how its activity compares with the weeks before, and how
 // it ranks. `noteFactsTrend.ts` is the reference builder and this one mirrors its idiom.
 //
 // It reads the STORED gauges, not a live fan-out: the sampler writes the same roster every hour,
@@ -29,9 +29,9 @@ import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 // THE GATE'S INTERFACE (`noteHonesty.ts`): a ratio belongs to a network only by its display name in
 // the fact's LABEL. The ratio of the whole network names none; a network's names it. `names` is the
 // FULL catalog list. Labels carry no digits of their own ("last week", not "last 7 days"), so the
-// model is not invited to write a figure no fact holds. ⚠️ "the three weeks before" is the user's
-// wording, and its "three" is a number word the gate reads as 3: a note echoing it is rejected
-// unless a fact backs a 3.
+// model is not invited to write a figure no fact holds — number WORDS included: the gate reads
+// "three" as 3, so the comparison window is "the weeks before", never "the three weeks before"
+// (R46: a note echoing that label was rejected).
 //
 // HONESTY (rule 10):
 //   · "networks" are the catalog's, the DAG's own core included (the unified node model). A network's
@@ -55,7 +55,7 @@ import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 //   · activity is the global snapshots a network WAS PART OF per day (`m.<id>.ticks` through
 //     `anchorSeries`, which reads a pre-2026-10-08 zero as "not measured") over the last week of
 //     COMPLETE days; "anchored" reads `m.<id>.snaps`. A network with no row is not ranked. "The
-//     three weeks before" is the mean over the 21 complete days before that week, measured days
+//     weeks before" is the mean over the 21 complete days before that week, measured days
 //     only and at least 7 of them, else no fact; the ratio is stated only when both are above 0
 //     and differ. The whole network's is `g.ticks` (one per global snapshot), covered days only;
 //   · HOW MANY NETWORKS ANCHORED goes through `networksAnchored` on the folded series, so measured
@@ -94,9 +94,9 @@ const LATE_START = 0.1;
 /** A sample's node count agrees with a level (the span's start or end) within this fraction. */
 const SHAPE_TOLERANCE = 0.1;
 const WEEK_DAYS = 7;
-/** "The three weeks before": the complete days before the last week, back to four weeks. */
+/** "The weeks before": the complete days before the last week, back to four weeks. */
 const PRIOR_DAYS = 21;
-/** The fewest measured days the three weeks before are read from at all. */
+/** The fewest measured days the weeks before are read from at all. */
 const PRIOR_MIN_DAYS = 7;
 const RANK_WORD = ["", "second ", "third "] as const;
 
@@ -156,7 +156,7 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
   const weekFrom = Math.max(0, n - WEEK_DAYS);
   const priorFrom = Math.max(0, weekFrom - PRIOR_DAYS);
   const coveredFrom = (lo: number) => covered.slice(lo).some((v) => v != null);
-  /** The per-day mean of a daily series over the three weeks before the last week, measured days
+  /** The per-day mean of a daily series over the weeks before the last week, measured days
    *  only; null under PRIOR_MIN_DAYS of them. */
   const priorMean = (points: Points): number | null => {
     const vals = points.slice(priorFrom, weekFrom).filter((v): v is number => v != null);
@@ -186,16 +186,16 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
     if (ch.from > 0 && ch.to !== ch.from) facts.push(fact(`${label}, ratio end to start`, ch.to / ch.from, "ratio"));
   };
 
-  /** A per-day reading over the last week beside the three weeks before, and their ratio when both
+  /** A per-day reading over the last week beside the weeks before, and their ratio when both
    *  are above 0 and differ. `lastWeek` null states nothing; the prior needs its measured days. */
   const activityChange = (label: string, lastWeek: number | null, points: Points): void => {
     if (lastWeek == null) return;
     facts.push(fact(`${label}, last week`, lastWeek, "count"));
     const before = priorMean(points);
     if (before == null) return;
-    facts.push(fact(`${label}, the three weeks before`, before, "count"));
+    facts.push(fact(`${label}, the weeks before`, before, "count"));
     if (lastWeek > 0 && before > 0 && lastWeek !== before)
-      facts.push(fact(`${label}, ratio last week to the three weeks before`, lastWeek / before, "ratio"));
+      facts.push(fact(`${label}, ratio last week to the weeks before`, lastWeek / before, "ratio"));
   };
 
   if (all) {
