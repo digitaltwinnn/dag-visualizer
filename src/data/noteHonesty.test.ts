@@ -102,3 +102,48 @@ describe("checkNote — the house voice", () => {
     if (!r.ok) expect(r.reasons.length).toBe(3);
   });
 });
+
+describe("checkNote — a named network is held to its own ratio, in tokens as in words", () => {
+  it("rejects another network's x or % under a name", () => {
+    expect(ok("BioFi ran at 2.5x its previous pace.")).toBe(false); // 2.5 is USDC.dag's
+    expect(ok("BioFi rose by 148%.")).toBe(false); // from USDC.dag's 2.48
+    expect(ok("USDC.dag ran at 2.5x its previous pace.")).toBe(true);
+  });
+  it("lets a % borrow a ratio only when the sentence names its network", () => {
+    expect(ok("Hetzner carries 37% of the nodes.")).toBe(false); // BioFi's ratio, not a share
+    expect(ok("Hetzner carries 58% of the nodes.")).toBe(true);
+  });
+});
+
+describe("checkNote — quantity words it cannot verify fail closed", () => {
+  it("rejects word quantities no fact is compared against", () => {
+    for (const bad of [
+      "Thirty networks anchored.", "Over a thousand nodes ran.", "Hundreds of nodes.",
+      "Half the nodes run on Hetzner.", "BioFi grew threefold.", "BioFi's pace tenfold.",
+      "BioFi doubles its pace.", "BioFi tripling its pace.", "Dozens of nodes ran.",
+    ]) expect(ok(bad), bad).toBe(false);
+  });
+  it("keeps the checked ratio words and a dozen", () => {
+    expect(ok("USDC.dag more than doubled its pace.")).toBe(true);
+    expect(ok("USDC.dag doubled its pace.")).toBe(true);
+    expect(ok("A dozen nodes ran.")).toBe(false); // 12 is backed by no fact
+    expect(checkNote("A dozen nodes ran.", [F("Nodes", 12, "count", "12")], names).ok).toBe(true);
+  });
+  it("names the word in the reason", () => {
+    const r = checkNote("Thirty networks anchored.", facts, names);
+    expect(!r.ok && r.reasons).toContain("unverifiable quantity word: Thirty");
+  });
+});
+
+describe("checkNote — a percentage is read in the direction the sentence says", () => {
+  it("rejects a fall for a rising ratio, and a rise for a falling one", () => {
+    expect(ok("BioFi fell by 37%.")).toBe(false);
+    expect(ok("BioFi rose by 37%.")).toBe(true);
+    const down = [F("BioFi snapshots anchored, ratio to previous span", 0.63, "ratio", "0.63")];
+    expect(checkNote("BioFi fell by 37%.", down, names).ok).toBe(true);
+    expect(checkNote("BioFi grew by 37%.", down, names).ok).toBe(false);
+  });
+  it("leaves all three readings with no direction verb", () => {
+    expect(ok("BioFi moved by 37%.")).toBe(true);
+  });
+});

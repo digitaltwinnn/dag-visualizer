@@ -23,8 +23,13 @@ import type { Fact } from "@/src/data/noteTypes";
 // ("Oct 19", "October 19, 2026", "19 Oct", "2026-10-19"). A date NO fact holds is left in, and its
 // day-of-month then has to back itself as a number — which it cannot.
 //
-// KNOWN LIMITS, stated rather than hidden: the direction of a percentage is not checked (a 37%
-// rise and a 37% fall both match a 1.37 ratio), and a duration is matched only against `duration`
+// DIRECTION: a sentence with a falling verb (fell, dropped, down, slowed ...) reads a `%` against a
+// ratio as (1-r)*100 only; a rising verb (rose, grew, up, climbed ...) as (r-1)*100 or r*100; with
+// neither, or both, all three stay allowed. A `%` against a ratio also needs the sentence to NAME
+// the network (else only a share fact can back it).
+//
+// KNOWN LIMITS, stated rather than hidden: direction is read from the sentence's verbs, not from
+// which number the verb governs, and a duration is matched only against `duration`
 // facts, so a count of days has to arrive as seconds.
 
 export type NoteCheck = { ok: true } | { ok: false; reasons: string[] };
@@ -46,6 +51,15 @@ const NUMBER_WORD_RE = new RegExp(`\\b(?:${Object.keys(NUMBER_WORDS).join("|")})
 const LAYER_RE = /\b[cd]?L[01]s?\b/g;
 // `\b` at the START only: "ticks" and "machines" are the words banned, "sticky" is not "tick".
 const BANNED_RE = /\bmachine|\btick|\bL1 snapshot|\bfeeless|\bdecentrali/gi;
+// QUANTITY WORDS THE GATE CANNOT CHECK fail closed: with no token produced, nothing would be
+// compared and "Thirty networks" or "BioFi grew threefold" would pass unread. The ratio words it
+// DOES check (doubled, tripled, quadrupled, halved, twice) are exempted by `unverifiable`.
+const UNVERIFIABLE_RE =
+  /\b(?:thirty|forty|fifty|sixty|seventy|eighty|ninety|hundreds?|thousands?|millions?|billions?|dozens|half|halves|quarters?)\b|\b\w+fold\b|\b(?:doubl|tripl|quadrupl|halv)\w*|(?<!\ba )\bdozen\b/gi;
+const CHECKED_RATIO_WORDS = new Set(["doubled", "tripled", "quadrupled", "halved"]);
+function unverifiable(s: string): string[] {
+  return [...s.matchAll(UNVERIFIABLE_RE)].map((m) => m[0]).filter((w) => !CHECKED_RATIO_WORDS.has(w.toLowerCase()));
+}
 const DASH_RE = /—|\s[–-]\s/;
 
 // A numeric token: digits with thousands commas and decimals, then an optional unit. A single
@@ -79,21 +93,35 @@ function tokens(s: string): Tok[] {
   return out;
 }
 
-/** The values a fact can honestly back for each way of writing a number. */
-function candidates(f: Fact, cls: Cls): number[] {
+/** Which way a sentence says a quantity moved, so a `%` is read in that direction only. */
+type Dir = "rise" | "fall" | "none";
+const FALL_RE = /\b(fell|fall|falls|dropped|drop|declined|decline|decreased|decrease|down|lower|slowed|shrank)\b/i;
+const RISE_RE = /\b(rose|rise|rises|grew|grow|increased|increase|up|higher|climbed)\b/i;
+function direction(s: string): Dir {
+  const fall = FALL_RE.test(s), rise = RISE_RE.test(s);
+  return fall && !rise ? "fall" : rise && !fall ? "rise" : "none";
+}
+
+/** The values a fact can honestly back for each way of writing a number. `ratios` is the set of
+ *  ratio facts THIS sentence may cite (see `checkNote`), not every ratio fact there is. */
+function candidates(f: Fact, cls: Cls, ratios: readonly Fact[], dir: Dir): number[] {
+  const isRatio = f.kind === "ratio" && ratios.includes(f);
   switch (cls) {
     case "plain": return f.kind === "count" || f.kind === "amount" ? [f.value] : [];
     case "pct":
       if (f.kind === "share") return [f.value * 100];
-      return f.kind === "ratio" ? [(f.value - 1) * 100, (1 - f.value) * 100, f.value * 100] : [];
-    case "x": return f.kind === "ratio" ? [f.value] : [];
+      if (!isRatio) return [];
+      return dir === "fall" ? [(1 - f.value) * 100]
+        : dir === "rise" ? [(f.value - 1) * 100, f.value * 100]
+        : [(f.value - 1) * 100, (1 - f.value) * 100, f.value * 100];
+    case "x": return isRatio ? [f.value] : [];
     case "dur": return f.kind === "duration" ? [f.value] : [];
   }
 }
 
-function backed(t: Tok, facts: readonly Fact[]): boolean {
+function backed(t: Tok, facts: readonly Fact[], ratios: readonly Fact[], dir: Dir): boolean {
   return facts.some((f) =>
-    candidates(f, t.cls).some((v) => Math.abs(v - t.value) <= t.tol + 1e-9 * Math.max(1, Math.abs(v))));
+    candidates(f, t.cls, ratios, dir).some((v) => Math.abs(v - t.value) <= t.tol + 1e-9 * Math.max(1, Math.abs(v))));
 }
 
 // RATIO WORDS. `ok` is the bare word's floor; `more` is "more than <word>", which must clear the
@@ -167,6 +195,7 @@ export function checkNote(
 
   const bare = stripNames(text);
   for (const m of bare.matchAll(BANNED_RE)) reasons.push(`banned word "${m[0]}"`);
+  for (const w of unverifiable(bare)) reasons.push(`unverifiable quantity word: ${w}`);
   if (DASH_RE.test(bare)) reasons.push("contains a dash used as punctuation");
 
   const parts = sentences(text, nameRegex);
@@ -179,12 +208,19 @@ export function checkNote(
     let s = stripNames(sentence).replace(LAYER_RE, " ");
     for (const re of dates) s = s.replace(re, " ");
 
-    const digits = s.replace(NUMBER_WORD_RE, (w) => ` ${NUMBER_WORDS[w.toLowerCase()]} `);
-    for (const t of tokens(digits)) if (!backed(t, facts)) reasons.push(`"${t.raw}" is not backed by any measured fact`);
-
+    // A sentence that names a network may cite only THAT network's ratio facts, for ratio words and
+    // for `x`/`%` tokens alike. One that names none may cite any ratio for `x` and a ratio word, but
+    // a bare `%` there is a share or nothing: it cannot borrow an unrelated network's ratio.
     const own = named.length
       ? ratios.filter((f) => named.some((n) => f.label.toLowerCase().includes(n.toLowerCase())))
       : ratios;
+    const pctRatios = named.length ? own : [];
+    const dir = direction(s);
+
+    const digits = s.replace(NUMBER_WORD_RE, (w) => ` ${NUMBER_WORDS[w.toLowerCase()]} `);
+    for (const t of tokens(digits))
+      if (!backed(t, facts, t.cls === "pct" ? pctRatios : own, dir)) reasons.push(`"${t.raw}" is not backed by any measured fact`);
+
     for (const m of s.matchAll(RATIO_WORD_RE)) {
       const rule = RATIO_WORDS[m[2].toLowerCase()];
       if (!own.some((f) => (m[1] ? rule.more(f.value) : rule.ok(f.value))))
