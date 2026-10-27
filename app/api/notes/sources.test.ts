@@ -16,7 +16,8 @@ const { trendFacts } = await import("@/src/data/noteFactsTrend");
 const { ledgerFacts } = await import("@/src/data/noteFactsLedger");
 const { hyperFacts } = await import("@/src/data/noteFactsHyper");
 const { geoFacts } = await import("@/src/data/noteFactsGeo");
-const { factsFor, noteSupported, readGeoDays, readSpan, storeReads } = await import("./sources");
+const { cleanBlurb, factsFor, noteSupported, readGeoDays, readSpan, storeReads } = await import("./sources");
+const realGeo = await vi.importActual<typeof import("@/src/data/noteFactsGeo")>("@/src/data/noteFactsGeo");
 
 const H = 3_600_000;
 const D = 86_400_000;
@@ -99,7 +100,8 @@ describe("factsFor — the per-view read table", () => {
     expect((input.daily as { tag?: string }).tag).toBe(`1d:${NOW - 37 * D}:${NOW}`);
     expect(input.names.dag).toBe("DAG");
     expect(input.names[USDC]).toBe("USDC.dag");
-    expect(input.blurbs[USDC]).toBeTruthy();
+    const BIOFI = CATALOG.mainnet.find((m) => m.name === "BioFi")!.id;
+    expect(input.blurbs[BIOFI]).toBeTruthy();
     expect(out!.spanFrom).toBe(NOW - 7 * D);
     expect(out!.spanTo).toBe(NOW);
     expect(out!.label).toBe("the hypergraph");
@@ -211,15 +213,18 @@ describe("factsFor — the per-view read table", () => {
     expect(out!.setKey).toBe("a,b");
     expect(out!.blurbs).toEqual(["USDC.dag is: x"]);
     expect(out!.facts).toContainEqual(expect.objectContaining({ label: "Span length", value: 2_592_000 }));
+    // The facts speak of the last day and the last week too (R30).
+    expect(out!.facts).toContainEqual(expect.objectContaining({ label: "Day", value: 86_400, kind: "duration" }));
+    expect(out!.facts).toContainEqual(expect.objectContaining({ label: "Week", value: 604_800, kind: "duration" }));
   });
 
-  it("geo: the geo family and the tiers' 1d over 31 days, pivoted by day; a country subject", async () => {
+  it("geo: the geo family and the tiers' 1d over 41 days (R29), pivoted by day; a country subject", async () => {
     const day = Date.UTC(2026, 9, 26);
     const tiers = { buckets: [day - D, day], stepMs: D, now: NOW, series: { "f.cc.DE": [4, null], "f.cc.US": [2, 3], "g.ticks": [1, 1], "f.nodes": [9, 9] } };
     const r = fakeReads({ async span(_n, tier, from, to) { r.calls.push({ tier, from, to }); return tiers; } });
     const out = await factsFor("mainnet", "geo", "cc:DE", "day", NOW, r);
-    expect(r.geoCalls).toEqual([{ from: NOW - 31 * D, to: NOW }]);
-    expect(r.calls).toEqual([{ tier: "1d", from: NOW - 31 * D, to: NOW }]);
+    expect(r.geoCalls).toEqual([{ from: NOW - 41 * D, to: NOW }]);
+    expect(r.calls).toEqual([{ tier: "1d", from: NOW - 41 * D, to: NOW }]);
     const input = vi.mocked(geoFacts).mock.calls[0]![0];
     expect(input.subject).toEqual({ cc: "DE" });
     expect(input.ccDays).toEqual({ "2026-10-25": { "f.cc.DE": 4, "f.cc.US": 2 }, "2026-10-26": { "f.cc.US": 3 } });
@@ -228,6 +233,49 @@ describe("factsFor — the per-view read table", () => {
     expect(input.countryNames).toMatchObject({ DE: "Germany", US: "United States", FR: "France" });
     expect(out!.label).toBe("Germany");
     expect(out!.spanFrom).toBe(NOW - 30 * D);
+    expect(out!.facts).toContainEqual(expect.objectContaining({ label: "Span length", value: 2_592_000 }));
+  });
+
+  it("geo, through the real builder: a partial outage 30 days back is never the month-ago anchor (R29)", async () => {
+    vi.mocked(geoFacts).mockImplementation(realGeo.geoFacts);
+    const today = Math.floor(NOW / D) * D;
+    const NORMAL = { DE: 50, US: 30 };
+    const OUTAGE = { DE: 20, US: 12 }; // a partial outage hour, read as the whole day
+    const level = (dayMs: number) => (dayMs === today - 31 * D || dayMs === today - 30 * D ? OUTAGE : NORMAL);
+    const daysIn = (from: number) => {
+      const out: number[] = [];
+      for (let t = Math.floor(from / D) * D; t <= NOW; t += D) out.push(t);
+      return out;
+    };
+    const geoField = (cc: Record<string, number>) => Object.fromEntries(Object.entries(cc).map(([c, n]) => [`f.cc.${c}`, n]));
+    const reads: NoteReads = {
+      async geoDays(_n, from) {
+        return { geoDays: Object.fromEntries(daysIn(from).map((t) => [new Date(t).toISOString().slice(0, 10), geoField(level(t))])), providerNames: {} };
+      },
+      async span(_n, _tier, from) {
+        const buckets = daysIn(from);
+        return { buckets, stepMs: D, now: NOW, series: { "g.ticks": buckets.map(() => 1), "f.cc.DE": buckets.map((t) => level(t).DE), "f.cc.US": buckets.map((t) => level(t).US) } };
+      },
+    };
+    const monthAgo = (facts: { label: string; value: number }[]) => facts.filter((f) => /a month ago/.test(f.label));
+
+    // The defect, shown: over a 31-day read the outage pair sits at the read's head, is judged
+    // against itself, and becomes the anchor ("Germany rose 150%").
+    const head = await reads.geoDays("mainnet", NOW - 31 * D, NOW);
+    const ccHead = await reads.span("mainnet", "1d", NOW - 31 * D, NOW);
+    const ccDays31 = Object.fromEntries(ccHead.buckets.map((b, i) => [new Date(b).toISOString().slice(0, 10), { "f.cc.DE": ccHead.series["f.cc.DE"]![i]!, "f.cc.US": ccHead.series["f.cc.US"]![i]! }]));
+    const short = realGeo.geoFacts({ subject: "all", geoDays: head.geoDays, ccDays: ccDays31, providerNames: {}, countryNames: { DE: "Germany", US: "United States" }, names: {} })!;
+    expect(monthAgo(short.facts).some((f) => f.label.endsWith("now against a month ago") && f.value === 2.5)).toBe(true);
+
+    // The fix: the read reaches 41 days back, the pair is judged against the week before it and
+    // fails, and no change fact reads from it.
+    const out = await factsFor("mainnet", "geo", "all", "day", NOW, reads);
+    const changes = monthAgo(out!.facts);
+    expect(changes.length).toBeGreaterThan(0);
+    for (const f of changes) {
+      if (f.label.endsWith("now against a month ago")) expect(f.value).toBe(1);
+      else expect([NORMAL.DE, NORMAL.US]).toContain(f.value);
+    }
   });
 
   it("a builder's null is no note", async () => {
@@ -244,6 +292,30 @@ describe("factsFor — the per-view read table", () => {
   it("a read that throws propagates (the generator counts it as a store outage)", async () => {
     const r = fakeReads({ span: async () => { throw new Error("down"); } });
     await expect(factsFor("mainnet", "ledger", "all", "hours", NOW, r)).rejects.toThrow("down");
+  });
+});
+
+describe("cleanBlurb — a catalog blurb in the house voice", () => {
+  it("turns a dash clause into a comma and keeps a joining hyphen", () => {
+    expect(cleanBlurb("DoD-vetted data-fingerprinting as a service — immutable proof of data authenticity, anchored to the Global L0."))
+      .toBe("DoD-vetted data-fingerprinting as a service, immutable proof of data authenticity, anchored to the Global L0.");
+    expect(cleanBlurb("A ledger – for data - anchored.")).toBe("A ledger, for data, anchored.");
+  });
+  it("drops a sentence holding a banned word, and is empty when nothing is left", () => {
+    expect(cleanBlurb("A USDC representation issued as a metagraph for fast, feeless transfers on the Hypergraph.")).toBe("");
+    expect(cleanBlurb("A decentralized exchange metagraph for swapping Constellation-ecosystem assets.")).toBe("");
+    expect(cleanBlurb("Swaps tokens. Decentralized and feeless. Runs on L0.")).toBe("Swaps tokens. Runs on L0.");
+  });
+  it("cleans the catalog the model is shown: no banned word or dash clause reaches a builder", async () => {
+    await factsFor("mainnet", "trend", "dag", "7d", NOW, fakeReads());
+    const { blurbs } = vi.mocked(trendFacts).mock.calls[0]![0];
+    expect(Object.keys(blurbs).length).toBeGreaterThan(0);
+    for (const b of Object.values(blurbs)) {
+      expect(b).not.toMatch(/—|\s[–-]\s/);
+      expect(b).not.toMatch(/feeless|decentrali|machine|\btick/i);
+      expect(b).not.toBe("");
+    }
+    expect(blurbs[USDC]).toBeUndefined(); // its one sentence says "feeless"
   });
 });
 

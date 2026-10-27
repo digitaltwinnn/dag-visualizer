@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { checkNote } from "@/src/data/noteHonesty";
+import { bannedWords, checkNote, undash } from "@/src/data/noteHonesty";
 import type { Fact } from "@/src/data/noteTypes";
 
 const F = (label: string, value: number, kind: Fact["kind"], text: string): Fact => ({ label, value, kind, text });
@@ -103,6 +103,14 @@ describe("checkNote — the house voice", () => {
   });
   it("does not split a sentence on a dot inside a name or a number", () => {
     expect(ok("USDC.dag ran at 2.5x the previous span.", { maxSentences: 1 })).toBe(true);
+  });
+  it("names the banned words it finds, and turns a dash clause into a comma", () => {
+    expect(bannedWords("Fast, feeless transfers on decentralized nodes, not machines.")).toEqual(["feeless", "decentrali", "machine"]);
+    expect(bannedWords("A sticky pace.")).toEqual([]);
+    expect(undash("Proof of data — anchored to the Global L0.")).toBe("Proof of data, anchored to the Global L0.");
+    expect(undash("Proof of data – anchored - here.")).toBe("Proof of data, anchored, here.");
+    expect(undash("Data-fingerprinting as a service.")).toBe("Data-fingerprinting as a service.");
+    expect(ok(undash("USDC.dag held steady — a calm week."))).toBe(true);
   });
   it("rejects an empty note and reports a reason per failure", () => {
     expect(ok("   ")).toBe(false);

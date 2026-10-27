@@ -3,7 +3,7 @@ import { fact } from "@/src/data/noteFacts";
 import { checkNote } from "@/src/data/noteHonesty";
 import type { NotableDay } from "@/src/data/noteTypes";
 import type { TrendsWindowData } from "@/src/data/trendWindow";
-import { generateNote, type NoteRecord } from "./generate";
+import { generateNote, LOCK_TTL_S, NOTE_STATS, type NoteRecord } from "./generate";
 import { GateError, type GateMessage } from "./gate";
 import { KIND_TIMING, lockKeyOf, noteKeyOf, statsKeyOf } from "./keys";
 import { factsFor, type NoteFacts, type NoteReads } from "./sources";
@@ -165,6 +165,47 @@ describe("generateNote", () => {
     expect(d.chat).not.toHaveBeenCalled();
     expect(await stats()).toEqual({ store: 1 });
     expect(await lockFree()).toBe(true);
+  });
+
+  it("takes the singleflight lock for 60 s (two Gate attempts and the reads fit, R30)", async () => {
+    const lock = vi.spyOn(store, "lock");
+    await generateNote(REQ, deps(), "read");
+    expect(LOCK_TTL_S).toBe(60);
+    expect(lock).toHaveBeenCalledWith(lockKeyOf(KEY), 60);
+  });
+
+  it("a failed note write: unavailable, counted as store, the lock released", async () => {
+    vi.spyOn(store, "set").mockRejectedValueOnce(new Error("down"));
+    const d = deps();
+    expect(await generateNote(REQ, d, "read")).toEqual({ state: "unavailable" });
+    expect(await stats()).toEqual({ store: 1 });
+    expect(await lockFree()).toBe(true);
+  });
+
+  it("anything else that throws after the lock: unavailable, counted as error, the lock released", async () => {
+    // A non-string answer makes `parseAnswer` throw: not the Gate's fault and not the store's.
+    const d = deps({ chat: async () => undefined as unknown as string });
+    expect(await generateNote(REQ, d, "read")).toEqual({ state: "unavailable" });
+    expect(await stats()).toEqual({ error: 1 });
+    expect(await lockFree()).toBe(true);
+
+    const d2 = deps({ chat: async () => { throw new TypeError("a bug"); } });
+    expect(await generateNote(REQ, d2, "read")).toEqual({ state: "unavailable" });
+    expect(d2.chat).toHaveBeenCalledTimes(1);
+    expect(await stats()).toEqual({ error: 2 });
+    expect(await lockFree()).toBe(true);
+  });
+
+  it("a lock that cannot be taken is a store outage", async () => {
+    vi.spyOn(store, "lock").mockRejectedValueOnce(new Error("down"));
+    const d = deps();
+    expect(await generateNote(REQ, d, "read")).toEqual({ state: "unavailable" });
+    expect(d.facts).not.toHaveBeenCalled();
+    expect(await stats()).toEqual({ store: 1 });
+  });
+
+  it("counts every outcome in one known list", () => {
+    expect([...NOTE_STATS]).toEqual(["ok", "gateFail", "rate", "http", "timeout", "empty", "nokey", "store", "error", "capped"]);
   });
 
   it("the notes cache itself failing is a store outage too", async () => {

@@ -1,4 +1,5 @@
 import { fact } from "@/src/data/noteFacts";
+import { bannedWords, undash } from "@/src/data/noteHonesty";
 import { geoFacts } from "@/src/data/noteFactsGeo";
 import { hyperFacts } from "@/src/data/noteFactsHyper";
 import { ledgerFacts } from "@/src/data/noteFactsLedger";
@@ -125,8 +126,20 @@ const catalogOf = (net: string) => CATALOG[net as NetworkId] ?? [];
 function namesOf(net: string): Record<string, string> {
   return { dag: DAG_NAME, ...Object.fromEntries(catalogOf(net).map((m) => [m.id, m.name])) };
 }
+/** A catalog blurb as the model may see it. Blurbs are the networks' own copy (the live
+ *  directory's descriptions) and do not follow the house voice: a dash clause becomes a comma and a
+ *  sentence holding a word the gate bans ("feeless", "decentralized") is dropped, so the model is
+ *  never handed a word it would echo into a rejected note. Empty when nothing is left. */
+export function cleanBlurb(blurb: string): string {
+  return undash(blurb)
+    .split(/(?<=[.!?])\s+/)
+    .filter((sentence) => sentence.trim() && bannedWords(sentence).length === 0)
+    .join(" ")
+    .trim();
+}
+
 function blurbsOf(net: string): Record<string, string> {
-  return Object.fromEntries(catalogOf(net).filter((m) => m.blurb).map((m) => [m.id, m.blurb]));
+  return Object.fromEntries(catalogOf(net).map((m) => [m.id, cleanBlurb(m.blurb)]).filter(([, b]) => b));
 }
 
 const isNetwork = (net: string, id: string) => id === "dag" || catalogOf(net).some((m) => m.id === id);
@@ -188,6 +201,9 @@ interface ViewSource {
 }
 
 const WHOLE = "the whole network";
+/** Geography's read: the 30-day month, its 5-day slack, and the 6 days the earliest candidate's
+ *  week needs before it (R29). */
+const GEO_READ_MS = (30 + 5 + 6) * D;
 const secondsOf = (fromMs: number, toMs: number) => (toMs - fromMs) / 1000;
 
 type TrendPill = "1h" | "24h" | "7d" | "30d" | "1y";
@@ -255,12 +271,17 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
         reads.span(net, "1d", span.fromMs - LEAD_IN_MS, nowMs),
       ]);
       const built = hyperFacts({ subject, fleet, daily, span, names, blurbs });
-      return { built, spanFrom: span.fromMs, spanTo: nowMs, windows: [["Span length", secondsOf(span.fromMs, nowMs)]] };
+      // The facts speak of the last day and the last week (activity, started / stopped) as well as
+      // the 30-day span, so each window the note may name is stated.
+      const windows: [string, number][] = [["Span length", secondsOf(span.fromMs, nowMs)], ["Day", D / 1000], ["Week", (7 * D) / 1000]];
+      return { built, spanFrom: span.fromMs, spanTo: nowMs, windows };
     },
   },
-  // WHERE: the geo family's days and the tiers' daily country counts over 31 days. The note's span
-  // is the month its changes are read over (now against the measured day nearest 30 days back);
-  // the extra day lets that day be a whole one.
+  // WHERE: the geo family's days and the tiers' daily country counts. The note's span is the month
+  // its changes are read over (now against the measured day nearest 30 days back, within 5 days),
+  // but the READ reaches further (R29): the builder judges each day against the week ending on it
+  // (R22), so the earliest day the comparison may use, 35 days back, needs the 6 days before it,
+  // or a partial outage at the read's head is judged against itself and becomes the month-ago anchor.
   geo: {
     accepts: (net, subject, span) => span === "day" && (subject === "all" || CC_RE.test(subject) || isNetwork(net, subject)),
     label: (subject, names) => {
@@ -268,7 +289,7 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
       return subject === "all" ? WHOLE : cc ? countryName(cc) : (names[subject] ?? subject);
     },
     async read({ net, subject, nowMs, reads, names }) {
-      const from = nowMs - 31 * D;
+      const from = nowMs - GEO_READ_MS;
       const [{ geoDays, providerNames }, tiers] = await Promise.all([
         reads.geoDays(net, from, nowMs),
         reads.span(net, "1d", from, nowMs),

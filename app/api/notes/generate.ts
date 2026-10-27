@@ -19,6 +19,8 @@ import type { NotesStore } from "./store";
 //   · nothing to describe (a builder's null) stores nothing and answers `none`, without a model call;
 //   · a store outage, the trends reads or this cache, answers `unavailable` and is counted
 //     (`store`): an instrument state, never a guess and never an error dump.
+//     Anything else that throws once the lock is taken answers the same, counted as `error`; the
+//     lock is released in every case.
 //
 // The model's text is UNTRUSTED: it is stored and returned as a plain string, never markup.
 // SECRETS: nothing here sees the Gate key; a log line carries the view, subject, span and an error
@@ -35,14 +37,18 @@ export interface NoteRecord {
   setKey?: string;
 }
 
-/** The day's counters (`statsKeyOf`): one field per outcome. `capped` is the request route's. */
-export const NOTE_STATS = ["ok", "gateFail", "rate", "http", "timeout", "empty", "nokey", "store", "capped"] as const;
+/** The day's counters (`statsKeyOf`): one field per outcome. `store` is an Upstash read or write
+ *  that failed, `error` anything else that threw after the lock was taken (a bug, never the model's
+ *  fault); `capped` is the request route's. */
+export const NOTE_STATS = ["ok", "gateFail", "rate", "http", "timeout", "empty", "nokey", "store", "error", "capped"] as const;
 export type NoteStat = (typeof NOTE_STATS)[number];
 /** How long a day's counters are kept: the go/no-go script reads the last 14 days. */
 export const STATS_TTL_S = 30 * 86_400;
 
-/** The singleflight lock's TTL: two Gate attempts at their 20-second timeout. */
-const LOCK_TTL_S = 40;
+/** The singleflight lock's TTL: two Gate attempts at their 20-second timeout plus the reads, with
+ *  room to spare. The unlock is unconditional, so a writer that outlived its lock would free the
+ *  next writer's (R30). */
+export const LOCK_TTL_S = 60;
 
 export interface NoteRequest {
   net: string;
@@ -114,7 +120,8 @@ async function write(
     try {
       answer = await chat(buildMessages(req.view, input.label, block, days, reasons));
     } catch (e) {
-      const kind: GateErrorKind = e instanceof GateError ? e.kind : "http";
+      if (!(e instanceof GateError)) throw e; // not the Gate's: `generateNote` counts it as `error`
+      const kind: GateErrorKind = e.kind;
       warn(req, kind);
       return { ok: false, stat: kind };
     }
@@ -209,6 +216,11 @@ export async function generateNote(req: NoteRequest, deps: GenerateDeps, mode: G
     }
     await countStat(store, net, now, "ok");
     return okOf(record);
+  } catch {
+    // Anything else that threw once the lock was taken: an instrument state, counted, never a dump.
+    warn(req, "error");
+    await countStat(store, net, now, "error");
+    return UNAVAILABLE;
   } finally {
     try {
       await store.unlock(lock);

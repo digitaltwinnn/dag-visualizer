@@ -61,6 +61,21 @@ function unverifiable(s: string): string[] {
   return [...s.matchAll(UNVERIFIABLE_RE)].map((m) => m[0]).filter((w) => !CHECKED_RATIO_WORDS.has(w.toLowerCase()));
 }
 const DASH_RE = /—|\s[–-]\s/;
+const DASH_CLAUSE_RE = /\s*—\s*|\s+[–-]\s+/g;
+
+/** The house words a sentence may not use (machine, tick, L1 snapshot, feeless, decentrali-), as
+ *  written. The gate fails on any; text written by people and shown to the model beside the facts
+ *  (a network's catalog blurb) is cleaned with the same list, so the model is not handed a word
+ *  the gate would then reject. */
+export function bannedWords(s: string): string[] {
+  return [...s.matchAll(BANNED_RE)].map((m) => m[0]);
+}
+
+/** A dash used as punctuation (an em dash, or a spaced en dash or hyphen) turned into the comma
+ *  the house voice uses instead; a joining hyphen is left alone. */
+export function undash(s: string): string {
+  return s.replace(DASH_CLAUSE_RE, ", ");
+}
 
 // A numeric token: digits with thousands commas and decimals, then an optional unit. A single
 // letter unit must stand alone (22h, 12.2K, 45s) so "3rd" or "2nd" stay plain numbers.
@@ -197,7 +212,7 @@ export function checkNote(
   if (!text.trim()) return { ok: false, reasons: ["the note is empty"] };
 
   const bare = stripNames(text);
-  for (const m of bare.matchAll(BANNED_RE)) reasons.push(`banned word "${m[0]}"`);
+  for (const w of bannedWords(bare)) reasons.push(`banned word "${w}"`);
   for (const w of unverifiable(bare)) reasons.push(`unverifiable quantity word: ${w}`);
   if (DASH_RE.test(bare)) reasons.push("contains a dash used as punctuation");
 
