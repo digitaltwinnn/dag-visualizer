@@ -9,7 +9,10 @@ import { join } from "node:path";
 //   · the card is PART OF THE STACK (R57): it renders as the lane's top slot through the lane's
 //     one render (`detailPane`), with no lead pane above the lane and no thread opt-out — the
 //     manifest-side half (lane order, focus) is `railCards.test.ts`;
-//   · the iridescent edge is the open BOX's alone, the resting entry stays subtle;
+//   · the iridescent edge is the open BOX's alone, the resting entry stays subtle, and it is the
+//     box's ONE edge on paper too (no slab box rule inside it);
+//   · Inspector asks the pure collapse module (`railCollapse.ts`, whose test drives the box
+//     invariant by outcome) rather than special-casing the notes slot inline;
 //   · History's notable days start FOLDED, and their rows mount only when opened;
 //   · notes are asked for on mainnet only, through the hydration-safe `useNet()` — never `NET`
 //     alone in render, which differs between the server (always mainnet) and a dev network.
@@ -30,8 +33,11 @@ describe("the notes card is part of the stack", () => {
     expect(src).not.toMatch(/notesPane|data-thread-off/);
     // The slot's presence reaches the focus derivation, so at rest the notes card is the box.
     expect(src).toMatch(/useLadderFocus\(noteAbsent\)/);
-    // A view's entry never pins it: pinned open, it stood as a second box above the late live tick.
-    expect(src).toMatch(/ladderIds\.filter\(\(id\) => id !== "notes" && presentOf\(id\)\)/);
+    // The collapse decisions are the pure module's (`railCollapse.ts`, tested by outcome); Inspector
+    // asks it rather than special-casing the notes slot inline (review M4/M5).
+    expect(src).toMatch(/setRailCollapseMany\(overridesOnViewEntry\(live\)\)/);
+    expect(src).toMatch(/const deepestId = subjectRunEnd\(ladderIds, presentOf\);/);
+    expect(src).not.toMatch(/=== "notes"|!== "notes"/);
   });
 
   it("RailThread gives every lane card a dot — no subtree is skipped", () => {
@@ -53,7 +59,11 @@ describe("the notes card's own behaviour", () => {
   });
 
   it("wears the iridescent edge on the open box only", () => {
-    expect(card).toMatch(/collapsed\s*\?\s*undefined\s*:\s*"border border-transparent \[background:[^"]*var\(--ai-edge\)_border-box\]"/);
+    expect(card).toMatch(/collapsed\s*\?\s*undefined\s*:\s*"border border-transparent [^"]*\[background:[^"]*var\(--ai-edge\)_border-box\]"/);
+  });
+
+  it("draws ONE edge on both grounds: the slab's paper box rule is stated away on the box (review M1)", () => {
+    expect(card).toMatch(/collapsed\s*\?\s*undefined\s*:\s*"[^"]*\[--box-rule:transparent\][^"]*"/);
   });
 
   it("asks for notes on mainnet only, the network read through useNet()", () => {

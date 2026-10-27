@@ -174,10 +174,14 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
       // shows only in the border ring.
       // The ground is load-bearing: `--panel-solid` is translucent, and without it the sweep tinted
       // the whole fill (user, 2026-10-27: "I like the outline but fill is too much AI color").
+      // ONE EDGE ON BOTH GROUNDS (review M1): in the slab the open box also draws `--box-rule`, the
+      // paper's heavier inset ring (globals.css, Print) — a second hairline inside the sweep. The
+      // sweep already says "this is the open one", so this card states the token transparent on
+      // itself (dark's arm already is); the slab rule, its lift and ambient are untouched.
       className={
         collapsed
           ? undefined
-          : "border border-transparent [background:linear-gradient(var(--panel-solid),var(--panel-solid))_padding-box,linear-gradient(var(--background),var(--background))_padding-box,var(--ai-edge)_border-box]"
+          : "border border-transparent [--box-rule:transparent] [background:linear-gradient(var(--panel-solid),var(--panel-solid))_padding-box,linear-gradient(var(--background),var(--background))_padding-box,var(--ai-edge)_border-box]"
       }
     >
       <CardHead

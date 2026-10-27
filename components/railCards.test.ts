@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { exploreCards, detailsCards, noteCardAbsent, parentHolds, focusSlotId, ladderLevelOfSlot, ladderSlotIds, type RailManifestState } from "@/components/railCards";
+import { exploreCards, detailsCards, isSubjectSlot, noteCardAbsent, parentHolds, focusSlotId, ladderLevelOfSlot, ladderSlotIds, type RailManifestState } from "@/components/railCards";
 import { LADDERS } from "@/src/engine/domain/focusLadder";
 import type { PickDescriptor } from "@/src/data/types";
 
@@ -68,7 +68,7 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
   // THE AI NOTES CARD (2026-10-27): its own card, first, in every view whose policy opts in
   // (`aiNotes`) — present unless the note is absent (no subject, or the server answered `none`).
   it.each(["hyper", "geo", "ledger", "trend"] as const)("%s hosts a present AI notes card, first", (mode) => {
-    const cards = detailsCards(details({ mode, noteAbsent: undefined }));
+    const cards = detailsCards(details({ mode, noteAbsent: false }));
     const notes = cards.find((c) => c.id === "notes")!;
     expect(notes.present).toBe(true);
     expect(notes.kind).toBe("notes");
@@ -78,6 +78,12 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
   it.each(["hyper", "geo", "ledger", "trend"] as const)("%s: the AI notes card is the TOP slot of the lane, not a rung", (mode) => {
     expect(ladderSlotIds(mode)[0]).toBe("notes");
     expect(ladderLevelOfSlot("notes")).toBeNull();
+  });
+  it("a caller that states nothing gets no notes slot (review M2) — never a focus on a card that may not exist", () => {
+    const st = { ...details({ mode: "hyper" }) };
+    delete st.noteAbsent;
+    expect(detailsCards(st).find((c) => c.id === "notes")!.present).toBe(false);
+    expect(focusSlotId(st)).toBeNull();
   });
   it("an absent note (no subject, or `none`) stands the AI notes card down", () => {
     const notes = detailsCards(details({ mode: "hyper", noteAbsent: true })).find((c) => c.id === "notes")!;
@@ -94,11 +100,11 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
     expect(noteCardAbsent(true, { state: "ok", text: "t", writtenAt: 0, spanFrom: 0, spanTo: 1, days: [] })).toBe(false);
   });
   it("the placeholder hosts no AI notes card", () => {
-    expect(detailsCards(details({ mode: "soon", noteAbsent: undefined })).some((c) => c.id === "notes")).toBe(false);
+    expect(detailsCards(details({ mode: "soon", noteAbsent: false })).some((c) => c.id === "notes")).toBe(false);
   });
   it("the AI notes card keeps one subject key, so a view switch never lights the tray", () => {
     const keys = (["hyper", "geo", "ledger", "trend"] as const).map(
-      (mode) => detailsCards(details({ mode, filter: "dor", noteAbsent: undefined })).find((c) => c.id === "notes")!.subjectKey,
+      (mode) => detailsCards(details({ mode, filter: "dor", noteAbsent: false })).find((c) => c.id === "notes")!.subjectKey,
     );
     expect(new Set(keys).size).toBe(1);
   });
@@ -460,12 +466,17 @@ describe("ghost hints — the copy rule", () => {
 // suppressed the leading ghost instead; it was retired here rather than kept, because a second
 // mechanism for a problem the order already solves is what convention 8 forbids.
 describe("the ledger lane leads with the tick", () => {
-  it("at 'all' with a live tick, the head SUBJECT card is populated and no ghost sits above it", () => {
-    const cards = detailsCards(details({ mode: "ledger", filter: "all", snap: snapPick }));
+  it.each([true, false])("at 'all' with a live tick, the head SUBJECT card is populated and no ghost sits above it (note absent: %s)", (noteAbsent) => {
+    const cards = detailsCards(details({ mode: "ledger", filter: "all", snap: snapPick, noteAbsent }));
+    const lane = ladderSlotIds("ledger");
     // The AI notes card tops every note view's lane (R57) but is no subject; the tick leads the subjects.
-    const lane = ladderSlotIds("ledger").filter((id) => id !== "notes");
-    expect(lane[0]).toBe("snap");
+    expect(lane.filter(isSubjectSlot)[0]).toBe("snap");
     expect(cards.find((c) => c.id === "snap")!.present).toBe(true);
+    // Nothing above the tick renders a ghost — whether the note stands or not (review M3).
+    for (const id of lane.slice(0, lane.indexOf("snap"))) {
+      const c = cards.find((x) => x.id === id)!;
+      expect(!c.present && c.hint != null, `${id} ghosts above the tick`).toBe(false);
+    }
   });
 
   it("the dossier sits UNDER the tick, where the tick's own anchor list points", () => {

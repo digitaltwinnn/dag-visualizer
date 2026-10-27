@@ -12,9 +12,11 @@ import { useTickHasFilter } from "@/components/useTickHasFilter";
 //
 // Returns the rail SLOT id ("notes" / "context" / "country" / "cohort" / "composition" / "node"),
 // so callers name the rung the same way the rail does.
-// `noteAbsent` is the AI notes slot's presence (`railCards.noteAbsent`), stated by the caller that
-// already holds the note (Inspector) — the slot tops the lane and is the focus at rest (R57).
-export function useLadderFocus(noteAbsent?: boolean): string | null {
+// `noteAbsent` is the AI notes slot's ABSENCE (`railCards.noteCardAbsent`), stated by the caller
+// that already holds the note (Inspector) — the slot tops the lane and is the focus at rest (R57).
+// Required (review M2): a caller that cannot say must say `true`, never get a focus on a card that
+// may not exist.
+export function useLadderFocus(noteAbsent: boolean): string | null {
   const mode = useStore((s) => s.mode);
   const filter = useStore((s) => s.filter);
   const tickNet = useStore((s) => s.tickNet);

@@ -123,6 +123,18 @@ export function ladderSlotIds(mode: Mode): string[] {
   return [...(DISPLAY_LANE[mode] ?? [])];
 }
 
+/** The lane slot the AI notes card stands in (R57). */
+export const NOTES_SLOT = "notes";
+/** The lane slots that are NOT SUBJECT CARDS — written context, not a subject anything committed
+ *  or the live follow put there. One home (convention 8) for every rule that reads the pile as a
+ *  run of subjects: the next-rung step's run (`subjectRunEnd`), and the view-entry pin, which keeps
+ *  only subjects (`overridesOnViewEntry`, `railCollapse.ts`). */
+const NON_SUBJECT_SLOTS: ReadonlySet<string> = new Set([NOTES_SLOT]);
+/** Is this lane slot a SUBJECT card (anything but the AI notes card today)? */
+export function isSubjectSlot(id: string): boolean {
+  return !NON_SUBJECT_SLOTS.has(id);
+}
+
 /** The selection fields the ladder derivation needs — the manifest state minus the ghost-copy
  *  inputs (which can't change a slot's presence). */
 export type LadderState = Pick<
@@ -134,10 +146,13 @@ export type LadderState = Pick<
   selStack?: readonly string[];
 };
 
-// The FOCUS rung: the finest ladder slot currently POPULATED (null = nothing committed). ONE
-// definition, two rails — the facts rail rests only this card expanded and gives its thread dot
-// the halo, and the explorers render every COARSER committed row at ancestor strength
-// (`selectedRow`), so both rails answer "where am I" the same way.
+// The FOCUS slot: the lane card that is the box by default — the most recently selected present
+// card, else the finest present one (null = no lane card stands at all). With nothing committed
+// that is the AI notes card (R57): the coarsest slot, present at rest, and never in `selStack`, so
+// any subject card that stands outranks it. ONE definition, two rails — the facts rail rests only
+// this card expanded and gives its thread dot the halo, and the explorers render every COARSER
+// committed row at ancestor strength (`selectedRow`), so both rails answer "where am I" the same
+// way.
 export function focusSlotId(s: LadderState): string | null {
   // `selNodesCount`/`filterLabel` only feed ghost COPY — presence is unaffected, so the ladder
   // question can be answered from the selection alone.
@@ -232,8 +247,9 @@ export interface RailManifestState {
   metaSnap?: MetaSnapSel | null;
   /** THE AI NOTE IS ABSENT (2026-10-27): the view's subject has no note (`noteSubjectOf` answered
    *  null — the unlisted network) or the server answered `none` (not mainnet). The note itself is
-   *  fetched in React (`useNote`), so the caller states the answer, as it states `tickHasFilter`.
-   *  Optional: undefined reads as "a note stands", which is the card's own default while it asks. */
+   *  fetched in React (`useNote`), so the caller states the answer (`noteCardAbsent`), as it states
+   *  `tickHasFilter`. ⚠️ Only an explicit `false` stands the card: a caller that states nothing gets
+   *  NO notes slot (review M2) — never a focus on a card that may not exist. */
   noteAbsent?: boolean;
 }
 
@@ -554,7 +570,7 @@ export function detailsCards(s: RailManifestState): RailCard[] {
     kind: "notes",
     icon: AI_NOTES_ICON,
     subjectKey: "notes",
-    present: VIEW_POLICIES[s.mode].aiNotes && !s.noteAbsent,
+    present: VIEW_POLICIES[s.mode].aiNotes && s.noteAbsent === false,
     hint: null,
   };
   // The manifest order drives the tablet/phone flat stack + tray icons and MUST agree with the

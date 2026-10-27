@@ -25,6 +25,7 @@ import { useTouch } from "@/components/useTouch";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { detailsCards, ladderSlotIds, noteCardAbsent, type RailCard } from "@/components/railCards";
 import { CHILD_OF, childStep, type SiblingStep } from "@/components/railSiblings";
+import { isCollapsed, boxedSlotOf, overridesOnSelection, overridesOnViewEntry, railSelectionKey, subjectRunEnd, type LaneCollapseState } from "@/components/railCollapse";
 import { useSiblingState } from "@/components/useSiblingState";
 import { openRailCard } from "@/components/railOpen";
 import { useLadderFocus } from "@/components/useLadderFocus";
@@ -463,14 +464,15 @@ export default function Inspector() {
   // a slot with no rung, so never the focus — sat folded above three ghosts on every tier, and
   // since the box lost its minimize (2026-09-11) a folded card with no box beside it is a state
   // nothing else can produce. With no focus rung the FIRST present ladder card opens by default.
-  const openDefault = focusId ?? ladderIds.find(presentOf) ?? null;
-  const autoCollapsed = (id: string) => ladderIds.includes(id) && presentOf(id) && id !== openDefault;
-  const effCollapsed = (id: string) => railCollapse[id] ?? autoCollapsed(id);
+  // The decision itself is pure (`railCollapse.ts`, tested by outcome): the default card, the auto
+  // fold, the box.
+  const collapseState: LaneCollapseState = { lane: ladderIds, present: presentOf, focusId, overrides: railCollapse };
+  const effCollapsed = (id: string) => isCollapsed(collapseState, id);
   // Publish which slot is the BOX (store.boxedCard) — the same `present && !effCollapsed` that
   // renders it, so channel and render can't disagree (the data-tier lesson). The subject
   // callout reads it to mirror the box exactly as the camera does: re-boxing an ancestor card
   // (clicking a committed node's hub) steps the scene label up with it (user, 2026-08-15).
-  const boxedId = ladderIds.find((id) => presentOf(id) && !effCollapsed(id)) ?? null;
+  const boxedId = boxedSlotOf(collapseState);
   const setBoxedCard = useStore((s) => s.setBoxedCard);
   useEffect(() => {
     setBoxedCard(boxedId);
@@ -495,13 +497,8 @@ export default function Inspector() {
   // reading that can be absent, and a run that had to begin at slot 0 left the Range card below a
   // gap with no step). The run begins at the first present card and ends at the first gap after it.
   // …and the run is a run of SUBJECT cards: the AI notes card tops the lane (R57) but is no
-  // subject, so it neither starts the run nor leaves a gap that ends it.
-  let deepestId: string | null = null;
-  for (const id of ladderIds) {
-    if (id === "notes") continue;
-    if (presentOf(id)) deepestId = id;
-    else if (deepestId !== null) break;
-  }
+  // subject, so it neither starts the run nor leaves a gap that ends it (`subjectRunEnd`).
+  const deepestId = subjectRunEnd(ladderIds, presentOf);
   const deepestKind = deepestId ? (manifest.find((c) => c.id === deepestId)?.kind ?? null) : null;
   const siblingState = useSiblingState(deepestKind);
   const nextStep = useMemo(() => {
@@ -537,33 +534,8 @@ export default function Inspector() {
   // dropped whenever the committed ladder changes (subject identity, not just depth) and the auto
   // "only the focus rung is open" default governs again. Within one selection the +/− still holds.
   const following = useStore((s) => s.following);
-  const selectionKey = [
-    mode,
-    filter,
-    country ?? "",
-    cohort ? `${cohort.cc}|${cohort.city}|${cohort.isp}` : "",
-    composition ? `${composition.netId}|${composition.key}` : "",
-    inspect ? hoverKeyOf(inspect) ?? "" : "",
-    // HISTORY'S OWN SUBJECT (2026-09-19). Picking an instant is a new selection moment like any
-    // other, and it has to be IN this key or the mode-entry snapshot below pins the cursor card
-    // shut forever: that snapshot writes `instant: true` on arrival (the slot is not yet present),
-    // and nothing else in this view is a selection change that would drop it. Unguarded on
-    // purpose, unlike the two live-advancing ordinals above — a cursor never advances by itself,
-    // and the timeline writes it at most once per bucket.
-    trendCursorMs ?? "",
-    // …and the RANGE, the cursor's parent (2026-10-07), for the same reason.
-    trendRange ? `${trendRange.fromMs}-${trendRange.toMs}` : "",
-    // …and the PLANE FOCUS, which names the Metagraph card here (2026-10-07): a row click is a
-    // new selection moment, or a fold override from before it keeps the card shut.
-    trendFocus ?? "",
-    // While FOLLOWING, the auto-advancing ordinals are NOT a new selection moment — the heartbeat
-    // must not drop the user's +/− overrides every ~4s (item 8; advanceSnap already keeps the
-    // recency stack still for the same reason). Guards BOTH live-advanced cards: the global
-    // (advanceSnap) AND the metagraph snapshot (advanceMetaSnap — found live 2026-08-08: its
-    // unguarded ordinal re-materialized the focus card on every heartbeat in live metagraph mode).
-    following ? (snap ? "live" : "") : snap?.data.ordinal ?? "",
-    following ? (metaSnap ? "live" : "") : metaSnap ? `${metaSnap.metaId}:${metaSnap.ordinal}` : "",
-  ].join("§");
+  // One pure key (`railCollapse.railSelectionKey` carries every member's reason).
+  const selectionKey = railSelectionKey({ mode, filter, country, cohort, composition, inspect, trendCursorMs, trendRange, trendFocus, tickNet, following, snap, metaSnap });
   // Arms HeightEase's growIn for slots that JOIN the lane after boot (false on the first
   // render pass, true on every later one — a mounting slot's wrapper then eases from 0
   // instead of shoving the pile in one frame). DESKTOP ONLY, as ExploreRail's (its note has
@@ -583,7 +555,8 @@ export default function Inspector() {
     lastMode.current = mode;
     // Read the live overrides rather than closing over them: `railCollapse` changes on every
     // +/− too, and this effect must fire on a SELECTION change only.
-    const staleNulls = Object.fromEntries(Object.keys(useStore.getState().railCollapse).map((id) => [id, null]));
+    const live: LaneCollapseState = { ...collapseState, overrides: useStore.getState().railCollapse };
+    const staleNulls = overridesOnSelection(live);
     // EXPANDED STATE SURVIVES A VIEW SWITCH (user, 2026-09-04 — reversing 2026-08-08's
     // scene-first entry, which collapsed the whole ladder on arrival: with every rung's height
     // now EASING, the collapse-and-reopen cycle was the "node card size jumps between views"
@@ -612,14 +585,9 @@ export default function Inspector() {
       // out of the selection key on purpose (heartbeats must not reset the +/− overrides), so
       // nothing ever dropped the pin and the only populated card sat folded above three ghosts.
       // An absent slot keeps no override and the auto rule (`openDefault`) governs its arrival.
-      // ⚠️ …and THE AI NOTES CARD IS NEVER PINNED (R57, found live in Snapshots): it is the open box
-      // exactly while no subject card stands, and at a view's entry it usually stands alone — the
-      // live tick lands a beat later — so a pinned-open note sat as a SECOND box above the tick.
-      // Left to the auto rule it yields the box to whatever subject arrives, as it does at rest.
-      setRailCollapseMany({
-        ...staleNulls,
-        ...Object.fromEntries(ladderIds.filter((id) => id !== "notes" && presentOf(id)).map((id) => [id, effCollapsed(id)])),
-      });
+      // ⚠️ …and only SUBJECT cards are pinned, and nothing at all when the departing box is the AI
+      // notes card (R57; review I1) — `overridesOnViewEntry` has both reasons and their tests.
+      setRailCollapseMany(overridesOnViewEntry(live));
       return;
     }
     if (Date.now() - modeEnteredAt.current < ENTRY_GRACE_MS) return;
