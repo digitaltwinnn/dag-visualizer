@@ -286,6 +286,25 @@ describe("GET /api/notes/warm (cron)", () => {
     expect((d.chat as unknown as { mock: { calls: unknown[] } }).mock.calls.length).toBe(planned);
   });
 
+  it("a due note another writer refreshed after the prefetch is served, not paid for twice", async () => {
+    vi.stubEnv("CRON_SECRET", "s3cret");
+    await warmNotes(warmReq("Bearer s3cret"), () => deps()); // everything written, fresh
+    const key = noteKeyOf("mainnet", "trend", "dag", "7d");
+    const note = (writtenAt: number) => JSON.stringify({ text: "A note.", writtenAt, spanFrom: NOW - 7 * D, spanTo: NOW, days: [] });
+    await store.set(key, note(NOW - 25 * H), 72 * 3600); // due
+    const mget = store.mget.bind(store);
+    vi.spyOn(store, "mget").mockImplementation(async (keys) => {
+      const seen = await mget(keys);
+      await store.set(key, note(NOW - 60_000), 72 * 3600); // a visitor's read rewrote it meanwhile
+      return seen;
+    });
+    const d = deps();
+    const body = await (await warmNotes(warmReq("Bearer s3cret"), () => d)).json();
+    expect(body).toEqual({ planned: 1, done: 1, failed: 0 });
+    expect(d.chat).not.toHaveBeenCalled();
+    expect(JSON.parse((await store.get(key))!).writtenAt).toBe(NOW - 60_000);
+  });
+
   it("a pass whose planning ate the budget starts nothing", async () => {
     vi.stubEnv("CRON_SECRET", "s3cret");
     let t = NOW;
