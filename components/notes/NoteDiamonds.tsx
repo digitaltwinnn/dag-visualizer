@@ -108,9 +108,13 @@ function Diamond({
         // Decoration for the eye: the button's own name already says all of it.
         <div aria-hidden className={cn("absolute bottom-3 z-10 w-max max-w-[240px] pointer-events-none", align)}>
           <div className="rounded-md p-px [background:var(--ai-edge)]">
-            <div className={cn(SCENE_GLASS, "border-0 px-2.5 py-1.5")}>
-              <div className="text-label tracking-caps text-muted-foreground tabular-nums">{date}</div>
-              <div className="text-body leading-snug text-foreground">{day.caption}</div>
+            {/* An opaque ground under the translucent glass, so the sweep stays in the 1px ring and
+                never tints the fill (the card's own rule, NotesCard). */}
+            <div className="rounded-[calc(var(--radius-md)-1px)] bg-background">
+              <div className={cn(SCENE_GLASS, "border-0 px-2.5 py-1.5")}>
+                <div className="text-label tracking-caps text-muted-foreground tabular-nums">{date}</div>
+                <div className="text-body leading-snug text-foreground">{day.caption}</div>
+              </div>
             </div>
           </div>
         </div>

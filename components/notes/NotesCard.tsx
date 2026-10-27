@@ -199,10 +199,12 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
   return (
     <RailPane
       entry={collapsed}
-      // THE IRIDESCENT EDGE: a 1px transparent border with two background layers — the card's own
-      // solid fill clipped to the padding box over the `--ai-edge` sweep clipped to the border box,
-      // so the sweep shows only in the border ring.
-      className="border border-transparent [background:linear-gradient(var(--panel-solid),var(--panel-solid))_padding-box,var(--ai-edge)_border-box]"
+      // THE IRIDESCENT EDGE: a 1px transparent border with three background layers — the card's own
+      // fill and, under it, the opaque page ground, both clipped to the padding box, over the
+      // `--ai-edge` sweep clipped to the border box, so the sweep shows only in the border ring.
+      // The ground is load-bearing: `--panel-solid` is translucent, and without it the sweep tinted
+      // the whole fill (user, 2026-10-27: "I like the outline but fill is too much AI color").
+      className="border border-transparent [background:linear-gradient(var(--panel-solid),var(--panel-solid))_padding-box,linear-gradient(var(--background),var(--background))_padding-box,var(--ai-edge)_border-box]"
     >
       <CardHead
         eyebrow={EYEBROW}
