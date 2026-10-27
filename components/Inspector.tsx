@@ -434,10 +434,10 @@ export default function Inspector() {
   const tickHasFilter = useTickHasFilter();
   // The AI note on screen (the card shares this fetch): its card — the top slot of the lane —
   // stands down when the view's subject has no note (off mainnet none has) or when the server
-  // answered `none` or `unavailable` (R67); while its first answer is read it stands, reading
-  // (`noteCardAbsent`).
+  // answered `none`, or `unavailable` to a read (R67; to the reader's own "Write notes" it stays and
+  // says so, R68); while its first answer is read it stands, reading (`noteCardAbsent`).
   const aiNote = useAiNote();
-  const noteAbsent = noteCardAbsent(aiNote.req != null, aiNote.note.res);
+  const noteAbsent = noteCardAbsent(aiNote.req != null, aiNote.note.res, aiNote.note.via);
   const manifest = detailsCards({
     mode, filter, tickNet, tickHasFilter, inspect, snap, country, cohort, composition, metaSnap, coarse, trendCursorMs, trendRange, trendFocus, trendFront, trendWindow,
     noteAbsent,

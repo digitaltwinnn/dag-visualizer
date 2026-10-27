@@ -95,8 +95,16 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
     // The card stands while its first answer is read (user, 2026-10-27), never popping in late.
     expect(noteCardAbsent(true, null)).toBe(false);
     expect(noteCardAbsent(true, { state: "none" })).toBe(true);
-    // A degraded model never owns the resting box (R67): `unavailable` stands the slot down too.
+    // A degraded model never owns the resting box (R67): `unavailable` answering a READ stands the
+    // slot down too…
     expect(noteCardAbsent(true, { state: "unavailable" })).toBe(true);
+    expect(noteCardAbsent(true, { state: "unavailable" }, "read")).toBe(true);
+    // …but answering the reader's own gesture ("Write notes for this range"), the card stays and
+    // says so, with the door to try again (R68).
+    expect(noteCardAbsent(true, { state: "unavailable" }, "request")).toBe(false);
+    // The gesture keeps nothing else alive: `none` and no request are absent on either path.
+    expect(noteCardAbsent(true, { state: "none" }, "request")).toBe(true);
+    expect(noteCardAbsent(false, { state: "unavailable" }, "request")).toBe(true);
     for (const res of [{ state: "pending" }, { state: "request" }] as const)
       expect(noteCardAbsent(true, res)).toBe(false);
     expect(noteCardAbsent(true, { state: "ok", text: "t", writtenAt: 0, spanFrom: 0, spanTo: 1, days: [] })).toBe(false);

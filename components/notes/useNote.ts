@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import type { NoteVia } from "@/components/railCards";
 import type { NoteResponse } from "@/src/data/noteTypes";
 import { netUrl } from "@/src/net/current";
 import { createNoteLoader, queryOf, type NoteReq } from "./noteLoader";
@@ -20,6 +21,9 @@ const loader = createNoteLoader({
 export interface NoteState {
   /** Null until the first answer (or while `req` is null). */
   res: NoteResponse | null;
+  /** Which path `res` came by: "request" once the reader's gesture has answered (R68: a failed
+   *  write then keeps the card, with the door again), "read" for every GET answer. */
+  via: NoteVia;
   /** Ask for the note to be written; shows `pending` until the answer lands. */
   request: () => void;
 }
@@ -27,12 +31,14 @@ export interface NoteState {
 /** A null `req` skips the fetch entirely, for a surface whose subject is conditional. */
 export default function useNote(req: NoteReq | null): NoteState {
   const key = req ? queryOf(req) : null;
-  const [state, setState] = useState<{ key: string | null; res: NoteResponse | null }>(() => ({
+  const [state, setState] = useState<{ key: string | null; res: NoteResponse | null; via: NoteVia }>(() => ({
     key,
     res: req ? loader.peek(req) : null,
+    via: "read",
   }));
   // The subject changed: show the held answer for it (or nothing) in the same render, never the last one's.
   const res = state.key === key ? state.res : req ? loader.peek(req) : null;
+  const via: NoteVia = state.key === key ? state.via : "read";
 
   const view = req?.view;
   const subject = req?.subject;
@@ -43,10 +49,10 @@ export default function useNote(req: NoteReq | null): NoteState {
     let dead = false;
     // A GET that answers `pending` is a note being written: say so while the loader polls (M3).
     const onPending = () => {
-      if (!dead) setState({ key, res: { state: "pending" } });
+      if (!dead) setState({ key, res: { state: "pending" }, via: "read" });
     };
     void loader.get({ view, subject, span }, onPending).then((r) => {
-      if (!dead) setState({ key, res: r });
+      if (!dead) setState({ key, res: r, via: "read" });
     });
     return () => {
       dead = true;
@@ -55,9 +61,9 @@ export default function useNote(req: NoteReq | null): NoteState {
 
   const request = useCallback(() => {
     if (!view || !subject || key == null) return;
-    setState({ key, res: { state: "pending" } });
-    void loader.request({ view, subject, span }).then((r) => setState((prev) => (prev.key === key ? { key, res: r } : prev)));
+    setState({ key, res: { state: "pending" }, via: "request" });
+    void loader.request({ view, subject, span }).then((r) => setState((prev) => (prev.key === key ? { key, res: r, via: "request" } : prev)));
   }, [key, view, subject, span]);
 
-  return { res, request };
+  return { res, via, request };
 }

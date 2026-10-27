@@ -75,3 +75,20 @@ describe("the notes card's own behaviour", () => {
     expect(body).toMatch(/useNote\(NET === net \? req : null\)/);
   });
 });
+
+describe("a failed write answers the gesture on the card's surface (R68)", () => {
+  it("Inspector states which path the answer came by", () => {
+    expect(read("components/Inspector.tsx")).toMatch(/noteCardAbsent\(aiNote\.req != null, aiNote\.note\.res, aiNote\.note\.via\)/);
+  });
+
+  it("useNote marks the request route's answer as the gesture's, and every GET answer as a read's", () => {
+    const src = read("components/notes/useNote.ts");
+    expect(src).toMatch(/loader\.request\([^]*?via: "request"/);
+    expect(src).toMatch(/loader\.get\([^]*?via: "read"/);
+  });
+
+  it("the card says it could not write, then offers the same door again", () => {
+    const card = read("components/notes/NotesCard.tsx");
+    expect(card).toMatch(/res\.state === "unavailable"[^]*?Couldn&apos;t write notes just now[^]*?<RequestDoor/);
+  });
+});

@@ -147,6 +147,18 @@ function NotableDays({ days }: { days: NoteDay[] }) {
   );
 }
 
+/** The door that asks for an on-request note (the 1H pill, a brushed range): the first ask, and
+ *  the ask again after a write that failed (R68). */
+function RequestDoor({ span, onClick }: { span: string | null | undefined; onClick: () => void }) {
+  return (
+    <div className={DOOR_RUN}>
+      <Door label={<AI_NOTES_ICON aria-hidden className="size-3.5 text-primary" />} onClick={onClick}>
+        {span === "1h" ? "Write notes for this hour" : "Write notes for this range"}
+      </Door>
+    </div>
+  );
+}
+
 export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const { subject, req, note } = useAiNote();
   const trendWindow = useStore((s) => s.trendWindow);
@@ -203,7 +215,7 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
           {/* No answer yet is READING (the manifest's `noteCardAbsent`): the card stands from the
               moment its subject is known. "writing…" is the server's own `pending`, a note being
               written — a GET's as soon as the loader hears it (M3), or a POST's. `none` and
-              `unavailable` never reach here: the slot stands down (R67). */}
+              a read's `unavailable` never reach here: the slot stands down (R67). */}
           {res == null ? (
             <p className="m-0 flex items-center gap-2 text-body text-muted-foreground">
               <NodeStars />
@@ -216,11 +228,14 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
             </p>
           ) : res.state === "request" ? (
             // The on-request kinds (the 1H pill, a brushed range): written only on the reader's ask.
-            <div className={DOOR_RUN}>
-              <Door label={<AI_NOTES_ICON aria-hidden className="size-3.5 text-primary" />} onClick={note.request}>
-                {req.span === "1h" ? "Write notes for this hour" : "Write notes for this range"}
-              </Door>
-            </div>
+            <RequestDoor span={req.span} onClick={note.request} />
+          ) : res.state === "unavailable" ? (
+            // Only the reader's own ask reaches here (a read's `unavailable` stands the slot down,
+            // `noteCardAbsent`): the gesture is answered on the card, with the same door again (R68).
+            <>
+              <p className="m-0 mb-2.5 text-body text-muted-foreground">Couldn&apos;t write notes just now</p>
+              <RequestDoor span={req.span} onClick={note.request} />
+            </>
           ) : res.state === "ok" ? (
             <>
               <p className="m-0 text-body leading-snug text-foreground">{res.text}</p>

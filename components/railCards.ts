@@ -441,17 +441,24 @@ export function parentHolds(s: Pick<RailManifestState, "snap" | "metaSnap" | "co
   return !s.country || !s.cohort || s.country === s.cohort.cc;
 }
 
+/** Which path an AI note's answer came by: a READ (the GET, and its poll) or the reader's REQUEST
+ *  gesture (the POST, and its poll). */
+export type NoteVia = "read" | "request";
+
 /** IS THE AI NOTE ABSENT? — no request (the view's subject has no note), the server's `none`, or
- *  `unavailable` (R67: the notes card is the resting focus in Hypergraph and Geography, so a missing
- *  key, a Gate outage or a cold store's failure hold would otherwise make "unavailable" the first
- *  open box a visitor sees; the loader never caches it, so the next subject change asks again).
+ *  `unavailable` answering a READ (R67: the notes card is the resting focus in Hypergraph and
+ *  Geography, so a missing key, a Gate outage or a cold store's failure hold would otherwise make
+ *  "unavailable" the first open box a visitor sees; the loader never caches it, so the next subject
+ *  change asks again). `unavailable` answering the reader's OWN GESTURE (`via: "request"`, the
+ *  request route after "Write notes for this hour / range") keeps the card, which says so on its
+ *  surface and offers the door again (R68): a click must never be answered by the card vanishing.
  *  A first fetch still in flight is PRESENT, reading (user, 2026-10-27: the card "is missing and
  *  then suddenly appears — it should use the reading animation"; this retires ruling R36). The
  *  flash R36 guarded against was off mainnet, where every subject answers `none`: there
  *  `useAiNote` asks nothing, so there is no request and no card. On mainnet `none` is rare (a
  *  subject with nothing measured), and "writing…" stays the server's own `pending`. */
-export function noteCardAbsent(hasRequest: boolean, res: NoteResponse | null): boolean {
-  return !hasRequest || res?.state === "none" || res?.state === "unavailable";
+export function noteCardAbsent(hasRequest: boolean, res: NoteResponse | null, via: NoteVia = "read"): boolean {
+  return !hasRequest || res?.state === "none" || (res?.state === "unavailable" && via === "read");
 }
 
 export function detailsCards(s: RailManifestState): RailCard[] {
