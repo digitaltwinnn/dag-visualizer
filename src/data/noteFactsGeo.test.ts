@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { geoFacts, type GeoFactsInput } from "@/src/data/noteFactsGeo";
 import { checkNote } from "@/src/data/noteHonesty";
-import type { Fact } from "@/src/data/noteTypes";
+import { pairsOf } from "@/src/data/testkit/notePairs";
 
 const NAMES = { dag: "Constellation", usdc: "USDC.dag", bio: "BioFi" };
 const COUNTRIES = { DE: "Germany", US: "United States", FR: "France", NL: "Netherlands" };
@@ -360,22 +360,6 @@ describe("geoFacts as a gate-passing source", () => {
 });
 
 describe("geoFacts tags each change as a pair (R54)", () => {
-  /** key → [from label, from value, to label, to value]; each key has exactly one of each end. */
-  function pairsOf(facts: readonly Fact[]): Map<string, [string, number, string, number]> {
-    const ends = new Map<string, Partial<Record<"from" | "to", Fact>>>();
-    for (const f of facts) {
-      if (!f.pair) continue;
-      const e = ends.get(f.pair.key) ?? {};
-      expect(e[f.pair.end], `${f.pair.key}: two ${f.pair.end} ends`).toBeUndefined();
-      ends.set(f.pair.key, { ...e, [f.pair.end]: f });
-    }
-    const out = new Map<string, [string, number, string, number]>();
-    for (const [k, { from, to }] of ends) {
-      expect(from && to, `${k}: one end only`).toBeTruthy();
-      out.set(k, [from!.label, from!.value, to!.label, to!.value]);
-    }
-    return out;
-  }
 
   it("keys the fleet, each top country and each top provider, a month ago to now, the standing fact as the now end", () => {
     const geoDays = { "2026-09-27": day(scaled(0.5)), "2026-10-27": day(NOW) };
@@ -448,6 +432,18 @@ describe("geoFacts states ONE figure per quantity: countries and the fleet from 
     expect(one(r, /^United States, share of the fleet's located nodes$/).value).toBeCloseTo(29 / 86);
     expect(one(r, /^United States, rank by nodes$/).value).toBe(2);
     expect(one(r, /^United States, nodes a month ago$/)).toMatchObject({ value: 58, pair: { end: "from" } });
+  });
+
+  it("states no network count in a country above the tiers' count for that country (M4)", () => {
+    // The geo family puts 30 of Constellation's nodes in Germany; the tiers count 25 there.
+    const geoDays = { "2026-10-27": day(NOW) };
+    const ccDays = { "2026-10-27": { ...ccOf(geoDays)["2026-10-27"]!, "f.cc.DE": 25 } };
+    const r = geoFacts(input({ subject: { cc: "DE" }, geoDays, ccDays }))!;
+    expect(one(r, /^Germany, nodes$/).value).toBe(25);
+    expect(find(r, /^Constellation, nodes in Germany$/)).toHaveLength(0);
+    expect(one(r, /^Constellation, share of its nodes in Germany$/).value).toBeCloseTo(30 / 55); // its own reading
+    expect(one(r, /^USDC\.dag, nodes in Germany$/).value).toBe(20);
+    expect(one(r, /^Networks with nodes in Germany$/).value).toBe(2);
   });
 
   it("keeps a network's note on the geo family: the tiers hold no per-network countries", () => {

@@ -72,12 +72,12 @@ function longestGap(gapMax: Points, d: TrendsWindowData): number | null {
   return max;
 }
 
-/** Σ numerator ÷ Σ denominator over the buckets where BOTH were measured and the denominator held
- *  something. Null where no bucket qualifies. */
 /** THE PAIR (R54) of one quantity read usual and recent: the ends' `pair` when BOTH were stated,
  *  else none (a lone end is no change). */
 const ends = (key: string, both: boolean) => (end: FactPair["end"]): FactPair | undefined => (both ? { key, end } : undefined);
 
+/** Σ numerator ÷ Σ denominator over the buckets where BOTH were measured and the denominator held
+ *  something. Null where no bucket qualifies. */
 function pairedSums(num: Points, den: Points, d: TrendsWindowData): { n: number; d: number } | null {
   const a = trimmed(num, d);
   const b = trimmed(den, d);

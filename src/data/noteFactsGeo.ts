@@ -323,7 +323,10 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     );
     facts.push(fact(`Networks with nodes in ${name}${dropped ? ", at least" : ""}`, hosted.length, "count"));
     for (const h of hosted.slice(0, NETWORK_TOP)) {
-      facts.push(fact(`${nameOf(h.id)}, nodes in ${name}`, h.count, "count"));
+      // A network's count there is the geo family's, the country's may be the tiers' (R58): a
+      // network is never stated holding more nodes in it than the country itself (review M4), as
+      // a network's own note never states a share of the fleet above the whole.
+      if (h.count <= here) facts.push(fact(`${nameOf(h.id)}, nodes in ${name}`, h.count, "count"));
       facts.push(fact(`${nameOf(h.id)}, share of its nodes in ${name}`, h.count / h.of, "share"));
     }
     countryChange(subjectCc);

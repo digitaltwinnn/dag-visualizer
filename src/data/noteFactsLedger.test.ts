@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { ledgerFacts, type LedgerFactsInput } from "@/src/data/noteFactsLedger";
 import { checkNote } from "@/src/data/noteHonesty";
 import { formatSeconds } from "@/src/data/trendSeries";
-import type { Fact } from "@/src/data/noteTypes";
+import { pairsOf } from "@/src/data/testkit/notePairs";
 import type { TrendsWindowData } from "@/src/data/trendWindow";
 
 const MIN = 60_000;
@@ -183,22 +183,6 @@ describe("ledgerFacts as a gate-passing source", () => {
 });
 
 describe("ledgerFacts tags each change as a pair (R54)", () => {
-  /** key → [from label, from value, to label, to value]; each key has exactly one of each end. */
-  function pairsOf(facts: readonly Fact[]): Map<string, [string, number, string, number]> {
-    const ends = new Map<string, Partial<Record<"from" | "to", Fact>>>();
-    for (const f of facts) {
-      if (!f.pair) continue;
-      const e = ends.get(f.pair.key) ?? {};
-      expect(e[f.pair.end], `${f.pair.key}: two ${f.pair.end} ends`).toBeUndefined();
-      ends.set(f.pair.key, { ...e, [f.pair.end]: f });
-    }
-    const out = new Map<string, [string, number, string, number]>();
-    for (const [k, { from, to }] of ends) {
-      expect(from && to, `${k}: one end only`).toBeTruthy();
-      out.set(k, [from!.label, from!.value, to!.label, to!.value]);
-    }
-    return out;
-  }
 
   it("keys the usual and the recent reading of each rate, spacing, fee and data figure of the chamber", () => {
     const r = ledgerFacts(input())!;

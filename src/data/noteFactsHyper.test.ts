@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { hyperFacts, type HyperFactsInput } from "@/src/data/noteFactsHyper";
 import { checkNote } from "@/src/data/noteHonesty";
-import type { Fact } from "@/src/data/noteTypes";
+import { pairsOf } from "@/src/data/testkit/notePairs";
 import type { TrendsWindowData } from "@/src/data/trendWindow";
 
 const HOUR = 3_600_000;
@@ -67,23 +67,6 @@ function input(patch: Partial<HyperFactsInput> = {}): HyperFactsInput {
 const find = (r: NonNullable<ReturnType<typeof hyperFacts>>, re: RegExp, kind?: string) =>
   r.facts.filter((f) => re.test(f.label) && (!kind || f.kind === kind));
 
-/** The pairs a facts list tags (R54), by key, as [from label, from value, to label, to value];
- *  each key has exactly one `from` and one `to`. */
-function pairsOf(facts: readonly Fact[]): Map<string, [string, number, string, number]> {
-  const ends = new Map<string, Partial<Record<"from" | "to", Fact>>>();
-  for (const f of facts) {
-    if (!f.pair) continue;
-    const e = ends.get(f.pair.key) ?? {};
-    expect(e[f.pair.end], `${f.pair.key}: two ${f.pair.end} ends`).toBeUndefined();
-    ends.set(f.pair.key, { ...e, [f.pair.end]: f });
-  }
-  const out = new Map<string, [string, number, string, number]>();
-  for (const [k, { from, to }] of ends) {
-    expect(from && to, `${k}: one end only`).toBeTruthy();
-    out.set(k, [from!.label, from!.value, to!.label, to!.value]);
-  }
-  return out;
-}
 
 describe("hyperFacts on all", () => {
   it("counts the networks with nodes: four networks, one without, make three", () => {
