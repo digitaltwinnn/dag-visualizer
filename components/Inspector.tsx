@@ -23,7 +23,7 @@ import HeightEase from "@/components/HeightEase";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { useTouch } from "@/components/useTouch";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { detailsCards, ladderSlotIds, type RailCard } from "@/components/railCards";
+import { detailsCards, ladderSlotIds, noteCardAbsent, type RailCard } from "@/components/railCards";
 import { CHILD_OF, childStep, type SiblingStep } from "@/components/railSiblings";
 import { useSiblingState } from "@/components/useSiblingState";
 import { openRailCard } from "@/components/railOpen";
@@ -431,11 +431,11 @@ export default function Inspector() {
   const trendWindow = useStore((s) => s.trendWindow);
   const tickHasFilter = useTickHasFilter();
   // The AI note on screen (the card shares this fetch): its card stands down when the view's
-  // subject has no note, or the server answered `none`.
+  // subject has no note, while no answer has landed, or when the server answered `none`.
   const aiNote = useAiNote();
   const manifest = detailsCards({
     mode, filter, tickNet, tickHasFilter, inspect, snap, country, cohort, composition, metaSnap, coarse, trendCursorMs, trendRange, trendFocus, trendFront, trendWindow,
-    noteAbsent: aiNote.req == null || aiNote.note.res?.state === "none",
+    noteAbsent: noteCardAbsent(aiNote.req != null, aiNote.note.res),
     selNodesCount: selNodes.length,
     filterLabel: displayNetwork(filter)?.ticker ?? null, // one lookup — catalog + the unlisted pseudo-network
   });

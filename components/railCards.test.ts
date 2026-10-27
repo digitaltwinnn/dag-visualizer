@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { exploreCards, detailsCards, parentHolds, focusSlotId, ladderLevelOfSlot, ladderSlotIds, type RailManifestState } from "@/components/railCards";
+import { exploreCards, detailsCards, noteCardAbsent, parentHolds, focusSlotId, ladderLevelOfSlot, ladderSlotIds, type RailManifestState } from "@/components/railCards";
 import { LADDERS } from "@/src/engine/domain/focusLadder";
 import type { PickDescriptor } from "@/src/data/types";
 
@@ -78,6 +78,15 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
   it("an absent note (no subject, or `none`) stands the AI notes card down", () => {
     const notes = detailsCards(details({ mode: "hyper", noteAbsent: true })).find((c) => c.id === "notes")!;
     expect(notes.present).toBe(false);
+  });
+  it("the AI note is absent with no request, no answer yet, or `none` (ruling R36)", () => {
+    expect(noteCardAbsent(false, { state: "pending" })).toBe(true);
+    // A first fetch in flight is no card — never a false "writing…" that flashes and pulses the tray.
+    expect(noteCardAbsent(true, null)).toBe(true);
+    expect(noteCardAbsent(true, { state: "none" })).toBe(true);
+    for (const res of [{ state: "pending" }, { state: "unavailable" }, { state: "request" }] as const)
+      expect(noteCardAbsent(true, res)).toBe(false);
+    expect(noteCardAbsent(true, { state: "ok", text: "t", writtenAt: 0, spanFrom: 0, spanTo: 1, days: [] })).toBe(false);
   });
   it("the placeholder hosts no AI notes card", () => {
     expect(detailsCards(details({ mode: "soon", noteAbsent: undefined })).some((c) => c.id === "notes")).toBe(false);

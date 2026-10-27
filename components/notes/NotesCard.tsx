@@ -3,8 +3,8 @@
 import { useEffect, useRef } from "react";
 
 import CardHead, { RailPane } from "@/components/CardHead";
-import { AI_NOTES_ICON } from "@/components/icons";
-import { Fact, FactGroup, SectionLabel } from "@/components/inspector/parts";
+import { AI_NOTES_ICON, KIND_MARK_CLASS } from "@/components/icons";
+import { Door, Fact, FactGroup, SectionLabel } from "@/components/inspector/parts";
 import { metagraphCardNetwork } from "@/components/railCards";
 import { NodeStars } from "@/components/state/StateAtoms";
 import Stamp from "@/components/Stamp";
@@ -84,19 +84,10 @@ function spanWords(fromMs: number, toMs: number): string {
   return toMs - fromMs >= 2 * DAY_MS ? rangeDays(fromMs, toMs) : ageWords(toMs - fromMs);
 }
 
-// THE CARD'S ROWS ARE DOORS (`parts.tsx` Door's recipe — the full-bleed row on the wash ladder
-// every control in a card wears), stated here because a notable day's row needs what the Door does
-// not carry: the hover pair, a lit state, and a readable figure on its right. The last row sits on
-// the card's bottom edge and picks up its inner radius (RecordsDoor's foot geometry).
-const ROW = cn(
-  "flex w-[calc(100%+2*var(--card-pad))] items-center gap-2.5 -mx-[var(--card-pad)] px-[var(--card-pad)] py-2 touch:min-h-11",
-  "border-t border-wash-strong text-left text-body text-foreground cursor-pointer last:rounded-b-[calc(var(--radius)-1px)]",
-  "hover:[background:light-dark(var(--wash-hover),var(--wash-soft))]",
-  "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
-);
-const ROW_REST = "[background:light-dark(var(--wash-soft),var(--wash-faint))]";
-// LIT is the hover wash, held: the timeline's day mark (or this row) hovers the same day.
-const ROW_LIT = "[background:light-dark(var(--wash-hover),var(--wash-soft))]";
+// THE CARD'S CONTROLS ARE DOORS (`parts.tsx` — the one way a card draws a way out, with the
+// per-ground wash the user ruled). They sit flush on the card's bottom edge (RecordsDoor's foot
+// geometry): the run bleeds by the card's padding below, and its last door takes the inner radius.
+const DOOR_RUN = "-mb-[var(--card-pad)] [&>:last-child]:rounded-b-[calc(var(--radius)-1px)]";
 
 /** One notable day: the caption, and its UTC day. Hover previews the day (`hoverNoteDay`), a
  *  click commits it as History's range. */
@@ -122,18 +113,18 @@ function DayRow({ day }: { day: NoteDay }) {
     useStore.getState().setHoverNoteDay(null);
   };
   return (
-    <button
-      type="button"
-      className={cn(ROW, lit ? ROW_LIT : ROW_REST)}
-      onMouseEnter={on}
-      onMouseLeave={off}
+    <Door
+      lit={lit}
+      wrap
+      figure={rangeDays(day.dayMs, day.dayMs + DAY_MS)}
+      onPointerEnter={on}
+      onPointerLeave={off}
       onFocus={on}
       onBlur={off}
       onClick={() => useStore.getState().setTrendRange({ fromMs: day.dayMs, toMs: day.dayMs + DAY_MS })}
     >
-      <span className="min-w-0 flex-1">{day.caption}</span>
-      <span className="flex-none text-muted-foreground tabular-nums">{rangeDays(day.dayMs, day.dayMs + DAY_MS)}</span>
-    </button>
+      {day.caption}
+    </Door>
   );
 }
 
@@ -166,7 +157,7 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
         eyebrow={EYEBROW}
         title={
           <span className="inline-flex min-w-0 items-center gap-2">
-            <AI_NOTES_ICON aria-hidden className="size-4 flex-none text-[var(--filter-accent,var(--primary))]" />
+            <AI_NOTES_ICON aria-hidden className={cn(KIND_MARK_CLASS, "text-[var(--filter-accent,var(--primary))]")} />
             <span className="truncate">{title}</span>
           </span>
         }
@@ -178,7 +169,9 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
       />
       {!collapsed && (
         <div>
-          {res == null || res.state === "pending" ? (
+          {/* No answer yet is no card (the manifest's `noteCardAbsent`, ruling R36): "writing…" is
+              the server's own `pending`, never a first fetch still in flight. */}
+          {res == null ? null : res.state === "pending" ? (
             <p className="m-0 flex items-center gap-2 text-body text-muted-foreground">
               <NodeStars />
               writing…
@@ -187,11 +180,10 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
             <p className="m-0 text-body text-muted-foreground">Notes unavailable — try again later</p>
           ) : res.state === "request" ? (
             // The on-request kinds (the 1H pill, a brushed range): written only on the reader's ask.
-            <div className="-mb-[var(--card-pad)]">
-              <button type="button" onClick={note.request} className={cn(ROW, ROW_REST)}>
-                <AI_NOTES_ICON aria-hidden className="size-3.5 flex-none text-primary" />
+            <div className={DOOR_RUN}>
+              <Door label={<AI_NOTES_ICON aria-hidden className="size-3.5 text-primary" />} onClick={note.request}>
                 {req.span === "1h" ? "Write notes for this hour" : "Write notes for this range"}
-              </button>
+              </Door>
             </div>
           ) : res.state === "ok" ? (
             <>
@@ -205,9 +197,11 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
               {res.days.length > 0 && (
                 <>
                   <SectionLabel label="Notable days" className="mt-3 mb-1.5" />
-                  <div className="-mb-[var(--card-pad)]">
+                  <div className={DOOR_RUN}>
+                    {/* Not keyed by day alone: one day can be two notables (a network's low and its
+                        pause; two networks' first day on the DAG). */}
                     {res.days.map((d) => (
-                      <DayRow key={d.dayMs} day={d} />
+                      <DayRow key={`${d.dayMs}:${d.kind}:${d.networkId ?? ""}`} day={d} />
                     ))}
                   </div>
                 </>

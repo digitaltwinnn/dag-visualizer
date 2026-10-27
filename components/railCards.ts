@@ -8,6 +8,7 @@ import { hoverKeyOf } from "@/src/data/hoverSubject";
 import type { Mode } from "@/src/store/store";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
+import type { NoteResponse } from "@/src/data/noteTypes";
 // LADDERS is plain DATA (the domain focus-ladder rung tables) — importing it keeps this module
 // data-only; CohortSel rides along type-only (the store mirrors the same import).
 import { type FocusLevel, type CohortSel, type CompositionSel } from "@/src/engine/domain/focusLadder";
@@ -411,6 +412,15 @@ export function metagraphCardNetwork(s: {
 export function parentHolds(s: Pick<RailManifestState, "snap" | "metaSnap" | "country" | "cohort">, child: "metaSnap" | "cohort"): boolean {
   if (child === "metaSnap") return !s.snap || !s.metaSnap || s.snap.data.ordinal === s.metaSnap.globalOrdinal;
   return !s.country || !s.cohort || s.country === s.cohort.cc;
+}
+
+/** IS THE AI NOTE ABSENT? (ruling R36) — no request (the view's subject has no note), no answer
+ *  yet, or the server's `none`. A first fetch still in flight is ABSENT, not "writing…": off
+ *  mainnet every subject answers `none`, and a card mounted for the wait would flash in and out and
+ *  pulse the dock tray (a newly present card is an update) on every uncached subject change.
+ *  "writing…" is the server's own `pending`, a note genuinely being written. */
+export function noteCardAbsent(hasRequest: boolean, res: NoteResponse | null): boolean {
+  return !hasRequest || res == null || res.state === "none";
 }
 
 export function detailsCards(s: RailManifestState): RailCard[] {
