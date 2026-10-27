@@ -32,10 +32,10 @@ gate after the spike and again after a few days of real running.
 
    | View | Its question | Nothing selected | A network selected | Finer rung | Facts from | Refreshed |
    |---|---|---|---|---|---|---|
-   | **Hypergraph** | who / what | **The hypergraph today** — the digest (#5): how many networks, which are active or quiet, the biggest by nodes and by activity, anything that started or stopped | **Who this network is** — its catalog `blurb` in one clause, its shape (L0 / currency L1 / data L1 node counts), how it ranks among the networks | a node → its network's note | `/api/metagraphs` (structure, node lists), `/api/trends` (activity level) | daily, plus when the network set changes |
-   | **Geography** | where | **Where the network runs** — how many countries and providers, how concentrated (the top countries' and top provider's shares), the decentralisation picture in plain words | **That network's footprint** — its countries and providers, and how concentrated it is against the whole | **a country → what that country hosts** (which networks, which providers, its share); a cohort → its network's note | `/api/metagraphs` + `/api/geo` (the geolocated node set) | daily (nodes move rarely) |
-   | **Snapshots** | when (live) | **The anchoring rhythm** — the global snapshot cadence lately, how many networks each one typically carries, fee and data volume, quiet or busy against the usual | **That network's rhythm** — how regularly it anchors, its longest gaps, its share of the global snapshots it was part of | a snapshot → its network's note | `/api/trends` 5m / 1h tiers (the last hours) | hourly |
-   | **History** | how it changed | **What changed** for the window pill, subject = the Range card's (below) | the same, for that network's plane | — | `/api/trends` | per pill: 24H hourly, the rest daily |
+   | **Hypergraph** | who / what | **The hypergraph today** — the digest (#5): how many networks, which are active or quiet, the biggest by nodes and by activity, anything that started or stopped, how the node count moved | **Who this network is** — its catalog `blurb` in one clause, its shape (how many nodes run L0 / currency L1 / data L1, and which combinations), how that moved lately, how it ranks among the networks | a node → its network's note | live: `/api/metagraphs`. Stored: the **fleet** series `f.nodes`, `f.nodes.<id>`, `f.layer.<id>.<layer>`, `f.type.<id>.<combo>`; activity rank from `m.<id>.ticks` | daily, plus when the network set changes |
+   | **Geography** | where | **Where the network runs** — how many countries and providers, which ones carry the most nodes, the range of hosts | **That network's footprint** — its countries and providers, against the whole fleet | **a country → what that country hosts** (which networks, which providers, its share); a cohort → its network's note | live: `/api/metagraphs` + `/api/geo`. Stored: **no location history exists** (see *Geography has no past yet*); `f.nodes.<id>` may give a node count's movement as context | daily (nodes move rarely) |
+   | **Snapshots** | when (live) | **The anchoring rhythm** — the global snapshot pace lately, how many networks each one carries, fee and data volume, quiet or busy against the usual | **That network's rhythm** — how regularly it anchors, its longest gaps, its share of the global snapshots it was part of | a snapshot → its network's note | Stored, 5m / 1h tiers, last hours against the last week: `g.ticks`, `g.anchors`, `g.gapSum`/`g.gapMax` (global spacing), `g.feeFloor`/`g.kbFloor`; per network `m.<id>.ticks`, `.snaps`, `.gapSum`/`.gapMax`, `.fee`, `.kb` | hourly |
+   | **History** | how it changed | **What changed** for the window pill, subject = the Range card's (below) | the same, for that network's plane | — | Stored: every measure History charts | per pill: 24H hourly, the rest daily |
 
    The **live** views' notes describe recent hours, not this instant: a note is written ahead and
    cached, so "right now" belongs to the measured cards beside it, never to the AI card. Each
@@ -112,6 +112,44 @@ gate after the spike and again after a few days of real running.
 - **Write-on-request path** (brushed ranges only): a POST route, behind a **per-visitor rate limit**
   and a **global daily cap**, both counted in Redis, because Gate's own spend caps are Pro-only.
   Ranges are snapped to whole buckets before keying, so the same brush hits the same cache entry.
+
+### The voice: the About copy's rules are the prompt's rules
+
+The /about page and the command bar's About row (`components/aboutCopy.ts`) say what each view lets
+you find out; an AI note says what that view shows *today*. The two are complementary and must
+sound like one product, so **every prompt carries the rules `aboutCopy.ts` already records**, as a
+shared voice block, and the honesty gate's sibling checks what can be checked mechanically:
+
+- **Vocabulary**: nodes, never machines; snapshots and global snapshots, never ticks; networks and
+  metagraphs; the base ledger; L0 / currency L1 / data L1 are *layers*; "anchoring" is the verb; a
+  network "was part of" global snapshots; never "L1 snapshots"; never "feeless".
+- **Geography stays off decentralisation entirely** (user, 2026-08-12): not the word, not a grade
+  of concentration as good or bad, not a hedged version of the claim. Shares and counts, plainly.
+- **True rows, false picture**: an outlier (four nodes on consumer ISPs among 160) is never the
+  headline. Lead with what carries the weight.
+- **No causes, no purpose read from numbers**: "it does not show what a network is built to do"
+  (user). Say what moved, never why, never what it means for the business.
+- **Plain sentences, no em-dash clause** (user: "the – text that AI often uses"). Checked
+  mechanically: a note containing a dash clause fails the gate like a bad number.
+- **No meta-commentary, no narrating the screen**: the reader is looking at it.
+- **Short**: two or three sentences; the About strip's own length discipline applies.
+
+**/about gains one short paragraph** on the AI notes, in the page's human voice (user,
+2026-09-04: "this doc is for humans to read, not a technical brief"): what they are, that a model writes them from the measured data, that
+a number it cannot back is thrown away, and that they are marked as AI wherever they appear.
+
+### Gauges and outages
+
+The fleet series are gauges sampled every 15 minutes, and a sampler or cluster outage reads as a
+low count (30 days of `f.nodes` run 177 → 90 with a minimum of 32). A facts builder must not hand
+the model an outage as "nodes left": it reads a gauge's level from covered buckets only (the same
+coverage History's own reading uses), and states a drop only when it holds across the span's end.
+
+### Geography has no past yet
+
+Every other view has stored history to compare against; Geography does not. The sampler stores how
+many nodes each network runs (`f.nodes.<id>`), never where. So Geography's notes are present tense
+(where the nodes are now), with node-count movement as the only change they can state.
 
 ### Facts, not buckets
 
