@@ -396,23 +396,24 @@ describe("hyperFacts on a network: the change of shape", () => {
     }
   });
 
-  it("states a layer end that splits evenly as a whole count, an observed sample (R52)", () => {
+  it("states a layer end that splits evenly as a whole count, the more recent observed sample (R52, R55)", () => {
     // The node count holds at 5 while the closing six hours read dL1 at 4, 4, 4, 5, 5, 5 (a
-    // median of 4.5): stated as 4.
+    // median of 4.5): stated as 5, the level it read last.
     const r = hyperFacts(
       input({ subject: "dor", fleet: dor({ "f.layer.dor.dl1": row(N, (i) => (i < N / 2 ? 3 : i < N - 3 ? 4 : 5)) }) }),
     )!;
     const [end] = find(r, /^Dor nodes on the dL1 layer at the end of the span$/);
-    expect(end!.value).toBe(4);
+    expect(end!.value).toBe(5);
     for (const f of r.facts.filter((x) => x.kind === "count" && / nodes/.test(x.label))) expect(Number.isInteger(f.value), f.label).toBe(true);
   });
 
   it("reads the start only from the span's opening samples, never from an outage hour mid-span (M1)", () => {
-    // The opening six hours read 2, 3, 4, 6, 7, 8: only one of them agrees with their level, 4.
-    // Hour 600 is a partial outage that happens to read 4, with one L0 node: never "the start of
+    // The opening six hours read 2, 3, 4, 6, 7, 8: only one of them agrees with their level, 6
+    // (the more recent middle, R55).
+    // Hour 600 is a partial outage that happens to read 6, with one L0 node: never "the start of
     // the span", so no shape is stated at all.
     const opening = [2, 3, 4, 6, 7, 8];
-    const nodes = (i: number) => (i < 6 ? opening[i]! : i === 600 ? 4 : 5);
+    const nodes = (i: number) => (i < 6 ? opening[i]! : i === 600 ? 6 : 5);
     const r = hyperFacts(
       input({
         subject: "dor",

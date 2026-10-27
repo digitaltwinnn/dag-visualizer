@@ -47,9 +47,9 @@ import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 //     failed cluster fetch drops a role's row while `f.nodes.<id>` HOLDS (the lists merge by IP, so
 //     a hybrid is still counted through its other layer). So each layer and combination is a HELD
 //     LEVEL at each end, read exactly where `gaugeChange` reads the node count: the MEDIAN (an
-//     observed sample, R52 — never a half node) over the
-//     gauge's first (start) / last (end) six measured samples, of those whose `f.nodes.<id>` is
-//     within 10% of the gauge's level at that end — one bad hour can neither make nor hide a
+//     observed sample, never a half node: R52, the more recent middle on an even count: R55) over
+//     the gauge's first (start) / last (end) six measured samples, of those whose `f.nodes.<id>`
+//     is within 10% of the gauge's level at that end — one bad hour can neither make nor hide a
 //     change, and the start never wanders mid-span. Fewer than three agreeing samples at either
 //     end, or no change of node count to read (null, late start, either level 0): no shape facts
 //     at all. At a sample a role with no row is a measured 0, unless the sample recorded no role
@@ -298,8 +298,8 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
       const endAt = measured.slice(-SHAPE_SAMPLES).filter((i) => agrees(i, ch.to));
       if (startAt.length >= SHAPE_MIN_SAMPLES && endAt.length >= SHAPE_MIN_SAMPLES && startAt[startAt.length - 1]! < endAt[0]!) {
         /** The observed median (`observedLevel`, R52: a whole count) of a reading over an end's
-         *  samples, the unread (null) ones left out; null
-         *  when fewer than SHAPE_MIN_SAMPLES were read. */
+         *  samples, the unread (null) ones left out; null when fewer than SHAPE_MIN_SAMPLES were
+         *  read. */
         const held = (at: readonly number[], read: (i: number) => number | null): number | null => {
           const xs = at.map(read).filter((v): v is number => v != null);
           return xs.length >= SHAPE_MIN_SAMPLES ? observedLevel(xs) : null;

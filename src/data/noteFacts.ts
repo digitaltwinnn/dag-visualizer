@@ -79,15 +79,25 @@ function median(xs: readonly number[]): number {
   return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2;
 }
 
-/** A LEVEL IS AN OBSERVED SAMPLE (ruling R52): the median of `xs` (non-empty), but with an even
- *  count the LOWER of the two middle values rather than their mean — so a held node count is
- *  always a reading the sampler made, and a note can never say "17.5 nodes". Every level a builder
- *  STATES goes through this (`heldLevel`, `gaugeChange`'s ends, Hypergraph's layer and combination
- *  ends); a median used only as a tolerance check (the hold test below, geo's day totals) is not
- *  a stated level and stays the plain median. */
+/** A LEVEL IS AN OBSERVED SAMPLE (ruling R52): the median of `xs` (non-empty, in SAMPLE ORDER),
+ *  but on an even count one of the two middle values rather than their mean, so a held node count
+ *  is always a reading the sampler made and a note can never say "17.5 nodes".
+ *
+ *  WHICH MIDDLE (R55): the one read MORE RECENTLY, i.e. the value whose last sample comes later.
+ *  An even split is a gauge caught between two levels, and the newer one is where it stands now:
+ *  0, 0, 0, 5, 5, 5 is a network that has just come up with 5 nodes and reads 5 ("with nodes",
+ *  ranked, in `setKey`); 5, 5, 5, 0, 0, 0 has just gone down and reads 0. The lower middle (R52's
+ *  first rule) read the first as 0, keeping it out of every count for hours after it came up.
+ *
+ *  Every level a builder STATES goes through this (`heldLevel`, `gaugeChange`'s ends, Hypergraph's
+ *  layer and combination ends); a median used only as a tolerance check (the hold test below,
+ *  geo's day totals) is not a stated level and stays the plain median. */
 export function observedLevel(xs: readonly number[]): number {
   const s = xs.slice().sort((a, b) => a - b);
-  return s[(s.length - 1) >> 1]!;
+  if (s.length % 2) return s[s.length >> 1]!;
+  const lo = s[s.length / 2 - 1]!;
+  const hi = s[s.length / 2]!;
+  return xs.lastIndexOf(hi) > xs.lastIndexOf(lo) ? hi : lo;
 }
 
 /** Samples a level is read from at either end, and the fewest a gauge needs to be read at all. */
@@ -96,22 +106,24 @@ const MIN_SAMPLES = 12;
 /** The end level must also hold over the final quarter of the span, within this fraction. */
 const HOLD_TOLERANCE = 0.1;
 
-/** A GAUGE'S CURRENT LEVEL: the median (`observedLevel`, R52) of its last six MEASURED samples (`gaugeChange`'s own `to`),
- *  so one bad hour — a failed fetch stored as 0 or a partial low count — never becomes "now". Null
- *  when the gauge has no measured sample; with fewer than six it is the median of those it has. */
+/** A GAUGE'S CURRENT LEVEL: the median (`observedLevel`, R52) of its last six MEASURED samples
+ *  (`gaugeChange`'s own `to`), so one bad hour — a failed fetch stored as 0 or a partial low count —
+ *  never becomes "now". Null when the gauge has no measured sample; with fewer than six it is the
+ *  median of those it has. */
 export function heldLevel(points: readonly (number | null)[]): number | null {
   const xs = points.filter((v): v is number => v != null);
   return xs.length ? observedLevel(xs.slice(-LEVEL_SAMPLES)) : null;
 }
 
 /** WHAT A GAUGE DID OVER A SPAN: the level at the start and at the end, each the MEDIAN of the
- *  first / last six measured samples, an observed one (`observedLevel`, R52). A median reads through an outage (an interior run of low
- *  samples never touches either end) and through a one-sample spike. The end level is stated only
- *  if it HOLDS: the median of the final quarter of the samples must sit within 10% of it, else
- *  the span ended mid-move and no honest "to" exists. Null samples are not measured and are left
- *  out; fewer than 12 measured samples is too few to call a level. `firstIndex` is where the first
- *  measured sample sits in `points`: a gauge that began late (the fleet's series starts the day the
- *  sampler first ran) has a `from` that is not the span's start, and the caller decides. */
+ *  first / last six measured samples, an observed one (`observedLevel`, R52). A median reads
+ *  through an outage (an interior run of low samples never touches either end) and through a
+ *  one-sample spike. The end level is stated only if it HOLDS: the median of the final quarter of
+ *  the samples must sit within 10% of it, else the span ended mid-move and no honest "to" exists.
+ *  Null samples are not measured and are left out; fewer than 12 measured samples is too few to
+ *  call a level. `firstIndex` is where the first measured sample sits in `points`: a gauge that
+ *  began late (the fleet's series starts the day the sampler first ran) has a `from` that is not
+ *  the span's start, and the caller decides. */
 export function gaugeChange(points: readonly (number | null)[]): { from: number; to: number; firstIndex: number } | null {
   const xs = points.filter((v): v is number => v != null);
   if (xs.length < MIN_SAMPLES) return null;
