@@ -156,10 +156,85 @@ describe("notableDays: first and last", () => {
   });
 });
 
+describe("notableDays: a series' own level", () => {
+  const steady = (n: number, from: number, to: number) => Array.from({ length: n }, (_, i): number => (i >= from && i <= to ? 50 : 0));
+
+  it("a network waking mid-window with steady activity yields its first and no high", () => {
+    for (const [n, wake] of [[30, 10], [60, 30]] as const) {
+      const { days, covered } = span(n);
+      const out = notableDays({ days, covered, series: { "m.a.snaps": steady(n, wake, n - 1) }, subject: "a", ids: ["a"], cap: 9 });
+      expect(out.map((d) => [d.kind, d.dayMs])).toEqual([["first", days[wake]]]);
+    }
+  });
+
+  it("a network that stops yields its last and no lows after it", () => {
+    const { days, covered } = span(30);
+    const out = notableDays({ days, covered, series: { "m.a.snaps": steady(30, 0, 19) }, subject: "a", ids: ["a"], cap: 9 });
+    expect(out.map((d) => [d.kind, d.dayMs])).toEqual([["last", days[19]]]);
+  });
+
+  it("a dip while the network is still running is still a low", () => {
+    const { days, covered } = span(30);
+    const snaps = steady(30, 0, 29);
+    snaps[20] = 5;
+    const out = notableDays({ days, covered, series: { "m.a.snaps": snaps }, subject: "a", ids: ["a"], cap: 9 });
+    expect(out.map((d) => d.kind)).toEqual(["low"]);
+  });
+});
+
+describe("notableDays: lead-in (from)", () => {
+  it("a spike on day 34 against a flat lead-in is a high that a 7-day window alone could never see", () => {
+    const { days, covered } = span(37);
+    const series = { "g.anchors": flat(37, 100, { 34: 250 }) };
+    const out = notableDays({ days, covered, series, subject: "dag", ids: [], cap: 5, from: 30 });
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ dayMs: days[34], kind: "high", value: 250, level: 100 });
+    const alone = notableDays({ days: days.slice(30), covered: covered.slice(30), series: { "g.anchors": flat(7, 100, { 4: 250 }) }, subject: "dag", ids: [], cap: 5 });
+    expect(alone).toEqual([]);
+  });
+
+  it("a network active in the lead-in, quiet at the window's start and then active again resumed: no first", () => {
+    const { days, covered } = span(40);
+    const snaps = Array.from({ length: 40 }, (_, i) => (i < 10 || i >= 34 ? 40 : 0)); // quiet 10..33
+    const out = notableDays({ days, covered, series: { "g.anchors": flat(40, 100), "m.a.snaps": snaps }, subject: "dag", ids: ["a"], cap: 5, from: 30 });
+    expect(out).toEqual([]);
+  });
+
+  it("a network whose first activity is inside the reportable window still begins there", () => {
+    const { days, covered } = span(40);
+    const snaps = Array.from({ length: 40 }, (_, i) => (i >= 35 ? 40 : 0));
+    const out = notableDays({ days, covered, series: { "g.anchors": flat(40, 100), "m.a.snaps": snaps }, subject: "dag", ids: ["a"], cap: 5, from: 30 });
+    expect(out.map((d) => [d.kind, d.dayMs])).toEqual([["first", days[35]]]);
+  });
+
+  it("a last in the lead-in is not reported", () => {
+    const { days, covered } = span(40);
+    const snaps = Array.from({ length: 40 }, (_, i) => (i <= 20 ? 40 : 0));
+    const out = notableDays({ days, covered, series: { "g.anchors": flat(40, 100), "m.a.snaps": snaps }, subject: "dag", ids: ["a"], cap: 5, from: 30 });
+    expect(out).toEqual([]);
+  });
+
+  it("nothing is ever reported for a day before from, and the lead-in still feeds the pause median", () => {
+    const { days, covered } = span(60);
+    const series = {
+      "g.anchors": flat(60, 100, { 12: 400, 20: 5, 45: 300 }),
+      "m.a.snaps": Array.from({ length: 60 }, (_, i) => (i >= 10 && i <= 40 ? 30 : 0)),
+      "m.a.gapMax": flat(60, 800, { 15: 9000, 50: 9000 }),
+    };
+    for (const subject of ["dag", "a"]) {
+      const out = notableDays({ days, covered, series, subject, ids: ["a"], cap: 99, from: 30 });
+      expect(out.length).toBeGreaterThan(0);
+      expect(out.every((d) => d.dayMs >= days[30]!)).toBe(true);
+    }
+    const pause = notableDays({ days, covered, series, subject: "a", ids: ["a"], cap: 99, from: 30 }).filter((d) => d.kind === "pause");
+    expect(pause.map((d) => d.dayMs)).toEqual([days[50]]);
+  });
+});
+
 describe("notableDays: whose days", () => {
   it("a network subject carries its own first/last/high/low/pause, and the DAG's total is left out", () => {
     const { days, covered } = span(40);
-    const snaps: number[] = Array.from({ length: 40 }, (_, i) => (i < 3 ? 0 : 50));
+    const snaps: number[] = Array.from({ length: 40 }, (_, i) => (i < 5 ? 0 : 50));
     snaps[25] = 400;
     const series = { "g.anchors": flat(40, 100, { 30: 900 }), "m.a.snaps": snaps };
     const out = notableDays({ days, covered, series, subject: "a", ids: ["a", "b"], cap: 9 });

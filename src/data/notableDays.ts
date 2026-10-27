@@ -11,6 +11,10 @@ import type { NotableDay } from "@/src/data/noteTypes";
 //     (`app/api/trends/assemble.ts`: covered + absent counter → 0, "the sampler looked, nothing was
 //     there"), and `withUnlisted` folds with the same `?? 0`. So `null` in a covered slot is read
 //     as 0 here, exactly as the charts read it;
+//   · a series' LEVEL is its own: built only from days at or after its first activity, and no high
+//     or low is read after its last — a network waking up or going quiet is a `first` / `last`,
+//     not a run of spikes and dips against a baseline of its own silence;
+//   · LEAD-IN (`from`): days before the first reportable one feed the levels but are never reported;
 //   · a gap of 0 seconds is NOT a measurement: `gapMax` is 0 on a day the chain sealed nothing, and
 //     a median that counted those would sink to 0 and make every ordinary gap a "pause". The pause
 //     level is the median of the covered days that HAD a widest gap.
@@ -47,6 +51,11 @@ export interface NotableInput {
   /** Every network id — the DAG subject reads each one's first and last day. */
   ids: readonly string[];
   cap: number;
+  /** Index into `days` of the first REPORTABLE day (default 0). Earlier days are lead-in: they feed
+   *  levels, the quiet-day counts and the pause median, but are never reported. A `first` is
+   *  reported only when the series' first activity in the WHOLE input falls at or after `from`
+   *  (otherwise the network resumed, it did not begin); a `last` only when its day does. */
+  from?: number;
 }
 
 function median(xs: number[]): number {
@@ -61,6 +70,20 @@ function reading(row: readonly (number | null)[], covered: readonly (number | nu
   return covered[i] == null ? null : row[i] ?? 0;
 }
 
+/** A series' first and last day with activity (> 0 on a covered day), over the whole input
+ *  (lead-in included), or null when it never reads above 0. */
+function activity(row: readonly (number | null)[], input: NotableInput): { first: number; last: number } | null {
+  let first = -1;
+  let last = -1;
+  for (let i = 0; i < input.days.length; i++) {
+    if ((reading(row, input.covered, i) ?? 0) > 0) {
+      if (first < 0) first = i;
+      last = i;
+    }
+  }
+  return first < 0 ? null : { first, last };
+}
+
 /** |ln(value / level)|, with the value floored at 1 so a day that read 0 scores finitely (a count
  *  is an integer; ln(0) would rank every dropout above every real spike). */
 const scoreOf = (value: number, level: number): number => Math.abs(Math.log(Math.max(value, 1) / level));
@@ -72,11 +95,16 @@ function highLow(
   out: NotableDay[],
 ): void {
   const { days, covered } = input;
-  for (let i = 0; i < days.length; i++) {
+  const act = activity(row, input);
+  if (!act) return;
+  // THE SERIES' OWN LEVEL: only days from its first activity on are its history (a network
+  // waking up must not read its own quiet lead-in as a baseline), and nothing after its last
+  // activity is a low — the quiet tail is the `last`'s business, not a run of lows.
+  for (let i = Math.max(act.first, input.from ?? 0); i <= act.last; i++) {
     const value = reading(row, covered, i);
     if (value == null) continue;
     const before: number[] = [];
-    for (let j = i - 1; j >= 0 && before.length < LEVEL_DAYS; j--) {
+    for (let j = i - 1; j >= act.first && before.length < LEVEL_DAYS; j--) {
       const v = reading(row, covered, j);
       if (v != null) before.push(v);
     }
@@ -90,26 +118,22 @@ function highLow(
 
 function firstLast(row: readonly (number | null)[], input: NotableInput, networkId: string, out: NotableDay[]): void {
   const { days, covered } = input;
-  let first = -1;
-  let last = -1;
-  for (let i = 0; i < days.length; i++) {
-    if ((reading(row, covered, i) ?? 0) > 0) {
-      if (first < 0) first = i;
-      last = i;
-    }
-  }
-  if (first < 0) return;
-  const coveredIn = (from: number, to: number): number => {
+  const act = activity(row, input);
+  if (!act) return;
+  const from = input.from ?? 0;
+  const coveredIn = (lo: number, hi: number): number => {
     let n = 0;
-    for (let i = from; i < to; i++) if (covered[i] != null) n++;
+    for (let i = lo; i < hi; i++) if (covered[i] != null) n++;
     return n;
   };
-  // Every covered day before the first activity read 0, by definition of "first".
-  if (coveredIn(0, first) >= QUIET_DAYS) {
-    out.push({ dayMs: days[first]!, kind: "first", networkId, value: reading(row, covered, first)!, level: 0, score: Infinity });
+  // Every covered day before the first activity read 0, by definition of "first". The count
+  // spans the lead-in too; a first activity inside the lead-in is a network that was already
+  // running when the window began, so it has no beginning to report.
+  if (act.first >= from && coveredIn(0, act.first) >= QUIET_DAYS) {
+    out.push({ dayMs: days[act.first]!, kind: "first", networkId, value: reading(row, covered, act.first)!, level: 0, score: Infinity });
   }
-  if (coveredIn(last + 1, days.length) >= QUIET_DAYS) {
-    out.push({ dayMs: days[last]!, kind: "last", networkId, value: reading(row, covered, last)!, level: 0, score: Infinity });
+  if (act.last >= from && coveredIn(act.last + 1, days.length) >= QUIET_DAYS) {
+    out.push({ dayMs: days[act.last]!, kind: "last", networkId, value: reading(row, covered, act.last)!, level: 0, score: Infinity });
   }
 }
 
@@ -122,7 +146,7 @@ function pauses(gap: readonly (number | null)[], input: NotableInput, networkId:
   }
   if (!had.length) return;
   const level = median(had);
-  for (let i = 0; i < days.length; i++) {
+  for (let i = Math.max(0, input.from ?? 0); i < days.length; i++) {
     const value = reading(gap, covered, i);
     if (value != null && value >= PAUSE_FLOOR_S && value >= PAUSE_RATIO * level) {
       out.push({ dayMs: days[i]!, kind: "pause", networkId, value, level, score: scoreOf(value, level) });
