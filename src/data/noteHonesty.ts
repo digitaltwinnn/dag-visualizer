@@ -11,13 +11,16 @@ import type { Fact } from "@/src/data/noteTypes";
 // WHAT IT CHECKS, in the order the code does it:
 //   · numeric tokens (12,159 · 12.2K · 1.5M · 37% · 2.5x / 2.5 times · 22 hours / 22h / 3 days / 45s)
 //     and number words (one … twenty, "a dozen") against the facts' values;
-//   · A PAST VALUE NEEDS ITS CURRENT FIGURE (R60). A number backed ONLY by a pair's `from` end
-//     (`Fact.pair`: no other fact holds it at its written precision) is the earlier side of a
-//     change, and the sentence must also state that pair's `to` end ("173 is a past value; its
-//     current figure 86 is not in the sentence"). The live failure "fell from 173 a month ago to
-//     9" fails because 86 is absent, whatever words sit between; no sentence form is parsed. A
-//     bare number joined by to / and / or / a dash to a number with a duration, `%` or K / M / B
-//     unit takes that unit ("from 20 to 45 seconds", "38 to 36%", "41.2 to 49.5K");
+//   · A PAST VALUE STANDS BESIDE ITS OWN CURRENT FIGURE (R60, R63). A number backed ONLY by a
+//     pair's `from` end (`Fact.pair`: no other fact holds it at its written precision) is the
+//     earlier side of a change, and its NEIGHBOUR must be that pair's `to` end: the first number
+//     after it that is no other past value and no size or span (a duration, `%` or `x`, unless it
+//     is one itself), else the nearest such number before it. "fell from 173 over 30 days to just
+//     86" and "86, down from 173" pass; "from 173 a month ago to 9" fails ("173 is a past value;
+//     the figure beside it, 9, is not its current figure 86"), and so does a current figure dealt
+//     to the wrong change in a sentence listing several. No sentence form is parsed. A bare
+//     number joined by to / and / or / a dash to a number with a duration, `%` or K / M / B unit
+//     takes that unit ("from 20 to 45 seconds", "38 to 36%", "41.2 to 49.5K");
 //   · a plain number that is a citable ratio fact's own text, exactly ("a ratio of 0.98");
 //   · ratio words (doubled, tripled, quadrupled, halved, twice — "more than" tightens) against the
 //     ratio facts. A sentence that NAMES a network is held to that network's own ratio fact:
@@ -41,11 +44,15 @@ import type { Fact } from "@/src/data/noteTypes";
 //
 // KNOWN LIMITS, stated rather than hidden: direction is read from the sentence's verbs, not from
 // which number the verb governs, and a duration is matched only against `duration`
-// facts, so a count of days has to arrive as seconds. A CURRENT figure is not bound to its
-// quantity (the parked single-number limit): a past value is held to its own pair's current
-// figure, but a current figure may sit beside the wrong past value's quantity, the ends may be
-// swapped ("rose from 86 to 173"), and a "from 38% to 11%" of two current figures has no past
-// value to hold. A past value that coincides with some other current fact is read as current.
+// facts, so a count of days has to arrive as seconds. A pair's figures are bound to EACH OTHER,
+// not to the words around them: the subject the sentence names ("Finland fell from 66 to 33" on
+// Germany's pair), the verb's direction ("rose from 66 to 33") and the order of the ends ("rose
+// from 86 to 173": 173's neighbour is 86) are not checked. A sentence of two CURRENT figures
+// ("from 38% to 11%") has no past value to hold, and a past value that coincides with some other
+// current fact is read as current. Adjacency also costs some honest forms a retry: ends written
+// "respectively" ("fell to 33 and 27, from 67 and 58"), coordinated ("from 67 and 58 to 33 and
+// 27"), or a past value followed by a number of another clause ("fell to 86, from 173; Germany
+// has 33").
 
 export type NoteCheck = { ok: true } | { ok: false; reasons: string[] };
 
@@ -167,27 +174,37 @@ function backed(t: Tok, facts: readonly Fact[], ratios: readonly Fact[], dir: Di
   return facts.some((f) => says(t, f, ratios, dir));
 }
 
-// A PAST VALUE NEEDS ITS CURRENT FIGURE (R60). A number the facts back ONLY as a pair's `from`
-// end (no fact other than a `from` end holds it at its written precision) is the earlier side of a
-// change, and may appear only in a sentence that also states that pair's `to` end. The sentence
-// form is not parsed: "fell from 173 to just 86", "86, down from 173" and "from 173 over 30 days
-// to 86" are all one rule, and "from 173 a month ago to 9" fails on 9's absence of 86, whatever
-// sits between them.
+// A PAST VALUE STANDS BESIDE ITS OWN CURRENT FIGURE (R60, R63). A number the facts back ONLY as a
+// pair's `from` end (no fact other than a `from` end holds it at its written precision) is the
+// earlier side of a change. Its NEIGHBOUR must be that pair's `to` end: the first number after it
+// that is neither another past value nor a size or span (a duration, a `%`, an `x`, unless the
+// past value is one itself), else, when none follows, the nearest such number before it ("86
+// nodes, down from 173"). No sentence form is parsed: "fell from 173 over 30 days to just 86"
+// passes and "from 173 a month ago to 9" fails on 9, whatever words sit between. Co-occurrence
+// alone (R60) let any current figure in the sentence satisfy any past value, so a sentence
+// listing several changes could deal the current figures to the wrong ones (re-review N1).
 
 /** Does the written number `t` say what fact `f` holds (the one-fact rule's comparison)? */
 function says(t: Tok, f: Fact, ratios: readonly Fact[], dir: Dir): boolean {
   return candidates(f, t.cls, ratios, dir).some((v) => near(t, v));
 }
 
-/** Why `t`, backed by no current fact, fails — or null when it is a past value whose current
- *  figure another number of the sentence states. */
-function pastReason(t: Tok, toks: readonly Tok[], facts: readonly Fact[], ratios: readonly Fact[], dir: Dir): string | null {
-  const past = facts.filter((f) => f.pair?.end === "from" && says(t, f, ratios, dir));
-  if (!past.length) return `"${t.raw}" is not backed by any measured fact`;
-  const nows = past.map((f) => facts.find((g) => g.pair?.key === f.pair!.key && g.pair.end === "to"));
-  if (nows.some((g) => g && toks.some((u) => u !== t && says(u, g, ratios, dir)))) return null;
+/** Why the past value `toks[i]` fails, or null when its neighbour is its pair's current figure.
+ *  `past[k]` says whether `toks[k]` is itself a past value. */
+function pastReason(i: number, toks: readonly Tok[], past: readonly boolean[], facts: readonly Fact[], ratios: readonly Fact[], dir: Dir): string {
+  const t = toks[i]!;
+  const nows = facts
+    .filter((f) => f.pair?.end === "from" && says(t, f, ratios, dir))
+    .map((f) => facts.find((g) => g.pair?.key === f.pair!.key && g.pair.end === "to"));
   const now = nows.find((g) => g);
-  return now ? `${t.raw} is a past value; its current figure ${now.text} is not in the sentence` : `${t.raw} is a past value with no current figure`;
+  if (!now) return `${t.raw} is a past value with no current figure`;
+  // A size or a span is no end: "down 50%" or "over 30 days" between the two is skipped.
+  const qualifies = (u: Tok, k: number) => k !== i && !past[k] && (u.cls === t.cls || u.cls === "plain");
+  let j = toks.findIndex((u, k) => k > i && qualifies(u, k));
+  if (j < 0) for (let k = i - 1; k >= 0 && j < 0; k--) if (qualifies(toks[k]!, k)) j = k;
+  if (j < 0) return `${t.raw} is a past value; its current figure ${now.text} is not in the sentence`;
+  const u = toks[j]!;
+  return nows.some((g) => g && says(u, g, ratios, dir)) ? "" : `${t.raw} is a past value; the figure beside it, ${u.raw}, is not its current figure ${now.text}`;
 }
 
 // A SHARED UNIT. "from 20 to 45 seconds", "38 to 36%" and "41.2 to 49.5K" write the unit once: a
@@ -342,13 +359,16 @@ export function checkNote(
     const digits = s.replace(NUMBER_WORD_RE, (w) => ` ${NUMBER_WORDS[w.toLowerCase()]} `);
     const toks = sharedUnits(digits, tokens(digits));
     // Every number to a CURRENT fact (any fact but a pair's `from` end); one that only a `from` end
-    // backs is a past value, and needs its pair's `to` end in this sentence (R60).
+    // backs is a past value, and its neighbour must be its pair's `to` end (R60, R63).
     const current = facts.filter((f) => f.pair?.end !== "from");
-    for (const t of toks) {
-      if (backed(t, current, own, dir)) continue;
-      const why = pastReason(t, toks, facts, own, dir);
+    const isCurrent = toks.map((t) => backed(t, current, own, dir));
+    const isPast = toks.map((t, k) => !isCurrent[k] && facts.some((f) => f.pair?.end === "from" && says(t, f, own, dir)));
+    toks.forEach((t, k) => {
+      if (isCurrent[k]) return;
+      if (!isPast[k]) return void reasons.push(`"${t.raw}" is not backed by any measured fact`);
+      const why = pastReason(k, toks, isPast, facts, own, dir);
       if (why) reasons.push(why);
-    }
+    });
     for (const m of digits.matchAll(ORDINAL_RE)) {
       if (m[1]!.toLowerCase() === "second" && A_SECOND_RE.test(digits.slice(0, m.index))) continue;
       if (!rankBacked(m[1]!, facts)) reasons.push(`"${m[1]}" is not backed by a rank fact`);

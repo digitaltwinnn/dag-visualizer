@@ -473,7 +473,7 @@ describe("geoFacts states ONE figure per quantity: countries and the fleet from 
     const gate = (t: string) => checkNote(t, r.facts, r.names);
     const live = gate("Located nodes fell from 173 a month ago to 9. Germany dropped from 67 to 33.");
     expect(live.ok).toBe(false);
-    if (!live.ok) expect(live.reasons).toEqual(["173 is a past value; its current figure 86 is not in the sentence"]);
+    if (!live.ok) expect(live.reasons).toEqual(["173 is a past value; the figure beside it, 9, is not its current figure 86"]);
     expect(gate("Located nodes fell from 173 a month ago to just 9.").ok).toBe(false);
     expect(gate("Located nodes stand at 9, down from 173 a month ago.").ok).toBe(false);
     expect(gate("Located nodes fell from 173 a month ago to 86.")).toEqual({ ok: true });
