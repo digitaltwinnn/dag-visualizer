@@ -319,6 +319,40 @@ describe("geoFacts on a country", () => {
   });
 });
 
+// R74 (user, 2026-10-29): the view's own facts first, then the common activity reading, last.
+describe("geoFacts appends the common activity reading last", () => {
+  const DAY_MS = 86_400_000;
+  const dailyRow = (n: number, f: (i: number) => number | null) => Array.from({ length: n }, (_, i) => f(i));
+  const daily = (over: Record<string, (number | null)[]> = {}) => {
+    const n = 28;
+    const start = D("2026-09-30");
+    return { buckets: dailyRow(n, (i) => start + i * DAY_MS) as number[], stepMs: DAY_MS, now: start + n * DAY_MS + 1000, series: { "g.ticks": dailyRow(n, (i) => (i >= 21 ? 8000 : 6000)), "m.usdc.snaps": dailyRow(n, () => 100), "m.usdc.ticks": dailyRow(n, (i) => (i >= 21 ? 60 : 40)), ...over } };
+  };
+  it("a network: its global snapshots per day last week against the weeks before, after every place fact", () => {
+    const r = geoFacts(input({ subject: "usdc", daily: daily() }))!;
+    const labels = r.facts.map((f) => f.label);
+    const at = labels.indexOf("USDC.dag global snapshots it was part of per day, last week");
+    expect(at).toBeGreaterThan(0);
+    expect(labels.slice(at)).toEqual([
+      "USDC.dag global snapshots it was part of per day, last week",
+      "USDC.dag global snapshots it was part of per day, the weeks before",
+      "USDC.dag global snapshots it was part of per day, ratio last week to the weeks before",
+    ]);
+    expect(labels.slice(0, at).some((l) => /global snapshots/.test(l))).toBe(false);
+    expect(r.facts[at]!.value).toBe(60);
+  });
+  it("the whole network: global snapshots per day, last", () => {
+    const r = geoFacts(input({ daily: daily() }))!;
+    const labels = r.facts.map((f) => f.label);
+    expect(labels.slice(-3)).toEqual(["Global snapshots per day, last week", "Global snapshots per day, the weeks before", "Global snapshots per day, ratio last week to the weeks before"]);
+    expect(r.facts[labels.length - 3]!.value).toBe(8000);
+  });
+  it("a country, or no daily read, gets none", () => {
+    expect(find(geoFacts(input({ subject: { cc: "DE" }, daily: daily() }))!, /global snapshots/)).toEqual([]);
+    expect(find(geoFacts(input())!, /global snapshots/)).toEqual([]);
+  });
+});
+
 describe("geoFacts names", () => {
   it("returns every catalog name, the countries and providers the facts mention, and their short forms", () => {
     const r = geoFacts(input())!;

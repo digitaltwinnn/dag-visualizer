@@ -1,5 +1,8 @@
 import { fact } from "@/src/data/noteFacts";
+import { activityFacts } from "@/src/data/noteFactsActivity";
 import type { Fact, FactPair } from "@/src/data/noteTypes";
+import { anchorSeries } from "@/src/data/trendSeries";
+import { trimNewestPartial, type TrendsWindowData } from "@/src/data/trendWindow";
 
 // GEOGRAPHY'S FACTS BUILDER — what the Geography note's model is shown.
 // THE WORD IS "THE NETWORK", NEVER "THE FLEET" (user, 2026-10-29): a label is what the model echoes
@@ -48,6 +51,9 @@ import type { Fact, FactPair } from "@/src/data/noteTypes";
 //     stripping `gmbh|ag|inc|llc|ltd|sas|se` (Hetzner Online GmbH + AG) are one provider, summed.
 //     The merged provider is called by the stem both share ("Hetzner Online");
 //   · the store holds no country × provider breakdown, so a country's note carries no providers;
+//   · THE VIEW'S OWN FACTS FIRST, THE COMMON READING LAST (user, 2026-10-29; R74): where the nodes
+//     run is this view's; the activity facts are the shared `noteFactsActivity.ts`, appended after
+//     every place fact for a network or the whole network, where the prompt asks for them;
 //   · A CHANGE IS A PAIR (R54). A week ago and now are the `from` and `to` of one key per
 //     quantity (the fleet's located total, each country, each provider, a network's located nodes
 //     and countries), the standing "now" fact is the `to` end, and the ratio is `to / from`.
@@ -68,6 +74,10 @@ export interface GeoFactsInput {
   providerNames: Record<string, string>; // provider key → display name (`geo:{net}:isp`)
   countryNames: Record<string, string>; // cc → English name
   names: Record<string, string>; // catalog id → display name
+  /** The daily tier over the last four weeks (store, unfolded), for the COMMON reading appended
+   *  last (R74, `noteFactsActivity.ts`): the network's, or the whole network's, global snapshots
+   *  per day last week against the weeks before. Absent (a country, or no read), none is stated. */
+  daily?: TrendsWindowData | null;
 }
 
 const TOP = 3;
@@ -388,6 +398,14 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
         facts.push(fact(`${pn(p)}, nodes now against a week ago`, p.count / before, "ratio"));
       }
     }
+  }
+
+  // THE COMMON READING, LAST (R74): activity, the same facts Hypergraph appends. A country has none.
+  if (input.daily && !subjectCc) {
+    const d = trimNewestPartial(input.daily);
+    facts.push(...(subjectNet
+      ? activityFacts(`${nameOf(subjectNet)} global snapshots it was part of per day`, anchorSeries(subjectNet, d.series))
+      : activityFacts("Global snapshots per day", d.series["g.ticks"] ?? [])));
   }
 
   const providerForms = [...mentionedProviders.values()].flatMap((p) => {

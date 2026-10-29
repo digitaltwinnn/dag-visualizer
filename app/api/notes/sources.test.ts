@@ -249,15 +249,16 @@ describe("factsFor — the per-view read table", () => {
     expect(out!.facts).toContainEqual(expect.objectContaining({ label: "Week", value: 604_800, kind: "duration" }));
   });
 
-  it("geo: the geo family and the tiers' 1d over 14 days (R29 over a one-week range, R72), pivoted by day; a country subject", async () => {
+  it("geo: the geo family and the tiers' 1d over 28 days (the common activity reading's four weeks, R74, past R29's 14), pivoted by day; a country subject", async () => {
     const day = Date.UTC(2026, 9, 26);
     const tiers = { buckets: [day - D, day], stepMs: D, now: NOW, series: { "f.cc.DE": [4, null], "f.cc.US": [2, 3], "g.ticks": [1, 1], "f.nodes": [9, 9] } };
     const r = fakeReads({ async span(_n, tier, from, to) { r.calls.push({ tier, from, to }); return tiers; } });
     const out = await factsFor("mainnet", "geo", "cc:DE", "day", NOW, r);
-    expect(r.geoCalls).toEqual([{ from: NOW - 14 * D, to: NOW }]);
-    expect(r.calls).toEqual([{ tier: "1d", from: NOW - 14 * D, to: NOW }]);
+    expect(r.geoCalls).toEqual([{ from: NOW - 28 * D, to: NOW }]);
+    expect(r.calls).toEqual([{ tier: "1d", from: NOW - 28 * D, to: NOW }]);
     const input = vi.mocked(geoFacts).mock.calls[0]![0];
     expect(input.subject).toEqual({ cc: "DE" });
+    expect(input.daily).toBe(tiers); // the same read, unfolded, is the common activity reading's (R74)
     expect(input.ccDays).toEqual({ "2026-10-25": { "f.cc.DE": 4, "f.cc.US": 2 }, "2026-10-26": { "f.cc.US": 3 } });
     expect(input.geoDays).toEqual({ "2026-10-27": { "f.cc.DE": 3, "f.cc.dag.FR": 1 } });
     expect(input.providerNames).toEqual({ hetzner: "Hetzner" });
@@ -265,6 +266,7 @@ describe("factsFor — the per-view read table", () => {
     expect(out!.label).toBe("Germany");
     expect(out!.spanFrom).toBe(NOW - 7 * D);
     expect(out!.facts).toContainEqual(expect.objectContaining({ label: "Span length", value: 604_800 }));
+    expect(out!.facts).toContainEqual(expect.objectContaining({ label: "Week", value: 604_800, kind: "duration" }));
   });
 
   it("geoInputs is the geo note's own read, so the warm pass plans its countries from the same reading (M5)", async () => {
@@ -272,8 +274,9 @@ describe("factsFor — the per-view read table", () => {
     const tiers = { buckets: [day - D, day], stepMs: D, now: NOW, series: { "f.cc.DE": [4, null], "f.cc.US": [2, 3], "g.ticks": [1, 1] } };
     const r = fakeReads({ async span(_n, tier, from, to) { r.calls.push({ tier, from, to }); return tiers; } });
     const got = await geoInputs("mainnet", NOW, r);
-    expect(r.geoCalls).toEqual([{ from: NOW - 14 * D, to: NOW }]);
-    expect(r.calls).toEqual([{ tier: "1d", from: NOW - 14 * D, to: NOW }]);
+    expect(r.geoCalls).toEqual([{ from: NOW - 28 * D, to: NOW }]);
+    expect(r.calls).toEqual([{ tier: "1d", from: NOW - 28 * D, to: NOW }]);
+    expect(got.daily).toBe(tiers);
     expect(got.ccDays).toEqual({ "2026-10-25": { "f.cc.DE": 4, "f.cc.US": 2 }, "2026-10-26": { "f.cc.US": 3 } });
     expect(got.geoDays).toEqual({ "2026-10-27": { "f.cc.DE": 3, "f.cc.dag.FR": 1 } });
     expect(got.providerNames).toEqual({ hetzner: "Hetzner" });
@@ -310,7 +313,7 @@ describe("factsFor — the per-view read table", () => {
     const short = realGeo.geoFacts({ subject: "all", geoDays: head.geoDays, ccDays: ccDays8, providerNames: {}, countryNames: { DE: "Germany", US: "United States" }, names: {} })!;
     expect(weekAgo(short.facts).some((f) => f.label.endsWith("now against a week ago") && f.value === 2.5)).toBe(true);
 
-    // The fix: the read reaches 14 days back, the pair is judged against the week before it and
+    // The fix: the read reaches past the pair (28 days now), it is judged against the week before it and
     // fails, and no change fact reads from it.
     const out = await factsFor("mainnet", "geo", "all", "day", NOW, reads);
     const changes = weekAgo(out!.facts);

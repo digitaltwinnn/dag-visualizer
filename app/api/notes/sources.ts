@@ -99,7 +99,7 @@ export async function readGeoDays(
 /** GEOGRAPHY'S READ — the geo family's days and the tiers' daily fleet `f.cc` (`ccDays`, pivoted by
  *  day) over `GEO_READ_MS`. The geo note's facts and the warm pass's country plan both read through
  *  it, so the countries warmed are the countries a note states (M5). */
-export async function geoInputs(net: string, nowMs: number, reads: NoteReads): Promise<GeoDaysRead & { ccDays: Record<string, Record<string, number>> }> {
+export async function geoInputs(net: string, nowMs: number, reads: NoteReads): Promise<GeoDaysRead & { ccDays: Record<string, Record<string, number>>; daily: TrendsWindowData }> {
   const from = nowMs - GEO_READ_MS;
   const [{ geoDays, providerNames }, tiers] = await Promise.all([
     reads.geoDays(net, from, nowMs),
@@ -112,7 +112,8 @@ export async function geoInputs(net: string, nowMs: number, reads: NoteReads): P
       if (k.startsWith("f.cc.") && v != null) (ccDays[iso(b)] ??= {})[k] = v;
     }
   });
-  return { geoDays, providerNames, ccDays };
+  // The same daily read is the common activity reading's (R74), unfolded, as the builder wants it.
+  return { geoDays, providerNames, ccDays, daily: tiers };
 }
 
 /** The default reads for ONE note: the trends store's read client, each hash read at most once (a
@@ -227,8 +228,9 @@ interface ViewSource {
 
 const WHOLE = "the whole network";
 /** Geography's read: the week its changes are read over, its one-day slack, and the 6 days the
- *  earliest candidate's own week needs before it (R29). */
-const GEO_READ_MS = (7 + 1 + 6) * D;
+ *  earliest candidate's own week needs before it (R29) — and, longer, the four weeks the common
+ *  activity reading compares (R74: last week against the three before; `noteFactsActivity.ts`). */
+const GEO_READ_MS = Math.max((7 + 1 + 6) * D, 28 * D);
 const secondsOf = (fromMs: number, toMs: number) => (toMs - fromMs) / 1000;
 
 type TrendPill = "1h" | "24h" | "7d" | "30d" | "1y";
@@ -317,16 +319,17 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
     },
     whole: (subject) => subject === "all",
     async read({ net, subject, nowMs, reads, names }) {
-      const { geoDays, providerNames, ccDays } = await geoInputs(net, nowMs, reads);
+      const { geoDays, providerNames, ccDays, daily } = await geoInputs(net, nowMs, reads);
       const ccs = new Set<string>();
       for (const day of [...Object.values(geoDays), ...Object.values(ccDays)])
         for (const k of Object.keys(day)) if (k.startsWith("f.cc.")) ccs.add(k.slice(k.lastIndexOf(".") + 1));
       const cc = CC_RE.exec(subject)?.[1];
       if (cc) ccs.add(cc);
       const countryNames = Object.fromEntries([...ccs].map((c) => [c, countryName(c)]));
-      const built = geoFacts({ subject: cc ? { cc } : subject, geoDays, ccDays, providerNames, countryNames, names });
+      const built = geoFacts({ subject: cc ? { cc } : subject, geoDays, ccDays, providerNames, countryNames, names, daily });
       const spanFrom = nowMs - 7 * D;
-      return { built, spanFrom, spanTo: nowMs, windows: [["Span length", secondsOf(spanFrom, nowMs)]] };
+      // The common reading speaks of the last week (R74), so that window is stated beside the span.
+      return { built, spanFrom, spanTo: nowMs, windows: [["Span length", secondsOf(spanFrom, nowMs)], ["Week", (7 * D) / 1000]] };
     },
   },
   // WHEN (live): the last six hours of the 5-minute tier against the last week of the hourly one.

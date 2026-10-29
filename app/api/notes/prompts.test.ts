@@ -16,9 +16,10 @@ describe("VOICE", () => {
     expect(VOICE).toMatch(/feeless/);
   });
 
-  it("leads with what changed and does not restate a breakdown the reader can see", () => {
+  it("answers in the question's order: the view's own subject first, the common reading last (R74), and leads each part with what changed", () => {
+    expect(VOICE).toContain("what it asks for first is what this view shows and comes first, even when it held; what it asks for last comes last, in one sentence.");
     expect(VOICE).toContain(
-      "Lead with what changed. Do not restate a breakdown the reader can already see on screen, such as how many nodes run each layer, unless it changed.",
+      "Within each part, lead with what changed. Do not restate a breakdown the reader can already see on screen, such as how many nodes run each layer, unless it changed.",
     );
   });
 
@@ -51,25 +52,26 @@ describe("PROMPTS", () => {
     }
   });
 
-  it("keeps Geography to where, never activity or pace, and the other views to theirs", () => {
-    const geo = PROMPTS.geo.system("the fleet");
+  it("keeps Geography to where, then one sentence of activity, never pace, and the other views to theirs", () => {
+    const geo = PROMPTS.geo.system("the network");
     expect(geo).not.toContain("pace");
     expect(geo).toMatch(/where/i);
     expect(geo).toMatch(/decentrali/i); // it is told to leave the subject alone
+    expect(geo).toMatch(/then the one sentence on activity/);
     expect(PROMPTS.hyper.question).toMatch(/who|what/i);
     expect(PROMPTS.ledger.question).toMatch(/anchoring/i);
     expect(PROMPTS.ledger.question).toMatch(/hours/i);
     expect(PROMPTS.trend.question).toMatch(/changed/i);
   });
 
-  it("asks Hypergraph and Geography what changed; the ledger and History keep their questions", () => {
+  it("asks Hypergraph and Geography their own subject first and activity last (R74); the ledger and History keep their questions", () => {
     expect(PROMPTS.hyper.question).toBe(
-      "Say what changed in who and what is on the network over the span: networks or layers that gained or lost nodes, networks that started or stopped anchoring, how much more or less active they were. If nothing changed, say in one sentence that it held, with the level.",
+      "First, who and what is on the network over the span: networks or layers that gained or lost nodes, networks that started or stopped anchoring; if nothing changed there, say that it held, with the level. Last, in one sentence, how active it was: the global snapshots it was part of per day last week against the weeks before.",
     );
     expect(PROMPTS.geo.question).toBe(
-      "Say how the places the nodes run have shifted: countries and hosting providers that gained or lost nodes. Where the facts hold no change, say briefly where the nodes are now. Say nothing about activity or speed.",
+      "First, where the nodes run: countries and hosting providers that gained or lost nodes, or where the nodes are now when nothing moved. Last, in one sentence and only when the facts state it, how active the network was: its global snapshots per day last week against the weeks before. Say nothing about speed.",
     );
-    expect(PROMPTS.geo.system("x")).toContain("Stay on where the nodes are located and who hosts them, and nothing else.");
+    expect(PROMPTS.geo.system("x")).toContain("Stay on where the nodes are located and who hosts them, then the one sentence on activity, and nothing else.");
     expect(PROMPTS.ledger.question).toBe(
       "Say what changed in the anchoring rhythm over the recent hours against the usual: what sped up or slowed down, from the usual figure to the recent one, and which networks did it. Then the reading itself: the longest gap, and what was part of the global snapshots.",
     );

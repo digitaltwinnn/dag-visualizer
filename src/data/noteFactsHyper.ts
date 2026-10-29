@@ -1,5 +1,6 @@
 import { ROLE_SHORT, roleKeyLabel } from "@/src/data/composition";
 import { fact, gaugeChange, heldLevel, networksAnchored, observedLevel } from "@/src/data/noteFacts";
+import { activityFacts, lastWeekMean, weekStart } from "@/src/data/noteFactsActivity";
 import { notableDays } from "@/src/data/notableDays";
 import type { Fact } from "@/src/data/noteTypes";
 import { anchorSeries, typeBands, withUnlisted } from "@/src/data/trendSeries";
@@ -64,6 +65,10 @@ import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 //     only and at least 7 of them, else no fact; the ratio is stated only when both are above 0
 //     and differ. The whole network's is `g.ticks` (one per global snapshot), covered days only,
 //     under the same floors;
+//   · THE VIEW'S OWN FACTS FIRST, THE COMMON READING LAST (user, 2026-10-29; R74): a note "starts
+//     from its key view focus, then adds info about more app-common topics like snapshots". The
+//     structure (nodes, layers, movers, started / stopped) is this view's; the activity facts are
+//     the shared `noteFactsActivity.ts` and are appended after it, where the prompt asks for them;
 //   · HOW MANY NETWORKS ANCHORED goes through `networksAnchored` on the folded series, so measured
 //     unlisted activity makes the count a floor (", at least");
 //   · "started" and "stopped" are Task 2's `first` / `last` read for every id, with the 30-day
@@ -103,14 +108,6 @@ const TOP = 3;
 const LATE_START = 0.1;
 /** A sample's node count agrees with a level (the span's start or end) within this fraction. */
 const SHAPE_TOLERANCE = 0.1;
-const WEEK_DAYS = 7;
-/** "The weeks before": the complete days before the last week, back to four weeks. */
-const PRIOR_DAYS = 21;
-/** The fewest measured days the weeks before are read from at all. */
-const PRIOR_MIN_DAYS = 7;
-/** The fewest measured days "last week" is read from at all (M7): a per-day rate set beside the
- *  weeks before must rest on more than a day or two. */
-const WEEK_MIN_DAYS = 4;
 /** A shape's level at either end is read from the gauge's first / last this-many measured samples
  *  (`gaugeChange`'s own LEVEL_SAMPLES), and needs at least SHAPE_MIN_SAMPLES of them to agree. */
 const SHAPE_SAMPLES = 6;
@@ -118,8 +115,6 @@ const SHAPE_MIN_SAMPLES = 3;
 const RANK_WORD = ["", "second ", "third "] as const;
 
 type Points = readonly (number | null)[];
-
-const mean = (xs: readonly number[]): number => xs.reduce((a, v) => a + v, 0) / xs.length;
 
 /** A gauge's change over the span, or null when it has none or began after the span did. */
 function spanChange(points: Points): { from: number; to: number; firstIndex: number } | null {
@@ -170,21 +165,15 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
   const d = trimNewestPartial({ ...input.daily, series: withUnlisted(input.daily.series, isListed, UNLISTED_ID) });
   const n = d.buckets.length;
   const covered = d.series["g.ticks"] ?? [];
-  const weekFrom = Math.max(0, n - WEEK_DAYS);
-  const priorFrom = Math.max(0, weekFrom - PRIOR_DAYS);
+  const weekFrom = weekStart(n);
   const coveredFrom = (lo: number) => covered.slice(lo).some((v) => v != null);
-  /** The per-day mean of a daily series over the weeks before the last week, measured days
-   *  only; null under PRIOR_MIN_DAYS of them. */
-  const priorMean = (points: Points): number | null => {
-    const vals = points.slice(priorFrom, weekFrom).filter((v): v is number => v != null);
-    return vals.length >= PRIOR_MIN_DAYS ? mean(vals) : null;
-  };
 
-  /** Activity per network over the last week: global snapshots it was part of, per day. */
+  /** Activity per network over the last week: global snapshots it was part of, per day — the
+   *  COMMON reading (`noteFactsActivity.ts`), so the rank and the change fact read one figure. */
   const activity = new Map<string, number>();
   for (const id of ids) {
-    const vals = anchorSeries(id, d.series).slice(weekFrom).filter((v): v is number => v != null);
-    if (vals.length >= WEEK_MIN_DAYS) activity.set(id, mean(vals));
+    const v = lastWeekMean(anchorSeries(id, d.series));
+    if (v != null) activity.set(id, v);
   }
   const byActivity = [...activity].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 
@@ -201,18 +190,6 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
     facts.push(fact(`${label} at the start of the span`, ch.from, "count", undefined, { key: label, end: "from" }));
     facts.push(fact(`${label} at the end of the span`, ch.to, "count", undefined, { key: label, end: "to" }));
     if (ch.from > 0 && ch.to !== ch.from) facts.push(fact(`${label}, ratio end to start`, ch.to / ch.from, "ratio"));
-  };
-
-  /** A per-day reading over the last week beside the weeks before, and their ratio when both
-   *  are above 0 and differ. `lastWeek` null states nothing; the prior needs its measured days. */
-  const activityChange = (label: string, lastWeek: number | null, points: Points): void => {
-    if (lastWeek == null) return;
-    const before = priorMean(points);
-    facts.push(fact(`${label}, last week`, lastWeek, "count", undefined, before == null ? undefined : { key: label, end: "to" }));
-    if (before == null) return;
-    facts.push(fact(`${label}, the weeks before`, before, "count", undefined, { key: label, end: "from" }));
-    if (lastWeek > 0 && before > 0 && lastWeek !== before)
-      facts.push(fact(`${label}, ratio last week to the weeks before`, lastWeek / before, "ratio"));
   };
 
   if (all) {
@@ -260,11 +237,6 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
 
     gaugeFacts("Nodes across all networks", total);
 
-    // THE WHOLE NETWORK'S ACTIVITY: global snapshots per day (`g.ticks` counts them, one per
-    // global snapshot), covered days only — an uncovered day is null.
-    const lastWeek = covered.slice(weekFrom).filter((v): v is number => v != null);
-    activityChange("Global snapshots per day", lastWeek.length >= WEEK_MIN_DAYS ? mean(lastWeek) : null, covered);
-
     // STARTED AND STOPPED: Task 2's first / last for every id, the 30-day lead-in before the span
     // marked via `from` so a network that began earlier, or merely resumed, is not a start.
     if (n) {
@@ -284,6 +256,10 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
         facts.push(fact(`${mention(id)} ${day.kind === "first" ? "started anchoring, first day" : "stopped anchoring, last day"}`, day.dayMs, "date"));
       }
     }
+
+    // THE COMMON READING, LAST (R74): the whole network's global snapshots per day (`g.ticks`
+    // counts them, one per global snapshot), covered days only — an uncovered day is null.
+    facts.push(...activityFacts("Global snapshots per day", covered));
   } else {
     const name = mention(subject);
     named.push(subject);
@@ -343,8 +319,9 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
       facts.push(fact(`${name} rank by nodes`, 1 + byNodes.filter((id) => levelOf(id)! > own).length, "count"));
       facts.push(fact("Networks with nodes", withNodes.length, "count"));
     }
+    // THE COMMON READING, LAST (R74): its activity, the same facts Geography appends.
     const mine = activity.get(subject);
-    activityChange(`${name} global snapshots it was part of per day`, mine ?? null, anchorSeries(subject, d.series));
+    facts.push(...activityFacts(`${name} global snapshots it was part of per day`, anchorSeries(subject, d.series)));
     if (mine != null && mine > 0) {
       facts.push(fact(`${name} rank by global snapshots it was part of`, 1 + byActivity.filter(([, v]) => v > mine).length, "count"));
       facts.push(fact("Networks that were part of global snapshots in the last week", byActivity.length, "count"));
