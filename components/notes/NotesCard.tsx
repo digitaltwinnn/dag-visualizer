@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import CardHead, { RailPane } from "@/components/CardHead";
 import { AI_NOTES_ICON, KIND_MARK_CLASS } from "@/components/icons";
-import { Door, foldLabel } from "@/components/inspector/parts";
+import { Door, QualifierChip, foldLabel } from "@/components/inspector/parts";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { cn } from "@/lib/utils";
 import type { NoteDay } from "@/src/data/noteTypes";
@@ -49,13 +49,16 @@ const DAY_MS = 86_400_000;
  *  `background` shorthand — the shorthand would reset the clip `bg-clip-text` sets. */
 
 /** THE RAIL'S OWN HEAD GRAMMAR (user, 2026-10-29: "re-use the same card structure as the others in
- *  the rung"): an EYEBROW and a TITLE with a kind mark at its left, the note where every card puts
- *  its first descriptive line ("Anchored by 4 metagraphs"). The title is the product's name on both
- *  tiers — the subject is the subject card's to name, and "What changed" was no datum — and the
- *  sparkles mark in the AI hue at its left is what says this is the one card a model wrote (it is
- *  no `data-kindmark`: the fold keeps it on purpose). The eyebrow is the span the note covers,
- *  in the explorer's span words (`noteSpanWords`; History's is the window or range on screen), so
- *  the body carries no Span row and no Written row (user: "implied by 'last 6 hours'"). */
+ *  the rung"): a TITLE with a kind mark at its left, a QUALIFIER CHIP as the aside, the note where
+ *  every card puts its first descriptive line ("Anchored by 4 metagraphs") — and NO EYEBROW (user:
+ *  "remove 'note', 'Constellation Gate AI' is the title"): the product's name is the whole head,
+ *  the one card in the pile that is not a kind of subject. The title is the product's name on both tiers — the subject is the subject
+ *  card's to name, and "What changed" was no datum — and the sparkles mark in the AI hue at its left
+ *  is what says this is the one card a model wrote (it is no `data-kindmark`: the fold keeps it on
+ *  purpose). The chip is the span the note covers, in the explorer's span words (`noteSpanWords`;
+ *  History's is the window or range on screen), to the right like the dossier's ticker (user: "a
+ *  pill-type of element to the right like on other cards"), so the body carries no Span row and no
+ *  Written row ("implied by 'last 6 hours'"). */
 const TITLE = "Constellation Gate AI";
 
 // THE CARD'S CONTROLS ARE DOORS (`parts.tsx` — the one way a card draws a way out, with the
@@ -184,9 +187,6 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
       }
     >
       <CardHead
-        // The span the note covers, as the kind word every other card wears here: History's is the
-        // span on screen, the other views' their fixed read (`noteSpanWords`).
-        eyebrow={subject.view === "trend" ? spanPhrase(trendWindow, trendRange) : noteSpanWords(subject.view)}
         title={
           <span className="inline-flex min-w-0 items-center gap-2">
             <AI_NOTES_ICON aria-hidden className={cn(KIND_MARK_CLASS, "text-[var(--ai-mark)]")} />
@@ -194,6 +194,10 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
           </span>
         }
         titleKey={titleKey}
+        // The span the note covers, the head's qualifier: History's is the span on screen, the other
+        // views' their fixed read (`noteSpanWords`). (After `title`: tooltipBoundary reads a `title=`
+        // as the nearest preceding element's, and a chip in the aside would have claimed it.)
+        aside={<QualifierChip>{subject.view === "trend" ? spanPhrase(trendWindow, trendRange) : noteSpanWords(subject.view)}</QualifierChip>}
         collapsed={collapsed}
         onToggle={onToggle}
       />
