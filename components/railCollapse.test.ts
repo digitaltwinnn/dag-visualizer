@@ -83,34 +83,52 @@ describe("the default box", () => {
 });
 
 describe("a view switch (`overridesOnViewEntry`)", () => {
-  // I1 (review, 2026-10-27): Hypergraph on `dor`, notes opened by hand, then another view. The
-  // entry used to pin `context: true` while the unpinned note yielded to the auto rule: no box.
-  it.each(["geo", "ledger", "trend"] as const)("I1: notes opened by hand in Hypergraph → %s arrives with exactly one box, the subject card", (to) => {
+  // R78 (user, 2026-10-29): a view is entered on its note — filtered or not, the note is the one
+  // box on arrival and the carried subject cards fold to their entries beneath it.
+  it.each(["geo", "ledger", "trend"] as const)("R78: a committed network arrives in %s on the note, the subject cards folded, exactly one box", (to) => {
     const hyper = rail(manifest({ filter: "dor" }), {}, ["network"]);
-    const opened = openByHand(hyper, "notes");
     // The effect runs on the first render of the NEW view, with the departing overrides.
-    const arriving = (o: Overrides) => rail(manifest({ mode: to, filter: "dor", ...(to === "ledger" ? { snap: snapPick } : {}) }), o, ["network"]);
-    const after = apply(opened, overridesOnViewEntry(arriving(opened)));
-    const boxes = openBoxes(arriving(after));
-    expect(boxes).toHaveLength(1);
-    expect(boxes[0]).not.toBe("notes");
+    const arriving = (o: Overrides) => rail(manifest({ mode: to, filter: "dor", ...(to === "ledger" ? { snap: snapPick } : {}) }), o, ["snap", "network"]);
+    const after = apply(hyper.overrides, overridesOnViewEntry(arriving(hyper.overrides)));
+    expect(openBoxes(arriving(after))).toEqual(["notes"]);
+    expect(isCollapsed(arriving(after), "context")).toBe(true);
   });
-  it("a subject box the reader opened survives the switch (EXPANDED STATE SURVIVES A VIEW SWITCH)", () => {
-    // Hyper: a node committed, the reader re-boxed the Metagraph card.
+  it("R78: a subject box the reader opened by hand still yields to the note on arrival (supersedes EXPANDED STATE SURVIVES A VIEW SWITCH there)", () => {
     const m = manifest({ filter: "dor", inspect: nodePick });
     const hyper = rail(m, {}, ["node", "network"]);
     const opened = openByHand(hyper, "context");
     const arriving = (o: Overrides) => rail({ ...m, mode: "geo" }, o, ["node", "network"]);
     const after = apply(opened, overridesOnViewEntry(arriving(opened)));
-    expect(openBoxes(arriving(after))).toEqual(["context"]);
+    expect(openBoxes(arriving(after))).toEqual(["notes"]);
+    expect(isCollapsed(arriving(after), "node")).toBe(true);
   });
-  it("the note is never pinned: at Snapshots' entry it stands alone, the late live tick lands under it, and a pinned tick takes the box", () => {
+  it("R78: the arrival pins are a selection moment's to drop — a click after it opens its own card and the note folds", () => {
+    const geo = rail(manifest({ mode: "geo", filter: "dor" }), {}, ["network"]);
+    const pinned = apply({}, overridesOnViewEntry(geo));
+    expect(openBoxes(rail(manifest({ mode: "geo", filter: "dor" }), pinned, ["network"]))).toEqual(["notes"]);
+    const clicked = rail(manifest({ mode: "geo", filter: "dor", country: "DE" }), pinned, ["country", "network"]);
+    const dropped = apply(pinned, overridesOnSelection(clicked));
+    expect(openBoxes(rail(manifest({ mode: "geo", filter: "dor", country: "DE" }), dropped, ["country", "network"]))).toEqual(["country"]);
+  });
+  it("R78: at Snapshots' entry the note stands alone and is pinned open; the late live tick lands folded under it, and a pinned tick still takes the box once the pins drop", () => {
     const entry = rail(manifest({ mode: "ledger" }));
-    expect(openBoxes(entry)).toEqual(["notes"]);
     const after = apply({}, overridesOnViewEntry(entry));
-    expect(after.notes).toBeUndefined();
+    expect(after.notes).toBe(false);
     expect(openBoxes(rail(manifest({ mode: "ledger", snap: snapPick }), after))).toEqual(["notes"]);
-    expect(openBoxes(rail(manifest({ mode: "ledger", snap: snapPick }), after, ["snap"]))).toEqual(["snap"]);
+    const pinnedTick = rail(manifest({ mode: "ledger", snap: snapPick }), after, ["snap"]);
+    expect(openBoxes(rail(manifest({ mode: "ledger", snap: snapPick }), apply(after, overridesOnSelection(pinnedTick)), ["snap"]))).toEqual(["snap"]);
+  });
+  it("without a note (off mainnet, or none for the subject), a subject box the reader opened survives the switch, and nothing is pinned when the departing box was no subject", () => {
+    const m = manifest({ filter: "dor", inspect: nodePick, noteAbsent: true });
+    const hyper = rail(m, {}, ["node", "network"]);
+    const opened = openByHand(hyper, "context");
+    const arriving = (o: Overrides) => rail({ ...m, mode: "geo" }, o, ["node", "network"]);
+    expect(openBoxes(arriving(apply(opened, overridesOnViewEntry(arriving(opened)))))).toEqual(["context"]);
+    // The departing box was the note (in a view that had one); the arriving view has none: no pin, the auto rule.
+    const withNote = rail(manifest({ filter: "dor" }), {}, ["network"]);
+    const noteOpen = openByHand(withNote, "notes");
+    const arrivingBare = (o: Overrides) => rail(manifest({ mode: "geo", filter: "dor", noteAbsent: true }), o, ["network"]);
+    expect(openBoxes(arrivingBare(apply(noteOpen, overridesOnViewEntry(arrivingBare(noteOpen)))))).toEqual(["context"]);
   });
 });
 

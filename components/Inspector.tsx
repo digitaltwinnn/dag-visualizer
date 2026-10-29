@@ -586,8 +586,10 @@ export default function Inspector() {
       // out of the selection key on purpose (heartbeats must not reset the +/− overrides), so
       // nothing ever dropped the pin and the only populated card sat folded above three ghosts.
       // An absent slot keeps no override and the auto rule (`openDefault`) governs its arrival.
-      // ⚠️ …and only SUBJECT cards are pinned, and nothing at all when the departing box is the AI
-      // notes card (R57; review I1) — `overridesOnViewEntry` has both reasons and their tests.
+      // ⚠️ …and A VIEW IS ENTERED ON ITS NOTE (R78): when the notes slot stands, it is pinned open
+      // and the present subject cards folded; without one, only SUBJECT cards are pinned, and
+      // nothing at all when the departing box was no subject (review I1) — `overridesOnViewEntry`
+      // has every reason and their tests.
       setRailCollapseMany(overridesOnViewEntry(live));
       return;
     }

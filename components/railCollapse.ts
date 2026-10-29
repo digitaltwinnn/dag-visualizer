@@ -55,28 +55,37 @@ export function overridesOnSelection(s: Pick<LaneCollapseState, "overrides">): R
   return Object.fromEntries(Object.keys(s.overrides).map((id) => [id, null]));
 }
 
-/** WHAT A VIEW SWITCH WRITES (Inspector's mode-entry snapshot): the departing view's open/closed
- *  state PINNED on its present SUBJECT cards, so the arrival's re-derive can shuffle the focus under
- *  an unchanged pile ("EXPANDED STATE SURVIVES A VIEW SWITCH", 2026-09-04). Absent slots keep no
- *  pin (2026-10-18: a late live tick pinned shut stayed shut).
+/** WHAT A VIEW SWITCH WRITES (Inspector's mode-entry snapshot), given the ARRIVING lane with the
+ *  departing overrides still standing.
  *
- *  The AI notes card is never pinned (R57): it is the box exactly while no CHOSEN subject card
- *  stands (`focusSlotId`, R70), which the auto rule re-derives on arrival; a pin would carry that
- *  answer into a lane whose chosen cards differ, and sit as a second box above them.
+ *  A VIEW IS ENTERED ON ITS NOTE (user, 2026-10-29, R78: "always have the AI notes as the expanded
+ *  card when entering a view … even if filtered, the note is specific so very relevant. Otherwise …
+ *  no new info is actually presented"). A switch is an arrival, not a choice: the subject cards are
+ *  the carried selection, the same dossier in every view, and the note is this view's reading of
+ *  it — the one thing new on arrival. So when the notes slot stands, it is pinned OPEN and every
+ *  present subject card pinned FOLDED to its entry (its one line still names the subject). The pins
+ *  are the usual ones: a selection after the grace window clears them, and the clicked card opens
+ *  by the auto rule (`focusSlotId`) with the note folding above it — a click is still answered by
+ *  its own card. This supersedes, for views with a note, "EXPANDED STATE SURVIVES A VIEW SWITCH"
+ *  (2026-09-04), whose point was the collapse-and-reopen cycle on every switch; the note arriving
+ *  open folds a subject card once and leaves it, so that cycle does not return.
  *
- *  ⚠️ AND WHEN THE DEPARTING BOX IS NOT A SUBJECT CARD, NOTHING IS PINNED (review I1): with the
- *  notes card opened by hand, every subject card stood folded, and pinning that state folded them
- *  all in the next view while the unpinned note yielded the box to the arriving focus by the auto
- *  rule — no box at all, until a selection after the grace window. Left to the auto rule entirely,
- *  the arriving focus card opens and the note folds: one box. */
+ *  WITHOUT A NOTE (a view with none, off mainnet, a subject the server answered `none` for) the
+ *  earlier rule holds: the departing open/closed state is pinned on the present SUBJECT cards, so
+ *  the arrival's re-derive can shuffle the focus under an unchanged pile — except when the departing
+ *  box was no subject card — read off the overrides, an open pin on a non-subject slot — where
+ *  nothing is pinned (review I1: pinning every subject card folded beside an unpinned note left no
+ *  box). Absent slots keep no pin either way (2026-10-18: a late
+ *  live tick pinned shut stayed shut). */
 export function overridesOnViewEntry(s: LaneCollapseState): Record<string, boolean | null> {
   const cleared = overridesOnSelection(s);
-  const box = boxedSlotOf(s);
-  if (box != null && !isSubjectSlot(box)) return cleared;
-  return {
-    ...cleared,
-    ...Object.fromEntries(s.lane.filter((id) => isSubjectSlot(id) && s.present(id)).map((id) => [id, isCollapsed(s, id)])),
-  };
+  const subjects = s.lane.filter((id) => isSubjectSlot(id) && s.present(id));
+  const note = s.lane.find((id) => !isSubjectSlot(id) && s.present(id));
+  if (note != null) return { ...cleared, [note]: false, ...Object.fromEntries(subjects.map((id) => [id, true])) };
+  // The departing box was the note (its open pin, `false`, stands on a non-subject slot) and this
+  // lane has none: pin nothing (I1).
+  if (Object.entries(s.overrides).some(([id, v]) => v === false && !isSubjectSlot(id))) return cleared;
+  return { ...cleared, ...Object.fromEntries(subjects.map((id) => [id, isCollapsed(s, id)])) };
 }
 
 /** The deepest card of the UNBROKEN RUN OF SUBJECT CARDS from the first present one (Inspector's

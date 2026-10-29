@@ -867,15 +867,21 @@ It has **no ghost**: an absent note is no card at all (`noteCardAbsent` — no r
 `unavailable` answering a READ; R67, so a degraded model never owns the resting box), while a first
 fetch in flight stands, reading. `unavailable` answering the reader's own "Write notes" gesture is
 the exception (R68, `useNote`'s `via`): the card stays and says "Couldn't write notes just now"
-above the same door, so a click is never answered by the card vanishing. And it is **outside every subject rule** of `railCollapse.ts`: a view switch never
-pins it, and pins nothing at all when it is the departing box (else every subject card arrived
-folded beside an unpinned note: no box); the step ghost's run skips it.
+above the same door, so a click is never answered by the card vanishing. And it is **outside every subject rule** of `railCollapse.ts`: a view switch pins it OPEN and
+the subject cards folded (R78, above — the one pin it ever gets), and where no note stands pins
+nothing at all when it was the departing box (else every subject card arrived folded beside an
+unpinned note: no box); the step ghost's run skips it.
 
-**Expanded state survives a view switch** (user, 2026-09-04 — reversing 2026-08-08's scene-first
-collapse: with rung heights easing, the collapse-and-reopen cycle WAS the "card size jumps between
-views"): a switch is arrival machinery, not a selection moment, so the +/− overrides hold through
-the mode change and its grace window, and only a post-window selection change resets them to the
-only-the-focus-rung-open default. Both live-advancing ordinals stay guarded in the selection key so
+**A view is entered on its note** (user, 2026-10-29, R78): in a view with a note, the switch pins
+the Gate AI card open and every present subject card folded — the subject cards are the carried
+selection, unchanged from the last view, and the note is this view's reading of it, the one thing
+new on arrival. A click after the grace window drops the pins and opens its own card as ever
+(`overridesOnViewEntry`, `railCollapse.ts`). Where no note stands, **expanded state survives a view
+switch** (user, 2026-09-04 — reversing 2026-08-08's scene-first collapse: with rung heights easing,
+the collapse-and-reopen cycle WAS the "card size jumps between views"; the note arriving open folds a
+subject card once and leaves it, so that cycle does not return): a switch is arrival machinery, not a
+selection moment, so the +/− overrides hold through the mode change and its grace window, and only a
+post-window selection change resets them to the only-the-focus-rung-open default. Both live-advancing ordinals stay guarded in the selection key so
 heartbeats never materialize a card. Conversely **the heartbeat is felt on closed
 cards**: both snapshot asides carry the beating dot and are the same tap-to-follow toggle, but **only
 one of them owns the clock.** The global aside ticks a `live · Xs` counter (the shown snapshot's age,
