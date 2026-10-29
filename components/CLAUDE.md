@@ -341,9 +341,11 @@ decisions inside them are design, not detail:
   (Parked at the back of the deck it paged the stack to its tail on focus.) It stays out of the
   RANK and off the shared ceiling: it is what the layers add up to. **History ARRIVES on it**
   (user, 2026-10-26: "set DAG the default in explorer (and thereby also the charts, cards etc)"):
-  under All, the view switch commits the DAG's plane focus (`viewPolicy.entryPlane`, applied by
-  `trendStack.entryFocus` inside the store's `setMode`) — the same state its row's click makes, so
-  its row, plane, Metagraph and Range cards all stand on the DAG; a committed filter arrives as itself.
+  under All, the view switch brings the DAG's plane forward (`viewPolicy.entryPlane`, applied by
+  `trendStack.entryFocus` inside the store's `setMode`) — the same focus its row's click makes,
+  so its row, plane, Metagraph and Range cards all stand on the DAG, except that the arrival ranks
+  nothing in `selStack` (R70, 2026-10-29): the click is a choice and opens the Range card, the
+  arrival is the view's own and leaves the AI notes card the box; a committed filter arrives as itself.
   **Two snapshot measures, because the DAG has two snapshot counts** (user, 2026-10-26 — dagscan's
   1Y "snapshots" read ~10× below ours): **Snapshots anchored** (`snapshots`) is each network's own
   snapshots, the DAG row their sum (`g.anchors`, tagged); **In global snapshots** (`globals` — "In" because a bare "Global snapshots" read as a network's own;

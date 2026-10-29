@@ -385,7 +385,8 @@ interface AppState {
    *  visible window, so the stack pages rather than capping at a top-N. */
   trendScroll: number;
   /** The plane brought forward (5b). View-scoped: it clears on leaving the view, like the other
-   *  view-scoped ladder levels. */
+   *  view-scoped ladder levels, and History's arrival seats its entry plane here UNRANKED
+   *  (`setMode` → `focusPatch`, R70): only a row's click ranks a plane in `selStack`. */
   trendFocus: string | null;
   /** How many cards a vertical swipe has turned the deck by (`trendStack.rotateOrder`): a VIEW
    *  SETTING like `trendScroll`, not a selection — the front card is simply whichever the rotation
@@ -534,8 +535,16 @@ const DEEP_MAX = 24;
  *  Range card (it is a commit, and the rail opens a commit's own card), the arrival does not — the
  *  entry plane is the view's own doing, and a card nobody chose must not take the resting box from
  *  the AI notes card (`focusSlotId` reads `selStack` as "what was picked"). */
-function focusPatch(s: { selStack: SelSlot[] }, id: string | null, chosen = true): { trendFocus: string | null; selStack: SelSlot[] } {
-  return { trendFocus: id, selStack: id != null && chosen ? bumpStack(s.selStack, "range", true) : s.selStack };
+function focusPatch(
+  s: { selStack: SelSlot[]; trendRange: { fromMs: number; toMs: number } | null },
+  id: string | null,
+  chosen = true,
+): { trendFocus: string | null; selStack: SelSlot[] } {
+  if (id != null && chosen) return { trendFocus: id, selStack: bumpStack(s.selStack, "range", true) };
+  // A focus released, or a plane seated unranked, takes its Range rank with it — else the rank a
+  // click left behind kept the Range card the box over the note after the release, and on the
+  // next visit (review, 2026-10-29). A BRUSHED range is the reader's own and keeps the rank.
+  return { trendFocus: id, selStack: s.trendRange != null ? s.selStack : bumpStack(s.selStack, "range", false) };
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -706,11 +715,9 @@ export const useStore = create<AppState>((set) => ({
         metaSnap && !(s.metaSnap && s.metaSnap.metaId === metaSnap.metaId && s.metaSnap.ordinal === metaSnap.ordinal)
           ? false
           : s.navQuiet,
-      selStack: !metaSnap
-        ? s.selStack.filter((x) => x !== "metaSnap")
-        : s.selStack.includes("metaSnap")
-          ? s.selStack
-          : [...s.selStack, "metaSnap"],
+      // …and the same stack rule (R70): a live advance never enters the stack; a pin
+      // (`setMetaSnap`) ranks, and a snapshot going away drops its pin.
+      selStack: !metaSnap ? s.selStack.filter((x) => x !== "metaSnap") : s.selStack,
     })),
   setHoverSnapOrd: (hoverSnapOrd) => set({ hoverSnapOrd }),
   setHoverMetaSnap: (hoverMetaSnap) => set({ hoverMetaSnap }),
@@ -796,6 +803,10 @@ export const useStore = create<AppState>((set) => ({
       // search of the reader's own, the range is left as it was.
       const now = Date.now();
       const range = s.logCut ? snapRange({ fromMs: s.logCut.fromMs, toMs: s.logCut.toMs ?? now }, now) : s.trendRange;
+      // Both come back RANKED, as the commits they are (`setFilter`'s and `setTrendRange`'s own
+      // bumps): the searched span last, so its Range card is the box. Unranked, the Range card
+      // came back folded under the open note (review, 2026-10-29).
+      const ranked = s.logCut && range ? bumpStack(s.selStack, "range", true) : s.selStack;
       return back != null && back !== s.mode
         ? {
             section,
@@ -805,7 +816,7 @@ export const useStore = create<AppState>((set) => ({
             trendFocus: focus,
             trendRange: range,
             rawReturnFocus: null,
-            selStack: focus != null ? bumpStack(s.selStack, "network", true) : s.selStack,
+            selStack: focus != null ? bumpStack(ranked, "network", true) : ranked,
             motionCause: { kind: "view", from: s.mode, to: back },
           }
         : { section, rawReturnMode: section === "scene" ? null : s.rawReturnMode };
@@ -883,7 +894,8 @@ export const useStore = create<AppState>((set) => ({
   // The Metagraph card still names that network — it stands above the Range as its parent, an
   // entry one click away — so nothing is lost and no view compare is added: this setter is
   // History's own. From 2026-10-07 until then the focus bumped the network slot instead. A
-  // release leaves the stack alone: the filter may still hold the dossier.
+  // release drops the Range rank unless a brushed range holds it (`focusPatch`); the filter's own
+  // rank, the dossier's, is untouched either way.
   setTrendFocus: (id) => set((s) => focusPatch(s, id)),
   setTrendRotation: (r) => set({ trendRotation: r, motionCause: { kind: "page" } }),
   setTrendScale: (scale) => set({ trendScale: scale }),

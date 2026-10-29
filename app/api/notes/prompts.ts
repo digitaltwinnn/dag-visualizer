@@ -51,7 +51,7 @@ export const PROMPTS: Record<NoteView, { question: string; questionNow?: string;
   },
   ledger: {
     question: "Say what changed in the anchoring rhythm over the recent hours against the usual: what sped up or slowed down, from the usual figure to the recent one, and which networks did it. Then the reading itself: the longest gap, and what was part of the global snapshots.",
-    questionNow: "The recent hours ran close to the usual, so do not describe a change and do not mention the usual figures: say what the anchoring rhythm looks like right now over the recent hours. How often snapshots are being anchored, their spacing, the longest gap, which networks are doing it and what they were part of.",
+    questionNow: "The recent hours ran close to the usual, so this note does not lead with what changed, whatever the rules above say: do not describe a change and do not mention the usual figures. Say what the anchoring rhythm looks like right now over the recent hours: how often snapshots are being anchored, their spacing, the longest gap, which networks are doing it and what they were part of.",
     system: (subjectLabel, lead) =>
       `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${lead?.kind === "now" ? PROMPTS.ledger.questionNow : PROMPTS.ledger.question}${
         lead?.kind === "change" ? `\nLead with what moved: ${lead.moved.join("; ")}. Every other figure held close to its usual: give it as a reading, never as a change.` : ""

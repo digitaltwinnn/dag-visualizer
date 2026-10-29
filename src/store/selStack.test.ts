@@ -74,10 +74,33 @@ describe("a plane focus bumps the RANGE slot (user, 2026-10-25 — a plane is it
     useStore.getState().setTrendFocus("dor");
     expect(useStore.getState().selStack).toEqual(["range", "instant"]);
   });
-  it("releasing the focus leaves the stack alone", () => {
+  it("releasing the focus drops the Range rank, unless a brushed range holds it (R70 review, 2026-10-29)", () => {
+    useStore.setState({ trendRange: null });
+    useStore.getState().setTrendFocus("dor");
+    useStore.getState().setTrendFocus(null);
+    expect(useStore.getState().selStack).toEqual([]);
+    useStore.getState().setTrendRange({ fromMs: 0, toMs: 86_400_000 });
     useStore.getState().setTrendFocus("dor");
     useStore.getState().setTrendFocus(null);
     expect(useStore.getState().selStack).toEqual(["range"]);
+  });
+  it("a second arrival does not inherit the last visit's plane rank", () => {
+    useStore.setState({ mode: "hyper", trendRange: null });
+    useStore.getState().setMode("trend");
+    useStore.getState().setTrendFocus("dor");
+    expect(useStore.getState().selStack).toEqual(["range"]);
+    useStore.getState().setMode("hyper");
+    useStore.getState().setMode("trend");
+    expect(useStore.getState().trendFocus).toBe("dag");
+    expect(useStore.getState().selStack).toEqual([]);
+  });
+  it("a span searched in the raw log comes back as a RANKED range (the Range card is the box, not folded under the note)", () => {
+    useStore.setState({ mode: "ledger", rawReturnMode: "trend", logCut: { fromMs: 0, toMs: 86_400_000 }, trendRange: null, metaSnap: null, tickNet: null, rawReturnFocus: null });
+    useStore.getState().setSection("scene");
+    const s = useStore.getState();
+    expect(s.mode).toBe("trend");
+    expect(s.trendRange).not.toBeNull();
+    expect(s.selStack[0]).toBe("range");
   });
 });
 

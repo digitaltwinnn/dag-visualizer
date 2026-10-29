@@ -30,8 +30,9 @@ import { useAiNote } from "./useAiNote";
 // snapshot, whatever) by default that will have the focus still, with the AI card header subtly
 // sitting on top as per current stack design"). It is the FIRST slot of every note view's lane
 // (`railCards.DISPLAY_LANE`, no ladder rung): in the slab, on the thread, under the rail's
-// single-open accordion like every card. At rest — no subject card present — it is the focus and
-// the one open box; once a subject card stands, the focus is that card's (`focusSlotId`) and this
+// single-open accordion like every card. At rest — nothing CHOSEN; a card the view seats by itself,
+// History's window range or Snapshots' live tick, is no choice (R70) — it is the focus and the one
+// open box; once a chosen subject card stands, the focus is that card's (`focusSlotId`) and this
 // one rests as the pile's top ENTRY, its eyebrow and title only, dimmed with distance like any
 // committed ancestor. Clicking the entry opens it the way any entry opens. (Two earlier homes were
 // rejected the same day: a card leading the rail outside the lane — "not part of [the ladder] (no

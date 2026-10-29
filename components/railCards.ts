@@ -85,9 +85,9 @@ export function ladderLevelOfSlot(id: string): FocusLevel | null {
 // the stack. Not as a so-called subject card, so if there is a true subject card … by default that
 // will have the focus still, with the AI card header subtly sitting on top as per current stack
 // design"). A lane slot with no rung — the snapshot slots' precedent — so it joins the slab and the
-// thread like any card, takes the focus only while no subject card stands (`focusSlotId` needs no
-// case for it: it is the coarsest slot and never in `selStack`), and otherwise rests as the pile's
-// top entry. It has no ghost: a view with no note has no slot (`detailsCards`' `notes`).
+// thread like any card, takes the focus while no CHOSEN subject card stands (`focusSlotId`, R70: a
+// card the view seated by itself is not a choice), and otherwise rests as the pile's top entry. It
+// has no ghost: a view with no note has no slot (`detailsCards`' `notes`).
 const DISPLAY_LANE: Partial<Record<Mode, readonly string[]>> = {
   hyper: ["notes", "context", "composition", "node"],
   geo: ["notes", "context", "country", "cohort", "node"],
