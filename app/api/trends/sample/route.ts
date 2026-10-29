@@ -8,8 +8,12 @@ import { getLiveGeo } from "@/app/api/geo/live";
 import { runSample } from "../runSample";
 import { writeStore } from "../store";
 import type { FleetCounts, GlobalRec, MetaRec } from "../bucketing";
-import { roleKey } from "@/src/data/composition";
+import { mergeDagClusters, type DagNode } from "@/src/data/dagCore";
+import type { ClusterNode } from "@/src/data/types";
+import { memo, readClusters } from "@/app/api/live/upstream";
+import { CLUSTER_WINDOW } from "@/app/api/live/windows";
 import { fleetGeo } from "../fleetGeo";
+import { fleetTallies } from "../fleetTally";
 import type { ChainPage } from "../fetchSince";
 
 // The trends SAMPLER — Vercel Cron hits this every 15 min (vercel.json). It pages the tiny
@@ -32,6 +36,17 @@ async function getJson(url: string, ms = 7000): Promise<unknown> {
   return r.json();
 }
 
+/** The DAG's own nodes from its two clusters, merged — null when either cluster cannot be read. */
+async function clusterNodes(net: ReturnType<typeof netOf>): Promise<DagNode[] | null> {
+  try {
+    const { l0, l1 } = NETWORKS[net];
+    const { value } = await memo(`clusters:${net}`, CLUSTER_WINDOW.memoMs, () => readClusters(l0, l1));
+    return mergeDagClusters(value.l0 as ClusterNode[], value.l1 as ClusterNode[]);
+  } catch {
+    return null;
+  }
+}
+
 // Fleet counts from the SAME cached loaders the /api/metagraphs and /api/geo routes serve —
 // shared unstable_cache entries, so sampling the fleet adds no upstream traffic. Null on
 // failure: an absent gauge is an honest gap (rule 10), a zeroed fleet is a fabrication.
@@ -40,35 +55,24 @@ async function fleetCounts(net: ReturnType<typeof netOf>): Promise<FleetCounts |
     const [{ metagraphs, geo: metaGeo }, dagGeo] = await Promise.all([getLive(net), getLiveGeo(net)]);
     const dagIps = Object.keys(dagGeo);
     const perNet: Record<string, number> = { dag: dagIps.length };
-    const layers: Record<string, number> = {};
     // Where the fleet runs (fleetGeo.ts): the WHOLE fleet by country and provider — each IP once,
     // validators first — and each network's own nodes, for the geo family. Its `countries` is
     // also the tiers' long-standing `f.cc.<cc>` gauge, so the two can never count differently.
     const geo = fleetGeo(dagGeo, metagraphs, metaGeo);
     const countries = geo.countries;
     let total = dagIps.length;
-    // f.layer.* counts metagraph-layer roles only — per-layer validator attribution isn't
-    // derivable from the geo map (it carries no role/layer field for validator IPs).
-    // f.layer.{id}.{role} is the same tally kept per network (2026-09-11 — the /trends
-    // per-network node panels draw the layer lines the hypergraph tab already has).
-    const perNetLayers: Record<string, Record<string, number>> = {};
-    // f.type.{id}.{key}: the same nodes by TYPE (2026-09-29) — each node counted ONCE, under its
-    // exact make-up, so a network's types sum to its total where its role tallies overlap.
-    const perNetTypes: Record<string, Record<string, number>> = {};
     for (const m of metagraphs) {
       perNet[m.id] = m.nodes.length;
       total += m.nodes.length;
-      const mine: Record<string, number> = (perNetLayers[m.id] = {});
-      const types: Record<string, number> = (perNetTypes[m.id] = {});
-      for (const n of m.nodes) {
-        const k = roleKey(n);
-        types[k] = (types[k] || 0) + 1;
-      }
-      for (const n of m.nodes) for (const role of n.roles) {
-        layers[role] = (layers[role] || 0) + 1;
-        mine[role] = (mine[role] || 0) + 1;
-      }
     }
+    // f.layer.{id}.{role} and f.type.{id}.{key} for EVERY network, the DAG included (2026-10-29):
+    // the DAG's nodes are its two validator clusters merged by the live Hypergraph's own rule
+    // (`mergeDagClusters`), read through the live clusters route's memo — same key, same window,
+    // so the sampler adds no upstream read. A failed cluster read leaves the DAG's layer and type
+    // fields ABSENT this sample (an honest gap), the rest of the fleet still written. The
+    // fleet-wide f.layer.{role} stays metagraph-only (`fleetTally.ts` says why).
+    const dagNodes = await clusterNodes(net);
+    const { layers, perNetLayers, perNetTypes } = fleetTallies(metagraphs, dagNodes);
     return total > 0 ? { total, perNet, layers, perNetLayers, perNetTypes, countries, geo } : null;
   } catch {
     return null;
