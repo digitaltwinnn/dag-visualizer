@@ -11,7 +11,10 @@ import { trimNewestPartial, type TrendsWindowData } from "@/src/data/trendWindow
 // (`fleetCc`, `bucketFleetGeo`) and never reaches a label. Geography answers WHERE:
 // the default note (subject `all`) says how many countries and providers host the fleet and which
 // carry the most nodes; a network's note gives its footprint against the fleet and where it stood
-// a week ago; a country's says what that country hosts. SHARES AND COUNTS ONLY: no label grades the spread (the gate also bans
+// a week ago; a country's says what that country hosts. A SUBJECT NOTE is one card's: a network's
+// nodes in one country, or one provider's nodes across the whole network or one network, each
+// labelled scope first ("USDC.dag, nodes in Germany") so the gate attributes its ratio by name.
+// SHARES AND COUNTS ONLY: no label grades the spread (the gate also bans
 // "decentrali-"), so the model has nothing to editorialise from.
 //
 // It reads the STORED geo family (`app/api/trends/bucketing.ts` `bucketFleetGeo`), one day bucket
@@ -51,6 +54,9 @@ import { trimNewestPartial, type TrendsWindowData } from "@/src/data/trendWindow
 //     stripping `gmbh|ag|inc|llc|ltd|sas|se` (Hetzner Online GmbH + AG) are one provider, summed.
 //     The merged provider is called by the stem both share ("Hetzner Online");
 //   · the store holds no country × provider breakdown, so a country's note carries no providers;
+//   · A SUBJECT NOTE is scoped as its card is (country × network, provider × scope): network-scoped
+//     figures read the geo family alone, a week ago only from the network's own measured day, no
+//     common reading;
 //   · THE VIEW'S OWN FACTS FIRST, THE COMMON READING LAST (user, 2026-10-29; R74): where the nodes
 //     run is this view's; the activity facts are the shared `noteFactsActivity.ts`, appended after
 //     every place fact for a network or the whole network, where the prompt asks for them;
@@ -66,7 +72,10 @@ import { trimNewestPartial, type TrendsWindowData } from "@/src/data/trendWindow
 // Pure: no store values, react or I/O (the colocated test is the specification — rule 4).
 
 export interface GeoFactsInput {
-  subject: "all" | string | { cc: string }; // "all" = the fleet; a string = a network id; { cc } = a country
+  /** "all" = the fleet; a string = a network id; `{ cc }` = a country, `{ isp }` = a provider by its
+   *  KEY (`providerKey`), either scoped to one network by `net` (`dag` included) or, without it, the
+   *  whole network's. */
+  subject: "all" | string | { cc: string; net?: string } | { isp: string; net?: string };
   /** "YYYY-MM-DD" → that day's geo fields (`f.cc.*`, `f.isp.*`, `f.cc.<id>.*`, `f.isp.<id>.*`). */
   geoDays: Record<string, Record<string, number>>;
   /** "YYYY-MM-DD" → the tiers' fleet `f.cc.<cc>` (since 2026-09-07). */
@@ -76,7 +85,8 @@ export interface GeoFactsInput {
   names: Record<string, string>; // catalog id → display name
   /** The daily tier over the last four weeks (store, unfolded), for the COMMON reading appended
    *  last (R74, `noteFactsActivity.ts`): the network's, or the whole network's, global snapshots
-   *  per day last week against the weeks before. Absent (a country, or no read), none is stated. */
+   *  per day last week against the weeks before. Absent (a country, or no read), none is stated,
+   *  and a subject note (a country or a provider) never states it. */
   daily?: TrendsWindowData | null;
 }
 
@@ -183,6 +193,7 @@ interface Provider {
   group: string; // the merge key
   name: string; // what the facts call it
   names: Set<string>; // every display name merged into it
+  keys: Set<string>; // every stored key merged into it: a subject note names its provider by key
   count: number;
 }
 
@@ -193,8 +204,9 @@ function providersOf(isp: Counts, providerNames: Record<string, string>): Map<st
     const display = providerNames[key] ?? key;
     const group = display.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(LEGAL, " ").replace(/\s+/g, " ").trim() || display.toLowerCase();
     let p = out.get(group);
-    if (!p) out.set(group, (p = { group, name: stemOf(display), names: new Set(), count: 0 }));
+    if (!p) out.set(group, (p = { group, name: stemOf(display), names: new Set(), keys: new Set(), count: 0 }));
     p.names.add(display);
+    p.keys.add(key);
     p.count += n;
     p.name = stemOf([...p.names].sort()[0]!); // the same pick whichever key came first
   }
@@ -231,7 +243,15 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
   const geo = parseAll(input.geoDays);
   const fleetDays = measuredDays(geo, (d) => sum(d.cc));
   const subjectNet = typeof subject === "string" && subject !== "all" ? subject : null;
-  const subjectCc = typeof subject === "object" ? subject.cc : null;
+  const picked = typeof subject === "object" ? subject : null;
+  /** A subject note's network scope (absent: the whole network's). */
+  const subjectScopeNet = picked?.net ?? null;
+  /** The fleet's country, the warmed view note; a country within a network is a subject note. */
+  const subjectCc = picked && "cc" in picked && !subjectScopeNet ? picked.cc : null;
+  const subjectNetCc = picked && "cc" in picked && subjectScopeNet ? picked.cc : null;
+  const subjectIsp = picked && "isp" in picked ? picked.isp : null;
+  /** The network whose own reading is `now`: a network's note, or a subject scoped to one. */
+  const readNet = subjectNet ?? subjectScopeNet;
 
   // THE CURRENT READING. The fleet's is the newest measured fleet day. A network must have a node
   // list ON that day (one that stopped publishing is silent, never described by an old footprint);
@@ -240,8 +260,8 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
   const newestFleet = fleetDays[fleetDays.length - 1];
   const listed = (d: Day, id: string) => d.netCc.has(id); // a node list means country fields, providers alone are not one
   let now: Day | undefined = newestFleet;
-  if (subjectNet) {
-    now = newestFleet && listed(newestFleet, subjectNet) ? measuredDays(geo, (d) => sum(d.netCc.get(subjectNet))).pop() : undefined;
+  if (readNet) {
+    now = newestFleet && listed(newestFleet, readNet) ? measuredDays(geo, (d) => sum(d.netCc.get(readNet))).pop() : undefined;
   }
   if (!now) return null;
   /** The fleet's figures on `now` are usable as a denominator only if `now` is a measured fleet day. */
@@ -333,6 +353,69 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
       if (located > 0 && locatedThen > 0 && located !== locatedThen)
         facts.push(fact(`${name}, located nodes now against a week ago`, located / locatedThen, "ratio"));
     }
+  } else if (subjectNetCc && subjectScopeNet) {
+    // A NETWORK'S NODES IN ONE COUNTRY: the geo family's reading of that network alone (the tiers
+    // hold no per-network countries), its week ago from its own measured day there.
+    const id = subjectScopeNet;
+    const netName = nameOf(id);
+    const own = ranked([...(now.netCc.get(id) ?? [])].map(([cc, count]) => ({ cc, count })), (c) => c.cc);
+    const here = now.netCc.get(id)?.get(subjectNetCc) ?? 0;
+    if (!here) return null;
+    const located = own.reduce((a, c) => a + c.count, 0);
+    const country = cn(subjectNetCc);
+    const then = weekBefore(ownMeasured(id), now);
+    // A measured day of the network lists every country it had nodes in, so one absent there held none.
+    const was = then ? (then.netCc.get(id)?.get(subjectNetCc) ?? 0) : null;
+    const key = `${id}:cc:${subjectNetCc}`;
+    facts.push(fact(`${netName}, nodes in ${country}`, here, "count", undefined, was != null ? { key, end: "to" } : undefined));
+    facts.push(fact(`${netName}, share of its located nodes in ${country}`, here / located, "share"));
+    facts.push(fact(`${country}, rank among ${netName}'s countries by nodes`, 1 + own.filter((c) => c.count > here).length, "count"));
+    facts.push(fact(`${netName}, located nodes`, located, "count"));
+    facts.push(fact(`${netName}, countries with nodes`, own.length, "count"));
+    if (was != null) {
+      facts.push(fact(`${netName}, nodes in ${country} a week ago`, was, "count", undefined, { key, end: "from" }));
+      if (was > 0 && was !== here) facts.push(fact(`${netName}, nodes in ${country} now against a week ago`, here / was, "ratio"));
+    }
+  } else if (subjectIsp && subjectScopeNet) {
+    // ONE PROVIDER'S NODES IN ONE NETWORK: the geo family's reading of that network alone, its share
+    // of the network's nodes with a known provider, its week ago from the network's own measured day.
+    const id = subjectScopeNet;
+    const netName = nameOf(id);
+    const ownProv = ranked(providersOf(now.netIsp.get(id) ?? new Map(), providerNames).values(), (p) => p.name);
+    const p = ownProv.find((x) => x.keys.has(subjectIsp));
+    if (!p) return null;
+    const provider = pn(p);
+    const known = ownProv.reduce((a, x) => a + x.count, 0);
+    const then = weekBefore(ownMeasured(id), now);
+    // The week-ago day must hold the network's providers at all: one with countries and no provider
+    // field that day says nothing about this provider.
+    const thenIsp = then?.netIsp.get(id);
+    const was = thenIsp ? (providersOf(thenIsp, providerNames).get(p.group)?.count ?? 0) : null;
+    const key = `${id}:provider:${p.group}`;
+    facts.push(fact(`${netName}, nodes with ${provider}`, p.count, "count", undefined, was != null ? { key, end: "to" } : undefined));
+    facts.push(fact(`${netName}, share of its nodes with a known provider with ${provider}`, p.count / known, "share"));
+    facts.push(fact(`${provider}, rank among ${netName}'s providers by nodes`, 1 + ownProv.filter((x) => x.count > p.count).length, "count"));
+    facts.push(fact(`${netName}, providers with nodes`, ownProv.length, "count"));
+    if (was != null) {
+      facts.push(fact(`${netName}, nodes with ${provider} a week ago`, was, "count", undefined, { key, end: "from" }));
+      if (was > 0 && was !== p.count) facts.push(fact(`${netName}, nodes with ${provider} now against a week ago`, p.count / was, "ratio"));
+    }
+  } else if (subjectIsp) {
+    // ONE PROVIDER ACROSS THE WHOLE NETWORK: the geo family's fleet providers, as the default note
+    // reads them, with its week ago only when both ends are measured.
+    const p = providers.find((x) => x.keys.has(subjectIsp));
+    if (!p) return null;
+    const provider = pn(p);
+    const before = geoThen ? providersOf(geoThen.isp, providerNames).get(p.group)?.count : undefined;
+    const key = `provider:${p.group}`;
+    facts.push(fact(`${provider}, nodes`, p.count, "count", undefined, before ? { key, end: "to" } : undefined));
+    facts.push(fact(`${provider}, share of the network's nodes with a known provider`, p.count / knownFleet, "share"));
+    facts.push(fact(`${provider}, rank by nodes among providers`, 1 + providers.filter((x) => x.count > p.count).length, "count"));
+    facts.push(fact("Providers hosting nodes", providers.length, "count"));
+    if (before) {
+      facts.push(fact(`${provider}, nodes a week ago`, before, "count", undefined, { key, end: "from" }));
+      facts.push(fact(`${provider}, nodes now against a week ago`, p.count / before, "ratio"));
+    }
   } else if (subjectCc) {
     const here = fleetCc.get(subjectCc);
     if (!here) return null;
@@ -400,8 +483,9 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     }
   }
 
-  // THE COMMON READING, LAST (R74): activity, the same facts Hypergraph appends. A country has none.
-  if (input.daily && !subjectCc) {
+  // THE COMMON READING, LAST (R74): activity, the same facts Hypergraph appends. A country and every
+  // subject note have none: it is a network's or the whole network's.
+  if (input.daily && !picked) {
     const d = trimNewestPartial(input.daily);
     facts.push(...(subjectNet
       ? activityFacts(`${nameOf(subjectNet)} global snapshots it was part of per day`, anchorSeries(subjectNet, d.series))

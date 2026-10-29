@@ -11,7 +11,7 @@ import { CATALOG, type NetworkId } from "@/src/engine/config";
 import { assembleSpan, WINDOWS } from "../trends/assemble";
 import { geoSlotOf, ispNamesKeyOf, slotsInWindow, type Tier } from "../trends/keys";
 import { readStore, type TrendsStore } from "../trends/store";
-import type { NoteSpan } from "./keys";
+import { isSubjectNote, subjectKindOf, type NoteSpan, type SubjectKind } from "./keys";
 
 // THE SOURCES OF AI NOTES — the impure half of the facts: which stored payloads each view's note
 // is written from, read and handed to that view's pure builder (`src/data/noteFacts*.ts`). The
@@ -165,6 +165,7 @@ function blurbsOf(net: string): Record<string, string> {
 
 const isNetwork = (net: string, id: string) => id === "dag" || catalogOf(net).some((m) => m.id === id);
 const CC_RE = /^cc:([A-Z]{2})$/;
+const ISP_RE = /^isp:([a-z0-9-]{1,48})$/;
 const RANGE_RE = /^r(\d+)-(\d+)$/;
 
 function rangeOf(span: string): { fromMs: number; toMs: number } | null {
@@ -182,6 +183,33 @@ function countryName(cc: string): string {
   } catch {
     return cc;
   }
+}
+
+type GeoSelection = { cc: string; net?: string } | { isp: string; net?: string };
+
+/** A GEOGRAPHY SELECTION as the builder takes it: a fleet country `cc:XX`, and the subject notes
+ *  `<net>/cc:XX`, `isp:<key>`, `<net>/isp:<key>`, whose scope is `dag` or a network this catalog
+ *  tracks (`params.ts` validates the request; this says whether the view writes it). Null for
+ *  anything else, a network's own note included. */
+function geoSelectionOf(net: string, subject: string): GeoSelection | null {
+  const scoped = isSubjectNote(subject) && subject.includes("/");
+  const scope = scoped ? subject.slice(0, subject.indexOf("/")) : undefined;
+  if (scope != null && !isNetwork(net, scope)) return null;
+  const tail = scope != null ? subject.slice(scope.length + 1) : subject;
+  const cc = CC_RE.exec(tail)?.[1];
+  const isp = ISP_RE.exec(tail)?.[1];
+  const at = scope != null ? { net: scope } : {};
+  return cc ? { cc, ...at } : isp ? { isp, ...at } : null;
+}
+
+/** A Geography subject note's prompt label and display name, SCOPE FIRST (the gate attributes a
+ *  sentence's ratios to the names in it): a network's nodes in a country or with a provider, else
+ *  the provider itself. The provider is called by its stored display name, else its key. */
+function geoSubjectLabel(sel: GeoSelection, names: Record<string, string>, providerNames: Record<string, string>): { label: string; subjectName: string } {
+  const what = "cc" in sel ? countryName(sel.cc) : (providerNames[sel.isp] ?? sel.isp);
+  if (sel.net == null) return { label: what, subjectName: what };
+  const netName = names[sel.net] ?? sel.net;
+  return { label: `${netName}'s nodes ${"cc" in sel ? "in" : "with"} ${what}`, subjectName: netName };
 }
 
 // ── The per-view table ─────────────────────────────────────────────────────────────────────────
@@ -203,6 +231,10 @@ interface Read {
   spanTo: number;
   /** The windows the note may name (R20): label → seconds, appended as `duration` facts. */
   windows: [string, number][];
+  /** The prompt's label and the subject's display name when the read knows them better than the
+   *  row's `label` (a Geography subject note names its provider from the names it read). */
+  label?: string;
+  subjectName?: string;
 }
 
 interface Ctx {
@@ -313,7 +345,7 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
   // (R22), so the earliest day the comparison may use, 8 days back, needs the 6 days before it,
   // or a partial outage at the read's head is judged against itself and becomes the week-ago anchor.
   geo: {
-    accepts: (net, subject, span) => span === "day" && (subject === "all" || CC_RE.test(subject) || isNetwork(net, subject)),
+    accepts: (net, subject, span) => span === "day" && (subject === "all" || isNetwork(net, subject) || geoSelectionOf(net, subject) != null),
     label: (subject, names) => {
       const cc = CC_RE.exec(subject)?.[1];
       return subject === "all" ? WHOLE : cc ? countryName(cc) : (names[subject] ?? subject);
@@ -324,13 +356,17 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
       const ccs = new Set<string>();
       for (const day of [...Object.values(geoDays), ...Object.values(ccDays)])
         for (const k of Object.keys(day)) if (k.startsWith("f.cc.")) ccs.add(k.slice(k.lastIndexOf(".") + 1));
-      const cc = CC_RE.exec(subject)?.[1];
-      if (cc) ccs.add(cc);
+      const sel = geoSelectionOf(net, subject);
+      if (sel && "cc" in sel) ccs.add(sel.cc);
       const countryNames = Object.fromEntries([...ccs].map((c) => [c, countryName(c)]));
-      const built = geoFacts({ subject: cc ? { cc } : subject, geoDays, ccDays, providerNames, countryNames, names, daily });
+      // A subject note is handed no daily read: the common reading is a network's or the whole
+      // network's, never one card's.
+      const subjectNote = isSubjectNote(subject);
+      const built = geoFacts({ subject: sel ?? subject, geoDays, ccDays, providerNames, countryNames, names, ...(subjectNote ? {} : { daily }) });
       const spanFrom = nowMs - 7 * D;
       // The common reading speaks of the last week (R74), so that window is stated beside the span.
-      return { built, spanFrom, spanTo: nowMs, windows: [["Span length", secondsOf(spanFrom, nowMs)], ["Week", (7 * D) / 1000]] };
+      const windows: [string, number][] = [["Span length", secondsOf(spanFrom, nowMs)], ["Week", (7 * D) / 1000]];
+      return { built, spanFrom, spanTo: nowMs, windows, ...(subjectNote && sel ? geoSubjectLabel(sel, names, providerNames) : {}) };
     },
   },
   // WHEN (live): the last 24 HOURS of the 5-minute tier against the last week of the hourly one
@@ -382,11 +418,16 @@ export interface NoteFacts {
   days: NotableDay[];
   spanFrom: number;
   spanTo: number;
-  /** The prompt's subject label ("the whole network", "the hypergraph", a network or a country). */
+  /** The prompt's subject label ("the whole network", "the hypergraph", a network, a country, or a
+   *  subject note's scope-first label: "USDC.dag's nodes in Germany"). */
   label: string;
-  /** The subject's display name when it is one network or one country, absent for the whole
-   *  network: the gate reads a sentence naming no one as speaking of it (R39). */
+  /** The subject's display name when it is one network, one country or one provider (a scoped
+   *  subject note's is its network's), absent for the whole network: the gate reads a sentence
+   *  naming no one as speaking of it (R39). */
   subjectName?: string;
+  /** What the subject names (`subjectKindOf`): the prompt asks a country, a provider or a make-up
+   *  its own question. */
+  kind: SubjectKind;
   /** Hyper `all` only: the networks with nodes (the warmer rewrites the digest when it changes). */
   setKey?: string;
   /** Snapshots only (R71): "change" when a pair moved, else "now" — the prompt's question follows. */
@@ -408,6 +449,7 @@ export async function factsFor(
   const r = await row.read({ net, subject, span, nowMs, reads: reads ?? storeReads(nowMs), names, blurbs: blurbsOf(net) });
   if (!r?.built) return null;
   const { built } = r;
+  const subjectName = r.subjectName ?? (row.whole(subject) ? undefined : row.label(subject, names));
   return {
     facts: [...built.facts, ...r.windows.map(([label, s]) => fact(label, s, "duration"))],
     names: built.names,
@@ -415,9 +457,10 @@ export async function factsFor(
     days: built.days ?? [],
     spanFrom: r.spanFrom,
     spanTo: r.spanTo,
-    label: row.label(subject, names),
+    label: r.label ?? row.label(subject, names),
+    kind: subjectKindOf(subject),
     common: hasCommonReading(built.facts),
-    ...(row.whole(subject) ? {} : { subjectName: row.label(subject, names) }),
+    ...(subjectName != null ? { subjectName } : {}),
     ...(built.setKey != null ? { setKey: built.setKey } : {}),
     ...(built.lead != null ? { lead: built.lead } : {}),
   };

@@ -98,6 +98,60 @@ describe("factsFor — the subject's display name for the gate (R39)", () => {
   });
 });
 
+// SUBJECT NOTES (2026-10-29): Geography's country × network and provider notes, scoped as their
+// cards are, labelled scope-first so the gate's attribution by name keeps working.
+describe("factsFor — Geography's subject notes", () => {
+  it("factsFor accepts the geo subject notes, labels them scope-first, names the subject and the kind, with no common reading", async () => {
+    const cases: [string, unknown, string, string, string][] = [
+      [`${USDC}/cc:DE`, { cc: "DE", net: USDC }, "USDC.dag's nodes in Germany", "USDC.dag", "country"],
+      ["dag/cc:FR", { cc: "FR", net: "dag" }, "DAG's nodes in France", "DAG", "country"],
+      ["isp:hetzner", { isp: "hetzner" }, "Hetzner", "Hetzner", "provider"],
+      ["isp:ovh-sas", { isp: "ovh-sas" }, "ovh-sas", "ovh-sas", "provider"], // no stored name: the key itself
+      [`${USDC}/isp:hetzner`, { isp: "hetzner", net: USDC }, "USDC.dag's nodes with Hetzner", "USDC.dag", "provider"],
+    ];
+    for (const [subject, parsed, label, subjectName, kind] of cases) {
+      vi.mocked(geoFacts).mockClear();
+      const out = await factsFor("mainnet", "geo", subject, "day", NOW, fakeReads());
+      expect(out, subject).not.toBeNull();
+      const input = vi.mocked(geoFacts).mock.calls[0]![0];
+      expect(input.subject, subject).toEqual(parsed);
+      expect(input.daily, subject).toBeUndefined();
+      expect({ label: out!.label, subjectName: out!.subjectName, kind: out!.kind, common: out!.common }, subject).toEqual({ label, subjectName, kind, common: false });
+    }
+    // A country note's country is named for the builder even when no stored day holds it.
+    await factsFor("mainnet", "geo", "dag/cc:JP", "day", NOW, fakeReads());
+    expect(vi.mocked(geoFacts).mock.calls.at(-1)![0].countryNames).toMatchObject({ JP: "Japan" });
+  });
+
+  it("every view's facts carry the subject's kind; the view notes are unchanged", async () => {
+    const got = async (view: "hyper" | "geo" | "ledger" | "trend", subject: string, span: "day" | "hours" | "7d") =>
+      (await factsFor("mainnet", view, subject, span, NOW, fakeReads()))!;
+    expect((await got("hyper", "all", "day")).kind).toBe("view");
+    expect((await got("ledger", USDC, "hours")).kind).toBe("view");
+    expect((await got("trend", "dag", "7d")).kind).toBe("view");
+    const cc = await got("geo", "cc:DE", "day");
+    expect([cc.kind, cc.label, cc.subjectName]).toEqual(["country", "Germany", "Germany"]);
+    const net = await got("geo", USDC, "day");
+    expect([net.kind, net.label, net.subjectName]).toEqual(["view", "USDC.dag", "USDC.dag"]);
+    expect((await got("geo", "all", "day")).label).toBe("the whole network");
+  });
+
+  it("geo accepts the scoped and provider forms for a tracked network or the DAG, nothing else", () => {
+    for (const s of [`${USDC}/cc:DE`, "dag/cc:DE", "isp:hetzner-online-gmbh", `${USDC}/isp:ovh`, "dag/isp:ovh"]) expect(noteSupported("geo", s, "day"), s).toBe(true);
+    for (const s of ["nope/cc:DE", "unlisted/cc:DE", `${USDC}/cc:de`, `${USDC}/type:l0`, "isp:Bad_Key", `${USDC}/isp:`, "all/cc:DE", `${USDC}/cc:DE/x`])
+      expect(noteSupported("geo", s, "day"), s).toBe(false);
+    expect(noteSupported("geo", `${USDC}/cc:DE`, "hours")).toBe(false);
+  });
+
+  it("noteSupported refuses a subject note in another view", () => {
+    for (const s of [`${USDC}/cc:DE`, "dag/cc:DE", "isp:hetzner", `${USDC}/isp:hetzner`]) {
+      expect(noteSupported("hyper", s, "day"), s).toBe(false);
+      expect(noteSupported("ledger", s, "hours"), s).toBe(false);
+      expect(noteSupported("trend", s, "7d"), s).toBe(false);
+    }
+  });
+});
+
 describe("factsFor — whether the facts hold the common reading (R74)", () => {
   it("is true only when the builder stated it", async () => {
     expect((await factsFor("mainnet", "geo", "cc:DE", "day", NOW, fakeReads()))!.common).toBe(false);

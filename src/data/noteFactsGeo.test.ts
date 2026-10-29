@@ -319,6 +319,111 @@ describe("geoFacts on a country", () => {
   });
 });
 
+// SUBJECT NOTES (2026-10-29): a card's own note, scoped as the card is. A network's figures read the
+// geo family alone; a week ago only from the network's own measured day there.
+describe("geoFacts on a country within a network", () => {
+  /** A week of the geo family with the network present, and the day a week back at half. */
+  const week = () => ({ "2026-10-20": day(scaled(0.5)), ...run("2026-10-27", 7, () => NOW) });
+
+  it("a network's nodes in a country: count, share of its located nodes, rank, with the week-ago pair and ratio from its own measured day", () => {
+    const geoDays = week();
+    const r = geoFacts(input({ subject: { cc: "US", net: "usdc" }, geoDays, ccDays: ccOf(geoDays) }))!;
+    expect(one(r, /^USDC\.dag, nodes in United States$/)).toMatchObject({ value: 10, kind: "count", pair: { key: "usdc:cc:US", end: "to" } });
+    expect(one(r, /^USDC\.dag, share of its located nodes in United States$/).value).toBeCloseTo(10 / 30);
+    expect(one(r, /^United States, rank among USDC\.dag's countries by nodes$/).value).toBe(2);
+    expect(one(r, /^USDC\.dag, located nodes$/).value).toBe(30);
+    expect(one(r, /^USDC\.dag, countries with nodes$/).value).toBe(2);
+    expect(one(r, /^USDC\.dag, nodes in United States a week ago$/)).toMatchObject({ value: 5, pair: { key: "usdc:cc:US", end: "from" } });
+    const ratio = one(r, /^USDC\.dag, nodes in United States now against a week ago$/);
+    expect([ratio.kind, ratio.value]).toEqual(["ratio", 2]);
+    expect([...pairsOf(r.facts).values()]).toEqual([["USDC.dag, nodes in United States a week ago", 5, "USDC.dag, nodes in United States", 10]]);
+    // Its own figures only: nothing of the fleet's, nor of another network.
+    expect(find(r, /^(Germany|Located nodes in the network|Countries hosting|Constellation|BioFi)/)).toHaveLength(0);
+  });
+
+  it("a network's country note states no week ago while the family is younger than a week", () => {
+    const geoDays = run("2026-10-27", 3, () => NOW);
+    const r = geoFacts(input({ subject: { cc: "DE", net: "usdc" }, geoDays, ccDays: ccOf(geoDays) }))!;
+    expect(one(r, /^USDC\.dag, nodes in Germany$/).value).toBe(20);
+    expect(one(r, /^USDC\.dag, nodes in Germany$/).pair).toBeUndefined();
+    expect(find(r, /week ago/)).toHaveLength(0);
+    expect(r.facts.filter((f) => f.kind === "ratio")).toHaveLength(0);
+  });
+
+  it("states no ratio when the network's count there held", () => {
+    const geoDays = { "2026-10-20": day(NOW), "2026-10-27": day(NOW) };
+    const r = geoFacts(input({ subject: { cc: "DE", net: "usdc" }, geoDays, ccDays: ccOf(geoDays) }))!;
+    expect(one(r, /^USDC\.dag, nodes in Germany a week ago$/).value).toBe(20);
+    expect(find(r, /now against a week ago/)).toHaveLength(0);
+  });
+
+  it("a network with no nodes in the country now is nothing to describe", () => {
+    expect(geoFacts(input({ subject: { cc: "FR", net: "usdc" } }))).toBeNull();
+    expect(geoFacts(input({ subject: { cc: "DE", net: "nope" } }))).toBeNull();
+  });
+});
+
+describe("geoFacts on a provider", () => {
+  it("a fleet provider: nodes, share of nodes with a known provider, rank, how many providers, and its week-ago pair", () => {
+    const geoDays = { "2026-10-20": day(scaled(0.5)), "2026-10-27": day(NOW) };
+    const r = geoFacts(input({ subject: { isp: "hetzner-online-ag" }, geoDays, ccDays: ccOf(geoDays) }))!; // merged with the GmbH key
+    expect(one(r, /^Hetzner Online, nodes$/)).toMatchObject({ value: 50, pair: { key: "provider:hetzner online", end: "to" } });
+    expect(one(r, /^Hetzner Online, share of the network's nodes with a known provider$/).value).toBeCloseTo(50 / 80);
+    expect(one(r, /^Hetzner Online, rank by nodes among providers$/).value).toBe(1);
+    expect(one(r, /^Providers hosting nodes$/).value).toBe(3);
+    expect([...pairsOf(r.facts).values()]).toEqual([["Hetzner Online, nodes a week ago", 25, "Hetzner Online, nodes", 50]]);
+    expect(one(r, /^Hetzner Online, nodes now against a week ago$/).value).toBeCloseTo(2);
+    expect(find(r, /^(Germany|United States|Located nodes|Countries hosting|OVH|Amazon)/)).toHaveLength(0);
+    expect(one(geoFacts(input({ subject: { isp: "ovh-sas" } }))!, /^OVH, rank by nodes among providers$/).value).toBe(3);
+  });
+
+  it("a fleet provider states no week ago with no measured day a week back", () => {
+    const r = geoFacts(input({ subject: { isp: "ovh-sas" } }))!;
+    expect(one(r, /^OVH, nodes$/).pair).toBeUndefined();
+    expect(find(r, /week ago/)).toHaveLength(0);
+  });
+
+  it("a provider hosting no node now is null", () => {
+    expect(geoFacts(input({ subject: { isp: "nope" } }))).toBeNull();
+    expect(geoFacts(input({ subject: { isp: "amazon-com-inc", net: "dag" } }))).toBeNull(); // in the network, not in Constellation's
+  });
+
+  it("a network's provider: the network's nodes with it, share of its known-provider nodes, rank among its providers", () => {
+    const geoDays = { "2026-10-20": day(scaled(0.5)), ...run("2026-10-27", 7, () => NOW) };
+    const r = geoFacts(input({ subject: { isp: "ovh-sas", net: "dag" }, geoDays, ccDays: ccOf(geoDays) }))!;
+    expect(one(r, /^Constellation, nodes with OVH$/)).toMatchObject({ value: 10, pair: { key: "dag:provider:ovh", end: "to" } });
+    expect(one(r, /^Constellation, share of its nodes with a known provider with OVH$/).value).toBeCloseTo(10 / 30);
+    expect(one(r, /^OVH, rank among Constellation's providers by nodes$/).value).toBe(2);
+    expect(one(r, /^Constellation, providers with nodes$/).value).toBe(2);
+    expect([...pairsOf(r.facts).values()]).toEqual([["Constellation, nodes with OVH a week ago", 5, "Constellation, nodes with OVH", 10]]);
+    expect(one(r, /^Constellation, nodes with OVH now against a week ago$/).value).toBeCloseTo(2);
+    expect(find(r, /^(Providers hosting|Hetzner Online, |Germany|USDC)/)).toHaveLength(0);
+  });
+
+  it("a network's provider states no week ago while the family is younger than a week", () => {
+    const r = geoFacts(input({ subject: { isp: "hetzner-online-gmbh", net: "dag" } }))!;
+    expect(one(r, /^Constellation, nodes with Hetzner Online$/)).toMatchObject({ value: 20 });
+    expect(one(r, /^Constellation, nodes with Hetzner Online$/).pair).toBeUndefined();
+    expect(find(r, /week ago/)).toHaveLength(0);
+  });
+
+  it("names include the provider's forms and the country", () => {
+    const p = geoFacts(input({ subject: { isp: "hetzner-online-ag", net: "usdc" } }))!;
+    expect(p.names).toEqual(expect.arrayContaining(["Hetzner Online AG", "Hetzner Online", "Hetzner", "USDC.dag"]));
+    const f = geoFacts(input({ subject: { isp: "hetzner-online-gmbh" } }))!;
+    expect(f.names).toEqual(expect.arrayContaining(["Hetzner Online GmbH", "Hetzner Online AG", "Hetzner Online", "Hetzner"]));
+    const c = geoFacts(input({ subject: { cc: "DE", net: "usdc" } }))!;
+    expect(c.names).toEqual(expect.arrayContaining(["Germany", "USDC.dag"]));
+  });
+
+  it("is the gate's source: a scoped sentence passes, a figure of another scope does not", () => {
+    const geoDays = { "2026-10-20": day(scaled(0.5)), ...run("2026-10-27", 7, () => NOW) };
+    const r = geoFacts(input({ subject: { cc: "DE", net: "usdc" }, geoDays, ccDays: ccOf(geoDays) }))!;
+    expect(checkNote("USDC.dag runs 20 nodes in Germany, doubled from 10 a week ago.", r.facts, r.names)).toEqual({ ok: true });
+    expect(checkNote("USDC.dag runs 50 nodes in Germany.", r.facts, r.names).ok).toBe(false); // the fleet's count there
+  });
+});
+
 // R74 (user, 2026-10-29): the view's own facts first, then the common activity reading, last.
 describe("geoFacts appends the common activity reading last", () => {
   const DAY_MS = 86_400_000;
@@ -350,6 +455,13 @@ describe("geoFacts appends the common activity reading last", () => {
   it("a country, or no daily read, gets none", () => {
     expect(find(geoFacts(input({ subject: { cc: "DE" }, daily: daily() }))!, /global snapshots/)).toEqual([]);
     expect(find(geoFacts(input())!, /global snapshots/)).toEqual([]);
+  });
+  it("a subject note appends no common reading even when daily is given", () => {
+    for (const subject of [{ cc: "DE", net: "usdc" }, { isp: "ovh-sas" }, { isp: "hetzner-online-ag", net: "usdc" }]) {
+      const r = geoFacts(input({ subject, daily: daily() }))!;
+      expect(r, JSON.stringify(subject)).not.toBeNull();
+      expect(find(r, /global snapshots/i)).toEqual([]);
+    }
   });
 });
 

@@ -26,6 +26,7 @@ const H = 3_600_000;
 const D = 86_400_000;
 const NOW = Date.UTC(2026, 9, 27, 12, 30);
 const FACTS: NoteFacts = {
+  kind: "view",
   common: false,
   facts: [fact("Snapshots anchored, per day, this span", 1200, "count"), fact("Span length", 604_800, "duration")],
   names: ["DAG"],
