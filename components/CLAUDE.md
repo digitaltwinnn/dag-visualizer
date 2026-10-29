@@ -895,9 +895,10 @@ card's own section grammar (the sparkles mark, "Constellation Gate AI", the span
 the selection itself**: a read that answers `request` is asked once, automatically, with no door —
 the reader's gesture was choosing the card. `none` and `unavailable` show nothing (the card never
 says "couldn't write" for a gesture the reader did not make), and a first fetch in flight reads
-"reading…"/"writing…". The Range card's old "Write notes for this range" door is gone with that;
-the 1h pill's door stays on the top card. A network-scoped country or provider note states no
-change until a week of the geo family exists, and reads as "right now" until then.
+"reading…"/"writing…". The Range card has no door of its own and no span chip on its block (the
+title is the span); the 1h pill's door stays on the top card. A network-scoped country or provider
+note states no change until a week of the geo family exists, so until then its facts hold no
+"a week ago" and the note describes the level.
 
 **A view is entered on its note** (user, 2026-10-29, R78): in a view with a note, the switch pins
 the Gate AI card open and every present subject card folded — the subject cards are the carried

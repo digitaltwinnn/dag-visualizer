@@ -7,6 +7,7 @@ import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { Fact, FactGroup, Lead, QualifierChip } from "@/components/inspector/parts";
 import Stamp from "@/components/Stamp";
 import RecordsDoor from "@/components/inspector/RecordsDoor";
+import { Separator } from "@/components/ui/separator";
 import SubjectNote from "@/components/notes/SubjectNote";
 import { rangeNoteReq } from "@/components/notes/subjectNote";
 import useTrendRoster from "@/components/useTrendRoster";
@@ -157,9 +158,14 @@ export default function TrendRangePane({
           </Lead>
           {/* THE RANGE'S OWN NOTE (spec 2026-10-29-subject-notes): only a BRUSHED range has one —
               the window standing in is the top Gate AI card's note — on the plane the deck stands
-              on (`cardNetwork`, the lead's own rule), asked as the brush lands. */}
+              on (`cardNetwork`, the lead's own rule), asked as the brush lands. No span chip: the
+              title IS the span, and the dates repeated as the unit clipped the block's label (live,
+              2026-10-29). The rule after it keeps the facts a section of their own. */}
           {range ? (
-            <SubjectNote req={rangeNoteReq(cardNetwork(filter, focus, front), range, (id) => id === UNLISTED_ID)} span={spanPhrase(windowId, range)} />
+            <>
+              <SubjectNote req={rangeNoteReq(cardNetwork(filter, focus, front), range, (id) => id === UNLISTED_ID)} span={null} />
+              <Separator className="mb-2" />
+            </>
           ) : null}
           <FactGroup>
             <Fact label="Start">{edge(span.fromMs)}</Fact>

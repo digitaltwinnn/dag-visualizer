@@ -29,7 +29,8 @@ them — but the Next Node server can.
   (2026-10-25 — the routes held a second copy of the cadence, and the cluster poll moved 25 → 30s
   under them): the edge a little under the poll (4s for the 5s feeds, 25s for the 30s one), the
   memo at most 5s, because the two caches STACK — the oldest answer a tab can get is memo + edge +
-  stale-while-revalidate, 10s and 35s today (`worstAgeMs`, tested). Each route holds a **module-level memo** (`upstream.ts`, per network) that checks its own
+  stale-while-revalidate, 10s and 35s today (`worstAgeMs`, tested). Each route holds a
+  **module-level memo** (`upstream.ts`, per network) that checks its own
   timestamp and shares one in-flight promise between concurrent misses;
   never `unstable_cache`, whose revalidate is too coarse for a 4 s window. The memo drops an expired
   entry when it is read and sweeps expired entries once it holds more than 256. **`?limit=` rounds UP
