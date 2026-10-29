@@ -57,7 +57,8 @@ describe("PROMPTS", () => {
     expect(geo).not.toContain("pace");
     expect(geo).toMatch(/where/i);
     expect(geo).toMatch(/decentrali/i); // it is told to leave the subject alone
-    expect(geo).toMatch(/then the one sentence on activity/);
+    expect(PROMPTS.geo.system("the network", undefined, true)).toMatch(/then the one sentence on activity/);
+    expect(geo).not.toMatch(/activity/);
     expect(PROMPTS.hyper.question).toMatch(/who|what/i);
     expect(PROMPTS.ledger.question).toMatch(/anchoring/i);
     expect(PROMPTS.ledger.question).toMatch(/hours/i);
@@ -66,12 +67,15 @@ describe("PROMPTS", () => {
 
   it("asks Hypergraph and Geography their own subject first and activity last (R74); the ledger and History keep their questions", () => {
     expect(PROMPTS.hyper.question).toBe(
-      "First, who and what is on the network over the span: networks or layers that gained or lost nodes, networks that started or stopped anchoring; if nothing changed there, say that it held, with the level. Last, in one sentence, how active it was: the global snapshots it was part of per day last week against the weeks before.",
+      "First, who and what is on the network over the span: networks or layers that gained or lost nodes, networks that started or stopped anchoring; if nothing changed there, say that it held, with the level.",
     );
+    expect(PROMPTS.hyper.questionCommon).toBe("Last, in one sentence, how active it was: the global snapshots it was part of per day last week against the weeks before.");
     expect(PROMPTS.geo.question).toBe(
-      "First, where the nodes run: countries and hosting providers that gained or lost nodes, or where the nodes are now when nothing moved. Last, in one sentence and only when the facts state it, how active the network was: its global snapshots per day last week against the weeks before. Say nothing about speed.",
+      "First, where the nodes run: countries and hosting providers that gained or lost nodes, or where the nodes are now when nothing moved. Say nothing about speed.",
     );
-    expect(PROMPTS.geo.system("x")).toContain("Stay on where the nodes are located and who hosts them, then the one sentence on activity, and nothing else.");
+    expect(PROMPTS.geo.questionCommon).toBe("Last, in one sentence, how active the network was: its global snapshots per day last week against the weeks before.");
+    expect(PROMPTS.geo.system("x")).toContain("Stay on where the nodes are located and who hosts them, and nothing else.");
+    expect(PROMPTS.geo.system("x", undefined, true)).toContain("Stay on where the nodes are located and who hosts them, then the one sentence on activity, and nothing else.");
     expect(PROMPTS.ledger.question).toBe(
       "Say what changed in the anchoring rhythm over the recent hours against the usual: what sped up or slowed down, from the usual figure to the recent one, and which networks did it. Then the reading itself: the longest gap, and what was part of the global snapshots.",
     );
@@ -108,8 +112,25 @@ describe("PROMPTS", () => {
     expect(buildMessages("ledger", "Mainnet", "Facts", null, undefined, { kind: "change", moved: ["Fees in DAG per hour"] })[0]!.content).toContain("Lead with what moved: Fees in DAG per hour.");
   });
 
+  // R74: the common part is asked only while the facts hold it — a country, or a network short of
+  // measured days, has none, and asked anyway the model wrote one from a share ratio (live 2026-10-29).
+  it("asks for the common reading only when the facts hold it, in Hypergraph and Geography alone", () => {
+    for (const v of ["hyper", "geo"] as const) {
+      expect(PROMPTS[v].system("x", undefined, false)).not.toContain(PROMPTS[v].questionCommon!);
+      expect(PROMPTS[v].system("x")).not.toContain(PROMPTS[v].questionCommon!);
+      expect(PROMPTS[v].system("x", undefined, true)).toContain(`${PROMPTS[v].question} ${PROMPTS[v].questionCommon}`);
+    }
+    for (const v of ["ledger", "trend"] as const) {
+      expect(PROMPTS[v].questionCommon).toBeUndefined();
+      expect(PROMPTS[v].system("x", undefined, true)).toBe(PROMPTS[v].system("x"));
+    }
+    expect(buildMessages("geo", "Germany", "Facts", null, undefined, undefined, false)[0]!.content).not.toContain("activity");
+    expect(buildMessages("geo", "the network", "Facts", null, undefined, undefined, true)[0]!.content).toContain(PROMPTS.geo.questionCommon!);
+  });
+
   it("keeps its own copy free of dashes", () => {
     for (const v of VIEWS) expect(PROMPTS[v].system("x")).not.toMatch(/—|\s[–-]\s/);
+    for (const v of VIEWS) expect(PROMPTS[v].system("x", undefined, true)).not.toMatch(/—|\s[–-]\s/);
     expect(PROMPTS.ledger.system("x", { kind: "now" })).not.toMatch(/—|\s[–-]\s/);
     expect(VOICE).not.toMatch(/—|\s[–-]\s/);
   });

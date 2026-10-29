@@ -2,6 +2,7 @@ import { fact } from "@/src/data/noteFacts";
 import { bannedWords, undash } from "@/src/data/noteHonesty";
 import { geoFacts } from "@/src/data/noteFactsGeo";
 import { hyperFacts } from "@/src/data/noteFactsHyper";
+import { hasCommonReading } from "@/src/data/noteFactsActivity";
 import { ledgerFacts } from "@/src/data/noteFactsLedger";
 import { trendFacts, type TrendFactsInput } from "@/src/data/noteFactsTrend";
 import type { Fact, NotableDay, NoteView, NoteLead } from "@/src/data/noteTypes";
@@ -389,6 +390,9 @@ export interface NoteFacts {
   setKey?: string;
   /** Snapshots only (R71): "change" when a pair moved, else "now" — the prompt's question follows. */
   lead?: NoteLead;
+  /** Whether the facts hold the COMMON reading (R74, `noteFactsActivity.ts`): the prompt asks for
+   *  its last sentence only then. */
+  common: boolean;
 }
 
 /** THE FACTS FOR ONE NOTE: that view's reads, its builder, and the span's length. Null when the
@@ -411,6 +415,7 @@ export async function factsFor(
     spanFrom: r.spanFrom,
     spanTo: r.spanTo,
     label: row.label(subject, names),
+    common: hasCommonReading(built.facts),
     ...(row.whole(subject) ? {} : { subjectName: row.label(subject, names) }),
     ...(built.setKey != null ? { setKey: built.setKey } : {}),
     ...(built.lead != null ? { lead: built.lead } : {}),

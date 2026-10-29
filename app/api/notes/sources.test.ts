@@ -98,6 +98,14 @@ describe("factsFor — the subject's display name for the gate (R39)", () => {
   });
 });
 
+describe("factsFor — whether the facts hold the common reading (R74)", () => {
+  it("is true only when the builder stated it", async () => {
+    expect((await factsFor("mainnet", "geo", "cc:DE", "day", NOW, fakeReads()))!.common).toBe(false);
+    vi.mocked(geoFacts).mockReturnValue({ facts: [FACT, { label: "Global snapshots per day, last week", value: 8000, kind: "count", text: "8,000" }], names: [] });
+    expect((await factsFor("mainnet", "geo", "all", "day", NOW, fakeReads()))!.common).toBe(true);
+  });
+});
+
 describe("factsFor — what the note leads with (R71)", () => {
   it("carries the Snapshots builder's lead through, and the other views none", async () => {
     expect((await factsFor("mainnet", "ledger", "all", "hours", NOW, fakeReads()))!.lead).toEqual({ kind: "now" });

@@ -15,6 +15,7 @@ const NOW = Date.UTC(2026, 9, 27, 12, 30);
 const DAY_ISO = "2026-10-27";
 
 const FACTS: NoteFacts = {
+  common: false,
   facts: [
     fact("Snapshots anchored, per day, this span", 1200, "count"),
     fact("Snapshots anchored, ratio to previous span", 1.37, "ratio"),

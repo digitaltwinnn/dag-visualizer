@@ -39,6 +39,14 @@ type Points = readonly (number | null)[];
 const mean = (xs: readonly number[]): number => xs.reduce((a, v) => a + v, 0) / xs.length;
 const measured = (xs: Points): number[] => xs.filter((v): v is number => v != null);
 
+/** Whether a facts list holds the common reading at all — the prompt asks for it only then (a
+ *  country has none, and a network short of measured days has none; asked anyway, the model wrote
+ *  one from a share ratio: "activity last week was 0.82 global snapshots per day", live 2026-10-29). */
+export function hasCommonReading(facts: readonly Fact[]): boolean {
+  return facts.some((f) => COMMON_RE.test(f.label));
+}
+const COMMON_RE = /global snapshots.*per day, last week$/i;
+
 /** The index the last week starts at in a daily series of `n` complete days. */
 export function weekStart(n: number): number {
   return Math.max(0, n - WEEK_DAYS);

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { PRIOR_DAYS, PRIOR_MIN_DAYS, WEEK_DAYS, WEEK_MIN_DAYS, activityFacts, lastWeekMean, priorWeeksMean, weekStart } from "@/src/data/noteFactsActivity";
+import { PRIOR_DAYS, PRIOR_MIN_DAYS, WEEK_DAYS, WEEK_MIN_DAYS, activityFacts, hasCommonReading, lastWeekMean, priorWeeksMean, weekStart } from "@/src/data/noteFactsActivity";
+import { fact } from "@/src/data/noteFacts";
 import { pairsOf } from "@/src/data/testkit/notePairs";
 
 const row = (n: number, f: (i: number) => number | null): (number | null)[] => Array.from({ length: n }, (_, i) => f(i));
@@ -35,6 +36,17 @@ describe("the common activity facts: last week against the weeks before", () => 
     expect(WEEK_MIN_DAYS).toBe(4);
     expect(activityFacts(L, row(60, (i) => (i >= 57 ? 60 : 40)))).toHaveLength(3);
     expect(activityFacts(L, row(60, (i) => (i >= 58 ? 60 : i >= 53 ? null : 40)))).toEqual([]);
+  });
+
+  it("says whether a facts list holds the common reading: its own facts yes, a rank or an anchored count no", () => {
+    expect(hasCommonReading(activityFacts(L, row(60, () => 50)))).toBe(true);
+    expect(hasCommonReading(activityFacts("Global snapshots per day", row(60, () => 50)))).toBe(true);
+    expect(hasCommonReading([])).toBe(false);
+    expect(hasCommonReading([
+      fact("USDC.dag, global snapshots it was part of per day, last week (most active network)", 50, "count"),
+      fact("Networks that anchored snapshots in the last week", 2, "count"),
+      fact("Germany, nodes now against a week ago", 0.82, "ratio"),
+    ])).toBe(false);
   });
 
   it("needs seven measured days for the weeks before, else the last week stands alone and unpaired", () => {
