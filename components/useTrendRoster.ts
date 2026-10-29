@@ -66,8 +66,8 @@ export interface TrendRosterRow {
   /** THE NODE-TYPE STACK under the Nodes measure (user, 2026-10-09: "can we now make it a stacked
    *  chart to show the composition?") — the bands that PARTITION this network's nodes, on the drawn
    *  axis (`typeBands`; a gauge is never edge-trimmed, so the raw axis IS the drawn one). Stored
-   *  per metagraph since 2026-09-29, so earlier buckets are a gap in every band, never a guess;
-   *  the DAG and the unlisted set carry none (the sampler keys types by catalog network). */
+   *  per metagraph since 2026-09-29 and for the DAG since 2026-10-29, so earlier buckets are a gap
+   *  in every band, never a guess; the unlisted set carries none (its chains publish no nodes). */
   stack?: TypeBand[];
   /** The newest MEASURED value, which is not the newest bucket (`lastMeasured`). */
   last: number | null;

@@ -1,4 +1,4 @@
-import { roleKey } from "@/src/data/composition";
+import { roleKey, rolesOf } from "@/src/data/composition";
 
 // THE FLEET'S LAYER AND MAKE-UP TALLIES (2026-10-29) — one arithmetic for every network the
 // sampler stores, the DAG core included. Before this the loop lived inline in the sampler and ran
@@ -18,15 +18,13 @@ import { roleKey } from "@/src/data/composition";
 // `dagNodes` null means the clusters could not be read this sample: the DAG's fields are then
 // ABSENT (rule 10 — an honest gap), never zero, and the rest of the fleet is still written.
 
-export interface RoleNode { roles?: string[]; layer?: string | null }
+export type RoleNode = Parameters<typeof rolesOf>[0];
 
 export interface FleetTallies {
   layers: Record<string, number>;
   perNetLayers: Record<string, Record<string, number>>;
   perNetTypes: Record<string, Record<string, number>>;
 }
-
-const rolesOf = (n: RoleNode): string[] => (n.roles && n.roles.length ? n.roles : n.layer ? [n.layer] : []);
 
 /** One network's roles and types. */
 export function tallyNetwork(nodes: readonly RoleNode[]): { layers: Record<string, number>; types: Record<string, number> } {

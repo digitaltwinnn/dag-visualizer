@@ -68,9 +68,11 @@ them — but the Next Node server can.
   yet; it exists so Geography has a past when something does (the AI notes design).
   **The DAG's nodes are tallied like a metagraph's** (2026-10-29): `f.layer.dag.<role>` and
   `f.type.dag.<key>` come from its two validator clusters merged by the live Hypergraph's own rule
-  (`src/data/dagCore.ts`), read through the live clusters route's memo, so the sampler adds no
-  upstream read; one tally for every network (`fleetTally.ts`). A failed cluster read leaves the
-  DAG's fields ABSENT that sample, the rest of the fleet still written. The FLEET-WIDE
+  (`src/data/dagCore.ts`): two small `cluster/info` reads once an hour, logged when they fail;
+  one tally for every network (`fleetTally.ts`), and `f.nodes.dag` is that same merged list's
+  length, so the DAG's stack sums to its line (the geo map's located count is the fallback when
+  the clusters cannot be read, the types absent that sample). A failed cluster read leaves the
+  DAG's layer and type fields ABSENT, the rest of the fleet still written. The FLEET-WIDE
   `f.layer.<role>` lines stay metagraph-only, so the existing history did not step on the day the
   DAG's own layers arrived. History's DAG plane draws the make-up stack from the hours sampled
   since; the hours before show none (`typeBands`' null rule).

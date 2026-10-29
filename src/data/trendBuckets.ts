@@ -21,6 +21,8 @@ const NET_TAILS = ["snaps", "ticks", "blocks", "fee", "kb", "gapSum", "gapMax"];
 const LAYERS = ["l0", "cl1", "dl1"];
 
 const isGlobalScope = (scope: string) => scope === "all" || scope === "dag";
+/** A network's own fleet fields: its node count, its per-layer gauges and its node types. */
+const ownFleet = (scope: string, k: string) => k === `f.nodes.${scope}` || k.startsWith(`f.layer.${scope}.`) || k.startsWith(`f.type.${scope}.`);
 /** A per-network key's address and tail: `m.{addr}.{tail}` → [addr, tail]. */
 const netKey = (k: string): [string, string] | null => {
   const m = /^m\.([^.]+)\.(.+)$/.exec(k);
@@ -29,8 +31,12 @@ const netKey = (k: string): [string, string] | null => {
 
 /** THE FIELDS A SCOPE OWNS, in the vocabulary's order. The global row: its counters, then the
  *  fleet-wide gauges, then the unlisted coverage — never the per-country or per-network fields,
- *  which are another scope's, and never the fold's derived totals. A network: its own counters,
- *  then its node count, its per-layer gauges and its node types. THE UNLISTED SCOPE (`unlistedId`,
+ *  which are another scope's, and never the fold's derived totals. THE DAG is the global row too
+ *  (its counters are the globals'), plus its OWN fleet fields after them — `f.nodes.dag` and, since
+ *  the sampler tallies its validators (2026-10-29), `f.layer.dag.*` and `f.type.dag.*`: the records
+ *  behind its plane's stack (rule 12: RAW is the stored buckets of the plane brought forward). A
+ *  network: its own counters, then its node count, its per-layer gauges and its node types. THE
+ *  UNLISTED SCOPE (`unlistedId`,
  *  with `listed` saying which addresses the catalog holds): every unlisted chain's own `m.{addr}.*`
  *  fields, chain by chain — the records the fold sums, not its sum. Unknown fields of a scope
  *  follow, alphabetically, so a field the sampler adds tomorrow is shown rather than hidden. */
@@ -43,7 +49,10 @@ export function bucketColumns(
   let own: (k: string) => boolean;
   if (isGlobalScope(scope)) {
     GLOBAL_ORDER.forEach((k, i) => rank.set(k, i));
-    own = (k) => !DERIVED.has(k) && (k.startsWith("g.") || k === "u.cov" || k === "f.nodes" || /^f\.layer\.(l0|cl1|dl1)$/.test(k));
+    rank.set(`f.nodes.${scope}`, 20);
+    LAYERS.forEach((l, i) => rank.set(`f.layer.${scope}.${l}`, 30 + i));
+    const global = (k: string) => !DERIVED.has(k) && (k.startsWith("g.") || k === "u.cov" || k === "f.nodes" || /^f\.layer\.(l0|cl1|dl1)$/.test(k));
+    own = scope === "dag" ? (k) => global(k) || ownFleet(scope, k) : global;
   } else if (unlisted && scope === unlisted.id) {
     const addrs = [...new Set(keys.map(netKey).filter((x): x is [string, string] => !!x).map(([a]) => a))]
       .filter((a) => a !== unlisted.id && !unlisted.listed(a))
@@ -55,7 +64,7 @@ export function bucketColumns(
     NET_TAILS.forEach((t, i) => rank.set(m + t, i));
     rank.set(`f.nodes.${scope}`, 20);
     LAYERS.forEach((l, i) => rank.set(`f.layer.${scope}.${l}`, 30 + i));
-    own = (k) => k.startsWith(m) || k === `f.nodes.${scope}` || k.startsWith(`f.layer.${scope}.`) || k.startsWith(`f.type.${scope}.`);
+    own = (k) => k.startsWith(m) || ownFleet(scope, k);
   }
   return [...new Set(keys)].filter(own).sort((a, b) => {
     const ra = rank.get(a) ?? 1000;
