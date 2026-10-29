@@ -330,7 +330,7 @@ describe("geoFacts on a country within a network", () => {
     const r = geoFacts(input({ subject: { cc: "US", net: "usdc" }, geoDays, ccDays: ccOf(geoDays) }))!;
     expect(one(r, /^USDC\.dag, nodes in United States$/)).toMatchObject({ value: 10, kind: "count", pair: { key: "usdc:cc:US", end: "to" } });
     expect(one(r, /^USDC\.dag, share of its located nodes in United States$/).value).toBeCloseTo(10 / 30);
-    expect(one(r, /^United States, rank among USDC\.dag's countries by nodes$/).value).toBe(2);
+    expect(one(r, /^United States, rank among the countries of USDC\.dag by nodes$/).value).toBe(2);
     expect(one(r, /^USDC\.dag, located nodes$/).value).toBe(30);
     expect(one(r, /^USDC\.dag, countries with nodes$/).value).toBe(2);
     expect(one(r, /^USDC\.dag, nodes in United States a week ago$/)).toMatchObject({ value: 5, pair: { key: "usdc:cc:US", end: "from" } });
@@ -401,7 +401,7 @@ describe("geoFacts on a provider", () => {
     const r = geoFacts(input({ subject: { isp: "ovh-sas", net: "dag" }, geoDays, ccDays: ccOf(geoDays) }))!;
     expect(one(r, /^Constellation, nodes with OVH$/)).toMatchObject({ value: 10, pair: { key: "dag:provider:ovh", end: "to" } });
     expect(one(r, /^Constellation, share of its nodes with a known provider with OVH$/).value).toBeCloseTo(10 / 30);
-    expect(one(r, /^OVH, rank among Constellation's providers by nodes$/).value).toBe(2);
+    expect(one(r, /^OVH, rank among the providers of Constellation by nodes$/).value).toBe(2);
     expect(one(r, /^Constellation, providers with nodes$/).value).toBe(2);
     expect([...pairsOf(r.facts).values()]).toEqual([["Constellation, nodes with OVH a week ago", 5, "Constellation, nodes with OVH", 10]]);
     expect(one(r, /^Constellation, nodes with OVH now against a week ago$/).value).toBeCloseTo(2);

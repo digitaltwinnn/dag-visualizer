@@ -374,7 +374,8 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     const key = `${id}:cc:${subjectNetCc}`;
     facts.push(fact(`${netName}, nodes in ${country}`, here, "count", undefined, was != null ? { key, end: "to" } : undefined));
     facts.push(fact(`${netName}, share of its located nodes in ${country}`, here / located, "share"));
-    facts.push(fact(`${country}, rank among ${netName}'s countries by nodes`, 1 + own.filter((c) => c.count > here).length, "count"));
+    // "the countries of X", not "X's": a name ending in s hands the model "Technologies's" (live 2026-10-29).
+    facts.push(fact(`${country}, rank among the countries of ${netName} by nodes`, 1 + own.filter((c) => c.count > here).length, "count"));
     facts.push(fact(`${netName}, located nodes`, located, "count"));
     facts.push(fact(`${netName}, countries with nodes`, own.length, "count"));
     if (was != null) {
@@ -400,7 +401,7 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     const key = `${id}:provider:${p.group}`;
     facts.push(fact(`${netName}, nodes with ${provider}`, p.count, "count", undefined, was != null ? { key, end: "to" } : undefined));
     facts.push(fact(`${netName}, share of its nodes with a known provider with ${provider}`, p.count / known, "share"));
-    facts.push(fact(`${provider}, rank among ${netName}'s providers by nodes`, 1 + ownProv.filter((x) => x.count > p.count).length, "count"));
+    facts.push(fact(`${provider}, rank among the providers of ${netName} by nodes`, 1 + ownProv.filter((x) => x.count > p.count).length, "count"));
     facts.push(fact(`${netName}, providers with nodes`, ownProv.length, "count"));
     if (was != null) {
       facts.push(fact(`${netName}, nodes with ${provider} a week ago`, was, "count", undefined, { key, end: "from" }));
