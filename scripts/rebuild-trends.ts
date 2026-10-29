@@ -7,6 +7,7 @@
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --recompute-from=2026-09-06
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --recompute-from=2026-09-06 --resume
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --backfill-gaps=2026-01-01
+//   npx tsx scripts/rebuild-trends.ts --net=mainnet --backfill-gaps=2025-07-01 --gaps-from-chain=DAG7fwxZJp
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --backfill-blocks=2025-07-01
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --backfill-unlisted
 //
@@ -33,7 +34,8 @@
 // kept record timestamps, so measuring gaps retroactively means re-walking each chain — but ONLY
 // the timestamps are collected, only those three fields are written (complete-day recomputations, HSET overwrite), TODAY is
 // excluded (the live sampler's accruing bucket must not be double-counted), and every other
-// field is untouched. Runs under the sampler lock like everything else here.
+// field is untouched. It is the one mode that takes NO sampler lock (2026-10-26): its writes are
+// disjoint from the cron's, so production keeps sampling — the fleet gauges included — beside it.
 //
 // --recompute-from REPAIRS RECENT DAYS (2026-09-07, found live the day it was needed): a
 // sampler catch-up that runs past the pager's 600-record cap ACCEPTS a gap — honest, but the
@@ -100,9 +102,9 @@ function loadEnvLocal(): void {
   }
 }
 
-interface Args { net: "mainnet" | "integrationnet" | "testnet"; days: number; wipeOnly: boolean; extendToMs: number | null; recomputeFromMs: number | null; gapsFromMs: number | null; blocksFromMs: number | null; unlisted: boolean; resume: "no" | "yes" | "force" }
+interface Args { net: "mainnet" | "integrationnet" | "testnet"; days: number; wipeOnly: boolean; extendToMs: number | null; recomputeFromMs: number | null; gapsFromMs: number | null; gapsFromChain: string | null; blocksFromMs: number | null; unlisted: boolean; resume: "no" | "yes" | "force" }
 function parseArgs(): Args {
-  const a: Args = { net: "mainnet", days: 90, wipeOnly: false, extendToMs: null, recomputeFromMs: null, gapsFromMs: null, blocksFromMs: null, unlisted: false, resume: "no" };
+  const a: Args = { net: "mainnet", days: 90, wipeOnly: false, extendToMs: null, recomputeFromMs: null, gapsFromMs: null, gapsFromChain: null, blocksFromMs: null, unlisted: false, resume: "no" };
   for (const arg of process.argv.slice(2)) {
     if (arg === "--wipe-only") a.wipeOnly = true;
     else if (arg === "--backfill-unlisted") a.unlisted = true;
@@ -130,12 +132,14 @@ function parseArgs(): Args {
       if (m) a.gapsFromMs = Date.UTC(+m[1], +m[2] - 1, +m[3]);
       else { console.error("--backfill-gaps wants YYYY-MM-DD (UTC)"); process.exit(1); }
     }
+    else if (arg.startsWith("--gaps-from-chain=")) a.gapsFromChain = arg.slice(18);
     else { console.error(`unknown arg ${arg}`); process.exit(1); }
   }
   if (!["mainnet", "integrationnet", "testnet"].includes(a.net) || !(a.days > 0 && a.days <= 400)) {
     console.error("usage: --net=... --days=1..400 [--wipe-only] [--extend-to=YYYY-MM-DD]");
     process.exit(1);
   }
+  if (a.gapsFromChain != null && a.gapsFromMs == null) { console.error("--gaps-from-chain needs --backfill-gaps"); process.exit(1); }
   if (a.extendToMs != null && a.wipeOnly) { console.error("--extend-to and --wipe-only are exclusive"); process.exit(1); }
   if (a.resume !== "no" && a.recomputeFromMs == null && a.extendToMs == null) {
     console.error("--resume only applies to --recompute-from and --extend-to (the checkpointed walks)");
@@ -194,15 +198,17 @@ async function seekBoundary(
 // ---- explorer paging (the probed `meta.next` cursor walk) ------------------------------------
 interface Page<T> { data?: T[]; meta?: { next?: string } }
 async function getPage<T>(url: string): Promise<Page<T>> {
-  // Backoff reaches ~1.5 min cumulative: a multi-hour walk must survive a transient DNS or
-  // network blip (one killed a 3-hour gaps walk at 83%, 2026-09-08 — EAI_AGAIN).
+  // Backoff reaches ~15 min cumulative (21 attempts, 20s timeouts, waits capped at 30s): a multi-hour walk must survive a transient DNS or
+  // network blip (one killed a 3-hour gaps walk at 83%, 2026-09-08 — EAI_AGAIN) AND a short
+  // explorer outage (2026-10-26: 20s timeouts past the old ~1.5-min budget killed a 2025-07-01
+  // gaps walk seven hours in).
   for (let attempt = 0; ; attempt++) {
     try {
       const r = await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(20000) });
       if (!r.ok) throw new Error(`${r.status}`);
       return (await r.json()) as Page<T>;
     } catch (e) {
-      if (attempt >= 6) throw e;
+      if (attempt >= 20) throw e;
       await new Promise((res) => setTimeout(res, Math.min(30000, 1000 * 2 ** attempt)));
     }
   }
@@ -245,7 +251,7 @@ class Abort extends Error {}
 
 async function main(): Promise<void> {
   loadEnvLocal();
-  const { net, days, wipeOnly, extendToMs, recomputeFromMs, gapsFromMs, blocksFromMs, unlisted, resume } = parseArgs();
+  const { net, days, wipeOnly, extendToMs, recomputeFromMs, gapsFromMs, gapsFromChain, blocksFromMs, unlisted, resume } = parseArgs();
 
   // Deferred imports: store.ts reads env at construction, so env must be loaded first.
   const { Redis } = await import("@upstash/redis");
@@ -256,7 +262,7 @@ async function main(): Promise<void> {
   const { fetchChainIds } = await import("../app/api/network/chainList");
   const { TIER_SINCE } = await import("../src/data/trendWindow");
   const { TTL_S, slotOf, cursorKeyOf, lockKeyOf } = await import("../app/api/trends/keys");
-  const { bucketGlobals, bucketMetas, addInc, markUnlistedCoverage } = await import("../app/api/trends/bucketing");
+  const { bucketGlobals, bucketMetas, addInc, markUnlistedCoverage, finalDays, stampRun } = await import("../app/api/trends/bucketing");
   const addIncGap = (inc: import("../app/api/trends/bucketing").IncMap, n: string, tsMs: number, id: string, gap: number) => {
     addInc(inc, n, tsMs, `m.${id}.gapSum`, gap);
     addInc(inc, n, tsMs, `m.${id}.gapMax`, gap);
@@ -281,7 +287,15 @@ async function main(): Promise<void> {
   // below the store's oldest day — so once the lock lapses the cron resumes live sampling
   // (the fleet gauges return) while the walk keeps flushing history. Released in finally.
   const lockStore = (await import("../app/api/trends/store")).writeStore();
-  if (!(await lockStore.acquireLock(lockKeyOf(net), 21600))) {
+  // ⚠️ …EXCEPT --backfill-gaps AND --extend-to, WHICH RUN BESIDE THE CRON (2026-10-26 — the gaps
+  // walk's 6-hour lock paused production sampling twice in one day, and the FLEET gauges, read live
+  // only, lost those hours for good). Neither can collide: the gaps walk HSETs only
+  // gapSum/gapMax/ticks of whole days before its launch's UTC today, and the extension writes only
+  // days at or before the store's OLDEST covered day (its cursor untouched), while the cron writes
+  // only the buckets of NEW records (today's) — disjoint fields, and HSET sets only the fields it
+  // names. So they take no lock and release none.
+  const holdsLock = gapsFromMs == null && extendToMs == null;
+  if (holdsLock && !(await lockStore.acquireLock(lockKeyOf(net), 21600))) {
     // A killed walk leaves its lock standing (up to 6 h) — which would block its own
     // --resume. Take it over ONLY on evidence: a resume was asked for, a checkpoint on disk
     // proves a rebuild died mid-walk, and the TTL says rebuild-class lock (a cron run's
@@ -317,9 +331,11 @@ async function main(): Promise<void> {
     const release = redis.ttl(lockKeyOf(net)).then((ttl) => (ttl > 900 ? lockStore.releaseLock(lockKeyOf(net)) : undefined));
     Promise.race([release, new Promise((r) => setTimeout(r, 5000))]).finally(() => process.exit(code));
   };
-  process.once("SIGINT", () => releaseOnSignal("SIGINT", 130));
-  process.once("SIGTERM", () => releaseOnSignal("SIGTERM", 143));
-  process.once("SIGHUP", () => releaseOnSignal("SIGHUP", 129));
+  if (holdsLock) {
+    process.once("SIGINT", () => releaseOnSignal("SIGINT", 130));
+    process.once("SIGTERM", () => releaseOnSignal("SIGTERM", 143));
+    process.once("SIGHUP", () => releaseOnSignal("SIGHUP", 129));
+  }
   try {
 
   const be0 = NETWORKS[net].be;
@@ -662,27 +678,7 @@ async function main(): Promise<void> {
       // so nothing is skipped (2026-09-10, the keep-forever flip).
       const fresh5m = TTL_S["5m"] == null ? "" : slotOf(net, "5m", Date.now() - TTL_S["5m"] * 1000).key;
     let fields = 0;
-    for (const id of lineageIds(net)) {
-      // Timestamps only — the walk's records are otherwise discarded, and the two gap
-      // fields plus the anchoring count are the only things this mode may write. Each chain WRITES as soon as its
-      // walk ends (complete-day HSET recomputations are idempotent), so a crash mid-run
-      // loses one chain's walk, not the whole night's (learned at 83% of DOR, 2026-09-08).
-      const stamps: number[] = [];
-      await walkChain<{ timestamp: string }>(`${NETWORKS[net].be}/currency/${id}/snapshots`, gapsFromMs, (recs) => {
-        for (const r of recs) {
-          const t = Date.parse(r.timestamp);
-          if (t < todayStartMs) stamps.push(t);
-        }
-      }, id.slice(0, 10));
-      stamps.sort((a, b) => a - b);
-      const inc: IncMap = new Map();
-      for (let i = 1; i < stamps.length; i++) {
-        const gap = Math.max(0, Math.round((stamps[i] - stamps[i - 1]) / 1000));
-        addIncGap(inc, net, stamps[i], id, gap);
-      }
-      // …and the anchoring count from the same sorted stamps (2026-10-08): this mode is its
-      // backfill route too — a distinct stamp is one global tick that carried the chain.
-      for (let i = 0; i < stamps.length; i++) if (i === 0 || stamps[i] !== stamps[i - 1]) addInc(inc, net, stamps[i], `m.${id}.ticks`, 1);
+    const writeInc = async (inc: IncMap) => {
       for (const [key, map] of inc) {
         const tier = tierOf(key);
         if (tier === "5m" && key < fresh5m) continue;
@@ -692,7 +688,79 @@ async function main(): Promise<void> {
         }
         fields += entries.length;
       }
+    };
+    // A batch of COMPLETE days as gap and anchoring fields (`stampRun` — the whole-chain arithmetic).
+    const writeRun = async (id: string, run: number[], pred: number | null) => {
+      if (!run.length) return;
+      const inc: IncMap = new Map();
+      stampRun(run, pred, (t, gap) => addIncGap(inc, net, t, id, gap), (t) => addInc(inc, net, t, `m.${id}.ticks`, 1));
+      await writeInc(inc);
+    };
+    // WRITTEN DAY BY DAY, RESUMABLE MID-CHAIN (2026-10-26 — user: "why save it in one go … to avoid
+    // it fails at the very end and you need to start all over?"; an explorer outage had already
+    // killed one 2025-07-01 run seven hours in). The walk runs newest→oldest, so each UTC day is
+    // complete once a stamp older than it arrives (`finalDays`) and is written then — HSET of whole
+    // days, idempotent on a replay. After each write the walk's place is CHECKPOINTED: the chain,
+    // the explorer's next-page cursor and the stamps of the day still being read. A rerun of the same
+    // `--backfill-gaps=` date picks the checkpoint up by itself and loses at most one day's pages.
+    // `--gaps-from-chain=<id prefix>` still starts at a named chain, from its tip (an unmatched prefix
+    // is an error, never a silent full run), and overrides a checkpoint.
+    const GAPS_CKPT = join(process.cwd(), ".rebuild-trends-ckpt", `gaps-${net}.json`);
+    interface GapsCkpt { fromMs: number; chain: string; cursor: string | null; pending: number[] }
+    const saveCkpt = (c: GapsCkpt) => {
+      mkdirSync(join(process.cwd(), ".rebuild-trends-ckpt"), { recursive: true });
+      writeFileSync(GAPS_CKPT + ".tmp", JSON.stringify(c));
+      renameSync(GAPS_CKPT + ".tmp", GAPS_CKPT); // atomic — a kill mid-write keeps the old file
+    };
+    let ckpt: GapsCkpt | null = null;
+    try { ckpt = JSON.parse(readFileSync(GAPS_CKPT, "utf8")) as GapsCkpt; } catch { /* none */ }
+    if (ckpt && ckpt.fromMs !== gapsFromMs) {
+      console.error(`a gaps checkpoint from ${new Date(ckpt.fromMs).toISOString().slice(0, 10)} exists (${GAPS_CKPT}) — rerun with that date to resume, or delete it to start over`);
+      process.exit(1);
     }
+    let ids = lineageIds(net);
+    if (gapsFromChain != null) {
+      const at = ids.findIndex((id) => id.startsWith(gapsFromChain));
+      if (at < 0) { console.error(`--gaps-from-chain: no chain starts with ${gapsFromChain}`); process.exit(1); }
+      console.log(`  starting at ${ids[at]!.slice(0, 10)} — skipping ${at} chain(s)`);
+      ids = ids.slice(at);
+      ckpt = null;
+    } else if (ckpt) {
+      const at = ids.indexOf(ckpt.chain);
+      if (at < 0) { console.error(`the gaps checkpoint names ${ckpt.chain}, which the catalog no longer lists`); process.exit(1); }
+      console.log(`  resuming the checkpoint at ${ckpt.chain.slice(0, 10)}${ckpt.cursor ? " mid-chain" : ""} — skipping ${at} chain(s) already written`);
+      ids = ids.slice(at);
+    }
+    for (const id of ids) {
+      const resumed = ckpt && ckpt.chain === id ? ckpt : null;
+      let pending: number[] = resumed ? [...resumed.pending] : [];
+      saveCkpt({ fromMs: gapsFromMs, chain: id, cursor: resumed?.cursor ?? null, pending });
+      await walkChain<{ timestamp: string }>(
+        `${NETWORKS[net].be}/currency/${id}/snapshots`,
+        gapsFromMs,
+        (recs) => {
+          for (const r of recs) {
+            const t = Date.parse(r.timestamp);
+            if (t < todayStartMs) pending.push(t);
+          }
+        },
+        id.slice(0, 10),
+        resumed?.cursor ?? undefined,
+        async (nextCursor) => {
+          const { batch, pred, rest } = finalDays(pending);
+          if (!batch.length) return;
+          await writeRun(id, batch, pred);
+          pending = rest;
+          saveCkpt({ fromMs: gapsFromMs, chain: id, cursor: nextCursor, pending });
+        },
+      );
+      // The walk's oldest day: its first stamp opens the window, with no gap before it.
+      await writeRun(id, pending.sort((a, b) => a - b), null);
+      const next = ids[ids.indexOf(id) + 1];
+      if (next) saveCkpt({ fromMs: gapsFromMs, chain: next, cursor: null, pending: [] });
+      ckpt = null;
+    }
+    rmSync(GAPS_CKPT, { force: true });
     console.log(`  ${fields} gap fields; every other field and the cursor untouched.`);
     return;
   }
@@ -905,7 +973,7 @@ async function main(): Promise<void> {
   console.log("done — the 15-min cron resumes from here.");
 
   } finally {
-    await lockStore.releaseLock(lockKeyOf(net));
+    if (holdsLock) await lockStore.releaseLock(lockKeyOf(net));
   }
 }
 
