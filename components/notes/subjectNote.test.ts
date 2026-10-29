@@ -36,6 +36,8 @@ describe("the subject notes' requests", () => {
     expect(typeNoteReq({ netId: "dor", key: "Hybrid|L0·cL1" }, unl)).toEqual({ view: "hyper", subject: "dor/type:l0+cl1" });
     expect(typeNoteReq({ netId: "dor", key: "Unknown|" }, unl)).toEqual({ view: "hyper", subject: "dor/type:none" });
     expect(typeNoteReq({ netId: "unlisted", key: "Data|dL1" }, unl)).toBeNull();
+    // The DAG core: no stored make-up series, so no ask that could only answer `none`.
+    expect(typeNoteReq({ netId: "dag", key: "Data|dL1" }, unl)).toBeNull();
   });
 
   it("a range note stands on the plane's network, the hypergraph for all / dag / none, and only while a range is brushed", () => {

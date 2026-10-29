@@ -38,9 +38,12 @@ export function providerNoteReq(isp: string | null, network: string | null, unli
   return key ? scoped(`isp:${key}`, network, unlisted) : null;
 }
 
-/** Hypergraph's make-up group: always one network's (`sel.netId`), its codes as the stored type key. */
+/** Hypergraph's make-up group: always one network's (`sel.netId`), its codes as the stored type key.
+ *  The DAG core's make-ups have none: the sampler writes no `f.type.dag.*` series (the DAG node-type
+ *  stack is the open sampler follow-up), and an ask that can only answer `none` would flash
+ *  "writing…" and spend a limited request (final review I2). */
 export function typeNoteReq(sel: { netId: string; key: string }, unlisted: Unlisted): NoteReq | null {
-  if (unlisted(sel.netId)) return null;
+  if (unlisted(sel.netId) || sel.netId === "dag") return null;
   return { view: "hyper", subject: `${sel.netId}/type:${roleKeyOfCodes(parseCompositionKey(sel.key).codes)}` };
 }
 

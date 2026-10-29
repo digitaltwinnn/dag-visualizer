@@ -105,11 +105,11 @@ describe("factsFor — Geography's subject notes", () => {
   it("factsFor accepts the geo subject notes, labels them scope-first, names the subject and the kind, with no common reading", async () => {
     // The last column is the provider as the builder's facts spell it (its `subjectName`).
     const cases: [string, unknown, string, string, string, string?][] = [
-      [`${USDC}/cc:DE`, { cc: "DE", net: USDC }, "USDC.dag's nodes in Germany", "USDC.dag", "country"],
-      ["dag/cc:FR", { cc: "FR", net: "dag" }, "DAG's nodes in France", "DAG", "country"],
+      [`${USDC}/cc:DE`, { cc: "DE", net: USDC }, "USDC.dag nodes in Germany", "USDC.dag", "country"],
+      ["dag/cc:FR", { cc: "FR", net: "dag" }, "DAG nodes in France", "DAG", "country"],
       ["isp:hetzner", { isp: "hetzner" }, "Hetzner", "Hetzner", "provider", "Hetzner"],
       ["isp:ovh-sas", { isp: "ovh-sas" }, "ovh-sas", "ovh-sas", "provider"], // no name from the builder: the key itself
-      [`${USDC}/isp:hetzner`, { isp: "hetzner", net: USDC }, "USDC.dag's nodes with Hetzner", "USDC.dag", "provider", "Hetzner"],
+      [`${USDC}/isp:hetzner`, { isp: "hetzner", net: USDC }, "USDC.dag nodes with Hetzner", "USDC.dag", "provider", "Hetzner"],
     ];
     for (const [subject, parsed, label, subjectName, kind, stem] of cases) {
       vi.mocked(geoFacts).mockClear().mockReturnValue({ facts: [FACT], names: ["USDC.dag"], ...(stem ? { subjectName: stem } : {}) });
@@ -131,7 +131,7 @@ describe("factsFor — Geography's subject notes", () => {
     const fleet = (await factsFor("mainnet", "geo", "isp:hetzner-online-gmbh", "day", NOW, reads))!;
     expect([fleet.label, fleet.subjectName]).toEqual(["Hetzner Online", "Hetzner Online"]);
     const scoped = (await factsFor("mainnet", "geo", `${USDC}/isp:hetzner-online-gmbh`, "day", NOW, reads))!;
-    expect([scoped.label, scoped.subjectName]).toEqual(["USDC.dag's nodes with Hetzner Online", "USDC.dag"]);
+    expect([scoped.label, scoped.subjectName]).toEqual(["USDC.dag nodes with Hetzner Online", "USDC.dag"]);
   });
 
   it("every view's facts carry the subject's kind; the view notes are unchanged", async () => {
@@ -171,7 +171,6 @@ describe("factsFor — Hypergraph's make-up notes", () => {
     const cases: [string, unknown, string, string][] = [
       [`${USDC}/type:l0+cl1`, { net: USDC, type: "l0+cl1" }, "USDC.dag nodes running L0 and cL1", "USDC.dag"],
       [`${USDC}/type:dl1`, { net: USDC, type: "dl1" }, "USDC.dag nodes running only dL1", "USDC.dag"],
-      ["dag/type:none", { net: "dag", type: "none" }, "DAG nodes with no stated layer", "DAG"],
     ];
     for (const [subject, parsed, label, subjectName] of cases) {
       expect(noteSupported("hyper", subject, "day"), subject).toBe(true);
@@ -186,8 +185,8 @@ describe("factsFor — Hypergraph's make-up notes", () => {
     expect([net.label, net.subjectName, net.kind]).toEqual(["USDC.dag", "USDC.dag", "view"]);
   });
 
-  it("hyper accepts a make-up for a tracked network or the DAG, spelled as its roleKey, nothing else", () => {
-    for (const s of ["nope/type:l0", "unlisted/type:l0", "all/type:l0", `${USDC}/type:cl1+l0`, `${USDC}/type:l0+l0`, `${USDC}/type:x`, `${USDC}/type:`, `${USDC}/type:l0/x`, "type:l0"])
+  it("hyper accepts a make-up for a tracked network, spelled as its roleKey — never the DAG's (no `f.type.dag.*` series: an accepted ask could only flash and answer none), nothing else", () => {
+    for (const s of ["nope/type:l0", "unlisted/type:l0", "all/type:l0", "dag/type:l0+cl1", "dag/type:none", `${USDC}/type:cl1+l0`, `${USDC}/type:l0+l0`, `${USDC}/type:x`, `${USDC}/type:`, `${USDC}/type:l0/x`, "type:l0"])
       expect(noteSupported("hyper", s, "day"), s).toBe(false);
     expect(noteSupported("hyper", `${USDC}/type:l0`, "hours")).toBe(false);
   });

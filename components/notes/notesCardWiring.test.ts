@@ -115,9 +115,12 @@ describe("subject notes live on their cards", () => {
     expect(src).not.toMatch(/Couldn/);
     expect(src).toMatch(/"none"/);
     expect(src).toMatch(/"unavailable"/);
-    expect(src).toMatch(/useEffect\(\(\) => \{[^]*?res\?\.state === "request"[^]*?note\.request\(\)[^]*?\}, \[/);
-    // …and once per key: the ref guard, so a re-render or a poll's `request` never POSTs twice.
-    expect(src).toMatch(/res\?\.state === "request" && askedFor\.current !== key/);
+    expect(src).toMatch(/useEffect\(\(\) => \{[^]*?res\?\.state !== "request"[^]*?note\.request\(\)[^]*?\}, \[/);
+    // …once per key (the ref guard, so a re-render or a poll's `request` never POSTs twice), and only
+    // after the key has stood for the dwell (final review I1: paging and a deck rotation change the
+    // key many times in seconds; each would be a Gate write).
+    expect(src).toMatch(/askedFor\.current === key\) return;/);
+    expect(src).toMatch(/setTimeout\(\(\) => \{[^]*?note\.request\(\);[^]*?\}, ASK_DWELL_MS\);[^]*?return \(\) => clearTimeout\(t\);/);
   });
 
   it("the Country, Provider and Composition cards mount it; the Range card mounts it only while a range is brushed", () => {

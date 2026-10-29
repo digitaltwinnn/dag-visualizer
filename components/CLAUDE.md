@@ -853,8 +853,8 @@ step down to the tick's networks. The AI notes slot neither starts that run nor 
 AI"**, with the sparkles mark in `--ai-mark` at its left on both tiers as the one sign it is an AI
 card — and the SPAN the note covers ("last 7 days") is the head's qualifier chip on the right, like
 the dossier's ticker; "AI notes" stays the code's and these docs' name for
-the slot. **The top card is the VIEW's note at the filter's scope** (`metagraphCardNetwork`:
-everything, or the filtered network) and does not follow a drill — a country, a provider or a
+the slot. **The top card is the VIEW's note on the metagraph card's network** (`metagraphCardNetwork`:
+everything, the filtered network, or the network a committed node or tick belongs to) and does not follow a drill — a country, a provider or a
 brushed range is a subject with a card of its own, below (user, 2026-10-29); History's top card is
 the window pill's note always. Every view that has a note (`viewPolicy.aiNotes`) leads its
 display lane with the `notes` slot (`DISPLAY_LANE` in `railCards.ts`), and the manifest leads with it

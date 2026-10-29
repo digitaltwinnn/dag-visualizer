@@ -21,6 +21,8 @@ import { useMainnetNote } from "./useAiNote";
 // no markdown (the top card's rule).
 
 const WAIT = "m-0 flex items-center gap-2 text-body text-muted-foreground";
+/** How long a subject has to stand before its note is asked for (above). */
+export const ASK_DWELL_MS = 1500;
 
 export default function SubjectNote({ req, span }: { req: NoteReq | null; span: string | null }) {
   // Presence through `useNet()`, the fetch through the gate (`useMainnetNote`'s hydration rule).
@@ -28,13 +30,20 @@ export default function SubjectNote({ req, span }: { req: NoteReq | null; span: 
   const note = useMainnetNote(asked);
   const res = note.res;
   const key = asked ? queryOf(asked) : null;
-  // ONE ASK PER KEY: a re-render, or the `request` answer a poll reads back, never POSTs twice.
+  // ONE ASK PER KEY, AFTER A DWELL (final review I1, 2026-10-29): a re-render, or the `request`
+  // answer a poll reads back, never POSTs twice — and a subject that is only PASSING is never
+  // asked at all. The rail pager, a deck rotation (the Range card follows the plane in front) and
+  // the explorer rows change the key many times in a few seconds; each key would be its own
+  // Gate write, and the free model refuses a burst (R32), leaving every key it refused dark for
+  // 15 minutes (`FAIL_TTL_S`). So the ask waits `ASK_DWELL_MS` with the key unchanged.
   const askedFor = useRef<string | null>(null);
   useEffect(() => {
-    if (key != null && res?.state === "request" && askedFor.current !== key) {
+    if (key == null || res?.state !== "request" || askedFor.current === key) return;
+    const t = setTimeout(() => {
       askedFor.current = key;
       note.request();
-    }
+    }, ASK_DWELL_MS);
+    return () => clearTimeout(t);
   }, [key, res?.state, note.request]);
 
   if (!asked || res?.state === "none" || res?.state === "unavailable") return null;
