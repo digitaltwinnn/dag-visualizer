@@ -128,6 +128,59 @@ describe("PROMPTS", () => {
     expect(buildMessages("geo", "the network", "Facts", null, undefined, undefined, true)[0]!.content).toContain(PROMPTS.geo.questionCommon!);
   });
 
+  // A subject note (a country, a provider, a make-up) asks its kind's question: the card's own lead
+  // sets the frame, and the common reading is the network's, so a subject's facts hold none.
+  it("asks a country, a provider and a make-up their own question, with no common part", () => {
+    const geo = PROMPTS.geo.questions!;
+    const hyper = PROMPTS.hyper.questions!;
+    expect(Object.keys(geo).sort()).toEqual(["country", "provider"]);
+    expect(Object.keys(hyper)).toEqual(["type"]);
+    expect(PROMPTS.ledger.questions).toBeUndefined();
+    expect(PROMPTS.trend.questions).toBeUndefined();
+    expect(geo.country).toBe(
+      "First, how many of the network's nodes run in the country and how that moved over the span; if nothing moved, say it held, with the level and the country's place among the network's countries. Say nothing about speed.",
+    );
+    expect(geo.provider).toBe(
+      "First, how many nodes the provider hosts across the network and how that moved over the span, stated as network-wide, not for one place; if nothing moved, say it held, with the level and its place among the providers. Say nothing about speed.",
+    );
+    expect(hyper.type).toBe(
+      "First, how many of the network's nodes run this make-up and how that changed over the span; if nothing changed, say it held, with the level and its share of the network's nodes.",
+    );
+    for (const [view, kind] of [["geo", "country"], ["geo", "provider"], ["hyper", "type"]] as const) {
+      const sys = PROMPTS[view].system("Germany", undefined, false, kind);
+      expect(sys).toContain(VOICE);
+      expect(sys).toContain("Subject: Germany.");
+      expect(sys).toContain(PROMPTS[view].questions![kind]!);
+      expect(sys).not.toContain(PROMPTS[view].question);
+      expect(sys).not.toContain(PROMPTS[view].questionCommon!);
+      expect(buildMessages(view, "Germany", "Facts", null, undefined, undefined, false, kind)[0]!.content).toContain(PROMPTS[view].questions![kind]!);
+    }
+  });
+
+  it("a view kind asks the view's question, unchanged, and a kind without a question falls back to it", () => {
+    for (const v of VIEWS) {
+      expect(PROMPTS[v].system("x", undefined, false, "view")).toBe(PROMPTS[v].system("x"));
+      expect(buildMessages(v, "x", "Facts", null, undefined, undefined, false, "view")).toEqual(buildMessages(v, "x", "Facts", null));
+    }
+    expect(PROMPTS.hyper.system("x", undefined, true, "view")).toContain(`${PROMPTS.hyper.question} ${PROMPTS.hyper.questionCommon}`);
+    // Only geo has country and provider, only hyper has type; elsewhere the view's question stands.
+    expect(PROMPTS.hyper.system("x", undefined, false, "country")).toContain(PROMPTS.hyper.question);
+    expect(PROMPTS.geo.system("x", undefined, false, "type")).toContain(PROMPTS.geo.question);
+    expect(PROMPTS.ledger.system("x", undefined, false, "provider")).toContain(PROMPTS.ledger.question);
+  });
+
+  it("the kind questions keep the house copy: no digits, no dashes, no fleet or machines", () => {
+    const all = [...Object.values(PROMPTS.geo.questions!), ...Object.values(PROMPTS.hyper.questions!)];
+    expect(all).toHaveLength(3);
+    for (const q of all) {
+      expect(q).not.toMatch(/\d/);
+      expect(q).not.toMatch(/—|–|\s-\s/);
+      expect(q).not.toMatch(/fleet|machine/i);
+    }
+    for (const [view, kind] of [["geo", "country"], ["geo", "provider"], ["hyper", "type"]] as const)
+      expect(PROMPTS[view].system("x", undefined, false, kind)).not.toMatch(/—|\s[–-]\s/);
+  });
+
   it("keeps its own copy free of dashes", () => {
     for (const v of VIEWS) expect(PROMPTS[v].system("x")).not.toMatch(/—|\s[–-]\s/);
     for (const v of VIEWS) expect(PROMPTS[v].system("x", undefined, true)).not.toMatch(/—|\s[–-]\s/);

@@ -6,6 +6,7 @@ import type { TrendsWindowData } from "@/src/data/trendWindow";
 import { FAIL_TTL_S, generateNote, LOCK_TTL_S, NOTE_STATS, type NoteRecord } from "./generate";
 import { GateError, type GateMessage } from "./gate";
 import { KIND_TIMING, lockKeyOf, noteKeyOf, statsKeyOf } from "./keys";
+import { PROMPTS } from "./prompts";
 import { factsFor, type NoteFacts, type NoteReads } from "./sources";
 import { memoryNotesStore, type NotesStore } from "./store";
 
@@ -229,6 +230,15 @@ describe("generateNote", () => {
     expect(await generateNote({ ...REQ, subject: "DAGnotTrackedAnywhere000000000000000000" }, d, "warm")).toEqual({ state: "none" });
     expect(d.facts).not.toHaveBeenCalled();
     expect(d.chat).not.toHaveBeenCalled();
+  });
+
+  it("a subject note's facts kind reaches the prompt", async () => {
+    const d = deps({ facts: async () => ({ ...FACTS, kind: "country" as const, common: false }) });
+    await generateNote({ net: "mainnet", view: "geo", subject: "isp:hetzner", span: "day" }, d, "request");
+    expect(d.chat).toHaveBeenCalledTimes(1);
+    const [system] = d.chat.mock.calls[0]![0];
+    expect(system!.content).toContain(PROMPTS.geo.questions!.country!);
+    expect(system!.content).not.toContain(PROMPTS.geo.question);
   });
 
   it("an on-request kind not yet written answers request on a read, and writes on a request", async () => {

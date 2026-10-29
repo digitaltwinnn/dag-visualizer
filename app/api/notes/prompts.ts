@@ -1,4 +1,5 @@
 import type { NoteLead, NoteView, NotableDay } from "@/src/data/noteTypes";
+import type { SubjectKind } from "./keys";
 
 // THE PROMPTS OF AI NOTES — one home for what the model is told and how its answer is read back.
 // The voice is the About page's (`components/aboutCopy.ts`): plain, present tense, nodes not
@@ -48,18 +49,35 @@ export const VOICE = [
 // asks every note to lead with what changed.
 // `questionCommon` is the LAST part (R74), asked only while the facts hold the common reading
 // (`common`): asked without it, the model wrote one from a share ratio.
-export const PROMPTS: Record<NoteView, { question: string; questionNow?: string; questionCommon?: string; system: (subjectLabel: string, lead?: NoteLead, common?: boolean) => string }> = {
+//
+// A SUBJECT NOTE ASKS ITS KIND'S QUESTION (a country, a provider, a node make-up). The card the
+// reader pressed already sets the frame (which country, which provider, which make-up), so the
+// question asks only for that subject's count and how it moved, with its place in the whole when
+// nothing moved. The common reading is the NETWORK's, not the subject's, so a subject note has
+// none: its facts answer `common: false` and the part is never asked. `kind` is the kind of
+// QUESTION (`NoteFacts.kind`), so the warmed network-wide country, a view note, asks the view's own.
+// A kind a view has no question for falls back to the view's: only geo has country and provider,
+// only hyper has type.
+type KindQuestions = Partial<Record<Exclude<SubjectKind, "view">, string>>;
+export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuestions; questionNow?: string; questionCommon?: string; system: (subjectLabel: string, lead?: NoteLead, common?: boolean, kind?: SubjectKind) => string }> = {
   hyper: {
     question: "First, who and what is on the network over the span: networks or layers that gained or lost nodes, networks that started or stopped anchoring; if nothing changed there, say that it held, with the level.",
+    questions: {
+      type: "First, how many of the network's nodes run this make-up and how that changed over the span; if nothing changed, say it held, with the level and its share of the network's nodes.",
+    },
     questionCommon: "Last, in one sentence, how active it was: the global snapshots it was part of per day last week against the weeks before.",
-    system: (subjectLabel, _lead, common) =>
-      `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${PROMPTS.hyper.question}${common ? ` ${PROMPTS.hyper.questionCommon}` : ""}`,
+    system: (subjectLabel, _lead, common, kind) =>
+      `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${questionOf("hyper", kind)}${common ? ` ${PROMPTS.hyper.questionCommon}` : ""}`,
   },
   geo: {
+    questions: {
+      country: "First, how many of the network's nodes run in the country and how that moved over the span; if nothing moved, say it held, with the level and the country's place among the network's countries. Say nothing about speed.",
+      provider: "First, how many nodes the provider hosts across the network and how that moved over the span, stated as network-wide, not for one place; if nothing moved, say it held, with the level and its place among the providers. Say nothing about speed.",
+    },
     question: "First, where the nodes run: countries and hosting providers that gained or lost nodes, or where the nodes are now when nothing moved. Say nothing about speed.",
     questionCommon: "Last, in one sentence, how active the network was: its global snapshots per day last week against the weeks before.",
-    system: (subjectLabel, _lead, common) =>
-      `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${PROMPTS.geo.question}${common ? ` ${PROMPTS.geo.questionCommon}` : ""}\nStay on where the nodes are located and who hosts them${common ? ", then the one sentence on activity" : ""}, and nothing else.`,
+    system: (subjectLabel, _lead, common, kind) =>
+      `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${questionOf("geo", kind)}${common ? ` ${PROMPTS.geo.questionCommon}` : ""}\nStay on where the nodes are located and who hosts them${common ? ", then the one sentence on activity" : ""}, and nothing else.`,
   },
   ledger: {
     question: "Say what changed in the anchoring rhythm over the recent hours against the usual: what sped up or slowed down, from the usual figure to the recent one, and which networks did it. Then the reading itself: the longest gap, and what was part of the global snapshots.",
@@ -76,13 +94,20 @@ export const PROMPTS: Record<NoteView, { question: string; questionNow?: string;
   },
 };
 
+/** The question a note asks: its kind's when the view has one for it, else the view's own. */
+function questionOf(view: NoteView, kind?: SubjectKind): string {
+  const p = PROMPTS[view];
+  return (kind && kind !== "view" ? p.questions?.[kind] : undefined) ?? p.question;
+}
+
 const isoDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
 /** The two messages for one attempt. `days` (History's 7d / 30d / 1y / all) asks for one caption
  *  line per notable day, in the order given; the facts already describe each day, numbered the
  *  same way. `retryReasons` names why the previous answer was rejected, so the second attempt can
  *  correct it. `lead` is the Snapshots builder's choice of question (R71); the other views ignore it.
- *  `common` says the facts hold the common reading, so Hypergraph and Geography ask for it (R74). */
+ *  `common` says the facts hold the common reading, so Hypergraph and Geography ask for it (R74).
+ *  `kind` is the kind of question (`NoteFacts.kind`): a subject note asks its own. */
 export function buildMessages(
   view: NoteView,
   subjectLabel: string,
@@ -91,6 +116,7 @@ export function buildMessages(
   retryReasons?: string[],
   lead?: NoteLead,
   common?: boolean,
+  kind?: SubjectKind,
 ): { role: "system" | "user"; content: string }[] {
   const withDays = !!days && days.length > 0;
   const format = withDays
@@ -101,7 +127,7 @@ export function buildMessages(
   if (retryReasons && retryReasons.length)
     parts.push(`Your previous answer was rejected: ${retryReasons.join("; ")}. Write it again and fix this.`);
   return [
-    { role: "system", content: `${PROMPTS[view].system(subjectLabel, lead, common)}\n\n${format}` },
+    { role: "system", content: `${PROMPTS[view].system(subjectLabel, lead, common, kind)}\n\n${format}` },
     { role: "user", content: parts.join("\n\n") },
   ];
 }
