@@ -66,9 +66,7 @@ function subjectOf(view: NoteView, raw: string | null): string | null {
   if (slash < 0) return networkOf(raw);
   const scope = raw.slice(0, slash);
   const net = scope === "dag" ? scope : networkOf(scope);
-  // A query read as a form decodes a bare `+` as a space, so a make-up written into a URL by hand
-  // (`type:l0+cl1`) arrives as `type:l0 cl1`: the same make-up, given its one spelling back.
-  const tail = raw.slice(slash + 1).replace(/ /g, "+");
+  const tail = raw.slice(slash + 1);
   return net && selectionOk(view, tail) ? `${net}/${tail}` : null;
 }
 

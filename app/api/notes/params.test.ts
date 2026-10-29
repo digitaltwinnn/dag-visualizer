@@ -7,6 +7,8 @@ const H = 3_600_000;
 const D = 86_400_000;
 const NOW = Date.UTC(2026, 9, 27, 12, 30);
 const sp = (q: string) => new URLSearchParams(q);
+/** A subject note's query as the client writes it (`URLSearchParams`, so a make-up's `+` is `%2B`). */
+const sq = (view: string, subject: string) => new URLSearchParams({ view, subject });
 // The catalog's own re-registered network: a former address must read as its current id.
 const relisted = CATALOG.mainnet.find((m) => m.formerIds?.length)!;
 const anId = CATALOG.mainnet[0]!.id;
@@ -90,8 +92,8 @@ describe("parseNoteParams", () => {
     expect(parseNoteParams(sp("view=geo&subject=dag/cc:FI"), NOW)).toEqual({ view: "geo", subject: "dag/cc:FI", span: "day" });
     expect(parseNoteParams(sp("view=geo&subject=isp:hetzner-online"), NOW)).toEqual({ view: "geo", subject: "isp:hetzner-online", span: "day" });
     expect(parseNoteParams(sp(`view=geo&subject=${anId}/isp:hetzner-online`), NOW)).toEqual({ view: "geo", subject: `${anId}/isp:hetzner-online`, span: "day" });
-    expect(parseNoteParams(sp(`view=hyper&subject=${anId}/type:l0+cl1`), NOW)).toEqual({ view: "hyper", subject: `${anId}/type:l0+cl1`, span: "day" });
-    expect(parseNoteParams(sp(`view=hyper&subject=${anId}/type:none`), NOW)).toEqual({ view: "hyper", subject: `${anId}/type:none`, span: "day" });
+    expect(parseNoteParams(sq("hyper", `${anId}/type:l0+cl1`), NOW)).toEqual({ view: "hyper", subject: `${anId}/type:l0+cl1`, span: "day" });
+    expect(parseNoteParams(sq("hyper", `${anId}/type:none`), NOW)).toEqual({ view: "hyper", subject: `${anId}/type:none`, span: "day" });
   });
 
   it("a former address inside a subject note answers as its current id", () => {
@@ -100,9 +102,11 @@ describe("parseNoteParams", () => {
 
   it("refuses a subject note in the wrong view, an untracked network, a bad key or a make-up out of order", () => {
     for (const q of [`view=hyper&subject=${anId}/cc:FI`, `view=geo&subject=${anId}/type:l0`, `view=ledger&subject=${anId}/type:l0`, `view=trend&subject=${anId}/cc:FI&span=7d`,
-      "view=geo&subject=nope/cc:FI", "view=geo&subject=isp:Hetzner", "view=geo&subject=isp:", `view=hyper&subject=${anId}/type:cl1+l0`, `view=hyper&subject=${anId}/type:l0+l0`, `view=hyper&subject=${anId}/type:l2`,
+      "view=geo&subject=nope/cc:FI", "view=geo&subject=isp:Hetzner", "view=geo&subject=isp:", `view=hyper&subject=${anId}/type:l2`,
       `view=geo&subject=${anId}/cc:fi`, `view=geo&subject=${anId}/`])
       expect(parseNoteParams(sp(q), NOW), q).toHaveProperty("error");
+    for (const s of [`${anId}/type:cl1+l0`, `${anId}/type:l0+l0`, `${anId}/type:l0 cl1`])
+      expect(parseNoteParams(sq("hyper", s), NOW), s).toHaveProperty("error");
   });
 
   it("an error never echoes the raw input", () => {
