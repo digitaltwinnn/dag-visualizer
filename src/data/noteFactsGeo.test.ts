@@ -357,6 +357,14 @@ describe("geoFacts on a country within a network", () => {
     expect(find(r, /now against a week ago/)).toHaveLength(0);
   });
 
+  it("a country absent from the network's measured day a week back held none there: the from end is 0, no ratio", () => {
+    const back = { ...NOW, net: { ...NOW.net, usdc: { cc: { DE: 30 }, isp: { "hetzner-online-ag": 30 } } } }; // no US that day
+    const geoDays = { "2026-10-20": day(back), "2026-10-27": day(NOW) };
+    const r = geoFacts(input({ subject: { cc: "US", net: "usdc" }, geoDays, ccDays: ccOf(geoDays) }))!;
+    expect([...pairsOf(r.facts).values()]).toEqual([["USDC.dag, nodes in United States a week ago", 0, "USDC.dag, nodes in United States", 10]]);
+    expect(find(r, /now against a week ago/)).toHaveLength(0);
+  });
+
   it("a network with no nodes in the country now is nothing to describe", () => {
     expect(geoFacts(input({ subject: { cc: "FR", net: "usdc" } }))).toBeNull();
     expect(geoFacts(input({ subject: { cc: "DE", net: "nope" } }))).toBeNull();
@@ -405,6 +413,27 @@ describe("geoFacts on a provider", () => {
     expect(one(r, /^Constellation, nodes with Hetzner Online$/)).toMatchObject({ value: 20 });
     expect(one(r, /^Constellation, nodes with Hetzner Online$/).pair).toBeUndefined();
     expect(find(r, /week ago/)).toHaveLength(0);
+  });
+
+  it("a network's provider states no week ago when the network's day a week back holds countries but no providers", () => {
+    const back = { ...NOW, net: { ...NOW.net, dag: { cc: NOW.net!.dag!.cc } } }; // countries, no provider field
+    const geoDays = { "2026-10-20": day(back), "2026-10-27": day(NOW) };
+    const r = geoFacts(input({ subject: { isp: "ovh-sas", net: "dag" }, geoDays, ccDays: ccOf(geoDays) }))!;
+    expect(one(r, /^Constellation, nodes with OVH$/).pair).toBeUndefined();
+    expect(find(r, /week ago/)).toHaveLength(0);
+  });
+
+  it("names a provider note's provider by the stem its facts use, the merged provider's", () => {
+    expect(geoFacts(input({ subject: { isp: "hetzner-online-gmbh" } }))!.subjectName).toBe("Hetzner Online");
+    expect(geoFacts(input({ subject: { isp: "hetzner-online-ag", net: "usdc" } }))!.subjectName).toBe("Hetzner Online");
+    expect(geoFacts(input({ subject: { cc: "DE", net: "usdc" } }))!.subjectName).toBeUndefined(); // its scope is the catalog's name
+    expect(geoFacts(input())!.subjectName).toBeUndefined();
+  });
+
+  it("a fleet provider's nameless sentence is attributed to it by that stem", () => {
+    const geoDays = { "2026-10-20": day(scaled(0.5)), "2026-10-27": day(NOW) };
+    const r = geoFacts(input({ subject: { isp: "hetzner-online-gmbh" }, geoDays, ccDays: ccOf(geoDays) }))!;
+    expect(checkNote("Its nodes doubled from 25 to 50 in a week.", r.facts, r.names, { subject: r.subjectName })).toEqual({ ok: true });
   });
 
   it("names include the provider's forms and the country", () => {

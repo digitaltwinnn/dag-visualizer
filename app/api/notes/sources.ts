@@ -204,9 +204,11 @@ function geoSelectionOf(net: string, subject: string): GeoSelection | null {
 
 /** A Geography subject note's prompt label and display name, SCOPE FIRST (the gate attributes a
  *  sentence's ratios to the names in it): a network's nodes in a country or with a provider, else
- *  the provider itself. The provider is called by its stored display name, else its key. */
-function geoSubjectLabel(sel: GeoSelection, names: Record<string, string>, providerNames: Record<string, string>): { label: string; subjectName: string } {
-  const what = "cc" in sel ? countryName(sel.cc) : (providerNames[sel.isp] ?? sel.isp);
+ *  the provider itself. The provider is called as its facts call it (`provider`, the builder's
+ *  merged stem: "Hetzner Online", never the stored "Hetzner Online GmbH", or the gate finds no fact
+ *  label holding the subject and rejects a nameless sentence about it). */
+function geoSubjectLabel(sel: GeoSelection, names: Record<string, string>, provider: string | undefined): { label: string; subjectName: string } {
+  const what = "cc" in sel ? countryName(sel.cc) : (provider ?? sel.isp);
   if (sel.net == null) return { label: what, subjectName: what };
   const netName = names[sel.net] ?? sel.net;
   return { label: `${netName}'s nodes ${"cc" in sel ? "in" : "with"} ${what}`, subjectName: netName };
@@ -223,6 +225,8 @@ interface Built {
   setKey?: string;
   /** Snapshots only (R71): which question the prompt asks. */
   lead?: NoteLead;
+  /** Geography's provider notes: the provider as the facts spell it, the label's to name it by. */
+  subjectName?: string;
 }
 
 interface Read {
@@ -232,7 +236,7 @@ interface Read {
   /** The windows the note may name (R20): label → seconds, appended as `duration` facts. */
   windows: [string, number][];
   /** The prompt's label and the subject's display name when the read knows them better than the
-   *  row's `label` (a Geography subject note names its provider from the names it read). */
+   *  row's `label` (a Geography subject note names its provider as its built facts spell it). */
   label?: string;
   subjectName?: string;
 }
@@ -366,7 +370,7 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
       const spanFrom = nowMs - 7 * D;
       // The common reading speaks of the last week (R74), so that window is stated beside the span.
       const windows: [string, number][] = [["Span length", secondsOf(spanFrom, nowMs)], ["Week", (7 * D) / 1000]];
-      return { built, spanFrom, spanTo: nowMs, windows, ...(subjectNote && sel ? geoSubjectLabel(sel, names, providerNames) : {}) };
+      return { built, spanFrom, spanTo: nowMs, windows, ...(subjectNote && sel ? geoSubjectLabel(sel, names, built?.subjectName) : {}) };
     },
   },
   // WHEN (live): the last 24 HOURS of the 5-minute tier against the last week of the hourly one

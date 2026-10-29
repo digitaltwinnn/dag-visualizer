@@ -102,15 +102,16 @@ describe("factsFor — the subject's display name for the gate (R39)", () => {
 // cards are, labelled scope-first so the gate's attribution by name keeps working.
 describe("factsFor — Geography's subject notes", () => {
   it("factsFor accepts the geo subject notes, labels them scope-first, names the subject and the kind, with no common reading", async () => {
-    const cases: [string, unknown, string, string, string][] = [
+    // The last column is the provider as the builder's facts spell it (its `subjectName`).
+    const cases: [string, unknown, string, string, string, string?][] = [
       [`${USDC}/cc:DE`, { cc: "DE", net: USDC }, "USDC.dag's nodes in Germany", "USDC.dag", "country"],
       ["dag/cc:FR", { cc: "FR", net: "dag" }, "DAG's nodes in France", "DAG", "country"],
-      ["isp:hetzner", { isp: "hetzner" }, "Hetzner", "Hetzner", "provider"],
-      ["isp:ovh-sas", { isp: "ovh-sas" }, "ovh-sas", "ovh-sas", "provider"], // no stored name: the key itself
-      [`${USDC}/isp:hetzner`, { isp: "hetzner", net: USDC }, "USDC.dag's nodes with Hetzner", "USDC.dag", "provider"],
+      ["isp:hetzner", { isp: "hetzner" }, "Hetzner", "Hetzner", "provider", "Hetzner"],
+      ["isp:ovh-sas", { isp: "ovh-sas" }, "ovh-sas", "ovh-sas", "provider"], // no name from the builder: the key itself
+      [`${USDC}/isp:hetzner`, { isp: "hetzner", net: USDC }, "USDC.dag's nodes with Hetzner", "USDC.dag", "provider", "Hetzner"],
     ];
-    for (const [subject, parsed, label, subjectName, kind] of cases) {
-      vi.mocked(geoFacts).mockClear();
+    for (const [subject, parsed, label, subjectName, kind, stem] of cases) {
+      vi.mocked(geoFacts).mockClear().mockReturnValue({ facts: [FACT], names: ["USDC.dag"], ...(stem ? { subjectName: stem } : {}) });
       const out = await factsFor("mainnet", "geo", subject, "day", NOW, fakeReads());
       expect(out, subject).not.toBeNull();
       const input = vi.mocked(geoFacts).mock.calls[0]![0];
@@ -121,6 +122,15 @@ describe("factsFor — Geography's subject notes", () => {
     // A country note's country is named for the builder even when no stored day holds it.
     await factsFor("mainnet", "geo", "dag/cc:JP", "day", NOW, fakeReads());
     expect(vi.mocked(geoFacts).mock.calls.at(-1)![0].countryNames).toMatchObject({ JP: "Japan" });
+  });
+
+  it("a provider is named by the stem its facts use, never the stored display name with its legal suffix", async () => {
+    const reads = fakeReads({ async geoDays() { return { geoDays: { "2026-10-27": { "f.cc.DE": 3 } }, providerNames: { "hetzner-online-gmbh": "Hetzner Online GmbH" } }; } });
+    vi.mocked(geoFacts).mockReturnValue({ facts: [FACT], names: [], subjectName: "Hetzner Online" });
+    const fleet = (await factsFor("mainnet", "geo", "isp:hetzner-online-gmbh", "day", NOW, reads))!;
+    expect([fleet.label, fleet.subjectName]).toEqual(["Hetzner Online", "Hetzner Online"]);
+    const scoped = (await factsFor("mainnet", "geo", `${USDC}/isp:hetzner-online-gmbh`, "day", NOW, reads))!;
+    expect([scoped.label, scoped.subjectName]).toEqual(["USDC.dag's nodes with Hetzner Online", "USDC.dag"]);
   });
 
   it("every view's facts carry the subject's kind; the view notes are unchanged", async () => {

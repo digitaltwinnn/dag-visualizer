@@ -235,7 +235,11 @@ export function fleetCountries(input: Pick<GeoFactsInput, "geoDays" | "ccDays">)
   return [...fleetReading(parseAll(input.ccDays), now).fleetCc.keys()].sort();
 }
 
-export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[] } | null {
+/** `subjectName` (provider notes only) is the provider as its facts spell it: the merged stem
+ *  ("Hetzner Online", never the stored "Hetzner Online GmbH"). The note's label and the gate's subject
+ *  are built from it, and the gate attributes a nameless sentence's ratios by matching fact labels,
+ *  so it must be the labels' own spelling. A network scope's name is the catalog's (`sources.ts`). */
+export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]; subjectName?: string } | null {
   const { subject, providerNames, countryNames, names: catalog } = input;
   const nameOf = (id: string) => catalog[id] ?? id;
   const countryOf = (cc: string) => countryNames[cc] ?? cc;
@@ -285,6 +289,7 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
   };
 
   const facts: Fact[] = [];
+  let subjectName: string | undefined;
 
   // THE FLEET'S COUNTRIES, ONE READING (R58). The tiers' daily `f.cc` (`ccDays`) is the only series
   // that reaches a week back, so it states EVERY country and fleet figure, now and a week ago,
@@ -385,6 +390,7 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     const p = ownProv.find((x) => x.keys.has(subjectIsp));
     if (!p) return null;
     const provider = pn(p);
+    subjectName = provider;
     const known = ownProv.reduce((a, x) => a + x.count, 0);
     const then = weekBefore(ownMeasured(id), now);
     // The week-ago day must hold the network's providers at all: one with countries and no provider
@@ -406,6 +412,7 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     const p = providers.find((x) => x.keys.has(subjectIsp));
     if (!p) return null;
     const provider = pn(p);
+    subjectName = provider;
     const before = geoThen ? providersOf(geoThen.isp, providerNames).get(p.group)?.count : undefined;
     const key = `provider:${p.group}`;
     facts.push(fact(`${provider}, nodes`, p.count, "count", undefined, before ? { key, end: "to" } : undefined));
@@ -497,5 +504,6 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     const first = stems.map((s) => s.split(" ")[0]!).filter((w) => w.length >= 4 && w.toLowerCase() !== "the");
     return [...p.names, ...stems, ...first];
   });
-  return { facts, names: [...new Set([...Object.values(catalog), ...mentionedCountries, ...providerForms])] };
+  const names = [...new Set([...Object.values(catalog), ...mentionedCountries, ...providerForms])];
+  return subjectName != null ? { facts, names, subjectName } : { facts, names };
 }
