@@ -130,6 +130,12 @@ describe("subject notes live on their cards", () => {
     expect(read("components/notes/NotesCard.tsx")).not.toMatch(/for this range/);
   });
 
+  it("a country or provider note is scoped by the filter, its lead's denominator, never the metagraph card's network", () => {
+    const body = fnBody(read("components/notes/useAiNote.ts"), "export function useNoteScopeNetwork(");
+    expect(body).toMatch(/useStore\(\(s\) => s\.filter\)/);
+    expect(body).not.toMatch(/metagraphCardNetwork\(/);
+  });
+
   it("the top card's subject carries no country", () => {
     expect(read("components/notes/noteSubject.ts")).not.toMatch(/\bcountry\b\s*[?:]/);
   });

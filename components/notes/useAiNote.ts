@@ -14,19 +14,13 @@ import useNote, { type NoteState } from "./useNote";
 // Its own module (2026-10-27) so the rail, the card and History's diamonds import the derivation
 // without the card's render tree.
 
-/** THE NETWORK THE METAGRAPH CARD STANDS ON, as a hook: the top card's scope, and the scope a geo
- *  or hyper subject card's own note is asked at (`subjectNote.ts`). One read of the store fields
- *  `metagraphCardNetwork` takes, so a card's note and the top card are never scoped by two rules. */
+/** THE SCOPE A COUNTRY OR PROVIDER CARD'S OWN NOTE IS ASKED AT (`subjectNote.ts`): the FILTER,
+ *  "all" being the fleet. Not `metagraphCardNetwork`, the top card's rule: the card's lead divides
+ *  by `selNodes`, the filter's population ("Hosts 30% of the selection's nodes"), and under no
+ *  filter Geography's metagraph card moves to a committed node's network while that lead keeps
+ *  counting everything. The note is scoped as its lead is, so the two never read in two frames. */
 export function useNoteScopeNetwork(): string {
-  const mode = useStore((s) => s.mode);
-  const filter = useStore((s) => s.filter);
-  const tickNet = useStore((s) => s.tickNet);
-  const snap = useStore((s) => s.snap);
-  const inspect = useStore((s) => s.inspect);
-  const trendFocus = useStore((s) => s.trendFocus);
-  const trendFront = useStore((s) => s.trendFront);
-  const tickHasFilter = useTickHasFilter();
-  return metagraphCardNetwork({ mode, filter, tickNet, snap, tickHasFilter, trendFocus, trendFront, inspect });
+  return useStore((s) => s.filter);
 }
 
 /** THE MAINNET GATE, one home for the top card and every subject card's note. Notes are written
@@ -49,13 +43,16 @@ export function useMainnetNote(req: NoteReq | null): NoteState {
 export function useAiNote(): { subject: NoteSubject | null; req: NoteReq | null; note: NoteState } {
   const mode = useStore((s) => s.mode);
   const filter = useStore((s) => s.filter);
+  const tickNet = useStore((s) => s.tickNet);
+  const snap = useStore((s) => s.snap);
+  const inspect = useStore((s) => s.inspect);
   const trendFocus = useStore((s) => s.trendFocus);
   const trendFront = useStore((s) => s.trendFront);
   const trendWindow = useStore((s) => s.trendWindow);
-  const metagraphNetwork = useNoteScopeNetwork();
+  const tickHasFilter = useTickHasFilter();
 
   const subject = noteSubjectOf(mode, {
-    metagraphNetwork,
+    metagraphNetwork: metagraphCardNetwork({ mode, filter, tickNet, snap, tickHasFilter, trendFocus, trendFront, inspect }),
     trendCard: cardNetwork(filter, trendFocus, trendFront),
     unlisted: (id) => id === UNLISTED_ID,
   });
