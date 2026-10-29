@@ -8,8 +8,11 @@ import { getLiveGeo } from "@/app/api/geo/live";
 import { runSample } from "../runSample";
 import { writeStore } from "../store";
 import type { FleetCounts, GlobalRec, MetaRec } from "../bucketing";
-import { roleKey } from "@/src/data/composition";
+import { mergeDagClusters, type DagNode } from "@/src/data/dagCore";
+import type { ClusterNode } from "@/src/data/types";
+import { readClusters } from "@/app/api/live/upstream";
 import { fleetGeo } from "../fleetGeo";
+import { fleetTallies } from "../fleetTally";
 import type { ChainPage } from "../fetchSince";
 
 // The trends SAMPLER — Vercel Cron hits this every 15 min (vercel.json). It pages the tiny
@@ -32,44 +35,59 @@ async function getJson(url: string, ms = 7000): Promise<unknown> {
   return r.json();
 }
 
+/** The DAG's own nodes from its two clusters, merged — null when either cluster cannot be read.
+ *  Two small `cluster/info` reads, once an hour (the fleet sample's cadence): the live route's memo
+ *  is per instance and seconds long, so there is nothing to share with it, and the geo loader keeps
+ *  its own hour-cached list because its product is locations. A failure is LOGGED (review
+ *  2026-10-29): the DAG's fields go absent for the sample, and a cluster host that stays
+ *  unreadable must read as an outage in the function logs, not as a quiet gap. */
+async function clusterNodes(net: ReturnType<typeof netOf>): Promise<DagNode[] | null> {
+  try {
+    const { l0, l1 } = NETWORKS[net];
+    const { l0: a, l1: b } = await readClusters(l0, l1);
+    return mergeDagClusters(a as ClusterNode[], b as ClusterNode[]);
+  } catch (e) {
+    console.error("trends/sample: cluster read failed", e);
+    return null;
+  }
+}
+
 // Fleet counts from the SAME cached loaders the /api/metagraphs and /api/geo routes serve —
 // shared unstable_cache entries, so sampling the fleet adds no upstream traffic. Null on
 // failure: an absent gauge is an honest gap (rule 10), a zeroed fleet is a fabrication.
 async function fleetCounts(net: ReturnType<typeof netOf>): Promise<FleetCounts | null> {
   try {
-    const [{ metagraphs, geo: metaGeo }, dagGeo] = await Promise.all([getLive(net), getLiveGeo(net)]);
+    const [{ metagraphs, geo: metaGeo }, dagGeo, dagNodes] = await Promise.all([getLive(net), getLiveGeo(net), clusterNodes(net)]);
     const dagIps = Object.keys(dagGeo);
-    const perNet: Record<string, number> = { dag: dagIps.length };
-    const layers: Record<string, number> = {};
+    // THE DAG'S LINE AND ITS STACK COME FROM ONE READ, AND ONE FIELD HAS ONE DEFINITION (review
+    // 2026-10-29): `f.nodes.dag` is the merged cluster list's length — the same list its types are
+    // tallied from, so the stack sums to the line exactly as every metagraph's does — and when the
+    // clusters cannot be read it is ABSENT, as is the fleet total `f.nodes` that includes it: a
+    // gauge that fell back to the geo map's LOCATED count would dip by every unlocated validator
+    // on each failed read and read as nodes leaving. (Until 2026-10-29 `f.nodes.dag` WAS that
+    // located count, so the stored series steps up once, by the unlocated validators, where the
+    // definition changed.) `f.cc.dag.*` stays the geo map's: a location is by nature a located
+    // node's.
+    const perNet: Record<string, number> = dagNodes ? { dag: dagNodes.length } : {};
     // Where the fleet runs (fleetGeo.ts): the WHOLE fleet by country and provider — each IP once,
     // validators first — and each network's own nodes, for the geo family. Its `countries` is
     // also the tiers' long-standing `f.cc.<cc>` gauge, so the two can never count differently.
     const geo = fleetGeo(dagGeo, metagraphs, metaGeo);
     const countries = geo.countries;
-    let total = dagIps.length;
-    // f.layer.* counts metagraph-layer roles only — per-layer validator attribution isn't
-    // derivable from the geo map (it carries no role/layer field for validator IPs).
-    // f.layer.{id}.{role} is the same tally kept per network (2026-09-11 — the /trends
-    // per-network node panels draw the layer lines the hypergraph tab already has).
-    const perNetLayers: Record<string, Record<string, number>> = {};
-    // f.type.{id}.{key}: the same nodes by TYPE (2026-09-29) — each node counted ONCE, under its
-    // exact make-up, so a network's types sum to its total where its role tallies overlap.
-    const perNetTypes: Record<string, Record<string, number>> = {};
+    let metaTotal = 0;
     for (const m of metagraphs) {
       perNet[m.id] = m.nodes.length;
-      total += m.nodes.length;
-      const mine: Record<string, number> = (perNetLayers[m.id] = {});
-      const types: Record<string, number> = (perNetTypes[m.id] = {});
-      for (const n of m.nodes) {
-        const k = roleKey(n);
-        types[k] = (types[k] || 0) + 1;
-      }
-      for (const n of m.nodes) for (const role of n.roles) {
-        layers[role] = (layers[role] || 0) + 1;
-        mine[role] = (mine[role] || 0) + 1;
-      }
+      metaTotal += m.nodes.length;
     }
-    return total > 0 ? { total, perNet, layers, perNetLayers, perNetTypes, countries, geo } : null;
+    const total = dagNodes ? dagNodes.length + metaTotal : undefined;
+    // f.layer.{id}.{role} and f.type.{id}.{key} for EVERY network, the DAG included (2026-10-29):
+    // the DAG's nodes are its two validator clusters merged by the live Hypergraph's own rule
+    // (`mergeDagClusters`, `clusterNodes` above). A failed cluster read leaves the DAG's layer and
+    // type fields ABSENT this sample (an honest gap), the rest of the fleet still written. The
+    // fleet-wide f.layer.{role} stays metagraph-only (`fleetTally.ts` says why).
+    const { layers, perNetLayers, perNetTypes } = fleetTallies(metagraphs, dagNodes);
+    if (!dagIps.length && !metagraphs.length) return null;
+    return { ...(total != null ? { total } : {}), perNet, layers, perNetLayers, perNetTypes, countries, geo };
   } catch {
     return null;
   }

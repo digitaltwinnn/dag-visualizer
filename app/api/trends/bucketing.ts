@@ -9,7 +9,9 @@ import { mergeVals } from "./merge";
 export interface GlobalRec { ordinal: number; timestamp: string; metagraphSnapshotCount?: number; blocks?: unknown[] }
 export interface MetaRec { ordinal: number; timestamp: string; fee?: number; sizeInKB?: number; blocks?: unknown[] }
 export interface FleetCounts {
-  total: number;
+  /** The whole fleet — absent when the DAG's count is unknown this sample (its clusters could not
+   *  be read): `f.nodes` is then not written, an honest gap, never a lower total (2026-10-29). */
+  total?: number;
   perNet: Record<string, number>;
   /** Per-network per-layer role tallies — f.layer.{id}.{role} (2026-09-11). */
   perNetLayers?: Record<string, Record<string, number>>;
@@ -120,7 +122,7 @@ export function bucketMetas(inc: IncMap, net: string, id: string, recs: MetaRec[
  *  (cardinality control — spec). */
 export function bucketFleet(inc: IncMap, net: string, tsMs: number, fleet: FleetCounts): void {
   const tiers: Tier[] = ["1h", "1d"];
-  addInc(inc, net, tsMs, "f.nodes", fleet.total, tiers);
+  if (fleet.total != null) addInc(inc, net, tsMs, "f.nodes", fleet.total, tiers);
   for (const [id, n] of Object.entries(fleet.perNet)) addInc(inc, net, tsMs, `f.nodes.${id}`, n, tiers);
   for (const [layer, n] of Object.entries(fleet.layers)) addInc(inc, net, tsMs, `f.layer.${layer}`, n, tiers);
   for (const [id, roles] of Object.entries(fleet.perNetLayers ?? {}))
@@ -157,5 +159,41 @@ export function markUnlistedCoverage(inc: IncMap): void {
       const cov = f.slice(0, -"g.ticks".length) + "u.cov";
       if (!fields.has(cov)) fields.set(cov, 0);
     }
+  }
+}
+
+const DAY_MS = 86_400_000;
+
+/** WHICH OF A NEWEST→OLDEST WALK'S STAMPS ARE FINAL (2026-10-26 — user: "why save it in one go …
+ *  to avoid it fails at the very end and you need to start all over?"). A walk that pages a chain
+ *  newest→oldest has seen every record newer than the oldest it holds, so every UTC DAY after the
+ *  oldest stamp's day is COMPLETE — including the predecessor its first record's gap is measured
+ *  from, which is the newest stamp left behind. `pending` is everything walked and not yet written;
+ *  the answer is the complete days (`batch`, oldest→newest), that predecessor (`pred`, null when
+ *  nothing older is held) and what stays pending. Written day by day, a died walk loses at most
+ *  the day it was inside. */
+export function finalDays(pending: readonly number[]): { batch: number[]; pred: number | null; rest: number[] } {
+  let oldest = Infinity;
+  for (const t of pending) if (t < oldest) oldest = t;
+  if (oldest === Infinity) return { batch: [], pred: null, rest: [] };
+  const cut = Math.floor(oldest / DAY_MS) * DAY_MS + DAY_MS;
+  const batch = pending.filter((t) => t >= cut).sort((a, b) => a - b);
+  const rest = pending.filter((t) => t < cut);
+  let pred: number | null = null;
+  for (const t of rest) if (pred == null || t > pred) pred = t;
+  return { batch, pred, rest };
+}
+
+/** A sorted run of one chain's stamps as its per-bucket GAPS and ANCHORINGS — the gaps backfill's
+ *  arithmetic, one home whether a run is a whole chain or one batch of `finalDays`. Each stamp's gap
+ *  is measured from the one before it (`pred` for the first; none when `pred` is null, so the walk's
+ *  oldest record opens the chain), and a stamp distinct from its predecessor is one global snapshot
+ *  that carried the chain. */
+export function stampRun(run: readonly number[], pred: number | null, onGap: (tsMs: number, gapS: number) => void, onTick: (tsMs: number) => void): void {
+  let prev = pred;
+  for (const t of run) {
+    if (prev != null) onGap(t, Math.max(0, Math.round((t - prev) / 1000)));
+    if (prev == null || t !== prev) onTick(t);
+    prev = t;
   }
 }

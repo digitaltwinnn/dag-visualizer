@@ -67,6 +67,16 @@ them — but the Next Node server can.
   and a location gauge can never be re-derived, and `/api/trends` ships every series a tier hash
   holds, so ~50 location series a day would ride every History payload undrawn. Nothing reads it
   yet; it exists so Geography has a past when something does (the AI notes design).
+  **The DAG's nodes are tallied like a metagraph's** (since 2026-10-29): `f.nodes.dag`,
+  `f.layer.dag.<role>` and `f.type.dag.<key>` all come from ONE read of its two validator clusters,
+  merged by the live Hypergraph's own rule (`src/data/dagCore.ts`) and tallied by the one tally
+  every network uses (`fleetTally.ts`), so the DAG's stack sums to its line. Two small
+  `cluster/info` reads an hour; a failure is logged and leaves `f.nodes.dag`, `f.nodes` and the
+  DAG's layer and type fields ABSENT for that sample (one field, one definition — never a
+  fallback to a smaller count), the rest of the fleet still written. Before 2026-10-29
+  `f.nodes.dag` is the geo map's LOCATED validators, so the stored series steps up once there.
+  The FLEET-WIDE `f.layer.<role>` lines are metagraph-only. `typeBands` is null for every bucket
+  before the first sample, so the DAG plane's stack starts where the data does.
   ⚠️ **A PRESENCE MARKER MUST NOT BE A COUNTER.** The read route zero-fills an absent ADD field in
   every covered bucket (an honest "measured, none"), so a marker classed as a counter reads 0 where
   it is missing — the same value it has where it is present. `u.cov` is classed `set` in

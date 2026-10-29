@@ -16,7 +16,10 @@ const UNL = { id: "unlisted", listed: (a: string) => a === ID || a === "other" }
 describe("bucketColumns — the STORED fields a scope owns, in the vocabulary's order", () => {
   it("the global row: counters, floors, fleet gauges, coverage; never the fold's derived totals, per-country or per-network fields", () => {
     expect(bucketColumns(KEYS, "all")).toEqual(["g.ticks", "g.anchors", "g.feeFloor", "g.kbFloor", "f.nodes", "f.layer.l0", "f.layer.dl1", "u.cov", "g.zzz"]);
-    expect(bucketColumns(KEYS, "dag")).toEqual(bucketColumns(KEYS, "all"));
+    // The DAG is the global row plus its OWN fleet fields (2026-10-29: the records behind its stack).
+    const dagKeys = [...KEYS, "f.type.dag.l0+cl1", "f.type.dag.cl1", "f.layer.dag.cl1", "f.layer.dag.l0", "f.nodes.dag", "f.type.abc.dl1", "f.nodes.abc"];
+    expect(bucketColumns(dagKeys, "dag")).toEqual([...bucketColumns(KEYS, "all").filter((k) => k !== "g.zzz"), "f.nodes.dag", "f.layer.dag.l0", "f.layer.dag.cl1", "f.type.dag.cl1", "f.type.dag.l0+cl1", "g.zzz"]);
+    expect(bucketColumns(dagKeys, "all")).toEqual(bucketColumns(KEYS, "all"));
   });
   it("a network: its counters, node count, layer gauges and node types — nobody else's", () => {
     expect(bucketColumns(KEYS, ID)).toEqual([`m.${ID}.snaps`, `m.${ID}.fee`, `m.${ID}.kb`, `f.nodes.${ID}`, `f.layer.${ID}.l0`, `f.layer.${ID}.cl1`, `f.type.${ID}.l0+cl1`]);

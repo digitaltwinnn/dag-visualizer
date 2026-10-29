@@ -13,8 +13,12 @@ const ROLE_ORDER = ["l0", "cl1", "dl1"];
 // SceneCallout's lead line reads layerCodesOf below — three private copies of this map existed
 // before the consolidation, which is exactly how a fourth dialect starts.
 export const ROLE_SHORT: Record<string, string> = { l0: "L0", cl1: "cL1", dl1: "dL1" };
-// A node's roles, falling back to its single primary layer when the role list is absent.
-const rolesOf = (n: NodeInfo): string[] => (n.roles && n.roles.length ? n.roles : [n.layer!]);
+/** A node's roles, falling back to its single primary layer when the role list is absent, and
+ *  none when it states neither. EXPORTED as the fallback's one home (2026-10-29): the sampler's
+ *  layer tallies (`app/api/trends/fleetTally.ts`) and `roleKey` below read the same rule, so the
+ *  per-role and per-type counts of one node list can never disagree. */
+export const rolesOf = (n: { roles?: string[]; layer?: string | null }): string[] =>
+  n.roles && n.roles.length ? n.roles : n.layer ? [n.layer] : [];
 const DEDICATED_LABEL: Record<string, string> = { l0: "Consensus", cl1: "Currency", dl1: "Data" };
 const codesFor = (roles: string[]) =>
   ROLE_ORDER.filter((r) => roles.includes(r)).map((r) => ROLE_SHORT[r]);
@@ -26,7 +30,7 @@ const codesFor = (roles: string[]) =>
  *  sampler writes `f.type.{id}.{key}` with this and the chart reads it back through
  *  `roleKeyLabel`, so the two can never name a type two ways. */
 export function roleKey(node: { roles?: string[]; layer?: string | null }): string {
-  const roles = node.roles && node.roles.length ? node.roles : node.layer ? [node.layer] : [];
+  const roles = rolesOf(node);
   return ROLE_ORDER.filter((r) => roles.includes(r)).join("+") || "none";
 }
 

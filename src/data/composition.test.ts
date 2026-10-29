@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { compareComposition, roleKey, roleKeyLabel, roleKeyOfCodes, compositionRows, nodeCompositionLabel, compositionKey, parseCompositionKey, compositionClause, ROLE_SHORT, layerCodesOf, compositionGroups, machineKey } from "./composition";
+import { compareComposition, roleKey, rolesOf, roleKeyLabel, roleKeyOfCodes, compositionRows, nodeCompositionLabel, compositionKey, parseCompositionKey, compositionClause, ROLE_SHORT, layerCodesOf, compositionGroups, machineKey } from "./composition";
 import type { NodeInfo, NodeRow } from "@/src/data/types";
 
 const n = (roles: string[]): NodeInfo => ({ ip: "x", state: "Ready", layer: roles[0], roles }) as NodeInfo;
@@ -166,5 +166,13 @@ describe("roleKeyOfCodes", () => {
   it("orders by the vocabulary and ignores a code it does not know", () => {
     expect(roleKeyOfCodes(["dL1", "L0"])).toBe("l0+dl1");
     expect(roleKeyOfCodes(["L9", "cL1"])).toBe("cl1");
+  });
+});
+
+describe("rolesOf (the one roles fallback)", () => {
+  it("reads the role list, else the single layer, else nothing", () => {
+    expect(rolesOf({ roles: ["l0", "cl1"], layer: "l0" })).toEqual(["l0", "cl1"]);
+    expect(rolesOf({ layer: "dl1" })).toEqual(["dl1"]);
+    expect(rolesOf({})).toEqual([]);
   });
 });
