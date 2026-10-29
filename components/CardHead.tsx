@@ -434,11 +434,6 @@ function keepFocusOnRung(el: HTMLElement): void {
         )}
         {(eyebrow || (caption != null && !entryMode)) && (
           <div className={entryMode ? "contents" : cn("flex items-start justify-between gap-2 mb-2", onClose && "pr-[30px]")}>
-            {/* AN EYEBROW MAY CARRY TWO FORMS (2026-10-29): `data-eyebrow-full` for the open box and
-                `data-eyebrow-short` (hidden by its own class) for the fold, the way a title carries
-                `data-kind-full` / `data-kind-short`. The Gate AI card's "Constellation Gate AI" is
-                twice the 7em column, and pushed its own title off the pile's shared x and into an
-                ellipsis; folded it reads "Gate AI". */}
             {/* `data-eyebrow` is RailThread's read: on an unboxed ENTRY the thread runs its
                 depth-reach connector at the EYEBROW's height (user, 2026-08-08 — the entry's
                 vertical centre put the line through the title-row aside's space). FOLDED it takes
@@ -447,7 +442,7 @@ function keepFocusOnRung(el: HTMLElement): void {
                 the label step, since the type scale is fluid — and the title's line box
                 (`ENTRY_LINE`), so centring the row aligns the baselines. */}
             {eyebrow ? (
-              <span data-eyebrow="" className={cn("block", eyebrowClass, entryMode && cn("flex-none min-w-[7em] [&_[data-eyebrow-full]]:hidden [&_[data-eyebrow-short]]:inline", ENTRY_LINE))}>{eyebrow}</span>
+              <span data-eyebrow="" className={cn("block", eyebrowClass, entryMode && cn("flex-none min-w-[7em]", ENTRY_LINE))}>{eyebrow}</span>
             ) : (
               <span />
             )}

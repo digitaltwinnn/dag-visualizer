@@ -19,11 +19,12 @@ import { useAiNote } from "./useAiNote";
 // for History a few notable days that each commit their own day as the range.
 //
 // It is CONTEXT, not a reading: the one card in the rail whose words no instrument measured, marked
-// as such — the `--ai-ink` eyebrow and the sparkles mark on both tiers, and the iridescent
-// `--ai-edge` outline on the open box. THE EYEBROW NAMES THE PRODUCT (user, 2026-10-29: "Constellation
-// Gate AI, this is the product and I'd like to promote it a bit") — Gate AI, Constellation's own AI
-// product, writes the notes (`app/api/notes/gate.ts`), so the card wears its name rather than the
-// generic "AI notes"; "notes" stays the word for what it writes (the doors, the About copy).
+// as such — the sparkles mark in the AI hue (`--ai-mark`) at the title's left on both tiers, and the
+// iridescent `--ai-edge` outline on the open box. THE TITLE NAMES THE PRODUCT (user, 2026-10-29:
+// "Constellation Gate AI, this is the product and I'd like to promote it a bit") — Gate AI,
+// Constellation's own AI product, writes the notes (`app/api/notes/gate.ts`), so the card wears its
+// name rather than the generic "AI notes"; "notes" stays the word for what it writes (the doors, the
+// About copy).
 //
 // ⚠️ A TOP CARD, PART OF THE STACK — NOT A SUBJECT CARD (user, 2026-10-27, R57: "a top card, part
 // of the stack. Not as a so-called subject card, so if there is a true subject card (metagraph,
@@ -46,21 +47,16 @@ import { useAiNote } from "./useAiNote";
 const DAY_MS = 86_400_000;
 /** The eyebrow, in the AI ink: the gradient clipped to the letters. `background-image`, not the
  *  `background` shorthand — the shorthand would reset the clip `bg-clip-text` sets. */
-const EYEBROW = (
-  <span className="[background-image:var(--ai-ink)] bg-clip-text text-transparent">
-    {/* The full product name on the open box; folded, the 7em eyebrow column holds "Gate AI" (CardHead). */}
-    <span data-eyebrow-full="">Constellation Gate AI</span>
-    <span data-eyebrow-short="" className="hidden">Gate AI</span>
-  </span>
-);
 
-/** ONE TITLE, EVERY VIEW, EVERY SUBJECT (user, 2026-10-29: a filtered note was titled "Dor
- *  Technologies", but "the dossier/metagraph will say that already", so "What changed"
- *  consistently, with the span under it as History's always had). The subject is the subject
- *  card's to name; what this card adds is the change over the span, and the span is the subtitle
- *  (`noteSpanWords`; History's is the window or range on screen) — so the body carries no Span row,
- *  and no Written row either (user, 2026-10-29: "not that relevant and implied by 'last 6 hours'"). */
-const TITLE = "What changed";
+/** THE RAIL'S OWN HEAD GRAMMAR (user, 2026-10-29: "re-use the same card structure as the others in
+ *  the rung"): an EYEBROW and a TITLE with a kind mark at its left, the note where every card puts
+ *  its first descriptive line ("Anchored by 4 metagraphs"). The title is the product's name on both
+ *  tiers — the subject is the subject card's to name, and "What changed" was no datum — and the
+ *  sparkles mark in the AI hue at its left is what says this is the one card a model wrote (it is
+ *  no `data-kindmark`: the fold keeps it on purpose). The eyebrow is the span the note covers,
+ *  in the explorer's span words (`noteSpanWords`; History's is the window or range on screen), so
+ *  the body carries no Span row and no Written row (user: "implied by 'last 6 hours'"). */
+const TITLE = "Constellation Gate AI";
 
 // THE CARD'S CONTROLS ARE DOORS (`parts.tsx` — the one way a card draws a way out, with the
 // per-ground wash the user ruled). They sit flush on the card's bottom edge (RecordsDoor's foot
@@ -188,17 +184,16 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
       }
     >
       <CardHead
-        eyebrow={EYEBROW}
+        // The span the note covers, as the kind word every other card wears here: History's is the
+        // span on screen, the other views' their fixed read (`noteSpanWords`).
+        eyebrow={subject.view === "trend" ? spanPhrase(trendWindow, trendRange) : noteSpanWords(subject.view)}
         title={
           <span className="inline-flex min-w-0 items-center gap-2">
-            <AI_NOTES_ICON aria-hidden className={cn(KIND_MARK_CLASS, "text-[var(--filter-accent,var(--primary))]")} />
+            <AI_NOTES_ICON aria-hidden className={cn(KIND_MARK_CLASS, "text-[var(--ai-mark)]")} />
             <span className="truncate">{TITLE}</span>
           </span>
         }
         titleKey={titleKey}
-        // The span the note changed over, in the explorer's own span words: History's is the span on
-        // screen, the other views' their fixed read (`noteSpanWords`).
-        subtitle={subject.view === "trend" ? spanPhrase(trendWindow, trendRange) : noteSpanWords(subject.view)}
         collapsed={collapsed}
         onToggle={onToggle}
       />

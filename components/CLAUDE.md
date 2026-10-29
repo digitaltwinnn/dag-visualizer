@@ -848,9 +848,11 @@ specification, driven by outcome (exactly one box); Inspector asks it and render
 gives a node no ancestry), and read as "the deepest" it left the Global snapshot card with no
 step down to the tick's networks. The AI notes slot neither starts that run nor breaks it.
 
-**THE AI NOTES SLOT** (2026-10-27, R57) — on screen **"Constellation Gate AI"** (user, 2026-10-29: the
-product that writes the notes, promoted by name; "AI notes" stays the code's and these docs' name for
-the slot). Every view that has a note (`viewPolicy.aiNotes`) leads its
+**THE AI NOTES SLOT** (2026-10-27, R57) — on screen the card wears the rail's own head grammar
+(user, 2026-10-29): the eyebrow is the SPAN the note covers ("last 7 days"), the title is the product
+that writes it, **"Constellation Gate AI"**, with the sparkles mark in `--ai-mark` at its left on
+both tiers as the one sign it is an AI card; "AI notes" stays the code's and these docs' name for
+the slot. Every view that has a note (`viewPolicy.aiNotes`) leads its
 display lane with the `notes` slot (`DISPLAY_LANE` in `railCards.ts`), and the manifest leads with it
 too. It is **not a rung**: no ladder level, no camera pose, never in `selStack`, a static subject
 key so a view switch never lights the tray, and `isSubjectSlot` says no. So it is the FOCUS only at
