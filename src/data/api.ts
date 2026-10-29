@@ -8,6 +8,7 @@ import { META_CATCHUP_MAX, chainNeedsCatchUp, chainToRecord, globalsToAppend, mi
 import type { LiveAnswer } from "@/src/data/types";
 import { METAGRAPHS, netUrl } from "@/src/net/current";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
+import { mergeDagClusters } from "@/src/data/dagCore";
 import { COLORS, POLL } from "@/src/engine/config";
 import type { Anchor, ClusterNode, DagCore, GlobalSnapshot, RawMetaSnapshot } from "@/src/data/types";
 import { activeRows } from "@/src/net/lineage";
@@ -389,33 +390,11 @@ export class NetworkData {
     }
   }
 
-  // Merge the L0 + L1 validator clusters (keyed by node `id`) into one node-list with
-  // `roles` — turning the DAG into the same hybrid/dedicated structure metagraphs use.
-  // A machine in both clusters is ONE hybrid node (`roles: ["l0","cl1"]`), not two.
+  // The L0 + L1 validator clusters merged into one node-list with `roles` — turning the DAG into
+  // the same hybrid/dedicated structure metagraphs use. The rule is `mergeDagClusters`
+  // (`src/data/dagCore.ts`), shared with the trends sampler's DAG tallies.
   private _buildDagCore(l0: ClusterNode[], l1: ClusterNode[]): DagCore {
-    const byId = new Map<string, { id: string; ip: string; state?: string; roles: string[]; layer?: string }>();
-    const merge = (list: ClusterNode[], role: string) => {
-      for (const n of list) {
-        if (!n || !n.id) continue;
-        let e = byId.get(n.id);
-        if (!e) { e = { id: n.id, ip: n.ip, state: n.state, roles: [] }; byId.set(n.id, e); }
-        if (!e.roles.includes(role)) e.roles.push(role);
-        if (!e.ip && n.ip) e.ip = n.ip;
-        if (role === "l0" && n.state) e.state = n.state; // prefer the consensus-layer state
-      }
-    };
-    merge(l0, "l0");    // consensus / settlement
-    merge(l1, "cl1");   // the DAG's L1 IS its $DAG currency-L1 (it has no data-L1)
-    const nodes = [...byId.values()].map((e) => {
-      e.roles.sort((a, b) => (a === "l0" ? 0 : 1) - (b === "l0" ? 0 : 1));
-      e.layer = e.roles[0]; // primary layer for plotting (l0 if present, else cl1)
-      return e;
-    });
-    // CANONICAL ORDER — cluster/info returns peers in an unstable order, and the scene places
-    // nodes by list INDEX (armillary ring slots, honeycomb stacks). Without this, the 25s
-    // membership poll could reshuffle indices and visibly SNAP every node to a new ring
-    // position mid-rotation (user bug).
-    nodes.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    const nodes = mergeDagClusters(l0, l1);
     return {
       id: "dag", name: "DAG", symbol: "DAG", isRoot: true, color: COLORS.core, nodes,
       description:

@@ -9,7 +9,9 @@ import { mergeVals } from "./merge";
 export interface GlobalRec { ordinal: number; timestamp: string; metagraphSnapshotCount?: number; blocks?: unknown[] }
 export interface MetaRec { ordinal: number; timestamp: string; fee?: number; sizeInKB?: number; blocks?: unknown[] }
 export interface FleetCounts {
-  total: number;
+  /** The whole fleet — absent when the DAG's count is unknown this sample (its clusters could not
+   *  be read): `f.nodes` is then not written, an honest gap, never a lower total (2026-10-29). */
+  total?: number;
   perNet: Record<string, number>;
   /** Per-network per-layer role tallies — f.layer.{id}.{role} (2026-09-11). */
   perNetLayers?: Record<string, Record<string, number>>;
@@ -120,7 +122,7 @@ export function bucketMetas(inc: IncMap, net: string, id: string, recs: MetaRec[
  *  (cardinality control — spec). */
 export function bucketFleet(inc: IncMap, net: string, tsMs: number, fleet: FleetCounts): void {
   const tiers: Tier[] = ["1h", "1d"];
-  addInc(inc, net, tsMs, "f.nodes", fleet.total, tiers);
+  if (fleet.total != null) addInc(inc, net, tsMs, "f.nodes", fleet.total, tiers);
   for (const [id, n] of Object.entries(fleet.perNet)) addInc(inc, net, tsMs, `f.nodes.${id}`, n, tiers);
   for (const [layer, n] of Object.entries(fleet.layers)) addInc(inc, net, tsMs, `f.layer.${layer}`, n, tiers);
   for (const [id, roles] of Object.entries(fleet.perNetLayers ?? {}))

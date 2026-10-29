@@ -9,6 +9,7 @@ import { anchorClause, anchorSeries, headWord, lastSeen, momentPhrase, rangePhra
   formatSeconds,
   lastMeasured,
   latestDay,
+  dagRowSeries,
   metricSeries,
   metricUnit,
   perPhrase,
@@ -585,6 +586,8 @@ describe("latestDay", () => {
   it("reads the daily tier when the charts are finer than a day", () => {
     expect(latestDay("snapshots", "dor", daily, [1, 2, 3], 300_000)).toBe(20);
     expect(latestDay("snapshots", "dag", daily, [1, 2, 3], 300_000)).toBe(4); // the hypergraph plane reads the global row
+    // …except for NODES, the DAG's OWN count (its stack partitions its validators, not the fleet).
+    expect(latestDay("nodes", "dag", { "f.nodes": [70, 71], "f.nodes.dag": [24, 25] }, [1, 2], 300_000)).toBe(25);
   });
   it("is the chart's own last point when the chart already IS daily", () => {
     expect(latestDay("snapshots", "dor", undefined, [4, 5, null], DAY)).toBe(5);
@@ -888,3 +891,10 @@ describe("peakReading — the peak on the head's own unit (2026-10-19)", () => {
   });
 });
 
+describe("dagRowSeries — what the DAG row reads", () => {
+  it("is the global row for every measure but nodes, which is the DAG's own stored count", () => {
+    const series = { "g.anchors": [3, 4], "f.nodes": [70, 71], "f.nodes.dag": [24, 25] };
+    expect(dagRowSeries("snapshots", series)).toEqual([3, 4]);
+    expect(dagRowSeries("nodes", series)).toEqual([24, 25]);
+  });
+});
