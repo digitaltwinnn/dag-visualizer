@@ -48,12 +48,17 @@ type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: 
 // every mark that speaks for it). The
 // Odometer owns the roll (digit-roll on each live tick), so no CardHead `titleKey` — a keyed
 // remount would restart it as a whole-title roll-in instead.
+// The ordinal is a FIGURE at the title size in the box; the size sits on the `data-figure` wrapper
+// so a folded ENTRY can take it down to the entry's own body size, and the mark is a KIND mark
+// (`data-kindmark`) the fold drops — the eyebrow word already says the kind there, and an identity
+// avatar it is not (CardHead's `ENTRY_TITLE`, 2026-10-29: nine digits at the title size beside the
+// live pill overran the one-row entry, once the note took the resting box over the live tick).
 export function SnapshotTitle({ data: d }: { data: GlobalSnapshot }) {
   const Mark = SNAPSHOT_ICON;
   return (
-    <span className="inline-flex items-center gap-2">
-      <Mark aria-hidden className={cn(KIND_MARK_CLASS, "text-[var(--filter-accent,var(--primary))]")} />
-      <Odometer value={d.ordinal} className="font-mono text-title font-semibold text-foreground tabular-nums" />
+    <span data-figure="" className="inline-flex items-center gap-2 text-title">
+      <Mark aria-hidden data-kindmark="" className={cn(KIND_MARK_CLASS, "text-[var(--filter-accent,var(--primary))]")} />
+      <Odometer value={d.ordinal} className="font-mono font-semibold text-foreground tabular-nums" />
     </span>
   );
 }
