@@ -470,7 +470,12 @@ function keepFocusOnRung(el: HTMLElement): void {
                   status pill / age counter is plain text, so a click there did nothing and the
                   cursor fell back to the default arrow over an otherwise-clickable entry (user,
                   2026-08-09). So the WRAPPER is transparent and only real controls inside it opt
-                  back in — text falls through to the toggle, links and buttons keep working. */}
+                  back in — text falls through to the toggle, links and buttons keep working.
+                  CENTRED ON BOTH TIERS (user, 2026-10-29: the Gate AI card's span chip "is not
+                  aligned properly with the card's title"): as a plain flex item the wrapper was a
+                  line box the chip sat on the BASELINE of, 4px under the title's centre in the open
+                  box (the dossier's ticker had the same 2px); `inline-flex items-center` centres
+                  whatever it carries, as the entry tier always did. */}
               {/* FOLDED, A `data-yields` PART OF THE ASIDE IS DROPPED (2026-10-29): the entry is one
                   row and the aside is flex-none, so whatever it carries comes straight out of the
                   title's width — the live tick's age chip beside its live pill left the ordinal
@@ -478,7 +483,7 @@ function keepFocusOnRung(el: HTMLElement): void {
                   (R70). A reading the open box states anyway yields; the control (live / pinned)
                   stays, since the entry is where it is pressed. */}
               {(aside != null || (entryMode && caption != null)) && (
-                <span className={cn("ml-auto flex-none relative z-10 pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto", entryMode && cn("inline-flex items-center gap-1.5 [&_[data-yields]]:hidden", ENTRY_LINE))}>
+                <span className={cn("ml-auto flex-none relative z-10 inline-flex items-center gap-1.5 pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto", entryMode && cn("[&_[data-yields]]:hidden", ENTRY_LINE))}>
                   {entryMode && caption != null && <span className="text-label text-muted-foreground text-right tabular-nums">{caption}</span>}
                   {aside}
                 </span>
