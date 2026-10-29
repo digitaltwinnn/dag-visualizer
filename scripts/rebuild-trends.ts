@@ -197,21 +197,30 @@ async function seekBoundary(
 
 // ---- explorer paging (the probed `meta.next` cursor walk) ------------------------------------
 interface Page<T> { data?: T[]; meta?: { next?: string } }
-async function getPage<T>(url: string): Promise<Page<T>> {
-  // Backoff reaches ~15 min cumulative (21 attempts, 20s timeouts, waits capped at 30s): a multi-hour walk must survive a transient DNS or
-  // network blip (one killed a 3-hour gaps walk at 83%, 2026-09-08 — EAI_AGAIN) AND a short
-  // explorer outage (2026-10-26: 20s timeouts past the old ~1.5-min budget killed a 2025-07-01
-  // gaps walk seven hours in).
+/** RIDE OUT A BLIP. Backoff reaches ~15 min cumulative (21 attempts, waits capped at 30s): a
+ *  multi-hour walk must survive a transient DNS or network blip (one killed a 3-hour gaps walk
+ *  at 83%, 2026-09-08 — EAI_AGAIN) AND a short explorer outage (2026-10-26: 20s timeouts past
+ *  the old ~1.5-min budget killed a 2025-07-01 gaps walk seven hours in). ONE helper for the
+ *  explorer pages AND the store's writes (2026-10-29: two unlisted backfills walked every chain
+ *  for 50 minutes, then died in their write phase on a Wi-Fi drop — the pager retried, the
+ *  writes did not). HSET/EXPIRE set the fields they name, so a retried write is the same write. */
+async function retrying<T>(op: () => Promise<T>): Promise<T> {
   for (let attempt = 0; ; attempt++) {
     try {
-      const r = await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(20000) });
-      if (!r.ok) throw new Error(`${r.status}`);
-      return (await r.json()) as Page<T>;
+      return await op();
     } catch (e) {
       if (attempt >= 20) throw e;
       await new Promise((res) => setTimeout(res, Math.min(30000, 1000 * 2 ** attempt)));
     }
   }
+}
+
+async function getPage<T>(url: string): Promise<Page<T>> {
+  return retrying(async () => {
+    const r = await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(20000) });
+    if (!r.ok) throw new Error(`${r.status}`);
+    return (await r.json()) as Page<T>;
+  });
 }
 
 /** Walk a chain newest→oldest until `cutoffMs`, streaming each page (newest-first) to `onPage`.
@@ -344,7 +353,10 @@ async function main(): Promise<void> {
   // See CRASH SAFETY in the header. The finality margin is deliberately a full spare day
   // beyond the frontier's own: page streams are only loosely ordered, and a bucket flushed
   // early would be OVERWRITTEN with a fragment by a later round, not merged.
-  const store = writeStore();
+  // Every write of the walks retries like the pager (`retrying`): a blip in a write phase that
+  // runs for half an hour must not cost the walk before it.
+  const rawStore = writeStore();
+  const store = { ...rawStore, applyWrites: (w: Parameters<typeof rawStore.applyWrites>[0]) => retrying(() => rawStore.applyWrites(w)) };
   const CKPT_ROOT = join(process.cwd(), ".rebuild-trends-ckpt", net);
   const FLUSH_EVERY = 500_000; // records between flush+checkpoint rounds (user, 2026-09-11)
   const FLOOR_SERIES = new Set(["g.feeFloor", "g.kbFloor"]);
@@ -604,7 +616,7 @@ async function main(): Promise<void> {
     const STEP: Record<Tier, number> = { "5m": 300000, "1h": 3600000, "1d": 86400000 };
     let scan = "0";
     do {
-      const [c, keys]: [string, string[]] = await redis.scan(scan, { match: `t:${net}:*`, count: 200 });
+      const [c, keys]: [string, string[]] = await retrying(() => redis.scan(scan, { match: `t:${net}:*`, count: 200 }));
       scan = c;
       for (const key of keys) {
         const parts = key.split(":");
