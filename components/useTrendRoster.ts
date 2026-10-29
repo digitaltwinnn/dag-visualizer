@@ -208,7 +208,9 @@ export default function useTrendRoster(
         // Each band keyed by its stored type (two hybrid make-ups are both "Hybrid" — found live as a
         // duplicate-key warning that dropped one band); the chart tells hybrids apart by their
         // layer pills (`TrendBand.codes`).
-        stack: metric === "nodes" && id !== "dag" && id !== UNLISTED_ID ? typeBands(id, series) : undefined,
+        // The DAG draws its stack too (2026-10-29, the sampler tallies its validators by make-up
+        // since then): `typeBands` answers [] for the hours before, so the plane shows no stack there.
+        stack: metric === "nodes" && id !== UNLISTED_ID ? typeBands(id, series) : undefined,
         last: lastMeasured(points),
         day: latestDay(metric, id, daily, points, stepMs),
         span: spanAverage(metric, points, stepMs, weights),
