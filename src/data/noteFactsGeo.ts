@@ -1,7 +1,11 @@
 import { fact } from "@/src/data/noteFacts";
 import type { Fact, FactPair } from "@/src/data/noteTypes";
 
-// GEOGRAPHY'S FACTS BUILDER — what the Geography note's model is shown. Geography answers WHERE:
+// GEOGRAPHY'S FACTS BUILDER — what the Geography note's model is shown.
+// THE WORD IS "THE NETWORK", NEVER "THE FLEET" (user, 2026-10-29): a label is what the model echoes
+// ("The fleet is hosted by four providers" came back from a label), and the gate bans the word, so a
+// label carrying it would reject every note written from it. "Fleet" stays internal vocabulary
+// (`fleetCc`, `bucketFleetGeo`) and never reaches a label. Geography answers WHERE:
 // the default note (subject `all`) says how many countries and providers host the fleet and which
 // carry the most nodes; a network's note gives its footprint against the fleet and where it stood
 // a week ago; a country's says what that country hosts. SHARES AND COUNTS ONLY: no label grades the spread (the gate also bans
@@ -295,7 +299,7 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     facts.push(fact(`${name}, countries with nodes`, own.length, "count", undefined, pairOf("countries", "to")));
     // Its fleet denominators are the geo family's, the reading its own counts come from (R58).
     const geoFleet = sum(now.cc);
-    if (fleetMeasured && geoFleet > 0 && located <= geoFleet) facts.push(fact(`${name}, share of the fleet's located nodes`, located / geoFleet, "share"));
+    if (fleetMeasured && geoFleet > 0 && located <= geoFleet) facts.push(fact(`${name}, share of the network's located nodes`, located / geoFleet, "share"));
     own.slice(0, TOP).forEach((c, i) => {
       facts.push(fact(`${name}, nodes in ${cn(c.cc)} (${RANK_WORD[i]}biggest country)`, c.count, "count"));
       facts.push(fact(`${name}, share of its nodes in ${cn(c.cc)}`, c.count / located, "share"));
@@ -303,7 +307,7 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     // ITS SHARE OF THE FLEET in the country it is biggest in.
     const top = own[0];
     const fleetThere = top ? (now.cc.get(top.cc) ?? 0) : 0;
-    if (fleetMeasured && top && fleetThere >= top.count) facts.push(fact(`${name}, share of the fleet's nodes in ${cn(top.cc)}`, top.count / fleetThere, "share"));
+    if (fleetMeasured && top && fleetThere >= top.count) facts.push(fact(`${name}, share of the network's nodes in ${cn(top.cc)}`, top.count / fleetThere, "share"));
     if (ownProv.length) {
       facts.push(fact(`${name}, providers with nodes`, ownProv.length, "count"));
       ownProv.slice(0, TOP).forEach((p, i) => {
@@ -324,7 +328,7 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     if (!here) return null;
     const name = cn(subjectCc);
     facts.push(fact(`${name}, nodes`, here, "count", undefined, ccNowEnd(subjectCc)));
-    facts.push(fact(`${name}, share of the fleet's located nodes`, here / locatedFleet, "share"));
+    facts.push(fact(`${name}, share of the network's located nodes`, here / locatedFleet, "share"));
     facts.push(fact(`${name}, rank by nodes`, 1 + countries.filter((c) => c.count > here).length, "count"));
     facts.push(fact("Countries hosting nodes", countries.length, "count"));
     let dropped = false; // a network there whose own list collapsed: the count below is a floor
@@ -352,12 +356,12 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     // The fleet's week ago, from the same tiers reading as its count now (R58).
     const thenTotal = tiersThen ? sum(tiersThen.cc) : 0;
     const fleetPair = (end: FactPair["end"]): FactPair | undefined => (thenTotal > 0 && locatedFleet > 0 ? { key: "fleet", end } : undefined);
-    facts.push(fact("Located nodes in the fleet", locatedFleet, "count", undefined, fleetPair("to")));
+    facts.push(fact("Located nodes in the network", locatedFleet, "count", undefined, fleetPair("to")));
     facts.push(fact("Countries hosting nodes", countries.length, "count"));
     facts.push(fact("Providers hosting nodes", providers.length, "count"));
     countries.slice(0, TOP).forEach((c, i) => {
       facts.push(fact(`${cn(c.cc)}, nodes (${RANK_WORD[i]}biggest country)`, c.count, "count", undefined, ccNowEnd(c.cc)));
-      facts.push(fact(`${cn(c.cc)}, share of the fleet's located nodes`, c.count / locatedFleet, "share"));
+      facts.push(fact(`${cn(c.cc)}, share of the network's located nodes`, c.count / locatedFleet, "share"));
     });
     // A provider's week ago is the geo family's own, so its standing count is the pair's now end.
     const wasProviders = geoThen ? providersOf(geoThen.isp, providerNames) : null;
@@ -365,15 +369,15 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     providers.slice(0, TOP).forEach((p, i) => {
       const before = wasProviders?.get(p.group)?.count;
       facts.push(fact(`${pn(p)}, nodes (${RANK_WORD[i]}biggest provider)`, p.count, "count", undefined, before ? { key: providerKey(p), end: "to" } : undefined));
-      facts.push(fact(`${pn(p)}, share of the fleet's nodes with a known provider`, p.count / knownFleet, "share"));
+      facts.push(fact(`${pn(p)}, share of the network's nodes with a known provider`, p.count / knownFleet, "share"));
     });
 
     // CHANGE. Countries from the tiers' history; providers from the geo family, both ends measured.
     // The earlier count beside the ratio, as every other "a week ago" here: a note says how much
     // it moved (from … to …), never only the direction (user, 2026-10-27).
     if (fleetPair("from")) {
-      facts.push(fact("Located nodes in the fleet a week ago", thenTotal, "count", undefined, fleetPair("from")));
-      facts.push(fact("Located nodes in the fleet, now against a week ago", locatedFleet / thenTotal, "ratio"));
+      facts.push(fact("Located nodes in the network a week ago", thenTotal, "count", undefined, fleetPair("from")));
+      facts.push(fact("Located nodes in the network, now against a week ago", locatedFleet / thenTotal, "ratio"));
     }
     for (const c of countries.slice(0, TOP)) countryChange(c.cc);
     if (wasProviders) {

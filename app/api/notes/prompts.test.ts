@@ -35,6 +35,7 @@ describe("VOICE", () => {
     expect(VOICE).toMatch(/never round a small figure to zero/i);
     expect(VOICE).toMatch(/only use durations the facts give/i);
     for (const w of ["half", "hundreds", "thousands", "-fold", "doubles"]) expect(VOICE).toContain(w);
+    expect(VOICE).toMatch(/never the fleet/);
   });
 });
 

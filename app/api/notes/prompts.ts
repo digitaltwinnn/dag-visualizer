@@ -25,7 +25,7 @@ export const VOICE = [
   "Do not use quantity words the facts do not state: no \"half\", \"hundreds\", \"thousands\", \"dozens\", no \"-fold\", no \"doubles\" or \"doubling\". \"Doubled\", \"tripled\" and \"halved\" are fine only when a ratio in the facts supports them.",
   "Only use durations the facts give. Do not name a span length with digits unless a fact states it.",
   "Describe what the numbers show: never explain why, and never read a purpose or a cause into them.",
-  "Say nodes, never machines. Say snapshots or global snapshots, never ticks, never \"L1 snapshots\". Never say feeless.",
+  "Say nodes, never machines. Say snapshots or global snapshots, never ticks, never \"L1 snapshots\". Never say feeless. All the nodes together are the network, never the fleet.",
   "A network's share of global snapshots is what it \"was part of\".",
   "L0, currency L1 and data L1 are layers.",
   "Make no claim about how decentralised or distributed anything is.",
