@@ -9,6 +9,7 @@ import { runSample } from "../runSample";
 import { writeStore } from "../store";
 import type { FleetCounts, GlobalRec, MetaRec } from "../bucketing";
 import { roleKey } from "@/src/data/composition";
+import { fleetGeo } from "../fleetGeo";
 import type { ChainPage } from "../fetchSince";
 
 // The trends SAMPLER — Vercel Cron hits this every 15 min (vercel.json). It pages the tiny
@@ -40,23 +41,11 @@ async function fleetCounts(net: ReturnType<typeof netOf>): Promise<FleetCounts |
     const dagIps = Object.keys(dagGeo);
     const perNet: Record<string, number> = { dag: dagIps.length };
     const layers: Record<string, number> = {};
-    // Country counts cover the WHOLE fleet — validators (dagGeo) and metagraph machines
-    // (metaGeo, already returned by getLive()) folded into one per-country tally. An IP can
-    // appear in both maps (a hybrid node is also geolocated by the metagraph directory scan),
-    // so count each IP once: validators first, metagraph geo only for IPs not already seen.
-    const countries: Record<string, number> = {};
-    const seenIps = new Set<string>();
-    for (const ip of dagIps) {
-      seenIps.add(ip);
-      const cc = dagGeo[ip]?.cc;
-      if (cc) countries[cc] = (countries[cc] || 0) + 1;
-    }
-    for (const ip of Object.keys(metaGeo)) {
-      if (seenIps.has(ip)) continue;
-      seenIps.add(ip);
-      const cc = metaGeo[ip]?.cc;
-      if (cc) countries[cc] = (countries[cc] || 0) + 1;
-    }
+    // Where the fleet runs (fleetGeo.ts): the WHOLE fleet by country and provider — each IP once,
+    // validators first — and each network's own nodes, for the geo family. Its `countries` is
+    // also the tiers' long-standing `f.cc.<cc>` gauge, so the two can never count differently.
+    const geo = fleetGeo(dagGeo, metagraphs, metaGeo);
+    const countries = geo.countries;
     let total = dagIps.length;
     // f.layer.* counts metagraph-layer roles only — per-layer validator attribution isn't
     // derivable from the geo map (it carries no role/layer field for validator IPs).
@@ -80,7 +69,7 @@ async function fleetCounts(net: ReturnType<typeof netOf>): Promise<FleetCounts |
         mine[role] = (mine[role] || 0) + 1;
       }
     }
-    return total > 0 ? { total, perNet, layers, perNetLayers, perNetTypes, countries } : null;
+    return total > 0 ? { total, perNet, layers, perNetLayers, perNetTypes, countries, geo } : null;
   } catch {
     return null;
   }

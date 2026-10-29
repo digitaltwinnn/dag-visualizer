@@ -2,7 +2,8 @@
 // (never fetch time), which is what makes bucket resolution independent of run cadence.
 // The IncMap folds repeats WITHIN a run through the same merge ops the store applies
 // ACROSS runs, so both layers speak one semantics (merge.ts).
-import { TIERS, slotOf, fieldOf, type Tier } from "./keys";
+import { TIERS, slotOf, fieldOf, geoSlotOf, type Tier } from "./keys";
+import type { FleetGeo } from "./fleetGeo";
 import { mergeVals } from "./merge";
 
 export interface GlobalRec { ordinal: number; timestamp: string; metagraphSnapshotCount?: number; blocks?: unknown[] }
@@ -18,6 +19,9 @@ export interface FleetCounts {
   perNetTypes?: Record<string, Record<string, number>>;
   layers: Record<string, number>;
   countries: Record<string, number>;
+  /** Where the fleet runs, for the geo family (2026-10-27) — absent when the tally was not
+   *  taken, which writes nothing there (an honest gap). */
+  geo?: FleetGeo;
 }
 
 /** redis key → field → value (merge-folded within this run). */
@@ -124,6 +128,19 @@ export function bucketFleet(inc: IncMap, net: string, tsMs: number, fleet: Fleet
   for (const [id, types] of Object.entries(fleet.perNetTypes ?? {}))
     for (const [key, n] of Object.entries(types)) addInc(inc, net, tsMs, `f.type.${id}.${key}`, n, tiers);
   for (const [cc, n] of Object.entries(fleet.countries)) addInc(inc, net, tsMs, `f.cc.${cc}`, n, ["1d"]);
+}
+
+/** The geo family's daily gauges (`keys.ts` `geoSlotOf`): the day's LAST hourly reading, as
+ *  every `f.*` gauge merges ("set"). Written beside, not instead of, the tiers' `f.cc.<cc>`. */
+export function bucketFleetGeo(inc: IncMap, net: string, tsMs: number, geo: FleetGeo): void {
+  const { key, bucket } = geoSlotOf(net, tsMs);
+  let m = inc.get(key);
+  if (!m) { m = new Map(); inc.set(key, m); }
+  const put = (series: string, v: number) => m.set(fieldOf(bucket, series), mergeVals(series, m.get(fieldOf(bucket, series)), v));
+  for (const [cc, n] of Object.entries(geo.countries)) put(`f.cc.${cc}`, n);
+  for (const [k, n] of Object.entries(geo.providers)) put(`f.isp.${k}`, n);
+  for (const [id, by] of Object.entries(geo.perNetCountries)) for (const [cc, n] of Object.entries(by)) put(`f.cc.${id}.${cc}`, n);
+  for (const [id, by] of Object.entries(geo.perNetProviders)) for (const [k, n] of Object.entries(by)) put(`f.isp.${id}.${k}`, n);
 }
 
 /** THE UNLISTED COVERAGE MARKER (2026-10-08). The unlisted channels' count is measured from their

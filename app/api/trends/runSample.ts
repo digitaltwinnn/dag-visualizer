@@ -10,10 +10,10 @@
 // dies mid-write-phase leaves the store exactly as it was — no key half-updated, no cursor
 // advanced past data that didn't land — so the NEXT run's hmget reads are still consistent
 // with what actually got merged, and nothing double-counts.
-import { TTL_S, cursorKeyOf, lockKeyOf, slotOf, fieldOf, type Tier } from "./keys";
+import { TTL_S, cursorKeyOf, lockKeyOf, ispNamesKeyOf, slotOf, fieldOf, type Tier } from "./keys";
 import { mergeVals } from "./merge";
 import {
-  bucketGlobals, bucketMetas, bucketFleet, markUnlistedCoverage,
+  bucketGlobals, bucketMetas, bucketFleet, bucketFleetGeo, markUnlistedCoverage,
   type FleetCounts, type GlobalRec, type IncMap, type MetaRec,
 } from "./bucketing";
 import { listSince, type ChainPage } from "./fetchSince";
@@ -42,6 +42,8 @@ export interface SampleResult {
 }
 
 const tierOfKey = (key: string): Tier => key.split(":")[2] as Tier;
+/** The geo family has no tier segment and keeps forever (`keys.ts` `geoSlotOf`). */
+const ttlOfKey = (key: string): number | null => (key.split(":")[0] === "geo" ? null : TTL_S[tierOfKey(key)]);
 
 export async function runSample(deps: SampleDeps): Promise<SampleResult> {
   const { net, store } = deps;
@@ -104,9 +106,14 @@ export async function runSample(deps: SampleDeps): Promise<SampleResult> {
     // (idempotent across runs and restarts — no boundary bookkeeping).
     const hourSlot = slotOf(net, "1h", deps.now());
     const [hasFleet] = await store.hmget(hourSlot.key, [fieldOf(hourSlot.bucket, "f.nodes")]);
+    let ispNames: Record<string, string> = {};
     if (hasFleet == null) {
       const fleet = await deps.fleet();
       if (fleet) bucketFleet(inc, net, deps.now(), fleet);
+      if (fleet?.geo) {
+        bucketFleetGeo(inc, net, deps.now(), fleet.geo);
+        ispNames = fleet.geo.providerNames;
+      }
     }
 
     // Compute every touched key's merged map first (hmget reads stay per-key, as before —
@@ -122,10 +129,12 @@ export async function runSample(deps: SampleDeps): Promise<SampleResult> {
         const p = prev[i] == null ? undefined : Number(prev[i]);
         out[f] = mergeVals(f.split("|")[1], p, fields.get(f)!);
       });
-      writes.push({ key, map: out, ttlS: TTL_S[tierOfKey(key)] });
+      writes.push({ key, map: out, ttlS: ttlOfKey(key) });
       wroteFields += names.length;
     }
 
+    // Provider names ride the same transaction: a stored key is never written without its name.
+    if (Object.keys(ispNames).length) writes.push({ key: ispNamesKeyOf(net), map: ispNames, ttlS: null });
     if (Object.keys(cursorNext).length > 1) writes.push({ key: cursorKeyOf(net), map: cursorNext, ttlS: null });
     if (writes.length) await store.applyWrites(writes);
     return { wroteFields, gap: g.gap, metaErrors };

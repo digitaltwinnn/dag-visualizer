@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { addInc, bucketGlobals, bucketMetas, bucketFleet, finalDays, stampRun, type IncMap } from "./bucketing";
+import { addInc, bucketGlobals, bucketMetas, bucketFleet, bucketFleetGeo, finalDays, stampRun, type IncMap } from "./bucketing";
 import { slotOf, fieldOf } from "./keys";
 
 const ts = (h: number, m: number, s = 0) => new Date(Date.UTC(2026, 8, 6, h, m, s)).toISOString();
@@ -284,5 +284,30 @@ describe("finalDays / stampRun — the gaps backfill, written day by day (2026-1
     stampRun([10_000, 10_000, 40_000], null, (_, g) => gaps.push(g), (t) => ticks.push(t));
     expect(gaps).toEqual([0, 30]);
     expect(ticks).toEqual([10_000, 40_000]);
+  });
+});
+
+describe("bucketFleetGeo", () => {
+  const geo = {
+    countries: { DE: 60, US: 40 },
+    providers: { "hetzner-online-gmbh": 70 },
+    perNetCountries: { dor: { DE: 3 } },
+    perNetProviders: { dor: { "hetzner-online-gmbh": 3 } },
+    providerNames: { "hetzner-online-gmbh": "Hetzner Online GmbH" },
+  };
+  it("writes the day's gauges into the geo family only — never a t:{net}:* tier", () => {
+    const inc: IncMap = new Map();
+    bucketFleetGeo(inc, "mainnet", Date.UTC(2026, 9, 27, 14, 30), geo);
+    expect([...inc.keys()]).toEqual(["geo:mainnet:2026"]);
+    expect(get(inc, "geo:mainnet:2026", "10-27|f.cc.DE")).toBe(60);
+    expect(get(inc, "geo:mainnet:2026", "10-27|f.isp.hetzner-online-gmbh")).toBe(70);
+    expect(get(inc, "geo:mainnet:2026", "10-27|f.cc.dor.DE")).toBe(3);
+    expect(get(inc, "geo:mainnet:2026", "10-27|f.isp.dor.hetzner-online-gmbh")).toBe(3);
+  });
+  it("keeps the LAST reading of the day, as every f.* gauge does", () => {
+    const inc: IncMap = new Map();
+    bucketFleetGeo(inc, "mainnet", Date.UTC(2026, 9, 27, 1), geo);
+    bucketFleetGeo(inc, "mainnet", Date.UTC(2026, 9, 27, 2), { ...geo, countries: { DE: 61 } });
+    expect(get(inc, "geo:mainnet:2026", "10-27|f.cc.DE")).toBe(61);
   });
 });
