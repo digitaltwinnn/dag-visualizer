@@ -4,7 +4,7 @@ import type { Fact, FactPair } from "@/src/data/noteTypes";
 // GEOGRAPHY'S FACTS BUILDER — what the Geography note's model is shown. Geography answers WHERE:
 // the default note (subject `all`) says how many countries and providers host the fleet and which
 // carry the most nodes; a network's note gives its footprint against the fleet and where it stood
-// a month ago; a country's says what that country hosts. SHARES AND COUNTS ONLY: no label grades the spread (the gate also bans
+// a week ago; a country's says what that country hosts. SHARES AND COUNTS ONLY: no label grades the spread (the gate also bans
 // "decentrali-"), so the model has nothing to editorialise from.
 //
 // It reads the STORED geo family (`app/api/trends/bucketing.ts` `bucketFleetGeo`), one day bucket
@@ -21,22 +21,22 @@ import type { Fact, FactPair } from "@/src/data/noteTypes";
 //     total (the fleet's Σ `f.cc.<cc>`; for a network its own Σ `f.cc.<id>.<cc>`) is within 10% of
 //     the median over the 7 calendar days ending on it (a day alone is measured; a total of 0 never
 //     is). The current reading is the newest measured day. A change compares it with the measured
-//     day nearest to 30 days earlier, and only if that day is within 5 days of the mark: a
-//     neighbour from yesterday is not "a month ago". No such day, no change fact;
+//     day nearest to 7 days earlier, and only if that day is within a day of the mark: a
+//     neighbour from yesterday is not "a week ago". No such day, no change fact;
 //   · ONE FIGURE PER QUANTITY (R58). Every COUNTRY and FLEET figure — the fleet's located total,
 //     each country's count, every country share, rank and "Countries hosting nodes", and both ends
-//     of each month-ago pair — comes from the tiers' daily `f.cc` (`ccDays`), the one series with
-//     a month ago, so the count now IS its pair's `to` (live 2026-10-27 the geo family located 80
+//     of each week-ago pair — comes from the tiers' daily `f.cc` (`ccDays`), the one series with
+//     a week ago, so the count now IS its pair's `to` (live 2026-10-27 the geo family located 80
 //     while the tiers counted 86 against 173: two figures for one quantity). That holds while the
 //     tiers' NEWEST day is measured and no older than the geo reading; otherwise the geo family's
-//     counts are stated and no month-ago figure is. PROVIDERS stay on the geo family (the tiers
+//     counts are stated and no week-ago figure is. PROVIDERS stay on the geo family (the tiers
 //     hold none), their shares of "nodes with a known provider", a quantity of their own; a
 //     provider's change reads `geoDays` only when BOTH ends are measured. A NETWORK's note stays
 //     wholly on the geo family (the tiers hold no per-network countries), its fleet denominators
 //     included, so a share never divides one reading by another: its change reads its OWN
-//     measured days there (its located nodes and countries a month ago, and the located ratio
+//     measured days there (its located nodes and countries a week ago, and the located ratio
 //     when both are above 0 and differ). The geo family began 2026-10-27, so a network states no
-//     change until a month of it exists — honest absence, never a substitute series;
+//     change until a week of it exists — honest absence, never a substitute series;
 //   · a share's denominator is what was located: countries against the fleet's LOCATED nodes,
 //     providers against the nodes with a KNOWN provider (a node can have a country and no
 //     provider), each labelled so;
@@ -44,7 +44,7 @@ import type { Fact, FactPair } from "@/src/data/noteTypes";
 //     stripping `gmbh|ag|inc|llc|ltd|sas|se` (Hetzner Online GmbH + AG) are one provider, summed.
 //     The merged provider is called by the stem both share ("Hetzner Online");
 //   · the store holds no country × provider breakdown, so a country's note carries no providers;
-//   · A CHANGE IS A PAIR (R54). A month ago and now are the `from` and `to` of one key per
+//   · A CHANGE IS A PAIR (R54). A week ago and now are the `from` and `to` of one key per
 //     quantity (the fleet's located total, each country, each provider, a network's located nodes
 //     and countries), the standing "now" fact is the `to` end, and the ratio is `to / from`.
 //
@@ -72,9 +72,12 @@ const DAY_MS = 86_400_000;
 const WINDOW_DAYS = 7;
 /** A day agrees with its week's median within this fraction. */
 const MEASURED_TOLERANCE = 0.1;
-const MONTH_MS = 30 * DAY_MS;
-/** The comparison day may sit this far either side of a month back. */
-const MONTH_SLACK_MS = 5 * DAY_MS;
+/** A change is read over ONE WEEK (user, 2026-10-29: the same range Hypergraph reads its changes
+ *  over, so the two views' notes agree on what "changed" means). */
+const WEEK_MS = 7 * DAY_MS;
+/** The comparison day may sit this far either side of a week back: six to eight days ago still
+ *  reads as "a week ago"; a neighbour from five days back does not. */
+const WEEK_SLACK_MS = DAY_MS;
 const RANK_WORD = ["", "second ", "third "] as const;
 const LEGAL = /\b(?:gmbh|ag|inc|llc|ltd|sas|se)\b/gi;
 
@@ -127,7 +130,7 @@ function median(xs: readonly number[]): number {
 }
 
 /** The days (oldest first) whose total is within 10% of the median over the up-to-7 CALENDAR days
- *  ending on them (a sparse store's neighbour a month back is not in the week). A day with a total of 0 is never measured; the median is over the window's non-zero days. */
+ *  ending on them (a sparse store's neighbour a week back is not in the week). A day with a total of 0 is never measured; the median is over the window's non-zero days. */
 function measuredDays(days: readonly Day[], totalOf: (d: Day) => number): Day[] {
   const totals = days.map(totalOf);
   return days.filter((_, i) => {
@@ -144,12 +147,12 @@ const parseAll = (days: Record<string, Record<string, number>>): Day[] =>
     .filter((d) => Number.isFinite(d.ms))
     .sort((a, b) => a.ms - b.ms);
 
-/** The measured day nearest to a month before `current`, within the slack; null when there is none. */
-function monthBefore(measured: readonly Day[], current: Day): Day | null {
-  const mark = current.ms - MONTH_MS;
+/** The measured day nearest to a week before `current`, within the slack; null when there is none. */
+function weekBefore(measured: readonly Day[], current: Day): Day | null {
+  const mark = current.ms - WEEK_MS;
   let best: Day | null = null;
   for (const d of measured) {
-    if (d.ms >= current.ms || Math.abs(d.ms - mark) > MONTH_SLACK_MS) continue;
+    if (d.ms >= current.ms || Math.abs(d.ms - mark) > WEEK_SLACK_MS) continue;
     if (!best || Math.abs(d.ms - mark) < Math.abs(best.ms - mark)) best = d;
   }
   return best;
@@ -250,30 +253,30 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
   const facts: Fact[] = [];
 
   // THE FLEET'S COUNTRIES, ONE READING (R58). The tiers' daily `f.cc` (`ccDays`) is the only series
-  // that reaches a month back, so it states EVERY country and fleet figure, now and a month ago,
+  // that reaches a week back, so it states EVERY country and fleet figure, now and a week ago,
   // when its newest day is measured and no older than the geo reading; else the geo family's
-  // counts stand alone and no month-ago figure is stated. A network's own note never reads it.
+  // counts stand alone and no week-ago figure is stated. A network's own note never reads it.
   const { tiers, tierMeasured, fleetCc } = fleetReading(parseAll(input.ccDays), now);
-  const tiersThen = tiers ? monthBefore(tierMeasured, tiers) : null;
+  const tiersThen = tiers ? weekBefore(tierMeasured, tiers) : null;
 
   const locatedFleet = sum(fleetCc);
   const countries = ranked([...fleetCc].map(([cc, count]) => ({ cc, count })), (c) => c.cc);
   const providers = ranked(providersOf(now.isp, providerNames).values(), (p) => p.name);
   const knownFleet = providers.reduce((a, p) => a + p.count, 0);
-  // A provider's month ago: the geo family's own, both ends measured.
-  const geoThen = monthBefore(fleetDays, now);
+  // A provider's week ago: the geo family's own, both ends measured.
+  const geoThen = weekBefore(fleetDays, now);
 
-  /** A country's count a month ago, from the same tiers reading as its count now (else none). */
+  /** A country's count a week ago, from the same tiers reading as its count now (else none). */
   const ccWas = (cc: string): number | undefined => (fleetCc.get(cc) ? tiersThen?.cc.get(cc) : undefined) || undefined;
   const ccKey = (cc: string) => `country:${cc}`;
-  /** A country's standing count is the `to` end of its pair whenever a month ago is stated. */
+  /** A country's standing count is the `to` end of its pair whenever a week ago is stated. */
   const ccNowEnd = (cc: string): FactPair | undefined => (ccWas(cc) ? { key: ccKey(cc), end: "to" } : undefined);
-  /** "now against a month ago" for a country: the earlier count and the ratio of the pair. */
+  /** "now against a week ago" for a country: the earlier count and the ratio of the pair. */
   const countryChange = (cc: string): void => {
     const was = ccWas(cc);
     if (!was) return;
-    facts.push(fact(`${cn(cc)}, nodes a month ago`, was, "count", undefined, { key: ccKey(cc), end: "from" }));
-    facts.push(fact(`${cn(cc)}, nodes now against a month ago`, fleetCc.get(cc)! / was, "ratio"));
+    facts.push(fact(`${cn(cc)}, nodes a week ago`, was, "count", undefined, { key: ccKey(cc), end: "from" }));
+    facts.push(fact(`${cn(cc)}, nodes now against a week ago`, fleetCc.get(cc)! / was, "ratio"));
   };
 
   if (subjectNet) {
@@ -282,10 +285,10 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     const ownProv = ranked(providersOf(now.netIsp.get(subjectNet) ?? new Map(), providerNames).values(), (p) => p.name);
     const located = own.reduce((a, c) => a + c.count, 0);
     const known = ownProv.reduce((a, p) => a + p.count, 0);
-    // A MONTH AGO, from its own measured day nearest a month back in the geo family (no such day,
+    // A WEEK AGO, from its own measured day nearest a week back in the geo family (no such day,
     // no fact — the family is young, and no other series holds a network's place). Read first: its
     // ends key the facts below (R54), both from the geo family, so one reading.
-    const then = monthBefore(ownMeasured(subjectNet), now);
+    const then = weekBefore(ownMeasured(subjectNet), now);
     const pairOf = (what: string, end: FactPair["end"]): FactPair | undefined => (then ? { key: `${subjectNet}:${what}`, end } : undefined);
 
     facts.push(fact(`${name}, located nodes`, located, "count", undefined, pairOf("located", "to")));
@@ -311,10 +314,10 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     if (then) {
       const was = then.netCc.get(subjectNet)!;
       const locatedThen = sum(was);
-      facts.push(fact(`${name}, located nodes a month ago`, locatedThen, "count", undefined, pairOf("located", "from")));
-      facts.push(fact(`${name}, countries with nodes a month ago`, was.size, "count", undefined, pairOf("countries", "from")));
+      facts.push(fact(`${name}, located nodes a week ago`, locatedThen, "count", undefined, pairOf("located", "from")));
+      facts.push(fact(`${name}, countries with nodes a week ago`, was.size, "count", undefined, pairOf("countries", "from")));
       if (located > 0 && locatedThen > 0 && located !== locatedThen)
-        facts.push(fact(`${name}, located nodes now against a month ago`, located / locatedThen, "ratio"));
+        facts.push(fact(`${name}, located nodes now against a week ago`, located / locatedThen, "ratio"));
     }
   } else if (subjectCc) {
     const here = fleetCc.get(subjectCc);
@@ -346,7 +349,7 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     }
     countryChange(subjectCc);
   } else {
-    // The fleet's month ago, from the same tiers reading as its count now (R58).
+    // The fleet's week ago, from the same tiers reading as its count now (R58).
     const thenTotal = tiersThen ? sum(tiersThen.cc) : 0;
     const fleetPair = (end: FactPair["end"]): FactPair | undefined => (thenTotal > 0 && locatedFleet > 0 ? { key: "fleet", end } : undefined);
     facts.push(fact("Located nodes in the fleet", locatedFleet, "count", undefined, fleetPair("to")));
@@ -356,7 +359,7 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
       facts.push(fact(`${cn(c.cc)}, nodes (${RANK_WORD[i]}biggest country)`, c.count, "count", undefined, ccNowEnd(c.cc)));
       facts.push(fact(`${cn(c.cc)}, share of the fleet's located nodes`, c.count / locatedFleet, "share"));
     });
-    // A provider's month ago is the geo family's own, so its standing count is the pair's now end.
+    // A provider's week ago is the geo family's own, so its standing count is the pair's now end.
     const wasProviders = geoThen ? providersOf(geoThen.isp, providerNames) : null;
     const providerKey = (p: Provider) => `provider:${p.group}`;
     providers.slice(0, TOP).forEach((p, i) => {
@@ -366,19 +369,19 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     });
 
     // CHANGE. Countries from the tiers' history; providers from the geo family, both ends measured.
-    // The earlier count beside the ratio, as every other "a month ago" here: a note says how much
+    // The earlier count beside the ratio, as every other "a week ago" here: a note says how much
     // it moved (from … to …), never only the direction (user, 2026-10-27).
     if (fleetPair("from")) {
-      facts.push(fact("Located nodes in the fleet a month ago", thenTotal, "count", undefined, fleetPair("from")));
-      facts.push(fact("Located nodes in the fleet, now against a month ago", locatedFleet / thenTotal, "ratio"));
+      facts.push(fact("Located nodes in the fleet a week ago", thenTotal, "count", undefined, fleetPair("from")));
+      facts.push(fact("Located nodes in the fleet, now against a week ago", locatedFleet / thenTotal, "ratio"));
     }
     for (const c of countries.slice(0, TOP)) countryChange(c.cc);
     if (wasProviders) {
       for (const p of providers.slice(0, TOP)) {
         const before = wasProviders.get(p.group)?.count;
         if (!before) continue;
-        facts.push(fact(`${pn(p)}, nodes a month ago`, before, "count", undefined, { key: providerKey(p), end: "from" }));
-        facts.push(fact(`${pn(p)}, nodes now against a month ago`, p.count / before, "ratio"));
+        facts.push(fact(`${pn(p)}, nodes a week ago`, before, "count", undefined, { key: providerKey(p), end: "from" }));
+        facts.push(fact(`${pn(p)}, nodes now against a week ago`, p.count / before, "ratio"));
       }
     }
   }

@@ -230,32 +230,32 @@ describe("factsFor — the per-view read table", () => {
     expect(out!.blurbs).toEqual([]);
   });
 
-  it("hyper: 1h over 30 days, 1d over 60 (a 30-day lead-in), the span the last 30 days; setKey passes through", async () => {
+  it("hyper: 1h over the last week (R72), 1d over 37 days (a 30-day lead-in), the span the last 7 days; setKey passes through", async () => {
     const r = fakeReads();
     const out = await factsFor("mainnet", "hyper", "all", "day", NOW, r);
     expect(r.calls).toEqual([
-      { tier: "1h", from: NOW - 30 * D, to: NOW },
-      { tier: "1d", from: NOW - 60 * D, to: NOW },
+      { tier: "1h", from: NOW - 7 * D, to: NOW },
+      { tier: "1d", from: NOW - 37 * D, to: NOW },
     ]);
     const input = vi.mocked(hyperFacts).mock.calls[0]![0];
-    expect(input.span).toEqual({ fromMs: NOW - 30 * D, toMs: NOW });
-    expect((input.fleet as { tag?: string }).tag).toBe(`1h:${NOW - 30 * D}:${NOW}`);
-    expect((input.daily as { tag?: string }).tag).toBe(`1d:${NOW - 60 * D}:${NOW}`);
+    expect(input.span).toEqual({ fromMs: NOW - 7 * D, toMs: NOW });
+    expect((input.fleet as { tag?: string }).tag).toBe(`1h:${NOW - 7 * D}:${NOW}`);
+    expect((input.daily as { tag?: string }).tag).toBe(`1d:${NOW - 37 * D}:${NOW}`);
     expect(out!.setKey).toBe("a,b");
     expect(out!.blurbs).toEqual(["USDC.dag is: x"]);
-    expect(out!.facts).toContainEqual(expect.objectContaining({ label: "Span length", value: 2_592_000 }));
+    expect(out!.facts).toContainEqual(expect.objectContaining({ label: "Span length", value: 604_800 }));
     // The facts speak of the last day and the last week too (R30).
     expect(out!.facts).toContainEqual(expect.objectContaining({ label: "Day", value: 86_400, kind: "duration" }));
     expect(out!.facts).toContainEqual(expect.objectContaining({ label: "Week", value: 604_800, kind: "duration" }));
   });
 
-  it("geo: the geo family and the tiers' 1d over 41 days (R29), pivoted by day; a country subject", async () => {
+  it("geo: the geo family and the tiers' 1d over 14 days (R29 over a one-week range, R72), pivoted by day; a country subject", async () => {
     const day = Date.UTC(2026, 9, 26);
     const tiers = { buckets: [day - D, day], stepMs: D, now: NOW, series: { "f.cc.DE": [4, null], "f.cc.US": [2, 3], "g.ticks": [1, 1], "f.nodes": [9, 9] } };
     const r = fakeReads({ async span(_n, tier, from, to) { r.calls.push({ tier, from, to }); return tiers; } });
     const out = await factsFor("mainnet", "geo", "cc:DE", "day", NOW, r);
-    expect(r.geoCalls).toEqual([{ from: NOW - 41 * D, to: NOW }]);
-    expect(r.calls).toEqual([{ tier: "1d", from: NOW - 41 * D, to: NOW }]);
+    expect(r.geoCalls).toEqual([{ from: NOW - 14 * D, to: NOW }]);
+    expect(r.calls).toEqual([{ tier: "1d", from: NOW - 14 * D, to: NOW }]);
     const input = vi.mocked(geoFacts).mock.calls[0]![0];
     expect(input.subject).toEqual({ cc: "DE" });
     expect(input.ccDays).toEqual({ "2026-10-25": { "f.cc.DE": 4, "f.cc.US": 2 }, "2026-10-26": { "f.cc.US": 3 } });
@@ -263,8 +263,8 @@ describe("factsFor — the per-view read table", () => {
     expect(input.providerNames).toEqual({ hetzner: "Hetzner" });
     expect(input.countryNames).toMatchObject({ DE: "Germany", US: "United States", FR: "France" });
     expect(out!.label).toBe("Germany");
-    expect(out!.spanFrom).toBe(NOW - 30 * D);
-    expect(out!.facts).toContainEqual(expect.objectContaining({ label: "Span length", value: 2_592_000 }));
+    expect(out!.spanFrom).toBe(NOW - 7 * D);
+    expect(out!.facts).toContainEqual(expect.objectContaining({ label: "Span length", value: 604_800 }));
   });
 
   it("geoInputs is the geo note's own read, so the warm pass plans its countries from the same reading (M5)", async () => {
@@ -272,19 +272,19 @@ describe("factsFor — the per-view read table", () => {
     const tiers = { buckets: [day - D, day], stepMs: D, now: NOW, series: { "f.cc.DE": [4, null], "f.cc.US": [2, 3], "g.ticks": [1, 1] } };
     const r = fakeReads({ async span(_n, tier, from, to) { r.calls.push({ tier, from, to }); return tiers; } });
     const got = await geoInputs("mainnet", NOW, r);
-    expect(r.geoCalls).toEqual([{ from: NOW - 41 * D, to: NOW }]);
-    expect(r.calls).toEqual([{ tier: "1d", from: NOW - 41 * D, to: NOW }]);
+    expect(r.geoCalls).toEqual([{ from: NOW - 14 * D, to: NOW }]);
+    expect(r.calls).toEqual([{ tier: "1d", from: NOW - 14 * D, to: NOW }]);
     expect(got.ccDays).toEqual({ "2026-10-25": { "f.cc.DE": 4, "f.cc.US": 2 }, "2026-10-26": { "f.cc.US": 3 } });
     expect(got.geoDays).toEqual({ "2026-10-27": { "f.cc.DE": 3, "f.cc.dag.FR": 1 } });
     expect(got.providerNames).toEqual({ hetzner: "Hetzner" });
   });
 
-  it("geo, through the real builder: a partial outage 30 days back is never the month-ago anchor (R29)", async () => {
+  it("geo, through the real builder: a partial outage a week back is never the week-ago anchor (R29)", async () => {
     vi.mocked(geoFacts).mockImplementation(realGeo.geoFacts);
     const today = Math.floor(NOW / D) * D;
     const NORMAL = { DE: 50, US: 30 };
     const OUTAGE = { DE: 20, US: 12 }; // a partial outage hour, read as the whole day
-    const level = (dayMs: number) => (dayMs === today - 31 * D || dayMs === today - 30 * D ? OUTAGE : NORMAL);
+    const level = (dayMs: number) => (dayMs === today - 8 * D || dayMs === today - 7 * D ? OUTAGE : NORMAL);
     const daysIn = (from: number) => {
       const out: number[] = [];
       for (let t = Math.floor(from / D) * D; t <= NOW; t += D) out.push(t);
@@ -300,23 +300,23 @@ describe("factsFor — the per-view read table", () => {
         return { buckets, stepMs: D, now: NOW, series: { "g.ticks": buckets.map(() => 1), "f.cc.DE": buckets.map((t) => level(t).DE), "f.cc.US": buckets.map((t) => level(t).US) } };
       },
     };
-    const monthAgo = (facts: { label: string; value: number }[]) => facts.filter((f) => /a month ago/.test(f.label));
+    const weekAgo = (facts: { label: string; value: number }[]) => facts.filter((f) => /a week ago/.test(f.label));
 
-    // The defect, shown: over a 31-day read the outage pair sits at the read's head, is judged
+    // The defect, shown: over an 8-day read the outage pair sits at the read's head, is judged
     // against itself, and becomes the anchor ("Germany rose 150%").
-    const head = await reads.geoDays("mainnet", NOW - 31 * D, NOW);
-    const ccHead = await reads.span("mainnet", "1d", NOW - 31 * D, NOW);
-    const ccDays31 = Object.fromEntries(ccHead.buckets.map((b, i) => [new Date(b).toISOString().slice(0, 10), { "f.cc.DE": ccHead.series["f.cc.DE"]![i]!, "f.cc.US": ccHead.series["f.cc.US"]![i]! }]));
-    const short = realGeo.geoFacts({ subject: "all", geoDays: head.geoDays, ccDays: ccDays31, providerNames: {}, countryNames: { DE: "Germany", US: "United States" }, names: {} })!;
-    expect(monthAgo(short.facts).some((f) => f.label.endsWith("now against a month ago") && f.value === 2.5)).toBe(true);
+    const head = await reads.geoDays("mainnet", NOW - 8 * D, NOW);
+    const ccHead = await reads.span("mainnet", "1d", NOW - 8 * D, NOW);
+    const ccDays8 = Object.fromEntries(ccHead.buckets.map((b, i) => [new Date(b).toISOString().slice(0, 10), { "f.cc.DE": ccHead.series["f.cc.DE"]![i]!, "f.cc.US": ccHead.series["f.cc.US"]![i]! }]));
+    const short = realGeo.geoFacts({ subject: "all", geoDays: head.geoDays, ccDays: ccDays8, providerNames: {}, countryNames: { DE: "Germany", US: "United States" }, names: {} })!;
+    expect(weekAgo(short.facts).some((f) => f.label.endsWith("now against a week ago") && f.value === 2.5)).toBe(true);
 
-    // The fix: the read reaches 41 days back, the pair is judged against the week before it and
+    // The fix: the read reaches 14 days back, the pair is judged against the week before it and
     // fails, and no change fact reads from it.
     const out = await factsFor("mainnet", "geo", "all", "day", NOW, reads);
-    const changes = monthAgo(out!.facts);
+    const changes = weekAgo(out!.facts);
     expect(changes.length).toBeGreaterThan(0);
     for (const f of changes) {
-      if (f.label.endsWith("now against a month ago")) expect(f.value).toBe(1);
+      if (f.label.endsWith("now against a week ago")) expect(f.value).toBe(1);
       else expect([NORMAL.DE, NORMAL.US, NORMAL.DE + NORMAL.US]).toContain(f.value); // a country, or the fleet's located total
     }
   });

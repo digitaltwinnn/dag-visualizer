@@ -21,9 +21,9 @@ import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 //
 // It reads the STORED gauges, not a live fan-out: the sampler writes the same roster every hour,
 // so a note costs no upstream read, and the span it states is the span the store measured.
-//   · `fleet` is 30 days of the 1h tier (`f.nodes`, `f.nodes.<id>`, `f.layer.<id>.<role>`,
+//   · `fleet` is the span's week of the 1h tier (`f.nodes`, `f.nodes.<id>`, `f.layer.<id>.<role>`,
 //     `f.type.<id>.<key>`) — gauges, so the newest hour is NOT trimmed;
-//   · `daily` is the 1d tier with a 30-day LEAD-IN before the 30-day `span` (`m.<id>.snaps`,
+//   · `daily` is the 1d tier with a 30-day LEAD-IN before the one-week `span` (`m.<id>.snaps`,
 //     `m.<id>.ticks`, `g.ticks`). Both are the STORE's payload, UNFOLDED.
 //
 // THE GATE'S INTERFACE (`noteHonesty.ts`): a ratio belongs to a network only by its display name in
@@ -77,10 +77,11 @@ import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 
 export interface HyperFactsInput {
   subject: "all" | "dag" | string; // "all" = the digest; "dag" and a network id = that network
-  fleet: TrendsWindowData; // 30 days of the 1h tier (store, unfolded)
+  fleet: TrendsWindowData; // the span's week of the 1h tier (store, unfolded)
   /** Daily tier: a 30-day lead-in before `span`, through its end (store, unfolded). */
   daily: TrendsWindowData;
-  /** The 30-day span the note describes; its start marks the end of the daily lead-in. */
+  /** The span the note describes — ONE WEEK (user, 2026-10-29: the same range Geography reads its
+   *  changes over); its start marks the end of the daily lead-in. */
   span: { fromMs: number; toMs: number };
   names: Record<string, string>; // catalog id → display name
   blurbs: Record<string, string>; // catalog id → `blurb` (config.METAGRAPHS)

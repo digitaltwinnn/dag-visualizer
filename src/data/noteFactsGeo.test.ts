@@ -117,34 +117,34 @@ describe("geoFacts on the fleet", () => {
 describe("geoFacts before history exists", () => {
   it("emits no change fact at all when only today is stored", () => {
     const r = geoFacts(input())!;
-    expect(r.facts.filter((f) => /against a month ago|a month ago/.test(f.label))).toHaveLength(0);
+    expect(r.facts.filter((f) => /against a week ago|a week ago/.test(f.label))).toHaveLength(0);
   });
 
   it("emits country changes from ccDays but no provider change when geoDays holds only today", () => {
     const geoDays = { "2026-10-27": day(NOW) };
-    const ccDays = { ...ccOf(geoDays), "2026-09-27": ccOf({ x: day(scaled(0.5)) }).x! };
+    const ccDays = { ...ccOf(geoDays), "2026-10-20": ccOf({ x: day(scaled(0.5)) }).x! };
     const r = geoFacts(input({ geoDays, ccDays }))!;
-    const de = one(r, /^Germany, nodes now against a month ago/);
+    const de = one(r, /^Germany, nodes now against a week ago/);
     expect(de.kind).toBe("ratio");
     expect(de.value).toBeCloseTo(2);
-    expect(one(r, /^Germany, nodes a month ago/).value).toBe(25);
-    expect(one(r, /^Located nodes in the fleet, now against a month ago/).value).toBeCloseTo(100 / 51); // the halved fleet rounds to 51
-    expect(one(r, /^Located nodes in the fleet a month ago$/).value).toBe(51);
-    expect(find(r, /^(Hetzner|OVH|Amazon).*month ago/)).toHaveLength(0);
+    expect(one(r, /^Germany, nodes a week ago/).value).toBe(25);
+    expect(one(r, /^Located nodes in the fleet, now against a week ago/).value).toBeCloseTo(100 / 51); // the halved fleet rounds to 51
+    expect(one(r, /^Located nodes in the fleet a week ago$/).value).toBe(51);
+    expect(find(r, /^(Hetzner|OVH|Amazon).*week ago/)).toHaveLength(0);
   });
 
   it("emits a provider change once both ends are stored", () => {
-    const geoDays = { "2026-09-27": day(scaled(0.5)), "2026-10-27": day(NOW) };
+    const geoDays = { "2026-10-20": day(scaled(0.5)), "2026-10-27": day(NOW) };
     const r = geoFacts(input({ geoDays, ccDays: ccOf(geoDays) }))!;
-    const h = one(r, /^Hetzner Online, nodes now against a month ago/);
+    const h = one(r, /^Hetzner Online, nodes now against a week ago/);
     expect(h.value).toBeCloseTo(2);
-    expect(one(r, /^Hetzner Online, nodes a month ago/).value).toBe(25);
+    expect(one(r, /^Hetzner Online, nodes a week ago/).value).toBe(25);
   });
 
-  it("states no change when the nearest earlier day is nowhere near a month back", () => {
+  it("states no change when the nearest earlier day is nowhere near a week back", () => {
     const geoDays = { "2026-10-26": day(scaled(0.5)), "2026-10-27": day(NOW) };
     const r = geoFacts(input({ geoDays, ccDays: ccOf(geoDays) }))!;
-    expect(r.facts.filter((f) => /month ago/.test(f.label))).toHaveLength(0);
+    expect(r.facts.filter((f) => /week ago/.test(f.label))).toHaveLength(0);
   });
 });
 
@@ -173,23 +173,23 @@ describe("geoFacts reads through an outage hour (R22)", () => {
     const geoDays = run("2026-10-27", 2, () => NOW);
     const ccDays = {
       ...Object.fromEntries(Array.from({ length: 6 }, (_, i) => [iso(D("2026-10-21") + i * DAY), ccOf({ x: day(NOW) }).x!])),
-      "2026-09-27": ccOf({ x: day(scaled(0.5)) }).x!,
+      "2026-10-20": ccOf({ x: day(scaled(0.5)) }).x!,
       "2026-10-27": { "f.cc.DE": 1 },
     };
     const r = geoFacts(input({ geoDays, ccDays }))!;
     expect(one(r, /^Germany, nodes \(/).value).toBe(50); // the geo family's, not 1
-    expect(find(r, /month ago/)).toHaveLength(0); // not 50 (Oct 26) against 25, a day the counts are not from
+    expect(find(r, /week ago/)).toHaveLength(0); // not 50 (Oct 26) against 25, a day the counts are not from
   });
 
-  it("compares with the measured day nearest a month earlier, skipping an outage day", () => {
+  it("compares with the measured day nearest a week earlier, skipping an outage day", () => {
     const geoDays = {
-      ...run("2026-09-26", 6, () => scaled(0.5)),
-      "2026-09-27": day({ cc: { DE: 1 }, isp: { "ovh-sas": 1 } }), // the day a month back is an outage
+      ...run("2026-10-19", 6, () => scaled(0.5)),
+      "2026-10-20": day({ cc: { DE: 1 }, isp: { "ovh-sas": 1 } }), // the day a week back is an outage
       "2026-10-27": day(NOW),
     };
     const r = geoFacts(input({ geoDays, ccDays: ccOf(geoDays) }))!;
-    expect(one(r, /^Germany, nodes now against a month ago/).value).toBeCloseTo(2);
-    expect(one(r, /^Hetzner Online, nodes now against a month ago/).value).toBeCloseTo(2);
+    expect(one(r, /^Germany, nodes now against a week ago/).value).toBeCloseTo(2);
+    expect(one(r, /^Hetzner Online, nodes now against a week ago/).value).toBeCloseTo(2);
   });
 });
 
@@ -239,36 +239,36 @@ describe("geoFacts on a network", () => {
     expect(find(r, /share of the fleet/)).toHaveLength(0);
   });
 
-  it("states where it stood a month ago when its own day a month back is measured", () => {
+  it("states where it stood a week ago when its own day a week back is measured", () => {
     const back = scaled(0.5, { ...NOW, net: { ...NOW.net, usdc: { cc: { DE: 20 }, isp: { "hetzner-online-ag": 20 } } } });
-    const geoDays = { "2026-09-27": day(back), "2026-10-27": day(NOW) };
+    const geoDays = { "2026-10-20": day(back), "2026-10-27": day(NOW) };
     const r = geoFacts(input({ subject: "usdc", geoDays, ccDays: ccOf(geoDays) }))!;
-    expect(one(r, /^USDC\.dag, located nodes a month ago$/).value).toBe(10);
-    expect(one(r, /^USDC\.dag, countries with nodes a month ago$/).value).toBe(1);
-    const ratio = one(r, /^USDC\.dag, located nodes now against a month ago$/);
+    expect(one(r, /^USDC\.dag, located nodes a week ago$/).value).toBe(10);
+    expect(one(r, /^USDC\.dag, countries with nodes a week ago$/).value).toBe(1);
+    const ratio = one(r, /^USDC\.dag, located nodes now against a week ago$/);
     expect(ratio.kind).toBe("ratio");
     expect(ratio.value).toBeCloseTo(30 / 10);
   });
 
-  it("states no ratio when the located count is the same as a month ago", () => {
-    const geoDays = { "2026-09-27": day(NOW), "2026-10-27": day(NOW) };
+  it("states no ratio when the located count is the same as a week ago", () => {
+    const geoDays = { "2026-10-20": day(NOW), "2026-10-27": day(NOW) };
     const r = geoFacts(input({ subject: "usdc", geoDays, ccDays: ccOf(geoDays) }))!;
-    expect(one(r, /^USDC\.dag, located nodes a month ago$/).value).toBe(30);
-    expect(find(r, /now against a month ago/)).toHaveLength(0);
+    expect(one(r, /^USDC\.dag, located nodes a week ago$/).value).toBe(30);
+    expect(find(r, /now against a week ago/)).toHaveLength(0);
   });
 
-  it("states nothing about a month ago without a measured day of its own there", () => {
-    expect(find(geoFacts(input({ subject: "usdc" }))!, /month ago/)).toHaveLength(0);
-    // The fleet was measured a month back but the network had no list of its own that day.
-    const geoDays = { "2026-09-27": day({ ...NOW, net: { dag: NOW.net!.dag! } }), "2026-10-27": day(NOW) };
-    expect(find(geoFacts(input({ subject: "usdc", geoDays, ccDays: ccOf(geoDays) }))!, /month ago/)).toHaveLength(0);
-    // Its nearest earlier day is nowhere near a month back.
-    const near = { "2026-10-20": day(scaled(0.5)), "2026-10-27": day(NOW) };
-    expect(find(geoFacts(input({ subject: "usdc", geoDays: near, ccDays: ccOf(near) }))!, /month ago/)).toHaveLength(0);
+  it("states nothing about a week ago without a measured day of its own there", () => {
+    expect(find(geoFacts(input({ subject: "usdc" }))!, /week ago/)).toHaveLength(0);
+    // The fleet was measured a week back but the network had no list of its own that day.
+    const geoDays = { "2026-10-20": day({ ...NOW, net: { dag: NOW.net!.dag! } }), "2026-10-27": day(NOW) };
+    expect(find(geoFacts(input({ subject: "usdc", geoDays, ccDays: ccOf(geoDays) }))!, /week ago/)).toHaveLength(0);
+    // Its nearest earlier day is nowhere near a week back.
+    const near = { "2026-10-25": day(scaled(0.5)), "2026-10-27": day(NOW) };
+    expect(find(geoFacts(input({ subject: "usdc", geoDays: near, ccDays: ccOf(near) }))!, /week ago/)).toHaveLength(0);
   });
 
   it("names the network and no other in its ratio-bearing labels", () => {
-    const geoDays = { "2026-09-27": day(scaled(0.5)), "2026-10-27": day(NOW) };
+    const geoDays = { "2026-10-20": day(scaled(0.5)), "2026-10-27": day(NOW) };
     const r = geoFacts(input({ subject: "usdc", geoDays, ccDays: ccOf(geoDays) }))!;
     expect(r.facts.some((x) => x.kind === "ratio")).toBe(true);
     for (const f of r.facts.filter((x) => x.kind === "ratio")) expect(f.label).toContain("USDC.dag");
@@ -311,11 +311,11 @@ describe("geoFacts on a country", () => {
     expect(geoFacts(input({ subject: { cc: "JP" } }))).toBeNull();
   });
 
-  it("carries the country's change since a month ago", () => {
+  it("carries the country's change since a week ago", () => {
     const geoDays = { "2026-10-27": day(NOW) };
-    const ccDays = { ...ccOf(geoDays), "2026-09-27": ccOf({ x: day(scaled(0.5)) }).x! };
+    const ccDays = { ...ccOf(geoDays), "2026-10-20": ccOf({ x: day(scaled(0.5)) }).x! };
     const r = geoFacts(input({ subject: { cc: "DE" }, geoDays, ccDays }))!;
-    expect(one(r, /^Germany, nodes now against a month ago/).value).toBeCloseTo(2);
+    expect(one(r, /^Germany, nodes now against a week ago/).value).toBeCloseTo(2);
   });
 });
 
@@ -346,66 +346,66 @@ describe("geoFacts as a gate-passing source", () => {
 
   it("accepts a country growth sentence when the history is stored", () => {
     const geoDays = { "2026-10-27": day(NOW) };
-    const ccDays = { ...ccOf(geoDays), "2026-09-27": ccOf({ x: day(scaled(0.5)) }).x! };
+    const ccDays = { ...ccOf(geoDays), "2026-10-20": ccOf({ x: day(scaled(0.5)) }).x! };
     const r = geoFacts(input({ geoDays, ccDays }))!;
-    expect(checkNote("Germany doubled its nodes since a month ago, from 25 to 50.", r.facts, r.names)).toEqual({ ok: true });
+    expect(checkNote("Germany doubled its nodes since a week ago, from 25 to 50.", r.facts, r.names)).toEqual({ ok: true });
   });
 
-  it("accepts a network's growth since a month ago and rejects a wrong earlier count", () => {
-    const geoDays = { "2026-09-27": day(scaled(0.5)), "2026-10-27": day(NOW) };
+  it("accepts a network's growth since a week ago and rejects a wrong earlier count", () => {
+    const geoDays = { "2026-10-20": day(scaled(0.5)), "2026-10-27": day(NOW) };
     const r = geoFacts(input({ subject: "usdc", geoDays, ccDays: ccOf(geoDays) }))!;
-    expect(checkNote("USDC.dag has 30 located nodes, doubled from 15 a month ago.", r.facts, r.names)).toEqual({ ok: true });
-    expect(checkNote("USDC.dag has 30 located nodes, up from 16 a month ago.", r.facts, r.names).ok).toBe(false);
+    expect(checkNote("USDC.dag has 30 located nodes, doubled from 15 a week ago.", r.facts, r.names)).toEqual({ ok: true });
+    expect(checkNote("USDC.dag has 30 located nodes, up from 16 a week ago.", r.facts, r.names).ok).toBe(false);
   });
 });
 
 describe("geoFacts tags each change as a pair (R54)", () => {
 
-  it("keys the fleet, each top country and each top provider, a month ago to now, the standing fact as the now end", () => {
-    const geoDays = { "2026-09-27": day(scaled(0.5)), "2026-10-27": day(NOW) };
+  it("keys the fleet, each top country and each top provider, a week ago to now, the standing fact as the now end", () => {
+    const geoDays = { "2026-10-20": day(scaled(0.5)), "2026-10-27": day(NOW) };
     const r = geoFacts(input({ geoDays, ccDays: ccOf(geoDays) }))!;
     expect([...pairsOf(r.facts).values()]).toEqual([
-      ["Located nodes in the fleet a month ago", 51, "Located nodes in the fleet", 100],
-      ["Germany, nodes a month ago", 25, "Germany, nodes (biggest country)", 50],
-      ["United States, nodes a month ago", 15, "United States, nodes (second biggest country)", 30],
-      ["France, nodes a month ago", 8, "France, nodes (third biggest country)", 15],
-      ["Hetzner Online, nodes a month ago", 25, "Hetzner Online, nodes (biggest provider)", 50],
-      ["Amazon.com, nodes a month ago", 10, "Amazon.com, nodes (second biggest provider)", 20],
-      ["OVH, nodes a month ago", 5, "OVH, nodes (third biggest provider)", 10],
+      ["Located nodes in the fleet a week ago", 51, "Located nodes in the fleet", 100],
+      ["Germany, nodes a week ago", 25, "Germany, nodes (biggest country)", 50],
+      ["United States, nodes a week ago", 15, "United States, nodes (second biggest country)", 30],
+      ["France, nodes a week ago", 8, "France, nodes (third biggest country)", 15],
+      ["Hetzner Online, nodes a week ago", 25, "Hetzner Online, nodes (biggest provider)", 50],
+      ["Amazon.com, nodes a week ago", 10, "Amazon.com, nodes (second biggest provider)", 20],
+      ["OVH, nodes a week ago", 5, "OVH, nodes (third biggest provider)", 10],
     ]);
   });
 
   it("keys a network's located nodes and its countries, and a country's own nodes", () => {
     const back = scaled(0.5, { ...NOW, net: { ...NOW.net, usdc: { cc: { DE: 20 }, isp: { "hetzner-online-ag": 20 } } } });
-    const geoDays = { "2026-09-27": day(back), "2026-10-27": day(NOW) };
+    const geoDays = { "2026-10-20": day(back), "2026-10-27": day(NOW) };
     const net = geoFacts(input({ subject: "usdc", geoDays, ccDays: ccOf(geoDays) }))!;
     expect([...pairsOf(net.facts).values()]).toEqual([
-      ["USDC.dag, located nodes a month ago", 10, "USDC.dag, located nodes", 30],
-      ["USDC.dag, countries with nodes a month ago", 1, "USDC.dag, countries with nodes", 2],
+      ["USDC.dag, located nodes a week ago", 10, "USDC.dag, located nodes", 30],
+      ["USDC.dag, countries with nodes a week ago", 1, "USDC.dag, countries with nodes", 2],
     ]);
     const cc = geoFacts(input({ subject: { cc: "DE" }, geoDays, ccDays: ccOf(geoDays) }))!;
-    expect([...pairsOf(cc.facts).values()]).toEqual([["Germany, nodes a month ago", 25, "Germany, nodes", 50]]);
+    expect([...pairsOf(cc.facts).values()]).toEqual([["Germany, nodes a week ago", 25, "Germany, nodes", 50]]);
   });
 });
 
 describe("geoFacts states ONE figure per quantity: countries and the fleet from the tiers (R58)", () => {
   // The live dump of 2026-10-27: the geo family locates 80 nodes today while the tiers' history,
-  // the only source of "a month ago" (173), counts 86. Germany is 33 in both; the United States
+  // the only source of "a week ago" (173), counts 86. Germany is 33 in both; the United States
   // reads 29 in the tiers, 27 in the geo family. Providers exist only in the geo family.
   const providers = { hetzner: "Hetzner Online GmbH", amazon: "Amazon.com, Inc.", ionos: "IONOS SE" };
   const countries = { DE: "Germany", US: "United States", FI: "Finland", NL: "Netherlands" };
   const geoToday = { cc: { DE: 33, US: 27, FI: 17, NL: 3 }, isp: { hetzner: 51, amazon: 9, ionos: 9 } };
   const tiersToday = { "f.cc.DE": 33, "f.cc.US": 29, "f.cc.FI": 17, "f.cc.NL": 7 };
   const tiersThen = { "f.cc.DE": 67, "f.cc.US": 58, "f.cc.FI": 41, "f.cc.NL": 7 };
-  const dump = (subject: GeoFactsInput["subject"] = "all", ccDays: GeoFactsInput["ccDays"] = { "2026-09-27": tiersThen, "2026-10-27": tiersToday }) =>
+  const dump = (subject: GeoFactsInput["subject"] = "all", ccDays: GeoFactsInput["ccDays"] = { "2026-10-20": tiersThen, "2026-10-27": tiersToday }) =>
     geoFacts({ subject, geoDays: { "2026-10-27": day(geoToday) }, ccDays, providerNames: providers, countryNames: countries, names: NAMES })!;
 
-  it("states the tiers' count now as the fleet's one figure, the now end of its month-ago pair", () => {
+  it("states the tiers' count now as the fleet's one figure, the now end of its week-ago pair", () => {
     const r = dump();
     const now = one(r, /^Located nodes in the fleet$/);
     expect([now.value, now.pair?.end]).toEqual([86, "to"]);
-    expect(one(r, /^Located nodes in the fleet a month ago$/)).toMatchObject({ value: 173, pair: { key: now.pair!.key, end: "from" } });
-    expect(one(r, /^Located nodes in the fleet, now against a month ago$/).value).toBeCloseTo(86 / 173);
+    expect(one(r, /^Located nodes in the fleet a week ago$/)).toMatchObject({ value: 173, pair: { key: now.pair!.key, end: "from" } });
+    expect(one(r, /^Located nodes in the fleet, now against a week ago$/).value).toBeCloseTo(86 / 173);
     expect(find(r, /counted as/)).toHaveLength(0);
     expect(r.facts.filter((f) => f.value === 80)).toHaveLength(0); // the geo family's total is stated nowhere
   });
@@ -415,7 +415,7 @@ describe("geoFacts states ONE figure per quantity: countries and the fleet from 
     expect(one(r, /^Countries hosting nodes$/).value).toBe(4);
     expect(one(r, /^United States, nodes \(second biggest country\)$/)).toMatchObject({ value: 29, pair: { end: "to" } });
     expect(one(r, /^United States, share of the fleet's located nodes$/).value).toBeCloseTo(29 / 86);
-    expect(one(r, /^United States, nodes now against a month ago$/).value).toBeCloseTo(29 / 58);
+    expect(one(r, /^United States, nodes now against a week ago$/).value).toBeCloseTo(29 / 58);
     expect(one(r, /^Germany, nodes \(biggest country\)$/)).toMatchObject({ value: 33, pair: { end: "to" } });
   });
 
@@ -431,7 +431,7 @@ describe("geoFacts states ONE figure per quantity: countries and the fleet from 
     expect(one(r, /^United States, nodes$/)).toMatchObject({ value: 29, pair: { end: "to" } });
     expect(one(r, /^United States, share of the fleet's located nodes$/).value).toBeCloseTo(29 / 86);
     expect(one(r, /^United States, rank by nodes$/).value).toBe(2);
-    expect(one(r, /^United States, nodes a month ago$/)).toMatchObject({ value: 58, pair: { end: "from" } });
+    expect(one(r, /^United States, nodes a week ago$/)).toMatchObject({ value: 58, pair: { end: "from" } });
   });
 
   it("states no network count in a country above the tiers' count for that country (M4)", () => {
@@ -453,17 +453,17 @@ describe("geoFacts states ONE figure per quantity: countries and the fleet from 
     expect(one(r, /^USDC\.dag, share of the fleet's nodes in Germany$/).value).toBeCloseTo(20 / 50);
   });
 
-  it("falls back to the geo family, with no month-ago figure, when the tiers' newest day is missing or unmeasured", () => {
+  it("falls back to the geo family, with no week-ago figure, when the tiers' newest day is missing or unmeasured", () => {
     const cases: GeoFactsInput["ccDays"][] = [
       {}, // no tiers at all
-      { "2026-09-27": tiersThen, "2026-10-26": tiersToday }, // the tiers' newest day is older than today's reading
-      { "2026-09-27": tiersThen, "2026-10-26": tiersToday, "2026-10-27": { "f.cc.DE": 2 } }, // an outage day
+      { "2026-10-20": tiersThen, "2026-10-26": tiersToday }, // the tiers' newest day is older than today's reading
+      { "2026-10-20": tiersThen, "2026-10-26": tiersToday, "2026-10-27": { "f.cc.DE": 2 } }, // an outage day
     ];
     for (const ccDays of cases) {
       const r = dump("all", ccDays);
       expect(one(r, /^Located nodes in the fleet$/).value).toBe(80);
       expect(one(r, /^United States, nodes \(second biggest country\)$/).value).toBe(27);
-      expect(r.facts.filter((f) => /month ago/.test(f.label))).toHaveLength(0);
+      expect(r.facts.filter((f) => /week ago/.test(f.label))).toHaveLength(0);
       expect(r.facts.filter((f) => f.pair && !/provider/.test(f.label))).toHaveLength(0);
     }
   });
@@ -471,14 +471,14 @@ describe("geoFacts states ONE figure per quantity: countries and the fleet from 
   it("is the gate's source for the live failure: only the tiers' one figure ends the change from 173", () => {
     const r = dump();
     const gate = (t: string) => checkNote(t, r.facts, r.names);
-    const live = gate("Located nodes fell from 173 a month ago to 9. Germany dropped from 67 to 33.");
+    const live = gate("Located nodes fell from 173 a week ago to 9. Germany dropped from 67 to 33.");
     expect(live.ok).toBe(false);
     if (!live.ok) expect(live.reasons).toEqual(["173 is a past value; the figure beside it, 9, is not its current figure 86"]);
-    expect(gate("Located nodes fell from 173 a month ago to just 9.").ok).toBe(false);
-    expect(gate("Located nodes stand at 9, down from 173 a month ago.").ok).toBe(false);
-    expect(gate("Located nodes fell from 173 a month ago to 86.")).toEqual({ ok: true });
+    expect(gate("Located nodes fell from 173 a week ago to just 9.").ok).toBe(false);
+    expect(gate("Located nodes stand at 9, down from 173 a week ago.").ok).toBe(false);
+    expect(gate("Located nodes fell from 173 a week ago to 86.")).toEqual({ ok: true });
     expect(gate("The fleet has 86 located nodes, down from 173.")).toEqual({ ok: true });
-    expect(gate("Located nodes fell from 173 a month ago to 80.").ok).toBe(false);
+    expect(gate("Located nodes fell from 173 a week ago to 80.").ok).toBe(false);
     expect(gate("Germany dropped from 67 to 33.")).toEqual({ ok: true });
     expect(gate("Germany dropped from 67 to 27.").ok).toBe(false);
     expect(gate("The United States fell from 58 to 29.")).toEqual({ ok: true });

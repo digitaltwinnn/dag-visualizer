@@ -226,9 +226,9 @@ interface ViewSource {
 }
 
 const WHOLE = "the whole network";
-/** Geography's read: the 30-day month, its 5-day slack, and the 6 days the earliest candidate's
- *  week needs before it (R29). */
-const GEO_READ_MS = (30 + 5 + 6) * D;
+/** Geography's read: the week its changes are read over, its one-day slack, and the 6 days the
+ *  earliest candidate's own week needs before it (R29). */
+const GEO_READ_MS = (7 + 1 + 6) * D;
 const secondsOf = (fromMs: number, toMs: number) => (toMs - fromMs) / 1000;
 
 type TrendPill = "1h" | "24h" | "7d" | "30d" | "1y";
@@ -285,29 +285,30 @@ async function readTrend(c: Ctx): Promise<Read | null> {
 }
 
 const VIEW_SOURCES: Record<NoteView, ViewSource> = {
-  // WHO / WHAT: the fleet's hourly gauges over 30 days; the daily tier over 60 (a 30-day lead-in).
+  // WHO / WHAT: the fleet's hourly gauges over the last WEEK (user, 2026-10-29: one change range for
+  // Hypergraph and Geography); the daily tier over 37 days (a 30-day lead-in, so a start is a start).
   hyper: {
     accepts: (net, subject, span) => span === "day" && (subject === "all" || isNetwork(net, subject)),
     label: (subject, names) => (subject === "all" ? WHOLE : (names[subject] ?? subject)),
     whole: (subject) => subject === "all",
     async read({ net, subject, nowMs, reads, names, blurbs }) {
-      const span = { fromMs: nowMs - 30 * D, toMs: nowMs };
+      const span = { fromMs: nowMs - 7 * D, toMs: nowMs };
       const [fleet, daily] = await Promise.all([
         reads.span(net, "1h", span.fromMs, nowMs),
         reads.span(net, "1d", span.fromMs - LEAD_IN_MS, nowMs),
       ]);
       const built = hyperFacts({ subject, fleet, daily, span, names, blurbs });
-      // The facts speak of the last day and the last week (activity, started / stopped) as well as
-      // the 30-day span, so each window the note may name is stated.
+      // The facts speak of the last day and the last week (the span, activity, started / stopped),
+      // so each window the note may name is stated.
       const windows: [string, number][] = [["Span length", secondsOf(span.fromMs, nowMs)], ["Day", D / 1000], ["Week", (7 * D) / 1000]];
       return { built, spanFrom: span.fromMs, spanTo: nowMs, windows };
     },
   },
-  // WHERE: the geo family's days and the tiers' daily country counts. The note's span is the month
-  // its changes are read over (now against the measured day nearest 30 days back, within 5 days),
+  // WHERE: the geo family's days and the tiers' daily country counts. The note's span is the WEEK
+  // its changes are read over (now against the measured day nearest 7 days back, within a day),
   // but the READ reaches further (R29): the builder judges each day against the week ending on it
-  // (R22), so the earliest day the comparison may use, 35 days back, needs the 6 days before it,
-  // or a partial outage at the read's head is judged against itself and becomes the month-ago anchor.
+  // (R22), so the earliest day the comparison may use, 8 days back, needs the 6 days before it,
+  // or a partial outage at the read's head is judged against itself and becomes the week-ago anchor.
   geo: {
     accepts: (net, subject, span) => span === "day" && (subject === "all" || CC_RE.test(subject) || isNetwork(net, subject)),
     label: (subject, names) => {
@@ -324,7 +325,7 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
       if (cc) ccs.add(cc);
       const countryNames = Object.fromEntries([...ccs].map((c) => [c, countryName(c)]));
       const built = geoFacts({ subject: cc ? { cc } : subject, geoDays, ccDays, providerNames, countryNames, names });
-      const spanFrom = nowMs - 30 * D;
+      const spanFrom = nowMs - 7 * D;
       return { built, spanFrom, spanTo: nowMs, windows: [["Span length", secondsOf(spanFrom, nowMs)]] };
     },
   },
