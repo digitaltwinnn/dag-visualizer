@@ -10,7 +10,7 @@ import type { NotesStore } from "./store";
 // THE GENERATOR OF AI NOTES — one function from a request to a note: cache → singleflight → facts →
 // model → honesty gate → retry → store → stats. Everything per view lives in `sources.ts`'s table
 // and `prompts.ts`'s; nothing here branches on a view. It applies NO limits: the request route
-// does, and only to brushed ranges (Task 9).
+// does, to the kinds `isLimitedNote` names.
 //
 // HONESTY (rule 10):
 //   · a note is stored only after EVERY number in it matched a fact (`checkNote`); a failing note
@@ -193,7 +193,7 @@ export async function generateNote(
   if (net !== "mainnet" || !noteSupported(view, subject, span, net)) return NONE;
 
   const key = noteKeyOf(net, view, subject, span);
-  const timing = timingOf(view, span);
+  const timing = timingOf(view, span, subject);
   const now = deps.now();
 
   // 2. Cached: served, unless the warm pass planned its rewrite (and nobody has done it since).

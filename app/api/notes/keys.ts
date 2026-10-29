@@ -50,7 +50,27 @@ export function capKeyOf(net: string, dayIso: string): string {
   return `ai:${net}:cap:${dayIso}`;
 }
 
-export type NoteKind = "hyper" | "geo" | "ledger" | "trend24h" | "trendDaily" | "trend1h" | "range";
+export type NoteKind = "hyper" | "geo" | "ledger" | "trend24h" | "trendDaily" | "trend1h" | "range" | "subject";
+
+/** What a subject names, for the prompt's question: the view itself (`all`, `dag`, a network), a
+ *  country (`cc:XX`, `<net>/cc:XX`), a provider (`isp:<key>`, `<net>/isp:<key>`) or a network's
+ *  node make-up (`<net>/type:<roleKey>`). Shape only: `params.ts` is what validates a subject. */
+export type SubjectKind = "view" | "country" | "provider" | "type";
+
+export function subjectKindOf(subject: string): SubjectKind {
+  const tail = subject.slice(subject.indexOf("/") + 1);
+  if (tail.startsWith("cc:")) return "country";
+  if (tail.startsWith("isp:")) return "provider";
+  if (subject.includes("/") && tail.startsWith("type:")) return "type";
+  return "view";
+}
+
+/** A SUBJECT NOTE: one selection's note, written on request and never warmed. Every scoped form
+ *  (`<net>/...`) and a fleet provider are one; a fleet country `cc:XX` is NOT — it is the warmed
+ *  kind Geography had before subject notes, and keeps its timing. */
+export function isSubjectNote(subject: string): boolean {
+  return subject.includes("/") || subject.startsWith("isp:");
+}
 
 const H = 3_600_000;
 /** Freshness per kind: `refreshMs` is how old a note may be before the warm pass rewrites it
@@ -63,9 +83,14 @@ export const KIND_TIMING: Record<NoteKind, { refreshMs: number | null; ttlS: num
   trendDaily: { refreshMs: 24 * H, ttlS: 72 * 3600 },
   trend1h: { refreshMs: null, ttlS: 900 },
   range: { refreshMs: null, ttlS: 30 * 86_400 },
+  // Asked for, never warmed: a subject note lives a day, as long as its figures stand, and the
+  // next reader to ask after that writes it again.
+  subject: { refreshMs: null, ttlS: 24 * 3600 },
 };
 
-export function timingOf(view: NoteView, span: NoteSpan): { refreshMs: number | null; ttlS: number } {
+/** The subject decides first: a subject note has one timing whatever its view. */
+export function timingOf(view: NoteView, span: NoteSpan, subject = ""): { refreshMs: number | null; ttlS: number } {
+  if (isSubjectNote(subject)) return KIND_TIMING.subject;
   if (span.startsWith("r")) return KIND_TIMING.range;
   if (view === "hyper") return KIND_TIMING.hyper;
   if (view === "geo") return KIND_TIMING.geo;

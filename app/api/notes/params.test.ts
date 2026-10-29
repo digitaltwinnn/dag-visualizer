@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CATALOG } from "@/src/engine/config";
-import { isLimitedSpan, parseNoteParams, parseNoteRequest } from "./params";
+import { isLimitedNote, parseNoteParams, parseNoteRequest } from "./params";
 import { snapSpan } from "./keys";
 
 const H = 3_600_000;
@@ -85,6 +85,26 @@ describe("parseNoteParams", () => {
     expect(parseNoteRequest({ view: "trend", subject: "dag", fromMs: NOW - D, toMs: NOW - D }, NOW)).toEqual({ none: true });
   });
 
+  it("Geography takes a network's country and a provider, fleet or network scoped; Hypergraph a network's make-up", () => {
+    expect(parseNoteParams(sp(`view=geo&subject=${anId}/cc:FI`), NOW)).toEqual({ view: "geo", subject: `${anId}/cc:FI`, span: "day" });
+    expect(parseNoteParams(sp("view=geo&subject=dag/cc:FI"), NOW)).toEqual({ view: "geo", subject: "dag/cc:FI", span: "day" });
+    expect(parseNoteParams(sp("view=geo&subject=isp:hetzner-online"), NOW)).toEqual({ view: "geo", subject: "isp:hetzner-online", span: "day" });
+    expect(parseNoteParams(sp(`view=geo&subject=${anId}/isp:hetzner-online`), NOW)).toEqual({ view: "geo", subject: `${anId}/isp:hetzner-online`, span: "day" });
+    expect(parseNoteParams(sp(`view=hyper&subject=${anId}/type:l0+cl1`), NOW)).toEqual({ view: "hyper", subject: `${anId}/type:l0+cl1`, span: "day" });
+    expect(parseNoteParams(sp(`view=hyper&subject=${anId}/type:none`), NOW)).toEqual({ view: "hyper", subject: `${anId}/type:none`, span: "day" });
+  });
+
+  it("a former address inside a subject note answers as its current id", () => {
+    expect(parseNoteParams(sp(`view=geo&subject=${relisted.formerIds![0]}/cc:FI`), NOW)).toEqual({ view: "geo", subject: `${relisted.id}/cc:FI`, span: "day" });
+  });
+
+  it("refuses a subject note in the wrong view, an untracked network, a bad key or a make-up out of order", () => {
+    for (const q of [`view=hyper&subject=${anId}/cc:FI`, `view=geo&subject=${anId}/type:l0`, `view=ledger&subject=${anId}/type:l0`, `view=trend&subject=${anId}/cc:FI&span=7d`,
+      "view=geo&subject=nope/cc:FI", "view=geo&subject=isp:Hetzner", "view=geo&subject=isp:", `view=hyper&subject=${anId}/type:cl1+l0`, `view=hyper&subject=${anId}/type:l0+l0`, `view=hyper&subject=${anId}/type:l2`,
+      `view=geo&subject=${anId}/cc:fi`, `view=geo&subject=${anId}/`])
+      expect(parseNoteParams(sp(q), NOW), q).toHaveProperty("error");
+  });
+
   it("an error never echoes the raw input", () => {
     const res = parseNoteParams(sp("view=<script>&subject=all"), NOW);
     expect(JSON.stringify(res)).not.toContain("<script>");
@@ -107,12 +127,24 @@ describe("parseNoteRequest (the request route's body)", () => {
     expect(parseNoteRequest("trend", NOW)).toHaveProperty("error");
     expect(parseNoteRequest({ view: "trend", subject: "DAGnotTracked", span: "1h" }, NOW)).toHaveProperty("error");
   });
+
+  it("takes a subject note for Hypergraph or Geography with no span", () => {
+    expect(parseNoteRequest({ view: "geo", subject: `${anId}/cc:FI` }, NOW)).toEqual({ view: "geo", subject: `${anId}/cc:FI`, span: "day" });
+    expect(parseNoteRequest({ view: "hyper", subject: `${anId}/type:l0` }, NOW)).toEqual({ view: "hyper", subject: `${anId}/type:l0`, span: "day" });
+  });
+
+  it("refuses a view note, the warmed country, or a span beside a subject note", () => {
+    for (const b of [{ view: "geo", subject: anId }, { view: "geo", subject: "cc:FI" }, { view: "geo", subject: `${anId}/cc:FI`, span: "day" }, { view: "ledger", subject: `${anId}/cc:FI` }])
+      expect(parseNoteRequest(b, NOW)).toHaveProperty("error");
+  });
 });
 
-describe("isLimitedSpan", () => {
-  it("is true for a brushed range only", () => {
-    expect(isLimitedSpan(`r${NOW - 2 * D}-${NOW - D}`)).toBe(true);
-    for (const s of ["1h", "24h", "7d", "30d", "1y", "all", "day", "hours"] as const) expect(isLimitedSpan(s)).toBe(false);
+describe("isLimitedNote", () => {
+  it("is true for a brushed range and for every subject note", () => {
+    expect(isLimitedNote("trend", anId, `r${NOW - 2 * D}-${NOW - D}`)).toBe(true);
+    expect(isLimitedNote("geo", `${anId}/cc:FI`, "day")).toBe(true); expect(isLimitedNote("geo", "isp:x", "day")).toBe(true);
+    expect(isLimitedNote("geo", "cc:FI", "day")).toBe(false); expect(isLimitedNote("hyper", anId, "day")).toBe(false);
+    for (const s of ["1h", "24h", "7d", "30d", "1y", "all"] as const) expect(isLimitedNote("trend", anId, s)).toBe(false);
   });
 });
 

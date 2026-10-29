@@ -65,7 +65,7 @@ export function planPass(
   return warmCandidates(subjects, countries).filter((item) => {
     const rec = cached(warmKeyOf(item));
     if (!rec) return true;
-    const { refreshMs } = timingOf(item.view, item.span);
+    const { refreshMs } = timingOf(item.view, item.span, item.subject);
     if (refreshMs != null && nowMs - rec.writtenAt > refreshMs - WARM_SLACK_MS) return true;
     return item.view === "hyper" && item.subject === "all" && setKey != null && rec.setKey !== setKey;
   });

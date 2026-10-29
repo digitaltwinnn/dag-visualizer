@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { KIND_TIMING, capKeyOf, failKeyOf, lockKeyOf, noteKeyOf, rateKeyOf, snapSpan, statsKeyOf, timingOf, NOTES_VERSION } from "./keys";
+import { KIND_TIMING, capKeyOf, failKeyOf, isSubjectNote, lockKeyOf, noteKeyOf, rateKeyOf, snapSpan, statsKeyOf, subjectKindOf, timingOf, NOTES_VERSION } from "./keys";
 
 const NOW = Date.UTC(2026, 9, 27, 12, 0, 0);
 const MIN = 60_000;
@@ -105,6 +105,21 @@ describe("keys", () => {
       expect(timingOf("hyper", "day")).toBe(KIND_TIMING.hyper);
       expect(timingOf("geo", "day")).toBe(KIND_TIMING.geo);
       expect(timingOf("ledger", "hours")).toBe(KIND_TIMING.ledger);
+    });
+
+    it("a subject note is never warmed and lives a day; the warmed country kind is not one", () => {
+      expect(isSubjectNote("dor/cc:FI")).toBe(true); expect(isSubjectNote("isp:hetzner-online")).toBe(true);
+      expect(isSubjectNote("dor/isp:hetzner-online")).toBe(true); expect(isSubjectNote("dor/type:l0+cl1")).toBe(true);
+      expect(isSubjectNote("cc:FI")).toBe(false); expect(isSubjectNote("dor")).toBe(false); expect(isSubjectNote("all")).toBe(false);
+      expect(timingOf("geo", "day", "dor/cc:FI")).toEqual({ refreshMs: null, ttlS: 86_400 });
+      expect(timingOf("geo", "day", "cc:FI")).toEqual(KIND_TIMING.geo);
+      expect(timingOf("hyper", "day", "dor/type:l0")).toEqual(KIND_TIMING.subject);
+    });
+
+    it("names a subject's kind", () => {
+      expect(subjectKindOf("cc:FI")).toBe("country"); expect(subjectKindOf("dor/cc:FI")).toBe("country");
+      expect(subjectKindOf("isp:x")).toBe("provider"); expect(subjectKindOf("dor/isp:x")).toBe("provider");
+      expect(subjectKindOf("dor/type:none")).toBe("type"); expect(subjectKindOf("dor")).toBe("view"); expect(subjectKindOf("all")).toBe("view");
     });
   });
 });

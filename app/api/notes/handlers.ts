@@ -7,7 +7,7 @@ import { netOf } from "@/src/net/request";
 import { countStat, generateNote, type GenerateDeps } from "./generate";
 import { gateChat } from "./gate";
 import { capKeyOf, rateKeyOf } from "./keys";
-import { isLimitedSpan, parseNoteParams, parseNoteRequest } from "./params";
+import { isLimitedNote, parseNoteParams, parseNoteRequest } from "./params";
 import { factsFor, geoInputs, storeReads } from "./sources";
 import { notesStore, notesWritable } from "./store";
 import { executePass, pacedChat, planPass, warmCandidates, warmKeyOf } from "./warm";
@@ -28,12 +28,15 @@ import { executePass, pacedChat, planPass, warmCandidates, warmKeyOf } from "./w
 // a cached note is still served, a miss (warmable or on request) is `none`, and the warm pass
 // answers `none` without planning.
 //
-// LIMITS (the global constraints): only a BRUSHED RANGE is limited (`isLimitedSpan`), since it is
-// the one unbounded key space. Per visitor 20 an hour, keyed by the first 16 hex characters of
+// LIMITS (the global constraints): two kinds are limited (`isLimitedNote`). A BRUSHED RANGE, the
+// one unbounded key space; and a SUBJECT NOTE (a country, provider or make-up, scoped), whose key
+// space is bounded but large — every network times every country, provider and make-up — and the
+// Gate's burst limit is not: a visitor stepping through selections would spend it for everyone.
+// The two share one count. Per visitor 20 an hour, keyed by the first 16 hex characters of
 // HMAC-SHA256(CRON_SECRET, ip) — plain sha256(ip) where no secret is set (a local server) — so a
 // stored key cannot be reversed by hashing the IPv4 space (the raw address and the secret are never
 // stored or logged); globally 2,000 a UTC day, a tripwire
-// counted as stats `capped`. Only a MISS is counted: a cached brush, or a subject no note exists
+// counted as stats `capped`. Only a MISS is counted: a cached note, or a subject no note exists
 // for, is answered without touching either counter. Every other kind is bounded by its key and the
 // singleflight lock.
 
@@ -93,7 +96,8 @@ function visitorHash(req: Request): string {
   return h.update(ip).digest("hex").slice(0, 16);
 }
 
-/** POST /api/notes/request — History's on-request kinds: the 1h pill and a brushed range. */
+/** POST /api/notes/request — the on-request kinds: History's 1h pill and brushed range, and the
+ *  subject notes of Hypergraph and Geography. */
 export async function requestNote(req: Request, deps: () => GenerateDeps): Promise<Response> {
   if (netOf(req) !== NET) return json(NONE, NO_STORE);
   let body: unknown;
@@ -116,7 +120,7 @@ export async function requestNote(req: Request, deps: () => GenerateDeps): Promi
     // one; `request` means a miss, and only then do the limits count and the model write.
     const cached = await generateNote(note, d, "read");
     if (cached.state !== "request") return json(cached, NO_STORE);
-    if (isLimitedSpan(parsed.span)) {
+    if (isLimitedNote(parsed.view, parsed.subject, parsed.span)) {
       if ((await d.store.incr(rateKeyOf(net, visitorHash(req), isoHour(now)), RATE_TTL_S)) > RATE_PER_HOUR)
         return json(UNAVAILABLE, NO_STORE, 429);
       if ((await d.store.incr(capKeyOf(net, isoDay(now)), CAP_TTL_S)) > CAP_PER_DAY) {

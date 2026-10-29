@@ -8,6 +8,19 @@ import { capKeyOf, lockKeyOf, noteKeyOf, rateKeyOf, statsKeyOf } from "./keys";
 import type { NoteFacts } from "./sources";
 import { memoryNotesStore, type NotesStore } from "./store";
 
+// These tests own the route: its parsing, its limits and its answers. Which subjects a view's facts
+// cover is `sources.test.ts`'s, so a subject note is supported here whatever the facts rows say,
+// and the limits on it are tested on their own.
+vi.mock("./sources", async (orig) => {
+  const real = await orig<typeof import("./sources")>();
+  const { isSubjectNote } = await import("./keys");
+  return {
+    ...real,
+    noteSupported: (...a: Parameters<typeof real.noteSupported>) =>
+      (isSubjectNote(a[1]) && a[2] === "day") || real.noteSupported(...a),
+  };
+});
+
 const H = 3_600_000;
 const D = 86_400_000;
 const NOW = Date.UTC(2026, 9, 27, 12, 30);
@@ -25,6 +38,10 @@ const CLEAN = "NOTE: The hypergraph anchored 1,200 snapshots a day.";
 const PUBLIC = "public, s-maxage=300, stale-while-revalidate=600";
 const RANGE = { fromMs: NOW - 2 * D, toMs: NOW - D };
 const RANGE_SPAN = `r${RANGE.fromMs}-${RANGE.toMs}` as const;
+/** A mainnet network the catalog tracks, as a subject note's scope. */
+const anId = sampledIds("mainnet")[0]!;
+/** The i-th of many distinct countries (each its own subject note, so each a miss). */
+const country = (i: number) => `${anId}/cc:${String.fromCharCode(65 + i)}Z`;
 /** The i-th of many distinct brushes (each its own note, so each a miss). */
 const brush = (i: number) => ({ fromMs: RANGE.fromMs - i * H, toMs: RANGE.toMs - i * H });
 
@@ -156,6 +173,40 @@ describe("POST /api/notes/request", () => {
     expect(await over.json()).toEqual({ state: "unavailable" });
     const other = await requestNote(post({ view: "trend", subject: "dag", ...brush(20) }, { "x-forwarded-for": "9.9.9.9" }), () => d);
     expect(other.status).toBe(200);
+  });
+
+  it("writes a subject note on request, counting the visitor like a brushed range; a read of it answers `request`", async () => {
+    const d = deps();
+    const read = await readNote(get(`view=geo&subject=${anId}/cc:FI`), () => d);
+    expect(await read.json()).toEqual({ state: "request" });
+    expect(d.chat).not.toHaveBeenCalled();
+    const incr = vi.spyOn(store, "incr");
+    const res = await requestNote(post({ view: "geo", subject: `${anId}/cc:FI` }, { "x-forwarded-for": "1.2.3.4" }), () => d);
+    expect(await res.json()).toMatchObject({ state: "ok" });
+    expect(res.headers.get("Cache-Control")).toBe("no-store");
+    expect(incr.mock.calls.map(([k]) => k)).toEqual([
+      rateKeyOf("mainnet", hash16("1.2.3.4"), "2026-10-27T12"),
+      capKeyOf("mainnet", "2026-10-27"),
+    ]);
+    expect(d.chat).toHaveBeenCalledTimes(1);
+    expect(await store.get(noteKeyOf("mainnet", "geo", `${anId}/cc:FI`, "day"))).not.toBeNull();
+    // Written: the next request is the cached note, and counts nothing.
+    const again = await requestNote(post({ view: "geo", subject: `${anId}/cc:FI` }, { "x-forwarded-for": "1.2.3.4" }), () => d);
+    expect(await again.json()).toMatchObject({ state: "ok" });
+    expect(incr).toHaveBeenCalledTimes(2);
+    expect(d.chat).toHaveBeenCalledTimes(1);
+  });
+
+  it("a visitor's 21st subject note in an hour is a 429", async () => {
+    const d = deps();
+    for (let i = 0; i < 20; i++) {
+      const res = await requestNote(post({ view: "geo", subject: country(i) }, { "x-forwarded-for": "1.2.3.4" }), () => d);
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({ state: "ok" });
+    }
+    const over = await requestNote(post({ view: "geo", subject: country(20) }, { "x-forwarded-for": "1.2.3.4" }), () => d);
+    expect(over.status).toBe(429);
+    expect(await over.json()).toEqual({ state: "unavailable" });
   });
 
   it("past the day's 2,000 brushed ranges, answers unavailable and counts `capped`", async () => {
