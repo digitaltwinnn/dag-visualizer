@@ -1,4 +1,5 @@
 import type { NoteView } from "@/src/data/noteTypes";
+import { spanPhrase } from "@/src/data/trendWindow";
 import type { Mode } from "@/src/store/mode";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 
@@ -29,6 +30,24 @@ export interface NoteSubjectState {
 export interface NoteSubject {
   view: NoteView;
   subject: string;
+}
+
+/** THE SPAN UNDER THE TITLE (user, 2026-10-29: every note is titled "What changed", and the span
+ *  it changed over reads under it "like trend says 'last 30 days'"). The three fixed-span views'
+ *  words, in the explorer's own span vocabulary (`spanPhrase`); History's span is the window or the
+ *  brushed range on screen, so the card reads it from the store (null here). The lengths are the
+ *  server's reads (`app/api/notes/sources.ts`: a week of the fleet for Hypergraph and Geography,
+ *  R72; the last six hours of the chamber for Snapshots). */
+export function noteSpanWords(view: NoteView): string | null {
+  switch (view) {
+    case "hyper":
+    case "geo":
+      return spanPhrase("7d", null);
+    case "ledger":
+      return "last 6 hours";
+    case "trend":
+      return null;
+  }
 }
 
 export function noteSubjectOf(mode: Mode, s: NoteSubjectState): NoteSubject | null {

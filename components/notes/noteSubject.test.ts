@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { noteSubjectOf, type NoteSubjectState } from "./noteSubject";
+import { noteSpanWords, noteSubjectOf, type NoteSubjectState } from "./noteSubject";
 
 const base: NoteSubjectState = {
   metagraphNetwork: "all",
@@ -55,5 +55,16 @@ describe("noteSubjectOf", () => {
 
   it("a geo country wins over an unlisted filter (the country's note is its own)", () => {
     expect(noteSubjectOf("geo", s({ country: "DE", metagraphNetwork: "unlisted" }))).toEqual({ view: "geo", subject: "cc:DE" });
+  });
+});
+
+// The span under the one title (user, 2026-10-29): the explorer's own span words for the three
+// fixed reads; History's is the span on screen, so none here.
+describe("noteSpanWords", () => {
+  it("names each fixed read in the span vocabulary, and leaves History to the store", () => {
+    expect(noteSpanWords("hyper")).toBe("last 7 days");
+    expect(noteSpanWords("geo")).toBe("last 7 days");
+    expect(noteSpanWords("ledger")).toBe("last 6 hours");
+    expect(noteSpanWords("trend")).toBeNull();
   });
 });

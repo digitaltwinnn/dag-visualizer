@@ -7,14 +7,12 @@ import { AI_NOTES_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { Door, Fact, FactGroup, foldLabel } from "@/components/inspector/parts";
 import { NodeStars } from "@/components/state/StateAtoms";
 import Stamp from "@/components/Stamp";
-import { useFeedRead } from "@/components/useFeedRead";
 import { cn } from "@/lib/utils";
-import type { NoteDay, NoteView } from "@/src/data/noteTypes";
+import type { NoteDay } from "@/src/data/noteTypes";
 import { spanPhrase } from "@/src/data/trendWindow";
-import { displayNetwork } from "@/src/data/unlisted";
 import { useStore } from "@/src/store/store";
 import { rangeDays } from "@/src/util/localTime";
-import { ageWords } from "@/src/util/relativeAge";
+import { noteSpanWords } from "./noteSubject";
 import { useAiNote } from "./useAiNote";
 
 // THE AI NOTES CARD (2026-10-27) — a few sentences a model wrote about what the view is showing,
@@ -44,25 +42,16 @@ import { useAiNote } from "./useAiNote";
 // interprets it.
 
 const DAY_MS = 86_400_000;
-/** A country subject, as `noteSubjectOf` writes it (`cc:<code>`). */
-const COUNTRY_SUBJECT = /^cc:(.+)$/;
 /** The eyebrow, in the AI ink: the gradient clipped to the letters. `background-image`, not the
  *  `background` shorthand — the shorthand would reset the clip `bg-clip-text` sets. */
 const EYEBROW = <span className="[background-image:var(--ai-ink)] bg-clip-text text-transparent">AI notes</span>;
 
-/** The title while the view stands on everything — what the note is ABOUT, per view. */
-const RESTING_TITLE: Record<NoteView, string> = {
-  hyper: "The hypergraph today",
-  geo: "Where the network runs",
-  ledger: "The anchoring rhythm",
-  trend: "What changed",
-};
-
-/** What the note read, as one value: a span of two days or more by its UTC days (the app's one
- *  span label), a shorter one by its length. */
-function spanWords(fromMs: number, toMs: number): string {
-  return toMs - fromMs >= 2 * DAY_MS ? rangeDays(fromMs, toMs) : ageWords(toMs - fromMs);
-}
+/** ONE TITLE, EVERY VIEW, EVERY SUBJECT (user, 2026-10-29: a filtered note was titled "Dor
+ *  Technologies", but "the dossier/metagraph will say that already", so "What changed"
+ *  consistently, with the span under it as History's always had). The subject is the subject
+ *  card's to name; what this card adds is the change over the span, and the span is the subtitle
+ *  (`noteSpanWords`; History's is the window or range on screen) — so the body carries no Span row. */
+const TITLE = "What changed";
 
 // THE CARD'S CONTROLS ARE DOORS (`parts.tsx` — the one way a card draws a way out, with the
 // per-ground wash the user ruled). They sit flush on the card's bottom edge (RecordsDoor's foot
@@ -164,16 +153,8 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
   const { subject, req, note } = useAiNote();
   const trendWindow = useStore((s) => s.trendWindow);
   const trendRange = useStore((s) => s.trendRange);
-  // A country is named off the located fleet's own rows — the country card's one source.
-  const cc = subject ? (COUNTRY_SUBJECT.exec(subject.subject)?.[1] ?? null) : null;
-  useFeedRead(["clusters", "api-geo"], "AI notes", cc != null);
-  const countryName = useStore((s) => (cc ? (s.selNodes.find((r) => r.cc === cc)?.country ?? cc) : null));
   if (!subject || !req) return null;
 
-  const title =
-    subject.view === "trend" || subject.subject === "all"
-      ? RESTING_TITLE[subject.view]
-      : (countryName ?? displayNetwork(subject.subject)?.name ?? subject.subject);
   const res = note.res;
   const titleKey = `${subject.view}:${subject.subject}`;
 
@@ -202,12 +183,13 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
         title={
           <span className="inline-flex min-w-0 items-center gap-2">
             <AI_NOTES_ICON aria-hidden className={cn(KIND_MARK_CLASS, "text-[var(--filter-accent,var(--primary))]")} />
-            <span className="truncate">{title}</span>
+            <span className="truncate">{TITLE}</span>
           </span>
         }
         titleKey={titleKey}
-        // History's note is over the span on screen, named in the explorer's own span words.
-        subtitle={subject.view === "trend" ? spanPhrase(trendWindow, trendRange) : undefined}
+        // The span the note changed over, in the explorer's own span words: History's is the span on
+        // screen, the other views' their fixed read (`noteSpanWords`).
+        subtitle={subject.view === "trend" ? spanPhrase(trendWindow, trendRange) : noteSpanWords(subject.view)}
         collapsed={collapsed}
         onToggle={onToggle}
       />
@@ -244,7 +226,6 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
                 <Fact label="Written">
                   <Stamp ms={res.writtenAt} />
                 </Fact>
-                <Fact label="Span">{spanWords(res.spanFrom, res.spanTo)}</Fact>
               </FactGroup>
               {res.days.length > 0 && <NotableDays key={titleKey} days={res.days} />}
             </>
