@@ -70,13 +70,44 @@ describe("PROMPTS", () => {
     );
     expect(PROMPTS.geo.system("x")).toContain("Stay on where the nodes are located and who hosts them, and nothing else.");
     expect(PROMPTS.ledger.question).toBe(
-      "Say what the anchoring rhythm looks like over the recent hours: how steadily snapshots are being anchored and which networks are doing it.",
+      "Say what changed in the anchoring rhythm over the recent hours against the usual: what sped up or slowed down, from the usual figure to the recent one, and which networks did it. Then the reading itself: the longest gap, and what was part of the global snapshots.",
     );
     expect(PROMPTS.trend.question).toBe("Say what changed over the span: what rose, what fell and when, as the numbers show it.");
   });
 
+  // R71 (user, 2026-10-29): "change, else now" — the Snapshots builder picks the question.
+  it("asks Snapshots for the reading itself when the builder says nothing moved, and tells it not to describe a change", () => {
+    const now = PROMPTS.ledger.questionNow!;
+    expect(now).toMatch(/do not describe a change/i);
+    expect(now).toMatch(/do not mention the usual/i);
+    expect(now).toMatch(/right now/i);
+    expect(now).toMatch(/longest gap/i);
+    const sysNow = PROMPTS.ledger.system("x", { kind: "now" });
+    expect(sysNow).toContain(now);
+    expect(sysNow).not.toContain(PROMPTS.ledger.question);
+    expect(sysNow).not.toContain("Lead with what moved");
+    expect(PROMPTS.ledger.system("x")).toContain(PROMPTS.ledger.question);
+    // The other views have one question and ignore the lead.
+    for (const v of ["hyper", "geo", "trend"] as const) {
+      expect(PROMPTS[v].questionNow).toBeUndefined();
+      expect(PROMPTS[v].system("x", { kind: "now" })).toBe(PROMPTS[v].system("x"));
+      expect(PROMPTS[v].system("x", { kind: "change", moved: ["Fees in DAG per hour"] })).toBe(PROMPTS[v].system("x"));
+    }
+    expect(buildMessages("ledger", "Mainnet", "Facts", null, undefined, { kind: "now" })[0]!.content).toContain(now);
+    expect(buildMessages("ledger", "Mainnet", "Facts", null)[0]!.content).toContain(PROMPTS.ledger.question);
+  });
+  it("names the pairs that moved when the builder found a change, so a one-percent drift beside them is a reading", () => {
+    const sys = PROMPTS.ledger.system("x", { kind: "change", moved: ["Fees in DAG per hour", "Data in MB per hour"] });
+    expect(sys).toContain(PROMPTS.ledger.question);
+    expect(sys).toContain("Lead with what moved: Fees in DAG per hour; Data in MB per hour.");
+    expect(sys).toMatch(/every other figure held/i);
+    expect(sys).not.toMatch(/—|\s[–-]\s/);
+    expect(buildMessages("ledger", "Mainnet", "Facts", null, undefined, { kind: "change", moved: ["Fees in DAG per hour"] })[0]!.content).toContain("Lead with what moved: Fees in DAG per hour.");
+  });
+
   it("keeps its own copy free of dashes", () => {
     for (const v of VIEWS) expect(PROMPTS[v].system("x")).not.toMatch(/—|\s[–-]\s/);
+    expect(PROMPTS.ledger.system("x", { kind: "now" })).not.toMatch(/—|\s[–-]\s/);
     expect(VOICE).not.toMatch(/—|\s[–-]\s/);
   });
 });

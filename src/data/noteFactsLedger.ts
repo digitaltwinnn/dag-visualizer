@@ -1,5 +1,5 @@
 import { fact, networksAnchored } from "@/src/data/noteFacts";
-import type { Fact, FactPair } from "@/src/data/noteTypes";
+import type { Fact, FactPair, NoteLead } from "@/src/data/noteTypes";
 import { anchorSeries, formatDag, globalSeries, metricSeries, spanAverage, trimCounterEdges, unlistedUnmeasured, withUnlisted } from "@/src/data/trendSeries";
 import type { TrendsWindowData } from "@/src/data/trendWindow";
 import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
@@ -37,6 +37,14 @@ import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 //     (R60);
 //   · null when `recent` holds no measured bucket: nothing to describe, so no model call.
 //
+// WHAT THE NOTE LEADS WITH (R71, user 2026-10-29: "change, else now"). The Snapshots note is the
+// one note whose subject is a live rhythm, and most hours it holds: a note made to lead with a
+// change then opens on noise ("rose from 1,440 to 1,451"). So the builder says which question the
+// prompt asks — `lead` names the pairs whose recent reading departs from the usual one by
+// `LEAD_CHANGE` or more ("change", with the keys), else is "now", the reading itself (the rate,
+// the spacing, the longest gap, what was part of what). The threshold is the builder's, not the
+// model's, so "clearly" is one number here rather than a judgement in the prompt.
+//
 // Pure: no store values, react or I/O (the colocated test is the specification — rule 4).
 
 export interface LedgerFactsInput {
@@ -48,7 +56,29 @@ export interface LedgerFactsInput {
 
 const HOURS_PER_DAY = 24;
 
+/** A pair's recent reading this far (as a ratio of its usual one) from 1 is a change worth leading
+ *  with; under it, the note leads with the reading itself (R71). */
+const LEAD_CHANGE = 0.1;
+
 type Points = readonly (number | null)[];
+
+/** The pairs whose two ends differ by `LEAD_CHANGE` or more, named by key in facts order — a
+ *  "change" lead when there are any, else "now". A pair whose usual end is 0 is a change whenever
+ *  its recent end is not (a rate that started). The moved pairs are NAMED so the prompt can say
+ *  which figures to lead with: told only "lead with change", the model led with a rate that had
+ *  moved one percent while the fees had doubled. */
+function leadOf(facts: readonly Fact[]): NoteLead {
+  const from = new Map<string, number>();
+  const to = new Map<string, number>();
+  for (const f of facts) if (f.pair) (f.pair.end === "from" ? from : to).set(f.pair.key, f.value);
+  const moved: string[] = [];
+  for (const [key, a] of from) {
+    const b = to.get(key);
+    if (b == null) continue;
+    if (a === 0 ? b !== 0 : Math.abs(b / a - 1) >= LEAD_CHANGE) moved.push(key);
+  }
+  return moved.length ? { kind: "change", moved } : { kind: "now" };
+}
 
 /** The window with its partial edge buckets cut, every series cut identically. */
 const trimmed = (a: Points, d: TrendsWindowData): (number | null)[] => trimCounterEdges(a, d.stepMs);
@@ -95,7 +125,7 @@ function pairedSums(num: Points, den: Points, d: TrendsWindowData): { n: number;
   return any ? { n, d: m } : null;
 }
 
-export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: string[] } | null {
+export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: string[]; lead: NoteLead } | null {
   const { subject, names: catalog } = input;
   const isListed = (id: string) => LISTED_IDS.has(id) || id in catalog;
   const fold = (d: TrendsWindowData): TrendsWindowData => ({ ...d, series: withUnlisted(d.series, isListed, UNLISTED_ID) });
@@ -189,5 +219,5 @@ export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: st
   }
 
   if (!facts.length) return null;
-  return { facts, names: [...new Set(Object.values(catalog))] };
+  return { facts, names: [...new Set(Object.values(catalog))], lead: leadOf(facts) };
 }

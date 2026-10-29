@@ -7,6 +7,11 @@
 /** The four 3D views a note can describe. */
 export type NoteView = "hyper" | "geo" | "ledger" | "trend";
 
+/** What a note leads with (R71): the changes the builder found worth leading with, named by
+ *  their pair keys, or the reading itself when nothing moved. The Snapshots builder decides it
+ *  from its own pairs; the other views always lead with change and carry none. */
+export type NoteLead = { kind: "change"; moved: string[] } | { kind: "now" };
+
 /** A fact the model may cite. `text` is exactly what the model is shown. */
 export interface Fact {
   label: string;

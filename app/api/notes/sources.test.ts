@@ -52,7 +52,7 @@ const FACT = { label: "Snapshots anchored, per day, this span", value: 1200, kin
 
 beforeEach(() => {
   vi.mocked(trendFacts).mockReset().mockReturnValue({ facts: [FACT], days: [], names: ["USDC.dag"], blurbs: [] });
-  vi.mocked(ledgerFacts).mockReset().mockReturnValue({ facts: [FACT], names: ["USDC.dag"] });
+  vi.mocked(ledgerFacts).mockReset().mockReturnValue({ facts: [FACT], names: ["USDC.dag"], lead: { kind: "now" } });
   vi.mocked(hyperFacts).mockReset().mockReturnValue({ facts: [FACT], names: ["USDC.dag"], blurbs: ["USDC.dag is: x"], setKey: "a,b" });
   vi.mocked(geoFacts).mockReset().mockReturnValue({ facts: [FACT], names: ["USDC.dag"] });
 });
@@ -95,6 +95,14 @@ describe("factsFor — the subject's display name for the gate (R39)", () => {
     expect(await name("geo", USDC, "day")).toBe("USDC.dag");
     expect(await name("ledger", "all", "hours")).toBeUndefined();
     expect(await name("ledger", USDC, "hours")).toBe("USDC.dag");
+  });
+});
+
+describe("factsFor — what the note leads with (R71)", () => {
+  it("carries the Snapshots builder's lead through, and the other views none", async () => {
+    expect((await factsFor("mainnet", "ledger", "all", "hours", NOW, fakeReads()))!.lead).toEqual({ kind: "now" });
+    expect((await factsFor("mainnet", "hyper", "all", "day", NOW, fakeReads()))!.lead).toBeUndefined();
+    expect((await factsFor("mainnet", "trend", "dag", "7d", NOW, fakeReads()))!.lead).toBeUndefined();
   });
 });
 

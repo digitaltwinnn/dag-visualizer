@@ -217,3 +217,28 @@ describe("ledgerFacts tags each change as a pair (R54)", () => {
     expect(p.size).toBe(2);
   });
 });
+
+// R71 (user, 2026-10-29: "change, else now"): the builder says which question the prompt asks.
+describe("ledgerFacts says what the note leads with", () => {
+  it("leads with change when a pair moved a tenth or more, naming every pair that did: recent at twice the usual moves the rate, the fees and the data, not the spacing", () => {
+    expect(ledgerFacts(input())!.lead).toEqual({ kind: "change", moved: ["Global snapshots per hour", "Fees in DAG per hour", "Data in MB per hour"] });
+  });
+  it("leads with the reading itself when every pair held: the week at the recent rate", () => {
+    expect(ledgerFacts(input({ week: side(168, HOUR, 240) }))!.lead).toEqual({ kind: "now" });
+  });
+  it("a move under a tenth is no change (240 against 228 an hour), one over it is (240 against 214)", () => {
+    expect(ledgerFacts(input({ week: side(168, HOUR, 228) }))!.lead).toEqual({ kind: "now" });
+    expect(ledgerFacts(input({ week: side(168, HOUR, 214) }))!.lead.kind).toBe("change");
+  });
+  it("names only the pair that moved: the fees alone", () => {
+    const week = side(168, HOUR, 240, { "g.feeFloor": row(168, () => 240 * 2e7) });
+    expect(ledgerFacts(input({ week }))!.lead).toEqual({ kind: "change", moved: ["Fees in DAG per hour"] });
+  });
+  it("with nothing usual to measure there is no pair, so the reading itself", () => {
+    expect(ledgerFacts(input({ week: side(168, HOUR, 0, { "g.ticks": row(168, () => null) }) }))!.lead).toEqual({ kind: "now" });
+  });
+  it("a network's own pairs decide its note", () => {
+    expect(ledgerFacts(input({ subject: "usdc" }))!.lead).toEqual({ kind: "change", moved: ["USDC.dag snapshots anchored per hour"] });
+    expect(ledgerFacts(input({ subject: "usdc", week: side(168, HOUR, 240) }))!.lead).toEqual({ kind: "now" });
+  });
+});

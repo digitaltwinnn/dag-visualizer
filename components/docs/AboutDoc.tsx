@@ -155,7 +155,8 @@ export default function AboutDoc() {
         <p>
           Each view also has one <strong>AI notes</strong> card, at the top of the cards on the
           right. A language model reads the same measured figures the view shows and says, in a
-          few sentences, what changed and by how much. A note with a number the figures
+          few sentences, what changed and by how much, or, when nothing moved, what the view is
+          showing right now. A note with a number the figures
           can&apos;t back is thrown away, and the card is always marked as AI so it never passes
           for a measurement.
         </p>

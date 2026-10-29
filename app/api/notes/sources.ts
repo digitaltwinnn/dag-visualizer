@@ -4,7 +4,7 @@ import { geoFacts } from "@/src/data/noteFactsGeo";
 import { hyperFacts } from "@/src/data/noteFactsHyper";
 import { ledgerFacts } from "@/src/data/noteFactsLedger";
 import { trendFacts, type TrendFactsInput } from "@/src/data/noteFactsTrend";
-import type { Fact, NotableDay, NoteView } from "@/src/data/noteTypes";
+import type { Fact, NotableDay, NoteView, NoteLead } from "@/src/data/noteTypes";
 import { leadingTrim, pickRangeTier, type TrendsWindowData } from "@/src/data/trendWindow";
 import { CATALOG, type NetworkId } from "@/src/engine/config";
 import { assembleSpan, WINDOWS } from "../trends/assemble";
@@ -191,6 +191,8 @@ interface Built {
   blurbs?: string[];
   days?: NotableDay[];
   setKey?: string;
+  /** Snapshots only (R71): which question the prompt asks. */
+  lead?: NoteLead;
 }
 
 interface Read {
@@ -381,6 +383,8 @@ export interface NoteFacts {
   subjectName?: string;
   /** Hyper `all` only: the networks with nodes (the warmer rewrites the digest when it changes). */
   setKey?: string;
+  /** Snapshots only (R71): "change" when a pair moved, else "now" — the prompt's question follows. */
+  lead?: NoteLead;
 }
 
 /** THE FACTS FOR ONE NOTE: that view's reads, its builder, and the span's length. Null when the
@@ -405,5 +409,6 @@ export async function factsFor(
     label: row.label(subject, names),
     ...(row.whole(subject) ? {} : { subjectName: row.label(subject, names) }),
     ...(built.setKey != null ? { setKey: built.setKey } : {}),
+    ...(built.lead != null ? { lead: built.lead } : {}),
   };
 }
