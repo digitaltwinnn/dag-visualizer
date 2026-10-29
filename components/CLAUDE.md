@@ -853,7 +853,10 @@ step down to the tick's networks. The AI notes slot neither starts that run nor 
 AI"**, with the sparkles mark in `--ai-mark` at its left on both tiers as the one sign it is an AI
 card — and the SPAN the note covers ("last 7 days") is the head's qualifier chip on the right, like
 the dossier's ticker; "AI notes" stays the code's and these docs' name for
-the slot. Every view that has a note (`viewPolicy.aiNotes`) leads its
+the slot. **The top card is the VIEW's note at the filter's scope** (`metagraphCardNetwork`:
+everything, or the filtered network) and does not follow a drill — a country, a provider or a
+brushed range is a subject with a card of its own, below (user, 2026-10-29); History's top card is
+the window pill's note always. Every view that has a note (`viewPolicy.aiNotes`) leads its
 display lane with the `notes` slot (`DISPLAY_LANE` in `railCards.ts`), and the manifest leads with it
 too. It is **not a rung**: no ladder level, no camera pose, never in `selStack`, a static subject
 key so a view switch never lights the tray, and `isSubjectSlot` says no. So it is the FOCUS only at
@@ -871,6 +874,30 @@ above the same door, so a click is never answered by the card vanishing. And it 
 the subject cards folded (R78, above — the one pin it ever gets), and where no note stands pins
 nothing at all when it was the departing box (else every subject card arrived folded beside an
 unpinned note: no box); the step ghost's run skips it.
+
+**SUBJECT NOTES** (user, 2026-10-29: "I like consistency"). One rule: **every subject card whose
+subject has a stored series over the note's span carries its own Gate AI note, scoped the way the
+card's own lead is scoped; the top card is the view's.** The finest rungs are live records with no
+stored history, so they carry none and show nothing extra.
+
+| View | Card | Note is about | Scope |
+|---|---|---|---|
+| Geography | Country | the country's nodes | the FILTER: fleet-wide, or that network's nodes there |
+| Geography | Provider (`cohort`) | the provider's nodes, named network-wide | the provider across the filter's scope |
+| Hypergraph | Composition | the make-up's nodes | its network |
+| History | Range | the brushed span | the plane's network |
+| all | Node, Tick, Metagraph snapshot, Moment | none | no per-subject series |
+
+The Metagraph card carries none: filtered, it is the same subject as the top card. The block is
+`components/notes/SubjectNote.tsx`, directly under the card's lead and above its breakdown, in the
+card's own section grammar (the sparkles mark, "Constellation Gate AI", the span as the unit);
+`components/notes/subjectNote.ts` is the pure home of the request derivations. **It is asked for by
+the selection itself**: a read that answers `request` is asked once, automatically, with no door —
+the reader's gesture was choosing the card. `none` and `unavailable` show nothing (the card never
+says "couldn't write" for a gesture the reader did not make), and a first fetch in flight reads
+"reading…"/"writing…". The Range card's old "Write notes for this range" door is gone with that;
+the 1h pill's door stays on the top card. A network-scoped country or provider note states no
+change until a week of the geo family exists, and reads as "right now" until then.
 
 **A view is entered on its note** (user, 2026-10-29, R78): in a view with a note, the switch pins
 the Gate AI card open and every present subject card folded — the subject cards are the carried

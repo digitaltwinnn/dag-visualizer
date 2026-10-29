@@ -103,10 +103,11 @@ them — but the Next Node server can.
   stored note at once (their TTLs reap them). Timing is `KIND_TIMING` in `keys.ts`: hyper and
   geography refresh daily (3-day TTL), the ledger and History's 24-hour note hourly (6 hours),
   History's daily pills daily, the 1-hour pill and a brushed range only when asked (15 minutes and
-  30 days). `GET /api/notes` reads: `ok`, `none` and `request` are `public, s-maxage=300,
+  30 days); a subject note (below) lives a day and is never warmed. `GET /api/notes` reads: `ok`, `none` and `request` are `public, s-maxage=300,
   stale-while-revalidate=600`; `pending`, `unavailable` and a 400 are `no-store` (a well-formed
   brush with no whole bucket in it is `none`, not a 400). The ledger's `dag` is folded into `all`
-  (the same facts: one note). `POST /api/notes/request` writes the two on-request kinds, and
+  (the same facts: one note). `POST /api/notes/request` writes the on-request kinds (a brushed range
+  and a subject note), and
   `GET /api/notes/warm` is the quarter-hourly cron (about 26 Gate calls a pass, spaced 8 s — the free
   model's burst limit, measured 2026-10-27). **The honesty gate (rule 10) is mechanical**
   (`src/data/noteHonesty.ts`, the colocated test is its specification): every number the note
@@ -117,11 +118,11 @@ them — but the Next Node server can.
   leaves a marker, and the next read or request of that key answers `unavailable` without a model
   call, so a cache-buster or a 429 run cannot turn visitors into unbounded calls; the warm pass
   ignores the marker and never writes one. **Limits
-  apply to brushed ranges only** (the one unbounded key space): 20 an hour per visitor, keyed by
+  apply to a brushed range (the one unbounded key space) and to a subject note**: 20 an hour per visitor, keyed by
   the first 16 hex characters of HMAC-SHA256(`CRON_SECRET`, ip), plain sha256(ip) where no secret
   is set (the raw address and the secret are never stored or logged; on Vercel
   `x-forwarded-for` is set by the platform, which is why the hash can be trusted there), and a
-  2,000 a day tripwire; a cached range is served without counting. Every other kind is bounded by
+  2,000 a day tripwire; a cached note is served without counting. Every other kind is bounded by
   its key and a singleflight lock. **The warm pass is paced**: one item at a time, at least 8 s
   between Gate calls, no new item after 210 s (the worst item, two attempts at the 20 s timeout,
   still ends inside the 300 s `maxDuration`), because the free model answered 429 at about five
@@ -138,6 +139,22 @@ them — but the Next Node server can.
   call, and `retried`, every note that needed its second attempt), and
   `npx tsx scripts/notes-stats.ts` prints the last 14 days on the read-only token: it is the
   go/no-go instrument for keeping the free model.
+  **Subject notes** (user, 2026-10-29) are a card's own note: a country, a provider, a node make-up.
+  The grammar has ONE home, `notes/keys.ts` — `CC_TAIL_RE`, `ISP_TAIL_RE`, `TYPE_TAIL_RE`,
+  `subjectKindOf`, `isSubjectNote`: `cc:XX` (fleet country), `<net>/cc:XX`, `isp:<key>`,
+  `<net>/isp:<key>` (the provider across the scope, named network-wide), `<net>/type:<roleKey>`,
+  with `<net>` a tracked network id or `dag`. `NoteFacts.kind` is the QUESTION kind, and every view
+  note (`cc:XX` included) is `"view"`; `PROMPTS[view].questions[kind]` asks a subject kind's own
+  question with no common reading. `KIND_TIMING.subject` is `{ refreshMs: null, ttlS: 24h }` and
+  `timingOf` lets the subject decide first, so a subject note has one timing whatever its view:
+  never warmed, written when someone first asks and rewritten at most once a day. The fleet
+  country `cc:XX` is the exception that stays warmed. **A subject note is the request route's
+  second limited kind** (`isLimitedNote` in `notes/params.ts`, beside a brushed range): its key
+  space is bounded (countries, providers and types times networks) but the Gate's burst limit is
+  not, and one visitor drilling through twenty countries should pace themselves, not the cron — the
+  same per-visitor (20 an hour) and daily (2,000) limits, a cached note served without counting.
+  `dag/type:*` is accepted and answers `none` (no `f.type.dag.*` series). A network-scoped country
+  or provider note states no change until a week of the geo family exists (from 2026-10-27).
 - **`/api/global/at?ts=`** binary-searches ~23 tiny per-ordinal records to find the global carrying
   that exact stamp (the anchor join is timestamp EQUALITY — which has exceptions: see the
   timestamp note in `src/data/CLAUDE.md`; such a row answers 404 here, honestly). Its one consumer is the anchor log's

@@ -160,7 +160,9 @@ export default function AboutDoc() {
           figures the view shows and writes, in a few sentences, what changed and by how much, or,
           when nothing moved, what the view is showing right now. A note with a number the figures
           can&apos;t back is thrown away, and the card is always marked as AI so it never passes
-          for a measurement.
+          for a measurement. Pick a country, a hosting provider, a kind of node or a stretch of
+          time on a chart, and its own card carries a note of its own, written when you first open
+          it.
         </p>
         {/* One selection across the views, and RAW as the one step down (user, 2026-10-09:
             the "three depths" paragraph this replaces called History a depth below the scene,
