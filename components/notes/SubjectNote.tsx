@@ -22,7 +22,7 @@ import { useMainnetNote } from "./useAiNote";
 
 const WAIT = "m-0 flex items-center gap-2 text-body text-muted-foreground";
 /** How long a subject has to stand before its note is asked for (above). */
-export const ASK_DWELL_MS = 1500;
+const ASK_DWELL_MS = 1500;
 
 export default function SubjectNote({ req, span }: { req: NoteReq | null; span: string | null }) {
   // Presence through `useNet()`, the fetch through the gate (`useMainnetNote`'s hydration rule).
@@ -62,13 +62,14 @@ export default function SubjectNote({ req, span }: { req: NoteReq | null; span: 
         unit={span}
         className="mb-1.5"
       />
-      {res == null ? (
+      {res == null || res.state === "request" ? (
+        // `request` is the dwell before the ask (the effect above): nothing is being written yet,
+        // so it reads as reading — "writing…" is the server's own `pending`, a write in flight.
         <p className={WAIT}>
           <NodeStars />
           reading…
         </p>
-      ) : res.state === "pending" || res.state === "request" ? (
-        // `request` is the ask about to go out (the effect above): it reads as the write it starts.
+      ) : res.state === "pending" ? (
         <p className={WAIT}>
           <NodeStars />
           writing…
