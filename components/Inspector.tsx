@@ -25,7 +25,7 @@ import { useTouch } from "@/components/useTouch";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { detailsCards, ladderSlotIds, noteCardAbsent, type RailCard } from "@/components/railCards";
 import { CHILD_OF, childStep, type SiblingStep } from "@/components/railSiblings";
-import { isCollapsed, boxedSlotOf, overridesOnSelection, overridesOnViewEntry, railSelectionKey, subjectRunEnd, type LaneCollapseState } from "@/components/railCollapse";
+import { isCollapsed, boxedSlotOf, overridesOnNoteStandDown, overridesOnSelection, overridesOnViewEntry, railSelectionKey, subjectRunEnd, type LaneCollapseState } from "@/components/railCollapse";
 import { useSiblingState } from "@/components/useSiblingState";
 import { openRailCard } from "@/components/railOpen";
 import { useLadderFocus } from "@/components/useLadderFocus";
@@ -596,6 +596,16 @@ export default function Inspector() {
     if (Date.now() - modeEnteredAt.current < ENTRY_GRACE_MS) return;
     if (Object.keys(staleNulls).length) setRailCollapseMany(staleNulls);
   }, [selectionKey, setRailCollapseMany]); // eslint-disable-line react-hooks/exhaustive-deps -- mode/ladderIds ride selectionKey (mode is a component of it)
+  // THE NOTE'S STAND-DOWN (review 2026-10-29): a view is entered while its note is still read, so
+  // the entry above pins a slot that may then answer `none`/`unavailable` and leave the lane — the
+  // pins would hold every card folded with no box. `overridesOnNoteStandDown` drops them (and only
+  // them); the lane is read live, as the entry reads it.
+  useEffect(() => {
+    if (!noteAbsent) return;
+    const live: LaneCollapseState = { ...collapseState, overrides: useStore.getState().railCollapse };
+    const drop = overridesOnNoteStandDown(live);
+    if (Object.keys(drop).length) setRailCollapseMany(drop);
+  }, [noteAbsent, setRailCollapseMany]); // eslint-disable-line react-hooks/exhaustive-deps -- fires on the stand-down only; the lane is read live
 
   const detailPane: Record<string, ReactNode> = {
     // Country/provider toggle CLOSED through the same tested table a row re-click runs — the ×

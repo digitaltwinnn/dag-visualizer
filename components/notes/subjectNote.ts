@@ -53,5 +53,9 @@ export function rangeNoteReq(trendCard: string | null, range: { fromMs: number; 
   if (!range) return null;
   const net = trendCard == null || trendCard === "all" ? "dag" : trendCard;
   if (unlisted(net)) return null;
-  return { view: "trend", subject: net, span: `r${range.fromMs}-${range.toMs}` };
+  // WHOLE MILLISECONDS (review 2026-10-29): a brush is read off the pointer (`msAtX`), so its ends
+  // are fractional, and both the loader's range pattern and the route's `MS_RE` take digits only —
+  // a fractional span was a `bad span`, and the Range card's note never appeared for a brush under
+  // two days (the only ones `snapRange` leaves unsnapped).
+  return { view: "trend", subject: net, span: `r${Math.round(range.fromMs)}-${Math.round(range.toMs)}` };
 }

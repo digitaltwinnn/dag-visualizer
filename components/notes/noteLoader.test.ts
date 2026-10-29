@@ -103,8 +103,9 @@ describe("loadNote", () => {
     expect(third).toEqual([]);
   });
 
-  it("pending forever gives up as unavailable after four re-fetches, and is not held", async () => {
-    const { loader, calls, sleeps } = rig(Array.from({ length: 10 }, () => reply({ state: "pending" })));
+  it("pending forever gives up as unavailable after MAX_RETRIES re-fetches — a minute, one whole write — and is not held", async () => {
+    expect(MAX_RETRIES * RETRY_MS).toBeGreaterThanOrEqual(60_000);
+    const { loader, calls, sleeps } = rig(Array.from({ length: MAX_RETRIES + 5 }, () => reply({ state: "pending" })));
     expect(await loader.get(REQ)).toEqual({ state: "unavailable" });
     expect(calls).toHaveLength(1 + MAX_RETRIES);
     expect(sleeps).toHaveLength(MAX_RETRIES);

@@ -96,6 +96,12 @@ export interface GenerateOptions {
    *  A record found with ANOTHER `writtenAt`, before or once the lock is held, was just written by
    *  someone else (an overlapping pass, a visitor's read): it is served, not rewritten. */
   seenWrittenAt?: number | null;
+  /** Request only: the limits, SPENT ONLY ON A WRITE (review 2026-10-29). Asked once the facts are
+   *  in hand and non-null — inside the lock, before the model — so an ask that answers `none`
+   *  (nothing measured for the subject) or `pending` (another writer's lock) costs the visitor
+   *  nothing. An answer, when it gives one, stands in the note's place: no model call, nothing
+   *  stored, no hold. */
+  spend?: () => Promise<NoteResponse | null>;
 }
 
 const NONE: NoteResponse = { state: "none" };
@@ -270,6 +276,12 @@ export async function generateNote(
       return UNAVAILABLE;
     }
     if (!input) return NONE;
+
+    // 5b. A limited request spends its count now, on a note that is about to be written.
+    if (opts.spend) {
+      const refused = await opts.spend();
+      if (refused) return refused;
+    }
 
     // 6–7. The model, held to the facts.
     const written = await write(req, input, deps.chat, (field) => countStat(store, net, now, field));

@@ -904,7 +904,7 @@ note states no change until a week of the geo family exists, so until then its f
 the Gate AI card open and every present subject card folded — the subject cards are the carried
 selection, unchanged from the last view, and the note is this view's reading of it, the one thing
 new on arrival. A click after the grace window drops the pins and opens its own card as ever
-(`overridesOnViewEntry`, `railCollapse.ts`). Where no note stands, **expanded state survives a view
+(`overridesOnViewEntry`, `railCollapse.ts`). **And a note that stands down after the entry drops those pins** (review 2026-10-29, `overridesOnNoteStandDown`): the view is entered while the note is still READ, so the pinned slot may answer `none`/`unavailable` and leave the lane, and the pins alone would hold every card folded with no box; Inspector drops them when the notes slot goes absent under an open pin, and the auto rule opens the focus rung. Where no note stands, **expanded state survives a view
 switch** (user, 2026-09-04 — reversing 2026-08-08's scene-first collapse: with rung heights easing,
 the collapse-and-reopen cycle WAS the "card size jumps between views"; the note arriving open folds a
 subject card once and leaves it, so that cycle does not return): a switch is arrival machinery, not a

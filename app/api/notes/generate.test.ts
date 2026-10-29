@@ -162,6 +162,25 @@ describe("generateNote", () => {
     expect(await lockFree()).toBe(true);
   });
 
+  it("a request's spend is asked once the facts are in hand, and its answer stands in the note's place (review 2026-10-29)", async () => {
+    // Nothing measured: none, and the spend is never asked.
+    const unasked = vi.fn(async () => null);
+    expect(await generateNote(REQ, deps({ facts: async () => null }), "request", { spend: unasked })).toEqual({ state: "none" });
+    expect(unasked).not.toHaveBeenCalled();
+    // Refused: the spend's own answer — no model call, nothing stored, no hold, the lock released.
+    const d = deps();
+    const refused = vi.fn(async () => ({ state: "unavailable" as const }));
+    expect(await generateNote(REQ, d, "request", { spend: refused })).toEqual({ state: "unavailable" });
+    expect(d.chat).not.toHaveBeenCalled();
+    expect(await store.get(KEY)).toBeNull();
+    expect(await lockFree()).toBe(true);
+    // Allowed: asked once, after the facts, and the note is written.
+    const spend = vi.fn(async () => null);
+    expect((await generateNote(REQ, d, "request", { spend })).state).toBe("ok");
+    expect(spend).toHaveBeenCalledTimes(1);
+    expect(d.chat).toHaveBeenCalledTimes(1);
+  });
+
   it("a store read failure: unavailable, counted as store, no model call, the lock released", async () => {
     const d = deps({ facts: async () => { throw new Error("Upstash down"); } });
     expect(await generateNote(REQ, d, "read")).toEqual({ state: "unavailable" });

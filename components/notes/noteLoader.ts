@@ -9,7 +9,10 @@ import type { NoteResponse, NoteView } from "@/src/data/noteTypes";
 //
 //   · GET first. It answers `ok` / `none` / `request` (cached) or `pending` / `unavailable`.
 //   · `pending` means a note is being written: re-fetch after RETRY_MS, at most MAX_RETRIES times,
-//     then give up as `unavailable` — never an endless "writing" (the acquiring give-up rule).
+//     then give up as `unavailable` — never an endless "writing" (the acquiring give-up rule). The
+//     budget OUTLASTS ONE WHOLE WRITE (review 2026-10-29): a write is the facts' reads, two Gate
+//     attempts at their 20 s timeout and an 8 s paced wait, up to a minute; a poll that gave up at
+//     12 s left every reader who met another writer's lock without a note until their next key.
 //     A GET's asker passes `onPending` to HEAR that while the poll runs (M3), so the card says
 //     "writing…" for a note being written rather than "reading…" for the whole poll; an asker
 //     joining a write already in flight hears it at once.
@@ -17,9 +20,9 @@ import type { NoteResponse, NoteView } from "@/src/data/noteTypes";
 //     and is NOT cached, so the next ask tries again.
 //   · `request()` POSTs on the reader's ask: a door, or a subject card's automatic ask on
 //     selection (`SubjectNote`). The POST's own answer is used and stored
-//     under the GET's key: the CDN holds a GET `request` answer for five minutes, so re-reading
-//     it would show `request` again. A POST that answers `pending` (another visitor's write is in
-//     flight) polls the GET like any pending, and a stale CDN `request` in that poll counts as
+//     under the GET's key (this loader holds a GET `request` answer for TTL_MS, so re-reading it
+//     would show `request` again). A POST that answers `pending` (another visitor's write is in
+//     flight) polls the GET like any pending, and a `request` read back in that poll counts as
 //     still-pending, not as a result.
 
 export interface NoteReq {
@@ -30,7 +33,8 @@ export interface NoteReq {
 }
 
 export const RETRY_MS = 3_000;
-export const MAX_RETRIES = 4;
+/** 20 × 3 s = a minute: one whole write (above), with room for the reads around it. */
+export const MAX_RETRIES = 20;
 /** Matches the read route's own `s-maxage`. */
 export const TTL_MS = 300_000;
 

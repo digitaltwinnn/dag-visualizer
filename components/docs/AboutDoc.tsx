@@ -94,7 +94,8 @@ export default function AboutDoc() {
           node&apos;s status, and drawn as it comes in. Built for many visitors at once: this site
           asks the network once every few seconds and shares that answer with everyone watching,
           so a busy day never adds load to the network itself. The one exception is an AI note,
-          which is written from those same figures a little earlier and shows when it was written.
+          which is written from those same figures a little earlier and says which stretch of time it
+          covers.
         </p>
         <p className="mt-2 text-prose text-muted-foreground">
           Node locations come from their public internet addresses, so they are accurate to a
@@ -102,9 +103,9 @@ export default function AboutDoc() {
           network&apos;s own public history — activity totals summed from the chain for the
           History view — and the short notes Constellation Gate AI writes about it. Nothing about you: the page
           keeps a short memory of recent snapshots while it is open, and forgets it when you
-          close the tab. The one trace is when you ask for a note on a range you brush: a
-          count kept for two hours under a scrambled form of your address, so no single visitor
-          can ask for too many.
+          close the tab. The one trace is a note written because you asked for it, by brushing a
+          range or picking a country, a provider or a kind of node: a count kept for two hours
+          under a scrambled form of your address, so no single visitor can ask for too many.
         </p>
         <p className="mt-2 text-prose text-muted-foreground">
           When something can&apos;t be reached for a moment, the screen simply says so —

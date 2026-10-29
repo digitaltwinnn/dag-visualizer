@@ -92,11 +92,11 @@ describe("GET /api/notes (read)", () => {
     expect(await res.json()).toMatchObject({ state: "ok", text: "The hypergraph anchored 1,200 snapshots a day." });
   });
 
-  it("answers `request` for an on-request kind, cacheable, with no model call", async () => {
+  it("answers `request` for an on-request kind, never cached (a CDN copy would outlive the write), with no model call", async () => {
     const d = deps();
     const res = await readNote(get(`view=trend&subject=dag&from=${RANGE.fromMs}&to=${RANGE.toMs}`), () => d);
     expect(await res.json()).toEqual({ state: "request" });
-    expect(res.headers.get("Cache-Control")).toBe(PUBLIC);
+    expect(res.headers.get("Cache-Control")).toBe("no-store");
     expect(d.chat).not.toHaveBeenCalled();
   });
 
@@ -187,6 +187,18 @@ describe("POST /api/notes/request", () => {
     expect(await again.json()).toMatchObject({ state: "ok" });
     expect(incr).toHaveBeenCalledTimes(2);
     expect(d.chat).toHaveBeenCalledTimes(1);
+  });
+
+  it("a subject with nothing measured answers none and spends no count; a write already in flight answers pending and spends none (review 2026-10-29)", async () => {
+    const incr = vi.spyOn(store, "incr");
+    const bare = deps({ facts: vi.fn(async () => null) });
+    const none = await requestNote(post({ view: "geo", subject: `${anId}/cc:FI` }, { "x-forwarded-for": "1.2.3.4" }), () => bare);
+    expect(await none.json()).toEqual({ state: "none" });
+    expect(bare.chat).not.toHaveBeenCalled();
+    await store.lock(lockKeyOf(noteKeyOf("mainnet", "trend", "dag", RANGE_SPAN)), 60);
+    const pending = await requestNote(post({ view: "trend", subject: "dag", ...RANGE }, { "x-forwarded-for": "1.2.3.4" }), () => deps());
+    expect(await pending.json()).toEqual({ state: "pending" });
+    expect(incr).not.toHaveBeenCalled();
   });
 
   it("a visitor's 21st subject note in an hour is a 429", async () => {

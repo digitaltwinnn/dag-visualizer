@@ -88,6 +88,20 @@ export function overridesOnViewEntry(s: LaneCollapseState): Record<string, boole
   return { ...cleared, ...Object.fromEntries(subjects.map((id) => [id, isCollapsed(s, id)])) };
 }
 
+/** WHAT THE NOTE'S STAND-DOWN WRITES (review 2026-10-29). A view is entered while its note is still
+ *  being READ — the slot stands, reading — and the entry pins it open with every present subject
+ *  card folded. If that read then answers `none` or `unavailable`, the notes slot leaves the lane
+ *  and the pins alone would hold a lane of folded cards with NO BOX, a state nothing else can
+ *  produce (the invariant `openBoxes` states), until the next selection moment dropped them. So
+ *  when no notes slot is present and an open pin still stands on one — the entry's — every
+ *  override is dropped and the auto rule governs: the focus rung opens. Nothing is written while
+ *  the note stands, or when no such pin rests on it. */
+export function overridesOnNoteStandDown(s: LaneCollapseState): Record<string, null> {
+  if (s.lane.some((id) => !isSubjectSlot(id) && s.present(id))) return {};
+  if (!Object.entries(s.overrides).some(([id, v]) => v === false && !isSubjectSlot(id))) return {};
+  return overridesOnSelection(s);
+}
+
 /** The deepest card of the UNBROKEN RUN OF SUBJECT CARDS from the first present one (Inspector's
  *  next-rung step: the ghost directly below it opens its first child). The AI notes card tops the
  *  lane but is no subject, so it neither starts the run nor leaves a gap that ends it. */

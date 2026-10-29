@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  boxedSlotOf, isCollapsed, openBoxes, openDefaultOf, overridesOnSelection, overridesOnViewEntry, railSelectionKey, subjectRunEnd,
+  boxedSlotOf, isCollapsed, openBoxes, openDefaultOf, overridesOnNoteStandDown, overridesOnSelection, overridesOnViewEntry, railSelectionKey, subjectRunEnd,
   type LaneCollapseState, type SelectionKeyState,
 } from "@/components/railCollapse";
 import { detailsCards, focusSlotId, ladderSlotIds, type RailManifestState } from "@/components/railCards";
@@ -129,6 +129,28 @@ describe("a view switch (`overridesOnViewEntry`)", () => {
     const noteOpen = openByHand(withNote, "notes");
     const arrivingBare = (o: Overrides) => rail(manifest({ mode: "geo", filter: "dor", noteAbsent: true }), o, ["network"]);
     expect(openBoxes(arrivingBare(apply(noteOpen, overridesOnViewEntry(arrivingBare(noteOpen)))))).toEqual(["context"]);
+  });
+});
+
+describe("the note's stand-down (`overridesOnNoteStandDown`)", () => {
+  it("a view entered while its note is read pins the note open and the subjects folded; when the read then answers none, the pins drop and the focus rung is the box", () => {
+    const m = manifest({ filter: "dor", inspect: nodePick });
+    const arrive = (o: Overrides, over: Partial<RailManifestState> = {}) => rail({ ...m, mode: "geo", ...over }, o, ["node", "network"]);
+    const pinned = apply({}, overridesOnViewEntry(arrive({})));
+    expect(openBoxes(arrive(pinned))).toEqual(["notes"]);
+    // The read answers none: the notes slot leaves the lane, and the pins alone leave NO box.
+    const standDown = arrive(pinned, { noteAbsent: true });
+    expect(openBoxes(standDown)).toEqual([]);
+    const after = arrive(apply(pinned, overridesOnNoteStandDown(standDown)), { noteAbsent: true });
+    expect(after.focusId).not.toBeNull();
+    expect(openBoxes(after)).toEqual([after.focusId]);
+  });
+
+  it("writes nothing while the note stands, and nothing when no open pin rests on the notes slot", () => {
+    const m = manifest({ filter: "dor", inspect: nodePick });
+    expect(overridesOnNoteStandDown(rail(m, { node: true }, ["node", "network"]))).toEqual({});
+    expect(overridesOnNoteStandDown(rail({ ...m, noteAbsent: true }, { node: true }, ["node", "network"]))).toEqual({});
+    expect(overridesOnNoteStandDown(rail({ ...m, noteAbsent: true }, {}, ["node", "network"]))).toEqual({});
   });
 });
 

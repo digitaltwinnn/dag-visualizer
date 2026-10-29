@@ -81,7 +81,10 @@ export async function readNote(req: Request, deps: () => GenerateDeps): Promise<
   if (!d) return json(UNAVAILABLE, NO_STORE);
   try {
     const res = await generateNote({ net: netOf(req), ...parsed }, d, "read");
-    const cacheable = res.state === "ok" || res.state === "none" || res.state === "request";
+    // `request` is NOT held (review 2026-10-29): a CDN copy would show the 1h pill's door to every
+    // other visitor for 15 minutes after one of them wrote the note. The read behind it is one
+    // store GET, so there is nothing to shield.
+    const cacheable = res.state === "ok" || res.state === "none";
     return json(res, cacheable ? PUBLIC : NO_STORE);
   } catch {
     return json(UNAVAILABLE, NO_STORE);
@@ -120,15 +123,29 @@ export async function requestNote(req: Request, deps: () => GenerateDeps): Promi
     // one; `request` means a miss, and only then do the limits count and the model write.
     const cached = await generateNote(note, d, "read");
     if (cached.state !== "request") return json(cached, NO_STORE);
+    // THE LIMITS ARE SPENT ONLY ON A WRITE (`GenerateOptions.spend`, review 2026-10-29): the
+    // generator asks once the facts are in hand, so a subject with nothing measured (`none`) and a
+    // write already in flight (`pending`) cost nothing — the subject cards ask on their own, and a
+    // visitor stepping through provider rows must not burn their hour on answers that are no note.
+    // A visitor already at the limit is refused before any work is done for them.
+    let status = 200;
+    let spend: (() => Promise<NoteResponse | null>) | undefined;
     if (isLimitedNote(parsed.view, parsed.subject, parsed.span)) {
-      if ((await d.store.incr(rateKeyOf(net, visitorHash(req), isoHour(now)), RATE_TTL_S)) > RATE_PER_HOUR)
-        return json(UNAVAILABLE, NO_STORE, 429);
-      if ((await d.store.incr(capKeyOf(net, isoDay(now)), CAP_TTL_S)) > CAP_PER_DAY) {
-        await countStat(d.store, net, now, "capped");
-        return json(UNAVAILABLE, NO_STORE);
-      }
+      const rateKey = rateKeyOf(net, visitorHash(req), isoHour(now));
+      if (Number((await d.store.get(rateKey)) ?? 0) >= RATE_PER_HOUR) return json(UNAVAILABLE, NO_STORE, 429);
+      spend = async () => {
+        if ((await d.store.incr(rateKey, RATE_TTL_S)) > RATE_PER_HOUR) {
+          status = 429;
+          return UNAVAILABLE;
+        }
+        if ((await d.store.incr(capKeyOf(net, isoDay(now)), CAP_TTL_S)) > CAP_PER_DAY) {
+          await countStat(d.store, net, now, "capped");
+          return UNAVAILABLE;
+        }
+        return null;
+      };
     }
-    return json(await generateNote(note, d, "request"), NO_STORE);
+    return json(await generateNote(note, d, "request", { spend }), NO_STORE, status);
   } catch {
     return json(UNAVAILABLE, NO_STORE);
   }

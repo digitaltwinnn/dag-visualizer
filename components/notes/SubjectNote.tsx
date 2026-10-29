@@ -24,7 +24,13 @@ const WAIT = "m-0 flex items-center gap-2 text-body text-muted-foreground";
 /** How long a subject has to stand before its note is asked for (above). */
 const ASK_DWELL_MS = 1500;
 
-export default function SubjectNote({ req, span }: { req: NoteReq | null; span: string | null }) {
+export default function SubjectNote({ req, span, trailingRule = false }: {
+  req: NoteReq | null;
+  span: string | null;
+  /** Close the block with a rule too — for a card whose next section draws none of its own (the
+   *  Range card's facts). It belongs to the block so that it goes when the block does. */
+  trailingRule?: boolean;
+}) {
   // Presence through `useNet()`, the fetch through the gate (`useMainnetNote`'s hydration rule).
   const asked = useNet() === "mainnet" ? req : null;
   const note = useMainnetNote(asked);
@@ -77,6 +83,7 @@ export default function SubjectNote({ req, span }: { req: NoteReq | null; span: 
       ) : res.state === "ok" ? (
         <p className="m-0 text-body leading-snug text-foreground">{res.text}</p>
       ) : null}
+      {trailingRule ? <Separator className="mt-2" /> : null}
     </div>
   );
 }

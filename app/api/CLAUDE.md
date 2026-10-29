@@ -104,9 +104,10 @@ them — but the Next Node server can.
   stored note at once (their TTLs reap them). Timing is `KIND_TIMING` in `keys.ts`: hyper and
   geography refresh daily (3-day TTL), the ledger and History's 24-hour note hourly (6 hours),
   History's daily pills daily, the 1-hour pill only when asked through its door (15 minutes) and a
-  brushed range when its card opens (30 days); a subject note (below) lives a day and is never warmed. `GET /api/notes` reads: `ok`, `none` and `request` are `public, s-maxage=300,
-  stale-while-revalidate=600`; `pending`, `unavailable` and a 400 are `no-store` (a well-formed
-  brush with no whole bucket in it is `none`, not a 400). The ledger's `dag` is folded into `all`
+  brushed range when its card opens (30 days); a subject note (below) lives a day and is never warmed. `GET /api/notes` reads: `ok` and `none` are `public, s-maxage=300,
+  stale-while-revalidate=600`; `request`, `pending`, `unavailable` and a 400 are `no-store` (a
+  well-formed brush with no whole bucket in it is `none`, not a 400; a `request` held by the CDN
+  would show the 1h door to every visitor for 15 minutes after one of them wrote the note). The ledger's `dag` is folded into `all`
   (the same facts: one note). `POST /api/notes/request` writes the on-request kinds (the 1h pill, a
   brushed range and a subject note), and
   `GET /api/notes/warm` is the quarter-hourly cron (about 26 Gate calls a pass, spaced 8 s — the free
@@ -123,7 +124,10 @@ them — but the Next Node server can.
   the first 16 hex characters of HMAC-SHA256(`CRON_SECRET`, ip), plain sha256(ip) where no secret
   is set (the raw address and the secret are never stored or logged; on Vercel
   `x-forwarded-for` is set by the platform, which is why the hash can be trusted there), and a
-  2,000 a day tripwire; a cached note is served without counting. Every other kind is bounded by
+  2,000 a day tripwire; a cached note is served without counting, and **the count is spent only on a
+  write** (`GenerateOptions.spend`, asked by the generator once the facts are in hand, inside the
+  lock): `none` and `pending` cost nothing, and a visitor already at the limit is refused before any
+  work is done for them. Every other kind is bounded by
   its key and a singleflight lock. **The warm pass is paced**: one item at a time, at least 8 s
   between Gate calls, no new item after 210 s (the worst item, two attempts at the 20 s timeout,
   still ends inside the 300 s `maxDuration`), because the free model answered 429 at about five
@@ -154,8 +158,9 @@ them — but the Next Node server can.
   space is bounded (countries, providers and types times networks) but the Gate's burst limit is
   not, and one visitor drilling through twenty countries should pace themselves, not the cron — the
   same per-visitor (20 an hour) and daily (2,000) limits, a cached note served without counting.
-  `dag/type:*` is refused (no `f.type.dag.*` series: an accepted on-request kind would answer
-  `request` before its facts and spend a count to learn `none`), and the client never asks it. A
+  `dag/type:*` is refused (no `f.type.dag.*` series: an accepted on-request kind answers `request`
+  before its facts, so every DAG make-up would show "reading…" and then vanish), and the client
+  never asks it. A
   network-scoped country or provider note, and a provider note at fleet scope, read the geo family
   for their week ago, so they state no change until a week of it exists (from 2026-10-27). The
   subject cards ask AFTER A DWELL (`ASK_DWELL_MS`, `components/notes/SubjectNote.tsx`): a key that
