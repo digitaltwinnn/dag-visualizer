@@ -100,7 +100,7 @@ export default function AboutDoc() {
           Node locations come from their public internet addresses, so they are accurate to a
           city and a hosting provider, not to a street. What is stored behind this site is the
           network&apos;s own public history — activity totals summed from the chain for the
-          History view — and the short AI notes written about it. Nothing about you: the page
+          History view — and the short notes Constellation Gate AI writes about it. Nothing about you: the page
           keeps a short memory of recent snapshots while it is open, and forgets it when you
           close the tab. The one trace is when you ask for a note on a range you brush: a
           count kept for two hours under a scrambled form of your address, so no single visitor
@@ -148,15 +148,17 @@ export default function AboutDoc() {
           already stated by the card above it isn&apos;t repeated below; and the label floating
           in the scene follows whichever card you open, just as the camera does.
         </p>
-        {/* The AI notes card, said once in the page's own register (2026-10-27; the user approves
+        {/* The Gate AI card, said once in the page's own register (2026-10-27; the user approves
             the wording live). One card per view, at the top of the cards, leading with what
             changed (review M4). It states the two promises the feature rests on: the numbers are
-            the view's own, and a note the figures cannot back never shows. */}
+            the view's own, and a note the figures cannot back never shows. Named for the product
+            (user, 2026-10-29: "this is the product and I'd like to promote it a bit"), the same
+            Gate AI the paragraph above says the site was built with. */}
         <p>
-          Each view also has one <strong>AI notes</strong> card, at the top of the cards on the
-          right. A language model reads the same measured figures the view shows and says, in a
-          few sentences, what changed and by how much, or, when nothing moved, what the view is
-          showing right now. A note with a number the figures
+          Each view also has one <strong>Constellation Gate AI</strong> card, at the top of the
+          cards on the right. Gate AI, Constellation&apos;s own AI product, reads the same measured
+          figures the view shows and writes, in a few sentences, what changed and by how much, or,
+          when nothing moved, what the view is showing right now. A note with a number the figures
           can&apos;t back is thrown away, and the card is always marked as AI so it never passes
           for a measurement.
         </p>

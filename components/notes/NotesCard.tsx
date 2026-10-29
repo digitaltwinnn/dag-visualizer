@@ -4,9 +4,8 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import CardHead, { RailPane } from "@/components/CardHead";
 import { AI_NOTES_ICON, KIND_MARK_CLASS } from "@/components/icons";
-import { Door, Fact, FactGroup, foldLabel } from "@/components/inspector/parts";
+import { Door, foldLabel } from "@/components/inspector/parts";
 import { NodeStars } from "@/components/state/StateAtoms";
-import Stamp from "@/components/Stamp";
 import { cn } from "@/lib/utils";
 import type { NoteDay } from "@/src/data/noteTypes";
 import { spanPhrase } from "@/src/data/trendWindow";
@@ -21,7 +20,10 @@ import { useAiNote } from "./useAiNote";
 //
 // It is CONTEXT, not a reading: the one card in the rail whose words no instrument measured, marked
 // as such — the `--ai-ink` eyebrow and the sparkles mark on both tiers, and the iridescent
-// `--ai-edge` outline on the open box.
+// `--ai-edge` outline on the open box. THE EYEBROW NAMES THE PRODUCT (user, 2026-10-29: "Constellation
+// Gate AI, this is the product and I'd like to promote it a bit") — Gate AI, Constellation's own AI
+// product, writes the notes (`app/api/notes/gate.ts`), so the card wears its name rather than the
+// generic "AI notes"; "notes" stays the word for what it writes (the doors, the About copy).
 //
 // ⚠️ A TOP CARD, PART OF THE STACK — NOT A SUBJECT CARD (user, 2026-10-27, R57: "a top card, part
 // of the stack. Not as a so-called subject card, so if there is a true subject card (metagraph,
@@ -44,13 +46,20 @@ import { useAiNote } from "./useAiNote";
 const DAY_MS = 86_400_000;
 /** The eyebrow, in the AI ink: the gradient clipped to the letters. `background-image`, not the
  *  `background` shorthand — the shorthand would reset the clip `bg-clip-text` sets. */
-const EYEBROW = <span className="[background-image:var(--ai-ink)] bg-clip-text text-transparent">AI notes</span>;
+const EYEBROW = (
+  <span className="[background-image:var(--ai-ink)] bg-clip-text text-transparent">
+    {/* The full product name on the open box; folded, the 7em eyebrow column holds "Gate AI" (CardHead). */}
+    <span data-eyebrow-full="">Constellation Gate AI</span>
+    <span data-eyebrow-short="" className="hidden">Gate AI</span>
+  </span>
+);
 
 /** ONE TITLE, EVERY VIEW, EVERY SUBJECT (user, 2026-10-29: a filtered note was titled "Dor
  *  Technologies", but "the dossier/metagraph will say that already", so "What changed"
  *  consistently, with the span under it as History's always had). The subject is the subject
  *  card's to name; what this card adds is the change over the span, and the span is the subtitle
- *  (`noteSpanWords`; History's is the window or range on screen) — so the body carries no Span row. */
+ *  (`noteSpanWords`; History's is the window or range on screen) — so the body carries no Span row,
+ *  and no Written row either (user, 2026-10-29: "not that relevant and implied by 'last 6 hours'"). */
 const TITLE = "What changed";
 
 // THE CARD'S CONTROLS ARE DOORS (`parts.tsx` — the one way a card draws a way out, with the
@@ -221,12 +230,9 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
             </>
           ) : res.state === "ok" ? (
             <>
+              {/* The text alone (user, 2026-10-29): no Written row — the span under the title says
+                  what it covers, and the note is rewritten on its own cadence. */}
               <p className="m-0 text-body leading-snug text-foreground">{res.text}</p>
-              <FactGroup className="mt-2.5">
-                <Fact label="Written">
-                  <Stamp ms={res.writtenAt} />
-                </Fact>
-              </FactGroup>
               {res.days.length > 0 && <NotableDays key={titleKey} days={res.days} />}
             </>
           ) : null}
