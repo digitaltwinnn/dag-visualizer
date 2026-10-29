@@ -66,16 +66,16 @@ them — but the Next Node server can.
   and a location gauge can never be re-derived, and `/api/trends` ships every series a tier hash
   holds, so ~50 location series a day would ride every History payload undrawn. Nothing reads it
   yet; it exists so Geography has a past when something does (the AI notes design).
-  **The DAG's nodes are tallied like a metagraph's** (2026-10-29): `f.layer.dag.<role>` and
-  `f.type.dag.<key>` come from its two validator clusters merged by the live Hypergraph's own rule
-  (`src/data/dagCore.ts`): two small `cluster/info` reads once an hour, logged when they fail;
-  one tally for every network (`fleetTally.ts`), and `f.nodes.dag` is that same merged list's
-  length, so the DAG's stack sums to its line (the geo map's located count is the fallback when
-  the clusters cannot be read, the types absent that sample). A failed cluster read leaves the
-  DAG's layer and type fields ABSENT, the rest of the fleet still written. The FLEET-WIDE
-  `f.layer.<role>` lines stay metagraph-only, so the existing history did not step on the day the
-  DAG's own layers arrived. History's DAG plane draws the make-up stack from the hours sampled
-  since; the hours before show none (`typeBands`' null rule).
+  **The DAG's nodes are tallied like a metagraph's** (since 2026-10-29): `f.nodes.dag`,
+  `f.layer.dag.<role>` and `f.type.dag.<key>` all come from ONE read of its two validator clusters,
+  merged by the live Hypergraph's own rule (`src/data/dagCore.ts`) and tallied by the one tally
+  every network uses (`fleetTally.ts`), so the DAG's stack sums to its line. Two small
+  `cluster/info` reads an hour; a failure is logged and leaves `f.nodes.dag`, `f.nodes` and the
+  DAG's layer and type fields ABSENT for that sample (one field, one definition — never a
+  fallback to a smaller count), the rest of the fleet still written. Before 2026-10-29
+  `f.nodes.dag` is the geo map's LOCATED validators, so the stored series steps up once there.
+  The FLEET-WIDE `f.layer.<role>` lines are metagraph-only. `typeBands` is null for every bucket
+  before the first sample, so the DAG plane's stack starts where the data does.
   ⚠️ **A PRESENCE MARKER MUST NOT BE A COUNTER.** The read route zero-fills an absent ADD field in
   every covered bucket (an honest "measured, none"), so a marker classed as a counter reads 0 where
   it is missing — the same value it has where it is present. `u.cov` is classed `set` in

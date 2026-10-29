@@ -46,11 +46,12 @@ export function bucketColumns(
   unlisted?: { id: string; listed: (addr: string) => boolean },
 ): string[] {
   const rank = new Map<string, number>();
+  // A scope's own fleet fields rank after its counters, for every scope that has them.
+  rank.set(`f.nodes.${scope}`, 20);
+  LAYERS.forEach((l, i) => rank.set(`f.layer.${scope}.${l}`, 30 + i));
   let own: (k: string) => boolean;
   if (isGlobalScope(scope)) {
     GLOBAL_ORDER.forEach((k, i) => rank.set(k, i));
-    rank.set(`f.nodes.${scope}`, 20);
-    LAYERS.forEach((l, i) => rank.set(`f.layer.${scope}.${l}`, 30 + i));
     const global = (k: string) => !DERIVED.has(k) && (k.startsWith("g.") || k === "u.cov" || k === "f.nodes" || /^f\.layer\.(l0|cl1|dl1)$/.test(k));
     own = scope === "dag" ? (k) => global(k) || ownFleet(scope, k) : global;
   } else if (unlisted && scope === unlisted.id) {
@@ -62,8 +63,6 @@ export function bucketColumns(
   } else {
     const m = `m.${scope}.`;
     NET_TAILS.forEach((t, i) => rank.set(m + t, i));
-    rank.set(`f.nodes.${scope}`, 20);
-    LAYERS.forEach((l, i) => rank.set(`f.layer.${scope}.${l}`, 30 + i));
     own = (k) => k.startsWith(m) || ownFleet(scope, k);
   }
   return [...new Set(keys)].filter(own).sort((a, b) => {

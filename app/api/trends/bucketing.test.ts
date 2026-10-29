@@ -178,6 +178,19 @@ describe("coverage zero-fill reaches every tier", () => {
 
 // Per-network layer gauges (2026-09-11): the /trends per-network node panels draw layer
 // lines, so the fleet sample keeps each network's role tally beside its total.
+describe("bucketFleet without a fleet total (the DAG's clusters unread)", () => {
+  it("writes no f.nodes and no f.nodes.dag — an absent gauge, never a lower count — and the rest still", () => {
+    const inc: IncMap = new Map();
+    const t = Date.parse("2026-10-29T10:00:00Z");
+    bucketFleet(inc, "mainnet", t, { perNet: { up: 3 }, layers: { l0: 3 }, perNetTypes: { up: { l0: 3 } }, countries: { DE: 3 } });
+    const k = slotOf("mainnet", "1h", t);
+    expect(inc.get(k.key)?.get(fieldOf(k.bucket, "f.nodes"))).toBeUndefined();
+    expect(inc.get(k.key)?.get(fieldOf(k.bucket, "f.nodes.dag"))).toBeUndefined();
+    expect(inc.get(k.key)?.get(fieldOf(k.bucket, "f.nodes.up"))).toBe(3);
+    expect(inc.get(k.key)?.get(fieldOf(k.bucket, "f.type.up.l0"))).toBe(3);
+  });
+});
+
 describe("bucketFleet per-network layers", () => {
   it("writes f.layer.{id}.{role} for every network's tally", () => {
     const inc: IncMap = new Map();

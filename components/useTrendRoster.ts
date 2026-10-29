@@ -7,6 +7,7 @@ import { stackRoster, viewScope, type TrendScope } from "@/src/data/trendScope";
 import {
   TREND_METRICS,
   anchorSeries,
+  dagRowSeries,
   globalSeries,
   lastMeasured,
   latestDay,
@@ -185,10 +186,11 @@ export default function useTrendRoster(
     const ids = unlistedFilter ? [] : stackRoster(filter);
     const rows = new Map<string, TrendRosterRow>();
     const rowOf = (id: string): TrendRosterRow => {
-      // THE HYPERGRAPH'S OWN SERIES is the global one (`globalSeries` — the same read the Moment
-      // card's whole-network lead and the band's overview make), with no sampling or gap marks:
-      // those are per-metagraph facts. Every other id reads its own `m.<id>.*` rows.
-      const s = id === "dag" ? { points: globalSeries(metric, series), sampled: undefined, gaps: undefined } : metricSeries(metric, id, series);
+      // THE HYPERGRAPH'S OWN SERIES is the global one (`dagRowSeries` — the same read the Moment
+      // card's whole-network lead and the band's overview make; NODES are the DAG's own count, the
+      // line its make-up stack sums to), with no sampling or gap marks: those are per-metagraph
+      // facts. Every other id reads its own `m.<id>.*` rows.
+      const s = id === "dag" ? { points: dagRowSeries(metric, series), sampled: undefined, gaps: undefined } : metricSeries(metric, id, series);
       const net = displayNetwork(id);
       const points = cut(s.points);
       // Continuity's weights: the snapshots each bucket's spacing was measured over.
@@ -235,19 +237,10 @@ export default function useTrendRoster(
     // The pinned row's NODES are the DAG's own (`f.nodes.dag`), not the fleet the global series
     // carries: beside rows that each state their own nodes, the fleet read as one more "all
     // nodes". Every other measure is the global series as it stands.
-    const totalRow = (): TrendRosterRow => {
-      const r = rowOf("dag");
-      if (metric !== "nodes") return r;
-      const rawNodes = metricSeries("nodes", "dag", series).points;
-      const points = cut(rawNodes);
-      r.series = { points, sampled: undefined, gaps: undefined };
-      r.rawPoints = rawNodes;
-      r.last = lastMeasured(points);
-      r.day = stepMs >= 86_400_000 ? lastMeasured(points) : daily ? lastMeasured(metricSeries("nodes", "dag", daily).points) : null;
-      r.span = spanAverage(metric, points, stepMs);
-      r.head = headKind === "span" ? r.span : r.day;
-      return r;
-    };
+    // The DAG's row, as `rowOf` already reads it: the global row's series, and for NODES its own
+    // count (`dagRowSeries` is the one home; the override that lived here moved there so the DAG
+    // FILTER reads the same line).
+    const totalRow = (): TrendRosterRow => rowOf("dag");
     // Under "all" the DAG's row joins the MAP — the stack draws its plane from it — but never
     // the RANK: `order` stays the networks, so the explorer's list, the Moment card and the
     // shared ceiling keep reading the layers alone.

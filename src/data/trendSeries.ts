@@ -241,6 +241,15 @@ export function lastMeasured(points: readonly (number | null)[]): number | null 
  *  all answer — over the DAILY tier (`TrendSlice.daily`, still-filling day already trimmed) where
  *  the charts are finer than a day, or the chart's own last point where it already is daily.
  *  Null while the daily tier is in flight: a finer bucket is never passed off as a day. */
+/** WHAT THE DAG ROW READS for a metric (2026-10-29, one home — the roster's row and `latestDay`
+ *  below both asked it, and under the DAG filter they disagreed): the global row's series
+ *  (`globalSeries`) for every measure but NODES, which is the DAG's OWN stored count
+ *  (`f.nodes.dag`, `GLOBAL_READING.nodes` = "own") — `f.nodes` is the whole fleet, and the DAG's
+ *  make-up stack (`typeBands("dag")`) partitions ITS nodes, so the line it sums to must be them. */
+export function dagRowSeries(metric: TrendMetric, series: Readonly<Record<string, (number | null)[]>>): (number | null)[] {
+  return metric === "nodes" ? metricSeries("nodes", "dag", series).points : globalSeries(metric, series);
+}
+
 export function latestDay(
   metric: TrendMetric,
   id: string,
@@ -250,7 +259,7 @@ export function latestDay(
 ): number | null {
   if (stepMs >= 86_400_000) return lastMeasured(chartPoints);
   if (!daily) return null;
-  return lastMeasured(id === "dag" ? globalSeries(metric, daily) : metricSeries(metric, id, daily).points);
+  return lastMeasured(id === "dag" ? dagRowSeries(metric, daily) : metricSeries(metric, id, daily).points);
 }
 
 /** THE SPAN READING — the roster's `head` over a window of a day or more (user, 2026-09-29,
