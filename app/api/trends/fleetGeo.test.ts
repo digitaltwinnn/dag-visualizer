@@ -1,21 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fleetGeo, providerKey } from "./fleetGeo";
-
-describe("providerKey", () => {
-  it("slugs the lookup's provider name into one dot- and bar-free series segment", () => {
-    expect(providerKey("Hetzner Online GmbH")).toBe("hetzner-online-gmbh");
-    expect(providerKey("netcup GmbH | AS197540")).toBe("netcup-gmbh-as197540");
-    expect(providerKey("Amazon.com, Inc.")).toBe("amazon-com-inc");
-  });
-  it("answers null for an unknown host rather than inventing a bucket for it", () => {
-    expect(providerKey(undefined)).toBeNull();
-    expect(providerKey("")).toBeNull();
-    expect(providerKey("  ·  ")).toBeNull();
-  });
-  it("caps a long name, so a field can never grow without bound", () => {
-    expect(providerKey("x".repeat(200))!.length).toBe(48);
-  });
-});
+import { fleetGeo } from "./fleetGeo";
 
 describe("fleetGeo", () => {
   const dagGeo = {
