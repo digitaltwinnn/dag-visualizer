@@ -1,7 +1,8 @@
+import { roleKey } from "@/src/data/composition";
 import { fact } from "@/src/data/noteFacts";
 import { bannedWords, undash } from "@/src/data/noteHonesty";
 import { geoFacts } from "@/src/data/noteFactsGeo";
-import { hyperFacts } from "@/src/data/noteFactsHyper";
+import { comboWords, hyperFacts } from "@/src/data/noteFactsHyper";
 import { hasCommonReading } from "@/src/data/noteFactsActivity";
 import { ledgerFacts } from "@/src/data/noteFactsLedger";
 import { trendFacts, type TrendFactsInput } from "@/src/data/noteFactsTrend";
@@ -166,6 +167,7 @@ function blurbsOf(net: string): Record<string, string> {
 const isNetwork = (net: string, id: string) => id === "dag" || catalogOf(net).some((m) => m.id === id);
 const CC_RE = /^cc:([A-Z]{2})$/;
 const ISP_RE = /^isp:([a-z0-9-]{1,48})$/;
+const TYPE_RE = /^type:((?:l0|cl1|dl1)(?:\+(?:l0|cl1|dl1)){0,2}|none)$/;
 const RANGE_RE = /^r(\d+)-(\d+)$/;
 
 function rangeOf(span: string): { fromMs: number; toMs: number } | null {
@@ -212,6 +214,19 @@ function geoSubjectLabel(sel: GeoSelection, names: Record<string, string>, provi
   if (sel.net == null) return { label: what, subjectName: what };
   const netName = names[sel.net] ?? sel.net;
   return { label: `${netName}'s nodes ${"cc" in sel ? "in" : "with"} ${what}`, subjectName: netName };
+}
+
+type HyperSelection = { net: string; type: string };
+
+/** A HYPERGRAPH SELECTION as the builder takes it: the subject note `<net>/type:<roleKey>`, a
+ *  network's make-up, scoped to `dag` or a network this catalog tracks and spelled as `roleKey`
+ *  spells it (one make-up, one key). Null for anything else, a network's own note included. */
+function hyperSelectionOf(net: string, subject: string): HyperSelection | null {
+  if (!isSubjectNote(subject) || subjectKindOf(subject) !== "type") return null;
+  const scope = subject.slice(0, subject.indexOf("/"));
+  const type = TYPE_RE.exec(subject.slice(scope.length + 1))?.[1];
+  if (!type || !isNetwork(net, scope) || roleKey({ roles: type.split("+") }) !== type) return null;
+  return { net: scope, type };
 }
 
 // ── The per-view table ─────────────────────────────────────────────────────────────────────────
@@ -327,20 +342,24 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
   // WHO / WHAT: the fleet's hourly gauges over the last WEEK (user, 2026-10-29: one change range for
   // Hypergraph and Geography); the daily tier over 37 days (a 30-day lead-in, so a start is a start).
   hyper: {
-    accepts: (net, subject, span) => span === "day" && (subject === "all" || isNetwork(net, subject)),
+    accepts: (net, subject, span) => span === "day" && (subject === "all" || isNetwork(net, subject) || hyperSelectionOf(net, subject) != null),
     label: (subject, names) => (subject === "all" ? WHOLE : (names[subject] ?? subject)),
     whole: (subject) => subject === "all",
     async read({ net, subject, nowMs, reads, names, blurbs }) {
+      const sel = hyperSelectionOf(net, subject);
       const span = { fromMs: nowMs - 7 * D, toMs: nowMs };
       const [fleet, daily] = await Promise.all([
         reads.span(net, "1h", span.fromMs, nowMs),
         reads.span(net, "1d", span.fromMs - LEAD_IN_MS, nowMs),
       ]);
-      const built = hyperFacts({ subject, fleet, daily, span, names, blurbs });
+      const built = hyperFacts({ subject: sel ?? subject, fleet, daily, span, names, blurbs });
       // The facts speak of the last day and the last week (the span, activity, started / stopped),
       // so each window the note may name is stated.
       const windows: [string, number][] = [["Span length", secondsOf(span.fromMs, nowMs)], ["Day", D / 1000], ["Week", (7 * D) / 1000]];
-      return { built, spanFrom: span.fromMs, spanTo: nowMs, windows };
+      // A make-up's note is labelled as its facts name it, and attributed to its network (the gate
+      // scopes a sentence's ratios by the network's name in it).
+      const netName = sel ? (names[sel.net] ?? sel.net) : "";
+      return { built, spanFrom: span.fromMs, spanTo: nowMs, windows, ...(sel ? { label: `${netName} nodes ${comboWords(sel.type)}`, subjectName: netName } : {}) };
     },
   },
   // WHERE: the geo family's days and the tiers' daily country counts. The note's span is the WEEK
@@ -423,7 +442,8 @@ export interface NoteFacts {
   spanFrom: number;
   spanTo: number;
   /** The prompt's subject label ("the whole network", "the hypergraph", a network, a country, or a
-   *  subject note's scope-first label: "USDC.dag's nodes in Germany"). */
+   *  subject note's scope-first label: "USDC.dag's nodes in Germany", "USDC.dag nodes running L0
+   *  and cL1"). */
   label: string;
   /** The subject's display name when it is one network, one country or one provider (a scoped
    *  subject note's is its network's), absent for the whole network: the gate reads a sentence

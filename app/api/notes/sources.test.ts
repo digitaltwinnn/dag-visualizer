@@ -9,7 +9,8 @@ import type { NoteReads } from "./sources";
 // colocated tests' business; `generate.test.ts` runs one real builder end to end.
 vi.mock("@/src/data/noteFactsTrend", () => ({ trendFacts: vi.fn() }));
 vi.mock("@/src/data/noteFactsLedger", () => ({ ledgerFacts: vi.fn() }));
-vi.mock("@/src/data/noteFactsHyper", () => ({ hyperFacts: vi.fn() }));
+// The make-up's words (`comboWords`) are the real ones: they are the subject note's label.
+vi.mock("@/src/data/noteFactsHyper", async (orig) => ({ ...(await orig<typeof import("@/src/data/noteFactsHyper")>()), hyperFacts: vi.fn() }));
 vi.mock("@/src/data/noteFactsGeo", () => ({ geoFacts: vi.fn() }));
 
 const { trendFacts } = await import("@/src/data/noteFactsTrend");
@@ -158,6 +159,42 @@ describe("factsFor — Geography's subject notes", () => {
   it("noteSupported refuses a subject note in another view", () => {
     for (const s of [`${USDC}/cc:DE`, "dag/cc:DE", "isp:hetzner", `${USDC}/isp:hetzner`]) {
       expect(noteSupported("hyper", s, "day"), s).toBe(false);
+      expect(noteSupported("ledger", s, "hours"), s).toBe(false);
+      expect(noteSupported("trend", s, "7d"), s).toBe(false);
+    }
+  });
+});
+
+// SUBJECT NOTES (2026-10-29): Hypergraph's make-up × network, the node-type card's selection.
+describe("factsFor — Hypergraph's make-up notes", () => {
+  it("factsFor accepts a network's make-up, labels it, kind `type`, no common reading", async () => {
+    const cases: [string, unknown, string, string][] = [
+      [`${USDC}/type:l0+cl1`, { net: USDC, type: "l0+cl1" }, "USDC.dag nodes running L0 and cL1", "USDC.dag"],
+      [`${USDC}/type:dl1`, { net: USDC, type: "dl1" }, "USDC.dag nodes running only dL1", "USDC.dag"],
+      ["dag/type:none", { net: "dag", type: "none" }, "DAG nodes with no stated layer", "DAG"],
+    ];
+    for (const [subject, parsed, label, subjectName] of cases) {
+      expect(noteSupported("hyper", subject, "day"), subject).toBe(true);
+      vi.mocked(hyperFacts).mockClear();
+      const out = await factsFor("mainnet", "hyper", subject, "day", NOW, fakeReads());
+      expect(out, subject).not.toBeNull();
+      expect(vi.mocked(hyperFacts).mock.calls[0]![0].subject, subject).toEqual(parsed);
+      expect({ label: out!.label, subjectName: out!.subjectName, kind: out!.kind, common: out!.common }, subject).toEqual({ label, subjectName, kind: "type", common: false });
+    }
+    // The view notes keep their labels and their question.
+    const net = (await factsFor("mainnet", "hyper", USDC, "day", NOW, fakeReads()))!;
+    expect([net.label, net.subjectName, net.kind]).toEqual(["USDC.dag", "USDC.dag", "view"]);
+  });
+
+  it("hyper accepts a make-up for a tracked network or the DAG, spelled as its roleKey, nothing else", () => {
+    for (const s of ["nope/type:l0", "unlisted/type:l0", "all/type:l0", `${USDC}/type:cl1+l0`, `${USDC}/type:l0+l0`, `${USDC}/type:x`, `${USDC}/type:`, `${USDC}/type:l0/x`, "type:l0"])
+      expect(noteSupported("hyper", s, "day"), s).toBe(false);
+    expect(noteSupported("hyper", `${USDC}/type:l0`, "hours")).toBe(false);
+  });
+
+  it("refuses a make-up in Geography", () => {
+    for (const s of [`${USDC}/type:l0`, "dag/type:l0+cl1", "dag/type:none"]) {
+      expect(noteSupported("geo", s, "day"), s).toBe(false);
       expect(noteSupported("ledger", s, "hours"), s).toBe(false);
       expect(noteSupported("trend", s, "7d"), s).toBe(false);
     }

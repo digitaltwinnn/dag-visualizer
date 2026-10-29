@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { hyperFacts, type HyperFactsInput } from "@/src/data/noteFactsHyper";
+import { comboWords, hyperFacts, type HyperFactsInput } from "@/src/data/noteFactsHyper";
 import { checkNote } from "@/src/data/noteHonesty";
 import { pairsOf } from "@/src/data/testkit/notePairs";
 import type { TrendsWindowData } from "@/src/data/trendWindow";
@@ -619,5 +619,78 @@ describe("hyperFacts tags each change as a pair (R54)", () => {
       ["Nodes across all networks at the start of the span", 120, "Nodes across all networks at the end of the span", 140],
       ["Global snapshots per day, the weeks before", 24_000, "Global snapshots per day, last week", 30_000],
     ]);
+  });
+});
+
+// A SUBJECT NOTE (2026-10-29): one network's make-up, the Hypergraph node-type card's selection.
+describe("hyperFacts on a network's make-up", () => {
+  const N = 720;
+  const makeUp = (type: string, over: Record<string, (number | null)[]> = {}) =>
+    hyperFacts(input({ subject: { net: "usdc", type }, fleet: fleet(over) }));
+
+  it("a make-up's note: its count over the span as a pair, the network's level, its share and how many make-ups", () => {
+    // USDC.dag grows 10 to 30: its L0+cL1 hybrids 5 to 20, its L0-only nodes 5 to 10.
+    const r = makeUp("l0+cl1", {
+      "f.type.usdc.l0+cl1": row(N, (i) => (i < N / 2 ? 5 : 20)),
+      "f.type.usdc.l0": row(N, (i) => (i < N / 2 ? 5 : 10)),
+    })!;
+    const key = "USDC.dag nodes running L0 and cL1";
+    expect(r.facts.map((f) => [f.label, f.value, f.kind, f.pair ?? null])).toEqual([
+      [`${key} at the start of the span`, 5, "count", { key, end: "from" }],
+      [`${key} at the end of the span`, 20, "count", { key, end: "to" }],
+      [`${key}, ratio end to start`, 4, "ratio", null],
+      ["USDC.dag nodes at the end of the span", 30, "count", null],
+      ["USDC.dag, share of its nodes running L0 and cL1", 20 / 30, "share", null],
+      ["Node make-ups in USDC.dag", 2, "count", null],
+    ]);
+    expect(find(r, /rank|global snapshots|Networks/)).toEqual([]); // no rank, no activity, no common reading
+    expect(r.blurbs).toEqual(["USDC.dag is: a stablecoin on the DAG"]);
+    expect(r.names).toEqual(expect.arrayContaining(Object.values(NAMES)));
+    expect(r.setKey).toBeUndefined();
+    expect(checkNote("USDC.dag grew its nodes running L0 and cL1 from 5 to 20, 67% of its 30 nodes.", r.facts, r.names)).toEqual({ ok: true });
+    expect(checkNote("USDC.dag grew its nodes running L0 and cL1 from 5 to 25.", r.facts, r.names).ok).toBe(false);
+  });
+
+  it("a make-up that held states its level at both ends and no ratio", () => {
+    const r = makeUp("l0+cl1")!; // 20 throughout
+    expect(find(r, /^USDC\.dag nodes running L0 and cL1 at the (start|end) of the span$/).map((f) => f.value)).toEqual([20, 20]);
+    expect(find(r, /ratio/)).toEqual([]);
+    expect(find(r, /^USDC\.dag, share of its nodes running L0 and cL1$/)[0]!.value).toBeCloseTo(20 / 30, 9);
+    // A make-up read above the network's level is no part of it: no share is stated.
+    const over = makeUp("l0+cl1", { "f.type.usdc.l0+cl1": row(N, () => 40) })!;
+    expect(find(over, /share/)).toEqual([]);
+    expect(find(over, /^USDC\.dag nodes running L0 and cL1 at the end of the span$/)[0]!.value).toBe(40);
+  });
+
+  it("a make-up that began after the span did states only its end level", () => {
+    // No type was recorded before hour 400: the make-up's start is unknown, never a 0.
+    const late = (v: number) => row(N, (i) => (i < 400 ? null : v));
+    const r = makeUp("l0+cl1", { "f.type.usdc.l0+cl1": late(20), "f.type.usdc.l0": late(10) })!;
+    expect(find(r, /^USDC\.dag nodes running L0 and cL1 at the end of the span$/)[0]!.value).toBe(20);
+    expect(find(r, /running L0 and cL1 at the start/)).toEqual([]);
+    expect(find(r, /ratio/)).toEqual([]);
+  });
+
+  it("a make-up absent while others were recorded is a measured 0 at the start, never unknown", () => {
+    const r = makeUp("dl1", { "f.type.usdc.dl1": row(N, (i) => (i < N / 2 ? null : 3)) })!;
+    expect(find(r, /^USDC\.dag nodes running only dL1 at the start of the span$/)[0]!.value).toBe(0);
+    expect(find(r, /^USDC\.dag nodes running only dL1 at the end of the span$/)[0]!.value).toBe(3);
+    expect(find(r, /^Node make-ups in USDC\.dag$/)[0]!.value).toBe(3);
+  });
+
+  it("a make-up with no sample, or ending at 0, is null", () => {
+    expect(makeUp("dl1")).toBeNull(); // never written
+    expect(makeUp("l0+cl1", { "f.type.usdc.l0+cl1": row(N, () => null), "f.type.usdc.l0": row(N, () => null) })).toBeNull();
+    expect(makeUp("l0+cl1", { "f.type.usdc.l0+cl1": row(N, (i) => (i < N / 2 ? 20 : 0)) })).toBeNull();
+    // The sampler stops writing a make-up that emptied: its last stored count is stale, read as 0.
+    expect(makeUp("l0+cl1", { "f.type.usdc.l0+cl1": row(N, (i) => (i < N / 2 ? 20 : null)) })).toBeNull();
+    expect(hyperFacts(input({ subject: { net: "ghost", type: "l0" } }))).toBeNull();
+  });
+
+  it("the none make-up reads f.type.<net>.none", () => {
+    expect(comboWords("none")).toBe("with no stated layer");
+    const r = makeUp("none", { "f.type.usdc.none": row(N, () => 4) })!;
+    expect(find(r, /^USDC\.dag nodes with no stated layer at the end of the span$/)[0]!.value).toBe(4);
+    expect(find(r, /^USDC\.dag, share of its nodes with no stated layer$/)[0]!.value).toBeCloseTo(4 / 30, 9);
   });
 });

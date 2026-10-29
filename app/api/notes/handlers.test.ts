@@ -9,18 +9,8 @@ import type { NoteFacts } from "./sources";
 import { memoryNotesStore, type NotesStore } from "./store";
 
 // These tests own the route: its parsing, its limits and its answers. Which subjects a view's facts
-// cover is `sources.test.ts`'s, so a subject note is supported here whatever the facts rows say,
-// and the limits on it are tested on their own.
-// Interim: Task 4 removes this mock once `sources.ts` accepts subject notes.
-vi.mock("./sources", async (orig) => {
-  const real = await orig<typeof import("./sources")>();
-  const { isSubjectNote } = await import("./keys");
-  return {
-    ...real,
-    noteSupported: (...a: Parameters<typeof real.noteSupported>) =>
-      (isSubjectNote(a[1]) && a[2] === "day") || real.noteSupported(...a),
-  };
-});
+// cover is `sources.test.ts`'s; the subject notes here are ones the real rows accept, and the
+// limits on them are tested on their own.
 
 const H = 3_600_000;
 const D = 86_400_000;

@@ -18,7 +18,10 @@ import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 // how its SHAPE CHANGED (the layers and node combinations whose count differs between the span's
 // start and its end, both ends stated, plus how many layers changed — an exact 0 when the shape
 // held), how its node count moved, how its activity compares with the weeks before, and how
-// it ranks. `noteFactsTrend.ts` is the reference builder and this one mirrors its idiom.
+// it ranks. A MAKE-UP'S note (a subject note: `{ net, type }`, the node-type card's selection) says
+// how many of one network's nodes run that make-up over the span, beside the network's own level,
+// the make-up's share of it and how many make-ups the network has. `noteFactsTrend.ts` is the
+// reference builder and this one mirrors its idiom.
 //
 // It reads the STORED gauges, not a live fan-out: the sampler writes the same roster every hour,
 // so a note costs no upstream read, and the span it states is the span the store measured.
@@ -76,12 +79,23 @@ import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 //   · A CHANGE IS A PAIR (R54): every start / end (node counts, movers, layers, combinations) and
 //     every weeks-before / last-week reading carries `pair`, keyed by the quantity's label, so the
 //     gate states an earlier figure only beside its own current one (R60);
+//   · A MAKE-UP'S NOTE reads the make-up through `typeBands`, so a sample that recorded other types
+//     but not this one is a measured 0 and a sample that recorded none is unread: the sampler stops
+//     writing a make-up that emptied, and its last stored row is a stale count, never its end. Its
+//     count goes through `gaugeFacts` (a pair, or only the end level when it began late); the
+//     network's level and the make-up count are held levels, and the share is the make-up's end
+//     level over the network's, stated only when it is one (the level above 0, the part within it).
+//     Null when the make-up has no change to read (no sample, too few, or still moving at the end)
+//     or ends at 0: a make-up the network no longer runs is no subject. No activity, rank or
+//     common reading: the note is one card's, never the network's;
 //   · null when the fleet has no measured sample (and, for a network, none of its own).
 //
 // Pure: no store values, react or I/O (the colocated test is the specification — rule 4).
 
 export interface HyperFactsInput {
-  subject: "all" | "dag" | string; // "all" = the digest; "dag" and a network id = that network
+  /** "all" = the digest; "dag" and a network id = that network; `{ net, type }` = that network's
+   *  make-up, `type` a `roleKey` (a subject note). */
+  subject: "all" | "dag" | string | { net: string; type: string };
   fleet: TrendsWindowData; // the span's week of the 1h tier (store, unfolded)
   /** Daily tier: a 30-day lead-in before `span`, through its end (store, unfolded). */
   daily: TrendsWindowData;
@@ -128,8 +142,8 @@ function codeList(codes: readonly string[]): string {
 }
 
 /** A node combination in words: one code is a dedicated node, several a hybrid, none a node that
- *  states no layer. */
-function comboWords(key: string): string {
+ *  states no layer. A make-up note's label is built from it too, so its facts and its label agree. */
+export function comboWords(key: string): string {
   const { codes } = roleKeyLabel(key);
   if (codes.length === 0) return "with no stated layer";
   return codes.length === 1 ? `running only ${codes[0]}` : `running ${codeList(codes)}`;
@@ -138,6 +152,8 @@ function comboWords(key: string): string {
 export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
   const { subject, fleet, span, names: catalog, blurbs: blurbOf } = input;
   const all = subject === "all";
+  /** The network the facts are about: a make-up's own network, else the subject. */
+  const netId = typeof subject === "object" ? subject.net : subject;
   const nameOf = (id: string) => catalog[id] ?? id;
   const ids = Object.keys(catalog);
 
@@ -145,7 +161,7 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
   const total = fleet.series["f.nodes"] ?? [];
   const latest = total.reduce<number>((acc, v, i) => (v != null ? i : acc), -1);
   if (latest < 0) return null;
-  if (!all && !(fleet.series[`f.nodes.${subject}`] ?? []).some((v) => v != null)) return null;
+  if (!all && !(fleet.series[`f.nodes.${netId}`] ?? []).some((v) => v != null)) return null;
 
   const mentioned = new Set<string>();
   const mention = (id: string): string => {
@@ -260,6 +276,24 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
     // THE COMMON READING, LAST (R74): the whole network's global snapshots per day (`g.ticks`
     // counts them, one per global snapshot), covered days only — an uncovered day is null.
     facts.push(...activityFacts("Global snapshots per day", covered));
+  } else if (typeof subject === "object") {
+    // ONE MAKE-UP OF ONE NETWORK: its count over the span, read where the shape facts read it
+    // (`typeBands`: absent beside other types is 0, so an emptied make-up never keeps its last count).
+    const { net, type } = subject;
+    const bands = typeBands(net, fleet.series);
+    const points = bands.find((b) => b.key === type)?.points ?? [];
+    const ch = gaugeChange(points);
+    if (!ch || ch.to === 0) return null;
+    const name = mention(net);
+    named.push(net);
+    const words = comboWords(type);
+    gaugeFacts(`${name} nodes ${words}`, points);
+    const level = levelOf(net)!; // measured: the network's own samples were checked above
+    facts.push(fact(`${name} nodes at the end of the span`, level, "count"));
+    // A share is a part of a whole: a make-up read above the network's level (a partial hour at
+    // one end) states none.
+    if (level > 0 && ch.to <= level) facts.push(fact(`${name}, share of its nodes ${words}`, ch.to / level, "share"));
+    facts.push(fact(`Node make-ups in ${name}`, bands.filter((b) => (heldLevel(b.points) ?? 0) > 0).length, "count"));
   } else {
     const name = mention(subject);
     named.push(subject);
