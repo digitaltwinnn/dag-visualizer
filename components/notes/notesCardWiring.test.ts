@@ -124,7 +124,7 @@ describe("subject notes live on their cards", () => {
     const cards = read("components/inspector/cards.tsx");
     for (const decl of ["export function CountryCard(", "export function ProviderCard(", "export function CompositionCard("])
       expect(fnBody(cards, decl), decl).toMatch(/<SubjectNote\b/);
-    expect(read("components/inspector/TrendRangePane.tsx")).toMatch(/\{range \? \(?\s*<SubjectNote\b/);
+    expect(read("components/inspector/TrendRangePane.tsx")).toMatch(/\{range \? \(?\s*(?:<>\s*)?<SubjectNote\b/);
   });
 
   it("History's top card is the window's note: no range in its span, and no range door", () => {
