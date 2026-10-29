@@ -38,14 +38,14 @@ export function statsKeyOf(net: string, dayIso: string): string {
   return `ai:${net}:stats:${dayIso}`;
 }
 
-/** One visitor's brushed-range count for one UTC hour (`YYYY-MM-DDTHH`); `ipHash` is the first
+/** One visitor's count of limited notes (a brushed range, a subject note) for one UTC hour (`YYYY-MM-DDTHH`); `ipHash` is the first
  *  16 hex characters of HMAC-SHA256(CRON_SECRET, ip), or sha256(ip) with no secret. The raw IP
  *  is never a key. */
 export function rateKeyOf(net: string, ipHash: string, hourIso: string): string {
   return `ai:${net}:rate:${ipHash}:${hourIso}`;
 }
 
-/** The global brushed-range tripwire for one UTC day. */
+/** The global tripwire for the limited notes (a brushed range, a subject note) for one UTC day. */
 export function capKeyOf(net: string, dayIso: string): string {
   return `ai:${net}:cap:${dayIso}`;
 }
