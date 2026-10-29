@@ -850,16 +850,19 @@ step down to the tick's networks. The AI notes slot neither starts that run nor 
 display lane with the `notes` slot (`DISPLAY_LANE` in `railCards.ts`), and the manifest leads with it
 too. It is **not a rung**: no ladder level, no camera pose, never in `selStack`, a static subject
 key so a view switch never lights the tray, and `isSubjectSlot` says no. So it is the FOCUS only at
-rest — with no subject card standing it is the lane's only present card and the box; the moment any
-subject card stands, that card is the focus and the note folds to an ENTRY above the subject box.
+rest — and REST IS "NOTHING CHOSEN", not "no subject card" (user, 2026-10-29; R70): the moment a
+subject card the reader committed stands (every commit bumps `selStack`), that card is the focus
+and the note folds to an ENTRY above the subject box; a card the VIEW seated by itself — History's
+Range card on the window's span and its Metagraph card on the front plane, Snapshots' live tick
+(`advanceSnap` bumps nothing) — leaves the note the box, so the note never arrives folded and a
+notable-day hover on History's timeline lights a row the reader can see.
 It has **no ghost**: an absent note is no card at all (`noteCardAbsent` — no request, `none`, or
 `unavailable` answering a READ; R67, so a degraded model never owns the resting box), while a first
 fetch in flight stands, reading. `unavailable` answering the reader's own "Write notes" gesture is
 the exception (R68, `useNote`'s `via`): the card stays and says "Couldn't write notes just now"
 above the same door, so a click is never answered by the card vanishing. And it is **outside every subject rule** of `railCollapse.ts`: a view switch never
 pins it, and pins nothing at all when it is the departing box (else every subject card arrived
-folded beside an unpinned note: no box); the step ghost's run skips it. History and Snapshots almost
-always hold a subject (the range, the live tick), so there the note is an entry by default.
+folded beside an unpinned note: no box); the step ghost's run skips it.
 
 **Expanded state survives a view switch** (user, 2026-09-04 — reversing 2026-08-08's scene-first
 collapse: with rung heights easing, the collapse-and-reopen cycle WAS the "card size jumps between

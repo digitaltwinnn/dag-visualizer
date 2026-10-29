@@ -529,9 +529,13 @@ const DEEP_MAX = 24;
 
 /** A PLANE FOCUS, AS STATE — one home for what committing it writes (PR review, 2026-10-26): the
  *  focus and, for a subject, its Range card brought up the stack. `setTrendFocus` and the view
- *  switch's arrival both write it, so arriving on a plane and clicking its row cannot drift. */
-function focusPatch(s: { selStack: SelSlot[] }, id: string | null): { trendFocus: string | null; selStack: SelSlot[] } {
-  return { trendFocus: id, selStack: id != null ? bumpStack(s.selStack, "range", true) : s.selStack };
+ *  switch's arrival both write it, so arriving on a plane and clicking its row cannot drift.
+ *  `chosen` is the one difference between them (R70, user 2026-10-29): a click RANKS the plane's
+ *  Range card (it is a commit, and the rail opens a commit's own card), the arrival does not — the
+ *  entry plane is the view's own doing, and a card nobody chose must not take the resting box from
+ *  the AI notes card (`focusSlotId` reads `selStack` as "what was picked"). */
+function focusPatch(s: { selStack: SelSlot[] }, id: string | null, chosen = true): { trendFocus: string | null; selStack: SelSlot[] } {
+  return { trendFocus: id, selStack: id != null && chosen ? bumpStack(s.selStack, "range", true) : s.selStack };
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -632,8 +636,9 @@ export const useStore = create<AppState>((set) => ({
   // universal subject and carries, the way `node` and `network` do in `LEVEL_CARRY`).
   // A view switch stamps its own motion cause (the hint says what it builds).
   // …AND ARRIVES ON THE VIEW'S ENTRY PLANE (2026-10-26, `viewPolicy.entryPlane`): History opens with
-  // the DAG's chart brought forward under All — the same focus a click on its row commits, so its
-  // Range card opens with it (`setTrendFocus`'s own stack bump).
+  // the DAG's chart brought forward under All — the same focus a click on its row commits, but
+  // UNRANKED (`focusPatch`'s `chosen: false`, R70): the arrival is the view's own doing, so the AI
+  // notes card keeps the resting box and the Range card stands as an entry under it.
   // The arrival starts at the TOP of the deck (`trendScroll: 0`, beside the rotation's reset —
   // PR review, 2026-10-26): the entry plane joins the stack at its front, and a window paged down
   // on an earlier visit would hold it out of sight. A switch to the view you are ALREADY in (the
@@ -642,7 +647,7 @@ export const useStore = create<AppState>((set) => ({
     set((s) => {
       const nav = { mode, navQuiet: false, docPage: null, docClosing: s.docPage != null || s.docClosing, rawReturnMode: null, motionCause: { kind: "view" as const, from: s.mode, to: mode } };
       if (mode === s.mode) return nav;
-      return { ...nav, trendRotation: 0, trendScroll: 0, ...focusPatch(s, entryFocus(VIEW_POLICIES[mode].entryPlane, s.filter)) };
+      return { ...nav, trendRotation: 0, trendScroll: 0, ...focusPatch(s, entryFocus(VIEW_POLICIES[mode].entryPlane, s.filter), false) };
     }),
   // Opening a doc also SURFACES THE SCENE POSE: the overlay sits at z-8, under the raw layer's
   // z-9 — a doc opened from the RAW pose rendered beneath the still-interactive table, with the
@@ -667,7 +672,11 @@ export const useStore = create<AppState>((set) => ({
   setSnap: (snap) => set((s) => ({ snap, selStack: bumpStack(s.selStack, "snap", !!snap) })),
   // FollowController's heartbeat advance: re-point the followed snapshot WITHOUT bumping the
   // selection recency — a tick is not a user act, and the facts rail's collapse rule reads
-  // `selStack` recency (item 8, 2026-08-06). Present-but-unranked: appended at the END if absent.
+  // `selStack` recency (item 8, 2026-08-06). NOT IN THE STACK AT ALL (R70, user 2026-10-29; it
+  // used to be appended at the end, "present but unranked"): the stack is what the reader picked,
+  // and a live tick nobody picked must not take the resting box from the AI notes card. A pinned
+  // tick (`setSnap`) ranks as every commit does; the live one is the rail's "finest present"
+  // fallback where no note stands. A tick going away still drops a pin that named it.
   advanceSnap: (snap) =>
     set((s) => ({
       snap,
@@ -677,11 +686,7 @@ export const useStore = create<AppState>((set) => ({
       // quiet from a manual expand suppressed every later live-advance roll). Same-ordinal
       // re-points leave the flag alone — a poll is not an arrival.
       navQuiet: snap && s.snap?.data.ordinal !== snap.data.ordinal ? false : s.navQuiet,
-      selStack: !snap
-        ? s.selStack.filter((x) => x !== "snap")
-        : s.selStack.includes("snap")
-          ? s.selStack
-          : [...s.selStack, "snap"],
+      selStack: !snap ? s.selStack.filter((x) => x !== "snap") : s.selStack,
     })),
   setMetaSnap: (metaSnap) => set((s) => ({ metaSnap, selStack: bumpStack(s.selStack, "metaSnap", !!metaSnap) })),
   // A NO-OP WRITE IS A NO-OP REFERENCE: the Engine's subscription re-resolves the chamber's lens

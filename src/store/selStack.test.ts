@@ -80,3 +80,27 @@ describe("a plane focus bumps the RANGE slot (user, 2026-10-25 — a plane is it
     expect(useStore.getState().selStack).toEqual(["range"]);
   });
 });
+
+// R70 (user, 2026-10-29): the stack is WHAT THE READER PICKED, and the AI notes card keeps the
+// resting box over any card the view seated by itself (`focusSlotId` reads the stack as "chosen").
+describe("what the view seats by itself is not in the stack (R70)", () => {
+  beforeEach(() => useStore.setState({ selStack: [], trendFocus: null, filter: "all", mode: "hyper", snap: null }));
+  it("arriving in History brings the entry plane forward but ranks nothing; a row click on a plane ranks its Range card", () => {
+    useStore.getState().setMode("trend");
+    expect(useStore.getState().trendFocus).toBe("dag");
+    expect(useStore.getState().selStack).toEqual([]);
+    useStore.getState().setTrendFocus("dor");
+    expect(useStore.getState().selStack).toEqual(["range"]);
+  });
+  it("the live tick never enters the stack; a pinned tick does, and a tick going away drops the pin", () => {
+    const tick = (ordinal: number) => ({ kind: "snapshot", title: `Global snapshot #${ordinal}`, data: { ordinal } }) as unknown as Parameters<ReturnType<typeof useStore.getState>["advanceSnap"]>[0] & object;
+    useStore.getState().advanceSnap(tick(1));
+    expect(useStore.getState().selStack).toEqual([]);
+    useStore.getState().setSnap(tick(2));
+    expect(useStore.getState().selStack).toEqual(["snap"]);
+    useStore.getState().advanceSnap(tick(3));
+    expect(useStore.getState().selStack).toEqual(["snap"]);
+    useStore.getState().advanceSnap(null);
+    expect(useStore.getState().selStack).toEqual([]);
+  });
+});

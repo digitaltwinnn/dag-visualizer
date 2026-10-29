@@ -60,9 +60,9 @@ export function overridesOnSelection(s: Pick<LaneCollapseState, "overrides">): R
  *  an unchanged pile ("EXPANDED STATE SURVIVES A VIEW SWITCH", 2026-09-04). Absent slots keep no
  *  pin (2026-10-18: a late live tick pinned shut stayed shut).
  *
- *  The AI notes card is never pinned (R57): it is the box exactly while no subject card stands, and
- *  at a view's entry it usually stands alone — Snapshots' live tick lands a beat later — so a pinned
- *  note sat as a second box above the tick.
+ *  The AI notes card is never pinned (R57): it is the box exactly while no CHOSEN subject card
+ *  stands (`focusSlotId`, R70), which the auto rule re-derives on arrival; a pin would carry that
+ *  answer into a lane whose chosen cards differ, and sit as a second box above them.
  *
  *  ⚠️ AND WHEN THE DEPARTING BOX IS NOT A SUBJECT CARD, NOTHING IS PINNED (review I1): with the
  *  notes card opened by hand, every subject card stood folded, and pinning that state folded them

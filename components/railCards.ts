@@ -147,12 +147,20 @@ export type LadderState = Pick<
 };
 
 // The FOCUS slot: the lane card that is the box by default — the most recently selected present
-// card, else the finest present one (null = no lane card stands at all). With nothing committed
-// that is the AI notes card (R57): the coarsest slot, present at rest, and never in `selStack`, so
-// any subject card that stands outranks it. ONE definition, two rails — the facts rail rests only
-// this card expanded and gives its thread dot the halo, and the explorers render every COARSER
-// committed row at ancestor strength (`selectedRow`), so both rails answer "where am I" the same
-// way.
+// card, else the AI notes card when it stands, else the finest present one (null = no lane card
+// stands at all). ONE definition, two rails — the facts rail rests only this card expanded and
+// gives its thread dot the halo, and the explorers render every COARSER committed row at ancestor
+// strength (`selectedRow`), so both rails answer "where am I" the same way.
+//
+// THE NOTE OUTRANKS EVERY CARD NOBODY CHOSE (user, 2026-10-29; R70). Two views seat a subject card
+// without a commit — History's Range card states the window's own span and its Metagraph card
+// stands on the front plane, Snapshots' tick follows live — and under the old "finest present"
+// fallback those took the box on arrival, so the note the reader came for sat folded (and a
+// notable-day hover on History's timeline lit a row in a card that was shut). Every CHOSEN subject
+// is in `selStack` — the store bumps it on each commit, and the live tick's `advanceSnap` on
+// purpose does not — so the stack is the one honest reading of "picked": the note yields to a
+// brushed range, a pinned tick, a plane brought forward, a committed filter, and rests open above
+// the cards the view seated by itself.
 export function focusSlotId(s: LadderState): string | null {
   // `selNodesCount`/`filterLabel` only feed ghost COPY — presence is unaffected, so the ladder
   // question can be answered from the selection alone.
@@ -160,13 +168,9 @@ export function focusSlotId(s: LadderState): string | null {
   const lane = ladderSlotIds(s.mode);
   const present = lane.filter((id) => cards.find((c) => c.id === id)?.present);
   if (!present.length) return null;
-  // THE AI NOTES CARD is the lane's COARSEST slot and never in the stack, so the two reads below
-  // already give it the focus only when it stands alone — at rest — and hand it to any subject card
-  // the moment one is present (R57). No case of its own, on purpose.
   // The ACTIVE card is the most recently selected present one (store.selStack, item 8 —
   // "keep the active card open, collapse the others"); the slot ids match the SelSlot names
-  // except the ladder's node slot. Falls back to the finest present slot (e.g. only the
-  // filter committed — selStack carries no "network" entry).
+  // except the ladder's node slot.
   for (const slot of s.selStack ?? []) {
     // The stack speaks selection slots; the lane speaks card slots — two renames:
     // the network selection's card is the CONTEXT dossier (user, 2026-08-14: a filter
@@ -174,6 +178,9 @@ export function focusSlotId(s: LadderState): string | null {
     const id = slot === "network" ? "context" : slot;
     if (present.includes(id)) return id;
   }
+  // Nothing chosen: the note (R70), else the finest present slot — a lane the view seated by
+  // itself in a view with no note (Snapshots' live tick off mainnet).
+  if (present.includes(NOTES_SLOT)) return NOTES_SLOT;
   return present[present.length - 1];
 }
 

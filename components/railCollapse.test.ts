@@ -61,10 +61,19 @@ describe("the default box", () => {
     expect(openBoxes(s)).toEqual(["context"]);
     expect(isCollapsed(s, "notes")).toBe(true);
   });
-  it("Snapshots: the live tick is the box, under a folded note", () => {
-    const s = rail(manifest({ mode: "ledger", snap: snapPick }));
-    expect(boxedSlotOf(s)).toBe("snap");
-    expect(openBoxes(s)).toEqual(["snap"]);
+  it("Snapshots: the LIVE tick leaves the note the box (R70); a PINNED tick takes it, under a folded note", () => {
+    const live = rail(manifest({ mode: "ledger", snap: snapPick }));
+    expect(boxedSlotOf(live)).toBe("notes");
+    expect(openBoxes(live)).toEqual(["notes"]);
+    const pinned = rail(manifest({ mode: "ledger", snap: snapPick }), {}, ["snap"]);
+    expect(boxedSlotOf(pinned)).toBe("snap");
+    expect(openBoxes(pinned)).toEqual(["snap"]);
+  });
+  it("History: the window's range and the front plane leave the note the box (R70); a brushed range takes it", () => {
+    const rest = rail(manifest({ mode: "trend", trendFront: "dag" }));
+    expect(openBoxes(rest)).toEqual(["notes"]);
+    const brushed = rail(manifest({ mode: "trend", trendFront: "dag", trendRange: { fromMs: 1, toMs: 2 } }), {}, ["range"]);
+    expect(openBoxes(brushed)).toEqual(["range"]);
   });
   it("opening the notes entry by hand makes it the one box", () => {
     const before = rail(manifest({ filter: "dor" }), {}, ["network"]);
@@ -95,12 +104,13 @@ describe("a view switch (`overridesOnViewEntry`)", () => {
     const after = apply(opened, overridesOnViewEntry(arriving(opened)));
     expect(openBoxes(arriving(after))).toEqual(["context"]);
   });
-  it("the note is never pinned: at Snapshots' entry it stands alone, and the late live tick still takes the box", () => {
+  it("the note is never pinned: at Snapshots' entry it stands alone, the late live tick lands under it, and a pinned tick takes the box", () => {
     const entry = rail(manifest({ mode: "ledger" }));
     expect(openBoxes(entry)).toEqual(["notes"]);
     const after = apply({}, overridesOnViewEntry(entry));
     expect(after.notes).toBeUndefined();
-    expect(openBoxes(rail(manifest({ mode: "ledger", snap: snapPick }), after))).toEqual(["snap"]);
+    expect(openBoxes(rail(manifest({ mode: "ledger", snap: snapPick }), after))).toEqual(["notes"]);
+    expect(openBoxes(rail(manifest({ mode: "ledger", snap: snapPick }), after, ["snap"]))).toEqual(["snap"]);
   });
 });
 

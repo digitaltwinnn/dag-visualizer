@@ -530,15 +530,28 @@ describe("focusSlotId with the AI notes card on top of the lane", () => {
   it.each(["hyper", "geo"] as const)("%s at rest: the notes card is the focus — the one box", (mode) => {
     expect(focusSlotId(withNote({ mode }))).toBe("notes");
   });
-  it("a subject card takes the focus the moment it is present; the notes card rests above it", () => {
-    expect(focusSlotId(withNote({ mode: "hyper", filter: "dor" }))).toBe("context");
-    expect(focusSlotId(withNote({ mode: "geo", filter: "dag", country: "DE" }))).toBe("country");
+  it("a CHOSEN subject card takes the focus the moment it is present; the notes card rests above it", () => {
+    // Every commit bumps `selStack` (the store's setters), which is what "chosen" reads.
+    expect(focusSlotId({ ...withNote({ mode: "hyper", filter: "dor" }), selStack: ["network"] })).toBe("context");
+    expect(focusSlotId({ ...withNote({ mode: "geo", filter: "dag", country: "DE" }), selStack: ["country", "network"] })).toBe("country");
     expect(focusSlotId({ ...withNote({ mode: "geo", filter: "dag", country: "DE", inspect: nodePick }), selStack: ["node", "country"] })).toBe("node");
-    // Snapshots: the live tick is a subject card, so it keeps the box with the note on top.
-    expect(focusSlotId(withNote({ mode: "ledger", snap: snapPick }))).toBe("snap");
+    // Snapshots: a PINNED tick is a chosen subject, so it keeps the box with the note on top.
+    expect(focusSlotId({ ...withNote({ mode: "ledger", snap: snapPick }), selStack: ["snap"] })).toBe("snap");
     expect(focusSlotId(withNote({ mode: "ledger" }))).toBe("notes");
-    // History: the dossier and the range stand on the plane in front and the window.
-    expect(focusSlotId(withNote({ mode: "trend", trendFront: "dag" }))).toBe("range");
+    // History: a brushed range, and a plane brought forward, are chosen.
+    expect(focusSlotId({ ...withNote({ mode: "trend", trendFront: "dag", trendRange: { fromMs: 1, toMs: 2 } }), selStack: ["range"] })).toBe("range");
+    expect(focusSlotId({ ...withNote({ mode: "trend", trendFocus: "dor" }), selStack: ["network"] })).toBe("context");
+  });
+  // R70 (user, 2026-10-29): the cards a view seats BY ITSELF are not a choice, and the note the
+  // reader came for must not arrive folded above them.
+  it("the note outranks every card nobody chose: History's window range and front plane, Snapshots' live tick", () => {
+    // History at rest: the Metagraph card stands on the front plane, the Range card on the window.
+    expect(focusSlotId(withNote({ mode: "trend", trendFront: "dag" }))).toBe("notes");
+    // Snapshots at rest: the live tick arrives by `advanceSnap`, which never bumps the stack.
+    expect(focusSlotId(withNote({ mode: "ledger", snap: snapPick }))).toBe("notes");
+    // …and with no note in the lane, the view's own card is the focus as it always was.
+    expect(focusSlotId(details({ mode: "ledger", snap: snapPick }))).toBe("snap");
+    expect(focusSlotId(details({ mode: "trend", trendFront: "dag" }))).toBe("range");
   });
   it("no note request, no notes slot — the focus is what it always was", () => {
     expect(focusSlotId(details({ mode: "hyper" }))).toBeNull();
