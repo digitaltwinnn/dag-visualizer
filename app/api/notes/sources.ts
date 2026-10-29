@@ -425,8 +425,9 @@ export interface NoteFacts {
    *  subject note's is its network's), absent for the whole network: the gate reads a sentence
    *  naming no one as speaking of it (R39). */
   subjectName?: string;
-  /** What the subject names (`subjectKindOf`): the prompt asks a country, a provider or a make-up
-   *  its own question. */
+  /** Which QUESTION the prompt asks, not the subject's shape: a subject note's kind
+   *  (`subjectKindOf`) asks a country, a provider or a make-up its own question; every other note,
+   *  the warmed fleet country `cc:XX` included, is "view" and asks its view's question. */
   kind: SubjectKind;
   /** Hyper `all` only: the networks with nodes (the warmer rewrites the digest when it changes). */
   setKey?: string;
@@ -458,7 +459,9 @@ export async function factsFor(
     spanFrom: r.spanFrom,
     spanTo: r.spanTo,
     label: r.label ?? row.label(subject, names),
-    kind: subjectKindOf(subject),
+    // The warmed fleet country (`cc:XX`) keeps Geography's own question: its facts are the country's
+    // place in the whole network, not a network's nodes there. Only on-request subject notes ask a kind's.
+    kind: isSubjectNote(subject) ? subjectKindOf(subject) : "view",
     common: hasCommonReading(built.facts),
     ...(subjectName != null ? { subjectName } : {}),
     ...(built.setKey != null ? { setKey: built.setKey } : {}),

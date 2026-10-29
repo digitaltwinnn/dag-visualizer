@@ -129,8 +129,10 @@ describe("factsFor — Geography's subject notes", () => {
     expect((await got("hyper", "all", "day")).kind).toBe("view");
     expect((await got("ledger", USDC, "hours")).kind).toBe("view");
     expect((await got("trend", "dag", "7d")).kind).toBe("view");
+    // The warmed fleet country keeps Geography's own question; a network's country asks the country's.
     const cc = await got("geo", "cc:DE", "day");
-    expect([cc.kind, cc.label, cc.subjectName]).toEqual(["country", "Germany", "Germany"]);
+    expect([cc.kind, cc.label, cc.subjectName]).toEqual(["view", "Germany", "Germany"]);
+    expect((await got("geo", `${USDC}/cc:DE`, "day")).kind).toBe("country");
     const net = await got("geo", USDC, "day");
     expect([net.kind, net.label, net.subjectName]).toEqual(["view", "USDC.dag", "USDC.dag"]);
     expect((await got("geo", "all", "day")).label).toBe("the whole network");
