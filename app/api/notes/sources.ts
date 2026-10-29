@@ -333,7 +333,8 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
       return { built, spanFrom, spanTo: nowMs, windows: [["Span length", secondsOf(spanFrom, nowMs)], ["Week", (7 * D) / 1000]] };
     },
   },
-  // WHEN (live): the last six hours of the 5-minute tier against the last week of the hourly one.
+  // WHEN (live): the last 24 HOURS of the 5-minute tier against the last week of the hourly one
+  // (user, 2026-10-29: "last 24h instead of last 6h" — the same day the vitals band reads).
   ledger: {
     // Its whole network is `all` alone: `dag` here would be the same facts under a second key, so a
     // second identical note an hour (the routes and the client fold `dag` into `all`).
@@ -341,7 +342,7 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
     label: (subject, names) => (subject === "all" ? WHOLE : (names[subject] ?? subject)),
     whole: (subject) => subject === "all",
     async read({ net, subject, nowMs, reads, names }) {
-      const recentFrom = nowMs - 6 * H;
+      const recentFrom = nowMs - 24 * H;
       const weekFrom = nowMs - 7 * D;
       const [recent, week] = await Promise.all([
         reads.span(net, "5m", recentFrom, nowMs),

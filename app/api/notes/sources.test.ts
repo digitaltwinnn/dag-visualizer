@@ -219,20 +219,20 @@ describe("factsFor — the per-view read table", () => {
     expect(input.daily).toBeNull();
   });
 
-  it("ledger: 5m over 6 hours and 1h over 7 days; both windows stated", async () => {
+  it("ledger: 5m over 24 hours (R79) and 1h over 7 days; both windows stated", async () => {
     const r = fakeReads();
     const out = await factsFor("mainnet", "ledger", "all", "hours", NOW, r);
     expect(r.calls).toEqual([
-      { tier: "5m", from: NOW - 6 * H, to: NOW },
+      { tier: "5m", from: NOW - 24 * H, to: NOW },
       { tier: "1h", from: NOW - 7 * D, to: NOW },
     ]);
     const input = vi.mocked(ledgerFacts).mock.calls[0]![0];
     expect(input.subject).toBe("all");
-    expect((input.recent as { tag?: string }).tag).toBe(`5m:${NOW - 6 * H}:${NOW}`);
+    expect((input.recent as { tag?: string }).tag).toBe(`5m:${NOW - 24 * H}:${NOW}`);
     expect((input.week as { tag?: string }).tag).toBe(`1h:${NOW - 7 * D}:${NOW}`);
-    expect(out!.spanFrom).toBe(NOW - 6 * H);
+    expect(out!.spanFrom).toBe(NOW - 24 * H);
     expect(out!.label).toBe("the whole network");
-    expect(out!.facts).toContainEqual(expect.objectContaining({ label: "Recent window", value: 21_600, kind: "duration" }));
+    expect(out!.facts).toContainEqual(expect.objectContaining({ label: "Recent window", value: 86_400, kind: "duration" }));
     expect(out!.facts).toContainEqual(expect.objectContaining({ label: "Usual window", value: 604_800, kind: "duration" }));
     expect(out!.days).toEqual([]);
     expect(out!.blurbs).toEqual([]);

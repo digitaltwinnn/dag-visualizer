@@ -64,7 +64,7 @@ describe("noteSpanWords", () => {
   it("names each fixed read in the span vocabulary, and leaves History to the store", () => {
     expect(noteSpanWords("hyper")).toBe("last 7 days");
     expect(noteSpanWords("geo")).toBe("last 7 days");
-    expect(noteSpanWords("ledger")).toBe("last 6 hours");
+    expect(noteSpanWords("ledger")).toBe("last 24 hours");
     expect(noteSpanWords("trend")).toBeNull();
   });
 });

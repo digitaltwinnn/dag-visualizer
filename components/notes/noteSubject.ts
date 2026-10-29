@@ -37,14 +37,14 @@ export interface NoteSubject {
  *  words, in the explorer's own span vocabulary (`spanPhrase`); History's span is the window or the
  *  brushed range on screen, so the card reads it from the store (null here). The lengths are the
  *  server's reads (`app/api/notes/sources.ts`: a week of the fleet for Hypergraph and Geography,
- *  R72; the last six hours of the chamber for Snapshots). */
+ *  R72; the last 24 hours of the chamber for Snapshots, R79). */
 export function noteSpanWords(view: NoteView): string | null {
   switch (view) {
     case "hyper":
     case "geo":
       return spanPhrase("7d", null);
     case "ledger":
-      return "last 6 hours";
+      return spanPhrase("24h", null);
     case "trend":
       return null;
   }

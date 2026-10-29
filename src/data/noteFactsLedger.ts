@@ -12,7 +12,7 @@ import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 // note and the History chart state one figure (`noteFactsTrend.ts` is the reference builder and
 // this one mirrors its idiom).
 //
-// `recent` is the last six hours of the 5-minute tier and `week` the last seven days of the
+// `recent` is the last 24 hours of the 5-minute tier (R79) and `week` the last seven days of the
 // hourly tier, both the STORE's payload, UNFOLDED (`withUnlisted` is applied here).
 //
 // THE GATE'S INTERFACE (`noteHonesty.ts`): a ratio belongs to a network only by its display name in
@@ -49,7 +49,7 @@ import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 
 export interface LedgerFactsInput {
   subject: "all" | "dag" | string; // "all" and "dag" = the whole chamber; else a network's catalog id
-  recent: TrendsWindowData; // last 6 hours of the 5m tier (store, unfolded)
+  recent: TrendsWindowData; // last 24 hours of the 5m tier (store, unfolded)
   week: TrendsWindowData; // last 7 days of the 1h tier (store, unfolded)
   names: Record<string, string>; // catalog id → display name
 }
