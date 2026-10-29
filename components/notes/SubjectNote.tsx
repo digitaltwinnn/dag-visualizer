@@ -35,7 +35,7 @@ export default function SubjectNote({ req, span }: { req: NoteReq | null; span: 
       askedFor.current = key;
       note.request();
     }
-  }, [key, res, note]);
+  }, [key, res?.state, note.request]);
 
   if (!asked || res?.state === "none" || res?.state === "unavailable") return null;
   return (

@@ -15,7 +15,8 @@ import type { NoteResponse, NoteView } from "@/src/data/noteTypes";
 //     joining a write already in flight hears it at once.
 //   · A network error, a non-2xx (the POST's 429 included) or an unreadable body is `unavailable`,
 //     and is NOT cached, so the next ask tries again.
-//   · `request()` POSTs only on the reader's gesture. The POST's own answer is used and stored
+//   · `request()` POSTs on the reader's ask: a door, or a subject card's automatic ask on
+//     selection (`SubjectNote`). The POST's own answer is used and stored
 //     under the GET's key: the CDN holds a GET `request` answer for five minutes, so re-reading
 //     it would show `request` again. A POST that answers `pending` (another visitor's write is in
 //     flight) polls the GET like any pending, and a stale CDN `request` in that poll counts as

@@ -116,6 +116,8 @@ describe("subject notes live on their cards", () => {
     expect(src).toMatch(/"none"/);
     expect(src).toMatch(/"unavailable"/);
     expect(src).toMatch(/useEffect\(\(\) => \{[^]*?res\?\.state === "request"[^]*?note\.request\(\)[^]*?\}, \[/);
+    // …and once per key: the ref guard, so a re-render or a poll's `request` never POSTs twice.
+    expect(src).toMatch(/res\?\.state === "request" && askedFor\.current !== key/);
   });
 
   it("the Country, Provider and Composition cards mount it; the Range card mounts it only while a range is brushed", () => {

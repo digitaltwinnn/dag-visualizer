@@ -8,8 +8,9 @@ import { createNoteLoader, queryOf, type NoteReq } from "./noteLoader";
 // The AI note, client side. NOT a network feed (no `FEEDS` row, no `useFeedRead`): it is written
 // context, fetched per subject. The fetch / poll / give-up rules live in `noteLoader.ts`; this is
 // the React wrapper: it follows the `useTrendsWindow` idiom (one module-level cache and in-flight
-// map shared by every consumer), and `request()` is the reader's gesture for the on-request kinds
-// (the 1H pill, a brushed range) — the only thing that ever POSTs.
+// map shared by every consumer), and `request()` is the one thing that ever POSTs: the reader's
+// gesture for the 1H pill (its door), and a subject card's AUTOMATIC ask (`SubjectNote`) for the
+// subject notes and a brushed range, where the selection itself was the gesture.
 
 const loader = createNoteLoader({
   urlOf: netUrl,
