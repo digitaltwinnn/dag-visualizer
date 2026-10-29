@@ -1,7 +1,7 @@
 import type { NoteView } from "@/src/data/noteTypes";
 import { roleKey } from "@/src/data/composition";
 import { currentIdOf, isTracked } from "@/src/net/lineage";
-import { KIND_TIMING, isSubjectNote, snapSpan, timingOf, type NoteSpan } from "./keys";
+import { CC_TAIL_RE, ISP_TAIL_RE, KIND_TIMING, TYPE_TAIL_RE, isSubjectNote, snapSpan, timingOf, type NoteSpan } from "./keys";
 
 // THE NOTE ROUTES' INPUT — one home for what a request may ask for, so the read route, the request
 // route and the CDN all see the same shapes. Bad input is an ERROR with a short fixed message,
@@ -24,9 +24,6 @@ const PILLS: readonly NoteSpan[] = ["1h", "24h", "7d", "30d", "1y", "all"];
 /** History's one on-request pill (`timingOf` says on-request); the request route writes it, a
  *  brushed range and the subject notes. */
 const ON_REQUEST_PILL: NoteSpan = "1h";
-const CC_RE = /^cc:[A-Z]{2}$/;
-const ISP_RE = /^isp:[a-z0-9-]{1,48}$/;
-const TYPE_RE = /^type:((?:l0|cl1|dl1)(?:\+(?:l0|cl1|dl1)){0,2}|none)$/;
 const MS_RE = /^\d{1,15}$/;
 const NET = "mainnet";
 
@@ -50,9 +47,9 @@ function networkOf(raw: string): string | null {
 /** A subject note's selection, per view. A make-up must be its own `roleKey` (vocabulary order, no
  *  repeat), so `cl1+l0` and `l0+l0` are refused rather than given a second key for one make-up. */
 function selectionOk(view: NoteView, tail: string): boolean {
-  if (view === "geo") return CC_RE.test(tail) || ISP_RE.test(tail);
+  if (view === "geo") return CC_TAIL_RE.test(tail) || ISP_TAIL_RE.test(tail);
   if (view !== "hyper") return false;
-  const m = TYPE_RE.exec(tail);
+  const m = TYPE_TAIL_RE.exec(tail);
   return m != null && roleKey({ roles: m[1]!.split("+") }) === m[1];
 }
 
@@ -61,7 +58,7 @@ function subjectOf(view: NoteView, raw: string | null): string | null {
   if (raw === "all") return raw;
   // The ledger reads `dag` as the whole network, the same facts as `all`: ONE subject, one note.
   if (raw === "dag") return view === "ledger" ? "all" : raw;
-  if (CC_RE.test(raw) || ISP_RE.test(raw)) return view === "geo" ? raw : null;
+  if (CC_TAIL_RE.test(raw) || ISP_TAIL_RE.test(raw)) return view === "geo" ? raw : null;
   const slash = raw.indexOf("/");
   if (slash < 0) return networkOf(raw);
   const scope = raw.slice(0, slash);

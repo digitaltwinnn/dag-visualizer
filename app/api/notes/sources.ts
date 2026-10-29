@@ -12,7 +12,7 @@ import { CATALOG, type NetworkId } from "@/src/engine/config";
 import { assembleSpan, WINDOWS } from "../trends/assemble";
 import { geoSlotOf, ispNamesKeyOf, slotsInWindow, type Tier } from "../trends/keys";
 import { readStore, type TrendsStore } from "../trends/store";
-import { isSubjectNote, subjectKindOf, type NoteSpan, type SubjectKind } from "./keys";
+import { CC_TAIL_RE, ISP_TAIL_RE, TYPE_TAIL_RE, isSubjectNote, subjectKindOf, type NoteSpan, type SubjectKind } from "./keys";
 
 // THE SOURCES OF AI NOTES — the impure half of the facts: which stored payloads each view's note
 // is written from, read and handed to that view's pure builder (`src/data/noteFacts*.ts`). The
@@ -165,9 +165,6 @@ function blurbsOf(net: string): Record<string, string> {
 }
 
 const isNetwork = (net: string, id: string) => id === "dag" || catalogOf(net).some((m) => m.id === id);
-const CC_RE = /^cc:([A-Z]{2})$/;
-const ISP_RE = /^isp:([a-z0-9-]{1,48})$/;
-const TYPE_RE = /^type:((?:l0|cl1|dl1)(?:\+(?:l0|cl1|dl1)){0,2}|none)$/;
 const RANGE_RE = /^r(\d+)-(\d+)$/;
 
 function rangeOf(span: string): { fromMs: number; toMs: number } | null {
@@ -198,8 +195,8 @@ function geoSelectionOf(net: string, subject: string): GeoSelection | null {
   const scope = scoped ? subject.slice(0, subject.indexOf("/")) : undefined;
   if (scope != null && !isNetwork(net, scope)) return null;
   const tail = scope != null ? subject.slice(scope.length + 1) : subject;
-  const cc = CC_RE.exec(tail)?.[1];
-  const isp = ISP_RE.exec(tail)?.[1];
+  const cc = CC_TAIL_RE.exec(tail)?.[1];
+  const isp = ISP_TAIL_RE.exec(tail)?.[1];
   const at = scope != null ? { net: scope } : {};
   return cc ? { cc, ...at } : isp ? { isp, ...at } : null;
 }
@@ -220,11 +217,14 @@ type HyperSelection = { net: string; type: string };
 
 /** A HYPERGRAPH SELECTION as the builder takes it: the subject note `<net>/type:<roleKey>`, a
  *  network's make-up, scoped to `dag` or a network this catalog tracks and spelled as `roleKey`
- *  spells it (one make-up, one key). Null for anything else, a network's own note included. */
+ *  spells it (one make-up, one key). Null for anything else, a network's own note included.
+ *  ⚠️ `dag/type:*` is accepted and always builds null: the sampler writes no `f.type.dag.*` (the
+ *  DAG node-type stack is the open sampler follow-up), so the DAG core's make-ups answer `none`
+ *  honestly rather than a note — not a bug to chase until that series exists. */
 function hyperSelectionOf(net: string, subject: string): HyperSelection | null {
   if (!isSubjectNote(subject) || subjectKindOf(subject) !== "type") return null;
   const scope = subject.slice(0, subject.indexOf("/"));
-  const type = TYPE_RE.exec(subject.slice(scope.length + 1))?.[1];
+  const type = TYPE_TAIL_RE.exec(subject.slice(scope.length + 1))?.[1];
   if (!type || !isNetwork(net, scope) || roleKey({ roles: type.split("+") }) !== type) return null;
   return { net: scope, type };
 }
@@ -370,7 +370,7 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
   geo: {
     accepts: (net, subject, span) => span === "day" && (subject === "all" || isNetwork(net, subject) || geoSelectionOf(net, subject) != null),
     label: (subject, names) => {
-      const cc = CC_RE.exec(subject)?.[1];
+      const cc = CC_TAIL_RE.exec(subject)?.[1];
       return subject === "all" ? WHOLE : cc ? countryName(cc) : (names[subject] ?? subject);
     },
     whole: (subject) => subject === "all",

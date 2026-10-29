@@ -55,6 +55,12 @@ export type NoteKind = "hyper" | "geo" | "ledger" | "trend24h" | "trendDaily" | 
 /** What a subject names, for the prompt's question: the view itself (`all`, `dag`, a network), a
  *  country (`cc:XX`, `<net>/cc:XX`), a provider (`isp:<key>`, `<net>/isp:<key>`) or a network's
  *  node make-up (`<net>/type:<roleKey>`). Shape only: `params.ts` is what validates a subject. */
+/** THE SUBJECT TAILS, one home: what follows the optional `<net>/` scope. `params.ts` validates a
+ *  request against them and `sources.ts` reads the selection back out, so the two cannot drift. */
+export const CC_TAIL_RE = /^cc:([A-Z]{2})$/;
+export const ISP_TAIL_RE = /^isp:([a-z0-9-]{1,48})$/;
+export const TYPE_TAIL_RE = /^type:((?:l0|cl1|dl1)(?:\+(?:l0|cl1|dl1)){0,2}|none)$/;
+
 export type SubjectKind = "view" | "country" | "provider" | "type";
 
 export function subjectKindOf(subject: string): SubjectKind {
