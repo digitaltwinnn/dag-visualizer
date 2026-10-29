@@ -71,8 +71,19 @@ describe("the notes card's own behaviour", () => {
     expect(body).toMatch(/const net = useNet\(\);/);
     expect(body).toMatch(/subject && net === "mainnet"/);
     expect(body).not.toMatch(/NET === "mainnet"/);
-    // The fetch never runs on a dev network's mainnet-faced first frame.
-    expect(body).toMatch(/useNote\(NET === net \? req : null\)/);
+    // The fetch goes through the one mainnet gate, which never runs it on a dev network's
+    // mainnet-faced first frame.
+    expect(body).toMatch(/useMainnetNote\(req\)/);
+    const gate = fnBody(read("components/notes/useAiNote.ts"), "export function useMainnetNote(");
+    expect(gate).toMatch(/const net = useNet\(\);/);
+    expect(gate).toMatch(/useNote\(NET === net \? req : null\)/);
+  });
+
+  it("a subject card's note stands only on mainnet, through the same gate", () => {
+    const src = read("components/notes/SubjectNote.tsx");
+    expect(src).toMatch(/useNet\(\) === "mainnet"/);
+    expect(src).toMatch(/useMainnetNote\(/);
+    expect(src).not.toMatch(/\buseNote\(/);
   });
 });
 
@@ -90,5 +101,36 @@ describe("a failed write answers the gesture on the card's surface (R68)", () =>
   it("the card says it could not write, then offers the same door again", () => {
     const card = read("components/notes/NotesCard.tsx");
     expect(card).toMatch(/res\.state === "unavailable"[^]*?Couldn&apos;t write notes just now[^]*?<RequestDoor/);
+  });
+});
+
+// THE TOP CARD HOLDS, THE SUBJECT CARDS CARRY THEIR OWN (spec 2026-10-29-subject-notes): the Gate
+// AI card is the view's note at the filter's scope, and a committed country, provider, make-up or
+// brushed range shows its note inside its own card. The subject note is asked by the selection
+// itself, so it has no door and never says it could not write.
+describe("subject notes live on their cards", () => {
+  it("SubjectNote has no door and no failure copy, stands down on none / unavailable, and asks once in an effect", () => {
+    const src = read("components/notes/SubjectNote.tsx");
+    expect(src).not.toMatch(/RequestDoor|<Door\b/);
+    expect(src).not.toMatch(/Couldn/);
+    expect(src).toMatch(/"none"/);
+    expect(src).toMatch(/"unavailable"/);
+    expect(src).toMatch(/useEffect\(\(\) => \{[^]*?res\?\.state === "request"[^]*?note\.request\(\)[^]*?\}, \[/);
+  });
+
+  it("the Country, Provider and Composition cards mount it; the Range card mounts it only while a range is brushed", () => {
+    const cards = read("components/inspector/cards.tsx");
+    for (const decl of ["export function CountryCard(", "export function ProviderCard(", "export function CompositionCard("])
+      expect(fnBody(cards, decl), decl).toMatch(/<SubjectNote\b/);
+    expect(read("components/inspector/TrendRangePane.tsx")).toMatch(/\{range \? \(?\s*<SubjectNote\b/);
+  });
+
+  it("History's top card is the window's note: no range in its span, and no range door", () => {
+    expect(read("components/notes/useAiNote.ts")).not.toMatch(/span = .*trendRange/);
+    expect(read("components/notes/NotesCard.tsx")).not.toMatch(/for this range/);
+  });
+
+  it("the top card's subject carries no country", () => {
+    expect(read("components/notes/noteSubject.ts")).not.toMatch(/\bcountry\b\s*[?:]/);
   });
 });

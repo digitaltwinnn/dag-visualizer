@@ -15,8 +15,10 @@ import { noteSpanWords } from "./noteSubject";
 import { useAiNote } from "./useAiNote";
 
 // THE AI NOTES CARD (2026-10-27) — a few sentences a model wrote about what the view is showing,
-// for the subject the view stands on (`noteSubjectOf`: the network, the country, the plane), and
-// for History a few notable days that each commit their own day as the range.
+// the VIEW's note at the filter's scope (`noteSubjectOf`: the network, else everything; History's
+// plane over the window pill), and for History a few notable days that each commit their own day
+// as the range. It HOLDS under a drill (spec 2026-10-29-subject-notes): a committed country,
+// provider, make-up or brushed range carries its own note inside its own card (`SubjectNote`).
 //
 // It is CONTEXT, not a reading: the one card in the rail whose words no instrument measured, marked
 // as such — the sparkles mark in the AI hue (`--ai-mark`) at the title's left on both tiers, and the
@@ -56,7 +58,7 @@ const DAY_MS = 86_400_000;
  *  card's to name, and "What changed" was no datum — and the sparkles mark in the AI hue at its left
  *  is what says this is the one card a model wrote (it is no `data-kindmark`: the fold keeps it on
  *  purpose). The chip is the span the note covers, in the explorer's span words (`noteSpanWords`;
- *  History's is the window or range on screen), to the right like the dossier's ticker (user: "a
+ *  History's is the window pill on screen), to the right like the dossier's ticker (user: "a
  *  pill-type of element to the right like on other cards"), so the body carries no Span row and no
  *  Written row ("implied by 'last 6 hours'"). */
 const TITLE = "Constellation Gate AI";
@@ -145,13 +147,14 @@ function NotableDays({ days }: { days: NoteDay[] }) {
   );
 }
 
-/** The door that asks for an on-request note (the 1H pill, a brushed range): the first ask, and
- *  the ask again after a write that failed (R68). */
-function RequestDoor({ span, onClick }: { span: string | null | undefined; onClick: () => void }) {
+/** The door that asks for the on-request window note (the 1H pill): the first ask, and the ask
+ *  again after a write that failed (R68). A brushed range's note is the Range card's, asked
+ *  without a door (`SubjectNote`). */
+function RequestDoor({ onClick }: { onClick: () => void }) {
   return (
     <div className={DOOR_RUN}>
       <Door label={<AI_NOTES_ICON aria-hidden className="size-3.5 text-primary" />} onClick={onClick}>
-        {span === "1h" ? "Write notes for this hour" : "Write notes for this range"}
+        Write notes for this hour
       </Door>
     </div>
   );
@@ -160,7 +163,6 @@ function RequestDoor({ span, onClick }: { span: string | null | undefined; onCli
 export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const { subject, req, note } = useAiNote();
   const trendWindow = useStore((s) => s.trendWindow);
-  const trendRange = useStore((s) => s.trendRange);
   if (!subject || !req) return null;
 
   const res = note.res;
@@ -194,10 +196,10 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
           </span>
         }
         titleKey={titleKey}
-        // The span the note covers, the head's qualifier: History's is the span on screen, the other
+        // The span the note covers, the head's qualifier: History's is the window pill, the other
         // views' their fixed read (`noteSpanWords`). (After `title`: tooltipBoundary reads a `title=`
         // as the nearest preceding element's, and a chip in the aside would have claimed it.)
-        aside={<QualifierChip>{subject.view === "trend" ? spanPhrase(trendWindow, trendRange) : noteSpanWords(subject.view)}</QualifierChip>}
+        aside={<QualifierChip>{subject.view === "trend" ? spanPhrase(trendWindow, null) : noteSpanWords(subject.view)}</QualifierChip>}
         collapsed={collapsed}
         onToggle={onToggle}
       />
@@ -218,14 +220,14 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
               writing…
             </p>
           ) : res.state === "request" ? (
-            // The on-request kinds (the 1H pill, a brushed range): written only on the reader's ask.
-            <RequestDoor span={req.span} onClick={note.request} />
+            // The on-request window (the 1H pill): written only on the reader's ask.
+            <RequestDoor onClick={note.request} />
           ) : res.state === "unavailable" ? (
             // Only the reader's own ask reaches here (a read's `unavailable` stands the slot down,
             // `noteCardAbsent`): the gesture is answered on the card, with the same door again (R68).
             <>
               <p className="m-0 mb-2.5 text-body text-muted-foreground">Couldn&apos;t write notes just now</p>
-              <RequestDoor span={req.span} onClick={note.request} />
+              <RequestDoor onClick={note.request} />
             </>
           ) : res.state === "ok" ? (
             <>

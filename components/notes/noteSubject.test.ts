@@ -3,7 +3,6 @@ import { noteSpanWords, noteSubjectOf, type NoteSubjectState } from "./noteSubje
 
 const base: NoteSubjectState = {
   metagraphNetwork: "all",
-  country: null,
   trendCard: null,
   unlisted: (id) => id === "unlisted",
 };
@@ -27,14 +26,13 @@ describe("noteSubjectOf", () => {
     expect(noteSubjectOf("hyper", s({ metagraphNetwork: "dag" }))).toEqual({ view: "hyper", subject: "dag" });
   });
 
-    it("geo stands on the country first, then the network, then everything", () => {
-    expect(noteSubjectOf("geo", s({ country: "DE", metagraphNetwork: "DAG123" }))).toEqual({ view: "geo", subject: "cc:DE" });
+  it("geo stands on the network, else everything, never a country (the Country card carries its own)", () => {
     expect(noteSubjectOf("geo", s({ metagraphNetwork: "DAG123" }))).toEqual({ view: "geo", subject: "DAG123" });
+    expect(noteSubjectOf("geo", s({ metagraphNetwork: "all" }))).toEqual({ view: "geo", subject: "all" });
     expect(noteSubjectOf("geo", s({}))).toEqual({ view: "geo", subject: "all" });
-  });
-
-  it("a country is only a subject in geo", () => {
-    expect(noteSubjectOf("hyper", s({ country: "DE" }))).toEqual({ view: "hyper", subject: "all" });
+    // A committed country no longer takes the top card over: a state still carrying one is ignored.
+    const withCountry = { ...base, country: "DE", metagraphNetwork: "DAG123" } as NoteSubjectState;
+    expect(noteSubjectOf("geo", withCountry)).toEqual({ view: "geo", subject: "DAG123" });
   });
 
   it("trend folds all / dag / no card into dag, else the plane", () => {
@@ -51,10 +49,6 @@ describe("noteSubjectOf", () => {
   it("an unlisted network has no note, in every view", () => {
     for (const m of ["hyper", "geo", "ledger"] as const) expect(noteSubjectOf(m, s({ metagraphNetwork: "unlisted" }))).toBeNull();
     expect(noteSubjectOf("trend", s({ trendCard: "unlisted" }))).toBeNull();
-  });
-
-  it("a geo country wins over an unlisted filter (the country's note is its own)", () => {
-    expect(noteSubjectOf("geo", s({ country: "DE", metagraphNetwork: "unlisted" }))).toEqual({ view: "geo", subject: "cc:DE" });
   });
 });
 
