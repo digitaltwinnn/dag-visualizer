@@ -131,7 +131,7 @@ describe("subject notes live on their cards", () => {
     expect(src).toMatch(/setTimeout\(\(\) => \{[^]*?note\.request\(\);[^]*?\}, ASK_DWELL_MS\);[^]*?return \(\) => clearTimeout\(t\);/);
   });
 
-  it("the Country, Provider, Composition and Range cards mount it as their lead, with no measured lead beside it; the Range card only while a range is brushed", () => {
+  it("the Country, Provider, Composition and Range cards mount it as their lead, with no measured lead beside it; the Range card in both its modes", () => {
     const cards = read("components/inspector/cards.tsx");
     for (const decl of ["export function CountryCard(", "export function ProviderCard(", "export function CompositionCard("]) {
       const body = fnBody(cards, decl);
@@ -139,7 +139,9 @@ describe("subject notes live on their cards", () => {
       expect(body, decl).not.toMatch(/<Lead\b/); // the measured lead sentence is gone (user, 2026-10-30)
     }
     const range = read("components/inspector/TrendRangePane.tsx");
-    expect(range).toMatch(/\{range \? <SubjectNote\b/);
+    // …in BOTH its modes (user, 2026-10-30): the brushed range's, or the forward plane's over the window.
+    expect(range).toMatch(/<SubjectNote req=\{rangeCardNoteReq\(/);
+    expect(range).not.toMatch(/\{range \? <SubjectNote\b/);
     expect(range).not.toMatch(/<Lead\b/);
   });
 

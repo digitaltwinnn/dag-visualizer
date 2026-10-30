@@ -22,7 +22,7 @@ import { useMinHold } from "@/components/useMinHold";
 import { useArchive, archiveFactState, archiveReach, archiveSchedule, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
 import { useNodeNames, nodeName } from "@/components/useNodeNames";
 import { POLL } from "@/src/engine/config";
-import { cap, Desc, foldLabel, StatusMark, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, ScheduleTable, partShade, Lead, Empty, QualifierChip, TickerChip, LayerCells, Door, SectionLabel, shareWords, type SchedulePart } from "./parts";
+import { cap, Desc, foldLabel, StatusMark, RoleChips, IdentityDot, metaKindWord, Fact, FactGroup, Foot, FootRow, LayerWho, ScheduleTable, partShade, Lead, Empty, QualifierChip, LayerCells, Door, SectionLabel, shareWords, type SchedulePart } from "./parts";
 import { statusItems } from "@/src/data/nodeStatus";
 import { compositionGroups, compositionRows, nodeCompositionLabel, parseCompositionKey } from "@/src/data/composition";
 import { netKeyOf, pickNetId } from "@/src/engine/domain/pickActions";
@@ -104,7 +104,6 @@ export function MetaTitle({ cfg }: { cfg: MetaCfg }) {
   const hue = cfg.id === UNLISTED_ID ? UNLISTED_HUE : identityHudCss(cfg.id);
   const iconUrl = mg?.iconUrl || cfg.iconUrl; // live metagraph icon, or the core's bundled logo
   const monogram = (cfg.ticker || cfg.name).slice(0, 3).toUpperCase();
-  const kind = networkKind(cfg.id, mg?.nodes || []);
   return (
     <span data-titlerow="" className="inline-flex items-center gap-2.5 min-w-0">
       {/* The logo shows as a clean circular mark — no squared tile (brand icons are round);
@@ -122,15 +121,17 @@ export function MetaTitle({ cfg }: { cfg: MetaCfg }) {
           kind INTO the site link, which has lived in the body since 2026-08-08. */}
       <span data-titleblock="" className="flex flex-col gap-px min-w-0">
         <span className="leading-[1.1]">{cfg.name}</span>
-        {/* The TICKER left this line for the title-row ASIDE (user, 2026-08-08 — MetaTickerAside,
-            taking the slot the site link held; the link moved into the body as a labelled row).
-            The kind descriptor keeps the second line alone. */}
-        {/* The kind, in two forms the head's tier picks between (CardHead's ENTRY_TITLE, 2026-10-25):
-            the box reads the full phrase; the one-row ENTRY, whose eyebrow already says METAGRAPH,
-            reads the qualifier alone ("currency", "data and currency") — the word it dropped is
-            the word beside it. The hypergraph and a bare "metagraph" have no qualifier to keep. */}
-        <span data-kind-full="" className="text-label font-normal text-muted-foreground truncate">{kind}</span>
-        <span data-kind-short="" className="hidden text-label font-normal text-muted-foreground truncate">{kind.replace(/ metagraph$/, "")}</span>
+        {/* THE TICKER IS BACK UNDER THE NAME, in the identity hue, and THE KIND IS THE PILL
+            (user, 2026-10-30: the collapsed card "has no right side element … should be the type
+            as a pill?"). The ticker chip was the aside and stood down where the ticker IS the name
+            (DAG, USDC.dag), so those entries had nothing on the right, and the kind rode as muted
+            text after the name. The kind is one word every network has, so it takes the aside
+            (`MetaKindAside`); the ticker reads here on the open box and is dropped in the one-row
+            entry (CardHead's ENTRY_TITLE), where the explorer row beside it already shows it. A
+            ticker that IS the name is not said twice. */}
+        {cfg.ticker && cfg.ticker.toLowerCase() !== cfg.name.toLowerCase() && (
+          <span data-ticker="" className={cn("text-label font-semibold tracking-[0.02em] truncate", IDENT_INK)} style={{ color: hue }}>{cfg.ticker}</span>
+        )}
       </span>
     </span>
   );
@@ -713,19 +714,16 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   );
 }
 
-// The dossier's title-row aside: the TICKER in the identity hue (user, 2026-08-08 — it took the
-// slot the site link used to hold; the link itself moved into the body, see MetaSiteRow). Reads
-// at the same 11px/hue treatment it had under the name, right-aligned like every head aside.
-export function MetaTickerAside({ cfg }: { cfg: MetaCfg }) {
-  if (!cfg.ticker) return null;
-  // A HEAD MUST NOT SAY THE SAME THING TWICE (CountryAside's rule): where the ticker IS the name
-  // (USDC.dag), the chip would repeat the title beside it — and in the one-row entry it took the
-  // room the kind needed (user, 2026-10-25: "no space for the metagraph type").
-  if (cfg.name.toLowerCase() === cfg.ticker.toLowerCase()) return null;
-  return (
-    // The one ticker chip (`TickerChip`). Unlisted stays neutral — same guard as MetaTitle above.
-    <TickerChip text={cfg.ticker} hue={cfg.id === UNLISTED_ID ? UNLISTED_HUE : identityHudCss(cfg.id)} />
-  );
+// The dossier's title-row aside: THE KIND, as a qualifier chip (user, 2026-10-30), the one word
+// every network has — "hypergraph" for the core, "currency" / "data" / "data and currency" for a
+// metagraph, read off the same composition as the body's kind sentence (`metaKindWord`). An
+// unknown type shows no chip: its only word is the eyebrow's. The unlisted set keeps its own
+// head (the "?" mark) and no chip: a mixed set has no one kind.
+export function MetaKindAside({ cfg }: { cfg: MetaCfg }) {
+  useFeedRead(["api-metagraphs"], "MetaKindAside");
+  const metaList = useStore((s) => s.metaList);
+  const word = metaKindWord(cfg.id, metaList.find((x) => x.id === cfg.id)?.nodes || []);
+  return word ? <QualifierChip>{word}</QualifierChip> : null;
 }
 
 // The dossier's site link as a labelled BODY row (user, 2026-08-08 — the icon-only aside link

@@ -22,7 +22,7 @@ import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { cardNetwork } from "@/src/engine/domain/trendStack";
 import { useStore } from "@/src/store/store";
-import Stamp from "@/components/Stamp";
+import { titleStamp } from "@/src/util/localTime";
 
 // THE CURSOR CARD (2026-09-19) — History's own facts slot, `instant`. The timeline commits one
 // moment and this card reads the whole stack AT it: what the subject network measured there, where
@@ -170,8 +170,9 @@ export default function TrendInstantPane({
           cursorMs != null ? (
             <span className="inline-flex items-center gap-2">
               <INSTANT_ICON aria-hidden className="size-4 flex-none text-[var(--filter-accent,var(--primary))]" />
-              {/* A finer-than-daily moment is a clock time: drawn by `Stamp`, its zone a tag. */}
-              {stepMs < 86_400_000 ? <Stamp ms={bucket ?? cursorMs} quietDate={false} /> : stampInstant(cursorMs, stepMs)}
+              {/* A finer-than-daily moment is a clock time, on one line with its zone (`titleStamp`;
+                  user, 2026-10-30: the "GMT+2" pill goes, the zone joins the date, more concise). */}
+              <span className="tabular-nums">{stepMs < 86_400_000 ? titleStamp(bucket ?? cursorMs) : stampInstant(cursorMs, stepMs)}</span>
             </span>
           ) : (
             "—"

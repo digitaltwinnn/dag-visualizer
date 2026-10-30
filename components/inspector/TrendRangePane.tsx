@@ -8,7 +8,7 @@ import { Fact, FactGroup, QualifierChip } from "@/components/inspector/parts";
 import Stamp from "@/components/Stamp";
 import RecordsDoor from "@/components/inspector/RecordsDoor";
 import SubjectNote from "@/components/notes/SubjectNote";
-import { rangeNoteReq } from "@/components/notes/subjectNote";
+import { rangeCardNoteReq } from "@/components/notes/subjectNote";
 import useTrendRoster from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { UNLISTED_ID } from "@/src/data/unlisted";
@@ -123,10 +123,11 @@ export default function TrendRangePane({
       {!collapsed && span && (
         <div>
           {/* THE RANGE'S OWN NOTE (spec 2026-10-29-subject-notes) is the lead (user, 2026-10-30: the
-              measured sentence, "DOR anchored N snapshots in this range", is gone): only a BRUSHED
-              range has one — the window standing in is the top Gate AI card's note — on the plane
-              the deck stands on (`cardNetwork`), asked as the brush lands. */}
-          {range ? <SubjectNote req={rangeNoteReq(cardNetwork(filter, focus, front), range, (id) => id === UNLISTED_ID)} /> : null}
+              measured sentence, "DOR anchored N snapshots in this range", is gone). A BRUSHED range
+              reads its own; the WINDOW standing in reads the plane brought forward over the pill,
+              only where that is not the top Gate AI card's own subject (`rangeCardNoteReq`, the
+              pile rule) — on the plane the deck stands on (`cardNetwork`), asked as it lands. */}
+          <SubjectNote req={rangeCardNoteReq(cardNetwork(filter, focus, front), filter, range, windowId, (id) => id === UNLISTED_ID)} />
           <FactGroup>
             <Fact label="Start">{edge(span.fromMs)}</Fact>
             {/* The end is exclusive, so a day-named span names the day it reaches into. A trailing

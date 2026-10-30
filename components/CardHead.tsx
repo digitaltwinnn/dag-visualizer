@@ -53,19 +53,17 @@ const TITLE = "m-0 text-title font-semibold";
 // and a `data-kindmark` glyph beside it is dropped: the eyebrow word states the kind in the fold
 // (an identity avatar stays). 2026-10-29: nine digits at the title size with their block mark and
 // the live pill overran the one-row entry by a third once the note took the resting box.
-// The KIND yields first, the name last (the kind's flex-shrink is a thousand times the name's, so
-// it collapses to nothing before the name loses a glyph; the name then ellipsizes) — the name is
-// what tells the entry from its siblings; the kind is read in full on the open box. On a 320px
-// rail a long name beside its ticker chip leaves the kind no room at all (Dor Technologies), a
-// short one keeps it (USDC.dag, with its repeated-ticker chip gone). The kind's short form stands
-// in for the full one here, and both lines inherit the h3's line box so every entry is one height.
+// The dossier's second line is its TICKER (2026-10-30; the kind moved to the aside pill, where
+// every network has a word), and the entry DROPS it: the explorer row beside the rail shows the
+// ticker, and the one-row entry has the name, the eyebrow and the kind pill to carry. The name
+// ellipsizes last. Every line inherits the h3's line box so every entry is one height.
 // The title's own row (`[data-titlerow]`, else the h3's first span) is `flex`, not inline-flex:
 // inline-flex is shrink-to-fit, so it overflowed the h3, which then clipped the kind under the
 // aside. (Baseline alignment of the outer row was tried and measured wrong by 2.4px per item on
 // the Country entry: the truncating spans' flex baselines are SYNTHESISED from their boxes, so
 // each title shape landed somewhere else. The row centres instead, and the eyebrow and chip are
 // given the title's line box — `ENTRY_LINE` — so centring IS the baseline to under a pixel.)
-const ENTRY_TITLE = "[&>span]:flex [&>span]:max-w-full [&_[data-titlerow]]:flex [&_[data-titlerow]]:max-w-full [&_[data-titlerow]]:gap-2 [&_[data-avatar]]:size-4 [&_[data-titleblock]]:flex-row [&_[data-titleblock]]:items-baseline [&_[data-titleblock]]:gap-2 [&_[data-titleblock]]:min-w-0 [&_[data-titleblock]>*]:leading-[inherit] [&_[data-titleblock]>:first-child]:shrink [&_[data-titleblock]>:first-child]:truncate [&_[data-kind-full]]:hidden [&_[data-kind-short]]:block [&_[data-kind-short]]:min-w-0 [&_[data-kind-short]]:[flex-shrink:1000] [&_[data-figure]_.odometer]:text-body [&_[data-kindmark]]:hidden";
+const ENTRY_TITLE = "[&>span]:flex [&>span]:max-w-full [&_[data-titlerow]]:flex [&_[data-titlerow]]:max-w-full [&_[data-titlerow]]:gap-2 [&_[data-avatar]]:size-4 [&_[data-titleblock]]:flex-row [&_[data-titleblock]]:items-baseline [&_[data-titleblock]]:gap-2 [&_[data-titleblock]]:min-w-0 [&_[data-titleblock]>*]:leading-[inherit] [&_[data-titleblock]>:first-child]:shrink [&_[data-titleblock]>:first-child]:truncate [&_[data-ticker]]:hidden [&_[data-figure]_.odometer]:text-body [&_[data-kindmark]]:hidden";
 // The body step's line box in absolute terms (its fluid size × its unitless leading), for the
 // entry's eyebrow and chip: a 12px caps label on a `leading-none` box centred against a 21px
 // title box put its baseline ~1.5px below the title's (user, 2026-10-25: the eyebrow and the name

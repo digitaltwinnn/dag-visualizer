@@ -62,6 +62,19 @@ export function stampParts(ms: number, opts: { seconds?: boolean; now?: number }
   return { date, time, zone };
 }
 
+/** A TITLE'S CLOCK TIME, ON ONE LINE (user, 2026-10-30: the Moment card's zone "pill" goes, the
+ *  zone joins the date, and the form gets more concise): the 24-hour clock, two digits each, the
+ *  zone's short name inline, the year only when it is not this year — "Sep 14, 10:04 EDT". The
+ *  Range card's Start/End rows and the raw pane keep `Stamp`, whose zone is a tag beside a figure
+ *  in a row; a title is one headline and reads as one line. */
+export function titleStamp(ms: number, opts: { now?: number } = {}): string {
+  const d = new Date(ms);
+  const thisYear = new Date(opts.now ?? Date.now()).getFullYear() === d.getFullYear();
+  const date = d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: thisYear ? undefined : "numeric" });
+  const time = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZoneName: "short" });
+  return `${date}, ${time}`;
+}
+
 /** A SPAN'S LABEL — its UTC days ("Jul 7 – Aug 22", or "Sep 8" inside one day), the end exclusive:
  *  ONE wording for the Range card's title, the explorer's span chip and the timeline's range chip
  *  (2026-10-07 — the chip once read "Jul 7, 5:57 AM GMT+2–Aug 22, 3:27 PM GMT+2" beside a card

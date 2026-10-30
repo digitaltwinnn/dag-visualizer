@@ -59,3 +59,24 @@ export function rangeNoteReq(trendCard: string | null, range: { fromMs: number; 
   // two days (the only ones `snapRange` leaves unsnapped).
   return { view: "trend", subject: net, span: `r${Math.round(range.fromMs)}-${Math.round(range.toMs)}` };
 }
+
+/** THE RANGE CARD'S NOTE IN BOTH ITS MODES (user, 2026-10-30: "the range card never shows an AI
+ *  note in the default mode [until now]"). Brushed, the range's (`rangeNoteReq`). Standing on the
+ *  WINDOW, the plane brought forward over the window pill, and only when that plane is not the
+ *  top card's subject: the Gate AI card above carries the filter's network over the same window
+ *  ("dag" for All), and the pile rule leaves out what an ancestor card states. So under All with
+ *  DOR forward the Range card reads DOR's month while the top card reads the hypergraph's; with
+ *  no plane forward, or the filter's own plane, it carries none. */
+export function rangeCardNoteReq(
+  trendCard: string | null,
+  filter: string,
+  range: { fromMs: number; toMs: number } | null,
+  windowId: string,
+  unlisted: Unlisted,
+): NoteReq | null {
+  if (range) return rangeNoteReq(trendCard, range, unlisted);
+  const net = trendCard == null || trendCard === "all" ? "dag" : trendCard;
+  const top = filter === "all" || filter === "dag" ? "dag" : filter;
+  if (net === top || unlisted(net)) return null;
+  return { view: "trend", subject: net, span: windowId };
+}

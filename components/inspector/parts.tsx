@@ -554,6 +554,14 @@ export function metaType(id: string, nodes: NodeInfo[]): MetaType {
   const hasData = present.includes("dl1");
   return hasCurrency && hasData ? "data + currency" : hasCurrency ? "currency" : "data";
 }
+/** THE ONE QUALIFIER THE METAGRAPH HEAD'S PILL SHOWS (user, 2026-10-30): the kind, a word every
+ *  network has ("hypergraph", "currency", "data", "data and currency"); null for an unknown type,
+ *  whose only word is the eyebrow's own "metagraph". */
+export function metaKindWord(id: string, nodes: NodeInfo[]): string | null {
+  const t = metaType(id, nodes);
+  if (t === "unknown") return null;
+  return t === "data + currency" ? "data and currency" : t;
+}
 export function networkKind(id: string, nodes: NodeInfo[]): string {
   const t = metaType(id, nodes);
   if (t === "hypergraph") return "hypergraph";

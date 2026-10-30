@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { countryNoteReq, noteScopeOf, providerNoteReq, rangeNoteReq, typeNoteReq } from "./subjectNote";
+import { countryNoteReq, noteScopeOf, providerNoteReq, rangeCardNoteReq, rangeNoteReq, typeNoteReq } from "./subjectNote";
 
 // A SUBJECT CARD'S OWN NOTE (spec 2026-10-29-subject-notes): the request each card asks with, in
 // the subject forms the server accepts — scoped as the card's lead is.
@@ -47,5 +47,30 @@ describe("the subject notes' requests", () => {
     // A brush read off the pointer is fractional; the span is whole milliseconds (digits only).
     expect(rangeNoteReq("dor", { fromMs: 1716000000123.456, toMs: 1716003600999.5 }, unl)?.span).toBe("r1716000000123-1716003601000");
     expect(rangeNoteReq("unlisted", { fromMs: 1, toMs: 2 }, unl)).toBeNull();
+  });
+});
+
+// THE RANGE CARD'S NOTE, BRUSHED OR NOT (user, 2026-10-30: "the range card never shows an AI note
+// in the default mode [until now]"). Brushed, it is the range's (`rangeNoteReq`). Standing on the
+// window, it is the plane's network over the window pill — and only when that is NOT the top
+// card's subject (the filter's network, "dag" for All): the pile rule, a piece an ancestor card
+// states is left out, and the Gate AI card above already carries the filter's note over the window.
+describe("rangeCardNoteReq — the Range card's note in both its modes", () => {
+  it("a brushed range is the range's note, as before", () => {
+    expect(rangeCardNoteReq("dor", "all", { fromMs: 1, toMs: 2 }, "30d", unl)).toEqual({ view: "trend", subject: "dor", span: "r1-2" });
+  });
+  it("on the window, a plane brought forward under All carries its network over the window pill", () => {
+    expect(rangeCardNoteReq("dor", "all", null, "30d", unl)).toEqual({ view: "trend", subject: "dor", span: "30d" });
+    expect(rangeCardNoteReq("dor", "all", null, "all", unl)).toEqual({ view: "trend", subject: "dor", span: "all" });
+  });
+  it("on the window, the top card's own subject carries none: the filter's network, or All with no plane forward", () => {
+    expect(rangeCardNoteReq("dor", "dor", null, "30d", unl)).toBeNull();
+    expect(rangeCardNoteReq("all", "all", null, "30d", unl)).toBeNull();
+    expect(rangeCardNoteReq(null, "all", null, "30d", unl)).toBeNull();
+    expect(rangeCardNoteReq("dag", "all", null, "30d", unl)).toBeNull();
+  });
+  it("the unlisted network has no note in either mode", () => {
+    expect(rangeCardNoteReq("unlisted", "all", null, "30d", unl)).toBeNull();
+    expect(rangeCardNoteReq("unlisted", "all", { fromMs: 1, toMs: 2 }, "30d", unl)).toBeNull();
   });
 });

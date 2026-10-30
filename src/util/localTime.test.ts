@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeAll, afterAll } from "vitest";
-import { bucketStamp, rangeDays, recordStamp, stampParts, utcDayKey, utcStamp } from "./localTime";
+import { bucketStamp, rangeDays, recordStamp, stampParts, titleStamp, utcDayKey, utcStamp } from "./localTime";
 
 // ONE RULE FOR EVERY DATE THE APP WRITES (user, 2026-10-07 — "so any figure shown with days will be
 // UTC right? … if a user shares a screenshot it should be the same for other users. If we show a
@@ -81,5 +81,18 @@ describe("rangeDays — a span's label: its UTC days, ONE wording for the card, 
   });
   it("a span inside one day is that day", () => {
     expect(rangeDays(Date.UTC(2026, 8, 8, 18), Date.UTC(2026, 8, 8, 22))).toBe("Sep 8");
+  });
+});
+
+// A TITLE'S CLOCK TIME, ON ONE LINE (user, 2026-10-30: the Moment card's "GMT+2" pill goes, the zone
+// joins the date, and a more concise form): the 24-hour clock, two digits each, the zone's short
+// name inline, the year only when it is not this year. The Range card's Start/End rows and the raw
+// pane keep `Stamp`, whose zone is a tag beside a figure in a row.
+describe("titleStamp — a concise one-line clock time for a card title", () => {
+  it("writes date, 24-hour clock and zone as one line", () => {
+    expect(titleStamp(Date.UTC(2026, 8, 14, 14, 4, 2), { now: Date.UTC(2026, 9, 7) })).toBe("Sep 14, 10:04 EDT");
+  });
+  it("carries the year only when it is not the current one", () => {
+    expect(titleStamp(Date.UTC(2025, 8, 14, 14, 4), { now: Date.UTC(2026, 9, 7) })).toBe("Sep 14, 2025, 10:04 EDT");
   });
 });
