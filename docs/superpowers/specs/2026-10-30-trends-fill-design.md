@@ -60,12 +60,21 @@ flag listed in the intent is removed; an old flag answers with the `fill` comman
   year hashes as today), which is partially covered and is recomputed whole, exactly as
   `--extend-to` does now. `--from` must be older than it; a `--from` at or after it refuses with
   "already covered — add --recompute to rewrite those days".
-- **With `--recompute`**: `--from` and `--to` are both given; `--to` is at most yesterday (today is
-  never in a span, it is the cron's); every day in the span is rewritten whole from the records,
-  covered or not. This is the data fix and the partial reload. `--chain=<id prefix>` narrows it to
-  one chain's own fields; the shared floors are then left untouched and the summary says so, since
-  a floor is every chain's sum.
-- **The span is pinned at the start** and carried in the checkpoint; a resume never re-derives it.
+- **With `--recompute`**: `--from` and `--to` are both REQUIRED (no "yesterday" default, so a
+  resume across UTC midnight has nothing to drift); `--to` is at most yesterday (today is never in
+  a span, it is the cron's); every day in the span is rewritten whole from the records, covered or
+  not. This is the data fix and the partial reload. `--chain=<id prefix>` narrows it to ONE chain's
+  own `m.<id>.*` fields — the prefix must match exactly one catalog or unlisted chain, else it
+  refuses — and leaves the shared floors, the global spine and `u.cov` untouched; the summary says
+  so, since a floor is every chain's sum.
+- **The span is pinned at the start** and carried in the checkpoint, with the unlisted chain list
+  the fill read at that moment; a resume never re-derives either — the pin always wins over a
+  store the previous attempt already advanced (the spine flushes progressively).
+- **The span's oldest edge keeps its gap** (builder check): a recompute of a mid-store span reads
+  ONE record older than `--from` on every chain and on the spine and threads the gap chain from it
+  (`stampRun`'s `pred`), so day `--from` keeps its cross-midnight gap instead of silently losing it
+  — today's `--recompute-from` has that loss. An extension's edge is a chain's genesis: no
+  predecessor, no invented gap, as now.
 
 ### `fill` — what one walk writes, for every day of the span
 
@@ -75,7 +84,7 @@ flag listed in the intent is removed; an old flag answers with the `fill` comman
 | each unlisted chain (`untrackedIds` of the explorer's list) | the same `m.<addr>.*`, outside the floors | its records | same |
 | the global spine | `g.ticks/anchors/blocks/gapSum/gapMax` | the global records | same |
 | the floors | `g.feeFloor/g.kbFloor` | every catalog chain, folded | same |
-| unlisted coverage | `u.cov = 0` on every bucket of the span | generated (the unlisted chains were walked for these days) | same |
+| unlisted coverage | `u.cov = 0` on every bucket of the span — ONLY when every unlisted chain in the pinned list was walked; one skipped chain (no cursor in the store) suppresses the marker for the whole span, said in the summary (today's `markUnlistedCoverage` rule) | generated | same |
 
 Never: `f.*`, today's buckets, any cron cursor (`t:<net>:cursor`), the lock.
 
@@ -91,17 +100,25 @@ Never: `f.*`, today's buckets, any cron cursor (`t:<net>:cursor`), the lock.
   cursor in the store is skipped with a message, as today. No whole-chain walk, no cursor write.
 - **Chains walk three at a time** **(my call)**: the full rebuild already does, every chain's
   checkpoint and fields are its own, and the extension's 36-hour legs were sequential. The pool
-  is a constant.
+  is a constant; the spine walks alone, last; the per-chain flush interval (500K records) bounds
+  each chain's residual to about two days of records, so three in flight stay small.
 - **Checkpoints resume by themselves**: a start that finds a checkpoint for the same net, mode and
   span continues it (finished chains skip, the in-flight chain rides its cursor); a checkpoint for
   a different span refuses and names `--fresh`, which discards it. No `--resume`.
 - **Every page read and every store write retries** through a blip (the shared `retrying`, ~15 min
   of backoff). A persistent failure aborts with the error; the checkpoint makes the rerun cheap.
-- **No sampler lock** in the ordinary case: nothing a fill writes is a field the cron writes. The
-  one exception is a `--recompute` whose span includes YESTERDAY: the cron's catch-up after an
-  outage can still add yesterday's late records, and an add racing a whole-day overwrite could
-  double-count, so that fill takes the lock for its run (minutes) and releases it in `finally` and
-  on a signal, as the rebuild does. The script says when it takes the lock and why.
+- **No sampler lock, ever** (builder check settled it): nothing a fill writes is a field the cron
+  still writes — PROVIDED the cron is past the span. The cron adds only records newer than its
+  cursors, so a recompute that includes yesterday collides only while a cursor's timestamp
+  (`gTs`, `mTs.<id>`) is still inside yesterday: shortly after UTC midnight, or during a catch-up
+  after an outage. A fill therefore checks the cursors BEFORE it starts and refuses while any is
+  inside the span ("the sampler has not finished <day> yet — rerun after it passes", naming the
+  cursor), rather than holding a lock that pauses production for the whole run. No lock, no
+  signal handler, no takeover rule.
+- **Fine tiers only where they exist**: hourly and 5m fields are written for days at or after
+  `TIER_SINCE` (2025-07-01) and pruned in ONE place (`flushFinal`) for chains and spine alike —
+  today's extension writes them below the floor, which the client never reads (`pickRangeTier`).
+  Stale fine fields already below the floor are left as they are (unread, harmless).
 - **`--dry-run`** derives the span and the boundary, lists the chains and the tiers it would write,
   and the lock decision, and writes nothing.
 - **Output**: one line per chain as it completes (records, fields), the floors line, and a last
@@ -110,10 +127,12 @@ Never: `f.*`, today's buckets, any cron cursor (`t:<net>:cursor`), the lock.
 ### `rebuild` and `wipe` — the disaster path, unchanged in substance
 
 `rebuild --days=N` is today's wipe-and-rebuild: it takes the sampler lock, wipes `t:<net>:*`
-(never the lock it holds), rebuilds N days through today, sets the cron cursors to the newest
-ordinals and marks unlisted coverage. `wipe` is the wipe alone. Both print what they are about to
-delete and wait for `yes` (or `--yes`) **(my call)**. They are not a fill and are never needed in
-the ordinary course; the header says when they are.
+(never the lock it holds), rebuilds N days (at most 400, as today) through today, sets the cron
+cursors to the newest ordinals and marks unlisted coverage. It is also the BOOTSTRAP of an empty
+store: a `fill` needs existing history to find its boundary and refuses on an empty store, naming
+`rebuild`. `wipe` is the wipe alone. Both print what they are about to delete and wait for `yes`;
+`--yes` answers it, and a non-interactive run without `--yes` refuses **(my call)**. They are not a
+fill and are never needed in the ordinary course; the header says when they are.
 
 ## Documentation that changes with it
 
