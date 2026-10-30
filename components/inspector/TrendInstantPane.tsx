@@ -25,7 +25,7 @@ import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { cardNetwork } from "@/src/engine/domain/trendStack";
 import { useStore } from "@/src/store/store";
-import { titleStamp } from "@/src/util/localTime";
+import { titleStampParts } from "@/src/util/localTime";
 
 // THE CURSOR CARD (2026-09-19) — History's own facts slot, `instant`. The timeline commits one
 // moment and this card reads the whole stack AT it: what the subject network measured there, where
@@ -176,11 +176,26 @@ export default function TrendInstantPane({
         // this card states one moment, and the mark is what tells the two lists apart at a glance.
         title={
           cursorMs != null ? (
-            <span className="inline-flex items-center gap-2">
+            // DATE OVER CLOCK (user, 2026-10-30: "'Sep 30, 18:00 GMT+2', can we shorten it by having
+            // two rows?"): the date is the headline at the title size, the clock and its zone a
+            // quieter label-size line under it (`titleStampParts`), the dossier's name-over-kind
+            // shape — so CardHead's one-row ENTRY lays the two inline (`data-titleblock`) and the
+            // open box stacks them. A daily moment has no clock: one line, its day.
+            <span data-titlerow="" className="inline-flex items-center gap-2 min-w-0">
               <INSTANT_ICON aria-hidden className="size-4 flex-none text-[var(--filter-accent,var(--primary))]" />
-              {/* A finer-than-daily moment is a clock time, on one line with its zone (`titleStamp`;
-                  user, 2026-10-30: the "GMT+2" pill goes, the zone joins the date, more concise). */}
-              <span className="tabular-nums">{stepMs < 86_400_000 ? titleStamp(bucket ?? cursorMs) : stampInstant(cursorMs, stepMs)}</span>
+              {stepMs < 86_400_000 ? (
+                (() => {
+                  const { date, time } = titleStampParts(bucket ?? cursorMs);
+                  return (
+                    <span data-titleblock="" className="flex flex-col gap-px min-w-0 tabular-nums">
+                      <span className="leading-[1.1]">{date}</span>
+                      <span className="text-label font-normal text-muted-foreground">{time}</span>
+                    </span>
+                  );
+                })()
+              ) : (
+                <span className="tabular-nums">{stampInstant(cursorMs, stepMs)}</span>
+              )}
             </span>
           ) : (
             "—"

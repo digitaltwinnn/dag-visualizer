@@ -62,21 +62,20 @@ export function rangeNoteReq(trendCard: string | null, range: { fromMs: number; 
 
 /** THE RANGE CARD'S NOTE IN BOTH ITS MODES (user, 2026-10-30: "the range card never shows an AI
  *  note in the default mode [until now]"). Brushed, the range's (`rangeNoteReq`). Standing on the
- *  WINDOW, the plane brought forward over the window pill, and only when that plane is not the
- *  top card's subject: the Gate AI card above carries the filter's network over the same window
- *  ("dag" for All), and the pile rule leaves out what an ancestor card states. So under All with
- *  DOR forward the Range card reads DOR's month while the top card reads the hypergraph's; with
- *  no plane forward, or the filter's own plane, it carries none. */
+ *  WINDOW, the plane the card stands on over the window pill (`cardNetwork`: the plane brought
+ *  forward, else the filter, the hypergraph for All) — ALWAYS (the same day, second round: "the
+ *  default range never shows an AI section, fix it … for DAG only I noticed"). A first cut left it
+ *  out where it was the top Gate AI card's own subject (the pile rule), which read as the card
+ *  having no note under the DAG filter; so where the two subjects coincide the Range card repeats
+ *  the top card's note, through the loader's one cache. */
 export function rangeCardNoteReq(
   trendCard: string | null,
-  filter: string,
   range: { fromMs: number; toMs: number } | null,
   windowId: string,
   unlisted: Unlisted,
 ): NoteReq | null {
   if (range) return rangeNoteReq(trendCard, range, unlisted);
   const net = trendCard == null || trendCard === "all" ? "dag" : trendCard;
-  const top = filter === "all" || filter === "dag" ? "dag" : filter;
-  if (net === top || unlisted(net)) return null;
+  if (unlisted(net)) return null;
   return { view: "trend", subject: net, span: windowId };
 }

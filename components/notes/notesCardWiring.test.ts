@@ -64,14 +64,25 @@ describe("the notes card's own behaviour", () => {
   // The kind's word rides along for assistive tech; the mark is decoration.
   it("a notable day's row leads with its date and its kind mark, the caption wrapping after them", () => {
     const body = fnBody(card, "function DayRow(");
-    expect(body).toMatch(/const Mark = NOTE_KIND_ICONS\[day\.kind\];/);
-    expect(body).toMatch(/label=\{[^]*?rangeDays\(day\.dayMs, day\.dayMs \+ DAY_MS\)[^]*?<Mark aria-hidden/);
+    // ONE COIN ON EVERY SURFACE (user, 2026-10-30, design option C of three in the brainstorming
+    // companion): the kind's glyph on a 16px violet coin — the row's mark, the timeline's mark and
+    // the chart plane's mark are the same `NoteKindCoin`, so the three never disagree in shape or size.
+    expect(body).toMatch(/label=\{[^]*?rangeDays\(day\.dayMs, day\.dayMs \+ DAY_MS\)[^]*?<NoteKindCoin kind=\{day\.kind\}/);
     expect(body).not.toMatch(/figure=/);
     expect(body).toMatch(/\bwrap\b/);
     expect(body).toMatch(/sr-only[^]*?NOTE_KIND_WORD\[day\.kind\]/);
-    expect(body).toMatch(/identityHudCss\(day\.networkId\)/);
     expect(read("components/icons.tsx")).toMatch(/export const NOTE_KIND_ICONS: Record<NotableKind, LucideIcon>/);
     expect(card).toMatch(/import \{ NOTE_KIND_WORD \} from "\.\/noteDays";/);
+    const coin = read("components/notes/NoteKindCoin.tsx");
+    expect(coin).toMatch(/NOTE_KIND_ICONS\[kind\]/);
+    expect(coin).toMatch(/size-4 rounded-full/);
+    expect(coin).toMatch(/bg-\[var\(--ai-coin\)\]/);
+    expect(coin).not.toMatch(/className=\{cn\("[^"]*(shadow|ring-|blur)/); // a plane must never carry a shadow (trendStackBoundary)
+    expect(read("components/notes/NoteDiamonds.tsx")).toMatch(/<NoteKindCoin kind=\{day\.kind\}/);
+    expect(read("components/notes/NoteDiamonds.tsx")).not.toMatch(/rotate-45/);
+    const chart = read("components/docs/TrendChart.tsx");
+    expect(chart).toMatch(/<NoteKindCoin kind=\{m\.kind\}/);
+    expect(chart).not.toMatch(/rotate-45/);
   });
 
   // THE MARKER TRAVELS (user, 2026-10-30: "if the moment is a notable day … show the marker on the

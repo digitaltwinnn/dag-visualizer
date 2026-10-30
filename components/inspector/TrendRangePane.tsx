@@ -138,10 +138,10 @@ export default function TrendRangePane({
         <div>
           {/* THE RANGE'S OWN NOTE (spec 2026-10-29-subject-notes) is the lead (user, 2026-10-30: the
               measured sentence, "DOR anchored N snapshots in this range", is gone). A BRUSHED range
-              reads its own; the WINDOW standing in reads the plane brought forward over the pill,
-              only where that is not the top Gate AI card's own subject (`rangeCardNoteReq`, the
-              pile rule) — on the plane the deck stands on (`cardNetwork`), asked as it lands. */}
-          <SubjectNote req={rangeCardNoteReq(cardNetwork(filter, focus, front), filter, range, windowId, (id) => id === UNLISTED_ID)} />
+              reads its own; the WINDOW standing in reads the plane the card stands on over the
+              pill, always (`rangeCardNoteReq`; user, 2026-10-30) — on the plane the deck stands on
+              (`cardNetwork`), asked as it lands. */}
+          <SubjectNote req={rangeCardNoteReq(cardNetwork(filter, focus, front), range, windowId, (id) => id === UNLISTED_ID)} />
           <FactGroup>
             <Fact label="Start">{edge(span.fromMs)}</Fact>
             {/* The end is exclusive, so a day-named span names the day it reaches into. A trailing

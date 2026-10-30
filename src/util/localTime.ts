@@ -68,11 +68,19 @@ export function stampParts(ms: number, opts: { seconds?: boolean; now?: number }
  *  Range card's Start/End rows and the raw pane keep `Stamp`, whose zone is a tag beside a figure
  *  in a row; a title is one headline and reads as one line. */
 export function titleStamp(ms: number, opts: { now?: number } = {}): string {
+  const { date, time } = titleStampParts(ms, opts);
+  return `${date}, ${time}`;
+}
+
+/** The same stamp in its two parts, for a title set as DATE over CLOCK (the Moment card, user
+ *  2026-10-30: "'Sep 30, 18:00 GMT+2', can we shorten it by having two rows?"): the date is the
+ *  headline, the clock and its zone a quieter second line. */
+export function titleStampParts(ms: number, opts: { now?: number } = {}): { date: string; time: string } {
   const d = new Date(ms);
   const thisYear = new Date(opts.now ?? Date.now()).getFullYear() === d.getFullYear();
   const date = d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: thisYear ? undefined : "numeric" });
   const time = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZoneName: "short" });
-  return `${date}, ${time}`;
+  return { date, time };
 }
 
 /** A SPAN'S LABEL — its UTC days ("Jul 7 – Aug 22", or "Sep 8" inside one day), the end exclusive:

@@ -52,25 +52,21 @@ describe("the subject notes' requests", () => {
 
 // THE RANGE CARD'S NOTE, BRUSHED OR NOT (user, 2026-10-30: "the range card never shows an AI note
 // in the default mode [until now]"). Brushed, it is the range's (`rangeNoteReq`). Standing on the
-// window, it is the plane's network over the window pill — and only when that is NOT the top
-// card's subject (the filter's network, "dag" for All): the pile rule, a piece an ancestor card
-// states is left out, and the Gate AI card above already carries the filter's note over the window.
+// window, it is the plane the card stands on over the window pill — always, the top card's own
+// subject included (the same day: "for DAG only I noticed", a first cut had left that case out).
 describe("rangeCardNoteReq — the Range card's note in both its modes", () => {
   it("a brushed range is the range's note, as before", () => {
-    expect(rangeCardNoteReq("dor", "all", { fromMs: 1, toMs: 2 }, "30d", unl)).toEqual({ view: "trend", subject: "dor", span: "r1-2" });
+    expect(rangeCardNoteReq("dor", { fromMs: 1, toMs: 2 }, "30d", unl)).toEqual({ view: "trend", subject: "dor", span: "r1-2" });
   });
-  it("on the window, a plane brought forward under All carries its network over the window pill", () => {
-    expect(rangeCardNoteReq("dor", "all", null, "30d", unl)).toEqual({ view: "trend", subject: "dor", span: "30d" });
-    expect(rangeCardNoteReq("dor", "all", null, "all", unl)).toEqual({ view: "trend", subject: "dor", span: "all" });
+  it("on the window, the plane the card stands on over the window pill", () => {
+    expect(rangeCardNoteReq("dor", null, "30d", unl)).toEqual({ view: "trend", subject: "dor", span: "30d" });
+    expect(rangeCardNoteReq("dor", null, "all", unl)).toEqual({ view: "trend", subject: "dor", span: "all" });
   });
-  it("on the window, the top card's own subject carries none: the filter's network, or All with no plane forward", () => {
-    expect(rangeCardNoteReq("dor", "dor", null, "30d", unl)).toBeNull();
-    expect(rangeCardNoteReq("all", "all", null, "30d", unl)).toBeNull();
-    expect(rangeCardNoteReq(null, "all", null, "30d", unl)).toBeNull();
-    expect(rangeCardNoteReq("dag", "all", null, "30d", unl)).toBeNull();
+  it("on the window with no plane, or the DAG, it is the hypergraph's — the top card's own, repeated", () => {
+    for (const card of ["all", "dag", null]) expect(rangeCardNoteReq(card, null, "30d", unl)).toEqual({ view: "trend", subject: "dag", span: "30d" });
   });
   it("the unlisted network has no note in either mode", () => {
-    expect(rangeCardNoteReq("unlisted", "all", null, "30d", unl)).toBeNull();
-    expect(rangeCardNoteReq("unlisted", "all", { fromMs: 1, toMs: 2 }, "30d", unl)).toBeNull();
+    expect(rangeCardNoteReq("unlisted", null, "30d", unl)).toBeNull();
+    expect(rangeCardNoteReq("unlisted", { fromMs: 1, toMs: 2 }, "30d", unl)).toBeNull();
   });
 });

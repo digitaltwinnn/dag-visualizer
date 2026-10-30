@@ -9,6 +9,7 @@ import { bucketAt, cursorFraction } from "@/src/data/trendWindow";
 import { bucketStamp } from "@/src/util/localTime";
 import { compactNumber } from "@/src/util/format";
 import type { NotableKind } from "@/src/data/noteTypes";
+import NoteKindCoin from "@/components/notes/NoteKindCoin";
 
 // THE TRENDS DOC'S ONE CHART PRIMITIVE — a small-multiple line chart over the /api/trends
 // buckets, on RECHARTS (user, 2026-09-07: "why hand-roll charts if we have a neat library?" —
@@ -113,8 +114,8 @@ const TAP_SLOP = 8;
 
 /** A NOTABLE DAY ON A PLANE (user, 2026-10-30: "place the notable day markers on the applicable
  *  chart as well"): the day the AI note names, drawn where the cursor hairline is drawn — beside
- *  the memoised plot, never in it — as a small mark on the plot's baseline in the AI edge's sweep,
- *  the timeline's own diamond. `kind` rides along for the caller's pairing; the mark itself is
+ *  the memoised plot, never in it — as the one coin every surface draws on its baseline
+ *  (`NoteKindCoin`, design C 2026-10-30), the timeline's own mark. `kind` rides along for the caller's pairing; the mark itself is
  *  decoration (the row and the diamond are the controls). */
 export interface TrendMark {
   /** The UTC day's start. */
@@ -411,8 +412,8 @@ export default function TrendChart({
   const cursorX = cursorFraction(buckets, cursorBucket);
   // The notable days' x, by the same scale (see `TrendMark`); a day the axis does not hold is skipped.
   const markXs = (marks ?? [])
-    .map((m) => ({ key: `${m.dayMs}:${m.kind}`, x: cursorFraction(buckets, bucketAt(buckets, stepMs, stepMs >= DAY_MS_CHART ? m.dayMs : m.dayMs + DAY_MS_CHART / 2)) }))
-    .filter((m): m is { key: string; x: number } => m.x != null);
+    .map((m) => ({ key: `${m.dayMs}:${m.kind}`, kind: m.kind, x: cursorFraction(buckets, bucketAt(buckets, stepMs, stepMs >= DAY_MS_CHART ? m.dayMs : m.dayMs + DAY_MS_CHART / 2)) }))
+    .filter((m): m is { key: string; kind: NotableKind; x: number } => m.x != null);
 
   const hue0 = lines[0]?.hue ?? "var(--primary)";
   // The head's right-hand readout: the NEWEST MEASURED BUCKET, stamped with its own date —
@@ -699,13 +700,14 @@ export default function TrendChart({
             markXs.map((m) => (
               <div
                 key={m.key}
-                aria-hidden
-                className="absolute size-[7px] rotate-45 rounded-[1px] [background:var(--ai-edge)] pointer-events-none"
+                className="absolute pointer-events-none"
                 style={{
-                  top: PLOT_MARGIN.top + plotInnerH(plotHeight) - 4,
-                  left: `calc(${PLOT_MARGIN.left}px + ${m.x} * (100% - ${PLOT_INSET_X}px) - 3.5px)`,
+                  top: PLOT_MARGIN.top + plotInnerH(plotHeight) - 8,
+                  left: `calc(${PLOT_MARGIN.left}px + ${m.x} * (100% - ${PLOT_INSET_X}px) - 8px)`,
                 }}
-              />
+              >
+                <NoteKindCoin kind={m.kind} />
+              </div>
             ))}
           {cursorX != null && !held && (
             <div

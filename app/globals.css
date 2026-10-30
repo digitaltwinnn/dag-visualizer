@@ -1150,6 +1150,12 @@
      as a flat violet, and since a later declaration wins the AI card's iridescent sweep and the
      timeline diamonds went flat for a day (user, 2026-10-30: "lost its AI multi-colored outline"). */
   --ai-wash: color-mix(in oklch, var(--ai-mark) 8%, transparent);
+  /* THE COIN (design C, 2026-10-30): the notable-day mark on the AI card's rows, the timeline and
+     the chart planes — a 16px disc the glyph sits on, so it needs a fill that holds on the band's
+     dark glass, a plane's plate and the card's face alike: the AI hue mixed INTO the page ground,
+     never a translucent wash (a glyph over a wash reads differently on every surface). */
+  --ai-coin: color-mix(in oklch, var(--ai-mark) 22%, var(--background));
+  --ai-coin-edge: color-mix(in oklch, var(--ai-mark) 60%, transparent);
   /* The site footer's lozenge — a VEIL, not a panel. It first borrowed --topbar-glass and read
      "too dominant white" on the light ground (user, 2026-09-01), which is right: that token is a
      0.86-alpha lit SURFACE for a full-width bar, and a 22px pill has no room to be a surface. This

@@ -8,10 +8,12 @@ import type { NoteDay } from "@/src/data/noteTypes";
 import { type TrackGeom, xAtMs } from "@/src/data/trendTimeline";
 import { useStore } from "@/src/store/store";
 import { rangeDays } from "@/src/util/localTime";
+import NoteKindCoin from "./NoteKindCoin";
 import { useAiNote } from "./useAiNote";
 
-// THE NOTABLE DAYS ON THE TIMELINE (2026-10-27) — the AI note's notable days, one iridescent
-// diamond each, on the History band's track. The same days the AI notes card lists as rows; the
+// THE NOTABLE DAYS ON THE TIMELINE (2026-10-27) — the AI note's notable days, one mark each on the
+// History band's track: the kind's glyph on a violet coin (`NoteKindCoin`, design C 2026-10-30; an
+// iridescent diamond until then, which read large here and small on the planes). The same days the AI notes card lists as rows; the
 // two surfaces are PAIRED through `hoverNoteDay` (rule 9): hovering a diamond lights its row,
 // hovering a row lights its diamond and raises the popover. Hovers preview, a click commits the
 // day as History's range — the row's own commit (`DayRow`), through the same store action.
@@ -96,14 +98,18 @@ function Diamond({
         onBlur={off}
         onClick={() => useStore.getState().setTrendRange({ fromMs: day.dayMs, toMs: day.dayMs + DAY_MS })}
         className={cn(
-          "absolute left-0 top-0 size-[11px] -translate-x-1/2 -translate-y-1/2 rotate-45 cursor-pointer border-0 p-0",
-          "[background:var(--ai-edge)] outline-none transition-transform duration-150",
+          // THE ONE COIN (design C, 2026-10-30): the same 16px mark the AI card's row leads with and
+          // a chart plane draws, so the band's mark is no longer the large one of three.
+          "absolute left-0 top-0 grid size-4 -translate-x-1/2 -translate-y-1/2 cursor-pointer border-0 bg-transparent p-0",
+          "outline-none transition-transform duration-150",
           // The hit area is larger than the mark; the touch tier's is a finger's.
           "before:absolute before:-inset-2 before:content-[''] touch:before:-inset-4",
           "focus-visible:ring-1 focus-visible:ring-foreground",
           (own || lit) && "scale-125",
         )}
-      />
+      >
+        <NoteKindCoin kind={day.kind} />
+      </button>
       {shown && (
         // Decoration for the eye: the button's own name already says all of it.
         <div aria-hidden className={cn("absolute bottom-3 z-10 w-max max-w-[240px] pointer-events-none", align)}>

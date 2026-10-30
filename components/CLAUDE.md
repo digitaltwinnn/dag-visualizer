@@ -898,7 +898,10 @@ stored history, so they carry none and show nothing extra.
 The Metagraph card carries none: filtered, it is the same subject as the top card. **History's top
 card reads the FILTER, not the plane brought forward** (user, 2026-10-30): a focus re-deals the
 stack and scopes the Range card, but the view's note keeps saying what the top bar says, so under
-All it stays the hypergraph's note whichever plane is forward (`noteSubjectOf`). The block is
+All it stays the hypergraph's note whichever plane is forward (`noteSubjectOf`). **The Range card
+standing on the window carries the plane's note over the window pill, always** (`rangeCardNoteReq`,
+the same day): where that is the top card's own subject the two cards say the same note (one
+fetch); a first cut left that case out and read as a missing section under the DAG filter. The block is
 `components/notes/SubjectNote.tsx`, and **it IS the card's lead** (user, 2026-10-30, design option D
 of four shown in the brainstorming companion, then "no fallback"): the measured lead sentences
 ("Hosts 25% of the selection's nodes", the Range card's "DOR anchored N snapshots in this range")

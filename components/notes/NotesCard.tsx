@@ -3,16 +3,16 @@
 import { useEffect, useId, useRef, useState } from "react";
 
 import CardHead, { RailPane } from "@/components/CardHead";
-import { AI_NOTES_ICON, KIND_MARK_CLASS, NOTE_KIND_ICONS } from "@/components/icons";
+import { AI_NOTES_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { Door, QualifierChip, foldLabel } from "@/components/inspector/parts";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { cn } from "@/lib/utils";
 import type { NoteDay } from "@/src/data/noteTypes";
-import { identityHudCss } from "@/src/palette/identity";
 import { spanPhrase } from "@/src/data/trendWindow";
 import { useStore } from "@/src/store/store";
 import { rangeDays } from "@/src/util/localTime";
 import { noteSpanWords } from "./noteSubject";
+import NoteKindCoin from "./NoteKindCoin";
 import { NOTE_KIND_WORD } from "./noteDays";
 import { useAiNote } from "./useAiNote";
 
@@ -73,13 +73,11 @@ const DOOR_RUN = "-mb-[var(--card-pad)] [&>:last-child]:rounded-b-[calc(var(--ra
 
 /** One notable day: DATE AND KIND LEAD (user, 2026-10-30, design option B of four in the
  *  brainstorming companion), then the caption. The date is the door's label at a fixed width so
- *  the rows align; the kind mark wears the day's network hue (the total's days are muted); the
+ *  the rows align; the kind mark is the one coin every surface draws (`NoteKindCoin`, design C); the
  *  caption WRAPS rather than truncating (no hover reveals text here, the tooltip rule), and the
  *  prompt keeps it to a short clause since the row already says the date and the kind. Hover
  *  previews the day (`hoverNoteDay`), a click commits it as History's range. */
 function DayRow({ day }: { day: NoteDay }) {
-  const Mark = NOTE_KIND_ICONS[day.kind];
-  const hue = day.networkId ? identityHudCss(day.networkId) : undefined;
   const lit = useStore((s) => s.hoverNoteDay === day.dayMs);
   // THE ROW CLEARS ONLY WHAT IT SET: a row unmounting under the pointer (a new note, the card
   // closing) leaves no hover behind — nothing else clears this channel — but must not clear a day
@@ -107,7 +105,7 @@ function DayRow({ day }: { day: NoteDay }) {
       label={
         <span className="inline-flex items-center gap-2">
           <span className="w-[3.4em] text-label tabular-nums">{rangeDays(day.dayMs, day.dayMs + DAY_MS)}</span>
-          <Mark aria-hidden className="size-3.5 flex-none" style={hue ? { color: hue } : undefined} />
+          <NoteKindCoin kind={day.kind} />
           <span className="sr-only">{NOTE_KIND_WORD[day.kind]}</span>
         </span>
       }
