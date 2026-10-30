@@ -71,7 +71,33 @@ describe("the notes card's own behaviour", () => {
     expect(body).toMatch(/sr-only[^]*?NOTE_KIND_WORD\[day\.kind\]/);
     expect(body).toMatch(/identityHudCss\(day\.networkId\)/);
     expect(read("components/icons.tsx")).toMatch(/export const NOTE_KIND_ICONS: Record<NotableKind, LucideIcon>/);
-    expect(card).toMatch(/const NOTE_KIND_WORD: Record<NotableKind, string>/);
+    expect(card).toMatch(/import \{ NOTE_KIND_WORD \} from "\.\/noteDays";/);
+  });
+
+  // THE MARKER TRAVELS (user, 2026-10-30: "if the moment is a notable day … show the marker on the
+  // cards as well, maybe as a 2nd pill on the right side in the header"): the Moment card wears the
+  // day's kind chip beside its bucket chip when its bucket falls on a notable day, the Range card
+  // when its span IS that day; and the chart planes draw the days as marks, outside the memoised
+  // plot (the cursor hairline's own rule), each on its network's plane.
+  it("the Moment and Range heads wear a notable day's kind chip, and the planes draw the marks", () => {
+    const moment = read("components/inspector/TrendInstantPane.tsx");
+    expect(moment).toMatch(/notableDayAt\(/);
+    expect(moment).toMatch(/<NoteKindChip day=\{/);
+    const range = read("components/inspector/TrendRangePane.tsx");
+    expect(range).toMatch(/notableDayOfRange\(/);
+    expect(range).toMatch(/<NoteKindChip day=\{/);
+    const chip = read("components/notes/NoteKindChip.tsx");
+    expect(chip).toMatch(/<QualifierChip/);
+    expect(chip).toMatch(/NOTE_KIND_ICONS\[day\.kind\]/);
+    expect(chip).toMatch(/NOTE_KIND_WORD\[day\.kind\]/);
+    const stack = read("components/TrendStack.tsx");
+    expect(stack).toMatch(/const marksById = useMemo\(/);
+    expect(stack).toMatch(/marks=\{marksById\.get\(pose\.id\)\}/);
+    const chart = read("components/docs/TrendChart.tsx");
+    expect(chart).toMatch(/marks\?: readonly TrendMark\[\];/);
+    // Drawn beside the plot, never inside it: TrendPlot's own props carry no marks.
+    const plot = chart.slice(chart.indexOf("const TrendPlot = memo("));
+    expect(plot).not.toMatch(/\bmarks[,=}]|\bmarks\b.*\?:/); // the word "axis marks" in prose is fine; the prop is not
   });
 
   it("wears the iridescent edge on the open box only", () => {

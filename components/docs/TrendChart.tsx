@@ -8,6 +8,7 @@ import { RoleChips } from "@/components/inspector/parts";
 import { bucketAt, cursorFraction } from "@/src/data/trendWindow";
 import { bucketStamp } from "@/src/util/localTime";
 import { compactNumber } from "@/src/util/format";
+import type { NotableKind } from "@/src/data/noteTypes";
 
 // THE TRENDS DOC'S ONE CHART PRIMITIVE — a small-multiple line chart over the /api/trends
 // buckets, on RECHARTS (user, 2026-09-07: "why hand-roll charts if we have a neat library?" —
@@ -110,6 +111,19 @@ const DAY_FMT = new Intl.DateTimeFormat(undefined, { month: "short", day: "numer
 /** How far a finger may wander and still be a tap rather than the brush. */
 const TAP_SLOP = 8;
 
+/** A NOTABLE DAY ON A PLANE (user, 2026-10-30: "place the notable day markers on the applicable
+ *  chart as well"): the day the AI note names, drawn where the cursor hairline is drawn — beside
+ *  the memoised plot, never in it — as a small mark on the plot's baseline in the AI edge's sweep,
+ *  the timeline's own diamond. `kind` rides along for the caller's pairing; the mark itself is
+ *  decoration (the row and the diamond are the controls). */
+export interface TrendMark {
+  /** The UTC day's start. */
+  dayMs: number;
+  kind: NotableKind;
+}
+
+const DAY_MS_CHART = 86_400_000;
+
 export default function TrendChart({
   name,
   unit,
@@ -126,6 +140,7 @@ export default function TrendChart({
   nameOnly,
   scaleMax,
   cursorMs,
+  marks,
   onPick,
   fill,
   plotHeight = PLOT_H,
@@ -213,6 +228,10 @@ export default function TrendChart({
    *  by this component as a CSS overlay beside the memoised plot rather than inside it — see the
    *  overlay's own comment, and `TrendPlot`'s, for the measurement that forced the split. */
   cursorMs?: number | null;
+  /** The notable days to mark on this plane (`TrendMark`), each at the bucket holding the day —
+   *  its own bucket on a daily axis, its midday's on a finer one; a day outside this chart's span
+   *  draws nothing. Like `cursorMs`, it never reaches the plot. */
+  marks?: readonly TrendMark[];
   /** THE AREA UNDER THE FIRST LINE, IN ITS OWN HUE (2026-09-19) — opt-in, and the 3D stack's
    *  planes are the only caller. A plane is a fully transparent body with one hairline, and a bare
    *  line floating in a scene reads as a wire rather than as a LAYER; the fill is what makes five
@@ -390,6 +409,10 @@ export default function TrendChart({
   // reasons there is nothing to draw at once — no cursor, or an instant this chart's span does
   // not contain (a chain measured over a shorter window than its neighbours).
   const cursorX = cursorFraction(buckets, cursorBucket);
+  // The notable days' x, by the same scale (see `TrendMark`); a day the axis does not hold is skipped.
+  const markXs = (marks ?? [])
+    .map((m) => ({ key: `${m.dayMs}:${m.kind}`, x: cursorFraction(buckets, bucketAt(buckets, stepMs, stepMs >= DAY_MS_CHART ? m.dayMs : m.dayMs + DAY_MS_CHART / 2)) }))
+    .filter((m): m is { key: string; x: number } => m.x != null);
 
   const hue0 = lines[0]?.hue ?? "var(--primary)";
   // The head's right-hand readout: the NEWEST MEASURED BUCKET, stamped with its own date —
@@ -669,6 +692,21 @@ export default function TrendChart({
               what lets it ride the 3D plane's projected scale.
               Structural accent, one hairline, no animation, no pointer events: it is a POSITION,
               and a position that eases in lags the gesture that set it. */}
+          {/* THE NOTABLE DAYS (user, 2026-10-30), the timeline's diamonds on the plane's own
+              baseline, by the cursor's rule: the same fraction math, outside the memoised plot, no
+              pointer events (the AI card's row and the timeline's diamond are the controls). */}
+          {!held &&
+            markXs.map((m) => (
+              <div
+                key={m.key}
+                aria-hidden
+                className="absolute size-[7px] rotate-45 rounded-[1px] [background:var(--ai-edge)] pointer-events-none"
+                style={{
+                  top: PLOT_MARGIN.top + plotInnerH(plotHeight) - 4,
+                  left: `calc(${PLOT_MARGIN.left}px + ${m.x} * (100% - ${PLOT_INSET_X}px) - 3.5px)`,
+                }}
+              />
+            ))}
           {cursorX != null && !held && (
             <div
               aria-hidden

@@ -1,6 +1,9 @@
 "use client";
 
 import { INSTANT_ICON } from "@/components/icons";
+import NoteKindChip from "@/components/notes/NoteKindChip";
+import { notableDayAt } from "@/components/notes/noteDays";
+import { useAiNote } from "@/components/notes/useAiNote";
 
 import CardHead, { RailPane } from "@/components/CardHead";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
@@ -94,6 +97,11 @@ export default function TrendInstantPane({
   // whenever the cursor sits outside the window on screen — a real state, said below.
   const bucket = cursorMs != null ? bucketAt(buckets, stepMs, cursorMs) : null;
   const pulseKey = useEdgePulse(bucket);
+  // THE MARKER TRAVELS (user, 2026-10-30): the note on screen names its notable days, and a bucket
+  // that falls on one wears the day's kind chip beside the bucket chip (`NoteKindChip`), however
+  // the cursor got there. One note, one fetch: `useAiNote` is the AI card's own derivation.
+  const { note: aiNote } = useAiNote();
+  const notable = notableDayAt(aiNote.res?.state === "ok" ? aiNote.res.days : null, bucket ?? cursorMs);
   // WHY there is no chart, when there is none. `null` cursor is its own case: the slot is a ghost
   // then and this card does not render at all.
   const note = cursorMs == null ? null : instantNote(placeInstant(cursorMs, buckets, roster.rawBuckets, stepMs), stepMs);
@@ -184,7 +192,14 @@ export default function TrendInstantPane({
         // named the thing being stepped). One chip in the cadence's own words, so the lead's "in
         // those 5 minutes" and the pager's squares read as one thing. (An age chip sat here until
         // 2026-09-26 and left: the title already dates the moment.)
-        aside={bucket != null ? <QualifierChip>{bucketWord(stepMs)} bucket</QualifierChip> : undefined}
+        aside={
+          bucket != null ? (
+            <>
+              <QualifierChip>{bucketWord(stepMs)} bucket</QualifierChip>
+              {notable && <NoteKindChip day={notable} />}
+            </>
+          ) : undefined
+        }
         onClose={onClose}
         collapsed={collapsed}
         onToggle={onToggle}

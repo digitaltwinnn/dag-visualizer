@@ -64,7 +64,8 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import TrendChart, { type TrendBand, type TrendLine } from "@/components/docs/TrendChart";
+import TrendChart, { type TrendBand, type TrendLine, type TrendMark } from "@/components/docs/TrendChart";
+import { useAiNote } from "@/components/notes/useAiNote";
 import useTrendRoster from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import useStagedMeasure, { ROLL_CLASS, useHeldOrder } from "@/components/useStagedMeasure";
@@ -307,6 +308,22 @@ export default function TrendStack() {
   // the retired document used for the same partition. Held still on the roster's deps like the
   // lines; a network without bands (the DAG, the unlisted set, a window before the type sampler)
   // keeps its plain line.
+  // THE NOTABLE DAYS, PER PLANE (user, 2026-10-30): the note on screen names them with their
+  // network; each goes on its network's plane, the whole network's on the DAG plane (present while
+  // the DAG is the focus). One note, one fetch (`useAiNote`); memoised on the days' reference, which
+  // the loader holds still, so a cursor write never re-hands a fresh array.
+  const { note: aiNote } = useAiNote();
+  const noteDays = aiNote.res?.state === "ok" ? aiNote.res.days : null;
+  const marksById = useMemo(() => {
+    const m = new Map<string, TrendMark[]>();
+    for (const d of noteDays ?? []) {
+      const id = d.networkId ?? "dag";
+      const list = m.get(id) ?? [];
+      list.push({ dayMs: d.dayMs, kind: d.kind });
+      m.set(id, list);
+    }
+    return m;
+  }, [noteDays]);
   const stackById = useMemo(() => {
     const m = new Map<string, TrendBand[]>();
     for (const [id, row] of rows) if (row.stack?.length) m.set(id, row.stack);
@@ -753,6 +770,7 @@ export default function TrendStack() {
                 gaps={row.series.gaps}
                 lines={linesById.get(pose.id)!}
                 stack={stackById.get(pose.id)}
+                marks={marksById.get(pose.id)}
                 // THE STACK IS THE FILL (user, 2026-10-09: "are they truly stacked? I feel the
                 // overlap"): under the Nodes measure the bands partition the area the fill would
                 // paint, and the fill's gradient over them washed the steps out. One or the other.

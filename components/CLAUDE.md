@@ -910,7 +910,12 @@ the plate shows "reading…" while the note is in flight (ONE word, user 2026-10
 being written is the cache's business); `none` and off-mainnet render
 nothing (no note to have), and `unavailable` renders "no note right now", muted, with no door (user,
 2026-10-30: the Gate refused a brushed range's write and the plate was simply missing for the 15
-minutes `FAIL_TTL_S` remembers it; a card with no lead and no reason read as broken). **A plane focus
+minutes `FAIL_TTL_S` remembers it; a card with no lead and no reason read as broken). **A notable day's marker travels** (user, 2026-10-30, `components/notes/noteDays.ts`): the Moment
+card's head wears the day's kind chip (`NoteKindChip`, mark in the network hue + the kind's word)
+beside its bucket chip when its bucket falls on a notable day, the Range card's when its span IS
+that day, and each chart plane draws the note's days on its own baseline (`TrendChart marks`, the
+cursor hairline's rule: beside the memoised plot, never in it; a whole-network day goes on the DAG
+plane, so under All with no DAG plane forward it shows on the timeline alone). **A plane focus
 never takes the box from the Moment card** (the same day: "the card itself also goes out of focus
 and the range card gets it instead"): `focusPatch` ranks the Range card in behind a Moment that leads
 the stack. `components/notes/subjectNote.ts` is the pure home of the request derivations. **It is asked

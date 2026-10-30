@@ -7,12 +7,13 @@ import { AI_NOTES_ICON, KIND_MARK_CLASS, NOTE_KIND_ICONS } from "@/components/ic
 import { Door, QualifierChip, foldLabel } from "@/components/inspector/parts";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { cn } from "@/lib/utils";
-import type { NotableKind, NoteDay } from "@/src/data/noteTypes";
+import type { NoteDay } from "@/src/data/noteTypes";
 import { identityHudCss } from "@/src/palette/identity";
 import { spanPhrase } from "@/src/data/trendWindow";
 import { useStore } from "@/src/store/store";
 import { rangeDays } from "@/src/util/localTime";
 import { noteSpanWords } from "./noteSubject";
+import { NOTE_KIND_WORD } from "./noteDays";
 import { useAiNote } from "./useAiNote";
 
 // THE AI NOTES CARD (2026-10-27) — a few sentences a model wrote about what the view is showing,
@@ -69,19 +70,6 @@ const TITLE = "Constellation Gate AI";
 // per-ground wash the user ruled). They sit flush on the card's bottom edge (RecordsDoor's foot
 // geometry): the run bleeds by the card's padding below, and its last door takes the inner radius.
 const DOOR_RUN = "-mb-[var(--card-pad)] [&>:last-child]:rounded-b-[calc(var(--radius)-1px)]";
-
-/** The kind's word, for assistive tech beside its mark (the mark is decoration). */
-const NOTE_KIND_WORD: Record<NotableKind, string> = {
-  high: "spike",
-  peak: "busiest day",
-  low: "dip",
-  trough: "quietest day",
-  first: "first day",
-  last: "last day",
-  pause: "pause",
-  longest: "longest wait",
-  broadest: "most networks",
-};
 
 /** One notable day: DATE AND KIND LEAD (user, 2026-10-30, design option B of four in the
  *  brainstorming companion), then the caption. The date is the door's label at a fixed width so

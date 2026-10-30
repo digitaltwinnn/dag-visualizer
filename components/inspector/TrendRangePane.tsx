@@ -7,7 +7,10 @@ import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { Fact, FactGroup, QualifierChip } from "@/components/inspector/parts";
 import Stamp from "@/components/Stamp";
 import RecordsDoor from "@/components/inspector/RecordsDoor";
+import NoteKindChip from "@/components/notes/NoteKindChip";
 import SubjectNote from "@/components/notes/SubjectNote";
+import { notableDayOfRange } from "@/components/notes/noteDays";
+import { useAiNote } from "@/components/notes/useAiNote";
 import { rangeCardNoteReq } from "@/components/notes/subjectNote";
 import useTrendRoster from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
@@ -78,6 +81,10 @@ export default function TrendRangePane({
     (axis.length ? { fromMs: axis[0]!, toMs: axis[axis.length - 1]! + stepMs } : null);
   const spanKey = range ? `${range.fromMs}-${range.toMs}` : `window:${windowId}`;
   const pulseKey = useEdgePulse(spanKey);
+  // A range that IS a notable day (a day row's commit, or a brush that landed on one) wears the
+  // day's kind chip beside the span's (user, 2026-10-30; `NoteKindChip`).
+  const { note: aiNote } = useAiNote();
+  const notable = notableDayOfRange(aiNote.res?.state === "ok" ? aiNote.res.days : null, range);
 
   const subject = subjectOf(filter, focus, front, ranked, (id) => id !== "dag" && rows.has(id));
   // How long ago the span ENDED — "until now" when it runs to the newest bucket (user, 2026-10-07:
@@ -115,7 +122,14 @@ export default function TrendRangePane({
         titleKey={spanKey}
         // When the span ENDED rides the head (user, 2026-10-07: "move '10 days ago' in range card to
         // its header") — a qualifier on the title's span, so the lead's sentence has the width.
-        aside={aside ? <QualifierChip className="tabular-nums">{aside}</QualifierChip> : undefined}
+        aside={
+          aside || notable ? (
+            <>
+              {aside && <QualifierChip className="tabular-nums">{aside}</QualifierChip>}
+              {notable && <NoteKindChip day={notable} />}
+            </>
+          ) : undefined
+        }
         onClose={onClose}
         collapsed={collapsed}
         onToggle={onToggle}
