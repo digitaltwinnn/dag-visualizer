@@ -696,7 +696,30 @@ async function main(): Promise<void> {
     return;
   }
 
-  // ---- REBUILD / WIPE: the disaster path (header) ----
+  // ---- REBUILD / WIPE: the disaster path (header) — ASKS FIRST ----
+  // What is about to be deleted is counted and shown; `yes` on a terminal or --yes proceeds, and a
+  // run with neither (a script, a cron) refuses rather than guessing.
+  {
+    let count = 0;
+    let scan0 = "0";
+    do {
+      const [c, keys] = await retrying(() => redis.scan(scan0, { match: `t:${net}:*`, count: 200 }));
+      scan0 = String(c);
+      count += (keys as string[]).filter((k) => k !== lockKeyOf(net)).length;
+    } while (scan0 !== "0");
+    const what = command.kind === "wipe" ? "wipe" : `wipe and rebuild ${command.days} day(s) of`;
+    console.log(`about to ${what} t:${net}:* — ${count} key(s) will be DELETED (every tier, the cursors, the unlisted coverage).`);
+    if (!command.yes) {
+      if (!process.stdin.isTTY) { console.error("refusing: not a terminal and no --yes"); throw new Abort(); }
+      process.stdout.write("type yes to continue: ");
+      const answer = await new Promise<string>((resolve) => {
+        process.stdin.setEncoding("utf8");
+        process.stdin.once("data", (d) => resolve(String(d).trim()));
+      });
+      process.stdin.pause();
+      if (answer !== "yes") { console.error("not confirmed — nothing deleted"); throw new Abort(); }
+    }
+  }
   // ---- wipe: SCAN t:{net}:* and delete — the rebuild contract's first half ----
   console.log(`wiping t:${net}:* …`);
   let cursor = "0";
