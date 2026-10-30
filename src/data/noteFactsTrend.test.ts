@@ -238,10 +238,11 @@ describe("trendFacts notable days", () => {
   it("a 7d zoom with a spiked day yields one date fact and a matching NotableDay", () => {
     const spike = row(37, (i) => (i === 33 ? 400 : 100));
     const r = trendFacts(input({ daily: daily({ "g.anchors": spike }) }))!;
-    expect(r.days).toHaveLength(1);
+    // The spike, then the floor's quietest day (the spike is the busiest, so no second peak).
+    expect(r.days.map((d) => d.kind)).toEqual(["high", "trough"]);
     expect(r.days[0]).toMatchObject({ kind: "high", networkId: null, value: 400, level: 100, dayMs: T0 + 3 * DAY });
     const dates = r.facts.filter((f) => f.kind === "date");
-    expect(dates).toHaveLength(1);
+    expect(dates).toHaveLength(2);
     expect(dates[0]!.value).toBe(T0 + 3 * DAY);
     expect(dates[0]!.text).toBe("Sep 4");
     const value = r.facts.find((f) => /Notable day 1 spike, snapshots anchored that day/.test(f.label))!;
@@ -263,6 +264,7 @@ describe("trendFacts notable days", () => {
   it("a network starting inside the span is a first, and the hypergraph carries its blurb", () => {
     const bio = row(37, (i) => (i < 34 ? 0 : 30));
     const r = trendFacts(input({ daily: daily({ "m.bio.snaps": bio }) }))!;
+    // The floor finds nothing to add: the total is flat, and the broadest day IS BioFi's first day.
     expect(r.days.map((d) => [d.kind, d.networkId])).toEqual([["first", "bio"]]);
     expect(r.blurbs).toEqual(["BioFi is: a lending app"]);
     expect(r.facts.some((f) => f.kind === "date" && f.label === "Notable day 1 date (first day BioFi anchored a snapshot, none before)")).toBe(true);
@@ -275,7 +277,8 @@ describe("trendFacts notable days", () => {
   it("a network going quiet inside the span is a last, named as the last day it anchored", () => {
     const bio = row(37, (i) => (i < 33 ? 30 : 0));
     const r = trendFacts(input({ daily: daily({ "m.bio.snaps": bio }) }))!;
-    expect(r.days.map((d) => [d.kind, d.networkId, d.dayMs])).toEqual([["last", "bio", T0 + 2 * DAY]]);
+    // …then the floor's broadest day: three networks anchored until BioFi stopped, two after.
+    expect(r.days.map((d) => [d.kind, d.networkId, d.dayMs])).toEqual([["last", "bio", T0 + 2 * DAY], ["broadest", null, T0]]);
     expect(r.facts.find((f) => f.kind === "date")!.label).toBe("Notable day 1 date (last day BioFi anchored a snapshot, none since)");
     expect(r.facts.find((f) => /^Notable day 1 last day BioFi anchored a snapshot, none since, snapshots anchored that day$/.test(f.label))!.value).toBe(30);
     expect(checkNote("BioFi's last day anchoring, nothing since.", r.facts, r.names, { maxSentences: 1 })).toEqual({ ok: true });
@@ -288,13 +291,35 @@ describe("trendFacts notable days", () => {
       expect(r.days).toEqual([]);
       expect(r.facts.some((f) => f.kind === "date")).toBe(false);
     }
-    expect(trendFacts(input({ zoom: "30d", daily: daily({ "g.anchors": spike }) }))!.days).toHaveLength(1);
+    expect(trendFacts(input({ zoom: "30d", daily: daily({ "g.anchors": spike }) }))!.days.map((d) => d.kind)).toEqual(["high", "trough"]);
   });
 
   it("never reports the day still filling", () => {
     const d = daily({ "g.anchors": row(37, (i) => (i === 36 ? 5 : 100)) });
     d.now = d.buckets[36]! + 1000;
     expect(trendFacts(input({ daily: d }))!.days).toEqual([]);
+  });
+
+  // THE FLOOR'S DAYS ARE NAMED AS THE RANGE'S EXTREMES (user, 2026-10-30), never as a spike or a
+  // dip: "busiest day of the span", with the span's median beside it, so the caption can place it.
+  it("a quiet network's three days are its busiest, quietest and longest wait, named as the span's", () => {
+    const snaps = row(37, (i) => (i === 33 ? 70 : i === 34 ? 50 : 60));
+    const gap = row(37, (i) => (i === 35 ? 900 : 600));
+    const r = trendFacts(input({ subject: "usdc", daily: daily({ "m.usdc.snaps": snaps, "m.usdc.gapMax": gap }) }))!;
+    expect(r.days.map((d) => [d.kind, d.dayMs])).toEqual([["peak", T0 + 3 * DAY], ["trough", T0 + 4 * DAY], ["longest", T0 + 5 * DAY]]);
+    const labels = r.facts.filter((f) => /^Notable day/.test(f.label)).map((f) => [f.label, f.value, f.kind]);
+    expect(labels).toEqual([
+      ["Notable day 1 date (busiest day of the span)", T0 + 3 * DAY, "date"],
+      ["Notable day 1 busiest day of the span, snapshots anchored that day", 70, "count"],
+      ["Notable day 1 busiest day of the span, span median", 60, "count"],
+      ["Notable day 2 date (quietest day of the span)", T0 + 4 * DAY, "date"],
+      ["Notable day 2 quietest day of the span, snapshots anchored that day", 50, "count"],
+      ["Notable day 2 quietest day of the span, span median", 60, "count"],
+      ["Notable day 3 date (longest wait of the span)", T0 + 5 * DAY, "date"],
+      ["Notable day 3 longest wait of the span, longest wait between snapshots", 900, "duration"],
+      ["Notable day 3 longest wait of the span, span median longest wait", 600, "duration"],
+    ]);
+    expect(checkNote("The busiest day of the span, with 70 snapshots against a median of 60.", r.facts, r.names, { maxSentences: 1 })).toEqual({ ok: true });
   });
 
   it("a network pause is a duration pair", () => {

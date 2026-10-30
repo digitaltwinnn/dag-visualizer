@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { NOTABLE_CAPS, notableDays } from "@/src/data/notableDays";
+import { NOTABLE_CAPS, NOTABLE_FLOOR, notableDays } from "@/src/data/notableDays";
 
 const DAY = 86_400_000;
 const T0 = Date.UTC(2026, 8, 1);
@@ -374,5 +374,69 @@ describe("notableDays: consecutive days of one kind are one event", () => {
     const series = { "m.a.snaps": flat(30, 40), "m.a.gapMax": flat(30, 900, { 12: 7200, 13: 9000 }) };
     const out = notableDays({ days, covered, series, subject: "a", ids: ["a"], cap: 5 });
     expect(out.map((d) => [d.kind, d.dayMs, d.value])).toEqual([["pause", days[13], 9000]]);
+  });
+});
+
+// THE FLOOR (user, 2026-10-30: "So far I've not seen more than 1 notable day, can we have at least
+// 3? If nothing really notable changed, call out the highs/lows of the network during that range").
+// A range short of `floor` days is filled with the range's own EXTREMES, named as such, never as a
+// spike or a dip: the busiest and quietest day, then the longest wait (a network) or the day the
+// most networks anchored (the hypergraph). Fills never displace a real pick and never repeat a day.
+describe("notableDays: the floor", () => {
+  it("is three", () => {
+    expect(NOTABLE_FLOOR).toBe(3);
+  });
+
+  it("a network with nothing notable gets its busiest, quietest and longest-wait day, in that order", () => {
+    const { days, covered } = span(30);
+    const out = notableDays({
+      days, covered, subject: "a", ids: ["a"], cap: 5, floor: 3,
+      series: { "m.a.snaps": flat(30, 100, { 10: 130, 20: 80 }), "m.a.gapMax": flat(30, 600, { 15: 900 }) },
+    });
+    expect(out.map((d) => [d.kind, d.dayMs, d.value, d.level, d.networkId, d.score])).toEqual([
+      ["peak", days[10], 130, 100, "a", 0],
+      ["trough", days[20], 80, 100, "a", 0],
+      ["longest", days[15], 900, 600, "a", 0],
+    ]);
+  });
+
+  it("the hypergraph gets the total's busiest and quietest day and the day the most networks anchored", () => {
+    const { days, covered } = span(30);
+    const out = notableDays({
+      days, covered, subject: "dag", ids: ["a", "b"], cap: 5, floor: 3,
+      series: { "g.anchors": flat(30, 100, { 5: 120, 7: 90 }), "m.a.snaps": flat(30, 10), "m.b.snaps": flat(30, 10, { 12: 0 }) },
+    });
+    expect(out.map((d) => [d.kind, d.dayMs, d.value, d.level, d.networkId])).toEqual([
+      ["peak", days[5], 120, 100, null],
+      ["trough", days[7], 90, 100, null],
+      ["broadest", days[0], 2, 2, null],
+    ]);
+  });
+
+  it("fills only up to the floor, never past the cap, and never repeats a picked day", () => {
+    const { days, covered } = span(30);
+    const series = { "g.anchors": flat(30, 100, { 20: 250 }) };
+    const out = notableDays({ days, covered, series, subject: "dag", ids: [], cap: 5, floor: 3 });
+    // The high IS the busiest day, so the peak is skipped; the quietest is the earliest 100.
+    expect(out.map((d) => [d.kind, d.dayMs])).toEqual([["high", days[20]], ["trough", days[0]]]);
+    expect(notableDays({ days, covered, series, subject: "dag", ids: [], cap: 1, floor: 3 }).map((d) => d.kind)).toEqual(["high"]);
+    expect(notableDays({ days, covered, series, subject: "dag", ids: [], cap: 5 }).map((d) => d.kind)).toEqual(["high"]); // no floor asked
+  });
+
+  it("a range whose days all read the same has no busiest or quietest day", () => {
+    const { days, covered } = span(30);
+    expect(notableDays({ days, covered, series: { "g.anchors": flat(30, 100) }, subject: "dag", ids: [], cap: 5, floor: 3 })).toEqual([]);
+  });
+
+  it("an uncovered day is never an extreme, and the lead-in is never reported", () => {
+    const { days, covered } = span(30, [3]);
+    const out = notableDays({ days, covered, series: { "g.anchors": flat(30, 100, { 3: 500, 1: 140 }) }, subject: "dag", ids: [], cap: 5, floor: 3, from: 2 });
+    expect(out.map((d) => [d.kind, d.dayMs])).toEqual([]); // days 2..29 all read 100: day 3 is unmeasured, day 1 is lead-in
+  });
+
+  it("a network's extremes are read inside its own activity: the quiet tail after its last day is no trough", () => {
+    const { days, covered } = span(30);
+    const out = notableDays({ days, covered, subject: "a", ids: ["a"], cap: 5, floor: 3, series: { "m.a.snaps": flat(30, 100, { 10: 130, 25: 0, 26: 0, 27: 0, 28: 0, 29: 0 }) } });
+    expect(out.map((d) => [d.kind, d.dayMs])).toEqual([["last", days[24]], ["peak", days[10]], ["trough", days[0]]]);
   });
 });

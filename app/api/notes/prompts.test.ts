@@ -255,6 +255,7 @@ describe("buildMessages", () => {
     const m = buildMessages("trend", "Mainnet", FACTS, days);
     expect(m[0]!.content).toContain("DAY YYYY-MM-DD:");
     // A first or last day is captioned as the event it is (user, 2026-10-30).
+    expect(m[0]!.content).toContain("A day the facts name the span's busiest, quietest, longest wait or most networks is the range's own extreme, not a spike, a dip or a pause: say so, with its figure.");
     expect(m[0]!.content).toContain("A day the facts name a first or last day is an event, not a count: its caption says that it was the first day that network anchored a snapshot, or the last, with nothing anchored since, and gives the day's count after that, if at all.");
     expect(m[1]!.content).toContain("DAY 2026-10-19");
     expect(m[1]!.content).toContain("DAY 2026-10-21");

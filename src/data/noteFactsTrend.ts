@@ -1,5 +1,5 @@
 import { fact, gaugeChange, networksAnchored } from "@/src/data/noteFacts";
-import { NOTABLE_CAPS, notableDays } from "@/src/data/notableDays";
+import { NOTABLE_CAPS, NOTABLE_FLOOR, notableDays } from "@/src/data/notableDays";
 import type { Fact, NotableDay } from "@/src/data/noteTypes";
 import { formatDag, globalSeries, METRIC_ORDER, metricLabel, metricSeries, spanAverage, trimCounterEdges, TREND_METRICS, unlistedUnmeasured, withUnlisted } from "@/src/data/trendSeries";
 import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
@@ -124,7 +124,7 @@ function floorOnly(data: TrendsWindowData): boolean {
   return trimCounterEdges(unlistedUnmeasured(data.series), data.stepMs).some(Boolean);
 }
 
-const dayMeasured = (d: NotableDay): "count" | "duration" => (d.kind === "pause" ? "duration" : "count");
+const dayMeasured = (d: NotableDay): "count" | "duration" => (d.kind === "pause" || d.kind === "longest" ? "duration" : "count");
 
 export function trendFacts(input: TrendFactsInput): TrendFacts | null {
   const { subject, zoom, span, names: catalog, blurbs: blurbOf } = input;
@@ -243,6 +243,7 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
       ids,
       cap,
       from: first < 0 ? d.buckets.length : first,
+      floor: NOTABLE_FLOOR,
     });
     days.forEach((day, i) => {
       const n = i + 1;
@@ -257,13 +258,28 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
         : day.kind === "low" ? "dip"
         : day.kind === "first" ? `first day ${who} anchored a snapshot, none before`
         : day.kind === "last" ? `last day ${who} anchored a snapshot, none since`
+        // THE RANGE'S EXTREMES (`NOTABLE_FLOOR`): named as the span's, never as a spike or a dip.
+        : day.kind === "peak" ? "busiest day of the span"
+        : day.kind === "trough" ? "quietest day of the span"
+        : day.kind === "longest" ? "longest wait of the span"
+        : day.kind === "broadest" ? "most networks anchoring of the span"
         : "pause";
       const kind = dayMeasured(day);
-      const measured = day.kind === "pause" ? "longest wait between snapshots" : "snapshots anchored that day";
+      const measured =
+        day.kind === "pause" || day.kind === "longest" ? "longest wait between snapshots"
+        : day.kind === "broadest" ? "networks that anchored that day"
+        : "snapshots anchored that day";
       facts.push(fact(`Notable day ${n} date (${what})`, day.dayMs, "date"));
       facts.push(fact(`Notable day ${n} ${what}, ${measured}`, day.value, kind));
-      if (day.kind === "high" || day.kind === "low" || day.kind === "pause")
-        facts.push(fact(`Notable day ${n} ${what}, ${day.kind === "pause" ? "usual longest wait" : "usual level"}`, day.level, kind));
+      // The level beside it: an event's USUAL level (the median before it), an extreme's SPAN median.
+      const level =
+        day.kind === "high" || day.kind === "low" ? "usual level"
+        : day.kind === "pause" ? "usual longest wait"
+        : day.kind === "peak" || day.kind === "trough" ? "span median"
+        : day.kind === "longest" ? "span median longest wait"
+        : day.kind === "broadest" ? "span median networks"
+        : null;
+      if (level) facts.push(fact(`Notable day ${n} ${what}, ${level}`, day.level, kind));
       if (dag && (day.kind === "first" || day.kind === "last") && day.networkId && blurbOf[day.networkId]) {
         const line = `${nameOf(day.networkId)} is: ${blurbOf[day.networkId]}`;
         if (!blurbs.includes(line)) blurbs.push(line);

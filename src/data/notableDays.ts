@@ -28,6 +28,16 @@ import type { NotableDay } from "@/src/data/noteTypes";
 /** How many notable days each History pill keeps. */
 export const NOTABLE_CAPS: Record<"7d" | "30d" | "1y" | "all", number> = { "7d": 3, "30d": 5, "1y": 8, all: 8 };
 
+/** THE FLOOR (user, 2026-10-30: "I've not seen more than 1 notable day, can we have at least 3? If
+ *  nothing really notable changed, call out the highs/lows of the network during that range"). A
+ *  range whose thresholded events fall short of this is filled with the range's own EXTREMES, each
+ *  named as such (`peak`, `trough`, then `longest` for a network's widest gap or `broadest` for the
+ *  day the most networks anchored on the hypergraph), never as a spike, a dip or a pause: an
+ *  extreme is the range's business, a spike is the level's. Fills score 0, never displace an
+ *  event, never repeat a day, and are read on covered reportable days only, inside a network's own
+ *  activity. The caller asks for it (`NotableInput.floor`); the default is none. */
+export const NOTABLE_FLOOR = 3;
+
 /** The covered days before a day that its level (their median) is read from, and the fewest of
  *  them a day needs before it can be called high or low at all. */
 const LEVEL_DAYS = 14;
@@ -60,6 +70,8 @@ export interface NotableInput {
    *  reported only when the series' first activity in the WHOLE input falls at or after `from`
    *  (otherwise the network resumed, it did not begin); a `last` only when its day does. */
   from?: number;
+  /** Fill up to this many days with the range's extremes when the events fall short (default 0). */
+  floor?: number;
 }
 
 function median(xs: number[]): number {
@@ -221,9 +233,61 @@ function pauses(gap: readonly (number | null)[], input: NotableInput, networkId:
   keep.flush();
 }
 
+/** THE RANGE'S EXTREMES, in fill order (see `NOTABLE_FLOOR`): the busiest and quietest day of the
+ *  subject's own series, then a network's longest wait or the hypergraph's broadest day. Read on
+ *  covered days from `from` on, and for a network inside its own activity (the quiet tail after
+ *  its last day is the `last`'s business). An extreme exists only when the range's readings
+ *  differ (a flat range has no busiest day); ties keep the earlier day; `level` is the range's
+ *  median, so a caption can place the day against the range. */
+function extremes(input: NotableInput): NotableDay[] {
+  const { days, covered, series, subject, ids } = input;
+  const from = input.from ?? 0;
+  const networkId = subject === "dag" ? null : subject;
+  const own = subject === "dag" ? series["g.anchors"] : series[`m.${subject}.snaps`];
+  if (!own) return [];
+  let lo = from;
+  let hi = days.length - 1;
+  if (subject !== "dag") {
+    const act = activity(own, input);
+    if (!act) return [];
+    lo = Math.max(lo, act.first);
+    hi = Math.min(hi, act.last);
+  }
+  /** The covered readings of a row over [lo, hi] as (index, value) pairs. */
+  const readings = (row: readonly (number | null)[], keep: (v: number) => boolean = () => true): [number, number][] => {
+    const out: [number, number][] = [];
+    for (let i = lo; i <= hi; i++) {
+      const v = reading(row, covered, i);
+      if (v != null && keep(v)) out.push([i, v]);
+    }
+    return out;
+  };
+  const pick = (xs: [number, number][], kind: NotableDay["kind"], better: (a: number, b: number) => boolean): NotableDay | null => {
+    if (xs.length < 2) return null;
+    const values = xs.map(([, v]) => v);
+    if (Math.min(...values) === Math.max(...values)) return null;
+    let best = xs[0]!;
+    for (const x of xs) if (better(x[1], best[1])) best = x;
+    return { dayMs: days[best[0]]!, kind, networkId, value: best[1], level: median(values), score: 0 };
+  };
+  const counts = readings(own);
+  const out: (NotableDay | null)[] = [pick(counts, "peak", (a, b) => a > b), pick(counts, "trough", (a, b) => a < b)];
+  if (subject === "dag") {
+    // The day the most networks anchored: how many ids read above 0 on each covered day.
+    const rows = ids.map((id) => series[`m.${id}.snaps`]).filter((r): r is (number | null)[] => !!r);
+    const breadth: (number | null)[] = days.map((_, i) => (covered[i] == null ? null : rows.filter((r) => (r[i] ?? 0) > 0).length));
+    out.push(pick(readings(breadth), "broadest", (a, b) => a > b));
+  } else {
+    const gap = series[`m.${subject}.gapMax`];
+    if (gap) out.push(pick(readings(gap, (v) => v > 0), "longest", (a, b) => a > b)); // a 0 gap is no measurement (header)
+  }
+  return out.filter((d): d is NotableDay => d != null);
+}
+
 /** The notable days of a subject, best first, at most `cap`. Highest score wins; first/last
  *  (+Infinity) outrank any ratio; ties keep the earlier day, then the network id, then the kind,
- *  so the order never depends on how the engine sorts equal keys. */
+ *  so the order never depends on how the engine sorts equal keys. Short of `floor`, the range's
+ *  extremes follow (`extremes`), never on a day already taken. */
 export function notableDays(input: NotableInput): NotableDay[] {
   const { series, subject, ids, cap } = input;
   const out: NotableDay[] = [];
@@ -250,5 +314,16 @@ export function notableDays(input: NotableInput): NotableDay[] {
       (a.networkId ?? "").localeCompare(b.networkId ?? "") ||
       a.kind.localeCompare(b.kind),
   );
-  return out.slice(0, Math.max(0, cap));
+  const picked = out.slice(0, Math.max(0, cap));
+  const floor = Math.min(input.floor ?? 0, Math.max(0, cap));
+  if (picked.length < floor) {
+    const taken = new Set(picked.map((d) => d.dayMs));
+    for (const fill of extremes(input)) {
+      if (picked.length >= floor) break;
+      if (taken.has(fill.dayMs)) continue;
+      taken.add(fill.dayMs);
+      picked.push(fill);
+    }
+  }
+  return picked;
 }

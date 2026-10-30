@@ -30,7 +30,9 @@ export interface FactPair {
   end: "from" | "to";
 }
 
-export type NotableKind = "high" | "low" | "first" | "last" | "pause";
+/** high/low/first/last/pause are THRESHOLDED events; peak/trough/longest/broadest are the range's
+ *  own EXTREMES, filled in only when the events fall short of the floor (`notableDays`). */
+export type NotableKind = "high" | "low" | "first" | "last" | "pause" | "peak" | "trough" | "longest" | "broadest";
 
 export interface NotableDay {
   dayMs: number;
