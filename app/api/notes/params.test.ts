@@ -96,6 +96,17 @@ describe("parseNoteParams", () => {
     expect(parseNoteParams(sq("hyper", `${anId}/type:none`), NOW)).toEqual({ view: "hyper", subject: `${anId}/type:none`, span: "day" });
   });
 
+  // THE SPAN FACET (user, 2026-10-30: the Range card standing on the window must not copy the top
+  // card's note — "we should be able to write something complementary"): History's `<net>/span`
+  // over a pill, a subject note like any other (on request, limited), and History's alone.
+  it("History takes a network's span facet over a pill", () => {
+    expect(parseNoteParams(sp("view=trend&subject=dag/span&span=30d"), NOW)).toEqual({ view: "trend", subject: "dag/span", span: "30d" });
+    expect(parseNoteParams(sp(`view=trend&subject=${anId}/span&span=all`), NOW)).toEqual({ view: "trend", subject: `${anId}/span`, span: "all" });
+    expect(parseNoteParams(sp("view=trend&subject=all/span&span=30d"), NOW)).toEqual({ error: "bad subject" });
+    expect(parseNoteParams(sp("view=hyper&subject=dag/span"), NOW)).toEqual({ error: "bad subject" });
+    expect(parseNoteParams(sp("view=geo&subject=dag/span"), NOW)).toEqual({ error: "bad subject" });
+  });
+
   it("a former address inside a subject note answers as its current id", () => {
     expect(parseNoteParams(sp(`view=geo&subject=${relisted.formerIds![0]}/cc:FI`), NOW)).toEqual({ view: "geo", subject: `${relisted.id}/cc:FI`, span: "day" });
   });
@@ -135,6 +146,12 @@ describe("parseNoteRequest (the request route's body)", () => {
   it("takes a subject note for Hypergraph or Geography with no span", () => {
     expect(parseNoteRequest({ view: "geo", subject: `${anId}/cc:FI` }, NOW)).toEqual({ view: "geo", subject: `${anId}/cc:FI`, span: "day" });
     expect(parseNoteRequest({ view: "hyper", subject: `${anId}/type:l0` }, NOW)).toEqual({ view: "hyper", subject: `${anId}/type:l0`, span: "day" });
+  });
+
+  it("takes History's span facet with its pill in the body", () => {
+    expect(parseNoteRequest({ view: "trend", subject: "dag/span", span: "30d" }, NOW)).toEqual({ view: "trend", subject: "dag/span", span: "30d" });
+    expect(parseNoteRequest({ view: "trend", subject: "dag/span" }, NOW)).toEqual({ error: "bad body" });
+    expect(parseNoteRequest({ view: "trend", subject: "dag/span", fromMs: 1, toMs: 2 }, NOW)).toEqual({ error: "bad body" });
   });
 
   it("refuses a view note, the warmed country, or a span beside a subject note", () => {

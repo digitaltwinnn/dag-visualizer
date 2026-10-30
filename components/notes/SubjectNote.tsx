@@ -71,7 +71,7 @@ export default function SubjectNote({ req }: { req: NoteReq | null }) {
       {MARK}
       {waiting ? (
         <p className="m-0 flex items-center gap-2 text-body text-muted-foreground">
-          <NodeStars />
+          <NodeStars tone="ai" />
           {waiting}
         </p>
       ) : res?.state === "unavailable" ? (

@@ -121,6 +121,10 @@ export interface TrendMark {
   /** The UTC day's start. */
   dayMs: number;
   kind: NotableKind;
+  /** Another surface previews this day (the AI card's row, the band's mark): the coin lifts. */
+  lit?: boolean;
+  /** The button's name: the day and its kind, as the band's mark says it. */
+  label: string;
 }
 
 const DAY_MS_CHART = 86_400_000;
@@ -142,6 +146,8 @@ export default function TrendChart({
   scaleMax,
   cursorMs,
   marks,
+  onMarkHover,
+  onMarkPick,
   onPick,
   fill,
   plotHeight = PLOT_H,
@@ -233,6 +239,10 @@ export default function TrendChart({
    *  its own bucket on a daily axis, its midday's on a finer one; a day outside this chart's span
    *  draws nothing. Like `cursorMs`, it never reaches the plot. */
   marks?: readonly TrendMark[];
+  /** THE PLANE'S COIN PAIRS LIKE THE BAND'S (user, 2026-10-30): hovering a coin previews its day
+   *  (the caller writes `hoverNoteDay`, rule 9), a click commits it as the range. */
+  onMarkHover?: (dayMs: number | null) => void;
+  onMarkPick?: (dayMs: number) => void;
   /** THE AREA UNDER THE FIRST LINE, IN ITS OWN HUE (2026-09-19) — opt-in, and the 3D stack's
    *  planes are the only caller. A plane is a fully transparent body with one hairline, and a bare
    *  line floating in a scene reads as a wire rather than as a LAYER; the fill is what makes five
@@ -412,8 +422,8 @@ export default function TrendChart({
   const cursorX = cursorFraction(buckets, cursorBucket);
   // The notable days' x, by the same scale (see `TrendMark`); a day the axis does not hold is skipped.
   const markXs = (marks ?? [])
-    .map((m) => ({ key: `${m.dayMs}:${m.kind}`, kind: m.kind, x: cursorFraction(buckets, bucketAt(buckets, stepMs, stepMs >= DAY_MS_CHART ? m.dayMs : m.dayMs + DAY_MS_CHART / 2)) }))
-    .filter((m): m is { key: string; kind: NotableKind; x: number } => m.x != null);
+    .map((m) => ({ ...m, key: `${m.dayMs}:${m.kind}`, x: cursorFraction(buckets, bucketAt(buckets, stepMs, stepMs >= DAY_MS_CHART ? m.dayMs : m.dayMs + DAY_MS_CHART / 2)) }))
+    .filter((m): m is TrendMark & { key: string; x: number } => m.x != null);
 
   const hue0 = lines[0]?.hue ?? "var(--primary)";
   // The head's right-hand readout: the NEWEST MEASURED BUCKET, stamped with its own date —
@@ -698,16 +708,35 @@ export default function TrendChart({
               pointer events (the AI card's row and the timeline's diamond are the controls). */}
           {!held &&
             markXs.map((m) => (
-              <div
+              // A BUTTON, LIKE THE BAND'S MARK (user, 2026-10-30): it stops the plot's own press and
+              // release (the plate picks the instant on release), lifts while its day is previewed
+              // anywhere, and commits the day on click. The hit area is a touch larger than the coin.
+              <button
                 key={m.key}
-                className="absolute pointer-events-none"
+                type="button"
+                aria-label={m.label}
+                onPointerDown={(e) => e.stopPropagation()}
+                onPointerUp={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onMarkPick?.(m.dayMs);
+                }}
+                onPointerEnter={() => onMarkHover?.(m.dayMs)}
+                onPointerLeave={() => onMarkHover?.(null)}
+                onFocus={() => onMarkHover?.(m.dayMs)}
+                onBlur={() => onMarkHover?.(null)}
+                className={cn(
+                  "absolute grid size-4 cursor-pointer border-0 bg-transparent p-0 outline-none transition-transform duration-150 motion-reduce:transition-none",
+                  "before:absolute before:-inset-2 before:content-[''] focus-visible:ring-1 focus-visible:ring-foreground",
+                  m.lit && "scale-125",
+                )}
                 style={{
                   top: PLOT_MARGIN.top + plotInnerH(plotHeight) - 8,
                   left: `calc(${PLOT_MARGIN.left}px + ${m.x} * (100% - ${PLOT_INSET_X}px) - 8px)`,
                 }}
               >
                 <NoteKindCoin kind={m.kind} />
-              </div>
+              </button>
             ))}
           {cursorX != null && !held && (
             <div

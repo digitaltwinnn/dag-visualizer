@@ -120,6 +120,9 @@ describe("keys", () => {
       expect(subjectKindOf("cc:FI")).toBe("country"); expect(subjectKindOf("dor/cc:FI")).toBe("country");
       expect(subjectKindOf("isp:x")).toBe("provider"); expect(subjectKindOf("dor/isp:x")).toBe("provider");
       expect(subjectKindOf("dor/type:none")).toBe("type"); expect(subjectKindOf("dor")).toBe("view"); expect(subjectKindOf("all")).toBe("view");
+      // THE SPAN FACET (user, 2026-10-30): the Range card's complementary note over the window.
+      expect(subjectKindOf("dag/span")).toBe("span"); expect(subjectKindOf("dor/span")).toBe("span");
+      expect(isSubjectNote("dag/span")).toBe(true);
     });
   });
 });

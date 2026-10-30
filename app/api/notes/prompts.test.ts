@@ -146,7 +146,15 @@ describe("PROMPTS", () => {
     expect(Object.keys(geo).sort()).toEqual(["country", "provider"]);
     expect(Object.keys(hyper)).toEqual(["type"]);
     expect(PROMPTS.ledger.questions).toBeUndefined();
-    expect(PROMPTS.trend.questions).toBeUndefined();
+    // History's one subject question is the SPAN FACET (user, 2026-10-30): the Range card's note
+    // over the window, complementary to the top card's "what changed", never a copy of it.
+    expect(Object.keys(PROMPTS.trend.questions!)).toEqual(["span"]);
+    expect(PROMPTS.trend.questions!.span).toBe(
+      "Describe the span's shape, as a companion to a note above it that already states what rose and fell: its busiest and quietest day with their figures and how far each stood from the typical day, where the facts name them, and what a typical day of the span looked like. Do not state where the span began or ended, and do not say what rose or fell overall.",
+    );
+    expect(PROMPTS.trend.system("the hypergraph", undefined, false, "span")).toContain(PROMPTS.trend.questions!.span);
+    expect(PROMPTS.trend.system("the hypergraph", undefined, false, "span")).not.toContain(PROMPTS.trend.question);
+    expect(PROMPTS.trend.system("the hypergraph")).toContain(PROMPTS.trend.question);
     expect(geo.country).toBe(
       "Open with a plain sentence with the network as its actor, in the shape \"<network> hosts N nodes in <country>\"; then what share of the network's located nodes that is and the country's place among the network's countries; then how that moved over the span, or that it held. Say nothing about speed.",
     );

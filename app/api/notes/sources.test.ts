@@ -135,11 +135,18 @@ describe("factsFor — Geography's subject notes", () => {
   });
 
   it("every view's facts carry the subject's kind; the view notes are unchanged", async () => {
-    const got = async (view: "hyper" | "geo" | "ledger" | "trend", subject: string, span: "day" | "hours" | "7d") =>
+    const got = async (view: "hyper" | "geo" | "ledger" | "trend", subject: string, span: "day" | "hours" | "7d" | "30d") =>
       (await factsFor("mainnet", view, subject, span, NOW, fakeReads()))!;
     expect((await got("hyper", "all", "day")).kind).toBe("view");
     expect((await got("ledger", USDC, "hours")).kind).toBe("view");
     expect((await got("trend", "dag", "7d")).kind).toBe("view");
+    // The span facet asks its own question over the same facts, names its network as the view
+    // note does, and captions no days (the Range card lists none).
+    const facet = await got("trend", "dag/span", "7d");
+    expect([facet.kind, facet.label, facet.subjectName, facet.days]).toEqual(["span", "the hypergraph", undefined, []]);
+    const netFacet = await got("trend", `${USDC}/span`, "30d");
+    expect([netFacet.kind, netFacet.label, netFacet.subjectName]).toEqual(["span", "USDC.dag", "USDC.dag"]);
+    expect(netFacet.facts.map((f) => f.label)).toEqual((await got("trend", USDC, "30d")).facts.map((f) => f.label));
     // The warmed fleet country keeps Geography's own question; a network's country asks the country's.
     const cc = await got("geo", "cc:DE", "day");
     expect([cc.kind, cc.label, cc.subjectName]).toEqual(["view", "Germany", "Germany"]);
@@ -185,8 +192,9 @@ describe("factsFor — Hypergraph's make-up notes", () => {
     expect([net.label, net.subjectName, net.kind]).toEqual(["USDC.dag", "USDC.dag", "view"]);
   });
 
-  it("hyper accepts a make-up for a tracked network, spelled as its roleKey — never the DAG's (no `f.type.dag.*` series: an accepted ask could only flash and answer none), nothing else", () => {
-    for (const s of ["nope/type:l0", "unlisted/type:l0", "all/type:l0", "dag/type:l0+cl1", "dag/type:none", `${USDC}/type:cl1+l0`, `${USDC}/type:l0+l0`, `${USDC}/type:x`, `${USDC}/type:`, `${USDC}/type:l0/x`, "type:l0"])
+  it("hyper accepts a layer group for a tracked network and for the DAG core (2026-10-30: `f.type.dag.*` is stored), spelled as its roleKey, nothing else", () => {
+    for (const s of ["dag/type:l0+cl1", "dag/type:none", `${USDC}/type:l0`]) expect(noteSupported("hyper", s, "day"), s).toBe(true);
+    for (const s of ["nope/type:l0", "unlisted/type:l0", "all/type:l0", `${USDC}/type:cl1+l0`, `${USDC}/type:l0+l0`, `${USDC}/type:x`, `${USDC}/type:`, `${USDC}/type:l0/x`, "type:l0"])
       expect(noteSupported("hyper", s, "day"), s).toBe(false);
     expect(noteSupported("hyper", `${USDC}/type:l0`, "hours")).toBe(false);
   });

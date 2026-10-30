@@ -62,10 +62,12 @@
 // no orbit (2026-09-26; `viewPolicy.rotate` is false): a drag across the FRONT chart's plot is the
 // range BRUSH (`onRange`), and the wheel still zooms through the canvas.
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import TrendChart, { type TrendBand, type TrendLine, type TrendMark } from "@/components/docs/TrendChart";
 import { useAiNote } from "@/components/notes/useAiNote";
+import { NOTE_KIND_WORD } from "@/components/notes/noteDays";
+import { rangeDays } from "@/src/util/localTime";
 import useTrendRoster from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import useStagedMeasure, { ROLL_CLASS, useHeldOrder } from "@/components/useStagedMeasure";
@@ -85,6 +87,8 @@ import { useStore } from "@/src/store/store";
 import TrendTether from "@/components/TrendTether";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { UNLISTED_ID } from "@/src/data/unlisted";
+
+const NOTE_DAY_MS = 86_400_000;
 
 /** The empty roster, as ONE frozen reference. Publishing a fresh `[]` would be a content-free
  *  change the engine's `!==` still has to answer. */
@@ -314,16 +318,21 @@ export default function TrendStack() {
   // the loader holds still, so a cursor write never re-hands a fresh array.
   const { note: aiNote } = useAiNote();
   const noteDays = aiNote.res?.state === "ok" ? aiNote.res.days : null;
+  // …PAIRED with the AI card's row and the band's mark through `hoverNoteDay` (rule 9; user,
+  // 2026-10-30: the planes "don't carry the same hover effect … like the vitals chart does").
+  const hoverNoteDay = useStore((s) => s.hoverNoteDay);
   const marksById = useMemo(() => {
     const m = new Map<string, TrendMark[]>();
     for (const d of noteDays ?? []) {
       const id = d.networkId ?? "dag";
       const list = m.get(id) ?? [];
-      list.push({ dayMs: d.dayMs, kind: d.kind });
+      list.push({ dayMs: d.dayMs, kind: d.kind, lit: hoverNoteDay === d.dayMs, label: `Notable day, ${rangeDays(d.dayMs, d.dayMs + NOTE_DAY_MS)}: ${NOTE_KIND_WORD[d.kind]}` });
       m.set(id, list);
     }
     return m;
-  }, [noteDays]);
+  }, [noteDays, hoverNoteDay]);
+  const onMarkHover = useCallback((dayMs: number | null) => useStore.getState().setHoverNoteDay(dayMs), []);
+  const onMarkPick = useCallback((dayMs: number) => useStore.getState().setTrendRange({ fromMs: dayMs, toMs: dayMs + NOTE_DAY_MS }), []);
   const stackById = useMemo(() => {
     const m = new Map<string, TrendBand[]>();
     for (const [id, row] of rows) if (row.stack?.length) m.set(id, row.stack);
@@ -771,6 +780,8 @@ export default function TrendStack() {
                 lines={linesById.get(pose.id)!}
                 stack={stackById.get(pose.id)}
                 marks={marksById.get(pose.id)}
+                onMarkHover={onMarkHover}
+                onMarkPick={onMarkPick}
                 // THE STACK IS THE FILL (user, 2026-10-09: "are they truly stacked? I feel the
                 // overlap"): under the Nodes measure the bands partition the area the fill would
                 // paint, and the fill's gradient over them washed the steps out. One or the other.

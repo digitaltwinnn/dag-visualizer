@@ -38,12 +38,12 @@ export function providerNoteReq(isp: string | null, network: string | null, unli
   return key ? scoped(`isp:${key}`, network, unlisted) : null;
 }
 
-/** Hypergraph's make-up group: always one network's (`sel.netId`), its codes as the stored type key.
- *  The DAG core's make-ups have none: the sampler writes no `f.type.dag.*` series (the DAG node-type
- *  stack is the open sampler follow-up), and an ask that can only answer `none` would flash
- *  "writing…" and spend a limited request (final review I2). */
+/** Hypergraph's layer group: always one network's (`sel.netId`), its codes as the stored type key.
+ *  The DAG core's groups included since 2026-10-30: the sampler has written `f.type.dag.*` since
+ *  the 2026-10-29 19:00Z run (PR #80), so the guard that spared an ask that could only answer
+ *  `none` is lifted (user: "Composition card is missing its AI section"). */
 export function typeNoteReq(sel: { netId: string; key: string }, unlisted: Unlisted): NoteReq | null {
-  if (unlisted(sel.netId) || sel.netId === "dag") return null;
+  if (unlisted(sel.netId)) return null;
   return { view: "hyper", subject: `${sel.netId}/type:${roleKeyOfCodes(parseCompositionKey(sel.key).codes)}` };
 }
 
@@ -66,8 +66,8 @@ export function rangeNoteReq(trendCard: string | null, range: { fromMs: number; 
  *  forward, else the filter, the hypergraph for All) — ALWAYS (the same day, second round: "the
  *  default range never shows an AI section, fix it … for DAG only I noticed"). A first cut left it
  *  out where it was the top Gate AI card's own subject (the pile rule), which read as the card
- *  having no note under the DAG filter; so where the two subjects coincide the Range card repeats
- *  the top card's note, through the loader's one cache. */
+ *  having no note under the DAG filter; a second cut repeated the top card's note there, which
+ *  "looks strange", so the window mode asks the SPAN FACET: its own question over the plane's facts. */
 export function rangeCardNoteReq(
   trendCard: string | null,
   range: { fromMs: number; toMs: number } | null,
@@ -77,5 +77,8 @@ export function rangeCardNoteReq(
   if (range) return rangeNoteReq(trendCard, range, unlisted);
   const net = trendCard == null || trendCard === "all" ? "dag" : trendCard;
   if (unlisted(net)) return null;
-  return { view: "trend", subject: net, span: windowId };
+  // THE SPAN FACET (`<net>/span`, `app/api/notes/keys.ts`): the plane's own facts over the window,
+  // asked the span's question, so the card never repeats the top card's note (user, 2026-10-30:
+  // "direct copy looks strange").
+  return { view: "trend", subject: `${net}/span`, span: windowId };
 }

@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 
 import CardHead, { RailPane } from "@/components/CardHead";
+import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { AI_NOTES_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { Door, QualifierChip, foldLabel } from "@/components/inspector/parts";
 import { NodeStars } from "@/components/state/StateAtoms";
@@ -180,6 +181,9 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
 
   const res = note.res;
   const titleKey = `${subject.view}:${subject.subject}`;
+  // THE ARRIVAL PULSE every rail card plays (user, 2026-10-30: "AI card is missing the animation
+  // on the left side when the card becomes active"), in the AI hue rather than the filter's.
+  const pulseKey = useEdgePulse(titleKey);
 
   return (
     <RailPane
@@ -226,7 +230,7 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
               `unavailable` never reach here: the slot stands down (R67). */}
           {res == null || res.state === "pending" ? (
             <p className="m-0 flex items-center gap-2 text-body text-muted-foreground">
-              <NodeStars />
+              <NodeStars tone="ai" />
               reading…
             </p>
           ) : res.state === "request" ? (
@@ -249,6 +253,7 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
           ) : null}
         </div>
       )}
+      <PulseEdge pulseKey={pulseKey} rail="right" off={collapsed} hue="var(--ai-mark)" />
     </RailPane>
   );
 }

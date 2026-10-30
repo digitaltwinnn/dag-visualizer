@@ -899,9 +899,13 @@ The Metagraph card carries none: filtered, it is the same subject as the top car
 card reads the FILTER, not the plane brought forward** (user, 2026-10-30): a focus re-deals the
 stack and scopes the Range card, but the view's note keeps saying what the top bar says, so under
 All it stays the hypergraph's note whichever plane is forward (`noteSubjectOf`). **The Range card
-standing on the window carries the plane's note over the window pill, always** (`rangeCardNoteReq`,
-the same day): where that is the top card's own subject the two cards say the same note (one
-fetch); a first cut left that case out and read as a missing section under the DAG filter. The block is
+standing on the window carries the plane's SPAN FACET over the window pill** (`rangeCardNoteReq`
+→ `<net>/span`, `app/api/notes/keys.ts` kind `span`, the same day): the plane's own facts, asked
+the span's question (where it began and ended, its busiest and quietest day, how steady the run
+was) rather than the top card's "what changed" — a first cut left the card bare where it would have
+repeated the top card, a second repeated it ("direct copy looks strange"). It is a subject note:
+on request, limited, never warmed. **A plane's coin pairs like the band's**: hover previews the day
+through `hoverNoteDay`, a click commits it (`TrendChart onMarkHover` / `onMarkPick`). The block is
 `components/notes/SubjectNote.tsx`, and **it IS the card's lead** (user, 2026-10-30, design option D
 of four shown in the brainstorming companion, then "no fallback"): the measured lead sentences
 ("Hosts 25% of the selection's nodes", the Range card's "DOR anchored N snapshots in this range")

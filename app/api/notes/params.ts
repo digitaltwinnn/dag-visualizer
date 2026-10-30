@@ -48,6 +48,7 @@ function networkOf(raw: string): string | null {
  *  repeat), so `cl1+l0` and `l0+l0` are refused rather than given a second key for one make-up. */
 function selectionOk(view: NoteView, tail: string): boolean {
   if (view === "geo") return CC_TAIL_RE.test(tail) || ISP_TAIL_RE.test(tail);
+  if (view === "trend") return tail === "span"; // the span facet (keys.ts), History's alone
   if (view !== "hyper") return false;
   const m = TYPE_TAIL_RE.exec(tail);
   return m != null && roleKey({ roles: m[1]!.split("+") }) === m[1];
@@ -98,6 +99,11 @@ export function parseNoteRequest(body: unknown, nowMs: number): Parsed {
   if ((view === "hyper" || view === "geo") && isSubjectNote(subject)) {
     if (span !== undefined || fromMs !== undefined || toMs !== undefined) return { error: "bad body" };
     return parseNoteParams(new URLSearchParams({ view, subject }), nowMs);
+  }
+  // History's span facet rides a PILL (the window the Range card stands on), never a brush.
+  if (view === "trend" && isSubjectNote(subject)) {
+    if (typeof span !== "string" || !PILLS.includes(span as NoteSpan) || fromMs !== undefined || toMs !== undefined) return { error: "bad body" };
+    return parseNoteParams(new URLSearchParams({ view, subject, span }), nowMs);
   }
   if (view !== "trend") return { error: "bad body" };
   const sp = new URLSearchParams({ view, subject });

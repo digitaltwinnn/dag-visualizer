@@ -165,6 +165,8 @@ function blurbsOf(net: string): Record<string, string> {
 }
 
 const isNetwork = (net: string, id: string) => id === "dag" || catalogOf(net).some((m) => m.id === id);
+/** History's subject without its span facet: `dor/span` → `dor` (keys.ts `SubjectKind` "span"). */
+const trendBaseOf = (subject: string) => (subject.endsWith("/span") ? subject.slice(0, -"/span".length) : subject);
 const RANGE_RE = /^r(\d+)-(\d+)$/;
 
 function rangeOf(span: string): { fromMs: number; toMs: number } | null {
@@ -228,7 +230,8 @@ function hyperSelectionOf(net: string, subject: string): HyperSelection | null {
   if (!isSubjectNote(subject) || subjectKindOf(subject) !== "type") return null;
   const scope = subject.slice(0, subject.indexOf("/"));
   const type = TYPE_TAIL_RE.exec(subject.slice(scope.length + 1))?.[1];
-  if (!type || scope === "dag" || !isNetwork(net, scope) || roleKey({ roles: type.split("+") }) !== type) return null;
+  // The DAG core's groups included (2026-10-30; `f.type.dag.*` is stored since 2026-10-29, PR #80).
+  if (!type || !isNetwork(net, scope) || roleKey({ roles: type.split("+") }) !== type) return null;
   return { net: scope, type };
 }
 
@@ -303,7 +306,10 @@ const LEAD_IN_MS = 30 * D;
 const isPill = (span: string): span is TrendPill => span in TREND_PILLS;
 
 async function readTrend(c: Ctx): Promise<Read | null> {
-  const { net, subject, span, nowMs, reads } = c;
+  const { net, span, nowMs, reads } = c;
+  // THE SPAN FACET reads the base network's facts and captions no days (the Range card lists none).
+  const subject = trendBaseOf(c.subject);
+  const facet = subject !== c.subject;
   let zoom: TrendFactsInput["zoom"];
   let cur: TrendsWindowData;
   let prev: TrendsWindowData | null;
@@ -338,7 +344,7 @@ async function readTrend(c: Ctx): Promise<Read | null> {
     ]);
   }
   const built = trendFacts({ subject, zoom, span: { fromMs, toMs }, cur, prev, daily, names: c.names, blurbs: c.blurbs });
-  return { built, spanFrom: fromMs, spanTo: toMs, windows: [["Span length", secondsOf(fromMs, toMs)]] };
+  return { built: built && facet ? { ...built, days: [] } : built, spanFrom: fromMs, spanTo: toMs, windows: [["Span length", secondsOf(fromMs, toMs)]] };
 }
 
 const VIEW_SOURCES: Record<NoteView, ViewSource> = {
@@ -422,9 +428,16 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
   // HOW IT CHANGED: the pill's (or the brushed range's) span, the equal span before it, and for the
   // long pills the daily tier the notable days are picked from.
   trend: {
-    accepts: (net, subject, span) => (isPill(span) || span === "all" || rangeOf(span) != null) && isNetwork(net, subject),
-    label: (subject, names) => (subject === "dag" ? "the hypergraph" : (names[subject] ?? subject)),
-    whole: (subject) => subject === "dag",
+    // …or a network's SPAN FACET (`<net>/span`, keys.ts), over a pill only: a brush has its own note.
+    accepts: (net, subject, span) =>
+      subject.endsWith("/span")
+        ? (isPill(span) || span === "all") && isNetwork(net, trendBaseOf(subject))
+        : (isPill(span) || span === "all" || rangeOf(span) != null) && isNetwork(net, subject),
+    label: (subject, names) => {
+      const base = trendBaseOf(subject);
+      return base === "dag" ? "the hypergraph" : (names[base] ?? base);
+    },
+    whole: (subject) => trendBaseOf(subject) === "dag",
     read: readTrend,
   },
 };

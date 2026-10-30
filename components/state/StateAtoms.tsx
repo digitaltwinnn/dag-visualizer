@@ -10,13 +10,18 @@ import { cn } from "@/lib/utils";
 // as the `animate-breathe` live-dot elsewhere. Presentational only — no store access.
 
 // ACQUIRING — a short row of node-stars twinkling on in staggered sequence while a value resolves.
-export function NodeStars({ count = 5 }: { count?: number }) {
+/** `tone="ai"`: the stars in the AI hue, where they wait for a model's note (the AI card and the
+ *  plates, user 2026-10-30: "give the reading icon for the AI card/sections also the AI colors"). */
+export function NodeStars({ count = 5, tone }: { count?: number; tone?: "ai" }) {
   return (
     <span className="inline-flex gap-[5px] items-center align-middle" aria-hidden>
       {Array.from({ length: count }).map((_, i) => (
         <span
           key={i}
-          className="w-[5px] h-[5px] rounded-full bg-primary opacity-30 animate-st-twinkle motion-reduce:animate-none motion-reduce:opacity-70"
+          className={cn(
+            "w-[5px] h-[5px] rounded-full opacity-30 animate-st-twinkle motion-reduce:animate-none motion-reduce:opacity-70",
+            tone === "ai" ? "bg-[var(--ai-mark)]" : "bg-primary",
+          )}
           style={{ animationDelay: `${i * 0.18}s` }}
         />
       ))}

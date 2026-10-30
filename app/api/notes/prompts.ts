@@ -105,8 +105,15 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
   },
   trend: {
     question: "Say what changed over the span: what rose, what fell and when, as the numbers show it.",
-    system: (subjectLabel) =>
-      `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${PROMPTS.trend.question}`,
+    questions: {
+      // THE SPAN FACET (user, 2026-10-30: the Range card on the window must not copy the top card's
+      // note — "we should be able to write something complementary"): the same facts, the span read
+      // for its SHAPE (its extremes against the typical day), never its ends: live, "where it began
+      // and ended" came back as the very rise the top card states.
+      span: "Describe the span's shape, as a companion to a note above it that already states what rose and fell: its busiest and quietest day with their figures and how far each stood from the typical day, where the facts name them, and what a typical day of the span looked like. Do not state where the span began or ended, and do not say what rose or fell overall.",
+    },
+    system: (subjectLabel, _lead, _common, kind) =>
+      `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${questionOf("trend", kind)}`,
   },
 };
 

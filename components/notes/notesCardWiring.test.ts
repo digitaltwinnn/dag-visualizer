@@ -85,6 +85,22 @@ describe("the notes card's own behaviour", () => {
     expect(chart).not.toMatch(/rotate-45/);
   });
 
+  // THE PLANE'S COIN PAIRS LIKE THE BAND'S (user, 2026-10-30: "the cards with charts don't carry the
+  // same hover effect for the AI notable days like the vitals chart does"): a coin on a plane is a
+  // button, lit when its day is the hovered one, hovering it lights the row and the band's mark
+  // through `hoverNoteDay` (rule 9), and a click commits the day as the range — the row's commit.
+  it("a plane's coin hovers and commits like the timeline's", () => {
+    const chart = read("components/docs/TrendChart.tsx");
+    expect(chart).toMatch(/lit\?: boolean;[^]*?label: string;/); // TrendMark carries its lit state and its name
+    expect(chart).toMatch(/onMarkHover\?: \(dayMs: number \| null\) => void;/);
+    expect(chart).toMatch(/onMarkPick\?: \(dayMs: number\) => void;/);
+    expect(chart).toMatch(/<button[^]*?aria-label=\{m\.label\}[^]*?onPointerDown=\{\(e\) => e\.stopPropagation\(\)\}[^]*?<NoteKindCoin kind=\{m\.kind\}/);
+    const stack = read("components/TrendStack.tsx");
+    expect(stack).toMatch(/useStore\(\(s\) => s\.hoverNoteDay\)/);
+    expect(stack).toMatch(/onMarkHover=\{/);
+    expect(stack).toMatch(/onMarkPick=\{/);
+  });
+
   // THE MARKER TRAVELS (user, 2026-10-30: "if the moment is a notable day … show the marker on the
   // cards as well, maybe as a 2nd pill on the right side in the header"): the Moment card wears the
   // day's kind chip beside its bucket chip when its bucket falls on a notable day, the Range card
@@ -116,6 +132,11 @@ describe("the notes card's own behaviour", () => {
     // Drawn beside the plot, never inside it: TrendPlot's own props carry no marks.
     const plot = chart.slice(chart.indexOf("const TrendPlot = memo("));
     expect(plot).not.toMatch(/\bmarks[,=}]|\bmarks\b.*\?:/); // the word "axis marks" in prose is fine; the prop is not
+  });
+
+  it("plays the rail's arrival pulse, in the AI hue (user, 2026-10-30)", () => {
+    expect(card).toMatch(/const pulseKey = useEdgePulse\(titleKey\);/);
+    expect(card).toMatch(/<PulseEdge pulseKey=\{pulseKey\} rail="right" off=\{collapsed\} hue="var\(--ai-mark\)" \/>/);
   });
 
   it("wears the iridescent edge on the open box only", () => {

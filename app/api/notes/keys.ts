@@ -61,13 +61,17 @@ export const CC_TAIL_RE = /^cc:([A-Z]{2})$/;
 export const ISP_TAIL_RE = /^isp:([a-z0-9-]{1,48})$/;
 export const TYPE_TAIL_RE = /^type:((?:l0|cl1|dl1)(?:\+(?:l0|cl1|dl1)){0,2}|none)$/;
 
-export type SubjectKind = "view" | "country" | "provider" | "type";
+/** `span` is THE SPAN FACET (user, 2026-10-30): History's `<net>/span` over a pill, the Range
+ *  card's note while it stands on the window — the same facts as the view note, a complementary
+ *  question (the span as a stretch of time), so the two cards never say one note twice. */
+export type SubjectKind = "view" | "country" | "provider" | "type" | "span";
 
 export function subjectKindOf(subject: string): SubjectKind {
   const tail = subject.slice(subject.indexOf("/") + 1);
   if (tail.startsWith("cc:")) return "country";
   if (tail.startsWith("isp:")) return "provider";
   if (subject.includes("/") && tail.startsWith("type:")) return "type";
+  if (subject.includes("/") && tail === "span") return "span";
   return "view";
 }
 

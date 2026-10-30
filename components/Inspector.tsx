@@ -328,10 +328,12 @@ function GhostCard({ card, open = false, onToggle, step }: { card: RailCard; ope
       className={cn(
         "rail-entry relative block w-auto pointer-events-auto min-h-0 flex-none text-foreground-dim",
         // A LIGHT GLASS, not bare scene (user, 2026-10-04: "the ghost card should have some fill, not
-        // fully transparent — to read text"): `--panel-light` under a blur, a step below the
-        // committed entry's `--panel-solid` + hairline ring, so empty still reads lighter than held.
-        "px-[18px] py-2 rounded-[var(--radius)] border border-dashed bg-[var(--panel-light)] backdrop-blur-[8px] transition-colors duration-150 motion-reduce:transition-none",
-        open && !step ? "border-border pb-3" : "border-transparent",
+        // fully transparent — to read text"), and since 2026-10-30 its OWN fill and a dashed edge
+        // that shows folded too (user: "the background and outline for ghost cards in light and
+        // dark mode is too faint"): `--ghost-fill` / `--ghost-edge`, a step below the committed
+        // entry's `--panel-solid` + hairline ring, so empty still reads lighter than held.
+        "px-[18px] py-2 rounded-[var(--radius)] border border-dashed bg-[var(--ghost-fill)] backdrop-blur-[8px] transition-colors duration-150 motion-reduce:transition-none",
+        open && !step ? "border-border pb-3" : "border-[var(--ghost-edge)]",
         step && "hover:border-border hover:text-foreground",
       )}
     >
