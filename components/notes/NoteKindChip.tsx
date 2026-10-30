@@ -14,9 +14,16 @@ export default function NoteKindChip({ day }: { day: NoteDay }) {
   const Mark = NOTE_KIND_ICONS[day.kind];
   const hue = day.networkId ? identityHudCss(day.networkId) : undefined;
   return (
-    <QualifierChip className="gap-1">
-      <Mark aria-hidden className="size-3 flex-none" style={hue ? { color: hue } : undefined} />
-      {NOTE_KIND_WORD[day.kind]}
+    // THE AI'S OWN EDGE (user, 2026-10-30: "if the tag comes from AI give it that color outline
+    // also"): the plate's violet edge and wash, so a chip a model's note produced is marked like
+    // the note itself, where every other qualifier chip is the card's neutral hairline.
+    <QualifierChip className="border-[var(--ai-plate-edge)] bg-[var(--ai-wash)]">
+      {/* One flex row inside the chip's truncating span: preflight makes an svg `display:block`,
+          so a bare mark beside text stood on its own line (user, 2026-10-30: "spans two rows"). */}
+      <span className="inline-flex items-center gap-1">
+        <Mark aria-hidden className="size-3 flex-none" style={hue ? { color: hue } : undefined} />
+        {NOTE_KIND_WORD[day.kind]}
+      </span>
     </QualifierChip>
   );
 }

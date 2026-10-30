@@ -83,7 +83,8 @@ describe("the notes card's own behaviour", () => {
     const moment = read("components/inspector/TrendInstantPane.tsx");
     // The bucket chip is a clock mark and the width alone (user, 2026-10-30: "instead of saying
     // '5-min bucket' say '5-min' with an icon, shorter"); "bucket" stays for assistive tech.
-    expect(moment).toMatch(/<BUCKET_ICON aria-hidden[^]*?\{bucketWord\(stepMs\)\}[^]*?<span className="sr-only"> bucket<\/span>/);
+    expect(moment).toMatch(/<span className="inline-flex items-center gap-1">\s*<BUCKET_ICON aria-hidden[^]*?\{bucketWord\(stepMs\)\}[^]*?<span className="sr-only"> bucket<\/span>/);
+    expect(read("components/notes/NoteKindChip.tsx")).toMatch(/<span className="inline-flex items-center gap-1">\s*<Mark aria-hidden/);
     expect(moment).not.toMatch(/\{bucketWord\(stepMs\)\} bucket/);
     expect(moment).toMatch(/notableDayAt\(/);
     expect(moment).toMatch(/<NoteKindChip day=\{/);
@@ -94,6 +95,8 @@ describe("the notes card's own behaviour", () => {
     expect(chip).toMatch(/<QualifierChip/);
     expect(chip).toMatch(/NOTE_KIND_ICONS\[day\.kind\]/);
     expect(chip).toMatch(/NOTE_KIND_WORD\[day\.kind\]/);
+    // A tag the AI's note produced wears the AI's edge (user, 2026-10-30), like the plate.
+    expect(chip).toMatch(/<QualifierChip className="border-\[var\(--ai-plate-edge\)\] bg-\[var\(--ai-wash\)\]">/);
     const stack = read("components/TrendStack.tsx");
     expect(stack).toMatch(/const marksById = useMemo\(/);
     expect(stack).toMatch(/marks=\{marksById\.get\(pose\.id\)\}/);

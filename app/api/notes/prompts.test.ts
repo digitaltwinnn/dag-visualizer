@@ -264,6 +264,9 @@ describe("buildMessages", () => {
     expect(CAPTION_FORMAT).toMatch(/at most ten words/);
     expect(CAPTION_FORMAT).toMatch(/repeats neither/);
     expect(CAPTION_FORMAT).not.toMatch(/\d/);
+    // Plain words (user, 2026-10-30: "'… against median' is not really human readable").
+    expect(CAPTION_FORMAT).toMatch(/never "median", never "against"/);
+    expect(CAPTION_FORMAT).toMatch(/usually/);
     expect(m[1]!.content).toContain("DAY 2026-10-19");
     expect(m[1]!.content).toContain("DAY 2026-10-21");
     expect(m[1]!.content.indexOf("2026-10-19")).toBeLessThan(m[1]!.content.indexOf("2026-10-21"));
