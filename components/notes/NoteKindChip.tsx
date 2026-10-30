@@ -4,6 +4,7 @@ import { NOTE_KIND_ICONS } from "@/components/icons";
 import { QualifierChip } from "@/components/inspector/parts";
 import type { NoteDay } from "@/src/data/noteTypes";
 import { identityHudCss } from "@/src/palette/identity";
+import { AI_SWEEP } from "./aiSweep";
 import { NOTE_KIND_WORD } from "./noteDays";
 
 /** A NOTABLE DAY'S KIND AS A HEAD CHIP (user, 2026-10-30: "a 2nd pill on the right side in the
@@ -15,9 +16,9 @@ export default function NoteKindChip({ day }: { day: NoteDay }) {
   const hue = day.networkId ? identityHudCss(day.networkId) : undefined;
   return (
     // THE AI'S OWN EDGE (user, 2026-10-30: "if the tag comes from AI give it that color outline
-    // also"): the plate's violet edge and wash, so a chip a model's note produced is marked like
-    // the note itself, where every other qualifier chip is the card's neutral hairline.
-    <QualifierChip className="border-[var(--ai-plate-edge)] bg-[var(--ai-wash)]">
+    // also"): the card's iridescent sweep (`AI_SWEEP`), so a chip a model's note produced is
+    // marked like the note itself, where every other qualifier chip is the card's neutral hairline.
+    <QualifierChip className={AI_SWEEP}>
       {/* One flex row inside the chip's truncating span: preflight makes an svg `display:block`,
           so a bare mark beside text stood on its own line (user, 2026-10-30: "spans two rows"). */}
       <span className="inline-flex items-center gap-1">

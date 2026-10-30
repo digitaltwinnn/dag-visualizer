@@ -96,7 +96,7 @@ describe("the notes card's own behaviour", () => {
     expect(chip).toMatch(/NOTE_KIND_ICONS\[day\.kind\]/);
     expect(chip).toMatch(/NOTE_KIND_WORD\[day\.kind\]/);
     // A tag the AI's note produced wears the AI's edge (user, 2026-10-30), like the plate.
-    expect(chip).toMatch(/<QualifierChip className="border-\[var\(--ai-plate-edge\)\] bg-\[var\(--ai-wash\)\]">/);
+    expect(chip).toMatch(/<QualifierChip className=\{AI_SWEEP\}>/);
     const stack = read("components/TrendStack.tsx");
     expect(stack).toMatch(/const marksById = useMemo\(/);
     expect(stack).toMatch(/marks=\{marksById\.get\(pose\.id\)\}/);
@@ -171,7 +171,9 @@ describe("subject notes live on their cards", () => {
     expect(src).toMatch(/res\?\.state === "unavailable" \? \([^]*?no note right now/);
     expect(src).not.toMatch(/RequestDoor|Couldn/);
     expect(src).not.toMatch(/fallback[=:}]|SectionLabel|Constellation Gate AI/); // the word may stay in prose; no prop, no render of one
-    expect(src).toMatch(/bg-\[var\(--ai-wash\)\]/);
+    // The plate wears the card's iridescent sweep (user, 2026-10-30), through the one home.
+    expect(src).toMatch(/cn\("mb-2\.5 flex gap-2 rounded-xs px-2\.5 py-2", AI_SWEEP\)/);
+    expect(read("components/notes/aiSweep.ts")).toMatch(/var\(--ai-wash\),var\(--ai-wash\)\)_padding-box[^"]*var\(--ai-edge\)_border-box/);
     expect(src).toMatch(/useEffect\(\(\) => \{[^]*?res\?\.state !== "request"[^]*?note\.request\(\)[^]*?\}, \[/);
     // …once per key (the ref guard, so a re-render or a poll's `request` never POSTs twice), and only
     // after the key has stood for the dwell (final review I1: paging and a deck rotation change the

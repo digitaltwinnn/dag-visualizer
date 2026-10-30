@@ -3,6 +3,8 @@
 import { useEffect, useRef } from "react";
 
 import { AI_NOTES_ICON } from "@/components/icons";
+import { AI_SWEEP } from "@/components/notes/aiSweep";
+import { cn } from "@/lib/utils";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { useNet } from "@/components/topbar/useNet";
 import { queryOf, type NoteReq } from "./noteLoader";
@@ -17,7 +19,7 @@ import { useMainnetNote } from "./useAiNote";
 // card's measured lead ("Hosts 25% of the selection's nodes") and the note served one purpose, what
 // this subject is to the whole it sits in, and the note says it better and names its span; so the
 // lead is gone and the note stands where it stood, on a faint violet plate with the mark
-// (`--ai-wash` / `--ai-plate-edge`). The plate shows its own "reading…" while the note is in
+// (`--ai-wash` under the `--ai-edge` sweep). The plate shows its own "reading…" while the note is in
 // flight (one word, user 2026-10-30: whether the note is held or still being written is the cache's
 // business, not the reader's), and nothing at all when there is no note to have (`none`: nothing measured; off
 // mainnet). `unavailable` IS shown, as an instrument state (rule 10): "no note right now", muted,
@@ -61,7 +63,11 @@ export default function SubjectNote({ req }: { req: NoteReq | null }) {
   const waiting = res == null || res.state === "request" || res.state === "pending" ? "reading…" : null;
   const text = res?.state === "ok" ? res.text : null;
   return (
-    <div className="mb-2.5 flex gap-2 rounded-xs border border-[var(--ai-plate-edge)] bg-[var(--ai-wash)] px-2.5 py-2">
+    // THE CARD'S OWN SWEEP (user, 2026-10-30: "the AI sections inside other cards are missing the
+    // colored outline"): the plate wears the iridescent `--ai-edge` the AI card and the diamonds
+    // wear, by the card's layer trick — the wash over an opaque ground clipped to the padding box,
+    // the sweep clipped to the border box, so it shows only in the 1px ring.
+    <div className={cn("mb-2.5 flex gap-2 rounded-xs px-2.5 py-2", AI_SWEEP)}>
       {MARK}
       {waiting ? (
         <p className="m-0 flex items-center gap-2 text-body text-muted-foreground">
