@@ -3,7 +3,7 @@ import { checkNote } from "@/src/data/noteHonesty";
 import type { NoteDay, NoteResponse, NoteView } from "@/src/data/noteTypes";
 import { GateError, type gateChat, type GateErrorKind } from "./gate";
 import { failKeyOf, lockKeyOf, noteKeyOf, statsKeyOf, timingOf, type NoteSpan } from "./keys";
-import { buildMessages, parseAnswer } from "./prompts";
+import { buildMessages, parseAnswer, spanWords } from "./prompts";
 import { noteSupported, type factsFor } from "./sources";
 import type { NotesStore } from "./store";
 
@@ -158,7 +158,7 @@ async function write(
     if (attempt > 0) await count("retried");
     let answer: string;
     try {
-      answer = await chat(buildMessages(req.view, input.label, block, days, reasons, input.lead, input.common, input.kind));
+      answer = await chat(buildMessages(req.view, input.label, block, days, reasons, input.lead, input.common, input.kind, spanWords(req.view, req.span, input.spanFrom, input.spanTo)));
       await count("calls");
     } catch (e) {
       if (!(e instanceof GateError)) throw e; // not the Gate's: `generateNote` counts it as `error`

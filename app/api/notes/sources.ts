@@ -479,7 +479,13 @@ export async function factsFor(
   const { built } = r;
   const subjectName = r.subjectName ?? (row.whole(subject) ? undefined : row.label(subject, names));
   return {
-    facts: [...built.facts, ...r.windows.map(([label, s]) => fact(label, s, "duration"))],
+    facts: [
+      ...built.facts,
+      ...r.windows.map(([label, s]) => fact(label, s, "duration")),
+      // A brushed range's first and last UTC day (the Range card's title), so the note may name
+      // them (`spanWords`; the gate accepts a date only when a date fact holds it).
+      ...(rangeOf(span) ? [fact("Span start", r.spanFrom, "date"), fact("Span end", r.spanTo - 1, "date")] : []),
+    ],
     names: built.names,
     blurbs: built.blurbs ?? [],
     days: built.days ?? [],

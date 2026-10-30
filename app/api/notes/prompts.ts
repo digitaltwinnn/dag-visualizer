@@ -1,5 +1,5 @@
 import type { NoteLead, NoteView, NotableDay } from "@/src/data/noteTypes";
-import type { SubjectKind } from "./keys";
+import type { NoteSpan, SubjectKind } from "./keys";
 
 // THE PROMPTS OF AI NOTES — one home for what the model is told and how its answer is read back.
 // The voice is the About page's (`components/aboutCopy.ts`): plain, present tense, nodes not
@@ -26,6 +26,8 @@ export const VOICE = [
   "Write figures exactly as the facts give them: use only numbers from the facts, and never round a small figure to zero.",
   "Do not use quantity words the facts do not state: no \"half\", \"hundreds\", \"thousands\", \"dozens\", no \"-fold\", no \"doubles\" or \"doubling\". \"Doubled\", \"tripled\" and \"halved\" are fine only when a ratio in the facts supports them.",
   "Only use durations the facts give. Do not name a span length with digits unless a fact states it.",
+  "Name the span in your first sentence, once, in exactly the words the Span line gives (such as \"over the last … days\" or \"from … to …\"); the reader sees the same words on the card.",
+  "Call the subject by its name, as the Subject line gives it, wherever you would otherwise say \"the network\" or \"it\": \"the network\" alone is only for the whole network.",
   "Describe what the numbers show: never explain why, and never read a purpose or a cause into them.",
   "Say nodes, never machines. Say snapshots or global snapshots, never ticks, never \"L1 snapshots\". Never say feeless. All the nodes together are the network, never the fleet.",
   "A network's share of global snapshots is what it \"was part of\".",
@@ -102,6 +104,32 @@ function questionOf(view: NoteView, kind?: SubjectKind): string {
 
 const isoDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
+/** THE SPAN IN THE CARD PILL'S OWN WORDS (user, 2026-10-30: "mention the range in its text as
+ *  well … 'The network held at 6 networks during the last 7 days'"), stated to the model on a
+ *  `Span:` line and asked for in the first sentence. One vocabulary with the client's
+ *  (`spanPhrase` / `noteSpanWords`): the fixed week of Hypergraph and Geography, the Snapshots day,
+ *  History's pills, and a brushed range by its UTC days exactly as the Range card titles it
+ *  (`rangeDays`: the last day shown is the day holding `toMs - 1`). The honesty gate backs every
+ *  figure here: the digits are the span-length duration facts, the dates a range's `Span start` /
+ *  `Span end` date facts. */
+const PILL_WORDS: Record<string, string> = {
+  "1h": "the last hour",
+  "24h": "the last 24 hours",
+  "7d": "the last 7 days",
+  "30d": "the last 30 days",
+  "1y": "the last year",
+  all: "all measured history",
+};
+const utcDay = (ms: number) => new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+export function spanWords(view: NoteView, span: NoteSpan, spanFrom: number, spanTo: number): string {
+  if (view === "hyper" || view === "geo") return "the last 7 days";
+  if (view === "ledger") return "the last 24 hours";
+  if (span in PILL_WORDS) return PILL_WORDS[span]!;
+  const a = utcDay(spanFrom);
+  const b = utcDay(Math.max(spanFrom, spanTo - 1));
+  return a === b ? `on ${a}` : `from ${a} to ${b}`;
+}
+
 /** The two messages for one attempt. `days` (History's 7d / 30d / 1y / all) asks for one caption
  *  line per notable day, in the order given; the facts already describe each day, numbered the
  *  same way. `retryReasons` names why the previous answer was rejected, so the second attempt can
@@ -117,12 +145,13 @@ export function buildMessages(
   lead?: NoteLead,
   common?: boolean,
   kind?: SubjectKind,
+  span?: string | null,
 ): { role: "system" | "user"; content: string }[] {
   const withDays = !!days && days.length > 0;
   const format = withDays
     ? "Answer format: first a line starting NOTE: with the note, then exactly one line per listed day, starting DAY YYYY-MM-DD: with a caption of one short sentence using only numbers from the facts. Do not repeat the date in the caption. Nothing else."
     : "Answer format: one line starting NOTE: and nothing else.";
-  const parts = [`Facts:\n${factsBlock}`];
+  const parts = [...(span ? [`Span: ${span}`] : []), `Facts:\n${factsBlock}`];
   if (withDays) parts.push(`Days to caption, in order:\n${days.map((d) => `DAY ${isoDay(d.dayMs)}`).join("\n")}`);
   if (retryReasons && retryReasons.length)
     parts.push(`Your previous answer was rejected: ${retryReasons.join("; ")}. Write it again and fix this.`);

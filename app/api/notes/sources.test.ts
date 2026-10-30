@@ -321,6 +321,16 @@ describe("factsFor — the per-view read table", () => {
     expect(input.daily).toBeNull();
   });
 
+  it("a brushed range's facts carry its first and last UTC day as dates, so the note may name them (user, 2026-10-30)", async () => {
+    const from = Date.UTC(2026, 9, 1);
+    const to = Date.UTC(2026, 9, 11);
+    const out = await factsFor("mainnet", "trend", "dag", `r${from}-${to}`, NOW, fakeReads());
+    const dates = out!.facts.filter((f) => f.kind === "date").map((f) => [f.label, f.value]);
+    expect(dates).toEqual([["Span start", from], ["Span end", to - 1]]);
+    const pill = await factsFor("mainnet", "trend", "dag", "7d", NOW, fakeReads());
+    expect(pill!.facts.some((f) => f.label === "Span start")).toBe(false);
+  });
+
   it("ledger: 5m over 24 hours (R79) and 1h over 7 days; both windows stated", async () => {
     const r = fakeReads();
     const out = await factsFor("mainnet", "ledger", "all", "hours", NOW, r);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { NoteView, NotableDay } from "@/src/data/noteTypes";
-import { PROMPTS, VOICE, buildMessages, parseAnswer } from "./prompts";
+import { PROMPTS, VOICE, buildMessages, parseAnswer, spanWords } from "./prompts";
 
 const VIEWS: NoteView[] = ["hyper", "geo", "ledger", "trend"];
 
@@ -189,8 +189,41 @@ describe("PROMPTS", () => {
   });
 });
 
+describe("spanWords — the span the note names, in the card pill's own words (user, 2026-10-30)", () => {
+  const D = 86_400_000;
+  const now = Date.UTC(2026, 9, 30, 12);
+  it("the fixed spans: a week for Hypergraph and Geography, a day for Snapshots", () => {
+    expect(spanWords("hyper", "day", now - 7 * D, now)).toBe("the last 7 days");
+    expect(spanWords("geo", "day", now - 7 * D, now)).toBe("the last 7 days");
+    expect(spanWords("ledger", "hours", now - D, now)).toBe("the last 24 hours");
+  });
+  it("History's pills", () => {
+    expect(spanWords("trend", "1h", now - 3_600_000, now)).toBe("the last hour");
+    expect(spanWords("trend", "24h", now - D, now)).toBe("the last 24 hours");
+    expect(spanWords("trend", "7d", now - 7 * D, now)).toBe("the last 7 days");
+    expect(spanWords("trend", "30d", now - 30 * D, now)).toBe("the last 30 days");
+    expect(spanWords("trend", "1y", now - 365 * D, now)).toBe("the last year");
+    expect(spanWords("trend", "all", 0, now)).toBe("all measured history");
+  });
+  it("a brushed range by its UTC days, as the Range card titles it; one day is 'on'", () => {
+    const from = Date.UTC(2026, 9, 28);
+    const to = Date.UTC(2026, 9, 30);
+    expect(spanWords("trend", `r${from}-${to}`, from, to)).toBe("from Oct 28 to Oct 29");
+    expect(spanWords("trend", `r${from}-${from + D}`, from, from + D)).toBe("on Oct 28");
+  });
+});
+
 describe("buildMessages", () => {
   const FACTS = "Snapshots anchored: 12,159";
+
+  it("hands the span's words to the model and asks for them in the first sentence (user, 2026-10-30)", () => {
+    const m = buildMessages("hyper", "Mainnet", FACTS, null, undefined, undefined, undefined, undefined, "the last 7 days");
+    expect(m[1]!.content).toContain("Span: the last 7 days");
+    expect(VOICE).toMatch(/Name the span in your first sentence/);
+    // …and the subject by its name, never "the network" for one network (user, 2026-10-30).
+    expect(VOICE).toMatch(/Call the subject by its name/);
+    expect(buildMessages("hyper", "Mainnet", FACTS, null)[1]!.content).not.toContain("Span:");
+  });
 
   it("is a system then a user message, the facts in the user message", () => {
     const m = buildMessages("hyper", "Mainnet", FACTS, null);

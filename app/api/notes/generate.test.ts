@@ -381,6 +381,7 @@ describe("the span length reaches the model and backs its window (R20)", () => {
     const d = deps({ facts: (net, view, subject, span, now) => factsFor(net, view, subject, span, now, reads), answers: [answer] });
     const res = await generateNote(REQ, d, "read");
     expect(d.chat.mock.calls[0]![0][1]!.content).toContain("Span length: 7d");
+    expect(d.chat.mock.calls[0]![0][1]!.content).toContain("Span: the last 7 days");
     expect(res).toMatchObject({ state: "ok", text: "Over the last 7 days the hypergraph held its pace." });
     expect(d.chat).toHaveBeenCalledTimes(1);
     const shown = await factsFor("mainnet", "trend", "dag", "7d", NOW, reads);
