@@ -8,6 +8,10 @@ the architecture map and the dev workflow; **its rules govern this file too**.
 
 ## Light/dark
 
+**The default is DARK** (user, 2026-10-30: "set the default to dark"): a first visit with nothing
+stored is the dark instrument whatever the OS says; `System` is a stored CHOICE like the other two,
+and the pre-paint script stamps `dark` when nothing is stored. Before that day absence meant System.
+
 **Theme is a two-way pref (`system` / `light` / `dark`), not a boolean** — `src/theme/resolve.ts`
 is the one resolver (`ThemePref`, `Theme`, `THEME_KEY`, `parseThemePref`, `resolveTheme`), the
 `src/net/parse.ts` pattern mirrored for theme. Almost every token is a single `light-dark(light,
@@ -15,7 +19,7 @@ dark)` call at its ONE definition site in `:root` — no second `[data-theme]` o
 way the network accent needs, because CSS itself carries both values. `color-scheme: light dark`
 on `:root` is what makes `light-dark()` resolve at all; an explicit choice stamps
 `[data-theme="light"|"dark"]` on `<html>`, narrowing `color-scheme` to just that value, and
-`System` removes the attribute so the browser's own `prefers-color-scheme` decides — confirmed
+`System` leaves the attribute off so the browser's own `prefers-color-scheme` decides — confirmed
 live: flipping the OS scheme with no reload repaints every token with zero JS, because nothing
 but CSS is involved while `data-theme` is absent. layout.tsx's inline pre-paint script (the same
 device the network accent uses) reads `localStorage['dagviz:theme']` and stamps `data-theme`
