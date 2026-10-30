@@ -121,6 +121,8 @@ export interface TrendMark {
   /** The UTC day's start. */
   dayMs: number;
   kind: NotableKind;
+  /** Whose day it is: the network, or null for the whole network's. */
+  networkId: string | null;
   /** Another surface previews this day (the AI card's row, the band's mark): the coin lifts. */
   lit?: boolean;
   /** The button's name: the day and its kind, as the band's mark says it. */
@@ -242,7 +244,7 @@ export default function TrendChart({
   /** THE PLANE'S COIN PAIRS LIKE THE BAND'S (user, 2026-10-30): hovering a coin previews its day
    *  (the caller writes `hoverNoteDay`, rule 9), a click commits it as the range. */
   onMarkHover?: (dayMs: number | null) => void;
-  onMarkPick?: (dayMs: number) => void;
+  onMarkPick?: (mark: TrendMark) => void;
   /** THE AREA UNDER THE FIRST LINE, IN ITS OWN HUE (2026-09-19) — opt-in, and the 3D stack's
    *  planes are the only caller. A plane is a fully transparent body with one hairline, and a bare
    *  line floating in a scene reads as a wire rather than as a LAYER; the fill is what makes five
@@ -719,7 +721,7 @@ export default function TrendChart({
                 onPointerUp={(e) => e.stopPropagation()}
                 onClick={(e) => {
                   e.stopPropagation();
-                  onMarkPick?.(m.dayMs);
+                  onMarkPick?.(m);
                 }}
                 onPointerEnter={() => onMarkHover?.(m.dayMs)}
                 onPointerLeave={() => onMarkHover?.(null)}

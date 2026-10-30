@@ -107,6 +107,16 @@ describe("parseNoteParams", () => {
     expect(parseNoteParams(sp("view=geo&subject=dag/span"), NOW)).toEqual({ error: "bad subject" });
   });
 
+  // The UNLISTED SET is History's subject too (user, 2026-10-30), and no other view's: its chains
+  // publish no nodes and no places, so the fleet's views have nothing measured to say about it.
+  it("History takes the unlisted set and its span facet; no other view does", () => {
+    expect(parseNoteParams(sp("view=trend&subject=unlisted&span=30d"), NOW)).toEqual({ view: "trend", subject: "unlisted", span: "30d" });
+    expect(parseNoteParams(sp("view=trend&subject=unlisted/span&span=30d"), NOW)).toEqual({ view: "trend", subject: "unlisted/span", span: "30d" });
+    for (const v of ["hyper", "geo", "ledger"]) expect(parseNoteParams(sp(`view=${v}&subject=unlisted`), NOW)).toEqual({ error: "bad subject" });
+    expect(parseNoteParams(sp("view=geo&subject=unlisted/cc:DE"), NOW)).toEqual({ error: "bad subject" });
+    expect(parseNoteParams(sp("view=hyper&subject=unlisted/type:l0"), NOW)).toEqual({ error: "bad subject" });
+  });
+
   it("a former address inside a subject note answers as its current id", () => {
     expect(parseNoteParams(sp(`view=geo&subject=${relisted.formerIds![0]}/cc:FI`), NOW)).toEqual({ view: "geo", subject: `${relisted.id}/cc:FI`, span: "day" });
   });

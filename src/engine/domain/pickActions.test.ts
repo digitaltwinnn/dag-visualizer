@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { netKeyOf, tickNetSelectActions, tickNetClearActions, viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, trendPlaneActions, snapshotClearActions, type ClickAction } from "./pickActions";
+import { netKeyOf, tickNetSelectActions, tickNetClearActions, viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, trendPlaneActions, noteDayActions, snapshotClearActions, type ClickAction } from "./pickActions";
 import { finerLevels } from "./focusLadder";
 import { METAGRAPHS } from "@/src/net/current";
 import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
@@ -637,6 +637,27 @@ describe("sameMetaSnap", () => {
     expect(sameMetaSnap(SEL, { ...SEL, ordinal: 1 })).toBe(false);
     expect(sameMetaSnap(SEL, null)).toBe(false);
     expect(sameMetaSnap(null, null)).toBe(true);
+  });
+});
+
+// A NOTABLE DAY BELONGS TO A CHART (user, 2026-10-30: "if we click it and it selects the range it
+// should also set the related explorer filter accordingly so the correct chart shows up"): under
+// All the click brings that day's plane forward, the explorer row's own commit. It is a focus and
+// never the filter, and it never toggles a plane already forward off.
+describe("noteDayActions — a notable day's plane", () => {
+  it("under All, focuses the day's network, or the hypergraph's plane for a whole-network day", () => {
+    expect(noteDayActions("dor", "all", null)).toEqual([{ kind: "trendFocus", id: "dor" }]);
+    expect(noteDayActions(null, "all", null)).toEqual([{ kind: "trendFocus", id: "dag" }]);
+    expect(noteDayActions("dor", "all", "bio")).toEqual([{ kind: "trendFocus", id: "dor" }]);
+  });
+  it("a plane already forward stays forward: no toggle off", () => {
+    expect(noteDayActions("dor", "all", "dor")).toEqual([]);
+    expect(noteDayActions(null, "all", "dag")).toEqual([]);
+  });
+  it("a filter already scopes the stack, and the click never writes it", () => {
+    expect(noteDayActions("dor", "dor", null)).toEqual([]);
+    expect(noteDayActions("bio", "dag", null)).toEqual([]);
+    for (const a of noteDayActions("dor", "all", null)) expect(a.kind).not.toBe("filter");
   });
 });
 

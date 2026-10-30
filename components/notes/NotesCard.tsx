@@ -12,6 +12,7 @@ import type { NoteDay } from "@/src/data/noteTypes";
 import { spanPhrase } from "@/src/data/trendWindow";
 import { useStore } from "@/src/store/store";
 import { rangeDays } from "@/src/util/localTime";
+import { commitNoteDay } from "./commitNoteDay";
 import { noteSpanWords } from "./noteSubject";
 import NoteKindCoin from "./NoteKindCoin";
 import { NOTE_KIND_WORD } from "./noteDays";
@@ -114,7 +115,7 @@ function DayRow({ day }: { day: NoteDay }) {
       onPointerLeave={off}
       onFocus={on}
       onBlur={off}
-      onClick={() => useStore.getState().setTrendRange({ fromMs: day.dayMs, toMs: day.dayMs + DAY_MS })}
+      onClick={() => commitNoteDay(day)}
     >
       {day.caption}
     </Door>

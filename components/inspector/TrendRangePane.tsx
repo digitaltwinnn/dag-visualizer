@@ -14,7 +14,6 @@ import { useAiNote } from "@/components/notes/useAiNote";
 import { rangeCardNoteReq } from "@/components/notes/subjectNote";
 import useTrendRoster from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
-import { UNLISTED_ID } from "@/src/data/unlisted";
 import { spanWord } from "@/src/data/trendSeries";
 import { spanPhrase, windowSpan } from "@/src/data/trendWindow";
 import { ageWords } from "@/src/util/relativeAge";
@@ -141,7 +140,7 @@ export default function TrendRangePane({
               reads its own; the WINDOW standing in reads the plane the card stands on over the
               pill, always (`rangeCardNoteReq`; user, 2026-10-30) — on the plane the deck stands on
               (`cardNetwork`), asked as it lands. */}
-          <SubjectNote req={rangeCardNoteReq(cardNetwork(filter, focus, front), range, windowId, (id) => id === UNLISTED_ID)} />
+          <SubjectNote req={rangeCardNoteReq(cardNetwork(filter, focus, front), range, windowId)} />
           <FactGroup>
             <Fact label="Start">{edge(span.fromMs)}</Fact>
             {/* The end is exclusive, so a day-named span names the day it reaches into. A trailing

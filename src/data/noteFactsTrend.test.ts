@@ -332,6 +332,140 @@ describe("trendFacts notable days", () => {
   });
 });
 
+// THE UNLISTED SET HAS A MEASURED HISTORY (user, 2026-10-30: "does AI work on unknown networks? I'd
+// like that also"): the sampler reads every unlisted chain and marks the buckets it read with
+// `u.cov`, so History can describe the set. The facts are the fold's, the coverage is `u.cov`, and
+// the set is named as a set.
+// THE SPAN FACET'S FIGURES ARE ITS OWN (live 2026-10-30: handed the notable days, the model wrote
+// "the busiest day was Aug 15 with 279 snapshots" of a chain's thin LAST day, and the gate, which
+// checks figures and not what they are, passed it). `shape` states the span's busiest, quietest and
+// typical day by those names, and no notable-day facts at all.
+describe("trendFacts in the span facet's shape", () => {
+  const snaps = row(37, (i) => (i === 33 ? 70 : i === 34 ? 50 : 60));
+  it("states the busiest, quietest and typical day by name, and no notable day", () => {
+    const r = trendFacts(input({ subject: "usdc", shape: true, daily: daily({ "m.usdc.snaps": snaps }) }))!;
+    expect(r.days).toEqual([]);
+    expect(r.facts.some((f) => /^Notable day/.test(f.label))).toBe(false);
+    expect(r.facts.filter((f) => /of the span/.test(f.label)).map((f) => [f.label, f.value])).toEqual([
+      ["Busiest day of the span, date", T0 + 3 * DAY],
+      ["Busiest day of the span, snapshots anchored", 70],
+      ["Quietest day of the span, date", T0 + 4 * DAY],
+      ["Quietest day of the span, snapshots anchored", 50],
+      ["Typical day of the span, snapshots anchored", 60],
+    ]);
+  });
+  it("a network's last day is no busiest day: the extremes are the span's, read over its activity", () => {
+    const stopped = row(37, (i) => (i < 33 ? 100 : i === 33 ? 5 : 0));
+    const r = trendFacts(input({ subject: "usdc", shape: true, daily: daily({ "m.usdc.snaps": stopped, "m.usdc.ticks": row(37, () => 1) }) }))!;
+    expect(r.facts.find((f) => f.label === "Quietest day of the span, snapshots anchored")?.value).toBe(5);
+    expect(r.facts.find((f) => f.label === "Busiest day of the span, snapshots anchored")?.value).toBe(100);
+  });
+  it("a flat span names no extremes", () => {
+    const r = trendFacts(input({ subject: "usdc", shape: true, daily: daily() }))!;
+    expect(r.facts.some((f) => /of the span/.test(f.label))).toBe(false);
+  });
+});
+
+describe("trendFacts on the unlisted set", () => {
+  const chains = (k: number): Record<string, (number | null)[]> => ({
+    "u.cov": row(7, () => 1),
+    "m.DAGaaa.snaps": row(7, () => 30 * k),
+    "m.DAGbbb.snaps": row(7, () => 10 * k),
+  });
+  const r = () =>
+    trendFacts(input({ subject: "unlisted", cur: win(7, week(2, chains(2))), prev: win(7, week(1, chains(1)), T0 - 7 * DAY) }))!;
+
+  it("names the set, states its measures, and tells the model what it is", () => {
+    const facts = r();
+    const f = facts.facts.find((x) => /^Unlisted networks snapshots anchored.*this span$/.test(x.label))!;
+    expect(f.value).toBe(80);
+    expect(facts.names).toContain("Unlisted networks");
+    expect(facts.blurbs.join(" ")).toMatch(/^Unlisted networks are: chains that anchor snapshots into the hypergraph/);
+    expect(checkNote("Unlisted networks anchored 80 snapshots per day.", facts.facts, facts.names, { subject: "Unlisted networks" })).toEqual({ ok: true });
+  });
+
+  it("counts the chains behind the set and how much the busiest one carries, naming none", () => {
+    const facts = r();
+    expect(facts.facts.find((x) => x.label === "Unlisted chains that anchored snapshots, this span")!.value).toBe(2);
+    const share = facts.facts.find((x) => x.label === "Busiest unlisted chain, share of the set's snapshots anchored, this span")!;
+    expect(share.value).toBeCloseTo(0.75, 9);
+    expect(share.kind).toBe("share");
+    expect(facts.facts.some((x) => /DAGaaa|DAGbbb/.test(x.label))).toBe(false);
+  });
+
+  it("one chain has no busiest share", () => {
+    const one = { "u.cov": row(7, () => 1), "m.DAGaaa.snaps": row(7, () => 30) };
+    const facts = trendFacts(input({ subject: "unlisted", cur: win(7, week(2, one)), prev: win(7, week(1, one), T0 - 7 * DAY) }))!;
+    expect(facts.facts.find((x) => x.label === "Unlisted chains that anchored snapshots, this span")!.value).toBe(1);
+    expect(facts.facts.some((x) => /Busiest unlisted/.test(x.label))).toBe(false);
+  });
+
+  // A SILENT SPAN SAYS SO (live 2026-10-30: the set's two chains stopped in August, and a 30-day note
+  // read "0 snapshots, 0 blocks, 0 fees and 0 data"): the zero rows go, and what the reader can use
+  // takes their place, that nothing anchored, when something last did, and how many ever have.
+  it("a silent span states that it is silent and when the set last anchored, never a row of zeros", () => {
+    const quiet = { "u.cov": row(7, () => 1), "m.DAGaaa.snaps": row(7, () => 0), "m.DAGbbb.snaps": row(7, () => 0) };
+    const history = win(60, {
+      "g.ticks": row(60, () => 288),
+      "u.cov": row(60, () => 1),
+      "m.DAGaaa.snaps": row(60, (i) => (i <= 20 ? 40 : 0)),
+      "m.DAGbbb.snaps": row(60, (i) => (i <= 30 ? 10 : 0)),
+    }, T0 - 50 * DAY);
+    const facts = trendFacts(input({ subject: "unlisted", cur: win(7, week(2, quiet)), prev: win(7, week(1, quiet), T0 - 7 * DAY), history }))!;
+    expect(facts.facts.map((f) => f.label)).toEqual([
+      "Unlisted chains that anchored snapshots, this span",
+      "Last day an unlisted chain anchored a snapshot",
+      "Unlisted chains that anchored snapshots in all measured history",
+    ]);
+    expect(facts.facts.map((f) => f.value)).toEqual([0, T0 - 20 * DAY, 2]);
+    expect(checkNote("No unlisted chain anchored a snapshot, and the last did on Aug 12.", facts.facts, facts.names)).toEqual({ ok: true });
+  });
+
+  // A span that stopped well before its end says when (live: the year's note never mentioned that
+  // the set went silent in August).
+  it("a set that stopped before the span's end states its last day; one still running does not", () => {
+    const history = win(60, { "g.ticks": row(60, () => 288), "u.cov": row(60, () => 1), "m.DAGaaa.snaps": row(60, (i) => (i <= 52 ? 40 : 0)) }, T0 - 50 * DAY);
+    const facts = trendFacts(input({ subject: "unlisted", cur: win(7, week(2, chains(2))), prev: win(7, week(1, chains(1)), T0 - 7 * DAY), history }))!;
+    expect(facts.facts.find((f) => f.label === "Last day an unlisted chain anchored a snapshot")!.value).toBe(T0 + 2 * DAY);
+    expect(facts.facts.some((f) => /all measured history/.test(f.label))).toBe(false);
+  });
+
+  it("an active span adds no history facts: its own figures speak", () => {
+    const history = win(60, { "g.ticks": row(60, () => 288), "u.cov": row(60, () => 1), "m.DAGaaa.snaps": row(60, () => 40) }, T0 - 50 * DAY);
+    const facts = trendFacts(input({ subject: "unlisted", cur: win(7, week(2, chains(2))), prev: win(7, week(1, chains(1)), T0 - 7 * DAY), history }))!;
+    expect(facts.facts.some((f) => /Last day an unlisted|all measured history/.test(f.label))).toBe(false);
+  });
+
+  // ⚠️ THE SPINE IS NOT THE SET'S COVERAGE: a day the chains went unread reads null in the fold, and
+  // the picker's rule is "covered + absent = measured 0", so against `g.ticks` it would be a dip.
+  it("a day the chains were not measured is no dip: its coverage is `u.cov`, not the spine", () => {
+    const d = daily({
+      "u.cov": row(37, (i) => (i === 33 ? null : 1)),
+      "m.DAGaaa.snaps": row(37, (i) => (i === 33 ? null : 100)),
+    });
+    const facts = trendFacts(input({ subject: "unlisted", cur: win(7, week(2, chains(2))), daily: d }))!;
+    expect(facts.days.some((x) => x.dayMs === T0 + 3 * DAY)).toBe(false);
+    expect(facts.days.some((x) => x.kind === "low")).toBe(false);
+  });
+
+  it("a real day of the set is reported as the set's", () => {
+    const d = daily({ "u.cov": row(37, () => 1), "m.DAGaaa.snaps": row(37, (i) => (i === 33 ? 400 : 100)) });
+    const facts = trendFacts(input({ subject: "unlisted", cur: win(7, week(2, chains(2))), daily: d }))!;
+    expect(facts.days[0]).toMatchObject({ kind: "high", networkId: "unlisted", value: 400, dayMs: T0 + 3 * DAY });
+  });
+
+  // A max across chains is one chain's wait, not the set's: no pause and no longest wait.
+  it("reports no pause or longest wait: the folded widest gap is no wait of the set", () => {
+    const d = daily({
+      "u.cov": row(37, () => 1),
+      "m.DAGaaa.snaps": row(37, () => 100),
+      "m.DAGaaa.gapMax": row(37, (i) => (i === 33 ? 7200 : 30)),
+    });
+    const facts = trendFacts(input({ subject: "unlisted", cur: win(7, week(2, chains(2))), daily: d }))!;
+    expect(facts.days.some((x) => x.kind === "pause" || x.kind === "longest")).toBe(false);
+  });
+});
+
 describe("trendFacts reads the STORE payload and folds it (fees and data)", () => {
   it("a store-shaped fixture (floors + per-network fields + u.cov) yields Fees and Data facts, the fee in the chart's notation", () => {
     const r = trendFacts(input())!;

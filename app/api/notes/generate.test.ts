@@ -243,10 +243,10 @@ describe("generateNote", () => {
     expect(await stats()).toEqual({ store: 1 });
   });
 
-  it("testnet and unlisted subjects get no note", async () => {
+  it("testnet gets no note, nor the unlisted set outside History", async () => {
     const d = deps();
     expect(await generateNote({ ...REQ, net: "testnet" }, d, "read")).toEqual({ state: "none" });
-    expect(await generateNote({ ...REQ, subject: "unlisted" }, d, "read")).toEqual({ state: "none" });
+    expect(await generateNote({ ...REQ, view: "hyper", subject: "unlisted", span: "day" }, d, "read")).toEqual({ state: "none" });
     expect(await generateNote({ ...REQ, subject: "DAGnotTrackedAnywhere000000000000000000" }, d, "warm")).toEqual({ state: "none" });
     expect(d.facts).not.toHaveBeenCalled();
     expect(d.chat).not.toHaveBeenCalled();

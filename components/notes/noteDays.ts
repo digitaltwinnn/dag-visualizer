@@ -22,6 +22,9 @@ export const NOTE_KIND_WORD: Record<NotableKind, string> = {
   broadest: "most networks",
 };
 
+/** The range a notable day commits: its whole UTC day. */
+export const notableDaySpan = (dayMs: number): { fromMs: number; toMs: number } => ({ fromMs: dayMs, toMs: dayMs + DAY_MS });
+
 /** The notable day whose UTC day holds `ms`, the first listed when two fall on one day. */
 export function notableDayAt(days: readonly NoteDay[] | null | undefined, ms: number | null | undefined): NoteDay | null {
   if (!days || ms == null) return null;

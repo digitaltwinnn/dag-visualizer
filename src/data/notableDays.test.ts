@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { NOTABLE_CAPS, NOTABLE_FLOOR, notableDays } from "@/src/data/notableDays";
+import { NOTABLE_CAPS, NOTABLE_FLOOR, notableDays, rangeExtremes } from "@/src/data/notableDays";
 
 const DAY = 86_400_000;
 const T0 = Date.UTC(2026, 8, 1);
@@ -179,6 +179,21 @@ describe("notableDays: a series' own level", () => {
     snaps[20] = 5;
     const out = notableDays({ days, covered, series: { "m.a.snaps": snaps }, subject: "a", ids: ["a"], cap: 9 });
     expect(out.map((d) => d.kind)).toEqual(["low"]);
+  });
+});
+
+// ONE DAY, ONE EVENT (live 2026-10-30: the unlisted set's Aug 15 was listed twice, its last day and
+// a dip): a network's last day is usually thin, and that thinness is the ending, not a second story.
+describe("notableDays: a first or last day swallows its own high or low", () => {
+  it("a last day that also reads as a dip is the last day alone", () => {
+    const { days, covered } = span(30);
+    const out = notableDays({ days, covered, subject: "a", ids: ["a"], cap: 5, series: { "m.a.snaps": flat(30, 100, { 20: 10, 21: 0, 22: 0, 23: 0, 24: 0, 25: 0, 26: 0, 27: 0, 28: 0, 29: 0 }) } });
+    expect(out.map((d) => [d.kind, d.dayMs])).toEqual([["last", days[20]]]);
+  });
+  it("another network's event on that day stands", () => {
+    const { days, covered } = span(30);
+    const out = notableDays({ days, covered, subject: "dag", ids: ["a"], cap: 5, series: { "g.anchors": flat(30, 100, { 20: 10 }), "m.a.snaps": flat(30, 100, { 21: 0, 22: 0, 23: 0, 24: 0, 25: 0, 26: 0, 27: 0, 28: 0, 29: 0 }) } });
+    expect(out.map((d) => [d.kind, d.networkId])).toEqual([["last", "a"], ["low", null]]);
   });
 });
 
@@ -382,6 +397,14 @@ describe("notableDays: consecutive days of one kind are one event", () => {
 // A range short of `floor` days is filled with the range's own EXTREMES, named as such, never as a
 // spike or a dip: the busiest and quietest day, then the longest wait (a network) or the day the
 // most networks anchored (the hypergraph). Fills never displace a real pick and never repeat a day.
+describe("rangeExtremes", () => {
+  it("is the range's busiest and quietest day, whatever events it holds", () => {
+    const { days, covered } = span(30);
+    const out = rangeExtremes({ days, covered, subject: "a", ids: ["a"], cap: 0, series: { "m.a.snaps": flat(30, 100, { 10: 130, 20: 80 }) } });
+    expect(out.map((d) => [d.kind, d.dayMs, d.value, d.level])).toEqual([["peak", days[10], 130, 100], ["trough", days[20], 80, 100]]);
+  });
+});
+
 describe("notableDays: the floor", () => {
   it("is three", () => {
     expect(NOTABLE_FLOOR).toBe(3);

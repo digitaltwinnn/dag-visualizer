@@ -417,6 +417,16 @@ export function trendPlaneActions(id: string, currentFocus: string | null): Clic
   return [{ kind: "trendFocus", id: currentFocus === id ? null : id }];
 }
 
+/** A NOTABLE DAY BELONGS TO A CHART (user, 2026-10-30): under All, committing one brings its plane
+ *  forward, the explorer row's own commit (a whole-network day's plane is the hypergraph's, "dag").
+ *  It commits and never toggles: a plane already forward stays forward. Under a filter it does
+ *  nothing, and that is the rule rather than a gap: the filter is the top bar's alone, and a
+ *  filtered stack holds only its own plane, so a focus could name a chart that is not there. */
+export function noteDayActions(networkId: string | null, filter: string, currentFocus: string | null): ClickAction[] {
+  const id = networkId ?? "dag";
+  return filter !== "all" || currentFocus === id ? [] : [{ kind: "trendFocus", id }];
+}
+
 /** The raw layer's ARRIVAL commit — "the layer opens on a subject": with nothing selected the
  *  anchor log commits its own first row when the layer surfaces, so the channel pane opens
  *  populated instead of on an empty state. An arrival is NOT a click, so it has no

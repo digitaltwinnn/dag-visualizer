@@ -17,6 +17,16 @@ function allCached(subjects: string[], countries: string[], writtenAt: number): 
   return Object.fromEntries(warmCandidates(subjects, countries).map((i) => [keyOf(i), { writtenAt, setKey: SET }]));
 }
 
+
+// The unlisted set is one more warm subject (user, 2026-10-30), and History alone takes it.
+describe("warmCandidates and the unlisted set", () => {
+  it("offers it in History only", () => {
+    const items = warmCandidates(["unlisted"], []);
+    expect(items.length).toBeGreaterThan(0);
+    expect(new Set(items.map((i) => i.view))).toEqual(new Set(["trend"]));
+  });
+});
+
 describe("planPass", () => {
   it("with nothing cached, the hourly kinds come first: ledger and trend24h before hyper", () => {
     const plan = planPass(NOW, SUBJECTS, [], SET, () => null);

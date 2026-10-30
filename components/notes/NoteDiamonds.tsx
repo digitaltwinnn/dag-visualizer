@@ -9,6 +9,7 @@ import { type TrackGeom, xAtMs } from "@/src/data/trendTimeline";
 import { useStore } from "@/src/store/store";
 import { rangeDays } from "@/src/util/localTime";
 import NoteKindCoin from "./NoteKindCoin";
+import { commitNoteDay } from "./commitNoteDay";
 import { useAiNote } from "./useAiNote";
 
 // THE NOTABLE DAYS ON THE TIMELINE (2026-10-27) — the AI note's notable days, one mark each on the
@@ -96,7 +97,7 @@ function Diamond({
           if (e.currentTarget.matches(":focus-visible")) on();
         }}
         onBlur={off}
-        onClick={() => useStore.getState().setTrendRange({ fromMs: day.dayMs, toMs: day.dayMs + DAY_MS })}
+        onClick={() => commitNoteDay(day)}
         className={cn(
           // THE ONE COIN (design C, 2026-10-30): the same 16px mark the AI card's row leads with and
           // a chart plane draws, so the band's mark is no longer the large one of three.

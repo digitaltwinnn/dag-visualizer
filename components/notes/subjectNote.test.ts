@@ -41,12 +41,12 @@ describe("the subject notes' requests", () => {
   });
 
   it("a range note stands on the plane's network, the hypergraph for all / dag / none, and only while a range is brushed", () => {
-    expect(rangeNoteReq("dor", { fromMs: 1, toMs: 2 }, unl)).toEqual({ view: "trend", subject: "dor", span: "r1-2" });
-    for (const c of ["all", "dag", null]) expect(rangeNoteReq(c, { fromMs: 1, toMs: 2 }, unl)).toEqual({ view: "trend", subject: "dag", span: "r1-2" });
-    expect(rangeNoteReq("dor", null, unl)).toBeNull();
+    expect(rangeNoteReq("dor", { fromMs: 1, toMs: 2 })).toEqual({ view: "trend", subject: "dor", span: "r1-2" });
+    for (const c of ["all", "dag", null]) expect(rangeNoteReq(c, { fromMs: 1, toMs: 2 })).toEqual({ view: "trend", subject: "dag", span: "r1-2" });
+    expect(rangeNoteReq("dor", null)).toBeNull();
     // A brush read off the pointer is fractional; the span is whole milliseconds (digits only).
-    expect(rangeNoteReq("dor", { fromMs: 1716000000123.456, toMs: 1716003600999.5 }, unl)?.span).toBe("r1716000000123-1716003601000");
-    expect(rangeNoteReq("unlisted", { fromMs: 1, toMs: 2 }, unl)).toBeNull();
+    expect(rangeNoteReq("dor", { fromMs: 1716000000123.456, toMs: 1716003600999.5 })?.span).toBe("r1716000000123-1716003601000");
+    expect(rangeNoteReq("unlisted", { fromMs: 1, toMs: 2 })).toEqual({ view: "trend", subject: "unlisted", span: "r1-2" });
   });
 });
 
@@ -56,20 +56,20 @@ describe("the subject notes' requests", () => {
 // subject included (the same day: "for DAG only I noticed", a first cut had left that case out).
 describe("rangeCardNoteReq — the Range card's note in both its modes", () => {
   it("a brushed range is the range's note, as before", () => {
-    expect(rangeCardNoteReq("dor", { fromMs: 1, toMs: 2 }, "30d", unl)).toEqual({ view: "trend", subject: "dor", span: "r1-2" });
+    expect(rangeCardNoteReq("dor", { fromMs: 1, toMs: 2 }, "30d")).toEqual({ view: "trend", subject: "dor", span: "r1-2" });
   });
   // THE SPAN FACET (user, 2026-10-30: "direct copy looks strange, we should be able to write
   // something complementary"): on the window the card asks `<net>/span`, its own question over the
   // plane's facts, so it never repeats the top card's note even where the two share a plane.
   it("on the window, the plane's SPAN FACET over the window pill", () => {
-    expect(rangeCardNoteReq("dor", null, "30d", unl)).toEqual({ view: "trend", subject: "dor/span", span: "30d" });
-    expect(rangeCardNoteReq("dor", null, "all", unl)).toEqual({ view: "trend", subject: "dor/span", span: "all" });
+    expect(rangeCardNoteReq("dor", null, "30d")).toEqual({ view: "trend", subject: "dor/span", span: "30d" });
+    expect(rangeCardNoteReq("dor", null, "all")).toEqual({ view: "trend", subject: "dor/span", span: "all" });
   });
   it("on the window with no plane, or the DAG, it is the hypergraph's span facet", () => {
-    for (const card of ["all", "dag", null]) expect(rangeCardNoteReq(card, null, "30d", unl)).toEqual({ view: "trend", subject: "dag/span", span: "30d" });
+    for (const card of ["all", "dag", null]) expect(rangeCardNoteReq(card, null, "30d")).toEqual({ view: "trend", subject: "dag/span", span: "30d" });
   });
-  it("the unlisted network has no note in either mode", () => {
-    expect(rangeCardNoteReq("unlisted", null, "30d", unl)).toBeNull();
-    expect(rangeCardNoteReq("unlisted", { fromMs: 1, toMs: 2 }, "30d", unl)).toBeNull();
+  it("the unlisted set carries its note in both modes (user, 2026-10-30)", () => {
+    expect(rangeCardNoteReq("unlisted", null, "30d")).toEqual({ view: "trend", subject: "unlisted/span", span: "30d" });
+    expect(rangeCardNoteReq("unlisted", { fromMs: 1, toMs: 2 }, "30d")).toEqual({ view: "trend", subject: "unlisted", span: "r1-2" });
   });
 });

@@ -239,7 +239,7 @@ function pauses(gap: readonly (number | null)[], input: NotableInput, networkId:
  *  its last day is the `last`'s business). An extreme exists only when the range's readings
  *  differ (a flat range has no busiest day); ties keep the earlier day; `level` is the range's
  *  median, so a caption can place the day against the range. */
-function extremes(input: NotableInput): NotableDay[] {
+export function rangeExtremes(input: NotableInput): NotableDay[] {
   const { days, covered, series, subject, ids } = input;
   const from = input.from ?? 0;
   const networkId = subject === "dag" ? null : subject;
@@ -287,7 +287,7 @@ function extremes(input: NotableInput): NotableDay[] {
 /** The notable days of a subject, best first, at most `cap`. Highest score wins; first/last
  *  (+Infinity) outrank any ratio; ties keep the earlier day, then the network id, then the kind,
  *  so the order never depends on how the engine sorts equal keys. Short of `floor`, the range's
- *  extremes follow (`extremes`), never on a day already taken. */
+ *  extremes follow (`rangeExtremes`), never on a day already taken. */
 export function notableDays(input: NotableInput): NotableDay[] {
   const { series, subject, ids, cap } = input;
   const out: NotableDay[] = [];
@@ -307,18 +307,22 @@ export function notableDays(input: NotableInput): NotableDay[] {
     const gap = series[`m.${subject}.gapMax`];
     if (gap) pauses(gap, input, subject, out);
   }
-  out.sort(
+  // ONE DAY, ONE EVENT: a network's last day is usually thin and its first usually thick, and that
+  // is the ending or the beginning, not a second story (live 2026-10-30: Aug 15 was listed twice).
+  const events = new Set(out.filter((d) => d.kind === "first" || d.kind === "last").map((d) => `${d.networkId}:${d.dayMs}`));
+  const kept = out.filter((d) => (d.kind !== "high" && d.kind !== "low") || !events.has(`${d.networkId}:${d.dayMs}`));
+  kept.sort(
     (a, b) =>
       (a.score === b.score ? 0 : b.score > a.score ? 1 : -1) ||
       a.dayMs - b.dayMs ||
       (a.networkId ?? "").localeCompare(b.networkId ?? "") ||
       a.kind.localeCompare(b.kind),
   );
-  const picked = out.slice(0, Math.max(0, cap));
+  const picked = kept.slice(0, Math.max(0, cap));
   const floor = Math.min(input.floor ?? 0, Math.max(0, cap));
   if (picked.length < floor) {
     const taken = new Set(picked.map((d) => d.dayMs));
-    for (const fill of extremes(input)) {
+    for (const fill of rangeExtremes(input)) {
       if (picked.length >= floor) break;
       if (taken.has(fill.dayMs)) continue;
       taken.add(fill.dayMs);

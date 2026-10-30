@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { NoteDay } from "@/src/data/noteTypes";
-import { NOTE_KIND_WORD, notableDayAt, notableDayOfRange } from "./noteDays";
+import { NOTE_KIND_WORD, notableDayAt, notableDayOfRange, notableDaySpan } from "./noteDays";
 
 // A NOTABLE DAY, MET ELSEWHERE (user, 2026-10-30: "if the moment is a notable day … can we show the
 // marker on the cards as well?"): the Moment card asks which notable day its bucket falls in, the
@@ -30,6 +30,13 @@ describe("notableDayOfRange", () => {
     expect(notableDayOfRange(days, { fromMs: T0, toMs: T0 + 2 * DAY })).toBeNull();
     expect(notableDayOfRange(days, { fromMs: T0 + 3_600_000, toMs: T0 + DAY })).toBeNull();
     expect(notableDayOfRange(days, null)).toBeNull();
+  });
+});
+
+describe("notableDaySpan", () => {
+  it("is the day's whole UTC span, the range a click commits", () => {
+    expect(notableDaySpan(T0)).toEqual({ fromMs: T0, toMs: T0 + DAY });
+    expect(notableDayOfRange(days, notableDaySpan(T0))).toBe(days[0]);
   });
 });
 

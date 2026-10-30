@@ -8,6 +8,7 @@ import { countStat, generateNote, type GenerateDeps } from "./generate";
 import { gateChat } from "./gate";
 import { capKeyOf, rateKeyOf } from "./keys";
 import { isLimitedNote, parseNoteParams, parseNoteRequest } from "./params";
+import { UNLISTED_ID } from "@/src/data/unlistedId";
 import { factsFor, geoInputs, storeReads } from "./sources";
 import { notesStore, notesWritable } from "./store";
 import { executePass, pacedChat, planPass, warmCandidates, warmKeyOf } from "./warm";
@@ -184,7 +185,8 @@ export async function warmNotes(req: Request, deps: () => WarmDeps): Promise<Res
     const d = deps();
     if (!d.writable) return json(NONE, NO_STORE); // a preview holding the secret still writes nothing (R66)
     const now = d.now(); // the budget's clock starts here: the prefetch spends it too
-    const subjects = ["all", "dag", ...sampledIds(NET)];
+    // The unlisted set is one more subject: `noteSupported` keeps it to History's pills.
+    const subjects = ["all", "dag", UNLISTED_ID, ...sampledIds(NET)];
     const [countries, setKey] = await Promise.all([
       d.countries(now).catch(() => [] as string[]),
       d.setKey(now).catch(() => null),

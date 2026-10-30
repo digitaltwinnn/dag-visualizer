@@ -1,6 +1,7 @@
 import type { NoteView } from "@/src/data/noteTypes";
 import { roleKey } from "@/src/data/composition";
 import { currentIdOf, isTracked } from "@/src/net/lineage";
+import { UNLISTED_ID } from "@/src/data/unlistedId";
 import { CC_TAIL_RE, ISP_TAIL_RE, KIND_TIMING, TYPE_TAIL_RE, isSubjectNote, snapSpan, timingOf, type NoteSpan } from "./keys";
 
 // THE NOTE ROUTES' INPUT — one home for what a request may ask for, so the read route, the request
@@ -59,11 +60,13 @@ function subjectOf(view: NoteView, raw: string | null): string | null {
   if (raw === "all") return raw;
   // The ledger reads `dag` as the whole network, the same facts as `all`: ONE subject, one note.
   if (raw === "dag") return view === "ledger" ? "all" : raw;
+  // THE UNLISTED SET is History's alone: the sampler measures its chains, which publish no nodes.
+  if (raw === UNLISTED_ID) return view === "trend" ? raw : null;
   if (CC_TAIL_RE.test(raw) || ISP_TAIL_RE.test(raw)) return view === "geo" ? raw : null;
   const slash = raw.indexOf("/");
   if (slash < 0) return networkOf(raw);
   const scope = raw.slice(0, slash);
-  const net = scope === "dag" ? scope : networkOf(scope);
+  const net = scope === "dag" || (scope === UNLISTED_ID && view === "trend") ? scope : networkOf(scope);
   const tail = raw.slice(slash + 1);
   return net && selectionOk(view, tail) ? `${net}/${tail}` : null;
 }

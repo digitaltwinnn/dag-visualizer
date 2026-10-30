@@ -9,8 +9,8 @@ import type { NoteReq } from "./noteLoader";
 //
 // One note per card, SCOPED AS THE LEAD: a country or provider card counts the filter's nodes, so
 // its note does too — the fleet's (`cc:FI`) with no filter, the network's (`dor/cc:FI`) under one.
-// "dag" is a network here, not the fleet. The unlisted network has no measured history of its own,
-// so no note.
+// "dag" is a network here, not the fleet. The unlisted set has no nodes or places, so Geography and
+// Hypergraph have no note for it; History does, since the sampler measures its chains.
 
 type Unlisted = (id: string) => boolean;
 
@@ -49,10 +49,9 @@ export function typeNoteReq(sel: { netId: string; key: string }, unlisted: Unlis
 
 /** History's brushed range, on the plane the card stands on — the hypergraph ("dag") for all, the
  *  core or no card, as the top card folds it (`noteSubjectOf`). No range brushed, no note. */
-export function rangeNoteReq(trendCard: string | null, range: { fromMs: number; toMs: number } | null, unlisted: Unlisted): NoteReq | null {
+export function rangeNoteReq(trendCard: string | null, range: { fromMs: number; toMs: number } | null): NoteReq | null {
   if (!range) return null;
   const net = trendCard == null || trendCard === "all" ? "dag" : trendCard;
-  if (unlisted(net)) return null;
   // WHOLE MILLISECONDS (review 2026-10-29): a brush is read off the pointer (`msAtX`), so its ends
   // are fractional, and both the loader's range pattern and the route's `MS_RE` take digits only —
   // a fractional span was a `bad span`, and the Range card's note never appeared for a brush under
@@ -72,11 +71,9 @@ export function rangeCardNoteReq(
   trendCard: string | null,
   range: { fromMs: number; toMs: number } | null,
   windowId: string,
-  unlisted: Unlisted,
 ): NoteReq | null {
-  if (range) return rangeNoteReq(trendCard, range, unlisted);
+  if (range) return rangeNoteReq(trendCard, range);
   const net = trendCard == null || trendCard === "all" ? "dag" : trendCard;
-  if (unlisted(net)) return null;
   // THE SPAN FACET (`<net>/span`, `app/api/notes/keys.ts`): the plane's own facts over the window,
   // asked the span's question, so the card never repeats the top card's note (user, 2026-10-30:
   // "direct copy looks strange").

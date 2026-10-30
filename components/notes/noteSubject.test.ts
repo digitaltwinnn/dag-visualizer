@@ -49,9 +49,10 @@ describe("noteSubjectOf", () => {
     expect(noteSubjectOf("trend", s({ trendFilter: "all", metagraphNetwork: "DAG123" }))).toEqual({ view: "trend", subject: "dag" });
   });
 
-  it("an unlisted network has no note, in every view", () => {
+  // Its chains publish no nodes or places, but the sampler measures them: History has a record.
+  it("the unlisted set has a note in History alone", () => {
     for (const m of ["hyper", "geo", "ledger"] as const) expect(noteSubjectOf(m, s({ metagraphNetwork: "unlisted" }))).toBeNull();
-    expect(noteSubjectOf("trend", s({ trendFilter: "unlisted" }))).toBeNull();
+    expect(noteSubjectOf("trend", s({ trendFilter: "unlisted" }))).toEqual({ view: "trend", subject: "unlisted" });
   });
 });
 

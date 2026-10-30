@@ -904,8 +904,16 @@ standing on the window carries the plane's SPAN FACET over the window pill** (`r
 the span's question (where it began and ended, its busiest and quietest day, how steady the run
 was) rather than the top card's "what changed" — a first cut left the card bare where it would have
 repeated the top card, a second repeated it ("direct copy looks strange"). It is a subject note:
-on request, limited, never warmed. **A plane's coin pairs like the band's**: hover previews the day
-through `hoverNoteDay`, a click commits it (`TrendChart onMarkHover` / `onMarkPick`). The block is
+on request, limited, never warmed. The facet's figures are its own (`trendFacts shape`): the span's busiest, quietest and typical day by
+those names, never the notable days, or the model calls a chain's thin last day the busiest and the
+gate, which checks figures and not meaning, passes it. **A plane's coin pairs like the band's**: hover
+previews the day through `hoverNoteDay`. **A notable day commits through one home**
+(`components/notes/commitNoteDay.ts`, the row, the band's mark and the plane's coin): under All its
+plane comes forward through the executor (`noteDayActions`, a focus, never the filter), then the
+day becomes the range. **The unlisted set has notes in History alone** (the same day): the sampler
+measures its chains, which publish no nodes or places. Named as a set ("Unlisted networks"), its
+days read `u.cov` as coverage (never the spine, or an unread day is a dip) and carry no pause (the
+folded widest gap is one chain's), and a silent span states when the set last anchored. The block is
 `components/notes/SubjectNote.tsx`, and **it IS the card's lead** (user, 2026-10-30, design option D
 of four shown in the brainstorming companion, then "no fallback"): the measured lead sentences
 ("Hosts 25% of the selection's nodes", the Range card's "DOR anchored N snapshots in this range")

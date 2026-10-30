@@ -23,7 +23,7 @@ import { noteSupported } from "./sources";
 // Order: the HOURLY kinds first (ledger, History's 24h), so a pass cut short by its time budget
 // still refreshes what goes stale fastest; then the daily kinds (hyper, Geography and its
 // countries, History's 7d / 30d / 1y / all). Only what a note exists for is planned
-// (`noteSupported`): History has no `all` subject, and an unlisted network has no note at all.
+// (`noteSupported`): History has no `all` subject, and the unlisted set has a note in History alone.
 // On-request kinds (the 1h pill, a brushed range) are never warmed.
 
 const NET = "mainnet";

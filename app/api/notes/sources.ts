@@ -1,3 +1,4 @@
+import { UNLISTED_ID } from "@/src/data/unlistedId";
 import { roleKey } from "@/src/data/composition";
 import { fact } from "@/src/data/noteFacts";
 import { bannedWords, undash } from "@/src/data/noteHonesty";
@@ -165,6 +166,8 @@ function blurbsOf(net: string): Record<string, string> {
 }
 
 const isNetwork = (net: string, id: string) => id === "dag" || catalogOf(net).some((m) => m.id === id);
+/** A subject History can describe: a network, or the unlisted set the sampler measures. */
+const isTrendSubject = (net: string, id: string) => id === UNLISTED_ID || isNetwork(net, id);
 /** History's subject without its span facet: `dor/span` → `dor` (keys.ts `SubjectKind` "span"). */
 const trendBaseOf = (subject: string) => (subject.endsWith("/span") ? subject.slice(0, -"/span".length) : subject);
 const RANGE_RE = /^r(\d+)-(\d+)$/;
@@ -307,7 +310,7 @@ const isPill = (span: string): span is TrendPill => span in TREND_PILLS;
 
 async function readTrend(c: Ctx): Promise<Read | null> {
   const { net, span, nowMs, reads } = c;
-  // THE SPAN FACET reads the base network's facts and captions no days (the Range card lists none).
+  // THE SPAN FACET reads the base network's facts in their `shape`: no notable days to caption.
   const subject = trendBaseOf(c.subject);
   const facet = subject !== c.subject;
   let zoom: TrendFactsInput["zoom"];
@@ -343,8 +346,17 @@ async function readTrend(c: Ctx): Promise<Read | null> {
       pill?.daily ? reads.span(net, "1d", fromMs - LEAD_IN_MS, toMs) : Promise.resolve(null),
     ]);
   }
-  const built = trendFacts({ subject, zoom, span: { fromMs, toMs }, cur, prev, daily, names: c.names, blurbs: c.blurbs });
-  return { built: built && facet ? { ...built, days: [] } : built, spanFrom: fromMs, spanTo: toMs, windows: [["Span length", secondsOf(fromMs, toMs)]] };
+  // The unlisted set's whole daily record, for what a silent span can still say (`trendFacts`).
+  const history = subject === UNLISTED_ID ? await reads.span(net, "1d", nowMs - WINDOWS.all.ms, nowMs) : null;
+  const built = trendFacts({ subject, zoom, span: { fromMs, toMs }, cur, prev, daily, history, shape: facet, names: c.names, blurbs: c.blurbs });
+  return {
+    built,
+    spanFrom: fromMs,
+    spanTo: toMs,
+    windows: [["Span length", secondsOf(fromMs, toMs)]],
+    // The facts' own spelling (`noteFactsTrend`): the gate cites a ratio by the name in its label.
+    ...(subject === UNLISTED_ID ? { subjectName: "Unlisted networks" } : {}),
+  };
 }
 
 const VIEW_SOURCES: Record<NoteView, ViewSource> = {
@@ -431,11 +443,11 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
     // …or a network's SPAN FACET (`<net>/span`, keys.ts), over a pill only: a brush has its own note.
     accepts: (net, subject, span) =>
       subject.endsWith("/span")
-        ? (isPill(span) || span === "all") && isNetwork(net, trendBaseOf(subject))
-        : (isPill(span) || span === "all" || rangeOf(span) != null) && isNetwork(net, subject),
+        ? (isPill(span) || span === "all") && isTrendSubject(net, trendBaseOf(subject))
+        : (isPill(span) || span === "all" || rangeOf(span) != null) && isTrendSubject(net, subject),
     label: (subject, names) => {
       const base = trendBaseOf(subject);
-      return base === "dag" ? "the hypergraph" : (names[base] ?? base);
+      return base === "dag" ? "the hypergraph" : base === UNLISTED_ID ? "the unlisted networks" : (names[base] ?? base);
     },
     whole: (subject) => trendBaseOf(subject) === "dag",
     read: readTrend,

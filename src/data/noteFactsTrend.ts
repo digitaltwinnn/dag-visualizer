@@ -1,7 +1,7 @@
 import { fact, gaugeChange, networksAnchored } from "@/src/data/noteFacts";
-import { NOTABLE_CAPS, NOTABLE_FLOOR, notableDays } from "@/src/data/notableDays";
+import { NOTABLE_CAPS, NOTABLE_FLOOR, notableDays, rangeExtremes } from "@/src/data/notableDays";
 import type { Fact, NotableDay } from "@/src/data/noteTypes";
-import { formatDag, globalSeries, METRIC_ORDER, metricLabel, metricSeries, spanAverage, trimCounterEdges, TREND_METRICS, unlistedUnmeasured, withUnlisted } from "@/src/data/trendSeries";
+import { formatDag, globalSeries, lastSeen, METRIC_ORDER, metricLabel, metricSeries, spanAverage, trimCounterEdges, TREND_METRICS, unlistedUnmeasured, withUnlisted } from "@/src/data/trendSeries";
 import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 import { trimNewestPartial, type TrendsWindowData } from "@/src/data/trendWindow";
 import type { TrendMetric } from "@/src/store/store";
@@ -54,6 +54,13 @@ export interface TrendFactsInput {
   /** Daily buckets for the notable days: ~30 days of LEAD-IN before the span (they feed each
    *  series' level) through the span's end. Null for 1h / 24h / short ranges. */
   daily: TrendsWindowData | null;
+  /** The unlisted set only: the whole daily record, so a silent span can say when the set last
+   *  anchored and how many chains ever have (store, unfolded). */
+  history?: TrendsWindowData | null;
+  /** THE SPAN FACET (`<net>/span`): the span's busiest, quietest and typical day, by those names,
+   *  in place of the notable days. Left to pick them out of the notable days the model called a
+   *  chain's thin last day the busiest (live 2026-10-30), and the gate checks figures, not meaning. */
+  shape?: boolean;
   names: Record<string, string>; // catalog id → display name
   blurbs: Record<string, string>; // catalog id → `blurb` (config.METAGRAPHS)
 }
@@ -124,6 +131,14 @@ function floorOnly(data: TrendsWindowData): boolean {
   return trimCounterEdges(unlistedUnmeasured(data.series), data.stepMs).some(Boolean);
 }
 
+/** The unlisted chains, as a note calls them: a SET, never one network. The name the facts carry
+ *  and the gate scopes by; the line beside the facts says what the set is. */
+const UNLISTED_SET_NAME = "Unlisted networks";
+const UNLISTED_SET_BLURB = `${UNLISTED_SET_NAME} are: chains that anchor snapshots into the hypergraph but are not in this app's catalog, so each is known only by its address and nothing is known of what it is for.`;
+
+/** Quiet this long before the span's end is a stop, not a slow day (the picker's own three). */
+const STOPPED_MS = 3 * DAY_MS;
+
 const dayMeasured = (d: NotableDay): "count" | "duration" => (d.kind === "pause" || d.kind === "longest" ? "duration" : "count");
 
 export function trendFacts(input: TrendFactsInput): TrendFacts | null {
@@ -136,7 +151,8 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
   const perDay = span.toMs - span.fromMs >= DAY_MS;
 
   const dag = subject === "dag";
-  const nameOf = (id: string) => catalog[id] ?? id;
+  const unlisted = subject === UNLISTED_ID;
+  const nameOf = (id: string) => (id === UNLISTED_ID ? UNLISTED_SET_NAME : catalog[id] ?? id);
   const ids = Object.keys(catalog).filter((id) => id !== "dag");
   const mentioned = new Set<string>();
   const mention = (id: string): string => {
@@ -228,23 +244,73 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
     }
   }
 
+  // THE CHAINS BEHIND THE SET: how many anchored and how much the busiest carried. None is named: a
+  // chain is an address here, and the catalog has nothing to say about it.
+  if (unlisted) {
+    const carried = Object.keys(input.cur.series)
+      .filter((k) => /^m\.[^.]+\.snaps$/.test(k))
+      .map((k) => k.split(".")[1]!)
+      .filter((id) => id !== UNLISTED_ID && !isListed(id))
+      .map((id) => spanValue("snapshots", id, cur) ?? 0)
+      .filter((v) => v > 0)
+      .sort((a, b) => b - a);
+    // A SILENT SPAN SAYS SO (live 2026-10-30: "0 snapshots, 0 blocks, 0 fees and 0 data"): the rows of
+    // zeros go, and what a reader can use takes their place, when the set last anchored and how
+    // many chains ever have.
+    if (!carried.length) facts.length = 0;
+    facts.push(fact("Unlisted chains that anchored snapshots, this span", carried.length, "count"));
+    if (carried.length > 1) {
+      const sum = carried.reduce((a, v) => a + v, 0);
+      facts.push(fact("Busiest unlisted chain, share of the set's snapshots anchored, this span", carried[0]! / sum, "share"));
+    }
+    if (input.history) {
+      const h = fold(trimNewestPartial(input.history));
+      const last = lastSeen(h.series[`m.${UNLISTED_ID}.snaps`] ?? [], h.buckets);
+      // …and a set that stopped well before the span's end says when, active span or not (live: the
+      // year's note never said the set went silent in August).
+      if (last != null && last < span.toMs - STOPPED_MS) facts.push(fact("Last day an unlisted chain anchored a snapshot", last, "date"));
+      const ever = Object.keys(h.series).filter((k) => {
+        const id = /^m\.([^.]+)\.snaps$/.exec(k)?.[1];
+        return id != null && id !== UNLISTED_ID && !isListed(id) && h.series[k]!.some((v) => (v ?? 0) > 0);
+      }).length;
+      if (!carried.length && ever) facts.push(fact("Unlisted chains that anchored snapshots in all measured history", ever, "count"));
+    }
+  }
+
   // NOTABLE DAYS, for the zooms long enough to have one.
   let days: NotableDay[] = [];
   const cap = zoom === "7d" || zoom === "30d" || zoom === "1y" || zoom === "all" ? NOTABLE_CAPS[zoom] : 0;
   const blurbs: string[] = [];
   if (cap > 0 && input.daily) {
-    const d = trimNewestPartial(input.daily);
+    // THE UNLISTED SET'S DAYS read the fold, and two things differ from a network's. Its coverage is
+    // `u.cov`, not the spine: a day the chains went unread is null in the fold, and the picker reads
+    // covered + absent as a measured 0, so against `g.ticks` that day would be a dip. And its folded
+    // `gapMax` is one chain's widest gap, not a wait of the set, so it has no pause and no longest wait.
+    const raw = trimNewestPartial(input.daily);
+    const d = unlisted ? fold(raw) : raw;
     const first = d.buckets.findIndex((b) => b >= span.fromMs);
-    days = notableDays({
+    const { [`m.${UNLISTED_ID}.gapMax`]: _setGap, ...noSetGap } = d.series;
+    const pick = {
       days: d.buckets,
-      covered: d.series["g.ticks"] ?? d.buckets.map(() => null),
-      series: d.series,
+      covered: d.series[unlisted ? "u.cov" : "g.ticks"] ?? d.buckets.map(() => null),
+      series: unlisted ? noSetGap : d.series,
       subject,
       ids,
       cap,
       from: first < 0 ? d.buckets.length : first,
       floor: NOTABLE_FLOOR,
-    });
+    };
+    if (input.shape) {
+      const ext = rangeExtremes(pick);
+      for (const [kind, name] of [["peak", "Busiest"], ["trough", "Quietest"]] as const) {
+        const day = ext.find((x) => x.kind === kind);
+        if (!day) continue;
+        facts.push(fact(`${name} day of the span, date`, day.dayMs, "date"));
+        facts.push(fact(`${name} day of the span, snapshots anchored`, day.value, "count"));
+      }
+      if (ext[0]) facts.push(fact("Typical day of the span, snapshots anchored", ext[0].level, "count"));
+    }
+    days = input.shape ? [] : notableDays(pick);
     days.forEach((day, i) => {
       const n = i + 1;
       const who = day.networkId ? mention(day.networkId) : "";
@@ -287,5 +353,6 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
     });
   }
 
+  if (unlisted) blurbs.push(UNLISTED_SET_BLURB);
   return { facts, days, names: [...new Set([...Object.values(catalog), ...mentioned])], blurbs };
 }

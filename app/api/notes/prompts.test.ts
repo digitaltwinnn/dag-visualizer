@@ -150,7 +150,7 @@ describe("PROMPTS", () => {
     // over the window, complementary to the top card's "what changed", never a copy of it.
     expect(Object.keys(PROMPTS.trend.questions!)).toEqual(["span"]);
     expect(PROMPTS.trend.questions!.span).toBe(
-      "Describe the span's shape, as a companion to a note above it that already states what rose and fell: its busiest and quietest day with their figures and how far each stood from the typical day, where the facts name them, and what a typical day of the span looked like. Do not state where the span began or ended, and do not say what rose or fell overall.",
+      "Describe the span's shape, as a companion to a note above it that already states what rose and fell: the busiest day and the quietest day, each with its date and figure, and a typical day's figure, using only the facts named for those days. If the facts name none, say how quiet or steady the span was. Do not say what rose or fell overall.",
     );
     expect(PROMPTS.trend.system("the hypergraph", undefined, false, "span")).toContain(PROMPTS.trend.questions!.span);
     expect(PROMPTS.trend.system("the hypergraph", undefined, false, "span")).not.toContain(PROMPTS.trend.question);

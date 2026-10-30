@@ -66,6 +66,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 
 import TrendChart, { type TrendBand, type TrendLine, type TrendMark } from "@/components/docs/TrendChart";
 import { useAiNote } from "@/components/notes/useAiNote";
+import { commitNoteDay } from "@/components/notes/commitNoteDay";
 import { NOTE_KIND_WORD } from "@/components/notes/noteDays";
 import { rangeDays } from "@/src/util/localTime";
 import useTrendRoster from "@/components/useTrendRoster";
@@ -326,13 +327,13 @@ export default function TrendStack() {
     for (const d of noteDays ?? []) {
       const id = d.networkId ?? "dag";
       const list = m.get(id) ?? [];
-      list.push({ dayMs: d.dayMs, kind: d.kind, lit: hoverNoteDay === d.dayMs, label: `Notable day, ${rangeDays(d.dayMs, d.dayMs + NOTE_DAY_MS)}: ${NOTE_KIND_WORD[d.kind]}` });
+      list.push({ dayMs: d.dayMs, kind: d.kind, networkId: d.networkId, lit: hoverNoteDay === d.dayMs, label: `Notable day, ${rangeDays(d.dayMs, d.dayMs + NOTE_DAY_MS)}: ${NOTE_KIND_WORD[d.kind]}` });
       m.set(id, list);
     }
     return m;
   }, [noteDays, hoverNoteDay]);
   const onMarkHover = useCallback((dayMs: number | null) => useStore.getState().setHoverNoteDay(dayMs), []);
-  const onMarkPick = useCallback((dayMs: number) => useStore.getState().setTrendRange({ fromMs: dayMs, toMs: dayMs + NOTE_DAY_MS }), []);
+  const onMarkPick = useCallback((mark: TrendMark) => commitNoteDay(mark), []);
   const stackById = useMemo(() => {
     const m = new Map<string, TrendBand[]>();
     for (const [id, row] of rows) if (row.stack?.length) m.set(id, row.stack);

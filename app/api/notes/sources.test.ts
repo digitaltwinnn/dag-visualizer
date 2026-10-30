@@ -75,11 +75,10 @@ describe("noteSupported", () => {
     expect(noteSupported("trend", "dag", "hours")).toBe(false);
   });
 
-  it("refuses an unlisted subject in every view", () => {
-    for (const [view, span] of [["hyper", "day"], ["geo", "day"], ["ledger", "hours"], ["trend", "7d"]] as const) {
-      expect(noteSupported(view, "unlisted", span)).toBe(false);
+  it("refuses the unlisted set outside History, and an untracked address everywhere", () => {
+    for (const [view, span] of [["hyper", "day"], ["geo", "day"], ["ledger", "hours"]] as const) expect(noteSupported(view, "unlisted", span)).toBe(false);
+    for (const [view, span] of [["hyper", "day"], ["geo", "day"], ["ledger", "hours"], ["trend", "7d"]] as const)
       expect(noteSupported(view, "DAGnotTrackedAnywhere000000000000000000", span)).toBe(false);
-    }
   });
 });
 
@@ -144,9 +143,18 @@ describe("factsFor — Geography's subject notes", () => {
     // note does, and captions no days (the Range card lists none).
     const facet = await got("trend", "dag/span", "7d");
     expect([facet.kind, facet.label, facet.subjectName, facet.days]).toEqual(["span", "the hypergraph", undefined, []]);
+    // The unlisted set is History's: called by its name as a set, the gate scoped to that name.
+    const set = await got("trend", "unlisted", "7d");
+    expect([set.kind, set.label, set.subjectName]).toEqual(["view", "the unlisted networks", "Unlisted networks"]);
+    const setFacet = await got("trend", "unlisted/span", "30d");
+    expect([setFacet.kind, setFacet.label, setFacet.subjectName, setFacet.days]).toEqual(["span", "the unlisted networks", "Unlisted networks", []]);
+    expect(noteSupported("trend", "unlisted", "1y")).toBe(true);
+    for (const v of ["hyper", "geo"] as const) expect(noteSupported(v, "unlisted", "day")).toBe(false);
+    expect(noteSupported("ledger", "unlisted", "hours")).toBe(false);
     const netFacet = await got("trend", `${USDC}/span`, "30d");
     expect([netFacet.kind, netFacet.label, netFacet.subjectName]).toEqual(["span", "USDC.dag", "USDC.dag"]);
-    expect(netFacet.facts.map((f) => f.label)).toEqual((await got("trend", USDC, "30d")).facts.map((f) => f.label));
+    const notNotable = (fs: { label: string }[]) => fs.map((f) => f.label).filter((l) => !/^Notable day/.test(l) && !/of the span/.test(l));
+    expect(notNotable(netFacet.facts)).toEqual(notNotable((await got("trend", USDC, "30d")).facts));
     // The warmed fleet country keeps Geography's own question; a network's country asks the country's.
     const cc = await got("geo", "cc:DE", "day");
     expect([cc.kind, cc.label, cc.subjectName]).toEqual(["view", "Germany", "Germany"]);
@@ -463,8 +471,18 @@ describe("factsFor — the per-view read table", () => {
 
   it("an unsupported request reads nothing", async () => {
     const r = fakeReads();
-    expect(await factsFor("mainnet", "trend", "unlisted", "7d", NOW, r)).toBeNull();
+    expect(await factsFor("mainnet", "hyper", "unlisted", "day", NOW, r)).toBeNull();
     expect(r.calls).toEqual([]);
+  });
+
+  it("the unlisted set reads the whole daily history as well, so a silent span can say when it last anchored", async () => {
+    const r = fakeReads();
+    await factsFor("mainnet", "trend", "unlisted", "30d", NOW, r);
+    const tiers = r.calls.map((c) => c.tier);
+    expect(tiers.filter((t) => t === "1d").length).toBeGreaterThan(1); // the pill's own daily read, and the history
+    const before = fakeReads();
+    await factsFor("mainnet", "trend", USDC, "30d", NOW, before);
+    expect(before.calls.length).toBeLessThan(r.calls.length); // a network pays for no such read
   });
 
   it("a read that throws propagates (the generator counts it as a store outage)", async () => {

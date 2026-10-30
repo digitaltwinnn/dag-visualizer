@@ -17,7 +17,9 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 // re-deals the stack and scopes the Range card (`cardNetwork`), but the view's note keeps reading
 // what the top bar says. A committed country, provider, make-up or brushed range carries its own
 // note on its own card (`subjectNote.ts`, `SubjectNote.tsx`), so none of them takes this one over.
-// The unlisted network is a pseudo-network with no measured history of its own, so it has no note.
+// THE UNLISTED SET HAS A NOTE IN HISTORY ALONE (user, 2026-10-30: "does AI work on unknown networks?
+// I'd like that also"): the sampler measures its chains, so History has a record; they publish no
+// nodes and no places, so the other views have nothing measured to say.
 
 export interface NoteSubjectState {
   /** `metagraphCardNetwork(state)`: the network the metagraph card stands on ("all" when none). */
@@ -57,7 +59,7 @@ export function noteSubjectOf(mode: Mode, s: NoteSubjectState): NoteSubject | nu
   if (view === "trend") {
     const net = s.trendFilter;
     if (net === "all" || net === "dag") return { view, subject: "dag" };
-    return s.unlisted(net) ? null : { view, subject: net };
+    return { view, subject: net }; // the unlisted set included: History alone has its record (below)
   }
   const net = s.metagraphNetwork ?? "all";
   // The ledger's DAG core is its whole network: one subject, `all` (the routes fold it the same way).

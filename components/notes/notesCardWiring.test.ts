@@ -93,7 +93,7 @@ describe("the notes card's own behaviour", () => {
     const chart = read("components/docs/TrendChart.tsx");
     expect(chart).toMatch(/lit\?: boolean;[^]*?label: string;/); // TrendMark carries its lit state and its name
     expect(chart).toMatch(/onMarkHover\?: \(dayMs: number \| null\) => void;/);
-    expect(chart).toMatch(/onMarkPick\?: \(dayMs: number\) => void;/);
+    expect(chart).toMatch(/onMarkPick\?: \(mark: TrendMark\) => void;/);
     expect(chart).toMatch(/<button[^]*?aria-label=\{m\.label\}[^]*?onPointerDown=\{\(e\) => e\.stopPropagation\(\)\}[^]*?<NoteKindCoin kind=\{m\.kind\}/);
     const stack = read("components/TrendStack.tsx");
     expect(stack).toMatch(/useStore\(\(s\) => s\.hoverNoteDay\)/);
@@ -124,6 +124,8 @@ describe("the notes card's own behaviour", () => {
     expect(chip).toMatch(/NOTE_KIND_WORD\[day\.kind\]/);
     // A tag the AI's note produced wears the AI's edge (user, 2026-10-30), like the plate.
     expect(chip).toMatch(/<QualifierChip className=\{AI_SWEEP\}>/);
+    // The unlisted set keeps its mandated neutral: `identityHudCss` would hash it a saturated hue.
+    expect(chip).toMatch(/UNLISTED_ID \? UNLISTED_HUE : identityHudCss/);
     const stack = read("components/TrendStack.tsx");
     expect(stack).toMatch(/const marksById = useMemo\(/);
     expect(stack).toMatch(/marks=\{marksById\.get\(pose\.id\)\}/);
@@ -137,6 +139,18 @@ describe("the notes card's own behaviour", () => {
   it("plays the rail's arrival pulse, in the AI hue (user, 2026-10-30)", () => {
     expect(card).toMatch(/const pulseKey = useEdgePulse\(titleKey\);/);
     expect(card).toMatch(/<PulseEdge pulseKey=\{pulseKey\} rail="right" off=\{collapsed\} hue="var\(--ai-mark\)" \/>/);
+  });
+
+  // ONE COMMIT FOR A DAY (user, 2026-10-30): the row, the band's mark and the plane's coin all bring
+  // the day's plane forward and set its range through `commitNoteDay`, so none can forget the plane.
+  it("every surface commits a notable day through one home, the plane through the executor", () => {
+    const home = read("components/notes/commitNoteDay.ts");
+    expect(home).toMatch(/applyClickActions\(noteDayActions\(/);
+    expect(home).toMatch(/setTrendRange\(notableDaySpan\(/);
+    for (const f of ["components/notes/NotesCard.tsx", "components/notes/NoteDiamonds.tsx", "components/TrendStack.tsx"]) {
+      expect(read(f), f).toMatch(/commitNoteDay\(/);
+      expect(read(f), f).not.toMatch(/setTrendRange\(\{ fromMs: (day|d)\w*\.?\w*, toMs/);
+    }
   });
 
   it("wears the iridescent edge on the open box only", () => {
