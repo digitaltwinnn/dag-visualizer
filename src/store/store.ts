@@ -607,7 +607,7 @@ export const useStore = create<AppState>((set) => ({
   sceneCoverBDetails: 0,
   sceneCoverBVitals: 0,
   boxedCard: null,
-  themePref: "system" as ThemePref,
+  themePref: "dark" as ThemePref, // the default (`src/theme/resolve.ts`); the controller adopts the stored choice on mount
   theme: "dark" as Theme,
 
   setLive: (live, lastGoodAt) => set((s) => ({ live, lastGoodAt: lastGoodAt ?? s.lastGoodAt })),
