@@ -162,7 +162,7 @@ describe("PROMPTS", () => {
       "Open with a plain sentence with the provider as its actor, in the shape \"<provider> hosts N of <network>'s nodes\", network-wide, not for one place; then what share of the network's nodes with a known provider that is and its place among the network's providers; then how that moved over the span, or that it held. Say nothing about speed.",
     );
     expect(hyper.type).toBe(
-      "Open with a plain sentence with the network as its actor, in the shape \"<network> runs N nodes on <layers>\"; then what share of the network's nodes that is and its place among the network's layer groups; then how that changed over the span, or that it held.",
+      "Open with a plain sentence with the network as its actor, in the shape \"<network> runs N of its M nodes on <layers>\", M being all its nodes; then say in plain words where that group stands among the network's layer groups, as a reader would (\"its largest group\", \"the smaller of its two groups\"), never \"share\", \"rank\" or a percentage; then how that changed over the span, or that it held.",
     );
     // The opening is a plain sentence with an actor, never the Subject line used as a noun
     // ("Dor Technologies nodes in Finland run 2" — user, 2026-10-30: "not really logical").

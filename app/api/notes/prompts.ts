@@ -76,8 +76,11 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
     // says the composition held rather than reaching for the node count, which is Geography's too.
     question: "First, who and what is on the network over the span: networks or layers that gained or lost nodes, networks that started or stopped anchoring; if nothing changed there, say so plainly: a quiet week, the node count held at its level and no network or layer changed.",
     questions: {
-      // "LAYER GROUP", never "make-up" (user, 2026-10-30): the Composition rung's own word.
-      type: "Open with a plain sentence with the network as its actor, in the shape \"<network> runs N nodes on <layers>\"; then what share of the network's nodes that is and its place among the network's layer groups; then how that changed over the span, or that it held.",
+      // "LAYER GROUP", never "make-up" (user, 2026-10-30): the Composition rung's own word. And the
+      // group's place is said as a reader would ("its largest group"), not as a share and a rank
+      // (the same day: "I don't know what is meant by 'which is 52% of its nodes and ranks first
+      // among its layer groups'").
+      type: "Open with a plain sentence with the network as its actor, in the shape \"<network> runs N of its M nodes on <layers>\", M being all its nodes; then say in plain words where that group stands among the network's layer groups, as a reader would (\"its largest group\", \"the smaller of its two groups\"), never \"share\", \"rank\" or a percentage; then how that changed over the span, or that it held.",
     },
     questionCommon: "Last, in one sentence, how active it was: the global snapshots it was part of per day last week against the weeks before.",
     questionCommonWhole: QUESTION_COMMON_WHOLE,
