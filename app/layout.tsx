@@ -86,13 +86,14 @@ export default function RootLayout({
               '(function(){var m=/[?&]net=(integrationnet|testnet)(?:&|$)/.exec(location.search);if(m)document.documentElement.dataset.net=m[1];})();',
           }}
         />
-        {/* Theme stamp — the data-net script's twin: pin data-theme BEFORE first paint iff an
-            explicit choice is stored. Absence = System = no attribute (color-scheme: light dark
-            lets the browser resolve). Mirrors src/theme/resolve.ts's two-value check. */}
+        {/* Theme stamp — the data-net script's twin: pin data-theme BEFORE first paint. A stored
+            light/dark stamps itself; a stored System leaves the attribute off (color-scheme: light
+            dark lets the browser resolve); NOTHING STORED stamps the default, dark (user, 2026-10-30),
+            so a light OS never flashes the sheet. Mirrors src/theme/resolve.ts. */}
         <script
           dangerouslySetInnerHTML={{
             __html:
-              '(function(){try{var t=localStorage.getItem("dagviz:theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}})();',
+              '(function(){var d=document.documentElement,t=null;try{t=localStorage.getItem("dagviz:theme");}catch(e){}if(t==="light"||t==="dark")d.dataset.theme=t;else if(t!=="system")d.dataset.theme="dark";})();',
           }}
         />
         {children}

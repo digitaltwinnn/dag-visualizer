@@ -6,12 +6,17 @@ describe("parseThemePref", () => {
     expect(parseThemePref("light")).toBe("light");
     expect(parseThemePref("dark")).toBe("dark");
   });
-  it("everything else is System — absence IS system, never stored", () => {
-    expect(parseThemePref(null)).toBe("system");
-    expect(parseThemePref(undefined)).toBe("system");
-    expect(parseThemePref("system")).toBe("system"); // never written, still tolerated
-    expect(parseThemePref("LIGHT")).toBe("system"); // exact values, no case folding
-    expect(parseThemePref("auto")).toBe("system");
+  // THE DEFAULT IS DARK (user, 2026-10-30: "set the default to dark"): a first visit with nothing
+  // stored is the dark instrument whatever the OS says; System is a CHOICE now, stored like the
+  // other two, since absence no longer means it.
+  it("accepts System as a stored choice", () => {
+    expect(parseThemePref("system")).toBe("system");
+  });
+  it("everything else is the default, dark — absence included", () => {
+    expect(parseThemePref(null)).toBe("dark");
+    expect(parseThemePref(undefined)).toBe("dark");
+    expect(parseThemePref("LIGHT")).toBe("dark"); // exact values, no case folding
+    expect(parseThemePref("auto")).toBe("dark");
   });
 });
 
