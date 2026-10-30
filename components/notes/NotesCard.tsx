@@ -15,8 +15,9 @@ import { noteSpanWords } from "./noteSubject";
 import { useAiNote } from "./useAiNote";
 
 // THE AI NOTES CARD (2026-10-27) — a few sentences a model wrote about what the view is showing,
-// the VIEW's note at the filter's scope (`noteSubjectOf`: the network, else everything; History's
-// plane over the window pill), and for History a few notable days that each commit their own day
+// the VIEW's note at the filter's scope (`noteSubjectOf`: the network, else everything; in History
+// the filter's plane over the window pill, never the plane brought forward), and for History a few
+// notable days that each commit their own day
 // as the range. It HOLDS under a drill (spec 2026-10-29-subject-notes): a committed country,
 // provider, make-up or brushed range carries its own note inside its own card (`SubjectNote`).
 //

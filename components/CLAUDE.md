@@ -885,10 +885,13 @@ stored history, so they carry none and show nothing extra.
 | Geography | Country | the country's nodes | the FILTER: fleet-wide, or that network's nodes there |
 | Geography | Provider (`cohort`) | the provider's nodes, named network-wide | the provider across the filter's scope |
 | Hypergraph | Composition | the make-up's nodes | its network |
-| History | Range | the brushed span | the plane's network |
+| History | Range | the brushed span | the plane's network (`cardNetwork`) |
 | all | Node, Tick, Metagraph snapshot, Moment | none | no per-subject series |
 
-The Metagraph card carries none: filtered, it is the same subject as the top card. The block is
+The Metagraph card carries none: filtered, it is the same subject as the top card. **History's top
+card reads the FILTER, not the plane brought forward** (user, 2026-10-30): a focus re-deals the
+stack and scopes the Range card, but the view's note keeps saying what the top bar says, so under
+All it stays the hypergraph's note whichever plane is forward (`noteSubjectOf`). The block is
 `components/notes/SubjectNote.tsx`, and **it IS the card's lead** (user, 2026-10-30, design option D
 of four shown in the brainstorming companion, then "no fallback"): the measured lead sentences
 ("Hosts 25% of the selection's nodes", the Range card's "DOR anchored N snapshots in this range")

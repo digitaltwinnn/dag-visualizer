@@ -11,17 +11,19 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 //
 // It is the VIEW's note at the filter's scope, and it holds under a drill (spec
 // 2026-10-29-subject-notes): Hypergraph, Geography and Snapshots stand on the network, else
-// everything (Snapshots' DAG core IS everything: `all`, one note); History stands on the plane the
-// metagraph card stands on, where "all" and the core are one subject ("dag" — the plane the stack
-// opens on). A committed country, provider, make-up or brushed range carries its own note on its
-// own card (`subjectNote.ts`, `SubjectNote.tsx`), so none of them takes this one over. The unlisted
-// network is a pseudo-network with no measured history of its own, so it has no note.
+// everything (Snapshots' DAG core IS everything: `all`, one note); History stands on the FILTER,
+// where "all" and the core are one subject ("dag", the hypergraph's plane). NOT on the plane
+// brought forward (user, 2026-10-30: "it should take the actual metagraph filter"): a focus
+// re-deals the stack and scopes the Range card (`cardNetwork`), but the view's note keeps reading
+// what the top bar says. A committed country, provider, make-up or brushed range carries its own
+// note on its own card (`subjectNote.ts`, `SubjectNote.tsx`), so none of them takes this one over.
+// The unlisted network is a pseudo-network with no measured history of its own, so it has no note.
 
 export interface NoteSubjectState {
   /** `metagraphCardNetwork(state)`: the network the metagraph card stands on ("all" when none). */
   metagraphNetwork: string | null;
-  /** `cardNetwork(filter, trendFocus, trendFront)`: the plane the History card stands on. */
-  trendCard: string | null;
+  /** The top-bar filter ("all", "dag" or a network id): History's note reads it directly. */
+  trendFilter: string;
   /** Is this id the unlisted pseudo-network? (`src/data/unlisted.ts` is the one home.) */
   unlisted: (id: string) => boolean;
 }
@@ -53,8 +55,8 @@ export function noteSubjectOf(mode: Mode, s: NoteSubjectState): NoteSubject | nu
   if (!VIEW_POLICIES[mode].aiNotes) return null;
   const view = mode as NoteView; // aiNotes is true exactly on the four note views
   if (view === "trend") {
-    const net = s.trendCard;
-    if (net == null || net === "all" || net === "dag") return { view, subject: "dag" };
+    const net = s.trendFilter;
+    if (net === "all" || net === "dag") return { view, subject: "dag" };
     return s.unlisted(net) ? null : { view, subject: net };
   }
   const net = s.metagraphNetwork ?? "all";

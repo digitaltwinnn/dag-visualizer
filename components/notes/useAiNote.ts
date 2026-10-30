@@ -5,7 +5,6 @@ import { useNet } from "@/components/topbar/useNet";
 import { useTickHasFilter } from "@/components/useTickHasFilter";
 import { UNLISTED_ID } from "@/src/data/unlisted";
 import { NET } from "@/src/net/current";
-import { cardNetwork } from "@/src/engine/domain/trendStack";
 import { useStore } from "@/src/store/store";
 import { noteSubjectOf, type NoteSubject } from "./noteSubject";
 import type { NoteReq } from "./noteLoader";
@@ -53,7 +52,7 @@ export function useAiNote(): { subject: NoteSubject | null; req: NoteReq | null;
 
   const subject = noteSubjectOf(mode, {
     metagraphNetwork: metagraphCardNetwork({ mode, filter, tickNet, snap, tickHasFilter, trendFocus, trendFront, inspect }),
-    trendCard: cardNetwork(filter, trendFocus, trendFront),
+    trendFilter: filter,
     unlisted: (id) => id === UNLISTED_ID,
   });
   // History's note is over the WINDOW pill on screen, brushed or not: a brushed range's note is

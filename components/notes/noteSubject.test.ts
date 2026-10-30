@@ -3,7 +3,7 @@ import { noteSpanWords, noteSubjectOf, type NoteSubjectState } from "./noteSubje
 
 const base: NoteSubjectState = {
   metagraphNetwork: "all",
-  trendCard: null,
+  trendFilter: "all",
   unlisted: (id) => id === "unlisted",
 };
 const s = (over: Partial<NoteSubjectState>): NoteSubjectState => ({ ...base, ...over });
@@ -35,20 +35,23 @@ describe("noteSubjectOf", () => {
     expect(noteSubjectOf("geo", withCountry)).toEqual({ view: "geo", subject: "DAG123" });
   });
 
-  it("trend folds all / dag / no card into dag, else the plane", () => {
-    expect(noteSubjectOf("trend", s({ trendCard: "all" }))).toEqual({ view: "trend", subject: "dag" });
-    expect(noteSubjectOf("trend", s({ trendCard: "dag" }))).toEqual({ view: "trend", subject: "dag" });
-    expect(noteSubjectOf("trend", s({ trendCard: null }))).toEqual({ view: "trend", subject: "dag" });
-    expect(noteSubjectOf("trend", s({ trendCard: "DAG123" }))).toEqual({ view: "trend", subject: "DAG123" });
+  // THE FILTER, NOT THE PLANE (user, 2026-10-30: "trend view AI card takes the filter from
+  // explorer it seems (range should, but not the AI card); it should take the actual metagraph
+  // filter"). A plane brought forward re-deals the stack and the Range card; the view's note keeps
+  // reading what the top bar says, so bringing a plane forward under All keeps the hypergraph's note.
+  it("trend folds all / dag into dag, else the FILTER's network", () => {
+    expect(noteSubjectOf("trend", s({ trendFilter: "all" }))).toEqual({ view: "trend", subject: "dag" });
+    expect(noteSubjectOf("trend", s({ trendFilter: "dag" }))).toEqual({ view: "trend", subject: "dag" });
+    expect(noteSubjectOf("trend", s({ trendFilter: "DAG123" }))).toEqual({ view: "trend", subject: "DAG123" });
   });
 
-  it("trend reads trendCard, not the metagraph network", () => {
-    expect(noteSubjectOf("trend", s({ trendCard: "dag", metagraphNetwork: "DAG123" }))).toEqual({ view: "trend", subject: "dag" });
+  it("trend reads the filter, never the plane the metagraph card stands on", () => {
+    expect(noteSubjectOf("trend", s({ trendFilter: "all", metagraphNetwork: "DAG123" }))).toEqual({ view: "trend", subject: "dag" });
   });
 
   it("an unlisted network has no note, in every view", () => {
     for (const m of ["hyper", "geo", "ledger"] as const) expect(noteSubjectOf(m, s({ metagraphNetwork: "unlisted" }))).toBeNull();
-    expect(noteSubjectOf("trend", s({ trendCard: "unlisted" }))).toBeNull();
+    expect(noteSubjectOf("trend", s({ trendFilter: "unlisted" }))).toBeNull();
   });
 });
 
