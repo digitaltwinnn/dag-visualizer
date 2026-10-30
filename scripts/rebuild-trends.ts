@@ -11,10 +11,14 @@
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --backfill-blocks=2025-07-01
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --backfill-unlisted
 //
-// ⚠️ THE UNLISTED COVERAGE MARKER (`u.cov`, 2026-10-08) is written by the cron, the full rebuild and
-// --backfill-unlisted — NOT by --recompute-from (it keeps the marker already there) or --extend-to
-// (the older days it adds read "unlisted: not measured" until a --backfill-unlisted follows it).
-// After an --extend-to, run --backfill-unlisted. It is idempotent: whole chains, exact values.
+// ⚠️ THE UNLISTED COVERAGE MARKER (`u.cov`, 2026-10-08) is written by the cron, the full rebuild,
+// --backfill-unlisted and the END of every --extend-to — NOT by --recompute-from (it keeps the
+// marker already there). ONE WALK (user, 2026-10-30: "I just want one walk from now on"): an
+// extension used to leave its older days reading "unlisted: not measured" until a separate
+// --backfill-unlisted followed it, and twice that follow-up was forgotten. The extension now ends
+// with the unlisted phase itself, taking the sampler lock only for that phase's WRITES (it sets
+// the unlisted chains' cron cursors and marks today's buckets, which the cron also writes);
+// --no-unlisted skips it. The phase is idempotent: whole chains, exact values.
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --wipe-only
 //
 // CRASH SAFETY (2026-09-11 — the overnight recompute died at hour 13 with every write still
@@ -102,12 +106,13 @@ function loadEnvLocal(): void {
   }
 }
 
-interface Args { net: "mainnet" | "integrationnet" | "testnet"; days: number; wipeOnly: boolean; extendToMs: number | null; recomputeFromMs: number | null; gapsFromMs: number | null; gapsFromChain: string | null; blocksFromMs: number | null; unlisted: boolean; resume: "no" | "yes" | "force" }
+interface Args { net: "mainnet" | "integrationnet" | "testnet"; days: number; wipeOnly: boolean; extendToMs: number | null; recomputeFromMs: number | null; gapsFromMs: number | null; gapsFromChain: string | null; blocksFromMs: number | null; unlisted: boolean; noUnlisted: boolean; resume: "no" | "yes" | "force" }
 function parseArgs(): Args {
-  const a: Args = { net: "mainnet", days: 90, wipeOnly: false, extendToMs: null, recomputeFromMs: null, gapsFromMs: null, gapsFromChain: null, blocksFromMs: null, unlisted: false, resume: "no" };
+  const a: Args = { net: "mainnet", days: 90, wipeOnly: false, extendToMs: null, recomputeFromMs: null, gapsFromMs: null, gapsFromChain: null, blocksFromMs: null, unlisted: false, noUnlisted: false, resume: "no" };
   for (const arg of process.argv.slice(2)) {
     if (arg === "--wipe-only") a.wipeOnly = true;
     else if (arg === "--backfill-unlisted") a.unlisted = true;
+    else if (arg === "--no-unlisted") a.noUnlisted = true;
     else if (arg === "--resume") a.resume = "yes";
     else if (arg === "--resume=force") a.resume = "force";
     else if (arg.startsWith("--net=")) a.net = arg.slice(6) as Args["net"];
@@ -260,7 +265,7 @@ class Abort extends Error {}
 
 async function main(): Promise<void> {
   loadEnvLocal();
-  const { net, days, wipeOnly, extendToMs, recomputeFromMs, gapsFromMs, gapsFromChain, blocksFromMs, unlisted, resume } = parseArgs();
+  const { net, days, wipeOnly, extendToMs, recomputeFromMs, gapsFromMs, gapsFromChain, blocksFromMs, unlisted, noUnlisted, resume } = parseArgs();
 
   // Deferred imports: store.ts reads env at construction, so env must be loaded first.
   const { Redis } = await import("@upstash/redis");
@@ -302,8 +307,10 @@ async function main(): Promise<void> {
   // gapSum/gapMax/ticks of whole days before its launch's UTC today, and the extension writes only
   // days at or before the store's OLDEST covered day (its cursor untouched), while the cron writes
   // only the buckets of NEW records (today's) — disjoint fields, and HSET sets only the fields it
-  // names. So they take no lock and release none.
-  const holdsLock = gapsFromMs == null && extendToMs == null;
+  // names. So they take no lock and release none — except that an --extend-to takes it LATE, for
+  // its closing unlisted phase only (one walk, header), and releases it in `finally` like a rebuild.
+  // `let`: an --extend-to takes the lock late, for its closing unlisted phase (`takeSamplerLock`).
+  let holdsLock = gapsFromMs == null && extendToMs == null;
   if (holdsLock && !(await lockStore.acquireLock(lockKeyOf(net), 21600))) {
     // A killed walk leaves its lock standing (up to 6 h) — which would block its own
     // --resume. Take it over ONLY on evidence: a resume was asked for, a checkpoint on disk
@@ -336,15 +343,24 @@ async function main(): Promise<void> {
   const releaseOnSignal = (sig: string, code: number) => {
     if (releasing) return;
     releasing = true;
+    if (!holdsLock) process.exit(code);
     console.error(`\n${sig}: releasing the sampler lock before exit …`);
     const release = redis.ttl(lockKeyOf(net)).then((ttl) => (ttl > 900 ? lockStore.releaseLock(lockKeyOf(net)) : undefined));
     Promise.race([release, new Promise((r) => setTimeout(r, 5000))]).finally(() => process.exit(code));
   };
-  if (holdsLock) {
-    process.once("SIGINT", () => releaseOnSignal("SIGINT", 130));
-    process.once("SIGTERM", () => releaseOnSignal("SIGTERM", 143));
-    process.once("SIGHUP", () => releaseOnSignal("SIGHUP", 129));
-  }
+  process.once("SIGINT", () => releaseOnSignal("SIGINT", 130));
+  process.once("SIGTERM", () => releaseOnSignal("SIGTERM", 143));
+  process.once("SIGHUP", () => releaseOnSignal("SIGHUP", 129));
+  /** The late lock of an extension's closing phase: a cron run holds the lock for seconds, so wait
+   *  it out (up to 20 min, 30 s apart); anything longer is another rebuild, and the phase is left
+   *  to a `--backfill-unlisted` run by hand rather than fought over. */
+  const takeSamplerLock = async (): Promise<boolean> => {
+    for (let i = 0; i < 40; i++) {
+      if (await lockStore.acquireLock(lockKeyOf(net), 21600)) return true;
+      await new Promise((r) => setTimeout(r, 30000));
+    }
+    return false;
+  };
   try {
 
   const be0 = NETWORKS[net].be;
@@ -574,7 +590,9 @@ async function main(): Promise<void> {
   // interleaves — and each chain's cron CURSOR is set to its tip, or the next cron run would read
   // the chain from genesis again and ADD it a second time. Coverage then goes on every bucket the
   // store's spine covered (`g.ticks`), since every unlisted record of every one of them is now in.
-  if (unlisted) {
+  /** THE UNLISTED PHASE — `--backfill-unlisted` alone, and the end of every `--extend-to` (one
+   *  walk, header). Its writes need the sampler lock (taken inside, after the walk, unless held). */
+  async function backfillUnlistedPhase(): Promise<void> {
     const tierOf = (key: string): Tier => key.split(":")[2] as Tier;
     const ids = untrackedIds(net, await fetchChainIds(be0));
     console.log(`backfilling ${ids.length} unlisted chain(s): ${ids.map((i) => i.slice(0, 10)).join(", ") || "none"} …`);
@@ -591,6 +609,17 @@ async function main(): Promise<void> {
       const tip = recs[recs.length - 1];
       if (tip) { cursorMap[`m.${id}`] = tip.ordinal; cursorMap[`mTs.${id}`] = Date.parse(tip.timestamp); }
       console.log(`  ${id.slice(0, 10)}: ${recs.length} snapshot(s)`);
+    }
+    // The WRITES need the sampler lock (the cursors below, and today's buckets the cron writes too);
+    // the walk above did not. A `--backfill-unlisted` run holds it from the start; an extension's
+    // closing phase takes it here, so the cron is paused for the writes alone, not the walk.
+    if (!holdsLock) {
+      console.log("  unlisted phase: taking the sampler lock for the writes …");
+      holdsLock = await takeSamplerLock();
+      if (!holdsLock) {
+        console.error("  the sampler lock stayed held for 20 min (another rebuild?) — run --backfill-unlisted by hand once it is free.");
+        throw new Abort();
+      }
     }
     // Fine grain is never invented backward (TIER_SINCE): an old record keeps its daily bucket only.
     const floor5m = slotOf(net, "5m", TIER_SINCE["5m"]).key;
@@ -641,6 +670,9 @@ async function main(): Promise<void> {
     }
     if (Object.keys(cursorMap).length) await store.applyWrites([{ key: cursorKeyOf(net), map: cursorMap, ttlS: null }]);
     console.log(`  ${fields} fields written (exact), ${Object.keys(cursorMap).length / 2} cron cursor(s) set to the chains' tips.`);
+  }
+  if (unlisted) {
+    await backfillUnlistedPhase();
     return;
   }
 
@@ -877,6 +909,10 @@ async function main(): Promise<void> {
     await walkGlobalCkpt(extendToMs, d1StartMs, seedG);
     await writeFloorsAndFinish(ids);
     console.log("  extension complete; cursor untouched — the cron never noticed.");
+    if (noUnlisted) return;
+    // ONE WALK (header): the unlisted chains and their coverage marker; the phase takes the
+    // sampler lock itself, for its writes only.
+    await backfillUnlistedPhase();
     return;
   }
 
