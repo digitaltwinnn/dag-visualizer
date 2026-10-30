@@ -144,23 +144,26 @@ export default function TrendRangePane({
       />
       {!collapsed && span && phrase && (
         <div>
-          {/* THE LEAD: what the span was to the network above, in one sentence (the Moment's
-              grammar); when it ended rides the head. */}
-          <Lead lines={3}>
-            {value != null ? (
-              <>
-                {who} {phrase.verb} <span className="font-medium text-foreground tabular-nums">{format(value)}</span> {phrase.rest}
-              </>
-            ) : (
-              <>No reading in this range</>
-            )}
-          </Lead>
-          {/* THE RANGE'S OWN NOTE (spec 2026-10-29-subject-notes): only a BRUSHED range has one —
-              the window standing in is the top Gate AI card's note — on the plane the deck stands
-              on (`cardNetwork`, the lead's own rule), asked as the brush lands. No span chip: the
-              title IS the span, and the dates repeated as the unit clipped the block's label (live,
-              2026-10-29). The rule after it keeps the facts a section of their own. */}
-          {range ? <SubjectNote req={rangeNoteReq(cardNetwork(filter, focus, front), range, (id) => id === UNLISTED_ID)} span={null} trailingRule /> : null}
+          {/* THE LEAD, what the span was to the network above in one sentence (the Moment's grammar;
+              when it ended rides the head), is the FALLBACK of the range's own note (spec
+              2026-10-29-subject-notes; user, 2026-10-30): only a BRUSHED range has one — the window
+              standing in is the top Gate AI card's note — on the plane the deck stands on
+              (`cardNetwork`, the lead's own rule), asked as the brush lands and standing in the lead's
+              place once written. */}
+          <SubjectNote
+            req={range ? rangeNoteReq(cardNetwork(filter, focus, front), range, (id) => id === UNLISTED_ID) : null}
+            fallback={
+              <Lead lines={3}>
+                {value != null ? (
+                  <>
+                    {who} {phrase.verb} <span className="font-medium text-foreground tabular-nums">{format(value)}</span> {phrase.rest}
+                  </>
+                ) : (
+                  <>No reading in this range</>
+                )}
+              </Lead>
+            }
+          />
           <FactGroup>
             <Fact label="Start">{edge(span.fromMs)}</Fact>
             {/* The end is exclusive, so a day-named span names the day it reaches into. A trailing

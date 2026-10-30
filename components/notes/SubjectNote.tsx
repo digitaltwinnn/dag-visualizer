@@ -1,35 +1,36 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 import { AI_NOTES_ICON } from "@/components/icons";
-import { SectionLabel } from "@/components/inspector/parts";
-import { NodeStars } from "@/components/state/StateAtoms";
 import { useNet } from "@/components/topbar/useNet";
-import { Separator } from "@/components/ui/separator";
 import { queryOf, type NoteReq } from "./noteLoader";
 import { useMainnetNote } from "./useAiNote";
 
 // A SUBJECT CARD'S OWN NOTE (spec 2026-10-29-subject-notes): one note per card, scoped as the
-// card's lead — the Country, Provider and Composition cards and the Range card mount this under
-// their lead, while the Gate AI card above keeps the view's note. The request is the caller's
-// (`subjectNote.ts`). It is asked AUTOMATICALLY: the selection was the gesture, so there is no
-// door, and a write that fails (`unavailable`) or a subject with nothing measured (`none`) shows
-// nothing — never "couldn't write" for an ask the reader did not make.
+// card's lead — the Country, Provider and Composition cards and the Range card mount this IN THE
+// LEAD'S PLACE, while the Gate AI card above keeps the view's note. The request is the caller's
+// (`subjectNote.ts`). It is asked AUTOMATICALLY: the selection was the gesture, so there is no door.
+//
+// THE PLATE TAKES THE LEAD'S PLACE (user, 2026-10-30, design option D): the card's measured lead
+// ("Hosts 25% of the selection's nodes") and the note serve one purpose, what this subject is to the
+// whole it sits in, and the note says it better and names its span; so the written note stands
+// where the lead stood, on a faint violet plate with the mark (`--ai-wash` / `--ai-edge`), and the
+// lead is the FALLBACK — shown while the note is still being read or written, and whenever there is
+// none (`none`, `unavailable`, off mainnet): never "couldn't write" for an ask the reader did not
+// make, and never an empty card. The text names its own span, so the block carries no label row.
 //
 // ⚠️ MODEL TEXT IS UNTRUSTED. It renders as React text, nothing else: no `dangerouslySetInnerHTML`,
 // no markdown (the top card's rule).
 
-const WAIT = "m-0 flex items-center gap-2 text-body text-muted-foreground";
-/** How long a subject has to stand before its note is asked for (above). */
+/** How long a subject has to stand before its note is asked for (the effect below). */
 const ASK_DWELL_MS = 1500;
+const MARK = <AI_NOTES_ICON aria-hidden className="mt-[3px] size-3.5 shrink-0 text-[var(--ai-mark)]" />;
 
-export default function SubjectNote({ req, span, trailingRule = false }: {
+export default function SubjectNote({ req, fallback }: {
   req: NoteReq | null;
-  span: string | null;
-  /** Close the block with a rule too — for a card whose next section draws none of its own (the
-   *  Range card's facts). It belongs to the block so that it goes when the block does. */
-  trailingRule?: boolean;
+  /** The card's measured lead, shown until the note exists and whenever it does not (above). */
+  fallback: ReactNode;
 }) {
   // Presence through `useNet()`, the fetch through the gate (`useMainnetNote`'s hydration rule).
   const asked = useNet() === "mainnet" ? req : null;
@@ -52,38 +53,13 @@ export default function SubjectNote({ req, span, trailingRule = false }: {
     return () => clearTimeout(t);
   }, [key, res?.state, note.request]);
 
-  if (!asked || res?.state === "none" || res?.state === "unavailable") return null;
+  // Only a WRITTEN note takes the plate: `none`, `unavailable`, a read or write still in flight
+  // (`request` is the dwell before the ask, `pending` the server's write) all leave the lead standing.
+  if (!asked || res?.state !== "ok") return <>{fallback}</>;
   return (
-    // The block closes with the card's own rhythm (a rule's `my-2`), so whatever follows — the
-    // card's next rule, the Range card's facts — sits clear of the text.
-    <div className="mb-2">
-      <Separator className="my-2" />
-      <SectionLabel
-        label={
-          <span className="inline-flex items-center gap-1.5">
-            <AI_NOTES_ICON aria-hidden className="size-3.5 text-[var(--ai-mark)]" />
-            Constellation Gate AI
-          </span>
-        }
-        unit={span}
-        className="mb-1.5"
-      />
-      {res == null || res.state === "request" ? (
-        // `request` is the dwell before the ask (the effect above): nothing is being written yet,
-        // so it reads as reading — "writing…" is the server's own `pending`, a write in flight.
-        <p className={WAIT}>
-          <NodeStars />
-          reading…
-        </p>
-      ) : res.state === "pending" ? (
-        <p className={WAIT}>
-          <NodeStars />
-          writing…
-        </p>
-      ) : res.state === "ok" ? (
-        <p className="m-0 text-body leading-snug text-foreground">{res.text}</p>
-      ) : null}
-      {trailingRule ? <Separator className="mt-2" /> : null}
+    <div className="mb-2.5 flex gap-2 rounded-xs border border-[var(--ai-edge)] bg-[var(--ai-wash)] px-2.5 py-2">
+      {MARK}
+      <p className="m-0 text-body leading-snug text-foreground">{res.text}</p>
     </div>
   );
 }

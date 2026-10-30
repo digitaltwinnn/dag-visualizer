@@ -138,13 +138,13 @@ describe("PROMPTS", () => {
     expect(PROMPTS.ledger.questions).toBeUndefined();
     expect(PROMPTS.trend.questions).toBeUndefined();
     expect(geo.country).toBe(
-      "First, how many of the network's nodes run in the country and how that moved over the span; if nothing moved, say it held, with the level and the country's place among the network's countries. Say nothing about speed.",
+      "First, how many of the network's nodes run in the country, what share of the network's located nodes that is and the country's place among the network's countries; then how that moved over the span, or that it held. Say nothing about speed.",
     );
     expect(geo.provider).toBe(
-      "First, how many nodes the provider hosts across the network and how that moved over the span, stated as network-wide, not for one place; if nothing moved, say it held, with the level and its place among the providers. Say nothing about speed.",
+      "First, how many nodes the provider hosts across the network, stated as network-wide, not for one place, what share of the network's nodes with a known provider that is and its place among the network's providers; then how that moved over the span, or that it held. Say nothing about speed.",
     );
     expect(hyper.type).toBe(
-      "First, how many of the network's nodes run this make-up and how that changed over the span; if nothing changed, say it held, with the level and its share of the network's nodes.",
+      "First, how many of the network's nodes run this make-up, what share of the network's nodes that is and how it stands against the network's other make-ups; then how that changed over the span, or that it held.",
     );
     for (const [view, kind] of [["geo", "country"], ["geo", "provider"], ["hyper", "type"]] as const) {
       const sys = PROMPTS[view].system("Germany", undefined, false, kind);

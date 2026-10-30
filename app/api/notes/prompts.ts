@@ -54,8 +54,10 @@ export const VOICE = [
 //
 // A SUBJECT NOTE ASKS ITS KIND'S QUESTION (a country, a provider, a node make-up). The card the
 // reader pressed already sets the frame (which country, which provider, which make-up), so the
-// question asks only for that subject's count and how it moved, with its place in the whole when
-// nothing moved. The common reading is the NETWORK's, not the subject's, so a subject note has
+// question asks for that subject's count, ITS PLACE IN ITS RUNG — share and rank among the other
+// countries, providers or make-ups, always, not only when nothing moved (user, 2026-10-30: the note
+// replaces the card's measured lead, "how that selected subject relates to the overall distribution
+// within the rung") — and how it moved over the span. The common reading is the NETWORK's, not the subject's, so a subject note has
 // none: its facts answer `common: false` and the part is never asked. `kind` is the kind of
 // QUESTION (`NoteFacts.kind`), so the warmed network-wide country, a view note, asks the view's own.
 // A kind a view has no question for falls back to the view's: only geo has country and provider,
@@ -65,7 +67,7 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
   hyper: {
     question: "First, who and what is on the network over the span: networks or layers that gained or lost nodes, networks that started or stopped anchoring; if nothing changed there, say that it held, with the level.",
     questions: {
-      type: "First, how many of the network's nodes run this make-up and how that changed over the span; if nothing changed, say it held, with the level and its share of the network's nodes.",
+      type: "First, how many of the network's nodes run this make-up, what share of the network's nodes that is and how it stands against the network's other make-ups; then how that changed over the span, or that it held.",
     },
     questionCommon: "Last, in one sentence, how active it was: the global snapshots it was part of per day last week against the weeks before.",
     system: (subjectLabel, _lead, common, kind) =>
@@ -73,8 +75,8 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
   },
   geo: {
     questions: {
-      country: "First, how many of the network's nodes run in the country and how that moved over the span; if nothing moved, say it held, with the level and the country's place among the network's countries. Say nothing about speed.",
-      provider: "First, how many nodes the provider hosts across the network and how that moved over the span, stated as network-wide, not for one place; if nothing moved, say it held, with the level and its place among the providers. Say nothing about speed.",
+      country: "First, how many of the network's nodes run in the country, what share of the network's located nodes that is and the country's place among the network's countries; then how that moved over the span, or that it held. Say nothing about speed.",
+      provider: "First, how many nodes the provider hosts across the network, stated as network-wide, not for one place, what share of the network's nodes with a known provider that is and its place among the network's providers; then how that moved over the span, or that it held. Say nothing about speed.",
     },
     question: "First, where the nodes run: countries and hosting providers that gained or lost nodes, or where the nodes are now when nothing moved. Say nothing about speed.",
     questionCommon: "Last, in one sentence, how active the network was: its global snapshots per day last week against the weeks before.",

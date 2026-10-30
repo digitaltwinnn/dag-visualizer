@@ -34,7 +34,6 @@ import { IDENT_INK } from "@/components/identInk";
 import { useFeedRead } from "@/components/useFeedRead";
 import SubjectNote from "@/components/notes/SubjectNote";
 import { countryNoteReq, providerNoteReq, typeNoteReq } from "@/components/notes/subjectNote";
-import { noteSpanWords } from "@/components/notes/noteSubject";
 import { useNoteScopeNetwork } from "@/components/notes/useAiNote";
 
 type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: K }>;
@@ -1113,10 +1112,10 @@ export function CountryCard({ cc }: { cc: string }) {
     <>
       {/* THE LEAD: what this country is to the selection it sits in. The city count that followed
           ("…, in 8 cities") is gone (user, 2026-10-04). */}
-      {share && <Lead>Hosts {share} of the selection&apos;s nodes</Lead>}
-      {/* THE COUNTRY'S OWN NOTE (spec 2026-10-29-subject-notes), scoped as the lead: the filter's
-          nodes here, the fleet's with no filter. The top Gate AI card keeps the view's note. */}
-      <SubjectNote req={countryNoteReq(cc, network, isUnlisted)} span={noteSpanWords("geo")} />
+      {/* THE COUNTRY'S OWN NOTE (spec 2026-10-29-subject-notes) stands in the lead's place, scoped as
+          the lead: the filter's nodes here, the fleet's with no filter; the measured lead is its
+          fallback (user, 2026-10-30). The top Gate AI card keeps the view's note. */}
+      <SubjectNote req={countryNoteReq(cc, network, isUnlisted)} fallback={share && <Lead>Hosts {share} of the selection&apos;s nodes</Lead>} />
       {/* EACH CARD CUTS BY THE NEXT LEVEL DOWN (user, 2026-10-02 — `docs/superpowers/design/
           2026-10-02-country-provider`, option B: "country and provider cards have the same content …
           the node part"). Both cards used to cut their nodes by network, so the provider's table was
@@ -1174,10 +1173,10 @@ export function CompositionCard({ sel }: { sel: CompositionSel }) {
   return (
     <>
     {/* THE LEAD: the group's share of its network — the old "Share of network" fact. */}
-    {share && <Lead>{share[0].toUpperCase() + share.slice(1)} of this network&apos;s online nodes</Lead>}
-    {/* THE MAKE-UP'S OWN NOTE (spec 2026-10-29-subject-notes): always its network's — the group
-        is one network's by construction (`sel.netId`), so no filter is read. */}
-    <SubjectNote req={typeNoteReq(sel, isUnlisted)} span={noteSpanWords("hyper")} />
+    {/* THE MAKE-UP'S OWN NOTE (spec 2026-10-29-subject-notes) in the lead's place: always its
+        network's — the group is one network's by construction (`sel.netId`), so no filter is read;
+        the measured share is its fallback (user, 2026-10-30). */}
+    <SubjectNote req={typeNoteReq(sel, isUnlisted)} fallback={share && <Lead>{share[0].toUpperCase() + share.slice(1)} of this network&apos;s online nodes</Lead>} />
     {/* The divider every card draws between its lead and what follows (lost when the breakdown
         left this card on 2026-10-02). */}
     {share && <Separator className="mb-2" />}
@@ -1256,13 +1255,12 @@ export function ProviderCard({ sel }: { sel: CohortSel }) {
   const countryShare = shareWords(members.length, selNodes.filter((r) => r.cc === sel.cc).length);
   return (
     <>
-    {/* THE LEAD: this host's share of its country — the figure neither card showed (option B,
-        2026-10-02). The city is the head's chip, so the lead does not repeat it. */}
-    {countryShare && <Lead>{countryShare[0].toUpperCase() + countryShare.slice(1)} of {where}&apos;s nodes</Lead>}
-    {/* THE PROVIDER'S OWN NOTE (spec 2026-10-29-subject-notes), scoped as the country card's: the
-        filter's nodes, the fleet's with no filter. Keyed by provider, not by city: the stored
-        series count a host across its cities. */}
-    <SubjectNote req={providerNoteReq(sel.isp, network, isUnlisted)} span={noteSpanWords("geo")} />
+    {/* THE PROVIDER'S OWN NOTE (spec 2026-10-29-subject-notes) in the lead's place, scoped as the
+        country card's: the filter's nodes, the fleet's with no filter. Keyed by provider, not by
+        city: the stored series count a host across its cities. Its fallback is the measured lead,
+        this host's share of its country (option B, 2026-10-02; the city is the head's chip, so the
+        lead does not repeat it). */}
+    <SubjectNote req={providerNoteReq(sel.isp, network, isUnlisted)} fallback={countryShare && <Lead>{countryShare[0].toUpperCase() + countryShare.slice(1)} of {where}&apos;s nodes</Lead>} />
     {/* THE BREAKDOWN: the cohort's nodes cut by NETWORK — whose nodes these are — the level below
         the country card's cut by provider. */}
     <Separator className="mb-2" />
