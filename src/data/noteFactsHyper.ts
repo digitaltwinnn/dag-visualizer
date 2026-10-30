@@ -282,7 +282,9 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
     // counts them, one per global snapshot), covered days only — an uncovered day is null.
     facts.push(...activityFacts(WHOLE_ACTIVITY_LABEL, covered));
   } else if (typeof subject === "object") {
-    // ONE MAKE-UP OF ONE NETWORK: its count over the span, read where the shape facts read it
+    // ONE LAYER GROUP OF ONE NETWORK ("layer group" in every label a reader meets, never the code's
+    // "make-up" — user, 2026-10-30: "not understandable for a human"; the rail's ghost hint already
+    // says "a layer group"): its count over the span, read where the shape facts read it
     // (`typeBands`: absent beside other types is 0, so an emptied make-up never keeps its last count).
     const { net, type } = subject;
     const bands = typeBands(net, fleet.series);
@@ -299,12 +301,12 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
     // one end) states none.
     if (level > 0 && ch.to <= level) facts.push(fact(`${name}, share of its nodes ${words}`, ch.to / level, "share"));
     const held = bands.map((b) => heldLevel(b.points) ?? 0);
-    facts.push(fact(`Node make-ups in ${name}`, held.filter((v) => v > 0).length, "count"));
+    facts.push(fact(`Layer groups in ${name}`, held.filter((v) => v > 0).length, "count"));
     // Its place among them, read as a country's or a provider's rank is (`noteFactsGeo.ts`): the
     // held levels, so a partial hour at one end cannot move it (user, 2026-10-30: the note is to
     // say how the subject relates to the rung's distribution, and "how it stands" was parroted).
     const own = heldLevel(points) ?? ch.to;
-    facts.push(fact(`${name}, rank among its make-ups by nodes`, 1 + held.filter((v) => v > own).length, "count"));
+    facts.push(fact(`${name}, rank among its layer groups by nodes`, 1 + held.filter((v) => v > own).length, "count"));
   } else {
     const name = mention(subject);
     named.push(subject);
@@ -357,7 +359,7 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
           }))
           .filter((b): b is { key: string; from: number; to: number } => b.from != null && b.to != null);
         const changedBands = bands.filter((b) => b.from !== b.to);
-        facts.push(fact(`${name} make-ups whose node count changed over the span`, changedBands.length, "count"));
+        facts.push(fact(`${name} layer groups whose node count changed over the span`, changedBands.length, "count"));
         for (const { key: type, from, to } of changedBands) {
           const key = `${name} nodes ${comboWords(type)}`;
           facts.push(fact(`${key} at the start of the span`, from, "count", undefined, { key, end: "from" }));

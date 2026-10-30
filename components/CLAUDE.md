@@ -642,11 +642,18 @@ reverse, so a slot without a rung is fine and a rung without a slot is not.
 
 **A HEAD THAT IS NOT THE OPEN BOX IS ONE ROW** (design pass, 2026-10-25 — user: the right rail
 "is pretty dense with all the header displayed. I don't want to lose info"): a folded ENTRY lays
-its eyebrow, its title and its aside on one line (`CardHead`'s entry branch — the eyebrow takes
+its eyebrow and its title on one line (`CardHead`'s entry branch — the eyebrow takes
 one column width so the pile's titles align; a two-line title node marks its block
-`data-titleblock` and its lines go inline, so the dossier's kind and the node's chips are kept,
-not dropped), and the explorer card's head does the same (the panel layout: EXPLORE · mark ·
-title · aside). The BOX keeps the two-row head — it is the one materialized card, and the tiers
+`data-titleblock` and its lines go inline, so the node's chips are kept, not dropped, while the
+dossier's ticker line is dropped), and the explorer card's head does the same (the panel layout:
+EXPLORE · mark · title · aside). **The qualifier pill yields in the fold** (user, 2026-10-30, design
+D of four in the brainstorming companion): the eyebrow, the mark and the pill were taking the
+320px row and the NAME truncated ("Dor …"), so a folded entry is slot + name; every `QualifierChip`
+is `data-pill` and the entry's aside hides it, and the kind, the country code, the bucket and the
+span are read on the open box. A CONTROL in the aside (the tick's live / pinned) stays.
+**The Metagraph head's pill is the KIND** ("hypergraph", "currency", "data", "data and currency",
+`MetaKindAside`, the same day): the ticker chip stood down where the ticker IS the name (DAG,
+USDC.dag), which left those entries bare; the ticker now rides under the name on the open box. The BOX keeps the two-row head — it is the one materialized card, and the tiers
 carry the depth. Measured at 1600×950 with three ancestors committed: the pile 175 → 143px, the
 explorer head 60 → 44. (A one-line dossier head was rejected once, 2026-07-12, when the kind text
 truncated into the site link; the link has lived in the body since 2026-08-08.)
@@ -899,7 +906,8 @@ served one purpose, what this subject is to the whole it sits in, and the note s
 names its span and places the subject in its rung, share and rank among the other countries,
 providers or make-ups (the prompt asks for that always) — so they are gone. The note renders on a
 faint violet PLATE with the mark (`--ai-wash` / `--ai-edge`, the mark's own surfaces), no label row;
-the plate shows "reading…"/"writing…" while the note is in flight; `none` and off-mainnet render
+the plate shows "reading…" while the note is in flight (ONE word, user 2026-10-30: held or still
+being written is the cache's business); `none` and off-mainnet render
 nothing (no note to have), and `unavailable` renders "no note right now", muted, with no door (user,
 2026-10-30: the Gate refused a brushed range's write and the plate was simply missing for the 15
 minutes `FAIL_TTL_S` remembers it; a card with no lead and no reason read as broken). **A plane focus

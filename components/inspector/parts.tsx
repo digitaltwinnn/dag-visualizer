@@ -150,6 +150,9 @@ export const foldLabel = (open: boolean): string =>
 export function QualifierChip({ children, className, style }: { children: ReactNode; className?: string; style?: CSSProperties }) {
   return (
     <span
+      // THE PILL YIELDS IN THE FOLD (user, 2026-10-30, design D): a folded entry is slot + name,
+      // and CardHead's entry aside hides every `data-pill`; the chip is read on the open box.
+      data-pill=""
       style={style}
       className={cn(
         "inline-flex items-center max-w-full rounded-xs border border-border bg-wash-faint px-[6px] py-[3px] text-label leading-none text-muted-foreground",

@@ -479,9 +479,14 @@ function keepFocusOnRung(el: HTMLElement): void {
                   title's width — the live tick's age chip beside its live pill left the ordinal
                   "7,183,468" a 30px slot reading "7" once the note took the resting box over it
                   (R70). A reading the open box states anyway yields; the control (live / pinned)
-                  stays, since the entry is where it is pressed. */}
+                  stays, since the entry is where it is pressed.
+                  …AND SO IS EVERY QUALIFIER PILL (user, 2026-10-30, design D of four in the
+                  brainstorming companion: "the pill yields"): the eyebrow, the mark and the pill
+                  were taking the row and the NAME truncated ("Dor …"), the one thing that tells an
+                  entry from its siblings. A folded entry is slot + name; the kind, the country code,
+                  the bucket and the span are read on the open box (`QualifierChip` is `data-pill`). */}
               {(aside != null || (entryMode && caption != null)) && (
-                <span className={cn("ml-auto flex-none relative z-10 inline-flex items-center gap-1.5 pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto", entryMode && cn("[&_[data-yields]]:hidden", ENTRY_LINE))}>
+                <span className={cn("ml-auto flex-none relative z-10 inline-flex items-center gap-1.5 pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto", entryMode && cn("[&_[data-yields]]:hidden [&_[data-pill]]:hidden", ENTRY_LINE))}>
                   {entryMode && caption != null && <span className="text-label text-muted-foreground text-right tabular-nums">{caption}</span>}
                   {aside}
                 </span>

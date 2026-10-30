@@ -142,3 +142,19 @@ describe("RailPane's Card baseline mirrors components/ui/card.tsx", () => {
     expect(/^\s*<Card asChild/m.test(head), "RailPane must not render through <Card asChild> — the tiers would be two element types again").toBe(false);
   });
 });
+
+// THE PILL YIELDS IN THE FOLD (user, 2026-10-30, design option D of four in the brainstorming
+// companion): a folded entry is slot + name, nothing else — the eyebrow and the full title share
+// the row, and the qualifier chip (a kind, a country code, a bucket, a span) is read on the open
+// box. One marker on the chip primitive, one rule in the entry's aside cluster; a CONTROL in the
+// aside (the tick's live / pinned button) is not a pill and stays, since the fold is where it is
+// pressed.
+describe("the folded entry drops its qualifier pill (design D, 2026-10-30)", () => {
+  it("QualifierChip is marked data-pill and the entry's aside hides it", () => {
+    const parts = readFileSync("components/inspector/parts.tsx", "utf8");
+    const chip = parts.slice(parts.indexOf("export function QualifierChip("));
+    expect(chip.slice(0, 600)).toMatch(/data-pill=""/);
+    const head = readFileSync("components/CardHead.tsx", "utf8");
+    expect(head).toMatch(/entryMode && cn\("\[&_\[data-yields\]\]:hidden \[&_\[data-pill\]\]:hidden", ENTRY_LINE\)/);
+  });
+});

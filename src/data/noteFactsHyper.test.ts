@@ -345,7 +345,7 @@ describe("hyperFacts on a network: the change of shape", () => {
     expect(from!.value).toBe(0);
     expect(find(r, /^Dor nodes running only dL1 at the end of the span$/)[0]!.value).toBe(2);
     expect(find(r, /running L0, cL1 and dL1/)).toEqual([]);
-    expect(find(r, /^Dor make-ups whose node count changed over the span$/)[0]!.value).toBe(1);
+    expect(find(r, /^Dor layer groups whose node count changed over the span$/)[0]!.value).toBe(1);
   });
 
   it("states a combination unknown at the start (no type recorded) not at all", () => {
@@ -362,7 +362,7 @@ describe("hyperFacts on a network: the change of shape", () => {
     expect(changed!.value).toBe(0);
     expect(changed!.text).toBe("0");
     expect(find(r, /layer at the/)).toEqual([]);
-    expect(find(r, /^BioFi make-ups whose node count changed over the span$/)[0]!.value).toBe(0);
+    expect(find(r, /^BioFi layer groups whose node count changed over the span$/)[0]!.value).toBe(0);
     expect(find(r, /nodes running/)).toEqual([]);
   });
 
@@ -471,7 +471,7 @@ describe("hyperFacts on a network: the change of shape", () => {
     const r = hyperFacts(
       input({ subject: "dor", fleet: dor({ "f.layer.dor.l0": blank(3), "f.layer.dor.cl1": blank(3), "f.layer.dor.dl1": row(N, (i) => (i < 100 ? null : i < N / 2 ? 3 : 5)) }) }),
     )!;
-    expect(find(r, /layer/)).toEqual([]);
+    expect(find(r, /layer(?! group)/)).toEqual([]); // no per-LAYER fact; the layer-group count is the bands' own
   });
 });
 
@@ -645,7 +645,10 @@ describe("hyperFacts on a network's make-up", () => {
   const makeUp = (type: string, over: Record<string, (number | null)[]> = {}) =>
     hyperFacts(input({ subject: { net: "usdc", type }, fleet: fleet(over) }));
 
-  it("a make-up's note: its count over the span as a pair, the network's level, its share and how many make-ups", () => {
+  // "LAYER GROUP", never "make-up", in anything the model is handed (user, 2026-10-30: "you talk
+  // about 'make-ups'? Not understandable for a human"): the Composition rung's own word in the
+  // rail's ghost hint ("a layer group") and the only one the reader meets.
+  it("a layer group's note: its count over the span as a pair, the network's level, its share and how many groups", () => {
     // USDC.dag grows 10 to 30: its L0+cL1 hybrids 5 to 20, its L0-only nodes 5 to 10.
     const r = makeUp("l0+cl1", {
       "f.type.usdc.l0+cl1": row(N, (i) => (i < N / 2 ? 5 : 20)),
@@ -658,12 +661,13 @@ describe("hyperFacts on a network's make-up", () => {
       [`${key}, ratio end to start`, 4, "ratio", null],
       ["USDC.dag nodes at the end of the span", 30, "count", null],
       ["USDC.dag, share of its nodes running L0 and cL1", 20 / 30, "share", null],
-      ["Node make-ups in USDC.dag", 2, "count", null],
+      ["Layer groups in USDC.dag", 2, "count", null],
       // Its place among them, like a country's or a provider's rank (user, 2026-10-30: "how that
       // selected subject relates to the overall distribution within the rung").
-      ["USDC.dag, rank among its make-ups by nodes", 1, "count", null],
+      ["USDC.dag, rank among its layer groups by nodes", 1, "count", null],
     ]);
     expect(find(r, /global snapshots|Networks/)).toEqual([]); // no activity, no common reading
+    expect(r.facts.some((f) => /make-up/.test(f.label))).toBe(false);
     expect(r.blurbs).toEqual(["USDC.dag is: a stablecoin on the DAG"]);
     expect(r.names).toEqual(expect.arrayContaining(Object.values(NAMES)));
     expect(r.setKey).toBeUndefined();
@@ -695,8 +699,8 @@ describe("hyperFacts on a network's make-up", () => {
     const r = makeUp("dl1", { "f.type.usdc.dl1": row(N, (i) => (i < N / 2 ? null : 3)) })!;
     expect(find(r, /^USDC\.dag nodes running only dL1 at the start of the span$/)[0]!.value).toBe(0);
     expect(find(r, /^USDC\.dag nodes running only dL1 at the end of the span$/)[0]!.value).toBe(3);
-    expect(find(r, /^Node make-ups in USDC\.dag$/)[0]!.value).toBe(3);
-    expect(find(r, /^USDC\.dag, rank among its make-ups by nodes$/)[0]!.value).toBe(3); // behind L0+cL1 (20) and L0 (10)
+    expect(find(r, /^Layer groups in USDC\.dag$/)[0]!.value).toBe(3);
+    expect(find(r, /^USDC\.dag, rank among its layer groups by nodes$/)[0]!.value).toBe(3); // behind L0+cL1 (20) and L0 (10)
   });
 
   it("a make-up with no sample, or ending at 0, is null", () => {

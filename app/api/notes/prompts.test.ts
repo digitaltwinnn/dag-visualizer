@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { NoteView, NotableDay } from "@/src/data/noteTypes";
-import { PROMPTS, VOICE, buildMessages, parseAnswer, spanWords } from "./prompts";
+import { CAPTION_FORMAT, PROMPTS, VOICE, buildMessages, parseAnswer, spanWords } from "./prompts";
 
 const VIEWS: NoteView[] = ["hyper", "geo", "ledger", "trend"];
 
@@ -67,7 +67,7 @@ describe("PROMPTS", () => {
 
   it("asks Hypergraph and Geography their own subject first and activity last (R74); the ledger and History keep their questions", () => {
     expect(PROMPTS.hyper.question).toBe(
-      "First, who and what is on the network over the span: networks or layers that gained or lost nodes, networks that started or stopped anchoring; if nothing changed there, say so plainly: a quiet week, the node count held at its level and no network, layer or make-up changed.",
+      "First, who and what is on the network over the span: networks or layers that gained or lost nodes, networks that started or stopped anchoring; if nothing changed there, say so plainly: a quiet week, the node count held at its level and no network or layer changed.",
     );
     expect(PROMPTS.hyper.questionCommon).toBe("Last, in one sentence, how active it was: the global snapshots it was part of per day last week against the weeks before.");
     expect(PROMPTS.geo.question).toBe(
@@ -154,11 +154,13 @@ describe("PROMPTS", () => {
       "Open with a plain sentence with the provider as its actor, in the shape \"<provider> hosts N of <network>'s nodes\", network-wide, not for one place; then what share of the network's nodes with a known provider that is and its place among the network's providers; then how that moved over the span, or that it held. Say nothing about speed.",
     );
     expect(hyper.type).toBe(
-      "Open with a plain sentence with the network as its actor, in the shape \"<network> runs N nodes as <make-up>\"; then what share of the network's nodes that is and its place among the network's make-ups; then how that changed over the span, or that it held.",
+      "Open with a plain sentence with the network as its actor, in the shape \"<network> runs N nodes on <layers>\"; then what share of the network's nodes that is and its place among the network's layer groups; then how that changed over the span, or that it held.",
     );
     // The opening is a plain sentence with an actor, never the Subject line used as a noun
     // ("Dor Technologies nodes in Finland run 2" — user, 2026-10-30: "not really logical").
     for (const q of [geo.country, geo.provider, hyper.type]) expect(q).toMatch(/^Open with a plain sentence with the \w+ as its actor, in the shape "<\w+> (hosts|runs) N /);
+    // Nothing the model is handed says "make-up" (user, 2026-10-30: not a human's word).
+    for (const q of [VOICE, hyper.type, PROMPTS.hyper.question, CAPTION_FORMAT]) expect(q).not.toMatch(/make-up/);
     for (const [view, kind] of [["geo", "country"], ["geo", "provider"], ["hyper", "type"]] as const) {
       const sys = PROMPTS[view].system("Germany", undefined, false, kind);
       expect(sys).toContain(VOICE);
@@ -256,9 +258,12 @@ describe("buildMessages", () => {
     ];
     const m = buildMessages("trend", "Mainnet", FACTS, days);
     expect(m[0]!.content).toContain("DAY YYYY-MM-DD:");
-    // A first or last day is captioned as the event it is (user, 2026-10-30).
-    expect(m[0]!.content).toContain("A day the facts name the span's busiest, quietest, longest wait or most networks is the range's own extreme, not a spike, a dip or a pause: say so, with its figure.");
-    expect(m[0]!.content).toContain("A day the facts name a first or last day is an event, not a count: its caption says that it was the first day that network anchored a snapshot, or the last, with nothing anchored since, and gives the day's count after that, if at all.");
+    // THE ROW SAYS THE DATE AND THE KIND, so the caption says neither (user, 2026-10-30, design B):
+    // a short clause with the figure and whose it was, read against what the facts name the day.
+    expect(m[0]!.content).toContain(CAPTION_FORMAT);
+    expect(CAPTION_FORMAT).toMatch(/at most ten words/);
+    expect(CAPTION_FORMAT).toMatch(/repeats neither/);
+    expect(CAPTION_FORMAT).not.toMatch(/\d/);
     expect(m[1]!.content).toContain("DAY 2026-10-19");
     expect(m[1]!.content).toContain("DAY 2026-10-21");
     expect(m[1]!.content.indexOf("2026-10-19")).toBeLessThan(m[1]!.content.indexOf("2026-10-21"));

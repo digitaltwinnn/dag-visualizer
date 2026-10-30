@@ -1145,9 +1145,12 @@
      (an icon stroke cannot carry a gradient). */
   --ai-mark: light-dark(oklch(0.52 0.17 295), oklch(0.78 0.14 295));
   /* The mark's own PLATE (design round 2026-10-30, option D): a faint violet surface and its edge,
-     the one place generated text sits apart from the measured rows around it. */
+     the one place generated text sits apart from the measured rows around it. ⚠️ Its edge is
+     `--ai-plate-edge`, NOT `--ai-edge`: the plate first redeclared `--ai-edge` here as this flat
+     violet, and since a later declaration wins, the AI card's iridescent sweep and the timeline
+     diamonds went flat for a day (user, 2026-10-30: "lost its AI multi-colored outline"). */
   --ai-wash: color-mix(in oklch, var(--ai-mark) 8%, transparent);
-  --ai-edge: color-mix(in oklch, var(--ai-mark) 28%, transparent);
+  --ai-plate-edge: color-mix(in oklch, var(--ai-mark) 28%, transparent);
   /* The site footer's lozenge — a VEIL, not a panel. It first borrowed --topbar-glass and read
      "too dominant white" on the light ground (user, 2026-09-01), which is right: that token is a
      0.86-alpha lit SURFACE for a full-width bar, and a 22px pill has no room to be a surface. This

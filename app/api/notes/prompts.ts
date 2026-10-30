@@ -74,9 +74,10 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
   hyper: {
     // A QUIET WEEK IS SAID (user, 2026-10-30): the facts count what changed even at 0, so the note
     // says the composition held rather than reaching for the node count, which is Geography's too.
-    question: "First, who and what is on the network over the span: networks or layers that gained or lost nodes, networks that started or stopped anchoring; if nothing changed there, say so plainly: a quiet week, the node count held at its level and no network, layer or make-up changed.",
+    question: "First, who and what is on the network over the span: networks or layers that gained or lost nodes, networks that started or stopped anchoring; if nothing changed there, say so plainly: a quiet week, the node count held at its level and no network or layer changed.",
     questions: {
-      type: "Open with a plain sentence with the network as its actor, in the shape \"<network> runs N nodes as <make-up>\"; then what share of the network's nodes that is and its place among the network's make-ups; then how that changed over the span, or that it held.",
+      // "LAYER GROUP", never "make-up" (user, 2026-10-30): the Composition rung's own word.
+      type: "Open with a plain sentence with the network as its actor, in the shape \"<network> runs N nodes on <layers>\"; then what share of the network's nodes that is and its place among the network's layer groups; then how that changed over the span, or that it held.",
     },
     questionCommon: "Last, in one sentence, how active it was: the global snapshots it was part of per day last week against the weeks before.",
     questionCommonWhole: QUESTION_COMMON_WHOLE,
@@ -149,6 +150,11 @@ export function spanWords(view: NoteView, span: NoteSpan, spanFrom: number, span
  *  correct it. `lead` is the Snapshots builder's choice of question (R71); the other views ignore it.
  *  `common` says the facts hold the common reading, so Hypergraph and Geography ask for it (R74).
  *  `kind` is the kind of question (`NoteFacts.kind`): a subject note asks its own. */
+/** THE CAPTION FORMAT. THE ROW SAYS THE DATE AND THE KIND (user, 2026-10-30, design B: "date and
+ *  kind lead"), so a caption repeats neither: a short clause with the figure and whose it was. */
+export const CAPTION_FORMAT =
+  "Answer format: first a line starting NOTE: with the note, then exactly one line per listed day, starting DAY YYYY-MM-DD: with a caption of one short clause, at most ten words, using only numbers from the facts. The reader sees the day's date and what kind of day it was beside the caption, so the caption repeats neither: it gives the figure and whose it was, as the facts name the day. For a first or last day, the network and that nothing was anchored before, or since. For the span's busiest, quietest, longest wait or most networks, the figure against the span's median. For a spike or a dip, the figure against the usual level. Nothing else.";
+
 export function buildMessages(
   view: NoteView,
   subjectLabel: string,
@@ -163,7 +169,7 @@ export function buildMessages(
 ): { role: "system" | "user"; content: string }[] {
   const withDays = !!days && days.length > 0;
   const format = withDays
-    ? "Answer format: first a line starting NOTE: with the note, then exactly one line per listed day, starting DAY YYYY-MM-DD: with a caption of one short sentence using only numbers from the facts. Do not repeat the date in the caption. A day the facts name the span's busiest, quietest, longest wait or most networks is the range's own extreme, not a spike, a dip or a pause: say so, with its figure. A day the facts name a first or last day is an event, not a count: its caption says that it was the first day that network anchored a snapshot, or the last, with nothing anchored since, and gives the day's count after that, if at all. Nothing else."
+    ? CAPTION_FORMAT
     : "Answer format: one line starting NOTE: and nothing else.";
   const parts = [...(span ? [`Span: ${span}`] : []), `Facts:\n${factsBlock}`];
   if (withDays) parts.push(`Days to caption, in order:\n${days.map((d) => `DAY ${isoDay(d.dayMs)}`).join("\n")}`);

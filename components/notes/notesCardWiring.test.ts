@@ -58,6 +58,22 @@ describe("the notes card's own behaviour", () => {
     expect(button).not.toMatch(/<div|<SectionLabel/);
   });
 
+  // DATE AND KIND LEAD (user, 2026-10-30, design option B of four in the brainstorming companion):
+  // a day's row opens with its date, then a mark for the kind of day in the day's network hue,
+  // then the caption, which wraps rather than truncates (nothing a hover would have to reveal).
+  // The kind's word rides along for assistive tech; the mark is decoration.
+  it("a notable day's row leads with its date and its kind mark, the caption wrapping after them", () => {
+    const body = fnBody(card, "function DayRow(");
+    expect(body).toMatch(/const Mark = NOTE_KIND_ICONS\[day\.kind\];/);
+    expect(body).toMatch(/label=\{[^]*?rangeDays\(day\.dayMs, day\.dayMs \+ DAY_MS\)[^]*?<Mark aria-hidden/);
+    expect(body).not.toMatch(/figure=/);
+    expect(body).toMatch(/\bwrap\b/);
+    expect(body).toMatch(/sr-only[^]*?NOTE_KIND_WORD\[day\.kind\]/);
+    expect(body).toMatch(/identityHudCss\(day\.networkId\)/);
+    expect(read("components/icons.tsx")).toMatch(/export const NOTE_KIND_ICONS: Record<NotableKind, LucideIcon>/);
+    expect(card).toMatch(/const NOTE_KIND_WORD: Record<NotableKind, string>/);
+  });
+
   it("wears the iridescent edge on the open box only", () => {
     expect(card).toMatch(/collapsed\s*\?\s*undefined\s*:\s*"border border-transparent [^"]*\[background:[^"]*var\(--ai-edge\)_border-box\]"/);
   });
@@ -114,7 +130,7 @@ describe("subject notes live on their cards", () => {
     expect(src).not.toMatch(/RequestDoor|<Door\b/);
     expect(src).not.toMatch(/Couldn/);
     // THE PLATE IS THE LEAD (user, 2026-10-30, design option D, then "no fallback"): the measured
-    // lead sentences are gone from the four cards; the plate shows "reading…"/"writing…" while the
+    // lead sentences are gone from the four cards; the plate shows "reading…" while the
     // note is in flight, nothing on none, and "no note right now" on unavailable (an instrument
     // state, not a door: the reader made no ask to answer). No label row: the text names its span.
     expect(src).toMatch(/if \(!asked \|\| res\?\.state === "none"\) return null;/);

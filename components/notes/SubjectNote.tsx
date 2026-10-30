@@ -17,8 +17,9 @@ import { useMainnetNote } from "./useAiNote";
 // card's measured lead ("Hosts 25% of the selection's nodes") and the note served one purpose, what
 // this subject is to the whole it sits in, and the note says it better and names its span; so the
 // lead is gone and the note stands where it stood, on a faint violet plate with the mark
-// (`--ai-wash` / `--ai-edge`). The plate shows its own "reading…" / "writing…" while the note is
-// in flight, and nothing at all when there is no note to have (`none`: nothing measured; off
+// (`--ai-wash` / `--ai-plate-edge`). The plate shows its own "reading…" while the note is in
+// flight (one word, user 2026-10-30: whether the note is held or still being written is the cache's
+// business, not the reader's), and nothing at all when there is no note to have (`none`: nothing measured; off
 // mainnet). `unavailable` IS shown, as an instrument state (rule 10): "no note right now", muted,
 // no door (user, 2026-10-30: a brushed range's plate was simply missing — the Gate had refused the
 // write, which `FAIL_TTL_S` remembers for 15 minutes, and a card with no lead and no reason read
@@ -55,12 +56,12 @@ export default function SubjectNote({ req }: { req: NoteReq | null }) {
   }, [key, res?.state, note.request]);
 
   if (!asked || res?.state === "none") return null;
-  // `request` is the dwell before the ask (the effect above): nothing is being written yet, so it
-  // reads as reading — "writing…" is the server's own `pending`, a write in flight.
-  const waiting = res == null || res.state === "request" ? "reading…" : res.state === "pending" ? "writing…" : null;
+  // `request` is the dwell before the ask (the effect above), `pending` the server's own write in
+  // flight: one word for both (above).
+  const waiting = res == null || res.state === "request" || res.state === "pending" ? "reading…" : null;
   const text = res?.state === "ok" ? res.text : null;
   return (
-    <div className="mb-2.5 flex gap-2 rounded-xs border border-[var(--ai-edge)] bg-[var(--ai-wash)] px-2.5 py-2">
+    <div className="mb-2.5 flex gap-2 rounded-xs border border-[var(--ai-plate-edge)] bg-[var(--ai-wash)] px-2.5 py-2">
       {MARK}
       {waiting ? (
         <p className="m-0 flex items-center gap-2 text-body text-muted-foreground">

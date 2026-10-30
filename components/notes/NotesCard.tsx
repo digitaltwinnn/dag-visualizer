@@ -3,11 +3,12 @@
 import { useEffect, useId, useRef, useState } from "react";
 
 import CardHead, { RailPane } from "@/components/CardHead";
-import { AI_NOTES_ICON, KIND_MARK_CLASS } from "@/components/icons";
+import { AI_NOTES_ICON, KIND_MARK_CLASS, NOTE_KIND_ICONS } from "@/components/icons";
 import { Door, QualifierChip, foldLabel } from "@/components/inspector/parts";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { cn } from "@/lib/utils";
-import type { NoteDay } from "@/src/data/noteTypes";
+import type { NotableKind, NoteDay } from "@/src/data/noteTypes";
+import { identityHudCss } from "@/src/palette/identity";
 import { spanPhrase } from "@/src/data/trendWindow";
 import { useStore } from "@/src/store/store";
 import { rangeDays } from "@/src/util/localTime";
@@ -69,9 +70,28 @@ const TITLE = "Constellation Gate AI";
 // geometry): the run bleeds by the card's padding below, and its last door takes the inner radius.
 const DOOR_RUN = "-mb-[var(--card-pad)] [&>:last-child]:rounded-b-[calc(var(--radius)-1px)]";
 
-/** One notable day: the caption, and its UTC day. Hover previews the day (`hoverNoteDay`), a
- *  click commits it as History's range. */
+/** The kind's word, for assistive tech beside its mark (the mark is decoration). */
+const NOTE_KIND_WORD: Record<NotableKind, string> = {
+  high: "spike",
+  peak: "busiest day",
+  low: "dip",
+  trough: "quietest day",
+  first: "first day",
+  last: "last day",
+  pause: "pause",
+  longest: "longest wait",
+  broadest: "most networks",
+};
+
+/** One notable day: DATE AND KIND LEAD (user, 2026-10-30, design option B of four in the
+ *  brainstorming companion), then the caption. The date is the door's label at a fixed width so
+ *  the rows align; the kind mark wears the day's network hue (the total's days are muted); the
+ *  caption WRAPS rather than truncating (no hover reveals text here, the tooltip rule), and the
+ *  prompt keeps it to a short clause since the row already says the date and the kind. Hover
+ *  previews the day (`hoverNoteDay`), a click commits it as History's range. */
 function DayRow({ day }: { day: NoteDay }) {
+  const Mark = NOTE_KIND_ICONS[day.kind];
+  const hue = day.networkId ? identityHudCss(day.networkId) : undefined;
   const lit = useStore((s) => s.hoverNoteDay === day.dayMs);
   // THE ROW CLEARS ONLY WHAT IT SET: a row unmounting under the pointer (a new note, the card
   // closing) leaves no hover behind — nothing else clears this channel — but must not clear a day
@@ -96,7 +116,13 @@ function DayRow({ day }: { day: NoteDay }) {
     <Door
       lit={lit}
       wrap
-      figure={rangeDays(day.dayMs, day.dayMs + DAY_MS)}
+      label={
+        <span className="inline-flex items-center gap-2">
+          <span className="w-[3.4em] text-label tabular-nums">{rangeDays(day.dayMs, day.dayMs + DAY_MS)}</span>
+          <Mark aria-hidden className="size-3.5 flex-none" style={hue ? { color: hue } : undefined} />
+          <span className="sr-only">{NOTE_KIND_WORD[day.kind]}</span>
+        </span>
+      }
       onPointerEnter={on}
       onPointerLeave={off}
       onFocus={on}
@@ -207,18 +233,15 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
       {!collapsed && (
         <div>
           {/* No answer yet is READING (the manifest's `noteCardAbsent`): the card stands from the
-              moment its subject is known. "writing…" is the server's own `pending`, a note being
-              written — a GET's as soon as the loader hears it (M3), or a POST's. `none` and
-              a read's `unavailable` never reach here: the slot stands down (R67). */}
-          {res == null ? (
+              moment its subject is known. ONE WAITING WORD (user, 2026-10-30: "the reading/writing
+              distinction is not really relevant to the user, writing is purely technical for our
+              cache strategy"): a held note and one the model is still writing (the server's
+              `pending`, M3) both read as the card reading its note. `none` and a read's
+              `unavailable` never reach here: the slot stands down (R67). */}
+          {res == null || res.state === "pending" ? (
             <p className="m-0 flex items-center gap-2 text-body text-muted-foreground">
               <NodeStars />
               reading…
-            </p>
-          ) : res.state === "pending" ? (
-            <p className="m-0 flex items-center gap-2 text-body text-muted-foreground">
-              <NodeStars />
-              writing…
             </p>
           ) : res.state === "request" ? (
             // The on-request window (the 1H pill): written only on the reader's ask.
