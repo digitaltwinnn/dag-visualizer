@@ -47,6 +47,18 @@ export function hasCommonReading(facts: readonly Fact[]): boolean {
 }
 const COMMON_RE = /global snapshots.*per day, last week$/i;
 
+/** THE WHOLE NETWORK'S activity label, ONE HOME: Hypergraph and Geography both append the whole
+ *  network's global snapshots per day under it, and the prompt reads it to ask in other words. */
+export const WHOLE_ACTIVITY_LABEL = "Global snapshots per day";
+
+/** Whether the common reading the facts hold is the WHOLE network's. A network "was part of" its
+ *  share of global snapshots; the whole network produces them (user, 2026-10-30: "there is no
+ *  specific network, so 'all' should probably have some different wording"), so the prompt asks
+ *  its activity sentence in those words. */
+export function commonIsWhole(facts: readonly Fact[]): boolean {
+  return facts.some((f) => f.label === `${WHOLE_ACTIVITY_LABEL}, last week`);
+}
+
 /** The index the last week starts at in a daily series of `n` complete days. */
 export function weekStart(n: number): number {
   return Math.max(0, n - WEEK_DAYS);

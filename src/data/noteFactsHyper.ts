@@ -1,6 +1,6 @@
 import { ROLE_SHORT, roleKeyLabel } from "@/src/data/composition";
 import { fact, gaugeChange, heldLevel, networksAnchored, observedLevel } from "@/src/data/noteFacts";
-import { activityFacts, lastWeekMean, weekStart } from "@/src/data/noteFactsActivity";
+import { WHOLE_ACTIVITY_LABEL, activityFacts, lastWeekMean, weekStart } from "@/src/data/noteFactsActivity";
 import { notableDays } from "@/src/data/notableDays";
 import type { Fact } from "@/src/data/noteTypes";
 import { anchorSeries, typeBands, withUnlisted } from "@/src/data/trendSeries";
@@ -275,7 +275,7 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
 
     // THE COMMON READING, LAST (R74): the whole network's global snapshots per day (`g.ticks`
     // counts them, one per global snapshot), covered days only — an uncovered day is null.
-    facts.push(...activityFacts("Global snapshots per day", covered));
+    facts.push(...activityFacts(WHOLE_ACTIVITY_LABEL, covered));
   } else if (typeof subject === "object") {
     // ONE MAKE-UP OF ONE NETWORK: its count over the span, read where the shape facts read it
     // (`typeBands`: absent beside other types is 0, so an emptied make-up never keeps its last count).
@@ -293,7 +293,13 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
     // A share is a part of a whole: a make-up read above the network's level (a partial hour at
     // one end) states none.
     if (level > 0 && ch.to <= level) facts.push(fact(`${name}, share of its nodes ${words}`, ch.to / level, "share"));
-    facts.push(fact(`Node make-ups in ${name}`, bands.filter((b) => (heldLevel(b.points) ?? 0) > 0).length, "count"));
+    const held = bands.map((b) => heldLevel(b.points) ?? 0);
+    facts.push(fact(`Node make-ups in ${name}`, held.filter((v) => v > 0).length, "count"));
+    // Its place among them, read as a country's or a provider's rank is (`noteFactsGeo.ts`): the
+    // held levels, so a partial hour at one end cannot move it (user, 2026-10-30: the note is to
+    // say how the subject relates to the rung's distribution, and "how it stands" was parroted).
+    const own = heldLevel(points) ?? ch.to;
+    facts.push(fact(`${name}, rank among its make-ups by nodes`, 1 + held.filter((v) => v > own).length, "count"));
   } else {
     const name = mention(subject);
     named.push(subject);

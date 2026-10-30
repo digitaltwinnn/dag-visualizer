@@ -18,6 +18,7 @@ const DAY_ISO = "2026-10-27";
 const FACTS: NoteFacts = {
   kind: "view",
   common: false,
+  whole: false,
   facts: [
     fact("Snapshots anchored, per day, this span", 1200, "count"),
     fact("Snapshots anchored, ratio to previous span", 1.37, "ratio"),
@@ -386,6 +387,14 @@ describe("the span length reaches the model and backs its window (R20)", () => {
     expect(d.chat).toHaveBeenCalledTimes(1);
     const shown = await factsFor("mainnet", "trend", "dag", "7d", NOW, reads);
     expect(checkNote("Over the last 7 days the hypergraph held its pace.", shown!.facts, shown!.names)).toEqual({ ok: true });
+  });
+
+  it("the whole network's Hypergraph note is asked for the snapshots it produced, not was part of", async () => {
+    const d = deps({ facts: async () => ({ ...FACTS, label: "the whole network", common: true, whole: true }), answers: ["NOTE: Over the last 7 days the network held at 97 nodes."] });
+    await generateNote({ ...REQ, view: "hyper", subject: "all", span: "day" }, d, "read");
+    const sys = d.chat.mock.calls[0]![0][0]!.content;
+    expect(sys).toContain("the global snapshots it produced per day");
+    expect(sys).not.toContain("it was part of per day");
   });
 });
 

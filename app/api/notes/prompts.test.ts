@@ -74,6 +74,16 @@ describe("PROMPTS", () => {
       "First, where the nodes run: countries and hosting providers that gained or lost nodes, or where the nodes are now when nothing moved. Say nothing about speed.",
     );
     expect(PROMPTS.geo.questionCommon).toBe("Last, in one sentence, how active the network was: its global snapshots per day last week against the weeks before.");
+    // The whole network PRODUCES its global snapshots (user, 2026-10-30: "there is no specific
+    // network, so 'all' should probably have some different wording").
+    for (const v of ["hyper", "geo"] as const) {
+      expect(PROMPTS[v].questionCommonWhole).toBe("Last, in one sentence, how active the network was: the global snapshots it produced per day last week against the weeks before.");
+      expect(PROMPTS[v].system("the whole network", undefined, true, undefined, true)).toContain(`${PROMPTS[v].question} ${PROMPTS[v].questionCommonWhole}`);
+      expect(PROMPTS[v].system("the whole network", undefined, true, undefined, true)).not.toContain(PROMPTS[v].questionCommon!);
+      expect(PROMPTS[v].system("the whole network", undefined, false, undefined, true)).not.toContain(PROMPTS[v].questionCommonWhole!);
+    }
+    expect(VOICE).toMatch(/the whole network is part of nothing: it produces them/);
+    expect(buildMessages("hyper", "the whole network", "Facts", null, undefined, undefined, true, undefined, null, true)[0]!.content).toContain(PROMPTS.hyper.questionCommonWhole!);
     expect(PROMPTS.geo.system("x")).toContain("Stay on where the nodes are located and who hosts them, and nothing else.");
     expect(PROMPTS.geo.system("x", undefined, true)).toContain("Stay on where the nodes are located and who hosts them, then the one sentence on activity, and nothing else.");
     expect(PROMPTS.ledger.question).toBe(
@@ -138,14 +148,17 @@ describe("PROMPTS", () => {
     expect(PROMPTS.ledger.questions).toBeUndefined();
     expect(PROMPTS.trend.questions).toBeUndefined();
     expect(geo.country).toBe(
-      "First, how many of the network's nodes run in the country, what share of the network's located nodes that is and the country's place among the network's countries; then how that moved over the span, or that it held. Say nothing about speed.",
+      "Open with a plain sentence with the network as its actor, in the shape \"<network> hosts N nodes in <country>\"; then what share of the network's located nodes that is and the country's place among the network's countries; then how that moved over the span, or that it held. Say nothing about speed.",
     );
     expect(geo.provider).toBe(
-      "First, how many nodes the provider hosts across the network, stated as network-wide, not for one place, what share of the network's nodes with a known provider that is and its place among the network's providers; then how that moved over the span, or that it held. Say nothing about speed.",
+      "Open with a plain sentence with the provider as its actor, in the shape \"<provider> hosts N of <network>'s nodes\", network-wide, not for one place; then what share of the network's nodes with a known provider that is and its place among the network's providers; then how that moved over the span, or that it held. Say nothing about speed.",
     );
     expect(hyper.type).toBe(
-      "First, how many of the network's nodes run this make-up, what share of the network's nodes that is and how it stands against the network's other make-ups; then how that changed over the span, or that it held.",
+      "Open with a plain sentence with the network as its actor, in the shape \"<network> runs N nodes as <make-up>\"; then what share of the network's nodes that is and its place among the network's make-ups; then how that changed over the span, or that it held.",
     );
+    // The opening is a plain sentence with an actor, never the Subject line used as a noun
+    // ("Dor Technologies nodes in Finland run 2" — user, 2026-10-30: "not really logical").
+    for (const q of [geo.country, geo.provider, hyper.type]) expect(q).toMatch(/^Open with a plain sentence with the \w+ as its actor, in the shape "<\w+> (hosts|runs) N /);
     for (const [view, kind] of [["geo", "country"], ["geo", "provider"], ["hyper", "type"]] as const) {
       const sys = PROMPTS[view].system("Germany", undefined, false, kind);
       expect(sys).toContain(VOICE);

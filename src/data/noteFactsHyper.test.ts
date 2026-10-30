@@ -642,8 +642,11 @@ describe("hyperFacts on a network's make-up", () => {
       ["USDC.dag nodes at the end of the span", 30, "count", null],
       ["USDC.dag, share of its nodes running L0 and cL1", 20 / 30, "share", null],
       ["Node make-ups in USDC.dag", 2, "count", null],
+      // Its place among them, like a country's or a provider's rank (user, 2026-10-30: "how that
+      // selected subject relates to the overall distribution within the rung").
+      ["USDC.dag, rank among its make-ups by nodes", 1, "count", null],
     ]);
-    expect(find(r, /rank|global snapshots|Networks/)).toEqual([]); // no rank, no activity, no common reading
+    expect(find(r, /global snapshots|Networks/)).toEqual([]); // no activity, no common reading
     expect(r.blurbs).toEqual(["USDC.dag is: a stablecoin on the DAG"]);
     expect(r.names).toEqual(expect.arrayContaining(Object.values(NAMES)));
     expect(r.setKey).toBeUndefined();
@@ -676,6 +679,7 @@ describe("hyperFacts on a network's make-up", () => {
     expect(find(r, /^USDC\.dag nodes running only dL1 at the start of the span$/)[0]!.value).toBe(0);
     expect(find(r, /^USDC\.dag nodes running only dL1 at the end of the span$/)[0]!.value).toBe(3);
     expect(find(r, /^Node make-ups in USDC\.dag$/)[0]!.value).toBe(3);
+    expect(find(r, /^USDC\.dag, rank among its make-ups by nodes$/)[0]!.value).toBe(3); // behind L0+cL1 (20) and L0 (10)
   });
 
   it("a make-up with no sample, or ending at 0, is null", () => {

@@ -10,7 +10,7 @@ import { pickRangeTier } from "@/src/data/trendWindow";
 //
 // Everything is UTC and the caller supplies the date strings; nothing here reads a clock.
 
-export const NOTES_VERSION = 11; // 11: the span named in the text, the subject by its name (2026-10-30)
+export const NOTES_VERSION = 12; // 12: a subject note opens "<network> hosts N nodes in <country>" (2026-10-30)
 
 /** What a note covers. Hyper and Geography are a standing picture ("day"), the ledger the recent
  *  hours ("hours"); History's pills are the rest, and a brushed range is `r<fromMs>-<toMs>` after

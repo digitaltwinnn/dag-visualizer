@@ -30,7 +30,7 @@ export const VOICE = [
   "Call the subject by its name, as the Subject line gives it, wherever you would otherwise say \"the network\" or \"it\": \"the network\" alone is only for the whole network.",
   "Describe what the numbers show: never explain why, and never read a purpose or a cause into them.",
   "Say nodes, never machines. Say snapshots or global snapshots, never ticks, never \"L1 snapshots\". Never say feeless. All the nodes together are the network, never the fleet.",
-  "A network's share of global snapshots is what it \"was part of\".",
+  "A network's share of global snapshots is what it \"was part of\"; the whole network is part of nothing: it produces them.",
   "L0, currency L1 and data L1 are layers.",
   "Make no claim about how decentralised or distributed anything is.",
   "Punctuation: no dash clauses. Never use an em dash, and never a hyphen or en dash with a blank on each side. Use commas, colons and full stops.",
@@ -62,26 +62,35 @@ export const VOICE = [
 // QUESTION (`NoteFacts.kind`), so the warmed network-wide country, a view note, asks the view's own.
 // A kind a view has no question for falls back to the view's: only geo has country and provider,
 // only hyper has type.
+// A SUBJECT QUESTION SPELLS OUT ITS OPENING SHAPE (user, 2026-10-30). The Subject line is a scope
+// phrase ("Dor Technologies nodes in Finland"), and VOICE's "call the subject by its name" had the
+// model use it as a noun: "Dor Technologies nodes in Finland run 2", which he read as "not really
+// logical". Each kind's question now gives the first sentence's shape with an ACTOR, "<network>
+// hosts N nodes in <country>", so the name lands as the sentence's subject, not as a label.
 type KindQuestions = Partial<Record<Exclude<SubjectKind, "view">, string>>;
-export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuestions; questionNow?: string; questionCommon?: string; system: (subjectLabel: string, lead?: NoteLead, common?: boolean, kind?: SubjectKind) => string }> = {
+// The whole network's activity, in its own words (user, 2026-10-30): one string for both views.
+const QUESTION_COMMON_WHOLE = "Last, in one sentence, how active the network was: the global snapshots it produced per day last week against the weeks before.";
+export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuestions; questionNow?: string; questionCommon?: string; questionCommonWhole?: string; system: (subjectLabel: string, lead?: NoteLead, common?: boolean, kind?: SubjectKind, whole?: boolean) => string }> = {
   hyper: {
     question: "First, who and what is on the network over the span: networks or layers that gained or lost nodes, networks that started or stopped anchoring; if nothing changed there, say that it held, with the level.",
     questions: {
-      type: "First, how many of the network's nodes run this make-up, what share of the network's nodes that is and how it stands against the network's other make-ups; then how that changed over the span, or that it held.",
+      type: "Open with a plain sentence with the network as its actor, in the shape \"<network> runs N nodes as <make-up>\"; then what share of the network's nodes that is and its place among the network's make-ups; then how that changed over the span, or that it held.",
     },
     questionCommon: "Last, in one sentence, how active it was: the global snapshots it was part of per day last week against the weeks before.",
-    system: (subjectLabel, _lead, common, kind) =>
-      `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${questionOf("hyper", kind)}${common ? ` ${PROMPTS.hyper.questionCommon}` : ""}`,
+    questionCommonWhole: QUESTION_COMMON_WHOLE,
+    system: (subjectLabel, _lead, common, kind, whole) =>
+      `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${questionOf("hyper", kind)}${common ? ` ${whole ? QUESTION_COMMON_WHOLE : PROMPTS.hyper.questionCommon}` : ""}`,
   },
   geo: {
     questions: {
-      country: "First, how many of the network's nodes run in the country, what share of the network's located nodes that is and the country's place among the network's countries; then how that moved over the span, or that it held. Say nothing about speed.",
-      provider: "First, how many nodes the provider hosts across the network, stated as network-wide, not for one place, what share of the network's nodes with a known provider that is and its place among the network's providers; then how that moved over the span, or that it held. Say nothing about speed.",
+      country: "Open with a plain sentence with the network as its actor, in the shape \"<network> hosts N nodes in <country>\"; then what share of the network's located nodes that is and the country's place among the network's countries; then how that moved over the span, or that it held. Say nothing about speed.",
+      provider: "Open with a plain sentence with the provider as its actor, in the shape \"<provider> hosts N of <network>'s nodes\", network-wide, not for one place; then what share of the network's nodes with a known provider that is and its place among the network's providers; then how that moved over the span, or that it held. Say nothing about speed.",
     },
     question: "First, where the nodes run: countries and hosting providers that gained or lost nodes, or where the nodes are now when nothing moved. Say nothing about speed.",
     questionCommon: "Last, in one sentence, how active the network was: its global snapshots per day last week against the weeks before.",
-    system: (subjectLabel, _lead, common, kind) =>
-      `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${questionOf("geo", kind)}${common ? ` ${PROMPTS.geo.questionCommon}` : ""}\nStay on where the nodes are located and who hosts them${common ? ", then the one sentence on activity" : ""}, and nothing else.`,
+    questionCommonWhole: QUESTION_COMMON_WHOLE,
+    system: (subjectLabel, _lead, common, kind, whole) =>
+      `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${questionOf("geo", kind)}${common ? ` ${whole ? QUESTION_COMMON_WHOLE : PROMPTS.geo.questionCommon}` : ""}\nStay on where the nodes are located and who hosts them${common ? ", then the one sentence on activity" : ""}, and nothing else.`,
   },
   ledger: {
     question: "Say what changed in the anchoring rhythm over the recent hours against the usual: what sped up or slowed down, from the usual figure to the recent one, and which networks did it. Then the reading itself: the longest gap, and what was part of the global snapshots.",
@@ -148,6 +157,7 @@ export function buildMessages(
   common?: boolean,
   kind?: SubjectKind,
   span?: string | null,
+  whole?: boolean,
 ): { role: "system" | "user"; content: string }[] {
   const withDays = !!days && days.length > 0;
   const format = withDays
@@ -158,7 +168,7 @@ export function buildMessages(
   if (retryReasons && retryReasons.length)
     parts.push(`Your previous answer was rejected: ${retryReasons.join("; ")}. Write it again and fix this.`);
   return [
-    { role: "system", content: `${PROMPTS[view].system(subjectLabel, lead, common, kind)}\n\n${format}` },
+    { role: "system", content: `${PROMPTS[view].system(subjectLabel, lead, common, kind, whole)}\n\n${format}` },
     { role: "user", content: parts.join("\n\n") },
   ];
 }

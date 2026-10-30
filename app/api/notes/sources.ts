@@ -3,7 +3,7 @@ import { fact } from "@/src/data/noteFacts";
 import { bannedWords, undash } from "@/src/data/noteHonesty";
 import { geoFacts } from "@/src/data/noteFactsGeo";
 import { comboWords, hyperFacts } from "@/src/data/noteFactsHyper";
-import { hasCommonReading } from "@/src/data/noteFactsActivity";
+import { commonIsWhole, hasCommonReading } from "@/src/data/noteFactsActivity";
 import { ledgerFacts } from "@/src/data/noteFactsLedger";
 import { trendFacts, type TrendFactsInput } from "@/src/data/noteFactsTrend";
 import type { Fact, NotableDay, NoteView, NoteLead } from "@/src/data/noteTypes";
@@ -463,6 +463,9 @@ export interface NoteFacts {
   /** Whether the facts hold the COMMON reading (R74, `noteFactsActivity.ts`): the prompt asks for
    *  its last sentence only then. */
   common: boolean;
+  /** Whether that common reading is the WHOLE network's (`commonIsWhole`): it produces its global
+   *  snapshots rather than being "part of" them, and the prompt asks for it in those words. */
+  whole: boolean;
 }
 
 /** THE FACTS FOR ONE NOTE: that view's reads, its builder, and the span's length. Null when the
@@ -496,6 +499,7 @@ export async function factsFor(
     // place in the whole network, not a network's nodes there. Only on-request subject notes ask a kind's.
     kind: isSubjectNote(subject) ? subjectKindOf(subject) : "view",
     common: hasCommonReading(built.facts),
+    whole: commonIsWhole(built.facts),
     ...(subjectName != null ? { subjectName } : {}),
     ...(built.setKey != null ? { setKey: built.setKey } : {}),
     ...(built.lead != null ? { lead: built.lead } : {}),

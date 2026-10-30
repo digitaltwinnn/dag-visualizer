@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { PRIOR_DAYS, PRIOR_MIN_DAYS, WEEK_DAYS, WEEK_MIN_DAYS, activityFacts, hasCommonReading, lastWeekMean, priorWeeksMean, weekStart } from "@/src/data/noteFactsActivity";
+import { PRIOR_DAYS, PRIOR_MIN_DAYS, WEEK_DAYS, WEEK_MIN_DAYS, WHOLE_ACTIVITY_LABEL, activityFacts, commonIsWhole, hasCommonReading, lastWeekMean, priorWeeksMean, weekStart } from "@/src/data/noteFactsActivity";
 import { fact } from "@/src/data/noteFacts";
 import { pairsOf } from "@/src/data/testkit/notePairs";
 
@@ -36,6 +36,15 @@ describe("the common activity facts: last week against the weeks before", () => 
     expect(WEEK_MIN_DAYS).toBe(4);
     expect(activityFacts(L, row(60, (i) => (i >= 57 ? 60 : 40)))).toHaveLength(3);
     expect(activityFacts(L, row(60, (i) => (i >= 58 ? 60 : i >= 53 ? null : 40)))).toEqual([]);
+  });
+
+  // The whole network is never "part of" its own global snapshots, it produces them (user,
+  // 2026-10-30): the prompt asks the whole network's activity in other words, keyed on the label.
+  it("says whether the common reading is the whole network's, by the one shared label", () => {
+    expect(WHOLE_ACTIVITY_LABEL).toBe("Global snapshots per day");
+    expect(commonIsWhole(activityFacts(WHOLE_ACTIVITY_LABEL, row(60, () => 50)))).toBe(true);
+    expect(commonIsWhole(activityFacts(L, row(60, () => 50)))).toBe(false);
+    expect(commonIsWhole([])).toBe(false);
   });
 
   it("says whether a facts list holds the common reading: its own facts yes, a rank or an anchored count no", () => {

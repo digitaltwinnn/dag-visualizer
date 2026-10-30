@@ -205,6 +205,10 @@ describe("factsFor — whether the facts hold the common reading (R74)", () => {
     expect((await factsFor("mainnet", "geo", "cc:DE", "day", NOW, fakeReads()))!.common).toBe(false);
     vi.mocked(geoFacts).mockReturnValue({ facts: [FACT, { label: "Global snapshots per day, last week", value: 8000, kind: "count", text: "8,000" }], names: [] });
     expect((await factsFor("mainnet", "geo", "all", "day", NOW, fakeReads()))!.common).toBe(true);
+    expect((await factsFor("mainnet", "geo", "all", "day", NOW, fakeReads()))!.whole).toBe(true);
+    vi.mocked(geoFacts).mockReturnValue({ facts: [FACT, { label: "USDC.dag global snapshots it was part of per day, last week", value: 800, kind: "count", text: "800" }], names: [] });
+    const net = (await factsFor("mainnet", "geo", USDC, "day", NOW, fakeReads()))!;
+    expect([net.common, net.whole]).toEqual([true, false]);
   });
 });
 

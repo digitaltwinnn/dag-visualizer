@@ -1,5 +1,5 @@
 import { fact } from "@/src/data/noteFacts";
-import { activityFacts } from "@/src/data/noteFactsActivity";
+import { WHOLE_ACTIVITY_LABEL, activityFacts } from "@/src/data/noteFactsActivity";
 import type { Fact, FactPair } from "@/src/data/noteTypes";
 import { anchorSeries } from "@/src/data/trendSeries";
 import { trimNewestPartial, type TrendsWindowData } from "@/src/data/trendWindow";
@@ -497,7 +497,7 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     const d = trimNewestPartial(input.daily);
     facts.push(...(subjectNet
       ? activityFacts(`${nameOf(subjectNet)} global snapshots it was part of per day`, anchorSeries(subjectNet, d.series))
-      : activityFacts("Global snapshots per day", d.series["g.ticks"] ?? [])));
+      : activityFacts(WHOLE_ACTIVITY_LABEL, d.series["g.ticks"] ?? [])));
   }
 
   const providerForms = [...mentionedProviders.values()].flatMap((p) => {
