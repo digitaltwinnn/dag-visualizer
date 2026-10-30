@@ -92,7 +92,6 @@ describe("the notes card's own behaviour", () => {
   it("a plane's coin hovers and commits like the timeline's", () => {
     const chart = read("components/docs/TrendChart.tsx");
     expect(chart).toMatch(/lit\?: boolean;[^]*?label: string;/); // TrendMark carries its lit state and its name
-    expect(chart).toMatch(/onMarkHover\?: \(dayMs: number \| null\) => void;/);
     expect(chart).toMatch(/onMarkPick\?: \(mark: TrendMark\) => void;/);
     expect(chart).toMatch(/<button[^]*?aria-label=\{m\.label\}[^]*?onPointerDown=\{\(e\) => e\.stopPropagation\(\)\}[^]*?<NoteKindCoin kind=\{m\.kind\}/);
     const stack = read("components/TrendStack.tsx");
@@ -137,7 +136,7 @@ describe("the notes card's own behaviour", () => {
   });
 
   it("plays the rail's arrival pulse, in the AI hue (user, 2026-10-30)", () => {
-    expect(card).toMatch(/const pulseKey = useEdgePulse\(titleKey\);/);
+    expect(card).toMatch(/const pulseKey = useEdgePulse\(subject \? /);
     expect(card).toMatch(/<PulseEdge pulseKey=\{pulseKey\} rail="right" off=\{collapsed\} hue="var\(--ai-mark\)" \/>/);
   });
 
@@ -151,6 +150,31 @@ describe("the notes card's own behaviour", () => {
       expect(read(f), f).toMatch(/commitNoteDay\(/);
       expect(read(f), f).not.toMatch(/setTrendRange\(\{ fromMs: (day|d)\w*\.?\w*, toMs/);
     }
+  });
+
+  // Review 2026-10-30. The hook sat after the early return, so the card's hook count depended on
+  // state; nothing lints for it here, so this test does.
+  it("calls every hook before its early return", () => {
+    const body = fnBody(card, "export default function NotesCard(");
+    expect(body.indexOf("useEdgePulse(")).toBeLessThan(body.indexOf("if (!subject || !req) return null;"));
+  });
+
+  // A click holds the plot, the coin unmounts under the pointer and no pointerleave fires, so a
+  // coin that cleared the channel only on leave left the day lit (the row's and diamond's own rule).
+  it("a plane's coin clears only the hover it set, on leave and on unmount", () => {
+    const chart = read("components/docs/TrendChart.tsx");
+    const coin = fnBody(chart, "function MarkCoin(");
+    expect(coin).toMatch(/const mine = useRef\(false\);/);
+    expect(coin).toMatch(/useEffect\(\s*\(\) => \(\) => \{\s*if \(mine\.current\)/);
+    expect(chart).toMatch(/onMarkHover\?: \(dayMs: number, on: boolean\) => void;/);
+    expect(read("components/TrendStack.tsx")).toMatch(/st\.hoverNoteDay === dayMs/);
+  });
+
+  // Rule 10: "no fallback" retired the measured lead, not the instrument state for an empty span.
+  it("a span with no reading says so, once the read has landed", () => {
+    const range = read("components/inspector/TrendRangePane.tsx");
+    expect(range).toMatch(/const noReading = headValue == null && slice\.p != null && !slice\.stale && !roster\.pending/);
+    expect(range).toMatch(/noReading[^]*?No reading/);
   });
 
   it("wears the iridescent edge on the open box only", () => {

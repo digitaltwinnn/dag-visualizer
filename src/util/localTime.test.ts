@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeAll, afterAll } from "vitest";
-import { bucketStamp, rangeDays, recordStamp, stampParts, titleStamp, titleStampParts, utcDayKey, utcStamp } from "./localTime";
+import { bucketStamp, rangeDays, recordStamp, stampParts, titleStampParts, utcDayKey, utcStamp } from "./localTime";
 
 // ONE RULE FOR EVERY DATE THE APP WRITES (user, 2026-10-07 — "so any figure shown with days will be
 // UTC right? … if a user shares a screenshot it should be the same for other users. If we show a
@@ -84,25 +84,14 @@ describe("rangeDays — a span's label: its UTC days, ONE wording for the card, 
   });
 });
 
-// A TITLE'S CLOCK TIME, ON ONE LINE (user, 2026-10-30: the Moment card's "GMT+2" pill goes, the zone
-// joins the date, and a more concise form): the 24-hour clock, two digits each, the zone's short
-// name inline, the year only when it is not this year. The Range card's Start/End rows and the raw
-// pane keep `Stamp`, whose zone is a tag beside a figure in a row.
-describe("titleStamp — a concise one-line clock time for a card title", () => {
-  it("writes date, 24-hour clock and zone as one line", () => {
-    expect(titleStamp(Date.UTC(2026, 8, 14, 14, 4, 2), { now: Date.UTC(2026, 9, 7) })).toBe("Sep 14, 10:04 EDT");
-  });
-  it("carries the year only when it is not the current one", () => {
-    expect(titleStamp(Date.UTC(2025, 8, 14, 14, 4), { now: Date.UTC(2026, 9, 7) })).toBe("Sep 14, 2025, 10:04 EDT");
-  });
-});
-
 // THE MOMENT CARD'S TITLE IN TWO ROWS (user, 2026-10-30: "'Sep 30, 18:00 GMT+2', can we shorten it
 // by having two rows, date row, time row?"): the date as the title, the clock and zone under it.
 describe("titleStampParts — the title's date over its clock", () => {
-  it("splits the same stamp titleStamp writes into its date and its clock with the zone", () => {
+  it("splits a clock time into its date and its clock with the zone", () => {
     const p = titleStampParts(Date.UTC(2026, 8, 14, 14, 4, 2), { now: Date.UTC(2026, 9, 7) });
     expect(p).toEqual({ date: "Sep 14", time: "10:04 EDT" });
-    expect(`${p.date}, ${p.time}`).toBe(titleStamp(Date.UTC(2026, 8, 14, 14, 4, 2), { now: Date.UTC(2026, 9, 7) }));
+  });
+  it("carries the year only when it is not the current one", () => {
+    expect(titleStampParts(Date.UTC(2025, 8, 14, 14, 4), { now: Date.UTC(2026, 9, 7) }).date).toBe("Sep 14, 2025");
   });
 });

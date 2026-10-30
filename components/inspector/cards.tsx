@@ -87,12 +87,8 @@ export function SnapshotAside(_: { data: GlobalSnapshot }) {
 // Dossier title: the pre-unification header composition (logo avatar ringed in the identity hue
 // + the NAME over the TICKER), re-homed INTO CardHead's title slot (user refinement — the head
 // unification had split the avatar/ticker off into a body row). The name inherits CardHead's one
-// 15px/semibold title standard; the ticker rides under it at its original 11px/hue — the SAME
-// treatment for every subject, DAG included (the ticker used to be metagraph-only). Right behind
-// the ticker, subtly (muted, smaller — quieter than the ticker), rides the network-type
-// descriptor ("data metagraph" / "currency metagraph" / "data and currency metagraph" /
-// "hypergraph" for DAG) — reusing the same composition read the old standalone body line derived
-// from (`networkKind`, in ./parts), just folded into the ticker row instead of its own line.
+// 15px/semibold title standard; the ticker rides under it at its original 11px/hue, unless the
+// ticker IS the name. The network's kind is the head's aside (`MetaKindAside`, 2026-10-30).
 // Rolls as a whole via InspectorCard's `titleKey` (keyed on the name, synced with the edge pulse).
 export function MetaTitle({ cfg }: { cfg: MetaCfg }) {
   useFeedRead(["api-metagraphs"], "MetaTitle");

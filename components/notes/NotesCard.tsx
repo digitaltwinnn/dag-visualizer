@@ -52,9 +52,6 @@ import { useAiNote } from "./useAiNote";
 // interprets it.
 
 const DAY_MS = 86_400_000;
-/** The eyebrow, in the AI ink: the gradient clipped to the letters. `background-image`, not the
- *  `background` shorthand — the shorthand would reset the clip `bg-clip-text` sets. */
-
 /** THE RAIL'S OWN HEAD GRAMMAR (user, 2026-10-29: "re-use the same card structure as the others in
  *  the rung"): a TITLE with a kind mark at its left, a QUALIFIER CHIP as the aside, the note where
  *  every card puts its first descriptive line ("Anchored by 4 metagraphs") — and NO EYEBROW (user:
@@ -178,13 +175,13 @@ function RequestDoor({ onClick }: { onClick: () => void }) {
 export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const { subject, req, note } = useAiNote();
   const trendWindow = useStore((s) => s.trendWindow);
+  // THE ARRIVAL PULSE every rail card plays (user, 2026-10-30: "AI card is missing the animation
+  // on the left side when the card becomes active"), in the AI hue rather than the filter's.
+  const pulseKey = useEdgePulse(subject ? `${subject.view}:${subject.subject}` : null);
   if (!subject || !req) return null;
 
   const res = note.res;
   const titleKey = `${subject.view}:${subject.subject}`;
-  // THE ARRIVAL PULSE every rail card plays (user, 2026-10-30: "AI card is missing the animation
-  // on the left side when the card becomes active"), in the AI hue rather than the filter's.
-  const pulseKey = useEdgePulse(titleKey);
 
   return (
     <RailPane

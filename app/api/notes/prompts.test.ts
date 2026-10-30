@@ -316,6 +316,22 @@ describe("parseAnswer", () => {
     expect(r.captions.size).toBe(0);
   });
 
+  // Review 2026-10-30: captions were keyed by date alone, so two notable days on one UTC date shared
+  // the last caption, and a row could show another network's event under its own coin.
+  it("keeps two captions for one date, the second under its occurrence", () => {
+    const r = parseAnswer("NOTE: A b.\nDAY 2026-08-15: First.\nDAY 2026-08-15: Second.");
+    expect([...r.captions]).toEqual([["2026-08-15", "First."], ["2026-08-15#2", "Second."]]);
+  });
+
+  it("drops a wrapping fence, markdown on the markers and chatter after a blank line", () => {
+    expect(parseAnswer("\`\`\`\nNOTE: The network held.\n\`\`\`").note).toBe("The network held.");
+    expect(parseAnswer("**NOTE:** The network held.").note).toBe("The network held.");
+    expect(parseAnswer("NOTE: The network held.\n\nLet me know if you need more.").note).toBe("The network held.");
+    expect(parseAnswer("NOTE:\n\nThe network held.").note).toBe("The network held.");
+    expect([...parseAnswer("NOTE: A.\n\n**DAY 2026-08-15:** B.").captions]).toEqual([["2026-08-15", "B."]]);
+    expect(parseAnswer("\`\`\`\nThe network held.\n\`\`\`").note).toBe("The network held.");
+  });
+
   it("keeps a note that runs over several lines up to the first DAY line", () => {
     const r = parseAnswer("NOTE: One.\nTwo.\nDAY 2026-10-19: Busy.");
     expect(r.note).toBe("One.\nTwo.");

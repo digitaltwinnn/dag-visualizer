@@ -123,6 +123,5 @@ export function parseNoteRequest(body: unknown, nowMs: number): Parsed {
  *  walking the selections would spend the Gate's burst limit. Every other kind is bounded by its
  *  key and the singleflight. */
 export function isLimitedNote(view: NoteView, subject: string, span: NoteSpan): boolean {
-  const timing = timingOf(view, span, subject);
-  return timing === KIND_TIMING.range || timing === KIND_TIMING.subject;
+  return isSubjectNote(subject) || timingOf(view, span, subject) === KIND_TIMING.range;
 }

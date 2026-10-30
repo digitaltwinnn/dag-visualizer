@@ -100,7 +100,13 @@ export const KIND_TIMING: Record<NoteKind, { refreshMs: number | null; ttlS: num
 
 /** The subject decides first: a subject note has one timing whatever its view. */
 export function timingOf(view: NoteView, span: NoteSpan, subject = ""): { refreshMs: number | null; ttlS: number } {
-  if (isSubjectNote(subject)) return KIND_TIMING.subject;
+  if (isSubjectNote(subject)) {
+    // A SPAN FACET over a short pill lives as long as that pill's figures stand (review 2026-10-30):
+    // a day-old note saying "over the last hour" is a stale reading presented as live. Asked, never
+    // warmed, whatever the pill: `refreshMs` stays null, so a read never writes one.
+    const short = subjectKindOf(subject) === "span" ? (span === "1h" ? KIND_TIMING.trend1h : span === "24h" ? KIND_TIMING.trend24h : null) : null;
+    return short ? { refreshMs: null, ttlS: short.ttlS } : KIND_TIMING.subject;
+  }
   if (span.startsWith("r")) return KIND_TIMING.range;
   if (view === "hyper") return KIND_TIMING.hyper;
   if (view === "geo") return KIND_TIMING.geo;

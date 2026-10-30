@@ -1,5 +1,5 @@
 "use client";
-import { memo, useId, useLayoutEffect, useRef, useState } from "react";
+import { memo, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { Area, CartesianGrid, ComposedChart, Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { cn } from "@/lib/utils";
@@ -131,6 +131,61 @@ export interface TrendMark {
 
 const DAY_MS_CHART = 86_400_000;
 
+/** A BUTTON, LIKE THE BAND'S MARK (user, 2026-10-30): it stops the plot's own press and release (the
+ *  plate picks the instant on release), lifts while its day is previewed anywhere, and commits the
+ *  day on click. The hit area is a touch larger than the coin. CLEARS ONLY WHAT IT SET, the row's
+ *  and the diamond's rule: a click holds the plot, the coin unmounts under the pointer and no
+ *  pointerleave fires, so the unmount has to release the hover too (review 2026-10-30). */
+function MarkCoin({
+  m,
+  top,
+  left,
+  onHover,
+  onPick,
+}: {
+  m: TrendMark;
+  top: number;
+  left: string;
+  onHover?: (dayMs: number, on: boolean) => void;
+  onPick?: (mark: TrendMark) => void;
+}) {
+  const mine = useRef(false);
+  const hover = (on: boolean) => {
+    mine.current = on;
+    onHover?.(m.dayMs, on);
+  };
+  useEffect(
+    () => () => {
+      if (mine.current) onHover?.(m.dayMs, false);
+    },
+    [m.dayMs, onHover],
+  );
+  return (
+    <button
+      type="button"
+      aria-label={m.label}
+      onPointerDown={(e) => e.stopPropagation()}
+      onPointerUp={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation();
+        onPick?.(m);
+      }}
+      onPointerEnter={() => hover(true)}
+      onPointerLeave={() => hover(false)}
+      onFocus={() => hover(true)}
+      onBlur={() => hover(false)}
+      className={cn(
+        "absolute grid size-4 cursor-pointer border-0 bg-transparent p-0 outline-none transition-transform duration-150 motion-reduce:transition-none",
+        "before:absolute before:-inset-2 before:content-[''] focus-visible:ring-1 focus-visible:ring-foreground",
+        m.lit && "scale-125",
+      )}
+      style={{ top, left }}
+    >
+      <NoteKindCoin kind={m.kind} />
+    </button>
+  );
+}
+
 export default function TrendChart({
   name,
   unit,
@@ -243,7 +298,7 @@ export default function TrendChart({
   marks?: readonly TrendMark[];
   /** THE PLANE'S COIN PAIRS LIKE THE BAND'S (user, 2026-10-30): hovering a coin previews its day
    *  (the caller writes `hoverNoteDay`, rule 9), a click commits it as the range. */
-  onMarkHover?: (dayMs: number | null) => void;
+  onMarkHover?: (dayMs: number, on: boolean) => void;
   onMarkPick?: (mark: TrendMark) => void;
   /** THE AREA UNDER THE FIRST LINE, IN ITS OWN HUE (2026-09-19) — opt-in, and the 3D stack's
    *  planes are the only caller. A plane is a fully transparent body with one hairline, and a bare
@@ -710,35 +765,14 @@ export default function TrendChart({
               pointer events (the AI card's row and the timeline's diamond are the controls). */}
           {!held &&
             markXs.map((m) => (
-              // A BUTTON, LIKE THE BAND'S MARK (user, 2026-10-30): it stops the plot's own press and
-              // release (the plate picks the instant on release), lifts while its day is previewed
-              // anywhere, and commits the day on click. The hit area is a touch larger than the coin.
-              <button
+              <MarkCoin
                 key={m.key}
-                type="button"
-                aria-label={m.label}
-                onPointerDown={(e) => e.stopPropagation()}
-                onPointerUp={(e) => e.stopPropagation()}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onMarkPick?.(m);
-                }}
-                onPointerEnter={() => onMarkHover?.(m.dayMs)}
-                onPointerLeave={() => onMarkHover?.(null)}
-                onFocus={() => onMarkHover?.(m.dayMs)}
-                onBlur={() => onMarkHover?.(null)}
-                className={cn(
-                  "absolute grid size-4 cursor-pointer border-0 bg-transparent p-0 outline-none transition-transform duration-150 motion-reduce:transition-none",
-                  "before:absolute before:-inset-2 before:content-[''] focus-visible:ring-1 focus-visible:ring-foreground",
-                  m.lit && "scale-125",
-                )}
-                style={{
-                  top: PLOT_MARGIN.top + plotInnerH(plotHeight) - 8,
-                  left: `calc(${PLOT_MARGIN.left}px + ${m.x} * (100% - ${PLOT_INSET_X}px) - 8px)`,
-                }}
-              >
-                <NoteKindCoin kind={m.kind} />
-              </button>
+                m={m}
+                onHover={onMarkHover}
+                onPick={onMarkPick}
+                top={PLOT_MARGIN.top + plotInnerH(plotHeight) - 8}
+                left={`calc(${PLOT_MARGIN.left}px + ${m.x} * (100% - ${PLOT_INSET_X}px) - 8px)`}
+              />
             ))}
           {cursorX != null && !held && (
             <div

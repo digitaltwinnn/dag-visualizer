@@ -194,28 +194,37 @@ export function buildMessages(
 
 // A closed block, or an UNCLOSED one running to the end (the model reasoned until max_tokens).
 const THINK_RE = /<think>[\s\S]*?(?:<\/think>|$)/gi;
-const NOTE_RE = /^\s*NOTE:\s*(.*)$/i;
-const DAY_RE = /^\s*DAY\s+(\d{4}-\d{2}-\d{2})\s*:\s*(.*)$/i;
+const NOTE_RE = /^[\s*_#]*NOTE[*_]*:[*_\s]*(.*)$/i;
+const DAY_RE = /^[\s*_#]*DAY\s+(\d{4}-\d{2}-\d{2})[*_]*\s*:[*_\s]*(.*)$/i;
+const FENCE_RE = /^```/;
 
 /** READ THE ANSWER BACK: `NOTE: …` then one `DAY YYYY-MM-DD: …` line per day. Tolerant by design,
- *  because the model sometimes wraps its output or reasons first: whitespace and any lines before
- *  `NOTE:` are ignored, and a leaked `<think>` block, closed or cut off, is dropped. A note may run over several lines
+ *  because the model sometimes wraps its output or reasons first: whitespace, code fences, markdown
+ *  on the markers and any lines before `NOTE:` are ignored, a leaked `<think>` block, closed or cut
+ *  off, is dropped, and a blank line ends the note. A second caption for one date is keyed
+ *  `<date>#2`, so two notable days on a date keep their own. A note may run over several lines
  *  up to the first DAY line. With no `NOTE:` line at all the whole trimmed text is the note, and
  *  there are no captions. */
 export function parseAnswer(text: string): { note: string; captions: Map<string, string> } {
-  const lines = text.replace(THINK_RE, "").trim().split("\n").map((l) => l.trim());
+  const lines = text.replace(THINK_RE, "").trim().split("\n").map((l) => l.trim()).filter((l) => !FENCE_RE.test(l));
   const captions = new Map<string, string>();
   const start = lines.findIndex((l) => NOTE_RE.test(l));
   if (start < 0) return { note: lines.join("\n").trim(), captions };
   const note = [NOTE_RE.exec(lines[start]!)![1]!];
+  const seen = new Map<string, number>();
   let inNote = true;
   for (const line of lines.slice(start + 1)) {
     const day = DAY_RE.exec(line);
     if (day) {
       inNote = false;
       const caption = day[2]!.trim();
-      if (caption) captions.set(day[1]!, caption);
-    } else if (inNote && line) note.push(line);
+      const n = (seen.get(day[1]!) ?? 0) + 1;
+      seen.set(day[1]!, n);
+      if (caption) captions.set(n === 1 ? day[1]! : `${day[1]!}#${n}`, caption);
+    } else if (inNote) {
+      if (line) note.push(line);
+      else if (note.some(Boolean)) inNote = false; // what follows a blank line is the model talking
+    }
   }
   return { note: note.join("\n").trim(), captions };
 }

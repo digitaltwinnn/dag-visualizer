@@ -174,8 +174,13 @@ async function write(
       continue;
     }
     const kept: NoteDay[] = [];
+    const seen = new Map<string, number>();
     for (const d of input.days) {
-      const caption = captions.get(isoDay(d.dayMs));
+      // The nth notable day of a date takes that date's nth caption (`parseAnswer`).
+      const iso = isoDay(d.dayMs);
+      const n = (seen.get(iso) ?? 0) + 1;
+      seen.set(iso, n);
+      const caption = captions.get(n === 1 ? iso : `${iso}#${n}`);
       if (caption && checkNote(caption, input.facts, input.names, { maxSentences: 1, subject }).ok)
         kept.push({ dayMs: d.dayMs, kind: d.kind, networkId: d.networkId, caption });
     }

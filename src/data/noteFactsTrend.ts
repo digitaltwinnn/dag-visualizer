@@ -308,7 +308,9 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
         facts.push(fact(`${name} day of the span, date`, day.dayMs, "date"));
         facts.push(fact(`${name} day of the span, snapshots anchored`, day.value, "count"));
       }
-      if (ext[0]) facts.push(fact("Typical day of the span, snapshots anchored", ext[0].level, "count"));
+      // The snapshots' own median: `ext` also holds a longest wait or a broadest day, each with a level of its own.
+      const counted = ext.find((x) => x.kind === "peak" || x.kind === "trough");
+      if (counted) facts.push(fact("Typical day of the span, snapshots anchored", counted.level, "count"));
     }
     days = input.shape ? [] : notableDays(pick);
     days.forEach((day, i) => {

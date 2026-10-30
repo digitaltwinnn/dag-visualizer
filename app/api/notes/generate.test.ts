@@ -343,6 +343,18 @@ describe("generateNote", () => {
     expect(d.chat.mock.calls[0]![0][1]!.content).toContain("DAY 2026-10-20");
   });
 
+  it("two notable days on one date keep their own captions, in order", async () => {
+    const dayMs = Date.parse("2026-10-20T00:00:00Z");
+    const days: NotableDay[] = [
+      { dayMs, kind: "first", networkId: "foo", value: 1, level: 0, score: Infinity },
+      { dayMs, kind: "last", networkId: "bar", value: 2, level: 0, score: Infinity },
+    ];
+    const d = deps({ facts: async () => ({ ...FACTS, days }), answers: [`${CLEAN}\nDAY 2026-10-20: Foo began.\nDAY 2026-10-20: Bar stopped.`] });
+    const res = await generateNote(REQ, d, "read");
+    if (res.state !== "ok") throw new Error(res.state);
+    expect(res.days.map((x) => [x.networkId, x.caption])).toEqual([["foo", "Foo began."], ["bar", "Bar stopped."]]);
+  });
+
   it("a caption of two sentences is dropped", async () => {
     const day: NotableDay = { dayMs: Date.parse("2026-10-22T00:00:00Z"), kind: "high", networkId: null, value: 1200, level: 600, score: 3 };
     const d = deps({ facts: async () => ({ ...FACTS, days: [day] }), answers: [`${CLEAN}\nDAY 2026-10-22: A busy day. It reached 1,200.`] });

@@ -171,6 +171,10 @@ describe("parseNoteRequest (the request route's body)", () => {
 });
 
 describe("isLimitedNote", () => {
+  it("is true for a span facet over every pill, whatever its lifetime", () => {
+    for (const span of ["1h", "24h", "7d", "30d", "1y", "all"] as const) expect(isLimitedNote("trend", "dag/span", span), span).toBe(true);
+  });
+
   it("is true for a brushed range and for every subject note", () => {
     expect(isLimitedNote("trend", anId, `r${NOW - 2 * D}-${NOW - D}`)).toBe(true);
     expect(isLimitedNote("geo", `${anId}/cc:FI`, "day")).toBe(true); expect(isLimitedNote("geo", "isp:x", "day")).toBe(true);

@@ -222,7 +222,6 @@ export function Door({
   glyph,
   disabled,
   flushFoot,
-  figure,
   wrap,
   lit,
   onPointerEnter,
@@ -238,9 +237,6 @@ export function Door({
   disabled?: boolean;
   /** Sits directly on the foot plate below it (cancels the foot's own top margin). */
   flushFoot?: boolean;
-  /** A READABLE value on the row's right (the AI notes card's day, 2026-10-27) — unlike `glyph`,
-   *  which is decoration and hidden from assistive tech. */
-  figure?: ReactNode;
   /** Let the target wrap instead of truncating — for a door whose target IS the content (a note's
    *  caption), where an ellipsis would hide text no hover can reveal. */
   wrap?: boolean;
@@ -271,7 +267,6 @@ export function Door({
     <>
       {label != null && <span className="flex-none text-muted-foreground">{label}</span>}
       <span className={cn("min-w-0", wrap ? "flex-1" : "truncate", href && "text-primary-ink")}>{children}</span>
-      {figure != null && <span className="ml-auto flex-none text-muted-foreground tabular-nums">{figure}</span>}
       {glyph != null && <span aria-hidden className="ml-auto flex-none text-muted-foreground">{glyph}</span>}
     </>
   );
@@ -545,7 +540,7 @@ function nodeComposition(nodes: NodeInfo[]): Composition {
 // from the SAME composition read as the old "data metagraph · no token" body line (reused, not
 // re-derived): a metagraph is a "data"/"currency"/"data and currency" metagraph by whether it
 // runs dL1/cL1 nodes; the DAG core is the one exception ("hypergraph", not a metagraph at all).
-// The STRUCTURED type read (2026-08-31) — networkKind's prose derives from this, and any
+// The STRUCTURED type read (2026-08-31) — the head's kind word derives from this, and any
 // classifier (the vitals donut's buckets) branches on THESE values, never on the display
 // sentence: a copy edit to the prose must not silently reclassify every metagraph.
 export type MetaType = "hypergraph" | "unknown" | "data" | "currency" | "data + currency";
@@ -564,13 +559,6 @@ export function metaKindWord(id: string, nodes: NodeInfo[]): string | null {
   const t = metaType(id, nodes);
   if (t === "unknown") return null;
   return t === "data + currency" ? "data and currency" : t;
-}
-export function networkKind(id: string, nodes: NodeInfo[]): string {
-  const t = metaType(id, nodes);
-  if (t === "hypergraph") return "hypergraph";
-  if (t === "unknown") return "metagraph";
-  if (t === "data + currency") return "data and currency metagraph";
-  return `${t} metagraph`;
 }
 
 // Long description with a 3-line clamp + "Show more" (replaces ui.js _descHTML + the delegated

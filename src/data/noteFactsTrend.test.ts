@@ -360,6 +360,13 @@ describe("trendFacts in the span facet's shape", () => {
     expect(r.facts.find((f) => f.label === "Quietest day of the span, snapshots anchored")?.value).toBe(5);
     expect(r.facts.find((f) => f.label === "Busiest day of the span, snapshots anchored")?.value).toBe(100);
   });
+  // Review 2026-10-30: `ext[0]` was the longest wait when the counts were flat, so a gap in seconds
+  // was stated as a typical day's snapshots, and the gate backed it (the figure was a real fact).
+  it("the typical day is the snapshots' own, never another extreme's level", () => {
+    const flat = trendFacts(input({ subject: "usdc", shape: true, daily: daily({ "m.usdc.gapMax": row(37, (i) => (i === 33 ? 900 : 600)) }) }))!;
+    expect(flat.facts.some((f) => /^Typical day/.test(f.label))).toBe(false);
+  });
+
   it("a flat span names no extremes", () => {
     const r = trendFacts(input({ subject: "usdc", shape: true, daily: daily() }))!;
     expect(r.facts.some((f) => /of the span/.test(f.label))).toBe(false);

@@ -332,7 +332,11 @@ export default function TrendStack() {
     }
     return m;
   }, [noteDays, hoverNoteDay]);
-  const onMarkHover = useCallback((dayMs: number | null) => useStore.getState().setHoverNoteDay(dayMs), []);
+  const onMarkHover = useCallback((dayMs: number, on: boolean) => {
+    const st = useStore.getState();
+    if (on) st.setHoverNoteDay(dayMs);
+    else if (st.hoverNoteDay === dayMs) st.setHoverNoteDay(null);
+  }, []);
   const onMarkPick = useCallback((mark: TrendMark) => commitNoteDay(mark), []);
   const stackById = useMemo(() => {
     const m = new Map<string, TrendBand[]>();

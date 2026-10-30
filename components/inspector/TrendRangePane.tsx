@@ -65,7 +65,8 @@ export default function TrendRangePane({
   const front = useStore((s) => s.trendFront);
   const windowId = useStore((s) => s.trendWindow);
 
-  const roster = useTrendRoster(useTrendsSlice(windowId, range, "Range card"), filter, metric);
+  const slice = useTrendsSlice(windowId, range, "Range card");
+  const roster = useTrendRoster(slice, filter, metric);
   const { ranked, rows, format, stepMs } = roster;
   // THE WINDOW STANDS WHEN NOTHING IS BRUSHED (user, 2026-10-08): the card is the span on screen —
   // the brushed range, else the pill's trailing span ending now, else (ALL, which has no fixed
@@ -106,6 +107,9 @@ export default function TrendRangePane({
   const edge = (ms: number) =>
     longSpan ? new Date(ms).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" }) : <Stamp ms={ms} />;
 
+  // AN EMPTY SPAN SAYS SO (rule 10; review 2026-10-30): the note's `none` renders nothing, so with
+  // no figure either the card would state nothing at all. Only once the read has landed.
+  const noReading = headValue == null && slice.p != null && !slice.stale && !roster.pending && !roster.dayPending;
   return (
     <RailPane entry={collapsed}>
       <CardHead
@@ -147,11 +151,15 @@ export default function TrendRangePane({
                 window ends now, and says so rather than printing a clock that drifts each poll. */}
             <Fact label="End">{range ? edge(longSpan ? span.toMs - 1 : span.toMs) : "now"}</Fact>
             <Fact label="Length">{ageWords(span.toMs - span.fromMs)}</Fact>
-            {headValue != null && (
+            {headValue != null ? (
               <Fact label={spanWord(metric)}>
                 <span className="tabular-nums">{format(headValue)}</span>
               </Fact>
-            )}
+            ) : noReading ? (
+              <Fact label={spanWord(metric)}>
+                <span className="text-muted-foreground">No reading</span>
+              </Fact>
+            ) : null}
           </FactGroup>
           <RecordsDoor subject={subject} span={{ ...span, label: spanPhrase(windowId, range) }} />
         </div>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { anchorClause, anchorSeries, headWord, lastSeen, momentPhrase, rangePhrase, sumMeasured, unlistedUnmeasured, withUnlisted, spanAverage, spanWord, typeBands,
+import { anchorClause, anchorSeries, headWord, lastSeen, momentPhrase, unlistedUnmeasured, withUnlisted, spanAverage, spanWord, typeBands,
   GLOBAL_METRIC_ROWS,
   GLOBAL_READING,
   TREND_METRICS,
@@ -719,10 +719,6 @@ describe("the global snapshots measure (2026-10-26 — dagscan's figure beside o
     expect(spanWord("globals")).toBe("Average per day");
   });
   it("the hypergraph CREATES them; a network is PART OF them", () => {
-    const r = rangePhrase("globals", false, true);
-    expect(`The hypergraph ${r.verb} 5,203 ${r.rest}`).toBe("The hypergraph created 5,203 global snapshots in this range");
-    const n = rangePhrase("globals", true);
-    expect(`DOR ${n.verb} 2,880 ${n.rest}`).toBe("DOR was part of at least 2,880 global snapshots in this range");
     const m = momentPhrase("globals", 300_000);
     expect(`DOR ${m.verb} 9 ${m.rest}`).toBe("DOR was part of 9 global snapshots in those 5 minutes");
     const h = momentPhrase("globals", DAY, true);
@@ -737,7 +733,6 @@ describe("the global snapshots measure (2026-10-26 — dagscan's figure beside o
   });
   it("the subject flag changes no other measure's sentence", () => {
     for (const m of METRIC_ORDER.filter((x) => x !== "globals")) {
-      expect(rangePhrase(m, false, true)).toEqual(rangePhrase(m, false));
       expect(momentPhrase(m, DAY, true)).toEqual(momentPhrase(m, DAY));
     }
   });
@@ -749,38 +744,6 @@ describe("the unlisted set has no In-global-snapshots reading (PR review, 2026-1
     expect(out["m.unl.ticks"]).toBeUndefined();
     expect(metricSeries("globals", "unl", out).points).toEqual([]);
     expect(out["m.unl.snaps"]).toEqual([9]);
-  });
-});
-
-describe("rangePhrase — a range's reading as a sentence about its network (2026-10-07)", () => {
-  // The span itself is the card's Start / End / Length rows (user: "Start and end date should be in
-  // the card"), so the sentence says "in this range" rather than restating the length.
-  const say = (m: Parameters<typeof rangePhrase>[0], v: string, partial = false) => {
-    const p = rangePhrase(m, partial);
-    return `DED ${p.verb} ${v} ${p.rest}`;
-  };
-  it("a counter is the TOTAL over the range", () => {
-    expect(say("snapshots", "52,140")).toBe("DED anchored 52,140 snapshots in this range");
-    expect(say("fees", "3.2")).toBe("DED paid 3.2 DAG in fees in this range");
-    expect(say("kb", "40 MB")).toBe("DED anchored 40 MB of data in this range");
-  });
-  it("a total with unmeasured buckets is said as a floor", () => {
-    expect(say("snapshots", "52,140", true)).toBe("DED anchored at least 52,140 snapshots in this range");
-  });
-  it("a gauge and the spacing are averages, and say so", () => {
-    expect(say("nodes", "12")).toBe("DED ran 12 nodes on average");
-    expect(say("continuity", "28s")).toBe("DED created a snapshot every 28s on average");
-  });
-});
-
-describe("sumMeasured — a counter's total over a span", () => {
-  it("adds what was measured and says whether any bucket was not", () => {
-    expect(sumMeasured([1, 2, 3])).toEqual({ sum: 6, partial: false });
-    expect(sumMeasured([1, null, 3])).toEqual({ sum: 4, partial: true });
-  });
-  it("nothing measured is no total, never a zero", () => {
-    expect(sumMeasured([null, null])).toBeNull();
-    expect(sumMeasured([])).toBeNull();
   });
 });
 

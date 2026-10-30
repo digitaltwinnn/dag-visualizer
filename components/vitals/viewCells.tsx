@@ -49,7 +49,7 @@ export function HyperCells({ accent }: { accent: string }) {
 
     // Metagraphs by TYPE — the DAG core is not a metagraph (one node model: it is the
     // metagraph-shaped CORE), so it stays out of this count; a committed filter scopes to it.
-    // metaType is the STRUCTURED read (parts.tsx) — never a match on networkKind's prose,
+    // metaType is the STRUCTURED read (parts.tsx) — never a match on a display word,
     // which a copy edit could reword without any type error reaching this bucket loop.
     const metas = metaList.filter((m) => m.id !== "dag" && (!cfg || m.id === cfg.id));
     const types: Record<string, number> = { data: 0, currency: 0, "data + currency": 0, unknown: 0 };
@@ -81,7 +81,7 @@ export function HyperCells({ accent }: { accent: string }) {
   // A COMMITTED SCOPE flips the card from a DISTRIBUTION to a CHARACTERISTIC (user, 2026-08-30:
   // "'currency 1' and a bar ... is more a single characteristic than a count"): one network has a
   // type, not a type breakdown, so the eyebrow goes singular and the value is the type — icon +
-  // word. The DAG answers networkKind's own "hypergraph" (the hyper view's Orbit), the unlisted
+  // word. The DAG answers `metaKindWord`'s own "hypergraph" (the hyper view's Orbit), the unlisted
   // set the honest "mixed set". "all" keeps the count with one icon+count entry per type — icons
   // over bars (user, same day): a type is a KIND, not a magnitude, so a glyph says it better
   // than a share bar, and the same glyphs then serve the filtered card unchanged.

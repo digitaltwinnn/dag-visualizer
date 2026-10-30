@@ -62,19 +62,10 @@ export function stampParts(ms: number, opts: { seconds?: boolean; now?: number }
   return { date, time, zone };
 }
 
-/** A TITLE'S CLOCK TIME, ON ONE LINE (user, 2026-10-30: the Moment card's zone "pill" goes, the
- *  zone joins the date, and the form gets more concise): the 24-hour clock, two digits each, the
- *  zone's short name inline, the year only when it is not this year — "Sep 14, 10:04 EDT". The
- *  Range card's Start/End rows and the raw pane keep `Stamp`, whose zone is a tag beside a figure
- *  in a row; a title is one headline and reads as one line. */
-export function titleStamp(ms: number, opts: { now?: number } = {}): string {
-  const { date, time } = titleStampParts(ms, opts);
-  return `${date}, ${time}`;
-}
-
-/** The same stamp in its two parts, for a title set as DATE over CLOCK (the Moment card, user
- *  2026-10-30: "'Sep 30, 18:00 GMT+2', can we shorten it by having two rows?"): the date is the
- *  headline, the clock and its zone a quieter second line. */
+/** A TITLE'S CLOCK TIME, DATE OVER CLOCK (the Moment card, user 2026-10-30: "'Sep 30, 18:00 GMT+2',
+ *  can we shorten it by having two rows?"): the date is the headline, the 24-hour clock and its
+ *  zone a quieter second line, the year only when it is not this year. The Range card's Start/End
+ *  rows and the raw pane keep `Stamp`, whose zone is a tag beside a figure in a row. */
 export function titleStampParts(ms: number, opts: { now?: number } = {}): { date: string; time: string } {
   const d = new Date(ms);
   const thisYear = new Date(opts.now ?? Date.now()).getFullYear() === d.getFullYear();
