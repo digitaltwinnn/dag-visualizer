@@ -233,6 +233,8 @@ describe("buildMessages", () => {
     const m = buildMessages("hyper", "Mainnet", FACTS, null, undefined, undefined, undefined, undefined, "the last 7 days");
     expect(m[1]!.content).toContain("Span: the last 7 days");
     expect(VOICE).toMatch(/Name the span in your first sentence/);
+    // Live 2026-10-30: "Over from Mar 6 to May 25" — the two examples were read as one template.
+    expect(VOICE).toMatch(/never "over from"/);
     // …and the subject by its name, never "the network" for one network (user, 2026-10-30).
     expect(VOICE).toMatch(/Call the subject by its name/);
     expect(buildMessages("hyper", "Mainnet", FACTS, null)[1]!.content).not.toContain("Span:");

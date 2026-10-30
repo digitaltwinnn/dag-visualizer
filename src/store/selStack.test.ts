@@ -70,9 +70,26 @@ describe("the RANGE takes a place in the stack (History's Range card, 2026-10-07
 describe("a plane focus bumps the RANGE slot (user, 2026-10-25 — a plane is its network's chart over the span, so the Range card is the focused plane's own card)", () => {
   beforeEach(() => useStore.setState({ selStack: [], trendFocus: null, filter: "all" }));
   it("focusing a plane makes the Range card the active card", () => {
-    useStore.getState().setTrendCursor(1_000);
     useStore.getState().setTrendFocus("dor");
-    expect(useStore.getState().selStack).toEqual(["range", "instant"]);
+    expect(useStore.getState().selStack).toEqual(["range"]);
+    // A cursor set afterwards is the newer commit and leads, as any commit does.
+    useStore.getState().setTrendCursor(1_000);
+    expect(useStore.getState().selStack).toEqual(["instant", "range"]);
+  });
+  // THE MOMENT KEEPS THE BOX (user, 2026-10-30: "moment card, clicking a row sets the explorer
+  // focus correctly but the card itself also goes out of focus and the range card gets it
+  // instead"). A plane focus still ranks the Range card, but never over the Moment card that is
+  // the box: the Moment is the finer rung and the reader's own commit, and its rows re-scope it.
+  it("a plane focus made while the Moment card is the box leaves the Moment the box, the Range ranked behind it", () => {
+    useStore.getState().setTrendRange({ fromMs: 0, toMs: 86_400_000 });
+    useStore.getState().setTrendCursor(1_000);
+    expect(useStore.getState().selStack).toEqual(["instant", "range"]);
+    useStore.getState().setTrendFocus("dor");
+    expect(useStore.getState().selStack).toEqual(["instant", "range"]);
+    // …and with no range brushed, the Range card is ranked in behind the Moment, not over it.
+    useStore.setState({ selStack: ["instant"], trendRange: null, trendFocus: null });
+    useStore.getState().setTrendFocus("dor");
+    expect(useStore.getState().selStack).toEqual(["instant", "range"]);
   });
   it("releasing the focus drops the Range rank, unless a brushed range holds it (R70 review, 2026-10-29)", () => {
     useStore.setState({ trendRange: null });

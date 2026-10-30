@@ -109,15 +109,18 @@ describe("a failed write answers the gesture on the card's surface (R68)", () =>
 // brushed range shows its note inside its own card. The subject note is asked by the selection
 // itself, so it has no door and never says it could not write.
 describe("subject notes live on their cards", () => {
-  it("SubjectNote has no door, no failure copy and no fallback: the plate is the lead, standing down on none / unavailable, and asks once in an effect", () => {
+  it("SubjectNote has no door and no fallback: the plate is the lead, standing down on none, saying so on unavailable, and asks once in an effect", () => {
     const src = read("components/notes/SubjectNote.tsx");
     expect(src).not.toMatch(/RequestDoor|<Door\b/);
     expect(src).not.toMatch(/Couldn/);
     // THE PLATE IS THE LEAD (user, 2026-10-30, design option D, then "no fallback"): the measured
     // lead sentences are gone from the four cards; the plate shows "reading…"/"writing…" while the
-    // note is in flight and nothing on none / unavailable — never "couldn't write" for an ask the
-    // reader did not make. No label row: the text names its span.
-    expect(src).toMatch(/if \(!asked \|\| res\?\.state === "none" \|\| res\?\.state === "unavailable"\) return null;/);
+    // note is in flight, nothing on none, and "no note right now" on unavailable (an instrument
+    // state, not a door: the reader made no ask to answer). No label row: the text names its span.
+    expect(src).toMatch(/if \(!asked \|\| res\?\.state === "none"\) return null;/);
+    // `unavailable` is an instrument state on the plate, not a door and not silence (user, 2026-10-30).
+    expect(src).toMatch(/res\?\.state === "unavailable" \? \([^]*?no note right now/);
+    expect(src).not.toMatch(/RequestDoor|Couldn/);
     expect(src).not.toMatch(/fallback[=:}]|SectionLabel|Constellation Gate AI/); // the word may stay in prose; no prop, no render of one
     expect(src).toMatch(/bg-\[var\(--ai-wash\)\]/);
     expect(src).toMatch(/useEffect\(\(\) => \{[^]*?res\?\.state !== "request"[^]*?note\.request\(\)[^]*?\}, \[/);

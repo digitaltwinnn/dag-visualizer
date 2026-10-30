@@ -540,7 +540,14 @@ function focusPatch(
   id: string | null,
   chosen = true,
 ): { trendFocus: string | null; selStack: SelSlot[] } {
-  if (id != null && chosen) return { trendFocus: id, selStack: bumpStack(s.selStack, "range", true) };
+  // THE MOMENT KEEPS THE BOX (user, 2026-10-30): a plane focus made from the Moment card's rows
+  // ranked the Range card over it and took the box away from the card the reader was using. The
+  // Moment is the finer rung and the reader's own commit, so the Range is ranked in BEHIND a Moment
+  // that leads the stack, and the box stays where the gesture was made.
+  if (id != null && chosen) {
+    const ranked = bumpStack(s.selStack, "range", true);
+    return { trendFocus: id, selStack: s.selStack[0] === "instant" ? ["instant", ...ranked.filter((x) => x !== "instant")] : ranked };
+  }
   // A focus released, or a plane seated unranked, takes its Range rank with it — else the rank a
   // click left behind kept the Range card the box over the note after the release, and on the
   // next visit (review, 2026-10-29). A BRUSHED range is the reader's own and keeps the rank.

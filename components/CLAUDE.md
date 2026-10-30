@@ -899,9 +899,13 @@ served one purpose, what this subject is to the whole it sits in, and the note s
 names its span and places the subject in its rung, share and rank among the other countries,
 providers or make-ups (the prompt asks for that always) — so they are gone. The note renders on a
 faint violet PLATE with the mark (`--ai-wash` / `--ai-edge`, the mark's own surfaces), no label row;
-the plate shows "reading…"/"writing…" while the note is in flight, and `none`, `unavailable` and
-off-mainnet render nothing (the card never says "couldn't write" for a gesture the reader did not
-make). `components/notes/subjectNote.ts` is the pure home of the request derivations. **It is asked
+the plate shows "reading…"/"writing…" while the note is in flight; `none` and off-mainnet render
+nothing (no note to have), and `unavailable` renders "no note right now", muted, with no door (user,
+2026-10-30: the Gate refused a brushed range's write and the plate was simply missing for the 15
+minutes `FAIL_TTL_S` remembers it; a card with no lead and no reason read as broken). **A plane focus
+never takes the box from the Moment card** (the same day: "the card itself also goes out of focus
+and the range card gets it instead"): `focusPatch` ranks the Range card in behind a Moment that leads
+the stack. `components/notes/subjectNote.ts` is the pure home of the request derivations. **It is asked
 for by the selection itself**: a read that answers `request` is asked once, automatically, with no
 door — the reader's gesture was choosing the card. The 1h pill's door stays on the top card. A network-scoped country or provider
 note states no change until a week of the geo family exists, so until then its facts hold no

@@ -18,8 +18,12 @@ import { useMainnetNote } from "./useAiNote";
 // this subject is to the whole it sits in, and the note says it better and names its span; so the
 // lead is gone and the note stands where it stood, on a faint violet plate with the mark
 // (`--ai-wash` / `--ai-edge`). The plate shows its own "reading…" / "writing…" while the note is
-// in flight, and nothing at all when there is none (`none`, `unavailable`, off mainnet): never
-// "couldn't write" for an ask the reader did not make. The text names its own span, so no label row.
+// in flight, and nothing at all when there is no note to have (`none`: nothing measured; off
+// mainnet). `unavailable` IS shown, as an instrument state (rule 10): "no note right now", muted,
+// no door (user, 2026-10-30: a brushed range's plate was simply missing — the Gate had refused the
+// write, which `FAIL_TTL_S` remembers for 15 minutes, and a card with no lead and no reason read
+// as broken; the next range's note then appeared and said nothing about the first). The text names
+// its own span, so no label row.
 //
 // ⚠️ MODEL TEXT IS UNTRUSTED. It renders as React text, nothing else: no `dangerouslySetInnerHTML`,
 // no markdown (the top card's rule).
@@ -50,7 +54,7 @@ export default function SubjectNote({ req }: { req: NoteReq | null }) {
     return () => clearTimeout(t);
   }, [key, res?.state, note.request]);
 
-  if (!asked || res?.state === "none" || res?.state === "unavailable") return null;
+  if (!asked || res?.state === "none") return null;
   // `request` is the dwell before the ask (the effect above): nothing is being written yet, so it
   // reads as reading — "writing…" is the server's own `pending`, a write in flight.
   const waiting = res == null || res.state === "request" ? "reading…" : res.state === "pending" ? "writing…" : null;
@@ -63,6 +67,8 @@ export default function SubjectNote({ req }: { req: NoteReq | null }) {
           <NodeStars />
           {waiting}
         </p>
+      ) : res?.state === "unavailable" ? (
+        <p className="m-0 text-body text-muted-foreground">no note right now</p>
       ) : (
         <p className="m-0 text-body leading-snug text-foreground">{text}</p>
       )}
