@@ -247,11 +247,16 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
     days.forEach((day, i) => {
       const n = i + 1;
       const who = day.networkId ? mention(day.networkId) : "";
+      // A FIRST OR LAST DAY IS AN EVENT, NOT A COUNT (user, 2026-10-30: "Pacaswap anchored 1
+      // snapshot on its last activity" read as if the 1 were the notable fact). The label says what
+      // the day is, the last day the network anchored and nothing since (`notableDays`: a `last`
+      // needs covered quiet days after it, to the measured record's end), and the prompt's caption
+      // rule asks for the event first.
       const what =
         day.kind === "high" ? "spike"
         : day.kind === "low" ? "dip"
-        : day.kind === "first" ? `first activity of ${who}`
-        : day.kind === "last" ? `last activity of ${who}`
+        : day.kind === "first" ? `first day ${who} anchored a snapshot, none before`
+        : day.kind === "last" ? `last day ${who} anchored a snapshot, none since`
         : "pause";
       const kind = dayMeasured(day);
       const measured = day.kind === "pause" ? "longest wait between snapshots" : "snapshots anchored that day";

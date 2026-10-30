@@ -265,8 +265,20 @@ describe("trendFacts notable days", () => {
     const r = trendFacts(input({ daily: daily({ "m.bio.snaps": bio }) }))!;
     expect(r.days.map((d) => [d.kind, d.networkId])).toEqual([["first", "bio"]]);
     expect(r.blurbs).toEqual(["BioFi is: a lending app"]);
-    expect(r.facts.some((f) => f.kind === "date" && f.label.includes("BioFi"))).toBe(true);
+    expect(r.facts.some((f) => f.kind === "date" && f.label === "Notable day 1 date (first day BioFi anchored a snapshot, none before)")).toBe(true);
     expect(factsBlock(r.facts, r.blurbs).split("\n").at(-1)).toBe("BioFi is: a lending app");
+  });
+
+  // A LAST DAY IS AN EVENT, NOT A COUNT (user, 2026-10-30: "Pacaswap anchored 1 snapshot on its
+  // last activity" read as if the 1 were the notable fact). The facts name the day for what it is,
+  // the last day the network anchored with nothing since, and a caption saying only that passes.
+  it("a network going quiet inside the span is a last, named as the last day it anchored", () => {
+    const bio = row(37, (i) => (i < 33 ? 30 : 0));
+    const r = trendFacts(input({ daily: daily({ "m.bio.snaps": bio }) }))!;
+    expect(r.days.map((d) => [d.kind, d.networkId, d.dayMs])).toEqual([["last", "bio", T0 + 2 * DAY]]);
+    expect(r.facts.find((f) => f.kind === "date")!.label).toBe("Notable day 1 date (last day BioFi anchored a snapshot, none since)");
+    expect(r.facts.find((f) => /^Notable day 1 last day BioFi anchored a snapshot, none since, snapshots anchored that day$/.test(f.label))!.value).toBe(30);
+    expect(checkNote("BioFi's last day anchoring, nothing since.", r.facts, r.names, { maxSentences: 1 })).toEqual({ ok: true });
   });
 
   it("only the 7d, 30d, 1y and all zooms get notable days", () => {

@@ -161,7 +161,7 @@ export function buildMessages(
 ): { role: "system" | "user"; content: string }[] {
   const withDays = !!days && days.length > 0;
   const format = withDays
-    ? "Answer format: first a line starting NOTE: with the note, then exactly one line per listed day, starting DAY YYYY-MM-DD: with a caption of one short sentence using only numbers from the facts. Do not repeat the date in the caption. Nothing else."
+    ? "Answer format: first a line starting NOTE: with the note, then exactly one line per listed day, starting DAY YYYY-MM-DD: with a caption of one short sentence using only numbers from the facts. Do not repeat the date in the caption. A day the facts name a first or last day is an event, not a count: its caption says that it was the first day that network anchored a snapshot, or the last, with nothing anchored since, and gives the day's count after that, if at all. Nothing else."
     : "Answer format: one line starting NOTE: and nothing else.";
   const parts = [...(span ? [`Span: ${span}`] : []), `Facts:\n${factsBlock}`];
   if (withDays) parts.push(`Days to caption, in order:\n${days.map((d) => `DAY ${isoDay(d.dayMs)}`).join("\n")}`);
