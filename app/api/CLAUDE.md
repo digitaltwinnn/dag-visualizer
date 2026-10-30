@@ -87,19 +87,32 @@ them — but the Next Node server can.
   specification-by-test (keys/merge/bucketing/fetchSince/runSample/assemble).
   **`scripts/rebuild-trends.ts` is the recovery tool — and the ONLY store-repair route**
   (user, 2026-09-10: "use existing sweep functionality … even if it replays a day"): a
-  whole-day replay through `--recompute-from` beats any surgical write, because the sweep
-  rebuilds the day from the chain's own records and is authoritative over whatever it
-  overwrites. Never hand-write store fields. Three modes: full wipe-and-rebuild
-  (`--days`; always wipes first — merge-based writes double-count otherwise), wipeless backward
-  extension (`--extend-to`; disjoint older records, the partial boundary day recomputed whole —
-  ⚠️ the explorer's cursors are CRAFTABLE but two-dialected: global `{created_at, ordinal}`,
-  currency `{hash}`, and a crafted cursor lands ON its record where server-issued ones are
-  exclusive), and day repair (`--recompute-from`; for days a capped catch-up left as floors).
-  Fleet gauges aren't backfillable (no upstream history exists). **Cron fires on the production
+  whole-day replay beats any surgical write, because the sweep rebuilds the day from the
+  chain's own records and is authoritative over whatever it overwrites. Never hand-write store
+  fields. **One verb, `fill`** (user, 2026-10-30: "fill buckets, resilient, and with the ability
+  to make data fixes or partial reloads if needed but not as the default"; the design is
+  `docs/superpowers/specs/2026-10-30-trends-fill-design.md`, the pure decisions
+  `app/api/trends/fillPlan.ts`): `fill --from=<day>` extends history backward in ONE walk —
+  catalog chains, unlisted chains, floors, the global spine and the unlisted coverage marker —
+  deriving its own end (the store's oldest covered day, recomputed whole); `fill --from --to
+  --recompute` is the DATA FIX, rewriting covered days (`--chain=<prefix>` for one chain's own
+  fields); `rebuild --days=N` (≤ 400) is the wipe-and-rebuild and the bootstrap of an empty store,
+  `wipe` the wipe alone, both asking first. A fill checkpoints and resumes by itself, retries every
+  read and write, takes NO sampler lock (a cursor pre-flight refuses while the cron is still inside
+  the span) and never touches a cron cursor or today. ⚠️ The explorer's cursors are CRAFTABLE but
+  two-dialected: global `{created_at, ordinal}`, currency `{hash}`, and a crafted cursor lands ON
+  its record where server-issued ones are exclusive. ⚠️ **The explorer's paged global list has a
+  FLOOR the per-ordinal endpoint does not** (2026-10-30): nothing older than 2025-05-20 pages,
+  while ordinal 1 (2022-09-28) is served on its own. The global spine is History's coverage
+  marker (`g.ticks`), so days below that floor stay uncovered however many chains a fill walked
+  — the store holds the metagraph chains back to 2024-07-01, and History shows from 2025-05-20,
+  **accepted as History's start** (user, 2026-10-30: fetching the spine per ordinal would be
+  millions of calls); the fill says so in its dry run and its summary. Fleet gauges aren't backfillable (no upstream
+  history exists). **Cron fires on the production
   deployment only; previews share the store read-only** — `CRON_SECRET` is deliberately absent
   from the Preview scope and the sampler fails closed. Self-heal: the cursor lives in Redis, a
   catch-up reaches 30K records per chain (~a day of DOR); beyond that the gap is ACCEPTED
-  (rule 10) and `--recompute-from` repairs. A chain the store has never read (a new network, or a
+  (rule 10) and `fill --from=<day> --to=<day> --recompute` repairs. A chain the store has never read (a new network, or a
   network's new address) is read back to its FIRST snapshot within the same depth
   (`fetchSince.ts`), not just its newest page. The History view (`/trends`) is the read route's
   consumer.
