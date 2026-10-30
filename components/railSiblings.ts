@@ -191,6 +191,13 @@ const compositionItem = (g: CompGroup, s: SiblingState): SiblingStep => ({
 });
 
 // A row without a hover key isn't steppable/pairable; its label is only a React-key fallback.
+// A RAIL STEP NEVER WRITES THE FILTER (user, 2026-10-30: "click a ghost card that opens a node
+// related to its parent card and the app filter is automatically set; that should not happen").
+// Hyper's SCENE click commits a node's network by policy (`nodeCommitsNetwork`: the hub frames
+// it), but in the rail the network is the node's ANCESTOR, two cards up — under the DAG core a
+// hybrid's row carries its metagraph, and the step re-filtered the whole app to it. The RAW
+// table's rule (`commitNetwork: false`), for the same reason: a rail inspects what its parent
+// already scopes, and the top bar stays the one place to commit a network.
 const nodeItem = (r: NodeRow, s: SiblingState, compositionSel?: CompositionSel | null): SiblingStep => ({
   key: hoverKeyOf(r.pick) ?? r.label,
   label: r.label,
@@ -199,6 +206,7 @@ const nodeItem = (r: NodeRow, s: SiblingState, compositionSel?: CompositionSel |
     currentFilter: s.filter,
     deselect: false,
     compositionSel: compositionSel ?? undefined,
+    commitNetwork: false,
   }),
 });
 
@@ -214,6 +222,23 @@ const metaSnapSelOf = (r: TickSnap, globalOrdinal: number): MetaSnapSel => ({
 });
 const ordinalLabel = (r: { ordinal: number }): string =>
   r.ordinal > 0 ? r.ordinal.toLocaleString() : "undecoded";
+
+/** THE DAG CORE IS THE WHOLE TICK (user, 2026-10-30: "treat DAG as a wildcard"). The chamber has
+ *  read the committed DAG as the whole ledger since 2026-08-13 (`ledgerStory`: every global tick
+ *  IS a DAG snapshot, so DAG is the base ledger, not a lane), and the rail's metagraph-snapshot
+ *  rung follows: under the DAG filter it spans every network's snapshots in the tick rather than
+ *  looking for the core's own, which no tick holds. The rows are the explorer's, in its order:
+ *  the busiest network first, the unlisted set last, each network's rows as `tickNets` lists them
+ *  (newest first; callers reverse for a pager). An item names its network, since the set crosses
+ *  them. A step is still `metaSnapSelectActions`, which commits the row's network INSIDE the tick
+ *  and never the filter. */
+const DAG_CORE = "dag";
+const tickWideRows = (s: SiblingState): { r: TickSnap; who: string }[] =>
+  (s.tickNets ?? []).flatMap((tn) => {
+    const meta = s.metaList.find((m) => m.id === tn.id);
+    const who = meta?.symbol || tn.name;
+    return tn.snaps.map((r) => ({ r, who }));
+  });
 
 // ---------------------------------------------------------------------------
 
@@ -402,6 +427,18 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
       // addresses — so the set is the unlisted level's every row.
       // THE ONE LIST, REVERSED: the explorer lists newest first, the pager steps OLDEST → NEWEST so
       // `›` means forward in time — a declared projection, not a second order (2026-10-07).
+      // UNDER THE DAG FILTER the set is the whole tick's (`tickWideRows`): every network's rows,
+      // each network oldest → newest, and the item names its network since the set crosses them.
+      if (s.filter === DAG_CORE) {
+        const wide = (s.tickNets ?? []).flatMap((tn) => tickWideRows({ ...s, tickNets: [{ ...tn, snaps: [...tn.snaps].reverse() }] }));
+        const items = wide.map(({ r, who }, i) => ({
+          key: `${r.metaId}:${r.ordinal}:${i}`,
+          label: `${who} ${ordinalLabel(r)}`,
+          actions: metaSnapSelectActions(metaSnapSelOf(r, cur.globalOrdinal), s.snap!, { metaSnap: cur, inspect: s.inspect }),
+        }));
+        const index = wide.findIndex(({ r }) => r.metaId === cur.metaId && r.ordinal === cur.ordinal);
+        return finish(slot, items, index, `Global ${cur.globalOrdinal.toLocaleString()}`);
+      }
       const tn = s.tickNets?.find((x) => x.id === keyOf(s, cur.metaId));
       if (!tn) return null;
       const rows = [...tn.snaps].reverse();
@@ -599,6 +636,14 @@ const metaSnapOfTickChildren = (s: SiblingState, n: number): SiblingStep[] => {
   const net = netOf(s);
   if (net === "all" || !s.snap) return [];
   const snap = s.snap;
+  // The DAG core's card opens the tick's first snapshot, whichever network's (`tickWideRows`).
+  if (net === DAG_CORE) {
+    return tickWideRows(s).slice(0, n).map(({ r, who }) => ({
+      key: `${r.metaId}:${r.ordinal}`,
+      label: `${who} ${ordinalLabel(r)}`,
+      actions: metaSnapSelectActions(metaSnapSelOf(r, snap.data.ordinal), snap, { metaSnap: s.metaSnap, inspect: s.inspect }),
+    }));
+  }
   // The explorer's own list for this network in this tick, NEWEST first — the ghost opens its top
   // row. By network KEY: the unlisted set's snapshots carry their own raw addresses.
   const tn = s.tickNets?.find((x) => x.id === net);

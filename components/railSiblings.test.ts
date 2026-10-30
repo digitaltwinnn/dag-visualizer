@@ -237,6 +237,25 @@ describe("siblingSet — node rung", () => {
       }),
     );
   });
+  // A STEP BELOW THE NETWORK CARD NEVER MOVES THE FILTER (user, 2026-10-30: "click a ghost card
+  // that opens a node related to its parent card and the app filter is automatically set; that
+  // should not happen"). Hyper's scene click commits a node's network by policy
+  // (`nodeCommitsNetwork`), but in the rail the network is the node's ANCESTOR: under the DAG core
+  // a hybrid's row carries its metagraph, and the step was re-filtering the whole app to it.
+  it("hyper: a node step or a composition's ghost never writes the filter, even for a hybrid of another network", () => {
+    const dorHybrid = { ...deA, pick: { ...deA.pick, meta: { id: "dor" } } } as unknown as NodeRow;
+    const rows = [dorHybrid, deB];
+    const groups = compositionGroups(rows);
+    const sel = { netId: "dag", key: groups[0]!.key };
+    const s = base({ mode: "hyper", filter: "dag", composition: sel, selNodes: rows, inspect: deB.pick });
+    const set = siblingSet("node", s)!;
+    expect(set.items.map((i) => i.key)).toEqual(["1.1.1.1", "1.1.1.2"]);
+    expect(set.items.flatMap((i) => i.actions).some((a) => a.kind === "filter")).toBe(false);
+    expect(childStep("composition", base({ mode: "hyper", filter: "dag", composition: sel, selNodes: rows }))!.actions.some((a) => a.kind === "filter")).toBe(false);
+    // The scene's own click still commits the network: the rule is the rail's, not the view's.
+    expect(nodeSelectActions(dorHybrid.pick, { mode: "hyper", currentFilter: "dag", deselect: false })[0]).toEqual({ kind: "filter", id: "dor" });
+  });
+
   it("nothing inspected → no set", () => {
     expect(siblingSet("node", base({}))).toBeNull();
   });
@@ -284,6 +303,25 @@ describe("siblingSet — metagraph snapshot rung", () => {
       ),
     );
   });
+  // THE DAG CORE IS THE WHOLE TICK (user, 2026-10-30: "treat DAG as a wildcard"; the chamber's
+  // own reading since 2026-08-13, `ledgerStory`: every global tick IS a DAG snapshot). Under the
+  // DAG filter the rung spans every network's snapshots in the tick, in the explorer's order
+  // (busiest network first, each oldest → newest), each item naming its network, and a step to
+  // another network's snapshot commits that network INSIDE the tick, never the filter.
+  it("under the DAG filter the set is every snapshot in the tick, named by network, and spans a step across networks", () => {
+    const dag = ledger({ filter: "dag", metaSnap: cur, snap: snapPick, exactRows: rows });
+    const set = siblingSet("metaSnap", dag)!;
+    expect(set.items.map((i) => i.label)).toEqual(["DED 100", "DED 101", "DOR 900", "Unlisted undecoded"]);
+    expect(set.index).toBe(0);
+    expect(set.parentLabel).toBe("Global 42");
+    const toDor = set.items[2]!.actions;
+    expect(toDor.some((a) => a.kind === "filter")).toBe(false);
+    expect(toDor).toEqual(metaSnapSelectActions({ metaId: "dor", ordinal: 900, hash: "", globalOrdinal: 42, ts: "T" }, snapPick, { metaSnap: cur, inspect: null }));
+    // Standing on DOR's snapshot inside the tick, the set is still the whole tick's.
+    const onDor = ledger({ filter: "dag", metaSnap: { ...cur, metaId: "dor", ordinal: 900 }, tickNet: { metaId: "dor", globalOrdinal: 42 }, snap: snapPick, exactRows: rows });
+    expect(siblingSet("metaSnap", onDor)!.index).toBe(2);
+  });
+
   it("a metagraph with a single snapshot in the tick gets NO pager", () => {
     const only = { ...cur, metaId: "dor", ordinal: 900 };
     expect(siblingSet("metaSnap", ledger({ ...s, filter: "dor", metaSnap: only }))).toBeNull();
@@ -484,6 +522,20 @@ describe("childStep — the first-child DOWN step", () => {
         { metaSnap: null, inspect: null },
       ),
     );
+  });
+
+  it("the DAG core's card opens the tick's first snapshot, whichever network's (DAG is the whole tick)", () => {
+    const rows = [
+      { metaId: "dor", ordinal: 900 },
+      { metaId: "ded", ordinal: 55 },
+      { metaId: "ded", ordinal: 56 },
+    ] as unknown as SiblingState["exactRows"];
+    const step = childStep("context", ledger({ filter: "dag", snap: snapPick, exactRows: rows }))!;
+    expect(step.label).toBe("DED 56"); // the busiest network's newest row, as the explorer lists it
+    expect(step.actions).toEqual(
+      metaSnapSelectActions({ metaId: "ded", ordinal: 56, hash: "", globalOrdinal: 42, ts: "T" }, snapPick, { metaSnap: null, inspect: null }),
+    );
+    expect(step.actions.some((a) => a.kind === "filter")).toBe(false);
   });
 
   it("a network that did not anchor into this tick has nothing to open", () => {
