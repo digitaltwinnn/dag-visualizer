@@ -1,5 +1,5 @@
 import type { MetaInfo, NodeRow } from "@/src/data/types";
-import { ROLE_SHORT } from "@/src/data/composition";
+import { LAYER_WORD } from "@/src/data/composition";
 
 // WHAT A NETWORK ROW COUNTS in the Hypergraph explorer — the heading control's choices, their
 // order and how each is read off a network (`components/explorer/ExplorerHeading.tsx` lists them).
@@ -21,12 +21,14 @@ export type HyperMeasure = "nodes" | "l0" | "cl1" | "dl1";
 /** The heading control's order: nodes first, then the layers in the vocabulary's own order. */
 export const HYPER_MEASURE_ORDER: readonly HyperMeasure[] = ["nodes", "l0", "cl1", "dl1"];
 
-/** The word the heading control shows — the layer CODES the chips already use (ROLE_SHORT). */
+/** The word the heading control shows — what each layer DOES (`LAYER_WORD`: Consensus, Currency,
+ *  Data), not its code (user, 2026-10-30: "instead of L0 use words like 'consensus layer'"); the
+ *  codes stay on the chips, where a sentence of them is the point. */
 export const HYPER_MEASURE_LABELS: Readonly<Record<HyperMeasure, string>> = {
   nodes: "Nodes",
-  l0: ROLE_SHORT.l0,
-  cl1: ROLE_SHORT.cl1,
-  dl1: ROLE_SHORT.dl1,
+  l0: LAYER_WORD.l0!,
+  cl1: LAYER_WORD.cl1!,
+  dl1: LAYER_WORD.dl1!,
 };
 
 

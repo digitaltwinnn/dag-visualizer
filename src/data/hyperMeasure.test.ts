@@ -6,6 +6,7 @@ import {  HYPER_MEASURE_LABELS,
   groupMeasure,
   networkMeasure,
 } from "./hyperMeasure";
+import { LAYER_WORD } from "@/src/data/composition";
 
 // The Hypergraph explorer's network-row figure (user, 2026-10-07 — the view is the architecture,
 // so its figures count what the network is BUILT of): its nodes, and its nodes per layer. Countries
@@ -20,9 +21,13 @@ const net = (n: number): Pick<MetaInfo, "nodes"> => ({ nodes: Array.from({ lengt
 const rows = [row("1", ["l0", "cl1"]), row("1", ["l0", "cl1"]), row("2", ["dl1"]), row("3", ["l0"])];
 
 describe("the order and its labels", () => {
-  it("leads with nodes, then the layers in the vocabulary's own order and codes", () => {
+  // THE CONTROL SAYS WHAT A LAYER DOES, NOT ITS CODE (user, 2026-10-30: "instead of L0 use words
+  // like 'consensus layer', cL1 is 'currency layer'"): the one-word layer names the composition
+  // rows already use (`LAYER_WORD`), one home with the chips' dedicated labels.
+  it("leads with nodes, then the layers in the vocabulary's own order, each by what it does", () => {
     expect(HYPER_MEASURE_ORDER).toEqual(["nodes", "l0", "cl1", "dl1"]);
-    expect(HYPER_MEASURE_LABELS).toEqual({ nodes: "Nodes", l0: "L0", cl1: "cL1", dl1: "dL1" });
+    expect(HYPER_MEASURE_LABELS).toEqual({ nodes: "Nodes", l0: "Consensus", cl1: "Currency", dl1: "Data" });
+    expect(HYPER_MEASURE_LABELS.l0).toBe(LAYER_WORD.l0);
   });
   it("lists every measure for the heading control, in order, each counted in nodes", () => {
     expect(HYPER_MEASURE_OPTIONS.map((o) => o.id)).toEqual(HYPER_MEASURE_ORDER);

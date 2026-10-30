@@ -1,10 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { compareComposition, roleKey, rolesOf, roleKeyLabel, roleKeyOfCodes, compositionRows, nodeCompositionLabel, compositionKey, parseCompositionKey, compositionClause, ROLE_SHORT, layerCodesOf, compositionGroups, machineKey } from "./composition";
+import { compareComposition, roleKey, rolesOf, roleKeyLabel, roleKeyOfCodes, compositionRows, nodeCompositionLabel, compositionKey, parseCompositionKey, compositionClause, ROLE_SHORT, layerCodesOf, compositionGroups, machineKey, LAYER_WORD } from "./composition";
 import type { NodeInfo, NodeRow } from "@/src/data/types";
 
 const n = (roles: string[]): NodeInfo => ({ ip: "x", state: "Ready", layer: roles[0], roles }) as NodeInfo;
 
 describe("compositionRows", () => {
+  // The layer words are the vocabulary's own (user, 2026-10-30: the Hypergraph measure control
+  // says "Consensus", not "L0"), one home with the dedicated rows' labels.
+  it("names what each layer does, one word each", () => {
+    expect(LAYER_WORD).toEqual({ l0: "Consensus", cl1: "Currency", dl1: "Data" });
+  });
+
   it("splits hybrid (by exact code set) from dedicated rows, summing to the total", () => {
     const nodes = [
       n(["l0", "dl1"]), n(["l0", "dl1"]), n(["l0", "dl1"]), // 3 hybrid L0·dL1

@@ -19,7 +19,10 @@ export const ROLE_SHORT: Record<string, string> = { l0: "L0", cl1: "cL1", dl1: "
  *  per-role and per-type counts of one node list can never disagree. */
 export const rolesOf = (n: { roles?: string[]; layer?: string | null }): string[] =>
   n.roles && n.roles.length ? n.roles : n.layer ? [n.layer] : [];
-const DEDICATED_LABEL: Record<string, string> = { l0: "Consensus", cl1: "Currency", dl1: "Data" };
+/** WHAT A LAYER DOES, one word each — the composition rows' dedicated labels and, since
+ *  2026-10-30, the Hypergraph explorer's measure control (user: "instead of L0 use words like
+ *  'consensus layer'"); the codes (`ROLE_SHORT`) stay the chips' and a sentence's. One home. */
+export const LAYER_WORD: Record<string, string> = { l0: "Consensus", cl1: "Currency", dl1: "Data" };
 const codesFor = (roles: string[]) =>
   ROLE_ORDER.filter((r) => roles.includes(r)).map((r) => ROLE_SHORT[r]);
 
@@ -119,7 +122,7 @@ export function compositionRows(nodes: NodeInfo[]): CompRow[] {
   }
   const hybridRows = [...hybridByKey.values()].sort((a, b) => a.codes.length - b.codes.length);
   const dedRows: CompRow[] = ROLE_ORDER.filter((r) => dedByRole[r]).map((r) => ({
-    label: DEDICATED_LABEL[r],
+    label: LAYER_WORD[r],
     codes: [ROLE_SHORT[r]],
     count: dedByRole[r],
   }));
