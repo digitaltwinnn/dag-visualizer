@@ -67,7 +67,7 @@ describe("PROMPTS", () => {
 
   it("asks Hypergraph and Geography their own subject first and activity last (R74); the ledger and History keep their questions", () => {
     expect(PROMPTS.hyper.question).toBe(
-      "First, who and what is on the network over the span: networks or layers that gained or lost nodes, networks that started or stopped anchoring; if nothing changed there, say that it held, with the level.",
+      "First, who and what is on the network over the span: networks or layers that gained or lost nodes, networks that started or stopped anchoring; if nothing changed there, say so plainly: a quiet week, the node count held at its level and no network, layer or make-up changed.",
     );
     expect(PROMPTS.hyper.questionCommon).toBe("Last, in one sentence, how active it was: the global snapshots it was part of per day last week against the weeks before.");
     expect(PROMPTS.geo.question).toBe(

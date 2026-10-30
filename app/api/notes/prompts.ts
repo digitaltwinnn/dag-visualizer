@@ -72,7 +72,9 @@ type KindQuestions = Partial<Record<Exclude<SubjectKind, "view">, string>>;
 const QUESTION_COMMON_WHOLE = "Last, in one sentence, how active the network was: the global snapshots it produced per day last week against the weeks before.";
 export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuestions; questionNow?: string; questionCommon?: string; questionCommonWhole?: string; system: (subjectLabel: string, lead?: NoteLead, common?: boolean, kind?: SubjectKind, whole?: boolean) => string }> = {
   hyper: {
-    question: "First, who and what is on the network over the span: networks or layers that gained or lost nodes, networks that started or stopped anchoring; if nothing changed there, say that it held, with the level.",
+    // A QUIET WEEK IS SAID (user, 2026-10-30): the facts count what changed even at 0, so the note
+    // says the composition held rather than reaching for the node count, which is Geography's too.
+    question: "First, who and what is on the network over the span: networks or layers that gained or lost nodes, networks that started or stopped anchoring; if nothing changed there, say so plainly: a quiet week, the node count held at its level and no network, layer or make-up changed.",
     questions: {
       type: "Open with a plain sentence with the network as its actor, in the shape \"<network> runs N nodes as <make-up>\"; then what share of the network's nodes that is and its place among the network's make-ups; then how that changed over the span, or that it held.",
     },

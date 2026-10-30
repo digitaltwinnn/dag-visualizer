@@ -238,10 +238,14 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
     });
 
     // THE MOVERS: the networks whose node count changed most over the span, by how many nodes.
-    ids
+    // HOW MANY MOVED is stated even at 0 (user, 2026-10-30: a quiet week is SAID, "no changes in
+    // composition", rather than left to the node count): the question asks for it by name.
+    const movers = ids
       .map((id) => ({ id, ch: spanChange(fleet.series[`f.nodes.${id}`] ?? []) }))
       .filter((m): m is { id: string; ch: NonNullable<typeof m.ch> } => !!m.ch && m.ch.to !== m.ch.from)
-      .sort((a, b) => Math.abs(b.ch.to - b.ch.from) - Math.abs(a.ch.to - a.ch.from) || a.id.localeCompare(b.id))
+      .sort((a, b) => Math.abs(b.ch.to - b.ch.from) - Math.abs(a.ch.to - a.ch.from) || a.id.localeCompare(b.id));
+    facts.push(fact("Networks whose node count changed over the span", movers.length, "count"));
+    movers
       .slice(0, TOP)
       .forEach(({ id, ch }) => {
         named.push(id);
@@ -266,6 +270,7 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
         cap: ids.length * 2, // a network has at most one first and one last
         from: from < 0 ? n : from,
       }).filter((day) => (day.kind === "first" || day.kind === "last") && day.networkId);
+      facts.push(fact("Networks that started or stopped anchoring over the span", days.length, "count"));
       for (const day of days) {
         const id = day.networkId!;
         named.push(id);
@@ -342,11 +347,19 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
             facts.push(fact(`${key} at the end of the span`, is[k]!, "count", undefined, { key, end: "to" }));
           }
         }
-        for (const band of typeBands(subject, fleet.series)) {
-          const from = held(startAt, "start", (i) => band.points[i] ?? null); // null: no type recorded at that sample
-          const to = held(endAt, "end", (i) => band.points[i] ?? null);
-          if (from == null || to == null || from === to) continue;
-          const key = `${name} nodes ${comboWords(band.key)}`;
+        // The make-ups read at both ends, and how many of them changed, stated even at 0 so a quiet
+        // week can be SAID (user, 2026-10-30); a band unread at either end is neither.
+        const bands = typeBands(subject, fleet.series)
+          .map((band) => ({
+            key: band.key,
+            from: held(startAt, "start", (i) => band.points[i] ?? null), // null: no type recorded at that sample
+            to: held(endAt, "end", (i) => band.points[i] ?? null),
+          }))
+          .filter((b): b is { key: string; from: number; to: number } => b.from != null && b.to != null);
+        const changedBands = bands.filter((b) => b.from !== b.to);
+        facts.push(fact(`${name} make-ups whose node count changed over the span`, changedBands.length, "count"));
+        for (const { key: type, from, to } of changedBands) {
+          const key = `${name} nodes ${comboWords(type)}`;
           facts.push(fact(`${key} at the start of the span`, from, "count", undefined, { key, end: "from" }));
           facts.push(fact(`${key} at the end of the span`, to, "count", undefined, { key, end: "to" }));
         }

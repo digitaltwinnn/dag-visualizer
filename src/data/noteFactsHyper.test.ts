@@ -124,6 +124,20 @@ describe("hyperFacts on all", () => {
     for (const n of Object.values(NAMES)) expect(ratio!.label).not.toContain(n);
   });
 
+  // A QUIET WEEK IS SAID, NOT LEFT UNSAID (user, 2026-10-30: "what about actually saying it's a
+  // quiet week with no changes in composition"): the counts of what changed are stated even at 0,
+  // so the note can say nothing moved rather than fall back on the node count.
+  it("counts the networks whose node count changed and those that started or stopped, 0 in a quiet week", () => {
+    const r = hyperFacts(input())!;
+    expect(find(r, /^Networks whose node count changed over the span$/)[0]!.value).toBe(1); // USDC.dag, 10 to 30
+    expect(find(r, /^Networks that started or stopped anchoring over the span$/)[0]!.value).toBe(0);
+    const quiet = hyperFacts(input({ fleet: fleet({ "f.nodes": row(720, () => 140), "f.nodes.usdc": row(720, () => 30) }) }))!;
+    const [changed] = find(quiet, /^Networks whose node count changed over the span$/);
+    expect([changed!.value, changed!.text]).toEqual([0, "0"]);
+    expect(find(quiet, /^Networks that started or stopped anchoring over the span$/)[0]!.value).toBe(0);
+    expect(find(quiet, /nodes at the (start|end) of the span$/).filter((f) => !/^Nodes across/.test(f.label))).toEqual([]); // no movers
+  });
+
   it("states only the current level of a total that began after the span did", () => {
     const late = fleet({ "f.nodes": row(720, (i) => (i < 400 ? null : 140)) });
     const r = hyperFacts(input({ fleet: late }))!;
@@ -141,12 +155,13 @@ describe("hyperFacts on all", () => {
         names: NAMES,
       }),
     )!;
-    const started = find(r, /started anchoring/);
+    const started = find(r, /started anchoring, first day/);
     expect(started.map((f) => f.label)).toEqual(["BioFi started anchoring, first day"]);
     expect(started[0]!.kind).toBe("date");
     expect(started[0]!.value).toBe(T0 + 45 * DAY);
-    const stopped = find(r, /stopped anchoring/);
+    const stopped = find(r, /stopped anchoring, last day/);
     expect(stopped.map((f) => f.label)).toEqual(["Dor stopped anchoring, last day"]);
+    expect(find(r, /^Networks that started or stopped anchoring over the span$/)[0]!.value).toBe(2);
     expect(stopped[0]!.value).toBe(T0 + 49 * DAY);
     // A network that was running before the span (USDC.dag) has no beginning to report.
     expect(find(r, /USDC\.dag (started|stopped)/)).toEqual([]);
@@ -330,6 +345,7 @@ describe("hyperFacts on a network: the change of shape", () => {
     expect(from!.value).toBe(0);
     expect(find(r, /^Dor nodes running only dL1 at the end of the span$/)[0]!.value).toBe(2);
     expect(find(r, /running L0, cL1 and dL1/)).toEqual([]);
+    expect(find(r, /^Dor make-ups whose node count changed over the span$/)[0]!.value).toBe(1);
   });
 
   it("states a combination unknown at the start (no type recorded) not at all", () => {
@@ -346,6 +362,7 @@ describe("hyperFacts on a network: the change of shape", () => {
     expect(changed!.value).toBe(0);
     expect(changed!.text).toBe("0");
     expect(find(r, /layer at the/)).toEqual([]);
+    expect(find(r, /^BioFi make-ups whose node count changed over the span$/)[0]!.value).toBe(0);
     expect(find(r, /nodes running/)).toEqual([]);
   });
 
