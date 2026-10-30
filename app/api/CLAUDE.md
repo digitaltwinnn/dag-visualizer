@@ -105,8 +105,9 @@ them — but the Next Node server can.
   FLOOR the per-ordinal endpoint does not** (2026-10-30): nothing older than 2025-05-20 pages,
   while ordinal 1 (2022-09-28) is served on its own. The global spine is History's coverage
   marker (`g.ticks`), so days below that floor stay uncovered however many chains a fill walked
-  — the store holds the metagraph chains back to 2024-07-01, and History shows from 2025-05-20;
-  the fill says so in its dry run and its summary. Fleet gauges aren't backfillable (no upstream
+  — the store holds the metagraph chains back to 2024-07-01, and History shows from 2025-05-20,
+  **accepted as History's start** (user, 2026-10-30: fetching the spine per ordinal would be
+  millions of calls); the fill says so in its dry run and its summary. Fleet gauges aren't backfillable (no upstream
   history exists). **Cron fires on the production
   deployment only; previews share the store read-only** — `CRON_SECRET` is deliberately absent
   from the Preview scope and the sampler fails closed. Self-heal: the cursor lives in Redis, a

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { TIER_SINCE } from "@/src/data/trendWindow";
-import { cursorsInsideSpan, FILL_POOL, parseCommand, resolveChain, tierExistsAt, UsageError } from "./fillPlan";
+import { bucketWritable, coverageSuppressedBy, cursorsInsideSpan, FILL_POOL, parseCommand, resolveChain, seekBoundary, tierExistsAt, UsageError } from "./fillPlan";
 
 // THE FILL'S PURE DECISIONS (spec 2026-10-30-trends-fill-design): what the script may not decide
 // inline because scripts/ has no test harness — the commands and their redirects, the span's
@@ -111,5 +111,47 @@ describe("resolveChain — --chain names exactly one chain", () => {
 describe("FILL_POOL", () => {
   it("walks a few chains at a time, as the full rebuild does", () => {
     expect(FILL_POOL).toBe(3);
+  });
+});
+
+describe("bucketWritable — nothing before the span, nothing below a tier's birth (final review 1)", () => {
+  const from = day("2026-09-01");
+  it("refuses a bucket that starts before the span's first day: the predecessor's own buckets are the store's, not the fill's", () => {
+    // bucketGlobals zero-fills g.ticks from the predecessor it is handed, which sits in the day
+    // BEFORE --from; written, that 0 would overwrite a real day's count.
+    expect(bucketWritable("1d", from - D, from)).toBe(false);
+    expect(bucketWritable("1h", from - 3_600_000, from)).toBe(false);
+    expect(bucketWritable("5m", from - 300_000, from)).toBe(false);
+    expect(bucketWritable("1d", from, from)).toBe(true);
+    expect(bucketWritable("1h", from + 3_600_000, from)).toBe(true);
+  });
+  it("still refuses fine grain below the tier's birth, and an unbounded span (a rebuild) writes every tier it has", () => {
+    expect(bucketWritable("1h", TIER_SINCE["1h"] - D, TIER_SINCE["1h"] - 30 * D)).toBe(false);
+    expect(bucketWritable("1d", TIER_SINCE["1h"] - D, -Infinity)).toBe(true);
+  });
+});
+
+describe("seekBoundary — where a chain stands against the span's end (final review 2)", () => {
+  const chain = (stamps: string[]) => async (o: number) => (o >= 1 && o <= stamps.length ? { ordinal: o, timestamp: stamps[o - 1]!, hash: `h${o}` } : null);
+  const end = day("2026-09-01");
+  it("answers the first record at/after the boundary, to craft the walk's start from", async () => {
+    const r = await seekBoundary(chain(["2026-08-30T00:00:00Z", "2026-08-31T12:00:00Z", "2026-09-01T00:00:05Z", "2026-09-02T00:00:00Z"]), 4, end);
+    expect(r).toEqual({ kind: "at", record: { ordinal: 3, timestamp: "2026-09-01T00:00:05Z", hash: "h3" } });
+  });
+  it("a chain born at or after the boundary has nothing older: born-after", async () => {
+    expect(await seekBoundary(chain(["2026-09-01T00:00:00Z", "2026-09-02T00:00:00Z"]), 2, end)).toEqual({ kind: "born-after" });
+  });
+  it("a chain that went quiet BEFORE the boundary is all-older: walked from its tip, never skipped as born-after", async () => {
+    // BioFi's former address stopped 2026-08-16; a recompute of August must still fold its days
+    // into the floors, and a dormant unlisted chain must still be read for its coverage.
+    expect(await seekBoundary(chain(["2026-08-01T00:00:00Z", "2026-08-10T00:00:00Z", "2026-08-16T00:00:00Z"]), 3, end)).toEqual({ kind: "all-older" });
+  });
+});
+
+describe("coverageSuppressedBy — a skipped unlisted chain is remembered across a resume (final review 3)", () => {
+  it("reads the skip from each unlisted chain's checkpoint, not from memory", () => {
+    const ckpt: Record<string, { done?: boolean; skipped?: string } | null> = { "DAG0aaaaaa": { done: true }, "DAG0bbbbbb": { done: true, skipped: "no-cursor" }, "DAG0cccccc": null };
+    expect(coverageSuppressedBy(["DAG0aaaaaaXYZ", "DAG0bbbbbbXYZ", "DAG0ccccccXYZ"], (label) => ckpt[label] ?? null)).toBe("DAG0bbbbbb");
+    expect(coverageSuppressedBy(["DAG0aaaaaaXYZ"], (label) => ckpt[label] ?? null)).toBeNull();
   });
 });

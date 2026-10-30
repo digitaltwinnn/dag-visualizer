@@ -141,3 +141,55 @@ export function resolveChain(prefix: string, ids: readonly string[]): { id: stri
   if (!hits.length) return { error: `--chain: no chain starts with ${prefix}` };
   return { error: `--chain: ${hits.length} chains start with ${prefix} (${hits.map((h) => h.slice(0, 10)).join(", ")}) — give more of the id` };
 }
+
+/** Whether the fill may WRITE a bucket: it must start inside the span (`fromMs`; -Infinity for a
+ *  rebuild) and its tier must exist there. The span floor exists because the predecessor record
+ *  the fill reads just below `--from` (to keep the span's first gap) makes `bucketGlobals` zero-fill
+ *  coverage from the predecessor's OWN bucket — a 0 that, written, would overwrite the real count of
+ *  the day before the span (final review, 2026-10-30). */
+export function bucketWritable(tier: "5m" | "1h" | "1d", bucketStartMs: number, fromMs: number): boolean {
+  return bucketStartMs >= fromMs && tierExistsAt(tier, bucketStartMs);
+}
+
+export type SeekRecord = { ordinal: number; timestamp: string; hash?: string };
+export type Seek = { kind: "at"; record: SeekRecord } | { kind: "born-after" } | { kind: "all-older" };
+
+/** WHERE A CHAIN STANDS AGAINST THE SPAN'S END, by binary search over the explorer's per-ordinal
+ *  endpoint: `at` — the first record at/after `boundaryMs`, which crafts the walk's start; `born-after`
+ *  — even ordinal 1 is at/after it, nothing older exists; `all-older` — every record is older, so the
+ *  chain went QUIET before the boundary and is walked from its tip with no seed. The old extension
+ *  folded the last two into one null and skipped a quiet chain as if it had never existed (final
+ *  review, 2026-10-30): a retired address's August days left out of August's floors. */
+export async function seekBoundary(
+  oneOf: (ordinal: number) => Promise<SeekRecord | null>,
+  tipOrdinal: number,
+  boundaryMs: number,
+): Promise<Seek> {
+  const first = await oneOf(1);
+  if (!first || Date.parse(first.timestamp) >= boundaryMs) return { kind: "born-after" };
+  let lo = 1;
+  let hi = tipOrdinal;
+  let best: SeekRecord | null = null;
+  while (lo <= hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    const rec = await oneOf(mid);
+    if (!rec) { hi = mid - 1; continue; } // unserved probe — tighten from above
+    if (Date.parse(rec.timestamp) >= boundaryMs) { best = rec; hi = mid - 1; }
+    else lo = mid + 1;
+  }
+  return best ? { kind: "at", record: best } : { kind: "all-older" };
+}
+
+/** The unlisted chain a fill SKIPPED (no cursor in the store), read from the chains' checkpoints —
+ *  never from memory, which a resume does not have (final review, 2026-10-30). Non-null suppresses
+ *  the span's `u.cov`: "measured, none" must be true of every unlisted chain. */
+export function coverageSuppressedBy(
+  unlisted: readonly string[],
+  checkpointOf: (label: string) => { done?: boolean; skipped?: string } | null,
+): string | null {
+  for (const id of unlisted) {
+    const label = id.slice(0, 10);
+    if (checkpointOf(label)?.skipped) return label;
+  }
+  return null;
+}

@@ -104,7 +104,7 @@ function loadEnvLocal(): void {
   }
 }
 
-import { cursorsInsideSpan, FILL_POOL, parseCommand, resolveChain, tierExistsAt, UsageError, type Parsed } from "../app/api/trends/fillPlan";
+import { bucketWritable, coverageSuppressedBy, cursorsInsideSpan, FILL_POOL, parseCommand, resolveChain, seekBoundary, tierExistsAt, UsageError, type Command, type Parsed } from "../app/api/trends/fillPlan";
 
 
 // ---- the seekable cursor (probed live 2026-09-06/07): meta.next decodes to
@@ -131,29 +131,6 @@ async function probeCursorShape(base: string, expect: string): Promise<void> {
   const keys = Object.keys(decoded).sort().join(",");
   if (keys !== expect) throw new Error(`cursor probe: format drifted (${keys}, wanted ${expect}) — refusing to seek`);
 }
-/** Smallest ordinal whose record timestamp >= boundaryMs, by binary search over the
- *  per-ordinal endpoint; null when the whole chain predates nothing (genesis already at or
- *  after the boundary — nothing older to extend). */
-async function seekBoundary(
-  oneOf: (ordinal: number) => Promise<{ ordinal: number; timestamp: string; hash?: string } | null>,
-  tipOrdinal: number,
-  boundaryMs: number,
-): Promise<{ ordinal: number; timestamp: string; hash?: string } | null> {
-  let lo = 1;
-  let hi = tipOrdinal;
-  const first = await oneOf(1);
-  if (!first || Date.parse(first.timestamp) >= boundaryMs) return null; // chain born at/after the boundary
-  let best: { ordinal: number; timestamp: string; hash?: string } | null = null;
-  while (lo <= hi) {
-    const mid = Math.floor((lo + hi) / 2);
-    const rec = await oneOf(mid);
-    if (!rec) { hi = mid - 1; continue; } // unserved probe — tighten from above
-    if (Date.parse(rec.timestamp) >= boundaryMs) { best = rec; hi = mid - 1; }
-    else lo = mid + 1;
-  }
-  return best;
-}
-
 // ---- explorer paging (the probed `meta.next` cursor walk) ------------------------------------
 interface Page<T> { data?: T[]; meta?: { next?: string } }
 /** RIDE OUT A BLIP. Backoff reaches ~15 min cumulative (21 attempts, waits capped at 30s): a
@@ -256,6 +233,32 @@ async function main(): Promise<void> {
     token: process.env.UPSTASH_KV_REST_API_TOKEN!,
   });
 
+  /** rebuild / wipe ASK FIRST (header): what is about to be deleted is counted and shown; `yes` on
+   *  a terminal or --yes proceeds; a run with neither (a script, a cron), or an EOF at the prompt,
+   *  refuses rather than guesses. Runs BEFORE the sampler lock is taken (final review 4): a prompt
+   *  that waited with the lock held would pause production for as long as nobody answered. */
+  async function confirmDeletion(cmd: Extract<Command, { kind: "rebuild" | "wipe" }>): Promise<void> {
+    let count = 0;
+    let scan0 = "0";
+    do {
+      const [c, keys] = await retrying(() => redis.scan(scan0, { match: `t:${net}:*`, count: 200 }));
+      scan0 = String(c);
+      count += (keys as string[]).filter((k) => k !== lockKeyOf(net)).length;
+    } while (scan0 !== "0");
+    const what = cmd.kind === "wipe" ? "wipe" : `wipe and rebuild ${cmd.days} day(s) of`;
+    console.log(`about to ${what} t:${net}:* — ${count} key(s) will be DELETED (every tier, the cursors, the unlisted coverage).`);
+    if (cmd.yes) return;
+    if (!process.stdin.isTTY) { console.error("refusing: not a terminal and no --yes"); throw new Abort(); }
+    process.stdout.write("type yes to continue: ");
+    const answer = await new Promise<string>((resolve) => {
+      process.stdin.setEncoding("utf8");
+      process.stdin.once("data", (d) => resolve(String(d).trim()));
+      process.stdin.once("end", () => resolve("")); // EOF is "no"
+    });
+    process.stdin.pause();
+    if (answer !== "yes") { console.error("not confirmed — nothing deleted"); throw new Abort(); }
+  }
+
   // ⚠️ THE PRODUCTION CRON IS A CONCURRENT WRITER (review find, 2026-09-07). A REBUILD takes the
   // sampler's own lock for its whole run (cron runs skip meanwhile and self-heal after), and its
   // wipe must never delete the lock key it is standing on. A FILL takes NO lock (header): its
@@ -263,6 +266,7 @@ async function main(): Promise<void> {
   // the one case where they would not be.
   const lockStore = writeStore();
   const holdsLock = command.kind !== "fill";
+  if (holdsLock) await confirmDeletion(command); // asks BEFORE the lock: a prompt must never pause the cron
   if (holdsLock && !(await lockStore.acquireLock(lockKeyOf(net), 21600))) {
     console.error("the sampler lock is held (a cron run or another rebuild is writing) — try again shortly (a killed rebuild's lock expires on its own within 6 h)");
     process.exit(1);
@@ -300,7 +304,7 @@ async function main(): Promise<void> {
   const FLUSH_EVERY = 500_000; // records between flush+checkpoint rounds (user, 2026-09-11)
   const FLOOR_SERIES = new Set(["g.feeFloor", "g.kbFloor"]);
   type SerInc = [string, [string, number][]][];
-  interface ChainCkpt { done?: boolean; cursor?: string; records?: number; minTs?: number; residualInc?: SerInc; residualStamps?: number[]; residualGlobals?: GlobalRec[]; floors?: SerInc }
+  interface ChainCkpt { done?: boolean; skipped?: "no-cursor"; cursor?: string; records?: number; minTs?: number; residualInc?: SerInc; residualStamps?: number[]; residualGlobals?: GlobalRec[]; floors?: SerInc }
   /** The fill's pin: its span, its mode and the unlisted chains it read at the start. */
   interface FillMeta { mode: "fill"; fromMs: number; toMs: number; recompute: boolean; chain: string | null; unlisted: string[] }
   const serInc = (m: IncMap): SerInc => [...m.entries()].map(([k, f]) => [k, [...f.entries()]]);
@@ -337,6 +341,10 @@ async function main(): Promise<void> {
     drain ? -Infinity : minTs === Infinity ? Infinity : dayFloor(minTs) + 2 * 86400000;
   /** HSET every bucket at/above `cutMs` out of `cinc` (retaining the younger rest for the
    *  next round), diverting shared floor fields into `cfloors` when given. */
+  /** The span's first day: no bucket before it is ever written (`bucketWritable`) — the predecessor
+   *  the walks read just below it must not become a zero-filled day of its own. -Infinity for a
+   *  rebuild, which has no span. */
+  let spanFromMs = -Infinity;
   const flushFinal = async (cinc: IncMap, cutMs: number, cfloors: IncMap | null): Promise<number> => {
     const fresh5m = TTL_S["5m"] == null ? "" : slotOf(net, "5m", Date.now() - TTL_S["5m"] * 1000).key;
     let written = 0;
@@ -349,7 +357,7 @@ async function main(): Promise<void> {
         if (start < cutMs) continue;
         map.delete(field);
         if (expired5m) continue;
-        if (!tierExistsAt(tier, start)) continue; // fine grain is never invented backward (header)
+        if (!bucketWritable(tier, start, spanFromMs)) continue; // not before the span; fine grain never invented backward
         if (cfloors && FLOOR_SERIES.has(seriesOf(field))) { addInto(cfloors, key, field, v); continue; }
         out.push([field, v]);
       }
@@ -499,15 +507,18 @@ async function main(): Promise<void> {
   if (command.kind === "fill") {
     const { fromMs, recompute, chain: chainPrefix, fresh, dryRun } = command;
     const todayStartMs = dayFloor(Date.now());
-    if (fresh) rmSync(CKPT_ROOT, { recursive: true, force: true });
-    const pinned = readJson<FillMeta>("_meta");
+    // --fresh ignores the standing checkpoint here and deletes it only once this fill really starts
+    // (after the pre-flight, never in a dry run — final review 5: a preview must not discard a
+    // day-long walk's progress).
+    const pinned = fresh ? null : readJson<FillMeta>("_meta");
 
     // THE SPAN. An extension derives --to from the store: its oldest covered day, recomputed whole.
     // A recompute is given both ends. Pinned once; a resume trusts the pin over the store.
     let toMs: number;
     if (pinned) {
-      if (pinned.mode !== "fill" || pinned.fromMs !== fromMs || pinned.recompute !== recompute || pinned.chain !== chainPrefix || (command.toMs != null && pinned.toMs !== command.toMs)) {
-        console.error(`a checkpoint for another fill stands in ${CKPT_ROOT} (${isoDay(pinned.fromMs)} → ${isoDay(pinned.toMs)}${pinned.recompute ? " --recompute" : ""}${pinned.chain ? ` --chain=${pinned.chain}` : ""}) — rerun that fill to finish it, or pass --fresh to discard it`);
+      if (pinned.mode !== "fill" || pinned.toMs == null || pinned.fromMs !== fromMs || pinned.recompute !== recompute || pinned.chain !== chainPrefix || (command.toMs != null && pinned.toMs !== command.toMs)) {
+        const was = pinned.mode === "fill" && pinned.toMs != null ? `${isoDay(pinned.fromMs)} → ${isoDay(pinned.toMs)}${pinned.recompute ? " --recompute" : ""}${pinned.chain ? ` --chain=${pinned.chain}` : ""}` : "an older walk's";
+        console.error(`a checkpoint for another fill stands in ${CKPT_ROOT} (${was}) — rerun that fill to finish it, or pass --fresh to discard it`);
         throw new Abort();
       }
       toMs = pinned.toMs;
@@ -528,6 +539,7 @@ async function main(): Promise<void> {
       toMs = oldest;
     }
     const spanEndMs = toMs + 86400000; // exclusive
+    spanFromMs = fromMs;
 
     // THE CHAINS: every catalog chain and every unlisted chain (one walk), or the one --chain.
     const catalog = lineageIds(net);
@@ -568,14 +580,15 @@ async function main(): Promise<void> {
     const tiers = (["1d", "1h", "5m"] as const).filter((t) => tierExistsAt(t, spanEndMs - 1));
     /** The global spine's seek and the list-floor probe: the crafted cursor at the span's end, and
      *  whether the list serves anything at or below it (one page). Null seed: nothing to walk. */
-    const seekSpine = async (): Promise<{ seed: string; listServes: boolean } | null> => {
-      const gBoundary = await seekBoundary(
+    const seekSpine = async (): Promise<{ seed: string | undefined; listServes: boolean } | null> => {
+      const sk = await seekBoundary(
         async (o) => ((await getPage<never>(`${be0}/global-snapshots/${o}`)) as unknown as { data?: { ordinal: number; timestamp: string } }).data ?? null,
         Number(cur.g ?? 0) || 1,
         spanEndMs,
       );
-      if (!gBoundary) return null;
-      const seed = craftGlobalCursor(gBoundary.timestamp, gBoundary.ordinal);
+      if (sk.kind === "born-after") return null;
+      if (sk.kind === "all-older") return { seed: undefined, listServes: true }; // every global is older: walk from the tip
+      const seed = craftGlobalCursor(sk.record.timestamp, sk.record.ordinal);
       const probe = await getPage<{ timestamp: string }>(`${be0}/global-snapshots?limit=1&next=${encodeURIComponent(seed)}`);
       return { seed, listServes: (probe.data ?? []).length > 0 };
     };
@@ -600,6 +613,7 @@ async function main(): Promise<void> {
       return;
     }
     if (!pinned) {
+      if (fresh) rmSync(CKPT_ROOT, { recursive: true, force: true });
       writeJson("_meta", { mode: "fill", fromMs, toMs, recompute, chain: chainPrefix, unlisted: unlistedList } satisfies FillMeta);
       console.log(`fill ${net} ${summary}: ${ids.length} chain(s)${withSpine ? " + the global spine" : ""}, tiers ${tiers.join("/")}, no lock (flush + checkpoint every ${FLUSH_EVERY / 1000}K records)`);
     }
@@ -613,7 +627,6 @@ async function main(): Promise<void> {
     // way suppresses the span's coverage marker (rule 10: "measured, none" must be true of every
     // unlisted chain). Crafted cursors land ON their record — walkMetaCkpt's upper filter keeps
     // only what is strictly before the span's end.
-    let coverageSuppressedBy: string | null = null;
     const fillChain = async (id: string): Promise<void> => {
       const label = id.slice(0, 10);
       const prev = readJson<ChainCkpt>(label);
@@ -623,20 +636,21 @@ async function main(): Promise<void> {
         const tip = Number(cur[`m.${id}`] ?? 0);
         if (!tip) {
           console.log(`  ${label}: no cursor — skipped (chain unseen by the store)`);
-          if (unlistedSet.has(id)) coverageSuppressedBy = label;
-          writeJson(label, { done: true } satisfies ChainCkpt);
+          writeJson(label, { done: true, skipped: "no-cursor" } satisfies ChainCkpt); // persisted: a resume must remember it
           return;
         }
-        const bnd = await seekBoundary(
+        const sk = await seekBoundary(
           // No catch: getPage already retried — a persistent probe failure ABORTS the run instead
           // of reading as "born at the boundary".
           async (o) => ((await getPage<never>(`${be0}/currency/${id}/snapshots/${o}`)) as unknown as { data?: { ordinal: number; timestamp: string; hash?: string } }).data ?? null,
           tip,
           spanEndMs,
         );
-        if (!bnd) { console.log(`  ${label}: born at/after the span's end — nothing to fill`); writeJson(label, { done: true } satisfies ChainCkpt); return; }
-        if (!bnd.hash) { console.error(`  ${label}: boundary record has no hash — cannot seek`); throw new Abort(); }
-        seed = craftCurrencyCursor(bnd.hash);
+        if (sk.kind === "born-after") { console.log(`  ${label}: born at/after the span's end — nothing to fill`); writeJson(label, { done: true } satisfies ChainCkpt); return; }
+        if (sk.kind === "at") {
+          if (!sk.record.hash) { console.error(`  ${label}: boundary record has no hash — cannot seek`); throw new Abort(); }
+          seed = craftCurrencyCursor(sk.record.hash);
+        } else console.log(`  ${label}: quiet since before the span's end — walked from its tip`);
       }
       await walkMetaCkpt(id, fromMs, spanEndMs, seed, withFloors && !unlistedSet.has(id));
     };
@@ -664,9 +678,11 @@ async function main(): Promise<void> {
     }
     if (withFloors) await writeFloors(catalog);
 
-    // u.cov: every bucket of the span, generated (the unlisted chains were walked for these days).
+    // u.cov: every bucket of the span, generated (the unlisted chains were walked for these days) —
+    // unless one was skipped, read from the CHECKPOINTS so a resume remembers it (final review 3).
+    const suppressedBy = coverageSuppressedBy(unlistedList, (label) => readJson<ChainCkpt>(label));
     let covFields = 0;
-    if (withCoverage && coverageSuppressedBy == null) {
+    if (withCoverage && suppressedBy == null) {
       const inc: IncMap = new Map();
       const STEP: Record<Tier, number> = { "5m": 300000, "1h": 3600000, "1d": 86400000 };
       for (const tier of tiers) {
@@ -689,37 +705,14 @@ async function main(): Promise<void> {
     rmSync(CKPT_ROOT, { recursive: true, force: true });
     const notes = [
       only ? "floors, spine and u.cov untouched (--chain)" : null,
-      coverageSuppressedBy ? `coverage NOT marked — unlisted chain ${coverageSuppressedBy} was skipped, so the span's unlisted figure stays "not measured"` : null,
+      suppressedBy ? `coverage NOT marked — unlisted chain ${suppressedBy} was skipped, so the span's unlisted figure stays "not measured"` : null,
       spineNote ? `⚠️ ${spineNote}` : null,
     ].filter(Boolean);
     console.log(`filled ${summary}: ${ids.length} chain(s) (${ids.filter((c) => unlistedSet.has(c)).length} unlisted)${withSpine ? ", the global spine" : ""}${withFloors ? ", the floors" : ""}${covFields ? `, ${covFields} coverage fields` : ""}${notes.length ? ` — ${notes.join("; ")}` : ""}; cursor untouched, checkpoint cleared.`);
     return;
   }
 
-  // ---- REBUILD / WIPE: the disaster path (header) — ASKS FIRST ----
-  // What is about to be deleted is counted and shown; `yes` on a terminal or --yes proceeds, and a
-  // run with neither (a script, a cron) refuses rather than guessing.
-  {
-    let count = 0;
-    let scan0 = "0";
-    do {
-      const [c, keys] = await retrying(() => redis.scan(scan0, { match: `t:${net}:*`, count: 200 }));
-      scan0 = String(c);
-      count += (keys as string[]).filter((k) => k !== lockKeyOf(net)).length;
-    } while (scan0 !== "0");
-    const what = command.kind === "wipe" ? "wipe" : `wipe and rebuild ${command.days} day(s) of`;
-    console.log(`about to ${what} t:${net}:* — ${count} key(s) will be DELETED (every tier, the cursors, the unlisted coverage).`);
-    if (!command.yes) {
-      if (!process.stdin.isTTY) { console.error("refusing: not a terminal and no --yes"); throw new Abort(); }
-      process.stdout.write("type yes to continue: ");
-      const answer = await new Promise<string>((resolve) => {
-        process.stdin.setEncoding("utf8");
-        process.stdin.once("data", (d) => resolve(String(d).trim()));
-      });
-      process.stdin.pause();
-      if (answer !== "yes") { console.error("not confirmed — nothing deleted"); throw new Abort(); }
-    }
-  }
+  // ---- REBUILD / WIPE: the disaster path (header); confirmed above, before the lock ----
   // ---- wipe: SCAN t:{net}:* and delete — the rebuild contract's first half ----
   console.log(`wiping t:${net}:* …`);
   let cursor = "0";
