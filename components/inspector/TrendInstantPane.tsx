@@ -1,6 +1,6 @@
 "use client";
 
-import { INSTANT_ICON } from "@/components/icons";
+import { BUCKET_ICON, INSTANT_ICON } from "@/components/icons";
 import NoteKindChip from "@/components/notes/NoteKindChip";
 import { notableDayAt } from "@/components/notes/noteDays";
 import { useAiNote } from "@/components/notes/useAiNote";
@@ -195,7 +195,13 @@ export default function TrendInstantPane({
         aside={
           bucket != null ? (
             <>
-              <QualifierChip>{bucketWord(stepMs)} bucket</QualifierChip>
+              {/* The width alone, behind a clock mark (user, 2026-10-30: "'5-min' with an icon");
+                  "bucket" stays for assistive tech. */}
+              <QualifierChip className="gap-1">
+                <BUCKET_ICON aria-hidden className="size-3 flex-none" />
+                {bucketWord(stepMs)}
+                <span className="sr-only"> bucket</span>
+              </QualifierChip>
               {notable && <NoteKindChip day={notable} />}
             </>
           ) : undefined

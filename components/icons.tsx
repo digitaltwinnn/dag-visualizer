@@ -35,6 +35,7 @@ import {
   Pause,
   Hourglass,
   Network,
+  Clock,
   type LucideIcon,
 } from "lucide-react";
 import type { NotableKind } from "@/src/data/noteTypes";
@@ -265,3 +266,7 @@ export const NOTE_KIND_ICONS: Record<NotableKind, LucideIcon> = {
   longest: Hourglass,
   broadest: Network,
 };
+
+/** THE BUCKET'S WIDTH (the Moment card's chip, user 2026-10-30: "'5-min' with an icon, shorter"):
+ *  a clock face, the width of one reading in time. The crosshair beside it is the instant. */
+export const BUCKET_ICON: LucideIcon = Clock;

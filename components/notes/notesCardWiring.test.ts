@@ -81,6 +81,10 @@ describe("the notes card's own behaviour", () => {
   // plot (the cursor hairline's own rule), each on its network's plane.
   it("the Moment and Range heads wear a notable day's kind chip, and the planes draw the marks", () => {
     const moment = read("components/inspector/TrendInstantPane.tsx");
+    // The bucket chip is a clock mark and the width alone (user, 2026-10-30: "instead of saying
+    // '5-min bucket' say '5-min' with an icon, shorter"); "bucket" stays for assistive tech.
+    expect(moment).toMatch(/<BUCKET_ICON aria-hidden[^]*?\{bucketWord\(stepMs\)\}[^]*?<span className="sr-only"> bucket<\/span>/);
+    expect(moment).not.toMatch(/\{bucketWord\(stepMs\)\} bucket/);
     expect(moment).toMatch(/notableDayAt\(/);
     expect(moment).toMatch(/<NoteKindChip day=\{/);
     const range = read("components/inspector/TrendRangePane.tsx");
