@@ -79,8 +79,9 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
       // "LAYER GROUP", never "make-up" (user, 2026-10-30): the Composition rung's own word. And the
       // group's place is said as a reader would ("its largest group"), not as a share and a rank
       // (the same day: "I don't know what is meant by 'which is 52% of its nodes and ranks first
-      // among its layer groups'").
-      type: "Open with a plain sentence with the network as its actor, in the shape \"<network> runs N of its M nodes on <layers>\", M being all its nodes; then say in plain words where that group stands among the network's layer groups, as a reader would (\"its largest group\", \"the smaller of its two groups\"), never \"share\", \"rank\" or a percentage; then how that changed over the span, or that it held.",
+      // among its layer groups'"). And the NODES are the sentence's subject, since a node runs its
+      // layers (the same day: "do they run the nodes on L0 or is the node composed out of it?").
+      type: "Open with a plain sentence whose subject is the nodes, in the shape \"N of the M <network> nodes run <layers>\", M being all its nodes, the layers named exactly as the facts name them, with no possessive on the name (a node RUNS its layers, so the verb is run); then say in plain words where that group stands among the network's layer groups, as a reader would (\"its largest group\", \"the smaller of its two groups\"), never \"share\", \"rank\" or a percentage; then how that changed over the span, or that it held.",
     },
     questionCommon: "Last, in one sentence, how active it was: the global snapshots it was part of per day last week against the weeks before.",
     questionCommonWhole: QUESTION_COMMON_WHOLE,

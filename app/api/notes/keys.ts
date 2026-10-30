@@ -10,7 +10,7 @@ import { pickRangeTier } from "@/src/data/trendWindow";
 //
 // Everything is UTC and the caller supplies the date strings; nothing here reads a clock.
 
-export const NOTES_VERSION = 18; // 18: a layer group's place in plain words, never a share and a rank (2026-10-30)
+export const NOTES_VERSION = 21; // 21: a layer group's sentence has the nodes as its subject, the layers named as the facts name them (2026-10-30)
 
 /** What a note covers. Hyper and Geography are a standing picture ("day"), the ledger the recent
  *  hours ("hours"); History's pills are the rest, and a brushed range is `r<fromMs>-<toMs>` after
