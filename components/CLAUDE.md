@@ -889,18 +889,18 @@ stored history, so they carry none and show nothing extra.
 | all | Node, Tick, Metagraph snapshot, Moment | none | no per-subject series |
 
 The Metagraph card carries none: filtered, it is the same subject as the top card. The block is
-`components/notes/SubjectNote.tsx`, and **it stands in the card's LEAD'S place** (user, 2026-10-30,
-design option D of four shown in the brainstorming companion): the measured lead ("Hosts 25% of the
-selection's nodes") and the note serve one purpose, what this subject is to the whole it sits in,
-and the note says it better — it names its span and places the subject in its rung, share and rank
-among the other countries, providers or make-ups (the prompt asks for that always). A written note
-renders on a faint violet PLATE with the mark (`--ai-wash` / `--ai-edge`, the mark's own surfaces),
-no label row; every other state — a read or write in flight, `none`, `unavailable`, off mainnet —
-renders the lead the card passed as `fallback`, so the card is never empty and never says "couldn't
-write" for a gesture the reader did not make. `components/notes/subjectNote.ts` is the pure home of
-the request derivations. **It is asked for by the selection itself**: a read that answers `request`
-is asked once, automatically, with no door — the reader's gesture was choosing the card. The Range
-card's sentence lead is its fallback the same way; the 1h pill's door stays on the top card. A network-scoped country or provider
+`components/notes/SubjectNote.tsx`, and **it IS the card's lead** (user, 2026-10-30, design option D
+of four shown in the brainstorming companion, then "no fallback"): the measured lead sentences
+("Hosts 25% of the selection's nodes", the Range card's "DOR anchored N snapshots in this range")
+served one purpose, what this subject is to the whole it sits in, and the note says it better — it
+names its span and places the subject in its rung, share and rank among the other countries,
+providers or make-ups (the prompt asks for that always) — so they are gone. The note renders on a
+faint violet PLATE with the mark (`--ai-wash` / `--ai-edge`, the mark's own surfaces), no label row;
+the plate shows "reading…"/"writing…" while the note is in flight, and `none`, `unavailable` and
+off-mainnet render nothing (the card never says "couldn't write" for a gesture the reader did not
+make). `components/notes/subjectNote.ts` is the pure home of the request derivations. **It is asked
+for by the selection itself**: a read that answers `request` is asked once, automatically, with no
+door — the reader's gesture was choosing the card. The 1h pill's door stays on the top card. A network-scoped country or provider
 note states no change until a week of the geo family exists, so until then its facts hold no
 "a week ago" and the note describes the level.
 

@@ -4,16 +4,15 @@ import { RANGE_ICON } from "@/components/icons";
 
 import CardHead, { RailPane } from "@/components/CardHead";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { Fact, FactGroup, Lead, QualifierChip } from "@/components/inspector/parts";
+import { Fact, FactGroup, QualifierChip } from "@/components/inspector/parts";
 import Stamp from "@/components/Stamp";
 import RecordsDoor from "@/components/inspector/RecordsDoor";
 import SubjectNote from "@/components/notes/SubjectNote";
 import { rangeNoteReq } from "@/components/notes/subjectNote";
 import useTrendRoster from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
-import { metagraphById } from "@/src/data/network";
 import { UNLISTED_ID } from "@/src/data/unlisted";
-import { GLOBAL_READING, rangePhrase, spanWord, sumMeasured, TREND_METRICS } from "@/src/data/trendSeries";
+import { spanWord } from "@/src/data/trendSeries";
 import { spanPhrase, windowSpan } from "@/src/data/trendWindow";
 import { ageWords } from "@/src/util/relativeAge";
 import { cardNetwork } from "@/src/engine/domain/trendStack";
@@ -28,12 +27,12 @@ import { useStore } from "@/src/store/store";
 // and the × clears the range through its setter (a setting's, exactly as the timeline's × does).
 //
 // The card says three things and nothing else: WHICH span (the title, in the explorer's own span
-// words — `spanPhrase`), what that span was TO THE NETWORK ABOVE (one sentence, `rangePhrase` — a
-// counter's total, a gauge's average), and the door to its records. The per-network breakdown is
+// words — `spanPhrase`), what that span was TO THE NETWORK ABOVE (a brushed range's own Gate AI
+// note, `SubjectNote`, in the lead's place — the measured one-sentence lead it replaced went on
+// 2026-10-30, user: "no fallback"), and the door to its records. The per-network breakdown is
 // deliberately absent: the Networks list in the left rail already IS that list over this span.
 //
-// ⚠️ IT READS THE SAME ROSTER PASS THE PLANES DRAW FROM (`useTrendRoster`), edge trim included, so
-// its total is the sum of exactly the buckets the chart above draws.
+// ⚠️ IT READS THE SAME ROSTER PASS THE PLANES DRAW FROM (`useTrendRoster`), edge trim included.
 
 /** How the LEAD names its subject. */
 function subjectOf(filter: string, focus: string | null, front: string | null, ranked: readonly string[], has: (id: string) => boolean): string | null {
@@ -81,31 +80,10 @@ export default function TrendRangePane({
   const pulseKey = useEdgePulse(spanKey);
 
   const subject = subjectOf(filter, focus, front, ranked, (id) => id !== "dag" && rows.has(id));
-  // THE UNSCOPED SUBJECT IS NAMED BY WHAT THE FIGURE IS (user, 2026-10-24: "'all networks created
-  // a snapshot every 13s on average', is it really 'all networks'?"): for the three measures whose
-  // total IS the networks added up (`GLOBAL_READING` — snapshots, fees, data) it is all networks;
-  // for the hypergraph's OWN readings — its nodes, its blocks, its snapshot spacing — it is the
-  // hypergraph, the same split the explorer's pinned DAG row makes with its "total" tag.
-  const who = subject
-    ? metagraphById(subject)?.ticker || rows.get(subject)?.name || subject
-    : GLOBAL_READING[metric] === "total" ? "All networks" : "The hypergraph";
-  // THE TOTAL IS SUMMED OVER EXACTLY [start, end) from the payload itself (the branch review's I8):
-  // the drawn series drop a counter's partial EDGE buckets, which for a range snapped to whole days
-  // dropped its whole first day. A snapped range's edges are whole, so nothing is trimmed here; a
-  // bucket that starts before the range is left out rather than counted partially.
-  const rawAll = subject ? (rows.get(subject)?.rawPoints ?? []) : roster.rawGlobal;
-  const points = !span ? [] : rawAll.filter((_, i) => axis[i]! >= span.fromMs && axis[i]! < span.toMs);
-
-  // A COUNTER is the span's total; a gauge and the spacing are its average (the roster's own span
-  // reading, the figure the Networks list states).
-  const counter = TREND_METRICS[metric].kind === "counter" && metric !== "continuity";
-  const total = counter ? sumMeasured(points) : null;
-  const value = counter ? (total?.sum ?? null) : subject ? (rows.get(subject)?.span ?? null) : (roster.total?.span ?? null);
   // How long ago the span ENDED — "until now" when it runs to the newest bucket (user, 2026-10-07:
   // "keep the N months ago on the range").
   const endAge = span ? Date.now() - span.toMs : null;
   const aside = endAge == null ? undefined : endAge < stepMs ? "until now" : `${ageWords(endAge)} ago`;
-  const phrase = span ? rangePhrase(metric, total?.partial ?? false, !subject) : null;
   // THE SPAN'S OWN ROWS (user, 2026-10-07: "Start and end date should be in the card I think for
   // clarity"): a span of two days or more is named by its UTC days, with the year (a day-only label
   // is a UTC day); a shorter one by its clock times, drawn by `Stamp` with the zone as a tag.
@@ -142,28 +120,13 @@ export default function TrendRangePane({
         collapsed={collapsed}
         onToggle={onToggle}
       />
-      {!collapsed && span && phrase && (
+      {!collapsed && span && (
         <div>
-          {/* THE LEAD, what the span was to the network above in one sentence (the Moment's grammar;
-              when it ended rides the head), is the FALLBACK of the range's own note (spec
-              2026-10-29-subject-notes; user, 2026-10-30): only a BRUSHED range has one — the window
-              standing in is the top Gate AI card's note — on the plane the deck stands on
-              (`cardNetwork`, the lead's own rule), asked as the brush lands and standing in the lead's
-              place once written. */}
-          <SubjectNote
-            req={range ? rangeNoteReq(cardNetwork(filter, focus, front), range, (id) => id === UNLISTED_ID) : null}
-            fallback={
-              <Lead lines={3}>
-                {value != null ? (
-                  <>
-                    {who} {phrase.verb} <span className="font-medium text-foreground tabular-nums">{format(value)}</span> {phrase.rest}
-                  </>
-                ) : (
-                  <>No reading in this range</>
-                )}
-              </Lead>
-            }
-          />
+          {/* THE RANGE'S OWN NOTE (spec 2026-10-29-subject-notes) is the lead (user, 2026-10-30: the
+              measured sentence, "DOR anchored N snapshots in this range", is gone): only a BRUSHED
+              range has one — the window standing in is the top Gate AI card's note — on the plane
+              the deck stands on (`cardNetwork`), asked as the brush lands. */}
+          {range ? <SubjectNote req={rangeNoteReq(cardNetwork(filter, focus, front), range, (id) => id === UNLISTED_ID)} /> : null}
           <FactGroup>
             <Fact label="Start">{edge(span.fromMs)}</Fact>
             {/* The end is exclusive, so a day-named span names the day it reaches into. A trailing

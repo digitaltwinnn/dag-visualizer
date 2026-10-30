@@ -1107,15 +1107,15 @@ export function CountryCard({ cc }: { cc: string }) {
   const network = useNoteScopeNetwork();
   const rows = useMemo(() => selNodes.filter((r) => r.cc === cc), [selNodes, cc]);
   const parts = useMemo(() => providerParts(rows), [rows]);
-  const share = shareWords(rows.length, selNodes.length);
   return (
     <>
       {/* THE LEAD: what this country is to the selection it sits in. The city count that followed
           ("…, in 8 cities") is gone (user, 2026-10-04). */}
-      {/* THE COUNTRY'S OWN NOTE (spec 2026-10-29-subject-notes) stands in the lead's place, scoped as
-          the lead: the filter's nodes here, the fleet's with no filter; the measured lead is its
-          fallback (user, 2026-10-30). The top Gate AI card keeps the view's note. */}
-      <SubjectNote req={countryNoteReq(cc, network, isUnlisted)} fallback={share && <Lead>Hosts {share} of the selection&apos;s nodes</Lead>} />
+      {/* THE COUNTRY'S OWN NOTE (spec 2026-10-29-subject-notes) is the lead (user, 2026-10-30: the
+          measured "Hosts N% of the selection's nodes" is gone, the note says it and more), scoped as
+          that lead was: the filter's nodes here, the fleet's with no filter. The top Gate AI card
+          keeps the view's note. */}
+      <SubjectNote req={countryNoteReq(cc, network, isUnlisted)} />
       {/* EACH CARD CUTS BY THE NEXT LEVEL DOWN (user, 2026-10-02 — `docs/superpowers/design/
           2026-10-02-country-provider`, option B: "country and provider cards have the same content …
           the node part"). Both cards used to cut their nodes by network, so the provider's table was
@@ -1173,10 +1173,10 @@ export function CompositionCard({ sel }: { sel: CompositionSel }) {
   return (
     <>
     {/* THE LEAD: the group's share of its network — the old "Share of network" fact. */}
-    {/* THE MAKE-UP'S OWN NOTE (spec 2026-10-29-subject-notes) in the lead's place: always its
-        network's — the group is one network's by construction (`sel.netId`), so no filter is read;
-        the measured share is its fallback (user, 2026-10-30). */}
-    <SubjectNote req={typeNoteReq(sel, isUnlisted)} fallback={share && <Lead>{share[0].toUpperCase() + share.slice(1)} of this network&apos;s online nodes</Lead>} />
+    {/* THE MAKE-UP'S OWN NOTE (spec 2026-10-29-subject-notes) is the lead (user, 2026-10-30: the
+        measured "share of this network's online nodes" is gone): always its network's — the group
+        is one network's by construction (`sel.netId`), so no filter is read. */}
+    <SubjectNote req={typeNoteReq(sel, isUnlisted)} />
     {/* The divider every card draws between its lead and what follows (lost when the breakdown
         left this card on 2026-10-02). */}
     {share && <Separator className="mb-2" />}
@@ -1251,16 +1251,13 @@ export function ProviderCard({ sel }: { sel: CohortSel }) {
     }
     return null;
   }, [members]);
-  const where = countryDisplayName(sel.cc, selNodes) ?? sel.cc;
-  const countryShare = shareWords(members.length, selNodes.filter((r) => r.cc === sel.cc).length);
   return (
     <>
-    {/* THE PROVIDER'S OWN NOTE (spec 2026-10-29-subject-notes) in the lead's place, scoped as the
-        country card's: the filter's nodes, the fleet's with no filter. Keyed by provider, not by
-        city: the stored series count a host across its cities. Its fallback is the measured lead,
-        this host's share of its country (option B, 2026-10-02; the city is the head's chip, so the
-        lead does not repeat it). */}
-    <SubjectNote req={providerNoteReq(sel.isp, network, isUnlisted)} fallback={countryShare && <Lead>{countryShare[0].toUpperCase() + countryShare.slice(1)} of {where}&apos;s nodes</Lead>} />
+    {/* THE PROVIDER'S OWN NOTE (spec 2026-10-29-subject-notes) is the lead (user, 2026-10-30: the
+        measured share of its country is gone), scoped as the country card's: the filter's nodes,
+        the fleet's with no filter. Keyed by provider, not by city: the stored series count a host
+        across its cities. */}
+    <SubjectNote req={providerNoteReq(sel.isp, network, isUnlisted)} />
     {/* THE BREAKDOWN: the cohort's nodes cut by NETWORK — whose nodes these are — the level below
         the country card's cut by provider. */}
     <Separator className="mb-2" />

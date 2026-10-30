@@ -109,16 +109,16 @@ describe("a failed write answers the gesture on the card's surface (R68)", () =>
 // brushed range shows its note inside its own card. The subject note is asked by the selection
 // itself, so it has no door and never says it could not write.
 describe("subject notes live on their cards", () => {
-  it("SubjectNote has no door and no failure copy, leaves the card's lead standing until a note is written, and asks once in an effect", () => {
+  it("SubjectNote has no door, no failure copy and no fallback: the plate is the lead, standing down on none / unavailable, and asks once in an effect", () => {
     const src = read("components/notes/SubjectNote.tsx");
     expect(src).not.toMatch(/RequestDoor|<Door\b/);
     expect(src).not.toMatch(/Couldn/);
-    // THE PLATE TAKES THE LEAD'S PLACE (user, 2026-10-30, design option D): only a written note
-    // (`ok`) renders; every other state — none, unavailable, a read or write in flight — renders
-    // the measured lead the card passed as `fallback`, so the card is never empty and never says
-    // "couldn't write" for an ask the reader did not make. No label row: the text names its span.
-    expect(src).toMatch(/if \(!asked \|\| res\?\.state !== "ok"\) return <>\{fallback\}<\/>;/);
-    expect(src).not.toMatch(/SectionLabel|Constellation Gate AI/);
+    // THE PLATE IS THE LEAD (user, 2026-10-30, design option D, then "no fallback"): the measured
+    // lead sentences are gone from the four cards; the plate shows "reading…"/"writing…" while the
+    // note is in flight and nothing on none / unavailable — never "couldn't write" for an ask the
+    // reader did not make. No label row: the text names its span.
+    expect(src).toMatch(/if \(!asked \|\| res\?\.state === "none" \|\| res\?\.state === "unavailable"\) return null;/);
+    expect(src).not.toMatch(/fallback[=:}]|SectionLabel|Constellation Gate AI/); // the word may stay in prose; no prop, no render of one
     expect(src).toMatch(/bg-\[var\(--ai-wash\)\]/);
     expect(src).toMatch(/useEffect\(\(\) => \{[^]*?res\?\.state !== "request"[^]*?note\.request\(\)[^]*?\}, \[/);
     // …once per key (the ref guard, so a re-render or a poll's `request` never POSTs twice), and only
@@ -128,15 +128,16 @@ describe("subject notes live on their cards", () => {
     expect(src).toMatch(/setTimeout\(\(\) => \{[^]*?note\.request\(\);[^]*?\}, ASK_DWELL_MS\);[^]*?return \(\) => clearTimeout\(t\);/);
   });
 
-  it("the Country, Provider, Composition and Range cards mount it in the lead's place, each with its measured lead as the fallback; the Range card asks only while a range is brushed", () => {
+  it("the Country, Provider, Composition and Range cards mount it as their lead, with no measured lead beside it; the Range card only while a range is brushed", () => {
     const cards = read("components/inspector/cards.tsx");
     for (const decl of ["export function CountryCard(", "export function ProviderCard(", "export function CompositionCard("]) {
       const body = fnBody(cards, decl);
-      expect(body, decl).toMatch(/<SubjectNote\b[^]*?fallback=\{[^]*?<Lead\b/);
-      expect(body, decl).not.toMatch(/^\s*\{\w+ && <Lead\b/m); // no second lead beside the note
+      expect(body, decl).toMatch(/<SubjectNote\b/);
+      expect(body, decl).not.toMatch(/<Lead\b/); // the measured lead sentence is gone (user, 2026-10-30)
     }
     const range = read("components/inspector/TrendRangePane.tsx");
-    expect(range).toMatch(/<SubjectNote\s+req=\{range \? rangeNoteReq\([^]*?: null\}\s+fallback=\{\s*<Lead\b/);
+    expect(range).toMatch(/\{range \? <SubjectNote\b/);
+    expect(range).not.toMatch(/<Lead\b/);
   });
 
   it("History's top card is the window's note: no range in its span, and no range door", () => {
