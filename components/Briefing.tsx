@@ -58,9 +58,8 @@ export default function Briefing() {
     if (!briefsOn({ pathname: location.pathname, net: NET, seen: seenThisSession() })) return;
     markSeen();
     const s = useStore.getState();
-    // Desktop's rails take width from the scene, and this is the app's own way to give it back.
-    // Tablet and phone frame the scene for the full width already.
-    if (breakpointOf(window.innerWidth) === "desktop") s.setRailsHidden(true);
+    // The app's own way to clear the stage, the scene's framing with it. A phone has no such mode.
+    if (breakpointOf(window.innerWidth) !== "phone") s.setRailsHidden(true);
     s.setBriefing(0);
   }, []);
 

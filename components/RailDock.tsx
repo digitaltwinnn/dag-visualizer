@@ -228,10 +228,18 @@ export default function RailDock({
   // tier has its own step-aside exactly as desktop has SCENE mode; the phone sheet is 60vh of a
   // small viewport over a persistent dock bar. Both tiers still dim under the user's own hand.
   const yielding = useSceneYield({ flight: isBarHalf });
+  // SCENE MODE ON A TABLET (user, 2026-10-31): the docks clear the stage with the rest of the
+  // chrome. The tab slides off its edge on the slide clock it already rides, and an open sheet closes.
+  const sceneOnly = useStore((s) => s.railsHidden) && !isBarHalf;
   const handleOpenChange = (next: boolean) => {
     setOpen(next);
     onOpenChange?.(next);
   };
+  useEffect(() => {
+    if (sceneOnly && open) handleOpenChange(false);
+    // The press of Scene closes the sheet; the sheet's own state changes nothing here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sceneOnly]);
   // LIVE CONTENT FIT (user, 2026-09-03: "determine and grow the size of the section based on
   // its contents" — superseding 2026-08-16's one-shot open fit, whose no-resizing-while-up rule
   // assumed content only changes when data does; with the phone explorers opening collapsed,
@@ -774,7 +782,8 @@ export default function RailDock({
             "min-[700px]:max-[1099px]:flex",
             side === "left" ? "rounded-r-[var(--radius)] border-l-0" : "rounded-l-[var(--radius)] border-r-0",
           )}
-          style={{ [side]: open && shellVisible ? sheetW : 0 }}
+          inert={sceneOnly || undefined}
+          style={{ [side]: sceneOnly ? "-3rem" : open && shellVisible ? sheetW : 0 }}
           aria-label={open ? `Close ${label} panel` : `${label} panel`}
           aria-expanded={open}
           onClick={() => handleOpenChange(!open)}

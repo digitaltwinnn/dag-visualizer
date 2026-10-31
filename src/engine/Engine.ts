@@ -392,6 +392,9 @@ export class Engine {
   // Store mirror for the rails-hidden camera lean — _tweenTo composes railsLean into every
   // dolly-eligible destination while it holds (see the subscription note). Seeded at boot.
   private railsHidden = false;
+  private _leansOnRails(): boolean {
+    return this.railsHidden && breakpointOf(window.innerWidth) === "desktop";
+  }
   // The user holds the camera (a free orbit/dolly since the last pose flight) — the SCENE⇄HUD
   // toggle then leaves it alone. Set by _onControlsStart, cleared by _resolveFocus and setMode.
   private _freeOrbit = false;
@@ -685,7 +688,9 @@ export class Engine {
       transition: this.transition,
       get mode() { return engineSelf.mode; },
       policy: () => this._policy,
-      railsHidden: () => this.railsHidden,
+      // The lean buys width by spending height, and only the desktop's rails free any: a tablet's
+      // are sheets over the canvas, and a portrait frame has no height to spend.
+      railsHidden: () => this._leansOnRails(),
       slowmo: () => this._choreoScale(),
       setFlying: (v) => useStore.getState().setCameraFlying(v),
       flyingNow: () => useStore.getState().cameraFlying,
@@ -920,7 +925,7 @@ export class Engine {
         // rest keeps today's exact behaviour.
         if (st.railsHidden !== prev.railsHidden) {
           this.railsHidden = st.railsHidden;
-          if (VIEW_POLICIES[this.mode].canvas && !this._freeOrbit) {
+          if (breakpointOf(window.innerWidth) === "desktop" && VIEW_POLICIES[this.mode].canvas && !this._freeOrbit) {
             this._resolveFocus();
             // The lean flight keeps the callout (user, 2026-09-11: "when we switch between
             // HUD and Scene, the callout is always redrawn why is that?") — the toggle moves
