@@ -448,12 +448,14 @@ export function metagraphCardNetwork(s: {
  *  its view (user, 2026-10-31: "often detached from the stack"). `signers` is lazy: it reads the
  *  snapshot's exact rows, only worth reading for a carried node. */
 export function nodeHereOf(
-  s: { mode: Mode; inspect: PickDescriptor | null; inspectView: Mode | null; metaSnap: MetaSnapSel | null },
+  s: { mode: Mode; inspect: PickDescriptor | null; inspectView: Mode | null; metaSnap: MetaSnapSel | null; following: boolean },
   signers: (sel: MetaSnapSel) => readonly NodeRow[],
 ): boolean | undefined {
   if (s.mode !== "ledger" || !s.inspect) return undefined;
   if (s.inspectView === "ledger") return true;
-  if (!s.metaSnap) return false;
+  // Only a snapshot the reader PICKED. One following live changes every tick, so the card came and
+  // went with the signers, and it is no selection moment, so it opened beside the entry's box.
+  if (!s.metaSnap || s.following) return false;
   const key = hoverKeyOf(s.inspect);
   return signers(s.metaSnap).some((r) => hoverKeyOf(r.pick) === key);
 }

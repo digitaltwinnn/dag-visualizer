@@ -1458,6 +1458,15 @@ export class Engine {
     // stale clear behind. Each level's clear is its own store write; country also owns scene
     // state (the drilled border), which is this bridge's half of the job.
     const st0 = useStore.getState();
+    // A BROWSED NETWORK is a look around one view. Not a network event: the scene falls back to the
+    // filter here, before the ancestry below, and what the reader selected under it carries as ever,
+    // unless a real filter stands that it does not belong to.
+    if (mode !== prevMode && st0.railNet != null) {
+      this.filter = st0.filter;
+      st0.setRailNet(null);
+      if (st0.filter !== "all" && st0.inspect && pickNetId(st0.inspect) !== st0.filter) st0.setInspect(null);
+      this.applyFilter(false);
+    }
     const dest3D = is3D(mode) ? mode : null;
     const carries = (lvl: FocusLevel & keyof typeof LEVEL_CARRY): boolean =>
       LEVEL_CARRY[lvl] === "always" || (dest3D != null && hasLevel(dest3D, lvl));
@@ -1486,12 +1495,6 @@ export class Engine {
     if (mode !== "ledger" && st0.metaSnap != null) st0.setMetaSnap(null);
     // …and so is the network committed inside a tick: it has no meaning outside this view.
     if (mode !== "ledger" && st0.tickNet != null) st0.setTickNet(null);
-    // …and so is a browsed network: it is a look around one view. Not a network event: the scene
-    // falls back to the filter below, and what the reader selected under it carries as ever.
-    if (mode !== prevMode && st0.railNet != null) {
-      this.filter = st0.filter;
-      st0.setRailNet(null);
-    }
 
     if (is3D(prevMode) && is3D(mode) && prevMode !== mode) {
       // 3D → 3D: run the staged gather choreography. The machine handles retargeting (a switch

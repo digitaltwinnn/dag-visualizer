@@ -162,6 +162,8 @@ async function write(
   // A sentence naming no one speaks of the subject (R39): absent for the whole network.
   const subject = input.subjectName;
   let reasons: string[] | undefined;
+  /** A note that passed the gate and only failed the style rewrite: it stands if the rewrite fails. */
+  let held: Written | null = null;
   for (let attempt = 0; attempt < 2; attempt++) {
     if (attempt > 0) await count("retried");
     let answer: string;
@@ -178,6 +180,7 @@ async function write(
     const { note, captions } = parseAnswer(answer);
     const check = checkNote(note, input.facts, input.names, { maxSentences: 3, subject });
     if (!check.ok) {
+      if (held) return held;
       reasons = check.reasons;
       continue;
     }
@@ -185,10 +188,6 @@ async function write(
     // layers", live). This is style, not honesty, so it asks once and the second answer stands: a
     // true note is never lost over a word. Notes only: a caption is a short clause of figures.
     const negative = attempt === 0 ? NEGATIVE_RE.exec(note)?.[0] : null;
-    if (negative) {
-      reasons = [`say what held steady instead of "${negative.toLowerCase()}"`];
-      continue;
-    }
     const kept: NoteDay[] = [];
     const seen = new Map<string, number>();
     for (const d of input.days) {
@@ -199,6 +198,11 @@ async function write(
       const caption = captions.get(n === 1 ? iso : `${iso}#${n}`);
       if (caption && checkNote(caption, input.facts, input.names, { maxSentences: 1, subject }).ok)
         kept.push({ dayMs: d.dayMs, kind: d.kind, networkId: d.networkId, caption });
+    }
+    if (negative) {
+      held = { ok: true, text: note, days: kept };
+      reasons = [`say what held steady instead of "${negative.toLowerCase()}"`];
+      continue;
     }
     return { ok: true, text: note, days: kept };
   }

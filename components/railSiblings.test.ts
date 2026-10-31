@@ -887,3 +887,19 @@ describe("the Geography rail never writes the filter", () => {
     expect(set.parentLabel).toBe("Networks");
   });
 });
+
+// REVIEW 2026-10-31: what hangs under a browsed network reads that network, never the filter.
+describe("the node pager under a browsed network", () => {
+  const row = (ip: string) => ({ id: ip, label: ip, pick: { kind: "metanode", node: { ip, roles: ["l0"] }, meta: { id: "dor" } } });
+  const rows = [row("2.2.2.1"), row("2.2.2.2")] as unknown as SiblingState["selNodes"];
+  const metaList = [{ id: "dor", name: "Dor", nodes: [], located: 2 }] as unknown as SiblingState["metaList"];
+  const set = () =>
+    siblingSet("node", base({ mode: "hyper", filter: "all", railNet: "dor", metaList, selNodes: rows, allNodes: rows, inspect: rows[0]!.pick }))!;
+  it("steps under its own network, not All", () => {
+    const acts = set().items[1]!.actions;
+    expect(acts).toContainEqual(expect.objectContaining({ kind: "composition", sel: expect.objectContaining({ netId: "dor" }) }));
+  });
+  it("names that network", () => {
+    expect(set().parentLabel).toBe("Dor");
+  });
+});

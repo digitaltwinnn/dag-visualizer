@@ -575,6 +575,15 @@ describe("a read-only deployment serves the cache and writes nothing (R66)", () 
   });
 });
 
+describe("the positive rewrite", () => {
+  beforeEach(() => { store = memoryNotesStore(); });
+  it("keeps the true first note when the rewrite fails the gate", async () => {
+    const first = "NOTE: The hypergraph anchored 1,200 snapshots a day, with no gaps.";
+    const res = await generateNote(REQ, deps({ answers: [first, BAD] }), "read");
+    expect(res).toMatchObject({ state: "ok", text: "The hypergraph anchored 1,200 snapshots a day, with no gaps." });
+  });
+});
+
 describe("a view note's notable changes", () => {
   beforeEach(() => { store = memoryNotesStore(); });
   it("are stored with the note and served with it", async () => {

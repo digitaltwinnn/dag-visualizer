@@ -273,6 +273,8 @@ describe("subject notes live on their cards", () => {
     const head = read("components/CardHead.tsx");
     expect(head).toMatch(/has-\[\+\[data-note-lead\]\]:hidden/);
     expect(head).toMatch(/has-\[\+\*>\[data-note-lead\]:first-child\]:hidden/);
+    // …and with no note a body's leading Separator stands down, or two hairlines touch.
+    expect(head).toMatch(/\[&\+\[data-slot=separator\]\]:hidden/);
     expect(src).toMatch(/const MARK = <AI_NOTES_ICON aria-hidden className="ml-px mt-\[3px\] size-3\.5 shrink-0 text-\[var\(--ai-mark\)\]" \/>;/);
     // The sweep stays the chip's: a true ring, so the card's own surface shows through.
     const sweep = read("components/notes/aiSweep.ts");

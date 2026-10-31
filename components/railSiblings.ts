@@ -140,8 +140,10 @@ export interface SiblingSet {
  *  the same box share (their ids are per layer). */
 const machineIp = (p: PickDescriptor): string | null => ("node" in p && p.node && "ip" in p.node ? ((p.node as { ip?: string }).ip ?? null) : null);
 
-const networkLabel = (s: SiblingState): string =>
-  s.filter === "all" ? "All networks" : (s.metaList.find((m) => m.id === s.filter)?.name ?? s.filter);
+const networkLabel = (s: SiblingState): string => {
+  const net = s.railNet ?? s.filter;
+  return net === "all" ? "All networks" : (s.metaList.find((m) => m.id === net)?.name ?? net);
+};
 
 /** A provider cohort's one label — PROVIDER FIRST (user, 2026-09-29), with the unknowns NAMED
  *  rather than dropped. The rail's pager and the Geography explorer's crumb both read this, so a
@@ -378,7 +380,7 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
         const scoped = s.composition ? groups.filter((g) => g.key === s.composition!.key) : groups;
         rows = scoped.flatMap((g) => g.rows);
         const byKey = new Map(scoped.flatMap((g) => g.rows.map((r) => [r, g.key] as const)));
-        groupOf = (r) => ({ netId: s.filter, key: byKey.get(r)! });
+        groupOf = (r) => ({ netId: netOf(s), key: byKey.get(r)! });
         parent = s.composition
           ? (scoped[0]?.label ?? networkLabel(s))
           : networkLabel(s);

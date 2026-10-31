@@ -647,7 +647,7 @@ export default function Inspector() {
         key="composition"
         sel={composition}
         onClose={() =>
-          applyClickActions(compositionToggleActions(composition, { composition, hasInspect: !!inspect, filter }))
+          applyClickActions(compositionToggleActions(composition, { composition, hasInspect: !!inspect, filter: railNet ?? filter }))
         }
         {...cx("composition")}
       />

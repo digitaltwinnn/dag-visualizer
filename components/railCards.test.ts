@@ -567,14 +567,17 @@ describe("a node in Snapshots", () => {
   const key = "9.9.9.9";
   const signers = (ips: string[]) => ips.map((ip) => ({ pick: { kind: "metanode", node: { ip } } })) as unknown as NodeRow[];
   const at = (over: Partial<Parameters<typeof nodeHereOf>[0]>) =>
-    nodeHereOf({ mode: "ledger", inspect: nodePick, inspectView: "geo", metaSnap: null, ...over }, () => signers([key]));
+    nodeHereOf({ mode: "ledger", inspect: nodePick, inspectView: "geo", metaSnap: null, following: false, ...over }, () => signers([key]));
   const held = { metaId: "dor", ordinal: 1, globalOrdinal: 2 } as MetaSnapSel;
   it("stands when it was picked there", () => {
     expect(at({ inspectView: "ledger" })).toBe(true);
   });
   it("stands when it signed the snapshot on screen, and not when it did not", () => {
     expect(at({ metaSnap: held })).toBe(true);
-    expect(nodeHereOf({ mode: "ledger", inspect: nodePick, inspectView: "geo", metaSnap: held }, () => signers(["1.1.1.1"]))).toBe(false);
+    expect(nodeHereOf({ mode: "ledger", inspect: nodePick, inspectView: "geo", metaSnap: held, following: false }, () => signers(["1.1.1.1"]))).toBe(false);
+  });
+  it("a live snapshot nobody picked is no reason to stand: it would come and go with every tick", () => {
+    expect(at({ metaSnap: held, following: true })).toBe(false);
   });
   it("leaves when it was carried in with no snapshot to have signed", () => {
     expect(at({})).toBe(false);
