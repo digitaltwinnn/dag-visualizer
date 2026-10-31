@@ -348,3 +348,24 @@ describe("network names in a note", () => {
     expect(text).not.toMatch(/dangerouslySetInnerHTML|font-|<a\b|onClick/);
   });
 });
+
+// A TAP IS NOT A HOVER (`useSubjectPairing`; review 2026-10-31): the note's rows and the chart's coins
+// write a preview channel by hand, so they carry the same gate, or a tap leaves the preview standing.
+describe("a note's rows take no hover from a tap", () => {
+  it("previews on a mouse's enter and a non-tap's focus", () => {
+    const notes = read("components/notes/NotesCard.tsx");
+    for (const body of [fnBody(notes, "function DayRow("), fnBody(notes, "function ChangeRow("), fnBody(read("components/docs/TrendChart.tsx"), "function MarkCoin(")]) {
+      expect(body).toMatch(/e\.pointerType === "mouse"/);
+      expect(body).toMatch(/focusPreviews\(\)/);
+    }
+  });
+});
+
+describe("the entry window", () => {
+  it("lets a reader's commit through, and reads the count ahead of the entry's return", () => {
+    const src = read("components/Inspector.tsx");
+    expect(src).toMatch(/const reader = !modeChanged && lastCommits\.current !== commits;/);
+    expect(src).toMatch(/if \(!reader && Date\.now\(\) - modeEnteredAt\.current < ENTRY_GRACE_MS\) return;/);
+    expect(read("src/engine/Engine.ts")).toMatch(/applyClickActions\(acts, \{ arrival: true \}\)/);
+  });
+});

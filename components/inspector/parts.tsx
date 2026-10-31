@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, type CSSProperties, useRef, useState, type ReactNode } from "react";
+import { Fragment, type CSSProperties, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { Check, Copy } from "lucide-react";
 import { cn, TOUCH_HIT } from "@/lib/utils";
 import { IDENT_INK } from "@/components/identInk";
@@ -248,7 +248,7 @@ export function Door({
   expanded?: boolean;
   controls?: string;
   /** The hover pair, for a door whose subject another surface can light (convention 9). */
-  onPointerEnter?: () => void;
+  onPointerEnter?: (e: PointerEvent<HTMLElement>) => void;
   onPointerLeave?: () => void;
   onFocus?: () => void;
   onBlur?: () => void;

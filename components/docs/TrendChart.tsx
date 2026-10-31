@@ -2,6 +2,7 @@
 import { memo, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { Area, CartesianGrid, ComposedChart, Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { focusPreviews } from "@/components/useSubjectPairing";
 import { cn } from "@/lib/utils";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { RoleChips } from "@/components/inspector/parts";
@@ -170,9 +171,9 @@ function MarkCoin({
         e.stopPropagation();
         onPick?.(m);
       }}
-      onPointerEnter={() => hover(true)}
+      onPointerEnter={(e) => e.pointerType === "mouse" && hover(true)}
       onPointerLeave={() => hover(false)}
-      onFocus={() => hover(true)}
+      onFocus={() => focusPreviews() && hover(true)}
       onBlur={() => hover(false)}
       className={cn(
         "absolute grid size-4 cursor-pointer border-0 bg-transparent p-0 outline-none transition-transform duration-150 motion-reduce:transition-none",

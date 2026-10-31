@@ -11,8 +11,10 @@ import { scrollToShow } from "@/src/engine/domain/trendStack";
 import { viewNetwork } from "@/src/engine/domain/viewNetwork";
 import type { MotionCause } from "@/src/store/store";
 
-export function applyClickActions(actions: ClickAction[], opts?: { quiet?: boolean }): void {
+export function applyClickActions(actions: ClickAction[], opts?: { quiet?: boolean; arrival?: boolean }): void {
   const st = useStore.getState();
+  // `arrival` is a view entry committing a carried node's ancestry: every other commit is the reader.
+  if (!opts?.arrival) st.noteReaderCommit();
   // Every commit states HOW it was reached (user, 2026-09-11 — the structural end of the
   // timer-based roll suppression): LOUD by default — a new subject announces itself with the
   // title roll — and QUIET only when the caller says so (the plank's first-child ∨, whose

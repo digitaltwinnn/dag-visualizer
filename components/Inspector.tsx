@@ -560,15 +560,18 @@ export default function Inspector() {
   const lastSelection = useRef(selectionKey);
   const lastMode = useRef(mode);
   const modeEnteredAt = useRef(0);
-  const lastRailNet = useRef(railNet);
+  const lastCommits = useRef(0);
   useEffect(() => {
     if (lastSelection.current === selectionKey) return;
     lastSelection.current = selectionKey;
     const modeChanged = lastMode.current !== mode;
     lastMode.current = mode;
-    // Read here, ahead of the entry's return: a browse released by leaving a view is no reader's move.
-    const browsed = !modeChanged && lastRailNet.current !== railNet;
-    lastRailNet.current = railNet;
+    // The reader's commits, counted ahead of the entry's return: the window below is for what ARRIVAL
+    // commits, and a reader's commit inside it has to drop the pins, or the note the view was entered
+    // on stands open beside the new card.
+    const commits = useStore.getState().readerCommits;
+    const reader = !modeChanged && lastCommits.current !== commits;
+    lastCommits.current = commits;
     // Read the live overrides rather than closing over them: `railCollapse` changes on every
     // +/− too, and this effect must fire on a SELECTION change only.
     const live: LaneCollapseState = { ...collapseState, overrides: useStore.getState().railCollapse };
@@ -608,8 +611,7 @@ export default function Inspector() {
       setRailCollapseMany(overridesOnViewEntry(live));
       return;
     }
-    // The window is for what ARRIVAL commits. A browsed network is never that: only the reader moves it.
-    if (!browsed && Date.now() - modeEnteredAt.current < ENTRY_GRACE_MS) return;
+    if (!reader && Date.now() - modeEnteredAt.current < ENTRY_GRACE_MS) return;
     if (Object.keys(staleNulls).length) setRailCollapseMany(staleNulls);
   }, [selectionKey, setRailCollapseMany]); // eslint-disable-line react-hooks/exhaustive-deps -- mode/ladderIds ride selectionKey (mode is a component of it)
   // THE NOTE'S STAND-DOWN (review 2026-10-29): a view is entered while its note is still read, so

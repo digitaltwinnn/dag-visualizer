@@ -10,6 +10,7 @@ import { Door, QualifierChip } from "@/components/inspector/parts";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { cn } from "@/lib/utils";
 import { useFeedRead } from "@/components/useFeedRead";
+import { focusPreviews } from "@/components/useSubjectPairing";
 import { latestTickOf } from "@/src/data/ladderLevels";
 import { getNetwork } from "@/src/data/network";
 import type { NotableKind, NoteChange, NoteChangeKind, NoteDay, NoteView } from "@/src/data/noteTypes";
@@ -120,9 +121,9 @@ function DayRow({ day }: { day: NoteDay }) {
           <span className="sr-only">{NOTE_KIND_WORD[day.kind]}</span>
         </span>
       }
-      onPointerEnter={on}
+      onPointerEnter={(e) => e.pointerType === "mouse" && on()}
       onPointerLeave={off}
-      onFocus={on}
+      onFocus={() => focusPreviews() && on()}
       onBlur={off}
       onClick={() => commitNoteDay(day)}
     >
@@ -192,9 +193,9 @@ function ChangeRow({ change, view }: { change: NoteChange; view: NoteView }) {
       wrap
       disabled={actions() == null}
       label={<NoteKindCoin kind={change.kind} />}
-      onPointerEnter={on}
+      onPointerEnter={(e) => e.pointerType === "mouse" && on()}
       onPointerLeave={off}
-      onFocus={on}
+      onFocus={() => focusPreviews() && on()}
       onBlur={off}
       onClick={() => {
         const acts = actions();

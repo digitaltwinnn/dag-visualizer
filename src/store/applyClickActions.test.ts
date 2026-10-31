@@ -308,3 +308,18 @@ describe("the network browsed in Hypergraph", () => {
     expect(useStore.getState().motionCause).toMatchObject({ kind: "filter", id: "dor" });
   });
 });
+
+// A READER'S COMMIT IS TOLD FROM ARRIVAL'S (review 2026-10-31): a view entry pins the note open, and a
+// commit in its grace window has to drop that pin, or the note stands open beside the new card.
+describe("readerCommits", () => {
+  it("counts a reader's commit", () => {
+    const before = useStore.getState().readerCommits;
+    applyClickActions([{ kind: "country", cc: "DE" }]);
+    expect(useStore.getState().readerCommits).toBe(before + 1);
+  });
+  it("does not count what a view entry commits", () => {
+    const before = useStore.getState().readerCommits;
+    applyClickActions([{ kind: "country", cc: "FI" }], { arrival: true });
+    expect(useStore.getState().readerCommits).toBe(before);
+  });
+});

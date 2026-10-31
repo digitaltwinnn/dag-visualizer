@@ -1655,7 +1655,7 @@ export class Engine {
       pick: st.inspect,
       compositionSel: this._compositionOf(st.inspect),
     });
-    if (acts.length) applyClickActions(acts);
+    if (acts.length) applyClickActions(acts, { arrival: true });
   }
 
   // `focusCamera` is false for BACKGROUND data refreshes (new cluster/meta/geo arriving) — they

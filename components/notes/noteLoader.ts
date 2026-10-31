@@ -75,6 +75,7 @@ async function readAnswer(r: Response): Promise<NoteResponse> {
 }
 
 export function createNoteLoader(deps: NoteLoaderDeps) {
+  const watchers = new Map<string, Set<(res: NoteResponse) => void>>();
   const cache = new Map<string, { at: number; res: NoteResponse }>();
   const inflight = new Map<string, Promise<NoteResponse>>();
   /** The GET keys whose in-flight answer is a write being polled, and who to tell when one is. */
@@ -122,6 +123,18 @@ export function createNoteLoader(deps: NoteLoaderDeps) {
   }
 
   return {
+    /** Hear what a POST for this key answers, whoever asked: the card and the rail's manifest each
+     *  hold the note, and the rail stands a card down on the answer the card alone would have seen. */
+    watch(key: string, hear: (res: NoteResponse) => void): () => void {
+      let set = watchers.get(key);
+      if (!set) watchers.set(key, (set = new Set()));
+      set.add(hear);
+      return () => {
+        set.delete(hear);
+        if (!set.size) watchers.delete(key);
+      };
+    },
+
     /** The held answer, if one is fresh. */
     peek: (req: NoteReq): NoteResponse | null => fresh(queryOf(req)),
 
@@ -176,7 +189,9 @@ export function createNoteLoader(deps: NoteLoaderDeps) {
           }
           // A POST never answers `request`: that would be the very state the reader just left.
           if (first.state === "request") first = UNAVAILABLE;
-          return store(key, await settle(key, first, true));
+          const res = store(key, await settle(key, first, true));
+          for (const hear of watchers.get(key) ?? []) hear(res);
+          return res;
         })().finally(() => inflight.delete(posting));
         inflight.set(posting, p);
       }

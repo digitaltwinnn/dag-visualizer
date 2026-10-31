@@ -125,6 +125,9 @@ interface AppState {
   // THE NETWORK THE RAIL IS BROWSING (`domain/viewNetwork.ts`), NOT the app filter. One view's, and
   // it rides the "network" selStack slot as `tickNet` does.
   railNet: string | null;
+  // How many commits the reader has made (`applyClickActions`): how the rail tells one from what a
+  // view entry commits, inside the entry's grace window.
+  readerCommits: number;
   selStack: SelSlot[];
   // Ordinal of the snapshot the cursor is hovering in the LiveStrip bar-chart (transient highlight —
   // the ledger re-colours that snapshot's tiles). null = not hovering.
@@ -459,6 +462,7 @@ interface AppState {
   setMetaSnap: (sel: MetaSnapSel | null) => void;
   setTickNet: (sel: TickNetSel | null) => void;
   setRailNet: (id: string | null) => void;
+  noteReaderCommit: () => void;
   /** The follow system's heartbeat advance for the metagraph-snapshot card — non-bumping, like
    *  advanceSnap: a live tick is never a "new selection" (the card recency/collapse order holds). */
   advanceMetaSnap: (sel: MetaSnapSel | null) => void;
@@ -583,6 +587,7 @@ export const useStore = create<AppState>((set) => ({
   metaSnap: null,
   tickNet: null,
   railNet: null,
+  readerCommits: 0,
   selStack: [],
   hoverSnapOrd: null,
   hoverMetaSnap: null,
@@ -716,6 +721,7 @@ export const useStore = create<AppState>((set) => ({
   // A NO-OP WRITE IS A NO-OP REFERENCE: the Engine's subscription re-resolves the chamber's lens
   // and the camera on a change, so re-committing the same network in the same tick (a tile under
   // an already-open network) must not hand it a fresh object.
+  noteReaderCommit: () => set((s) => ({ readerCommits: s.readerCommits + 1 })),
   setRailNet: (railNet) =>
     set((s) => (s.railNet === railNet ? s : { railNet, selStack: bumpStack(s.selStack, "network", !!railNet || s.filter !== "all") })),
   setTickNet: (tickNet) =>

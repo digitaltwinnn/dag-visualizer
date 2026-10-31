@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { noteInput, shouldRelease, subjectPairing } from "./useSubjectPairing";
+import { focusPreviews, noteInput, shouldRelease, subjectPairing } from "./useSubjectPairing";
 
 describe("subjectPairing", () => {
   it("is paired when the key matches the active channel value, exposing the hue var", () => {
@@ -110,5 +110,16 @@ describe("subjectPairing — input modality", () => {
     noteInput("mouse");
     subjectPairing<number>(null, 9, set, "#fff").onMouseEnter();
     expect(set).toHaveBeenLastCalledWith(9);
+  });
+});
+
+describe("focusPreviews", () => {
+  it("is every focus but a tap's", () => {
+    noteInput("touch");
+    expect(focusPreviews()).toBe(false);
+    noteInput("keyboard");
+    expect(focusPreviews()).toBe(true);
+    noteInput("mouse");
+    expect(focusPreviews()).toBe(true);
   });
 });

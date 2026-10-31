@@ -60,6 +60,12 @@ export default function useNote(req: NoteReq | null): NoteState {
     };
   }, [key, view, subject, span]);
 
+  // A POST answers every holder of the note, not only the one that asked.
+  useEffect(() => {
+    if (key == null) return;
+    return loader.watch(key, (r) => setState({ key, res: r, via: "request" }));
+  }, [key]);
+
   const request = useCallback(() => {
     if (!view || !subject || key == null) return;
     setState({ key, res: { state: "pending" }, via: "request" });

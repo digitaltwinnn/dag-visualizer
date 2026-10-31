@@ -177,3 +177,24 @@ describe("loadNote", () => {
     expect(calls).toHaveLength(2);
   });
 });
+
+// ONE ANSWER, EVERY HOLDER (review 2026-10-31): the note card and the rail's manifest each hold the
+// note, and only the holder that asked heard the POST, so a `none` left the rail with a titled box.
+describe("watch", () => {
+  const answer = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
+  it("tells every holder what a POST answered", async () => {
+    const { loader } = rig([answer({ state: "none" })]);
+    const heard: NoteResponse[] = [];
+    const stop = loader.watch(queryOf(REQ), (r) => heard.push(r));
+    await loader.request(REQ);
+    expect(heard).toEqual([{ state: "none" }]);
+    stop();
+  });
+  it("stops telling a holder that left", async () => {
+    const { loader } = rig([answer({ state: "none" })]);
+    const heard: NoteResponse[] = [];
+    loader.watch(queryOf(REQ), (r) => heard.push(r))();
+    await loader.request(REQ);
+    expect(heard).toEqual([]);
+  });
+});
