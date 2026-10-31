@@ -369,3 +369,22 @@ describe("the entry window", () => {
     expect(read("src/engine/Engine.ts")).toMatch(/applyClickActions\(acts, \{ arrival: true \}\)/);
   });
 });
+
+describe("a chart coin's hover", () => {
+  const chart = read("components/docs/TrendChart.tsx");
+  const band = read("components/notes/NoteDiamonds.tsx");
+
+  it("says the day beside the coin", () => {
+    expect(chart).toMatch(/<NoteDayPopover\s/);
+    expect(chart).toMatch(/caption: string/);
+  });
+
+  it("does not also raise the band's label, far from the pointer", () => {
+    expect(band).toMatch(/lit && first && !fromChart/);
+  });
+
+  it("the two labels are one component", () => {
+    expect(band).toMatch(/<NoteDayPopover\s/);
+    expect(band).not.toMatch(/SCENE_GLASS/);
+  });
+});

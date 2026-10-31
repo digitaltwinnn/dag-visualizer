@@ -338,14 +338,14 @@ export default function TrendStack() {
     for (const d of noteDays ?? []) {
       const id = d.networkId ?? "dag";
       const list = m.get(id) ?? [];
-      list.push({ dayMs: d.dayMs, kind: d.kind, networkId: d.networkId, lit: hoverNoteDay === d.dayMs, label: `Notable day, ${rangeDays(d.dayMs, d.dayMs + NOTE_DAY_MS)}: ${NOTE_KIND_WORD[d.kind]}` });
+      list.push({ dayMs: d.dayMs, kind: d.kind, networkId: d.networkId, lit: hoverNoteDay === d.dayMs, caption: d.caption, label: `Notable day, ${rangeDays(d.dayMs, d.dayMs + NOTE_DAY_MS)}: ${NOTE_KIND_WORD[d.kind]}` });
       m.set(id, list);
     }
     return m;
   }, [noteDays, hoverNoteDay]);
   const onMarkHover = useCallback((dayMs: number, on: boolean) => {
     const st = useStore.getState();
-    if (on) st.setHoverNoteDay(dayMs);
+    if (on) st.setHoverNoteDay(dayMs, true);
     else if (st.hoverNoteDay === dayMs) st.setHoverNoteDay(null);
   }, []);
   const onMarkPick = useCallback((mark: TrendMark) => commitNoteDay(mark), []);

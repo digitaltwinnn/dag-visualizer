@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { SCENE_GLASS } from "@/components/selection";
 import { cn } from "@/lib/utils";
 import type { NoteDay } from "@/src/data/noteTypes";
 import { type TrackGeom, xAtMs } from "@/src/data/trendTimeline";
 import { useStore } from "@/src/store/store";
 import { rangeDays } from "@/src/util/localTime";
+import NoteDayPopover from "./NoteDayPopover";
 import NoteKindCoin from "./NoteKindCoin";
 import { commitNoteDay } from "./commitNoteDay";
 import { useAiNote } from "./useAiNote";
@@ -28,9 +28,9 @@ import { useAiNote } from "./useAiNote";
 // press on EMPTY track still brushes. Keyboard events bubble on purpose (Escape clears a standing
 // range from a focused diamond too).
 //
-// THE POPOVER wears `SCENE_GLASS`, the one scene-anchored label container, inside a 1px
-// `--ai-edge` ring (the card's own edge: this text is a model's, marked so everywhere it stands).
-// The caption also lives in the card's row, so it is never hover-only text.
+// THE POPOVER is `NoteDayPopover`. The caption also lives in the card's row, so it is never
+// hover-only text. A hover from a chart's coin leaves it down: that coin says the day itself, and
+// a label on the band would stand far from the pointer (user, 2026-10-31).
 
 const DAY_MS = 86_400_000;
 const HALF_DAY_MS = 43_200_000;
@@ -80,7 +80,8 @@ function Diamond({
     useStore.getState().setHoverNoteDay(null);
   };
   const date = rangeDays(day.dayMs, day.dayMs + DAY_MS);
-  const shown = own || (lit && first);
+  const fromChart = useStore((s) => s.hoverNoteChart);
+  const shown = own || (lit && first && !fromChart);
   const align = x < EDGE_PX ? "left-0" : x > width - EDGE_PX ? "right-0" : "left-1/2 -translate-x-1/2";
   return (
     <div className="absolute size-0" style={{ left: x, bottom }}>
@@ -111,21 +112,7 @@ function Diamond({
       >
         <NoteKindCoin kind={day.kind} />
       </button>
-      {shown && (
-        // Decoration for the eye: the button's own name already says all of it.
-        <div aria-hidden className={cn("absolute bottom-3 z-10 w-max max-w-[240px] pointer-events-none", align)}>
-          <div className="rounded-md p-px [background:var(--ai-edge)]">
-            {/* An opaque ground under the translucent glass, so the sweep stays in the 1px ring and
-                never tints the fill (the card's own rule, NotesCard). */}
-            <div className="rounded-[calc(var(--radius-md)-1px)] bg-background">
-              <div className={cn(SCENE_GLASS, "border-0 px-2.5 py-1.5")}>
-                <div className="text-label tracking-caps text-muted-foreground tabular-nums">{date}</div>
-                <div className="text-body leading-snug text-foreground">{day.caption}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {shown && <NoteDayPopover date={date} caption={day.caption} className={cn("bottom-3 z-10", align)} />}
     </div>
   );
 }

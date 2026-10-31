@@ -7,9 +7,10 @@ import { cn } from "@/lib/utils";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { RoleChips } from "@/components/inspector/parts";
 import { bucketAt, cursorFraction } from "@/src/data/trendWindow";
-import { bucketStamp } from "@/src/util/localTime";
+import { bucketStamp, rangeDays } from "@/src/util/localTime";
 import { compactNumber } from "@/src/util/format";
 import type { NotableKind } from "@/src/data/noteTypes";
+import NoteDayPopover from "@/components/notes/NoteDayPopover";
 import NoteKindCoin from "@/components/notes/NoteKindCoin";
 
 // THE TRENDS DOC'S ONE CHART PRIMITIVE — a small-multiple line chart over the /api/trends
@@ -128,6 +129,8 @@ export interface TrendMark {
   lit?: boolean;
   /** The button's name: the day and its kind, as the band's mark says it. */
   label: string;
+  /** What the day was, in the note's words: the coin says it beside itself on hover. */
+  caption: string;
 }
 
 const DAY_MS_CHART = 86_400_000;
@@ -141,18 +144,24 @@ function MarkCoin({
   m,
   top,
   left,
+  x,
   onHover,
   onPick,
 }: {
   m: TrendMark;
   top: number;
   left: string;
+  /** Where the coin sits across the plate, 0 to 1: near an edge the label anchors into the plate,
+   *  whose `overflow-hidden` would cut it. */
+  x: number;
   onHover?: (dayMs: number, on: boolean) => void;
   onPick?: (mark: TrendMark) => void;
 }) {
   const mine = useRef(false);
+  const [own, setOwn] = useState(false);
   const hover = (on: boolean) => {
     mine.current = on;
+    setOwn(on);
     onHover?.(m.dayMs, on);
   };
   useEffect(
@@ -162,6 +171,7 @@ function MarkCoin({
     [m.dayMs, onHover],
   );
   return (
+    <>
     <button
       type="button"
       aria-label={m.label}
@@ -184,6 +194,15 @@ function MarkCoin({
     >
       <NoteKindCoin kind={m.kind} />
     </button>
+    {own && (
+      <NoteDayPopover
+        date={rangeDays(m.dayMs, m.dayMs + DAY_MS_CHART)}
+        caption={m.caption}
+        className={cn("z-10 mb-1", x > 0.75 ? "right-2" : x < 0.25 ? "left-2" : "ml-2 -translate-x-1/2")}
+        style={{ bottom: `calc(100% - ${top}px)`, ...(x > 0.75 || x < 0.25 ? {} : { left }) }}
+      />
+    )}
+    </>
   );
 }
 
@@ -769,6 +788,7 @@ export default function TrendChart({
               <MarkCoin
                 key={m.key}
                 m={m}
+                x={m.x}
                 onHover={onMarkHover}
                 onPick={onMarkPick}
                 top={PLOT_MARGIN.top + plotInnerH(plotHeight) - 8}
