@@ -630,6 +630,9 @@ export default function RailDock({
   // instead of blinking the whole line at once.
   const switchP = usePulseWindow(signalKey);
   const updateP = usePulseWindow(updateKey);
+  // The closed tab's edge, end to end: the recipe's own insets and its faded tips would leave the
+  // line well short of the tab, so it takes the whole height and a longer segment.
+  const tabEdge = cn("inset-y-0 [--pulse-len:60%] [&>.edge-pulse]:inset-y-0!", side === "left" ? "right-0" : "left-0");
   const pulseSpan = (p: { pulse: number; live: boolean }, cls: string, short = false) =>
     p.live && (
       <span
@@ -784,8 +787,8 @@ export default function RailDock({
           {/* CLOSED-state pulses down the tab's scene-facing edge (the sheet's spine-equivalent
               while there's no sheet on screen): the view/filter SWITCH signal + the hosted-card
               UPDATE signal — both short-host scaled. */}
-          {!open && pulseSpan(switchP, cn("inset-y-1", side === "left" ? "right-0" : "left-0"), true)}
-          {!open && pulseSpan(updateP, cn("inset-y-1", side === "left" ? "right-0" : "left-0"), true)}
+          {!open && pulseSpan(switchP, tabEdge, true)}
+          {!open && pulseSpan(updateP, tabEdge, true)}
         </button>
       )}
       {/* NON-MODAL (`modal={false}`): on tablet the left "Explore" and right "Details" edge docks
