@@ -13,11 +13,18 @@ import { typedLength } from "./typedNote";
 /** Notes already written in: folding a card and opening it again shows the note, it does not retype it. */
 const TYPED = new Set<string>();
 
-export default function TypedNote({ text, waited, className }: { text: string; waited: boolean; className?: string }) {
+export default function TypedNote({ text, waited, always, className }: {
+  text: string;
+  waited?: boolean;
+  /** Types whatever came before: the Briefing's words are a performance, not a note arriving, and
+   *  each stop remounts this, which the card's once-only memory would read as already written. */
+  always?: boolean;
+  className?: string;
+}) {
   const [shown, setShown] = useState<number | null>(null);
   // Before paint, so the finished text never flashes ahead of the first letter.
   useLayoutEffect(() => {
-    const type = waited && !TYPED.has(text) && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const type = (always || (waited && !TYPED.has(text))) && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     TYPED.add(text);
     setShown(type ? 0 : null);
     // A note is typed when it arrives, not when `waited` next changes.

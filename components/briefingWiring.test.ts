@@ -27,6 +27,13 @@ describe("the tour before the scene is up", () => {
   });
 });
 
+describe("the tour's words", () => {
+  it("type in at every stop, whatever has been written before", () => {
+    expect(briefing).toMatch(/<TypedNote [^>]*\balways\b/);
+    expect(readFileSync("components/notes/TypedNote.tsx", "utf8")).toMatch(/\(always \|\| \(waited && !TYPED\.has\(text\)\)\)/);
+  });
+});
+
 describe("the tour for a screen reader or a keyboard", () => {
   it("speaks each stop once, from a region that stands from the start", () => {
     expect(briefing).toMatch(/<p className="sr-only" aria-live="polite">/);

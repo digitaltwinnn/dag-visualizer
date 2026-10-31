@@ -181,7 +181,7 @@ function Tour({ stop }: { stop: number }) {
           <div className="absolute inset-x-0 bottom-0 px-[max(16px,3.7vw)] pb-[calc(env(safe-area-inset-bottom)+22px)]">
             {phone ? <div className="mb-1 min-h-5">{who}</div> : <p aria-hidden className="mb-1 text-title text-muted-foreground">{name}</p>}
             <div aria-hidden className="min-h-[2.52em] max-w-[79%] text-briefing font-medium text-foreground max-[700px]:min-h-[3.8em] max-[700px]:max-w-full">
-              <TypedNote key={`${stop}:${words.text}`} text={words.text} waited />
+              <TypedNote key={`${stop}:${words.text}`} text={words.text} always />
             </div>
             {!phone && (
               <div className="mt-3 flex items-center gap-3.5">
