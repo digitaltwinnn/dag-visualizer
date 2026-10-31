@@ -1,5 +1,5 @@
 import type { NoteResponse, NoteView } from "@/src/data/noteTypes";
-import { BRIEFING_STOPS } from "@/src/engine/domain/briefing";
+import { BRIEFING_STOPS, LINE_MAX } from "@/src/engine/domain/briefing";
 import type { NoteReq } from "./noteLoader";
 import { noteSubjectOf } from "./noteSubject";
 
@@ -23,13 +23,22 @@ const PLAIN: Record<NoteView, string> = {
   trend: "The measured record of the network.",
 };
 
-/** The note's opening sentence: a stop in a figure ("5.8") is not an end. */
-export function firstSentence(text: string): string {
-  return (/^.*?[.!?](?=\s|$)/s.exec(text)?.[0] ?? text).trim();
+const SENTENCE_RE = /.*?[.!?](?=\s|$)/gs;
+
+/** The note's opening: its first sentence, and the next one while the caption holds them. A stop in
+ *  a figure ("5.8") is not an end. */
+export function openingOf(text: string): string {
+  const [first, ...rest] = (text.match(SENTENCE_RE) ?? [text]).map((s) => s.trim());
+  let out = first!;
+  for (const next of rest) {
+    if (out.length + 1 + next.length > LINE_MAX) break;
+    out += ` ${next}`;
+  }
+  return out;
 }
 
 /** The words for a stop, and whether they are the AI's. */
 export function briefingWords(view: NoteView, res: NoteResponse | null): { text: string; ai: boolean } {
   if (res?.state !== "ok") return { text: PLAIN[view], ai: false };
-  return { text: res.line ?? firstSentence(res.text), ai: true };
+  return { text: res.line ?? openingOf(res.text), ai: true };
 }

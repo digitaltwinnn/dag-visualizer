@@ -8,8 +8,13 @@ import type { Mode } from "@/src/store/mode";
 /** The route: where, then now, then who, then how it changed. */
 export const BRIEFING_STOPS = ["geo", "ledger", "hyper", "trend"] as const satisfies readonly Mode[];
 
-/** How long a stop stands, from the moment it is reached. */
-export const STOP_MS = 4600;
+/** How long a stop stands, from the moment it is reached: its longest line, read at subtitle pace
+ *  while it types (4600 until the line grew, user 2026-10-31: "2-3 should be feasible"). */
+export const STOP_MS = 6500;
+
+/** The longest a stop's words may run: two to three lines of the desktop caption. A longer line
+ *  would need a longer stop, and a tour that outstays its welcome is the one thing it must not do. */
+export const LINE_MAX = 140;
 
 /** How much faster the choreography runs for the tour, on the clock `?slowmo` scales: a normal
  *  switch lands in over 3 seconds, which would leave a stop nothing to stand on. */

@@ -10,7 +10,7 @@ import { pickRangeTier } from "@/src/data/trendWindow";
 //
 // Everything is UTC and the caller supplies the date strings; nothing here reads a clock.
 
-export const NOTES_VERSION = 38; // 38: the only one has nothing to rank against (2026-10-31)
+export const NOTES_VERSION = 39; // 39: the Briefing's line runs to two or three lines (2026-10-31)
 
 /** What a note covers. Hyper and Geography are a standing picture ("day"), the ledger the recent
  *  hours ("hours"); History's pills are the rest, and a brushed range is `r<fromMs>-<toMs>` after

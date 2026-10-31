@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BRIEFING_COVER, BRIEFING_PACE, BRIEFING_STOPS, SCENE_WAIT_MS, STOP_MS, briefsOn, mayAdvance, nextStop } from "./briefing";
+import { BRIEFING_COVER, BRIEFING_PACE, BRIEFING_STOPS, LINE_MAX, SCENE_WAIT_MS, STOP_MS, briefsOn, mayAdvance, nextStop } from "./briefing";
 
 const on = { pathname: "/", net: "mainnet", seen: false };
 
@@ -43,6 +43,17 @@ describe("the tour's clock", () => {
   it("never leaves a view the scene has not finished entering", () => {
     expect(mayAdvance(STOP_MS * 3, "in")).toBe(false);
     expect(mayAdvance(STOP_MS * 3, "out")).toBe(false);
+  });
+});
+
+describe("the tour's words", () => {
+  it("run past a single line of the desktop caption, about 55 characters", () => {
+    expect(LINE_MAX).toBeGreaterThan(2 * 55);
+    expect(LINE_MAX).toBeLessThanOrEqual(3 * 55);
+  });
+
+  it("can be read inside their stop, near subtitle pace of 20 characters a second", () => {
+    expect(STOP_MS).toBeGreaterThanOrEqual((LINE_MAX / 20) * 1000 * 0.9);
   });
 });
 

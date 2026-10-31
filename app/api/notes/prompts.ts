@@ -172,7 +172,7 @@ export const CAPTION_FORMAT =
 
 /** THE BRIEFING'S LINE: what the tour shows at this view's stop, in the note's own answer. */
 export const LINE_FORMAT =
-  "One more line belongs in this answer, whatever the format above says: directly after the note, a line starting LINE: with the note's opening finding as one plain sentence of at most sixteen words. Keep the note's own wording for it: the span, what moved, and both numbers as \"from X to Y\".";
+  "One more line belongs in this answer, whatever the format above says: directly after the note, a line starting LINE: with the note's main findings as one or two plain sentences, eighteen to twenty-two words in all. Keep the note's own wording for it: the span, what moved, and both numbers as \"from X to Y\".";
 
 export function buildMessages(
   view: NoteView,

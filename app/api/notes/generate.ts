@@ -1,5 +1,6 @@
 import { factsBlock, sayAll, spellDurations } from "@/src/data/noteFacts";
 import { checkNote } from "@/src/data/noteHonesty";
+import { LINE_MAX } from "@/src/engine/domain/briefing";
 import { withDayChange } from "@/src/data/notableDays";
 import { withMovePercents } from "@/src/data/noteChanges";
 import type { NoteChange, NoteDay, NoteResponse, NoteView } from "@/src/data/noteTypes";
@@ -154,9 +155,6 @@ function warn(req: NoteRequest, kind: string): void {
 
 type Written = { ok: true; text: string; days: NoteDay[]; line?: string } | { ok: false; stat: NoteStat };
 
-/** The longest the Briefing's line may run: past this it stops being a line, and the tour falls
- *  back on the note's first sentence. */
-export const LINE_MAX = 110;
 /** The room an answer with a line gets: a cut-off answer is no answer, so a line must never cost
  *  its note (History's 30-day note also carries up to five captions). */
 const LINE_TOKENS = 560;
@@ -217,7 +215,7 @@ async function write(
     }
     // The Briefing's line is held to the note's gate and is never worth a retry: one that fails,
     // runs long or says what did not happen is dropped, and the tour reads the note instead.
-    const brief = wantsLine && line && !NEGATIVE_RE.test(line) && checkNote(line, input.facts, input.names, { maxSentences: 1, subject }).ok
+    const brief = wantsLine && line && !NEGATIVE_RE.test(line) && checkNote(line, input.facts, input.names, { maxSentences: 2, subject }).ok
       ? withMovePercents(plainly(line), input.facts).replace(/[^.!?]$/, "$&.")
       : null;
     const written: Written = { ok: true, text: withMovePercents(plainly(note), input.facts), days: kept, ...(brief && brief.length <= LINE_MAX ? { line: brief } : {}) };

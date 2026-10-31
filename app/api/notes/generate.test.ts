@@ -3,7 +3,8 @@ import { fact } from "@/src/data/noteFacts";
 import { checkNote } from "@/src/data/noteHonesty";
 import type { NotableDay } from "@/src/data/noteTypes";
 import type { TrendsWindowData } from "@/src/data/trendWindow";
-import { FAIL_TTL_S, generateNote, LINE_MAX, LOCK_TTL_S, NOTE_STATS, type NoteRecord } from "./generate";
+import { LINE_MAX } from "@/src/engine/domain/briefing";
+import { FAIL_TTL_S, generateNote, LOCK_TTL_S, NOTE_STATS, type NoteRecord } from "./generate";
 import { GateError, type GateMessage } from "./gate";
 import { KIND_TIMING, lockKeyOf, noteKeyOf, statsKeyOf } from "./keys";
 import { PROMPTS } from "./prompts";
@@ -657,8 +658,13 @@ describe("the Briefing's line", () => {
     expect(await generateNote(BRIEF, deps({ answers: answer("There were no changes at 1,200 a day.") }), "read")).not.toHaveProperty("line");
   });
 
+  it("may run to two sentences", async () => {
+    const two = "The hypergraph anchored 1,200 snapshots a day. That is 37% up on the span before.";
+    expect(await generateNote(BRIEF, deps({ answers: answer(two) }), "read")).toMatchObject({ line: two });
+  });
+
   it("is dropped past its length", async () => {
-    const long = `The hypergraph anchored 1,200 snapshots a day ${"and it went on saying so ".repeat(4)}in one breath.`;
+    const long = `The hypergraph anchored 1,200 snapshots a day ${"and it went on saying so ".repeat(7)}in one breath.`;
     expect(long.length).toBeGreaterThan(LINE_MAX);
     expect(await generateNote(BRIEF, deps({ answers: answer(long) }), "read")).not.toHaveProperty("line");
   });

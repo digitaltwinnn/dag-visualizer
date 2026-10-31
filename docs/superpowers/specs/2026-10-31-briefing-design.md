@@ -10,8 +10,8 @@ so it reads as a daily briefing rather than an intro.
 ## What the visitor gets
 
 1. `/` opens on Geography, which is now the default view.
-2. The tour plays Geography, Snapshots, Hypergraph, History. Each stop is 4.6 seconds, about 18
-   seconds in all, and each shows one line from Constellation Gate AI, typed in.
+2. The tour plays Geography, Snapshots, Hypergraph, History. Each stop is 6.5 seconds, about 26
+   seconds in all, and each shows two or three lines from Constellation Gate AI, typed in.
 3. The stage clears on every screen size: the HUD steps aside, the scene fills the screen and lifts,
    and large words stand beneath it. Phones keep progress and Skip at the top, as the mock showed.
 4. Skip, a tap anywhere or Escape ends it and leaves the visitor in that view. Finishing returns to
@@ -23,7 +23,7 @@ so it reads as a daily briefing rather than an intro.
 - Tour stops are not page views: the URL stays on `/` and nothing is pushed. The view a visitor stops
   on publishes its URL and `view-switch` as usual. `briefing-stop` and `briefing-end` custom events
   record how far people watch and where they leave.
-- The tour clock never outruns the scene: a stop ends at 4.6 seconds, or when the transition lands
+- The tour clock never outruns the scene: a stop ends at 6.5 seconds, or when the transition lands
   if that is later, so a slow phone gets its whole view.
 - Faster transition for the tour only (`BRIEFING_PACE`), through the clock `?slowmo` already scales.
   Normal switching is unchanged.
@@ -33,10 +33,10 @@ so it reads as a daily briefing rather than an intro.
 
 ## The line
 
-The model writes one extra `LINE:` for the four notes the tour reads, in the same answer as the note,
+The model writes one extra `LINE:`, one or two sentences, for the four notes the tour reads, in the same answer as the note,
 so there is no second call. It passes the same honesty gate and code adds the percentage as usual. A
 line that fails, runs long or leads with a negative is dropped, and the tour falls back to the note's
-first sentence.
+opening.
 
 ## How it is built
 
