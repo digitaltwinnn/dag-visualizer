@@ -10,7 +10,7 @@ import { pickRangeTier } from "@/src/data/trendWindow";
 //
 // Everything is UTC and the caller supplies the date strings; nothing here reads a clock.
 
-export const NOTES_VERSION = 24; // 24: the span facet states its own busiest, quietest and typical day (2026-10-30)
+export const NOTES_VERSION = 25; // 25: honest and positive, growth up front, steady over negatives (2026-10-31)
 
 /** What a note covers. Hyper and Geography are a standing picture ("day"), the ledger the recent
  *  hours ("hours"); History's pills are the rest, and a brushed range is `r<fromMs>-<toMs>` after

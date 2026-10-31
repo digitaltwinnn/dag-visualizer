@@ -67,17 +67,17 @@ describe("PROMPTS", () => {
 
   it("asks Hypergraph and Geography their own subject first and activity last (R74); the ledger and History keep their questions", () => {
     expect(PROMPTS.hyper.question).toBe(
-      "First, who and what is on the network over the span: networks or layers that gained or lost nodes, networks that started or stopped anchoring; if nothing changed there, say so plainly: a quiet week, the node count held at its level and no network or layer changed.",
+      "First, who and what is on the network over the span: networks or layers that gained or lost nodes, networks that started or stopped anchoring; if nothing changed there, say so plainly: a steady week, the node count held at its level and every network and layer stayed as it was.",
     );
-    expect(PROMPTS.hyper.questionCommon).toBe("Last, in one sentence, how active it was: the global snapshots it was part of per day last week against the weeks before.");
+    expect(PROMPTS.hyper.questionCommon).toBe("Last, in one sentence, how active it was: open with the direction, up, down or steady, then the global snapshots it was part of per day last week against the weeks before.");
     expect(PROMPTS.geo.question).toBe(
       "First, where the nodes run: countries and hosting providers that gained or lost nodes, or where the nodes are now when nothing moved. Say nothing about speed.",
     );
-    expect(PROMPTS.geo.questionCommon).toBe("Last, in one sentence, how active the network was: its global snapshots per day last week against the weeks before.");
+    expect(PROMPTS.geo.questionCommon).toBe("Last, in one sentence, how active the network was: open with the direction, up, down or steady, then its global snapshots per day last week against the weeks before.");
     // The whole network PRODUCES its global snapshots (user, 2026-10-30: "there is no specific
     // network, so 'all' should probably have some different wording").
     for (const v of ["hyper", "geo"] as const) {
-      expect(PROMPTS[v].questionCommonWhole).toBe("Last, in one sentence, how active the network was: the global snapshots it produced per day last week against the weeks before.");
+      expect(PROMPTS[v].questionCommonWhole).toBe("Last, in one sentence, how active the network was: open with the direction, up, down or steady, then the global snapshots it produced per day last week against the weeks before.");
       expect(PROMPTS[v].system("the whole network", undefined, true, undefined, true)).toContain(`${PROMPTS[v].question} ${PROMPTS[v].questionCommonWhole}`);
       expect(PROMPTS[v].system("the whole network", undefined, true, undefined, true)).not.toContain(PROMPTS[v].questionCommon!);
       expect(PROMPTS[v].system("the whole network", undefined, false, undefined, true)).not.toContain(PROMPTS[v].questionCommonWhole!);
@@ -244,6 +244,16 @@ describe("spanWords — the span the note names, in the card pill's own words (u
 
 describe("buildMessages", () => {
   const FACTS = "Snapshots anchored: 12,159";
+
+  // HONEST, AND SAID POSITIVELY (user, 2026-10-31): growth opens its sentence rather than trailing
+  // as an afterthought ("It was part of 6,146 …, up from 5,002"), stillness reads as steady rather
+  // than as what did not happen ("No network started or stopped"), and a fall stays a plain fall.
+  it("asks for growth up front, steadiness over negatives, and a fall stated plainly", () => {
+    expect(VOICE).toMatch(/When a figure grew, open the sentence with the growth/);
+    expect(VOICE).toMatch(/say it held steady/);
+    expect(VOICE).toMatch(/never open a sentence with "no" or "none"/);
+    expect(VOICE).toMatch(/State a fall plainly: never soften, hide or reframe it/);
+  });
 
   it("hands the span's words to the model and asks for them in the first sentence (user, 2026-10-30)", () => {
     const m = buildMessages("hyper", "Mainnet", FACTS, null, undefined, undefined, undefined, undefined, "the last 7 days");

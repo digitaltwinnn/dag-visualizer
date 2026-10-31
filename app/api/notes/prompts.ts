@@ -20,6 +20,8 @@ export const VOICE = [
   "Answer the question in its order: what it asks for first is what this view shows and comes first, even when it held; what it asks for last comes last, in one sentence.",
   "Within each part, lead with what changed. Do not restate a breakdown the reader can already see on screen, such as how many nodes run each layer, unless it changed.",
   "When something rose or fell, say by how much: write it from the earlier figure to the current one, both as the facts state them for that same thing, never only the direction.",
+  // HONEST, AND SAID POSITIVELY (user, 2026-10-31). The second half of the rule is what keeps it honest.
+  "Say things positively. When a figure grew, open the sentence with the growth, never leave it trailing at the end. When nothing moved, say it held steady rather than naming what did not happen, and never open a sentence with \"no\" or \"none\". State a fall plainly: never soften, hide or reframe it, and never call a figure good or bad.",
   "",
   "Rules:",
   "Plain, present tense, no hype, no advice. No meta-commentary: never mention the facts, the data, the note or yourself.",
@@ -69,12 +71,12 @@ export const VOICE = [
 // hosts N nodes in <country>", so the name lands as the sentence's subject, not as a label.
 type KindQuestions = Partial<Record<Exclude<SubjectKind, "view">, string>>;
 // The whole network's activity, in its own words (user, 2026-10-30): one string for both views.
-const QUESTION_COMMON_WHOLE = "Last, in one sentence, how active the network was: the global snapshots it produced per day last week against the weeks before.";
+const QUESTION_COMMON_WHOLE = "Last, in one sentence, how active the network was: open with the direction, up, down or steady, then the global snapshots it produced per day last week against the weeks before.";
 export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuestions; questionNow?: string; questionCommon?: string; questionCommonWhole?: string; system: (subjectLabel: string, lead?: NoteLead, common?: boolean, kind?: SubjectKind, whole?: boolean) => string }> = {
   hyper: {
     // A QUIET WEEK IS SAID (user, 2026-10-30): the facts count what changed even at 0, so the note
     // says the composition held rather than reaching for the node count, which is Geography's too.
-    question: "First, who and what is on the network over the span: networks or layers that gained or lost nodes, networks that started or stopped anchoring; if nothing changed there, say so plainly: a quiet week, the node count held at its level and no network or layer changed.",
+    question: "First, who and what is on the network over the span: networks or layers that gained or lost nodes, networks that started or stopped anchoring; if nothing changed there, say so plainly: a steady week, the node count held at its level and every network and layer stayed as it was.",
     questions: {
       // "LAYER GROUP", never "make-up" (user, 2026-10-30): the Composition rung's own word. And the
       // group's place is said as a reader would ("its largest group"), not as a share and a rank
@@ -83,7 +85,7 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
       // layers (the same day: "do they run the nodes on L0 or is the node composed out of it?").
       type: "Open with a plain sentence whose subject is the nodes, in the shape \"N of the M <network> nodes run <layers>\", M being all its nodes, the layers named exactly as the facts name them, with no possessive on the name (a node RUNS its layers, so the verb is run); then say in plain words where that group stands among the network's layer groups, as a reader would (\"its largest group\", \"the smaller of its two groups\"), never \"share\", \"rank\" or a percentage; then how that changed over the span, or that it held.",
     },
-    questionCommon: "Last, in one sentence, how active it was: the global snapshots it was part of per day last week against the weeks before.",
+    questionCommon: "Last, in one sentence, how active it was: open with the direction, up, down or steady, then the global snapshots it was part of per day last week against the weeks before.",
     questionCommonWhole: QUESTION_COMMON_WHOLE,
     system: (subjectLabel, _lead, common, kind, whole) =>
       `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${questionOf("hyper", kind)}${common ? ` ${whole ? QUESTION_COMMON_WHOLE : PROMPTS.hyper.questionCommon}` : ""}`,
@@ -94,7 +96,7 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
       provider: "Open with a plain sentence with the provider as its actor, in the shape \"<provider> hosts N of <network>'s nodes\", network-wide, not for one place; then what share of the network's nodes with a known provider that is and its place among the network's providers; then how that moved over the span, or that it held. Say nothing about speed.",
     },
     question: "First, where the nodes run: countries and hosting providers that gained or lost nodes, or where the nodes are now when nothing moved. Say nothing about speed.",
-    questionCommon: "Last, in one sentence, how active the network was: its global snapshots per day last week against the weeks before.",
+    questionCommon: "Last, in one sentence, how active the network was: open with the direction, up, down or steady, then its global snapshots per day last week against the weeks before.",
     questionCommonWhole: QUESTION_COMMON_WHOLE,
     system: (subjectLabel, _lead, common, kind, whole) =>
       `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${questionOf("geo", kind)}${common ? ` ${whole ? QUESTION_COMMON_WHOLE : PROMPTS.geo.questionCommon}` : ""}\nStay on where the nodes are located and who hosts them${common ? ", then the one sentence on activity" : ""}, and nothing else.`,
