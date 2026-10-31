@@ -1,4 +1,3 @@
-import { AI_NOTES_ON } from "@/src/engine/config";
 import { liveWarmDeps, warmNotes } from "../handlers";
 
 // THE NOTES WARMER — Vercel Cron hits this every 15 minutes at :07, :22, :37 and :52 (vercel.json),
@@ -11,6 +10,5 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 export function GET(req: Request) {
-  if (!AI_NOTES_ON) return Response.json({ off: true });
   return warmNotes(req, liveWarmDeps);
 }

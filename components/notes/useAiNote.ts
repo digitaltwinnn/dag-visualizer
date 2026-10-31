@@ -7,7 +7,6 @@ import { useTickHasFilter } from "@/components/useTickHasFilter";
 import { UNLISTED_ID } from "@/src/data/unlisted";
 import type { NoteResponse } from "@/src/data/noteTypes";
 import { NET } from "@/src/net/current";
-import { AI_NOTES_ON } from "@/src/engine/config";
 import { viewNetwork } from "@/src/engine/domain/viewNetwork";
 import { useStore } from "@/src/store/store";
 import { noteSubjectOf, type NoteSubject } from "./noteSubject";
@@ -74,6 +73,6 @@ export function useAiNote(): { subject: NoteSubject | null; req: NoteReq | null;
   const span = subject?.view === "trend" ? trendWindow : null;
   // Presence through `useNet()`, the fetch through the gate (`useMainnetNote`, the hydration rule).
   const net = useNet();
-  const req: NoteReq | null = subject && net === "mainnet" && AI_NOTES_ON ? { view: subject.view, subject: subject.subject, span } : null;
+  const req: NoteReq | null = subject && net === "mainnet" ? { view: subject.view, subject: subject.subject, span } : null;
   return { subject, req, note: useMainnetNote(req) };
 }
