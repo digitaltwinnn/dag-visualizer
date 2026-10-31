@@ -37,6 +37,13 @@ Four views drive the 3D scene:
   plane at once. The planes are DOM, not WebGL — `TrendChart`, the app's one chart —
   and the bottom band is a scrubbable timeline rather than vitals cells.
 
+**The Briefing** (2026-10-31, `domain/briefing.ts`, `components/Briefing.tsx`,
+`docs/superpowers/specs/2026-10-31-briefing-design.md`): `/` opens on Geography and plays every 3D
+view once, one AI line per stop, on a cleared stage; one tap stays in that view. Only on `/`, on
+mainnet, once per browser session. `store.briefing` is the one channel: `useBootStage` stands the HUD
+down on it, `RouteSync` holds the URL so a stop is never a page view, and the Engine reads it for the
+tour's pace and the scene's lift.
+
 The placeholder is ONE consolidated `soon` Mode, at `/soon` (2026-09-04; the old `status`/`transactions`/
 `staking` modes said the same nothing three times): the canvas fades out and `Blueprint.tsx` draws a
 wireframe GALLERY of the coming features, with no numbers, so it never reads as live data. The

@@ -124,7 +124,9 @@ them — but the Next Node server can.
   is parsed (it is checked against mainnet's catalog, so a testnet network would otherwise 400). Notes live in
   their OWN key family, `ai:{net}:v{NOTES_VERSION}:{view}:{subject}:{span}` (`keys.ts`), never under
   `t:` (a rebuild wipes that prefix) or `geo:`: a note is a losable cache entry, and the families
-  must not share a fate. ⚠️ **A prompt or a facts change bumps `NOTES_VERSION`**, which orphans every
+  must not share a fate. The four notes the Briefing reads (`isBriefingNote`) also carry its one short `line`, asked for in
+  the same answer and held to the same gate; a line that fails is dropped, never retried, and the
+  tour reads the note's first sentence. ⚠️ **A prompt or a facts change bumps `NOTES_VERSION`**, which orphans every
   stored note at once (their TTLs reap them). Timing is `KIND_TIMING` in `keys.ts`: hyper and
   geography refresh daily (3-day TTL), the ledger and History's 24-hour note hourly (6 hours),
   History's daily pills daily, the 1-hour pill only when asked through its door (15 minutes) and a

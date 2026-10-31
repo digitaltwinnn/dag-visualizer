@@ -215,7 +215,7 @@ async function write(
     // The Briefing's line is held to the note's gate and is never worth a retry: one that fails,
     // runs long or says what did not happen is dropped, and the tour reads the note instead.
     const brief = wantsLine && line && !NEGATIVE_RE.test(line) && checkNote(line, input.facts, input.names, { maxSentences: 1, subject }).ok
-      ? withMovePercents(plainly(line), input.facts)
+      ? withMovePercents(plainly(line), input.facts).replace(/[^.!?]$/, "$&.")
       : null;
     const written: Written = { ok: true, text: withMovePercents(plainly(note), input.facts), days: kept, ...(brief && brief.length <= LINE_MAX ? { line: brief } : {}) };
     if (negative) {

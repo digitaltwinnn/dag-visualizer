@@ -634,6 +634,11 @@ describe("the Briefing's line", () => {
     expect((await stored()).line).toBe("The hypergraph anchored 1,200 snapshots a day.");
   });
 
+  it("ends as a sentence, whatever the model left off", async () => {
+    const r = await generateNote(BRIEF, deps({ answers: answer("The hypergraph anchored 1,200 snapshots a day") }), "read");
+    expect(r).toMatchObject({ line: "The hypergraph anchored 1,200 snapshots a day." });
+  });
+
   it("is asked of no other note", async () => {
     const d = deps();
     await generateNote(REQ, d, "read");
