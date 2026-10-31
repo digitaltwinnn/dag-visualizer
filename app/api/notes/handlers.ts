@@ -11,7 +11,7 @@ import { isLimitedNote, parseNoteParams, parseNoteRequest } from "./params";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
 import { factsFor, geoInputs, storeReads } from "./sources";
 import { notesStore, notesWritable } from "./store";
-import { executePass, pacedChat, planPass, warmCandidates, warmKeyOf } from "./warm";
+import { driftKeyOf, executePass, pacedChat, planPass, warmCandidates, warmKeyOf, type DriftKeys } from "./warm";
 
 // THE NOTE ROUTES' BODIES — `app/api/notes/route.ts` (read), `request/route.ts` and `warm/route.ts`
 // each hand their request to one of these with a deps THUNK, so the tests run them against an
@@ -40,6 +40,8 @@ import { executePass, pacedChat, planPass, warmCandidates, warmKeyOf } from "./w
 // counted as stats `capped`. Only a MISS is counted: a cached note, or a subject no note exists
 // for, is answered without touching either counter. Every other kind is bounded by its key and the
 // singleflight lock.
+
+type WarmRecord = { writtenAt: number; setKey?: string; driftKey?: string };
 
 const NET = "mainnet";
 export const RATE_PER_HOUR = 20;
@@ -155,8 +157,9 @@ export async function requestNote(req: Request, deps: () => GenerateDeps): Promi
 export interface WarmDeps extends GenerateDeps {
   /** The countries a country note exists for now (`fleetCountries`, over the geo note's own read). */
   countries(nowMs: number): Promise<string[]>;
-  /** The current networks-with-nodes key (the hyper digest's own `setKey`); null when unknown. */
-  setKey(nowMs: number): Promise<string | null>;
+  /** The hyper digest's own `setKey` (the networks with nodes) and `driftKeys` (their held counts),
+   *  from one read; null fields when unknown, which compares nothing. */
+  digest(nowMs: number): Promise<{ setKey: string | null; driftKeys: DriftKeys | null }>;
   sleep(ms: number): Promise<void>;
 }
 
@@ -168,7 +171,10 @@ export function liveWarmDeps(): WarmDeps {
     // none is generated unpaced by a visitor and none is planned only to answer `none`.
     countries: async (nowMs) => fleetCountries(await geoInputs(NET, nowMs, storeReads(nowMs))),
     // The digest's own builder decides which networks have nodes, so the two keys cannot disagree.
-    setKey: async (nowMs) => (await factsFor(NET, "hyper", "all", "day", nowMs))?.setKey ?? null,
+    digest: async (nowMs) => {
+      const f = await factsFor(NET, "hyper", "all", "day", nowMs);
+      return { setKey: f?.setKey ?? null, driftKeys: f?.driftKeys ?? null };
+    },
     sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   };
 }
@@ -187,24 +193,24 @@ export async function warmNotes(req: Request, deps: () => WarmDeps): Promise<Res
     const now = d.now(); // the budget's clock starts here: the prefetch spends it too
     // The unlisted set is one more subject: `noteSupported` keeps it to History's pills.
     const subjects = ["all", "dag", UNLISTED_ID, ...sampledIds(NET)];
-    const [countries, setKey] = await Promise.all([
+    const [countries, { setKey, driftKeys }] = await Promise.all([
       d.countries(now).catch(() => [] as string[]),
-      d.setKey(now).catch(() => null),
+      d.digest(now).catch(() => ({ setKey: null, driftKeys: null })),
     ]);
     // ONE prefetch of every candidate's record, so the planner is pure and the pass costs one read.
     const candidates = warmCandidates(subjects, countries);
     const keys = candidates.map(warmKeyOf);
     const raws = await d.store.mget(keys);
-    const records = new Map<string, { writtenAt: number; setKey?: string }>();
+    const records = new Map<string, WarmRecord>();
     raws.forEach((raw, i) => {
       const rec = recordOf(raw);
       if (rec) records.set(keys[i]!, rec);
     });
-    const plan = planPass(now, subjects, countries, setKey, (k) => records.get(k) ?? null);
+    const plan = planPass(now, subjects, countries, setKey, (k) => records.get(k) ?? null, driftKeys);
     const paced = { ...d, chat: pacedChat(d.chat, WARM_SPACING_MS, d.now, d.sleep) };
     const result = await executePass(
       plan,
-      (item) => generateNote({ net: NET, ...item }, paced, "warm", { seenWrittenAt: records.get(warmKeyOf(item))?.writtenAt ?? null }),
+      (item) => generateNote({ net: NET, ...item }, paced, "warm", { driftKey: driftKeyOf(item, driftKeys) ?? undefined, seenWrittenAt: records.get(warmKeyOf(item))?.writtenAt ?? null }),
       { now: d.now, start: now, budgetMs: WARM_BUDGET_MS, concurrency: WARM_CONCURRENCY },
     );
     return json(result, NO_STORE);
@@ -214,12 +220,16 @@ export async function warmNotes(req: Request, deps: () => WarmDeps): Promise<Res
 }
 
 /** A stored record's planning fields; null for a missing or unreadable one (a miss: rewritten). */
-function recordOf(raw: string | null): { writtenAt: number; setKey?: string } | null {
+function recordOf(raw: string | null): WarmRecord | null {
   if (raw == null) return null;
   try {
-    const r = JSON.parse(raw) as { writtenAt?: unknown; setKey?: unknown } | null;
+    const r = JSON.parse(raw) as { writtenAt?: unknown; setKey?: unknown; driftKey?: unknown } | null;
     if (!r || typeof r.writtenAt !== "number") return null;
-    return typeof r.setKey === "string" ? { writtenAt: r.writtenAt, setKey: r.setKey } : { writtenAt: r.writtenAt };
+    return {
+      writtenAt: r.writtenAt,
+      ...(typeof r.setKey === "string" ? { setKey: r.setKey } : {}),
+      ...(typeof r.driftKey === "string" ? { driftKey: r.driftKey } : {}),
+    };
   } catch {
     return null;
   }

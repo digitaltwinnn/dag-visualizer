@@ -1,5 +1,5 @@
 import type { NoteResponse, NoteView } from "@/src/data/noteTypes";
-import { noteKeyOf, timingOf, type NoteSpan } from "./keys";
+import { noteKeyOf, subjectKindOf, timingOf, type NoteSpan } from "./keys";
 import { noteSupported } from "./sources";
 
 // THE WARM PASS — what the quarter-hourly cron (`/api/notes/warm`, vercel.json `7,22,37,52 * * * *`) rewrites, as
@@ -7,8 +7,15 @@ import { noteSupported } from "./sources";
 // is due: the route prefetches every candidate's record, `planPass` picks the due ones, and the
 // generator rewrites each planned item unconditionally (`generateNote(…, "warm")`).
 //
-// A note is due when it is missing, older than its kind's refresh less `WARM_SLACK_MS`, or (hyper
-// `all` only) written for a different set of networks with nodes. The slack exists because a pass
+// A note is due when it is missing, older than its kind's refresh less `WARM_SLACK_MS`, (hyper `all`
+// only) written for a different set of networks with nodes, or, for Hypergraph's and Geography's
+// networks and the whole network, written under a held node count that has since moved, at most
+// hourly per note (user, 2026-10-31: notes should feel dynamic). A daily note otherwise disagrees
+// with the live card beside it for up to a day. The key is the HELD level, the median of the last
+// six hourly samples and the very reading the note states, so a bad hour moves nothing and a real
+// change arrives in about three hours; a layer change at one count, or a node moving country,
+// still waits for the daily rewrite. A record with no key, a visitor's, gets one rewrite to earn a
+// baseline. The slack exists because a pass
 // takes minutes: a ledger note written at 10:09 is 58 minutes old at the 11:07 pass, and an exact
 // one-hour refresh would leave it standing until 11:22. It stays under the 15-minute cron step, so
 // a note written early in the 10:07 pass is not rewritten by the 10:52 one (45 minutes old, under
@@ -38,7 +45,20 @@ export interface WarmItem {
 }
 
 /** What the planner needs of a cached record (`NoteRecord`'s fields), null when there is none. */
-export type CachedLookup = (key: string) => { writtenAt: number; setKey?: string } | null;
+export type CachedLookup = (key: string) => { writtenAt: number; setKey?: string; driftKey?: string } | null;
+
+/** A network's or the whole network's held node count, by subject (`HyperFacts.driftKeys`). */
+export type DriftKeys = Record<string, string>;
+
+/** At most this often a note is rewritten because its numbers moved, less the slack. */
+const DRIFT_MIN_MS = 3_600_000;
+
+/** The key speaking for a note, or null: Hypergraph's and Geography's networks and the whole
+ *  network, the first rollout. A warmed country and History stay on their clock. */
+export function driftKeyOf(item: WarmItem, drift: DriftKeys | null): string | null {
+  if ((item.view !== "hyper" && item.view !== "geo") || subjectKindOf(item.subject) === "country") return null;
+  return drift?.[item.subject] ?? null;
+}
 
 const HOURLY: [NoteView, NoteSpan][] = [["ledger", "hours"], ["trend", "24h"]];
 const DAILY: [NoteView, NoteSpan][] = [["hyper", "day"], ["geo", "day"], ["trend", "7d"], ["trend", "30d"], ["trend", "1y"], ["trend", "all"]];
@@ -60,14 +80,16 @@ export function warmKeyOf(item: WarmItem): string {
 /** THE PASS: the candidates that are due. `setKey` is the current networks-with-nodes key (sorted
  *  ids, as the hyper digest stores it); null when it could not be read, which compares nothing. */
 export function planPass(
-  nowMs: number, subjects: string[], countries: string[], setKey: string | null, cached: CachedLookup,
+  nowMs: number, subjects: string[], countries: string[], setKey: string | null, cached: CachedLookup, drift: DriftKeys | null = null,
 ): WarmItem[] {
   return warmCandidates(subjects, countries).filter((item) => {
     const rec = cached(warmKeyOf(item));
     if (!rec) return true;
     const { refreshMs } = timingOf(item.view, item.span, item.subject);
     if (refreshMs != null && nowMs - rec.writtenAt > refreshMs - WARM_SLACK_MS) return true;
-    return item.view === "hyper" && item.subject === "all" && setKey != null && rec.setKey !== setKey;
+    if (item.view === "hyper" && item.subject === "all" && setKey != null && rec.setKey !== setKey) return true;
+    const key = driftKeyOf(item, drift);
+    return key != null && rec.driftKey !== key && nowMs - rec.writtenAt > DRIFT_MIN_MS - WARM_SLACK_MS;
   });
 }
 

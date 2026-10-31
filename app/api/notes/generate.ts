@@ -47,6 +47,8 @@ export interface NoteRecord {
   days: NoteDay[];
   /** Hyper `all` only: the networks with nodes when the digest was written (the warmer compares). */
   setKey?: string;
+  /** The network's held count this note was warmed under (`planPass`); absent on a visitor's write. */
+  driftKey?: string;
 }
 
 /** The day's counters (`statsKeyOf`): one field per outcome, then two volumes. `store` is an
@@ -98,6 +100,8 @@ export interface GenerateOptions {
    *  A record found with ANOTHER `writtenAt`, before or once the lock is held, was just written by
    *  someone else (an overlapping pass, a visitor's read): it is served, not rewritten. */
   seenWrittenAt?: number | null;
+  /** Warm only: stored on the record, what the next pass compares against. */
+  driftKey?: string;
   /** Request only: the limits, SPENT ONLY ON A WRITE (review 2026-10-29). Asked once the facts are
    *  in hand and non-null — inside the lock, before the model — so an ask that answers `none`
    *  (nothing measured for the subject) or `pending` (another writer's lock) costs the visitor
@@ -314,6 +318,7 @@ export async function generateNote(
       spanTo: input.spanTo,
       days: written.days,
       ...(input.setKey != null ? { setKey: input.setKey } : {}),
+      ...(opts.driftKey != null ? { driftKey: opts.driftKey } : {}),
     };
     try {
       await store.set(key, JSON.stringify(record), timing.ttlS);

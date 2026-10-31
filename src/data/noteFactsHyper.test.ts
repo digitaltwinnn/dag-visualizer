@@ -115,6 +115,18 @@ describe("hyperFacts on all", () => {
     expect(find(r, /^Networks that anchored snapshots in the last day, at least$/)[0]!.value).toBe(3);
   });
 
+  // What the warm pass compares (`planPass`): one read of the digest answers every network.
+  it("states each network's held count as its drift key, and the whole network's as all of them", () => {
+    const r = hyperFacts(input())!;
+    expect(r.driftKeys).toMatchObject({ usdc: "30", bio: "10", dor: "0" });
+    expect(r.driftKeys!.all).toContain("usdc:30");
+    expect(hyperFacts(input({ subject: "usdc" }))!.driftKeys).toBeUndefined();
+  });
+  it("an hour's dip in a network's count moves no drift key: the key is the held level", () => {
+    const blip = fleet({ "f.nodes.usdc": row(720, (i) => (i === 716 ? 0 : i < 360 ? 10 : 30)) });
+    expect(hyperFacts(input({ fleet: blip }))!.driftKeys!.usdc).toBe("30");
+  });
+
   it("states the total nodes through gaugeChange: start, end and the ratio, naming no network", () => {
     const r = hyperFacts(input())!;
     expect(find(r, /^Nodes across all networks at the start of the span$/)[0]!.value).toBe(120);

@@ -247,6 +247,7 @@ interface Built {
   blurbs?: string[];
   days?: NotableDay[];
   setKey?: string;
+  driftKeys?: Record<string, string>;
   /** Snapshots only (R71): which question the prompt asks. */
   lead?: NoteLead;
   /** Geography's provider notes: the provider as the facts spell it, the label's to name it by. */
@@ -483,6 +484,8 @@ export interface NoteFacts {
   kind: SubjectKind;
   /** Hyper `all` only: the networks with nodes (the warmer rewrites the digest when it changes). */
   setKey?: string;
+  /** Hyper `all` only: what the warm pass compares a note against (`HyperFacts.driftKeys`). */
+  driftKeys?: Record<string, string>;
   /** Snapshots only (R71): "change" when a pair moved, else "now" — the prompt's question follows. */
   lead?: NoteLead;
   /** Whether the facts hold the COMMON reading (R74, `noteFactsActivity.ts`): the prompt asks for
@@ -527,6 +530,7 @@ export async function factsFor(
     whole: commonIsWhole(built.facts),
     ...(subjectName != null ? { subjectName } : {}),
     ...(built.setKey != null ? { setKey: built.setKey } : {}),
+    ...(built.driftKeys != null ? { driftKeys: built.driftKeys } : {}),
     ...(built.lead != null ? { lead: built.lead } : {}),
   };
 }

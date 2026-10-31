@@ -9,7 +9,7 @@ const [a, b] = CATALOG.mainnet.map((m) => m.id);
 const SUBJECTS = [a!, b!];
 const SET = "DAGa,dag";
 
-type Rec = { writtenAt: number; setKey?: string };
+type Rec = { writtenAt: number; setKey?: string; driftKey?: string };
 const cacheOf = (records: Record<string, Rec>) => (key: string) => records[key] ?? null;
 const keyOf = (i: WarmItem) => noteKeyOf("mainnet", i.view, i.subject, i.span);
 /** Every candidate written at `writtenAt` (hyper `all` carrying the current set). */
@@ -24,6 +24,48 @@ describe("warmCandidates and the unlisted set", () => {
     const items = warmCandidates(["unlisted"], []);
     expect(items.length).toBeGreaterThan(0);
     expect(new Set(items.map((i) => i.view))).toEqual(new Set(["trend"]));
+  });
+});
+
+// A NOTE FOLLOWS ITS NUMBERS, NOT ONLY THE CLOCK (user, 2026-10-31: "or do they feel more dynamic?").
+// A daily note can disagree with the live card for a day, so a Hypergraph or Geography note whose
+// network's held node count moved is due, at most hourly per note.
+describe("planPass — a note follows its numbers", () => {
+  const NET_ID = a!;
+  const item = (view: "hyper" | "geo") => noteKeyOf("mainnet", view, NET_ID, "day");
+  const fresh = (rec: Rec, view: "hyper" | "geo" = "hyper") => {
+    const all = allCached([NET_ID], ["DE"], NOW - 2 * H);
+    return cacheOf({ ...all, [item(view)]: rec });
+  };
+  const has = (plan: WarmItem[], view: string, subject = NET_ID) => plan.some((i) => i.view === view && i.subject === subject);
+
+  it("plans a Hypergraph and a Geography note whose network's count moved", () => {
+    for (const view of ["hyper", "geo"] as const) {
+      const plan = planPass(NOW, [NET_ID], ["DE"], SET, fresh({ writtenAt: NOW - 2 * H, driftKey: "8" }, view), { [NET_ID]: "7" });
+      expect(has(plan, view), view).toBe(true);
+    }
+  });
+  it("leaves a note whose count held", () => {
+    const plan = planPass(NOW, [NET_ID], ["DE"], SET, fresh({ writtenAt: NOW - 2 * H, driftKey: "8" }), { [NET_ID]: "8" });
+    expect(has(plan, "hyper")).toBe(false);
+  });
+  it("rewrites a moved note at most hourly", () => {
+    const young = fresh({ writtenAt: NOW - 30 * 60_000, driftKey: "8" });
+    expect(has(planPass(NOW, [NET_ID], ["DE"], SET, young, { [NET_ID]: "7" }), "hyper")).toBe(false);
+  });
+  it("gives a note with no baseline one rewrite, then it compares", () => {
+    expect(has(planPass(NOW, [NET_ID], ["DE"], SET, fresh({ writtenAt: NOW - 2 * H }), { [NET_ID]: "8" }), "hyper")).toBe(true);
+  });
+  it("compares nothing when the counts could not be read, or the subject has none", () => {
+    const rec = fresh({ writtenAt: NOW - 2 * H, driftKey: "8" });
+    expect(has(planPass(NOW, [NET_ID], ["DE"], SET, rec, null), "hyper")).toBe(false);
+    expect(has(planPass(NOW, [NET_ID], ["DE"], SET, rec, {}), "hyper")).toBe(false);
+  });
+  it("a warmed country and History stay on their clock: the rollout is the two views' networks", () => {
+    const cached = cacheOf(allCached([NET_ID], ["DE"], NOW - 2 * H));
+    const plan = planPass(NOW, [NET_ID], ["DE"], SET, cached, { [NET_ID]: "7", "cc:DE": "1" });
+    expect(has(plan, "geo", "cc:DE")).toBe(false);
+    expect(plan.some((i) => i.view === "trend" && i.span !== "24h")).toBe(false);
   });
 });
 

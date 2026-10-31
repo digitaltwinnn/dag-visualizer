@@ -355,6 +355,16 @@ describe("generateNote", () => {
     expect(res.days.map((x) => [x.networkId, x.caption])).toEqual([["foo", "Foo began."], ["bar", "Bar stopped."]]);
   });
 
+  it("a warm write stores the drift key it was written under", async () => {
+    await generateNote(REQ, deps(), "warm", { driftKey: "8" });
+    expect(JSON.parse((await store.get(KEY))!).driftKey).toBe("8");
+  });
+
+  it("a visitor's write stores none", async () => {
+    await generateNote(REQ, deps(), "warm");
+    expect(JSON.parse((await store.get(KEY))!).driftKey).toBeUndefined();
+  });
+
   // SAID POSITIVELY, ONE REWRITE (user, 2026-10-31): the prompt alone was ignored ("no changes in
   // layers", live). It is style, not honesty, so the second answer stands: a true note is never lost.
   it("a note saying no or none is asked once more, naming the word", async () => {

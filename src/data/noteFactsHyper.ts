@@ -115,6 +115,10 @@ export interface HyperFacts {
   /** On `all` only: the sorted ids of the networks with nodes, comma-joined. The generator stores
    *  it so the warmer can re-write the digest when the set of networks changes. */
   setKey?: string;
+  /** On `all` only: each network's held node count, and `all` for the whole network, as strings.
+   *  The warm pass compares them with what a note was written under (`planPass`), so a note follows
+   *  its numbers. Held levels, so a bad hour moves none. */
+  driftKeys?: Record<string, string>;
 }
 
 const TOP = 3;
@@ -390,6 +394,13 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
   }
 
   const result: HyperFacts = { facts, names: [...new Set([...Object.values(catalog), ...mentioned])], blurbs };
-  if (all) result.setKey = withNodes.slice().sort().join(",");
+  if (all) {
+    result.setKey = withNodes.slice().sort().join(",");
+    const levels = ids.flatMap((id): [string, string][] => {
+      const level = levelOf(id);
+      return level == null ? [] : [[id, String(level)]];
+    });
+    result.driftKeys = { ...Object.fromEntries(levels), all: levels.map(([id, v]) => `${id}:${v}`).sort().join(",") };
+  }
   return result;
 }

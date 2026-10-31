@@ -47,7 +47,7 @@ function deps(over: Partial<WarmDeps> = {}): WarmDeps {
     now: () => NOW,
     writable: true,
     countries: async () => ["DE"],
-    setKey: async () => "DAGa,dag",
+    digest: async () => ({ setKey: "DAGa,dag", driftKeys: { all: "dag:66" } }),
     sleep: vi.fn(async () => {}),
     ...over,
   };
@@ -395,9 +395,27 @@ describe("GET /api/notes/warm (cron)", () => {
   it("a network set that changed rewrites the hyper digest", async () => {
     vi.stubEnv("CRON_SECRET", "s3cret");
     await warmNotes(warmReq("Bearer s3cret"), () => deps());
-    const d = deps({ setKey: async () => "dag" });
+    const d = deps({ digest: async () => ({ setKey: "dag", driftKeys: null }) });
     const body = await (await warmNotes(warmReq("Bearer s3cret"), () => d)).json();
     expect(body).toEqual({ planned: 1, done: 1, failed: 0 });
+  });
+
+  // A note follows its numbers (user, 2026-10-31): one read of the digest, one rewrite of the note
+  // whose count moved, a good hour after it was written, and the new count stored for the next pass.
+  it("a network's held count that moved rewrites its Hypergraph and Geography notes, an hour on", async () => {
+    vi.stubEnv("CRON_SECRET", "s3cret");
+    const id = sampledIds("mainnet")[0]!;
+    const keys = (n: string) => ({ all: "x", [id]: n });
+    const first = deps({ digest: async () => ({ setKey: "DAGa,dag", driftKeys: keys("8") }) });
+    await warmNotes(warmReq("Bearer s3cret"), () => first);
+    expect(JSON.parse((await store.get(noteKeyOf("mainnet", "hyper", id, "day")))!).driftKey).toBe("8");
+    const sameHour = deps({ digest: async () => ({ setKey: "DAGa,dag", driftKeys: keys("7") }) });
+    expect((await (await warmNotes(warmReq("Bearer s3cret"), () => sameHour)).json()).planned).toBe(0);
+    vi.advanceTimersByTime(55 * 60_000);
+    const later = deps({ digest: async () => ({ setKey: "DAGa,dag", driftKeys: keys("7") }), now: () => Date.now() } as never);
+    await warmNotes(warmReq("Bearer s3cret"), () => later);
+    expect(JSON.parse((await store.get(noteKeyOf("mainnet", "geo", id, "day")))!).driftKey).toBe("7");
+    expect(JSON.parse((await store.get(noteKeyOf("mainnet", "hyper", id, "day")))!).driftKey).toBe("7");
   });
 
   it("waits WARM_SPACING_MS before every Gate call but the first, one item at a time", async () => {
