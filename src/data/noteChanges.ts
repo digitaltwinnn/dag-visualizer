@@ -27,7 +27,7 @@ export function countChange(name: string, from: number, to: number, subject: Not
 
 /** A network starting or stopping. Outranks any count: nothing else says it. */
 export function eventChange(name: string, kind: "active" | "quiet", subject: NoteChangeSubject): NoteChange {
-  return { kind, subject, size: Infinity, text: `${name} ${kind === "active" ? "became active" : "went quiet"}` };
+  return { kind, subject, size: Number.MAX_SAFE_INTEGER, text: `${name} ${kind === "active" ? "became active" : "went quiet"}` };
 }
 
 function spacingWords(seconds: number): string {

@@ -26,8 +26,16 @@ describe("countChange", () => {
 
 describe("eventChange", () => {
   it("states a network starting and stopping", () => {
-    expect(eventChange("Dor", "active", NET)).toMatchObject({ kind: "active", text: "Dor became active", size: Infinity });
+    expect(eventChange("Dor", "active", NET)).toMatchObject({ kind: "active", text: "Dor became active" });
     expect(eventChange("Dor", "quiet", NET)).toMatchObject({ kind: "quiet", text: "Dor went quiet" });
+  });
+});
+
+describe("a row's size", () => {
+  it("survives the note's JSON, and an event still outranks any count", () => {
+    const event = eventChange("Dor", "quiet", NET);
+    expect(JSON.parse(JSON.stringify(event)).size).toBe(event.size);
+    expect(event.size).toBeGreaterThan(countChange("Germany", 100000, 0, NET)!.size);
   });
 });
 
