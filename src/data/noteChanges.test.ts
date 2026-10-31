@@ -1,19 +1,36 @@
 import { describe, expect, it } from "vitest";
 
-import { NOTE_CHANGES_CAP, RHYTHM_CHANGE, countChange, eventChange, pickChanges, rhythmChange, siteOfChange } from "@/src/data/noteChanges";
+import { NOTE_CHANGES_CAP, RHYTHM_CHANGE, changeWords, countChange, eventChange, pickChanges, rhythmChange, siteOfChange } from "@/src/data/noteChanges";
 import type { NoteChange } from "@/src/data/noteTypes";
 
 const NET = { kind: "network", id: "dor" } as const;
 
+describe("changeWords", () => {
+  it("says how far a figure moved, rounded", () => {
+    expect(changeWords(34, 30)).toBe("down 12%");
+    expect(changeWords(49669, 53959)).toBe("up 9%");
+  });
+  it("says nothing when it rounds to no change, or there is nothing to move from", () => {
+    expect(changeWords(1000, 1002)).toBeNull();
+    expect(changeWords(0, 5)).toBeNull();
+  });
+});
+
 describe("countChange", () => {
-  it("says the move in one plain sentence, one node or several", () => {
-    expect(countChange("Germany", 34, 29, NET)).toMatchObject({ kind: "lost", text: "Germany lost 5 nodes", size: 5 });
-    expect(countChange("Germany", 29, 30, NET)).toMatchObject({ kind: "gained", text: "Germany gained 1 node", size: 1 });
+  it("says the move in one plain sentence, with how far it moved", () => {
+    expect(countChange("Germany", 34, 30, NET)).toMatchObject({ kind: "lost", text: "Germany lost 4 nodes, down 12%", size: 4 });
+    expect(countChange("Germany", 29, 30, NET)).toMatchObject({ kind: "gained", text: "Germany gained 1 node, up 3%", size: 1 });
   });
-  it("names a place when it was measured", () => {
-    expect(countChange("Hetzner", 9, 6, NET, "Falkenstein")?.text).toBe("Hetzner lost 3 nodes in Falkenstein");
+  it("leaves a move too small to round out as the count alone", () => {
+    expect(countChange("Fleet", 1000, 999, NET)?.text).toBe("Fleet lost 1 node");
   });
-  it("tells a first arrival and a last departure apart from a move", () => {
+  it("names a place when it was measured, and the percentage is that place's", () => {
+    expect(countChange("Hetzner", 51, 48, NET, { city: "Falkenstein", was: 12 })?.text).toBe("Hetzner lost 3 nodes in Falkenstein, down 25%");
+  });
+  it("a provider's first nodes in a city have no percentage", () => {
+    expect(countChange("Hetzner", 48, 51, NET, { city: "Falkenstein", was: 0 })?.text).toBe("Hetzner gained 3 nodes in Falkenstein");
+  });
+  it("tells a first arrival and a last departure apart from a move, with no percentage", () => {
     expect(countChange("Japan", 0, 2, NET)).toMatchObject({ kind: "new", text: "Japan gained its first 2 nodes" });
     expect(countChange("Japan", 0, 1, NET)).toMatchObject({ kind: "new", text: "Japan gained its first node" });
     expect(countChange("Japan", 2, 0, NET)).toMatchObject({ kind: "gone", text: "Japan lost its last 2 nodes" });
@@ -60,11 +77,11 @@ describe("siteOfChange", () => {
   const then = { [f("DE.Falkenstein.hetzner")]: 9, [f("FI.Helsinki.hetzner")]: 4, [f("US.Boston.aws")]: 2 };
   it("is the one city that holds the whole change", () => {
     const now = { ...then, [f("DE.Falkenstein.hetzner")]: 6 };
-    expect(siteOfChange(new Set(["hetzner"]), now, then, -3)).toEqual({ cc: "DE", city: "Falkenstein" });
+    expect(siteOfChange(new Set(["hetzner"]), now, then, -3)).toEqual({ cc: "DE", city: "Falkenstein", was: 9 });
   });
   it("reads a city back out of its segment", () => {
     const a = { [f("US.St%2E%20Louis.aws")]: 1 };
-    expect(siteOfChange(new Set(["aws"]), a, {}, 1)).toEqual({ cc: "US", city: "St. Louis" });
+    expect(siteOfChange(new Set(["aws"]), a, {}, 1)).toEqual({ cc: "US", city: "St. Louis", was: 0 });
   });
   it("is nothing when the change spreads over cities", () => {
     const now = { ...then, [f("DE.Falkenstein.hetzner")]: 8, [f("FI.Helsinki.hetzner")]: 2 };

@@ -701,21 +701,21 @@ describe("geoFacts' notable changes", () => {
   it("a row for a country and one for a provider that moved, read as the facts read them", () => {
     const r = geoFacts(input(week))!;
     expect(r.changes).toEqual([
-      { kind: "lost", size: 2, text: "Germany lost 2 nodes", subject: { kind: "country", cc: "DE" } },
-      { kind: "lost", size: 2, text: "OVH lost 2 nodes", subject: { kind: "provider", keys: ["ovh-sas"], cc: null, city: null } },
+      { kind: "lost", size: 2, text: "Germany lost 2 nodes, down 4%", subject: { kind: "country", cc: "DE" } },
+      { kind: "lost", size: 2, text: "OVH lost 2 nodes, down 17%", subject: { kind: "provider", keys: ["ovh-sas"], cc: null, city: null } },
     ]);
   });
   it("names the city only where the sites measured it at both ends", () => {
     const site = (n: number) => ({ "f.site.DE.Falkenstein.ovh-sas": n });
     const r = geoFacts(input({ ...week, siteDays: { "2026-10-20": site(12), "2026-10-27": site(10) } }))!;
-    expect(r.changes?.[1]).toMatchObject({ text: "OVH lost 2 nodes in Falkenstein", subject: { cc: "DE", city: "Falkenstein" } });
+    expect(r.changes?.[1]).toMatchObject({ text: "OVH lost 2 nodes in Falkenstein, down 17%", subject: { cc: "DE", city: "Falkenstein" } });
   });
   it("a network reads its own days, and names no city", () => {
     const own: DaySpec = { ...NOW, net: { ...NOW.net, usdc: { cc: { DE: 22, US: 10 }, isp: { "hetzner-online-ag": 22 } } } };
     const days = run("2026-10-27", 8, (i) => (i < 2 ? own : NOW));
     const site = (n: number) => ({ "f.site.DE.Falkenstein.hetzner-online-ag": n });
     const r = geoFacts(input({ subject: "usdc", geoDays: days, ccDays: ccOf(days), siteDays: { "2026-10-20": site(22), "2026-10-27": site(20) } }))!;
-    expect(r.changes?.map((c) => c.text)).toEqual(["Germany lost 2 nodes", "Hetzner Online lost 2 nodes"]);
+    expect(r.changes?.map((c) => c.text)).toEqual(["Germany lost 2 nodes, down 9%", "Hetzner Online lost 2 nodes, down 9%"]);
   });
   it("tells a country's first nodes and its last apart from a move", () => {
     const nl: DaySpec = { ...NOW, net: { ...NOW.net, ext: { cc: { FR: 5, JP: 5 }, isp: NOW.net!.ext!.isp } } };
@@ -750,7 +750,7 @@ describe("geoFacts counts nodes as the cards do", () => {
     expect(one(r, /^Germany, nodes a week ago$/).value).toBe(40);
     expect(one(r, /^Located nodes in the network$/).value).toBe(34);
     expect(one(r, /^OVH, nodes \(/).value).toBe(34);
-    expect(r.changes?.[0]?.text).toBe("Germany lost 6 nodes");
+    expect(r.changes?.[0]?.text).toBe("Germany lost 6 nodes, down 15%");
   });
   it("keeps the older count at both ends until then", () => {
     const geoDays = { "2026-10-27": day(fleet(34)) };

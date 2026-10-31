@@ -738,7 +738,7 @@ describe("hyperFacts' notable changes", () => {
   const steady = { "f.nodes": row(N, () => 150), "f.nodes.usdc": row(N, () => 30) };
   it("on all, a row for each network whose node count moved, biggest first", () => {
     const r = hyperFacts(input({ fleet: fleet({ "f.nodes.bio": row(N, (i) => (i < N / 2 ? 10 : 7)) }) }))!;
-    expect(r.changes?.map((c) => c.text)).toEqual(["USDC.dag gained 20 nodes", "BioFi lost 3 nodes"]);
+    expect(r.changes?.map((c) => c.text)).toEqual(["USDC.dag gained 20 nodes, up 200%", "BioFi lost 3 nodes, down 30%"]);
     expect(r.changes?.[0]).toMatchObject({ kind: "gained", subject: { kind: "network", id: "usdc" } });
   });
   it("on all, a network starting outranks a count", () => {
@@ -755,7 +755,7 @@ describe("hyperFacts' notable changes", () => {
       fleet: fleet({ ...steady, "f.type.usdc.l0+cl1": row(N, (i) => (i < N / 2 ? 20 : 19)), "f.type.usdc.l0": row(N, (i) => (i < N / 2 ? 10 : 11)) }),
     }))!;
     expect(r.changes).toHaveLength(2);
-    expect(r.changes).toContainEqual({ kind: "lost", size: 1, text: "Hybrid group lost 1 node", subject: { kind: "type", netId: "usdc", type: "l0+cl1" } });
+    expect(r.changes).toContainEqual({ kind: "lost", size: 1, text: "Hybrid group lost 1 node, down 5%", subject: { kind: "type", netId: "usdc", type: "l0+cl1" } });
   });
   it("a layer group's own note is a subject note: no rows", () => {
     expect(hyperFacts(input({ subject: { net: "usdc", type: "l0" } }))!.changes).toBeUndefined();

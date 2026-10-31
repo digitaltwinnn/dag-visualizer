@@ -566,7 +566,7 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
           const keys = new Set([...(a?.keys ?? []), ...(b?.keys ?? [])]);
           const site = siteOfChange(keys, sitesNow, sitesThen, to - from);
           const subject: NoteChangeSubject = { kind: "provider", keys: [...keys], cc: site?.cc ?? null, city: site?.city ?? null };
-          return countChange(p.name, from, to, subject, site?.city) ?? [];
+          return countChange(p.name, from, to, subject, site) ?? [];
         })
       : [];
     changes = pickChanges(countryRows, providerRows);
