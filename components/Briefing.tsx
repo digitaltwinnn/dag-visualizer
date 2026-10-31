@@ -179,13 +179,13 @@ function Tour({ stop }: { stop: number }) {
             <div className="absolute inset-x-0 top-0 flex flex-col gap-1 px-3 pt-[calc(env(safe-area-inset-top)+10px)]">
               {bars}
               <div className="flex items-center justify-between">
-                <span aria-hidden className="text-title font-semibold text-foreground">{name}</span>
+                <span aria-hidden className="text-body font-semibold text-foreground">{name}</span>
                 {skip}
               </div>
             </div>
           )}
           <div className="absolute inset-x-0 bottom-0 px-[max(16px,3.7vw)] pb-[calc(env(safe-area-inset-bottom)+22px)]">
-            {phone ? <div className="mb-1 min-h-5">{who}</div> : <p aria-hidden className="mb-2 text-figure text-muted-foreground">{name}</p>}
+            {phone ? <div className="mb-1 min-h-5">{who}</div> : <p aria-hidden className="mb-1 text-title text-muted-foreground">{name}</p>}
             <div aria-hidden className="min-h-[2.52em] max-w-[79%] text-briefing font-medium text-foreground max-[700px]:min-h-[3.8em] max-[700px]:max-w-full">
               <TypedNote key={`${stop}:${words.text}`} text={words.text} waited />
             </div>
