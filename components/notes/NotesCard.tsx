@@ -1,17 +1,18 @@
 "use client";
 
+import { ChevronUp } from "lucide-react";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 import CardHead, { RailPane } from "@/components/CardHead";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { AI_NOTES_ICON, KIND_MARK_CLASS } from "@/components/icons";
-import { Door, QualifierChip, foldLabel } from "@/components/inspector/parts";
+import { Door, QualifierChip } from "@/components/inspector/parts";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { cn } from "@/lib/utils";
 import { useFeedRead } from "@/components/useFeedRead";
 import { latestTickOf } from "@/src/data/ladderLevels";
 import { getNetwork } from "@/src/data/network";
-import type { NoteChange, NoteDay, NoteView } from "@/src/data/noteTypes";
+import type { NotableKind, NoteChange, NoteChangeKind, NoteDay, NoteView } from "@/src/data/noteTypes";
 import { spanPhrase } from "@/src/data/trendWindow";
 import { ledgerNetwork } from "@/src/engine/domain/tickNet";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -30,7 +31,7 @@ import { useAiNote, useWaited } from "./useAiNote";
 // the VIEW's note at the filter's scope (`noteSubjectOf`: the network, else everything; in History
 // the filter's plane over the window pill, never the plane brought forward), with History's few
 // notable days that each commit their own day as the range, and the other views' notable changes
-// that each commit their own subject. It HOLDS under a drill (spec 2026-10-29-subject-notes): a committed country,
+// that each commit their own subject, both folded into the card's foot. It HOLDS under a drill (spec 2026-10-29-subject-notes): a committed country,
 // provider, make-up or brushed range carries its own note inside its own card (`SubjectNote`).
 //
 // It is CONTEXT, not a reading: the one card in the rail whose words no instrument measured, marked
@@ -76,6 +77,8 @@ const TITLE = "Constellation Gate AI";
 // THE CARD'S CONTROLS ARE DOORS (`parts.tsx` — the one way a card draws a way out, with the
 // per-ground wash the user ruled). They sit flush on the card's bottom edge (RecordsDoor's foot
 // geometry): the run bleeds by the card's padding below, and its last door takes the inner radius.
+/** The most coins the foot stacks: enough to say what kinds are inside, in the row's own height. */
+const STACK_MAX = 3;
 const DOOR_RUN = "-mb-[var(--card-pad)] [&>:last-child]:rounded-b-[calc(var(--radius)-1px)]";
 
 /** One notable day: DATE AND KIND LEAD (user, 2026-10-30, design option B of four in the
@@ -202,39 +205,34 @@ function ChangeRow({ change, view }: { change: NoteChange; view: NoteView }) {
   );
 }
 
-/** A NOTE'S ROWS, FOLDED (user, 2026-10-27): the card tops the lane, so a run of rows open by default
- *  would push the view's subject cards down the rail. The fold is marked on its label (`foldLabel`,
- *  the app's there-is-more affordance), the count on the right edge. Keyed on the subject by the
- *  caller, so a new subject starts folded. */
-function NoteRows({ heading, count, children }: { heading: string; count: number; children: ReactNode }) {
+/** A NOTE'S ROWS, ON THE CARD'S FOOT (user, 2026-10-31, option B of five). The card tops the lane, so
+ *  a run of rows open by default would push the view's subject cards down the rail (2026-10-27), and
+ *  a label floating between the note and the rows belonged to neither. Folded, they are one door on
+ *  the card's bottom edge, the "Snapshot records" recipe, their coins stacked to say what is inside;
+ *  open, they sit above it and the foot holds its place, so the card always ends the same way. Keyed
+ *  on the subject by the caller, so a new subject starts folded. */
+function NoteRows({ word, kinds, children }: { word: string; kinds: readonly (NotableKind | NoteChangeKind)[]; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const panel = useId();
   return (
-    <>
-      {/* THE APP'S FOLD (ScheduleGroup's recipe, `inspector/cards.tsx`): one CONTROL that selects
-          nothing, a keyboard-only focus outline, the touch tier's tap height, the label lifting to
-          full ink on hover and when open. Phrasing content only inside a <button>: no <div>. */}
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={panel}
+    <div className={cn("mt-3", DOOR_RUN)}>
+      {open && <div id={panel}>{children}</div>}
+      <Door
+        expanded={open}
+        controls={panel}
         onClick={() => setOpen((o) => !o)}
-        className={cn(
-          "group mt-3 flex w-full items-center justify-between gap-2.5 touch:min-h-10 cursor-pointer select-none border-0 bg-transparent p-0 text-left outline-none focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
-          open ? "mb-1.5" : "mb-0",
-        )}
+        label={
+          <span aria-hidden className="inline-flex [&>:not(:first-child)]:-ml-[5px]">
+            {kinds.slice(0, STACK_MAX).map((k, i) => (
+              <NoteKindCoin key={i} kind={k} />
+            ))}
+          </span>
+        }
+        glyph={<ChevronUp className={cn("size-3.5 transition-transform motion-reduce:transition-none", open && "rotate-180")} />}
       >
-        <span className={cn("min-w-0 truncate text-label tracking-caps uppercase", open ? "text-foreground" : "text-muted-foreground group-hover:text-foreground", foldLabel(open))}>
-          {heading}
-        </span>
-        <span className="flex-none font-mono text-body font-bold tabular-nums text-foreground">{count}</span>
-      </button>
-      {open && (
-        <div id={panel} className={DOOR_RUN}>
-          {children}
-        </div>
-      )}
-    </>
+        {kinds.length} notable {word}{kinds.length === 1 ? "" : "s"}
+      </Door>
+    </div>
   );
 }
 
@@ -327,7 +325,7 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
                   what it covers, and the note is rewritten on its own cadence. */}
               <TypedNote text={res.text} waited={waited} className="m-0 text-body leading-snug text-foreground" />
               {res.days.length > 0 && (
-                <NoteRows key={titleKey} heading="Notable days" count={res.days.length}>
+                <NoteRows key={titleKey} word="day" kinds={res.days.map((d) => d.kind)}>
                   {/* Not keyed by day alone: one day can be two notables (a network's low and its
                       pause; two networks' first day on the DAG). */}
                   {res.days.map((d) => (
@@ -336,7 +334,7 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
                 </NoteRows>
               )}
               {res.changes?.length ? (
-                <NoteRows key={titleKey} heading="Notable changes" count={res.changes.length}>
+                <NoteRows key={titleKey} word="change" kinds={res.changes.map((c) => c.kind)}>
                   {res.changes.map((c) => (
                     <ChangeRow key={c.text} change={c} view={subject.view} />
                   ))}

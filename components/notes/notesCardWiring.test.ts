@@ -51,22 +51,25 @@ describe("the notes card's own behaviour", () => {
   // THE OTHER VIEWS' ROWS (user, 2026-10-31): a sentence code wrote, committing its subject through
   // the one executor (rule 2; `noteChangeTarget`), and folded like the days, under their own title.
   it("a view note's notable changes share the days' fold and commit through the executor", () => {
-    expect(card).toMatch(/heading="Notable days"/);
-    expect(card).toMatch(/heading="Notable changes"/);
+    expect(card).toMatch(/word="day"/);
+    expect(card).toMatch(/word="change"/);
     const body = fnBody(card, "function ChangeRow(");
     expect(body).toMatch(/applyClickActions\(acts\)/);
     expect(body).toMatch(/<NoteKindCoin kind=\{change\.kind\} \/>/);
     expect(body).toMatch(/<NoteText text=\{change\.text\} \/>/);
   });
 
-  it("History's notable days start folded, their rows mounted only when open", () => {
+  // THE CARD'S FOOT (user, 2026-10-31, option B of five): folded, the rows are one door on the card's
+  // bottom edge with their coins stacked; open, they sit above it and the foot stays where it was.
+  it("a note's rows fold into the card's foot, mounted only when open", () => {
     const body = fnBody(card, "function NoteRows(");
     expect(body).toMatch(/const \[open, setOpen\] = useState\(false\);/);
-    expect(body).toMatch(/\{open && \(/);
-    expect(body).toMatch(/aria-expanded=\{open\}/);
-    // The fold's control holds phrasing content only (no SectionLabel <div> inside a <button>).
-    const button = /<button\s+type=[^]*?<\/button>/.exec(body)![0];
-    expect(button).not.toMatch(/<div|<SectionLabel/);
+    expect(body).toMatch(/\{open && <div id=\{panel\}>\{children\}<\/div>\}/);
+    expect(body).toMatch(/expanded=\{open\}/);
+    expect(body).toMatch(/controls=\{panel\}/);
+    expect(body.indexOf("{children}")).toBeLessThan(body.indexOf("<Door"));
+    expect(body).toMatch(/kinds\.slice\(0, STACK_MAX\)/);
+    expect(read("components/inspector/parts.tsx")).toMatch(/aria-expanded=\{expanded\}/);
   });
 
   // DATE AND KIND LEAD (user, 2026-10-30, design option B of four in the brainstorming companion):

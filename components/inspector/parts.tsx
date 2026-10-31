@@ -224,6 +224,8 @@ export function Door({
   flushFoot,
   wrap,
   lit,
+  expanded,
+  controls,
   onPointerEnter,
   onPointerLeave,
   onFocus,
@@ -242,6 +244,9 @@ export function Door({
   wrap?: boolean;
   /** Hold the hover wash: another surface previews this door's subject (a hover pairing). */
   lit?: boolean;
+  /** A door that discloses: whether its panel is open, and that panel's id. */
+  expanded?: boolean;
+  controls?: string;
   /** The hover pair, for a door whose subject another surface can light (convention 9). */
   onPointerEnter?: () => void;
   onPointerLeave?: () => void;
@@ -276,7 +281,7 @@ export function Door({
       {inner}
     </a>
   ) : (
-    <button type="button" onClick={onClick} disabled={disabled} className={cn(cls, "w-[calc(100%+2*var(--card-pad))] cursor-pointer")} {...pair}>
+    <button type="button" onClick={onClick} disabled={disabled} aria-expanded={expanded} aria-controls={expanded ? controls : undefined} className={cn(cls, "w-[calc(100%+2*var(--card-pad))] cursor-pointer")} {...pair}>
       {inner}
     </button>
   );
