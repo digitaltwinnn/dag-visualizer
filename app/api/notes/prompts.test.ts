@@ -387,3 +387,21 @@ describe("the Briefing's line", () => {
     expect(parseAnswer("A b.").line).toBeNull();
   });
 });
+
+describe("the Briefing's line, in an untidy answer", () => {
+  it("leaves the note when the model skipped NOTE:", () => {
+    const r = parseAnswer("A b. C d.\nLINE: A in short.");
+    expect(r.note).toBe("A b. C d.");
+    expect(r.line).toBe("A in short.");
+  });
+
+  it("is split from a note on the same line", () => {
+    const r = parseAnswer("NOTE: A b. C d. LINE: A in short.");
+    expect(r.note).toBe("A b. C d.");
+    expect(r.line).toBe("A in short.");
+  });
+
+  it("loses the markdown around it", () => {
+    expect(parseAnswer("NOTE: A b.\n**LINE: A in short.**").line).toBe("A in short.");
+  });
+});

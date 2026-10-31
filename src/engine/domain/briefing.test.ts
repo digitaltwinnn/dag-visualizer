@@ -47,8 +47,8 @@ describe("the tour's clock", () => {
 });
 
 describe("the tour's staging", () => {
-  it("gives the scene longer than the HUD's own boot timeout before standing down", () => {
-    expect(SCENE_WAIT_MS).toBeGreaterThan(8000);
+  it("stands down when the HUD's boot ladder would, so a dead feed never hides the controls longer", () => {
+    expect(SCENE_WAIT_MS).toBe(8000);
   });
 
   it("runs the transition faster, never slower", () => {

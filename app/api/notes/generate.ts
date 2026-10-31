@@ -157,6 +157,9 @@ type Written = { ok: true; text: string; days: NoteDay[]; line?: string } | { ok
 /** The longest the Briefing's line may run: past this it stops being a line, and the tour falls
  *  back on the note's first sentence. */
 export const LINE_MAX = 110;
+/** The room an answer with a line gets: a cut-off answer is no answer, so a line must never cost
+ *  its note (History's 30-day note also carries up to five captions). */
+const LINE_TOKENS = 560;
 
 /** What the code tidies in checked text: the numbers stand, only their words change. */
 const plainly = (text: string): string => sayAll(spellDurations(text));
@@ -180,7 +183,7 @@ async function write(
     if (attempt > 0) await count("retried");
     let answer: string;
     try {
-      answer = await chat(buildMessages(req.view, input.label, block, days, reasons, input.lead, input.common, input.kind, spanWords(req.view, req.span, input.spanFrom, input.spanTo), input.whole, wantsLine));
+      answer = await chat(buildMessages(req.view, input.label, block, days, reasons, input.lead, input.common, input.kind, spanWords(req.view, req.span, input.spanFrom, input.spanTo), input.whole, wantsLine), wantsLine ? { maxTokens: LINE_TOKENS } : undefined);
       await count("calls");
     } catch (e) {
       if (!(e instanceof GateError)) throw e; // not the Gate's: `generateNote` counts it as `error`

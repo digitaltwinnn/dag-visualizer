@@ -36,7 +36,7 @@ export interface GateMessage { role: "system" | "user"; content: string }
 
 export async function gateChat(
   messages: GateMessage[],
-  opts?: { fetchImpl?: typeof fetch; timeoutMs?: number },
+  opts?: { fetchImpl?: typeof fetch; timeoutMs?: number; maxTokens?: number },
 ): Promise<string> {
   const key = process.env.GATE_API_KEY?.trim();
   if (!key) throw new GateError("nokey");
@@ -51,7 +51,7 @@ export async function gateChat(
       res = await doFetch(ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-        body: JSON.stringify({ model, messages, temperature: 0.3, max_tokens: 400 }),
+        body: JSON.stringify({ model, messages, temperature: 0.3, max_tokens: opts?.maxTokens ?? 400 }),
         signal: ctl.signal,
       });
     } catch (e) {

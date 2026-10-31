@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { SCENE_WAIT_MS } from "@/src/engine/domain/briefing";
 import { useStore } from "@/src/store/store";
 
 // THE HUD'S STAGED ENTRANCE (2026-09-04). Cold start used to be: boot overlay + forming scene,
@@ -23,7 +24,7 @@ import { useStore } from "@/src/store/store";
 export type BootStage = 0 | 1 | 2 | 3;
 
 const STEP_MS = 350;
-const CHROME_TIMEOUT_MS = 8000;
+const CHROME_TIMEOUT_MS = SCENE_WAIT_MS;
 
 export function useBootStage(): BootStage {
   const engineReady = useStore((s) => s.engineReady);

@@ -2,8 +2,9 @@ import { describe, it, expect } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-// The four REACT → ENGINE publish channels (2026-08-19; the fourth 2026-09-18): `boxedCard`,
-// the `sceneCover*` family, `focusRung` and `trendIds`. The cover family is five scalars since
+// The five REACT → ENGINE publish channels (2026-08-19; the fourth 2026-09-18, the fifth
+// 2026-10-31): `boxedCard`, the `sceneCover*` family, `focusRung`, `trendIds` and `briefing`, the
+// tour's stop. The cover family is five scalars since
 // 2026-09-28: `sceneCoverL`/`R` (a tablet side sheet's MEASURED width) and `sceneCoverBExplore`/
 // `BDetails`/`BVitals` (each phone dock's bottom height, published from the dock's own target-height
 // STATE, so the scene shift eases once rather than chasing a grow). Each carries a fact only React can know
@@ -19,10 +20,10 @@ import { join } from "node:path";
 // four rules below are recorded as ⚠️ comments in CLAUDE.md or at their call sites; this makes them
 // executable.
 //
-// EXEMPTIONS: none. All four channels are covered, and adding a fifth means adding it here.
+// EXEMPTIONS: none. All five channels are covered, and adding a sixth means adding it here.
 // Their consumers are separately covered — `components/calloutBoundary.test.ts` pins that both
 // callout owners consult `boxedCard`, which is the READ half of that channel.
-const CHANNELS = ["setBoxedCard", "setSceneCover", "requestFocusRung", "setTrendIds"] as const;
+const CHANNELS = ["setBoxedCard", "setSceneCover", "requestFocusRung", "setTrendIds", "setBriefing"] as const;
 
 const walk = (dir: string): string[] =>
   readdirSync(dir).flatMap((name) => {
@@ -43,7 +44,7 @@ const callersOf = (setter: string, roots: string[]) =>
 describe("the React → Engine publish channels are one-way", () => {
   it("no engine module writes a publish channel", () => {
     // Rule 1 makes the engine layer the only one that touches the store at all; this says what it
-    // may do there with these four. A channel the Engine could write is a feedback loop: it renders
+    // may do there with these five. A channel the Engine could write is a feedback loop: it renders
     // from the value it just set, and React's own reading arrives a commit later to fight it.
     const offenders = walk(join("src", "engine"))
       .map((p) => ({ p, src: read(p) }))
@@ -52,6 +53,10 @@ describe("the React → Engine publish channels are one-way", () => {
       offenders,
       `the engine READS these channels and must never write them: ${offenders.join(", ")}`,
     ).toEqual([]);
+  });
+
+  it("the tour's stop has one writer", () => {
+    expect(callersOf("setBriefing", ["app", "components"])).toEqual([join("components", "Briefing.tsx")]);
   });
 
   it("trendIds is published, never subscribed — React must not render from it", () => {

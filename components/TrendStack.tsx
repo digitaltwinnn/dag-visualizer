@@ -119,6 +119,8 @@ export default function TrendStack() {
   // the reader's eyes, exactly as it cuts the document's per-network columns.
   const filter = useStore((s) => s.filter);
   const metric = useStore((s) => s.trendMetric);
+  // The Briefing's stage is look, don't touch: its chart heads stay out of the tab order behind it.
+  const briefing = useStore((s) => s.briefing != null);
   const liveScroll = useStore((s) => s.trendScroll);
   const liveFocus = useStore((s) => s.trendFocus);
   // THE DEAL HOLDS WHILE IT LEAVES (user, 2026-10-31: the chart "was showing DAG but while the view
@@ -555,6 +557,7 @@ export default function TrendStack() {
               ["--roll-in-y" as string]: staged.dir === "next" ? "14px" : "-14px",
             }
       }
+      inert={briefing || undefined}
       className="group/stack absolute inset-0 pointer-events-none z-[4] opacity-0 [transition:opacity_var(--tempo-nav)_ease] data-[on='1']:opacity-100 motion-reduce:!transition-none"
     >
       {/* THE TETHER from the band's span to the front chart's time axis — inside this layer so it

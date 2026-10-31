@@ -90,12 +90,13 @@ rung maps to a hinted rail card slot), `components/railTierBoundary.test.ts` (`d
 homes and the slab's geometry — the pager included — keys on `data-tier`),
 `components/cssTrapBoundary.test.ts` (CSS traps 3 and 6 — a `bg-[var()]` never points at a gradient
 token, and every custom `text-*`/`tracking-*`/`rounded-*` token is registered with twMerge),
-`components/publishChannelBoundary.test.ts` (the four React→Engine publish channels are one-way and
+`components/publishChannelBoundary.test.ts` (the five React→Engine publish channels are one-way and
 single-publisher: `focusRung` is a fresh object bridged by reference, the `sceneCover*` family
 is reported by `RailDock` and sided by its owner — a tablet side sheet's MEASURED width by the two
 rails, a phone dock's bottom HEIGHT from its own target-height state by all three docks, `boxedCard` is Inspector's alone, and
 `trendIds` — the History stack's busiest-first roster, derived from fetched data that lives only in
-React's cache — is `TrendStack`'s alone and is never read back by a component),
+React's cache — is `TrendStack`'s alone and is never read back by a component, and `briefing`, the tour's stop, is
+`Briefing`'s alone),
 `components/trendStackBoundary.test.ts` (the DOM chart planes' split with their projector: the two
 markers, the anchor's 0-size shape, no blur or shadow anywhere on a plane, the memoised plot and the
 plot box its cursor overlay is calculated against),

@@ -663,3 +663,17 @@ describe("the Briefing's line", () => {
     expect(await generateNote(BRIEF, deps({ answers: answer(long) }), "read")).not.toHaveProperty("line");
   });
 });
+
+describe("an answer with a line gets more room", () => {
+  it("so a line never costs its note", async () => {
+    const d = deps();
+    await generateNote({ net: "mainnet", view: "trend", subject: "dag", span: "30d" }, d, "read");
+    expect(d.chat.mock.calls[0]![1 as never]).toMatchObject({ maxTokens: expect.any(Number) });
+  });
+
+  it("and no other note asks for it", async () => {
+    const d = deps();
+    await generateNote(REQ, d, "read");
+    expect(d.chat.mock.calls[0]![1 as never]).toBeUndefined();
+  });
+});

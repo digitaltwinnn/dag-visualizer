@@ -19,9 +19,9 @@ export const BRIEFING_PACE = 1.5;
  *  through the projection offset a phone sheet's cover already uses (`sheetShift.ts`). */
 export const BRIEFING_COVER = 0.18;
 
-/** How long the tour waits for the scene before standing down: a dead feed must not hold the app
- *  behind a tour that cannot start. */
-export const SCENE_WAIT_MS = 15_000;
+/** How long the tour waits for the scene before standing down: the moment the HUD's boot ladder
+ *  gives up on a dead feed (`useBootStage`), so the tour never holds the controls back longer. */
+export const SCENE_WAIT_MS = 8000;
 
 export interface BriefingEntry {
   pathname: string;

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { track } from "@vercel/analytics";
+import { cn } from "@/lib/utils";
 import { AI_NOTES_ICON } from "@/components/icons";
 import { briefingReq, briefingWords } from "@/components/notes/briefingNote";
 import { AI_TITLE } from "@/components/notes/noteSubject";
@@ -47,7 +48,7 @@ function endBriefing(stop: number, how: End): void {
   if (how === "done") s.setMode(BRIEFING_STOPS[0]);
   s.setBriefing(null); // after the mode, so the route publishes where the tour left off
   s.setRailsHidden(false);
-  if (how !== "unready") track("briefing-end", { how, at: BRIEFING_STOPS[stop] });
+  track("briefing-end", { how, at: BRIEFING_STOPS[stop] });
 }
 
 export default function Briefing() {
@@ -78,18 +79,29 @@ function Tour({ stop }: { stop: number }) {
   const words = briefingWords(view, { geo, ledger, hyper, trend }[view].res);
   const name = VIEWS.find((v) => v.id === view)!.name;
   const fill = useRef<HTMLElement | null>(null);
+  const skipRef = useRef<HTMLButtonElement | null>(null);
+
+  // On the scene, not on the mount: a stop nobody could see is no stop, and the first mount runs
+  // before analytics has its queue.
+  useEffect(() => {
+    if (ready) track("briefing-stop", { stop: view });
+  }, [ready, view]);
 
   useEffect(() => {
-    track("briefing-stop", { stop: view });
+    if (ready) skipRef.current?.focus({ preventScroll: true });
+  }, [ready]);
+
+  useEffect(() => {
     let raf = 0;
     let last = performance.now();
     let waited = 0;
     let ran = 0;
     const tick = (now: number) => {
       const dt = Math.min(now - last, 100); // a tab coming back must not jump the tour
+      waited += Math.min(now - last, 1000); // real time: a slow phone gets no longer behind a dead feed
       last = now;
       const s = useStore.getState();
-      if (s.engineFailed || (!s.sceneReady && (waited += dt) > SCENE_WAIT_MS)) return endBriefing(stop, "unready");
+      if (s.engineFailed || (!s.sceneReady && waited > SCENE_WAIT_MS)) return endBriefing(stop, "unready");
       if (s.sceneReady) ran += dt;
       if (fill.current) fill.current.style.transform = `scaleX(${Math.min(1, ran / STOP_MS)})`;
       if (mayAdvance(ran, s.motionPhase)) {
@@ -133,6 +145,7 @@ function Tour({ stop }: { stop: number }) {
   );
   const skip = (
     <button
+      ref={skipRef}
       type="button"
       onClick={(e) => {
         e.stopPropagation();
@@ -152,7 +165,14 @@ function Tour({ stop }: { stop: number }) {
   );
 
   return (
-    <section aria-label="Network briefing" onClick={() => endBriefing(stop, "tap")} className="fixed inset-0 z-50 cursor-pointer">
+    <section
+      aria-label="Network briefing"
+      onClick={ready ? () => endBriefing(stop, "tap") : undefined}
+      className={cn("fixed inset-0 z-50", ready ? "cursor-pointer" : "pointer-events-none")}
+    >
+      {/* The caption types itself in, so a screen reader hears this instead: one region, standing
+          from the start, so the first stop is announced and each is announced once. */}
+      <p className="sr-only" aria-live="polite">{ready ? `${name}: ${words.text}` : ""}</p>
       {ready && (
         <>
           <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-[44%] [background:linear-gradient(transparent,var(--scene-ground)_38%)]" />
@@ -160,14 +180,14 @@ function Tour({ stop }: { stop: number }) {
             <div className="absolute inset-x-0 top-0 flex flex-col gap-1 px-3 pt-[calc(env(safe-area-inset-top)+10px)]">
               {bars}
               <div className="flex items-center justify-between">
-                <span className="text-title font-semibold text-foreground">{name}</span>
+                <span aria-hidden className="text-title font-semibold text-foreground">{name}</span>
                 {skip}
               </div>
             </div>
           )}
           <div className="absolute inset-x-0 bottom-0 px-[max(16px,3.7vw)] pb-[calc(env(safe-area-inset-bottom)+22px)]">
-            {phone ? <div className="mb-1 min-h-5">{who}</div> : <p className="mb-2 text-figure text-muted-foreground">{name}</p>}
-            <div aria-live="polite" className="min-h-[2.52em] max-w-[79%] text-briefing font-medium text-foreground max-[700px]:min-h-[3.8em] max-[700px]:max-w-full">
+            {phone ? <div className="mb-1 min-h-5">{who}</div> : <p aria-hidden className="mb-2 text-figure text-muted-foreground">{name}</p>}
+            <div aria-hidden className="min-h-[2.52em] max-w-[79%] text-briefing font-medium text-foreground max-[700px]:min-h-[3.8em] max-[700px]:max-w-full">
               <TypedNote key={`${stop}:${words.text}`} text={words.text} waited />
             </div>
             {!phone && (

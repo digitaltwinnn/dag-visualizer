@@ -57,17 +57,19 @@ export default function RouteSync() {
 
     const unsub = useStore.subscribe((state, prev) => {
       if (state.mode === prev.mode && state.docPage === prev.docPage && state.briefing === prev.briefing) return;
-      const view = VIEWS.find((v) => v.id === state.mode);
-      document.title = state.docPage ? DOC_TITLES[state.docPage] : view ? viewTitle(view.name) : document.title;
       // A tour stop is not a page view: the address bar holds on `/` until the tour ends, and the
-      // view it ended on then publishes as any switch does. On the globe that is nothing at all.
-      if (fromPop || state.briefing != null) return;
+      // view it ended on then publishes as any switch does. On the globe that is nothing at all,
+      // and `/` keeps its own title.
+      if (state.briefing != null) return;
+      const landed = !state.docPage && modeForPath(location.pathname) === state.mode;
+      const view = VIEWS.find((v) => v.id === state.mode);
+      if (!landed || fromPop) document.title = state.docPage ? DOC_TITLES[state.docPage] : view ? viewTitle(view.name) : document.title;
+      if (fromPop) return;
       const modePath = pathForMode(state.mode);
       if (modePath) lastViewPath = modePath;
       const path = state.docPage
         ? DOC_PATHS[state.docPage]
         : (modePath ?? (docForPath(location.pathname) ? lastViewPath : null));
-      const landed = !state.docPage && modeForPath(location.pathname) === state.mode;
       if (path && path !== location.pathname && !landed) {
         history.pushState(null, "", path + location.search);
         // ONE custom event per in-app switch (2026-10-18): Web Analytics counts the pushState as a

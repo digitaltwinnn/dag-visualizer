@@ -204,7 +204,9 @@ export function buildMessages(
 const THINK_RE = /<think>[\s\S]*?(?:<\/think>|$)/gi;
 const NOTE_RE = /^[\s*_#]*NOTE[*_]*:[*_\s]*(.*)$/i;
 const DAY_RE = /^[\s*_#]*DAY\s+(\d{4}-\d{2}-\d{2})[*_]*\s*:[*_\s]*(.*)$/i;
-const LINE_RE = /^[\s*_#]*LINE[*_]*:[*_\s]*(.*)$/i;
+const LINE_RE = /^[\s*_#]*LINE[*_]*:[*_\s]*(.*?)[*_\s]*$/i;
+/** A `LINE:` the model ran on from the note: put on its own line before anything reads it. */
+const LINE_RUN_ON_RE = /(?<=\S)[ \t]+(?=[*_]*LINE[*_]*:)/g;
 const FENCE_RE = /^```/;
 
 /** READ THE ANSWER BACK: `NOTE: …`, an optional `LINE: …`, then one `DAY YYYY-MM-DD: …` line per day. Tolerant by design,
@@ -215,10 +217,13 @@ const FENCE_RE = /^```/;
  *  up to the first DAY line. With no `NOTE:` line at all the whole trimmed text is the note, and
  *  there are no captions. */
 export function parseAnswer(text: string): { note: string; captions: Map<string, string>; line: string | null } {
-  const lines = text.replace(THINK_RE, "").trim().split("\n").map((l) => l.trim()).filter((l) => !FENCE_RE.test(l));
+  const lines = text.replace(THINK_RE, "").replace(LINE_RUN_ON_RE, "\n").trim().split("\n").map((l) => l.trim()).filter((l) => !FENCE_RE.test(l));
   const captions = new Map<string, string>();
   const start = lines.findIndex((l) => NOTE_RE.test(l));
-  if (start < 0) return { note: lines.join("\n").trim(), captions, line: null };
+  if (start < 0) {
+    const said = lines.find((l) => LINE_RE.test(l));
+    return { note: lines.filter((l) => l !== said).join("\n").trim(), captions, line: said ? LINE_RE.exec(said)![1]!.trim() || null : null };
+  }
   const note = [NOTE_RE.exec(lines[start]!)![1]!];
   const seen = new Map<string, number>();
   let inNote = true;
