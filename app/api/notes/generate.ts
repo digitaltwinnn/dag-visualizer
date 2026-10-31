@@ -1,4 +1,4 @@
-import { factsBlock } from "@/src/data/noteFacts";
+import { factsBlock, spellDurations } from "@/src/data/noteFacts";
 import { checkNote } from "@/src/data/noteHonesty";
 import { withDayChange } from "@/src/data/notableDays";
 import { withMovePercents } from "@/src/data/noteChanges";
@@ -200,14 +200,14 @@ async function write(
       seen.set(iso, n);
       const caption = captions.get(n === 1 ? iso : `${iso}#${n}`);
       if (caption && checkNote(caption, input.facts, input.names, { maxSentences: 1, subject }).ok)
-        kept.push({ dayMs: d.dayMs, kind: d.kind, networkId: d.networkId, caption: withDayChange(caption, d) });
+        kept.push({ dayMs: d.dayMs, kind: d.kind, networkId: d.networkId, caption: withDayChange(spellDurations(caption), d) });
     }
     if (negative) {
-      held = { ok: true, text: withMovePercents(note, input.facts), days: kept };
+      held = { ok: true, text: withMovePercents(spellDurations(note), input.facts), days: kept };
       reasons = [`say what held steady instead of "${negative.toLowerCase()}"`];
       continue;
     }
-    return { ok: true, text: withMovePercents(note, input.facts), days: kept };
+    return { ok: true, text: withMovePercents(spellDurations(note), input.facts), days: kept };
   }
   warn(req, "gateFail");
   return { ok: false, stat: "gateFail" };

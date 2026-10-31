@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { ledgerFacts, type LedgerFactsInput } from "@/src/data/noteFactsLedger";
 import { checkNote } from "@/src/data/noteHonesty";
-import { formatSeconds } from "@/src/data/trendSeries";
 import { pairsOf } from "@/src/data/testkit/notePairs";
 import type { TrendsWindowData } from "@/src/data/trendWindow";
 
@@ -65,16 +64,16 @@ describe("ledgerFacts on the whole chamber", () => {
     expect(ledgerFacts(input({ subject: "dag" }))!.facts).toEqual(ledgerFacts(input())!.facts);
   });
 
-  it("states the spacing as durations whose text is formatSeconds", () => {
+  it("states the spacing as durations, written out", () => {
     const r = ledgerFacts(input())!;
     const [mean] = find(r, /^Mean spacing between global snapshots, recent/);
     const [longest] = find(r, /^Longest gap between global snapshots, recent/);
     expect(mean!.kind).toBe("duration");
     expect(mean!.value).toBeCloseTo(15, 9); // g.gapSum / g.ticks
-    expect(mean!.text).toBe(formatSeconds(mean!.value));
+    expect(mean!.text).toBe("15 seconds");
     expect(longest!.kind).toBe("duration");
     expect(longest!.value).toBe(40);
-    expect(longest!.text).toBe(formatSeconds(40));
+    expect(longest!.text).toBe("40 seconds");
   });
 
   it("states the snapshots anchored per global snapshot with one decimal, fees and data per hour, and the networks that anchored", () => {
@@ -151,7 +150,7 @@ describe("ledgerFacts on a network", () => {
     expect(mean!.value).toBeCloseTo(20, 9); // gapSum 100 over 5 snapshots per bucket
     const [longest] = find(r, /^USDC\.dag longest gap between snapshots, recent/);
     expect(longest!.value).toBe(55);
-    expect(longest!.text).toBe(formatSeconds(55));
+    expect(longest!.text).toBe("55 seconds");
   });
 
   it("states the share of the global snapshots it was part of, between 0 and 1", () => {

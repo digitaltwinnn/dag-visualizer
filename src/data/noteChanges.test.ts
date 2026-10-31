@@ -130,7 +130,7 @@ describe("withMovePercents", () => {
     expect(withMovePercents("Global snapshots rose from 1,754 in the weeks before to 1,941 last week.", facts)).toBe("Global snapshots rose 11% from 1,754 in the weeks before to 1,941 last week.");
   });
   it("takes a duration as the facts write it", () => {
-    expect(withMovePercents("Cadence fell from 21s to 12s.", facts)).toBe("Cadence fell 43% from 21s to 12s.");
+    expect(withMovePercents("Cadence fell from 21 seconds to 12 seconds.", facts)).toBe("Cadence fell 43% from 21 seconds to 12 seconds.");
   });
   it("adds one to each change in a sentence", () => {
     expect(withMovePercents("Nodes dropped from 91 to 83, and activity climbed from 1,754 to 1,941.", facts)).toBe("Nodes dropped 9% from 91 to 83, and activity climbed 11% from 1,754 to 1,941.");

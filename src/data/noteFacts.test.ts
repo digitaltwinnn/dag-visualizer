@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fact, factsBlock, gaugeChange, heldLevel, networksAnchored, observedLevel } from "@/src/data/noteFacts";
+import { fact, factsBlock, gaugeChange, heldLevel, networksAnchored, observedLevel, spellDurations } from "@/src/data/noteFacts";
 import { checkNote } from "@/src/data/noteHonesty";
 import { formatDag } from "@/src/data/trendSeries";
 
@@ -8,7 +8,7 @@ describe("fact", () => {
     expect(fact("x", 12159, "count").text).toBe("12,159");
     expect(fact("x", 0.583, "share").text).toBe("58%");
     expect(fact("x", 2.4817, "ratio").text).toBe("2.48");
-    expect(fact("x", 79200, "duration").text).toBe("22h");
+    expect(fact("x", 79200, "duration").text).toBe("22 hours");
     expect(fact("x", Date.UTC(2026, 9, 19), "date").text).toBe("Oct 19");
     expect(fact("x", 1234.56, "amount").text).toBe("1,234.6");
   });
@@ -188,5 +188,24 @@ describe("networksAnchored", () => {
 
   it("does not count activity in a partial edge bucket", () => {
     expect(networksAnchored(3, { "m.unlisted.snaps": [9, 0, 0, 9] }, DAY)).toEqual({ count: 3, atLeast: false });
+  });
+});
+
+describe("a duration in a note is written out", () => {
+  it("as a fact the model can copy", () => {
+    expect(fact("x", 10, "duration").text).toBe("10 seconds");
+    expect(fact("x", 66, "duration").text).toBe("1.1 minutes");
+    expect(fact("x", 3600, "duration").text).toBe("1 hour");
+    expect(fact("x", 604_800, "duration").text).toBe("7 days");
+  });
+
+  it("wherever the model still shortened one", () => {
+    expect(spellDurations("A mean spacing of 10s and a longest gap of 1.1m.")).toBe("A mean spacing of 10 seconds and a longest gap of 1.1 minutes.");
+    expect(spellDurations("Every 1h, usually 3.2h, over 22d.")).toBe("Every 1 hour, usually 3.2 hours, over 22 days.");
+  });
+
+  it("and leaves every other figure alone", () => {
+    const untouched = "Fees of 1.5M DAG, 12.2K snapshots, 25 KB, 5 networks, 3x, 9%, the 1,000s, 7 days.";
+    expect(spellDurations(untouched)).toBe(untouched);
   });
 });

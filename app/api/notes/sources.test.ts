@@ -267,7 +267,7 @@ describe("factsFor — the per-view read table", () => {
     expect(out!.spanTo).toBe(NOW);
     expect(out!.label).toBe("the hypergraph");
     // R20: the span's own length, as a duration fact the gate can back "the last 7 days" with.
-    expect(out!.facts).toContainEqual(expect.objectContaining({ label: "Span length", value: 604_800, kind: "duration", text: "7d" }));
+    expect(out!.facts).toContainEqual(expect.objectContaining({ label: "Span length", value: 604_800, kind: "duration", text: "7 days" }));
   });
 
   it("trend 24h reads 1h and no days; 1h reads 5m", async () => {

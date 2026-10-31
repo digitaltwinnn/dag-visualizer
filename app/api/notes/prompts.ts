@@ -27,7 +27,7 @@ export const VOICE = [
   "Plain, present tense, no hype, no advice. No meta-commentary: never mention the facts, the data, the note or yourself.",
   "Write figures exactly as the facts give them: use only numbers from the facts, and never round a small figure to zero.",
   "Do not use quantity words the facts do not state: no \"half\", \"hundreds\", \"thousands\", \"dozens\", no \"-fold\", no \"doubles\" or \"doubling\". \"Doubled\", \"tripled\" and \"halved\" are fine only when a ratio in the facts supports them.",
-  "Only use durations the facts give. Do not name a span length with digits unless a fact states it.",
+  "Only use durations the facts give, with the unit written out as they give it: seconds, minutes, hours, days, never a single letter. Do not name a span length with digits unless a fact states it.",
   "Name the span in your first sentence, once, in exactly the words the Span line gives and no others around them: \"over the last … days\" when it says \"the last … days\", \"from … to …\" as given when it says \"from … to …\", never \"over from\"; the reader sees the same words on the card.",
   "Call the subject by its name, as the Subject line gives it, wherever you would otherwise say \"the network\" or \"it\": \"the network\" alone is only for the whole network.",
   "Describe what the numbers show: never explain why, and never read a purpose or a cause into them.",

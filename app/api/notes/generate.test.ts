@@ -109,7 +109,7 @@ describe("generateNote", () => {
     await generateNote(REQ, d, "read");
     const [system, user] = d.chat.mock.calls[0]![0];
     expect(system!.content).toContain("Subject: the hypergraph.");
-    expect(user!.content).toContain("Span length: 7d");
+    expect(user!.content).toContain("Span length: 7 days");
     expect(user!.content).toContain("Snapshots anchored, per day, this span: 1,200");
   });
 
@@ -430,7 +430,7 @@ describe("the span length reaches the model and backs its window (R20)", () => {
     const answer = "NOTE: Over the last 7 days the hypergraph held its pace.";
     const d = deps({ facts: (net, view, subject, span, now) => factsFor(net, view, subject, span, now, reads), answers: [answer] });
     const res = await generateNote(REQ, d, "read");
-    expect(d.chat.mock.calls[0]![0][1]!.content).toContain("Span length: 7d");
+    expect(d.chat.mock.calls[0]![0][1]!.content).toContain("Span length: 7 days");
     expect(d.chat.mock.calls[0]![0][1]!.content).toContain("Span: the last 7 days");
     expect(res).toMatchObject({ state: "ok", text: "Over the last 7 days the hypergraph held its pace." });
     expect(d.chat).toHaveBeenCalledTimes(1);
@@ -604,5 +604,14 @@ describe("a view note's notable changes", () => {
   it("a note with none carries no field", async () => {
     const res = await generateNote(REQ, deps(), "read");
     expect(res).not.toHaveProperty("changes");
+  });
+});
+
+describe("a note writes its durations out", () => {
+  const SPACED: NoteFacts = { ...FACTS, facts: [...FACTS.facts, fact("Mean spacing", 10, "duration")] };
+
+  it("whatever the model wrote", async () => {
+    const r = await generateNote(REQ, deps({ facts: async () => structuredClone(SPACED), answers: ["NOTE: The hypergraph anchored 1,200 snapshots a day, every 10s."] }), "read");
+    expect(r).toMatchObject({ state: "ok", text: "The hypergraph anchored 1,200 snapshots a day, every 10 seconds." });
   });
 });

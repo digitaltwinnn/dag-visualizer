@@ -36,9 +36,19 @@ function countText(v: number): string {
     : v.toLocaleString("en-US", { maximumFractionDigits: 1 });
 }
 
+const UNIT_WORDS: Record<string, string> = { s: "second", m: "minute", h: "hour", d: "day" };
+const SHORT_DURATION_RE = /(?<![\w.,])(\d+(?:\.\d+)?)([smhd])(?![\w%])/g;
+
+/** A NOTE WRITES ITS UNITS OUT (user, 2026-10-31: "10s spacing"; "use written seconds, minutes,
+ *  hours"). A chart's axis stays short, so this belongs to the notes alone: a duration fact reads
+ *  this way, and the generator runs it over what the model wrote, which sometimes shortens one anyway. */
+export function spellDurations(text: string): string {
+  return text.replace(SHORT_DURATION_RE, (_, n: string, u: string) => `${n} ${UNIT_WORDS[u]}${n === "1" ? "" : "s"}`);
+}
+
 /** One fact. `kind` picks the notation: count (12,159), amount (one decimal at most, two
  *  significant digits under 1), share (a rounded %), ratio (2 decimals), duration
- *  (`formatSeconds`, seconds in), date (UTC "Oct 19", epoch ms in). `format` replaces an amount's
+ *  (`formatSeconds`, written out, seconds in), date (UTC "Oct 19", epoch ms in). `format` replaces an amount's
  *  notation with the chart's own formatter (fees are written by `formatDag`). `pair` marks the fact
  *  as one end of a measured change (`Fact.pair`, R54); a fact with none carries no `pair` key. */
 export function fact(
@@ -56,7 +66,7 @@ export function fact(
       break;
     case "share": text = `${Math.round(value * 100)}%`; break;
     case "ratio": text = value.toFixed(2); break;
-    case "duration": text = formatSeconds(value); break;
+    case "duration": text = spellDurations(formatSeconds(value)); break;
     case "date": {
       const d = new Date(value);
       text = `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;

@@ -176,7 +176,7 @@ describe("trendFacts on a network", () => {
     const r = trendFacts(input({ subject: "usdc" }))!;
     const [c] = find(r, /cadence, between snapshots, this span/i, "duration");
     expect(c!.value).toBeCloseTo(12, 9);
-    expect(c!.text).toBe("12s");
+    expect(c!.text).toBe("12 seconds");
   });
 });
 
@@ -328,7 +328,7 @@ describe("trendFacts notable days", () => {
     expect(r.days.map((d) => d.kind)).toEqual(["pause"]);
     const v = r.facts.find((f) => /Notable day 1 pause, longest wait between snapshots/.test(f.label))!;
     expect(v.kind).toBe("duration");
-    expect(v.text).toBe("2h");
+    expect(v.text).toBe("2 hours");
   });
 });
 
