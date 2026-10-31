@@ -46,6 +46,21 @@ export function spellDurations(text: string): string {
   return text.replace(SHORT_DURATION_RE, (_, n: string, u: string) => `${n} ${UNIT_WORDS[u]}${n === "1" ? "" : "s"}`);
 }
 
+const WHOLE_RE = /(?<![\w.,])(\d+|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve) of (the |its |their )?\1(?![\w%]|[.,]\d)/gi;
+
+/** A WHOLE GROUP IS SAID AS ALL OF IT (user, 2026-10-31: "3 of the 3" … "can't you say all 3
+ *  instead? More human readable"), a pair as both. The make-up note's shape, "N of the M nodes run",
+ *  reads this way when M is all of them, and it is the code's to catch: the numbers are the same, so
+ *  it runs after the gate. A lone "1 of the 1" has no better words and stands. */
+export function sayAll(text: string): string {
+  return text.replace(WHOLE_RE, (whole, n: string, owner: string | undefined, at: number) => {
+    if (n === "1") return whole;
+    const count = n === "2" || n.toLowerCase() === "two" ? "both" : `all ${n.toLowerCase()}`;
+    const said = owner === "its " || owner === "their " ? `${count} of ${owner.trim()}` : count;
+    return at === 0 || /[.!?]\s+$/.test(text.slice(0, at)) ? said[0]!.toUpperCase() + said.slice(1) : said;
+  });
+}
+
 /** One fact. `kind` picks the notation: count (12,159), amount (one decimal at most, two
  *  significant digits under 1), share (a rounded %), ratio (2 decimals), duration
  *  (`formatSeconds`, written out, seconds in), date (UTC "Oct 19", epoch ms in). `format` replaces an amount's

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fact, factsBlock, gaugeChange, heldLevel, networksAnchored, observedLevel, spellDurations } from "@/src/data/noteFacts";
+import { fact, factsBlock, gaugeChange, heldLevel, networksAnchored, observedLevel, sayAll, spellDurations } from "@/src/data/noteFacts";
 import { checkNote } from "@/src/data/noteHonesty";
 import { formatDag } from "@/src/data/trendSeries";
 
@@ -207,5 +207,21 @@ describe("a duration in a note is written out", () => {
   it("and leaves every other figure alone", () => {
     const untouched = "Fees of 1.5M DAG, 12.2K snapshots, 25 KB, 5 networks, 3x, 9%, the 1,000s, 7 days.";
     expect(spellDurations(untouched)).toBe(untouched);
+  });
+});
+
+describe("a whole group is said as all of it", () => {
+  it("opens a sentence with a capital", () => {
+    expect(sayAll("3 of the 3 Dor Technologies nodes run L0. They held.")).toBe("All 3 Dor Technologies nodes run L0. They held.");
+  });
+
+  it("reads the same mid-sentence, in figures or words", () => {
+    expect(sayAll("Over 7 days, 5 of the 5 networks anchored, and two of the two nodes held.")).toBe("Over 7 days, all 5 networks anchored, and both nodes held.");
+    expect(sayAll("Germany hosts 34 of its 34 nodes.")).toBe("Germany hosts all 34 of its nodes.");
+    expect(sayAll("2 of the 2 Dor nodes run L0, 2 of its 2 layers.")).toBe("Both Dor nodes run L0, both of its layers.");
+  });
+
+  it("leaves a part of a group alone", () => {
+    for (const t of ["3 of the 30 nodes run L0.", "30 of the 3 nodes.", "3 of the 3.5 hours.", "1 of the 1 node ran."]) expect(sayAll(t)).toBe(t);
   });
 });

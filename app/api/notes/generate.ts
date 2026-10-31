@@ -1,4 +1,4 @@
-import { factsBlock, spellDurations } from "@/src/data/noteFacts";
+import { factsBlock, sayAll, spellDurations } from "@/src/data/noteFacts";
 import { checkNote } from "@/src/data/noteHonesty";
 import { withDayChange } from "@/src/data/notableDays";
 import { withMovePercents } from "@/src/data/noteChanges";
@@ -152,6 +152,9 @@ function warn(req: NoteRequest, kind: string): void {
 
 type Written = { ok: true; text: string; days: NoteDay[] } | { ok: false; stat: NoteStat };
 
+/** What the code tidies in checked text: the numbers stand, only their words change. */
+const plainly = (text: string): string => sayAll(spellDurations(text));
+
 /** The model and the gate: at most two attempts, the second told why the first was rejected. */
 async function write(
   req: NoteRequest,
@@ -200,14 +203,14 @@ async function write(
       seen.set(iso, n);
       const caption = captions.get(n === 1 ? iso : `${iso}#${n}`);
       if (caption && checkNote(caption, input.facts, input.names, { maxSentences: 1, subject }).ok)
-        kept.push({ dayMs: d.dayMs, kind: d.kind, networkId: d.networkId, caption: withDayChange(spellDurations(caption), d) });
+        kept.push({ dayMs: d.dayMs, kind: d.kind, networkId: d.networkId, caption: withDayChange(plainly(caption), d) });
     }
     if (negative) {
-      held = { ok: true, text: withMovePercents(spellDurations(note), input.facts), days: kept };
+      held = { ok: true, text: withMovePercents(plainly(note), input.facts), days: kept };
       reasons = [`say what held steady instead of "${negative.toLowerCase()}"`];
       continue;
     }
-    return { ok: true, text: withMovePercents(spellDurations(note), input.facts), days: kept };
+    return { ok: true, text: withMovePercents(plainly(note), input.facts), days: kept };
   }
   warn(req, "gateFail");
   return { ok: false, stat: "gateFail" };

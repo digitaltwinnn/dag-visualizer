@@ -615,3 +615,10 @@ describe("a note writes its durations out", () => {
     expect(r).toMatchObject({ state: "ok", text: "The hypergraph anchored 1,200 snapshots a day, every 10 seconds." });
   });
 });
+
+describe("a whole group is said as all of it", () => {
+  it("whatever the model wrote", async () => {
+    const r = await generateNote(REQ, deps({ facts: async () => ({ ...structuredClone(FACTS), facts: [...FACTS.facts, fact("Nodes", 3, "count")] }), answers: ["NOTE: The hypergraph anchored 1,200 snapshots a day, and 3 of the 3 nodes held."] }), "read");
+    expect(r).toMatchObject({ state: "ok", text: "The hypergraph anchored 1,200 snapshots a day, and all 3 nodes held." });
+  });
+});
