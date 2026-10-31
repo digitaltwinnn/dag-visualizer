@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { compareComposition, roleKey, rolesOf, roleKeyLabel, compositionRows, nodeCompositionLabel, compositionKey, parseCompositionKey, compositionClause, ROLE_SHORT, layerCodesOf, compositionGroups, machineKey } from "./composition";
+import { compareComposition, roleKey, rolesOf, roleKeyLabel, roleKeyOfCodes, compositionRows, nodeCompositionLabel, compositionKey, parseCompositionKey, compositionClause, ROLE_SHORT, layerCodesOf, compositionGroups, machineKey } from "./composition";
 import type { NodeInfo, NodeRow } from "@/src/data/types";
 
 const n = (roles: string[]): NodeInfo => ({ ip: "x", state: "Ready", layer: roles[0], roles }) as NodeInfo;
@@ -155,6 +155,17 @@ describe("roleKey / roleKeyLabel", () => {
     expect(roleKeyLabel("l0+cl1")).toEqual({ label: "Hybrid", codes: ["L0", "cL1"] });
     expect(roleKeyLabel("dl1")).toEqual({ label: "Data", codes: ["dL1"] });
     expect(roleKeyLabel("none")).toEqual({ label: "Unknown", codes: [] });
+  });
+});
+
+describe("roleKeyOfCodes", () => {
+  it("is roleKeyLabel's inverse on the codes", () => {
+    for (const key of ["l0", "cl1", "dl1", "l0+cl1", "l0+dl1", "cl1+dl1", "l0+cl1+dl1", "none"])
+      expect(roleKeyOfCodes(roleKeyLabel(key).codes)).toBe(key);
+  });
+  it("orders by the vocabulary and ignores a code it does not know", () => {
+    expect(roleKeyOfCodes(["dL1", "L0"])).toBe("l0+dl1");
+    expect(roleKeyOfCodes(["L9", "cL1"])).toBe("cl1");
   });
 });
 

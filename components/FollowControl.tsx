@@ -37,7 +37,13 @@ import { useFeedRead } from "@/components/useFeedRead";
 function Age({ ts }: { ts: string }) {
   const now = useNowTick(1000);
   const age = relativeAge(now - Date.parse(ts));
-  return age ? <QualifierChip className="tabular-nums">{age}</QualifierChip> : null;
+  // `data-yields`: a reading, so a folded ENTRY drops it (CardHead) and the ordinal beside it keeps
+  // its width; the open box, the explorer's foot and the callout still show it.
+  return age ? (
+    <span data-yields="" className="contents">
+      <QualifierChip className="tabular-nums">{age}</QualifierChip>
+    </span>
+  ) : null;
 }
 
 export default function FollowControl({ className }: { className?: string }) {

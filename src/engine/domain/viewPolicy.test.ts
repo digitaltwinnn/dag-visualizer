@@ -147,6 +147,12 @@ describe("the trends view is registered and inert", () => {
     expect(VIEW_POLICIES.ledger.rawSurface).toBe("records");
   });
 
+  // The AI note opts in per view (convention 7): the four 3D views carry one, the placeholder none.
+  it("opts the four 3D views into AI notes and the placeholder out", () => {
+    for (const m of ["hyper", "geo", "ledger", "trend"] as const) expect(VIEW_POLICIES[m].aiNotes).toBe(true);
+    expect(VIEW_POLICIES.soon.aiNotes).toBe(false);
+  });
+
   // `chartStack` is the flag `components/TrendStack.tsx` gates its mount on (convention 7 — gate
   // on the view a behaviour is FOR, never `mode === "x"`).
   it("mounts the chart-plane stack only in trend", () => {

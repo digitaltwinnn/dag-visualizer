@@ -49,6 +49,10 @@ const TITLE = "m-0 text-title font-semibold";
 // dossier's avatar takes the KIND MARK's size and gap there (user, 2026-10-25: the metagraph entry
 // "is not fully horizontally aligned like the others" — measured 20px + 10px against 16 + 8, so
 // its name started 7px further right than Country's and Provider's).
+// A `data-figure` title (the snapshot ordinal) drops from the title size to the entry's body size,
+// and a `data-kindmark` glyph beside it is dropped: the eyebrow word states the kind in the fold
+// (an identity avatar stays). 2026-10-29: nine digits at the title size with their block mark and
+// the live pill overran the one-row entry by a third once the note took the resting box.
 // The KIND yields first, the name last (the kind's flex-shrink is a thousand times the name's, so
 // it collapses to nothing before the name loses a glyph; the name then ellipsizes) — the name is
 // what tells the entry from its siblings; the kind is read in full on the open box. On a 320px
@@ -61,7 +65,7 @@ const TITLE = "m-0 text-title font-semibold";
 // the Country entry: the truncating spans' flex baselines are SYNTHESISED from their boxes, so
 // each title shape landed somewhere else. The row centres instead, and the eyebrow and chip are
 // given the title's line box — `ENTRY_LINE` — so centring IS the baseline to under a pixel.)
-const ENTRY_TITLE = "[&>span]:flex [&>span]:max-w-full [&_[data-titlerow]]:flex [&_[data-titlerow]]:max-w-full [&_[data-titlerow]]:gap-2 [&_[data-avatar]]:size-4 [&_[data-titleblock]]:flex-row [&_[data-titleblock]]:items-baseline [&_[data-titleblock]]:gap-2 [&_[data-titleblock]]:min-w-0 [&_[data-titleblock]>*]:leading-[inherit] [&_[data-titleblock]>:first-child]:shrink [&_[data-titleblock]>:first-child]:truncate [&_[data-kind-full]]:hidden [&_[data-kind-short]]:block [&_[data-kind-short]]:min-w-0 [&_[data-kind-short]]:[flex-shrink:1000]";
+const ENTRY_TITLE = "[&>span]:flex [&>span]:max-w-full [&_[data-titlerow]]:flex [&_[data-titlerow]]:max-w-full [&_[data-titlerow]]:gap-2 [&_[data-avatar]]:size-4 [&_[data-titleblock]]:flex-row [&_[data-titleblock]]:items-baseline [&_[data-titleblock]]:gap-2 [&_[data-titleblock]]:min-w-0 [&_[data-titleblock]>*]:leading-[inherit] [&_[data-titleblock]>:first-child]:shrink [&_[data-titleblock]>:first-child]:truncate [&_[data-kind-full]]:hidden [&_[data-kind-short]]:block [&_[data-kind-short]]:min-w-0 [&_[data-kind-short]]:[flex-shrink:1000] [&_[data-figure]_.odometer]:text-body [&_[data-kindmark]]:hidden";
 // The body step's line box in absolute terms (its fluid size × its unitless leading), for the
 // entry's eyebrow and chip: a 12px caps label on a `leading-none` box centred against a 21px
 // title box put its baseline ~1.5px below the title's (user, 2026-10-25: the eyebrow and the name
@@ -466,9 +470,20 @@ function keepFocusOnRung(el: HTMLElement): void {
                   status pill / age counter is plain text, so a click there did nothing and the
                   cursor fell back to the default arrow over an otherwise-clickable entry (user,
                   2026-08-09). So the WRAPPER is transparent and only real controls inside it opt
-                  back in — text falls through to the toggle, links and buttons keep working. */}
+                  back in — text falls through to the toggle, links and buttons keep working.
+                  CENTRED ON BOTH TIERS (user, 2026-10-29: the Gate AI card's span chip "is not
+                  aligned properly with the card's title"): as a plain flex item the wrapper was a
+                  line box the chip sat on the BASELINE of, 4px under the title's centre in the open
+                  box (the dossier's ticker had the same 2px); `inline-flex items-center` centres
+                  whatever it carries, as the entry tier always did. */}
+              {/* FOLDED, A `data-yields` PART OF THE ASIDE IS DROPPED (2026-10-29): the entry is one
+                  row and the aside is flex-none, so whatever it carries comes straight out of the
+                  title's width — the live tick's age chip beside its live pill left the ordinal
+                  "7,183,468" a 30px slot reading "7" once the note took the resting box over it
+                  (R70). A reading the open box states anyway yields; the control (live / pinned)
+                  stays, since the entry is where it is pressed. */}
               {(aside != null || (entryMode && caption != null)) && (
-                <span className={cn("ml-auto flex-none relative z-10 pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto", entryMode && cn("inline-flex items-center gap-1.5", ENTRY_LINE))}>
+                <span className={cn("ml-auto flex-none relative z-10 inline-flex items-center gap-1.5 pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto", entryMode && cn("[&_[data-yields]]:hidden", ENTRY_LINE))}>
                   {entryMode && caption != null && <span className="text-label text-muted-foreground text-right tabular-nums">{caption}</span>}
                   {aside}
                 </span>

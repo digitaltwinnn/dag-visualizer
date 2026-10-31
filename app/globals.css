@@ -1123,6 +1123,27 @@
   --topbar-glass: linear-gradient(180deg,
     light-dark(rgba(246, 247, 250, 0.94), rgba(20, 26, 46, 0.82)),
     light-dark(rgba(246, 247, 250, 0.94), rgba(10, 14, 28, 0.76))); /* light: the Print sheet, same as the cards */
+  /* THE AI NOTES card's iridescence (2026-10-27) — cyan → violet → pink, the one surface in the HUD
+     whose text a model wrote, marked so it can never pass for a measured reading. Two tokens, one
+     sweep: --ai-edge is the card's 1px border (drawn as a border-box layer under a padding-box fill,
+     NotesCard.tsx), --ai-ink the eyebrow's clipped text. Gradients, so trap 3: consumed as
+     [background:var()], never bg-[var()]. Each stop is light-dark(): paper's stops sit far darker —
+     a hairline needs body on the 0.97 sheet and the eyebrow is caps at the label step, which wants
+     ink contrast (the --primary-ink argument); dark's are lamps, the ink a step brighter than the
+     edge so the caps read above the glass. */
+  --ai-edge: linear-gradient(120deg,
+    light-dark(oklch(0.62 0.11 205), oklch(0.80 0.12 205)),
+    light-dark(oklch(0.56 0.17 295), oklch(0.70 0.16 295)),
+    light-dark(oklch(0.60 0.17 350), oklch(0.74 0.15 350)));
+  --ai-ink: linear-gradient(120deg,
+    light-dark(oklch(0.48 0.09 210), oklch(0.88 0.12 205)),
+    light-dark(oklch(0.46 0.19 295), oklch(0.80 0.14 295)),
+    light-dark(oklch(0.50 0.19 350), oklch(0.82 0.13 350)));
+  /* The AI card's KIND MARK (2026-10-29): the card wears the rail's own head grammar — an eyebrow
+     and a title with a mark at its left, like the snapshot block or the dossier avatar — and the
+     mark is what says "AI" on both tiers, so it takes the sweep's middle stop as one solid hue
+     (an icon stroke cannot carry a gradient). */
+  --ai-mark: light-dark(oklch(0.52 0.17 295), oklch(0.78 0.14 295));
   /* The site footer's lozenge — a VEIL, not a panel. It first borrowed --topbar-glass and read
      "too dominant white" on the light ground (user, 2026-09-01), which is right: that token is a
      0.86-alpha lit SURFACE for a full-width bar, and a 22px pill has no room to be a surface. This

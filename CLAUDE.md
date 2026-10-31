@@ -73,7 +73,9 @@ construction — rule 1 denies it react, the store and the addons — so its cov
 exemptions. `src/data/` holds the live singleton and the geo cache alongside the row builders, so
 `dataExportCoverage.test.ts` carries an explicit exemption list plus guards that keep it from
 growing: a mechanical purity classifier was tried and rejected (its regex matched the words
-"window" and "fetch" inside this repo's own comments), and the header records why.
+"window" and "fetch" inside this repo's own comments), and the header records why. `src/data/testkit/` is
+TEST-ONLY helpers shared by sibling tests (never imported by app code) and sits outside the scan,
+which reads `src/data/*.ts` only.
 
 Seventeen narrower boundary tests work the same way: `components/feedReadBoundary.test.ts` (every HUD read of a feed's data holds that feed, so the pulse strip's "in use here" is measured, not declared — `src/data/feedUse.ts`), `components/unlistedBoundary.test.ts` (the `"unlisted"`
 id literal has exactly two homes), `components/railLadderBoundary.test.ts` (every committable focus
@@ -123,7 +125,8 @@ scope from the table.
    click semantics → `domain/pickActions.ts`, the unlisted network → `src/data/unlisted.ts`, the stage
    light → `scene/objects/StageLight.ts`. Don't grow a second copy in the Engine or a component.
 9. **The scene↔HUD hover pairing is sacrosanct.** The shared store channels (`hoverFilter`,
-   `hoverNodeId`, `hoverSnapOrd`, `hoverMetaSnap`, `hoverCountry`, `hoverCohort`), `.subject-paired`
+   `hoverNodeId`, `hoverSnapOrd`, `hoverMetaSnap`, `hoverCountry`, `hoverCohort`, `hoverNoteDay`),
+   `.subject-paired`
    and the marker classes survive every refactor. Hovers preview, never commit. **A surface hovers the
    subject it would COMMIT** — `hoverSnapOrd` is a global tick, `hoverMetaSnap` one metagraph
    snapshot (keyed by `metaSnapHoverKey(metaId, ordinal)`), so the anchor-log row, the explorer's leaf
@@ -494,22 +497,28 @@ not through `_tweenTo`, which would compose `dollyBack` and `railsLean` in a sec
 ## Deploying (Vercel)
 
 Target host is Vercel; any Node host works. The trends backend needs `CRON_SECRET` and the Upstash
-Redis tokens as env vars — the rest of the app needs none.
+Redis tokens as env vars; the AI notes add `GATE_API_KEY` (the Constellation Gate, free model) and
+optionally `GATE_MODEL` — the rest of the app needs none.
 
 Enabled now, on the **Pro plan** (upgraded 2026-09-06 for the trends cron): a clean `next build` with
 the route caching above; **security headers** in `next.config.mjs` (a moderate CSP — inline
 script/style for the Next runtime, `img https:` for logos, `connect https:` since the Constellation
 host set is open, plus telemetry; dev adds `unsafe-eval`/`ws:`/`http:`), added for reputation-scanner
 posture after a scanner NRD-isolated the fresh domain; Speed Insights + Analytics in the layout, both
-no-op off Vercel; and a 15-minute Vercel Cron (`vercel.json`) hitting `/api/trends/sample`, which
-merge-writes into Upstash Redis (the Vercel-native marketplace integration) holding the trends
-timeseries — see `app/api/CLAUDE.md`.
+no-op off Vercel; and two Vercel Crons (`vercel.json`): a 15-minute one hitting `/api/trends/sample`,
+which merge-writes into Upstash Redis (the Vercel-native marketplace integration) holding the trends
+timeseries, and a quarter-hourly one (`7,22,37,52 * * * *`) hitting `/api/notes/warm`, which rewrites the AI notes
+that are due, under the same `CRON_SECRET` — see `app/api/CLAUDE.md`.
 
 ⚠️ **Crons fire on the PRODUCTION deployment only — a PR preview is not production.** The preview
 deploys the trends routes against the SAME Upstash store (the marketplace env vars span all three
-scopes), so its History view shows real history — but `CRON_SECRET` is deliberately absent from the
-Preview scope and the sampler FAILS CLOSED without it, so a public preview holds no credential that
-can write. Don't "fix" a preview's 401 by adding the secret there. Deploys and downtime self-heal:
+scopes), so its History view shows real history — and that token CAN write, so two rules keep a
+preview out of the store. `CRON_SECRET` is deliberately absent from the Preview scope and the trends
+sampler FAILS CLOSED without it; don't "fix" a preview's 401 by adding the secret there. And **AI
+notes are written by production only** (`notesWritable()`, `app/api/notes/store.ts`, failing closed —
+locally only `next dev` with `NOTES_STORE=memory` writes, into memory): a preview
+serves the notes already cached and answers a miss with no card, so its visitors never write notes
+from unmerged code, spend the model's quota or count into production's note stats. Deploys and downtime self-heal:
 the cursor lives in Redis, and the next production run catches up to 30K records per chain (~a day
 of the busiest chain) with no hole; beyond that the gap is accepted and
 `scripts/rebuild-trends.ts fill --from=<day> --to=<day> --recompute` repairs the affected days.

@@ -1,3 +1,6 @@
 {
-  "crons": [{ "path": "/api/trends/sample", "schedule": "*/15 * * * *" }]
+  "crons": [
+    { "path": "/api/trends/sample", "schedule": "*/15 * * * *" },
+    { "path": "/api/notes/warm", "schedule": "7,22,37,52 * * * *" }
+  ]
 }

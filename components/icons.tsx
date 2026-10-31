@@ -25,6 +25,7 @@ import {
   ChartSpline,
   CalendarRange,
   Crosshair,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import type { NetworkId } from "@/src/engine/config";
@@ -94,6 +95,11 @@ export const INSTANT_ICON: LucideIcon = Crosshair;
 // THE BRUSHED RANGE's mark (History's Range card, 2026-10-07): a span of dates — the Moment's
 // parent, so a calendar span beside the crosshair's single point.
 export const RANGE_ICON: LucideIcon = CalendarRange;
+
+// THE AI NOTES card's mark (2026-10-27): the sparkles, the common sign for written-by-a-model, so
+// the card says what kind of text it holds before a word of it is read — and never mistakes itself
+// for a measured reading. Card head and dock tray (railCards.ts) wear the same glyph.
+export const AI_NOTES_ICON: LucideIcon = Sparkles;
 
 // The NODE's mark — card head, ghost, callout, dock tray, and the explorers' Nodes measure tile:
 // the honeycomb's HEXAGON, the cell the Geography view stacks a node as. It was the Globe (the

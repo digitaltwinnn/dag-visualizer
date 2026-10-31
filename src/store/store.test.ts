@@ -149,13 +149,13 @@ describe("the trends view's channels", () => {
 describe("History arrives on the DAG's plane (2026-10-26)", () => {
   // Each test ARRIVES, so each starts outside History with nothing focused.
   beforeEach(() => useStore.setState({ mode: "hyper", trendFocus: null, trendScroll: 0, trendRotation: 0 }));
-  it("entering under All commits the DAG's focus, opens its Range card and starts at the top of the deck", () => {
+  it("entering under All brings the DAG's plane forward, unranked (R70: the note keeps the resting box), and starts at the top of the deck", () => {
     useStore.setState({ filter: "all", trendScroll: 4, selStack: [] });
     useStore.getState().setMode("trend");
     const s = useStore.getState();
     expect(s.trendFocus).toBe("dag");
     expect(s.trendScroll).toBe(0);
-    expect(s.selStack[s.selStack.length - 1]).toBe("range");
+    expect(s.selStack).toEqual([]);
   });
   it("a committed filter arrives as itself", () => {
     useStore.setState({ filter: "DAG0CyySf35ftDQDQBnd1bdQ9aPyUdacMghpnCuM" });

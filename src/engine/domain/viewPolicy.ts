@@ -159,6 +159,9 @@ export interface ViewPolicy {
   // span on screen and the scope its cards stand on. (It was a door onto the anchor log for one
   // day, 2026-10-07; the cards' "Snapshot records" still is.)
   rawSurface: "records" | "buckets";
+  // Does this view carry an AI NOTE — the written context card (`components/notes/`) for the
+  // subject on screen? The four 3D views do; the placeholder gallery shows no data, so no note.
+  aiNotes: boolean;
   // How deep the left rail's EXPLORER stands (user, 2026-10-07). The rule: the explorer shows the
   // OPEN card's children (`components/explorer/boxLevel.ts`) — "follow" — UNLESS the view's first
   // level is its own AXIS: N records along it rather than a set of scopes to choose one of. Then
@@ -229,6 +232,7 @@ const FLAT: ViewPolicy = {
   chipEnv: 1,
   fleet: "placed",
   rawSurface: "records",
+  aiNotes: false,
   explorerDepth: "follow",
   chartStack: false,
   entryPlane: null,
@@ -281,6 +285,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     chipEnv: 1,
     fleet: "placed",
     rawSurface: "records",
+    aiNotes: true,
     explorerDepth: "follow",
     chartStack: false,
     entryPlane: null,
@@ -326,6 +331,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     chipEnv: 0.35,
     fleet: "placed",
     rawSurface: "records",
+    aiNotes: true,
     explorerDepth: "follow",
     chartStack: false,
     entryPlane: null,
@@ -361,6 +367,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     chipEnv: 0.5, // low, not zero — coplanar trays wash at full sheen, go bland at none (field note)
     fleet: "placed",
     rawSurface: "records",
+    aiNotes: true,
     explorerDepth: "axis",
     chartStack: false,
     entryPlane: null,
@@ -406,6 +413,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     chipEnv: 1,
     fleet: "parked",
     rawSurface: "buckets",
+    aiNotes: true,
     explorerDepth: "follow",
     chartStack: true,
     entryPlane: "dag",

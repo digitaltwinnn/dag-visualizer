@@ -341,9 +341,11 @@ decisions inside them are design, not detail:
   (Parked at the back of the deck it paged the stack to its tail on focus.) It stays out of the
   RANK and off the shared ceiling: it is what the layers add up to. **History ARRIVES on it**
   (user, 2026-10-26: "set DAG the default in explorer (and thereby also the charts, cards etc)"):
-  under All, the view switch commits the DAG's plane focus (`viewPolicy.entryPlane`, applied by
-  `trendStack.entryFocus` inside the store's `setMode`) — the same state its row's click makes, so
-  its row, plane, Metagraph and Range cards all stand on the DAG; a committed filter arrives as itself.
+  under All, the view switch brings the DAG's plane forward (`viewPolicy.entryPlane`, applied by
+  `trendStack.entryFocus` inside the store's `setMode`) — the same focus its row's click makes,
+  so its row, plane, Metagraph and Range cards all stand on the DAG, except that the arrival ranks
+  nothing in `selStack` (R70, 2026-10-29): the click is a choice and opens the Range card, the
+  arrival is the view's own and leaves the AI notes card the box; a committed filter arrives as itself.
   **Two snapshot measures, because the DAG has two snapshot counts** (user, 2026-10-26 — dagscan's
   1Y "snapshots" read ~10× below ours): **Snapshots anchored** (`snapshots`) is each network's own
   snapshots, the DAG row their sum (`g.anchors`, tagged); **In global snapshots** (`globals` — "In" because a bare "Global snapshots" read as a network's own;
@@ -632,7 +634,8 @@ commit, the cards are opaque so there is no opacity to lift, and `.subject-paire
 box-shadow, which a transformed plane may not carry.
 
 The chain runs coarse→fine like every other rung: a lane whose committed cards abut as one body reads
-adjacency as containment. (The chamber's storeys are the other way round — ribbons fall INTO the global
+adjacency as containment (the AI notes card, which tops the pile, is the one member that contains
+nothing below it — see THE AI NOTES SLOT). (The chamber's storeys are the other way round — ribbons fall INTO the global
 floor; geometry shows the fall, the rail states the containment.) The snapshot cards are slots that
 ride the lane **without being focus rungs** — `railLadderBoundary.test.ts` asserts rung → slot, not the
 reverse, so a slot without a rung is fine and a rung without a slot is not.
@@ -663,7 +666,9 @@ it keeps its full radius on all four corners and its own hairline all the way ro
 opens around it. Its border is NOT handed to a seam the way an entry↔entry joint is — a rounded border
 curves in at each corner, so it never draws the full-width division the inset-seam rule exists to
 prevent; it reads as the box cut into the pile. **The stack carries DEPTH, the thread carries STATE**;
-adjacency is what reads as containment, which is why the snapshot chain runs coarse→fine above. Ghosts
+adjacency is what reads as containment, which is why the snapshot chain runs coarse→fine above — among
+SUBJECT cards. The AI notes card abuts the top of the pile and contains neither the tick nor the
+dossier under it: it is written context about the pile, not a rung of it. Ghosts
 stay outside the slab. The block's GEOMETRY never animates (seams, corners, washes) — but since
 2026-09-04 every rung's HEIGHT eases (`HeightEase` on the Inspector rung wrappers; the no-pop bullet
 below carries the rules). Reduced motion snaps, so the no-op guarantee holds there.
@@ -833,18 +838,78 @@ supported (no − icon etc)"). With nothing committed the live Global snapshot c
 rung, never the focus — sat folded above three ghosts on every tier: the mode-entry collapse
 pinned the ABSENT slot shut, and the live ordinal is kept out of the selection key on purpose
 (heartbeats must not reset the +/− overrides), so nothing ever dropped the pin. Two rules now:
-the mode-entry snapshot writes overrides for PRESENT slots only, and with no focus rung the
-FIRST present ladder card is the box (`openDefault` in `Inspector.tsx`).
-**And the step ghost hangs off the UNBROKEN committed run from the top** (same day): a node
-carried into Snapshots from another view stands below a gap (its ladder gives a node no
-ancestry), and read as "the deepest" it left the Global snapshot card with no step down to the
-tick's networks.
+the mode-entry snapshot pins PRESENT SUBJECT slots only (`overridesOnViewEntry`), and with no
+focus rung the FIRST present ladder card is the box (`openDefaultOf`). Both live in
+**`components/railCollapse.ts`, the one home of the open/fold decision** — which card is the box,
+what a view switch pins, what a selection moment drops — with `railCollapse.test.ts` as its
+specification, driven by outcome (exactly one box); Inspector asks it and renders the answer.
+**And the step ghost hangs off the UNBROKEN run of SUBJECT cards from the top** (same day,
+`subjectRunEnd`): a node carried into Snapshots from another view stands below a gap (its ladder
+gives a node no ancestry), and read as "the deepest" it left the Global snapshot card with no
+step down to the tick's networks. The AI notes slot neither starts that run nor breaks it.
 
-**Expanded state survives a view switch** (user, 2026-09-04 — reversing 2026-08-08's scene-first
-collapse: with rung heights easing, the collapse-and-reopen cycle WAS the "card size jumps between
-views"): a switch is arrival machinery, not a selection moment, so the +/− overrides hold through
-the mode change and its grace window, and only a post-window selection change resets them to the
-only-the-focus-rung-open default. Both live-advancing ordinals stay guarded in the selection key so
+**THE AI NOTES SLOT** (2026-10-27, R57) — on screen the card wears the rail's own head grammar
+(user, 2026-10-29): NO eyebrow — the title is the product that writes it, **"Constellation Gate
+AI"**, with the sparkles mark in `--ai-mark` at its left on both tiers as the one sign it is an AI
+card — and the SPAN the note covers ("last 7 days") is the head's qualifier chip on the right, like
+the dossier's ticker; "AI notes" stays the code's and these docs' name for
+the slot. **The top card is the VIEW's note on the metagraph card's network** (`metagraphCardNetwork`:
+everything, the filtered network, or the network a committed node or tick belongs to) and does not follow a drill — a country, a provider or a
+brushed range is a subject with a card of its own, below (user, 2026-10-29); History's top card is
+the window pill's note always. Every view that has a note (`viewPolicy.aiNotes`) leads its
+display lane with the `notes` slot (`DISPLAY_LANE` in `railCards.ts`), and the manifest leads with it
+too. It is **not a rung**: no ladder level, no camera pose, never in `selStack`, a static subject
+key so a view switch never lights the tray, and `isSubjectSlot` says no. So it is the FOCUS only at
+rest — and REST IS "NOTHING CHOSEN", not "no subject card" (user, 2026-10-29; R70): the moment a
+subject card the reader committed stands (every commit bumps `selStack`), that card is the focus
+and the note folds to an ENTRY above the subject box; a card the VIEW seated by itself — History's
+Range card on the window's span and its Metagraph card on the front plane, Snapshots' live tick
+(`advanceSnap` bumps nothing) — leaves the note the box, so the note never arrives folded and a
+notable-day hover on History's timeline lights a row the reader can see.
+It has **no ghost**: an absent note is no card at all (`noteCardAbsent` — no request, `none`, or
+`unavailable` answering a READ; R67, so a degraded model never owns the resting box), while a first
+fetch in flight stands, reading. `unavailable` answering the reader's own "Write notes" gesture is
+the exception (R68, `useNote`'s `via`): the card stays and says "Couldn't write notes just now"
+above the same door, so a click is never answered by the card vanishing. And it is **outside every subject rule** of `railCollapse.ts`: a view switch pins it OPEN and
+the subject cards folded (R78, above — the one pin it ever gets), and where no note stands pins
+nothing at all when it was the departing box (else every subject card arrived folded beside an
+unpinned note: no box); the step ghost's run skips it.
+
+**SUBJECT NOTES** (user, 2026-10-29: "I like consistency"). One rule: **every subject card whose
+subject has a stored series over the note's span carries its own Gate AI note, scoped the way the
+card's own lead is scoped; the top card is the view's.** The finest rungs are live records with no
+stored history, so they carry none and show nothing extra.
+
+| View | Card | Note is about | Scope |
+|---|---|---|---|
+| Geography | Country | the country's nodes | the FILTER: fleet-wide, or that network's nodes there |
+| Geography | Provider (`cohort`) | the provider's nodes, named network-wide | the provider across the filter's scope |
+| Hypergraph | Composition | the make-up's nodes | its network |
+| History | Range | the brushed span | the plane's network |
+| all | Node, Tick, Metagraph snapshot, Moment | none | no per-subject series |
+
+The Metagraph card carries none: filtered, it is the same subject as the top card. The block is
+`components/notes/SubjectNote.tsx`, directly under the card's lead and above its breakdown, in the
+card's own section grammar (the sparkles mark, "Constellation Gate AI", the span as the unit);
+`components/notes/subjectNote.ts` is the pure home of the request derivations. **It is asked for by
+the selection itself**: a read that answers `request` is asked once, automatically, with no door —
+the reader's gesture was choosing the card. `none` and `unavailable` show nothing (the card never
+says "couldn't write" for a gesture the reader did not make), and a first fetch in flight reads
+"reading…"/"writing…". The Range card has no door of its own and no span chip on its block (the
+title is the span); the 1h pill's door stays on the top card. A network-scoped country or provider
+note states no change until a week of the geo family exists, so until then its facts hold no
+"a week ago" and the note describes the level.
+
+**A view is entered on its note** (user, 2026-10-29, R78): in a view with a note, the switch pins
+the Gate AI card open and every present subject card folded — the subject cards are the carried
+selection, unchanged from the last view, and the note is this view's reading of it, the one thing
+new on arrival. A click after the grace window drops the pins and opens its own card as ever
+(`overridesOnViewEntry`, `railCollapse.ts`). **And a note that stands down after the entry drops those pins** (review 2026-10-29, `overridesOnNoteStandDown`): the view is entered while the note is still READ, so the pinned slot may answer `none`/`unavailable` and leave the lane, and the pins alone would hold every card folded with no box; Inspector drops them when the notes slot goes absent under an open pin, and the auto rule opens the focus rung. Where no note stands, **expanded state survives a view
+switch** (user, 2026-09-04 — reversing 2026-08-08's scene-first collapse: with rung heights easing,
+the collapse-and-reopen cycle WAS the "card size jumps between views"; the note arriving open folds a
+subject card once and leaves it, so that cycle does not return): a switch is arrival machinery, not a
+selection moment, so the +/− overrides hold through the mode change and its grace window, and only a
+post-window selection change resets them to the only-the-focus-rung-open default. Both live-advancing ordinals stay guarded in the selection key so
 heartbeats never materialize a card. Conversely **the heartbeat is felt on closed
 cards**: both snapshot asides carry the beating dot and are the same tap-to-follow toggle, but **only
 one of them owns the clock.** The global aside ticks a `live · Xs` counter (the shown snapshot's age,
@@ -903,9 +968,10 @@ channel pane head, the pager's step labels, the ledger explorer's tooltips and t
 noise in all of them: the label beside it already says what the number is. Internal `PickDescriptor.title`
 strings still read `Global snapshot #N`, but nothing renders that field for a snapshot.
 
-Every card the current view CAN produce is always visible — populated when its subject is selected,
-else a **ghost card** — so the rail shows the view's whole possibility space and a deselect returns
-its slot to the ghost in place. A ghost is a card like every other (user, 2026-10-04 — option A of
+Every SUBJECT card the current view CAN produce is always visible — populated when its subject is
+selected, else a **ghost card** — so the rail shows the view's whole possibility space and a deselect
+returns its slot to the ghost in place. (The AI notes slot is no subject card and has no ghost: an
+absent note is no card.) A ghost is a card like every other (user, 2026-10-04 — option A of
 `docs/superpowers/design/2026-10-04-ghost-cards`, "the structure is always present, but the visual
 and content differ"): FOLDED it is the rung's name alone, one quiet line; OPEN it is a dashed,
 glassless box whose body is the hint. It opens on its own, outside the single-open accordion — it

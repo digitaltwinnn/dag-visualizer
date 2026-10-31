@@ -32,8 +32,15 @@ import FollowControl from "@/components/FollowControl";
 import { NODE_ID_GLYPHS } from "@/components/explorer/nodeRow";
 import { IDENT_INK } from "@/components/identInk";
 import { useFeedRead } from "@/components/useFeedRead";
+import SubjectNote from "@/components/notes/SubjectNote";
+import { countryNoteReq, providerNoteReq, typeNoteReq } from "@/components/notes/subjectNote";
+import { noteSpanWords } from "@/components/notes/noteSubject";
+import { useNoteScopeNetwork } from "@/components/notes/useAiNote";
 
 type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: K }>;
+
+/** The unlisted pseudo-network has no note of its own (`subjectNote.ts`). */
+const isUnlisted = (id: string) => id === UNLISTED_ID;
 
 // ── Card-head pieces (unified head anatomy, Task 13 follow-up) ──────────────────────────────
 // Every inspector card's primary TITLE now renders in CardHead's title slot (one standard:
@@ -48,11 +55,17 @@ type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: 
 // every mark that speaks for it). The
 // Odometer owns the roll (digit-roll on each live tick), so no CardHead `titleKey` — a keyed
 // remount would restart it as a whole-title roll-in instead.
+// The ordinal is a FIGURE at the title size in the box (the size stays on the Odometer itself, so
+// its own line box is what it always was); the `data-figure` wrapper is the hook a folded ENTRY
+// uses to take it down to the entry's own body size, and the mark is a KIND mark
+// (`data-kindmark`) the fold drops — the eyebrow word already says the kind there, and an identity
+// avatar it is not (CardHead's `ENTRY_TITLE`, 2026-10-29: nine digits at the title size beside the
+// live pill overran the one-row entry, once the note took the resting box over the live tick).
 export function SnapshotTitle({ data: d }: { data: GlobalSnapshot }) {
   const Mark = SNAPSHOT_ICON;
   return (
-    <span className="inline-flex items-center gap-2">
-      <Mark aria-hidden className={cn(KIND_MARK_CLASS, "text-[var(--filter-accent,var(--primary))]")} />
+    <span data-figure="" className="inline-flex items-center gap-2">
+      <Mark aria-hidden data-kindmark="" className={cn(KIND_MARK_CLASS, "text-[var(--filter-accent,var(--primary))]")} />
       <Odometer value={d.ordinal} className="font-mono text-title font-semibold text-foreground tabular-nums" />
     </span>
   );
@@ -1092,6 +1105,7 @@ function providerParts(rows: { pick: PickDescriptor }[]): SchedulePart[] {
 export function CountryCard({ cc }: { cc: string }) {
   useFeedRead(["clusters", "api-geo"], "CountryCard");
   const selNodes = useStore((s) => s.selNodes);
+  const network = useNoteScopeNetwork();
   const rows = useMemo(() => selNodes.filter((r) => r.cc === cc), [selNodes, cc]);
   const parts = useMemo(() => providerParts(rows), [rows]);
   const share = shareWords(rows.length, selNodes.length);
@@ -1100,6 +1114,9 @@ export function CountryCard({ cc }: { cc: string }) {
       {/* THE LEAD: what this country is to the selection it sits in. The city count that followed
           ("…, in 8 cities") is gone (user, 2026-10-04). */}
       {share && <Lead>Hosts {share} of the selection&apos;s nodes</Lead>}
+      {/* THE COUNTRY'S OWN NOTE (spec 2026-10-29-subject-notes), scoped as the lead: the filter's
+          nodes here, the fleet's with no filter. The top Gate AI card keeps the view's note. */}
+      <SubjectNote req={countryNoteReq(cc, network, isUnlisted)} span={noteSpanWords("geo")} />
       {/* EACH CARD CUTS BY THE NEXT LEVEL DOWN (user, 2026-10-02 — `docs/superpowers/design/
           2026-10-02-country-provider`, option B: "country and provider cards have the same content …
           the node part"). Both cards used to cut their nodes by network, so the provider's table was
@@ -1158,6 +1175,9 @@ export function CompositionCard({ sel }: { sel: CompositionSel }) {
     <>
     {/* THE LEAD: the group's share of its network — the old "Share of network" fact. */}
     {share && <Lead>{share[0].toUpperCase() + share.slice(1)} of this network&apos;s online nodes</Lead>}
+    {/* THE MAKE-UP'S OWN NOTE (spec 2026-10-29-subject-notes): always its network's — the group
+        is one network's by construction (`sel.netId`), so no filter is read. */}
+    <SubjectNote req={typeNoteReq(sel, isUnlisted)} span={noteSpanWords("hyper")} />
     {/* The divider every card draws between its lead and what follows (lost when the breakdown
         left this card on 2026-10-02). */}
     {share && <Separator className="mb-2" />}
@@ -1212,6 +1232,7 @@ export function ProviderAside({ sel }: { sel: CohortSel }) {
 export function ProviderCard({ sel }: { sel: CohortSel }) {
   useFeedRead(["clusters", "api-geo"], "ProviderCard");
   const selNodes = useStore((s) => s.selNodes);
+  const network = useNoteScopeNetwork();
   const members = useMemo(
     () =>
       selNodes.filter((r) => {
@@ -1238,6 +1259,10 @@ export function ProviderCard({ sel }: { sel: CohortSel }) {
     {/* THE LEAD: this host's share of its country — the figure neither card showed (option B,
         2026-10-02). The city is the head's chip, so the lead does not repeat it. */}
     {countryShare && <Lead>{countryShare[0].toUpperCase() + countryShare.slice(1)} of {where}&apos;s nodes</Lead>}
+    {/* THE PROVIDER'S OWN NOTE (spec 2026-10-29-subject-notes), scoped as the country card's: the
+        filter's nodes, the fleet's with no filter. Keyed by provider, not by city: the stored
+        series count a host across its cities. */}
+    <SubjectNote req={providerNoteReq(sel.isp, network, isUnlisted)} span={noteSpanWords("geo")} />
     {/* THE BREAKDOWN: the cohort's nodes cut by NETWORK — whose nodes these are — the level below
         the country card's cut by provider. */}
     <Separator className="mb-2" />

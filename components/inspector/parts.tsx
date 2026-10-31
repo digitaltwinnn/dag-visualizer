@@ -219,6 +219,13 @@ export function Door({
   glyph,
   disabled,
   flushFoot,
+  figure,
+  wrap,
+  lit,
+  onPointerEnter,
+  onPointerLeave,
+  onFocus,
+  onBlur,
 }: {
   label?: ReactNode;
   children: ReactNode;
@@ -228,6 +235,19 @@ export function Door({
   disabled?: boolean;
   /** Sits directly on the foot plate below it (cancels the foot's own top margin). */
   flushFoot?: boolean;
+  /** A READABLE value on the row's right (the AI notes card's day, 2026-10-27) — unlike `glyph`,
+   *  which is decoration and hidden from assistive tech. */
+  figure?: ReactNode;
+  /** Let the target wrap instead of truncating — for a door whose target IS the content (a note's
+   *  caption), where an ellipsis would hide text no hover can reveal. */
+  wrap?: boolean;
+  /** Hold the hover wash: another surface previews this door's subject (a hover pairing). */
+  lit?: boolean;
+  /** The hover pair, for a door whose subject another surface can light (convention 9). */
+  onPointerEnter?: () => void;
+  onPointerLeave?: () => void;
+  onFocus?: () => void;
+  onBlur?: () => void;
 }) {
   const cls = cn(
     flushFoot && "-mb-3",
@@ -238,23 +258,27 @@ export function Door({
     // a bit too faint in light mode"). 6% of the accent is a visible plate on the dark glass and
     // very nearly the card's own white on paper, so the row stopped reading as a control there:
     // paper rests at `soft` and hovers at `hover`, dark keeps `faint` → `soft`.
-    "flex items-center gap-2 -mx-[var(--card-pad)] px-[var(--card-pad)] py-2 touch:min-h-11 border-t border-wash-strong [background:light-dark(var(--wash-soft),var(--wash-faint))] text-body text-foreground text-left",
+    "flex items-center gap-2 -mx-[var(--card-pad)] px-[var(--card-pad)] py-2 touch:min-h-11 border-t border-wash-strong text-body text-foreground text-left",
+    // LIT is the hover wash, held.
+    lit ? "[background:light-dark(var(--wash-hover),var(--wash-soft))]" : "[background:light-dark(var(--wash-soft),var(--wash-faint))]",
     "hover:[background:light-dark(var(--wash-hover),var(--wash-soft))] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
     disabled && "opacity-65 pointer-events-none",
   );
   const inner = (
     <>
       {label != null && <span className="flex-none text-muted-foreground">{label}</span>}
-      <span className={cn("min-w-0 truncate", href && "text-primary-ink")}>{children}</span>
-      <span aria-hidden className="ml-auto flex-none text-muted-foreground">{glyph}</span>
+      <span className={cn("min-w-0", wrap ? "flex-1" : "truncate", href && "text-primary-ink")}>{children}</span>
+      {figure != null && <span className="ml-auto flex-none text-muted-foreground tabular-nums">{figure}</span>}
+      {glyph != null && <span aria-hidden className="ml-auto flex-none text-muted-foreground">{glyph}</span>}
     </>
   );
+  const pair = { onPointerEnter, onPointerLeave, onFocus, onBlur };
   return href ? (
-    <a href={href} target="_blank" rel="noopener noreferrer" className={cls}>
+    <a href={href} target="_blank" rel="noopener noreferrer" className={cls} {...pair}>
       {inner}
     </a>
   ) : (
-    <button type="button" onClick={onClick} disabled={disabled} className={cn(cls, "w-[calc(100%+2*var(--card-pad))] cursor-pointer")}>
+    <button type="button" onClick={onClick} disabled={disabled} className={cn(cls, "w-[calc(100%+2*var(--card-pad))] cursor-pointer")} {...pair}>
       {inner}
     </button>
   );

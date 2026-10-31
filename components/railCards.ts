@@ -3,11 +3,12 @@ import { ledgerCardNetwork } from "@/src/engine/domain/tickNet";
 import { pickNetId } from "@/src/engine/domain/pickActions";
 import { cardNetwork } from "@/src/engine/domain/trendStack";
 import type { TickNetSel } from "@/src/data/types";
-import { EXPLORE_ICON, INSTANT_ICON, RANGE_ICON, iconForPick } from "@/components/icons";
+import { AI_NOTES_ICON, EXPLORE_ICON, INSTANT_ICON, RANGE_ICON, iconForPick } from "@/components/icons";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import type { Mode } from "@/src/store/store";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
+import type { NoteResponse } from "@/src/data/noteTypes";
 // LADDERS is plain DATA (the domain focus-ladder rung tables) — importing it keeps this module
 // data-only; CohortSel rides along type-only (the store mirrors the same import).
 import { type FocusLevel, type CohortSel, type CompositionSel } from "@/src/engine/domain/focusLadder";
@@ -33,7 +34,7 @@ import { is3D } from "@/src/engine/domain/viewTransition";
 // Hue + active-flag stay with the tray builders (per-rail presentation), not here.
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-export type RailCardKind = "tool" | "context" | "range" | "instant" | "metaSnap" | "country" | "cohort" | "composition" | "node" | "snap";
+export type RailCardKind = "tool" | "context" | "range" | "instant" | "metaSnap" | "country" | "cohort" | "composition" | "node" | "snap" | "notes";
 
 // ── The rail LADDER lane (Inspector's descent spine, variant-A redesign 2026-07-19) ──────────
 // Which facts-rail slot stands for each FOCUS-LADDER rung. The lane's ORDER lives in
@@ -80,9 +81,16 @@ export function ladderLevelOfSlot(id: string): FocusLevel | null {
  *  Members with no rung are card slots only (the ledger's two snapshot slots) — display hierarchy,
  *  no camera pose, no deselect step. `ladderLevelOfSlot` is the inverse read and stays the one
  *  place a slot can name a rung. */
+// ⚠️ THE AI NOTES CARD TOPS EVERY NOTE VIEW'S LANE (user, 2026-10-27, R57: "a top card, part of
+// the stack. Not as a so-called subject card, so if there is a true subject card … by default that
+// will have the focus still, with the AI card header subtly sitting on top as per current stack
+// design"). A lane slot with no rung — the snapshot slots' precedent — so it joins the slab and the
+// thread like any card, takes the focus while no CHOSEN subject card stands (`focusSlotId`, R70: a
+// card the view seated by itself is not a choice), and otherwise rests as the pile's top entry. It
+// has no ghost: a view with no note has no slot (`detailsCards`' `notes`).
 const DISPLAY_LANE: Partial<Record<Mode, readonly string[]>> = {
-  hyper: ["context", "composition", "node"],
-  geo: ["context", "country", "cohort", "node"],
+  hyper: ["notes", "context", "composition", "node"],
+  geo: ["notes", "context", "country", "cohort", "node"],
   // ⚠️ THE TICK LEADS (user, 2026-09-15). The lane is a containment claim — the slab abuts
   // committed cards into one body, and adjacency is what says what holds what — so the question is
   // which claim is least wrong. Neither order is literally true: a tick does not contain a network,
@@ -95,7 +103,8 @@ const DISPLAY_LANE: Partial<Record<Mode, readonly string[]>> = {
   // commit — the tick follows live by itself — so the lane opens speaking rather than inviting.
   // (The chamber's storeys are unchanged: geometry still shows ribbons falling INTO the global
   // floor; the rail states the reading order.)
-  ledger: ["snap", "context", "metaSnap", "node"],
+  // (The AI notes card sits above the tick — the one slot above it, and not a subject.)
+  ledger: ["notes", "snap", "context", "metaSnap", "node"],
   // HISTORY: the network dossier, then the INSTANT (2026-09-19). `instant` is a card slot with no
   // focus rung — the two snapshot slots' precedent, and `railLadderBoundary.test.ts` asserts
   // rung → slot rather than the reverse. It sits UNDER the dossier because the lane is a
@@ -107,28 +116,51 @@ const DISPLAY_LANE: Partial<Record<Mode, readonly string[]>> = {
   // The RANGE sits between them (user, 2026-10-07: "range -> moment is also a logical parent -
   // child relation"): a brushed span of the network, and the cursor one moment inside it. Like
   // `instant`, a card slot with no rung.
-  trend: ["context", "range", "instant"],
+  trend: ["notes", "context", "range", "instant"],
 };
 
 export function ladderSlotIds(mode: Mode): string[] {
   return [...(DISPLAY_LANE[mode] ?? [])];
 }
 
+/** The lane slot the AI notes card stands in (R57). */
+const NOTES_SLOT = "notes";
+/** The lane slots that are NOT SUBJECT CARDS — written context, not a subject anything committed
+ *  or the live follow put there. One home (convention 8) for every rule that reads the pile as a
+ *  run of subjects: the next-rung step's run (`subjectRunEnd`), and the view-entry pin, which keeps
+ *  only subjects (`overridesOnViewEntry`, `railCollapse.ts`). */
+const NON_SUBJECT_SLOTS: ReadonlySet<string> = new Set([NOTES_SLOT]);
+/** Is this lane slot a SUBJECT card (anything but the AI notes card today)? */
+export function isSubjectSlot(id: string): boolean {
+  return !NON_SUBJECT_SLOTS.has(id);
+}
+
 /** The selection fields the ladder derivation needs — the manifest state minus the ghost-copy
  *  inputs (which can't change a slot's presence). */
 export type LadderState = Pick<
   RailManifestState,
-  "mode" | "filter" | "tickNet" | "tickHasFilter" | "inspect" | "snap" | "metaSnap" | "country" | "cohort" | "composition" | "trendCursorMs" | "trendRange" | "trendFocus"
+  "mode" | "filter" | "tickNet" | "tickHasFilter" | "inspect" | "snap" | "metaSnap" | "country" | "cohort" | "composition" | "trendCursorMs" | "trendRange" | "trendFocus" | "noteAbsent"
 > & {
   /** The store's selection recency (most-recent-FIRST) — the collapse rule reads it (item 8):
    *  the most recently selected present card is the ACTIVE one; the rest rest collapsed. */
   selStack?: readonly string[];
 };
 
-// The FOCUS rung: the finest ladder slot currently POPULATED (null = nothing committed). ONE
-// definition, two rails — the facts rail rests only this card expanded and gives its thread dot
-// the halo, and the explorers render every COARSER committed row at ancestor strength
-// (`selectedRow`), so both rails answer "where am I" the same way.
+// The FOCUS slot: the lane card that is the box by default — the most recently selected present
+// card, else the AI notes card when it stands, else the finest present one (null = no lane card
+// stands at all). ONE definition, two rails — the facts rail rests only this card expanded and
+// gives its thread dot the halo, and the explorers render every COARSER committed row at ancestor
+// strength (`selectedRow`), so both rails answer "where am I" the same way.
+//
+// THE NOTE OUTRANKS EVERY CARD NOBODY CHOSE (user, 2026-10-29; R70). Two views seat a subject card
+// without a commit — History's Range card states the window's own span and its Metagraph card
+// stands on the front plane, Snapshots' tick follows live — and under the old "finest present"
+// fallback those took the box on arrival, so the note the reader came for sat folded (and a
+// notable-day hover on History's timeline lit a row in a card that was shut). Every CHOSEN subject
+// is in `selStack` — the store bumps it on each commit, and the live tick's `advanceSnap` on
+// purpose does not — so the stack is the one honest reading of "picked": the note yields to a
+// brushed range, a pinned tick, a plane brought forward, a committed filter, and rests open above
+// the cards the view seated by itself.
 export function focusSlotId(s: LadderState): string | null {
   // `selNodesCount`/`filterLabel` only feed ghost COPY — presence is unaffected, so the ladder
   // question can be answered from the selection alone.
@@ -138,8 +170,7 @@ export function focusSlotId(s: LadderState): string | null {
   if (!present.length) return null;
   // The ACTIVE card is the most recently selected present one (store.selStack, item 8 —
   // "keep the active card open, collapse the others"); the slot ids match the SelSlot names
-  // except the ladder's node slot. Falls back to the finest present slot (e.g. only the
-  // filter committed — selStack carries no "network" entry).
+  // except the ladder's node slot.
   for (const slot of s.selStack ?? []) {
     // The stack speaks selection slots; the lane speaks card slots — two renames:
     // the network selection's card is the CONTEXT dossier (user, 2026-08-14: a filter
@@ -147,6 +178,9 @@ export function focusSlotId(s: LadderState): string | null {
     const id = slot === "network" ? "context" : slot;
     if (present.includes(id)) return id;
   }
+  // Nothing chosen: the note (R70), else the finest present slot — a lane the view seated by
+  // itself in a view with no note (Snapshots' live tick off mainnet).
+  if (present.includes(NOTES_SLOT)) return NOTES_SLOT;
   return present[present.length - 1];
 }
 
@@ -218,6 +252,12 @@ export interface RailManifestState {
    *  ladder rung. Optional: the ladder derivation (`LadderState`) and its callers never carry
    *  this field, so `detailsCards` treats an absent key the same as `null`. */
   metaSnap?: MetaSnapSel | null;
+  /** THE AI NOTE IS ABSENT (2026-10-27): the view's subject has no note (`noteSubjectOf` answered
+   *  null — the unlisted network) or the server answered `none` (not mainnet). The note itself is
+   *  fetched in React (`useNote`), so the caller states the answer (`noteCardAbsent`), as it states
+   *  `tickHasFilter`. ⚠️ Only an explicit `false` stands the card: a caller that states nothing gets
+   *  NO notes slot (review M2) — never a focus on a card that may not exist. */
+  noteAbsent?: boolean;
 }
 
 const isNodePick = (p: PickDescriptor | null): boolean =>
@@ -408,6 +448,26 @@ export function parentHolds(s: Pick<RailManifestState, "snap" | "metaSnap" | "co
   return !s.country || !s.cohort || s.country === s.cohort.cc;
 }
 
+/** Which path an AI note's answer came by: a READ (the GET, and its poll) or the reader's REQUEST
+ *  gesture (the POST, and its poll). */
+export type NoteVia = "read" | "request";
+
+/** IS THE AI NOTE ABSENT? — no request (the view's subject has no note), the server's `none`, or
+ *  `unavailable` answering a READ (R67: the notes card is the resting focus in Hypergraph and
+ *  Geography, so a missing key, a Gate outage or a cold store's failure hold would otherwise make
+ *  "unavailable" the first open box a visitor sees; the loader never caches it, so the next subject
+ *  change asks again). `unavailable` answering the reader's OWN GESTURE (`via: "request"`, the
+ *  request route after "Write notes for this hour / range") keeps the card, which says so on its
+ *  surface and offers the door again (R68): a click must never be answered by the card vanishing.
+ *  A first fetch still in flight is PRESENT, reading (user, 2026-10-27: the card "is missing and
+ *  then suddenly appears — it should use the reading animation"; this retires ruling R36). The
+ *  flash R36 guarded against was off mainnet, where every subject answers `none`: there
+ *  `useAiNote` asks nothing, so there is no request and no card. On mainnet `none` is rare (a
+ *  subject with nothing measured), and "writing…" stays the server's own `pending`. */
+export function noteCardAbsent(hasRequest: boolean, res: NoteResponse | null, via: NoteVia = "read"): boolean {
+  return !hasRequest || res?.state === "none" || (res?.state === "unavailable" && via === "read");
+}
+
 export function detailsCards(s: RailManifestState): RailCard[] {
   // A PLACEHOLDER VIEW HAS NO FACTS SCOPE (user, 2026-08-10). `status`/`transactions`/`staking`
   // draw a wireframe captioned `preview · in development` and deliberately show no numbers, so
@@ -516,10 +576,25 @@ export function detailsCards(s: RailManifestState): RailCard[] {
     present: !!s.snap,
     hint: snapHint(s),
   };
+  // THE AI NOTES CARD (2026-10-27) — written context about the view's subject, not a subject of
+  // its own: the TOP slot of the lane (R57), no ladder rung, no ghost (an absent note is no card
+  // at all). Gated on the view it is FOR (`aiNotes`, convention 7).
+  // ⚠️ A STATIC subject key, the tool card's precedent: the note follows the selection and the
+  // view, so keying the tray on its subject would light the dock on every view switch and every
+  // filter change — announcing the selection a second time, through a card that is not it.
+  const notes: RailCard = {
+    id: "notes",
+    kind: "notes",
+    icon: AI_NOTES_ICON,
+    subjectKey: "notes",
+    present: VIEW_POLICIES[s.mode].aiNotes && s.noteAbsent === false,
+    hint: null,
+  };
   // The manifest order drives the tablet/phone flat stack + tray icons and MUST agree with the
   // desktop lane above: tick → dossier → the tick's own metagraph snapshot → node. History's
   // `instant` sits directly under the dossier, which is exactly where its own lane puts it —
-  // every slot between them is unreachable in that view, so the two orders agree.
-  return [snap, context, range, instant, country, cohort, composition, metaSnap, node];
+  // every slot between them is unreachable in that view, so the two orders agree. The notes card
+  // leads both: it is the top slot of every note view's lane (R57).
+  return [notes, snap, context, range, instant, country, cohort, composition, metaSnap, node];
 }
 

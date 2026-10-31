@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
+import NoteDiamonds from "@/components/notes/NoteDiamonds";
 import { cn } from "@/lib/utils";
 import { globalSeries } from "@/src/data/trendSeries";
 import type { TrendsWindowData } from "@/src/data/trendWindow";
@@ -505,6 +506,9 @@ export default function TrendTrack({
           </g>
         )}
       </svg>
+      {/* THE AI NOTE'S NOTABLE DAYS — HTML marks over the SVG (they are buttons), on the baseline.
+          Their presses stop at the mark, so the gestures above never see them. */}
+      <NoteDiamonds geom={geom} bottom={LABEL_H} />
     </div>
   );
 }

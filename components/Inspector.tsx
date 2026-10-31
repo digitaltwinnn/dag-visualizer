@@ -23,8 +23,9 @@ import HeightEase from "@/components/HeightEase";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { useTouch } from "@/components/useTouch";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { detailsCards, ladderSlotIds, type RailCard } from "@/components/railCards";
+import { detailsCards, ladderSlotIds, noteCardAbsent, type RailCard } from "@/components/railCards";
 import { CHILD_OF, childStep, type SiblingStep } from "@/components/railSiblings";
+import { isCollapsed, boxedSlotOf, overridesOnNoteStandDown, overridesOnSelection, overridesOnViewEntry, railSelectionKey, subjectRunEnd, type LaneCollapseState } from "@/components/railCollapse";
 import { useSiblingState } from "@/components/useSiblingState";
 import { openRailCard } from "@/components/railOpen";
 import { useLadderFocus } from "@/components/useLadderFocus";
@@ -34,6 +35,8 @@ import { CountryTitle, CountryAside, CountryCard, ProviderTitle, ProviderCard, P
 import MetaSnapPane from "@/components/inspector/MetaSnapPane";
 import TrendRangePane from "@/components/inspector/TrendRangePane";
 import TrendInstantPane from "@/components/inspector/TrendInstantPane";
+import NotesCard from "@/components/notes/NotesCard";
+import { useAiNote } from "@/components/notes/useAiNote";
 import type { TabSignal } from "@/components/RailDock";
 import type { PickDescriptor } from "@/src/data/types";
 import type { Mode } from "@/src/store/store";
@@ -429,8 +432,15 @@ export default function Inspector() {
   const trendFront = useStore((s) => s.trendFront);
   const trendWindow = useStore((s) => s.trendWindow);
   const tickHasFilter = useTickHasFilter();
+  // The AI note on screen (the card shares this fetch): its card — the top slot of the lane —
+  // stands down when the view's subject has no note (off mainnet none has) or when the server
+  // answered `none`, or `unavailable` to a read (R67; to the reader's own "Write notes" it stays and
+  // says so, R68); while its first answer is read it stands, reading (`noteCardAbsent`).
+  const aiNote = useAiNote();
+  const noteAbsent = noteCardAbsent(aiNote.req != null, aiNote.note.res, aiNote.note.via);
   const manifest = detailsCards({
     mode, filter, tickNet, tickHasFilter, inspect, snap, country, cohort, composition, metaSnap, coarse, trendCursorMs, trendRange, trendFocus, trendFront, trendWindow,
+    noteAbsent,
     selNodesCount: selNodes.length,
     filterLabel: displayNetwork(filter)?.ticker ?? null, // one lookup — catalog + the unlisted pseudo-network
   });
@@ -448,20 +458,22 @@ export default function Inspector() {
   const presentOf = (id: string) => manifest.find((c) => c.id === id)?.present ?? false;
   // The focus rung comes from the shared derivation the EXPLORE rail reads too (`focusSlotId`),
   // so the row emphasis over there and the collapse/halo over here can't disagree.
-  const focusId = useLadderFocus();
+  // …with the AI notes slot's presence, so at rest the notes card is the focus (R57).
+  const focusId = useLadderFocus(noteAbsent);
   // NO BOX OPEN IS NOT A REST ANY MORE (user, 2026-10-18: "snapshot is collapsed but it is no
   // longer supported (no − icon etc)"). With nothing committed the live Global snapshot card —
   // a slot with no rung, so never the focus — sat folded above three ghosts on every tier, and
   // since the box lost its minimize (2026-09-11) a folded card with no box beside it is a state
   // nothing else can produce. With no focus rung the FIRST present ladder card opens by default.
-  const openDefault = focusId ?? ladderIds.find(presentOf) ?? null;
-  const autoCollapsed = (id: string) => ladderIds.includes(id) && presentOf(id) && id !== openDefault;
-  const effCollapsed = (id: string) => railCollapse[id] ?? autoCollapsed(id);
+  // The decision itself is pure (`railCollapse.ts`, tested by outcome): the default card, the auto
+  // fold, the box.
+  const collapseState: LaneCollapseState = { lane: ladderIds, present: presentOf, focusId, overrides: railCollapse };
+  const effCollapsed = (id: string) => isCollapsed(collapseState, id);
   // Publish which slot is the BOX (store.boxedCard) — the same `present && !effCollapsed` that
   // renders it, so channel and render can't disagree (the data-tier lesson). The subject
   // callout reads it to mirror the box exactly as the camera does: re-boxing an ancestor card
   // (clicking a committed node's hub) steps the scene label up with it (user, 2026-08-15).
-  const boxedId = ladderIds.find((id) => presentOf(id) && !effCollapsed(id)) ?? null;
+  const boxedId = boxedSlotOf(collapseState);
   const setBoxedCard = useStore((s) => s.setBoxedCard);
   useEffect(() => {
     setBoxedCard(boxedId);
@@ -485,11 +497,9 @@ export default function Inspector() {
   // "with a range the Moment card does not open the first entry" — History's Metagraph card is a
   // reading that can be absent, and a run that had to begin at slot 0 left the Range card below a
   // gap with no step). The run begins at the first present card and ends at the first gap after it.
-  let deepestId: string | null = null;
-  for (const id of ladderIds) {
-    if (presentOf(id)) deepestId = id;
-    else if (deepestId !== null) break;
-  }
+  // …and the run is a run of SUBJECT cards: the AI notes card tops the lane (R57) but is no
+  // subject, so it neither starts the run nor leaves a gap that ends it (`subjectRunEnd`).
+  const deepestId = subjectRunEnd(ladderIds, presentOf);
   const deepestKind = deepestId ? (manifest.find((c) => c.id === deepestId)?.kind ?? null) : null;
   const siblingState = useSiblingState(deepestKind);
   const nextStep = useMemo(() => {
@@ -525,33 +535,8 @@ export default function Inspector() {
   // dropped whenever the committed ladder changes (subject identity, not just depth) and the auto
   // "only the focus rung is open" default governs again. Within one selection the +/− still holds.
   const following = useStore((s) => s.following);
-  const selectionKey = [
-    mode,
-    filter,
-    country ?? "",
-    cohort ? `${cohort.cc}|${cohort.city}|${cohort.isp}` : "",
-    composition ? `${composition.netId}|${composition.key}` : "",
-    inspect ? hoverKeyOf(inspect) ?? "" : "",
-    // HISTORY'S OWN SUBJECT (2026-09-19). Picking an instant is a new selection moment like any
-    // other, and it has to be IN this key or the mode-entry snapshot below pins the cursor card
-    // shut forever: that snapshot writes `instant: true` on arrival (the slot is not yet present),
-    // and nothing else in this view is a selection change that would drop it. Unguarded on
-    // purpose, unlike the two live-advancing ordinals above — a cursor never advances by itself,
-    // and the timeline writes it at most once per bucket.
-    trendCursorMs ?? "",
-    // …and the RANGE, the cursor's parent (2026-10-07), for the same reason.
-    trendRange ? `${trendRange.fromMs}-${trendRange.toMs}` : "",
-    // …and the PLANE FOCUS, which names the Metagraph card here (2026-10-07): a row click is a
-    // new selection moment, or a fold override from before it keeps the card shut.
-    trendFocus ?? "",
-    // While FOLLOWING, the auto-advancing ordinals are NOT a new selection moment — the heartbeat
-    // must not drop the user's +/− overrides every ~4s (item 8; advanceSnap already keeps the
-    // recency stack still for the same reason). Guards BOTH live-advanced cards: the global
-    // (advanceSnap) AND the metagraph snapshot (advanceMetaSnap — found live 2026-08-08: its
-    // unguarded ordinal re-materialized the focus card on every heartbeat in live metagraph mode).
-    following ? (snap ? "live" : "") : snap?.data.ordinal ?? "",
-    following ? (metaSnap ? "live" : "") : metaSnap ? `${metaSnap.metaId}:${metaSnap.ordinal}` : "",
-  ].join("§");
+  // One pure key (`railCollapse.railSelectionKey` carries every member's reason).
+  const selectionKey = railSelectionKey({ mode, filter, country, cohort, composition, inspect, trendCursorMs, trendRange, trendFocus, tickNet, following, snap, metaSnap });
   // Arms HeightEase's growIn for slots that JOIN the lane after boot (false on the first
   // render pass, true on every later one — a mounting slot's wrapper then eases from 0
   // instead of shoving the pile in one frame). DESKTOP ONLY, as ExploreRail's (its note has
@@ -571,7 +556,8 @@ export default function Inspector() {
     lastMode.current = mode;
     // Read the live overrides rather than closing over them: `railCollapse` changes on every
     // +/− too, and this effect must fire on a SELECTION change only.
-    const staleNulls = Object.fromEntries(Object.keys(useStore.getState().railCollapse).map((id) => [id, null]));
+    const live: LaneCollapseState = { ...collapseState, overrides: useStore.getState().railCollapse };
+    const staleNulls = overridesOnSelection(live);
     // EXPANDED STATE SURVIVES A VIEW SWITCH (user, 2026-09-04 — reversing 2026-08-08's
     // scene-first entry, which collapsed the whole ladder on arrival: with every rung's height
     // now EASING, the collapse-and-reopen cycle was the "node card size jumps between views"
@@ -600,15 +586,26 @@ export default function Inspector() {
       // out of the selection key on purpose (heartbeats must not reset the +/− overrides), so
       // nothing ever dropped the pin and the only populated card sat folded above three ghosts.
       // An absent slot keeps no override and the auto rule (`openDefault`) governs its arrival.
-      setRailCollapseMany({
-        ...staleNulls,
-        ...Object.fromEntries(ladderIds.filter(presentOf).map((id) => [id, effCollapsed(id)])),
-      });
+      // ⚠️ …and A VIEW IS ENTERED ON ITS NOTE (R78): when the notes slot stands, it is pinned open
+      // and the present subject cards folded; without one, only SUBJECT cards are pinned, and
+      // nothing at all when the departing box was no subject (review I1) — `overridesOnViewEntry`
+      // has every reason and their tests.
+      setRailCollapseMany(overridesOnViewEntry(live));
       return;
     }
     if (Date.now() - modeEnteredAt.current < ENTRY_GRACE_MS) return;
     if (Object.keys(staleNulls).length) setRailCollapseMany(staleNulls);
   }, [selectionKey, setRailCollapseMany]); // eslint-disable-line react-hooks/exhaustive-deps -- mode/ladderIds ride selectionKey (mode is a component of it)
+  // THE NOTE'S STAND-DOWN (review 2026-10-29): a view is entered while its note is still read, so
+  // the entry above pins a slot that may then answer `none`/`unavailable` and leave the lane — the
+  // pins would hold every card folded with no box. `overridesOnNoteStandDown` drops them (and only
+  // them); the lane is read live, as the entry reads it.
+  useEffect(() => {
+    if (!noteAbsent) return;
+    const live: LaneCollapseState = { ...collapseState, overrides: useStore.getState().railCollapse };
+    const drop = overridesOnNoteStandDown(live);
+    if (Object.keys(drop).length) setRailCollapseMany(drop);
+  }, [noteAbsent, setRailCollapseMany]); // eslint-disable-line react-hooks/exhaustive-deps -- fires on the stand-down only; the lane is read live
 
   const detailPane: Record<string, ReactNode> = {
     // Country/provider toggle CLOSED through the same tested table a row re-click runs — the ×
@@ -666,6 +663,9 @@ export default function Inspector() {
     metaSnap: metaSnap ? (
       <MetaSnapPane key="metaSnap" onClose={() => applyClickActions([{ kind: "metaSnap", sel: null }])} {...cx("metaSnap")} />
     ) : null,
+    // The AI notes card: the lane's top slot, no rung, no ×, no ghost — it renders while the
+    // manifest says a note stands.
+    notes: <NotesCard key="notes" {...cx("notes")} />,
   };
 
   // ── The desktop LADDER LANE + the flat tablet/phone stack ────────────────────────────────────
@@ -775,9 +775,6 @@ export default function Inspector() {
   // slab's word for containment, so one hairline says the pile ends here. Only above PRESENT
   // cards: the trailing ghosts are the view's own possibility space.
   const trailingDivider = trailingPanes.length > 0 ? <div key="trailing-divider" aria-hidden className="h-px flex-none mx-[18px] bg-border" /> : null;
-
-
-
   // The tablet/phone sheets host the SAME LADDER LANE as the desktop rail (card-redesign
   // 2026-08-08 — sheets used to keep a flat populated-first/ghosts-last stack; with ghosts now
   // one-line entries the scroll-cost rationale is gone, and the lane brings the entry

@@ -57,6 +57,13 @@ export function roleKeyLabel(key: string): { label: string; codes: string[] } {
   return row ? { label: row.label, codes: row.codes } : { label: key, codes: [] };
 }
 
+/** `roleKeyLabel`'s inverse: the stored type key for a composition row's layer codes, in the
+ *  vocabulary's order whatever order they arrive in. A code outside the vocabulary names nothing and
+ *  is dropped; no codes at all is "none". */
+export function roleKeyOfCodes(codes: readonly string[]): string {
+  return ROLE_ORDER.filter((r) => codes.includes(ROLE_SHORT[r])).join("+") || "none";
+}
+
 /** The layer codes present across a set of role lists, in the fixed vocabulary order — the
  *  subject callout's lead-line read, and the one aggregate over ROLE_SHORT. */
 export function layerCodesOf(nodes: ReadonlyArray<{ roles?: string[] }>): string[] {
