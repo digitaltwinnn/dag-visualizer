@@ -53,6 +53,11 @@ export default function SubjectNote({ req }: { req: NoteReq | null }) {
   // Gate write, and the free model refuses a burst (R32), leaving every key it refused dark for
   // 15 minutes (`FAIL_TTL_S`). So the ask waits `ASK_DWELL_MS` with the key unchanged.
   const askedFor = useRef<string | null>(null);
+  // …per VISIT to the key: coming back to one whose note has since expired must ask again, or the
+  // card reads forever.
+  useEffect(() => {
+    askedFor.current = null;
+  }, [key]);
   useEffect(() => {
     if (key == null || res?.state !== "request" || askedFor.current === key) return;
     const t = setTimeout(() => {

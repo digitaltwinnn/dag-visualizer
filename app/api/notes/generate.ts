@@ -1,5 +1,6 @@
 import { factsBlock } from "@/src/data/noteFacts";
 import { checkNote } from "@/src/data/noteHonesty";
+import { withDayChange } from "@/src/data/notableDays";
 import type { NoteChange, NoteDay, NoteResponse, NoteView } from "@/src/data/noteTypes";
 import { GateError, type gateChat, type GateErrorKind } from "./gate";
 import { failKeyOf, lockKeyOf, noteKeyOf, statsKeyOf, timingOf, type NoteSpan } from "./keys";
@@ -175,6 +176,7 @@ async function write(
       const kind: GateErrorKind = e.kind;
       if (kind !== "nokey") await count("calls"); // a missing key never reached the Gate
       warn(req, kind);
+      if (held) return held; // the rewrite was style, and a checked note is in hand
       return { ok: false, stat: kind };
     }
     const { note, captions } = parseAnswer(answer);
@@ -197,7 +199,7 @@ async function write(
       seen.set(iso, n);
       const caption = captions.get(n === 1 ? iso : `${iso}#${n}`);
       if (caption && checkNote(caption, input.facts, input.names, { maxSentences: 1, subject }).ok)
-        kept.push({ dayMs: d.dayMs, kind: d.kind, networkId: d.networkId, caption });
+        kept.push({ dayMs: d.dayMs, kind: d.kind, networkId: d.networkId, caption: withDayChange(caption, d) });
     }
     if (negative) {
       held = { ok: true, text: note, days: kept };

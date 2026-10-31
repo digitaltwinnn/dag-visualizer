@@ -566,6 +566,9 @@ export default function Inspector() {
     lastSelection.current = selectionKey;
     const modeChanged = lastMode.current !== mode;
     lastMode.current = mode;
+    // Read here, ahead of the entry's return: a browse released by leaving a view is no reader's move.
+    const browsed = !modeChanged && lastRailNet.current !== railNet;
+    lastRailNet.current = railNet;
     // Read the live overrides rather than closing over them: `railCollapse` changes on every
     // +/− too, and this effect must fire on a SELECTION change only.
     const live: LaneCollapseState = { ...collapseState, overrides: useStore.getState().railCollapse };
@@ -606,8 +609,6 @@ export default function Inspector() {
       return;
     }
     // The window is for what ARRIVAL commits. A browsed network is never that: only the reader moves it.
-    const browsed = lastRailNet.current !== railNet;
-    lastRailNet.current = railNet;
     if (!browsed && Date.now() - modeEnteredAt.current < ENTRY_GRACE_MS) return;
     if (Object.keys(staleNulls).length) setRailCollapseMany(staleNulls);
   }, [selectionKey, setRailCollapseMany]); // eslint-disable-line react-hooks/exhaustive-deps -- mode/ladderIds ride selectionKey (mode is a component of it)

@@ -340,7 +340,7 @@ describe("generateNote", () => {
     const res = await generateNote(REQ, d, "read");
     expect(res.state).toBe("ok");
     if (res.state !== "ok") return;
-    expect(res.days).toEqual([{ dayMs: days[1]!.dayMs, kind: "high", networkId: null, caption: "Snapshots anchored reached 1,300." }]);
+    expect(res.days).toEqual([{ dayMs: days[1]!.dayMs, kind: "high", networkId: null, caption: "Snapshots anchored reached 1,300, up 117%" }]);
     expect(d.chat.mock.calls[0]![0][1]!.content).toContain("DAY 2026-10-20");
   });
 
@@ -577,6 +577,15 @@ describe("a read-only deployment serves the cache and writes nothing (R66)", () 
 
 describe("the positive rewrite", () => {
   beforeEach(() => { store = memoryNotesStore(); });
+  it("keeps the true first note when the rewrite hits a Gate error", async () => {
+    const first = "NOTE: The hypergraph anchored 1,200 snapshots a day, with no gaps.";
+    let calls = 0;
+    const chat = async () => {
+      if (calls++ === 0) return first;
+      throw new GateError("rate");
+    };
+    expect(await generateNote(REQ, deps({ chat }), "read")).toMatchObject({ state: "ok" });
+  });
   it("keeps the true first note when the rewrite fails the gate", async () => {
     const first = "NOTE: The hypergraph anchored 1,200 snapshots a day, with no gaps.";
     const res = await generateNote(REQ, deps({ answers: [first, BAD] }), "read");

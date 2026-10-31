@@ -234,11 +234,7 @@ type HyperSelection = { net: string; type: string };
 /** A HYPERGRAPH SELECTION as the builder takes it: the subject note `<net>/type:<roleKey>`, a
  *  network's make-up, scoped to `dag` or a network this catalog tracks and spelled as `roleKey`
  *  spells it (one make-up, one key). Null for anything else, a network's own note included.
- *  ⚠️ `dag/type:*` is NOT accepted: the sampler writes no `f.type.dag.*` (the DAG node-type stack
- *  is the open sampler follow-up), so a build could only answer null, and an on-request kind that
- *  is accepted answers `request` BEFORE its facts are read — the card would flash "writing…" and
- *  spend a limited request to learn `none` (final review I2). Refused here, the read answers a
- *  cacheable `none` and the client never asks (`typeNoteReq` agrees). */
+ *  `dag/type:*` is accepted: the sampler has written `f.type.dag.*` since PR #80. */
 function hyperSelectionOf(net: string, subject: string): HyperSelection | null {
   if (!isSubjectNote(subject) || subjectKindOf(subject) !== "type") return null;
   const scope = subject.slice(0, subject.indexOf("/"));

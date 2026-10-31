@@ -182,9 +182,7 @@ them — but the Next Node server can.
   space is bounded (countries, providers and types times networks) but the Gate's burst limit is
   not, and one visitor drilling through twenty countries should pace themselves, not the cron — the
   same per-visitor (20 an hour) and daily (2,000) limits, a cached note served without counting.
-  `dag/type:*` is refused (no `f.type.dag.*` series: an accepted on-request kind answers `request`
-  before its facts, so every DAG make-up would show "reading…" and then vanish), and the client
-  never asks it. A
+  A
   network-scoped country or provider note, and a provider note at fleet scope, read the geo family
   for their week ago, so they state no change until a week of it exists (from 2026-10-27). The
   subject cards ask AFTER A DWELL (`ASK_DWELL_MS`, `components/notes/SubjectNote.tsx`): a key that

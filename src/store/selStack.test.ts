@@ -111,6 +111,11 @@ describe("a plane focus bumps the RANGE slot (user, 2026-10-25 — a plane is it
     expect(useStore.getState().trendFocus).toBe("dag");
     expect(useStore.getState().selStack).toEqual([]);
   });
+  it("a searched span outranks the plane that comes back with it", () => {
+    useStore.setState({ mode: "ledger", rawReturnMode: "trend", rawReturnFocus: "dor", logCut: { fromMs: 0, toMs: 86_400_000 }, trendRange: null, metaSnap: null, selStack: [] });
+    useStore.getState().setSection("scene");
+    expect(useStore.getState().selStack[0]).toBe("range");
+  });
   it("a span searched in the raw log comes back as a RANKED range (the Range card is the box, not folded under the note)", () => {
     useStore.setState({ mode: "ledger", rawReturnMode: "trend", logCut: { fromMs: 0, toMs: 86_400_000 }, trendRange: null, metaSnap: null, tickNet: null, rawReturnFocus: null });
     useStore.getState().setSection("scene");

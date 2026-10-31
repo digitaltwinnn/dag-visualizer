@@ -233,6 +233,18 @@ function pauses(gap: readonly (number | null)[], input: NotableInput, networkId:
   keep.flush();
 }
 
+/** A DAY'S DISTANCE FROM USUAL (user, 2026-10-31: "can you mention the increase / decrease in
+ *  percentage also?"), added by code to the model's caption, so it is computed from the measured
+ *  pair. Only a count against its usual has one: a first or a last day is an event, and a wait or a
+ *  count of networks reads worse as a percentage. Rounds to nothing, says nothing. */
+export function withDayChange(caption: string, day: Pick<NotableDay, "kind" | "value" | "level">): string {
+  const counted = day.kind === "high" || day.kind === "low" || day.kind === "peak" || day.kind === "trough";
+  if (!counted || !(day.level > 0) || caption.includes("%")) return caption;
+  const pct = Math.round((day.value / day.level - 1) * 100);
+  if (pct === 0) return caption;
+  return `${caption.replace(/[.\s]+$/, "")}, ${pct > 0 ? "up" : "down"} ${Math.abs(pct)}%`;
+}
+
 /** THE RANGE'S EXTREMES, in fill order (see `NOTABLE_FLOOR`): the busiest and quietest day of the
  *  subject's own series, then a network's longest wait or the hypergraph's broadest day. Read on
  *  covered days from `from` on, and for a network inside its own activity (the quiet tail after

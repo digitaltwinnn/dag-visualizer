@@ -823,7 +823,9 @@ export const useStore = create<AppState>((set) => ({
       // Both come back RANKED, as the commits they are (`setFilter`'s and `setTrendRange`'s own
       // bumps): the searched span last, so its Range card is the box. Unranked, the Range card
       // came back folded under the open note (review, 2026-10-29).
-      const ranked = s.logCut && range ? bumpStack(s.selStack, "range", true) : s.selStack;
+      // The plane first, the searched span last, so its Range card is the box.
+      const planed = focus != null ? bumpStack(s.selStack, "network", true) : s.selStack;
+      const ranked = s.logCut && range ? bumpStack(planed, "range", true) : planed;
       return back != null && back !== s.mode
         ? {
             section,
@@ -833,7 +835,7 @@ export const useStore = create<AppState>((set) => ({
             trendFocus: focus,
             trendRange: range,
             rawReturnFocus: null,
-            selStack: focus != null ? bumpStack(ranked, "network", true) : ranked,
+            selStack: ranked,
             motionCause: { kind: "view", from: s.mode, to: back },
           }
         : { section, rawReturnMode: section === "scene" ? null : s.rawReturnMode };
