@@ -129,6 +129,7 @@ export function displayOrder(lane: readonly string[], present: (id: string) => b
 export interface SelectionKeyState {
   mode: Mode;
   filter: string;
+  railNet: string | null;
   country: string | null;
   cohort: CohortSel | null;
   composition: CompositionSel | null;
@@ -151,6 +152,9 @@ export function railSelectionKey(s: SelectionKeyState): string {
   return [
     s.mode,
     s.filter,
+    // A browsed network is a choice like a filter: without it the note a view was entered on stayed
+    // pinned open beside the card (user, 2026-10-31: "the AI card does not collapse").
+    s.railNet ?? "",
     s.country ?? "",
     s.cohort ? `${s.cohort.cc}|${s.cohort.city}|${s.cohort.isp}` : "",
     s.composition ? `${s.composition.netId}|${s.composition.key}` : "",

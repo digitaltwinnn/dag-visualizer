@@ -157,7 +157,7 @@ describe("the note's stand-down (`overridesOnNoteStandDown`)", () => {
 describe("a new selection moment (`railSelectionKey` + `overridesOnSelection`)", () => {
   const key = (over: Partial<SelectionKeyState>): string =>
     railSelectionKey({
-      mode: "ledger", filter: "all", country: null, cohort: null, composition: null, inspect: null,
+      mode: "ledger", filter: "all", railNet: null, country: null, cohort: null, composition: null, inspect: null,
       trendCursorMs: null, trendRange: null, trendFocus: null, tickNet: null, following: false, snap: snapPick, metaSnap: null,
       ...over,
     });
@@ -215,5 +215,17 @@ describe("displayOrder", () => {
   it("is the lane itself with nothing chosen, and with everything", () => {
     expect(displayOrder(geo, present([]), null)).toEqual(geo);
     expect(displayOrder(geo, present(geo), null)).toEqual(geo);
+  });
+});
+
+// A BROWSED NETWORK IS A CHOICE (user, 2026-10-31: "the AI card does not collapse"): arriving in a
+// view pins the note open, and only a new selection moment drops that pin.
+describe("railSelectionKey and the browsed network", () => {
+  const state = { mode: "hyper", filter: "all", railNet: null, country: null, cohort: null, composition: null, inspect: null, trendCursorMs: null, trendRange: null, trendFocus: null, tickNet: null, following: false, snap: null, metaSnap: null } as SelectionKeyState;
+  it("browsing a network is a new moment, and so is each swipe", () => {
+    const rest = railSelectionKey(state);
+    const dag = railSelectionKey({ ...state, railNet: "dag" });
+    expect(dag).not.toBe(rest);
+    expect(railSelectionKey({ ...state, railNet: "dor" })).not.toBe(dag);
   });
 });

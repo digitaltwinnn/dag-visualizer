@@ -7,6 +7,7 @@ import { useTickHasFilter } from "@/components/useTickHasFilter";
 import { UNLISTED_ID } from "@/src/data/unlisted";
 import type { NoteResponse } from "@/src/data/noteTypes";
 import { NET } from "@/src/net/current";
+import { viewNetwork } from "@/src/engine/domain/viewNetwork";
 import { useStore } from "@/src/store/store";
 import { noteSubjectOf, type NoteSubject } from "./noteSubject";
 import { nextWait, type WaitState } from "./typedNote";
@@ -16,13 +17,13 @@ import useNote, { type NoteState } from "./useNote";
 // Its own module (2026-10-27) so the rail, the card and History's diamonds import the derivation
 // without the card's render tree.
 
-/** THE SCOPE A COUNTRY OR PROVIDER CARD'S OWN NOTE IS ASKED AT (`subjectNote.ts`): the FILTER,
- *  "all" being the fleet. Not `metagraphCardNetwork`, the top card's rule: the card's lead divides
+/** THE SCOPE A COUNTRY OR PROVIDER CARD'S OWN NOTE IS ASKED AT (`subjectNote.ts`): the network the
+ *  view stands on, the FILTER unless one is browsed, "all" being the fleet. Not `metagraphCardNetwork`, the top card's rule: the card's lead divides
  *  by `selNodes`, the filter's population ("Hosts 30% of the selection's nodes"), and under no
  *  filter Geography's metagraph card moves to a committed node's network while that lead keeps
  *  counting everything. The note is scoped as its lead is, so the two never read in two frames. */
 export function useNoteScopeNetwork(): string {
-  return useStore((s) => s.filter);
+  return useStore(viewNetwork);
 }
 
 /** THE MAINNET GATE, one home for the top card and every subject card's note. Notes are written
@@ -53,7 +54,7 @@ export function useWaited(res: NoteResponse | null): boolean {
 export function useAiNote(): { subject: NoteSubject | null; req: NoteReq | null; note: NoteState } {
   const mode = useStore((s) => s.mode);
   const filter = useStore((s) => s.filter);
-  const hyperNet = useStore((s) => s.hyperNet);
+  const railNet = useStore((s) => s.railNet);
   const tickNet = useStore((s) => s.tickNet);
   const snap = useStore((s) => s.snap);
   const inspect = useStore((s) => s.inspect);
@@ -63,7 +64,7 @@ export function useAiNote(): { subject: NoteSubject | null; req: NoteReq | null;
   const tickHasFilter = useTickHasFilter();
 
   const subject = noteSubjectOf(mode, {
-    metagraphNetwork: metagraphCardNetwork({ mode, filter, hyperNet, tickNet, snap, tickHasFilter, trendFocus, trendFront, inspect }),
+    metagraphNetwork: metagraphCardNetwork({ mode, filter, railNet, tickNet, snap, tickHasFilter, trendFocus, trendFront, inspect }),
     trendFilter: filter,
     unlisted: (id) => id === UNLISTED_ID,
   });

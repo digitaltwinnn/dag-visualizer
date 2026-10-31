@@ -309,9 +309,9 @@ describe("subject notes live on their cards", () => {
     expect(read("components/notes/NotesCard.tsx")).not.toMatch(/for this range/);
   });
 
-  it("a country or provider note is scoped by the filter, its lead's denominator, never the metagraph card's network", () => {
+  it("a country or provider note is scoped by the network the view stands on, never the metagraph card's", () => {
     const body = fnBody(read("components/notes/useAiNote.ts"), "export function useNoteScopeNetwork(");
-    expect(body).toMatch(/useStore\(\(s\) => s\.filter\)/);
+    expect(body).toMatch(/useStore\(viewNetwork\)/);
     expect(body).not.toMatch(/metagraphCardNetwork\(/);
   });
 

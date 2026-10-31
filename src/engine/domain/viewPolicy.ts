@@ -86,8 +86,8 @@ export interface ViewPolicy {
   // `cardNetwork`). One rule across the views — the Metagraph card is the committed subject's
   // network — and each view names its subject here. `railCards.metagraphCardNetwork` resolves
   // it; the card's × and the slot's hint read the same row.
-  // Hypergraph's is `rail`: the network its rail is browsing, else the filter (`viewNetwork.ts`).
-  metagraphCard: "filter" | "rail" | "node" | "tickNet" | "plane";
+  // A network the rail is browsing outranks it (`viewNetwork.ts`).
+  metagraphCard: "filter" | "node" | "tickNet" | "plane";
   // Does this view publish the selection's flat node list (`store.selNodes`) for its explorer
   // card? geo (Country breakdown) + hyper (Network breakdown); elsewhere the list empties so the
   // browsers stay quiet.
@@ -281,7 +281,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     // so hyper shares the overview pose with the other views and never needs the pole-crossing relax
     rotate: true,
     dragOrbitsSubject: false,
-    metagraphCard: "rail",
+    metagraphCard: "filter",
     nodeList: true,
     vitalsLane: true,
     bandContent: "vitals",

@@ -2,7 +2,6 @@ import type { LucideIcon } from "lucide-react";
 import { ledgerCardNetwork } from "@/src/engine/domain/tickNet";
 import { pickNetId } from "@/src/engine/domain/pickActions";
 import { cardNetwork } from "@/src/engine/domain/trendStack";
-import { viewNetwork } from "@/src/engine/domain/viewNetwork";
 import type { TickNetSel } from "@/src/data/types";
 import { AI_NOTES_ICON, EXPLORE_ICON, INSTANT_ICON, RANGE_ICON, iconForPick } from "@/components/icons";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
@@ -140,7 +139,7 @@ export function isSubjectSlot(id: string): boolean {
  *  inputs (which can't change a slot's presence). */
 export type LadderState = Pick<
   RailManifestState,
-  "mode" | "filter" | "hyperNet" | "tickNet" | "tickHasFilter" | "nodeHere" | "inspect" | "snap" | "metaSnap" | "country" | "cohort" | "composition" | "trendCursorMs" | "trendRange" | "trendFocus" | "noteAbsent"
+  "mode" | "filter" | "railNet" | "tickNet" | "tickHasFilter" | "nodeHere" | "inspect" | "snap" | "metaSnap" | "country" | "cohort" | "composition" | "trendCursorMs" | "trendRange" | "trendFocus" | "noteAbsent"
 > & {
   /** The store's selection recency (most-recent-FIRST) — the collapse rule reads it (item 8):
    *  the most recently selected present card is the ACTIVE one; the rest rest collapsed. */
@@ -221,7 +220,7 @@ export interface RailManifestState {
    *  the Metagraph card down under that tick (`ledgerCardNetwork`); undefined = unknown. */
   tickHasFilter?: boolean;
   /** The network Hypergraph's rail is browsing (`domain/viewNetwork.ts`). */
-  hyperNet?: string | null;
+  railNet?: string | null;
   /** Does the committed node belong to what this view shows (`useNodeHere`)? ⚠️ Only an explicit
    *  `false` stands the card down, as `tickHasFilter`'s does. */
   nodeHere?: boolean;
@@ -418,7 +417,7 @@ function metaSnapHint(s: RailManifestState): string | null {
 export function metagraphCardNetwork(s: {
   mode: Mode;
   filter: string;
-  hyperNet?: string | null;
+  railNet?: string | null;
   tickNet?: TickNetSel | null;
   snap?: { data: { ordinal: number } } | null;
   tickHasFilter?: boolean;
@@ -426,11 +425,12 @@ export function metagraphCardNetwork(s: {
   trendFront?: string | null;
   inspect?: PickDescriptor | null;
 }): string {
+  // A network the rail is browsing is the card's in the views that browse (`viewNetwork.ts`).
+  if (s.railNet) return s.railNet;
   const from = VIEW_POLICIES[s.mode].metagraphCard;
   if (from === "tickNet")
     return ledgerCardNetwork({ filter: s.filter, tickNet: s.tickNet ?? null, snapOrdinal: s.snap?.data.ordinal ?? null, tickHasFilter: s.tickHasFilter });
   if (from === "plane") return cardNetwork(s.filter, s.trendFocus ?? null, s.trendFront ?? null);
-  if (from === "rail") return viewNetwork({ filter: s.filter, hyperNet: s.hyperNet ?? null });
   // IN GEOGRAPHY it is the committed NODE's network while the filter is All (2026-10-18, user:
   // "click a node: it should also populate the dossier card"). A geo node never writes the filter
   // (the view's own rule), so the card had stayed a ghost under a committed node; it now stands on

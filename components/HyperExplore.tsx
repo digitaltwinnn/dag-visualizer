@@ -43,8 +43,8 @@ export default function HyperExplore() {
   const metaList = useStore((s) => s.metaList);
   // WHAT IT READS is the network the view stands on; only a row's own commit reads the real filter.
   const appFilter = useStore((s) => s.filter);
-  const hyperNet = useStore((s) => s.hyperNet);
-  const filter = viewNetwork({ filter: appFilter, hyperNet });
+  const railNet = useStore((s) => s.railNet);
+  const filter = viewNetwork({ filter: appFilter, railNet });
   const selNodes = useStore((s) => s.selNodes);
   const allNodes = useStore((s) => s.allNodes);
   const hyperMeasure = useStore((s) => s.hyperMeasure);
@@ -62,7 +62,7 @@ export default function HyperExplore() {
   // The three writes, all through the decision table and the one executor (rule 2).
   const toggleNetwork = (id: string) => applyClickActions(filterToggleActions(id, appFilter));
   // Home releases what the view stands on: a browsed network first, the filter after it.
-  const releaseNetwork = () => applyClickActions(hyperNet ? [{ kind: "hyperNet", id: null }] : filterToggleActions(appFilter, appFilter));
+  const releaseNetwork = () => applyClickActions(railNet ? [{ kind: "railNet", id: null }] : filterToggleActions(appFilter, appFilter));
   const toggleComposition = (compKey: string) =>
     applyClickActions(compositionToggleActions({ netId: filter, key: compKey }, { composition, hasInspect: !!inspect, filter }));
   const selectNode = (pick: NodeRow["pick"], selected: boolean, compKey: string) =>
@@ -71,7 +71,7 @@ export default function HyperExplore() {
         mode: "hyper",
         currentFilter: filter,
         deselect: selected,
-        ...(hyperNet ? { commitNetwork: false } : {}),
+        ...(railNet ? { commitNetwork: false } : {}),
         // FULL-ANCESTRY: a node select commits its parent group too, so a deselect steps back
         // onto the composition rung.
         compositionSel: { netId: filter, key: compKey },

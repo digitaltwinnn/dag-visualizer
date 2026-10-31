@@ -147,7 +147,7 @@ function ChangeRow({ change, view }: { change: NoteChange; view: NoteView }) {
     const id = change.subject.kind === "network" ? change.subject.id : null;
     const state = {
       filter: s.filter,
-      hyperNet: s.hyperNet,
+      railNet: s.railNet,
       country: s.country,
       cohort: s.cohort,
       composition: s.composition,

@@ -40,7 +40,7 @@ import {
   compositionToggleActions,
   countryToggleActions,
   filterToggleActions,
-  hyperNetActions,
+  railNetActions,
   metaSnapSelectActions,
   tickNetSelectActions,
   nodeSelectActions,
@@ -82,8 +82,8 @@ export interface SiblingState {
   countries: CountryStat[];
   /** The selected tick's exact-read rows (store.snapshotExact[globalOrdinal]?.rows ?? null). */
   exactRows: ChannelSnapRow[] | null;
-  /** The network Hypergraph's rail is browsing (`domain/viewNetwork.ts`). */
-  hyperNet?: string | null;
+  /** The network the rail is browsing (`domain/viewNetwork.ts`). */
+  railNet?: string | null;
   /** store.following — a followed chain has no pin, which is what `pinnedOrdinal` must say. */
   following: boolean;
   /** The retained global tick window, OLDEST→NEWEST (the LiveStrip's own buffer and order), each
@@ -253,12 +253,20 @@ const keyOf = (s: SiblingState, metaId: string): string =>
 /** The network a ledger card stands on: the one committed inside the pinned tick, else the app
  *  filter (`domain/tickNet.ledgerNetwork`). Outside the ledger it is the filter. */
 const netOf = (s: SiblingState): string =>
-  s.hyperNet ? s.hyperNet : s.mode === "ledger" ? ledgerNetwork({ filter: s.filter, tickNet: s.tickNet, snapOrdinal: s.snap?.data.ordinal ?? null }) : s.filter;
+  s.railNet ? s.railNet : s.mode === "ledger" ? ledgerNetwork({ filter: s.filter, tickNet: s.tickNet, snapOrdinal: s.snap?.data.ordinal ?? null }) : s.filter;
 
 // The explorer's own lists (src/data/ladderLevels.ts) — so a step, a ghost and a row agree.
 const byCountryOf = (s: SiblingState) => nodesByCountry(s.selNodes);
 const countriesOf = (s: SiblingState) => countriesLevel(s.countries, byCountryOf(s), s.geoMeasure).map((x) => x.c);
 const cohortsIn = (s: SiblingState, cc: string) => cohortsLevel(countryNodes(cc, s.countries, byCountryOf(s)));
+
+/** The networks a Metagraph card steps. Hypergraph has its explorer's list, in the picked figure's
+ *  order; elsewhere the card has no explorer level above it and keeps the filter strip's located
+ *  order (0-located rows stay steppable, as the strip keeps them clickable). */
+const stepNetworks = (s: SiblingState) =>
+  s.mode === "hyper"
+    ? networksLevel(s.metaList, s.allNodes, s.hyperMeasure).map((x) => x.m)
+    : [...s.metaList].sort((a, b) => (b.located ?? 0) - (a.located ?? 0));
 
 export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | null {
   switch (slot) {
@@ -267,7 +275,7 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
       // its siblings are THAT MACHINE's other networks — a hybrid validating the DAG and running a
       // metagraph is two rows at one IP — each step the same node select the row's click runs
       // (place and provider re-committed, the filter untouched). One network is no set.
-      if (s.mode === "geo" && s.filter === "all" && s.inspect) {
+      if (s.mode === "geo" && s.filter === "all" && s.inspect && !s.railNet) {
         const ip = machineIp(s.inspect);
         const cur = pickNetId(s.inspect);
         if (!ip || !cur) return null;
@@ -313,18 +321,12 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
       // filter, so a filter step would write the top bar, and History's network order is the
       // stack's roster, which only React holds (`trendIds` is never read back by a component).
       if (s.mode === "trend" && s.trendFocus != null && s.trendFocus !== s.filter) return null;
-      // Hypergraph steps its explorer's network list, in the picked figure's order (one list per
-      // level, 2026-10-07); elsewhere the Metagraph card has no explorer level above it and keeps the
-      // filter strip's located order (0-located rows stay steppable, as the strip keeps them clickable).
-      const nets =
-        s.mode === "hyper"
-          ? networksLevel(s.metaList, s.allNodes, s.hyperMeasure).map((x) => x.m)
-          : [...s.metaList].sort((a, b) => (b.located ?? 0) - (a.located ?? 0));
+      const nets = stepNetworks(s);
       const items = nets.map((m) => ({
         key: m.id,
         label: m.name,
-        // THE RAIL BROWSES IN HYPERGRAPH (`domain/viewNetwork.ts`): a swipe leaves the filter alone.
-        actions: s.mode === "hyper" ? hyperNetActions(m.id, s.filter) : filterToggleActions(m.id, s.filter),
+        // A VIEW THAT BROWSES (`domain/viewNetwork.ts`): a swipe leaves the filter alone.
+        actions: ROOT_OF[s.mode] ? railNetActions(m.id, s.filter) : filterToggleActions(m.id, s.filter),
       }));
       return finish(slot, items, nets.findIndex((m) => m.id === net), "Networks");
     }
@@ -585,7 +587,7 @@ const momentOfRangeChildren = (s: SiblingState, n: number): SiblingStep[] => {
 // it states its own precondition — the dossier only exists under a committed network, so at "all"
 // there is no card to open anything FROM (the same shape `cohortChildren` asserts with `s.country`).
 const countryChildren = (s: SiblingState, n: number): SiblingStep[] => {
-  if (s.filter === "all") return [];
+  if (netOf(s) === "all") return [];
   return countriesOf(s).slice(0, n).map((c) => countryItem(c, s));
 };
 // geo: the committed country's cohorts.
@@ -690,15 +692,11 @@ export const CHILD_OF: Partial<Record<Mode, Partial<Record<RailCardKind, ChildEn
 
 /** A VIEW'S OWN FIRST STEP (user, 2026-10-31): with nothing chosen there is no parent card to step
  *  from, so a view can name the slot its first ghost opens and the set it opens the first of. */
-export const ROOT_OF: Partial<Record<Mode, ChildEntry>> = {
-  hyper: {
-    to: "context",
-    steps: (s, n) =>
-      networksLevel(s.metaList, s.allNodes, s.hyperMeasure)
-        .slice(0, n)
-        .map(({ m }) => ({ key: m.id, label: m.name, actions: hyperNetActions(m.id, s.filter) })),
-  },
+const rootNetworks: ChildEntry = {
+  to: "context",
+  steps: (s, n) => stepNetworks(s).slice(0, n).map((m) => ({ key: m.id, label: m.name, actions: railNetActions(m.id, s.filter) })),
 };
+export const ROOT_OF: Partial<Record<Mode, ChildEntry>> = { hyper: rootNetworks, geo: rootNetworks };
 
 export function rootStep(s: SiblingState): SiblingStep | null {
   return ROOT_OF[s.mode]?.steps(s, 1)[0] ?? null;

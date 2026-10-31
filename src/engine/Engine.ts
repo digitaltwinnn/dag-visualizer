@@ -971,7 +971,7 @@ export class Engine {
         }
         // Country drill-down is geo-only — gate on the view so a re-entrant clear
         // (e.g. from setMode while switching away) can't run a geo focus in hyper.
-        if (st.country !== prev.country && st.filter === prev.filter && st.mode === "geo") {
+        if (st.country !== prev.country && viewNetwork(st) === viewNetwork(prev) && st.mode === "geo") {
           this.country = st.country;
           this.globe.setCountry(st.country);
           this._resolveFocus();
@@ -1486,11 +1486,11 @@ export class Engine {
     if (mode !== "ledger" && st0.metaSnap != null) st0.setMetaSnap(null);
     // …and so is the network committed inside a tick: it has no meaning outside this view.
     if (mode !== "ledger" && st0.tickNet != null) st0.setTickNet(null);
-    // …and so is a browsed network in Hypergraph. Not a network event: the scene falls back to the
-    // filter below, and what the reader selected under it carries as any selection does.
-    if (policy.metagraphCard !== "rail" && st0.hyperNet != null) {
+    // …and so is a browsed network: it is a look around one view. Not a network event: the scene
+    // falls back to the filter below, and what the reader selected under it carries as ever.
+    if (mode !== prevMode && st0.railNet != null) {
       this.filter = st0.filter;
-      st0.setHyperNet(null);
+      st0.setRailNet(null);
     }
 
     if (is3D(prevMode) && is3D(mode) && prevMode !== mode) {

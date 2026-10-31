@@ -54,18 +54,19 @@ export default function ContextCard({
   // …and in GEOGRAPHY a card standing on the committed node's network has nothing of its own to
   // clear: the node card's × releases the node (2026-10-18).
   const cardFrom = useStore((s) => VIEW_POLICIES[s.mode].metagraphCard);
-  const onNode = cardFrom === "node" && filter !== appFilter;
+  const railNet = useStore((s) => s.railNet);
+  const onNode = cardFrom === "node" && filter !== appFilter && !railNet;
   const clearable = !onNode && (filter === appFilter || !chartStack || trendFocus != null);
   const close = () => {
     const st = useStore.getState();
     applyClickActions(
-      filter === appFilter
-        ? [{ kind: "filter", id: "all" }]
-        : VIEW_POLICIES[st.mode].metagraphCard === "plane"
-          ? [{ kind: "trendFocus", id: null }]
-          : st.hyperNet != null
-            ? [{ kind: "hyperNet", id: null }]
-            : tickNetClearActions({ metaSnap: st.metaSnap, hasInspect: !!st.inspect }),
+      st.railNet != null
+        ? [{ kind: "railNet", id: null }]
+        : filter === appFilter
+          ? [{ kind: "filter", id: "all" }]
+          : VIEW_POLICIES[st.mode].metagraphCard === "plane"
+            ? [{ kind: "trendFocus", id: null }]
+          : tickNetClearActions({ metaSnap: st.metaSnap, hasInspect: !!st.inspect }),
     );
   };
   // THE CARD'S EFFECTS WEAR THE NETWORK'S HUE ONLY WHILE IT IS THE FILTER (user, 2026-10-03: "a

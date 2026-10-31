@@ -24,7 +24,7 @@ import HeightEase from "@/components/HeightEase";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { useTouch } from "@/components/useTouch";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { detailsCards, isSubjectSlot, ladderSlotIds, noteCardAbsent, type RailCard } from "@/components/railCards";
+import { detailsCards, ladderSlotIds, noteCardAbsent, type RailCard } from "@/components/railCards";
 import { CHILD_OF, ROOT_OF, childStep, rootStep, type SiblingStep } from "@/components/railSiblings";
 import { displayOrder, isCollapsed, boxedSlotOf, overridesOnNoteStandDown, overridesOnSelection, overridesOnViewEntry, railSelectionKey, subjectRunEnd, type LaneCollapseState } from "@/components/railCollapse";
 import { useSiblingState } from "@/components/useSiblingState";
@@ -404,7 +404,7 @@ export default function Inspector() {
   const cohort = useStore((s) => s.cohort);
   const composition = useStore((s) => s.composition);
   const filter = useStore((s) => s.filter);
-  const hyperNet = useStore((s) => s.hyperNet);
+  const railNet = useStore((s) => s.railNet);
   const mode = useStore((s) => s.mode) as Mode;
   // The rail's node hints count the located fleet — only where the view publishes one (the policy's
   // own `nodeList` flag, the same one that gates `selNodes`).
@@ -444,10 +444,10 @@ export default function Inspector() {
   const aiNote = useAiNote();
   const noteAbsent = noteCardAbsent(aiNote.req != null, aiNote.note.res, aiNote.note.via);
   const manifest = detailsCards({
-    mode, filter, hyperNet, tickNet, tickHasFilter, nodeHere, inspect, snap, country, cohort, composition, metaSnap, coarse, trendCursorMs, trendRange, trendFocus, trendFront, trendWindow,
+    mode, filter, railNet, tickNet, tickHasFilter, nodeHere, inspect, snap, country, cohort, composition, metaSnap, coarse, trendCursorMs, trendRange, trendFocus, trendFront, trendWindow,
     noteAbsent,
     selNodesCount: selNodes.length,
-    filterLabel: displayNetwork(filter)?.ticker ?? null, // one lookup — catalog + the unlisted pseudo-network
+    filterLabel: displayNetwork(railNet ?? filter)?.ticker ?? null, // one lookup — catalog + the unlisted pseudo-network
   });
 
   // ── The descent-spine ladder collapse model (variant-A, 2026-07-19) ──────────────────────────
@@ -508,12 +508,6 @@ export default function Inspector() {
   const deepestKind = deepestId ? (manifest.find((c) => c.id === deepestId)?.kind ?? null) : null;
   const siblingState = useSiblingState(deepestKind);
   const nextStep = useMemo(() => {
-    // NOTHING CHOSEN YET, the view's own first step (user, 2026-10-31): the AI card tops the lane but
-    // is no parent, and a ghost with nothing above it would only open its hint.
-    if (!presentLadderIds.some(isSubjectSlot)) {
-      const root = rootStep(siblingState);
-      return root ? { id: ROOT_OF[mode]!.to, step: root } : null;
-    }
     if (!deepestId || !deepestKind) return null;
     const below = ladderIds[ladderIds.indexOf(deepestId) + 1];
     const to = CHILD_OF[mode]?.[deepestKind]?.to;
@@ -522,6 +516,12 @@ export default function Inspector() {
     return step ? { id: below, step } : null;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `manifest`/`ladderIds` derive from the same store slices
   }, [deepestId, deepestKind, siblingState, mode]);
+  // THE VIEW'S OWN FIRST STEP (user, 2026-10-31: "open the 1st of that set"): its ghost has no parent
+  // to step from, so it would only open its hint. A held node leaves it alone in Hypergraph: opening
+  // a network would drop the node, and in Geography the card stands on the node's network anyway.
+  const rootId = ROOT_OF[mode]?.to ?? null;
+  const rootGhost = rootId && !presentOf(rootId) && !inspect ? rootStep(siblingState) : null;
+  const ghostStep = (id: string) => (id === nextStep?.id ? nextStep.step : id === rootId ? (rootGhost ?? undefined) : undefined);
   // EXPAND-ONLY since the box lost its minimize (review find, 2026-09-11): every reachable
   // caller — an entry's stretched toggle, the plank's ∧/∨ targeting collapsed neighbours —
   // arrives with effCollapsed(id) true, so this always OPENS `id` (single-open collapses the
@@ -547,7 +547,7 @@ export default function Inspector() {
   // "only the focus rung is open" default governs again. Within one selection the +/− still holds.
   const following = useStore((s) => s.following);
   // One pure key (`railCollapse.railSelectionKey` carries every member's reason).
-  const selectionKey = railSelectionKey({ mode, filter, country, cohort, composition, inspect, trendCursorMs, trendRange, trendFocus, tickNet, following, snap, metaSnap });
+  const selectionKey = railSelectionKey({ mode, filter, railNet, country, cohort, composition, inspect, trendCursorMs, trendRange, trendFocus, tickNet, following, snap, metaSnap });
   // Arms HeightEase's growIn for slots that JOIN the lane after boot (false on the first
   // render pass, true on every later one — a mounting slot's wrapper then eases from 0
   // instead of shoving the pile in one frame). DESKTOP ONLY, as ExploreRail's (its note has
@@ -560,6 +560,7 @@ export default function Inspector() {
   const lastSelection = useRef(selectionKey);
   const lastMode = useRef(mode);
   const modeEnteredAt = useRef(0);
+  const lastRailNet = useRef(railNet);
   useEffect(() => {
     if (lastSelection.current === selectionKey) return;
     lastSelection.current = selectionKey;
@@ -604,7 +605,10 @@ export default function Inspector() {
       setRailCollapseMany(overridesOnViewEntry(live));
       return;
     }
-    if (Date.now() - modeEnteredAt.current < ENTRY_GRACE_MS) return;
+    // The window is for what ARRIVAL commits. A browsed network is never that: only the reader moves it.
+    const browsed = lastRailNet.current !== railNet;
+    lastRailNet.current = railNet;
+    if (!browsed && Date.now() - modeEnteredAt.current < ENTRY_GRACE_MS) return;
     if (Object.keys(staleNulls).length) setRailCollapseMany(staleNulls);
   }, [selectionKey, setRailCollapseMany]); // eslint-disable-line react-hooks/exhaustive-deps -- mode/ladderIds ride selectionKey (mode is a component of it)
   // THE NOTE'S STAND-DOWN (review 2026-10-29): a view is entered while its note is still read, so
@@ -715,13 +719,13 @@ export default function Inspector() {
                   Snapshots it sits under the global snapshot, and its step opens the tick's
                   first network. */}
               {!card.present && card.hint != null && (
-                <GhostCard card={card} {...ghostCx(id)} step={id === nextStep?.id ? nextStep.step : undefined} />
+                <GhostCard card={card} {...ghostCx(id)} step={ghostStep(id)} />
               )}
             </>
           ) : card.present ? (
             detailPane[id]
           ) : card.hint != null ? (
-            <GhostCard card={card} {...ghostCx(id)} step={id === nextStep?.id ? nextStep.step : undefined} />
+            <GhostCard card={card} {...ghostCx(id)} step={ghostStep(id)} />
           ) : null;
         if (!body) return null;
         // The rung's PRESENTATION TIER, stated on the wrapper for the slab CSS (globals.css) —

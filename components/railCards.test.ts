@@ -614,13 +614,21 @@ describe("a card leaves the rail in a view that can't show it", () => {
 // left/right swipe without setting the filter").
 describe("the Metagraph card in Hypergraph", () => {
   it("stands on the browsed network, else the filter", () => {
-    expect(metagraphCardNetwork({ mode: "hyper", filter: "all", hyperNet: "dor" })).toBe("dor");
-    expect(metagraphCardNetwork({ mode: "hyper", filter: "dag", hyperNet: "dor" })).toBe("dor");
+    expect(metagraphCardNetwork({ mode: "hyper", filter: "all", railNet: "dor" })).toBe("dor");
+    expect(metagraphCardNetwork({ mode: "hyper", filter: "dag", railNet: "dor" })).toBe("dor");
     expect(metagraphCardNetwork({ mode: "hyper", filter: "dag" })).toBe("dag");
   });
   it("is present on a browsed network with the filter on All, and takes the focus", () => {
-    const s = details({ mode: "hyper", filter: "all", hyperNet: "dor" });
+    const s = details({ mode: "hyper", filter: "all", railNet: "dor" });
     expect(detailsCards(s).find((c) => c.id === "context")?.present).toBe(true);
     expect(focusSlotId({ ...s, selStack: ["network"] })).toBe("context");
+  });
+});
+
+describe("the Metagraph card in Geography", () => {
+  const node = { kind: "metanode", node: { ip: "9.9.9.9" }, meta: { id: "bio" } } as unknown as PickDescriptor;
+  it("stands on the browsed network over a node's, else as it did", () => {
+    expect(metagraphCardNetwork({ mode: "geo", filter: "all", railNet: "dor", inspect: node })).toBe("dor");
+    expect(metagraphCardNetwork({ mode: "geo", filter: "all", inspect: node })).toBe("bio");
   });
 });

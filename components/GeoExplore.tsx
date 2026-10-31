@@ -15,6 +15,7 @@ import {
   footTotal,
   type GeoMeasure } from "@/src/data/geoMeasure";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
+import { viewNetwork } from "@/src/engine/domain/viewNetwork";
 import { filterAccent, metagraphById } from "@/src/data/network";
 import type { NodeRow } from "@/src/data/types";
 import type { CohortSel } from "@/src/engine/domain/focusLadder";
@@ -54,7 +55,8 @@ export default function GeoExplore() {
   const cohort = useStore((s) => s.cohort);
   const selNodes = useStore((s) => s.selNodes);
   const inspect = useStore((s) => s.inspect);
-  const filter = useStore((s) => s.filter);
+  // The network the view stands on; a browsed one stands for the filter in everything this reads.
+  const filter = useStore(viewNetwork);
   const geoMeasure = useStore((s) => s.geoMeasure);
   const metaList = useStore((s) => s.metaList); // co-location reads the full catalog (nodeRowSpec)
   const setGeoMeasure = useStore((s) => s.setGeoMeasure);

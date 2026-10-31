@@ -35,7 +35,7 @@ export function applyClickActions(actions: ClickAction[], opts?: { quiet?: boole
         st.setFilter(a.id);
         // A committed network replaces a browsed one, after the write: on the same network the
         // view stands where it stood, so the Engine sees no change and the camera holds.
-        if (st.hyperNet != null) st.setHyperNet(null);
+        if (st.railNet != null) st.setRailNet(null);
         // COMMITTING a filter in the ledger (re-)enters live mode (2026-08-08 — moved here
         // from FollowController's filter-dep effect, which fired AFTER any pin whose actions
         // included a filter change and stomped the pin: the release rule's step-to-"all" and
@@ -69,8 +69,8 @@ export function applyClickActions(actions: ClickAction[], opts?: { quiet?: boole
         // themselves) and it never leaves the Snapshots view.
         st.setTickNet(a.sel);
         break;
-      case "hyperNet":
-        st.setHyperNet(a.id);
+      case "railNet":
+        st.setRailNet(a.id);
         break;
       case "metaSnap":
         st.setMetaSnap(a.sel);
@@ -138,7 +138,7 @@ function motionCauseOf(actions: readonly ClickAction[]): MotionCause | null {
       // The tick-local network frames the same subject a committed network does, so it speaks
       // the filter's sentence ("Framing Dor Technologies").
       case "tickNet": return { kind: "filter", id: a.sel?.metaId ?? "all" };
-      case "hyperNet": return { kind: "filter", id: viewNetwork(useStore.getState()) };
+      case "railNet": return { kind: "filter", id: viewNetwork(useStore.getState()) };
       case "metaSnap": return a.sel ? { kind: "metaSnap", metaId: a.sel.metaId, ordinal: a.sel.ordinal } : { kind: "metaSnap", metaId: null };
       case "trendFocus": return { kind: "focus", id: a.id };
       // A cursor step moves no scene — the planes' line and the card answer it.

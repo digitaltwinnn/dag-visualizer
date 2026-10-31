@@ -225,7 +225,7 @@ export function GeoCells({ accent }: { accent: string }) {
   useFeedRead(["clusters", "api-geo"], "GeoCells");
   const lb = useStore((s) => s.leaderboard);
   const selNodes = useStore((s) => s.selNodes);
-  const filter = useStore((s) => s.filter);
+  const filter = useStore(viewNetwork);
   const countries = lb?.countries ?? [];
   const { ispCounts, topIsps, byRegion } = useMemo(() => {
     const ispCounts = new Map<string, number>();

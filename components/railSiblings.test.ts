@@ -115,14 +115,10 @@ describe("siblingSet — context (network) rung", () => {
     expect(set.items[set.index]!.key).toBe("ded");
     expect(set.parentLabel).toBe("Networks");
   });
-  it("a step to a DIFFERENT network is a plain filter select", () => {
+  it("a step to a DIFFERENT network browses it", () => {
     const set = siblingSet("context", base({ filter: "ded" }))!;
     const other = set.items.find((i) => i.key !== "ded")!;
-    expect(other.actions).toEqual([{ kind: "filter", id: other.key }]);
-  });
-  it("the CURRENT item builds the deselect-toggle (documented: the pager never invokes it)", () => {
-    const set = siblingSet("context", base({ filter: "ded" }))!;
-    expect(set.items[set.index]!.actions).toEqual([{ kind: "filter", id: "all" }]);
+    expect(other.actions).toEqual([{ kind: "railNet", id: other.key }]);
   });
   it("no committed filter → no set", () => {
     expect(siblingSet("context", base({}))).toBeNull();
@@ -838,27 +834,56 @@ describe("the Hypergraph rail never writes the filter", () => {
   const noFilter = (acts: { kind: string }[]) => expect(acts.some((a) => a.kind === "filter")).toBe(false);
   it("the ghost's first step is the explorer's first network", () => {
     const step = rootStep(hyper({}))!;
-    expect(step.actions).toEqual([{ kind: "hyperNet", id: step.key }]);
+    expect(step.actions).toEqual([{ kind: "railNet", id: step.key }]);
   });
-  it("only Hypergraph has a root step", () => {
-    expect(rootStep(base({ mode: "geo", filter: "all", metaList: nets }))).toBeNull();
+  it("Hypergraph and Geography have a root step, the other views none", () => {
+    expect(rootStep(base({ mode: "ledger", filter: "all", metaList: nets }))).toBeNull();
+    expect(rootStep(base({ mode: "trend", filter: "all", metaList: nets }))).toBeNull();
   });
   it("a swipe steps the list from the browsed network", () => {
-    const set = siblingSet("context", hyper({ hyperNet: "dor" }))!;
+    const set = siblingSet("context", hyper({ railNet: "dor" }))!;
     expect(set.items.map((i) => i.key).sort()).toEqual(["dag", "dor"]);
     expect(set.items[set.index]!.key).toBe("dor");
     set.items.forEach((i) => noFilter(i.actions));
   });
   it("a swipe under a real filter still leaves it alone, and coming back to it ends the browse", () => {
     const set = siblingSet("context", hyper({ filter: "dag" }))!;
-    expect(set.items.find((i) => i.key === "dor")!.actions).toEqual([{ kind: "hyperNet", id: "dor" }]);
-    expect(set.items.find((i) => i.key === "dag")!.actions).toEqual([{ kind: "hyperNet", id: null }]);
+    expect(set.items.find((i) => i.key === "dor")!.actions).toEqual([{ kind: "railNet", id: "dor" }]);
+    expect(set.items.find((i) => i.key === "dag")!.actions).toEqual([{ kind: "railNet", id: null }]);
   });
   it("a layer group opens under the browsed network with no filter write", () => {
     const row = { id: "n1", label: "n1", pick: { kind: "metanode", node: { ip: "2.2.2.1", roles: ["l0"] }, meta: { id: "dor" } } };
-    const s = hyper({ hyperNet: "dor", selNodes: [row] as unknown as SiblingState["selNodes"] });
+    const s = hyper({ railNet: "dor", selNodes: [row] as unknown as SiblingState["selNodes"] });
     const step = childStep("context", s)!;
     noFilter(step.actions);
     expect(step.actions).toContainEqual({ kind: "composition", sel: { netId: "dor", key: step.key } });
+  });
+});
+
+// GEOGRAPHY BROWSES TOO (user, 2026-10-31: "geo metagraph ghost should also be opening all cards").
+describe("the Geography rail never writes the filter", () => {
+  const nets = [
+    { id: "dor", name: "Dor", nodes: [], located: 1 },
+    { id: "dag", name: "DAG", nodes: [], located: 9 },
+  ] as unknown as SiblingState["metaList"];
+  const geo = (over: Partial<SiblingState>) => base({ mode: "geo", filter: "all", metaList: nets, ...over });
+  it("the ghost's first step is the most located network", () => {
+    expect(rootStep(geo({}))).toMatchObject({ key: "dag", actions: [{ kind: "railNet", id: "dag" }] });
+  });
+  it("a swipe steps every network from the browsed one, no filter", () => {
+    const set = siblingSet("context", geo({ railNet: "dag" }))!;
+    expect(set.items.map((i) => i.key)).toEqual(["dag", "dor"]);
+    expect(set.items[set.index]!.key).toBe("dag");
+    expect(set.items.find((i) => i.key === "dor")!.actions).toEqual([{ kind: "railNet", id: "dor" }]);
+  });
+  it("a country opens under the browsed network", () => {
+    const step = childStep("context", geo({ railNet: "dag" }))!;
+    expect(step.actions.some((a) => a.kind === "filter")).toBe(false);
+    expect(step.actions.some((a) => a.kind === "country")).toBe(true);
+  });
+  it("a node under a browsed network still steps networks, not that machine's", () => {
+    const pick = { kind: "l0", node: { ip: "1.1.1.1" } };
+    const set = siblingSet("context", geo({ railNet: "dag", inspect: pick as unknown as SiblingState["inspect"] }))!;
+    expect(set.parentLabel).toBe("Networks");
   });
 });

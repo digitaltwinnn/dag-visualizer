@@ -183,7 +183,7 @@ describe("the trends view is registered and inert", () => {
     expect(VIEW_POLICIES.geo.metagraphCard).toBe("node");
     expect(VIEW_POLICIES.ledger.metagraphCard).toBe("tickNet");
     expect(VIEW_POLICIES.trend.metagraphCard).toBe("plane");
-    expect(VIEW_POLICIES.hyper.metagraphCard).toBe("rail");
+    expect(VIEW_POLICIES.hyper.metagraphCard).toBe("filter");
     // A folded card's title starts on one x: the column fits the view's longest slot noun, and
     // Snapshots' two long ones do not set theirs (user, 2026-10-31).
     expect(VIEW_POLICIES.hyper.entryColumn).toBe("8.3em");

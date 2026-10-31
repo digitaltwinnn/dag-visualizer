@@ -20,7 +20,7 @@ beforeEach(() => {
   st.setSnap(null);
   st.setMetaSnap(null);
   st.setTickNet(null);
-  st.setHyperNet(null);
+  st.setRailNet(null);
   st.setFollowing(true);
 });
 
@@ -284,27 +284,27 @@ describe("filter action clears a stale plane focus", () => {
 
 describe("the network browsed in Hypergraph", () => {
   it("stands in the store without touching the filter, and ranks as a network", () => {
-    applyClickActions([{ kind: "hyperNet", id: "dor" }]);
+    applyClickActions([{ kind: "railNet", id: "dor" }]);
     const st = useStore.getState();
     expect(st.filter).toBe("all");
-    expect(st.hyperNet).toBe("dor");
+    expect(st.railNet).toBe("dor");
     expect(st.selStack[0]).toBe("network");
   });
   it("releasing it clears the rank", () => {
-    applyClickActions([{ kind: "hyperNet", id: "dor" }]);
-    applyClickActions([{ kind: "hyperNet", id: null }]);
+    applyClickActions([{ kind: "railNet", id: "dor" }]);
+    applyClickActions([{ kind: "railNet", id: null }]);
     expect(useStore.getState().selStack).not.toContain("network");
   });
   it("a real filter commit replaces it", () => {
-    applyClickActions([{ kind: "hyperNet", id: "dor" }]);
+    applyClickActions([{ kind: "railNet", id: "dor" }]);
     applyClickActions([{ kind: "filter", id: "dag" }]);
     const st = useStore.getState();
-    expect(st.hyperNet).toBeNull();
+    expect(st.railNet).toBeNull();
     expect(st.filter).toBe("dag");
     expect(st.selStack).toContain("network");
   });
   it("frames as a network commit does", () => {
-    applyClickActions([{ kind: "hyperNet", id: "dor" }]);
+    applyClickActions([{ kind: "railNet", id: "dor" }]);
     expect(useStore.getState().motionCause).toMatchObject({ kind: "filter", id: "dor" });
   });
 });

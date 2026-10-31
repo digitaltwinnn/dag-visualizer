@@ -16,7 +16,7 @@ import { join } from "node:path";
 //     executor like everything else.
 //
 // In scope: the selection setters (setFilter / setCountry / setInspect / setSnap / setLayer /
-// setFollowing / setCohort / setTrendFocus / setHyperNet). NOT in scope: the hover channels (subjectPairing's
+// setFollowing / setCohort / setTrendFocus / setRailNet). NOT in scope: the hover channels (subjectPairing's
 // lane), view/mode navigation, phone-UI chrome, and data-bridge setters — those are not
 // selections.
 //
@@ -38,7 +38,7 @@ const COMPONENTS = join(import.meta.dirname, ".");
 // not a user pick). Anything else that needs an exemption should instead get a table entry.
 const ALLOW = new Set(["FollowController.tsx"]);
 
-const SELECTION_SETTERS = /\bset(Filter|Country|Inspect|Snap|Layer|Following|Cohort|TrendFocus|HyperNet)\b/;
+const SELECTION_SETTERS = /\bset(Filter|Country|Inspect|Snap|Layer|Following|Cohort|TrendFocus|RailNet)\b/;
 
 function sourceFiles(dir: string): string[] {
   const out: string[] = [];
