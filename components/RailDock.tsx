@@ -761,10 +761,10 @@ export default function RailDock({
         // pointing into the scene; open it rides the sheet's inner edge (`sheetW`, measured), its
         // chevron flipped, and the same tap closes. It moves on the sheet's own slide clock. An
         // unseen update colours the chevron in that card's hue — the only signal it carries.
-        // 32×64 to the eye; the hit area reaches 48px wide on touch.
+        // 32×112 to the eye, long enough to read as a control; the hit area reaches 48px wide on touch.
         <button
           className={cn(
-            "fixed z-[39] top-1/2 -translate-y-1/2 w-8 h-16 hidden items-center justify-center cursor-pointer",
+            "fixed z-[39] top-1/2 -translate-y-1/2 w-8 h-28 hidden items-center justify-center cursor-pointer",
             "bg-[var(--panel)] border border-border text-foreground backdrop-blur-[14px]",
             "transition-[left,right] duration-[280ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
             "touch:after:absolute touch:after:-inset-x-2 touch:after:inset-y-0 touch:after:content-['']",
