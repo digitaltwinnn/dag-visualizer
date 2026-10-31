@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronUp } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 import CardHead, { RailPane } from "@/components/CardHead";
@@ -79,7 +79,8 @@ const TITLE = "Constellation Gate AI";
 // geometry): the run bleeds by the card's padding below, and its last door takes the inner radius.
 /** The most coins the foot stacks: enough to say what kinds are inside, in the row's own height. */
 const STACK_MAX = 3;
-const DOOR_RUN = "-mb-[var(--card-pad)] [&>:last-child]:rounded-b-[calc(var(--radius)-1px)]";
+const LAST_ROW = "[&>:last-child]:rounded-b-[calc(var(--radius)-1px)]";
+const DOOR_RUN = `-mb-[var(--card-pad)] ${LAST_ROW}`;
 
 /** One notable day: DATE AND KIND LEAD (user, 2026-10-30, design option B of four in the
  *  brainstorming companion), then the caption. The date is the door's label at a fixed width so
@@ -208,15 +209,15 @@ function ChangeRow({ change, view }: { change: NoteChange; view: NoteView }) {
 /** A NOTE'S ROWS, ON THE CARD'S FOOT (user, 2026-10-31, option B of five). The card tops the lane, so
  *  a run of rows open by default would push the view's subject cards down the rail (2026-10-27), and
  *  a label floating between the note and the rows belonged to neither. Folded, they are one door on
- *  the card's bottom edge, the "Snapshot records" recipe, their coins stacked to say what is inside;
- *  open, they sit above it and the foot holds its place, so the card always ends the same way. Keyed
- *  on the subject by the caller, so a new subject starts folded. */
+ *  the card's bottom edge, the "Snapshot records" recipe, their coins stacked to say what is inside.
+ *  Open, they unfold below it (same day: a control left under its own list "looks strange"), so the
+ *  chevron says the plain thing: down to open, up to close. Keyed on the subject by the caller, so a
+ *  new subject starts folded. */
 function NoteRows({ word, kinds, children }: { word: string; kinds: readonly (NotableKind | NoteChangeKind)[]; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const panel = useId();
   return (
     <div className={cn("mt-3", DOOR_RUN)}>
-      {open && <div id={panel}>{children}</div>}
       <Door
         expanded={open}
         controls={panel}
@@ -228,10 +229,15 @@ function NoteRows({ word, kinds, children }: { word: string; kinds: readonly (No
             ))}
           </span>
         }
-        glyph={<ChevronUp className={cn("size-3.5 transition-transform motion-reduce:transition-none", open && "rotate-180")} />}
+        glyph={<ChevronDown className={cn("size-3.5 transition-transform motion-reduce:transition-none", open && "rotate-180")} />}
       >
         {kinds.length} notable {word}{kinds.length === 1 ? "" : "s"}
       </Door>
+      {open && (
+        <div id={panel} className={LAST_ROW}>
+          {children}
+        </div>
+      )}
     </div>
   );
 }

@@ -60,14 +60,16 @@ describe("the notes card's own behaviour", () => {
   });
 
   // THE CARD'S FOOT (user, 2026-10-31, option B of five): folded, the rows are one door on the card's
-  // bottom edge with their coins stacked; open, they sit above it and the foot stays where it was.
+  // bottom edge with their coins stacked. Open, they unfold BELOW it, the door staying at the head of
+  // them (same day: "the control at the bottom when it's expanded looks strange").
   it("a note's rows fold into the card's foot, mounted only when open", () => {
     const body = fnBody(card, "function NoteRows(");
     expect(body).toMatch(/const \[open, setOpen\] = useState\(false\);/);
-    expect(body).toMatch(/\{open && <div id=\{panel\}>\{children\}<\/div>\}/);
+    expect(body).toMatch(/\{open && \(\s*<div id=\{panel\} className=\{LAST_ROW\}>\s*\{children\}/);
     expect(body).toMatch(/expanded=\{open\}/);
     expect(body).toMatch(/controls=\{panel\}/);
-    expect(body.indexOf("{children}")).toBeLessThan(body.indexOf("<Door"));
+    expect(body.indexOf("<Door")).toBeLessThan(body.indexOf("{children}"));
+    expect(body).toMatch(/<ChevronDown className=\{cn\([^]*open && "rotate-180"/);
     expect(body).toMatch(/kinds\.slice\(0, STACK_MAX\)/);
     expect(read("components/inspector/parts.tsx")).toMatch(/aria-expanded=\{expanded\}/);
   });
