@@ -17,7 +17,7 @@ const flat = (n: number, v: number, patch: Record<number, number | null> = {}): 
 
 describe("NOTABLE_CAPS", () => {
   it("states how many days each pill keeps", () => {
-    expect(NOTABLE_CAPS).toEqual({ "7d": 3, "30d": 5, "1y": 8, all: 8 });
+    expect(NOTABLE_CAPS).toEqual({ "7d": 3, "30d": 5, "90d": 6, "1y": 8, all: 8 });
   });
 });
 

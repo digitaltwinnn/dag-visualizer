@@ -355,8 +355,8 @@ describe("planTrendFetch", () => {
 
 describe("ZOOMS", () => {
   it("is the one window vocabulary both registers read, coarsest last", () => {
-    expect(ZOOMS.map((z) => z.id)).toEqual(["1h", "24h", "7d", "30d", "1y", "all"]);
-    expect(ZOOMS.map((z) => z.label)).toEqual(["1H", "24H", "7D", "30D", "1Y", "All"]);
+    expect(ZOOMS.map((z) => z.id)).toEqual(["1h", "24h", "7d", "30d", "90d", "1y", "all"]);
+    expect(ZOOMS.map((z) => z.label)).toEqual(["1H", "24H", "7D", "30D", "90D", "1Y", "All"]);
   });
 });
 
@@ -556,5 +556,18 @@ describe("spanStep", () => {
   });
   it("is null for a degenerate span", () => {
     expect(spanStep({ fromMs: NOW, toMs: NOW }, -1, "30d", NOW)).toBeNull();
+  });
+});
+
+describe("the 90D pill", () => {
+  it("reads the daily tier, so its own last point is the day", () => {
+    const plan = planTrendFetch("90d", null);
+    expect(plan.main).toEqual({ window: "90d", tiles: null, cut: { kind: "none" } });
+    expect(plan.daily).toBeNull();
+  });
+
+  it("says its span in words, and reaches back ninety days", () => {
+    expect(spanPhrase("90d", null)).toBe("last 90 days");
+    expect(windowSpan("90d", null, 90 * 86_400_000)).toEqual({ fromMs: 0, toMs: 90 * 86_400_000 });
   });
 });

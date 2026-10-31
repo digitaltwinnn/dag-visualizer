@@ -304,6 +304,7 @@ export const ZOOMS = [
   { id: "24h", label: "24H" },
   { id: "7d", label: "7D" },
   { id: "30d", label: "30D" },
+  { id: "90d", label: "90D" },
   { id: "1y", label: "1Y" },
   { id: "all", label: "All" },
 ] as const;
@@ -315,6 +316,7 @@ const WINDOW_MS: Record<Exclude<ZoomId, "all">, number> = {
   "24h": 24 * H,
   "7d": 7 * 24 * H,
   "30d": 30 * 24 * H,
+  "90d": 90 * 24 * H,
   "1y": 365 * 24 * H,
 };
 
@@ -392,9 +394,9 @@ const HOUR_MS = 3_600_000;
 export function planTrendFetch(zoom: ZoomId | null, range: TrendRange | null): TrendFetchPlan {
   if (!zoom) return { main: NO_LEG, fleet: NO_LEG, daily: null, tier: null };
   // THE DAILY LEG rides wherever the charts' own grain is finer than a day (user, 2026-09-29:
-  // "day should be the standard always" for the head readout) — every zoom but 1Y/ALL, and any
+  // "day should be the standard always" for the head readout) — every zoom but 90D/1Y/ALL, and any
   // range whose tier is finer than daily. Where the chart IS daily its own last point is the day.
-  const dailyZoom: TrendApiWindow | null = zoom === "1y" || zoom === "all" ? null : "90d";
+  const dailyZoom: TrendApiWindow | null = zoom === "90d" || zoom === "1y" || zoom === "all" ? null : "90d";
   if (range) {
     const tier = pickRangeTier(range.fromMs, range.toMs);
     const daily: TrendApiWindow | null = tier === "1d" ? null : "90d";
@@ -495,6 +497,7 @@ const SPAN_WORDS: Record<ZoomId, string> = {
   "24h": "last 24 hours",
   "7d": "last 7 days",
   "30d": "last 30 days",
+  "90d": "last 90 days",
   "1y": "last year",
   all: "all measured",
 };

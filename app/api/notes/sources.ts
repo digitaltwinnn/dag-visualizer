@@ -302,7 +302,7 @@ const WHOLE = "the whole network";
 const GEO_READ_MS = Math.max((7 + 1 + 6) * D, 28 * D);
 const secondsOf = (fromMs: number, toMs: number) => (toMs - fromMs) / 1000;
 
-type TrendPill = "1h" | "24h" | "7d" | "30d" | "1y";
+type TrendPill = "1h" | "24h" | "7d" | "30d" | "90d" | "1y";
 /** History's pills: the tier each is read at, its length, and whether it gets notable days (whose
  *  daily read carries a 30-day lead-in before the span, R13). `all` and a brushed range are
  *  their own cases below. */
@@ -311,6 +311,7 @@ const TREND_PILLS: Record<TrendPill, { tier: Tier; ms: number; daily: boolean }>
   "24h": { tier: "1h", ms: WINDOWS["24h"].ms, daily: false },
   "7d": { tier: "1h", ms: WINDOWS["7d"].ms, daily: true },
   "30d": { tier: "1d", ms: WINDOWS["30d"].ms, daily: true },
+  "90d": { tier: "1d", ms: WINDOWS["90d"].ms, daily: true },
   "1y": { tier: "1d", ms: WINDOWS["1y"].ms, daily: true },
 };
 const LEAD_IN_MS = 30 * D;

@@ -58,7 +58,7 @@ describe("parseNoteParams", () => {
   });
 
   it("a span that is no pill is an error", () => {
-    expect(parseNoteParams(sp("view=trend&subject=dag&span=90d"), NOW)).toHaveProperty("error");
+    expect(parseNoteParams(sp("view=trend&subject=dag&span=180d"), NOW)).toHaveProperty("error");
     expect(parseNoteParams(sp("view=trend&subject=dag"), NOW)).toHaveProperty("error");
   });
 

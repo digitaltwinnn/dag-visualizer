@@ -77,7 +77,7 @@ describe("planPass", () => {
     expect(kinds.slice(4, 6)).toEqual(["hyper:day", "hyper:day"]);
     expect(plan.slice(0, 2).map((i) => i.subject)).toEqual(SUBJECTS);
     // Every warmable kind, and no on-request one.
-    expect(new Set(kinds)).toEqual(new Set(["ledger:hours", "trend:24h", "hyper:day", "geo:day", "trend:7d", "trend:30d", "trend:1y", "trend:all"]));
+    expect(new Set(kinds)).toEqual(new Set(["ledger:hours", "trend:24h", "hyper:day", "geo:day", "trend:7d", "trend:30d", "trend:90d", "trend:1y", "trend:all"]));
   });
 
   it("lists only what a note exists for: History has no `all` subject", () => {

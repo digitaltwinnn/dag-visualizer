@@ -38,7 +38,7 @@ import type { TrendMetric } from "@/src/store/store";
 //     span, carry `pair` (`from` / `to`, keyed by the measure's label), so the gate states an
 //     earlier figure only beside its own current one (R60). A floor (", at least") is never an end.
 //
-// WHICH ZOOMS GET NOTABLE DAYS: 7d, 30d, 1y and all (`NOTABLE_CAPS`). A 1h, 24h or custom-range
+// WHICH ZOOMS GET NOTABLE DAYS: 7d, 30d, 90d, 1y and all (`NOTABLE_CAPS`). A 1h, 24h or custom-range
 // note describes a stretch too short for "a day that stood out".
 //
 // Pure: no store values, react or I/O (the colocated test is the specification — rule 4).
@@ -47,7 +47,7 @@ import type { TrendMetric } from "@/src/store/store";
  *  `trendFacts` folds each with `withUnlisted` itself. */
 export interface TrendFactsInput {
   subject: "dag" | string; // "dag" = the whole hypergraph
-  zoom: "1h" | "24h" | "7d" | "30d" | "1y" | "all" | "range";
+  zoom: "1h" | "24h" | "7d" | "30d" | "90d" | "1y" | "all" | "range";
   span: { fromMs: number; toMs: number };
   cur: TrendsWindowData; // the span's own payload (store, unfolded)
   prev: TrendsWindowData | null; // the equal span before it (null for "all"; store, unfolded)
@@ -279,7 +279,7 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
 
   // NOTABLE DAYS, for the zooms long enough to have one.
   let days: NotableDay[] = [];
-  const cap = zoom === "7d" || zoom === "30d" || zoom === "1y" || zoom === "all" ? NOTABLE_CAPS[zoom] : 0;
+  const cap = zoom === "7d" || zoom === "30d" || zoom === "90d" || zoom === "1y" || zoom === "all" ? NOTABLE_CAPS[zoom] : 0;
   const blurbs: string[] = [];
   if (cap > 0 && input.daily) {
     // THE UNLISTED SET'S DAYS read the fold, and two things differ from a network's. Its coverage is

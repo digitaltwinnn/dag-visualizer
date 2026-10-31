@@ -12,9 +12,8 @@ export const WINDOWS: Record<WindowId, { tier: Tier; ms: number }> = {
   "24h": { tier: "5m", ms: 86400000 },
   "7d": { tier: "1h", ms: 604800000 },
   "30d": { tier: "1h", ms: 2592000000 },
-  // 90d/180d currently have no consumer (the /trends page reads 24h/7d/30d/1y) — kept as
-  // cheap API surface: a window is one table row, and removing one breaks any caller for a
-  // rounding error of savings.
+  // 180d currently has no consumer — kept as cheap API surface: a window is one table row, and
+  // removing one breaks any caller for a rounding error of savings.
   "90d": { tier: "1d", ms: 7776000000 },
   "180d": { tier: "1d", ms: 15552000000 },
   "1y": { tier: "1d", ms: 31536000000 },

@@ -205,6 +205,7 @@ export const WINDOW_MS: Record<ZoomId, number | null> = {
   "24h": 86_400_000,
   "7d": 7 * 86_400_000,
   "30d": 30 * 86_400_000,
+  "90d": 90 * 86_400_000,
   "1y": 365 * 86_400_000,
   all: null,
 };

@@ -61,7 +61,7 @@ export function driftKeyOf(item: WarmItem, drift: DriftKeys | null): string | nu
 }
 
 const HOURLY: [NoteView, NoteSpan][] = [["ledger", "hours"], ["trend", "24h"]];
-const DAILY: [NoteView, NoteSpan][] = [["hyper", "day"], ["geo", "day"], ["trend", "7d"], ["trend", "30d"], ["trend", "1y"], ["trend", "all"]];
+const DAILY: [NoteView, NoteSpan][] = [["hyper", "day"], ["geo", "day"], ["trend", "7d"], ["trend", "30d"], ["trend", "90d"], ["trend", "1y"], ["trend", "all"]];
 
 /** Every warmable note for these subjects and countries (`["DE", …]`), in pass order. */
 export function warmCandidates(subjects: string[], countries: string[]): WarmItem[] {

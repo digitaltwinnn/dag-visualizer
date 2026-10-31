@@ -27,7 +27,7 @@ import type { NotableDay } from "@/src/data/noteTypes";
 // ⚠️ Nothing here reads the store, react or THREE; the colocated test is the specification (rule 4).
 
 /** How many notable days each History pill keeps. */
-export const NOTABLE_CAPS: Record<"7d" | "30d" | "1y" | "all", number> = { "7d": 3, "30d": 5, "1y": 8, all: 8 };
+export const NOTABLE_CAPS: Record<"7d" | "30d" | "90d" | "1y" | "all", number> = { "7d": 3, "30d": 5, "90d": 6, "1y": 8, all: 8 };
 
 /** THE FLOOR (user, 2026-10-30: "I've not seen more than 1 notable day, can we have at least 3? If
  *  nothing really notable changed, call out the highs/lows of the network during that range"). A

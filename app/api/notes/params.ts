@@ -21,7 +21,7 @@ import { CC_TAIL_RE, ISP_TAIL_RE, KIND_TIMING, TYPE_TAIL_RE, isSubjectNote, snap
 
 const VIEWS: readonly NoteView[] = ["hyper", "geo", "ledger", "trend"];
 const FIXED_SPAN: Partial<Record<NoteView, NoteSpan>> = { hyper: "day", geo: "day", ledger: "hours" };
-const PILLS: readonly NoteSpan[] = ["1h", "24h", "7d", "30d", "1y", "all"];
+const PILLS: readonly NoteSpan[] = ["1h", "24h", "7d", "30d", "90d", "1y", "all"];
 /** History's one on-request pill (`timingOf` says on-request); the request route writes it, a
  *  brushed range and the subject notes. */
 const ON_REQUEST_PILL: NoteSpan = "1h";

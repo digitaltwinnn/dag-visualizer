@@ -145,6 +145,7 @@ const PILL_WORDS: Record<string, string> = {
   "24h": "the last 24 hours",
   "7d": "the last 7 days",
   "30d": "the last 30 days",
+  "90d": "the last 90 days",
   "1y": "the last year",
   all: "all measured history",
 };

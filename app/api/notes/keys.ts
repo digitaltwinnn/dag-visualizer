@@ -15,7 +15,7 @@ export const NOTES_VERSION = 37; // 37: the Briefing's one line (2026-10-31)
 /** What a note covers. Hyper and Geography are a standing picture ("day"), the ledger the recent
  *  hours ("hours"); History's pills are the rest, and a brushed range is `r<fromMs>-<toMs>` after
  *  `snapSpan`, so two brushes of the same buckets share one key. */
-export type NoteSpan = "day" | "hours" | "1h" | "24h" | "7d" | "30d" | "1y" | "all" | `r${number}-${number}`;
+export type NoteSpan = "day" | "hours" | "1h" | "24h" | "7d" | "30d" | "90d" | "1y" | "all" | `r${number}-${number}`;
 
 export function noteKeyOf(net: string, view: NoteView, subject: string, span: NoteSpan): string {
   return `ai:${net}:v${NOTES_VERSION}:${view}:${subject}:${span}`;
