@@ -922,7 +922,7 @@ of four shown in the brainstorming companion, then "no fallback"): the measured 
 served one purpose, what this subject is to the whole it sits in, and the note says it better — it
 names its span and places the subject in its rung, share and rank among the other countries,
 providers or make-ups (the prompt asks for that always) — so they are gone. The note renders on a
-faint violet PLATE with the mark (a faint `--ai-wash` inside a softened, masked `--ai-edge` ring, so the card's surface shows through; `aiSweep.ts`:
+faint violet PLATE with the mark (a faint `--ai-wash` inside a softened, masked half-pixel `--ai-edge` ring, so the card's surface shows through; `aiSweep.ts`:
 every surface a model's words produced wears the sweep, user 2026-10-30), no label row;
 the plate shows "reading…" while the note is in flight (ONE word, user 2026-10-30: held or still
 being written is the cache's business); `none` and off-mainnet render

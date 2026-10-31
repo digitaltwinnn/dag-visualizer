@@ -254,7 +254,7 @@ describe("subject notes live on their cards", () => {
     expect(src).not.toMatch(/RequestDoor|Couldn/);
     expect(src).not.toMatch(/fallback[=:}]|SectionLabel|Constellation Gate AI/); // the word may stay in prose; no prop, no render of one
     // The plate wears the card's iridescent sweep (user, 2026-10-30), through the one home.
-    expect(src).toMatch(/cn\("mb-2\.5 flex gap-2 rounded-xs px-2\.5 py-2", AI_SWEEP\)/);
+    expect(src).toMatch(/cn\("mb-2\.5 flex gap-2 rounded-xs px-2 py-1", AI_SWEEP\)/);
     // A TRUE RING, so the card's own surface shows through (user, 2026-10-31: the section "doesn't
     // match with the card itself"): no opaque ground of its own, the sweep masked to the 1px edge
     // and softened, and only a faint wash inside.
@@ -262,6 +262,7 @@ describe("subject notes live on their cards", () => {
     expect(sweep).toMatch(/before:\[background:var\(--ai-edge\)\]/);
     expect(sweep).toMatch(/before:\[mask:[^"]*content-box_exclude/);
     expect(sweep).toMatch(/before:opacity-/);
+    expect(sweep).toMatch(/before:p-\[0\.5px\]/); // a hairline: 2026-10-31, "a thinner box"
     expect(sweep).not.toMatch(/--panel-solid\)|--background\)|_padding-box/);
     expect(read("app/globals.css")).toMatch(/--ai-wash: light-dark\(color-mix\(in oklch, var\(--ai-mark\) 8%, transparent\), color-mix\(in oklch, var\(--ai-mark\) 4%, transparent\)\);/);
     expect(src).toMatch(/useEffect\(\(\) => \{[^]*?res\?\.state !== "request"[^]*?note\.request\(\)[^]*?\}, \[/);

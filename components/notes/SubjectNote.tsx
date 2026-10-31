@@ -69,7 +69,7 @@ export default function SubjectNote({ req }: { req: NoteReq | null }) {
     // colored outline"): the plate wears the iridescent `--ai-edge` the AI card and the diamonds
     // wear, by the card's layer trick — the wash over an opaque ground clipped to the padding box,
     // the sweep clipped to the border box, so it shows only in the 1px ring.
-    <div className={cn("mb-2.5 flex gap-2 rounded-xs px-2.5 py-2", AI_SWEEP)}>
+    <div className={cn("mb-2.5 flex gap-2 rounded-xs px-2 py-1", AI_SWEEP)}>
       {MARK}
       {waiting ? (
         <p className="m-0 flex items-center gap-2 text-body text-muted-foreground">
