@@ -255,7 +255,15 @@ describe("subject notes live on their cards", () => {
     expect(src).not.toMatch(/fallback[=:}]|SectionLabel|Constellation Gate AI/); // the word may stay in prose; no prop, no render of one
     // The plate wears the card's iridescent sweep (user, 2026-10-30), through the one home.
     expect(src).toMatch(/cn\("mb-2\.5 flex gap-2 rounded-xs px-2\.5 py-2", AI_SWEEP\)/);
-    expect(read("components/notes/aiSweep.ts")).toMatch(/var\(--ai-wash\),var\(--ai-wash\)\)_padding-box[^"]*var\(--ai-edge\)_border-box/);
+    // A TRUE RING, so the card's own surface shows through (user, 2026-10-31: the section "doesn't
+    // match with the card itself"): no opaque ground of its own, the sweep masked to the 1px edge
+    // and softened, and only a faint wash inside.
+    const sweep = read("components/notes/aiSweep.ts");
+    expect(sweep).toMatch(/before:\[background:var\(--ai-edge\)\]/);
+    expect(sweep).toMatch(/before:\[mask:[^"]*content-box_exclude/);
+    expect(sweep).toMatch(/before:opacity-/);
+    expect(sweep).not.toMatch(/--panel-solid\)|--background\)|_padding-box/);
+    expect(read("app/globals.css")).toMatch(/--ai-wash: light-dark\(color-mix\(in oklch, var\(--ai-mark\) 8%, transparent\), color-mix\(in oklch, var\(--ai-mark\) 4%, transparent\)\);/);
     expect(src).toMatch(/useEffect\(\(\) => \{[^]*?res\?\.state !== "request"[^]*?note\.request\(\)[^]*?\}, \[/);
     // …once per key (the ref guard, so a re-render or a poll's `request` never POSTs twice), and only
     // after the key has stood for the dwell (final review I1: paging and a deck rotation change the
