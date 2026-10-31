@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { NOTE_CHANGES_CAP, RHYTHM_CHANGE, changeWords, countChange, eventChange, pickChanges, rhythmChange, siteOfChange } from "@/src/data/noteChanges";
-import type { NoteChange } from "@/src/data/noteTypes";
+import { NOTE_CHANGES_CAP, RHYTHM_CHANGE, changeWords, countChange, withMovePercents, eventChange, pickChanges, rhythmChange, siteOfChange } from "@/src/data/noteChanges";
+import { fact } from "@/src/data/noteFacts";
+import type { Fact, NoteChange } from "@/src/data/noteTypes";
 
 const NET = { kind: "network", id: "dor" } as const;
 
@@ -110,5 +111,41 @@ describe("pickChanges", () => {
   it("stops at the cap, and nothing moved is no rows", () => {
     expect(pickChanges([row("a", 4), row("b", 3), row("c", 2), row("d", 1)])).toHaveLength(NOTE_CHANGES_CAP);
     expect(pickChanges([], [])).toEqual([]);
+  });
+});
+
+// HOW FAR A FIGURE MOVED, IN THE NOTE (user, 2026-10-31: "also add percentages to these texts"). Code
+// adds it after the gate: asked of the model, it wrote "[up 11%]" and failed the gate.
+describe("withMovePercents", () => {
+  const pair = (key: string, from: number, to: number, kind: Fact["kind"] = "count"): Fact[] => [
+    fact(`${key} before`, from, kind, undefined, { key, end: "from" }),
+    fact(`${key} now`, to, kind, undefined, { key, end: "to" }),
+  ];
+  const facts = [...pair("active", 1754, 1941), ...pair("located", 91, 83), ...pair("flat", 1000, 1001), ...pair("gap", 21, 12, "duration")];
+  it("puts the percentage on the verb", () => {
+    expect(withMovePercents("Active participation rose from 1,754 to 1,941 global snapshots per day.", facts)).toBe("Active participation rose 11% from 1,754 to 1,941 global snapshots per day.");
+    expect(withMovePercents("Located nodes fell from 91 to 83.", facts)).toBe("Located nodes fell 9% from 91 to 83.");
+  });
+  it("reads the weeks-before form the activity sentence takes", () => {
+    expect(withMovePercents("Global snapshots rose from 1,754 in the weeks before to 1,941 last week.", facts)).toBe("Global snapshots rose 11% from 1,754 in the weeks before to 1,941 last week.");
+  });
+  it("takes a duration as the facts write it", () => {
+    expect(withMovePercents("Cadence fell from 21s to 12s.", facts)).toBe("Cadence fell 43% from 21s to 12s.");
+  });
+  it("adds one to each change in a sentence", () => {
+    expect(withMovePercents("Nodes dropped from 91 to 83, and activity climbed from 1,754 to 1,941.", facts)).toBe("Nodes dropped 9% from 91 to 83, and activity climbed 11% from 1,754 to 1,941.");
+  });
+  it("leaves a figure pair the facts do not state, and a wrong order", () => {
+    expect(withMovePercents("Nodes fell from 91 to 80.", facts)).toBe("Nodes fell from 91 to 80.");
+    expect(withMovePercents("Nodes rose from 83 to 91.", facts)).toBe("Nodes rose from 83 to 91.");
+  });
+  it("leaves a sentence with no verb to carry it", () => {
+    expect(withMovePercents("Nodes went from 91 to 83.", facts)).toBe("Nodes went from 91 to 83.");
+  });
+  it("leaves a move that rounds to nothing", () => {
+    expect(withMovePercents("Blocks rose from 1,000 to 1,001.", facts)).toBe("Blocks rose from 1,000 to 1,001.");
+  });
+  it("does not stop short of a longer number", () => {
+    expect(withMovePercents("Nodes fell from 91 to 830.", facts)).toBe("Nodes fell from 91 to 830.");
   });
 });

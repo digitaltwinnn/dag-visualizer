@@ -1,4 +1,4 @@
-import type { NoteChange, NoteChangeSubject } from "@/src/data/noteTypes";
+import type { Fact, NoteChange, NoteChangeSubject } from "@/src/data/noteTypes";
 
 // A VIEW NOTE'S NOTABLE CHANGES (user, 2026-10-31: "notables in the other views' AI cards ... related
 // to a clickable subject"): what moved over the note's span, as rows the reader can click into the
@@ -21,6 +21,32 @@ export function changeWords(from: number, to: number): string | null {
   if (!(from > 0)) return null;
   const pct = Math.round((to / from - 1) * 100);
   return pct === 0 ? null : `${pct > 0 ? "up" : "down"} ${Math.abs(pct)}%`;
+}
+
+/** The verbs a percentage can follow ("fell 9% from …"). Any other word leaves the sentence as written. */
+const MOVED = /\b(?:rose|risen|rising|grew|grown|growing|climbed|climbing|increased|increasing|fell|fallen|falling|dropped|dropping|declined|declining|decreased|decreasing|shrank|shrunk|shrinking|slipped)\s$/i;
+
+/** HOW FAR A FIGURE MOVED, IN A NOTE (user, 2026-10-31: "also add percentages to these texts"). Code
+ *  adds it to the checked note: asked of the model, a live trial wrote "[up 11%]" and failed the gate.
+ *  Only where the note states a fact's own pair, as the facts write it and in its order, and a verb
+ *  carries it, so the worst case is a sentence with no percentage. */
+export function withMovePercents(note: string, facts: readonly Fact[]): string {
+  let out = note;
+  for (const to of facts) {
+    if (to.pair?.end !== "to") continue;
+    const from = facts.find((f) => f.pair?.key === to.pair!.key && f.pair.end === "from");
+    const change = from ? changeWords(from.value, to.value) : null;
+    if (!from || !change) continue;
+    const percent = change.split(" ")[1]!;
+    for (const said of [`from ${from.text} to ${to.text}`, `from ${from.text} in the weeks before to ${to.text}`]) {
+      for (let at = out.indexOf(said); at >= 0; at = out.indexOf(said, at + said.length)) {
+        if (/[\p{L}\p{N}]/u.test(out[at + said.length] ?? "") || !MOVED.test(out.slice(0, at))) continue;
+        out = `${out.slice(0, at)}${percent} ${out.slice(at)}`;
+        at += percent.length + 1;
+      }
+    }
+  }
+  return out;
 }
 
 /** A count's move, or null when it did not. `place` is a measured city, never a guess, and a row

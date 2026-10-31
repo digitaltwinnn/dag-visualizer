@@ -1,6 +1,7 @@
 import { factsBlock } from "@/src/data/noteFacts";
 import { checkNote } from "@/src/data/noteHonesty";
 import { withDayChange } from "@/src/data/notableDays";
+import { withMovePercents } from "@/src/data/noteChanges";
 import type { NoteChange, NoteDay, NoteResponse, NoteView } from "@/src/data/noteTypes";
 import { GateError, type gateChat, type GateErrorKind } from "./gate";
 import { failKeyOf, lockKeyOf, noteKeyOf, statsKeyOf, timingOf, type NoteSpan } from "./keys";
@@ -202,11 +203,11 @@ async function write(
         kept.push({ dayMs: d.dayMs, kind: d.kind, networkId: d.networkId, caption: withDayChange(caption, d) });
     }
     if (negative) {
-      held = { ok: true, text: note, days: kept };
+      held = { ok: true, text: withMovePercents(note, input.facts), days: kept };
       reasons = [`say what held steady instead of "${negative.toLowerCase()}"`];
       continue;
     }
-    return { ok: true, text: note, days: kept };
+    return { ok: true, text: withMovePercents(note, input.facts), days: kept };
   }
   warn(req, "gateFail");
   return { ok: false, stat: "gateFail" };
