@@ -211,6 +211,7 @@ export default function MetaSnapPane({
           // both states, the selection wash when pinned, here in this snapshot's own hue.
           aside={
             <span
+              data-pill=""
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-sm px-1.5 py-[3px] border border-transparent whitespace-nowrap text-label font-normal",
                 following ? "text-muted-foreground" : cn(selectedRow(true), "text-foreground"),

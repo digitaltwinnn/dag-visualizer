@@ -8,7 +8,8 @@ import { cn } from "@/lib/utils";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { useNet } from "@/components/topbar/useNet";
 import { queryOf, type NoteReq } from "./noteLoader";
-import { useMainnetNote } from "./useAiNote";
+import TypedNote from "./TypedNote";
+import { useMainnetNote, useWaited } from "./useAiNote";
 
 // A SUBJECT CARD'S OWN NOTE (spec 2026-10-29-subject-notes): one note per card, scoped as the
 // card's lead — the Country, Provider and Composition cards and the Range card mount this IN THE
@@ -41,6 +42,7 @@ export default function SubjectNote({ req }: { req: NoteReq | null }) {
   const note = useMainnetNote(asked);
   const res = note.res;
   const key = asked ? queryOf(asked) : null;
+  const waited = useWaited(res);
   // ONE ASK PER KEY, AFTER A DWELL (final review I1, 2026-10-29): a re-render, or the `request`
   // answer a poll reads back, never POSTs twice — and a subject that is only PASSING is never
   // asked at all. The rail pager, a deck rotation (the Range card follows the plane in front) and
@@ -77,7 +79,7 @@ export default function SubjectNote({ req }: { req: NoteReq | null }) {
       ) : res?.state === "unavailable" ? (
         <p className="m-0 text-body text-muted-foreground">no note right now</p>
       ) : (
-        <p className="m-0 text-body leading-snug text-foreground">{text}</p>
+        <TypedNote text={text!} waited={waited} className="m-0 text-body leading-snug text-foreground" />
       )}
     </div>
   );

@@ -154,7 +154,25 @@ describe("the folded entry drops its qualifier pill (design D, 2026-10-30)", () 
     const parts = readFileSync("components/inspector/parts.tsx", "utf8");
     const chip = parts.slice(parts.indexOf("export function QualifierChip("));
     expect(chip.slice(0, 600)).toMatch(/data-pill=""/);
+    // …and every other pill a head's aside can hold: the node's status, a group's layer chips and
+    // the metagraph snapshot's live or pinned state (user, 2026-10-31: the first cut only caught
+    // the qualifier chip, so "ready" and "L0 cL1" stayed on folded entries).
+    for (const fn of ["function StatusPill(", "export function RoleChips("]) {
+      expect(parts.slice(parts.indexOf(fn)).slice(0, 700), fn).toMatch(/data-pill=""/);
+    }
+    expect(readFileSync("components/inspector/MetaSnapPane.tsx", "utf8")).toMatch(/aside=\{\s*<span\s+data-pill=""/);
     const head = readFileSync("components/CardHead.tsx", "utf8");
     expect(head).toMatch(/entryMode && cn\("\[&_\[data-yields\]\]:hidden \[&_\[data-pill\]\]:hidden", ENTRY_LINE\)/);
+  });
+});
+
+// A CARD WITH NO EYEBROW STILL HAS A HEAD (user, 2026-10-31: "when we click the collapsed AI card it
+// disappears/appears briefly"). HeightEase finds the head by `[data-eyebrow]` and fades only what
+// follows it; the AI card alone has no eyebrow, so it fell back to fading the whole card, title
+// included, from 0 on every expand. The title carries the marker when no eyebrow does.
+describe("every card head carries the marker the arrival fade reads", () => {
+  it("the title stands in for a missing eyebrow", () => {
+    const head = readFileSync("components/CardHead.tsx", "utf8");
+    expect(head).toMatch(/<h3 data-eyebrow=\{eyebrow \? undefined : ""\}/);
   });
 });

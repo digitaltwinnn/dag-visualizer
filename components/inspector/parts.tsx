@@ -430,6 +430,7 @@ export function IdentityDot({ hue, className }: { hue: string; className?: strin
 function StatusPill({ color, children }: { color: string; children: React.ReactNode }) {
   return (
     <Badge
+      data-pill=""
       variant="outline"
       className="text-label font-semibold px-2 py-px rounded-full border"
       // color-mix (not hex-append) so the alpha composes on ANY colour format — the bucket
@@ -489,7 +490,7 @@ export function RoleChips({ codes, compact, tight }: { codes: string[]; compact?
   return (
     // `tight` — the explorer row's tag home (2026-09-26): three chips have ~80px there, so the
     // pills close up by a pixel each side and the gap drops to 3px. Same pill, same vocabulary.
-    <span className={cn("inline-flex items-center", tight ? "gap-[3px]" : "gap-1")}>
+    <span data-pill="" className={cn("inline-flex items-center", tight ? "gap-[3px]" : "gap-1")}>
       {codes.map((c) => (
         <span
           key={c}

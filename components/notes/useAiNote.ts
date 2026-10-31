@@ -1,12 +1,15 @@
 "use client";
 
+import { useRef } from "react";
 import { metagraphCardNetwork } from "@/components/railCards";
 import { useNet } from "@/components/topbar/useNet";
 import { useTickHasFilter } from "@/components/useTickHasFilter";
 import { UNLISTED_ID } from "@/src/data/unlisted";
+import type { NoteResponse } from "@/src/data/noteTypes";
 import { NET } from "@/src/net/current";
 import { useStore } from "@/src/store/store";
 import { noteSubjectOf, type NoteSubject } from "./noteSubject";
+import { nextWait, type WaitState } from "./typedNote";
 import type { NoteReq } from "./noteLoader";
 import useNote, { type NoteState } from "./useNote";
 
@@ -34,6 +37,14 @@ export function useNoteScopeNetwork(): string {
 export function useMainnetNote(req: NoteReq | null): NoteState {
   const net = useNet();
   return useNote(NET === net ? req : null);
+}
+
+/** Whether the reader watched this answer arrive: true once the note has been seen waiting, so a
+ *  note that lands types itself in (`TypedNote`) and one already held simply stands. */
+export function useWaited(res: NoteResponse | null): boolean {
+  const state = useRef<WaitState>({ waited: false, text: null });
+  state.current = nextWait(state.current, res);
+  return state.current.waited;
 }
 
 /** THE NOTE ON SCREEN, one derivation for the card, the rail's manifest and its focus, and the

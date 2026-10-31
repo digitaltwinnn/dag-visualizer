@@ -177,6 +177,18 @@ describe("the notes card's own behaviour", () => {
     expect(range).toMatch(/noReading[^]*?No reading/);
   });
 
+  // Only a note the reader watched arrive is typed: one already held appears at once, the full text
+  // reserves its height so the card never grows per letter, and a screen reader gets it whole.
+  it("types a note in on both surfaces, through one component", () => {
+    const typed = read("components/notes/TypedNote.tsx");
+    expect(typed).toMatch(/prefers-reduced-motion: reduce/);
+    expect(typed).toMatch(/<span className="invisible col-start-1 row-start-1">\{text\}<\/span>/);
+    expect(typed).toMatch(/<span aria-hidden className="col-start-1 row-start-1">\{text\.slice\(0, shown\)\}<\/span>/);
+    expect(typed).toMatch(/<span className="sr-only">\{text\}<\/span>/);
+    expect(card).toMatch(/<TypedNote text=\{res\.text\} waited=\{waited\}/);
+    expect(read("components/notes/SubjectNote.tsx")).toMatch(/<TypedNote text=\{text!?\} waited=\{waited\}/);
+  });
+
   it("wears the iridescent edge on the open box only", () => {
     expect(card).toMatch(/collapsed\s*\?\s*undefined\s*:\s*"border border-transparent [^"]*\[background:[^"]*var\(--ai-edge\)_border-box\]"/);
   });

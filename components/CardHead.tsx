@@ -461,7 +461,7 @@ function keepFocusOnRung(el: HTMLElement): void {
         {title != null && (
           <>
             <div className={entryMode ? "contents" : "flex items-center gap-2 min-w-0"}>
-              <h3 className={cn(TITLE, "text-foreground min-w-0", entryMode && cn("text-body truncate", ENTRY_TITLE))}>{rolled}</h3>
+              <h3 data-eyebrow={eyebrow ? undefined : ""} className={cn(TITLE, "text-foreground min-w-0", entryMode && cn("text-body truncate", ENTRY_TITLE))}>{rolled}</h3>
               {/* The aside is DECORATION over a stretched toggle, so it must not swallow the
                   gesture. z-10 lifts it above the head's overlay (a site link has to stay
                   clickable), and that alone made the title row's right end dead: the ticker /
@@ -474,6 +474,9 @@ function keepFocusOnRung(el: HTMLElement): void {
                   line box the chip sat on the BASELINE of, 4px under the title's centre in the open
                   box (the dossier's ticker had the same 2px); `inline-flex items-center` centres
                   whatever it carries, as the entry tier always did. */}
+              {/* A HEAD WITH NO EYEBROW MARKS ITS TITLE INSTEAD (the h3 above; user, 2026-10-31: the AI
+                  card "disappears/appears briefly"). `HeightEase` and `RailThread` both find a head
+                  by `[data-eyebrow]`, and with no marker the arrival faded the whole card from 0. */}
               {/* FOLDED, A `data-yields` PART OF THE ASIDE IS DROPPED (2026-10-29): the entry is one
                   row and the aside is flex-none, so whatever it carries comes straight out of the
                   title's width — the live tick's age chip beside its live pill left the ordinal

@@ -650,7 +650,9 @@ EXPLORE · mark · title · aside). **The qualifier pill yields in the fold** (u
 D of four in the brainstorming companion): the eyebrow, the mark and the pill were taking the
 320px row and the NAME truncated ("Dor …"), so a folded entry is slot + name; every `QualifierChip`
 is `data-pill` and the entry's aside hides it, and the kind, the country code, the bucket and the
-span are read on the open box. A CONTROL in the aside (the tick's live / pinned) stays.
+span are read on the open box. Status pills, layer chips and the metagraph snapshot's state are
+`data-pill` too, so the rule covers every pill an aside holds (user, 2026-10-31: the first cut caught
+only the qualifier chip). A CONTROL in the aside (the tick's live / pinned) stays.
 **The Metagraph head's pill is the KIND** ("hypergraph", "currency", "data", "data and currency",
 `MetaKindAside`, the same day): the ticker chip stood down where the ticker IS the name (DAG,
 USDC.dag), which left those entries bare; the ticker now rides under the name on the open box. The BOX keeps the two-row head — it is the one materialized card, and the tiers
@@ -926,7 +928,12 @@ the plate shows "reading…" while the note is in flight (ONE word, user 2026-10
 being written is the cache's business); `none` and off-mainnet render
 nothing (no note to have), and `unavailable` renders "no note right now", muted, with no door (user,
 2026-10-30: the Gate refused a brushed range's write and the plate was simply missing for the 15
-minutes `FAIL_TTL_S` remembers it; a card with no lead and no reason read as broken). **A notable day's marker travels** (user, 2026-10-30, `components/notes/noteDays.ts`): the Moment
+minutes `FAIL_TTL_S` remembers it; a card with no lead and no reason read as broken). **A note writes itself in** (user, 2026-10-31: "appear letter by letter as if it's written by the
+AI", the card and the plates alike; `TypedNote`, `typedNote.ts`): at most 2.4s, only for a note the
+reader watched arrive, never for one already held and never under reduced motion. The full text
+holds the height invisibly, so the card grows once, and a screen reader gets it whole. **A head with
+no eyebrow marks its title** (`data-eyebrow` on the h3): `HeightEase` finds a head by that marker,
+and the AI card, the one card with no eyebrow, used to fade from 0 on every expand. **A notable day's marker travels** (user, 2026-10-30, `components/notes/noteDays.ts`): the Moment
 card's head wears the day's kind chip (`NoteKindChip`, mark in the network hue + the kind's word)
 beside its bucket chip when its bucket falls on a notable day, the Range card's when its span IS
 that day, and each chart plane draws the note's days on its own baseline (`TrendChart marks`, the

@@ -15,8 +15,9 @@ import { rangeDays } from "@/src/util/localTime";
 import { commitNoteDay } from "./commitNoteDay";
 import { noteSpanWords } from "./noteSubject";
 import NoteKindCoin from "./NoteKindCoin";
+import TypedNote from "./TypedNote";
 import { NOTE_KIND_WORD } from "./noteDays";
-import { useAiNote } from "./useAiNote";
+import { useAiNote, useWaited } from "./useAiNote";
 
 // THE AI NOTES CARD (2026-10-27) — a few sentences a model wrote about what the view is showing,
 // the VIEW's note at the filter's scope (`noteSubjectOf`: the network, else everything; in History
@@ -178,6 +179,7 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
   // THE ARRIVAL PULSE every rail card plays (user, 2026-10-30: "AI card is missing the animation
   // on the left side when the card becomes active"), in the AI hue rather than the filter's.
   const pulseKey = useEdgePulse(subject ? `${subject.view}:${subject.subject}` : null);
+  const waited = useWaited(note.res);
   if (!subject || !req) return null;
 
   const res = note.res;
@@ -245,7 +247,7 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
             <>
               {/* The text alone (user, 2026-10-29): no Written row — the span under the title says
                   what it covers, and the note is rewritten on its own cadence. */}
-              <p className="m-0 text-body leading-snug text-foreground">{res.text}</p>
+              <TypedNote text={res.text} waited={waited} className="m-0 text-body leading-snug text-foreground" />
               {res.days.length > 0 && <NotableDays key={titleKey} days={res.days} />}
             </>
           ) : null}
