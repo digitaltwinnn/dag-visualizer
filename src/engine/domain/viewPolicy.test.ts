@@ -183,7 +183,7 @@ describe("the trends view is registered and inert", () => {
     expect(VIEW_POLICIES.geo.metagraphCard).toBe("node");
     expect(VIEW_POLICIES.ledger.metagraphCard).toBe("tickNet");
     expect(VIEW_POLICIES.trend.metagraphCard).toBe("plane");
-    expect(VIEW_POLICIES.hyper.metagraphCard).toBe("filter");
+    expect(VIEW_POLICIES.hyper.metagraphCard).toBe("rail");
     expect(VIEW_POLICIES.soon.metagraphCard).toBe("filter");
   });
   it("the subject orbit is geo's alone, and never alongside the stock camera orbit", () => {

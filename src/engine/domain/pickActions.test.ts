@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { netKeyOf, tickNetSelectActions, tickNetClearActions, viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, trendPlaneActions, noteCohortActions, noteDayActions, snapshotClearActions, type ClickAction } from "./pickActions";
+import { netKeyOf, tickNetSelectActions, tickNetClearActions, viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, trendPlaneActions, hyperNetActions, noteCohortActions, noteDayActions, snapshotClearActions, type ClickAction } from "./pickActions";
 import { finerLevels } from "./focusLadder";
 import { METAGRAPHS } from "@/src/net/current";
 import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
@@ -705,5 +705,17 @@ describe("noteCohortActions", () => {
   });
   it("the same row again releases the cohort, one toggle language", () => {
     expect(noteCohortActions(c, { country: "DE", cohort: c, hasInspect: false })).toEqual([{ kind: "cohort", sel: null }]);
+  });
+});
+
+// THE HYPERGRAPH RAIL BROWSES (user, 2026-10-31): a step on the Metagraph card changes what the rail
+// and the scene stand on, and the top bar stays what the reader set.
+describe("hyperNetActions", () => {
+  it("browses a network and never writes the filter", () => {
+    expect(hyperNetActions("dor", "all")).toEqual([{ kind: "hyperNet", id: "dor" }]);
+    expect(hyperNetActions("dor", "dag")).toEqual([{ kind: "hyperNet", id: "dor" }]);
+  });
+  it("stepping onto the filter's own network ends the browse: nothing left to differ", () => {
+    expect(hyperNetActions("dag", "dag")).toEqual([{ kind: "hyperNet", id: null }]);
   });
 });

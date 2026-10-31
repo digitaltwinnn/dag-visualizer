@@ -36,6 +36,7 @@
 //   spread across the globe, so no surface point stands for it; the ring does).
 // - ledger: the pinned metagraph snapshot's own tile (rewind included), else the committed
 //   global tick's byte-bar lead.
+import { viewNetwork } from "@/src/engine/domain/viewNetwork";
 import { useState, type CSSProperties } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -246,7 +247,7 @@ function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; className?
 
 export default function SceneCallout() {
   const mode = useStore((s) => s.mode);
-  const filter = useStore((s) => s.filter);
+  const filter = useStore(viewNetwork);
   const section = useStore((s) => s.section);
   const metaList = useStore((s) => s.metaList);
   const inspect = useStore((s) => s.inspect);

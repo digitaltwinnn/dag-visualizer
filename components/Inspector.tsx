@@ -24,8 +24,8 @@ import HeightEase from "@/components/HeightEase";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { useTouch } from "@/components/useTouch";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { detailsCards, ladderSlotIds, noteCardAbsent, type RailCard } from "@/components/railCards";
-import { CHILD_OF, childStep, type SiblingStep } from "@/components/railSiblings";
+import { detailsCards, isSubjectSlot, ladderSlotIds, noteCardAbsent, type RailCard } from "@/components/railCards";
+import { CHILD_OF, ROOT_OF, childStep, rootStep, type SiblingStep } from "@/components/railSiblings";
 import { displayOrder, isCollapsed, boxedSlotOf, overridesOnNoteStandDown, overridesOnSelection, overridesOnViewEntry, railSelectionKey, subjectRunEnd, type LaneCollapseState } from "@/components/railCollapse";
 import { useSiblingState } from "@/components/useSiblingState";
 import { openRailCard } from "@/components/railOpen";
@@ -404,6 +404,7 @@ export default function Inspector() {
   const cohort = useStore((s) => s.cohort);
   const composition = useStore((s) => s.composition);
   const filter = useStore((s) => s.filter);
+  const hyperNet = useStore((s) => s.hyperNet);
   const mode = useStore((s) => s.mode) as Mode;
   // The rail's node hints count the located fleet — only where the view publishes one (the policy's
   // own `nodeList` flag, the same one that gates `selNodes`).
@@ -443,7 +444,7 @@ export default function Inspector() {
   const aiNote = useAiNote();
   const noteAbsent = noteCardAbsent(aiNote.req != null, aiNote.note.res, aiNote.note.via);
   const manifest = detailsCards({
-    mode, filter, tickNet, tickHasFilter, nodeHere, inspect, snap, country, cohort, composition, metaSnap, coarse, trendCursorMs, trendRange, trendFocus, trendFront, trendWindow,
+    mode, filter, hyperNet, tickNet, tickHasFilter, nodeHere, inspect, snap, country, cohort, composition, metaSnap, coarse, trendCursorMs, trendRange, trendFocus, trendFront, trendWindow,
     noteAbsent,
     selNodesCount: selNodes.length,
     filterLabel: displayNetwork(filter)?.ticker ?? null, // one lookup — catalog + the unlisted pseudo-network
@@ -507,6 +508,12 @@ export default function Inspector() {
   const deepestKind = deepestId ? (manifest.find((c) => c.id === deepestId)?.kind ?? null) : null;
   const siblingState = useSiblingState(deepestKind);
   const nextStep = useMemo(() => {
+    // NOTHING CHOSEN YET, the view's own first step (user, 2026-10-31): the AI card tops the lane but
+    // is no parent, and a ghost with nothing above it would only open its hint.
+    if (!presentLadderIds.some(isSubjectSlot)) {
+      const root = rootStep(siblingState);
+      return root ? { id: ROOT_OF[mode]!.to, step: root } : null;
+    }
     if (!deepestId || !deepestKind) return null;
     const below = ladderIds[ladderIds.indexOf(deepestId) + 1];
     const to = CHILD_OF[mode]?.[deepestKind]?.to;

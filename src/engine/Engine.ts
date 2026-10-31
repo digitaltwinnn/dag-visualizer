@@ -38,6 +38,7 @@ import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { ledgerNetwork } from "./domain/tickNet";
 import { pickNetId, viewEntryActions } from "./domain/pickActions";
+import { viewNetwork } from "./domain/viewNetwork";
 import { ViewTransition, is3D, fleetFaded, fleetHolder, type FleetPlacement } from "./domain/viewTransition";
 import { gatherBand, railGapPx, railGapShiftPx, type GatherBand } from "./domain/gatherLayout";
 import { LADDERS, LEVEL_CARRY, hasLevel, type CohortSel, type CompositionSel, type FocusLevel, type SelectionSnapshot, type ResolverKey } from "./domain/focusLadder";
@@ -932,8 +933,12 @@ export class Engine {
         if (st.focusRung !== prev.focusRung && st.focusRung && VIEW_POLICIES[this.mode].canvas) {
           this._resolveFocus(st.focusRung.level);
         }
-        if (st.filter !== prev.filter) {
-          this.filter = st.filter;
+        // THE NETWORK THE VIEW STANDS ON, the filter or the one the rail is browsing (`viewNetwork.ts`).
+        // Read fresh: a view switch above (`setMode`) releases a browsed network while `st` still
+        // holds it, and that is no network event, so nothing selected under it may drop.
+        const standsOn = viewNetwork(useStore.getState());
+        if (standsOn !== this.filter) {
+          this.filter = standsOn;
           // Switching network clears any country drill-down (matches the old geo UX).
           this.country = null;
           if (prev.country != null) useStore.getState().setCountry(null);
@@ -1481,6 +1486,12 @@ export class Engine {
     if (mode !== "ledger" && st0.metaSnap != null) st0.setMetaSnap(null);
     // …and so is the network committed inside a tick: it has no meaning outside this view.
     if (mode !== "ledger" && st0.tickNet != null) st0.setTickNet(null);
+    // …and so is a browsed network in Hypergraph. Not a network event: the scene falls back to the
+    // filter below, and what the reader selected under it carries as any selection does.
+    if (policy.metagraphCard !== "rail" && st0.hyperNet != null) {
+      this.filter = st0.filter;
+      st0.setHyperNet(null);
+    }
 
     if (is3D(prevMode) && is3D(mode) && prevMode !== mode) {
       // 3D → 3D: run the staged gather choreography. The machine handles retargeting (a switch

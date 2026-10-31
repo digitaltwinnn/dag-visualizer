@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { exploreCards, detailsCards, isSubjectSlot, nodeHereOf, noteCardAbsent, parentHolds, focusSlotId, ladderLevelOfSlot, ladderSlotIds, type RailManifestState } from "@/components/railCards";
+import { exploreCards, detailsCards, isSubjectSlot, metagraphCardNetwork, nodeHereOf, noteCardAbsent, parentHolds, focusSlotId, ladderLevelOfSlot, ladderSlotIds, type RailManifestState } from "@/components/railCards";
 import { LADDERS } from "@/src/engine/domain/focusLadder";
 import type { PickDescriptor } from "@/src/data/types";
 
@@ -607,5 +607,20 @@ describe("a card leaves the rail in a view that can't show it", () => {
       const full = cards(mode, { snap: snapPick, country: "DE", composition: { netId: "dag", key: "k" } } as Partial<RailManifestState>);
       for (const c of full.filter((x) => x.present)) expect(ladderSlotIds(mode)).toContain(c.id);
     }
+  });
+});
+
+// THE METAGRAPH CARD WITHOUT THE FILTER (user, 2026-10-31: "open the 1st of that set and allow
+// left/right swipe without setting the filter").
+describe("the Metagraph card in Hypergraph", () => {
+  it("stands on the browsed network, else the filter", () => {
+    expect(metagraphCardNetwork({ mode: "hyper", filter: "all", hyperNet: "dor" })).toBe("dor");
+    expect(metagraphCardNetwork({ mode: "hyper", filter: "dag", hyperNet: "dor" })).toBe("dor");
+    expect(metagraphCardNetwork({ mode: "hyper", filter: "dag" })).toBe("dag");
+  });
+  it("is present on a browsed network with the filter on All, and takes the focus", () => {
+    const s = details({ mode: "hyper", filter: "all", hyperNet: "dor" });
+    expect(detailsCards(s).find((c) => c.id === "context")?.present).toBe(true);
+    expect(focusSlotId({ ...s, selStack: ["network"] })).toBe("context");
   });
 });

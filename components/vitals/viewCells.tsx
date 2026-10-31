@@ -1,5 +1,6 @@
 "use client";
 
+import { viewNetwork } from "@/src/engine/domain/viewNetwork";
 // THE VITALS BAND'S PER-VIEW CELL SETS — what each 3D view says in the bottom lane: hyper leads
 // with the composition DONUT (four counts that are shares of one fleet — the one honest home for
 // a donut), geo with its footprint numbers plus the nodes-by-country micro-bar row, and the
@@ -36,7 +37,7 @@ import { useFeedRead } from "@/components/useFeedRead";
 
 export function HyperCells({ accent }: { accent: string }) {
   useFeedRead(["api-metagraphs"], "HyperCells");
-  const filter = useStore((s) => s.filter);
+  const filter = useStore(viewNetwork);
   const metaList = useStore((s) => s.metaList);
   // No `selNodes` subscription any more: the NODES card was its only reader, and dropping it also
   // drops a per-publish re-render of this whole cell from the band.

@@ -32,6 +32,8 @@ export type ClickAction =
   // Commit/clear the network INSIDE the pinned tick — the ledger's Metagraph rung. NOT the filter:
   // see `tickNetSelectActions` and `domain/tickNet.ts`.
   | { kind: "tickNet"; sel: TickNetSel | null }
+  // The network the Hypergraph rail is browsing (`domain/viewNetwork.ts`), never the filter.
+  | { kind: "hyperNet"; id: string | null }
   | { kind: "metaSnap"; sel: MetaSnapSel | null }
   // Bring a trend plane forward, or release the focused one (null) — a VIEW-LOCAL emphasis, not a
   // selection rung: see `trendPlaneActions`.
@@ -221,6 +223,12 @@ export function viewEntryActions(opts: {
 // toggles off.
 export function filterToggleActions(id: string, currentFilter: string): ClickAction[] {
   return [{ kind: "filter", id: id !== "all" && id === currentFilter ? "all" : id }];
+}
+
+/** A STEP ON THE HYPERGRAPH RAIL (user, 2026-10-31): browses a network and leaves the filter alone.
+ *  Coming back to the filter's own network ends the browse: there is nothing left to differ. */
+export function hyperNetActions(id: string, filter: string): ClickAction[] {
+  return [{ kind: "hyperNet", id: id === filter ? null : id }];
 }
 
 // Selecting a SNAPSHOT — shared by the ledger's tile click and LiveStrip's bar click:

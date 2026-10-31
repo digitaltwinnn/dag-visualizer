@@ -20,6 +20,7 @@ import {
 
 export interface ChangeState {
   filter: string;
+  hyperNet: string | null;
   country: string | null;
   cohort: CohortSel | null;
   composition: CompositionSel | null;
@@ -53,7 +54,7 @@ export function changeActions(
         net: s.ledgerNet,
       });
     case "type":
-      return compositionToggleActions({ netId: subject.netId, key: compKeyOf(subject.type) }, s);
+      return compositionToggleActions({ netId: subject.netId, key: compKeyOf(subject.type) }, { ...s, filter: s.hyperNet ?? s.filter });
     case "country":
       return countryToggleActions(subject.cc, s);
     case "provider": {

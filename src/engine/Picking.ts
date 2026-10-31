@@ -1,3 +1,4 @@
+import { viewNetwork } from "./domain/viewNetwork";
 import * as THREE from "three";
 import { useStore, type Mode } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -236,7 +237,7 @@ export class Picking {
         // key — so no list lookup.
         compositionSel: this.h.compositionOf(p),
         current: {
-          filter: st.filter,
+          filter: viewNetwork(st),
           country: st.country,
           hasInspect: !!st.inspect,
           cohort: this.h.cohortSel,

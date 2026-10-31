@@ -122,6 +122,9 @@ interface AppState {
   // its tick, so `ledgerNetwork` only honours it while that tick is on screen. It rides the
   // "network" selStack slot — the same card slot a committed filter fills.
   tickNet: TickNetSel | null;
+  // THE NETWORK THE HYPERGRAPH RAIL IS BROWSING (`domain/viewNetwork.ts`), NOT the app filter.
+  // Hypergraph-scoped, and it rides the "network" selStack slot as `tickNet` does.
+  hyperNet: string | null;
   selStack: SelSlot[];
   // Ordinal of the snapshot the cursor is hovering in the LiveStrip bar-chart (transient highlight —
   // the ledger re-colours that snapshot's tiles). null = not hovering.
@@ -455,6 +458,7 @@ interface AppState {
   advanceSnap: (snap: Extract<PickDescriptor, { kind: "snapshot" }> | null) => void;
   setMetaSnap: (sel: MetaSnapSel | null) => void;
   setTickNet: (sel: TickNetSel | null) => void;
+  setHyperNet: (id: string | null) => void;
   /** The follow system's heartbeat advance for the metagraph-snapshot card — non-bumping, like
    *  advanceSnap: a live tick is never a "new selection" (the card recency/collapse order holds). */
   advanceMetaSnap: (sel: MetaSnapSel | null) => void;
@@ -578,6 +582,7 @@ export const useStore = create<AppState>((set) => ({
   snap: null,
   metaSnap: null,
   tickNet: null,
+  hyperNet: null,
   selStack: [],
   hoverSnapOrd: null,
   hoverMetaSnap: null,
@@ -685,7 +690,7 @@ export const useStore = create<AppState>((set) => ({
   // Committing a network IS a user gesture (user, 2026-08-14 — changing the filter or paging
   // the dossier left the snapshot card as the box): it bumps the recency stack like every
   // other selection, so the facts rail focuses the metagraph card. "all" clears the entry.
-  setFilter: (filter) => set((s) => ({ filter, selStack: bumpStack(s.selStack, "network", filter !== "all" || !!s.tickNet) })),
+  setFilter: (filter) => set((s) => ({ filter, selStack: bumpStack(s.selStack, "network", filter !== "all" || !!s.tickNet || !!s.hyperNet) })),
   setMetaList: (metaList) => set({ metaList }),
   setInspect: (inspect) => set((s) => ({ inspect, inspectView: inspect ? s.mode : null, selStack: bumpStack(s.selStack, "node", !!inspect) })),
   setSnap: (snap) => set((s) => ({ snap, selStack: bumpStack(s.selStack, "snap", !!snap) })),
@@ -711,6 +716,8 @@ export const useStore = create<AppState>((set) => ({
   // A NO-OP WRITE IS A NO-OP REFERENCE: the Engine's subscription re-resolves the chamber's lens
   // and the camera on a change, so re-committing the same network in the same tick (a tile under
   // an already-open network) must not hand it a fresh object.
+  setHyperNet: (hyperNet) =>
+    set((s) => (s.hyperNet === hyperNet ? s : { hyperNet, selStack: bumpStack(s.selStack, "network", !!hyperNet || s.filter !== "all") })),
   setTickNet: (tickNet) =>
     set((s) =>
       sameTickNet(s.tickNet, tickNet)

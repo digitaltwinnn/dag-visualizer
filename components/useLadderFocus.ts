@@ -20,6 +20,7 @@ import { useTickHasFilter } from "@/components/useTickHasFilter";
 export function useLadderFocus(noteAbsent: boolean): string | null {
   const mode = useStore((s) => s.mode);
   const filter = useStore((s) => s.filter);
+  const hyperNet = useStore((s) => s.hyperNet);
   const tickNet = useStore((s) => s.tickNet);
   const country = useStore((s) => s.country);
   const cohort = useStore((s) => s.cohort);
@@ -35,5 +36,5 @@ export function useLadderFocus(noteAbsent: boolean): string | null {
   const trendFocus = useStore((s) => s.trendFocus);
   const tickHasFilter = useTickHasFilter();
   const nodeHere = useNodeHere();
-  return focusSlotId({ mode, filter, tickNet, tickHasFilter, nodeHere, country, cohort, composition, inspect, snap, metaSnap, trendCursorMs, trendRange, trendFocus, noteAbsent, selStack });
+  return focusSlotId({ mode, filter, hyperNet, tickNet, tickHasFilter, nodeHere, country, cohort, composition, inspect, snap, metaSnap, trendCursorMs, trendRange, trendFocus, noteAbsent, selStack });
 }

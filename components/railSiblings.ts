@@ -40,6 +40,7 @@ import {
   compositionToggleActions,
   countryToggleActions,
   filterToggleActions,
+  hyperNetActions,
   metaSnapSelectActions,
   tickNetSelectActions,
   nodeSelectActions,
@@ -81,6 +82,8 @@ export interface SiblingState {
   countries: CountryStat[];
   /** The selected tick's exact-read rows (store.snapshotExact[globalOrdinal]?.rows ?? null). */
   exactRows: ChannelSnapRow[] | null;
+  /** The network Hypergraph's rail is browsing (`domain/viewNetwork.ts`). */
+  hyperNet?: string | null;
   /** store.following — a followed chain has no pin, which is what `pinnedOrdinal` must say. */
   following: boolean;
   /** The retained global tick window, OLDEST→NEWEST (the LiveStrip's own buffer and order), each
@@ -185,8 +188,8 @@ const compositionItem = (g: CompGroup, s: SiblingState): SiblingStep => ({
   key: g.key,
   label: g.label,
   actions: compositionToggleActions(
-    { netId: s.filter, key: g.key },
-    { composition: s.composition, hasInspect: !!s.inspect, filter: s.filter },
+    { netId: netOf(s), key: g.key },
+    { composition: s.composition, hasInspect: !!s.inspect, filter: netOf(s) },
   ),
 });
 
@@ -250,7 +253,7 @@ const keyOf = (s: SiblingState, metaId: string): string =>
 /** The network a ledger card stands on: the one committed inside the pinned tick, else the app
  *  filter (`domain/tickNet.ledgerNetwork`). Outside the ledger it is the filter. */
 const netOf = (s: SiblingState): string =>
-  s.mode === "ledger" ? ledgerNetwork({ filter: s.filter, tickNet: s.tickNet, snapOrdinal: s.snap?.data.ordinal ?? null }) : s.filter;
+  s.hyperNet ? s.hyperNet : s.mode === "ledger" ? ledgerNetwork({ filter: s.filter, tickNet: s.tickNet, snapOrdinal: s.snap?.data.ordinal ?? null }) : s.filter;
 
 // The explorer's own lists (src/data/ladderLevels.ts) — so a step, a ghost and a row agree.
 const byCountryOf = (s: SiblingState) => nodesByCountry(s.selNodes);
@@ -320,9 +323,10 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
       const items = nets.map((m) => ({
         key: m.id,
         label: m.name,
-        actions: filterToggleActions(m.id, s.filter),
+        // THE RAIL BROWSES IN HYPERGRAPH (`domain/viewNetwork.ts`): a swipe leaves the filter alone.
+        actions: s.mode === "hyper" ? hyperNetActions(m.id, s.filter) : filterToggleActions(m.id, s.filter),
       }));
-      return finish(slot, items, nets.findIndex((m) => m.id === s.filter), "Networks");
+      return finish(slot, items, nets.findIndex((m) => m.id === net), "Networks");
     }
 
     case "country": {
@@ -599,14 +603,14 @@ const nodeOfCohortChildren = (s: SiblingState, n: number): SiblingStep[] => {
 };
 // hyper: the explorer leads with the composition groups, size-desc (same dossier precondition).
 const compositionChildren = (s: SiblingState, n: number): SiblingStep[] => {
-  if (s.filter === "all") return [];
+  if (netOf(s) === "all") return [];
   return compositionGroups(s.selNodes).slice(0, n).map((g) => compositionItem(g, s));
 };
 // hyper: the committed group's own row order — the same sequence the node pager steps.
 const nodeOfCompositionChildren = (s: SiblingState, n: number): SiblingStep[] => {
   if (!s.composition) return [];
   const g = compositionGroups(s.selNodes).find((x) => x.key === s.composition!.key);
-  return g ? machinesOf(g.rows).slice(0, n).map((r) => nodeItem(r, s, { netId: s.filter, key: g.key })) : [];
+  return g ? machinesOf(g.rows).slice(0, n).map((r) => nodeItem(r, s, { netId: netOf(s), key: g.key })) : [];
 };
 /** ledger: the networks that anchored into this tick, in the explorer's own order (`tickNets` —
  *  busiest first, the unlisted set last). Opening the Metagraph card under a tick commits that network INSIDE the tick
@@ -683,6 +687,22 @@ export const CHILD_OF: Partial<Record<Mode, Partial<Record<RailCardKind, ChildEn
     range: { to: "instant", steps: momentOfRangeChildren },
   },
 };
+
+/** A VIEW'S OWN FIRST STEP (user, 2026-10-31): with nothing chosen there is no parent card to step
+ *  from, so a view can name the slot its first ghost opens and the set it opens the first of. */
+export const ROOT_OF: Partial<Record<Mode, ChildEntry>> = {
+  hyper: {
+    to: "context",
+    steps: (s, n) =>
+      networksLevel(s.metaList, s.allNodes, s.hyperMeasure)
+        .slice(0, n)
+        .map(({ m }) => ({ key: m.id, label: m.name, actions: hyperNetActions(m.id, s.filter) })),
+  },
+};
+
+export function rootStep(s: SiblingState): SiblingStep | null {
+  return ROOT_OF[s.mode]?.steps(s, 1)[0] ?? null;
+}
 
 /** The rung's first child, or null when there is nothing finer to open.
  *  A node and a metagraph snapshot are leaves; About and the tool card never focus. */

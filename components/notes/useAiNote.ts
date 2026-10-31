@@ -53,6 +53,7 @@ export function useWaited(res: NoteResponse | null): boolean {
 export function useAiNote(): { subject: NoteSubject | null; req: NoteReq | null; note: NoteState } {
   const mode = useStore((s) => s.mode);
   const filter = useStore((s) => s.filter);
+  const hyperNet = useStore((s) => s.hyperNet);
   const tickNet = useStore((s) => s.tickNet);
   const snap = useStore((s) => s.snap);
   const inspect = useStore((s) => s.inspect);
@@ -62,7 +63,7 @@ export function useAiNote(): { subject: NoteSubject | null; req: NoteReq | null;
   const tickHasFilter = useTickHasFilter();
 
   const subject = noteSubjectOf(mode, {
-    metagraphNetwork: metagraphCardNetwork({ mode, filter, tickNet, snap, tickHasFilter, trendFocus, trendFront, inspect }),
+    metagraphNetwork: metagraphCardNetwork({ mode, filter, hyperNet, tickNet, snap, tickHasFilter, trendFocus, trendFront, inspect }),
     trendFilter: filter,
     unlisted: (id) => id === UNLISTED_ID,
   });

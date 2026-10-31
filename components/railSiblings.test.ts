@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CHILD_OF, childStep, positionMarks, siblingSet, type SiblingState } from "@/components/railSiblings";
+import { CHILD_OF, childStep, positionMarks, rootStep, siblingSet, type SiblingState } from "@/components/railSiblings";
 import {
   cohortToggleActions,
   compositionToggleActions,
@@ -823,5 +823,42 @@ describe("siblingSet — History's Metagraph card on a plane focus", () => {
   });
   it("…while one standing on the filter keeps the filter's pager", () => {
     expect(siblingSet("context", base({ mode: "trend", filter: "ded", trendFocus: null }))).not.toBeNull();
+  });
+});
+
+// THE RAIL BROWSES IN HYPERGRAPH (user, 2026-10-31): the Metagraph ghost opens the first network, a
+// swipe steps the explorer's list, and neither writes the filter. What hangs under it reads the
+// card's network, so it never needs one either.
+describe("the Hypergraph rail never writes the filter", () => {
+  const nets = [
+    { id: "dag", name: "DAG", nodes: [{ ip: "1.1.1.1" }, { ip: "1.1.1.2" }], located: 2 },
+    { id: "dor", name: "Dor", nodes: [{ ip: "2.2.2.1" }], located: 1 },
+  ] as unknown as SiblingState["metaList"];
+  const hyper = (over: Partial<SiblingState>) => base({ mode: "hyper", filter: "all", metaList: nets, hyperMeasure: "nodes", ...over });
+  const noFilter = (acts: { kind: string }[]) => expect(acts.some((a) => a.kind === "filter")).toBe(false);
+  it("the ghost's first step is the explorer's first network", () => {
+    const step = rootStep(hyper({}))!;
+    expect(step.actions).toEqual([{ kind: "hyperNet", id: step.key }]);
+  });
+  it("only Hypergraph has a root step", () => {
+    expect(rootStep(base({ mode: "geo", filter: "all", metaList: nets }))).toBeNull();
+  });
+  it("a swipe steps the list from the browsed network", () => {
+    const set = siblingSet("context", hyper({ hyperNet: "dor" }))!;
+    expect(set.items.map((i) => i.key).sort()).toEqual(["dag", "dor"]);
+    expect(set.items[set.index]!.key).toBe("dor");
+    set.items.forEach((i) => noFilter(i.actions));
+  });
+  it("a swipe under a real filter still leaves it alone, and coming back to it ends the browse", () => {
+    const set = siblingSet("context", hyper({ filter: "dag" }))!;
+    expect(set.items.find((i) => i.key === "dor")!.actions).toEqual([{ kind: "hyperNet", id: "dor" }]);
+    expect(set.items.find((i) => i.key === "dag")!.actions).toEqual([{ kind: "hyperNet", id: null }]);
+  });
+  it("a layer group opens under the browsed network with no filter write", () => {
+    const row = { id: "n1", label: "n1", pick: { kind: "metanode", node: { ip: "2.2.2.1", roles: ["l0"] }, meta: { id: "dor" } } };
+    const s = hyper({ hyperNet: "dor", selNodes: [row] as unknown as SiblingState["selNodes"] });
+    const step = childStep("context", s)!;
+    noFilter(step.actions);
+    expect(step.actions).toContainEqual({ kind: "composition", sel: { netId: "dor", key: step.key } });
   });
 });

@@ -1,5 +1,6 @@
 "use client";
 
+import { viewNetwork } from "@/src/engine/domain/viewNetwork";
 import { useEffect, useRef, useState } from "react";
 
 import { VIEWS } from "@/components/views";
@@ -71,7 +72,7 @@ export default function MotionHint() {
   const gatherBottom = useStore((s) => s.gatherBottom);
   // The rung names read the selection the rail card stands for — resolved here, at render, so the
   // domain module stays a function of its arguments.
-  const filter = useStore((s) => s.filter);
+  const filter = useStore(viewNetwork);
   const inspect = useStore((s) => s.inspect);
   const country = useStore((s) => s.country);
   // The measure is named from the deck's subject, as the explorer's tile names it (`metricLabel`).
