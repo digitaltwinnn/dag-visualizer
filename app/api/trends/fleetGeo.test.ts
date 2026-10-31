@@ -2,19 +2,20 @@ import { describe, it, expect } from "vitest";
 import { fleetGeo } from "./fleetGeo";
 
 describe("fleetGeo", () => {
-  it("counts the fleet by city and provider, every IP once, in segments a series can carry", () => {
+  it("counts the fleet by city and provider as the cards count nodes, in segments a series can carry", () => {
     const dagGeo = {
       "1.1.1.1": { cc: "DE", city: "Falkenstein", isp: "Hetzner Online GmbH" },
       "1.1.1.2": { cc: "DE", city: "Falkenstein", isp: "Hetzner Online GmbH" },
     };
     const metaGeo = {
-      "1.1.1.1": { cc: "DE", city: "Falkenstein", isp: "Hetzner Online GmbH" },
+      "1.1.1.1": { cc: "DE", city: "Falkenstein", isp: "Hetzner Online GmbH" }, // runs for both: two nodes
       "2.2.2.2": { cc: "US", city: "St. Louis", isp: "Hetzner Online GmbH" },
       "3.3.3.3": { cc: "US", isp: "Hetzner Online GmbH" }, // no city: no site
       "4.4.4.4": { cc: "US", city: "Boston" }, // no provider: no site
     };
-    expect(fleetGeo(dagGeo, [], metaGeo).sites).toEqual({
-      "DE.Falkenstein.hetzner-online-gmbh": 2,
+    const metagraphs = [{ id: "dor", nodes: Object.keys(metaGeo).map((ip) => ({ ip })) }];
+    expect(fleetGeo(dagGeo, metagraphs, metaGeo).sites).toEqual({
+      "DE.Falkenstein.hetzner-online-gmbh": 3,
       "US.St%2E%20Louis.hetzner-online-gmbh": 1,
     });
   });

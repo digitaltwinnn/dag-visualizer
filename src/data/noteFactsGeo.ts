@@ -34,6 +34,11 @@ import { trimNewestPartial, type TrendsWindowData } from "@/src/data/trendWindow
 //     is). The current reading is the newest measured day. A change compares it with the measured
 //     day nearest to 7 days earlier, and only if that day is within a day of the mark: a
 //     neighbour from yesterday is not "a week ago". No such day, no change fact;
+//   · NODES, AS THE CARDS COUNT THEM (user, 2026-10-31). A server running for two networks is two
+//     nodes on every card, and one IP in the fleet's stored `f.cc` / `f.isp`, so a note read 31
+//     beside a card's 34. Every fleet figure is each network's own nodes added up once `now` and a
+//     week ago are both measured that way (`fleetReading`), which needs a week of the geo family;
+//     until then R58 below holds at both ends. A change never takes one end from each;
 //   · ONE FIGURE PER QUANTITY (R58). Every COUNTRY and FLEET figure — the fleet's located total,
 //     each country's count, every country share, rank and "Countries hosting nodes", and both ends
 //     of each week-ago pair — comes from the tiers' daily `f.cc` (`ccDays`), the one series with
@@ -219,23 +224,49 @@ function providersOf(isp: Counts, providerNames: Record<string, string>): Map<st
 const ranked = <T extends { count: number }>(xs: Iterable<T>, tie: (x: T) => string): T[] =>
   [...xs].sort((a, b) => b.count - a.count || tie(a).localeCompare(tie(b)));
 
-/** THE FLEET'S COUNTRY READING on `now` (R58): the tiers' newest day while it is measured and no
- *  older than `now`, else `now`'s own geo-family counts. One home, so the facts and the warm pass's
- *  country plan (`fleetCountries`) cannot read two sources. */
-function fleetReading(tierDays: readonly Day[], now: Day): { tiers: Day | null; tierMeasured: Day[]; fleetCc: Counts } {
+/** A day's fleet AS THE CARDS COUNT IT: each network's own nodes added up, so a server running for
+ *  two networks is two nodes. The fleet's own `f.cc` / `f.isp` count each IP once. */
+function asNodes(d: Day): Day {
+  const cc: Counts = new Map();
+  const isp: Counts = new Map();
+  for (const by of d.netCc.values()) for (const [k, n] of by) bump(cc, k, n);
+  for (const by of d.netIsp.values()) for (const [k, n] of by) bump(isp, k, n);
+  return { ...d, cc, isp };
+}
+
+/** THE FLEET'S READING on `now`, one home, so the facts and the warm pass's country plan
+ *  (`fleetCountries`) cannot read two sources. NODES (user, 2026-10-31) wherever `now` and a week ago
+ *  are both measured in them, which needs a week of the geo family. Until then the older reading at
+ *  BOTH ends (R58): the tiers' newest day while it is measured and no older than `now`, else `now`'s
+ *  own counts. Never one end from each: the two counts differ by every shared server. */
+function fleetReading(
+  tierDays: readonly Day[],
+  geoDays: readonly Day[],
+  now: Day,
+): { fleetCc: Counts; fleetIsp: Counts; ccThen: Counts | null; geoThen: Day | null } {
+  const nodes = measuredDays(geoDays.map(asNodes), (d) => sum(d.cc));
+  const today = nodes.find((d) => d.ms === now.ms);
+  const then = today ? weekBefore(nodes, today) : null;
+  if (today && then) return { fleetCc: today.cc, fleetIsp: today.isp, ccThen: then.cc, geoThen: then };
   const tierMeasured = measuredDays(tierDays, (d) => sum(d.cc));
   const tierNewest = tierDays[tierDays.length - 1];
   const tiers = tierNewest && tierNewest.ms >= now.ms && tierMeasured.includes(tierNewest) ? tierNewest : null;
-  return { tiers, tierMeasured, fleetCc: tiers ? tiers.cc : now.cc };
+  return {
+    fleetCc: tiers ? tiers.cc : now.cc,
+    fleetIsp: now.isp,
+    ccThen: (tiers ? weekBefore(tierMeasured, tiers) : null)?.cc ?? null,
+    geoThen: weekBefore(measuredDays(geoDays, (d) => sum(d.cc)), now), // a provider's, the geo family's own
+  };
 }
 
 /** The countries a COUNTRY note exists for, sorted: those the fleet's country reading counts nodes
  *  in, on the newest measured fleet day (the warm pass plans its `cc:` notes from this, M5). None
  *  when no geo day is measured, as `geoFacts` then has nothing to say about place. */
 export function fleetCountries(input: Pick<GeoFactsInput, "geoDays" | "ccDays">): string[] {
-  const now = measuredDays(parseAll(input.geoDays), (d) => sum(d.cc)).pop();
+  const geo = parseAll(input.geoDays);
+  const now = measuredDays(geo, (d) => sum(d.cc)).pop();
   if (!now) return [];
-  return [...fleetReading(parseAll(input.ccDays), now).fleetCc.keys()].sort();
+  return [...fleetReading(parseAll(input.ccDays), geo, now).fleetCc.keys()].sort();
 }
 
 /** `subjectName` (provider notes only) is the provider as its facts spell it: the merged stem
@@ -294,22 +325,16 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
   const facts: Fact[] = [];
   let subjectName: string | undefined;
 
-  // THE FLEET'S COUNTRIES, ONE READING (R58). The tiers' daily `f.cc` (`ccDays`) is the only series
-  // that reaches a week back, so it states EVERY country and fleet figure, now and a week ago,
-  // when its newest day is measured and no older than the geo reading; else the geo family's
-  // counts stand alone and no week-ago figure is stated. A network's own note never reads it.
-  const { tiers, tierMeasured, fleetCc } = fleetReading(parseAll(input.ccDays), now);
-  const tiersThen = tiers ? weekBefore(tierMeasured, tiers) : null;
+  // THE FLEET, ONE READING (`fleetReading`): nodes once a week of them exists, else R58's.
+  const { fleetCc, fleetIsp, ccThen: fleetCcThen, geoThen } = fleetReading(parseAll(input.ccDays), geo, now);
 
   const locatedFleet = sum(fleetCc);
   const countries = ranked([...fleetCc].map(([cc, count]) => ({ cc, count })), (c) => c.cc);
-  const providers = ranked(providersOf(now.isp, providerNames).values(), (p) => p.name);
+  const providers = ranked(providersOf(fleetIsp, providerNames).values(), (p) => p.name);
   const knownFleet = providers.reduce((a, p) => a + p.count, 0);
-  // A provider's week ago: the geo family's own, both ends measured.
-  const geoThen = weekBefore(fleetDays, now);
 
-  /** A country's count a week ago, from the same tiers reading as its count now (else none). */
-  const ccWas = (cc: string): number | undefined => (fleetCc.get(cc) ? tiersThen?.cc.get(cc) : undefined) || undefined;
+  /** A country's count a week ago, from the same reading as its count now (else none). */
+  const ccWas = (cc: string): number | undefined => (fleetCc.get(cc) ? fleetCcThen?.get(cc) : undefined) || undefined;
   const ccKey = (cc: string) => `country:${cc}`;
   /** A country's standing count is the `to` end of its pair whenever a week ago is stated. */
   const ccNowEnd = (cc: string): FactPair | undefined => (ccWas(cc) ? { key: ccKey(cc), end: "to" } : undefined);
@@ -335,8 +360,10 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
 
     facts.push(fact(`${name}, located nodes`, located, "count", undefined, pairOf("located", "to")));
     facts.push(fact(`${name}, countries with nodes`, own.length, "count", undefined, pairOf("countries", "to")));
-    // Its fleet denominators are the geo family's, the reading its own counts come from (R58).
-    const geoFleet = sum(now.cc);
+    // Its fleet denominators are the geo family's, the reading its own counts come from (R58), and
+    // in nodes: a part and its whole are one count.
+    const fleetNodes = asNodes(now).cc;
+    const geoFleet = sum(fleetNodes);
     if (fleetMeasured && geoFleet > 0 && located <= geoFleet) facts.push(fact(`${name}, share of the network's located nodes`, located / geoFleet, "share"));
     own.slice(0, TOP).forEach((c, i) => {
       facts.push(fact(`${name}, nodes in ${cn(c.cc)} (${RANK_WORD[i]}biggest country)`, c.count, "count"));
@@ -344,7 +371,7 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     });
     // ITS SHARE OF THE FLEET in the country it is biggest in.
     const top = own[0];
-    const fleetThere = top ? (now.cc.get(top.cc) ?? 0) : 0;
+    const fleetThere = top ? (fleetNodes.get(top.cc) ?? 0) : 0;
     if (fleetMeasured && top && fleetThere >= top.count) facts.push(fact(`${name}, share of the network's nodes in ${cn(top.cc)}`, top.count / fleetThere, "share"));
     if (ownProv.length) {
       facts.push(fact(`${name}, providers with nodes`, ownProv.length, "count"));
@@ -457,8 +484,8 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     }
     countryChange(subjectCc);
   } else {
-    // The fleet's week ago, from the same tiers reading as its count now (R58).
-    const thenTotal = tiersThen ? sum(tiersThen.cc) : 0;
+    // The fleet's week ago, from the same reading as its count now.
+    const thenTotal = fleetCcThen ? sum(fleetCcThen) : 0;
     const fleetPair = (end: FactPair["end"]): FactPair | undefined => (thenTotal > 0 && locatedFleet > 0 ? { key: "fleet", end } : undefined);
     facts.push(fact("Located nodes in the network", locatedFleet, "count", undefined, fleetPair("to")));
     facts.push(fact("Countries hosting nodes", countries.length, "count"));
@@ -511,14 +538,13 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
   const names = [...new Set([...Object.values(catalog), ...mentionedCountries, ...providerForms])];
 
   // THE CARD'S ROWS, on a view note (`noteChanges.ts`), read as the facts read them: the fleet's
-  // countries from the tiers and its providers from the geo family, a network's both from its own
-  // measured days. Only the fleet's providers can name a city: nothing stores a network's by place.
+  // from its one reading, a network's from its own measured days. Only the fleet's providers can name a city: nothing stores a network's by place.
   let changes: NoteChange[] = [];
   if (!picked) {
     const ownThen = subjectNet ? weekBefore(ownMeasured(subjectNet), now) : null;
     const ccNow = subjectNet ? (now.netCc.get(subjectNet) ?? new Map<string, number>()) : fleetCc;
-    const ccThen = subjectNet ? ownThen?.netCc.get(subjectNet) : tiersThen?.cc;
-    const ispNow = subjectNet ? (now.netIsp.get(subjectNet) ?? new Map<string, number>()) : now.isp;
+    const ccThen = subjectNet ? ownThen?.netCc.get(subjectNet) : fleetCcThen;
+    const ispNow = subjectNet ? (now.netIsp.get(subjectNet) ?? new Map<string, number>()) : fleetIsp;
     const ispThen = subjectNet ? ownThen?.netIsp.get(subjectNet) : geoThen?.isp;
     const countryRows = ccThen
       ? [...new Set([...ccNow.keys(), ...ccThen.keys()])].flatMap((cc) =>

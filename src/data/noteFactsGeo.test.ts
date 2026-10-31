@@ -38,6 +38,7 @@ const NOW: DaySpec = {
     dag: { cc: { DE: 30, US: 15, FR: 10 }, isp: { "hetzner-online-gmbh": 20, "ovh-sas": 10 } },
     usdc: { cc: { DE: 20, US: 10 }, isp: { "hetzner-online-ag": 20 } },
     bio: { cc: { US: 5 }, isp: { "amazon-com-inc": 5 } },
+    ext: { cc: { FR: 5, NL: 5 }, isp: { "hetzner-online-gmbh": 10, "amazon-com-inc": 15 } }, // the fleet is its networks
   },
 };
 
@@ -540,12 +541,12 @@ describe("geoFacts tags each change as a pair (R54)", () => {
     const geoDays = { "2026-10-20": day(scaled(0.5)), "2026-10-27": day(NOW) };
     const r = geoFacts(input({ geoDays, ccDays: ccOf(geoDays) }))!;
     expect([...pairsOf(r.facts).values()]).toEqual([
-      ["Located nodes in the network a week ago", 51, "Located nodes in the network", 100],
+      ["Located nodes in the network a week ago", 52, "Located nodes in the network", 100], // each network halved and rounded
       ["Germany, nodes a week ago", 25, "Germany, nodes (biggest country)", 50],
-      ["United States, nodes a week ago", 15, "United States, nodes (second biggest country)", 30],
+      ["United States, nodes a week ago", 16, "United States, nodes (second biggest country)", 30],
       ["France, nodes a week ago", 8, "France, nodes (third biggest country)", 15],
       ["Hetzner Online, nodes a week ago", 25, "Hetzner Online, nodes (biggest provider)", 50],
-      ["Amazon.com, nodes a week ago", 10, "Amazon.com, nodes (second biggest provider)", 20],
+      ["Amazon.com, nodes a week ago", 11, "Amazon.com, nodes (second biggest provider)", 20],
       ["OVH, nodes a week ago", 5, "OVH, nodes (third biggest provider)", 10],
     ]);
   });
@@ -694,7 +695,7 @@ describe("fleetCountries: the countries a country note exists for", () => {
 
 // THE CARD'S ROWS (user, 2026-10-31: "just say 'Hetzner lost 3 nodes in <city>'").
 describe("geoFacts' notable changes", () => {
-  const was: DaySpec = { ...NOW, cc: { ...NOW.cc, DE: 52 }, isp: { ...NOW.isp, "ovh-sas": 12 } };
+  const was: DaySpec = { ...NOW, net: { ...NOW.net, dag: { cc: { DE: 32, US: 15, FR: 10 }, isp: { "hetzner-online-gmbh": 20, "ovh-sas": 12 } } } };
   const geoDays = run("2026-10-27", 8, (i) => (i < 2 ? was : NOW));
   const week = { geoDays, ccDays: ccOf(geoDays) };
   it("a row for a country and one for a provider that moved, read as the facts read them", () => {
@@ -717,7 +718,7 @@ describe("geoFacts' notable changes", () => {
     expect(r.changes?.map((c) => c.text)).toEqual(["Germany lost 2 nodes", "Hetzner Online lost 2 nodes"]);
   });
   it("tells a country's first nodes and its last apart from a move", () => {
-    const nl: DaySpec = { ...NOW, cc: { DE: 50, US: 30, FR: 15, JP: 5 } };
+    const nl: DaySpec = { ...NOW, net: { ...NOW.net, ext: { cc: { FR: 5, JP: 5 }, isp: NOW.net!.ext!.isp } } };
     const days = run("2026-10-27", 8, (i) => (i < 2 ? NOW : nl));
     const r = geoFacts(input({ geoDays: days, ccDays: ccOf(days), countryNames: { ...COUNTRIES, JP: "Japan" } }))!;
     expect(r.changes?.map((c) => [c.kind, c.text])).toEqual([["new", "Japan gained its first 5 nodes"], ["gone", "Netherlands lost its last 5 nodes"]]);
@@ -729,5 +730,47 @@ describe("geoFacts' notable changes", () => {
   });
   it("a subject's note is not the card's: no rows", () => {
     expect(geoFacts(input({ ...week, subject: { cc: "DE" } }))!.changes).toBeUndefined();
+  });
+});
+
+// ONE COUNT WITH THE CARDS (user, 2026-10-31): a server running for two networks is two nodes on
+// every card, so the note counts each network's nodes, added up, once a week of them exists. Never
+// one end of a change from each count: "34 to 31" would be two different quantities.
+describe("geoFacts counts nodes as the cards do", () => {
+  // Two servers run for both networks: 32 IPs in Germany, 34 nodes.
+  const fleet = (de: number): DaySpec => ({
+    cc: { DE: de - 2 },
+    isp: { "ovh-sas": de - 2 },
+    net: { dag: { cc: { DE: de - 10 }, isp: { "ovh-sas": de - 10 } }, usdc: { cc: { DE: 10 }, isp: { "ovh-sas": 10 } } },
+  });
+  it("states both ends of a change in nodes once the week exists", () => {
+    const geoDays = run("2026-10-27", 8, (i) => fleet(i < 2 ? 40 : 34));
+    const r = geoFacts(input({ geoDays, ccDays: ccOf(geoDays) }))!;
+    expect(one(r, /^Germany, nodes \(/).value).toBe(34);
+    expect(one(r, /^Germany, nodes a week ago$/).value).toBe(40);
+    expect(one(r, /^Located nodes in the network$/).value).toBe(34);
+    expect(one(r, /^OVH, nodes \(/).value).toBe(34);
+    expect(r.changes?.[0]?.text).toBe("Germany lost 6 nodes");
+  });
+  it("keeps the older count at both ends until then", () => {
+    const geoDays = { "2026-10-27": day(fleet(34)) };
+    const ccDays = { ...ccOf(geoDays), "2026-10-20": { "f.cc.DE": 38 } };
+    const r = geoFacts(input({ geoDays, ccDays }))!;
+    expect(one(r, /^Germany, nodes \(/).value).toBe(32);
+    expect(one(r, /^Germany, nodes a week ago$/).value).toBe(38);
+  });
+  it("a day a network's list collapsed is no week ago", () => {
+    const collapsed: DaySpec = { ...fleet(40), net: { dag: { cc: { DE: 3 } } } };
+    const geoDays = run("2026-10-27", 14, (i) => (i === 6 ? collapsed : fleet(i < 7 ? 40 : 36)));
+    const r = geoFacts(input({ geoDays, ccDays: ccOf(geoDays) }))!;
+    expect(one(r, /^Germany, nodes a week ago$/).value).toBe(40); // the neighbour, never 3
+  });
+  it("a network's share of the whole is of nodes too", () => {
+    const geoDays = { "2026-10-27": day(fleet(34)) };
+    expect(one(geoFacts(input({ subject: "usdc", geoDays, ccDays: ccOf(geoDays) }))!, /^USDC\.dag, share of the network's located nodes$/).value).toBeCloseTo(10 / 34, 9);
+  });
+  it("plans the same countries the note counts", () => {
+    const geoDays = run("2026-10-27", 8, () => fleet(34));
+    expect(fleetCountries({ geoDays, ccDays: ccOf(geoDays) })).toEqual(["DE"]);
   });
 });
