@@ -61,6 +61,12 @@ export const NETWORKS: Record<NetworkId, NetworkDef> = {
 // comments (e.g. --primary's oklch resolves to 0x53f2f2, a touch greener than the "#2af5ff" note) —
 // the token is canonical, so these mirror the token, not the comment. Update both together if a token
 // changes; the Engine dev-warns on drift.
+// THE AI NOTES SWITCH (user, 2026-10-31: deploy with the AI card behind a flag). Off unless the build
+// says "on", so a forgotten setting can only leave it off, and off is the state notes already have
+// off mainnet: no card, no request, no write, no Gate call. Read at BUILD time, so turning it on is
+// setting `NEXT_PUBLIC_AI_NOTES=on` on the Vercel scope and redeploying.
+export const AI_NOTES_ON = process.env.NEXT_PUBLIC_AI_NOTES === "on";
+
 export const COLORS = {
   core: 0x53f2f2,    // = --primary   (accent cyan — the DAG spine)
   dagCore: 0x618df3, // = --core      (DAG hypergraph-core blue — ONE hue; L0/L1 not distinguished)

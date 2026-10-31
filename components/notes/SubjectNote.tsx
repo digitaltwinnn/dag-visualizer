@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react";
 import { AI_NOTES_ICON } from "@/components/icons";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { useNet } from "@/components/topbar/useNet";
+import { AI_NOTES_ON } from "@/src/engine/config";
 import { queryOf, type NoteReq } from "./noteLoader";
 import TypedNote from "./TypedNote";
 import { useMainnetNote, useWaited } from "./useAiNote";
@@ -40,7 +41,7 @@ const MARK = <AI_NOTES_ICON aria-hidden className="ml-px mt-[3px] size-3.5 shrin
 
 export default function SubjectNote({ req }: { req: NoteReq | null }) {
   // Presence through `useNet()`, the fetch through the gate (`useMainnetNote`'s hydration rule).
-  const asked = useNet() === "mainnet" ? req : null;
+  const asked = useNet() === "mainnet" && AI_NOTES_ON ? req : null;
   const note = useMainnetNote(asked);
   const res = note.res;
   const key = asked ? queryOf(asked) : null;

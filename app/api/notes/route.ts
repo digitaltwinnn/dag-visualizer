@@ -1,3 +1,4 @@
+import { AI_NOTES_ON } from "@/src/engine/config";
 import { liveDeps, readNote } from "./handlers";
 
 // THE NOTE READ — `GET /api/notes?view=…&subject=…&span=…` (History's brushed range: `&from=…&to=…`).
@@ -8,5 +9,6 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export function GET(req: Request) {
+  if (!AI_NOTES_ON) return Response.json({ state: "none" });
   return readNote(req, liveDeps);
 }

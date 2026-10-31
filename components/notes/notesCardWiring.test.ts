@@ -341,3 +341,23 @@ describe("network names in a note", () => {
     expect(text).not.toMatch(/dangerouslySetInnerHTML|font-|<a\b|onClick/);
   });
 });
+
+// THE SWITCH (user, 2026-10-31: deploy with the AI card behind a flag): off unless the build says
+// "on", so a forgotten setting cannot turn it on, and off is the app with no note anywhere: no card,
+// no request, no write. The state notes already have off mainnet.
+describe("the AI notes switch", () => {
+  it("is on only when the build says so", () => {
+    expect(read("src/engine/config.ts")).toMatch(/export const AI_NOTES_ON = process\.env\.NEXT_PUBLIC_AI_NOTES === "on";/);
+  });
+  it("stops every client ask at the one request", () => {
+    expect(read("components/notes/useAiNote.ts")).toMatch(/subject && net === "mainnet" && AI_NOTES_ON \?/);
+    expect(read("components/notes/SubjectNote.tsx")).toMatch(/useNet\(\) === "mainnet" && AI_NOTES_ON \? req : null/);
+  });
+  it("stops every route before the Gate or the store", () => {
+    for (const route of ["route", "request/route", "warm/route"])
+      expect(read(`app/api/notes/${route}.ts`)).toMatch(/if \(!AI_NOTES_ON\) return Response\.json\(/);
+  });
+  it("the About page says nothing of a card that is not there", () => {
+    expect(read("components/docs/AboutDoc.tsx")).toMatch(/\{AI_NOTES_ON && \(/);
+  });
+});
