@@ -1153,11 +1153,10 @@
      clear, it's too soft"): the mark, the edge's stops, the wash and the coin all step up on the
      light ground, where a pale violet on a white sheet read as grey. */
   --ai-mark: light-dark(oklch(0.46 0.20 295), oklch(0.78 0.14 295));
-  /* The mark's own PLATE (design round 2026-10-30, option D; quieter 2026-10-31, the writing carries
-     the effect): a faint violet wash inside the `--ai-edge` ring (`components/notes/aiSweep.ts`), the one place generated text sits apart from
-     the measured rows around it. ⚠️ Never redeclare `--ai-edge` below this point: the plate once did,
-     as a flat violet, and since a later declaration wins the AI card's iridescent sweep and the
-     timeline diamonds went flat for a day (user, 2026-10-30: "lost its AI multi-colored outline"). */
+  /* A faint violet wash inside the `--ai-edge` ring of a tag the AI produced (`components/notes/aiSweep.ts`).
+     ⚠️ Never redeclare `--ai-edge` below this point: a later declaration wins, and one did once, as a
+     flat violet, and the AI card's iridescent sweep and the timeline diamonds went flat for a day
+     (user, 2026-10-30: "lost its AI multi-colored outline"). */
   --ai-wash: light-dark(color-mix(in oklch, var(--ai-mark) 8%, transparent), color-mix(in oklch, var(--ai-mark) 4%, transparent));
   /* THE COIN (design C, 2026-10-30): the notable-day mark on the AI card's rows, the timeline and
      the chart planes — a 16px disc the glyph sits on, so it needs a fill that holds on the band's

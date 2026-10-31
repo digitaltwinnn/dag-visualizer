@@ -921,15 +921,16 @@ of four shown in the brainstorming companion, then "no fallback"): the measured 
 ("Hosts 25% of the selection's nodes", the Range card's "DOR anchored N snapshots in this range")
 served one purpose, what this subject is to the whole it sits in, and the note says it better — it
 names its span and places the subject in its rung, share and rank among the other countries,
-providers or make-ups (the prompt asks for that always) — so they are gone. The note renders on a
-faint violet PLATE with the mark (a faint `--ai-wash` inside a softened, masked half-pixel `--ai-edge` ring, so the card's surface shows through; `aiSweep.ts`:
-every surface a model's words produced wears the sweep, user 2026-10-30), no label row;
-the plate shows "reading…" while the note is in flight (ONE word, user 2026-10-30: held or still
+providers or make-ups (the prompt asks for that always) — so they are gone. The note is the LAST LINE OF THE HEAD (user, 2026-10-31, option B of six: a plate read as a box
+inside the card, "not embedded enough"): no box, no fill, no edge, the mark under the title's kind
+mark and the words on the title's column, no label row, and the head's rule stands down while it
+stands (`data-note-lead`), so a card with no note keeps its rule. The mark and the writing say AI. `aiSweep.ts`
+is the chips' ring alone. The note's place shows "reading…" while the note is in flight (ONE word, user 2026-10-30: held or still
 being written is the cache's business); `none` and off-mainnet render
 nothing (no note to have), and `unavailable` renders "no note right now", muted, with no door (user,
-2026-10-30: the Gate refused a brushed range's write and the plate was simply missing for the 15
+2026-10-30: the Gate refused a brushed range's write and the note was simply missing for the 15
 minutes `FAIL_TTL_S` remembers it; a card with no lead and no reason read as broken). **A note writes itself in** (user, 2026-10-31: "appear letter by letter as if it's written by the
-AI", the card and the plates alike; `TypedNote`, `typedNote.ts`): at most 2.4s, only for a note the
+AI", the AI card and the cards' notes alike; `TypedNote`, `typedNote.ts`): at most 2.4s, only for a note the
 reader watched arrive, never for one already held and never under reduced motion. The full text
 holds the height invisibly, so the card grows once, and a screen reader gets it whole. **A head with
 no eyebrow marks its title** (`data-eyebrow` on the h3): `HeightEase` finds a head by that marker,

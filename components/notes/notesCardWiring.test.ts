@@ -121,7 +121,7 @@ describe("the notes card's own behaviour", () => {
     expect(chip).toMatch(/<QualifierChip/);
     expect(chip).toMatch(/NOTE_KIND_ICONS\[day\.kind\]/);
     expect(chip).toMatch(/NOTE_KIND_WORD\[day\.kind\]/);
-    // A tag the AI's note produced wears the AI's edge (user, 2026-10-30), like the plate.
+    // A tag the AI's note produced wears the AI's edge (user, 2026-10-30).
     expect(chip).toMatch(/<QualifierChip className=\{AI_SWEEP\}>/);
     // The unlisted set keeps its mandated neutral: `identityHudCss` would hash it a saturated hue.
     expect(chip).toMatch(/UNLISTED_ID \? UNLISTED_HUE : identityHudCss/);
@@ -240,31 +240,37 @@ describe("a failed write answers the gesture on the card's surface (R68)", () =>
 // brushed range shows its note inside its own card. The subject note is asked by the selection
 // itself, so it has no door and never says it could not write.
 describe("subject notes live on their cards", () => {
-  it("SubjectNote has no door and no fallback: the plate is the lead, standing down on none, saying so on unavailable, and asks once in an effect", () => {
+  it("SubjectNote has no door and no fallback: the note is the lead, standing down on none, saying so on unavailable, and asks once in an effect", () => {
     const src = read("components/notes/SubjectNote.tsx");
     expect(src).not.toMatch(/RequestDoor|<Door\b/);
     expect(src).not.toMatch(/Couldn/);
-    // THE PLATE IS THE LEAD (user, 2026-10-30, design option D, then "no fallback"): the measured
-    // lead sentences are gone from the four cards; the plate shows "reading…" while the
-    // note is in flight, nothing on none, and "no note right now" on unavailable (an instrument
+    // THE NOTE IS THE LEAD (user, 2026-10-30, then "no fallback"): the measured lead sentences
+    // are gone from the four cards; the note's place shows "reading…" while it is in flight, nothing on none, and "no note right now" on unavailable (an instrument
     // state, not a door: the reader made no ask to answer). No label row: the text names its span.
     expect(src).toMatch(/if \(!asked \|\| res\?\.state === "none"\) return null;/);
-    // `unavailable` is an instrument state on the plate, not a door and not silence (user, 2026-10-30).
+    // `unavailable` is an instrument state in the note's place, not a door and not silence (user, 2026-10-30).
     expect(src).toMatch(/res\?\.state === "unavailable" \? \([^]*?no note right now/);
     expect(src).not.toMatch(/RequestDoor|Couldn/);
     expect(src).not.toMatch(/fallback[=:}]|SectionLabel|Constellation Gate AI/); // the word may stay in prose; no prop, no render of one
-    // The plate wears the card's iridescent sweep (user, 2026-10-30), through the one home.
-    expect(src).toMatch(/cn\("mb-2\.5 flex gap-2 rounded-xs px-2 py-1", AI_SWEEP\)/);
-    // A TRUE RING, so the card's own surface shows through (user, 2026-10-31: the section "doesn't
-    // match with the card itself"): no opaque ground of its own, the sweep masked to the 1px edge
-    // and softened, and only a faint wash inside.
+    // THE LAST LINE OF THE HEAD (user, 2026-10-31, option B of six: "not embedded enough in the
+    // card"): no box, no fill, no sweep of its own. The mark sits under the title's kind mark and the
+    // words on the title's column, so its width plus the gap is the kind mark's 16px plus its 8.
+    expect(src).not.toMatch(/AI_SWEEP/);
+    expect(src).toMatch(/data-note-lead="" className="mt-2\.5 mb-3 flex gap-\[9px\]"/);
+    // The head's rule stands down for it, wherever a card's body wraps it, and only while it stands:
+    // a card with no note to have keeps its rule. The rule's own margins go with it.
+    const head = read("components/CardHead.tsx");
+    expect(head).toMatch(/has-\[\+\[data-note-lead\]\]:hidden/);
+    expect(head).toMatch(/has-\[\+\*>\[data-note-lead\]:first-child\]:hidden/);
+    expect(src).toMatch(/const MARK = <AI_NOTES_ICON aria-hidden className="ml-px mt-\[3px\] size-3\.5 shrink-0 text-\[var\(--ai-mark\)\]" \/>;/);
+    // The sweep stays the chip's: a true ring, so the card's own surface shows through.
     const sweep = read("components/notes/aiSweep.ts");
     expect(sweep).toMatch(/before:\[background:var\(--ai-edge\)\]/);
     expect(sweep).toMatch(/before:\[mask:[^"]*content-box_exclude/);
     expect(sweep).toMatch(/before:opacity-/);
     expect(sweep).toMatch(/before:p-\[0\.5px\]/); // a hairline: 2026-10-31, "a thinner box"
     expect(sweep).not.toMatch(/--panel-solid\)|--background\)|_padding-box/);
-    expect(read("app/globals.css")).toMatch(/--ai-wash: light-dark\(color-mix\(in oklch, var\(--ai-mark\) 8%, transparent\), color-mix\(in oklch, var\(--ai-mark\) 4%, transparent\)\);/);
+    expect(read("app/globals.css")).toMatch(/--ai-wash: light-dark\(color-mix\(in oklch, var\(--ai-mark\) 8%, transparent\), color-mix\(in oklch, var\(--ai-mark\) 4%, transparent\)\)/);
     expect(src).toMatch(/useEffect\(\(\) => \{[^]*?res\?\.state !== "request"[^]*?note\.request\(\)[^]*?\}, \[/);
     // …once per key (the ref guard, so a re-render or a poll's `request` never POSTs twice), and only
     // after the key has stood for the dwell (final review I1: paging and a deck rotation change the

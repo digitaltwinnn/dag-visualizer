@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useState } from "react";
 
 import { typedLength } from "./typedNote";
 
-/** A NOTE, WRITTEN IN (`typedNote.ts`), one component for the AI card and the plates. Only a note
+/** A NOTE, WRITTEN IN (`typedNote.ts`), one component for the AI card and the cards' notes. Only a note
  *  the reader watched arrive is typed (`waited`): one already held appears at once, as does any
  *  note under reduced motion. While it types, the whole text stands invisibly in the same grid cell,
  *  so the card takes its final height once and never grows per letter; a screen reader gets the

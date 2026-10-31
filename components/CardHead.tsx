@@ -509,9 +509,11 @@ function keepFocusOnRung(el: HTMLElement): void {
       {/* Head-vs-body sits INSIDE the card's padding here, so it needs no bleed and no inset of its
           own: the padding box already gives it the same left/right spacing the slab's resting seam
           has (user, 2026-08-09 — "give the header divider also some spacing on the left/right").
-          One resting weight for every division in the pile; full width belongs to the hovered seam. */}
+          One resting weight for every division in the pile; full width belongs to the hovered seam.
+          A NOTE LEADING THE BODY IS THE HEAD'S LAST LINE (`SubjectNote`, user 2026-10-31), so the rule
+          stands down for it, whether the card's body is flat or wrapped. */}
       {title != null && !collapsed && (
-        <div className="border-b border-border mt-2 mb-2.5" aria-hidden />
+        <div className="border-b border-border mt-2 mb-2.5 has-[+[data-note-lead]]:hidden has-[+*>[data-note-lead]:first-child]:hidden" aria-hidden />
       )}
     </>
   );
