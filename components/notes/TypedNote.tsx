@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useState } from "react";
 
+import NoteText from "./NoteText";
 import { typedLength } from "./typedNote";
 
 /** A NOTE, WRITTEN IN (`typedNote.ts`), one component for the AI card and the cards' notes. Only a note
@@ -31,11 +32,11 @@ export default function TypedNote({ text, waited, className }: { text: string; w
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
   }, [typing, text]);
-  if (shown == null) return <p className={className}>{text}</p>;
+  if (shown == null) return <p className={className}><NoteText text={text} /></p>;
   return (
     <p className={`grid ${className ?? ""}`}>
       <span className="invisible col-start-1 row-start-1">{text}</span>
-      <span aria-hidden className="col-start-1 row-start-1">{text.slice(0, shown)}</span>
+      <span aria-hidden className="col-start-1 row-start-1"><NoteText text={text} upto={shown} /></span>
       <span className="sr-only">{text}</span>
     </p>
   );

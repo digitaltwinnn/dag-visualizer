@@ -21,6 +21,7 @@ import { commitNoteDay } from "./commitNoteDay";
 import { changeActions, changeHover } from "./noteChangeTarget";
 import { noteSpanWords } from "./noteSubject";
 import NoteKindCoin from "./NoteKindCoin";
+import NoteText from "./NoteText";
 import TypedNote from "./TypedNote";
 import { NOTE_KIND_WORD } from "./noteDays";
 import { useAiNote, useWaited } from "./useAiNote";
@@ -121,7 +122,7 @@ function DayRow({ day }: { day: NoteDay }) {
       onBlur={off}
       onClick={() => commitNoteDay(day)}
     >
-      {day.caption}
+      <NoteText text={day.caption} />
     </Door>
   );
 }
@@ -196,7 +197,7 @@ function ChangeRow({ change, view }: { change: NoteChange; view: NoteView }) {
         if (acts) applyClickActions(acts);
       }}
     >
-      {change.text}
+      <NoteText text={change.text} />
     </Door>
   );
 }

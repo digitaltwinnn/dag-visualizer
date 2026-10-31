@@ -56,7 +56,7 @@ describe("the notes card's own behaviour", () => {
     const body = fnBody(card, "function ChangeRow(");
     expect(body).toMatch(/applyClickActions\(acts\)/);
     expect(body).toMatch(/<NoteKindCoin kind=\{change\.kind\} \/>/);
-    expect(body).toMatch(/\{change\.text\}/);
+    expect(body).toMatch(/<NoteText text=\{change\.text\} \/>/);
   });
 
   it("History's notable days start folded, their rows mounted only when open", () => {
@@ -194,7 +194,7 @@ describe("the notes card's own behaviour", () => {
     const typed = read("components/notes/TypedNote.tsx");
     expect(typed).toMatch(/prefers-reduced-motion: reduce/);
     expect(typed).toMatch(/<span className="invisible col-start-1 row-start-1">\{text\}<\/span>/);
-    expect(typed).toMatch(/<span aria-hidden className="col-start-1 row-start-1">\{text\.slice\(0, shown\)\}<\/span>/);
+    expect(typed).toMatch(/<span aria-hidden className="col-start-1 row-start-1"><NoteText text=\{text\} upto=\{shown\} \/><\/span>/);
     expect(typed).toMatch(/<span className="sr-only">\{text\}<\/span>/);
     expect(card).toMatch(/<TypedNote text=\{res\.text\} waited=\{waited\}/);
     expect(read("components/notes/SubjectNote.tsx")).toMatch(/<TypedNote text=\{text!?\} waited=\{waited\}/);
@@ -324,5 +324,20 @@ describe("a folded card's title column", () => {
   it("is the view's, set on the lane and read by the head", () => {
     expect(read("components/CardHead.tsx")).toMatch(/flex-none min-w-\[var\(--entry-col\)\]/);
     expect(read("components/Inspector.tsx")).toMatch(/\["--entry-col"\]: VIEW_POLICIES\[mode\]\.entryColumn/);
+  });
+});
+
+// A NOTE'S NETWORK NAMES WEAR THEIR COLOUR (user, 2026-10-31), found by code (`noteNames.ts`), on
+// every surface a note's words reach, the screen reader's copy left plain.
+describe("network names in a note", () => {
+  it("every surface draws through NoteText, and a colour is text ink", () => {
+    const typed = read("components/notes/TypedNote.tsx");
+    expect(typed).toMatch(/<NoteText text=\{text\} \/>/);
+    expect(typed).toMatch(/<NoteText text=\{text\} upto=\{shown\} \/>/);
+    expect(typed).toMatch(/<span className="sr-only">\{text\}<\/span>/);
+    expect(read("components/notes/NotesCard.tsx")).toMatch(/<NoteText text=\{day\.caption\} \/>/);
+    const text = read("components/notes/NoteText.tsx");
+    expect(text).toMatch(/className=\{IDENT_INK\}/);
+    expect(text).not.toMatch(/dangerouslySetInnerHTML|font-|<a\b|onClick/);
   });
 });

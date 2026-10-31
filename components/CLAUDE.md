@@ -929,7 +929,7 @@ is the chips' ring alone. The note's place shows "reading…" while the note is 
 being written is the cache's business); `none` and off-mainnet render
 nothing (no note to have), and `unavailable` renders "no note right now", muted, with no door (user,
 2026-10-30: the Gate refused a brushed range's write and the note was simply missing for the 15
-minutes `FAIL_TTL_S` remembers it; a card with no lead and no reason read as broken). **A note writes itself in** (user, 2026-10-31: "appear letter by letter as if it's written by the
+minutes `FAIL_TTL_S` remembers it; a card with no lead and no reason read as broken). **A note's network names wear their colour** (user, 2026-10-31; `src/data/noteNames.ts`, `NoteText`): code finds them against mainnet's catalog after the note is written, whole words, full names, tickers of three letters or more and two hand-picked short forms, never "333 DAG" the amount; the text ink (`IDENT_INK`), same weight, no link. **A note writes itself in** (user, 2026-10-31: "appear letter by letter as if it's written by the
 AI", the AI card and the cards' notes alike; `TypedNote`, `typedNote.ts`): at most 2.4s, only for a note the
 reader watched arrive, never for one already held and never under reduced motion. The full text
 holds the height invisibly, so the card grows once, and a screen reader gets it whole. **A head with
