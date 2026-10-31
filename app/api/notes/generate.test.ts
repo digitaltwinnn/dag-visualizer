@@ -355,6 +355,32 @@ describe("generateNote", () => {
     expect(res.days.map((x) => [x.networkId, x.caption])).toEqual([["foo", "Foo began."], ["bar", "Bar stopped."]]);
   });
 
+  // SAID POSITIVELY, ONE REWRITE (user, 2026-10-31): the prompt alone was ignored ("no changes in
+  // layers", live). It is style, not honesty, so the second answer stands: a true note is never lost.
+  it("a note saying no or none is asked once more, naming the word", async () => {
+    const d = deps({ answers: ["NOTE: Snapshots anchored rose, with no changes in layers.", CLEAN] });
+    const res = await generateNote(REQ, d, "read");
+    expect(res.state).toBe("ok");
+    expect(d.chat).toHaveBeenCalledTimes(2);
+    expect(d.chat.mock.calls[1]![0][1]!.content).toMatch(/say what held steady instead of "no"/);
+  });
+
+  it("a second answer that still says no stands", async () => {
+    const twice = "NOTE: Snapshots anchored rose, with no changes in layers.";
+    const d = deps({ answers: [twice, twice] });
+    const res = await generateNote(REQ, d, "read");
+    if (res.state !== "ok") throw new Error(res.state);
+    expect(res.text).toBe("Snapshots anchored rose, with no changes in layers.");
+    expect(d.chat).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not take a word holding those letters for a negative", async () => {
+    const d = deps({ answers: ["NOTE: Snapshots anchored saw a notable rise."] });
+    const res = await generateNote(REQ, d, "read");
+    expect(res.state).toBe("ok");
+    expect(d.chat).toHaveBeenCalledTimes(1);
+  });
+
   it("a caption of two sentences is dropped", async () => {
     const day: NotableDay = { dayMs: Date.parse("2026-10-22T00:00:00Z"), kind: "high", networkId: null, value: 1200, level: 600, score: 3 };
     const d = deps({ facts: async () => ({ ...FACTS, days: [day] }), answers: [`${CLEAN}\nDAY 2026-10-22: A busy day. It reached 1,200.`] });

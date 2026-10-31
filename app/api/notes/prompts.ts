@@ -21,7 +21,7 @@ export const VOICE = [
   "Within each part, lead with what changed. Do not restate a breakdown the reader can already see on screen, such as how many nodes run each layer, unless it changed.",
   "When something rose or fell, say by how much: write it from the earlier figure to the current one, both as the facts state them for that same thing, never only the direction.",
   // HONEST, AND SAID POSITIVELY (user, 2026-10-31). The second half of the rule is what keeps it honest.
-  "Say things positively. When a figure grew, open the sentence with the growth, never leave it trailing at the end. When nothing moved, say it held steady rather than naming what did not happen, and never open a sentence with \"no\" or \"none\". State a fall plainly: never soften, hide or reframe it, and never call a figure good or bad.",
+  "Say things positively. When a figure grew, open the sentence with the growth, never leave it trailing at the end. When nothing moved, say what held steady, anywhere in a sentence: never write that something did not happen, such as \"no changes\" or \"no networks\". A span where nothing was anchored at all was quiet. State a fall plainly: never soften, hide or reframe it, and never call a figure good or bad.",
   "",
   "Rules:",
   "Plain, present tense, no hype, no advice. No meta-commentary: never mention the facts, the data, the note or yourself.",
@@ -33,6 +33,7 @@ export const VOICE = [
   "Describe what the numbers show: never explain why, and never read a purpose or a cause into them.",
   "Say nodes, never machines. Say snapshots or global snapshots, never ticks, never \"L1 snapshots\". Never say feeless. All the nodes together are the network, never the fleet.",
   "A network's share of global snapshots is what it \"was part of\"; the whole network is part of nothing: it produces them.",
+  "A network creates its snapshots and anchors them into global snapshots. A network that creates snapshots is an active network, never an \"anchoring network\". A note about one network says nothing about other networks being active.",
   "L0, currency L1 and data L1 are layers.",
   "Make no claim about how decentralised or distributed anything is.",
   "Punctuation: no dash clauses. Never use an em dash, and never a hyphen or en dash with a blank on each side. Use commas, colons and full stops.",
@@ -76,7 +77,7 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
   hyper: {
     // A QUIET WEEK IS SAID (user, 2026-10-30): the facts count what changed even at 0, so the note
     // says the composition held rather than reaching for the node count, which is Geography's too.
-    question: "First, who and what is on the network over the span: networks or layers that gained or lost nodes, networks that started or stopped anchoring; if nothing changed there, say so plainly: a steady week, the node count held at its level and every network and layer stayed as it was.",
+    question: "First, who and what is on the network over the span: networks or layers that gained or lost nodes, networks that became active or went quiet; if nothing changed there, say so plainly: a steady week: the node count held at its level and the layers held steady, and for the whole network so did the active networks.",
     questions: {
       // "LAYER GROUP", never "make-up" (user, 2026-10-30): the Composition rung's own word. And the
       // group's place is said as a reader would ("its largest group"), not as a share and a rank

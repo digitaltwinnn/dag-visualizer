@@ -67,7 +67,7 @@ describe("PROMPTS", () => {
 
   it("asks Hypergraph and Geography their own subject first and activity last (R74); the ledger and History keep their questions", () => {
     expect(PROMPTS.hyper.question).toBe(
-      "First, who and what is on the network over the span: networks or layers that gained or lost nodes, networks that started or stopped anchoring; if nothing changed there, say so plainly: a steady week, the node count held at its level and every network and layer stayed as it was.",
+      "First, who and what is on the network over the span: networks or layers that gained or lost nodes, networks that became active or went quiet; if nothing changed there, say so plainly: a steady week: the node count held at its level and the layers held steady, and for the whole network so did the active networks.",
     );
     expect(PROMPTS.hyper.questionCommon).toBe("Last, in one sentence, how active it was: open with the direction, up, down or steady, then the global snapshots it was part of per day last week against the weeks before.");
     expect(PROMPTS.geo.question).toBe(
@@ -250,8 +250,12 @@ describe("buildMessages", () => {
   // than as what did not happen ("No network started or stopped"), and a fall stays a plain fall.
   it("asks for growth up front, steadiness over negatives, and a fall stated plainly", () => {
     expect(VOICE).toMatch(/When a figure grew, open the sentence with the growth/);
-    expect(VOICE).toMatch(/say it held steady/);
-    expect(VOICE).toMatch(/never open a sentence with "no" or "none"/);
+    // …anywhere in a sentence (the same day: "'no networks started or stopped anchoring', this is
+    // also steady no?"): the rule first stopped negatives only at a sentence's start.
+    expect(VOICE).toMatch(/say what held steady, anywhere in a sentence/);
+    // A network creates snapshots and anchors them (user, 2026-10-31): "anchoring networks" is jargon.
+    expect(VOICE).toMatch(/A network that creates snapshots is an active network, never an "anchoring network"/);
+    expect(VOICE).toMatch(/never write that something did not happen, such as "no changes" or "no networks"/);
     expect(VOICE).toMatch(/State a fall plainly: never soften, hide or reframe it/);
   });
 

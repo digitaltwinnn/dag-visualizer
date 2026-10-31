@@ -4,6 +4,8 @@ import type { NoteDay, NoteResponse, NoteView } from "@/src/data/noteTypes";
 import { GateError, type gateChat, type GateErrorKind } from "./gate";
 import { failKeyOf, lockKeyOf, noteKeyOf, statsKeyOf, timingOf, type NoteSpan } from "./keys";
 import { buildMessages, parseAnswer, spanWords } from "./prompts";
+
+const NEGATIVE_RE = /\b(?:no|none)\b/i;
 import { noteSupported, type factsFor } from "./sources";
 import type { NotesStore } from "./store";
 
@@ -171,6 +173,14 @@ async function write(
     const check = checkNote(note, input.facts, input.names, { maxSentences: 3, subject });
     if (!check.ok) {
       reasons = check.reasons;
+      continue;
+    }
+    // SAID POSITIVELY, ONE REWRITE (user, 2026-10-31): the prompt alone was ignored ("no changes in
+    // layers", live). This is style, not honesty, so it asks once and the second answer stands: a
+    // true note is never lost over a word. Notes only: a caption is a short clause of figures.
+    const negative = attempt === 0 ? NEGATIVE_RE.exec(note)?.[0] : null;
+    if (negative) {
+      reasons = [`say what held steady instead of "${negative.toLowerCase()}"`];
       continue;
     }
     const kept: NoteDay[] = [];

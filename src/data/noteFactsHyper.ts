@@ -270,7 +270,7 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
         cap: ids.length * 2, // a network has at most one first and one last
         from: from < 0 ? n : from,
       }).filter((day) => (day.kind === "first" || day.kind === "last") && day.networkId);
-      facts.push(fact("Networks that started or stopped anchoring over the span", days.length, "count"));
+      facts.push(fact("Networks that became active or went quiet over the span", days.length, "count"));
       for (const day of days) {
         const id = day.networkId!;
         named.push(id);

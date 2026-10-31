@@ -130,11 +130,11 @@ describe("hyperFacts on all", () => {
   it("counts the networks whose node count changed and those that started or stopped, 0 in a quiet week", () => {
     const r = hyperFacts(input())!;
     expect(find(r, /^Networks whose node count changed over the span$/)[0]!.value).toBe(1); // USDC.dag, 10 to 30
-    expect(find(r, /^Networks that started or stopped anchoring over the span$/)[0]!.value).toBe(0);
+    expect(find(r, /^Networks that became active or went quiet over the span$/)[0]!.value).toBe(0);
     const quiet = hyperFacts(input({ fleet: fleet({ "f.nodes": row(720, () => 140), "f.nodes.usdc": row(720, () => 30) }) }))!;
     const [changed] = find(quiet, /^Networks whose node count changed over the span$/);
     expect([changed!.value, changed!.text]).toEqual([0, "0"]);
-    expect(find(quiet, /^Networks that started or stopped anchoring over the span$/)[0]!.value).toBe(0);
+    expect(find(quiet, /^Networks that became active or went quiet over the span$/)[0]!.value).toBe(0);
     expect(find(quiet, /nodes at the (start|end) of the span$/).filter((f) => !/^Nodes across/.test(f.label))).toEqual([]); // no movers
   });
 
@@ -161,7 +161,7 @@ describe("hyperFacts on all", () => {
     expect(started[0]!.value).toBe(T0 + 45 * DAY);
     const stopped = find(r, /stopped anchoring, last day/);
     expect(stopped.map((f) => f.label)).toEqual(["Dor stopped anchoring, last day"]);
-    expect(find(r, /^Networks that started or stopped anchoring over the span$/)[0]!.value).toBe(2);
+    expect(find(r, /^Networks that became active or went quiet over the span$/)[0]!.value).toBe(2);
     expect(stopped[0]!.value).toBe(T0 + 49 * DAY);
     // A network that was running before the span (USDC.dag) has no beginning to report.
     expect(find(r, /USDC\.dag (started|stopped)/)).toEqual([]);
