@@ -119,8 +119,18 @@ export default function TrendStack() {
   // the reader's eyes, exactly as it cuts the document's per-network columns.
   const filter = useStore((s) => s.filter);
   const metric = useStore((s) => s.trendMetric);
-  const scroll = useStore((s) => s.trendScroll);
-  const focus = useStore((s) => s.trendFocus);
+  const liveScroll = useStore((s) => s.trendScroll);
+  const liveFocus = useStore((s) => s.trendFocus);
+  // THE DEAL HOLDS WHILE IT LEAVES (user, 2026-10-31: the chart "was showing DAG but while the view
+  // is leaving it switches to DOR"). `setMode` resets the focus, the scroll and the rotation the
+  // moment a view is left, which is right for the next arrival; the cards still falling keep the
+  // deal they were showing, or the plane in front leaves the deck mid-fall.
+  const liveRotation = useStore((s) => s.trendRotation);
+  const dealt = useRef({ focus: liveFocus, scroll: liveScroll, rotation: liveRotation });
+  if (on) dealt.current = { focus: liveFocus, scroll: liveScroll, rotation: liveRotation };
+  const focus = dealt.current.focus;
+  const scroll = dealt.current.scroll;
+  const rotation = dealt.current.rotation;
   const scaleMode = useStore((s) => s.trendScale);
   // THE SHARED TIME CURSOR — one instant, marked on every plane whose span contains it, so the
   // stack is read at ONE moment rather than five. A COMMIT, not a hover (store `trendCursorMs`,
@@ -198,7 +208,6 @@ export default function TrendStack() {
   // THE DECK TURNED by the swipes so far (`rotateOrder`, store `trendRotation`): the rotation sits
   // UNDER the held order and the focus re-deal — a focus still brings its card forward, a swipe
   // releases the focus first so the two never fight over slot one.
-  const rotation = useStore((s) => s.trendRotation);
   const rotated = useMemo(() => rotateOrder(deck, rotation), [deck, rotation]);
   const order = useHeldOrder(rotated, staged.settled);
   // What a card says it shows — named from its OWN network (`metricLabel`: the DAG's chart is

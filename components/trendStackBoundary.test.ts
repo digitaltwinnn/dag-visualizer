@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { PLANE_PX_W, planeFormat } from "@/src/engine/domain/trendStack";
 
 // THE TREND STACK's contracts, made executable (2026-09-18 — the boundary-test idiom).
@@ -250,5 +251,21 @@ describe("trend-stack boundary", () => {
       /linesById/.test(src) && /useMemo/.test(src),
       `${FILE} must hand each plane a memoised lines array (linesById)`,
     ).toBe(true);
+  });
+});
+
+describe("a leaving stack keeps the deal it was showing", () => {
+  // `setMode` resets the focus, the scroll and the rotation the moment a view is left, which is
+  // right for the next arrival and wrong for cards still on screen: the DAG's plane left the deck
+  // and the next network slid forward while the cards fell (user, 2026-10-31).
+  it("the planes hold the deck's state while the layer lingers", () => {
+    const src = readFileSync(join("components", "TrendStack.tsx"), "utf8");
+    expect(src).toMatch(/if \(on\) dealt\.current = /);
+    for (const key of ["focus", "scroll", "rotation"]) expect(src).toMatch(new RegExp(`\\b${key} = dealt\\.current\\.${key}|\\b${key}: .*dealt`));
+  });
+
+  it("the projector takes no new poses during the leave beat", () => {
+    const src = readFileSync(join("src", "engine", "TrendStackSync.ts"), "utf8");
+    expect(src).toMatch(/!this\._leaving &&\s*\(\s*st\.ids !== this\._ids/);
   });
 });
