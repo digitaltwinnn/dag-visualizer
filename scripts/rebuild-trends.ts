@@ -1,87 +1,89 @@
-// REBUILD the trends store from the explorer's own history — the recovery tool (user,
-// 2026-09-06: "this 'initial load' could be useful in the future as well when there is a bug").
-// Run manually, like every scripts/ tool:
+// THE TRENDS FILL — the manual tool that completes the measured history (`/api/trends`) from the
+// explorer's own records. Three commands, one of them the everyday one:
 //
-//   npx tsx scripts/rebuild-trends.ts --net=mainnet --days=180
-//   npx tsx scripts/rebuild-trends.ts --net=mainnet --extend-to=2026-01-01
-//   npx tsx scripts/rebuild-trends.ts --net=mainnet --recompute-from=2026-09-06
-//   npx tsx scripts/rebuild-trends.ts --net=mainnet --recompute-from=2026-09-06 --resume
-//   npx tsx scripts/rebuild-trends.ts --net=mainnet --backfill-gaps=2026-01-01
-//   npx tsx scripts/rebuild-trends.ts --net=mainnet --backfill-gaps=2025-07-01 --gaps-from-chain=DAG7fwxZJp
-//   npx tsx scripts/rebuild-trends.ts --net=mainnet --backfill-blocks=2025-07-01
-//   npx tsx scripts/rebuild-trends.ts --net=mainnet --backfill-unlisted
+//   npx tsx scripts/rebuild-trends.ts --net=mainnet fill --from=2023-11-13
+//   npx tsx scripts/rebuild-trends.ts --net=mainnet fill --from=2026-09-01 --to=2026-09-10 --recompute
+//   npx tsx scripts/rebuild-trends.ts --net=mainnet fill --from=2026-09-01 --to=2026-09-10 --recompute --chain=DAG0CyySf3
+//   npx tsx scripts/rebuild-trends.ts --net=mainnet fill --from=2023-11-13 --dry-run
+//   npx tsx scripts/rebuild-trends.ts --net=mainnet rebuild --days=90     # wipe + rebuild, asks first
+//   npx tsx scripts/rebuild-trends.ts --net=mainnet wipe                  # asks first
 //
-// ⚠️ THE UNLISTED COVERAGE MARKER (`u.cov`, 2026-10-08) is written by the cron, the full rebuild and
-// --backfill-unlisted — NOT by --recompute-from (it keeps the marker already there) or --extend-to
-// (the older days it adds read "unlisted: not measured" until a --backfill-unlisted follows it).
-// After an --extend-to, run --backfill-unlisted. It is idempotent: whole chains, exact values.
-//   npx tsx scripts/rebuild-trends.ts --net=mainnet --wipe-only
+// `fill` MAKES A SPAN OF UTC DAYS COMPLETE — every series a day has, from the chains' complete
+// records, in ONE WALK (user, 2026-10-30: "I just want one walk from now on … fill buckets,
+// resilient, and with the ability to make data fixes or partial reloads if needed but not as the
+// default"). The design is docs/superpowers/specs/2026-10-30-trends-fill-design.md; the pure
+// decisions (commands and the redirects for every flag this replaced, the span's rules, the
+// cursor pre-flight, the tier floor) are app/api/trends/fillPlan.ts, tested.
 //
-// CRASH SAFETY (2026-09-11 — the overnight recompute died at hour 13 with every write still
-// queued behind the last chain; nothing landed): --recompute-from and --extend-to flush each
-// chain's FINALIZED buckets as the walk passes them and checkpoint the cursor plus the
-// still-filling frontier to .rebuild-trends-ckpt/{net}/ every 500K records. The walk descends
-// newest→oldest, so a bucket is final once the frontier sits two whole UTC days below it —
-// only complete buckets ever reach the store (a partial sum would read as a crash, rule 10);
-// the frontier rides the checkpoint file, never the store. A killed run reruns with --resume:
-// finished chains skip, the in-flight chain continues from its saved cursor. The two shared
-// floor series (g.feeFloor/g.kbFloor — bucketMetas adds EVERY chain's fee into the same
-// field, so no single chain may HSET them) divert into the checkpoints and are written once,
-// after the last chain. The checkpoint directory is cleared only then.
+//   · Without --recompute it is an EXTENSION: --to is derived — the store's oldest covered day
+//     (the first day holding g.ticks in the daily tier), partially covered, recomputed whole —
+//     and --from must be older. Everything older than that day is a disjoint record set, so no
+//     double count is possible (user, 2026-09-07: "without removing/duplicating data").
+//   · With --recompute both ends are given, --to at most yesterday, and every day in the span
+//     is rewritten whole from the records: the DATA FIX and the PARTIAL RELOAD (2026-09-07, found
+//     live: a sampler catch-up past the pager's cap accepts a gap, and the day then carries a
+//     measured-looking floor that reads as a crash). --chain=<prefix> narrows it to ONE chain's
+//     own m.<id>.* fields: the floors (every chain's sum), the global spine and u.cov are then
+//     left alone, and the summary says so.
+//   · WHAT ONE WALK WRITES for every day of the span: each catalog chain's m.<id>.snaps/fee/kb/
+//     blocks/gapSum/gapMax/ticks; each UNLISTED chain's the same, outside the floors (one walk —
+//     the separate --backfill-unlisted that used to follow an extension was forgotten twice);
+//     the global spine's g.ticks/anchors/blocks/gapSum/gapMax; the floors g.feeFloor/g.kbFloor,
+//     every catalog chain folded; and u.cov on every bucket of the span — ONLY when every unlisted
+//     chain in the pinned list was walked, else suppressed for the span and said. Never: f.*
+//     (the FLEET family has no historical record anywhere upstream; node counts, layers, make-ups,
+//     countries and providers begin the day their sampler shipped), today's buckets, any cron
+//     cursor, the lock.
+//   · NO SAMPLER LOCK, EVER. Nothing a fill writes is a field the cron still writes — provided the
+//     cron is past the span. The cron adds only records newer than its cursors, so a recompute
+//     collides with it only while a cursor's timestamp (gTs, mTs.<id>) is still inside the span:
+//     shortly after UTC midnight, or during a catch-up after an outage. The fill checks the
+//     cursors BEFORE it starts and refuses while any is inside (`cursorsInsideSpan`), naming the
+//     cursor, instead of holding a lock that pauses production for the whole run (the 6-hour lock
+//     of the old walks paused sampling twice in one day, 2026-10-26, and the FLEET gauges, read
+//     live only, lost those hours for good).
+//   · THE SPAN'S OLDEST EDGE KEEPS ITS GAP: a recompute reads one record older than --from on
+//     every chain and on the spine and threads the gap chain from it, so day --from keeps its
+//     cross-midnight gap. An extension's edge is a chain's genesis: no predecessor, no invented gap.
+//   · FINE GRAIN IS NEVER INVENTED BACKWARD: hourly and 5m fields exist for days ≥ TIER_SINCE
+//     (2025-07-01), pruned in one place (`flushFinal`, `tierExistsAt`); older days are daily alone.
 //
-// --backfill-gaps writes the per-network CONTINUITY series (m.{id}.gapSum/gapMax) and, since
-// 2026-10-08, the ANCHORING count (m.{id}.ticks) for history: the ordinary backfills never
-// kept record timestamps, so measuring gaps retroactively means re-walking each chain — but ONLY
-// the timestamps are collected, only those three fields are written (complete-day recomputations, HSET overwrite), TODAY is
-// excluded (the live sampler's accruing bucket must not be double-counted), and every other
-// field is untouched. It is the one mode that takes NO sampler lock (2026-10-26): its writes are
-// disjoint from the cron's, so production keeps sampling — the fleet gauges included — beside it.
+// CRASH SAFETY (2026-09-11 — an overnight recompute died at hour 13 with every write still queued
+// behind the last chain; nothing landed): each chain is walked newest→oldest from a crafted
+// explorer cursor at the span's newest day (`seekBoundary`), bucketed per page, its FINALIZED
+// buckets flushed as the walk passes them and the cursor plus the still-filling frontier
+// checkpointed to .rebuild-trends-ckpt/{net}/ every 500K records. A bucket is final once the
+// frontier sits two whole UTC days below it — only complete buckets ever reach the store (a
+// partial sum would read as a crash, rule 10); the frontier rides the checkpoint, never the store.
+// The two shared floor series (bucketMetas adds EVERY chain's fee into the same field, so no single
+// chain may HSET them) divert into the checkpoints and are written once, after the last chain; the
+// global spine walks LAST, so the coverage frontier (g.ticks, what /trends' leading trim reveals)
+// only advances over days every chain already holds — history appears complete or not at all.
+// A KILLED FILL RESUMES BY ITSELF: a start that finds a checkpoint for the same span continues it
+// (finished chains skip, the in-flight chain rides its saved cursor), a checkpoint for another
+// span refuses and names --fresh, which discards it. The span and the unlisted chain list are
+// PINNED in the checkpoint at the start and never re-derived: the pin wins over a store the
+// previous attempt already advanced. Every page read and every store write RIDES OUT A BLIP
+// (`retrying`, ~15 min of backoff — 2026-10-29: two walks of 50 minutes died in a write phase on
+// a Wi-Fi drop the pager would have survived).
 //
-// --recompute-from REPAIRS RECENT DAYS (2026-09-07, found live the day it was needed): a
-// sampler catch-up that runs past the pager's 600-record cap ACCEPTS a gap — honest, but the
-// affected day then carries a measured-looking floor that reads as a crash. This mode
-// recomputes every day from the given date through YESTERDAY (UTC) completely from the tip —
-// all chains, every tier overwritten whole, today's partial day and the cron cursor untouched.
-// Locally-driven stores need it after manual sampling; a production cron never should.
+// `rebuild --days=N` is the DISASTER PATH and the bootstrap of an EMPTY store (a fill needs
+// existing history to find its boundary): it takes the sampler lock, wipes t:{net}:* (never the
+// lock it holds), rebuilds N ≤ 400 days through today, sets the cron cursors to the newest
+// ordinals and marks unlisted coverage; the 15-min cron resumes from those cursors. The store's
+// write path is merge-based (add-series accumulate), so a rebuild over existing data would
+// double-count — wipe-and-rebuild is its only honest contract. `wipe` is the wipe alone. Both ask
+// before deleting (--yes answers; a non-interactive run without it refuses).
 //
-// --extend-to EXTENDS HISTORY BACKWARD WITHOUT WIPING (user, 2026-09-07: "without removing/
-// duplicating data"): everything strictly older than the store's oldest covered day is a
-// DISJOINT record set, so no double-count is possible — and the one boundary day (partial,
-// because the original cutoff landed mid-day) is recomputed COMPLETELY from its full records
-// and OVERWRITTEN, which replaces partial sums with complete ones. The walk does not re-page
-// from the tip: the explorer's `meta.next` cursor is a craftable {created_at, ordinal} token
-// (probed live — created_at is the record's own timestamp), so each chain seeks its boundary
-// by binary-searching the per-ordinal endpoint, then walks only the missing span. Writes go
-// to the DAILY tier alone — the hourly tier only serves the 7d/30d windows, which never reach
-// this far back — and the cron cursor is untouched (the extension is backward-only).
-// The SAME walk also yields the per-network continuity fields (user, 2026-09-09: every
-// metric the store holds, one walk): each chain's record timestamps fold into
-// m.{id}.gapSum/gapMax exactly as --backfill-gaps does, so an extension never needs a
-// second re-walk. The span's first record opens the chain (no invented gap at extend-to),
-// and the boundary day's gap fields are recomputed whole — now INCLUDING the cross-midnight
-// gap from the day before it, which the original forward-only gaps walk could not see.
-//
-// A rebuild ALWAYS wipes `t:{net}:*` first: the store's write path is merge-based (add-series
-// accumulate), so backfilling over existing data would double-count — wipe-and-rebuild is the
-// only honest contract, and the 15-min cron then resumes seamlessly from the cursor this tool
-// leaves behind (the newest backfilled ordinal per chain).
-//
-// HONESTY (rule 10): everything written here is a REAL record read from the explorer's indexer
-// — full fidelity, every record in the window, through the SAME bucketing/merge modules the live
-// sampler uses, so backfill and live writes cannot disagree. The one thing that cannot be
-// backfilled is the FLEET family: no historical node/geo records exist anywhere upstream, so
-// f.* series honestly begin at the first live sampler run after the rebuild.
+// HONESTY (rule 10): everything written here is a REAL record read from the explorer's indexer,
+// through the SAME bucketing/merge modules the live sampler uses (bucketing.ts, merge.ts), so a
+// fill and the live writes cannot disagree.
 //
 // Mechanics worth knowing:
 //  - The explorer pages by an opaque `meta.next` cursor (probed live 2026-09-06 — `?limit=&next=`
-//    walks newest→oldest; `offset` is silently ignored). ~330 B/record, 600/page: a 90-day
-//    rebuild is a few thousand requests, run sequentially per chain and a few chains in parallel.
-//  - Global records are day-chunked through bucketGlobals so the gap chain threads across chunks
-//    while the 5m coverage zero-fill stays bounded: 5m-tier fields older than the tier's own 48 h
-//    retention are pruned as we go instead of being written and left to expire.
-//  - The script holds the SAMPLER'S OWN LOCK for its whole run (cron runs skip meanwhile and
-//    self-heal after), so the store has exactly one writer and the write passes need no
-//    read-merge: chunked applyWrites transactions carry the folded IncMap.
+//    walks newest→oldest; `offset` is silently ignored). ~330 B/record, 600/page.
+//  - Global records are day-chunked through bucketGlobals so the gap chain threads across chunks.
+//  - A few chains walk at a time (FILL_POOL); the spine walks alone, last.
 import { readFileSync, writeFileSync, mkdirSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
@@ -102,51 +104,8 @@ function loadEnvLocal(): void {
   }
 }
 
-interface Args { net: "mainnet" | "integrationnet" | "testnet"; days: number; wipeOnly: boolean; extendToMs: number | null; recomputeFromMs: number | null; gapsFromMs: number | null; gapsFromChain: string | null; blocksFromMs: number | null; unlisted: boolean; resume: "no" | "yes" | "force" }
-function parseArgs(): Args {
-  const a: Args = { net: "mainnet", days: 90, wipeOnly: false, extendToMs: null, recomputeFromMs: null, gapsFromMs: null, gapsFromChain: null, blocksFromMs: null, unlisted: false, resume: "no" };
-  for (const arg of process.argv.slice(2)) {
-    if (arg === "--wipe-only") a.wipeOnly = true;
-    else if (arg === "--backfill-unlisted") a.unlisted = true;
-    else if (arg === "--resume") a.resume = "yes";
-    else if (arg === "--resume=force") a.resume = "force";
-    else if (arg.startsWith("--net=")) a.net = arg.slice(6) as Args["net"];
-    else if (arg.startsWith("--days=")) a.days = Number(arg.slice(7));
-    else if (arg.startsWith("--extend-to=")) {
-      const m = arg.slice(12).match(/^(\d{4})-(\d{2})-(\d{2})$/);
-      if (m) a.extendToMs = Date.UTC(+m[1], +m[2] - 1, +m[3]);
-      else { console.error("--extend-to wants YYYY-MM-DD (UTC)"); process.exit(1); }
-    }
-    else if (arg.startsWith("--recompute-from=")) {
-      const m = arg.slice(17).match(/^(\d{4})-(\d{2})-(\d{2})$/);
-      if (m) a.recomputeFromMs = Date.UTC(+m[1], +m[2] - 1, +m[3]);
-      else { console.error("--recompute-from wants YYYY-MM-DD (UTC)"); process.exit(1); }
-    }
-    else if (arg.startsWith("--backfill-blocks=")) {
-      const m = /^--backfill-blocks=(\d{4})-(\d{2})-(\d{2})$/.exec(arg);
-      if (m) a.blocksFromMs = Date.UTC(+m[1], +m[2] - 1, +m[3]);
-      else { console.error("--backfill-blocks wants YYYY-MM-DD (UTC)"); process.exit(1); }
-    }
-    else if (arg.startsWith("--backfill-gaps=")) {
-      const m = arg.slice(16).match(/^(\d{4})-(\d{2})-(\d{2})$/);
-      if (m) a.gapsFromMs = Date.UTC(+m[1], +m[2] - 1, +m[3]);
-      else { console.error("--backfill-gaps wants YYYY-MM-DD (UTC)"); process.exit(1); }
-    }
-    else if (arg.startsWith("--gaps-from-chain=")) a.gapsFromChain = arg.slice(18);
-    else { console.error(`unknown arg ${arg}`); process.exit(1); }
-  }
-  if (!["mainnet", "integrationnet", "testnet"].includes(a.net) || !(a.days > 0 && a.days <= 400)) {
-    console.error("usage: --net=... --days=1..400 [--wipe-only] [--extend-to=YYYY-MM-DD]");
-    process.exit(1);
-  }
-  if (a.gapsFromChain != null && a.gapsFromMs == null) { console.error("--gaps-from-chain needs --backfill-gaps"); process.exit(1); }
-  if (a.extendToMs != null && a.wipeOnly) { console.error("--extend-to and --wipe-only are exclusive"); process.exit(1); }
-  if (a.resume !== "no" && a.recomputeFromMs == null && a.extendToMs == null) {
-    console.error("--resume only applies to --recompute-from and --extend-to (the checkpointed walks)");
-    process.exit(1);
-  }
-  return a;
-}
+import { bucketWritable, coverageSuppressedBy, cursorsInsideSpan, FILL_POOL, parseCommand, resolveChain, seekBoundary, tierExistsAt, UsageError, type Command, type Parsed } from "../app/api/trends/fillPlan";
+
 
 // ---- the seekable cursor (probed live 2026-09-06/07): meta.next decodes to
 // {"created_at": <the record's own timestamp>, "ordinal": <hex ordinal>} — so a walk can be
@@ -172,41 +131,19 @@ async function probeCursorShape(base: string, expect: string): Promise<void> {
   const keys = Object.keys(decoded).sort().join(",");
   if (keys !== expect) throw new Error(`cursor probe: format drifted (${keys}, wanted ${expect}) — refusing to seek`);
 }
-/** Smallest ordinal whose record timestamp >= boundaryMs, by binary search over the
- *  per-ordinal endpoint; null when the whole chain predates nothing (genesis already at or
- *  after the boundary — nothing older to extend). */
-async function seekBoundary(
-  oneOf: (ordinal: number) => Promise<{ ordinal: number; timestamp: string; hash?: string } | null>,
-  tipOrdinal: number,
-  boundaryMs: number,
-): Promise<{ ordinal: number; timestamp: string; hash?: string } | null> {
-  let lo = 1;
-  let hi = tipOrdinal;
-  const first = await oneOf(1);
-  if (!first || Date.parse(first.timestamp) >= boundaryMs) return null; // chain born at/after the boundary
-  let best: { ordinal: number; timestamp: string; hash?: string } | null = null;
-  while (lo <= hi) {
-    const mid = Math.floor((lo + hi) / 2);
-    const rec = await oneOf(mid);
-    if (!rec) { hi = mid - 1; continue; } // unserved probe — tighten from above
-    if (Date.parse(rec.timestamp) >= boundaryMs) { best = rec; hi = mid - 1; }
-    else lo = mid + 1;
-  }
-  return best;
-}
-
 // ---- explorer paging (the probed `meta.next` cursor walk) ------------------------------------
 interface Page<T> { data?: T[]; meta?: { next?: string } }
-async function getPage<T>(url: string): Promise<Page<T>> {
-  // Backoff reaches ~15 min cumulative (21 attempts, 20s timeouts, waits capped at 30s): a multi-hour walk must survive a transient DNS or
-  // network blip (one killed a 3-hour gaps walk at 83%, 2026-09-08 — EAI_AGAIN) AND a short
-  // explorer outage (2026-10-26: 20s timeouts past the old ~1.5-min budget killed a 2025-07-01
-  // gaps walk seven hours in).
+/** RIDE OUT A BLIP. Backoff reaches ~15 min cumulative (21 attempts, waits capped at 30s): a
+ *  multi-hour walk must survive a transient DNS or network blip (one killed a 3-hour gaps walk
+ *  at 83%, 2026-09-08 — EAI_AGAIN) AND a short explorer outage (2026-10-26: 20s timeouts past
+ *  the old ~1.5-min budget killed a 2025-07-01 gaps walk seven hours in). ONE helper for the
+ *  explorer pages AND the store's writes (2026-10-29: two unlisted backfills walked every chain
+ *  for 50 minutes, then died in their write phase on a Wi-Fi drop — the pager retried, the
+ *  writes did not). HSET/EXPIRE set the fields they name, so a retried write is the same write. */
+async function retrying<T>(op: () => Promise<T>): Promise<T> {
   for (let attempt = 0; ; attempt++) {
     try {
-      const r = await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(20000) });
-      if (!r.ok) throw new Error(`${r.status}`);
-      return (await r.json()) as Page<T>;
+      return await op();
     } catch (e) {
       if (attempt >= 20) throw e;
       await new Promise((res) => setTimeout(res, Math.min(30000, 1000 * 2 ** attempt)));
@@ -214,14 +151,23 @@ async function getPage<T>(url: string): Promise<Page<T>> {
   }
 }
 
-/** Walk a chain newest→oldest until `cutoffMs`, streaming each page (newest-first) to `onPage`.
- *  `onPageEnd` (checkpointing) sees the NEXT page's cursor after each processed page — saving
- *  it and later resuming from it re-enters the walk exactly where it left off (server-issued
- *  tokens are exclusive). */
+async function getPage<T>(url: string): Promise<Page<T>> {
+  return retrying(async () => {
+    const r = await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(20000) });
+    if (!r.ok) throw new Error(`${r.status}`);
+    return (await r.json()) as Page<T>;
+  });
+}
+
+/** Walk a chain newest→oldest until `cutoffMs`, streaming each page (newest-first) to `onPage`,
+ *  with the page's records OLDER than the cutoff as `older` (newest-first; non-empty only on the
+ *  last page — the span's predecessors, which open its gap chain). `onPageEnd` (checkpointing)
+ *  sees the NEXT page's cursor after each processed page — saving it and later resuming from it
+ *  re-enters the walk exactly where it left off (server-issued tokens are exclusive). */
 async function walkChain<T extends { timestamp: string }>(
   base: string,
   cutoffMs: number,
-  onPage: (recs: T[]) => void,
+  onPage: (recs: T[], older: T[]) => void,
   label: string,
   startCursor?: string,
   onPageEnd?: (nextCursor: string) => Promise<void>,
@@ -232,9 +178,11 @@ async function walkChain<T extends { timestamp: string }>(
   for (;;) {
     const url = `${base}?limit=600${next ? `&next=${encodeURIComponent(next)}` : ""}`;
     const page = await getPage<T>(url);
-    const recs = (page.data ?? []).filter((r) => Date.parse(r.timestamp) >= cutoffMs);
+    const all = page.data ?? [];
+    const recs = all.filter((r) => Date.parse(r.timestamp) >= cutoffMs);
+    const older = all.filter((r) => Date.parse(r.timestamp) < cutoffMs);
     total += recs.length;
-    if (recs.length) onPage(recs);
+    if (recs.length || older.length) onPage(recs, older);
     pages++;
     if (pages % 25 === 0) process.stdout.write(`\r  ${label}: ${total} records (${pages} pages)…`);
     const nextCursor = page.meta?.next;
@@ -251,18 +199,25 @@ class Abort extends Error {}
 
 async function main(): Promise<void> {
   loadEnvLocal();
-  const { net, days, wipeOnly, extendToMs, recomputeFromMs, gapsFromMs, gapsFromChain, blocksFromMs, unlisted, resume } = parseArgs();
+  let parsed: Parsed;
+  try {
+    parsed = parseCommand(process.argv.slice(2));
+  } catch (e) {
+    if (e instanceof UsageError) { console.error(e.message); process.exit(1); }
+    throw e;
+  }
+  const { net, command } = parsed;
 
   // Deferred imports: store.ts reads env at construction, so env must be loaded first.
   const { Redis } = await import("@upstash/redis");
   const { NETWORKS, CATALOG } = await import("../src/engine/config");
   // Every address the catalog has EVER tracked — a re-registered network's retired chain keeps its
-  // days in the store, so a rebuild or recompute must walk it too (`src/net/lineage.ts`).
+  // days in the store, so a fill must walk it too (`src/net/lineage.ts`).
   const { lineageIds, untrackedIds } = await import("../src/net/lineage");
   const { fetchChainIds } = await import("../app/api/network/chainList");
-  const { TIER_SINCE } = await import("../src/data/trendWindow");
   const { TTL_S, slotOf, cursorKeyOf, lockKeyOf } = await import("../app/api/trends/keys");
-  const { bucketGlobals, bucketMetas, addInc, markUnlistedCoverage, finalDays, stampRun } = await import("../app/api/trends/bucketing");
+  const { TIER_SINCE } = await import("../src/data/trendWindow");
+  const { bucketGlobals, bucketMetas, addInc, markUnlistedCoverage } = await import("../app/api/trends/bucketing");
   const addIncGap = (inc: import("../app/api/trends/bucketing").IncMap, n: string, tsMs: number, id: string, gap: number) => {
     addInc(inc, n, tsMs, `m.${id}.gapSum`, gap);
     addInc(inc, n, tsMs, `m.${id}.gapMax`, gap);
@@ -278,52 +233,49 @@ async function main(): Promise<void> {
     token: process.env.UPSTASH_KV_REST_API_TOKEN!,
   });
 
-  // ⚠️ THE PRODUCTION CRON IS A CONCURRENT WRITER (review find, 2026-09-07 — this script
-  // used to claim sole-writer status it never enforced). Take the sampler's own lock for the
-  // whole run: cron runs skip while it's held (honest gaps, self-healed afterward), and the
-  // wipe below must never delete the lock key it is standing on. TTL 6 h, deliberately NOT
-  // refreshed by the multi-day walks (2026-09-11): their writes are disjoint from the cron's
-  // by construction — recompute stops at its pinned today-boundary, the extension writes only
-  // below the store's oldest day — so once the lock lapses the cron resumes live sampling
-  // (the fleet gauges return) while the walk keeps flushing history. Released in finally.
-  const lockStore = (await import("../app/api/trends/store")).writeStore();
-  // ⚠️ …EXCEPT --backfill-gaps AND --extend-to, WHICH RUN BESIDE THE CRON (2026-10-26 — the gaps
-  // walk's 6-hour lock paused production sampling twice in one day, and the FLEET gauges, read live
-  // only, lost those hours for good). Neither can collide: the gaps walk HSETs only
-  // gapSum/gapMax/ticks of whole days before its launch's UTC today, and the extension writes only
-  // days at or before the store's OLDEST covered day (its cursor untouched), while the cron writes
-  // only the buckets of NEW records (today's) — disjoint fields, and HSET sets only the fields it
-  // names. So they take no lock and release none.
-  const holdsLock = gapsFromMs == null && extendToMs == null;
+  /** rebuild / wipe ASK FIRST (header): what is about to be deleted is counted and shown; `yes` on
+   *  a terminal or --yes proceeds; a run with neither (a script, a cron), or an EOF at the prompt,
+   *  refuses rather than guesses. Runs BEFORE the sampler lock is taken (final review 4): a prompt
+   *  that waited with the lock held would pause production for as long as nobody answered. */
+  async function confirmDeletion(cmd: Extract<Command, { kind: "rebuild" | "wipe" }>): Promise<void> {
+    let count = 0;
+    let scan0 = "0";
+    do {
+      const [c, keys] = await retrying(() => redis.scan(scan0, { match: `t:${net}:*`, count: 200 }));
+      scan0 = String(c);
+      count += (keys as string[]).filter((k) => k !== lockKeyOf(net)).length;
+    } while (scan0 !== "0");
+    const what = cmd.kind === "wipe" ? "wipe" : `wipe and rebuild ${cmd.days} day(s) of`;
+    console.log(`about to ${what} t:${net}:* — ${count} key(s) will be DELETED (every tier, the cursors, the unlisted coverage).`);
+    if (cmd.yes) return;
+    if (!process.stdin.isTTY) { console.error("refusing: not a terminal and no --yes"); throw new Abort(); }
+    process.stdout.write("type yes to continue: ");
+    const answer = await new Promise<string>((resolve) => {
+      process.stdin.setEncoding("utf8");
+      process.stdin.once("data", (d) => resolve(String(d).trim()));
+      process.stdin.once("end", () => resolve("")); // EOF is "no"
+    });
+    process.stdin.pause();
+    if (answer !== "yes") { console.error("not confirmed — nothing deleted"); throw new Abort(); }
+  }
+
+  // ⚠️ THE PRODUCTION CRON IS A CONCURRENT WRITER (review find, 2026-09-07). A REBUILD takes the
+  // sampler's own lock for its whole run (cron runs skip meanwhile and self-heal after), and its
+  // wipe must never delete the lock key it is standing on. A FILL takes NO lock (header): its
+  // writes are disjoint from the cron's by construction, and the cursor pre-flight below refuses
+  // the one case where they would not be.
+  const lockStore = writeStore();
+  const holdsLock = command.kind !== "fill";
+  if (holdsLock) await confirmDeletion(command); // asks BEFORE the lock: a prompt must never pause the cron
   if (holdsLock && !(await lockStore.acquireLock(lockKeyOf(net), 21600))) {
-    // A killed walk leaves its lock standing (up to 6 h) — which would block its own
-    // --resume. Take it over ONLY on evidence: a resume was asked for, a checkpoint on disk
-    // proves a rebuild died mid-walk, and the TTL says rebuild-class lock (a cron run's
-    // lives ≤900 s — never stomp a live sampler write).
-    let hasCkpt = false;
-    try { hasCkpt = !!readFileSync(join(process.cwd(), ".rebuild-trends-ckpt", net, "_meta.json"), "utf8"); } catch { /* no checkpoint */ }
-    const ttl = await redis.ttl(lockKeyOf(net));
-    if (resume !== "no" && hasCkpt && ttl > 900) {
-      console.log(`taking over the killed run's sampler lock (${Math.round(ttl / 60)} min of TTL remained)`);
-      await lockStore.releaseLock(lockKeyOf(net));
-      if (!(await lockStore.acquireLock(lockKeyOf(net), 21600))) {
-        console.error("lock takeover lost a race — try again shortly");
-        process.exit(1);
-      }
-    } else {
-      console.error("the sampler lock is held (a cron run or another rebuild is writing) — try again shortly (a killed rebuild's lock expires on its own within 6 h)");
-      process.exit(1);
-    }
+    console.error("the sampler lock is held (a cron run or another rebuild is writing) — try again shortly (a killed rebuild's lock expires on its own within 6 h)");
+    process.exit(1);
   }
   // ⚠️ AN INTERRUPTED RUN RELEASES THE LOCK (2026-10-08 — a run killed by a shell timeout left its
   // 6-hour lock standing, and the production cron skipped every run until it was released by hand).
-  // `finally` does not run on a signal, so SIGINT/SIGTERM release it explicitly before exiting. A
-  // checkpointed walk resumes with --resume as before; nothing else holds the lock once it is gone.
+  // `finally` does not run on a signal, so SIGINT/SIGTERM release it explicitly before exiting. Only
+  // a REBUILD-CLASS lock is released (TTL > 900 s): a cron run's lives ≤ 900 s and is never stomped.
   let releasing = false;
-  // Only a REBUILD-CLASS lock is released (TTL > 900 s): a long walk lets its own 6-hour lock lapse
-  // and the cron re-takes it every 15 minutes, so an unconditional delete could remove a running
-  // cron's lock — the --resume takeover refuses exactly that, and so does this (the review). The
-  // release is bounded to 5 s; a second signal still exits at once (`once` restores the default).
   const releaseOnSignal = (sig: string, code: number) => {
     if (releasing) return;
     releasing = true;
@@ -340,17 +292,21 @@ async function main(): Promise<void> {
 
   const be0 = NETWORKS[net].be;
 
-  // ---- crash-safe walk machinery (2026-09-11) — shared by --recompute-from and --extend-to.
+  // ---- crash-safe walk machinery (2026-09-11) — the fill's walk, per chain and for the spine.
   // See CRASH SAFETY in the header. The finality margin is deliberately a full spare day
   // beyond the frontier's own: page streams are only loosely ordered, and a bucket flushed
   // early would be OVERWRITTEN with a fragment by a later round, not merged.
-  const store = writeStore();
+  // Every write of the walks retries like the pager (`retrying`): a blip in a write phase that
+  // runs for half an hour must not cost the walk before it.
+  const rawStore = writeStore();
+  const store = { ...rawStore, applyWrites: (w: Parameters<typeof rawStore.applyWrites>[0]) => retrying(() => rawStore.applyWrites(w)) };
   const CKPT_ROOT = join(process.cwd(), ".rebuild-trends-ckpt", net);
   const FLUSH_EVERY = 500_000; // records between flush+checkpoint rounds (user, 2026-09-11)
   const FLOOR_SERIES = new Set(["g.feeFloor", "g.kbFloor"]);
   type SerInc = [string, [string, number][]][];
-  interface ChainCkpt { done?: boolean; cursor?: string; records?: number; minTs?: number; residualInc?: SerInc; residualStamps?: number[]; residualGlobals?: GlobalRec[]; floors?: SerInc }
-  interface CkptMeta { mode: "recompute" | "extend"; fromMs: number; boundaryMs: number }
+  interface ChainCkpt { done?: boolean; skipped?: "no-cursor"; cursor?: string; records?: number; minTs?: number; residualInc?: SerInc; residualStamps?: number[]; residualGlobals?: GlobalRec[]; floors?: SerInc }
+  /** The fill's pin: its span, its mode and the unlisted chains it read at the start. */
+  interface FillMeta { mode: "fill"; fromMs: number; toMs: number; recompute: boolean; chain: string | null; unlisted: string[] }
   const serInc = (m: IncMap): SerInc => [...m.entries()].map(([k, f]) => [k, [...f.entries()]]);
   const deserInc = (s?: SerInc): IncMap => new Map((s ?? []).map(([k, f]) => [k, new Map(f)]));
   const addInto = (dst: IncMap, key: string, field: string, v: number): void => {
@@ -385,6 +341,10 @@ async function main(): Promise<void> {
     drain ? -Infinity : minTs === Infinity ? Infinity : dayFloor(minTs) + 2 * 86400000;
   /** HSET every bucket at/above `cutMs` out of `cinc` (retaining the younger rest for the
    *  next round), diverting shared floor fields into `cfloors` when given. */
+  /** The span's first day: no bucket before it is ever written (`bucketWritable`) — the predecessor
+   *  the walks read just below it must not become a zero-filled day of its own. -Infinity for a
+   *  rebuild, which has no span. */
+  let spanFromMs = -Infinity;
   const flushFinal = async (cinc: IncMap, cutMs: number, cfloors: IncMap | null): Promise<number> => {
     const fresh5m = TTL_S["5m"] == null ? "" : slotOf(net, "5m", Date.now() - TTL_S["5m"] * 1000).key;
     let written = 0;
@@ -393,9 +353,11 @@ async function main(): Promise<void> {
       const expired5m = tier === "5m" && key < fresh5m; // finite-era guard; inert under keep-forever
       const out: [string, number][] = [];
       for (const [field, v] of map) {
-        if (bucketStartOf(key, field) < cutMs) continue;
+        const start = bucketStartOf(key, field);
+        if (start < cutMs) continue;
         map.delete(field);
         if (expired5m) continue;
+        if (!bucketWritable(tier, start, spanFromMs)) continue; // not before the span; fine grain never invented backward
         if (cfloors && FLOOR_SERIES.has(seriesOf(field))) { addInto(cfloors, key, field, v); continue; }
         out.push([field, v]);
       }
@@ -407,43 +369,18 @@ async function main(): Promise<void> {
     }
     return written;
   };
-  /** Fresh runs refuse to trample an existing checkpoint; resumed runs must match it. A
-   *  recompute resumed across UTC midnight needs --resume=force (finished chains stop at the
-   *  old boundary) and a follow-up sweep for the seam. */
-  const ensureCkptMeta = (mode: CkptMeta["mode"], fromMs: number, boundaryMs: number): void => {
-    const existing = readJson<CkptMeta>("_meta");
-    if (resume === "no") {
-      if (existing) {
-        console.error(`a checkpoint exists in ${CKPT_ROOT} — pass --resume to continue it, or delete that directory to start over`);
-        throw new Abort();
-      }
-      writeJson("_meta", { mode, fromMs, boundaryMs } satisfies CkptMeta);
-      return;
-    }
-    if (!existing || existing.mode !== mode || existing.fromMs !== fromMs) {
-      console.error(`--resume: no matching checkpoint in ${CKPT_ROOT} (wanted ${mode} from ${new Date(fromMs).toISOString().slice(0, 10)})`);
-      throw new Abort();
-    }
-    if (existing.boundaryMs !== boundaryMs) {
-      const seam = new Date(existing.boundaryMs).toISOString().slice(0, 10);
-      if (resume !== "force") {
-        console.error(`--resume: UTC midnight passed since the checkpoint — finished chains stop at ${seam}. Pass --resume=force to continue (later chains reach further), then sweep the seam with --recompute-from=${seam}.`);
-        throw new Abort();
-      }
-      console.log(`  resuming across a day boundary — remember the follow-up sweep: --recompute-from=${seam}`);
-    }
-  };
   /** Day-chunk every buffered global at/above the cut through bucketGlobals (ascending, the
    *  gap chain threaded from the newest record below the cut — exactly the one-shot path's
    *  prevTs discipline) and return the residue. */
-  const finalizeGlobals = (buf: GlobalRec[], cutMs: number, cinc: IncMap): GlobalRec[] => {
+  const finalizeGlobals = (buf: GlobalRec[], cutMs: number, cinc: IncMap, pred: number | null): GlobalRec[] => {
     buf.sort((a, b) => a.ordinal - b.ordinal);
     let split = buf.length;
     while (split > 0 && Date.parse(buf[split - 1].timestamp) >= cutMs) split--;
     const final = buf.slice(split);
     const residual = buf.slice(0, split);
     if (final.length) {
-      let prevTs = residual.length ? Date.parse(residual[residual.length - 1].timestamp) : null;
+      // The span's oldest edge keeps its gap (header): the record just older than --from, else null.
+      let prevTs = residual.length ? Date.parse(residual[residual.length - 1].timestamp) : pred;
       let dayStart = 0;
       for (let i = 1; i <= final.length; i++) {
         const boundary = i === final.length ||
@@ -460,24 +397,30 @@ async function main(): Promise<void> {
   /** Crash-safe global-chain walk: buffer records, finalize whole days behind the frontier,
    *  flush, checkpoint the cursor. `upperMs` is exclusive (today for recompute, the boundary
    *  day's end for extend). */
-  const walkGlobalCkpt = async (floorMs: number, upperMs: number, seedCursor?: string): Promise<void> => {
-    const prev = resume !== "no" ? readJson<ChainCkpt>("global") : null;
-    if (prev?.done) { console.log("  global: complete in the checkpoint — skipped"); return; }
+  /** Answers the oldest global timestamp the list served (Infinity when it served none): the
+   *  explorer's LIST has a floor the per-ordinal endpoint does not (found 2026-10-30: nothing
+   *  older than 2025-05-20 pages, while ordinal 1 is 2022-09-28), and a fill must say when the
+   *  spine stopped short of the span rather than leave those days quietly uncovered. */
+  const walkGlobalCkpt = async (floorMs: number, upperMs: number, seedCursor?: string): Promise<number> => {
+    const prev = readJson<ChainCkpt>("global");
+    if (prev?.done) { console.log("  global: complete in the checkpoint — skipped"); return prev.minTs ?? -Infinity; }
     const cinc = deserInc(prev?.residualInc);
     let buf: GlobalRec[] = prev?.residualGlobals ?? [];
     let minTs = prev?.minTs ?? Infinity;
     let processed = prev?.records ?? 0;
     let sinceFlush = 0;
+    let pred: number | null = null; // the record just older than the span, seen on the last page
     const round = async (cursor: string | undefined, drain: boolean): Promise<void> => {
       const cut = cutOf(minTs, drain);
-      buf = finalizeGlobals(buf, cut, cinc);
+      buf = finalizeGlobals(buf, cut, cinc, drain ? pred : null);
       const n = await flushFinal(cinc, cut, null);
       writeJson("global", drain
-        ? { done: true, records: processed } satisfies ChainCkpt
+        ? { done: true, records: processed, minTs } satisfies ChainCkpt
         : { cursor, records: processed, minTs, residualInc: serInc(cinc), residualGlobals: buf } satisfies ChainCkpt);
       console.log(`\n  global: ${drain ? "done" : "checkpoint"} at ${processed} records — ${n} fields flushed`);
     };
-    await walkChain<GlobalRec & { timestamp: string }>(`${be0}/global-snapshots`, floorMs, (recs) => {
+    await walkChain<GlobalRec & { timestamp: string }>(`${be0}/global-snapshots`, floorMs, (recs, older) => {
+      for (const o of older) { const t = Date.parse(o.timestamp); if (pred == null || t > pred) pred = t; }
       for (const r of recs) {
         const t = Date.parse(r.timestamp);
         if (t >= upperMs) continue;
@@ -490,15 +433,17 @@ async function main(): Promise<void> {
       if (sinceFlush >= FLUSH_EVERY) { sinceFlush = 0; await round(cursor, false); }
     });
     await round(undefined, true);
+    return minTs;
   };
   /** Crash-safe metagraph-chain walk: bucket per page, fold the gaps that are final, flush,
    *  divert floors, checkpoint. Skips itself when the checkpoint says done. */
-  const walkMetaCkpt = async (id: string, floorMs: number, upperMs: number, seedCursor?: string): Promise<void> => {
+  const walkMetaCkpt = async (id: string, floorMs: number, upperMs: number, seedCursor: string | undefined, floors: boolean): Promise<void> => {
     const label = id.slice(0, 10);
-    const prev = resume !== "no" ? readJson<ChainCkpt>(label) : null;
+    const prev = readJson<ChainCkpt>(label);
     if (prev?.done) { console.log(`  ${label}: complete in the checkpoint — skipped`); return; }
     const cinc = deserInc(prev?.residualInc);
-    const cfloors = deserInc(prev?.floors);
+    const cfloors = floors ? deserInc(prev?.floors) : null; // an unlisted chain, or --chain: no floor share
+    let pred: number | null = null; // the record just older than the span, seen on the last page
     let stamps: number[] = prev?.residualStamps ?? [];
     let minTs = prev?.minTs ?? Infinity;
     let processed = prev?.records ?? 0;
@@ -509,9 +454,11 @@ async function main(): Promise<void> {
       const keep: number[] = [];
       for (let i = 0; i < stamps.length; i++) {
         // A gap belongs to the NEWER record of its pair, and every older partner is already
-        // collected (the walk descends) — so gaps at/above the cut are final. The span's
-        // oldest record opens the chain: no invented gap (i > 0), same as the one-shot path.
-        if (i > 0 && stamps[i] >= cut) addIncGap(cinc, net, stamps[i], id, Math.max(0, Math.round((stamps[i] - stamps[i - 1]) / 1000)));
+        // collected (the walk descends) — so gaps at/above the cut are final. The span's oldest
+        // record is measured from the predecessor just older than the span when the walk saw one
+        // (a recompute), else it opens the chain with no invented gap (an extension at genesis).
+        const before = i > 0 ? stamps[i - 1] : drain ? pred : null;
+        if (before != null && stamps[i] >= cut) addIncGap(cinc, net, stamps[i], id, Math.max(0, Math.round((stamps[i] - before) / 1000)));
         // ANCHORINGS (m.{id}.ticks — bucketMetas' note): a distinct stamp is one global tick.
         // The 2-day cut margin keeps every record of one tick on the same side of the cut.
         if (stamps[i] >= cut && (i === 0 || stamps[i] !== stamps[i - 1])) addInc(cinc, net, stamps[i], `m.${id}.ticks`, 1);
@@ -520,18 +467,19 @@ async function main(): Promise<void> {
       stamps = keep;
       const n = await flushFinal(cinc, cut, cfloors);
       writeJson(label, drain
-        ? { done: true, records: processed, floors: serInc(cfloors) } satisfies ChainCkpt
-        : { cursor, records: processed, minTs, residualInc: serInc(cinc), residualStamps: stamps, floors: serInc(cfloors) } satisfies ChainCkpt);
+        ? { done: true, records: processed, floors: serInc(cfloors ?? new Map()) } satisfies ChainCkpt
+        : { cursor, records: processed, minTs, residualInc: serInc(cinc), residualStamps: stamps, floors: serInc(cfloors ?? new Map()) } satisfies ChainCkpt);
       console.log(`\n  ${label}: ${drain ? "done" : "checkpoint"} at ${processed} records — ${n} fields flushed`);
     };
-    await walkChain<MetaRec & { timestamp: string }>(`${be0}/currency/${id}/snapshots`, floorMs, (recs) => {
+    await walkChain<MetaRec & { timestamp: string }>(`${be0}/currency/${id}/snapshots`, floorMs, (recs, older) => {
+      for (const o of older) { const t = Date.parse(o.timestamp); if (pred == null || t > pred) pred = t; }
       const w = recs.filter((r) => Date.parse(r.timestamp) < upperMs);
       for (const r of w) {
         const t = Date.parse(r.timestamp);
         stamps.push(t);
         if (t < minTs) minTs = t;
       }
-      bucketMetas(cinc, net, id, w.map((r) => ({ ordinal: r.ordinal, timestamp: r.timestamp, fee: r.fee, sizeInKB: r.sizeInKB, blocks: r.blocks })));
+      bucketMetas(cinc, net, id, w.map((r) => ({ ordinal: r.ordinal, timestamp: r.timestamp, fee: r.fee, sizeInKB: r.sizeInKB, blocks: r.blocks })), undefined, floors);
       processed += w.length;
       sinceFlush += w.length;
     }, label, prev?.cursor ?? seedCursor, async (cursor) => {
@@ -540,9 +488,9 @@ async function main(): Promise<void> {
     await round(undefined, true);
   };
   /** Merge every chain's diverted floor contributions and write them — meaningful only once
-   *  ALL chains are done (each adds into the same shared fields), which is why this runs
-   *  last and why the checkpoint directory is cleared only here. */
-  const writeFloorsAndFinish = async (ids: string[]): Promise<void> => {
+   *  ALL chains are done (each adds into the same shared fields), which is why this runs after
+   *  the last chain. The checkpoint directory is cleared by the fill itself, at its very end. */
+  const writeFloors = async (ids: string[]): Promise<void> => {
     const floors: IncMap = new Map();
     for (const id of ids) {
       for (const [key, fields] of readJson<ChainCkpt>(id.slice(0, 10))?.floors ?? []) {
@@ -550,324 +498,221 @@ async function main(): Promise<void> {
       }
     }
     const n = await flushFinal(floors, -Infinity, null);
-    rmSync(CKPT_ROOT, { recursive: true, force: true });
-    console.log(`  floors: ${n} shared fee/size fields written (every chain folded in); checkpoint cleared.`);
+    console.log(`  floors: ${n} shared fee/size fields written (every chain folded in).`);
   };
 
-  // ---- UNLISTED BACKFILL: the unlisted channels' own counts, and where they were measured ----
-  // (2026-10-08 — History's unlisted figure became MEASURED from their own chains, `u.cov` marking
-  // the buckets measured; before this walk every old bucket reads "not measured", never zero.)
-  // The unlisted chains are few and small, so each is walked WHOLE and written EXACT (HSET
-  // overwrite, never a merge), today included — the run holds the sampler lock, so no cron run
-  // interleaves — and each chain's cron CURSOR is set to its tip, or the next cron run would read
-  // the chain from genesis again and ADD it a second time. Coverage then goes on every bucket the
-  // store's spine covered (`g.ticks`), since every unlisted record of every one of them is now in.
-  if (unlisted) {
-    const tierOf = (key: string): Tier => key.split(":")[2] as Tier;
-    const ids = untrackedIds(net, await fetchChainIds(be0));
-    console.log(`backfilling ${ids.length} unlisted chain(s): ${ids.map((i) => i.slice(0, 10)).join(", ") || "none"} …`);
-    const inc: IncMap = new Map();
-    const cursorMap: Record<string, string | number> = {};
-    for (const id of ids) {
-      const recs: MetaRec[] = [];
-      await walkChain<MetaRec & { timestamp: string }>(`${be0}/currency/${id}/snapshots`, 0, (page) => {
-        for (const r of page) recs.push({ ordinal: r.ordinal, timestamp: r.timestamp, fee: r.fee, sizeInKB: r.sizeInKB, blocks: r.blocks });
-      }, id.slice(0, 10));
-      recs.sort((a, b) => a.ordinal - b.ordinal);
-      // Ordered, so the gap and anchoring counts are written too; outside the catalog floors.
-      bucketMetas(inc, net, id, recs, null, false);
-      const tip = recs[recs.length - 1];
-      if (tip) { cursorMap[`m.${id}`] = tip.ordinal; cursorMap[`mTs.${id}`] = Date.parse(tip.timestamp); }
-      console.log(`  ${id.slice(0, 10)}: ${recs.length} snapshot(s)`);
-    }
-    // Fine grain is never invented backward (TIER_SINCE): an old record keeps its daily bucket only.
-    const floor5m = slotOf(net, "5m", TIER_SINCE["5m"]).key;
-    const floor1h = slotOf(net, "1h", TIER_SINCE["1h"]).key;
-    for (const key of [...inc.keys()]) {
-      if ((tierOf(key) === "5m" && key < floor5m) || (tierOf(key) === "1h" && key < floor1h)) inc.delete(key);
-    }
-    // Coverage: every bucket of every stored key, up to now. Writing the marker where the spine
-    // has no `g.ticks` is harmless — the read side treats such a bucket as unmeasured whatever else
-    // it holds (assemble's coverage rule) — and it spares reading every stored hash: only the key
-    // NAMES are listed (the Upstash read-bandwidth watch item), the buckets are generated.
-    const nowMs = Date.now();
-    const unitStart = (unit: string): number => {
-      const [y, mo = "01", da = "01"] = unit.split("-");
-      return Date.UTC(+y, +mo - 1, +da);
-    };
-    const unitEnd = (tier: Tier, start: number): number => {
-      const d = new Date(start);
-      if (tier === "5m") return start + 86400000;
-      if (tier === "1h") return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1);
-      return Date.UTC(d.getUTCFullYear() + 1, 0, 1);
-    };
-    const STEP: Record<Tier, number> = { "5m": 300000, "1h": 3600000, "1d": 86400000 };
-    let scan = "0";
-    do {
-      const [c, keys]: [string, string[]] = await redis.scan(scan, { match: `t:${net}:*`, count: 200 });
-      scan = c;
-      for (const key of keys) {
-        const parts = key.split(":");
-        const tier = parts[2] as Tier;
-        if (parts.length !== 4 || !(tier in STEP)) continue; // the cursor and the lock are not tier keys
-        const start = unitStart(parts[3]!);
-        let m = inc.get(key);
-        if (!m) { m = new Map(); inc.set(key, m); }
-        for (let t = start; t < unitEnd(tier, start) && t <= nowMs; t += STEP[tier]) {
-          const slot = slotOf(net, tier, t);
-          if (slot.key === key) m.set(`${slot.bucket}|u.cov`, 0);
-        }
-      }
-    } while (scan !== "0");
-    let fields = 0;
-    for (const [key, map] of inc) {
-      const entries = [...map.entries()];
-      for (let i = 0; i < entries.length; i += 400) {
-        await store.applyWrites([{ key, map: Object.fromEntries(entries.slice(i, i + 400)), ttlS: TTL_S[tierOf(key)] }]);
-      }
-      fields += entries.length;
-    }
-    if (Object.keys(cursorMap).length) await store.applyWrites([{ key: cursorKeyOf(net), map: cursorMap, ttlS: null }]);
-    console.log(`  ${fields} fields written (exact), ${Object.keys(cursorMap).length / 2} cron cursor(s) set to the chains' tips.`);
-    return;
-  }
+  const isoDay = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
 
-  // ---- GAPS BACKFILL mode: per-network continuity history (see the header) ----
-  // ---- BLOCKS BACKFILL: per-network sealed-block counts from the chain's own records ----
-  // (2026-09-11 — m.{id}.blocks joined bucketMetas for the cron; history needs this walk
-  // once, or every covered old bucket would read "measured zero blocks", a fabrication.)
-  if (blocksFromMs != null) {
-    const todayStartMs = Math.floor(Date.now() / 86400000) * 86400000;
-    console.log(`backfilling per-network block counts ${new Date(blocksFromMs).toISOString().slice(0, 10)} → yesterday …`);
-    const tierOf = (key: string): Tier => key.split(":")[2] as Tier;
-    let fields = 0;
-    for (const id of lineageIds(net)) {
-      // Timestamps + block counts only — one field is all this mode may write. Each chain
-      // writes as soon as its walk ends (complete-day HSETs are idempotent), the gaps
-      // walk's crash rule.
-      const inc: IncMap = new Map();
-      await walkChain<{ timestamp: string; blocks?: unknown[] }>(`${NETWORKS[net].be}/currency/${id}/snapshots`, blocksFromMs, (recs) => {
-        for (const r of recs) {
-          const t = Date.parse(r.timestamp);
-          if (!(t < todayStartMs)) continue;
-          // Whole days only, and each tier only past its own birthdate (TIER_SINCE): the
-          // daily tier carries the deep history; fine grain is never invented backward.
-          const tiers: Tier[] = ["1d"];
-          if (t >= TIER_SINCE["1h"]) tiers.push("1h");
-          if (t >= TIER_SINCE["5m"]) tiers.push("5m");
-          addInc(inc, net, t, `m.${id}.blocks`, Array.isArray(r.blocks) ? r.blocks.length : 0, tiers);
-        }
-      }, id.slice(0, 10));
-      for (const [key, map] of inc) {
-        const entries = [...map.entries()];
-        for (let i = 0; i < entries.length; i += 400) {
-          await store.applyWrites([{ key, map: Object.fromEntries(entries.slice(i, i + 400)), ttlS: TTL_S[tierOf(key)] }]);
-        }
-        fields += entries.length;
-      }
-    }
-    console.log(`  ${fields} block fields; every other field and the cursor untouched.`);
-    return;
-  }
-
-  if (gapsFromMs != null) {
-    const todayStartMs = Math.floor(Date.now() / 86400000) * 86400000;
-    console.log(`backfilling per-network gap stats ${new Date(gapsFromMs).toISOString().slice(0, 10)} → yesterday …`);
-    const tierOf = (key: string): Tier => key.split(":")[2] as Tier;
-    // A null TTL means the tier keeps forever — the empty-string floor sorts below every key,
-      // so nothing is skipped (2026-09-10, the keep-forever flip).
-      const fresh5m = TTL_S["5m"] == null ? "" : slotOf(net, "5m", Date.now() - TTL_S["5m"] * 1000).key;
-    let fields = 0;
-    const writeInc = async (inc: IncMap) => {
-      for (const [key, map] of inc) {
-        const tier = tierOf(key);
-        if (tier === "5m" && key < fresh5m) continue;
-        const entries = [...map.entries()];
-        for (let i = 0; i < entries.length; i += 400) {
-          await store.applyWrites([{ key, map: Object.fromEntries(entries.slice(i, i + 400)), ttlS: TTL_S[tier] }]);
-        }
-        fields += entries.length;
-      }
-    };
-    // A batch of COMPLETE days as gap and anchoring fields (`stampRun` — the whole-chain arithmetic).
-    const writeRun = async (id: string, run: number[], pred: number | null) => {
-      if (!run.length) return;
-      const inc: IncMap = new Map();
-      stampRun(run, pred, (t, gap) => addIncGap(inc, net, t, id, gap), (t) => addInc(inc, net, t, `m.${id}.ticks`, 1));
-      await writeInc(inc);
-    };
-    // WRITTEN DAY BY DAY, RESUMABLE MID-CHAIN (2026-10-26 — user: "why save it in one go … to avoid
-    // it fails at the very end and you need to start all over?"; an explorer outage had already
-    // killed one 2025-07-01 run seven hours in). The walk runs newest→oldest, so each UTC day is
-    // complete once a stamp older than it arrives (`finalDays`) and is written then — HSET of whole
-    // days, idempotent on a replay. After each write the walk's place is CHECKPOINTED: the chain,
-    // the explorer's next-page cursor and the stamps of the day still being read. A rerun of the same
-    // `--backfill-gaps=` date picks the checkpoint up by itself and loses at most one day's pages.
-    // `--gaps-from-chain=<id prefix>` still starts at a named chain, from its tip (an unmatched prefix
-    // is an error, never a silent full run), and overrides a checkpoint.
-    const GAPS_CKPT = join(process.cwd(), ".rebuild-trends-ckpt", `gaps-${net}.json`);
-    interface GapsCkpt { fromMs: number; chain: string; cursor: string | null; pending: number[] }
-    const saveCkpt = (c: GapsCkpt) => {
-      mkdirSync(join(process.cwd(), ".rebuild-trends-ckpt"), { recursive: true });
-      writeFileSync(GAPS_CKPT + ".tmp", JSON.stringify(c));
-      renameSync(GAPS_CKPT + ".tmp", GAPS_CKPT); // atomic — a kill mid-write keeps the old file
-    };
-    let ckpt: GapsCkpt | null = null;
-    try { ckpt = JSON.parse(readFileSync(GAPS_CKPT, "utf8")) as GapsCkpt; } catch { /* none */ }
-    if (ckpt && ckpt.fromMs !== gapsFromMs) {
-      console.error(`a gaps checkpoint from ${new Date(ckpt.fromMs).toISOString().slice(0, 10)} exists (${GAPS_CKPT}) — rerun with that date to resume, or delete it to start over`);
-      process.exit(1);
-    }
-    let ids = lineageIds(net);
-    if (gapsFromChain != null) {
-      const at = ids.findIndex((id) => id.startsWith(gapsFromChain));
-      if (at < 0) { console.error(`--gaps-from-chain: no chain starts with ${gapsFromChain}`); process.exit(1); }
-      console.log(`  starting at ${ids[at]!.slice(0, 10)} — skipping ${at} chain(s)`);
-      ids = ids.slice(at);
-      ckpt = null;
-    } else if (ckpt) {
-      const at = ids.indexOf(ckpt.chain);
-      if (at < 0) { console.error(`the gaps checkpoint names ${ckpt.chain}, which the catalog no longer lists`); process.exit(1); }
-      console.log(`  resuming the checkpoint at ${ckpt.chain.slice(0, 10)}${ckpt.cursor ? " mid-chain" : ""} — skipping ${at} chain(s) already written`);
-      ids = ids.slice(at);
-    }
-    for (const id of ids) {
-      const resumed = ckpt && ckpt.chain === id ? ckpt : null;
-      let pending: number[] = resumed ? [...resumed.pending] : [];
-      saveCkpt({ fromMs: gapsFromMs, chain: id, cursor: resumed?.cursor ?? null, pending });
-      await walkChain<{ timestamp: string }>(
-        `${NETWORKS[net].be}/currency/${id}/snapshots`,
-        gapsFromMs,
-        (recs) => {
-          for (const r of recs) {
-            const t = Date.parse(r.timestamp);
-            if (t < todayStartMs) pending.push(t);
-          }
-        },
-        id.slice(0, 10),
-        resumed?.cursor ?? undefined,
-        async (nextCursor) => {
-          const { batch, pred, rest } = finalDays(pending);
-          if (!batch.length) return;
-          await writeRun(id, batch, pred);
-          pending = rest;
-          saveCkpt({ fromMs: gapsFromMs, chain: id, cursor: nextCursor, pending });
-        },
-      );
-      // The walk's oldest day: its first stamp opens the window, with no gap before it.
-      await writeRun(id, pending.sort((a, b) => a - b), null);
-      const next = ids[ids.indexOf(id) + 1];
-      if (next) saveCkpt({ fromMs: gapsFromMs, chain: next, cursor: null, pending: [] });
-      ckpt = null;
-    }
-    rmSync(GAPS_CKPT, { force: true });
-    console.log(`  ${fields} gap fields; every other field and the cursor untouched.`);
-    return;
-  }
-
-  // ---- RECOMPUTE mode: repair recent days whole, crash-safely (see the header) ----
-  if (recomputeFromMs != null) {
+  // ---- FILL: one walk that completes a span of days (header) ----
+  if (command.kind === "fill") {
+    const { fromMs, recompute, chain: chainPrefix, fresh, dryRun } = command;
     const todayStartMs = dayFloor(Date.now());
-    if (recomputeFromMs >= todayStartMs) { console.error("recompute-from must be before today (UTC)"); throw new Abort(); }
-    ensureCkptMeta("recompute", recomputeFromMs, todayStartMs);
-    console.log(`recomputing ${new Date(recomputeFromMs).toISOString().slice(0, 10)} → yesterday, whole days, from the tip (all tiers; flush + checkpoint every ${FLUSH_EVERY / 1000}K records${resume !== "no" ? "; resuming" : ""}) …`);
-    await walkGlobalCkpt(recomputeFromMs, todayStartMs);
-    const ids = lineageIds(net);
-    for (const id of ids) await walkMetaCkpt(id, recomputeFromMs, todayStartMs);
-    await writeFloorsAndFinish(ids);
-    console.log("  every affected tier repaired; cursor untouched.");
-    return;
-  }
+    // --fresh ignores the standing checkpoint here and deletes it only once this fill really starts
+    // (after the pre-flight, never in a dry run — final review 5: a preview must not discard a
+    // day-long walk's progress).
+    const pinned = fresh ? null : readJson<FillMeta>("_meta");
 
-  // ---- EXTEND mode: backward-only, wipeless, crash-safe (see the header) ----
-  if (extendToMs != null) {
-    // The store's oldest covered day is the overwrite boundary, derived ONCE and pinned in
-    // the checkpoint. The global spine flushes progressively and walks LAST, precisely so
-    // the store's g.ticks frontier (which IS this boundary detector, and what /trends'
-    // leading trim reveals) only ever advances over days every metagraph already covers —
-    // history appears complete or not at all. A resumed run must therefore trust the pin,
-    // never a re-scan of a store the previous attempt already extended.
-    let d1StartMs: number;
-    if (resume !== "no") {
-      const m = readJson<CkptMeta>("_meta");
-      if (!m || m.mode !== "extend" || m.fromMs !== extendToMs) {
-        console.error(`--resume: no matching extend checkpoint in ${CKPT_ROOT}`);
+    // THE SPAN. An extension derives --to from the store: its oldest covered day, recomputed whole.
+    // A recompute is given both ends. Pinned once; a resume trusts the pin over the store.
+    let toMs: number;
+    if (pinned) {
+      if (pinned.mode !== "fill" || pinned.toMs == null || pinned.fromMs !== fromMs || pinned.recompute !== recompute || pinned.chain !== chainPrefix || (command.toMs != null && pinned.toMs !== command.toMs)) {
+        const was = pinned.mode === "fill" && pinned.toMs != null ? `${isoDay(pinned.fromMs)} → ${isoDay(pinned.toMs)}${pinned.recompute ? " --recompute" : ""}${pinned.chain ? ` --chain=${pinned.chain}` : ""}` : "an older walk's";
+        console.error(`a checkpoint for another fill stands in ${CKPT_ROOT} (${was}) — rerun that fill to finish it, or pass --fresh to discard it`);
         throw new Abort();
       }
-      d1StartMs = m.boundaryMs;
-      console.log(`resuming the extension to ${new Date(extendToMs).toISOString().slice(0, 10)} (boundary pinned at ${new Date(d1StartMs).toISOString().slice(0, 10)})`);
+      toMs = pinned.toMs;
+      console.log(`resuming the fill ${isoDay(fromMs)} → ${isoDay(toMs)}${recompute ? " (--recompute)" : ""}`);
+    } else if (recompute) {
+      toMs = command.toMs!;
+      if (toMs >= todayStartMs) { console.error(`fill --recompute: --to must be at most yesterday (${isoDay(todayStartMs - 86400000)}) — today is the cron's`); throw new Abort(); }
     } else {
-      // Scanned across every year hash from the extend target to now — an extension may
-      // cross year boundaries.
-      let oldest: { year: number; d: string } | null = null;
-      for (let y = new Date(extendToMs).getUTCFullYear(); y <= new Date().getUTCFullYear(); y++) {
-        const dayHash = (await redis.hgetall<Record<string, string>>(`t:${net}:1d:${y}`)) ?? {};
+      // Scanned across every year hash from --from to now — a span may cross year boundaries.
+      let oldest: number | null = null;
+      for (let y = new Date(fromMs).getUTCFullYear(); y <= new Date().getUTCFullYear(); y++) {
+        const dayHash = (await retrying(() => redis.hgetall<Record<string, string>>(`t:${net}:1d:${y}`))) ?? {};
         const covered = Object.keys(dayHash).filter((f) => f.endsWith("|g.ticks")).map((f) => f.slice(0, 5)).sort();
-        if (covered.length) { oldest = { year: y, d: covered[0] }; break; }
+        if (covered.length) { oldest = Date.UTC(y, +covered[0]!.slice(0, 2) - 1, +covered[0]!.slice(3)); break; }
       }
-      if (!oldest) {
-        console.error("extend: no covered days found in the daily tier — extending needs existing history (run a plain --days rebuild first, or check --net)");
-        throw new Abort();
+      if (oldest == null) { console.error("fill: the store holds no covered day — an empty store is bootstrapped by `rebuild --days=N`, and a fill extends it from there"); throw new Abort(); }
+      if (fromMs >= oldest) { console.error(`fill: the store already reaches ${isoDay(oldest)} — ${isoDay(fromMs)} is covered; add --to=… --recompute to rewrite covered days`); throw new Abort(); }
+      toMs = oldest;
+    }
+    const spanEndMs = toMs + 86400000; // exclusive
+    spanFromMs = fromMs;
+
+    // THE CHAINS: every catalog chain and every unlisted chain (one walk), or the one --chain.
+    const catalog = lineageIds(net);
+    const unlistedList = pinned?.unlisted ?? untrackedIds(net, await retrying(() => fetchChainIds(be0)));
+    const unlistedSet = new Set(unlistedList);
+    let ids = [...catalog, ...unlistedList.filter((id) => !catalog.includes(id))];
+    let only: string | null = null;
+    if (chainPrefix != null) {
+      const r = resolveChain(chainPrefix, ids);
+      if ("error" in r) { console.error(`fill: ${r.error}`); throw new Abort(); }
+      only = r.id;
+      ids = [only];
+    }
+    const withSpine = only == null;
+    const withFloors = only == null;
+    const withCoverage = only == null;
+
+    // THE CURSOR PRE-FLIGHT (header): refuse while the cron is still inside the span. A cursor
+    // inside the span is only a candidate: a DORMANT chain's cursor sits at its own tip forever
+    // (found on the first dry run — an unlisted chain last seen 2024-06-19), and the cron has
+    // nothing to add there. So each candidate is compared with its chain's tip: caught up (the
+    // tip's ordinal is the cursor's) is past the span; anything newer upstream is not.
+    const cur = (await retrying(() => redis.hgetall<Record<string, string>>(cursorKeyOf(net)))) ?? {};
+    const candidates = cursorsInsideSpan(cur, ids, spanEndMs, withSpine);
+    const stillInside: string[] = [];
+    for (const name of candidates) {
+      const list = name === "gTs" ? `${be0}/global-snapshots` : `${be0}/currency/${name.slice(4)}/snapshots`;
+      const ordKey = name === "gTs" ? "g" : `m.${name.slice(4)}`;
+      const tipOrd = (await getPage<{ ordinal: number }>(`${list}?limit=1`)).data?.[0]?.ordinal;
+      if (tipOrd != null && tipOrd > Number(cur[ordKey] ?? 0)) stillInside.push(name);
+    }
+    if (stillInside.length) {
+      const at = (n: string) => new Date(Number(cur[n])).toISOString().slice(0, 19) + "Z";
+      console.error(`fill: the sampler has not finished ${isoDay(toMs)} yet — cursor ${stillInside[0]} is at ${at(stillInside[0]!)}${stillInside.length > 1 ? ` (and ${stillInside.length - 1} more)` : ""}; rerun once it passes`);
+      throw new Abort();
+    }
+
+    const tiers = (["1d", "1h", "5m"] as const).filter((t) => tierExistsAt(t, spanEndMs - 1));
+    /** The global spine's seek and the list-floor probe: the crafted cursor at the span's end, and
+     *  whether the list serves anything at or below it (one page). Null seed: nothing to walk. */
+    const seekSpine = async (): Promise<{ seed: string | undefined; listServes: boolean } | null> => {
+      const sk = await seekBoundary(
+        async (o) => ((await getPage<never>(`${be0}/global-snapshots/${o}`)) as unknown as { data?: { ordinal: number; timestamp: string } }).data ?? null,
+        Number(cur.g ?? 0) || 1,
+        spanEndMs,
+      );
+      if (sk.kind === "born-after") return null;
+      if (sk.kind === "all-older") return { seed: undefined, listServes: true }; // every global is older: walk from the tip
+      const seed = craftGlobalCursor(sk.record.timestamp, sk.record.ordinal);
+      const probe = await getPage<{ timestamp: string }>(`${be0}/global-snapshots?limit=1&next=${encodeURIComponent(seed)}`);
+      return { seed, listServes: (probe.data ?? []).length > 0 };
+    };
+    const spineFloorNote = (oldestServedMs: number): string | null =>
+      oldestServedMs === Infinity
+        ? `the explorer's global list serves NOTHING at or below ${isoDay(toMs)}: the spine cannot be filled for this span, so these days stay uncovered (History trims by g.ticks) — the per-ordinal endpoint still has them, which a fill does not use`
+        : oldestServedMs > fromMs + 86400000
+          ? `the explorer's global list ends at ${isoDay(oldestServedMs)}: the spine covers ${isoDay(oldestServedMs)} → ${isoDay(toMs)} only, and ${isoDay(fromMs)} → ${isoDay(oldestServedMs - 86400000)} stays uncovered (History trims by g.ticks)`
+          : null;
+    const summary = `${isoDay(fromMs)} → ${isoDay(toMs)}${recompute ? " --recompute" : " (extension)"}${only ? ` --chain=${only.slice(0, 10)}` : ""}`;
+    if (dryRun) {
+      console.log(`fill ${net} ${summary} — dry run, nothing written`);
+      console.log(`  chains: ${ids.length} (${catalog.filter((c) => ids.includes(c)).length} catalog, ${ids.filter((c) => unlistedSet.has(c)).length} unlisted)${withSpine ? " + the global spine" : ""}`);
+      console.log(`  tiers: ${tiers.join(", ")} (hourly and 5m from ${isoDay(TIER_SINCE["1h"])})`);
+      console.log(`  floors: ${withFloors ? "every catalog chain folded, written after the last chain" : "untouched (--chain)"}; u.cov: ${withCoverage ? "every bucket of the span, unless an unlisted chain is skipped" : "untouched (--chain)"}`);
+      console.log(`  lock: none (cursors past the span: ${withSpine ? "gTs, " : ""}${ids.length} chain cursor(s) checked${candidates.length ? `; ${candidates.length} dormant at their tip` : ""})`);
+      if (withSpine) {
+        const sp = await seekSpine();
+        console.log(`  spine: ${!sp ? "no global at or after the span's end — nothing to walk" : sp.listServes ? "the list serves the span's end; how far down it reaches shows as the walk runs" : "⚠️ " + spineFloorNote(Infinity)}`);
       }
-      d1StartMs = Date.UTC(oldest.year, +oldest.d.slice(0, 2) - 1, +oldest.d.slice(3)) + 86400000;
-      if (extendToMs >= d1StartMs) {
-        console.error(`extend: the store already reaches ${oldest.year}-${oldest.d} — nothing to extend to ${new Date(extendToMs).toISOString().slice(0, 10)}`);
-        throw new Abort();
-      }
-      ensureCkptMeta("extend", extendToMs, d1StartMs);
-      console.log(`extending ${new Date(extendToMs).toISOString().slice(0, 10)} → ${oldest.year}-${oldest.d} (boundary day recomputed whole; all tiers; metagraphs first, the global spine last; flush + checkpoint every ${FLUSH_EVERY / 1000}K records)`);
+      console.log(`  checkpoint: ${pinned ? "resuming" : "fresh"} in ${CKPT_ROOT}`);
+      return;
+    }
+    if (!pinned) {
+      if (fresh) rmSync(CKPT_ROOT, { recursive: true, force: true });
+      writeJson("_meta", { mode: "fill", fromMs, toMs, recompute, chain: chainPrefix, unlisted: unlistedList } satisfies FillMeta);
+      console.log(`fill ${net} ${summary}: ${ids.length} chain(s)${withSpine ? " + the global spine" : ""}, tiers ${tiers.join("/")}, no lock (flush + checkpoint every ${FLUSH_EVERY / 1000}K records)`);
     }
 
     await probeCursorShape(`${be0}/global-snapshots`, "created_at,ordinal");
     const anyMeta = CATALOG[net].find((m) => m.id)?.id;
     if (anyMeta) await probeCursorShape(`${be0}/currency/${anyMeta}/snapshots`, "hash");
-    const cur = (await redis.hgetall<Record<string, string>>(cursorKeyOf(net))) ?? {};
 
-    // Metagraphs: per-chain seek + crash-safe walk. A chain born after the boundary skips
-    // (recorded done, so a resume never re-seeks it). Crafted cursors land ON their record —
-    // walkMetaCkpt's upper filter keeps only what is strictly before the boundary.
-    const ids = lineageIds(net);
-    for (const id of ids) {
+    // Chains, a few at a time: per-chain seek + crash-safe walk. A chain with no cursor in the
+    // store is skipped (recorded done, so a resume never re-seeks it); an unlisted one skipped this
+    // way suppresses the span's coverage marker (rule 10: "measured, none" must be true of every
+    // unlisted chain). Crafted cursors land ON their record — walkMetaCkpt's upper filter keeps
+    // only what is strictly before the span's end.
+    const fillChain = async (id: string): Promise<void> => {
       const label = id.slice(0, 10);
-      const prev = resume !== "no" ? readJson<ChainCkpt>(label) : null;
-      if (prev?.done) { console.log(`  ${label}: complete in the checkpoint — skipped`); continue; }
+      const prev = readJson<ChainCkpt>(label);
+      if (prev?.done) { console.log(`  ${label}: complete in the checkpoint — skipped`); return; }
       let seed: string | undefined;
       if (!prev?.cursor) {
         const tip = Number(cur[`m.${id}`] ?? 0);
-        if (!tip) { console.log(`  ${label}: no cursor — skipped (chain unseen by the store)`); writeJson(label, { done: true } satisfies ChainCkpt); continue; }
-        const bnd = await seekBoundary(
-          // No catch: getPage already retried — a persistent probe failure ABORTS the run
-          // instead of reading as "born at the boundary".
+        if (!tip) {
+          console.log(`  ${label}: no cursor — skipped (chain unseen by the store)`);
+          writeJson(label, { done: true, skipped: "no-cursor" } satisfies ChainCkpt); // persisted: a resume must remember it
+          return;
+        }
+        const sk = await seekBoundary(
+          // No catch: getPage already retried — a persistent probe failure ABORTS the run instead
+          // of reading as "born at the boundary".
           async (o) => ((await getPage<never>(`${be0}/currency/${id}/snapshots/${o}`)) as unknown as { data?: { ordinal: number; timestamp: string; hash?: string } }).data ?? null,
           tip,
-          d1StartMs,
+          spanEndMs,
         );
-        if (!bnd) { console.log(`  ${label}: born at/after the boundary — nothing older`); writeJson(label, { done: true } satisfies ChainCkpt); continue; }
-        if (!bnd.hash) { console.error(`  ${label}: boundary record has no hash — cannot seek`); throw new Abort(); }
-        seed = craftCurrencyCursor(bnd.hash);
+        if (sk.kind === "born-after") { console.log(`  ${label}: born at/after the span's end — nothing to fill`); writeJson(label, { done: true } satisfies ChainCkpt); return; }
+        if (sk.kind === "at") {
+          if (!sk.record.hash) { console.error(`  ${label}: boundary record has no hash — cannot seek`); throw new Abort(); }
+          seed = craftCurrencyCursor(sk.record.hash);
+        } else console.log(`  ${label}: quiet since before the span's end — walked from its tip`);
       }
-      await walkMetaCkpt(id, extendToMs, d1StartMs, seed);
-    }
+      await walkMetaCkpt(id, fromMs, spanEndMs, seed, withFloors && !unlistedSet.has(id));
+    };
+    for (let i = 0; i < ids.length; i += FILL_POOL) await Promise.all(ids.slice(i, i + FILL_POOL).map(fillChain));
 
-    // The global spine, LAST (see above). A resume rides its saved cursor; only a fresh
-    // start seeks the boundary.
-    const prevG = resume !== "no" ? readJson<ChainCkpt>("global") : null;
-    let seedG: string | undefined;
-    if (!prevG?.done && !prevG?.cursor) {
-      const gBoundary = await seekBoundary(
-        async (o) => ((await getPage<never>(`${be0}/global-snapshots/${o}`)) as unknown as { data?: { ordinal: number; timestamp: string } }).data ?? null,
-        Number(cur.g ?? 0) || 1,
-        d1StartMs,
-      );
-      if (!gBoundary) { console.error("extend: could not seek the global boundary"); throw new Abort(); }
-      seedG = craftGlobalCursor(gBoundary.timestamp, gBoundary.ordinal);
+    // The global spine, LAST (header). A resume rides its saved cursor; only a fresh start seeks —
+    // and probes the list floor first, so a span the list cannot serve is said, not walked.
+    let spineNote: string | null = null;
+    if (withSpine) {
+      const prevG = readJson<ChainCkpt>("global");
+      let seedG: string | undefined;
+      let walk = true;
+      if (!prevG?.done && !prevG?.cursor) {
+        const sp = await seekSpine();
+        if (!sp) { console.error("fill: could not seek the global boundary"); throw new Abort(); }
+        if (!sp.listServes) {
+          spineNote = spineFloorNote(Infinity);
+          console.log(`  global: ⚠️ ${spineNote}`);
+          writeJson("global", { done: true, records: 0, minTs: Infinity } satisfies ChainCkpt);
+          walk = false;
+        }
+        seedG = sp.seed;
+      }
+      if (walk) spineNote = spineFloorNote(await walkGlobalCkpt(fromMs, spanEndMs, seedG));
     }
-    await walkGlobalCkpt(extendToMs, d1StartMs, seedG);
-    await writeFloorsAndFinish(ids);
-    console.log("  extension complete; cursor untouched — the cron never noticed.");
+    if (withFloors) await writeFloors(catalog);
+
+    // u.cov: every bucket of the span, generated (the unlisted chains were walked for these days) —
+    // unless one was skipped, read from the CHECKPOINTS so a resume remembers it (final review 3).
+    const suppressedBy = coverageSuppressedBy(unlistedList, (label) => readJson<ChainCkpt>(label));
+    let covFields = 0;
+    if (withCoverage && suppressedBy == null) {
+      const inc: IncMap = new Map();
+      const STEP: Record<Tier, number> = { "5m": 300000, "1h": 3600000, "1d": 86400000 };
+      for (const tier of tiers) {
+        for (let t = fromMs; t < spanEndMs; t += STEP[tier]) {
+          if (!tierExistsAt(tier, t)) continue;
+          const slot = slotOf(net, tier, t);
+          let m = inc.get(slot.key);
+          if (!m) { m = new Map(); inc.set(slot.key, m); }
+          m.set(`${slot.bucket}|u.cov`, 0);
+        }
+      }
+      for (const [key, map] of inc) {
+        const entries = [...map.entries()];
+        for (let i = 0; i < entries.length; i += 400) {
+          await store.applyWrites([{ key, map: Object.fromEntries(entries.slice(i, i + 400)), ttlS: TTL_S[key.split(":")[2] as Tier] }]);
+        }
+        covFields += entries.length;
+      }
+    }
+    rmSync(CKPT_ROOT, { recursive: true, force: true });
+    const notes = [
+      only ? "floors, spine and u.cov untouched (--chain)" : null,
+      suppressedBy ? `coverage NOT marked — unlisted chain ${suppressedBy} was skipped, so the span's unlisted figure stays "not measured"` : null,
+      spineNote ? `⚠️ ${spineNote}` : null,
+    ].filter(Boolean);
+    console.log(`filled ${summary}: ${ids.length} chain(s) (${ids.filter((c) => unlistedSet.has(c)).length} unlisted)${withSpine ? ", the global spine" : ""}${withFloors ? ", the floors" : ""}${covFields ? `, ${covFields} coverage fields` : ""}${notes.length ? ` — ${notes.join("; ")}` : ""}; cursor untouched, checkpoint cleared.`);
     return;
   }
 
+  // ---- REBUILD / WIPE: the disaster path (header); confirmed above, before the lock ----
   // ---- wipe: SCAN t:{net}:* and delete — the rebuild contract's first half ----
   console.log(`wiping t:${net}:* …`);
   let cursor = "0";
@@ -882,7 +727,8 @@ async function main(): Promise<void> {
     }
   } while (cursor !== "0");
   console.log(`  wiped ${wiped} keys`);
-  if (wipeOnly) return;
+  if (command.kind === "wipe") return;
+  const { days } = command;
 
   const be = NETWORKS[net].be;
   const now = Date.now();

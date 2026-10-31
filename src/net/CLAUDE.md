@@ -38,7 +38,7 @@ home** that turns that into answers, and its test is the specification:
   `foldLineage` merges the former addresses' series into the current one's ON THE READ PATH
   (`app/api/trends/assemble.ts`), so every chart shows the network's whole life. The 15-minute
   sampler tracks current ids only (a retired chain produces nothing); `scripts/rebuild-trends.ts`
-  walks `lineageIds`, so a rebuild keeps the retired chains' days.
+  walks `lineageIds`, so a fill or a rebuild keeps the retired chains' days.
 - **Server routes** — the exact-read decode and the per-chain snapshot route accept former
   addresses.
 

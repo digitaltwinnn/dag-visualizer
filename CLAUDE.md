@@ -521,7 +521,7 @@ serves the notes already cached and answers a miss with no card, so its visitors
 from unmerged code, spend the model's quota or count into production's note stats. Deploys and downtime self-heal:
 the cursor lives in Redis, and the next production run catches up to 30K records per chain (~a day
 of the busiest chain) with no hole; beyond that the gap is accepted and
-`scripts/rebuild-trends.ts --recompute-from` repairs the affected days.
+`scripts/rebuild-trends.ts fill --from=<day> --to=<day> --recompute` repairs the affected days.
 
 ⚠️ **The store is shared by every deployment, so a change to WHAT IS STORED ships reader first**
 (learned 2026-10-08). A backfill run from a branch wrote new fields the deployed code then

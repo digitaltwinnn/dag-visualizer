@@ -136,7 +136,7 @@ export function monthlySum(data: TrendsWindowData): TrendsWindowData {
 // era that is measured perfectly well one tier up.
 export const TIER_SINCE: Record<"5m" | "1h", number> = {
   // ONE floor for both fine tiers since the 2026-09-11 clean-sheet walk (rebuild-trends
-  // --recompute-from=2025-07-01, then --extend-to): it rebuilds 5m AND hourly back to the
+  // --recompute-from=2025-07-01, then --extend-to — today's `fill`): it rebuilds 5m AND hourly back to the
   // start of the store's fine-history era. While a walk is still filling, a fine range may
   // transiently read sparse — the walk's progressive flush closes it from the newest days
   // backward; the floors moved ahead of the walk by decision (user, 2026-09-11).
