@@ -319,3 +319,10 @@ describe("subject notes live on their cards", () => {
     expect(read("components/notes/noteSubject.ts")).not.toMatch(/\bcountry\b\s*[?:]/);
   });
 });
+
+describe("a folded card's title column", () => {
+  it("is the view's, set on the lane and read by the head", () => {
+    expect(read("components/CardHead.tsx")).toMatch(/flex-none min-w-\[var\(--entry-col\)\]/);
+    expect(read("components/Inspector.tsx")).toMatch(/\["--entry-col"\]: VIEW_POLICIES\[mode\]\.entryColumn/);
+  });
+});

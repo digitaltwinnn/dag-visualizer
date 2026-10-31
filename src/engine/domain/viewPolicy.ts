@@ -200,6 +200,11 @@ export interface ViewPolicy {
   // LENS, which no explorer row may move (user, 2026-09-29: the signer row set it). Was a
   // `mode !== "geo"` deny-list in `pickActions`, which handed the ledger hyper's answer by default.
   nodeCommitsNetwork: boolean;
+  // THE LABEL COLUMN OF A FOLDED CARD (user, 2026-10-31: "right align the titles in hyper also"), so
+  // every entry's title starts on one x. It fits the view's longest slot noun: METAGRAPH, and
+  // Hypergraph's COMPOSITION. Snapshots keeps the short one: GLOBAL SNAPSHOT and METAGRAPH SNAPSHOT
+  // would leave a title too little room, so those two run past it. In em of the label step.
+  entryColumn: string;
 }
 
 // The calm bloom the ledger view uses — the reference the design likes (thin lines, sparse
@@ -242,6 +247,7 @@ const FLAT: ViewPolicy = {
   // given it, so wiring one up later changes nothing by accident.
   autoRotate: true,
   nodeCommitsNetwork: false,
+  entryColumn: "7.1em",
 };
 
 export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
@@ -297,6 +303,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     // the framing's override are different facts and they live in different places.
     autoRotate: true,
     nodeCommitsNetwork: true,
+    entryColumn: "8.3em",
     },
   // Footprint: the holographic globe + travelling packets; picks the globe nodes only.
   geo: {
@@ -340,6 +347,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     // a camera orbiting a spinning globe is two rotations fighting over one subject.
     autoRotate: false,
     nodeCommitsNetwork: false,
+    entryColumn: "7.1em",
     },
   // Snapshots: the settlement chamber. Morph frozen (nodes fly into lanes); picks the centred
   // snapshot + the reused producer dots. (The ledger-specific depth-fog recency treatment was
@@ -377,6 +385,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     // away from the reader, and an orbit turns that axis into a shape being inspected.
     autoRotate: false,
     nodeCommitsNetwork: false,
+    entryColumn: "7.1em",
   },
   // MEASURED HISTORY (2026-09-18) — the charts ARE the scene: DOM planes driven by
   // TrendStackSync, so almost every engine-side switch here is OFF. The canvas stays on because
@@ -424,6 +433,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     // five DOM style writes every frame, in the one view that already runs five composited layers.
     autoRotate: false,
     nodeCommitsNetwork: false,
+    entryColumn: "7.1em",
   },
   soon: FLAT,
 };

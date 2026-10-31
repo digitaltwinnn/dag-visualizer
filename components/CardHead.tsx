@@ -435,12 +435,12 @@ function keepFocusOnRung(el: HTMLElement): void {
             {/* `data-eyebrow` is RailThread's read: on an unboxed ENTRY the thread runs its
                 depth-reach connector at the EYEBROW's height (user, 2026-08-08 — the entry's
                 vertical centre put the line through the title-row aside's space). FOLDED it takes
-                one COLUMN width ("METAGRAPH", the longest slot noun, sets it) so every entry's
-                title starts on the same x and the pile reads as a ladder — stated in em against
-                the label step, since the type scale is fluid — and the title's line box
+                one COLUMN width (the view's, `viewPolicy.entryColumn`) so every entry's title
+                starts on the same x and the pile reads as a ladder — stated in em against the
+                label step, since the type scale is fluid — and the title's line box
                 (`ENTRY_LINE`), so centring the row aligns the baselines. */}
             {eyebrow ? (
-              <span data-eyebrow="" className={cn("block", eyebrowClass, entryMode && cn("flex-none min-w-[7em]", ENTRY_LINE))}>{eyebrow}</span>
+              <span data-eyebrow="" className={cn("block", eyebrowClass, entryMode && cn("flex-none min-w-[var(--entry-col)]", ENTRY_LINE))}>{eyebrow}</span>
             ) : (
               <span />
             )}

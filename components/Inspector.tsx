@@ -703,7 +703,7 @@ export default function Inspector() {
     return Math.max(ENTRY_DIM_FLOOR, 1 - ENTRY_DIM_STEP * dist);
   };
   const ladderLane = (
-    <div className="rail-ladder flex flex-col">
+    <div className="rail-ladder flex flex-col" style={{ ["--entry-col"]: VIEW_POLICIES[mode].entryColumn } as CSSProperties}>
       {displayOrder(ladderIds, presentOf, nextStep?.id ?? null).map((id, depth) => {
         const card = manifest.find((c) => c.id === id);
         if (!card) return null;

@@ -184,6 +184,10 @@ describe("the trends view is registered and inert", () => {
     expect(VIEW_POLICIES.ledger.metagraphCard).toBe("tickNet");
     expect(VIEW_POLICIES.trend.metagraphCard).toBe("plane");
     expect(VIEW_POLICIES.hyper.metagraphCard).toBe("rail");
+    // A folded card's title starts on one x: the column fits the view's longest slot noun, and
+    // Snapshots' two long ones do not set theirs (user, 2026-10-31).
+    expect(VIEW_POLICIES.hyper.entryColumn).toBe("8.3em");
+    for (const mode of ["geo", "ledger", "trend"] as const) expect(VIEW_POLICIES[mode].entryColumn).toBe("7.1em");
     expect(VIEW_POLICIES.soon.metagraphCard).toBe("filter");
   });
   it("the subject orbit is geo's alone, and never alongside the stock camera orbit", () => {
