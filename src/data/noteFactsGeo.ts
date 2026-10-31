@@ -403,9 +403,13 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     const was = then ? (then.netCc.get(id)?.get(subjectNetCc) ?? 0) : null;
     const key = `${id}:cc:${subjectNetCc}`;
     facts.push(fact(`${netName}, nodes in ${country}`, here, "count", undefined, was != null ? { key, end: "to" } : undefined));
-    facts.push(fact(`${netName}, share of its located nodes in ${country}`, here / located, "share"));
-    // "the countries of X", not "X's": a name ending in s hands the model "Technologies's" (live 2026-10-29).
-    facts.push(fact(`${country}, rank among the countries of ${netName} by nodes`, 1 + own.filter((c) => c.count > here).length, "count"));
+    // THE ONLY ONE HAS NOTHING TO RANK AGAINST (user, 2026-10-31: "100% of its located nodes and
+    // ranks first"): no share and no rank to state, and the count below says it is the only one.
+    if (own.length > 1) {
+      facts.push(fact(`${netName}, share of its located nodes in ${country}`, here / located, "share"));
+      // "the countries of X", not "X's": a name ending in s hands the model "Technologies's" (live 2026-10-29).
+      facts.push(fact(`${country}, rank among the countries of ${netName} by nodes`, 1 + own.filter((c) => c.count > here).length, "count"));
+    }
     facts.push(fact(`${netName}, located nodes`, located, "count"));
     facts.push(fact(`${netName}, countries with nodes`, own.length, "count"));
     if (was != null) {
@@ -430,8 +434,10 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     const was = thenIsp ? (providersOf(thenIsp, providerNames).get(p.group)?.count ?? 0) : null;
     const key = `${id}:provider:${p.group}`;
     facts.push(fact(`${netName}, nodes with ${provider}`, p.count, "count", undefined, was != null ? { key, end: "to" } : undefined));
-    facts.push(fact(`${netName}, share of its nodes with a known provider with ${provider}`, p.count / known, "share"));
-    facts.push(fact(`${provider}, rank among the providers of ${netName} by nodes`, 1 + ownProv.filter((x) => x.count > p.count).length, "count"));
+    if (ownProv.length > 1) {
+      facts.push(fact(`${netName}, share of its nodes with a known provider with ${provider}`, p.count / known, "share"));
+      facts.push(fact(`${provider}, rank among the providers of ${netName} by nodes`, 1 + ownProv.filter((x) => x.count > p.count).length, "count"));
+    }
     facts.push(fact(`${netName}, providers with nodes`, ownProv.length, "count"));
     if (was != null) {
       facts.push(fact(`${netName}, nodes with ${provider} a week ago`, was, "count", undefined, { key, end: "from" }));

@@ -761,3 +761,12 @@ describe("hyperFacts' notable changes", () => {
     expect(hyperFacts(input({ subject: { net: "usdc", type: "l0" } }))!.changes).toBeUndefined();
   });
 });
+
+describe("the only layer group has nothing to rank against", () => {
+  const N = 720;
+  it("carries no share and no rank", () => {
+    const r = hyperFacts(input({ subject: { net: "usdc", type: "l0" }, fleet: fleet({ "f.type.usdc.l0": row(N, () => 10), "f.type.usdc.l0+cl1": row(N, () => 0) }) }))!;
+    expect(r.facts.filter((f) => /share of its nodes|rank among its layer groups/.test(f.label))).toEqual([]);
+    expect(r.facts.find((f) => /^Layer groups in/.test(f.label))!.value).toBe(1);
+  });
+});

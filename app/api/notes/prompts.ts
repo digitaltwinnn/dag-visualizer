@@ -84,7 +84,7 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
       // (the same day: "I don't know what is meant by 'which is 52% of its nodes and ranks first
       // among its layer groups'"). And the NODES are the sentence's subject, since a node runs its
       // layers (the same day: "do they run the nodes on L0 or is the node composed out of it?").
-      type: "Open with a plain sentence whose subject is the nodes, in the shape \"N of the M <network> nodes run <layers>\", M being all its nodes, the layers named exactly as the facts name them, with no possessive on the name (a node RUNS its layers, so the verb is run); then say in plain words where that group stands among the network's layer groups, as a reader would (\"its largest group\", \"the smaller of its two groups\"), never \"share\", \"rank\" or a percentage; then how that changed over the span, or that it held.",
+      type: "Open with a plain sentence whose subject is the nodes, in the shape \"N of the M <network> nodes run <layers>\", M being all its nodes, the layers named exactly as the facts name them, with no possessive on the name (a node RUNS its layers, so the verb is run); then say in plain words where that group stands among the network's layer groups, as a reader would (\"its largest group\", \"the smaller of its two groups\", \"its only group\"), never \"share\", \"rank\" or a percentage; then how that changed over the span, or that it held.",
     },
     questionCommon: "Last, in one sentence, how active it was: open with the direction, up, down or steady, then the global snapshots it was part of per day last week against the weeks before.",
     questionCommonWhole: QUESTION_COMMON_WHOLE,
@@ -93,8 +93,8 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
   },
   geo: {
     questions: {
-      country: "Open with a plain sentence with the network as its actor, in the shape \"<network> hosts N nodes in <country>\"; then what share of the network's located nodes that is and the country's place among the network's countries; then how that moved over the span, or that it held. Say nothing about speed.",
-      provider: "Open with a plain sentence with the provider as its actor, in the shape \"<provider> hosts N of <network>'s nodes\", network-wide, not for one place; then what share of the network's nodes with a known provider that is and its place among the network's providers; then how that moved over the span, or that it held. Say nothing about speed.",
+      country: "Open with a plain sentence with the network as its actor, in the shape \"<network> hosts N nodes in <country>\"; then what share of the network's located nodes that is and the country's place among the network's countries, or, when the facts count one country, that it is the network's only country, with no share and no place; then how that moved over the span, or that it held. Say nothing about speed.",
+      provider: "Open with a plain sentence with the provider as its actor, in the shape \"<provider> hosts N of <network>'s nodes\", network-wide, not for one place; then what share of the network's nodes with a known provider that is and its place among the network's providers, or, when the facts count one provider, that it is the network's only provider, with no share and no place; then how that moved over the span, or that it held. Say nothing about speed.",
     },
     question: "First, where the nodes run: countries and hosting providers that gained or lost nodes, or where the nodes are now when nothing moved. Say nothing about speed.",
     questionCommon: "Last, in one sentence, how active the network was: open with the direction, up, down or steady, then its global snapshots per day last week against the weeks before.",

@@ -774,3 +774,27 @@ describe("geoFacts counts nodes as the cards do", () => {
     expect(fleetCountries({ geoDays, ccDays: ccOf(geoDays) })).toEqual(["DE"]);
   });
 });
+
+describe("the only one has nothing to rank against", () => {
+  const bio = () => input({ subject: { cc: "US", net: "bio" } });
+
+  it("a network's only country carries no share and no rank", () => {
+    const r = geoFacts(bio())!;
+    expect(find(r, /share of its located nodes/)).toEqual([]);
+    expect(find(r, /rank among the countries/)).toEqual([]);
+    expect(find(r, /countries with nodes/)[0]!.value).toBe(1);
+  });
+
+  it("one of several keeps both", () => {
+    const r = geoFacts(input({ subject: { cc: "DE", net: "usdc" } }))!;
+    expect(find(r, /share of its located nodes/).length).toBe(1);
+    expect(find(r, /rank among the countries/).length).toBe(1);
+  });
+
+  it("a network's only provider carries no share and no rank", () => {
+    const r = geoFacts(input({ subject: { isp: "amazon-com-inc", net: "bio" } }))!;
+    expect(find(r, /share of its nodes with a known provider/)).toEqual([]);
+    expect(find(r, /rank among the providers/)).toEqual([]);
+    expect(find(r, /providers with nodes/)[0]!.value).toBe(1);
+  });
+});

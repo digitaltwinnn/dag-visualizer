@@ -309,16 +309,17 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
     gaugeFacts(`${name} nodes ${words}`, points);
     const level = levelOf(net)!; // measured: the network's own samples were checked above
     facts.push(fact(`${name} nodes at the end of the span`, level, "count"));
-    // A share is a part of a whole: a make-up read above the network's level (a partial hour at
-    // one end) states none.
-    if (level > 0 && ch.to <= level) facts.push(fact(`${name}, share of its nodes ${words}`, ch.to / level, "share"));
     const held = bands.map((b) => heldLevel(b.points) ?? 0);
-    facts.push(fact(`Layer groups in ${name}`, held.filter((v) => v > 0).length, "count"));
+    const groups = held.filter((v) => v > 0).length;
+    // A share is a part of a whole: a make-up read above the network's level (a partial hour at
+    // one end) states none, and neither does the only group, which has nothing to rank against.
+    if (groups > 1 && level > 0 && ch.to <= level) facts.push(fact(`${name}, share of its nodes ${words}`, ch.to / level, "share"));
+    facts.push(fact(`Layer groups in ${name}`, groups, "count"));
     // Its place among them, read as a country's or a provider's rank is (`noteFactsGeo.ts`): the
     // held levels, so a partial hour at one end cannot move it (user, 2026-10-30: the note is to
     // say how the subject relates to the rung's distribution, and "how it stands" was parroted).
     const own = heldLevel(points) ?? ch.to;
-    facts.push(fact(`${name}, rank among its layer groups by nodes`, 1 + held.filter((v) => v > own).length, "count"));
+    if (groups > 1) facts.push(fact(`${name}, rank among its layer groups by nodes`, 1 + held.filter((v) => v > own).length, "count"));
   } else {
     const name = mention(subject);
     named.push(subject);
