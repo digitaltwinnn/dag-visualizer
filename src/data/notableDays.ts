@@ -236,9 +236,11 @@ function pauses(gap: readonly (number | null)[], input: NotableInput, networkId:
 /** THE RANGE'S EXTREMES, in fill order (see `NOTABLE_FLOOR`): the busiest and quietest day of the
  *  subject's own series, then a network's longest wait or the hypergraph's broadest day. Read on
  *  covered days from `from` on, and for a network inside its own activity (the quiet tail after
- *  its last day is the `last`'s business). An extreme exists only when the range's readings
- *  differ (a flat range has no busiest day); ties keep the earlier day; `level` is the range's
- *  median, so a caption can place the day against the range. */
+ *  its last day is the `last`'s business). An extreme exists only when its day stands off the
+ *  range's usual level, compared rounded as a caption states them (live 2026-10-31: "5 networks
+ *  anchoring, usually 5"; one quiet day elsewhere made every ordinary day the broadest), so a range
+ *  can stay short of the floor. Ties keep the earlier day; `level` is the range's median, so a
+ *  caption can place the day against the range. */
 export function rangeExtremes(input: NotableInput): NotableDay[] {
   const { days, covered, series, subject, ids } = input;
   const from = input.from ?? 0;
@@ -268,7 +270,9 @@ export function rangeExtremes(input: NotableInput): NotableDay[] {
     if (Math.min(...values) === Math.max(...values)) return null;
     let best = xs[0]!;
     for (const x of xs) if (better(x[1], best[1])) best = x;
-    return { dayMs: days[best[0]]!, kind, networkId, value: best[1], level: median(values), score: 0 };
+    const level = median(values);
+    if (Math.round(best[1]) === Math.round(level)) return null;
+    return { dayMs: days[best[0]]!, kind, networkId, value: best[1], level, score: 0 };
   };
   const counts = readings(own);
   const out: (NotableDay | null)[] = [pick(counts, "peak", (a, b) => a > b), pick(counts, "trough", (a, b) => a < b)];

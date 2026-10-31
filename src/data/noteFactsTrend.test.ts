@@ -238,11 +238,11 @@ describe("trendFacts notable days", () => {
   it("a 7d zoom with a spiked day yields one date fact and a matching NotableDay", () => {
     const spike = row(37, (i) => (i === 33 ? 400 : 100));
     const r = trendFacts(input({ daily: daily({ "g.anchors": spike }) }))!;
-    // The spike, then the floor's quietest day (the spike is the busiest, so no second peak).
-    expect(r.days.map((d) => d.kind)).toEqual(["high", "trough"]);
+    // The spike alone: it is the busiest, and every other day reads the usual level.
+    expect(r.days.map((d) => d.kind)).toEqual(["high"]);
     expect(r.days[0]).toMatchObject({ kind: "high", networkId: null, value: 400, level: 100, dayMs: T0 + 3 * DAY });
     const dates = r.facts.filter((f) => f.kind === "date");
-    expect(dates).toHaveLength(2);
+    expect(dates).toHaveLength(1);
     expect(dates[0]!.value).toBe(T0 + 3 * DAY);
     expect(dates[0]!.text).toBe("Sep 4");
     const value = r.facts.find((f) => /Notable day 1 spike, snapshots anchored that day/.test(f.label))!;
@@ -291,7 +291,7 @@ describe("trendFacts notable days", () => {
       expect(r.days).toEqual([]);
       expect(r.facts.some((f) => f.kind === "date")).toBe(false);
     }
-    expect(trendFacts(input({ zoom: "30d", daily: daily({ "g.anchors": spike }) }))!.days.map((d) => d.kind)).toEqual(["high", "trough"]);
+    expect(trendFacts(input({ zoom: "30d", daily: daily({ "g.anchors": spike }) }))!.days.map((d) => d.kind)).toEqual(["high"]);
   });
 
   it("never reports the day still filling", () => {
@@ -358,7 +358,9 @@ describe("trendFacts in the span facet's shape", () => {
     const stopped = row(37, (i) => (i < 33 ? 100 : i === 33 ? 5 : 0));
     const r = trendFacts(input({ subject: "usdc", shape: true, daily: daily({ "m.usdc.snaps": stopped, "m.usdc.ticks": row(37, () => 1) }) }))!;
     expect(r.facts.find((f) => f.label === "Quietest day of the span, snapshots anchored")?.value).toBe(5);
-    expect(r.facts.find((f) => f.label === "Busiest day of the span, snapshots anchored")?.value).toBe(100);
+    // Every active day read 100, so no day was the busiest: it is the typical one.
+    expect(r.facts.some((f) => f.label.startsWith("Busiest day"))).toBe(false);
+    expect(r.facts.find((f) => f.label === "Typical day of the span, snapshots anchored")?.value).toBe(100);
   });
   // Review 2026-10-30: `ext[0]` was the longest wait when the counts were flat, so a gap in seconds
   // was stated as a typical day's snapshots, and the gate backed it (the figure was a real fact).
