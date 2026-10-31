@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 import CardHead, { RailPane } from "@/components/CardHead";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
@@ -8,11 +8,17 @@ import { AI_NOTES_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { Door, QualifierChip, foldLabel } from "@/components/inspector/parts";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { cn } from "@/lib/utils";
-import type { NoteDay } from "@/src/data/noteTypes";
+import { useFeedRead } from "@/components/useFeedRead";
+import { latestTickOf } from "@/src/data/ladderLevels";
+import { getNetwork } from "@/src/data/network";
+import type { NoteChange, NoteDay, NoteView } from "@/src/data/noteTypes";
 import { spanPhrase } from "@/src/data/trendWindow";
+import { ledgerNetwork } from "@/src/engine/domain/tickNet";
+import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 import { rangeDays } from "@/src/util/localTime";
 import { commitNoteDay } from "./commitNoteDay";
+import { changeActions, changeHover } from "./noteChangeTarget";
 import { noteSpanWords } from "./noteSubject";
 import NoteKindCoin from "./NoteKindCoin";
 import TypedNote from "./TypedNote";
@@ -21,9 +27,9 @@ import { useAiNote, useWaited } from "./useAiNote";
 
 // THE AI NOTES CARD (2026-10-27) — a few sentences a model wrote about what the view is showing,
 // the VIEW's note at the filter's scope (`noteSubjectOf`: the network, else everything; in History
-// the filter's plane over the window pill, never the plane brought forward), and for History a few
-// notable days that each commit their own day
-// as the range. It HOLDS under a drill (spec 2026-10-29-subject-notes): a committed country,
+// the filter's plane over the window pill, never the plane brought forward), with History's few
+// notable days that each commit their own day as the range, and the other views' notable changes
+// that each commit their own subject. It HOLDS under a drill (spec 2026-10-29-subject-notes): a committed country,
 // provider, make-up or brushed range carries its own note inside its own card (`SubjectNote`).
 //
 // It is CONTEXT, not a reading: the one card in the rail whose words no instrument measured, marked
@@ -120,11 +126,85 @@ function DayRow({ day }: { day: NoteDay }) {
   );
 }
 
-/** THE NOTABLE DAYS, FOLDED (user, 2026-10-27): the card tops the lane, so a run of days open by
- *  default would push History's subject cards down the rail. The fold is marked on its label
- *  (`foldLabel`, the app's there-is-more affordance), the count on the right edge. Keyed on the
- *  subject by the caller, so a new subject starts folded. */
-function NotableDays({ days }: { days: NoteDay[] }) {
+/** ONE NOTABLE CHANGE (user, 2026-10-31): what moved over the note's span, the kind's coin then a
+ *  sentence code wrote, so unlike a day's caption it is never the model's. The row is the subject's:
+ *  it commits and hovers what the view's explorer row for that subject does (`noteChangeTarget`).
+ *  A subject with nothing to open any more is listed all the same, as a closed door. */
+function ChangeRow({ change, view }: { change: NoteChange; view: NoteView }) {
+  useFeedRead(["clusters", "api-geo"], "Notable change");
+  useFeedRead(["global", "metasnaps"], "Notable change", view === "ledger");
+  const selNodes = useStore((s) => s.selNodes);
+  const hover = changeHover(change, selNodes);
+  const lit = useStore((s) => {
+    if (!hover) return false;
+    if (hover.channel === "filter") return s.hoverFilter === hover.key;
+    return (hover.channel === "country" ? s.hoverCountry : s.hoverGroup) === hover.key;
+  });
+  const actions = () => {
+    const s = useStore.getState();
+    const net = view === "ledger" ? getNetwork() : null;
+    const id = change.subject.kind === "network" ? change.subject.id : null;
+    const state = {
+      filter: s.filter,
+      country: s.country,
+      cohort: s.cohort,
+      composition: s.composition,
+      hasInspect: !!s.inspect,
+      metaSnap: s.metaSnap,
+      ledgerNet: ledgerNetwork({ filter: s.filter, tickNet: s.tickNet, snapOrdinal: s.snap?.data.ordinal ?? null }),
+    };
+    return changeActions(change, view, state, s.selNodes, net && id ? latestTickOf(net.metaSnaps, net.globalSnapshots, id) : null);
+  };
+  const preview = (on: boolean) => {
+    if (!hover) return;
+    const s = useStore.getState();
+    if (hover.channel === "filter") return s.setHoverFilter(on ? hover.key : null);
+    if (hover.channel === "group") {
+      s.setHoverGroup(on ? hover.key : null);
+      s.setHoverCohort(on ? (hover.nodes ?? null) : null);
+    }
+    if (hover.channel === "country" || hover.cc) s.setHoverCountry(on ? (hover.cc ?? hover.key) : null);
+  };
+  // A row can leave under the pointer: its click moves the note on. Nothing else clears a hover.
+  const held = useRef(false);
+  const release = useRef(preview);
+  release.current = preview;
+  useEffect(() => () => {
+    if (held.current) release.current(false);
+  }, []);
+  const on = () => {
+    held.current = true;
+    preview(true);
+  };
+  const off = () => {
+    held.current = false;
+    preview(false);
+  };
+  return (
+    <Door
+      lit={lit}
+      wrap
+      disabled={actions() == null}
+      label={<NoteKindCoin kind={change.kind} />}
+      onPointerEnter={on}
+      onPointerLeave={off}
+      onFocus={on}
+      onBlur={off}
+      onClick={() => {
+        const acts = actions();
+        if (acts) applyClickActions(acts);
+      }}
+    >
+      {change.text}
+    </Door>
+  );
+}
+
+/** A NOTE'S ROWS, FOLDED (user, 2026-10-27): the card tops the lane, so a run of rows open by default
+ *  would push the view's subject cards down the rail. The fold is marked on its label (`foldLabel`,
+ *  the app's there-is-more affordance), the count on the right edge. Keyed on the subject by the
+ *  caller, so a new subject starts folded. */
+function NoteRows({ heading, count, children }: { heading: string; count: number; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const panel = useId();
   return (
@@ -143,17 +223,13 @@ function NotableDays({ days }: { days: NoteDay[] }) {
         )}
       >
         <span className={cn("min-w-0 truncate text-label tracking-caps uppercase", open ? "text-foreground" : "text-muted-foreground group-hover:text-foreground", foldLabel(open))}>
-          Notable days
+          {heading}
         </span>
-        <span className="flex-none font-mono text-body font-bold tabular-nums text-foreground">{days.length}</span>
+        <span className="flex-none font-mono text-body font-bold tabular-nums text-foreground">{count}</span>
       </button>
       {open && (
         <div id={panel} className={DOOR_RUN}>
-          {/* Not keyed by day alone: one day can be two notables (a network's low and its pause;
-              two networks' first day on the DAG). */}
-          {days.map((d) => (
-            <DayRow key={`${d.dayMs}:${d.kind}:${d.networkId ?? ""}`} day={d} />
-          ))}
+          {children}
         </div>
       )}
     </>
@@ -248,7 +324,22 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
               {/* The text alone (user, 2026-10-29): no Written row — the span under the title says
                   what it covers, and the note is rewritten on its own cadence. */}
               <TypedNote text={res.text} waited={waited} className="m-0 text-body leading-snug text-foreground" />
-              {res.days.length > 0 && <NotableDays key={titleKey} days={res.days} />}
+              {res.days.length > 0 && (
+                <NoteRows key={titleKey} heading="Notable days" count={res.days.length}>
+                  {/* Not keyed by day alone: one day can be two notables (a network's low and its
+                      pause; two networks' first day on the DAG). */}
+                  {res.days.map((d) => (
+                    <DayRow key={`${d.dayMs}:${d.kind}:${d.networkId ?? ""}`} day={d} />
+                  ))}
+                </NoteRows>
+              )}
+              {res.changes?.length ? (
+                <NoteRows key={titleKey} heading="Notable changes" count={res.changes.length}>
+                  {res.changes.map((c) => (
+                    <ChangeRow key={c.text} change={c} view={subject.view} />
+                  ))}
+                </NoteRows>
+              ) : null}
             </>
           ) : null}
         </div>

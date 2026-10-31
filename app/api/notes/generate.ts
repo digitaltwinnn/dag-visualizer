@@ -1,6 +1,6 @@
 import { factsBlock } from "@/src/data/noteFacts";
 import { checkNote } from "@/src/data/noteHonesty";
-import type { NoteDay, NoteResponse, NoteView } from "@/src/data/noteTypes";
+import type { NoteChange, NoteDay, NoteResponse, NoteView } from "@/src/data/noteTypes";
 import { GateError, type gateChat, type GateErrorKind } from "./gate";
 import { failKeyOf, lockKeyOf, noteKeyOf, statsKeyOf, timingOf, type NoteSpan } from "./keys";
 import { buildMessages, parseAnswer, spanWords } from "./prompts";
@@ -45,6 +45,8 @@ export interface NoteRecord {
   spanFrom: number;
   spanTo: number;
   days: NoteDay[];
+  /** A view note's notable changes (`noteChanges.ts`), measured when the note was written. */
+  changes?: NoteChange[];
   /** Hyper `all` only: the networks with nodes when the digest was written (the warmer compares). */
   setKey?: string;
   /** The network's held count this note was warmed under (`planPass`); absent on a visitor's write. */
@@ -139,7 +141,7 @@ function parseRecord(raw: string | null): NoteRecord | null {
 }
 
 function okOf(r: NoteRecord): NoteResponse {
-  return { state: "ok", text: r.text, writtenAt: r.writtenAt, spanFrom: r.spanFrom, spanTo: r.spanTo, days: r.days };
+  return { state: "ok", text: r.text, writtenAt: r.writtenAt, spanFrom: r.spanFrom, spanTo: r.spanTo, days: r.days, ...(r.changes?.length ? { changes: r.changes } : {}) };
 }
 
 function warn(req: NoteRequest, kind: string): void {
@@ -317,6 +319,7 @@ export async function generateNote(
       spanFrom: input.spanFrom,
       spanTo: input.spanTo,
       days: written.days,
+      ...(input.changes.length ? { changes: input.changes } : {}),
       ...(input.setKey != null ? { setKey: input.setKey } : {}),
       ...(opts.driftKey != null ? { driftKey: opts.driftKey } : {}),
     };

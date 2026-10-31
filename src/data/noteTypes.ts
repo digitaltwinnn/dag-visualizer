@@ -50,8 +50,28 @@ export interface NoteDay {
   caption: string;
 }
 
+/** What moved over a view note's span (`noteChanges.ts`), as the row's coin says it. */
+export type NoteChangeKind = "gained" | "lost" | "new" | "gone" | "active" | "quiet" | "faster" | "slower";
+
+/** The subject a change row commits: what the view's own explorer row for it commits. */
+export type NoteChangeSubject =
+  | { kind: "network"; id: string }
+  | { kind: "type"; netId: string; type: string } // a `roleKey`
+  | { kind: "country"; cc: string }
+  | { kind: "provider"; keys: string[]; cc: string | null; city: string | null };
+
+/** One row of a view note's notable changes. `text` is written here by code, never by the model: a
+ *  row states one measured move in one plain sentence, so it has nothing to get wrong. */
+export interface NoteChange {
+  kind: NoteChangeKind;
+  subject: NoteChangeSubject;
+  text: string;
+  /** How much it moved: nodes for a count, a rhythm's ratio off 1, which rows outrank which. */
+  size: number;
+}
+
 export type NoteResponse =
-  | { state: "ok"; text: string; writtenAt: number; spanFrom: number; spanTo: number; days: NoteDay[] }
+  | { state: "ok"; text: string; writtenAt: number; spanFrom: number; spanTo: number; days: NoteDay[]; changes?: NoteChange[] }
   | { state: "pending" }
   | { state: "none" }
   | { state: "unavailable" }

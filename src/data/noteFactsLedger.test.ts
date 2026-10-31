@@ -242,3 +242,27 @@ describe("ledgerFacts says what the note leads with", () => {
     expect(ledgerFacts(input({ subject: "usdc", week: side(168, HOUR, 240) }))!.lead).toEqual({ kind: "now" });
   });
 });
+
+// THE CARD'S ROWS (user, 2026-10-31: "do snapshots also"): a network's rhythm leaving its usual one.
+describe("ledgerFacts' notable changes", () => {
+  const weekSide = (over: Record<string, (number | null)[]>) => side(168, HOUR, 120, over, 0);
+  it("a row for a network anchoring well off its usual pace", () => {
+    const r = ledgerFacts(input({ week: weekSide({ "m.usdc.gapSum": row(168, () => 30 * 60) }) }))!; // 30 snapshots, 60s apart
+    expect(r.changes).toEqual([
+      { kind: "faster", size: expect.any(Number), text: "USDC.dag sped up: a snapshot every 20 seconds, usually 1 minute", subject: { kind: "network", id: "usdc" } },
+    ]);
+  });
+  it("a row for a network that stopped, ahead of any pace", () => {
+    const r = ledgerFacts(input({
+      recent: side(74, 5 * MIN, 20, { "m.bio.snaps": row(74, () => 0), "m.bio.ticks": row(74, () => 0) }),
+      week: weekSide({ "m.usdc.gapSum": row(168, () => 30 * 60) }),
+    }))!;
+    expect(r.changes?.map((c) => c.text)).toEqual(["BioFi went quiet", "USDC.dag sped up: a snapshot every 20 seconds, usually 1 minute"]);
+  });
+  it("the usual rhythm is no rows", () => {
+    expect(ledgerFacts(input())!.changes).toBeUndefined();
+  });
+  it("a network's own note has no rows: it is the row", () => {
+    expect(ledgerFacts(input({ subject: "usdc", week: weekSide({ "m.usdc.gapSum": row(168, () => 30 * 60) }) }))!.changes).toBeUndefined();
+  });
+});

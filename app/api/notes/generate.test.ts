@@ -27,6 +27,7 @@ const FACTS: NoteFacts = {
   names: ["USDC.dag", "BioFi", "DAG"],
   blurbs: [],
   days: [],
+  changes: [],
   spanFrom: NOW - 7 * D,
   spanTo: NOW,
   label: "the hypergraph",
@@ -571,5 +572,19 @@ describe("a read-only deployment serves the cache and writes nothing (R66)", () 
     vi.spyOn(store, "get").mockRejectedValue(new Error("down"));
     expect(await generateNote(REQ, deps({ writable: false }), "read")).toEqual({ state: "unavailable" });
     expect(hincr).not.toHaveBeenCalled();
+  });
+});
+
+describe("a view note's notable changes", () => {
+  beforeEach(() => { store = memoryNotesStore(); });
+  it("are stored with the note and served with it", async () => {
+    const changes = [{ kind: "lost" as const, size: 2, text: "Germany lost 2 nodes", subject: { kind: "country" as const, cc: "DE" } }];
+    const res = await generateNote(REQ, deps({ facts: async () => ({ ...structuredClone(FACTS), changes }) }), "read");
+    expect(res).toMatchObject({ state: "ok", changes });
+    expect(await generateNote(REQ, deps(), "read")).toMatchObject({ state: "ok", changes }); // from the store
+  });
+  it("a note with none carries no field", async () => {
+    const res = await generateNote(REQ, deps(), "read");
+    expect(res).not.toHaveProperty("changes");
   });
 });

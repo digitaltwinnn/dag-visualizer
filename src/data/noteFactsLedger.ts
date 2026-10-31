@@ -1,5 +1,6 @@
 import { fact, networksAnchored } from "@/src/data/noteFacts";
-import type { Fact, FactPair, NoteLead } from "@/src/data/noteTypes";
+import { eventChange, pickChanges, rhythmChange } from "@/src/data/noteChanges";
+import type { Fact, FactPair, NoteChange, NoteLead } from "@/src/data/noteTypes";
 import { anchorSeries, formatDag, globalSeries, metricSeries, spanAverage, trimCounterEdges, unlistedUnmeasured, withUnlisted } from "@/src/data/trendSeries";
 import type { TrendsWindowData } from "@/src/data/trendWindow";
 import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
@@ -125,7 +126,7 @@ function pairedSums(num: Points, den: Points, d: TrendsWindowData): { n: number;
   return any ? { n, d: m } : null;
 }
 
-export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: string[]; lead: NoteLead } | null {
+export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: string[]; lead: NoteLead; changes?: NoteChange[] } | null {
   const { subject, names: catalog } = input;
   const isListed = (id: string) => LISTED_IDS.has(id) || id in catalog;
   const fold = (d: TrendsWindowData): TrendsWindowData => ({ ...d, series: withUnlisted(d.series, isListed, UNLISTED_ID) });
@@ -219,5 +220,27 @@ export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: st
   }
 
   if (!facts.length) return null;
-  return { facts, names: [...new Set(Object.values(catalog))], lead: leadOf(facts) };
+  // THE CARD'S ROWS, on the whole chamber's note: the networks whose rhythm left its usual one, read
+  // as a network's own note reads it. Nothing without a usual to stand against.
+  const events: NoteChange[] = [];
+  const paces: NoteChange[] = [];
+  if (whole && weekCovered) {
+    for (const id of ids) {
+      const snaps = (d: TrendsWindowData) => metricSeries("snapshots", id, d.series).points;
+      const total = (d: TrendsWindowData) => trimmed(snaps(d), d).reduce<number>((a, v) => a + (v ?? 0), 0);
+      const spacing = (d: TrendsWindowData) => spanAverage("continuity", trimmed(metricSeries("continuity", id, d.series).points, d), d.stepMs, trimmed(snaps(d), d));
+      const subject = { kind: "network", id } as const;
+      const now = total(recent);
+      const usual = total(week);
+      const name = catalog[id] ?? id;
+      if (usual > 0 && now === 0) events.push(eventChange(name, "quiet", subject));
+      else if (now > 0 && usual <= now) events.push(eventChange(name, "active", subject)); // the week's snapshots are all the day's
+      else {
+        const change = rhythmChange(name, spacing(week) ?? 0, spacing(recent) ?? 0, subject);
+        if (change) paces.push(change);
+      }
+    }
+  }
+  const changes = pickChanges(events, paces);
+  return { facts, names: [...new Set(Object.values(catalog))], lead: leadOf(facts), ...(changes.length ? { changes } : {}) };
 }

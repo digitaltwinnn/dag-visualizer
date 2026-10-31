@@ -23,6 +23,7 @@ const FACTS: NoteFacts = {
   names: ["DAG"],
   blurbs: [],
   days: [],
+  changes: [],
   spanFrom: NOW - 7 * D,
   spanTo: NOW,
   label: "the hypergraph",

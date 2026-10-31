@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cohortsLevel, countriesLevel, countryNodes, machinesOf, networksLevel, nodeOrder, nodesByCountry, tickNetworksLevel, tickPolledRows } from "./ladderLevels";
+import { cohortOfProvider, cohortsLevel, countriesLevel, latestTickOf, countryNodes, machinesOf, networksLevel, nodeOrder, nodesByCountry, tickNetworksLevel, tickPolledRows } from "./ladderLevels";
 import type { AnchorLogRow } from "./anchorLog";
 import type { MetaSnapRecord } from "./api";
 import type { CountryStat, GlobalSnapshot, MetaInfo, NodeRow } from "./types";
@@ -178,5 +178,42 @@ describe("the level sorts are total — input order never decides", () => {
     const ex = (metaId: string) => ({ metaId, ordinal: 1, fee: 0, bytes: 0 });
     const order = (rows: ReturnType<typeof ex>[]) => tickNetworksLevel(tick, [], rows, () => true).map((n) => n.id);
     expect(order([ex(ids[0]!), ex(ids[1]!)])).toEqual(order([ex(ids[1]!), ex(ids[0]!)]));
+  });
+});
+
+describe("cohortOfProvider", () => {
+  const rows = [
+    node({ ip: "1", cc: "DE", city: "Falkenstein", isp: "Hetzner Online GmbH" }),
+    node({ ip: "2", cc: "DE", city: "Falkenstein", isp: "Hetzner Online GmbH" }),
+    node({ ip: "3", cc: "FI", city: "Helsinki", isp: "Hetzner Online GmbH" }),
+    node({ ip: "4", cc: "US", city: "Boston", isp: "Amazon.com, Inc." }),
+  ];
+  const keys = ["hetzner-online-gmbh"];
+  it("is the provider's biggest group of nodes when the note named no place", () => {
+    const c = cohortOfProvider(rows, keys, null, null);
+    expect(c).toMatchObject({ cc: "DE", city: "Falkenstein", isp: "Hetzner Online GmbH" });
+    expect(c?.rows).toHaveLength(2);
+  });
+  it("is the place the note named, while it still has nodes", () => {
+    expect(cohortOfProvider(rows, keys, "FI", "Helsinki")).toMatchObject({ cc: "FI", city: "Helsinki" });
+    expect(cohortOfProvider(rows, keys, "FR", "Paris")).toMatchObject({ cc: "DE" }); // emptied: where it stands now
+  });
+  it("is nothing for a provider with no nodes left", () => {
+    expect(cohortOfProvider(rows, ["gone"], null, null)).toBeNull();
+  });
+});
+
+describe("latestTickOf", () => {
+  const tick = (ordinal: number, timestamp: string) => ({ ordinal, timestamp }) as GlobalSnapshot;
+  const rec = (ts: string) => ({ ts }) as MetaSnapRecord;
+  const globals = [tick(1, "a"), tick(2, "b"), tick(3, "c")];
+  it("is the newest tick the network anchored into", () => {
+    expect(latestTickOf(new Map([["dor", [rec("a"), rec("b")]]]), globals, "dor")?.ordinal).toBe(2);
+  });
+  it("skips a record older than the tick buffer", () => {
+    expect(latestTickOf(new Map([["dor", [rec("b"), rec("old")]]]), globals, "dor")?.ordinal).toBe(2);
+  });
+  it("is nothing for a network with none in reach", () => {
+    expect(latestTickOf(new Map(), globals, "dor")).toBeNull();
   });
 });

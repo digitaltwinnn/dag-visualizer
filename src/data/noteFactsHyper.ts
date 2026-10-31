@@ -2,7 +2,8 @@ import { ROLE_SHORT, roleKeyLabel } from "@/src/data/composition";
 import { fact, gaugeChange, heldLevel, networksAnchored, observedLevel } from "@/src/data/noteFacts";
 import { WHOLE_ACTIVITY_LABEL, activityFacts, lastWeekMean, weekStart } from "@/src/data/noteFactsActivity";
 import { notableDays } from "@/src/data/notableDays";
-import type { Fact } from "@/src/data/noteTypes";
+import { countChange, eventChange, pickChanges } from "@/src/data/noteChanges";
+import type { Fact, NoteChange } from "@/src/data/noteTypes";
 import { anchorSeries, typeBands, withUnlisted } from "@/src/data/trendSeries";
 import { trimNewestPartial, type TrendsWindowData } from "@/src/data/trendWindow";
 import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
@@ -119,6 +120,8 @@ export interface HyperFacts {
    *  The warm pass compares them with what a note was written under (`planPass`), so a note follows
    *  its numbers. Held levels, so a bad hour moves none. */
   driftKeys?: Record<string, string>;
+  /** On a view note: what moved over the span, as the card's clickable rows (`noteChanges.ts`). */
+  changes?: NoteChange[];
 }
 
 const TOP = 3;
@@ -198,6 +201,9 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
   const byActivity = [...activity].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 
   const facts: Fact[] = [];
+  /** The card's rows, per kind of move (`pickChanges`): what started or stopped, then the counts. */
+  let events: NoteChange[] = [];
+  let counts: NoteChange[] = [];
 
   /** A gauge's start, end and ratio, or only its current level where it began late. */
   const gaugeFacts = (label: string, points: Points): void => {
@@ -249,6 +255,7 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
       .filter((m): m is { id: string; ch: NonNullable<typeof m.ch> } => !!m.ch && m.ch.to !== m.ch.from)
       .sort((a, b) => Math.abs(b.ch.to - b.ch.from) - Math.abs(a.ch.to - a.ch.from) || a.id.localeCompare(b.id));
     facts.push(fact("Networks whose node count changed over the span", movers.length, "count"));
+    counts = movers.flatMap(({ id, ch }) => countChange(nameOf(id), ch.from, ch.to, { kind: "network", id }) ?? []);
     movers
       .slice(0, TOP)
       .forEach(({ id, ch }) => {
@@ -275,6 +282,7 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
         from: from < 0 ? n : from,
       }).filter((day) => (day.kind === "first" || day.kind === "last") && day.networkId);
       facts.push(fact("Networks that became active or went quiet over the span", days.length, "count"));
+      events = days.map((day) => eventChange(nameOf(day.networkId!), day.kind === "first" ? "active" : "quiet", { kind: "network", id: day.networkId! }));
       for (const day of days) {
         const id = day.networkId!;
         named.push(id);
@@ -364,6 +372,9 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
           .filter((b): b is { key: string; from: number; to: number } => b.from != null && b.to != null);
         const changedBands = bands.filter((b) => b.from !== b.to);
         facts.push(fact(`${name} layer groups whose node count changed over the span`, changedBands.length, "count"));
+        counts = changedBands.flatMap(({ key: type, from, to }) =>
+          countChange(`${roleKeyLabel(type).label} group`, from, to, { kind: "type", netId: subject, type }) ?? [],
+        );
         for (const { key: type, from, to } of changedBands) {
           const key = `${name} nodes ${comboWords(type)}`;
           facts.push(fact(`${key} at the start of the span`, from, "count", undefined, { key, end: "from" }));
@@ -394,6 +405,8 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
   }
 
   const result: HyperFacts = { facts, names: [...new Set([...Object.values(catalog), ...mentioned])], blurbs };
+  const changes = pickChanges(events, counts);
+  if (changes.length) result.changes = changes;
   if (all) {
     result.setKey = withNodes.slice().sort().join(",");
     const levels = ids.flatMap((id): [string, string][] => {

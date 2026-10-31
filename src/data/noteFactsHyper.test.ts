@@ -731,3 +731,33 @@ describe("hyperFacts on a network's make-up", () => {
     expect(find(r, /^USDC\.dag, share of its nodes with no stated layer$/)[0]!.value).toBeCloseTo(4 / 30, 9);
   });
 });
+
+// THE CARD'S ROWS (user, 2026-10-31): what moved, each row a subject the reader can click into.
+describe("hyperFacts' notable changes", () => {
+  const N = 720;
+  const steady = { "f.nodes": row(N, () => 150), "f.nodes.usdc": row(N, () => 30) };
+  it("on all, a row for each network whose node count moved, biggest first", () => {
+    const r = hyperFacts(input({ fleet: fleet({ "f.nodes.bio": row(N, (i) => (i < N / 2 ? 10 : 7)) }) }))!;
+    expect(r.changes?.map((c) => c.text)).toEqual(["USDC.dag gained 20 nodes", "BioFi lost 3 nodes"]);
+    expect(r.changes?.[0]).toMatchObject({ kind: "gained", subject: { kind: "network", id: "usdc" } });
+  });
+  it("on all, a network starting outranks a count", () => {
+    const d = daily({ "m.dor.snaps": row(60, (i) => (i < 40 ? 0 : 5)), "m.dor.ticks": row(60, (i) => (i < 40 ? 0 : 1)) });
+    const r = hyperFacts(input({ daily: d }))!;
+    expect(r.changes?.[0]).toMatchObject({ kind: "active", text: "Dor became active", subject: { kind: "network", id: "dor" } });
+  });
+  it("a week where nothing moved has no rows, never filler", () => {
+    expect(hyperFacts(input({ fleet: fleet(steady) }))!.changes).toBeUndefined();
+  });
+  it("on a network, a row for each layer group whose node count moved", () => {
+    const r = hyperFacts(input({
+      subject: "usdc",
+      fleet: fleet({ ...steady, "f.type.usdc.l0+cl1": row(N, (i) => (i < N / 2 ? 20 : 19)), "f.type.usdc.l0": row(N, (i) => (i < N / 2 ? 10 : 11)) }),
+    }))!;
+    expect(r.changes).toHaveLength(2);
+    expect(r.changes).toContainEqual({ kind: "lost", size: 1, text: "Hybrid group lost 1 node", subject: { kind: "type", netId: "usdc", type: "l0+cl1" } });
+  });
+  it("a layer group's own note is a subject note: no rows", () => {
+    expect(hyperFacts(input({ subject: { net: "usdc", type: "l0" } }))!.changes).toBeUndefined();
+  });
+});

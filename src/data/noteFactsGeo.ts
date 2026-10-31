@@ -1,6 +1,7 @@
 import { fact } from "@/src/data/noteFacts";
 import { WHOLE_ACTIVITY_LABEL, activityFacts } from "@/src/data/noteFactsActivity";
-import type { Fact, FactPair } from "@/src/data/noteTypes";
+import { countChange, pickChanges, siteOfChange } from "@/src/data/noteChanges";
+import type { Fact, FactPair, NoteChange, NoteChangeSubject } from "@/src/data/noteTypes";
 import { anchorSeries } from "@/src/data/trendSeries";
 import { trimNewestPartial, type TrendsWindowData } from "@/src/data/trendWindow";
 
@@ -78,6 +79,8 @@ export interface GeoFactsInput {
   subject: "all" | string | { cc: string; net?: string } | { isp: string; net?: string };
   /** "YYYY-MM-DD" → that day's geo fields (`f.cc.*`, `f.isp.*`, `f.cc.<id>.*`, `f.isp.<id>.*`). */
   geoDays: Record<string, Record<string, number>>;
+  /** "YYYY-MM-DD" → that day's `f.site.<cc>.<city>.<key>`, from 2026-10-31: names a provider's city. */
+  siteDays?: Record<string, Record<string, number>>;
   /** "YYYY-MM-DD" → the tiers' fleet `f.cc.<cc>` (since 2026-09-07). */
   ccDays: Record<string, Record<string, number>>;
   providerNames: Record<string, string>; // provider key → display name (`geo:{net}:isp`)
@@ -239,7 +242,7 @@ export function fleetCountries(input: Pick<GeoFactsInput, "geoDays" | "ccDays">)
  *  ("Hetzner Online", never the stored "Hetzner Online GmbH"). The note's label and the gate's subject
  *  are built from it, and the gate attributes a nameless sentence's ratios by matching fact labels,
  *  so it must be the labels' own spelling. A network scope's name is the catalog's (`sources.ts`). */
-export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]; subjectName?: string } | null {
+export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]; subjectName?: string; changes?: NoteChange[] } | null {
   const { subject, providerNames, countryNames, names: catalog } = input;
   const nameOf = (id: string) => catalog[id] ?? id;
   const countryOf = (cc: string) => countryNames[cc] ?? cc;
@@ -506,5 +509,46 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     return [...p.names, ...stems, ...first];
   });
   const names = [...new Set([...Object.values(catalog), ...mentionedCountries, ...providerForms])];
-  return subjectName != null ? { facts, names, subjectName } : { facts, names };
+
+  // THE CARD'S ROWS, on a view note (`noteChanges.ts`), read as the facts read them: the fleet's
+  // countries from the tiers and its providers from the geo family, a network's both from its own
+  // measured days. Only the fleet's providers can name a city: nothing stores a network's by place.
+  let changes: NoteChange[] = [];
+  if (!picked) {
+    const ownThen = subjectNet ? weekBefore(ownMeasured(subjectNet), now) : null;
+    const ccNow = subjectNet ? (now.netCc.get(subjectNet) ?? new Map<string, number>()) : fleetCc;
+    const ccThen = subjectNet ? ownThen?.netCc.get(subjectNet) : tiersThen?.cc;
+    const ispNow = subjectNet ? (now.netIsp.get(subjectNet) ?? new Map<string, number>()) : now.isp;
+    const ispThen = subjectNet ? ownThen?.netIsp.get(subjectNet) : geoThen?.isp;
+    const countryRows = ccThen
+      ? [...new Set([...ccNow.keys(), ...ccThen.keys()])].flatMap((cc) =>
+          countChange(countryOf(cc), ccThen.get(cc) ?? 0, ccNow.get(cc) ?? 0, { kind: "country", cc }) ?? [],
+        )
+      : [];
+    const was = ispThen ? providersOf(ispThen, providerNames) : null;
+    const is = providersOf(ispNow, providerNames);
+    const sitesOn = (d: Day | null | undefined) => (d && !subjectNet ? input.siteDays?.[new Date(d.ms).toISOString().slice(0, 10)] : undefined);
+    const sitesThen = sitesOn(geoThen);
+    const sitesNow = sitesOn(now);
+    const providerRows = was
+      ? [...new Set([...is.keys(), ...was.keys()])].flatMap((group) => {
+          const a = was.get(group);
+          const b = is.get(group);
+          const p = (b ?? a)!;
+          const from = a?.count ?? 0;
+          const to = b?.count ?? 0;
+          const keys = new Set([...(a?.keys ?? []), ...(b?.keys ?? [])]);
+          const site = siteOfChange(keys, sitesNow, sitesThen, to - from);
+          const subject: NoteChangeSubject = { kind: "provider", keys: [...keys], cc: site?.cc ?? null, city: site?.city ?? null };
+          return countChange(p.name, from, to, subject, site?.city) ?? [];
+        })
+      : [];
+    changes = pickChanges(countryRows, providerRows);
+  }
+  return {
+    facts,
+    names,
+    ...(subjectName != null ? { subjectName } : {}),
+    ...(changes.length ? { changes } : {}),
+  };
 }

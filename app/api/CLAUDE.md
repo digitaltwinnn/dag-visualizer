@@ -63,7 +63,8 @@ them — but the Next Node server can.
   **Where the fleet runs has its own key family** (2026-10-27): once an hour, beside the fleet
   gauges, the sampler stores the whole fleet and each network by country and by hosting provider
   into `geo:{net}:{YYYY}` (day buckets, `f.cc.*` / `f.isp.*`, `fleetGeo.ts`), with provider names
-  in `geo:{net}:isp`. ⚠️ **It lives outside `t:{net}:*` on purpose:** a rebuild wipes that prefix
+  in `geo:{net}:isp` and the fleet by city and provider in `geo:{net}:sites:{YYYY-MM}` (`f.site.*`,
+  2026-10-31, one hash per month since a note reads a week of it). ⚠️ **It lives outside `t:{net}:*` on purpose:** a rebuild wipes that prefix
   and a location gauge can never be re-derived, and `/api/trends` ships every series a tier hash
   holds, so ~50 location series a day would ride every History payload undrawn. Nothing reads it
   yet; it exists so Geography has a past when something does (the AI notes design).

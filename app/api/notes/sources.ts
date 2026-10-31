@@ -7,7 +7,7 @@ import { comboWords, hyperFacts } from "@/src/data/noteFactsHyper";
 import { commonIsWhole, hasCommonReading } from "@/src/data/noteFactsActivity";
 import { ledgerFacts } from "@/src/data/noteFactsLedger";
 import { trendFacts, type TrendFactsInput } from "@/src/data/noteFactsTrend";
-import type { Fact, NotableDay, NoteView, NoteLead } from "@/src/data/noteTypes";
+import type { Fact, NotableDay, NoteChange, NoteView, NoteLead } from "@/src/data/noteTypes";
 import { leadingTrim, pickRangeTier, type TrendsWindowData } from "@/src/data/trendWindow";
 import { CATALOG, type NetworkId } from "@/src/engine/config";
 import { assembleSpan, WINDOWS } from "../trends/assemble";
@@ -256,6 +256,7 @@ interface Built {
   names: string[];
   blurbs?: string[];
   days?: NotableDay[];
+  changes?: NoteChange[];
   setKey?: string;
   driftKeys?: Record<string, string>;
   /** Snapshots only (R71): which question the prompt asks. */
@@ -407,7 +408,7 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
     },
     whole: (subject) => subject === "all",
     async read({ net, subject, nowMs, reads, names }) {
-      const { geoDays, providerNames, ccDays, daily } = await geoInputs(net, nowMs, reads);
+      const { geoDays, providerNames, siteDays, ccDays, daily } = await geoInputs(net, nowMs, reads);
       const ccs = new Set<string>();
       for (const day of [...Object.values(geoDays), ...Object.values(ccDays)])
         for (const k of Object.keys(day)) if (k.startsWith("f.cc.")) ccs.add(k.slice(k.lastIndexOf(".") + 1));
@@ -417,7 +418,7 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
       // A subject note is handed no daily read: the common reading is a network's or the whole
       // network's, never one card's.
       const subjectNote = isSubjectNote(subject);
-      const built = geoFacts({ subject: sel ?? subject, geoDays, ccDays, providerNames, countryNames, names, ...(subjectNote ? {} : { daily }) });
+      const built = geoFacts({ subject: sel ?? subject, geoDays, siteDays, ccDays, providerNames, countryNames, names, ...(subjectNote ? {} : { daily }) });
       const spanFrom = nowMs - 7 * D;
       // The common reading speaks of the last week (R74), so that window is stated beside the span.
       const windows: [string, number][] = [["Span length", secondsOf(spanFrom, nowMs)], ["Week", (7 * D) / 1000]];
@@ -478,6 +479,7 @@ export interface NoteFacts {
   /** "<name> is: <blurb>" lines, shown to the model beside the facts (never as facts). */
   blurbs: string[];
   days: NotableDay[];
+  changes: NoteChange[];
   spanFrom: number;
   spanTo: number;
   /** The prompt's subject label ("the whole network", "the hypergraph", a network, a country, or a
@@ -530,6 +532,7 @@ export async function factsFor(
     names: built.names,
     blurbs: built.blurbs ?? [],
     days: built.days ?? [],
+    changes: built.changes ?? [],
     spanFrom: r.spanFrom,
     spanTo: r.spanTo,
     label: r.label ?? row.label(subject, names),

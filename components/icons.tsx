@@ -37,8 +37,10 @@ import {
   Network,
   Clock,
   type LucideIcon,
+  Minus,
+  Plus,
 } from "lucide-react";
-import type { NotableKind } from "@/src/data/noteTypes";
+import type { NotableKind, NoteChangeKind } from "@/src/data/noteTypes";
 import type { NetworkId } from "@/src/engine/config";
 import type { Mode } from "@/src/store/store";
 import type { PickDescriptor } from "@/src/data/types";
@@ -255,7 +257,7 @@ export const measureIcon = (id: string): LucideIcon | undefined => (MEASURE_ICON
  *  extremes the single ones (its busiest, quietest day); a first day is the play mark, a last day
  *  the stop square, a pause the pause bars; the longest wait an hourglass, the day the most
  *  networks anchored the network mark. Monochrome via currentColor, tinted the day's network hue. */
-export const NOTE_KIND_ICONS: Record<NotableKind, LucideIcon> = {
+export const NOTE_KIND_ICONS: Record<NotableKind | NoteChangeKind, LucideIcon> = {
   high: ChevronsUp,
   peak: ChevronUp,
   low: ChevronsDown,
@@ -265,6 +267,16 @@ export const NOTE_KIND_ICONS: Record<NotableKind, LucideIcon> = {
   pause: Pause,
   longest: Hourglass,
   broadest: Network,
+  // The notable changes' rows speak the same language: what arrives or starts is the play, what
+  // leaves or stops the square, a pace the double chevrons.
+  gained: Plus,
+  lost: Minus,
+  new: Play,
+  gone: Square,
+  active: Play,
+  quiet: Pause,
+  faster: ChevronsUp,
+  slower: ChevronsDown,
 };
 
 /** THE BUCKET'S WIDTH (the Moment card's chip, user 2026-10-30: "'5-min' with an icon, shorter"):

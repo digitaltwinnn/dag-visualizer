@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { netKeyOf, tickNetSelectActions, tickNetClearActions, viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, trendPlaneActions, noteDayActions, snapshotClearActions, type ClickAction } from "./pickActions";
+import { netKeyOf, tickNetSelectActions, tickNetClearActions, viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, trendPlaneActions, noteCohortActions, noteDayActions, snapshotClearActions, type ClickAction } from "./pickActions";
 import { finerLevels } from "./focusLadder";
 import { METAGRAPHS } from "@/src/net/current";
 import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
@@ -684,5 +684,26 @@ describe("trendPlaneActions — a plane click in the History view (2026-09-18)",
     for (const current of [null, "elpaca", "dor-metagraph"]) {
       expect(kinds(trendPlaneActions("elpaca", current))).toEqual(["trendFocus"]);
     }
+  });
+});
+
+// THE AI CARD'S PROVIDER ROW (user, 2026-10-31): the row names a provider, not a place the reader
+// has drilled into, so it brings its country along.
+describe("noteCohortActions", () => {
+  const c = { cc: "DE", city: "Falkenstein", isp: "Hetzner" };
+  it("commits the country, then the cohort", () => {
+    expect(noteCohortActions(c, { country: null, cohort: null, hasInspect: false })).toEqual([
+      { kind: "country", cc: "DE" },
+      { kind: "cohort", sel: c },
+    ]);
+  });
+  it("leaves a country that already stands, and drops a finer node first", () => {
+    expect(noteCohortActions(c, { country: "DE", cohort: null, hasInspect: true })).toEqual([
+      { kind: "inspect", pick: null },
+      { kind: "cohort", sel: c },
+    ]);
+  });
+  it("the same row again releases the cohort, one toggle language", () => {
+    expect(noteCohortActions(c, { country: "DE", cohort: c, hasInspect: false })).toEqual([{ kind: "cohort", sel: null }]);
   });
 });

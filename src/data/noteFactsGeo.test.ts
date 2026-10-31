@@ -691,3 +691,43 @@ describe("fleetCountries: the countries a country note exists for", () => {
     expect(fleetCountries({ geoDays: {}, ccDays: { "2026-10-27": tiersToday } })).toEqual([]);
   });
 });
+
+// THE CARD'S ROWS (user, 2026-10-31: "just say 'Hetzner lost 3 nodes in <city>'").
+describe("geoFacts' notable changes", () => {
+  const was: DaySpec = { ...NOW, cc: { ...NOW.cc, DE: 52 }, isp: { ...NOW.isp, "ovh-sas": 12 } };
+  const geoDays = run("2026-10-27", 8, (i) => (i < 2 ? was : NOW));
+  const week = { geoDays, ccDays: ccOf(geoDays) };
+  it("a row for a country and one for a provider that moved, read as the facts read them", () => {
+    const r = geoFacts(input(week))!;
+    expect(r.changes).toEqual([
+      { kind: "lost", size: 2, text: "Germany lost 2 nodes", subject: { kind: "country", cc: "DE" } },
+      { kind: "lost", size: 2, text: "OVH lost 2 nodes", subject: { kind: "provider", keys: ["ovh-sas"], cc: null, city: null } },
+    ]);
+  });
+  it("names the city only where the sites measured it at both ends", () => {
+    const site = (n: number) => ({ "f.site.DE.Falkenstein.ovh-sas": n });
+    const r = geoFacts(input({ ...week, siteDays: { "2026-10-20": site(12), "2026-10-27": site(10) } }))!;
+    expect(r.changes?.[1]).toMatchObject({ text: "OVH lost 2 nodes in Falkenstein", subject: { cc: "DE", city: "Falkenstein" } });
+  });
+  it("a network reads its own days, and names no city", () => {
+    const own: DaySpec = { ...NOW, net: { ...NOW.net, usdc: { cc: { DE: 22, US: 10 }, isp: { "hetzner-online-ag": 22 } } } };
+    const days = run("2026-10-27", 8, (i) => (i < 2 ? own : NOW));
+    const site = (n: number) => ({ "f.site.DE.Falkenstein.hetzner-online-ag": n });
+    const r = geoFacts(input({ subject: "usdc", geoDays: days, ccDays: ccOf(days), siteDays: { "2026-10-20": site(22), "2026-10-27": site(20) } }))!;
+    expect(r.changes?.map((c) => c.text)).toEqual(["Germany lost 2 nodes", "Hetzner Online lost 2 nodes"]);
+  });
+  it("tells a country's first nodes and its last apart from a move", () => {
+    const nl: DaySpec = { ...NOW, cc: { DE: 50, US: 30, FR: 15, JP: 5 } };
+    const days = run("2026-10-27", 8, (i) => (i < 2 ? NOW : nl));
+    const r = geoFacts(input({ geoDays: days, ccDays: ccOf(days), countryNames: { ...COUNTRIES, JP: "Japan" } }))!;
+    expect(r.changes?.map((c) => [c.kind, c.text])).toEqual([["new", "Japan gained its first 5 nodes"], ["gone", "Netherlands lost its last 5 nodes"]]);
+  });
+  it("nothing moved, or no week ago to read, is no rows", () => {
+    const flat = run("2026-10-27", 8, () => NOW);
+    expect(geoFacts(input({ geoDays: flat, ccDays: ccOf(flat) }))!.changes).toBeUndefined();
+    expect(geoFacts(input())!.changes).toBeUndefined();
+  });
+  it("a subject's note is not the card's: no rows", () => {
+    expect(geoFacts(input({ ...week, subject: { cc: "DE" } }))!.changes).toBeUndefined();
+  });
+});

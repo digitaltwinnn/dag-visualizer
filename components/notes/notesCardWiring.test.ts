@@ -48,8 +48,19 @@ describe("the notes card is part of the stack", () => {
 describe("the notes card's own behaviour", () => {
   const card = read("components/notes/NotesCard.tsx");
 
+  // THE OTHER VIEWS' ROWS (user, 2026-10-31): a sentence code wrote, committing its subject through
+  // the one executor (rule 2; `noteChangeTarget`), and folded like the days, under their own title.
+  it("a view note's notable changes share the days' fold and commit through the executor", () => {
+    expect(card).toMatch(/heading="Notable days"/);
+    expect(card).toMatch(/heading="Notable changes"/);
+    const body = fnBody(card, "function ChangeRow(");
+    expect(body).toMatch(/applyClickActions\(acts\)/);
+    expect(body).toMatch(/<NoteKindCoin kind=\{change\.kind\} \/>/);
+    expect(body).toMatch(/\{change\.text\}/);
+  });
+
   it("History's notable days start folded, their rows mounted only when open", () => {
-    const body = fnBody(card, "function NotableDays(");
+    const body = fnBody(card, "function NoteRows(");
     expect(body).toMatch(/const \[open, setOpen\] = useState\(false\);/);
     expect(body).toMatch(/\{open && \(/);
     expect(body).toMatch(/aria-expanded=\{open\}/);
@@ -71,7 +82,7 @@ describe("the notes card's own behaviour", () => {
     expect(body).not.toMatch(/figure=/);
     expect(body).toMatch(/\bwrap\b/);
     expect(body).toMatch(/sr-only[^]*?NOTE_KIND_WORD\[day\.kind\]/);
-    expect(read("components/icons.tsx")).toMatch(/export const NOTE_KIND_ICONS: Record<NotableKind, LucideIcon>/);
+    expect(read("components/icons.tsx")).toMatch(/export const NOTE_KIND_ICONS: Record<NotableKind \| NoteChangeKind, LucideIcon>/);
     expect(card).toMatch(/import \{ NOTE_KIND_WORD \} from "\.\/noteDays";/);
     const coin = read("components/notes/NoteKindCoin.tsx");
     expect(coin).toMatch(/NOTE_KIND_ICONS\[kind\]/);

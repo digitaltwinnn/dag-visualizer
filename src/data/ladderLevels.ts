@@ -14,6 +14,7 @@ import { countryMeasure, networkOfRow, type GeoMeasure } from "./geoMeasure";
 import { hoverKeyOf } from "./hoverSubject";
 import { networkMeasure, type HyperMeasure } from "./hyperMeasure";
 import { metagraphById } from "./network";
+import { providerKey } from "./providerKey";
 import type { CountryStat, GlobalSnapshot, MetaInfo, NodeRow } from "./types";
 import { UNLISTED_HUE, UNLISTED_ID, UNLISTED_LABEL } from "./unlisted";
 import { identityHudCss } from "@/src/palette/identity";
@@ -74,6 +75,40 @@ export function cohortsLevel(rows: readonly NodeRow[]): Cohort[] {
     (by.get(key) ?? by.set(key, { key, city, isp, rows: [] }).get(key)!).rows.push(r);
   }
   return [...by.values()].sort((a, b) => b.rows.length - a.rows.length || (a.city ?? "￿").localeCompare(b.city ?? "￿"));
+}
+
+/** THE LIVE GROUP OF A PROVIDER'S NODES an AI card row opens: the place the note named while it
+ *  still has nodes, else the provider's biggest. Keyed by the stored provider keys, since a row
+ *  comes from the store; the rows are live, so a provider with no nodes left has none. */
+export function cohortOfProvider(
+  rows: readonly NodeRow[],
+  keys: readonly string[],
+  cc: string | null,
+  city: string | null,
+): { cc: string; city: string | null; isp: string; rows: NodeRow[] } | null {
+  const want = new Set(keys);
+  const by = new Map<string, { cc: string; city: string | null; isp: string; rows: NodeRow[] }>();
+  for (const r of rows) {
+    const isp = "geo" in r.pick ? r.pick.geo?.isp : undefined;
+    const key = providerKey(isp);
+    if (!isp || !key || !want.has(key) || !r.cc) continue;
+    const at = `${r.cc}|${r.city ?? ""}|${isp}`;
+    (by.get(at) ?? by.set(at, { cc: r.cc, city: r.city || null, isp, rows: [] }).get(at)!).rows.push(r);
+  }
+  const groups = [...by.values()].sort((a, b) => b.rows.length - a.rows.length || a.cc.localeCompare(b.cc));
+  return groups.find((g) => g.cc === cc && g.city === city) ?? groups[0] ?? null;
+}
+
+/** The newest global snapshot a network anchored into, within the buffers: where an AI card row
+ *  opens that network in Snapshots, which commits a network INSIDE a tick (`tickNetSelectActions`). */
+export function latestTickOf(
+  metaSnaps: ReadonlyMap<string, readonly MetaSnapRecord[]>,
+  globals: readonly GlobalSnapshot[],
+  id: string,
+): GlobalSnapshot | null {
+  const anchored = new Set((metaSnaps.get(id) ?? []).map((r) => r.ts));
+  for (let i = globals.length - 1; i >= 0; i--) if (anchored.has(globals[i]!.timestamp)) return globals[i]!;
+  return null;
 }
 
 /** THE NODE PAGER'S PROJECTION: a node that runs two layers is two explorer rows (one per layer) but

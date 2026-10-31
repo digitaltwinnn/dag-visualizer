@@ -97,6 +97,20 @@ export function cohortToggleActions(
   return acts;
 }
 
+/** THE AI CARD'S PROVIDER ROW (user, 2026-10-31): the cohort rung's toggle, for a row that names a
+ *  provider rather than sitting under a drilled country, so it brings its country along. The node
+ *  goes first, as `cohortToggleActions`; the country before its cohort, which hangs under it. */
+export function noteCohortActions(
+  c: CohortSel,
+  current: { country: string | null; cohort: CohortSel | null; hasInspect: boolean },
+): ClickAction[] {
+  const acts: ClickAction[] = [];
+  if (current.hasInspect) acts.push({ kind: "inspect", pick: null });
+  if (current.country !== c.cc) acts.push({ kind: "country", cc: c.cc });
+  acts.push({ kind: "cohort", sel: sameCohort(current.cohort, c) ? null : c });
+  return acts;
+}
+
 // Composition-group identity — network + group key (the `${label}|${codes}` HyperExplore builds).
 export const sameComposition = (a: CompositionSel | null, b: CompositionSel | null): boolean =>
   !!a && !!b && a.netId === b.netId && a.key === b.key;
