@@ -11,6 +11,11 @@ import * as THREE from "three";
 // whole ring still fits with no selection).
 export const META_ORBIT = 29;
 
+/** How much further out each of the four staggered slots sits. 3.2 until 2026-10-31 (user: "some
+ *  are quite far away"): the outer slot's spoke ran a third longer than the inner one's, and the hub
+ *  at the front of the ring fell out of the bottom of the frame. */
+export const META_STAGGER = 1.6;
+
 // Anchor position of metagraph i's orbiting cluster in the Hypergraph layout.
 // Shared by HyperView (the hub mesh) and Globe (where each metagraph's real nodes
 // start before they fly out to the map) so the burst originates from the hub.
@@ -20,7 +25,7 @@ export function metaAnchor(
 ): { x: number; y: number; z: number; a: number; radius: number; incl: number } {
   const a = (i / n) * Math.PI * 2;
   const incl = (i % 2 === 0 ? 1 : -1) * (0.15 + (i % 3) * 0.12);
-  const radius = META_ORBIT + (i % 4) * 3.2;
+  const radius = META_ORBIT + (i % 4) * META_STAGGER;
   return {
     x: Math.cos(a) * radius,
     y: Math.sin(a) * radius * Math.sin(incl) + (i % 2 ? 4 : -3),
