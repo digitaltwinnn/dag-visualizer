@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { KIND_TIMING, capKeyOf, failKeyOf, isSubjectNote, lockKeyOf, noteKeyOf, rateKeyOf, snapSpan, statsKeyOf, subjectKindOf, timingOf, NOTES_VERSION } from "./keys";
+import { KIND_TIMING, capKeyOf, failKeyOf, isBriefingNote, isSubjectNote, lockKeyOf, noteKeyOf, rateKeyOf, snapSpan, statsKeyOf, subjectKindOf, timingOf, NOTES_VERSION } from "./keys";
 
 const NOW = Date.UTC(2026, 9, 27, 12, 0, 0);
 const MIN = 60_000;
@@ -7,9 +7,9 @@ const DAY = 86_400_000;
 
 describe("keys", () => {
   it("writes a note key in its own family", () => {
-    expect(NOTES_VERSION).toBe(36);
-    expect(noteKeyOf("mainnet", "trend", "dag", "7d")).toBe("ai:mainnet:v36:trend:dag:7d");
-    expect(noteKeyOf("mainnet", "hyper", "all", "day")).toBe("ai:mainnet:v36:hyper:all:day");
+    expect(NOTES_VERSION).toBe(37);
+    expect(noteKeyOf("mainnet", "trend", "dag", "7d")).toBe("ai:mainnet:v37:trend:dag:7d");
+    expect(noteKeyOf("mainnet", "hyper", "all", "day")).toBe("ai:mainnet:v37:hyper:all:day");
   });
 
   it("keeps lock, stats, rate and cap keys inside the ai: family and apart from note keys", () => {
@@ -129,5 +129,20 @@ describe("keys", () => {
       expect(subjectKindOf("dag/span")).toBe("span"); expect(subjectKindOf("dor/span")).toBe("span");
       expect(isSubjectNote("dag/span")).toBe(true);
     });
+  });
+});
+
+describe("the notes the Briefing reads", () => {
+  it("are every view's widest note and History's resting window", () => {
+    expect(isBriefingNote("hyper", "all", "day")).toBe(true);
+    expect(isBriefingNote("geo", "all", "day")).toBe(true);
+    expect(isBriefingNote("ledger", "all", "hours")).toBe(true);
+    expect(isBriefingNote("trend", "dag", "30d")).toBe(true);
+  });
+
+  it("are no other note, so no other write pays for a line", () => {
+    expect(isBriefingNote("hyper", "dor", "day")).toBe(false);
+    expect(isBriefingNote("trend", "dag", "7d")).toBe(false);
+    expect(isBriefingNote("trend", "dor", "30d")).toBe(false);
   });
 });

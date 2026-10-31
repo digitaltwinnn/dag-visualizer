@@ -1664,6 +1664,9 @@
      same fluid ramp: 20px to a 1440px viewport, 22.5px by 2560px). Figures only — never a word. */
   --text-figure: clamp(20px, 16.79px + 0.223vw, 22.5px);
   --text-figure--line-height: 1;
+  /* The Briefing's words: the one line of display type on the stage. */
+  --text-briefing: clamp(20px, 13.6px + 1.82vw, 40px);
+  --text-briefing--line-height: 1.26;
   /* DOCUMENT PROSE — the fourth step, for the doc overlay's paragraphs only (/about, /design, the
      History document). A paragraph is read, not scanned: the HUD's label step in a 700px column
      ran 115 characters a line at 11.5px, which is a footnote, not a page. 15px over a 1.65

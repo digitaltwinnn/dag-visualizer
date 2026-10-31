@@ -32,6 +32,9 @@ export function useBootStage(): BootStage {
   const live = useStore((s) => s.live);
   const [timedOut, setTimedOut] = useState(false);
   const [stage, setStage] = useState<BootStage>(0);
+  // The Briefing clears the stage: the zones stand down for the tour and come back with this same
+  // fade when it ends. The ladder keeps climbing underneath, so nothing is waited for twice.
+  const briefing = useStore((s) => s.briefing != null);
   const targetRef = useRef<BootStage>(0);
 
   useEffect(() => {
@@ -60,5 +63,5 @@ export function useBootStage(): BootStage {
     return () => clearTimeout(id);
   }, [stage, target]);
 
-  return stage;
+  return briefing ? 0 : stage;
 }

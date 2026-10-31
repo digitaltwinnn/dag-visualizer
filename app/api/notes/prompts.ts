@@ -169,6 +169,10 @@ export function spanWords(view: NoteView, span: NoteSpan, spanFrom: number, span
 export const CAPTION_FORMAT =
   "Answer format: first a line starting NOTE: with the note, then exactly one line per listed day, starting DAY YYYY-MM-DD: with a caption of one short clause, at most ten words, using only numbers from the facts, in plain words a reader would say: never \"median\", never \"against\". The reader sees the day's date and what kind of day it was beside the caption, so the caption repeats neither: it gives the figure and whose it was, as the facts name the day. For a first or last day, the network and that nothing was anchored before, or since. For the span's busiest, quietest, longest wait or most networks, the day's figure, then the typical day's as \"usually …\". For a spike or a dip, the same shape: the day's figure, then the usual as \"usually …\". Nothing else.";
 
+/** THE BRIEFING'S LINE: what the tour shows at this view's stop, in the note's own answer. */
+export const LINE_FORMAT =
+  "One more line belongs in this answer, whatever the format above says: directly after the note, a line starting LINE: with the note's opening finding as one plain sentence of at most sixteen words. Keep the note's own wording for it: the span, what moved, and both numbers as \"from X to Y\".";
+
 export function buildMessages(
   view: NoteView,
   subjectLabel: string,
@@ -180,6 +184,7 @@ export function buildMessages(
   kind?: SubjectKind,
   span?: string | null,
   whole?: boolean,
+  line?: boolean,
 ): { role: "system" | "user"; content: string }[] {
   const withDays = !!days && days.length > 0;
   const format = withDays
@@ -190,7 +195,7 @@ export function buildMessages(
   if (retryReasons && retryReasons.length)
     parts.push(`Your previous answer was rejected: ${retryReasons.join("; ")}. Write it again and fix this.`);
   return [
-    { role: "system", content: `${PROMPTS[view].system(subjectLabel, lead, common, kind, whole)}\n\n${format}` },
+    { role: "system", content: `${PROMPTS[view].system(subjectLabel, lead, common, kind, whole)}\n\n${format}${line ? ` ${LINE_FORMAT}` : ""}` },
     { role: "user", content: parts.join("\n\n") },
   ];
 }
@@ -199,26 +204,32 @@ export function buildMessages(
 const THINK_RE = /<think>[\s\S]*?(?:<\/think>|$)/gi;
 const NOTE_RE = /^[\s*_#]*NOTE[*_]*:[*_\s]*(.*)$/i;
 const DAY_RE = /^[\s*_#]*DAY\s+(\d{4}-\d{2}-\d{2})[*_]*\s*:[*_\s]*(.*)$/i;
+const LINE_RE = /^[\s*_#]*LINE[*_]*:[*_\s]*(.*)$/i;
 const FENCE_RE = /^```/;
 
-/** READ THE ANSWER BACK: `NOTE: …` then one `DAY YYYY-MM-DD: …` line per day. Tolerant by design,
+/** READ THE ANSWER BACK: `NOTE: …`, an optional `LINE: …`, then one `DAY YYYY-MM-DD: …` line per day. Tolerant by design,
  *  because the model sometimes wraps its output or reasons first: whitespace, code fences, markdown
  *  on the markers and any lines before `NOTE:` are ignored, a leaked `<think>` block, closed or cut
  *  off, is dropped, and a blank line ends the note. A second caption for one date is keyed
  *  `<date>#2`, so two notable days on a date keep their own. A note may run over several lines
  *  up to the first DAY line. With no `NOTE:` line at all the whole trimmed text is the note, and
  *  there are no captions. */
-export function parseAnswer(text: string): { note: string; captions: Map<string, string> } {
+export function parseAnswer(text: string): { note: string; captions: Map<string, string>; line: string | null } {
   const lines = text.replace(THINK_RE, "").trim().split("\n").map((l) => l.trim()).filter((l) => !FENCE_RE.test(l));
   const captions = new Map<string, string>();
   const start = lines.findIndex((l) => NOTE_RE.test(l));
-  if (start < 0) return { note: lines.join("\n").trim(), captions };
+  if (start < 0) return { note: lines.join("\n").trim(), captions, line: null };
   const note = [NOTE_RE.exec(lines[start]!)![1]!];
   const seen = new Map<string, number>();
   let inNote = true;
+  let brief: string | null = null;
   for (const line of lines.slice(start + 1)) {
     const day = DAY_RE.exec(line);
-    if (day) {
+    const said = LINE_RE.exec(line);
+    if (said) {
+      inNote = false;
+      brief = said[1]!.trim() || null;
+    } else if (day) {
       inNote = false;
       const caption = day[2]!.trim();
       const n = (seen.get(day[1]!) ?? 0) + 1;
@@ -229,5 +240,5 @@ export function parseAnswer(text: string): { note: string; captions: Map<string,
       else if (note.some(Boolean)) inNote = false; // what follows a blank line is the model talking
     }
   }
-  return { note: note.join("\n").trim(), captions };
+  return { note: note.join("\n").trim(), captions, line: brief };
 }

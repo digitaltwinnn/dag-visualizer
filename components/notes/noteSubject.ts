@@ -21,6 +21,9 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 // I'd like that also"): the sampler measures its chains, so History has a record; they publish no
 // nodes and no places, so the other views have nothing measured to say.
 
+/** The product's name, wherever the AI signs its words. */
+export const AI_TITLE = "Constellation Gate AI";
+
 export interface NoteSubjectState {
   /** `metagraphCardNetwork(state)`: the network the metagraph card stands on ("all" when none). */
   metagraphNetwork: string | null;

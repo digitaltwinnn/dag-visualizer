@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { NoteView, NotableDay } from "@/src/data/noteTypes";
-import { CAPTION_FORMAT, PROMPTS, VOICE, buildMessages, parseAnswer, spanWords } from "./prompts";
+import { CAPTION_FORMAT, LINE_FORMAT, PROMPTS, VOICE, buildMessages, parseAnswer, spanWords } from "./prompts";
 
 const VIEWS: NoteView[] = ["hyper", "geo", "ledger", "trend"];
 
@@ -365,5 +365,25 @@ describe("parseAnswer", () => {
 
   it("returns an empty note for empty text", () => {
     expect(parseAnswer("  \n").note).toBe("");
+  });
+});
+
+describe("the Briefing's line", () => {
+  it("is asked for only when wanted", () => {
+    const asked = (line?: boolean) => buildMessages("geo", "x", "Facts", null, undefined, undefined, false, undefined, null, false, line)[0]!.content;
+    expect(asked(true)).toContain(LINE_FORMAT);
+    expect(asked()).not.toContain(LINE_FORMAT);
+  });
+
+  it("is read back apart from the note", () => {
+    const r = parseAnswer("NOTE: A b. C d.\nLINE: A in short.\nDAY 2026-10-19: Busy.");
+    expect(r.note).toBe("A b. C d.");
+    expect(r.line).toBe("A in short.");
+    expect(r.captions.get("2026-10-19")).toBe("Busy.");
+  });
+
+  it("is absent from an answer without one", () => {
+    expect(parseAnswer("NOTE: A b.").line).toBeNull();
+    expect(parseAnswer("A b.").line).toBeNull();
   });
 });

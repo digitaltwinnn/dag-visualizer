@@ -4,7 +4,7 @@ import { withDayChange } from "@/src/data/notableDays";
 import { withMovePercents } from "@/src/data/noteChanges";
 import type { NoteChange, NoteDay, NoteResponse, NoteView } from "@/src/data/noteTypes";
 import { GateError, type gateChat, type GateErrorKind } from "./gate";
-import { failKeyOf, lockKeyOf, noteKeyOf, statsKeyOf, timingOf, type NoteSpan } from "./keys";
+import { failKeyOf, isBriefingNote, lockKeyOf, noteKeyOf, statsKeyOf, timingOf, type NoteSpan } from "./keys";
 import { buildMessages, parseAnswer, spanWords } from "./prompts";
 
 const NEGATIVE_RE = /\b(?:no|none)\b/i;
@@ -49,6 +49,8 @@ export interface NoteRecord {
   days: NoteDay[];
   /** A view note's notable changes (`noteChanges.ts`), measured when the note was written. */
   changes?: NoteChange[];
+  /** The Briefing's one line, on the four notes it reads (`isBriefingNote`). */
+  line?: string;
   /** Hyper `all` only: the networks with nodes when the digest was written (the warmer compares). */
   setKey?: string;
   /** The network's held count this note was warmed under (`planPass`); absent on a visitor's write. */
@@ -143,14 +145,18 @@ function parseRecord(raw: string | null): NoteRecord | null {
 }
 
 function okOf(r: NoteRecord): NoteResponse {
-  return { state: "ok", text: r.text, writtenAt: r.writtenAt, spanFrom: r.spanFrom, spanTo: r.spanTo, days: r.days, ...(r.changes?.length ? { changes: r.changes } : {}) };
+  return { state: "ok", text: r.text, writtenAt: r.writtenAt, spanFrom: r.spanFrom, spanTo: r.spanTo, days: r.days, ...(r.changes?.length ? { changes: r.changes } : {}), ...(r.line ? { line: r.line } : {}) };
 }
 
 function warn(req: NoteRequest, kind: string): void {
   console.warn(`[notes] ${req.view}/${req.subject}/${req.span}: ${kind}`);
 }
 
-type Written = { ok: true; text: string; days: NoteDay[] } | { ok: false; stat: NoteStat };
+type Written = { ok: true; text: string; days: NoteDay[]; line?: string } | { ok: false; stat: NoteStat };
+
+/** The longest the Briefing's line may run: past this it stops being a line, and the tour falls
+ *  back on the note's first sentence. */
+export const LINE_MAX = 110;
 
 /** What the code tidies in checked text: the numbers stand, only their words change. */
 const plainly = (text: string): string => sayAll(spellDurations(text));
@@ -166,6 +172,7 @@ async function write(
   const days = input.days.length ? input.days : null;
   // A sentence naming no one speaks of the subject (R39): absent for the whole network.
   const subject = input.subjectName;
+  const wantsLine = isBriefingNote(req.view, req.subject, req.span);
   let reasons: string[] | undefined;
   /** A note that passed the gate and only failed the style rewrite: it stands if the rewrite fails. */
   let held: Written | null = null;
@@ -173,7 +180,7 @@ async function write(
     if (attempt > 0) await count("retried");
     let answer: string;
     try {
-      answer = await chat(buildMessages(req.view, input.label, block, days, reasons, input.lead, input.common, input.kind, spanWords(req.view, req.span, input.spanFrom, input.spanTo), input.whole));
+      answer = await chat(buildMessages(req.view, input.label, block, days, reasons, input.lead, input.common, input.kind, spanWords(req.view, req.span, input.spanFrom, input.spanTo), input.whole, wantsLine));
       await count("calls");
     } catch (e) {
       if (!(e instanceof GateError)) throw e; // not the Gate's: `generateNote` counts it as `error`
@@ -183,7 +190,7 @@ async function write(
       if (held) return held; // the rewrite was style, and a checked note is in hand
       return { ok: false, stat: kind };
     }
-    const { note, captions } = parseAnswer(answer);
+    const { note, captions, line } = parseAnswer(answer);
     const check = checkNote(note, input.facts, input.names, { maxSentences: 3, subject });
     if (!check.ok) {
       if (held) return held;
@@ -205,12 +212,18 @@ async function write(
       if (caption && checkNote(caption, input.facts, input.names, { maxSentences: 1, subject }).ok)
         kept.push({ dayMs: d.dayMs, kind: d.kind, networkId: d.networkId, caption: withDayChange(plainly(caption), d) });
     }
+    // The Briefing's line is held to the note's gate and is never worth a retry: one that fails,
+    // runs long or says what did not happen is dropped, and the tour reads the note instead.
+    const brief = wantsLine && line && !NEGATIVE_RE.test(line) && checkNote(line, input.facts, input.names, { maxSentences: 1, subject }).ok
+      ? withMovePercents(plainly(line), input.facts)
+      : null;
+    const written: Written = { ok: true, text: withMovePercents(plainly(note), input.facts), days: kept, ...(brief && brief.length <= LINE_MAX ? { line: brief } : {}) };
     if (negative) {
-      held = { ok: true, text: withMovePercents(plainly(note), input.facts), days: kept };
+      held = written;
       reasons = [`say what held steady instead of "${negative.toLowerCase()}"`];
       continue;
     }
-    return { ok: true, text: withMovePercents(plainly(note), input.facts), days: kept };
+    return written;
   }
   warn(req, "gateFail");
   return { ok: false, stat: "gateFail" };
@@ -330,6 +343,7 @@ export async function generateNote(
       spanTo: input.spanTo,
       days: written.days,
       ...(input.changes.length ? { changes: input.changes } : {}),
+      ...(written.line ? { line: written.line } : {}),
       ...(input.setKey != null ? { setKey: input.setKey } : {}),
       ...(opts.driftKey != null ? { driftKey: opts.driftKey } : {}),
     };

@@ -71,7 +71,7 @@ export interface NoteChange {
 }
 
 export type NoteResponse =
-  | { state: "ok"; text: string; writtenAt: number; spanFrom: number; spanTo: number; days: NoteDay[]; changes?: NoteChange[] }
+  | { state: "ok"; text: string; writtenAt: number; spanFrom: number; spanTo: number; days: NoteDay[]; changes?: NoteChange[]; line?: string }
   | { state: "pending" }
   | { state: "none" }
   | { state: "unavailable" }

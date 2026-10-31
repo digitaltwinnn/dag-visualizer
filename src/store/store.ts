@@ -306,6 +306,10 @@ interface AppState {
   // The view transition's phase while one runs — OUT is the teardown, IN the build — so a view
   // switch can say "leaving A" and then "entering B" (user, 2026-09-26). Engine-written, edges only.
   motionPhase: "out" | "in" | null;
+  // THE BRIEFING (`domain/briefing.ts`): the stop on screen, or null when no tour runs. One channel:
+  // the HUD stands down on it (`useBootStage`), the URL holds (`RouteSync`), and the Engine reads it
+  // for the tour's pace and the scene's lift. `components/Briefing.tsx` is its one writer.
+  briefing: number | null;
   // Where the view transition's STAGING BAND ends, in canvas-local CSS px from the top (2026-09-29)
   // — the lowest row of the gathered grids — so the motion hint can stand clear of it while a
   // switch runs. Engine-written on change only; null until a transition has measured one.
@@ -497,6 +501,7 @@ interface AppState {
   setCameraFlying: (flying: boolean) => void;
   setSceneMoving: (moving: boolean) => void;
   setMotionPhase: (phase: "out" | "in" | null) => void;
+  setBriefing: (stop: number | null) => void;
   setGatherBottom: (px: number | null) => void;
   setMotionCause: (cause: MotionCause | null) => void;
   setPhoneSheetPx: (px: number | null) => void;
@@ -573,7 +578,7 @@ export const useStore = create<AppState>((set) => ({
   nodes: { l0: 0, l1: 0 },
   latestSnapshot: null,
   activity: null,
-  mode: "hyper",
+  mode: "geo",
   docPage: null,
   logSeek: null,
   logCut: null,
@@ -619,6 +624,7 @@ export const useStore = create<AppState>((set) => ({
   sceneMoving: false,
   motionCause: null,
   motionPhase: null,
+  briefing: null,
   gatherBottom: null,
   railCollapse: {},
   navQuiet: false,
@@ -852,6 +858,7 @@ export const useStore = create<AppState>((set) => ({
   setCameraFlying: (cameraFlying) => set({ cameraFlying }),
   setSceneMoving: (sceneMoving) => set({ sceneMoving }),
   setMotionPhase: (motionPhase) => set({ motionPhase }),
+  setBriefing: (briefing) => set({ briefing }),
   setGatherBottom: (gatherBottom) => set({ gatherBottom }),
   setMotionCause: (motionCause) => set({ motionCause }),
   setNavQuiet: (navQuiet) => set({ navQuiet }),

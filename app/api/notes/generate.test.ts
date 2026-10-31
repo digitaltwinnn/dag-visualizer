@@ -3,7 +3,7 @@ import { fact } from "@/src/data/noteFacts";
 import { checkNote } from "@/src/data/noteHonesty";
 import type { NotableDay } from "@/src/data/noteTypes";
 import type { TrendsWindowData } from "@/src/data/trendWindow";
-import { FAIL_TTL_S, generateNote, LOCK_TTL_S, NOTE_STATS, type NoteRecord } from "./generate";
+import { FAIL_TTL_S, generateNote, LINE_MAX, LOCK_TTL_S, NOTE_STATS, type NoteRecord } from "./generate";
 import { GateError, type GateMessage } from "./gate";
 import { KIND_TIMING, lockKeyOf, noteKeyOf, statsKeyOf } from "./keys";
 import { PROMPTS } from "./prompts";
@@ -620,5 +620,41 @@ describe("a whole group is said as all of it", () => {
   it("whatever the model wrote", async () => {
     const r = await generateNote(REQ, deps({ facts: async () => ({ ...structuredClone(FACTS), facts: [...FACTS.facts, fact("Nodes", 3, "count")] }), answers: ["NOTE: The hypergraph anchored 1,200 snapshots a day, and 3 of the 3 nodes held."] }), "read");
     expect(r).toMatchObject({ state: "ok", text: "The hypergraph anchored 1,200 snapshots a day, and all 3 nodes held." });
+  });
+});
+
+describe("the Briefing's line", () => {
+  const BRIEF = { net: "mainnet", view: "trend" as const, subject: "dag", span: "30d" as const };
+  const stored = async () => JSON.parse((await store.get(noteKeyOf("mainnet", "trend", "dag", "30d")))!) as NoteRecord;
+  const answer = (line: string) => [`${CLEAN}\nLINE: ${line}`];
+
+  it("is kept on a note the tour reads, and served", async () => {
+    const r = await generateNote(BRIEF, deps({ answers: answer("The hypergraph anchored 1,200 snapshots a day.") }), "read");
+    expect(r).toMatchObject({ state: "ok", line: "The hypergraph anchored 1,200 snapshots a day." });
+    expect((await stored()).line).toBe("The hypergraph anchored 1,200 snapshots a day.");
+  });
+
+  it("is asked of no other note", async () => {
+    const d = deps();
+    await generateNote(REQ, d, "read");
+    expect(d.chat.mock.calls[0]![0]![0]!.content).not.toContain("LINE:");
+  });
+
+  it("is dropped when a number fails the gate, and the note stands", async () => {
+    const d = deps({ answers: answer("The hypergraph anchored 9,999 snapshots a day.") });
+    const r = await generateNote(BRIEF, d, "read");
+    expect(r).toMatchObject({ state: "ok" });
+    expect(r).not.toHaveProperty("line");
+    expect(d.chat).toHaveBeenCalledTimes(1);
+  });
+
+  it("is dropped when it says what did not happen", async () => {
+    expect(await generateNote(BRIEF, deps({ answers: answer("There were no changes at 1,200 a day.") }), "read")).not.toHaveProperty("line");
+  });
+
+  it("is dropped past its length", async () => {
+    const long = `The hypergraph anchored 1,200 snapshots a day ${"and it went on saying so ".repeat(4)}in one breath.`;
+    expect(long.length).toBeGreaterThan(LINE_MAX);
+    expect(await generateNote(BRIEF, deps({ answers: answer(long) }), "read")).not.toHaveProperty("line");
   });
 });

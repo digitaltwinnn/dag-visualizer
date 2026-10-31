@@ -42,6 +42,7 @@ export default function PresentationToggle() {
   const railsHidden = useStore((s) => s.railsHidden);
   const setSection = useStore((s) => s.setSection);
   const setRailsHidden = useStore((s) => s.setRailsHidden);
+  const briefing = useStore((s) => s.briefing != null);
   // Below 1100px SCENE has no meaning (the rails are dock sheets) and this — the state's ONE
   // writer — is CSS-hidden but still mounted. Without this reset, pressing Scene on desktop and
   // then narrowing left railsHidden stuck true with no visible control: the vitals band never
@@ -84,6 +85,7 @@ export default function PresentationToggle() {
         <span className="text-label tracking-caps uppercase max-[1649px]:hidden">Scene</span>
       </button>
       {railsHidden &&
+        !briefing &&
         portalHost &&
         createPortal(
           // The bar's own glass, at the bar's own corner and inset — one control's worth of the

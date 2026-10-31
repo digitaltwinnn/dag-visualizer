@@ -30,6 +30,7 @@ import { THEME_KEY, parseThemePref, resolveTheme, type Theme } from "@/src/theme
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
 import { sceneFeeds } from "./domain/sceneFeeds";
 import { liveArrivals } from "./domain/arrivals";
+import { BRIEFING_COVER, BRIEFING_PACE } from "./domain/briefing";
 import { SHEET_SHIFT_K, chromeShiftPx, sheetShiftPx, stripShiftPx } from "./domain/sheetShift";
 import { ChromeBounds } from "./ChromeBounds";
 import { FOCI, nodeFraming, cohortFraming, ledgerCommitTilt, trendFocusPush, trendFit } from "./domain/cameraRig";
@@ -495,6 +496,10 @@ export class Engine {
   // No param → stays 1 → the whole mechanism is a no-op, so the parse itself is the dev/prod gate
   // (unlike `stats`, which toggles a visible DOM panel and so needs an explicit environment check).
   private _slowmo = 1;
+  /** The choreography clock's divisor: `?slowmo`, and the Briefing's faster pace while it runs. */
+  private _choreoScale(): number {
+    return useStore.getState().briefing != null ? this._slowmo / BRIEFING_PACE : this._slowmo;
+  }
   /** `?clickdebug` — log why each click resolved as it did. Dev instrument; see the parse site. */
   private _clickDebug = false;
   // The live-tuning panel's handle (devTune.ts) — dev tooling, disposed with the engine.
@@ -681,7 +686,7 @@ export class Engine {
       get mode() { return engineSelf.mode; },
       policy: () => this._policy,
       railsHidden: () => this.railsHidden,
-      slowmo: () => this._slowmo,
+      slowmo: () => this._choreoScale(),
       setFlying: (v) => useStore.getState().setCameraFlying(v),
       flyingNow: () => useStore.getState().cameraFlying,
     });
@@ -2041,7 +2046,7 @@ export class Engine {
       // Published for the DOM-side projectors, which ease on their own clock rather than through a
       // phase argument. `?slowmo` divides it exactly as the choreography's tick does, so the debug
       // flag stretches the stack's travel with everything else instead of leaving it at full speed.
-      this._frameDt = dt / this._slowmo;
+      this._frameDt = dt / this._choreoScale();
       // ---- THE FRAME ORDER CONTRACT (spec C#1) -------------------------------------------
       // Phases run in this order and NOTHING may mutate a pose after the phase that derives
       // from it: inputs/boundary → camera → motion (spin/rotation) → derived frames (staging
@@ -2091,7 +2096,7 @@ export class Engine {
     // Advance the machine; tick() returns TRUE exactly once, at the OUT→IN boundary. The nodes
     // are then fully gathered and both furnitures are dark, so snapping the destination layout +
     // morph + starting the camera flight here is invisible.
-    if (this.transition.tick(dt / this._slowmo) && this._pendingBoundary) {
+    if (this.transition.tick(dt / this._choreoScale()) && this._pendingBoundary) {
       const dest = this._pendingBoundary;
       this._pendingBoundary = null;
       this._applyBoundary(dest);
@@ -2154,8 +2159,9 @@ export class Engine {
       const el = this.ctx.renderer.domElement;
       const w = el.clientWidth || window.innerWidth;
       const h = el.clientHeight || window.innerHeight;
+      const words = st.briefing != null ? h * BRIEFING_COVER : 0; // the Briefing's caption, the same lift
       const target =
-        sheetShiftPx(Math.max(st.sceneCoverBExplore, st.sceneCoverBDetails, st.sceneCoverBVitals), h) + this._chromeShift();
+        sheetShiftPx(Math.max(st.sceneCoverBExplore, st.sceneCoverBDetails, st.sceneCoverBVitals, words), h) + this._chromeShift();
       const d = target - this._sheetShift;
       // REDUCED MOTION SNAPS (review, 2026-09-28): a whole-scene slide of up to half the viewport,
       // riding a sheet, is exactly the large-area motion the setting exists to remove. The sheet

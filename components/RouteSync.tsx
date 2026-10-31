@@ -28,7 +28,7 @@ import {
 //     DocLayer, whose `initial` prop is what the route server-rendered — one owner per axis.
 //  2. PUBLISH — a store subscription pushes the derived path whenever mode or docPage changes
 //     (search string preserved — ?net= and the dev flags ride along), skipped when the URL
-//     already says it and when the change came from popstate. Every view has a path since
+//     already says it, while the Briefing runs, and when the change came from popstate. Every view has a path since
 //     2026-10-03 (the placeholder is `/soon`); the no-path branch below stays for a mode that
 //     ever lacks one. `/` is only ever the landing URL.
 //  3. RESTORE — popstate maps the pathname back onto the store, so browser back/forward steps
@@ -56,16 +56,19 @@ export default function RouteSync() {
     let lastViewPath = modeForPath(location.pathname) ? location.pathname : (pathForMode(useStore.getState().mode) ?? "/");
 
     const unsub = useStore.subscribe((state, prev) => {
-      if (state.mode === prev.mode && state.docPage === prev.docPage) return;
+      if (state.mode === prev.mode && state.docPage === prev.docPage && state.briefing === prev.briefing) return;
       const view = VIEWS.find((v) => v.id === state.mode);
       document.title = state.docPage ? DOC_TITLES[state.docPage] : view ? viewTitle(view.name) : document.title;
-      if (fromPop) return;
+      // A tour stop is not a page view: the address bar holds on `/` until the tour ends, and the
+      // view it ended on then publishes as any switch does. On the globe that is nothing at all.
+      if (fromPop || state.briefing != null) return;
       const modePath = pathForMode(state.mode);
       if (modePath) lastViewPath = modePath;
       const path = state.docPage
         ? DOC_PATHS[state.docPage]
         : (modePath ?? (docForPath(location.pathname) ? lastViewPath : null));
-      if (path && path !== location.pathname) {
+      const landed = !state.docPage && modeForPath(location.pathname) === state.mode;
+      if (path && path !== location.pathname && !landed) {
         history.pushState(null, "", path + location.search);
         // ONE custom event per in-app switch (2026-10-18): Web Analytics counts the pushState as a
         // page view but has no sessions, so "how many visitors ever leave /" was unanswerable.

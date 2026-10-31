@@ -10,7 +10,7 @@ import { pickRangeTier } from "@/src/data/trendWindow";
 //
 // Everything is UTC and the caller supplies the date strings; nothing here reads a clock.
 
-export const NOTES_VERSION = 36; // 36: a note writes its durations out (2026-10-31)
+export const NOTES_VERSION = 37; // 37: the Briefing's one line (2026-10-31)
 
 /** What a note covers. Hyper and Geography are a standing picture ("day"), the ledger the recent
  *  hours ("hours"); History's pills are the rest, and a brushed range is `r<fromMs>-<toMs>` after
@@ -19,6 +19,12 @@ export type NoteSpan = "day" | "hours" | "1h" | "24h" | "7d" | "30d" | "1y" | "a
 
 export function noteKeyOf(net: string, view: NoteView, subject: string, span: NoteSpan): string {
   return `ai:${net}:v${NOTES_VERSION}:${view}:${subject}:${span}`;
+}
+
+/** THE FOUR NOTES THE BRIEFING READS (`components/notes/briefingNote.ts`), which also carry its one
+ *  short line: every view at its widest, and History over its resting window. */
+export function isBriefingNote(view: NoteView, subject: string, span: NoteSpan): boolean {
+  return view === "trend" ? subject === "dag" && span === "30d" : subject === "all";
 }
 
 /** The singleflight lock for one note key: a sibling of the note, in the same family. */

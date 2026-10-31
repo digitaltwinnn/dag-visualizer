@@ -21,7 +21,7 @@ import { useStore } from "@/src/store/store";
 import { rangeDays } from "@/src/util/localTime";
 import { commitNoteDay } from "./commitNoteDay";
 import { changeActions, changeHover } from "./noteChangeTarget";
-import { noteSpanWords } from "./noteSubject";
+import { AI_TITLE, noteSpanWords } from "./noteSubject";
 import NoteKindCoin from "./NoteKindCoin";
 import NoteText from "./NoteText";
 import TypedNote from "./TypedNote";
@@ -73,7 +73,6 @@ const DAY_MS = 86_400_000;
  *  History's is the window pill on screen), to the right like the dossier's ticker (user: "a
  *  pill-type of element to the right like on other cards"), so the body carries no Span row and no
  *  Written row ("implied by 'last 6 hours'"). */
-const TITLE = "Constellation Gate AI";
 
 // THE CARD'S CONTROLS ARE DOORS (`parts.tsx` — the one way a card draws a way out, with the
 // per-ground wash the user ruled). They sit flush on the card's bottom edge (RecordsDoor's foot
@@ -292,7 +291,7 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
         title={
           <span className="inline-flex min-w-0 items-center gap-2">
             <AI_NOTES_ICON aria-hidden className={cn(KIND_MARK_CLASS, "text-[var(--ai-mark)]")} />
-            <span className="truncate">{TITLE}</span>
+            <span className="truncate">{AI_TITLE}</span>
           </span>
         }
         titleKey={titleKey}
