@@ -33,8 +33,8 @@ describe("the tour for a screen reader or a keyboard", () => {
     expect(briefing).not.toMatch(/<div aria-live/);
   });
 
-  it("puts the keyboard on Skip", () => {
-    expect(briefing).toMatch(/skipRef\.current\?\.focus\(/);
+  it("leaves Skip as the first stop for Tab, with no ring forced on a mouse user", () => {
+    expect(briefing).not.toMatch(/\.focus\(/);
   });
 
   it("keeps History's chart heads out of the tab order behind it", () => {

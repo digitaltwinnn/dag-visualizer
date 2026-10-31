@@ -78,17 +78,12 @@ function Tour({ stop }: { stop: number }) {
   const words = briefingWords(view, { geo, ledger, hyper, trend }[view].res);
   const name = VIEWS.find((v) => v.id === view)!.name;
   const fill = useRef<HTMLElement | null>(null);
-  const skipRef = useRef<HTMLButtonElement | null>(null);
 
   // On the scene, not on the mount: a stop nobody could see is no stop, and the first mount runs
   // before analytics has its queue.
   useEffect(() => {
     if (ready) track("briefing-stop", { stop: view });
   }, [ready, view]);
-
-  useEffect(() => {
-    if (ready) skipRef.current?.focus({ preventScroll: true });
-  }, [ready]);
 
   useEffect(() => {
     let raf = 0;
@@ -144,7 +139,6 @@ function Tour({ stop }: { stop: number }) {
   );
   const skip = (
     <button
-      ref={skipRef}
       type="button"
       onClick={(e) => {
         e.stopPropagation();

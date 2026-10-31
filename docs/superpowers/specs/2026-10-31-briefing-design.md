@@ -44,7 +44,7 @@ first sentence.
 - `store.briefing`: the stop on screen, or null. One channel, read by everything below.
 - `useBootStage` answers stage 0 while it is set, so `BootFade` hides and inerts the HUD and brings
   it back with the fade it already has. Tablet and phone therefore clear the same way as desktop.
-- Desktop also sets `railsHidden`, which is what frames the scene for the full width.
+- Desktop and tablet also set `railsHidden`, which is what frames the scene for the full width.
 - `Engine`: the pace on the choreography clock, and the cover added to the sheet shift, so the scene
   lifts by the same projection offset a phone sheet uses.
 - `RouteSync` holds publishing while the tour runs and publishes the result when it ends.
