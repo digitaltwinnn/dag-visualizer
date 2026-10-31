@@ -2,7 +2,7 @@
 
 import LiveDot from "@/components/LiveDot";
 import { selectedRow, selectionHue } from "@/components/selection";
-import { NoSignalDot, PinMark } from "@/components/state/StateAtoms";
+import { NoSignalDot, PinMark, PinnedMark } from "@/components/state/StateAtoms";
 import { useNowTick } from "@/components/useNowTick";
 import { filterAccent } from "@/src/data/network";
 import { followToggleActions } from "@/src/engine/domain/pickActions";
@@ -63,7 +63,6 @@ export default function FollowControl({ className }: { className?: string }) {
 
   const pinned = !following && snap != null;
   const washed = pinned;
-  const label = pinned ? "pinned" : "live";
   // The age is the SHOWN snapshot's — the committed one whether pinned or following. Under a
   // metagraph filter, following lands on the newest tick THAT network anchored into
   // (`followLatest`), which may be minutes behind the global tip; the tip's age there would read
@@ -82,9 +81,10 @@ export default function FollowControl({ className }: { className?: string }) {
         const target = snap ?? (latestSnapshot ? ({ kind: "snapshot", title: `Global snapshot #${latestSnapshot.ordinal}`, data: latestSnapshot } as const) : null);
         if (target) applyClickActions(followToggleActions(target, following));
       }}
-      // One box in every state, so the pill never changes size or place as the state flips: the
+      // One box in every state, so the pill keeps its height and place as the state flips: the
       // padding is there when it is invisible (LIVE, transparent) as when the PINNED wash makes it
-      // a visible chip (user, 2026-09-26: the pinned block "looks ugly, no padding").
+      // a visible chip (user, 2026-09-26: the pinned block "looks ugly, no padding"). Pinned is the
+      // icon alone (`PinnedMark`), so it is the narrower of the two.
       className={cn(
         "inline-flex items-center gap-1.5 rounded-sm px-1.5 py-[3px] cursor-pointer select-none border border-transparent whitespace-nowrap",
         "hover:bg-wash-hover focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
@@ -94,8 +94,14 @@ export default function FollowControl({ className }: { className?: string }) {
     >
       {/* The one PIN mark (`PinMark`): the explorer row, the callout and the raw layer say
           pinned with the same glyph — a hollow dot here read as a third state (user, 2026-10-09). */}
-      {following ? <LiveDot /> : <PinMark className={washed ? "text-foreground" : "text-muted-foreground"} />}
-      <span className={cn("text-label", washed ? "text-foreground" : "text-muted-foreground")}>{label}</span>
+      {pinned ? (
+        <PinnedMark className="text-foreground" />
+      ) : (
+        <>
+          {following ? <LiveDot /> : <PinMark className="text-muted-foreground" />}
+          <span className="text-label text-muted-foreground">live</span>
+        </>
+      )}
     </button>
     </span>
   );

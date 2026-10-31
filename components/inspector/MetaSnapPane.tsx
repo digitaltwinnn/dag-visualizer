@@ -7,7 +7,7 @@
 // store channel (`store.metaSnap`) and a fixed rail slot, and appears in no ladder.
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import LiveDot from "@/components/LiveDot";
-import { PinMark } from "@/components/state/StateAtoms";
+import { PinnedMark } from "@/components/state/StateAtoms";
 import CardHead, { RailPane } from "@/components/CardHead";
 import { DEEP_GIVE_UP_MS } from "@/components/RawSnapshotBridge";
 import { subjectPairing } from "@/components/useSubjectPairing";
@@ -217,8 +217,14 @@ export default function MetaSnapPane({
               )}
               style={following ? undefined : selectionHue(hue)}
             >
-              {following ? <LiveDot /> : <PinMark className="text-foreground" />}
-              {following ? "live" : "pinned"}
+              {following ? (
+                <>
+                  <LiveDot />
+                  live
+                </>
+              ) : (
+                <PinnedMark className="text-foreground" />
+              )}
             </span>
           }
           titleKey={`${sel.metaId}:${sel.ordinal}`}

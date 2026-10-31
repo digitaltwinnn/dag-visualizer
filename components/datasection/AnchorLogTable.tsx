@@ -38,7 +38,7 @@ import { useUnlistedChains } from "@/components/datasection/useUnlistedChains";
 import { useChainSpan } from "@/components/useArchive";
 import LiveDot from "@/components/LiveDot";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { NodeStars, PinMark } from "@/components/state/StateAtoms";
+import { NodeStars, PinnedMark } from "@/components/state/StateAtoms";
 import { isRetired } from "@/src/net/lineage";
 import { useFeedRead } from "@/components/useFeedRead";
 
@@ -1910,8 +1910,14 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                             the row's sat by its number). */}
                         {inSelGroup && (
                           <span className="inline-flex items-center gap-1.5 text-label normal-case tracking-normal text-muted-foreground">
-                            {following ? <LiveDot /> : <PinMark className="text-muted-foreground" />}
-                            {following ? "live" : "pinned"}
+                            {following ? (
+                              <>
+                                <LiveDot />
+                                live
+                              </>
+                            ) : (
+                              <PinnedMark className="text-muted-foreground" />
+                            )}
                           </span>
                         )}
                         <span className={cn("ml-auto tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground-dim")}><LiveAge ts={r.ts} /></span>
@@ -2012,11 +2018,17 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                         explorer's own state mark on its highlighted row, the same two glyphs. */}
                     <span className="inline-flex items-center gap-1.5">
                       {seam ? <Dash /> : r.ordinal.toLocaleString()}
-                      {/* Mark AND word, as the global plate says it (user, 2026-10-25). */}
+                      {/* As the global plate says it: the live dot and word, or the pin alone. */}
                       {rowSel && !seam && (
                         <span className="inline-flex items-center gap-1.5 font-sans text-label text-muted-foreground">
-                          {following ? <LiveDot /> : <PinMark className="text-muted-foreground" />}
-                          {following ? "live" : "pinned"}
+                          {following ? (
+                            <>
+                              <LiveDot />
+                              live
+                            </>
+                          ) : (
+                            <PinnedMark className="text-muted-foreground" />
+                          )}
                         </span>
                       )}
                     </span>

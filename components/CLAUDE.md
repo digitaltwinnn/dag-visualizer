@@ -1754,7 +1754,7 @@ Every rail card leads with `CardHead`: eyebrow / title / inset hairline / body.
     front — and takes the reader's OWN date search as the committed range (`store.logCut`, written
     by the log's `cutIsOwn` mirror; a door's span never writes it, it came from History). Snapshots
     needs nothing: a raw row click pins, and the explorer and card show the pin.
-  · **State marks are one species.** `LiveDot` + "live", `PinMark` + "pinned" (StateAtoms, 14px),
+  · **State marks are one species.** `LiveDot` + "live", `PinnedMark` alone, the word for screen readers only (user, 2026-10-31; StateAtoms, 14px),
     on the explorer's tick row, the Global snapshot card's control, the scene callout, the raw log's
     selected row and the raw pane's head. Since 2026-10-18 the METAGRAPH snapshot's label and card head
     carry them too (user: "that's also pinned") — a committed pair is live or pinned together.

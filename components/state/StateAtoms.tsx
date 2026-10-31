@@ -58,3 +58,15 @@ export function SonarRing() {
 export function PinMark({ className }: { className?: string }) {
   return <Pin aria-hidden className={cn("size-3.5 flex-none", className)} />;
 }
+
+/** THE PINNED STATE, AS AN ICON (user, 2026-10-31: "instead of 'pinned' + icon just use the icon
+ *  everywhere without the text"). The word stays for assistive tech only, here, its one home
+ *  (`components/pinnedMark.test.ts`); "live" keeps its word, since a dot alone says nothing. */
+export function PinnedMark({ className }: { className?: string }) {
+  return (
+    <>
+      <PinMark className={className} />
+      <span className="sr-only">pinned</span>
+    </>
+  );
+}

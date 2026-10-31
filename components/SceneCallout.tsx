@@ -60,7 +60,7 @@ import { relativeAge } from "@/src/util/relativeAge";
 import { CALLOUT_OFF_X, CALLOUT_OFF_Y, CALLOUT_LEG_INSET, CALLOUT_PHONE_K, CALLOUT_HANG_K } from "@/src/engine/domain/calloutPlacement";
 import type { GeoInfo } from "@/src/data/types";
 import LiveDot from "@/components/LiveDot";
-import { PinMark } from "@/components/state/StateAtoms";
+import { PinMark, PinnedMark } from "@/components/state/StateAtoms";
 import { IDENT_INK } from "@/components/identInk";
 import { ledgerNetwork } from "@/src/engine/domain/tickNet";
 import { useFeedRead } from "@/components/useFeedRead";
@@ -189,7 +189,7 @@ function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; className?
           <span className="inline-flex items-center gap-1.5 text-label text-muted-foreground ml-1">
             {m.aside.chip && <QualifierChip className="mr-0.5 tabular-nums">{m.aside.chip}</QualifierChip>}
             {m.aside.live && <LiveDot />}
-            {m.aside.pinned && <PinMark />}
+            {m.aside.pinned && <PinnedMark />}
             {m.aside.text}
           </span>
         ) : null}
@@ -490,7 +490,7 @@ export default function SceneCallout() {
           ? liveFeed
             ? { text: "live", live: true, chip: rel || undefined }
             : { text: "no signal" }
-          : { text: "pinned", pinned: true, chip: rel || undefined },
+          : { text: "", pinned: true, chip: rel || undefined },
         // Unneted the ring marks the whole bar (core cyan); under a filter the anchor
         // points at the committed network's own SEGMENT, so the ring takes its accent
         // (user, 2026-08-16 — "if filter, select the correct segment of the byte bar").
