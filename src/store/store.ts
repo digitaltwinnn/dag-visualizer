@@ -111,6 +111,8 @@ interface AppState {
   // top-to-bottom in that order (the one you picked last sits on top). Add a future card type by
   // adding a slot field + a `setSel(...)` call + a registry entry in Inspector — nothing else.
   inspect: PickDescriptor | null;
+  /** The view the committed node was picked in: Snapshots keeps a node it picked (`useNodeHere`). */
+  inspectView: Mode | null;
   snap: Extract<PickDescriptor, { kind: "snapshot" }> | null;
   // The selected METAGRAPH SNAPSHOT (a tile on the ledger's upper floor). LEDGER-SCOPED like
   // `snap`: Engine.setMode clears it on the way out of the view. A selStack slot like `snap`.
@@ -572,6 +574,7 @@ export const useStore = create<AppState>((set) => ({
   filter: "all",
   metaList: [],
   inspect: null,
+  inspectView: null,
   snap: null,
   metaSnap: null,
   tickNet: null,
@@ -684,7 +687,7 @@ export const useStore = create<AppState>((set) => ({
   // other selection, so the facts rail focuses the metagraph card. "all" clears the entry.
   setFilter: (filter) => set((s) => ({ filter, selStack: bumpStack(s.selStack, "network", filter !== "all" || !!s.tickNet) })),
   setMetaList: (metaList) => set({ metaList }),
-  setInspect: (inspect) => set((s) => ({ inspect, selStack: bumpStack(s.selStack, "node", !!inspect) })),
+  setInspect: (inspect) => set((s) => ({ inspect, inspectView: inspect ? s.mode : null, selStack: bumpStack(s.selStack, "node", !!inspect) })),
   setSnap: (snap) => set((s) => ({ snap, selStack: bumpStack(s.selStack, "snap", !!snap) })),
   // FollowController's heartbeat advance: re-point the followed snapshot WITHOUT bumping the
   // selection recency — a tick is not a user act, and the facts rail's collapse rule reads

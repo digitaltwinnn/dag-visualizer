@@ -115,6 +115,16 @@ export function subjectRunEnd(lane: readonly string[], present: (id: string) => 
   return deepest;
 }
 
+/** THE ORDER THE LANE IS DRAWN IN (user, 2026-10-31, option B of four: a Node card "detached from
+ *  the stack"). Chosen cards close up in lane order and the ghosts wait below them, so a ghost can
+ *  never split the stack. `stepId`, the ghost that is the next step, leads the ghosts: it opens the
+ *  deepest card's first child, so it belongs directly under the stack. The lane stays the one order
+ *  of the ladder; this is only how it is laid out. */
+export function displayOrder(lane: readonly string[], present: (id: string) => boolean, stepId: string | null): string[] {
+  const waiting = lane.filter((id) => !present(id));
+  return [...lane.filter(present), ...waiting.filter((id) => id === stepId), ...waiting.filter((id) => id !== stepId)];
+}
+
 /** The slice of the store a SELECTION MOMENT is made of. */
 export interface SelectionKeyState {
   mode: Mode;

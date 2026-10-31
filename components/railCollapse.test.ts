@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  boxedSlotOf, isCollapsed, openBoxes, openDefaultOf, overridesOnNoteStandDown, overridesOnSelection, overridesOnViewEntry, railSelectionKey, subjectRunEnd,
+  boxedSlotOf, displayOrder, isCollapsed, openBoxes, openDefaultOf, overridesOnNoteStandDown, overridesOnSelection, overridesOnViewEntry, railSelectionKey, subjectRunEnd,
   type LaneCollapseState, type SelectionKeyState,
 } from "@/components/railCollapse";
 import { detailsCards, focusSlotId, ladderSlotIds, type RailManifestState } from "@/components/railCards";
@@ -193,5 +193,27 @@ describe("subjectRunEnd — the run the next-rung step reads", () => {
     expect(subjectRunEnd(ladderSlotIds("hyper"), present(["notes"]))).toBeNull();
     // A gap after the run still ends it.
     expect(subjectRunEnd(ladderSlotIds("geo"), present(["notes", "context", "node"]))).toBe("context");
+  });
+});
+
+// GHOSTS SINK (user, 2026-10-31, option B of four): a ghost holding its ladder slot could sit above
+// a real card and split the stack, so the chosen cards close up and the ghosts wait below them. The
+// ghost that is the next step leads them: the slot under the deepest card is where a step is drawn.
+describe("displayOrder", () => {
+  const present = (ids: string[]) => (id: string) => ids.includes(id);
+  const geo = ladderSlotIds("geo");
+  it("draws the chosen cards first, in lane order, then the ghosts", () => {
+    expect(displayOrder(geo, present(["notes", "country"]), null)).toEqual(["notes", "country", "context", "cohort", "node"]);
+  });
+  it("the next step's ghost leads the ghosts", () => {
+    expect(displayOrder(geo, present(["notes", "country"]), "cohort")).toEqual(["notes", "country", "cohort", "context", "node"]);
+  });
+  it("closes a gap in the stack", () => {
+    const lane = ladderSlotIds("ledger");
+    expect(displayOrder(lane, present(["notes", "snap", "node"]), "context")).toEqual(["notes", "snap", "node", "context", "metaSnap"]);
+  });
+  it("is the lane itself with nothing chosen, and with everything", () => {
+    expect(displayOrder(geo, present([]), null)).toEqual(geo);
+    expect(displayOrder(geo, present(geo), null)).toEqual(geo);
   });
 });

@@ -853,9 +853,9 @@ focus rung the FIRST present ladder card is the box (`openDefaultOf`). Both live
 what a view switch pins, what a selection moment drops — with `railCollapse.test.ts` as its
 specification, driven by outcome (exactly one box); Inspector asks it and renders the answer.
 **And the step ghost hangs off the UNBROKEN run of SUBJECT cards from the top** (same day,
-`subjectRunEnd`): a node carried into Snapshots from another view stands below a gap (its ladder
-gives a node no ancestry), and read as "the deepest" it left the Global snapshot card with no
-step down to the tick's networks. The AI notes slot neither starts that run nor breaks it.
+`subjectRunEnd`): a node standing in Snapshots has no card above it in the ladder (its ladder gives
+a node no ancestry), and read as "the deepest" it left the Global snapshot card with no step down
+to the tick's networks. The AI notes slot neither starts that run nor breaks it.
 
 **THE AI NOTES SLOT** (2026-10-27, R57) — on screen the card wears the rail's own head grammar
 (user, 2026-10-29): NO eyebrow — the title is the product that writes it, **"Constellation Gate
@@ -1018,7 +1018,7 @@ strings still read `Global snapshot #N`, but nothing renders that field for a sn
 
 Every SUBJECT card the current view CAN produce is always visible — populated when its subject is
 selected, else a **ghost card** — so the rail shows the view's whole possibility space and a deselect
-returns its slot to the ghost in place. (The AI notes slot is no subject card and has no ghost: an
+returns its slot to the ghosts below. (The AI notes slot is no subject card and has no ghost: an
 absent note is no card.) A ghost is a card like every other (user, 2026-10-04 — option A of
 `docs/superpowers/design/2026-10-04-ghost-cards`, "the structure is always present, but the visual
 and content differ"): FOLDED it is the rung's name alone, one quiet line; OPEN it is a dashed,
@@ -1034,14 +1034,17 @@ the containment the slab shows.
 
 Two honesty rules: when the filtered network has nothing pickable in geo the node ghost turns into the
 honest variant naming that fact; but "all" with 0 nodes is boot, so that ghost stays silent rather than
-flashing a false invite. A populated card renders in any 3D view; the ghost only appears where the view
-can actually produce the card.
+flashing a false invite. The ghost only appears where the view can actually produce the card.
 
-**A hairline divides the lane from the cards that are not this view's rungs** (user, 2026-10-19 —
-History with a node carried in from Geography: "when a card is not part of the rung, show a
-divider"): a populated card below the lane is a subject the view did not produce, and adjacency
-is the slab's word for containment. Only above PRESENT trailing cards; the trailing ghosts are the
-view's own possibility space. **And the Snapshots explorer's held head is the PIN itself** (same
+**A card speaks only in a view whose lane holds it** (user, 2026-10-31, option B of four, replacing a
+hairline above a full card running off the rail): `detailsCards` states a card off its view's lane
+as absent, so a node carried into History leaves the rail. In Snapshots it stands when it was picked
+there or signed the metagraph snapshot on screen (`nodeHereOf`). The SELECTION is untouched, so going
+back restores the card, as the placeholder views do; a pinned snapshot needs no such rule, since
+leaving Snapshots clears the pin. **Ghosts sink** (same day, option B of four): chosen cards close up
+at the top and the ghosts wait below in lane order, the next step's ghost first (`displayOrder`), so
+a ghost can never split the stack. The lane stays the ladder's one order; this is only its layout.
+**And the Snapshots explorer's held head is the PIN itself** (same
 day: "put it on the 1st row and directly show x newer") — it froze at the newest tick on screen
 from 2026-10-02; `src/data/ledgerHold.ts`.
 

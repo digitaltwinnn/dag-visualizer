@@ -1,11 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { exploreCards, detailsCards, isSubjectSlot, noteCardAbsent, parentHolds, focusSlotId, ladderLevelOfSlot, ladderSlotIds, type RailManifestState } from "@/components/railCards";
+import { exploreCards, detailsCards, isSubjectSlot, nodeHereOf, noteCardAbsent, parentHolds, focusSlotId, ladderLevelOfSlot, ladderSlotIds, type RailManifestState } from "@/components/railCards";
 import { LADDERS } from "@/src/engine/domain/focusLadder";
 import type { PickDescriptor } from "@/src/data/types";
 
 // Present card kinds in render order — the exact set/order both the rail and the tray consume.
 const presentKinds = (cards: { kind: string; present: boolean }[]) =>
   cards.filter((c) => c.present).map((c) => c.kind);
+
+import type { MetaSnapSel, NodeRow } from "@/src/data/types";
+import type { Mode } from "@/src/store/store";
 
 const nodePick = { kind: "metanode", node: { ip: "9.9.9.9" } } as unknown as PickDescriptor;
 const snapPick = { kind: "snapshot", data: { ordinal: 42 } } as unknown as Extract<
@@ -161,14 +164,13 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
     const held = details({ mode, filter: "dor", inspect: nodePick, snap: snapPick, country: "US" });
     expect(detailsCards(held)).toEqual([]);
   });
-  it("a populated slot loses its ghost but keeps rendering in any 3D view (pinned snap in hyper)", () => {
-    const cards = detailsCards(details({ mode: "hyper", snap: snapPick }));
-    const snap = cards.find((c) => c.id === "snap")!;
-    expect(snap.present).toBe(true);
-    expect(ghostIds(cards)).toEqual(["context", "composition", "node"]); // snap populated → no snap ghost
+  it("a populated slot loses its ghost", () => {
+    const cards = detailsCards(details({ mode: "hyper", filter: "dor" }));
+    expect(cards.find((c) => c.id === "context")!.present).toBe(true);
+    expect(ghostIds(cards)).toEqual(["composition", "node"]); // context populated → no context ghost
   });
   it("subjectKeys track each card's EdgePulse subject (filter / node ip / snapshot ordinal)", () => {
-    const s = details({ filter: "dor", inspect: nodePick, snap: snapPick });
+    const s = details({ mode: "ledger", filter: "dor", inspect: nodePick, snap: snapPick });
     const byId = Object.fromEntries(detailsCards(s).map((c) => [c.id, c.subjectKey]));
     expect(byId.context).toBe("dor");
     expect(byId.node).toBe("9.9.9.9");
@@ -556,5 +558,54 @@ describe("focusSlotId with the AI notes card on top of the lane", () => {
   it("no note request, no notes slot — the focus is what it always was", () => {
     expect(focusSlotId(details({ mode: "hyper" }))).toBeNull();
     expect(detailsCards(details({ mode: "geo" })).find((c) => c.id === "notes")!.present).toBe(false);
+  });
+});
+
+// A CARD THE VIEW CAN'T PRODUCE (user, 2026-10-31, option B of four): a card speaks only in a view
+// whose lane holds it. The selection stays, so going back restores it, as the placeholder views do.
+describe("a node in Snapshots", () => {
+  const key = "9.9.9.9";
+  const signers = (ips: string[]) => ips.map((ip) => ({ pick: { kind: "metanode", node: { ip } } })) as unknown as NodeRow[];
+  const at = (over: Partial<Parameters<typeof nodeHereOf>[0]>) =>
+    nodeHereOf({ mode: "ledger", inspect: nodePick, inspectView: "geo", metaSnap: null, ...over }, () => signers([key]));
+  const held = { metaId: "dor", ordinal: 1, globalOrdinal: 2 } as MetaSnapSel;
+  it("stands when it was picked there", () => {
+    expect(at({ inspectView: "ledger" })).toBe(true);
+  });
+  it("stands when it signed the snapshot on screen, and not when it did not", () => {
+    expect(at({ metaSnap: held })).toBe(true);
+    expect(nodeHereOf({ mode: "ledger", inspect: nodePick, inspectView: "geo", metaSnap: held }, () => signers(["1.1.1.1"]))).toBe(false);
+  });
+  it("leaves when it was carried in with no snapshot to have signed", () => {
+    expect(at({})).toBe(false);
+  });
+  it("is no question in any other view, or with no node", () => {
+    expect(at({ mode: "geo" })).toBeUndefined();
+    expect(at({ inspect: null })).toBeUndefined();
+  });
+});
+
+describe("a card leaves the rail in a view that can't show it", () => {
+  const cards = (mode: Mode, over: Partial<RailManifestState> = {}) =>
+    detailsCards({ mode, filter: "all", inspect: nodePick, ...over } as RailManifestState);
+  const node = (mode: Mode, over: Partial<RailManifestState> = {}) => cards(mode, over).find((c) => c.id === "node")?.present;
+  it("a node stands in Hypergraph and Geography, and never in History", () => {
+    expect(node("hyper")).toBe(true);
+    expect(node("geo")).toBe(true);
+    expect(node("trend")).toBe(false);
+  });
+  it("in Snapshots a node stands unless the caller says it does not belong there", () => {
+    expect(node("ledger", { nodeHere: true })).toBe(true);
+    expect(node("ledger", { nodeHere: false })).toBe(false);
+  });
+  it("the focus passes to what the view holds", () => {
+    const stack = { selStack: ["node"] } as Partial<RailManifestState>;
+    expect(focusSlotId({ mode: "trend", filter: "all", inspect: nodePick, trendWindow: "30d", ...stack } as Parameters<typeof focusSlotId>[0])).not.toBe("node");
+  });
+  it("no present card is ever off its view's lane", () => {
+    for (const mode of ["hyper", "geo", "ledger", "trend"] as const) {
+      const full = cards(mode, { snap: snapPick, country: "DE", composition: { netId: "dag", key: "k" } } as Partial<RailManifestState>);
+      for (const c of full.filter((x) => x.present)) expect(ladderSlotIds(mode)).toContain(c.id);
+    }
   });
 });

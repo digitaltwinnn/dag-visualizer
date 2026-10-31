@@ -7,7 +7,7 @@ import { AI_NOTES_ICON, EXPLORE_ICON, INSTANT_ICON, RANGE_ICON, iconForPick } fr
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import type { Mode } from "@/src/store/store";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
-import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
+import type { MetaSnapSel, NodeRow, PickDescriptor } from "@/src/data/types";
 import type { NoteResponse } from "@/src/data/noteTypes";
 // LADDERS is plain DATA (the domain focus-ladder rung tables) — importing it keeps this module
 // data-only; CohortSel rides along type-only (the store mirrors the same import).
@@ -139,7 +139,7 @@ export function isSubjectSlot(id: string): boolean {
  *  inputs (which can't change a slot's presence). */
 export type LadderState = Pick<
   RailManifestState,
-  "mode" | "filter" | "tickNet" | "tickHasFilter" | "inspect" | "snap" | "metaSnap" | "country" | "cohort" | "composition" | "trendCursorMs" | "trendRange" | "trendFocus" | "noteAbsent"
+  "mode" | "filter" | "tickNet" | "tickHasFilter" | "nodeHere" | "inspect" | "snap" | "metaSnap" | "country" | "cohort" | "composition" | "trendCursorMs" | "trendRange" | "trendFocus" | "noteAbsent"
 > & {
   /** The store's selection recency (most-recent-FIRST) — the collapse rule reads it (item 8):
    *  the most recently selected present card is the ACTIVE one; the rest rest collapsed. */
@@ -219,6 +219,9 @@ export interface RailManifestState {
   /** Ledger only: whether the FILTERED network anchored into the tick on screen. `false` stands
    *  the Metagraph card down under that tick (`ledgerCardNetwork`); undefined = unknown. */
   tickHasFilter?: boolean;
+  /** Does the committed node belong to what this view shows (`useNodeHere`)? ⚠️ Only an explicit
+   *  `false` stands the card down, as `tickHasFilter`'s does. */
+  nodeHere?: boolean;
   inspect: PickDescriptor | null;
   snap: Extract<PickDescriptor, { kind: "snapshot" }> | null;
   /** How many nodes the current selection plots in geo (store.selNodes.length). */
@@ -403,9 +406,8 @@ function metaSnapHint(s: RailManifestState): string | null {
 // cohort, composition, the snapshot chain (global, then the metagraph snapshot that anchors into
 // it), then node (coarse→fine, matching the focus ladders + the ledger's display lane). Each slot
 // renders its populated card when selected, else its GHOST hint when the view can produce it (see
-// `hint` above) — so the rail always shows the view's full possibility space and a deselect
-// returns a slot to its ghost in place (spatially stable; the old recency reordering made cards
-// jump). Callers filter to `present` for the tray icons.
+// `hint` above) — so the rail always shows the view's full possibility space, the ghosts below the
+// chosen cards (`displayOrder`). Callers filter to `present` for the tray icons.
 /** THE NETWORK THE METAGRAPH CARD STANDS ON — one home for the manifest and the card itself (the
  *  branch review's M7: the same three-way rule was written in both). In the ledger, the network
  *  committed inside the pinned tick (else the filter, standing down under a tick it did not anchor
@@ -432,6 +434,23 @@ export function metagraphCardNetwork(s: {
   // them (`siblingSet("context")`).
   if (from === "node" && s.filter === "all" && s.inspect) return pickNetId(s.inspect) ?? s.filter;
   return s.filter;
+}
+
+/** DOES THE COMMITTED NODE BELONG TO WHAT THIS VIEW SHOWS? Hypergraph and Geography show every node
+ *  and History holds no node slot, so only Snapshots has a question (undefined elsewhere). There a
+ *  node is a validator of a snapshot, so its card stands when it was picked there or it signed the
+ *  metagraph snapshot on screen. A node carried in leaves the rail, stays selected and returns with
+ *  its view (user, 2026-10-31: "often detached from the stack"). `signers` is lazy: it reads the
+ *  snapshot's exact rows, only worth reading for a carried node. */
+export function nodeHereOf(
+  s: { mode: Mode; inspect: PickDescriptor | null; inspectView: Mode | null; metaSnap: MetaSnapSel | null },
+  signers: (sel: MetaSnapSel) => readonly NodeRow[],
+): boolean | undefined {
+  if (s.mode !== "ledger" || !s.inspect) return undefined;
+  if (s.inspectView === "ledger") return true;
+  if (!s.metaSnap) return false;
+  const key = hoverKeyOf(s.inspect);
+  return signers(s.metaSnap).some((r) => hoverKeyOf(r.pick) === key);
 }
 
 /** A CHILD CARD STATES ITS PARENT OR IT DOES NOT RENDER (user, 2026-10-08: "I had a metagraph
@@ -506,10 +525,9 @@ export function detailsCards(s: RailManifestState): RailCard[] {
     kind: "instant",
     icon: INSTANT_ICON,
     subjectKey: s.trendCursorMs ?? null,
-    // ⚠️ VIEW-SCOPED PRESENCE, unlike the pinned snapshot's (2026-09-19). A pinned snapshot is a
-    // subject that keeps meaning wherever you carry it, which is why its card renders in any 3D
-    // view; an instant is a reading OF THIS STACK — outside History there is no chart it names
-    // and no roster it ranks, so a card stating it there would be facts from a view you left.
+    // ⚠️ VIEW-SCOPED PRESENCE (2026-09-19): an instant is a reading OF THIS STACK — outside History
+    // there is no chart it names and no roster it ranks, so a card stating it there would be facts
+    // from a view you left.
     // The cursor itself survives the switch (store `trendCursorMs`, deliberately not view-scoped);
     // only the card stands down.
     present: s.mode === "trend" && s.trendCursorMs != null,
@@ -565,7 +583,7 @@ export function detailsCards(s: RailManifestState): RailCard[] {
     kind: "node",
     icon: iconForPick("geoLive"),
     subjectKey: hoverKeyOf(s.inspect),
-    present: isNodePick(s.inspect),
+    present: isNodePick(s.inspect) && s.nodeHere !== false,
     hint: nodeHint(s),
   };
   const snap: RailCard = {
@@ -595,6 +613,13 @@ export function detailsCards(s: RailManifestState): RailCard[] {
   // `instant` sits directly under the dossier, which is exactly where its own lane puts it —
   // every slot between them is unreachable in that view, so the two orders agree. The notes card
   // leads both: it is the top slot of every note view's lane (R57).
-  return [notes, snap, context, range, instant, country, cohort, composition, metaSnap, node];
+  // ⚠️ A CARD SPEAKS ONLY IN A VIEW WHOSE LANE HOLDS IT (user, 2026-10-31, option B of four: a node
+  // carried into History "has no relevance to the view"; it replaced a divider above a full card
+  // running off the rail). The SELECTION IS UNTOUCHED, the placeholder views' own rule above: this
+  // only stops the view speaking for it, so going back restores the card in place.
+  const lane = ladderSlotIds(s.mode);
+  return [notes, snap, context, range, instant, country, cohort, composition, metaSnap, node].map((c) =>
+    c.present && !lane.includes(c.id) ? { ...c, present: false } : c,
+  );
 }
 

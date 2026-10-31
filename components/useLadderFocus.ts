@@ -2,6 +2,7 @@
 
 import { useStore } from "@/src/store/store";
 import { focusSlotId } from "@/components/railCards";
+import { useNodeHere } from "@/components/useNodeHere";
 import { useTickHasFilter } from "@/components/useTickHasFilter";
 
 // Which ladder rung currently holds the FOCUS, for the EXPLORE rail (the facts rail derives the
@@ -33,5 +34,6 @@ export function useLadderFocus(noteAbsent: boolean): string | null {
   const trendRange = useStore((s) => s.trendRange);
   const trendFocus = useStore((s) => s.trendFocus);
   const tickHasFilter = useTickHasFilter();
-  return focusSlotId({ mode, filter, tickNet, tickHasFilter, country, cohort, composition, inspect, snap, metaSnap, trendCursorMs, trendRange, trendFocus, noteAbsent, selStack });
+  const nodeHere = useNodeHere();
+  return focusSlotId({ mode, filter, tickNet, tickHasFilter, nodeHere, country, cohort, composition, inspect, snap, metaSnap, trendCursorMs, trendRange, trendFocus, noteAbsent, selStack });
 }

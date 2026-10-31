@@ -12,6 +12,7 @@ import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { compositionGroups } from "@/src/data/composition";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import CardHead, { RailPane } from "@/components/CardHead";
+import { useNodeHere } from "@/components/useNodeHere";
 import { useTickHasFilter } from "@/components/useTickHasFilter";
 import InspectorCard from "@/components/InspectorCard";
 import ContextCard from "@/components/ContextCard";
@@ -25,7 +26,7 @@ import { useTouch } from "@/components/useTouch";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { detailsCards, ladderSlotIds, noteCardAbsent, type RailCard } from "@/components/railCards";
 import { CHILD_OF, childStep, type SiblingStep } from "@/components/railSiblings";
-import { isCollapsed, boxedSlotOf, overridesOnNoteStandDown, overridesOnSelection, overridesOnViewEntry, railSelectionKey, subjectRunEnd, type LaneCollapseState } from "@/components/railCollapse";
+import { displayOrder, isCollapsed, boxedSlotOf, overridesOnNoteStandDown, overridesOnSelection, overridesOnViewEntry, railSelectionKey, subjectRunEnd, type LaneCollapseState } from "@/components/railCollapse";
 import { useSiblingState } from "@/components/useSiblingState";
 import { openRailCard } from "@/components/railOpen";
 import { useLadderFocus } from "@/components/useLadderFocus";
@@ -434,6 +435,7 @@ export default function Inspector() {
   const trendFront = useStore((s) => s.trendFront);
   const trendWindow = useStore((s) => s.trendWindow);
   const tickHasFilter = useTickHasFilter();
+  const nodeHere = useNodeHere();
   // The AI note on screen (the card shares this fetch): its card — the top slot of the lane —
   // stands down when the view's subject has no note (off mainnet none has) or when the server
   // answered `none`, or `unavailable` to a read (R67; to the reader's own "Write notes" it stays and
@@ -441,7 +443,7 @@ export default function Inspector() {
   const aiNote = useAiNote();
   const noteAbsent = noteCardAbsent(aiNote.req != null, aiNote.note.res, aiNote.note.via);
   const manifest = detailsCards({
-    mode, filter, tickNet, tickHasFilter, inspect, snap, country, cohort, composition, metaSnap, coarse, trendCursorMs, trendRange, trendFocus, trendFront, trendWindow,
+    mode, filter, tickNet, tickHasFilter, nodeHere, inspect, snap, country, cohort, composition, metaSnap, coarse, trendCursorMs, trendRange, trendFocus, trendFront, trendWindow,
     noteAbsent,
     selNodesCount: selNodes.length,
     filterLabel: displayNetwork(filter)?.ticker ?? null, // one lookup — catalog + the unlisted pseudo-network
@@ -491,7 +493,7 @@ export default function Inspector() {
   // (`childStep`, the explorer's own first row), so stepping down happens where the level is drawn.
   // The rail's state is read by the pager's own builder, so the step and the pager cannot disagree.
   // …the deepest rung of the UNBROKEN run from the top, not the deepest present card: a node
-  // carried in from another view stands below a gap in Snapshots (its ladder gives a node no
+  // standing in Snapshots has no card above it in the ladder (its ladder gives a node no
   // ancestry), and read as "the deepest" it left the Global snapshot card with no step down to
   // the tick's networks (user, 2026-10-18: "we can't navigate the rung down from the snapshot card
   // to the metagraph card, lower in the rung there is the node card").
@@ -695,7 +697,7 @@ export default function Inspector() {
   };
   const ladderLane = (
     <div className="rail-ladder flex flex-col">
-      {ladderIds.map((id, depth) => {
+      {displayOrder(ladderIds, presentOf, nextStep?.id ?? null).map((id, depth) => {
         const card = manifest.find((c) => c.id === id);
         if (!card) return null;
         const body: ReactNode =
@@ -764,19 +766,6 @@ export default function Inspector() {
       })}
     </div>
   );
-  // Cards that AREN'T ladder rungs (the snapshot slot in every 3D view) render below the lane —
-  // present card first, else its ghost — plus, in flat/placeholder views (no ladder), everything.
-  const nonLadder = manifest.filter((c) => c.kind !== "context" && !ladderIds.includes(c.id));
-  const trailingPanes = nonLadder.filter((c) => c.present).map((c) => detailPane[c.id]);
-  const trailingGhosts = nonLadder
-    .filter((c) => !c.present && c.hint != null)
-    .map((c) => <GhostCard key={`${c.id}-ghost`} card={c} {...ghostCx(c.id)} />);
-  // A DIVIDER BEFORE THE CARDS THAT ARE NOT THIS VIEW'S RUNGS (user, 2026-10-19 — History with a
-  // node carried in from another view: "when a card is not part of the rung, show a divider"). A
-  // populated card below the lane is a subject the view did not produce, and adjacency is the
-  // slab's word for containment, so one hairline says the pile ends here. Only above PRESENT
-  // cards: the trailing ghosts are the view's own possibility space.
-  const trailingDivider = trailingPanes.length > 0 ? <div key="trailing-divider" aria-hidden className="h-px flex-none mx-[18px] bg-border" /> : null;
   // The tablet/phone sheets host the SAME LADDER LANE as the desktop rail (card-redesign
   // 2026-08-08 — sheets used to keep a flat populated-first/ghosts-last stack; with ghosts now
   // one-line entries the scroll-cost rationale is gone, and the lane brings the entry
@@ -822,9 +811,6 @@ export default function Inspector() {
   const content = (
     <>
       {ladderLane}
-      {trailingDivider}
-      {trailingPanes}
-      {trailingGhosts}
     </>
   );
 
@@ -844,12 +830,7 @@ export default function Inspector() {
           className="max-[1100px]:!w-[calc(288px+2*var(--rail-bleed))] max-[860px]:!w-[min(300px,calc(100vw-32px))] max-[1099px]:!hidden"
           style={accent}
         >
-          <RailShade>
-            {ladderLane}
-            {trailingDivider}
-            {trailingPanes}
-            {trailingGhosts}
-          </RailShade>
+          <RailShade>{ladderLane}</RailShade>
         </div>
       </>
     );
