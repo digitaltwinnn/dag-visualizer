@@ -108,8 +108,10 @@ describe("runSample", () => {
       countries: { DE: 5 }, providers: { "hetzner-online-gmbh": 5 },
       perNetCountries: { dag: { DE: 5 } }, perNetProviders: { dag: { "hetzner-online-gmbh": 5 } },
       providerNames: { "hetzner-online-gmbh": "Hetzner Online GmbH" },
+      sites: { "DE.Falkenstein.hetzner-online-gmbh": 5 },
     };
     await runSample(deps(store, { fleet: async () => ({ total: 5, perNet: { dag: 5 }, layers: {}, countries: { DE: 5 }, geo }) }));
+    expect(store.data.get("geo:mainnet:sites:2026-09")!.get("09-06|f.site.DE.Falkenstein.hetzner-online-gmbh")).toBe("5");
     const day = store.data.get("geo:mainnet:2026")!;
     expect(day.get("09-06|f.cc.DE")).toBe("5");
     expect(day.get("09-06|f.isp.dag.hetzner-online-gmbh")).toBe("5");

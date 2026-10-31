@@ -1,7 +1,7 @@
 // One sampler run: cursor → grow-until-cursor fetches → bucket → merge-write one key per
 // tier → advance cursor. Dependency-injected so the whole contract is unit-tested; the
 // route provides the real deps. Command budget per run: 1 lock + 1 hgetall (cursor) +
-// 1 hmget per touched tier key (reads, pre-transaction) + 1 applyWrites MULTI/EXEC
+// 1 hmget per touched tier or geo key (reads, pre-transaction) + 1 applyWrites MULTI/EXEC
 // (every touched key's HSET + EXPIRE, plus the cursor HSET) + 1 del ≈ 8.
 //
 // The write phase is ALL-OR-NOTHING (data + cursor together): the hmgets read prior values

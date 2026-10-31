@@ -540,10 +540,16 @@ describe("the store reads", () => {
       "geo:mainnet:2025": { "12-30|f.cc.DE": 1, "12-31|f.cc.DE": "2" },
       "geo:mainnet:2026": { "01-01|f.cc.DE": 3, "01-01|f.isp.hetzner": 3, "01-02|f.cc.usdc.FR": 1, "02-01|f.cc.DE": 9 },
       "geo:mainnet:isp": { hetzner: "Hetzner Online GmbH" },
+      "geo:mainnet:sites:2025-12": { "12-31|f.site.DE.Falkenstein.hetzner": 2, "12-01|f.site.DE.Falkenstein.hetzner": 9 },
+      "geo:mainnet:sites:2026-01": { "01-02|f.site.DE.Falkenstein.hetzner": 1 },
     };
     const store = { async hgetall(key: string) { asked.push(key); return (hashes[key] as Record<string, string>) ?? null; } };
     const out = await readGeoDays("mainnet", Date.UTC(2025, 11, 31, 6), Date.UTC(2026, 0, 2, 6), store);
-    expect(asked.sort()).toEqual(["geo:mainnet:2025", "geo:mainnet:2026", "geo:mainnet:isp"]);
+    expect(asked.sort()).toEqual(["geo:mainnet:2025", "geo:mainnet:2026", "geo:mainnet:isp", "geo:mainnet:sites:2025-12", "geo:mainnet:sites:2026-01"]);
+    expect(out.siteDays).toEqual({ // a month's hash holds days outside the window: left out
+      "2025-12-31": { "f.site.DE.Falkenstein.hetzner": 2 },
+      "2026-01-02": { "f.site.DE.Falkenstein.hetzner": 1 },
+    });
     expect(out.geoDays).toEqual({
       "2025-12-31": { "f.cc.DE": 2 },
       "2026-01-01": { "f.cc.DE": 3, "f.isp.hetzner": 3 },

@@ -2,7 +2,7 @@
 // the geo family (`keys.ts` `geoSlotOf`), so Geography gets a past: by country and by hosting
 // provider, for the whole fleet and for each network. Pure: the route hands it the same cached
 // geo maps `/api/geo` and `/api/metagraphs` serve, so it costs no upstream read.
-import type { GeoMap } from "@/src/data/types";
+import type { GeoInfo, GeoMap } from "@/src/data/types";
 import { providerKey } from "@/src/data/providerKey";
 
 export interface FleetGeo {
@@ -16,7 +16,14 @@ export interface FleetGeo {
   perNetProviders: Record<string, Record<string, number>>;
   /** provider key → the lookup's provider name, as the explorer shows it. */
   providerNames: Record<string, string>;
+  /** The whole fleet by place and host, `<cc>.<city>.<provider key>` (`siteSegment`): every
+   *  geolocated IP once, like `countries`, and only where the lookup names both a city and a host. */
+  sites: Record<string, number>;
 }
+
+/** A city as ONE series segment, reversibly: a city is shown, so unlike a provider it has no name
+ *  table to slug against. No dot (the segment separator) and no bar (the field grammar's). */
+export const siteSegment = (city: string): string => encodeURIComponent(city).replace(/\./g, "%2E");
 
 const bump = (m: Record<string, number>, k: string) => { m[k] = (m[k] ?? 0) + 1; };
 
@@ -25,7 +32,7 @@ export function fleetGeo(
   metagraphs: readonly { id: string; nodes: readonly { ip?: string }[] }[],
   metaGeo: GeoMap,
 ): FleetGeo {
-  const out: FleetGeo = { countries: {}, providers: {}, perNetCountries: {}, perNetProviders: {}, providerNames: {} };
+  const out: FleetGeo = { countries: {}, providers: {}, perNetCountries: {}, perNetProviders: {}, providerNames: {}, sites: {} };
   const tally = (ip: string, cc: Record<string, number>, prov: Record<string, number>, geo = metaGeo[ip] ?? dagGeo[ip]) => {
     if (!geo) return;
     if (geo.cc) bump(cc, geo.cc);
@@ -33,8 +40,13 @@ export function fleetGeo(
     if (k) { bump(prov, k); out.providerNames[k] ??= geo.isp!; }
   };
   const seen = new Set<string>();
-  for (const ip of Object.keys(dagGeo)) { seen.add(ip); tally(ip, out.countries, out.providers, dagGeo[ip]); }
-  for (const ip of Object.keys(metaGeo)) if (!seen.has(ip)) { seen.add(ip); tally(ip, out.countries, out.providers, metaGeo[ip]); }
+  const fleetTally = (ip: string, geo: GeoInfo | undefined) => {
+    tally(ip, out.countries, out.providers, geo);
+    const k = providerKey(geo?.isp);
+    if (geo?.cc && geo.city && k) bump(out.sites, `${geo.cc}.${siteSegment(geo.city)}.${k}`);
+  };
+  for (const ip of Object.keys(dagGeo)) { seen.add(ip); fleetTally(ip, dagGeo[ip]); }
+  for (const ip of Object.keys(metaGeo)) if (!seen.has(ip)) { seen.add(ip); fleetTally(ip, metaGeo[ip]); }
 
   const perNet = (id: string, ips: readonly (string | undefined)[], own?: GeoMap) => {
     const cc: Record<string, number> = {};

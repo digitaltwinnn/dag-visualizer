@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { slotOf, fieldOf, slotsInWindow, stepMsOf, cursorKeyOf, lockKeyOf, geoSlotOf, ispNamesKeyOf, TTL_S } from "./keys";
+import { slotOf, fieldOf, slotsInWindow, stepMsOf, cursorKeyOf, lockKeyOf, geoSitesSlotOf, geoSlotOf, ispNamesKeyOf, TTL_S } from "./keys";
 
 const T = Date.UTC(2026, 8, 6, 14, 37, 22); // 2026-09-06T14:37:22Z
 
@@ -36,6 +36,10 @@ describe("trends keys", () => {
 });
 
 describe("the geo family", () => {
+  it("keeps a provider's cities in one hash per month, read a week at a time", () => {
+    expect(geoSitesSlotOf("mainnet", Date.UTC(2026, 9, 31, 23, 59))).toEqual({ key: "geo:mainnet:sites:2026-10", bucket: "10-31" });
+    expect(geoSitesSlotOf("mainnet", Date.UTC(2026, 10, 1)).key).toBe("geo:mainnet:sites:2026-11");
+  });
   it("is one hash per UTC year, one bucket per UTC day, outside the t:{net}:* tiers a rebuild wipes", () => {
     const s = geoSlotOf("mainnet", Date.UTC(2026, 9, 27, 23, 59));
     expect(s).toEqual({ key: "geo:mainnet:2026", bucket: "10-27" });

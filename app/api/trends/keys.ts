@@ -43,6 +43,15 @@ export function geoSlotOf(net: string, tsMs: number): { key: string; bucket: str
   return { key: `geo:${net}:${new Date(tsMs).getUTCFullYear()}`, bucket };
 }
 
+/** A PROVIDER'S CITIES (2026-10-31): the fleet by city and provider, `MM-DD|f.site.<cc>.<city>.<key>`,
+ *  so a note can say "Hetzner lost 3 nodes in Falkenstein" from a measurement. In the geo family's
+ *  keep-forever prefix but its own hash, one per month: it is the family's widest series and only
+ *  the last week is ever read, so a note's yearly read does not carry it. */
+export function geoSitesSlotOf(net: string, tsMs: number): { key: string; bucket: string } {
+  const { bucket } = slotOf(net, "1d", tsMs);
+  return { key: `geo:${net}:sites:${new Date(tsMs).toISOString().slice(0, 7)}`, bucket };
+}
+
 /** provider key → the lookup's provider name (`fleetGeo.ts` `providerNames`), one hash per
  *  network, so a reader can name a host whose nodes have since gone. */
 export function ispNamesKeyOf(net: string): string {

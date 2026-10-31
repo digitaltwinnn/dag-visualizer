@@ -11,7 +11,7 @@ import type { Fact, NotableDay, NoteView, NoteLead } from "@/src/data/noteTypes"
 import { leadingTrim, pickRangeTier, type TrendsWindowData } from "@/src/data/trendWindow";
 import { CATALOG, type NetworkId } from "@/src/engine/config";
 import { assembleSpan, WINDOWS } from "../trends/assemble";
-import { geoSlotOf, ispNamesKeyOf, slotsInWindow, type Tier } from "../trends/keys";
+import { geoSitesSlotOf, geoSlotOf, ispNamesKeyOf, slotsInWindow, type Tier } from "../trends/keys";
 import { readStore, type TrendsStore } from "../trends/store";
 import { CC_TAIL_RE, ISP_TAIL_RE, TYPE_TAIL_RE, isSubjectNote, subjectKindOf, type NoteSpan, type SubjectKind } from "./keys";
 
@@ -44,6 +44,8 @@ export interface GeoDaysRead {
   geoDays: Record<string, Record<string, number>>;
   /** provider key → display name (`geo:{net}:isp`). */
   providerNames: Record<string, string>;
+  /** "YYYY-MM-DD" → that day's `f.site.<cc>.<city>.<key>` (`geoSitesSlotOf`), where it was sampled. */
+  siteDays?: Record<string, Record<string, number>>;
 }
 
 /** What `factsFor` reads through. The default is the trends store's read client. */
@@ -71,32 +73,40 @@ export async function readSpan(
 const iso = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
 /** THE GEO FAMILY over the UTC days [fromMs's day, toMs]: one `geo:{net}:{YYYY}` hash per year the
- *  window touches (fields `MM-DD|<series>`), regrouped by day, plus the provider names. */
+ *  window touches and one sites hash per month (fields `MM-DD|<series>`), regrouped by day, plus the
+ *  provider names. */
 export async function readGeoDays(
   net: string, fromMs: number, toMs: number, store: HashReader = readStore(),
 ): Promise<GeoDaysRead> {
   const firstDay = Math.floor(fromMs / D) * D;
   const years: number[] = [];
   for (let y = new Date(firstDay).getUTCFullYear(); y <= new Date(toMs).getUTCFullYear(); y++) years.push(y);
-  const [names, ...hashes] = await Promise.all([
+  const months: number[] = [];
+  for (const d = new Date(firstDay); d.getTime() <= toMs; d.setUTCMonth(d.getUTCMonth() + 1, 1)) months.push(d.getTime());
+  const [names, yearHashes, monthHashes] = await Promise.all([
     store.hgetall(ispNamesKeyOf(net)),
-    ...years.map((y) => store.hgetall(geoSlotOf(net, Date.UTC(y, 0, 1)).key)),
+    Promise.all(years.map((y) => store.hgetall(geoSlotOf(net, Date.UTC(y, 0, 1)).key))),
+    Promise.all(months.map((m) => store.hgetall(geoSitesSlotOf(net, m).key))),
   ]);
-  const geoDays: Record<string, Record<string, number>> = {};
-  hashes.forEach((h, i) => {
+  /** A hash's fields into `out`, by day, inside the window. */
+  const regroup = (h: Record<string, string> | null, year: number, out: Record<string, Record<string, number>>) => {
     for (const [field, raw] of Object.entries(h ?? {})) {
       const bar = field.indexOf("|");
       if (bar < 0) continue;
-      const date = `${years[i]}-${field.slice(0, bar)}`;
+      const date = `${year}-${field.slice(0, bar)}`;
       const ms = Date.parse(`${date}T00:00:00Z`);
       const n = Number(raw);
       if (!(ms >= firstDay && ms <= toMs) || !Number.isFinite(n)) continue;
-      (geoDays[date] ??= {})[field.slice(bar + 1)] = n;
+      (out[date] ??= {})[field.slice(bar + 1)] = n;
     }
-  });
+  };
+  const geoDays: Record<string, Record<string, number>> = {};
+  yearHashes.forEach((h, i) => regroup(h, years[i]!, geoDays));
+  const siteDays: Record<string, Record<string, number>> = {};
+  monthHashes.forEach((h, i) => regroup(h, new Date(months[i]!).getUTCFullYear(), siteDays));
   const providerNames: Record<string, string> = {};
   for (const [k, v] of Object.entries(names ?? {})) if (v != null) providerNames[k] = String(v);
-  return { geoDays, providerNames };
+  return { geoDays, providerNames, siteDays };
 }
 
 /** GEOGRAPHY'S READ — the geo family's days and the tiers' daily fleet `f.cc` (`ccDays`, pivoted by
@@ -104,7 +114,7 @@ export async function readGeoDays(
  *  it, so the countries warmed are the countries a note states (M5). */
 export async function geoInputs(net: string, nowMs: number, reads: NoteReads): Promise<GeoDaysRead & { ccDays: Record<string, Record<string, number>>; daily: TrendsWindowData }> {
   const from = nowMs - GEO_READ_MS;
-  const [{ geoDays, providerNames }, tiers] = await Promise.all([
+  const [{ geoDays, providerNames, siteDays }, tiers] = await Promise.all([
     reads.geoDays(net, from, nowMs),
     reads.span(net, "1d", from, nowMs),
   ]);
@@ -116,7 +126,7 @@ export async function geoInputs(net: string, nowMs: number, reads: NoteReads): P
     }
   });
   // The same daily read is the common activity reading's (R74), unfolded, as the builder wants it.
-  return { geoDays, providerNames, ccDays, daily: tiers };
+  return { geoDays, providerNames, ...(siteDays ? { siteDays } : {}), ccDays, daily: tiers };
 }
 
 /** The default reads for ONE note: the trends store's read client, each hash read at most once (a

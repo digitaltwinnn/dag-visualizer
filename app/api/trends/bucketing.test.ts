@@ -301,7 +301,17 @@ describe("finalDays / stampRun — the gaps backfill, written day by day (2026-1
 });
 
 describe("bucketFleetGeo", () => {
+  it("writes the day's sites to their own monthly hash, beside the family's yearly one", () => {
+    const inc: IncMap = new Map();
+    const geo = { countries: {}, providers: {}, perNetCountries: {}, perNetProviders: {}, providerNames: {}, sites: { "DE.Falkenstein.hetzner": 4 } };
+    bucketFleetGeo(inc, "mainnet", Date.UTC(2026, 9, 27, 14, 30), geo);
+    expect(inc.get("geo:mainnet:sites:2026-10")?.get("10-27|f.site.DE.Falkenstein.hetzner")).toBe(4);
+    bucketFleetGeo(inc, "mainnet", Date.UTC(2026, 9, 27, 15, 30), { ...geo, sites: { "DE.Falkenstein.hetzner": 3 } });
+    expect(inc.get("geo:mainnet:sites:2026-10")?.get("10-27|f.site.DE.Falkenstein.hetzner")).toBe(3); // the day's last reading
+    expect([...(inc.get("geo:mainnet:2026")?.keys() ?? [])]).toEqual([]);
+  });
   const geo = {
+    sites: {},
     countries: { DE: 60, US: 40 },
     providers: { "hetzner-online-gmbh": 70 },
     perNetCountries: { dor: { DE: 3 } },
