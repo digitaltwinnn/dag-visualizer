@@ -92,7 +92,11 @@ describe("the notes card's own behaviour", () => {
     const coin = read("components/notes/NoteKindCoin.tsx");
     expect(coin).toMatch(/NOTE_KIND_ICONS\[kind\]/);
     expect(coin).toMatch(/size-4 rounded-full/);
-    expect(coin).toMatch(/bg-\[var\(--ai-coin\)\]/);
+    // The AI's own sweep, not one hue of it (user, 2026-11-01), and an arbitrary `background` since
+    // the token is a gradient (CSS trap 3). The ground-coloured edge keeps overlapping coins apart.
+    expect(coin).toMatch(/\[background:var\(--ai-edge\)_padding-box\]/);
+    expect(coin).toMatch(/border border-background/);
+    expect(coin).toMatch(/text-background/);
     expect(coin).not.toMatch(/className=\{cn\("[^"]*(shadow|ring-|blur)/); // a plane must never carry a shadow (trendStackBoundary)
     expect(read("components/notes/NoteDiamonds.tsx")).toMatch(/<NoteKindCoin kind=\{day\.kind\}/);
     expect(read("components/notes/NoteDiamonds.tsx")).not.toMatch(/rotate-45/);
@@ -376,6 +380,8 @@ describe("a chart coin's hover", () => {
 
   it("says the day beside the coin", () => {
     expect(chart).toMatch(/<NoteDayPopover\s/);
+    // The size of the chart's own labels and tooltip (user, 2026-11-01: "unusually large").
+    expect(read("components/notes/NoteDayPopover.tsx")).toMatch(/<div className="text-label leading-snug text-foreground">\{caption\}/);
     expect(chart).toMatch(/caption: string/);
   });
 

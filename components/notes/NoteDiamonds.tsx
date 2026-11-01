@@ -13,7 +13,7 @@ import { commitNoteDay } from "./commitNoteDay";
 import { useAiNote } from "./useAiNote";
 
 // THE NOTABLE DAYS ON THE TIMELINE (2026-10-27) — the AI note's notable days, one mark each on the
-// History band's track: the kind's glyph on a violet coin (`NoteKindCoin`, design C 2026-10-30; an
+// History band's track: the kind's glyph on the AI's coin (`NoteKindCoin`, design C 2026-10-30; an
 // iridescent diamond until then, which read large here and small on the planes). The same days the AI notes card lists as rows; the
 // two surfaces are PAIRED through `hoverNoteDay` (rule 9): hovering a diamond lights its row,
 // hovering a row lights its diamond and raises the popover. Hovers preview, a click commits the

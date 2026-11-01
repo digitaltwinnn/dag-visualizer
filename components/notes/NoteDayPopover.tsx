@@ -15,7 +15,7 @@ export default function NoteDayPopover({ date, caption, className, style }: { da
         <div className="rounded-[calc(var(--radius-md)-1px)] bg-background">
           <div className={cn(SCENE_GLASS, "border-0 px-2.5 py-1.5")}>
             <div className="text-label tracking-caps text-muted-foreground tabular-nums">{date}</div>
-            <div className="text-body leading-snug text-foreground">{caption}</div>
+            <div className="text-label leading-snug text-foreground">{caption}</div>
           </div>
         </div>
       </div>
