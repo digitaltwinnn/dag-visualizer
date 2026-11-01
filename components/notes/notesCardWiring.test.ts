@@ -92,11 +92,12 @@ describe("the notes card's own behaviour", () => {
     const coin = read("components/notes/NoteKindCoin.tsx");
     expect(coin).toMatch(/NOTE_KIND_ICONS\[kind\]/);
     expect(coin).toMatch(/size-4 rounded-full/);
-    // The AI's own sweep, not one hue of it (user, 2026-11-01), and an arbitrary `background` since
-    // the token is a gradient (CSS trap 3). The ground-coloured edge keeps overlapping coins apart.
-    expect(coin).toMatch(/\[background:var\(--ai-edge\)_padding-box\]/);
-    expect(coin).toMatch(/border border-background/);
-    expect(coin).toMatch(/text-background/);
+    // The AI's own sweep as the OUTLINE, the card's own edge (user, 2026-11-01: a full fill was
+    // "a bit too much"), over an opaque face that also keeps overlapping coins apart. An arbitrary
+    // `background`, since the token is a gradient (CSS trap 3).
+    expect(coin).toMatch(/border border-transparent/);
+    expect(coin).toMatch(/\[background:linear-gradient\(var\(--background\),var\(--background\)\)_padding-box,var\(--ai-edge\)_border-box\]/);
+    expect(coin).toMatch(/text-foreground/);
     expect(coin).not.toMatch(/className=\{cn\("[^"]*(shadow|ring-|blur)/); // a plane must never carry a shadow (trendStackBoundary)
     expect(read("components/notes/NoteDiamonds.tsx")).toMatch(/<NoteKindCoin kind=\{day\.kind\}/);
     expect(read("components/notes/NoteDiamonds.tsx")).not.toMatch(/rotate-45/);
