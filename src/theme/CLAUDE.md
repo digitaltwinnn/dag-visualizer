@@ -31,7 +31,7 @@ light value under OS-light (`:not([data-theme="dark"])` guards an explicit dark 
 overridden by the media query), and `:root[data-theme="light"]` restates that same light value
 for an explicit light pin. Two tokens use it and the CSS comment above each says why:
 `--ident-l`/`--ident-c` (the identity lanes' L and C), and **`--trend-fill-top`**, the opacity at
-the top of the History cards' area fill — 0.30 dark, 0.18 on paper, because there the hue is INK
+the top of the History cards' and the timeline's area fill — 0.20 dark, 0.12 on paper, because there the hue is INK
 and the presence that reads as a quiet tint on the dark card reads as a painted block on the light
 one (the card's face is `--panel-solid` over the opaque `--scene-ground`). The fill is drawn as an SVG gradient
 stop, so the token reaches it through `style={{ stopOpacity: "var(--trend-fill-top)" }}` — a

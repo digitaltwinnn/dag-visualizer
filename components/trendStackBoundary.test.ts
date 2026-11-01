@@ -269,3 +269,21 @@ describe("a leaving stack keeps the deal it was showing", () => {
     expect(src).toMatch(/!this\._leaving &&\s*\(\s*st\.ids !== this\._ids/);
   });
 });
+
+// ONE FILL (user, 2026-11-01: "the same gradient effect should apply to the vitals chart"): the
+// timeline under the planes fades as a plane does, from the one token, so the two cannot drift.
+describe("the chart's fill", () => {
+  const track = readFileSync(join(process.cwd(), "components/TrendTrack.tsx"), "utf8");
+
+  it("fades from the shared token to nothing on the timeline too", () => {
+    expect(track).toMatch(/<linearGradient id=\{fadeId\}[^>]*gradientUnits="userSpaceOnUse"/);
+    expect(track).toMatch(/stopOpacity: "var\(--trend-fill-top\)"/);
+    expect(track).toMatch(/stopOpacity=\{0\}/);
+    expect(track).toMatch(/fill=\{`url\(#\$\{fadeId\}\)`\}/);
+  });
+
+  it("is no longer a flat wash there", () => {
+    expect(track).not.toMatch(/fill="var\(--primary\)"\s+opacity=\{0\.12\}/);
+  });
+});
+
