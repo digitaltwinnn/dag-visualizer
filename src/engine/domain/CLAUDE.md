@@ -105,7 +105,7 @@ The design rules behind the table, which the tests pin but don't explain:
   whole app from a card and dropping the pin on the way (a filter commit in the ledger re-enters
   live). It is `store.tickNet` now — `{ metaId, globalOrdinal }`, carrying its tick so it can never
   outlive it — and **`domain/tickNet.ledgerNetwork` is the ONE resolver every ledger surface
-  reads**: the rail's Metagraph rung and card, the chamber's coloured dim, the commit tilt, the
+  reads**: the rail's Metagraph rung and card, the chamber's coloured dim, the
   pager, the explorer row's committed state. The tick-local commit wins inside its tick; elsewhere
   the filter. Full ancestry there is tick → network → snapshot (`metaSnapSelectActions`,
   `bandSelectActions`, `tickNetSelectActions`), every one of which PINS the tick. Only the top

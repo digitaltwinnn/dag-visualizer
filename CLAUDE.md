@@ -441,10 +441,10 @@ its claim is paper-only, so its one `intensity` already is its paper number.
    `getWorldPosition`/`getMatrixAt` in an Engine framing path needs a justified `render-state OK`
    marker (rule 6 enforces this).
 2. **View emphasis moves the structure, not the camera.** Shared, lockstep and policy-driven beats
-   composed camera cleverness; camera poses stay dumb. Where a view *does* answer a commit with the
-   camera, it gets **ONE pose with ONE state-keyed variation** — the ledger's `ledgerCommitTilt`
-   (`domain/cameraRig.ts`) leans the settled chamber pose in when a network is committed and back out
-   when it isn't, and that is the whole vocabulary. **History is the second instance**:
+   composed camera cleverness; camera poses stay dumb. The Snapshots chamber has ONE pose at every
+   rung (`FOCI.ledger`, a subtle angle; a commit tilt became that pose, user 2026-11-01). Where a view
+   *does* answer a commit with the camera, it gets **ONE pose with ONE state-keyed variation**.
+   **History is that instance**:
    `trendFocusPush` slides `FOCI.trend` a little way down its own view axis while a focus has re-dealt
    the stack (`trendStack.focusDepth()`, layout data — never a projected plane), and back out when the focus
    clears, so every rung of `LADDERS.trend` inherits it by delegating to the resting pose. It is a

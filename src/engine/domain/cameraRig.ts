@@ -54,19 +54,19 @@ export const FOCI = {
   // acknowledgement (principle 3's structural exception, `tweenTo`'s `structureMoves`: a same-pose
   // nudge on top of the spin was "no need … rotation is enough", user, same day), with the HUD
   // dim riding the held window.
-  // The Snapshots RESTING pose (user, 2026-08-07 — it used to share `overview`): FRONTAL and
-  // zoomed in, straight onto the chamber's camera-side face, so the ribbon sheets (which span
-  // the lane field) and the node trays (which face +Z) present flat-on. Slightly elevated,
-  // aimed between the floors.
-  // Nearly level (user: "more from the front, no tilt") — a ~6° pitch keeps the plane tops
-  // just barely readable while the trays + ribbon sheets present flat-on.
+  // THE SNAPSHOTS POSE, THE VIEW'S ONLY ONE (user, 2026-11-01: "starting pos / all pos the same and
+  // when a metagraph is selected, subtle angle"). It was frontal, with a commit tilt orbiting a
+  // little into three-quarter while a metagraph stood; that tilt IS this pose now, so entering,
+  // `all` and a commit all stand at one subtle angle and a commit moves nothing it must then undo.
+  // An orbit about the field's own centre keeps every lane in frame and frames none better than
+  // another: about 13° toward +X, a little more look-down so the two storeys separate, and the
+  // radius pays for the yawed field's wider diagonal. Aimed between the floors.
   // Raised in FRAME (user, 2026-08-09 — "the scene elements sit too close to the bottom of the
   // viewport", then "lower it a little bit, in HUD mode it's too high now"): pos.y and target.y
-  // are lowered by the SAME 4.5, which translates the frustum down without touching the view
-  // direction — so the ~6° pitch is preserved exactly and the chamber centres in the band between
-  // the topbar and the LiveStrip. Both global levers survive it: dollyBack and railsLean scale
+  // were lowered by the SAME 4.5, which translates the frustum down without touching the view
+  // direction, so the chamber centres in the band between the topbar and the LiveStrip. Both global levers survive it: dollyBack and railsLean scale
   // (pos − target) around the target, so a pure translation of the pair is invariant under them.
-  ledger: { pos: new THREE.Vector3(0, -1, 54), target: new THREE.Vector3(0, -7, 0) },
+  ledger: { pos: new THREE.Vector3(13.08, 5.27, 55.87), target: new THREE.Vector3(0, -7, 0) },
   // The trends RESTING pose: frontal, looking down the stack's −Z depth axis so every plane
   // presents flat-on and depth reads as scale and fade rather than perspective skew. Elevated
   // only enough to separate the planes' bottom edges.
@@ -259,7 +259,6 @@ export function closeness(altitude: number): number {
 const _out = new THREE.Vector3();
 const _side = new THREE.Vector3();
 const _up = new THREE.Vector3(0, 1, 0);
-const _sph = new THREE.Spherical();
 
 // Hypergraph metagraph-hub framing (Engine.ts:699-707 `_focusFilter` verbatim): camera pulled
 // back along the hub's outward radial, offset sideways and lifted, looking at the hub itself.
@@ -457,39 +456,9 @@ export function clampPose(
   return pos;
 }
 
-// ---- the Snapshots COMMIT ORBIT -------------------------------------------------------------
-// With a metagraph filter committed, the frontal resting pose ORBITS a little into a
-// three-quarter view (user, 2026-08-09: "when there is a filter on a metagraph, tilt the camera a
-// bit to give it a nicer 3d effect") — the chamber's depth (two storeys, the trail running away
-// from the lead edge) then reads as 3D instead of as a flat elevation. Keyed on the FILTER, not on
-// a rung, so it is a property of the committed STATE: every ledger rung inherits it by delegating
-// to `ledgerOverview`, and clearing the filter tweens back to frontal.
-//
-// ⚠️ This is NOT the retired `ledgerLaneNudge` in another shape, and the difference is exactly why
-// it's allowed: the nudge translated laterally, which walks the symmetric field's far end out of
-// frame. An ORBIT about the field's own centre keeps every lane in frame — it only changes the
-// angle they are seen at — and the radius factor pays for the wider projected diagonal a yawed
-// field presents. The composition is still filter-independent: the orbit is the same for every
-// network, so no lane is ever framed better than another.
-//
-// Composes cleanly with both global levers (`dollyBack`, `railsLean`): they scale (pos − target)
-// about the target, which commutes with a rotation about that same target. Safe to call with
-// `outPos === pos` — the scratch read happens before the write.
-export const LEDGER_TILT_YAW = 0.23; // rad ≈ 13°, orbiting toward +X (the lane field's right end)
-export const LEDGER_TILT_PITCH = 0.1; // rad ≈ 5.7° of extra look-down, so the two storeys separate
-export const LEDGER_TILT_DOLLY = 1.08; // pays for the yawed field's wider projected diagonal
-export function ledgerCommitTilt(pos: THREE.Vector3, target: THREE.Vector3, outPos: THREE.Vector3): void {
-  _sph.setFromVector3(_out.subVectors(pos, target));
-  _sph.theta += LEDGER_TILT_YAW;
-  _sph.phi -= LEDGER_TILT_PITCH; // phi is measured from +Y, so subtracting RAISES the camera
-  _sph.radius *= LEDGER_TILT_DOLLY;
-  outPos.setFromSpherical(_sph).add(target);
-}
-
 // ---- the History view's FOCUS LEAN ----------------------------------------------------------
 // The trends view owns ONE pose, `FOCI.trend`, with ONE state-keyed variation — this — which is
-// exactly the shape `ledgerCommitTilt` has in the chamber, and for the same reason: camera
-// principle 2 says view emphasis moves the STRUCTURE, and a second pose is a second thing the
+// because camera principle 2 says view emphasis moves the STRUCTURE, and a second pose is a second thing the
 // reader has to learn. The structure already answers a plane click (`domain/trendStack.stackPoses`
 // RE-DEALS the deck: the focused plane takes first place and the planes ahead of it slide back);
 // this is the camera's share of that one gesture — it leans IN while a focus stands and back out

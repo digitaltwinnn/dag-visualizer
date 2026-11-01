@@ -33,7 +33,7 @@ import { liveArrivals } from "./domain/arrivals";
 import { BRIEFING_COVER, BRIEFING_PACE, BRIEFING_RELEASE_MS } from "./domain/briefing";
 import { SHEET_SHIFT_K, chromeShiftPx, sheetShiftPx, stripShiftPx } from "./domain/sheetShift";
 import { ChromeBounds } from "./ChromeBounds";
-import { FOCI, nodeFraming, cohortFraming, ledgerCommitTilt, trendFocusPush, trendFit } from "./domain/cameraRig";
+import { FOCI, nodeFraming, cohortFraming, trendFocusPush, trendFit } from "./domain/cameraRig";
 import { elevationCap, isDrag, orbitAbout, orbitAllowed, orbitAngles } from "./domain/subjectOrbit";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
@@ -160,7 +160,7 @@ export class Engine {
   private _policy: ViewPolicy = VIEW_POLICIES.hyper;
   private filter = "all";
   /** The network committed INSIDE the pinned tick, and that tick's ordinal — the two inputs of
-   *  `ledgerNetwork`, bridged from the store so the chamber's lens and the commit tilt resolve
+   *  `ledgerNetwork`, bridged from the store so the chamber's lens resolves
    *  against the ledger's own network rather than the app filter (2026-10-02). */
   private tickNet: TickNetSel | null = null;
   private snapOrd: number | null = null;
@@ -1058,7 +1058,7 @@ export class Engine {
         // THE LEDGER'S OWN NETWORK (2026-10-02): the one committed inside the pinned tick, else the
         // filter. It changes when that commit does or when the tick on screen does (the commit is
         // honoured only in its own tick), and the chamber answers exactly as it does to a filter:
-        // the coloured dim, and the commit tilt through the one ledger pose. Nothing app-wide moves.
+        // the coloured dim, on the one ledger pose. Nothing app-wide moves.
         if (st.tickNet !== prev.tickNet || st.snap !== prev.snap) {
           const before = this._ledgerNet();
           this.tickNet = st.tickNet;
@@ -1698,9 +1698,9 @@ export class Engine {
     } else if (this.mode === "ledger") {
       // The committed network's COLOURED DIM: the other networks' ribbons, bands and tiles drop to
       // their own hue, this one's hold identity down the whole trail (four-tier emphasis). Geometry
-      // never moves and the camera's only answer is the shared commit tilt inside the settled ledger
-      // pose — the per-lane and per-node framings were retired (2026-08-09), so the ladder's NETWORK
-      // rung resolves to that one pose, not a lane fly-to.
+      // never moves and the camera holds the one ledger pose: the per-lane and per-node framings were
+      // retired (2026-08-09) and the commit tilt became that pose (2026-11-01), so the ladder's
+      // NETWORK rung resolves to it, not a lane fly-to.
       this.globe.setFilter(this._ledgerNet());
       this.ledger.setFilter(ledgerLens(this._ledgerNet()));
       if (focusCamera) this._resolveFocus();
@@ -1820,33 +1820,7 @@ export class Engine {
     ledgerNode: () => this._resolvers.ledgerOverview(),
     ledgerNetwork: () => this._resolvers.ledgerOverview(),
     ledgerOverview: () => {
-      // The frontal resting pose (FOCI.ledger, 2026-08-07) — which ORBITS into a three-quarter
-      // view while a metagraph is committed (cameraRig.ledgerCommitTilt, user 2026-08-09). Keyed on
-      // the FILTER rather than on the rung, so the two finer rungs inherit it by delegating here and
-      // clearing the filter tweens back to frontal on its own.
-      // ⚠️ THROUGH THE LEDGER'S OWN LENS, like everything else in this chamber (user, 2026-09-01:
-      // filtering DAG left "a bloom on the trail that stays behind; on other filters it does not
-      // behave like this"). This gate read the RAW filter while `setFilter`, the hover preview and
-      // the live edge all read `ledgerLens` — where `dag` IS `all`, because every global tick is a
-      // DAG snapshot and the base ledger's story is the whole chamber.
-      //
-      // The mismatch composed two correct behaviours into a wrong picture: committing DAG tilted
-      // the camera into the three-quarter pose — which turns the global floor toward the viewer, so
-      // more of its emissive surface faces the camera and blooms — while the coloured dim, reading
-      // the lens, correctly dimmed NOTHING. Every other filter tilts and dims together, so the tilt
-      // reads as emphasis; DAG alone tilted with nothing dimmed, and that is the bloom.
-      //
-      // Frontal is also what the tilt is FOR: it exists so "the two storeys separate" when a
-      // metagraph's lane must be read against the floor. Commit the DAG and there is no lane to
-      // separate — the subject IS the floor — so the lean has no work to do.
-      const f = FOCI.ledger;
-      if (ledgerLens(this._ledgerNet()) === "all") {
-        this.cam.focus("ledger");
-        return true;
-      }
-      ledgerCommitTilt(f.pos, f.target, this.cam.out.pos);
-      this.cam.out.target.copy(f.target);
-      this.cam.tweenTo(this.cam.out.pos, this.cam.out.target);
+      this.cam.focus("ledger");
       return true;
     },
     // The History view has ONE camera POSE, exactly as the Snapshots chamber does — `FOCI.trend`,

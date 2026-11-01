@@ -310,7 +310,7 @@ export function snapshotSelectActions(
  *
  *  It replaces "the filter IS the step" (2026-09-15): stepping down from a card re-scoped the whole
  *  app — the top bar, the other views, the lists — from a pager, and the commit outlived the visit.
- *  The chamber still answers exactly as it did (the coloured dim, the commit tilt, the Metagraph
+ *  The chamber still answers exactly as it did (the coloured dim, the Metagraph
  *  card), because every ledger surface resolves through `domain/tickNet.ledgerNetwork`; only the
  *  app-wide lens is left alone.
  *

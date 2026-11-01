@@ -99,8 +99,8 @@ the root is morph-scaled, so a world position would aim at the origin mid-morph.
 while focused, and picking is filter-gated to the in-focus selection's nodes. Depth of field is wired
 but no view opts in — the bokeh read as fuzz on the selected atom.
 
-**Snapshots** — the ladder is node → network → all. Committing a filter leans the chamber pose in (the
-one commit tilt) but never moves the lanes; floors and trays are visual aid, and the real subjects are
+**Snapshots** — the ladder is node → network → all. The chamber has one pose, at a subtle angle, and
+a commit moves neither it nor the lanes; floors and trays are visual aid, and the real subjects are
 the snapshots themselves.
 
 **Hover previews at the same strength as a committed filter**, but never runs the click's camera
@@ -310,7 +310,7 @@ story, not an off-filter bystander. A WHO-is-in-scope statement, so it lives at 
 rows keep saying how much, and every other view still dims the DAG under a metagraph filter.
 
 **Lanes and the committed filter. The field is fixed**: every lane always owns its own slice, and a
-committed filter never moves or hides geometry — only the shared commit tilt answers it with the camera.
+committed filter never moves or hides geometry, or the camera.
 The emphasis is a **coloured dim** on every identity-coloured element — the others drop to their *own
 hue* at the row's `dim`, a tier between full colour and the neutral trail, so the committed network
 leads while the rest stay identifiable. `src/engine/scene/objects/dimTiers.test.ts` keeps the tier
