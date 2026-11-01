@@ -17,7 +17,7 @@ const flat = (n: number, v: number, patch: Record<number, number | null> = {}): 
 
 describe("NOTABLE_CAPS", () => {
   it("states how many days each pill keeps", () => {
-    expect(NOTABLE_CAPS).toEqual({ "7d": 3, "30d": 5, "90d": 6, "1y": 8, all: 8 });
+    expect(NOTABLE_CAPS).toEqual({ "7d": 3, "30d": 5, "90d": 6, "1y": 10, all: 10 });
   });
 });
 
@@ -91,6 +91,39 @@ describe("notableDays: high and low", () => {
     const out = notableDays({ days, covered, series, subject: "a", ids: ["a"], cap: 5 });
     expect(out).toHaveLength(1);
     expect(out[0]).toMatchObject({ dayMs: days[15], kind: "high", networkId: "a", value: 200, level: 50 });
+  });
+});
+
+// THE WHOLE NETWORK'S SECOND MEASURE (user, 2026-11-01): the total anchored barely moves, so a year
+// found one day, while the network stalled for hours twice and tripled its global snapshots.
+describe("notableDays: the whole network's global snapshots", () => {
+  const ticks = (patch: Record<number, number>) => flat(30, 5000, patch);
+  const run = (series: Record<string, (number | null)[]>, subject = "dag") => {
+    const { days } = span(30);
+    return { days, out: notableDays({ days, covered: series["g.ticks"]!, series, subject, ids: [], cap: 5 }) };
+  };
+
+  it("a spike or dip in them is a notable day that says whose measure it is", () => {
+    const { days, out } = run({ "g.ticks": ticks({ 20: 1000 }), "g.anchors": flat(30, 40000) });
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ dayMs: days[20], kind: "low", networkId: null, measure: "globals", value: 1000, level: 5000 });
+  });
+
+  it("a day of the total anchored carries no such word", () => {
+    const { out } = run({ "g.ticks": ticks({}), "g.anchors": flat(30, 40000, { 20: 1000 }) });
+    expect(out).toHaveLength(1);
+    expect(out[0]).not.toHaveProperty("measure");
+  });
+
+  it("is one day when both measures moved on it, the total's", () => {
+    const { days, out } = run({ "g.ticks": ticks({ 20: 1000 }), "g.anchors": flat(30, 40000, { 20: 1000 }) });
+    expect(out.filter((d) => d.dayMs === days[20])).toHaveLength(1);
+    expect(out[0]).not.toHaveProperty("measure");
+  });
+
+  it("is the whole network's alone: a network reads its own snapshots", () => {
+    const { out } = run({ "g.ticks": ticks({ 20: 1000 }), "m.usdc.snaps": flat(30, 100) }, "usdc");
+    expect(out.filter((d) => d.kind === "high" || d.kind === "low")).toEqual([]);
   });
 });
 

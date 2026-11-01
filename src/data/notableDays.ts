@@ -27,7 +27,7 @@ import type { NotableDay } from "@/src/data/noteTypes";
 // ⚠️ Nothing here reads the store, react or THREE; the colocated test is the specification (rule 4).
 
 /** How many notable days each History pill keeps. */
-export const NOTABLE_CAPS: Record<"7d" | "30d" | "90d" | "1y" | "all", number> = { "7d": 3, "30d": 5, "90d": 6, "1y": 8, all: 8 };
+export const NOTABLE_CAPS: Record<"7d" | "30d" | "90d" | "1y" | "all", number> = { "7d": 3, "30d": 5, "90d": 6, "1y": 10, all: 10 };
 
 /** THE FLOOR (user, 2026-10-30: "I've not seen more than 1 notable day, can we have at least 3? If
  *  nothing really notable changed, call out the highs/lows of the network during that range"). A
@@ -59,7 +59,7 @@ export interface NotableInput {
   days: number[];
   /** `g.ticks` per day; null = the day was not measured. */
   covered: (number | null)[];
-  /** The daily rows: `g.anchors`, `m.<id>.snaps`, `m.<id>.gapMax`. */
+  /** The daily rows: `g.anchors`, `g.ticks`, `m.<id>.snaps`, `m.<id>.gapMax`. */
   series: Record<string, (number | null)[]>;
   /** "dag" for the whole network, else a network id. */
   subject: "dag" | string;
@@ -158,6 +158,7 @@ function highLow(
   input: NotableInput,
   networkId: string | null,
   out: NotableDay[],
+  measure?: NotableDay["measure"],
 ): void {
   const { days, covered } = input;
   const act = activity(row, input);
@@ -189,7 +190,7 @@ function highLow(
       continue;
     }
     const kind = value >= HIGH_RATIO * level && value >= HIGH_FLOOR ? "high" : value <= LOW_RATIO * level ? "low" : null;
-    keep.day(kind ? { dayMs: days[i]!, kind, networkId, value, level, score: scoreOf(value, level) } : null);
+    keep.day(kind ? { dayMs: days[i]!, kind, networkId, ...(measure ? { measure } : {}), value, level, score: scoreOf(value, level) } : null);
   }
   keep.flush();
 }
@@ -308,8 +309,17 @@ export function notableDays(input: NotableInput): NotableDay[] {
   const { series, subject, ids, cap } = input;
   const out: NotableDay[] = [];
   if (subject === "dag") {
+    // TWO MEASURES (user, 2026-11-01): the total anchored barely moves, so a year found one day of
+    // it, and the network's own pace, a stall or a step up in global snapshots, went unread.
     const total = series["g.anchors"];
     if (total) highLow(total, input, null, out);
+    const globals = series["g.ticks"];
+    if (globals) {
+      const taken = new Set(out.map((d) => d.dayMs));
+      const paced: NotableDay[] = [];
+      highLow(globals, input, null, paced, "globals");
+      out.push(...paced.filter((d) => !taken.has(d.dayMs)));
+    }
     for (const id of ids) {
       const snaps = series[`m.${id}.snaps`];
       if (snaps) firstLast(snaps, input, id, out);

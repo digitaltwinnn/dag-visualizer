@@ -362,6 +362,7 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
       const measured =
         day.kind === "pause" || day.kind === "longest" ? "longest wait between snapshots"
         : day.kind === "broadest" ? "networks that anchored that day"
+        : day.measure === "globals" ? "global snapshots that day"
         : "snapshots anchored that day";
       facts.push(fact(`Notable day ${n} date (${what})`, day.dayMs, "date"));
       facts.push(fact(`Notable day ${n} ${what}, ${measured}`, day.value, kind));

@@ -624,3 +624,12 @@ describe("a network's silent span", () => {
     expect(r.facts.some((f) => /^(Last|First) day/.test(f.label))).toBe(false);
   });
 });
+
+describe("a notable day of global snapshots", () => {
+  it("names its measure, so the caption cannot call it snapshots anchored", () => {
+    const n = 30;
+    const daily = win(n, { "g.ticks": row(n, (i) => (i === 20 ? 1000 : 5000)), "g.anchors": row(n, () => 40000) }, T0 - 20 * DAY);
+    const r = trendFacts(input({ zoom: "30d", span: { fromMs: T0 - 20 * DAY, toMs: T0 + 10 * DAY }, daily }))!;
+    expect(r.facts.find((f) => /^Notable day 1 dip, /.test(f.label))).toMatchObject({ label: "Notable day 1 dip, global snapshots that day", value: 1000 });
+  });
+});

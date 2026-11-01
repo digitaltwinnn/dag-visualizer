@@ -38,6 +38,8 @@ export interface NotableDay {
   dayMs: number;
   kind: NotableKind;
   networkId: string | null;
+  /** Set when `value` counts global snapshots, not the snapshots anchored every other day reads. */
+  measure?: "globals";
   value: number;
   level: number;
   score: number;
