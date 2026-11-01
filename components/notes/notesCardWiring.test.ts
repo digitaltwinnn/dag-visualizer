@@ -130,8 +130,10 @@ describe("the notes card's own behaviour", () => {
     const moment = read("components/inspector/TrendInstantPane.tsx");
     // The bucket chip is a clock mark and the width alone (user, 2026-10-30: "instead of saying
     // '5-min bucket' say '5-min' with an icon, shorter"); "bucket" stays for assistive tech.
-    expect(moment).toMatch(/<span className="inline-flex items-center gap-1">\s*<BUCKET_ICON aria-hidden[^]*?\{bucketWord\(stepMs\)\}[^]*?<span className="sr-only"> bucket<\/span>/);
-    expect(read("components/notes/NoteKindChip.tsx")).toMatch(/<span className="inline-flex items-center gap-1">\s*<Mark aria-hidden/);
+    // A plain `flex`, never `inline-flex`: an inline box stands on a text baseline, and that line
+    // made these two chips 1.7px taller than the plain chip beside them (user, 2026-11-01).
+    expect(moment).toMatch(/<span className="flex items-center gap-1">\s*<BUCKET_ICON aria-hidden[^]*?\{bucketWord\(stepMs\)\}[^]*?<span className="sr-only"> bucket<\/span>/);
+    expect(read("components/notes/NoteKindChip.tsx")).toMatch(/<span className="flex items-center gap-1">\s*<Mark aria-hidden/);
     expect(moment).not.toMatch(/\{bucketWord\(stepMs\)\} bucket/);
     expect(moment).toMatch(/notableDayAt\(/);
     expect(moment).toMatch(/<NoteKindChip day=\{/);

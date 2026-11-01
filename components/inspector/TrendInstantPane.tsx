@@ -213,7 +213,7 @@ export default function TrendInstantPane({
               {/* The width alone, behind a clock mark (user, 2026-10-30: "'5-min' with an icon");
                   "bucket" stays for assistive tech. */}
               <QualifierChip>
-                <span className="inline-flex items-center gap-1">
+                <span className="flex items-center gap-1">
                   <BUCKET_ICON aria-hidden className="size-3 flex-none" />
                   {bucketWord(stepMs)}
                   <span className="sr-only"> bucket</span>

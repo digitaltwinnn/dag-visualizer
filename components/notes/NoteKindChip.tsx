@@ -23,7 +23,7 @@ export default function NoteKindChip({ day }: { day: NoteDay }) {
     <QualifierChip className={AI_SWEEP}>
       {/* One flex row inside the chip's truncating span: preflight makes an svg `display:block`,
           so a bare mark beside text stood on its own line (user, 2026-10-30: "spans two rows"). */}
-      <span className="inline-flex items-center gap-1">
+      <span className="flex items-center gap-1">
         <Mark aria-hidden className="size-3 flex-none" style={hue ? { color: hue } : undefined} />
         {NOTE_KIND_WORD[day.kind]}
       </span>
