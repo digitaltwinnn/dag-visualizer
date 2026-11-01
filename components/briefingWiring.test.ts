@@ -33,8 +33,19 @@ describe("the tour's chrome", () => {
     expect(briefing).toMatch(/new URL\(SITE_ORIGIN\)\.host/);
   });
 
-  it("names it on every screen, the phone's header and the corner elsewhere", () => {
+  it("names it on every screen, the phone's header and the progress bar elsewhere", () => {
     expect(briefing.match(/\{site\}/g)).toHaveLength(2);
+    expect(briefing).toMatch(/\{site\}\s*\{bars\}\s*\{skip\}/);
+  });
+
+  it("credits the AI with the words it wrote, over them and never on the bar", () => {
+    expect(briefing).toMatch(/\{name\}<\/p>\s*\{who\}\s*<\/div>/);
+    expect(briefing).not.toMatch(/\{who\}\s*\{bars\}/);
+  });
+
+  it("says the AI powers the words, and only when they are the AI's", () => {
+    expect(briefing).toMatch(/const who = words\.ai && \(/);
+    expect(briefing).toMatch(/Powered by \{AI_TITLE\}/);
   });
 });
 
