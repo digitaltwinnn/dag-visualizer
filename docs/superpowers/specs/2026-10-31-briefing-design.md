@@ -4,7 +4,7 @@
 
 October: 271 visitors, two in three on phones, and 71 arrivals from t.co saw 77 pages, nearly all of
 them `/`. Bounce is about 60%. Most visitors never reach a second view. The Briefing shows every view
-once, in the AI's words, on every entry to `/`, and one tap ends it. It says something new each time,
+once, in the AI's words, on every entry to `/`, and Skip ends it. It says something new each time,
 so it reads as a daily briefing rather than an intro.
 
 ## What the visitor gets
@@ -15,8 +15,9 @@ so it reads as a daily briefing rather than an intro.
 3. The stage clears on every screen size: the HUD steps aside, the scene fills the screen and lifts,
    and large words stand beneath it. Phones keep progress and Skip at the top, as the mock showed.
 4. The progress bar's segments, and the arrow keys, move back and forward between stops.
-   Skip, a tap anywhere or Escape ends it and leaves the visitor in that view, the words fading as
-   the interface arrives. Finishing returns to the globe in three beats: the words go, the scene
+   Skip or Escape ends it and leaves the visitor in that view, the words fading as the interface
+   arrives. The scene stays live: a drag orbits as usual and holds the stop's clock, and a tap on it
+   does nothing, so a visitor exploring never ends the tour by accident. Finishing returns to the globe in three beats: the words go, the scene
    moves alone, and the interface arrives as it lands. Either way the interface arrives, which shows
    this is a tool and not a video.
 

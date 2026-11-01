@@ -18,10 +18,6 @@ describe("the tour and the address bar", () => {
 });
 
 describe("the tour before the scene is up", () => {
-  it("takes no tap on the loading screen", () => {
-    expect(briefing).toMatch(/onClick=\{ready \? /);
-  });
-
   it("counts a stop only once it can be seen", () => {
     expect(briefing).toMatch(/if \(ready\) track\("briefing-stop"/);
   });
@@ -31,7 +27,7 @@ describe("the tour's progress bar", () => {
   it("moves the tour to the stop clicked, without the click ending it", () => {
     expect(briefing).toMatch(/const goTo = \(i: number\) => \{/);
     expect(briefing).toMatch(/s\.setMode\(BRIEFING_STOPS\[i\]!\);\s*s\.setBriefing\(i\);/);
-    expect(briefing).toMatch(/onClick=\{\(e\) => \{\s*e\.stopPropagation\(\);\s*goTo\(i\);/);
+    expect(briefing).toMatch(/onClick=\{\(\) => goTo\(i\)\}/);
   });
 
   it("names each stop for a screen reader, and leaves Skip the first stop for Tab", () => {
@@ -66,7 +62,7 @@ describe("the tour's end", () => {
 describe("the tour's three-beat ending", () => {
   it("fades the words and the gradient together, on one clock", () => {
     expect(briefing).toMatch(/transitionDuration: `\$\{BRIEFING_WORDS_OUT_MS\}ms`/);
-    expect(briefing).toMatch(/fading && "pointer-events-none opacity-0"/);
+    expect(briefing).toMatch(/fading && "opacity-0"/);
     expect(briefing).toMatch(/motion-reduce:transition-none/);
   });
 
@@ -83,8 +79,41 @@ describe("the tour's three-beat ending", () => {
     expect(briefing).toMatch(/<Tour stop=\{shown\} leaving=\{stop == null\} \/>/);
   });
 
-  it("finishes the tour on a tap during the ending, rather than stopping short of the globe", () => {
-    expect(briefing).toMatch(/endBriefing\(stop, ending \? "done" : "tap"\)/);
+  it("finishes the tour on Escape during the ending, rather than stopping short of the globe", () => {
+    expect(briefing).toMatch(/endBriefing\(stop, ending \? "done" : "key"\)/);
+  });
+});
+
+// THE SCENE STAYS THE SCENE (user, 2026-11-01: "draggable according to its normal behavior and not
+// open the view directly, also when you drag it pauses the intro progress").
+describe("the scene behind the tour", () => {
+  const engine = readFileSync("src/engine/Engine.ts", "utf8");
+
+  it("lets the pointer through to the canvas: only the tour's own controls take it", () => {
+    expect(briefing).toMatch(/"fixed inset-0 z-50 pointer-events-none"/);
+    expect(briefing).not.toMatch(/<section[^>]*onClick/);
+    expect(briefing).toMatch(/const live = fading \? "pointer-events-none" : "pointer-events-auto";/);
+    expect(briefing.match(/, live\)/g)).toHaveLength(2); // the bars and Skip
+  });
+
+  it("ends on Skip or Escape alone, so a tap on the scene ends nothing", () => {
+    expect(briefing).not.toMatch(/"tap"/);
+  });
+
+  it("holds the clock while the scene is pressed, and only then", () => {
+    expect(briefing).toMatch(/e\.target instanceof HTMLCanvasElement/);
+    expect(briefing).toMatch(/if \(s\.sceneReady && !held\.current\) ran \+= dt;/);
+    expect(briefing).toMatch(/"pointercancel"/);
+  });
+
+  it("is look, don't touch: nothing behind the hidden HUD is picked or hovered", () => {
+    expect(engine).toMatch(/private _pickSuppressed\(\)[^{]*\{\s*(\/\/[^\n]*\n\s*)*if \(useStore\.getState\(\)\.briefing != null\) return true;/);
+  });
+});
+
+describe("the tour's Skip", () => {
+  it("is large and solid enough not to be missed", () => {
+    expect(briefing).toMatch(/h-10 rounded-full bg-foreground px-6 text-body font-semibold text-background/);
   });
 });
 

@@ -2,7 +2,7 @@ import type { Mode } from "@/src/store/mode";
 
 // THE BRIEFING (user, 2026-10-31): the tour every entry to `/` plays, one stop per 3D view, each
 // in the AI's own line. Most visitors never reach a second view, so the app shows them all once and
-// one tap ends it. The design is `docs/superpowers/specs/2026-10-31-briefing-design.md`. This
+// Skip ends it. The design is `docs/superpowers/specs/2026-10-31-briefing-design.md`. This
 // module is the tour as data; `components/Briefing.tsx` runs it and `store.briefing` carries it.
 
 /** The route: where, then now, then who, then how it changed. */

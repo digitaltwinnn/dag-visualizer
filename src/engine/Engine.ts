@@ -1951,6 +1951,8 @@ export class Engine {
   // ramp passes 0.6 the fleet is in its ease-out tail, converging on real positions, and a
   // click means what it looks like. `settleAlpha` is the same ramp the geo glow rides.
   private _pickSuppressed(): boolean {
+    // The Briefing's stage is look, don't touch: a drag orbits, but nothing behind the hidden HUD picks.
+    if (useStore.getState().briefing != null) return true;
     if (!this.transition.active()) return false;
     if (this.transition.phase !== "in") return true;
     return !is3D(this.mode) || this.transition.settleAlpha(this.mode) < 0.6;

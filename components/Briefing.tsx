@@ -21,8 +21,9 @@ import { useStore } from "@/src/store/store";
 // the controller and the caption. It writes `store.briefing`, and everything else follows that one
 // channel: the HUD stands down, the URL holds, the Engine runs the pace and lifts the scene.
 //
-// Skip, a click anywhere or Escape ends it where it stands: the visitor stays in that view, the
-// words fade, and the interface arrives through the HUD's own fade. Run to its end, it takes three
+// Skip or Escape ends it where it stands: the visitor stays in that view, the words fade, and the
+// interface arrives through the HUD's own fade. The scene stays the scene (user, 2026-11-01): the
+// pointer passes through to the canvas, a drag orbits as it always does, and it holds the clock. Run to its end, it takes three
 // beats (`BRIEFING_WORDS_OUT_MS`): the words go, the scene moves alone, the HUD arrives as it lands.
 // The clock is frame-driven, so a hidden tab holds the tour instead of running it out unseen.
 
@@ -44,7 +45,7 @@ function markSeen(): void {
   }
 }
 
-type End = "done" | "skip" | "tap" | "key" | "back" | "unready";
+type End = "done" | "skip" | "key" | "back" | "unready";
 
 function endBriefing(stop: number, how: End): void {
   const s = useStore.getState();
@@ -100,6 +101,9 @@ function Tour({ stop, leaving }: { stop: number; leaving: boolean }) {
   // The last stop's time is up: the ending's three beats run from here.
   const [ending, setEnding] = useState(false);
   const fading = ending || leaving;
+  // The scene is pressed: a drag, or the moment before one. A visitor turning a view has not finished
+  // with it. Read off the press itself, so a press that never moves holds the tour too.
+  const held = useRef(false);
 
   // On the scene, not on the mount: a stop nobody could see is no stop, and the first mount runs
   // before analytics has its queue.
@@ -120,7 +124,7 @@ function Tour({ stop, leaving }: { stop: number; leaving: boolean }) {
       last = now;
       const s = useStore.getState();
       if (s.engineFailed || (!s.sceneReady && waited > SCENE_WAIT_MS)) return endBriefing(stop, "unready");
-      if (s.sceneReady) ran += dt;
+      if (s.sceneReady && !held.current) ran += dt;
       if (fill.current) fill.current.style.transform = `scaleX(${Math.min(1, ran / STOP_MS)})`;
       if (mayAdvance(ran, s.motionPhase)) {
         const next = nextStop(stop);
@@ -161,6 +165,25 @@ function Tour({ stop, leaving }: { stop: number; leaving: boolean }) {
   }, [ending, leaving, stop]);
 
   useEffect(() => {
+    const press = (e: PointerEvent) => {
+      if (e.target instanceof HTMLCanvasElement) held.current = true;
+    };
+    const release = () => {
+      held.current = false;
+    };
+    window.addEventListener("pointerdown", press);
+    window.addEventListener("pointerup", release);
+    window.addEventListener("pointercancel", release);
+    window.addEventListener("blur", release);
+    return () => {
+      window.removeEventListener("pointerdown", press);
+      window.removeEventListener("pointerup", release);
+      window.removeEventListener("pointercancel", release);
+      window.removeEventListener("blur", release);
+    };
+  }, []);
+
+  useEffect(() => {
     if (leaving) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") endBriefing(stop, ending ? "done" : "key");
@@ -177,8 +200,9 @@ function Tour({ stop, leaving }: { stop: number; leaving: boolean }) {
     };
   }, [stop, ending, leaving]);
 
+  const live = fading ? "pointer-events-none" : "pointer-events-auto";
   const bars = (
-    <div className="flex flex-1 gap-1">
+    <div className={cn("flex flex-1 gap-1", live)}>
       {/* Each segment is a way back or forward. Out of the Tab order, so Skip stays the first stop
           for a keyboard, which has the arrow keys. A stop's fill is keyed on the tour's stop: the
           clock writes it by hand, and React would not repaint one stepped back past. */}
@@ -188,10 +212,7 @@ function Tour({ stop, leaving }: { stop: number; leaving: boolean }) {
           type="button"
           tabIndex={-1}
           aria-label={`Go to ${VIEWS.find((x) => x.id === v)!.name}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            goTo(i);
-          }}
+          onClick={() => goTo(i)}
           className="group -my-3 flex-1 py-3 touch:-my-5 touch:py-5"
         >
           <span className="block h-[3px] overflow-hidden rounded-full bg-foreground/20 group-hover:bg-foreground/40">
@@ -209,11 +230,8 @@ function Tour({ stop, leaving }: { stop: number; leaving: boolean }) {
   const skip = (
     <button
       type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        endBriefing(stop, "skip");
-      }}
-      className="h-7 rounded-full bg-foreground/10 px-3 text-label text-foreground hover:bg-foreground/20 touch:min-h-11 touch:px-4"
+      onClick={() => endBriefing(stop, "skip")}
+      className={cn("h-10 rounded-full bg-foreground px-6 text-body font-semibold text-background hover:bg-foreground/85 touch:min-h-11", live)}
     >
       Skip
     </button>
@@ -236,15 +254,14 @@ function Tour({ stop, leaving }: { stop: number; leaving: boolean }) {
   return (
     <section
       aria-label="Network briefing"
-      onClick={ready ? () => endBriefing(stop, ending ? "done" : "tap") : undefined}
-      className={cn("fixed inset-0 z-50", ready && !leaving ? "cursor-pointer" : "pointer-events-none")}
+      className="fixed inset-0 z-50 pointer-events-none"
     >
       {/* The caption types itself in, so a screen reader hears this instead: one region, standing
           from the start, so the first stop is announced and each is announced once. */}
       <p className="sr-only" aria-live="polite">{ready ? `${name}: ${words.text}` : ""}</p>
       {ready && (
         <div
-          className={cn("absolute inset-0 transition-opacity ease-out motion-reduce:transition-none", fading && "pointer-events-none opacity-0")}
+          className={cn("absolute inset-0 transition-opacity ease-out motion-reduce:transition-none", fading && "opacity-0")}
           style={{ transitionDuration: `${BRIEFING_WORDS_OUT_MS}ms` }}
         >
           <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-[44%] [background:linear-gradient(transparent,var(--scene-ground)_38%)]" />
