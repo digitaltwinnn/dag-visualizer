@@ -22,8 +22,10 @@ export const LINE_MAX = 140;
  *  by eye from 1.5, by 20% and then 15% (user 2026-11-01), and it lands in about 3 seconds. */
 export const BRIEFING_PACE = 1.09;
 
-/** The share of the viewport's height the words stand in. The scene frames itself in what is left,
- *  through the projection offset a phone sheet's cover already uses (`sheetShift.ts`). */
+/** The share of a PHONE's height the words stand in. The scene frames itself in what is left, through
+ *  the projection offset a phone sheet's cover already uses (`sheetShift.ts`). Wider tiers take no
+ *  lift (user, 2026-11-01: "why does it actually have to move down?"): they stand in the view's own
+ *  framing, so the tour's end moves nothing. */
 export const BRIEFING_COVER = 0.18;
 
 /** How long the lift stands after the tour ends, while the HUD slides back. The bars' edges are

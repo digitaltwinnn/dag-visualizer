@@ -12,8 +12,9 @@ so it reads as a daily briefing rather than an intro.
 1. `/` opens on Geography, which is now the default view.
 2. The tour plays Geography, Snapshots, Hypergraph, History. Each stop is about 4.9 seconds, about 20
    seconds in all, and each shows two or three lines from Constellation Gate AI, typed in.
-3. The stage clears on every screen size: the HUD steps aside, the scene fills the screen and lifts,
-   and large words stand beneath it. Phones keep progress and Skip at the top, as the mock showed.
+3. The stage clears on every screen size: the HUD steps aside and large words stand beneath the
+   scene. Desktop and tablet keep the view's own framing, so the tour's end moves nothing; a phone
+   lifts the scene clear of the words. Phones keep progress and Skip at the top, as the mock showed.
 4. The progress bar's segments, and the arrow keys, move back and forward between stops.
    Skip or Escape ends it and leaves the visitor in that view, the words fading as the interface
    arrives. The scene stays live: a drag orbits as usual and holds the stop's clock, and a tap on it
@@ -48,8 +49,9 @@ opening.
 - `store.briefing`: the stop on screen, or null. One channel, read by everything below.
 - `useBootStage` answers stage 0 while it is set, so `BootFade` hides and inerts the HUD and brings
   it back with the fade it already has. Tablet and phone therefore clear the same way as desktop.
-- Desktop and tablet also set `railsHidden`, which is what frames the scene for the full width.
-- `Engine`: the pace on the choreography clock, and the cover added to the sheet shift, so the scene
-  lifts by the same projection offset a phone sheet uses.
+- The tour leaves `railsHidden` alone: the HUD stands invisible where it will land, so the Engine
+  measures the same edges as at rest and the scene is framed as the view rests.
+- `Engine`: the pace on the choreography clock, and on a phone the cover added to the sheet shift, so
+  the scene lifts by the same projection offset a phone sheet uses.
 - `RouteSync` holds publishing while the tour runs and publishes the result when it ends.
 - `components/Briefing.tsx`: the controller and the caption.

@@ -11,7 +11,6 @@ import useNote from "@/components/notes/useNote";
 import EcgMark from "@/components/topbar/EcgMark";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { VIEWS } from "@/components/views";
-import { breakpointOf } from "@/src/data/breakpoint";
 import { SITE_ORIGIN } from "@/src/data/site";
 import { BRIEFING_STOPS, BRIEFING_WORDS_OUT_MS, SCENE_WAIT_MS, STOP_MS, briefsOn, hasLanded, mayAdvance, nextStop, prevStop } from "@/src/engine/domain/briefing";
 import { NET } from "@/src/net/current";
@@ -23,8 +22,10 @@ import { useStore } from "@/src/store/store";
 //
 // Skip or Escape ends it where it stands: the visitor stays in that view, the words fade, and the
 // interface arrives through the HUD's own fade. The scene stays the scene (user, 2026-11-01): the
-// pointer passes through to the canvas, a drag orbits as it always does, and it holds the clock. Run to its end, it takes three
-// beats (`BRIEFING_WORDS_OUT_MS`): the words go, the scene moves alone, the HUD arrives as it lands.
+// pointer passes through to the canvas, a drag orbits as it always does, and it holds the clock. It
+// is framed as the view rests, the HUD standing invisible where it will land, so the end moves
+// nothing on desktop and tablet. Run to its end, it takes three beats (`BRIEFING_WORDS_OUT_MS`): the
+// words go, the scene moves alone, the HUD arrives as it lands.
 // The clock is frame-driven, so a hidden tab holds the tour instead of running it out unseen.
 
 const SEEN_KEY = "dag:briefed";
@@ -51,7 +52,6 @@ function endBriefing(stop: number, how: End): void {
   const s = useStore.getState();
   if (how === "done") s.setMode(BRIEFING_STOPS[0]);
   s.setBriefing(null); // after the mode, so the route publishes where the tour left off
-  s.setRailsHidden(false);
   track("briefing-end", { how, at: BRIEFING_STOPS[stop] });
 }
 
@@ -77,10 +77,7 @@ export default function Briefing() {
   useEffect(() => {
     if (!briefsOn({ pathname: location.pathname, net: NET, seen: seenThisSession() })) return;
     markSeen();
-    const s = useStore.getState();
-    // The app's own way to clear the stage, the scene's framing with it. A phone has no such mode.
-    if (breakpointOf(window.innerWidth) !== "phone") s.setRailsHidden(true);
-    s.setBriefing(0);
+    useStore.getState().setBriefing(0);
   }, []);
 
   return shown == null ? null : <Tour stop={shown} leaving={stop == null} />;
@@ -138,8 +135,7 @@ function Tour({ stop, leaving }: { stop: number; leaving: boolean }) {
     return () => cancelAnimationFrame(raf);
   }, [stop, view, fading]);
 
-  // THE ENDING'S SECOND AND THIRD BEATS. The rails go back now, unseen behind the HUD `briefing` still
-  // holds down, so the scene's one ease takes their final edges and the HUD's arrival moves nothing.
+  // THE ENDING'S SECOND AND THIRD BEATS: the globe comes back, and the HUD arrives as it lands.
   useEffect(() => {
     if (!ending || leaving) return;
     const start = performance.now();
@@ -153,7 +149,6 @@ function Tour({ stop, leaving }: { stop: number; leaving: boolean }) {
         moved = true;
         s.setMode(BRIEFING_STOPS[0]);
         s.setBriefingLanding(true);
-        s.setRailsHidden(false);
       } else if (moved) {
         saw ||= s.motionPhase != null;
         if (hasLanded(since - BRIEFING_WORDS_OUT_MS, saw, s.motionPhase)) return endBriefing(stop, "done");

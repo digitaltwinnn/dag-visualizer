@@ -42,7 +42,7 @@ Four views drive the 3D scene:
 view once, one AI line per stop, on a cleared stage; one tap stays in that view. Only on `/`, on
 mainnet, once per browser session. `store.briefing` is the one channel: `useBootStage` stands the HUD
 down on it, `RouteSync` holds the URL so a stop is never a page view, and the Engine reads it for the
-tour's pace and the scene's lift.
+tour's pace and a phone's lift.
 
 The placeholder is ONE consolidated `soon` Mode, at `/soon` (2026-09-04; the old `status`/`transactions`/
 `staking` modes said the same nothing three times): the canvas fades out and `Blueprint.tsx` draws a

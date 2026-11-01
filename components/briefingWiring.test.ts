@@ -52,8 +52,19 @@ describe("the tour's progress bar", () => {
 describe("the tour's end", () => {
   const engine = readFileSync("src/engine/Engine.ts", "utf8");
 
-  it("lets the lift go only once the HUD's edges are final, read fresh that frame", () => {
-    expect(engine).toMatch(/const lifting = \(st\.briefing != null && !st\.briefingLanding\) \|\| performance\.now\(\) < this\._liftHeldUntil/);
+  // user, 2026-11-01: "why does it actually have to move down?" Skip measured 49px down and 14% back.
+  it("frames the scene as the view rests on desktop and tablet, so the end moves nothing", () => {
+    expect(briefing).not.toMatch(/setRailsHidden/);
+    expect(engine).toMatch(/const lifting =\s*breakpointOf\(window\.innerWidth\) === "phone" &&/);
+  });
+
+  it("stands History's tether down with the HUD it runs to, since no scene mode does it now", () => {
+    const tether = readFileSync("components/TrendTether.tsx", "utf8");
+    expect(tether).toMatch(/\(railsHidden \|\| briefing\) && "!opacity-0"/);
+  });
+
+  it("lets a phone's lift go only once the HUD's edges are final, read fresh that frame", () => {
+    expect(engine).toMatch(/\(\(st\.briefing != null && !st\.briefingLanding\) \|\| performance\.now\(\) < this\._liftHeldUntil\)/);
     expect(engine).toMatch(/const chromeShift = lifting \? 0 : this\._chromeShift\(\)/);
     expect(engine).toMatch(/if \(lifting !== this\._lifting\) \{\s*this\._lifting = lifting;\s*this\._settleFrom = null;\s*if \(!lifting\) \{\s*this\._chrome\.refresh\(\);/);
     expect(engine).toMatch(/liftSettling\(this\._settleFrom, target, settling!\)/);
@@ -67,9 +78,9 @@ describe("the tour's three-beat ending", () => {
     expect(briefing).toMatch(/motion-reduce:transition-none/);
   });
 
-  it("starts the scene only once the words are gone, and sends the rails back unseen behind the hidden HUD", () => {
+  it("starts the scene only once the words are gone", () => {
     expect(briefing).toMatch(/if \(!moved && since >= BRIEFING_WORDS_OUT_MS\) \{/);
-    expect(briefing).toMatch(/s\.setMode\(BRIEFING_STOPS\[0\]\);\s*s\.setBriefingLanding\(true\);\s*s\.setRailsHidden\(false\);/);
+    expect(briefing).toMatch(/s\.setMode\(BRIEFING_STOPS\[0\]\);\s*s\.setBriefingLanding\(true\);/);
   });
 
   it("brings the HUD back when the scene has landed", () => {

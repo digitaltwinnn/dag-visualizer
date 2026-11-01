@@ -484,7 +484,7 @@ export class Engine {
   }
   private _sheetShiftW = 0;
   private _sheetShiftH = 0;
-  /** The Briefing's lift: standing, and until when it outlives the tour (`BRIEFING_RELEASE_MS`). */
+  /** The Briefing's lift on a phone: standing, and until when it outlives the tour (`BRIEFING_RELEASE_MS`). */
   private _lifting = false;
   private _liftHeldUntil = 0;
   /** Where the lift stood when it let go and when it did, while it eases out (`liftSettling`). */
@@ -2147,9 +2147,12 @@ export class Engine {
       const el = this.ctx.renderer.domElement;
       const w = el.clientWidth || window.innerWidth;
       const h = el.clientHeight || window.innerHeight;
-      // The Briefing's caption, the same lift. It outlives the tour while the HUD slides back: the
-      // bars' edges are final only once they land, so the one ease runs to where the scene rests.
-      const lifting = (st.briefing != null && !st.briefingLanding) || performance.now() < this._liftHeldUntil;
+      // The Briefing's caption on a phone, the same lift. It outlives the tour while the HUD slides
+      // back: the bars' edges are final only once they land, so the one ease runs to where the scene
+      // rests. Wider tiers need no lift: the words fit under the framing the HUD's own bars measure.
+      const lifting =
+        breakpointOf(window.innerWidth) === "phone" &&
+        ((st.briefing != null && !st.briefingLanding) || performance.now() < this._liftHeldUntil);
       if (lifting !== this._lifting) {
         this._lifting = lifting;
         this._settleFrom = null;
