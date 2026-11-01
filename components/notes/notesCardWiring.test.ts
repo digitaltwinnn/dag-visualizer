@@ -377,6 +377,14 @@ describe("the entry window", () => {
   });
 });
 
+// A NAME IN A NOTE (user, 2026-11-01: "more subtle"): mixed toward the text colour, which reads
+// better on both grounds at every hue, never by dimming it, which reads worse.
+describe("a network's name in a note", () => {
+  it("is its colour mixed toward the ink", () => {
+    expect(read("components/notes/NoteText.tsx")).toMatch(/color-mix\(in oklab, \$\{identityHudCss\(s\.id\)\} \$\{NAME_TINT\}%, var\(--foreground\)\)/);
+  });
+});
+
 describe("a chart coin's hover", () => {
   const chart = read("components/docs/TrendChart.tsx");
   const band = read("components/notes/NoteDiamonds.tsx");
