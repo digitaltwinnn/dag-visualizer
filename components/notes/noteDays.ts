@@ -22,6 +22,10 @@ export const NOTE_KIND_WORD: Record<NotableKind, string> = {
   broadest: "most networks",
 };
 
+/** The days as the card lists them, oldest first, the way the chart reads left to right (user,
+ *  2026-11-01). The note itself keeps them best first: that order is what the cap and the model read. */
+export const daysByDate = (days: readonly NoteDay[]): NoteDay[] => [...days].sort((a, b) => a.dayMs - b.dayMs);
+
 /** The range a notable day commits: its whole UTC day. */
 export const notableDaySpan = (dayMs: number): { fromMs: number; toMs: number } => ({ fromMs: dayMs, toMs: dayMs + DAY_MS });
 

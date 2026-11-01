@@ -25,7 +25,7 @@ import { AI_TITLE, noteSpanWords } from "./noteSubject";
 import NoteKindCoin from "./NoteKindCoin";
 import NoteText from "./NoteText";
 import TypedNote from "./TypedNote";
-import { NOTE_KIND_WORD } from "./noteDays";
+import { NOTE_KIND_WORD, daysByDate } from "./noteDays";
 import { useAiNote, useWaited } from "./useAiNote";
 
 // THE AI NOTES CARD (2026-10-27) — a few sentences a model wrote about what the view is showing,
@@ -334,10 +334,10 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
                   what it covers, and the note is rewritten on its own cadence. */}
               <TypedNote text={res.text} waited={waited} className="m-0 text-body leading-snug text-foreground" />
               {res.days.length > 0 && (
-                <NoteRows key={titleKey} word="day" kinds={res.days.map((d) => d.kind)}>
+                <NoteRows key={titleKey} word="day" kinds={daysByDate(res.days).map((d) => d.kind)}>
                   {/* Not keyed by day alone: one day can be two notables (a network's low and its
                       pause; two networks' first day on the DAG). */}
-                  {res.days.map((d) => (
+                  {daysByDate(res.days).map((d) => (
                     <DayRow key={`${d.dayMs}:${d.kind}:${d.networkId ?? ""}`} day={d} />
                   ))}
                 </NoteRows>

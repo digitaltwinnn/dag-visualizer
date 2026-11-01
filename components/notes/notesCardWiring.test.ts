@@ -88,7 +88,7 @@ describe("the notes card's own behaviour", () => {
     expect(body).toMatch(/\bwrap\b/);
     expect(body).toMatch(/sr-only[^]*?NOTE_KIND_WORD\[day\.kind\]/);
     expect(read("components/icons.tsx")).toMatch(/export const NOTE_KIND_ICONS: Record<NotableKind \| NoteChangeKind, LucideIcon>/);
-    expect(card).toMatch(/import \{ NOTE_KIND_WORD \} from "\.\/noteDays";/);
+    expect(card).toMatch(/import \{ NOTE_KIND_WORD, daysByDate \} from "\.\/noteDays";/);
     const coin = read("components/notes/NoteKindCoin.tsx");
     expect(coin).toMatch(/NOTE_KIND_ICONS\[kind\]/);
     expect(coin).toMatch(/size-4 rounded-full/);
