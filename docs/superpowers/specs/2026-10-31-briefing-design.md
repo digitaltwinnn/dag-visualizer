@@ -25,7 +25,7 @@ so it reads as a daily briefing rather than an intro.
   record how far people watch and where they leave.
 - The tour clock never outruns the scene: a stop ends at about 4.9 seconds, or when the transition lands
   if that is later, so a slow phone gets its whole view.
-- Faster transition for the tour only (`BRIEFING_PACE`), through the clock `?slowmo` already scales.
+- Faster transition for the tour only (`BRIEFING_PACE`, about 2.6 seconds), through the clock `?slowmo` already scales.
   Normal switching is unchanged.
 - Reduced motion uses the app's normal view switch, and the line appears without typing.
 - A stop with no note shows a plain sentence with no AI mark. No number is invented (rule 10).

@@ -17,8 +17,9 @@ export const STOP_MS = 4875;
 export const LINE_MAX = 140;
 
 /** How much faster the choreography runs for the tour, on the clock `?slowmo` scales: a normal
- *  switch lands in over 3 seconds, which would leave a stop nothing to stand on. */
-export const BRIEFING_PACE = 1.5;
+ *  switch lands in over 3 seconds, which would leave a stop nothing to stand on. 1.5 was a touch
+ *  brisk: this runs it 20% longer (user 2026-11-01). */
+export const BRIEFING_PACE = 1.25;
 
 /** The share of the viewport's height the words stand in. The scene frames itself in what is left,
  *  through the projection offset a phone sheet's cover already uses (`sheetShift.ts`). */

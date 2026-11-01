@@ -67,6 +67,12 @@ describe("the tour's staging", () => {
     expect(BRIEFING_PACE).toBeGreaterThan(1);
   });
 
+  it("lands inside its stop, with the view left standing for over two seconds", () => {
+    const choreographyMs = 3300; // DUR_OUT + DUR_IN, `domain/viewTransition.ts`
+    expect(BRIEFING_PACE).toBe(1.25);
+    expect(STOP_MS - choreographyMs / BRIEFING_PACE).toBeGreaterThan(2000);
+  });
+
   it("leaves the scene the upper part of the screen", () => {
     expect(BRIEFING_COVER).toBeGreaterThan(0);
     expect(BRIEFING_COVER).toBeLessThan(0.5);
