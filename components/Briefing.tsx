@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { track } from "@vercel/analytics";
 import { cn } from "@/lib/utils";
 import { AI_NOTES_ICON } from "@/components/icons";
@@ -13,7 +13,7 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 import { VIEWS } from "@/components/views";
 import { breakpointOf } from "@/src/data/breakpoint";
 import { SITE_ORIGIN } from "@/src/data/site";
-import { BRIEFING_STOPS, SCENE_WAIT_MS, STOP_MS, briefsOn, mayAdvance, nextStop, prevStop } from "@/src/engine/domain/briefing";
+import { BRIEFING_STOPS, BRIEFING_WORDS_OUT_MS, SCENE_WAIT_MS, STOP_MS, briefsOn, hasLanded, mayAdvance, nextStop, prevStop } from "@/src/engine/domain/briefing";
 import { NET } from "@/src/net/current";
 import { useStore } from "@/src/store/store";
 
@@ -21,9 +21,10 @@ import { useStore } from "@/src/store/store";
 // the controller and the caption. It writes `store.briefing`, and everything else follows that one
 // channel: the HUD stands down, the URL holds, the Engine runs the pace and lifts the scene.
 //
-// Skip, a click anywhere or Escape ends it where it stands: the visitor stays in that view, and the
-// interface arrives through the HUD's own fade. The clock is frame-driven, so a hidden tab holds
-// the tour instead of running it out unseen.
+// Skip, a click anywhere or Escape ends it where it stands: the visitor stays in that view, the
+// words fade, and the interface arrives through the HUD's own fade. Run to its end, it takes three
+// beats (`BRIEFING_WORDS_OUT_MS`): the words go, the scene moves alone, the HUD arrives as it lands.
+// The clock is frame-driven, so a hidden tab holds the tour instead of running it out unseen.
 
 const SEEN_KEY = "dag:briefed";
 
@@ -62,6 +63,15 @@ const goTo = (i: number) => {
 
 export default function Briefing() {
   const stop = useStore((s) => s.briefing);
+  // The stop on screen outlives the tour by the words' own fade, so an end never cuts them.
+  const [shown, setShown] = useState<number | null>(null);
+  if (stop != null && stop !== shown) setShown(stop);
+
+  useEffect(() => {
+    if (stop != null || shown == null) return;
+    const id = setTimeout(() => setShown(null), BRIEFING_WORDS_OUT_MS);
+    return () => clearTimeout(id);
+  }, [stop, shown]);
 
   useEffect(() => {
     if (!briefsOn({ pathname: location.pathname, net: NET, seen: seenThisSession() })) return;
@@ -72,10 +82,10 @@ export default function Briefing() {
     s.setBriefing(0);
   }, []);
 
-  return stop == null ? null : <Tour stop={stop} />;
+  return shown == null ? null : <Tour stop={shown} leaving={stop == null} />;
 }
 
-function Tour({ stop }: { stop: number }) {
+function Tour({ stop, leaving }: { stop: number; leaving: boolean }) {
   const phone = useBreakpoint() === "phone";
   const ready = useStore((s) => s.sceneReady);
   // Every stop's note is asked for at the start, so a line is on hand when its view arrives.
@@ -87,6 +97,9 @@ function Tour({ stop }: { stop: number }) {
   const words = briefingWords(view, { geo, ledger, hyper, trend }[view].res);
   const name = VIEWS.find((v) => v.id === view)!.name;
   const fill = useRef<HTMLElement | null>(null);
+  // The last stop's time is up: the ending's three beats run from here.
+  const [ending, setEnding] = useState(false);
+  const fading = ending || leaving;
 
   // On the scene, not on the mount: a stop nobody could see is no stop, and the first mount runs
   // before analytics has its queue.
@@ -95,6 +108,7 @@ function Tour({ stop }: { stop: number }) {
   }, [ready, view]);
 
   useEffect(() => {
+    if (fading) return;
     let raf = 0;
     let last = performance.now();
     let waited = 0;
@@ -110,7 +124,7 @@ function Tour({ stop }: { stop: number }) {
       if (fill.current) fill.current.style.transform = `scaleX(${Math.min(1, ran / STOP_MS)})`;
       if (mayAdvance(ran, s.motionPhase)) {
         const next = nextStop(stop);
-        if (next == null) return endBriefing(stop, "done");
+        if (next == null) return setEnding(true);
         goTo(next);
         return;
       }
@@ -118,22 +132,50 @@ function Tour({ stop }: { stop: number }) {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [stop, view]);
+  }, [stop, view, fading]);
+
+  // THE ENDING'S SECOND AND THIRD BEATS. The rails go back now, unseen behind the HUD `briefing` still
+  // holds down, so the scene's one ease takes their final edges and the HUD's arrival moves nothing.
+  useEffect(() => {
+    if (!ending || leaving) return;
+    const start = performance.now();
+    let raf = 0;
+    let moved = false;
+    let saw = false;
+    const tick = (now: number) => {
+      const since = now - start;
+      const s = useStore.getState();
+      if (!moved && since >= BRIEFING_WORDS_OUT_MS) {
+        moved = true;
+        s.setMode(BRIEFING_STOPS[0]);
+        s.setBriefingLanding(true);
+        s.setRailsHidden(false);
+      } else if (moved) {
+        saw ||= s.motionPhase != null;
+        if (hasLanded(since - BRIEFING_WORDS_OUT_MS, saw, s.motionPhase)) return endBriefing(stop, "done");
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [ending, leaving, stop]);
 
   useEffect(() => {
+    if (leaving) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") endBriefing(stop, "key");
+      if (e.key === "Escape") endBriefing(stop, ending ? "done" : "key");
+      if (ending) return;
       const step = e.key === "ArrowRight" ? nextStop(stop) : e.key === "ArrowLeft" ? prevStop(stop) : null;
       if (step != null) goTo(step);
     };
-    const onPop = () => endBriefing(stop, "back");
+    const onPop = () => endBriefing(stop, ending ? "done" : "back");
     window.addEventListener("keydown", onKey);
     window.addEventListener("popstate", onPop);
     return () => {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("popstate", onPop);
     };
-  }, [stop]);
+  }, [stop, ending, leaving]);
 
   const bars = (
     <div className="flex flex-1 gap-1">
@@ -194,14 +236,17 @@ function Tour({ stop }: { stop: number }) {
   return (
     <section
       aria-label="Network briefing"
-      onClick={ready ? () => endBriefing(stop, "tap") : undefined}
-      className={cn("fixed inset-0 z-50", ready ? "cursor-pointer" : "pointer-events-none")}
+      onClick={ready ? () => endBriefing(stop, ending ? "done" : "tap") : undefined}
+      className={cn("fixed inset-0 z-50", ready && !leaving ? "cursor-pointer" : "pointer-events-none")}
     >
       {/* The caption types itself in, so a screen reader hears this instead: one region, standing
           from the start, so the first stop is announced and each is announced once. */}
       <p className="sr-only" aria-live="polite">{ready ? `${name}: ${words.text}` : ""}</p>
       {ready && (
-        <>
+        <div
+          className={cn("absolute inset-0 transition-opacity ease-out motion-reduce:transition-none", fading && "pointer-events-none opacity-0")}
+          style={{ transitionDuration: `${BRIEFING_WORDS_OUT_MS}ms` }}
+        >
           <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-[44%] [background:linear-gradient(transparent,var(--scene-ground)_38%)]" />
           {phone && (
             <div className="absolute inset-x-0 top-0 flex flex-col gap-1 px-3 pt-[calc(env(safe-area-inset-top)+10px)]">
@@ -233,7 +278,7 @@ function Tour({ stop }: { stop: number }) {
               </div>
             )}
           </div>
-        </>
+        </div>
       )}
     </section>
   );

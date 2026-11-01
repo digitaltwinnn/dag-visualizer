@@ -30,6 +30,25 @@ export const BRIEFING_COVER = 0.18;
  *  (user 2026-11-01: "it should not move or at least be smooth and not a bounce"). */
 export const BRIEFING_RELEASE_MS = 600;
 
+/** THE ENDING, THREE BEATS (user, 2026-11-01: "abrupt, not smooth/designed"): a tour that stages
+ *  everything one step at a time ended in one frame, the words cut and a view change, the rails, the
+ *  lift and the HUD all starting together at different lengths. Now the words go, the scene moves
+ *  alone, and the HUD arrives as it lands. This is the first beat, and Skip's fade too. */
+export const BRIEFING_WORDS_OUT_MS = 400;
+
+/** How long the ending waits for a scene that never starts moving. Past a slow renderer's frame:
+ *  at 2 FPS the switch's first phase shows up half a second late. */
+export const BRIEFING_NO_MOTION_MS = 1000;
+
+/** The most the ending holds the controls back behind a slow renderer, whose transition stretches
+ *  in wall-clock time. Real time, and within the tour's own promise (`SCENE_WAIT_MS`). */
+export const BRIEFING_LAND_MAX_MS = 6000;
+
+/** Whether the HUD may arrive, `sinceMs` after the switch to the globe: the scene moved and landed,
+ *  or there is no point waiting any longer. */
+export const hasLanded = (sinceMs: number, sawMotion: boolean, phase: "out" | "in" | null): boolean =>
+  sinceMs >= BRIEFING_LAND_MAX_MS || (sawMotion ? phase == null : sinceMs >= BRIEFING_NO_MOTION_MS);
+
 /** How long the tour waits for the scene before standing down: the moment the HUD's boot ladder
  *  gives up on a dead feed (`useBootStage`), so the tour never holds the controls back longer. */
 export const SCENE_WAIT_MS = 8000;

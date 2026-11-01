@@ -15,8 +15,10 @@ so it reads as a daily briefing rather than an intro.
 3. The stage clears on every screen size: the HUD steps aside, the scene fills the screen and lifts,
    and large words stand beneath it. Phones keep progress and Skip at the top, as the mock showed.
 4. The progress bar's segments, and the arrow keys, move back and forward between stops.
-   Skip, a tap anywhere or Escape ends it and leaves the visitor in that view. Finishing returns to
-   the globe. Either way the interface arrives, which shows this is a tool and not a video.
+   Skip, a tap anywhere or Escape ends it and leaves the visitor in that view, the words fading as
+   the interface arrives. Finishing returns to the globe in three beats: the words go, the scene
+   moves alone, and the interface arrives as it lands. Either way the interface arrives, which shows
+   this is a tool and not a video.
 
 ## Rules
 

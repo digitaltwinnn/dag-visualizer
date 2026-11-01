@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BRIEFING_COVER, BRIEFING_PACE, BRIEFING_RELEASE_MS, BRIEFING_STOPS, LINE_MAX, SCENE_WAIT_MS, STOP_MS, briefsOn, mayAdvance, nextStop, prevStop } from "./briefing";
+import { BRIEFING_COVER, BRIEFING_LAND_MAX_MS, BRIEFING_NO_MOTION_MS, BRIEFING_PACE, BRIEFING_RELEASE_MS, BRIEFING_STOPS, BRIEFING_WORDS_OUT_MS, LINE_MAX, SCENE_WAIT_MS, STOP_MS, briefsOn, hasLanded, mayAdvance, nextStop, prevStop } from "./briefing";
 
 const on = { pathname: "/", net: "mainnet", seen: false };
 
@@ -87,5 +87,33 @@ describe("the tour's staging", () => {
   it("holds the lift until the HUD has landed, so the scene eases once, with no dip and rise", () => {
     expect(BRIEFING_RELEASE_MS).toBeGreaterThan(550); // the band's slide back, measured
     expect(BRIEFING_RELEASE_MS).toBeLessThan(1000);
+  });
+});
+
+describe("the tour's ending, three beats: the words go, the scene moves, the HUD arrives", () => {
+  it("lets the words go quickly, before anything else starts", () => {
+    expect(BRIEFING_WORDS_OUT_MS).toBeGreaterThanOrEqual(300);
+    expect(BRIEFING_WORDS_OUT_MS).toBeLessThanOrEqual(500);
+  });
+
+  it("brings the HUD back once the scene has moved and landed", () => {
+    expect(hasLanded(100, true, "out")).toBe(false);
+    expect(hasLanded(100, true, "in")).toBe(false);
+    expect(hasLanded(100, true, null)).toBe(true);
+  });
+
+  it("does not take the moment before the switch for a landing", () => {
+    expect(hasLanded(100, false, null)).toBe(false);
+  });
+
+  it("gives up waiting for a move that never comes, past a slow renderer's frame", () => {
+    expect(BRIEFING_NO_MOTION_MS).toBeGreaterThanOrEqual(500);
+    expect(hasLanded(BRIEFING_NO_MOTION_MS, false, null)).toBe(true);
+  });
+
+  it("never holds the controls behind a slow renderer's transition", () => {
+    expect(BRIEFING_LAND_MAX_MS).toBeLessThanOrEqual(SCENE_WAIT_MS);
+    expect(BRIEFING_LAND_MAX_MS).toBeGreaterThan(3300 / BRIEFING_PACE); // a normal landing fits
+    expect(hasLanded(BRIEFING_LAND_MAX_MS, true, "in")).toBe(true);
   });
 });

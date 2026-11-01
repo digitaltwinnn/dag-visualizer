@@ -57,9 +57,34 @@ describe("the tour's end", () => {
   const engine = readFileSync("src/engine/Engine.ts", "utf8");
 
   it("lets the lift go only once the HUD's edges are final, read fresh that frame", () => {
-    expect(engine).toMatch(/const lifting = st\.briefing != null \|\| performance\.now\(\) < this\._liftHeldUntil/);
+    expect(engine).toMatch(/const lifting = \(st\.briefing != null && !st\.briefingLanding\) \|\| performance\.now\(\) < this\._liftHeldUntil/);
     expect(engine).toMatch(/const chromeShift = lifting \? 0 : this\._chromeShift\(\)/);
     expect(engine).toMatch(/if \(lifting !== this\._lifting\) \{\s*this\._lifting = lifting;\s*if \(!lifting\) this\._chrome\.refresh\(\);/);
+  });
+});
+
+describe("the tour's three-beat ending", () => {
+  it("fades the words and the gradient together, on one clock", () => {
+    expect(briefing).toMatch(/transitionDuration: `\$\{BRIEFING_WORDS_OUT_MS\}ms`/);
+    expect(briefing).toMatch(/fading && "pointer-events-none opacity-0"/);
+    expect(briefing).toMatch(/motion-reduce:transition-none/);
+  });
+
+  it("starts the scene only once the words are gone, and sends the rails back unseen behind the hidden HUD", () => {
+    expect(briefing).toMatch(/if \(!moved && since >= BRIEFING_WORDS_OUT_MS\) \{/);
+    expect(briefing).toMatch(/s\.setMode\(BRIEFING_STOPS\[0\]\);\s*s\.setBriefingLanding\(true\);\s*s\.setRailsHidden\(false\);/);
+  });
+
+  it("brings the HUD back when the scene has landed", () => {
+    expect(briefing).toMatch(/hasLanded\([^)]*\)\) return endBriefing\(stop, "done"\)/);
+  });
+
+  it("keeps the words mounted through an early end too, so Skip fades rather than cuts", () => {
+    expect(briefing).toMatch(/<Tour stop=\{shown\} leaving=\{stop == null\} \/>/);
+  });
+
+  it("finishes the tour on a tap during the ending, rather than stopping short of the globe", () => {
+    expect(briefing).toMatch(/endBriefing\(stop, ending \? "done" : "tap"\)/);
   });
 });
 

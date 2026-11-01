@@ -312,6 +312,9 @@ interface AppState {
   // the HUD stands down on it (`useBootStage`), the URL holds (`RouteSync`), and the Engine reads it
   // for the tour's pace and the scene's lift. `components/Briefing.tsx` is its one writer.
   briefing: number | null;
+  /** The ending's second beat: the words have gone and the scene is landing, so the lift lets go
+   *  while `briefing` still holds the HUD down. Cleared with `briefing`. */
+  briefingLanding: boolean;
   // Where the view transition's STAGING BAND ends, in canvas-local CSS px from the top (2026-09-29)
   // — the lowest row of the gathered grids — so the motion hint can stand clear of it while a
   // switch runs. Engine-written on change only; null until a transition has measured one.
@@ -504,6 +507,7 @@ interface AppState {
   setSceneMoving: (moving: boolean) => void;
   setMotionPhase: (phase: "out" | "in" | null) => void;
   setBriefing: (stop: number | null) => void;
+  setBriefingLanding: (landing: boolean) => void;
   setGatherBottom: (px: number | null) => void;
   setMotionCause: (cause: MotionCause | null) => void;
   setPhoneSheetPx: (px: number | null) => void;
@@ -628,6 +632,7 @@ export const useStore = create<AppState>((set) => ({
   motionCause: null,
   motionPhase: null,
   briefing: null,
+  briefingLanding: false,
   gatherBottom: null,
   railCollapse: {},
   navQuiet: false,
@@ -861,7 +866,8 @@ export const useStore = create<AppState>((set) => ({
   setCameraFlying: (cameraFlying) => set({ cameraFlying }),
   setSceneMoving: (sceneMoving) => set({ sceneMoving }),
   setMotionPhase: (motionPhase) => set({ motionPhase }),
-  setBriefing: (briefing) => set({ briefing }),
+  setBriefing: (briefing) => set(briefing == null ? { briefing, briefingLanding: false } : { briefing }),
+  setBriefingLanding: (briefingLanding) => set({ briefingLanding }),
   setGatherBottom: (gatherBottom) => set({ gatherBottom }),
   setMotionCause: (motionCause) => set({ motionCause }),
   setNavQuiet: (navQuiet) => set({ navQuiet }),

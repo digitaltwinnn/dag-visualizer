@@ -926,7 +926,7 @@ export class Engine {
         // toggle re-resolving there reads as a reset, not a lean. `_freeOrbit` (set by the
         // controls' own start event, cleared by the next pose flight) gates it; a camera at
         // rest keeps today's exact behaviour.
-        if (prev.briefing != null && st.briefing == null) this._liftHeldUntil = performance.now() + BRIEFING_RELEASE_MS;
+        if (prev.briefing != null && !prev.briefingLanding && (st.briefing == null || st.briefingLanding)) this._liftHeldUntil = performance.now() + BRIEFING_RELEASE_MS;
         if (st.railsHidden !== prev.railsHidden) {
           this.railsHidden = st.railsHidden;
           if (breakpointOf(window.innerWidth) === "desktop" && VIEW_POLICIES[this.mode].canvas && !this._freeOrbit) {
@@ -2170,7 +2170,7 @@ export class Engine {
       const h = el.clientHeight || window.innerHeight;
       // The Briefing's caption, the same lift. It outlives the tour while the HUD slides back: the
       // bars' edges are final only once they land, so the one ease runs to where the scene rests.
-      const lifting = st.briefing != null || performance.now() < this._liftHeldUntil;
+      const lifting = (st.briefing != null && !st.briefingLanding) || performance.now() < this._liftHeldUntil;
       if (lifting !== this._lifting) {
         this._lifting = lifting;
         if (!lifting) this._chrome.refresh();
