@@ -27,6 +27,16 @@ describe("the tour before the scene is up", () => {
   });
 });
 
+describe("the tour's end", () => {
+  const engine = readFileSync("src/engine/Engine.ts", "utf8");
+
+  it("lets the lift go only once the HUD's edges are final, read fresh that frame", () => {
+    expect(engine).toMatch(/const lifting = st\.briefing != null \|\| performance\.now\(\) < this\._liftHeldUntil/);
+    expect(engine).toMatch(/const chromeShift = lifting \? 0 : this\._chromeShift\(\)/);
+    expect(engine).toMatch(/if \(lifting !== this\._lifting\) \{\s*this\._lifting = lifting;\s*if \(!lifting\) this\._chrome\.refresh\(\);/);
+  });
+});
+
 describe("the tour's chrome", () => {
   it("names the site itself, since the top bar that does so is stood down", () => {
     expect(briefing).toMatch(/<EcgMark \/>/);

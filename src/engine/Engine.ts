@@ -30,7 +30,7 @@ import { THEME_KEY, parseThemePref, resolveTheme, type Theme } from "@/src/theme
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
 import { sceneFeeds } from "./domain/sceneFeeds";
 import { liveArrivals } from "./domain/arrivals";
-import { BRIEFING_COVER, BRIEFING_PACE } from "./domain/briefing";
+import { BRIEFING_COVER, BRIEFING_PACE, BRIEFING_RELEASE_MS } from "./domain/briefing";
 import { SHEET_SHIFT_K, chromeShiftPx, sheetShiftPx, stripShiftPx } from "./domain/sheetShift";
 import { ChromeBounds } from "./ChromeBounds";
 import { FOCI, nodeFraming, cohortFraming, ledgerCommitTilt, trendFocusPush, trendFit } from "./domain/cameraRig";
@@ -484,6 +484,9 @@ export class Engine {
   }
   private _sheetShiftW = 0;
   private _sheetShiftH = 0;
+  /** The Briefing's lift: standing, and until when it outlives the tour (`BRIEFING_RELEASE_MS`). */
+  private _lifting = false;
+  private _liftHeldUntil = 0;
   /** The aspect the current pose was resolved at — seeds from the boot camera, updated per re-frame. */
   private _framedAspect = typeof window !== "undefined" ? window.innerWidth / Math.max(1, window.innerHeight) : 16 / 9;
   // FPS/ms monitor — dev only, or in prod via `?stats`/`#stats` for ad-hoc checks, so
@@ -923,6 +926,7 @@ export class Engine {
         // toggle re-resolving there reads as a reset, not a lean. `_freeOrbit` (set by the
         // controls' own start event, cleared by the next pose flight) gates it; a camera at
         // rest keeps today's exact behaviour.
+        if (prev.briefing != null && st.briefing == null) this._liftHeldUntil = performance.now() + BRIEFING_RELEASE_MS;
         if (st.railsHidden !== prev.railsHidden) {
           this.railsHidden = st.railsHidden;
           if (breakpointOf(window.innerWidth) === "desktop" && VIEW_POLICIES[this.mode].canvas && !this._freeOrbit) {
@@ -2164,9 +2168,17 @@ export class Engine {
       const el = this.ctx.renderer.domElement;
       const w = el.clientWidth || window.innerWidth;
       const h = el.clientHeight || window.innerHeight;
-      const words = st.briefing != null ? h * BRIEFING_COVER : 0; // the Briefing's caption, the same lift
+      // The Briefing's caption, the same lift. It outlives the tour while the HUD slides back: the
+      // bars' edges are final only once they land, so the one ease runs to where the scene rests.
+      const lifting = st.briefing != null || performance.now() < this._liftHeldUntil;
+      if (lifting !== this._lifting) {
+        this._lifting = lifting;
+        if (!lifting) this._chrome.refresh();
+      }
+      const words = lifting ? h * BRIEFING_COVER : 0;
+      const chromeShift = lifting ? 0 : this._chromeShift();
       const target =
-        sheetShiftPx(Math.max(st.sceneCoverBExplore, st.sceneCoverBDetails, st.sceneCoverBVitals, words), h) + this._chromeShift();
+        sheetShiftPx(Math.max(st.sceneCoverBExplore, st.sceneCoverBDetails, st.sceneCoverBVitals, words), h) + chromeShift;
       const d = target - this._sheetShift;
       // REDUCED MOTION SNAPS (review, 2026-09-28): a whole-scene slide of up to half the viewport,
       // riding a sheet, is exactly the large-area motion the setting exists to remove. The sheet

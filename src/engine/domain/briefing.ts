@@ -25,6 +25,11 @@ export const BRIEFING_PACE = 1.25;
  *  through the projection offset a phone sheet's cover already uses (`sheetShift.ts`). */
 export const BRIEFING_COVER = 0.18;
 
+/** How long the lift stands after the tour ends, while the HUD slides back. The bars' edges are
+ *  final only once they land, and easing toward a half-arrived bar reads as a dip and a rise
+ *  (user 2026-11-01: "it should not move or at least be smooth and not a bounce"). */
+export const BRIEFING_RELEASE_MS = 600;
+
 /** How long the tour waits for the scene before standing down: the moment the HUD's boot ladder
  *  gives up on a dead feed (`useBootStage`), so the tour never holds the controls back longer. */
 export const SCENE_WAIT_MS = 8000;

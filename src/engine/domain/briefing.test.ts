@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BRIEFING_COVER, BRIEFING_PACE, BRIEFING_STOPS, LINE_MAX, SCENE_WAIT_MS, STOP_MS, briefsOn, mayAdvance, nextStop } from "./briefing";
+import { BRIEFING_COVER, BRIEFING_PACE, BRIEFING_RELEASE_MS, BRIEFING_STOPS, LINE_MAX, SCENE_WAIT_MS, STOP_MS, briefsOn, mayAdvance, nextStop } from "./briefing";
 
 const on = { pathname: "/", net: "mainnet", seen: false };
 
@@ -76,5 +76,10 @@ describe("the tour's staging", () => {
   it("leaves the scene the upper part of the screen", () => {
     expect(BRIEFING_COVER).toBeGreaterThan(0);
     expect(BRIEFING_COVER).toBeLessThan(0.5);
+  });
+
+  it("holds the lift until the HUD has landed, so the scene eases once, with no dip and rise", () => {
+    expect(BRIEFING_RELEASE_MS).toBeGreaterThan(550); // the band's slide back, measured
+    expect(BRIEFING_RELEASE_MS).toBeLessThan(1000);
   });
 });
