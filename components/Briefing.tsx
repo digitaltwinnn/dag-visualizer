@@ -8,9 +8,11 @@ import { briefingReq, briefingWords } from "@/components/notes/briefingNote";
 import { AI_TITLE } from "@/components/notes/noteSubject";
 import TypedNote from "@/components/notes/TypedNote";
 import useNote from "@/components/notes/useNote";
+import EcgMark from "@/components/topbar/EcgMark";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { VIEWS } from "@/components/views";
 import { breakpointOf } from "@/src/data/breakpoint";
+import { SITE_ORIGIN } from "@/src/data/site";
 import { BRIEFING_STOPS, SCENE_WAIT_MS, STOP_MS, briefsOn, mayAdvance, nextStop } from "@/src/engine/domain/briefing";
 import { NET } from "@/src/net/current";
 import { useStore } from "@/src/store/store";
@@ -149,6 +151,13 @@ function Tour({ stop }: { stop: number }) {
       Skip
     </button>
   );
+  // The top bar that carries the brand is stood down, so the tour says where you are itself.
+  const site = (
+    <span className="flex items-center gap-1.5 text-body font-semibold text-foreground">
+      <EcgMark />
+      {new URL(SITE_ORIGIN).host}
+    </span>
+  );
   const Mark = AI_NOTES_ICON;
   const who = words.ai && (
     <span className="flex shrink-0 items-center gap-1.5 text-label font-semibold text-[var(--ai-mark)]">
@@ -169,14 +178,17 @@ function Tour({ stop }: { stop: number }) {
       {ready && (
         <>
           <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-[44%] [background:linear-gradient(transparent,var(--scene-ground)_38%)]" />
-          {phone && (
+          {phone ? (
             <div className="absolute inset-x-0 top-0 flex flex-col gap-1 px-3 pt-[calc(env(safe-area-inset-top)+10px)]">
               {bars}
               <div className="flex items-center justify-between">
                 <span aria-hidden className="text-body font-semibold text-foreground">{name}</span>
+                {site}
                 {skip}
               </div>
             </div>
+          ) : (
+            <div className="absolute left-[max(16px,3.7vw)] top-[calc(env(safe-area-inset-top)+20px)]">{site}</div>
           )}
           <div className="absolute inset-x-0 bottom-0 px-[max(16px,3.7vw)] pb-[calc(env(safe-area-inset-bottom)+22px)]">
             {phone ? <div className="mb-1 min-h-5">{who}</div> : <p aria-hidden className="mb-1 text-title text-muted-foreground">{name}</p>}

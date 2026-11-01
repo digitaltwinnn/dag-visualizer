@@ -27,6 +27,17 @@ describe("the tour before the scene is up", () => {
   });
 });
 
+describe("the tour's chrome", () => {
+  it("names the site itself, since the top bar that does so is stood down", () => {
+    expect(briefing).toMatch(/<EcgMark \/>/);
+    expect(briefing).toMatch(/new URL\(SITE_ORIGIN\)\.host/);
+  });
+
+  it("names it on every screen, the phone's header and the corner elsewhere", () => {
+    expect(briefing.match(/\{site\}/g)).toHaveLength(2);
+  });
+});
+
 describe("the tour's words", () => {
   it("type in at every stop, whatever has been written before", () => {
     expect(briefing).toMatch(/<TypedNote [^>]*\balways\b/);
