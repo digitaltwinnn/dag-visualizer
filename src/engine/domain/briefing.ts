@@ -1,4 +1,5 @@
 import type { Mode } from "@/src/store/mode";
+import { easeInOutQuad } from "./cameraRig";
 
 // THE BRIEFING (user, 2026-10-31): the tour every entry to `/` plays, one stop per 3D view, each
 // in the AI's own line. Most visitors never reach a second view, so the app shows them all once and
@@ -29,6 +30,17 @@ export const BRIEFING_COVER = 0.18;
  *  final only once they land, and easing toward a half-arrived bar reads as a dip and a rise
  *  (user 2026-11-01: "it should not move or at least be smooth and not a bounce"). */
 export const BRIEFING_RELEASE_MS = 600;
+
+/** How long the lift takes to let go, once it may (user, 2026-11-01: "a bit abrupt"). The sheet's
+ *  own ease starts at full speed, right for following a finger and a snap for a scene at rest:
+ *  measured 5.4px in its first frame and most of the way in 0.2s. */
+export const BRIEFING_SETTLE_MS = 1100;
+
+/** Where the scene's shift stands `elapsedMs` into letting go: eased at both ends. */
+export function liftSettling(fromPx: number, toPx: number, elapsedMs: number): number {
+  const t = Math.min(1, Math.max(0, elapsedMs / BRIEFING_SETTLE_MS));
+  return t >= 1 ? toPx : fromPx + (toPx - fromPx) * easeInOutQuad(t);
+}
 
 /** THE ENDING, THREE BEATS (user, 2026-11-01: "abrupt, not smooth/designed"): a tour that stages
  *  everything one step at a time ended in one frame, the words cut and a view change, the rails, the

@@ -30,7 +30,7 @@ import { THEME_KEY, parseThemePref, resolveTheme, type Theme } from "@/src/theme
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
 import { sceneFeeds } from "./domain/sceneFeeds";
 import { liveArrivals } from "./domain/arrivals";
-import { BRIEFING_COVER, BRIEFING_PACE, BRIEFING_RELEASE_MS } from "./domain/briefing";
+import { BRIEFING_COVER, BRIEFING_PACE, BRIEFING_RELEASE_MS, BRIEFING_SETTLE_MS, liftSettling } from "./domain/briefing";
 import { SHEET_SHIFT_K, chromeShiftPx, sheetShiftPx, stripShiftPx } from "./domain/sheetShift";
 import { ChromeBounds } from "./ChromeBounds";
 import { FOCI, nodeFraming, cohortFraming, trendFocusPush, trendFit } from "./domain/cameraRig";
@@ -487,6 +487,9 @@ export class Engine {
   /** The Briefing's lift: standing, and until when it outlives the tour (`BRIEFING_RELEASE_MS`). */
   private _lifting = false;
   private _liftHeldUntil = 0;
+  /** Where the lift stood when it let go and when it did, while it eases out (`liftSettling`). */
+  private _settleFrom: number | null = null;
+  private _settleAt = 0;
   /** The aspect the current pose was resolved at — seeds from the boot camera, updated per re-frame. */
   private _framedAspect = typeof window !== "undefined" ? window.innerWidth / Math.max(1, window.innerHeight) : 16 / 9;
   // FPS/ms monitor — dev only, or in prod via `?stats`/`#stats` for ad-hoc checks, so
@@ -2149,20 +2152,31 @@ export class Engine {
       const lifting = (st.briefing != null && !st.briefingLanding) || performance.now() < this._liftHeldUntil;
       if (lifting !== this._lifting) {
         this._lifting = lifting;
-        if (!lifting) this._chrome.refresh();
+        this._settleFrom = null;
+        if (!lifting) {
+          this._chrome.refresh();
+          this._settleFrom = this._sheetShift;
+          this._settleAt = performance.now();
+        }
       }
       const words = lifting ? h * BRIEFING_COVER : 0;
       const chromeShift = lifting ? 0 : this._chromeShift();
       const target =
         sheetShiftPx(Math.max(st.sceneCoverBExplore, st.sceneCoverBDetails, st.sceneCoverBVitals, words), h) + chromeShift;
       const d = target - this._sheetShift;
+      const settling = this._settleFrom == null ? null : performance.now() - this._settleAt;
+      if (settling != null && settling >= BRIEFING_SETTLE_MS) this._settleFrom = null;
       // REDUCED MOTION SNAPS (review, 2026-09-28): a whole-scene slide of up to half the viewport,
       // riding a sheet, is exactly the large-area motion the setting exists to remove. The sheet
       // itself is already instant there (its transition is motion-reduce:transition-none).
       this._sheetShift =
-        this._reduceMotion.matches || Math.abs(d) < 0.25
+        this._reduceMotion.matches
           ? target
-          : this._sheetShift + d * (1 - Math.exp(-SHEET_SHIFT_K * dt));
+          : this._settleFrom != null
+            ? liftSettling(this._settleFrom, target, settling!)
+            : Math.abs(d) < 0.25
+              ? target
+              : this._sheetShift + d * (1 - Math.exp(-SHEET_SHIFT_K * dt));
       if (this._sheetShift !== this._sheetShiftApplied || w !== this._sheetShiftW || h !== this._sheetShiftH) {
         const cam = this.ctx.camera;
         if (this._sheetShift === 0) cam.clearViewOffset();

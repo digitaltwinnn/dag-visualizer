@@ -55,7 +55,8 @@ describe("the tour's end", () => {
   it("lets the lift go only once the HUD's edges are final, read fresh that frame", () => {
     expect(engine).toMatch(/const lifting = \(st\.briefing != null && !st\.briefingLanding\) \|\| performance\.now\(\) < this\._liftHeldUntil/);
     expect(engine).toMatch(/const chromeShift = lifting \? 0 : this\._chromeShift\(\)/);
-    expect(engine).toMatch(/if \(lifting !== this\._lifting\) \{\s*this\._lifting = lifting;\s*if \(!lifting\) this\._chrome\.refresh\(\);/);
+    expect(engine).toMatch(/if \(lifting !== this\._lifting\) \{\s*this\._lifting = lifting;\s*this\._settleFrom = null;\s*if \(!lifting\) \{\s*this\._chrome\.refresh\(\);/);
+    expect(engine).toMatch(/liftSettling\(this\._settleFrom, target, settling!\)/);
   });
 });
 

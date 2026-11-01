@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BRIEFING_COVER, BRIEFING_LAND_MAX_MS, BRIEFING_NO_MOTION_MS, BRIEFING_PACE, BRIEFING_RELEASE_MS, BRIEFING_STOPS, BRIEFING_WORDS_OUT_MS, LINE_MAX, SCENE_WAIT_MS, STOP_MS, briefsOn, hasLanded, mayAdvance, nextStop, prevStop } from "./briefing";
+import { BRIEFING_COVER, BRIEFING_LAND_MAX_MS, BRIEFING_NO_MOTION_MS, BRIEFING_PACE, BRIEFING_RELEASE_MS, BRIEFING_SETTLE_MS, BRIEFING_STOPS, BRIEFING_WORDS_OUT_MS, LINE_MAX, SCENE_WAIT_MS, STOP_MS, briefsOn, hasLanded, liftSettling, mayAdvance, nextStop, prevStop } from "./briefing";
 
 const on = { pathname: "/", net: "mainnet", seen: false };
 
@@ -117,3 +117,29 @@ describe("the tour's ending, three beats: the words go, the scene moves, the HUD
     expect(hasLanded(BRIEFING_LAND_MAX_MS, true, "in")).toBe(true);
   });
 });
+
+// user, 2026-11-01: measured 5.4px in the first frame and most of the way in 0.2s after a stand-still.
+describe("the lift letting go", () => {
+  const at = (ms: number) => liftSettling(81, 32, ms);
+
+  it("starts from where it stood and lands where the scene rests", () => {
+    expect(at(0)).toBe(81);
+    expect(at(BRIEFING_SETTLE_MS)).toBeCloseTo(32, 9);
+    expect(at(BRIEFING_SETTLE_MS * 2)).toBe(32);
+  });
+
+  it("eases in: the first frame barely moves", () => {
+    expect(81 - at(16)).toBeLessThan(0.1);
+  });
+
+  it("eases out the same way, half the distance at half the time", () => {
+    expect(at(BRIEFING_SETTLE_MS / 2)).toBeCloseTo((81 + 32) / 2, 9);
+    expect(at(BRIEFING_SETTLE_MS - 16) - 32).toBeLessThan(0.1);
+  });
+
+  it("is slow enough to read as a settle, and quick enough not to outstay it", () => {
+    expect(BRIEFING_SETTLE_MS).toBeGreaterThanOrEqual(800);
+    expect(BRIEFING_SETTLE_MS).toBeLessThanOrEqual(1500);
+  });
+});
+
