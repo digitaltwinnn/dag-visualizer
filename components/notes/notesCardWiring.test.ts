@@ -398,7 +398,11 @@ describe("the AI card's rows", () => {
 
 describe("a network's name in a note", () => {
   it("is its colour mixed toward the ink", () => {
-    expect(read("components/notes/NoteText.tsx")).toMatch(/color-mix\(in oklab, \$\{identityHudCss\(s\.id\)\} \$\{NAME_TINT\}%, var\(--foreground\)\)/);
+    expect(read("components/notes/NoteText.tsx")).toMatch(/color-mix\(in oklab, \$\{ink\} \$\{NAME_TINT\}%, var\(--foreground\)\)/);
+  });
+
+  it("keeps its full colour on paper, where ink pulls a hue toward grey", () => {
+    expect(read("components/notes/NoteText.tsx")).toMatch(/`light-dark\(\$\{ink\}, color-mix/);
   });
 });
 
