@@ -139,6 +139,12 @@ const UNLISTED_SET_BLURB = `${UNLISTED_SET_NAME} are: chains that anchor snapsho
 /** Quiet this long before the span's end is a stop, not a slow day (the picker's own three). */
 const STOPPED_MS = 3 * DAY_MS;
 
+/** Whether a network anchored nothing in a span. Absent reads as zero, the picker's own rule: the
+ *  spine measured the span, and the hourly tiers store no key for a network with nothing to say.
+ *  The hypergraph is never silent here, and the unlisted set has its own rule below. */
+export const trendSilent = (subject: string, cur: TrendsWindowData): boolean =>
+  subject !== "dag" && subject !== UNLISTED_ID && !metricSeries("snapshots", subject, cur.series).points.some((v) => (v ?? 0) > 0);
+
 const dayMeasured = (d: NotableDay): "count" | "duration" => (d.kind === "pause" || d.kind === "longest" ? "duration" : "count");
 
 export function trendFacts(input: TrendFactsInput): TrendFacts | null {
@@ -274,6 +280,26 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
         return id != null && id !== UNLISTED_ID && !isListed(id) && h.series[k]!.some((v) => (v ?? 0) > 0);
       }).length;
       if (!carried.length && ever) facts.push(fact("Unlisted chains that anchored snapshots in all measured history", ever, "count"));
+    }
+  }
+
+  // A NETWORK'S SILENT SPAN SAYS SO, the set's rule above (user, 2026-11-01: NDT's Aug 23 read
+  // "steady", three days past its last day, on facts holding only the span's own dates). The rows
+  // of zeros go, a figure that is not zero stays (nodes can outlast the anchoring), and the
+  // history says which side of the network's life the span fell on.
+  if (trendSilent(subject, cur)) {
+    facts.splice(0, facts.length, ...facts.filter((f) => f.value !== 0));
+    const name = base("snapshots", subject);
+    facts.push(fact(`${name}, this span`, 0, "count"));
+    if (input.history) {
+      const h = trimNewestPartial(input.history);
+      const points = metricSeries("snapshots", subject, h.series).points;
+      const seen = h.buckets.filter((_, i) => (points[i] ?? 0) > 0);
+      const before = seen.filter((b) => b < span.fromMs).at(-1);
+      const after = seen.find((b) => b >= span.toMs);
+      const who = mention(subject);
+      if (before != null) facts.push(fact(`Last day ${who} anchored a snapshot${after != null ? " before this span" : ", none since"}`, before, "date"));
+      if (after != null) facts.push(fact(`First day ${who} anchored a snapshot${before != null ? " after this span" : ", none before"}`, after, "date"));
     }
   }
 

@@ -6,7 +6,7 @@ import { geoFacts } from "@/src/data/noteFactsGeo";
 import { comboWords, hyperFacts } from "@/src/data/noteFactsHyper";
 import { commonIsWhole, hasCommonReading } from "@/src/data/noteFactsActivity";
 import { ledgerFacts } from "@/src/data/noteFactsLedger";
-import { trendFacts, type TrendFactsInput } from "@/src/data/noteFactsTrend";
+import { trendFacts, trendSilent, type TrendFactsInput } from "@/src/data/noteFactsTrend";
 import type { Fact, NotableDay, NoteChange, NoteView, NoteLead } from "@/src/data/noteTypes";
 import { leadingTrim, pickRangeTier, type TrendsWindowData } from "@/src/data/trendWindow";
 import { CATALOG, type NetworkId } from "@/src/engine/config";
@@ -355,8 +355,9 @@ async function readTrend(c: Ctx): Promise<Read | null> {
       pill?.daily ? reads.span(net, "1d", fromMs - LEAD_IN_MS, toMs) : Promise.resolve(null),
     ]);
   }
-  // The unlisted set's whole daily record, for what a silent span can still say (`trendFacts`).
-  const history = subject === UNLISTED_ID ? await reads.span(net, "1d", nowMs - WINDOWS.all.ms, nowMs) : null;
+  // The whole daily record, for what a silent span can still say (`trendFacts`): always the unlisted
+  // set's, and a network's only when its span is silent, so an active note reads nothing more.
+  const history = subject === UNLISTED_ID || trendSilent(subject, cur) ? await reads.span(net, "1d", nowMs - WINDOWS.all.ms, nowMs) : null;
   const built = trendFacts({ subject, zoom, span: { fromMs, toMs }, cur, prev, daily, history, shape: facet, names: c.names, blurbs: c.blurbs });
   return {
     built,

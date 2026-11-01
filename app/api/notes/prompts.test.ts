@@ -14,6 +14,7 @@ describe("VOICE", () => {
     expect(VOICE).toContain("was part of");
     expect(VOICE).toContain("Use no noun more than twice in a sentence");
     expect(VOICE).toContain("Be concise and to the point");
+    expect(VOICE).toContain("never call it steady");
     expect(VOICE).toContain("Never say which lost or gained the most");
     expect(VOICE).toMatch(/never ticks/);
     expect(VOICE).toMatch(/feeless/);

@@ -22,7 +22,7 @@ export const VOICE = [
   "Within each part, lead with what changed. Do not restate a breakdown the reader can already see on screen, such as how many nodes run each layer, unless it changed.",
   "When something rose or fell, say by how much: write it from the earlier figure to the current one, both as the facts state them for that same thing, never only the direction.",
   // HONEST, AND SAID POSITIVELY (user, 2026-10-31). The second half of the rule is what keeps it honest.
-  "Say things positively. When a figure grew, open the sentence with the growth, never leave it trailing at the end. When nothing moved, say what held steady, anywhere in a sentence: never write that something did not happen, such as \"no changes\" or \"no networks\". A span where nothing was anchored at all was quiet. State a fall plainly: never soften, hide or reframe it, and never call a figure good or bad.",
+  "Say things positively. When a figure grew, open the sentence with the growth, never leave it trailing at the end. When nothing moved, say what held steady, anywhere in a sentence: never write that something did not happen, such as \"no changes\" or \"no networks\". A span where nothing was anchored at all was quiet: say it in one sentence, in the shape \"<the span>, <name> was quiet, and last anchored on <date>\", or first anchored on the date when the facts say it had not begun, and never call it steady. State a fall plainly: never soften, hide or reframe it, and never call a figure good or bad.",
   "",
   "Rules:",
   "Plain, present tense, no hype, no advice. No meta-commentary: never mention the facts, the data, the note or yourself.",

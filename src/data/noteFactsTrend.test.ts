@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { trendFacts, type TrendFactsInput } from "@/src/data/noteFactsTrend";
+import { trendFacts, trendSilent, type TrendFactsInput } from "@/src/data/noteFactsTrend";
 import { formatDag } from "@/src/data/trendSeries";
 import { checkNote } from "@/src/data/noteHonesty";
 import { factsBlock } from "@/src/data/noteFacts";
@@ -565,5 +565,62 @@ describe("trendFacts names: the whole catalog", () => {
     expect(checkNote("Zeta Chain doubled.", r.facts, r.names).ok).toBe(false);
     // The hypergraph's own ratio is still citable by a nameless sentence.
     expect(checkNote("Snapshots anchored doubled.", r.facts, r.names)).toEqual({ ok: true });
+  });
+});
+
+// A NETWORK'S SILENT SPAN SAYS SO (user, 2026-11-01: NDT's Aug 23 read "steady", three days after
+// its last day, because the facts held only the span's own length and dates). The unlisted set's
+// rule, for every network.
+describe("a network's silent span", () => {
+  const quiet = { "m.bio.snaps": row(7, () => null) };
+  const silent = (patch: Partial<TrendFactsInput> = {}, over: Record<string, (number | null)[]> = quiet) =>
+    trendFacts(input({ subject: "bio", cur: win(7, week(2, over)), prev: null, ...patch }))!;
+  const history = (active: (day: number) => boolean) =>
+    win(100, { "g.ticks": row(100, () => 288), "m.bio.snaps": row(100, (i) => (active(i - 50) ? 40 : 0)) }, T0 - 50 * DAY);
+  const of = (r: ReturnType<typeof silent>) => r.facts.map((f) => [f.label, f.value]);
+
+  it("is one with no snapshot in it, whether the store says zero or nothing", () => {
+    expect(trendSilent("bio", win(7, week(2, quiet)))).toBe(true);
+    expect(trendSilent("bio", win(7, week(2, { "m.bio.snaps": row(7, () => 0) })))).toBe(true);
+    expect(trendSilent("bio", win(7, week(2)))).toBe(false);
+  });
+
+  it("is never the hypergraph's, or the unlisted set's, which has its own rule", () => {
+    expect(trendSilent("dag", win(7, week(2, { "g.anchors": row(7, () => 0) })))).toBe(false);
+    expect(trendSilent("unlisted", win(7, week(2)))).toBe(false);
+  });
+
+  it("states the zero and the last day, in place of a row of zeros", () => {
+    const r = silent({ history: history((d) => d < -3) }, { "m.bio.snaps": row(7, () => 0), "f.nodes.bio": row(7, () => 0) });
+    expect(of(r)).toEqual([
+      ["BioFi snapshots anchored, this span", 0],
+      ["Last day BioFi anchored a snapshot, none since", T0 - 4 * DAY],
+    ]);
+    expect(checkNote("BioFi was quiet over the span: its last day was Aug 28.", r.facts, r.names)).toEqual({ ok: true });
+  });
+
+  it("states the first day of a network that had not begun", () => {
+    expect(of(silent({ history: history((d) => d >= 20) }))).toContainEqual(["First day BioFi anchored a snapshot, none before", T0 + 20 * DAY]);
+  });
+
+  it("states both sides of a pause", () => {
+    const r = of(silent({ history: history((d) => d < -3 || d >= 20) }));
+    expect(r).toContainEqual(["Last day BioFi anchored a snapshot before this span", T0 - 4 * DAY]);
+    expect(r).toContainEqual(["First day BioFi anchored a snapshot after this span", T0 + 20 * DAY]);
+  });
+
+  it("keeps a figure that is not zero: the nodes can outlast the anchoring", () => {
+    const cur = win(30, { "g.ticks": row(30, () => 288), "f.nodes.bio": row(30, () => 5) });
+    const r = silent({ cur, span: { fromMs: T0, toMs: T0 + 30 * DAY } });
+    expect(r.facts.some((f) => /nodes/.test(f.label) && f.value === 5)).toBe(true);
+  });
+
+  it("states the zero alone when nothing in the history says more", () => {
+    expect(of(silent({ history: null }))).toEqual([["BioFi snapshots anchored, this span", 0]]);
+  });
+
+  it("changes nothing for a network that anchored", () => {
+    const r = trendFacts(input({ subject: "bio", history: history(() => true) }))!;
+    expect(r.facts.some((f) => /^(Last|First) day/.test(f.label))).toBe(false);
   });
 });

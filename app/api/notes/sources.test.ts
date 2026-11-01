@@ -7,7 +7,7 @@ import type { NoteReads } from "./sources";
 // The builders are mocked here: these tests pin what `factsFor` READS (the per-view table: tiers
 // and windows) and the INPUT it assembles for each builder. The builders' own behaviour is their
 // colocated tests' business; `generate.test.ts` runs one real builder end to end.
-vi.mock("@/src/data/noteFactsTrend", () => ({ trendFacts: vi.fn() }));
+vi.mock("@/src/data/noteFactsTrend", async (orig) => ({ ...(await orig<typeof import("@/src/data/noteFactsTrend")>()), trendFacts: vi.fn() }));
 vi.mock("@/src/data/noteFactsLedger", () => ({ ledgerFacts: vi.fn() }));
 // The make-up's words (`comboWords`) are the real ones: they are the subject note's label.
 vi.mock("@/src/data/noteFactsHyper", async (orig) => ({ ...(await orig<typeof import("@/src/data/noteFactsHyper")>()), hyperFacts: vi.fn() }));
@@ -39,7 +39,7 @@ function fakeReads(over: Partial<NoteReads> = {}): NoteReads & { calls: Call[]; 
     geoCalls,
     async span(_net, tier, from, to) {
       calls.push({ tier, from, to });
-      return payload(`${tier}:${from}:${to}`);
+      return payload(`${tier}:${from}:${to}`, [0], { [`m.${USDC}.snaps`]: [1] }); // an active network: a silent one reads more
     },
     async geoDays(_net, from, to) {
       geoCalls.push({ from, to });
@@ -483,6 +483,14 @@ describe("factsFor — the per-view read table", () => {
     const before = fakeReads();
     await factsFor("mainnet", "trend", USDC, "30d", NOW, before);
     expect(before.calls.length).toBeLessThan(r.calls.length); // a network pays for no such read
+  });
+
+  it("a network pays for that read only when its span is silent", async () => {
+    const quiet = fakeReads();
+    await factsFor("mainnet", "trend", "DAG06z64ifT2HzXoHfMexRfrcnpYFEwMqjFiPKze", "30d", NOW, quiet); // NDT, absent from the fake store
+    const active = fakeReads();
+    await factsFor("mainnet", "trend", USDC, "30d", NOW, active);
+    expect(quiet.calls.length).toBe(active.calls.length + 1);
   });
 
   it("a read that throws propagates (the generator counts it as a store outage)", async () => {
