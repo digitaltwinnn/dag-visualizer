@@ -6,7 +6,7 @@ import { focusPreviews } from "@/components/useSubjectPairing";
 import { cn } from "@/lib/utils";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { RoleChips } from "@/components/inspector/parts";
-import { bucketAt, cursorFraction } from "@/src/data/trendWindow";
+import { bucketAt, cursorFraction, plotCeiling, valueFraction } from "@/src/data/trendWindow";
 import { bucketStamp, rangeDays } from "@/src/util/localTime";
 import { compactNumber } from "@/src/util/format";
 import type { NotableKind } from "@/src/data/noteTypes";
@@ -144,6 +144,8 @@ function MarkCoin({
   m,
   top,
   left,
+  lineLeft,
+  reach,
   x,
   onHover,
   onPick,
@@ -151,6 +153,12 @@ function MarkCoin({
   m: TrendMark;
   top: number;
   left: string;
+  /** The day's x on the plot: the coin's centre. */
+  lineLeft: string;
+  /** THE HAIRLINE'S SPAN (user, 2026-11-01): from the chart's line down to the coin, which stays on
+   *  the baseline because a day's kind need not be the measure on screen. Null with no value to
+   *  reach, or one the coin already stands on. */
+  reach: { top: number; height: number } | null;
   /** Where the coin sits across the plate, 0 to 1: near an edge the label anchors into the plate,
    *  whose `overflow-hidden` would cut it. */
   x: number;
@@ -172,6 +180,13 @@ function MarkCoin({
   );
   return (
     <>
+    {(own || m.lit) && reach && (
+      <div
+        aria-hidden
+        className="absolute w-px pointer-events-none [background:var(--ai-edge)]"
+        style={{ ...reach, left: lineLeft }}
+      />
+    )}
     <button
       type="button"
       aria-label={m.label}
@@ -198,8 +213,8 @@ function MarkCoin({
       <NoteDayPopover
         date={rangeDays(m.dayMs, m.dayMs + DAY_MS_CHART)}
         caption={m.caption}
-        className={cn("z-10 mb-1", x > 0.75 ? "right-2" : x < 0.25 ? "left-2" : "ml-2 -translate-x-1/2")}
-        style={{ bottom: `calc(100% - ${top}px)`, ...(x > 0.75 || x < 0.25 ? {} : { left }) }}
+        className="z-10 mb-1"
+        style={{ bottom: `calc(100% - ${top}px)`, ...(x > 0.5 ? { right: `calc(100% - ${lineLeft} + 8px)` } : { left: `calc(${lineLeft} + 8px)` }) }}
       />
     )}
     </>
@@ -498,9 +513,13 @@ export default function TrendChart({
   // not contain (a chain measured over a shorter window than its neighbours).
   const cursorX = cursorFraction(buckets, cursorBucket);
   // The notable days' x, by the same scale (see `TrendMark`); a day the axis does not hold is skipped.
+  const ceiling = marks?.length ? plotCeiling(lines.map((l) => l.points), scaleMax) : 1;
   const markXs = (marks ?? [])
-    .map((m) => ({ ...m, key: `${m.dayMs}:${m.kind}`, x: cursorFraction(buckets, bucketAt(buckets, stepMs, stepMs >= DAY_MS_CHART ? m.dayMs : m.dayMs + DAY_MS_CHART / 2)) }))
-    .filter((m): m is TrendMark & { key: string; x: number } => m.x != null);
+    .map((m) => {
+      const bucket = bucketAt(buckets, stepMs, stepMs >= DAY_MS_CHART ? m.dayMs : m.dayMs + DAY_MS_CHART / 2);
+      return { ...m, key: `${m.dayMs}:${m.kind}`, x: cursorFraction(buckets, bucket), rise: lines[0] ? valueFraction(lines[0].points, buckets, bucket, ceiling) : null };
+    })
+    .filter((m): m is TrendMark & { key: string; x: number; rise: number | null } => m.x != null);
 
   const hue0 = lines[0]?.hue ?? "var(--primary)";
   // The head's right-hand readout: the NEWEST MEASURED BUCKET, stamped with its own date —
@@ -784,17 +803,24 @@ export default function TrendChart({
               baseline, by the cursor's rule: the same fraction math, outside the memoised plot, no
               pointer events (the AI card's row and the timeline's diamond are the controls). */}
           {!held &&
-            markXs.map((m) => (
-              <MarkCoin
-                key={m.key}
-                m={m}
-                x={m.x}
-                onHover={onMarkHover}
-                onPick={onMarkPick}
-                top={PLOT_MARGIN.top + plotInnerH(plotHeight) - 8}
-                left={`calc(${PLOT_MARGIN.left}px + ${m.x} * (100% - ${PLOT_INSET_X}px) - 8px)`}
-              />
-            ))}
+            markXs.map((m) => {
+              const coinTop = PLOT_MARGIN.top + plotInnerH(plotHeight) - 8;
+              const lineTop = m.rise == null ? null : PLOT_MARGIN.top + plotInnerH(plotHeight) * (1 - m.rise);
+              const lineLeft = `calc(${PLOT_MARGIN.left}px + ${m.x} * (100% - ${PLOT_INSET_X}px))`;
+              return (
+                <MarkCoin
+                  key={m.key}
+                  m={m}
+                  x={m.x}
+                  onHover={onMarkHover}
+                  onPick={onMarkPick}
+                  top={coinTop}
+                  left={`calc(${lineLeft} - 8px)`}
+                  lineLeft={lineLeft}
+                  reach={lineTop != null && coinTop > lineTop ? { top: lineTop, height: coinTop - lineTop } : null}
+                />
+              );
+            })}
           {cursorX != null && !held && (
             <div
               aria-hidden
@@ -962,13 +988,11 @@ const TrendPlot = memo(function TrendPlot({
         },
       }
     : {};
-  // ⚠️ THE PEAK READOUT IS THE CHART'S OWN, WHATEVER THE SCALE. `ownMax` is what this chart's
-  // data reaches; `max` is the height it is drawn against, which a caller may impose to put a
-  // column of charts on one scale. Keeping them separate is what lets a chart shrink to a sliver
+  // ⚠️ THE PEAK READOUT IS THE CHART'S OWN, WHATEVER THE SCALE. `max` is the height it is drawn
+  // against, which a caller may impose to put a column of charts on one scale. Keeping them separate is what lets a chart shrink to a sliver
   // and still say, in its own corner, how high it actually got — otherwise a shared scale would
   // flatten the small networks AND take away the number that says by how much.
-  const ownMax = Math.max(1e-9, ...lines.flatMap((l) => l.points.filter((v): v is number => v != null)));
-  const max = (scaleMax != null && scaleMax > 0 ? scaleMax : ownMax) * 1.12;
+  const max = plotCeiling(lines.map((l) => l.points), scaleMax);
 
   // THE TOTAL WHERE THE STACK HAS NOTHING (2026-10-09). Under a stack the first line is not drawn —
   // the top band's edge is the total — but the bands exist only where the composition was

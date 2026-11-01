@@ -381,6 +381,21 @@ describe("a chart coin's hover", () => {
   const chart = read("components/docs/TrendChart.tsx");
   const band = read("components/notes/NoteDiamonds.tsx");
 
+  // user, 2026-11-01: the coin stays on the baseline, and its day's value is reached on hover.
+  it("draws a hairline in the AI's sweep from the coin up to the chart's line, outside the plot", () => {
+    expect(chart).toMatch(/\(own \|\| m\.lit\) && reach && \(\s*<div\s+aria-hidden\s+className="absolute w-px pointer-events-none \[background:var\(--ai-edge\)\]"/);
+    expect(chart).toMatch(/valueFraction\(lines\[0\]\.points, buckets, bucket, ceiling\)/);
+  });
+
+  it("reads the plot's own ceiling on both sides of the memo", () => {
+    expect(chart.match(/plotCeiling\(/g)).toHaveLength(2);
+    expect(chart).not.toMatch(/\* 1\.12/);
+  });
+
+  it("stands the label beside the hairline, never over it", () => {
+    expect(chart).toMatch(/x > 0\.5 \? \{ right: `calc\(100% - \$\{lineLeft\} \+ 8px\)` \} : \{ left: `calc\(\$\{lineLeft\} \+ 8px\)` \}/);
+  });
+
   it("says the day beside the coin", () => {
     expect(chart).toMatch(/<NoteDayPopover\s/);
     // The size of the chart's own labels and tooltip (user, 2026-11-01: "unusually large").

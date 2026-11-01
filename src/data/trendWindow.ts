@@ -289,6 +289,20 @@ export function cursorFraction(buckets: readonly number[], bucket: number | null
 // side is `components/useTrendsSlice.ts`, which is nothing but the hook calls the plan names.
 
 /** The API's own window vocabulary — `/api/trends?window=…`. */
+/** The height a plot is drawn against: its peak with some headroom, or a shared scale's where a
+ *  caller puts a column of charts on one. One home, so what stands over the plot (a coin's hairline)
+ *  reads the same scale the plot draws with. */
+export function plotCeiling(series: readonly (readonly (number | null)[])[], scaleMax?: number): number {
+  const peak = Math.max(1e-9, ...series.flatMap((p) => p.filter((v): v is number => v != null)));
+  return (scaleMax != null && scaleMax > 0 ? scaleMax : peak) * 1.12;
+}
+
+/** A bucket's value as a share of the plot's height, null where it has none to stand on. */
+export function valueFraction(points: readonly (number | null)[], buckets: readonly number[], bucket: number | null, ceiling: number): number | null {
+  const v = bucket == null ? null : points[buckets.indexOf(bucket)];
+  return v == null ? null : Math.min(1, v / ceiling);
+}
+
 export type TrendApiWindow = "24h" | "7d" | "30d" | "90d" | "1y" | "all";
 
 // THE ZOOM (user, 2026-09-07: "can we zoom in?") — the window picker is the tiers made
