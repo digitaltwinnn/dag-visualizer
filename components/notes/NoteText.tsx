@@ -6,10 +6,10 @@ import { identityHudCss } from "@/src/palette/identity";
 
 /** How much of its own colour a name keeps, the rest being the text's. Full colour read loud in a
  *  sentence (user, 2026-11-01). Mixing toward the ink RAISES the contrast (measured worst hue,
- *  dark 7.3 to 10.6, paper 4.8 to 8.5), so the limit is telling two names apart, not reading them.
+ *  dark 7.3 to 9.2, paper 4.8 to 6.9), so the limit is telling two names apart, not reading them.
  *  In oklab, never oklch: a polar mix rotates the hue toward the ink's, and on paper Dor's orange
  *  came out plum and Upsider's gold came out green. */
-const NAME_TINT = 60;
+const NAME_TINT = 75;
 
 /** A NOTE'S WORDS, with each network it names in a tint of that network's colour (`noteNames.ts`), set
  *  as text (`IDENT_INK`), so every hue holds on paper. Colour only, same weight: a name is not a link
