@@ -10,7 +10,7 @@ so it reads as a daily briefing rather than an intro.
 ## What the visitor gets
 
 1. `/` opens on Geography, which is now the default view.
-2. The tour plays Geography, Snapshots, Hypergraph, History. Each stop is 6.5 seconds, about 26
+2. The tour plays Geography, Snapshots, Hypergraph, History. Each stop is about 4.9 seconds, about 20
    seconds in all, and each shows two or three lines from Constellation Gate AI, typed in.
 3. The stage clears on every screen size: the HUD steps aside, the scene fills the screen and lifts,
    and large words stand beneath it. Phones keep progress and Skip at the top, as the mock showed.
@@ -23,7 +23,7 @@ so it reads as a daily briefing rather than an intro.
 - Tour stops are not page views: the URL stays on `/` and nothing is pushed. The view a visitor stops
   on publishes its URL and `view-switch` as usual. `briefing-stop` and `briefing-end` custom events
   record how far people watch and where they leave.
-- The tour clock never outruns the scene: a stop ends at 6.5 seconds, or when the transition lands
+- The tour clock never outruns the scene: a stop ends at about 4.9 seconds, or when the transition lands
   if that is later, so a slow phone gets its whole view.
 - Faster transition for the tour only (`BRIEFING_PACE`), through the clock `?slowmo` already scales.
   Normal switching is unchanged.

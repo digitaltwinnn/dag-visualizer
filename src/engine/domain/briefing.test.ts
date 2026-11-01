@@ -52,8 +52,9 @@ describe("the tour's words", () => {
     expect(LINE_MAX).toBeLessThanOrEqual(3 * 55);
   });
 
-  it("can be read inside their stop, near subtitle pace of 20 characters a second", () => {
-    expect(STOP_MS).toBeGreaterThanOrEqual((LINE_MAX / 20) * 1000 * 0.9);
+  it("stand for the stop the user chose, brisker than subtitle pace on the longest line", () => {
+    expect(STOP_MS).toBe(4875);
+    expect(LINE_MAX / (STOP_MS / 1000)).toBeLessThan(30);
   });
 });
 

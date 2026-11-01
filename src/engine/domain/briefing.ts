@@ -8,9 +8,9 @@ import type { Mode } from "@/src/store/mode";
 /** The route: where, then now, then who, then how it changed. */
 export const BRIEFING_STOPS = ["geo", "ledger", "hyper", "trend"] as const satisfies readonly Mode[];
 
-/** How long a stop stands, from the moment it is reached: its longest line, read at subtitle pace
- *  while it types (4600 until the line grew, user 2026-10-31: "2-3 should be feasible"). */
-export const STOP_MS = 6500;
+/** How long a stop stands, from the moment it is reached: a quarter under the 6500 that read the
+ *  longest line at subtitle pace (user 2026-11-01: "25% shorter"). The tour's pace won over that. */
+export const STOP_MS = 4875;
 
 /** The longest a stop's words may run: two to three lines of the desktop caption. A longer line
  *  would need a longer stop, and a tour that outstays its welcome is the one thing it must not do. */
