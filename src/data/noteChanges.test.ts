@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { NOTE_CHANGES_CAP, RHYTHM_CHANGE, changeWords, countChange, withMovePercents, eventChange, pickChanges, rhythmChange, siteOfChange } from "@/src/data/noteChanges";
+import { NOTE_CHANGES_CAP, RHYTHM_CHANGE, changeWords, countChange, withMovePercents, eventChange, largestSnapshotChange, longestGapChange, pickChanges, rhythmChange, siteOfChange } from "@/src/data/noteChanges";
 import { fact } from "@/src/data/noteFacts";
 import type { Fact, NoteChange } from "@/src/data/noteTypes";
 
@@ -54,6 +54,23 @@ describe("a row's size", () => {
     const event = eventChange("Dor", "quiet", NET);
     expect(JSON.parse(JSON.stringify(event)).size).toBe(event.size);
     expect(event.size).toBeGreaterThan(countChange("Germany", 100000, 0, NET)!.size);
+  });
+});
+
+describe("the chamber's extremes (user, 2026-11-01)", () => {
+  it("names who held the largest snapshot", () => {
+    expect(largestSnapshotChange("Dor", "1.2 DAG", NET)).toMatchObject({ kind: "peak", subject: NET, text: "Dor had the largest snapshot, 1.2 DAG" });
+  });
+
+  it("names who held the longest gap, the unit written out", () => {
+    expect(longestGapChange("Dor", 720, NET)).toMatchObject({ kind: "longest", subject: NET, text: "Dor had the longest gap, 12 minutes" });
+  });
+
+  it("gives way to anything that moved, and leads with the snapshot", () => {
+    const moved = [eventChange("BioFi", "quiet", NET), eventChange("Dor", "active", NET), eventChange("USDC", "quiet", NET)];
+    const extremes = [longestGapChange("Dor", 720, NET), largestSnapshotChange("Dor", "1 DAG", NET)];
+    expect(pickChanges(moved, extremes).map((c) => c.kind)).toEqual(["quiet", "peak", "active"]);
+    expect(pickChanges([], extremes).map((c) => c.kind)).toEqual(["peak", "longest"]);
   });
 });
 

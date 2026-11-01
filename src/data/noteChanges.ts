@@ -5,7 +5,8 @@ import type { Fact, NoteChange, NoteChangeSubject } from "@/src/data/noteTypes";
 // subject that moved, the sibling of History's notable days. Code picks them and code words them
 // (user: "just say 'Hetzner lost 3 nodes in <city>'"): a row is one measured move in a set sentence,
 // so the model has nothing to add to it and the gate nothing to check. A span where nothing moved
-// has no rows, never filler (the day picker's own lesson, `rangeExtremes`).
+// has no rows of change. The chamber alone adds its extremes, each a measured fact of the span
+// (user, 2026-11-01), never a move: size 0 and below, so anything that moved reads first.
 
 export const NOTE_CHANGES_CAP = 3;
 
@@ -89,6 +90,16 @@ export function rhythmChange(name: string, usualS: number, recentS: number, subj
   if (size < RHYTHM_CHANGE || now === usual) return null;
   const faster = recentS < usualS;
   return { kind: faster ? "faster" : "slower", subject, size, text: `${name} ${faster ? "sped up" : "slowed down"}: a snapshot every ${now}, usually ${usual}` };
+}
+
+/** Who held the span's largest snapshot by fees. `fee` is as the card writes it. */
+export function largestSnapshotChange(name: string, fee: string, subject: NoteChangeSubject): NoteChange {
+  return { kind: "peak", subject, size: 0, text: `${name} had the largest snapshot, ${fee}` };
+}
+
+/** Who held the span's longest gap between snapshots. Below the largest snapshot on a tie of kinds. */
+export function longestGapChange(name: string, seconds: number, subject: NoteChangeSubject): NoteChange {
+  return { kind: "longest", subject, size: -1, text: `${name} had the longest gap, ${spacingWords(seconds)}` };
 }
 
 type Sites = Readonly<Record<string, number>>;

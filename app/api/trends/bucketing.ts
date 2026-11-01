@@ -97,6 +97,7 @@ export function bucketMetas(inc: IncMap, net: string, id: string, recs: MetaRec[
     // The floors are the CATALOG's (the fee card's "every network summed" lower bound): an unlisted
     // chain sampled for its own count stays out of them (`floors: false`).
     if (floors) {
+      addInc(inc, net, t, `m.${id}.feeMax`, r.fee || 0); // its largest snapshot, the Snapshots card's row
       addInc(inc, net, t, "g.feeFloor", r.fee || 0);
       addInc(inc, net, t, "g.kbFloor", r.sizeInKB || 0);
     }

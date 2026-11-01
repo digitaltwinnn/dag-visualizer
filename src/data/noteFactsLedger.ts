@@ -1,7 +1,7 @@
 import { fact, networksAnchored } from "@/src/data/noteFacts";
-import { eventChange, pickChanges, rhythmChange } from "@/src/data/noteChanges";
+import { eventChange, largestSnapshotChange, longestGapChange, pickChanges, rhythmChange } from "@/src/data/noteChanges";
 import type { Fact, FactPair, NoteChange, NoteLead } from "@/src/data/noteTypes";
-import { anchorSeries, formatDag, globalSeries, metricSeries, spanAverage, trimCounterEdges, unlistedUnmeasured, withUnlisted } from "@/src/data/trendSeries";
+import { anchorSeries, formatDag, globalSeries, metricSeries, spanAverage, TREND_METRICS, trimCounterEdges, unlistedUnmeasured, withUnlisted } from "@/src/data/trendSeries";
 import type { TrendsWindowData } from "@/src/data/trendWindow";
 import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 
@@ -241,6 +241,25 @@ export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: st
       }
     }
   }
-  const changes = pickChanges(events, paces);
+  // THE CHAMBER'S EXTREMES: who held the span's largest snapshot and its longest gap, so a quiet day
+  // still has something to click. Each network's own widest reading, which is why a stopped one
+  // stands out of it. A fee of 0 is the store from before the sampler kept one (`m.<id>.feeMax`).
+  const extremes: NoteChange[] = [];
+  if (whole) {
+    const held = (key: (id: string) => string) => {
+      let best: { id: string; v: number } | null = null;
+      for (const id of ids) {
+        const v = longestGap(recent.series[key(id)] ?? [], recent);
+        if (v != null && (!best || v > best.v)) best = { id, v };
+      }
+      return best;
+    };
+    const named = (id: string) => [catalog[id] ?? id, { kind: "network", id } as const] as const;
+    const fee = held((id) => `m.${id}.feeMax`);
+    const gap = held((id) => `m.${id}.gapMax`);
+    if (fee) extremes.push(largestSnapshotChange(named(fee.id)[0], `${formatDag(fee.v * TREND_METRICS.fees.scale)} DAG`, named(fee.id)[1]));
+    if (gap) extremes.push(longestGapChange(named(gap.id)[0], gap.v, named(gap.id)[1]));
+  }
+  const changes = pickChanges(events, paces, extremes);
   return { facts, names: [...new Set(Object.values(catalog))], lead: leadOf(facts), ...(changes.length ? { changes } : {}) };
 }

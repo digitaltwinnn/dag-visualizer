@@ -53,7 +53,7 @@ export interface NoteDay {
 }
 
 /** What moved over a view note's span (`noteChanges.ts`), as the row's coin says it. */
-export type NoteChangeKind = "gained" | "lost" | "new" | "gone" | "active" | "quiet" | "faster" | "slower";
+export type NoteChangeKind = "gained" | "lost" | "new" | "gone" | "active" | "quiet" | "faster" | "slower" | "peak" | "longest";
 
 /** The subject a change row commits: what the view's own explorer row for it commits. */
 export type NoteChangeSubject =

@@ -10,7 +10,7 @@ import { pickRangeTier } from "@/src/data/trendWindow";
 //
 // Everything is UTC and the caller supplies the date strings; nothing here reads a clock.
 
-export const NOTES_VERSION = 49; // 49: the whole network's global snapshots make notable days (2026-11-01)
+export const NOTES_VERSION = 50; // 50: the chamber's rows name its largest snapshot and longest gap (2026-11-01)
 
 /** What a note covers. Hyper and Geography are a standing picture ("day"), the ledger the recent
  *  hours ("hours"); History's pills are the rest, and a brushed range is `r<fromMs>-<toMs>` after

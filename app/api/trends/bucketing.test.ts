@@ -118,6 +118,28 @@ describe("bucketMetas", () => {
   });
 });
 
+describe("bucketMetas: a network's largest snapshot by fee", () => {
+  const recs = [
+    { ordinal: 1, timestamp: ts(14, 0, 10), fee: 3 },
+    { ordinal: 2, timestamp: ts(14, 0, 20), fee: 9 },
+    { ordinal: 3, timestamp: ts(14, 0, 30), fee: 4 },
+  ];
+  const day = "t:mainnet:5m:2026-09-06";
+
+  it("keeps the bucket's largest, beside the sum", () => {
+    const inc: IncMap = new Map();
+    bucketMetas(inc, "mainnet", "abc", recs);
+    expect(get(inc, day, "14:00|m.abc.feeMax")).toBe(9);
+    expect(get(inc, day, "14:00|m.abc.fee")).toBe(16);
+  });
+
+  it("is the catalog's alone: an unlisted chain stays a count", () => {
+    const inc: IncMap = new Map();
+    bucketMetas(inc, "mainnet", "abc", recs, undefined, false);
+    expect(get(inc, day, "14:00|m.abc.feeMax")).toBeUndefined();
+  });
+});
+
 describe("bucketFleet", () => {
   it("writes gauges to hourly+daily only, countries daily only", () => {
     const inc: IncMap = new Map();

@@ -25,8 +25,8 @@
 //     measured-looking floor that reads as a crash). --chain=<prefix> narrows it to ONE chain's
 //     own m.<id>.* fields: the floors (every chain's sum), the global spine and u.cov are then
 //     left alone, and the summary says so.
-//   · WHAT ONE WALK WRITES for every day of the span: each catalog chain's m.<id>.snaps/fee/kb/
-//     blocks/gapSum/gapMax/ticks; each UNLISTED chain's the same, outside the floors (one walk —
+//   · WHAT ONE WALK WRITES for every day of the span: each catalog chain's m.<id>.snaps/fee/feeMax/kb/
+//     blocks/gapSum/gapMax/ticks; each UNLISTED chain's the same but feeMax, outside the floors (one walk —
 //     the separate --backfill-unlisted that used to follow an extension was forgotten twice);
 //     the global spine's g.ticks/anchors/blocks/gapSum/gapMax; the floors g.feeFloor/g.kbFloor,
 //     every catalog chain folded; and u.cov on every bucket of the span — ONLY when every unlisted

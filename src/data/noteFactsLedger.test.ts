@@ -247,19 +247,30 @@ describe("ledgerFacts' notable changes", () => {
   const weekSide = (over: Record<string, (number | null)[]>) => side(168, HOUR, 120, over, 0);
   it("a row for a network anchoring well off its usual pace", () => {
     const r = ledgerFacts(input({ week: weekSide({ "m.usdc.gapSum": row(168, () => 30 * 60) }) }))!; // 30 snapshots, 60s apart
-    expect(r.changes).toEqual([
-      { kind: "faster", size: expect.any(Number), text: "USDC.dag sped up: a snapshot every 20 seconds, usually 1 minute", subject: { kind: "network", id: "usdc" } },
-    ]);
+    expect(r.changes?.[0]).toEqual({ kind: "faster", size: expect.any(Number), text: "USDC.dag sped up: a snapshot every 20 seconds, usually 1 minute", subject: { kind: "network", id: "usdc" } });
   });
   it("a row for a network that stopped, ahead of any pace", () => {
     const r = ledgerFacts(input({
       recent: side(74, 5 * MIN, 20, { "m.bio.snaps": row(74, () => 0), "m.bio.ticks": row(74, () => 0) }),
       week: weekSide({ "m.usdc.gapSum": row(168, () => 30 * 60) }),
     }))!;
-    expect(r.changes?.map((c) => c.text)).toEqual(["BioFi went quiet", "USDC.dag sped up: a snapshot every 20 seconds, usually 1 minute"]);
+    expect(r.changes?.slice(0, 2).map((c) => c.text)).toEqual(["BioFi went quiet", "USDC.dag sped up: a snapshot every 20 seconds, usually 1 minute"]);
   });
-  it("the usual rhythm is no rows", () => {
-    expect(ledgerFacts(input())!.changes).toBeUndefined();
+  // THE CHAMBER'S EXTREMES (user, 2026-11-01): a day where nothing moved still has a largest snapshot.
+  it("the usual rhythm still names the longest gap", () => {
+    expect(ledgerFacts(input())!.changes).toEqual([
+      { kind: "longest", size: -1, text: "USDC.dag had the longest gap, 55 seconds", subject: { kind: "network", id: "usdc" } },
+    ]);
+  });
+  it("names the largest snapshot once the sampler holds one, ahead of the gap", () => {
+    const fees = { "m.usdc.feeMax": row(74, () => 2e8), "m.bio.feeMax": row(74, (i) => (i === 30 ? 5e8 : 1e8)) };
+    const r = ledgerFacts(input({ recent: side(74, 5 * MIN, 20, fees) }))!;
+    expect(r.changes?.map((c) => c.text)).toEqual(["BioFi had the largest snapshot, 5 DAG", "USDC.dag had the longest gap, 55 seconds"]);
+    expect(r.changes?.[0]).toMatchObject({ kind: "peak", subject: { kind: "network", id: "bio" } });
+  });
+  it("names no largest snapshot from before the sampler held one: a zero is no snapshot", () => {
+    const r = ledgerFacts(input({ recent: side(74, 5 * MIN, 20, { "m.usdc.feeMax": row(74, () => 0) }) }))!;
+    expect(r.changes?.some((c) => c.kind === "peak")).toBe(false);
   });
   it("a network's own note has no rows: it is the row", () => {
     expect(ledgerFacts(input({ subject: "usdc", week: weekSide({ "m.usdc.gapSum": row(168, () => 30 * 60) }) }))!.changes).toBeUndefined();
