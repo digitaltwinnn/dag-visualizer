@@ -338,7 +338,7 @@ export const NUDGE_DUR = 0.55; //  seconds
 // it exists to give. What answers the click is that SOMETHING moved — the eye catches a sub-percent
 // shift on a still frame — so the amplitude is set at the low end of visible, and the 0.55s clock
 // does the rest of the work.
-export const NUDGE_AMP = 0.012; //  peak push, as a fraction of the way toward the pose's target
+export const NUDGE_AMP = 0.018; //  peak push, as a fraction of the way toward the pose's target (0.012 until user 2026-11-01: "a little bit bigger")
 // Two poses are "the same" within this fraction of the ORBIT DISTANCE — relative, because the views
 // sit an order of magnitude apart in scale, and because a move too small to see is one the nudge
 // should replace rather than one the epsilon merely forgives.
