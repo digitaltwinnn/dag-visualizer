@@ -1,4 +1,4 @@
-import { factsBlock, sayAll, spellDurations } from "@/src/data/noteFacts";
+import { capitalFirst, factsBlock, sayAll, spellDurations } from "@/src/data/noteFacts";
 import { checkNote } from "@/src/data/noteHonesty";
 import { LINE_MAX } from "@/src/engine/domain/briefing";
 import { withDayChange } from "@/src/data/notableDays";
@@ -162,6 +162,10 @@ const LINE_TOKENS = 1000;
  *  a bare "the last 24 hours" (2026-11-01), which holds nothing the gate could fault. */
 const NOTE_MIN_WORDS = 6;
 
+/** Where a note is asked to say it again shorter. The prompt says under forty-five and the model
+ *  drifts past that, so this catches the ones that run on, not the ones that land near it. */
+const NOTE_MAX_WORDS = 50;
+
 /** What the code tidies in checked text: the numbers stand, only their words change. */
 const plainly = (text: string): string => sayAll(spellDurations(text));
 
@@ -203,8 +207,11 @@ async function write(
     }
     // SAID POSITIVELY, ONE REWRITE (user, 2026-10-31): the prompt alone was ignored ("no changes in
     // layers", live). This is style, not honesty, so it asks once and the second answer stands: a
-    // true note is never lost over a word. Notes only: a caption is a short clause of figures.
+    // true note is never lost over a word. Notes only: a caption is a short clause of figures. A
+    // note that runs long takes the same one rewrite (user, 2026-11-01: "to the point").
     const negative = attempt === 0 ? NEGATIVE_RE.exec(note)?.[0] : null;
+    const words = note.trim().split(/\s+/).length;
+    const wordy = attempt === 0 && words > NOTE_MAX_WORDS;
     const kept: NoteDay[] = [];
     const seen = new Map<string, number>();
     for (const d of input.days) {
@@ -219,12 +226,15 @@ async function write(
     // The Briefing's line is held to the note's gate and is never worth a retry: one that fails,
     // runs long or says what did not happen is dropped, and the tour reads the note instead.
     const brief = wantsLine && line && !NEGATIVE_RE.test(line) && checkNote(line, input.facts, input.names, { maxSentences: 2, subject }).ok
-      ? withMovePercents(plainly(line), input.facts).replace(/[^.!?]$/, "$&.")
+      ? capitalFirst(withMovePercents(plainly(line), input.facts)).replace(/[^.!?]$/, "$&.")
       : null;
-    const written: Written = { ok: true, text: withMovePercents(plainly(note), input.facts), days: kept, ...(brief && brief.length <= LINE_MAX ? { line: brief } : {}) };
-    if (negative) {
+    const written: Written = { ok: true, text: capitalFirst(withMovePercents(plainly(note), input.facts)), days: kept, ...(brief && brief.length <= LINE_MAX ? { line: brief } : {}) };
+    if (negative || wordy) {
       held = written;
-      reasons = [`say what held steady instead of "${negative.toLowerCase()}"`];
+      reasons = [
+        ...(negative ? [`say what held steady instead of "${negative.toLowerCase()}"`] : []),
+        ...(wordy ? [`${words} words: keep the note under forty-five, naming only the two biggest moves and cutting every other clause`] : []),
+      ];
       continue;
     }
     return written;

@@ -386,6 +386,37 @@ describe("generateNote", () => {
     expect(d.chat).toHaveBeenCalledTimes(2);
   });
 
+  // TO THE POINT, ONE REWRITE (user, 2026-11-01): the prompt alone left the longest notes at 61
+  // words (live). Style again: asked once, and the second answer stands.
+  const LONG = `NOTE: The hypergraph anchored 1,200 snapshots a day${", up 37% on the span before".repeat(10)}.`;
+
+  it("a note that runs long is asked once more, naming its length", async () => {
+    const d = deps({ answers: [LONG, CLEAN] });
+    const res = await generateNote(REQ, d, "read");
+    expect(res.state).toBe("ok");
+    expect(d.chat).toHaveBeenCalledTimes(2);
+    expect(d.chat.mock.calls[1]![0][1]!.content).toMatch(/\d+ words: keep the note under forty-five/);
+    expect(res.state === "ok" && res.text).toBe(CLEAN.slice("NOTE: ".length));
+  });
+
+  it("a second answer that still runs long stands", async () => {
+    const d = deps({ answers: [LONG, LONG] });
+    const res = await generateNote(REQ, d, "read");
+    expect(res.state).toBe("ok");
+    expect(d.chat).toHaveBeenCalledTimes(2);
+  });
+
+  it("a note at the limit is not asked again", async () => {
+    const d = deps({ answers: [`NOTE: The hypergraph anchored 1,200 snapshots a day ${"and it held ".repeat(14)}steady.`] });
+    await generateNote(REQ, d, "read");
+    expect(d.chat).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens a note with a capital", async () => {
+    const res = await generateNote(REQ, deps({ answers: ["NOTE: over the span the hypergraph anchored 1,200 snapshots a day."] }), "read");
+    expect(res.state === "ok" && res.text).toBe("Over the span the hypergraph anchored 1,200 snapshots a day.");
+  });
+
   it("does not take a word holding those letters for a negative", async () => {
     const d = deps({ answers: ["NOTE: Snapshots anchored saw a notable rise."] });
     const res = await generateNote(REQ, d, "read");

@@ -61,6 +61,10 @@ export function sayAll(text: string): string {
   });
 }
 
+/** A sentence's first word with its capital, which the model drops now and then when it opens on
+ *  the span's own words. A first word with a capital inside it (cL1) is a name, and stays. */
+export const capitalFirst = (text: string): string => text.replace(/^[a-z]+\b/, (w) => w[0]!.toUpperCase() + w.slice(1));
+
 /** One fact. `kind` picks the notation: count (12,159), amount (one decimal at most, two
  *  significant digits under 1), share (a rounded %), ratio (2 decimals), duration
  *  (`formatSeconds`, written out, seconds in), date (UTC "Oct 19", epoch ms in). `format` replaces an amount's

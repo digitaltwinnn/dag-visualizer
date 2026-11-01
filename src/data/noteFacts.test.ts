@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fact, factsBlock, gaugeChange, heldLevel, networksAnchored, observedLevel, sayAll, spellDurations } from "@/src/data/noteFacts";
+import { capitalFirst, fact, factsBlock, gaugeChange, heldLevel, networksAnchored, observedLevel, sayAll, spellDurations } from "@/src/data/noteFacts";
 import { checkNote } from "@/src/data/noteHonesty";
 import { formatDag } from "@/src/data/trendSeries";
 
@@ -207,6 +207,17 @@ describe("a duration in a note is written out", () => {
   it("and leaves every other figure alone", () => {
     const untouched = "Fees of 1.5M DAG, 12.2K snapshots, 25 KB, 5 networks, 3x, 9%, the 1,000s, 7 days.";
     expect(spellDurations(untouched)).toBe(untouched);
+  });
+});
+
+describe("a sentence opens with a capital", () => {
+  it("raises a plain first word", () => {
+    expect(capitalFirst("over the last 7 days the network held.")).toBe("Over the last 7 days the network held.");
+  });
+
+  it("leaves a name that is spelled that way, and text already capitalised", () => {
+    expect(capitalFirst("cL1 nodes held.")).toBe("cL1 nodes held.");
+    expect(capitalFirst("Over the last 7 days.")).toBe("Over the last 7 days.");
   });
 });
 

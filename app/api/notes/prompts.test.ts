@@ -13,6 +13,7 @@ describe("VOICE", () => {
     expect(VOICE).toContain("never explain why");
     expect(VOICE).toContain("was part of");
     expect(VOICE).toContain("Use no noun more than twice in a sentence");
+    expect(VOICE).toContain("Be concise and to the point");
     expect(VOICE).toMatch(/never ticks/);
     expect(VOICE).toMatch(/feeless/);
   });
@@ -88,7 +89,7 @@ describe("PROMPTS", () => {
     expect(PROMPTS.geo.system("x")).toContain("Stay on where the nodes are located and who hosts them, and nothing else.");
     expect(PROMPTS.geo.system("x", undefined, true)).toContain("Stay on where the nodes are located and who hosts them, then the one sentence on activity, and nothing else.");
     expect(PROMPTS.ledger.question).toBe(
-      "Say what changed in the anchoring rhythm over the recent hours against the usual: what sped up or slowed down, from the usual figure to the recent one, and which networks did it. Then the reading itself: the longest gap, then what each global snapshot holds, in one short clause: for the whole network \"N snapshots from M networks in each global snapshot\", never that it was part of anything; for one network, the share of global snapshots it was part of.",
+      "Say what changed in the anchoring rhythm over the recent hours against the usual: what sped up or slowed down, from the usual figure to the recent one, and which networks did it. Then the reading itself: the longest gap, then, in one short clause: for the whole network, what each global snapshot holds, as \"N snapshots from M networks in each global snapshot\", never that it was part of anything; for one network, only the share of global snapshots it was part of.",
     );
     expect(PROMPTS.trend.question).toBe("Say what changed over the span: what rose, what fell and when, as the numbers show it.");
   });
