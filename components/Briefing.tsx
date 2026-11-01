@@ -13,7 +13,7 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 import { VIEWS } from "@/components/views";
 import { breakpointOf } from "@/src/data/breakpoint";
 import { SITE_ORIGIN } from "@/src/data/site";
-import { BRIEFING_STOPS, SCENE_WAIT_MS, STOP_MS, briefsOn, mayAdvance, nextStop } from "@/src/engine/domain/briefing";
+import { BRIEFING_STOPS, SCENE_WAIT_MS, STOP_MS, briefsOn, mayAdvance, nextStop, prevStop } from "@/src/engine/domain/briefing";
 import { NET } from "@/src/net/current";
 import { useStore } from "@/src/store/store";
 
@@ -52,6 +52,13 @@ function endBriefing(stop: number, how: End): void {
   s.setRailsHidden(false);
   track("briefing-end", { how, at: BRIEFING_STOPS[stop] });
 }
+
+/** Move the tour to a stop: the clock starts over there, so a stop stepped to gets its full time. */
+const goTo = (i: number) => {
+  const s = useStore.getState();
+  s.setMode(BRIEFING_STOPS[i]!);
+  s.setBriefing(i);
+};
 
 export default function Briefing() {
   const stop = useStore((s) => s.briefing);
@@ -93,8 +100,9 @@ function Tour({ stop }: { stop: number }) {
     let waited = 0;
     let ran = 0;
     const tick = (now: number) => {
-      const dt = Math.min(now - last, 100); // a tab coming back must not jump the tour
-      waited += Math.min(now - last, 1000); // real time: a slow phone gets no longer behind a dead feed
+      const since = Math.max(0, now - last); // a frame's own time can fall before the stop began
+      const dt = Math.min(since, 100); // a tab coming back must not jump the tour
+      waited += Math.min(since, 1000); // real time: a slow phone gets no longer behind a dead feed
       last = now;
       const s = useStore.getState();
       if (s.engineFailed || (!s.sceneReady && waited > SCENE_WAIT_MS)) return endBriefing(stop, "unready");
@@ -103,8 +111,7 @@ function Tour({ stop }: { stop: number }) {
       if (mayAdvance(ran, s.motionPhase)) {
         const next = nextStop(stop);
         if (next == null) return endBriefing(stop, "done");
-        s.setMode(BRIEFING_STOPS[next]);
-        s.setBriefing(next);
+        goTo(next);
         return;
       }
       raf = requestAnimationFrame(tick);
@@ -116,6 +123,8 @@ function Tour({ stop }: { stop: number }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") endBriefing(stop, "key");
+      const step = e.key === "ArrowRight" ? nextStop(stop) : e.key === "ArrowLeft" ? prevStop(stop) : null;
+      if (step != null) goTo(step);
     };
     const onPop = () => endBriefing(stop, "back");
     window.addEventListener("keydown", onKey);
@@ -127,15 +136,31 @@ function Tour({ stop }: { stop: number }) {
   }, [stop]);
 
   const bars = (
-    <div className="flex flex-1 gap-1" aria-hidden>
+    <div className="flex flex-1 gap-1">
+      {/* Each segment is a way back or forward. Out of the Tab order, so Skip stays the first stop
+          for a keyboard, which has the arrow keys. A stop's fill is keyed on the tour's stop: the
+          clock writes it by hand, and React would not repaint one stepped back past. */}
       {BRIEFING_STOPS.map((v, i) => (
-        <span key={v} className="h-[3px] flex-1 overflow-hidden rounded-full bg-foreground/20">
-          <i
-            ref={i === stop ? fill : undefined}
-            className="block h-full origin-left bg-[var(--ai-mark)]"
-            style={{ transform: `scaleX(${i < stop ? 1 : 0})` }}
-          />
-        </span>
+        <button
+          key={v}
+          type="button"
+          tabIndex={-1}
+          aria-label={`Go to ${VIEWS.find((x) => x.id === v)!.name}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            goTo(i);
+          }}
+          className="group -my-3 flex-1 py-3 touch:-my-5 touch:py-5"
+        >
+          <span className="block h-[3px] overflow-hidden rounded-full bg-foreground/20 group-hover:bg-foreground/40">
+            <i
+              key={stop}
+              ref={i === stop ? fill : undefined}
+              className="block h-full origin-left bg-[var(--ai-mark)]"
+              style={{ transform: `scaleX(${i < stop ? 1 : 0})` }}
+            />
+          </span>
+        </button>
       ))}
     </div>
   );

@@ -27,6 +27,32 @@ describe("the tour before the scene is up", () => {
   });
 });
 
+describe("the tour's progress bar", () => {
+  it("moves the tour to the stop clicked, without the click ending it", () => {
+    expect(briefing).toMatch(/const goTo = \(i: number\) => \{/);
+    expect(briefing).toMatch(/s\.setMode\(BRIEFING_STOPS\[i\]!\);\s*s\.setBriefing\(i\);/);
+    expect(briefing).toMatch(/onClick=\{\(e\) => \{\s*e\.stopPropagation\(\);\s*goTo\(i\);/);
+  });
+
+  it("names each stop for a screen reader, and leaves Skip the first stop for Tab", () => {
+    expect(briefing).toMatch(/aria-label=\{`Go to \$\{/);
+    expect(briefing).toMatch(/tabIndex=\{-1\}/);
+  });
+
+  it("gives a keyboard the same two steps", () => {
+    expect(briefing).toMatch(/e\.key === "ArrowRight"/);
+    expect(briefing).toMatch(/e\.key === "ArrowLeft"/);
+  });
+
+  it("never runs a stop's clock backwards: a frame's own time can fall before the stop began", () => {
+    expect(briefing).toMatch(/const since = Math\.max\(0, now - last\);/);
+  });
+
+  it("repaints a stop stepped back past, whose fill the clock wrote by hand", () => {
+    expect(briefing).toMatch(/key=\{stop\}/);
+  });
+});
+
 describe("the tour's end", () => {
   const engine = readFileSync("src/engine/Engine.ts", "utf8");
 

@@ -17,9 +17,9 @@ export const STOP_MS = 4875;
 export const LINE_MAX = 140;
 
 /** How much faster the choreography runs for the tour, on the clock `?slowmo` scales: a normal
- *  switch lands in over 3 seconds, which would leave a stop nothing to stand on. 1.5 was a touch
- *  brisk: this runs it 20% longer (user 2026-11-01). */
-export const BRIEFING_PACE = 1.25;
+ *  switch lands in over 3 seconds, which would leave a stop nothing to stand on. Slowed twice
+ *  by eye from 1.5, by 20% and then 15% (user 2026-11-01), and it lands in about 3 seconds. */
+export const BRIEFING_PACE = 1.09;
 
 /** The share of the viewport's height the words stand in. The scene frames itself in what is left,
  *  through the projection offset a phone sheet's cover already uses (`sheetShift.ts`). */
@@ -47,6 +47,9 @@ export const briefsOn = ({ pathname, net, seen }: BriefingEntry): boolean => pat
 
 /** The stop after this one, or null at the end of the route. */
 export const nextStop = (stop: number): number | null => (stop + 1 < BRIEFING_STOPS.length ? stop + 1 : null);
+
+/** The stop before this one, or null at the start of the route. */
+export const prevStop = (stop: number): number | null => (stop > 0 ? stop - 1 : null);
 
 /** A stop ends when its time is up AND the scene has landed, so a slow renderer, whose transition
  *  stretches in wall-clock time, still shows every view. */

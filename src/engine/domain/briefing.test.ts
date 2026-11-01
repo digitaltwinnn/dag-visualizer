@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BRIEFING_COVER, BRIEFING_PACE, BRIEFING_RELEASE_MS, BRIEFING_STOPS, LINE_MAX, SCENE_WAIT_MS, STOP_MS, briefsOn, mayAdvance, nextStop } from "./briefing";
+import { BRIEFING_COVER, BRIEFING_PACE, BRIEFING_RELEASE_MS, BRIEFING_STOPS, LINE_MAX, SCENE_WAIT_MS, STOP_MS, briefsOn, mayAdvance, nextStop, prevStop } from "./briefing";
 
 const on = { pathname: "/", net: "mainnet", seen: false };
 
@@ -12,6 +12,12 @@ describe("the tour's route", () => {
     expect(nextStop(0)).toBe(1);
     expect(nextStop(2)).toBe(3);
     expect(nextStop(3)).toBeNull();
+  });
+
+  it("steps back to the stop before, and no further than the first", () => {
+    expect(prevStop(3)).toBe(2);
+    expect(prevStop(1)).toBe(0);
+    expect(prevStop(0)).toBeNull();
   });
 });
 
@@ -67,10 +73,10 @@ describe("the tour's staging", () => {
     expect(BRIEFING_PACE).toBeGreaterThan(1);
   });
 
-  it("lands inside its stop, with the view left standing for over two seconds", () => {
+  it("lands inside its stop, with the view left standing for over a second and a half", () => {
     const choreographyMs = 3300; // DUR_OUT + DUR_IN, `domain/viewTransition.ts`
-    expect(BRIEFING_PACE).toBe(1.25);
-    expect(STOP_MS - choreographyMs / BRIEFING_PACE).toBeGreaterThan(2000);
+    expect(BRIEFING_PACE).toBe(1.09);
+    expect(STOP_MS - choreographyMs / BRIEFING_PACE).toBeGreaterThan(1500);
   });
 
   it("leaves the scene the upper part of the screen", () => {
