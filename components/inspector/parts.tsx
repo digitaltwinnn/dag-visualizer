@@ -226,6 +226,7 @@ export function Door({
   lit,
   expanded,
   controls,
+  tone,
   onPointerEnter,
   onPointerLeave,
   onFocus,
@@ -247,6 +248,9 @@ export function Door({
   /** A door that discloses: whether its panel is open, and that panel's id. */
   expanded?: boolean;
   controls?: string;
+  /** The AI card's own wash, quieter than the ladder: inside that card a door is a row of the note,
+   *  and the card's violet edge already says what it is (user, 2026-11-01). */
+  tone?: "ai";
   /** The hover pair, for a door whose subject another surface can light (convention 9). */
   onPointerEnter?: (e: PointerEvent<HTMLElement>) => void;
   onPointerLeave?: () => void;
@@ -262,10 +266,12 @@ export function Door({
     // a bit too faint in light mode"). 6% of the accent is a visible plate on the dark glass and
     // very nearly the card's own white on paper, so the row stopped reading as a control there:
     // paper rests at `soft` and hovers at `hover`, dark keeps `faint` → `soft`.
-    "flex items-center gap-2 -mx-[var(--card-pad)] px-[var(--card-pad)] py-2 touch:min-h-11 border-t border-wash-strong text-body text-foreground text-left",
+    "flex items-center gap-2 -mx-[var(--card-pad)] px-[var(--card-pad)] py-2 touch:min-h-11 border-t text-body text-foreground text-left",
+    "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
     // LIT is the hover wash, held.
-    lit ? "[background:light-dark(var(--wash-hover),var(--wash-soft))]" : "[background:light-dark(var(--wash-soft),var(--wash-faint))]",
-    "hover:[background:light-dark(var(--wash-hover),var(--wash-soft))] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
+    tone === "ai"
+      ? cn("border-[var(--ai-row)] hover:[background:var(--ai-row-hover)]", lit ? "[background:var(--ai-row-hover)]" : "[background:var(--ai-row)]")
+      : cn("border-wash-strong hover:[background:light-dark(var(--wash-hover),var(--wash-soft))]", lit ? "[background:light-dark(var(--wash-hover),var(--wash-soft))]" : "[background:light-dark(var(--wash-soft),var(--wash-faint))]"),
     disabled && "opacity-65 pointer-events-none",
   );
   const inner = (

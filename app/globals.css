@@ -1158,6 +1158,10 @@
      flat violet, and the AI card's iridescent sweep and the timeline diamonds went flat for a day
      (user, 2026-10-30: "lost its AI multi-colored outline"). */
   --ai-wash: light-dark(color-mix(in oklch, var(--ai-mark) 8%, transparent), color-mix(in oklch, var(--ai-mark) 4%, transparent));
+  /* The AI card's rows: paper runs at half the chip's wash, because a full-bleed row is a far larger
+     area of the same tint and read as a lavender block (user, 2026-11-01: "too strong"). */
+  --ai-row: color-mix(in oklch, var(--ai-mark) 4%, transparent);
+  --ai-row-hover: light-dark(color-mix(in oklch, var(--ai-mark) 9%, transparent), color-mix(in oklch, var(--ai-mark) 8%, transparent));
   /* The site footer's lozenge — a VEIL, not a panel. It first borrowed --topbar-glass and read
      "too dominant white" on the light ground (user, 2026-09-01), which is right: that token is a
      0.86-alpha lit SURFACE for a full-width bar, and a 22px pill has no room to be a surface. This

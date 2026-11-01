@@ -379,6 +379,23 @@ describe("the entry window", () => {
 
 // A NAME IN A NOTE (user, 2026-11-01: "more subtle"): mixed toward the text colour, which reads
 // better on both grounds at every hue, never by dimming it, which reads worse.
+// THE CARD'S ROWS WEAR THE CARD'S OWN WASH (user, 2026-11-01: "a bit too strong coloured, especially
+// in light mode"). The shared door is teal and a step up on paper, for a link that must read as one.
+describe("the AI card's rows", () => {
+  it("every door on the card takes the AI's wash", () => {
+    const card = read("components/notes/NotesCard.tsx");
+    expect(card.match(/<Door\b/g)!.length).toBe(card.match(/<Door\b[^>]*?\btone="ai"|<Door\s+tone="ai"/g)!.length);
+  });
+
+  it("every other door keeps the wash ladder", () => {
+    const parts = read("components/inspector/parts.tsx");
+    expect(parts).toMatch(/tone === "ai"/);
+    expect(parts).toMatch(/\[background:light-dark\(var\(--wash-soft\),var\(--wash-faint\)\)\]/);
+    expect(parts).toMatch(/\[background:var\(--ai-row\)\]/);
+    expect(parts).toMatch(/\[background:var\(--ai-row-hover\)\]/);
+  });
+});
+
 describe("a network's name in a note", () => {
   it("is its colour mixed toward the ink", () => {
     expect(read("components/notes/NoteText.tsx")).toMatch(/color-mix\(in oklab, \$\{identityHudCss\(s\.id\)\} \$\{NAME_TINT\}%, var\(--foreground\)\)/);

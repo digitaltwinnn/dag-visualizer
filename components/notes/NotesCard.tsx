@@ -111,6 +111,7 @@ function DayRow({ day }: { day: NoteDay }) {
   };
   return (
     <Door
+      tone="ai"
       lit={lit}
       wrap
       label={
@@ -188,6 +189,7 @@ function ChangeRow({ change, view }: { change: NoteChange; view: NoteView }) {
   };
   return (
     <Door
+      tone="ai"
       lit={lit}
       wrap
       disabled={actions() == null}
@@ -219,6 +221,7 @@ function NoteRows({ word, kinds, children }: { word: string; kinds: readonly (No
   return (
     <div className={cn("mt-3", DOOR_RUN)}>
       <Door
+        tone="ai"
         expanded={open}
         controls={panel}
         onClick={() => setOpen((o) => !o)}
@@ -248,7 +251,7 @@ function NoteRows({ word, kinds, children }: { word: string; kinds: readonly (No
 function RequestDoor({ onClick }: { onClick: () => void }) {
   return (
     <div className={DOOR_RUN}>
-      <Door label={<AI_NOTES_ICON aria-hidden className="size-3.5 text-primary" />} onClick={onClick}>
+      <Door tone="ai" label={<AI_NOTES_ICON aria-hidden className="size-3.5 text-primary" />} onClick={onClick}>
         Write notes for this hour
       </Door>
     </div>
