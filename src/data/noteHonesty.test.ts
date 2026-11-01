@@ -113,6 +113,8 @@ describe("checkNote — the house voice", () => {
   it("names the banned words it finds, and turns a dash clause into a comma", () => {
     expect(bannedWords("Fast, feeless transfers on decentralized nodes, not machines.")).toEqual(["feeless", "decentrali", "machine"]);
     expect(bannedWords("A sticky pace.")).toEqual([]);
+    expect(bannedWords("Located nodes fell, and the located nodes in Germany held.")).toEqual(["Located nodes", "located nodes"]);
+    expect(bannedWords("The nodes are located in Germany.")).toEqual([]); // the verb is plain English
     expect(undash("Proof of data — anchored to the Global L0.")).toBe("Proof of data, anchored to the Global L0.");
     expect(undash("Proof of data – anchored - here.")).toBe("Proof of data, anchored, here.");
     expect(undash("Data-fingerprinting as a service.")).toBe("Data-fingerprinting as a service.");
@@ -230,7 +232,7 @@ describe("checkNote — a nameless sentence cites the SUBJECT's own ratios (R39)
   const nf = [
     F("USDC.dag snapshots anchored, ratio to previous span", 1.37, "ratio", "1.37"),
     F("BioFi snapshots anchored, ratio to previous span", 1.5, "ratio", "1.50"),
-    F("Located nodes in the network, now against a month ago", 1.1, "ratio", "1.10"),
+    F("Nodes in the network, now against a month ago", 1.1, "ratio", "1.10"),
   ];
   const nn = ["USDC.dag", "BioFi"];
   it("a pronoun sentence passes on a network subject, citing its own ratio", () => {
@@ -243,7 +245,7 @@ describe("checkNote — a nameless sentence cites the SUBJECT's own ratios (R39)
     expect(checkNote("Its nodes rose by 10%.", nf, nn, { subject: "USDC.dag" }).ok).toBe(false);
   });
   it("without a subject (the whole network), the unattributed ratios stay citable", () => {
-    expect(checkNote("Located nodes rose by 10%.", nf, nn).ok).toBe(true);
+    expect(checkNote("Nodes rose by 10%.", nf, nn).ok).toBe(true);
     expect(checkNote("Its snapshots anchored rose by 37%.", nf, nn).ok).toBe(false);
   });
   it("works for a country subject by its display name", () => {
@@ -282,15 +284,15 @@ describe("checkNote — a past value stands beside its own current figure (R60, 
   // model saw them, with the fleet's one figure the tiers' 86 (R58); 9 is Amazon's (and IONOS's)
   // node count, not the fleet's.
   const dump: Fact[] = [
-    Pf("Located nodes in the network", 86, "count", "86", "fleet", "to"),
+    Pf("Nodes in the network", 86, "count", "86", "fleet", "to"),
     Pf("Germany, nodes (biggest country)", 33, "count", "33", "cc:DE", "to"),
     Pf("United States, nodes (second biggest country)", 27, "count", "27", "cc:US", "to"),
     Pf("Finland, nodes (third biggest country)", 17, "count", "17", "cc:FI", "to"),
     Pf("Hetzner Online, nodes (biggest provider)", 51, "count", "51"),
     Pf("Amazon.com, nodes (second biggest provider)", 9, "count", "9"),
     Pf("IONOS, nodes (third biggest provider)", 9, "count", "9"),
-    Pf("Located nodes in the network a month ago", 173, "count", "173", "fleet", "from"),
-    Pf("Located nodes in the network, now against a month ago", 86 / 173, "ratio", "0.50"),
+    Pf("Nodes in the network a month ago", 173, "count", "173", "fleet", "from"),
+    Pf("Nodes in the network, now against a month ago", 86 / 173, "ratio", "0.50"),
     Pf("Germany, nodes a month ago", 67, "count", "67", "cc:DE", "from"),
     Pf("Germany, nodes now against a month ago", 33 / 67, "ratio", "0.49"),
     Pf("United States, nodes a month ago", 58, "count", "58", "cc:US", "from"),
@@ -305,16 +307,16 @@ describe("checkNote — a past value stands beside its own current figure (R60, 
   };
 
   it("rejects the live failure, naming the past value, the figure beside it and its current figure", () => {
-    expect(reasons("Located nodes fell from 173 a month ago to 9. Germany dropped from 67 to 33.")).toEqual([
+    expect(reasons("Nodes fell from 173 a month ago to 9. Germany dropped from 67 to 33.")).toEqual([
       "173 is a past value; the figure beside it, 9, is not its current figure 86",
     ]);
   });
 
   it("rejects every rewording the review found, whatever sits between the numbers", () => {
     for (const t of [
-      "Located nodes fell from 173 a month ago to just 9.",
-      "Located nodes fell from 173 over 30 days to 9.", // the span is no end
-      "Located nodes stand at 9, down from 173 a month ago.", // nothing after: the figure before
+      "Nodes fell from 173 a month ago to just 9.",
+      "Nodes fell from 173 over 30 days to 9.", // the span is no end
+      "Nodes stand at 9, down from 173 a month ago.", // nothing after: the figure before
     ])
       expect(reasons(t), t).toEqual(["173 is a past value; the figure beside it, 9, is not its current figure 86"]);
     expect(reasons("Germany dropped from 67 to 33 and the United States 58 to 9.")).toEqual([
@@ -331,11 +333,11 @@ describe("checkNote — a past value stands beside its own current figure (R60, 
 
   it("accepts a change whose current figure stands beside its past value, however it is worded", () => {
     for (const t of [
-      "Located nodes fell from 173 a month ago to 86.",
+      "Nodes fell from 173 a month ago to 86.",
       "Germany dropped from 67 to 33.",
       "The network has 86 nodes, down from 173.",
-      "Located nodes fell from 173 over 30 days to just 86.",
-      "Located nodes fell from 173, down 50%, to 86.", // the size of the move is no end
+      "Nodes fell from 173 over 30 days to just 86.",
+      "Nodes fell from 173, down 50%, to 86.", // the size of the move is no end
     ])
       expect(gate(t), t).toEqual({ ok: true });
   });
@@ -366,8 +368,8 @@ describe("checkNote — a past value stands beside its own current figure (R60, 
   // current figure. Co-occurrence (R60) let any current figure in the sentence satisfy any past
   // value; adjacency (R63) holds each to the figure beside it.
   const live: Fact[] = [
-    Pf("Located nodes in the network", 88, "count", "88", "fleet", "to"),
-    Pf("Located nodes in the network a month ago", 174, "count", "174", "fleet", "from"),
+    Pf("Nodes in the network", 88, "count", "88", "fleet", "to"),
+    Pf("Nodes in the network a month ago", 174, "count", "174", "fleet", "from"),
     Pf("Germany, nodes (biggest country)", 33, "count", "33", "cc:DE", "to"),
     Pf("Germany, nodes a month ago", 66, "count", "66", "cc:DE", "from"),
     Pf("United States, nodes (second biggest country)", 33, "count", "33", "cc:US", "to"),
@@ -378,7 +380,7 @@ describe("checkNote — a past value stands beside its own current figure (R60, 
 
   it("accepts the honest live geo note verbatim, and a shared current figure written once", () => {
     expect(
-      gate("Located nodes fell from 174 to 88. Germany dropped from 66 to 33, the United States from 60 to 33, and Finland from 41 to 19.", live),
+      gate("Nodes fell from 174 to 88. Germany dropped from 66 to 33, the United States from 60 to 33, and Finland from 41 to 19.", live),
     ).toEqual({ ok: true });
     expect(gate("Germany and the United States each fell to 33, from 66 and 60.", live)).toEqual({ ok: true });
   });
@@ -391,18 +393,18 @@ describe("checkNote — a past value stands beside its own current figure (R60, 
       "66 is a past value; the figure beside it, 19, is not its current figure 33",
       "41 is a past value; the figure beside it, 33, is not its current figure 19",
     ]);
-    expect(reasons("Located nodes fell from 174 to 19; 88 remain located.", live)).toEqual([
+    expect(reasons("Nodes fell from 174 to 19; 88 remain located.", live)).toEqual([
       "174 is a past value; the figure beside it, 19, is not its current figure 88",
     ]);
-    expect(reasons("Located nodes fell from 174 to 33, with 88 located.", live)).toEqual([
+    expect(reasons("Nodes fell from 174 to 33, with 88 located.", live)).toEqual([
       "174 is a past value; the figure beside it, 33, is not its current figure 88",
     ]);
   });
 
   it("holds a past percentage to its current one too", () => {
     const shares: Fact[] = [
-      Pf("Germany, share of the network's located nodes a month ago", 0.38, "share", "38%", "share:DE", "from"),
-      Pf("Germany, share of the network's located nodes", 0.36, "share", "36%", "share:DE", "to"),
+      Pf("Germany, share of the network's nodes a month ago", 0.38, "share", "38%", "share:DE", "from"),
+      Pf("Germany, share of the network's nodes", 0.36, "share", "36%", "share:DE", "to"),
       Pf("Amazon.com, share of the network's nodes with a known provider", 0.11, "share", "11%"),
     ];
     const r = checkNote("Germany's share fell from 38% to 11%.", shares, geoNames);
@@ -439,10 +441,10 @@ describe("checkNote — a past value stands beside its own current figure (R60, 
     // value beside its own current figure passes whatever subject or verb the sentence gives it.
     expect(gate("Finland fell from 66 to 33.", live)).toEqual({ ok: true }); // Germany's pair, Finland named
     expect(gate("Germany rose from 66 to 33.", live)).toEqual({ ok: true }); // a fall written as a rise
-    expect(gate("Located nodes rose from 86 to 173.")).toEqual({ ok: true }); // the ends swapped: 173's neighbour is 86
+    expect(gate("Nodes rose from 86 to 173.")).toEqual({ ok: true }); // the ends swapped: 173's neighbour is 86
     // Two CURRENT figures have no past value to hold.
     const current: Fact[] = [
-      Pf("Germany, share of the network's located nodes", 0.38, "share", "38%"),
+      Pf("Germany, share of the network's nodes", 0.38, "share", "38%"),
       Pf("Amazon.com, share of the network's nodes with a known provider", 0.11, "share", "11%"),
     ];
     expect(checkNote("Germany's share fell from 38% to 11%.", current, geoNames)).toEqual({ ok: true });
@@ -458,6 +460,6 @@ describe("checkNote — a past value stands beside its own current figure (R60, 
     // Adjacency's cost: honest forms whose ends do not sit side by side fail, and the model retries.
     expect(gate("Germany and the United States fell from 67 and 58 to 33 and 27.").ok).toBe(false); // coordinated ends
     expect(gate("Germany fell to 33 from 67, and the United States to 27 from 58.").ok).toBe(false); // a later pair's figure follows
-    expect(gate("Located nodes fell to 86, from 173; Germany has 33.").ok).toBe(false); // a later clause's number follows
+    expect(gate("Nodes fell to 86, from 173; Germany has 33.").ok).toBe(false); // a later clause's number follows
   });
 });

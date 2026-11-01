@@ -12,6 +12,7 @@ describe("VOICE", () => {
     expect(VOICE).toContain("use only numbers from the facts");
     expect(VOICE).toContain("never explain why");
     expect(VOICE).toContain("was part of");
+    expect(VOICE).toContain("Use no noun more than twice in a sentence");
     expect(VOICE).toMatch(/never ticks/);
     expect(VOICE).toMatch(/feeless/);
   });
@@ -87,7 +88,7 @@ describe("PROMPTS", () => {
     expect(PROMPTS.geo.system("x")).toContain("Stay on where the nodes are located and who hosts them, and nothing else.");
     expect(PROMPTS.geo.system("x", undefined, true)).toContain("Stay on where the nodes are located and who hosts them, then the one sentence on activity, and nothing else.");
     expect(PROMPTS.ledger.question).toBe(
-      "Say what changed in the anchoring rhythm over the recent hours against the usual: what sped up or slowed down, from the usual figure to the recent one, and which networks did it. Then the reading itself: the longest gap, and what was part of the global snapshots.",
+      "Say what changed in the anchoring rhythm over the recent hours against the usual: what sped up or slowed down, from the usual figure to the recent one, and which networks did it. Then the reading itself: the longest gap, then what each global snapshot holds, in one short clause: for the whole network \"N snapshots from M networks in each global snapshot\", never that it was part of anything; for one network, the share of global snapshots it was part of.",
     );
     expect(PROMPTS.trend.question).toBe("Say what changed over the span: what rose, what fell and when, as the numbers show it.");
   });
@@ -99,6 +100,8 @@ describe("PROMPTS", () => {
     expect(now).toMatch(/do not mention the usual/i);
     expect(now).toMatch(/right now/i);
     expect(now).toMatch(/longest gap/i);
+    expect(now).toContain("N snapshots from M networks in each global snapshot");
+    expect(now).not.toMatch(/what they were part of/);
     const sysNow = PROMPTS.ledger.system("x", { kind: "now" });
     expect(sysNow).toContain(now);
     expect(sysNow).not.toContain(PROMPTS.ledger.question);
@@ -156,7 +159,7 @@ describe("PROMPTS", () => {
     expect(PROMPTS.trend.system("the hypergraph", undefined, false, "span")).not.toContain(PROMPTS.trend.question);
     expect(PROMPTS.trend.system("the hypergraph")).toContain(PROMPTS.trend.question);
     expect(geo.country).toBe(
-      "Open with a plain sentence with the network as its actor, in the shape \"<network> hosts N nodes in <country>\"; then what share of the network's located nodes that is and the country's place among the network's countries, or, when the facts count one country, that it is the network's only country, with no share and no place; then how that moved over the span, or that it held. Say nothing about speed.",
+      "Open with a plain sentence with the network as its actor, in the shape \"<network> hosts N nodes in <country>\"; then what share of the network's nodes that is and the country's place among the network's countries, or, when the facts count one country, that it is the network's only country, with no share and no place; then how that moved over the span, or that it held. Say nothing about speed.",
     );
     expect(geo.provider).toBe(
       "Open with a plain sentence with the provider as its actor, in the shape \"<provider> hosts N of <network>'s nodes\", network-wide, not for one place; then what share of the network's nodes with a known provider that is and its place among the network's providers, or, when the facts count one provider, that it is the network's only provider, with no share and no place; then how that moved over the span, or that it held. Say nothing about speed.",

@@ -76,7 +76,7 @@ const NUMBER_WORD_RE = new RegExp(`\\b(?:${Object.keys(NUMBER_WORDS).join("|")})
 
 const LAYER_RE = /\b[cd]?L[01]s?\b/g;
 // `\b` at the START only: "ticks" and "machines" are the words banned, "sticky" is not "tick".
-const BANNED_RE = /\bmachine|\btick|\bL1 snapshot|\bfeeless|\bdecentrali|\bfleet/gi;
+const BANNED_RE = /\bmachine|\btick|\bL1 snapshot|\bfeeless|\bdecentrali|\bfleet|\blocated nodes/gi;
 // QUANTITY WORDS THE GATE CANNOT CHECK fail closed: with no token produced, nothing would be
 // compared and "Thirty networks" or "BioFi grew threefold" would pass unread. The ratio words it
 // DOES check (doubled, tripled, quadrupled, halved, twice) are exempted by `unverifiable`.
@@ -90,7 +90,7 @@ const DASH_RE = /—|\s[–-]\s/;
 const DASH_CLAUSE_RE = /\s*—\s*|\s+[–-]\s+/g;
 
 /** The house words a sentence may not use (machine, tick, L1 snapshot, feeless, decentrali-, fleet —
- *  the whole network is "the network", user 2026-10-29), as
+ *  the whole network is "the network", user 2026-10-29 — and located nodes, just nodes), as
  *  written. The gate fails on any; text written by people and shown to the model beside the facts
  *  (a network's catalog blurb) is cleaned with the same list, so the model is not handed a word
  *  the gate would then reject. */

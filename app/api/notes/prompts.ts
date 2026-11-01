@@ -36,6 +36,7 @@ export const VOICE = [
   "A network creates its snapshots and anchors them into global snapshots. A network that creates snapshots is an active network, never an \"anchoring network\". A note about one network says nothing about other networks being active.",
   "L0, currency L1 and data L1 are layers.",
   "Make no claim about how decentralised or distributed anything is.",
+  "Use no noun more than twice in a sentence: name a thing once and let the sentence carry it.",
   "Punctuation: no dash clauses. Never use an em dash, and never a hyphen or en dash with a blank on each side. Use commas, colons and full stops.",
 ].join("\n");
 
@@ -93,7 +94,7 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
   },
   geo: {
     questions: {
-      country: "Open with a plain sentence with the network as its actor, in the shape \"<network> hosts N nodes in <country>\"; then what share of the network's located nodes that is and the country's place among the network's countries, or, when the facts count one country, that it is the network's only country, with no share and no place; then how that moved over the span, or that it held. Say nothing about speed.",
+      country: "Open with a plain sentence with the network as its actor, in the shape \"<network> hosts N nodes in <country>\"; then what share of the network's nodes that is and the country's place among the network's countries, or, when the facts count one country, that it is the network's only country, with no share and no place; then how that moved over the span, or that it held. Say nothing about speed.",
       provider: "Open with a plain sentence with the provider as its actor, in the shape \"<provider> hosts N of <network>'s nodes\", network-wide, not for one place; then what share of the network's nodes with a known provider that is and its place among the network's providers, or, when the facts count one provider, that it is the network's only provider, with no share and no place; then how that moved over the span, or that it held. Say nothing about speed.",
     },
     question: "First, where the nodes run: countries and hosting providers that gained or lost nodes, or where the nodes are now when nothing moved. Say nothing about speed.",
@@ -103,8 +104,8 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
       `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${questionOf("geo", kind)}${common ? ` ${whole ? QUESTION_COMMON_WHOLE : PROMPTS.geo.questionCommon}` : ""}\nStay on where the nodes are located and who hosts them${common ? ", then the one sentence on activity" : ""}, and nothing else.`,
   },
   ledger: {
-    question: "Say what changed in the anchoring rhythm over the recent hours against the usual: what sped up or slowed down, from the usual figure to the recent one, and which networks did it. Then the reading itself: the longest gap, and what was part of the global snapshots.",
-    questionNow: "The recent hours ran close to the usual, so this note does not lead with what changed, whatever the rules above say: do not describe a change and do not mention the usual figures. Say what the anchoring rhythm looks like right now over the recent hours: how often snapshots are being anchored, their spacing, the longest gap, which networks are doing it and what they were part of.",
+    question: "Say what changed in the anchoring rhythm over the recent hours against the usual: what sped up or slowed down, from the usual figure to the recent one, and which networks did it. Then the reading itself: the longest gap, then what each global snapshot holds, in one short clause: for the whole network \"N snapshots from M networks in each global snapshot\", never that it was part of anything; for one network, the share of global snapshots it was part of.",
+    questionNow: "The recent hours ran close to the usual, so this note does not lead with what changed, whatever the rules above say: do not describe a change and do not mention the usual figures. Say what the anchoring rhythm looks like right now over the recent hours: how often snapshots are being anchored, their spacing, the longest gap, then what each global snapshot holds, in one short clause: for the whole network \"N snapshots from M networks in each global snapshot\", never that it was part of anything; for one network, the share of global snapshots it was part of.",
     system: (subjectLabel, lead) =>
       `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${lead?.kind === "now" ? PROMPTS.ledger.questionNow : PROMPTS.ledger.question}${
         lead?.kind === "change" ? `\nLead with what moved: ${lead.moved.join("; ")}. Every other figure held close to its usual: give it as a reading, never as a change.` : ""

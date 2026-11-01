@@ -55,7 +55,8 @@ import { trimNewestPartial, type TrendsWindowData } from "@/src/data/trendWindow
 //     change until a week of it exists — honest absence, never a substitute series;
 //   · a share's denominator is what was located: countries against the fleet's LOCATED nodes,
 //     providers against the nodes with a KNOWN provider (a node can have a country and no
-//     provider), each labelled so;
+//     provider). The label says plain "nodes" for the first (user, 2026-11-01): a place note only
+//     ever counts nodes with a place, so the qualifier told a reader nothing;
 //   · providers merge by display name only: two keys whose names are equal after lower-casing and
 //     stripping `gmbh|ag|inc|llc|ltd|sas|se` (Hetzner Online GmbH + AG) are one provider, summed.
 //     The merged provider is called by the stem both share ("Hetzner Online");
@@ -358,13 +359,13 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     const then = weekBefore(ownMeasured(subjectNet), now);
     const pairOf = (what: string, end: FactPair["end"]): FactPair | undefined => (then ? { key: `${subjectNet}:${what}`, end } : undefined);
 
-    facts.push(fact(`${name}, located nodes`, located, "count", undefined, pairOf("located", "to")));
+    facts.push(fact(`${name}, nodes`, located, "count", undefined, pairOf("located", "to")));
     facts.push(fact(`${name}, countries with nodes`, own.length, "count", undefined, pairOf("countries", "to")));
     // Its fleet denominators are the geo family's, the reading its own counts come from (R58), and
     // in nodes: a part and its whole are one count.
     const fleetNodes = asNodes(now).cc;
     const geoFleet = sum(fleetNodes);
-    if (fleetMeasured && geoFleet > 0 && located <= geoFleet) facts.push(fact(`${name}, share of the network's located nodes`, located / geoFleet, "share"));
+    if (fleetMeasured && geoFleet > 0 && located <= geoFleet) facts.push(fact(`${name}, share of the network's nodes`, located / geoFleet, "share"));
     own.slice(0, TOP).forEach((c, i) => {
       facts.push(fact(`${name}, nodes in ${cn(c.cc)} (${RANK_WORD[i]}biggest country)`, c.count, "count"));
       facts.push(fact(`${name}, share of its nodes in ${cn(c.cc)}`, c.count / located, "share"));
@@ -383,10 +384,10 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     if (then) {
       const was = then.netCc.get(subjectNet)!;
       const locatedThen = sum(was);
-      facts.push(fact(`${name}, located nodes a week ago`, locatedThen, "count", undefined, pairOf("located", "from")));
+      facts.push(fact(`${name}, nodes a week ago`, locatedThen, "count", undefined, pairOf("located", "from")));
       facts.push(fact(`${name}, countries with nodes a week ago`, was.size, "count", undefined, pairOf("countries", "from")));
       if (located > 0 && locatedThen > 0 && located !== locatedThen)
-        facts.push(fact(`${name}, located nodes now against a week ago`, located / locatedThen, "ratio"));
+        facts.push(fact(`${name}, nodes now against a week ago`, located / locatedThen, "ratio"));
     }
   } else if (subjectNetCc && subjectScopeNet) {
     // A NETWORK'S NODES IN ONE COUNTRY: the geo family's reading of that network alone (the tiers
@@ -406,11 +407,11 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     // THE ONLY ONE HAS NOTHING TO RANK AGAINST (user, 2026-10-31: "100% of its located nodes and
     // ranks first"): no share and no rank to state, and the count below says it is the only one.
     if (own.length > 1) {
-      facts.push(fact(`${netName}, share of its located nodes in ${country}`, here / located, "share"));
+      facts.push(fact(`${netName}, share of its nodes in ${country}`, here / located, "share"));
       // "the countries of X", not "X's": a name ending in s hands the model "Technologies's" (live 2026-10-29).
       facts.push(fact(`${country}, rank among the countries of ${netName} by nodes`, 1 + own.filter((c) => c.count > here).length, "count"));
     }
-    facts.push(fact(`${netName}, located nodes`, located, "count"));
+    facts.push(fact(`${netName}, nodes`, located, "count"));
     facts.push(fact(`${netName}, countries with nodes`, own.length, "count"));
     if (was != null) {
       facts.push(fact(`${netName}, nodes in ${country} a week ago`, was, "count", undefined, { key, end: "from" }));
@@ -465,7 +466,7 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     if (!here) return null;
     const name = cn(subjectCc);
     facts.push(fact(`${name}, nodes`, here, "count", undefined, ccNowEnd(subjectCc)));
-    facts.push(fact(`${name}, share of the network's located nodes`, here / locatedFleet, "share"));
+    facts.push(fact(`${name}, share of the network's nodes`, here / locatedFleet, "share"));
     facts.push(fact(`${name}, rank by nodes`, 1 + countries.filter((c) => c.count > here).length, "count"));
     facts.push(fact("Countries hosting nodes", countries.length, "count"));
     let dropped = false; // a network there whose own list collapsed: the count below is a floor
@@ -493,12 +494,12 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     // The fleet's week ago, from the same reading as its count now.
     const thenTotal = fleetCcThen ? sum(fleetCcThen) : 0;
     const fleetPair = (end: FactPair["end"]): FactPair | undefined => (thenTotal > 0 && locatedFleet > 0 ? { key: "fleet", end } : undefined);
-    facts.push(fact("Located nodes in the network", locatedFleet, "count", undefined, fleetPair("to")));
+    facts.push(fact("Nodes in the network", locatedFleet, "count", undefined, fleetPair("to")));
     facts.push(fact("Countries hosting nodes", countries.length, "count"));
     facts.push(fact("Providers hosting nodes", providers.length, "count"));
     countries.slice(0, TOP).forEach((c, i) => {
       facts.push(fact(`${cn(c.cc)}, nodes (${RANK_WORD[i]}biggest country)`, c.count, "count", undefined, ccNowEnd(c.cc)));
-      facts.push(fact(`${cn(c.cc)}, share of the network's located nodes`, c.count / locatedFleet, "share"));
+      facts.push(fact(`${cn(c.cc)}, share of the network's nodes`, c.count / locatedFleet, "share"));
     });
     // A provider's week ago is the geo family's own, so its standing count is the pair's now end.
     const wasProviders = geoThen ? providersOf(geoThen.isp, providerNames) : null;
@@ -513,8 +514,8 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     // The earlier count beside the ratio, as every other "a week ago" here: a note says how much
     // it moved (from … to …), never only the direction (user, 2026-10-27).
     if (fleetPair("from")) {
-      facts.push(fact("Located nodes in the network a week ago", thenTotal, "count", undefined, fleetPair("from")));
-      facts.push(fact("Located nodes in the network, now against a week ago", locatedFleet / thenTotal, "ratio"));
+      facts.push(fact("Nodes in the network a week ago", thenTotal, "count", undefined, fleetPair("from")));
+      facts.push(fact("Nodes in the network, now against a week ago", locatedFleet / thenTotal, "ratio"));
     }
     for (const c of countries.slice(0, TOP)) countryChange(c.cc);
     if (wasProviders) {
