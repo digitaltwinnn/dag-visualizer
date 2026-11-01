@@ -252,21 +252,13 @@ function Tour({ stop, leaving }: { stop: number; leaving: boolean }) {
             <div className="absolute inset-x-0 top-0 flex flex-col gap-1 px-3 pt-[calc(env(safe-area-inset-top)+10px)]">
               {bars}
               <div className="flex items-center justify-between">
-                <span aria-hidden className="text-body font-semibold text-foreground">{name}</span>
                 {site}
                 {skip}
               </div>
             </div>
           )}
           <div className="absolute inset-x-0 bottom-0 px-[max(16px,3.7vw)] pb-[calc(env(safe-area-inset-bottom)+22px)]">
-            {phone ? (
-              <div className="mb-1 min-h-5">{who}</div>
-            ) : (
-              <div className="mb-1 flex items-baseline gap-3.5">
-                <p aria-hidden className="text-title text-muted-foreground">{name}</p>
-                {who}
-              </div>
-            )}
+            <div className="mb-1 min-h-5">{who}</div>
             <div aria-hidden className="min-h-[2.52em] max-w-[79%] text-briefing font-medium text-foreground max-[700px]:min-h-[3.8em] max-[700px]:max-w-full">
               <TypedNote key={`${stop}:${words.text}`} text={words.text} always />
             </div>

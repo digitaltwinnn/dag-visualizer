@@ -100,8 +100,14 @@ describe("the tour's chrome", () => {
   });
 
   it("credits the AI with the words it wrote, over them and never on the bar", () => {
-    expect(briefing).toMatch(/\{name\}<\/p>\s*\{who\}\s*<\/div>/);
+    expect(briefing).toMatch(/<div className="mb-1 min-h-5">\{who\}<\/div>/);
     expect(briefing).not.toMatch(/\{who\}\s*\{bars\}/);
+  });
+
+  // user, 2026-11-01: the scene and the words say where you are. A screen reader has no scene.
+  it("names no view on screen, and still names it for a screen reader", () => {
+    expect(briefing).not.toMatch(/\{name\}<\/(p|span)>/);
+    expect(briefing).toMatch(/`\$\{name\}: \$\{words\.text\}`/);
   });
 
   it("says the AI powers the words, and only when they are the AI's", () => {
