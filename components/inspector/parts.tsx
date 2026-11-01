@@ -249,7 +249,8 @@ export function Door({
   expanded?: boolean;
   controls?: string;
   /** The AI card's own wash, quieter than the ladder: inside that card a door is a row of the note,
-   *  and the card's violet edge already says what it is (user, 2026-11-01). */
+   *  and the card's violet edge already says what it is. Paper rests on the card itself, a hairline
+   *  between rows, so a coloured name reads on clean ground (user, 2026-11-01). */
   tone?: "ai";
   /** The hover pair, for a door whose subject another surface can light (convention 9). */
   onPointerEnter?: (e: PointerEvent<HTMLElement>) => void;
@@ -270,7 +271,7 @@ export function Door({
     "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
     // LIT is the hover wash, held.
     tone === "ai"
-      ? cn("border-[var(--ai-row)] hover:[background:var(--ai-row-hover)]", lit ? "[background:var(--ai-row-hover)]" : "[background:var(--ai-row)]")
+      ? cn("border-[light-dark(var(--border),var(--ai-row))] hover:[background:var(--ai-row-hover)]", lit ? "[background:var(--ai-row-hover)]" : "[background:light-dark(transparent,var(--ai-row))]")
       : cn("border-wash-strong hover:[background:light-dark(var(--wash-hover),var(--wash-soft))]", lit ? "[background:light-dark(var(--wash-hover),var(--wash-soft))]" : "[background:light-dark(var(--wash-soft),var(--wash-faint))]"),
     disabled && "opacity-65 pointer-events-none",
   );

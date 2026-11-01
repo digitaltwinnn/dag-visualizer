@@ -391,7 +391,9 @@ describe("the AI card's rows", () => {
     const parts = read("components/inspector/parts.tsx");
     expect(parts).toMatch(/tone === "ai"/);
     expect(parts).toMatch(/\[background:light-dark\(var\(--wash-soft\),var\(--wash-faint\)\)\]/);
-    expect(parts).toMatch(/\[background:var\(--ai-row\)\]/);
+    // Paper rests on the card itself, a hairline between rows: a name reads on clean ground there.
+    expect(parts).toMatch(/\[background:light-dark\(transparent,var\(--ai-row\)\)\]/);
+    expect(parts).toMatch(/border-\[light-dark\(var\(--border\),var\(--ai-row\)\)\]/);
     expect(parts).toMatch(/\[background:var\(--ai-row-hover\)\]/);
   });
 });
