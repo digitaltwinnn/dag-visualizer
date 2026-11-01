@@ -13,7 +13,7 @@ const facts = [
   F("Busiest day", Date.UTC(2026, 9, 19), "date", "Oct 19"),
 ];
 const names = ["USDC.dag", "BioFi", "Hetzner Online GmbH"];
-const ok = (t: string, o?: { maxSentences?: number }) => checkNote(t, facts, names, o).ok;
+const ok = (t: string, o?: { maxSentences?: number; minWords?: number }) => checkNote(t, facts, names, o).ok;
 
 describe("checkNote — numbers must be backed by a fact", () => {
   it("passes a note with no numbers that a ratio fact backs", () => {
@@ -95,6 +95,12 @@ describe("checkNote — the house voice", () => {
     expect(checkNote("TickTock doubled.", facts, ["TickTock"]).ok).toBe(false); // no ratio fact names it
     expect(checkNote("TickTock held steady.", facts, ["TickTock"]).ok).toBe(true);
   });
+  it("holds a note to a whole sentence's length, so a fragment is never a note (the trial's \"the last 24 hours\")", () => {
+    expect(checkNote("the last 24 hours", [], [], { minWords: 6 })).toMatchObject({ ok: false, reasons: expect.arrayContaining(["a fragment, not a sentence"]) });
+    expect(ok("USDC.dag doubled its pace this week.", { minWords: 6 })).toBe(true);
+    expect(ok("USDC.dag doubled.")).toBe(true); // a caption has no floor
+  });
+
   it("caps the sentence count, 3 by default and as asked", () => {
     expect(ok("One. Two. Three. Four.")).toBe(false);
     expect(ok("The pace held. It stayed calm. Nothing moved.")).toBe(true);

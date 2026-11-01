@@ -2,7 +2,7 @@ import { createHash, createHmac } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fact } from "@/src/data/noteFacts";
 import { sampledIds } from "@/src/net/lineage";
-import { liveDeps, readNote, requestNote, WARM_BUDGET_MS, WARM_SPACING_MS, warmNotes, type WarmDeps } from "./handlers";
+import { liveDeps, RATE_PER_HOUR, readNote, requestNote, WARM_BUDGET_MS, WARM_CONCURRENCY, WARM_SPACING_MS, warmNotes, type WarmDeps } from "./handlers";
 import { GateError } from "./gate";
 import { capKeyOf, lockKeyOf, noteKeyOf, rateKeyOf, statsKeyOf } from "./keys";
 import type { NoteFacts } from "./sources";
@@ -35,7 +35,7 @@ const RANGE_SPAN = `r${RANGE.fromMs}-${RANGE.toMs}` as const;
 /** A mainnet network the catalog tracks, as a subject note's scope. */
 const anId = sampledIds("mainnet")[0]!;
 /** The i-th of many distinct countries (each its own subject note, so each a miss). */
-const country = (i: number) => `${anId}/cc:${String.fromCharCode(65 + i)}Z`;
+const country = (i: number) => `${anId}/cc:${String.fromCharCode(65 + (i % 26))}${String.fromCharCode(90 - Math.floor(i / 26))}`;
 /** The i-th of many distinct brushes (each its own note, so each a miss). */
 const brush = (i: number) => ({ fromMs: RANGE.fromMs - i * H, toMs: RANGE.toMs - i * H });
 
@@ -156,16 +156,16 @@ describe("POST /api/notes/request", () => {
     expect(incr.mock.calls[2]![0]).toBe(rateKeyOf("mainnet", hash16("unknown"), "2026-10-27T12"));
   });
 
-  it("a visitor's 21st brushed range in an hour is a 429, and another visitor is not held to it", async () => {
+  it("a visitor's brushed range past the hour's limit is a 429, and another visitor is not held to it", async () => {
     const d = deps();
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < RATE_PER_HOUR; i++) {
       const res = await requestNote(post({ view: "trend", subject: "dag", ...brush(i) }, { "x-forwarded-for": "1.2.3.4" }), () => d);
       expect(res.status).toBe(200);
     }
-    const over = await requestNote(post({ view: "trend", subject: "dag", ...brush(20) }, { "x-forwarded-for": "1.2.3.4" }), () => d);
+    const over = await requestNote(post({ view: "trend", subject: "dag", ...brush(RATE_PER_HOUR) }, { "x-forwarded-for": "1.2.3.4" }), () => d);
     expect(over.status).toBe(429);
     expect(await over.json()).toEqual({ state: "unavailable" });
-    const other = await requestNote(post({ view: "trend", subject: "dag", ...brush(20) }, { "x-forwarded-for": "9.9.9.9" }), () => d);
+    const other = await requestNote(post({ view: "trend", subject: "dag", ...brush(RATE_PER_HOUR) }, { "x-forwarded-for": "9.9.9.9" }), () => d);
     expect(other.status).toBe(200);
   });
 
@@ -203,14 +203,14 @@ describe("POST /api/notes/request", () => {
     expect(incr).not.toHaveBeenCalled();
   });
 
-  it("a visitor's 21st subject note in an hour is a 429", async () => {
+  it("a visitor's subject note past the hour's limit is a 429", async () => {
     const d = deps();
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < RATE_PER_HOUR; i++) {
       const res = await requestNote(post({ view: "geo", subject: country(i) }, { "x-forwarded-for": "1.2.3.4" }), () => d);
       expect(res.status).toBe(200);
       expect(await res.json()).toMatchObject({ state: "ok" });
     }
-    const over = await requestNote(post({ view: "geo", subject: country(20) }, { "x-forwarded-for": "1.2.3.4" }), () => d);
+    const over = await requestNote(post({ view: "geo", subject: country(RATE_PER_HOUR) }, { "x-forwarded-for": "1.2.3.4" }), () => d);
     expect(over.status).toBe(429);
     expect(await over.json()).toEqual({ state: "unavailable" });
   });
@@ -344,8 +344,12 @@ describe("the warm budget leaves the worst item room inside maxDuration 300 s", 
     expect(WARM_BUDGET_MS + WARM_SPACING_MS + 2 * 20_000).toBeLessThan(300_000);
   });
 
-  it("spaces the Gate calls 8 s: 3.5 s still drew 429s from the free model (2026-10-27)", () => {
-    expect(WARM_SPACING_MS).toBe(8_000);
+  it("is paced for the paid model: a cold store of 121 notes fills in one pass", () => {
+    expect(WARM_SPACING_MS).toBe(500);
+    expect(WARM_CONCURRENCY).toBe(3);
+    const secondsAWrite = 2.7; // measured on the model, 2026-11-01
+    const callsAPass = Math.min(WARM_BUDGET_MS / WARM_SPACING_MS, (WARM_BUDGET_MS / 1000 / secondsAWrite) * WARM_CONCURRENCY);
+    expect(callsAPass).toBeGreaterThan(121 * 1.3); // a third of the notes take a second attempt
   });
 });
 
@@ -419,7 +423,7 @@ describe("GET /api/notes/warm (cron)", () => {
     expect(JSON.parse((await store.get(noteKeyOf("mainnet", "hyper", id, "day")))!).driftKey).toBe("7");
   });
 
-  it("waits WARM_SPACING_MS before every Gate call but the first, one item at a time", async () => {
+  it("waits WARM_SPACING_MS before every Gate call but the first, and runs no more than WARM_CONCURRENCY at once", async () => {
     vi.stubEnv("CRON_SECRET", "s3cret");
     const d = deps();
     let running = 0;
@@ -434,8 +438,9 @@ describe("GET /api/notes/warm (cron)", () => {
     await warmNotes(warmReq("Bearer s3cret"), () => d);
     const calls = (d.chat as unknown as { mock: { calls: unknown[] } }).mock.calls.length;
     expect(calls).toBeGreaterThan(1);
-    expect(peak).toBe(1);
-    expect((d.sleep as unknown as { mock: { calls: number[][] } }).mock.calls).toEqual(Array.from({ length: calls - 1 }, () => [WARM_SPACING_MS]));
+    expect(peak).toBeLessThanOrEqual(WARM_CONCURRENCY);
+    // The clock stands still here, so each call's reserved slot sits one spacing past the last.
+    expect((d.sleep as unknown as { mock: { calls: number[][] } }).mock.calls).toEqual(Array.from({ length: calls - 1 }, (_, i) => [(i + 1) * WARM_SPACING_MS]));
   });
 
   it("two overlapping passes write each due note once", async () => {

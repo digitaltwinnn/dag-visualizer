@@ -33,7 +33,7 @@ import { driftKeyOf, executePass, pacedChat, planPass, warmCandidates, warmKeyOf
 // one unbounded key space; and a SUBJECT NOTE (a country, provider or make-up, scoped), whose key
 // space is bounded but large — every network times every country, provider and make-up — and the
 // Gate's burst limit is not: a visitor stepping through selections would spend it for everyone.
-// The two share one count. Per visitor 20 an hour, keyed by the first 16 hex characters of
+// The two share one count. Per visitor 60 an hour, keyed by the first 16 hex characters of
 // HMAC-SHA256(CRON_SECRET, ip) — plain sha256(ip) where no secret is set (a local server) — so a
 // stored key cannot be reversed by hashing the IPv4 space (the raw address and the secret are never
 // stored or logged); globally 2,000 a UTC day, a tripwire
@@ -44,19 +44,17 @@ import { driftKeyOf, executePass, pacedChat, planPass, warmCandidates, warmKeyOf
 type WarmRecord = { writtenAt: number; setKey?: string; driftKey?: string };
 
 const NET = "mainnet";
-export const RATE_PER_HOUR = 20;
+export const RATE_PER_HOUR = 60;
 export const CAP_PER_DAY = 2_000;
 const RATE_TTL_S = 2 * 3600;
 const CAP_TTL_S = 2 * 86_400;
-/** The warm route's `maxDuration` is 300 s: no new item starts after this. The worst item is a
- *  paced wait and two Gate attempts at their 20 s timeout (8 + 20 + 20 s: pacing is start to
- *  start, so a 20 s first call leaves no wait before the second) plus its reads, so 210 s leaves
- *  it room to finish — and holds a pass to about 26 Gate calls. */
+/** The warm route's `maxDuration` is 300 s: no new item starts after this. The worst item is two
+ *  Gate attempts at their 20 s timeout plus its reads, so 210 s leaves it room to finish. */
 export const WARM_BUDGET_MS = 210_000;
-/** One item at a time, and the Gate calls spaced (`pacedChat`): the free model 429'd at about five
- *  calls in 15 s (2026-10-27, R32), and at 3.5 s spacing still refused 20 of 71 in one pass (R40). */
-export const WARM_CONCURRENCY = 1;
-export const WARM_SPACING_MS = 8_000;
+/** Paced for the paid model, whose calls take under 3 s and which never refused three at once in the
+ *  trial (2026-11-01): the whole set of 121 notes fills in one pass. */
+export const WARM_CONCURRENCY = 3;
+export const WARM_SPACING_MS = 500;
 
 const PUBLIC = "public, s-maxage=300, stale-while-revalidate=600";
 const NO_STORE = "no-store";

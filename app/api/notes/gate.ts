@@ -1,6 +1,10 @@
-// THE GATE CLIENT — one chat call to the Constellation Gate (OpenAI shape), nothing else. The
-// model is free-tier only: there is no fallback model and no paid route, so a failure is an
-// error the caller counts, never a reason to try elsewhere.
+// THE GATE CLIENT — one chat call to the Constellation Gate (OpenAI shape), nothing else. One paid
+// model, chosen by trial (user, 2026-11-01, when the Gate retired the free one): there is no
+// fallback model, so a failure is an error the caller counts, never a reason to try elsewhere.
+//
+// THINKING IS HELD LOW, AND IT IS WHAT MAKES THE MODEL USABLE: left to its default a reasoning model
+// spends thousands of tokens thinking before it writes a hundred, so a note takes over 20 s or is
+// cut off at `max_tokens`. This model refuses `none`, so `low` is its floor.
 //
 // SECRETS: `GATE_API_KEY` is read from `process.env` at CALL time, sent only in the Authorization
 // header, and never logged, returned or placed in an error. A `GateError` message is built from
@@ -29,7 +33,10 @@ export class GateError extends Error {
 }
 
 const ENDPOINT = "https://gateway.constellationgate.ai/v1/chat/completions";
-const DEFAULT_MODEL = "constellation/qwen3-8-flash-free";
+const DEFAULT_MODEL = "z-ai/glm-5-3-flash";
+const REASONING_EFFORT = "low";
+/** Thinking counts against this, and only what is used is billed: the room costs nothing. */
+const DEFAULT_MAX_TOKENS = 800;
 const DEFAULT_TIMEOUT_MS = 20_000;
 
 export interface GateMessage { role: "system" | "user"; content: string }
@@ -51,7 +58,7 @@ export async function gateChat(
       res = await doFetch(ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-        body: JSON.stringify({ model, messages, temperature: 0.3, max_tokens: opts?.maxTokens ?? 400 }),
+        body: JSON.stringify({ model, messages, temperature: 0.3, max_tokens: opts?.maxTokens ?? DEFAULT_MAX_TOKENS, reasoning_effort: REASONING_EFFORT }),
         signal: ctl.signal,
       });
     } catch (e) {

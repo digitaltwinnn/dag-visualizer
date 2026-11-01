@@ -315,6 +315,8 @@ function sentences(text: string, nameRegex: RegExp | null): string[] {
 export interface CheckOptions {
   /** At most this many sentences (default 3). */
   maxSentences?: number;
+  /** At least this many words: a note's floor, unset for a caption, which is a short clause. */
+  minWords?: number;
   /** The SUBJECT's display name when it is one network or one country (R39): a sentence naming
    *  no one ("Its snapshots rose by 37%") speaks of the subject, so it cites the ratio facts whose
    *  label carries this name. Absent for the whole network (`all` / `dag`), whose own ratios are
@@ -337,6 +339,8 @@ export function checkNote(
   const dates = datePhrases(facts);
 
   if (!text.trim()) return { ok: false, reasons: ["the note is empty"] };
+
+  if (opts?.minWords && text.trim().split(/\s+/).length < opts.minWords) reasons.push("a fragment, not a sentence");
 
   const bare = stripNames(text);
   for (const w of bannedWords(bare)) reasons.push(`banned word "${w}"`);

@@ -22,10 +22,10 @@ import { noteSupported } from "./sources";
 // the 50 that make it due), even one that starts late: equal to the step, a :52 run a few seconds
 // late would rewrite it, and an item could settle into a 45-minute cycle.
 //
-// PACING: one item at a time, and at least `WARM_SPACING_MS` between Gate calls (`pacedChat`),
-// because the free model's burst limit is far below its stated per-minute one. A pass is bounded
-// (about 26 calls), so a backlog — a cold store, a version bump — drains over several runs; an item whose
-// record another writer refreshed since the plan is served, not rewritten (`seenWrittenAt`).
+// PACING: `WARM_CONCURRENCY` items at a time and at least `WARM_SPACING_MS` between the starts of
+// Gate calls (`pacedChat`), sized for the paid model: a cold store or a version bump fills in one
+// pass, and a pass cut short by its budget hands the rest to the next. An item whose record another
+// writer refreshed since the plan is served, not rewritten (`seenWrittenAt`).
 //
 // Order: the HOURLY kinds first (ledger, History's 24h), so a pass cut short by its time budget
 // still refreshes what goes stale fastest; then the daily kinds (hyper, Geography and its
@@ -130,20 +130,19 @@ export async function executePass(
   return { planned: items.length, done, failed };
 }
 
-/** A model call that keeps at least `spacingMs` between the STARTS of consecutive calls (the Gate
- *  answered 429 at about five calls in 15 s on the free model, 2026-10-27). Only a call that
- *  reaches the model waits, so a cached or empty item costs no time. For a serial caller: the
- *  warm pass runs one item at a time. */
+/** A model call that keeps at least `spacingMs` between the STARTS of consecutive calls. Each caller
+ *  reserves its slot before it waits, so items running side by side queue rather than all reading
+ *  the same last start. Only a call that reaches the model waits, so a cached or empty item costs
+ *  no time. */
 export function pacedChat<A extends unknown[], R>(
   chat: (...args: A) => Promise<R>, spacingMs: number, now: () => number, sleep: (ms: number) => Promise<void>,
 ): (...args: A) => Promise<R> {
-  let last: number | null = null;
+  let next = 0;
   return async (...args: A) => {
-    if (last != null) {
-      const wait = last + spacingMs - now();
-      if (wait > 0) await sleep(wait);
-    }
-    last = now();
+    const t = now();
+    const at = Math.max(t, next);
+    next = at + spacingMs;
+    if (at > t) await sleep(at - t);
     return chat(...args);
   };
 }

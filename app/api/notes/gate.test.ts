@@ -39,10 +39,11 @@ describe("gateChat", () => {
     expect(headers.Authorization).toBe(`Bearer ${FAKE_KEY}`);
     expect(headers["Content-Type"]).toBe("application/json");
     expect(JSON.parse(init.body as string)).toEqual({
-      model: "constellation/qwen3-8-flash-free",
+      model: "z-ai/glm-5-3-flash",
       messages: MSGS,
       temperature: 0.3,
-      max_tokens: 400,
+      max_tokens: 800,
+      reasoning_effort: "low",
     });
   });
 

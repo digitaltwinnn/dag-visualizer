@@ -16,6 +16,8 @@ Model: Constellation Gate AI, `constellation/qwen3-8-flash-free` (free, 1M conte
 `Authorization: Bearer sk-gw-…`). **The Anthropic `/v1/messages` route refuses this model**
 ("does not support the Anthropic Messages API"), despite Gate's own example — found in the spike.
 It is an experiment: "let's see if it holds up over time and this is workable" **(user)**.
+**Superseded 2026-11-01 (user):** the Gate retired the free model, and notes run on the paid
+`z-ai/glm-5-3-flash` with thinking held low, about $1.60 a month. The original rule follows.
 **Free model or nothing** **(user, 2026-10-27)**: if the free tier cannot sustain the load (rate
 limits, or too many notes failing the honesty gate), the experiment stops — no paid fallback. So
 the plan puts the spike first and treats the warmer's volume as something to measure: a go/no-go

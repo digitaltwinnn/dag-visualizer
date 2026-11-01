@@ -70,9 +70,8 @@ export const STATS_TTL_S = 30 * 86_400;
 
 /** The singleflight lock's TTL. A warm item's paced wait runs INSIDE the lock (`pacedChat` wraps
  *  the chat this generator calls), so the worst writer holds it for the facts reads, a paced wait
- *  of up to 8 s, two Gate attempts at their 20-second timeout (pacing is start to start, so there
- *  is no wait after a 20 s first call) and the set: 48 s plus the reads. 90 s leaves the reads about
- *  40 s. The unlock is unconditional, so a writer that outlived its lock would free the next
+ *  of a second or two, two Gate attempts at their 20-second timeout and the set: 42 s plus the
+ *  reads. 90 s leaves the reads about 45 s. The unlock is unconditional, so a writer that outlived its lock would free the next
  *  writer's (R30). */
 export const LOCK_TTL_S = 90;
 
@@ -157,7 +156,11 @@ type Written = { ok: true; text: string; days: NoteDay[]; line?: string } | { ok
 
 /** The room an answer with a line gets: a cut-off answer is no answer, so a line must never cost
  *  its note (History's 30-day note also carries up to five captions). */
-const LINE_TOKENS = 560;
+const LINE_TOKENS = 1000;
+
+/** A note is a sentence or more. The parser takes what the model labelled, and a model has labelled
+ *  a bare "the last 24 hours" (2026-11-01), which holds nothing the gate could fault. */
+const NOTE_MIN_WORDS = 6;
 
 /** What the code tidies in checked text: the numbers stand, only their words change. */
 const plainly = (text: string): string => sayAll(spellDurations(text));
@@ -192,7 +195,7 @@ async function write(
       return { ok: false, stat: kind };
     }
     const { note, captions, line } = parseAnswer(answer);
-    const check = checkNote(note, input.facts, input.names, { maxSentences: 3, subject });
+    const check = checkNote(note, input.facts, input.names, { maxSentences: 3, minWords: NOTE_MIN_WORDS, subject });
     if (!check.ok) {
       if (held) return held;
       reasons = check.reasons;

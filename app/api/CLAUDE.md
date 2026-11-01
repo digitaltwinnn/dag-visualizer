@@ -119,7 +119,7 @@ them — but the Next Node server can.
   (`fetchSince.ts`), not just its newest page. The History view (`/trends`) is the read route's
   consumer.
 - **`/api/notes`, `/api/notes/request`, `/api/notes/warm`** (2026-10-27) are the AI notes: a few
-  sentences a free model (the Constellation Gate, `GATE_API_KEY`, `GATE_MODEL`) writes about the
+  sentences a paid model (the Constellation Gate, `GATE_API_KEY`, `GATE_MODEL`, default `z-ai/glm-5-3-flash` with thinking held low, `gate.ts`) writes about the
   figures a view is showing. **Mainnet only**; any other `?net=` answers `none`, before the subject
   is parsed (it is checked against mainnet's catalog, so a testnet network would otherwise 400). Notes live in
   their OWN key family, `ai:{net}:v{NOTES_VERSION}:{view}:{subject}:{span}` (`keys.ts`), never under
@@ -136,8 +136,8 @@ them — but the Next Node server can.
   would show the 1h door to every visitor for 15 minutes after one of them wrote the note). The ledger's `dag` is folded into `all`
   (the same facts: one note). `POST /api/notes/request` writes the on-request kinds (the 1h pill, a
   brushed range and a subject note), and
-  `GET /api/notes/warm` is the quarter-hourly cron (about 26 Gate calls a pass, spaced 8 s — the free
-  model's burst limit, measured 2026-10-27). **The honesty gate (rule 10) is mechanical**
+  `GET /api/notes/warm` is the quarter-hourly cron (three items at a time, 0.5 s between call
+  starts, so the 121 warmed notes fill in one pass). **The honesty gate (rule 10) is mechanical**
   (`src/data/noteHonesty.ts`, the colocated test is its specification): every number the note
   states must match a fact the model was shown, within the precision it was written to, and a
   failing note is asked for once more with the reasons, then dropped and counted. Nothing is ever
@@ -146,7 +146,7 @@ them — but the Next Node server can.
   leaves a marker, and the next read or request of that key answers `unavailable` without a model
   call, so a cache-buster or a 429 run cannot turn visitors into unbounded calls; the warm pass
   ignores the marker and never writes one. **Limits
-  apply to a brushed range (the one unbounded key space) and to a subject note**: 20 an hour per visitor, keyed by
+  apply to a brushed range (the one unbounded key space) and to a subject note**: 60 an hour per visitor, keyed by
   the first 16 hex characters of HMAC-SHA256(`CRON_SECRET`, ip), plain sha256(ip) where no secret
   is set (the raw address and the secret are never stored or logged; on Vercel
   `x-forwarded-for` is set by the platform, which is why the hash can be trusted there), and a
@@ -154,10 +154,9 @@ them — but the Next Node server can.
   write** (`GenerateOptions.spend`, asked by the generator once the facts are in hand, inside the
   lock): `none` and `pending` cost nothing, and a visitor already at the limit is refused before any
   work is done for them. Every other kind is bounded by
-  its key and a singleflight lock. **The warm pass is paced**: one item at a time, at least 8 s
-  between Gate calls, no new item after 210 s (the worst item, two attempts at the 20 s timeout,
-  still ends inside the 300 s `maxDuration`), because the free model answered 429 at about five
-  calls in 15 s on 2026-10-27, and still refused 20 of 71 at 3.5 s. The cron fails closed without
+  its key and a singleflight lock. **The warm pass is paced**: three items at a time, at least 0.5 s
+  between Gate call starts, no new item after 210 s (the worst item, two attempts at the 20 s timeout,
+  still ends inside the 300 s `maxDuration`). The cron fails closed without
   `CRON_SECRET`, like the sampler (and a preview has none). ⚠️ **Notes are written by production
   only** (R66/R69, `notesWritable()` in `notes/store.ts` — it fails closed): a preview shares the
   store, so there every route serves what is cached and answers a miss `none` — no note, no
@@ -169,7 +168,7 @@ them — but the Next Node server can.
   `timeout`, `empty`, `nokey`, `store`, `error`, `capped`, then the volumes `calls`, every Gate
   call, and `retried`, every note that needed its second attempt), and
   `npx tsx scripts/notes-stats.ts` prints the last 14 days on the read-only token: it is the
-  go/no-go instrument for keeping the free model.
+  instrument for how the model is holding up.
   **Subject notes** (user, 2026-10-29) are a card's own note: a country, a provider, a node make-up.
   The grammar has ONE home, `notes/keys.ts` — `CC_TAIL_RE`, `ISP_TAIL_RE`, `TYPE_TAIL_RE`,
   `subjectKindOf`, `isSubjectNote`: `cc:XX` (fleet country), `<net>/cc:XX`, `isp:<key>`,
@@ -183,7 +182,7 @@ them — but the Next Node server can.
   second limited kind** (`isLimitedNote` in `notes/params.ts`, beside a brushed range): its key
   space is bounded (countries, providers and types times networks) but the Gate's burst limit is
   not, and one visitor drilling through twenty countries should pace themselves, not the cron — the
-  same per-visitor (20 an hour) and daily (2,000) limits, a cached note served without counting.
+  same per-visitor (60 an hour) and daily (2,000) limits, a cached note served without counting.
   A
   network-scoped country or provider note, and a provider note at fleet scope, read the geo family
   for their week ago, so they state no change until a week of it exists (from 2026-10-27). The
