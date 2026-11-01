@@ -351,7 +351,7 @@ describe("network names in a note", () => {
     expect(typed).toMatch(/<span className="sr-only">\{text\}<\/span>/);
     expect(read("components/notes/NotesCard.tsx")).toMatch(/<NoteText text=\{day\.caption\} \/>/);
     const text = read("components/notes/NoteText.tsx");
-    expect(text).toMatch(/className=\{IDENT_INK\}/);
+    expect(text).toMatch(/className="\[--ident-l:var\(--ident-note-l\)\]"/);
     expect(text).not.toMatch(/dangerouslySetInnerHTML|font-|<a\b|onClick/);
   });
 });
@@ -399,6 +399,11 @@ describe("the AI card's rows", () => {
 describe("a network's name in a note", () => {
   it("is its colour mixed toward the ink", () => {
     expect(read("components/notes/NoteText.tsx")).toMatch(/color-mix\(in oklab, \$\{ink\} \$\{NAME_TINT\}%, var\(--foreground\)\)/);
+  });
+
+  it("stands on its own lightness step, so a note's names deepen on paper and no chip moves", () => {
+    expect(read("components/notes/NoteText.tsx")).toMatch(/className="\[--ident-l:var\(--ident-note-l\)\]"/);
+    expect(read("components/notes/NoteText.tsx")).not.toMatch(/IDENT_INK/);
   });
 
   it("keeps its full colour on paper, where ink pulls a hue toward grey", () => {

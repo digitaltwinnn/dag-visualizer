@@ -1,6 +1,5 @@
 "use client";
 
-import { IDENT_INK } from "@/components/identInk";
 import { noteSegments, takeSegments } from "@/src/data/noteNames";
 import { identityHudCss } from "@/src/palette/identity";
 
@@ -12,7 +11,7 @@ import { identityHudCss } from "@/src/palette/identity";
 const NAME_TINT = 75;
 
 /** A NOTE'S WORDS, with each network it names in that network's colour (`noteNames.ts`), set
- *  as text (`IDENT_INK`), so every hue holds on paper. Colour only, same weight: a name is not a link
+ *  on the note's own lightness step (`--ident-note-l`), so every hue holds on paper. Colour only, same weight: a name is not a link
  *  here, the note's rows are where a subject is clicked. `upto` is how far a note has written itself in. */
 export default function NoteText({ text, upto }: { text: string; upto?: number }) {
   const all = noteSegments(text);
@@ -20,7 +19,7 @@ export default function NoteText({ text, upto }: { text: string; upto?: number }
     if (!s.id) return s.text;
     const ink = identityHudCss(s.id);
     return (
-      <span key={i} className={IDENT_INK} style={{ color: `light-dark(${ink}, color-mix(in oklab, ${ink} ${NAME_TINT}%, var(--foreground)))` }}>
+      <span key={i} className="[--ident-l:var(--ident-note-l)]" style={{ color: `light-dark(${ink}, color-mix(in oklab, ${ink} ${NAME_TINT}%, var(--foreground)))` }}>
         {s.text}
       </span>
     );
