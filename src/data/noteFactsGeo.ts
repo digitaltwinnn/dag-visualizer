@@ -100,6 +100,10 @@ export interface GeoFactsInput {
 }
 
 const TOP = 3;
+/** The smallest move the whole network's note is offered: a node coming or going from a country or
+ *  provider that holds dozens is not news (user, 2026-11-01). Its own note keeps it: there it is
+ *  the subject, and a change of one in a handful is most of what happened. */
+const MIN_MOVE = 2;
 const NETWORK_TOP = 5;
 const DAY_MS = 86_400_000;
 const WINDOW_DAYS = 7;
@@ -517,11 +521,12 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
       facts.push(fact("Nodes in the network a week ago", thenTotal, "count", undefined, fleetPair("from")));
       facts.push(fact("Nodes in the network, now against a week ago", locatedFleet / thenTotal, "ratio"));
     }
-    for (const c of countries.slice(0, TOP)) countryChange(c.cc);
+    const moved = (now: number, was: number): boolean => Math.abs(now - was) >= MIN_MOVE;
+    for (const c of countries.slice(0, TOP)) if (moved(c.count, ccWas(c.cc) ?? c.count)) countryChange(c.cc);
     if (wasProviders) {
       for (const p of providers.slice(0, TOP)) {
         const before = wasProviders.get(p.group)?.count;
-        if (!before) continue;
+        if (!before || !moved(p.count, before)) continue;
         facts.push(fact(`${pn(p)}, nodes a week ago`, before, "count", undefined, { key: providerKey(p), end: "from" }));
         facts.push(fact(`${pn(p)}, nodes now against a week ago`, p.count / before, "ratio"));
       }

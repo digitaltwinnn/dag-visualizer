@@ -14,6 +14,7 @@ describe("VOICE", () => {
     expect(VOICE).toContain("was part of");
     expect(VOICE).toContain("Use no noun more than twice in a sentence");
     expect(VOICE).toContain("Be concise and to the point");
+    expect(VOICE).toContain("Never say which lost or gained the most");
     expect(VOICE).toMatch(/never ticks/);
     expect(VOICE).toMatch(/feeless/);
   });
@@ -73,7 +74,7 @@ describe("PROMPTS", () => {
     );
     expect(PROMPTS.hyper.questionCommon).toBe("Last, in one sentence, how active it was: open with the direction, up, down or steady, then the global snapshots it was part of per day last week against the weeks before.");
     expect(PROMPTS.geo.question).toBe(
-      "First, where the nodes run: countries and hosting providers that gained or lost nodes, or where the nodes are now when nothing moved. Say nothing about speed.",
+      "First, how many nodes there are and how that moved, then where they run: the countries and hosting providers that gained or lost nodes and no others, or where the nodes are now when nothing moved. Say nothing about speed.",
     );
     expect(PROMPTS.geo.questionCommon).toBe("Last, in one sentence, how active the network was: open with the direction, up, down or steady, then its global snapshots per day last week against the weeks before.");
     // The whole network PRODUCES its global snapshots (user, 2026-10-30: "there is no specific

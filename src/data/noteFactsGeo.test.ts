@@ -142,6 +142,28 @@ describe("geoFacts before history exists", () => {
     expect(one(r, /^Hetzner Online, nodes a week ago/).value).toBe(25);
   });
 
+  // A NODE IS NOT NEWS (user, 2026-11-01: "inland from 20 to 19 is not really noteworthy").
+  it("offers the whole network's note no country or provider that moved by a node or less", () => {
+    const then: DaySpec = {
+      cc: { DE: 40, US: 29, FR: 15, NL: 5 },
+      isp: { "hetzner-online-gmbh": 20, "hetzner-online-ag": 20, "ovh-sas": 9, "amazon-com-inc": 20 },
+    };
+    const was = day(then);
+    const geoDays = { "2026-10-20": was, "2026-10-27": day(NOW) };
+    const r = geoFacts(input({ geoDays, ccDays: ccOf(geoDays) }))!;
+    expect(one(r, /^Germany, nodes a week ago$/).value).toBe(40);
+    expect(find(r, /^(United States|France), nodes (a week ago|now against)/)).toEqual([]);
+    expect(one(r, /^Hetzner Online, nodes a week ago$/).value).toBe(40);
+    expect(find(r, /^(OVH|Amazon)[^,]*, nodes (a week ago|now against)/)).toEqual([]);
+    expect(one(r, /^United States, nodes \(/).value).toBe(30); // the standing count stays
+  });
+
+  it("keeps a node's move in that country's own note, where it is the subject", () => {
+    const geoDays = { "2026-10-27": day(NOW) };
+    const ccDays = { ...ccOf(geoDays), "2026-10-20": ccOf({ x: day({ ...NOW, cc: { ...NOW.cc, US: 29 } }) }).x! };
+    expect(one(geoFacts(input({ subject: { cc: "US" }, geoDays, ccDays }))!, /^United States, nodes a week ago$/).value).toBe(29);
+  });
+
   it("states no change when the nearest earlier day is nowhere near a week back", () => {
     const geoDays = { "2026-10-26": day(scaled(0.5)), "2026-10-27": day(NOW) };
     const r = geoFacts(input({ geoDays, ccDays: ccOf(geoDays) }))!;
