@@ -45,6 +45,15 @@ describe("the notes card is part of the stack", () => {
   });
 });
 
+describe("the top card under a drill", () => {
+  // user, 2026-11-02: "under all filter the AI cards was showing DED notes". The Metagraph card moves to
+  // a committed node's network in Geography, and the note rode along.
+  it("takes no subject from a committed node", () => {
+    const hook = read("components/notes/useAiNote.ts");
+    expect(fnBody(hook, "export function useAiNote(")).not.toMatch(/\binspect\b/);
+  });
+});
+
 describe("a subject card's rows", () => {
   const rows = read("components/notes/NoteRows.tsx");
   const subject = read("components/notes/SubjectNote.tsx");

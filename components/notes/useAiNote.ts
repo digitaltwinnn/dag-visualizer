@@ -57,14 +57,15 @@ export function useAiNote(): { subject: NoteSubject | null; req: NoteReq | null;
   const railNet = useStore((s) => s.railNet);
   const tickNet = useStore((s) => s.tickNet);
   const snap = useStore((s) => s.snap);
-  const inspect = useStore((s) => s.inspect);
   const trendFocus = useStore((s) => s.trendFocus);
   const trendFront = useStore((s) => s.trendFront);
   const trendWindow = useStore((s) => s.trendWindow);
   const tickHasFilter = useTickHasFilter();
 
+  // A committed node moves the Metagraph card to its network in Geography, and leaves this card alone
+  // (user, 2026-11-02: under All it read "DED notes"): a node is a drill, and the note holds under one.
   const subject = noteSubjectOf(mode, {
-    metagraphNetwork: metagraphCardNetwork({ mode, filter, railNet, tickNet, snap, tickHasFilter, trendFocus, trendFront, inspect }),
+    metagraphNetwork: metagraphCardNetwork({ mode, filter, railNet, tickNet, snap, tickHasFilter, trendFocus, trendFront }),
     trendFilter: filter,
     unlisted: (id) => id === UNLISTED_ID,
   });
