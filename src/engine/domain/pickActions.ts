@@ -209,14 +209,22 @@ function nodeAncestryActions(
 // destination rail with every parent slot back on its ghost, and a deselect would step straight
 // to the network (user, 2026-08-02: every card up to the selection belongs on the rail, in every
 // view). So the entry re-derives exactly the ancestry a click on that node IN the destination
-// view would have committed — no filter (it carried), no inspect (it's already open). A non-node
-// pick (a dossier, a snapshot) has no ancestry and yields nothing.
+// view would have committed, no inspect (it's already open). EXCEPT THE NETWORK (user, 2026-11-02: "as
+// they fly between the views their focus should be kept"): a browse clears on leaving and the node
+// carries, so a view whose node stands on its network does so again, and the node commits after it,
+// because a network change clears what was picked under the old one. A non-node pick (a dossier, a
+// snapshot) has no ancestry and yields nothing.
 export function viewEntryActions(opts: {
   mode: Mode;
+  filter: string;
   pick: PickDescriptor | null;
   compositionSel?: CompositionSel | null;
 }): ClickAction[] {
-  return opts.pick ? nodeAncestryActions(opts.pick, opts) : [];
+  const { pick } = opts;
+  if (!pick) return [];
+  const ancestry = nodeAncestryActions(pick, opts);
+  const netId = VIEW_POLICIES[opts.mode].nodeCommitsNetwork ? pickNetId(pick) : null;
+  return netId && netId !== opts.filter ? [{ kind: "railNet", id: netId }, ...ancestry, { kind: "inspect", pick }] : ancestry;
 }
 
 // The network-filter TOGGLE — the FilterPicker's committed-row rule: picking the committed
@@ -229,16 +237,10 @@ export function filterToggleActions(id: string, currentFilter: string, railNet: 
 }
 
 /** ONE RULE (user, 2026-11-02: "yes make it one rule everywhere"): only the top bar sets the filter.
- *  A row naming a network stands the view on it, and a second click steps back off. `current` is
- *  the network the view stands on. */
-export function networkRowActions(id: string, current: string): ClickAction[] {
+ *  A step on a rail or a row naming a network stands the view on it, and leaves the filter alone.
+ *  `current` is what the step comes back from: the network it would end the browse on. */
+export function railNetActions(id: string, current: string): ClickAction[] {
   return [{ kind: "railNet", id: id === current ? null : id }];
-}
-
-/** A STEP ON A RAIL THAT BROWSES (user, 2026-10-31): browses a network and leaves the filter alone.
- *  Coming back to the filter's own network ends the browse: there is nothing left to differ. */
-export function railNetActions(id: string, filter: string): ClickAction[] {
-  return [{ kind: "railNet", id: id === filter ? null : id }];
 }
 
 // Selecting a SNAPSHOT — shared by the ledger's tile click and LiveStrip's bar click:

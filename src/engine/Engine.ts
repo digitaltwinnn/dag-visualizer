@@ -1669,6 +1669,7 @@ export class Engine {
     const st = useStore.getState();
     const acts = viewEntryActions({
       mode,
+      filter: st.filter,
       pick: st.inspect,
       compositionSel: this._compositionOf(st.inspect),
     });
