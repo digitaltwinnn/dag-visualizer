@@ -259,7 +259,7 @@ function Tour({ stop, leaving }: { stop: number; leaving: boolean }) {
           className={cn("absolute inset-0 transition-opacity ease-out motion-reduce:transition-none", fading && "opacity-0")}
           style={{ transitionDuration: `${BRIEFING_WORDS_OUT_MS}ms` }}
         >
-          <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-[44%] [background:linear-gradient(transparent,var(--scene-ground)_38%)]" />
+          <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-[30%] [background:linear-gradient(transparent,var(--scene-ground)_25%)] max-[700px]:h-[44%] max-[700px]:[background:linear-gradient(transparent,var(--scene-ground)_38%)]" />
           {phone ? (
             <div className="absolute inset-x-0 top-0 flex flex-col gap-1 px-3 pt-[calc(env(safe-area-inset-top)+10px)]">
               {bars}

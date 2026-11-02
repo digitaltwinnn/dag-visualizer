@@ -155,6 +155,10 @@ describe("the tour's Skip", () => {
 describe("the tour's chrome", () => {
   // user, 2026-11-02: "the intro feels a bit too much at the bottom". The controls stand at the top on
   // every screen, where the top bar lands, and the words alone stand under the scene.
+  it("keeps the fade behind the words short of the scene on the wide tiers, a phone's words being taller", () => {
+    expect(briefing).toMatch(/bottom-0 h-\[30%\] \[background:linear-gradient\(transparent,var\(--scene-ground\)_25%\)\] max-\[700px\]:h-\[44%\] max-\[700px\]:\[background:linear-gradient\(transparent,var\(--scene-ground\)_38%\)\]/);
+  });
+
   it("stands the controls at the top on every screen, the words alone at the bottom", () => {
     expect(briefing).toMatch(/absolute inset-x-0 top-0 flex items-center gap-3\.5 px-\[max\(16px,3\.7vw\)\]/);
     expect(briefing).not.toMatch(/mt-3 flex items-center gap-3\.5/);
