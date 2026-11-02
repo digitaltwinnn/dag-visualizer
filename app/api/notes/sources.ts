@@ -1,4 +1,5 @@
 import { UNLISTED_ID } from "@/src/data/unlistedId";
+import { utcDayKey } from "@/src/util/localTime";
 import { roleKey } from "@/src/data/composition";
 import { fact } from "@/src/data/noteFacts";
 import { bannedWords, undash } from "@/src/data/noteHonesty";
@@ -70,7 +71,6 @@ export async function readSpan(
   return { buckets, stepMs, series, now };
 }
 
-const iso = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
 /** THE GEO FAMILY over the UTC days [fromMs's day, toMs]: one `geo:{net}:{YYYY}` hash per year the
  *  window touches and one sites hash per month (fields `MM-DD|<series>`), regrouped by day, plus the
@@ -122,15 +122,16 @@ export async function geoInputs(net: string, nowMs: number, reads: NoteReads): P
   tiers.buckets.forEach((b, i) => {
     for (const [k, pts] of Object.entries(tiers.series)) {
       const v = pts[i];
-      if (k.startsWith("f.cc.") && v != null) (ccDays[iso(b)] ??= {})[k] = v;
+      if (k.startsWith("f.cc.") && v != null) (ccDays[utcDayKey(b)] ??= {})[k] = v;
     }
   });
   // The same daily read is the common activity reading's (R74), unfolded, as the builder wants it.
   return { geoDays, providerNames, ...(siteDays ? { siteDays } : {}), ccDays, daily: tiers };
 }
 
-/** The default reads for ONE note: the trends store's read client, each hash read at most once (a
- *  History note reads the same daily year-hash for its span, the span before and its days). */
+/** The default reads for ONE note, or one warm pass: the trends store's read client, each hash read
+ *  at most once (a History note reads the same daily year-hash for its span, the span before and
+ *  its days). */
 export function storeReads(nowMs: number, store: HashReader = readStore()): NoteReads {
   const seen = new Map<string, Promise<Record<string, string> | null>>();
   const once: HashReader = {

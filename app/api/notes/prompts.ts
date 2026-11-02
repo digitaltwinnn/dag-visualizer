@@ -1,4 +1,5 @@
 import type { NoteLead, NoteView, NotableDay } from "@/src/data/noteTypes";
+import { utcDayKey } from "@/src/util/localTime";
 import type { NoteSpan, SubjectKind } from "./keys";
 
 // THE PROMPTS OF AI NOTES — one home for what the model is told and how its answer is read back.
@@ -75,8 +76,8 @@ export const VOICE = [
 // hosts N nodes in <country>", so the name lands as the sentence's subject, not as a label.
 type KindQuestions = Partial<Record<Exclude<SubjectKind, "view">, string>>;
 // The whole network's activity, in its own words (user, 2026-10-30): one string for both views.
-const QUESTION_COMMON_WHOLE = "Last, in one sentence, how active the network was: open with the direction, up, down or steady, then the global snapshots it produced per day last week against the weeks before.";
-export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuestions; questionNow?: string; questionCommon?: string; questionCommonWhole?: string; system: (subjectLabel: string, lead?: NoteLead, common?: boolean, kind?: SubjectKind, whole?: boolean) => string }> = {
+export const QUESTION_COMMON_WHOLE = "Last, in one sentence, how active the network was: open with the direction, up, down or steady, then the global snapshots it produced per day last week against the weeks before.";
+export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuestions; questionNow?: string; questionCommon?: string; system: (subjectLabel: string, lead?: NoteLead, common?: boolean, kind?: SubjectKind, whole?: boolean) => string }> = {
   hyper: {
     // A QUIET WEEK IS SAID (user, 2026-10-30): the facts count what changed even at 0, so the note
     // says the composition held rather than reaching for the node count, which is Geography's too.
@@ -90,7 +91,6 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
       type: "Open with a plain sentence whose subject is the nodes, in the shape \"N of the M <network> nodes run <layers>\", M being all its nodes, the layers named exactly as the facts name them, with no possessive on the name (a node RUNS its layers, so the verb is run); then say in plain words where that group stands among the network's layer groups, as a reader would (\"its largest group\", \"the smaller of its two groups\", \"its only group\"), never \"share\", \"rank\" or a percentage; then how that changed over the span, or that it held.",
     },
     questionCommon: "Last, in one sentence, how active it was: open with the direction, up, down or steady, then the global snapshots it was part of per day last week against the weeks before.",
-    questionCommonWhole: QUESTION_COMMON_WHOLE,
     system: (subjectLabel, _lead, common, kind, whole) =>
       `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${questionOf("hyper", kind)}${common ? ` ${whole ? QUESTION_COMMON_WHOLE : PROMPTS.hyper.questionCommon}` : ""}`,
   },
@@ -101,7 +101,6 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
     },
     question: "First, how many nodes there are and how that moved, then where they run: the countries and hosting providers that gained or lost nodes and no others, or where the nodes are now when nothing moved. Say nothing about speed.",
     questionCommon: "Last, in one sentence, how active the network was: open with the direction, up, down or steady, then its global snapshots per day last week against the weeks before.",
-    questionCommonWhole: QUESTION_COMMON_WHOLE,
     system: (subjectLabel, _lead, common, kind, whole) =>
       `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${questionOf("geo", kind)}${common ? ` ${whole ? QUESTION_COMMON_WHOLE : PROMPTS.geo.questionCommon}` : ""}\nStay on where the nodes are located and who hosts them${common ? ", then the one sentence on activity" : ""}, and nothing else.`,
   },
@@ -133,7 +132,6 @@ function questionOf(view: NoteView, kind?: SubjectKind): string {
   return (kind && kind !== "view" ? p.questions?.[kind] : undefined) ?? p.question;
 }
 
-const isoDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
 /** THE SPAN IN THE CARD PILL'S OWN WORDS (user, 2026-10-30: "mention the range in its text as
  *  well … 'The network held at 6 networks during the last 7 days'"), stated to the model on a
@@ -195,7 +193,7 @@ export function buildMessages(
     ? CAPTION_FORMAT
     : "Answer format: one line starting NOTE: and nothing else.";
   const parts = [...(span ? [`Span: ${span}`] : []), `Facts:\n${factsBlock}`];
-  if (withDays) parts.push(`Days to caption, in order:\n${days.map((d) => `DAY ${isoDay(d.dayMs)}`).join("\n")}`);
+  if (withDays) parts.push(`Days to caption, in order:\n${days.map((d) => `DAY ${utcDayKey(d.dayMs)}`).join("\n")}`);
   if (retryReasons && retryReasons.length)
     parts.push(`Your previous answer was rejected: ${retryReasons.join("; ")}. Write it again and fix this.`);
   return [

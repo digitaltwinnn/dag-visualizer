@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { NoteView, NotableDay } from "@/src/data/noteTypes";
-import { CAPTION_FORMAT, LINE_FORMAT, PROMPTS, VOICE, buildMessages, parseAnswer, spanWords } from "./prompts";
+import { CAPTION_FORMAT, LINE_FORMAT, PROMPTS, QUESTION_COMMON_WHOLE, VOICE, buildMessages, parseAnswer, spanWords } from "./prompts";
 
 const VIEWS: NoteView[] = ["hyper", "geo", "ledger", "trend"];
 
@@ -80,14 +80,14 @@ describe("PROMPTS", () => {
     expect(PROMPTS.geo.questionCommon).toBe("Last, in one sentence, how active the network was: open with the direction, up, down or steady, then its global snapshots per day last week against the weeks before.");
     // The whole network PRODUCES its global snapshots (user, 2026-10-30: "there is no specific
     // network, so 'all' should probably have some different wording").
+    expect(QUESTION_COMMON_WHOLE).toBe("Last, in one sentence, how active the network was: open with the direction, up, down or steady, then the global snapshots it produced per day last week against the weeks before.");
     for (const v of ["hyper", "geo"] as const) {
-      expect(PROMPTS[v].questionCommonWhole).toBe("Last, in one sentence, how active the network was: open with the direction, up, down or steady, then the global snapshots it produced per day last week against the weeks before.");
-      expect(PROMPTS[v].system("the whole network", undefined, true, undefined, true)).toContain(`${PROMPTS[v].question} ${PROMPTS[v].questionCommonWhole}`);
+      expect(PROMPTS[v].system("the whole network", undefined, true, undefined, true)).toContain(`${PROMPTS[v].question} ${QUESTION_COMMON_WHOLE}`);
       expect(PROMPTS[v].system("the whole network", undefined, true, undefined, true)).not.toContain(PROMPTS[v].questionCommon!);
-      expect(PROMPTS[v].system("the whole network", undefined, false, undefined, true)).not.toContain(PROMPTS[v].questionCommonWhole!);
+      expect(PROMPTS[v].system("the whole network", undefined, false, undefined, true)).not.toContain(QUESTION_COMMON_WHOLE);
     }
     expect(VOICE).toMatch(/the whole network is part of nothing: it produces them/);
-    expect(buildMessages("hyper", "the whole network", "Facts", null, undefined, undefined, true, undefined, null, true)[0]!.content).toContain(PROMPTS.hyper.questionCommonWhole!);
+    expect(buildMessages("hyper", "the whole network", "Facts", null, undefined, undefined, true, undefined, null, true)[0]!.content).toContain(QUESTION_COMMON_WHOLE);
     expect(PROMPTS.geo.system("x")).toContain("Stay on where the nodes are located and who hosts them, and nothing else.");
     expect(PROMPTS.geo.system("x", undefined, true)).toContain("Stay on where the nodes are located and who hosts them, then the one sentence on activity, and nothing else.");
     expect(PROMPTS.ledger.question).toBe(

@@ -9,7 +9,8 @@ import { gateChat } from "./gate";
 import { capKeyOf, rateKeyOf } from "./keys";
 import { isLimitedNote, parseNoteParams, parseNoteRequest } from "./params";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
-import { factsFor, geoInputs, storeReads } from "./sources";
+import { utcDayKey } from "@/src/util/localTime";
+import { factsFor, geoInputs, storeReads, type NoteReads } from "./sources";
 import { notesStore, notesWritable } from "./store";
 import { driftKeyOf, executePass, pacedChat, planPass, warmCandidates, warmKeyOf, type DriftKeys } from "./warm";
 
@@ -64,7 +65,6 @@ const NONE: NoteResponse = { state: "none" };
 const json = (body: unknown, cache: string, status = 200) =>
   NextResponse.json(body, { status, headers: { "Cache-Control": cache } });
 const isoHour = (ms: number) => new Date(ms).toISOString().slice(0, 13);
-const isoDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
 /** The live dependencies: the write-token notes store, the trends store's reads, the Gate, and
  *  whether this deployment may write notes at all (`notesWritable`: never on a preview, R66). */
@@ -139,7 +139,7 @@ export async function requestNote(req: Request, deps: () => GenerateDeps): Promi
           status = 429;
           return UNAVAILABLE;
         }
-        if ((await d.store.incr(capKeyOf(net, isoDay(now)), CAP_TTL_S)) > CAP_PER_DAY) {
+        if ((await d.store.incr(capKeyOf(net, utcDayKey(now)), CAP_TTL_S)) > CAP_PER_DAY) {
           await countStat(d.store, net, now, "capped");
           return UNAVAILABLE;
         }
@@ -161,16 +161,19 @@ export interface WarmDeps extends GenerateDeps {
   sleep(ms: number): Promise<void>;
 }
 
-export function liveWarmDeps(): WarmDeps {
+/** ONE PASS, ONE READ OF EACH HASH: every note of it reads the same trend months, and the deps live
+ *  for the one pass. */
+export function liveWarmDeps(reads: NoteReads = storeReads(Date.now())): WarmDeps {
   const base = liveDeps();
   return {
     ...base,
+    facts: (net, view, subject, span, nowMs) => factsFor(net, view, subject, span, nowMs, reads),
     // The geo note's own read and reading (M5): the countries planned are the countries stated, so
     // none is generated unpaced by a visitor and none is planned only to answer `none`.
-    countries: async (nowMs) => fleetCountries(await geoInputs(NET, nowMs, storeReads(nowMs))),
+    countries: async (nowMs) => fleetCountries(await geoInputs(NET, nowMs, reads)),
     // The digest's own builder decides which networks have nodes, so the two keys cannot disagree.
     digest: async (nowMs) => {
-      const f = await factsFor(NET, "hyper", "all", "day", nowMs);
+      const f = await factsFor(NET, "hyper", "all", "day", nowMs, reads);
       return { setKey: f?.setKey ?? null, driftKeys: f?.driftKeys ?? null };
     },
     sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),

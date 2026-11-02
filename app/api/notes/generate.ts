@@ -9,6 +9,7 @@ import { failKeyOf, isBriefingNote, lockKeyOf, noteKeyOf, statsKeyOf, timingOf, 
 import { buildMessages, parseAnswer, spanWords } from "./prompts";
 
 const NEGATIVE_RE = /\b(?:no|none)\b/i;
+import { utcDayKey } from "@/src/util/localTime";
 import { noteSupported, type factsFor } from "./sources";
 import type { NotesStore } from "./store";
 
@@ -121,12 +122,11 @@ const PENDING: NoteResponse = { state: "pending" };
 const UNAVAILABLE: NoteResponse = { state: "unavailable" };
 const REQUEST: NoteResponse = { state: "request" };
 
-const isoDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
 /** Count one outcome in the day's stats. Best effort: a stats write never changes the answer. */
 export async function countStat(store: NotesStore, net: string, nowMs: number, field: NoteStat): Promise<void> {
   try {
-    await store.hincr(statsKeyOf(net, isoDay(nowMs)), field, STATS_TTL_S);
+    await store.hincr(statsKeyOf(net, utcDayKey(nowMs)), field, STATS_TTL_S);
   } catch {
     // The store is down; the answer already says so where it matters.
   }
@@ -216,7 +216,7 @@ async function write(
     const seen = new Map<string, number>();
     for (const d of input.days) {
       // The nth notable day of a date takes that date's nth caption (`parseAnswer`).
-      const iso = isoDay(d.dayMs);
+      const iso = utcDayKey(d.dayMs);
       const n = (seen.get(iso) ?? 0) + 1;
       seen.set(iso, n);
       const caption = captions.get(n === 1 ? iso : `${iso}#${n}`);

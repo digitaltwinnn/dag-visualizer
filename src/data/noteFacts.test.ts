@@ -1,7 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { capitalFirst, fact, factsBlock, gaugeChange, heldLevel, networksAnchored, observedLevel, sayAll, spellDurations } from "@/src/data/noteFacts";
+import { capitalFirst, fact, factsBlock, gaugeChange, heldLevel, median, networksAnchored, observedLevel, sayAll, spellDurations } from "@/src/data/noteFacts";
 import { checkNote } from "@/src/data/noteHonesty";
 import { formatDag } from "@/src/data/trendSeries";
+
+describe("median", () => {
+  it("takes the middle value, or the mean of the two middle ones, leaving its input alone", () => {
+    const xs = [9, 1, 5];
+    expect(median(xs)).toBe(5);
+    expect(xs).toEqual([9, 1, 5]);
+    expect(median([1, 2, 3, 10])).toBe(2.5);
+  });
+});
 
 describe("fact", () => {
   it("writes each kind in the app's notation", () => {

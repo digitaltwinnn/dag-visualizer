@@ -2,7 +2,7 @@ import { createHash, createHmac } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fact } from "@/src/data/noteFacts";
 import { sampledIds } from "@/src/net/lineage";
-import { liveDeps, RATE_PER_HOUR, readNote, requestNote, WARM_BUDGET_MS, WARM_CONCURRENCY, WARM_SPACING_MS, warmNotes, type WarmDeps } from "./handlers";
+import { liveDeps, liveWarmDeps, RATE_PER_HOUR, readNote, requestNote, WARM_BUDGET_MS, WARM_CONCURRENCY, WARM_SPACING_MS, warmNotes, type WarmDeps } from "./handlers";
 import { GateError } from "./gate";
 import { capKeyOf, lockKeyOf, noteKeyOf, rateKeyOf, statsKeyOf } from "./keys";
 import type { NoteFacts } from "./sources";
@@ -501,6 +501,22 @@ describe("GET /api/notes/warm (cron)", () => {
 // env vars span every scope), so a miss there would write notes from the preview's code, draw on
 // the Gate's quota and count into production's go/no-go stats. Generation runs only where
 // `notesWritable()` holds (store.ts); elsewhere a cached note is served and a miss is `none`.
+describe("a warm pass reads the store once", () => {
+  it("sends every note of the pass, the digest and the countries through one read client", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("NOTES_STORE", "memory");
+    const span = vi.fn(async () => { throw new Error("stop here"); });
+    const geoDays = vi.fn(async () => { throw new Error("stop here"); });
+    const d = liveWarmDeps({ span, geoDays });
+    await d.facts("mainnet", "ledger", "all", "hours", 1).catch(() => null);
+    expect(span).toHaveBeenCalledTimes(2); // this note's two windows
+    await d.digest(1).catch(() => null);
+    expect(span.mock.calls.length).toBeGreaterThan(2);
+    await d.countries(1).catch(() => null);
+    expect(geoDays).toHaveBeenCalled();
+  });
+});
+
 describe("a preview deployment writes no notes (R66)", () => {
   it("the live deps carry `notesWritable()`: false on a preview", () => {
     vi.stubEnv("NODE_ENV", "development");

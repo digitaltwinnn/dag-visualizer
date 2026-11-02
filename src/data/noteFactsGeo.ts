@@ -1,9 +1,10 @@
-import { fact } from "@/src/data/noteFacts";
+import { fact, median } from "@/src/data/noteFacts";
 import { WHOLE_ACTIVITY_LABEL, activityFacts } from "@/src/data/noteFactsActivity";
 import { countChange, pickChanges, siteOfChange } from "@/src/data/noteChanges";
 import type { Fact, FactPair, NoteChange, NoteChangeSubject } from "@/src/data/noteTypes";
 import { anchorSeries } from "@/src/data/trendSeries";
 import { trimNewestPartial, type TrendsWindowData } from "@/src/data/trendWindow";
+import { utcDayKey } from "@/src/util/localTime";
 
 // GEOGRAPHY'S FACTS BUILDER — what the Geography note's model is shown.
 // THE WORD IS "THE NETWORK", NEVER "THE FLEET" (user, 2026-10-29): a label is what the model echoes
@@ -159,12 +160,6 @@ const sum = (m: Counts | undefined): number => {
   for (const n of m?.values() ?? []) t += n;
   return t;
 };
-
-function median(xs: readonly number[]): number {
-  const s = xs.slice().sort((a, b) => a - b);
-  const m = s.length >> 1;
-  return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2;
-}
 
 /** The days (oldest first) whose total is within 10% of the median over the up-to-7 CALENDAR days
  *  ending on them (a sparse store's neighbour a week back is not in the week). A day with a total of 0 is never measured; the median is over the window's non-zero days. */
@@ -565,7 +560,7 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
       : [];
     const was = ispThen ? providersOf(ispThen, providerNames) : null;
     const is = providersOf(ispNow, providerNames);
-    const sitesOn = (d: Day | null | undefined) => (d && !subjectNet ? input.siteDays?.[new Date(d.ms).toISOString().slice(0, 10)] : undefined);
+    const sitesOn = (d: Day | null | undefined) => (d && !subjectNet ? input.siteDays?.[utcDayKey(d.ms)] : undefined);
     const sitesThen = sitesOn(geoThen);
     const sitesNow = sitesOn(now);
     const providerRows = was

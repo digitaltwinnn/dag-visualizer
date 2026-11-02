@@ -1,4 +1,5 @@
 import { changeWords } from "@/src/data/noteChanges";
+import { median } from "@/src/data/noteFacts";
 import type { NotableDay } from "@/src/data/noteTypes";
 
 // NOTABLE DAYS — which days of the measured history deserve a line of their own. Code decides, a
@@ -73,12 +74,6 @@ export interface NotableInput {
   from?: number;
   /** Fill up to this many days with the range's extremes when the events fall short (default 0). */
   floor?: number;
-}
-
-function median(xs: number[]): number {
-  const s = xs.slice().sort((a, b) => a - b);
-  const m = s.length >> 1;
-  return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2;
 }
 
 /** The reading on day `i`: null when uncovered, else the stored value with an absent counter

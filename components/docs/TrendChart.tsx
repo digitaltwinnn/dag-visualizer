@@ -117,8 +117,8 @@ const TAP_SLOP = 8;
 /** A NOTABLE DAY ON A PLANE (user, 2026-10-30: "place the notable day markers on the applicable
  *  chart as well"): the day the AI note names, drawn where the cursor hairline is drawn — beside
  *  the memoised plot, never in it — as the one coin every surface draws on its baseline
- *  (`NoteKindCoin`, design C 2026-10-30), the timeline's own mark. `kind` rides along for the caller's pairing; the mark itself is
- *  decoration (the row and the diamond are the controls). */
+ *  (`NoteKindCoin`, design C 2026-10-30), the timeline's own mark. `kind` rides along for the caller's pairing. The coin is a
+ *  button that commits its day, as the card's row and the band's mark do. */
 export interface TrendMark {
   /** The UTC day's start. */
   dayMs: number;
@@ -804,8 +804,8 @@ export default function TrendChart({
               Structural accent, one hairline, no animation, no pointer events: it is a POSITION,
               and a position that eases in lags the gesture that set it. */}
           {/* THE NOTABLE DAYS (user, 2026-10-30), the timeline's diamonds on the plane's own
-              baseline, by the cursor's rule: the same fraction math, outside the memoised plot, no
-              pointer events (the AI card's row and the timeline's diamond are the controls). */}
+              baseline, by the cursor's rule: the same fraction math, outside the memoised plot. Each
+              coin is a button, as the AI card's row and the timeline's diamond are. */}
           {!held &&
             markXs.map((m) => {
               const coinTop = PLOT_MARGIN.top + plotInnerH(plotHeight) - 8;

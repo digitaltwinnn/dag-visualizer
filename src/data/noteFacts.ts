@@ -109,7 +109,7 @@ export function networksAnchored(
   return active ? { count: listed + 1, atLeast: true } : { count: listed, atLeast: false };
 }
 
-function median(xs: readonly number[]): number {
+export function median(xs: readonly number[]): number {
   const s = xs.slice().sort((a, b) => a - b);
   const m = s.length >> 1;
   return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2;
