@@ -1,5 +1,6 @@
-import { chainReadThrough, fact, networksAnchored, spanMeasured, type ChainReads } from "@/src/data/noteFacts";
-import { eventChange, largestSnapshotChange, longestGapChange, pickChanges, rhythmChange, withExtremes } from "@/src/data/noteChanges";
+import { isPause } from "@/src/data/notableDays";
+import { chainReadThrough, fact, median, networksAnchored, spanMeasured, type ChainReads } from "@/src/data/noteFacts";
+import { eventChange, largestSnapshotChange, longestGapChange, pauseChange, pickChanges, rateChange, rhythmChange, withExtremes } from "@/src/data/noteChanges";
 import type { Fact, FactPair, NoteChange, NoteLead } from "@/src/data/noteTypes";
 import { anchorSeries, formatDag, globalSeries, metricSeries, spanAverage, TREND_METRICS, trimCounterEdges, unlistedUnmeasured, withUnlisted } from "@/src/data/trendSeries";
 import type { TrendsWindowData } from "@/src/data/trendWindow";
@@ -62,6 +63,8 @@ const HOURS_PER_DAY = 24;
  *  anchors at least this many a day, or this many from one silent all week. Below it the day reads
  *  by chance: one snapshot every few days "went quiet" on most days and "became active" on the rest. */
 const EVENT_MIN_SNAPS = 3;
+/** A network's gap this close to the global snapshots' own is that stall, not one of its own. */
+const STALL_SHARED = 1.1;
 
 /** A pair's recent reading this far (as a ratio of its usual one) from 1 is a change worth leading
  *  with; under it, the note leads with the reading itself (R71). */
@@ -226,27 +229,54 @@ export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: st
   }
 
   if (!facts.length) return null;
-  // THE CARD'S ROWS, on the whole chamber's note: the networks whose rhythm left its usual one, read
-  // as a network's own note reads it. Nothing without a usual to stand against.
+  // THE CARD'S ROWS: what left its usual rhythm, read over the chamber's networks, or over the one
+  // network a note is about (user, 2026-11-02: a 2.3 hour gap on Digital Evidence's card said nothing).
+  // Nothing without a usual to stand against.
   const events: NoteChange[] = [];
+  const paused: NoteChange[] = [];
   const paces: NoteChange[] = [];
-  if (whole && weekCovered) {
+  const rateRows: NoteChange[] = [];
+  /** The recent widest gap, when it is a pause against the week's usual widest one. */
+  const pauseOf = (key: string): { gap: number; usual: number } | null => {
+    const gap = longestGap(recent.series[key] ?? [], recent);
+    const widths = trimmed(week.series[key] ?? [], week).filter((v): v is number => v != null && v > 0);
+    if (gap == null || !widths.length) return null;
+    const usual = median(widths);
+    return isPause(gap, usual) ? { gap, usual } : null;
+  };
+  const seconds = (v: number) => fact("", v, "duration").text;
+  if (weekCovered) {
     const dayMeasured = spanMeasured(trimmed(recent.series["g.ticks"] ?? [], recent), recent.stepMs);
-    for (const id of ids) {
+    // A STALL OF THE WHOLE NETWORK IS ONE ROW: every chain waits on the global snapshots, so one row
+    // per network would say the same thing up to three times.
+    const stall = whole ? pauseOf("g.gapMax") : null;
+    if (stall) paused.push(pauseChange("Global snapshots", seconds(stall.gap), seconds(stall.usual), stall.gap, { kind: "network", id: "dag" }));
+    for (const id of whole ? ids : [subject]) {
       const snaps = (d: TrendsWindowData) => metricSeries("snapshots", id, d.series).points;
       const total = (d: TrendsWindowData) => trimmed(snaps(d), d).reduce<number>((a, v) => a + (v ?? 0), 0);
       const spacing = (d: TrendsWindowData) => spanAverage("continuity", trimmed(metricSeries("continuity", id, d.series).points, d), d.stepMs, trimmed(snaps(d), d));
-      const subject = { kind: "network", id } as const;
+      const at = { kind: "network", id } as const;
       const now = total(recent);
       const usual = total(week);
       const name = catalog[id] ?? id;
       const sure = dayMeasured && chainReadThrough(input.chainReads, id, recent.now);
       const daily = spanAverage("snapshots", trimmed(snaps(week), week), week.stepMs) ?? 0;
-      if (sure && now === 0 && daily >= EVENT_MIN_SNAPS) events.push(eventChange(name, "quiet", subject));
-      else if (sure && now >= EVENT_MIN_SNAPS && usual <= now) events.push(eventChange(name, "active", subject)); // the week's snapshots are all the day's
+      if (sure && now === 0 && daily >= EVENT_MIN_SNAPS) events.push(eventChange(name, "quiet", at));
+      else if (sure && now >= EVENT_MIN_SNAPS && usual <= now) events.push(eventChange(name, "active", at)); // the week's snapshots are all the day's
       else {
-        const change = rhythmChange(name, spacing(week) ?? 0, spacing(recent) ?? 0, subject);
+        const change = rhythmChange(name, spacing(week) ?? 0, spacing(recent) ?? 0, at);
         if (change) paces.push(change);
+      }
+      const gap = pauseOf(`m.${id}.gapMax`);
+      if (gap && !(stall && gap.gap <= STALL_SHARED * stall.gap)) paused.push(pauseChange(name, seconds(gap.gap), seconds(gap.usual), gap.gap, at));
+      if (!sure) continue;
+      for (const [metric, word, unit, floor] of [["fees", "fees", "DAG", 1 / HOURS_PER_DAY], ["kb", "data", "MB", 1 / HOURS_PER_DAY]] as const) {
+        const nowRate = perHour(metric, metricSeries(metric, id, recent.series).points, recent);
+        const usualRate = perHour(metric, metricSeries(metric, id, week.series).points, week);
+        if (nowRate == null || usualRate == null || Math.max(nowRate, usualRate) < floor) continue;
+        const text = (v: number) => `${fact("", v, "amount", TREND_METRICS[metric].format).text} ${unit}`;
+        const change = rateChange(`${name} ${word}`, nowRate, usualRate, text(nowRate), text(usualRate), at);
+        if (change) rateRows.push(change);
       }
     }
   }
@@ -267,8 +297,8 @@ export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: st
     const fee = held((id) => `m.${id}.feeMax`);
     const gap = held((id) => `m.${id}.gapMax`);
     if (fee) extremes.push(largestSnapshotChange(named(fee.id)[0], `${formatDag(fee.v * TREND_METRICS.fees.scale)} DAG`, named(fee.id)[1]));
-    if (gap) extremes.push(longestGapChange(named(gap.id)[0], gap.v, named(gap.id)[1]));
+    if (gap && !paused.length) extremes.push(longestGapChange(named(gap.id)[0], gap.v, named(gap.id)[1])); // a pause is that gap
   }
-  const changes = withExtremes(pickChanges(events, paces), extremes);
+  const changes = withExtremes(pickChanges(events, paused, paces, rateRows), extremes);
   return { facts, names: [...new Set(Object.values(catalog))], lead: leadOf(facts), ...(changes.length ? { changes } : {}) };
 }

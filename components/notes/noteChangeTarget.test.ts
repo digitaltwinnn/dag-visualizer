@@ -36,6 +36,9 @@ describe("changeActions: a row commits what the view's explorer row commits", ()
     expect(acts.some((a) => a.kind === "filter")).toBe(false);
     expect(acts.at(-1)).toEqual({ kind: "tickNet", sel: { metaId: "dor", globalOrdinal: 7 } });
   });
+  it("the chamber's own row has no network to open in Snapshots", () => {
+    expect(changeActions(change({ kind: "network", id: "dag" }), "ledger", STATE, [], TICK)).toBeNull();
+  });
   it("a network with no tick in reach has nothing to open", () => {
     expect(changeActions(change({ kind: "network", id: "dor" }), "ledger", STATE, [], null)).toBeNull();
   });

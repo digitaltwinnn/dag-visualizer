@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { NotableKind } from "@/src/data/noteTypes";
-import { NOTABLE_CAPS, NOTABLE_FLOOR, notableDays, rangeExtremes, withDayChange } from "@/src/data/notableDays";
+import { NOTABLE_CAPS, NOTABLE_FLOOR, isPause, notableDays, rangeExtremes, withDayChange } from "@/src/data/notableDays";
 
 const DAY = 86_400_000;
 const T0 = Date.UTC(2026, 8, 1);
@@ -539,5 +539,57 @@ describe("withDayChange", () => {
   });
   it("never doubles a percentage the caption already states", () => {
     expect(withDayChange("up 9% on usual", day("peak", 109, 100))).toBe("up 9% on usual");
+  });
+});
+
+// EVERY MEASURE GETS ITS OWN ANOMALIES (user, 2026-11-02: "check also cadence, size, fees, etc"). A
+// day's cadence is its snapshot count inverted, so a spike or dip there is already the count's; a gap
+// is the pause, and the rest are their own rows.
+describe("the measures beyond the snapshot count", () => {
+  const D = 86_400_000;
+  const days = Array.from({ length: 30 }, (_, i) => 1_700_000_000_000 - (1_700_000_000_000 % D) + i * D);
+  const covered = days.map(() => 100);
+  const base = (over: Record<string, (number | null)[]>) => ({ days, covered, ids: ["dor"], cap: 5, from: 0, series: over });
+  const flat = (v: number) => days.map(() => v);
+  const at = (v: number, i: number, odd: number) => days.map((_, k) => (k === i ? odd : v));
+
+  it("the whole network pauses too", () => {
+    const r = notableDays({ ...base({ "g.anchors": flat(50), "g.ticks": flat(50), "g.gapMax": at(60, 20, 8000) }), subject: "dag" });
+    expect(r).toMatchObject([{ dayMs: days[20], kind: "pause", networkId: null, value: 8000, level: 60 }]);
+  });
+
+  it("leaves blocks to the charts: a normal day swings them twofold, which filled every slot live", () => {
+    expect(notableDays({ ...base({ "m.dor.snaps": flat(50), "m.dor.blocks": at(100, 20, 500) }), subject: "dor" })).toEqual([]);
+  });
+
+  it("reads a network's fees and data", () => {
+    const row = (key: string, normal: number, odd: number) => ({ "m.dor.snaps": flat(50), [key]: at(normal, 20, odd) });
+    expect(notableDays({ ...base(row("m.dor.fee", 5e8, 40e8)), subject: "dor" })).toMatchObject([{ dayMs: days[20], kind: "high", measure: "fees" }]);
+    expect(notableDays({ ...base(row("m.dor.kb", 20_000, 2_000)), subject: "dor" })).toMatchObject([{ dayMs: days[20], kind: "low", measure: "kb" }]);
+  });
+
+  it("reads the whole network's from its stored floors", () => {
+    const r = notableDays({ ...base({ "g.anchors": flat(50), "g.ticks": flat(50), "g.feeFloor": at(5e8, 20, 40e8) }), subject: "dag" });
+    expect(r).toMatchObject([{ kind: "high", measure: "fees", networkId: null }]);
+  });
+
+  it("calls nothing notable under a measure's own floor", () => {
+    expect(notableDays({ ...base({ "m.dor.snaps": flat(50), "m.dor.fee": at(1e6, 20, 40e6) }), subject: "dor" })).toEqual([]);
+    expect(notableDays({ ...base({ "m.dor.snaps": flat(50), "m.dor.kb": at(100, 20, 10) }), subject: "dor" })).toEqual([]);
+  });
+
+  it("tells one day once, the snapshot count first", () => {
+    const r = notableDays({ ...base({ "m.dor.snaps": at(50, 20, 200), "m.dor.fee": at(5e8, 20, 40e8), "m.dor.kb": at(20_000, 20, 90_000) }), subject: "dor" });
+    expect(r).toHaveLength(1);
+    expect(r[0]).toMatchObject({ kind: "high", value: 200 });
+    expect(r[0]!.measure).toBeUndefined();
+  });
+});
+
+describe("isPause", () => {
+  it("needs both an hour and six times the usual widest gap", () => {
+    expect(isPause(3600, 600)).toBe(true);
+    expect(isPause(3599, 60)).toBe(false);
+    expect(isPause(3600, 601)).toBe(false);
   });
 });

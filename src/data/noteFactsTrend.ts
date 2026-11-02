@@ -148,7 +148,7 @@ const STOPPED_MS = 3 * DAY_MS;
 export const trendSilent = (subject: string, cur: TrendsWindowData): boolean =>
   subject !== "dag" && subject !== UNLISTED_ID && !metricSeries("snapshots", subject, cur.series).points.some((v) => (v ?? 0) > 0);
 
-const dayMeasured = (d: NotableDay): "count" | "duration" => (d.kind === "pause" || d.kind === "longest" ? "duration" : "count");
+const dayMeasured = (d: NotableDay): Fact["kind"] => (d.kind === "pause" || d.kind === "longest" ? "duration" : d.measure === "fees" || d.measure === "kb" ? "amount" : "count");
 
 export function trendFacts(input: TrendFactsInput): TrendFacts | null {
   const { subject, zoom, span, names: catalog, blurbs: blurbOf } = input;
@@ -366,12 +366,19 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
         : "pause";
       const kind = dayMeasured(day);
       const measured =
-        day.kind === "pause" || day.kind === "longest" ? "longest wait between snapshots"
+        day.kind === "pause" || day.kind === "longest" ? `longest wait between ${dag ? "global snapshots" : "snapshots"}`
         : day.kind === "broadest" ? "networks that anchored that day"
         : day.measure === "globals" ? "global snapshots that day"
+        // The whole network's fees and data are read from the stored floors (`notableDays`), which
+        // leave out what the unlisted chains paid and wrote.
+        : day.measure === "fees" ? `DAG in fees that day${dag ? ", at least" : ""}`
+        : day.measure === "kb" ? `MB of data that day${dag ? ", at least" : ""}`
         : "snapshots anchored that day";
+      const metric = day.measure === "fees" || day.measure === "kb" ? TREND_METRICS[day.measure] : null;
+      const read = (v: number) => (metric ? v * metric.scale : v);
+      const format = metric?.format;
       facts.push(fact(`Notable day ${n} date (${what})`, day.dayMs, "date"));
-      facts.push(fact(`Notable day ${n} ${what}, ${measured}`, day.value, kind));
+      facts.push(fact(`Notable day ${n} ${what}, ${measured}`, read(day.value), kind, format));
       // The level beside it: an event's USUAL level (the median before it), an extreme's SPAN median.
       const level =
         day.kind === "high" || day.kind === "low" ? "usual level"
@@ -380,7 +387,7 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
         : day.kind === "longest" ? "span median longest wait"
         : day.kind === "broadest" ? "span median networks"
         : null;
-      if (level) facts.push(fact(`Notable day ${n} ${what}, ${level}`, day.level, kind));
+      if (level) facts.push(fact(`Notable day ${n} ${what}, ${level}`, read(day.level), kind, format));
       if (dag && (day.kind === "first" || day.kind === "last") && day.networkId && blurbOf[day.networkId]) {
         const line = `${nameOf(day.networkId)} is: ${blurbOf[day.networkId]}`;
         if (!blurbs.includes(line)) blurbs.push(line);

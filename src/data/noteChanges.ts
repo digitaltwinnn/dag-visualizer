@@ -59,6 +59,18 @@ export function withMovePercents(note: string, facts: readonly Fact[]): string {
   return out;
 }
 
+/** A gap far past a chain's usual widest one (`isPause`). The words are the facts' own. */
+export function pauseChange(name: string, gap: string, usual: string, seconds: number, subject: NoteChangeSubject): NoteChange {
+  return { kind: "pause", subject, size: seconds, text: `${name} paused for ${gap}, the longest gap is usually ${usual}` };
+}
+
+/** A rate far from its usual one, on the notable days' own bands (`notableDays.ts`), or null. */
+export function rateChange(name: string, now: number, usual: number, nowText: string, usualText: string, subject: NoteChangeSubject): NoteChange | null {
+  if (!(usual > 0)) return null;
+  const kind = now >= 2 * usual ? "high" : now <= 0.4 * usual ? "low" : null;
+  return kind && { kind, subject, size: Math.abs(Math.log(Math.max(now, 1e-9) / usual)), text: `${name} ran at ${nowText} an hour, usually ${usualText}` };
+}
+
 /** TWO WHOLE SPANS ARE NOT A START AND AN END (user, 2026-11-02). Code writes the comparison: the
  *  model keeps saying "fell to 64 from 73", and the gate sending that back cost whole notes of
  *  several figures, whose retries ran past the sentence limit. Runs before the gate, which still

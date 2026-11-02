@@ -573,6 +573,20 @@ describe("trendFacts names: the whole catalog", () => {
 // rule, for every network.
 // THE WHOLE NETWORK'S NODES ARE ALL OF THEM (user, 2026-11-02): a note on the whole network said "nodes
 // fell from 132 to 67", the DAG's own validators, beside 87 everywhere else in the app.
+describe("a notable day of another measure", () => {
+  const span = { fromMs: T0, toMs: T0 + 40 * DAY };
+  const daily = (over: Record<string, (number | null)[]>) => win(40, { "g.ticks": row(40, () => 288), "m.bio.snaps": row(40, () => 50), ...over }, T0 - 0 * DAY);
+  it("states it in that measure's own unit", () => {
+    const r = trendFacts(input({ subject: "bio", zoom: "30d", span, daily: daily({ "m.bio.fee": row(40, (i) => (i === 30 ? 40e8 : 5e8)) }), cur: win(7, week(2)), prev: null }))!;
+    expect(r.facts.find((f) => /spike, DAG in fees that day/.test(f.label))?.text).toBe("40");
+    expect(r.facts.find((f) => /spike, usual level/.test(f.label))?.text).toBe("5");
+  });
+  it("marks the whole network's as a floor, since the unlisted chains may not be in it", () => {
+    const r = trendFacts(input({ zoom: "30d", span, daily: daily({ "g.anchors": row(40, () => 100), "g.feeFloor": row(40, (i) => (i === 30 ? 40e8 : 5e8)) }), cur: win(7, week(2)), prev: null }))!;
+    expect(r.facts.some((f) => /spike, DAG in fees that day, at least/.test(f.label))).toBe(true);
+  });
+});
+
 describe("a span against the one before it", () => {
   it("marks the pair, so the gate can hold how it is written; a gauge's start and end stay unmarked", () => {
     const r = trendFacts(input({}))!;

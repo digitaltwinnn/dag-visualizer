@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { NOTE_CHANGES_CAP, RHYTHM_CHANGE, changeWords, countChange, withMovePercents, eventChange, largestSnapshotChange, longestGapChange, pickChanges, rhythmChange, siteOfChange, withExtremes, withSpanComparisons } from "@/src/data/noteChanges";
+import { NOTE_CHANGES_CAP, RHYTHM_CHANGE, changeWords, countChange, withMovePercents, eventChange, largestSnapshotChange, longestGapChange, pauseChange, pickChanges, rateChange, rhythmChange, siteOfChange, withExtremes, withSpanComparisons } from "@/src/data/noteChanges";
 import { fact } from "@/src/data/noteFacts";
 import type { Fact, NoteChange } from "@/src/data/noteTypes";
 
@@ -212,5 +212,20 @@ describe("withSpanComparisons", () => {
   });
   it("ends in a sentence the percentage reaches", () => {
     expect(withMovePercents(withSpanComparisons("Fees fell to 64 from 73.", facts, null), facts)).toBe("Fees fell to 64, down 12% from 73.");
+  });
+});
+
+describe("a pause and a rate, as rows", () => {
+  it("states the gap beside the usual widest one", () => {
+    expect(pauseChange("Digital Evidence", "2.3 hours", "38 seconds", 8280, NET)).toEqual({ kind: "pause", subject: NET, size: 8280, text: "Digital Evidence paused for 2.3 hours, the longest gap is usually 38 seconds" });
+  });
+  it("states a rate at least twice or at most 0.4 of its usual one", () => {
+    expect(rateChange("Dor fees", 12, 4, "12 DAG", "4 DAG", NET)).toMatchObject({ kind: "high", text: "Dor fees ran at 12 DAG an hour, usually 4 DAG" });
+    expect(rateChange("Dor data", 1, 4, "1 MB", "4 MB", NET)).toMatchObject({ kind: "low", text: "Dor data ran at 1 MB an hour, usually 4 MB" });
+  });
+  it("says nothing inside that band, or against no usual", () => {
+    expect(rateChange("Dor fees", 7, 4, "7 DAG", "4 DAG", NET)).toBeNull();
+    expect(rateChange("Dor fees", 2, 4, "2 DAG", "4 DAG", NET)).toBeNull();
+    expect(rateChange("Dor fees", 2, 0, "2 DAG", "0 DAG", NET)).toBeNull();
   });
 });

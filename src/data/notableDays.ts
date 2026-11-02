@@ -54,6 +54,13 @@ const QUIET_DAYS = 3;
 /** A pause: this many times the network's median widest gap, and at least this many seconds. */
 const PAUSE_RATIO = 6;
 const PAUSE_FLOOR_S = 3600;
+/** The fewest of a measure, in its stored unit, that can be high or the usual a low stands against:
+ *  a DAG in fees, a MB of data. Under these a ratio is noise. */
+const FEE_FLOOR = 1e8;
+const KB_FLOOR = 1024;
+
+/** Whether a widest gap is a pause against a chain's usual one. */
+export const isPause = (value: number, level: number): boolean => value >= PAUSE_FLOOR_S && value >= PAUSE_RATIO * level;
 
 export interface NotableInput {
   /** UTC-midnight starts, oldest first. */
@@ -154,6 +161,7 @@ function highLow(
   networkId: string | null,
   out: NotableDay[],
   measure?: NotableDay["measure"],
+  min: { high: number; low: number } = { high: HIGH_FLOOR, low: 0 },
 ): void {
   const { days, covered } = input;
   const act = activity(row, input);
@@ -184,7 +192,7 @@ function highLow(
       keep.day(null); // no level, no ratio — a network waking up is a `first`, not a high
       continue;
     }
-    const kind = value >= HIGH_RATIO * level && value >= HIGH_FLOOR ? "high" : value <= LOW_RATIO * level ? "low" : null;
+    const kind = value >= HIGH_RATIO * level && value >= min.high ? "high" : value <= LOW_RATIO * level && level >= min.low ? "low" : null;
     keep.day(kind ? { dayMs: days[i]!, kind, networkId, ...(measure ? { measure } : {}), value, level, score: scoreOf(value, level) } : null);
   }
   keep.flush();
@@ -211,7 +219,7 @@ function firstLast(row: readonly (number | null)[], input: NotableInput, network
   }
 }
 
-function pauses(gap: readonly (number | null)[], input: NotableInput, networkId: string, out: NotableDay[]): void {
+function pauses(gap: readonly (number | null)[], input: NotableInput, networkId: string | null, out: NotableDay[]): void {
   const { days, covered } = input;
   const had: number[] = [];
   for (let i = 0; i < days.length; i++) {
@@ -224,8 +232,7 @@ function pauses(gap: readonly (number | null)[], input: NotableInput, networkId:
   for (let i = Math.max(0, input.from ?? 0); i < days.length; i++) {
     const value = reading(gap, covered, i);
     if (value == null) continue;
-    const paused = value >= PAUSE_FLOOR_S && value >= PAUSE_RATIO * level;
-    keep.day(paused ? { dayMs: days[i]!, kind: "pause", networkId, value, level, score: scoreOf(value, level) } : null);
+    keep.day(isPause(value, level) ? { dayMs: days[i]!, kind: "pause", networkId, value, level, score: scoreOf(value, level) } : null);
   }
   keep.flush();
 }
@@ -303,18 +310,30 @@ export function rangeExtremes(input: NotableInput): NotableDay[] {
 export function notableDays(input: NotableInput): NotableDay[] {
   const { series, subject, ids, cap } = input;
   const out: NotableDay[] = [];
+  /** A further measure's days, one event a day: what is already told keeps its day. */
+  const also = (row: readonly (number | null)[] | undefined, networkId: string | null, measure: NotableDay["measure"], min?: { high: number; low: number }) => {
+    if (!row) return;
+    const taken = new Set(out.map((d) => d.dayMs));
+    const more: NotableDay[] = [];
+    highLow(row, input, networkId, more, measure, min);
+    out.push(...more.filter((d) => !taken.has(d.dayMs)));
+  };
+  // A day's CADENCE is its snapshot count inverted, so a spike or dip in it is already the count's;
+  // a gap is the pause. Fees and data can move on their own. Blocks are not read: an ordinary day
+  // swings them twofold, and live they took four of a span's five rows.
+  const rest = (fee: string, kb: string, networkId: string | null) => {
+    also(series[fee], networkId, "fees", { high: FEE_FLOOR, low: FEE_FLOOR });
+    also(series[kb], networkId, "kb", { high: KB_FLOOR, low: KB_FLOOR });
+  };
   if (subject === "dag") {
     // TWO MEASURES (user, 2026-11-01): the total anchored barely moves, so a year found one day of
-    // it, and the network's own pace, a stall or a step up in global snapshots, went unread.
-    const total = series["g.anchors"];
-    if (total) highLow(total, input, null, out);
-    const globals = series["g.ticks"];
-    if (globals) {
-      const taken = new Set(out.map((d) => d.dayMs));
-      const paced: NotableDay[] = [];
-      highLow(globals, input, null, paced, "globals");
-      out.push(...paced.filter((d) => !taken.has(d.dayMs)));
-    }
+    // it, and the network's own pace, a stall or a step up in global snapshots, went unread. A
+    // stall is the pause first (user, 2026-11-02): that is the day's story, not its low count.
+    const gap = series["g.gapMax"];
+    if (gap) pauses(gap, input, null, out);
+    also(series["g.anchors"], null, undefined);
+    also(series["g.ticks"], null, "globals");
+    rest("g.feeFloor", "g.kbFloor", null);
     for (const id of ids) {
       const snaps = series[`m.${id}.snaps`];
       if (snaps) firstLast(snaps, input, id, out);
@@ -327,6 +346,7 @@ export function notableDays(input: NotableInput): NotableDay[] {
     }
     const gap = series[`m.${subject}.gapMax`];
     if (gap) pauses(gap, input, subject, out);
+    rest(`m.${subject}.fee`, `m.${subject}.kb`, subject);
   }
   // ONE DAY, ONE EVENT: a network's last day is usually thin and its first usually thick, and that
   // is the ending or the beginning, not a second story (live 2026-10-30: Aug 15 was listed twice).
