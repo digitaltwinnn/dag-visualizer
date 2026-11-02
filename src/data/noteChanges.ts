@@ -138,3 +138,7 @@ export function pickChanges(...lists: (readonly NoteChange[])[]): NoteChange[] {
   }
   return out;
 }
+
+/** The chamber's rows: what moved, and its extremes only in the slots left. */
+export const withExtremes = (moved: readonly NoteChange[], extremes: readonly NoteChange[]): NoteChange[] =>
+  [...moved, ...pickChanges(extremes)].slice(0, NOTE_CHANGES_CAP);

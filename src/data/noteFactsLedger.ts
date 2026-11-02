@@ -1,5 +1,5 @@
 import { fact, networksAnchored } from "@/src/data/noteFacts";
-import { eventChange, largestSnapshotChange, longestGapChange, pickChanges, rhythmChange } from "@/src/data/noteChanges";
+import { eventChange, largestSnapshotChange, longestGapChange, pickChanges, rhythmChange, withExtremes } from "@/src/data/noteChanges";
 import type { Fact, FactPair, NoteChange, NoteLead } from "@/src/data/noteTypes";
 import { anchorSeries, formatDag, globalSeries, metricSeries, spanAverage, TREND_METRICS, trimCounterEdges, unlistedUnmeasured, withUnlisted } from "@/src/data/trendSeries";
 import type { TrendsWindowData } from "@/src/data/trendWindow";
@@ -260,6 +260,6 @@ export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: st
     if (fee) extremes.push(largestSnapshotChange(named(fee.id)[0], `${formatDag(fee.v * TREND_METRICS.fees.scale)} DAG`, named(fee.id)[1]));
     if (gap) extremes.push(longestGapChange(named(gap.id)[0], gap.v, named(gap.id)[1]));
   }
-  const changes = pickChanges(events, paces, extremes);
+  const changes = withExtremes(pickChanges(events, paces), extremes);
   return { facts, names: [...new Set(Object.values(catalog))], lead: leadOf(facts), ...(changes.length ? { changes } : {}) };
 }
