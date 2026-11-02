@@ -54,9 +54,7 @@ import type { Fact } from "@/src/data/noteTypes";
 // figure standing between the two may read as the one that changed ("the fleet has 86 nodes and
 // Germany 33, down from 173" passes on the fleet's pair), and a current figure two pairs share
 // satisfies either ("Germany has 19 nodes, the US 33, down from 66" with both at 33). Adjacency
-// still costs some honest forms a retry: ends coordinated ("from 67 and 58 to 33 and 27"), a pair
-// written current-first followed by another ("to 33 from 67, and the US to 27 from 58"), or a past
-// value followed by a number of another clause ("fell to 86, from 173; Germany has 33").
+// still costs some honest forms a retry: ends coordinated ("from 67 and 58 to 33 and 27").
 
 export type NoteCheck = { ok: true } | { ok: false; reasons: string[] };
 
@@ -76,7 +74,7 @@ const NUMBER_WORD_RE = new RegExp(`\\b(?:${Object.keys(NUMBER_WORDS).join("|")})
 
 const LAYER_RE = /\b[cd]?L[01]s?\b/g;
 // `\b` at the START only: "ticks" and "machines" are the words banned, "sticky" is not "tick".
-const BANNED_RE = /\bmachine|\btick|\bL1 snapshot|\bfeeless|\bdecentrali|\bfleet|\blocated nodes/gi;
+const BANNED_RE = /\bmachine|\btick|\bL1 snapshot|\bfeeless|\bdecentrali|\bfleet|\blocated nodes|\b(?:grew|gained|lost|rose|fell|dropped|shrank)(?: the)? most\b|\b(?:is|are) shown\b|\bsignificant/gi;
 // QUANTITY WORDS THE GATE CANNOT CHECK fail closed: with no token produced, nothing would be
 // compared and "Thirty networks" or "BioFi grew threefold" would pass unread. The ratio words it
 // DOES check (doubled, tripled, quadrupled, halved, twice) are exempted by `unverifiable`.
@@ -172,6 +170,11 @@ function near(t: Tok, v: number): boolean {
   return zero ? v === 0 : Math.abs(v - t.value) <= t.tol + 1e-9 * Math.max(1, Math.abs(v));
 }
 
+const UP_OR_DOWN_FROM_RE = /\b(?:up|down) from\s+$/i;
+
+/** A move verb directly on a bare decimal ("rose 14.03"): a ratio can be quoted, never moved by. */
+const MOVED_BY_RE = /\b(rose|fell|grew|climbed|dropped|increased|decreased|declined|slipped)\s+(\d+\.\d+)(?![\d%x]|\s*times)/gi;
+
 function backed(t: Tok, facts: readonly Fact[], ratios: readonly Fact[], dir: Dir): boolean {
   // A RATIO QUOTED AS WRITTEN ("a ratio of 0.98"): a plain number backs itself only when it IS the
   // text of a ratio fact this sentence may cite, character for character (R33).
@@ -194,9 +197,11 @@ function says(t: Tok, f: Fact, ratios: readonly Fact[], dir: Dir): boolean {
   return candidates(f, t.cls, ratios, dir).some((v) => near(t, v));
 }
 
+const TO_NEXT_RE = /^\s*(?:\p{L}+\s+){0,3}to\s+\d/iu;
+
 /** Why the past value `toks[i]` fails, or null when its neighbour is its pair's current figure.
  *  `past[k]` says whether `toks[k]` is itself a past value. */
-function pastReason(i: number, toks: readonly Tok[], past: readonly boolean[], facts: readonly Fact[], ratios: readonly Fact[], dir: Dir): string {
+function pastReason(i: number, s: string, toks: readonly Tok[], past: readonly boolean[], facts: readonly Fact[], ratios: readonly Fact[], dir: Dir): string {
   const t = toks[i]!;
   const nows = facts
     .filter((f) => f.pair?.end === "from" && says(t, f, ratios, dir))
@@ -206,6 +211,10 @@ function pastReason(i: number, toks: readonly Tok[], past: readonly boolean[], f
   // A size or a span is no end: "down 50%" or "over 30 days" between the two is skipped.
   const qualifies = (u: Tok, k: number) => k !== i && !past[k] && (u.cls === t.cls || u.cls === "plain");
   const isNow = (u: Tok) => nows.some((g) => g && says(u, g, ratios, dir));
+  // WRITTEN CURRENT FIGURE FIRST ("averaged 7,478, up from 4,021, and nodes fell from 163 to 87"): the
+  // figure just before it is its own, and no "to" hands it another. What follows is another clause.
+  const before = toks.slice(0, i).findLastIndex((u, k) => qualifies(u, k));
+  if (before >= 0 && isNow(toks[before]!) && !TO_NEXT_RE.test(s.slice(t.end))) return "";
   const after = toks.findIndex((u, k) => k > i && qualifies(u, k));
   // Nothing current follows: its current figure may stand ANYWHERE before it (R65), and the reason
   // names the nearest figure there.
@@ -377,9 +386,21 @@ export function checkNote(
     toks.forEach((t, k) => {
       if (isCurrent[k]) return;
       if (!isPast[k]) return void reasons.push(`"${t.raw}" is not backed by any measured fact`);
-      const why = pastReason(k, toks, isPast, facts, own, dir);
+      const why = pastReason(k, digits, toks, isPast, facts, own, dir);
       if (why) reasons.push(why);
     });
+    // TWO WHOLE SPANS ARE NOT A START AND AN END (user, 2026-11-02): "rose from 4,021 to 7,478" over
+    // two 30-day averages read as a climb inside the span. The figures are right, so `backed` passes it.
+    toks.forEach((t, k) => {
+      if (!isPast[k]) return;
+      const past = facts.find((f) => f.pair?.end === "from" && f.pair.span && says(t, f, own, dir));
+      if (!past || UP_OR_DOWN_FROM_RE.test(digits.slice(0, t.at))) return;
+      const now = facts.find((f) => f.pair?.key === past.pair!.key && f.pair.end === "to");
+      reasons.push(`${past.text} and ${now?.text} are two whole spans, not a start and an end: write ${now?.text} first, then "up from" or "down from" ${past.text}`);
+    });
+    for (const m of s.matchAll(MOVED_BY_RE)) {
+      if (ratios.some((f) => f.text === m[2])) reasons.push(`"${m[0]}" writes a ratio as how far a figure moved: give the figures instead`);
+    }
     for (const m of digits.matchAll(ORDINAL_RE)) {
       if (m[1]!.toLowerCase() === "second" && A_SECOND_RE.test(digits.slice(0, m.index))) continue;
       if (!rankBacked(m[1]!, facts)) reasons.push(`"${m[1]}" is not backed by a rank fact`);

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { bannedWords, checkNote, undash } from "@/src/data/noteHonesty";
+import { fact } from "@/src/data/noteFacts";
 import type { Fact } from "@/src/data/noteTypes";
 
 const F = (label: string, value: number, kind: Fact["kind"], text: string): Fact => ({ label, value, kind, text });
@@ -353,9 +354,8 @@ describe("checkNote — a past value stands beside its own current figure (R60, 
     expect(reasons("The network locates 9 nodes in 12 countries, down from 173.", withCountries)).toEqual([
       "173 is a past value; the figure beside it, 12, is not its current figure 86",
     ]);
-    expect(reasons("Germany fell to 33 from 67, and the United States to 27 from 58.")).toEqual([
-      "67 is a past value; the figure beside it, 27, is not its current figure 33",
-    ]);
+    // Each pair written current figure first binds to the figure just before it (user, 2026-11-02).
+    expect(gate("Germany fell to 33 from 67, and the United States to 27 from 58.")).toEqual({ ok: true });
   });
 
   it("holds numbers that are no past value to the one-fact rule, a range included", () => {
@@ -423,6 +423,48 @@ describe("checkNote — a past value stands beside its own current figure (R60, 
   ];
   const r = (t: string) => checkNote(t, rates, []);
 
+  // A SPAN AGAINST THE ONE BEFORE IT (user, 2026-11-02): the current figure first, on its own sentence.
+  it("passes a comparison written current figure first, with a second change after it", () => {
+    const span = [fact("Global snapshots, per day, this span", 7478, "count", undefined, { key: "g", end: "to" }), fact("Global snapshots, per day, previous span", 4021, "count", undefined, { key: "g", end: "from" }), fact("Nodes at the start of the span", 163, "count", undefined, { key: "n", end: "from" }), fact("Nodes at the end of the span", 87, "count", undefined, { key: "n", end: "to" }), fact("Span length", 30 * 86_400, "duration")];
+    expect(checkNote("Over the last 30 days, global snapshots averaged 7,478 per day, up from 4,021 in the 30 days before. Nodes fell from 163 to 87.", span, [], { maxSentences: 3, subject: undefined })).toEqual({ ok: true });
+    expect(checkNote("Global snapshots averaged 7,478 per day, up from 4,021 in the 30 days before, and nodes fell from 163 to 87.", span, [], { maxSentences: 3, subject: undefined })).toEqual({ ok: true });
+    // The figure before it has to be its own, and it has to end there: "to 87" hands it another.
+    expect(checkNote("Nodes stood at 87, up from 4,021.", span, [], { maxSentences: 3, subject: undefined }).ok).toBe(false);
+    expect(checkNote("Global snapshots stood at 7,478, down from 4,021 to 87.", span, [], { maxSentences: 3, subject: undefined }).ok).toBe(false);
+  });
+
+  it("sends back two whole spans written as a start and an end, the reason naming the way to write them", () => {
+    const pair = (end: "from" | "to") => ({ key: "g", end, span: true }) as const;
+    const span = [fact("Blocks, per day, this span", 227, "count", undefined, pair("to")), fact("Blocks, per day, previous span", 355, "count", undefined, pair("from")), fact("Gap, this span", 12, "duration", undefined, { key: "c", end: "to", span: true }), fact("Gap, previous span", 21, "duration", undefined, { key: "c", end: "from", span: true })];
+    const check = (note: string) => checkNote(note, span, [], { maxSentences: 3 });
+    const failed = check("Blocks fell from 355 to 227 per day.");
+    expect(failed.ok).toBe(false);
+    expect(!failed.ok && failed.reasons[0]).toMatch(/two whole spans.*write 227 first.*355/);
+    expect(check("The gap went from 21 seconds to 12 seconds.").ok).toBe(false);
+    expect(check("The gap went from 21 to 12 seconds.").ok).toBe(false);
+    expect(check("Blocks fell to 227 per day from 355.").ok).toBe(false);
+    expect(check("Blocks averaged 227 per day, down from 355.")).toEqual({ ok: true });
+  });
+
+  it("leaves a start and an end alone: those did move inside the span", () => {
+    const gauge = [fact("Nodes at the start", 163, "count", undefined, { key: "n", end: "from" }), fact("Nodes at the end", 87, "count", undefined, { key: "n", end: "to" })];
+    expect(checkNote("Nodes fell from 163 to 87.", gauge, [], { maxSentences: 3 })).toEqual({ ok: true });
+  });
+
+  it("sends back a ratio written as how far a figure moved", () => {
+    const ratio = [fact("Dor snapshots, ratio to previous span", 14.03, "ratio")];
+    expect(checkNote("Dor rose 14.03.", ratio, ["Dor"], { maxSentences: 3 }).ok).toBe(false);
+    expect(checkNote("Dor held a ratio of 14.03.", ratio, ["Dor"], { maxSentences: 3 })).toEqual({ ok: true });
+  });
+
+  it("sends back a note that says which moved most, or describes the card", () => {
+    expect(bannedWords("Digital Evidence grew most")).toEqual(["grew most"]);
+    expect(bannedWords("Dor lost the most nodes")).toEqual(["lost the most"]);
+    expect(bannedWords("the network's activity is shown")).toEqual(["is shown"]);
+    expect(bannedWords("BioFi saw significant activity")).toEqual(["significant"]);
+    expect(bannedWords("most nodes run in Germany")).toEqual([]);
+  });
+
   it("reads a pair at each number's written precision, and a bare number with the unit it is joined to", () => {
     expect(r("Global snapshots rose from 41.2K to 49.5K a day.").ok).toBe(true);
     expect(r("Global snapshots rose to 49,512 per day from 41,200.").ok).toBe(true);
@@ -459,7 +501,6 @@ describe("checkNote — a past value stands beside its own current figure (R60, 
     expect(gate("Germany has 19 nodes, the US 33, down from 66.", live)).toEqual({ ok: true });
     // Adjacency's cost: honest forms whose ends do not sit side by side fail, and the model retries.
     expect(gate("Germany and the United States fell from 67 and 58 to 33 and 27.").ok).toBe(false); // coordinated ends
-    expect(gate("Germany fell to 33 from 67, and the United States to 27 from 58.").ok).toBe(false); // a later pair's figure follows
-    expect(gate("Nodes fell to 86, from 173; Germany has 33.").ok).toBe(false); // a later clause's number follows
+    expect(gate("The network fell to 86, from 173; Germany has 33.")).toEqual({ ok: true }); // the figure before it is its own
   });
 });

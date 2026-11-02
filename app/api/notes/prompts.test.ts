@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { NoteView, NotableDay } from "@/src/data/noteTypes";
-import { CAPTION_FORMAT, LINE_FORMAT, PROMPTS, QUESTION_COMMON_WHOLE, VOICE, buildMessages, parseAnswer, spanWords } from "./prompts";
+import { CAPTION_FORMAT, LINE_FORMAT, PROMPTS, QUESTION_COMMON_WHOLE, VOICE, buildMessages, parseAnswer, spanBeforeWords, spanWords } from "./prompts";
 
 const VIEWS: NoteView[] = ["hyper", "geo", "ledger", "trend"];
 
@@ -221,6 +221,42 @@ describe("PROMPTS", () => {
     for (const v of VIEWS) expect(PROMPTS[v].system("x", undefined, true)).not.toMatch(/—|\s[–-]\s/);
     expect(PROMPTS.ledger.system("x", { kind: "now" })).not.toMatch(/—|\s[–-]\s/);
     expect(VOICE).not.toMatch(/—|\s[–-]\s/);
+  });
+});
+
+// A SPAN AGAINST THE ONE BEFORE IT IS NOT A CLIMB INSIDE THE SPAN (user, 2026-11-02): "over the last 30
+// days, global snapshots rose 86% from 4,021 to 7,478" was two averages, and inside the span they
+// rose about a third.
+describe("the span before", () => {
+  it("is named by the pill's own length, and only where one was read", () => {
+    expect(spanBeforeWords("trend", "1h")).toBe("the hour before");
+    expect(spanBeforeWords("trend", "24h")).toBe("the 24 hours before");
+    expect(spanBeforeWords("trend", "7d")).toBe("the 7 days before");
+    expect(spanBeforeWords("trend", "30d")).toBe("the 30 days before");
+    expect(spanBeforeWords("trend", "90d")).toBe("the 90 days before");
+    expect(spanBeforeWords("trend", "1y")).toBe("the year before");
+    expect(spanBeforeWords("trend", "all")).toBeNull();
+    expect(spanBeforeWords("trend", `r0-${20 * 86_400_000}`)).toBe("the 20 days before");
+    expect(spanBeforeWords("trend", `r0-${86_400_000}`)).toBe("the day before");
+    expect(spanBeforeWords("trend", "r1-2")).toBe("the same length of time before");
+    expect(spanBeforeWords("hyper", "day")).toBeNull();
+    expect(spanBeforeWords("ledger", "hours")).toBeNull();
+  });
+  it("reaches the model beside the span", () => {
+    const user = buildMessages("trend", "x", "Facts", null, undefined, undefined, undefined, undefined, "the last 30 days", undefined, undefined, "the 30 days before")[1]!.content;
+    expect(user).toContain("Span: the last 30 days\nSpan before: the 30 days before\n\nFacts:");
+  });
+  it("tells History's note what those figures are, and how to write them", () => {
+    const system = PROMPTS.trend.system("x");
+    expect(system).toMatch(/a figure for "this span" or the "previous span" is that whole span/i);
+    expect(system).toMatch(/never say it rose or fell over the span/i);
+    expect(system).toContain("Span before line");
+    expect(system).toMatch(/averaged <this span's figure> per day, up from <the previous span's figure with its unit>/);
+    expect(PROMPTS.geo.system("x")).not.toContain("Span before line");
+  });
+  it("leaves the tour's line to write figures as the note does", () => {
+    expect(LINE_FORMAT).not.toContain("from X to Y");
+    expect(LINE_FORMAT).toMatch(/both numbers as the note writes them/);
   });
 });
 

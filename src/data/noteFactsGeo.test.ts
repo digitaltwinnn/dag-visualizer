@@ -750,8 +750,35 @@ describe("geoFacts' notable changes", () => {
     expect(geoFacts(input({ geoDays: flat, ccDays: ccOf(flat) }))!.changes).toBeUndefined();
     expect(geoFacts(input())!.changes).toBeUndefined();
   });
-  it("a subject's note is not the card's: no rows", () => {
-    expect(geoFacts(input({ ...week, subject: { cc: "DE" } }))!.changes).toBeUndefined();
+  // A SUBJECT CARD'S ROWS (user, 2026-11-02): its own move, and where inside it that happened.
+  describe("a subject card's rows", () => {
+    const site = (ovh: number) => ({ "f.site.DE.Falkenstein.ovh-sas": ovh, "f.site.DE.Falkenstein.hetzner-online-gmbh": 20 });
+    const sites = { siteDays: { "2026-10-20": site(12), "2026-10-27": site(10) } };
+    it("a country says its own move, which has nowhere to go from its own card", () => {
+      const r = geoFacts(input({ ...week, subject: { cc: "DE" } }))!;
+      expect(r.changes?.[0]).toMatchObject({ kind: "lost", text: "Germany lost 2 nodes, down 4%", subject: { kind: "self" } });
+    });
+    it("then the provider and city that moved inside it, which open that group", () => {
+      const r = geoFacts(input({ ...week, ...sites, subject: { cc: "DE" } }))!;
+      expect(r.changes?.[1]).toMatchObject({ text: "OVH lost 2 nodes in Falkenstein, down 17%", subject: { kind: "provider", keys: ["ovh-sas"], cc: "DE", city: "Falkenstein" } });
+    });
+    it("a provider says its own move and where", () => {
+      const r = geoFacts(input({ ...week, ...sites, subject: { isp: "ovh-sas" } }))!;
+      expect(r.changes?.map((c) => c.text)).toEqual(["OVH lost 2 nodes, down 17%", "OVH lost 2 nodes in Falkenstein, down 17%"]);
+      expect(r.changes?.[0]!.subject).toEqual({ kind: "self" });
+    });
+    it("a network's country or provider says its own move: nothing stores a network by place", () => {
+      const was2: DaySpec = { ...NOW, net: { ...NOW.net, usdc: { cc: { DE: 9 }, isp: { "ovh-sas": 9 } } } };
+      const days = run("2026-10-27", 8, (i) => (i < 2 ? was2 : NOW));
+      const scoped = { geoDays: days, ccDays: ccOf(days), ...sites };
+      const here = geoFacts(input({ ...scoped, subject: { cc: "DE", net: "usdc" } }))!;
+      expect(here.changes?.map((c) => c.subject)).toEqual([{ kind: "self" }]);
+      expect(here.changes?.[0]!.text).toMatch(/^USDC\.dag (lost|gained) \d+ nodes? in Germany/);
+    });
+    it("a quiet week has no rows", () => {
+      const flat = run("2026-10-27", 8, () => NOW);
+      expect(geoFacts(input({ geoDays: flat, ccDays: ccOf(flat), subject: { cc: "DE" } }))!.changes).toBeUndefined();
+    });
   });
 });
 

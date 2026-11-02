@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { NOTE_CHANGES_CAP, RHYTHM_CHANGE, changeWords, countChange, withMovePercents, eventChange, largestSnapshotChange, longestGapChange, pickChanges, rhythmChange, siteOfChange, withExtremes } from "@/src/data/noteChanges";
+import { NOTE_CHANGES_CAP, RHYTHM_CHANGE, changeWords, countChange, withMovePercents, eventChange, largestSnapshotChange, longestGapChange, pauseChange, pickChanges, siteMoves, rateChange, rhythmChange, siteOfChange, withExtremes, withSpanComparisons } from "@/src/data/noteChanges";
 import { fact } from "@/src/data/noteFacts";
 import type { Fact, NoteChange } from "@/src/data/noteTypes";
 
@@ -165,5 +165,83 @@ describe("withMovePercents", () => {
   });
   it("does not stop short of a longer number", () => {
     expect(withMovePercents("Nodes fell from 91 to 830.", facts)).toBe("Nodes fell from 91 to 830.");
+  });
+  // A SPAN AGAINST THE ONE BEFORE IT (user, 2026-11-02): the current figure first, since "rose from X
+  // to Y" read as a climb inside the span.
+  it("takes a comparison written current figure first", () => {
+    expect(withMovePercents("Activity averaged 1,941 per day, up from 1,754 in the 30 days before.", facts)).toBe("Activity averaged 1,941 per day, up 11% from 1,754 in the 30 days before.");
+    expect(withMovePercents("Cadence averaged 12 seconds, down from 21 seconds.", facts)).toBe("Cadence averaged 12 seconds, down 43% from 21 seconds.");
+  });
+  it("leaves one whose direction or current figure is not the pair's", () => {
+    expect(withMovePercents("Activity averaged 1,941 per day, down from 1,754.", facts)).toBe("Activity averaged 1,941 per day, down from 1,754.");
+    expect(withMovePercents("Activity averaged 1,800 per day, up from 1,754.", facts)).toBe("Activity averaged 1,800 per day, up from 1,754.");
+    expect(withMovePercents("Activity held at 1,941. It is up from 1,754.", facts)).toBe("Activity held at 1,941. It is up from 1,754.");
+  });
+});
+
+// TWO WHOLE SPANS ARE NOT A START AND AN END (user, 2026-11-02). The model keeps writing "fell to 64
+// from 73", and a retry on a note of several figures ran past the sentence limit and lost the note,
+// so code writes the comparison the way it adds the percentage.
+describe("withSpanComparisons", () => {
+  const pair = (key: string, from: number, to: number, kind: Fact["kind"] = "count"): Fact[] => [
+    fact(`${key}, previous span`, from, kind, undefined, { key, end: "from", span: true }),
+    fact(`${key}, this span`, to, kind, undefined, { key, end: "to", span: true }),
+  ];
+  const facts = [...pair("globals", 4021, 7478), ...pair("fees", 73, 64), ...pair("gap", 21, 12, "duration")];
+  const before = "the 30 days before";
+  it("turns a start and an end into a figure and what it stood at before", () => {
+    expect(withSpanComparisons("Global snapshots rose from 4,021 to 7,478 per day.", facts, null)).toBe("Global snapshots rose to 7,478, up from 4,021 per day.");
+    expect(withSpanComparisons("Fees fell to 64 DAG per day from 73.", facts, null)).toBe("Fees fell to 64 DAG per day, down from 73.");
+  });
+  it("writes a shared unit out, so the figure reads as the facts state it", () => {
+    expect(withSpanComparisons("Cadence widened from 21 to 12 seconds.", facts, null)).toBe("Cadence widened to 12 seconds, down from 21 seconds.");
+    expect(withSpanComparisons("Cadence slowed to 12 seconds from 21.", facts, null)).toBe("Cadence slowed to 12 seconds, down from 21 seconds.");
+  });
+  it("names the span before once, at the first comparison", () => {
+    expect(withSpanComparisons("Global snapshots averaged 7,478 per day, up from 4,021 per day. Fees fell to 64 DAG per day from 73.", facts, before))
+      .toBe("Global snapshots averaged 7,478 per day, up from 4,021 per day in the 30 days before. Fees fell to 64 DAG per day, down from 73.");
+    expect(withSpanComparisons("Fees averaged 64, down from 73 in the 30 days before.", facts, before)).toBe("Fees averaged 64, down from 73 in the 30 days before.");
+    expect(withSpanComparisons("Fees averaged 64, down from 73 in the previous span.", facts, before)).toBe("Fees averaged 64, down from 73 in the 30 days before.");
+    expect(withSpanComparisons("Fees averaged 64, down from 73 the 30 days before.", facts, before)).toBe("Fees averaged 64, down from 73 in the 30 days before.");
+  });
+  it("leaves a gauge's start and end, a form already right, and a pair the note does not state", () => {
+    const gauge = [fact("Nodes at the start", 163, "count", undefined, { key: "n", end: "from" }), fact("Nodes at the end", 87, "count", undefined, { key: "n", end: "to" })];
+    expect(withSpanComparisons("Nodes fell from 163 to 87.", gauge, before)).toBe("Nodes fell from 163 to 87.");
+    expect(withSpanComparisons("Fees averaged 64, down from 73.", facts, null)).toBe("Fees averaged 64, down from 73.");
+    expect(withSpanComparisons("Fees fell from 73 to 640.", facts, null)).toBe("Fees fell from 73 to 640.");
+  });
+  it("ends in a sentence the percentage reaches", () => {
+    expect(withMovePercents(withSpanComparisons("Fees fell to 64 from 73.", facts, null), facts)).toBe("Fees fell to 64, down 12% from 73.");
+  });
+});
+
+describe("a pause and a rate, as rows", () => {
+  it("states the gap beside the usual widest one", () => {
+    expect(pauseChange("Digital Evidence", "2.3 hours", "38 seconds", 8280, NET)).toEqual({ kind: "pause", subject: NET, size: 8280, text: "Digital Evidence paused for 2.3 hours, the longest gap is usually 38 seconds" });
+  });
+  it("states a rate at least twice or at most 0.4 of its usual one", () => {
+    expect(rateChange("Dor fees", 12, 4, "12 DAG", "4 DAG", NET)).toMatchObject({ kind: "high", text: "Dor fees ran at 12 DAG an hour, usually 4 DAG" });
+    expect(rateChange("Dor data", 1, 4, "1 MB", "4 MB", NET)).toMatchObject({ kind: "low", text: "Dor data ran at 1 MB an hour, usually 4 MB" });
+  });
+  it("says nothing inside that band, or against no usual", () => {
+    expect(rateChange("Dor fees", 7, 4, "7 DAG", "4 DAG", NET)).toBeNull();
+    expect(rateChange("Dor fees", 2, 4, "2 DAG", "4 DAG", NET)).toBeNull();
+    expect(rateChange("Dor fees", 2, 0, "2 DAG", "0 DAG", NET)).toBeNull();
+  });
+});
+
+describe("siteMoves", () => {
+  const f = (cc: string, city: string, key: string) => `f.site.${cc}.${city}.${key}`;
+  const then = { [f("DE", "Falkenstein", "ovh")]: 12, [f("DE", "Berlin", "ovh")]: 3, [f("US", "Ashburn", "aws")]: 5 };
+  const now = { [f("DE", "Falkenstein", "ovh")]: 10, [f("DE", "Berlin", "ovh")]: 3, [f("US", "Ashburn", "aws")]: 5, [f("DE", "Bonn", "hetzner")]: 2 };
+  it("names each provider's move at each place, held counts left out", () => {
+    expect(siteMoves(now, then, (cc) => cc === "DE")).toEqual([
+      { cc: "DE", city: "Falkenstein", key: "ovh", from: 12, to: 10 },
+      { cc: "DE", city: "Bonn", key: "hetzner", from: 0, to: 2 },
+    ]);
+  });
+  it("needs both days", () => {
+    expect(siteMoves(now, undefined, () => true)).toEqual([]);
+    expect(siteMoves(undefined, then, () => true)).toEqual([]);
   });
 });

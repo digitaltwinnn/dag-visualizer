@@ -203,6 +203,8 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
   const facts: Fact[] = [];
   /** The card's rows, per kind of move (`pickChanges`): what started or stopped, then the counts. */
   let events: NoteChange[] = [];
+  /** A line for the model: what this note has no start for. */
+  let unread: string | null = null;
   let counts: NoteChange[] = [];
 
   /** A gauge's start, end and ratio, or only its current level where it began late. */
@@ -320,6 +322,10 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
     // say how the subject relates to the rung's distribution, and "how it stands" was parroted).
     const own = heldLevel(points) ?? ch.to;
     if (groups > 1) facts.push(fact(`${name}, rank among its layer groups by nodes`, 1 + held.filter((v) => v > own).length, "count"));
+    // A group whose series began inside the week has no start of the span's to move from.
+    const moved = spanChange(points);
+    if (moved) counts = [countChange(`${roleKeyLabel(type).label} group`, moved.from, moved.to, { kind: "self" })].filter((c) => c != null);
+    else unread = `${name} nodes ${words} has no reading from the start of the span: say nothing about whether it moved or held.`;
   } else {
     const name = mention(subject);
     named.push(subject);
@@ -399,7 +405,7 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
     }
   }
 
-  const blurbs: string[] = [];
+  const blurbs: string[] = unread ? [unread] : [];
   for (const id of named) {
     const line = blurbOf[id] ? `${nameOf(id)} is: ${blurbOf[id]}` : "";
     if (line && !blurbs.includes(line)) blurbs.push(line);

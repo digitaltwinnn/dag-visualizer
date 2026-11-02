@@ -331,7 +331,7 @@ describe("factsFor — the per-view read table", () => {
 
   it("a brushed range reads the tier the range is charted at, and the equal span before it", async () => {
     const from = Date.UTC(2026, 9, 1);
-    const to = Date.UTC(2026, 9, 11);
+    const to = Date.UTC(2026, 9, 6);
     const r = fakeReads();
     await factsFor("mainnet", "trend", "dag", `r${from}-${to}`, NOW, r);
     const tier = pickRangeTier(from, to);
@@ -579,6 +579,15 @@ describe("the store reads", () => {
     await reads.span("mainnet", "1d", NOW - 30 * D, NOW);
     await reads.span("mainnet", "1d", NOW - 60 * D, NOW - 30 * D);
     expect(n).toBe(1); // one year hash, read once
+  });
+
+  it("a brushed range of a week or more reads the daily tier through today, for what came after it", async () => {
+    const reads = fakeReads();
+    await factsFor("mainnet", "trend", "dag", `r${NOW - 40 * D}-${NOW - 20 * D}`, NOW, reads);
+    expect(reads.calls.some((c) => c.tier === "1d" && c.to === NOW)).toBe(true);
+    const short = fakeReads();
+    await factsFor("mainnet", "trend", "dag", `r${NOW - 25 * D}-${NOW - 22 * D}`, NOW, short);
+    expect(short.calls.some((c) => c.to === NOW)).toBe(false);
   });
 
   it("storeReads answers each chain's last read from the cursor hash", async () => {

@@ -45,15 +45,28 @@ describe("the notes card is part of the stack", () => {
   });
 });
 
+describe("a subject card's rows", () => {
+  const rows = read("components/notes/NoteRows.tsx");
+  const subject = read("components/notes/SubjectNote.tsx");
+  it("are the top card's own, under the note", () => {
+    expect(subject).toMatch(/<NoteFoot res=\{res\} view=\{asked\.view\} subject=\{key!\} onCard \/>/);
+    expect(read("components/notes/NotesCard.tsx")).toMatch(/<NoteFoot res=\{res\} view=\{subject\.view\} subject=\{titleKey\} \/>/);
+  });
+  it("stay on the card: a click that would close it is a closed door", () => {
+    expect(rows).toMatch(/onCard && acts && !staysOnCard\(acts\)/);
+  });
+});
+
 describe("the notes card's own behaviour", () => {
   const card = read("components/notes/NotesCard.tsx");
+  const rows = read("components/notes/NoteRows.tsx");
 
   // THE OTHER VIEWS' ROWS (user, 2026-10-31): a sentence code wrote, committing its subject through
   // the one executor (rule 2; `noteChangeTarget`), and folded like the days, under their own title.
   it("a view note's notable changes share the days' fold and commit through the executor", () => {
-    expect(card).toMatch(/word="day"/);
-    expect(card).toMatch(/word="change"/);
-    const body = fnBody(card, "function ChangeRow(");
+    expect(rows).toMatch(/word="day"/);
+    expect(rows).toMatch(/word="change"/);
+    const body = fnBody(rows, "function ChangeRow(");
     expect(body).toMatch(/applyClickActions\(acts\)/);
     expect(body).toMatch(/<NoteKindCoin kind=\{change\.kind\} \/>/);
     expect(body).toMatch(/<NoteText text=\{change\.text\} \/>/);
@@ -63,7 +76,7 @@ describe("the notes card's own behaviour", () => {
   // bottom edge with their coins stacked. Open, they unfold BELOW it, the door staying at the head of
   // them (same day: "the control at the bottom when it's expanded looks strange").
   it("a note's rows fold into the card's foot, mounted only when open", () => {
-    const body = fnBody(card, "function NoteRows(");
+    const body = fnBody(rows, "function NoteRows(");
     expect(body).toMatch(/const \[open, setOpen\] = useState\(false\);/);
     expect(body).toMatch(/\{open && \(\s*<div id=\{panel\} className=\{LAST_ROW\}>\s*\{children\}/);
     expect(body).toMatch(/expanded=\{open\}/);
@@ -79,7 +92,7 @@ describe("the notes card's own behaviour", () => {
   // then the caption, which wraps rather than truncates (nothing a hover would have to reveal).
   // The kind's word rides along for assistive tech; the mark is decoration.
   it("a notable day's row leads with its date and its kind mark, the caption wrapping after them", () => {
-    const body = fnBody(card, "function DayRow(");
+    const body = fnBody(rows, "function DayRow(");
     // ONE COIN ON EVERY SURFACE (user, 2026-10-30, design option C of three in the brainstorming
     // companion): the kind's glyph on a 16px violet coin — the row's mark, the timeline's mark and
     // the chart plane's mark are the same `NoteKindCoin`, so the three never disagree in shape or size.
@@ -88,7 +101,7 @@ describe("the notes card's own behaviour", () => {
     expect(body).toMatch(/\bwrap\b/);
     expect(body).toMatch(/sr-only[^]*?NOTE_KIND_WORD\[day\.kind\]/);
     expect(read("components/icons.tsx")).toMatch(/export const NOTE_KIND_ICONS: Record<NotableKind \| NoteChangeKind, LucideIcon>/);
-    expect(card).toMatch(/import \{ NOTE_KIND_WORD, daysByDate \} from "\.\/noteDays";/);
+    expect(rows).toMatch(/import \{ NOTE_KIND_WORD, daysByDate \} from "\.\/noteDays";/);
     const coin = read("components/notes/NoteKindCoin.tsx");
     expect(coin).toMatch(/NOTE_KIND_ICONS\[kind\]/);
     expect(coin).toMatch(/size-4 rounded-full/);
@@ -169,7 +182,7 @@ describe("the notes card's own behaviour", () => {
     const home = read("components/notes/commitNoteDay.ts");
     expect(home).toMatch(/applyClickActions\(noteDayActions\(/);
     expect(home).toMatch(/setTrendRange\(notableDaySpan\(/);
-    for (const f of ["components/notes/NotesCard.tsx", "components/notes/NoteDiamonds.tsx", "components/TrendStack.tsx"]) {
+    for (const f of ["components/notes/NoteRows.tsx", "components/notes/NoteDiamonds.tsx", "components/TrendStack.tsx"]) {
       expect(read(f), f).toMatch(/commitNoteDay\(/);
       expect(read(f), f).not.toMatch(/setTrendRange\(\{ fromMs: (day|d)\w*\.?\w*, toMs/);
     }
@@ -279,7 +292,7 @@ describe("subject notes live on their cards", () => {
     // card"): no box, no fill, no sweep of its own. The mark sits under the title's kind mark and the
     // words on the title's column, so its width plus the gap is the kind mark's 16px plus its 8.
     expect(src).not.toMatch(/AI_SWEEP/);
-    expect(src).toMatch(/data-note-lead="" className="mt-2\.5 mb-3 flex gap-\[9px\]"/);
+    expect(src).toMatch(/data-note-lead="" className="mt-2\.5 mb-3"/);
     // The head's rule stands down for it, wherever a card's body wraps it, and only while it stands:
     // a card with no note to have keeps its rule. The rule's own margins go with it.
     const head = read("components/CardHead.tsx");
@@ -349,7 +362,7 @@ describe("network names in a note", () => {
     expect(typed).toMatch(/<NoteText text=\{text\} \/>/);
     expect(typed).toMatch(/<NoteText text=\{text\} upto=\{shown\} \/>/);
     expect(typed).toMatch(/<span className="sr-only">\{text\}<\/span>/);
-    expect(read("components/notes/NotesCard.tsx")).toMatch(/<NoteText text=\{day\.caption\} \/>/);
+    expect(read("components/notes/NoteRows.tsx")).toMatch(/<NoteText text=\{day\.caption\} \/>/);
     const text = read("components/notes/NoteText.tsx");
     expect(text).toMatch(/className="\[--ident-l:var\(--ident-note-l\)\]"/);
     expect(text).not.toMatch(/dangerouslySetInnerHTML|font-|<a\b|onClick/);
@@ -360,7 +373,7 @@ describe("network names in a note", () => {
 // write a preview channel by hand, so they carry the same gate, or a tap leaves the preview standing.
 describe("a note's rows take no hover from a tap", () => {
   it("previews on a mouse's enter and a non-tap's focus", () => {
-    const notes = read("components/notes/NotesCard.tsx");
+    const notes = read("components/notes/NoteRows.tsx");
     for (const body of [fnBody(notes, "function DayRow("), fnBody(notes, "function ChangeRow("), fnBody(read("components/docs/TrendChart.tsx"), "function MarkCoin(")]) {
       expect(body).toMatch(/e\.pointerType === "mouse"/);
       expect(body).toMatch(/focusPreviews\(\)/);

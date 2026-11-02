@@ -1,31 +1,16 @@
 "use client";
 
-import { ChevronDown } from "lucide-react";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-
 import CardHead, { RailPane } from "@/components/CardHead";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { AI_NOTES_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { Door, QualifierChip } from "@/components/inspector/parts";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { cn } from "@/lib/utils";
-import { useFeedRead } from "@/components/useFeedRead";
-import { focusPreviews } from "@/components/useSubjectPairing";
-import { latestTickOf } from "@/src/data/ladderLevels";
-import { getNetwork } from "@/src/data/network";
-import type { NotableKind, NoteChange, NoteChangeKind, NoteDay, NoteView } from "@/src/data/noteTypes";
 import { spanPhrase } from "@/src/data/trendWindow";
-import { ledgerNetwork } from "@/src/engine/domain/tickNet";
-import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
-import { rangeDays } from "@/src/util/localTime";
-import { commitNoteDay } from "./commitNoteDay";
-import { changeActions, changeHover } from "./noteChangeTarget";
 import { AI_TITLE, noteSpanWords } from "./noteSubject";
-import NoteKindCoin from "./NoteKindCoin";
-import NoteText from "./NoteText";
+import { DOOR_RUN, NoteFoot } from "./NoteRows";
 import TypedNote from "./TypedNote";
-import { NOTE_KIND_WORD, daysByDate } from "./noteDays";
 import { useAiNote, useWaited } from "./useAiNote";
 
 // THE AI NOTES CARD (2026-10-27) — a few sentences a model wrote about what the view is showing,
@@ -61,7 +46,6 @@ import { useAiNote, useWaited } from "./useAiNote";
 // no markdown. The server's honesty gate checked its numbers before it was stored; nothing here
 // interprets it.
 
-const DAY_MS = 86_400_000;
 /** THE RAIL'S OWN HEAD GRAMMAR (user, 2026-10-29: "re-use the same card structure as the others in
  *  the rung"): a TITLE with a kind mark at its left, a QUALIFIER CHIP as the aside, the note where
  *  every card puts its first descriptive line ("Anchored by 4 metagraphs") — and NO EYEBROW (user:
@@ -73,177 +57,6 @@ const DAY_MS = 86_400_000;
  *  History's is the window pill on screen), to the right like the dossier's ticker (user: "a
  *  pill-type of element to the right like on other cards"), so the body carries no Span row and no
  *  Written row ("implied by 'last 6 hours'"). */
-
-// THE CARD'S CONTROLS ARE DOORS (`parts.tsx` — the one way a card draws a way out, with the
-// per-ground wash the user ruled). They sit flush on the card's bottom edge (RecordsDoor's foot
-// geometry): the run bleeds by the card's padding below, and its last door takes the inner radius.
-/** The most coins the foot stacks: enough to say what kinds are inside, in the row's own height. */
-const STACK_MAX = 3;
-const LAST_ROW = "[&>:last-child]:rounded-b-[calc(var(--radius)-1px)]";
-const DOOR_RUN = `-mb-[var(--card-pad)] ${LAST_ROW}`;
-
-/** One notable day: DATE AND KIND LEAD (user, 2026-10-30, design option B of four in the
- *  brainstorming companion), then the caption. The date is the door's label at a fixed width so
- *  the rows align; the kind mark is the one coin every surface draws (`NoteKindCoin`, design C); the
- *  caption WRAPS rather than truncating (no hover reveals text here, the tooltip rule), and the
- *  prompt keeps it to a short clause since the row already says the date and the kind. Hover
- *  previews the day (`hoverNoteDay`), a click commits it as History's range. */
-function DayRow({ day }: { day: NoteDay }) {
-  const lit = useStore((s) => s.hoverNoteDay === day.dayMs);
-  // THE ROW CLEARS ONLY WHAT IT SET: a row unmounting under the pointer (a new note, the card
-  // closing) leaves no hover behind — nothing else clears this channel — but must not clear a day
-  // another surface lit in the meantime.
-  const mine = useRef(false);
-  useEffect(
-    () => () => {
-      const st = useStore.getState();
-      if (mine.current && st.hoverNoteDay === day.dayMs) st.setHoverNoteDay(null);
-    },
-    [day.dayMs],
-  );
-  const on = () => {
-    mine.current = true;
-    useStore.getState().setHoverNoteDay(day.dayMs);
-  };
-  const off = () => {
-    mine.current = false;
-    useStore.getState().setHoverNoteDay(null);
-  };
-  return (
-    <Door
-      tone="ai"
-      lit={lit}
-      wrap
-      label={
-        <span className="inline-flex items-center gap-2">
-          <span className="w-[3.4em] text-label tabular-nums">{rangeDays(day.dayMs, day.dayMs + DAY_MS)}</span>
-          <NoteKindCoin kind={day.kind} />
-          <span className="sr-only">{NOTE_KIND_WORD[day.kind]}</span>
-        </span>
-      }
-      onPointerEnter={(e) => e.pointerType === "mouse" && on()}
-      onPointerLeave={off}
-      onFocus={() => focusPreviews() && on()}
-      onBlur={off}
-      onClick={() => commitNoteDay(day)}
-    >
-      <NoteText text={day.caption} />
-    </Door>
-  );
-}
-
-/** ONE NOTABLE CHANGE (user, 2026-10-31): what moved over the note's span, the kind's coin then a
- *  sentence code wrote, so unlike a day's caption it is never the model's. The row is the subject's:
- *  it commits and hovers what the view's explorer row for that subject does (`noteChangeTarget`).
- *  A subject with nothing to open any more is listed all the same, as a closed door. */
-function ChangeRow({ change, view }: { change: NoteChange; view: NoteView }) {
-  useFeedRead(["clusters", "api-geo"], "Notable change");
-  useFeedRead(["global", "metasnaps"], "Notable change", view === "ledger");
-  const selNodes = useStore((s) => s.selNodes);
-  const hover = changeHover(change, selNodes);
-  const lit = useStore((s) => {
-    if (!hover) return false;
-    if (hover.channel === "filter") return s.hoverFilter === hover.key;
-    return (hover.channel === "country" ? s.hoverCountry : s.hoverGroup) === hover.key;
-  });
-  const actions = () => {
-    const s = useStore.getState();
-    const net = view === "ledger" ? getNetwork() : null;
-    const id = change.subject.kind === "network" ? change.subject.id : null;
-    const state = {
-      filter: s.filter,
-      railNet: s.railNet,
-      country: s.country,
-      cohort: s.cohort,
-      composition: s.composition,
-      hasInspect: !!s.inspect,
-      metaSnap: s.metaSnap,
-      ledgerNet: ledgerNetwork({ filter: s.filter, tickNet: s.tickNet, snapOrdinal: s.snap?.data.ordinal ?? null }),
-    };
-    return changeActions(change, view, state, s.selNodes, net && id ? latestTickOf(net.metaSnaps, net.globalSnapshots, id) : null);
-  };
-  const preview = (on: boolean) => {
-    if (!hover) return;
-    const s = useStore.getState();
-    if (hover.channel === "filter") return s.setHoverFilter(on ? hover.key : null);
-    if (hover.channel === "group") {
-      s.setHoverGroup(on ? hover.key : null);
-      s.setHoverCohort(on ? (hover.nodes ?? null) : null);
-    }
-    if (hover.channel === "country" || hover.cc) s.setHoverCountry(on ? (hover.cc ?? hover.key) : null);
-  };
-  // A row can leave under the pointer: its click moves the note on. Nothing else clears a hover.
-  const held = useRef(false);
-  const release = useRef(preview);
-  release.current = preview;
-  useEffect(() => () => {
-    if (held.current) release.current(false);
-  }, []);
-  const on = () => {
-    held.current = true;
-    preview(true);
-  };
-  const off = () => {
-    held.current = false;
-    preview(false);
-  };
-  return (
-    <Door
-      tone="ai"
-      lit={lit}
-      wrap
-      disabled={actions() == null}
-      label={<NoteKindCoin kind={change.kind} />}
-      onPointerEnter={(e) => e.pointerType === "mouse" && on()}
-      onPointerLeave={off}
-      onFocus={() => focusPreviews() && on()}
-      onBlur={off}
-      onClick={() => {
-        const acts = actions();
-        if (acts) applyClickActions(acts);
-      }}
-    >
-      <NoteText text={change.text} />
-    </Door>
-  );
-}
-
-/** A NOTE'S ROWS, ON THE CARD'S FOOT (user, 2026-10-31, option B of five). The card tops the lane, so
- *  a run of rows open by default would push the view's subject cards down the rail (2026-10-27), and
- *  a label floating between the note and the rows belonged to neither. Folded, they are one door on
- *  the card's bottom edge, the "Snapshot records" recipe, their coins stacked to say what is inside.
- *  Open, they unfold below it (same day: a control left under its own list "looks strange"), so the
- *  chevron says the plain thing: down to open, up to close. Keyed on the subject by the caller, so a
- *  new subject starts folded. */
-function NoteRows({ word, kinds, children }: { word: string; kinds: readonly (NotableKind | NoteChangeKind)[]; children: ReactNode }) {
-  const [open, setOpen] = useState(false);
-  const panel = useId();
-  return (
-    <div className={cn("mt-3", DOOR_RUN)}>
-      <Door
-        tone="ai"
-        expanded={open}
-        controls={panel}
-        onClick={() => setOpen((o) => !o)}
-        label={
-          <span aria-hidden className="inline-flex [&>:not(:first-child)]:-ml-[5px]">
-            {kinds.slice(0, STACK_MAX).map((k, i) => (
-              <NoteKindCoin key={i} kind={k} />
-            ))}
-          </span>
-        }
-        glyph={<ChevronDown className={cn("size-3.5 transition-transform motion-reduce:transition-none", open && "rotate-180")} />}
-      >
-        {kinds.length} notable {word}{kinds.length === 1 ? "" : "s"}
-      </Door>
-      {open && (
-        <div id={panel} className={LAST_ROW}>
-          {children}
-        </div>
-      )}
-    </div>
-  );
-}
 
 /** The door that asks for the on-request window note (the 1H pill): the first ask, and the ask
  *  again after a write that failed (R68). A brushed range's note is the Range card's, asked
@@ -333,22 +146,7 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
               {/* The text alone (user, 2026-10-29): no Written row — the span under the title says
                   what it covers, and the note is rewritten on its own cadence. */}
               <TypedNote text={res.text} waited={waited} className="m-0 text-body leading-snug text-foreground" />
-              {res.days.length > 0 && (
-                <NoteRows key={titleKey} word="day" kinds={daysByDate(res.days).map((d) => d.kind)}>
-                  {/* Not keyed by day alone: one day can be two notables (a network's low and its
-                      pause; two networks' first day on the DAG). */}
-                  {daysByDate(res.days).map((d) => (
-                    <DayRow key={`${d.dayMs}:${d.kind}:${d.networkId ?? ""}`} day={d} />
-                  ))}
-                </NoteRows>
-              )}
-              {res.changes?.length ? (
-                <NoteRows key={titleKey} word="change" kinds={res.changes.map((c) => c.kind)}>
-                  {res.changes.map((c) => (
-                    <ChangeRow key={c.text} change={c} view={subject.view} />
-                  ))}
-                </NoteRows>
-              ) : null}
+              <NoteFoot res={res} view={subject.view} subject={titleKey} />
             </>
           ) : null}
         </div>

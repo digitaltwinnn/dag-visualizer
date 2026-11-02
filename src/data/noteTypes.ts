@@ -28,6 +28,8 @@ export interface Fact {
 export interface FactPair {
   key: string;
   end: "from" | "to";
+  /** The ends are two whole spans, this one and the one before it: never a start and an end. */
+  span?: true;
 }
 
 /** high/low/first/last/pause are THRESHOLDED events; peak/trough/longest/broadest are the range's
@@ -38,8 +40,9 @@ export interface NotableDay {
   dayMs: number;
   kind: NotableKind;
   networkId: string | null;
-  /** Set when `value` counts global snapshots, not the snapshots anchored every other day reads. */
-  measure?: "globals";
+  /** Set when `value` is not the snapshots anchored a day reads by default: global snapshots, fees
+   *  (datums) or data (KB), stored as they are. */
+  measure?: "globals" | "fees" | "kb";
   value: number;
   level: number;
   score: number;
@@ -53,14 +56,15 @@ export interface NoteDay {
 }
 
 /** What moved over a view note's span (`noteChanges.ts`), as the row's coin says it. */
-export type NoteChangeKind = "gained" | "lost" | "new" | "gone" | "active" | "quiet" | "faster" | "slower" | "peak" | "longest";
+export type NoteChangeKind = "gained" | "lost" | "new" | "gone" | "active" | "quiet" | "faster" | "slower" | "peak" | "longest" | "pause" | "high" | "low";
 
 /** The subject a change row commits: what the view's own explorer row for it commits. */
 export type NoteChangeSubject =
   | { kind: "network"; id: string }
   | { kind: "type"; netId: string; type: string } // a `roleKey`
   | { kind: "country"; cc: string }
-  | { kind: "provider"; keys: string[]; cc: string | null; city: string | null };
+  | { kind: "provider"; keys: string[]; cc: string | null; city: string | null }
+  | { kind: "self" }; // the card the row sits on: stated, with nowhere to go
 
 /** One row of a view note's notable changes. `text` is written here by code, never by the model: a
  *  row states one measured move in one plain sentence, so it has nothing to get wrong. */

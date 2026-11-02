@@ -6,7 +6,8 @@ import type { Fact, NoteChange, NoteChangeSubject } from "@/src/data/noteTypes";
 // (user: "just say 'Hetzner lost 3 nodes in <city>'"): a row is one measured move in a set sentence,
 // so the model has nothing to add to it and the gate nothing to check. A span where nothing moved
 // has no rows of change. The chamber alone adds its extremes, each a measured fact of the span
-// (user, 2026-11-01), never a move: size 0 and below, so anything that moved reads first.
+// (user, 2026-11-01), never a move: size 0 and below, so anything that moved reads first. A subject
+// card's rows (user, 2026-11-02) are its own move, then where inside it that happened.
 
 export const NOTE_CHANGES_CAP = 3;
 
@@ -46,8 +47,61 @@ export function withMovePercents(note: string, facts: readonly Fact[]): string {
         at += percent.length + 1;
       }
     }
+    // A span against the one before it, the current figure first: "averaged Y, up from X".
+    const said = `${change.split(" ")[0]} from ${from.text}`;
+    for (let at = out.indexOf(said); at >= 0; at = out.indexOf(said, at + said.length)) {
+      if (/[\p{L}\p{N}]/u.test(out[at + said.length] ?? "")) continue;
+      const sentence = out.slice(out.lastIndexOf(". ", at) + 1, at);
+      if (!new RegExp(`(?<![\\d.,])${to.text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\d])`).test(sentence)) continue;
+      out = `${out.slice(0, at)}${change} ${out.slice(at + change.split(" ")[0]!.length + 1)}`;
+      at += percent.length + 1;
+    }
   }
   return out;
+}
+
+/** A gap far past a chain's usual widest one (`isPause`). The words are the facts' own. */
+export function pauseChange(name: string, gap: string, usual: string, seconds: number, subject: NoteChangeSubject): NoteChange {
+  return { kind: "pause", subject, size: seconds, text: `${name} paused for ${gap}, the longest gap is usually ${usual}` };
+}
+
+/** A rate far from its usual one, on the notable days' own bands (`notableDays.ts`), or null. */
+export function rateChange(name: string, now: number, usual: number, nowText: string, usualText: string, subject: NoteChangeSubject): NoteChange | null {
+  if (!(usual > 0)) return null;
+  const kind = now >= 2 * usual ? "high" : now <= 0.4 * usual ? "low" : null;
+  return kind && { kind, subject, size: Math.abs(Math.log(Math.max(now, 1e-9) / usual)), text: `${name} ran at ${nowText} an hour, usually ${usualText}` };
+}
+
+/** TWO WHOLE SPANS ARE NOT A START AND AN END (user, 2026-11-02). Code writes the comparison: the
+ *  model keeps saying "fell to 64 from 73", and the gate sending that back cost whole notes of
+ *  several figures, whose retries ran past the sentence limit. Runs before the gate, which still
+ *  holds whatever this cannot reach. `before` names the span before, once, at the first comparison. */
+export function withSpanComparisons(note: string, facts: readonly Fact[], before: string | null): string {
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const fig = (f: Fact) => {
+    const [n, ...unit] = f.text.split(" ");
+    return `${esc(n!)}${unit.length ? `(?: ${esc(unit.join(" "))})?` : ""}`;
+  };
+  const END = "(?!\\d|[.,]\\d)";
+  let out = before ? note.replace(/\b(?:in|over) the previous span\b/gi, `in ${before}`) : note;
+  const pairs: { from: Fact; to: Fact }[] = [];
+  for (const to of facts) {
+    if (to.pair?.end !== "to" || !to.pair.span) continue;
+    const from = facts.find((f) => f.pair?.key === to.pair!.key && f.pair.end === "from");
+    if (!from || from.value === to.value) continue;
+    pairs.push({ from, to });
+    const dir = to.value > from.value ? "up" : "down";
+    out = out.replace(new RegExp(`\\bfrom ${fig(from)} to ${fig(to)}${END}`, "g"), `to ${to.text}, ${dir} from ${from.text}`);
+    out = out.replace(new RegExp(`\\bto ${fig(to)}((?: (?:DAG|MB|per|a|day))*),? from ${fig(from)}${END}`, "g"), (_, tail: string) => `to ${to.text}${tail}, ${dir} from ${from.text}`);
+  }
+  if (!before) return out;
+  if (out.includes(before)) return out.replace(new RegExp(`(?<!(?:in|over) )${esc(before)}`), `in ${before}`);
+  let first: { end: number } | null = null;
+  for (const { from } of pairs) {
+    const m = new RegExp(`\\b(?:up|down) from ${fig(from)}(?: (?:DAG|MB))?(?: (?:per|a) day)?${END}`).exec(out);
+    if (m && (!first || m.index + m[0].length < first.end)) first = { end: m.index + m[0].length };
+  }
+  return first ? `${out.slice(0, first.end)} in ${before}${out.slice(first.end)}` : out;
 }
 
 /** A count's move, or null when it did not. `place` is a measured city, never a guess, and a row
@@ -127,6 +181,26 @@ export function siteOfChange(keys: ReadonlySet<string>, now: Sites | undefined, 
   const at = places[0]![0];
   const [cc, city] = at.split(".");
   return { cc: cc!, city: decodeURIComponent(city!), was: was.get(at) ?? 0 };
+}
+
+/** Each provider's move at each place in the stored sites, for the places `keep` holds. Both days or
+ *  nothing, as `siteOfChange`: a place missing on one is read as a move only when the day was stored. */
+export function siteMoves(now: Sites | undefined, then: Sites | undefined, keep: (cc: string, key: string) => boolean): { cc: string; city: string; key: string; from: number; to: number }[] {
+  if (!now || !then) return [];
+  const moves = new Map<string, { cc: string; city: string; key: string; from: number; to: number }>();
+  const tally = (sites: Sites, end: "from" | "to") => {
+    for (const [field, n] of Object.entries(sites)) {
+      const [, , cc, city, key] = field.split(".");
+      if (!cc || !city || !key || !keep(cc, key)) continue;
+      const at = `${cc}.${city}.${key}`;
+      const m = moves.get(at) ?? { cc, city: decodeURIComponent(city), key, from: 0, to: 0 };
+      m[end] += n;
+      moves.set(at, m);
+    }
+  };
+  tally(then, "from");
+  tally(now, "to");
+  return [...moves.values()].filter((m) => m.from !== m.to);
 }
 
 /** The rows to show: each list's biggest in turn, so no one kind of subject fills them. */

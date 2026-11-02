@@ -287,6 +287,33 @@ describe("ledgerFacts' notable changes", () => {
     const r = ledgerFacts(input({ recent: side(74, 5 * MIN, 20, stopped), week: weekSide({}) }))!;
     expect(r.changes?.slice(0, 2).map((c) => c.kind)).toEqual(["quiet", "quiet"]);
   });
+  // A NETWORK'S OWN NOTE HAS ROWS TOO (user, 2026-11-02: "that 2.3 hour gap should be a notable event no?").
+  describe("what a network's own note flags", () => {
+    const stalled = { "m.usdc.gapMax": row(74, (i) => (i === 40 ? 8280 : 30)) };
+    const usual = { "m.usdc.gapMax": row(168, () => 40) };
+    it("a gap far past its usual widest one", () => {
+      const r = ledgerFacts(input({ subject: "usdc", recent: side(74, 5 * MIN, 20, stalled), week: weekSide(usual) }))!;
+      expect(r.changes).toContainEqual({ kind: "pause", size: 8280, subject: { kind: "network", id: "usdc" }, text: "USDC.dag paused for 2.3 hours, the longest gap is usually 40 seconds" });
+    });
+    it("no row for a gap of its usual size", () => {
+      const r = ledgerFacts(input({ subject: "usdc", recent: side(74, 5 * MIN, 20, { "m.usdc.gapMax": row(74, () => 41) }), week: weekSide(usual) }))!;
+      expect(r.changes ?? []).toEqual([]);
+    });
+    it("fees or data running far from their usual rate", () => {
+      const fees = (n: number, f: number) => ({ "m.usdc.fee": row(n, () => f) });
+      const r = ledgerFacts(input({ subject: "usdc", recent: side(74, 5 * MIN, 20, fees(74, 2e8)), week: weekSide(fees(168, 2e8)) }))!;
+      expect(r.changes?.map((c) => c.kind)).toContain("high");
+    });
+  });
+  it("on the whole network, a stall of global snapshots is one row, not one per network", () => {
+    const stall = { "g.gapMax": row(74, (i) => (i === 40 ? 8280 : 30)), "m.usdc.gapMax": row(74, (i) => (i === 40 ? 8280 : 30)), "m.bio.gapMax": row(74, (i) => (i === 40 ? 8280 : 30)) };
+    const usualGap = { "g.gapMax": row(168, () => 40), "m.usdc.gapMax": row(168, () => 40), "m.bio.gapMax": row(168, () => 40) };
+    const r = ledgerFacts(input({ recent: side(74, 5 * MIN, 20, stall), week: side(168, HOUR, 120, usualGap, 0) }))!;
+    const pauses = r.changes!.filter((c) => c.kind === "pause");
+    expect(pauses).toHaveLength(1);
+    expect(pauses[0]).toMatchObject({ subject: { kind: "network", id: "dag" }, text: "Global snapshots paused for 2.3 hours, the longest gap is usually 40 seconds" });
+    expect(r.changes!.some((c) => c.kind === "longest")).toBe(false); // the pause is that gap
+  });
   // THE CHAMBER'S EXTREMES (user, 2026-11-01): a day where nothing moved still has a largest snapshot.
   it("the usual rhythm still names the longest gap", () => {
     expect(ledgerFacts(input())!.changes).toEqual([
@@ -303,7 +330,8 @@ describe("ledgerFacts' notable changes", () => {
     const r = ledgerFacts(input({ recent: side(74, 5 * MIN, 20, { "m.usdc.feeMax": row(74, () => 0) }) }))!;
     expect(r.changes?.some((c) => c.kind === "peak")).toBe(false);
   });
-  it("a network's own note has no rows: it is the row", () => {
-    expect(ledgerFacts(input({ subject: "usdc", week: weekSide({ "m.usdc.gapSum": row(168, () => 30 * 60) }) }))!.changes).toBeUndefined();
+  it("a network's own note reads its own rhythm, and no other network's", () => {
+    const r = ledgerFacts(input({ subject: "usdc", week: weekSide({ "m.usdc.gapSum": row(168, () => 30 * 60) }) }))!;
+    expect(r.changes?.map((c) => c.subject)).toEqual([{ kind: "network", id: "usdc" }]);
   });
 });

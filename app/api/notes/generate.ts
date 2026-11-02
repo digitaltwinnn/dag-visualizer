@@ -2,11 +2,11 @@ import { capitalFirst, factsBlock, sayAll, spellDurations } from "@/src/data/not
 import { checkNote } from "@/src/data/noteHonesty";
 import { LINE_MAX } from "@/src/engine/domain/briefing";
 import { withDayChange } from "@/src/data/notableDays";
-import { withMovePercents } from "@/src/data/noteChanges";
+import { withMovePercents, withSpanComparisons } from "@/src/data/noteChanges";
 import type { NoteChange, NoteDay, NoteResponse, NoteView } from "@/src/data/noteTypes";
 import { GateError, type gateChat, type GateErrorKind } from "./gate";
 import { failKeyOf, isBriefingNote, lockKeyOf, noteKeyOf, statsKeyOf, timingOf, type NoteSpan } from "./keys";
-import { buildMessages, parseAnswer, spanWords } from "./prompts";
+import { buildMessages, parseAnswer, spanBeforeWords, spanWords } from "./prompts";
 
 const NEGATIVE_RE = /\b(?:no|none)\b/i;
 import { utcDayKey } from "@/src/util/localTime";
@@ -188,7 +188,7 @@ async function write(
     if (attempt > 0) await count("retried");
     let answer: string;
     try {
-      answer = await chat(buildMessages(req.view, input.label, block, days, reasons, input.lead, input.common, input.kind, spanWords(req.view, req.span, input.spanFrom, input.spanTo), input.whole, wantsLine), wantsLine ? { maxTokens: LINE_TOKENS } : undefined);
+      answer = await chat(buildMessages(req.view, input.label, block, days, reasons, input.lead, input.common, input.kind, spanWords(req.view, req.span, input.spanFrom, input.spanTo), input.whole, wantsLine, spanBeforeWords(req.view, req.span)), wantsLine ? { maxTokens: LINE_TOKENS } : undefined);
       await count("calls");
     } catch (e) {
       if (!(e instanceof GateError)) throw e; // not the Gate's: `generateNote` counts it as `error`
@@ -198,7 +198,10 @@ async function write(
       if (held) return held; // the rewrite was style, and a checked note is in hand
       return { ok: false, stat: kind };
     }
-    const { note, captions, line } = parseAnswer(answer);
+    const parsed = parseAnswer(answer);
+    const { captions } = parsed;
+    const note = withSpanComparisons(parsed.note, input.facts, spanBeforeWords(req.view, req.span));
+    const line = parsed.line && withSpanComparisons(parsed.line, input.facts, null);
     const check = checkNote(note, input.facts, input.names, { maxSentences: 3, minWords: NOTE_MIN_WORDS, subject });
     if (!check.ok) {
       if (held) return held;
@@ -221,7 +224,7 @@ async function write(
       seen.set(iso, n);
       const caption = captions.get(n === 1 ? iso : `${iso}#${n}`);
       if (caption && checkNote(caption, input.facts, input.names, { maxSentences: 1, subject }).ok)
-        kept.push({ dayMs: d.dayMs, kind: d.kind, networkId: d.networkId, caption: withDayChange(plainly(caption), d) });
+        kept.push({ dayMs: d.dayMs, kind: d.kind, networkId: d.networkId, caption: capitalFirst(withDayChange(plainly(caption), d)) });
     }
     // The Briefing's line is held to the note's gate and is never worth a retry: one that fails,
     // runs long or says what did not happen is dropped, and the tour reads the note instead.
