@@ -6,7 +6,8 @@ import type { Fact, NoteChange, NoteChangeSubject } from "@/src/data/noteTypes";
 // (user: "just say 'Hetzner lost 3 nodes in <city>'"): a row is one measured move in a set sentence,
 // so the model has nothing to add to it and the gate nothing to check. A span where nothing moved
 // has no rows of change. The chamber alone adds its extremes, each a measured fact of the span
-// (user, 2026-11-01), never a move: size 0 and below, so anything that moved reads first.
+// (user, 2026-11-01), never a move: size 0 and below, so anything that moved reads first. A subject
+// card's rows (user, 2026-11-02) are its own move, then where inside it that happened.
 
 export const NOTE_CHANGES_CAP = 3;
 
@@ -180,6 +181,26 @@ export function siteOfChange(keys: ReadonlySet<string>, now: Sites | undefined, 
   const at = places[0]![0];
   const [cc, city] = at.split(".");
   return { cc: cc!, city: decodeURIComponent(city!), was: was.get(at) ?? 0 };
+}
+
+/** Each provider's move at each place in the stored sites, for the places `keep` holds. Both days or
+ *  nothing, as `siteOfChange`: a place missing on one is read as a move only when the day was stored. */
+export function siteMoves(now: Sites | undefined, then: Sites | undefined, keep: (cc: string, key: string) => boolean): { cc: string; city: string; key: string; from: number; to: number }[] {
+  if (!now || !then) return [];
+  const moves = new Map<string, { cc: string; city: string; key: string; from: number; to: number }>();
+  const tally = (sites: Sites, end: "from" | "to") => {
+    for (const [field, n] of Object.entries(sites)) {
+      const [, , cc, city, key] = field.split(".");
+      if (!cc || !city || !key || !keep(cc, key)) continue;
+      const at = `${cc}.${city}.${key}`;
+      const m = moves.get(at) ?? { cc, city: decodeURIComponent(city), key, from: 0, to: 0 };
+      m[end] += n;
+      moves.set(at, m);
+    }
+  };
+  tally(then, "from");
+  tally(now, "to");
+  return [...moves.values()].filter((m) => m.from !== m.to);
 }
 
 /** The rows to show: each list's biggest in turn, so no one kind of subject fills them. */

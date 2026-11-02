@@ -457,6 +457,14 @@ describe("checkNote — a past value stands beside its own current figure (R60, 
     expect(checkNote("Dor held a ratio of 14.03.", ratio, ["Dor"], { maxSentences: 3 })).toEqual({ ok: true });
   });
 
+  it("sends back a note that says which moved most, or describes the card", () => {
+    expect(bannedWords("Digital Evidence grew most")).toEqual(["grew most"]);
+    expect(bannedWords("Dor lost the most nodes")).toEqual(["lost the most"]);
+    expect(bannedWords("the network's activity is shown")).toEqual(["is shown"]);
+    expect(bannedWords("BioFi saw significant activity")).toEqual(["significant"]);
+    expect(bannedWords("most nodes run in Germany")).toEqual([]);
+  });
+
   it("reads a pair at each number's written precision, and a bare number with the unit it is joined to", () => {
     expect(r("Global snapshots rose from 41.2K to 49.5K a day.").ok).toBe(true);
     expect(r("Global snapshots rose to 49,512 per day from 41,200.").ok).toBe(true);

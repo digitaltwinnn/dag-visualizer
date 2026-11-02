@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { NoteChange, NoteChangeSubject } from "@/src/data/noteTypes";
 import type { GlobalSnapshot, NodeRow } from "@/src/data/types";
-import { changeActions, changeHover, type ChangeState } from "./noteChangeTarget";
+import { changeActions, changeHover, staysOnCard, type ChangeState } from "./noteChangeTarget";
 
 const change = (subject: NoteChangeSubject): NoteChange => ({ kind: "lost", size: 1, text: "", subject });
 const STATE: ChangeState = { filter: "all", railNet: null, country: null, cohort: null, composition: null, hasInspect: false, metaSnap: null, ledgerNet: null };
@@ -38,6 +38,15 @@ describe("changeActions: a row commits what the view's explorer row commits", ()
   });
   it("the chamber's own row has no network to open in Snapshots", () => {
     expect(changeActions(change({ kind: "network", id: "dag" }), "ledger", STATE, [], TICK)).toBeNull();
+  });
+  it("a card's own row has nowhere to go", () => {
+    expect(changeActions(change({ kind: "self" }), "geo", STATE, [], null)).toBeNull();
+    expect(changeHover(change({ kind: "self" }), [])).toBeNull();
+  });
+  it("a row on a card never closes the card it sits on", () => {
+    expect(staysOnCard([{ kind: "cohort", sel: null }])).toBe(false);
+    expect(staysOnCard([{ kind: "country", cc: null }])).toBe(false);
+    expect(staysOnCard([{ kind: "country", cc: "DE" }, { kind: "cohort", sel: { cc: "DE", city: "Falkenstein", isp: "Hetzner" } }])).toBe(true);
   });
   it("a network with no tick in reach has nothing to open", () => {
     expect(changeActions(change({ kind: "network", id: "dor" }), "ledger", STATE, [], null)).toBeNull();

@@ -7,6 +7,7 @@ import { geoFacts } from "@/src/data/noteFactsGeo";
 import { comboWords, hyperFacts } from "@/src/data/noteFactsHyper";
 import { commonIsWhole, hasCommonReading } from "@/src/data/noteFactsActivity";
 import { ledgerFacts } from "@/src/data/noteFactsLedger";
+import { rangeNotableCap } from "@/src/data/notableDays";
 import { trendFacts, trendSilent, type TrendFactsInput } from "@/src/data/noteFactsTrend";
 import type { Fact, NotableDay, NoteChange, NoteView, NoteLead } from "@/src/data/noteTypes";
 import { leadingTrim, pickRangeTier, type TrendsWindowData } from "@/src/data/trendWindow";
@@ -356,7 +357,8 @@ async function readTrend(c: Ctx): Promise<Read | null> {
     [cur, prev, daily] = await Promise.all([
       reads.span(net, tier, fromMs, toMs),
       reads.span(net, tier, fromMs - len, fromMs),
-      pill?.daily ? reads.span(net, "1d", fromMs - LEAD_IN_MS, toMs) : Promise.resolve(null),
+      // Through today, even for a range that ended before it: what came after says who really stopped.
+      pill?.daily || rangeNotableCap(len) > 0 ? reads.span(net, "1d", fromMs - LEAD_IN_MS, nowMs) : Promise.resolve(null),
     ]);
   }
   // The whole daily record, for what a silent span can still say (`trendFacts`): always the unlisted

@@ -320,6 +320,7 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
     // say how the subject relates to the rung's distribution, and "how it stands" was parroted).
     const own = heldLevel(points) ?? ch.to;
     if (groups > 1) facts.push(fact(`${name}, rank among its layer groups by nodes`, 1 + held.filter((v) => v > own).length, "count"));
+    counts = [countChange(`${roleKeyLabel(type).label} group`, ch.from, ch.to, { kind: "self" })].filter((c) => c != null);
   } else {
     const name = mention(subject);
     named.push(subject);

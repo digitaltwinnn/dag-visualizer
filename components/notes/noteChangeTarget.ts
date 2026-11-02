@@ -62,8 +62,15 @@ export function changeActions(
       const c = cohortOfProvider(rows, subject.keys, subject.cc, subject.city);
       return c ? noteCohortActions({ cc: c.cc, city: c.city, isp: c.isp }, s) : null;
     }
+    case "self":
+      return null;
   }
 }
+
+/** Whether a row's clicks leave the card it sits on standing: an explorer row toggles, but a row on a
+ *  subject's own card must not clear the subject under the reader. */
+export const staysOnCard = (acts: readonly ClickAction[]): boolean =>
+  !acts.some((a) => (a.kind === "cohort" && a.sel == null) || (a.kind === "country" && a.cc == null));
 
 /** The store channel a row previews on, the key its explorer row uses, and the nodes it lights. */
 export interface ChangeHover {
@@ -77,6 +84,8 @@ const nodeKeys = (rows: readonly NodeRow[]) => rows.map((r) => hoverKeyOf(r.pick
 
 export function changeHover({ subject }: { subject: NoteChangeSubject }, rows: NodeRow[]): ChangeHover | null {
   switch (subject.kind) {
+    case "self":
+      return null;
     case "network":
       return { channel: "filter", key: subject.id };
     case "country":

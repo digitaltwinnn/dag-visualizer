@@ -1,5 +1,5 @@
 import { chainReadThrough, fact, gaugeChange, networksAnchored, type ChainReads } from "@/src/data/noteFacts";
-import { NOTABLE_CAPS, NOTABLE_FLOOR, notableDays, rangeExtremes } from "@/src/data/notableDays";
+import { NOTABLE_CAPS, rangeNotableCap, NOTABLE_FLOOR, notableDays, rangeExtremes } from "@/src/data/notableDays";
 import type { Fact, NotableDay } from "@/src/data/noteTypes";
 import { formatDag, globalSeries, lastSeen, METRIC_ORDER, metricLabel, metricSeries, spanAverage, trimCounterEdges, TREND_METRICS, unlistedUnmeasured, withUnlisted } from "@/src/data/trendSeries";
 import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
@@ -38,8 +38,9 @@ import type { TrendMetric } from "@/src/store/store";
 //     span, carry `pair` (`from` / `to`, keyed by the measure's label), so the gate states an
 //     earlier figure only beside its own current one (R60). A floor (", at least") is never an end.
 //
-// WHICH ZOOMS GET NOTABLE DAYS: 7d, 30d, 90d, 1y and all (`NOTABLE_CAPS`). A 1h, 24h or custom-range
-// note describes a stretch too short for "a day that stood out".
+// WHICH ZOOMS GET NOTABLE DAYS: 7d, 30d, 90d, 1y and all (`NOTABLE_CAPS`), and a brushed range of a
+// week or more (`rangeNotableCap`). A 1h, 24h or shorter note describes a stretch too short for "a
+// day that stood out".
 //
 // Pure: no store values, react or I/O (the colocated test is the specification — rule 4).
 
@@ -311,7 +312,7 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
 
   // NOTABLE DAYS, for the zooms long enough to have one.
   let days: NotableDay[] = [];
-  const cap = zoom === "7d" || zoom === "30d" || zoom === "90d" || zoom === "1y" || zoom === "all" ? NOTABLE_CAPS[zoom] : 0;
+  const cap = zoom === "range" ? rangeNotableCap(span.toMs - span.fromMs) : zoom === "7d" || zoom === "30d" || zoom === "90d" || zoom === "1y" || zoom === "all" ? NOTABLE_CAPS[zoom] : 0;
   const blurbs: string[] = [];
   if (cap > 0 && input.daily) {
     // THE UNLISTED SET'S DAYS read the fold, and two things differ from a network's. Its coverage is
@@ -321,6 +322,7 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
     const raw = trimNewestPartial(input.daily);
     const d = unlisted ? fold(raw) : raw;
     const first = d.buckets.findIndex((b) => b >= span.fromMs);
+    const end = d.buckets.findIndex((b) => b >= span.toMs); // a brushed range ends before the record does
     const { [`m.${UNLISTED_ID}.gapMax`]: _setGap, ...noSetGap } = d.series;
     const pick = {
       days: d.buckets,
@@ -330,6 +332,7 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
       ids,
       cap,
       from: first < 0 ? d.buckets.length : first,
+      ...(end >= 0 ? { until: end } : {}),
       floor: NOTABLE_FLOOR,
     };
     if (input.shape) {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { NotableKind } from "@/src/data/noteTypes";
-import { NOTABLE_CAPS, NOTABLE_FLOOR, isPause, notableDays, rangeExtremes, withDayChange } from "@/src/data/notableDays";
+import { NOTABLE_CAPS, NOTABLE_FLOOR, isPause, notableDays, rangeExtremes, rangeNotableCap, withDayChange } from "@/src/data/notableDays";
 
 const DAY = 86_400_000;
 const T0 = Date.UTC(2026, 8, 1);
@@ -591,5 +591,40 @@ describe("isPause", () => {
     expect(isPause(3600, 600)).toBe(true);
     expect(isPause(3599, 60)).toBe(false);
     expect(isPause(3600, 601)).toBe(false);
+  });
+});
+
+// A BRUSHED RANGE HAS NOTABLE DAYS OF ITS OWN (user, 2026-11-02).
+describe("rangeNotableCap", () => {
+  const D = 86_400_000;
+  it("gives a range the pill of its length's cap, and none under a week", () => {
+    expect(rangeNotableCap(6 * D)).toBe(0);
+    expect(rangeNotableCap(7 * D)).toBe(NOTABLE_CAPS["7d"]);
+    expect(rangeNotableCap(30 * D)).toBe(NOTABLE_CAPS["30d"]);
+    expect(rangeNotableCap(90 * D)).toBe(NOTABLE_CAPS["90d"]);
+    expect(rangeNotableCap(365 * D)).toBe(NOTABLE_CAPS["1y"]);
+  });
+});
+
+describe("a range that ends before the record does", () => {
+  const D = 86_400_000;
+  const days = Array.from({ length: 40 }, (_, i) => 1_700_006_400_000 + i * D);
+  const covered = days.map(() => 100);
+  const base = { days, covered, ids: ["dor"], cap: 5, from: 0 };
+  const at = (odd: Record<number, number>, v = 50) => days.map((_, k) => odd[k] ?? v);
+  it("reports nothing past its end", () => {
+    const series = { "m.dor.snaps": at({ 20: 400, 35: 400 }) };
+    expect(notableDays({ ...base, series, subject: "dor", until: 30 }).map((d) => d.dayMs)).toEqual([days[20]]);
+  });
+  it("calls no last day on a network that resumed after it, and does on one that never did", () => {
+    const resumed = { "m.dor.snaps": days.map((_, k) => (k >= 24 && k < 32 ? 0 : 50)) };
+    expect(notableDays({ ...base, series: resumed, subject: "dor", until: 30 }).some((d) => d.kind === "last")).toBe(false);
+    const stopped = { "m.dor.snaps": days.map((_, k) => (k >= 24 ? 0 : 50)) };
+    expect(notableDays({ ...base, series: stopped, subject: "dor", until: 30 }).some((d) => d.kind === "last")).toBe(true);
+  });
+  it("reads its extremes inside it", () => {
+    const series = { "m.dor.snaps": at({ 25: 90, 35: 900, 36: 1 }) };
+    const ext = rangeExtremes({ ...base, series, subject: "dor", until: 30 });
+    expect(ext.find((d) => d.kind === "peak")?.dayMs).toBe(days[25]);
   });
 });

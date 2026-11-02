@@ -40,6 +40,13 @@ export const NOTABLE_CAPS: Record<"7d" | "30d" | "90d" | "1y" | "all", number> =
  *  activity. The caller asks for it (`NotableInput.floor`); the default is none. */
 export const NOTABLE_FLOOR = 3;
 
+/** A brushed range's cap: the pill of its length's, and none under a week, too short for a day to
+ *  stand out (the pills' own rule). */
+export function rangeNotableCap(ms: number): number {
+  const days = ms / 86_400_000;
+  return days >= 365 ? NOTABLE_CAPS["1y"] : days >= 90 ? NOTABLE_CAPS["90d"] : days >= 30 ? NOTABLE_CAPS["30d"] : days >= 7 ? NOTABLE_CAPS["7d"] : 0;
+}
+
 /** The covered days before a day that its level (their median) is read from, and the fewest of
  *  them a day needs before it can be called high or low at all. */
 const LEVEL_DAYS = 14;
@@ -79,6 +86,10 @@ export interface NotableInput {
    *  reported only when the series' first activity in the WHOLE input falls at or after `from`
    *  (otherwise the network resumed, it did not begin); a `last` only when its day does. */
   from?: number;
+  /** Index into `days` of the first day past the reportable ones (default: none). A brushed range
+   *  ends before the record does, and the days after it still say whether a network really stopped
+   *  (a `last` needs quiet days after it, wherever the range happens to end). */
+  until?: number;
   /** Fill up to this many days with the range's extremes when the events fall short (default 0). */
   floor?: number;
 }
@@ -263,7 +274,7 @@ export function rangeExtremes(input: NotableInput): NotableDay[] {
   const own = subject === "dag" ? series["g.anchors"] : series[`m.${subject}.snaps`];
   if (!own) return [];
   let lo = from;
-  let hi = days.length - 1;
+  let hi = (input.until ?? days.length) - 1;
   if (subject !== "dag") {
     const act = activity(own, input);
     if (!act) return [];
@@ -308,7 +319,7 @@ export function rangeExtremes(input: NotableInput): NotableDay[] {
  *  so the order never depends on how the engine sorts equal keys. Short of `floor`, the range's
  *  extremes follow (`rangeExtremes`), never on a day already taken. */
 export function notableDays(input: NotableInput): NotableDay[] {
-  const { series, subject, ids, cap } = input;
+  const { days, series, subject, ids, cap } = input;
   const out: NotableDay[] = [];
   /** A further measure's days, one event a day: what is already told keeps its day. */
   const also = (row: readonly (number | null)[] | undefined, networkId: string | null, measure: NotableDay["measure"], min?: { high: number; low: number }) => {
@@ -359,7 +370,8 @@ export function notableDays(input: NotableInput): NotableDay[] {
       (a.networkId ?? "").localeCompare(b.networkId ?? "") ||
       a.kind.localeCompare(b.kind),
   );
-  const picked = kept.slice(0, Math.max(0, cap));
+  const end = days[input.until ?? days.length] ?? Infinity;
+  const picked = kept.filter((d) => d.dayMs < end).slice(0, Math.max(0, cap));
   const floor = Math.min(input.floor ?? 0, Math.max(0, cap));
   if (picked.length < floor) {
     const taken = new Set(picked.map((d) => d.dayMs));

@@ -63,7 +63,8 @@ export type NoteChangeSubject =
   | { kind: "network"; id: string }
   | { kind: "type"; netId: string; type: string } // a `roleKey`
   | { kind: "country"; cc: string }
-  | { kind: "provider"; keys: string[]; cc: string | null; city: string | null };
+  | { kind: "provider"; keys: string[]; cc: string | null; city: string | null }
+  | { kind: "self" }; // the card the row sits on: stated, with nowhere to go
 
 /** One row of a view note's notable changes. `text` is written here by code, never by the model: a
  *  row states one measured move in one plain sentence, so it has nothing to get wrong. */

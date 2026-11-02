@@ -757,8 +757,12 @@ describe("hyperFacts' notable changes", () => {
     expect(r.changes).toHaveLength(2);
     expect(r.changes).toContainEqual({ kind: "lost", size: 1, text: "Hybrid group lost 1 node, down 5%", subject: { kind: "type", netId: "usdc", type: "l0+cl1" } });
   });
-  it("a layer group's own note is a subject note: no rows", () => {
-    expect(hyperFacts(input({ subject: { net: "usdc", type: "l0" } }))!.changes).toBeUndefined();
+  it("a layer group's own note says its own move, and has nowhere to go from its own card", () => {
+    const r = hyperFacts(input({ subject: { net: "usdc", type: "l0+cl1" }, fleet: fleet({ ...steady, "f.type.usdc.l0+cl1": row(N, (i) => (i < N / 2 ? 20 : 19)) }) }))!;
+    expect(r.changes).toEqual([{ kind: "lost", size: 1, text: "Hybrid group lost 1 node, down 5%", subject: { kind: "self" } }]);
+  });
+  it("a layer group that held has no rows", () => {
+    expect(hyperFacts(input({ subject: { net: "usdc", type: "l0" }, fleet: fleet(steady) }))!.changes).toBeUndefined();
   });
 });
 

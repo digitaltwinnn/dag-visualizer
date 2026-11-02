@@ -284,10 +284,11 @@ describe("trendFacts notable days", () => {
     expect(checkNote("BioFi's last day anchoring, nothing since.", r.facts, r.names, { maxSentences: 1 })).toEqual({ ok: true });
   });
 
-  it("only the 7d, 30d, 1y and all zooms get notable days", () => {
+  it("a 1h, a 24h and a range under a week get no notable days", () => {
     const spike = row(37, (i) => (i === 33 ? 400 : 100));
     for (const zoom of ["1h", "24h", "range"] as const) {
-      const r = trendFacts(input({ zoom, daily: daily({ "g.anchors": spike }) }))!;
+      const short = zoom === "range" ? { span: { fromMs: T0, toMs: T0 + 5 * DAY } } : {};
+      const r = trendFacts(input({ zoom, ...short, daily: daily({ "g.anchors": spike }) }))!;
       expect(r.days).toEqual([]);
       expect(r.facts.some((f) => f.kind === "date")).toBe(false);
     }
@@ -584,6 +585,21 @@ describe("a notable day of another measure", () => {
   it("marks the whole network's as a floor, since the unlisted chains may not be in it", () => {
     const r = trendFacts(input({ zoom: "30d", span, daily: daily({ "g.anchors": row(40, () => 100), "g.feeFloor": row(40, (i) => (i === 30 ? 40e8 : 5e8)) }), cur: win(7, week(2)), prev: null }))!;
     expect(r.facts.some((f) => /spike, DAG in fees that day, at least/.test(f.label))).toBe(true);
+  });
+});
+
+describe("a brushed range's notable days", () => {
+  const daily = win(40, { "g.ticks": row(40, () => 288), "m.bio.snaps": row(40, (i) => (i === 25 ? 400 : i === 36 ? 900 : 50)) });
+  const brushed = (days: number) => input({ subject: "bio", zoom: "range", span: { fromMs: T0 + 10 * DAY, toMs: T0 + (10 + days) * DAY }, daily, cur: win(7, week(2)), prev: null });
+  it("has them from a week up, reading only inside the range", () => {
+    expect(trendFacts(brushed(20))!.days.map((d) => d.dayMs)).toContain(T0 + 25 * DAY);
+    expect(trendFacts(brushed(20))!.days.map((d) => d.dayMs)).not.toContain(T0 + 36 * DAY);
+  });
+  it("has none under a week", () => {
+    expect(trendFacts(brushed(5))!.days).toEqual([]);
+  });
+  it("the span facet keeps its own question: it would only repeat the card above it", () => {
+    expect(trendFacts({ ...brushed(20), shape: true })!.days).toEqual([]);
   });
 });
 

@@ -6,6 +6,7 @@ import { AI_NOTES_ICON } from "@/components/icons";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { useNet } from "@/components/topbar/useNet";
 import { queryOf, type NoteReq } from "./noteLoader";
+import { NoteFoot } from "./NoteRows";
 import TypedNote from "./TypedNote";
 import { useMainnetNote, useWaited } from "./useAiNote";
 
@@ -74,18 +75,21 @@ export default function SubjectNote({ req }: { req: NoteReq | null }) {
   return (
     // `data-note-lead` stands the head's rule down (`CardHead`), so the note and the title read as one
     // block, and only while there is a note to stand in its place.
-    <div data-note-lead="" className="mt-2.5 mb-3 flex gap-[9px]">
-      {MARK}
-      {waiting ? (
-        <p className="m-0 flex items-center gap-2 text-body text-muted-foreground">
-          <NodeStars tone="ai" />
-          {waiting}
-        </p>
-      ) : res?.state === "unavailable" ? (
-        <p className="m-0 text-body text-muted-foreground">no note right now</p>
-      ) : (
-        <TypedNote text={text!} waited={waited} className="m-0 text-body leading-snug text-foreground" />
-      )}
+    <div data-note-lead="" className="mt-2.5 mb-3">
+      <div className="flex gap-[9px]">
+        {MARK}
+        {waiting ? (
+          <p className="m-0 flex items-center gap-2 text-body text-muted-foreground">
+            <NodeStars tone="ai" />
+            {waiting}
+          </p>
+        ) : res?.state === "unavailable" ? (
+          <p className="m-0 text-body text-muted-foreground">no note right now</p>
+        ) : (
+          <TypedNote text={text!} waited={waited} className="m-0 text-body leading-snug text-foreground" />
+        )}
+      </div>
+      {res?.state === "ok" && <NoteFoot res={res} view={asked.view} subject={key!} onCard />}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { NOTE_CHANGES_CAP, RHYTHM_CHANGE, changeWords, countChange, withMovePercents, eventChange, largestSnapshotChange, longestGapChange, pauseChange, pickChanges, rateChange, rhythmChange, siteOfChange, withExtremes, withSpanComparisons } from "@/src/data/noteChanges";
+import { NOTE_CHANGES_CAP, RHYTHM_CHANGE, changeWords, countChange, withMovePercents, eventChange, largestSnapshotChange, longestGapChange, pauseChange, pickChanges, siteMoves, rateChange, rhythmChange, siteOfChange, withExtremes, withSpanComparisons } from "@/src/data/noteChanges";
 import { fact } from "@/src/data/noteFacts";
 import type { Fact, NoteChange } from "@/src/data/noteTypes";
 
@@ -227,5 +227,21 @@ describe("a pause and a rate, as rows", () => {
     expect(rateChange("Dor fees", 7, 4, "7 DAG", "4 DAG", NET)).toBeNull();
     expect(rateChange("Dor fees", 2, 4, "2 DAG", "4 DAG", NET)).toBeNull();
     expect(rateChange("Dor fees", 2, 0, "2 DAG", "0 DAG", NET)).toBeNull();
+  });
+});
+
+describe("siteMoves", () => {
+  const f = (cc: string, city: string, key: string) => `f.site.${cc}.${city}.${key}`;
+  const then = { [f("DE", "Falkenstein", "ovh")]: 12, [f("DE", "Berlin", "ovh")]: 3, [f("US", "Ashburn", "aws")]: 5 };
+  const now = { [f("DE", "Falkenstein", "ovh")]: 10, [f("DE", "Berlin", "ovh")]: 3, [f("US", "Ashburn", "aws")]: 5, [f("DE", "Bonn", "hetzner")]: 2 };
+  it("names each provider's move at each place, held counts left out", () => {
+    expect(siteMoves(now, then, (cc) => cc === "DE")).toEqual([
+      { cc: "DE", city: "Falkenstein", key: "ovh", from: 12, to: 10 },
+      { cc: "DE", city: "Bonn", key: "hetzner", from: 0, to: 2 },
+    ]);
+  });
+  it("needs both days", () => {
+    expect(siteMoves(now, undefined, () => true)).toEqual([]);
+    expect(siteMoves(undefined, then, () => true)).toEqual([]);
   });
 });
