@@ -116,14 +116,14 @@ function Tour({ stop, leaving }: { stop: number; leaving: boolean }) {
     let ran = 0;
     const tick = (now: number) => {
       const since = Math.max(0, now - last); // a frame's own time can fall before the stop began
-      const dt = Math.min(since, 100); // a tab coming back must not jump the tour
-      waited += Math.min(since, 1000); // real time: a slow phone gets no longer behind a dead feed
+      const dt = Math.min(since, 1000); // a tab coming back must not jump the tour; a slow phone keeps real time
+      waited += dt;
       last = now;
       const s = useStore.getState();
       if (s.engineFailed || (!s.sceneReady && waited > SCENE_WAIT_MS)) return endBriefing(stop, "unready");
       if (s.sceneReady && !held.current) ran += dt;
       if (fill.current) fill.current.style.transform = `scaleX(${Math.min(1, ran / STOP_MS)})`;
-      if (mayAdvance(ran, s.motionPhase)) {
+      if (!held.current && mayAdvance(ran, s.motionPhase)) {
         const next = nextStop(stop);
         if (next == null) return setEnding(true);
         goTo(next);

@@ -112,6 +112,15 @@ describe("the scene behind the tour", () => {
     expect(briefing).not.toMatch(/"tap"/);
   });
 
+  it("changes no stop under a press, even one whose time is already up", () => {
+    expect(briefing).toMatch(/if \(!held\.current && mayAdvance\(ran, s\.motionPhase\)\)/);
+  });
+
+  it("keeps real time on a slow phone: the cap stops a tab coming back jumping the tour, no more", () => {
+    expect(briefing).toMatch(/const dt = Math\.min\(since, 1000\);/);
+    expect(briefing).toMatch(/waited \+= dt;/);
+  });
+
   it("holds the clock while the scene is pressed, and only then", () => {
     expect(briefing).toMatch(/e\.target instanceof HTMLCanvasElement/);
     expect(briefing).toMatch(/if \(s\.sceneReady && !held\.current\) ran \+= dt;/);
