@@ -218,8 +218,10 @@ describe("the notes card's own behaviour", () => {
   it("types a note in on both surfaces, through one component", () => {
     const typed = read("components/notes/TypedNote.tsx");
     expect(typed).toMatch(/prefers-reduced-motion: reduce/);
-    expect(typed).toMatch(/<span className="invisible col-start-1 row-start-1">\{text\}<\/span>/);
-    expect(typed).toMatch(/<span aria-hidden className="col-start-1 row-start-1"><NoteText text=\{text\} upto=\{shown\} \/><\/span>/);
+    // REVEALED IN PLACE (user, 2026-11-02): the rest of the line stands invisible beside what is
+    // written, so a centred line never re-centres on each letter and no line wraps differently.
+    expect(typed).toMatch(/<NoteText text=\{text\} upto=\{shown\} \/>\s*<span className="invisible">\{text\.slice\(shown\)\}<\/span>/);
+    expect(typed).not.toMatch(/\bgrid\b/);
     expect(typed).toMatch(/<span className="sr-only">\{text\}<\/span>/);
     expect(card).toMatch(/<TypedNote text=\{res\.text\} waited=\{waited\}/);
     expect(read("components/notes/SubjectNote.tsx")).toMatch(/<TypedNote text=\{text!?\} waited=\{waited\}/);

@@ -7,7 +7,7 @@ import { typedLength } from "./typedNote";
 
 /** A NOTE, WRITTEN IN (`typedNote.ts`), one component for the AI card and the cards' notes. Only a note
  *  the reader watched arrive is typed (`waited`): one already held appears at once, as does any
- *  note under reduced motion. While it types, the whole text stands invisibly in the same grid cell,
+ *  note under reduced motion. While it types, the unwritten rest stands invisibly in the same run,
  *  so the card takes its final height once and never grows per letter; a screen reader gets the
  *  whole text at once. Model text renders as React text only, like every note surface. */
 /** Notes already written in: folding a card and opening it again shows the note, it does not retype it. */
@@ -46,9 +46,10 @@ export default function TypedNote({ text, waited, always, className }: {
   }, [typing, text]);
   if (shown == null) return <p className={className}><NoteText text={text} /></p>;
   return (
-    <p className={`grid ${className ?? ""}`}>
-      <span className="invisible col-start-1 row-start-1">{text}</span>
-      <span aria-hidden className="col-start-1 row-start-1"><NoteText text={text} upto={shown} /></span>
+    <p className={className}>
+      {/* The rest stands invisible in the same run, so what is written never moves: a centred line
+          does not re-centre on each letter, and every line wraps where it will end up. */}
+      <span aria-hidden><NoteText text={text} upto={shown} /><span className="invisible">{text.slice(shown)}</span></span>
       <span className="sr-only">{text}</span>
     </p>
   );

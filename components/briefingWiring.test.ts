@@ -164,7 +164,7 @@ describe("the tour's chrome", () => {
   });
 
   it("credits the AI with the words it wrote, over them and never on the bar", () => {
-    expect(briefing).toMatch(/<div className="mb-1 min-h-5">\{who\}<\/div>/);
+    expect(briefing).toMatch(/\{who\}<\/div>\s*<div aria-hidden className="mx-auto/);
     expect(briefing).not.toMatch(/\{who\}\s*\{bars\}/);
   });
 
@@ -181,6 +181,14 @@ describe("the tour's chrome", () => {
 });
 
 describe("the tour's words", () => {
+  // user, 2026-11-02: the scene is centred, so its caption is; a phone's fills the width, and both
+  // edges uneven read worse over figures.
+  it("stand centred under the scene on the wide tiers, left on a phone", () => {
+    expect(briefing).toMatch(/mx-auto min-h-\[2\.52em\] max-w-\[79%\] text-balance text-center text-briefing/);
+    expect(briefing).toMatch(/max-\[700px\]:mx-0 max-\[700px\]:min-h-\[3\.8em\] max-\[700px\]:max-w-full max-\[700px\]:text-left max-\[700px\]:text-wrap/);
+    expect(briefing).toMatch(/<div className="mb-1 flex min-h-5 justify-center max-\[700px\]:justify-start">\{who\}<\/div>/);
+  });
+
   it("type in at every stop, whatever has been written before", () => {
     expect(briefing).toMatch(/<TypedNote [^>]*\balways\b/);
     expect(readFileSync("components/notes/TypedNote.tsx", "utf8")).toMatch(/\(always \|\| \(waited && !TYPED\.has\(text\)\)\)/);

@@ -15,6 +15,7 @@ so it reads as a daily briefing rather than an intro.
 3. The stage clears on every screen size: the HUD steps aside and large words stand beneath the
    scene. Desktop and tablet keep the view's own framing, so the tour's end moves nothing; a phone
    lifts the scene clear of the words. Phones keep progress and Skip at the top, as the mock showed.
+   The words stand centred under the scene, on a phone left-aligned, where they fill the width.
 4. The progress bar's segments, and the arrow keys, move back and forward between stops.
    Skip or Escape ends it and leaves the visitor in that view, the words fading as the interface
    arrives. The scene stays live: a drag orbits as usual and holds the stop's clock, and a tap on it
