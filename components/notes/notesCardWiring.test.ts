@@ -54,6 +54,12 @@ describe("the top card's scope", () => {
   });
 });
 
+describe("a day's measure", () => {
+  it("rides a chart's coin as it does a card's row", () => {
+    expect(read("components/TrendStack.tsx")).toMatch(/list\.push\(\{ dayMs: d\.dayMs, kind: d\.kind, measure: d\.measure, networkId: d\.networkId/);
+  });
+});
+
 describe("a row with nothing to open", () => {
   // user, 2026-11-02: "the style of the notable row is difficult, they should keep the same style".
   it("reads like every other row, and only takes no click", () => {

@@ -323,7 +323,7 @@ export default function TrendStack() {
     for (const d of noteDays ?? []) {
       const id = d.networkId ?? "dag";
       const list = m.get(id) ?? [];
-      list.push({ dayMs: d.dayMs, kind: d.kind, networkId: d.networkId, lit: hoverNoteDay === d.dayMs, caption: d.caption, label: `Notable day, ${rangeDays(d.dayMs, d.dayMs + NOTE_DAY_MS)}: ${NOTE_KIND_WORD[d.kind]}` });
+      list.push({ dayMs: d.dayMs, kind: d.kind, measure: d.measure, networkId: d.networkId, lit: hoverNoteDay === d.dayMs, caption: d.caption, label: `Notable day, ${rangeDays(d.dayMs, d.dayMs + NOTE_DAY_MS)}: ${NOTE_KIND_WORD[d.kind]}` });
       m.set(id, list);
     }
     return m;
