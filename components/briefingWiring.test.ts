@@ -189,6 +189,23 @@ describe("the tour's chrome", () => {
     expect(briefing).toMatch(/const who = words\.ai && \(/);
     expect(briefing).toMatch(/Powered by \{AI_TITLE\}/);
   });
+
+  // 320 wide: the line and a full Skip are 14 pixels more than the phone's row holds.
+  it("narrows Skip on a phone, so the line beside it fits", () => {
+    expect(briefing).toMatch(/className=\{cn\("h-10 rounded-full [^"]*px-6 [^"]*max-\[700px\]:px-3/);
+  });
+
+  it("sets that credit one step up the scale, in body type", () => {
+    expect(briefing).toMatch(/const who = words\.ai && \(\s*<span className="[^"]*text-body/);
+  });
+
+  // user, 2026-11-02: the footer that says so stands down for the tour, and a first visitor must
+  // not take this for Constellation's own site. It rides the site name, so every stop says it.
+  it("says it is unofficial under the site name, in the footer's words and register", () => {
+    expect(briefing).toMatch(
+      /const site = \([\s\S]*?<span className="text-label tracking-caps uppercase text-primary-ink[^"]*">\s*unofficial community project\s*<\/span>[\s\S]*?\);\n/,
+    );
+  });
 });
 
 describe("the tour's words", () => {

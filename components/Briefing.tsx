@@ -226,21 +226,27 @@ function Tour({ stop, leaving }: { stop: number; leaving: boolean }) {
     <button
       type="button"
       onClick={() => endBriefing(stop, "skip")}
-      className={cn("h-10 rounded-full bg-foreground px-6 text-body font-semibold text-background hover:bg-foreground/85 touch:min-h-11", live)}
+      className={cn("h-10 rounded-full bg-foreground px-6 text-body font-semibold text-background hover:bg-foreground/85 max-[700px]:px-3 touch:min-h-11", live)}
     >
       Skip
     </button>
   );
-  // The top bar that carries the brand is stood down, so the tour says where you are itself.
+  // The top bar that carries the brand is stood down, so the tour says where you are itself. The
+  // footer that says this is unofficial is stood down with it, so that line rides the name.
   const site = (
-    <span className="flex shrink-0 items-center gap-1.5 text-body font-semibold text-foreground">
-      <EcgMark />
-      {new URL(SITE_ORIGIN).host}
+    <span className="flex shrink-0 flex-col gap-0.5">
+      <span className="flex items-center gap-1.5 text-body font-semibold text-foreground">
+        <EcgMark />
+        {new URL(SITE_ORIGIN).host}
+      </span>
+      <span className="text-label tracking-caps uppercase text-primary-ink select-none">
+        unofficial community project
+      </span>
     </span>
   );
   const Mark = AI_NOTES_ICON;
   const who = words.ai && (
-    <span className="flex shrink-0 items-center gap-1.5 text-label font-semibold text-[var(--ai-mark)]">
+    <span className="flex shrink-0 items-center gap-1.5 text-body font-semibold text-[var(--ai-mark)]">
       <Mark aria-hidden className="size-3.5" />
       Powered by {AI_TITLE}
     </span>
