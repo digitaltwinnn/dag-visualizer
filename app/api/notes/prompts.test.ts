@@ -236,6 +236,8 @@ describe("the span before", () => {
     expect(spanBeforeWords("trend", "90d")).toBe("the 90 days before");
     expect(spanBeforeWords("trend", "1y")).toBe("the year before");
     expect(spanBeforeWords("trend", "all")).toBeNull();
+    expect(spanBeforeWords("trend", `r0-${20 * 86_400_000}`)).toBe("the 20 days before");
+    expect(spanBeforeWords("trend", `r0-${86_400_000}`)).toBe("the day before");
     expect(spanBeforeWords("trend", "r1-2")).toBe("the same length of time before");
     expect(spanBeforeWords("hyper", "day")).toBeNull();
     expect(spanBeforeWords("ledger", "hours")).toBeNull();

@@ -224,7 +224,7 @@ async function write(
       seen.set(iso, n);
       const caption = captions.get(n === 1 ? iso : `${iso}#${n}`);
       if (caption && checkNote(caption, input.facts, input.names, { maxSentences: 1, subject }).ok)
-        kept.push({ dayMs: d.dayMs, kind: d.kind, networkId: d.networkId, caption: withDayChange(plainly(caption), d) });
+        kept.push({ dayMs: d.dayMs, kind: d.kind, networkId: d.networkId, caption: capitalFirst(withDayChange(plainly(caption), d)) });
     }
     // The Briefing's line is held to the note's gate and is never worth a retry: one that fails,
     // runs long or says what did not happen is dropped, and the tour reads the note instead.

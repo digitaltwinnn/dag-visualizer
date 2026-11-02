@@ -167,7 +167,10 @@ const BEFORE_WORDS: Record<string, string> = {
 /** The equal span History compares its figures with, in the note's words. Null where none is read. */
 export function spanBeforeWords(view: NoteView, span: NoteSpan): string | null {
   if (view !== "trend" || span === "all") return null;
-  return BEFORE_WORDS[span] ?? "the same length of time before";
+  const range = /^r(\d+)-(\d+)$/.exec(span);
+  const days = range ? (Number(range[2]) - Number(range[1])) / 86_400_000 : 0;
+  if (days === 1) return "the day before";
+  return Number.isInteger(days) && days > 1 ? `the ${days} days before` : (BEFORE_WORDS[span] ?? "the same length of time before");
 }
 const utcDay = (ms: number) => new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 export function spanWords(view: NoteView, span: NoteSpan, spanFrom: number, spanTo: number): string {
