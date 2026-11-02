@@ -22,7 +22,7 @@ import { metagraphCardNetwork } from "@/components/railCards";
 // top-bar filter: a metagraph selected there shows its dossier here; on "all" (no selection)
 // the card simply doesn't render — the resting "All · whole network" summary card was removed
 // (Task 13 follow-up, user: it added little value and took space; the counts live in the filter
-// picker's All row). Non-dismissible while shown (it IS the filter) — the × clears the filter.
+// picker's All row). Non-dismissible while it IS the filter: only the top bar leaves one.
 // Read-only identity; its live readout is the top-bar vitals.
 export default function ContextCard({
   collapsed,
@@ -44,9 +44,9 @@ export default function ContextCard({
   // In HISTORY it is the plane brought forward, else the filter (`trendStack.cardNetwork`, user
   // 2026-10-07) — a network row there names this card without writing the top bar.
   const filter = useStore((s) => metagraphCardNetwork({ ...s, tickHasFilter }));
-  // The × clears what the card STANDS ON: a tick-local network clears itself and what hangs under
-  // it (the tick stays), a plane focus releases the focus, and the filter clears the filter, as it
-  // always did.
+  // The × clears what the card STANDS ON: a browse ends, a tick-local network clears itself and
+  // what hangs under it (the tick stays), and a plane focus releases the focus. Standing on the
+  // filter the card has no × (user, 2026-11-02: "top bar only way out").
   // THE PLANE IN FRONT stands the card up with nothing committed (2026-10-08): no filter, no focus —
   // so there is nothing for an × to clear, and the head shows none.
   const trendFocus = useStore((s) => s.trendFocus);
@@ -56,16 +56,14 @@ export default function ContextCard({
   const cardFrom = useStore((s) => VIEW_POLICIES[s.mode].metagraphCard);
   const railNet = useStore((s) => s.railNet);
   const onNode = cardFrom === "node" && filter !== appFilter && !railNet;
-  const clearable = !onNode && (filter === appFilter || !chartStack || trendFocus != null);
+  const clearable = !onNode && filter !== appFilter && (!chartStack || trendFocus != null);
   const close = () => {
     const st = useStore.getState();
     applyClickActions(
       st.railNet != null
         ? [{ kind: "railNet", id: null }]
-        : filter === appFilter
-          ? [{ kind: "filter", id: "all" }]
-          : VIEW_POLICIES[st.mode].metagraphCard === "plane"
-            ? [{ kind: "trendFocus", id: null }]
+        : VIEW_POLICIES[st.mode].metagraphCard === "plane"
+          ? [{ kind: "trendFocus", id: null }]
           : tickNetClearActions({ metaSnap: st.metaSnap, hasInspect: !!st.inspect }),
     );
   };
