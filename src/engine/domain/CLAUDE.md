@@ -97,7 +97,14 @@ The design rules behind the table, which the tests pin but don't explain:
   node stopped on 2026-09-29). **ONE RULE: ONLY THE TOP BAR SETS THE FILTER** (user, 2026-11-02:
   "yes make it one rule everywhere"): Hypergraph's rows, hubs, nodes, groups and notable rows browse
   (`railNet`), which clears on leaving the view. A card's × and the explorer's home can still release
-  a filter. **The
+  a filter. **A FILTER HOLDS THE VIEW** (user, 2026-11-02): a browse is a look around from All, so
+  with a filter on, the Metagraph card has no swipe and another network's rows, hubs, rings and nodes
+  stay on screen, dimmed, answering neither click nor hover (`viewNetwork.heldOut`, asked by
+  `pickActive` and the row). Snapshots holds by the TICK instead: a global snapshot the filter's
+  network is not in answers nothing, in the explorer, the scene and the pager, unless it is the one on
+  screen (`ledgerStory.tickLocked`), while a tick that holds it opens whole, its pager stepping that
+  tick's own networks. ⚠️ Only a landed exact read can lock a tick: a polled zero is also what a tick
+  looks like once the buffer has rolled past it, and no read means unknown, never none. **The
   ledger's SNAPSHOT rows never set it either** (design session 2026-09-26, decision 13):
   `metaSnapSelectActions` no longer re-commits the app-wide filter when you browse a tick's anchors
   and pick one.

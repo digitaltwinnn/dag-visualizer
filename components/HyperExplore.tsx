@@ -10,7 +10,7 @@ import { IdentityDot, RoleChips } from "@/components/inspector/parts";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { compositionClause, compositionGroups } from "@/src/data/composition";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
-import { viewNetwork } from "@/src/engine/domain/viewNetwork";
+import { heldOut, viewNetwork } from "@/src/engine/domain/viewNetwork";
 import { HYPER_MEASURE_OPTIONS, groupMeasure, type HyperMeasure } from "@/src/data/hyperMeasure";
 import { metagraphById } from "@/src/data/network";
 import type { NodeRow } from "@/src/data/types";
@@ -107,6 +107,8 @@ export default function HyperExplore() {
         const cfg = metagraphById(m.id);
         const name = cfg?.name ?? m.id;
         const hue = identityHudCss(m.id);
+        // A filter holds the view: another network stays listed, dimmed, and answers nothing.
+        const held = heldOut(appFilter, m.id);
         return {
           key: m.id,
           // No dot beside a hued bar (user, 2026-10-23) — one hue carrier per row.
@@ -117,9 +119,9 @@ export default function HyperExplore() {
           // A network that has never answered has no count to state — a dash, not a 0 (rule 10;
           // `useNoSignal`). The row still lists: the catalog is ours and the network exists.
           figure: dead ? "—" : v.toLocaleString(),
-          faint: dead || m.nodes.length === 0,
-          onClick: () => toggleNetwork(m.id),
-          pair: subjectPairing(hoverFilter, m.id, setHoverFilter, hue),
+          faint: dead || m.nodes.length === 0 || held,
+          onClick: held ? undefined : () => toggleNetwork(m.id),
+          pair: held ? undefined : subjectPairing(hoverFilter, m.id, setHoverFilter, hue),
         };
       }),
     },

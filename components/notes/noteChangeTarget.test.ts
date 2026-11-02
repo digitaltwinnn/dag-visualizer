@@ -74,6 +74,13 @@ describe("changeActions: a row commits what the view's explorer row commits", ()
   });
 });
 
+describe("changeActions under a filter", () => {
+  // user, 2026-11-02: only the top bar leaves the network a filter stands on.
+  it("opens no other network", () => {
+    expect(changeActions(change({ kind: "network", id: "dor" }), "hyper", { ...STATE, filter: "swap" }, [], null)).toBeNull();
+  });
+});
+
 describe("changeHover: a row hovers the subject it would commit (rule 9)", () => {
   it("a network rides the filter channel", () => {
     expect(changeHover(change({ kind: "network", id: "dor" }), [])).toEqual({ channel: "filter", key: "dor" });

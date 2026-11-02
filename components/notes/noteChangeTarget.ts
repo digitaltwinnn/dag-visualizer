@@ -14,7 +14,7 @@ import {
   tickNetSelectActions,
   type ClickAction,
 } from "@/src/engine/domain/pickActions";
-import { viewNetwork } from "@/src/engine/domain/viewNetwork";
+import { heldOut, viewNetwork } from "@/src/engine/domain/viewNetwork";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 
 // WHAT A NOTABLE CHANGE'S ROW IS ABOUT (user, 2026-10-31: "related to a clickable subject"): the
@@ -58,7 +58,8 @@ export function changeActions(
 ): ClickAction[] | null {
   switch (subject.kind) {
     case "network":
-      if (!VIEW_POLICIES[view].tickScoped) return subject.id === viewNetwork(s) ? null : railNetActions(subject.id, s.filter);
+      if (!VIEW_POLICIES[view].tickScoped)
+        return subject.id === viewNetwork(s) || heldOut(s.filter, subject.id) ? null : railNetActions(subject.id, s.filter);
       if (!tick || subject.id === "dag") return null; // the chamber's own row names no network to open
       return tickNetSelectActions(subject.id, { kind: "snapshot", title: `Global snapshot #${tick.ordinal}`, data: tick }, {
         metaSnap: s.metaSnap,

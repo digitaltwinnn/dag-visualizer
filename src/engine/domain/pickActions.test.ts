@@ -150,6 +150,30 @@ describe("pickActive — which picks respond at all, per view", () => {
     expect(pickActive(nodePick(), "hyper", "swap", null)).toBe(true);
     expect(pickActive(nodePick(), "ledger", "swap", null)).toBe(true);
   });
+  // user, 2026-11-02: with a filter on, you stay inside that network until the top bar changes it.
+  it("a filter holds the browsing views: another network's hub and nodes do not respond", () => {
+    const other = { kind: "meta", cfg: { id: "swap" } } as unknown as PickDescriptor;
+    expect(pickActive(other, "hyper", "dor", null, "dor")).toBe(false);
+    expect(pickActive(other, "geo", "dor", null, "dor")).toBe(false);
+    expect(pickActive(hubPick(), "hyper", "dor", null, "dor")).toBe(true);
+    expect(pickActive(nodePick(), "hyper", "swap", null, "swap")).toBe(false);
+    expect(pickActive(nodePick(), "hyper", "dor", null, "dor")).toBe(true);
+    expect(pickActive(validatorPick(), "hyper", "dor", null, "dor")).toBe(false);
+  });
+  it("the core is the DAG's: a metagraph filter holds it out, a DAG filter keeps it", () => {
+    const core = { kind: "core" } as unknown as PickDescriptor;
+    expect(pickActive(core, "hyper", "dor", null, "dor")).toBe(false);
+    expect(pickActive(core, "hyper", "dag", null, "dag")).toBe(true);
+    expect(pickActive(core, "hyper", "all", null, "all")).toBe(true);
+  });
+  it("a browse holds nothing in Hypergraph: under All another hub still answers", () => {
+    const other = { kind: "meta", cfg: { id: "swap" } } as unknown as PickDescriptor;
+    expect(pickActive(other, "hyper", "dor", null, "all")).toBe(true);
+    expect(pickActive(nodePick(), "hyper", "swap", null, "all")).toBe(true);
+  });
+  it("Snapshots is not held here: its tick decides, and a tick's own networks stay open", () => {
+    expect(pickActive(nodePick(), "ledger", "swap", null, "swap")).toBe(true);
+  });
   it("non-node picks (snapshot) pass — their view gating is pickSources", () => {
     expect(pickActive(snapPick(), "ledger", "dor", null)).toBe(true);
   });

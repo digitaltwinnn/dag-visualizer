@@ -63,6 +63,7 @@ const tick = (ordinal: number, live = false) => ({
   data: { ordinal, timestamp: `T${ordinal}` } as unknown as GlobalSnapshot,
   isLiveTip: live,
   inStory: true,
+  locked: false,
 });
 
 const base = (over: Partial<SiblingState>): SiblingState => ({
@@ -109,14 +110,14 @@ const ledger = (over: Partial<SiblingState>): SiblingState => {
 
 describe("siblingSet — context (network) rung", () => {
   it("steps the explorer's network order (the picked figure), with the committed network at index", () => {
-    const s = base({ mode: "hyper", filter: "ded" });
+    const s = base({ mode: "hyper", railNet: "ded" });
     const set = siblingSet("context", s)!;
     expect(set.items.map((i) => i.key)).toEqual(networksLevel(metaList, s.allNodes, "nodes").map((x) => x.m.id));
     expect(set.items[set.index]!.key).toBe("ded");
     expect(set.parentLabel).toBe("Networks");
   });
   it("a step to a DIFFERENT network browses it", () => {
-    const set = siblingSet("context", base({ filter: "ded" }))!;
+    const set = siblingSet("context", base({ railNet: "ded" }))!;
     const other = set.items.find((i) => i.key !== "ded")!;
     expect(other.actions).toEqual([{ kind: "railNet", id: other.key }]);
   });
@@ -353,7 +354,7 @@ describe("siblingSet — global snapshot slot (the OPEN set)", () => {
     expect(siblingSet("snap", s)!.open).toBe(true);
     expect(siblingSet("snap", s)!.parentLabel).toBe("Snapshot stream");
     // Every other rung stays a counted set under a real parent.
-    expect(siblingSet("context", base({ filter: "ded" }))!.open).toBeUndefined();
+    expect(siblingSet("context", base({ railNet: "ded" }))!.open).toBeUndefined();
   });
   it("a step agrees with snapshotSelectActions — the same descriptor the LiveStrip bar builds", () => {
     const set = siblingSet("snap", s)!;
@@ -814,11 +815,8 @@ describe("siblingSet — instant (a moment inside the committed range)", () => {
 });
 
 describe("siblingSet — History's Metagraph card on a plane focus", () => {
-  it("has no pager: a filter step would write the top bar", () => {
-    expect(siblingSet("context", base({ mode: "trend", filter: "all", trendFocus: "ded" }))).toBeNull();
-  });
-  it("…while one standing on the filter keeps the filter's pager", () => {
-    expect(siblingSet("context", base({ mode: "trend", filter: "ded", trendFocus: null }))).not.toBeNull();
+  it("has no pager: History has no browse, and its order is the stack's roster", () => {
+    expect(siblingSet("context", base({ mode: "trend", filter: "all" }))).toBeNull();
   });
 });
 
@@ -845,11 +843,6 @@ describe("the Hypergraph rail never writes the filter", () => {
     expect(set.items.map((i) => i.key).sort()).toEqual(["dag", "dor"]);
     expect(set.items[set.index]!.key).toBe("dor");
     set.items.forEach((i) => noFilter(i.actions));
-  });
-  it("a swipe under a real filter still leaves it alone, and coming back to it ends the browse", () => {
-    const set = siblingSet("context", hyper({ filter: "dag" }))!;
-    expect(set.items.find((i) => i.key === "dor")!.actions).toEqual([{ kind: "railNet", id: "dor" }]);
-    expect(set.items.find((i) => i.key === "dag")!.actions).toEqual([{ kind: "railNet", id: null }]);
   });
   it("a layer group opens under the browsed network with no filter write", () => {
     const row = { id: "n1", label: "n1", pick: { kind: "metanode", node: { ip: "2.2.2.1", roles: ["l0"] }, meta: { id: "dor" } } };
@@ -906,5 +899,41 @@ describe("the node pager under a browsed network", () => {
   });
   it("names that network", () => {
     expect(set().parentLabel).toBe("Dor");
+  });
+});
+
+// user, 2026-11-02: with a filter on, you stay inside that network until the top bar changes it.
+describe("a filter holds the Metagraph card", () => {
+  const onFilter = (over: Partial<SiblingState>) => base({ filter: "dor", ...over });
+
+  it.each(["geo", "hyper", "trend"] as const)("%s: the card has no pager", (mode) => {
+    expect(siblingSet("context", onFilter({ mode }))).toBeNull();
+  });
+  it("a browse under All still swipes", () => {
+    expect(siblingSet("context", base({ mode: "geo", filter: "all", railNet: "dor" }))).not.toBeNull();
+  });
+  it("Snapshots keeps its pager: the tick's own networks, a parent the filter chose", () => {
+    const snap = { data: { ordinal: 7, timestamp: "T7" } } as unknown as SiblingState["snap"];
+    const set = siblingSet("context", onFilter({ mode: "ledger", snap, tickNets: metaList.slice(0, 2) as unknown as SiblingState["tickNets"] }));
+    expect(set?.items.map((i) => i.key)).toEqual(metaList.slice(0, 2).map((m) => m.id));
+  });
+  it("offers no first network to step to", () => {
+    expect(rootStep(onFilter({ mode: "hyper" }))).toBeNull();
+    expect(rootStep(onFilter({ mode: "geo" }))).toBeNull();
+  });
+});
+
+describe("a filter holds the global snapshot pager", () => {
+  const snap = { data: { ordinal: 42, timestamp: "T42" } } as unknown as SiblingState["snap"];
+  const ledger = (ticks: SiblingState["ticks"]) => base({ mode: "ledger", filter: "dor", snap, ticks });
+
+  it("skips a tick the read proves does not hold the filter", () => {
+    const set = siblingSet("snap", ledger([tick(41), { ...tick(42) }, { ...tick(43), locked: true }, tick(44)]));
+    expect(set?.items.map((i) => i.key)).toEqual(["41", "42", "44"]);
+  });
+  it("keeps the tick on screen, or a locked one could not say where it is", () => {
+    const set = siblingSet("snap", ledger([tick(41), { ...tick(42), locked: true }, tick(43)]));
+    expect(set?.items.map((i) => i.key)).toEqual(["41", "42", "43"]);
+    expect(set?.index).toBe(1);
   });
 });

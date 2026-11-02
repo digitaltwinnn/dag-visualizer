@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ledgerLens, storyCount, tickInStory, STORY_SETTLE_MS } from "./ledgerStory";
+import { ledgerLens, storyCount, tickInStory, tickLocked, STORY_SETTLE_MS } from "./ledgerStory";
 import { METAGRAPHS } from "@/src/net/current";
 import type { Anchor, SnapshotExact } from "@/src/data/types";
 
@@ -71,5 +71,41 @@ describe("ledgerLens (the ledger's own reading of the filter)", () => {
     expect(ledgerLens("all")).toBe("all");
     expect(ledgerLens("unlisted")).toBe("unlisted");
     expect(ledgerLens("DAG0CyySf35ftDQDQBnd1bdQ9aPyUdacMghpnCuM")).toBe("DAG0CyySf35ftDQDQBnd1bdQ9aPyUdacMghpnCuM");
+  });
+});
+
+const read = (perMeta: Record<string, number>, unlistedCount = 0): SnapshotExact =>
+  ({ unlistedCount, perMeta: Object.fromEntries(Object.entries(perMeta).map(([k, count]) => [k, { count, fee: 0, bytes: 0 }])) }) as SnapshotExact;
+
+describe("a tick's exact read outranks the polled count", () => {
+  const FORMER = METAGRAPHS.find((m) => m.formerIds?.length)!;
+
+  it("counts a listed network from the read, where the polled buffer has rolled past it", () => {
+    expect(storyCount(LISTED, null, read({ [LISTED]: 4 }))).toBe(4);
+    expect(storyCount(LISTED, anchor({ [LISTED]: 9 }), read({}))).toBe(0);
+  });
+  it("counts a network's former addresses as the network", () => {
+    expect(storyCount(FORMER.id, null, read({ [FORMER.formerIds![0]]: 2, [FORMER.id]: 1 }))).toBe(3);
+  });
+  it("says no at once from a read: a read has nothing left to settle", () => {
+    expect(tickInStory(LISTED, anchor({}), read({}), 0)).toBe(false);
+  });
+});
+
+describe("tickLocked: only a read can say a tick does not hold the filter", () => {
+  it("locks a tick whose read proves the network absent", () => {
+    expect(tickLocked(LISTED, read({ other: 3 }))).toBe(true);
+    expect(tickLocked("unlisted", read({ [LISTED]: 3 }, 0))).toBe(true);
+  });
+  it("never locks a tick that holds it", () => {
+    expect(tickLocked(LISTED, read({ [LISTED]: 1 }))).toBe(false);
+    expect(tickLocked("unlisted", read({}, 2))).toBe(false);
+  });
+  it("never locks without a read: no read is not knowing, not none", () => {
+    expect(tickLocked(LISTED, undefined)).toBe(false);
+  });
+  it("never locks with no story to hold: All, and the DAG that every tick is", () => {
+    expect(tickLocked("all", read({}))).toBe(false);
+    expect(tickLocked("dag", read({}))).toBe(false);
   });
 });

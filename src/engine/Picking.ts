@@ -6,6 +6,7 @@ import { countrySubject, hoverKeyOf, tooltipSubject } from "@/src/data/hoverSubj
 import { metaSnapHoverKey, type PickDescriptor } from "@/src/data/types";
 import { VIEW_POLICIES } from "./domain/viewPolicy";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
+import { tickLocked } from "@/src/data/ledgerStory";
 import { clickActions, pickActive, metaSnapSelectActions, bandSelectActions } from "./domain/pickActions";
 import type { CohortSel, CompositionSel } from "./domain/focusLadder";
 import type { SceneCtx } from "./scene/SceneContext";
@@ -88,6 +89,7 @@ export class Picking {
     // geo view are hidden, so they shouldn't be clickable/hoverable either (Three's raycaster
     // ignores scale/visibility, so the inactive ones must be skipped explicitly).
     this._hitObj = null;
+    const st = useStore.getState();
     for (const h of hits) {
       // A BLOCKER (the ledger's floor glass) is a normal surface: the ray stops here, and the
       // glass itself is no subject — content underneath must not pick through it (user,
@@ -102,11 +104,18 @@ export class Picking {
         this._hitObj = h.object;
         return null;
       }
-      if (!pick || !pickActive(pick, this.h.mode, this.h.filter, this.h.activeMetaIds)) continue;
+      if (!pick || !pickActive(pick, this.h.mode, this.h.filter, this.h.activeMetaIds, st.filter) || this.tickHeldOut(pick, st)) continue;
       this._hitObj = h.object;
       return pick;
     }
     return null;
+  }
+
+  /** The tile or band of a tick the filter's network is not in answers nothing, as its explorer
+   *  row does (`ledgerStory.tickLocked`). The tick on screen always answers: it is the way back. */
+  private tickHeldOut(p: PickDescriptor, st: ReturnType<typeof useStore.getState>): boolean {
+    const ordinal = p.kind === "snapshot" ? p.data.ordinal : p.kind === "metaSnap" ? p.global.data.ordinal : null;
+    return ordinal != null && ordinal !== st.snap?.data.ordinal && tickLocked(st.filter, st.snapshotExact[ordinal]);
   }
 
   /** THE COUNTRY UNDER THE CURSOR with nothing picked (one home for the hover and the click,
