@@ -4,9 +4,8 @@ import type { NoteReq } from "./noteLoader";
 import { noteSubjectOf } from "./noteSubject";
 
 // WHAT THE BRIEFING SAYS AT EACH STOP (`domain/briefing.ts`): the model's own short line, else the
-// opening of the same note if the caption holds it, else a plain sentence about the view. The last
-// carries no AI mark and no number: it stands in for a note that is not there, and nothing is
-// invented (rule 10).
+// opening of the same note, else a plain sentence about the view. The last carries no AI mark and
+// no number: it stands in for a note that is not there, and nothing is invented (rule 10).
 
 /** The window History rests on. A visitor on the tour has not chosen one. */
 const TREND_SPAN = "30d";
@@ -27,11 +26,11 @@ const PLAIN: Record<NoteView, string> = {
 const SENTENCE_RE = /.*?[.!?](?=\s|$)/gs;
 
 /** The note's opening: its first sentence, and the next one while the caption holds them. A stop in
- *  a figure ("5.8") is not an end. Null when the first sentence alone overruns the caption: a
- *  sentence cut short could say something the note does not. */
-export function openingOf(text: string): string | null {
+ *  a figure ("5.8") is not an end. A first sentence the caption cannot hold is cut at a word, with
+ *  an ellipsis (user, 2026-11-02). */
+export function openingOf(text: string): string {
   const [first, ...rest] = (text.match(SENTENCE_RE) ?? [text]).map((s) => s.trim());
-  if (first!.length > LINE_MAX) return null;
+  if (first!.length > LINE_MAX) return `${first!.slice(0, LINE_MAX).replace(/\s+\S*$/, "").replace(/[\s,;:]+$/, "")}…`;
   let out = first!;
   for (const next of rest) {
     if (out.length + 1 + next.length > LINE_MAX) break;
@@ -42,6 +41,6 @@ export function openingOf(text: string): string | null {
 
 /** The words for a stop, and whether they are the AI's. */
 export function briefingWords(view: NoteView, res: NoteResponse | null): { text: string; ai: boolean } {
-  const text = res?.state === "ok" ? (res.line ?? openingOf(res.text)) : null;
-  return text ? { text, ai: true } : { text: PLAIN[view], ai: false };
+  if (res?.state !== "ok") return { text: PLAIN[view], ai: false };
+  return { text: res.line ?? openingOf(res.text), ai: true };
 }

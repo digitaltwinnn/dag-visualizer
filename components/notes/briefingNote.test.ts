@@ -27,10 +27,10 @@ describe("the words at a stop", () => {
     expect(briefingWords("geo", ok("A long note. With more."))).toEqual({ text: "A long note. With more.", ai: true });
   });
 
-  it("are plain, without the AI's mark, when the note's opening overruns the caption", () => {
+  it("keep the AI's mark when the note's opening has to be cut", () => {
     const w = briefingWords("hyper", ok(`${"And this sentence goes on at length ".repeat(6)}until it ends.`));
-    expect(w.ai).toBe(false);
-    expect(w.text.length).toBeLessThanOrEqual(LINE_MAX);
+    expect(w.ai).toBe(true);
+    expect(w.text.endsWith("…")).toBe(true);
   });
 
   it("are plain, without the AI's mark, when there is no note", () => {
@@ -62,7 +62,19 @@ describe("a note's opening", () => {
     expect(openingOf(`${short} ${long}`)).toBe(short);
   });
 
-  it("has no opening when even the first sentence overruns the caption", () => {
-    expect(openingOf(`${"And this sentence goes on at length ".repeat(6)}until it ends.`)).toBeNull();
+  it("cuts a first sentence that overruns the caption, at a word, with an ellipsis", () => {
+    const cut = openingOf(`${"And this sentence goes on at length ".repeat(6)}until it ends.`);
+    expect(cut.length).toBeLessThanOrEqual(LINE_MAX);
+    expect(cut).toMatch(/^And this sentence .*\b(And|this|sentence|goes|on|at|length)…$/);
+  });
+
+  it("leaves no comma before the ellipsis", () => {
+    const cut = openingOf(`${"Twelve networks, ".repeat(10)}and more.`);
+    expect(cut).toMatch(/networks…$/);
+  });
+
+  it("never cuts inside a figure", () => {
+    const cut = openingOf(`${"a".repeat(120)} anchored 12,345.678 more snapshots in total.`);
+    expect(cut).not.toMatch(/12,3|12,345\.\d?…/);
   });
 });
