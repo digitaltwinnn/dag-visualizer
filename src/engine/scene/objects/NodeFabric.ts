@@ -22,7 +22,7 @@ import type { DimContext } from "../../domain/dimModel";
 import type { MetaNodeRecord, ValidatorRecord } from "../../domain/records";
 import type { ViewTransition } from "../../domain/viewTransition";
 import type { PickDescriptor } from "@/src/data/types";
-import { inkPresence, isLightGround, type SceneColors } from "../../sceneColors";
+import { inkPresence, isLightGround, paperDimTarget, type SceneColors } from "../../sceneColors";
 import { joinBloom } from "../SceneContext";
 
 const Y_AXIS = new THREE.Vector3(0, 1, 0); // hex-prism axis (radial after _qRadial)
@@ -45,17 +45,15 @@ const HEX_ALPHA = 0.92;
 export const GATHER_SCALE = 0.11;
 // The DIM TARGET — what an off-filter node's colour is lerped TOWARD. On the dark ground it is a
 // LIFTED navy (not the background itself): a mute has to stay a mark, so it sits just above the
-// ground rather than dissolving into it. Themed by the same reasoning read on paper — there the
-// direction reverses, because a navy mark on white is EMPHASIS, not a mute, so the target becomes
-// the paper itself and dimming is receding into the ground. (Dark keeps 0x223046 verbatim, so the
-// shipped look is byte-identical; the light analogue is a first-pass value — sub-project 2.)
+// ground rather than dissolving into it. The same reasoning holds on paper: a navy mark on white is
+// EMPHASIS, so the target is lighter than the mark, but it stops short of the page (`paperDimTarget`).
 const DIM_DARK = 0x223046;
 const DIM = new THREE.Color(DIM_DARK);
 /** THEME FLIP — module-level because the target is one shared value for every fabric, and the
  *  per-instance consumers below lerp toward it each frame with no copy of their own. Called by the
  *  Engine's `_refreshTheme` (event-time), beside the clear colour. */
 export function setNodeDimTarget(colors: SceneColors): void {
-  DIM.setHex(isLightGround(colors) ? colors.bg : DIM_DARK);
+  DIM.setHex(isLightGround(colors) ? paperDimTarget(colors) : DIM_DARK);
   _paper = isLightGround(colors);
 }
 // The ground flag for the per-frame emissive mapping below — module-level for the same reason

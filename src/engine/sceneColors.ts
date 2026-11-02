@@ -174,6 +174,18 @@ export function structureInk(c: SceneColors): number {
   return _structA.setHex(c.muted).lerp(_structB.setHex(c.core), STRUCT_INK_MIX).getHex();
 }
 
+/**
+ * WHERE A DIMMED NODE GOES ON PAPER (user, 2026-11-02: "the others dimmed are also quite faint,
+ * probably has to do with the light mode and direction of the dim"). The page itself read as the
+ * right answer, since a mute on paper recedes into the ground, but it ends AS the ground and a small
+ * chip disappears. The dark target stops short of its ground for the same reason: a mute has to stay
+ * a mark. So this is a quiet tone just off the page, and the hue still drains toward it.
+ */
+const PAPER_DIM_INK = 0.8; // 0 = the page, 1 = the muted ink
+export function paperDimTarget(c: SceneColors): number {
+  return _structA.setHex(c.bg).lerp(_structB.setHex(c.muted), PAPER_DIM_INK).getHex();
+}
+
 const _ground = new THREE.Color();
 
 /**
