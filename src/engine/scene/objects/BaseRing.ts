@@ -62,14 +62,14 @@ export const RULER_PRESENCE_PAPER = 0.85; // 0.4 was "almost invisible" on Print
  *  and less visible when the filter is active" — a committed network re-partitions the whole ring,
  *  so its wedge is the whole disc; it rests, see `targetOf`). */
 export const WEDGE_PRESENCE_DARK = 0.065; // 0.14 → 0.09 → 0.065 (user: the hover "too strong", then "reduce it a bit more")
-export const WEDGE_PRESENCE_PAPER = 0.12; // 0.22 → 0.16 → 0.12, the same steps
+export const WEDGE_PRESENCE_PAPER = 0.18; // 0.22 → 0.16 → 0.12, the same steps; 0.18 keeps a hover above the firmer rest below
 /** The pie is READABLE AT REST too (user, 2026-10-24: "when at rest the pie is not very visible"),
  *  and the RESTING PRESENCE is the invariant — stated per ground, because additive light over
  *  black reads at a fraction of the ink the same number lays on paper (user: "ok for light but in
  *  dark it's too much"; then "increase rest fill just a bit"). A hover retune leaves these alone;
  *  `targetOf` derives the resting weight as rest / hover. A dimmed slice is a share of the hover. */
-export const WEDGE_REST_DARK = 0.027; // 0.02 → 0.027, 0.066 → 0.085 (user, 2026-11-02: "slight increase")
-export const WEDGE_REST_PAPER = 0.085;
+export const WEDGE_REST_DARK = 0.027; // 0.02 → 0.027 (user, 2026-11-02: "slight increase")
+export const WEDGE_REST_PAPER = 0.13; // 0.066 → 0.085 → 0.13 (same day: "in light mode the fill still needs to be stronger")
 export const WEDGE_DIM_MUL = 0.12;
 /** A wedge state's weight on the hover presence, given the ground's resting weight. */
 const wedgeWeight = (state: WedgeState, rest: number): number =>
