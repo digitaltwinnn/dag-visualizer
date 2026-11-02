@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { NOTE_CHANGES_CAP, RHYTHM_CHANGE, changeWords, countChange, withMovePercents, eventChange, largestSnapshotChange, longestGapChange, pauseChange, pickChanges, siteMoves, rateChange, rhythmChange, siteOfChange, withExtremes, withSpanComparisons } from "@/src/data/noteChanges";
+import { NOTE_CHANGES_CAP, RHYTHM_CHANGE, changeWords, countChange, withMovePercents, eventChange, largestGlobalChange, longestGapChange, pauseChange, pickChanges, siteMoves, rateChange, rhythmChange, siteOfChange, withExtremes, withSpanComparisons } from "@/src/data/noteChanges";
 import { fact } from "@/src/data/noteFacts";
 import type { Fact, NoteChange } from "@/src/data/noteTypes";
 
@@ -55,8 +55,8 @@ describe("a row's size", () => {
 });
 
 describe("the chamber's extremes (user, 2026-11-01)", () => {
-  it("names who held the largest snapshot", () => {
-    expect(largestSnapshotChange("Dor", "1.2 DAG", NET)).toMatchObject({ kind: "peak", subject: NET, text: "Dor had the largest snapshot, 1.2 DAG" });
+  it("states the largest global snapshot by what it anchored, with no network to name", () => {
+    expect(largestGlobalChange(18)).toEqual({ kind: "peak", size: 0, subject: { kind: "self" }, text: "The largest global snapshot anchored 18 snapshots" });
   });
 
   it("names who held the longest gap, the unit written out", () => {
@@ -65,7 +65,7 @@ describe("the chamber's extremes (user, 2026-11-01)", () => {
 
   it("gives way to anything that moved, and leads with the snapshot", () => {
     const moved = [eventChange("BioFi", "quiet", NET), eventChange("Dor", "active", NET), eventChange("USDC", "quiet", NET)];
-    const extremes = [longestGapChange("Dor", 720, NET), largestSnapshotChange("Dor", "1 DAG", NET)];
+    const extremes = [longestGapChange("Dor", 720, NET), largestGlobalChange(18)];
     expect(withExtremes(moved, extremes).map((c) => c.kind)).toEqual(["quiet", "active", "quiet"]);
     expect(withExtremes(moved.slice(0, 2), extremes).map((c) => c.kind)).toEqual(["quiet", "active", "peak"]);
     expect(withExtremes([], extremes).map((c) => c.kind)).toEqual(["peak", "longest"]);

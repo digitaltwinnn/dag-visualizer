@@ -80,10 +80,10 @@ export interface NoteGlobal {
 }
 
 /** The search a row asks of the explorer when its note is written (`app/api/notes/snapshotAt.ts`),
- *  never stored: a chain's snapshot in a bucket by its fee or the gap it ended, or its last one. A
- *  null chain is the global chain. */
+ *  never stored: a snapshot in a bucket by what it anchored or the gap it ended, or a chain's last
+ *  one. A null chain is the global chain. */
 export type NoteChangeFind =
-  | { chain: string | null; fromMs: number; toMs: number; fee?: number; gapS?: number }
+  | { chain: string | null; fromMs: number; toMs: number; count?: number; gapS?: number }
   | { chain: string | null; last: true };
 
 /** One row of a view note's notable changes. `text` is written here by code, never by the model: a

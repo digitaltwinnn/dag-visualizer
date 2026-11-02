@@ -47,7 +47,9 @@ export function bucketGlobals(inc: IncMap, net: string, recs: GlobalRec[], prevT
   for (const r of recs) {
     const t = Date.parse(r.timestamp);
     addInc(inc, net, t, "g.ticks", 1);
-    addInc(inc, net, t, "g.anchors", typeof r.metagraphSnapshotCount === "number" ? r.metagraphSnapshotCount : 0);
+    const anchored = typeof r.metagraphSnapshotCount === "number" ? r.metagraphSnapshotCount : 0;
+    addInc(inc, net, t, "g.anchors", anchored);
+    addInc(inc, net, t, "g.anchorsMax", anchored); // the largest global snapshot, the Snapshots card's row
     addInc(inc, net, t, "g.blocks", Array.isArray(r.blocks) ? r.blocks.length : 0);
     if (prev != null) {
       const gap = Math.max(0, Math.round((t - prev) / 1000));
@@ -97,7 +99,6 @@ export function bucketMetas(inc: IncMap, net: string, id: string, recs: MetaRec[
     // The floors are the CATALOG's (the fee card's "every network summed" lower bound): an unlisted
     // chain sampled for its own count stays out of them (`floors: false`).
     if (floors) {
-      addInc(inc, net, t, `m.${id}.feeMax`, r.fee || 0); // its largest snapshot, the Snapshots card's row
       addInc(inc, net, t, "g.feeFloor", r.fee || 0);
       addInc(inc, net, t, "g.kbFloor", r.sizeInKB || 0);
     }

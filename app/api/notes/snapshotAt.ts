@@ -2,8 +2,8 @@ import type { NoteChange, NoteChangeFind, NoteChangeSubject } from "@/src/data/n
 import { NETWORKS, type NetworkId } from "@/src/engine/config";
 
 // A NOTABLE ROW'S EXACT SNAPSHOT (user, 2026-11-02: "largest snapshot could open the snapshot
-// cards"). The store keeps a chain's largest fee and widest gap per 5-minute bucket, not which
-// snapshot held them, so the builder names the bucket and the value (`NoteChange.find`) and this
+// cards"). The store keeps the largest global and a chain's widest gap per 5-minute bucket, not
+// which snapshot held them, so the builder names the bucket and the value (`NoteChange.find`) and this
 // finds the record when the note is written: a seek to the bucket, then a scan of it. The record's
 // timestamp is its anchoring global's own (the join is equality, `app/api/global/at`), which gives
 // every field the Metagraph snapshot card needs, the road the raw log's rows already take.
@@ -15,7 +15,8 @@ export interface SnapRead {
   ordinal: number;
   hash: string;
   timestamp: string;
-  fee?: number;
+  /** A global's `metagraphSnapshotCount`. */
+  count?: number;
   lastSnapshotHash?: string;
 }
 
@@ -68,14 +69,14 @@ async function ordinalAtOrAfter(reader: ChainReader, chain: string | null, targe
   return hi;
 }
 
-/** The record in the bucket a row names: the fee it held, or the gap it ended. */
-async function scanBucket(reader: ChainReader, f: Exclude<NoteChangeFind, { last: true }>, first: number): Promise<SnapRead | null> {
+/** The record in the bucket a row names: what it anchored, or the gap it ended. */
+async function scanBucket(reader: ChainReader, f: Extract<NoteChangeFind, { fromMs: number }>, first: number): Promise<SnapRead | null> {
   let prev = first > 1 ? await reader.at(f.chain, first - 1) : null;
   for (let at = first; at < first + SCAN_MAX; at += SCAN_BATCH) {
     const page = await Promise.all(Array.from({ length: SCAN_BATCH }, (_, i) => reader.at(f.chain, at + i)));
     for (const r of page) {
       if (!r || Date.parse(r.timestamp) >= f.toMs) return null;
-      if (f.fee != null && r.fee === f.fee) return r;
+      if (f.count != null && r.count === f.count) return r;
       if (f.gapS != null && prev && Math.round((Date.parse(r.timestamp) - Date.parse(prev.timestamp)) / 1000) === f.gapS) return r;
       prev = r;
     }
@@ -137,11 +138,11 @@ export function locateRows(rows: readonly NoteChange[], reader: ChainReader, bud
   );
 }
 
-type Record_ = { ordinal?: number; hash?: string; timestamp?: string; fee?: number; lastSnapshotHash?: string };
+type Record_ = { ordinal?: number; hash?: string; timestamp?: string; metagraphSnapshotCount?: number; lastSnapshotHash?: string };
 
 const asRead = (d: Record_ | undefined): SnapRead | null =>
   d && typeof d.ordinal === "number" && typeof d.timestamp === "string"
-    ? { ordinal: d.ordinal, hash: d.hash ?? "", timestamp: d.timestamp, ...(typeof d.fee === "number" ? { fee: d.fee } : {}), ...(d.lastSnapshotHash ? { lastSnapshotHash: d.lastSnapshotHash } : {}) }
+    ? { ordinal: d.ordinal, hash: d.hash ?? "", timestamp: d.timestamp, ...(typeof d.metagraphSnapshotCount === "number" ? { count: d.metagraphSnapshotCount } : {}), ...(d.lastSnapshotHash ? { lastSnapshotHash: d.lastSnapshotHash } : {}) }
     : null;
 
 async function readRecord(url: string): Promise<SnapRead | null> {

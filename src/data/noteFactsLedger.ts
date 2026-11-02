@@ -1,6 +1,6 @@
 import { isPause } from "@/src/data/notableDays";
 import { chainReadThrough, fact, median, networksAnchored, spanMeasured, type ChainReads } from "@/src/data/noteFacts";
-import { eventChange, largestSnapshotChange, longestGapChange, pauseChange, pickChanges, rateChange, rhythmChange, withExtremes } from "@/src/data/noteChanges";
+import { eventChange, largestGlobalChange, longestGapChange, pauseChange, pickChanges, rateChange, rhythmChange, withExtremes } from "@/src/data/noteChanges";
 import type { Fact, FactPair, NoteChange, NoteChangeFind, NoteLead } from "@/src/data/noteTypes";
 import { anchorSeries, formatDag, globalSeries, metricSeries, spanAverage, TREND_METRICS, trimCounterEdges, unlistedUnmeasured, withUnlisted } from "@/src/data/trendSeries";
 import type { TrendsWindowData } from "@/src/data/trendWindow";
@@ -290,24 +290,20 @@ export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: st
       }
     }
   }
-  // THE CHAMBER'S EXTREMES: who held the span's largest snapshot and its longest gap, so a quiet day
-  // still has something to click. Each network's own widest reading, which is why a stopped one
-  // stands out of it. A fee of 0 is the store from before the sampler kept one (`m.<id>.feeMax`).
+  // THE CHAMBER'S EXTREMES: the span's largest global snapshot and its longest gap, so a quiet day
+  // still has something to click. Each network's own widest reading for the gap, which is why a
+  // stopped one stands out of it. No `g.anchorsMax` is the store from before the sampler kept one.
   const extremes: NoteChange[] = [];
   if (whole) {
-    const held = (key: (id: string) => string) => {
-      let best: { id: string; v: number; fromMs: number; toMs: number } | null = null;
-      for (const id of ids) {
-        const peak = peakOf(recent.series[key(id)] ?? [], recent);
-        if (peak && (!best || peak.v > best.v)) best = { id, ...peak };
-      }
-      return best;
-    };
-    const named = (id: string) => [catalog[id] ?? id, { kind: "network", id } as const] as const;
-    const fee = held((id) => `m.${id}.feeMax`);
-    const gap = held((id) => `m.${id}.gapMax`);
-    if (fee) extremes.push({ ...largestSnapshotChange(named(fee.id)[0], `${formatDag(fee.v * TREND_METRICS.fees.scale)} DAG`, named(fee.id)[1]), find: { chain: fee.id, fromMs: fee.fromMs, toMs: fee.toMs, fee: fee.v } });
-    if (gap && !paused.length) extremes.push({ ...longestGapChange(named(gap.id)[0], gap.v, named(gap.id)[1]), find: { chain: gap.id, fromMs: gap.fromMs, toMs: gap.toMs, gapS: gap.v } }); // a pause is that gap
+    const largest = peakOf(recent.series["g.anchorsMax"] ?? [], recent);
+    if (largest) extremes.push({ ...largestGlobalChange(largest.v), find: { chain: null, fromMs: largest.fromMs, toMs: largest.toMs, count: largest.v } });
+    let gap: { id: string; v: number; fromMs: number; toMs: number } | null = null;
+    for (const id of ids) {
+      const peak = peakOf(recent.series[`m.${id}.gapMax`] ?? [], recent);
+      if (peak && (!gap || peak.v > gap.v)) gap = { id, ...peak };
+    }
+    const widest = gap as { id: string; v: number; fromMs: number; toMs: number } | null;
+    if (widest && !paused.length) extremes.push({ ...longestGapChange(catalog[widest.id] ?? widest.id, widest.v, { kind: "network", id: widest.id }), find: { chain: widest.id, fromMs: widest.fromMs, toMs: widest.toMs, gapS: widest.v } }); // a pause is that gap
   }
   const changes = withExtremes(pickChanges(events, paused, paces, rateRows), extremes);
   return { facts, names: [...new Set(Object.values(catalog))], lead: leadOf(facts), ...(changes.length ? { changes } : {}) };

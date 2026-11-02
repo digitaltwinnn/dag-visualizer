@@ -330,15 +330,14 @@ describe("ledgerFacts' notable changes", () => {
       expect.objectContaining({ kind: "longest", size: -1, text: "USDC.dag had the longest gap, 55 seconds", subject: { kind: "network", id: "usdc" } }),
     ]);
   });
-  it("names the largest snapshot once the sampler holds one, ahead of the gap", () => {
-    const fees = { "m.usdc.feeMax": row(74, () => 2e8), "m.bio.feeMax": row(74, (i) => (i === 30 ? 5e8 : 1e8)) };
-    const r = ledgerFacts(input({ recent: side(74, 5 * MIN, 20, fees) }))!;
-    expect(r.changes?.map((c) => c.text)).toEqual(["BioFi had the largest snapshot, 5 DAG", "USDC.dag had the longest gap, 55 seconds"]);
-    expect(r.changes?.[0]).toMatchObject({ kind: "peak", subject: { kind: "network", id: "bio" } });
+  it("names the largest global snapshot once the sampler holds one, ahead of the gap", () => {
+    const r = ledgerFacts(input({ recent: side(74, 5 * MIN, 20, { "g.anchorsMax": row(74, (i) => (i === 30 ? 18 : 6)) }) }))!;
+    expect(r.changes?.map((c) => c.text)).toEqual(["The largest global snapshot anchored 18 snapshots", "USDC.dag had the longest gap, 55 seconds"]);
+    const at = T0 + 30 * 5 * MIN;
+    expect(r.changes?.[0]).toMatchObject({ kind: "peak", subject: { kind: "self" }, find: { chain: null, fromMs: at, toMs: at + 5 * MIN, count: 18 } });
   });
-  it("names no largest snapshot from before the sampler held one: a zero is no snapshot", () => {
-    const r = ledgerFacts(input({ recent: side(74, 5 * MIN, 20, { "m.usdc.feeMax": row(74, () => 0) }) }))!;
-    expect(r.changes?.some((c) => c.kind === "peak")).toBe(false);
+  it("names none from before the sampler held one", () => {
+    expect(ledgerFacts(input())!.changes?.some((c) => c.kind === "peak")).toBe(false);
   });
   it("a network's own note reads its own rhythm, and no other network's", () => {
     const r = ledgerFacts(input({ subject: "usdc", week: weekSide({ "m.usdc.gapSum": row(168, () => 30 * 60) }) }))!;
