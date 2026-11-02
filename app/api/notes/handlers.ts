@@ -50,7 +50,7 @@ export const CAP_PER_DAY = 2_000;
 const RATE_TTL_S = 2 * 3600;
 const CAP_TTL_S = 2 * 86_400;
 /** The warm route's `maxDuration` is 300 s: no new item starts after this. The worst item is two
- *  Gate attempts at their 20 s timeout plus its reads, so 210 s leaves it room to finish. */
+ *  Gate attempts at their 20 s timeout plus its reads and row lookups, so 210 s leaves it room to finish. */
 export const WARM_BUDGET_MS = 210_000;
 /** Paced for the paid model, whose calls take under 3 s and which never refused three at once in the
  *  trial (2026-11-01): the whole set of 121 notes fills in one pass. */

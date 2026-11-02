@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { locateRows, type ChainReader, type SnapRead } from "./snapshotAt";
+import { LOCATE_BUDGET_MS, locateRows, type ChainReader, type SnapRead } from "./snapshotAt";
 import type { NoteChange } from "@/src/data/noteTypes";
 
 // A chain every 10 seconds from T0, with one 2 hour gap, and a global chain stamped the same way.
@@ -32,6 +32,10 @@ const row = (over: Partial<NoteChange>): NoteChange => ({ kind: "peak", size: 0,
 const span = (rec: SnapRead) => ({ fromMs: Date.parse(rec.timestamp) - 1000, toMs: Date.parse(rec.timestamp) + 299_000 });
 
 describe("locateRows", () => {
+  it("leaves a note's write room inside its route's 60 seconds", () => {
+    expect(LOCATE_BUDGET_MS).toBeLessThanOrEqual(8000);
+  });
+
   const dor = chain(400, 216);
   const globals = dor.map((r, i) => ({ ...r, ordinal: 1000 + i, hash: `g${i}`, lastSnapshotHash: "prev" }));
 
@@ -82,6 +86,23 @@ describe("locateRows", () => {
     const slow: ChainReader = { latest: () => new Promise(() => {}), at: async () => null };
     const [r] = await locateRows([row({ find: { chain: "dor", last: true } })], slow, 5);
     expect(r!.subject).toEqual({ kind: "network", id: "dor" });
+  });
+
+  it("stops reading once it has given up", async () => {
+    let seen: AbortSignal | undefined;
+    const hung: ChainReader = { latest: (_c, signal) => { seen = signal; return new Promise(() => {}); }, at: async () => null };
+    await locateRows([row({ find: { chain: "dor", last: true } })], hung, 5);
+    expect(seen?.aborted).toBe(true);
+  });
+
+  it("reads one record once a note, across its rows", async () => {
+    const rd = reader({ dor }, globals);
+    const find = { chain: "dor", last: true } as const;
+    await locateRows([row({ find }), row({ find, text: "y" })], rd);
+    expect(rd.reads).toBeLessThan(40);
+    const alone = reader({ dor }, globals);
+    await locateRows([row({ find })], alone);
+    expect(rd.reads).toBe(alone.reads);
   });
 
   it("reads nothing for a row with no search", async () => {

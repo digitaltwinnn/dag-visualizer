@@ -72,7 +72,8 @@ export const STATS_TTL_S = 30 * 86_400;
 /** The singleflight lock's TTL. A warm item's paced wait runs INSIDE the lock (`pacedChat` wraps
  *  the chat this generator calls), so the worst writer holds it for the facts reads, a paced wait
  *  of a second or two, two Gate attempts at their 20-second timeout and the set: 42 s plus the
- *  reads. 90 s leaves the reads about 45 s. The unlock is unconditional, so a writer that outlived its lock would free the next
+ *  reads, a Snapshots note's row lookups among them (`LOCATE_BUDGET_MS`, 8 s). 90 s leaves the reads
+ *  about 45 s. The unlock is unconditional, so a writer that outlived its lock would free the next
  *  writer's (R30). */
 export const LOCK_TTL_S = 90;
 
