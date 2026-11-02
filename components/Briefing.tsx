@@ -260,7 +260,7 @@ function Tour({ stop, leaving }: { stop: number; leaving: boolean }) {
           style={{ transitionDuration: `${BRIEFING_WORDS_OUT_MS}ms` }}
         >
           <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-[44%] [background:linear-gradient(transparent,var(--scene-ground)_38%)]" />
-          {phone && (
+          {phone ? (
             <div className="absolute inset-x-0 top-0 flex flex-col gap-1 px-3 pt-[calc(env(safe-area-inset-top)+10px)]">
               {bars}
               <div className="flex items-center justify-between">
@@ -268,19 +268,18 @@ function Tour({ stop, leaving }: { stop: number; leaving: boolean }) {
                 {skip}
               </div>
             </div>
+          ) : (
+            <div className="absolute inset-x-0 top-0 flex items-center gap-3.5 px-[max(16px,3.7vw)] pt-[calc(env(safe-area-inset-top)+24px)]">
+              {site}
+              {bars}
+              {skip}
+            </div>
           )}
           <div className="absolute inset-x-0 bottom-0 px-[max(16px,3.7vw)] pb-[calc(env(safe-area-inset-bottom)+22px)]">
             <div className="mb-1 flex min-h-5 justify-center max-[700px]:justify-start">{who}</div>
             <div aria-hidden className="mx-auto min-h-[2.52em] max-w-[79%] text-balance text-center text-briefing font-medium text-foreground max-[700px]:mx-0 max-[700px]:min-h-[3.8em] max-[700px]:max-w-full max-[700px]:text-left max-[700px]:text-wrap">
               <TypedNote key={`${stop}:${words.text}`} text={words.text} always />
             </div>
-            {!phone && (
-              <div className="mt-3 flex items-center gap-3.5">
-                {site}
-                {bars}
-                {skip}
-              </div>
-            )}
           </div>
         </div>
       )}

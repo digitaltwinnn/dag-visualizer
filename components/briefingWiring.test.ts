@@ -153,6 +153,13 @@ describe("the tour's Skip", () => {
 });
 
 describe("the tour's chrome", () => {
+  // user, 2026-11-02: "the intro feels a bit too much at the bottom". The controls stand at the top on
+  // every screen, where the top bar lands, and the words alone stand under the scene.
+  it("stands the controls at the top on every screen, the words alone at the bottom", () => {
+    expect(briefing).toMatch(/absolute inset-x-0 top-0 flex items-center gap-3\.5 px-\[max\(16px,3\.7vw\)\]/);
+    expect(briefing).not.toMatch(/mt-3 flex items-center gap-3\.5/);
+  });
+
   it("names the site itself, since the top bar that does so is stood down", () => {
     expect(briefing).toMatch(/<EcgMark \/>/);
     expect(briefing).toMatch(/new URL\(SITE_ORIGIN\)\.host/);
