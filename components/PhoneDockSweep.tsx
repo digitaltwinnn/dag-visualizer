@@ -1,6 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import { viewNetwork } from "@/src/engine/domain/viewNetwork";
 import { useStore } from "@/src/store/store";
 import { filterAccent } from "@/src/data/network";
 import { PulseEdge } from "@/components/EdgePulse";
@@ -32,7 +33,8 @@ import { usePulseWindow } from "@/components/RailDock";
 export default function PhoneDockSweep() {
   const mode = useStore((s) => s.mode);
   const filter = useStore((s) => s.filter);
-  const switchP = usePulseWindow(`${mode}|${filter}`);
+  const network = useStore(viewNetwork);
+  const switchP = usePulseWindow(`${mode}|${network}`);
   const accent = filterAccent(filter);
   if (!switchP.live) return null;
   return (

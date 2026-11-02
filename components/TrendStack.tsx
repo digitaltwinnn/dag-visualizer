@@ -450,7 +450,7 @@ export default function TrendStack() {
     const st = useStore.getState();
     if (st.trendFocus) applyClickActions(trendPlaneActions(st.trendFocus, st.trendFocus));
     if (st.trendScroll) st.setTrendScroll(0);
-    st.setTrendRotation(st.trendRotation + step);
+    st.setTrendRotation(useStore.getState().trendRotation + step); // read after the release, which rewinds it
   };
   const stepMeasure = (dir: -1 | 1, axis: "x" | "y" = "y") => {
     const next = stepMetric(useStore.getState().trendMetric, dir);

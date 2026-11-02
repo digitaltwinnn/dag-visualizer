@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
+import { viewNetwork } from "@/src/engine/domain/viewNetwork";
 import { useStore } from "@/src/store/store";
 import { filterAccent } from "@/src/data/network";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
@@ -93,6 +94,7 @@ export default function RailThread({
   signal = "",
 }: { side?: Side; standalone?: boolean; signal?: string }) {
   const filter = useStore((s) => s.filter);
+  const network = useStore(viewNetwork); // the pulse acknowledges a browse too; the accent stays the filter's
   const mode = useStore((s) => s.mode);
   // The accent may be a hex (a committed metagraph) OR a var() (all → --primary, unlisted →
   // --muted-foreground). Either way it is set ONCE as the SVG's `color` style property and
@@ -109,7 +111,7 @@ export default function RailThread({
   // on the identity spine (the recipe is HTML/CSS, so it rides a fixed wrapper rather than the
   // SVG). ONE combined subject key: a simultaneous mode+filter change is a single key change →
   // one pulse (and the hook's PULSE_MS debounce keeps rapid back-to-back changes calm).
-  const pulseKey = useEdgePulse(`${mode}|${filter}|${signal}`);
+  const pulseKey = useEdgePulse(`${mode}|${network}|${signal}`);
 
   const { W } = GEOM[side];
   const railId = side === "right" ? "rightcol" : "leftcol";

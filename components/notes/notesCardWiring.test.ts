@@ -54,6 +54,23 @@ describe("the top card's scope", () => {
   });
 });
 
+describe("a swipe that releases a focus", () => {
+  it("turns from the deck the release left, read after it", () => {
+    const stack = read("components/TrendStack.tsx");
+    expect(stack).toMatch(/st\.setTrendRotation\(useStore\.getState\(\)\.trendRotation \+ step\)/);
+  });
+});
+
+describe("the rail's pulse", () => {
+  // A network picked in Hypergraph is a browse now, so a key on the filter never changed.
+  it("keys on the network the view stands on, on every tier", () => {
+    expect(read("components/RailThread.tsx")).toMatch(/useEdgePulse\(`\$\{mode\}\|\$\{network\}\|\$\{signal\}`\)/);
+    expect(read("components/ExploreRail.tsx")).toMatch(/signalKey=\{`\$\{mode\}\|\$\{network\}`\}/);
+    expect(read("components/Inspector.tsx")).toMatch(/signalKey=\{`\$\{mode\}\|\$\{viewNetwork\(\{ filter, railNet \}\)\}`\}/);
+    expect(read("components/PhoneDockSweep.tsx")).toMatch(/usePulseWindow\(`\$\{mode\}\|\$\{network\}`\)/);
+  });
+});
+
 describe("a day's measure", () => {
   it("rides a chart's coin as it does a card's row", () => {
     expect(read("components/TrendStack.tsx")).toMatch(/list\.push\(\{ dayMs: d\.dayMs, kind: d\.kind, measure: d\.measure, networkId: d\.networkId/);

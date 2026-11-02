@@ -204,3 +204,17 @@ describe("the raw layer returns to the view a door left (2026-09-26)", () => {
     expect(useStore.getState().mode).toBe("ledger");
   });
 });
+
+// A re-pick is a real commit (user-visible since `railNet` took Hypergraph's clicks, the review of
+// 2026-11-02): under a boxed node, the network's own hub brings its card forward.
+describe("setRailNet", () => {
+  it("re-picking the network the view stands on still brings its card forward", () => {
+    useStore.setState({ filter: "dor", railNet: null, selStack: ["node", "network"] as never });
+    useStore.getState().setRailNet(null);
+    expect(useStore.getState().selStack[0]).toBe("network");
+    useStore.setState({ filter: "all", railNet: "dor", selStack: ["node", "network"] as never });
+    useStore.getState().setRailNet("dor");
+    expect(useStore.getState().selStack[0]).toBe("network");
+    useStore.setState({ railNet: null, selStack: [] });
+  });
+});

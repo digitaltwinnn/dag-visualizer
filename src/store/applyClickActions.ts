@@ -11,6 +11,13 @@ import { scrollToShow } from "@/src/engine/domain/trendStack";
 import { viewNetwork } from "@/src/engine/domain/viewNetwork";
 import type { MotionCause } from "@/src/store/store";
 
+/** A released focus or a new filter turns the deck back to its front: under All that is the DAG
+ *  (`deckOf`). One home, so no path can leave a rotation behind it. */
+function turnDeckBack(st: ReturnType<typeof useStore.getState>): void {
+  if (st.trendScroll) st.setTrendScroll(0);
+  if (st.trendRotation) st.setTrendRotation(0);
+}
+
 export function applyClickActions(actions: ClickAction[], opts?: { quiet?: boolean; arrival?: boolean }): void {
   const st = useStore.getState();
   // `arrival` is a view entry committing a carried node's ancestry: every other commit is the reader.
@@ -33,6 +40,7 @@ export function applyClickActions(actions: ClickAction[], opts?: { quiet?: boole
           if (st.tickNet != null) st.setTickNet(null);
           // …and History's plane focus, which names the Metagraph card and scopes RAW there (I6).
           if (st.trendFocus != null) st.setTrendFocus(null);
+          turnDeckBack(st);
         }
         st.setFilter(a.id);
         // A committed network replaces a browsed one, after the write: on the same network the
@@ -89,9 +97,7 @@ export function applyClickActions(actions: ClickAction[], opts?: { quiet?: boole
           const scroll = scrollToShow(st.trendIds, a.id, st.trendScroll);
           if (scroll !== st.trendScroll) st.setTrendScroll(scroll);
         } else if (st.trendFocus != null) {
-          // A focus released turns the deck back to its front: under All that is the DAG (`deckOf`).
-          if (st.trendScroll) st.setTrendScroll(0);
-          if (st.trendRotation) st.setTrendRotation(0);
+          turnDeckBack(st);
         }
         st.setTrendFocus(a.id);
         break;

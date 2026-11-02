@@ -167,6 +167,26 @@ describe("metaSnap action", () => {
   });
 });
 
+describe("a filter change and the deck", () => {
+  it("turns the deck back to its front, wherever it was paged or swiped", () => {
+    useStore.setState({ filter: "all", trendFocus: null, trendScroll: 3, trendRotation: 2 });
+    applyClickActions([{ kind: "filter", id: "dor" }]);
+    let st = useStore.getState();
+    expect(st.trendScroll).toBe(0);
+    expect(st.trendRotation).toBe(0);
+    useStore.setState({ trendRotation: 2 });
+    applyClickActions([{ kind: "filter", id: "all" }]);
+    st = useStore.getState();
+    expect(st.trendRotation).toBe(0);
+  });
+  it("re-picking the same filter leaves the deck where it is", () => {
+    useStore.setState({ filter: "dor", trendRotation: 2 });
+    applyClickActions([{ kind: "filter", id: "dor" }]);
+    expect(useStore.getState().trendRotation).toBe(2);
+    useStore.setState({ filter: "all", trendRotation: 0 });
+  });
+});
+
 describe("railNet action", () => {
   it("standing on the filter's own network is no browse", () => {
     useStore.setState({ filter: "dor", railNet: "usdc" });
