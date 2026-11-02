@@ -96,6 +96,8 @@ const hexPitchDeg = (r: number) => ((2 * r * 1.04) / (R + LAND_H)) * (180 / Math
 // shadow while staying well short of the blot the OP comment above warns about.
 const POOL_SHADE = 0.34;
 const POOL_SHADE_OP = 0.72;
+/** How much of its light a pool keeps off the network in scope. */
+const POOL_OFF_SCOPE = 0.2;
 
 // View-transition staging grid: THE cell pitch (world units). setGatherFit may only shrink it
 // (with the chip size, by one factor) to make the packed row of per-network squares
@@ -989,7 +991,7 @@ export class Globe implements GeoViewHost {
     }
 
     // Build a pool per site×network ALWAYS (all nodes, each tagged with its network + identity hue);
-    // the committed filter just SHOWS/HIDES pools (setFilter → _applyGlowFilter), no recluster needed.
+    // the committed filter just mutes pools (setFilter → _applyGlowFilter), no recluster needed.
     const dagHex = this.sceneColors?.dag ?? this.geoColor;
     const metaHex = (id: string) => this.sceneColors?.[id] ?? this.geoColor;
 
@@ -1021,22 +1023,24 @@ export class Globe implements GeoViewHost {
       // counts) doesn't overpower; a metagraph selection's lower counts sit naturally below the cap.
       // Opacity is driven per-frame in setMorph (morph fade × the country-drill recede), NOT geoFades.
       mesh.userData.glowBase = Math.min(0.28, 0.1 + c.n * 0.024);
-      mesh.userData.net = c.net; // which network this pool belongs to (for the filter toggle)
+      mesh.userData.net = c.net; // which network this pool belongs to (for the scope's mute)
+      mesh.userData.scope = 1;
+      mesh.userData.scopeNow = 1;
       this.surface.add(mesh);
       this._densityGlow.push(mesh);
     }
     this._applyGlowFilter();
+    for (const m of this._densityGlow) m.userData.scopeNow = m.userData.scope; // a rebuild is no scope change, so nothing eases
   }
 
-  // Show only the pools of the committed network ("all" shows every pool) — a cheap visibility
-  // toggle, so a filter change never re-clusters the light pools (just drops the other planes).
-  // The pools follow the SELECTOR the chips follow — the hover preview when there is one, else the
-  // committed filter (user, 2026-10-24: "not only the other nodes should be affected but also the
-  // node-coloured plane sitting on top of the sphere") — and answer it the way geo answers a
-  // filter, the isolate (`hide`): an off-selector pool is gone, not dimmed.
+  // Mute the pools off the network in scope ("all" keeps every pool) — a cheap target, so a filter
+  // change never re-clusters the light pools. The pools follow the SELECTOR the chips follow — the
+  // hover preview when there is one, else the committed filter (user, 2026-10-24: "not only the
+  // other nodes should be affected but also the node-coloured plane sitting on top of the sphere")
+  // — and answer it as the chips do (user, 2026-11-02: dim, never remove). Eased per frame.
   private _applyGlowFilter(): void {
     const sel = this._selector();
-    for (const m of this._densityGlow) m.visible = sel === "all" || m.userData.net === sel;
+    for (const m of this._densityGlow) m.userData.scope = sel === "all" || m.userData.net === sel ? 1 : POOL_OFF_SCOPE;
     this.arcs.setSelector(sel); // the packets take the same isolate (objects/Arcs.ts)
   }
 
@@ -1049,7 +1053,7 @@ export class Globe implements GeoViewHost {
     return this._hoverSel != null;
   }
 
-  // Isolate one network on the globe and dim the rest.
+  // Stand the globe on one network and dim the rest.
   setFilter(sel: string): void {
     this.filter = sel;
     this.countryFilter = null; // switching network clears the country drill-down
@@ -1057,7 +1061,7 @@ export class Globe implements GeoViewHost {
     this._updateCountryBorder();
     this._applyDim(this._selector(), this._previewing()); // a live hover preview survives a data rebuild's re-apply
     this._relayoutGeo();
-    this._applyGlowFilter(); // just show/hide the matching pools — no recluster
+    this._applyGlowFilter(); // just mute the other pools — no recluster
     this._rebuildBaseRing(); // the rings re-partition over the filtered fleet (domain/baseRing)
   }
 
@@ -1074,15 +1078,12 @@ export class Globe implements GeoViewHost {
   private _hoverSel: string | null = null;
 
   // Set the dim TARGETS for a selection (the dim itself eases each frame).
-  // ⚠️ In the LEDGER the DAG core is ALWAYS lit (user, 2026-08-30: "the DAG nodes should never be
-  // dimmed since in this view the global snapshot is part of our active/selected scope"): every
-  // metagraph anchors INTO the global, so the global layer — floor, fleet tray — is inside every
-  // committed story, and the L0 validators under it show at rest whatever the filter says. This is
-  // a WHO-is-in-scope statement, so it lives here at the TARGET (the view rows keep saying how
-  // MUCH); applyLedgerLayout re-derives it when the flag flips, and the ease carries the change.
+  // One rule in every view (user, 2026-11-02, reversing 2026-08-30's "never dimmed" in the ledger):
+  // under a network the DAG's nodes dim like any other. The chamber's floor and its snapshots are
+  // not nodes and stay as they were: every metagraph still anchors into the global.
   private _applyDim(sel: string, preview = false): void {
     this.baseRing.setSubject(sel, preview);
-    const dagLit = sel === "all" || sel === "dag" || this.ledger;
+    const dagLit = sel === "all" || sel === "dag";
     this.dimTarget = dagLit ? 0 : 1;
     for (const r of this.metaNodes) r.dimTarget = (sel === "all" || sel === r.metaId) ? 0 : 1;
   }
@@ -1569,9 +1570,9 @@ export class Globe implements GeoViewHost {
     return geoStats.listNodes(this.nodes, this.metaNodes, filter);
   }
 
-  // Re-fan the co-located nodes and rebuild the arcs using ONLY the filter-active nodes.
-  // Inactive (dimmed) nodes collapse back to their true location and drop out of the arc pool.
-  // Co-located groups come back as HEX STACKS in a honeycomb (spreadCoLocated's levels): each
+  // Re-fan the co-located nodes and rebuild the arcs. EVERY node stays in the fan (user, 2026-11-02:
+  // "dim the other nodes not remove them"), so a network never re-tiles the world: its nodes stay in
+  // the stacks they stood in, the rest muted around them. Only the arcs keep to the scope. Co-located groups come back as HEX STACKS in a honeycomb (spreadCoLocated's levels): each
   // node's stack level lifts it radially by CHIP_PITCH. (The density heatmap that used to be
   // rebuilt here was removed entirely — user decision; the honeycomb itself shows density.)
   private _relayoutGeo(): void {
@@ -1579,35 +1580,32 @@ export class Globe implements GeoViewHost {
     // Gather BOTH pools' active nodes, then run ONE combined fan: validators and metagraph
     // nodes at the same site must share one honeycomb + one stack chunking — fanning the pools
     // separately put each pool's first stack on the SAME centre cell (the Ashburn overlap bug).
-    // Because only filter-ACTIVE nodes enter the fan, every filter change re-tiles the
-    // survivors into a fresh honeycomb (inactive nodes collapse back to their true location).
-    const vActive: ValidatorRecord[] = [];
+    const vFan: ValidatorRecord[] = [];
     for (const u of this.nodes) {
       if (u.noGeo) continue;
       u.geoDir!.copy(u.trueDir!);
       u.geoRadius = HEX_BASE_R; // rest on the plateau until the fan assigns a level
-      if (u.geoPrimary && this._nodeActive("dag", geoOf(u.pick))) vActive.push(u);
+      if (u.geoPrimary) vFan.push(u);
     }
-    const mActive: MetaNodeRecord[] = [];
+    const mFan: MetaNodeRecord[] = [];
     const mLevel = new Map<MetaNodeRecord, number>();
     for (const r of this.metaNodes) {
       r.geoDir.copy(r.trueDir);
-      if (!(r.geoPrimary ?? true)) continue; // hybrid siblings: hidden on the globe
-      if (this._nodeActive(r.metaId, geoOf(r.pick))) mActive.push(r);
+      if (r.geoPrimary ?? true) mFan.push(r); // hybrid siblings: hidden on the globe
     }
-    if (vActive.length + mActive.length) {
+    if (vFan.length + mFan.length) {
       const lv: number[] = [];
       // one pitch for the combined set, sized to the LARGER hex footprint. KEYS group the fan by
       // network (validators = "dag", metagraph nodes by metaId) so each metagraph's co-located
       // chips get their OWN stack/cell instead of intermixing at a shared site (user).
       spreadCoLocated(
-        [...vActive.map((u) => u.geoDir!), ...mActive.map((r) => r.geoDir)],
+        [...vFan.map((u) => u.geoDir!), ...mFan.map((r) => r.geoDir)],
         { spacingDeg: hexPitchDeg(Math.max(VALIDATOR_HEX_R, META_HEX_R)) },
         lv,
-        [...vActive.map(() => "dag"), ...mActive.map((r) => r.metaId)],
+        [...vFan.map(() => "dag"), ...mFan.map((r) => r.metaId)],
       );
-      vActive.forEach((u, i) => { u.geoRadius = HEX_BASE_R + (lv[i] ?? 0) * CHIP_PITCH; });
-      mActive.forEach((r, i) => mLevel.set(r, lv[vActive.length + i] ?? 0));
+      vFan.forEach((u, i) => { u.geoRadius = HEX_BASE_R + (lv[i] ?? 0) * CHIP_PITCH; });
+      mFan.forEach((r, i) => mLevel.set(r, lv[vFan.length + i] ?? 0));
     }
     for (const r of this.metaNodes)
       r.geoPos.copy(r.geoDir).multiplyScalar(HEX_BASE_R + (mLevel.get(r) ?? 0) * CHIP_PITCH);
@@ -1618,12 +1616,13 @@ export class Globe implements GeoViewHost {
     // arrays) so the sim's flashHits map straight to `arcRecs`; the tint reads .base / .color.
     const arcPts: ArcEndpoint[] = [];
     const arcRecs: (ValidatorRecord | MetaNodeRecord)[] = [];
-    for (const u of vActive) if (u.ready) {
+    for (const u of vFan) if (u.ready && this._nodeActive("dag", geoOf(u.pick))) {
       const i = arcPts.length;
       arcRecs.push(u);
       arcPts.push({ dir: u.geoDir!, node: { index: i, base: u.base } });
     }
-    for (const r of mActive) {
+    for (const r of mFan) {
+      if (!this._nodeActive(r.metaId, geoOf(r.pick))) continue;
       const i = arcPts.length;
       arcRecs.push(r);
       arcPts.push({ dir: r.geoDir, node: { index: i, color: r.color } });
@@ -1782,8 +1781,6 @@ export class Globe implements GeoViewHost {
   // gather dissolve).
   applyLedgerLayout(on: boolean): void {
     this.ledger = on;
-    // The core's dim target keys on this flag (the ledger always lights the DAG — see _applyDim),
-    // so a flip re-derives it under the current filter; the per-frame ease makes the change soft.
     this._applyDim(this.filter);
     if (on) {
       this.group.rotation.set(0, 0, 0);
@@ -1831,7 +1828,7 @@ export class Globe implements GeoViewHost {
     const poolW = paper ? POOL_SHADE_OP : 1; // hoisted: ink and glow do not rest at one weight
     for (const g of this._densityGlow) {
       (g.material as THREE.MeshBasicMaterial).opacity =
-        (g.userData.glowBase as number) * poolW * surf * ge * this._glowDim * this._glowAllDim;
+        (g.userData.glowBase as number) * poolW * surf * ge * this._glowDim * this._glowAllDim * g.userData.scopeNow;
     }
     // Depth cueing for the see-through hologram: the graticule + coastal walls dim their far
     // hemisphere through the shared facing uniform (camera dir in this group's local frame),
@@ -1926,6 +1923,7 @@ export class Globe implements GeoViewHost {
     // In "all" the per-network pools OVERLAP and stack additively — damp them so multi-network sites
     // don't blow out (a single-network filter has no overlap, so it stays full), eased on switch.
     this._glowAllDim += ((this.filter === "all" ? 0.62 : 1) - this._glowAllDim) * Math.min(1, dt * 3);
+    for (const g of this._densityGlow) g.userData.scopeNow += (g.userData.scope - g.userData.scopeNow) * Math.min(1, dt * 3);
     // Ease the wall colour (held at the default cyan).
     if (this.landWallUniforms) {
       this._edgeColor.lerp(this._edgeTarget, Math.min(1, dt * 3));

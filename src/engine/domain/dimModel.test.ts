@@ -50,7 +50,7 @@ const ctx = (overrides: Partial<DimContext> = {}): DimContext => ({
 // THE ROWS ARE READ, THE RELATIONS PINNED (review, 2026-10-24): a retune of a view's `dim` is a
 // design decision this file must not veto — what it guards is how the rows COMPOSE (the morph
 // ramp, the ledger's flat row, hover = commit) and the design facts about them (hyper mutes in
-// place, geo isolates outright). `FOCUS_TUNE_DEFAULTS` is the shipped look, never the live knobs.
+// place, as geo does since 2026-11-02). `FOCUS_TUNE_DEFAULTS` is the shipped look, never the live knobs.
 const HYPER_DIM = FOCUS_TUNE_DEFAULTS.hyper.dim;
 const GEO_DIM = FOCUS_TUNE_DEFAULTS.geo.dim;
 const LEDGER_DIM = FOCUS_TUNE_DEFAULTS.ledger.dim;
@@ -62,9 +62,8 @@ describe("nodeDimScale", () => {
     expect(HYPER_DIM).toBeLessThan(1);
   });
 
-  it("ramps linearly to the geo row's dim at morph=1 — the isolate's full 1", () => {
+  it("ramps linearly to the geo row's dim at morph=1", () => {
     expect(nodeDimScale(ctx({ morph: 1 }))).toBeCloseTo(GEO_DIM, 10);
-    expect(GEO_DIM).toBe(1);
   });
 
   it("is hyper + (geo − hyper)·morph at a midpoint", () => {
@@ -84,12 +83,11 @@ describe("nodeDimScale", () => {
 });
 
 describe("hideFrac (the shrink, an independent reading of the same ramp as the dim)", () => {
-  // HIDE IS NOT DIM (user, 2026-08-11). A dim mutes two ways — colour and emissive — and geo does a
-  // third thing that is not an emphasis at all: the ISOLATE. It gets its own row field, which is
-  // what lets hyper's dim mute a node in place instead of shrinking it away.
-  it("is the FULL ramp on the globe — the off-filter isolate is bit-identical", () => {
-    expect(hideFrac(ctx({ morph: 1 }), 1)).toBeCloseTo(1, 10);
-    expect(hideFrac(ctx({ morph: 1 }), 0.4)).toBeCloseTo(0.4, 10);
+  // HIDE IS NOT DIM (user, 2026-08-11). A dim mutes two ways, colour and emissive; a shrink is a third
+  // thing and gets its own row field. Every row holds it at 0 since 2026-11-02.
+  it("is ZERO on the globe: an off-scope node mutes in place, at full size", () => {
+    expect(hideFrac(ctx({ morph: 1 }), 1)).toBeCloseTo(0, 10);
+    expect(hideFrac(ctx({ morph: 1 }), 0.4)).toBeCloseTo(0, 10);
   });
 
   it("is ZERO in hyper at any dim — a turned-up dim mutes in place, at full size", () => {
@@ -100,10 +98,6 @@ describe("hideFrac (the shrink, an independent reading of the same ramp as the d
   it("is ZERO in the ledger, whose chips are uniform-sized by their own rule", () => {
     expect(hideFrac(ctx({ morph: 0, ledger: true }), 1)).toBeCloseTo(0, 10);
     expect(hideFrac(ctx({ morph: 1, ledger: true }), 1)).toBeCloseTo(0, 10);
-  });
-
-  it("ramps with the morph, so the isolate arrives as the nodes land", () => {
-    expect(hideFrac(ctx({ morph: 0.5 }), 1)).toBeCloseTo(0.5, 10);
   });
 
   // The knob-independence rule (user, 2026-08-11: "dim.off-filter also resizes when hide is 0.5").
@@ -151,10 +145,10 @@ describe("gatherRaw (the view-transition's escape hatch — it lifts the RAMP, n
   // The whole point of moving the hatch onto the ramp: the DIM follows the size back up, so an
   // off-filter chip is never restored to full size while still resolving to a black glow.
   it("brings the dim up with the size — the two readings can no longer disagree", () => {
-    const geo = ctx({ morph: 1 }); // dim 1.0, hide 1 — the isolate
-    // At rest an off-filter chip is gone AND black; parked it is present AND lit, together.
-    expect(hideFrac(geo, gatherRaw(1, 0))).toBeCloseTo(1, 10);
-    expect(nodeDim(geo, gatherRaw(1, 0), null)).toBeCloseTo(1, 10);
+    const geo = ctx({ morph: 1 });
+    // At rest an off-filter chip is muted, in place; parked it is lit.
+    expect(hideFrac(geo, gatherRaw(1, 0))).toBeCloseTo(0, 10);
+    expect(nodeDim(geo, gatherRaw(1, 0), null)).toBeCloseTo(FOCUS_TUNE_DEFAULTS.geo.dim, 10);
     expect(hideFrac(geo, gatherRaw(1, 1))).toBeCloseTo(0, 10);
     expect(nodeDim(geo, gatherRaw(1, 1), null)).toBeCloseTo(0, 10);
   });
@@ -523,12 +517,12 @@ describe("nodeDim", () => {
   it("does NOT raise the dim when the node IS inside the drilled country", () => {
     const c = ctx({ morph: 1, countryFilter: "US", countryMix: 0.9 });
     // inside the country the max(d, countryMix) branch is skipped entirely, so d stays 0.4.
-    expect(nodeDim(c, 0.4, "US")).toBeCloseTo(0.4, 10);
+    expect(nodeDim(c, 0.4, "US")).toBeCloseTo(0.4 * GEO_DIM, 10);
   });
 
   it("never raises the dim when no country is drilled into", () => {
     const c = ctx({ morph: 1, countryFilter: null, countryMix: 0 });
-    expect(nodeDim(c, 0.4, "DE")).toBeCloseTo(0.4, 10);
+    expect(nodeDim(c, 0.4, "DE")).toBeCloseTo(0.4 * GEO_DIM, 10);
   });
 
   it("takes the ledger row's flat multiplier, ignoring the morph", () => {
@@ -670,16 +664,11 @@ describe("FOCUS_TUNE", () => {
     }
   });
 
-  // The GEO isolate is the shipped behaviour `hide` was split out of, and it must not move:
-  // there, hide is 1, so the shrink is the whole dim exactly as the inline `1 - dEff` was.
-  // Hyper is the deliberate change — it used to shrink the DAG core by dim×0.32 and now mutes
-  // it in place (user, 2026-08-11). Mid-morph values are unobservable: `morph` is snapped at the
-  // transition's invisible boundary frame, never eased through.
-  it("leaves the geo isolate bit-identical while releasing hyper's shrink", () => {
-    for (const d of [0.25, 0.5, 1]) {
-      expect(hideFrac(ctx({ morph: 1 }), d)).toBeCloseTo(d, 10);
-      expect(hideFrac(ctx({ morph: 0 }), d)).toBeCloseTo(0, 10);
-    }
+  // NO VIEW SHRINKS A NODE AWAY (user, 2026-11-02: "dim the other nodes not remove them"). `hide` stays
+  // a knob, at 0 on every row, so the three views answer an off-scope node one way.
+  it("mutes in place in every view", () => {
+    for (const row of Object.values(FOCUS_TUNE_DEFAULTS)) expect(row.hide).toBe(0);
+    expect(FOCUS_TUNE_DEFAULTS.geo.dim).toBeLessThan(1);
   });
 
   it("reproduces the pre-refactor ledger overrides", () => {

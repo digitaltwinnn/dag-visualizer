@@ -40,9 +40,9 @@ them; today that is the focus TIER ranking alone. `dimModel`'s four resolvers al
 ⚠️ **HIDE IS NOT DIM** (user, 2026-08-11). A dim number used to drive three effects, and one of them —
 scaling the node to nothing — is geo's ISOLATE, not a mute. It only rode along because hyper's
 metagraph dim was then pinned to 0, so the shrink was never seen there; the moment the knob existed it
-was the first thing it did. The shrink is now its own row field, `hide`, resolved by `hideFrac()` — geo
-keeps `1` (off-filter nodes vanish on the globe), hyper and the ledger `0`, so a dim there mutes in
-place. Any new effect a dim number reaches must ask the same question before joining it.
+was the first thing it did. The shrink is its own row field, `hide`, resolved by `hideFrac()`, and
+every row holds `0`: the globe's isolate went on 2026-11-02, so a dim mutes in place in every view.
+Any new effect a dim number reaches must ask the same question before joining it.
 
 **The two are INDEPENDENT readings of the same raw ramp, not a knob and its fraction** (user,
 2026-08-11 — *"dim · off-filter actually also resizes"*). `hideFrac` first took the RESOLVED dim, which
@@ -90,7 +90,7 @@ its limit: the one sphere at the origin is the structure's centre and always rea
 
 ⚠️ **A SNAPSHOT IS DATA, NOT FURNITURE** (user, 2026-08-11). `elem` is hyper's alone, because both
 other views honestly answer `0`: geo's globe draws no per-network furniture (its off-filter answer is
-the nodes' `hide` isolate), and everything the chamber emphasises — the byte bands, the lane tiles, the
+the nodes' own dim), and everything the chamber emphasises — the byte bands, the lane tiles, the
 ribbons — is a real snapshot, so it reads the NODE vocabulary instead. `snapBright()` in
 `domain/dimModel.ts` is that one call: the ledger row's own `dim`, `boost` and `back`, exactly what the
 chips in its trays answer to, applied to whichever resting level the instrument owns (the bar's is an
@@ -111,8 +111,8 @@ apply twice; that zero is the whole origin of the split, never a design decision
 now exposes ONE `dim` row field and one `nodeDim`/`nodeGlow`/`nodeEmissive` triple that both pools call.
 That asymmetry's last survivor, `hubMatchBoost`, is RETIRED (user, 2026-08-30, structural): **a
 committed filter adds NO light to member nodes, in any view.** The commit is answered by each
-view's own channel — hyper by the HUB and the others' `elem`/`dim` drops, geo by the isolate
-(`hide`; no per-network furniture exists there), the ledger by the coloured dim — and light added
+view's own channel — hyper by the HUB and the others' `elem`/`dim` drops, geo by the others' `dim`
+(no per-network furniture exists there), the ledger by the coloured dim — and light added
 to a node is reserved for the FOCUS vocabulary (the hovered/committed node, a group while it is
 the finest rung). Member nodes keep their at-rest colour under a filter everywhere; the rule's
 executable pin is in `dimModel.test.ts`. The core's own SPHERE follows

@@ -9,9 +9,10 @@
 //     input (pinning an out-of-story tick steps the filter back to "all" —
 //     `snapshotSelectActions`).
 //
-// Membership sources are per network kind: a LISTED metagraph answers from the polled anchor
-// index; the UNLISTED set answers from the exact reads (the only honest source); "all"/"dag"
-// have no per-network story (null/undefined — the filter never releases).
+// Membership sources: a tick's exact read when it has landed (the complete manifest, under every
+// address a network has used), else the polled anchor index for a LISTED metagraph, whose buffers
+// roll; the UNLISTED set answers from the exact reads (the only honest source); "all"/"dag" have
+// no per-network story (null/undefined — the filter never releases).
 import { metagraphById } from "@/src/data/network";
 import { UNLISTED_ID } from "@/src/data/unlistedId";  // the LEAF, not unlisted.ts: importing the
 // network module here would close an import cycle (see src/data/unlistedId.ts).
@@ -29,8 +30,10 @@ export function storyCount(
   // The unlisted set reads like a listed network (its chains are polled too, 2026-10-08), with the
   // exact read winning where it landed: it is the tick's own manifest.
   if (filter === UNLISTED_ID) return exact ? exact.unlistedCount : (anchor?.metaCounts?.get(UNLISTED_ID) ?? 0);
-  if (metagraphById(filter)) return anchor?.metaCounts?.get(filter) ?? 0;
-  return null;
+  const cfg = metagraphById(filter);
+  if (!cfg) return null;
+  if (exact?.perMeta) return [cfg.id, ...(cfg.formerIds ?? [])].reduce((n, id) => n + (exact.perMeta[id]?.count ?? 0), 0);
+  return anchor?.metaCounts?.get(filter) ?? 0;
 }
 
 /** THE LEDGER'S OWN READING OF THE FILTER (user, 2026-08-13): committed DAG reads as the WHOLE
@@ -63,8 +66,15 @@ export function tickInStory(
   if (n == null) return undefined;
   // A polled zero may still be settling — never release on lag. The unlisted count is exact once
   // the tick's read has landed, so only its polled fallback waits.
-  const polled = filter !== UNLISTED_ID || !exact;
+  const polled = filter === UNLISTED_ID ? !exact : !exact?.perMeta;
   if (n === 0 && polled && anchor && now - anchor.touched < STORY_SETTLE_MS)
     return undefined;
   return n > 0;
 }
+
+/** A FILTER HOLDS THE CHAMBER (user, 2026-11-02: "only make the actual snapshots that contains
+ *  Biofi clickable"): a tick its network did not anchor into answers no click. Only a landed read
+ *  can say so. A polled zero is also what a tick looks like when the buffer has rolled past it, so
+ *  with no read the tick stays open: unknown is not none. */
+export const tickLocked = (filter: string, exact: SnapshotExact | undefined): boolean =>
+  !!exact?.perMeta && storyCount(filter, null, exact) === 0;

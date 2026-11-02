@@ -153,6 +153,17 @@ describe("the tour's Skip", () => {
 });
 
 describe("the tour's chrome", () => {
+  // user, 2026-11-02: "the intro feels a bit too much at the bottom". The controls stand at the top on
+  // every screen, where the top bar lands, and the words alone stand under the scene.
+  it("keeps the fade behind the words short of the scene on the wide tiers, a phone's words being taller", () => {
+    expect(briefing).toMatch(/bottom-0 h-\[30%\] \[background:linear-gradient\(transparent,var\(--scene-ground\)_25%\)\] max-\[700px\]:h-\[44%\] max-\[700px\]:\[background:linear-gradient\(transparent,var\(--scene-ground\)_38%\)\]/);
+  });
+
+  it("stands the controls at the top on every screen, the words alone at the bottom", () => {
+    expect(briefing).toMatch(/absolute inset-x-0 top-0 flex items-center gap-3\.5 px-\[max\(16px,3\.7vw\)\]/);
+    expect(briefing).not.toMatch(/mt-3 flex items-center gap-3\.5/);
+  });
+
   it("names the site itself, since the top bar that does so is stood down", () => {
     expect(briefing).toMatch(/<EcgMark \/>/);
     expect(briefing).toMatch(/new URL\(SITE_ORIGIN\)\.host/);
@@ -177,6 +188,23 @@ describe("the tour's chrome", () => {
   it("says the AI powers the words, and only when they are the AI's", () => {
     expect(briefing).toMatch(/const who = words\.ai && \(/);
     expect(briefing).toMatch(/Powered by \{AI_TITLE\}/);
+  });
+
+  // 320 wide: the line and a full Skip are 14 pixels more than the phone's row holds.
+  it("narrows Skip on a phone, so the line beside it fits", () => {
+    expect(briefing).toMatch(/className=\{cn\("h-10 rounded-full [^"]*px-6 [^"]*max-\[700px\]:px-3/);
+  });
+
+  it("sets that credit one step up the scale, in body type", () => {
+    expect(briefing).toMatch(/const who = words\.ai && \(\s*<span className="[^"]*text-body/);
+  });
+
+  // user, 2026-11-02: the footer that says so stands down for the tour, and a first visitor must
+  // not take this for Constellation's own site. It rides the site name, so every stop says it.
+  it("says it is unofficial under the site name, in the footer's words and register", () => {
+    expect(briefing).toMatch(
+      /const site = \([\s\S]*?<span className="text-label tracking-caps uppercase text-primary-ink[^"]*">\s*unofficial community project\s*<\/span>[\s\S]*?\);\n/,
+    );
   });
 });
 

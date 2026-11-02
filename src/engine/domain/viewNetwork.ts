@@ -6,3 +6,10 @@
 // (Engine.setMode). Snapshots' network inside a tick is the precedent (`tickNet.ts`). `railNet` is
 // null everywhere else, so this asks no view.
 export const viewNetwork = (s: { filter: string; railNet: string | null }): string => s.railNet ?? s.filter;
+
+// A FILTER HOLDS THE VIEW (user, 2026-11-02: "when we have an active filter we should not allow
+// that"). A browse is a look around from All; with a filter on, you stay inside that network until
+// the top bar changes it, so another network is listed and dimmed and answers no click. Snapshots
+// asks its ticks instead (`ledgerStory.tickLocked`): a tick the filter's network anchored into may
+// be opened whole, because the tick is the parent there.
+export const heldOut = (filter: string, id: string): boolean => filter !== "all" && id !== filter;

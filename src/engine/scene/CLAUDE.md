@@ -46,7 +46,8 @@ Everything routes through `Engine.applyFilter()`. The ladder per view is data in
 `domain/focusLadder.ts`; what a click commits is `domain/pickActions.ts`.
 
 **Geography** — network → country → provider cohort → node, each deselect stepping back one. Selecting
-isolates and dims, refreshes the leaderboard, and rotates the globe so the densest part of the
+dims the rest in place, the stacks unmoved (user, 2026-11-02: "dim the other nodes not remove them"; the
+filter and a browse alike), refreshes the leaderboard, and rotates the globe so the densest part of the
 selection faces the camera (Y rotation only — north stays up). A metagraph frames deliberately wider
 than the country pose so drilling still reads as a zoom.
 
@@ -155,8 +156,8 @@ network, and the camera answers with the same-pose nudge, a subtle zoom in and b
 constructs the ring before its ink and ground are set, and a material born then was black until
 a theme flip retinted it. The arrival beat lifts each RING as one piece, outer to inner
 (`RING_ENTRY_STAG`), not arc by arc (user: "too detailed, just animate each circle"). The
-density pools (`_densityGlow`) follow the same selector the chips follow — a hover preview hides
-the off-selector pools exactly as a commit does, and the PACKETS take the same isolate
+density pools (`_densityGlow`) follow the same selector the chips follow — a hover preview mutes
+the off-selector pools exactly as a commit does, and the PACKETS stand down the same way
 (`Arcs.setSelector`: a packet with an endpoint off the selector is written at the centre, where the
 exact occlusion hides it — the pool itself is only rebuilt by a commit, since rebuilding restarts
 every packet). **Each packet also draws its whole hop as a PATH TRACE** (same day): a second
@@ -303,11 +304,9 @@ rewrite *those* matrices to the tray positions. The Engine freezes `morph` while
 `ledgerT` is a boundary-snapped layout parameter, not an eased blend. The hubs, the globe surface and
 the starfield are gated off so none lingers when arriving from geo.
 
-**The DAG core never dims in the chamber** (user, 2026-08-30): every metagraph anchors INTO the
-global, so the global layer — floor, fleet tray, its L0 validators — is inside every committed
-story, not an off-filter bystander. A WHO-is-in-scope statement, so it lives at the dim TARGET
-(`Globe._applyDim`'s ledger clause, re-derived by `applyLedgerLayout` on the flag flip); the view
-rows keep saying how much, and every other view still dims the DAG under a metagraph filter.
+**The DAG's nodes dim in the chamber like any other** (user, 2026-11-02, reversing 2026-08-30's
+"never dimmed"): `Globe._applyDim` has one rule in every view. The floor and its snapshots are not
+nodes and stay as they were, because every metagraph still anchors into the global.
 
 **Lanes and the committed filter. The field is fixed**: every lane always owns its own slice, and a
 committed filter never moves or hides geometry, or the camera.

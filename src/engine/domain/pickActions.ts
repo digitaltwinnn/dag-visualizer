@@ -13,6 +13,7 @@
 //     levels deselects the finer ones); the "ladder-derived stepping" tests assert this
 //     matches `domain/focusLadder.ts`'s finerLevels() exactly, so pickActions can't drift
 //     from the ladder even though the drop list is hand-written per builder.
+import { heldOut } from "./viewNetwork";
 import type { Mode } from "@/src/store/store";
 import type { PickDescriptor, MetaSnapSel, TickNetSel } from "@/src/data/types";
 import { METAGRAPHS } from "@/src/net/current";
@@ -51,16 +52,21 @@ export const pickNetId = (p: PickDescriptor): string | null =>
 //  - A registered-but-node-less metagraph hub is shown (dim) but never selectable, matching
 //    its inactive look + its "registered · no live nodes" filter chip (`activeMetaIds` null =
 //    counts not loaded yet → all allowed).
-//  - GEO: off-filter nodes are genuinely hidden, so they must not respond either (Three's
-//    raycaster ignores `visible`); the country drill is a LENS, so it does NOT gate picking.
+//  - GEO: a node off the network the view stands on stays on screen, dimmed, and answers nothing,
+//    under a browse too; the country drill is a LENS, so it does NOT gate picking.
 //  - HYPER (and elsewhere): every node stays interactive — off-focus ones are only dimmed,
 //    and clicking one drills into its network (gating them out read as a bug).
+//  - A FILTER (`held`, the real one, never a browse) holds a view that browses: another network's
+//    hub and nodes stay on screen, dimmed, and do not respond (`viewNetwork.heldOut`).
 export function pickActive(
   p: PickDescriptor,
   mode: Mode,
   filter: string,
   activeMetaIds: ReadonlySet<string> | null,
+  held = "all",
 ): boolean {
+  const net = p.kind === "meta" ? p.cfg.id : p.kind === "core" ? "dag" : pickNetId(p);
+  if (VIEW_POLICIES[mode].railBrowses && net != null && heldOut(held, net)) return false;
   if (p.kind === "meta") return !activeMetaIds || activeMetaIds.has(p.cfg.id);
   if (mode !== "geo") return true;
   const id = p.kind === "l0" || p.kind === "l1" ? "dag" : p.kind === "metanode" ? p.meta?.id : undefined;
@@ -222,6 +228,10 @@ export function viewEntryActions(opts: {
 }): ClickAction[] {
   const { pick } = opts;
   if (!pick) return [];
+  // A FILTER HOLDS THE VIEW (`viewNetwork.heldOut`): Snapshots can pick a node of another network
+  // inside a tick, and carrying it here would step around the filter, so it stays behind.
+  const held = pickNetId(pick);
+  if (VIEW_POLICIES[opts.mode].railBrowses && held && heldOut(opts.filter, held)) return [{ kind: "inspect", pick: null }];
   const ancestry = nodeAncestryActions(pick, opts);
   const netId = VIEW_POLICIES[opts.mode].nodeCommitsNetwork ? pickNetId(pick) : null;
   return netId && netId !== opts.filter ? [{ kind: "railNet", id: netId }, ...ancestry, { kind: "inspect", pick }] : ancestry;

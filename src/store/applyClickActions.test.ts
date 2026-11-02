@@ -188,6 +188,12 @@ describe("a filter change and the deck", () => {
 });
 
 describe("railNet action", () => {
+  // user, 2026-11-02: a filter holds the view, whichever surface asked.
+  it("ignores a browse to another network under a filter", () => {
+    useStore.setState({ filter: "dor", railNet: null });
+    applyClickActions([{ kind: "railNet", id: "usdc" }]);
+    expect(useStore.getState().railNet).toBeNull();
+  });
   it("standing on the filter's own network is no browse", () => {
     useStore.setState({ filter: "dor", railNet: "usdc" });
     applyClickActions([{ kind: "railNet", id: "dor" }]);

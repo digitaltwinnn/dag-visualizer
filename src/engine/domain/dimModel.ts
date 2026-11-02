@@ -41,8 +41,8 @@ export interface DimContext {
 }
 
 // How strong the network/country dim is, ramped by the morph: SUBTLE in the Hypergraph (a gentle
-// "out of focus" push — nodes stay visible and full-size, muting in place) and FULL on the globe
-// (off-filter nodes vanish — the isolate, see hideFrac). ONE value for EVERY node, DAG core and
+// "out of focus" push — nodes stay visible and full-size, muting in place), a notch stronger on the
+// globe. No view removes a node (user, 2026-11-02, see hideFrac). ONE value for EVERY node, DAG core and
 // metagraph alike, and every consumer — scale AND glow AND colour — multiplies the raw eased dim
 // by it, so they can never drift apart (the old bug: the validator *scale* used the raw,
 // un-ramped dim and so scaled the nodes to nothing in hyper, while their glow only dimmed).
@@ -64,9 +64,8 @@ export const nodeDimScale = (c: DimContext): number => viewMix(c, "dim");
 // So `hide` is its own STRENGTH ON THE SAME RAW RAMP as `dim`, not a fraction of the dim's output
 // (user, 2026-08-11: turning `dim` was resizing nodes whenever `hide` was non-zero — one knob moving
 // two effects is not a knob). Two independent readings of one ramp: `dim` says how far an off-filter
-// node mutes, `hide` how far it shrinks away. 1 on the globe (bit-identical isolate, since geo's dim
-// is 1.0 too), 0 in hyper (mute in place, full size) and 0 in the ledger, whose chips are
-// uniform-sized by their own rule anyway.
+// node mutes, `hide` how far it shrinks away. 0 on every row: the globe's isolate went on 2026-11-02
+// (user: "dim the other nodes not remove them"), so every view mutes in place, at full size.
 //
 // Reading the RAW ramp is also what keeps the country drill a LENS: `nodeDim`'s countryMix raise is
 // a mute, and must never shrink the nodes it looks past.
@@ -112,8 +111,8 @@ export const dimTargetsFor = (sel: string, metaIds: string[]) => ({
 // Read PER VIEW, not morph-lerped like the four node fields: furniture belongs to one view and
 // fades out with it, so blending the neighbour view's value in would only describe elements that
 // are no longer drawn. Two of the three views read 0, and both zeros are honest rather than
-// unused: geo's globe has no per-network furniture at all — its off-filter answer is the nodes
-// themselves (`hide`, the isolate) — and everything the ledger draws per network is DATA, so its
+// unused: geo's globe has no per-network furniture at all — its off-filter answer is the nodes'
+// own dim — and everything the ledger draws per network is DATA, so its
 // bands, tiles and ribbons take the node's own `dim` through `snapBright` (user, 2026-08-11).
 export const offNetMul = (view: View3D): number => 1 - FOCUS_TUNE[view].elem;
 
@@ -206,7 +205,7 @@ export const ancestryGlow = (
 export interface FocusRow {
   /** Network/country dim strength for EVERY node — DAG core and metagraph alike (`nodeDimScale`). */
   dim: number;
-  /** How far an off-filter node SHRINKS AWAY — geo's isolate. Independent of `dim`; see `hideFrac`. */
+  /** How far an off-filter node shrinks. Independent of `dim`; see `hideFrac`. */
   hide: number;
   /** How far the view's own per-network ELEMENTS drop when off-filter — `offNetMul`. */
   elem: number;
@@ -252,8 +251,8 @@ export const FOCUS_TUNE_DEFAULTS: Readonly<Record<View3D, Readonly<FocusRow>>> =
   // smaller still — their chips sit in dense stacks/trays where a large swell collides
   // with neighbours.
   hyper: { dim: 0.42, hide: 0, elem: 0.44, back: 0.41, boost: 1.1, grow: 0.28 }, // dim 0.32 → 0.5 → 0.42, elem 0.38 → 0.5 → 0.44 (user, 2026-10-24: a hovered or committed network's others were "not very clear"; then the committed one "pops" too much against the darker field — a step back, beside a dimmer stage light)
-  geo: { dim: 1.0, hide: 1, elem: 0, back: 0.65, boost: 0.7, grow: 0.24 }, // 0.16 → 0.24 (user, 2026-08-30: "same as hyper" — the old value was below noticing in a stack); hyper stays loudest
-  ledger: { dim: 0.67, hide: 0, elem: 0, back: 0.55, boost: 0.7, grow: 0.24 }, // dim 0.5 → 0.67 (user export, 2026-08-30): a deeper coloured dim on the other lanes, paired with the DAG core never dimming here at all (Globe._applyDim's ledger rule)
+  geo: { dim: 0.5, hide: 0, elem: 0, back: 0.65, boost: 0.7, grow: 0.24 }, // 0.16 → 0.24 (user, 2026-08-30: "same as hyper" — the old value was below noticing in a stack); hyper stays loudest
+  ledger: { dim: 0.67, hide: 0, elem: 0, back: 0.55, boost: 0.7, grow: 0.24 }, // dim 0.5 → 0.67 (user export, 2026-08-30): a deeper coloured dim on the other lanes, paired then with a DAG core that never dimmed here
   // trend: no shared nodes reach this view at all (the fleet parks), so the row is inert in
   // practice but required to compile — ledger's row COPIED VERBATIM as the starting point
   // (2026-09-18), same as sceneRig's trend row.
@@ -433,7 +432,7 @@ export function snapBright(
 // hub's resting glow (0.72), which made "select a metagraph" read as "highlight all its nodes".
 // The user's structural correction: the commit is answered by each view's OWN channel — hyper by
 // the hub (furniture: the flight, the paused orbit, every other network's `elem` drop and `dim`),
-// geo by the isolate (`hide` — there is no per-network furniture to answer with), the ledger by
+// geo by the others' `dim` (there is no per-network furniture to answer with), the ledger by
 // the coloured dim. Member nodes keep their at-rest colour everywhere; light added to a node is
 // reserved for the FOCUS vocabulary (a hovered/committed node, a group while it is the finest
 // rung). The DAG had been pulled INTO the lift on one-node-model grounds (2026-08-18); the model

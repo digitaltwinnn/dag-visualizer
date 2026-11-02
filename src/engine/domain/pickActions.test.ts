@@ -129,6 +129,23 @@ describe("clickActions — flat/placeholder + non-geo safety (the table gates it
   });
 });
 
+// user, 2026-11-02: a filter holds the view, and a node carried in from Snapshots cannot step around it.
+describe("viewEntryActions under a filter", () => {
+  it("drops a node of another network rather than standing the view on it", () => {
+    expect(viewEntryActions({ mode: "hyper", filter: "swap", pick: nodePick() })).toEqual([{ kind: "inspect", pick: null }]);
+    expect(viewEntryActions({ mode: "geo", filter: "swap", pick: nodePick() })).toEqual([{ kind: "inspect", pick: null }]);
+  });
+  it("keeps a node of the filter's own network", () => {
+    expect(viewEntryActions({ mode: "hyper", filter: "dor", pick: nodePick() })).not.toContainEqual({ kind: "inspect", pick: null });
+  });
+  it("still stands a view on a carried node's network under All", () => {
+    expect(viewEntryActions({ mode: "hyper", filter: "all", pick: nodePick() })[0]).toEqual({ kind: "railNet", id: "dor" });
+  });
+  it("leaves Snapshots alone: a tick's own networks stay open there", () => {
+    expect(viewEntryActions({ mode: "ledger", filter: "swap", pick: nodePick() })).not.toContainEqual({ kind: "inspect", pick: null });
+  });
+});
+
 describe("pickActive — which picks respond at all, per view", () => {
   it("a node-less metagraph hub is never selectable; a located one is", () => {
     const active = new Set(["dor"]);
@@ -149,6 +166,30 @@ describe("pickActive — which picks respond at all, per view", () => {
   it("HYPER/LEDGER: every node stays interactive — off-focus ones are only dimmed", () => {
     expect(pickActive(nodePick(), "hyper", "swap", null)).toBe(true);
     expect(pickActive(nodePick(), "ledger", "swap", null)).toBe(true);
+  });
+  // user, 2026-11-02: with a filter on, you stay inside that network until the top bar changes it.
+  it("a filter holds the browsing views: another network's hub and nodes do not respond", () => {
+    const other = { kind: "meta", cfg: { id: "swap" } } as unknown as PickDescriptor;
+    expect(pickActive(other, "hyper", "dor", null, "dor")).toBe(false);
+    expect(pickActive(other, "geo", "dor", null, "dor")).toBe(false);
+    expect(pickActive(hubPick(), "hyper", "dor", null, "dor")).toBe(true);
+    expect(pickActive(nodePick(), "hyper", "swap", null, "swap")).toBe(false);
+    expect(pickActive(nodePick(), "hyper", "dor", null, "dor")).toBe(true);
+    expect(pickActive(validatorPick(), "hyper", "dor", null, "dor")).toBe(false);
+  });
+  it("the core is the DAG's: a metagraph filter holds it out, a DAG filter keeps it", () => {
+    const core = { kind: "core" } as unknown as PickDescriptor;
+    expect(pickActive(core, "hyper", "dor", null, "dor")).toBe(false);
+    expect(pickActive(core, "hyper", "dag", null, "dag")).toBe(true);
+    expect(pickActive(core, "hyper", "all", null, "all")).toBe(true);
+  });
+  it("a browse holds nothing in Hypergraph: under All another hub still answers", () => {
+    const other = { kind: "meta", cfg: { id: "swap" } } as unknown as PickDescriptor;
+    expect(pickActive(other, "hyper", "dor", null, "all")).toBe(true);
+    expect(pickActive(nodePick(), "hyper", "swap", null, "all")).toBe(true);
+  });
+  it("Snapshots is not held here: its tick decides, and a tick's own networks stay open", () => {
+    expect(pickActive(nodePick(), "ledger", "swap", null, "swap")).toBe(true);
   });
   it("non-node picks (snapshot) pass — their view gating is pickSources", () => {
     expect(pickActive(snapPick(), "ledger", "dor", null)).toBe(true);

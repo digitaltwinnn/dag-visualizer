@@ -191,13 +191,16 @@ export default function Explorer({ id, title, hint, placeholder, levels: selecte
   // 2026-10-07 — "where there is no filter, the whole control is missing … shouldn't we indicate
   // that there is a control there always?"): at the root it is the one filled step, house and word,
   // so the control is in place before the first drill rather than appearing with it.
-  const crumbs: Crumb[] = levels.map((l, i) => ({
-    key: l.key,
-    label: l.crumb.label,
-    title: l.crumb.title ?? (typeof l.crumb.label === "string" ? l.crumb.label : undefined),
-    root: i === 0,
-    ...(i < levels.length - 1 ? { onSelect: l.crumb.onRelease } : {}),
-  }));
+  // An earlier level with no way back is no step: a step that goes nowhere reads as broken.
+  const crumbs: Crumb[] = levels
+    .filter((l, i) => i === levels.length - 1 || l.crumb.onRelease)
+    .map((l) => ({
+      key: l.key,
+      label: l.crumb.label,
+      title: l.crumb.title ?? (typeof l.crumb.label === "string" ? l.crumb.label : undefined),
+      root: l === levels[0],
+      ...(l !== levels[levels.length - 1] ? { onSelect: l.crumb.onRelease } : {}),
+    }));
   // THE BAND SHOWS THE EXPLORER'S WHOLE MEASURE SET — the ROOT's — on every level (user,
   // 2026-10-23: "instead of removing the control band when there is nothing to show, can we just
   // make them inactive? I don't like it just disappears"). A level names the measures it can

@@ -1476,12 +1476,10 @@ export class Engine {
     // state (the drilled border), which is this bridge's half of the job.
     const st0 = useStore.getState();
     // A BROWSED NETWORK is a look around one view. Not a network event: the scene falls back to the
-    // filter here, before the ancestry below, and what the reader selected under it carries as ever,
-    // unless a real filter stands that it does not belong to.
+    // filter here, before the ancestry below, and what the reader selected under it carries as ever.
     if (mode !== prevMode && st0.railNet != null) {
       this.filter = st0.filter;
       st0.setRailNet(null);
-      if (st0.filter !== "all" && st0.inspect && pickNetId(st0.inspect) !== st0.filter) st0.setInspect(null);
       this.applyFilter(false);
     }
     const dest3D = is3D(mode) ? mode : null;

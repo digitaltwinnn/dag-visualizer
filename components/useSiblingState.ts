@@ -8,7 +8,7 @@ import { latestRelevant } from "@/src/data/follow";
 import { getAnchor, getNetwork } from "@/src/data/network";
 import { tickNetworksLevel, tickPolledRows } from "@/src/data/ladderLevels";
 import { LISTED_IDS } from "@/src/data/unlisted";
-import { tickInStory } from "@/src/data/ledgerStory";
+import { tickInStory, tickLocked } from "@/src/data/ledgerStory";
 import { POLL } from "@/src/engine/config";
 import type { RailCardKind } from "@/components/railCards";
 import { useFeedRead } from "@/components/useFeedRead";
@@ -47,7 +47,6 @@ export function useSiblingState(slot: RailCardKind | null): SiblingState {
   const allNodes = useStore((s) => s.allNodes);
   const trendRange = useStore((s) => s.trendRange);
   const trendCursorMs = useStore((s) => s.trendCursorMs);
-  const trendFocus = useStore((s) => s.trendFocus);
   const trendWindow = useStore((s) => s.trendWindow);
   // The global chain's window — the SAME buffer and cap the vitals band plots, so the plank and the
   // bars step the same sequence. Only the SNAP slot reads it (review find, 2026-09-11: with the feed
@@ -63,6 +62,7 @@ export function useSiblingState(slot: RailCardKind | null): SiblingState {
             data: d,
             isLiveTip: d.ordinal === liveOrd,
             inStory: tickInStory(filter, getAnchor(d.timestamp), snapshotExact[d.ordinal]),
+            locked: tickLocked(filter, snapshotExact[d.ordinal]),
           }))
         : [];
     // THE SHOWN TICK'S NETWORKS — the ledger explorer's own level, so the Metagraph card's ‹ › and
@@ -110,8 +110,7 @@ export function useSiblingState(slot: RailCardKind | null): SiblingState {
       tickNets,
       trendRange,
       trendCursorMs,
-      trendFocus,
       trendWindow,
     };
-  }, [slot, mode, filter, country, cohort, composition, inspect, snap, tickNet, railNet, metaSnap, selNodes, metaList, leaderboard, snapshotExact, following, snapsForTicks, geoMeasure, hyperMeasure, allNodes, trendRange, trendCursorMs, trendFocus, trendWindow]);
+  }, [slot, mode, filter, country, cohort, composition, inspect, snap, tickNet, railNet, metaSnap, selNodes, metaList, leaderboard, snapshotExact, following, snapsForTicks, geoMeasure, hyperMeasure, allNodes, trendRange, trendCursorMs, trendWindow]);
 }

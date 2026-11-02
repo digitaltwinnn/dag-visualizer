@@ -40,7 +40,6 @@ import {
   cohortToggleActions,
   compositionToggleActions,
   countryToggleActions,
-  filterToggleActions,
   railNetActions,
   metaSnapSelectActions,
   tickNetSelectActions,
@@ -92,8 +91,9 @@ export interface SiblingState {
    *  both come from the network singleton and this module stays pure. `inStory` is
    *  ledgerStory.tickInStory: whether the committed network anchored into that tick, with
    *  `undefined` meaning NO VERDICT (settling or unmeasured) — passed through untouched, because
-   *  the story rule's own contract is to never release a filter on lag. */
-  ticks: { data: GlobalSnapshot; isLiveTip: boolean; inStory: boolean | undefined }[];
+   *  the story rule's own contract is to never release a filter on lag. `locked` is
+   *  ledgerStory.tickLocked: a read proves the filter's network is not in that tick. */
+  ticks: { data: GlobalSnapshot; isLiveTip: boolean; inStory: boolean | undefined; locked: boolean }[];
   /** The explorers' picked figures — a level's ORDER follows them (one list per level, 2026-10-07). */
   geoMeasure: GeoMeasure;
   hyperMeasure: HyperMeasure;
@@ -107,8 +107,6 @@ export interface SiblingState {
   /** The window the stack shows while no range stands — the Range card's own set (`siblingSet`). */
   trendWindow: ZoomId;
   trendCursorMs: number | null;
-  /** History's plane focus — the network its Metagraph card stands on when set. */
-  trendFocus?: string | null;
 }
 
 export interface SiblingStep {
@@ -320,17 +318,13 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
         const items = nets.map((m) => ({ key: m.id, label: m.name, actions: tickNetSelectActions(m.id, s.snap!, { metaSnap: s.metaSnap, hasInspect: s.inspect != null, net }) }));
         return finish(slot, items, nets.findIndex((m) => m.id === net), `Global ${s.snap!.data.ordinal.toLocaleString()}`);
       }
-      // IN HISTORY, A CARD STANDING ON A PLANE FOCUS HAS NO PAGER (2026-10-07): the focus is not the
-      // filter, so a filter step would write the top bar, and History's network order is the
-      // stack's roster, which only React holds (`trendIds` is never read back by a component).
-      if (s.mode === "trend" && s.trendFocus != null && s.trendFocus !== s.filter) return null;
+      // A FILTER HOLDS THE CARD (`domain/viewNetwork.heldOut`): only the top bar leaves it. So what
+      // reaches here is a browse from All, in a view that browses, and a swipe leaves the filter
+      // alone. History has no browse, so a card on a plane focus has no pager: its network order
+      // is the stack's roster, which only React holds.
+      if (s.filter !== "all") return null;
       const nets = stepNetworks(s);
-      const items = nets.map((m) => ({
-        key: m.id,
-        label: m.name,
-        // A VIEW THAT BROWSES (`domain/viewNetwork.ts`): a swipe leaves the filter alone.
-        actions: VIEW_POLICIES[s.mode].railBrowses ? railNetActions(m.id, s.filter) : filterToggleActions(m.id, s.filter),
-      }));
+      const items = nets.map((m) => ({ key: m.id, label: m.name, actions: railNetActions(m.id, s.filter) }));
       return finish(slot, items, nets.findIndex((m) => m.id === net), "Networks");
     }
 
@@ -477,7 +471,9 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
     case "snap": {
       const cur = s.snap;
       if (!cur) return null;
-      const items = s.ticks.map((t) => ({
+      // A locked tick is not a step (`ledgerStory.tickLocked`), unless it is the one on screen.
+      const ticks = s.ticks.filter((t) => !t.locked || t.data.ordinal === cur.data.ordinal);
+      const items = ticks.map((t) => ({
         key: String(t.data.ordinal),
         label: t.data.ordinal.toLocaleString(),
         actions: snapshotSelectActions(
@@ -492,7 +488,7 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
       }));
       // A pin that has aged out of the retained window can't be located, so it gets no pager
       // rather than a plank whose "adjacent" tick would be a guess (finish's index rule).
-      return finish(slot, items, s.ticks.findIndex((t) => t.data.ordinal === cur.data.ordinal), "Snapshot stream", true);
+      return finish(slot, items, ticks.findIndex((t) => t.data.ordinal === cur.data.ordinal), "Snapshot stream", true);
     }
 
     // THE SAME SPAN, PAGED THROUGH TIME (user, 2026-10-23: "keep the range and just select the
@@ -704,7 +700,7 @@ export const rootOf = (mode: Mode): ChildEntry | null => (VIEW_POLICIES[mode].ra
 /** Nothing while a drill is held: a network change clears a country and a provider, and in
  *  Hypergraph it would drop the node. The ghost then only opens its hint. */
 export function rootStep(s: SiblingState): SiblingStep | null {
-  if (s.inspect || s.country || s.cohort) return null;
+  if (s.inspect || s.country || s.cohort || s.filter !== "all") return null;
   return rootOf(s.mode)?.steps(s, 1)[0] ?? null;
 }
 

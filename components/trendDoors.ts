@@ -15,11 +15,6 @@ import { useStore } from "@/src/store/store";
 // surface offering it. The History view's cursor card offers the SAME door, and a second copy of
 // four ordered steps is how two surfaces end up landing a reader in different places from the
 // same words. So it lives here, called by both.
-//
-// ⚠️ THE NETWORK COMMIT RIDES THE TABLE (rule 2). `filterToggleActions` is the same builder the
-// explorer row and the scene hub run, applied through the one executor — and it is GUARDED by the
-// `st.filter !== metaId` check, because that builder TOGGLES: handing it the already-committed
-// network would release the filter on a control whose whole purpose is to scope the log to it.
 
 /** The span a door hands the anchor log — a brushed range, or the window on screen. */
 export interface RecordSpan {

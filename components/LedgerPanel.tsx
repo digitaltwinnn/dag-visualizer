@@ -30,7 +30,7 @@ import {
   SNAP_MEASURES,
   TICK_NET_MEASURES,
 } from "@/src/data/ledgerMeasure";
-import { ledgerLens, storyCount } from "@/src/data/ledgerStory";
+import { ledgerLens, storyCount, tickLocked } from "@/src/data/ledgerStory";
 import { filterAccent, getAnchor, getNetwork, resolveSigner, SIGNER_UNKNOWN, snapshotSigners } from "@/src/data/network";
 import { metaSnapHoverKey, type GlobalSnapshot, type NodeRow, type SnapshotExact } from "@/src/data/types";
 import { displayNetwork, LISTED_IDS, UNLISTED_HUE, UNLISTED_ID } from "@/src/data/unlisted";
@@ -350,6 +350,8 @@ export default function LedgerPanel() {
         const v = tickValues[i];
         const globalPick = { kind: "snapshot", title: `Global snapshot #${d.ordinal}`, data: d } as const;
         const on = d.ordinal === activeSnapOrd;
+        // A filter holds the chamber: a tick its network is not in answers nothing (`tickLocked`).
+        const locked = !on && tickLocked(filter, snapshotExact[d.ordinal]);
         return {
           key: String(d.ordinal),
           // THE SHOWN TICK SAYS WHETHER IT IS LIVE OR PINNED (user, 2026-10-07: on a phone the Global
@@ -373,7 +375,7 @@ export default function LedgerPanel() {
           // state), which a re-box would swallow — and its Global snapshot card is the box anyway.
           faint: !!filterNet && count === 0 && !on,
           // The count the bar's colour stands for, in words — colour is never the only carrier.
-          onClick: () => {
+          onClick: locked ? undefined : () => {
             // THE SELECTED ROW DRILLS (user, 2026-10-07 — the explorer rests on this list, its axis,
             // so the highlighted row is always on screen and is the way DOWN): it opens the tick's
             // networks and leaves the selection as it is — live stays live, a pin stays pinned. The
@@ -394,7 +396,7 @@ export default function LedgerPanel() {
             // Any other row selects its tick and opens it, the live tip included.
             setPath({ ...CLOSED_PATH, tick: d.ordinal, selfResume });
           },
-          pair: subjectPairing(hoverSnapOrd, d.ordinal, setHoverSnapOrd, accent),
+          pair: locked ? undefined : subjectPairing(hoverSnapOrd, d.ordinal, setHoverSnapOrd, accent),
         };
       })),
       pager:
