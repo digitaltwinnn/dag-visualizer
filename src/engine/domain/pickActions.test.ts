@@ -129,6 +129,23 @@ describe("clickActions — flat/placeholder + non-geo safety (the table gates it
   });
 });
 
+// user, 2026-11-02: a filter holds the view, and a node carried in from Snapshots cannot step around it.
+describe("viewEntryActions under a filter", () => {
+  it("drops a node of another network rather than standing the view on it", () => {
+    expect(viewEntryActions({ mode: "hyper", filter: "swap", pick: nodePick() })).toEqual([{ kind: "inspect", pick: null }]);
+    expect(viewEntryActions({ mode: "geo", filter: "swap", pick: nodePick() })).toEqual([{ kind: "inspect", pick: null }]);
+  });
+  it("keeps a node of the filter's own network", () => {
+    expect(viewEntryActions({ mode: "hyper", filter: "dor", pick: nodePick() })).not.toContainEqual({ kind: "inspect", pick: null });
+  });
+  it("still stands a view on a carried node's network under All", () => {
+    expect(viewEntryActions({ mode: "hyper", filter: "all", pick: nodePick() })[0]).toEqual({ kind: "railNet", id: "dor" });
+  });
+  it("leaves Snapshots alone: a tick's own networks stay open there", () => {
+    expect(viewEntryActions({ mode: "ledger", filter: "swap", pick: nodePick() })).not.toContainEqual({ kind: "inspect", pick: null });
+  });
+});
+
 describe("pickActive — which picks respond at all, per view", () => {
   it("a node-less metagraph hub is never selectable; a located one is", () => {
     const active = new Set(["dor"]);

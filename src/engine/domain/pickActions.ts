@@ -228,6 +228,10 @@ export function viewEntryActions(opts: {
 }): ClickAction[] {
   const { pick } = opts;
   if (!pick) return [];
+  // A FILTER HOLDS THE VIEW (`viewNetwork.heldOut`): Snapshots can pick a node of another network
+  // inside a tick, and carrying it here would step around the filter, so it stays behind.
+  const held = pickNetId(pick);
+  if (VIEW_POLICIES[opts.mode].railBrowses && held && heldOut(opts.filter, held)) return [{ kind: "inspect", pick: null }];
   const ancestry = nodeAncestryActions(pick, opts);
   const netId = VIEW_POLICIES[opts.mode].nodeCommitsNetwork ? pickNetId(pick) : null;
   return netId && netId !== opts.filter ? [{ kind: "railNet", id: netId }, ...ancestry, { kind: "inspect", pick }] : ancestry;
