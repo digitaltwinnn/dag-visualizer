@@ -68,8 +68,8 @@ export const WEDGE_PRESENCE_PAPER = 0.12; // 0.22 → 0.16 → 0.12, the same st
  *  black reads at a fraction of the ink the same number lays on paper (user: "ok for light but in
  *  dark it's too much"; then "increase rest fill just a bit"). A hover retune leaves these alone;
  *  `targetOf` derives the resting weight as rest / hover. A dimmed slice is a share of the hover. */
-export const WEDGE_REST_DARK = 0.02;
-export const WEDGE_REST_PAPER = 0.066;
+export const WEDGE_REST_DARK = 0.027; // 0.02 → 0.027, 0.066 → 0.085 (user, 2026-11-02: "slight increase")
+export const WEDGE_REST_PAPER = 0.085;
 export const WEDGE_DIM_MUL = 0.12;
 /** A wedge state's weight on the hover presence, given the ground's resting weight. */
 const wedgeWeight = (state: WedgeState, rest: number): number =>
