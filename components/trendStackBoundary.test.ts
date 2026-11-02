@@ -110,6 +110,14 @@ describe("trend-stack boundary", () => {
     }
   });
 
+  it("hangs no blur on a plane through the chart's coin — the popover is drawn inside the plane", () => {
+    const POPOVER = "components/notes/NoteDayPopover.tsx";
+    const src = stripComments(readFileSync(POPOVER, "utf8"));
+    for (const banned of ["SCENE_GLASS", "backdrop-filter", "backdrop-blur", "shadow-"]) {
+      expect(src.includes(banned), `${POPOVER} uses ${banned} — ${CHART} draws it on a transformed plane, which would re-raster every frame`).toBe(false);
+    }
+  });
+
   it("never imports the engine — the reach is one-way", () => {
     expect(
       /@\/src\/engine\/Engine/.test(code()),
@@ -180,6 +188,14 @@ describe("trend-stack boundary", () => {
     expect(
       /cursorFraction/.test(src),
       `${CHART} must position its cursor overlay with cursorFraction (src/data/trendWindow.ts) — the chart's own numeric axis, re-expressed as a fraction, so the overlay needs no measurement`,
+    ).toBe(true);
+  });
+
+  it("places its notable days once per series, not once per cursor write", () => {
+    const src = stripComments(readFileSync(CHART, "utf8"));
+    expect(
+      /const\s+markXs\s*=\s*useMemo\(/.test(src),
+      `${CHART} must memoise its marks — the chart body runs on every cursor write, and placing them walks every line's points`,
     ).toBe(true);
   });
 

@@ -1,5 +1,5 @@
 "use client";
-import { memo, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { memo, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { Area, CartesianGrid, ComposedChart, Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { focusPreviews } from "@/components/useSubjectPairing";
@@ -513,13 +513,17 @@ export default function TrendChart({
   // not contain (a chain measured over a shorter window than its neighbours).
   const cursorX = cursorFraction(buckets, cursorBucket);
   // The notable days' x, by the same scale (see `TrendMark`); a day the axis does not hold is skipped.
-  const ceiling = marks?.length ? plotCeiling(lines.map((l) => l.points), scaleMax) : 1;
-  const markXs = (marks ?? [])
-    .map((m) => {
-      const bucket = bucketAt(buckets, stepMs, stepMs >= DAY_MS_CHART ? m.dayMs : m.dayMs + DAY_MS_CHART / 2);
-      return { ...m, key: `${m.dayMs}:${m.kind}`, x: cursorFraction(buckets, bucket), rise: lines[0] ? valueFraction(lines[0].points, buckets, bucket, ceiling) : null };
-    })
-    .filter((m): m is TrendMark & { key: string; x: number; rise: number | null } => m.x != null);
+  // Memoised: this body runs on every cursor write, and placing a mark walks the series.
+  const markXs = useMemo(() => {
+    if (!marks?.length) return [];
+    const ceiling = plotCeiling(lines.map((l) => l.points), scaleMax);
+    return marks
+      .map((m) => {
+        const bucket = bucketAt(buckets, stepMs, stepMs >= DAY_MS_CHART ? m.dayMs : m.dayMs + DAY_MS_CHART / 2);
+        return { ...m, key: `${m.dayMs}:${m.kind}`, x: cursorFraction(buckets, bucket), rise: lines[0] ? valueFraction(lines[0].points, buckets, bucket, ceiling) : null };
+      })
+      .filter((m): m is TrendMark & { key: string; x: number; rise: number | null } => m.x != null);
+  }, [marks, lines, buckets, stepMs, scaleMax]);
 
   const hue0 = lines[0]?.hue ?? "var(--primary)";
   // The head's right-hand readout: the NEWEST MEASURED BUCKET, stamped with its own date —
