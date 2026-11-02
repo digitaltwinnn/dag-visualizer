@@ -72,7 +72,8 @@ export function applyClickActions(actions: ClickAction[], opts?: { quiet?: boole
         st.setTickNet(a.sel);
         break;
       case "railNet":
-        st.setRailNet(a.id);
+        // The filter's own network is no browse: the view already stands on it.
+        st.setRailNet(a.id === st.filter ? null : a.id);
         break;
       case "metaSnap":
         st.setMetaSnap(a.sel);
@@ -144,7 +145,7 @@ function motionCauseOf(actions: readonly ClickAction[]): MotionCause | null {
       // The tick-local network frames the same subject a committed network does, so it speaks
       // the filter's sentence ("Framing Dor Technologies").
       case "tickNet": return { kind: "filter", id: a.sel?.metaId ?? "all" };
-      case "railNet": return { kind: "filter", id: viewNetwork(useStore.getState()) };
+      case "railNet": return { kind: "network", id: viewNetwork(useStore.getState()) };
       case "metaSnap": return a.sel ? { kind: "metaSnap", metaId: a.sel.metaId, ordinal: a.sel.ordinal } : { kind: "metaSnap", metaId: null };
       case "trendFocus": return { kind: "focus", id: a.id };
       // A cursor step moves no scene — the planes' line and the card answer it.

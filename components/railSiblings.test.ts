@@ -248,8 +248,8 @@ describe("siblingSet — node rung", () => {
     expect(set.items.map((i) => i.key)).toEqual(["1.1.1.1", "1.1.1.2"]);
     expect(set.items.flatMap((i) => i.actions).some((a) => a.kind === "filter")).toBe(false);
     expect(childStep("composition", base({ mode: "hyper", filter: "dag", composition: sel, selNodes: rows }))!.actions.some((a) => a.kind === "filter")).toBe(false);
-    // The scene's own click still commits the network: the rule is the rail's, not the view's.
-    expect(nodeSelectActions(dorHybrid.pick, { mode: "hyper", currentFilter: "dag", deselect: false })[0]).toEqual({ kind: "filter", id: "dor" });
+    // The scene's own click stands the view on the network, and writes no filter either.
+    expect(nodeSelectActions(dorHybrid.pick, { mode: "hyper", currentFilter: "dag", deselect: false })[0]).toEqual({ kind: "railNet", id: "dor" });
   });
 
   it("nothing inspected → no set", () => {

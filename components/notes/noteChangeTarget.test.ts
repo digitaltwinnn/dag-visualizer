@@ -11,8 +11,12 @@ const row = (ip: string, isp: string, cc = "DE", city = "Falkenstein") =>
 const TICK = { ordinal: 7, timestamp: "t" } as GlobalSnapshot;
 
 describe("changeActions: a row commits what the view's explorer row commits", () => {
-  it("a network in Hypergraph commits the filter", () => {
-    expect(changeActions(change({ kind: "network", id: "dor" }), "hyper", STATE, [], null)).toEqual([{ kind: "filter", id: "dor" }]);
+  it("a network in Hypergraph stands the view on it, and writes no filter", () => {
+    expect(changeActions(change({ kind: "network", id: "dor" }), "hyper", STATE, [], null)).toEqual([{ kind: "railNet", id: "dor" }]);
+  });
+  it("the network the view already stands on has nowhere to go", () => {
+    expect(changeActions(change({ kind: "network", id: "dor" }), "hyper", { ...STATE, railNet: "dor" }, [], null)).toBeNull();
+    expect(changeActions(change({ kind: "network", id: "dor" }), "hyper", { ...STATE, filter: "dor" }, [], null)).toBeNull();
   });
   it("a layer group opens its card under its network", () => {
     const acts = changeActions(change({ kind: "type", netId: "dag", type: "l0+cl1" }), "hyper", { ...STATE, filter: "dag" }, [], null);

@@ -7,7 +7,7 @@ import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder"
 import {
   compositionToggleActions,
   countryToggleActions,
-  filterToggleActions,
+  networkRowActions,
   noteCohortActions,
   tickNetSelectActions,
   type ClickAction,
@@ -47,7 +47,7 @@ export function changeActions(
 ): ClickAction[] | null {
   switch (subject.kind) {
     case "network":
-      if (!VIEW_POLICIES[view].tickScoped) return filterToggleActions(subject.id, s.filter, s.railNet);
+      if (!VIEW_POLICIES[view].tickScoped) return subject.id === (s.railNet ?? s.filter) ? null : networkRowActions(subject.id, s.railNet ?? s.filter);
       if (!tick || subject.id === "dag") return null; // the chamber's own row names no network to open
       return tickNetSelectActions(subject.id, { kind: "snapshot", title: `Global snapshot #${tick.ordinal}`, data: tick }, {
         metaSnap: s.metaSnap,

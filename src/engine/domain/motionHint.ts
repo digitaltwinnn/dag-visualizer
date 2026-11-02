@@ -61,6 +61,8 @@ export function motionHint(cause: MotionCause, mode: Mode, names: HintNames, pha
       // idiomatic form: "filtering to X" is UI shorthand, not English, so the line names the
       // control and its new state.
       return cause.id === "all" ? "Filter cleared" : `Filter set to ${names.network(cause.id)}`;
+    case "network":
+      return cause.id === "all" ? "Showing the whole network" : `Showing ${names.network(cause.id)}`;
     case "focus":
       // The re-deal: the focused card takes first place and the cards ahead of it slide back.
       return cause.id === null ? "Returning the stack to its order" : `Bringing ${names.network(cause.id)} to the front`;

@@ -167,6 +167,22 @@ describe("metaSnap action", () => {
   });
 });
 
+describe("railNet action", () => {
+  it("standing on the filter's own network is no browse", () => {
+    useStore.setState({ filter: "dor", railNet: "usdc" });
+    applyClickActions([{ kind: "railNet", id: "dor" }]);
+    expect(useStore.getState().railNet).toBeNull();
+    useStore.setState({ filter: "all" });
+  });
+  it("says what it did in its own words, never that a filter was set", () => {
+    useStore.setState({ filter: "all", railNet: null });
+    applyClickActions([{ kind: "railNet", id: "dor" }]);
+    expect(useStore.getState().motionCause).toEqual({ kind: "network", id: "dor" });
+    applyClickActions([{ kind: "railNet", id: null }]);
+    expect(useStore.getState().motionCause).toEqual({ kind: "network", id: "all" });
+  });
+});
+
 describe("trendFocus action (the History view's plane click)", () => {
   it("a released focus turns the deck back to its front, where the DAG stands under All", () => {
     useStore.setState({ trendFocus: "c", trendScroll: 3, trendRotation: 2 });
@@ -315,7 +331,7 @@ describe("the network browsed in Hypergraph", () => {
   });
   it("frames as a network commit does", () => {
     applyClickActions([{ kind: "railNet", id: "dor" }]);
-    expect(useStore.getState().motionCause).toMatchObject({ kind: "filter", id: "dor" });
+    expect(useStore.getState().motionCause).toMatchObject({ kind: "network", id: "dor" });
   });
 });
 

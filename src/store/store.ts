@@ -37,6 +37,7 @@ import type { HyperMeasure } from "@/src/data/hyperMeasure";
 export type MotionCause =
   | { kind: "view"; from: Mode; to: Mode }
   | { kind: "filter"; id: string }
+  | { kind: "network"; id: string } // the view stands on a network, the filter untouched
   | { kind: "focus"; id: string | null }
   // A node pick's `title` is its NETWORK's name and `sub` its place (Globe builds the pick so).
   | { kind: "node"; title: string | null; sub?: string | null }
