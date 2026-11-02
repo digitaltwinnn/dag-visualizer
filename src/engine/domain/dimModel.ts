@@ -41,8 +41,8 @@ export interface DimContext {
 }
 
 // How strong the network/country dim is, ramped by the morph: SUBTLE in the Hypergraph (a gentle
-// "out of focus" push — nodes stay visible and full-size, muting in place) and FULL on the globe
-// (off-filter nodes vanish — the isolate, see hideFrac). ONE value for EVERY node, DAG core and
+// "out of focus" push — nodes stay visible and full-size, muting in place), a notch stronger on the
+// globe. No view removes a node (user, 2026-11-02, see hideFrac). ONE value for EVERY node, DAG core and
 // metagraph alike, and every consumer — scale AND glow AND colour — multiplies the raw eased dim
 // by it, so they can never drift apart (the old bug: the validator *scale* used the raw,
 // un-ramped dim and so scaled the nodes to nothing in hyper, while their glow only dimmed).
@@ -64,9 +64,8 @@ export const nodeDimScale = (c: DimContext): number => viewMix(c, "dim");
 // So `hide` is its own STRENGTH ON THE SAME RAW RAMP as `dim`, not a fraction of the dim's output
 // (user, 2026-08-11: turning `dim` was resizing nodes whenever `hide` was non-zero — one knob moving
 // two effects is not a knob). Two independent readings of one ramp: `dim` says how far an off-filter
-// node mutes, `hide` how far it shrinks away. 1 on the globe (bit-identical isolate, since geo's dim
-// is 1.0 too), 0 in hyper (mute in place, full size) and 0 in the ledger, whose chips are
-// uniform-sized by their own rule anyway.
+// node mutes, `hide` how far it shrinks away. 0 on every row: the globe's isolate went on 2026-11-02
+// (user: "dim the other nodes not remove them"), so every view mutes in place, at full size.
 //
 // Reading the RAW ramp is also what keeps the country drill a LENS: `nodeDim`'s countryMix raise is
 // a mute, and must never shrink the nodes it looks past.
@@ -252,7 +251,7 @@ export const FOCUS_TUNE_DEFAULTS: Readonly<Record<View3D, Readonly<FocusRow>>> =
   // smaller still — their chips sit in dense stacks/trays where a large swell collides
   // with neighbours.
   hyper: { dim: 0.42, hide: 0, elem: 0.44, back: 0.41, boost: 1.1, grow: 0.28 }, // dim 0.32 → 0.5 → 0.42, elem 0.38 → 0.5 → 0.44 (user, 2026-10-24: a hovered or committed network's others were "not very clear"; then the committed one "pops" too much against the darker field — a step back, beside a dimmer stage light)
-  geo: { dim: 1.0, hide: 1, elem: 0, back: 0.65, boost: 0.7, grow: 0.24 }, // 0.16 → 0.24 (user, 2026-08-30: "same as hyper" — the old value was below noticing in a stack); hyper stays loudest
+  geo: { dim: 0.5, hide: 0, elem: 0, back: 0.65, boost: 0.7, grow: 0.24 }, // 0.16 → 0.24 (user, 2026-08-30: "same as hyper" — the old value was below noticing in a stack); hyper stays loudest
   ledger: { dim: 0.67, hide: 0, elem: 0, back: 0.55, boost: 0.7, grow: 0.24 }, // dim 0.5 → 0.67 (user export, 2026-08-30): a deeper coloured dim on the other lanes, paired with the DAG core never dimming here at all (Globe._applyDim's ledger rule)
   // trend: no shared nodes reach this view at all (the fleet parks), so the row is inert in
   // practice but required to compile — ledger's row COPIED VERBATIM as the starting point
