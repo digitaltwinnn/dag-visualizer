@@ -5,6 +5,13 @@ beforeEach(() => vi.useFakeTimers({ now: 1_000_000 }));
 afterEach(() => vi.useRealTimers());
 
 describe("memoryNotesStore", () => {
+  it("reads a counter back, as the rate limit's pre-check does on Upstash", async () => {
+    const store = memoryNotesStore();
+    await store.incr("rate", 60);
+    await store.incr("rate", 60);
+    expect(await store.get("rate")).toBe("2");
+  });
+
   it("sets and gets a value until its TTL passes", async () => {
     const s = memoryNotesStore();
     expect(await s.get("k")).toBeNull();

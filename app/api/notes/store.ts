@@ -114,6 +114,8 @@ export function memoryNotesStore(): NotesStore {
     async get(key) {
       const v = live(values, key);
       if (v) return v.v;
+      const c = live(counts, key);
+      if (c) return String(c.n);
       const h = live(hashes, key);
       return h ? JSON.stringify(h.h) : null;
     },
