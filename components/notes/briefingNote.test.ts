@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { NoteResponse } from "@/src/data/noteTypes";
-import { BRIEFING_STOPS } from "@/src/engine/domain/briefing";
+import { BRIEFING_STOPS, LINE_MAX } from "@/src/engine/domain/briefing";
 import { briefingReq, briefingWords, openingOf } from "./briefingNote";
 
 const ok = (text: string, line?: string): NoteResponse => ({ state: "ok", text, writtenAt: 1, spanFrom: 0, spanTo: 1, days: [], ...(line ? { line } : {}) });
@@ -25,6 +25,12 @@ describe("the words at a stop", () => {
 
   it("fall back to the note's opening", () => {
     expect(briefingWords("geo", ok("A long note. With more."))).toEqual({ text: "A long note. With more.", ai: true });
+  });
+
+  it("are plain, without the AI's mark, when the note's opening overruns the caption", () => {
+    const w = briefingWords("hyper", ok(`${"And this sentence goes on at length ".repeat(6)}until it ends.`));
+    expect(w.ai).toBe(false);
+    expect(w.text.length).toBeLessThanOrEqual(LINE_MAX);
   });
 
   it("are plain, without the AI's mark, when there is no note", () => {
@@ -56,8 +62,7 @@ describe("a note's opening", () => {
     expect(openingOf(`${short} ${long}`)).toBe(short);
   });
 
-  it("never takes more than the caption holds, even for one long sentence", () => {
-    const one = `${"And this sentence goes on at length ".repeat(6)}until it ends.`;
-    expect(openingOf(one)).toBe(one);
+  it("has no opening when even the first sentence overruns the caption", () => {
+    expect(openingOf(`${"And this sentence goes on at length ".repeat(6)}until it ends.`)).toBeNull();
   });
 });
