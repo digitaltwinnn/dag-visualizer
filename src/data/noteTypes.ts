@@ -28,6 +28,8 @@ export interface Fact {
 export interface FactPair {
   key: string;
   end: "from" | "to";
+  /** The ends are two whole spans, this one and the one before it: never a start and an end. */
+  span?: true;
 }
 
 /** high/low/first/last/pause are THRESHOLDED events; peak/trough/longest/broadest are the range's

@@ -46,8 +46,49 @@ export function withMovePercents(note: string, facts: readonly Fact[]): string {
         at += percent.length + 1;
       }
     }
+    // A span against the one before it, the current figure first: "averaged Y, up from X".
+    const said = `${change.split(" ")[0]} from ${from.text}`;
+    for (let at = out.indexOf(said); at >= 0; at = out.indexOf(said, at + said.length)) {
+      if (/[\p{L}\p{N}]/u.test(out[at + said.length] ?? "")) continue;
+      const sentence = out.slice(out.lastIndexOf(". ", at) + 1, at);
+      if (!new RegExp(`(?<![\\d.,])${to.text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\d])`).test(sentence)) continue;
+      out = `${out.slice(0, at)}${change} ${out.slice(at + change.split(" ")[0]!.length + 1)}`;
+      at += percent.length + 1;
+    }
   }
   return out;
+}
+
+/** TWO WHOLE SPANS ARE NOT A START AND AN END (user, 2026-11-02). Code writes the comparison: the
+ *  model keeps saying "fell to 64 from 73", and the gate sending that back cost whole notes of
+ *  several figures, whose retries ran past the sentence limit. Runs before the gate, which still
+ *  holds whatever this cannot reach. `before` names the span before, once, at the first comparison. */
+export function withSpanComparisons(note: string, facts: readonly Fact[], before: string | null): string {
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const fig = (f: Fact) => {
+    const [n, ...unit] = f.text.split(" ");
+    return `${esc(n!)}${unit.length ? `(?: ${esc(unit.join(" "))})?` : ""}`;
+  };
+  const END = "(?!\\d|[.,]\\d)";
+  let out = before ? note.replace(/\b(?:in|over) the previous span\b/gi, `in ${before}`) : note;
+  const pairs: { from: Fact; to: Fact }[] = [];
+  for (const to of facts) {
+    if (to.pair?.end !== "to" || !to.pair.span) continue;
+    const from = facts.find((f) => f.pair?.key === to.pair!.key && f.pair.end === "from");
+    if (!from || from.value === to.value) continue;
+    pairs.push({ from, to });
+    const dir = to.value > from.value ? "up" : "down";
+    out = out.replace(new RegExp(`\\bfrom ${fig(from)} to ${fig(to)}${END}`, "g"), `to ${to.text}, ${dir} from ${from.text}`);
+    out = out.replace(new RegExp(`\\bto ${fig(to)}((?: (?:DAG|MB|per|a|day))*),? from ${fig(from)}${END}`, "g"), (_, tail: string) => `to ${to.text}${tail}, ${dir} from ${from.text}`);
+  }
+  if (!before) return out;
+  if (out.includes(before)) return out.replace(new RegExp(`(?<!(?:in|over) )${esc(before)}`), `in ${before}`);
+  let first: { end: number } | null = null;
+  for (const { from } of pairs) {
+    const m = new RegExp(`\\b(?:up|down) from ${fig(from)}(?: (?:DAG|MB))?(?: (?:per|a) day)?${END}`).exec(out);
+    if (m && (!first || m.index + m[0].length < first.end)) first = { end: m.index + m[0].length };
+  }
+  return first ? `${out.slice(0, first.end)} in ${before}${out.slice(first.end)}` : out;
 }
 
 /** A count's move, or null when it did not. `place` is a measured city, never a guess, and a row

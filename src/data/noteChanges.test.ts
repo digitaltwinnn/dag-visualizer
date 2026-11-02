@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { NOTE_CHANGES_CAP, RHYTHM_CHANGE, changeWords, countChange, withMovePercents, eventChange, largestSnapshotChange, longestGapChange, pickChanges, rhythmChange, siteOfChange, withExtremes } from "@/src/data/noteChanges";
+import { NOTE_CHANGES_CAP, RHYTHM_CHANGE, changeWords, countChange, withMovePercents, eventChange, largestSnapshotChange, longestGapChange, pickChanges, rhythmChange, siteOfChange, withExtremes, withSpanComparisons } from "@/src/data/noteChanges";
 import { fact } from "@/src/data/noteFacts";
 import type { Fact, NoteChange } from "@/src/data/noteTypes";
 
@@ -165,5 +165,52 @@ describe("withMovePercents", () => {
   });
   it("does not stop short of a longer number", () => {
     expect(withMovePercents("Nodes fell from 91 to 830.", facts)).toBe("Nodes fell from 91 to 830.");
+  });
+  // A SPAN AGAINST THE ONE BEFORE IT (user, 2026-11-02): the current figure first, since "rose from X
+  // to Y" read as a climb inside the span.
+  it("takes a comparison written current figure first", () => {
+    expect(withMovePercents("Activity averaged 1,941 per day, up from 1,754 in the 30 days before.", facts)).toBe("Activity averaged 1,941 per day, up 11% from 1,754 in the 30 days before.");
+    expect(withMovePercents("Cadence averaged 12 seconds, down from 21 seconds.", facts)).toBe("Cadence averaged 12 seconds, down 43% from 21 seconds.");
+  });
+  it("leaves one whose direction or current figure is not the pair's", () => {
+    expect(withMovePercents("Activity averaged 1,941 per day, down from 1,754.", facts)).toBe("Activity averaged 1,941 per day, down from 1,754.");
+    expect(withMovePercents("Activity averaged 1,800 per day, up from 1,754.", facts)).toBe("Activity averaged 1,800 per day, up from 1,754.");
+    expect(withMovePercents("Activity held at 1,941. It is up from 1,754.", facts)).toBe("Activity held at 1,941. It is up from 1,754.");
+  });
+});
+
+// TWO WHOLE SPANS ARE NOT A START AND AN END (user, 2026-11-02). The model keeps writing "fell to 64
+// from 73", and a retry on a note of several figures ran past the sentence limit and lost the note,
+// so code writes the comparison the way it adds the percentage.
+describe("withSpanComparisons", () => {
+  const pair = (key: string, from: number, to: number, kind: Fact["kind"] = "count"): Fact[] => [
+    fact(`${key}, previous span`, from, kind, undefined, { key, end: "from", span: true }),
+    fact(`${key}, this span`, to, kind, undefined, { key, end: "to", span: true }),
+  ];
+  const facts = [...pair("globals", 4021, 7478), ...pair("fees", 73, 64), ...pair("gap", 21, 12, "duration")];
+  const before = "the 30 days before";
+  it("turns a start and an end into a figure and what it stood at before", () => {
+    expect(withSpanComparisons("Global snapshots rose from 4,021 to 7,478 per day.", facts, null)).toBe("Global snapshots rose to 7,478, up from 4,021 per day.");
+    expect(withSpanComparisons("Fees fell to 64 DAG per day from 73.", facts, null)).toBe("Fees fell to 64 DAG per day, down from 73.");
+  });
+  it("writes a shared unit out, so the figure reads as the facts state it", () => {
+    expect(withSpanComparisons("Cadence widened from 21 to 12 seconds.", facts, null)).toBe("Cadence widened to 12 seconds, down from 21 seconds.");
+    expect(withSpanComparisons("Cadence slowed to 12 seconds from 21.", facts, null)).toBe("Cadence slowed to 12 seconds, down from 21 seconds.");
+  });
+  it("names the span before once, at the first comparison", () => {
+    expect(withSpanComparisons("Global snapshots averaged 7,478 per day, up from 4,021 per day. Fees fell to 64 DAG per day from 73.", facts, before))
+      .toBe("Global snapshots averaged 7,478 per day, up from 4,021 per day in the 30 days before. Fees fell to 64 DAG per day, down from 73.");
+    expect(withSpanComparisons("Fees averaged 64, down from 73 in the 30 days before.", facts, before)).toBe("Fees averaged 64, down from 73 in the 30 days before.");
+    expect(withSpanComparisons("Fees averaged 64, down from 73 in the previous span.", facts, before)).toBe("Fees averaged 64, down from 73 in the 30 days before.");
+    expect(withSpanComparisons("Fees averaged 64, down from 73 the 30 days before.", facts, before)).toBe("Fees averaged 64, down from 73 in the 30 days before.");
+  });
+  it("leaves a gauge's start and end, a form already right, and a pair the note does not state", () => {
+    const gauge = [fact("Nodes at the start", 163, "count", undefined, { key: "n", end: "from" }), fact("Nodes at the end", 87, "count", undefined, { key: "n", end: "to" })];
+    expect(withSpanComparisons("Nodes fell from 163 to 87.", gauge, before)).toBe("Nodes fell from 163 to 87.");
+    expect(withSpanComparisons("Fees averaged 64, down from 73.", facts, null)).toBe("Fees averaged 64, down from 73.");
+    expect(withSpanComparisons("Fees fell from 73 to 640.", facts, null)).toBe("Fees fell from 73 to 640.");
+  });
+  it("ends in a sentence the percentage reaches", () => {
+    expect(withMovePercents(withSpanComparisons("Fees fell to 64 from 73.", facts, null), facts)).toBe("Fees fell to 64, down 12% from 73.");
   });
 });

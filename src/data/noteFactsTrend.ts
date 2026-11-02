@@ -101,11 +101,11 @@ const valueKind = (m: TrendMetric): Fact["kind"] => (m === "continuity" ? "durat
 const valueFormat = (m: TrendMetric): ((v: number) => string) | undefined => (m === "fees" ? formatDag : undefined);
 
 /** One measure of one subject across a window: the points and, for cadence, the weights it was
- *  measured over. The hypergraph reads its global rows — except its NODES, which are its own
- *  (`f.nodes.dag`), as the History roster's pinned row reads them. */
+ *  measured over. The hypergraph reads its global rows, its NODES too: a note on the whole network
+ *  counts all of them, though the DAG's plane beside it charts its own (user, 2026-11-02). */
 function pointsOf(metric: TrendMetric, id: string, data: TrendsWindowData): { points: (number | null)[]; weights?: (number | null)[] } {
   const dag = id === "dag";
-  const points = dag && metric !== "nodes" ? globalSeries(metric, data.series) : metricSeries(metric, id, data.series).points;
+  const points = dag ? globalSeries(metric, data.series) : metricSeries(metric, id, data.series).points;
   if (metric !== "continuity") return { points };
   return { points, weights: dag ? globalSeries("globals", data.series) : metricSeries("snapshots", id, data.series).points };
 }
@@ -220,10 +220,10 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
     const paired = shown != null && shownBefore != null && !curFloor && !prevFloor;
     const key = `${label}${unit}`;
     if (shown != null)
-      facts.push(fact(`${label}${unit}, this span${curFloor ? ", at least" : ""}`, shown, kind, format, paired ? { key, end: "to" } : undefined));
+      facts.push(fact(`${label}${unit}, this span${curFloor ? ", at least" : ""}`, shown, kind, format, paired ? { key, end: "to", span: true } : undefined));
     if (before == null) continue;
     if (shownBefore != null)
-      facts.push(fact(`${label}${unit}, previous span${prevFloor ? ", at least" : ""}`, shownBefore, kind, format, paired ? { key, end: "from" } : undefined));
+      facts.push(fact(`${label}${unit}, previous span${prevFloor ? ", at least" : ""}`, shownBefore, kind, format, paired ? { key, end: "from", span: true } : undefined));
     if (before > 0 && !curFloor && !prevFloor) facts.push(fact(`${label}, ratio to previous span`, now / before, "ratio"));
   }
 

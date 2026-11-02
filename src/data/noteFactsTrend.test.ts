@@ -105,11 +105,11 @@ describe("trendFacts on the hypergraph", () => {
     expect(f.value).toBeCloseTo(2, 9);
   });
 
-  it("reads nodes through gaugeChange: the DAG's own nodes, start and end", () => {
+  it("reads nodes through gaugeChange, start and end", () => {
     const r = trendFacts(input({ cur: win(7, week(2)), prev: null }))!;
     // 7 samples is under the 12 a level needs, so no node line is stated at all.
     expect(find(r, /Nodes/)).toEqual([]);
-    const long = win(14, { ...week(2), "g.ticks": row(14, () => 288), "f.nodes.dag": row(14, (i) => (i < 7 ? 140 : 120)) });
+    const long = win(14, { ...week(2), "g.ticks": row(14, () => 288), "f.nodes": row(14, (i) => (i < 7 ? 140 : 120)) });
     const r2 = trendFacts(input({ cur: long, prev: null }))!;
     expect(find(r2, /^Nodes at the start/)[0]!.value).toBe(140);
     expect(find(r2, /^Nodes at the end/)[0]!.value).toBe(120);
@@ -144,7 +144,7 @@ describe("trendFacts tags each change as a pair (R54)", () => {
 
   it("keys a gauge's start and end, and a late-starting gauge's lone end not at all", () => {
     const long = (nodes: (number | null)[]) =>
-      win(nodes.length, { "g.ticks": row(nodes.length, () => 288), "g.anchors": row(nodes.length, () => 100), "f.nodes.dag": nodes }, T0 - 100 * DAY);
+      win(nodes.length, { "g.ticks": row(nodes.length, () => 288), "g.anchors": row(nodes.length, () => 100), "f.nodes": nodes }, T0 - 100 * DAY);
     const at = (nodes: (number | null)[]) =>
       trendFacts(input({ zoom: "1y", span: { fromMs: T0 - 100 * DAY, toMs: T0 }, cur: long(nodes), prev: null }))!.facts;
     expect(pairsOf(at(row(100, (i) => (i < 50 ? 140 : 120)))).get("Nodes")).toEqual(["Nodes at the start of the span", 140, "Nodes at the end of the span", 120]);
@@ -511,7 +511,7 @@ describe("trendFacts reads the STORE payload and folds it (fees and data)", () =
 
 describe("trendFacts: a gauge that began after the span did", () => {
   const long = (nodes: (number | null)[]) =>
-    win(nodes.length, { "g.ticks": row(nodes.length, () => 288), "g.anchors": row(nodes.length, () => 100), "f.nodes.dag": nodes }, T0 - 100 * DAY);
+    win(nodes.length, { "g.ticks": row(nodes.length, () => 288), "g.anchors": row(nodes.length, () => 100), "f.nodes": nodes }, T0 - 100 * DAY);
   const at = (nodes: (number | null)[]) =>
     trendFacts(input({ zoom: "1y", span: { fromMs: T0 - 100 * DAY, toMs: T0 }, cur: long(nodes), prev: null }))!.facts.filter((f) => /^Nodes/.test(f.label));
 
@@ -571,6 +571,27 @@ describe("trendFacts names: the whole catalog", () => {
 // A NETWORK'S SILENT SPAN SAYS SO (user, 2026-11-01: NDT's Aug 23 read "steady", three days after
 // its last day, because the facts held only the span's own length and dates). The unlisted set's
 // rule, for every network.
+// THE WHOLE NETWORK'S NODES ARE ALL OF THEM (user, 2026-11-02): a note on the whole network said "nodes
+// fell from 132 to 67", the DAG's own validators, beside 87 everywhere else in the app.
+describe("a span against the one before it", () => {
+  it("marks the pair, so the gate can hold how it is written; a gauge's start and end stay unmarked", () => {
+    const r = trendFacts(input({}))!;
+    const before = r.facts.filter((f) => f.pair?.end === "from");
+    expect(before.length).toBeGreaterThan(0);
+    for (const f of before) expect(f.pair!.span).toBe(/previous span/.test(f.label) ? true : undefined);
+  });
+});
+
+describe("the whole network's nodes", () => {
+  const span = (n: number) => row(n, () => 288);
+  const data = win(14, { ...week(2), "g.ticks": span(14), "f.nodes": row(14, (i) => (i < 7 ? 160 : 90)), "f.nodes.dag": row(14, (i) => (i < 7 ? 130 : 70)) });
+  it("counts every network's", () => {
+    const r = trendFacts(input({ cur: data, prev: null }))!;
+    expect(r.facts.find((f) => f.label === "Nodes at the start of the span")?.value).toBe(160);
+    expect(r.facts.find((f) => f.label === "Nodes at the end of the span")?.value).toBe(90);
+  });
+});
+
 describe("a network's silent span", () => {
   const quiet = { "m.bio.snaps": row(7, () => null) };
   const silent = (patch: Partial<TrendFactsInput> = {}, over: Record<string, (number | null)[]> = quiet) =>

@@ -77,6 +77,12 @@ export const VOICE = [
 type KindQuestions = Partial<Record<Exclude<SubjectKind, "view">, string>>;
 // The whole network's activity, in its own words (user, 2026-10-30): one string for both views.
 export const QUESTION_COMMON_WHOLE = "Last, in one sentence, how active the network was: open with the direction, up, down or steady, then the global snapshots it produced per day last week against the weeks before.";
+// A SPAN AGAINST THE ONE BEFORE IT IS NOT A CLIMB INSIDE THE SPAN (user, 2026-11-02). Live: "Over the
+// last 30 days, global snapshots rose 86% from 4,021 to 7,478 per day", where both were 30-day
+// averages and the figure inside the span rose about a third. The gate holds the form, since the
+// figures alone are right (`noteHonesty.ts`).
+const SPAN_FIGURES = 'A figure for "this span" or the "previous span" is that whole span, as an average per day or a total, never a point in it: never say it rose or fell over the span, and never write the previous figure first. Write a per day figure in this shape, with "down from" for a fall: "<what> averaged <this span\'s figure> per day, up from <the previous span\'s figure with its unit> <the words of the Span before line>". Give the Span before words the first time only. A total or a spacing takes the same shape without "averaged". Figures "at the start of the span" and "at the end of the span" did move inside the span: write those as "from <start figure> to <end figure>". A ratio is for reading: never write it as a figure.';
+
 export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuestions; questionNow?: string; questionCommon?: string; system: (subjectLabel: string, lead?: NoteLead, common?: boolean, kind?: SubjectKind, whole?: boolean) => string }> = {
   hyper: {
     // A QUIET WEEK IS SAID (user, 2026-10-30): the facts count what changed even at 0, so the note
@@ -122,7 +128,7 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
       span: "Describe the span's shape, as a companion to a note above it that already states what rose and fell: the busiest day and the quietest day, each with its date and figure, and a typical day's figure, using only the facts named for those days. If the facts name none, say how quiet or steady the span was. Do not say what rose or fell overall.",
     },
     system: (subjectLabel, _lead, _common, kind) =>
-      `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${questionOf("trend", kind)}`,
+      `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${questionOf("trend", kind)}\n${SPAN_FIGURES}`,
   },
 };
 
@@ -150,6 +156,19 @@ const PILL_WORDS: Record<string, string> = {
   "1y": "the last year",
   all: "all measured history",
 };
+const BEFORE_WORDS: Record<string, string> = {
+  "1h": "the hour before",
+  "24h": "the 24 hours before",
+  "7d": "the 7 days before",
+  "30d": "the 30 days before",
+  "90d": "the 90 days before",
+  "1y": "the year before",
+};
+/** The equal span History compares its figures with, in the note's words. Null where none is read. */
+export function spanBeforeWords(view: NoteView, span: NoteSpan): string | null {
+  if (view !== "trend" || span === "all") return null;
+  return BEFORE_WORDS[span] ?? "the same length of time before";
+}
 const utcDay = (ms: number) => new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 export function spanWords(view: NoteView, span: NoteSpan, spanFrom: number, spanTo: number): string {
   if (view === "hyper" || view === "geo") return "the last 7 days";
@@ -173,7 +192,7 @@ export const CAPTION_FORMAT =
 
 /** THE BRIEFING'S LINE: what the tour shows at this view's stop, in the note's own answer. */
 export const LINE_FORMAT =
-  "One more line belongs in this answer, whatever the format above says: directly after the note, a line starting LINE: with the note's main findings as one or two plain sentences, eighteen to twenty-two words in all. Keep the note's own wording for it: the span, what moved, and both numbers as \"from X to Y\".";
+  "One more line belongs in this answer, whatever the format above says: directly after the note, a line starting LINE: with the note's main findings as one or two plain sentences, eighteen to twenty-two words in all. Keep the note's own wording for it: the span, what moved, and both numbers as the note writes them.";
 
 export function buildMessages(
   view: NoteView,
@@ -187,12 +206,14 @@ export function buildMessages(
   span?: string | null,
   whole?: boolean,
   line?: boolean,
+  spanBefore?: string | null,
 ): { role: "system" | "user"; content: string }[] {
   const withDays = !!days && days.length > 0;
   const format = withDays
     ? CAPTION_FORMAT
     : "Answer format: one line starting NOTE: and nothing else.";
-  const parts = [...(span ? [`Span: ${span}`] : []), `Facts:\n${factsBlock}`];
+  const spanLines = [...(span ? [`Span: ${span}`] : []), ...(spanBefore ? [`Span before: ${spanBefore}`] : [])];
+  const parts = [...(spanLines.length ? [spanLines.join("\n")] : []), `Facts:\n${factsBlock}`];
   if (withDays) parts.push(`Days to caption, in order:\n${days.map((d) => `DAY ${utcDayKey(d.dayMs)}`).join("\n")}`);
   if (retryReasons && retryReasons.length)
     parts.push(`Your previous answer was rejected: ${retryReasons.join("; ")}. Write it again and fix this.`);
