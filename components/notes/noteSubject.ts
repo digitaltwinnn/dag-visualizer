@@ -57,15 +57,16 @@ export function noteSpanWords(view: NoteView): string | null {
 }
 
 export function noteSubjectOf(mode: Mode, s: NoteSubjectState): NoteSubject | null {
-  if (!VIEW_POLICIES[mode].aiNotes) return null;
+  const { aiNotes, noteScope } = VIEW_POLICIES[mode];
+  if (!aiNotes) return null;
   const view = mode as NoteView; // aiNotes is true exactly on the four note views
-  if (view === "trend") {
+  if (noteScope === "history") {
     const net = s.trendFilter;
     if (net === "all" || net === "dag") return { view, subject: "dag" };
     return { view, subject: net }; // the unlisted set included: History alone has its record (below)
   }
   const net = s.metagraphNetwork ?? "all";
   // The ledger's DAG core is its whole network: one subject, `all` (the routes fold it the same way).
-  if (view === "ledger" && net === "dag") return { view, subject: "all" };
+  if (noteScope === "chamber" && net === "dag") return { view, subject: "all" };
   return s.unlisted(net) ? null : { view, subject: net };
 }

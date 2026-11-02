@@ -153,6 +153,22 @@ describe("the trends view is registered and inert", () => {
     expect(VIEW_POLICIES.soon.aiNotes).toBe(false);
   });
 
+  it("scopes selections to a global snapshot in Snapshots alone", () => {
+    expect(VIEW_POLICIES.ledger.tickScoped).toBe(true);
+    for (const m of ["hyper", "geo", "trend", "soon"] as const) expect(VIEW_POLICIES[m].tickScoped).toBe(false);
+  });
+
+  it("lets the rail browse in Hypergraph and Geography alone", () => {
+    for (const m of ["hyper", "geo"] as const) expect(VIEW_POLICIES[m].railBrowses).toBe(true);
+    for (const m of ["ledger", "trend", "soon"] as const) expect(VIEW_POLICIES[m].railBrowses).toBe(false);
+  });
+
+  it("says what each view's note reads its subject from", () => {
+    expect(VIEW_POLICIES.ledger.noteScope).toBe("chamber");
+    expect(VIEW_POLICIES.trend.noteScope).toBe("history");
+    for (const m of ["hyper", "geo", "soon"] as const) expect(VIEW_POLICIES[m].noteScope).toBe("network");
+  });
+
   // `chartStack` is the flag `components/TrendStack.tsx` gates its mount on (convention 7 — gate
   // on the view a behaviour is FOR, never `mode === "x"`).
   it("mounts the chart-plane stack only in trend", () => {

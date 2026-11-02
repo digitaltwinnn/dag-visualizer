@@ -21,6 +21,7 @@
 //   chevrons that step one tick, nothing that claims to measure the chain. That is what keeps it
 //   from rivalling the LiveStrip — the strip is the time INSTRUMENT (scale, window, cadence), the
 //   card's plank is a nudge to the adjacent tick.
+import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import type { Mode } from "@/src/store/store";
 import { ledgerNetwork } from "@/src/engine/domain/tickNet";
 import type { TickNetSel } from "@/src/data/types";
@@ -328,7 +329,7 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
         key: m.id,
         label: m.name,
         // A VIEW THAT BROWSES (`domain/viewNetwork.ts`): a swipe leaves the filter alone.
-        actions: ROOT_OF[s.mode] ? railNetActions(m.id, s.filter) : filterToggleActions(m.id, s.filter),
+        actions: VIEW_POLICIES[s.mode].railBrowses ? railNetActions(m.id, s.filter) : filterToggleActions(m.id, s.filter),
       }));
       return finish(slot, items, nets.findIndex((m) => m.id === net), "Networks");
     }
@@ -698,13 +699,13 @@ const rootNetworks: ChildEntry = {
   to: "context",
   steps: (s, n) => stepNetworks(s).slice(0, n).map((m) => ({ key: m.id, label: m.name, actions: railNetActions(m.id, s.filter) })),
 };
-export const ROOT_OF: Partial<Record<Mode, ChildEntry>> = { hyper: rootNetworks, geo: rootNetworks };
+export const rootOf = (mode: Mode): ChildEntry | null => (VIEW_POLICIES[mode].railBrowses ? rootNetworks : null);
 
 /** Nothing while a drill is held: a network change clears a country and a provider, and in
  *  Hypergraph it would drop the node. The ghost then only opens its hint. */
 export function rootStep(s: SiblingState): SiblingStep | null {
   if (s.inspect || s.country || s.cohort) return null;
-  return ROOT_OF[s.mode]?.steps(s, 1)[0] ?? null;
+  return rootOf(s.mode)?.steps(s, 1)[0] ?? null;
 }
 
 /** The rung's first child, or null when there is nothing finer to open.

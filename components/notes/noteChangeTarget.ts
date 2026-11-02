@@ -12,6 +12,7 @@ import {
   tickNetSelectActions,
   type ClickAction,
 } from "@/src/engine/domain/pickActions";
+import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 
 // WHAT A NOTABLE CHANGE'S ROW IS ABOUT (user, 2026-10-31: "related to a clickable subject"): the
 // row commits what the view's own explorer row for that subject commits, through the same table
@@ -46,7 +47,7 @@ export function changeActions(
 ): ClickAction[] | null {
   switch (subject.kind) {
     case "network":
-      if (view !== "ledger") return filterToggleActions(subject.id, s.filter, s.railNet);
+      if (!VIEW_POLICIES[view].tickScoped) return filterToggleActions(subject.id, s.filter, s.railNet);
       if (!tick) return null;
       return tickNetSelectActions(subject.id, { kind: "snapshot", title: `Global snapshot #${tick.ordinal}`, data: tick }, {
         metaSnap: s.metaSnap,

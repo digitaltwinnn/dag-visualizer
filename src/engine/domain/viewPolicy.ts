@@ -163,6 +163,15 @@ export interface ViewPolicy {
   // Does this view carry an AI NOTE — the written context card (`components/notes/`) for the
   // subject on screen? The four 3D views do; the placeholder gallery shows no data, so no note.
   aiNotes: boolean;
+  // Where this view's note finds its subject: the network the view stands on, the same with the
+  // DAG core read as the whole chamber ("chamber"), or the History filter ("history").
+  noteScope: "network" | "chamber" | "history";
+  // Do this view's selections live inside a global snapshot? A network then commits inside the tick
+  // and never writes the filter, and a node card stands only where it belongs to what is shown.
+  tickScoped: boolean;
+  // Does the rail BROWSE (`viewNetwork.ts`)? Its Metagraph ghost and swipe then look around the view
+  // and leave the filter alone.
+  railBrowses: boolean;
   // How deep the left rail's EXPLORER stands (user, 2026-10-07). The rule: the explorer shows the
   // OPEN card's children (`components/explorer/boxLevel.ts`) — "follow" — UNLESS the view's first
   // level is its own AXIS: N records along it rather than a set of scopes to choose one of. Then
@@ -239,6 +248,9 @@ const FLAT: ViewPolicy = {
   fleet: "placed",
   rawSurface: "records",
   aiNotes: false,
+  noteScope: "network",
+  tickScoped: false,
+  railBrowses: false,
   explorerDepth: "follow",
   chartStack: false,
   entryPlane: null,
@@ -293,6 +305,9 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     fleet: "placed",
     rawSurface: "records",
     aiNotes: true,
+    noteScope: "network",
+    tickScoped: false,
+    railBrowses: true,
     explorerDepth: "follow",
     chartStack: false,
     entryPlane: null,
@@ -340,6 +355,9 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     fleet: "placed",
     rawSurface: "records",
     aiNotes: true,
+    noteScope: "network",
+    tickScoped: false,
+    railBrowses: true,
     explorerDepth: "follow",
     chartStack: false,
     entryPlane: null,
@@ -377,6 +395,9 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     fleet: "placed",
     rawSurface: "records",
     aiNotes: true,
+    noteScope: "chamber",
+    tickScoped: true,
+    railBrowses: false,
     explorerDepth: "axis",
     chartStack: false,
     entryPlane: null,
@@ -424,6 +445,9 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     fleet: "parked",
     rawSurface: "buckets",
     aiNotes: true,
+    noteScope: "history",
+    tickScoped: false,
+    railBrowses: false,
     explorerDepth: "follow",
     chartStack: true,
     entryPlane: "dag",

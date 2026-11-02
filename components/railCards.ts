@@ -451,8 +451,8 @@ export function nodeHereOf(
   s: { mode: Mode; inspect: PickDescriptor | null; inspectView: Mode | null; metaSnap: MetaSnapSel | null; following: boolean },
   signers: (sel: MetaSnapSel) => readonly NodeRow[],
 ): boolean | undefined {
-  if (s.mode !== "ledger" || !s.inspect) return undefined;
-  if (s.inspectView === "ledger") return true;
+  if (!VIEW_POLICIES[s.mode].tickScoped || !s.inspect) return undefined;
+  if (s.inspectView === s.mode) return true;
   // Only a snapshot the reader PICKED. One following live changes every tick, so the card came and
   // went with the signers, and it is no selection moment, so it opened beside the entry's box.
   if (!s.metaSnap || s.following) return false;

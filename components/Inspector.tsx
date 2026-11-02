@@ -25,7 +25,7 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 import { useTouch } from "@/components/useTouch";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { detailsCards, ladderSlotIds, noteCardAbsent, type RailCard } from "@/components/railCards";
-import { CHILD_OF, ROOT_OF, childStep, rootStep, type SiblingStep } from "@/components/railSiblings";
+import { CHILD_OF, childStep, rootOf, rootStep, type SiblingStep } from "@/components/railSiblings";
 import { displayOrder, isCollapsed, boxedSlotOf, overridesOnNoteStandDown, overridesOnSelection, overridesOnViewEntry, railSelectionKey, subjectRunEnd, type LaneCollapseState } from "@/components/railCollapse";
 import { useSiblingState } from "@/components/useSiblingState";
 import { openRailCard } from "@/components/railOpen";
@@ -518,7 +518,7 @@ export default function Inspector() {
   }, [deepestId, deepestKind, siblingState, mode]);
   // THE VIEW'S OWN FIRST STEP (user, 2026-10-31: "open the 1st of that set"): its ghost has no parent
   // to step from, so it would only open its hint.
-  const rootId = ROOT_OF[mode]?.to ?? null;
+  const rootId = rootOf(mode)?.to ?? null;
   const rootGhost = rootId && !presentOf(rootId) ? rootStep(siblingState) : null;
   const ghostStep = (id: string) => (id === nextStep?.id ? nextStep.step : id === rootId ? (rootGhost ?? undefined) : undefined);
   // EXPAND-ONLY since the box lost its minimize (review find, 2026-09-11): every reachable
