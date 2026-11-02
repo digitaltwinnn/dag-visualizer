@@ -221,6 +221,7 @@ export function Door({
   onClick,
   glyph,
   disabled,
+  still,
   flushFoot,
   wrap,
   lit,
@@ -238,6 +239,9 @@ export function Door({
   onClick?: () => void;
   glyph?: ReactNode;
   disabled?: boolean;
+  /** A row in a run of doors with nowhere to go: it reads like them and takes no pointer, where
+   *  `disabled` says a control is off (user, 2026-11-02: "they should keep the same style"). */
+  still?: boolean;
   /** Sits directly on the foot plate below it (cancels the foot's own top margin). */
   flushFoot?: boolean;
   /** Let the target wrap instead of truncating — for a door whose target IS the content (a note's
@@ -274,6 +278,7 @@ export function Door({
       ? cn("border-[light-dark(var(--border),var(--ai-row))] hover:[background:var(--ai-row-hover)]", lit ? "[background:var(--ai-row-hover)]" : "[background:light-dark(transparent,var(--ai-row))]")
       : cn("border-wash-strong hover:[background:light-dark(var(--wash-hover),var(--wash-soft))]", lit ? "[background:light-dark(var(--wash-hover),var(--wash-soft))]" : "[background:light-dark(var(--wash-soft),var(--wash-faint))]"),
     disabled && "opacity-65 pointer-events-none",
+    still && "pointer-events-none",
   );
   const inner = (
     <>
@@ -283,7 +288,9 @@ export function Door({
     </>
   );
   const pair = { onPointerEnter, onPointerLeave, onFocus, onBlur };
-  return href ? (
+  return still ? (
+    <div className={cn(cls, "w-[calc(100%+2*var(--card-pad))] cursor-pointer")}>{inner}</div>
+  ) : href ? (
     <a href={href} target="_blank" rel="noopener noreferrer" className={cls} {...pair}>
       {inner}
     </a>

@@ -86,7 +86,7 @@ function DayRow({ day }: { day: NoteDay }) {
 /** ONE NOTABLE CHANGE (user, 2026-10-31): what moved over the note's span, the kind's coin then a
  *  sentence code wrote, so unlike a day's caption it is never the model's. The row is the subject's:
  *  it commits and hovers what the view's explorer row for that subject does (`noteChangeTarget`).
- *  A subject with nothing to open any more is listed all the same, as a closed door. */
+ *  A subject with nothing to open is listed all the same, in the same style, and takes no click. */
 function ChangeRow({ change, view, onCard }: { change: NoteChange; view: NoteView; onCard?: boolean }) {
   useFeedRead(["clusters", "api-geo"], "Notable change");
   useFeedRead(["global", "metasnaps"], "Notable change", view === "ledger");
@@ -144,7 +144,7 @@ function ChangeRow({ change, view, onCard }: { change: NoteChange; view: NoteVie
       tone="ai"
       lit={lit}
       wrap
-      disabled={actions() == null}
+      still={actions() == null}
       label={<NoteKindCoin kind={change.kind} />}
       onPointerEnter={(e) => e.pointerType === "mouse" && on()}
       onPointerLeave={off}

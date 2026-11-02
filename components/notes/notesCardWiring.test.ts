@@ -54,6 +54,18 @@ describe("the top card's scope", () => {
   });
 });
 
+describe("a row with nothing to open", () => {
+  // user, 2026-11-02: "the style of the notable row is difficult, they should keep the same style".
+  it("reads like every other row, and only takes no click", () => {
+    const body = fnBody(read("components/notes/NoteRows.tsx"), "function ChangeRow(");
+    expect(body).toMatch(/still=\{actions\(\) == null\}/);
+    expect(body).not.toMatch(/disabled=/);
+    const door = fnBody(read("components/inspector/parts.tsx"), "export function Door(");
+    expect(door).toMatch(/still && "pointer-events-none"/);
+    expect(door).toMatch(/still \? \(\s*<div className=/);
+  });
+});
+
 describe("a subject card's rows", () => {
   const rows = read("components/notes/NoteRows.tsx");
   const subject = read("components/notes/SubjectNote.tsx");
