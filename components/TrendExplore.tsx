@@ -151,7 +151,7 @@ export default function TrendExplore() {
             slice.stale ? <NodeStars count={3} /> : total.head != null ? format(total.head) : roster.pending || (roster.headKind === "day" && roster.dayPending) ? <NodeStars count={3} /> : <span className="text-muted-foreground" aria-label={NO_READING}>—</span>,
           // THE ROW BRINGS THE DAG'S CHART FORWARD, like every row below it (user, 2026-10-03:
           // "why is the dag pinned row not clickable? we have the chart data, no?"). Its plane
-          // joins the front of the deck while it is the focus (`TrendStack`), so this is the same
+          // stands at the front of the deck under All (`deckOf`), so this is the same
           // plane focus the other rows run. It NEVER sets the page filter (same day: "don't set the page filter") —
           // the first cut did, and re-scoped the whole app from a row that states one number.
           on: cardNet === "dag",

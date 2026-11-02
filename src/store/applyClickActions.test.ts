@@ -168,6 +168,15 @@ describe("metaSnap action", () => {
 });
 
 describe("trendFocus action (the History view's plane click)", () => {
+  it("a released focus turns the deck back to its front, where the DAG stands under All", () => {
+    useStore.setState({ trendFocus: "c", trendScroll: 3, trendRotation: 2 });
+    applyClickActions([{ kind: "trendFocus", id: null }]);
+    const st = useStore.getState();
+    expect(st.trendFocus).toBeNull();
+    expect(st.trendScroll).toBe(0);
+    expect(st.trendRotation).toBe(0);
+  });
+
   const ROSTER = ["a", "b", "c", "d", "e", "f", "g", "h"]; // 8 networks, a 5-wide window
 
   beforeEach(() => {
@@ -209,7 +218,8 @@ describe("trendFocus action (the History view's plane click)", () => {
     expect(useStore.getState().trendScroll).toBe(2);
   });
 
-  it("a RELEASE never pages — clearing the focus is not a place to go", () => {
+  it("with no focus to release, the window stays where the reader paged it", () => {
+    useStore.setState({ trendFocus: null });
     useStore.getState().setTrendScroll(2);
     applyClickActions([{ kind: "trendFocus", id: null }]);
     expect(useStore.getState().trendScroll).toBe(2);

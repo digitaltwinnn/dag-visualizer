@@ -87,6 +87,10 @@ export function applyClickActions(actions: ClickAction[], opts?: { quiet?: boole
         if (a.id !== null) {
           const scroll = scrollToShow(st.trendIds, a.id, st.trendScroll);
           if (scroll !== st.trendScroll) st.setTrendScroll(scroll);
+        } else if (st.trendFocus != null) {
+          // A focus released turns the deck back to its front: under All that is the DAG (`deckOf`).
+          if (st.trendScroll) st.setTrendScroll(0);
+          if (st.trendRotation) st.setTrendRotation(0);
         }
         st.setTrendFocus(a.id);
         break;

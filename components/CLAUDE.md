@@ -335,9 +335,10 @@ decisions inside them are design, not detail:
   random"): three tags for three shades of meaning was the randomness. Never ranked among the
   networks: it would always be first with a full bar. **A click brings the DAG's chart forward and never sets the page filter** (user, same
   day, two rounds: "don't set the page filter", then "why is the dag pinned row not clickable?
-  we have the chart data, no?"). The DAG's plane — the one the DAG filter always drew — joins the
-  deck at the FRONT while it is the focus (`TrendStack`'s `deck`) and leaves when released, so
-  the resting stack is unchanged and the row runs the same plane focus every other row does.
+  we have the chart data, no?"). The DAG's plane — the one the DAG filter always drew — stands at the
+  deck's FRONT under All (`trendStack.deckOf`; user, 2026-11-02: "that should be DAG which is the
+  'all' basically") and steps out only behind a network's focus; releasing a focus turns the deck
+  back to it. The row runs the same plane focus every other row does.
   (Parked at the back of the deck it paged the stack to its tail on focus.) It stays out of the
   RANK and off the shared ceiling: it is what the layers add up to. **History ARRIVES on it**
   (user, 2026-10-26: "set DAG the default in explorer (and thereby also the charts, cards etc)"):

@@ -540,6 +540,21 @@ export function rotateOrder(ids: readonly string[], r: number): readonly string[
   return k === 0 ? ids : [...ids.slice(k), ...ids.slice(0, k)];
 }
 
+/** THE DECK BEFORE ITS ROTATION: the ranked networks, with the planes outside the rank where they
+ *  belong. ALL IS THE DAG (user, 2026-11-02: "that should be DAG which is the 'all' basically"): under
+ *  All it stands in front with nothing focused, as it does on arrival, and steps out of the deck
+ *  only behind a network's focus. Outside the rank on purpose: it is what the layers add up to, so it
+ *  stays off the shared ceiling and out of the networks' order. The unlisted plane, what the networks
+ *  leave over, comes forward while it is the focus. */
+export function deckOf(
+  ranked: readonly string[],
+  o: { total: boolean; unlisted: boolean; focus: string | null; unlistedId: string },
+): readonly string[] {
+  if (o.total && (o.focus === "dag" || o.focus == null)) return ["dag", ...ranked];
+  if (o.unlisted && o.focus === o.unlistedId && !ranked.includes(o.unlistedId)) return [o.unlistedId, ...ranked];
+  return ranked;
+}
+
 /** THE PLANE IN FRONT with no focus re-deal: the first slot of the window the scroll shows
  *  (`stackPoses`' own arithmetic — slot 0 is `ids[clampScroll(…)]`). Null for an empty roster. */
 export function frontPlane(ids: readonly string[], scroll: number): string | null {
