@@ -55,7 +55,7 @@ export default function FilterPicker({ onPicked, shown = true }: { onPicked?: ()
   // hover PREVIEW is dropped explicitly: the strip collapses out from under the pointer, so its
   // own mouseleave can't be relied on to clear the channel.
   const pick = (id: string) => {
-    applyClickActions(filterToggleActions(id, filter));
+    applyClickActions(filterToggleActions(id, filter, useStore.getState().railNet));
     setHoverFilter(null);
     onPicked?.();
   };

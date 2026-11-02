@@ -46,7 +46,7 @@ export function changeActions(
 ): ClickAction[] | null {
   switch (subject.kind) {
     case "network":
-      if (view !== "ledger") return filterToggleActions(subject.id, s.filter);
+      if (view !== "ledger") return filterToggleActions(subject.id, s.filter, s.railNet);
       if (!tick) return null;
       return tickNetSelectActions(subject.id, { kind: "snapshot", title: `Global snapshot #${tick.ordinal}`, data: tick }, {
         metaSnap: s.metaSnap,

@@ -319,6 +319,12 @@ describe("viewEntryActions (a carried node's ancestry in the destination view)",
 });
 
 describe("filterToggleActions (the remaining rail interaction)", () => {
+  it("re-picking the filter's own network while browsing ends the browse and keeps the filter", () => {
+    expect(filterToggleActions("dor", "dor", "usdc")).toEqual([{ kind: "railNet", id: null }]);
+    expect(filterToggleActions("bio", "dor", "usdc")).toEqual([{ kind: "filter", id: "bio" }]);
+    expect(filterToggleActions("all", "all", "usdc")).toEqual([{ kind: "railNet", id: null }]);
+  });
+
   it("the filter picker's committed-row rule: re-picking steps back to 'all'; 'all' never toggles", () => {
     expect(filterToggleActions("dor", "all")).toEqual([{ kind: "filter", id: "dor" }]);
     expect(filterToggleActions("dor", "dor")).toEqual([{ kind: "filter", id: "all" }]);

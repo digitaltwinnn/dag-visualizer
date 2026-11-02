@@ -60,7 +60,7 @@ export default function HyperExplore() {
   const setHoverGroup = useStore((s) => s.setHoverGroup);
 
   // The three writes, all through the decision table and the one executor (rule 2).
-  const toggleNetwork = (id: string) => applyClickActions(filterToggleActions(id, appFilter));
+  const toggleNetwork = (id: string) => applyClickActions(filterToggleActions(id, appFilter, railNet));
   // Home releases what the view stands on: a browsed network first, the filter after it.
   const releaseNetwork = () => applyClickActions(railNet ? [{ kind: "railNet", id: null }] : filterToggleActions(appFilter, appFilter));
   const toggleComposition = (compKey: string) =>

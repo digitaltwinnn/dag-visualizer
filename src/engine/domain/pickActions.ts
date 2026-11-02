@@ -221,7 +221,9 @@ export function viewEntryActions(opts: {
 // The network-filter TOGGLE — the FilterPicker's committed-row rule: picking the committed
 // metagraph again steps back to "all" (one toggle language everywhere); "all" itself never
 // toggles off.
-export function filterToggleActions(id: string, currentFilter: string): ClickAction[] {
+export function filterToggleActions(id: string, currentFilter: string, railNet: string | null = null): ClickAction[] {
+  // Browsing, the filter's own network is the way back (`railNetActions`), not a re-pick.
+  if (railNet != null && id === currentFilter) return [{ kind: "railNet", id: null }];
   return [{ kind: "filter", id: id !== "all" && id === currentFilter ? "all" : id }];
 }
 
