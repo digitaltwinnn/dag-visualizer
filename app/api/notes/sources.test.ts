@@ -45,6 +45,9 @@ function fakeReads(over: Partial<NoteReads> = {}): NoteReads & { calls: Call[]; 
       geoCalls.push({ from, to });
       return { geoDays: { "2026-10-27": { "f.cc.DE": 3, "f.cc.dag.FR": 1 } }, providerNames: { hetzner: "Hetzner" } };
     },
+    async chainReads() {
+      return {};
+    },
     ...over,
   };
 }
@@ -435,6 +438,9 @@ describe("factsFor — the per-view read table", () => {
     };
     const geoField = (cc: Record<string, number>) => Object.fromEntries(Object.entries(cc).map(([c, n]) => [`f.cc.${c}`, n]));
     const reads: NoteReads = {
+      async chainReads() {
+        return {};
+      },
       async geoDays(_n, from) {
         return { geoDays: Object.fromEntries(daysIn(from).map((t) => [new Date(t).toISOString().slice(0, 10), geoField(level(t))])), providerNames: {} };
       },
@@ -573,5 +579,12 @@ describe("the store reads", () => {
     await reads.span("mainnet", "1d", NOW - 30 * D, NOW);
     await reads.span("mainnet", "1d", NOW - 60 * D, NOW - 30 * D);
     expect(n).toBe(1); // one year hash, read once
+  });
+
+  it("storeReads answers each chain's last read from the cursor hash", async () => {
+    const asked: string[] = [];
+    const store = { async hgetall(key: string) { asked.push(key); return { g: "1", "read.dor": "1000" }; } };
+    expect(await storeReads(NOW, store).chainReads("mainnet")).toEqual({ dor: 1000 });
+    expect(asked).toEqual(["t:mainnet:cursor"]);
   });
 });

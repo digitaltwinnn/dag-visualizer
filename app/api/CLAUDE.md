@@ -57,7 +57,10 @@ them — but the Next Node server can.
   (TTL_S all-null; the finite era's pending expiries were PERSISTed away one-time); history's
   FLOORS — where fine grain begins to exist — live in `src/data/trendWindow.ts` TIER_SINCE; **`/api/trends/sample`** is the Vercel-Cron sampler (15 min,
   `CRON_SECRET` auth) that pages the explorer stream since a Redis cursor and
-  merge-writes 5m/1h/1d hash tiers. It also samples the UNLISTED chains — the explorer's `/currency`
+  merge-writes 5m/1h/1d hash tiers. The cursor hash also keeps `read.<id>`, when a run last read
+  each catalog chain, new records or none: the cursor itself only moves on a record, so this is the
+  one thing that tells a silent chain from a failed one (a note states silence only past it,
+  `chainReadThrough`). It also samples the UNLISTED chains — the explorer's `/currency`
   list less every tracked address — for their own counts, outside the fee/size floors, marking the
   buckets it measured them in with `u.cov` (History's unlisted figure is measured, not derived).
   **Where the fleet runs has its own key family** (2026-10-27): once an hour, beside the fleet

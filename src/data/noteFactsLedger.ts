@@ -1,4 +1,4 @@
-import { fact, networksAnchored } from "@/src/data/noteFacts";
+import { chainReadThrough, fact, networksAnchored, spanMeasured, type ChainReads } from "@/src/data/noteFacts";
 import { eventChange, largestSnapshotChange, longestGapChange, pickChanges, rhythmChange, withExtremes } from "@/src/data/noteChanges";
 import type { Fact, FactPair, NoteChange, NoteLead } from "@/src/data/noteTypes";
 import { anchorSeries, formatDag, globalSeries, metricSeries, spanAverage, TREND_METRICS, trimCounterEdges, unlistedUnmeasured, withUnlisted } from "@/src/data/trendSeries";
@@ -53,9 +53,15 @@ export interface LedgerFactsInput {
   recent: TrendsWindowData; // last 24 hours of the 5m tier (store, unfolded)
   week: TrendsWindowData; // last 7 days of the 1h tier (store, unfolded)
   names: Record<string, string>; // catalog id → display name
+  chainReads?: ChainReads | null; // when the sampler last read each chain
 }
 
 const HOURS_PER_DAY = 24;
+
+/** A day is an event only for a network with a daily rhythm: a day without a snapshot from one that
+ *  anchors at least this many a day, or this many from one silent all week. Below it the day reads
+ *  by chance: one snapshot every few days "went quiet" on most days and "became active" on the rest. */
+const EVENT_MIN_SNAPS = 3;
 
 /** A pair's recent reading this far (as a ratio of its usual one) from 1 is a change worth leading
  *  with; under it, the note leads with the reading itself (R71). */
@@ -225,6 +231,7 @@ export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: st
   const events: NoteChange[] = [];
   const paces: NoteChange[] = [];
   if (whole && weekCovered) {
+    const dayMeasured = spanMeasured(trimmed(recent.series["g.ticks"] ?? [], recent), recent.stepMs);
     for (const id of ids) {
       const snaps = (d: TrendsWindowData) => metricSeries("snapshots", id, d.series).points;
       const total = (d: TrendsWindowData) => trimmed(snaps(d), d).reduce<number>((a, v) => a + (v ?? 0), 0);
@@ -233,8 +240,10 @@ export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: st
       const now = total(recent);
       const usual = total(week);
       const name = catalog[id] ?? id;
-      if (usual > 0 && now === 0) events.push(eventChange(name, "quiet", subject));
-      else if (now > 0 && usual <= now) events.push(eventChange(name, "active", subject)); // the week's snapshots are all the day's
+      const sure = dayMeasured && chainReadThrough(input.chainReads, id, recent.now);
+      const daily = spanAverage("snapshots", trimmed(snaps(week), week), week.stepMs) ?? 0;
+      if (sure && now === 0 && daily >= EVENT_MIN_SNAPS) events.push(eventChange(name, "quiet", subject));
+      else if (sure && now >= EVENT_MIN_SNAPS && usual <= now) events.push(eventChange(name, "active", subject)); // the week's snapshots are all the day's
       else {
         const change = rhythmChange(name, spacing(week) ?? 0, spacing(recent) ?? 0, subject);
         if (change) paces.push(change);

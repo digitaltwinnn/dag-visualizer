@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { slotOf, fieldOf, slotsInWindow, stepMsOf, cursorKeyOf, lockKeyOf, geoSitesSlotOf, geoSlotOf, ispNamesKeyOf, TTL_S } from "./keys";
+import { chainReadField, chainReadsOf, slotOf, fieldOf, slotsInWindow, stepMsOf, cursorKeyOf, lockKeyOf, geoSitesSlotOf, geoSlotOf, ispNamesKeyOf, TTL_S } from "./keys";
 
 const T = Date.UTC(2026, 8, 6, 14, 37, 22); // 2026-09-06T14:37:22Z
 
@@ -48,5 +48,17 @@ describe("the geo family", () => {
   });
   it("keeps provider names beside it, per network", () => {
     expect(ispNamesKeyOf("mainnet")).toBe("geo:mainnet:isp");
+  });
+});
+
+// Silence is only measured where the chain was read (notes, the review of 2026-11-02): a chain with
+// nothing new and a chain that failed leave the same store otherwise.
+describe("chainReadsOf", () => {
+  it("collects each chain's last read from the cursor hash, and nothing else", () => {
+    expect(chainReadsOf({ v: "1", g: "102", "m.abc": "9", [chainReadField("abc")]: "1000", [chainReadField("def")]: 2000 })).toEqual({ abc: 1000, def: 2000 });
+  });
+  it("is empty for a store with no cursor, and for one from before the first run that keeps a read", () => {
+    expect(chainReadsOf(null)).toEqual({});
+    expect(chainReadsOf({ v: "1", g: "102" })).toEqual({});
   });
 });

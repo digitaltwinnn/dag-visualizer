@@ -1,7 +1,7 @@
 import { UNLISTED_ID } from "@/src/data/unlistedId";
 import { utcDayKey } from "@/src/util/localTime";
 import { roleKey } from "@/src/data/composition";
-import { fact } from "@/src/data/noteFacts";
+import { fact, type ChainReads } from "@/src/data/noteFacts";
 import { bannedWords, undash } from "@/src/data/noteHonesty";
 import { geoFacts } from "@/src/data/noteFactsGeo";
 import { comboWords, hyperFacts } from "@/src/data/noteFactsHyper";
@@ -12,7 +12,7 @@ import type { Fact, NotableDay, NoteChange, NoteView, NoteLead } from "@/src/dat
 import { leadingTrim, pickRangeTier, type TrendsWindowData } from "@/src/data/trendWindow";
 import { CATALOG, type NetworkId } from "@/src/engine/config";
 import { assembleSpan, WINDOWS } from "../trends/assemble";
-import { geoSitesSlotOf, geoSlotOf, ispNamesKeyOf, slotsInWindow, type Tier } from "../trends/keys";
+import { chainReadsOf, cursorKeyOf, geoSitesSlotOf, geoSlotOf, ispNamesKeyOf, slotsInWindow, type Tier } from "../trends/keys";
 import { readStore, type TrendsStore } from "../trends/store";
 import { CC_TAIL_RE, ISP_TAIL_RE, TYPE_TAIL_RE, isSubjectNote, subjectKindOf, type NoteSpan, type SubjectKind } from "./keys";
 
@@ -53,6 +53,8 @@ export interface GeoDaysRead {
 export interface NoteReads {
   span(net: string, tier: Tier, fromMs: number, toMs: number): Promise<TrendsWindowData>;
   geoDays(net: string, fromMs: number, toMs: number): Promise<GeoDaysRead>;
+  /** When the sampler last read each chain. */
+  chainReads(net: string): Promise<ChainReads>;
 }
 
 /** ONE TIER over [fromMs, toMs): the tile route's body, at any span. */
@@ -144,6 +146,7 @@ export function storeReads(nowMs: number, store: HashReader = readStore()): Note
   return {
     span: (net, tier, fromMs, toMs) => readSpan(net, tier, fromMs, toMs, once, nowMs),
     geoDays: (net, fromMs, toMs) => readGeoDays(net, fromMs, toMs, once),
+    chainReads: async (net) => chainReadsOf(await once.hgetall(cursorKeyOf(net))),
   };
 }
 
@@ -358,8 +361,12 @@ async function readTrend(c: Ctx): Promise<Read | null> {
   }
   // The whole daily record, for what a silent span can still say (`trendFacts`): always the unlisted
   // set's, and a network's only when its span is silent, so an active note reads nothing more.
-  const history = subject === UNLISTED_ID || trendSilent(subject, cur) ? await reads.span(net, "1d", nowMs - WINDOWS.all.ms, nowMs) : null;
-  const built = trendFacts({ subject, zoom, span: { fromMs, toMs }, cur, prev, daily, history, shape: facet, names: c.names, blurbs: c.blurbs });
+  const silent = trendSilent(subject, cur);
+  const [history, chainReads] = await Promise.all([
+    subject === UNLISTED_ID || silent ? reads.span(net, "1d", nowMs - WINDOWS.all.ms, nowMs) : null,
+    silent ? reads.chainReads(net) : null,
+  ]);
+  const built = trendFacts({ subject, zoom, span: { fromMs, toMs }, cur, prev, daily, history, chainReads, shape: facet, names: c.names, blurbs: c.blurbs });
   return {
     built,
     spanFrom: fromMs,
@@ -435,11 +442,12 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
     async read({ net, subject, nowMs, reads, names }) {
       const recentFrom = nowMs - 24 * H;
       const weekFrom = nowMs - 7 * D;
-      const [recent, week] = await Promise.all([
+      const [recent, week, chainReads] = await Promise.all([
         reads.span(net, "5m", recentFrom, nowMs),
         reads.span(net, "1h", weekFrom, nowMs),
+        reads.chainReads(net),
       ]);
-      const built = ledgerFacts({ subject, recent, week, names });
+      const built = ledgerFacts({ subject, recent, week, names, chainReads });
       return {
         built,
         spanFrom: recentFrom,

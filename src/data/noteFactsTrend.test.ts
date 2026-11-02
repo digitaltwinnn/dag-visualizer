@@ -585,6 +585,13 @@ describe("a network's silent span", () => {
     expect(trendSilent("bio", win(7, week(2)))).toBe(false);
   });
 
+  it("has no facts where the sampler could not read the chain: an absence is not a measured zero", () => {
+    const to = input({}).span.toMs;
+    const asked = (chainReads: Record<string, number>) => trendFacts(input({ subject: "bio", cur: win(7, week(2, quiet)), prev: null, chainReads }));
+    expect(asked({ bio: to - 3 * 3_600_000 })).toBeNull();
+    expect(asked({ bio: to })).not.toBeNull();
+  });
+
   it("is never the hypergraph's, or the unlisted set's, which has its own rule", () => {
     expect(trendSilent("dag", win(7, week(2, { "g.anchors": row(7, () => 0) })))).toBe(false);
     expect(trendSilent("unlisted", win(7, week(2)))).toBe(false);

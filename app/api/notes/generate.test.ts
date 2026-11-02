@@ -456,6 +456,7 @@ describe("the span length reaches the model and backs its window (R20)", () => {
   const reads: NoteReads = {
     span: async (_n, tier, from, to) => covered(tier === "1d" ? D : tier === "1h" ? H : 300_000, from, to),
     geoDays: async () => ({ geoDays: {}, providerNames: {} }),
+    chainReads: async () => ({}),
   };
 
   it("a 7d History note saying \"the last 7 days\" passes the gate", async () => {

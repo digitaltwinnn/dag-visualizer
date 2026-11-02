@@ -77,6 +77,21 @@ export function slotsInWindow(
 export function cursorKeyOf(net: string): string {
   return `t:${net}:cursor`;
 }
+
+/** The cursor hash's field for when a run last READ a catalog chain, new records or none. Silence
+ *  needs it: the cursor itself only moves on a record, so a chain with nothing new and a chain that
+ *  failed leave the store the same, and the read route zero-fills both. */
+export const chainReadField = (id: string): string => `read.${id}`;
+
+/** Each chain's last read (ms), from the cursor hash. */
+export function chainReadsOf(cursor: Record<string, string | number> | null): Record<string, number> {
+  const reads: Record<string, number> = {};
+  for (const [field, at] of Object.entries(cursor ?? {})) {
+    const id = /^read\.(.+)$/.exec(field)?.[1];
+    if (id) reads[id] = Number(at);
+  }
+  return reads;
+}
 export function lockKeyOf(net: string): string {
   return `t:${net}:lock`;
 }

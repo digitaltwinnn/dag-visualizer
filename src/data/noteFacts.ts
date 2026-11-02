@@ -109,6 +109,29 @@ export function networksAnchored(
   return active ? { count: listed + 1, atLeast: true } : { count: listed, atLeast: false };
 }
 
+/** How far behind a span's end the sampler may stand and the span still count as read: two of its
+ *  15-minute runs, one still to come and one late. */
+export const READ_SLACK_MS = 30 * 60_000;
+
+/** When the sampler last read each catalog chain (`read.<id>` in the cursor hash). */
+export type ChainReads = Readonly<Record<string, number>>;
+
+/** WHETHER A CHAIN'S SILENCE IS MEASURED (rule 10). The spine says the sampler ran, not that this
+ *  chain answered, and the store reads a failed chain and a silent one the same. Past spans stay
+ *  whole, since a later read catches them up, so it is the span's end that must be read. No read on
+ *  record leaves the store's word standing: the first run that keeps one, or a chain not sampled. */
+export function chainReadThrough(reads: ChainReads | null | undefined, id: string, toMs: number): boolean {
+  const at = reads?.[id];
+  return at == null || at >= toMs - READ_SLACK_MS;
+}
+
+/** Whether the spine covered a whole span, apart from the tail the sampler has yet to reach. */
+export function spanMeasured(ticks: readonly (number | null)[], stepMs: number): boolean {
+  const last = ticks.findLastIndex((v) => v != null);
+  if (last < 0 || (ticks.length - 1 - last) * stepMs > READ_SLACK_MS) return false;
+  return ticks.slice(0, last).every((v) => v != null);
+}
+
 export function median(xs: readonly number[]): number {
   const s = xs.slice().sort((a, b) => a - b);
   const m = s.length >> 1;

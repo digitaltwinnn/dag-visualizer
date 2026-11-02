@@ -10,7 +10,7 @@
 // dies mid-write-phase leaves the store exactly as it was — no key half-updated, no cursor
 // advanced past data that didn't land — so the NEXT run's hmget reads are still consistent
 // with what actually got merged, and nothing double-counts.
-import { TTL_S, cursorKeyOf, lockKeyOf, ispNamesKeyOf, slotOf, fieldOf, type Tier } from "./keys";
+import { TTL_S, chainReadField, cursorKeyOf, lockKeyOf, ispNamesKeyOf, slotOf, fieldOf, type Tier } from "./keys";
 import { mergeVals } from "./merge";
 import {
   bucketGlobals, bucketMetas, bucketFleet, bucketFleetGeo, markUnlistedCoverage,
@@ -88,6 +88,7 @@ export async function runSample(deps: SampleDeps): Promise<SampleResult> {
       const s = settled[i];
       if (s.status === "rejected") { metaErrors.push(ids[i]); continue; }
       const { id, r } = s.value;
+      if (!unlistedSet.has(id)) cursorNext[chainReadField(id)] = deps.now();
       if (r.recs.length) {
         // The per-chain gap chain rides its own timestamp cursor; an accepted gap breaks the
         // chain (null) exactly as the global spine's does.

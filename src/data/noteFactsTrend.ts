@@ -1,4 +1,4 @@
-import { fact, gaugeChange, networksAnchored } from "@/src/data/noteFacts";
+import { chainReadThrough, fact, gaugeChange, networksAnchored, type ChainReads } from "@/src/data/noteFacts";
 import { NOTABLE_CAPS, NOTABLE_FLOOR, notableDays, rangeExtremes } from "@/src/data/notableDays";
 import type { Fact, NotableDay } from "@/src/data/noteTypes";
 import { formatDag, globalSeries, lastSeen, METRIC_ORDER, metricLabel, metricSeries, spanAverage, trimCounterEdges, TREND_METRICS, unlistedUnmeasured, withUnlisted } from "@/src/data/trendSeries";
@@ -57,6 +57,8 @@ export interface TrendFactsInput {
   /** The unlisted set only: the whole daily record, so a silent span can say when the set last
    *  anchored and how many chains ever have (store, unfolded). */
   history?: TrendsWindowData | null;
+  /** When the sampler last read each chain, for a silent span (`chainReadThrough`). */
+  chainReads?: ChainReads | null;
   /** THE SPAN FACET (`<net>/span`): the span's busiest, quietest and typical day, by those names,
    *  in place of the notable days. Left to pick them out of the notable days the model called a
    *  chain's thin last day the busiest (live 2026-10-30), and the gate checks figures, not meaning. */
@@ -141,6 +143,7 @@ const STOPPED_MS = 3 * DAY_MS;
 
 /** Whether a network anchored nothing in a span. Absent reads as zero, the picker's own rule: the
  *  spine measured the span, and the hourly tiers store no key for a network with nothing to say.
+ *  That the sampler reached this chain is `chainReadThrough`'s question, not this one's.
  *  The hypergraph is never silent here, and the unlisted set has its own rule below. */
 export const trendSilent = (subject: string, cur: TrendsWindowData): boolean =>
   subject !== "dag" && subject !== UNLISTED_ID && !metricSeries("snapshots", subject, cur.series).points.some((v) => (v ?? 0) > 0);
@@ -154,6 +157,9 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
   const cur = fold(input.cur);
   const prev = input.prev && fold(input.prev);
   if (!(cur.series["g.ticks"] ?? []).some((v) => v != null)) return null;
+  // Silent by the store, but the sampler never reached the chain: nothing is known of the span, so
+  // it stays an instrument state (rule 10). The silence below is a measured one.
+  if (trendSilent(subject, cur) && !chainReadThrough(input.chainReads, subject, span.toMs)) return null;
   const perDay = span.toMs - span.fromMs >= DAY_MS;
 
   const dag = subject === "dag";

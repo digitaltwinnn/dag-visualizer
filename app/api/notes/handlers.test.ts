@@ -507,7 +507,7 @@ describe("a warm pass reads the store once", () => {
     vi.stubEnv("NOTES_STORE", "memory");
     const span = vi.fn(async () => { throw new Error("stop here"); });
     const geoDays = vi.fn(async () => { throw new Error("stop here"); });
-    const d = liveWarmDeps({ span, geoDays });
+    const d = liveWarmDeps({ span, geoDays, chainReads: async () => ({}) });
     await d.facts("mainnet", "ledger", "all", "hours", 1).catch(() => null);
     expect(span).toHaveBeenCalledTimes(2); // this note's two windows
     await d.digest(1).catch(() => null);

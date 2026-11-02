@@ -1,7 +1,42 @@
 import { describe, it, expect } from "vitest";
-import { capitalFirst, fact, factsBlock, gaugeChange, heldLevel, median, networksAnchored, observedLevel, sayAll, spellDurations } from "@/src/data/noteFacts";
+import { READ_SLACK_MS, capitalFirst, chainReadThrough, fact, factsBlock, gaugeChange, heldLevel, median, networksAnchored, observedLevel, sayAll, spanMeasured, spellDurations } from "@/src/data/noteFacts";
 import { checkNote } from "@/src/data/noteHonesty";
 import { formatDag } from "@/src/data/trendSeries";
+
+describe("chainReadThrough", () => {
+  const TO = 1_000_000_000;
+  it("needs the sampler to have read the chain up to the span's end", () => {
+    expect(chainReadThrough({ dor: TO }, "dor", TO)).toBe(true);
+    expect(chainReadThrough({ dor: TO + 1 }, "dor", TO)).toBe(true);
+    expect(chainReadThrough({ dor: TO - READ_SLACK_MS - 1 }, "dor", TO)).toBe(false);
+  });
+  it("allows the runs still to come", () => {
+    expect(chainReadThrough({ dor: TO - READ_SLACK_MS }, "dor", TO)).toBe(true);
+  });
+  it("takes the store's word where no read was kept: before the first run that keeps one, or a chain it does not sample", () => {
+    expect(chainReadThrough(null, "dor", TO)).toBe(true);
+    expect(chainReadThrough(undefined, "dor", TO)).toBe(true);
+    expect(chainReadThrough({ bio: TO }, "dor", TO)).toBe(true);
+  });
+});
+
+describe("spanMeasured", () => {
+  const STEP = 300_000;
+  it("is a span the spine covered, its unsampled tail aside", () => {
+    expect(spanMeasured([1, 1, 1], STEP)).toBe(true);
+    expect(spanMeasured([1, 1, null, null], STEP)).toBe(true);
+  });
+  it("is not a span with a hole in it", () => {
+    expect(spanMeasured([1, null, 1], STEP)).toBe(false);
+  });
+  it("is not a span whose tail outran the sampler", () => {
+    expect(spanMeasured([1, ...Array(READ_SLACK_MS / STEP + 1).fill(null)], STEP)).toBe(false);
+  });
+  it("is not an empty span", () => {
+    expect(spanMeasured([], STEP)).toBe(false);
+    expect(spanMeasured([null], STEP)).toBe(false);
+  });
+});
 
 describe("median", () => {
   it("takes the middle value, or the mean of the two middle ones, leaving its input alone", () => {

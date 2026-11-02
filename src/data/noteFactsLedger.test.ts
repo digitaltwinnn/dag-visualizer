@@ -256,6 +256,37 @@ describe("ledgerFacts' notable changes", () => {
     }))!;
     expect(r.changes?.slice(0, 2).map((c) => c.text)).toEqual(["BioFi went quiet", "USDC.dag sped up: a snapshot every 20 seconds, usually 1 minute"]);
   });
+  // A DAY IS ONLY AN EVENT WHERE THE NETWORK HAS A DAILY RHYTHM (the review, 2026-11-02).
+  const quietDay = side(74, 5 * MIN, 20, { "m.bio.snaps": row(74, () => 0), "m.bio.ticks": row(74, () => 0) });
+  const texts = (r: ReturnType<typeof ledgerFacts>) => r!.changes?.map((c) => c.text) ?? [];
+  it("no 'went quiet' for a network that anchors every few days", () => {
+    const sparse = weekSide({ "m.bio.snaps": row(168, (i) => (i % 72 === 0 ? 1 : 0)), "m.bio.ticks": row(168, () => 0) });
+    expect(texts(ledgerFacts(input({ recent: quietDay, week: sparse })))).not.toContain("BioFi went quiet");
+  });
+  it("no 'became active' for a network's one snapshot of the week", () => {
+    const one = (n: number, at: number) => ({ "m.bio.snaps": row(n, (i) => (i === at ? 1 : 0)), "m.bio.ticks": row(n, () => 0) });
+    const r = ledgerFacts(input({ recent: side(74, 5 * MIN, 20, one(74, 30)), week: weekSide(one(168, 160)) }));
+    expect(texts(r)).not.toContain("BioFi became active");
+  });
+  it("'became active' for a network that opened the week today", () => {
+    const three = (n: number, at: number) => ({ "m.bio.snaps": row(n, (i) => (i === at ? 3 : 0)), "m.bio.ticks": row(n, () => 0) });
+    const r = ledgerFacts(input({ recent: side(74, 5 * MIN, 20, three(74, 30)), week: weekSide(three(168, 160)) }));
+    expect(texts(r)).toContain("BioFi became active");
+  });
+  it("no 'went quiet' over a day the spine has a hole in: an unmeasured bucket is not a zero", () => {
+    const holed = { ...quietDay, series: { ...quietDay.series, "g.ticks": row(74, (i) => (i === 30 ? null : 20)) } };
+    expect(texts(ledgerFacts(input({ recent: holed, week: weekSide({}) })))).not.toContain("BioFi went quiet");
+  });
+  it("no 'went quiet' for a chain the sampler has not been able to read", () => {
+    const at = quietDay.now;
+    expect(texts(ledgerFacts(input({ recent: quietDay, week: weekSide({}), chainReads: { bio: at - 3 * 3_600_000 } })))).not.toContain("BioFi went quiet");
+    expect(texts(ledgerFacts(input({ recent: quietDay, week: weekSide({}), chainReads: { bio: at } })))).toContain("BioFi went quiet");
+  });
+  it("gives every row to what moved before the chamber's extremes", () => {
+    const stopped = { "m.bio.snaps": row(74, () => 0), "m.bio.ticks": row(74, () => 0), "m.usdc.snaps": row(74, () => 0), "m.usdc.ticks": row(74, () => 0), "m.usdc.gapMax": row(74, () => 90) };
+    const r = ledgerFacts(input({ recent: side(74, 5 * MIN, 20, stopped), week: weekSide({}) }))!;
+    expect(r.changes?.slice(0, 2).map((c) => c.kind)).toEqual(["quiet", "quiet"]);
+  });
   // THE CHAMBER'S EXTREMES (user, 2026-11-01): a day where nothing moved still has a largest snapshot.
   it("the usual rhythm still names the longest gap", () => {
     expect(ledgerFacts(input())!.changes).toEqual([
