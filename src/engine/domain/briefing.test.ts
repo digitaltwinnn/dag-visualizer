@@ -3,6 +3,14 @@ import { BRIEFING_COVER, BRIEFING_LAND_MAX_MS, BRIEFING_NO_MOTION_MS, BRIEFING_P
 
 const on = { pathname: "/", net: "mainnet", seen: false };
 
+describe("how long a stop stands", () => {
+  // user, 2026-11-02: 4.9 seconds asked 21 to 25 characters a second of the live lines, past a subtitle's 20.
+  it("reads a line of the longest kind at a subtitle's pace", () => {
+    expect(STOP_MS).toBe(6000);
+    expect(122 / (STOP_MS / 1000)).toBeLessThanOrEqual(20.5);
+  });
+});
+
 describe("the tour's route", () => {
   it("visits every 3D view, starting on the globe", () => {
     expect(BRIEFING_STOPS).toEqual(["geo", "ledger", "hyper", "trend"]);
@@ -59,7 +67,6 @@ describe("the tour's words", () => {
   });
 
   it("stand for the stop the user chose, brisker than subtitle pace on the longest line", () => {
-    expect(STOP_MS).toBe(4875);
     expect(LINE_MAX / (STOP_MS / 1000)).toBeLessThan(30);
   });
 });
