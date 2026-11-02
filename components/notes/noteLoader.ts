@@ -18,6 +18,8 @@ import type { NoteResponse, NoteView } from "@/src/data/noteTypes";
 //     joining a write already in flight hears it at once.
 //   · A network error, a non-2xx (the POST's 429 included) or an unreadable body is `unavailable`,
 //     and is NOT cached, so the next ask tries again.
+//   · A card left open re-reads past the hold (`useNote`), on a clock and on coming back to the tab,
+//     so a long-open tab follows its note instead of showing an old one as current.
 //   · `request()` POSTs on the reader's ask: a door, or a subject card's automatic ask on
 //     selection (`SubjectNote`). The POST's own answer is used and stored
 //     under the GET's key (this loader holds a GET `request` answer for TTL_MS, so re-reading it
@@ -37,6 +39,8 @@ export const RETRY_MS = 3_000;
 export const MAX_RETRIES = 20;
 /** Matches the read route's own `s-maxage`. */
 export const TTL_MS = 300_000;
+/** How often a card left open re-reads its note: just past the hold, so the read reaches the route. */
+export const REREAD_MS = TTL_MS + 5_000;
 
 const RANGE_RE = /^r(\d{1,15})-(\d{1,15})$/;
 const STATES = new Set(["ok", "pending", "none", "unavailable", "request"]);
@@ -58,6 +62,13 @@ export function bodyOf(req: NoteReq): Record<string, unknown> {
   const range = req.span ? RANGE_RE.exec(req.span) : null;
   if (range) return { view: req.view, subject: req.subject, fromMs: Number(range[1]), toMs: Number(range[2]) };
   return { view: req.view, subject: req.subject, span: req.span ?? undefined };
+}
+
+/** What a card left open shows after a re-read: the answer, unless it is a failed read over a note
+ *  (a blip must not blank a card, and the next re-read tries again), or a write is under way. */
+export function afterReread(held: NoteResponse | null, next: NoteResponse): NoteResponse | null {
+  if (held?.state === "pending") return held;
+  return next.state === "unavailable" && held?.state === "ok" ? held : next;
 }
 
 export interface NoteLoaderDeps {

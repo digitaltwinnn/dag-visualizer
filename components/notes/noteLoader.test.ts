@@ -1,6 +1,7 @@
+import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 import type { NoteResponse } from "@/src/data/noteTypes";
-import { bodyOf, createNoteLoader, MAX_RETRIES, queryOf, RETRY_MS, TTL_MS, type NoteReq } from "./noteLoader";
+import { afterReread, bodyOf, createNoteLoader, MAX_RETRIES, queryOf, REREAD_MS, RETRY_MS, TTL_MS, type NoteReq } from "./noteLoader";
 
 const OK: NoteResponse = { state: "ok", text: "Two sentences.", writtenAt: 1, spanFrom: 0, spanTo: 2, days: [] };
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
@@ -196,5 +197,37 @@ describe("watch", () => {
     loader.watch(queryOf(REQ), (r) => heard.push(r))();
     await loader.request(REQ);
     expect(heard).toEqual([]);
+  });
+});
+
+// A card left open follows its note (the review, 2026-11-02): a tab stays open for hours, and the
+// note's own words say "over the last 24 hours".
+describe("a card left open", () => {
+  const note = { state: "ok", text: "Old.", writtenAt: 1, spanFrom: 0, spanTo: 1, days: [] } as NoteResponse;
+  const newer = { ...note, text: "New." } as NoteResponse;
+  const hook = readFileSync("components/notes/useNote.ts", "utf8");
+
+  it("re-reads past the loader's hold, so a re-read never lands on the held answer", () => {
+    expect(REREAD_MS).toBeGreaterThan(TTL_MS);
+  });
+
+  it("takes the newer note, and whatever replaced a note that is gone", () => {
+    expect(afterReread(note, newer)).toBe(newer);
+    expect(afterReread(note, { state: "request" })).toEqual({ state: "request" });
+    expect(afterReread({ state: "unavailable" }, newer)).toBe(newer);
+  });
+
+  it("keeps its note through a failed read", () => {
+    expect(afterReread(note, { state: "unavailable" })).toBe(note);
+  });
+
+  it("leaves a card alone while its note is being written", () => {
+    expect(afterReread({ state: "pending" }, newer)).toEqual({ state: "pending" });
+  });
+
+  it("re-reads on a clock and on coming back to the tab, never in a hidden one", () => {
+    expect(hook).toMatch(/setInterval\(reread, REREAD_MS\)/);
+    expect(hook).toMatch(/addEventListener\("visibilitychange", reread\)/);
+    expect(hook).toMatch(/if \(document\.hidden\) return;/);
   });
 });

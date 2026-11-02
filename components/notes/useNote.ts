@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { NoteVia } from "@/components/railCards";
 import type { NoteResponse } from "@/src/data/noteTypes";
 import { netUrl } from "@/src/net/current";
-import { createNoteLoader, queryOf, type NoteReq } from "./noteLoader";
+import { afterReread, createNoteLoader, queryOf, REREAD_MS, type NoteReq } from "./noteLoader";
 
 // The AI note, client side. NOT a network feed (no `FEEDS` row, no `useFeedRead`): it is written
 // context, fetched per subject. The fetch / poll / give-up rules live in `noteLoader.ts`; this is
@@ -57,6 +57,26 @@ export default function useNote(req: NoteReq | null): NoteState {
     });
     return () => {
       dead = true;
+    };
+  }, [key, view, subject, span]);
+
+  // A CARD LEFT OPEN FOLLOWS ITS NOTE (the review, 2026-11-02): the app is a long-lived tab, the card
+  // says "over the last 24 hours", and nothing else asks again until the subject changes.
+  useEffect(() => {
+    if (!view || !subject || key == null) return;
+    let dead = false;
+    const reread = () => {
+      if (document.hidden) return;
+      void loader.get({ view, subject, span }).then((r) => {
+        if (!dead) setState((prev) => (prev.key === key ? { key, res: afterReread(prev.res, r), via: prev.via } : prev));
+      });
+    };
+    const clock = setInterval(reread, REREAD_MS);
+    document.addEventListener("visibilitychange", reread);
+    return () => {
+      dead = true;
+      clearInterval(clock);
+      document.removeEventListener("visibilitychange", reread);
     };
   }, [key, view, subject, span]);
 
