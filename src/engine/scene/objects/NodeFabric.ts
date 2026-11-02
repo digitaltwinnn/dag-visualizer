@@ -610,8 +610,8 @@ export class NodeFabric {
         _dummy.position.copy(dir).multiplyScalar(lerp(u.hyperRadius, u.geoRadius, e));
       }
 
-      // Off-filter nodes SHRINK AWAY on the globe and merely mute in hyper — dimModel.hideFrac
-      // owns that split. It reads the RAW ramp, not the resolved dim, so the two knobs are
+      // How far an off-filter node shrinks is dimModel.hideFrac, 0 in every view today. It reads the
+      // RAW ramp, not the resolved dim, so the two knobs are
       // independent (and the country drill's mute can never shrink a node — lens, not filter).
       // dimModel.gatherRaw releases that ramp along the gather flight, so the parked squares show
       // the whole fleet at full size AND full brightness — the glow loop reads the same hatch.
@@ -782,8 +782,8 @@ export class NodeFabric {
       // makes (user, 2026-08-11: one node model), raised by the country dim when outside the
       // drilled-into country (geo only); LEDGER forces its flat row value (morph frozen).
       const dEff = nodeDim(c, rawEff, geoCc);
-      // dimModel.hideFrac: how far an off-filter node SHRINKS AWAY — 1 on the globe (the isolate),
-      // 0 in hyper, where a turned-up dim mutes in place at full size. It reads the RAW ramp, not
+      // dimModel.hideFrac: how far an off-filter node shrinks, 0 in every view today, so a dim mutes
+      // in place at full size. It reads the RAW ramp, not
       // dEff, so `dim` and `hide` move one effect each.
       const vis = 1 - hideFrac(c, rawEff);
       // NO FILTER LIFT (hubMatchBoost retired 2026-08-30 — see the validator loop and dimModel).

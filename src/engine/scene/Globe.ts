@@ -991,7 +991,7 @@ export class Globe implements GeoViewHost {
     }
 
     // Build a pool per site×network ALWAYS (all nodes, each tagged with its network + identity hue);
-    // the committed filter just SHOWS/HIDES pools (setFilter → _applyGlowFilter), no recluster needed.
+    // the committed filter just mutes pools (setFilter → _applyGlowFilter), no recluster needed.
     const dagHex = this.sceneColors?.dag ?? this.geoColor;
     const metaHex = (id: string) => this.sceneColors?.[id] ?? this.geoColor;
 
@@ -1030,6 +1030,7 @@ export class Globe implements GeoViewHost {
       this._densityGlow.push(mesh);
     }
     this._applyGlowFilter();
+    for (const m of this._densityGlow) m.userData.scopeNow = m.userData.scope; // a rebuild is no scope change, so nothing eases
   }
 
   // Mute the pools off the network in scope ("all" keeps every pool) — a cheap target, so a filter
@@ -1052,7 +1053,7 @@ export class Globe implements GeoViewHost {
     return this._hoverSel != null;
   }
 
-  // Isolate one network on the globe and dim the rest.
+  // Stand the globe on one network and dim the rest.
   setFilter(sel: string): void {
     this.filter = sel;
     this.countryFilter = null; // switching network clears the country drill-down
@@ -1060,7 +1061,7 @@ export class Globe implements GeoViewHost {
     this._updateCountryBorder();
     this._applyDim(this._selector(), this._previewing()); // a live hover preview survives a data rebuild's re-apply
     this._relayoutGeo();
-    this._applyGlowFilter(); // just show/hide the matching pools — no recluster
+    this._applyGlowFilter(); // just mute the other pools — no recluster
     this._rebuildBaseRing(); // the rings re-partition over the filtered fleet (domain/baseRing)
   }
 

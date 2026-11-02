@@ -52,12 +52,12 @@ export const pickNetId = (p: PickDescriptor): string | null =>
 //  - A registered-but-node-less metagraph hub is shown (dim) but never selectable, matching
 //    its inactive look + its "registered · no live nodes" filter chip (`activeMetaIds` null =
 //    counts not loaded yet → all allowed).
-//  - GEO: off-filter nodes are genuinely hidden, so they must not respond either (Three's
-//    raycaster ignores `visible`); the country drill is a LENS, so it does NOT gate picking.
+//  - GEO: a node off the network the view stands on stays on screen, dimmed, and answers nothing,
+//    under a browse too; the country drill is a LENS, so it does NOT gate picking.
 //  - HYPER (and elsewhere): every node stays interactive — off-focus ones are only dimmed,
 //    and clicking one drills into its network (gating them out read as a bug).
 //  - A FILTER (`held`, the real one, never a browse) holds a view that browses: another network's
-//    hub, ring and nodes stay on screen, dimmed, and do not respond (`viewNetwork.heldOut`).
+//    hub and nodes stay on screen, dimmed, and do not respond (`viewNetwork.heldOut`).
 export function pickActive(
   p: PickDescriptor,
   mode: Mode,

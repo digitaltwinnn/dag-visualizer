@@ -16,6 +16,10 @@ describe("the globe under a network", () => {
     expect(globe).toMatch(/for \(const r of mFan\) \{\s*if \(!this\._nodeActive\(r\.metaId, geoOf\(r\.pick\)\)\) continue;/);
   });
 
+  it("rebuilds a pool at its scope, so a data poll never flashes the rest", () => {
+    expect(globe).toMatch(/this\._applyGlowFilter\(\);\s*for \(const m of this\._densityGlow\) m\.userData\.scopeNow = m\.userData\.scope;/);
+  });
+
   it("dims a pool off the scope and eases it, where it used to drop it", () => {
     expect(globe).not.toMatch(/m\.visible = sel === "all"/);
     expect(globe).toMatch(/m\.userData\.scope = sel === "all" \|\| m\.userData\.net === sel \? 1 : POOL_OFF_SCOPE/);

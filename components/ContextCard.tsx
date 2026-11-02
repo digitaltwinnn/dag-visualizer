@@ -56,7 +56,10 @@ export default function ContextCard({
   const cardFrom = useStore((s) => VIEW_POLICIES[s.mode].metagraphCard);
   const railNet = useStore((s) => s.railNet);
   const onNode = cardFrom === "node" && filter !== appFilter && !railNet;
-  const clearable = !onNode && filter !== appFilter && (!chartStack || trendFocus != null);
+  // A commit finer than the filter has its × even on the filter's own network.
+  const tickNet = useStore((s) => (VIEW_POLICIES[s.mode].tickScoped ? s.tickNet : null));
+  const finer = chartStack ? trendFocus != null : tickNet != null;
+  const clearable = !onNode && (finer || (filter !== appFilter && !chartStack));
   const close = () => {
     const st = useStore.getState();
     applyClickActions(

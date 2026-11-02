@@ -3,6 +3,7 @@
 // actions through here, so an action kind always maps to exactly one store effect. New action
 // kinds get their effect HERE (and a test in applyClickActions.test.ts), never inline in a
 // caller.
+import { heldOut } from "@/src/engine/domain/viewNetwork";
 import { useStore } from "./store";
 import { finestRung } from "@/src/engine/domain/focusLadder";
 import type { ClickAction } from "@/src/engine/domain/pickActions";
@@ -80,8 +81,9 @@ export function applyClickActions(actions: ClickAction[], opts?: { quiet?: boole
         st.setTickNet(a.sel);
         break;
       case "railNet":
-        // The filter's own network is no browse: the view already stands on it.
-        st.setRailNet(a.id === st.filter ? null : a.id);
+        // The filter's own network is no browse: the view already stands on it. Another network is
+        // none either, whichever surface asked: a filter holds the view (`viewNetwork.heldOut`).
+        if (a.id == null || !heldOut(st.filter, a.id)) st.setRailNet(a.id === st.filter ? null : a.id);
         break;
       case "metaSnap":
         st.setMetaSnap(a.sel);

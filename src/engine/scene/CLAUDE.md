@@ -156,8 +156,8 @@ network, and the camera answers with the same-pose nudge, a subtle zoom in and b
 constructs the ring before its ink and ground are set, and a material born then was black until
 a theme flip retinted it. The arrival beat lifts each RING as one piece, outer to inner
 (`RING_ENTRY_STAG`), not arc by arc (user: "too detailed, just animate each circle"). The
-density pools (`_densityGlow`) follow the same selector the chips follow — a hover preview hides
-the off-selector pools exactly as a commit does, and the PACKETS take the same isolate
+density pools (`_densityGlow`) follow the same selector the chips follow — a hover preview mutes
+the off-selector pools exactly as a commit does, and the PACKETS stand down the same way
 (`Arcs.setSelector`: a packet with an endpoint off the selector is written at the centre, where the
 exact occlusion hides it — the pool itself is only rebuilt by a commit, since rebuilding restarts
 every packet). **Each packet also draws its whole hop as a PATH TRACE** (same day): a second

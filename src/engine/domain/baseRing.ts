@@ -95,9 +95,9 @@ function ownMachines(nets: readonly RingNet[], dagId: string): Owned[] {
  *  networks nested in that. Sub-arcs tile their parent's span minus the gaps between siblings,
  *  biggest first; the unknown bucket (a null code or provider) sorts last. */
 export function ringLevels(nets: readonly RingNet[], dagId: string, filter: string = "all"): RingLevels {
-  // THE COMMITTED FILTER RE-PARTITIONS (user, 2026-10-24: "apply the filter"): the globe isolates
-  // its off-filter nodes (`hide`), so the rings count the filtered network's participants alone —
-  // its countries, their providers, one hue — rather than dimming the others in place.
+  // THE COMMITTED FILTER RE-PARTITIONS (user, 2026-10-24: "apply the filter"): the stand is a
+  // reading of the network in view, so the rings count its participants alone — its countries,
+  // their providers, one hue — while the globe above dims the others in place.
   const owned = ownMachines(filter === "all" ? nets : nets.filter((n) => n.id === filter), dagId);
   const total = owned.length;
   const out: RingLevels = { countries: [], providers: [], networks: [] };

@@ -100,9 +100,11 @@ The design rules behind the table, which the tests pin but don't explain:
   ("top bar only way out"): a card standing on it has no ×, Hypergraph's explorer has no home step,
   and `components/filterHoldsWiring.test.ts` scans for any other writer. **A FILTER HOLDS THE VIEW**
   (user, 2026-11-02): a browse is a look around from All, so
-  with a filter on, the Metagraph card has no swipe and another network's rows, hubs, rings and nodes
-  stay on screen, dimmed, answering neither click nor hover (`viewNetwork.heldOut`, asked by
-  `pickActive` and the row). Snapshots holds by the TICK instead: a global snapshot the filter's
+  with a filter on, the Metagraph card has no swipe, no list offers another network, and that
+  network's hubs and nodes stay on screen, dimmed, answering neither click nor hover
+  (`viewNetwork.heldOut`, asked by `pickActive`, and once more at the `railNet` write). The stand
+  under the globe re-partitions over the network in view instead of dimming the rest. Snapshots holds
+  by the TICK instead: a global snapshot the filter's
   network is not in answers nothing, in the explorer, the scene and the pager, unless it is the one on
   screen (`ledgerStory.tickLocked`), while a tick that holds it opens whole, its pager stepping that
   tick's own networks. ⚠️ Only a landed exact read can lock a tick: a polled zero is also what a tick

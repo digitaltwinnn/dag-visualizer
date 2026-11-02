@@ -7,12 +7,8 @@ import { describe, expect, it } from "vitest";
 const read = (path: string) => readFileSync(path, "utf8");
 
 describe("the surfaces a filter holds", () => {
-  it("Hypergraph's rows stay listed, dimmed, with no click and no preview", () => {
-    const src = read("components/HyperExplore.tsx");
-    expect(src).toMatch(/const held = heldOut\(appFilter, m\.id\);/);
-    expect(src).toMatch(/faint: dead \|\| m\.nodes\.length === 0 \|\| held,/);
-    expect(src).toMatch(/onClick: held \? undefined : \(\) => toggleNetwork\(m\.id\),/);
-    expect(src).toMatch(/pair: held \? undefined : subjectPairing\(hoverFilter, m\.id,/);
+  it("the moment card and the explorer offer no other network: a filtered list holds only its own", () => {
+    expect(read("components/HyperExplore.tsx")).not.toMatch(/heldOut/);
   });
 
   it("a Snapshots row the read rules out has no click and no preview, unless it is on screen", () => {
@@ -46,14 +42,16 @@ describe("only the top bar writes the filter", () => {
   const matching = (pattern: RegExp) => all.filter((path) => pattern.test(read(path)));
 
   it("runs the toggle from the picker alone", () => {
-    expect(matching(/[^n ] ?filterToggleActions\(|\(filterToggleActions\(/)).toEqual(["components/topbar/FilterPicker.tsx"]);
+    const callers = matching(/filterToggleActions\(/).filter((path) => path !== "src/engine/domain/pickActions.ts");
+    expect(callers).toEqual(["components/topbar/FilterPicker.tsx"]);
   });
   it("builds the write in the table alone, and the executor applies it", () => {
-    expect(matching(/kind: "filter", id:/).sort()).toEqual(["src/engine/domain/pickActions.ts", "src/store/applyClickActions.ts"]);
+    expect(matching(/kind: "filter",/).sort()).toEqual(["src/engine/domain/pickActions.ts", "src/store/applyClickActions.ts"]);
   });
-  it("gives a card standing on the filter no close", () => {
+  it("gives a card standing on the filter no close, while a finer commit on the same network keeps one", () => {
     const src = read("components/ContextCard.tsx");
-    expect(src).toMatch(/const clearable = !onNode && filter !== appFilter && \(!chartStack \|\| trendFocus != null\);/);
+    expect(src).toMatch(/const finer = chartStack \? trendFocus != null : tickNet != null;/);
+    expect(src).toMatch(/const clearable = !onNode && \(finer \|\| \(filter !== appFilter && !chartStack\)\);/);
   });
   it("gives Hypergraph's explorer no home under a filter", () => {
     expect(read("components/HyperExplore.tsx")).toMatch(/onRelease: railNet \? \(\) => applyClickActions\(\[\{ kind: "railNet", id: null \}\]\) : undefined/);

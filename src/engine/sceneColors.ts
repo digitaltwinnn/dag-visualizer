@@ -179,7 +179,8 @@ export function structureInk(c: SceneColors): number {
  * probably has to do with the light mode and direction of the dim"). The page itself read as the
  * right answer, since a mute on paper recedes into the ground, but it ends AS the ground and a small
  * chip disappears. The dark target stops short of its ground for the same reason: a mute has to stay
- * a mark. So this is a quiet tone just off the page, and the hue still drains toward it.
+ * a mark. So the hue drains toward a mid slate, most of the way to the muted ink, which a coloured
+ * chip reads as stepped back even where the slate is darker than the chip (tuned live, same day).
  */
 const PAPER_DIM_INK = 0.8; // 0 = the page, 1 = the muted ink
 export function paperDimTarget(c: SceneColors): number {

@@ -85,9 +85,8 @@ export class Picking {
     if (!list.length) return null;
     this.raycaster.setFromCamera(this.pointer, this.h.ctx.camera);
     const hits = this.raycaster.intersectObjects(list, false);
-    // Return the first hit that's part of the current selection — nodes filtered out of the
-    // geo view are hidden, so they shouldn't be clickable/hoverable either (Three's raycaster
-    // ignores scale/visibility, so the inactive ones must be skipped explicitly).
+    // Return the first hit that's part of the current selection — a dimmed node outside it answers
+    // nothing (`pickActive`), so the inactive ones are skipped here.
     this._hitObj = null;
     const st = useStore.getState();
     for (const h of hits) {
