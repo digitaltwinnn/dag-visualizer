@@ -45,12 +45,12 @@ describe("the notes card is part of the stack", () => {
   });
 });
 
-describe("the top card under a drill", () => {
-  // user, 2026-11-02: "under all filter the AI cards was showing DED notes". The Metagraph card moves to
-  // a committed node's network in Geography, and the note rode along.
-  it("takes no subject from a committed node", () => {
-    const hook = read("components/notes/useAiNote.ts");
-    expect(fnBody(hook, "export function useAiNote(")).not.toMatch(/\binspect\b/);
+describe("the top card's scope", () => {
+  // user, 2026-11-02: the network the Metagraph rung stands on, the filter unless one is selected there.
+  it("is the rung's network in every view, a committed node's included", () => {
+    const body = fnBody(read("components/notes/useAiNote.ts"), "export function useAiNote(");
+    expect(body).toMatch(/metagraphCardNetwork\(\{ mode, filter, railNet, tickNet, snap, tickHasFilter, trendFocus, trendFront, inspect \}\)/);
+    expect(body).not.toMatch(/trendFilter/);
   });
 });
 
@@ -283,7 +283,7 @@ describe("a failed write answers the gesture on the card's surface (R68)", () =>
 });
 
 // THE TOP CARD HOLDS, THE SUBJECT CARDS CARRY THEIR OWN (spec 2026-10-29-subject-notes): the Gate
-// AI card is the view's note at the filter's scope, and a committed country, provider, make-up or
+// AI card is the view's note at the rung's scope, and a committed country, provider, make-up or
 // brushed range shows its note inside its own card. The subject note is asked by the selection
 // itself, so it has no door and never says it could not write.
 describe("subject notes live on their cards", () => {

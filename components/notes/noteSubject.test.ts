@@ -3,7 +3,6 @@ import { noteSpanWords, noteSubjectOf, type NoteSubjectState } from "./noteSubje
 
 const base: NoteSubjectState = {
   metagraphNetwork: "all",
-  trendFilter: "all",
   unlisted: (id) => id === "unlisted",
 };
 const s = (over: Partial<NoteSubjectState>): NoteSubjectState => ({ ...base, ...over });
@@ -35,24 +34,18 @@ describe("noteSubjectOf", () => {
     expect(noteSubjectOf("geo", withCountry)).toEqual({ view: "geo", subject: "DAG123" });
   });
 
-  // THE FILTER, NOT THE PLANE (user, 2026-10-30: "trend view AI card takes the filter from
-  // explorer it seems (range should, but not the AI card); it should take the actual metagraph
-  // filter"). A plane brought forward re-deals the stack and the Range card; the view's note keeps
-  // reading what the top bar says, so bringing a plane forward under All keeps the hypergraph's note.
-  it("trend folds all / dag into dag, else the FILTER's network", () => {
-    expect(noteSubjectOf("trend", s({ trendFilter: "all" }))).toEqual({ view: "trend", subject: "dag" });
-    expect(noteSubjectOf("trend", s({ trendFilter: "dag" }))).toEqual({ view: "trend", subject: "dag" });
-    expect(noteSubjectOf("trend", s({ trendFilter: "DAG123" }))).toEqual({ view: "trend", subject: "DAG123" });
-  });
-
-  it("trend reads the filter, never the plane the metagraph card stands on", () => {
-    expect(noteSubjectOf("trend", s({ trendFilter: "all", metagraphNetwork: "DAG123" }))).toEqual({ view: "trend", subject: "dag" });
+  // ONE SCOPE (user, 2026-11-02: "make top card scope be the network, and apply either the filter or
+  // the network that is selected in the rung"), which replaces the filter-only rule of 2026-10-30.
+  it("trend stands on the rung's network too, folding all and dag into dag", () => {
+    expect(noteSubjectOf("trend", s({ metagraphNetwork: "all" }))).toEqual({ view: "trend", subject: "dag" });
+    expect(noteSubjectOf("trend", s({ metagraphNetwork: "dag" }))).toEqual({ view: "trend", subject: "dag" });
+    expect(noteSubjectOf("trend", s({ metagraphNetwork: "DAG123" }))).toEqual({ view: "trend", subject: "DAG123" });
   });
 
   // Its chains publish no nodes or places, but the sampler measures them: History has a record.
   it("the unlisted set has a note in History alone", () => {
     for (const m of ["hyper", "geo", "ledger"] as const) expect(noteSubjectOf(m, s({ metagraphNetwork: "unlisted" }))).toBeNull();
-    expect(noteSubjectOf("trend", s({ trendFilter: "unlisted" }))).toEqual({ view: "trend", subject: "unlisted" });
+    expect(noteSubjectOf("trend", s({ metagraphNetwork: "unlisted" }))).toEqual({ view: "trend", subject: "unlisted" });
   });
 });
 

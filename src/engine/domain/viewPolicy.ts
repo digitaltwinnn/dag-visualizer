@@ -163,8 +163,8 @@ export interface ViewPolicy {
   // Does this view carry an AI NOTE — the written context card (`components/notes/`) for the
   // subject on screen? The four 3D views do; the placeholder gallery shows no data, so no note.
   aiNotes: boolean;
-  // Where this view's note finds its subject: the network the view stands on, the same with the
-  // DAG core read as the whole chamber ("chamber"), or the History filter ("history").
+  // How this view's note folds the rung's network: as it stands, with the DAG core read as the whole
+  // chamber ("chamber"), or with All read as the hypergraph's plane ("history").
   noteScope: "network" | "chamber" | "history";
   // Do this view's selections live inside a global snapshot? A network then commits inside the tick
   // and never writes the filter, and a node card stands only where it belongs to what is shown.
