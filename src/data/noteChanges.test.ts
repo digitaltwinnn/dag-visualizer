@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { NOTE_CHANGES_CAP, RHYTHM_CHANGE, changeWords, countChange, withMovePercents, eventChange, largestSnapshotChange, longestGapChange, pauseChange, pickChanges, siteMoves, rateChange, rhythmChange, siteOfChange, withExtremes, withSpanComparisons } from "@/src/data/noteChanges";
+import { NOTE_CHANGES_CAP, RHYTHM_CHANGE, changeWords, countChange, withMovePercents, eventChange, largestGlobalChange, longestGapChange, pauseChange, pickChanges, siteMoves, rateChange, rhythmChange, siteOfChange, withExtremes, withSpanComparisons } from "@/src/data/noteChanges";
 import { fact } from "@/src/data/noteFacts";
 import type { Fact, NoteChange } from "@/src/data/noteTypes";
 
@@ -20,10 +20,7 @@ describe("changeWords", () => {
 describe("countChange", () => {
   it("says the move in one plain sentence, with how far it moved", () => {
     expect(countChange("Germany", 34, 30, NET)).toMatchObject({ kind: "lost", text: "Germany lost 4 nodes, down 12%", size: 4 });
-    expect(countChange("Germany", 29, 30, NET)).toMatchObject({ kind: "gained", text: "Germany gained 1 node, up 3%", size: 1 });
-  });
-  it("leaves a move too small to round out as the count alone", () => {
-    expect(countChange("Fleet", 1000, 999, NET)?.text).toBe("Fleet lost 1 node");
+    expect(countChange("Germany", 30, 34, NET)).toMatchObject({ kind: "gained", text: "Germany gained 4 nodes, up 13%", size: 4 });
   });
   it("names a place when it was measured, and the percentage is that place's", () => {
     expect(countChange("Hetzner", 51, 48, NET, { city: "Falkenstein", was: 12 })?.text).toBe("Hetzner lost 3 nodes in Falkenstein, down 25%");
@@ -58,8 +55,8 @@ describe("a row's size", () => {
 });
 
 describe("the chamber's extremes (user, 2026-11-01)", () => {
-  it("names who held the largest snapshot", () => {
-    expect(largestSnapshotChange("Dor", "1.2 DAG", NET)).toMatchObject({ kind: "peak", subject: NET, text: "Dor had the largest snapshot, 1.2 DAG" });
+  it("states the largest global snapshot by what it anchored, with no network to name", () => {
+    expect(largestGlobalChange(18)).toEqual({ kind: "peak", size: 0, subject: { kind: "self" }, text: "The largest global snapshot anchored 18 snapshots" });
   });
 
   it("names who held the longest gap, the unit written out", () => {
@@ -68,7 +65,7 @@ describe("the chamber's extremes (user, 2026-11-01)", () => {
 
   it("gives way to anything that moved, and leads with the snapshot", () => {
     const moved = [eventChange("BioFi", "quiet", NET), eventChange("Dor", "active", NET), eventChange("USDC", "quiet", NET)];
-    const extremes = [longestGapChange("Dor", 720, NET), largestSnapshotChange("Dor", "1 DAG", NET)];
+    const extremes = [longestGapChange("Dor", 720, NET), largestGlobalChange(18)];
     expect(withExtremes(moved, extremes).map((c) => c.kind)).toEqual(["quiet", "active", "quiet"]);
     expect(withExtremes(moved.slice(0, 2), extremes).map((c) => c.kind)).toEqual(["quiet", "active", "peak"]);
     expect(withExtremes([], extremes).map((c) => c.kind)).toEqual(["peak", "longest"]);
@@ -243,5 +240,33 @@ describe("siteMoves", () => {
   it("needs both days", () => {
     expect(siteMoves(now, undefined, () => true)).toEqual([]);
     expect(siteMoves(undefined, then, () => true)).toEqual([]);
+  });
+});
+
+// A NOTABLE MOVE IS A MOVE WORTH A ROW (user, 2026-11-02: "'United States lost 1 node, down 3%' -> how
+// is that notable?"). The note can still say it; a row says something happened.
+describe("countChange's bar", () => {
+  it("drops a move of one node, or under a twentieth of the count", () => {
+    expect(countChange("United States", 36, 35, NET)).toBeNull();
+    expect(countChange("Finland", 19, 18, NET)).toBeNull();
+    expect(countChange("Germany", 46, 44, NET)).toBeNull();
+    expect(countChange("Hetzner", 100, 104, NET)).toBeNull();
+  });
+  it("keeps a move of two or more that clears it", () => {
+    expect(countChange("Germany", 33, 29, NET)).toMatchObject({ text: "Germany lost 4 nodes, down 12%" });
+    expect(countChange("DAG", 70, 64, NET)).toMatchObject({ text: "DAG lost 6 nodes, down 9%" });
+  });
+  it("keeps one node that is a large part of a small count", () => {
+    expect(countChange("BioFi", 3, 2, NET)).toMatchObject({ kind: "lost" });
+    expect(countChange("BioFi", 5, 6, NET)).toMatchObject({ kind: "gained" });
+    expect(countChange("Dor", 6, 5, NET)).toBeNull();
+  });
+  it("always keeps a first and a last", () => {
+    expect(countChange("Japan", 0, 1, NET)).toMatchObject({ kind: "new" });
+    expect(countChange("Japan", 1, 0, NET)).toMatchObject({ kind: "gone" });
+  });
+  it("judges a place by that place's own count", () => {
+    expect(countChange("OVH", 40, 38, NET, { city: "Falkenstein", was: 12 })).toMatchObject({ text: "OVH lost 2 nodes in Falkenstein, down 17%" });
+    expect(countChange("OVH", 40, 39, NET, { city: "Falkenstein", was: 30 })).toBeNull();
   });
 });

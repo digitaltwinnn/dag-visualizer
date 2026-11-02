@@ -7,7 +7,7 @@ describe("trends merge ops", () => {
     expect(opOf("m.abc.fee")).toBe("add");
     expect(opOf("g.gapMax")).toBe("max");
     expect(opOf("m.abc.gapMax")).toBe("max");
-    expect(opOf("m.abc.feeMax")).toBe("max");
+    expect(opOf("g.anchorsMax")).toBe("max");
     expect(opOf("f.nodes")).toBe("set");
     expect(opOf("f.cc.DE")).toBe("set");
   });

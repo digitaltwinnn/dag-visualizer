@@ -11,6 +11,13 @@ import { scrollToShow } from "@/src/engine/domain/trendStack";
 import { viewNetwork } from "@/src/engine/domain/viewNetwork";
 import type { MotionCause } from "@/src/store/store";
 
+/** A released focus or a new filter turns the deck back to its front: under All that is the DAG
+ *  (`deckOf`). One home, so no path can leave a rotation behind it. */
+function turnDeckBack(st: ReturnType<typeof useStore.getState>): void {
+  if (st.trendScroll) st.setTrendScroll(0);
+  if (st.trendRotation) st.setTrendRotation(0);
+}
+
 export function applyClickActions(actions: ClickAction[], opts?: { quiet?: boolean; arrival?: boolean }): void {
   const st = useStore.getState();
   // `arrival` is a view entry committing a carried node's ancestry: every other commit is the reader.
@@ -33,6 +40,7 @@ export function applyClickActions(actions: ClickAction[], opts?: { quiet?: boole
           if (st.tickNet != null) st.setTickNet(null);
           // …and History's plane focus, which names the Metagraph card and scopes RAW there (I6).
           if (st.trendFocus != null) st.setTrendFocus(null);
+          turnDeckBack(st);
         }
         st.setFilter(a.id);
         // A committed network replaces a browsed one, after the write: on the same network the
@@ -72,7 +80,8 @@ export function applyClickActions(actions: ClickAction[], opts?: { quiet?: boole
         st.setTickNet(a.sel);
         break;
       case "railNet":
-        st.setRailNet(a.id);
+        // The filter's own network is no browse: the view already stands on it.
+        st.setRailNet(a.id === st.filter ? null : a.id);
         break;
       case "metaSnap":
         st.setMetaSnap(a.sel);
@@ -87,6 +96,8 @@ export function applyClickActions(actions: ClickAction[], opts?: { quiet?: boole
         if (a.id !== null) {
           const scroll = scrollToShow(st.trendIds, a.id, st.trendScroll);
           if (scroll !== st.trendScroll) st.setTrendScroll(scroll);
+        } else if (st.trendFocus != null) {
+          turnDeckBack(st);
         }
         st.setTrendFocus(a.id);
         break;
@@ -140,7 +151,7 @@ function motionCauseOf(actions: readonly ClickAction[]): MotionCause | null {
       // The tick-local network frames the same subject a committed network does, so it speaks
       // the filter's sentence ("Framing Dor Technologies").
       case "tickNet": return { kind: "filter", id: a.sel?.metaId ?? "all" };
-      case "railNet": return { kind: "filter", id: viewNetwork(useStore.getState()) };
+      case "railNet": return { kind: "network", id: viewNetwork(useStore.getState()) };
       case "metaSnap": return a.sel ? { kind: "metaSnap", metaId: a.sel.metaId, ordinal: a.sel.ordinal } : { kind: "metaSnap", metaId: null };
       case "trendFocus": return { kind: "focus", id: a.id };
       // A cursor step moves no scene — the planes' line and the card answer it.

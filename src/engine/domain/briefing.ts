@@ -9,9 +9,10 @@ import { easeInOutQuad } from "./cameraRig";
 /** The route: where, then now, then who, then how it changed. */
 export const BRIEFING_STOPS = ["geo", "ledger", "hyper", "trend"] as const satisfies readonly Mode[];
 
-/** How long a stop stands, from the moment it is reached: a quarter under the 6500 that read the
- *  longest line at subtitle pace (user 2026-11-01: "25% shorter"). The tour's pace won over that. */
-export const STOP_MS = 4875;
+/** How long a stop stands, its scene's transition included. A quarter under 6500 went too far (user
+ *  2026-11-01: "25% shorter"; 2026-11-02, after reading it against the live lines of 102 to 122
+ *  characters: back up to 6 seconds), which reads them at a subtitle's 20 characters a second. */
+export const STOP_MS = 6000;
 
 /** The longest a stop's words may run: two to three lines of the desktop caption. A longer line
  *  would need a longer stop, and a tour that outstays its welcome is the one thing it must not do. */

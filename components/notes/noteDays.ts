@@ -1,4 +1,5 @@
-import type { NotableKind, NoteDay } from "@/src/data/noteTypes";
+import type { NotableDay, NotableKind, NoteDay } from "@/src/data/noteTypes";
+import type { TrendMetric } from "@/src/store/store";
 
 // A NOTABLE DAY, MET ELSEWHERE (user, 2026-10-30: "if the moment is a notable day, either navigated
 // by a click on the row in the AI card or any other means, can we show the marker on the cards as
@@ -21,6 +22,12 @@ export const NOTE_KIND_WORD: Record<NotableKind, string> = {
   longest: "longest wait",
   broadest: "most networks",
 };
+
+/** The measure a day was notable on, for the chart that shows it; null leaves the chart as it is. */
+export function dayMetric(day: { kind: NotableKind; measure?: NotableDay["measure"] }): TrendMetric | null {
+  if (day.measure) return day.measure;
+  return day.kind === "high" || day.kind === "low" || day.kind === "peak" || day.kind === "trough" ? "snapshots" : null;
+}
 
 /** The days as the card lists them, oldest first, the way the chart reads left to right (user,
  *  2026-11-01). The note itself keeps them best first: that order is what the cap and the model read. */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
+import { deckOf,
   rotateOrder,
   entryFocus,
   focusOnReturn,
@@ -755,5 +755,26 @@ describe("rotateOrder — the deck a swipe turns (user, 2026-10-24)", () => {
     expect(rotateOrder(ids, -5)).toEqual(["d", "a", "b", "c"]);
     expect(rotateOrder(["a"], 3)).toEqual(["a"]);
     expect(rotateOrder([], 1)).toEqual([]);
+  });
+});
+
+// ALL IS THE DAG (user, 2026-11-02: "that should be DAG which is the 'all' basically"). Clearing a focus
+// left the busiest network in front, and the Metagraph card and the AI note stood on it unasked.
+describe("deckOf", () => {
+  const ranked = ["dor", "ded", "bio"];
+  const unlisted = "unlisted";
+  it("stands on the DAG with nothing focused, the networks behind it", () => {
+    expect(deckOf(ranked, { total: true, unlisted: true, focus: null, unlistedId: unlisted })).toEqual(["dag", ...ranked]);
+    expect(deckOf(ranked, { total: true, unlisted: true, focus: "dag", unlistedId: unlisted })).toEqual(["dag", ...ranked]);
+  });
+  it("leaves the DAG out behind a network's focus: the focused plane comes forward alone", () => {
+    expect(deckOf(ranked, { total: true, unlisted: true, focus: "ded", unlistedId: unlisted })).toEqual(ranked);
+  });
+  it("brings the unlisted plane forward while it is the focus", () => {
+    expect(deckOf(ranked, { total: true, unlisted: true, focus: unlisted, unlistedId: unlisted })).toEqual([unlisted, ...ranked]);
+    expect(deckOf([...ranked, unlisted], { total: true, unlisted: true, focus: unlisted, unlistedId: unlisted })).toEqual([...ranked, unlisted]);
+  });
+  it("a filtered stack keeps its own planes", () => {
+    expect(deckOf(["dor"], { total: false, unlisted: false, focus: null, unlistedId: unlisted })).toEqual(["dor"]);
   });
 });

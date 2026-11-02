@@ -37,6 +37,7 @@ import type { HyperMeasure } from "@/src/data/hyperMeasure";
 export type MotionCause =
   | { kind: "view"; from: Mode; to: Mode }
   | { kind: "filter"; id: string }
+  | { kind: "network"; id: string } // the view stands on a network, the filter untouched
   | { kind: "focus"; id: string | null }
   // A node pick's `title` is its NETWORK's name and `sub` its place (Globe builds the pick so).
   | { kind: "node"; title: string | null; sub?: string | null }
@@ -737,7 +738,8 @@ export const useStore = create<AppState>((set) => ({
   // an already-open network) must not hand it a fresh object.
   noteReaderCommit: () => set((s) => ({ readerCommits: s.readerCommits + 1 })),
   setRailNet: (railNet) =>
-    set((s) => (s.railNet === railNet ? s : { railNet, selStack: bumpStack(s.selStack, "network", !!railNet || s.filter !== "all") })),
+    // Re-picking the network the view stands on still brings its card forward, as a filter write does.
+    set((s) => ({ railNet, selStack: bumpStack(s.selStack, "network", !!railNet || s.filter !== "all") })),
   setTickNet: (tickNet) =>
     set((s) =>
       sameTickNet(s.tickNet, tickNet)

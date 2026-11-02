@@ -12,7 +12,7 @@ const TREND_SPAN = "30d";
 
 /** The note a stop reads: the view at its widest, as a visitor with no filter would see it. */
 export function briefingReq(view: (typeof BRIEFING_STOPS)[number]): NoteReq {
-  const subject = noteSubjectOf(view, { metagraphNetwork: "all", trendFilter: "all", unlisted: () => false })!;
+  const subject = noteSubjectOf(view, { metagraphNetwork: "all", unlisted: () => false })!;
   return { view: subject.view, subject: subject.subject, span: view === "trend" ? TREND_SPAN : null };
 }
 

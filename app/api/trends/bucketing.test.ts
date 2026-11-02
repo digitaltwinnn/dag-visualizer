@@ -118,28 +118,6 @@ describe("bucketMetas", () => {
   });
 });
 
-describe("bucketMetas: a network's largest snapshot by fee", () => {
-  const recs = [
-    { ordinal: 1, timestamp: ts(14, 0, 10), fee: 3 },
-    { ordinal: 2, timestamp: ts(14, 0, 20), fee: 9 },
-    { ordinal: 3, timestamp: ts(14, 0, 30), fee: 4 },
-  ];
-  const day = "t:mainnet:5m:2026-09-06";
-
-  it("keeps the bucket's largest, beside the sum", () => {
-    const inc: IncMap = new Map();
-    bucketMetas(inc, "mainnet", "abc", recs);
-    expect(get(inc, day, "14:00|m.abc.feeMax")).toBe(9);
-    expect(get(inc, day, "14:00|m.abc.fee")).toBe(16);
-  });
-
-  it("is the catalog's alone: an unlisted chain stays a count", () => {
-    const inc: IncMap = new Map();
-    bucketMetas(inc, "mainnet", "abc", recs, undefined, false);
-    expect(get(inc, day, "14:00|m.abc.feeMax")).toBeUndefined();
-  });
-});
-
 describe("bucketFleet", () => {
   it("writes gauges to hourly+daily only, countries daily only", () => {
     const inc: IncMap = new Map();
@@ -354,5 +332,17 @@ describe("bucketFleetGeo", () => {
     bucketFleetGeo(inc, "mainnet", Date.UTC(2026, 9, 27, 1), geo);
     bucketFleetGeo(inc, "mainnet", Date.UTC(2026, 9, 27, 2), { ...geo, countries: { DE: 61 } });
     expect(get(inc, "geo:mainnet:2026", "10-27|f.cc.DE")).toBe(61);
+  });
+});
+
+// THE LARGEST GLOBAL SNAPSHOT (user, 2026-11-02: "perhaps based on # snapshots anchored"): the count
+// sits on each global's own record, so one field is the whole of it.
+describe("bucketGlobals: the largest global snapshot", () => {
+  const rec = (s: number, n: number) => ({ ordinal: s, timestamp: ts(14, 0, s), metagraphSnapshotCount: n });
+  it("keeps the bucket's largest beside the sum", () => {
+    const inc: IncMap = new Map();
+    bucketGlobals(inc, "mainnet", [rec(1, 4), rec(30, 11), rec(60, 7)], null);
+    expect(get(inc, "t:mainnet:5m:2026-09-06", "14:00|g.anchorsMax")).toBe(11);
+    expect(get(inc, "t:mainnet:5m:2026-09-06", "14:00|g.anchors")).toBe(22);
   });
 });

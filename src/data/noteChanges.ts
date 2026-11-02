@@ -104,9 +104,22 @@ export function withSpanComparisons(note: string, facts: readonly Fact[], before
   return first ? `${out.slice(0, first.end)} in ${before}${out.slice(first.end)}` : out;
 }
 
-/** A count's move, or null when it did not. `place` is a measured city, never a guess, and a row
- *  naming one states that city's percentage: the sentence reads as the city's (`was` nodes there).
- *  A first or a last node has no percentage: the words already say all of it or none of it. */
+/** The smallest share of a count a move of two or more nodes takes to be worth a row. */
+const MOVE_MIN_SHARE = 0.05;
+/** The share a single node takes to: one of a handful is a change of shape, one of dozens is churn. */
+const ONE_NODE_MIN_SHARE = 0.2;
+
+/** Whether a move is an event rather than churn (user, 2026-11-02: "'United States lost 1 node, down
+ *  3%' -> how is that notable?"). The note can still state it; a row claims something happened. */
+const worthARow = (from: number, delta: number): boolean => {
+  const size = Math.abs(delta);
+  return size / from >= (size === 1 ? ONE_NODE_MIN_SHARE : MOVE_MIN_SHARE);
+};
+
+/** A count's move, or null when it did not, or moved too little to be worth a row (`worthARow`).
+ *  `place` is a measured city, never a guess, and a row naming one states that city's percentage:
+ *  the sentence reads as the city's (`was` nodes there). A first or a last node is always an event,
+ *  and has no percentage: the words already say all of it or none of it. */
 export function countChange(
   name: string,
   from: number,
@@ -117,6 +130,7 @@ export function countChange(
   if (from === to) return null;
   const size = Math.abs(to - from);
   const where = place ? ` in ${place.city}` : "";
+  if (from > 0 && to > 0 && !worthARow(place?.was || from, to - from)) return null;
   if (from === 0) return { kind: "new", subject, size, text: `${name} gained its first ${size === 1 ? "node" : count(size, "node")}${where}` };
   if (to === 0) return { kind: "gone", subject, size, text: `${name} lost its last ${size === 1 ? "node" : count(size, "node")}${where}` };
   const by = place ? changeWords(place.was, place.was + to - from) : changeWords(from, to);
@@ -146,9 +160,11 @@ export function rhythmChange(name: string, usualS: number, recentS: number, subj
   return { kind: faster ? "faster" : "slower", subject, size, text: `${name} ${faster ? "sped up" : "slowed down"}: a snapshot every ${now}, usually ${usual}` };
 }
 
-/** Who held the span's largest snapshot by fees. `fee` is as the card writes it. */
-export function largestSnapshotChange(name: string, fee: string, subject: NoteChangeSubject): NoteChange {
-  return { kind: "peak", subject, size: 0, text: `${name} had the largest snapshot, ${fee}` };
+/** The span's largest global snapshot, by the snapshots it anchored (user, 2026-11-02: "more
+ *  interesting" than a metagraph's). Its record is found with the note; until then, or where it
+ *  cannot be, the row is a statement. */
+export function largestGlobalChange(anchored: number): NoteChange {
+  return { kind: "peak", subject: { kind: "self" }, size: 0, text: `The largest global snapshot anchored ${anchored} snapshots` };
 }
 
 /** Who held the span's longest gap between snapshots. Below the largest snapshot on a tie of kinds. */

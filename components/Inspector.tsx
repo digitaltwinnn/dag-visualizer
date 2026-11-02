@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from "react";
+import { viewNetwork } from "@/src/engine/domain/viewNetwork";
 import { useStore } from "@/src/store/store";
 import { cn } from "@/lib/utils";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
@@ -872,7 +873,7 @@ export default function Inspector() {
         style={accent}
         signals={tray}
         updateKey={updateKey}
-        signalKey={`${mode}|${filter}`}
+        signalKey={`${mode}|${viewNetwork({ filter, railNet })}`}
         onOpenChange={onTrayOpenChange}
         // See `store.sceneCoverR` — this sheet takes width off the canvas the Engine places
         // the subject callout against.

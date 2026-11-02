@@ -65,7 +65,6 @@ export function useAiNote(): { subject: NoteSubject | null; req: NoteReq | null;
 
   const subject = noteSubjectOf(mode, {
     metagraphNetwork: metagraphCardNetwork({ mode, filter, railNet, tickNet, snap, tickHasFilter, trendFocus, trendFront, inspect }),
-    trendFilter: filter,
     unlisted: (id) => id === UNLISTED_ID,
   });
   // History's note is over the WINDOW pill on screen, brushed or not: a brushed range's note is

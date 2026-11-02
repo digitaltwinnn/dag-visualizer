@@ -3,9 +3,10 @@
 // the paginator has to adjust"). Pure arithmetic over measured numbers; the component measures.
 //
 // Fixed-point by construction: the count is the rows ON SCREEN plus however many whole row
-// pitches the free space below the card still holds (negative when it overflows). Applied, the
-// free space drops below one pitch and the next measure answers the same count, so the card's
-// own growth can never feed back into a loop.
+// pitches the free space below the card's CONTENT still holds (negative when it overflows). Applied,
+// the free space drops below one pitch and the next measure answers the same count, so the card's
+// own growth can never feed back into a loop. That holds only for the content: the card's box eases
+// behind it (`useFitRows`).
 
 /** The page-size bounds: never so few that a page is a peephole, never so many that a tall
  *  monitor fetches dozens of exact reads for one page. */

@@ -80,7 +80,7 @@ import { DUR_OUT } from "@/src/engine/domain/viewTransition";
 import { swipeIntent, swipeOf } from "@/src/engine/domain/planeSwipe";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import {
-  frontPlane, MORE_ID, moreCount, morePose, planeFormat, rotateOrder, stackPoses, VISIBLE_PLANES } from "@/src/engine/domain/trendStack";
+  deckOf, frontPlane, MORE_ID, moreCount, morePose, planeFormat, rotateOrder, stackPoses, VISIBLE_PLANES } from "@/src/engine/domain/trendStack";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -187,24 +187,9 @@ export default function TrendStack() {
   // THE ORDER ON SCREEN — the ranking once settled, the HELD order while a measure change is in
   // flight, so the plots land before the cards move. Poses, the hover backstop and the engine's
   // `trendIds` all read THIS, never `ranked`: the projector and React must agree on the order.
-  // THE DAG'S PLANE JOINS THE DECK WHILE IT IS THE FOCUS (user, 2026-10-03: "why is the dag
-  // pinned row not clickable? we have the chart data, no?"). It is the plane the DAG filter has
-  // always drawn; under "all" the explorer's pinned row brings it to the FRONT of the stack
-  // with the busiest networks behind it, and releasing it takes it away again — the resting
-  // stack stays the networks, and the filter is never touched. Parked at the back of the deck
-  // instead (the first cut) it paged the stack to its tail: the focus re-deal holds the focused
-  // plane in the window, so the empty networks stood behind the DAG and stayed there after.
-  // Outside the rank on purpose: it is what the layers add up to, so it stays off the shared
-  // ceiling and out of the networks' order.
-  // …and so does the UNLISTED plane while it is the focus (the Unlisted audit, 2026-10-07): like the
-  // DAG it is outside the rank — what the networks leave over — so it comes forward on its row.
+  // THE DAG STANDS IN FRONT UNDER ALL (`deckOf`), and the unlisted plane comes forward on its row.
   const deck = useMemo(
-    () =>
-      roster.total && focus === "dag"
-        ? ["dag", ...ranked]
-        : roster.unlisted && focus === UNLISTED_ID && !ranked.includes(UNLISTED_ID)
-          ? [UNLISTED_ID, ...ranked]
-          : ranked,
+    () => deckOf(ranked, { total: !!roster.total, unlisted: !!roster.unlisted, focus, unlistedId: UNLISTED_ID }),
     [ranked, roster.total, roster.unlisted, focus],
   );
   // THE DECK TURNED by the swipes so far (`rotateOrder`, store `trendRotation`): the rotation sits
@@ -338,7 +323,7 @@ export default function TrendStack() {
     for (const d of noteDays ?? []) {
       const id = d.networkId ?? "dag";
       const list = m.get(id) ?? [];
-      list.push({ dayMs: d.dayMs, kind: d.kind, networkId: d.networkId, lit: hoverNoteDay === d.dayMs, caption: d.caption, label: `Notable day, ${rangeDays(d.dayMs, d.dayMs + NOTE_DAY_MS)}: ${NOTE_KIND_WORD[d.kind]}` });
+      list.push({ dayMs: d.dayMs, kind: d.kind, measure: d.measure, networkId: d.networkId, lit: hoverNoteDay === d.dayMs, caption: d.caption, label: `Notable day, ${rangeDays(d.dayMs, d.dayMs + NOTE_DAY_MS)}: ${NOTE_KIND_WORD[d.kind]}` });
       m.set(id, list);
     }
     return m;
@@ -465,7 +450,7 @@ export default function TrendStack() {
     const st = useStore.getState();
     if (st.trendFocus) applyClickActions(trendPlaneActions(st.trendFocus, st.trendFocus));
     if (st.trendScroll) st.setTrendScroll(0);
-    st.setTrendRotation(st.trendRotation + step);
+    st.setTrendRotation(useStore.getState().trendRotation + step); // read after the release, which rewinds it
   };
   const stepMeasure = (dir: -1 | 1, axis: "x" | "y" = "y") => {
     const next = stepMetric(useStore.getState().trendMetric, dir);

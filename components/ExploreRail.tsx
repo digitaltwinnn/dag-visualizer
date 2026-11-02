@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useRef, type CSSProperties, type ReactNode } from "react";
+import { viewNetwork } from "@/src/engine/domain/viewNetwork";
 import { useStore } from "@/src/store/store";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { filterAccent } from "@/src/data/network";
@@ -40,6 +41,7 @@ export default function ExploreRail() {
   }, []);
   const mode = useStore((s) => s.mode);
   const filter = useStore((s) => s.filter);
+  const network = useStore(viewNetwork);
   const phoneDock = useStore((s) => s.phoneDock);
   const setPhoneDock = useStore((s) => s.setPhoneDock);
   const phoneSheetPx = useStore((s) => s.phoneSheetPx);
@@ -135,7 +137,7 @@ export default function ExploreRail() {
         label="Explore"
         style={accent}
         signals={tray}
-        signalKey={`${mode}|${filter}`}
+        signalKey={`${mode}|${network}`}
         // This sheet OVERLAYS the canvas rather than sitting beside it, so the Engine has to
         // know what it can't see — see `store.sceneCoverL`.
         onCoverPx={(px) => setSceneCover("left", px)}

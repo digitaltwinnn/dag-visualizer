@@ -17,7 +17,7 @@ complements. "I like consistency": every card that can carry one does, by one ru
 
 **Every subject card whose subject has a stored series over the note's span carries its own Gate
 AI note, scoped the way the card's own lead is scoped. The Gate AI card at the top of the lane is
-the view's note at the filter's scope.** The finest rungs are live records with no stored history,
+the view's note at the Metagraph rung's scope, the filter unless a network is selected there (user, 2026-11-02).** The finest rungs are live records with no stored history,
 so they carry none, and show nothing extra.
 
 | View | Card | Note | Scope | Backing series |

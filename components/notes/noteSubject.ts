@@ -3,20 +3,17 @@ import { spanPhrase } from "@/src/data/trendWindow";
 import type { Mode } from "@/src/store/mode";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 
-// THE SUBJECT A NOTE STANDS ON, per view — one home, so the card, the timeline diamonds and the
-// hook can never disagree about which note is on screen. Pure: the caller hands in the two
-// network answers the cards already compute (`metagraphCardNetwork`, `cardNetwork`) and the
-// repo's own "is this the unlisted network" predicate, so this module reads no store and holds
-// no copy of either rule.
+// THE SUBJECT A NOTE STANDS ON, per view: one home, so the card, the timeline diamonds and the hook
+// can never disagree about which note is on screen. Pure: the caller hands in the network the card
+// already computes (`metagraphCardNetwork`) and the repo's own "is this the unlisted network"
+// predicate, so this module reads no store and holds no copy of either rule.
 //
-// It is the VIEW's note at the filter's scope, and it holds under a drill (spec
-// 2026-10-29-subject-notes): Hypergraph, Geography and Snapshots stand on the network, else
-// everything (Snapshots' DAG core IS everything: `all`, one note); History stands on the FILTER,
-// where "all" and the core are one subject ("dag", the hypergraph's plane). NOT on the plane
-// brought forward (user, 2026-10-30: "it should take the actual metagraph filter"): a focus
-// re-deals the stack and scopes the Range card (`cardNetwork`), but the view's note keeps reading
-// what the top bar says. A committed country, provider, make-up or brushed range carries its own
-// note on its own card (`subjectNote.ts`, `SubjectNote.tsx`), so none of them takes this one over.
+// ONE SCOPE (user, 2026-11-02: "make top card scope be the network, and apply either the filter or
+// the network that is selected in the rung/has the focus"): the view's note stands on the network
+// the Metagraph rung stands on, the filter unless one is selected there, in every view. All and the
+// DAG core fold per view: Snapshots' core IS everything (`all`, one note), History's All is the
+// hypergraph's plane ("dag"). A committed country, provider, make-up or brushed range carries its
+// own note on its own card (`subjectNote.ts`, `SubjectNote.tsx`), so none of them takes this one over.
 // THE UNLISTED SET HAS A NOTE IN HISTORY ALONE (user, 2026-10-30: "does AI work on unknown networks?
 // I'd like that also"): the sampler measures its chains, so History has a record; they publish no
 // nodes and no places, so the other views have nothing measured to say.
@@ -27,8 +24,6 @@ export const AI_TITLE = "Constellation Gate AI";
 export interface NoteSubjectState {
   /** `metagraphCardNetwork(state)`: the network the metagraph card stands on ("all" when none). */
   metagraphNetwork: string | null;
-  /** The top-bar filter ("all", "dag" or a network id): History's note reads it directly. */
-  trendFilter: string;
   /** Is this id the unlisted pseudo-network? (`src/data/unlisted.ts` is the one home.) */
   unlisted: (id: string) => boolean;
 }
@@ -60,12 +55,11 @@ export function noteSubjectOf(mode: Mode, s: NoteSubjectState): NoteSubject | nu
   const { aiNotes, noteScope } = VIEW_POLICIES[mode];
   if (!aiNotes) return null;
   const view = mode as NoteView; // aiNotes is true exactly on the four note views
-  if (noteScope === "history") {
-    const net = s.trendFilter;
-    if (net === "all" || net === "dag") return { view, subject: "dag" };
-    return { view, subject: net }; // the unlisted set included: History alone has its record (below)
-  }
   const net = s.metagraphNetwork ?? "all";
+  if (noteScope === "history") {
+    if (net === "all" || net === "dag") return { view, subject: "dag" };
+    return { view, subject: net }; // the unlisted set included: History alone has its record (above)
+  }
   // The ledger's DAG core is its whole network: one subject, `all` (the routes fold it the same way).
   if (noteScope === "chamber" && net === "dag") return { view, subject: "all" };
   return s.unlisted(net) ? null : { view, subject: net };

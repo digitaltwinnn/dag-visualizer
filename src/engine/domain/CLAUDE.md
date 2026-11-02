@@ -92,8 +92,12 @@ The design rules behind the table, which the tests pin but don't explain:
   The ledger contributes no ancestry. **Except the network, in Geography** (user, 2026-09-26): a geo
   node is a place first, and committing its network from a click emptied the globe and the country
   list down to one network mid-browse. There the ancestry is country → cohort → node and the filter
-  stays the top bar's own gesture; hyper keeps filter-first, and it is the ONLY view whose node does
-  (`viewPolicy.nodeCommitsNetwork`, pinned by its test — the ledger's node stopped on 2026-09-29). **The
+  stays the top bar's own gesture; hyper's node stands the view on its network, a browse, and it is
+  the ONLY view whose node does (`viewPolicy.nodeCommitsNetwork`, pinned by its test — the ledger's
+  node stopped on 2026-09-29). **ONE RULE: ONLY THE TOP BAR SETS THE FILTER** (user, 2026-11-02:
+  "yes make it one rule everywhere"): Hypergraph's rows, hubs, nodes, groups and notable rows browse
+  (`railNet`), which clears on leaving the view. A card's × and the explorer's home can still release
+  a filter. **The
   ledger's SNAPSHOT rows never set it either** (design session 2026-09-26, decision 13):
   `metaSnapSelectActions` no longer re-commits the app-wide filter when you browse a tick's anchors
   and pick one.
@@ -109,7 +113,7 @@ The design rules behind the table, which the tests pin but don't explain:
   pager, the explorer row's committed state. The tick-local commit wins inside its tick; elsewhere
   the filter. Full ancestry there is tick → network → snapshot (`metaSnapSelectActions`,
   `bandSelectActions`, `tickNetSelectActions`), every one of which PINS the tick. Only the top
-  bar's picker and the Hypergraph's hub and rows set the filter; a ledger NODE never does
+  bar's picker sets the filter; a ledger NODE never does
   (`viewPolicy.nodeCommitsNetwork` is hyper's alone). A filter switch clears it (same rung, one commit
   finer), and so does leaving the view.
 - **No selection in Snapshots writes the filter — not even to release it** (user, 2026-10-02:

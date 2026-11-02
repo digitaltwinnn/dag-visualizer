@@ -72,7 +72,8 @@ export const STATS_TTL_S = 30 * 86_400;
 /** The singleflight lock's TTL. A warm item's paced wait runs INSIDE the lock (`pacedChat` wraps
  *  the chat this generator calls), so the worst writer holds it for the facts reads, a paced wait
  *  of a second or two, two Gate attempts at their 20-second timeout and the set: 42 s plus the
- *  reads. 90 s leaves the reads about 45 s. The unlock is unconditional, so a writer that outlived its lock would free the next
+ *  reads, a Snapshots note's row lookups among them (`LOCATE_BUDGET_MS`, 8 s). 90 s leaves the reads
+ *  about 45 s. The unlock is unconditional, so a writer that outlived its lock would free the next
  *  writer's (R30). */
 export const LOCK_TTL_S = 90;
 
@@ -224,7 +225,7 @@ async function write(
       seen.set(iso, n);
       const caption = captions.get(n === 1 ? iso : `${iso}#${n}`);
       if (caption && checkNote(caption, input.facts, input.names, { maxSentences: 1, subject }).ok)
-        kept.push({ dayMs: d.dayMs, kind: d.kind, networkId: d.networkId, caption: capitalFirst(withDayChange(plainly(caption), d)) });
+        kept.push({ dayMs: d.dayMs, kind: d.kind, networkId: d.networkId, ...(d.measure ? { measure: d.measure } : {}), caption: capitalFirst(withDayChange(plainly(caption), d)) });
     }
     // The Briefing's line is held to the note's gate and is never worth a retry: one that fails,
     // runs long or says what did not happen is dropped, and the tour reads the note instead.

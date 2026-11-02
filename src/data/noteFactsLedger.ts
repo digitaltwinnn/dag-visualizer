@@ -1,7 +1,7 @@
 import { isPause } from "@/src/data/notableDays";
 import { chainReadThrough, fact, median, networksAnchored, spanMeasured, type ChainReads } from "@/src/data/noteFacts";
-import { eventChange, largestSnapshotChange, longestGapChange, pauseChange, pickChanges, rateChange, rhythmChange, withExtremes } from "@/src/data/noteChanges";
-import type { Fact, FactPair, NoteChange, NoteLead } from "@/src/data/noteTypes";
+import { eventChange, largestGlobalChange, longestGapChange, pauseChange, pickChanges, rateChange, rhythmChange, withExtremes } from "@/src/data/noteChanges";
+import type { Fact, FactPair, NoteChange, NoteChangeFind, NoteLead } from "@/src/data/noteTypes";
 import { anchorSeries, formatDag, globalSeries, metricSeries, spanAverage, TREND_METRICS, trimCounterEdges, unlistedUnmeasured, withUnlisted } from "@/src/data/trendSeries";
 import type { TrendsWindowData } from "@/src/data/trendWindow";
 import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
@@ -110,6 +110,16 @@ function longestGap(gapMax: Points, d: TrendsWindowData): number | null {
   let max: number | null = null;
   for (const v of trimmed(gapMax, d)) if (v != null && v > 0 && (max == null || v > max)) max = v;
   return max;
+}
+
+/** The widest reading of a max series, and the bucket it stands in. Null where none was measured. */
+function peakOf(row: Points, d: TrendsWindowData): { v: number; fromMs: number; toMs: number } | null {
+  let at = -1;
+  const cut = trimmed(row, d);
+  cut.forEach((v, i) => {
+    if (v != null && v > 0 && (at < 0 || v > cut[at]!)) at = i;
+  });
+  return at < 0 ? null : { v: cut[at]!, fromMs: d.buckets[at]!, toMs: d.buckets[at]! + d.stepMs };
 }
 
 /** THE PAIR (R54) of one quantity read usual and recent: the ends' `pair` when BOTH were stated,
@@ -237,20 +247,20 @@ export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: st
   const paces: NoteChange[] = [];
   const rateRows: NoteChange[] = [];
   /** The recent widest gap, when it is a pause against the week's usual widest one. */
-  const pauseOf = (key: string): { gap: number; usual: number } | null => {
-    const gap = longestGap(recent.series[key] ?? [], recent);
+  const pauseOf = (key: string, chain: string | null): { gap: number; usual: number; find: NoteChangeFind } | null => {
+    const peak = peakOf(recent.series[key] ?? [], recent);
     const widths = trimmed(week.series[key] ?? [], week).filter((v): v is number => v != null && v > 0);
-    if (gap == null || !widths.length) return null;
+    if (!peak || !widths.length) return null;
     const usual = median(widths);
-    return isPause(gap, usual) ? { gap, usual } : null;
+    return isPause(peak.v, usual) ? { gap: peak.v, usual, find: { chain, fromMs: peak.fromMs, toMs: peak.toMs, gapS: peak.v } } : null;
   };
   const seconds = (v: number) => fact("", v, "duration").text;
   if (weekCovered) {
     const dayMeasured = spanMeasured(trimmed(recent.series["g.ticks"] ?? [], recent), recent.stepMs);
     // A STALL OF THE WHOLE NETWORK IS ONE ROW: every chain waits on the global snapshots, so one row
     // per network would say the same thing up to three times.
-    const stall = whole ? pauseOf("g.gapMax") : null;
-    if (stall) paused.push(pauseChange("Global snapshots", seconds(stall.gap), seconds(stall.usual), stall.gap, { kind: "network", id: "dag" }));
+    const stall = whole ? pauseOf("g.gapMax", null) : null;
+    if (stall) paused.push({ ...pauseChange("Global snapshots", seconds(stall.gap), seconds(stall.usual), stall.gap, { kind: "network", id: "dag" }), find: stall.find });
     for (const id of whole ? ids : [subject]) {
       const snaps = (d: TrendsWindowData) => metricSeries("snapshots", id, d.series).points;
       const total = (d: TrendsWindowData) => trimmed(snaps(d), d).reduce<number>((a, v) => a + (v ?? 0), 0);
@@ -261,14 +271,14 @@ export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: st
       const name = catalog[id] ?? id;
       const sure = dayMeasured && chainReadThrough(input.chainReads, id, recent.now);
       const daily = spanAverage("snapshots", trimmed(snaps(week), week), week.stepMs) ?? 0;
-      if (sure && now === 0 && daily >= EVENT_MIN_SNAPS) events.push(eventChange(name, "quiet", at));
+      if (sure && now === 0 && daily >= EVENT_MIN_SNAPS) events.push({ ...eventChange(name, "quiet", at), find: { chain: id, last: true } });
       else if (sure && now >= EVENT_MIN_SNAPS && usual <= now) events.push(eventChange(name, "active", at)); // the week's snapshots are all the day's
       else {
         const change = rhythmChange(name, spacing(week) ?? 0, spacing(recent) ?? 0, at);
         if (change) paces.push(change);
       }
-      const gap = pauseOf(`m.${id}.gapMax`);
-      if (gap && !(stall && gap.gap <= STALL_SHARED * stall.gap)) paused.push(pauseChange(name, seconds(gap.gap), seconds(gap.usual), gap.gap, at));
+      const gap = pauseOf(`m.${id}.gapMax`, id);
+      if (gap && !(stall && gap.gap <= STALL_SHARED * stall.gap)) paused.push({ ...pauseChange(name, seconds(gap.gap), seconds(gap.usual), gap.gap, at), find: gap.find });
       if (!sure) continue;
       for (const [metric, word, unit, floor] of [["fees", "fees", "DAG", 1 / HOURS_PER_DAY], ["kb", "data", "MB", 1 / HOURS_PER_DAY]] as const) {
         const nowRate = perHour(metric, metricSeries(metric, id, recent.series).points, recent);
@@ -280,24 +290,20 @@ export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: st
       }
     }
   }
-  // THE CHAMBER'S EXTREMES: who held the span's largest snapshot and its longest gap, so a quiet day
-  // still has something to click. Each network's own widest reading, which is why a stopped one
-  // stands out of it. A fee of 0 is the store from before the sampler kept one (`m.<id>.feeMax`).
+  // THE CHAMBER'S EXTREMES: the span's largest global snapshot and its longest gap, so a quiet day
+  // still has something to click. Each network's own widest reading for the gap, which is why a
+  // stopped one stands out of it. No `g.anchorsMax` is the store from before the sampler kept one.
   const extremes: NoteChange[] = [];
   if (whole) {
-    const held = (key: (id: string) => string) => {
-      let best: { id: string; v: number } | null = null;
-      for (const id of ids) {
-        const v = longestGap(recent.series[key(id)] ?? [], recent);
-        if (v != null && (!best || v > best.v)) best = { id, v };
-      }
-      return best;
-    };
-    const named = (id: string) => [catalog[id] ?? id, { kind: "network", id } as const] as const;
-    const fee = held((id) => `m.${id}.feeMax`);
-    const gap = held((id) => `m.${id}.gapMax`);
-    if (fee) extremes.push(largestSnapshotChange(named(fee.id)[0], `${formatDag(fee.v * TREND_METRICS.fees.scale)} DAG`, named(fee.id)[1]));
-    if (gap && !paused.length) extremes.push(longestGapChange(named(gap.id)[0], gap.v, named(gap.id)[1])); // a pause is that gap
+    const largest = peakOf(recent.series["g.anchorsMax"] ?? [], recent);
+    if (largest) extremes.push({ ...largestGlobalChange(largest.v), find: { chain: null, fromMs: largest.fromMs, toMs: largest.toMs, count: largest.v } });
+    let gap: { id: string; v: number; fromMs: number; toMs: number } | null = null;
+    for (const id of ids) {
+      const peak = peakOf(recent.series[`m.${id}.gapMax`] ?? [], recent);
+      if (peak && (!gap || peak.v > gap.v)) gap = { id, ...peak };
+    }
+    const widest = gap as { id: string; v: number; fromMs: number; toMs: number } | null;
+    if (widest && !paused.length) extremes.push({ ...longestGapChange(catalog[widest.id] ?? widest.id, widest.v, { kind: "network", id: widest.id }), find: { chain: widest.id, fromMs: widest.fromMs, toMs: widest.toMs, gapS: widest.v } }); // a pause is that gap
   }
   const changes = withExtremes(pickChanges(events, paused, paces, rateRows), extremes);
   return { facts, names: [...new Set(Object.values(catalog))], lead: leadOf(facts), ...(changes.length ? { changes } : {}) };

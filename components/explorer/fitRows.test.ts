@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { FIT_MAX, FIT_MIN, pageKeepingRow, rowsThatFit, pageHolding, pageOnResize } from "./fitRows";
 
@@ -51,5 +52,29 @@ describe("pageOnResize — a page-size change keeps the reader's place", () => {
   });
   it("without a pin, keeps the row that was first on screen", () => {
     expect(pageOnResize(3, 10, 20, -1)).toBe(pageKeepingRow(3, 10, 20));
+  });
+});
+
+// THE BOX EASES, THE CONTENT DOES NOT (user, 2026-11-02: "the explorer section bottom keeps jumping up/
+// down a bit the height of a row"; measured at 1536x864, 14, 11, 12, 13, 14 rows every 0.7 seconds).
+// `HeightEase` holds the card's box at its old height while the rows are already laid out, so a fit
+// read off the box saw room that was not there, added a row, overflowed when the ease landed, and
+// went round again.
+describe("what the fit measures", () => {
+  const hook = readFileSync("components/explorer/useFitRows.ts", "utf8");
+  it("reads the card's content, never its eased box", () => {
+    expect(hook).not.toMatch(/card\.getBoundingClientRect\(\)\.bottom/);
+    expect(hook).toMatch(/card\.lastElementChild/);
+  });
+  it("converges from either side while the box stands anywhere", () => {
+    const pitch = 31.7;
+    const top = 100;
+    const host = top + 12 * pitch + 3.4;
+    const bottom = (rows: number) => top + rows * pitch;
+    for (const start of [9, 11, 14, 18]) {
+      let n = start;
+      for (let i = 0; i < 4; i++) n = rowsThatFit(n, host - bottom(n), pitch, 10);
+      expect(n).toBe(12);
+    }
   });
 });

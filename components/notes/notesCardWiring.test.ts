@@ -45,6 +45,50 @@ describe("the notes card is part of the stack", () => {
   });
 });
 
+describe("the top card's scope", () => {
+  // user, 2026-11-02: the network the Metagraph rung stands on, the filter unless one is selected there.
+  it("is the rung's network in every view, a committed node's included", () => {
+    const body = fnBody(read("components/notes/useAiNote.ts"), "export function useAiNote(");
+    expect(body).toMatch(/metagraphCardNetwork\(\{ mode, filter, railNet, tickNet, snap, tickHasFilter, trendFocus, trendFront, inspect \}\)/);
+    expect(body).not.toMatch(/trendFilter/);
+  });
+});
+
+describe("a swipe that releases a focus", () => {
+  it("turns from the deck the release left, read after it", () => {
+    const stack = read("components/TrendStack.tsx");
+    expect(stack).toMatch(/st\.setTrendRotation\(useStore\.getState\(\)\.trendRotation \+ step\)/);
+  });
+});
+
+describe("the rail's pulse", () => {
+  // A network picked in Hypergraph is a browse now, so a key on the filter never changed.
+  it("keys on the network the view stands on, on every tier", () => {
+    expect(read("components/RailThread.tsx")).toMatch(/useEdgePulse\(`\$\{mode\}\|\$\{network\}\|\$\{signal\}`\)/);
+    expect(read("components/ExploreRail.tsx")).toMatch(/signalKey=\{`\$\{mode\}\|\$\{network\}`\}/);
+    expect(read("components/Inspector.tsx")).toMatch(/signalKey=\{`\$\{mode\}\|\$\{viewNetwork\(\{ filter, railNet \}\)\}`\}/);
+    expect(read("components/PhoneDockSweep.tsx")).toMatch(/usePulseWindow\(`\$\{mode\}\|\$\{network\}`\)/);
+  });
+});
+
+describe("a day's measure", () => {
+  it("rides a chart's coin as it does a card's row", () => {
+    expect(read("components/TrendStack.tsx")).toMatch(/list\.push\(\{ dayMs: d\.dayMs, kind: d\.kind, measure: d\.measure, networkId: d\.networkId/);
+  });
+});
+
+describe("a row with nothing to open", () => {
+  // user, 2026-11-02: "the style of the notable row is difficult, they should keep the same style".
+  it("reads like every other row, and only takes no click", () => {
+    const body = fnBody(read("components/notes/NoteRows.tsx"), "function ChangeRow(");
+    expect(body).toMatch(/still=\{actions\(\) == null\}/);
+    expect(body).not.toMatch(/disabled=/);
+    const door = fnBody(read("components/inspector/parts.tsx"), "export function Door(");
+    expect(door).toMatch(/still && "pointer-events-none"/);
+    expect(door).toMatch(/still \? \(\s*<div className=/);
+  });
+});
+
 describe("a subject card's rows", () => {
   const rows = read("components/notes/NoteRows.tsx");
   const subject = read("components/notes/SubjectNote.tsx");
@@ -218,8 +262,10 @@ describe("the notes card's own behaviour", () => {
   it("types a note in on both surfaces, through one component", () => {
     const typed = read("components/notes/TypedNote.tsx");
     expect(typed).toMatch(/prefers-reduced-motion: reduce/);
-    expect(typed).toMatch(/<span className="invisible col-start-1 row-start-1">\{text\}<\/span>/);
-    expect(typed).toMatch(/<span aria-hidden className="col-start-1 row-start-1"><NoteText text=\{text\} upto=\{shown\} \/><\/span>/);
+    // REVEALED IN PLACE (user, 2026-11-02): the rest of the line stands invisible beside what is
+    // written, so a centred line never re-centres on each letter and no line wraps differently.
+    expect(typed).toMatch(/<NoteText text=\{text\} upto=\{shown\} \/>\s*<span className="invisible">\{text\.slice\(shown\)\}<\/span>/);
+    expect(typed).not.toMatch(/\bgrid\b/);
     expect(typed).toMatch(/<span className="sr-only">\{text\}<\/span>/);
     expect(card).toMatch(/<TypedNote text=\{res\.text\} waited=\{waited\}/);
     expect(read("components/notes/SubjectNote.tsx")).toMatch(/<TypedNote text=\{text!?\} waited=\{waited\}/);
@@ -272,7 +318,7 @@ describe("a failed write answers the gesture on the card's surface (R68)", () =>
 });
 
 // THE TOP CARD HOLDS, THE SUBJECT CARDS CARRY THEIR OWN (spec 2026-10-29-subject-notes): the Gate
-// AI card is the view's note at the filter's scope, and a committed country, provider, make-up or
+// AI card is the view's note at the rung's scope, and a committed country, provider, make-up or
 // brushed range shows its note inside its own card. The subject note is asked by the selection
 // itself, so it has no door and never says it could not write.
 describe("subject notes live on their cards", () => {

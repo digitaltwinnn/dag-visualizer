@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 import { netKeyOf, tickNetSelectActions, tickNetClearActions, viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, trendPlaneActions, railNetActions, noteCohortActions, noteDayActions, snapshotClearActions, type ClickAction } from "./pickActions";
 import { finerLevels } from "./focusLadder";
@@ -68,7 +69,7 @@ describe("clickActions — empty click (the land-sphere country toggle, geo)", (
 describe("clickActions — hub / snapshot", () => {
   it("a hub click selects its metagraph, nothing else", () => {
     expect(clickActions({ mode: "hyper", pick: hubPick(), countryCc: null, current: state() })).toEqual([
-      { kind: "filter", id: "dor" },
+      { kind: "railNet", id: "dor" },
     ]);
   });
   it("a snapshot tile PINS that snapshot (a scene tile is never the strip's live tip)", () => {
@@ -105,10 +106,10 @@ describe("clickActions — node clicks (the ordering contracts)", () => {
     expect(acts[0]).toEqual({ kind: "country", cc: "US" });
     expect(kinds(acts)).not.toContain("filter");
   });
-  it("HYPER: filter + inspect only — no country (a geo concept), no autoRotate stop", () => {
+  it("HYPER: its network + inspect only — no country (a geo concept), no autoRotate stop", () => {
     const p = nodePick("DE");
     expect(kinds(clickActions({ mode: "hyper", pick: p, countryCc: null, current: state() }))).toEqual([
-      "filter",
+      "railNet",
       "inspect",
     ]);
   });
@@ -172,11 +173,11 @@ describe("the shared component builders (GeoExplore rows + LiveStrip bars run th
       { kind: "inspect", pick: null },
     ]);
   });
-  it("nodeSelectActions: commitNetwork false never moves the filter, even where the view's policy would", () => {
+  it("nodeSelectActions: commitNetwork false never moves the network, even where the view's policy would", () => {
     const hyper = nodeSelectActions(nodePick(), { mode: "hyper", currentFilter: "all" });
-    expect(hyper.some((a) => a.kind === "filter")).toBe(true);
+    expect(hyper.some((a) => a.kind === "railNet")).toBe(true);
     const raw = nodeSelectActions(nodePick(), { mode: "hyper", currentFilter: "all", commitNetwork: false });
-    expect(raw.some((a) => a.kind === "filter")).toBe(false);
+    expect(raw.some((a) => a.kind === "railNet")).toBe(false);
     expect(raw[raw.length - 1]).toEqual({ kind: "inspect", pick: nodePick() });
   });
   it("nodeSelectActions: a row select == a scene node click (same ordered actions)", () => {
@@ -281,40 +282,58 @@ describe("the shared component builders (GeoExplore rows + LiveStrip bars run th
 // rail again. The drift guard is the equality with nodeSelectActions' own ancestry — the two
 // must always name the same rungs.
 describe("viewEntryActions (a carried node's ancestry in the destination view)", () => {
+  // user, 2026-11-02: "as they fly between the views their focus should be kept". A browse clears on
+  // leaving and the node carries, so arriving where a node stands the view on its network does so
+  // again, node last, because a network change clears what was picked under the old one.
+  it("hyper stands on a carried node's network again, under All, with the node after it", () => {
+    const p = nodePick();
+    expect(viewEntryActions({ filter: "all", mode: "hyper", pick: p, compositionSel: COMP })).toEqual([
+      { kind: "railNet", id: "dor" },
+      { kind: "composition", sel: COMP },
+      { kind: "inspect", pick: p },
+    ]);
+  });
+  it("no browse where the filter already stands on it", () => {
+    expect(viewEntryActions({ filter: "dor", mode: "hyper", pick: nodePick(), compositionSel: COMP }).map((a) => a.kind)).toEqual(["composition"]);
+  });
+  it("a view that does not commit a node's network stays out of it", () => {
+    expect(viewEntryActions({ filter: "all", mode: "ledger", pick: nodePick() })).toEqual([]);
+  });
+
   const COMP = { netId: "dor", key: "Hybrid|L0,cL1" };
   const ancestryOf = (acts: ClickAction[]) => acts.filter((a) => a.kind !== "filter" && a.kind !== "inspect");
 
   it("geo: re-commits the node's country AND provider cohort", () => {
     const p = nodePick("DE");
-    expect(viewEntryActions({ mode: "geo", pick: p })).toEqual([
+    expect(viewEntryActions({ filter: "dor", mode: "geo", pick: p })).toEqual([
       { kind: "country", cc: "DE" },
       { kind: "cohort", sel: { cc: "DE", city: null, isp: null } },
     ]);
   });
 
   it("hyper: re-commits the node's composition group", () => {
-    expect(viewEntryActions({ mode: "hyper", pick: nodePick(), compositionSel: COMP })).toEqual([
+    expect(viewEntryActions({ filter: "dor", mode: "hyper", pick: nodePick(), compositionSel: COMP })).toEqual([
       { kind: "composition", sel: COMP },
     ]);
   });
 
   it("ledger: contributes nothing — its floors/containers are visual aid (layer retired 2026-08-06)", () => {
-    expect(viewEntryActions({ mode: "ledger", pick: nodePick() })).toEqual([]);
+    expect(viewEntryActions({ filter: "dor", mode: "ledger", pick: nodePick() })).toEqual([]);
   });
 
   it("names exactly the rungs a node CLICK in that view commits (no drift)", () => {
     const p = nodePick("DE");
     for (const mode of ["geo", "hyper", "ledger"] as const) {
-      expect(viewEntryActions({ mode, pick: p, compositionSel: COMP })).toEqual(
+      expect(viewEntryActions({ filter: "dor", mode, pick: p, compositionSel: COMP })).toEqual(
         ancestryOf(nodeSelectActions(p, { mode, currentFilter: "dor", compositionSel: COMP })),
       );
     }
   });
 
   it("has nothing to say without a node selection (a dossier or a snapshot carries no ancestry)", () => {
-    expect(viewEntryActions({ mode: "geo", pick: null })).toEqual([]);
-    expect(viewEntryActions({ mode: "geo", pick: hubPick() })).toEqual([]);
-    expect(viewEntryActions({ mode: "ledger", pick: snapPick() })).toEqual([]);
+    expect(viewEntryActions({ filter: "dor", mode: "geo", pick: null })).toEqual([]);
+    expect(viewEntryActions({ filter: "dor", mode: "geo", pick: hubPick() })).toEqual([]);
+    expect(viewEntryActions({ filter: "dor", mode: "ledger", pick: snapPick() })).toEqual([]);
   });
 });
 
@@ -357,9 +376,9 @@ describe("cohortToggleActions — the provider/cohort rung toggle (spec Part 4)"
 const COMP = { netId: "dor", key: "Hybrid|L0·dL1" };
 
 describe("compositionToggleActions — the hyper composition rung toggle (user, 2026-08-02)", () => {
-  it("commits the group, drilling the filter FIRST and dropping a selected node", () => {
+  it("commits the group, standing on its network FIRST and dropping a selected node", () => {
     expect(compositionToggleActions(COMP, { composition: null, hasInspect: true, filter: "all" })).toEqual([
-      { kind: "filter", id: "dor" },
+      { kind: "railNet", id: "dor" },
       { kind: "inspect", pick: null },
       { kind: "composition", sel: COMP },
     ]);
@@ -425,7 +444,7 @@ describe("nodeSelectActions ancestry (spec Part 3 — full-ancestry rule)", () =
   });
   it("hyper: the node's composition GROUP commits before inspect (full ancestry)", () => {
     const acts = nodeSelectActions(geoPick, { mode: "hyper", currentFilter: "all", compositionSel: COMP });
-    expect(acts.map((a) => a.kind)).toEqual(["filter", "composition", "inspect"]);
+    expect(acts.map((a) => a.kind)).toEqual(["railNet", "composition", "inspect"]);
     expect(acts[1]).toEqual({ kind: "composition", sel: COMP });
   });
   it("hyper: no resolvable group → the node still selects (no empty commit)", () => {
@@ -723,5 +742,19 @@ describe("railNetActions", () => {
   });
   it("stepping onto the filter's own network ends the browse: nothing left to differ", () => {
     expect(railNetActions("dag", "dag")).toEqual([{ kind: "railNet", id: null }]);
+  });
+});
+
+// ONE RULE (user, 2026-11-02: "yes make it one rule everywhere"): only the top bar sets the filter.
+// Hypergraph's rows, hubs, nodes and groups stand the view on a network the way the rail does.
+describe("a network picked in the view", () => {
+  it("a row steps onto a network, and back off the one the view stands on", () => {
+    expect(railNetActions("dor", "all")).toEqual([{ kind: "railNet", id: "dor" }]);
+    expect(railNetActions("dor", "usdc")).toEqual([{ kind: "railNet", id: "dor" }]);
+    expect(railNetActions("dor", "dor")).toEqual([{ kind: "railNet", id: null }]);
+  });
+  it("no gesture in the table sets the filter but the picker's own", () => {
+    const src = readFileSync("src/engine/domain/pickActions.ts", "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+    expect(src.match(/\{ kind: "filter", id:[^}]*\}/g)).toEqual(['{ kind: "filter", id: id !== "all" && id === currentFilter ? "all" : id }']);
   });
 });

@@ -63,6 +63,11 @@ them — but the Next Node server can.
   `chainReadThrough`). It also samples the UNLISTED chains — the explorer's `/currency`
   list less every tracked address — for their own counts, outside the fee/size floors, marking the
   buckets it measured them in with `u.cov` (History's unlisted figure is measured, not derived).
+  **The largest global snapshot** (`g.anchorsMax`, 2026-11-02): each bucket's widest
+  `metagraphSnapshotCount`, a field of the global's own record, so `fill` writes it too.
+  **A notable row's exact snapshot is found when its note is written** (`app/api/notes/snapshotAt.ts`,
+  2026-11-02): the store keeps the largest global and a chain's widest gap per bucket, never which snapshot it was, so the explorer is read by ordinal, best effort, and a row that cannot be resolved keeps
+  its network. Nothing new is stored in the trends family.
   **Where the fleet runs has its own key family** (2026-10-27): once an hour, beside the fleet
   gauges, the sampler stores the whole fleet and each network by country and by hosting provider
   into `geo:{net}:{YYYY}` (day buckets, `f.cc.*` / `f.isp.*`, `fleetGeo.ts`), with provider names

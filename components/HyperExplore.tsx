@@ -14,7 +14,7 @@ import { viewNetwork } from "@/src/engine/domain/viewNetwork";
 import { HYPER_MEASURE_OPTIONS, groupMeasure, type HyperMeasure } from "@/src/data/hyperMeasure";
 import { metagraphById } from "@/src/data/network";
 import type { NodeRow } from "@/src/data/types";
-import { compositionToggleActions, filterToggleActions, nodeSelectActions } from "@/src/engine/domain/pickActions";
+import { compositionToggleActions, filterToggleActions, nodeSelectActions, railNetActions } from "@/src/engine/domain/pickActions";
 import { identityHudCss } from "@/src/palette/identity";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
@@ -60,7 +60,7 @@ export default function HyperExplore() {
   const setHoverGroup = useStore((s) => s.setHoverGroup);
 
   // The three writes, all through the decision table and the one executor (rule 2).
-  const toggleNetwork = (id: string) => applyClickActions(filterToggleActions(id, appFilter, railNet));
+  const toggleNetwork = (id: string) => applyClickActions(railNetActions(id, filter));
   // Home releases what the view stands on: a browsed network first, the filter after it.
   const releaseNetwork = () => applyClickActions(railNet ? [{ kind: "railNet", id: null }] : filterToggleActions(appFilter, appFilter));
   const toggleComposition = (compKey: string) =>

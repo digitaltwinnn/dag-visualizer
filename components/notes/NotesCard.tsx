@@ -14,8 +14,8 @@ import TypedNote from "./TypedNote";
 import { useAiNote, useWaited } from "./useAiNote";
 
 // THE AI NOTES CARD (2026-10-27) — a few sentences a model wrote about what the view is showing,
-// the VIEW's note at the filter's scope (`noteSubjectOf`: the network, else everything; in History
-// the filter's plane over the window pill, never the plane brought forward), with History's few
+// the VIEW's note at the Metagraph rung's scope (`noteSubjectOf`: the network, else everything; in
+// History over the window pill), with History's few
 // notable days that each commit their own day as the range, and the other views' notable changes
 // that each commit their own subject, both folded into the card's foot. It HOLDS under a drill (spec 2026-10-29-subject-notes): a committed country,
 // provider, make-up or brushed range carries its own note inside its own card (`SubjectNote`).

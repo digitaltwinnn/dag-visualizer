@@ -118,16 +118,16 @@ export const sameComposition = (a: CompositionSel | null, b: CompositionSel | nu
   !!a && !!b && a.netId === b.netId && a.key === b.key;
 
 // The COMPOSITION zoom-level TOGGLE (user, 2026-08-02) — HyperExplore's group row. A group is
-// network-scoped, so the row commits its NETWORK first (only when it changes, the no-churn rule;
-// the Engine's filter subscription clears every finer rung, which is why the composition commit
-// must come after it), then drops the finer node selection (finerLevels("hyper","composition")),
+// network-scoped, so the row stands the view on its NETWORK first (only when it changes, the no-churn
+// rule; the Engine's network subscription clears every finer rung, which is why the composition
+// commit must come after it), then drops the finer node selection (finerLevels("hyper","composition")),
 // then commits the group itself. Re-clicking the committed group clears it — one toggle language.
 export function compositionToggleActions(
   c: CompositionSel,
   current: { composition: CompositionSel | null; hasInspect: boolean; filter: string },
 ): ClickAction[] {
   const acts: ClickAction[] = [];
-  if (c.netId !== current.filter) acts.push({ kind: "filter", id: c.netId });
+  if (c.netId !== current.filter) acts.push({ kind: "railNet", id: c.netId });
   if (current.hasInspect) acts.push({ kind: "inspect", pick: null });
   acts.push({ kind: "composition", sel: sameComposition(current.composition, c) ? null : c });
   return acts;
@@ -146,10 +146,11 @@ export function compositionToggleActions(
 // cohort → node and the network is never committed by a node — the top-bar filter and the
 // hub-less scene keep it a deliberate, separate gesture. NOR IN THE LEDGER (user, 2026-09-29: the
 // explorer's signer row set the filter): the committed network is the chamber's LENS, and no
-// other row of that explorer moves it (`metaSnapSelectActions`, decision 13). Only hyper keeps
-// filter-first (a node is a bead on its hub's shell; the filter is what dims the other hubs and
-// frames the network, and the node rung inherits that framing) — `viewPolicy.nodeCommitsNetwork`
-// is the allow-list. Full-ancestry rule
+// other row of that explorer moves it (`metaSnapSelectActions`, decision 13). Only hyper stands the
+// view on the node's network first (a node is a bead on its hub's shell; the network is what dims
+// the other hubs and frames the hub, and the node rung inherits that framing), as a browse, never
+// the filter (user, 2026-11-02: "one rule everywhere") — `viewPolicy.nodeCommitsNetwork` is the
+// allow-list. Full-ancestry rule
 // (spec Part 3): committing every
 // rung above the node means a deselect steps back down the SAME ladder regardless of how the
 // node was reached (scene click, explorer row, or a jump straight from "all"). `deselect` is
@@ -176,7 +177,7 @@ export function nodeSelectActions(
   const acts: ClickAction[] = [];
   const netId = pickNetId(p);
   // Only a view whose row opts in drills the filter first (see the header).
-  if (netId && netId !== opts.currentFilter && (opts.commitNetwork ?? VIEW_POLICIES[opts.mode].nodeCommitsNetwork)) acts.push({ kind: "filter", id: netId });
+  if (netId && netId !== opts.currentFilter && (opts.commitNetwork ?? VIEW_POLICIES[opts.mode].nodeCommitsNetwork)) acts.push({ kind: "railNet", id: netId });
   acts.push(...nodeAncestryActions(p, opts));
   acts.push({ kind: "inspect", pick: p });
   return acts;
@@ -208,14 +209,22 @@ function nodeAncestryActions(
 // destination rail with every parent slot back on its ghost, and a deselect would step straight
 // to the network (user, 2026-08-02: every card up to the selection belongs on the rail, in every
 // view). So the entry re-derives exactly the ancestry a click on that node IN the destination
-// view would have committed — no filter (it carried), no inspect (it's already open). A non-node
-// pick (a dossier, a snapshot) has no ancestry and yields nothing.
+// view would have committed, no inspect (it's already open). EXCEPT THE NETWORK (user, 2026-11-02: "as
+// they fly between the views their focus should be kept"): a browse clears on leaving and the node
+// carries, so a view whose node stands on its network does so again, and the node commits after it,
+// because a network change clears what was picked under the old one. A non-node pick (a dossier, a
+// snapshot) has no ancestry and yields nothing.
 export function viewEntryActions(opts: {
   mode: Mode;
+  filter: string;
   pick: PickDescriptor | null;
   compositionSel?: CompositionSel | null;
 }): ClickAction[] {
-  return opts.pick ? nodeAncestryActions(opts.pick, opts) : [];
+  const { pick } = opts;
+  if (!pick) return [];
+  const ancestry = nodeAncestryActions(pick, opts);
+  const netId = VIEW_POLICIES[opts.mode].nodeCommitsNetwork ? pickNetId(pick) : null;
+  return netId && netId !== opts.filter ? [{ kind: "railNet", id: netId }, ...ancestry, { kind: "inspect", pick }] : ancestry;
 }
 
 // The network-filter TOGGLE — the FilterPicker's committed-row rule: picking the committed
@@ -227,10 +236,11 @@ export function filterToggleActions(id: string, currentFilter: string, railNet: 
   return [{ kind: "filter", id: id !== "all" && id === currentFilter ? "all" : id }];
 }
 
-/** A STEP ON A RAIL THAT BROWSES (user, 2026-10-31): browses a network and leaves the filter alone.
- *  Coming back to the filter's own network ends the browse: there is nothing left to differ. */
-export function railNetActions(id: string, filter: string): ClickAction[] {
-  return [{ kind: "railNet", id: id === filter ? null : id }];
+/** ONE RULE (user, 2026-11-02: "yes make it one rule everywhere"): only the top bar sets the filter.
+ *  A step on a rail or a row naming a network stands the view on it, and leaves the filter alone.
+ *  `current` is what the step comes back from: the network it would end the browse on. */
+export function railNetActions(id: string, current: string): ClickAction[] {
+  return [{ kind: "railNet", id: id === current ? null : id }];
 }
 
 // Selecting a SNAPSHOT — shared by the ledger's tile click and LiveStrip's bar click:
@@ -388,8 +398,7 @@ export const sameMetaSnap = (a: MetaSnapSel | null, b: MetaSnapSel | null): bool
  *  explorer and picking one re-committed the app-wide filter: every other network vanished from
  *  the chamber, the list and the other views, and the commit outlived the visit (user: "click dor,
  *  then click the actual dor snapshot: it does filter"). A snapshot is a record in a tick; the
- *  filter is a lens over the whole app, and only the top bar's picker and the Hypergraph's hub
- *  and network rows set it now.
+ *  filter is a lens over the whole app, and only the top bar's picker sets it now.
  *
  *  FULL ANCESTRY IS tick → network → snapshot (user, 2026-10-02: "the parent rung is incomplete;
  *  it should ensure it is complete and also select the related details card"). Dropping the filter
@@ -542,8 +551,8 @@ export function clickActions(input: {
   // safe on its own).
   if (!p) return mode === "geo" && countryCc ? countryToggleActions(countryCc, current) : [];
 
-  // A hub click selects the metagraph (opens its context pane + frames it).
-  if (p.kind === "meta") return [{ kind: "filter", id: p.cfg.id }];
+  // A hub click stands the view on its network (opens its context pane + frames it).
+  if (p.kind === "meta") return [{ kind: "railNet", id: p.cfg.id }];
 
   // The ledger's snapshot bands: a scene band is never the strip's live tip — it pins, and
   // re-clicking the pinned tick's band deselects (the same tested toggle the explorer runs).

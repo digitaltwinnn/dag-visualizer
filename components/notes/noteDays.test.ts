@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { NoteDay } from "@/src/data/noteTypes";
-import { NOTE_KIND_WORD, daysByDate, notableDayAt, notableDayOfRange, notableDaySpan } from "./noteDays";
+import { NOTE_KIND_WORD, dayMetric, daysByDate, notableDayAt, notableDayOfRange, notableDaySpan } from "./noteDays";
 
 // A NOTABLE DAY, MET ELSEWHERE (user, 2026-10-30: "if the moment is a notable day … can we show the
 // marker on the cards as well?"): the Moment card asks which notable day its bucket falls in, the
@@ -65,3 +65,21 @@ describe("daysByDate", () => {
   });
 });
 
+
+// A DAY OPENS ON THE MEASURE THAT MADE IT NOTABLE (user, 2026-11-02): a fee spike opened on the
+// snapshot chart showed nothing of it.
+describe("dayMetric", () => {
+  it("is the day's own measure", () => {
+    expect(dayMetric({ kind: "high", measure: "fees" })).toBe("fees");
+    expect(dayMetric({ kind: "low", measure: "kb" })).toBe("kb");
+    expect(dayMetric({ kind: "high", measure: "globals" })).toBe("globals");
+  });
+  it("a day of the count is the snapshot chart", () => {
+    expect(dayMetric({ kind: "high" })).toBe("snapshots");
+    expect(dayMetric({ kind: "peak" })).toBe("snapshots");
+  });
+  it("a pause or a first day leaves the chart alone", () => {
+    expect(dayMetric({ kind: "pause" })).toBeNull();
+    expect(dayMetric({ kind: "first" })).toBeNull();
+  });
+});

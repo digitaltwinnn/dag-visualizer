@@ -86,7 +86,7 @@ function DayRow({ day }: { day: NoteDay }) {
 /** ONE NOTABLE CHANGE (user, 2026-10-31): what moved over the note's span, the kind's coin then a
  *  sentence code wrote, so unlike a day's caption it is never the model's. The row is the subject's:
  *  it commits and hovers what the view's explorer row for that subject does (`noteChangeTarget`).
- *  A subject with nothing to open any more is listed all the same, as a closed door. */
+ *  A subject with nothing to open is listed all the same, in the same style, and takes no click. */
 function ChangeRow({ change, view, onCard }: { change: NoteChange; view: NoteView; onCard?: boolean }) {
   useFeedRead(["clusters", "api-geo"], "Notable change");
   useFeedRead(["global", "metasnaps"], "Notable change", view === "ledger");
@@ -95,6 +95,8 @@ function ChangeRow({ change, view, onCard }: { change: NoteChange; view: NoteVie
   const lit = useStore((s) => {
     if (!hover) return false;
     if (hover.channel === "filter") return s.hoverFilter === hover.key;
+    if (hover.channel === "metaSnap") return s.hoverMetaSnap === hover.key;
+    if (hover.channel === "snap") return s.hoverSnapOrd === Number(hover.key);
     return (hover.channel === "country" ? s.hoverCountry : s.hoverGroup) === hover.key;
   });
   const actions = () => {
@@ -109,6 +111,10 @@ function ChangeRow({ change, view, onCard }: { change: NoteChange; view: NoteVie
       composition: s.composition,
       hasInspect: !!s.inspect,
       metaSnap: s.metaSnap,
+      following: s.following,
+      pinnedOrdinal: s.following ? null : (s.snap?.data.ordinal ?? null),
+      inspect: s.inspect,
+      tickNet: s.tickNet,
       ledgerNet: ledgerNetwork({ filter: s.filter, tickNet: s.tickNet, snapOrdinal: s.snap?.data.ordinal ?? null }),
     };
     const acts = changeActions(change, view, state, s.selNodes, net && id ? latestTickOf(net.metaSnaps, net.globalSnapshots, id) : null);
@@ -118,6 +124,8 @@ function ChangeRow({ change, view, onCard }: { change: NoteChange; view: NoteVie
     if (!hover) return;
     const s = useStore.getState();
     if (hover.channel === "filter") return s.setHoverFilter(on ? hover.key : null);
+    if (hover.channel === "metaSnap") return s.setHoverMetaSnap(on ? hover.key : null);
+    if (hover.channel === "snap") return s.setHoverSnapOrd(on ? Number(hover.key) : null);
     if (hover.channel === "group") {
       s.setHoverGroup(on ? hover.key : null);
       s.setHoverCohort(on ? (hover.nodes ?? null) : null);
@@ -144,7 +152,7 @@ function ChangeRow({ change, view, onCard }: { change: NoteChange; view: NoteVie
       tone="ai"
       lit={lit}
       wrap
-      disabled={actions() == null}
+      still={actions() == null}
       label={<NoteKindCoin kind={change.kind} />}
       onPointerEnter={(e) => e.pointerType === "mouse" && on()}
       onPointerLeave={off}

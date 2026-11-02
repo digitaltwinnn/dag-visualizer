@@ -167,7 +167,52 @@ describe("metaSnap action", () => {
   });
 });
 
+describe("a filter change and the deck", () => {
+  it("turns the deck back to its front, wherever it was paged or swiped", () => {
+    useStore.setState({ filter: "all", trendFocus: null, trendScroll: 3, trendRotation: 2 });
+    applyClickActions([{ kind: "filter", id: "dor" }]);
+    let st = useStore.getState();
+    expect(st.trendScroll).toBe(0);
+    expect(st.trendRotation).toBe(0);
+    useStore.setState({ trendRotation: 2 });
+    applyClickActions([{ kind: "filter", id: "all" }]);
+    st = useStore.getState();
+    expect(st.trendRotation).toBe(0);
+  });
+  it("re-picking the same filter leaves the deck where it is", () => {
+    useStore.setState({ filter: "dor", trendRotation: 2 });
+    applyClickActions([{ kind: "filter", id: "dor" }]);
+    expect(useStore.getState().trendRotation).toBe(2);
+    useStore.setState({ filter: "all", trendRotation: 0 });
+  });
+});
+
+describe("railNet action", () => {
+  it("standing on the filter's own network is no browse", () => {
+    useStore.setState({ filter: "dor", railNet: "usdc" });
+    applyClickActions([{ kind: "railNet", id: "dor" }]);
+    expect(useStore.getState().railNet).toBeNull();
+    useStore.setState({ filter: "all" });
+  });
+  it("says what it did in its own words, never that a filter was set", () => {
+    useStore.setState({ filter: "all", railNet: null });
+    applyClickActions([{ kind: "railNet", id: "dor" }]);
+    expect(useStore.getState().motionCause).toEqual({ kind: "network", id: "dor" });
+    applyClickActions([{ kind: "railNet", id: null }]);
+    expect(useStore.getState().motionCause).toEqual({ kind: "network", id: "all" });
+  });
+});
+
 describe("trendFocus action (the History view's plane click)", () => {
+  it("a released focus turns the deck back to its front, where the DAG stands under All", () => {
+    useStore.setState({ trendFocus: "c", trendScroll: 3, trendRotation: 2 });
+    applyClickActions([{ kind: "trendFocus", id: null }]);
+    const st = useStore.getState();
+    expect(st.trendFocus).toBeNull();
+    expect(st.trendScroll).toBe(0);
+    expect(st.trendRotation).toBe(0);
+  });
+
   const ROSTER = ["a", "b", "c", "d", "e", "f", "g", "h"]; // 8 networks, a 5-wide window
 
   beforeEach(() => {
@@ -209,7 +254,8 @@ describe("trendFocus action (the History view's plane click)", () => {
     expect(useStore.getState().trendScroll).toBe(2);
   });
 
-  it("a RELEASE never pages — clearing the focus is not a place to go", () => {
+  it("with no focus to release, the window stays where the reader paged it", () => {
+    useStore.setState({ trendFocus: null });
     useStore.getState().setTrendScroll(2);
     applyClickActions([{ kind: "trendFocus", id: null }]);
     expect(useStore.getState().trendScroll).toBe(2);
@@ -305,7 +351,7 @@ describe("the network browsed in Hypergraph", () => {
   });
   it("frames as a network commit does", () => {
     applyClickActions([{ kind: "railNet", id: "dor" }]);
-    expect(useStore.getState().motionCause).toMatchObject({ kind: "filter", id: "dor" });
+    expect(useStore.getState().motionCause).toMatchObject({ kind: "network", id: "dor" });
   });
 });
 
