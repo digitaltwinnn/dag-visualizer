@@ -42,7 +42,11 @@ export default function useFitRows(cardId: string, fill: boolean, measuring: boo
       const pitch = rows[1]!.getBoundingClientRect().top - rows[0]!.getBoundingClientRect().top;
       const bottom = hostBottom();
       if (!Number.isFinite(bottom)) return;
-      const free = bottom - card.getBoundingClientRect().bottom;
+      // ⚠️ THE CONTENT'S BOTTOM, NOT THE BOX'S (user, 2026-11-02: the bottom kept jumping a row):
+      // `HeightEase` clips the card to its old height while the rows already stand at the new one,
+      // so the box read free room that was not there, and the page grew and shrank for good.
+      const content = card.lastElementChild!.getBoundingClientRect().bottom;
+      const free = bottom - content - (parseFloat(getComputedStyle(card).borderBottomWidth) || 0);
       const next = rowsThatFit(rows.length, free, pitch, fallback);
       setSize((cur) => (cur === next ? cur : next));
     };
