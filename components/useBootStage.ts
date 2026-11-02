@@ -26,16 +26,15 @@ export type BootStage = 0 | 1 | 2 | 3;
 const STEP_MS = 350;
 const CHROME_TIMEOUT_MS = SCENE_WAIT_MS;
 
-export function useBootStage(): BootStage {
+/** The ladder itself, which keeps climbing through the Briefing. For a zone outside `BootFade` that
+ *  stands down on its own (the phone dock); everything else asks `useBootStage`. */
+export function useBootLadder(): BootStage {
   const engineReady = useStore((s) => s.engineReady);
   const engineFailed = useStore((s) => s.engineFailed);
   const hasData = useStore((s) => s.latestSnapshot != null || s.metaList.length > 0);
   const live = useStore((s) => s.live);
   const [timedOut, setTimedOut] = useState(false);
   const [stage, setStage] = useState<BootStage>(0);
-  // The Briefing clears the stage: the zones stand down for the tour and come back with this same
-  // fade when it ends. The ladder keeps climbing underneath, so nothing is waited for twice.
-  const briefing = useStore((s) => s.briefing != null);
   const targetRef = useRef<BootStage>(0);
 
   useEffect(() => {
@@ -64,5 +63,13 @@ export function useBootStage(): BootStage {
     return () => clearTimeout(id);
   }, [stage, target]);
 
+  return stage;
+}
+
+/** The ladder as the zones read it. The Briefing clears the stage: they stand down for the tour and
+ *  come back with this same fade when it ends, and nothing is waited for twice. */
+export function useBootStage(): BootStage {
+  const stage = useBootLadder();
+  const briefing = useStore((s) => s.briefing != null);
   return briefing ? 0 : stage;
 }

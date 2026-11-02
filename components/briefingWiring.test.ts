@@ -49,6 +49,20 @@ describe("the tour's progress bar", () => {
   });
 });
 
+describe("the phone dock, which sits outside the HUD's fade", () => {
+  const dock = readFileSync("components/RailDock.tsx", "utf8");
+
+  it("stays mounted through the tour, so it stands where it lands", () => {
+    expect(dock).toMatch(/const bootStage = useBootLadder\(\);/);
+    expect(dock).toMatch(/portalReady && bootStage >= 2 && createPortal\(/);
+  });
+
+  it("stands invisible and out of reach, and fades back as the HUD does", () => {
+    expect(dock).toMatch(/inert=\{briefing \|\| undefined\}/);
+    expect(dock).toMatch(/"transition-opacity duration-700 ease-out motion-reduce:transition-none",\s*briefing && "opacity-0",/);
+  });
+});
+
 describe("the tour's end", () => {
   const engine = readFileSync("src/engine/Engine.ts", "utf8");
 

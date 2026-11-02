@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { useBootStage } from "@/components/useBootStage";
+import { useBootLadder } from "@/components/useBootStage";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -219,8 +219,11 @@ export default function RailDock({
   // pane exactly as over the scene, so a row picked there commits and the table follows. The
   // tablet and desktop rails still step aside with the scene.
   const shellVisible = section === "scene" || isBarHalf;
-  // Out of the shell it is out of its `BootFade` too, so it keeps that zone's boot gate itself.
-  const bootStage = useBootStage();
+  // Out of the shell it is out of its `BootFade` too, so it keeps that zone's boot gate itself, and
+  // stands down for the Briefing itself: mounted and invisible, so it arrives with the HUD's fade
+  // and the Engine can measure where it will land.
+  const bootStage = useBootLadder();
+  const briefing = useStore((s) => s.briefing != null);
   const [portalReady, setPortalReady] = useState(false);
   useEffect(() => setPortalReady(true), []);
   // PHONE ONLY takes the commit-flight half of the yield (`flight`). The tablet edge-tab sheet is
@@ -706,6 +709,7 @@ export default function RailDock({
         <ToggleGroup
           // The phone callout's floor (CalloutSync reads this bar's top edge).
           data-phone-dock=""
+          inert={briefing || undefined}
           type="single"
           value={open ? "open" : ""}
           onValueChange={(v) => handleOpenChange(v === "open")}
@@ -715,6 +719,8 @@ export default function RailDock({
             // above it rather than centring into the indicator's strip. Zero on flat bottoms.
             "fixed z-[42] bottom-0 h-[var(--phone-dock-h)] pb-[env(safe-area-inset-bottom,0px)] hidden max-[700px]:flex rounded-none",
             barGeom ?? (side === "left" ? "w-1/2 left-0" : "w-1/2 right-0"),
+            "transition-opacity duration-700 ease-out motion-reduce:transition-none",
+            briefing && "opacity-0",
           )}
         >
           <ToggleGroupItem
