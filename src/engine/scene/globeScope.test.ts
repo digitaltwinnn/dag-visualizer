@@ -22,3 +22,12 @@ describe("the globe under a network", () => {
     expect(globe).toMatch(/g\.userData\.scopeNow \+= \(g\.userData\.scope - g\.userData\.scopeNow\) \* Math\.min\(1, dt \* 3\)/);
   });
 });
+
+// user, 2026-11-02, reversing 2026-08-30: under a network the DAG's nodes dim in Snapshots as they
+// do in every other view. The floor and its snapshots are not nodes, and they stay as they were.
+describe("the DAG's nodes under a network", () => {
+  it("dim in every view, Snapshots included", () => {
+    expect(globe).toMatch(/const dagLit = sel === "all" \|\| sel === "dag";/);
+  });
+});
+

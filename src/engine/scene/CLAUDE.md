@@ -304,11 +304,9 @@ rewrite *those* matrices to the tray positions. The Engine freezes `morph` while
 `ledgerT` is a boundary-snapped layout parameter, not an eased blend. The hubs, the globe surface and
 the starfield are gated off so none lingers when arriving from geo.
 
-**The DAG core never dims in the chamber** (user, 2026-08-30): every metagraph anchors INTO the
-global, so the global layer — floor, fleet tray, its L0 validators — is inside every committed
-story, not an off-filter bystander. A WHO-is-in-scope statement, so it lives at the dim TARGET
-(`Globe._applyDim`'s ledger clause, re-derived by `applyLedgerLayout` on the flag flip); the view
-rows keep saying how much, and every other view still dims the DAG under a metagraph filter.
+**The DAG's nodes dim in the chamber like any other** (user, 2026-11-02, reversing 2026-08-30's
+"never dimmed"): `Globe._applyDim` has one rule in every view. The floor and its snapshots are not
+nodes and stay as they were, because every metagraph still anchors into the global.
 
 **Lanes and the committed filter. The field is fixed**: every lane always owns its own slice, and a
 committed filter never moves or hides geometry, or the camera.
