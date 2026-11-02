@@ -894,8 +894,8 @@ export class LedgerView implements SceneView {
 
   /** The COMMITTED network. It drives the COLOURED DIM (the other networks drop to their own hue at
    *  the ledger's `elem` strength, this network's own rows hold identity down the trail). What it
-   *  deliberately does NOT do: move or hide any geometry. The camera's only answer is the shared
-   *  `ledgerCommitTilt` (the per-lane fly-to was retired 2026-08-09). */
+   *  deliberately does NOT do: move or hide any geometry, or the camera, whose one pose it stands
+   *  on (the per-lane fly-to was retired 2026-08-09). */
   setFilter(filter: string) {
     this._filter = filter || "all"; // event-time
     this._applyNetDim();

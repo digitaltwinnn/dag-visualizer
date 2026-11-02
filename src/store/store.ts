@@ -111,6 +111,8 @@ interface AppState {
   // top-to-bottom in that order (the one you picked last sits on top). Add a future card type by
   // adding a slot field + a `setSel(...)` call + a registry entry in Inspector — nothing else.
   inspect: PickDescriptor | null;
+  /** The view the committed node was picked in: Snapshots keeps a node it picked (`useNodeHere`). */
+  inspectView: Mode | null;
   snap: Extract<PickDescriptor, { kind: "snapshot" }> | null;
   // The selected METAGRAPH SNAPSHOT (a tile on the ledger's upper floor). LEDGER-SCOPED like
   // `snap`: Engine.setMode clears it on the way out of the view. A selStack slot like `snap`.
@@ -120,6 +122,12 @@ interface AppState {
   // its tick, so `ledgerNetwork` only honours it while that tick is on screen. It rides the
   // "network" selStack slot — the same card slot a committed filter fills.
   tickNet: TickNetSel | null;
+  // THE NETWORK THE RAIL IS BROWSING (`domain/viewNetwork.ts`), NOT the app filter. One view's, and
+  // it rides the "network" selStack slot as `tickNet` does.
+  railNet: string | null;
+  // How many commits the reader has made (`applyClickActions`): how the rail tells one from what a
+  // view entry commits, inside the entry's grace window.
+  readerCommits: number;
   selStack: SelSlot[];
   // Ordinal of the snapshot the cursor is hovering in the LiveStrip bar-chart (transient highlight —
   // the ledger re-colours that snapshot's tiles). null = not hovering.
@@ -140,6 +148,11 @@ interface AppState {
   hoverCountry: string | null;
   // Node ids of a hovered explorer COHORT row — the whole 3D honeycomb stack glows together.
   hoverCohort: string[] | null;
+  // The UTC day (ms) of a hovered AI-note day — a caption on the note card or a diamond on the
+  // History timeline. The pair previews each other and neither commits (convention 9). null = none.
+  hoverNoteDay: number | null;
+  /** The preview came from a chart's coin, which labels itself, so the band's mark stays quiet. */
+  hoverNoteChart: boolean;
   // The hovered GROUP RUNG's identity, as a scalar key — the pairing twin of `hoverCohort`
   // (which carries member ids for the 3D glow and can't be compared by `subjectPairing`).
   // Both group rungs share this ONE channel because no view shows both: geo's provider cohort
@@ -295,6 +308,13 @@ interface AppState {
   // The view transition's phase while one runs — OUT is the teardown, IN the build — so a view
   // switch can say "leaving A" and then "entering B" (user, 2026-09-26). Engine-written, edges only.
   motionPhase: "out" | "in" | null;
+  // THE BRIEFING (`domain/briefing.ts`): the stop on screen, or null when no tour runs. One channel:
+  // the HUD stands down on it (`useBootStage`), the URL holds (`RouteSync`), and the Engine reads it
+  // for the tour's pace and the scene's lift. `components/Briefing.tsx` is its one writer.
+  briefing: number | null;
+  /** The ending's second beat: the words have gone and the scene is landing, so the lift lets go
+   *  while `briefing` still holds the HUD down. Cleared with `briefing`. */
+  briefingLanding: boolean;
   // Where the view transition's STAGING BAND ends, in canvas-local CSS px from the top (2026-09-29)
   // — the lowest row of the gathered grids — so the motion hint can stand clear of it while a
   // switch runs. Engine-written on change only; null until a transition has measured one.
@@ -382,7 +402,8 @@ interface AppState {
    *  visible window, so the stack pages rather than capping at a top-N. */
   trendScroll: number;
   /** The plane brought forward (5b). View-scoped: it clears on leaving the view, like the other
-   *  view-scoped ladder levels. */
+   *  view-scoped ladder levels, and History's arrival seats its entry plane here UNRANKED
+   *  (`setMode` → `focusPatch`, R70): only a row's click ranks a plane in `selStack`. */
   trendFocus: string | null;
   /** How many cards a vertical swipe has turned the deck by (`trendStack.rotateOrder`): a VIEW
    *  SETTING like `trendScroll`, not a selection — the front card is simply whichever the rotation
@@ -449,6 +470,8 @@ interface AppState {
   advanceSnap: (snap: Extract<PickDescriptor, { kind: "snapshot" }> | null) => void;
   setMetaSnap: (sel: MetaSnapSel | null) => void;
   setTickNet: (sel: TickNetSel | null) => void;
+  setRailNet: (id: string | null) => void;
+  noteReaderCommit: () => void;
   /** The follow system's heartbeat advance for the metagraph-snapshot card — non-bumping, like
    *  advanceSnap: a live tick is never a "new selection" (the card recency/collapse order holds). */
   advanceMetaSnap: (sel: MetaSnapSel | null) => void;
@@ -458,6 +481,7 @@ interface AppState {
   setHoverNodeId: (id: string | null) => void;
   setHoverCountry: (cc: string | null) => void;
   setHoverCohort: (ids: string[] | null) => void;
+  setHoverNoteDay: (dayMs: number | null, chart?: boolean) => void;
   setHoverGroup: (key: string | null) => void;
   setFollowing: (following: boolean) => void;
   setHover: (hover: HoverSubject | null) => void;
@@ -482,6 +506,8 @@ interface AppState {
   setCameraFlying: (flying: boolean) => void;
   setSceneMoving: (moving: boolean) => void;
   setMotionPhase: (phase: "out" | "in" | null) => void;
+  setBriefing: (stop: number | null) => void;
+  setBriefingLanding: (landing: boolean) => void;
   setGatherBottom: (px: number | null) => void;
   setMotionCause: (cause: MotionCause | null) => void;
   setPhoneSheetPx: (px: number | null) => void;
@@ -525,9 +551,28 @@ const DEEP_MAX = 24;
 
 /** A PLANE FOCUS, AS STATE — one home for what committing it writes (PR review, 2026-10-26): the
  *  focus and, for a subject, its Range card brought up the stack. `setTrendFocus` and the view
- *  switch's arrival both write it, so arriving on a plane and clicking its row cannot drift. */
-function focusPatch(s: { selStack: SelSlot[] }, id: string | null): { trendFocus: string | null; selStack: SelSlot[] } {
-  return { trendFocus: id, selStack: id != null ? bumpStack(s.selStack, "range", true) : s.selStack };
+ *  switch's arrival both write it, so arriving on a plane and clicking its row cannot drift.
+ *  `chosen` is the one difference between them (R70, user 2026-10-29): a click RANKS the plane's
+ *  Range card (it is a commit, and the rail opens a commit's own card), the arrival does not — the
+ *  entry plane is the view's own doing, and a card nobody chose must not take the resting box from
+ *  the AI notes card (`focusSlotId` reads `selStack` as "what was picked"). */
+function focusPatch(
+  s: { selStack: SelSlot[]; trendRange: { fromMs: number; toMs: number } | null },
+  id: string | null,
+  chosen = true,
+): { trendFocus: string | null; selStack: SelSlot[] } {
+  // THE MOMENT KEEPS THE BOX (user, 2026-10-30): a plane focus made from the Moment card's rows
+  // ranked the Range card over it and took the box away from the card the reader was using. The
+  // Moment is the finer rung and the reader's own commit, so the Range is ranked in BEHIND a Moment
+  // that leads the stack, and the box stays where the gesture was made.
+  if (id != null && chosen) {
+    const ranked = bumpStack(s.selStack, "range", true);
+    return { trendFocus: id, selStack: s.selStack[0] === "instant" ? ["instant", ...ranked.filter((x) => x !== "instant")] : ranked };
+  }
+  // A focus released, or a plane seated unranked, takes its Range rank with it — else the rank a
+  // click left behind kept the Range card the box over the note after the release, and on the
+  // next visit (review, 2026-10-29). A BRUSHED range is the reader's own and keeps the rank.
+  return { trendFocus: id, selStack: s.trendRange != null ? s.selStack : bumpStack(s.selStack, "range", false) };
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -539,7 +584,7 @@ export const useStore = create<AppState>((set) => ({
   nodes: { l0: 0, l1: 0 },
   latestSnapshot: null,
   activity: null,
-  mode: "hyper",
+  mode: "geo",
   docPage: null,
   logSeek: null,
   logCut: null,
@@ -548,9 +593,12 @@ export const useStore = create<AppState>((set) => ({
   filter: "all",
   metaList: [],
   inspect: null,
+  inspectView: null,
   snap: null,
   metaSnap: null,
   tickNet: null,
+  railNet: null,
+  readerCommits: 0,
   selStack: [],
   hoverSnapOrd: null,
   hoverMetaSnap: null,
@@ -558,6 +606,8 @@ export const useStore = create<AppState>((set) => ({
   hoverNodeId: null,
   hoverCountry: null,
   hoverCohort: null,
+  hoverNoteDay: null,
+  hoverNoteChart: false,
   hoverGroup: null,
   following: false,
   hover: null,
@@ -581,6 +631,8 @@ export const useStore = create<AppState>((set) => ({
   sceneMoving: false,
   motionCause: null,
   motionPhase: null,
+  briefing: null,
+  briefingLanding: false,
   gatherBottom: null,
   railCollapse: {},
   navQuiet: false,
@@ -627,8 +679,9 @@ export const useStore = create<AppState>((set) => ({
   // universal subject and carries, the way `node` and `network` do in `LEVEL_CARRY`).
   // A view switch stamps its own motion cause (the hint says what it builds).
   // …AND ARRIVES ON THE VIEW'S ENTRY PLANE (2026-10-26, `viewPolicy.entryPlane`): History opens with
-  // the DAG's chart brought forward under All — the same focus a click on its row commits, so its
-  // Range card opens with it (`setTrendFocus`'s own stack bump).
+  // the DAG's chart brought forward under All — the same focus a click on its row commits, but
+  // UNRANKED (`focusPatch`'s `chosen: false`, R70): the arrival is the view's own doing, so the AI
+  // notes card keeps the resting box and the Range card stands as an entry under it.
   // The arrival starts at the TOP of the deck (`trendScroll: 0`, beside the rotation's reset —
   // PR review, 2026-10-26): the entry plane joins the stack at its front, and a window paged down
   // on an earlier visit would hold it out of sight. A switch to the view you are ALREADY in (the
@@ -637,7 +690,7 @@ export const useStore = create<AppState>((set) => ({
     set((s) => {
       const nav = { mode, navQuiet: false, docPage: null, docClosing: s.docPage != null || s.docClosing, rawReturnMode: null, motionCause: { kind: "view" as const, from: s.mode, to: mode } };
       if (mode === s.mode) return nav;
-      return { ...nav, trendRotation: 0, trendScroll: 0, ...focusPatch(s, entryFocus(VIEW_POLICIES[mode].entryPlane, s.filter)) };
+      return { ...nav, trendRotation: 0, trendScroll: 0, ...focusPatch(s, entryFocus(VIEW_POLICIES[mode].entryPlane, s.filter), false) };
     }),
   // Opening a doc also SURFACES THE SCENE POSE: the overlay sits at z-8, under the raw layer's
   // z-9 — a doc opened from the RAW pose rendered beneath the still-interactive table, with the
@@ -656,13 +709,17 @@ export const useStore = create<AppState>((set) => ({
   // Committing a network IS a user gesture (user, 2026-08-14 — changing the filter or paging
   // the dossier left the snapshot card as the box): it bumps the recency stack like every
   // other selection, so the facts rail focuses the metagraph card. "all" clears the entry.
-  setFilter: (filter) => set((s) => ({ filter, selStack: bumpStack(s.selStack, "network", filter !== "all" || !!s.tickNet) })),
+  setFilter: (filter) => set((s) => ({ filter, selStack: bumpStack(s.selStack, "network", filter !== "all" || !!s.tickNet || !!s.railNet) })),
   setMetaList: (metaList) => set({ metaList }),
-  setInspect: (inspect) => set((s) => ({ inspect, selStack: bumpStack(s.selStack, "node", !!inspect) })),
+  setInspect: (inspect) => set((s) => ({ inspect, inspectView: inspect ? s.mode : null, selStack: bumpStack(s.selStack, "node", !!inspect) })),
   setSnap: (snap) => set((s) => ({ snap, selStack: bumpStack(s.selStack, "snap", !!snap) })),
   // FollowController's heartbeat advance: re-point the followed snapshot WITHOUT bumping the
   // selection recency — a tick is not a user act, and the facts rail's collapse rule reads
-  // `selStack` recency (item 8, 2026-08-06). Present-but-unranked: appended at the END if absent.
+  // `selStack` recency (item 8, 2026-08-06). NOT IN THE STACK AT ALL (R70, user 2026-10-29; it
+  // used to be appended at the end, "present but unranked"): the stack is what the reader picked,
+  // and a live tick nobody picked must not take the resting box from the AI notes card. A pinned
+  // tick (`setSnap`) ranks as every commit does; the live one is the rail's "finest present"
+  // fallback where no note stands. A tick going away still drops a pin that named it.
   advanceSnap: (snap) =>
     set((s) => ({
       snap,
@@ -672,16 +729,15 @@ export const useStore = create<AppState>((set) => ({
       // quiet from a manual expand suppressed every later live-advance roll). Same-ordinal
       // re-points leave the flag alone — a poll is not an arrival.
       navQuiet: snap && s.snap?.data.ordinal !== snap.data.ordinal ? false : s.navQuiet,
-      selStack: !snap
-        ? s.selStack.filter((x) => x !== "snap")
-        : s.selStack.includes("snap")
-          ? s.selStack
-          : [...s.selStack, "snap"],
+      selStack: !snap ? s.selStack.filter((x) => x !== "snap") : s.selStack,
     })),
   setMetaSnap: (metaSnap) => set((s) => ({ metaSnap, selStack: bumpStack(s.selStack, "metaSnap", !!metaSnap) })),
   // A NO-OP WRITE IS A NO-OP REFERENCE: the Engine's subscription re-resolves the chamber's lens
   // and the camera on a change, so re-committing the same network in the same tick (a tile under
   // an already-open network) must not hand it a fresh object.
+  noteReaderCommit: () => set((s) => ({ readerCommits: s.readerCommits + 1 })),
+  setRailNet: (railNet) =>
+    set((s) => (s.railNet === railNet ? s : { railNet, selStack: bumpStack(s.selStack, "network", !!railNet || s.filter !== "all") })),
   setTickNet: (tickNet) =>
     set((s) =>
       sameTickNet(s.tickNet, tickNet)
@@ -696,11 +752,9 @@ export const useStore = create<AppState>((set) => ({
         metaSnap && !(s.metaSnap && s.metaSnap.metaId === metaSnap.metaId && s.metaSnap.ordinal === metaSnap.ordinal)
           ? false
           : s.navQuiet,
-      selStack: !metaSnap
-        ? s.selStack.filter((x) => x !== "metaSnap")
-        : s.selStack.includes("metaSnap")
-          ? s.selStack
-          : [...s.selStack, "metaSnap"],
+      // …and the same stack rule (R70): a live advance never enters the stack; a pin
+      // (`setMetaSnap`) ranks, and a snapshot going away drops its pin.
+      selStack: !metaSnap ? s.selStack.filter((x) => x !== "metaSnap") : s.selStack,
     })),
   setHoverSnapOrd: (hoverSnapOrd) => set({ hoverSnapOrd }),
   setHoverMetaSnap: (hoverMetaSnap) => set({ hoverMetaSnap }),
@@ -708,6 +762,7 @@ export const useStore = create<AppState>((set) => ({
   setHoverNodeId: (hoverNodeId) => set({ hoverNodeId }),
   setHoverCountry: (hoverCountry) => set({ hoverCountry }),
   setHoverCohort: (hoverCohort) => set({ hoverCohort }),
+  setHoverNoteDay: (hoverNoteDay, chart = false) => set({ hoverNoteDay, hoverNoteChart: chart }),
   setHoverGroup: (hoverGroup) => set({ hoverGroup }),
   setFollowing: (following) => set({ following }),
   setHover: (hover) => set({ hover }),
@@ -785,6 +840,12 @@ export const useStore = create<AppState>((set) => ({
       // search of the reader's own, the range is left as it was.
       const now = Date.now();
       const range = s.logCut ? snapRange({ fromMs: s.logCut.fromMs, toMs: s.logCut.toMs ?? now }, now) : s.trendRange;
+      // Both come back RANKED, as the commits they are (`setFilter`'s and `setTrendRange`'s own
+      // bumps): the searched span last, so its Range card is the box. Unranked, the Range card
+      // came back folded under the open note (review, 2026-10-29).
+      // The plane first, the searched span last, so its Range card is the box.
+      const planed = focus != null ? bumpStack(s.selStack, "network", true) : s.selStack;
+      const ranked = s.logCut && range ? bumpStack(planed, "range", true) : planed;
       return back != null && back !== s.mode
         ? {
             section,
@@ -794,7 +855,7 @@ export const useStore = create<AppState>((set) => ({
             trendFocus: focus,
             trendRange: range,
             rawReturnFocus: null,
-            selStack: focus != null ? bumpStack(s.selStack, "network", true) : s.selStack,
+            selStack: ranked,
             motionCause: { kind: "view", from: s.mode, to: back },
           }
         : { section, rawReturnMode: section === "scene" ? null : s.rawReturnMode };
@@ -805,6 +866,8 @@ export const useStore = create<AppState>((set) => ({
   setCameraFlying: (cameraFlying) => set({ cameraFlying }),
   setSceneMoving: (sceneMoving) => set({ sceneMoving }),
   setMotionPhase: (motionPhase) => set({ motionPhase }),
+  setBriefing: (briefing) => set(briefing == null ? { briefing, briefingLanding: false } : { briefing }),
+  setBriefingLanding: (briefingLanding) => set({ briefingLanding }),
   setGatherBottom: (gatherBottom) => set({ gatherBottom }),
   setMotionCause: (motionCause) => set({ motionCause }),
   setNavQuiet: (navQuiet) => set({ navQuiet }),
@@ -872,7 +935,8 @@ export const useStore = create<AppState>((set) => ({
   // The Metagraph card still names that network — it stands above the Range as its parent, an
   // entry one click away — so nothing is lost and no view compare is added: this setter is
   // History's own. From 2026-10-07 until then the focus bumped the network slot instead. A
-  // release leaves the stack alone: the filter may still hold the dossier.
+  // release drops the Range rank unless a brushed range holds it (`focusPatch`); the filter's own
+  // rank, the dossier's, is untouched either way.
   setTrendFocus: (id) => set((s) => focusPatch(s, id)),
   setTrendRotation: (r) => set({ trendRotation: r, motionCause: { kind: "page" } }),
   setTrendScale: (scale) => set({ trendScale: scale }),

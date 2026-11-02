@@ -11,7 +11,8 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 // vs hud [is] a toggle; raw is still separate because that's unrelated"), splitting the one
 // 3-state axis of 2026-08-08 back along the store's own seams:
 //   · SCENE ⇄ HUD — one two-state toggle over `railsHidden`: the same scene, chrome off/on.
-//     Desktop-only as a PAIR (below 1100px the rails are dock sheets and SCENE has no meaning).
+//     Desktop and tablet (user, 2026-10-31): it clears the bar, the band and the footer as well as
+//     the rails, so a tablet's docks have a stage to clear too. The phone's dock IS its navigation.
 //   · RAW — its own pressed toggle over `section`: not a third dressing but a different LAYER
 //     (SectionShell's depth choreography, with its own Escape/× exits). Because the two axes are
 //     now independent controls, popping out of RAW RESTORES whichever presentation you had —
@@ -42,14 +43,14 @@ export default function PresentationToggle() {
   const railsHidden = useStore((s) => s.railsHidden);
   const setSection = useStore((s) => s.setSection);
   const setRailsHidden = useStore((s) => s.setRailsHidden);
-  // Below 1100px SCENE has no meaning (the rails are dock sheets) and this — the state's ONE
-  // writer — is CSS-hidden but still mounted. Without this reset, pressing Scene on desktop and
-  // then narrowing left railsHidden stuck true with no visible control: the vitals band never
-  // mounted and the railsLean camera lean stayed composed into every pose until the window
-  // widened back. The writer clears its own state when its surface leaves (review, 2026-08-31).
+  const briefing = useStore((s) => s.briefing != null);
+  // On a phone SCENE has no surface and this — the state's ONE writer — is CSS-hidden but still
+  // mounted. Without this reset, pressing Scene and then narrowing left railsHidden stuck true with
+  // no visible control: the vitals band never mounted until the window widened back. The writer
+  // clears its own state when its surface leaves (review, 2026-08-31).
   const bp = useBreakpoint();
   useEffect(() => {
-    if (bp !== "desktop" && railsHidden) setRailsHidden(false);
+    if (bp === "phone" && railsHidden) setRailsHidden(false);
   }, [bp, railsHidden, setRailsHidden]);
   // THE ONE WAY BACK FROM SCENE MODE (user, 2026-10-25: "hide also the footer and the bar, but
   // keep the button somewhere to toggle back"). The bar leaves the screen with the rest of the
@@ -78,12 +79,13 @@ export default function PresentationToggle() {
         aria-pressed={railsHidden}
         aria-label={railsHidden ? "Show the info cards" : "Show just the 3D scene"}
         onClick={() => setRailsHidden(!railsHidden)}
-        className={cn(SEG, "max-[1099px]:hidden")}
+        className={cn(SEG, "max-[700px]:hidden")}
       >
         <Focus aria-hidden className="size-4" />
         <span className="text-label tracking-caps uppercase max-[1649px]:hidden">Scene</span>
       </button>
       {railsHidden &&
+        !briefing &&
         portalHost &&
         createPortal(
           // The bar's own glass, at the bar's own corner and inset — one control's worth of the

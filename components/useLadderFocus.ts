@@ -2,6 +2,7 @@
 
 import { useStore } from "@/src/store/store";
 import { focusSlotId } from "@/components/railCards";
+import { useNodeHere } from "@/components/useNodeHere";
 import { useTickHasFilter } from "@/components/useTickHasFilter";
 
 // Which ladder rung currently holds the FOCUS, for the EXPLORE rail (the facts rail derives the
@@ -10,11 +11,16 @@ import { useTickHasFilter } from "@/components/useTickHasFilter";
 // selection mark, every coarser committed row wears the ancestor strength (`selectedRow`), so a
 // drill-down list reads as a path with a head instead of a stack of equal selections.
 //
-// Returns the rail SLOT id ("context" / "country" / "cohort" / "composition" / "node"),
+// Returns the rail SLOT id ("notes" / "context" / "country" / "cohort" / "composition" / "node"),
 // so callers name the rung the same way the rail does.
-export function useLadderFocus(): string | null {
+// `noteAbsent` is the AI notes slot's ABSENCE (`railCards.noteCardAbsent`), stated by the caller
+// that already holds the note (Inspector) — the slot tops the lane and is the focus at rest (R57).
+// Required (review M2): a caller that cannot say must say `true`, never get a focus on a card that
+// may not exist.
+export function useLadderFocus(noteAbsent: boolean): string | null {
   const mode = useStore((s) => s.mode);
   const filter = useStore((s) => s.filter);
+  const railNet = useStore((s) => s.railNet);
   const tickNet = useStore((s) => s.tickNet);
   const country = useStore((s) => s.country);
   const cohort = useStore((s) => s.cohort);
@@ -29,5 +35,6 @@ export function useLadderFocus(): string | null {
   const trendRange = useStore((s) => s.trendRange);
   const trendFocus = useStore((s) => s.trendFocus);
   const tickHasFilter = useTickHasFilter();
-  return focusSlotId({ mode, filter, tickNet, tickHasFilter, country, cohort, composition, inspect, snap, metaSnap, trendCursorMs, trendRange, trendFocus, selStack });
+  const nodeHere = useNodeHere();
+  return focusSlotId({ mode, filter, railNet, tickNet, tickHasFilter, nodeHere, country, cohort, composition, inspect, snap, metaSnap, trendCursorMs, trendRange, trendFocus, noteAbsent, selStack });
 }

@@ -366,7 +366,7 @@ export function DonutTotal({ counts, accent, total, className, hues }: { counts:
   );
 }
 
-// hyper — the structure cells (3): METAGRAPHS with a by-type stacked bar (networkKind is the
+// hyper — the structure cells (3): METAGRAPHS with a by-type stacked bar (metaType is the
 // one home for the type read — "unknown" is the honest word for a 0-node network whose roles
 // can't be known), the COMPOSITION donut (whose hole IS the fleet total, so no separate NODES
 // card), and the LAYERS' own populations (the shells' vocabulary: how many L0 / cL1 / dL1

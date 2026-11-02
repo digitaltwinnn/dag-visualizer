@@ -203,12 +203,15 @@ export class TrendStackSync {
     cam.updateMatrixWorld();
 
     let retarget = false;
+    // Not while leaving: the store has already reset the deal for the next arrival, and the cards
+    // fall from where they stand (the same hold as `TrendStack`'s).
     if (
-      st.ids !== this._ids ||
-      st.scroll !== this._scroll ||
-      st.focus !== this._focus ||
-      st.narrow !== this._narrow ||
-      st.phone !== this._phone
+      !this._leaving &&
+      (st.ids !== this._ids ||
+        st.scroll !== this._scroll ||
+        st.focus !== this._focus ||
+        st.narrow !== this._narrow ||
+        st.phone !== this._phone)
     ) {
       this._ids = st.ids;
       this._scroll = st.scroll;

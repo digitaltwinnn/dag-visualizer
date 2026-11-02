@@ -83,6 +83,10 @@ export function subjectPairing<T extends string | number>(
   };
 }
 
+/** For a surface that writes a preview channel by hand: whether a FOCUS previews, the rule above
+ *  (its pointer half is the event's own `pointerType === "mouse"`). */
+export const focusPreviews = (): boolean => lastInput !== "touch";
+
 /** Whether a surface should release the shared hover channel.
  *
  *  ⚠️ OWNERSHIP, NOT DOMAIN (2026-09-19, and the first cut got this exactly wrong). The channels

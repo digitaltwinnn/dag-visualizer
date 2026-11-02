@@ -22,7 +22,7 @@ import { useMinHold } from "@/components/useMinHold";
 import { useArchive, archiveFactState, archiveReach, archiveSchedule, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
 import { useNodeNames, nodeName } from "@/components/useNodeNames";
 import { POLL } from "@/src/engine/config";
-import { cap, Desc, foldLabel, StatusMark, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, ScheduleTable, partShade, Lead, Empty, QualifierChip, TickerChip, LayerCells, Door, SectionLabel, shareWords, type SchedulePart } from "./parts";
+import { cap, Desc, foldLabel, StatusMark, RoleChips, IdentityDot, metaKindWord, Fact, FactGroup, Foot, FootRow, LayerWho, ScheduleTable, partShade, Lead, Empty, QualifierChip, LayerCells, Door, SectionLabel, shareWords, type SchedulePart } from "./parts";
 import { statusItems } from "@/src/data/nodeStatus";
 import { compositionGroups, compositionRows, nodeCompositionLabel, parseCompositionKey } from "@/src/data/composition";
 import { netKeyOf, pickNetId } from "@/src/engine/domain/pickActions";
@@ -32,8 +32,14 @@ import FollowControl from "@/components/FollowControl";
 import { NODE_ID_GLYPHS } from "@/components/explorer/nodeRow";
 import { IDENT_INK } from "@/components/identInk";
 import { useFeedRead } from "@/components/useFeedRead";
+import SubjectNote from "@/components/notes/SubjectNote";
+import { countryNoteReq, providerNoteReq, typeNoteReq } from "@/components/notes/subjectNote";
+import { useNoteScopeNetwork } from "@/components/notes/useAiNote";
 
 type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: K }>;
+
+/** The unlisted pseudo-network has no note of its own (`subjectNote.ts`). */
+const isUnlisted = (id: string) => id === UNLISTED_ID;
 
 // ── Card-head pieces (unified head anatomy, Task 13 follow-up) ──────────────────────────────
 // Every inspector card's primary TITLE now renders in CardHead's title slot (one standard:
@@ -48,11 +54,17 @@ type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: 
 // every mark that speaks for it). The
 // Odometer owns the roll (digit-roll on each live tick), so no CardHead `titleKey` — a keyed
 // remount would restart it as a whole-title roll-in instead.
+// The ordinal is a FIGURE at the title size in the box (the size stays on the Odometer itself, so
+// its own line box is what it always was); the `data-figure` wrapper is the hook a folded ENTRY
+// uses to take it down to the entry's own body size, and the mark is a KIND mark
+// (`data-kindmark`) the fold drops — the eyebrow word already says the kind there, and an identity
+// avatar it is not (CardHead's `ENTRY_TITLE`, 2026-10-29: nine digits at the title size beside the
+// live pill overran the one-row entry, once the note took the resting box over the live tick).
 export function SnapshotTitle({ data: d }: { data: GlobalSnapshot }) {
   const Mark = SNAPSHOT_ICON;
   return (
-    <span className="inline-flex items-center gap-2">
-      <Mark aria-hidden className={cn(KIND_MARK_CLASS, "text-[var(--filter-accent,var(--primary))]")} />
+    <span data-figure="" className="inline-flex items-center gap-2">
+      <Mark aria-hidden data-kindmark="" className={cn(KIND_MARK_CLASS, "text-[var(--filter-accent,var(--primary))]")} />
       <Odometer value={d.ordinal} className="font-mono text-title font-semibold text-foreground tabular-nums" />
     </span>
   );
@@ -75,12 +87,8 @@ export function SnapshotAside(_: { data: GlobalSnapshot }) {
 // Dossier title: the pre-unification header composition (logo avatar ringed in the identity hue
 // + the NAME over the TICKER), re-homed INTO CardHead's title slot (user refinement — the head
 // unification had split the avatar/ticker off into a body row). The name inherits CardHead's one
-// 15px/semibold title standard; the ticker rides under it at its original 11px/hue — the SAME
-// treatment for every subject, DAG included (the ticker used to be metagraph-only). Right behind
-// the ticker, subtly (muted, smaller — quieter than the ticker), rides the network-type
-// descriptor ("data metagraph" / "currency metagraph" / "data and currency metagraph" /
-// "hypergraph" for DAG) — reusing the same composition read the old standalone body line derived
-// from (`networkKind`, in ./parts), just folded into the ticker row instead of its own line.
+// 15px/semibold title standard; the ticker rides under it at its original 11px/hue, unless the
+// ticker IS the name. The network's kind is the head's aside (`MetaKindAside`, 2026-10-30).
 // Rolls as a whole via InspectorCard's `titleKey` (keyed on the name, synced with the edge pulse).
 export function MetaTitle({ cfg }: { cfg: MetaCfg }) {
   useFeedRead(["api-metagraphs"], "MetaTitle");
@@ -92,7 +100,6 @@ export function MetaTitle({ cfg }: { cfg: MetaCfg }) {
   const hue = cfg.id === UNLISTED_ID ? UNLISTED_HUE : identityHudCss(cfg.id);
   const iconUrl = mg?.iconUrl || cfg.iconUrl; // live metagraph icon, or the core's bundled logo
   const monogram = (cfg.ticker || cfg.name).slice(0, 3).toUpperCase();
-  const kind = networkKind(cfg.id, mg?.nodes || []);
   return (
     <span data-titlerow="" className="inline-flex items-center gap-2.5 min-w-0">
       {/* The logo shows as a clean circular mark — no squared tile (brand icons are round);
@@ -110,15 +117,17 @@ export function MetaTitle({ cfg }: { cfg: MetaCfg }) {
           kind INTO the site link, which has lived in the body since 2026-08-08. */}
       <span data-titleblock="" className="flex flex-col gap-px min-w-0">
         <span className="leading-[1.1]">{cfg.name}</span>
-        {/* The TICKER left this line for the title-row ASIDE (user, 2026-08-08 — MetaTickerAside,
-            taking the slot the site link held; the link moved into the body as a labelled row).
-            The kind descriptor keeps the second line alone. */}
-        {/* The kind, in two forms the head's tier picks between (CardHead's ENTRY_TITLE, 2026-10-25):
-            the box reads the full phrase; the one-row ENTRY, whose eyebrow already says METAGRAPH,
-            reads the qualifier alone ("currency", "data and currency") — the word it dropped is
-            the word beside it. The hypergraph and a bare "metagraph" have no qualifier to keep. */}
-        <span data-kind-full="" className="text-label font-normal text-muted-foreground truncate">{kind}</span>
-        <span data-kind-short="" className="hidden text-label font-normal text-muted-foreground truncate">{kind.replace(/ metagraph$/, "")}</span>
+        {/* THE TICKER IS BACK UNDER THE NAME, in the identity hue, and THE KIND IS THE PILL
+            (user, 2026-10-30: the collapsed card "has no right side element … should be the type
+            as a pill?"). The ticker chip was the aside and stood down where the ticker IS the name
+            (DAG, USDC.dag), so those entries had nothing on the right, and the kind rode as muted
+            text after the name. The kind is one word every network has, so it takes the aside
+            (`MetaKindAside`); the ticker reads here on the open box and is dropped in the one-row
+            entry (CardHead's ENTRY_TITLE), where the explorer row beside it already shows it. A
+            ticker that IS the name is not said twice. */}
+        {cfg.ticker && cfg.ticker.toLowerCase() !== cfg.name.toLowerCase() && (
+          <span data-ticker="" className={cn("text-label font-semibold tracking-[0.02em] truncate", IDENT_INK)} style={{ color: hue }}>{cfg.ticker}</span>
+        )}
       </span>
     </span>
   );
@@ -701,19 +710,16 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   );
 }
 
-// The dossier's title-row aside: the TICKER in the identity hue (user, 2026-08-08 — it took the
-// slot the site link used to hold; the link itself moved into the body, see MetaSiteRow). Reads
-// at the same 11px/hue treatment it had under the name, right-aligned like every head aside.
-export function MetaTickerAside({ cfg }: { cfg: MetaCfg }) {
-  if (!cfg.ticker) return null;
-  // A HEAD MUST NOT SAY THE SAME THING TWICE (CountryAside's rule): where the ticker IS the name
-  // (USDC.dag), the chip would repeat the title beside it — and in the one-row entry it took the
-  // room the kind needed (user, 2026-10-25: "no space for the metagraph type").
-  if (cfg.name.toLowerCase() === cfg.ticker.toLowerCase()) return null;
-  return (
-    // The one ticker chip (`TickerChip`). Unlisted stays neutral — same guard as MetaTitle above.
-    <TickerChip text={cfg.ticker} hue={cfg.id === UNLISTED_ID ? UNLISTED_HUE : identityHudCss(cfg.id)} />
-  );
+// The dossier's title-row aside: THE KIND, as a qualifier chip (user, 2026-10-30), the one word
+// every network has — "hypergraph" for the core, "currency" / "data" / "data and currency" for a
+// metagraph, read off the same composition as the body's kind sentence (`metaKindWord`). An
+// unknown type shows no chip: its only word is the eyebrow's. The unlisted set keeps its own
+// head (the "?" mark) and no chip: a mixed set has no one kind.
+export function MetaKindAside({ cfg }: { cfg: MetaCfg }) {
+  useFeedRead(["api-metagraphs"], "MetaKindAside");
+  const metaList = useStore((s) => s.metaList);
+  const word = metaKindWord(cfg.id, metaList.find((x) => x.id === cfg.id)?.nodes || []);
+  return word ? <QualifierChip>{word}</QualifierChip> : null;
 }
 
 // The dossier's site link as a labelled BODY row (user, 2026-08-08 — the icon-only aside link
@@ -1092,14 +1098,18 @@ function providerParts(rows: { pick: PickDescriptor }[]): SchedulePart[] {
 export function CountryCard({ cc }: { cc: string }) {
   useFeedRead(["clusters", "api-geo"], "CountryCard");
   const selNodes = useStore((s) => s.selNodes);
+  const network = useNoteScopeNetwork();
   const rows = useMemo(() => selNodes.filter((r) => r.cc === cc), [selNodes, cc]);
   const parts = useMemo(() => providerParts(rows), [rows]);
-  const share = shareWords(rows.length, selNodes.length);
   return (
     <>
       {/* THE LEAD: what this country is to the selection it sits in. The city count that followed
           ("…, in 8 cities") is gone (user, 2026-10-04). */}
-      {share && <Lead>Hosts {share} of the selection&apos;s nodes</Lead>}
+      {/* THE COUNTRY'S OWN NOTE (spec 2026-10-29-subject-notes) is the lead (user, 2026-10-30: the
+          measured "Hosts N% of the selection's nodes" is gone, the note says it and more), scoped as
+          that lead was: the filter's nodes here, the fleet's with no filter. The top Gate AI card
+          keeps the view's note. */}
+      <SubjectNote req={countryNoteReq(cc, network, isUnlisted)} />
       {/* EACH CARD CUTS BY THE NEXT LEVEL DOWN (user, 2026-10-02 — `docs/superpowers/design/
           2026-10-02-country-provider`, option B: "country and provider cards have the same content …
           the node part"). Both cards used to cut their nodes by network, so the provider's table was
@@ -1157,7 +1167,10 @@ export function CompositionCard({ sel }: { sel: CompositionSel }) {
   return (
     <>
     {/* THE LEAD: the group's share of its network — the old "Share of network" fact. */}
-    {share && <Lead>{share[0].toUpperCase() + share.slice(1)} of this network&apos;s online nodes</Lead>}
+    {/* THE MAKE-UP'S OWN NOTE (spec 2026-10-29-subject-notes) is the lead (user, 2026-10-30: the
+        measured "share of this network's online nodes" is gone): always its network's — the group
+        is one network's by construction (`sel.netId`), so no filter is read. */}
+    <SubjectNote req={typeNoteReq(sel, isUnlisted)} />
     {/* The divider every card draws between its lead and what follows (lost when the breakdown
         left this card on 2026-10-02). */}
     {share && <Separator className="mb-2" />}
@@ -1212,6 +1225,7 @@ export function ProviderAside({ sel }: { sel: CohortSel }) {
 export function ProviderCard({ sel }: { sel: CohortSel }) {
   useFeedRead(["clusters", "api-geo"], "ProviderCard");
   const selNodes = useStore((s) => s.selNodes);
+  const network = useNoteScopeNetwork();
   const members = useMemo(
     () =>
       selNodes.filter((r) => {
@@ -1231,13 +1245,13 @@ export function ProviderCard({ sel }: { sel: CohortSel }) {
     }
     return null;
   }, [members]);
-  const where = countryDisplayName(sel.cc, selNodes) ?? sel.cc;
-  const countryShare = shareWords(members.length, selNodes.filter((r) => r.cc === sel.cc).length);
   return (
     <>
-    {/* THE LEAD: this host's share of its country — the figure neither card showed (option B,
-        2026-10-02). The city is the head's chip, so the lead does not repeat it. */}
-    {countryShare && <Lead>{countryShare[0].toUpperCase() + countryShare.slice(1)} of {where}&apos;s nodes</Lead>}
+    {/* THE PROVIDER'S OWN NOTE (spec 2026-10-29-subject-notes) is the lead (user, 2026-10-30: the
+        measured share of its country is gone), scoped as the country card's: the filter's nodes,
+        the fleet's with no filter. Keyed by provider, not by city: the stored series count a host
+        across its cities. */}
+    <SubjectNote req={providerNoteReq(sel.isp, network, isUnlisted)} />
     {/* THE BREAKDOWN: the cohort's nodes cut by NETWORK — whose nodes these are — the level below
         the country card's cut by provider. */}
     <Separator className="mb-2" />

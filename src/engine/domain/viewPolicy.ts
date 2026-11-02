@@ -86,6 +86,7 @@ export interface ViewPolicy {
   // `cardNetwork`). One rule across the views — the Metagraph card is the committed subject's
   // network — and each view names its subject here. `railCards.metagraphCardNetwork` resolves
   // it; the card's × and the slot's hint read the same row.
+  // A network the rail is browsing outranks it (`viewNetwork.ts`).
   metagraphCard: "filter" | "node" | "tickNet" | "plane";
   // Does this view publish the selection's flat node list (`store.selNodes`) for its explorer
   // card? geo (Country breakdown) + hyper (Network breakdown); elsewhere the list empties so the
@@ -159,6 +160,18 @@ export interface ViewPolicy {
   // span on screen and the scope its cards stand on. (It was a door onto the anchor log for one
   // day, 2026-10-07; the cards' "Snapshot records" still is.)
   rawSurface: "records" | "buckets";
+  // Does this view carry an AI NOTE — the written context card (`components/notes/`) for the
+  // subject on screen? The four 3D views do; the placeholder gallery shows no data, so no note.
+  aiNotes: boolean;
+  // Where this view's note finds its subject: the network the view stands on, the same with the
+  // DAG core read as the whole chamber ("chamber"), or the History filter ("history").
+  noteScope: "network" | "chamber" | "history";
+  // Do this view's selections live inside a global snapshot? A network then commits inside the tick
+  // and never writes the filter, and a node card stands only where it belongs to what is shown.
+  tickScoped: boolean;
+  // Does the rail BROWSE (`viewNetwork.ts`)? Its Metagraph ghost and swipe then look around the view
+  // and leave the filter alone.
+  railBrowses: boolean;
   // How deep the left rail's EXPLORER stands (user, 2026-10-07). The rule: the explorer shows the
   // OPEN card's children (`components/explorer/boxLevel.ts`) — "follow" — UNLESS the view's first
   // level is its own AXIS: N records along it rather than a set of scopes to choose one of. Then
@@ -196,6 +209,11 @@ export interface ViewPolicy {
   // LENS, which no explorer row may move (user, 2026-09-29: the signer row set it). Was a
   // `mode !== "geo"` deny-list in `pickActions`, which handed the ledger hyper's answer by default.
   nodeCommitsNetwork: boolean;
+  // THE LABEL COLUMN OF A FOLDED CARD (user, 2026-10-31: "right align the titles in hyper also"), so
+  // every entry's title starts on one x. It fits the view's longest slot noun: METAGRAPH, and
+  // Hypergraph's COMPOSITION. Snapshots keeps the short one: GLOBAL SNAPSHOT and METAGRAPH SNAPSHOT
+  // would leave a title too little room, so those two run past it. In em of the label step.
+  entryColumn: string;
 }
 
 // The calm bloom the ledger view uses — the reference the design likes (thin lines, sparse
@@ -229,6 +247,10 @@ const FLAT: ViewPolicy = {
   chipEnv: 1,
   fleet: "placed",
   rawSurface: "records",
+  aiNotes: false,
+  noteScope: "network",
+  tickScoped: false,
+  railBrowses: false,
   explorerDepth: "follow",
   chartStack: false,
   entryPlane: null,
@@ -237,6 +259,7 @@ const FLAT: ViewPolicy = {
   // given it, so wiring one up later changes nothing by accident.
   autoRotate: true,
   nodeCommitsNetwork: false,
+  entryColumn: "7.1em",
 };
 
 export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
@@ -281,6 +304,10 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     chipEnv: 1,
     fleet: "placed",
     rawSurface: "records",
+    aiNotes: true,
+    noteScope: "network",
+    tickScoped: false,
+    railBrowses: true,
     explorerDepth: "follow",
     chartStack: false,
     entryPlane: null,
@@ -291,6 +318,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     // the framing's override are different facts and they live in different places.
     autoRotate: true,
     nodeCommitsNetwork: true,
+    entryColumn: "8.3em",
     },
   // Footprint: the holographic globe + travelling packets; picks the globe nodes only.
   geo: {
@@ -326,6 +354,10 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     chipEnv: 0.35,
     fleet: "placed",
     rawSurface: "records",
+    aiNotes: true,
+    noteScope: "network",
+    tickScoped: false,
+    railBrowses: true,
     explorerDepth: "follow",
     chartStack: false,
     entryPlane: null,
@@ -333,6 +365,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     // a camera orbiting a spinning globe is two rotations fighting over one subject.
     autoRotate: false,
     nodeCommitsNetwork: false,
+    entryColumn: "7.1em",
     },
   // Snapshots: the settlement chamber. Morph frozen (nodes fly into lanes); picks the centred
   // snapshot + the reused producer dots. (The ledger-specific depth-fog recency treatment was
@@ -361,6 +394,10 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     chipEnv: 0.5, // low, not zero — coplanar trays wash at full sheen, go bland at none (field note)
     fleet: "placed",
     rawSurface: "records",
+    aiNotes: true,
+    noteScope: "chamber",
+    tickScoped: true,
+    railBrowses: false,
     explorerDepth: "axis",
     chartStack: false,
     entryPlane: null,
@@ -369,6 +406,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     // away from the reader, and an orbit turns that axis into a shape being inspected.
     autoRotate: false,
     nodeCommitsNetwork: false,
+    entryColumn: "7.1em",
   },
   // MEASURED HISTORY (2026-09-18) — the charts ARE the scene: DOM planes driven by
   // TrendStackSync, so almost every engine-side switch here is OFF. The canvas stays on because
@@ -406,6 +444,10 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     chipEnv: 1,
     fleet: "parked",
     rawSurface: "buckets",
+    aiNotes: true,
+    noteScope: "history",
+    tickScoped: false,
+    railBrowses: false,
     explorerDepth: "follow",
     chartStack: true,
     entryPlane: "dag",
@@ -415,6 +457,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     // five DOM style writes every frame, in the one view that already runs five composited layers.
     autoRotate: false,
     nodeCommitsNetwork: false,
+    entryColumn: "7.1em",
   },
   soon: FLAT,
 };

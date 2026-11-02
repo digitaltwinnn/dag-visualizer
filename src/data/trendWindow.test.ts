@@ -4,7 +4,7 @@
 // as "no leading gap"; the client clock judging a CDN-cached payload's newest bucket; the
 // leading partial month drawn whole while the trailing one was trimmed).
 import { describe, expect, it } from "vitest";
-import { assembleTrendSlice, bucketAt, spanPhrase, spanStep, cursorFraction, cutRange, leadingTrim, monthlySum, pickRangeTier, planTrendFetch, rangeBuckets, snapRange, sliceWindow, stitchWindows, TIER_SINCE, tilesFor, trimNewestPartial, windowSpan, ZOOMS, type TrendsWindowData } from "./trendWindow";
+import { assembleTrendSlice, bucketAt, plotCeiling, valueFraction, spanPhrase, spanStep, cursorFraction, cutRange, leadingTrim, monthlySum, pickRangeTier, planTrendFetch, rangeBuckets, snapRange, sliceWindow, stitchWindows, TIER_SINCE, tilesFor, trimNewestPartial, windowSpan, ZOOMS, type TrendsWindowData } from "./trendWindow";
 import { rangeDays } from "@/src/util/localTime";
 
 const HOUR = 3_600_000;
@@ -355,8 +355,8 @@ describe("planTrendFetch", () => {
 
 describe("ZOOMS", () => {
   it("is the one window vocabulary both registers read, coarsest last", () => {
-    expect(ZOOMS.map((z) => z.id)).toEqual(["1h", "24h", "7d", "30d", "1y", "all"]);
-    expect(ZOOMS.map((z) => z.label)).toEqual(["1H", "24H", "7D", "30D", "1Y", "All"]);
+    expect(ZOOMS.map((z) => z.id)).toEqual(["1h", "24h", "7d", "30d", "90d", "1y", "all"]);
+    expect(ZOOMS.map((z) => z.label)).toEqual(["1H", "24H", "7D", "30D", "90D", "1Y", "All"]);
   });
 });
 
@@ -556,5 +556,44 @@ describe("spanStep", () => {
   });
   it("is null for a degenerate span", () => {
     expect(spanStep({ fromMs: NOW, toMs: NOW }, -1, "30d", NOW)).toBeNull();
+  });
+});
+
+describe("the 90D pill", () => {
+  it("reads the daily tier, so its own last point is the day", () => {
+    const plan = planTrendFetch("90d", null);
+    expect(plan.main).toEqual({ window: "90d", tiles: null, cut: { kind: "none" } });
+    expect(plan.daily).toBeNull();
+  });
+
+  it("says its span in words, and reaches back ninety days", () => {
+    expect(spanPhrase("90d", null)).toBe("last 90 days");
+    expect(windowSpan("90d", null, 90 * 86_400_000)).toEqual({ fromMs: 0, toMs: 90 * 86_400_000 });
+  });
+});
+
+// A coin's hairline meets the chart's line, so it reads the plot's own scale (user, 2026-11-01).
+describe("a value's height on a plot", () => {
+  it("the ceiling is the peak with its headroom, or a shared scale's", () => {
+    expect(plotCeiling([[10, 50, null], [20]])).toBeCloseTo(56);
+    expect(plotCeiling([[10, 50]], 200)).toBeCloseTo(224);
+  });
+
+  it("falls back on the series when a shared scale says nothing", () => {
+    expect(plotCeiling([[10]], 0)).toBeCloseTo(11.2);
+  });
+
+  it("stands on a flat zero chart without dividing by nothing", () => {
+    expect(plotCeiling([[0, null]])).toBeGreaterThan(0);
+  });
+
+  it("is the bucket's value as a share of the ceiling", () => {
+    expect(valueFraction([10, 50], [100, 200], 200, 100)).toBeCloseTo(0.5);
+  });
+
+  it("is nothing where nothing was measured, or the axis does not hold the bucket", () => {
+    expect(valueFraction([10, null], [100, 200], 200, 100)).toBeNull();
+    expect(valueFraction([10, 50], [100, 200], 300, 100)).toBeNull();
+    expect(valueFraction([10, 50], [100, 200], null, 100)).toBeNull();
   });
 });

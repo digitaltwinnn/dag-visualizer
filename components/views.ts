@@ -82,7 +82,7 @@ const MODE_BY_SLUG = new Map<string, Mode>(ROUTED_VIEWS.map((v) => [v.slug, v.id
 /** The mode a pathname names: `/` is the default view, a routed slug its view, anything else null. */
 export function modeForPath(pathname: string): Mode | null {
   const seg = pathname.replace(/^\/+|\/+$/g, "");
-  if (seg === "") return "hyper";
+  if (seg === "") return "geo";
   return MODE_BY_SLUG.get(seg) ?? null;
 }
 

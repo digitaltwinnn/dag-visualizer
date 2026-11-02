@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeAll, afterAll } from "vitest";
-import { bucketStamp, rangeDays, recordStamp, stampParts, utcDayKey, utcStamp } from "./localTime";
+import { bucketStamp, rangeDays, recordStamp, stampParts, titleStampParts, utcDayKey, utcStamp } from "./localTime";
 
 // ONE RULE FOR EVERY DATE THE APP WRITES (user, 2026-10-07 — "so any figure shown with days will be
 // UTC right? … if a user shares a screenshot it should be the same for other users. If we show a
@@ -81,5 +81,17 @@ describe("rangeDays — a span's label: its UTC days, ONE wording for the card, 
   });
   it("a span inside one day is that day", () => {
     expect(rangeDays(Date.UTC(2026, 8, 8, 18), Date.UTC(2026, 8, 8, 22))).toBe("Sep 8");
+  });
+});
+
+// THE MOMENT CARD'S TITLE IN TWO ROWS (user, 2026-10-30: "'Sep 30, 18:00 GMT+2', can we shorten it
+// by having two rows, date row, time row?"): the date as the title, the clock and zone under it.
+describe("titleStampParts — the title's date over its clock", () => {
+  it("splits a clock time into its date and its clock with the zone", () => {
+    const p = titleStampParts(Date.UTC(2026, 8, 14, 14, 4, 2), { now: Date.UTC(2026, 9, 7) });
+    expect(p).toEqual({ date: "Sep 14", time: "10:04 EDT" });
+  });
+  it("carries the year only when it is not the current one", () => {
+    expect(titleStampParts(Date.UTC(2025, 8, 14, 14, 4), { now: Date.UTC(2026, 9, 7) }).date).toBe("Sep 14, 2025");
   });
 });

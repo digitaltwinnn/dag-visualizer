@@ -1,5 +1,6 @@
 "use client";
 
+import { viewNetwork } from "@/src/engine/domain/viewNetwork";
 // THE VITALS BAND'S PER-VIEW CELL SETS — what each 3D view says in the bottom lane: hyper leads
 // with the composition DONUT (four counts that are shares of one fleet — the one honest home for
 // a donut), geo with its footprint numbers plus the nodes-by-country micro-bar row, and the
@@ -36,7 +37,7 @@ import { useFeedRead } from "@/components/useFeedRead";
 
 export function HyperCells({ accent }: { accent: string }) {
   useFeedRead(["api-metagraphs"], "HyperCells");
-  const filter = useStore((s) => s.filter);
+  const filter = useStore(viewNetwork);
   const metaList = useStore((s) => s.metaList);
   // No `selNodes` subscription any more: the NODES card was its only reader, and dropping it also
   // drops a per-publish re-render of this whole cell from the band.
@@ -49,7 +50,7 @@ export function HyperCells({ accent }: { accent: string }) {
 
     // Metagraphs by TYPE — the DAG core is not a metagraph (one node model: it is the
     // metagraph-shaped CORE), so it stays out of this count; a committed filter scopes to it.
-    // metaType is the STRUCTURED read (parts.tsx) — never a match on networkKind's prose,
+    // metaType is the STRUCTURED read (parts.tsx) — never a match on a display word,
     // which a copy edit could reword without any type error reaching this bucket loop.
     const metas = metaList.filter((m) => m.id !== "dag" && (!cfg || m.id === cfg.id));
     const types: Record<string, number> = { data: 0, currency: 0, "data + currency": 0, unknown: 0 };
@@ -81,7 +82,7 @@ export function HyperCells({ accent }: { accent: string }) {
   // A COMMITTED SCOPE flips the card from a DISTRIBUTION to a CHARACTERISTIC (user, 2026-08-30:
   // "'currency 1' and a bar ... is more a single characteristic than a count"): one network has a
   // type, not a type breakdown, so the eyebrow goes singular and the value is the type — icon +
-  // word. The DAG answers networkKind's own "hypergraph" (the hyper view's Orbit), the unlisted
+  // word. The DAG answers `metaKindWord`'s own "hypergraph" (the hyper view's Orbit), the unlisted
   // set the honest "mixed set". "all" keeps the count with one icon+count entry per type — icons
   // over bars (user, same day): a type is a KIND, not a magnitude, so a glyph says it better
   // than a share bar, and the same glyphs then serve the filtered card unchanged.
@@ -224,7 +225,7 @@ export function GeoCells({ accent }: { accent: string }) {
   useFeedRead(["clusters", "api-geo"], "GeoCells");
   const lb = useStore((s) => s.leaderboard);
   const selNodes = useStore((s) => s.selNodes);
-  const filter = useStore((s) => s.filter);
+  const filter = useStore(viewNetwork);
   const countries = lb?.countries ?? [];
   const { ispCounts, topIsps, byRegion } = useMemo(() => {
     const ispCounts = new Map<string, number>();

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
+import NoteDiamonds from "@/components/notes/NoteDiamonds";
 import { cn } from "@/lib/utils";
 import { globalSeries } from "@/src/data/trendSeries";
 import type { TrendsWindowData } from "@/src/data/trendWindow";
@@ -114,6 +115,7 @@ export default function TrendTrack({
   const [box, setBox] = useState({ w: 0, h: 0 });
   // A React id holds colons, which a `url(#…)` reference would have to escape.
   const clipId = `span${useId().replace(/:/g, "")}`;
+  const fadeId = `fade${useId().replace(/:/g, "")}`;
   useEffect(() => {
     if (!track) return;
     const measure = () => setBox({ w: track.clientWidth, h: track.clientHeight });
@@ -383,6 +385,15 @@ export default function TrendTrack({
       <svg width={box.w} height={box.h} className="block" aria-hidden>
         {/* THE BASELINE — the track reads as an axis even where the series is all holes. */}
         <line x1={0} y1={plotH} x2={box.w} y2={plotH} stroke="var(--border)" strokeWidth={1} />
+        {/* THE FILL FADES AS A PLANE'S DOES, from the one token (user, 2026-11-01), so the band reads
+            as the same chart. Measured from the track's own height, so every run of a broken
+            series fades to the baseline at one rate. */}
+        <defs>
+          <linearGradient id={fadeId} x1="0" y1="0" x2="0" y2={plotH} gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="var(--primary)" style={{ stopOpacity: "var(--trend-fill-top)" }} />
+            <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
+          </linearGradient>
+        </defs>
         {/* ⚠️ OUTSIDE THE BRUSH THE INK DIMS — the INK, never a veil over it (user, 2026-09-29: the
             selector's chart "has its own background … it does not really blend in with the card
             it's already on"). Two rects of `--background` at 55% used to cover everything outside
@@ -414,8 +425,7 @@ export default function TrendTrack({
               <>
                 <path
                   d={`${path(run)} L${run[run.length - 1].x.toFixed(1)} ${plotH} L${run[0].x.toFixed(1)} ${plotH} Z`}
-                  fill="var(--primary)"
-                  opacity={0.12}
+                  fill={`url(#${fadeId})`}
                 />
                 <path d={path(run)} fill="none" stroke="var(--primary)" strokeWidth={1} opacity={0.75} />
               </>
@@ -505,6 +515,9 @@ export default function TrendTrack({
           </g>
         )}
       </svg>
+      {/* THE AI NOTE'S NOTABLE DAYS — HTML marks over the SVG (they are buttons), on the baseline.
+          Their presses stop at the mark, so the gestures above never see them. */}
+      <NoteDiamonds geom={geom} bottom={LABEL_H} />
     </div>
   );
 }

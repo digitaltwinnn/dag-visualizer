@@ -10,13 +10,18 @@ import { cn } from "@/lib/utils";
 // as the `animate-breathe` live-dot elsewhere. Presentational only — no store access.
 
 // ACQUIRING — a short row of node-stars twinkling on in staggered sequence while a value resolves.
-export function NodeStars({ count = 5 }: { count?: number }) {
+/** `tone="ai"`: the stars in the AI hue, where they wait for a model's note (the AI card and the
+ *  plates, user 2026-10-30: "give the reading icon for the AI card/sections also the AI colors"). */
+export function NodeStars({ count = 5, tone }: { count?: number; tone?: "ai" }) {
   return (
     <span className="inline-flex gap-[5px] items-center align-middle" aria-hidden>
       {Array.from({ length: count }).map((_, i) => (
         <span
           key={i}
-          className="w-[5px] h-[5px] rounded-full bg-primary opacity-30 animate-st-twinkle motion-reduce:animate-none motion-reduce:opacity-70"
+          className={cn(
+            "w-[5px] h-[5px] rounded-full opacity-30 animate-st-twinkle motion-reduce:animate-none motion-reduce:opacity-70",
+            tone === "ai" ? "bg-[var(--ai-mark)]" : "bg-primary",
+          )}
           style={{ animationDelay: `${i * 0.18}s` }}
         />
       ))}
@@ -52,4 +57,16 @@ export function SonarRing() {
 // (was 12 on the one row that had it); the ink is the caller's — muted at rest, full on a wash.
 export function PinMark({ className }: { className?: string }) {
   return <Pin aria-hidden className={cn("size-3.5 flex-none", className)} />;
+}
+
+/** THE PINNED STATE, AS AN ICON (user, 2026-10-31: "instead of 'pinned' + icon just use the icon
+ *  everywhere without the text"). The word stays for assistive tech only, here, its one home
+ *  (`components/pinnedMark.test.ts`); "live" keeps its word, since a dot alone says nothing. */
+export function PinnedMark({ className }: { className?: string }) {
+  return (
+    <>
+      <PinMark className={className} />
+      <span className="sr-only">pinned</span>
+    </>
+  );
 }

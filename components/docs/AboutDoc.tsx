@@ -93,14 +93,19 @@ export default function AboutDoc() {
           endpoints, the global snapshot stream, each metagraph&apos;s cluster and each
           node&apos;s status, and drawn as it comes in. Built for many visitors at once: this site
           asks the network once every few seconds and shares that answer with everyone watching,
-          so a busy day never adds load to the network itself.
+          so a busy day never adds load to the network itself. The one exception is an AI note,
+          which is written from those same figures a little earlier and says which stretch of time it
+          covers.
         </p>
         <p className="mt-2 text-prose text-muted-foreground">
           Node locations come from their public internet addresses, so they are accurate to a
-          city and a hosting provider, not to a street. The only thing stored behind this site
-          is the network&apos;s own public history — activity totals summed from the chain for
-          the History view. Nothing about you: the page keeps a short memory of recent
-          snapshots while it is open, and forgets it when you close the tab.
+          city and a hosting provider, not to a street. What is stored behind this site is the
+          network&apos;s own public history — activity totals summed from the chain for the
+          History view — and the short notes Constellation Gate AI writes about it. Nothing about you: the page
+          keeps a short memory of recent snapshots while it is open, and forgets it when you
+          close the tab. The one trace is a note written because you asked for it, by brushing a
+          range or picking a country, a provider or a kind of node: a count kept for two hours
+          under a scrambled form of your address, so no single visitor can ask for too many.
         </p>
         <p className="mt-2 text-prose text-muted-foreground">
           When something can&apos;t be reached for a moment, the screen simply says so —
@@ -143,6 +148,22 @@ export default function AboutDoc() {
           while a snapshot is pinned and its card leads with how the two are related; a fact
           already stated by the card above it isn&apos;t repeated below; and the label floating
           in the scene follows whichever card you open, just as the camera does.
+        </p>
+        {/* The Gate AI card, said once in the page's own register (2026-10-27; the user approves
+            the wording live). One card per view, at the top of the cards, leading with what
+            changed (review M4). It states the two promises the feature rests on: the numbers are
+            the view's own, and a note the figures cannot back never shows. Named for the product
+            (user, 2026-10-29: "this is the product and I'd like to promote it a bit"), the same
+            Gate AI the paragraph above says the site was built with. */}
+        <p>
+          Each view also has one <strong>Constellation Gate AI</strong> card, at the top of the
+          cards on the right. Gate AI, Constellation&apos;s own AI product, reads the same measured
+          figures the view shows and writes, in a few sentences, what changed and by how much, or,
+          when nothing moved, what the view is showing right now. A note with a number the figures
+          can&apos;t back is thrown away, and the card is always marked as AI so it never passes
+          for a measurement. Pick a country, a hosting provider, a kind of node or a stretch of
+          time on a chart, and its own card carries a note of its own, written when you first open
+          it.
         </p>
         {/* One selection across the views, and RAW as the one step down (user, 2026-10-09:
             the "three depths" paragraph this replaces called History a depth below the scene,

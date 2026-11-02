@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CHILD_OF, childStep, positionMarks, siblingSet, type SiblingState } from "@/components/railSiblings";
+import { CHILD_OF, childStep, positionMarks, rootStep, siblingSet, type SiblingState } from "@/components/railSiblings";
 import {
   cohortToggleActions,
   compositionToggleActions,
@@ -115,14 +115,10 @@ describe("siblingSet — context (network) rung", () => {
     expect(set.items[set.index]!.key).toBe("ded");
     expect(set.parentLabel).toBe("Networks");
   });
-  it("a step to a DIFFERENT network is a plain filter select", () => {
+  it("a step to a DIFFERENT network browses it", () => {
     const set = siblingSet("context", base({ filter: "ded" }))!;
     const other = set.items.find((i) => i.key !== "ded")!;
-    expect(other.actions).toEqual([{ kind: "filter", id: other.key }]);
-  });
-  it("the CURRENT item builds the deselect-toggle (documented: the pager never invokes it)", () => {
-    const set = siblingSet("context", base({ filter: "ded" }))!;
-    expect(set.items[set.index]!.actions).toEqual([{ kind: "filter", id: "all" }]);
+    expect(other.actions).toEqual([{ kind: "railNet", id: other.key }]);
   });
   it("no committed filter → no set", () => {
     expect(siblingSet("context", base({}))).toBeNull();
@@ -237,6 +233,25 @@ describe("siblingSet — node rung", () => {
       }),
     );
   });
+  // A STEP BELOW THE NETWORK CARD NEVER MOVES THE FILTER (user, 2026-10-30: "click a ghost card
+  // that opens a node related to its parent card and the app filter is automatically set; that
+  // should not happen"). Hyper's scene click commits a node's network by policy
+  // (`nodeCommitsNetwork`), but in the rail the network is the node's ANCESTOR: under the DAG core
+  // a hybrid's row carries its metagraph, and the step was re-filtering the whole app to it.
+  it("hyper: a node step or a composition's ghost never writes the filter, even for a hybrid of another network", () => {
+    const dorHybrid = { ...deA, pick: { ...deA.pick, meta: { id: "dor" } } } as unknown as NodeRow;
+    const rows = [dorHybrid, deB];
+    const groups = compositionGroups(rows);
+    const sel = { netId: "dag", key: groups[0]!.key };
+    const s = base({ mode: "hyper", filter: "dag", composition: sel, selNodes: rows, inspect: deB.pick });
+    const set = siblingSet("node", s)!;
+    expect(set.items.map((i) => i.key)).toEqual(["1.1.1.1", "1.1.1.2"]);
+    expect(set.items.flatMap((i) => i.actions).some((a) => a.kind === "filter")).toBe(false);
+    expect(childStep("composition", base({ mode: "hyper", filter: "dag", composition: sel, selNodes: rows }))!.actions.some((a) => a.kind === "filter")).toBe(false);
+    // The scene's own click still commits the network: the rule is the rail's, not the view's.
+    expect(nodeSelectActions(dorHybrid.pick, { mode: "hyper", currentFilter: "dag", deselect: false })[0]).toEqual({ kind: "filter", id: "dor" });
+  });
+
   it("nothing inspected → no set", () => {
     expect(siblingSet("node", base({}))).toBeNull();
   });
@@ -284,6 +299,25 @@ describe("siblingSet — metagraph snapshot rung", () => {
       ),
     );
   });
+  // THE DAG CORE IS THE WHOLE TICK (user, 2026-10-30: "treat DAG as a wildcard"; the chamber's
+  // own reading since 2026-08-13, `ledgerStory`: every global tick IS a DAG snapshot). Under the
+  // DAG filter the rung spans every network's snapshots in the tick, in the explorer's order
+  // (busiest network first, each oldest → newest), each item naming its network, and a step to
+  // another network's snapshot commits that network INSIDE the tick, never the filter.
+  it("under the DAG filter the set is every snapshot in the tick, named by network, and spans a step across networks", () => {
+    const dag = ledger({ filter: "dag", metaSnap: cur, snap: snapPick, exactRows: rows });
+    const set = siblingSet("metaSnap", dag)!;
+    expect(set.items.map((i) => i.label)).toEqual(["DED 100", "DED 101", "DOR 900", "Unlisted undecoded"]);
+    expect(set.index).toBe(0);
+    expect(set.parentLabel).toBe("Global 42");
+    const toDor = set.items[2]!.actions;
+    expect(toDor.some((a) => a.kind === "filter")).toBe(false);
+    expect(toDor).toEqual(metaSnapSelectActions({ metaId: "dor", ordinal: 900, hash: "", globalOrdinal: 42, ts: "T" }, snapPick, { metaSnap: cur, inspect: null }));
+    // Standing on DOR's snapshot inside the tick, the set is still the whole tick's.
+    const onDor = ledger({ filter: "dag", metaSnap: { ...cur, metaId: "dor", ordinal: 900 }, tickNet: { metaId: "dor", globalOrdinal: 42 }, snap: snapPick, exactRows: rows });
+    expect(siblingSet("metaSnap", onDor)!.index).toBe(2);
+  });
+
   it("a metagraph with a single snapshot in the tick gets NO pager", () => {
     const only = { ...cur, metaId: "dor", ordinal: 900 };
     expect(siblingSet("metaSnap", ledger({ ...s, filter: "dor", metaSnap: only }))).toBeNull();
@@ -484,6 +518,20 @@ describe("childStep — the first-child DOWN step", () => {
         { metaSnap: null, inspect: null },
       ),
     );
+  });
+
+  it("the DAG core's card opens the tick's first snapshot, whichever network's (DAG is the whole tick)", () => {
+    const rows = [
+      { metaId: "dor", ordinal: 900 },
+      { metaId: "ded", ordinal: 55 },
+      { metaId: "ded", ordinal: 56 },
+    ] as unknown as SiblingState["exactRows"];
+    const step = childStep("context", ledger({ filter: "dag", snap: snapPick, exactRows: rows }))!;
+    expect(step.label).toBe("DED 56"); // the busiest network's newest row, as the explorer lists it
+    expect(step.actions).toEqual(
+      metaSnapSelectActions({ metaId: "ded", ordinal: 56, hash: "", globalOrdinal: 42, ts: "T" }, snapPick, { metaSnap: null, inspect: null }),
+    );
+    expect(step.actions.some((a) => a.kind === "filter")).toBe(false);
   });
 
   it("a network that did not anchor into this tick has nothing to open", () => {
@@ -771,5 +819,92 @@ describe("siblingSet — History's Metagraph card on a plane focus", () => {
   });
   it("…while one standing on the filter keeps the filter's pager", () => {
     expect(siblingSet("context", base({ mode: "trend", filter: "ded", trendFocus: null }))).not.toBeNull();
+  });
+});
+
+// THE RAIL BROWSES IN HYPERGRAPH (user, 2026-10-31): the Metagraph ghost opens the first network, a
+// swipe steps the explorer's list, and neither writes the filter. What hangs under it reads the
+// card's network, so it never needs one either.
+describe("the Hypergraph rail never writes the filter", () => {
+  const nets = [
+    { id: "dag", name: "DAG", nodes: [{ ip: "1.1.1.1" }, { ip: "1.1.1.2" }], located: 2 },
+    { id: "dor", name: "Dor", nodes: [{ ip: "2.2.2.1" }], located: 1 },
+  ] as unknown as SiblingState["metaList"];
+  const hyper = (over: Partial<SiblingState>) => base({ mode: "hyper", filter: "all", metaList: nets, hyperMeasure: "nodes", ...over });
+  const noFilter = (acts: { kind: string }[]) => expect(acts.some((a) => a.kind === "filter")).toBe(false);
+  it("the ghost's first step is the explorer's first network", () => {
+    const step = rootStep(hyper({}))!;
+    expect(step.actions).toEqual([{ kind: "railNet", id: step.key }]);
+  });
+  it("Hypergraph and Geography have a root step, the other views none", () => {
+    expect(rootStep(base({ mode: "ledger", filter: "all", metaList: nets }))).toBeNull();
+    expect(rootStep(base({ mode: "trend", filter: "all", metaList: nets }))).toBeNull();
+  });
+  it("a swipe steps the list from the browsed network", () => {
+    const set = siblingSet("context", hyper({ railNet: "dor" }))!;
+    expect(set.items.map((i) => i.key).sort()).toEqual(["dag", "dor"]);
+    expect(set.items[set.index]!.key).toBe("dor");
+    set.items.forEach((i) => noFilter(i.actions));
+  });
+  it("a swipe under a real filter still leaves it alone, and coming back to it ends the browse", () => {
+    const set = siblingSet("context", hyper({ filter: "dag" }))!;
+    expect(set.items.find((i) => i.key === "dor")!.actions).toEqual([{ kind: "railNet", id: "dor" }]);
+    expect(set.items.find((i) => i.key === "dag")!.actions).toEqual([{ kind: "railNet", id: null }]);
+  });
+  it("a layer group opens under the browsed network with no filter write", () => {
+    const row = { id: "n1", label: "n1", pick: { kind: "metanode", node: { ip: "2.2.2.1", roles: ["l0"] }, meta: { id: "dor" } } };
+    const s = hyper({ railNet: "dor", selNodes: [row] as unknown as SiblingState["selNodes"] });
+    const step = childStep("context", s)!;
+    noFilter(step.actions);
+    expect(step.actions).toContainEqual({ kind: "composition", sel: { netId: "dor", key: step.key } });
+  });
+});
+
+// GEOGRAPHY BROWSES TOO (user, 2026-10-31: "geo metagraph ghost should also be opening all cards").
+describe("the Geography rail never writes the filter", () => {
+  const nets = [
+    { id: "dor", name: "Dor", nodes: [], located: 1 },
+    { id: "dag", name: "DAG", nodes: [], located: 9 },
+  ] as unknown as SiblingState["metaList"];
+  const geo = (over: Partial<SiblingState>) => base({ mode: "geo", filter: "all", metaList: nets, ...over });
+  it("the ghost's first step is the most located network", () => {
+    expect(rootStep(geo({}))).toMatchObject({ key: "dag", actions: [{ kind: "railNet", id: "dag" }] });
+  });
+  it("the ghost takes no step over a held country, provider or node: a new network would drop them", () => {
+    expect(rootStep(geo({ country: "DE" }))).toBeNull();
+    expect(rootStep(geo({ cohort: {} as SiblingState["cohort"] }))).toBeNull();
+    expect(rootStep(geo({ inspect: {} as SiblingState["inspect"] }))).toBeNull();
+  });
+  it("a swipe steps every network from the browsed one, no filter", () => {
+    const set = siblingSet("context", geo({ railNet: "dag" }))!;
+    expect(set.items.map((i) => i.key)).toEqual(["dag", "dor"]);
+    expect(set.items[set.index]!.key).toBe("dag");
+    expect(set.items.find((i) => i.key === "dor")!.actions).toEqual([{ kind: "railNet", id: "dor" }]);
+  });
+  it("a country opens under the browsed network", () => {
+    const step = childStep("context", geo({ railNet: "dag" }))!;
+    expect(step.actions.some((a) => a.kind === "filter")).toBe(false);
+    expect(step.actions.some((a) => a.kind === "country")).toBe(true);
+  });
+  it("a node under a browsed network still steps networks, not that machine's", () => {
+    const pick = { kind: "l0", node: { ip: "1.1.1.1" } };
+    const set = siblingSet("context", geo({ railNet: "dag", inspect: pick as unknown as SiblingState["inspect"] }))!;
+    expect(set.parentLabel).toBe("Networks");
+  });
+});
+
+// REVIEW 2026-10-31: what hangs under a browsed network reads that network, never the filter.
+describe("the node pager under a browsed network", () => {
+  const row = (ip: string) => ({ id: ip, label: ip, pick: { kind: "metanode", node: { ip, roles: ["l0"] }, meta: { id: "dor" } } });
+  const rows = [row("2.2.2.1"), row("2.2.2.2")] as unknown as SiblingState["selNodes"];
+  const metaList = [{ id: "dor", name: "Dor", nodes: [], located: 2 }] as unknown as SiblingState["metaList"];
+  const set = () =>
+    siblingSet("node", base({ mode: "hyper", filter: "all", railNet: "dor", metaList, selNodes: rows, allNodes: rows, inspect: rows[0]!.pick }))!;
+  it("steps under its own network, not All", () => {
+    const acts = set().items[1]!.actions;
+    expect(acts).toContainEqual(expect.objectContaining({ kind: "composition", sel: expect.objectContaining({ netId: "dor" }) }));
+  });
+  it("names that network", () => {
+    expect(set().parentLabel).toBe("Dor");
   });
 });

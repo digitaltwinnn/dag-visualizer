@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { PLANE_PX_W, planeFormat } from "@/src/engine/domain/trendStack";
 
 // THE TREND STACK's contracts, made executable (2026-09-18 — the boundary-test idiom).
@@ -109,6 +110,14 @@ describe("trend-stack boundary", () => {
     }
   });
 
+  it("hangs no blur on a plane through the chart's coin — the popover is drawn inside the plane", () => {
+    const POPOVER = "components/notes/NoteDayPopover.tsx";
+    const src = stripComments(readFileSync(POPOVER, "utf8"));
+    for (const banned of ["SCENE_GLASS", "backdrop-filter", "backdrop-blur", "shadow-"]) {
+      expect(src.includes(banned), `${POPOVER} uses ${banned} — ${CHART} draws it on a transformed plane, which would re-raster every frame`).toBe(false);
+    }
+  });
+
   it("never imports the engine — the reach is one-way", () => {
     expect(
       /@\/src\/engine\/Engine/.test(code()),
@@ -182,6 +191,14 @@ describe("trend-stack boundary", () => {
     ).toBe(true);
   });
 
+  it("places its notable days once per series, not once per cursor write", () => {
+    const src = stripComments(readFileSync(CHART, "utf8"));
+    expect(
+      /const\s+markXs\s*=\s*useMemo\(/.test(src),
+      `${CHART} must memoise its marks — the chart body runs on every cursor write, and placing them walks every line's points`,
+    ).toBe(true);
+  });
+
   it("keeps the plot box the cursor overlay is calculated against", () => {
     const src = stripComments(readFileSync(CHART, "utf8"));
     expect(
@@ -252,3 +269,37 @@ describe("trend-stack boundary", () => {
     ).toBe(true);
   });
 });
+
+describe("a leaving stack keeps the deal it was showing", () => {
+  // `setMode` resets the focus, the scroll and the rotation the moment a view is left, which is
+  // right for the next arrival and wrong for cards still on screen: the DAG's plane left the deck
+  // and the next network slid forward while the cards fell (user, 2026-10-31).
+  it("the planes hold the deck's state while the layer lingers", () => {
+    const src = readFileSync(join("components", "TrendStack.tsx"), "utf8");
+    expect(src).toMatch(/if \(on\) dealt\.current = /);
+    for (const key of ["focus", "scroll", "rotation"]) expect(src).toMatch(new RegExp(`\\b${key} = dealt\\.current\\.${key}|\\b${key}: .*dealt`));
+  });
+
+  it("the projector takes no new poses during the leave beat", () => {
+    const src = readFileSync(join("src", "engine", "TrendStackSync.ts"), "utf8");
+    expect(src).toMatch(/!this\._leaving &&\s*\(\s*st\.ids !== this\._ids/);
+  });
+});
+
+// ONE FILL (user, 2026-11-01: "the same gradient effect should apply to the vitals chart"): the
+// timeline under the planes fades as a plane does, from the one token, so the two cannot drift.
+describe("the chart's fill", () => {
+  const track = readFileSync(join(process.cwd(), "components/TrendTrack.tsx"), "utf8");
+
+  it("fades from the shared token to nothing on the timeline too", () => {
+    expect(track).toMatch(/<linearGradient id=\{fadeId\}[^>]*gradientUnits="userSpaceOnUse"/);
+    expect(track).toMatch(/stopOpacity: "var\(--trend-fill-top\)"/);
+    expect(track).toMatch(/stopOpacity=\{0\}/);
+    expect(track).toMatch(/fill=\{`url\(#\$\{fadeId\}\)`\}/);
+  });
+
+  it("is no longer a flat wash there", () => {
+    expect(track).not.toMatch(/fill="var\(--primary\)"\s+opacity=\{0\.12\}/);
+  });
+});
+

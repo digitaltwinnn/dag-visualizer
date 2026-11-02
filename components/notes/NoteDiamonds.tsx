@@ -1,0 +1,146 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+
+import { cn } from "@/lib/utils";
+import type { NoteDay } from "@/src/data/noteTypes";
+import { type TrackGeom, xAtMs } from "@/src/data/trendTimeline";
+import { useStore } from "@/src/store/store";
+import { rangeDays } from "@/src/util/localTime";
+import NoteDayPopover from "./NoteDayPopover";
+import NoteKindCoin from "./NoteKindCoin";
+import { commitNoteDay } from "./commitNoteDay";
+import { useAiNote } from "./useAiNote";
+
+// THE NOTABLE DAYS ON THE TIMELINE (2026-10-27) — the AI note's notable days, one mark each on the
+// History band's track: the kind's glyph on the AI's coin (`NoteKindCoin`, design C 2026-10-30; an
+// iridescent diamond until then, which read large here and small on the planes). The same days the AI notes card lists as rows; the
+// two surfaces are PAIRED through `hoverNoteDay` (rule 9): hovering a diamond lights its row,
+// hovering a row lights its diamond and raises the popover. Hovers preview, a click commits the
+// day as History's range — the row's own commit (`DayRow`), through the same store action.
+//
+// ONE NOTE, ONE FETCH: `useAiNote` is the card's own derivation, so the diamonds and the card read
+// the same note through the loader's module cache. Nothing renders unless that note is `ok` and
+// carries days; the days are the model's words (untrusted) rendered as React text only.
+//
+// ⚠️ A DIAMOND IS AN ISLAND ON A TRACK THAT OWNS EVERY POINTER. `onPointerDown` stops at the
+// button, so the track's capture, brush and cursor never see a press that began on a mark — a
+// press on EMPTY track still brushes. Keyboard events bubble on purpose (Escape clears a standing
+// range from a focused diamond too).
+//
+// THE POPOVER is `NoteDayPopover`. The caption also lives in the card's row, so it is never
+// hover-only text. A hover from a chart's coin leaves it down: that coin says the day itself, and
+// a label on the band would stand far from the pointer (user, 2026-10-31).
+
+const DAY_MS = 86_400_000;
+const HALF_DAY_MS = 43_200_000;
+/** Two notables on one UTC day share one x: the later ones step right by this many px, so both
+ *  stay clickable. */
+const STACK_PX = 12;
+/** Within this many px of either end the popover anchors INTO the track instead of centring. */
+const EDGE_PX = 110;
+
+const keyOf = (d: NoteDay) => `${d.dayMs}:${d.kind}:${d.networkId ?? ""}`;
+
+function Diamond({
+  day,
+  x,
+  bottom,
+  width,
+  first,
+}: {
+  day: NoteDay;
+  x: number;
+  bottom: number;
+  width: number;
+  /** The first notable of its day answers the card row's hover (a row names a day, not a kind). */
+  first: boolean;
+}) {
+  const lit = useStore((s) => s.hoverNoteDay === day.dayMs);
+  // Hover or keyboard focus on THIS diamond; a row's hover raises only the day's first diamond.
+  const [own, setOwn] = useState(false);
+  // CLEARS ONLY WHAT IT SET, like `DayRow`: an unmount under the pointer (a new note, a range
+  // committed) must not leave a hover behind, nor clear a day another surface lit meanwhile.
+  const mine = useRef(false);
+  useEffect(
+    () => () => {
+      const st = useStore.getState();
+      if (mine.current && st.hoverNoteDay === day.dayMs) st.setHoverNoteDay(null);
+    },
+    [day.dayMs],
+  );
+  const on = () => {
+    mine.current = true;
+    setOwn(true);
+    useStore.getState().setHoverNoteDay(day.dayMs);
+  };
+  const off = () => {
+    mine.current = false;
+    setOwn(false);
+    useStore.getState().setHoverNoteDay(null);
+  };
+  const date = rangeDays(day.dayMs, day.dayMs + DAY_MS);
+  const fromChart = useStore((s) => s.hoverNoteChart);
+  const shown = own || (lit && first && !fromChart);
+  const align = x < EDGE_PX ? "left-0" : x > width - EDGE_PX ? "right-0" : "left-1/2 -translate-x-1/2";
+  return (
+    <div className="absolute size-0" style={{ left: x, bottom }}>
+      <button
+        type="button"
+        aria-label={`Notable day, ${date}: ${day.caption}`}
+        // The track would capture this press and start a brush or move the cursor.
+        onPointerDown={(e) => e.stopPropagation()}
+        onPointerEnter={on}
+        onPointerLeave={off}
+        onFocus={(e) => {
+          // A mouse press focuses the button too; only keyboard focus is a preview worth keeping
+          // (a click commits and the hover would otherwise stay lit on the card's row).
+          if (e.currentTarget.matches(":focus-visible")) on();
+        }}
+        onBlur={off}
+        onClick={() => commitNoteDay(day)}
+        className={cn(
+          // THE ONE COIN (design C, 2026-10-30): the same 16px mark the AI card's row leads with and
+          // a chart plane draws, so the band's mark is no longer the large one of three.
+          "absolute left-0 top-0 grid size-4 -translate-x-1/2 -translate-y-1/2 cursor-pointer border-0 bg-transparent p-0",
+          "outline-none transition-transform duration-150",
+          // The hit area is larger than the mark; the touch tier's is a finger's.
+          "before:absolute before:-inset-2 before:content-[''] touch:before:-inset-4",
+          "focus-visible:ring-1 focus-visible:ring-foreground",
+          (own || lit) && "scale-125",
+        )}
+      >
+        <NoteKindCoin kind={day.kind} />
+      </button>
+      {shown && <NoteDayPopover date={date} caption={day.caption} className={cn("bottom-3 z-10", align)} />}
+    </div>
+  );
+}
+
+/** The days of the note on screen that fall inside the track, as marks on its baseline.
+ *  `bottom` is the baseline's distance from the track's bottom edge (the month strip's height). */
+export default function NoteDiamonds({ geom, bottom }: { geom: TrackGeom; bottom: number }) {
+  const { subject, note } = useAiNote();
+  const res = note.res;
+  const days = subject?.view === "trend" && res?.state === "ok" ? res.days : null;
+  const marks = useMemo(() => {
+    if (!days || geom.width <= 0) return [];
+    const seen = new Map<number, number>();
+    return days
+      .filter((d) => d.dayMs >= geom.fromMs && d.dayMs < geom.toMs)
+      .map((d) => {
+        const nth = seen.get(d.dayMs) ?? 0;
+        seen.set(d.dayMs, nth + 1);
+        const x = Math.min(geom.width, xAtMs(d.dayMs + HALF_DAY_MS, geom) + nth * STACK_PX);
+        return { day: d, x, first: nth === 0 };
+      });
+  }, [days, geom]);
+  if (marks.length === 0) return null;
+  return (
+    <>
+      {marks.map((m) => (
+        <Diamond key={keyOf(m.day)} day={m.day} x={m.x} bottom={bottom} width={geom.width} first={m.first} />
+      ))}
+    </>
+  );
+}

@@ -43,6 +43,11 @@ export class ChromeBounds {
    *  forces a fresh read the frame it flips, so a strip toggle answers at once, not up to 30 frames late. */
   private _rowOpen = false;
 
+  /** The next `read()` measures, whatever the cadence: for a caller that knows the bars just landed. */
+  refresh(): void {
+    this._in = 0;
+  }
+
   /** Refresh at most every EVERY calls; cheap to call per frame, from every consumer. */
   read(): this {
     const rowOpen = document.getElementById("filter-strip")?.getAttribute("aria-hidden") === "false";

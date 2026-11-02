@@ -29,7 +29,8 @@ them — but the Next Node server can.
   (2026-10-25 — the routes held a second copy of the cadence, and the cluster poll moved 25 → 30s
   under them): the edge a little under the poll (4s for the 5s feeds, 25s for the 30s one), the
   memo at most 5s, because the two caches STACK — the oldest answer a tab can get is memo + edge +
-  stale-while-revalidate, 10s and 35s today (`worstAgeMs`, tested). Each route holds a **module-level memo** (`upstream.ts`, per network) that checks its own
+  stale-while-revalidate, 10s and 35s today (`worstAgeMs`, tested). Each route holds a
+  **module-level memo** (`upstream.ts`, per network) that checks its own
   timestamp and shares one in-flight promise between concurrent misses;
   never `unstable_cache`, whose revalidate is too coarse for a 4 s window. The memo drops an expired
   entry when it is read and sweeps expired entries once it holds more than 256. **`?limit=` rounds UP
@@ -56,13 +57,17 @@ them — but the Next Node server can.
   (TTL_S all-null; the finite era's pending expiries were PERSISTed away one-time); history's
   FLOORS — where fine grain begins to exist — live in `src/data/trendWindow.ts` TIER_SINCE; **`/api/trends/sample`** is the Vercel-Cron sampler (15 min,
   `CRON_SECRET` auth) that pages the explorer stream since a Redis cursor and
-  merge-writes 5m/1h/1d hash tiers. It also samples the UNLISTED chains — the explorer's `/currency`
+  merge-writes 5m/1h/1d hash tiers. The cursor hash also keeps `read.<id>`, when a run last read
+  each catalog chain, new records or none: the cursor itself only moves on a record, so this is the
+  one thing that tells a silent chain from a failed one (a note states silence only past it,
+  `chainReadThrough`). It also samples the UNLISTED chains — the explorer's `/currency`
   list less every tracked address — for their own counts, outside the fee/size floors, marking the
   buckets it measured them in with `u.cov` (History's unlisted figure is measured, not derived).
   **Where the fleet runs has its own key family** (2026-10-27): once an hour, beside the fleet
   gauges, the sampler stores the whole fleet and each network by country and by hosting provider
   into `geo:{net}:{YYYY}` (day buckets, `f.cc.*` / `f.isp.*`, `fleetGeo.ts`), with provider names
-  in `geo:{net}:isp`. ⚠️ **It lives outside `t:{net}:*` on purpose:** a rebuild wipes that prefix
+  in `geo:{net}:isp` and the fleet by city and provider in `geo:{net}:sites:{YYYY-MM}` (`f.site.*`,
+  2026-10-31, each network's nodes added up, one hash per month since a note reads a week of it). ⚠️ **It lives outside `t:{net}:*` on purpose:** a rebuild wipes that prefix
   and a location gauge can never be re-derived, and `/api/trends` ships every series a tier hash
   holds, so ~50 location series a day would ride every History payload undrawn. Nothing reads it
   yet; it exists so Geography has a past when something does (the AI notes design).
@@ -116,6 +121,76 @@ them — but the Next Node server can.
   network's new address) is read back to its FIRST snapshot within the same depth
   (`fetchSince.ts`), not just its newest page. The History view (`/trends`) is the read route's
   consumer.
+- **`/api/notes`, `/api/notes/request`, `/api/notes/warm`** (2026-10-27) are the AI notes: a few
+  sentences a paid model (the Constellation Gate, `GATE_API_KEY`, `GATE_MODEL`, default `z-ai/glm-5-3-flash` with thinking held low, `gate.ts`) writes about the
+  figures a view is showing. **Mainnet only**; any other `?net=` answers `none`, before the subject
+  is parsed (it is checked against mainnet's catalog, so a testnet network would otherwise 400). Notes live in
+  their OWN key family, `ai:{net}:v{NOTES_VERSION}:{view}:{subject}:{span}` (`keys.ts`), never under
+  `t:` (a rebuild wipes that prefix) or `geo:`: a note is a losable cache entry, and the families
+  must not share a fate. The four notes the Briefing reads (`isBriefingNote`) also carry its one short `line`, asked for in
+  the same answer and held to the same gate; a line that fails is dropped, never retried, and the
+  tour reads the note's opening. ⚠️ **A prompt or a facts change bumps `NOTES_VERSION`**, which orphans every
+  stored note at once (their TTLs reap them). Timing is `KIND_TIMING` in `keys.ts`: hyper and
+  geography refresh daily (3-day TTL), the ledger and History's 24-hour note hourly (6 hours),
+  History's daily pills daily, the 1-hour pill only when asked through its door (15 minutes) and a
+  brushed range when its card opens (30 days); a subject note (below) lives a day and is never warmed. `GET /api/notes` reads: `ok` and `none` are `public, s-maxage=300,
+  stale-while-revalidate=600`; `request`, `pending`, `unavailable` and a 400 are `no-store` (a
+  well-formed brush with no whole bucket in it is `none`, not a 400; a `request` held by the CDN
+  would show the 1h door to every visitor for 15 minutes after one of them wrote the note). The ledger's `dag` is folded into `all`
+  (the same facts: one note). `POST /api/notes/request` writes the on-request kinds (the 1h pill, a
+  brushed range and a subject note), and
+  `GET /api/notes/warm` is the quarter-hourly cron (three items at a time, 0.5 s between call
+  starts, so the 121 warmed notes fill in one pass). **The honesty gate (rule 10) is mechanical**
+  (`src/data/noteHonesty.ts`, the colocated test is its specification): every number the note
+  states must match a fact the model was shown, within the precision it was written to, and a
+  failing note is asked for once more with the reasons, then dropped and counted. Nothing is ever
+  stored unchecked, and the model's text is untrusted (a plain string, never markup). **A failure
+  holds its key** (`failKeyOf`, `FAIL_TTL_S` = 15 minutes): a read or request whose write failed
+  leaves a marker, and the next read or request of that key answers `unavailable` without a model
+  call, so a cache-buster or a 429 run cannot turn visitors into unbounded calls; the warm pass
+  ignores the marker and never writes one. **Limits
+  apply to a brushed range (the one unbounded key space) and to a subject note**: 60 an hour per visitor, keyed by
+  the first 16 hex characters of HMAC-SHA256(`CRON_SECRET`, ip), plain sha256(ip) where no secret
+  is set (the raw address and the secret are never stored or logged; on Vercel
+  `x-forwarded-for` is set by the platform, which is why the hash can be trusted there), and a
+  2,000 a day tripwire; a cached note is served without counting, and **the count is spent only on a
+  write** (`GenerateOptions.spend`, asked by the generator once the facts are in hand, inside the
+  lock): `none` and `pending` cost nothing, and a visitor already at the limit is refused before any
+  work is done for them. Every other kind is bounded by
+  its key and a singleflight lock. **The warm pass is paced**: three items at a time, at least 0.5 s
+  between Gate call starts, no new item after 210 s (the worst item, two attempts at the 20 s timeout,
+  still ends inside the 300 s `maxDuration`). The cron fails closed without
+  `CRON_SECRET`, like the sampler (and a preview has none). ⚠️ **Notes are written by production
+  only** (R66/R69, `notesWritable()` in `notes/store.ts` — it fails closed): a preview shares the
+  store, so there every route serves what is cached and answers a miss `none` — no note, no
+  failure hold, no stats, and the warm pass writes nothing even with the secret. The one other
+  writer is a local `next dev` with `NOTES_STORE=memory`, which writes into its own process memory;
+  a plain `next dev`, a local `next start` and a Vercel deployment with no `VERCEL_ENV` are all
+  read-only, because `.env.local`'s token would otherwise write into the shared store. **Each UTC day's outcomes are counted** in
+  `ai:mainnet:stats:{day}` (`NOTE_STATS` in `generate.ts`: `ok`, `gateFail`, `rate`, `http`,
+  `timeout`, `empty`, `nokey`, `store`, `error`, `capped`, then the volumes `calls`, every Gate
+  call, and `retried`, every note that needed its second attempt), and
+  `npx tsx scripts/notes-stats.ts` prints the last 14 days on the read-only token: it is the
+  instrument for how the model is holding up.
+  **Subject notes** (user, 2026-10-29) are a card's own note: a country, a provider, a node make-up.
+  The grammar has ONE home, `notes/keys.ts` — `CC_TAIL_RE`, `ISP_TAIL_RE`, `TYPE_TAIL_RE`,
+  `subjectKindOf`, `isSubjectNote`: `cc:XX` (fleet country), `<net>/cc:XX`, `isp:<key>`,
+  `<net>/isp:<key>` (the provider across the scope, named network-wide), `<net>/type:<roleKey>`,
+  with `<net>` a tracked network id or `dag`. `NoteFacts.kind` is the QUESTION kind, and every view
+  note (`cc:XX` included) is `"view"`; `PROMPTS[view].questions[kind]` asks a subject kind's own
+  question with no common reading. `KIND_TIMING.subject` is `{ refreshMs: null, ttlS: 24h }` and
+  `timingOf` lets the subject decide first, so a subject note has one timing whatever its view:
+  never warmed, written when someone first asks and rewritten at most once a day. The fleet
+  country `cc:XX` is the exception that stays warmed. **A subject note is the request route's
+  second limited kind** (`isLimitedNote` in `notes/params.ts`, beside a brushed range): its key
+  space is bounded (countries, providers and types times networks) but the Gate's burst limit is
+  not, and one visitor drilling through twenty countries should pace themselves, not the cron — the
+  same per-visitor (60 an hour) and daily (2,000) limits, a cached note served without counting.
+  A
+  network-scoped country or provider note, and a provider note at fleet scope, read the geo family
+  for their week ago, so they state no change until a week of it exists (from 2026-10-27). The
+  subject cards ask AFTER A DWELL (`ASK_DWELL_MS`, `components/notes/SubjectNote.tsx`): a key that
+  changes under paging or a deck rotation is never written, so browsing cannot burst the Gate.
 - **`/api/global/at?ts=`** binary-searches ~23 tiny per-ordinal records to find the global carrying
   that exact stamp (the anchor join is timestamp EQUALITY — which has exceptions: see the
   timestamp note in `src/data/CLAUDE.md`; such a row answers 404 here, honestly). Its one consumer is the anchor log's

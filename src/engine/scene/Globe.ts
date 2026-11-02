@@ -1491,7 +1491,7 @@ export class Globe implements GeoViewHost {
   // ---- per-node world positions: RETIRED (2026-08-13) ----
   // `hyperWorldPos` and `ledgerWorldPos` existed for one purpose each: a camera framing on a
   // single node. Both of those poses are gone — the ledger's on 2026-08-09 (three bespoke ledger
-  // framings retired, one commit tilt kept), hyper's today, because hyper's node rung frames the
+  // framings retired), hyper's today, because hyper's node rung frames the
   // node's NETWORK (see the retirement note in domain/cameraRig.ts). Nothing else ever asked a
   // node where it is in world space, and nothing should: framing math consumes LAYOUT data
   // (rule 6), which is what these two read on the way out.

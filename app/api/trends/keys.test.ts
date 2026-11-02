@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { slotOf, fieldOf, slotsInWindow, stepMsOf, cursorKeyOf, lockKeyOf, geoSlotOf, ispNamesKeyOf, TTL_S } from "./keys";
+import { chainReadField, chainReadsOf, slotOf, fieldOf, slotsInWindow, stepMsOf, cursorKeyOf, lockKeyOf, geoSitesSlotOf, geoSlotOf, ispNamesKeyOf, TTL_S } from "./keys";
 
 const T = Date.UTC(2026, 8, 6, 14, 37, 22); // 2026-09-06T14:37:22Z
 
@@ -36,6 +36,10 @@ describe("trends keys", () => {
 });
 
 describe("the geo family", () => {
+  it("keeps a provider's cities in one hash per month, read a week at a time", () => {
+    expect(geoSitesSlotOf("mainnet", Date.UTC(2026, 9, 31, 23, 59))).toEqual({ key: "geo:mainnet:sites:2026-10", bucket: "10-31" });
+    expect(geoSitesSlotOf("mainnet", Date.UTC(2026, 10, 1)).key).toBe("geo:mainnet:sites:2026-11");
+  });
   it("is one hash per UTC year, one bucket per UTC day, outside the t:{net}:* tiers a rebuild wipes", () => {
     const s = geoSlotOf("mainnet", Date.UTC(2026, 9, 27, 23, 59));
     expect(s).toEqual({ key: "geo:mainnet:2026", bucket: "10-27" });
@@ -44,5 +48,17 @@ describe("the geo family", () => {
   });
   it("keeps provider names beside it, per network", () => {
     expect(ispNamesKeyOf("mainnet")).toBe("geo:mainnet:isp");
+  });
+});
+
+// Silence is only measured where the chain was read (notes, the review of 2026-11-02): a chain with
+// nothing new and a chain that failed leave the same store otherwise.
+describe("chainReadsOf", () => {
+  it("collects each chain's last read from the cursor hash, and nothing else", () => {
+    expect(chainReadsOf({ v: "1", g: "102", "m.abc": "9", [chainReadField("abc")]: "1000", [chainReadField("def")]: 2000 })).toEqual({ abc: 1000, def: 2000 });
+  });
+  it("is empty for a store with no cursor, and for one from before the first run that keeps a read", () => {
+    expect(chainReadsOf(null)).toEqual({});
+    expect(chainReadsOf({ v: "1", g: "102" })).toEqual({});
   });
 });

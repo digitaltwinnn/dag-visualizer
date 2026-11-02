@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import * as THREE from "three";
 import {
-  META_ORBIT, metaAnchor,
+  META_ORBIT, META_STAGGER, metaAnchor,
   META_LAYERS, META_RING, DAG_L0, DAG_L1, HYPER_TILT, HYPER_TILT_FOCUS, applyHyperRig,
 } from "./hyperLayout";
 
@@ -12,10 +12,15 @@ describe("metaAnchor", () => {
     expect(a).toEqual(b);
   });
 
+  it("keeps the longest spoke within a sixth of the shortest", () => {
+    const radii = Array.from({ length: 12 }, (_, i) => metaAnchor(i, 12).radius);
+    expect(Math.max(...radii) / Math.min(...radii)).toBeLessThanOrEqual(7 / 6);
+  });
+
   it("orbits at ≥ the base radius, staggered per slot (i % 4 steps)", () => {
     for (let i = 0; i < 10; i++) {
       const { radius } = metaAnchor(i, 10);
-      expect(radius).toBeCloseTo(META_ORBIT + (i % 4) * 3.2, 10);
+      expect(radius).toBeCloseTo(META_ORBIT + (i % 4) * META_STAGGER, 10);
       expect(radius).toBeGreaterThanOrEqual(META_ORBIT);
     }
   });

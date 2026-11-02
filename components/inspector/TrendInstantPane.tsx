@@ -1,6 +1,9 @@
 "use client";
 
-import { INSTANT_ICON } from "@/components/icons";
+import { BUCKET_ICON, INSTANT_ICON } from "@/components/icons";
+import NoteKindChip from "@/components/notes/NoteKindChip";
+import { notableDayAt } from "@/components/notes/noteDays";
+import { useAiNote } from "@/components/notes/useAiNote";
 
 import CardHead, { RailPane } from "@/components/CardHead";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
@@ -22,7 +25,7 @@ import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { cardNetwork } from "@/src/engine/domain/trendStack";
 import { useStore } from "@/src/store/store";
-import Stamp from "@/components/Stamp";
+import { titleStampParts } from "@/src/util/localTime";
 
 // THE CURSOR CARD (2026-09-19) — History's own facts slot, `instant`. The timeline commits one
 // moment and this card reads the whole stack AT it: what the subject network measured there, where
@@ -94,6 +97,11 @@ export default function TrendInstantPane({
   // whenever the cursor sits outside the window on screen — a real state, said below.
   const bucket = cursorMs != null ? bucketAt(buckets, stepMs, cursorMs) : null;
   const pulseKey = useEdgePulse(bucket);
+  // THE MARKER TRAVELS (user, 2026-10-30): the note on screen names its notable days, and a bucket
+  // that falls on one wears the day's kind chip beside the bucket chip (`NoteKindChip`), however
+  // the cursor got there. One note, one fetch: `useAiNote` is the AI card's own derivation.
+  const { note: aiNote } = useAiNote();
+  const notable = notableDayAt(aiNote.res?.state === "ok" ? aiNote.res.days : null, bucket ?? cursorMs);
   // WHY there is no chart, when there is none. `null` cursor is its own case: the slot is a ghost
   // then and this card does not render at all.
   const note = cursorMs == null ? null : instantNote(placeInstant(cursorMs, buckets, roster.rawBuckets, stepMs), stepMs);
@@ -168,10 +176,26 @@ export default function TrendInstantPane({
         // this card states one moment, and the mark is what tells the two lists apart at a glance.
         title={
           cursorMs != null ? (
-            <span className="inline-flex items-center gap-2">
+            // DATE OVER CLOCK (user, 2026-10-30: "'Sep 30, 18:00 GMT+2', can we shorten it by having
+            // two rows?"): the date is the headline at the title size, the clock and its zone a
+            // quieter label-size line under it (`titleStampParts`), the dossier's name-over-kind
+            // shape — so CardHead's one-row ENTRY lays the two inline (`data-titleblock`) and the
+            // open box stacks them. A daily moment has no clock: one line, its day.
+            <span data-titlerow="" className="inline-flex items-center gap-2 min-w-0">
               <INSTANT_ICON aria-hidden className="size-4 flex-none text-[var(--filter-accent,var(--primary))]" />
-              {/* A finer-than-daily moment is a clock time: drawn by `Stamp`, its zone a tag. */}
-              {stepMs < 86_400_000 ? <Stamp ms={bucket ?? cursorMs} quietDate={false} /> : stampInstant(cursorMs, stepMs)}
+              {stepMs < 86_400_000 ? (
+                (() => {
+                  const { date, time } = titleStampParts(bucket ?? cursorMs);
+                  return (
+                    <span data-titleblock="" className="flex flex-col gap-px min-w-0 tabular-nums">
+                      <span className="leading-[1.1]">{date}</span>
+                      <span className="text-label font-normal text-muted-foreground">{time}</span>
+                    </span>
+                  );
+                })()
+              ) : (
+                <span className="tabular-nums">{stampInstant(cursorMs, stepMs)}</span>
+              )}
             </span>
           ) : (
             "—"
@@ -183,7 +207,22 @@ export default function TrendInstantPane({
         // named the thing being stepped). One chip in the cadence's own words, so the lead's "in
         // those 5 minutes" and the pager's squares read as one thing. (An age chip sat here until
         // 2026-09-26 and left: the title already dates the moment.)
-        aside={bucket != null ? <QualifierChip>{bucketWord(stepMs)} bucket</QualifierChip> : undefined}
+        aside={
+          bucket != null ? (
+            <>
+              {/* The width alone, behind a clock mark (user, 2026-10-30: "'5-min' with an icon");
+                  "bucket" stays for assistive tech. */}
+              <QualifierChip>
+                <span className="flex items-center gap-1">
+                  <BUCKET_ICON aria-hidden className="size-3 flex-none" />
+                  {bucketWord(stepMs)}
+                  <span className="sr-only"> bucket</span>
+                </span>
+              </QualifierChip>
+              {notable && <NoteKindChip day={notable} />}
+            </>
+          ) : undefined
+        }
         onClose={onClose}
         collapsed={collapsed}
         onToggle={onToggle}

@@ -341,9 +341,11 @@ decisions inside them are design, not detail:
   (Parked at the back of the deck it paged the stack to its tail on focus.) It stays out of the
   RANK and off the shared ceiling: it is what the layers add up to. **History ARRIVES on it**
   (user, 2026-10-26: "set DAG the default in explorer (and thereby also the charts, cards etc)"):
-  under All, the view switch commits the DAG's plane focus (`viewPolicy.entryPlane`, applied by
-  `trendStack.entryFocus` inside the store's `setMode`) — the same state its row's click makes, so
-  its row, plane, Metagraph and Range cards all stand on the DAG; a committed filter arrives as itself.
+  under All, the view switch brings the DAG's plane forward (`viewPolicy.entryPlane`, applied by
+  `trendStack.entryFocus` inside the store's `setMode`) — the same focus its row's click makes,
+  so its row, plane, Metagraph and Range cards all stand on the DAG, except that the arrival ranks
+  nothing in `selStack` (R70, 2026-10-29): the click is a choice and opens the Range card, the
+  arrival is the view's own and leaves the AI notes card the box; a committed filter arrives as itself.
   **Two snapshot measures, because the DAG has two snapshot counts** (user, 2026-10-26 — dagscan's
   1Y "snapshots" read ~10× below ours): **Snapshots anchored** (`snapshots`) is each network's own
   snapshots, the DAG row their sum (`g.anchors`, tagged); **In global snapshots** (`globals` — "In" because a bare "Global snapshots" read as a network's own;
@@ -632,18 +634,28 @@ commit, the cards are opaque so there is no opacity to lift, and `.subject-paire
 box-shadow, which a transformed plane may not carry.
 
 The chain runs coarse→fine like every other rung: a lane whose committed cards abut as one body reads
-adjacency as containment. (The chamber's storeys are the other way round — ribbons fall INTO the global
+adjacency as containment (the AI notes card, which tops the pile, is the one member that contains
+nothing below it — see THE AI NOTES SLOT). (The chamber's storeys are the other way round — ribbons fall INTO the global
 floor; geometry shows the fall, the rail states the containment.) The snapshot cards are slots that
 ride the lane **without being focus rungs** — `railLadderBoundary.test.ts` asserts rung → slot, not the
 reverse, so a slot without a rung is fine and a rung without a slot is not.
 
 **A HEAD THAT IS NOT THE OPEN BOX IS ONE ROW** (design pass, 2026-10-25 — user: the right rail
 "is pretty dense with all the header displayed. I don't want to lose info"): a folded ENTRY lays
-its eyebrow, its title and its aside on one line (`CardHead`'s entry branch — the eyebrow takes
+its eyebrow and its title on one line (`CardHead`'s entry branch — the eyebrow takes
 one column width so the pile's titles align; a two-line title node marks its block
-`data-titleblock` and its lines go inline, so the dossier's kind and the node's chips are kept,
-not dropped), and the explorer card's head does the same (the panel layout: EXPLORE · mark ·
-title · aside). The BOX keeps the two-row head — it is the one materialized card, and the tiers
+`data-titleblock` and its lines go inline, so the node's chips are kept, not dropped, while the
+dossier's ticker line is dropped), and the explorer card's head does the same (the panel layout:
+EXPLORE · mark · title · aside). **The qualifier pill yields in the fold** (user, 2026-10-30, design
+D of four in the brainstorming companion): the eyebrow, the mark and the pill were taking the
+320px row and the NAME truncated ("Dor …"), so a folded entry is slot + name; every `QualifierChip`
+is `data-pill` and the entry's aside hides it, and the kind, the country code, the bucket and the
+span are read on the open box. Status pills, layer chips and the metagraph snapshot's state are
+`data-pill` too, so the rule covers every pill an aside holds (user, 2026-10-31: the first cut caught
+only the qualifier chip). A CONTROL in the aside (the tick's live / pinned) stays.
+**The Metagraph head's pill is the KIND** ("hypergraph", "currency", "data", "data and currency",
+`MetaKindAside`, the same day): the ticker chip stood down where the ticker IS the name (DAG,
+USDC.dag), which left those entries bare; the ticker now rides under the name on the open box. The BOX keeps the two-row head — it is the one materialized card, and the tiers
 carry the depth. Measured at 1600×950 with three ancestors committed: the pile 175 → 143px, the
 explorer head 60 → 44. (A one-line dossier head was rejected once, 2026-07-12, when the kind text
 truncated into the site link; the link has lived in the body since 2026-08-08.)
@@ -663,7 +675,9 @@ it keeps its full radius on all four corners and its own hairline all the way ro
 opens around it. Its border is NOT handed to a seam the way an entry↔entry joint is — a rounded border
 curves in at each corner, so it never draws the full-width division the inset-seam rule exists to
 prevent; it reads as the box cut into the pile. **The stack carries DEPTH, the thread carries STATE**;
-adjacency is what reads as containment, which is why the snapshot chain runs coarse→fine above. Ghosts
+adjacency is what reads as containment, which is why the snapshot chain runs coarse→fine above — among
+SUBJECT cards. The AI notes card abuts the top of the pile and contains neither the tick nor the
+dossier under it: it is written context about the pile, not a rung of it. Ghosts
 stay outside the slab. The block's GEOMETRY never animates (seams, corners, washes) — but since
 2026-09-04 every rung's HEIGHT eases (`HeightEase` on the Inspector rung wrappers; the no-pop bullet
 below carries the rules). Reduced motion snaps, so the no-op guarantee holds there.
@@ -833,18 +847,117 @@ supported (no − icon etc)"). With nothing committed the live Global snapshot c
 rung, never the focus — sat folded above three ghosts on every tier: the mode-entry collapse
 pinned the ABSENT slot shut, and the live ordinal is kept out of the selection key on purpose
 (heartbeats must not reset the +/− overrides), so nothing ever dropped the pin. Two rules now:
-the mode-entry snapshot writes overrides for PRESENT slots only, and with no focus rung the
-FIRST present ladder card is the box (`openDefault` in `Inspector.tsx`).
-**And the step ghost hangs off the UNBROKEN committed run from the top** (same day): a node
-carried into Snapshots from another view stands below a gap (its ladder gives a node no
-ancestry), and read as "the deepest" it left the Global snapshot card with no step down to the
-tick's networks.
+the mode-entry snapshot pins PRESENT SUBJECT slots only (`overridesOnViewEntry`), and with no
+focus rung the FIRST present ladder card is the box (`openDefaultOf`). Both live in
+**`components/railCollapse.ts`, the one home of the open/fold decision** — which card is the box,
+what a view switch pins, what a selection moment drops — with `railCollapse.test.ts` as its
+specification, driven by outcome (exactly one box); Inspector asks it and renders the answer.
+**And the step ghost hangs off the UNBROKEN run of SUBJECT cards from the top** (same day,
+`subjectRunEnd`): a node standing in Snapshots has no card above it in the ladder (its ladder gives
+a node no ancestry), and read as "the deepest" it left the Global snapshot card with no step down
+to the tick's networks. The AI notes slot neither starts that run nor breaks it.
 
-**Expanded state survives a view switch** (user, 2026-09-04 — reversing 2026-08-08's scene-first
-collapse: with rung heights easing, the collapse-and-reopen cycle WAS the "card size jumps between
-views"): a switch is arrival machinery, not a selection moment, so the +/− overrides hold through
-the mode change and its grace window, and only a post-window selection change resets them to the
-only-the-focus-rung-open default. Both live-advancing ordinals stay guarded in the selection key so
+**THE AI NOTES SLOT** (2026-10-27, R57) — on screen the card wears the rail's own head grammar
+(user, 2026-10-29): NO eyebrow — the title is the product that writes it, **"Constellation Gate
+AI"**, with the sparkles mark in `--ai-mark` at its left on both tiers as the one sign it is an AI
+card — and the SPAN the note covers ("last 7 days") is the head's qualifier chip on the right, like
+the dossier's ticker; "AI notes" stays the code's and these docs' name for
+the slot. **The top card is the VIEW's note on the metagraph card's network** (`metagraphCardNetwork`:
+everything, the filtered network, or the network a committed node or tick belongs to) and does not follow a drill — a country, a provider or a
+brushed range is a subject with a card of its own, below (user, 2026-10-29); History's top card is
+the window pill's note always. Every view that has a note (`viewPolicy.aiNotes`) leads its
+display lane with the `notes` slot (`DISPLAY_LANE` in `railCards.ts`), and the manifest leads with it
+too. It is **not a rung**: no ladder level, no camera pose, never in `selStack`, a static subject
+key so a view switch never lights the tray, and `isSubjectSlot` says no. So it is the FOCUS only at
+rest — and REST IS "NOTHING CHOSEN", not "no subject card" (user, 2026-10-29; R70): the moment a
+subject card the reader committed stands (every commit bumps `selStack`), that card is the focus
+and the note folds to an ENTRY above the subject box; a card the VIEW seated by itself — History's
+Range card on the window's span and its Metagraph card on the front plane, Snapshots' live tick
+(`advanceSnap` bumps nothing) — leaves the note the box, so the note never arrives folded and a
+notable-day hover on History's timeline lights a row the reader can see.
+It has **no ghost**: an absent note is no card at all (`noteCardAbsent` — no request, `none`, or
+`unavailable` answering a READ; R67, so a degraded model never owns the resting box), while a first
+fetch in flight stands, reading. `unavailable` answering the reader's own "Write notes" gesture is
+the exception (R68, `useNote`'s `via`): the card stays and says "Couldn't write notes just now"
+above the same door, so a click is never answered by the card vanishing. And it is **outside every subject rule** of `railCollapse.ts`: a view switch pins it OPEN and
+the subject cards folded (R78, above — the one pin it ever gets), and where no note stands pins
+nothing at all when it was the departing box (else every subject card arrived folded beside an
+unpinned note: no box); the step ghost's run skips it.
+
+**SUBJECT NOTES** (user, 2026-10-29: "I like consistency"). One rule: **every subject card whose
+subject has a stored series over the note's span carries its own Gate AI note, scoped the way the
+card's own lead is scoped; the top card is the view's.** The finest rungs are live records with no
+stored history, so they carry none and show nothing extra.
+
+| View | Card | Note is about | Scope |
+|---|---|---|---|
+| Geography | Country | the country's nodes | the FILTER: fleet-wide, or that network's nodes there |
+| Geography | Provider (`cohort`) | the provider's nodes, named network-wide | the provider across the filter's scope |
+| Hypergraph | Composition | the make-up's nodes | its network |
+| History | Range | the brushed span | the plane's network (`cardNetwork`) |
+| all | Node, Tick, Metagraph snapshot, Moment | none | no per-subject series |
+
+The Metagraph card carries none: filtered, it is the same subject as the top card. **History's top
+card reads the FILTER, not the plane brought forward** (user, 2026-10-30): a focus re-deals the
+stack and scopes the Range card, but the view's note keeps saying what the top bar says, so under
+All it stays the hypergraph's note whichever plane is forward (`noteSubjectOf`). **The Range card
+standing on the window carries the plane's SPAN FACET over the window pill** (`rangeCardNoteReq`
+→ `<net>/span`, `app/api/notes/keys.ts` kind `span`, the same day): the plane's own facts, asked
+the span's question (where it began and ended, its busiest and quietest day, how steady the run
+was) rather than the top card's "what changed" — a first cut left the card bare where it would have
+repeated the top card, a second repeated it ("direct copy looks strange"). It is a subject note:
+on request, limited, never warmed. The facet's figures are its own (`trendFacts shape`): the span's busiest, quietest and typical day by
+those names, never the notable days, or the model calls a chain's thin last day the busiest and the
+gate, which checks figures and not meaning, passes it. **A plane's coin pairs like the band's**: hover
+previews the day through `hoverNoteDay`. **A notable day commits through one home**
+(`components/notes/commitNoteDay.ts`, the row, the band's mark and the plane's coin): under All its
+plane comes forward through the executor (`noteDayActions`, a focus, never the filter), then the
+day becomes the range. **The unlisted set has notes in History alone** (the same day): the sampler
+measures its chains, which publish no nodes or places. Named as a set ("Unlisted networks"), its
+days read `u.cov` as coverage (never the spine, or an unread day is a dip) and carry no pause (the
+folded widest gap is one chain's), and a silent span states when the set last anchored. The block is
+`components/notes/SubjectNote.tsx`, and **it IS the card's lead** (user, 2026-10-30, design option D
+of four shown in the brainstorming companion, then "no fallback"): the measured lead sentences
+("Hosts 25% of the selection's nodes", the Range card's "DOR anchored N snapshots in this range")
+served one purpose, what this subject is to the whole it sits in, and the note says it better — it
+names its span and places the subject in its rung, share and rank among the other countries,
+providers or make-ups (the prompt asks for that always) — so they are gone. The note is the LAST LINE OF THE HEAD (user, 2026-10-31, option B of six: a plate read as a box
+inside the card, "not embedded enough"): no box, no fill, no edge, the mark under the title's kind
+mark and the words on the title's column, no label row, and the head's rule stands down while it
+stands (`data-note-lead`), so a card with no note keeps its rule. The mark and the writing say AI. `aiSweep.ts`
+is the chips' ring alone. The note's place shows "reading…" while the note is in flight (ONE word, user 2026-10-30: held or still
+being written is the cache's business); `none` and off-mainnet render
+nothing (no note to have), and `unavailable` renders "no note right now", muted, with no door (user,
+2026-10-30: the Gate refused a brushed range's write and the note was simply missing for the 15
+minutes `FAIL_TTL_S` remembers it; a card with no lead and no reason read as broken). **A note's network names wear their colour** (user, 2026-10-31; `src/data/noteNames.ts`, `NoteText`): code finds them against mainnet's catalog after the note is written, whole words, full names, tickers of three letters or more and two hand-picked short forms, never "333 DAG" the amount; the text ink (`IDENT_INK`), same weight, no link. **A note writes itself in** (user, 2026-10-31: "appear letter by letter as if it's written by the
+AI", the AI card and the cards' notes alike; `TypedNote`, `typedNote.ts`): at most 2.4s, only for a note the
+reader watched arrive, never for one already held and never under reduced motion. The full text
+holds the height invisibly, so the card grows once, and a screen reader gets it whole. **A head with
+no eyebrow marks its title** (`data-eyebrow` on the h3): `HeightEase` finds a head by that marker,
+and the AI card, the one card with no eyebrow, used to fade from 0 on every expand. **A note's rows fold into the card's foot** (user, 2026-10-31, option B of five): one door on the bottom edge with up to three coins stacked and the count, the rows unfolding below it. **A reader's commit is told from arrival's** (`readerCommits`, 2026-10-31): the entry's grace window holds the rail's pins through what a view entry commits, never through a reader's own commit. **A note's percentages are added by code** (`withMovePercents`, user 2026-10-31): the model does not write them, since a live trial bracketed them and failed the gate; code finds the "from X to Y" a note states for a fact's pair and writes "rose 11% from X to Y", so the worst case is a sentence with none. **The other views' notes carry NOTABLE CHANGES** (user, 2026-10-31; `src/data/noteChanges.ts`, `components/notes/noteChangeTarget.ts`): zero to three rows of what moved over the span, each a subject the row commits and hovers exactly as the view's explorer row does, so Snapshots commits inside a tick and never writes the filter. Code picks them and code words them, one measured move in one set sentence, so a span where nothing moved has no rows. A provider's city comes only from `f.site.*` measured at both ends. **A notable day's marker travels** (user, 2026-10-30, `components/notes/noteDays.ts`): the Moment
+card's head wears the day's kind chip (`NoteKindChip`, mark in the network hue + the kind's word)
+beside its bucket chip when its bucket falls on a notable day, the Range card's when its span IS
+that day, and each chart plane draws the note's days on its own baseline (`TrendChart marks`, the
+cursor hairline's rule: beside the memoised plot, never in it; a whole-network day goes on the DAG
+plane, so under All with no DAG plane forward it shows on the timeline alone). **A plane focus
+never takes the box from the Moment card** (the same day: "the card itself also goes out of focus
+and the range card gets it instead"): `focusPatch` ranks the Range card in behind a Moment that leads
+the stack. `components/notes/subjectNote.ts` is the pure home of the request derivations. **It is asked
+for by the selection itself**: a read that answers `request` is asked once, automatically, with no
+door — the reader's gesture was choosing the card. The 1h pill's door stays on the top card. A network-scoped country or provider
+note states no change until a week of the geo family exists, so until then its facts hold no
+"a week ago" and the note describes the level.
+
+**A view is entered on its note** (user, 2026-10-29, R78): in a view with a note, the switch pins
+the Gate AI card open and every present subject card folded — the subject cards are the carried
+selection, unchanged from the last view, and the note is this view's reading of it, the one thing
+new on arrival. A click after the grace window drops the pins and opens its own card as ever
+(`overridesOnViewEntry`, `railCollapse.ts`). **And a note that stands down after the entry drops those pins** (review 2026-10-29, `overridesOnNoteStandDown`): the view is entered while the note is still READ, so the pinned slot may answer `none`/`unavailable` and leave the lane, and the pins alone would hold every card folded with no box; Inspector drops them when the notes slot goes absent under an open pin, and the auto rule opens the focus rung. Where no note stands, **expanded state survives a view
+switch** (user, 2026-09-04 — reversing 2026-08-08's scene-first collapse: with rung heights easing,
+the collapse-and-reopen cycle WAS the "card size jumps between views"; the note arriving open folds a
+subject card once and leaves it, so that cycle does not return): a switch is arrival machinery, not a
+selection moment, so the +/− overrides hold through the mode change and its grace window, and only a
+post-window selection change resets them to the only-the-focus-rung-open default. Both live-advancing ordinals stay guarded in the selection key so
 heartbeats never materialize a card. Conversely **the heartbeat is felt on closed
 cards**: both snapshot asides carry the beating dot and are the same tap-to-follow toggle, but **only
 one of them owns the clock.** The global aside ticks a `live · Xs` counter (the shown snapshot's age,
@@ -903,9 +1016,10 @@ channel pane head, the pager's step labels, the ledger explorer's tooltips and t
 noise in all of them: the label beside it already says what the number is. Internal `PickDescriptor.title`
 strings still read `Global snapshot #N`, but nothing renders that field for a snapshot.
 
-Every card the current view CAN produce is always visible — populated when its subject is selected,
-else a **ghost card** — so the rail shows the view's whole possibility space and a deselect returns
-its slot to the ghost in place. A ghost is a card like every other (user, 2026-10-04 — option A of
+Every SUBJECT card the current view CAN produce is always visible — populated when its subject is
+selected, else a **ghost card** — so the rail shows the view's whole possibility space and a deselect
+returns its slot to the ghosts below. (The AI notes slot is no subject card and has no ghost: an
+absent note is no card.) A ghost is a card like every other (user, 2026-10-04 — option A of
 `docs/superpowers/design/2026-10-04-ghost-cards`, "the structure is always present, but the visual
 and content differ"): FOLDED it is the rung's name alone, one quiet line; OPEN it is a dashed,
 glassless box whose body is the hint. It opens on its own, outside the single-open accordion — it
@@ -920,14 +1034,17 @@ the containment the slab shows.
 
 Two honesty rules: when the filtered network has nothing pickable in geo the node ghost turns into the
 honest variant naming that fact; but "all" with 0 nodes is boot, so that ghost stays silent rather than
-flashing a false invite. A populated card renders in any 3D view; the ghost only appears where the view
-can actually produce the card.
+flashing a false invite. The ghost only appears where the view can actually produce the card.
 
-**A hairline divides the lane from the cards that are not this view's rungs** (user, 2026-10-19 —
-History with a node carried in from Geography: "when a card is not part of the rung, show a
-divider"): a populated card below the lane is a subject the view did not produce, and adjacency
-is the slab's word for containment. Only above PRESENT trailing cards; the trailing ghosts are the
-view's own possibility space. **And the Snapshots explorer's held head is the PIN itself** (same
+**The rail browses in Hypergraph and Geography** (user, 2026-10-31: "open the 1st of that set and allow left/right swipe without setting the filter"): the Metagraph ghost opens the first network (`ROOT_OF`, `rootStep`), unless a node is held, a swipe steps that list, and what hangs under it reads the same network, all without writing the filter. The store's `railNet` holds it and `domain/viewNetwork.ts` is the one reading: the card, the scene, the explorer, the band and the callout stand on it, the top bar and the accent hue stay the filter's. A real filter commit replaces it, the card's × releases it, and leaving the view clears it without dropping what was selected under it. **A card speaks only in a view whose lane holds it** (user, 2026-10-31, option B of four, replacing a
+hairline above a full card running off the rail): `detailsCards` states a card off its view's lane
+as absent, so a node carried into History leaves the rail. In Snapshots it stands when it was picked
+there or signed the metagraph snapshot on screen (`nodeHereOf`). The SELECTION is untouched, so going
+back restores the card, as the placeholder views do; a pinned snapshot needs no such rule, since
+leaving Snapshots clears the pin. **Ghosts sink** (same day, option B of four): chosen cards close up
+at the top and the ghosts wait below in lane order, the next step's ghost first (`displayOrder`), so
+a ghost can never split the stack. The lane stays the ladder's one order; this is only its layout.
+**And the Snapshots explorer's held head is the PIN itself** (same
 day: "put it on the 1st row and directly show x newer") — it froze at the newest tick on screen
 from 2026-10-02; `src/data/ledgerHold.ts`.
 
@@ -1648,7 +1765,7 @@ Every rail card leads with `CardHead`: eyebrow / title / inset hairline / body.
     front — and takes the reader's OWN date search as the committed range (`store.logCut`, written
     by the log's `cutIsOwn` mirror; a door's span never writes it, it came from History). Snapshots
     needs nothing: a raw row click pins, and the explorer and card show the pin.
-  · **State marks are one species.** `LiveDot` + "live", `PinMark` + "pinned" (StateAtoms, 14px),
+  · **State marks are one species.** `LiveDot` + "live", `PinnedMark` alone, the word for screen readers only (user, 2026-10-31; StateAtoms, 14px),
     on the explorer's tick row, the Global snapshot card's control, the scene callout, the raw log's
     selected row and the raw pane's head. Since 2026-10-18 the METAGRAPH snapshot's label and card head
     carry them too (user: "that's also pinned") — a committed pair is live or pinned together.

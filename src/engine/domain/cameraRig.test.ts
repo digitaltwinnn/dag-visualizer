@@ -1,10 +1,11 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
 import * as THREE from "three";
 import { FOCUS_LEAN } from "./trendStack";
-import { FOCI, hubFraming, HUB_CLOSE, geoFraming, REST_ASPECT, aspectFit, ledgerCommitTilt, LEDGER_TILT_YAW, LEDGER_TILT_PITCH, LEDGER_TILT_DOLLY, easeInOutQuad, CAM_ZOOM, dollyBack, RAILS_HIDDEN_DOLLY, railsLean, restOrbit, restPitch, nodeFraming, cohortFraming, isSamePose, nudgeMix, NUDGE_AMP, NUDGE_DUR, NUDGE_SAME, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT, NODE_RAISE, orbitLerp, clampPose, trendFocusPush, TREND_FOCUS_PUSH, trendFit } from "./cameraRig";
+import { FOCI, hubFraming, HUB_CLOSE, geoFraming, REST_ASPECT, aspectFit, easeInOutQuad, CAM_ZOOM, dollyBack, RAILS_HIDDEN_DOLLY, railsLean, restOrbit, restPitch, nodeFraming, cohortFraming, isSamePose, nudgeMix, NUDGE_AMP, NUDGE_DUR, NUDGE_SAME, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT, NODE_RAISE, orbitLerp, clampPose, trendFocusPush, TREND_FOCUS_PUSH, trendFit } from "./cameraRig";
 
 // NO Snapshots framing is pinned here, because the view HAS none: it owns one pose, `FOCI.ledger`,
-// with one state-keyed variation — `ledgerCommitTilt`, the commit ORBIT, pinned below. Five framings
+// and every rung stands on it (the commit tilt became that pose, user 2026-11-01). Five framings
 // were tried and all five are retired; the ⚠️ note in cameraRig.ts is the record of why, and the
 // reason this comment exists is so a future test doesn't re-pin numbers for a sixth.
 
@@ -18,17 +19,17 @@ describe("FOCI", () => {
   };
   const dist = (p: { pos: THREE.Vector3; target: THREE.Vector3 }) => p.pos.distanceTo(p.target);
 
-  it("every resting pose is FRONTAL (no sideways offset) and looks at the structure's axis", () => {
+  it("every resting pose but the chamber's is FRONTAL (no sideways offset), and each looks at the structure's axis", () => {
     for (const [name, p] of Object.entries(FOCI)) {
-      expect(p.pos.x, `${name} pos.x`).toBe(0);
+      if (name !== "ledger") expect(p.pos.x, `${name} pos.x`).toBe(0);
       expect(p.target.x, `${name} target.x`).toBe(0);
       expect(p.target.z, `${name} target.z`).toBe(0);
     }
   });
 
-  it("the Snapshots pose is nearly level — straight onto the chamber's face — and looks between the floors", () => {
+  it("the Snapshots pose stays low and looks between the floors", () => {
     expect(pitchDeg(FOCI.ledger)).toBeGreaterThan(0);
-    expect(pitchDeg(FOCI.ledger)).toBeLessThan(12);
+    expect(pitchDeg(FOCI.ledger)).toBeLessThan(15);
     expect(FOCI.ledger.target.y).toBeLessThan(0);
   });
 
@@ -199,7 +200,7 @@ describe("railsLean (the rails-hidden camera lean, 2026-08-08; ramped 2026-08-13
     expect(out.z).toBeCloseTo(12, 6);
   });
   it("clamps at full lean — a pose ORBITING WIDER than rest never over-leans", () => {
-    // The ledger commit tilt dollies OUT (×1.08), so k would exceed 1 without the clamp.
+    // A pose orbiting wider than its view's rest would put k above 1 without the clamp.
     const pos = new THREE.Vector3(0, 0, 12);
     const target = new THREE.Vector3(0, 0, 2);
     const wide = new THREE.Vector3();
@@ -387,50 +388,26 @@ describe("closeness (camera altitude → surface-sharpening factor)", () => {
   });
 });
 
-describe("ledgerCommitTilt (the Snapshots commit ORBIT, 2026-08-09)", () => {
-  const pos = () => FOCI.ledger.pos.clone();
-  const tgt = () => FOCI.ledger.target.clone();
+describe("FOCI.ledger, the chamber's one pose (user, 2026-11-01)", () => {
+  const offset = () => FOCI.ledger.pos.clone().sub(FOCI.ledger.target);
 
-  it("is an ORBIT about the target, not a lateral translation — the retired lane nudge's whole failure", () => {
-    // The distinction is the reason this framing is allowed where `ledgerLaneNudge` was retired: a
-    // translation walks the symmetric field's far end out of frame, an orbit only changes the angle.
-    // So the ONLY radial change is the documented dolly factor, and the azimuth moves by the yaw.
-    const out = new THREE.Vector3();
-    ledgerCommitTilt(pos(), tgt(), out);
-    const before = new THREE.Spherical().setFromVector3(pos().sub(tgt()));
-    const after = new THREE.Spherical().setFromVector3(out.clone().sub(tgt()));
-    expect(after.radius).toBeCloseTo(before.radius * LEDGER_TILT_DOLLY, 9);
-    expect(after.theta).toBeCloseTo(before.theta + LEDGER_TILT_YAW, 9);
-    expect(after.phi).toBeCloseTo(before.phi - LEDGER_TILT_PITCH, 9);
+  it("stands at a subtle angle: swung toward +X and raised, so the two storeys separate", () => {
+    const yaw = Math.atan2(offset().x, offset().z);
+    expect(yaw).toBeGreaterThan(0);
+    expect(yaw).toBeLessThan(Math.PI / 6); // the flat edge labels must stay legible
   });
 
-  it("swings toward +X and RISES (a three-quarter view looking a little further down)", () => {
-    const out = new THREE.Vector3();
-    ledgerCommitTilt(pos(), tgt(), out);
-    expect(out.x).toBeGreaterThan(FOCI.ledger.pos.x); // lanes spread on X (LEDGER.viewRotY)
-    expect(out.y).toBeGreaterThan(FOCI.ledger.pos.y); // phi − pitch lifts the camera
-  });
-
-  it("stays MODEST — a nicer 3D read, not a new pose (the flat edge labels must stay legible)", () => {
-    expect(LEDGER_TILT_YAW).toBeGreaterThan(0);
-    expect(LEDGER_TILT_YAW).toBeLessThan(Math.PI / 6); // < 30°
-    expect(LEDGER_TILT_PITCH).toBeGreaterThan(0);
-    expect(LEDGER_TILT_PITCH).toBeLessThan(LEDGER_TILT_YAW); // the yaw leads, the pitch supports
-    expect(LEDGER_TILT_DOLLY).toBeGreaterThan(1); // never closer than the frontal pose
-  });
-
-  it("is safe to compose IN PLACE (outPos === pos — the Engine tweens from a preset)", () => {
-    const expected = new THREE.Vector3();
-    ledgerCommitTilt(pos(), tgt(), expected);
-    const p = pos();
-    ledgerCommitTilt(p, tgt(), p);
-    expect(p.distanceTo(expected)).toBeLessThan(1e-12);
+  it("is the pose of every rung: the view keeps no second pose for a commit", () => {
+    const engine = readFileSync("src/engine/Engine.ts", "utf8");
+    expect(engine).toMatch(/ledgerOverview: \(\) => \{\s*(\/\/[^\n]*\n\s*)*this\.cam\.focus\("ledger"\);\s*return true;\s*\}/);
+    expect(engine).toMatch(/ledgerNode: \(\) => this\._resolvers\.ledgerOverview\(\)/);
+    expect(engine).toMatch(/ledgerNetwork: \(\) => this\._resolvers\.ledgerOverview\(\)/);
   });
 });
 
 describe("trendFocusPush (the History view's ONE state-keyed variation, 2026-09-18)", () => {
-  // The trends view owns ONE pose, `FOCI.trend`, exactly as the Snapshots chamber owns one — and
-  // this is its `ledgerCommitTilt`: the settled pose leans IN toward the front of the stack while a
+  // The trends view owns ONE pose, `FOCI.trend`, exactly as the Snapshots chamber owns one. This
+  // is its one variation: the settled pose leans IN toward the front of the stack while a
   // plane is focused, and back out when the focus clears. Not a pose per plane: `stackPoses` RE-DEALS
   // whichever plane is focused into first place, so there is one destination to frame.
   const pos = () => FOCI.trend.pos.clone();

@@ -3,6 +3,7 @@
 // provider, for the whole fleet and for each network. Pure: the route hands it the same cached
 // geo maps `/api/geo` and `/api/metagraphs` serve, so it costs no upstream read.
 import type { GeoMap } from "@/src/data/types";
+import { providerKey } from "@/src/data/providerKey";
 
 export interface FleetGeo {
   /** Every geolocated IP ONCE (validators first, then metagraph machines not already seen) —
@@ -15,18 +16,14 @@ export interface FleetGeo {
   perNetProviders: Record<string, Record<string, number>>;
   /** provider key → the lookup's provider name, as the explorer shows it. */
   providerNames: Record<string, string>;
+  /** The whole fleet by place and host, `<cc>.<city>.<provider key>` (`siteSegment`): each network's
+   *  own nodes added up, as the cards count them, and only where the lookup names a city and a host. */
+  sites: Record<string, number>;
 }
 
-const KEY_MAX = 48;
-
-/** A provider name as ONE series segment: lowercase, every run of anything but a letter or a
- *  digit one dash. No dot (lineage folding splits series names on dots) and no bar (the field
- *  grammar's separator). Keyed by NAME, not ASN, because the explorer groups hosts by name. Null
- *  for an unknown host: it is left uncounted, never filed under an invented bucket. */
-export function providerKey(isp: string | undefined): string | null {
-  const k = (isp ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, KEY_MAX);
-  return k || null;
-}
+/** A city as ONE series segment, reversibly: a city is shown, so unlike a provider it has no name
+ *  table to slug against. No dot (the segment separator) and no bar (the field grammar's). */
+export const siteSegment = (city: string): string => encodeURIComponent(city).replace(/\./g, "%2E");
 
 const bump = (m: Record<string, number>, k: string) => { m[k] = (m[k] ?? 0) + 1; };
 
@@ -35,7 +32,7 @@ export function fleetGeo(
   metagraphs: readonly { id: string; nodes: readonly { ip?: string }[] }[],
   metaGeo: GeoMap,
 ): FleetGeo {
-  const out: FleetGeo = { countries: {}, providers: {}, perNetCountries: {}, perNetProviders: {}, providerNames: {} };
+  const out: FleetGeo = { countries: {}, providers: {}, perNetCountries: {}, perNetProviders: {}, providerNames: {}, sites: {} };
   const tally = (ip: string, cc: Record<string, number>, prov: Record<string, number>, geo = metaGeo[ip] ?? dagGeo[ip]) => {
     if (!geo) return;
     if (geo.cc) bump(cc, geo.cc);
@@ -49,7 +46,13 @@ export function fleetGeo(
   const perNet = (id: string, ips: readonly (string | undefined)[], own?: GeoMap) => {
     const cc: Record<string, number> = {};
     const prov: Record<string, number> = {};
-    for (const ip of ips) if (ip) tally(ip, cc, prov, own ? own[ip] : undefined);
+    for (const ip of ips) {
+      if (!ip) continue;
+      tally(ip, cc, prov, own ? own[ip] : undefined);
+      const geo = own ? own[ip] : (metaGeo[ip] ?? dagGeo[ip]);
+      const k = providerKey(geo?.isp);
+      if (geo?.cc && geo.city && k) bump(out.sites, `${geo.cc}.${siteSegment(geo.city)}.${k}`);
+    }
     if (Object.keys(cc).length) out.perNetCountries[id] = cc;
     if (Object.keys(prov).length) out.perNetProviders[id] = prov;
   };

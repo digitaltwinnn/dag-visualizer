@@ -60,6 +60,8 @@ export default function TrendTether() {
   // is hidden but the dotted lines still show"): the lines run from the timeline, so with the
   // timeline stepped aside they point at nothing. They leave on the band's own exit tempo.
   const railsHidden = useStore((s) => s.railsHidden);
+  // The Briefing too: portalled, it sits outside the fade that stands the timeline down.
+  const briefing = useStore((s) => s.briefing != null);
   // Portalled above everything, the thread would draw across the RAW layer (2026-10-08: a hairline
   // and two dashed legs through the buckets table) — it stands down while the layer is up.
   const rawOpen = useStore((s) => s.section === "data");
@@ -181,7 +183,7 @@ export default function TrendTether() {
         "fixed inset-0 z-[11] w-full h-full pointer-events-none overflow-visible",
         dock === "vitals" && "max-[700px]:z-[42]",
         "opacity-0 [transition:opacity_var(--tempo-nav)_ease] data-[on='1']:opacity-100 motion-reduce:!transition-none",
-        railsHidden && "!opacity-0",
+        (railsHidden || briefing) && "!opacity-0",
       )}
       style={{ visibility: "hidden" }}
     >

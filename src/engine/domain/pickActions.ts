@@ -32,6 +32,8 @@ export type ClickAction =
   // Commit/clear the network INSIDE the pinned tick — the ledger's Metagraph rung. NOT the filter:
   // see `tickNetSelectActions` and `domain/tickNet.ts`.
   | { kind: "tickNet"; sel: TickNetSel | null }
+  // The network the rail is browsing (`domain/viewNetwork.ts`), never the filter.
+  | { kind: "railNet"; id: string | null }
   | { kind: "metaSnap"; sel: MetaSnapSel | null }
   // Bring a trend plane forward, or release the focused one (null) — a VIEW-LOCAL emphasis, not a
   // selection rung: see `trendPlaneActions`.
@@ -93,6 +95,20 @@ export function cohortToggleActions(
 ): ClickAction[] {
   const acts: ClickAction[] = [];
   if (current.hasInspect) acts.push({ kind: "inspect", pick: null });
+  acts.push({ kind: "cohort", sel: sameCohort(current.cohort, c) ? null : c });
+  return acts;
+}
+
+/** THE AI CARD'S PROVIDER ROW (user, 2026-10-31): the cohort rung's toggle, for a row that names a
+ *  provider rather than sitting under a drilled country, so it brings its country along. The node
+ *  goes first, as `cohortToggleActions`; the country before its cohort, which hangs under it. */
+export function noteCohortActions(
+  c: CohortSel,
+  current: { country: string | null; cohort: CohortSel | null; hasInspect: boolean },
+): ClickAction[] {
+  const acts: ClickAction[] = [];
+  if (current.hasInspect) acts.push({ kind: "inspect", pick: null });
+  if (current.country !== c.cc) acts.push({ kind: "country", cc: c.cc });
   acts.push({ kind: "cohort", sel: sameCohort(current.cohort, c) ? null : c });
   return acts;
 }
@@ -205,8 +221,16 @@ export function viewEntryActions(opts: {
 // The network-filter TOGGLE — the FilterPicker's committed-row rule: picking the committed
 // metagraph again steps back to "all" (one toggle language everywhere); "all" itself never
 // toggles off.
-export function filterToggleActions(id: string, currentFilter: string): ClickAction[] {
+export function filterToggleActions(id: string, currentFilter: string, railNet: string | null = null): ClickAction[] {
+  // Browsing, the filter's own network is the way back (`railNetActions`), not a re-pick.
+  if (railNet != null && id === currentFilter) return [{ kind: "railNet", id: null }];
   return [{ kind: "filter", id: id !== "all" && id === currentFilter ? "all" : id }];
+}
+
+/** A STEP ON A RAIL THAT BROWSES (user, 2026-10-31): browses a network and leaves the filter alone.
+ *  Coming back to the filter's own network ends the browse: there is nothing left to differ. */
+export function railNetActions(id: string, filter: string): ClickAction[] {
+  return [{ kind: "railNet", id: id === filter ? null : id }];
 }
 
 // Selecting a SNAPSHOT — shared by the ledger's tile click and LiveStrip's bar click:
@@ -288,7 +312,7 @@ export function snapshotSelectActions(
  *
  *  It replaces "the filter IS the step" (2026-09-15): stepping down from a card re-scoped the whole
  *  app — the top bar, the other views, the lists — from a pager, and the commit outlived the visit.
- *  The chamber still answers exactly as it did (the coloured dim, the commit tilt, the Metagraph
+ *  The chamber still answers exactly as it did (the coloured dim, the Metagraph
  *  card), because every ledger surface resolves through `domain/tickNet.ledgerNetwork`; only the
  *  app-wide lens is left alone.
  *
@@ -415,6 +439,16 @@ export function metaSnapSelectActions(
  */
 export function trendPlaneActions(id: string, currentFocus: string | null): ClickAction[] {
   return [{ kind: "trendFocus", id: currentFocus === id ? null : id }];
+}
+
+/** A NOTABLE DAY BELONGS TO A CHART (user, 2026-10-30): under All, committing one brings its plane
+ *  forward, the explorer row's own commit (a whole-network day's plane is the hypergraph's, "dag").
+ *  It commits and never toggles: a plane already forward stays forward. Under a filter it does
+ *  nothing, and that is the rule rather than a gap: the filter is the top bar's alone, and a
+ *  filtered stack holds only its own plane, so a focus could name a chart that is not there. */
+export function noteDayActions(networkId: string | null, filter: string, currentFocus: string | null): ClickAction[] {
+  const id = networkId ?? "dag";
+  return filter !== "all" || currentFocus === id ? [] : [{ kind: "trendFocus", id }];
 }
 
 /** The raw layer's ARRIVAL commit — "the layer opens on a subject": with nothing selected the

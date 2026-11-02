@@ -1,3 +1,4 @@
+import { chainReadField } from "./keys";
 import { describe, it, expect } from "vitest";
 import { runSample, type SampleDeps } from "./runSample";
 import type { TrendsStore, TrendsWrite } from "./store";
@@ -74,6 +75,7 @@ describe("runSample", () => {
     expect(cursor.get("m.abc")).toBe("9");
     expect(cursor.get("mTs.abc")).toBe(String(Date.UTC(2026, 8, 6, 14, 0, 8)));
     expect(cursor.get("v")).toBe("1");
+    expect(cursor.get(chainReadField("abc"))).toBe(String(Date.UTC(2026, 8, 6, 14, 10)));
     expect(store.ttls.get("t:mainnet:5m:2026-09-06")).toBeUndefined();
     expect(store.ttls.has("t:mainnet:1d:2026")).toBe(false); // forever tier: no TTL
     expect(store.locked).toBe(false);
@@ -108,8 +110,10 @@ describe("runSample", () => {
       countries: { DE: 5 }, providers: { "hetzner-online-gmbh": 5 },
       perNetCountries: { dag: { DE: 5 } }, perNetProviders: { dag: { "hetzner-online-gmbh": 5 } },
       providerNames: { "hetzner-online-gmbh": "Hetzner Online GmbH" },
+      sites: { "DE.Falkenstein.hetzner-online-gmbh": 5 },
     };
     await runSample(deps(store, { fleet: async () => ({ total: 5, perNet: { dag: 5 }, layers: {}, countries: { DE: 5 }, geo }) }));
+    expect(store.data.get("geo:mainnet:sites:2026-09")!.get("09-06|f.site.DE.Falkenstein.hetzner-online-gmbh")).toBe("5");
     const day = store.data.get("geo:mainnet:2026")!;
     expect(day.get("09-06|f.cc.DE")).toBe("5");
     expect(day.get("09-06|f.isp.dag.hetzner-online-gmbh")).toBe("5");
@@ -129,6 +133,7 @@ describe("runSample", () => {
     const res = await runSample(deps(store, { pageMeta: async () => { throw new Error("503"); } }));
     expect(res.metaErrors).toEqual(["abc"]);
     expect(store.data.get("t:mainnet:cursor")!.get("m.abc")).toBeUndefined();
+    expect(store.data.get("t:mainnet:cursor")!.get(chainReadField("abc"))).toBeUndefined();
     expect(store.data.get("t:mainnet:cursor")!.get("g")).toBe("102"); // global still advanced
   });
   it("samples the UNLISTED chains for their own count, outside the floors, and marks the buckets it measured them in", async () => {

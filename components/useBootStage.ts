@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { SCENE_WAIT_MS } from "@/src/engine/domain/briefing";
 import { useStore } from "@/src/store/store";
 
 // THE HUD'S STAGED ENTRANCE (2026-09-04). Cold start used to be: boot overlay + forming scene,
@@ -23,9 +24,11 @@ import { useStore } from "@/src/store/store";
 export type BootStage = 0 | 1 | 2 | 3;
 
 const STEP_MS = 350;
-const CHROME_TIMEOUT_MS = 8000;
+const CHROME_TIMEOUT_MS = SCENE_WAIT_MS;
 
-export function useBootStage(): BootStage {
+/** The ladder itself, which keeps climbing through the Briefing. For a zone outside `BootFade` that
+ *  stands down on its own (the phone dock); everything else asks `useBootStage`. */
+export function useBootLadder(): BootStage {
   const engineReady = useStore((s) => s.engineReady);
   const engineFailed = useStore((s) => s.engineFailed);
   const hasData = useStore((s) => s.latestSnapshot != null || s.metaList.length > 0);
@@ -61,4 +64,12 @@ export function useBootStage(): BootStage {
   }, [stage, target]);
 
   return stage;
+}
+
+/** The ladder as the zones read it. The Briefing clears the stage: they stand down for the tour and
+ *  come back with this same fade when it ends, and nothing is waited for twice. */
+export function useBootStage(): BootStage {
+  const stage = useBootLadder();
+  const briefing = useStore((s) => s.briefing != null);
+  return briefing ? 0 : stage;
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { useBootStage } from "@/components/useBootStage";
+import { useBootLadder } from "@/components/useBootStage";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -219,8 +219,11 @@ export default function RailDock({
   // pane exactly as over the scene, so a row picked there commits and the table follows. The
   // tablet and desktop rails still step aside with the scene.
   const shellVisible = section === "scene" || isBarHalf;
-  // Out of the shell it is out of its `BootFade` too, so it keeps that zone's boot gate itself.
-  const bootStage = useBootStage();
+  // Out of the shell it is out of its `BootFade` too, so it keeps that zone's boot gate itself, and
+  // stands down for the Briefing itself: mounted and invisible, so it arrives with the HUD's fade
+  // and the Engine can measure where it will land.
+  const bootStage = useBootLadder();
+  const briefing = useStore((s) => s.briefing != null);
   const [portalReady, setPortalReady] = useState(false);
   useEffect(() => setPortalReady(true), []);
   // PHONE ONLY takes the commit-flight half of the yield (`flight`). The tablet edge-tab sheet is
@@ -228,10 +231,18 @@ export default function RailDock({
   // tier has its own step-aside exactly as desktop has SCENE mode; the phone sheet is 60vh of a
   // small viewport over a persistent dock bar. Both tiers still dim under the user's own hand.
   const yielding = useSceneYield({ flight: isBarHalf });
+  // SCENE MODE ON A TABLET (user, 2026-10-31): the docks clear the stage with the rest of the
+  // chrome. The tab slides off its edge on the slide clock it already rides, and an open sheet closes.
+  const sceneOnly = useStore((s) => s.railsHidden) && !isBarHalf;
   const handleOpenChange = (next: boolean) => {
     setOpen(next);
     onOpenChange?.(next);
   };
+  useEffect(() => {
+    if (sceneOnly && open) handleOpenChange(false);
+    // The press of Scene closes the sheet; the sheet's own state changes nothing here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sceneOnly]);
   // LIVE CONTENT FIT (user, 2026-09-03: "determine and grow the size of the section based on
   // its contents" — superseding 2026-08-16's one-shot open fit, whose no-resizing-while-up rule
   // assumed content only changes when data does; with the phone explorers opening collapsed,
@@ -630,6 +641,9 @@ export default function RailDock({
   // instead of blinking the whole line at once.
   const switchP = usePulseWindow(signalKey);
   const updateP = usePulseWindow(updateKey);
+  // The closed tab's edge, end to end: the recipe's own insets and its faded tips would leave the
+  // line well short of the tab, so it takes the whole height and a longer segment.
+  const tabEdge = cn("inset-y-0 [--pulse-len:60%] [&>.edge-pulse]:inset-y-0!", side === "left" ? "right-0" : "left-0");
   const pulseSpan = (p: { pulse: number; live: boolean }, cls: string, short = false) =>
     p.live && (
       <span
@@ -695,6 +709,7 @@ export default function RailDock({
         <ToggleGroup
           // The phone callout's floor (CalloutSync reads this bar's top edge).
           data-phone-dock=""
+          inert={briefing || undefined}
           type="single"
           value={open ? "open" : ""}
           onValueChange={(v) => handleOpenChange(v === "open")}
@@ -704,6 +719,8 @@ export default function RailDock({
             // above it rather than centring into the indicator's strip. Zero on flat bottoms.
             "fixed z-[42] bottom-0 h-[var(--phone-dock-h)] pb-[env(safe-area-inset-bottom,0px)] hidden max-[700px]:flex rounded-none",
             barGeom ?? (side === "left" ? "w-1/2 left-0" : "w-1/2 right-0"),
+            "transition-opacity duration-700 ease-out motion-reduce:transition-none",
+            briefing && "opacity-0",
           )}
         >
           <ToggleGroupItem
@@ -761,17 +778,18 @@ export default function RailDock({
         // pointing into the scene; open it rides the sheet's inner edge (`sheetW`, measured), its
         // chevron flipped, and the same tap closes. It moves on the sheet's own slide clock. An
         // unseen update colours the chevron in that card's hue — the only signal it carries.
-        // 32×64 to the eye; the hit area reaches 48px wide on touch.
+        // 32×112 to the eye, long enough to read as a control; the hit area reaches 48px wide on touch.
         <button
           className={cn(
-            "fixed z-[39] top-1/2 -translate-y-1/2 w-8 h-16 hidden items-center justify-center cursor-pointer",
+            "fixed z-[39] top-1/2 -translate-y-1/2 w-8 h-28 hidden items-center justify-center cursor-pointer",
             "bg-[var(--panel)] border border-border text-foreground backdrop-blur-[14px]",
             "transition-[left,right] duration-[280ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
             "touch:after:absolute touch:after:-inset-x-2 touch:after:inset-y-0 touch:after:content-['']",
             "min-[700px]:max-[1099px]:flex",
             side === "left" ? "rounded-r-[var(--radius)] border-l-0" : "rounded-l-[var(--radius)] border-r-0",
           )}
-          style={{ [side]: open && shellVisible ? sheetW : 0 }}
+          inert={sceneOnly || undefined}
+          style={{ [side]: sceneOnly ? "-3rem" : open && shellVisible ? sheetW : 0 }}
           aria-label={open ? `Close ${label} panel` : `${label} panel`}
           aria-expanded={open}
           onClick={() => handleOpenChange(!open)}
@@ -784,8 +802,8 @@ export default function RailDock({
           {/* CLOSED-state pulses down the tab's scene-facing edge (the sheet's spine-equivalent
               while there's no sheet on screen): the view/filter SWITCH signal + the hosted-card
               UPDATE signal — both short-host scaled. */}
-          {!open && pulseSpan(switchP, cn("inset-y-1", side === "left" ? "right-0" : "left-0"), true)}
-          {!open && pulseSpan(updateP, cn("inset-y-1", side === "left" ? "right-0" : "left-0"), true)}
+          {!open && pulseSpan(switchP, tabEdge, true)}
+          {!open && pulseSpan(updateP, tabEdge, true)}
         </button>
       )}
       {/* NON-MODAL (`modal={false}`): on tablet the left "Explore" and right "Details" edge docks

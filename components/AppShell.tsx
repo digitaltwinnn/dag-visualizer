@@ -2,6 +2,7 @@ import SceneCanvas from "@/components/SceneCanvas";
 import Blueprint from "@/components/Blueprint";
 import BootFade from "@/components/BootFade";
 import BootOverlay from "@/components/BootOverlay";
+import Briefing from "@/components/Briefing";
 import DataBridge from "@/components/DataBridge";
 import DocGate from "@/components/DocGate";
 import DocLayer from "@/components/DocLayer";
@@ -24,6 +25,7 @@ import DevCssCanary from "@/components/DevCssCanary";
 import SectionShell from "@/components/SectionShell";
 import DataSection from "@/components/DataSection";
 import SiteFooter from "@/components/SiteFooter";
+import StageGate from "@/components/StageGate";
 import type { DocPage } from "@/components/views";
 
 // THE app — one shell, rendered identically by `/`, every routed view page (app/[view]) AND the
@@ -93,8 +95,10 @@ export default function AppShell({ doc }: { doc?: DocPage }) {
               the rest of the scene furniture while a doc overlay is open. It gates itself on
               `VIEW_POLICIES[mode].chartStack`, so it costs every other view one null render. */}
           <TrendStack />
-          <SceneCallout />
-          <MotionHint />
+          <StageGate>
+            <SceneCallout />
+            <MotionHint />
+          </StageGate>
         </DocGate>
         <BootFade at="data">
           <DocGate>
@@ -106,13 +110,16 @@ export default function AppShell({ doc }: { doc?: DocPage }) {
           </DocGate>
         </BootFade>
         <DocGate>
-          <PhoneDockSweep />
+          <StageGate>
+            <PhoneDockSweep />
+          </StageGate>
         </DocGate>
         <RailScroll />
       </SectionShell>
       {/* The doc overlay — over the canvas and the stood-down HUD, under the bar and footer.
           `doc` is the route's server-rendered seed, so /about's prose is in its HTML. */}
       <DocLayer initial={doc ?? null} />
+      <Briefing />
       <DataBridge />
       <FollowController />
       <RawSnapshotBridge />

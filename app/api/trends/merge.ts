@@ -10,7 +10,7 @@ export function opOf(series: string): MergeOp {
   // covered-counter zero-fill made an ABSENT marker read 0, exactly what a present one reads, so
   // every bucket looked measured (the branch review, 2026-10-08). "set" keeps absence null.
   if (series === "u.cov") return "set";
-  if (series.endsWith("gapMax")) return "max"; // g.gapMax and every m.{id}.gapMax
+  if (series.endsWith("gapMax") || series.endsWith("feeMax")) return "max"; // g.gapMax, every m.{id}.gapMax and m.{id}.feeMax
   return "add";
 }
 

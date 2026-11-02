@@ -2,7 +2,7 @@
 // (never fetch time), which is what makes bucket resolution independent of run cadence.
 // The IncMap folds repeats WITHIN a run through the same merge ops the store applies
 // ACROSS runs, so both layers speak one semantics (merge.ts).
-import { TIERS, slotOf, fieldOf, geoSlotOf, type Tier } from "./keys";
+import { TIERS, slotOf, fieldOf, geoSitesSlotOf, geoSlotOf, type Tier } from "./keys";
 import type { FleetGeo } from "./fleetGeo";
 import { mergeVals } from "./merge";
 
@@ -97,6 +97,7 @@ export function bucketMetas(inc: IncMap, net: string, id: string, recs: MetaRec[
     // The floors are the CATALOG's (the fee card's "every network summed" lower bound): an unlisted
     // chain sampled for its own count stays out of them (`floors: false`).
     if (floors) {
+      addInc(inc, net, t, `m.${id}.feeMax`, r.fee || 0); // its largest snapshot, the Snapshots card's row
       addInc(inc, net, t, "g.feeFloor", r.fee || 0);
       addInc(inc, net, t, "g.kbFloor", r.sizeInKB || 0);
     }
@@ -143,6 +144,15 @@ export function bucketFleetGeo(inc: IncMap, net: string, tsMs: number, geo: Flee
   for (const [k, n] of Object.entries(geo.providers)) put(`f.isp.${k}`, n);
   for (const [id, by] of Object.entries(geo.perNetCountries)) for (const [cc, n] of Object.entries(by)) put(`f.cc.${id}.${cc}`, n);
   for (const [id, by] of Object.entries(geo.perNetProviders)) for (const [k, n] of Object.entries(by)) put(`f.isp.${id}.${k}`, n);
+  const sites = Object.entries(geo.sites);
+  if (!sites.length) return;
+  const slot = geoSitesSlotOf(net, tsMs);
+  let own = inc.get(slot.key);
+  if (!own) { own = new Map(); inc.set(slot.key, own); }
+  for (const [site, n] of sites) {
+    const field = fieldOf(slot.bucket, `f.site.${site}`);
+    own.set(field, mergeVals(`f.site.${site}`, own.get(field), n));
+  }
 }
 
 /** THE UNLISTED COVERAGE MARKER (2026-10-08). The unlisted channels' count is measured from their

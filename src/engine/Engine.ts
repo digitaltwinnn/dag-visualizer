@@ -30,14 +30,16 @@ import { THEME_KEY, parseThemePref, resolveTheme, type Theme } from "@/src/theme
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
 import { sceneFeeds } from "./domain/sceneFeeds";
 import { liveArrivals } from "./domain/arrivals";
+import { BRIEFING_COVER, BRIEFING_PACE, BRIEFING_RELEASE_MS, BRIEFING_SETTLE_MS, liftSettling } from "./domain/briefing";
 import { SHEET_SHIFT_K, chromeShiftPx, sheetShiftPx, stripShiftPx } from "./domain/sheetShift";
 import { ChromeBounds } from "./ChromeBounds";
-import { FOCI, nodeFraming, cohortFraming, ledgerCommitTilt, trendFocusPush, trendFit } from "./domain/cameraRig";
+import { FOCI, nodeFraming, cohortFraming, trendFocusPush, trendFit } from "./domain/cameraRig";
 import { elevationCap, isDrag, orbitAbout, orbitAllowed, orbitAngles } from "./domain/subjectOrbit";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { ledgerNetwork } from "./domain/tickNet";
 import { pickNetId, viewEntryActions } from "./domain/pickActions";
+import { viewNetwork } from "./domain/viewNetwork";
 import { ViewTransition, is3D, fleetFaded, fleetHolder, type FleetPlacement } from "./domain/viewTransition";
 import { gatherBand, railGapPx, railGapShiftPx, type GatherBand } from "./domain/gatherLayout";
 import { LADDERS, LEVEL_CARRY, hasLevel, type CohortSel, type CompositionSel, type FocusLevel, type SelectionSnapshot, type ResolverKey } from "./domain/focusLadder";
@@ -158,7 +160,7 @@ export class Engine {
   private _policy: ViewPolicy = VIEW_POLICIES.hyper;
   private filter = "all";
   /** The network committed INSIDE the pinned tick, and that tick's ordinal — the two inputs of
-   *  `ledgerNetwork`, bridged from the store so the chamber's lens and the commit tilt resolve
+   *  `ledgerNetwork`, bridged from the store so the chamber's lens resolves
    *  against the ledger's own network rather than the app filter (2026-10-02). */
   private tickNet: TickNetSel | null = null;
   private snapOrd: number | null = null;
@@ -390,6 +392,9 @@ export class Engine {
   // Store mirror for the rails-hidden camera lean — _tweenTo composes railsLean into every
   // dolly-eligible destination while it holds (see the subscription note). Seeded at boot.
   private railsHidden = false;
+  private _leansOnRails(): boolean {
+    return this.railsHidden && breakpointOf(window.innerWidth) === "desktop";
+  }
   // The user holds the camera (a free orbit/dolly since the last pose flight) — the SCENE⇄HUD
   // toggle then leaves it alone. Set by _onControlsStart, cleared by _resolveFocus and setMode.
   private _freeOrbit = false;
@@ -479,6 +484,12 @@ export class Engine {
   }
   private _sheetShiftW = 0;
   private _sheetShiftH = 0;
+  /** The Briefing's lift on a phone: standing, and until when it outlives the tour (`BRIEFING_RELEASE_MS`). */
+  private _lifting = false;
+  private _liftHeldUntil = 0;
+  /** Where the lift stood when it let go and when it did, while it eases out (`liftSettling`). */
+  private _settleFrom: number | null = null;
+  private _settleAt = 0;
   /** The aspect the current pose was resolved at — seeds from the boot camera, updated per re-frame. */
   private _framedAspect = typeof window !== "undefined" ? window.innerWidth / Math.max(1, window.innerHeight) : 16 / 9;
   // FPS/ms monitor — dev only, or in prod via `?stats`/`#stats` for ad-hoc checks, so
@@ -494,6 +505,10 @@ export class Engine {
   // No param → stays 1 → the whole mechanism is a no-op, so the parse itself is the dev/prod gate
   // (unlike `stats`, which toggles a visible DOM panel and so needs an explicit environment check).
   private _slowmo = 1;
+  /** The choreography clock's divisor: `?slowmo`, and the Briefing's faster pace while it runs. */
+  private _choreoScale(): number {
+    return useStore.getState().briefing != null ? this._slowmo / BRIEFING_PACE : this._slowmo;
+  }
   /** `?clickdebug` — log why each click resolved as it did. Dev instrument; see the parse site. */
   private _clickDebug = false;
   // The live-tuning panel's handle (devTune.ts) — dev tooling, disposed with the engine.
@@ -679,8 +694,10 @@ export class Engine {
       transition: this.transition,
       get mode() { return engineSelf.mode; },
       policy: () => this._policy,
-      railsHidden: () => this.railsHidden,
-      slowmo: () => this._slowmo,
+      // The lean buys width by spending height, and only the desktop's rails free any: a tablet's
+      // are sheets over the canvas, and a portrait frame has no height to spend.
+      railsHidden: () => this._leansOnRails(),
+      slowmo: () => this._choreoScale(),
       setFlying: (v) => useStore.getState().setCameraFlying(v),
       flyingNow: () => useStore.getState().cameraFlying,
     });
@@ -912,9 +929,10 @@ export class Engine {
         // toggle re-resolving there reads as a reset, not a lean. `_freeOrbit` (set by the
         // controls' own start event, cleared by the next pose flight) gates it; a camera at
         // rest keeps today's exact behaviour.
+        if (prev.briefing != null && !prev.briefingLanding && (st.briefing == null || st.briefingLanding)) this._liftHeldUntil = performance.now() + BRIEFING_RELEASE_MS;
         if (st.railsHidden !== prev.railsHidden) {
           this.railsHidden = st.railsHidden;
-          if (VIEW_POLICIES[this.mode].canvas && !this._freeOrbit) {
+          if (breakpointOf(window.innerWidth) === "desktop" && VIEW_POLICIES[this.mode].canvas && !this._freeOrbit) {
             this._resolveFocus();
             // The lean flight keeps the callout (user, 2026-09-11: "when we switch between
             // HUD and Scene, the callout is always redrawn why is that?") — the toggle moves
@@ -932,8 +950,12 @@ export class Engine {
         if (st.focusRung !== prev.focusRung && st.focusRung && VIEW_POLICIES[this.mode].canvas) {
           this._resolveFocus(st.focusRung.level);
         }
-        if (st.filter !== prev.filter) {
-          this.filter = st.filter;
+        // THE NETWORK THE VIEW STANDS ON, the filter or the one the rail is browsing (`viewNetwork.ts`).
+        // Read fresh: a view switch above (`setMode`) releases a browsed network while `st` still
+        // holds it, and that is no network event, so nothing selected under it may drop.
+        const standsOn = viewNetwork(useStore.getState());
+        if (standsOn !== this.filter) {
+          this.filter = standsOn;
           // Switching network clears any country drill-down (matches the old geo UX).
           this.country = null;
           if (prev.country != null) useStore.getState().setCountry(null);
@@ -966,7 +988,7 @@ export class Engine {
         }
         // Country drill-down is geo-only — gate on the view so a re-entrant clear
         // (e.g. from setMode while switching away) can't run a geo focus in hyper.
-        if (st.country !== prev.country && st.filter === prev.filter && st.mode === "geo") {
+        if (st.country !== prev.country && viewNetwork(st) === viewNetwork(prev) && st.mode === "geo") {
           this.country = st.country;
           this.globe.setCountry(st.country);
           this._resolveFocus();
@@ -1039,7 +1061,7 @@ export class Engine {
         // THE LEDGER'S OWN NETWORK (2026-10-02): the one committed inside the pinned tick, else the
         // filter. It changes when that commit does or when the tick on screen does (the commit is
         // honoured only in its own tick), and the chamber answers exactly as it does to a filter:
-        // the coloured dim, and the commit tilt through the one ledger pose. Nothing app-wide moves.
+        // the coloured dim, on the one ledger pose. Nothing app-wide moves.
         if (st.tickNet !== prev.tickNet || st.snap !== prev.snap) {
           const before = this._ledgerNet();
           this.tickNet = st.tickNet;
@@ -1453,6 +1475,15 @@ export class Engine {
     // stale clear behind. Each level's clear is its own store write; country also owns scene
     // state (the drilled border), which is this bridge's half of the job.
     const st0 = useStore.getState();
+    // A BROWSED NETWORK is a look around one view. Not a network event: the scene falls back to the
+    // filter here, before the ancestry below, and what the reader selected under it carries as ever,
+    // unless a real filter stands that it does not belong to.
+    if (mode !== prevMode && st0.railNet != null) {
+      this.filter = st0.filter;
+      st0.setRailNet(null);
+      if (st0.filter !== "all" && st0.inspect && pickNetId(st0.inspect) !== st0.filter) st0.setInspect(null);
+      this.applyFilter(false);
+    }
     const dest3D = is3D(mode) ? mode : null;
     const carries = (lvl: FocusLevel & keyof typeof LEVEL_CARRY): boolean =>
       LEVEL_CARRY[lvl] === "always" || (dest3D != null && hasLevel(dest3D, lvl));
@@ -1641,7 +1672,7 @@ export class Engine {
       pick: st.inspect,
       compositionSel: this._compositionOf(st.inspect),
     });
-    if (acts.length) applyClickActions(acts);
+    if (acts.length) applyClickActions(acts, { arrival: true });
   }
 
   // `focusCamera` is false for BACKGROUND data refreshes (new cluster/meta/geo arriving) — they
@@ -1670,9 +1701,9 @@ export class Engine {
     } else if (this.mode === "ledger") {
       // The committed network's COLOURED DIM: the other networks' ribbons, bands and tiles drop to
       // their own hue, this one's hold identity down the whole trail (four-tier emphasis). Geometry
-      // never moves and the camera's only answer is the shared commit tilt inside the settled ledger
-      // pose — the per-lane and per-node framings were retired (2026-08-09), so the ladder's NETWORK
-      // rung resolves to that one pose, not a lane fly-to.
+      // never moves and the camera holds the one ledger pose: the per-lane and per-node framings were
+      // retired (2026-08-09) and the commit tilt became that pose (2026-11-01), so the ladder's
+      // NETWORK rung resolves to it, not a lane fly-to.
       this.globe.setFilter(this._ledgerNet());
       this.ledger.setFilter(ledgerLens(this._ledgerNet()));
       if (focusCamera) this._resolveFocus();
@@ -1792,33 +1823,7 @@ export class Engine {
     ledgerNode: () => this._resolvers.ledgerOverview(),
     ledgerNetwork: () => this._resolvers.ledgerOverview(),
     ledgerOverview: () => {
-      // The frontal resting pose (FOCI.ledger, 2026-08-07) — which ORBITS into a three-quarter
-      // view while a metagraph is committed (cameraRig.ledgerCommitTilt, user 2026-08-09). Keyed on
-      // the FILTER rather than on the rung, so the two finer rungs inherit it by delegating here and
-      // clearing the filter tweens back to frontal on its own.
-      // ⚠️ THROUGH THE LEDGER'S OWN LENS, like everything else in this chamber (user, 2026-09-01:
-      // filtering DAG left "a bloom on the trail that stays behind; on other filters it does not
-      // behave like this"). This gate read the RAW filter while `setFilter`, the hover preview and
-      // the live edge all read `ledgerLens` — where `dag` IS `all`, because every global tick is a
-      // DAG snapshot and the base ledger's story is the whole chamber.
-      //
-      // The mismatch composed two correct behaviours into a wrong picture: committing DAG tilted
-      // the camera into the three-quarter pose — which turns the global floor toward the viewer, so
-      // more of its emissive surface faces the camera and blooms — while the coloured dim, reading
-      // the lens, correctly dimmed NOTHING. Every other filter tilts and dims together, so the tilt
-      // reads as emphasis; DAG alone tilted with nothing dimmed, and that is the bloom.
-      //
-      // Frontal is also what the tilt is FOR: it exists so "the two storeys separate" when a
-      // metagraph's lane must be read against the floor. Commit the DAG and there is no lane to
-      // separate — the subject IS the floor — so the lean has no work to do.
-      const f = FOCI.ledger;
-      if (ledgerLens(this._ledgerNet()) === "all") {
-        this.cam.focus("ledger");
-        return true;
-      }
-      ledgerCommitTilt(f.pos, f.target, this.cam.out.pos);
-      this.cam.out.target.copy(f.target);
-      this.cam.tweenTo(this.cam.out.pos, this.cam.out.target);
+      this.cam.focus("ledger");
       return true;
     },
     // The History view has ONE camera POSE, exactly as the Snapshots chamber does — `FOCI.trend`,
@@ -1949,6 +1954,8 @@ export class Engine {
   // ramp passes 0.6 the fleet is in its ease-out tail, converging on real positions, and a
   // click means what it looks like. `settleAlpha` is the same ramp the geo glow rides.
   private _pickSuppressed(): boolean {
+    // The Briefing's stage is look, don't touch: a drag orbits, but nothing behind the hidden HUD picks.
+    if (useStore.getState().briefing != null) return true;
     if (!this.transition.active()) return false;
     if (this.transition.phase !== "in") return true;
     return !is3D(this.mode) || this.transition.settleAlpha(this.mode) < 0.6;
@@ -2027,7 +2034,7 @@ export class Engine {
       // Published for the DOM-side projectors, which ease on their own clock rather than through a
       // phase argument. `?slowmo` divides it exactly as the choreography's tick does, so the debug
       // flag stretches the stack's travel with everything else instead of leaving it at full speed.
-      this._frameDt = dt / this._slowmo;
+      this._frameDt = dt / this._choreoScale();
       // ---- THE FRAME ORDER CONTRACT (spec C#1) -------------------------------------------
       // Phases run in this order and NOTHING may mutate a pose after the phase that derives
       // from it: inputs/boundary → camera → motion (spin/rotation) → derived frames (staging
@@ -2077,7 +2084,7 @@ export class Engine {
     // Advance the machine; tick() returns TRUE exactly once, at the OUT→IN boundary. The nodes
     // are then fully gathered and both furnitures are dark, so snapping the destination layout +
     // morph + starting the camera flight here is invisible.
-    if (this.transition.tick(dt / this._slowmo) && this._pendingBoundary) {
+    if (this.transition.tick(dt / this._choreoScale()) && this._pendingBoundary) {
       const dest = this._pendingBoundary;
       this._pendingBoundary = null;
       this._applyBoundary(dest);
@@ -2140,16 +2147,39 @@ export class Engine {
       const el = this.ctx.renderer.domElement;
       const w = el.clientWidth || window.innerWidth;
       const h = el.clientHeight || window.innerHeight;
+      // The Briefing's caption on a phone, the same lift. It outlives the tour while the HUD slides
+      // back: the bars' edges are final only once they land, so the one ease runs to where the scene
+      // rests. Wider tiers need no lift: the words fit under the framing the HUD's own bars measure.
+      const lifting =
+        breakpointOf(window.innerWidth) === "phone" &&
+        ((st.briefing != null && !st.briefingLanding) || performance.now() < this._liftHeldUntil);
+      if (lifting !== this._lifting) {
+        this._lifting = lifting;
+        this._settleFrom = null;
+        if (!lifting) {
+          this._chrome.refresh();
+          this._settleFrom = this._sheetShift;
+          this._settleAt = performance.now();
+        }
+      }
+      const words = lifting ? h * BRIEFING_COVER : 0;
+      const chromeShift = lifting ? 0 : this._chromeShift();
       const target =
-        sheetShiftPx(Math.max(st.sceneCoverBExplore, st.sceneCoverBDetails, st.sceneCoverBVitals), h) + this._chromeShift();
+        sheetShiftPx(Math.max(st.sceneCoverBExplore, st.sceneCoverBDetails, st.sceneCoverBVitals, words), h) + chromeShift;
       const d = target - this._sheetShift;
+      const settling = this._settleFrom == null ? null : performance.now() - this._settleAt;
+      if (settling != null && settling >= BRIEFING_SETTLE_MS) this._settleFrom = null;
       // REDUCED MOTION SNAPS (review, 2026-09-28): a whole-scene slide of up to half the viewport,
       // riding a sheet, is exactly the large-area motion the setting exists to remove. The sheet
       // itself is already instant there (its transition is motion-reduce:transition-none).
       this._sheetShift =
-        this._reduceMotion.matches || Math.abs(d) < 0.25
+        this._reduceMotion.matches
           ? target
-          : this._sheetShift + d * (1 - Math.exp(-SHEET_SHIFT_K * dt));
+          : this._settleFrom != null
+            ? liftSettling(this._settleFrom, target, settling!)
+            : Math.abs(d) < 0.25
+              ? target
+              : this._sheetShift + d * (1 - Math.exp(-SHEET_SHIFT_K * dt));
       if (this._sheetShift !== this._sheetShiftApplied || w !== this._sheetShiftW || h !== this._sheetShiftH) {
         const cam = this.ctx.camera;
         if (this._sheetShift === 0) cam.clearViewOffset();

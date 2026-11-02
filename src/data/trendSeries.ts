@@ -618,7 +618,7 @@ export function momentPhrase(metric: TrendMetric, stepMs: number, hypergraph = f
   const inBucket = stepMs >= 86400000 ? "on that day" : stepMs >= 3600000 ? "in that hour" : "in those 5 minutes";
   switch (metric) {
     case "snapshots": return { verb: "anchored", rest: `snapshots ${inBucket}` };
-    case "globals": return { verb: globalsVerb(hypergraph, ""), rest: `global snapshots ${inBucket}` };
+    case "globals": return { verb: globalsVerb(hypergraph), rest: `global snapshots ${inBucket}` };
     case "blocks": return { verb: "produced", rest: `blocks ${inBucket}` };
     case "fees": return { verb: "paid", rest: `DAG in fees ${inBucket}` };
     case "kb": return { verb: "anchored", rest: `of data ${inBucket}` };
@@ -630,9 +630,9 @@ export function momentPhrase(metric: TrendMetric, stepMs: number, hypergraph = f
 /** THE ONE MEASURE WHOSE VERB DEPENDS ON THE SUBJECT (2026-10-26): the hypergraph CREATES its global
  *  snapshots, a network is PART OF them — "DOR was part of 2,880 global snapshots" (user: "it's not
  *  the one who actually creates them"; "was carried by", then "anchored into", came first), never
- *  "DOR created" (it created its own, which is the other measure). `floor` is " at least" or "". */
-function globalsVerb(hypergraph: boolean, floor: string): string {
-  return hypergraph ? `created${floor}` : `was part of${floor}`;
+ *  "DOR created" (it created its own, which is the other measure). */
+function globalsVerb(hypergraph: boolean): string {
+  return hypergraph ? "created" : "was part of";
 }
 
 /** HOW MANY GLOBAL SNAPSHOTS CARRIED A CHAIN, per bucket (`m.<id>.ticks`, sampled since
@@ -653,35 +653,6 @@ export function anchorSeries(id: string, series: Readonly<Record<string, (number
 /** The Moment lead's second clause, beside the creation spacing: "and anchored {n} times". */
 export function anchorClause(n: number): { before: string; after: string } {
   return { before: "and anchored", after: n === 1 ? "time" : "times" };
-}
-
-/** A RANGE'S READING AS A SENTENCE ABOUT ITS NETWORK (2026-10-07 — the Range card, the Moment's
- *  parent; `momentPhrase`'s sibling). A counter is the TOTAL over the span ("DED anchored 52,140
- *  snapshots in this range") — what a reader asks of a range — and a total that skipped an
- *  unmeasured bucket is a floor and says so ("at least", rule 10). A gauge and the spacing have no
- *  total, so they are the span's average and say that instead. */
-export function rangePhrase(metric: TrendMetric, partial: boolean, hypergraph = false): { verb: string; rest: string } {
-  // The span is the card's own Start / End / Length rows, so the sentence points at it.
-  const over = "in this range";
-  const floor = partial ? " at least" : "";
-  switch (metric) {
-    case "snapshots": return { verb: `anchored${floor}`, rest: `snapshots ${over}` };
-    case "globals": return { verb: globalsVerb(hypergraph, floor), rest: `global snapshots ${over}` };
-    case "blocks": return { verb: `produced${floor}`, rest: `blocks ${over}` };
-    case "fees": return { verb: `paid${floor}`, rest: `DAG in fees ${over}` };
-    case "kb": return { verb: `anchored${floor}`, rest: `of data ${over}` };
-    case "nodes": return { verb: "ran", rest: "nodes on average" };
-    case "continuity": return { verb: "created a snapshot every", rest: "on average" };
-  }
-}
-
-/** A counter's total over a span: the measured buckets added, and whether any was not measured
- *  (the total is then a floor). Nothing measured at all is no total — null, never a zero. */
-export function sumMeasured(points: readonly (number | null)[]): { sum: number; partial: boolean } | null {
-  let sum = 0;
-  let measured = 0;
-  for (const p of points) if (p != null) { sum += p; measured++; }
-  return measured === 0 ? null : { sum, partial: measured < points.length };
 }
 
 /** What a History card says it is showing: the measure's name with its unit, in one phrase.

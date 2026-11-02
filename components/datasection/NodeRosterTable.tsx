@@ -5,6 +5,7 @@ import { ArrowDown, ArrowUp, type LucideIcon } from "lucide-react";
 import type { CSSProperties } from "react";
 import type { NodeRow } from "@/src/data/types";
 import { useStore } from "@/src/store/store";
+import { viewNetwork } from "@/src/engine/domain/viewNetwork";
 import { metagraphById, filterAccent, shortHash } from "@/src/data/network";
 import { buildRoster, groupRosterByCountry, groupRosterByNetwork, sortRoster, type RosterCountryGroup, type RosterRow, type RosterSortKey } from "@/src/data/roster";
 import { compareComposition, compositionRows } from "@/src/data/composition";
@@ -68,7 +69,7 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
   useFeedRead(["clusters", "api-metagraphs", "api-geo"], "NodeRosterTable", rawOpen);
   const selNodes = useStore((s) => s.selNodes);
   const metaList = useStore((s) => s.metaList);
-  const filter = useStore((s) => s.filter);
+  const filter = useStore(viewNetwork);
   const live = useStore((s) => s.live);
   const inspect = useStore((s) => s.inspect);
   const setHoverNodeId = useStore((s) => s.setHoverNodeId);

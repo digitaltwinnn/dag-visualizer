@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, type CSSProperties, useRef, useState, type ReactNode } from "react";
+import { Fragment, type CSSProperties, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { Check, Copy } from "lucide-react";
 import { cn, TOUCH_HIT } from "@/lib/utils";
 import { IDENT_INK } from "@/components/identInk";
@@ -150,6 +150,9 @@ export const foldLabel = (open: boolean): string =>
 export function QualifierChip({ children, className, style }: { children: ReactNode; className?: string; style?: CSSProperties }) {
   return (
     <span
+      // THE PILL YIELDS IN THE FOLD (user, 2026-10-30, design D): a folded entry is slot + name,
+      // and CardHead's entry aside hides every `data-pill`; the chip is read on the open box.
+      data-pill=""
       style={style}
       className={cn(
         "inline-flex items-center max-w-full rounded-xs border border-border bg-wash-faint px-[6px] py-[3px] text-label leading-none text-muted-foreground",
@@ -219,6 +222,15 @@ export function Door({
   glyph,
   disabled,
   flushFoot,
+  wrap,
+  lit,
+  expanded,
+  controls,
+  tone,
+  onPointerEnter,
+  onPointerLeave,
+  onFocus,
+  onBlur,
 }: {
   label?: ReactNode;
   children: ReactNode;
@@ -228,6 +240,23 @@ export function Door({
   disabled?: boolean;
   /** Sits directly on the foot plate below it (cancels the foot's own top margin). */
   flushFoot?: boolean;
+  /** Let the target wrap instead of truncating — for a door whose target IS the content (a note's
+   *  caption), where an ellipsis would hide text no hover can reveal. */
+  wrap?: boolean;
+  /** Hold the hover wash: another surface previews this door's subject (a hover pairing). */
+  lit?: boolean;
+  /** A door that discloses: whether its panel is open, and that panel's id. */
+  expanded?: boolean;
+  controls?: string;
+  /** The AI card's own wash, quieter than the ladder: inside that card a door is a row of the note,
+   *  and the card's violet edge already says what it is. Paper rests on the card itself, a hairline
+   *  between rows, so a coloured name reads on clean ground (user, 2026-11-01). */
+  tone?: "ai";
+  /** The hover pair, for a door whose subject another surface can light (convention 9). */
+  onPointerEnter?: (e: PointerEvent<HTMLElement>) => void;
+  onPointerLeave?: () => void;
+  onFocus?: () => void;
+  onBlur?: () => void;
 }) {
   const cls = cn(
     flushFoot && "-mb-3",
@@ -238,23 +267,28 @@ export function Door({
     // a bit too faint in light mode"). 6% of the accent is a visible plate on the dark glass and
     // very nearly the card's own white on paper, so the row stopped reading as a control there:
     // paper rests at `soft` and hovers at `hover`, dark keeps `faint` → `soft`.
-    "flex items-center gap-2 -mx-[var(--card-pad)] px-[var(--card-pad)] py-2 touch:min-h-11 border-t border-wash-strong [background:light-dark(var(--wash-soft),var(--wash-faint))] text-body text-foreground text-left",
-    "hover:[background:light-dark(var(--wash-hover),var(--wash-soft))] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
+    "flex items-center gap-2 -mx-[var(--card-pad)] px-[var(--card-pad)] py-2 touch:min-h-11 border-t text-body text-foreground text-left",
+    "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
+    // LIT is the hover wash, held.
+    tone === "ai"
+      ? cn("border-[light-dark(var(--border),var(--ai-row))] hover:[background:var(--ai-row-hover)]", lit ? "[background:var(--ai-row-hover)]" : "[background:light-dark(transparent,var(--ai-row))]")
+      : cn("border-wash-strong hover:[background:light-dark(var(--wash-hover),var(--wash-soft))]", lit ? "[background:light-dark(var(--wash-hover),var(--wash-soft))]" : "[background:light-dark(var(--wash-soft),var(--wash-faint))]"),
     disabled && "opacity-65 pointer-events-none",
   );
   const inner = (
     <>
       {label != null && <span className="flex-none text-muted-foreground">{label}</span>}
-      <span className={cn("min-w-0 truncate", href && "text-primary-ink")}>{children}</span>
-      <span aria-hidden className="ml-auto flex-none text-muted-foreground">{glyph}</span>
+      <span className={cn("min-w-0", wrap ? "flex-1" : "truncate", href && "text-primary-ink")}>{children}</span>
+      {glyph != null && <span aria-hidden className="ml-auto flex-none text-muted-foreground">{glyph}</span>}
     </>
   );
+  const pair = { onPointerEnter, onPointerLeave, onFocus, onBlur };
   return href ? (
-    <a href={href} target="_blank" rel="noopener noreferrer" className={cls}>
+    <a href={href} target="_blank" rel="noopener noreferrer" className={cls} {...pair}>
       {inner}
     </a>
   ) : (
-    <button type="button" onClick={onClick} disabled={disabled} className={cn(cls, "w-[calc(100%+2*var(--card-pad))] cursor-pointer")}>
+    <button type="button" onClick={onClick} disabled={disabled} aria-expanded={expanded} aria-controls={expanded ? controls : undefined} className={cn(cls, "w-[calc(100%+2*var(--card-pad))] cursor-pointer")} {...pair}>
       {inner}
     </button>
   );
@@ -408,6 +442,7 @@ export function IdentityDot({ hue, className }: { hue: string; className?: strin
 function StatusPill({ color, children }: { color: string; children: React.ReactNode }) {
   return (
     <Badge
+      data-pill=""
       variant="outline"
       className="text-label font-semibold px-2 py-px rounded-full border"
       // color-mix (not hex-append) so the alpha composes on ANY colour format — the bucket
@@ -467,7 +502,7 @@ export function RoleChips({ codes, compact, tight }: { codes: string[]; compact?
   return (
     // `tight` — the explorer row's tag home (2026-09-26): three chips have ~80px there, so the
     // pills close up by a pixel each side and the gap drops to 3px. Same pill, same vocabulary.
-    <span className={cn("inline-flex items-center", tight ? "gap-[3px]" : "gap-1")}>
+    <span data-pill="" className={cn("inline-flex items-center", tight ? "gap-[3px]" : "gap-1")}>
       {codes.map((c) => (
         <span
           key={c}
@@ -518,7 +553,7 @@ function nodeComposition(nodes: NodeInfo[]): Composition {
 // from the SAME composition read as the old "data metagraph · no token" body line (reused, not
 // re-derived): a metagraph is a "data"/"currency"/"data and currency" metagraph by whether it
 // runs dL1/cL1 nodes; the DAG core is the one exception ("hypergraph", not a metagraph at all).
-// The STRUCTURED type read (2026-08-31) — networkKind's prose derives from this, and any
+// The STRUCTURED type read (2026-08-31) — the head's kind word derives from this, and any
 // classifier (the vitals donut's buckets) branches on THESE values, never on the display
 // sentence: a copy edit to the prose must not silently reclassify every metagraph.
 export type MetaType = "hypergraph" | "unknown" | "data" | "currency" | "data + currency";
@@ -530,12 +565,13 @@ export function metaType(id: string, nodes: NodeInfo[]): MetaType {
   const hasData = present.includes("dl1");
   return hasCurrency && hasData ? "data + currency" : hasCurrency ? "currency" : "data";
 }
-export function networkKind(id: string, nodes: NodeInfo[]): string {
+/** THE ONE QUALIFIER THE METAGRAPH HEAD'S PILL SHOWS (user, 2026-10-30): the kind, a word every
+ *  network has ("hypergraph", "currency", "data", "data and currency"); null for an unknown type,
+ *  whose only word is the eyebrow's own "metagraph". */
+export function metaKindWord(id: string, nodes: NodeInfo[]): string | null {
   const t = metaType(id, nodes);
-  if (t === "hypergraph") return "hypergraph";
-  if (t === "unknown") return "metagraph";
-  if (t === "data + currency") return "data and currency metagraph";
-  return `${t} metagraph`;
+  if (t === "unknown") return null;
+  return t === "data + currency" ? "data and currency" : t;
 }
 
 // Long description with a 3-line clamp + "Show more" (replaces ui.js _descHTML + the delegated

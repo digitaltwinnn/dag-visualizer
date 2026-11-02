@@ -49,19 +49,21 @@ const TITLE = "m-0 text-title font-semibold";
 // dossier's avatar takes the KIND MARK's size and gap there (user, 2026-10-25: the metagraph entry
 // "is not fully horizontally aligned like the others" — measured 20px + 10px against 16 + 8, so
 // its name started 7px further right than Country's and Provider's).
-// The KIND yields first, the name last (the kind's flex-shrink is a thousand times the name's, so
-// it collapses to nothing before the name loses a glyph; the name then ellipsizes) — the name is
-// what tells the entry from its siblings; the kind is read in full on the open box. On a 320px
-// rail a long name beside its ticker chip leaves the kind no room at all (Dor Technologies), a
-// short one keeps it (USDC.dag, with its repeated-ticker chip gone). The kind's short form stands
-// in for the full one here, and both lines inherit the h3's line box so every entry is one height.
+// A `data-figure` title (the snapshot ordinal) drops from the title size to the entry's body size,
+// and a `data-kindmark` glyph beside it is dropped: the eyebrow word states the kind in the fold
+// (an identity avatar stays). 2026-10-29: nine digits at the title size with their block mark and
+// the live pill overran the one-row entry by a third once the note took the resting box.
+// The dossier's second line is its TICKER (2026-10-30; the kind moved to the aside pill, where
+// every network has a word), and the entry DROPS it: the explorer row beside the rail shows the
+// ticker, and the one-row entry has the name, the eyebrow and the kind pill to carry. The name
+// ellipsizes last. Every line inherits the h3's line box so every entry is one height.
 // The title's own row (`[data-titlerow]`, else the h3's first span) is `flex`, not inline-flex:
 // inline-flex is shrink-to-fit, so it overflowed the h3, which then clipped the kind under the
 // aside. (Baseline alignment of the outer row was tried and measured wrong by 2.4px per item on
 // the Country entry: the truncating spans' flex baselines are SYNTHESISED from their boxes, so
 // each title shape landed somewhere else. The row centres instead, and the eyebrow and chip are
 // given the title's line box — `ENTRY_LINE` — so centring IS the baseline to under a pixel.)
-const ENTRY_TITLE = "[&>span]:flex [&>span]:max-w-full [&_[data-titlerow]]:flex [&_[data-titlerow]]:max-w-full [&_[data-titlerow]]:gap-2 [&_[data-avatar]]:size-4 [&_[data-titleblock]]:flex-row [&_[data-titleblock]]:items-baseline [&_[data-titleblock]]:gap-2 [&_[data-titleblock]]:min-w-0 [&_[data-titleblock]>*]:leading-[inherit] [&_[data-titleblock]>:first-child]:shrink [&_[data-titleblock]>:first-child]:truncate [&_[data-kind-full]]:hidden [&_[data-kind-short]]:block [&_[data-kind-short]]:min-w-0 [&_[data-kind-short]]:[flex-shrink:1000]";
+const ENTRY_TITLE = "[&>span]:flex [&>span]:max-w-full [&_[data-titlerow]]:flex [&_[data-titlerow]]:max-w-full [&_[data-titlerow]]:gap-2 [&_[data-avatar]]:size-4 [&_[data-titleblock]]:flex-row [&_[data-titleblock]]:items-baseline [&_[data-titleblock]]:gap-2 [&_[data-titleblock]]:min-w-0 [&_[data-titleblock]>*]:leading-[inherit] [&_[data-titleblock]>:first-child]:shrink [&_[data-titleblock]>:first-child]:truncate [&_[data-ticker]]:hidden [&_[data-figure]_.odometer]:text-body [&_[data-kindmark]]:hidden";
 // The body step's line box in absolute terms (its fluid size × its unitless leading), for the
 // entry's eyebrow and chip: a 12px caps label on a `leading-none` box centred against a 21px
 // title box put its baseline ~1.5px below the title's (user, 2026-10-25: the eyebrow and the name
@@ -433,12 +435,12 @@ function keepFocusOnRung(el: HTMLElement): void {
             {/* `data-eyebrow` is RailThread's read: on an unboxed ENTRY the thread runs its
                 depth-reach connector at the EYEBROW's height (user, 2026-08-08 — the entry's
                 vertical centre put the line through the title-row aside's space). FOLDED it takes
-                one COLUMN width ("METAGRAPH", the longest slot noun, sets it) so every entry's
-                title starts on the same x and the pile reads as a ladder — stated in em against
-                the label step, since the type scale is fluid — and the title's line box
+                one COLUMN width (the view's, `viewPolicy.entryColumn`) so every entry's title
+                starts on the same x and the pile reads as a ladder — stated in em against the
+                label step, since the type scale is fluid — and the title's line box
                 (`ENTRY_LINE`), so centring the row aligns the baselines. */}
             {eyebrow ? (
-              <span data-eyebrow="" className={cn("block", eyebrowClass, entryMode && cn("flex-none min-w-[7em]", ENTRY_LINE))}>{eyebrow}</span>
+              <span data-eyebrow="" className={cn("block", eyebrowClass, entryMode && cn("flex-none min-w-[var(--entry-col)]", ENTRY_LINE))}>{eyebrow}</span>
             ) : (
               <span />
             )}
@@ -459,16 +461,35 @@ function keepFocusOnRung(el: HTMLElement): void {
         {title != null && (
           <>
             <div className={entryMode ? "contents" : "flex items-center gap-2 min-w-0"}>
-              <h3 className={cn(TITLE, "text-foreground min-w-0", entryMode && cn("text-body truncate", ENTRY_TITLE))}>{rolled}</h3>
+              <h3 data-eyebrow={eyebrow ? undefined : ""} className={cn(TITLE, "text-foreground min-w-0", entryMode && cn("text-body truncate", ENTRY_TITLE))}>{rolled}</h3>
               {/* The aside is DECORATION over a stretched toggle, so it must not swallow the
                   gesture. z-10 lifts it above the head's overlay (a site link has to stay
                   clickable), and that alone made the title row's right end dead: the ticker /
                   status pill / age counter is plain text, so a click there did nothing and the
                   cursor fell back to the default arrow over an otherwise-clickable entry (user,
                   2026-08-09). So the WRAPPER is transparent and only real controls inside it opt
-                  back in — text falls through to the toggle, links and buttons keep working. */}
+                  back in — text falls through to the toggle, links and buttons keep working.
+                  CENTRED ON BOTH TIERS (user, 2026-10-29: the Gate AI card's span chip "is not
+                  aligned properly with the card's title"): as a plain flex item the wrapper was a
+                  line box the chip sat on the BASELINE of, 4px under the title's centre in the open
+                  box (the dossier's ticker had the same 2px); `inline-flex items-center` centres
+                  whatever it carries, as the entry tier always did. */}
+              {/* A HEAD WITH NO EYEBROW MARKS ITS TITLE INSTEAD (the h3 above; user, 2026-10-31: the AI
+                  card "disappears/appears briefly"). `HeightEase` and `RailThread` both find a head
+                  by `[data-eyebrow]`, and with no marker the arrival faded the whole card from 0. */}
+              {/* FOLDED, A `data-yields` PART OF THE ASIDE IS DROPPED (2026-10-29): the entry is one
+                  row and the aside is flex-none, so whatever it carries comes straight out of the
+                  title's width — the live tick's age chip beside its live pill left the ordinal
+                  "7,183,468" a 30px slot reading "7" once the note took the resting box over it
+                  (R70). A reading the open box states anyway yields; the control (live / pinned)
+                  stays, since the entry is where it is pressed.
+                  …AND SO IS EVERY QUALIFIER PILL (user, 2026-10-30, design D of four in the
+                  brainstorming companion: "the pill yields"): the eyebrow, the mark and the pill
+                  were taking the row and the NAME truncated ("Dor …"), the one thing that tells an
+                  entry from its siblings. A folded entry is slot + name; the kind, the country code,
+                  the bucket and the span are read on the open box (`QualifierChip` is `data-pill`). */}
               {(aside != null || (entryMode && caption != null)) && (
-                <span className={cn("ml-auto flex-none relative z-10 pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto", entryMode && cn("inline-flex items-center gap-1.5", ENTRY_LINE))}>
+                <span className={cn("ml-auto flex-none relative z-10 inline-flex items-center gap-1.5 pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto", entryMode && cn("[&_[data-yields]]:hidden [&_[data-pill]]:hidden", ENTRY_LINE))}>
                   {entryMode && caption != null && <span className="text-label text-muted-foreground text-right tabular-nums">{caption}</span>}
                   {aside}
                 </span>
@@ -488,9 +509,12 @@ function keepFocusOnRung(el: HTMLElement): void {
       {/* Head-vs-body sits INSIDE the card's padding here, so it needs no bleed and no inset of its
           own: the padding box already gives it the same left/right spacing the slab's resting seam
           has (user, 2026-08-09 — "give the header divider also some spacing on the left/right").
-          One resting weight for every division in the pile; full width belongs to the hovered seam. */}
+          One resting weight for every division in the pile; full width belongs to the hovered seam.
+          A NOTE LEADING THE BODY IS THE HEAD'S LAST LINE (`SubjectNote`, user 2026-10-31), so the rule
+          stands down for it, whether the card's body is flat or wrapped. With no note a body's own
+          leading Separator stands down instead: two hairlines with nothing between. */}
       {title != null && !collapsed && (
-        <div className="border-b border-border mt-2 mb-2.5" aria-hidden />
+        <div className="border-b border-border mt-2 mb-2.5 has-[+[data-note-lead]]:hidden has-[+*>[data-note-lead]:first-child]:hidden [&+[data-slot=separator]]:hidden" aria-hidden />
       )}
     </>
   );

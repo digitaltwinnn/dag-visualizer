@@ -289,6 +289,20 @@ export function cursorFraction(buckets: readonly number[], bucket: number | null
 // side is `components/useTrendsSlice.ts`, which is nothing but the hook calls the plan names.
 
 /** The API's own window vocabulary — `/api/trends?window=…`. */
+/** The height a plot is drawn against: its peak with some headroom, or a shared scale's where a
+ *  caller puts a column of charts on one. One home, so what stands over the plot (a coin's hairline)
+ *  reads the same scale the plot draws with. */
+export function plotCeiling(series: readonly (readonly (number | null)[])[], scaleMax?: number): number {
+  const peak = Math.max(1e-9, ...series.flatMap((p) => p.filter((v): v is number => v != null)));
+  return (scaleMax != null && scaleMax > 0 ? scaleMax : peak) * 1.12;
+}
+
+/** A bucket's value as a share of the plot's height, null where it has none to stand on. */
+export function valueFraction(points: readonly (number | null)[], buckets: readonly number[], bucket: number | null, ceiling: number): number | null {
+  const v = bucket == null ? null : points[buckets.indexOf(bucket)];
+  return v == null ? null : Math.min(1, v / ceiling);
+}
+
 export type TrendApiWindow = "24h" | "7d" | "30d" | "90d" | "1y" | "all";
 
 // THE ZOOM (user, 2026-09-07: "can we zoom in?") — the window picker is the tiers made
@@ -304,6 +318,7 @@ export const ZOOMS = [
   { id: "24h", label: "24H" },
   { id: "7d", label: "7D" },
   { id: "30d", label: "30D" },
+  { id: "90d", label: "90D" },
   { id: "1y", label: "1Y" },
   { id: "all", label: "All" },
 ] as const;
@@ -315,6 +330,7 @@ const WINDOW_MS: Record<Exclude<ZoomId, "all">, number> = {
   "24h": 24 * H,
   "7d": 7 * 24 * H,
   "30d": 30 * 24 * H,
+  "90d": 90 * 24 * H,
   "1y": 365 * 24 * H,
 };
 
@@ -392,9 +408,9 @@ const HOUR_MS = 3_600_000;
 export function planTrendFetch(zoom: ZoomId | null, range: TrendRange | null): TrendFetchPlan {
   if (!zoom) return { main: NO_LEG, fleet: NO_LEG, daily: null, tier: null };
   // THE DAILY LEG rides wherever the charts' own grain is finer than a day (user, 2026-09-29:
-  // "day should be the standard always" for the head readout) — every zoom but 1Y/ALL, and any
+  // "day should be the standard always" for the head readout) — every zoom but 90D/1Y/ALL, and any
   // range whose tier is finer than daily. Where the chart IS daily its own last point is the day.
-  const dailyZoom: TrendApiWindow | null = zoom === "1y" || zoom === "all" ? null : "90d";
+  const dailyZoom: TrendApiWindow | null = zoom === "90d" || zoom === "1y" || zoom === "all" ? null : "90d";
   if (range) {
     const tier = pickRangeTier(range.fromMs, range.toMs);
     const daily: TrendApiWindow | null = tier === "1d" ? null : "90d";
@@ -495,6 +511,7 @@ const SPAN_WORDS: Record<ZoomId, string> = {
   "24h": "last 24 hours",
   "7d": "last 7 days",
   "30d": "last 30 days",
+  "90d": "last 90 days",
   "1y": "last year",
   all: "all measured",
 };

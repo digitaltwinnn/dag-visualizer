@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { netKeyOf, tickNetSelectActions, tickNetClearActions, viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, trendPlaneActions, snapshotClearActions, type ClickAction } from "./pickActions";
+import { netKeyOf, tickNetSelectActions, tickNetClearActions, viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, trendPlaneActions, railNetActions, noteCohortActions, noteDayActions, snapshotClearActions, type ClickAction } from "./pickActions";
 import { finerLevels } from "./focusLadder";
 import { METAGRAPHS } from "@/src/net/current";
 import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
@@ -319,6 +319,12 @@ describe("viewEntryActions (a carried node's ancestry in the destination view)",
 });
 
 describe("filterToggleActions (the remaining rail interaction)", () => {
+  it("re-picking the filter's own network while browsing ends the browse and keeps the filter", () => {
+    expect(filterToggleActions("dor", "dor", "usdc")).toEqual([{ kind: "railNet", id: null }]);
+    expect(filterToggleActions("bio", "dor", "usdc")).toEqual([{ kind: "filter", id: "bio" }]);
+    expect(filterToggleActions("all", "all", "usdc")).toEqual([{ kind: "railNet", id: null }]);
+  });
+
   it("the filter picker's committed-row rule: re-picking steps back to 'all'; 'all' never toggles", () => {
     expect(filterToggleActions("dor", "all")).toEqual([{ kind: "filter", id: "dor" }]);
     expect(filterToggleActions("dor", "dor")).toEqual([{ kind: "filter", id: "all" }]);
@@ -640,6 +646,27 @@ describe("sameMetaSnap", () => {
   });
 });
 
+// A NOTABLE DAY BELONGS TO A CHART (user, 2026-10-30: "if we click it and it selects the range it
+// should also set the related explorer filter accordingly so the correct chart shows up"): under
+// All the click brings that day's plane forward, the explorer row's own commit. It is a focus and
+// never the filter, and it never toggles a plane already forward off.
+describe("noteDayActions — a notable day's plane", () => {
+  it("under All, focuses the day's network, or the hypergraph's plane for a whole-network day", () => {
+    expect(noteDayActions("dor", "all", null)).toEqual([{ kind: "trendFocus", id: "dor" }]);
+    expect(noteDayActions(null, "all", null)).toEqual([{ kind: "trendFocus", id: "dag" }]);
+    expect(noteDayActions("dor", "all", "bio")).toEqual([{ kind: "trendFocus", id: "dor" }]);
+  });
+  it("a plane already forward stays forward: no toggle off", () => {
+    expect(noteDayActions("dor", "all", "dor")).toEqual([]);
+    expect(noteDayActions(null, "all", "dag")).toEqual([]);
+  });
+  it("a filter already scopes the stack, and the click never writes it", () => {
+    expect(noteDayActions("dor", "dor", null)).toEqual([]);
+    expect(noteDayActions("bio", "dag", null)).toEqual([]);
+    for (const a of noteDayActions("dor", "all", null)) expect(a.kind).not.toBe("filter");
+  });
+});
+
 describe("trendPlaneActions — a plane click in the History view (2026-09-18)", () => {
   // ⚠️ A PLANE CLICK IS FOCUS ONLY, and that is a decision, not an omission. In this view a
   // committed network FILTER scopes the stack down to that one network — so committing the
@@ -663,5 +690,38 @@ describe("trendPlaneActions — a plane click in the History view (2026-09-18)",
     for (const current of [null, "elpaca", "dor-metagraph"]) {
       expect(kinds(trendPlaneActions("elpaca", current))).toEqual(["trendFocus"]);
     }
+  });
+});
+
+// THE AI CARD'S PROVIDER ROW (user, 2026-10-31): the row names a provider, not a place the reader
+// has drilled into, so it brings its country along.
+describe("noteCohortActions", () => {
+  const c = { cc: "DE", city: "Falkenstein", isp: "Hetzner" };
+  it("commits the country, then the cohort", () => {
+    expect(noteCohortActions(c, { country: null, cohort: null, hasInspect: false })).toEqual([
+      { kind: "country", cc: "DE" },
+      { kind: "cohort", sel: c },
+    ]);
+  });
+  it("leaves a country that already stands, and drops a finer node first", () => {
+    expect(noteCohortActions(c, { country: "DE", cohort: null, hasInspect: true })).toEqual([
+      { kind: "inspect", pick: null },
+      { kind: "cohort", sel: c },
+    ]);
+  });
+  it("the same row again releases the cohort, one toggle language", () => {
+    expect(noteCohortActions(c, { country: "DE", cohort: c, hasInspect: false })).toEqual([{ kind: "cohort", sel: null }]);
+  });
+});
+
+// THE HYPERGRAPH RAIL BROWSES (user, 2026-10-31): a step on the Metagraph card changes what the rail
+// and the scene stand on, and the top bar stays what the reader set.
+describe("railNetActions", () => {
+  it("browses a network and never writes the filter", () => {
+    expect(railNetActions("dor", "all")).toEqual([{ kind: "railNet", id: "dor" }]);
+    expect(railNetActions("dor", "dag")).toEqual([{ kind: "railNet", id: "dor" }]);
+  });
+  it("stepping onto the filter's own network ends the browse: nothing left to differ", () => {
+    expect(railNetActions("dag", "dag")).toEqual([{ kind: "railNet", id: null }]);
   });
 });

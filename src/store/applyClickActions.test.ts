@@ -20,6 +20,7 @@ beforeEach(() => {
   st.setSnap(null);
   st.setMetaSnap(null);
   st.setTickNet(null);
+  st.setRailNet(null);
   st.setFollowing(true);
 });
 
@@ -278,5 +279,47 @@ describe("filter action clears a stale plane focus", () => {
     expect(useStore.getState().trendFocus).toBe("bio");
     applyClickActions([{ kind: "filter", id: "dor" }]);
     expect(useStore.getState().trendFocus).toBeNull();
+  });
+});
+
+describe("the network browsed in Hypergraph", () => {
+  it("stands in the store without touching the filter, and ranks as a network", () => {
+    applyClickActions([{ kind: "railNet", id: "dor" }]);
+    const st = useStore.getState();
+    expect(st.filter).toBe("all");
+    expect(st.railNet).toBe("dor");
+    expect(st.selStack[0]).toBe("network");
+  });
+  it("releasing it clears the rank", () => {
+    applyClickActions([{ kind: "railNet", id: "dor" }]);
+    applyClickActions([{ kind: "railNet", id: null }]);
+    expect(useStore.getState().selStack).not.toContain("network");
+  });
+  it("a real filter commit replaces it", () => {
+    applyClickActions([{ kind: "railNet", id: "dor" }]);
+    applyClickActions([{ kind: "filter", id: "dag" }]);
+    const st = useStore.getState();
+    expect(st.railNet).toBeNull();
+    expect(st.filter).toBe("dag");
+    expect(st.selStack).toContain("network");
+  });
+  it("frames as a network commit does", () => {
+    applyClickActions([{ kind: "railNet", id: "dor" }]);
+    expect(useStore.getState().motionCause).toMatchObject({ kind: "filter", id: "dor" });
+  });
+});
+
+// A READER'S COMMIT IS TOLD FROM ARRIVAL'S (review 2026-10-31): a view entry pins the note open, and a
+// commit in its grace window has to drop that pin, or the note stands open beside the new card.
+describe("readerCommits", () => {
+  it("counts a reader's commit", () => {
+    const before = useStore.getState().readerCommits;
+    applyClickActions([{ kind: "country", cc: "DE" }]);
+    expect(useStore.getState().readerCommits).toBe(before + 1);
+  });
+  it("does not count what a view entry commits", () => {
+    const before = useStore.getState().readerCommits;
+    applyClickActions([{ kind: "country", cc: "FI" }], { arrival: true });
+    expect(useStore.getState().readerCommits).toBe(before);
   });
 });

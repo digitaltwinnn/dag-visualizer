@@ -25,8 +25,22 @@ import {
   ChartSpline,
   CalendarRange,
   Crosshair,
+  Sparkles,
+  ChevronsUp,
+  ChevronUp,
+  ChevronsDown,
+  ChevronDown,
+  Play,
+  Square,
+  Pause,
+  Hourglass,
+  Network,
+  Clock,
   type LucideIcon,
+  Minus,
+  Plus,
 } from "lucide-react";
+import type { NotableKind, NoteChangeKind } from "@/src/data/noteTypes";
 import type { NetworkId } from "@/src/engine/config";
 import type { Mode } from "@/src/store/store";
 import type { PickDescriptor } from "@/src/data/types";
@@ -94,6 +108,11 @@ export const INSTANT_ICON: LucideIcon = Crosshair;
 // THE BRUSHED RANGE's mark (History's Range card, 2026-10-07): a span of dates — the Moment's
 // parent, so a calendar span beside the crosshair's single point.
 export const RANGE_ICON: LucideIcon = CalendarRange;
+
+// THE AI NOTES card's mark (2026-10-27): the sparkles, the common sign for written-by-a-model, so
+// the card says what kind of text it holds before a word of it is read — and never mistakes itself
+// for a measured reading. Card head and dock tray (railCards.ts) wear the same glyph.
+export const AI_NOTES_ICON: LucideIcon = Sparkles;
 
 // The NODE's mark — card head, ghost, callout, dock tray, and the explorers' Nodes measure tile:
 // the honeycomb's HEXAGON, the cell the Geography view stacks a node as. It was the Globe (the
@@ -232,3 +251,34 @@ export const MEASURE_ICONS: Readonly<Record<MeasureId, LucideIcon>> = {
 
 /** A measure option's glyph by its id — undefined for an id no vocabulary declares. */
 export const measureIcon = (id: string): LucideIcon | undefined => (MEASURE_ICONS as Readonly<Record<string, LucideIcon | undefined>>)[id];
+
+/** A NOTABLE DAY'S KIND, as a mark (the AI notes card's day rows, design B 2026-10-30: "date and
+ *  kind lead"). The thresholded events are the doubled chevrons (a spike, a dip), the range's own
+ *  extremes the single ones (its busiest, quietest day); a first day is the play mark, a last day
+ *  the stop square, a pause the pause bars; the longest wait an hourglass, the day the most
+ *  networks anchored the network mark. Monochrome via currentColor, tinted the day's network hue. */
+export const NOTE_KIND_ICONS: Record<NotableKind | NoteChangeKind, LucideIcon> = {
+  high: ChevronsUp,
+  peak: ChevronUp,
+  low: ChevronsDown,
+  trough: ChevronDown,
+  first: Play,
+  last: Square,
+  pause: Pause,
+  longest: Hourglass,
+  broadest: Network,
+  // The notable changes' rows speak the same language: what arrives or starts is the play, what
+  // leaves or stops the square, a pace the double chevrons.
+  gained: Plus,
+  lost: Minus,
+  new: Play,
+  gone: Square,
+  active: Play,
+  quiet: Pause,
+  faster: ChevronsUp,
+  slower: ChevronsDown,
+};
+
+/** THE BUCKET'S WIDTH (the Moment card's chip, user 2026-10-30: "'5-min' with an icon, shorter"):
+ *  a clock face, the width of one reading in time. The crosshair beside it is the instant. */
+export const BUCKET_ICON: LucideIcon = Clock;

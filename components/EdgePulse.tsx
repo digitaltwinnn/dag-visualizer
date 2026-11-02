@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 
 // One-shot "new subject" edge pulse (~1.2s) when the card's SUBJECT changes (a new metagraph
@@ -51,9 +51,14 @@ export function PulseEdge({
   pulseKey,
   rail = "left",
   off,
+  hue,
 }: {
   pulseKey: number;
   rail?: "left" | "right";
+  /** The travelling hue, as a CSS token expression; default the rail's own (`--spine` on the left,
+   *  the filter accent on the right). The AI card passes its mark (user, 2026-10-30: "use correct
+   *  colors also for it"): its subject is a model's note, not the filter. */
+  hue?: string;
   /** The host is a COLLAPSED entry: no pulse. Expanding one rail card collapses another, and the
    *  swap remounts both — so the card that had just stepped BACK replayed the pulse alongside the
    *  one that came forward (user, 2026-10-03: "it should only trigger the card that is the new
@@ -63,7 +68,7 @@ export function PulseEdge({
 }) {
   if (off) return null;
   if (pulseKey === 0) return null; // nothing until the first real subject change (skips mount)
-  return <PulseSpan key={pulseKey} rail={rail} />;
+  return <PulseSpan key={pulseKey} rail={rail} hue={hue} />;
 }
 
 /** One pulse, keyed by its parent so it remounts per pulse.
@@ -76,13 +81,15 @@ export function PulseEdge({
  *  wait included) until either layer's animation ends, and globals.css holds the host's hover
  *  edge at 0 under it. `animationend` bubbles from the `<i>` sweep and fires on the span for its
  *  `::before` line — under reduced motion only the line animates, and that one end is enough. */
-function PulseSpan({ rail }: { rail: "left" | "right" }) {
+function PulseSpan({ rail, hue }: { rail: "left" | "right"; hue?: string }) {
   const [live, setLive] = useState(true);
   return (
     <span
       data-live={live ? "" : undefined}
       onAnimationEnd={() => setLive(false)}
       className={cn("edge-pulse", rail === "right" && "edge-pulse--rail-right")}
+      // An inline custom property beats the rail class's own `--pulse-hue`.
+      style={hue ? ({ "--pulse-hue": hue } as CSSProperties) : undefined}
       aria-hidden="true"
     >
       <i />

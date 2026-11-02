@@ -9,7 +9,7 @@
 //
 // So the ledger has a commit of its own — `TickNetSel`, the network INSIDE a tick — and this is
 // the one resolver every ledger surface reads: the rail's Metagraph rung, the chamber's coloured
-// dim, the commit tilt, the pager. Everything outside the ledger keeps reading the filter.
+// dim, the pager. Everything outside the ledger keeps reading the filter.
 import type { TickNetSel } from "@/src/data/types";
 
 /** The network the ledger resolves against: the tick-local commit while ITS tick is the one on

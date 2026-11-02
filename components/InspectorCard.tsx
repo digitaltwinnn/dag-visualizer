@@ -6,7 +6,7 @@ import { useStore } from "@/src/store/store";
 import CardHead from "@/components/CardHead";
 import {
   GeoLiveAside, GeoLiveCard, GeoLiveTitle,
-  MetaCard, MetaTickerAside, MetaTitle, SnapshotAside, SnapshotCard, SnapshotTitle,
+  MetaCard, MetaKindAside, MetaTitle, SnapshotAside, SnapshotCard, SnapshotTitle,
 } from "@/components/inspector/cards";
 
 // Only three kinds ever reach the inspector frame now: a metagraph/core dossier (ContextCard),
@@ -35,7 +35,7 @@ function headFor(p: PickDescriptor): {
     // title-row aside (user, 2026-08-08 — it took the slot the site link held; the link moved
     // into the body as MetaCard's labelled Site row). Still rolls via titleKey on the name,
     // synced with the edge pulse.
-    case "meta": return { title: <MetaTitle cfg={p.cfg} />, titleKey: p.cfg.name, aside: <MetaTickerAside cfg={p.cfg} /> };
+    case "meta": return { title: <MetaTitle cfg={p.cfg} />, titleKey: p.cfg.name, aside: <MetaKindAside cfg={p.cfg} /> };
     case "snapshot": return { title: <SnapshotTitle data={p.data} />, aside: <SnapshotAside data={p.data} /> };
     case "geoLive": return { title: <GeoLiveTitle />, aside: <GeoLiveAside /> };
     default: return {};

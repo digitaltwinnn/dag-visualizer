@@ -7,7 +7,7 @@
 // store channel (`store.metaSnap`) and a fixed rail slot, and appears in no ladder.
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import LiveDot from "@/components/LiveDot";
-import { PinMark } from "@/components/state/StateAtoms";
+import { PinnedMark } from "@/components/state/StateAtoms";
 import CardHead, { RailPane } from "@/components/CardHead";
 import { DEEP_GIVE_UP_MS } from "@/components/RawSnapshotBridge";
 import { subjectPairing } from "@/components/useSubjectPairing";
@@ -211,14 +211,21 @@ export default function MetaSnapPane({
           // both states, the selection wash when pinned, here in this snapshot's own hue.
           aside={
             <span
+              data-pill=""
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-sm px-1.5 py-[3px] border border-transparent whitespace-nowrap text-label font-normal",
                 following ? "text-muted-foreground" : cn(selectedRow(true), "text-foreground"),
               )}
               style={following ? undefined : selectionHue(hue)}
             >
-              {following ? <LiveDot /> : <PinMark className="text-foreground" />}
-              {following ? "live" : "pinned"}
+              {following ? (
+                <>
+                  <LiveDot />
+                  live
+                </>
+              ) : (
+                <PinnedMark className="text-foreground" />
+              )}
             </span>
           }
           titleKey={`${sel.metaId}:${sel.ordinal}`}

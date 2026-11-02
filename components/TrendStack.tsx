@@ -62,9 +62,13 @@
 // no orbit (2026-09-26; `viewPolicy.rotate` is false): a drag across the FRONT chart's plot is the
 // range BRUSH (`onRange`), and the wheel still zooms through the canvas.
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import TrendChart, { type TrendBand, type TrendLine } from "@/components/docs/TrendChart";
+import TrendChart, { type TrendBand, type TrendLine, type TrendMark } from "@/components/docs/TrendChart";
+import { useAiNote } from "@/components/notes/useAiNote";
+import { commitNoteDay } from "@/components/notes/commitNoteDay";
+import { NOTE_KIND_WORD } from "@/components/notes/noteDays";
+import { rangeDays } from "@/src/util/localTime";
 import useTrendRoster from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import useStagedMeasure, { ROLL_CLASS, useHeldOrder } from "@/components/useStagedMeasure";
@@ -84,6 +88,8 @@ import { useStore } from "@/src/store/store";
 import TrendTether from "@/components/TrendTether";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { UNLISTED_ID } from "@/src/data/unlisted";
+
+const NOTE_DAY_MS = 86_400_000;
 
 /** The empty roster, as ONE frozen reference. Publishing a fresh `[]` would be a content-free
  *  change the engine's `!==` still has to answer. */
@@ -113,8 +119,20 @@ export default function TrendStack() {
   // the reader's eyes, exactly as it cuts the document's per-network columns.
   const filter = useStore((s) => s.filter);
   const metric = useStore((s) => s.trendMetric);
-  const scroll = useStore((s) => s.trendScroll);
-  const focus = useStore((s) => s.trendFocus);
+  // The Briefing's stage is look, don't touch: its chart heads stay out of the tab order behind it.
+  const briefing = useStore((s) => s.briefing != null);
+  const liveScroll = useStore((s) => s.trendScroll);
+  const liveFocus = useStore((s) => s.trendFocus);
+  // THE DEAL HOLDS WHILE IT LEAVES (user, 2026-10-31: the chart "was showing DAG but while the view
+  // is leaving it switches to DOR"). `setMode` resets the focus, the scroll and the rotation the
+  // moment a view is left, which is right for the next arrival; the cards still falling keep the
+  // deal they were showing, or the plane in front leaves the deck mid-fall.
+  const liveRotation = useStore((s) => s.trendRotation);
+  const dealt = useRef({ focus: liveFocus, scroll: liveScroll, rotation: liveRotation });
+  if (on) dealt.current = { focus: liveFocus, scroll: liveScroll, rotation: liveRotation };
+  const focus = dealt.current.focus;
+  const scroll = dealt.current.scroll;
+  const rotation = dealt.current.rotation;
   const scaleMode = useStore((s) => s.trendScale);
   // THE SHARED TIME CURSOR — one instant, marked on every plane whose span contains it, so the
   // stack is read at ONE moment rather than five. A COMMIT, not a hover (store `trendCursorMs`,
@@ -192,7 +210,6 @@ export default function TrendStack() {
   // THE DECK TURNED by the swipes so far (`rotateOrder`, store `trendRotation`): the rotation sits
   // UNDER the held order and the focus re-deal — a focus still brings its card forward, a swipe
   // releases the focus first so the two never fight over slot one.
-  const rotation = useStore((s) => s.trendRotation);
   const rotated = useMemo(() => rotateOrder(deck, rotation), [deck, rotation]);
   const order = useHeldOrder(rotated, staged.settled);
   // What a card says it shows — named from its OWN network (`metricLabel`: the DAG's chart is
@@ -307,6 +324,31 @@ export default function TrendStack() {
   // the retired document used for the same partition. Held still on the roster's deps like the
   // lines; a network without bands (the DAG, the unlisted set, a window before the type sampler)
   // keeps its plain line.
+  // THE NOTABLE DAYS, PER PLANE (user, 2026-10-30): the note on screen names them with their
+  // network; each goes on its network's plane, the whole network's on the DAG plane (present while
+  // the DAG is the focus). One note, one fetch (`useAiNote`); memoised on the days' reference, which
+  // the loader holds still, so a cursor write never re-hands a fresh array.
+  const { note: aiNote } = useAiNote();
+  const noteDays = aiNote.res?.state === "ok" ? aiNote.res.days : null;
+  // …PAIRED with the AI card's row and the band's mark through `hoverNoteDay` (rule 9; user,
+  // 2026-10-30: the planes "don't carry the same hover effect … like the vitals chart does").
+  const hoverNoteDay = useStore((s) => s.hoverNoteDay);
+  const marksById = useMemo(() => {
+    const m = new Map<string, TrendMark[]>();
+    for (const d of noteDays ?? []) {
+      const id = d.networkId ?? "dag";
+      const list = m.get(id) ?? [];
+      list.push({ dayMs: d.dayMs, kind: d.kind, networkId: d.networkId, lit: hoverNoteDay === d.dayMs, caption: d.caption, label: `Notable day, ${rangeDays(d.dayMs, d.dayMs + NOTE_DAY_MS)}: ${NOTE_KIND_WORD[d.kind]}` });
+      m.set(id, list);
+    }
+    return m;
+  }, [noteDays, hoverNoteDay]);
+  const onMarkHover = useCallback((dayMs: number, on: boolean) => {
+    const st = useStore.getState();
+    if (on) st.setHoverNoteDay(dayMs, true);
+    else if (st.hoverNoteDay === dayMs) st.setHoverNoteDay(null);
+  }, []);
+  const onMarkPick = useCallback((mark: TrendMark) => commitNoteDay(mark), []);
   const stackById = useMemo(() => {
     const m = new Map<string, TrendBand[]>();
     for (const [id, row] of rows) if (row.stack?.length) m.set(id, row.stack);
@@ -515,6 +557,7 @@ export default function TrendStack() {
               ["--roll-in-y" as string]: staged.dir === "next" ? "14px" : "-14px",
             }
       }
+      inert={briefing || undefined}
       className="group/stack absolute inset-0 pointer-events-none z-[4] opacity-0 [transition:opacity_var(--tempo-nav)_ease] data-[on='1']:opacity-100 motion-reduce:!transition-none"
     >
       {/* THE TETHER from the band's span to the front chart's time axis — inside this layer so it
@@ -753,6 +796,9 @@ export default function TrendStack() {
                 gaps={row.series.gaps}
                 lines={linesById.get(pose.id)!}
                 stack={stackById.get(pose.id)}
+                marks={marksById.get(pose.id)}
+                onMarkHover={onMarkHover}
+                onMarkPick={onMarkPick}
                 // THE STACK IS THE FILL (user, 2026-10-09: "are they truly stacked? I feel the
                 // overlap"): under the Nodes measure the bands partition the area the fill would
                 // paint, and the fill's gradient over them washed the steps out. One or the other.

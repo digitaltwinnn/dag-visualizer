@@ -1,13 +1,17 @@
 "use client";
-import { memo, useId, useLayoutEffect, useRef, useState } from "react";
+import { memo, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { Area, CartesianGrid, ComposedChart, Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { focusPreviews } from "@/components/useSubjectPairing";
 import { cn } from "@/lib/utils";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { RoleChips } from "@/components/inspector/parts";
-import { bucketAt, cursorFraction } from "@/src/data/trendWindow";
-import { bucketStamp } from "@/src/util/localTime";
+import { bucketAt, cursorFraction, plotCeiling, valueFraction } from "@/src/data/trendWindow";
+import { bucketStamp, rangeDays } from "@/src/util/localTime";
 import { compactNumber } from "@/src/util/format";
+import type { NotableKind } from "@/src/data/noteTypes";
+import NoteDayPopover from "@/components/notes/NoteDayPopover";
+import NoteKindCoin from "@/components/notes/NoteKindCoin";
 
 // THE TRENDS DOC'S ONE CHART PRIMITIVE — a small-multiple line chart over the /api/trends
 // buckets, on RECHARTS (user, 2026-09-07: "why hand-roll charts if we have a neat library?" —
@@ -110,6 +114,113 @@ const DAY_FMT = new Intl.DateTimeFormat(undefined, { month: "short", day: "numer
 /** How far a finger may wander and still be a tap rather than the brush. */
 const TAP_SLOP = 8;
 
+/** A NOTABLE DAY ON A PLANE (user, 2026-10-30: "place the notable day markers on the applicable
+ *  chart as well"): the day the AI note names, drawn where the cursor hairline is drawn — beside
+ *  the memoised plot, never in it — as the one coin every surface draws on its baseline
+ *  (`NoteKindCoin`, design C 2026-10-30), the timeline's own mark. `kind` rides along for the caller's pairing. The coin is a
+ *  button that commits its day, as the card's row and the band's mark do. */
+export interface TrendMark {
+  /** The UTC day's start. */
+  dayMs: number;
+  kind: NotableKind;
+  /** Whose day it is: the network, or null for the whole network's. */
+  networkId: string | null;
+  /** Another surface previews this day (the AI card's row, the band's mark): the coin lifts. */
+  lit?: boolean;
+  /** The button's name: the day and its kind, as the band's mark says it. */
+  label: string;
+  /** What the day was, in the note's words: the coin says it beside itself on hover. */
+  caption: string;
+}
+
+const DAY_MS_CHART = 86_400_000;
+
+/** A BUTTON, LIKE THE BAND'S MARK (user, 2026-10-30): it stops the plot's own press and release (the
+ *  plate picks the instant on release), lifts while its day is previewed anywhere, and commits the
+ *  day on click. The hit area is a touch larger than the coin. CLEARS ONLY WHAT IT SET, the row's
+ *  and the diamond's rule: a click holds the plot, the coin unmounts under the pointer and no
+ *  pointerleave fires, so the unmount has to release the hover too (review 2026-10-30). */
+function MarkCoin({
+  m,
+  top,
+  left,
+  lineLeft,
+  reach,
+  x,
+  onHover,
+  onPick,
+}: {
+  m: TrendMark;
+  top: number;
+  left: string;
+  /** The day's x on the plot: the coin's centre. */
+  lineLeft: string;
+  /** THE HAIRLINE'S SPAN (user, 2026-11-01): from the chart's line down to the coin, which stays on
+   *  the baseline because a day's kind need not be the measure on screen. Null with no value to
+   *  reach, or one the coin already stands on. */
+  reach: { top: number; height: number } | null;
+  /** Where the coin sits across the plate, 0 to 1: near an edge the label anchors into the plate,
+   *  whose `overflow-hidden` would cut it. */
+  x: number;
+  onHover?: (dayMs: number, on: boolean) => void;
+  onPick?: (mark: TrendMark) => void;
+}) {
+  const mine = useRef(false);
+  const [own, setOwn] = useState(false);
+  const hover = (on: boolean) => {
+    mine.current = on;
+    setOwn(on);
+    onHover?.(m.dayMs, on);
+  };
+  useEffect(
+    () => () => {
+      if (mine.current) onHover?.(m.dayMs, false);
+    },
+    [m.dayMs, onHover],
+  );
+  return (
+    <>
+    {(own || m.lit) && reach && (
+      <div
+        aria-hidden
+        className="absolute w-px pointer-events-none [background:var(--ai-edge)]"
+        style={{ ...reach, left: lineLeft }}
+      />
+    )}
+    <button
+      type="button"
+      aria-label={m.label}
+      onPointerDown={(e) => e.stopPropagation()}
+      onPointerUp={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation();
+        onPick?.(m);
+      }}
+      onPointerEnter={(e) => e.pointerType === "mouse" && hover(true)}
+      onPointerLeave={() => hover(false)}
+      onFocus={() => focusPreviews() && hover(true)}
+      onBlur={() => hover(false)}
+      className={cn(
+        "absolute grid size-4 cursor-pointer border-0 bg-transparent p-0 outline-none transition-transform duration-150 motion-reduce:transition-none",
+        "before:absolute before:-inset-2 before:content-[''] focus-visible:ring-1 focus-visible:ring-foreground",
+        m.lit && "scale-125",
+      )}
+      style={{ top, left }}
+    >
+      <NoteKindCoin kind={m.kind} />
+    </button>
+    {own && (
+      <NoteDayPopover
+        date={rangeDays(m.dayMs, m.dayMs + DAY_MS_CHART)}
+        caption={m.caption}
+        className="z-10 mb-1"
+        style={{ bottom: `calc(100% - ${top}px)`, ...(x > 0.5 ? { right: `calc(100% - ${lineLeft} + 8px)` } : { left: `calc(${lineLeft} + 8px)` }) }}
+      />
+    )}
+    </>
+  );
+}
+
 export default function TrendChart({
   name,
   unit,
@@ -126,6 +237,9 @@ export default function TrendChart({
   nameOnly,
   scaleMax,
   cursorMs,
+  marks,
+  onMarkHover,
+  onMarkPick,
   onPick,
   fill,
   plotHeight = PLOT_H,
@@ -213,6 +327,14 @@ export default function TrendChart({
    *  by this component as a CSS overlay beside the memoised plot rather than inside it — see the
    *  overlay's own comment, and `TrendPlot`'s, for the measurement that forced the split. */
   cursorMs?: number | null;
+  /** The notable days to mark on this plane (`TrendMark`), each at the bucket holding the day —
+   *  its own bucket on a daily axis, its midday's on a finer one; a day outside this chart's span
+   *  draws nothing. Like `cursorMs`, it never reaches the plot. */
+  marks?: readonly TrendMark[];
+  /** THE PLANE'S COIN PAIRS LIKE THE BAND'S (user, 2026-10-30): hovering a coin previews its day
+   *  (the caller writes `hoverNoteDay`, rule 9), a click commits it as the range. */
+  onMarkHover?: (dayMs: number, on: boolean) => void;
+  onMarkPick?: (mark: TrendMark) => void;
   /** THE AREA UNDER THE FIRST LINE, IN ITS OWN HUE (2026-09-19) — opt-in, and the 3D stack's
    *  planes are the only caller. A plane is a fully transparent body with one hairline, and a bare
    *  line floating in a scene reads as a wire rather than as a LAYER; the fill is what makes five
@@ -390,6 +512,18 @@ export default function TrendChart({
   // reasons there is nothing to draw at once — no cursor, or an instant this chart's span does
   // not contain (a chain measured over a shorter window than its neighbours).
   const cursorX = cursorFraction(buckets, cursorBucket);
+  // The notable days' x, by the same scale (see `TrendMark`); a day the axis does not hold is skipped.
+  // Memoised: this body runs on every cursor write, and placing a mark walks the series.
+  const markXs = useMemo(() => {
+    if (!marks?.length) return [];
+    const ceiling = plotCeiling(lines.map((l) => l.points), scaleMax);
+    return marks
+      .map((m) => {
+        const bucket = bucketAt(buckets, stepMs, stepMs >= DAY_MS_CHART ? m.dayMs : m.dayMs + DAY_MS_CHART / 2);
+        return { ...m, key: `${m.dayMs}:${m.kind}`, x: cursorFraction(buckets, bucket), rise: lines[0] ? valueFraction(lines[0].points, buckets, bucket, ceiling) : null };
+      })
+      .filter((m): m is TrendMark & { key: string; x: number; rise: number | null } => m.x != null);
+  }, [marks, lines, buckets, stepMs, scaleMax]);
 
   const hue0 = lines[0]?.hue ?? "var(--primary)";
   // The head's right-hand readout: the NEWEST MEASURED BUCKET, stamped with its own date —
@@ -669,6 +803,28 @@ export default function TrendChart({
               what lets it ride the 3D plane's projected scale.
               Structural accent, one hairline, no animation, no pointer events: it is a POSITION,
               and a position that eases in lags the gesture that set it. */}
+          {/* THE NOTABLE DAYS (user, 2026-10-30), the timeline's diamonds on the plane's own
+              baseline, by the cursor's rule: the same fraction math, outside the memoised plot. Each
+              coin is a button, as the AI card's row and the timeline's diamond are. */}
+          {!held &&
+            markXs.map((m) => {
+              const coinTop = PLOT_MARGIN.top + plotInnerH(plotHeight) - 8;
+              const lineTop = m.rise == null ? null : PLOT_MARGIN.top + plotInnerH(plotHeight) * (1 - m.rise);
+              const lineLeft = `calc(${PLOT_MARGIN.left}px + ${m.x} * (100% - ${PLOT_INSET_X}px))`;
+              return (
+                <MarkCoin
+                  key={m.key}
+                  m={m}
+                  x={m.x}
+                  onHover={onMarkHover}
+                  onPick={onMarkPick}
+                  top={coinTop}
+                  left={`calc(${lineLeft} - 8px)`}
+                  lineLeft={lineLeft}
+                  reach={lineTop != null && coinTop > lineTop ? { top: lineTop, height: coinTop - lineTop } : null}
+                />
+              );
+            })}
           {cursorX != null && !held && (
             <div
               aria-hidden
@@ -836,13 +992,11 @@ const TrendPlot = memo(function TrendPlot({
         },
       }
     : {};
-  // ⚠️ THE PEAK READOUT IS THE CHART'S OWN, WHATEVER THE SCALE. `ownMax` is what this chart's
-  // data reaches; `max` is the height it is drawn against, which a caller may impose to put a
-  // column of charts on one scale. Keeping them separate is what lets a chart shrink to a sliver
+  // ⚠️ THE PEAK READOUT IS THE CHART'S OWN, WHATEVER THE SCALE. `max` is the height it is drawn
+  // against, which a caller may impose to put a column of charts on one scale. Keeping them separate is what lets a chart shrink to a sliver
   // and still say, in its own corner, how high it actually got — otherwise a shared scale would
   // flatten the small networks AND take away the number that says by how much.
-  const ownMax = Math.max(1e-9, ...lines.flatMap((l) => l.points.filter((v): v is number => v != null)));
-  const max = (scaleMax != null && scaleMax > 0 ? scaleMax : ownMax) * 1.12;
+  const max = plotCeiling(lines.map((l) => l.points), scaleMax);
 
   // THE TOTAL WHERE THE STACK HAS NOTHING (2026-10-09). Under a stack the first line is not drawn —
   // the top band's edge is the total — but the bands exist only where the composition was

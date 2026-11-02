@@ -1,7 +1,7 @@
 // One sampler run: cursor → grow-until-cursor fetches → bucket → merge-write one key per
 // tier → advance cursor. Dependency-injected so the whole contract is unit-tested; the
 // route provides the real deps. Command budget per run: 1 lock + 1 hgetall (cursor) +
-// 1 hmget per touched tier key (reads, pre-transaction) + 1 applyWrites MULTI/EXEC
+// 1 hmget per touched tier or geo key (reads, pre-transaction) + 1 applyWrites MULTI/EXEC
 // (every touched key's HSET + EXPIRE, plus the cursor HSET) + 1 del ≈ 8.
 //
 // The write phase is ALL-OR-NOTHING (data + cursor together): the hmgets read prior values
@@ -10,7 +10,7 @@
 // dies mid-write-phase leaves the store exactly as it was — no key half-updated, no cursor
 // advanced past data that didn't land — so the NEXT run's hmget reads are still consistent
 // with what actually got merged, and nothing double-counts.
-import { TTL_S, cursorKeyOf, lockKeyOf, ispNamesKeyOf, slotOf, fieldOf, type Tier } from "./keys";
+import { TTL_S, chainReadField, cursorKeyOf, lockKeyOf, ispNamesKeyOf, slotOf, fieldOf, type Tier } from "./keys";
 import { mergeVals } from "./merge";
 import {
   bucketGlobals, bucketMetas, bucketFleet, bucketFleetGeo, markUnlistedCoverage,
@@ -88,6 +88,7 @@ export async function runSample(deps: SampleDeps): Promise<SampleResult> {
       const s = settled[i];
       if (s.status === "rejected") { metaErrors.push(ids[i]); continue; }
       const { id, r } = s.value;
+      if (!unlistedSet.has(id)) cursorNext[chainReadField(id)] = deps.now();
       if (r.recs.length) {
         // The per-chain gap chain rides its own timestamp cursor; an accepted gap breaks the
         // chain (null) exactly as the global spine's does.

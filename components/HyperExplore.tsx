@@ -10,6 +10,7 @@ import { IdentityDot, RoleChips } from "@/components/inspector/parts";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { compositionClause, compositionGroups } from "@/src/data/composition";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
+import { viewNetwork } from "@/src/engine/domain/viewNetwork";
 import { HYPER_MEASURE_OPTIONS, groupMeasure, type HyperMeasure } from "@/src/data/hyperMeasure";
 import { metagraphById } from "@/src/data/network";
 import type { NodeRow } from "@/src/data/types";
@@ -40,7 +41,10 @@ export default function HyperExplore() {
   useFeedRead(["clusters", "api-metagraphs", "api-geo"], "HyperExplore");
   const dead = useNoSignal();
   const metaList = useStore((s) => s.metaList);
-  const filter = useStore((s) => s.filter);
+  // WHAT IT READS is the network the view stands on; only a row's own commit reads the real filter.
+  const appFilter = useStore((s) => s.filter);
+  const railNet = useStore((s) => s.railNet);
+  const filter = viewNetwork({ filter: appFilter, railNet });
   const selNodes = useStore((s) => s.selNodes);
   const allNodes = useStore((s) => s.allNodes);
   const hyperMeasure = useStore((s) => s.hyperMeasure);
@@ -56,7 +60,9 @@ export default function HyperExplore() {
   const setHoverGroup = useStore((s) => s.setHoverGroup);
 
   // The three writes, all through the decision table and the one executor (rule 2).
-  const toggleNetwork = (id: string) => applyClickActions(filterToggleActions(id, filter));
+  const toggleNetwork = (id: string) => applyClickActions(filterToggleActions(id, appFilter, railNet));
+  // Home releases what the view stands on: a browsed network first, the filter after it.
+  const releaseNetwork = () => applyClickActions(railNet ? [{ kind: "railNet", id: null }] : filterToggleActions(appFilter, appFilter));
   const toggleComposition = (compKey: string) =>
     applyClickActions(compositionToggleActions({ netId: filter, key: compKey }, { composition, hasInspect: !!inspect, filter }));
   const selectNode = (pick: NodeRow["pick"], selected: boolean, compKey: string) =>
@@ -65,6 +71,7 @@ export default function HyperExplore() {
         mode: "hyper",
         currentFilter: filter,
         deselect: selected,
+        ...(railNet ? { commitNetwork: false } : {}),
         // FULL-ANCESTRY: a node select commits its parent group too, so a deselect steps back
         // onto the composition rung.
         compositionSel: { netId: filter, key: compKey },
@@ -88,7 +95,7 @@ export default function HyperExplore() {
   const levels: ExplorerLevelSpec[] = [
     {
       key: "networks",
-      crumb: { label: "Networks", onRelease: () => toggleNetwork(filter) },
+      crumb: { label: "Networks", onRelease: releaseNetwork },
       measure: { options: HYPER_MEASURE_OPTIONS, value: hyperMeasure, onPick: (id) => setHyperMeasure(id as HyperMeasure) },
       hasFigure: true,
       // The live foot on every level (components/explorer/LiveFoot.tsx has the argument).

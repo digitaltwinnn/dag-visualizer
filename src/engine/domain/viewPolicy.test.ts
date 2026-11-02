@@ -147,6 +147,28 @@ describe("the trends view is registered and inert", () => {
     expect(VIEW_POLICIES.ledger.rawSurface).toBe("records");
   });
 
+  // The AI note opts in per view (convention 7): the four 3D views carry one, the placeholder none.
+  it("opts the four 3D views into AI notes and the placeholder out", () => {
+    for (const m of ["hyper", "geo", "ledger", "trend"] as const) expect(VIEW_POLICIES[m].aiNotes).toBe(true);
+    expect(VIEW_POLICIES.soon.aiNotes).toBe(false);
+  });
+
+  it("scopes selections to a global snapshot in Snapshots alone", () => {
+    expect(VIEW_POLICIES.ledger.tickScoped).toBe(true);
+    for (const m of ["hyper", "geo", "trend", "soon"] as const) expect(VIEW_POLICIES[m].tickScoped).toBe(false);
+  });
+
+  it("lets the rail browse in Hypergraph and Geography alone", () => {
+    for (const m of ["hyper", "geo"] as const) expect(VIEW_POLICIES[m].railBrowses).toBe(true);
+    for (const m of ["ledger", "trend", "soon"] as const) expect(VIEW_POLICIES[m].railBrowses).toBe(false);
+  });
+
+  it("says what each view's note reads its subject from", () => {
+    expect(VIEW_POLICIES.ledger.noteScope).toBe("chamber");
+    expect(VIEW_POLICIES.trend.noteScope).toBe("history");
+    for (const m of ["hyper", "geo", "soon"] as const) expect(VIEW_POLICIES[m].noteScope).toBe("network");
+  });
+
   // `chartStack` is the flag `components/TrendStack.tsx` gates its mount on (convention 7 — gate
   // on the view a behaviour is FOR, never `mode === "x"`).
   it("mounts the chart-plane stack only in trend", () => {
@@ -178,6 +200,10 @@ describe("the trends view is registered and inert", () => {
     expect(VIEW_POLICIES.ledger.metagraphCard).toBe("tickNet");
     expect(VIEW_POLICIES.trend.metagraphCard).toBe("plane");
     expect(VIEW_POLICIES.hyper.metagraphCard).toBe("filter");
+    // A folded card's title starts on one x: the column fits the view's longest slot noun, and
+    // Snapshots' two long ones do not set theirs (user, 2026-10-31).
+    expect(VIEW_POLICIES.hyper.entryColumn).toBe("8.3em");
+    for (const mode of ["geo", "ledger", "trend"] as const) expect(VIEW_POLICIES[mode].entryColumn).toBe("7.1em");
     expect(VIEW_POLICIES.soon.metagraphCard).toBe("filter");
   });
   it("the subject orbit is geo's alone, and never alongside the stock camera orbit", () => {
