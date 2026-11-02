@@ -1,3 +1,4 @@
+import type { MetaSnapSel } from "@/src/data/types";
 // THE SHAPES OF AN AI NOTE — types only, no value exports, so nothing here needs a sibling test
 // (`dataExportCoverage.test.ts` reads a module with no value export as covered). Every later
 // piece of the notes pipeline imports from here: the fact builders produce `Fact[]`, the honesty
@@ -52,6 +53,8 @@ export interface NoteDay {
   dayMs: number;
   kind: NotableKind;
   networkId: string | null;
+  /** The measure the day was notable on, when it is not the snapshots anchored. */
+  measure?: NotableDay["measure"];
   caption: string;
 }
 
@@ -64,7 +67,24 @@ export type NoteChangeSubject =
   | { kind: "type"; netId: string; type: string } // a `roleKey`
   | { kind: "country"; cc: string }
   | { kind: "provider"; keys: string[]; cc: string | null; city: string | null }
+  | { kind: "metaSnap"; sel: MetaSnapSel; global: NoteGlobal } // one snapshot and the global it anchored into
+  | { kind: "global"; global: NoteGlobal }
   | { kind: "self" }; // the card the row sits on: stated, with nowhere to go
+
+/** A global snapshot as a row carries it: what the card needs of a tick the live buffer has left. */
+export interface NoteGlobal {
+  ordinal: number;
+  timestamp: string;
+  hash: string;
+  lastSnapshotHash?: string;
+}
+
+/** The search a row asks of the explorer when its note is written (`app/api/notes/snapshotAt.ts`),
+ *  never stored: a chain's snapshot in a bucket by its fee or the gap it ended, or its last one. A
+ *  null chain is the global chain. */
+export type NoteChangeFind =
+  | { chain: string | null; fromMs: number; toMs: number; fee?: number; gapS?: number }
+  | { chain: string | null; last: true };
 
 /** One row of a view note's notable changes. `text` is written here by code, never by the model: a
  *  row states one measured move in one plain sentence, so it has nothing to get wrong. */
@@ -74,6 +94,7 @@ export interface NoteChange {
   text: string;
   /** How much it moved: nodes for a count, a rhythm's ratio off 1, which rows outrank which. */
   size: number;
+  find?: NoteChangeFind;
 }
 
 export type NoteResponse =

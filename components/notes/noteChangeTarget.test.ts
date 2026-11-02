@@ -1,3 +1,4 @@
+import { metaSnapHoverKey } from "@/src/data/types";
 import { describe, expect, it } from "vitest";
 
 import type { NoteChange, NoteChangeSubject } from "@/src/data/noteTypes";
@@ -42,6 +43,22 @@ describe("changeActions: a row commits what the view's explorer row commits", ()
   });
   it("the chamber's own row has no network to open in Snapshots", () => {
     expect(changeActions(change({ kind: "network", id: "dag" }), "ledger", STATE, [], TICK)).toBeNull();
+  });
+  const GLOBAL = { ordinal: 7218758, timestamp: "2026-11-02T09:00:00.000Z", hash: "g" };
+  const SEL = { metaId: "dor", ordinal: 55, hash: "h", globalOrdinal: 7218758, ts: GLOBAL.timestamp };
+  it("a snapshot row opens that snapshot, under its tick and its network, and writes no filter", () => {
+    const acts = changeActions(change({ kind: "metaSnap", sel: SEL, global: GLOBAL }), "ledger", STATE, [], null)!;
+    expect(acts.some((a) => a.kind === "filter")).toBe(false);
+    expect(acts.find((a) => a.kind === "snapshot")).toMatchObject({ pick: { kind: "snapshot", data: { ordinal: 7218758 } }, follow: false });
+    expect(acts.at(-1)?.kind === "metaSnap" || acts.some((a) => a.kind === "metaSnap")).toBe(true);
+  });
+  it("a global snapshot row opens that tick", () => {
+    const acts = changeActions(change({ kind: "global", global: GLOBAL }), "ledger", STATE, [], null)!;
+    expect(acts).toContainEqual(expect.objectContaining({ kind: "snapshot", follow: false }));
+  });
+  it("those rows hover the channel their explorer rows do (rule 9)", () => {
+    expect(changeHover(change({ kind: "metaSnap", sel: SEL, global: GLOBAL }), [])).toEqual({ channel: "metaSnap", key: metaSnapHoverKey("dor", 55) });
+    expect(changeHover(change({ kind: "global", global: GLOBAL }), [])).toEqual({ channel: "snap", key: "7218758" });
   });
   it("a card's own row has nowhere to go", () => {
     expect(changeActions(change({ kind: "self" }), "geo", STATE, [], null)).toBeNull();

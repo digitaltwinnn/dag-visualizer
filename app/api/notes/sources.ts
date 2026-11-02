@@ -13,6 +13,7 @@ import type { Fact, NotableDay, NoteChange, NoteView, NoteLead } from "@/src/dat
 import { leadingTrim, pickRangeTier, type TrendsWindowData } from "@/src/data/trendWindow";
 import { CATALOG, type NetworkId } from "@/src/engine/config";
 import { assembleSpan, WINDOWS } from "../trends/assemble";
+import { explorerReader, locateRows, type ChainReader } from "./snapshotAt";
 import { chainReadsOf, cursorKeyOf, geoSitesSlotOf, geoSlotOf, ispNamesKeyOf, slotsInWindow, type Tier } from "../trends/keys";
 import { readStore, type TrendsStore } from "../trends/store";
 import { CC_TAIL_RE, ISP_TAIL_RE, TYPE_TAIL_RE, isSubjectNote, subjectKindOf, type NoteSpan, type SubjectKind } from "./keys";
@@ -50,12 +51,17 @@ export interface GeoDaysRead {
   siteDays?: Record<string, Record<string, number>>;
 }
 
+/** No explorer to ask: every row keeps its network. */
+const NO_CHAIN: ChainReader = { latest: async () => null, at: async () => null };
+
 /** What `factsFor` reads through. The default is the trends store's read client. */
 export interface NoteReads {
   span(net: string, tier: Tier, fromMs: number, toMs: number): Promise<TrendsWindowData>;
   geoDays(net: string, fromMs: number, toMs: number): Promise<GeoDaysRead>;
   /** When the sampler last read each chain. */
   chainReads(net: string): Promise<ChainReads>;
+  /** The explorer's records, for a row that names one snapshot. Absent, a row keeps its network. */
+  chain?(net: string): ChainReader;
 }
 
 /** ONE TIER over [fromMs, toMs): the tile route's body, at any span. */
@@ -148,6 +154,7 @@ export function storeReads(nowMs: number, store: HashReader = readStore()): Note
     span: (net, tier, fromMs, toMs) => readSpan(net, tier, fromMs, toMs, once, nowMs),
     geoDays: (net, fromMs, toMs) => readGeoDays(net, fromMs, toMs, once),
     chainReads: async (net) => chainReadsOf(await once.hgetall(cursorKeyOf(net))),
+    chain: explorerReader,
   };
 }
 
@@ -450,6 +457,7 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
         reads.chainReads(net),
       ]);
       const built = ledgerFacts({ subject, recent, week, names, chainReads });
+      if (built?.changes) built.changes = await locateRows(built.changes, reads.chain?.(net) ?? NO_CHAIN);
       return {
         built,
         spanFrom: recentFrom,

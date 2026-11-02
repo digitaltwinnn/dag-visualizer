@@ -95,6 +95,8 @@ function ChangeRow({ change, view, onCard }: { change: NoteChange; view: NoteVie
   const lit = useStore((s) => {
     if (!hover) return false;
     if (hover.channel === "filter") return s.hoverFilter === hover.key;
+    if (hover.channel === "metaSnap") return s.hoverMetaSnap === hover.key;
+    if (hover.channel === "snap") return s.hoverSnapOrd === Number(hover.key);
     return (hover.channel === "country" ? s.hoverCountry : s.hoverGroup) === hover.key;
   });
   const actions = () => {
@@ -109,6 +111,10 @@ function ChangeRow({ change, view, onCard }: { change: NoteChange; view: NoteVie
       composition: s.composition,
       hasInspect: !!s.inspect,
       metaSnap: s.metaSnap,
+      following: s.following,
+      pinnedOrdinal: s.following ? null : (s.snap?.data.ordinal ?? null),
+      inspect: s.inspect,
+      tickNet: s.tickNet,
       ledgerNet: ledgerNetwork({ filter: s.filter, tickNet: s.tickNet, snapOrdinal: s.snap?.data.ordinal ?? null }),
     };
     const acts = changeActions(change, view, state, s.selNodes, net && id ? latestTickOf(net.metaSnaps, net.globalSnapshots, id) : null);
@@ -118,6 +124,8 @@ function ChangeRow({ change, view, onCard }: { change: NoteChange; view: NoteVie
     if (!hover) return;
     const s = useStore.getState();
     if (hover.channel === "filter") return s.setHoverFilter(on ? hover.key : null);
+    if (hover.channel === "metaSnap") return s.setHoverMetaSnap(on ? hover.key : null);
+    if (hover.channel === "snap") return s.setHoverSnapOrd(on ? Number(hover.key) : null);
     if (hover.channel === "group") {
       s.setHoverGroup(on ? hover.key : null);
       s.setHoverCohort(on ? (hover.nodes ?? null) : null);

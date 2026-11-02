@@ -9,7 +9,7 @@ import { RoleChips } from "@/components/inspector/parts";
 import { bucketAt, cursorFraction, plotCeiling, valueFraction } from "@/src/data/trendWindow";
 import { bucketStamp, rangeDays } from "@/src/util/localTime";
 import { compactNumber } from "@/src/util/format";
-import type { NotableKind } from "@/src/data/noteTypes";
+import type { NotableDay, NotableKind } from "@/src/data/noteTypes";
 import NoteDayPopover from "@/components/notes/NoteDayPopover";
 import NoteKindCoin from "@/components/notes/NoteKindCoin";
 
@@ -123,6 +123,8 @@ export interface TrendMark {
   /** The UTC day's start. */
   dayMs: number;
   kind: NotableKind;
+  /** The measure the day was notable on, when it is not the snapshots anchored. */
+  measure?: NotableDay["measure"];
   /** Whose day it is: the network, or null for the whole network's. */
   networkId: string | null;
   /** Another surface previews this day (the AI card's row, the band's mark): the coin lifts. */

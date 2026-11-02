@@ -263,6 +263,10 @@ describe("ledgerFacts' notable changes", () => {
     const sparse = weekSide({ "m.bio.snaps": row(168, (i) => (i % 72 === 0 ? 1 : 0)), "m.bio.ticks": row(168, () => 0) });
     expect(texts(ledgerFacts(input({ recent: quietDay, week: sparse })))).not.toContain("BioFi went quiet");
   });
+  it("a quiet network asks for its last snapshot", () => {
+    const r = ledgerFacts(input({ recent: quietDay, week: weekSide({}) }))!;
+    expect(r.changes?.find((c) => c.kind === "quiet")?.find).toEqual({ chain: "bio", last: true });
+  });
   it("no 'became active' for a network's one snapshot of the week", () => {
     const one = (n: number, at: number) => ({ "m.bio.snaps": row(n, (i) => (i === at ? 1 : 0)), "m.bio.ticks": row(n, () => 0) });
     const r = ledgerFacts(input({ recent: side(74, 5 * MIN, 20, one(74, 30)), week: weekSide(one(168, 160)) }));
@@ -293,7 +297,12 @@ describe("ledgerFacts' notable changes", () => {
     const usual = { "m.usdc.gapMax": row(168, () => 40) };
     it("a gap far past its usual widest one", () => {
       const r = ledgerFacts(input({ subject: "usdc", recent: side(74, 5 * MIN, 20, stalled), week: weekSide(usual) }))!;
-      expect(r.changes).toContainEqual({ kind: "pause", size: 8280, subject: { kind: "network", id: "usdc" }, text: "USDC.dag paused for 2.3 hours, the longest gap is usually 40 seconds" });
+      expect(r.changes).toContainEqual(expect.objectContaining({ kind: "pause", size: 8280, subject: { kind: "network", id: "usdc" }, text: "USDC.dag paused for 2.3 hours, the longest gap is usually 40 seconds" }));
+    });
+    it("names the bucket that gap ended in, for the snapshot to be found", () => {
+      const r = ledgerFacts(input({ subject: "usdc", recent: side(74, 5 * MIN, 20, stalled), week: weekSide(usual) }))!;
+      const at = T0 + 40 * 5 * MIN;
+      expect(r.changes?.find((c) => c.kind === "pause")?.find).toEqual({ chain: "usdc", fromMs: at, toMs: at + 5 * MIN, gapS: 8280 });
     });
     it("no row for a gap of its usual size", () => {
       const r = ledgerFacts(input({ subject: "usdc", recent: side(74, 5 * MIN, 20, { "m.usdc.gapMax": row(74, () => 41) }), week: weekSide(usual) }))!;
@@ -312,12 +321,13 @@ describe("ledgerFacts' notable changes", () => {
     const pauses = r.changes!.filter((c) => c.kind === "pause");
     expect(pauses).toHaveLength(1);
     expect(pauses[0]).toMatchObject({ subject: { kind: "network", id: "dag" }, text: "Global snapshots paused for 2.3 hours, the longest gap is usually 40 seconds" });
+    expect(pauses[0]!.find).toMatchObject({ chain: null, gapS: 8280 });
     expect(r.changes!.some((c) => c.kind === "longest")).toBe(false); // the pause is that gap
   });
   // THE CHAMBER'S EXTREMES (user, 2026-11-01): a day where nothing moved still has a largest snapshot.
   it("the usual rhythm still names the longest gap", () => {
     expect(ledgerFacts(input())!.changes).toEqual([
-      { kind: "longest", size: -1, text: "USDC.dag had the longest gap, 55 seconds", subject: { kind: "network", id: "usdc" } },
+      expect.objectContaining({ kind: "longest", size: -1, text: "USDC.dag had the longest gap, 55 seconds", subject: { kind: "network", id: "usdc" } }),
     ]);
   });
   it("names the largest snapshot once the sampler holds one, ahead of the gap", () => {

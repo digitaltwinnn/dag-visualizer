@@ -1,14 +1,16 @@
 import { compositionGroups, compositionKey, roleKeyLabel } from "@/src/data/composition";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { cohortOfProvider } from "@/src/data/ladderLevels";
-import type { NoteChange, NoteChangeSubject, NoteView } from "@/src/data/noteTypes";
-import type { GlobalSnapshot, MetaSnapSel, NodeRow } from "@/src/data/types";
+import type { NoteChange, NoteChangeSubject, NoteGlobal, NoteView } from "@/src/data/noteTypes";
+import { metaSnapHoverKey, type GlobalSnapshot, type MetaSnapSel, type NodeRow, type PickDescriptor, type TickNetSel } from "@/src/data/types";
 import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder";
 import {
   compositionToggleActions,
   countryToggleActions,
+  metaSnapSelectActions,
   networkRowActions,
   noteCohortActions,
+  snapshotSelectActions,
   tickNetSelectActions,
   type ClickAction,
 } from "@/src/engine/domain/pickActions";
@@ -21,6 +23,11 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 
 export interface ChangeState {
   filter: string;
+  /** Snapshots: the tick and the follow state its rows commit against. */
+  following?: boolean;
+  pinnedOrdinal?: number | null;
+  inspect?: PickDescriptor | null;
+  tickNet?: TickNetSel | null;
   railNet: string | null;
   country: string | null;
   cohort: CohortSel | null;
@@ -30,6 +37,9 @@ export interface ChangeState {
   /** The network the Snapshots card stands on (`ledgerNetwork`). */
   ledgerNet: string | null;
 }
+
+/** A global snapshot as a pick: the record a row carries, the road the raw log takes to an old tick. */
+const globalPick = (g: NoteGlobal): Extract<PickDescriptor, { kind: "snapshot" }> => ({ kind: "snapshot", title: `Global snapshot #${g.ordinal}`, data: g as GlobalSnapshot });
 
 const compKeyOf = (type: string): string => {
   const { label, codes } = roleKeyLabel(type);
@@ -62,6 +72,15 @@ export function changeActions(
       const c = cohortOfProvider(rows, subject.keys, subject.cc, subject.city);
       return c ? noteCohortActions({ cc: c.cc, city: c.city, isp: c.isp }, s) : null;
     }
+    case "metaSnap":
+      return metaSnapSelectActions(subject.sel, globalPick(subject.global), { metaSnap: s.metaSnap, following: s.following, inspect: s.inspect ?? null });
+    case "global":
+      return snapshotSelectActions(globalPick(subject.global), false, {
+        pinnedOrdinal: s.pinnedOrdinal ?? null,
+        metaSnap: s.metaSnap,
+        hasInspect: s.hasInspect,
+        tickNet: s.tickNet,
+      });
     case "self":
       return null;
   }
@@ -74,7 +93,7 @@ export const staysOnCard = (acts: readonly ClickAction[]): boolean =>
 
 /** The store channel a row previews on, the key its explorer row uses, and the nodes it lights. */
 export interface ChangeHover {
-  channel: "filter" | "country" | "group";
+  channel: "filter" | "country" | "group" | "metaSnap" | "snap";
   key: string;
   nodes?: string[];
   cc?: string;
@@ -86,6 +105,10 @@ export function changeHover({ subject }: { subject: NoteChangeSubject }, rows: N
   switch (subject.kind) {
     case "self":
       return null;
+    case "metaSnap":
+      return { channel: "metaSnap", key: metaSnapHoverKey(subject.sel.metaId, subject.sel.ordinal) };
+    case "global":
+      return { channel: "snap", key: String(subject.global.ordinal) };
     case "network":
       return { channel: "filter", key: subject.id };
     case "country":
