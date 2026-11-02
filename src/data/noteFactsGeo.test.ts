@@ -723,14 +723,17 @@ describe("geoFacts' notable changes", () => {
   it("a row for a country and one for a provider that moved, read as the facts read them", () => {
     const r = geoFacts(input(week))!;
     expect(r.changes).toEqual([
-      { kind: "lost", size: 2, text: "Germany lost 2 nodes, down 4%", subject: { kind: "country", cc: "DE" } },
       { kind: "lost", size: 2, text: "OVH lost 2 nodes, down 17%", subject: { kind: "provider", keys: ["ovh-sas"], cc: null, city: null } },
     ]);
   });
   it("names the city only where the sites measured it at both ends", () => {
     const site = (n: number) => ({ "f.site.DE.Falkenstein.ovh-sas": n });
     const r = geoFacts(input({ ...week, siteDays: { "2026-10-20": site(12), "2026-10-27": site(10) } }))!;
-    expect(r.changes?.[1]).toMatchObject({ text: "OVH lost 2 nodes in Falkenstein, down 17%", subject: { cc: "DE", city: "Falkenstein" } });
+    expect(r.changes?.[0]).toMatchObject({ text: "OVH lost 2 nodes in Falkenstein, down 17%", subject: { cc: "DE", city: "Falkenstein" } });
+  });
+  it("a move too small for its count has no row, though the note can state it", () => {
+    const r = geoFacts(input(week))!;
+    expect(r.changes?.some((c) => c.text.startsWith("Germany"))).toBe(false); // 48 to 46
   });
   it("a network reads its own days, and names no city", () => {
     const own: DaySpec = { ...NOW, net: { ...NOW.net, usdc: { cc: { DE: 22, US: 10 }, isp: { "hetzner-online-ag": 22 } } } };
@@ -754,12 +757,15 @@ describe("geoFacts' notable changes", () => {
   describe("a subject card's rows", () => {
     const site = (ovh: number) => ({ "f.site.DE.Falkenstein.ovh-sas": ovh, "f.site.DE.Falkenstein.hetzner-online-gmbh": 20 });
     const sites = { siteDays: { "2026-10-20": site(12), "2026-10-27": site(10) } };
+    const bigger: DaySpec = { ...NOW, net: { ...NOW.net, dag: { cc: { DE: 36, US: 15, FR: 10 }, isp: { "hetzner-online-gmbh": 20, "ovh-sas": 12 } } } };
+    const moved = run("2026-10-27", 8, (i) => (i < 2 ? bigger : NOW));
+    const bigWeek = { geoDays: moved, ccDays: ccOf(moved) };
     it("a country says its own move, which has nowhere to go from its own card", () => {
-      const r = geoFacts(input({ ...week, subject: { cc: "DE" } }))!;
-      expect(r.changes?.[0]).toMatchObject({ kind: "lost", text: "Germany lost 2 nodes, down 4%", subject: { kind: "self" } });
+      const r = geoFacts(input({ ...bigWeek, subject: { cc: "DE" } }))!;
+      expect(r.changes?.[0]).toMatchObject({ kind: "lost", text: expect.stringMatching(/^Germany lost 6 nodes, down \d+%$/), subject: { kind: "self" } });
     });
     it("then the provider and city that moved inside it, which open that group", () => {
-      const r = geoFacts(input({ ...week, ...sites, subject: { cc: "DE" } }))!;
+      const r = geoFacts(input({ ...bigWeek, ...sites, subject: { cc: "DE" } }))!;
       expect(r.changes?.[1]).toMatchObject({ text: "OVH lost 2 nodes in Falkenstein, down 17%", subject: { kind: "provider", keys: ["ovh-sas"], cc: "DE", city: "Falkenstein" } });
     });
     it("a provider says its own move and where", () => {

@@ -752,14 +752,14 @@ describe("hyperFacts' notable changes", () => {
   it("on a network, a row for each layer group whose node count moved", () => {
     const r = hyperFacts(input({
       subject: "usdc",
-      fleet: fleet({ ...steady, "f.type.usdc.l0+cl1": row(N, (i) => (i < N / 2 ? 20 : 19)), "f.type.usdc.l0": row(N, (i) => (i < N / 2 ? 10 : 11)) }),
+      fleet: fleet({ ...steady, "f.type.usdc.l0+cl1": row(N, (i) => (i < N / 2 ? 20 : 16)), "f.type.usdc.l0": row(N, (i) => (i < N / 2 ? 10 : 14)) }),
     }))!;
     expect(r.changes).toHaveLength(2);
-    expect(r.changes).toContainEqual({ kind: "lost", size: 1, text: "Hybrid group lost 1 node, down 5%", subject: { kind: "type", netId: "usdc", type: "l0+cl1" } });
+    expect(r.changes).toContainEqual({ kind: "lost", size: 4, text: "Hybrid group lost 4 nodes, down 20%", subject: { kind: "type", netId: "usdc", type: "l0+cl1" } });
   });
   it("a layer group's own note says its own move, and has nowhere to go from its own card", () => {
-    const r = hyperFacts(input({ subject: { net: "usdc", type: "l0+cl1" }, fleet: fleet({ ...steady, "f.type.usdc.l0+cl1": row(N, (i) => (i < N / 2 ? 20 : 19)) }) }))!;
-    expect(r.changes).toEqual([{ kind: "lost", size: 1, text: "Hybrid group lost 1 node, down 5%", subject: { kind: "self" } }]);
+    const r = hyperFacts(input({ subject: { net: "usdc", type: "l0+cl1" }, fleet: fleet({ ...steady, "f.type.usdc.l0+cl1": row(N, (i) => (i < N / 2 ? 20 : 16)) }) }))!;
+    expect(r.changes).toEqual([{ kind: "lost", size: 4, text: "Hybrid group lost 4 nodes, down 20%", subject: { kind: "self" } }]);
   });
   it("a layer group whose history began inside the week has no start: no row, and no claim that it moved or held", () => {
     const late = row(N, (i) => (i < N / 2 ? null : i < (3 * N) / 4 ? 20 : 19));
