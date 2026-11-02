@@ -517,10 +517,9 @@ export default function Inspector() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `manifest`/`ladderIds` derive from the same store slices
   }, [deepestId, deepestKind, siblingState, mode]);
   // THE VIEW'S OWN FIRST STEP (user, 2026-10-31: "open the 1st of that set"): its ghost has no parent
-  // to step from, so it would only open its hint. A held node leaves it alone in Hypergraph: opening
-  // a network would drop the node, and in Geography the card stands on the node's network anyway.
+  // to step from, so it would only open its hint.
   const rootId = ROOT_OF[mode]?.to ?? null;
-  const rootGhost = rootId && !presentOf(rootId) && !inspect ? rootStep(siblingState) : null;
+  const rootGhost = rootId && !presentOf(rootId) ? rootStep(siblingState) : null;
   const ghostStep = (id: string) => (id === nextStep?.id ? nextStep.step : id === rootId ? (rootGhost ?? undefined) : undefined);
   // EXPAND-ONLY since the box lost its minimize (review find, 2026-09-11): every reachable
   // caller — an entry's stretched toggle, the plank's ∧/∨ targeting collapsed neighbours —

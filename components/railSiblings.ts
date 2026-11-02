@@ -700,7 +700,10 @@ const rootNetworks: ChildEntry = {
 };
 export const ROOT_OF: Partial<Record<Mode, ChildEntry>> = { hyper: rootNetworks, geo: rootNetworks };
 
+/** Nothing while a drill is held: a network change clears a country and a provider, and in
+ *  Hypergraph it would drop the node. The ghost then only opens its hint. */
 export function rootStep(s: SiblingState): SiblingStep | null {
+  if (s.inspect || s.country || s.cohort) return null;
   return ROOT_OF[s.mode]?.steps(s, 1)[0] ?? null;
 }
 

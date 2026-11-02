@@ -870,6 +870,11 @@ describe("the Geography rail never writes the filter", () => {
   it("the ghost's first step is the most located network", () => {
     expect(rootStep(geo({}))).toMatchObject({ key: "dag", actions: [{ kind: "railNet", id: "dag" }] });
   });
+  it("the ghost takes no step over a held country, provider or node: a new network would drop them", () => {
+    expect(rootStep(geo({ country: "DE" }))).toBeNull();
+    expect(rootStep(geo({ cohort: {} as SiblingState["cohort"] }))).toBeNull();
+    expect(rootStep(geo({ inspect: {} as SiblingState["inspect"] }))).toBeNull();
+  });
   it("a swipe steps every network from the browsed one, no filter", () => {
     const set = siblingSet("context", geo({ railNet: "dag" }))!;
     expect(set.items.map((i) => i.key)).toEqual(["dag", "dor"]);
