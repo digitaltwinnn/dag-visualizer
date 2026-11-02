@@ -761,6 +761,12 @@ describe("hyperFacts' notable changes", () => {
     const r = hyperFacts(input({ subject: { net: "usdc", type: "l0+cl1" }, fleet: fleet({ ...steady, "f.type.usdc.l0+cl1": row(N, (i) => (i < N / 2 ? 20 : 19)) }) }))!;
     expect(r.changes).toEqual([{ kind: "lost", size: 1, text: "Hybrid group lost 1 node, down 5%", subject: { kind: "self" } }]);
   });
+  it("a layer group whose history began inside the week has no start: no row, and no claim that it moved or held", () => {
+    const late = row(N, (i) => (i < N / 2 ? null : i < (3 * N) / 4 ? 20 : 19));
+    const r = hyperFacts(input({ subject: { net: "usdc", type: "l0+cl1" }, fleet: fleet({ ...steady, ...Object.fromEntries(Object.keys(fleet().series).filter((k) => k.startsWith("f.type.usdc.")).map((k) => [k, row(N, () => null)])), "f.type.usdc.l0+cl1": late, "f.type.usdc.l0": row(N, (i) => (i < N / 2 ? null : 10)) }) }))!;
+    expect(r.changes).toBeUndefined();
+    expect(r.blurbs.join(" ")).toMatch(/has no reading from the start of the span: say nothing about whether it moved or held/);
+  });
   it("a layer group that held has no rows", () => {
     expect(hyperFacts(input({ subject: { net: "usdc", type: "l0" }, fleet: fleet(steady) }))!.changes).toBeUndefined();
   });
