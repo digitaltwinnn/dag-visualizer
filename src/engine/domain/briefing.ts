@@ -12,9 +12,10 @@ export const BRIEFING_STOPS = ["geo", "ledger", "hyper", "trend"] as const satis
 /** How long a stop stands, its scene's transition included. A quarter under 6500 went too far (user
  *  2026-11-01: "25% shorter"; 2026-11-02, after reading it against the live lines of 102 to 122
  *  characters: back up to 6 seconds); 2026-11-03, "keep all timing the same but just spend 15%
- *  less time on each view": 5.1 seconds, the transition's pace untouched, which reads the longest
- *  live line at about 24 characters a second. */
-export const STOP_MS = 5100;
+ *  less time on each view", then "make it 5": 5 seconds, every other timing untouched. The pace
+ *  checked out on screen (same day: "usually all characters are on screen in time with still time
+ *  left"). */
+export const STOP_MS = 5000;
 
 /** The longest a stop's words may run: two to three lines of the desktop caption. A longer line
  *  would need a longer stop, and a tour that outstays its welcome is the one thing it must not do. */
