@@ -7,7 +7,7 @@ import { PulseEdge } from "@/components/EdgePulse";
 import TypedNote from "@/components/notes/TypedNote";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { useTouch } from "@/components/useTouch";
-import { HANDOVER_MS, handoverHand, handoverPulses, type HandoverTarget } from "@/src/engine/domain/briefing";
+import { BRIEFING_TYPE_SLOW, HANDOVER_MS, handoverHand, handoverPulses, type HandoverTarget } from "@/src/engine/domain/briefing";
 import { useStore } from "@/src/store/store";
 
 // THE HAND-OVER (user, 2026-11-03 — design A + D with C's gesture, in the brainstorming companion):
@@ -201,7 +201,7 @@ export default function TourHandover() {
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[calc(100%+56px)] [background:linear-gradient(transparent,var(--scene-ground)_55%)] opacity-85" />
         <div className="relative mx-auto max-w-[79%] px-4 text-center max-[700px]:max-w-full">
           <div className="text-briefing font-medium text-foreground text-balance">
-            <TypedNote text={CAPTION} always />
+            <TypedNote text={CAPTION} always slow={BRIEFING_TYPE_SLOW} />
           </div>
           <div className="mt-2 flex flex-wrap justify-center gap-x-5 gap-y-1 text-body text-foreground-dim">{words}</div>
         </div>
