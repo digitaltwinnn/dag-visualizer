@@ -2,7 +2,7 @@
 
 import type { CSSProperties, MutableRefObject, ReactNode } from "react";
 import { createContext, useContext, useLayoutEffect, useRef } from "react";
-import { Minus, Plus, X, type LucideIcon } from "lucide-react";
+import { Minus, X, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { Button } from "@/components/ui/button";
@@ -172,12 +172,12 @@ export interface RailHoverHandlers {
  *  (globals.css). A RailPane inside a host hands its handlers to the host instead of its panel. */
 export const RailHoverHost = createContext<MutableRefObject<RailHoverHandlers> | null>(null);
 
-/** THE +/− IS BACK WHERE A CARD CAN BE FOLDED BY HAND (user, 2026-11-03: "add the open/close +/−
+/** THE − IS BACK WHERE A CARD CAN BE FOLDED BY HAND (user, 2026-11-03: "add the open/close +/−
  *  button in the AI card and on phone in each of the cards"). The box lost its minimize on
- *  2026-09-11 ("hardly used") and the entry its + on 2026-08-08 (clutter on a one-line entry); both
- *  return only where Inspector says so — the AI card, which has no × to leave by, and every card on
- *  the phone, where a sheet's one open box is the space the reader has. The rung states it, CardHead
- *  draws it, so no card body threads a prop. */
+ *  2026-09-11 ("hardly used"); it returns only where Inspector says so — the AI card, which has no
+ *  × to leave by, and every card on the phone, where a sheet's one open box is the space the reader
+ *  has. The folded entry carries NO + (same day: "the + is implicit"): the whole entry is already
+ *  the toggle. The rung states it, CardHead draws it, so no card body threads a prop. */
 export const RailFold = createContext(false);
 
 export function RailPane({
@@ -401,10 +401,9 @@ function keepFocusOnRung(el: HTMLElement): void {
   // chrome. The LEFT rail's panel layout above keeps its collapse toggle — the removal is the
   // right rail's alone.
   const entryMode = !!collapsed && !!onToggle;
-  // Where the rung allows it (`RailFold`), the box wears a − beside its × and the entry a + at its
-  // row's end. The entry's + is a MARK, not a second button: the whole entry is already the toggle.
+  // Where the rung allows it (`RailFold`), the box wears a − beside its ×. The entry wears nothing:
+  // the whole entry is already the toggle, so a + would be implicit (user, 2026-11-03).
   const foldable = foldHere && !!onToggle;
-  const hasAside = aside != null || (entryMode && caption != null);
   // The first row clears the absolute corner controls: the eyebrow's row, or the title's on a head
   // with no eyebrow (the AI card), which until now never had a corner control to clear.
   const cornerPad = onClose && foldable ? "pr-[62px] touch:pr-[66px]" : (onClose || foldable) && "pr-[30px]";
@@ -469,6 +468,23 @@ function keepFocusOnRung(el: HTMLElement): void {
             <span className="sr-only">Expand</span>
           </button>
         )}
+        {/* THE OPEN HEAD FOLDS TOO, where the − stands (user, 2026-11-03: "clicking the row header
+            will collapse, not only the − icon (but also that)"): the entry's own stretched device
+            over the head block, under the corner controls and the aside's real controls (z-10).
+            The − is the keyboard's and the screen reader's control, so this one is pointer-only —
+            no second tab stop saying the same thing. */}
+        {foldable && !entryMode && (
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-hidden
+            onClick={(e) => {
+              keepFocusOnRung(e.currentTarget);
+              onToggle?.();
+            }}
+            className="absolute inset-0 z-[1] appearance-none bg-transparent border-0 p-0 m-0 cursor-pointer"
+          />
+        )}
         {(eyebrow || (caption != null && !entryMode)) && (
           <div className={entryMode ? "contents" : cn("flex items-start justify-between gap-2 mb-2", cornerPad)}>
             {/* `data-eyebrow` is RailThread's read: on an unboxed ENTRY the thread runs its
@@ -527,14 +543,11 @@ function keepFocusOnRung(el: HTMLElement): void {
                   were taking the row and the NAME truncated ("Dor …"), the one thing that tells an
                   entry from its siblings. A folded entry is slot + name; the kind, the country code,
                   the bucket and the span are read on the open box (`QualifierChip` is `data-pill`). */}
-              {hasAside && (
+              {(aside != null || (entryMode && caption != null)) && (
                 <span className={cn("ml-auto flex-none relative z-10 inline-flex items-center gap-1.5 pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto", entryMode && cn("[&_[data-yields]]:hidden [&_[data-pill]]:hidden", ENTRY_LINE))}>
                   {entryMode && caption != null && <span className="text-label text-muted-foreground text-right tabular-nums">{caption}</span>}
                   {aside}
                 </span>
-              )}
-              {foldable && entryMode && (
-                <Plus aria-hidden className={cn("flex-none size-4 text-muted-foreground", !hasAside && "ml-auto")} />
               )}
             </div>
             {subtitle != null && !entryMode && (

@@ -11,6 +11,7 @@ import useNote from "@/components/notes/useNote";
 import EcgMark from "@/components/topbar/EcgMark";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { VIEWS } from "@/components/views";
+import { breakpointOf } from "@/src/data/breakpoint";
 import { SITE_ORIGIN } from "@/src/data/site";
 import { BRIEFING_STOPS, BRIEFING_WORDS_OUT_MS, SCENE_WAIT_MS, STOP_MS, briefsOn, hasLanded, mayAdvance, nextStop, prevStop } from "@/src/engine/domain/briefing";
 import { NET } from "@/src/net/current";
@@ -52,6 +53,11 @@ function endBriefing(stop: number, how: End): void {
   const s = useStore.getState();
   if (how === "done") s.setMode(BRIEFING_STOPS[0]);
   s.setBriefing(null); // after the mode, so the route publishes where the tour left off
+  // ON THE PHONE THE TOUR HANDS OVER TO THE EXPLORE SHEET (user, 2026-11-03: "after intro also open
+  // the 'explore' section by default"): the tour is the one arrival that ends with the reader on
+  // their own, and a bare globe over a closed dock left them to find the list. Not a pick, so the
+  // no-auto-open rule (a selection never opens a sheet) is untouched.
+  if (breakpointOf(window.innerWidth) === "phone") s.setPhoneDock("explore");
   track("briefing-end", { how, at: BRIEFING_STOPS[stop] });
 }
 

@@ -230,7 +230,7 @@ describe("railSelectionKey and the browsed network", () => {
   });
 });
 
-describe("hasFoldControl — who wears the +/−", () => {
+describe("hasFoldControl — who wears the −", () => {
   it("the AI notes card everywhere, a subject card only on the phone", () => {
     expect(hasFoldControl("notes", false)).toBe(true);
     expect(hasFoldControl("notes", true)).toBe(true);

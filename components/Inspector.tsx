@@ -753,7 +753,7 @@ export default function Inspector() {
         // so an entry→box swap REMOUNTED the card — the title re-created, the avatar back to its
         // fallback for a frame. The pager renders the same element shape on both tiers and is a
         // plain pass-through while `active` is off; the plank and the gesture come with the box.
-        // The +/− (`RailFold`) — which cards wear it is `railCollapse.hasFoldControl`'s.
+        // The − (`RailFold`) — which cards wear it is `railCollapse.hasFoldControl`'s.
         const wrapped = (
           <RailFold.Provider value={card.present && hasFoldControl(id, bp === "phone")}>
             <RailPager slot={card.kind} active={boxed}>{body}</RailPager>

@@ -25,7 +25,7 @@ export interface LaneCollapseState {
   overrides: Readonly<Record<string, boolean | undefined>>;
 }
 
-/** DOES THIS CARD WEAR THE +/− (`RailFold`; user, 2026-11-03)? The written-context card (the AI
+/** DOES THIS CARD WEAR THE − (`RailFold`; user, 2026-11-03)? The written-context card (the AI
  *  notes) everywhere — it is no subject, so it has no × to leave by — and every card on the phone,
  *  where a sheet's one open box is the room the reader has. */
 export function hasFoldControl(id: string, phone: boolean): boolean {
