@@ -186,18 +186,12 @@ export default function AboutDoc() {
 
         {/* Asked the way a visitor would, before they know the product (user, 2026-11-03: the Gate
             AI section "should be more generic as user won't know yet what that is"); the answer
-            names it. It keeps the feature's two promises: the figures are the view's own, and a note
-            they can't back never shows. */}
+            names it, and that the figures are the view's own. */}
         <Question q="Who writes the short notes on the cards?">
           <p>
             An AI does, and the card always says so. Each view has one note at the top of the cards on the right, written by{" "}
             <B>Gate AI</B>, Constellation&apos;s own AI product. It reads the same measured figures the view shows and writes,
             in a few sentences, what changed and by how much — or, when nothing moved, what the view is showing right now.
-          </p>
-          <p>
-            A note with a number the figures can&apos;t back is thrown away, so it never passes for a measurement. Pick a
-            country, a hosting provider, a kind of node or a stretch of time on a chart, and its own card carries a note of
-            its own.
           </p>
         </Question>
 
