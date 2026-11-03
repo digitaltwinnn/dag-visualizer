@@ -155,10 +155,6 @@ export default function AboutDoc() {
             Only from public sources: the Constellation Network&apos;s own public endpoints, and public lookups for where
             each node runs. Every number is live, drawn as it comes in.
           </p>
-          <p>
-            The one exception is a written note on a card, which is made from those same figures a little earlier and says
-            which stretch of time it covers.
-          </p>
         </Question>
 
         {/* ONE HOME for the per-view copy (components/aboutCopy.ts), shared with the in-app About row. */}
