@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
-import { netKeyOf, tickNetSelectActions, tickNetClearActions, viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, trendPlaneActions, railNetActions, noteCohortActions, noteDayActions, snapshotClearActions, type ClickAction } from "./pickActions";
+import { netKeyOf, tickNetSelectActions, tickNetClearActions, viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, countryClearActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, trendPlaneActions, railNetActions, noteCohortActions, noteDayActions, snapshotClearActions, type ClickAction } from "./pickActions";
 import { finerLevels } from "./focusLadder";
 import { METAGRAPHS } from "@/src/net/current";
 import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
@@ -208,6 +208,25 @@ describe("the shared component builders (GeoExplore rows + LiveStrip bars run th
       { kind: "inspect", pick: null },
       { kind: "country", cc: "FI" },
     ]);
+  });
+  it("a click on the committed country with a node or provider under it steps UP to the country, never off it", () => {
+    expect(countryToggleActions("DE", { country: "DE", hasInspect: true, cohort: CO })).toEqual([
+      { kind: "inspect", pick: null },
+      { kind: "cohort", sel: null },
+      { kind: "country", cc: "DE" },
+    ]);
+    expect(countryToggleActions("DE", { country: "DE", hasInspect: false, cohort: CO })).toEqual([
+      { kind: "cohort", sel: null },
+      { kind: "country", cc: "DE" },
+    ]);
+  });
+  it("countryClearActions (the Country card's ×) releases the country and everything under it", () => {
+    expect(countryClearActions({ hasInspect: true, cohort: CO })).toEqual([
+      { kind: "inspect", pick: null },
+      { kind: "cohort", sel: null },
+      { kind: "country", cc: null },
+    ]);
+    expect(countryClearActions({ hasInspect: false, cohort: null })).toEqual([{ kind: "country", cc: null }]);
   });
   it("nodeSelectActions: the row's re-click deselects (one toggle language everywhere)", () => {
     expect(nodeSelectActions(nodePick(), { mode: "geo", currentFilter: "dor", deselect: true })).toEqual([

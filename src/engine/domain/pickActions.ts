@@ -77,15 +77,28 @@ export function pickActive(
 // The country zoom-level TOGGLE — shared by the scene's empty-click-on-a-country and
 // GeoExplore's country row (`drill`). Entering/leaving a country level drops the finer rungs
 // first (the zoom-level rule — finerLevels("geo","country") = ["node","cohort"]): a selected
-// node, then a committed cohort.
+// node, then a committed cohort. The committed country is RELEASED only while it is the finest
+// rung: with a node or a provider held under it, the click steps up TO the country (user,
+// 2026-11-03: a click on the country from a node's close-up "should give that the focus but it
+// zooms out entirely").
 export function countryToggleActions(
   cc: string,
   current: { country: string | null; hasInspect: boolean; cohort: CohortSel | null },
 ): ClickAction[] {
+  const finest = !current.hasInspect && !current.cohort;
   const acts: ClickAction[] = [];
   if (current.hasInspect) acts.push({ kind: "inspect", pick: null });
   if (current.cohort) acts.push({ kind: "cohort", sel: null });
-  acts.push({ kind: "country", cc: current.country === cc ? null : cc });
+  acts.push({ kind: "country", cc: current.country === cc && finest ? null : cc });
+  return acts;
+}
+
+/** The Country card's × — releases the country and everything finer, whatever is held under it. */
+export function countryClearActions(current: { hasInspect: boolean; cohort: CohortSel | null }): ClickAction[] {
+  const acts: ClickAction[] = [];
+  if (current.hasInspect) acts.push({ kind: "inspect", pick: null });
+  if (current.cohort) acts.push({ kind: "cohort", sel: null });
+  acts.push({ kind: "country", cc: null });
   return acts;
 }
 

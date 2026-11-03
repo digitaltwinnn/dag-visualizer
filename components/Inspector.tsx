@@ -32,7 +32,7 @@ import { useSiblingState } from "@/components/useSiblingState";
 import { openRailCard } from "@/components/railOpen";
 import { useLadderFocus } from "@/components/useLadderFocus";
 import { useTrayActives } from "@/components/useTrayActives";
-import { countryToggleActions, cohortToggleActions, compositionToggleActions, snapshotClearActions } from "@/src/engine/domain/pickActions";
+import { countryClearActions, cohortToggleActions, compositionToggleActions, snapshotClearActions } from "@/src/engine/domain/pickActions";
 import { CountryTitle, CountryAside, CountryCard, ProviderTitle, ProviderCard, ProviderAside, CompositionTitle, CompositionCard, CompositionAside } from "@/components/inspector/cards";
 import MetaSnapPane from "@/components/inspector/MetaSnapPane";
 import TrendRangePane from "@/components/inspector/TrendRangePane";
@@ -627,14 +627,14 @@ export default function Inspector() {
   }, [noteAbsent, setRailCollapseMany]); // eslint-disable-line react-hooks/exhaustive-deps -- fires on the stand-down only; the lane is read live
 
   const detailPane: Record<string, ReactNode> = {
-    // Country/provider toggle CLOSED through the same tested table a row re-click runs — the ×
-    // is the ladder's own step-back, not a bespoke clear (countryToggleActions also drops any
-    // finer rung first, matching the zoom-level rule).
+    // Country/provider CLOSED through the tested table — the country's × is `countryClearActions`
+    // (it drops any finer rung first, matching the zoom-level rule, and releases the country even
+    // with a node held, where a re-click of the country now steps up to it instead).
     country: country ? (
       <CountryPane
         key="country"
         cc={country}
-        onClose={() => applyClickActions(countryToggleActions(country, { country, hasInspect: !!inspect, cohort }))}
+        onClose={() => applyClickActions(countryClearActions({ hasInspect: !!inspect, cohort }))}
         {...cx("country")}
       />
     ) : null,
