@@ -138,6 +138,12 @@ describe("machinesOf — the node pager steps nodes, not layer rows (Review Focu
     const keyless = { ...node({ ip: "" }), pick: { kind: "metanode", node: null } } as unknown as NodeRow;
     expect(machinesOf([l0, l1, de1, keyless]).map((r) => r.layer + r.id)).toEqual(["l0m", "l0b"]);
   });
+  it("keeps one row for a machine on two networks, the preferred one when named", () => {
+    const dag = { ...node({ ip: "9", id: "peer" }), pick: { kind: "l0", node: { ip: "9", id: "peer" } } } as unknown as NodeRow;
+    const up = node({ ip: "9", id: "peer2", meta: "up" });
+    expect(machinesOf([dag, up])).toEqual([dag]);
+    expect(machinesOf([dag, up], (r) => r === up)).toEqual([up]);
+  });
 });
 
 describe("tickPolledRows — the one polled input both the explorer and the rail feed tickNetworksLevel", () => {
