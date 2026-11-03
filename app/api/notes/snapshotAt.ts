@@ -44,7 +44,7 @@ const ORDINAL_CACHE_S = 86_400;
  *  eightfold. Every target here is recent, and the search is for a gap, which is exactly what bends
  *  the time axis the interpolating `seekOrdinalByTime` leans on, so this one assumes no cadence. And
  *  a read takes half a second on a busy chain, so one at a time spends the whole budget seeking. */
-async function ordinalAtOrAfter(reader: ChainReader, chain: string | null, targetMs: number, latest: number, signal?: AbortSignal): Promise<number | null> {
+export async function ordinalAtOrAfter(reader: ChainReader, chain: string | null, targetMs: number, latest: number, signal?: AbortSignal): Promise<number | null> {
   const before = async (ordinal: number): Promise<boolean | null> => {
     const r = await reader.at(chain, ordinal, signal);
     return r ? Date.parse(r.timestamp) < targetMs : null;
