@@ -78,7 +78,7 @@ describe("PROMPTS", () => {
     );
     expect(PROMPTS.hyper.questionCommon).toBe('Last, in one sentence, how active it was, in the shape "Activity was <up, down or steady>: <network> was part of <last week\'s figure> global snapshots per day last week, <up or down> <change> on the weeks before", or "held at" the figure when it was steady.');
     expect(PROMPTS.geo.question).toBe(
-      "First, how many nodes there are and how that moved, then where they run: the countries and hosting providers that gained or lost nodes and no others, each with its current count, as \"<country> fell <change> to <count>\", or where the nodes are now when nothing moved. Say nothing about speed.",
+      "First, how many nodes there are and how that moved, then where they run: of the countries and hosting providers that gained or lost nodes, name only the ONE with the largest change, since a provider's nodes sit in a country and the two moves are usually the same nodes, with its current count, as \"<country or provider> fell <change> to <count>\", without calling it the largest; or where the nodes are now when nothing moved. Say nothing about speed.",
     );
     expect(PROMPTS.geo.questionCommon).toBe('Last, in one sentence, how active the network was, in the shape "Activity was <up, down or steady>: <network> was part of <last week\'s figure> global snapshots per day last week, <up or down> <change> on the weeks before", or "held at" the figure when it was steady.');
     // The whole network PRODUCES its global snapshots (user, 2026-10-30: "there is no specific
