@@ -175,16 +175,18 @@ function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; className?
         {m.mark && <SceneMark mark={m.mark} />}
         <span className={cn("text-body font-semibold text-foreground", m.titleMono && "font-mono tabular-nums")}>{m.title}</span>
         {/* A hued aside is a TICKER beside a title, so it is the card head's own chip
-            (`TickerChip`, 2026-10-02); the un-hued one is a state line and stays text. */}
+            (`TickerChip`, 2026-10-02); the un-hued one is a state line and stays text. Both sit
+            at the row's right edge (user, 2026-11-03: "right align the tags (pinned, network,
+            age, etc) those are in the header"). */}
         {m.aside && m.aside.hue ? (
-          <span className="ml-1 inline-flex items-center gap-1.5">
+          <span className="ml-auto pl-3 inline-flex items-center gap-1.5">
             {m.aside.live && <LiveDot />}
             {m.aside.pinned && <PinMark />}
             <TickerChip text={m.aside.text} hue={m.aside.hue} />
           </span>
         ) : m.aside ? (
           // Age, then state — the order the card's own head reads (2026-10-03).
-          <span className="inline-flex items-center gap-1.5 text-label text-muted-foreground ml-1">
+          <span className="ml-auto pl-3 inline-flex items-center gap-1.5 text-label text-muted-foreground">
             {m.aside.chip && <QualifierChip className="mr-0.5 tabular-nums">{m.aside.chip}</QualifierChip>}
             {m.aside.live && <LiveDot />}
             {m.aside.pinned && <PinnedMark />}
