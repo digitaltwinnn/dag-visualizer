@@ -4,9 +4,7 @@ import { ChevronDown, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VIEW_ICONS } from "@/components/icons";
 import { ABOUT } from "@/components/aboutCopy";
-import NetLink from "@/components/NetLink";
 import { ROUTED_VIEWS } from "@/components/views";
-import { useStore } from "@/src/store/store";
 import type { Mode } from "@/src/store/store";
 
 // THE ABOUT DOCUMENT — the crawlable, GENERIC, non-technical prose (user, 2026-07-10): the app
@@ -21,8 +19,7 @@ import type { Mode } from "@/src/store/store";
 // THE VIEWS, THEN QUESTIONS (user, 2026-11-03, option B of three in the brainstorming companion:
 // the page "feels a bit unorganized"). One "Live data" box carried six topics and the explore
 // section mixed the views with how the cards work, so the page is now: the disclosure first (user:
-// "move unofficial section to the top"), the title and lead, the views as tiles that open
-// them, and everything else as the questions a visitor actually has, one topic each. The answers
+// "move unofficial section to the top"), the title and lead, the views as tiles, and everything else as the questions a visitor actually has, one topic each. The answers
 // are native `<details>`: folded, they stay in the server-rendered HTML for crawlers, where a
 // Radix collapsible would unmount them. No privacy question (user, same day: "drop the privacy
 // section"), and the AI question is asked the way a visitor would ask it, before they know the
@@ -56,29 +53,18 @@ const VIEW_QUESTION: Record<Mode, string> = {
 };
 
 // A view's tile: its REAL mark (VIEW_ICONS, so the tiles, the command bar and the footer can't
-// disagree), its name and its question. A real link to the view's route, switched in place the way
-// the footer's view links are, so the engine never reboots and a crawler still follows it.
-function ViewTile({ id, name, slug, soon }: { id: Mode; name: string; slug: string; soon?: boolean }) {
-  const setMode = useStore((s) => s.setMode);
+// disagree), its name and its question. A reading, not a control (user, 2026-11-03: "don't make the
+// view cards clickable"): the command bar and the footer's view links are the ways in.
+function ViewTile({ id, name, soon }: { id: Mode; name: string; soon?: boolean }) {
   const Icon = VIEW_ICONS[id];
   return (
-    <NetLink
-      href={`/${slug}`}
-      onClick={(e) => {
-        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
-        e.preventDefault();
-        setMode(id);
-      }}
-      className="group block rounded-lg focus-visible:outline-1 focus-visible:outline-ring/60"
-    >
-      {/* A view still to come wears the ghost card's dashed edge and a dimmed mark — nothing to
-          show yet, the bar's dimmed "Coming soon" entry in the same voice. */}
-      <Panel className={cn("h-full p-4 transition-colors duration-150 group-hover:border-[color-mix(in_oklch,var(--primary)_45%,transparent)] motion-reduce:transition-none", soon && "border-dashed")}>
-        <Icon aria-hidden className={cn("size-5", soon ? "text-muted-foreground" : "text-primary")} />
-        <h2 className="mt-2.5 text-title font-semibold text-foreground">{name}</h2>
-        <p className="mt-1 text-body text-muted-foreground">{VIEW_QUESTION[id]}</p>
-      </Panel>
-    </NetLink>
+    // A view still to come wears the ghost card's dashed edge and a dimmed mark — nothing to show
+    // yet, the bar's dimmed "Coming soon" entry in the same voice.
+    <Panel className={cn("h-full p-4", soon && "border-dashed")}>
+      <Icon aria-hidden className={cn("size-5", soon ? "text-muted-foreground" : "text-primary")} />
+      <h2 className="mt-2.5 text-title font-semibold text-foreground">{name}</h2>
+      <p className="mt-1 text-body text-muted-foreground">{VIEW_QUESTION[id]}</p>
+    </Panel>
   );
 }
 
@@ -141,7 +127,7 @@ export default function AboutDoc() {
 
       <section id="explore" aria-label="The views" className="mt-8 grid grid-cols-5 gap-3 max-[900px]:grid-cols-3 max-[700px]:grid-cols-2">
         {ROUTED_VIEWS.map((v) => (
-          <ViewTile key={v.id} id={v.id} name={v.name} slug={v.slug} soon={v.soon} />
+          <ViewTile key={v.id} id={v.id} name={v.name} soon={v.soon} />
         ))}
       </section>
 
