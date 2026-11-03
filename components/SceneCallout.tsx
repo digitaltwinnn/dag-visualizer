@@ -503,10 +503,12 @@ export default function SceneCallout() {
             : mine && !settling
               ? {
                   ident: { text: mine.ticker || mine.name, hue: filterAccent(net) },
-                  text: `${share ?? 0} of ${total} snapshots`,
+                  // NAMED BY KIND (user, 2026-11-03: "5 snapshots -> can we say 5 metagraph snapshots?"):
+                  // what a global snapshot holds are metagraph snapshots, the notes' and the vitals' word.
+                  text: `${share ?? 0} of ${total} metagraph ${total === 1 ? "snapshot" : "snapshots"}`,
                   chip: mineKB != null && exact ? fmtShareKB(mineKB, exact.totalSizeKB) : undefined,
                 }
-              : { text: `${total} snapshots`, chip: exact ? fmtKB(exact.totalSizeKB) : undefined },
+              : { text: `${total} metagraph ${total === 1 ? "snapshot" : "snapshots"}`, chip: exact ? fmtKB(exact.totalSizeKB) : undefined },
       };
     };
     // THE NETWORK'S OWN LABEL, on its lane (user, 2026-10-03: "the dossier on snapshots page has
