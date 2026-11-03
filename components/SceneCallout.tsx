@@ -60,7 +60,7 @@ import { relativeAge } from "@/src/util/relativeAge";
 import { CALLOUT_OFF_X, CALLOUT_OFF_Y, CALLOUT_LEG_INSET, CALLOUT_PHONE_K, CALLOUT_HANG_K } from "@/src/engine/domain/calloutPlacement";
 import type { GeoInfo } from "@/src/data/types";
 import LiveDot from "@/components/LiveDot";
-import { PinMark, PinnedMark } from "@/components/state/StateAtoms";
+import { PinnedMark } from "@/components/state/StateAtoms";
 import { IDENT_INK } from "@/components/identInk";
 import { ledgerNetwork } from "@/src/engine/domain/tickNet";
 import { useFeedRead } from "@/components/useFeedRead";
@@ -179,10 +179,17 @@ function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; className?
             at the row's right edge (user, 2026-11-03: "right align the tags (pinned, network,
             age, etc) those are in the header"). */}
         {m.aside && m.aside.hue ? (
+          // The ticker, then the follow state LAST — the global label's order, so both snapshot
+          // labels end on the same element: the live dot and its word, or the pin (user, 2026-11-03).
           <span className="ml-auto pl-3 inline-flex items-center gap-1.5">
-            {m.aside.live && <LiveDot />}
-            {m.aside.pinned && <PinMark />}
             <TickerChip text={m.aside.text} hue={m.aside.hue} />
+            {m.aside.live && (
+              <span className="inline-flex items-center gap-1.5 text-label text-muted-foreground">
+                <LiveDot />
+                live
+              </span>
+            )}
+            {m.aside.pinned && <PinnedMark />}
           </span>
         ) : m.aside ? (
           // Age, then state — the order the card's own head reads (2026-10-03).
