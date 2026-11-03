@@ -1,4 +1,3 @@
-import { changeWords } from "@/src/data/noteChanges";
 import { median } from "@/src/data/noteFacts";
 import type { NotableDay } from "@/src/data/noteTypes";
 
@@ -246,17 +245,6 @@ function pauses(gap: readonly (number | null)[], input: NotableInput, networkId:
     keep.day(isPause(value, level) ? { dayMs: days[i]!, kind: "pause", networkId, value, level, score: scoreOf(value, level) } : null);
   }
   keep.flush();
-}
-
-/** A DAY'S DISTANCE FROM USUAL (user, 2026-10-31: "can you mention the increase / decrease in
- *  percentage also?"), added by code to the model's caption, so it is computed from the measured
- *  pair. Only a count against its usual has one: a first or a last day is an event, and a wait or a
- *  count of networks reads worse as a percentage. Rounds to nothing, says nothing. */
-export function withDayChange(caption: string, day: Pick<NotableDay, "kind" | "value" | "level">): string {
-  const counted = day.kind === "high" || day.kind === "low" || day.kind === "peak" || day.kind === "trough";
-  if (!counted || caption.includes("%")) return caption;
-  const change = changeWords(day.level, day.value);
-  return change ? `${caption.replace(/[.\s]+$/, "")}, ${change}` : caption;
 }
 
 /** THE RANGE'S EXTREMES, in fill order (see `NOTABLE_FLOOR`): the busiest and quietest day of the

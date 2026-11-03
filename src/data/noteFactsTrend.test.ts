@@ -313,9 +313,12 @@ describe("trendFacts notable days", () => {
       ["Notable day 1 date (busiest day of the span)", T0 + 3 * DAY, "date"],
       ["Notable day 1 busiest day of the span, metagraph snapshots anchored that day", 70, "count"],
       ["Notable day 1 busiest day of the span, span median", 60, "count"],
+      // How far the day stood from the median, as a fact the caption copies (user, 2026-11-03).
+      ["Notable day 1 busiest day of the span, change against the span median, up", 0.17, "share"],
       ["Notable day 2 date (quietest day of the span)", T0 + 4 * DAY, "date"],
       ["Notable day 2 quietest day of the span, metagraph snapshots anchored that day", 50, "count"],
       ["Notable day 2 quietest day of the span, span median", 60, "count"],
+      ["Notable day 2 quietest day of the span, change against the span median, down", 0.17, "share"],
       ["Notable day 3 date (longest wait of the span)", T0 + 5 * DAY, "date"],
       ["Notable day 3 longest wait of the span, longest wait between metagraph snapshots", 900, "duration"],
       ["Notable day 3 longest wait of the span, span median longest wait", 600, "duration"],

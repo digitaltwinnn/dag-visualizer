@@ -439,7 +439,7 @@ describe("checkNote — a past value stands beside its own current figure (R60, 
     const check = (note: string) => checkNote(note, span, [], { maxSentences: 3 });
     const failed = check("Blocks fell from 355 to 227 per day.");
     expect(failed.ok).toBe(false);
-    expect(!failed.ok && failed.reasons[0]).toMatch(/two whole spans.*write 227 first.*355/);
+    expect(!failed.ok && failed.reasons[0]).toMatch(/two whole spans.*write 227 and how far it moved.*never 355/);
     expect(check("The gap went from 21 seconds to 12 seconds.").ok).toBe(false);
     expect(check("The gap went from 21 to 12 seconds.").ok).toBe(false);
     expect(check("Blocks fell to 227 per day from 355.").ok).toBe(false);

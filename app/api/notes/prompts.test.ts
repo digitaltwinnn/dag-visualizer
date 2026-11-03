@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { NoteView, NotableDay } from "@/src/data/noteTypes";
-import { CAPTION_FORMAT, LINE_FORMAT, PROMPTS, QUESTION_COMMON_WHOLE, VOICE, buildMessages, parseAnswer, spanBeforeWords, spanWords } from "./prompts";
+import { CAPTION_FORMAT, LINE_FORMAT, PROMPTS, QUESTION_COMMON_WHOLE, VOICE, buildMessages, parseAnswer, spanBeforeWords, spanFigures, spanWords } from "./prompts";
 
 const VIEWS: NoteView[] = ["hyper", "geo", "ledger", "trend"];
 
@@ -28,7 +28,10 @@ describe("VOICE", () => {
   });
 
   it("asks for how much a figure moved, never only the direction (user, 2026-10-27)", () => {
-    expect(VOICE).toContain("say by how much: write it from the earlier figure to the current one");
+    // user, 2026-11-03: the current figure and how far it moved, from the change facts; never the earlier one.
+    expect(VOICE).toContain("give the current figure and how far it moved");
+    expect(VOICE).toContain('Take the change from its "change against" fact');
+    expect(VOICE).toContain("Never write the earlier figure.");
   });
 
   it("holds no digit a facts list could also hold, layer names aside (R59: an example's 9 became a note's 9)", () => {
@@ -73,14 +76,14 @@ describe("PROMPTS", () => {
     expect(PROMPTS.hyper.question).toBe(
       "First, who and what is on the network over the span: networks or layers that gained or lost nodes, networks that became active or went quiet; if nothing changed there, say so plainly: a steady week: the node count held at its level and the layers held steady, and for the whole network so did the active networks.",
     );
-    expect(PROMPTS.hyper.questionCommon).toBe("Last, in one sentence, how active it was: open with the direction, up, down or steady, then the global snapshots it was part of per day last week against the weeks before.");
+    expect(PROMPTS.hyper.questionCommon).toBe('Last, in one sentence, how active it was, in the shape "Activity was <up, down or steady>: <network> was part of <last week\'s figure> global snapshots per day last week, <up or down> <change> on the weeks before", or "held at" the figure when it was steady.');
     expect(PROMPTS.geo.question).toBe(
-      "First, how many nodes there are and how that moved, then where they run: the countries and hosting providers that gained or lost nodes and no others, or where the nodes are now when nothing moved. Say nothing about speed.",
+      "First, how many nodes there are and how that moved, then where they run: the countries and hosting providers that gained or lost nodes and no others, each with its current count, as \"<country> fell <change> to <count>\", or where the nodes are now when nothing moved. Say nothing about speed.",
     );
-    expect(PROMPTS.geo.questionCommon).toBe("Last, in one sentence, how active the network was: open with the direction, up, down or steady, then its global snapshots per day last week against the weeks before.");
+    expect(PROMPTS.geo.questionCommon).toBe('Last, in one sentence, how active the network was, in the shape "Activity was <up, down or steady>: <network> was part of <last week\'s figure> global snapshots per day last week, <up or down> <change> on the weeks before", or "held at" the figure when it was steady.');
     // The whole network PRODUCES its global snapshots (user, 2026-10-30: "there is no specific
     // network, so 'all' should probably have some different wording").
-    expect(QUESTION_COMMON_WHOLE).toBe("Last, in one sentence, how active the network was: open with the direction, up, down or steady, then the global snapshots the DAG produced per day last week against the weeks before, with the DAG as the one producing them.");
+    expect(QUESTION_COMMON_WHOLE).toBe('Last, in one sentence, how active the network was, in the shape "Activity was <up, down or steady>: the DAG produced <last week\'s figure> global snapshots per day last week, <up or down> <change> on the weeks before", the DAG as the one producing them, or "held at" the figure when it was steady.');
     for (const v of ["hyper", "geo"] as const) {
       expect(PROMPTS[v].system("the whole network", undefined, true, undefined, true)).toContain(`${PROMPTS[v].question} ${QUESTION_COMMON_WHOLE}`);
       expect(PROMPTS[v].system("the whole network", undefined, true, undefined, true)).not.toContain(PROMPTS[v].questionCommon!);
@@ -92,7 +95,7 @@ describe("PROMPTS", () => {
     expect(PROMPTS.geo.system("x")).toContain("Stay on where the nodes are located and who hosts them, and nothing else.");
     expect(PROMPTS.geo.system("x", undefined, true)).toContain("Stay on where the nodes are located and who hosts them, then the one sentence on activity, and nothing else.");
     expect(PROMPTS.ledger.question).toBe(
-      "Say what changed in the anchoring rhythm over the recent hours against the usual: what sped up or slowed down, from the usual figure to the recent one, and which networks did it. Then the reading itself: the longest gap, then, in one short clause: for the whole network, what each global snapshot holds, as \"N metagraph snapshots from M networks in each global snapshot\", never that it was part of anything; for one network, only the share of global snapshots it was part of.",
+      "Say what changed in the anchoring rhythm over the recent hours against the usual: what sped up or slowed down, as the recent figure and how far it is from the usual (\"<recent figure>, up <change> on the usual\"), and which networks did it. Then the reading itself: the longest gap, then, in one short clause: for the whole network, what each global snapshot holds, as \"N metagraph snapshots from M networks in each global snapshot\", never that it was part of anything; for one network, only the share of global snapshots it was part of.",
     );
     expect(PROMPTS.trend.question).toBe("Say what changed over the span: what rose, what fell and when, as the numbers show it.");
   });
@@ -247,17 +250,20 @@ describe("the span before", () => {
     const user = buildMessages("trend", "x", "Facts", null, undefined, undefined, undefined, undefined, "the last 30 days", undefined, undefined, "the 30 days before")[1]!.content;
     expect(user).toContain("Span: the last 30 days\nSpan before: the 30 days before\n\nFacts:");
   });
-  it("tells History's note what those figures are, and how to write them", () => {
-    const system = PROMPTS.trend.system("x");
+  it("tells History's note what those figures are, and how to write them, in the span-before words themselves", () => {
+    const system = PROMPTS.trend.system("x", undefined, undefined, undefined, undefined, "the 30 days before");
     expect(system).toMatch(/a figure for "this span" or the "previous span" is that whole span/i);
     expect(system).toMatch(/never say it rose or fell over the span/i);
-    expect(system).toContain("Span before line");
-    expect(system).toMatch(/averaged <this span's figure> per day, up from <the previous span's figure with its unit>/);
-    expect(PROMPTS.geo.system("x")).not.toContain("Span before line");
+    expect(system).toContain('"<what> rose <change> to <this span\'s figure> per day on "the 30 days before""');
+    // live 2026-11-03: a placeholder naming the "Span before line" was copied as "on the Span before".
+    expect(system).not.toContain("Span before line");
+    expect(system).toContain('averaged <this span\'s figure> per day, up <change> on "the 30 days before"');
+    expect(system).toMatch(/never the previous span's figure/);
+    expect(spanFigures(null)).toContain("on the span before");
   });
   it("leaves the tour's line to write figures as the note does", () => {
     expect(LINE_FORMAT).not.toContain("from X to Y");
-    expect(LINE_FORMAT).toMatch(/both numbers as the note writes them/);
+    expect(LINE_FORMAT).toMatch(/its figures and changes as the note writes them/);
   });
 });
 

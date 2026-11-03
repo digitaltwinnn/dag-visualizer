@@ -10,7 +10,7 @@ import { pickRangeTier } from "@/src/data/trendWindow";
 //
 // Everything is UTC and the caller supplies the date strings; nothing here reads a clock.
 
-export const NOTES_VERSION = 57; // 57: the DAG produces global snapshots, metagraphs their own metagraph snapshots (2026-11-03)
+export const NOTES_VERSION = 61; // 61: each change is a fact the model copies; no code rewrites its words (2026-11-03)
 
 /** What a note covers. Hyper and Geography are a standing picture ("day"), the ledger the recent
  *  hours ("hours"); History's pills are the rest, and a brushed range is `r<fromMs>-<toMs>` after

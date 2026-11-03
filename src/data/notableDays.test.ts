@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { NotableKind } from "@/src/data/noteTypes";
-import { NOTABLE_CAPS, NOTABLE_FLOOR, isPause, notableDays, rangeExtremes, rangeNotableCap, withDayChange } from "@/src/data/notableDays";
+import { NOTABLE_CAPS, NOTABLE_FLOOR, isPause, notableDays, rangeExtremes, rangeNotableCap } from "@/src/data/notableDays";
 
 const DAY = 86_400_000;
 const T0 = Date.UTC(2026, 8, 1);
@@ -516,29 +515,6 @@ describe("notableDays: the floor", () => {
     const { days, covered } = span(30);
     const out = notableDays({ days, covered, subject: "a", ids: ["a"], cap: 5, floor: 3, series: { "m.a.snaps": flat(30, 100, { 10: 130, 25: 0, 26: 0, 27: 0, 28: 0, 29: 0 }) } });
     expect(out.map((d) => [d.kind, d.dayMs])).toEqual([["last", days[24]], ["peak", days[10]]]);
-  });
-});
-
-// HOW FAR OFF USUAL (user, 2026-10-31: "can you mention the increase / decrease in percentage also?").
-// Code adds it to the caption, so the figure is measured and the model cannot get it wrong.
-describe("withDayChange", () => {
-  const day = (kind: NotableKind, value: number, level: number) => ({ kind, value, level });
-  it("adds how far a day stood above or below usual", () => {
-    expect(withDayChange("53,959 snapshots anchored, usually 49,669", day("peak", 53959, 49669))).toBe("53,959 snapshots anchored, usually 49,669, up 9%");
-    expect(withDayChange("43,888 snapshots anchored, usually 49,669", day("low", 43888, 49669))).toBe("43,888 snapshots anchored, usually 49,669, down 12%");
-  });
-  it("takes a caption's closing full stop", () => {
-    expect(withDayChange("400 snapshots, usually 100.", day("high", 400, 100))).toBe("400 snapshots, usually 100, up 300%");
-  });
-  it("only counts have a percentage", () => {
-    for (const kind of ["first", "last", "pause", "longest", "broadest"] as const) expect(withDayChange("x", day(kind, 9, 3))).toBe("x");
-  });
-  it("says nothing when it rounds to no change, or there is no usual", () => {
-    expect(withDayChange("x", day("peak", 1002, 1000))).toBe("x");
-    expect(withDayChange("x", day("peak", 5, 0))).toBe("x");
-  });
-  it("never doubles a percentage the caption already states", () => {
-    expect(withDayChange("up 9% on usual", day("peak", 109, 100))).toBe("up 9% on usual");
   });
 });
 

@@ -1,4 +1,4 @@
-import type { Fact, NoteChange, NoteChangeSubject } from "@/src/data/noteTypes";
+import type { NoteChange, NoteChangeSubject } from "@/src/data/noteTypes";
 
 // A VIEW NOTE'S NOTABLE CHANGES (user, 2026-10-31: "notables in the other views' AI cards ... related
 // to a clickable subject"): what moved over the note's span, as rows the reader can click into the
@@ -18,65 +18,11 @@ export const RHYTHM_CHANGE = 0.25;
 const count = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 /** How far a figure moved, in words ("down 12%"), or null when it rounds to nothing or has no start
- *  to move from. One home for a notable change and a notable day (`withDayChange`). */
+ *  to move from. A notable change row's own words (a row is code-worded by design). */
 export function changeWords(from: number, to: number): string | null {
   if (!(from > 0)) return null;
   const pct = Math.round((to / from - 1) * 100);
   return pct === 0 ? null : `${pct > 0 ? "up" : "down"} ${Math.abs(pct)}%`;
-}
-
-/** The verbs a percentage can follow ("fell 9% from …"). Any other word leaves the sentence as written. */
-const MOVED = /\b(?:rose|risen|rising|grew|grown|growing|climbed|climbing|increased|increasing|fell|fallen|falling|dropped|dropping|declined|declining|decreased|decreasing|shrank|shrunk|shrinking|slipped)\s$/i;
-
-/** HOW FAR A FIGURE MOVED, IN A NOTE (user, 2026-10-31: "also add percentages to these texts"). Code
- *  adds it to the checked note: asked of the model, a live trial wrote "[up 11%]" and failed the gate.
- *  Only where the note states a fact's own pair, as the facts write it and in its order, and a verb
- *  carries it, so the worst case is a sentence as the model wrote it.
- *  …AND THE PERCENTAGE TAKES THE EARLIER FIGURE'S PLACE (user, 2026-11-03: "from x to y, up z% can be
- *  shortened by saying just the current value and its increase"): "fell from 70 to 66" reads "fell 6%
- *  to 66", and "averaged 7,553 per day, up from 4,072 in the 30 days before" reads "…, up 85% on the
- *  30 days before". The model still writes both figures, so the gate checks both; code drops the
- *  earlier one only where it put the percentage that replaces it. */
-export function withMovePercents(note: string, facts: readonly Fact[]): string {
-  let out = note;
-  for (const to of facts) {
-    if (to.pair?.end !== "to") continue;
-    const from = facts.find((f) => f.pair?.key === to.pair!.key && f.pair.end === "from");
-    const change = from ? changeWords(from.value, to.value) : null;
-    if (!from || !change) continue;
-    const [dir, percent] = change.split(" ") as [string, string];
-    const esc = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    for (const said of [`from ${from.text} to ${to.text}`, `from ${from.text} in the weeks before to ${to.text}`]) {
-      for (let at = out.indexOf(said); at >= 0; at = out.indexOf(said, at)) {
-        if (/[\p{L}\p{N}]/u.test(out[at + said.length] ?? "") || !MOVED.test(out.slice(0, at))) {
-          at += said.length;
-          continue;
-        }
-        const short = `${percent} to ${to.text}`;
-        out = `${out.slice(0, at)}${short}${out.slice(at + said.length)}`;
-        at += short.length;
-      }
-    }
-    // NO VERB TO CARRY IT ("taking the total from 90 to 86"): the current figure and the change after
-    // it, "taking the total to 86, down 4%". Not after "lost" or "gained", whose object stands between
-    // the verb and the figures ("lost nodes from 33 to 28"): that sentence stays as written.
-    const bare = new RegExp(`\\bfrom ${esc(from.text)} to ${esc(to.text)}(?![\\p{L}\\p{N}]|[.,]\\d)`, "gu");
-    out = out.replace(bare, (whole: string, at: number) =>
-      /\b(?:lost|gained|losing|gaining)\b(?:\s+\S+){0,2}\s$/i.test(out.slice(Math.max(0, at - 40), at)) ? whole : `to ${to.text}, ${change}`);
-    // THE ACTIVITY SENTENCE'S OWN SHAPE, "Y per day last week against X in the weeks before": the
-    // current figure stands, the earlier one gives way to its change.
-    const against = new RegExp(`(${esc(to.text)}[^.;]*?) against ${esc(from.text)}(?![\\d.,]\\d|\\d)((?: (?:DAG|MB|per|a|day))*)( in the weeks before)?`, "g");
-    out = out.replace(against, (_w: string, lead: string, _tail: string, weeks: string | undefined) => `${lead}, ${change}${weeks ? " on the weeks before" : ""}`);
-    // A span against the one before it, the current figure first: "averaged Y, up from X" reads
-    // "averaged Y, up P%", and the span-before words that named X's span now name the comparison.
-    const comparison = new RegExp(`\\b${dir} from ${esc(from.text)}(?![\\d.,]\\d|\\d)((?: (?:DAG|MB|per|a|day))*)(?: (?:in|over) (the [^.,;]*? before))?`, "g");
-    out = out.replace(comparison, (whole: string, _tail: string, before: string | undefined, at: number) => {
-      const sentence = out.slice(out.lastIndexOf(". ", at) + 1, at);
-      if (!new RegExp(`(?<![\\d.,])${esc(to.text)}(?![\\d])`).test(sentence)) return whole;
-      return `${change}${before ? ` on ${before}` : ""}`;
-    });
-  }
-  return out;
 }
 
 /** A gap far past a chain's usual widest one (`isPause`). The words are the facts' own. */
@@ -89,38 +35,6 @@ export function rateChange(name: string, now: number, usual: number, nowText: st
   if (!(usual > 0)) return null;
   const kind = now >= 2 * usual ? "high" : now <= 0.4 * usual ? "low" : null;
   return kind && { kind, subject, size: Math.abs(Math.log(Math.max(now, 1e-9) / usual)), text: `${name} ran at ${nowText} an hour, usually ${usualText}` };
-}
-
-/** TWO WHOLE SPANS ARE NOT A START AND AN END (user, 2026-11-02). Code writes the comparison: the
- *  model keeps saying "fell to 64 from 73", and the gate sending that back cost whole notes of
- *  several figures, whose retries ran past the sentence limit. Runs before the gate, which still
- *  holds whatever this cannot reach. `before` names the span before, once, at the first comparison. */
-export function withSpanComparisons(note: string, facts: readonly Fact[], before: string | null): string {
-  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const fig = (f: Fact) => {
-    const [n, ...unit] = f.text.split(" ");
-    return `${esc(n!)}${unit.length ? `(?: ${esc(unit.join(" "))})?` : ""}`;
-  };
-  const END = "(?!\\d|[.,]\\d)";
-  let out = before ? note.replace(/\b(?:in|over) the previous span\b/gi, `in ${before}`) : note;
-  const pairs: { from: Fact; to: Fact }[] = [];
-  for (const to of facts) {
-    if (to.pair?.end !== "to" || !to.pair.span) continue;
-    const from = facts.find((f) => f.pair?.key === to.pair!.key && f.pair.end === "from");
-    if (!from || from.value === to.value) continue;
-    pairs.push({ from, to });
-    const dir = to.value > from.value ? "up" : "down";
-    out = out.replace(new RegExp(`\\bfrom ${fig(from)} to ${fig(to)}${END}`, "g"), `to ${to.text}, ${dir} from ${from.text}`);
-    out = out.replace(new RegExp(`\\bto ${fig(to)}((?: (?:DAG|MB|per|a|day))*),? from ${fig(from)}${END}`, "g"), (_, tail: string) => `to ${to.text}${tail}, ${dir} from ${from.text}`);
-  }
-  if (!before) return out;
-  if (out.includes(before)) return out.replace(new RegExp(`(?<!(?:in|over) )${esc(before)}`), `in ${before}`);
-  let first: { end: number } | null = null;
-  for (const { from } of pairs) {
-    const m = new RegExp(`\\b(?:up|down) from ${fig(from)}(?: (?:DAG|MB))?(?: (?:per|a) day)?${END}`).exec(out);
-    if (m && (!first || m.index + m[0].length < first.end)) first = { end: m.index + m[0].length };
-  }
-  return first ? `${out.slice(0, first.end)} in ${before}${out.slice(first.end)}` : out;
 }
 
 /** The smallest share of a count a move of two or more nodes takes to be worth a row. */

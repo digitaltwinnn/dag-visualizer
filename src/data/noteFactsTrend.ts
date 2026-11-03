@@ -353,6 +353,13 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
       if (counted) facts.push(fact("Typical day of the span, metagraph snapshots anchored", counted.level, "count"));
     }
     days = input.shape ? [] : notableDays(pick);
+    // THE DAYS' OWN COUNTS (live 2026-11-03: "Five networks anchored their first metagraph snapshot on
+    // the days below" failed the gate, the five being the model's own count of the list): given as
+    // facts, a summary of the list is a figure the gate can back.
+    for (const [kind, word] of [["first", "first"], ["last", "last"]] as const) {
+      const n = days.filter((d) => d.kind === kind).length;
+      if (n > 1) facts.push(fact(`Notable days that are a network's ${word} day`, n, "count"));
+    }
     days.forEach((day, i) => {
       const n = i + 1;
       const who = day.networkId ? mention(day.networkId) : "";
@@ -396,6 +403,11 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
         : day.kind === "broadest" ? "span median networks"
         : null;
       if (level) facts.push(fact(`Notable day ${n} ${what}, ${level}`, read(day.level), kind, format));
+      // HOW FAR THE DAY STOOD FROM IT, as a fact (user, 2026-11-03: a figure and its change, in the
+      // model's own words rather than appended by code). A count only: a wait is said against its usual.
+      const counted = day.kind === "high" || day.kind === "low" || day.kind === "peak" || day.kind === "trough";
+      const pct = counted && day.level > 0 ? Math.round((day.value / day.level - 1) * 100) : 0;
+      if (level && pct !== 0) facts.push(fact(`Notable day ${n} ${what}, change against the ${level}, ${pct > 0 ? "up" : "down"}`, Math.abs(pct) / 100, "share"));
       if (dag && (day.kind === "first" || day.kind === "last") && day.networkId && blurbOf[day.networkId]) {
         const line = `${nameOf(day.networkId)} is: ${blurbOf[day.networkId]}`;
         if (!blurbs.includes(line)) blurbs.push(line);

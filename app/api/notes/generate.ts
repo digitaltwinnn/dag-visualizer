@@ -1,9 +1,7 @@
-import { capitalFirst, factsBlock, sayAll, spellDurations } from "@/src/data/noteFacts";
+import { factsBlock, pairChange, withChangeFacts } from "@/src/data/noteFacts";
 import { checkNote } from "@/src/data/noteHonesty";
 import { LINE_MAX } from "@/src/engine/domain/briefing";
-import { withDayChange } from "@/src/data/notableDays";
-import { withMovePercents, withSpanComparisons } from "@/src/data/noteChanges";
-import type { NoteChange, NoteDay, NoteResponse, NoteView } from "@/src/data/noteTypes";
+import type { Fact, NoteChange, NoteDay, NoteResponse, NoteView } from "@/src/data/noteTypes";
 import { GateError, type gateChat, type GateErrorKind } from "./gate";
 import { failKeyOf, isBriefingNote, lockKeyOf, noteKeyOf, statsKeyOf, timingOf, type NoteSpan } from "./keys";
 import { buildMessages, parseAnswer, spanBeforeWords, spanWords } from "./prompts";
@@ -167,8 +165,64 @@ const NOTE_MIN_WORDS = 6;
  *  drifts past that, so this catches the ones that run on, not the ones that land near it. */
 const NOTE_MAX_WORDS = 50;
 
-/** What the code tidies in checked text: the numbers stand, only their words change. */
-const plainly = (text: string): string => sayAll(spellDurations(text));
+/** THE MODEL'S WORDS ARE ITS OWN (user, 2026-11-03: "remove hardcoded text changes on the prompt
+ *  response"). Code once tidied checked text — percentages spliced in, an earlier figure dropped,
+ *  "3 of the 3" made "all 3", "10s" spelled out, a first letter capitalised — and each splice was a
+ *  hidden patch that could garble a sentence ("up 11% before", live). The prompt asks for all of it
+ *  now and the facts carry every figure it needs (`withChangeFacts`); what the model still gets
+ *  wrong in form is named here and asked for once more, like a negative or a long note, and the
+ *  checked note stands if the second answer is no better. Honesty stays the gate's. */
+function styleSlips(text: string, facts: readonly Fact[]): string[] {
+  const out: string[] = [];
+  if (/^[a-z]/.test(text.trim())) out.push("start the note with a capital letter");
+  const unit = /\b\d+(?:\.\d+)?\s?(?:s|m|h|d)\b/.exec(text);
+  if (unit) out.push(`"${unit[0]}": write the unit out in full, as the facts write it`);
+  const whole = /(?<![\w.,])(\d+) of (?:the |its |their )?\1(?![\w%]|[.,]\d)/.exec(text);
+  if (whole && whole[1] !== "1") out.push(`"${whole[0]}": say "${whole[1] === "2" ? "both" : `all ${whole[1]}`}" instead`);
+  // AN EARLIER FIGURE WRITTEN BESIDE ITS CHANGE: the prompt asks for the current figure and how far it
+  // moved, so a past end that has a change fact is one figure too many.
+  const said = new Set<string>();
+  for (const from of facts) {
+    if (from.pair?.end !== "from" || said.has(from.text)) continue;
+    const to = facts.find((f) => f.pair?.key === from.pair!.key && f.pair.end === "to");
+    const pct = to ? pairChange(from, to) : 0;
+    const hasChange = to != null && pct !== 0 && to.value !== 0 && pct < 1000;
+    const elsewhere = facts.some((f) => f !== from && f.pair?.end !== "from" && f.text === from.text);
+    const esc = from.text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    if (hasChange && !elsewhere && new RegExp(`(?<![\\d.,])${esc}(?![\\d]|[.,]\\d)`).test(text)) {
+      said.add(from.text);
+      out.push(`"${from.text}" is an earlier figure: give only ${to!.text} and how far it moved, as its change fact says`);
+    }
+  }
+  // A WHOLE SPAN WRITTEN AS A CLIMB ("blocks fell 50% to 154 per day" over two 90-day averages, live):
+  // the figure is right and the shape says it moved inside the span (user, 2026-11-02).
+  for (const to of facts) {
+    if (to.pair?.end !== "to" || !to.pair.span) continue;
+    const esc = to.text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    // "grew 85% to 7,553 per day on the 30 days before" names what it is measured against and reads
+    // true; the same rise with no "on …" after it reads as a climb inside the span.
+    const climb = new RegExp(`\\b(?:rose|fell|grew|dropped|climbed|declined|increased|decreased|slipped)\\b[^.;]{0,40}?\\bto ${esc}(?![\\d]|[.,]\\d)([^.;,]*)`, "i").exec(text);
+    if (climb && !/\bon\b/.test(climb[1] ?? ""))
+      out.push(`"${to.text}" is a whole span's figure: say what it is measured against ("on the span before"), or write "averaged ${to.text} per day" with its change`);
+  }
+  // "HELD" WITH A CHANGE BESIDE IT ("Fees held at 332 DAG per day, up 11%", live): held is no change.
+  const held = /\bheld\b[^.;]*?\d+%/i.exec(text);
+  if (held) out.push(`"${held[0]}": held means it did not move; a figure with a change rose or fell`);
+  // A CHANGE WITH NO CURRENT FIGURE ("Germany lost 9% of its nodes", live): the reader gets how far
+  // it moved and not where it stands.
+  const moves = new Map<string, string[]>();
+  for (const to of facts) {
+    if (to.pair?.end !== "to") continue;
+    const from = facts.find((f) => f.pair?.key === to.pair!.key && f.pair.end === "from");
+    const pct = from ? pairChange(from, to) : 0;
+    if (pct) moves.set(`${Math.abs(pct)}%`, [...(moves.get(`${Math.abs(pct)}%`) ?? []), to.text]);
+  }
+  for (const [pct, nows] of moves) {
+    const has = (t: string) => new RegExp(`(?<![\\d.,])${t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\d]|[.,]\\d)`).test(text);
+    if (has(pct) && !nows.some(has)) out.push(`"${pct}": give the current figure beside its change, as "<what> fell ${pct} to <current figure>"`);
+  }
+  return out;
+}
 
 /** The model and the gate: at most two attempts, the second told why the first was rejected. */
 async function write(
@@ -177,12 +231,16 @@ async function write(
   chat: typeof gateChat,
   count: (field: NoteStat) => Promise<void>,
 ): Promise<Written> {
-  const block = factsBlock(input.facts, input.blurbs);
+  // Every measured change carries its own percentage (`withChangeFacts`): the model is shown it and
+  // the gate backs it, so the note can say how far a figure moved without arithmetic.
+  const facts = withChangeFacts(input.facts);
+  const block = factsBlock(facts, input.blurbs);
   const days = input.days.length ? input.days : null;
   // A sentence naming no one speaks of the subject (R39): absent for the whole network.
   const subject = input.subjectName;
   const wantsLine = isBriefingNote(req.view, req.subject, req.span);
   let reasons: string[] | undefined;
+  let lastNote = "";
   /** A note that passed the gate and only failed the style rewrite: it stands if the rewrite fails. */
   let held: Written | null = null;
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -201,9 +259,10 @@ async function write(
     }
     const parsed = parseAnswer(answer);
     const { captions } = parsed;
-    const note = withSpanComparisons(parsed.note, input.facts, spanBeforeWords(req.view, req.span));
-    const line = parsed.line && withSpanComparisons(parsed.line, input.facts, null);
-    const check = checkNote(note, input.facts, input.names, { maxSentences: 3, minWords: NOTE_MIN_WORDS, subject });
+    const note = parsed.note.trim();
+    lastNote = note;
+    const line = parsed.line?.trim();
+    const check = checkNote(note, facts, input.names, { maxSentences: 3, minWords: NOTE_MIN_WORDS, subject });
     if (!check.ok) {
       if (held) return held;
       reasons = check.reasons;
@@ -216,6 +275,7 @@ async function write(
     const negative = attempt === 0 ? NEGATIVE_RE.exec(note)?.[0] : null;
     const words = note.trim().split(/\s+/).length;
     const wordy = attempt === 0 && words > NOTE_MAX_WORDS;
+    const slips = attempt === 0 ? styleSlips(note, facts) : [];
     const kept: NoteDay[] = [];
     const seen = new Map<string, number>();
     for (const d of input.days) {
@@ -224,26 +284,27 @@ async function write(
       const n = (seen.get(iso) ?? 0) + 1;
       seen.set(iso, n);
       const caption = captions.get(n === 1 ? iso : `${iso}#${n}`);
-      if (caption && checkNote(caption, input.facts, input.names, { maxSentences: 1, subject }).ok)
-        kept.push({ dayMs: d.dayMs, kind: d.kind, networkId: d.networkId, ...(d.measure ? { measure: d.measure } : {}), caption: capitalFirst(withDayChange(plainly(caption), d)) });
+      if (caption && checkNote(caption, facts, input.names, { maxSentences: 1, subject }).ok)
+        kept.push({ dayMs: d.dayMs, kind: d.kind, networkId: d.networkId, ...(d.measure ? { measure: d.measure } : {}), caption: caption.trim() });
     }
     // The Briefing's line is held to the note's gate and is never worth a retry: one that fails,
     // runs long or says what did not happen is dropped, and the tour reads the note instead.
-    const brief = wantsLine && line && !NEGATIVE_RE.test(line) && checkNote(line, input.facts, input.names, { maxSentences: 2, subject }).ok
-      ? capitalFirst(withMovePercents(plainly(line), input.facts)).replace(/[^.!?]$/, "$&.")
-      : null;
-    const written: Written = { ok: true, text: capitalFirst(withMovePercents(plainly(note), input.facts)), days: kept, ...(brief && brief.length <= LINE_MAX ? { line: brief } : {}) };
-    if (negative || wordy) {
+    const brief = wantsLine && line && !NEGATIVE_RE.test(line) && checkNote(line, facts, input.names, { maxSentences: 2, subject }).ok ? line : null;
+    const written: Written = { ok: true, text: note, days: kept, ...(brief && brief.length <= LINE_MAX ? { line: brief } : {}) };
+    if (negative || wordy || slips.length) {
       held = written;
       reasons = [
         ...(negative ? [`say what held steady instead of "${negative.toLowerCase()}"`] : []),
         ...(wordy ? [`${words} words: keep the note under forty-five, naming only the two biggest moves and cutting every other clause`] : []),
+        ...slips,
       ];
       continue;
     }
     return written;
   }
   warn(req, "gateFail");
+  // A LOCAL TRIAL NEEDS THE WHY (2026-11-03): prompt work reads the gate's reasons; production keeps its log to the outcome.
+  if (process.env.NODE_ENV !== "production" && reasons?.length) console.warn(`[notes]   ${reasons.join("; ")}\n[notes]   wrote: ${lastNote}`);
   return { ok: false, stat: "gateFail" };
 }
 
