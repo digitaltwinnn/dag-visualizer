@@ -33,8 +33,8 @@ export const VOICE = [
   "Name the span in your first sentence, once, in exactly the words the Span line gives and no others around them: \"over the last … days\" when it says \"the last … days\", \"from … to …\" as given when it says \"from … to …\", never \"over from\"; the reader sees the same words on the card.",
   "Call the subject by its name, as the Subject line gives it, wherever you would otherwise say \"the network\" or \"it\": \"the network\" alone is only for the whole network.",
   "Describe what the numbers show: never explain why, and never read a purpose or a cause into them.",
-  "Say nodes, never machines. A network's own snapshots are metagraph snapshots and the hypergraph's are global snapshots: name the kind every time, never a bare \"snapshots\" (a fact that says snapshots without \"global\" means metagraph snapshots), never ticks, never \"L1 snapshots\". Never say feeless. All the nodes together are the network, never the fleet.",
-  "A network's share of global snapshots is what it \"was part of\"; the whole network is part of nothing: it produces them.",
+  "Say nodes, never machines. A network's own snapshots are metagraph snapshots and the DAG's are global snapshots: name the kind every time, never a bare \"snapshots\" (a fact that says snapshots without \"global\" means metagraph snapshots), never ticks, never \"L1 snapshots\". Never say feeless. All the nodes together are the network, never the fleet.",
+  "The DAG produces global snapshots and each metagraph produces its own metagraph snapshots: never say the whole network, or a metagraph, produced global snapshots. A network's share of global snapshots is what it \"was part of\"; the DAG is part of nothing: it produces them.",
   "A network creates its metagraph snapshots and anchors them into global snapshots. A network that creates metagraph snapshots is an active network, never an \"anchoring network\". A note about one network says nothing about other networks being active.",
   "L0, currency L1 and data L1 are layers.",
   "Make no claim about how decentralised or distributed anything is.",
@@ -76,7 +76,9 @@ export const VOICE = [
 // hosts N nodes in <country>", so the name lands as the sentence's subject, not as a label.
 type KindQuestions = Partial<Record<Exclude<SubjectKind, "view">, string>>;
 // The whole network's activity, in its own words (user, 2026-10-30): one string for both views.
-export const QUESTION_COMMON_WHOLE = "Last, in one sentence, how active the network was: open with the direction, up, down or steady, then the global snapshots it produced per day last week against the weeks before.";
+// WHO PRODUCES THEM (user, 2026-11-03: "DAG produces global snapshots, metagraphs produce metagraph
+// snapshots"): the sentence's subject is the DAG, never "the whole network".
+export const QUESTION_COMMON_WHOLE = "Last, in one sentence, how active the network was: open with the direction, up, down or steady, then the global snapshots the DAG produced per day last week against the weeks before, with the DAG as the one producing them.";
 // A SPAN AGAINST THE ONE BEFORE IT IS NOT A CLIMB INSIDE THE SPAN (user, 2026-11-02). Live: "Over the
 // last 30 days, global snapshots rose 86% from 4,021 to 7,478 per day", where both were 30-day
 // averages and the figure inside the span rose about a third. The gate holds the form, since the

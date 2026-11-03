@@ -486,11 +486,11 @@ describe("the span length reaches the model and backs its window (R20)", () => {
     expect(checkNote("Over the last 7 days the hypergraph held its pace.", shown!.facts, shown!.names)).toEqual({ ok: true });
   });
 
-  it("the whole network's Hypergraph note is asked for the snapshots it produced, not was part of", async () => {
+  it("the whole network's Hypergraph note is asked for the global snapshots the DAG produced, not was part of", async () => {
     const d = deps({ facts: async () => ({ ...FACTS, label: "the whole network", common: true, whole: true }), answers: ["NOTE: Over the last 7 days the network held at 97 nodes."] });
     await generateNote({ ...REQ, view: "hyper", subject: "all", span: "day" }, d, "read");
     const sys = d.chat.mock.calls[0]![0][0]!.content;
-    expect(sys).toContain("the global snapshots it produced per day");
+    expect(sys).toContain("the global snapshots the DAG produced per day");
     expect(sys).not.toContain("it was part of per day");
   });
 });

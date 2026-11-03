@@ -80,13 +80,14 @@ describe("PROMPTS", () => {
     expect(PROMPTS.geo.questionCommon).toBe("Last, in one sentence, how active the network was: open with the direction, up, down or steady, then its global snapshots per day last week against the weeks before.");
     // The whole network PRODUCES its global snapshots (user, 2026-10-30: "there is no specific
     // network, so 'all' should probably have some different wording").
-    expect(QUESTION_COMMON_WHOLE).toBe("Last, in one sentence, how active the network was: open with the direction, up, down or steady, then the global snapshots it produced per day last week against the weeks before.");
+    expect(QUESTION_COMMON_WHOLE).toBe("Last, in one sentence, how active the network was: open with the direction, up, down or steady, then the global snapshots the DAG produced per day last week against the weeks before, with the DAG as the one producing them.");
     for (const v of ["hyper", "geo"] as const) {
       expect(PROMPTS[v].system("the whole network", undefined, true, undefined, true)).toContain(`${PROMPTS[v].question} ${QUESTION_COMMON_WHOLE}`);
       expect(PROMPTS[v].system("the whole network", undefined, true, undefined, true)).not.toContain(PROMPTS[v].questionCommon!);
       expect(PROMPTS[v].system("the whole network", undefined, false, undefined, true)).not.toContain(QUESTION_COMMON_WHOLE);
     }
-    expect(VOICE).toMatch(/the whole network is part of nothing: it produces them/);
+    expect(VOICE).toMatch(/The DAG produces global snapshots and each metagraph produces its own metagraph snapshots/);
+    expect(VOICE).toMatch(/the DAG is part of nothing: it produces them/);
     expect(buildMessages("hyper", "the whole network", "Facts", null, undefined, undefined, true, undefined, null, true)[0]!.content).toContain(QUESTION_COMMON_WHOLE);
     expect(PROMPTS.geo.system("x")).toContain("Stay on where the nodes are located and who hosts them, and nothing else.");
     expect(PROMPTS.geo.system("x", undefined, true)).toContain("Stay on where the nodes are located and who hosts them, then the one sentence on activity, and nothing else.");
@@ -299,7 +300,7 @@ describe("buildMessages", () => {
     expect(VOICE).toMatch(/A network that creates metagraph snapshots is an active network, never an "anchoring network"/);
     // user, 2026-11-03: a note said "global snapshot" and a bare "snapshot" side by side, the second
     // meaning a metagraph's. The rule names both kinds; the facts name them too.
-    expect(VOICE).toMatch(/A network's own snapshots are metagraph snapshots and the hypergraph's are global snapshots: name the kind every time, never a bare "snapshots"/);
+    expect(VOICE).toMatch(/A network's own snapshots are metagraph snapshots and the DAG's are global snapshots: name the kind every time, never a bare "snapshots"/);
     expect(VOICE).toMatch(/never write that something did not happen, such as "no changes" or "no networks"/);
     expect(VOICE).toMatch(/State a fall plainly: never soften, hide or reframe it/);
   });
