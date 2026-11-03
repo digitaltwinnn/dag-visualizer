@@ -4,10 +4,13 @@ import { BRIEFING_COVER, BRIEFING_LAND_MAX_MS, BRIEFING_NO_MOTION_MS, BRIEFING_P
 const on = { pathname: "/", net: "mainnet", seen: false };
 
 describe("how long a stop stands", () => {
-  // user, 2026-11-02: 4.9 seconds asked 21 to 25 characters a second of the live lines, past a subtitle's 20.
-  it("reads a line of the longest kind at a subtitle's pace", () => {
-    expect(STOP_MS).toBe(6000);
-    expect(122 / (STOP_MS / 1000)).toBeLessThanOrEqual(20.5);
+  // user, 2026-11-02: 4.9 seconds asked 21 to 25 characters a second of the live lines, past a subtitle's
+  // 20, and the stop went back to 6 seconds; 2026-11-03: 15% less time on each view, the rest of the
+  // timing unchanged — 5.1 seconds, the longest live line at about 24 characters a second.
+  it("stands 15% under the 6 seconds it had, still above the 4.9 that read too fast", () => {
+    expect(STOP_MS).toBe(5100);
+    expect(STOP_MS).toBeGreaterThan(4900);
+    expect(122 / (STOP_MS / 1000)).toBeLessThanOrEqual(24);
   });
 });
 
