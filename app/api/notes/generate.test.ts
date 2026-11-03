@@ -697,16 +697,26 @@ describe("the Briefing's line", () => {
   const BRIEF = { net: "mainnet", view: "trend" as const, subject: "dag", span: "30d" as const };
   const stored = async () => JSON.parse((await store.get(noteKeyOf("mainnet", "trend", "dag", "30d")))!) as NoteRecord;
   const answer = (line: string) => [`${CLEAN}\nLINE: ${line}`];
+  // The 30-day pill's facts state its own span length, so "the last 30 days" is a backed figure.
+  const SPAN30: NoteFacts = { ...FACTS, facts: [...FACTS.facts.filter((f) => f.label !== "Span length"), fact("Span length", 30 * 86_400, "duration")] };
+  const bdeps = (answers: string[]) => deps({ facts: async () => structuredClone(SPAN30), answers });
 
   it("is kept on a note the tour reads, and served", async () => {
-    const r = await generateNote(BRIEF, deps({ answers: answer("The hypergraph anchored 1,200 snapshots a day.") }), "read");
-    expect(r).toMatchObject({ state: "ok", line: "The hypergraph anchored 1,200 snapshots a day." });
-    expect((await stored()).line).toBe("The hypergraph anchored 1,200 snapshots a day.");
+    const r = await generateNote(BRIEF, bdeps(answer("Over the last 30 days, the hypergraph anchored 1,200 snapshots a day.")), "read");
+    expect(r).toMatchObject({ state: "ok", line: "Over the last 30 days, the hypergraph anchored 1,200 snapshots a day." });
+    expect((await stored()).line).toBe("Over the last 30 days, the hypergraph anchored 1,200 snapshots a day.");
   });
 
   it("is kept in the model's own words", async () => {
+    const r = await generateNote(BRIEF, bdeps(answer("Over the last 30 days, the hypergraph anchored 1,200 snapshots a day.")), "read");
+    expect(r).toMatchObject({ line: "Over the last 30 days, the hypergraph anchored 1,200 snapshots a day." });
+  });
+
+  // user, 2026-11-03: "the geo intro should mention the range".
+  it("is dropped when it does not name its span, so the tour reads the note's opening", async () => {
     const r = await generateNote(BRIEF, deps({ answers: answer("The hypergraph anchored 1,200 snapshots a day.") }), "read");
-    expect(r).toMatchObject({ line: "The hypergraph anchored 1,200 snapshots a day." });
+    expect(r).toMatchObject({ state: "ok" });
+    expect(r).not.toHaveProperty("line");
   });
 
   it("is asked of no other note", async () => {
@@ -728,8 +738,8 @@ describe("the Briefing's line", () => {
   });
 
   it("may run to two sentences", async () => {
-    const two = "The hypergraph anchored 1,200 snapshots a day. That is 37% up on the span before.";
-    expect(await generateNote(BRIEF, deps({ answers: answer(two) }), "read")).toMatchObject({ line: two });
+    const two = "Over the last 30 days, the hypergraph anchored 1,200 snapshots a day. That is 37% up on the span before.";
+    expect(await generateNote(BRIEF, bdeps(answer(two)), "read")).toMatchObject({ line: two });
   });
 
   it("is dropped past its length", async () => {

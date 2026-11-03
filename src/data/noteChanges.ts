@@ -25,9 +25,11 @@ export function changeWords(from: number, to: number): string | null {
   return pct === 0 ? null : `${pct > 0 ? "up" : "down"} ${Math.abs(pct)}%`;
 }
 
-/** A gap far past a chain's usual widest one (`isPause`). The words are the facts' own. */
-export function pauseChange(name: string, gap: string, usual: string, seconds: number, subject: NoteChangeSubject): NoteChange {
-  return { kind: "pause", subject, size: seconds, text: `${name} paused for ${gap}, the longest gap is usually ${usual}` };
+/** A gap far past a chain's usual widest one (`isPause`), stated against its NORMAL SPACING (user,
+ *  2026-11-03: "don't compare gaps against other gaps; compare gaps against the normal spacing between
+ *  snapshots"). `what` names one snapshot of the kind that paused. The words are the facts' own. */
+export function pauseChange(name: string, gap: string, spacing: string, what: string, seconds: number, subject: NoteChangeSubject): NoteChange {
+  return { kind: "pause", subject, size: seconds, text: `${name} paused for ${gap}, normally ${what} every ${spacing}` };
 }
 
 /** A rate far from its usual one, on the notable days' own bands (`notableDays.ts`), or null. */

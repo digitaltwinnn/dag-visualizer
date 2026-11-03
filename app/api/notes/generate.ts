@@ -205,6 +205,10 @@ function styleSlips(text: string, facts: readonly Fact[]): string[] {
     if (climb && !/\bon\b/.test(climb[1] ?? ""))
       out.push(`"${to.text}" is a whole span's figure: say what it is measured against ("on the span before"), or write "averaged ${to.text} per day" with its change`);
   }
+  // A NETWORK'S GLOBAL SNAPSHOTS AS A SHARE OR ANOTHER NOUN ("its share of global snapshots rose 5%",
+  // "placements", live 2026-11-03): the figure is the global snapshots it was part of.
+  const share = /\b(?:share of global snapshots|global snapshot (?:placements|appearances))\b/i.exec(text);
+  if (share) out.push(`"${share[0]}": say "<network> was part of <figure> global snapshots per day"`);
   // "HELD" WITH A CHANGE BESIDE IT ("Fees held at 332 DAG per day, up 11%", live): held is no change.
   const held = /\bheld\b[^.;]*?\d+%/i.exec(text);
   if (held) out.push(`"${held[0]}": held means it did not move; a figure with a change rose or fell`);
@@ -239,6 +243,7 @@ async function write(
   // A sentence naming no one speaks of the subject (R39): absent for the whole network.
   const subject = input.subjectName;
   const wantsLine = isBriefingNote(req.view, req.subject, req.span);
+  const span = spanWords(req.view, req.span, input.spanFrom, input.spanTo);
   let reasons: string[] | undefined;
   let lastNote = "";
   /** A note that passed the gate and only failed the style rewrite: it stands if the rewrite fails. */
@@ -247,7 +252,7 @@ async function write(
     if (attempt > 0) await count("retried");
     let answer: string;
     try {
-      answer = await chat(buildMessages(req.view, input.label, block, days, reasons, input.lead, input.common, input.kind, spanWords(req.view, req.span, input.spanFrom, input.spanTo), input.whole, wantsLine, spanBeforeWords(req.view, req.span)), wantsLine ? { maxTokens: LINE_TOKENS } : undefined);
+      answer = await chat(buildMessages(req.view, input.label, block, days, reasons, input.lead, input.common, input.kind, span, input.whole, wantsLine, spanBeforeWords(req.view, req.span)), wantsLine ? { maxTokens: LINE_TOKENS } : undefined);
       await count("calls");
     } catch (e) {
       if (!(e instanceof GateError)) throw e; // not the Gate's: `generateNote` counts it as `error`
@@ -289,7 +294,10 @@ async function write(
     }
     // The Briefing's line is held to the note's gate and is never worth a retry: one that fails,
     // runs long or says what did not happen is dropped, and the tour reads the note instead.
-    const brief = wantsLine && line && !NEGATIVE_RE.test(line) && checkNote(line, facts, input.names, { maxSentences: 2, subject }).ok ? line : null;
+    // THE TOUR'S LINE NAMES ITS RANGE (user, 2026-11-03: "the geo intro should mention the range"): a
+    // line without the span's words is dropped, and the tour reads the note's opening, which names it.
+    const named = line?.toLowerCase().includes(span.replace(/^the /, "").toLowerCase());
+    const brief = wantsLine && line && named && !NEGATIVE_RE.test(line) && checkNote(line, facts, input.names, { maxSentences: 2, subject }).ok ? line : null;
     const written: Written = { ok: true, text: note, days: kept, ...(brief && brief.length <= LINE_MAX ? { line: brief } : {}) };
     if (negative || wordy || slips.length) {
       held = written;

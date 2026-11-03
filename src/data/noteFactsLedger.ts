@@ -260,7 +260,11 @@ export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: st
     // A STALL OF THE WHOLE NETWORK IS ONE ROW: every chain waits on the global snapshots, so one row
     // per network would say the same thing up to three times.
     const stall = whole ? pauseOf("g.gapMax", null) : null;
-    if (stall) paused.push({ ...pauseChange("Global snapshots", seconds(stall.gap), seconds(stall.usual), stall.gap, { kind: "network", id: "dag" }), find: stall.find });
+    // The week's normal spacing between global snapshots: its covered seconds over its global snapshots.
+    const ticks = trimmed(week.series["g.ticks"] ?? [], week).filter((v): v is number => v != null);
+    const tickSum = ticks.reduce((a, v) => a + v, 0);
+    const globalSpacing = tickSum > 0 ? (ticks.length * week.stepMs) / 1000 / tickSum : null;
+    if (stall && globalSpacing) paused.push({ ...pauseChange("Global snapshots", seconds(stall.gap), seconds(globalSpacing), "one", stall.gap, { kind: "network", id: "dag" }), find: stall.find });
     for (const id of whole ? ids : [subject]) {
       const snaps = (d: TrendsWindowData) => metricSeries("snapshots", id, d.series).points;
       const total = (d: TrendsWindowData) => trimmed(snaps(d), d).reduce<number>((a, v) => a + (v ?? 0), 0);
@@ -278,7 +282,8 @@ export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: st
         if (change) paces.push(change);
       }
       const gap = pauseOf(`m.${id}.gapMax`, id);
-      if (gap && !(stall && gap.gap <= STALL_SHARED * stall.gap)) paused.push({ ...pauseChange(name, seconds(gap.gap), seconds(gap.usual), gap.gap, at), find: gap.find });
+      const normal = spacing(week);
+      if (gap && normal && !(stall && gap.gap <= STALL_SHARED * stall.gap)) paused.push({ ...pauseChange(name, seconds(gap.gap), seconds(normal), "a metagraph snapshot", gap.gap, at), find: gap.find });
       if (!sure) continue;
       for (const [metric, word, unit, floor] of [["fees", "fees", "DAG", 1 / HOURS_PER_DAY], ["kb", "data", "MB", 1 / HOURS_PER_DAY]] as const) {
         const nowRate = perHour(metric, metricSeries(metric, id, recent.series).points, recent);

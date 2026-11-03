@@ -91,6 +91,8 @@ describe("PROMPTS", () => {
     }
     expect(VOICE).toMatch(/The DAG produces global snapshots and each metagraph produces its own metagraph snapshots/);
     expect(VOICE).toMatch(/the DAG is part of nothing: it produces them/);
+    // live 2026-11-03: "Dor Technologies averaged 5,403 global snapshot placements per day".
+    expect(VOICE).toContain('"<network> was part of <figure> global snapshots per day"');
     expect(buildMessages("hyper", "the whole network", "Facts", null, undefined, undefined, true, undefined, null, true)[0]!.content).toContain(QUESTION_COMMON_WHOLE);
     expect(PROMPTS.geo.system("x")).toContain("Stay on where the nodes are located and who hosts them, and nothing else.");
     expect(PROMPTS.geo.system("x", undefined, true)).toContain("Stay on where the nodes are located and who hosts them, then the one sentence on activity, and nothing else.");

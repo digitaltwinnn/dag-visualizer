@@ -129,8 +129,8 @@ describe("pickChanges", () => {
 });
 
 describe("a pause and a rate, as rows", () => {
-  it("states the gap beside the usual widest one", () => {
-    expect(pauseChange("Digital Evidence", "2.3 hours", "38 seconds", 8280, NET)).toEqual({ kind: "pause", subject: NET, size: 8280, text: "Digital Evidence paused for 2.3 hours, the longest gap is usually 38 seconds" });
+  it("states the gap beside the normal spacing, never beside another gap (user, 2026-11-03)", () => {
+    expect(pauseChange("Digital Evidence", "2.3 hours", "7 seconds", "a metagraph snapshot", 8280, NET)).toEqual({ kind: "pause", subject: NET, size: 8280, text: "Digital Evidence paused for 2.3 hours, normally a metagraph snapshot every 7 seconds" });
   });
   it("states a rate at least twice or at most 0.4 of its usual one", () => {
     expect(rateChange("Dor fees", 12, 4, "12 DAG", "4 DAG", NET)).toMatchObject({ kind: "high", text: "Dor fees ran at 12 DAG an hour, usually 4 DAG" });

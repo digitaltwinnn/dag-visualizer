@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { NOTABLE_CAPS, NOTABLE_FLOOR, isPause, notableDays, rangeExtremes, rangeNotableCap } from "@/src/data/notableDays";
+import { NOTABLE_CAPS, NOTABLE_FLOOR, isPause, notableDays, rangeExtremes, rangeNotableCap, spacingOver } from "@/src/data/notableDays";
 
 const DAY = 86_400_000;
 const T0 = Date.UTC(2026, 8, 1);
@@ -280,13 +280,14 @@ describe("notableDays: lead-in (from)", () => {
 
   // user, 2026-11-03: "I don't think it's usually 3.5 minutes". A span that sped up states its own
   // typical day, while the lead-in still steadies what counts as a pause.
-  it("a pause is detected against the lead-in too, but stated against the span's own typical day", () => {
+  // user, 2026-11-03: "don't compare gaps against other gaps; compare gaps against the normal spacing".
+  it("a pause is detected against the long run's gaps, but stated against the span's normal spacing", () => {
     const { days, covered } = span(60);
     const gap: number[] = Array.from({ length: 60 }, (_, i) => (i < 30 ? 600 : 100));
     gap[50] = 8000;
     const series = { "m.a.snaps": flat(60, 40), "m.a.gapMax": gap };
     const [pause] = notableDays({ days, covered, series, subject: "a", ids: ["a"], cap: 99, from: 30 }).filter((d) => d.kind === "pause");
-    expect(pause).toMatchObject({ dayMs: days[50], value: 8000, level: 100 });
+    expect(pause).toMatchObject({ dayMs: days[50], value: 8000, level: 86_400 / 40 });
   });
 });
 
@@ -316,7 +317,7 @@ describe("notableDays: pause", () => {
     const series = { "m.a.snaps": flat(30, 40), "m.a.gapMax": flat(30, 900, { 12: 7200 }) };
     const out = notableDays({ days, covered, series, subject: "a", ids: ["a"], cap: 5 });
     expect(out).toHaveLength(1);
-    expect(out[0]).toMatchObject({ dayMs: days[12], kind: "pause", networkId: "a", value: 7200, level: 900 });
+    expect(out[0]).toMatchObject({ dayMs: days[12], kind: "pause", networkId: "a", value: 7200, level: 86_400 / 40 });
   });
 
   it("6x the median but under an hour is not a pause", () => {
@@ -454,7 +455,7 @@ describe("notableDays: the floor", () => {
     expect(NOTABLE_FLOOR).toBe(3);
   });
 
-  it("a network with nothing notable gets its busiest, quietest and longest-wait day, in that order", () => {
+  it("a network with nothing notable gets its busiest, quietest and longest-gap day, in that order", () => {
     const { days, covered } = span(30);
     const out = notableDays({
       days, covered, subject: "a", ids: ["a"], cap: 5, floor: 3,
@@ -463,7 +464,8 @@ describe("notableDays: the floor", () => {
     expect(out.map((d) => [d.kind, d.dayMs, d.value, d.level, d.networkId, d.score])).toEqual([
       ["peak", days[10], 130, 100, "a", 0],
       ["trough", days[20], 80, 100, "a", 0],
-      ["longest", days[15], 900, 600, "a", 0],
+      // The longest gap is stated against the span's normal spacing, never another gap (user, 2026-11-03).
+      ["longest", days[15], 900, (30 * 86_400) / 3010, "a", 0],
     ]);
   });
 
@@ -542,7 +544,7 @@ describe("the measures beyond the snapshot count", () => {
 
   it("the whole network pauses too", () => {
     const r = notableDays({ ...base({ "g.anchors": flat(50), "g.ticks": flat(50), "g.gapMax": at(60, 20, 8000) }), subject: "dag" });
-    expect(r).toMatchObject([{ dayMs: days[20], kind: "pause", networkId: null, value: 8000, level: 60 }]);
+    expect(r).toMatchObject([{ dayMs: days[20], kind: "pause", networkId: null, value: 8000, level: 86_400 / 50 }]);
   });
 
   it("leaves blocks to the charts: a normal day swings them twofold, which filled every slot live", () => {
@@ -613,5 +615,15 @@ describe("a range that ends before the record does", () => {
     const series = { "m.dor.snaps": at({ 25: 90, 35: 900, 36: 1 }) };
     const ext = rangeExtremes({ ...base, series, subject: "dor", until: 30 });
     expect(ext.find((d) => d.kind === "peak")?.dayMs).toBe(days[25]);
+  });
+});
+
+describe("spacingOver", () => {
+  it("is the covered days' seconds over the snapshots they held, skipping uncovered days", () => {
+    expect(spacingOver([40, 40, null, 80], [1, 1, null, 1], 0, 3)).toBe((3 * 86_400) / 160);
+  });
+  it("is NaN with nothing held", () => {
+    expect(spacingOver([0, 0], [1, 1], 0, 1)).toBeNaN();
+    expect(spacingOver(undefined, [1], 0, 0)).toBeNaN();
   });
 });

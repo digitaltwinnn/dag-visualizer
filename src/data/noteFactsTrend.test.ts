@@ -321,8 +321,8 @@ describe("trendFacts notable days", () => {
       ["Notable day 2 quietest day of the span, change against the span median, down", 0.17, "share"],
       ["Notable day 3 date (longest gap of the span)", T0 + 5 * DAY, "date"],
       ["Notable day 3 longest gap of the span, longest gap in anchoring", 900, "duration"],
-      // A day's longest gap, never the spacing (user, 2026-11-03), so its level is named as that.
-      ["Notable day 3 longest gap of the span, longest gap on a typical day of the span", 600, "duration"],
+      // A gap is stated against the span's normal spacing, never another gap (user, 2026-11-03).
+      ["Notable day 3 longest gap of the span, normal spacing between metagraph snapshots over the span", 1440, "duration"],
     ]);
     expect(checkNote("The busiest day of the span, with 70 snapshots against a median of 60.", r.facts, r.names, { maxSentences: 1 })).toEqual({ ok: true });
   });

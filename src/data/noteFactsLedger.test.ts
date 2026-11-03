@@ -295,9 +295,9 @@ describe("ledgerFacts' notable changes", () => {
   describe("what a network's own note flags", () => {
     const stalled = { "m.usdc.gapMax": row(74, (i) => (i === 40 ? 8280 : 30)) };
     const usual = { "m.usdc.gapMax": row(168, () => 40) };
-    it("a gap far past its usual widest one", () => {
+    it("a gap far past its usual widest one, stated against its normal spacing", () => {
       const r = ledgerFacts(input({ subject: "usdc", recent: side(74, 5 * MIN, 20, stalled), week: weekSide(usual) }))!;
-      expect(r.changes).toContainEqual(expect.objectContaining({ kind: "pause", size: 8280, subject: { kind: "network", id: "usdc" }, text: "USDC.dag paused for 2.3 hours, the longest gap is usually 40 seconds" }));
+      expect(r.changes).toContainEqual(expect.objectContaining({ kind: "pause", size: 8280, subject: { kind: "network", id: "usdc" }, text: "USDC.dag paused for 2.3 hours, normally a metagraph snapshot every 20 seconds" }));
     });
     it("names the bucket that gap ended in, for the snapshot to be found", () => {
       const r = ledgerFacts(input({ subject: "usdc", recent: side(74, 5 * MIN, 20, stalled), week: weekSide(usual) }))!;
@@ -320,7 +320,7 @@ describe("ledgerFacts' notable changes", () => {
     const r = ledgerFacts(input({ recent: side(74, 5 * MIN, 20, stall), week: side(168, HOUR, 120, usualGap, 0) }))!;
     const pauses = r.changes!.filter((c) => c.kind === "pause");
     expect(pauses).toHaveLength(1);
-    expect(pauses[0]).toMatchObject({ subject: { kind: "network", id: "dag" }, text: "Global snapshots paused for 2.3 hours, the longest gap is usually 40 seconds" });
+    expect(pauses[0]).toMatchObject({ subject: { kind: "network", id: "dag" }, text: "Global snapshots paused for 2.3 hours, normally one every 30 seconds" });
     expect(pauses[0]!.find).toMatchObject({ chain: null, gapS: 8280 });
     expect(r.changes!.some((c) => c.kind === "longest")).toBe(false); // the pause is that gap
   });

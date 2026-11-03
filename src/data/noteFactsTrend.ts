@@ -400,15 +400,14 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
       // The level beside it: an event's USUAL level (the median before it), an extreme's SPAN median.
       const level =
         day.kind === "high" || day.kind === "low" ? "usual level"
-        // THE LEVEL IS A DAY'S LONGEST GAP, never the spacing (user, 2026-11-03: "I don't think it's
-        // usually 3.5 minutes"): the median, over the days, of each day's longest gap, so the words
-        // name it as that, or a reader takes it for the cadence.
-        : day.kind === "pause" ? "longest gap on a typical day"
+        // A GAP IS STATED AGAINST THE NORMAL SPACING (user, 2026-11-03: "don't compare gaps against
+        // other gaps; compare gaps against the normal spacing between snapshots"): the span's covered
+        // seconds over its snapshots (`spacingOver`).
+        : day.kind === "pause" || day.kind === "longest" ? `normal spacing between ${dag ? "global" : "metagraph"} snapshots over the span`
         : day.kind === "peak" || day.kind === "trough" ? "span median"
-        : day.kind === "longest" ? "longest gap on a typical day of the span"
         : day.kind === "broadest" ? "span median networks"
         : null;
-      if (level) facts.push(fact(`Notable day ${n} ${what}, ${level}`, read(day.level), kind, format));
+      if (level && Number.isFinite(day.level)) facts.push(fact(`Notable day ${n} ${what}, ${level}`, read(day.level), kind, format));
       // HOW FAR THE DAY STOOD FROM IT, as a fact (user, 2026-11-03: a figure and its change, in the
       // model's own words rather than appended by code). A count only: a wait is said against its usual.
       const counted = day.kind === "high" || day.kind === "low" || day.kind === "peak" || day.kind === "trough";
