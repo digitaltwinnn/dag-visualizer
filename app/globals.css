@@ -1168,7 +1168,10 @@
   /* The AI card's rows: paper runs at half the chip's wash, because a full-bleed row is a far larger
      area of the same tint and read as a lavender block (user, 2026-11-01: "too strong"). */
   --ai-row: color-mix(in oklch, var(--ai-mark) 4%, transparent);
-  --ai-row-hover: light-dark(color-mix(in oklch, var(--ai-mark) 9%, transparent), color-mix(in oklch, var(--ai-mark) 8%, transparent));
+  /* Hovered or lit (another surface previewing the row's day): a clear step over the rest, on both
+     grounds (user, 2026-11-03: the notable row's hover "a bit too faint" at 9% paper / 8% dark, which
+     on dark sat 4% over the resting row). */
+  --ai-row-hover: light-dark(color-mix(in oklch, var(--ai-mark) 14%, transparent), color-mix(in oklch, var(--ai-mark) 16%, transparent));
   /* The site footer's lozenge — a VEIL, not a panel. It first borrowed --topbar-glass and read
      "too dominant white" on the light ground (user, 2026-09-01), which is right: that token is a
      0.86-alpha lit SURFACE for a full-width bar, and a 22px pill has no room to be a surface. This
