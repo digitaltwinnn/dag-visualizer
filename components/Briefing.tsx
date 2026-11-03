@@ -52,6 +52,9 @@ type End = "done" | "skip" | "key" | "back" | "unready";
 function endBriefing(stop: number, how: End): void {
   const s = useStore.getState();
   if (how === "done") s.setMode(BRIEFING_STOPS[0]);
+  // A tour played to its end hands the live view over (`components/TourHandover.tsx`); any other
+  // ending is the reader already taking it.
+  if (how === "done") s.setHandover(true);
   s.setBriefing(null); // after the mode, so the route publishes where the tour left off
   // ON THE PHONE THE TOUR HANDS OVER TO THE EXPLORE SHEET (user, 2026-11-03: "after intro also open
   // the 'explore' section by default"): the tour is the one arrival that ends with the reader on

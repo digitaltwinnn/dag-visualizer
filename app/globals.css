@@ -238,6 +238,11 @@
   filter: drop-shadow(0 0 6px var(--pulse-hue));
   animation: edge-pulse-sweep var(--tempo-signal) ease;
 }
+/* THE TOUR'S HAND-OVER (components/TourHandover.tsx): one traced drag — the hand rides the arc's
+   path (`offset-path` on the element), the coach fades in, holds, fades out. Played once; reduced
+   motion never mounts it. Keyframes only: a utility cannot declare one. */
+@keyframes handover-coach { 0% { opacity: 0; } 10%, 85% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes handover-drag { 0%, 10% { offset-distance: 0%; } 85%, 100% { offset-distance: 100%; } }
 @keyframes edge-pulse-sweep {
   0%   { top: calc(-1 * var(--pulse-len, 64px)); opacity: 0; }
   15%  { opacity: 1; }

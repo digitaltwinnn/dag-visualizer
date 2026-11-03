@@ -91,3 +91,37 @@ export const prevStop = (stop: number): number | null => (stop > 0 ? stop - 1 : 
 /** A stop ends when its time is up AND the scene has landed, so a slow renderer, whose transition
  *  stretches in wall-clock time, still shows every view. */
 export const mayAdvance = (elapsedMs: number, phase: "out" | "in" | null): boolean => elapsedMs >= STOP_MS && phase == null;
+
+// THE HAND-OVER (user, 2026-11-03: "if we finish the intro entirely … show some hint that they now
+// landed on the real view and can interact with it", design A + D with C's gesture, brainstormed in
+// the companion). A tour played to its end leaves the reader on the live view: its sign-off caption
+// stands where the tour's words stood, each surface pulses its edge in turn, and one drag is traced
+// across the scene. Only a tour that ENDED — Skip, Back, a key or a scene that never readied hand
+// nothing over. Played once; the reader's first gesture ends it.
+
+/** How long the hand-over stands, unless the reader moves first. */
+export const HANDOVER_MS = 8000;
+
+/** A surface that pulses its edge on the hand-over: the desktop's explore card, card rail and vitals
+ *  band, or the phone's open sheet and its dock bar. */
+export type HandoverTarget = "explore" | "rail" | "band" | "sheet" | "dock";
+
+/** The beat between one surface's pulse and the next. */
+const PULSE_GAP_MS = 500;
+/** The first pulse waits for the caption to arrive. */
+const PULSE_FIRST_MS = 600;
+
+/** The surfaces in the order they pulse, each with when it starts. Coarse to fine on screen: the
+ *  tool you browse with, then the facts, then the vitals — on the phone the sheet, then the dock
+ *  that reaches the others. */
+export function handoverPulses(phone: boolean): { target: HandoverTarget; atMs: number }[] {
+  const order: HandoverTarget[] = phone ? ["sheet", "dock"] : ["explore", "rail", "band"];
+  return order.map((target, i) => ({ target, atMs: PULSE_FIRST_MS + i * PULSE_GAP_MS }));
+}
+
+/** The traced drag: when it starts (a beat after the last pulse) and how long it runs, its fades
+ *  included. ONE pass (user, 2026-11-03: "do it only once"). */
+export function handoverHand(phone: boolean): { atMs: number; durMs: number } {
+  const pulses = handoverPulses(phone);
+  return { atMs: pulses[pulses.length - 1]!.atMs + 300, durMs: 2200 };
+}
