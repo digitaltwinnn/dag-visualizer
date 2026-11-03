@@ -17,6 +17,14 @@ export function generateStaticParams() {
   return ROUTED_VIEWS.map((v) => ({ view: v.slug }));
 }
 
+/** The root's share image, at its plain path (the root itself gets it from the file convention). */
+const SHARE_IMAGE = {
+  url: "/opengraph-image.png",
+  width: 1200,
+  height: 630,
+  alt: "DAG Visualizer: live 3D map of the Constellation Network, a globe of its nodes and the traffic between them",
+};
+
 export async function generateMetadata({ params }: { params: Promise<{ view: string }> }): Promise<Metadata> {
   const { view } = await params;
   const def = ROUTED_VIEWS.find((v) => v.slug === view)!;
@@ -28,8 +36,11 @@ export async function generateMetadata({ params }: { params: Promise<{ view: str
     // The placeholder is a real URL (so the address bar is honest and a reload stays put) but not
     // a page to index: it is a gallery of wireframes with no content of its own.
     ...(def.soon ? { robots: { index: false, follow: true } } : {}),
-    openGraph: { title, description: def.desc, type: "website", url: `/${def.slug}`, siteName: "DAG Visualizer" },
-    twitter: { card: "summary_large_image", title, description: def.desc },
+    // A segment's own `openGraph`/`twitter` REPLACE the root's, image included, so the share image
+    // (`app/opengraph-image.png`, a frame of the intro) is named here too, or a view's link
+    // previews with no picture at all.
+    openGraph: { title, description: def.desc, type: "website", url: `/${def.slug}`, siteName: "DAG Visualizer", images: [SHARE_IMAGE] },
+    twitter: { card: "summary_large_image", title, description: def.desc, images: [SHARE_IMAGE] },
   };
 }
 
