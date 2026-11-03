@@ -185,7 +185,7 @@ export interface MetaSnapRecord {
 }
 
 /** One explorer metagraph snapshot as the rolling buffer records it (fee/size kept, blocks counted). */
-function metaSnapRecord(s: RawMetaSnapshot): MetaSnapRecord {
+export function metaSnapRecord(s: RawMetaSnapshot): MetaSnapRecord {
   return {
     ordinal: s.ordinal, hash: s.hash, parent: s.lastSnapshotHash,
     ts: s.timestamp, fee: s.fee || 0, sizeInKB: s.sizeInKB || 0,
