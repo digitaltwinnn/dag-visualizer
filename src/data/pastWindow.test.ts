@@ -3,7 +3,7 @@ import type { MetaSnapRecord } from "@/src/data/api";
 import type { GlobalSnapshot, RawMetaSnapshot } from "@/src/data/types";
 import { CATALOG } from "@/src/engine/config";
 import { tickPolledRows } from "@/src/data/ladderLevels";
-import { buildPastWindow, foldAnchors, getPastWindow, ledgerSource, onPastWindow, pastWanted, setPastWindow, type LedgerSource } from "@/src/data/pastWindow";
+import { PAST_RETRY_MS, buildPastWindow, foldAnchors, pastRetryDelay, getPastWindow, ledgerSource, onPastWindow, pastWanted, setPastWindow, type LedgerSource } from "@/src/data/pastWindow";
 
 const g = (o: number): GlobalSnapshot => ({ ordinal: o, timestamp: `t${o}`, hash: `g${o}` });
 const raw = (o: number, ts: string, fee = 10): RawMetaSnapshot => ({ ordinal: o, timestamp: ts, hash: `m${o}`, lastSnapshotHash: `m${o - 1}`, fee, sizeInKB: 1 } as RawMetaSnapshot);
@@ -75,5 +75,13 @@ describe("the held window", () => {
     off();
     setPastWindow(w);
     expect(heard).toBe(2);
+  });
+});
+
+describe("pastRetryDelay", () => {
+  it("spaces three retries further apart, then gives up", () => {
+    expect([0, 1, 2].map(pastRetryDelay)).toEqual([...PAST_RETRY_MS]);
+    expect(PAST_RETRY_MS[0]! < PAST_RETRY_MS[1]! && PAST_RETRY_MS[1]! < PAST_RETRY_MS[2]!).toBe(true);
+    expect(pastRetryDelay(3)).toBeNull();
   });
 });

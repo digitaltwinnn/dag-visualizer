@@ -93,6 +93,15 @@ export function pastWanted(s: { ledger: boolean; following: boolean; pin: number
   return { kind: "fetch", ordinal: s.pin };
 }
 
+/** THE RETRY SCHEDULE for a window read that failed (user, 2026-11-03: "add a retry"): the delay
+ *  before retry `attempt` (0-based), or null once the budget is spent and the failure is told. A
+ *  read crosses many explorer reads, so one upstream blip should not cost the reader the window;
+ *  three spaced tries cover a blip without knocking on a door that stays shut. */
+export const PAST_RETRY_MS: readonly number[] = [2_000, 6_000, 15_000];
+export function pastRetryDelay(attempt: number): number | null {
+  return PAST_RETRY_MS[attempt] ?? null;
+}
+
 // ── The held window (the module's one piece of state) ─────────────────────────────────────────
 
 let held: PastWindow | null = null;

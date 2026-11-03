@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { useStore } from "@/src/store/store";
 import { NET, netUrl } from "@/src/net/current";
 import { POLL } from "@/src/engine/config";
-import { buildPastWindow, getPastWindow, pastWanted, setPastWindow, type PastWindowAnswer } from "@/src/data/pastWindow";
+import { buildPastWindow, getPastWindow, pastRetryDelay, pastWanted, setPastWindow, type PastWindowAnswer } from "@/src/data/pastWindow";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 
@@ -25,6 +25,14 @@ export default function PastWindowBridge() {
   const liveOldest = snaps[0]?.ordinal ?? null;
   // The ordinal in flight, or the last one that failed: neither is asked for twice in a row.
   const asked = useRef<number | null>(null);
+  // A scheduled retry: dropped when the reader moves on (another pin, live, another view). Kept in
+  // a ref, not the effect's cleanup, since the effect re-runs on every live tick.
+  const retry = useRef<number | null>(null);
+  const dropRetry = () => {
+    if (retry.current != null) window.clearTimeout(retry.current);
+    retry.current = null;
+  };
+  useEffect(() => dropRetry, []);
 
   useEffect(() => {
     const held = getPastWindow();
@@ -32,6 +40,7 @@ export default function PastWindowBridge() {
     if (want.kind === "keep") return;
     if (want.kind === "clear") {
       asked.current = null;
+      dropRetry();
       setPastWindow(null);
       if (useStore.getState().pastWindow) setStatus(null);
       return;
@@ -39,28 +48,40 @@ export default function PastWindowBridge() {
     const ordinal = want.ordinal;
     if (asked.current === ordinal) return;
     asked.current = ordinal;
+    dropRetry();
     setStatus({ ordinal, from: null, to: null, status: "loading" });
     // The answer applies only while the reader still wants THIS pin; a later pin has asked anew.
     const current = () => useStore.getState().pastWindow?.ordinal === ordinal;
-    fetch(netUrl(`/api/ledger/window?ordinal=${ordinal}`))
-      .then((r) => (r.ok ? (r.json() as Promise<PastWindowAnswer>) : null))
-      .then((answer) => {
-        if (!current()) return;
-        const w = answer ? buildPastWindow(answer, NET) : null;
-        if (!w) {
-          // A failed read stands the view back on the live feed (an earlier pin's window included).
-          setPastWindow(null);
-          setStatus({ ordinal, from: null, to: null, status: "failed" });
-          return;
-        }
-        setPastWindow(w);
-        setStatus({ ordinal, from: w.from, to: w.to, status: "ready" });
-      })
-      .catch(() => {
-        if (!current()) return;
-        setPastWindow(null);
-        setStatus({ ordinal, from: null, to: null, status: "failed" });
-      });
+    // A FAILED READ IS TRIED AGAIN (user, 2026-11-03: "add a retry"), on `pastRetryDelay`'s
+    // schedule, the explorer still saying it is reading; only when the budget is spent does the
+    // view stand back on the live feed (an earlier pin's window included) and say so.
+    const failed = (attempt: number) => {
+      if (!current()) return;
+      const delay = pastRetryDelay(attempt);
+      if (delay != null) {
+        retry.current = window.setTimeout(() => {
+          retry.current = null;
+          read(attempt + 1);
+        }, delay);
+        return;
+      }
+      setPastWindow(null);
+      setStatus({ ordinal, from: null, to: null, status: "failed" });
+    };
+    const read = (attempt: number) => {
+      if (!current()) return;
+      fetch(netUrl(`/api/ledger/window?ordinal=${ordinal}`))
+        .then((r) => (r.ok ? (r.json() as Promise<PastWindowAnswer>) : null))
+        .then((answer) => {
+          if (!current()) return;
+          const w = answer ? buildPastWindow(answer, NET) : null;
+          if (!w) return failed(attempt);
+          setPastWindow(w);
+          setStatus({ ordinal, from: w.from, to: w.to, status: "ready" });
+        })
+        .catch(() => failed(attempt));
+    };
+    read(0);
   }, [ledger, following, pin, liveOldest, setStatus]);
 
   return null;
