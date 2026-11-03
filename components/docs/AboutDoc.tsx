@@ -1,8 +1,13 @@
 "use client";
-import { TriangleAlert, type LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
+import { ChevronDown, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VIEW_ICONS } from "@/components/icons";
 import { ABOUT } from "@/components/aboutCopy";
+import NetLink from "@/components/NetLink";
+import { ROUTED_VIEWS } from "@/components/views";
+import { useStore } from "@/src/store/store";
+import type { Mode } from "@/src/store/store";
 
 // THE ABOUT DOCUMENT — the crawlable, GENERIC, non-technical prose (user, 2026-07-10): the app
 // is a WebGL canvas with almost no indexable text, so this carries the search-facing copy (what
@@ -12,16 +17,21 @@ import { ABOUT } from "@/components/aboutCopy";
 // wash) — the /about route server-renders this same component through AppShell, so the prose is
 // still in the route's HTML for crawlers. It also carries the UNOFFICIAL-PROJECT DISCLOSURE
 // (user, 2026-08-09), which used to be an always-on ribbon over the command bar.
-
-// The house eyebrow: a bare role word in caps micro, the same register every card head uses.
-function Eyebrow({ children }: { children: React.ReactNode }) {
-  return <p className="text-label tracking-caps uppercase text-muted-foreground">{children}</p>;
-}
+//
+// THE VIEWS, THEN QUESTIONS (user, 2026-11-03, option B of three in the brainstorming companion:
+// the page "feels a bit unorganized"). One "Live data" box carried six topics and the explore
+// section mixed the views with how the cards work, so the page is now: the disclosure first (user:
+// "move unofficial section to the top"), the title and lead, the views as tiles that open
+// them, and everything else as the questions a visitor actually has, one topic each. The answers
+// are native `<details>`: folded, they stay in the server-rendered HTML for crawlers, where a
+// Radix collapsible would unmount them. No privacy question (user, same day: "drop the privacy
+// section"), and the AI question is asked the way a visitor would ask it, before they know the
+// product's name.
 
 // One glass panel. Not `.ig-panel`: that class carries the rail cards' signal-edge pseudo-element
 // machinery (hover pairing, subject pulses) which has no meaning on a static document — reusing it
 // here would hang a live signal channel off prose. Same materials, none of the instrument.
-export function Panel({ className, children }: { className?: string; children: React.ReactNode }) {
+export function Panel({ className, children }: { className?: string; children: ReactNode }) {
   return (
     <div
       className={cn(
@@ -35,209 +45,188 @@ export function Panel({ className, children }: { className?: string; children: R
   );
 }
 
-// A view's card in the "what you can explore" grid. The icon is the view's REAL mark from the
-// app's own vocabulary (components/icons.tsx → VIEW_ICONS), so the cards here, the command
-// bar's buttons and the footer's view links can't disagree.
-function ViewCard({ icon: Icon, name, about }: { icon: LucideIcon; name: string; about: { title: string; text: string } }) {
+/** The question each view answers — the tile's line under the view's name. Every routed view has
+ *  one, Coming soon included (user, 2026-11-03), and nothing on the page counts them: more will come. */
+const VIEW_QUESTION: Record<Mode, string> = {
+  hyper: "How is it built?",
+  geo: "Where does it run?",
+  ledger: "When does it anchor?",
+  trend: "How has it changed?",
+  soon: "What comes next?",
+};
+
+// A view's tile: its REAL mark (VIEW_ICONS, so the tiles, the command bar and the footer can't
+// disagree), its name and its question. A real link to the view's route, switched in place the way
+// the footer's view links are, so the engine never reboots and a crawler still follows it.
+function ViewTile({ id, name, slug, soon }: { id: Mode; name: string; slug: string; soon?: boolean }) {
+  const setMode = useStore((s) => s.setMode);
+  const Icon = VIEW_ICONS[id];
   return (
-    <Panel className="p-4">
-      <div className="flex items-center gap-2">
-        <Icon aria-hidden className="size-4 text-primary flex-none" />
-        <h3 className="text-title font-semibold text-foreground">{name}</h3>
-        <span className="text-label text-muted-foreground">· {about.title}</span>
-      </div>
-      <p className="mt-2 text-prose text-foreground-dim">{about.text}</p>
-    </Panel>
+    <NetLink
+      href={`/${slug}`}
+      onClick={(e) => {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+        e.preventDefault();
+        setMode(id);
+      }}
+      className="group block rounded-lg focus-visible:outline-1 focus-visible:outline-ring/60"
+    >
+      {/* A view still to come wears the ghost card's dashed edge and a dimmed mark — nothing to
+          show yet, the bar's dimmed "Coming soon" entry in the same voice. */}
+      <Panel className={cn("h-full p-4 transition-colors duration-150 group-hover:border-[color-mix(in_oklch,var(--primary)_45%,transparent)] motion-reduce:transition-none", soon && "border-dashed")}>
+        <Icon aria-hidden className={cn("size-5", soon ? "text-muted-foreground" : "text-primary")} />
+        <h2 className="mt-2.5 text-title font-semibold text-foreground">{name}</h2>
+        <p className="mt-1 text-body text-muted-foreground">{VIEW_QUESTION[id]}</p>
+      </Panel>
+    </NetLink>
   );
 }
 
-// A prose section: the eyebrow/heading grammar plus an inset hairline, the card-head rule at
-// document scale. `scroll-mt` keeps an anchored heading clear of the fixed bar.
-function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
+// One question, folded: the summary is the question, the body its answer. The fold mark is the
+// app's own (the AI card's rows fold on the same chevron).
+function Question({ q, open, children }: { q: string; open?: boolean; children: ReactNode }) {
   return (
-    <section id={id} className="mt-12 scroll-mt-24">
-      <h2 className="text-xl font-semibold text-foreground">{title}</h2>
-      <div className="mt-3 border-t border-border" />
-      <div className="mt-4 space-y-4 text-foreground-dim leading-relaxed">{children}</div>
-    </section>
+    <details open={open} className="group border-b border-border">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-4 text-title font-semibold text-foreground [&::-webkit-details-marker]:hidden focus-visible:outline-1 focus-visible:outline-ring/60 rounded-sm">
+        <h3 className="m-0 [font:inherit] text-inherit">{q}</h3>
+        <ChevronDown aria-hidden className="size-4 flex-none text-muted-foreground transition-transform duration-150 group-open:rotate-180 motion-reduce:transition-none" />
+      </summary>
+      <div className="-mt-1 pb-5 space-y-3 text-prose text-foreground-dim">{children}</div>
+    </details>
   );
 }
+
+const B = ({ children }: { children: ReactNode }) => <strong className="text-foreground font-semibold">{children}</strong>;
 
 export default function AboutDoc() {
   return (
     <article className="pt-14">
-      <Eyebrow>About</Eyebrow>
-      <h1 className="mt-3 text-3xl font-semibold tracking-[-0.01em] leading-tight">
-        A live 3D map of the Constellation Network
-      </h1>
-      <p className="mt-5 text-lg text-foreground-dim leading-relaxed">
-        DAG Visualizer is a free, browser-based visualizer that shows the Constellation
-        Network as a living 3D scene. It connects to the network&apos;s public APIs and renders
-        what is actually happening right now: real nodes, real locations, real activity.
-      </p>
-      {/* The making-of, one line (user, 2026-10-18: "mention also that the site has been built and
-          designed using Constellation's own product called Gate AI"). A fact about the site, not a
-          claim about the network, so it sits under the lead and outside the live-data panel. */}
-      <p className="mt-3 text-prose text-muted-foreground">
-        The site itself was designed and built with Gate AI, Constellation&apos;s own AI product.
-      </p>
-
-      {/* The live-data promise, stated POSITIVELY (user, 2026-09-04: "nothing is made up"
-          answers an assumption no reader arrived with — just say we use live data) — and merged
-          with the old "Where the data comes from" section, which this panel replaces. It earns
-          a panel because it is the claim everything else on the page rests on. */}
-      <Panel className="mt-6 py-4 px-5">
-        <Eyebrow>Live data</Eyebrow>
-        <p className="mt-2 text-lg text-foreground leading-relaxed">
-          Every number on screen is live — read from the Constellation Network&apos;s own public
-          endpoints, the global snapshot stream, each metagraph&apos;s cluster and each
-          node&apos;s status, and drawn as it comes in. Built for many visitors at once: this site
-          asks the network once every few seconds and shares that answer with everyone watching,
-          so a busy day never adds load to the network itself. The one exception is an AI note,
-          which is written from those same figures a little earlier and says which stretch of time it
-          covers.
-        </p>
-        <p className="mt-2 text-prose text-muted-foreground">
-          Node locations come from their public internet addresses, so they are accurate to a
-          city and a hosting provider, not to a street. What is stored behind this site is the
-          network&apos;s own public history — activity totals summed from the chain for the
-          History view — and the short notes Constellation Gate AI writes about it. Nothing about you: the page
-          keeps a short memory of recent snapshots while it is open, and forgets it when you
-          close the tab. The one trace is a note written because you asked for it, by brushing a
-          range or picking a country, a provider or a kind of node: a count kept for two hours
-          under a scrambled form of your address, so no single visitor can ask for too many.
-        </p>
-        <p className="mt-2 text-prose text-muted-foreground">
-          When something can&apos;t be reached for a moment, the screen simply says so —
-          you&apos;ll see a small label like <span className="font-mono">NO SIGNAL</span> instead
-          of a number.
-        </p>
-        {/* The arcs-exception PARAGRAPH was cut (user, 2026-09-04: "it emphasises the wrong
-            thing") — but its 2026-08-12 honesty constraint still binds: the arcs are simulated
-            motion, so the promise above stays scoped to NUMBERS ("every number is live"), which
-            is that fix's own resolution. Don't widen the claim back to "everything" without
-            restoring an exception. */}
-      </Panel>
-
-      <Section id="explore" title="What you can explore">
-        <p>
-          Four views of the same network, each answering a different question: who and what,
-          where, when, and how it has changed.
-        </p>
-        {/* ONE HOME for the per-view copy (user, 2026-08-13 — "can't we re-use the about
-            card?"): these cards render the SAME lines the in-app About cards carry
-            (components/aboutCopy.ts), so the two surfaces can't drift. Each card leads with the
-            About TITLE (the orientation headline) under the view's NAME, exactly the pairing the
-            command bar's caption strip makes in-app. Single column: three paragraphs per view
-            read as prose, not as grid tiles. */}
-        <div className="grid gap-3">
-          <ViewCard icon={VIEW_ICONS.hyper} name="Hypergraph" about={ABOUT.hyper} />
-          <ViewCard icon={VIEW_ICONS.geo} name="Geography" about={ABOUT.geo} />
-          <ViewCard icon={VIEW_ICONS.ledger} name="Snapshots" about={ABOUT.ledger} />
-          {/* History was missing here (user, 2026-10-02) — the page still listed the three views
-              it launched with. */}
-          <ViewCard icon={VIEW_ICONS.trend} name="History" about={ABOUT.trend} />
-        </div>
-        {/* The card-adaptation principle, stated for the reader (user, 2026-08-15) — the same
-            text CLAUDE.md and the README carry in their own registers, given the human-voice
-            pass 2026-09-04 (the "ancestor card"/"routine facts" phrasing was the technical
-            register leaking through). */}
-        <p>
-          Whatever you select gets its own card — and the cards <strong>adapt to what
-          you&apos;re looking at</strong> rather than reciting a fixed record. Select a node
-          while a snapshot is pinned and its card leads with how the two are related; a fact
-          already stated by the card above it isn&apos;t repeated below; and the label floating
-          in the scene follows whichever card you open, just as the camera does.
-        </p>
-        {/* The Gate AI card, said once in the page's own register (2026-10-27; the user approves
-            the wording live). One card per view, at the top of the cards, leading with what
-            changed (review M4). It states the two promises the feature rests on: the numbers are
-            the view's own, and a note the figures cannot back never shows. Named for the product
-            (user, 2026-10-29: "this is the product and I'd like to promote it a bit"), the same
-            Gate AI the paragraph above says the site was built with. */}
-        <p>
-          Each view also has one <strong>Constellation Gate AI</strong> card, at the top of the
-          cards on the right. Gate AI, Constellation&apos;s own AI product, reads the same measured
-          figures the view shows and writes, in a few sentences, what changed and by how much, or,
-          when nothing moved, what the view is showing right now. A note with a number the figures
-          can&apos;t back is thrown away, and the card is always marked as AI so it never passes
-          for a measurement. Pick a country, a hosting provider, a kind of node or a stretch of
-          time on a chart, and its own card carries a note of its own, written when you first open
-          it.
-        </p>
-        {/* One selection across the views, and RAW as the one step down (user, 2026-10-09:
-            the "three depths" paragraph this replaces called History a depth below the scene,
-            while the switch shows it as a sibling of the other three — "we have a separate
-            trend page now rather than a 3rd depth"). The observation ladder CLAUDE.md carries
-            as convention 12 still holds in the app; this page states the part a reader can
-            see: the selection travels, and RAW opens the records under whatever view they are in. */}
-        <p>
-          <strong>One selection carries across all four views.</strong> Pick a network in the
-          Hypergraph and the globe, the snapshot chamber and the charts all open on it. And every
-          view has a <strong>RAW</strong> switch that drops one level down to the records
-          underneath — the actual snapshots in the live views, the stored measurements behind the
-          charts in History — with the card you had open coming along, so the records open where
-          you were looking.
-        </p>
-      </Section>
-
-      {/* The two explainer sections retired (user, 2026-09-04: "better to refer to their own
-          documentation") — one orientation sentence keeps the vocabulary the visualizer uses,
-          the official docs carry the full story. */}
-      <Section id="constellation" title="New to Constellation?">
-        <p>
-          Constellation is a distributed network whose native token is <strong>$DAG</strong>;
-          the independent application networks that plug into it are called{" "}
-          <em>metagraphs</em> — the same names you&apos;ll see all over this visualizer. For the
-          full story, straight from the source, see the official documentation at{" "}
-          <a
-            href="https://docs.constellationnetwork.io"
-            className="text-primary-ink underline underline-offset-2"
-            rel="noopener"
-          >
-            docs.constellationnetwork.io
-          </a>
-          .
-        </p>
-      </Section>
-
-      {/* The disclosure that used to be the always-on banner. Amber `--warn-soft` is the
-          advisory register — deliberately NOT --destructive: nothing here is an error.
-          The border is amber at low ALPHA, not a mix with --border: that token is itself a
-          translucent blue (#5a8cff38), so mixing 28% amber into it landed at hue 214 and the
-          panel read cyan — the one colour reserved for affordances. */}
-      <section id="unofficial" className="mt-12 scroll-mt-24">
-        <Panel className="py-4 px-5 border-[color-mix(in_oklch,var(--warn-soft)_30%,transparent)]">
+      {/* The disclosure that used to be the always-on banner, FIRST (user, 2026-11-03). Amber
+          `--warn-soft` is the advisory register — deliberately NOT --destructive: nothing here is an
+          error. The border is amber at low ALPHA, not a mix with --border: that token is itself a
+          translucent blue, so mixing amber into it landed at hue 214 and the panel read cyan — the
+          one colour reserved for affordances. */}
+      <section id="unofficial" className="scroll-mt-24">
+        <Panel className="py-3.5 px-5 border-[color-mix(in_oklch,var(--warn-soft)_30%,transparent)]">
           <div className="flex items-center gap-2">
             <TriangleAlert aria-hidden className="size-3.5 text-warn-soft opacity-85 flex-none" />
-            <h2 className="text-label tracking-caps uppercase font-bold text-warn-soft">
-              Unofficial, experimental
-            </h2>
+            {/* A label, not a heading: the page's title stays its first heading. */}
+            <p className="text-label tracking-caps uppercase font-bold text-warn-soft">Unofficial, experimental</p>
           </div>
-          <p className="mt-3 text-foreground-dim leading-relaxed">
-            DAG Visualizer is an independent community project. It is{" "}
-            <strong className="text-foreground">not affiliated with, endorsed by, or operated by</strong>{" "}
-            Constellation Network or any of the metagraph projects it displays. Their names,
-            tickers and brand colours appear here only to identify what is being shown.
-          </p>
-          <p className="mt-3 text-foreground-dim leading-relaxed">
-            It is also a work in progress: views arrive unfinished, readings can be wrong, and
-            a feed can go quiet without warning. Nothing here is financial advice or an
-            official record of the network. For anything that matters, use the official
-            sources.
-          </p>
-          <p className="mt-3 text-prose text-muted-foreground">
-            For the official project, see{" "}
-            <a
-              href="https://constellationnetwork.io"
-              className="text-primary-ink underline underline-offset-2"
-              rel="noopener"
-            >
+          <p className="mt-2 text-prose text-foreground-dim">
+            An independent community project, <B>not affiliated with, endorsed by, or operated by</B> Constellation
+            Network or any of the metagraph projects it shows; their names, tickers and colours appear only to identify
+            them. It is a work in progress: views arrive unfinished and readings can be wrong. Nothing here is financial
+            advice or an official record. For the official project, see{" "}
+            <a href="https://constellationnetwork.io" className="text-primary-ink underline underline-offset-2" rel="noopener">
               constellationnetwork.io
             </a>
             .
           </p>
         </Panel>
+      </section>
+
+      <p className="mt-10 text-label tracking-caps uppercase text-muted-foreground">About</p>
+      <h1 className="mt-3 text-3xl font-semibold tracking-[-0.01em] leading-tight">A live 3D map of the Constellation Network</h1>
+      <p className="mt-5 text-lg text-foreground-dim leading-relaxed">
+        DAG Visualizer is a free, browser-based visualizer that shows the Constellation Network as a living 3D scene. It
+        connects to the network&apos;s public APIs and renders what is actually happening right now: real nodes, real
+        locations, real activity.
+      </p>
+      {/* The making-of, one line (user, 2026-10-18; "integrated" 2026-11-03 — the notes on the cards are
+          Gate AI's too). A fact about the site, not a claim about the network. */}
+      <p className="mt-3 text-prose text-muted-foreground">
+        Designed, built and integrated with Gate AI, Constellation&apos;s own AI product.
+      </p>
+
+      <section id="explore" aria-label="The views" className="mt-8 grid grid-cols-5 gap-3 max-[900px]:grid-cols-3 max-[700px]:grid-cols-2">
+        {ROUTED_VIEWS.map((v) => (
+          <ViewTile key={v.id} id={v.id} name={v.name} slug={v.slug} soon={v.soon} />
+        ))}
+      </section>
+
+      <section id="questions" aria-label="Questions" className="mt-10 border-t border-border">
+        {/* The live-data promise, stated POSITIVELY (user, 2026-09-04), and scoped to NUMBERS: the
+            arcs are simulated motion (2026-08-12), so don't widen the claim to "everything". */}
+        <Question q="Are the numbers live?" open>
+          <p>
+            Yes. Every number on screen is read from the Constellation Network&apos;s own public endpoints — the global
+            snapshot stream, each metagraph&apos;s cluster and each node&apos;s status — and drawn as it comes in.
+          </p>
+          <p>
+            It is built for many visitors at once: the site asks the network once every few seconds and shares that answer
+            with everyone watching, so a busy day never adds load to the network itself. The one exception is a written
+            note on a card, which is made from those same figures a little earlier and says which stretch of time it covers.
+          </p>
+        </Question>
+
+        {/* ONE HOME for the per-view copy (components/aboutCopy.ts), shared with the in-app About row. */}
+        <Question q="What does each view show?">
+          {ROUTED_VIEWS.map((v) => (
+            <p key={v.id}>
+              <B>{v.name}</B> — {ABOUT[v.id].title.toLowerCase()}. {ABOUT[v.id].text}
+            </p>
+          ))}
+        </Question>
+
+        <Question q="How do I find my way around?">
+          <p>
+            <B>One selection carries across every view.</B> Pick a network in the Hypergraph and the globe, the snapshot
+            chamber and the charts all open on it.
+          </p>
+          <p>
+            Whatever you select gets its own card, and the cards <B>adapt to what you&apos;re looking at</B> rather than
+            reciting a fixed record: select a node while a snapshot is pinned and its card leads with how the two are
+            related, and a fact the card above already states isn&apos;t repeated below.
+          </p>
+          <p>
+            Every view has a <B>RAW</B> switch that drops one level down to the records underneath — the actual snapshots in
+            the live views, the stored measurements behind the charts in History — with the card you had open coming along.
+          </p>
+        </Question>
+
+        {/* Asked the way a visitor would, before they know the product (user, 2026-11-03: the Gate
+            AI section "should be more generic as user won't know yet what that is"); the answer
+            names it. It keeps the feature's two promises: the figures are the view's own, and a note
+            they can't back never shows. */}
+        <Question q="Who writes the short notes on the cards?">
+          <p>
+            An AI does, and the card always says so. Each view has one note at the top of the cards on the right, written by{" "}
+            <B>Gate AI</B>, Constellation&apos;s own AI product. It reads the same measured figures the view shows and writes,
+            in a few sentences, what changed and by how much — or, when nothing moved, what the view is showing right now.
+          </p>
+          <p>
+            A note with a number the figures can&apos;t back is thrown away, so it never passes for a measurement. Pick a
+            country, a hosting provider, a kind of node or a stretch of time on a chart, and its own card carries a note of
+            its own.
+          </p>
+        </Question>
+
+        <Question q="How accurate are the node locations?">
+          <p>
+            Each node is placed by its public internet address, so its location is accurate to a city and a hosting
+            provider, not to a street.
+          </p>
+        </Question>
+
+        <Question q="What if something can't be reached?">
+          <p>
+            The screen simply says so. You&apos;ll see a small label like <span className="font-mono">NO SIGNAL</span>{" "}
+            instead of a number, and it fills in again as soon as the network answers.
+          </p>
+        </Question>
+
+        <Question q="New to Constellation?">
+          <p>
+            Constellation is a distributed network whose native token is <B>$DAG</B>; the independent application networks
+            that plug into it are called <em>metagraphs</em> — the same names you&apos;ll see all over this visualizer. For
+            the full story, straight from the source, see the official documentation at{" "}
+            <a href="https://docs.constellationnetwork.io" className="text-primary-ink underline underline-offset-2" rel="noopener">
+              docs.constellationnetwork.io
+            </a>
+            .
+          </p>
+        </Question>
       </section>
 
       {/* No article footer at all (user, 2026-09-04, two rounds): the site footer below the
