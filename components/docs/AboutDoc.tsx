@@ -154,9 +154,8 @@ export default function AboutDoc() {
             snapshot stream, each metagraph&apos;s cluster and each node&apos;s status — and drawn as it comes in.
           </p>
           <p>
-            It is built for many visitors at once: the site asks the network once every few seconds and shares that answer
-            with everyone watching, so a busy day never adds load to the network itself. The one exception is a written
-            note on a card, which is made from those same figures a little earlier and says which stretch of time it covers.
+            The one exception is a written note on a card, which is made from those same figures a little earlier and says
+            which stretch of time it covers.
           </p>
         </Question>
 
