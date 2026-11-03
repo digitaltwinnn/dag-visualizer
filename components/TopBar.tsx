@@ -16,6 +16,7 @@ import SettingsMenu from "@/components/topbar/SettingsMenu";
 import ViewPicker from "@/components/topbar/ViewPicker";
 import { NET_SWITCH_VIEW } from "@/components/topbar/NetworkSwitch";
 import { useBreakpoint } from "@/components/useBreakpoint";
+import { useSceneYield } from "@/components/RailShade";
 import { DOC_PAGES, LISTED_VIEWS, VIEWS } from "@/components/views";
 import { stepView, swipeDirection } from "@/src/engine/domain/viewSwipe";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
@@ -77,6 +78,11 @@ export default function TopBar() {
   const shownStrip = strip ?? lastStrip;
 
   const bp = useBreakpoint();
+  // THE BAR STEPS BACK WITH THE RAILS AND THE BAND while the hand is on the camera (user, 2026-11-03:
+  // "when we drag it dims the bottom section but in normal pc it should also dim the header"). The
+  // one read (`useSceneYield`), on the DESKTOP tier only: below it the bar holds the phone's view
+  // face and the tablet's only controls, and the docks already step aside on their own.
+  const yielding = useSceneYield() && bp === "desktop";
   useEffect(() => {
     setStrip((cur) => (bp === "phone" || cur === "views" ? null : cur));
   }, [bp]);
@@ -294,6 +300,10 @@ export default function TopBar() {
           // The card elevation pair, by TOKEN (Print, 2026-10-09): the literal restated `--card-ambient`'s
           // dark bytes and so kept casting a drop on light after the token went to zero there.
           "[box-shadow:var(--card-ambient)]",
+          // The `.rail-shade` recipe's tempos: away 0.3s, back 0.18s (the return answers a gesture
+          // already finished).
+          "transition-opacity duration-[180ms] ease-out motion-reduce:transition-none",
+          yielding && "opacity-40 duration-300 ease-[ease]",
         )}
       >
       <div
