@@ -167,18 +167,16 @@ describe("PROMPTS", () => {
     expect(PROMPTS.trend.system("the hypergraph", undefined, false, "span")).toContain(PROMPTS.trend.questions!.span);
     expect(PROMPTS.trend.system("the hypergraph", undefined, false, "span")).not.toContain(PROMPTS.trend.question);
     expect(PROMPTS.trend.system("the hypergraph")).toContain(PROMPTS.trend.question);
-    expect(geo.country).toBe(
-      "Open with a plain sentence with the network as its actor, in the shape \"<network> hosts N nodes in <country>\"; then what share of the network's nodes that is and the country's place among the network's countries, or, when the facts count one country, that it is the network's only country, with no share and no place; then how that moved over the span, or that it held. Say nothing about speed.",
-    );
-    expect(geo.provider).toBe(
-      "Open with a plain sentence with the provider as its actor, in the shape \"<provider> hosts N of <network>'s nodes\", network-wide, not for one place; then what share of the network's nodes with a known provider that is and its place among the network's providers, or, when the facts count one provider, that it is the network's only provider, with no share and no place; then how that moved over the span, or that it held. Say nothing about speed.",
-    );
+    // VARIED, NOT A TEMPLATE (user, 2026-11-03: country and provider notes read "very similar"): each
+    // opens on what is most telling for it, with the name still the sentence's actor.
+    expect(geo.country).toMatch(/^Say three things about this country, in whichever order reads best for it, opening on the most telling/);
+    expect(geo.provider).toMatch(/^Say three things about this provider, network-wide and not for one place/);
     expect(hyper.type).toBe(
       "Open with a plain sentence whose subject is the nodes, in the shape \"N of the M <network> nodes run <layers>\", M being all its nodes, the layers named exactly as the facts name them, with no possessive on the name (a node RUNS its layers, so the verb is run); then say in plain words where that group stands among the network's layer groups, as a reader would (\"its largest group\", \"the smaller of its two groups\", \"its only group\"), never \"share\", \"rank\" or a percentage; then how that changed over the span, or that it held.",
     );
     // The opening is a plain sentence with an actor, never the Subject line used as a noun
     // ("Dor Technologies nodes in Finland run 2" — user, 2026-10-30: "not really logical").
-    for (const q of [geo.country, geo.provider]) expect(q).toMatch(/^Open with a plain sentence with the \w+ as its actor, in the shape "<\w+> (hosts|runs) N /);
+    for (const q of [geo.country, geo.provider]) expect(q).toMatch(/as the sentence's actor/);
     // A node RUNS its layers (user, 2026-10-30: "do they run the nodes on L0 or is the node composed
     // out of it?"): the group's sentence has the nodes as its subject, never the network running
     // nodes "on" a layer.

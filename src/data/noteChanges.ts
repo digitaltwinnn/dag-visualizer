@@ -1,13 +1,16 @@
-import type { NoteChange, NoteChangeSubject } from "@/src/data/noteTypes";
+import type { ChangeBrief, Fact, NoteChange, NoteChangeSubject } from "@/src/data/noteTypes";
+import { fact } from "@/src/data/noteFacts";
 
 // A VIEW NOTE'S NOTABLE CHANGES (user, 2026-10-31: "notables in the other views' AI cards ... related
 // to a clickable subject"): what moved over the note's span, as rows the reader can click into the
-// subject that moved, the sibling of History's notable days. Code picks them and code words them
-// (user: "just say 'Hetzner lost 3 nodes in <city>'"): a row is one measured move in a set sentence,
-// so the model has nothing to add to it and the gate nothing to check. A span where nothing moved
-// has no rows of change. The chamber alone adds its extremes, each a measured fact of the span
-// (user, 2026-11-01), never a move: size 0 and below, so anything that moved reads first. A subject
-// card's rows (user, 2026-11-02) are its own move, then where inside it that happened.
+// subject that moved, the sibling of History's notable days. CODE PICKS THEM, THE MODEL WORDS THEM
+// (user, 2026-11-03: "the notable-change rows all must come from AI"; they were code-worded set
+// sentences until then): each builder here decides whether a move is worth a row and hands over a
+// BRIEF — what the row is about and its measured figures — and the model writes the row's line from
+// it, checked by the gate like a notable day's caption; a row whose line fails is dropped. A span
+// where nothing moved has no rows. The chamber alone adds its extremes, each a measured fact of the
+// span (user, 2026-11-01), never a move: size 0 and below, so anything that moved reads first. A
+// subject card's rows (user, 2026-11-02) are its own move, then where inside it that happened.
 
 export const NOTE_CHANGES_CAP = 3;
 
@@ -15,28 +18,34 @@ export const NOTE_CHANGES_CAP = 3;
  *  note's own lead threshold: a row is a claim the reader can click, and pace is noisy. */
 export const RHYTHM_CHANGE = 0.25;
 
-const count = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+/** A row waiting for its line: the brief the model words it from. */
+const row = (kind: NoteChange["kind"], subject: NoteChangeSubject, size: number, about: string, facts: Fact[] = []): NoteChange => {
+  const brief: ChangeBrief = { about, facts };
+  return { kind, subject, size, text: "", brief };
+};
 
-/** How far a figure moved, in words ("down 12%"), or null when it rounds to nothing or has no start
- *  to move from. A notable change row's own words (a row is code-worded by design). */
-export function changeWords(from: number, to: number): string | null {
-  if (!(from > 0)) return null;
-  const pct = Math.round((to / from - 1) * 100);
-  return pct === 0 ? null : `${pct > 0 ? "up" : "down"} ${Math.abs(pct)}%`;
-}
+/** How far a pair moved, as the share fact a note's own changes carry (`withChangeFacts`). */
+const changeFact = (label: string, from: number, to: number): Fact[] => {
+  const pct = from > 0 ? Math.round((to / from - 1) * 100) : 0;
+  return pct === 0 ? [] : [fact(`${label}, change against the start of the span, ${pct > 0 ? "up" : "down"}`, Math.abs(pct) / 100, "share")];
+};
 
 /** A gap far past a chain's usual widest one (`isPause`), stated against its NORMAL SPACING (user,
  *  2026-11-03: "don't compare gaps against other gaps; compare gaps against the normal spacing between
- *  snapshots"). `what` names one snapshot of the kind that paused. The words are the facts' own. */
-export function pauseChange(name: string, gap: string, spacing: string, what: string, seconds: number, subject: NoteChangeSubject): NoteChange {
-  return { kind: "pause", subject, size: seconds, text: `${name} paused for ${gap}, normally ${what} every ${spacing}` };
+ *  snapshots"). `what` names the kind of snapshot that paused. */
+export function pauseChange(name: string, gapS: number, spacingS: number, what: string, subject: NoteChangeSubject): NoteChange {
+  return row("pause", subject, gapS, `${name} paused`, [fact("Pause length", gapS, "duration"), fact(`Normal spacing between ${what}`, spacingS, "duration")]);
 }
 
-/** A rate far from its usual one, on the notable days' own bands (`notableDays.ts`), or null. */
-export function rateChange(name: string, now: number, usual: number, nowText: string, usualText: string, subject: NoteChangeSubject): NoteChange | null {
+/** A rate far from its usual one, on the notable days' own bands (`notableDays.ts`), or null.
+ *  `format` writes an hour's amount as the facts write it, with its unit. */
+export function rateChange(name: string, now: number, usual: number, unit: string, subject: NoteChangeSubject, format?: (v: number) => string): NoteChange | null {
   if (!(usual > 0)) return null;
   const kind = now >= 2 * usual ? "high" : now <= 0.4 * usual ? "low" : null;
-  return kind && { kind, subject, size: Math.abs(Math.log(Math.max(now, 1e-9) / usual)), text: `${name} ran at ${nowText} an hour, usually ${usualText}` };
+  return kind && row(kind, subject, Math.abs(Math.log(Math.max(now, 1e-9) / usual)), `${name} ran ${kind === "high" ? "far above" : "far below"} its usual rate`, [
+    fact(`${unit} an hour, recent`, now, "amount", format),
+    fact(`${unit} an hour, usual`, usual, "amount", format),
+  ]);
 }
 
 /** The smallest share of a count a move of two or more nodes takes to be worth a row. */
@@ -52,9 +61,8 @@ const worthARow = (from: number, delta: number): boolean => {
 };
 
 /** A count's move, or null when it did not, or moved too little to be worth a row (`worthARow`).
- *  `place` is a measured city, never a guess, and a row naming one states that city's percentage:
- *  the sentence reads as the city's (`was` nodes there). A first or a last node is always an event,
- *  and has no percentage: the words already say all of it or none of it. */
+ *  `place` is a measured city, never a guess, and a row naming one carries that city's own counts
+ *  (`was` nodes there). A first or a last node is an event, with no change against a start. */
 export function countChange(
   name: string,
   from: number,
@@ -66,21 +74,22 @@ export function countChange(
   const size = Math.abs(to - from);
   const where = place ? ` in ${place.city}` : "";
   if (from > 0 && to > 0 && !worthARow(place?.was || from, to - from)) return null;
-  if (from === 0) return { kind: "new", subject, size, text: `${name} gained its first ${size === 1 ? "node" : count(size, "node")}${where}` };
-  if (to === 0) return { kind: "gone", subject, size, text: `${name} lost its last ${size === 1 ? "node" : count(size, "node")}${where}` };
-  const by = place ? changeWords(place.was, place.was + to - from) : changeWords(from, to);
-  return { kind: to > from ? "gained" : "lost", subject, size, text: `${name} ${to > from ? "gained" : "lost"} ${count(size, "node")}${where}${by ? `, ${by}` : ""}` };
+  const moved = fact(to > from ? "Nodes gained" : "Nodes lost", size, "count");
+  if (from === 0) return row("new", subject, size, `${name} gained its first nodes${where}`, [moved]);
+  if (to === 0) return row("gone", subject, size, `${name} lost its last nodes${where}`, [moved]);
+  const was = place ? place.was : from;
+  const now = place ? place.was + to - from : to;
+  return row(to > from ? "gained" : "lost", subject, size, `${name}'s nodes${where}`, [
+    moved,
+    fact(`Nodes${where} at the start of the span`, was, "count"),
+    fact(`Nodes${where} at the end of the span`, now, "count"),
+    ...changeFact(`Nodes${where}`, was, now),
+  ]);
 }
 
 /** A network starting or stopping. Outranks any count: nothing else says it. */
 export function eventChange(name: string, kind: "active" | "quiet", subject: NoteChangeSubject): NoteChange {
-  return { kind, subject, size: Number.MAX_SAFE_INTEGER, text: `${name} ${kind === "active" ? "became active" : "went quiet"}` };
-}
-
-function spacingWords(seconds: number): string {
-  if (seconds < 60) return count(Math.round(seconds), "second");
-  if (seconds < 3600) return count(Math.round(seconds / 60), "minute");
-  return count(Math.round(seconds / 3600), "hour");
+  return row(kind, subject, Number.MAX_SAFE_INTEGER, `${name} ${kind === "active" ? "became active" : "went quiet"} over the span`);
 }
 
 /** A network's pace against its usual one, seconds between snapshots: null under the threshold and
@@ -88,23 +97,21 @@ function spacingWords(seconds: number): string {
 export function rhythmChange(name: string, usualS: number, recentS: number, subject: NoteChangeSubject): NoteChange | null {
   if (!(usualS > 0) || !(recentS > 0)) return null;
   const size = Math.abs(recentS / usualS - 1);
-  const now = spacingWords(recentS);
-  const usual = spacingWords(usualS);
-  if (size < RHYTHM_CHANGE || now === usual) return null;
-  const faster = recentS < usualS;
-  return { kind: faster ? "faster" : "slower", subject, size, text: `${name} ${faster ? "sped up" : "slowed down"}: a metagraph snapshot every ${now}, usually ${usual}` };
+  const now = fact("Spacing between its metagraph snapshots, recent", recentS, "duration");
+  const usual = fact("Spacing between its metagraph snapshots, usual", usualS, "duration");
+  if (size < RHYTHM_CHANGE || now.text === usual.text) return null;
+  return row(recentS < usualS ? "faster" : "slower", subject, size, `${name} ${recentS < usualS ? "sped up" : "slowed down"}`, [now, usual]);
 }
 
 /** The span's largest global snapshot, by the snapshots it anchored (user, 2026-11-02: "more
- *  interesting" than a metagraph's). Its record is found with the note; until then, or where it
- *  cannot be, the row is a statement. */
+ *  interesting" than a metagraph's). Its record is found with the note. */
 export function largestGlobalChange(anchored: number): NoteChange {
-  return { kind: "peak", subject: { kind: "self" }, size: 0, text: `The largest global snapshot anchored ${anchored} metagraph snapshots` };
+  return row("peak", { kind: "self" }, 0, "The span's largest global snapshot", [fact("Metagraph snapshots it anchored", anchored, "count")]);
 }
 
 /** Who held the span's longest gap between snapshots. Below the largest snapshot on a tie of kinds. */
 export function longestGapChange(name: string, seconds: number, subject: NoteChangeSubject): NoteChange {
-  return { kind: "longest", subject, size: -1, text: `${name} had the longest gap, ${spacingWords(seconds)}` };
+  return row("longest", subject, -1, `${name} had the span's longest gap`, [fact("Longest gap", seconds, "duration")]);
 }
 
 type Sites = Readonly<Record<string, number>>;
@@ -156,7 +163,7 @@ export function siteMoves(now: Sites | undefined, then: Sites | undefined, keep:
 
 /** The rows to show: each list's biggest in turn, so no one kind of subject fills them. */
 export function pickChanges(...lists: (readonly NoteChange[])[]): NoteChange[] {
-  const queues = lists.map((l) => [...l].sort((a, b) => b.size - a.size || a.text.localeCompare(b.text)));
+  const queues = lists.map((l) => [...l].sort((a, b) => b.size - a.size || (a.brief?.about ?? a.text).localeCompare(b.brief?.about ?? b.text)));
   const out: NoteChange[] = [];
   while (out.length < NOTE_CHANGES_CAP && queues.some((q) => q.length)) {
     for (const q of queues) if (q.length && out.length < NOTE_CHANGES_CAP) out.push(q.shift()!);

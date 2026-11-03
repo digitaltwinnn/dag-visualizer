@@ -553,9 +553,12 @@ export async function factsFor(
     spanFrom: r.spanFrom,
     spanTo: r.spanTo,
     label: r.label ?? row.label(subject, names),
-    // The warmed fleet country (`cc:XX`) keeps Geography's own question: its facts are the country's
-    // place in the whole network, not a network's nodes there. Only on-request subject notes ask a kind's.
-    kind: isSubjectNote(subject) ? subjectKindOf(subject) : "view",
+    // A COUNTRY IS ASKED THE COUNTRY'S QUESTION, the warmed fleet country (`cc:XX`) too (user,
+    // 2026-11-03, reading "Hosting held steady across 5 countries" on Germany's card): Geography's own
+    // question asks the whole network's count and the places that moved, which a country note answered
+    // with the network's figures. Its facts are the country's place in the whole network, which is what
+    // the country question asks for.
+    kind: isSubjectNote(subject) || subjectKindOf(subject) === "country" ? subjectKindOf(subject) : "view",
     common: hasCommonReading(built.facts),
     whole: commonIsWhole(built.facts),
     ...(subjectName != null ? { subjectName } : {}),

@@ -88,10 +88,22 @@ export type NoteChangeFind =
 
 /** One row of a view note's notable changes. `text` is written here by code, never by the model: a
  *  row states one measured move in one plain sentence, so it has nothing to get wrong. */
+/** WHAT A ROW IS ABOUT, FOR THE MODEL TO WORD (user, 2026-11-03: "the notable-change rows all must
+ *  come from AI"): a short label naming the subject and what happened, and its measured figures. Code
+ *  picks the row; the model writes its line from this, held to the gate like any caption. Never
+ *  stored or served: the row's `text` is the model's line. */
+export interface ChangeBrief {
+  about: string;
+  facts: Fact[];
+}
+
 export interface NoteChange {
   kind: NoteChangeKind;
   subject: NoteChangeSubject;
+  /** The model's line for the row (empty until it is written; a row with no line is never stored). */
   text: string;
+  /** Present while the row is being written, gone once it is (`ChangeBrief`). */
+  brief?: ChangeBrief;
   /** How much it moved: nodes for a count, a rhythm's ratio off 1, which rows outrank which. */
   size: number;
   find?: NoteChangeFind;

@@ -254,7 +254,6 @@ export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: st
     const usual = median(widths);
     return isPause(peak.v, usual) ? { gap: peak.v, usual, find: { chain, fromMs: peak.fromMs, toMs: peak.toMs, gapS: peak.v } } : null;
   };
-  const seconds = (v: number) => fact("", v, "duration").text;
   if (weekCovered) {
     const dayMeasured = spanMeasured(trimmed(recent.series["g.ticks"] ?? [], recent), recent.stepMs);
     // A STALL OF THE WHOLE NETWORK IS ONE ROW: every chain waits on the global snapshots, so one row
@@ -264,7 +263,7 @@ export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: st
     const ticks = trimmed(week.series["g.ticks"] ?? [], week).filter((v): v is number => v != null);
     const tickSum = ticks.reduce((a, v) => a + v, 0);
     const globalSpacing = tickSum > 0 ? (ticks.length * week.stepMs) / 1000 / tickSum : null;
-    if (stall && globalSpacing) paused.push({ ...pauseChange("Global snapshots", seconds(stall.gap), seconds(globalSpacing), "one", stall.gap, { kind: "network", id: "dag" }), find: stall.find });
+    if (stall && globalSpacing) paused.push({ ...pauseChange("Global snapshots", stall.gap, globalSpacing, "global snapshots", { kind: "network", id: "dag" }), find: stall.find });
     for (const id of whole ? ids : [subject]) {
       const snaps = (d: TrendsWindowData) => metricSeries("snapshots", id, d.series).points;
       const total = (d: TrendsWindowData) => trimmed(snaps(d), d).reduce<number>((a, v) => a + (v ?? 0), 0);
@@ -283,14 +282,13 @@ export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: st
       }
       const gap = pauseOf(`m.${id}.gapMax`, id);
       const normal = spacing(week);
-      if (gap && normal && !(stall && gap.gap <= STALL_SHARED * stall.gap)) paused.push({ ...pauseChange(name, seconds(gap.gap), seconds(normal), "a metagraph snapshot", gap.gap, at), find: gap.find });
+      if (gap && normal && !(stall && gap.gap <= STALL_SHARED * stall.gap)) paused.push({ ...pauseChange(`${name}'s anchoring`, gap.gap, normal, "its metagraph snapshots", at), find: gap.find });
       if (!sure) continue;
       for (const [metric, word, unit, floor] of [["fees", "fees", "DAG", 1 / HOURS_PER_DAY], ["kb", "data", "MB", 1 / HOURS_PER_DAY]] as const) {
         const nowRate = perHour(metric, metricSeries(metric, id, recent.series).points, recent);
         const usualRate = perHour(metric, metricSeries(metric, id, week.series).points, week);
         if (nowRate == null || usualRate == null || Math.max(nowRate, usualRate) < floor) continue;
-        const text = (v: number) => `${fact("", v, "amount", TREND_METRICS[metric].format).text} ${unit}`;
-        const change = rateChange(`${name} ${word}`, nowRate, usualRate, text(nowRate), text(usualRate), at);
+        const change = rateChange(`${name}'s ${word}`, nowRate, usualRate, unit, at, TREND_METRICS[metric].format);
         if (change) rateRows.push(change);
       }
     }

@@ -663,11 +663,27 @@ describe("the positive rewrite", () => {
 
 describe("a view note's notable changes", () => {
   beforeEach(() => { store = memoryNotesStore(); });
-  it("are stored with the note and served with it", async () => {
-    const changes = [{ kind: "lost" as const, size: 2, text: "Germany lost 2 nodes", subject: { kind: "country" as const, cc: "DE" } }];
-    const res = await generateNote(REQ, deps({ facts: async () => ({ ...structuredClone(FACTS), changes }) }), "read");
-    expect(res).toMatchObject({ state: "ok", changes });
-    expect(await generateNote(REQ, deps(), "read")).toMatchObject({ state: "ok", changes }); // from the store
+  // THE ROWS ARE THE MODEL'S (user, 2026-11-03: "the notable-change rows all must come from AI"): each
+  // brief is shown, its line read back from CHANGE n:, checked against its own figures, and stored.
+  const draft = (about: string, lost: number, from: number) => ({
+    kind: "lost" as const, size: lost, text: "", subject: { kind: "country" as const, cc: "DE" },
+    brief: { about, facts: [fact("Nodes lost", lost, "count"), fact("Nodes at the start of the span", from, "count"), fact("Nodes at the end of the span", from - lost, "count")] },
+  });
+  it("shows each row's brief and stores the model's line, served with the note", async () => {
+    const d = deps({ facts: async () => ({ ...structuredClone(FACTS), changes: [draft("Germany's nodes", 2, 22)] }), answers: [`${CLEAN}\nCHANGE 1: Germany lost 2 nodes, now 20`] });
+    const res = await generateNote(REQ, d, "read");
+    expect(d.chat.mock.calls[0]![0][1]!.content).toContain("Rows to write, in order:\nCHANGE 1: Germany's nodes\n  Nodes lost: 2");
+    const served = [{ kind: "lost", size: 2, text: "Germany lost 2 nodes, now 20", subject: { kind: "country", cc: "DE" } }];
+    expect(res).toMatchObject({ state: "ok", changes: served });
+    expect(res.state === "ok" && res.changes?.[0]).not.toHaveProperty("brief");
+    expect(await generateNote(REQ, deps(), "read")).toMatchObject({ state: "ok", changes: served }); // from the store
+  });
+  it("drops a row whose line is missing or names a figure its row does not give", async () => {
+    const changes = [draft("Germany's nodes", 2, 22), draft("France's nodes", 3, 13)];
+    const d = deps({ facts: async () => ({ ...structuredClone(FACTS), changes }), answers: [`${CLEAN}\nCHANGE 1: Germany lost 7 nodes`] });
+    const res = await generateNote(REQ, d, "read");
+    expect(res).toMatchObject({ state: "ok" });
+    expect(res).not.toHaveProperty("changes");
   });
   it("a note with none carries no field", async () => {
     const res = await generateNote(REQ, deps(), "read");

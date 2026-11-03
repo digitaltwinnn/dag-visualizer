@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { fleetCountries, geoFacts, type GeoFactsInput } from "@/src/data/noteFactsGeo";
 import { checkNote } from "@/src/data/noteHonesty";
+import { briefLine } from "@/src/data/testkit/briefLine";
 import { pairsOf } from "@/src/data/testkit/notePairs";
 
 const NAMES = { dag: "Constellation", usdc: "USDC.dag", bio: "BioFi" };
@@ -99,7 +100,7 @@ describe("geoFacts on the fleet", () => {
     expect(find(r, /GmbH|\bAG\b/)).toHaveLength(0);
     const nodes = one(r, /^Hetzner Online, nodes/);
     expect(nodes.value).toBe(50);
-    expect(one(r, /^Hetzner Online, share of the network's nodes with a known provider/).value).toBeCloseTo(50 / 80); // of the 80 nodes with a known provider
+    expect(one(r, /^Hetzner Online, share of the network's nodes/).value).toBeCloseTo(50 / 80); // of the 80 nodes with a known provider
   });
 
   it("returns null when no day holds the fleet", () => {
@@ -399,7 +400,7 @@ describe("geoFacts on a provider", () => {
     const geoDays = { "2026-10-20": day(scaled(0.5)), "2026-10-27": day(NOW) };
     const r = geoFacts(input({ subject: { isp: "hetzner-online-ag" }, geoDays, ccDays: ccOf(geoDays) }))!; // merged with the GmbH key
     expect(one(r, /^Hetzner Online, nodes$/)).toMatchObject({ value: 50, pair: { key: "provider:hetzner online", end: "to" } });
-    expect(one(r, /^Hetzner Online, share of the network's nodes with a known provider$/).value).toBeCloseTo(50 / 80);
+    expect(one(r, /^Hetzner Online, share of the network's nodes$/).value).toBeCloseTo(50 / 80);
     expect(one(r, /^Hetzner Online, rank by nodes among providers$/).value).toBe(1);
     expect(one(r, /^Providers hosting nodes$/).value).toBe(3);
     expect([...pairsOf(r.facts).values()]).toEqual([["Hetzner Online, nodes a week ago", 25, "Hetzner Online, nodes", 50]]);
@@ -423,7 +424,7 @@ describe("geoFacts on a provider", () => {
     const geoDays = { "2026-10-20": day(scaled(0.5)), ...run("2026-10-27", 7, () => NOW) };
     const r = geoFacts(input({ subject: { isp: "ovh-sas", net: "dag" }, geoDays, ccDays: ccOf(geoDays) }))!;
     expect(one(r, /^Constellation, nodes with OVH$/)).toMatchObject({ value: 10, pair: { key: "dag:provider:ovh", end: "to" } });
-    expect(one(r, /^Constellation, share of its nodes with a known provider with OVH$/).value).toBeCloseTo(10 / 30);
+    expect(one(r, /^Constellation, share of its nodes with OVH$/).value).toBeCloseTo(10 / 30);
     expect(one(r, /^OVH, rank among the providers of Constellation by nodes$/).value).toBe(2);
     expect(one(r, /^Constellation, providers with nodes$/).value).toBe(2);
     expect([...pairsOf(r.facts).values()]).toEqual([["Constellation, nodes with OVH a week ago", 5, "Constellation, nodes with OVH", 10]]);
@@ -620,7 +621,7 @@ describe("geoFacts states ONE figure per quantity: countries and the fleet from 
   it("keeps providers on the geo family, their shares of the nodes with a known provider", () => {
     const r = dump();
     expect(one(r, /^Hetzner Online, nodes \(biggest provider\)$/).value).toBe(51);
-    expect(one(r, /^Hetzner Online, share of the network's nodes with a known provider$/).value).toBeCloseTo(51 / 69);
+    expect(one(r, /^Hetzner Online, share of the network's nodes$/).value).toBeCloseTo(51 / 69);
     expect(one(r, /^Providers hosting nodes$/).value).toBe(3);
   });
 
@@ -722,31 +723,32 @@ describe("geoFacts' notable changes", () => {
   const week = { geoDays, ccDays: ccOf(geoDays) };
   it("a row for a country and one for a provider that moved, read as the facts read them", () => {
     const r = geoFacts(input(week))!;
-    expect(r.changes).toEqual([
-      { kind: "lost", size: 2, text: "OVH lost 2 nodes, down 17%", subject: { kind: "provider", keys: ["ovh-sas"], cc: null, city: null } },
-    ]);
+    expect(r.changes).toMatchObject([{ kind: "lost", size: 2, subject: { kind: "provider", keys: ["ovh-sas"], cc: null, city: null } }]);
+    expect(r.changes?.map(briefLine)).toEqual(["OVH's nodes | Nodes lost 2 · Nodes at the start of the span 12 · Nodes at the end of the span 10 · Nodes, change against the start of the span, down 17%"]);
   });
   it("names the city only where the sites measured it at both ends", () => {
     const site = (n: number) => ({ "f.site.DE.Falkenstein.ovh-sas": n });
     const r = geoFacts(input({ ...week, siteDays: { "2026-10-20": site(12), "2026-10-27": site(10) } }))!;
-    expect(r.changes?.[0]).toMatchObject({ text: "OVH lost 2 nodes in Falkenstein, down 17%", subject: { cc: "DE", city: "Falkenstein" } });
+    expect(r.changes?.[0]).toMatchObject({ subject: { cc: "DE", city: "Falkenstein" } });
+    expect(briefLine(r.changes?.[0])).toBe("OVH's nodes in Falkenstein | Nodes lost 2 · Nodes in Falkenstein at the start of the span 12 · Nodes in Falkenstein at the end of the span 10 · Nodes in Falkenstein, change against the start of the span, down 17%");
   });
   it("a move too small for its count has no row, though the note can state it", () => {
     const r = geoFacts(input(week))!;
-    expect(r.changes?.some((c) => c.text.startsWith("Germany"))).toBe(false); // 48 to 46
+    expect(r.changes?.some((c) => c.brief!.about.startsWith("Germany"))).toBe(false); // 48 to 46
   });
   it("a network reads its own days, and names no city", () => {
     const own: DaySpec = { ...NOW, net: { ...NOW.net, usdc: { cc: { DE: 22, US: 10 }, isp: { "hetzner-online-ag": 22 } } } };
     const days = run("2026-10-27", 8, (i) => (i < 2 ? own : NOW));
     const site = (n: number) => ({ "f.site.DE.Falkenstein.hetzner-online-ag": n });
     const r = geoFacts(input({ subject: "usdc", geoDays: days, ccDays: ccOf(days), siteDays: { "2026-10-20": site(22), "2026-10-27": site(20) } }))!;
-    expect(r.changes?.map((c) => c.text)).toEqual(["Germany lost 2 nodes, down 9%", "Hetzner Online lost 2 nodes, down 9%"]);
+    expect(r.changes?.map((c) => c.brief!.about)).toEqual(["Germany's nodes", "Hetzner Online's nodes"]);
+    expect(r.changes?.map((c) => c.brief!.facts.at(-1)!.text)).toEqual(["9%", "9%"]);
   });
   it("tells a country's first nodes and its last apart from a move", () => {
     const nl: DaySpec = { ...NOW, net: { ...NOW.net, ext: { cc: { FR: 5, JP: 5 }, isp: NOW.net!.ext!.isp } } };
     const days = run("2026-10-27", 8, (i) => (i < 2 ? NOW : nl));
     const r = geoFacts(input({ geoDays: days, ccDays: ccOf(days), countryNames: { ...COUNTRIES, JP: "Japan" } }))!;
-    expect(r.changes?.map((c) => [c.kind, c.text])).toEqual([["new", "Japan gained its first 5 nodes"], ["gone", "Netherlands lost its last 5 nodes"]]);
+    expect(r.changes?.map((c) => [c.kind, briefLine(c)])).toEqual([["new", "Japan gained its first nodes | Nodes gained 5"], ["gone", "Netherlands lost its last nodes | Nodes lost 5"]]);
   });
   it("nothing moved, or no week ago to read, is no rows", () => {
     const flat = run("2026-10-27", 8, () => NOW);
@@ -762,15 +764,17 @@ describe("geoFacts' notable changes", () => {
     const bigWeek = { geoDays: moved, ccDays: ccOf(moved) };
     it("a country says its own move, which has nowhere to go from its own card", () => {
       const r = geoFacts(input({ ...bigWeek, subject: { cc: "DE" } }))!;
-      expect(r.changes?.[0]).toMatchObject({ kind: "lost", text: expect.stringMatching(/^Germany lost 6 nodes, down \d+%$/), subject: { kind: "self" } });
+      expect(r.changes?.[0]).toMatchObject({ kind: "lost", size: 6, subject: { kind: "self" } });
+      expect(r.changes?.[0]!.brief!.about).toBe("Germany's nodes");
     });
     it("then the provider and city that moved inside it, which open that group", () => {
       const r = geoFacts(input({ ...bigWeek, ...sites, subject: { cc: "DE" } }))!;
-      expect(r.changes?.[1]).toMatchObject({ text: "OVH lost 2 nodes in Falkenstein, down 17%", subject: { kind: "provider", keys: ["ovh-sas"], cc: "DE", city: "Falkenstein" } });
+      expect(r.changes?.[1]).toMatchObject({ subject: { kind: "provider", keys: ["ovh-sas"], cc: "DE", city: "Falkenstein" } });
+      expect(briefLine(r.changes?.[1])).toBe("OVH's nodes in Falkenstein | Nodes lost 2 · Nodes in Falkenstein at the start of the span 12 · Nodes in Falkenstein at the end of the span 10 · Nodes in Falkenstein, change against the start of the span, down 17%");
     });
     it("a provider says its own move and where", () => {
       const r = geoFacts(input({ ...week, ...sites, subject: { isp: "ovh-sas" } }))!;
-      expect(r.changes?.map((c) => c.text)).toEqual(["OVH lost 2 nodes, down 17%", "OVH lost 2 nodes in Falkenstein, down 17%"]);
+      expect(r.changes?.map(briefLine)).toEqual(["OVH's nodes | Nodes lost 2 · Nodes at the start of the span 12 · Nodes at the end of the span 10 · Nodes, change against the start of the span, down 17%", "OVH's nodes in Falkenstein | Nodes lost 2 · Nodes in Falkenstein at the start of the span 12 · Nodes in Falkenstein at the end of the span 10 · Nodes in Falkenstein, change against the start of the span, down 17%"]);
       expect(r.changes?.[0]!.subject).toEqual({ kind: "self" });
     });
     it("a network's country or provider says its own move: nothing stores a network by place", () => {
@@ -779,7 +783,7 @@ describe("geoFacts' notable changes", () => {
       const scoped = { geoDays: days, ccDays: ccOf(days), ...sites };
       const here = geoFacts(input({ ...scoped, subject: { cc: "DE", net: "usdc" } }))!;
       expect(here.changes?.map((c) => c.subject)).toEqual([{ kind: "self" }]);
-      expect(here.changes?.[0]!.text).toMatch(/^USDC\.dag (lost|gained) \d+ nodes? in Germany/);
+      expect(here.changes?.[0]!.brief!.about).toMatch(/^USDC\.dag('s nodes| (gained its first|lost its last) nodes) in Germany/);
     });
     it("a quiet week has no rows", () => {
       const flat = run("2026-10-27", 8, () => NOW);
@@ -805,7 +809,8 @@ describe("geoFacts counts nodes as the cards do", () => {
     expect(one(r, /^Germany, nodes a week ago$/).value).toBe(40);
     expect(one(r, /^Nodes in the network$/).value).toBe(34);
     expect(one(r, /^OVH, nodes \(/).value).toBe(34);
-    expect(r.changes?.[0]?.text).toBe("Germany lost 6 nodes, down 15%");
+    expect(r.changes?.[0]?.brief?.about).toBe("Germany's nodes");
+    expect(r.changes?.[0]?.brief?.facts.map((f) => f.text)).toEqual(["6", "40", "34", "15%"]);
   });
   it("keeps the older count at both ends until then", () => {
     const geoDays = { "2026-10-27": day(fleet(34)) };
@@ -848,7 +853,7 @@ describe("the only one has nothing to rank against", () => {
 
   it("a network's only provider carries no share and no rank", () => {
     const r = geoFacts(input({ subject: { isp: "amazon-com-inc", net: "bio" } }))!;
-    expect(find(r, /share of its nodes with a known provider/)).toEqual([]);
+    expect(find(r, /share of its nodes with /)).toEqual([]);
     expect(find(r, /rank among the providers/)).toEqual([]);
     expect(find(r, /providers with nodes/)[0]!.value).toBe(1);
   });

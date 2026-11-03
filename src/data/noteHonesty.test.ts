@@ -405,7 +405,7 @@ describe("checkNote — a past value stands beside its own current figure (R60, 
     const shares: Fact[] = [
       Pf("Germany, share of the network's nodes a month ago", 0.38, "share", "38%", "share:DE", "from"),
       Pf("Germany, share of the network's nodes", 0.36, "share", "36%", "share:DE", "to"),
-      Pf("Amazon.com, share of the network's nodes with a known provider", 0.11, "share", "11%"),
+      Pf("Amazon.com, share of the network's nodes", 0.11, "share", "11%"),
     ];
     const r = checkNote("Germany's share fell from 38% to 11%.", shares, geoNames);
     expect(r).toEqual({ ok: false, reasons: ["38% is a past value; the figure beside it, 11%, is not its current figure 36%"] });
@@ -487,7 +487,7 @@ describe("checkNote — a past value stands beside its own current figure (R60, 
     // Two CURRENT figures have no past value to hold.
     const current: Fact[] = [
       Pf("Germany, share of the network's nodes", 0.38, "share", "38%"),
-      Pf("Amazon.com, share of the network's nodes with a known provider", 0.11, "share", "11%"),
+      Pf("Amazon.com, share of the network's nodes", 0.11, "share", "11%"),
     ];
     expect(checkNote("Germany's share fell from 38% to 11%.", current, geoNames)).toEqual({ ok: true });
     // A past value that coincides with some other current fact is read as current.

@@ -54,6 +54,9 @@ import { utcDayKey } from "@/src/util/localTime";
 //     measured days there (its located nodes and countries a week ago, and the located ratio
 //     when both are above 0 and differ). The geo family began 2026-10-27, so a network states no
 //     change until a week of it exists — honest absence, never a substitute series;
+//   · NO "KNOWN" OR "LOCATED" IN A LABEL (user, 2026-11-03: "all providers are known and all nodes are
+//     located so we don't have to say things like 'known' or 'located'"): the data is kept complete,
+//     so a share is "of the network's nodes". The arithmetic below still divides by what was placed.
 //   · a share's denominator is what was located: countries against the fleet's LOCATED nodes,
 //     providers against the nodes with a KNOWN provider (a node can have a country and no
 //     provider). The label says plain "nodes" for the first (user, 2026-11-01): a place note only
@@ -379,7 +382,7 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
       facts.push(fact(`${name}, providers with nodes`, ownProv.length, "count"));
       ownProv.slice(0, TOP).forEach((p, i) => {
         facts.push(fact(`${name}, nodes with ${pn(p)} (${RANK_WORD[i]}biggest provider)`, p.count, "count"));
-        facts.push(fact(`${name}, share of its nodes with a known provider with ${pn(p)}`, p.count / known, "share"));
+        facts.push(fact(`${name}, share of its nodes with ${pn(p)}`, p.count / known, "share"));
       });
     }
     if (then) {
@@ -439,7 +442,7 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     const key = `${id}:provider:${p.group}`;
     facts.push(fact(`${netName}, nodes with ${provider}`, p.count, "count", undefined, was != null ? { key, end: "to" } : undefined));
     if (ownProv.length > 1) {
-      facts.push(fact(`${netName}, share of its nodes with a known provider with ${provider}`, p.count / known, "share"));
+      facts.push(fact(`${netName}, share of its nodes with ${provider}`, p.count / known, "share"));
       facts.push(fact(`${provider}, rank among the providers of ${netName} by nodes`, 1 + ownProv.filter((x) => x.count > p.count).length, "count"));
     }
     facts.push(fact(`${netName}, providers with nodes`, ownProv.length, "count"));
@@ -458,7 +461,7 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     if (before) ownRow = countChange(provider, before, p.count, { kind: "self" });
     const key = `provider:${p.group}`;
     facts.push(fact(`${provider}, nodes`, p.count, "count", undefined, before ? { key, end: "to" } : undefined));
-    facts.push(fact(`${provider}, share of the network's nodes with a known provider`, p.count / knownFleet, "share"));
+    facts.push(fact(`${provider}, share of the network's nodes`, p.count / knownFleet, "share"));
     facts.push(fact(`${provider}, rank by nodes among providers`, 1 + providers.filter((x) => x.count > p.count).length, "count"));
     facts.push(fact("Providers hosting nodes", providers.length, "count"));
     if (before) {
@@ -513,7 +516,7 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     providers.slice(0, TOP).forEach((p, i) => {
       const before = wasProviders?.get(p.group)?.count;
       facts.push(fact(`${pn(p)}, nodes (${RANK_WORD[i]}biggest provider)`, p.count, "count", undefined, before ? { key: providerKey(p), end: "to" } : undefined));
-      facts.push(fact(`${pn(p)}, share of the network's nodes with a known provider`, p.count / knownFleet, "share"));
+      facts.push(fact(`${pn(p)}, share of the network's nodes`, p.count / knownFleet, "share"));
     });
 
     // CHANGE. Countries from the tiers' history; providers from the geo family, both ends measured.

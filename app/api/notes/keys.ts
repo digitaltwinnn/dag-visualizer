@@ -10,7 +10,7 @@ import { pickRangeTier } from "@/src/data/trendWindow";
 //
 // Everything is UTC and the caller supplies the date strings; nothing here reads a clock.
 
-export const NOTES_VERSION = 64; // 64: a gap is stated against the normal spacing; the tour's line names its span (2026-11-03)
+export const NOTES_VERSION = 67; // 67: the rows are the model's; no "known"/"located"; varied subject notes; every country asks the country question (2026-11-03)
 
 /** What a note covers. Hyper and Geography are a standing picture ("day"), the ledger the recent
  *  hours ("hours"); History's pills are the rest, and a brushed range is `r<fromMs>-<toMs>` after

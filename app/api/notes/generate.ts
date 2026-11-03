@@ -151,7 +151,7 @@ function warn(req: NoteRequest, kind: string): void {
   console.warn(`[notes] ${req.view}/${req.subject}/${req.span}: ${kind}`);
 }
 
-type Written = { ok: true; text: string; days: NoteDay[]; line?: string } | { ok: false; stat: NoteStat };
+type Written = { ok: true; text: string; days: NoteDay[]; changes: NoteChange[]; line?: string } | { ok: false; stat: NoteStat };
 
 /** The room an answer with a line gets: a cut-off answer is no answer, so a line must never cost
  *  its note (History's 30-day note also carries up to five captions). */
@@ -244,6 +244,9 @@ async function write(
   const subject = input.subjectName;
   const wantsLine = isBriefingNote(req.view, req.subject, req.span);
   const span = spanWords(req.view, req.span, input.spanFrom, input.spanTo);
+  /** The notable-change rows the model words, in the order code picked them. */
+  const drafts = input.changes.filter((c) => c.brief);
+  const briefs = drafts.map((c) => c.brief!);
   let reasons: string[] | undefined;
   let lastNote = "";
   /** A note that passed the gate and only failed the style rewrite: it stands if the rewrite fails. */
@@ -252,7 +255,7 @@ async function write(
     if (attempt > 0) await count("retried");
     let answer: string;
     try {
-      answer = await chat(buildMessages(req.view, input.label, block, days, reasons, input.lead, input.common, input.kind, span, input.whole, wantsLine, spanBeforeWords(req.view, req.span)), wantsLine ? { maxTokens: LINE_TOKENS } : undefined);
+      answer = await chat(buildMessages(req.view, input.label, block, days, reasons, input.lead, input.common, input.kind, span, input.whole, wantsLine, spanBeforeWords(req.view, req.span), briefs), wantsLine || briefs.length ? { maxTokens: LINE_TOKENS } : undefined);
       await count("calls");
     } catch (e) {
       if (!(e instanceof GateError)) throw e; // not the Gate's: `generateNote` counts it as `error`
@@ -298,7 +301,16 @@ async function write(
     // line without the span's words is dropped, and the tour reads the note's opening, which names it.
     const named = line?.toLowerCase().includes(span.replace(/^the /, "").toLowerCase());
     const brief = wantsLine && line && named && !NEGATIVE_RE.test(line) && checkNote(line, facts, input.names, { maxSentences: 2, subject }).ok ? line : null;
-    const written: Written = { ok: true, text: note, days: kept, ...(brief && brief.length <= LINE_MAX ? { line: brief } : {}) };
+    // THE ROWS ARE THE MODEL'S (user, 2026-11-03): each line is checked against its own row's figures
+    // and the note's, like a caption, and a row whose line is missing or fails is dropped.
+    const rows: NoteChange[] = [];
+    drafts.forEach((c, i) => {
+      const said = parsed.rows.get(i + 1);
+      if (!said || !checkNote(said, [...facts, ...c.brief!.facts], input.names, { maxSentences: 1, subject }).ok) return;
+      const { brief: _brief, ...draft } = c;
+      rows.push({ ...draft, text: said });
+    });
+    const written: Written = { ok: true, text: note, days: kept, changes: rows, ...(brief && brief.length <= LINE_MAX ? { line: brief } : {}) };
     if (negative || wordy || slips.length) {
       held = written;
       reasons = [
@@ -429,7 +441,7 @@ export async function generateNote(
       spanFrom: input.spanFrom,
       spanTo: input.spanTo,
       days: written.days,
-      ...(input.changes.length ? { changes: input.changes } : {}),
+      ...(written.changes.length ? { changes: written.changes } : {}),
       ...(written.line ? { line: written.line } : {}),
       ...(input.setKey != null ? { setKey: input.setKey } : {}),
       ...(opts.driftKey != null ? { driftKey: opts.driftKey } : {}),

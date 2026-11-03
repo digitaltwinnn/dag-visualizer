@@ -1,4 +1,4 @@
-import type { NoteLead, NoteView, NotableDay } from "@/src/data/noteTypes";
+import type { ChangeBrief, NoteLead, NoteView, NotableDay } from "@/src/data/noteTypes";
 import { utcDayKey } from "@/src/util/localTime";
 import type { NoteSpan, SubjectKind } from "./keys";
 
@@ -111,8 +111,11 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
   },
   geo: {
     questions: {
-      country: "Open with a plain sentence with the network as its actor, in the shape \"<network> hosts N nodes in <country>\"; then what share of the network's nodes that is and the country's place among the network's countries, or, when the facts count one country, that it is the network's only country, with no share and no place; then how that moved over the span, or that it held. Say nothing about speed.",
-      provider: "Open with a plain sentence with the provider as its actor, in the shape \"<provider> hosts N of <network>'s nodes\", network-wide, not for one place; then what share of the network's nodes with a known provider that is and its place among the network's providers, or, when the facts count one provider, that it is the network's only provider, with no share and no place; then how that moved over the span, or that it held. Say nothing about speed.",
+      // VARIED, NOT A TEMPLATE (user, 2026-11-03: "for country or provider the text is very similar, we
+      // can show some variation"): the shapes stay as guides, so the name is still the sentence's
+      // actor (2026-10-30), and the note opens on whatever is most telling for this subject.
+      country: "Say three things about this country, in whichever order reads best for it, opening on the most telling: if it gained or lost nodes, that move; else its place or its share. The three: how many of the network's nodes it hosts, with the network or the country as the sentence's actor (\"<network> runs N nodes in <country>\", \"<country> hosts N of <network>'s nodes\", or your own plain words); what share of the network's nodes that is and its place among the network's countries said in plain words (\"the network's largest\", \"its third\"), never \"rank\", or, when the facts count one country, that it is the network's only country, with no share and no place; and how that moved over the span, or that it held. A count of countries or providers is the network's, never this country's. Say nothing about speed.",
+      provider: "Say three things about this provider, network-wide and not for one place, in whichever order reads best for it, opening on the most telling: if it gained or lost nodes, that move; else its place or its share. The three: how many of the network's nodes it hosts, with the provider as the sentence's actor (\"<provider> hosts N of <network>'s nodes\", \"<provider> runs N nodes for <network>\", or your own plain words); what share of the network's nodes that is and its place among the network's providers said in plain words (\"the network's largest\", \"its third\"), never \"rank\", or, when the facts count one provider, that it is the network's only provider, with no share and no place; and how that moved over the span, or that it held. Say nothing about speed.",
     },
     question: "First, how many nodes there are and how that moved, then where they run: the countries and hosting providers that gained or lost nodes and no others, each with its current count, as \"<country> fell <change> to <count>\", or where the nodes are now when nothing moved. Say nothing about speed.",
     questionCommon: "Last, in one sentence, how active the network was, in the shape \"Activity was <up, down or steady>: <network> was part of <last week's figure> global snapshots per day last week, <up or down> <change> on the weeks before\", or \"held at\" the figure when it was steady.",
@@ -204,6 +207,11 @@ export function spanWords(view: NoteView, span: NoteSpan, spanFrom: number, span
 export const CAPTION_FORMAT =
   "Answer format: first a line starting NOTE: with the note, then exactly one line per listed day, starting DAY YYYY-MM-DD: with a caption of one short clause, at most ten words, using only numbers from the facts, in plain words a reader would say: never \"median\", never \"against\". The reader sees the day's date and what kind of day it was beside the caption, so the caption repeats neither: it gives the figure and whose it was, as the facts name the day. For a first or last day, the network and that nothing was anchored before, or since. For the span's busiest or quietest day, a spike or a dip: the day's figure and what it counts, then how far it stood from the usual, in the shape \"<figure> <what>, up <change> on a typical day\", with \"down\" for a fall and the change from the day's \"change against\" fact. For a pause or a longest gap: what paused and for how long, then the normal spacing it stood against, in the shape \"Global snapshots paused for <gap>, normally one every <spacing>\" for the hypergraph, or \"Anchoring paused for <gap>, normally a metagraph snapshot every <spacing>\" for a network. Never \"wait\". For the most networks: the day's figure, then the typical day's as \"usually …\". Start with a capital letter. Nothing else.";
 
+/** THE NOTABLE-CHANGE ROWS, IN THE MODEL'S WORDS (user, 2026-11-03: "the notable-change rows all must
+ *  come from AI"). Code picks each row and hands its brief; the model writes the line. */
+export const ROW_FORMAT =
+  "Then, after every other line, exactly one line per listed row, starting CHANGE n: with the row's line: one plain sentence of at most twelve words, without a full stop, that names the row's subject first and says what happened, using only that row's own figures as they are given. A count that moved reads like \"<subject> lost <nodes lost> nodes, now <end figure>\", with the place after the subject when the row names one, and no percentage: the note carries those; a pause like \"<subject> paused for <pause length>, normally one every <normal spacing>\"; a pace like \"<subject> sped up: a metagraph snapshot every <recent>, usually <usual>\"; an event with no figures says what happened in plain words. A row adds to the note, never repeats it (user: rows should not \"almost copy\" the note): use different words from the note, and when the note already gives the row's change, the row gives what the note leaves out, such as where it stands now or where it happened. Never \"wait\", never a figure the row does not give.";
+
 /** THE BRIEFING'S LINE: what the tour shows at this view's stop, in the note's own answer. */
 export const LINE_FORMAT =
   "One more line belongs in this answer, whatever the format above says: directly after the note, a line starting LINE: with the note's main findings as one or two plain sentences, eighteen to twenty-two words in all, opening with the span in the Span line's own words. Keep the note's own wording for it: the span, what moved, and its figures and changes as the note writes them.";
@@ -221,14 +229,20 @@ export function buildMessages(
   whole?: boolean,
   line?: boolean,
   spanBefore?: string | null,
+  rows?: readonly ChangeBrief[] | null,
 ): { role: "system" | "user"; content: string }[] {
   const withDays = !!days && days.length > 0;
-  const format = withDays
+  const withRows = !!rows && rows.length > 0;
+  const format = (withDays
     ? CAPTION_FORMAT
-    : "Answer format: one line starting NOTE: and nothing else.";
+    : withRows ? "Answer format: first a line starting NOTE: with the note." : "Answer format: one line starting NOTE: and nothing else.") + (withRows ? ` ${ROW_FORMAT}` : "");
   const spanLines = [...(span ? [`Span: ${span}`] : []), ...(spanBefore ? [`Span before: ${spanBefore}`] : [])];
   const parts = [...(spanLines.length ? [spanLines.join("\n")] : []), `Facts:\n${factsBlock}`];
   if (withDays) parts.push(`Days to caption, in order:\n${days.map((d) => `DAY ${utcDayKey(d.dayMs)}`).join("\n")}`);
+  // The note and its rows share one card, so the note keeps to the overall picture and leaves each
+  // row's own figures to the row (user, 2026-11-03: the rows "almost copy the card's own AI section").
+  if (withRows) parts.push("These rows stand under the note on the card: keep the note on the overall picture, and leave each row's own figures to its row rather than saying them twice.");
+  if (withRows) parts.push(`Rows to write, in order:\n${rows.map((r, i) => [`CHANGE ${i + 1}: ${r.about}`, ...r.facts.map((f) => `  ${f.label}: ${f.text}`)].join("\n")).join("\n")}`);
   if (retryReasons && retryReasons.length)
     parts.push(`Your previous answer was rejected: ${retryReasons.join("; ")}. Write it again and fix this.`);
   return [
@@ -242,6 +256,7 @@ const THINK_RE = /<think>[\s\S]*?(?:<\/think>|$)/gi;
 const NOTE_RE = /^[\s*_#]*NOTE[*_]*:[*_\s]*(.*)$/i;
 const DAY_RE = /^[\s*_#]*DAY\s+(\d{4}-\d{2}-\d{2})[*_]*\s*:[*_\s]*(.*)$/i;
 const LINE_RE = /^[\s*_#]*LINE[*_]*:[*_\s]*(.*?)[*_\s]*$/i;
+const CHANGE_RE = /^[\s*_#]*CHANGE\s+(\d+)[*_]*\s*:[*_\s]*(.*?)[*_\s]*$/i;
 /** A `LINE:` the model ran on from the note: put on its own line before anything reads it. */
 const LINE_RUN_ON_RE = /(?<=\S)[ \t]+(?=[*_]*LINE[*_]*:)/g;
 const FENCE_RE = /^```/;
@@ -253,13 +268,14 @@ const FENCE_RE = /^```/;
  *  `<date>#2`, so two notable days on a date keep their own. A note may run over several lines
  *  up to the first DAY line. With no `NOTE:` line at all the whole trimmed text is the note, and
  *  there are no captions. */
-export function parseAnswer(text: string): { note: string; captions: Map<string, string>; line: string | null } {
+export function parseAnswer(text: string): { note: string; captions: Map<string, string>; line: string | null; rows: Map<number, string> } {
   const lines = text.replace(THINK_RE, "").replace(LINE_RUN_ON_RE, "\n").trim().split("\n").map((l) => l.trim()).filter((l) => !FENCE_RE.test(l));
   const captions = new Map<string, string>();
+  const rows = new Map<number, string>();
   const start = lines.findIndex((l) => NOTE_RE.test(l));
   if (start < 0) {
     const said = lines.find((l) => LINE_RE.test(l));
-    return { note: lines.filter((l) => l !== said).join("\n").trim(), captions, line: said ? LINE_RE.exec(said)![1]!.trim() || null : null };
+    return { note: lines.filter((l) => l !== said).join("\n").trim(), captions, line: said ? LINE_RE.exec(said)![1]!.trim() || null : null, rows };
   }
   const note = [NOTE_RE.exec(lines[start]!)![1]!];
   const seen = new Map<string, number>();
@@ -268,7 +284,12 @@ export function parseAnswer(text: string): { note: string; captions: Map<string,
   for (const line of lines.slice(start + 1)) {
     const day = DAY_RE.exec(line);
     const said = LINE_RE.exec(line);
-    if (said) {
+    const change = CHANGE_RE.exec(line);
+    if (change) {
+      inNote = false;
+      const text = change[2]!.trim();
+      if (text) rows.set(Number(change[1]), text);
+    } else if (said) {
       inNote = false;
       brief = said[1]!.trim() || null;
     } else if (day) {
@@ -282,5 +303,5 @@ export function parseAnswer(text: string): { note: string; captions: Map<string,
       else if (note.some(Boolean)) inNote = false; // what follows a blank line is the model talking
     }
   }
-  return { note: note.join("\n").trim(), captions, line: brief };
+  return { note: note.join("\n").trim(), captions, line: brief, rows };
 }

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { comboWords, hyperFacts, type HyperFactsInput } from "@/src/data/noteFactsHyper";
 import { checkNote } from "@/src/data/noteHonesty";
+import { briefLine } from "@/src/data/testkit/briefLine";
 import { pairsOf } from "@/src/data/testkit/notePairs";
 import type { TrendsWindowData } from "@/src/data/trendWindow";
 
@@ -738,13 +739,14 @@ describe("hyperFacts' notable changes", () => {
   const steady = { "f.nodes": row(N, () => 150), "f.nodes.usdc": row(N, () => 30) };
   it("on all, a row for each network whose node count moved, biggest first", () => {
     const r = hyperFacts(input({ fleet: fleet({ "f.nodes.bio": row(N, (i) => (i < N / 2 ? 10 : 7)) }) }))!;
-    expect(r.changes?.map((c) => c.text)).toEqual(["USDC.dag gained 20 nodes, up 200%", "BioFi lost 3 nodes, down 30%"]);
+    expect(r.changes?.map((c) => [c.brief!.about, c.brief!.facts[0]!.text, c.brief!.facts.at(-1)!.text])).toEqual([["USDC.dag's nodes", "20", "200%"], ["BioFi's nodes", "3", "30%"]]);
     expect(r.changes?.[0]).toMatchObject({ kind: "gained", subject: { kind: "network", id: "usdc" } });
   });
   it("on all, a network starting outranks a count", () => {
     const d = daily({ "m.dor.snaps": row(60, (i) => (i < 40 ? 0 : 5)), "m.dor.ticks": row(60, (i) => (i < 40 ? 0 : 1)) });
     const r = hyperFacts(input({ daily: d }))!;
-    expect(r.changes?.[0]).toMatchObject({ kind: "active", text: "Dor became active", subject: { kind: "network", id: "dor" } });
+    expect(r.changes?.[0]).toMatchObject({ kind: "active", subject: { kind: "network", id: "dor" } });
+    expect(briefLine(r.changes?.[0])).toBe("Dor became active over the span");
   });
   it("a week where nothing moved has no rows, never filler", () => {
     expect(hyperFacts(input({ fleet: fleet(steady) }))!.changes).toBeUndefined();
@@ -755,11 +757,15 @@ describe("hyperFacts' notable changes", () => {
       fleet: fleet({ ...steady, "f.type.usdc.l0+cl1": row(N, (i) => (i < N / 2 ? 20 : 16)), "f.type.usdc.l0": row(N, (i) => (i < N / 2 ? 10 : 14)) }),
     }))!;
     expect(r.changes).toHaveLength(2);
-    expect(r.changes).toContainEqual({ kind: "lost", size: 4, text: "Hybrid group lost 4 nodes, down 20%", subject: { kind: "type", netId: "usdc", type: "l0+cl1" } });
+    const group = r.changes?.find((c) => c.subject.kind === "type" && c.subject.type === "l0+cl1");
+    expect(group).toMatchObject({ kind: "lost", size: 4, subject: { kind: "type", netId: "usdc", type: "l0+cl1" } });
+    expect(group?.brief?.about).toBe("Hybrid group's nodes");
+    expect(group?.brief?.facts.at(-1)?.text).toBe("20%");
   });
   it("a layer group's own note says its own move, and has nowhere to go from its own card", () => {
     const r = hyperFacts(input({ subject: { net: "usdc", type: "l0+cl1" }, fleet: fleet({ ...steady, "f.type.usdc.l0+cl1": row(N, (i) => (i < N / 2 ? 20 : 16)) }) }))!;
-    expect(r.changes).toEqual([{ kind: "lost", size: 4, text: "Hybrid group lost 4 nodes, down 20%", subject: { kind: "self" } }]);
+    expect(r.changes).toMatchObject([{ kind: "lost", size: 4, subject: { kind: "self" } }]);
+    expect(r.changes?.[0]?.brief?.about).toBe("Hybrid group's nodes");
   });
   it("a layer group whose history began inside the week has no start: no row, and no claim that it moved or held", () => {
     const late = row(N, (i) => (i < N / 2 ? null : i < (3 * N) / 4 ? 20 : 19));

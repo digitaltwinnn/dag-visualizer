@@ -158,9 +158,9 @@ describe("factsFor — Geography's subject notes", () => {
     expect([netFacet.kind, netFacet.label, netFacet.subjectName]).toEqual(["span", "USDC.dag", "USDC.dag"]);
     const notNotable = (fs: { label: string }[]) => fs.map((f) => f.label).filter((l) => !/^Notable day/.test(l) && !/of the span/.test(l));
     expect(notNotable(netFacet.facts)).toEqual(notNotable((await got("trend", USDC, "30d")).facts));
-    // The warmed fleet country keeps Geography's own question; a network's country asks the country's.
+    // Every country asks the country's question, the warmed fleet country too (user, 2026-11-03).
     const cc = await got("geo", "cc:DE", "day");
-    expect([cc.kind, cc.label, cc.subjectName]).toEqual(["view", "Germany", "Germany"]);
+    expect([cc.kind, cc.label, cc.subjectName]).toEqual(["country", "Germany", "Germany"]);
     expect((await got("geo", `${USDC}/cc:DE`, "day")).kind).toBe("country");
     const net = await got("geo", USDC, "day");
     expect([net.kind, net.label, net.subjectName]).toEqual(["view", "USDC.dag", "USDC.dag"]);
