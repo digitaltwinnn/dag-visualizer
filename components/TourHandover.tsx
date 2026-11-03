@@ -30,6 +30,9 @@ const CAPTION = "Your turn. This is the live network.";
 const OUT_MS = 400;
 /** The phone caption's clearance over the sheet's top edge. */
 const SHEET_GAP_PX = 16;
+/** The desktop caption's clearance over the vitals band's top edge (user, 2026-11-03: "a bit too
+ *  close to the bottom section" at 6px, when it rode `--bottom-reserve`, which is not the band's edge). */
+const BAND_GAP_PX = 32;
 
 type Box = { left: number; top: number; width: number; height: number };
 const boxOf = (el: Element | null | undefined): Box | null => {
@@ -123,6 +126,18 @@ export default function TourHandover() {
   const [reduced, setReduced] = useState(false);
   const [pulses, setPulses] = useState<{ target: HandoverTarget; box: Box; edge: "left" | "right" | "top" }[]>([]);
   const [hand, setHand] = useState<{ x: number; y: number } | null>(null);
+  // The band's top edge, from the viewport's bottom — measured, as the hand's floor is.
+  const [bandRise, setBandRise] = useState<number | null>(null);
+  useEffect(() => {
+    if (!on || phone) return;
+    const measure = () => {
+      const band = boxOf(document.getElementById("vitalsband"));
+      setBandRise(band ? window.innerHeight - band.top : null);
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [on, phone]);
 
   // Arm on the flag: the clock, the beats, the end, and the reader's first gesture.
   useEffect(() => {
@@ -186,9 +201,11 @@ export default function TourHandover() {
   const words = touch
     ? [<Gesture key="d" icon={Hand}>drag to turn</Gesture>, <Gesture key="z" icon={ZoomIn}>pinch to zoom</Gesture>, <Gesture key="c" icon={Pointer}>tap a country or a row</Gesture>]
     : [<Gesture key="d" icon={Hand}>drag to turn</Gesture>, <Gesture key="z" icon={ZoomIn}>scroll to zoom</Gesture>, <Gesture key="c" icon={MousePointerClick}>click a country or a row</Gesture>];
-  // Desktop: above the band, where the tour's words stood. Phone: a fixed gap over the open sheet's
+  // Desktop: a fixed gap over the vitals band's measured top edge. Phone: a fixed gap over the open sheet's
   // top edge (its published height over the dock bar), never on it.
-  const bottom = phone ? `calc(var(--phone-dock-h) + ${sheetPx}px + ${SHEET_GAP_PX}px)` : "calc(var(--bottom-reserve) + 26px)";
+  const bottom = phone
+    ? `calc(var(--phone-dock-h) + ${sheetPx}px + ${SHEET_GAP_PX}px)`
+    : bandRise != null ? `${bandRise + BAND_GAP_PX}px` : `calc(var(--bottom-reserve) + ${BAND_GAP_PX}px)`;
 
   return (
     <section
