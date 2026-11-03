@@ -349,7 +349,9 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
                   // PLACE FIRST (design E1): the city, its provider beneath; WHO it is at the right
                   // edge, the network over the short id. The country is the plate above, and the
                   // make-up chip is Hypergraph's lens — the node card states it one tap away.
-                  <TableCell className="py-1.5 whitespace-normal">
+                  <TableCell className="min-[700px]:hidden py-1.5 whitespace-normal">
+                    {/* Phone-only, like the other branch's cells: `geoPhone` is also true on a wider
+                        tier whenever the list is grouped by country, where the columns carry the row. */}
                     <span className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 min-h-10">
                       <span className="flex flex-col min-w-0">
                         <span className="truncate text-foreground">{r.node.city ?? "Unknown city"}</span>
