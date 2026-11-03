@@ -17,6 +17,10 @@ export const BRIEFING_STOPS = ["geo", "ledger", "hyper", "trend"] as const satis
  *  left"). */
 export const STOP_MS = 5000;
 
+/** How much slower the tour's words type than a note writes itself in (user, 2026-11-03: "make the
+ *  text-typing 15% slower"): the whole typing clock, its ceiling included. */
+export const BRIEFING_TYPE_SLOW = 1.15;
+
 /** The longest a stop's words may run: two to three lines of the desktop caption. A longer line
  *  would need a longer stop, and a tour that outstays its welcome is the one thing it must not do. */
 export const LINE_MAX = 140;

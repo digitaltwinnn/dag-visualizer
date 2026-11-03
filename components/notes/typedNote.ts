@@ -9,12 +9,13 @@ const MS_PER_CHAR = 16;
 /** The longest a note takes to write itself in. */
 export const MAX_TYPE_MS = 2400;
 
-/** How long a text of `total` characters takes. */
-export const typeDuration = (total: number): number => Math.min(total * MS_PER_CHAR, MAX_TYPE_MS);
+/** How long a text of `total` characters takes; `slow` stretches the whole clock, its ceiling
+ *  included (the Briefing's words, `BRIEFING_TYPE_SLOW`). */
+export const typeDuration = (total: number, slow = 1): number => Math.min(total * MS_PER_CHAR, MAX_TYPE_MS) * slow;
 
 /** How many characters stand after `elapsedMs`. */
-export function typedLength(elapsedMs: number, total: number): number {
-  const d = typeDuration(total);
+export function typedLength(elapsedMs: number, total: number, slow = 1): number {
+  const d = typeDuration(total, slow);
   return d === 0 ? total : Math.min(total, Math.floor((elapsedMs / d) * total));
 }
 

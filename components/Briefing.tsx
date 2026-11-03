@@ -13,7 +13,7 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 import { VIEWS } from "@/components/views";
 import { breakpointOf } from "@/src/data/breakpoint";
 import { SITE_ORIGIN } from "@/src/data/site";
-import { BRIEFING_STOPS, BRIEFING_WORDS_OUT_MS, SCENE_WAIT_MS, STOP_MS, briefsOn, hasLanded, mayAdvance, nextStop, prevStop } from "@/src/engine/domain/briefing";
+import { BRIEFING_STOPS, BRIEFING_TYPE_SLOW, BRIEFING_WORDS_OUT_MS, SCENE_WAIT_MS, STOP_MS, briefsOn, hasLanded, mayAdvance, nextStop, prevStop } from "@/src/engine/domain/briefing";
 import { NET } from "@/src/net/current";
 import { useStore } from "@/src/store/store";
 
@@ -293,7 +293,7 @@ function Tour({ stop, leaving }: { stop: number; leaving: boolean }) {
           <div className="absolute inset-x-0 bottom-0 px-[max(16px,3.7vw)] pb-[calc(env(safe-area-inset-bottom)+22px)]">
             <div className="mb-1 flex min-h-5 justify-center max-[700px]:justify-start">{who}</div>
             <div aria-hidden className="mx-auto min-h-[2.52em] max-w-[79%] text-balance text-center text-briefing font-medium text-foreground max-[700px]:mx-0 max-[700px]:min-h-[3.8em] max-[700px]:max-w-full max-[700px]:text-left max-[700px]:text-wrap">
-              <TypedNote key={`${stop}:${words.text}`} text={words.text} always />
+              <TypedNote key={`${stop}:${words.text}`} text={words.text} always slow={BRIEFING_TYPE_SLOW} />
             </div>
           </div>
         </div>
