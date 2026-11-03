@@ -12,7 +12,7 @@ import { identityHudCss } from "@/src/palette/identity";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { compositionGroups } from "@/src/data/composition";
 import { subjectPairing } from "@/components/useSubjectPairing";
-import CardHead, { RailPane } from "@/components/CardHead";
+import CardHead, { RailFold, RailPane } from "@/components/CardHead";
 import { useNodeHere } from "@/components/useNodeHere";
 import { useTickHasFilter } from "@/components/useTickHasFilter";
 import InspectorCard from "@/components/InspectorCard";
@@ -27,7 +27,7 @@ import { useTouch } from "@/components/useTouch";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { detailsCards, ladderSlotIds, noteCardAbsent, type RailCard } from "@/components/railCards";
 import { CHILD_OF, childStep, rootOf, rootStep, type SiblingStep } from "@/components/railSiblings";
-import { displayOrder, isCollapsed, boxedSlotOf, overridesOnNoteStandDown, overridesOnSelection, overridesOnViewEntry, railSelectionKey, subjectRunEnd, type LaneCollapseState } from "@/components/railCollapse";
+import { displayOrder, hasFoldControl, isCollapsed, boxedSlotOf, overridesOnNoteStandDown, overridesOnSelection, overridesOnViewEntry, railSelectionKey, subjectRunEnd, type LaneCollapseState } from "@/components/railCollapse";
 import { useSiblingState } from "@/components/useSiblingState";
 import { openRailCard } from "@/components/railOpen";
 import { useLadderFocus } from "@/components/useLadderFocus";
@@ -522,14 +522,15 @@ export default function Inspector() {
   const rootId = rootOf(mode)?.to ?? null;
   const rootGhost = rootId && !presentOf(rootId) ? rootStep(siblingState) : null;
   const ghostStep = (id: string) => (id === nextStep?.id ? nextStep.step : id === rootId ? (rootGhost ?? undefined) : undefined);
-  // EXPAND-ONLY since the box lost its minimize (review find, 2026-09-11): every reachable
-  // caller — an entry's stretched toggle, the plank's ∧/∨ targeting collapsed neighbours —
-  // arrives with effCollapsed(id) true, so this always OPENS `id` (single-open collapses the
-  // rest); there is no gesture left that collapses a box into nothing. Kept under its
-  // historical name because cx/onToggle is the wiring vocabulary CardHead shares.
+  // An entry's stretched toggle OPENS `id` (single-open folds the rest). The box's − FOLDS it, and
+  // that may leave no box open: the − exists only where `RailFold` puts it (the AI card, every card
+  // on the phone — user, 2026-11-03), and folding is the reader's own choice, an override like any
+  // other that the next selection moment clears.
   const toggleCollapse = (id: string) =>
-    // The one open-a-card routine (railOpen.ts). A non-ladder card (the snapshot slots) folds nothing.
-    openRailCard(id, ladderIds.includes(id) ? presentLadderIds : []);
+    effCollapsed(id)
+      // The one open-a-card routine (railOpen.ts). A non-ladder card (the snapshot slots) folds nothing.
+      ? openRailCard(id, ladderIds.includes(id) ? presentLadderIds : [])
+      : setRailCollapse(id, true);
   const cx = (id: string) => ({ collapsed: effCollapsed(id), onToggle: () => toggleCollapse(id) });
   // A GHOST's disclosure (GhostCard's header has the why): its own override, outside the
   // single-open accordion — folded by default, `false` = open, cleared back to folded.
@@ -752,7 +753,12 @@ export default function Inspector() {
         // so an entry→box swap REMOUNTED the card — the title re-created, the avatar back to its
         // fallback for a frame. The pager renders the same element shape on both tiers and is a
         // plain pass-through while `active` is off; the plank and the gesture come with the box.
-        const wrapped = <RailPager slot={card.kind} active={boxed}>{body}</RailPager>;
+        // The +/− (`RailFold`) — which cards wear it is `railCollapse.hasFoldControl`'s.
+        const wrapped = (
+          <RailFold.Provider value={card.present && hasFoldControl(id, bp === "phone")}>
+            <RailPager slot={card.kind} active={boxed}>{body}</RailPager>
+          </RailFold.Provider>
+        );
         return (
           // The distance-dim rides a VAR, not wrapper opacity (2026-08-08): the entry itself
           // applies `opacity-[var(--entry-dim,1)]` and RELEASES it on hover (the materialize

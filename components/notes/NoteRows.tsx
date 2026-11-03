@@ -68,7 +68,7 @@ function DayRow({ day }: { day: NoteDay }) {
       label={
         <span className="inline-flex items-center gap-2">
           <span className="w-[3.4em] text-label tabular-nums">{rangeDays(day.dayMs, day.dayMs + DAY_MS)}</span>
-          <NoteKindCoin kind={day.kind} />
+          <NoteKindCoin kind={day.kind} row />
           <span className="sr-only">{NOTE_KIND_WORD[day.kind]}</span>
         </span>
       }
@@ -153,7 +153,7 @@ function ChangeRow({ change, view, onCard }: { change: NoteChange; view: NoteVie
       lit={lit}
       wrap
       still={actions() == null}
-      label={<NoteKindCoin kind={change.kind} />}
+      label={<NoteKindCoin kind={change.kind} row />}
       onPointerEnter={(e) => e.pointerType === "mouse" && on()}
       onPointerLeave={off}
       onFocus={() => focusPreviews() && on()}

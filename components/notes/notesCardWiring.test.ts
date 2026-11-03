@@ -112,7 +112,7 @@ describe("the notes card's own behaviour", () => {
     expect(rows).toMatch(/word="change"/);
     const body = fnBody(rows, "function ChangeRow(");
     expect(body).toMatch(/applyClickActions\(acts\)/);
-    expect(body).toMatch(/<NoteKindCoin kind=\{change\.kind\} \/>/);
+    expect(body).toMatch(/<NoteKindCoin kind=\{change\.kind\} row \/>/);
     expect(body).toMatch(/<NoteText text=\{change\.text\} \/>/);
   });
 
@@ -148,7 +148,9 @@ describe("the notes card's own behaviour", () => {
     expect(rows).toMatch(/import \{ NOTE_KIND_WORD, daysByDate \} from "\.\/noteDays";/);
     const coin = read("components/notes/NoteKindCoin.tsx");
     expect(coin).toMatch(/NOTE_KIND_ICONS\[kind\]/);
-    expect(coin).toMatch(/size-4 rounded-full/);
+    // One coin, two steps (user, 2026-11-03): 16px beside a line, 20px in a row that is read.
+    expect(coin).toMatch(/rounded-full/);
+    expect(coin).toMatch(/row \? "size-5" : "size-4"/);
     // The AI's own sweep as the OUTLINE, the card's own edge (user, 2026-11-01: a full fill was
     // "a bit too much"), over an opaque face that also keeps overlapping coins apart. An arbitrary
     // `background`, since the token is a gradient (CSS trap 3).
