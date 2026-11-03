@@ -43,7 +43,7 @@ export const metadata: Metadata = {
   title,
   description,
   alternates: { canonical: "/" },
-  // Next auto-attaches the generated app/opengraph-image to both cards.
+  // Next auto-attaches app/opengraph-image.png (a frame of the intro) to both cards.
   openGraph: { title, description, type: "website", url: "/", siteName: "DAG Visualizer" },
   twitter: { card: "summary_large_image", title, description },
 };
