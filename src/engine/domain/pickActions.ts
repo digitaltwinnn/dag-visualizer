@@ -443,6 +443,17 @@ export function metaSnapSelectActions(
   // click-scoped decode rule, user 2026-08-07), not silently deselect.
   if (sameMetaSnap(current.metaSnap, sel) && !current.following) return [{ kind: "metaSnap", sel: null }];
   const out: ClickAction[] = [];
+  // A STEP INSIDE THE LIVE PAIR STAYS LIVE (user, 2026-11-03: "if we swipe metagraph snapshots
+  // we're still within the 'live' global … so it should not become pinned"). Following, with the
+  // live card on this network's snapshot in the live global, another snapshot of the SAME network
+  // in the SAME global is held without pinning the global; `followLatest` keeps it until the next
+  // global arrives. The shown subject itself still converts to a pin (the rule above).
+  const live = current.following ? current.metaSnap : null;
+  if (live && !sameMetaSnap(live, sel) && live.metaId === sel.metaId && live.globalOrdinal === sel.globalOrdinal && global.data.ordinal === sel.globalOrdinal) {
+    if (current.inspect && !nodeIsOf(current.inspect, sel.metaId)) out.push({ kind: "inspect", pick: null });
+    out.push({ kind: "metaSnap", sel: { ...sel, held: true } });
+    return out;
+  }
   // A SNAPSHOT DROPS THE NODE IT CANNOT CONTAIN (user, 2026-10-03: "remove node"). A node carried
   // in from another view — a DAG validator picked on the globe — stayed in the pile under a
   // Digital Evidence snapshot, where adjacency is containment: the rail said that node belonged

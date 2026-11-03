@@ -549,6 +549,18 @@ describe("metaSnapSelectActions (a tile on the upper floor)", () => {
     expect(kept.some((x) => x.kind === "filter")).toBe(false);
   });
 
+  it("a step inside the LIVE pair holds the snapshot and pins nothing; another tick or network still pins", () => {
+    const live = { ...SEL, ordinal: 745191, hash: "h2" };
+    expect(metaSnapSelectActions(SEL, GLOBAL, { metaSnap: live, following: true, inspect: null })).toEqual([
+      { kind: "metaSnap", sel: { ...SEL, held: true } },
+    ]);
+    // The shown subject converts to a pin, as ever; a step while pinned pins.
+    expect(metaSnapSelectActions(live, GLOBAL, { metaSnap: live, following: true, inspect: null })[0]).toMatchObject({ kind: "snapshot", follow: false });
+    expect(metaSnapSelectActions(SEL, GLOBAL, { metaSnap: live, following: false, inspect: null })[0]).toMatchObject({ kind: "snapshot", follow: false });
+    // Another network in the same global is a different story: it pins.
+    expect(metaSnapSelectActions({ ...SEL, metaId: "other" }, GLOBAL, { metaSnap: live, following: true, inspect: null })[0]).toMatchObject({ kind: "snapshot", follow: false });
+  });
+
   it("commits the tick, then the network INSIDE that tick, then the subject — and NEVER the filter", () => {
     const a = metaSnapSelectActions(SEL, GLOBAL, { metaSnap: null, inspect: null });
     expect(a).toEqual([

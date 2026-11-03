@@ -439,7 +439,7 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
         const items = wide.map(({ r, who }, i) => ({
           key: `${r.metaId}:${r.ordinal}:${i}`,
           label: `${who} ${ordinalLabel(r)}`,
-          actions: metaSnapSelectActions(metaSnapSelOf(r, cur.globalOrdinal), s.snap!, { metaSnap: cur, inspect: s.inspect }),
+          actions: metaSnapSelectActions(metaSnapSelOf(r, cur.globalOrdinal), s.snap!, { metaSnap: cur, following: s.following, inspect: s.inspect }),
         }));
         const index = wide.findIndex(({ r }) => r.metaId === cur.metaId && r.ordinal === cur.ordinal);
         return finish(slot, items, index, `Global ${cur.globalOrdinal.toLocaleString()}`);
@@ -457,7 +457,7 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
         // other rendered ordinal — and an undecodable payload says so rather than claiming 0
         // (the route's contract).
         label: ordinalLabel(r),
-        actions: metaSnapSelectActions(metaSnapSelOf(r, cur.globalOrdinal), s.snap!, { metaSnap: cur, inspect: s.inspect }),
+        actions: metaSnapSelectActions(metaSnapSelOf(r, cur.globalOrdinal), s.snap!, { metaSnap: cur, following: s.following, inspect: s.inspect }),
       }));
       const index = rows.findIndex((r) => r.metaId === cur.metaId && r.ordinal === cur.ordinal);
       return finish(slot, items, index, `${who} in global ${cur.globalOrdinal.toLocaleString()}`);
