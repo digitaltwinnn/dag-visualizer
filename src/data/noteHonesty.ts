@@ -152,7 +152,8 @@ function candidates(f: Fact, cls: Cls, ratios: readonly Fact[], dir: Dir): numbe
   switch (cls) {
     case "plain": return f.kind === "count" || f.kind === "amount" ? [f.value] : [];
     case "pct":
-      if (f.kind === "share") return [f.value * 100];
+      // A change fact backs its percentage only beside a verb going its way (or none at all).
+      if (f.kind === "share") return (f.move === "up" && dir === "fall") || (f.move === "down" && dir === "rise") ? [] : [f.value * 100];
       if (!isRatio) return [];
       return dir === "fall" ? [(1 - f.value) * 100]
         : dir === "rise" ? [(f.value - 1) * 100, f.value * 100]

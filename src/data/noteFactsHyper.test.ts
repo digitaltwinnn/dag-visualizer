@@ -739,7 +739,7 @@ describe("hyperFacts' notable changes", () => {
   const steady = { "f.nodes": row(N, () => 150), "f.nodes.usdc": row(N, () => 30) };
   it("on all, a row for each network whose node count moved, biggest first", () => {
     const r = hyperFacts(input({ fleet: fleet({ "f.nodes.bio": row(N, (i) => (i < N / 2 ? 10 : 7)) }) }))!;
-    expect(r.changes?.map((c) => [c.brief!.about, c.brief!.facts[0]!.text, c.brief!.facts.at(-1)!.text])).toEqual([["USDC.dag's nodes", "20", "200%"], ["BioFi's nodes", "3", "30%"]]);
+    expect(r.changes?.map((c) => [c.brief!.about, c.brief!.facts[0]!.text, c.brief!.facts.at(-1)!.text])).toEqual([["USDC.dag's nodes", "20", "30"], ["BioFi's nodes", "3", "7"]]);
     expect(r.changes?.[0]).toMatchObject({ kind: "gained", subject: { kind: "network", id: "usdc" } });
   });
   it("on all, a network starting outranks a count", () => {
@@ -760,7 +760,7 @@ describe("hyperFacts' notable changes", () => {
     const group = r.changes?.find((c) => c.subject.kind === "type" && c.subject.type === "l0+cl1");
     expect(group).toMatchObject({ kind: "lost", size: 4, subject: { kind: "type", netId: "usdc", type: "l0+cl1" } });
     expect(group?.brief?.about).toBe("Hybrid group's nodes");
-    expect(group?.brief?.facts.at(-1)?.text).toBe("20%");
+    expect(group?.brief?.facts.at(-1)?.text).toBe("16");
   });
   it("a layer group's own note says its own move, and has nowhere to go from its own card", () => {
     const r = hyperFacts(input({ subject: { net: "usdc", type: "l0+cl1" }, fleet: fleet({ ...steady, "f.type.usdc.l0+cl1": row(N, (i) => (i < N / 2 ? 20 : 16)) }) }))!;

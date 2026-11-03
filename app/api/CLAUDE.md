@@ -148,7 +148,11 @@ them — but the Next Node server can.
   starts, so the 121 warmed notes fill in one pass). **The honesty gate (rule 10) is mechanical**
   (`src/data/noteHonesty.ts`, the colocated test is its specification): every number the note
   states must match a fact the model was shown, within the precision it was written to, and a
-  failing note is asked for once more with the reasons, then dropped and counted. Nothing is ever
+  failing note is asked for once more with the reasons, then dropped and counted. A note that
+  passes with a FORM slip (`styleSlips`: an earlier figure, a span written as a climb, "held" beside
+  a change) is asked for once more too, and the checked note stands if the second answer fails; a
+  change's percentage is read only beside a verb going its way (`Fact.move`), and a notable-change
+  row's line must name the subject its click commits (`namesSubject`). Nothing is ever
   stored unchecked, and the model's text is untrusted (a plain string, never markup). **A failure
   holds its key** (`failKeyOf`, `FAIL_TTL_S` = 15 minutes): a read or request whose write failed
   leaves a marker, and the next read or request of that key answers `unavailable` without a model
@@ -181,8 +185,8 @@ them — but the Next Node server can.
   The grammar has ONE home, `notes/keys.ts` — `CC_TAIL_RE`, `ISP_TAIL_RE`, `TYPE_TAIL_RE`,
   `subjectKindOf`, `isSubjectNote`: `cc:XX` (fleet country), `<net>/cc:XX`, `isp:<key>`,
   `<net>/isp:<key>` (the provider across the scope, named network-wide), `<net>/type:<roleKey>`,
-  with `<net>` a tracked network id or `dag`. `NoteFacts.kind` is the QUESTION kind, and every view
-  note (`cc:XX` included) is `"view"`; `PROMPTS[view].questions[kind]` asks a subject kind's own
+  with `<net>` a tracked network id or `dag`. `NoteFacts.kind` is the QUESTION kind: every view
+  note is `"view"`, except the fleet country `cc:XX`, which asks the country question (2026-11-03); `PROMPTS[view].questions[kind]` asks a subject kind's own
   question with no common reading. `KIND_TIMING.subject` is `{ refreshMs: null, ttlS: 24h }` and
   `timingOf` lets the subject decide first, so a subject note has one timing whatever its view:
   never warmed, written when someone first asks and rewritten at most once a day. The fleet

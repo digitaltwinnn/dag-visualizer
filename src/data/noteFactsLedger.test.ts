@@ -333,7 +333,7 @@ describe("ledgerFacts' notable changes", () => {
   // THE CHAMBER'S EXTREMES (user, 2026-11-01): a day where nothing moved still has a largest snapshot.
   it("the usual rhythm still names the longest gap", () => {
     expect(ledgerFacts(input())!.changes).toEqual([
-      expect.objectContaining({ kind: "longest", size: -1, subject: { kind: "network", id: "usdc" }, brief: { about: "USDC.dag had the span's longest gap", facts: [expect.objectContaining({ label: "Longest gap", text: "55 seconds" })] } }),
+      expect.objectContaining({ kind: "longest", size: -1, subject: { kind: "network", id: "usdc" }, brief: { about: "USDC.dag had the span's longest gap", facts: [expect.objectContaining({ label: "Longest gap", text: "55 seconds" })], name: "USDC.dag" } }),
     ]);
   });
   it("names the largest global snapshot once the sampler holds one, ahead of the gap", () => {

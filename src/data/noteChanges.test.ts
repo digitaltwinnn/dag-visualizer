@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { NOTE_CHANGES_CAP, RHYTHM_CHANGE, countChange, eventChange, largestGlobalChange, longestGapChange, pauseChange, pickChanges, siteMoves, rateChange, rhythmChange, siteOfChange, withExtremes } from "@/src/data/noteChanges";
+import { NOTE_CHANGES_CAP, RHYTHM_CHANGE, countChange, eventChange, largestGlobalChange, longestGapChange, namesSubject, pauseChange, pickChanges, siteMoves, rateChange, rhythmChange, siteOfChange, withExtremes } from "@/src/data/noteChanges";
 import type { NoteChange } from "@/src/data/noteTypes";
 
 const NET = { kind: "network", id: "dor" } as const;
@@ -14,14 +14,14 @@ describe("countChange", () => {
     expect(countChange("Germany", 34, 30, NET)).toMatchObject({ kind: "lost", text: "", size: 4 });
     expect(briefOf(countChange("Germany", 34, 30, NET))).toEqual({
       about: "Germany's nodes",
-      facts: [["Nodes lost", "4"], ["Nodes at the start of the span", "34"], ["Nodes at the end of the span", "30"], ["Nodes, change against the start of the span, down", "12%"]],
+      facts: [["Nodes lost", "4"], ["Nodes at the start of the span", "34"], ["Nodes at the end of the span", "30"]],
     });
     expect(countChange("Germany", 30, 34, NET)).toMatchObject({ kind: "gained", size: 4 });
   });
   it("names a place when it was measured, and its counts are that place's", () => {
     expect(briefOf(countChange("Hetzner", 51, 48, NET, { city: "Falkenstein", was: 12 }))).toEqual({
       about: "Hetzner's nodes in Falkenstein",
-      facts: [["Nodes lost", "3"], ["Nodes in Falkenstein at the start of the span", "12"], ["Nodes in Falkenstein at the end of the span", "9"], ["Nodes in Falkenstein, change against the start of the span, down", "25%"]],
+      facts: [["Nodes lost", "3"], ["Nodes in Falkenstein at the start of the span", "12"], ["Nodes in Falkenstein at the end of the span", "9"]],
     });
   });
   it("tells a first arrival and a last departure apart from a move, with no change against a start", () => {
@@ -189,7 +189,19 @@ describe("countChange's bar", () => {
     expect(countChange("Japan", 1, 0, NET)).toMatchObject({ kind: "gone" });
   });
   it("judges a place by that place's own count", () => {
-    expect(briefOf(countChange("OVH", 40, 38, NET, { city: "Falkenstein", was: 12 }))?.facts.at(-1)).toEqual(["Nodes in Falkenstein, change against the start of the span, down", "17%"]);
+    expect(briefOf(countChange("OVH", 40, 38, NET, { city: "Falkenstein", was: 12 }))?.facts.at(-1)).toEqual(["Nodes in Falkenstein at the end of the span", "10"]);
     expect(countChange("OVH", 40, 39, NET, { city: "Falkenstein", was: 30 })).toBeNull();
+  });
+});
+
+describe("namesSubject — a row's line must name the subject its click commits", () => {
+  it("accepts any distinctive word of the name, as a whole word", () => {
+    expect(namesSubject("Hetzner lost 4 nodes in Falkenstein.", "Hetzner Online GmbH")).toBe(true);
+    expect(namesSubject("Germany fell 6% to 66 nodes.", "Germany")).toBe(true);
+    expect(namesSubject("The Upsider AI paused for 2 hours.", "The Upsider AI")).toBe(true);
+  });
+  it("refuses a line about another subject", () => {
+    expect(namesSubject("France lost 2 nodes, now 20.", "Germany")).toBe(false);
+    expect(namesSubject("Germanyx lost 2 nodes.", "Germany")).toBe(false);
   });
 });

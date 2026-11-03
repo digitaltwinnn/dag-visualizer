@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { READ_SLACK_MS, chainReadThrough, fact, factsBlock, gaugeChange, heldLevel, median, networksAnchored, observedLevel, spanMeasured, pairChange, spellDurations, withChangeFacts } from "@/src/data/noteFacts";
+import { READ_SLACK_MS, chainReadThrough, fact, factsBlock, gaugeChange, heldLevel, median, networksAnchored, observedLevel, spanMeasured, pairChange, spellDurations, withChangeFacts, changeShare } from "@/src/data/noteFacts";
 import { checkNote } from "@/src/data/noteHonesty";
 import { formatDag } from "@/src/data/trendSeries";
 
@@ -269,6 +269,10 @@ describe("withChangeFacts", () => {
     const out = withChangeFacts(pair("g", "Global snapshots per day, the weeks before", 7405, "Global snapshots per day, last week", 8192));
     expect(out.at(-1)!.label).toBe("Global snapshots per day, last week, change against the weeks before, up");
     expect(out.at(-1)!.text).toBe("11%");
+  });
+  it("carries its direction, built by the one change builder", () => {
+    expect(withChangeFacts(pair("k", "k before", 70, "k now", 66)).at(-1)!.move).toBe("down");
+    expect(changeShare("k now", "k before", 11)).toMatchObject({ move: "up", text: "11%", label: "k now, change against k before, up" });
   });
   it("reads a pair's change in whole percent", () => {
     const [a, b] = pair("k", "k before", 70, "k now", 66);

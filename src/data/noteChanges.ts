@@ -18,23 +18,29 @@ export const NOTE_CHANGES_CAP = 3;
  *  note's own lead threshold: a row is a claim the reader can click, and pace is noisy. */
 export const RHYTHM_CHANGE = 0.25;
 
-/** A row waiting for its line: the brief the model words it from. */
-const row = (kind: NoteChange["kind"], subject: NoteChangeSubject, size: number, about: string, facts: Fact[] = []): NoteChange => {
-  const brief: ChangeBrief = { about, facts };
-  return { kind, subject, size, text: "", brief };
-};
+/** Generic words a subject's name shares with others, never enough to say which one a line names. */
+const GENERIC = new Set(["the", "and", "inc", "llc", "ltd", "gmbh", "corp", "online", "limited", "services", "technologies", "network", "networks"]);
 
-/** How far a pair moved, as the share fact a note's own changes carry (`withChangeFacts`). */
-const changeFact = (label: string, from: number, to: number): Fact[] => {
-  const pct = from > 0 ? Math.round((to / from - 1) * 100) : 0;
-  return pct === 0 ? [] : [fact(`${label}, change against the start of the span, ${pct > 0 ? "up" : "down"}`, Math.abs(pct) / 100, "share")];
+/** DOES A ROW'S LINE NAME ITS SUBJECT? Any distinctive word of the name (three letters or more,
+ *  not a generic one) as a whole word, so "Hetzner" names "Hetzner Online GmbH". A validity check on
+ *  the model's line, never a rewrite: a row that names another subject than its click is dropped. */
+export function namesSubject(line: string, name: string): boolean {
+  const words = name.split(/[\s,.()]+/).filter((w) => w.length >= 3 && !GENERIC.has(w.toLowerCase()));
+  if (!words.length) return true;
+  return words.some((w) => new RegExp(`(^|[^\\p{L}\\p{N}])${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}])`, "iu").test(line));
+}
+
+/** A row waiting for its line: the brief the model words it from. */
+const row = (kind: NoteChange["kind"], subject: NoteChangeSubject, size: number, about: string, facts: Fact[] = [], name?: string): NoteChange => {
+  const brief: ChangeBrief = { about, facts, ...(name ? { name } : {}) };
+  return { kind, subject, size, text: "", brief };
 };
 
 /** A gap far past a chain's usual widest one (`isPause`), stated against its NORMAL SPACING (user,
  *  2026-11-03: "don't compare gaps against other gaps; compare gaps against the normal spacing between
  *  snapshots"). `what` names the kind of snapshot that paused. */
 export function pauseChange(name: string, gapS: number, spacingS: number, what: string, subject: NoteChangeSubject): NoteChange {
-  return row("pause", subject, gapS, `${name} paused`, [fact("Pause length", gapS, "duration"), fact(`Normal spacing between ${what}`, spacingS, "duration")]);
+  return row("pause", subject, gapS, `${name} paused`, [fact("Pause length", gapS, "duration"), fact(`Normal spacing between ${what}`, spacingS, "duration")], name);
 }
 
 /** A rate far from its usual one, on the notable days' own bands (`notableDays.ts`), or null.
@@ -45,7 +51,7 @@ export function rateChange(name: string, now: number, usual: number, unit: strin
   return kind && row(kind, subject, Math.abs(Math.log(Math.max(now, 1e-9) / usual)), `${name} ran ${kind === "high" ? "far above" : "far below"} its usual rate`, [
     fact(`${unit} an hour, recent`, now, "amount", format),
     fact(`${unit} an hour, usual`, usual, "amount", format),
-  ]);
+  ], name);
 }
 
 /** The smallest share of a count a move of two or more nodes takes to be worth a row. */
@@ -75,21 +81,20 @@ export function countChange(
   const where = place ? ` in ${place.city}` : "";
   if (from > 0 && to > 0 && !worthARow(place?.was || from, to - from)) return null;
   const moved = fact(to > from ? "Nodes gained" : "Nodes lost", size, "count");
-  if (from === 0) return row("new", subject, size, `${name} gained its first nodes${where}`, [moved]);
-  if (to === 0) return row("gone", subject, size, `${name} lost its last nodes${where}`, [moved]);
+  if (from === 0) return row("new", subject, size, `${name} gained its first nodes${where}`, [moved], name);
+  if (to === 0) return row("gone", subject, size, `${name} lost its last nodes${where}`, [moved], name);
   const was = place ? place.was : from;
   const now = place ? place.was + to - from : to;
   return row(to > from ? "gained" : "lost", subject, size, `${name}'s nodes${where}`, [
     moved,
     fact(`Nodes${where} at the start of the span`, was, "count"),
     fact(`Nodes${where} at the end of the span`, now, "count"),
-    ...changeFact(`Nodes${where}`, was, now),
-  ]);
+  ], name);
 }
 
 /** A network starting or stopping. Outranks any count: nothing else says it. */
 export function eventChange(name: string, kind: "active" | "quiet", subject: NoteChangeSubject): NoteChange {
-  return row(kind, subject, Number.MAX_SAFE_INTEGER, `${name} ${kind === "active" ? "became active" : "went quiet"} over the span`);
+  return row(kind, subject, Number.MAX_SAFE_INTEGER, `${name} ${kind === "active" ? "became active" : "went quiet"} over the span`, [], name);
 }
 
 /** A network's pace against its usual one, seconds between snapshots: null under the threshold and
@@ -100,7 +105,7 @@ export function rhythmChange(name: string, usualS: number, recentS: number, subj
   const now = fact("Spacing between its metagraph snapshots, recent", recentS, "duration");
   const usual = fact("Spacing between its metagraph snapshots, usual", usualS, "duration");
   if (size < RHYTHM_CHANGE || now.text === usual.text) return null;
-  return row(recentS < usualS ? "faster" : "slower", subject, size, `${name} ${recentS < usualS ? "sped up" : "slowed down"}`, [now, usual]);
+  return row(recentS < usualS ? "faster" : "slower", subject, size, `${name} ${recentS < usualS ? "sped up" : "slowed down"}`, [now, usual], name);
 }
 
 /** The span's largest global snapshot, by the snapshots it anchored (user, 2026-11-02: "more
@@ -111,7 +116,7 @@ export function largestGlobalChange(anchored: number): NoteChange {
 
 /** Who held the span's longest gap between snapshots. Below the largest snapshot on a tie of kinds. */
 export function longestGapChange(name: string, seconds: number, subject: NoteChangeSubject): NoteChange {
-  return row("longest", subject, -1, `${name} had the span's longest gap`, [fact("Longest gap", seconds, "duration")]);
+  return row("longest", subject, -1, `${name} had the span's longest gap`, [fact("Longest gap", seconds, "duration")], name);
 }
 
 type Sites = Readonly<Record<string, number>>;

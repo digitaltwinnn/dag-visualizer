@@ -278,7 +278,8 @@ export function parseAnswer(text: string): { note: string; captions: Map<string,
   const start = lines.findIndex((l) => NOTE_RE.test(l));
   if (start < 0) {
     const said = lines.find((l) => LINE_RE.test(l));
-    return { note: lines.filter((l) => l !== said).join("\n").trim(), captions, line: said ? LINE_RE.exec(said)![1]!.trim() || null : null, rows };
+    // A row or a caption line is never the note, even with no NOTE: line to say where it ends.
+    return { note: lines.filter((l) => l !== said && !CHANGE_RE.test(l) && !DAY_RE.test(l)).join("\n").trim(), captions, line: said ? LINE_RE.exec(said)![1]!.trim() || null : null, rows };
   }
   const note = [NOTE_RE.exec(lines[start]!)![1]!];
   const seen = new Map<string, number>();

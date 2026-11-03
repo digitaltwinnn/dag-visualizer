@@ -289,6 +289,16 @@ describe("notableDays: lead-in (from)", () => {
     const [pause] = notableDays({ days, covered, series, subject: "a", ids: ["a"], cap: 99, from: 30 }).filter((d) => d.kind === "pause");
     expect(pause).toMatchObject({ dayMs: days[50], value: 8000, level: 86_400 / 40 });
   });
+
+  it("a network that began mid-span states its normal spacing over its own active days", () => {
+    const { days, covered } = span(60);
+    const snaps = Array.from({ length: 60 }, (_, i) => (i >= 40 ? 40 : 0));
+    const gap: number[] = Array.from({ length: 60 }, (_, i) => (i >= 40 ? 100 : 0));
+    gap[50] = 8000;
+    const series = { "m.a.snaps": snaps, "m.a.gapMax": gap };
+    const [pause] = notableDays({ days, covered, series, subject: "a", ids: ["a"], cap: 99, from: 30 }).filter((d) => d.kind === "pause");
+    expect(pause).toMatchObject({ dayMs: days[50], level: 86_400 / 40 });
+  });
 });
 
 describe("notableDays: whose days", () => {

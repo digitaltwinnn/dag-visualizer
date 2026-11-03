@@ -859,8 +859,8 @@ a node no ancestry), and read as "the deepest" it left the Global snapshot card 
 to the tick's networks. The AI notes slot neither starts that run nor breaks it.
 
 **THE AI NOTES SLOT** (2026-10-27, R57) — on screen the card wears the rail's own head grammar
-(user, 2026-10-29): NO eyebrow — the title is the product that writes it, **"Constellation Gate
-AI"**, with the sparkles mark in `--ai-mark` at its left on both tiers as the one sign it is an AI
+(user, 2026-10-29): NO eyebrow — the title is the product that writes it, **"Gate AI"** (shortened
+2026-11-03 to save room), with the sparkles mark in `--ai-mark` at its left on both tiers as the one sign it is an AI
 card — and the SPAN the note covers ("last 7 days") is the head's qualifier chip on the right, like
 the dossier's ticker; "AI notes" stays the code's and these docs' name for
 the slot. **The top card is the VIEW's note on the metagraph card's network** (`metagraphCardNetwork`:

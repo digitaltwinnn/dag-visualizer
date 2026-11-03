@@ -260,7 +260,10 @@ function pauses(gap: readonly (number | null)[], count: readonly (number | null)
   // long snapshots normally came apart over the span itself.
   const level = median(had);
   const from = Math.max(0, input.from ?? 0);
-  const stated = spacingOver(count, covered, from, (input.until ?? days.length) - 1);
+  // Over the network's OWN active stretch, as `rangeExtremes` reads it: covered days before its first
+  // snapshot or after its last hold none, and counted they would stretch the normal (review, 2026-11-03).
+  const act = networkId != null && count ? activity(count, input) : null;
+  const stated = spacingOver(count, covered, Math.max(from, act?.first ?? from), Math.min((input.until ?? days.length) - 1, act?.last ?? Infinity));
   const keep = runKeeper(out);
   for (let i = from; i < days.length; i++) {
     const value = reading(gap, covered, i);

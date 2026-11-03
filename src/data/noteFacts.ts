@@ -178,6 +178,19 @@ export function gaugeChange(points: readonly (number | null)[]): { from: number;
   return { from, to, firstIndex: points.findIndex((v) => v != null) };
 }
 
+/** How far a pair moved, in whole percent, or 0 when it rounds to nothing or has nothing to move from. */
+export function pairChange(from: Fact, to: Fact): number {
+  return from.value > 0 ? Math.round((to.value / from.value - 1) * 100) : 0;
+}
+
+/** ONE CHANGE FACT — a move of `pct` percent against `against`, labelled with its direction and
+ *  carrying it as `move`, so the gate reads its percentage only with a verb going the same way.
+ *  The one builder every change fact uses (`withChangeFacts`, the briefs, a notable day's). */
+export function changeShare(label: string, against: string, pct: number): Fact {
+  const move = pct > 0 ? "up" : "down";
+  return { ...fact(`${label}, change against ${against}, ${move}`, Math.abs(pct) / 100, "share"), move };
+}
+
 /** HOW FAR EACH MEASURED CHANGE MOVED, AS A FACT (user, 2026-11-03: "from x to y, up z% can be
  *  shortened by saying just the current value and its increase", and the wording belongs in the
  *  prompt, never in code rewriting the model's answer). For every pair (`Fact.pair`) whose ends
@@ -188,11 +201,6 @@ export function gaugeChange(points: readonly (number | null)[]): { from: number;
  *  prompt's quiet rule says it) or grew more than tenfold from almost nothing (live 2026-11-03:
  *  "up 3551600%"): a percentage there says nothing a reader can use, so the note gives where it
  *  stands. */
-/** How far a pair moved, in whole percent, or 0 when it rounds to nothing or has nothing to move from. */
-export function pairChange(from: Fact, to: Fact): number {
-  return from.value > 0 ? Math.round((to.value / from.value - 1) * 100) : 0;
-}
-
 export function withChangeFacts(facts: readonly Fact[]): Fact[] {
   const out = [...facts];
   for (const to of facts) {
@@ -200,7 +208,7 @@ export function withChangeFacts(facts: readonly Fact[]): Fact[] {
     const from = facts.find((f) => f.pair?.key === to.pair!.key && f.pair.end === "from");
     const pct = from ? pairChange(from, to) : 0;
     if (!from || pct === 0 || to.value === 0 || pct >= 1000) continue;
-    out.push(fact(`${to.label}, change against ${againstWords(from.label, to.label)}, ${pct > 0 ? "up" : "down"}`, Math.abs(pct) / 100, "share"));
+    out.push(changeShare(to.label, againstWords(from.label, to.label), pct));
   }
   return out;
 }

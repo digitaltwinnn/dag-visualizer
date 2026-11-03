@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { bannedWords, checkNote, undash } from "@/src/data/noteHonesty";
-import { fact } from "@/src/data/noteFacts";
+import { changeShare, fact } from "@/src/data/noteFacts";
 import type { Fact } from "@/src/data/noteTypes";
 
 const F = (label: string, value: number, kind: Fact["kind"], text: string): Fact => ({ label, value, kind, text });
@@ -15,6 +15,17 @@ const facts = [
 ];
 const names = ["USDC.dag", "BioFi", "Hetzner Online GmbH"];
 const ok = (t: string, o?: { maxSentences?: number; minWords?: number }) => checkNote(t, facts, names, o).ok;
+
+describe("checkNote — a change fact reads only in its own direction", () => {
+  const moved = [F("Germany, nodes", 66, "count", "66"), changeShare("Germany, nodes", "a week ago", -6)];
+  it("backs a fall written as a fall, or with no verb", () => {
+    expect(checkNote("Germany fell 6% to 66 nodes.", moved, ["Germany"]).ok).toBe(true);
+    expect(checkNote("Germany hosts 66 nodes, 6% fewer than a week ago.", moved, ["Germany"]).ok).toBe(true);
+  });
+  it("refuses a fall written as a rise", () => {
+    expect(checkNote("Germany hosts 66 nodes, up 6% on a week ago.", moved, ["Germany"]).ok).toBe(false);
+  });
+});
 
 describe("checkNote — numbers must be backed by a fact", () => {
   it("passes a note with no numbers that a ratio fact backs", () => {

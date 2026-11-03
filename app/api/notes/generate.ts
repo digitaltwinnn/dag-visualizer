@@ -1,5 +1,6 @@
 import { factsBlock, pairChange, withChangeFacts } from "@/src/data/noteFacts";
 import { checkNote } from "@/src/data/noteHonesty";
+import { namesSubject } from "@/src/data/noteChanges";
 import { LINE_MAX } from "@/src/engine/domain/briefing";
 import type { Fact, NoteChange, NoteDay, NoteResponse, NoteView } from "@/src/data/noteTypes";
 import { GateError, type gateChat, type GateErrorKind } from "./gate";
@@ -208,7 +209,14 @@ function styleSlips(text: string, facts: readonly Fact[]): string[] {
   // A NETWORK'S GLOBAL SNAPSHOTS AS A SHARE OR ANOTHER NOUN ("its share of global snapshots rose 5%",
   // "placements", live 2026-11-03): the figure is the global snapshots it was part of.
   const share = /\b(?:share of global snapshots|global snapshot (?:placements|appearances))\b/i.exec(text);
-  if (share) out.push(`"${share[0]}": say "<network> was part of <figure> global snapshots per day"`);
+  // Its fix matches the figure: a percentage stays a share ("was part of 12% of global snapshots", the
+  // ledger's one-network question asks exactly that), a count is the global snapshots it was part of.
+  if (share) {
+    const pctNear = /\d+(?:\.\d+)?\s*(?:%|percent)/i.test(text.slice(share.index, share.index + share[0].length + 40));
+    out.push(pctNear
+      ? `"${share[0]}": say "<network> was part of <figure>% of global snapshots"`
+      : `"${share[0]}": say "<network> was part of <figure> global snapshots per day"`);
+  }
   // "HELD" WITH A CHANGE BESIDE IT ("Fees held at 332 DAG per day, up 11%", live): held is no change.
   const held = /\bheld\b[^.;]*?\d+%/i.exec(text);
   if (held) out.push(`"${held[0]}": held means it did not move; a figure with a change rose or fell`);
@@ -307,6 +315,8 @@ async function write(
     drafts.forEach((c, i) => {
       const said = parsed.rows.get(i + 1);
       if (!said || !checkNote(said, [...facts, ...c.brief!.facts], input.names, { maxSentences: 1, subject }).ok) return;
+      // The line must name the subject its click commits: the gate checks figures, not who.
+      if (c.brief!.name && !namesSubject(said, c.brief!.name)) return;
       const { brief: _brief, ...draft } = c;
       rows.push({ ...draft, text: said });
     });
