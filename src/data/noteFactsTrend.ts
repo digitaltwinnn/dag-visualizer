@@ -323,7 +323,7 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
     // THE UNLISTED SET'S DAYS read the fold, and two things differ from a network's. Its coverage is
     // `u.cov`, not the spine: a day the chains went unread is null in the fold, and the picker reads
     // covered + absent as a measured 0, so against `g.ticks` that day would be a dip. And its folded
-    // `gapMax` is one chain's widest gap, not a wait of the set, so it has no pause and no longest wait.
+    // `gapMax` is one chain's widest gap, not a gap of the set, so it has no pause and no longest gap.
     const raw = trimNewestPartial(input.daily);
     const d = unlisted ? fold(raw) : raw;
     const first = d.buckets.findIndex((b) => b >= span.fromMs);
@@ -348,7 +348,7 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
         facts.push(fact(`${name} day of the span, date`, day.dayMs, "date"));
         facts.push(fact(`${name} day of the span, metagraph snapshots anchored`, day.value, "count"));
       }
-      // The snapshots' own median: `ext` also holds a longest wait or a broadest day, each with a level of its own.
+      // The snapshots' own median: `ext` also holds a longest gap or a broadest day, each with a level of its own.
       const counted = ext.find((x) => x.kind === "peak" || x.kind === "trough");
       if (counted) facts.push(fact("Typical day of the span, metagraph snapshots anchored", counted.level, "count"));
     }
@@ -376,12 +376,15 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
         // THE RANGE'S EXTREMES (`NOTABLE_FLOOR`): named as the span's, never as a spike or a dip.
         : day.kind === "peak" ? "busiest day of the span"
         : day.kind === "trough" ? "quietest day of the span"
-        : day.kind === "longest" ? "longest wait of the span"
+        : day.kind === "longest" ? "longest gap of the span"
         : day.kind === "broadest" ? "most networks anchoring of the span"
         : "pause";
       const kind = dayMeasured(day);
       const measured =
-        day.kind === "pause" || day.kind === "longest" ? `longest wait between ${dag ? "global snapshots" : "metagraph snapshots"}`
+        // A GAP IN ANCHORING, NOT A "WAIT" (user, 2026-11-03: "wait has no real meaning so I think
+        // anchoring is more suitable"): the DAG's is a gap between its global snapshots, a network's
+        // a gap in its anchoring.
+        day.kind === "pause" || day.kind === "longest" ? (dag ? "longest gap between global snapshots" : "longest gap in anchoring")
         : day.kind === "broadest" ? "networks that anchored that day"
         : day.measure === "globals" ? "global snapshots that day"
         // The whole network's fees and data are read from the stored floors (`notableDays`), which
@@ -397,9 +400,12 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
       // The level beside it: an event's USUAL level (the median before it), an extreme's SPAN median.
       const level =
         day.kind === "high" || day.kind === "low" ? "usual level"
-        : day.kind === "pause" ? "usual longest wait"
+        // THE LEVEL IS A DAY'S LONGEST GAP, never the spacing (user, 2026-11-03: "I don't think it's
+        // usually 3.5 minutes"): the median, over the days, of each day's longest gap, so the words
+        // name it as that, or a reader takes it for the cadence.
+        : day.kind === "pause" ? "longest gap on a typical day"
         : day.kind === "peak" || day.kind === "trough" ? "span median"
-        : day.kind === "longest" ? "span median longest wait"
+        : day.kind === "longest" ? "longest gap on a typical day of the span"
         : day.kind === "broadest" ? "span median networks"
         : null;
       if (level) facts.push(fact(`Notable day ${n} ${what}, ${level}`, read(day.level), kind, format));

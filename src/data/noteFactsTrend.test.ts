@@ -303,7 +303,7 @@ describe("trendFacts notable days", () => {
 
   // THE FLOOR'S DAYS ARE NAMED AS THE RANGE'S EXTREMES (user, 2026-10-30), never as a spike or a
   // dip: "busiest day of the span", with the span's median beside it, so the caption can place it.
-  it("a quiet network's three days are its busiest, quietest and longest wait, named as the span's", () => {
+  it("a quiet network's three days are its busiest, quietest and longest gap, named as the span's", () => {
     const snaps = row(37, (i) => (i === 33 ? 70 : i === 34 ? 50 : 60));
     const gap = row(37, (i) => (i === 35 ? 900 : 600));
     const r = trendFacts(input({ subject: "usdc", daily: daily({ "m.usdc.snaps": snaps, "m.usdc.gapMax": gap }) }))!;
@@ -319,9 +319,10 @@ describe("trendFacts notable days", () => {
       ["Notable day 2 quietest day of the span, metagraph snapshots anchored that day", 50, "count"],
       ["Notable day 2 quietest day of the span, span median", 60, "count"],
       ["Notable day 2 quietest day of the span, change against the span median, down", 0.17, "share"],
-      ["Notable day 3 date (longest wait of the span)", T0 + 5 * DAY, "date"],
-      ["Notable day 3 longest wait of the span, longest wait between metagraph snapshots", 900, "duration"],
-      ["Notable day 3 longest wait of the span, span median longest wait", 600, "duration"],
+      ["Notable day 3 date (longest gap of the span)", T0 + 5 * DAY, "date"],
+      ["Notable day 3 longest gap of the span, longest gap in anchoring", 900, "duration"],
+      // A day's longest gap, never the spacing (user, 2026-11-03), so its level is named as that.
+      ["Notable day 3 longest gap of the span, longest gap on a typical day of the span", 600, "duration"],
     ]);
     expect(checkNote("The busiest day of the span, with 70 snapshots against a median of 60.", r.facts, r.names, { maxSentences: 1 })).toEqual({ ok: true });
   });
@@ -330,7 +331,7 @@ describe("trendFacts notable days", () => {
     const gap = row(37, (i) => (i === 33 ? 7200 : 30));
     const r = trendFacts(input({ subject: "usdc", daily: daily({ "m.usdc.gapMax": gap }) }))!;
     expect(r.days.map((d) => d.kind)).toEqual(["pause"]);
-    const v = r.facts.find((f) => /Notable day 1 pause, longest wait between metagraph snapshots/.test(f.label))!;
+    const v = r.facts.find((f) => /Notable day 1 pause, longest gap in anchoring/.test(f.label))!;
     expect(v.kind).toBe("duration");
     expect(v.text).toBe("2 hours");
   });
@@ -468,7 +469,7 @@ describe("trendFacts on the unlisted set", () => {
   });
 
   // A max across chains is one chain's wait, not the set's: no pause and no longest wait.
-  it("reports no pause or longest wait: the folded widest gap is no wait of the set", () => {
+  it("reports no pause or longest gap: the folded widest gap is no gap of the set", () => {
     const d = daily({
       "u.cov": row(37, () => 1),
       "m.DAGaaa.snaps": row(37, () => 100),

@@ -255,7 +255,7 @@ export const measureIcon = (id: string): LucideIcon | undefined => (MEASURE_ICON
 /** A NOTABLE DAY'S KIND, as a mark (the AI notes card's day rows, design B 2026-10-30: "date and
  *  kind lead"). The thresholded events are the doubled chevrons (a spike, a dip), the range's own
  *  extremes the single ones (its busiest, quietest day); a first day is the play mark, a last day
- *  the stop square, a pause the pause bars; the longest wait an hourglass, the day the most
+ *  the stop square, a pause the pause bars; the longest gap an hourglass, the day the most
  *  networks anchored the network mark. Monochrome via currentColor, tinted the day's network hue. */
 export const NOTE_KIND_ICONS: Record<NotableKind | NoteChangeKind, LucideIcon> = {
   high: ChevronsUp,

@@ -237,18 +237,30 @@ function pauses(gap: readonly (number | null)[], input: NotableInput, networkId:
     if (v != null && v > 0) had.push(v);
   }
   if (!had.length) return;
+  // DETECTED AGAINST THE LONG RUN, STATED AGAINST THE SPAN (user, 2026-11-03: "I don't think it's
+  // usually 3.5 minutes, based on what data is that?"). The lead-in steadies the detection, but a
+  // caption says "a typical day's longest gap", and over a span that sped up the lead-in's slower
+  // days held that figure at 3.5 minutes while the span's own days ran 1.8. So the level a day is
+  // reported against is the span's own median, once the span holds LEVEL_MIN days that had a gap.
   const level = median(had);
+  const from = Math.max(0, input.from ?? 0);
+  const inSpan: number[] = [];
+  for (let i = from; i < days.length; i++) {
+    const v = reading(gap, covered, i);
+    if (v != null && v > 0) inSpan.push(v);
+  }
+  const stated = inSpan.length >= LEVEL_MIN ? median(inSpan) : level;
   const keep = runKeeper(out);
-  for (let i = Math.max(0, input.from ?? 0); i < days.length; i++) {
+  for (let i = from; i < days.length; i++) {
     const value = reading(gap, covered, i);
     if (value == null) continue;
-    keep.day(isPause(value, level) ? { dayMs: days[i]!, kind: "pause", networkId, value, level, score: scoreOf(value, level) } : null);
+    keep.day(isPause(value, level) ? { dayMs: days[i]!, kind: "pause", networkId, value, level: stated, score: scoreOf(value, level) } : null);
   }
   keep.flush();
 }
 
 /** THE RANGE'S EXTREMES, in fill order (see `NOTABLE_FLOOR`): the busiest and quietest day of the
- *  subject's own series, then a network's longest wait or the hypergraph's broadest day. Read on
+ *  subject's own series, then a network's longest gap or the hypergraph's broadest day. Read on
  *  covered days from `from` on, and for a network inside its own activity (the quiet tail after
  *  its last day is the `last`'s business). An extreme exists only when its day stands off the
  *  range's usual level, compared rounded as a caption states them (live 2026-10-31: "5 networks

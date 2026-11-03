@@ -19,7 +19,7 @@ export const NOTE_KIND_WORD: Record<NotableKind, string> = {
   first: "first day",
   last: "last day",
   pause: "pause",
-  longest: "longest wait",
+  longest: "longest gap",
   broadest: "most networks",
 };
 

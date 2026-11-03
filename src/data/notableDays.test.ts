@@ -277,6 +277,17 @@ describe("notableDays: lead-in (from)", () => {
     const pause = notableDays({ days, covered, series, subject: "a", ids: ["a"], cap: 99, from: 30 }).filter((d) => d.kind === "pause");
     expect(pause.map((d) => d.dayMs)).toEqual([days[50]]);
   });
+
+  // user, 2026-11-03: "I don't think it's usually 3.5 minutes". A span that sped up states its own
+  // typical day, while the lead-in still steadies what counts as a pause.
+  it("a pause is detected against the lead-in too, but stated against the span's own typical day", () => {
+    const { days, covered } = span(60);
+    const gap: number[] = Array.from({ length: 60 }, (_, i) => (i < 30 ? 600 : 100));
+    gap[50] = 8000;
+    const series = { "m.a.snaps": flat(60, 40), "m.a.gapMax": gap };
+    const [pause] = notableDays({ days, covered, series, subject: "a", ids: ["a"], cap: 99, from: 30 }).filter((d) => d.kind === "pause");
+    expect(pause).toMatchObject({ dayMs: days[50], value: 8000, level: 100 });
+  });
 });
 
 describe("notableDays: whose days", () => {
