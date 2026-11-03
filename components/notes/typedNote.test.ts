@@ -50,3 +50,12 @@ describe("nextWait", () => {
     expect(run(null, { state: "unavailable" }, ok("A")).waited).toBe(false);
   });
 });
+
+describe("a slower clock", () => {
+  it("stretches the whole run, its ceiling included", () => {
+    expect(typeDuration(100, 1.15)).toBeCloseTo(typeDuration(100) * 1.15);
+    expect(typeDuration(100_000, 1.15)).toBeCloseTo(MAX_TYPE_MS * 1.15);
+    expect(typedLength(typeDuration(100), 100, 1.15)).toBeLessThan(100);
+    expect(typedLength(typeDuration(100, 1.15), 100, 1.15)).toBe(100);
+  });
+});

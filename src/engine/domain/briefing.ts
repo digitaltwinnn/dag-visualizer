@@ -11,8 +11,15 @@ export const BRIEFING_STOPS = ["geo", "ledger", "hyper", "trend"] as const satis
 
 /** How long a stop stands, its scene's transition included. A quarter under 6500 went too far (user
  *  2026-11-01: "25% shorter"; 2026-11-02, after reading it against the live lines of 102 to 122
- *  characters: back up to 6 seconds), which reads them at a subtitle's 20 characters a second. */
-export const STOP_MS = 6000;
+ *  characters: back up to 6 seconds); 2026-11-03, "keep all timing the same but just spend 15%
+ *  less time on each view", then "make it 5": 5 seconds, every other timing untouched. The pace
+ *  checked out on screen (same day: "usually all characters are on screen in time with still time
+ *  left"). */
+export const STOP_MS = 5000;
+
+/** How much slower the tour's words type than a note writes itself in (user, 2026-11-03: "make the
+ *  text-typing 15% slower"): the whole typing clock, its ceiling included. */
+export const BRIEFING_TYPE_SLOW = 1.15;
 
 /** The longest a stop's words may run: two to three lines of the desktop caption. A longer line
  *  would need a longer stop, and a tour that outstays its welcome is the one thing it must not do. */
@@ -88,3 +95,38 @@ export const prevStop = (stop: number): number | null => (stop > 0 ? stop - 1 : 
 /** A stop ends when its time is up AND the scene has landed, so a slow renderer, whose transition
  *  stretches in wall-clock time, still shows every view. */
 export const mayAdvance = (elapsedMs: number, phase: "out" | "in" | null): boolean => elapsedMs >= STOP_MS && phase == null;
+
+// THE HAND-OVER (user, 2026-11-03: "if we finish the intro entirely … show some hint that they now
+// landed on the real view and can interact with it", design A + D with C's gesture, brainstormed in
+// the companion). A tour played to its end leaves the reader on the live view: its sign-off caption
+// stands where the tour's words stood, each surface pulses its edge in turn, and one drag is traced
+// across the scene. Only a tour that ENDED — Skip, Back, a key or a scene that never readied hand
+// nothing over. Played once; the reader's first gesture ends it.
+
+/** How long the hand-over stands, unless the reader moves first (8 → 6 seconds, user 2026-11-03:
+ *  "remove the text a bit earlier"). */
+export const HANDOVER_MS = 6000;
+
+/** A surface that pulses its edge on the hand-over: the desktop's explore card, card rail and vitals
+ *  band, or the phone's open sheet and its dock bar. */
+export type HandoverTarget = "explore" | "rail" | "band" | "sheet" | "dock";
+
+/** The beat between one surface's pulse and the next. */
+const PULSE_GAP_MS = 500;
+/** The first pulse waits for the caption to arrive. */
+const PULSE_FIRST_MS = 600;
+
+/** The surfaces in the order they pulse, each with when it starts. Coarse to fine on screen: the
+ *  tool you browse with, then the facts, then the vitals — on the phone the sheet, then the dock
+ *  that reaches the others. */
+export function handoverPulses(phone: boolean): { target: HandoverTarget; atMs: number }[] {
+  const order: HandoverTarget[] = phone ? ["sheet", "dock"] : ["explore", "rail", "band"];
+  return order.map((target, i) => ({ target, atMs: PULSE_FIRST_MS + i * PULSE_GAP_MS }));
+}
+
+/** The traced drag: when it starts (a beat after the last pulse) and how long it runs, its fades
+ *  included. ONE pass (user, 2026-11-03: "do it only once"). */
+export function handoverHand(phone: boolean): { atMs: number; durMs: number } {
+  const pulses = handoverPulses(phone);
+  return { atMs: pulses[pulses.length - 1]!.atMs + 300, durMs: 2200 };
+}

@@ -13,7 +13,8 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 import { IdentityDot } from "@/components/inspector/parts";
 import { ensurePage } from "@/components/RawSnapshotBridge";
 import { subjectPairing } from "@/components/useSubjectPairing";
-import { useSnapshotFeed } from "@/components/useSnapshotFeed";
+import { useLedgerSource } from "@/components/useLedgerSource";
+import { relativeAge } from "@/src/util/relativeAge";
 import { cn } from "@/lib/utils";
 import { latestRelevant } from "@/src/data/follow";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
@@ -31,7 +32,7 @@ import {
   TICK_NET_MEASURES,
 } from "@/src/data/ledgerMeasure";
 import { ledgerLens, storyCount, tickLocked } from "@/src/data/ledgerStory";
-import { filterAccent, getAnchor, getNetwork, resolveSigner, SIGNER_UNKNOWN, snapshotSigners } from "@/src/data/network";
+import { filterAccent, resolveSigner, SIGNER_UNKNOWN, snapshotSigners } from "@/src/data/network";
 import { metaSnapHoverKey, type GlobalSnapshot, type NodeRow, type SnapshotExact } from "@/src/data/types";
 import { displayNetwork, LISTED_IDS, UNLISTED_HUE, UNLISTED_ID } from "@/src/data/unlisted";
 import { POLL } from "@/src/engine/config";
@@ -129,6 +130,15 @@ function spanWords(ordered: readonly GlobalSnapshot[]): string {
   return min < 90 ? `last ${min} min` : `last ${Math.round(min / 60)} h`;
 }
 
+/** A past window's own stretch, in the foot's room beside the pager: how long it spans and how long
+ *  ago it ended — "8 min, 1d ago", the card head's age register. A clock span would not fit there,
+ *  and the card above names the pinned snapshot's own time. */
+function windowWords(snaps: readonly GlobalSnapshot[]): string {
+  if (!snaps.length) return "";
+  const end = Date.parse(snaps[snaps.length - 1]!.timestamp);
+  return `${spanWords(snaps.slice().reverse()).replace("last ", "")}, ${relativeAge(Date.now() - end)}`;
+}
+
 export default function LedgerPanel() {
   useFeedRead(["global", "metasnaps", "clusters", "api-metagraphs", "api-geo", "exact"], "LedgerPanel");
   const filter = useStore((s) => s.filter);
@@ -170,12 +180,14 @@ export default function LedgerPanel() {
   // ticks is what the app already holds, so paging costs no fetch; the raw layer is where a walk
   // to genesis belongs. Hovering a row older than the trail previews nothing in the scene, which
   // is an honest no-op, not a broken pair.
-  const { snaps } = useSnapshotFeed(POLL.maxSnapshots);
-  const net = getNetwork();
+  // THE LEDGER SOURCE (`useLedgerSource`): the past window around an old pin — the list then IS
+  // that stretch of the chain, frozen — else the live buffer.
+  const { snaps, liveSnaps, source: net, past } = useLedgerSource(POLL.maxSnapshots);
+  const pastStatus = useStore((s) => s.pastWindow?.status ?? null);
   // Through the ledger's lens: `displayNetwork("dag")` RESOLVES, and a committed DAG must not
   // narrow the list to a story that can never have members (found live 2026-08-13).
   const filterNet = displayNetwork(ledgerLens(filter));
-  const tickFilterCount = (d: GlobalSnapshot): number => storyCount(filter, getAnchor(d.timestamp), snapshotExact[d.ordinal]) ?? 0;
+  const tickFilterCount = (d: GlobalSnapshot): number => storyCount(filter, net?.getAnchor(d.timestamp) ?? null, snapshotExact[d.ordinal]) ?? 0;
 
   // ⚠️ THE LENS DIMS, IT DOES NOT EDIT — the tick list is always the whole retained window (user,
   // 2026-09-14: a list whose LENGTH depended on the filter kept answering "how much is there?"
@@ -195,6 +207,10 @@ export default function LedgerPanel() {
   const wantTop = nextHoldTop(holdTop, pinnedOrd, snaps.length ? snaps[snaps.length - 1].ordinal : null);
   if (wantTop !== holdTop) setHoldTop(wantTop);
   const held = heldTicks(snaps, wantTop, pinnedOrd);
+  // NEWER THAN THE PIN: the window's own ticks above it, plus — in a past window — every live tick
+  // since the window's newest (ordinals are gapless, so the count is exact). Its click resumes live.
+  const liveNewest = liveSnaps.length ? liveSnaps[liveSnaps.length - 1]!.ordinal : null;
+  const newer = held.newer + (past && liveNewest != null ? Math.max(0, liveNewest - past.to) : 0);
   const orderedSnaps = [...held.ticks].reverse(); // newest first, the log convention
   const activeSnapOrd = snap?.data.ordinal ?? null;
   const [tickPage, setTickPage] = useState(1);
@@ -303,9 +319,21 @@ export default function LedgerPanel() {
   // is ours to know and not the reader's (his ruling on the raw phone panel's title, 2026-10-02).
   // The span alone, "last 8 min" (user, 2026-10-25: "avoid cache" — the word joined on 2026-10-19
   // and left with the About page's copy; how the site holds data is not the reader's vocabulary).
-  const spanScope = { word: spanWords(orderedSnaps) };
+  // A PAST WINDOW states its own stretch of time, not "last N min" (which would be a claim about now);
+  // while it is read, and if the read fails, the foot says that instead.
+  const spanScope = {
+    // The status first: while another window loads, or after a read failed, the held window (if
+    // any) is not what the reader asked for.
+    word: pastStatus === "loading"
+      ? "reading that time…"
+      : pastStatus === "failed"
+        ? "couldn't read that time"
+        : past
+          ? windowWords(past.globalSnapshots)
+          : spanWords(orderedSnaps),
+  };
   const spanFooter =
-    live && orderedSnaps.length > 0 ? (
+    (live || past || pastStatus) && orderedSnaps.length > 0 ? (
       <ExplorerFoot left={spanScope.word} />
     ) : undefined;
   const levels: ExplorerLevelSpec[] = [
@@ -328,14 +356,14 @@ export default function LedgerPanel() {
       // rode the heading as a setting-style button until then. A live-dot row, "3 newer", sliding
       // in from the top as the scene's front bar does; its click is the follow switch
       // (`followToggleActions` through the one executor) — the same write the card's pill makes.
-      rows: (held.newer > 0 && snap
+      rows: (newer > 0 && snap
         ? [
             {
               key: "newer",
               // The mark AFTER the words, as the pin follows the pinned row's ordinal (user, 2026-10-19).
               name: (
                 <span className="inline-flex items-center gap-1.5">
-                  <span className="tabular-nums">{held.newer}</span> newer
+                  <span className="tabular-nums">{newer.toLocaleString()}</span> newer
                   <LiveDot />
                 </span>
               ),

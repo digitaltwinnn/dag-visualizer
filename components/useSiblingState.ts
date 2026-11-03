@@ -3,9 +3,8 @@
 import { useMemo } from "react";
 import { useStore } from "@/src/store/store";
 import type { SiblingState } from "@/components/railSiblings";
-import { useSnapshotFeed } from "@/components/useSnapshotFeed";
+import { useLedgerSource } from "@/components/useLedgerSource";
 import { latestRelevant } from "@/src/data/follow";
-import { getAnchor, getNetwork } from "@/src/data/network";
 import { tickNetworksLevel, tickPolledRows } from "@/src/data/ladderLevels";
 import { LISTED_IDS } from "@/src/data/unlisted";
 import { tickInStory, tickLocked } from "@/src/data/ledgerStory";
@@ -52,7 +51,8 @@ export function useSiblingState(slot: RailCardKind | null): SiblingState {
   // bars step the same sequence. Only the SNAP slot reads it (review find, 2026-09-11: with the feed
   // as a plain dep, every poll re-derived every card) — and only the snap slot SUBSCRIBES: the next ghost reads this hook from Inspector itself, and a
   // subscription there re-rendered the whole rail on every tick in every view (review, 2026-10-04).
-  const { snaps } = useSnapshotFeed(POLL.maxSnapshots, slot === "snap");
+  // THE LEDGER SOURCE: inside a past window around an old pin the plank steps that window's ticks.
+  const { snaps, source } = useLedgerSource(POLL.maxSnapshots, slot === "snap");
   const snapsForTicks = slot === "snap" ? snaps : EMPTY_SNAPS;
   return useMemo(() => {
     const liveOrd = slot === "snap" ? (latestRelevant("all")?.ordinal ?? null) : null;
@@ -61,7 +61,7 @@ export function useSiblingState(slot: RailCardKind | null): SiblingState {
         ? snapsForTicks.map((d) => ({
             data: d,
             isLiveTip: d.ordinal === liveOrd,
-            inStory: tickInStory(filter, getAnchor(d.timestamp), snapshotExact[d.ordinal]),
+            inStory: tickInStory(filter, source?.getAnchor(d.timestamp) ?? null, snapshotExact[d.ordinal]),
             locked: tickLocked(filter, snapshotExact[d.ordinal]),
           }))
         : [];
@@ -72,7 +72,7 @@ export function useSiblingState(slot: RailCardKind | null): SiblingState {
     // pager — and only that tick's records (final review, 2026-10-07: every slot rebuilt the whole log).
     const wantsTick = slot === "snap" || slot === "context" || slot === "metaSnap";
     const tickGlobal = mode === "ledger" && wantsTick ? (snap?.data ?? null) : null;
-    const net = tickGlobal ? getNetwork() : null;
+    const net = tickGlobal ? source : null;
     const tickNets = tickGlobal
       ? tickNetworksLevel(
           tickGlobal,
@@ -112,5 +112,5 @@ export function useSiblingState(slot: RailCardKind | null): SiblingState {
       trendCursorMs,
       trendWindow,
     };
-  }, [slot, mode, filter, country, cohort, composition, inspect, snap, tickNet, railNet, metaSnap, selNodes, metaList, leaderboard, snapshotExact, following, snapsForTicks, geoMeasure, hyperMeasure, allNodes, trendRange, trendCursorMs, trendWindow]);
+  }, [slot, mode, filter, country, cohort, composition, inspect, snap, tickNet, railNet, metaSnap, selNodes, metaList, leaderboard, snapshotExact, following, snapsForTicks, source, geoMeasure, hyperMeasure, allNodes, trendRange, trendCursorMs, trendWindow]);
 }

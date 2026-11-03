@@ -782,7 +782,9 @@ export default function RailDock({
         <button
           className={cn(
             "fixed z-[39] top-1/2 -translate-y-1/2 w-8 h-28 hidden items-center justify-center cursor-pointer",
-            "bg-[var(--panel)] border border-border text-foreground backdrop-blur-[14px]",
+            // The outline in the accent's ink at 45% (user, 2026-11-03: "make the outline … a bit more
+            // visible"): the hairline token is a card's edge, and a lone tab over the scene read faint.
+            "bg-[var(--panel)] border border-[color-mix(in_oklch,var(--primary-ink)_45%,transparent)] text-foreground backdrop-blur-[14px]",
             "transition-[left,right] duration-[280ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
             "touch:after:absolute touch:after:-inset-x-2 touch:after:inset-y-0 touch:after:content-['']",
             "min-[700px]:max-[1099px]:flex",

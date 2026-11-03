@@ -43,25 +43,24 @@ import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { displayNetwork } from "@/src/data/unlisted";
-import { coLocatedNetworks, filterAccent, getAnchor, isAnchorSettling, metagraphById } from "@/src/data/network";
+import { coLocatedNetworks, filterAccent, isAnchorSettling, ledgerAnchor, metagraphById } from "@/src/data/network";
 import { fmtKB, fmtShareKB, midHash } from "@/src/util/format";
 import { iconForPick } from "@/components/icons";
 import { SceneMark, type SceneMarkSpec } from "@/components/SceneMark";
 import { netKeyOf } from "@/src/engine/domain/pickActions";
 import { NODE_ID_GLYPHS } from "@/components/explorer/nodeRow";
 import { SCENE_GLASS } from "@/components/selection";
-import { QualifierChip, RoleChips, StatusMark, TickerChip } from "@/components/inspector/parts";
+import { QualifierChip, RoleChips, TickerChip } from "@/components/inspector/parts";
 // The lead line's codes come from the composition vocabulary's ONE home, rendered by the cards'
 // own RoleChips (user, 2026-08-15: "look at my cards — square pills").
 import { layerCodesOf } from "@/src/data/composition";
-import { nodeStatus } from "@/src/data/nodeStatus";
 import { useNowTick } from "@/components/useNowTick";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { relativeAge } from "@/src/util/relativeAge";
 import { CALLOUT_OFF_X, CALLOUT_OFF_Y, CALLOUT_LEG_INSET, CALLOUT_PHONE_K, CALLOUT_HANG_K } from "@/src/engine/domain/calloutPlacement";
 import type { GeoInfo } from "@/src/data/types";
 import LiveDot from "@/components/LiveDot";
-import { PinMark, PinnedMark } from "@/components/state/StateAtoms";
+import { PinnedMark } from "@/components/state/StateAtoms";
 import { IDENT_INK } from "@/components/identInk";
 import { ledgerNetwork } from "@/src/engine/domain/tickNet";
 import { useFeedRead } from "@/components/useFeedRead";
@@ -98,18 +97,16 @@ interface CalloutModel {
    *  both; with the same mark they pair at a glance. Same glyph home (`iconForPick`), same hue
    *  rule as the card head: a kind mark takes the filter's accent, a subject's own mark its hue. */
   mark?: SceneMarkSpec;
-  /** `ident` leads the row in its identity hue (the aside's hued-ticker idiom, one register).
-   *  `also` closes it with the OTHER networks sharing this subject's machine — same idiom,
-   *  one hued ticker each (user, 2026-08-18). */
+  /** NETWORK TAGS at the title row's right edge, one ticker chip per network the subject runs
+   *  on — a node's own network, then every other network on the same machine as an equal tag
+   *  (user, 2026-11-03: "don't say +DAG (for UP) but just show both as tags"). */
+  tags?: { text: string; hue: string }[];
+  /** Words on the left (`ident` in its identity hue, then `text`), tags on the right (user,
+   *  2026-11-03: "right align the tags"). */
   lead?: {
     ident?: { text: string; hue: string };
     text?: string;
     codes?: string[];
-    /** The node's raw lifecycle state, set only when MEASURED (the scene's status fill
-     *  channel hollows a not-ready chip, so the label names the state beside it — user,
-     *  2026-09-11); `unknown` stays absent, the callout's unmeasured-means-no-line rule. */
-    status?: string;
-    also?: { text: string; hue: string }[];
     /** A second measure of the same subject, on the right — a size beside a count. */
     chip?: string;
   };
@@ -178,22 +175,38 @@ function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; className?
         {m.mark && <SceneMark mark={m.mark} />}
         <span className={cn("text-body font-semibold text-foreground", m.titleMono && "font-mono tabular-nums")}>{m.title}</span>
         {/* A hued aside is a TICKER beside a title, so it is the card head's own chip
-            (`TickerChip`, 2026-10-02); the un-hued one is a state line and stays text. */}
+            (`TickerChip`, 2026-10-02); the un-hued one is a state line and stays text. Both sit
+            at the row's right edge (user, 2026-11-03: "right align the tags (pinned, network,
+            age, etc) those are in the header"). */}
         {m.aside && m.aside.hue ? (
-          <span className="ml-1 inline-flex items-center gap-1.5">
-            {m.aside.live && <LiveDot />}
-            {m.aside.pinned && <PinMark />}
+          // The ticker, then the follow state LAST — the global label's order, so both snapshot
+          // labels end on the same element: the live dot and its word, or the pin (user, 2026-11-03).
+          <span className="ml-auto pl-3 inline-flex items-center gap-1.5">
             <TickerChip text={m.aside.text} hue={m.aside.hue} />
+            {m.aside.live && (
+              <span className="inline-flex items-center gap-1.5 text-label text-muted-foreground">
+                <LiveDot />
+                live
+              </span>
+            )}
+            {m.aside.pinned && <PinnedMark />}
           </span>
         ) : m.aside ? (
           // Age, then state — the order the card's own head reads (2026-10-03).
-          <span className="inline-flex items-center gap-1.5 text-label text-muted-foreground ml-1">
+          <span className="ml-auto pl-3 inline-flex items-center gap-1.5 text-label text-muted-foreground">
             {m.aside.chip && <QualifierChip className="mr-0.5 tabular-nums">{m.aside.chip}</QualifierChip>}
             {m.aside.live && <LiveDot />}
             {m.aside.pinned && <PinnedMark />}
             {m.aside.text}
           </span>
         ) : null}
+        {m.tags && m.tags.length > 0 && (
+          <span className="ml-auto pl-3 inline-flex items-center gap-1.5">
+            {m.tags.map((t) => (
+              <TickerChip key={t.text} text={t.text} hue={t.hue} />
+            ))}
+          </span>
+        )}
       </div>
       {/* The card grammar's HEAD HAIRLINE at callout scale (user, 2026-08-15 — "cards have an
           underline between header and the rest"): it divides the HEAD (eyebrow + title, whose
@@ -209,36 +222,9 @@ function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; className?
             </span>
           )}
           {m.lead.text && <span>{m.lead.text}</span>}
+          {(!!m.lead.codes?.length || !!m.lead.chip) && <span className="flex-1 min-w-3" />}
           {m.lead.codes && m.lead.codes.length > 0 && <RoleChips codes={m.lead.codes} />}
-          {/* STATUS — the cards' one status chrome (colour = bucket, text = exact stage), here
-              because the scene itself now speaks status (the fill channel hollows a not-ready
-              chip, 2026-09-10) and the label beside the shell should name what it shows (user,
-              2026-09-11). After the composition (what it runs), before the co-tenant addendum
-              (who else runs here); rendered for every MEASURED state, ready included — a status
-              readout that only spoke up for trouble would be an alarm, not a reading. */}
-          {m.lead.status && <StatusMark state={m.lead.status} />}
-          {/* CO-TENANTS — the other networks running on this same machine, each as its own
-              hued ticker (user, 2026-08-18). It closes the lead because the node card reads
-              place → role → host → co-located, and the chips to its left are this node's own
-              composition: the `+` says these are additional networks, not more of its layers.
-              Rendered only when the fact is MEASURED — the builder passes nothing while both
-              cluster sides aren't live, so the callout never guesses a co-tenancy. */}
-          {m.lead.also && m.lead.also.length > 0 && (
-            <span className="inline-flex items-center gap-1.5">
-              <span className="opacity-60">+</span>
-              {m.lead.also.map((t) => (
-                <span key={t.text} className={cn("font-bold", IDENT_INK)} style={{ color: t.hue }}>
-                  {t.text}
-                </span>
-              ))}
-            </span>
-          )}
-          {m.lead.chip && (
-            <>
-              <span className="flex-1 min-w-1.5" />
-              <QualifierChip className="tabular-nums">{m.lead.chip}</QualifierChip>
-            </>
-          )}
+          {m.lead.chip && <QualifierChip className="tabular-nums">{m.lead.chip}</QualifierChip>}
         </div>
       )}
     </div>
@@ -250,6 +236,8 @@ export default function SceneCallout() {
   const filter = useStore(viewNetwork);
   const section = useStore((s) => s.section);
   const metaList = useStore((s) => s.metaList);
+  // Re-render when an old pin's window lands: the global label's share reads it (`ledgerSource`).
+  useStore((s) => s.pastWindow?.status);
   const inspect = useStore((s) => s.inspect);
   const cohort = useStore((s) => s.cohort);
   const country = useStore((s) => s.country);
@@ -315,10 +303,8 @@ export default function SceneCallout() {
     const ip = (nodePick as { node?: { ip?: string } }).node?.ip;
     const coloReady = metaList.some((x) => x.isRoot) && metaList.some((x) => !x.isRoot);
     const colo = coloReady ? coLocatedNetworks(ip, netId, metaList) : [];
-    const also = colo.map((c) => ({ text: displayNetwork(c.id)?.ticker ?? c.name, hue: filterAccent(c.id) }));
-    // Status: only a MEASURED state gets the mark (unknown = no line, like co-location above).
-    const state = (nodePick as { node?: { state?: string | null } }).node?.state;
-    const status = state != null && nodeStatus(state).bucket !== "unknown" ? state : undefined;
+    const also = colo.map((c) => ({ text: displayNetwork(c.id)?.ticker ?? c.name, hue: displayNetwork(c.id)?.hue ?? filterAccent(c.id) }));
+    const place = [g?.city, g?.isp].filter(Boolean).join(", ");
     return {
       key: `node|${id ?? `${g?.lat},${g?.lon}`}`,
       eyebrow: "Node",
@@ -327,10 +313,14 @@ export default function SceneCallout() {
       // informal, a content fact rather than the subject's name).
       title: id ? midHash(id, NODE_ID_GLYPHS) : g?.city ?? "Node",
       titleMono: !!id,
-      aside: nnet ? { text: nnet.ticker, hue: nnet.hue } : undefined,
+      // Its own network first, then the co-tenants — co-tenancy is MEASURED: the builder passes
+      // nothing while both cluster sides aren't live, so the callout never guesses one.
+      tags: [...(nnet ? [{ text: nnet.ticker, hue: nnet.hue }] : []), ...also],
       ring: nnet?.hue ?? "var(--primary)",
       mark: { icon: iconForPick("metanode"), hue: nnet?.hue ?? "var(--primary)" },
-      lead: codes.length || also.length || status ? { codes, status, also } : undefined,
+      // THE PLACE, in words, on the left of the layer tags (user, 2026-11-03, option B: the row
+      // held tags alone). City then provider, each only where the lookup measured it.
+      lead: place || codes.length ? { text: place || undefined, codes } : undefined,
     };
   };
 
@@ -458,7 +448,8 @@ export default function SceneCallout() {
       // gives a lane the catalog can't name. The ring keeps the network's hue, so the identity is
       // not lost, and the share appears the moment it is real. (The strip's own `?? 0` one surface
       // over drives a BAR HEIGHT, where an absent count is an honest gap, not a stated numeral.)
-      const share = mine ? getAnchor(snap.data.timestamp)?.metaCounts?.get(net) : undefined;
+      // The LEDGER SOURCE: an old pin's anchors live in its past window, not the live index.
+      const share = mine ? ledgerAnchor(snap.data.timestamp)?.metaCounts?.get(net) : undefined;
       // THE LABEL NAMES BOTH THINGS THE BAR SHOWS (user, 2026-10-03 — suggestion 1). The ring
       // points at this network's band, and a band's LENGTH is bytes (`domain/ledgerBands`) — the
       // label only counted. The count now says "snapshots", the card's word, and the size rides
@@ -503,10 +494,12 @@ export default function SceneCallout() {
             : mine && !settling
               ? {
                   ident: { text: mine.ticker || mine.name, hue: filterAccent(net) },
-                  text: `${share ?? 0} of ${total} snapshots`,
+                  // NAMED BY KIND (user, 2026-11-03: "5 snapshots -> can we say 5 metagraph snapshots?"):
+                  // what a global snapshot holds are metagraph snapshots, the notes' and the vitals' word.
+                  text: `${share ?? 0} of ${total} metagraph ${total === 1 ? "snapshot" : "snapshots"}`,
                   chip: mineKB != null && exact ? fmtShareKB(mineKB, exact.totalSizeKB) : undefined,
                 }
-              : { text: `${total} snapshots`, chip: exact ? fmtKB(exact.totalSizeKB) : undefined },
+              : { text: `${total} metagraph ${total === 1 ? "snapshot" : "snapshots"}`, chip: exact ? fmtKB(exact.totalSizeKB) : undefined },
       };
     };
     // THE NETWORK'S OWN LABEL, on its lane (user, 2026-10-03: "the dossier on snapshots page has

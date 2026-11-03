@@ -55,6 +55,15 @@ describe("the follow flow decision table", () => {
     expect(st().following).toBe(true);
   });
 
+  it("LIVE → step to another snapshot of the live pair: still following, the global unpinned, the step held", () => {
+    const live = { ...child(100), ordinal: 2, hash: "mh2" };
+    useStore.setState({ following: true, snap: snapPick(100), metaSnap: live });
+    applyClickActions(metaSnapSelectActions(child(100), snapPick(100), { metaSnap: live, following: true, inspect: null }));
+    expect(st().following).toBe(true);
+    expect(st().snap?.data.ordinal).toBe(100);
+    expect(st().metaSnap).toEqual({ ...child(100), held: true });
+  });
+
   it("any state → the live tip re-follows", () => {
     useStore.setState({ following: false, snap: snapPick(90) });
     applyClickActions(snapshotSelectActions(snapPick(100), true, { pinnedOrdinal: 90, metaSnap: null }));

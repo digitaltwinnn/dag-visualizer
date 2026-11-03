@@ -318,6 +318,8 @@ export default function TrendStack() {
   // …PAIRED with the AI card's row and the band's mark through `hoverNoteDay` (rule 9; user,
   // 2026-10-30: the planes "don't carry the same hover effect … like the vitals chart does").
   const hoverNoteDay = useStore((s) => s.hoverNoteDay);
+  // A day lit from a chart's own coin stays label-less on the other surfaces (NoteDiamonds' rule).
+  const hoverNoteChart = useStore((s) => s.hoverNoteChart);
   const marksById = useMemo(() => {
     const m = new Map<string, TrendMark[]>();
     for (const d of noteDays ?? []) {
@@ -782,6 +784,7 @@ export default function TrendStack() {
                 lines={linesById.get(pose.id)!}
                 stack={stackById.get(pose.id)}
                 marks={marksById.get(pose.id)}
+                markEcho={pose.interactive && !hoverNoteChart}
                 onMarkHover={onMarkHover}
                 onMarkPick={onMarkPick}
                 // THE STACK IS THE FILL (user, 2026-10-09: "are they truly stacked? I feel the

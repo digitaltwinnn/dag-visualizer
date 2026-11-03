@@ -1,7 +1,9 @@
 "use client";
 
 import { useStore } from "@/src/store/store";
-import { getAnchor } from "@/src/data/network";
+import { ledgerAnchor } from "@/src/data/network";
+import { getPastWindow, onPastWindow } from "@/src/data/pastWindow";
+import { useSyncExternalStore } from "react";
 import { tickInStory } from "@/src/data/ledgerStory";
 import { useFeedRead } from "@/components/useFeedRead";
 
@@ -15,6 +17,8 @@ export function useTickHasFilter(): boolean | undefined {
   // It reads the tick's anchors and exact read only with a tick pinned under a filter.
   useFeedRead(["metasnaps", "exact"], "Snapshot filter check", snap != null && filter !== "all");
   const exact = useStore((s) => (s.snap ? s.snapshotExact[s.snap.data.ordinal] : undefined));
+  // Re-read when a past window arrives or leaves: an old pin's anchors are in it, not the live index.
+  useSyncExternalStore(onPastWindow, getPastWindow, () => null);
   if (!snap || filter === "all") return undefined;
-  return tickInStory(filter, getAnchor(snap.data.timestamp), exact);
+  return tickInStory(filter, ledgerAnchor(snap.data.timestamp), exact);
 }

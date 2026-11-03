@@ -13,12 +13,14 @@ import { typedLength } from "./typedNote";
 /** Notes already written in: folding a card and opening it again shows the note, it does not retype it. */
 const TYPED = new Set<string>();
 
-export default function TypedNote({ text, waited, always, className }: {
+export default function TypedNote({ text, waited, always, slow, className }: {
   text: string;
   waited?: boolean;
   /** Types whatever came before: the Briefing's words are a performance, not a note arriving, and
    *  each stop remounts this, which the card's once-only memory would read as already written. */
   always?: boolean;
+  /** Stretches the typing clock (`typeDuration`); the Briefing's words type slower than a note. */
+  slow?: number;
   className?: string;
 }) {
   const [shown, setShown] = useState<number | null>(null);
@@ -36,14 +38,14 @@ export default function TypedNote({ text, waited, always, className }: {
     const start = performance.now();
     let raf = 0;
     const step = (now: number) => {
-      const n = typedLength(now - start, text.length);
+      const n = typedLength(now - start, text.length, slow);
       if (n >= text.length) return setShown(null);
       setShown(n);
       raf = requestAnimationFrame(step);
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [typing, text]);
+  }, [typing, text, slow]);
   if (shown == null) return <p className={className}><NoteText text={text} /></p>;
   return (
     <p className={className}>

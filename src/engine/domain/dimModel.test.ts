@@ -33,6 +33,7 @@ import {
 const ctx = (overrides: Partial<DimContext> = {}): DimContext => ({
   morph: 0,
   hoverFilterActive: false,
+  held: false,
   ledger: false,
   countryFilter: null,
   countryMix: 0,
@@ -85,9 +86,17 @@ describe("nodeDimScale", () => {
 describe("hideFrac (the shrink, an independent reading of the same ramp as the dim)", () => {
   // HIDE IS NOT DIM (user, 2026-08-11). A dim mutes two ways, colour and emissive; a shrink is a third
   // thing and gets its own row field. Every row holds it at 0 since 2026-11-02.
-  it("is ZERO on the globe: an off-scope node mutes in place, at full size", () => {
+  it("is ZERO on the globe for a browse: an off-scope node mutes in place, at full size", () => {
     expect(hideFrac(ctx({ morph: 1 }), 1)).toBeCloseTo(0, 10);
     expect(hideFrac(ctx({ morph: 1 }), 0.4)).toBeCloseTo(0, 10);
+  });
+
+  // user, 2026-11-03: "when filter it should hide others".
+  it("hides on the globe under a HELD filter, along the same raw ramp", () => {
+    expect(hideFrac(ctx({ morph: 1, held: true }), 1)).toBeCloseTo(1, 10);
+    expect(hideFrac(ctx({ morph: 1, held: true }), 0.4)).toBeCloseTo(0.4, 10);
+    expect(hideFrac(ctx({ morph: 0, held: true }), 1)).toBeCloseTo(0, 10); // hyper never hides
+    expect(hideFrac(ctx({ ledger: true, held: true }), 1)).toBeCloseTo(0, 10);
   });
 
   it("is ZERO in hyper at any dim — a turned-up dim mutes in place, at full size", () => {
@@ -666,9 +675,11 @@ describe("FOCUS_TUNE", () => {
 
   // NO VIEW SHRINKS A NODE AWAY (user, 2026-11-02: "dim the other nodes not remove them"). `hide` stays
   // a knob, at 0 on every row, so the three views answer an off-scope node one way.
-  it("mutes in place in every view", () => {
-    for (const row of Object.values(FOCUS_TUNE_DEFAULTS)) expect(row.hide).toBe(0);
+  // user, 2026-11-03: a browse dims, a held filter hides, and only on the globe.
+  it("mutes in place everywhere but the globe, which hides only under a held filter", () => {
+    for (const [view, row] of Object.entries(FOCUS_TUNE_DEFAULTS)) expect(row.hide).toBe(view === "geo" ? 1 : 0);
     expect(FOCUS_TUNE_DEFAULTS.geo.dim).toBeLessThan(1);
+    expect(FOCUS_TUNE_DEFAULTS.geo.dim).toBeGreaterThan(FOCUS_TUNE_DEFAULTS.hyper.dim);
   });
 
   it("reproduces the pre-refactor ledger overrides", () => {

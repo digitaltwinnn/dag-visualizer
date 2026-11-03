@@ -1,6 +1,6 @@
 import { getNetwork, getAnchor, metagraphById } from "@/src/data/network";
 import { ledgerLens } from "@/src/data/ledgerStory";
-import { UNLISTED_ID, latestUnlistedTick, unlistedLog } from "@/src/data/unlisted";
+import { LISTED_IDS, UNLISTED_ID, latestUnlistedTick, unlistedLog } from "@/src/data/unlisted";
 import { useStore } from "@/src/store/store";
 import type { GlobalSnapshot } from "@/src/data/types";
 
@@ -66,7 +66,9 @@ export function followLatest() {
       if (best) {
         const { m, g } = best;
         if (snap?.data.ordinal !== g.ordinal) advanceSnap({ kind: "snapshot", title: `Global snapshot #${g.ordinal}`, data: g });
-        if (metaSnap?.metaId !== filter || metaSnap.ordinal !== m.ordinal) {
+        // A snapshot the reader stepped to inside this live global is kept until the next one.
+        const held = !!metaSnap?.held && metaSnap.metaId === filter && metaSnap.globalOrdinal === g.ordinal;
+        if (!held && (metaSnap?.metaId !== filter || metaSnap.ordinal !== m.ordinal)) {
           advanceMetaSnap({ metaId: filter, ordinal: m.ordinal, hash: m.hash, globalOrdinal: g.ordinal, ts: m.ts });
         }
         return;
@@ -82,7 +84,8 @@ export function followLatest() {
     const row = unlistedLog([latest], useStore.getState().snapshotExact, net?.unlistedSnaps)[0];
     // Same guard as above: an unlisted row always names its channel, so `row.metaId` is present —
     // the check is what keeps a follow from ever advancing onto a subject that has no network.
-    if (row?.metaId && (metaSnap?.metaId !== row.metaId || metaSnap.ordinal !== row.ordinal)) {
+    const held = !!metaSnap?.held && metaSnap.globalOrdinal === latest.ordinal && !LISTED_IDS.has(metaSnap.metaId);
+    if (row?.metaId && !held && (metaSnap?.metaId !== row.metaId || metaSnap.ordinal !== row.ordinal)) {
       advanceMetaSnap({ metaId: row.metaId, ordinal: row.ordinal, hash: row.hash, globalOrdinal: latest.ordinal, ts: latest.timestamp });
     }
     return;

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { bannedWords, checkNote, undash } from "@/src/data/noteHonesty";
-import { fact } from "@/src/data/noteFacts";
+import { changeShare, fact } from "@/src/data/noteFacts";
 import type { Fact } from "@/src/data/noteTypes";
 
 const F = (label: string, value: number, kind: Fact["kind"], text: string): Fact => ({ label, value, kind, text });
@@ -15,6 +15,17 @@ const facts = [
 ];
 const names = ["USDC.dag", "BioFi", "Hetzner Online GmbH"];
 const ok = (t: string, o?: { maxSentences?: number; minWords?: number }) => checkNote(t, facts, names, o).ok;
+
+describe("checkNote — a change fact reads only in its own direction", () => {
+  const moved = [F("Germany, nodes", 66, "count", "66"), changeShare("Germany, nodes", "a week ago", -6)];
+  it("backs a fall written as a fall, or with no verb", () => {
+    expect(checkNote("Germany fell 6% to 66 nodes.", moved, ["Germany"]).ok).toBe(true);
+    expect(checkNote("Germany hosts 66 nodes, 6% fewer than a week ago.", moved, ["Germany"]).ok).toBe(true);
+  });
+  it("refuses a fall written as a rise", () => {
+    expect(checkNote("Germany hosts 66 nodes, up 6% on a week ago.", moved, ["Germany"]).ok).toBe(false);
+  });
+});
 
 describe("checkNote — numbers must be backed by a fact", () => {
   it("passes a note with no numbers that a ratio fact backs", () => {
@@ -405,7 +416,7 @@ describe("checkNote — a past value stands beside its own current figure (R60, 
     const shares: Fact[] = [
       Pf("Germany, share of the network's nodes a month ago", 0.38, "share", "38%", "share:DE", "from"),
       Pf("Germany, share of the network's nodes", 0.36, "share", "36%", "share:DE", "to"),
-      Pf("Amazon.com, share of the network's nodes with a known provider", 0.11, "share", "11%"),
+      Pf("Amazon.com, share of the network's nodes", 0.11, "share", "11%"),
     ];
     const r = checkNote("Germany's share fell from 38% to 11%.", shares, geoNames);
     expect(r).toEqual({ ok: false, reasons: ["38% is a past value; the figure beside it, 11%, is not its current figure 36%"] });
@@ -439,7 +450,7 @@ describe("checkNote — a past value stands beside its own current figure (R60, 
     const check = (note: string) => checkNote(note, span, [], { maxSentences: 3 });
     const failed = check("Blocks fell from 355 to 227 per day.");
     expect(failed.ok).toBe(false);
-    expect(!failed.ok && failed.reasons[0]).toMatch(/two whole spans.*write 227 first.*355/);
+    expect(!failed.ok && failed.reasons[0]).toMatch(/two whole spans.*write 227 and how far it moved.*never 355/);
     expect(check("The gap went from 21 seconds to 12 seconds.").ok).toBe(false);
     expect(check("The gap went from 21 to 12 seconds.").ok).toBe(false);
     expect(check("Blocks fell to 227 per day from 355.").ok).toBe(false);
@@ -487,7 +498,7 @@ describe("checkNote — a past value stands beside its own current figure (R60, 
     // Two CURRENT figures have no past value to hold.
     const current: Fact[] = [
       Pf("Germany, share of the network's nodes", 0.38, "share", "38%"),
-      Pf("Amazon.com, share of the network's nodes with a known provider", 0.11, "share", "11%"),
+      Pf("Amazon.com, share of the network's nodes", 0.11, "share", "11%"),
     ];
     expect(checkNote("Germany's share fell from 38% to 11%.", current, geoNames)).toEqual({ ok: true });
     // A past value that coincides with some other current fact is read as current.

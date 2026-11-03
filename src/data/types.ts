@@ -114,6 +114,10 @@ export interface MetaSnapSel {
   hash: string;
   globalOrdinal: number; // the global tick it anchored into
   ts: string;            // that tick's timestamp — the anchor join
+  /** A step the reader took INSIDE the live pair (user, 2026-11-03: swiping the metagraph snapshots
+   *  of the live global "should not become pinned"): the global stays live, and the follow keeps
+   *  this snapshot until the next global arrives (`followLatest`). Absent on every other selection. */
+  held?: true;
 }
 
 /** THE NETWORK INSIDE A TICK — the ledger's Metagraph rung as a commit of its own (2026-10-02).

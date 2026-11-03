@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { READ_SLACK_MS, capitalFirst, chainReadThrough, fact, factsBlock, gaugeChange, heldLevel, median, networksAnchored, observedLevel, sayAll, spanMeasured, spellDurations } from "@/src/data/noteFacts";
+import { READ_SLACK_MS, chainReadThrough, fact, factsBlock, gaugeChange, heldLevel, median, networksAnchored, observedLevel, spanMeasured, pairChange, spellDurations, withChangeFacts, changeShare } from "@/src/data/noteFacts";
 import { checkNote } from "@/src/data/noteHonesty";
 import { formatDag } from "@/src/data/trendSeries";
 
@@ -254,29 +254,32 @@ describe("a duration in a note is written out", () => {
   });
 });
 
-describe("a sentence opens with a capital", () => {
-  it("raises a plain first word", () => {
-    expect(capitalFirst("over the last 7 days the network held.")).toBe("Over the last 7 days the network held.");
-  });
 
-  it("leaves a name that is spelled that way, and text already capitalised", () => {
-    expect(capitalFirst("cL1 nodes held.")).toBe("cL1 nodes held.");
-    expect(capitalFirst("Over the last 7 days.")).toBe("Over the last 7 days.");
+describe("withChangeFacts", () => {
+  const pair = (key: string, fromLabel: string, from: number, toLabel: string, to: number) => [
+    fact(fromLabel, from, "count", undefined, { key, end: "from" }),
+    fact(toLabel, to, "count", undefined, { key, end: "to" }),
+  ];
+  it("adds how far each pair moved, as a share labelled with what it is against and its direction", () => {
+    const out = withChangeFacts(pair("DAG nodes", "DAG nodes at the start of the span", 70, "DAG nodes at the end of the span", 66));
+    const change = out.at(-1)!;
+    expect(change).toMatchObject({ kind: "share", text: "6%", label: "DAG nodes at the end of the span, change against start of the span, down" });
   });
-});
-
-describe("a whole group is said as all of it", () => {
-  it("opens a sentence with a capital", () => {
-    expect(sayAll("3 of the 3 Dor Technologies nodes run L0. They held.")).toBe("All 3 Dor Technologies nodes run L0. They held.");
+  it("names the earlier end by the words the two labels do not share", () => {
+    const out = withChangeFacts(pair("g", "Global snapshots per day, the weeks before", 7405, "Global snapshots per day, last week", 8192));
+    expect(out.at(-1)!.label).toBe("Global snapshots per day, last week, change against the weeks before, up");
+    expect(out.at(-1)!.text).toBe("11%");
   });
-
-  it("reads the same mid-sentence, in figures or words", () => {
-    expect(sayAll("Over 7 days, 5 of the 5 networks anchored, and two of the two nodes held.")).toBe("Over 7 days, all 5 networks anchored, and both nodes held.");
-    expect(sayAll("Germany hosts 34 of its 34 nodes.")).toBe("Germany hosts all 34 of its nodes.");
-    expect(sayAll("2 of the 2 Dor nodes run L0, 2 of its 2 layers.")).toBe("Both Dor nodes run L0, both of its layers.");
+  it("carries its direction, built by the one change builder", () => {
+    expect(withChangeFacts(pair("k", "k before", 70, "k now", 66)).at(-1)!.move).toBe("down");
+    expect(changeShare("k now", "k before", 11)).toMatchObject({ move: "up", text: "11%", label: "k now, change against k before, up" });
   });
-
-  it("leaves a part of a group alone", () => {
-    for (const t of ["3 of the 30 nodes run L0.", "30 of the 3 nodes.", "3 of the 3.5 hours.", "1 of the 1 node ran."]) expect(sayAll(t)).toBe(t);
+  it("reads a pair's change in whole percent", () => {
+    const [a, b] = pair("k", "k before", 70, "k now", 66);
+    expect(pairChange(a!, b!)).toBe(-6);
+  });
+  it("adds nothing for a pair that rounds to no change, or has nothing to move from", () => {
+    expect(withChangeFacts(pair("k", "k before", 1000, "k now", 1002))).toHaveLength(2);
+    expect(withChangeFacts(pair("k", "k before", 0, "k now", 5))).toHaveLength(2);
   });
 });

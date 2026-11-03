@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  boxedSlotOf, displayOrder, isCollapsed, openBoxes, openDefaultOf, overridesOnNoteStandDown, overridesOnSelection, overridesOnViewEntry, railSelectionKey, subjectRunEnd,
+  boxedSlotOf, displayOrder, hasFoldControl, isCollapsed, openBoxes, openDefaultOf, overridesOnNoteStandDown, overridesOnSelection, overridesOnViewEntry, railSelectionKey, subjectRunEnd,
   type LaneCollapseState, type SelectionKeyState,
 } from "@/components/railCollapse";
 import { detailsCards, focusSlotId, ladderSlotIds, type RailManifestState } from "@/components/railCards";
@@ -227,5 +227,16 @@ describe("railSelectionKey and the browsed network", () => {
     const dag = railSelectionKey({ ...state, railNet: "dag" });
     expect(dag).not.toBe(rest);
     expect(railSelectionKey({ ...state, railNet: "dor" })).not.toBe(dag);
+  });
+});
+
+describe("hasFoldControl — who wears the −", () => {
+  it("the AI notes card everywhere, a subject card only on the phone", () => {
+    expect(hasFoldControl("notes", false)).toBe(true);
+    expect(hasFoldControl("notes", true)).toBe(true);
+    expect(hasFoldControl("context", false)).toBe(false);
+    expect(hasFoldControl("node", false)).toBe(false);
+    expect(hasFoldControl("context", true)).toBe(true);
+    expect(hasFoldControl("snap", true)).toBe(true);
   });
 });

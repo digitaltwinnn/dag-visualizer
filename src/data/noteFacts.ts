@@ -46,25 +46,6 @@ export function spellDurations(text: string): string {
   return text.replace(SHORT_DURATION_RE, (_, n: string, u: string) => `${n} ${UNIT_WORDS[u]}${n === "1" ? "" : "s"}`);
 }
 
-const WHOLE_RE = /(?<![\w.,])(\d+|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve) of (the |its |their )?\1(?![\w%]|[.,]\d)/gi;
-
-/** A WHOLE GROUP IS SAID AS ALL OF IT (user, 2026-10-31: "3 of the 3" … "can't you say all 3
- *  instead? More human readable"), a pair as both. The make-up note's shape, "N of the M nodes run",
- *  reads this way when M is all of them, and it is the code's to catch: the numbers are the same, so
- *  it runs after the gate. A lone "1 of the 1" has no better words and stands. */
-export function sayAll(text: string): string {
-  return text.replace(WHOLE_RE, (whole, n: string, owner: string | undefined, at: number) => {
-    if (n === "1") return whole;
-    const count = n === "2" || n.toLowerCase() === "two" ? "both" : `all ${n.toLowerCase()}`;
-    const said = owner === "its " || owner === "their " ? `${count} of ${owner.trim()}` : count;
-    return at === 0 || /[.!?]\s+$/.test(text.slice(0, at)) ? said[0]!.toUpperCase() + said.slice(1) : said;
-  });
-}
-
-/** A sentence's first word with its capital, which the model drops now and then when it opens on
- *  the span's own words. A first word with a capital inside it (cL1) is a name, and stays. */
-export const capitalFirst = (text: string): string => text.replace(/^[a-z]+\b/, (w) => w[0]!.toUpperCase() + w.slice(1));
-
 /** One fact. `kind` picks the notation: count (12,159), amount (one decimal at most, two
  *  significant digits under 1), share (a rounded %), ratio (2 decimals), duration
  *  (`formatSeconds`, written out, seconds in), date (UTC "Oct 19", epoch ms in). `format` replaces an amount's
@@ -195,6 +176,51 @@ export function gaugeChange(points: readonly (number | null)[]): { from: number;
   const quarter = median(xs.slice(-Math.ceil(xs.length / 4)));
   if (Math.abs(quarter - to) > HOLD_TOLERANCE * Math.abs(to)) return null;
   return { from, to, firstIndex: points.findIndex((v) => v != null) };
+}
+
+/** How far a pair moved, in whole percent, or 0 when it rounds to nothing or has nothing to move from. */
+export function pairChange(from: Fact, to: Fact): number {
+  return from.value > 0 ? Math.round((to.value / from.value - 1) * 100) : 0;
+}
+
+/** ONE CHANGE FACT — a move of `pct` percent against `against`, labelled with its direction and
+ *  carrying it as `move`, so the gate reads its percentage only with a verb going the same way.
+ *  The one builder every change fact uses (`withChangeFacts`, the briefs, a notable day's). */
+export function changeShare(label: string, against: string, pct: number): Fact {
+  const move = pct > 0 ? "up" : "down";
+  return { ...fact(`${label}, change against ${against}, ${move}`, Math.abs(pct) / 100, "share"), move };
+}
+
+/** HOW FAR EACH MEASURED CHANGE MOVED, AS A FACT (user, 2026-11-03: "from x to y, up z% can be
+ *  shortened by saying just the current value and its increase", and the wording belongs in the
+ *  prompt, never in code rewriting the model's answer). For every pair (`Fact.pair`) whose ends
+ *  differ by a rounded percent or more, one `share` fact: the change, labelled with the current
+ *  figure's own label, what it is measured against and its direction, so the model can write
+ *  "fell 6% to 66" without arithmetic and the gate backs the 6% like any other figure. A pair that
+ *  rounds to no change gets none: it held. Nor does one that stopped (a current figure of 0: the
+ *  prompt's quiet rule says it) or grew more than tenfold from almost nothing (live 2026-11-03:
+ *  "up 3551600%"): a percentage there says nothing a reader can use, so the note gives where it
+ *  stands. */
+export function withChangeFacts(facts: readonly Fact[]): Fact[] {
+  const out = [...facts];
+  for (const to of facts) {
+    if (to.pair?.end !== "to") continue;
+    const from = facts.find((f) => f.pair?.key === to.pair!.key && f.pair.end === "from");
+    const pct = from ? pairChange(from, to) : 0;
+    if (!from || pct === 0 || to.value === 0 || pct >= 1000) continue;
+    out.push(changeShare(to.label, againstWords(from.label, to.label), pct));
+  }
+  return out;
+}
+
+/** What a pair's earlier end is measured as, said once: the earlier label less the words it shares
+ *  with the current one ("Germany, nodes a week ago" against "Germany, nodes" is "a week ago"). */
+function againstWords(fromLabel: string, toLabel: string): string {
+  const a = fromLabel.split(" "), b = toLabel.split(" ");
+  let i = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) i++;
+  const rest = a.slice(i).join(" ").replace(/^[,\s]+/, "");
+  return rest || fromLabel;
 }
 
 /** The facts as the model is shown them: one `label: text` line each, then the ready-made

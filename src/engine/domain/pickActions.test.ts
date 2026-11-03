@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
-import { netKeyOf, tickNetSelectActions, tickNetClearActions, viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, trendPlaneActions, railNetActions, noteCohortActions, noteDayActions, snapshotClearActions, type ClickAction } from "./pickActions";
+import { netKeyOf, tickNetSelectActions, tickNetClearActions, viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, countryClearActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, trendPlaneActions, railNetActions, noteCohortActions, noteDayActions, snapshotClearActions, type ClickAction } from "./pickActions";
 import { finerLevels } from "./focusLadder";
 import { METAGRAPHS } from "@/src/net/current";
 import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
@@ -208,6 +208,25 @@ describe("the shared component builders (GeoExplore rows + LiveStrip bars run th
       { kind: "inspect", pick: null },
       { kind: "country", cc: "FI" },
     ]);
+  });
+  it("a click on the committed country with a node or provider under it steps UP to the country, never off it", () => {
+    expect(countryToggleActions("DE", { country: "DE", hasInspect: true, cohort: CO })).toEqual([
+      { kind: "inspect", pick: null },
+      { kind: "cohort", sel: null },
+      { kind: "country", cc: "DE" },
+    ]);
+    expect(countryToggleActions("DE", { country: "DE", hasInspect: false, cohort: CO })).toEqual([
+      { kind: "cohort", sel: null },
+      { kind: "country", cc: "DE" },
+    ]);
+  });
+  it("countryClearActions (the Country card's ×) releases the country and everything under it", () => {
+    expect(countryClearActions({ hasInspect: true, cohort: CO })).toEqual([
+      { kind: "inspect", pick: null },
+      { kind: "cohort", sel: null },
+      { kind: "country", cc: null },
+    ]);
+    expect(countryClearActions({ hasInspect: false, cohort: null })).toEqual([{ kind: "country", cc: null }]);
   });
   it("nodeSelectActions: the row's re-click deselects (one toggle language everywhere)", () => {
     expect(nodeSelectActions(nodePick(), { mode: "geo", currentFilter: "dor", deselect: true })).toEqual([
@@ -528,6 +547,18 @@ describe("metaSnapSelectActions (a tile on the upper floor)", () => {
     const kept = metaSnapSelectActions(SEL, GLOBAL, { metaSnap: null, inspect: own });
     expect(kept.map((x) => x.kind)).toEqual(["snapshot", "tickNet", "metaSnap"]);
     expect(kept.some((x) => x.kind === "filter")).toBe(false);
+  });
+
+  it("a step inside the LIVE pair holds the snapshot and pins nothing; another tick or network still pins", () => {
+    const live = { ...SEL, ordinal: 745191, hash: "h2" };
+    expect(metaSnapSelectActions(SEL, GLOBAL, { metaSnap: live, following: true, inspect: null })).toEqual([
+      { kind: "metaSnap", sel: { ...SEL, held: true } },
+    ]);
+    // The shown subject converts to a pin, as ever; a step while pinned pins.
+    expect(metaSnapSelectActions(live, GLOBAL, { metaSnap: live, following: true, inspect: null })[0]).toMatchObject({ kind: "snapshot", follow: false });
+    expect(metaSnapSelectActions(SEL, GLOBAL, { metaSnap: live, following: false, inspect: null })[0]).toMatchObject({ kind: "snapshot", follow: false });
+    // Another network in the same global is a different story: it pins.
+    expect(metaSnapSelectActions({ ...SEL, metaId: "other" }, GLOBAL, { metaSnap: live, following: true, inspect: null })[0]).toMatchObject({ kind: "snapshot", follow: false });
   });
 
   it("commits the tick, then the network INSIDE that tick, then the subject — and NEVER the filter", () => {

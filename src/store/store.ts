@@ -197,6 +197,10 @@ interface AppState {
   // "resolving" rows turn into honest words, and the entry is deleted the moment the exact read
   // lands (a later trigger — reselecting, the next live tick — still retries as before).
   exactMiss: Record<number, number>;
+  /** THE SNAPSHOTS VIEW'S PAST WINDOW — its status only (`src/data/pastWindow.ts` holds the data;
+   *  `components/PastWindowBridge.tsx` is the one writer). `ordinal` is the pin it was asked for;
+   *  `from`/`to` the global snapshots it holds once ready. Null while the view reads the live feed. */
+  pastWindow: { ordinal: number; from: number | null; to: number | null; status: "loading" | "ready" | "failed" } | null;
   // Deep channel reads (full decode of one metagraph snapshot), keyed by metaSnapDeepKey(globalOrdinal, metaId).
   // Immutably cached — fetched from /api/snapshot/[ordinal]/channel/[address] on explicit gesture,
   // never on poll or mass reads.
@@ -316,6 +320,10 @@ interface AppState {
   /** The ending's second beat: the words have gone and the scene is landing, so the lift lets go
    *  while `briefing` still holds the HUD down. Cleared with `briefing`. */
   briefingLanding: boolean;
+  /** THE HAND-OVER (`domain/briefing.ts`): a tour played to its end leaves its sign-off on the live
+   *  view until the reader's first gesture or `HANDOVER_MS`. Set by the Briefing's "done" ending,
+   *  cleared by `components/TourHandover.tsx`. */
+  handover: boolean;
   // Where the view transition's STAGING BAND ends, in canvas-local CSS px from the top (2026-09-29)
   // — the lowest row of the gathered grids — so the motion hint can stand clear of it while a
   // switch runs. Engine-written on change only; null until a transition has measured one.
@@ -495,6 +503,7 @@ interface AppState {
   setSnapshotExact: (data: SnapshotExact) => void;
   /** Record a FAILED exact read for this ordinal — the acquiring states' give-up signal. */
   setExactMiss: (ordinal: number) => void;
+  setPastWindowStatus: (w: AppState["pastWindow"]) => void;
   /** `key` defaults to the decode's own identity; the bridge passes the REQUESTED key when
    *  the route fell back to another entry (an undecodable row asks with ordinal 0). */
   setMetaSnapDeep: (d: ChannelSnapDeep, key?: string) => void;
@@ -509,6 +518,7 @@ interface AppState {
   setMotionPhase: (phase: "out" | "in" | null) => void;
   setBriefing: (stop: number | null) => void;
   setBriefingLanding: (landing: boolean) => void;
+  setHandover: (on: boolean) => void;
   setGatherBottom: (px: number | null) => void;
   setMotionCause: (cause: MotionCause | null) => void;
   setPhoneSheetPx: (px: number | null) => void;
@@ -620,6 +630,8 @@ export const useStore = create<AppState>((set) => ({
   allNodes: [],
   snapshotExact: {},
   exactMiss: {},
+  pastWindow: null,
+  setPastWindowStatus: (pastWindow) => set({ pastWindow }),
   metaSnapDeep: {},
   deepWanted: null,
   phoneDock: null,
@@ -634,6 +646,7 @@ export const useStore = create<AppState>((set) => ({
   motionPhase: null,
   briefing: null,
   briefingLanding: false,
+  handover: false,
   gatherBottom: null,
   railCollapse: {},
   navQuiet: false,
@@ -870,6 +883,7 @@ export const useStore = create<AppState>((set) => ({
   setMotionPhase: (motionPhase) => set({ motionPhase }),
   setBriefing: (briefing) => set(briefing == null ? { briefing, briefingLanding: false } : { briefing }),
   setBriefingLanding: (briefingLanding) => set({ briefingLanding }),
+  setHandover: (handover) => set({ handover }),
   setGatherBottom: (gatherBottom) => set({ gatherBottom }),
   setMotionCause: (motionCause) => set({ motionCause }),
   setNavQuiet: (navQuiet) => set({ navQuiet }),

@@ -46,8 +46,10 @@ Everything routes through `Engine.applyFilter()`. The ladder per view is data in
 `domain/focusLadder.ts`; what a click commits is `domain/pickActions.ts`.
 
 **Geography** — network → country → provider cohort → node, each deselect stepping back one. Selecting
-dims the rest in place, the stacks unmoved (user, 2026-11-02: "dim the other nodes not remove them"; the
-filter and a browse alike), refreshes the leaderboard, and rotates the globe so the densest part of the
+dims the rest in place, the stacks unmoved (user, 2026-11-02: "dim the other nodes not remove them") —
+a BROWSE dims the other networks to 0.75, and a held top-bar FILTER hides them (user, 2026-11-03: "a
+selected metagraph but without filter should dim other nodes … and when filter it should hide
+others"; `dimModel`'s `held`) — refreshes the leaderboard, and rotates the globe so the densest part of the
 selection faces the camera (Y rotation only — north stays up). A metagraph frames deliberately wider
 than the country pose so drilling still reads as a zoom.
 

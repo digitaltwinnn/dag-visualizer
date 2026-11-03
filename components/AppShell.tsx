@@ -3,6 +3,7 @@ import Blueprint from "@/components/Blueprint";
 import BootFade from "@/components/BootFade";
 import BootOverlay from "@/components/BootOverlay";
 import Briefing from "@/components/Briefing";
+import TourHandover from "@/components/TourHandover";
 import DataBridge from "@/components/DataBridge";
 import DocGate from "@/components/DocGate";
 import DocLayer from "@/components/DocLayer";
@@ -16,6 +17,7 @@ import PhoneDockSweep from "@/components/PhoneDockSweep";
 import RailScroll from "@/components/RailScroll";
 import FollowController from "@/components/FollowController";
 import RawSnapshotBridge from "@/components/RawSnapshotBridge";
+import PastWindowBridge from "@/components/PastWindowBridge";
 import RouteSync from "@/components/RouteSync";
 import Tooltip from "@/components/Tooltip";
 import MotionHint from "@/components/MotionHint";
@@ -120,9 +122,11 @@ export default function AppShell({ doc }: { doc?: DocPage }) {
           `doc` is the route's server-rendered seed, so /about's prose is in its HTML. */}
       <DocLayer initial={doc ?? null} />
       <Briefing />
+      <TourHandover />
       <DataBridge />
       <FollowController />
       <RawSnapshotBridge />
+      <PastWindowBridge />
       <RouteSync />
       <ThemeController />
       <Tooltip />

@@ -1,4 +1,5 @@
 import { useStore } from "@/src/store/store";
+import { getPastWindow } from "@/src/data/pastWindow";
 import type { Anchor, ChannelSnapRow, GlobalSnapshot, MetaInfo, NodeRow } from "@/src/data/types";
 import { NetworkData, shortHash } from "@/src/data/api";
 import { METAGRAPHS } from "@/src/net/current";
@@ -60,6 +61,12 @@ export function getNetwork(): NetworkData | null {
 // Per-tick derived DAG fee + anchored metagraph set (null until polled).
 export function getAnchor(ts: string): Anchor | null {
   return net?.getAnchor(ts) ?? null;
+}
+
+// The same read through the LEDGER SOURCE (`pastWindow.ts`): an old pin's anchors live in its past
+// window, not the live index — what a Snapshots surface asks about the tick on screen.
+export function ledgerAnchor(ts: string): Anchor | null {
+  return (getPastWindow() ?? net)?.getAnchor(ts) ?? null;
 }
 
 // How long after a tick's identified count last grew we treat it as "settled". Until then its

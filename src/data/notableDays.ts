@@ -1,4 +1,3 @@
-import { changeWords } from "@/src/data/noteChanges";
 import { median } from "@/src/data/noteFacts";
 import type { NotableDay } from "@/src/data/noteTypes";
 
@@ -230,7 +229,23 @@ function firstLast(row: readonly (number | null)[], input: NotableInput, network
   }
 }
 
-function pauses(gap: readonly (number | null)[], input: NotableInput, networkId: string | null, out: NotableDay[]): void {
+const DAY_S = 86_400;
+
+/** THE NORMAL SPACING over days [lo, hi]: the covered days' seconds over the snapshots they held, or
+ *  NaN with none. What a gap is stated against (user, 2026-11-03: "don't compare gaps against other
+ *  gaps; compare gaps against the normal spacing between snapshots"). */
+export function spacingOver(count: readonly (number | null)[] | undefined, covered: readonly (number | null)[], lo: number, hi: number): number {
+  let days = 0, total = 0;
+  for (let i = Math.max(0, lo); i <= hi && i < covered.length; i++) {
+    const v = reading(count ?? [], covered, i);
+    if (v == null) continue;
+    days++;
+    total += v;
+  }
+  return total > 0 ? (days * DAY_S) / total : NaN;
+}
+
+function pauses(gap: readonly (number | null)[], count: readonly (number | null)[] | undefined, input: NotableInput, networkId: string | null, out: NotableDay[]): void {
   const { days, covered } = input;
   const had: number[] = [];
   for (let i = 0; i < days.length; i++) {
@@ -238,29 +253,28 @@ function pauses(gap: readonly (number | null)[], input: NotableInput, networkId:
     if (v != null && v > 0) had.push(v);
   }
   if (!had.length) return;
+  // DETECTED AGAINST THE LONG RUN'S LONGEST GAPS, STATED AGAINST THE SPAN'S NORMAL SPACING (user,
+  // 2026-11-03: "I don't think it's usually 3.5 minutes", then "don't compare gaps against other gaps;
+  // compare gaps against the normal spacing between snapshots"). The median widest gap, lead-in
+  // included, keeps a noisy chain's ordinary gaps from reading as pauses; what a reader is told is how
+  // long snapshots normally came apart over the span itself.
   const level = median(had);
+  const from = Math.max(0, input.from ?? 0);
+  // Over the network's OWN active stretch, as `rangeExtremes` reads it: covered days before its first
+  // snapshot or after its last hold none, and counted they would stretch the normal (review, 2026-11-03).
+  const act = networkId != null && count ? activity(count, input) : null;
+  const stated = spacingOver(count, covered, Math.max(from, act?.first ?? from), Math.min((input.until ?? days.length) - 1, act?.last ?? Infinity));
   const keep = runKeeper(out);
-  for (let i = Math.max(0, input.from ?? 0); i < days.length; i++) {
+  for (let i = from; i < days.length; i++) {
     const value = reading(gap, covered, i);
     if (value == null) continue;
-    keep.day(isPause(value, level) ? { dayMs: days[i]!, kind: "pause", networkId, value, level, score: scoreOf(value, level) } : null);
+    keep.day(isPause(value, level) ? { dayMs: days[i]!, kind: "pause", networkId, value, level: stated, score: scoreOf(value, level) } : null);
   }
   keep.flush();
 }
 
-/** A DAY'S DISTANCE FROM USUAL (user, 2026-10-31: "can you mention the increase / decrease in
- *  percentage also?"), added by code to the model's caption, so it is computed from the measured
- *  pair. Only a count against its usual has one: a first or a last day is an event, and a wait or a
- *  count of networks reads worse as a percentage. Rounds to nothing, says nothing. */
-export function withDayChange(caption: string, day: Pick<NotableDay, "kind" | "value" | "level">): string {
-  const counted = day.kind === "high" || day.kind === "low" || day.kind === "peak" || day.kind === "trough";
-  if (!counted || caption.includes("%")) return caption;
-  const change = changeWords(day.level, day.value);
-  return change ? `${caption.replace(/[.\s]+$/, "")}, ${change}` : caption;
-}
-
 /** THE RANGE'S EXTREMES, in fill order (see `NOTABLE_FLOOR`): the busiest and quietest day of the
- *  subject's own series, then a network's longest wait or the hypergraph's broadest day. Read on
+ *  subject's own series, then a network's longest gap or the hypergraph's broadest day. Read on
  *  covered days from `from` on, and for a network inside its own activity (the quiet tail after
  *  its last day is the `last`'s business). An extreme exists only when its day stands off the
  *  range's usual level, compared rounded as a caption states them (live 2026-10-31: "5 networks
@@ -309,7 +323,10 @@ export function rangeExtremes(input: NotableInput): NotableDay[] {
     out.push(pick(readings(breadth), "broadest", (a, b) => a > b));
   } else {
     const gap = series[`m.${subject}.gapMax`];
-    if (gap) out.push(pick(readings(gap, (v) => v > 0), "longest", (a, b) => a > b)); // a 0 gap is no measurement (header)
+    // A 0 gap is no measurement (header). The widest day is picked against the span's other gaps, then
+    // stated against its normal spacing, never against another gap (user, 2026-11-03).
+    const longest = gap ? pick(readings(gap, (v) => v > 0), "longest", (a, b) => a > b) : null;
+    if (longest) out.push({ ...longest, level: spacingOver(own, covered, lo, hi) });
   }
   return out.filter((d): d is NotableDay => d != null);
 }
@@ -341,7 +358,7 @@ export function notableDays(input: NotableInput): NotableDay[] {
     // it, and the network's own pace, a stall or a step up in global snapshots, went unread. A
     // stall is the pause first (user, 2026-11-02): that is the day's story, not its low count.
     const gap = series["g.gapMax"];
-    if (gap) pauses(gap, input, null, out);
+    if (gap) pauses(gap, series["g.ticks"], input, null, out);
     also(series["g.anchors"], null, undefined);
     also(series["g.ticks"], null, "globals");
     rest("g.feeFloor", "g.kbFloor", null);
@@ -356,7 +373,7 @@ export function notableDays(input: NotableInput): NotableDay[] {
       firstLast(snaps, input, subject, out);
     }
     const gap = series[`m.${subject}.gapMax`];
-    if (gap) pauses(gap, input, subject, out);
+    if (gap) pauses(gap, snaps, input, subject, out);
     rest(`m.${subject}.fee`, `m.${subject}.kb`, subject);
   }
   // ONE DAY, ONE EVENT: a network's last day is usually thin and its first usually thick, and that

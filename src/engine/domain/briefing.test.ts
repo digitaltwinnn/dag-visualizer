@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { BRIEFING_COVER, BRIEFING_LAND_MAX_MS, BRIEFING_NO_MOTION_MS, BRIEFING_PACE, BRIEFING_RELEASE_MS, BRIEFING_SETTLE_MS, BRIEFING_STOPS, BRIEFING_WORDS_OUT_MS, LINE_MAX, SCENE_WAIT_MS, STOP_MS, briefsOn, hasLanded, liftSettling, mayAdvance, nextStop, prevStop } from "./briefing";
+import { BRIEFING_COVER, BRIEFING_LAND_MAX_MS, BRIEFING_NO_MOTION_MS, BRIEFING_PACE, BRIEFING_RELEASE_MS, BRIEFING_SETTLE_MS, BRIEFING_STOPS, BRIEFING_TYPE_SLOW, BRIEFING_WORDS_OUT_MS, HANDOVER_MS, LINE_MAX, SCENE_WAIT_MS, STOP_MS, briefsOn, handoverHand, handoverPulses, hasLanded, liftSettling, mayAdvance, nextStop, prevStop } from "./briefing";
 
 const on = { pathname: "/", net: "mainnet", seen: false };
 
 describe("how long a stop stands", () => {
-  // user, 2026-11-02: 4.9 seconds asked 21 to 25 characters a second of the live lines, past a subtitle's 20.
-  it("reads a line of the longest kind at a subtitle's pace", () => {
-    expect(STOP_MS).toBe(6000);
-    expect(122 / (STOP_MS / 1000)).toBeLessThanOrEqual(20.5);
+  // user, 2026-11-02: 4.9 seconds asked 21 to 25 characters a second of the live lines, past a subtitle's
+  // 20, and the stop went back to 6 seconds; 2026-11-03: "make it 5", the rest of the timing
+  // unchanged — read live, the lines were on screen in time with time left.
+  it("stands the 5 seconds the user set", () => {
+    expect(STOP_MS).toBe(5000);
   });
 });
 
@@ -150,3 +151,28 @@ describe("the lift letting go", () => {
   });
 });
 
+
+describe("the hand-over", () => {
+  it("pulses the desktop's three surfaces, then the phone's two, half a second apart, after the caption", () => {
+    expect(handoverPulses(false).map((p) => p.target)).toEqual(["explore", "rail", "band"]);
+    expect(handoverPulses(true).map((p) => p.target)).toEqual(["sheet", "dock"]);
+    const at = handoverPulses(false).map((p) => p.atMs);
+    expect(at[0]).toBeGreaterThan(0);
+    expect(at[1]! - at[0]!).toBe(500);
+  });
+
+  it("traces the drag once, after the last pulse, and is done well inside the hand-over", () => {
+    for (const phone of [false, true]) {
+      const hand = handoverHand(phone);
+      const last = handoverPulses(phone).at(-1)!.atMs;
+      expect(hand.atMs).toBeGreaterThan(last);
+      expect(hand.atMs + hand.durMs).toBeLessThan(HANDOVER_MS);
+    }
+  });
+});
+
+describe("the tour's typing", () => {
+  it("runs 15% slower than a note's", () => {
+    expect(BRIEFING_TYPE_SLOW).toBe(1.15);
+  });
+});

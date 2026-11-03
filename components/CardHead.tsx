@@ -2,7 +2,7 @@
 
 import type { CSSProperties, MutableRefObject, ReactNode } from "react";
 import { createContext, useContext, useLayoutEffect, useRef } from "react";
-import { X, type LucideIcon } from "lucide-react";
+import { Minus, X, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { Button } from "@/components/ui/button";
@@ -172,6 +172,14 @@ export interface RailHoverHandlers {
  *  (globals.css). A RailPane inside a host hands its handlers to the host instead of its panel. */
 export const RailHoverHost = createContext<MutableRefObject<RailHoverHandlers> | null>(null);
 
+/** THE − IS BACK WHERE A CARD CAN BE FOLDED BY HAND (user, 2026-11-03: "add the open/close +/−
+ *  button in the AI card and on phone in each of the cards"). The box lost its minimize on
+ *  2026-09-11 ("hardly used"); it returns only where Inspector says so — the AI card, which has no
+ *  × to leave by, and every card on the phone, where a sheet's one open box is the space the reader
+ *  has. The folded entry carries NO + (same day: "the + is implicit"): the whole entry is already
+ *  the toggle. The rung states it, CardHead draws it, so no card body threads a prop. */
+export const RailFold = createContext(false);
+
 export function RailPane({
   entry = false,
   id,
@@ -288,6 +296,7 @@ export default function CardHead({
   eyebrowMuted?: boolean;
 }) {
   const rolled = useRolledTitle(titleKey, title);
+  const foldHere = useContext(RailFold);
   // `text-primary-ink`, not `text-accent` (design review 2026-10-02): the eyebrow is 11–12.5px
   // caps, and the accent on paper measured 3.1:1 — a lamp, not an ink. The ink token IS the
   // accent on dark, so the dark face is byte-identical.
@@ -392,8 +401,37 @@ function keepFocusOnRung(el: HTMLElement): void {
   // chrome. The LEFT rail's panel layout above keeps its collapse toggle — the removal is the
   // right rail's alone.
   const entryMode = !!collapsed && !!onToggle;
+  // Where the rung allows it (`RailFold`), the box wears a − beside its ×. The entry wears nothing:
+  // the whole entry is already the toggle, so a + would be implicit (user, 2026-11-03).
+  const foldable = foldHere && !!onToggle;
+  // The first row clears the absolute corner controls: the eyebrow's row, or the title's on a head
+  // with no eyebrow (the AI card), which until now never had a corner control to clear.
+  const cornerPad = onClose && foldable ? "pr-[62px] touch:pr-[66px]" : (onClose || foldable) && "pr-[30px]";
   return (
     <>
+      {foldable && !entryMode && (
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          aria-label="Collapse"
+          aria-expanded
+          // ⚠️ FOCUS FIRST, THEN TOGGLE — folding swaps the box for its entry, destroying this button.
+          onClick={(e) => {
+            keepFocusOnRung(e.currentTarget);
+            onToggle?.();
+          }}
+          // The ×'s own recipe, one control-width further in when the card has one.
+          className={cn(
+            "absolute z-10 size-auto rounded-md py-1 px-2 leading-none text-muted-foreground touch:after:absolute touch:after:-inset-2 touch:after:content-['']",
+            onClose ? "right-[42px] touch:right-[44px]" : "right-[10px]",
+            // Centred on the FIRST row: the eyebrow's (the ×'s own 8px), or the title's on a head
+            // with no eyebrow, whose centre sits 29px down the card (18px pad + half its 22px line).
+            eyebrow || caption != null ? "top-[8px]" : "top-[17px]",
+          )}
+        >
+          <Minus aria-hidden className="size-4 touch:size-[18px]" />
+        </Button>
+      )}
       {onClose && !entryMode && (
         <Button
           variant="ghost"
@@ -430,8 +468,25 @@ function keepFocusOnRung(el: HTMLElement): void {
             <span className="sr-only">Expand</span>
           </button>
         )}
+        {/* THE OPEN HEAD FOLDS TOO, where the − stands (user, 2026-11-03: "clicking the row header
+            will collapse, not only the − icon (but also that)"): the entry's own stretched device
+            over the head block, under the corner controls and the aside's real controls (z-10).
+            The − is the keyboard's and the screen reader's control, so this one is pointer-only —
+            no second tab stop saying the same thing. */}
+        {foldable && !entryMode && (
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-hidden
+            onClick={(e) => {
+              keepFocusOnRung(e.currentTarget);
+              onToggle?.();
+            }}
+            className="absolute inset-0 z-[1] appearance-none bg-transparent border-0 p-0 m-0 cursor-pointer"
+          />
+        )}
         {(eyebrow || (caption != null && !entryMode)) && (
-          <div className={entryMode ? "contents" : cn("flex items-start justify-between gap-2 mb-2", onClose && "pr-[30px]")}>
+          <div className={entryMode ? "contents" : cn("flex items-start justify-between gap-2 mb-2", cornerPad)}>
             {/* `data-eyebrow` is RailThread's read: on an unboxed ENTRY the thread runs its
                 depth-reach connector at the EYEBROW's height (user, 2026-08-08 — the entry's
                 vertical centre put the line through the title-row aside's space). FOLDED it takes
@@ -460,7 +515,7 @@ function keepFocusOnRung(el: HTMLElement): void {
         )}
         {title != null && (
           <>
-            <div className={entryMode ? "contents" : "flex items-center gap-2 min-w-0"}>
+            <div className={entryMode ? "contents" : cn("flex items-center gap-2 min-w-0", !eyebrow && caption == null && cornerPad)}>
               <h3 data-eyebrow={eyebrow ? undefined : ""} className={cn(TITLE, "text-foreground min-w-0", entryMode && cn("text-body truncate", ENTRY_TITLE))}>{rolled}</h3>
               {/* The aside is DECORATION over a stretched toggle, so it must not swallow the
                   gesture. z-10 lifts it above the head's overlay (a site link has to stay

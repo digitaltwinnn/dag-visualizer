@@ -174,7 +174,8 @@ export function tickPolledRows(metaSnaps: ReadonlyMap<string, readonly MetaSnapR
   for (const [metaId, recs] of metaSnaps) {
     for (const rec of recs) {
       if (rec.ts !== tick.timestamp) continue;
-      rows.push({ metaId, ordinal: rec.ordinal, hash: rec.hash, fee: rec.fee, sizeInKB: rec.sizeInKB, ts: rec.ts, global: tick });
+      // A record's own chain where it is filed under another key (a past window's former address).
+      rows.push({ metaId: rec.chain ?? metaId, ordinal: rec.ordinal, hash: rec.hash, fee: rec.fee, sizeInKB: rec.sizeInKB, ts: rec.ts, global: tick });
     }
   }
   return rows;

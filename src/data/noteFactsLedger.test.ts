@@ -1,3 +1,4 @@
+import { briefLine } from "@/src/data/testkit/briefLine";
 import { describe, it, expect } from "vitest";
 import { ledgerFacts, type LedgerFactsInput } from "@/src/data/noteFactsLedger";
 import { checkNote } from "@/src/data/noteHonesty";
@@ -76,7 +77,7 @@ describe("ledgerFacts on the whole chamber", () => {
     expect(longest!.text).toBe("40 seconds");
   });
 
-  it("states the snapshots anchored per global snapshot with one decimal, fees and data per hour, and the networks that anchored", () => {
+  it("states the metagraph snapshots anchored per global snapshot with one decimal, fees and data per hour, and the networks that anchored", () => {
     const r = ledgerFacts(input())!;
     const [per] = find(r, /anchored per global snapshot/);
     expect(per!.kind).toBe("amount");
@@ -86,7 +87,7 @@ describe("ledgerFacts on the whole chamber", () => {
     expect(find(r, /^Fees in DAG per hour, usual/)).toHaveLength(1);
     expect(find(r, /^Data in MB per hour, recent/)).toHaveLength(1);
     expect(find(r, /^Data in MB per hour, usual/)).toHaveLength(1);
-    const [n] = find(r, /^Networks that anchored snapshots, recent/);
+    const [n] = find(r, /^Networks that anchored metagraph snapshots, recent/);
     expect(n!.value).toBe(2); // Dor created nothing
   });
 
@@ -118,11 +119,11 @@ describe("ledgerFacts on the whole chamber", () => {
 
   it("counts unlisted chains as a floor: one more network, labelled at least", () => {
     const plain = ledgerFacts(input())!;
-    expect(find(plain, /^Networks that anchored snapshots, recent$/)[0]!.value).toBe(2);
+    expect(find(plain, /^Networks that anchored metagraph snapshots, recent$/)[0]!.value).toBe(2);
     const r = ledgerFacts(input({ recent: side(74, 5 * MIN, 20, { "m.xyz.snaps": row(74, () => 3) }) }))!;
-    const [n] = find(r, /^Networks that anchored snapshots, recent, at least$/);
+    const [n] = find(r, /^Networks that anchored metagraph snapshots, recent, at least$/);
     expect(n!.value).toBe(3);
-    expect(find(r, /^Networks that anchored snapshots, recent$/)).toHaveLength(0);
+    expect(find(r, /^Networks that anchored metagraph snapshots, recent$/)).toHaveLength(0);
     expect(r.facts.some((f) => /listed/i.test(f.label))).toBe(false);
   });
 
@@ -134,8 +135,8 @@ describe("ledgerFacts on the whole chamber", () => {
 describe("ledgerFacts on a network", () => {
   it("states the snapshots per hour with a ratio naming the network", () => {
     const r = ledgerFacts(input({ subject: "usdc" }))!;
-    expect(find(r, /^USDC\.dag snapshots anchored per hour, recent/)[0]!.value).toBeCloseTo(60, 9);
-    expect(find(r, /^USDC\.dag snapshots anchored per hour, usual/)[0]!.value).toBeCloseTo(30, 9);
+    expect(find(r, /^USDC\.dag metagraph snapshots anchored per hour, recent/)[0]!.value).toBeCloseTo(60, 9);
+    expect(find(r, /^USDC\.dag metagraph snapshots anchored per hour, usual/)[0]!.value).toBeCloseTo(30, 9);
     const ratios = r.facts.filter((f) => f.kind === "ratio");
     expect(ratios).toHaveLength(1);
     expect(ratios[0]!.label).toContain("USDC.dag");
@@ -145,10 +146,10 @@ describe("ledgerFacts on a network", () => {
 
   it("states its mean and longest spacing", () => {
     const r = ledgerFacts(input({ subject: "usdc" }))!;
-    const [mean] = find(r, /^USDC\.dag mean spacing between snapshots, recent/);
+    const [mean] = find(r, /^USDC\.dag mean spacing between metagraph snapshots, recent/);
     expect(mean!.kind).toBe("duration");
     expect(mean!.value).toBeCloseTo(20, 9); // gapSum 100 over 5 snapshots per bucket
-    const [longest] = find(r, /^USDC\.dag longest gap between snapshots, recent/);
+    const [longest] = find(r, /^USDC\.dag longest gap between metagraph snapshots, recent/);
     expect(longest!.value).toBe(55);
     expect(longest!.text).toBe("55 seconds");
   });
@@ -207,11 +208,11 @@ describe("ledgerFacts tags each change as a pair (R54)", () => {
 
   it("keys a network's own rate and spacing", () => {
     const p = pairsOf(ledgerFacts(input({ subject: "usdc" }))!.facts);
-    expect(p.get("USDC.dag snapshots anchored per hour")).toEqual([
-      "USDC.dag snapshots anchored per hour, usual", 30, "USDC.dag snapshots anchored per hour, recent", 60,
+    expect(p.get("USDC.dag metagraph snapshots anchored per hour")).toEqual([
+      "USDC.dag metagraph snapshots anchored per hour, usual", 30, "USDC.dag metagraph snapshots anchored per hour, recent", 60,
     ]);
-    expect(p.get("USDC.dag mean spacing between snapshots")).toEqual([
-      "USDC.dag mean spacing between snapshots, usual", 20, "USDC.dag mean spacing between snapshots, recent", 20,
+    expect(p.get("USDC.dag mean spacing between metagraph snapshots")).toEqual([
+      "USDC.dag mean spacing between metagraph snapshots, usual", 20, "USDC.dag mean spacing between metagraph snapshots, recent", 20,
     ]);
     expect(p.size).toBe(2);
   });
@@ -237,7 +238,7 @@ describe("ledgerFacts says what the note leads with", () => {
     expect(ledgerFacts(input({ week: side(168, HOUR, 0, { "g.ticks": row(168, () => null) }) }))!.lead).toEqual({ kind: "now" });
   });
   it("a network's own pairs decide its note", () => {
-    expect(ledgerFacts(input({ subject: "usdc" }))!.lead).toEqual({ kind: "change", moved: ["USDC.dag snapshots anchored per hour"] });
+    expect(ledgerFacts(input({ subject: "usdc" }))!.lead).toEqual({ kind: "change", moved: ["USDC.dag metagraph snapshots anchored per hour"] });
     expect(ledgerFacts(input({ subject: "usdc", week: side(168, HOUR, 240) }))!.lead).toEqual({ kind: "now" });
   });
 });
@@ -247,21 +248,23 @@ describe("ledgerFacts' notable changes", () => {
   const weekSide = (over: Record<string, (number | null)[]>) => side(168, HOUR, 120, over, 0);
   it("a row for a network anchoring well off its usual pace", () => {
     const r = ledgerFacts(input({ week: weekSide({ "m.usdc.gapSum": row(168, () => 30 * 60) }) }))!; // 30 snapshots, 60s apart
-    expect(r.changes?.[0]).toEqual({ kind: "faster", size: expect.any(Number), text: "USDC.dag sped up: a snapshot every 20 seconds, usually 1 minute", subject: { kind: "network", id: "usdc" } });
+    expect(r.changes?.[0]).toMatchObject({ kind: "faster", size: expect.any(Number), subject: { kind: "network", id: "usdc" } });
+    expect(briefLine(r.changes?.[0])).toBe("USDC.dag sped up | Spacing between its metagraph snapshots, recent 20 seconds · Spacing between its metagraph snapshots, usual 1 minute");
   });
   it("a row for a network that stopped, ahead of any pace", () => {
     const r = ledgerFacts(input({
       recent: side(74, 5 * MIN, 20, { "m.bio.snaps": row(74, () => 0), "m.bio.ticks": row(74, () => 0) }),
       week: weekSide({ "m.usdc.gapSum": row(168, () => 30 * 60) }),
     }))!;
-    expect(r.changes?.slice(0, 2).map((c) => c.text)).toEqual(["BioFi went quiet", "USDC.dag sped up: a snapshot every 20 seconds, usually 1 minute"]);
+    expect(r.changes?.slice(0, 2).map((c) => c.brief!.about)).toEqual(["BioFi went quiet over the span", "USDC.dag sped up"]);
   });
   // A DAY IS ONLY AN EVENT WHERE THE NETWORK HAS A DAILY RHYTHM (the review, 2026-11-02).
   const quietDay = side(74, 5 * MIN, 20, { "m.bio.snaps": row(74, () => 0), "m.bio.ticks": row(74, () => 0) });
-  const texts = (r: ReturnType<typeof ledgerFacts>) => r!.changes?.map((c) => c.text) ?? [];
+  // What each row is about, as the brief the model words it from (user, 2026-11-03).
+  const texts = (r: ReturnType<typeof ledgerFacts>) => r!.changes?.map((c) => c.brief!.about) ?? [];
   it("no 'went quiet' for a network that anchors every few days", () => {
     const sparse = weekSide({ "m.bio.snaps": row(168, (i) => (i % 72 === 0 ? 1 : 0)), "m.bio.ticks": row(168, () => 0) });
-    expect(texts(ledgerFacts(input({ recent: quietDay, week: sparse })))).not.toContain("BioFi went quiet");
+    expect(texts(ledgerFacts(input({ recent: quietDay, week: sparse })))).not.toContain("BioFi went quiet over the span");
   });
   it("a quiet network asks for its last snapshot", () => {
     const r = ledgerFacts(input({ recent: quietDay, week: weekSide({}) }))!;
@@ -270,21 +273,21 @@ describe("ledgerFacts' notable changes", () => {
   it("no 'became active' for a network's one snapshot of the week", () => {
     const one = (n: number, at: number) => ({ "m.bio.snaps": row(n, (i) => (i === at ? 1 : 0)), "m.bio.ticks": row(n, () => 0) });
     const r = ledgerFacts(input({ recent: side(74, 5 * MIN, 20, one(74, 30)), week: weekSide(one(168, 160)) }));
-    expect(texts(r)).not.toContain("BioFi became active");
+    expect(texts(r)).not.toContain("BioFi became active over the span");
   });
   it("'became active' for a network that opened the week today", () => {
     const three = (n: number, at: number) => ({ "m.bio.snaps": row(n, (i) => (i === at ? 3 : 0)), "m.bio.ticks": row(n, () => 0) });
     const r = ledgerFacts(input({ recent: side(74, 5 * MIN, 20, three(74, 30)), week: weekSide(three(168, 160)) }));
-    expect(texts(r)).toContain("BioFi became active");
+    expect(texts(r)).toContain("BioFi became active over the span");
   });
   it("no 'went quiet' over a day the spine has a hole in: an unmeasured bucket is not a zero", () => {
     const holed = { ...quietDay, series: { ...quietDay.series, "g.ticks": row(74, (i) => (i === 30 ? null : 20)) } };
-    expect(texts(ledgerFacts(input({ recent: holed, week: weekSide({}) })))).not.toContain("BioFi went quiet");
+    expect(texts(ledgerFacts(input({ recent: holed, week: weekSide({}) })))).not.toContain("BioFi went quiet over the span");
   });
   it("no 'went quiet' for a chain the sampler has not been able to read", () => {
     const at = quietDay.now;
-    expect(texts(ledgerFacts(input({ recent: quietDay, week: weekSide({}), chainReads: { bio: at - 3 * 3_600_000 } })))).not.toContain("BioFi went quiet");
-    expect(texts(ledgerFacts(input({ recent: quietDay, week: weekSide({}), chainReads: { bio: at } })))).toContain("BioFi went quiet");
+    expect(texts(ledgerFacts(input({ recent: quietDay, week: weekSide({}), chainReads: { bio: at - 3 * 3_600_000 } })))).not.toContain("BioFi went quiet over the span");
+    expect(texts(ledgerFacts(input({ recent: quietDay, week: weekSide({}), chainReads: { bio: at } })))).toContain("BioFi went quiet over the span");
   });
   it("gives every row to what moved before the chamber's extremes", () => {
     const stopped = { "m.bio.snaps": row(74, () => 0), "m.bio.ticks": row(74, () => 0), "m.usdc.snaps": row(74, () => 0), "m.usdc.ticks": row(74, () => 0), "m.usdc.gapMax": row(74, () => 90) };
@@ -295,9 +298,11 @@ describe("ledgerFacts' notable changes", () => {
   describe("what a network's own note flags", () => {
     const stalled = { "m.usdc.gapMax": row(74, (i) => (i === 40 ? 8280 : 30)) };
     const usual = { "m.usdc.gapMax": row(168, () => 40) };
-    it("a gap far past its usual widest one", () => {
+    it("a gap far past its usual widest one, stated against its normal spacing", () => {
       const r = ledgerFacts(input({ subject: "usdc", recent: side(74, 5 * MIN, 20, stalled), week: weekSide(usual) }))!;
-      expect(r.changes).toContainEqual(expect.objectContaining({ kind: "pause", size: 8280, subject: { kind: "network", id: "usdc" }, text: "USDC.dag paused for 2.3 hours, the longest gap is usually 40 seconds" }));
+      const pause = r.changes?.find((c) => c.kind === "pause");
+      expect(pause).toMatchObject({ size: 8280, subject: { kind: "network", id: "usdc" } });
+      expect(briefLine(pause)).toBe("USDC.dag's anchoring paused | Pause length 2.3 hours · Normal spacing between its metagraph snapshots 20 seconds");
     });
     it("names the bucket that gap ended in, for the snapshot to be found", () => {
       const r = ledgerFacts(input({ subject: "usdc", recent: side(74, 5 * MIN, 20, stalled), week: weekSide(usual) }))!;
@@ -320,19 +325,20 @@ describe("ledgerFacts' notable changes", () => {
     const r = ledgerFacts(input({ recent: side(74, 5 * MIN, 20, stall), week: side(168, HOUR, 120, usualGap, 0) }))!;
     const pauses = r.changes!.filter((c) => c.kind === "pause");
     expect(pauses).toHaveLength(1);
-    expect(pauses[0]).toMatchObject({ subject: { kind: "network", id: "dag" }, text: "Global snapshots paused for 2.3 hours, the longest gap is usually 40 seconds" });
+    expect(pauses[0]).toMatchObject({ subject: { kind: "network", id: "dag" } });
+    expect(briefLine(pauses[0])).toBe("Global snapshots paused | Pause length 2.3 hours · Normal spacing between global snapshots 30 seconds");
     expect(pauses[0]!.find).toMatchObject({ chain: null, gapS: 8280 });
     expect(r.changes!.some((c) => c.kind === "longest")).toBe(false); // the pause is that gap
   });
   // THE CHAMBER'S EXTREMES (user, 2026-11-01): a day where nothing moved still has a largest snapshot.
   it("the usual rhythm still names the longest gap", () => {
     expect(ledgerFacts(input())!.changes).toEqual([
-      expect.objectContaining({ kind: "longest", size: -1, text: "USDC.dag had the longest gap, 55 seconds", subject: { kind: "network", id: "usdc" } }),
+      expect.objectContaining({ kind: "longest", size: -1, subject: { kind: "network", id: "usdc" }, brief: { about: "USDC.dag had the span's longest gap", facts: [expect.objectContaining({ label: "Longest gap", text: "55 seconds" })], name: "USDC.dag" } }),
     ]);
   });
   it("names the largest global snapshot once the sampler holds one, ahead of the gap", () => {
     const r = ledgerFacts(input({ recent: side(74, 5 * MIN, 20, { "g.anchorsMax": row(74, (i) => (i === 30 ? 18 : 6)) }) }))!;
-    expect(r.changes?.map((c) => c.text)).toEqual(["The largest global snapshot anchored 18 snapshots", "USDC.dag had the longest gap, 55 seconds"]);
+    expect(r.changes?.map(briefLine)).toEqual(["The span's largest global snapshot | Metagraph snapshots it anchored 18", "USDC.dag had the span's longest gap | Longest gap 55 seconds"]);
     const at = T0 + 30 * 5 * MIN;
     expect(r.changes?.[0]).toMatchObject({ kind: "peak", subject: { kind: "self" }, find: { chain: null, fromMs: at, toMs: at + 5 * MIN, count: 18 } });
   });

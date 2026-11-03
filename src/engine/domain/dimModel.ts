@@ -38,6 +38,9 @@ export interface DimContext {
   hoverCohort: ReadonlySet<string> | null;
   selectedNodeId: string | null;
   filter: string;
+  /** The network in view is the TOP BAR's filter, not a browse (`railNet`): only a held filter may
+   *  hide the rest (`hideFrac`); a browse mutes them. */
+  held: boolean;
 }
 
 // How strong the network/country dim is, ramped by the morph: SUBTLE in the Hypergraph (a gentle
@@ -64,13 +67,18 @@ export const nodeDimScale = (c: DimContext): number => viewMix(c, "dim");
 // So `hide` is its own STRENGTH ON THE SAME RAW RAMP as `dim`, not a fraction of the dim's output
 // (user, 2026-08-11: turning `dim` was resizing nodes whenever `hide` was non-zero — one knob moving
 // two effects is not a knob). Two independent readings of one ramp: `dim` says how far an off-filter
-// node mutes, `hide` how far it shrinks away. 0 on every row: the globe's isolate went on 2026-11-02
-// (user: "dim the other nodes not remove them"), so every view mutes in place, at full size.
+// node mutes, `hide` how far it shrinks away.
+//
+// ⚠️ ONLY A HELD FILTER HIDES (user, 2026-11-03: "in geo, a selected metagraph but without filter
+// should dim other nodes (more than it does now) and when filter it should hide others"). The globe's
+// isolate went on 2026-11-02 when every scope muted alike; it returns for the top bar's filter alone,
+// which holds the view on one network, while a browse (`railNet`) looks around from All and keeps
+// the rest on screen, muted. So `hide` reads 0 unless `held`, and only the geo row carries it.
 //
 // Reading the RAW ramp is also what keeps the country drill a LENS: `nodeDim`'s countryMix raise is
 // a mute, and must never shrink the nodes it looks past.
 // The gather escape hatch is `gatherRaw` below, applied to the ramp BEFORE this reads it.
-export const hideFrac = (c: DimContext, raw: number): number => raw * viewMix(c, "hide");
+export const hideFrac = (c: DimContext, raw: number): number => (c.held ? raw * viewMix(c, "hide") : 0);
 
 // The view-transition's staging block shows the WHOLE fleet, so the gather releases a node from the
 // filter as it flies: the ramp itself relaxes to 0 at the parked position, and BOTH readings follow
@@ -205,7 +213,7 @@ export const ancestryGlow = (
 export interface FocusRow {
   /** Network/country dim strength for EVERY node — DAG core and metagraph alike (`nodeDimScale`). */
   dim: number;
-  /** How far an off-filter node shrinks. Independent of `dim`; see `hideFrac`. */
+  /** How far an off-filter node shrinks under a HELD filter (never a browse). Independent of `dim`; see `hideFrac`. */
   hide: number;
   /** How far the view's own per-network ELEMENTS drop when off-filter — `offNetMul`. */
   elem: number;
@@ -251,7 +259,8 @@ export const FOCUS_TUNE_DEFAULTS: Readonly<Record<View3D, Readonly<FocusRow>>> =
   // smaller still — their chips sit in dense stacks/trays where a large swell collides
   // with neighbours.
   hyper: { dim: 0.42, hide: 0, elem: 0.44, back: 0.41, boost: 1.1, grow: 0.28 }, // dim 0.32 → 0.5 → 0.42, elem 0.38 → 0.5 → 0.44 (user, 2026-10-24: a hovered or committed network's others were "not very clear"; then the committed one "pops" too much against the darker field — a step back, beside a dimmer stage light)
-  geo: { dim: 0.5, hide: 0, elem: 0, back: 0.65, boost: 0.7, grow: 0.24 }, // 0.16 → 0.24 (user, 2026-08-30: "same as hyper" — the old value was below noticing in a stack); hyper stays loudest
+  // dim 0.5 → 0.75 and hide 0 → 1 (user, 2026-11-03: a browsed network should dim the others "more than it does now", and a filter should hide them; hide reads only under a held filter, `hideFrac`). grow 0.16 → 0.24 (user, 2026-08-30: "same as hyper"); hyper stays loudest
+  geo: { dim: 0.75, hide: 1, elem: 0, back: 0.65, boost: 0.7, grow: 0.24 },
   ledger: { dim: 0.67, hide: 0, elem: 0, back: 0.55, boost: 0.7, grow: 0.24 }, // dim 0.5 → 0.67 (user export, 2026-08-30): a deeper coloured dim on the other lanes, paired then with a DAG core that never dimmed here
   // trend: no shared nodes reach this view at all (the fleet parks), so the row is inert in
   // practice but required to compile — ledger's row COPIED VERBATIM as the starting point
@@ -284,7 +293,7 @@ const viewMix = (c: DimContext, k: keyof FocusRow): number =>
 
 export const FOCUS_ROW_SCHEMA: TuneSchema<FocusRow> = {
   dim: { min: 0, max: 1, label: "dim · off-filter" },
-  hide: { min: 0, max: 1, label: "hide · off-filter" },
+  hide: { min: 0, max: 1, label: "hide · filter" },
   elem: { min: 0, max: 1, label: "dim · elements" },
   back: { min: 0, max: 1, label: "dim-back on focus" },
   boost: { min: 0, max: 3, step: 0.05, label: "focus boost" },

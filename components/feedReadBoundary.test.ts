@@ -21,7 +21,7 @@ const TOKENS: { re: RegExp; feeds: string[] }[] = [
   { re: /\bs\.metaList\b/, feeds: ["api-metagraphs"] },
   { re: /\bs\.(selNodes|allNodes|leaderboard)\b/, feeds: ["clusters", "api-geo"] },
   { re: /\bs\.(latestSnapshot|activity)\b|\buseSnapshotFeed\(|\bgetNetwork\(/, feeds: ["global"] },
-  { re: /\bgetAnchor\(|\bisAnchorSettling\(/, feeds: ["metasnaps"] },
+  { re: /\bgetAnchor\(|\bledgerAnchor\(|\bisAnchorSettling\(/, feeds: ["metasnaps"] },
 ];
 
 // Files that read feed data but are PLUMBING, not a surface the reader sees — each with why.
@@ -31,6 +31,8 @@ const EXEMPT: Record<string, string> = {
   "components/RawSnapshotBridge.tsx": "the snapshot-read FETCHER: it starts reads, the cards that show them hold",
   "components/FollowController.tsx": "the live/pinned follow switch: moves the pin, draws nothing",
   "components/useSnapshotFeed.ts": "the accessor itself: its callers hold (the token above)",
+  "components/useLedgerSource.ts": "an accessor over the feed or a past window: its callers hold",
+  "components/PastWindowBridge.tsx": "the past window's FETCHER: reads the feed's oldest tick to decide, draws nothing",
   "components/railSiblings.ts": "pure resolver over state its caller passes in; the caller holds",
   "components/useFeedRead.ts": "the hold hook",
 };

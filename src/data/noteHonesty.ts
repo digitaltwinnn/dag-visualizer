@@ -152,7 +152,8 @@ function candidates(f: Fact, cls: Cls, ratios: readonly Fact[], dir: Dir): numbe
   switch (cls) {
     case "plain": return f.kind === "count" || f.kind === "amount" ? [f.value] : [];
     case "pct":
-      if (f.kind === "share") return [f.value * 100];
+      // A change fact backs its percentage only beside a verb going its way (or none at all).
+      if (f.kind === "share") return (f.move === "up" && dir === "fall") || (f.move === "down" && dir === "rise") ? [] : [f.value * 100];
       if (!isRatio) return [];
       return dir === "fall" ? [(1 - f.value) * 100]
         : dir === "rise" ? [(f.value - 1) * 100, f.value * 100]
@@ -396,7 +397,7 @@ export function checkNote(
       const past = facts.find((f) => f.pair?.end === "from" && f.pair.span && says(t, f, own, dir));
       if (!past || UP_OR_DOWN_FROM_RE.test(digits.slice(0, t.at))) return;
       const now = facts.find((f) => f.pair?.key === past.pair!.key && f.pair.end === "to");
-      reasons.push(`${past.text} and ${now?.text} are two whole spans, not a start and an end: write ${now?.text} first, then "up from" or "down from" ${past.text}`);
+      reasons.push(now ? `${past.text} and ${now.text} are two whole spans, not a start and an end: write ${now.text} and how far it moved, as its change fact says, never ${past.text}` : `${past.text} is the previous span's figure: leave it out`);
     });
     for (const m of s.matchAll(MOVED_BY_RE)) {
       if (ratios.some((f) => f.text === m[2])) reasons.push(`"${m[0]}" writes a ratio as how far a figure moved: give the figures instead`);

@@ -151,6 +151,7 @@ function MarkCoin({
   x,
   onHover,
   onPick,
+  echo = false,
 }: {
   m: TrendMark;
   top: number;
@@ -166,6 +167,8 @@ function MarkCoin({
   x: number;
   onHover?: (dayMs: number, on: boolean) => void;
   onPick?: (mark: TrendMark) => void;
+  /** This coin may answer another surface's hover of its day with its label (`markEcho`). */
+  echo?: boolean;
 }) {
   const mine = useRef(false);
   const [own, setOwn] = useState(false);
@@ -211,7 +214,7 @@ function MarkCoin({
     >
       <NoteKindCoin kind={m.kind} />
     </button>
-    {own && (
+    {(own || (echo && m.lit)) && (
       <NoteDayPopover
         date={rangeDays(m.dayMs, m.dayMs + DAY_MS_CHART)}
         caption={m.caption}
@@ -242,6 +245,7 @@ export default function TrendChart({
   marks,
   onMarkHover,
   onMarkPick,
+  markEcho = false,
   onPick,
   fill,
   plotHeight = PLOT_H,
@@ -337,6 +341,11 @@ export default function TrendChart({
    *  (the caller writes `hoverNoteDay`, rule 9), a click commits it as the range. */
   onMarkHover?: (dayMs: number, on: boolean) => void;
   onMarkPick?: (mark: TrendMark) => void;
+  /** A day lit from ANOTHER surface (the AI card's row, the band's diamond) opens this chart's label
+   *  too, on its first coin of that day (user, 2026-11-03: the row's hover "shows the vitals popover
+   *  but not on the chart card"). The caller passes it for the front card alone, and never while the
+   *  hover came from a chart's own coin. */
+  markEcho?: boolean;
   /** THE AREA UNDER THE FIRST LINE, IN ITS OWN HUE (2026-09-19) — opt-in, and the 3D stack's
    *  planes are the only caller. A plane is a fully transparent body with one hairline, and a bare
    *  line floating in a scene reads as a wire rather than as a LAYER; the fill is what makes five
@@ -809,7 +818,7 @@ export default function TrendChart({
               baseline, by the cursor's rule: the same fraction math, outside the memoised plot. Each
               coin is a button, as the AI card's row and the timeline's diamond are. */}
           {!held &&
-            markXs.map((m) => {
+            markXs.map((m, i) => {
               const coinTop = PLOT_MARGIN.top + plotInnerH(plotHeight) - 8;
               const lineTop = m.rise == null ? null : PLOT_MARGIN.top + plotInnerH(plotHeight) * (1 - m.rise);
               const lineLeft = `calc(${PLOT_MARGIN.left}px + ${m.x} * (100% - ${PLOT_INSET_X}px))`;
@@ -820,6 +829,7 @@ export default function TrendChart({
                   x={m.x}
                   onHover={onMarkHover}
                   onPick={onMarkPick}
+                  echo={markEcho && markXs.findIndex((o) => o.dayMs === m.dayMs) === i}
                   top={coinTop}
                   left={`calc(${lineLeft} - 8px)`}
                   lineLeft={lineLeft}

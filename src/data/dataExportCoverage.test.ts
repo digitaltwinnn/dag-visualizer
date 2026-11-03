@@ -46,7 +46,7 @@ const EXEMPT_MODULES: Record<string, string> = {
 const EXEMPT_EXPORTS: Record<string, string[]> = {
   "network.ts": [
     // live-singleton accessors
-    "initNetwork", "getNetwork", "getAnchor", "isAnchorSettling",
+    "initNetwork", "getNetwork", "getAnchor", "ledgerAnchor", "isAnchorSettling",
     // config mirrors (config.ts is pure static data; these re-expose it to the HUD)
     "COLORS", "DEFAULT_META_COLOR", "ANCHOR_SETTLE_MS",
     // catalog lookups over the CATALOG (via src/net/current)

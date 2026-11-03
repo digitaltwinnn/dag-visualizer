@@ -8,7 +8,7 @@ import { NodeStars } from "@/components/state/StateAtoms";
 import { cn } from "@/lib/utils";
 import { spanPhrase } from "@/src/data/trendWindow";
 import { useStore } from "@/src/store/store";
-import { AI_TITLE, noteSpanWords } from "./noteSubject";
+import { AI_CARD_TITLE, noteSpanWords } from "./noteSubject";
 import { DOOR_RUN, NoteFoot } from "./NoteRows";
 import TypedNote from "./TypedNote";
 import { useAiNote, useWaited } from "./useAiNote";
@@ -107,7 +107,7 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
         title={
           <span className="inline-flex min-w-0 items-center gap-2">
             <AI_NOTES_ICON aria-hidden className={cn(KIND_MARK_CLASS, "text-[var(--ai-mark)]")} />
-            <span className="truncate">{AI_TITLE}</span>
+            <span className="truncate">{AI_CARD_TITLE}</span>
           </span>
         }
         titleKey={titleKey}

@@ -105,19 +105,37 @@ describe("generateNote", () => {
     expect(await lockFree()).toBe(true);
   });
 
-  it("writes a span against the one before it as a figure and what it stood at, before the gate", async () => {
+  // THE MODEL'S WORDS ARE ITS OWN (user, 2026-11-03): the change is a fact it is shown, and an
+  // earlier figure written beside it is asked for once more, never cut out by code.
+  it("shows each change as a fact, and asks again when the note writes the earlier figure", async () => {
     const pair = (end: "from" | "to") => ({ key: "b", end, span: true }) as const;
     const facts = { ...FACTS, facts: [...FACTS.facts, fact("Blocks, per day, this span", 64, "count", undefined, pair("to")), fact("Blocks, per day, previous span", 73, "count", undefined, pair("from"))] };
-    const d = deps({ facts: async () => facts, answers: ["NOTE: Over the last 7 days, blocks fell to 64 per day from 73, and the network held."] });
+    const d = deps({
+      facts: async () => facts,
+      answers: [
+        "NOTE: Over the last 7 days, blocks averaged 64 per day, down from 73, and the network held.",
+        "NOTE: Over the last 7 days, blocks averaged 64 per day, down 12% on the 7 days before, and the network held.",
+      ],
+    });
     const res = await generateNote(REQ, d, "read");
-    expect(res.state === "ok" && res.text).toBe("Over the last 7 days, blocks fell to 64 per day, down 12% from 73 in the 7 days before, and the network held.");
+    expect(d.chat.mock.calls[0]![0][1]!.content).toContain("Blocks, per day, this span, change against previous span, down: 12%");
+    expect(d.chat.mock.calls[1]![0].map((m) => m.content).join("\n")).toContain('"73" is an earlier figure');
+    expect(res.state === "ok" && res.text).toBe("Over the last 7 days, blocks averaged 64 per day, down 12% on the 7 days before, and the network held.");
   });
 
-  it("starts a notable day's caption with a capital, as the note does", async () => {
+  it("keeps the checked note as written when the second answer is no better", async () => {
+    const pair = (end: "from" | "to") => ({ key: "b", end, span: true }) as const;
+    const facts = { ...FACTS, facts: [...FACTS.facts, fact("Blocks, per day, this span", 64, "count", undefined, pair("to")), fact("Blocks, per day, previous span", 73, "count", undefined, pair("from"))] };
+    const first = "NOTE: Over the last 7 days, blocks averaged 64 per day, down from 73, and the network held.";
+    const res = await generateNote(REQ, deps({ facts: async () => facts, answers: [first, first] }), "read");
+    expect(res.state === "ok" && res.text).toBe("Over the last 7 days, blocks averaged 64 per day, down from 73, and the network held.");
+  });
+
+  it("keeps a notable day's caption in the model's own words", async () => {
     const day = { dayMs: Date.UTC(2026, 9, 22), kind: "peak" as const, networkId: null, value: 1200, level: 1000, score: 0 };
-    const d = deps({ facts: async () => ({ ...FACTS, days: [day] }), answers: [`${CLEAN}\nDAY 2026-10-22: the hypergraph anchored 1,200 snapshots.`] });
+    const d = deps({ facts: async () => ({ ...FACTS, days: [day] }), answers: [`${CLEAN}\nDAY 2026-10-22: The hypergraph anchored 1,200 snapshots.`] });
     const res = await generateNote(REQ, d, "read");
-    expect(res.state === "ok" && res.days[0]!.caption).toMatch(/^The hypergraph anchored 1,200 snapshots/);
+    expect(res.state === "ok" && res.days[0]!.caption).toBe("The hypergraph anchored 1,200 snapshots.");
   });
 
   it("the model is shown the facts and the subject", async () => {
@@ -356,7 +374,7 @@ describe("generateNote", () => {
     const res = await generateNote(REQ, d, "read");
     expect(res.state).toBe("ok");
     if (res.state !== "ok") return;
-    expect(res.days).toEqual([{ dayMs: days[1]!.dayMs, kind: "high", networkId: null, caption: "Snapshots anchored reached 1,300, up 117%" }]);
+    expect(res.days).toEqual([{ dayMs: days[1]!.dayMs, kind: "high", networkId: null, caption: "Snapshots anchored reached 1,300." }]);
     expect(d.chat.mock.calls[0]![0][1]!.content).toContain("DAY 2026-10-20");
   });
 
@@ -427,8 +445,10 @@ describe("generateNote", () => {
     expect(d.chat).toHaveBeenCalledTimes(1);
   });
 
-  it("opens a note with a capital", async () => {
-    const res = await generateNote(REQ, deps({ answers: ["NOTE: over the span the hypergraph anchored 1,200 snapshots a day."] }), "read");
+  it("asks again for a note that opens without its capital", async () => {
+    const d = deps({ answers: ["NOTE: over the span the hypergraph anchored 1,200 snapshots a day.", "NOTE: Over the span the hypergraph anchored 1,200 snapshots a day."] });
+    const res = await generateNote(REQ, d, "read");
+    expect(d.chat).toHaveBeenCalledTimes(2);
     expect(res.state === "ok" && res.text).toBe("Over the span the hypergraph anchored 1,200 snapshots a day.");
   });
 
@@ -486,11 +506,11 @@ describe("the span length reaches the model and backs its window (R20)", () => {
     expect(checkNote("Over the last 7 days the hypergraph held its pace.", shown!.facts, shown!.names)).toEqual({ ok: true });
   });
 
-  it("the whole network's Hypergraph note is asked for the snapshots it produced, not was part of", async () => {
+  it("the whole network's Hypergraph note is asked for the global snapshots the DAG produced, not was part of", async () => {
     const d = deps({ facts: async () => ({ ...FACTS, label: "the whole network", common: true, whole: true }), answers: ["NOTE: Over the last 7 days the network held at 97 nodes."] });
     await generateNote({ ...REQ, view: "hyper", subject: "all", span: "day" }, d, "read");
     const sys = d.chat.mock.calls[0]![0][0]!.content;
-    expect(sys).toContain("the global snapshots it produced per day");
+    expect(sys).toContain("the DAG produced <last week's figure> global snapshots per day last week");
     expect(sys).not.toContain("it was part of per day");
   });
 });
@@ -643,11 +663,27 @@ describe("the positive rewrite", () => {
 
 describe("a view note's notable changes", () => {
   beforeEach(() => { store = memoryNotesStore(); });
-  it("are stored with the note and served with it", async () => {
-    const changes = [{ kind: "lost" as const, size: 2, text: "Germany lost 2 nodes", subject: { kind: "country" as const, cc: "DE" } }];
-    const res = await generateNote(REQ, deps({ facts: async () => ({ ...structuredClone(FACTS), changes }) }), "read");
-    expect(res).toMatchObject({ state: "ok", changes });
-    expect(await generateNote(REQ, deps(), "read")).toMatchObject({ state: "ok", changes }); // from the store
+  // THE ROWS ARE THE MODEL'S (user, 2026-11-03: "the notable-change rows all must come from AI"): each
+  // brief is shown, its line read back from CHANGE n:, checked against its own figures, and stored.
+  const draft = (about: string, lost: number, from: number) => ({
+    kind: "lost" as const, size: lost, text: "", subject: { kind: "country" as const, cc: "DE" },
+    brief: { about, facts: [fact("Nodes lost", lost, "count"), fact("Nodes at the start of the span", from, "count"), fact("Nodes at the end of the span", from - lost, "count")] },
+  });
+  it("shows each row's brief and stores the model's line, served with the note", async () => {
+    const d = deps({ facts: async () => ({ ...structuredClone(FACTS), changes: [draft("Germany's nodes", 2, 22)] }), answers: [`${CLEAN}\nCHANGE 1: Germany lost 2 nodes, now 20`] });
+    const res = await generateNote(REQ, d, "read");
+    expect(d.chat.mock.calls[0]![0][1]!.content).toContain("Rows to write, in order:\nCHANGE 1: Germany's nodes\n  Nodes lost: 2");
+    const served = [{ kind: "lost", size: 2, text: "Germany lost 2 nodes, now 20", subject: { kind: "country", cc: "DE" } }];
+    expect(res).toMatchObject({ state: "ok", changes: served });
+    expect(res.state === "ok" && res.changes?.[0]).not.toHaveProperty("brief");
+    expect(await generateNote(REQ, deps(), "read")).toMatchObject({ state: "ok", changes: served }); // from the store
+  });
+  it("drops a row whose line is missing or names a figure its row does not give", async () => {
+    const changes = [draft("Germany's nodes", 2, 22), draft("France's nodes", 3, 13)];
+    const d = deps({ facts: async () => ({ ...structuredClone(FACTS), changes }), answers: [`${CLEAN}\nCHANGE 1: Germany lost 7 nodes`] });
+    const res = await generateNote(REQ, d, "read");
+    expect(res).toMatchObject({ state: "ok" });
+    expect(res).not.toHaveProperty("changes");
   });
   it("a note with none carries no field", async () => {
     const res = await generateNote(REQ, deps(), "read");
@@ -658,15 +694,17 @@ describe("a view note's notable changes", () => {
 describe("a note writes its durations out", () => {
   const SPACED: NoteFacts = { ...FACTS, facts: [...FACTS.facts, fact("Mean spacing", 10, "duration")] };
 
-  it("whatever the model wrote", async () => {
-    const r = await generateNote(REQ, deps({ facts: async () => structuredClone(SPACED), answers: ["NOTE: The hypergraph anchored 1,200 snapshots a day, every 10s."] }), "read");
+  it("asked once more for a unit written as a letter, in the model's own words", async () => {
+    const d = deps({ facts: async () => structuredClone(SPACED), answers: ["NOTE: The hypergraph anchored 1,200 snapshots a day, every 10s.", "NOTE: The hypergraph anchored 1,200 snapshots a day, every 10 seconds."] });
+    const r = await generateNote(REQ, d, "read");
+    expect(d.chat.mock.calls[1]![0].map((m) => m.content).join("\n")).toContain('"10s": write the unit out');
     expect(r).toMatchObject({ state: "ok", text: "The hypergraph anchored 1,200 snapshots a day, every 10 seconds." });
   });
 });
 
 describe("a whole group is said as all of it", () => {
-  it("whatever the model wrote", async () => {
-    const r = await generateNote(REQ, deps({ facts: async () => ({ ...structuredClone(FACTS), facts: [...FACTS.facts, fact("Nodes", 3, "count")] }), answers: ["NOTE: The hypergraph anchored 1,200 snapshots a day, and 3 of the 3 nodes held."] }), "read");
+  it("asked once more for \"3 of the 3\", in the model's own words", async () => {
+    const r = await generateNote(REQ, deps({ facts: async () => ({ ...structuredClone(FACTS), facts: [...FACTS.facts, fact("Nodes", 3, "count")] }), answers: ["NOTE: The hypergraph anchored 1,200 snapshots a day, and 3 of the 3 nodes held.", "NOTE: The hypergraph anchored 1,200 snapshots a day, and all 3 nodes held."] }), "read");
     expect(r).toMatchObject({ state: "ok", text: "The hypergraph anchored 1,200 snapshots a day, and all 3 nodes held." });
   });
 });
@@ -675,16 +713,26 @@ describe("the Briefing's line", () => {
   const BRIEF = { net: "mainnet", view: "trend" as const, subject: "dag", span: "30d" as const };
   const stored = async () => JSON.parse((await store.get(noteKeyOf("mainnet", "trend", "dag", "30d")))!) as NoteRecord;
   const answer = (line: string) => [`${CLEAN}\nLINE: ${line}`];
+  // The 30-day pill's facts state its own span length, so "the last 30 days" is a backed figure.
+  const SPAN30: NoteFacts = { ...FACTS, facts: [...FACTS.facts.filter((f) => f.label !== "Span length"), fact("Span length", 30 * 86_400, "duration")] };
+  const bdeps = (answers: string[]) => deps({ facts: async () => structuredClone(SPAN30), answers });
 
   it("is kept on a note the tour reads, and served", async () => {
-    const r = await generateNote(BRIEF, deps({ answers: answer("The hypergraph anchored 1,200 snapshots a day.") }), "read");
-    expect(r).toMatchObject({ state: "ok", line: "The hypergraph anchored 1,200 snapshots a day." });
-    expect((await stored()).line).toBe("The hypergraph anchored 1,200 snapshots a day.");
+    const r = await generateNote(BRIEF, bdeps(answer("Over the last 30 days, the hypergraph anchored 1,200 snapshots a day.")), "read");
+    expect(r).toMatchObject({ state: "ok", line: "Over the last 30 days, the hypergraph anchored 1,200 snapshots a day." });
+    expect((await stored()).line).toBe("Over the last 30 days, the hypergraph anchored 1,200 snapshots a day.");
   });
 
-  it("ends as a sentence, whatever the model left off", async () => {
-    const r = await generateNote(BRIEF, deps({ answers: answer("The hypergraph anchored 1,200 snapshots a day") }), "read");
-    expect(r).toMatchObject({ line: "The hypergraph anchored 1,200 snapshots a day." });
+  it("is kept in the model's own words", async () => {
+    const r = await generateNote(BRIEF, bdeps(answer("Over the last 30 days, the hypergraph anchored 1,200 snapshots a day.")), "read");
+    expect(r).toMatchObject({ line: "Over the last 30 days, the hypergraph anchored 1,200 snapshots a day." });
+  });
+
+  // user, 2026-11-03: "the geo intro should mention the range".
+  it("is dropped when it does not name its span, so the tour reads the note's opening", async () => {
+    const r = await generateNote(BRIEF, deps({ answers: answer("The hypergraph anchored 1,200 snapshots a day.") }), "read");
+    expect(r).toMatchObject({ state: "ok" });
+    expect(r).not.toHaveProperty("line");
   });
 
   it("is asked of no other note", async () => {
@@ -706,8 +754,8 @@ describe("the Briefing's line", () => {
   });
 
   it("may run to two sentences", async () => {
-    const two = "The hypergraph anchored 1,200 snapshots a day. That is 37% up on the span before.";
-    expect(await generateNote(BRIEF, deps({ answers: answer(two) }), "read")).toMatchObject({ line: two });
+    const two = "Over the last 30 days, the hypergraph anchored 1,200 snapshots a day. That is 37% up on the span before.";
+    expect(await generateNote(BRIEF, bdeps(answer(two)), "read")).toMatchObject({ line: two });
   });
 
   it("is dropped past its length", async () => {
@@ -728,5 +776,30 @@ describe("an answer with a line gets more room", () => {
     const d = deps();
     await generateNote(REQ, d, "read");
     expect(d.chat.mock.calls[0]![1 as never]).toBeUndefined();
+  });
+});
+
+describe("the style slips are asked for once more, never edited", () => {
+  const span = (end: "from" | "to") => ({ key: "b", end, span: true }) as const;
+  const BLOCKS: NoteFacts = { ...FACTS, facts: [...FACTS.facts, fact("Blocks, per day, this span", 64, "count", undefined, span("to")), fact("Blocks, per day, previous span", 73, "count", undefined, span("from"))] };
+  const second = (d: ReturnType<typeof deps>) => d.chat.mock.calls[1]![0].map((m) => m.content).join("\n");
+
+  it("a whole span written as a climb with nothing it is measured against", async () => {
+    const d = deps({ facts: async () => structuredClone(BLOCKS), answers: ["NOTE: The hypergraph anchored 1,200 snapshots a day, and blocks fell 12% to 64 per day.", CLEAN] });
+    await generateNote(REQ, d, "read");
+    expect(second(d)).toContain('"64" is a whole span\'s figure');
+  });
+
+  it("but not when the comparison follows it", async () => {
+    const d = deps({ facts: async () => structuredClone(BLOCKS), answers: ["NOTE: The hypergraph anchored 1,200 snapshots a day, and blocks fell 12% to 64 per day on the 7 days before."] });
+    await generateNote(REQ, d, "read");
+    expect(d.chat).toHaveBeenCalledTimes(1);
+  });
+
+  it("a change with no current figure beside it, and held beside a change", async () => {
+    const d = deps({ facts: async () => structuredClone(BLOCKS), answers: ["NOTE: The hypergraph anchored 1,200 snapshots a day, and blocks held, down 12%.", CLEAN] });
+    await generateNote(REQ, d, "read");
+    expect(second(d)).toContain('"12%": give the current figure beside its change');
+    expect(second(d)).toContain("held means it did not move");
   });
 });

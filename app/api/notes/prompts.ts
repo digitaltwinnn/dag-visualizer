@@ -1,4 +1,4 @@
-import type { NoteLead, NoteView, NotableDay } from "@/src/data/noteTypes";
+import type { ChangeBrief, NoteLead, NoteView, NotableDay } from "@/src/data/noteTypes";
 import { utcDayKey } from "@/src/util/localTime";
 import type { NoteSpan, SubjectKind } from "./keys";
 
@@ -21,7 +21,10 @@ export const VOICE = [
   "Be concise and to the point: name the two biggest moves, not every one, drop any figure or clause the point can stand without, and keep the whole note under forty-five words.",
   "Answer the question in its order: what it asks for first is what this view shows and comes first, even when it held; what it asks for last comes last, in one sentence.",
   "Within each part, lead with what changed. Do not restate a breakdown the reader can already see on screen, such as how many nodes run each layer, unless it changed.",
-  "When something rose or fell, say by how much: write it from the earlier figure to the current one, both as the facts state them for that same thing, never only the direction.",
+  // THE CURRENT FIGURE AND HOW FAR IT MOVED (user, 2026-11-03: "from x to y, up z% can be shortened
+  // by saying just the current value and its increase"). Every measured change has a "change
+  // against" fact (`withChangeFacts`), so the model copies a percentage rather than working one out.
+  "When something rose or fell, give the current figure and how far it moved, in one of two shapes: \"<what> fell <change> to <current figure>\", or \"<current figure>, up <change> on <what it is measured against>\". Take the change from its \"change against\" fact, with that fact's direction. Never write the earlier figure. A figure with no change fact either held, or moved too far for a percentage to mean anything: say where it stands now, and that it held only when its ends are the same.",
   // HONEST, AND SAID POSITIVELY (user, 2026-10-31). The second half of the rule is what keeps it honest.
   "Say things positively. When a figure grew, open the sentence with the growth, never leave it trailing at the end. When nothing moved, say what held steady, anywhere in a sentence: never write that something did not happen, such as \"no changes\" or \"no networks\". A span where nothing was anchored at all was quiet: say it in one sentence, in the shape \"<the span>, <name> was quiet, and last anchored on <date>\", or first anchored on the date when the facts say it had not begun, and never call it steady. State a fall plainly: never soften, hide or reframe it, and never call a figure good or bad.",
   "",
@@ -33,13 +36,14 @@ export const VOICE = [
   "Name the span in your first sentence, once, in exactly the words the Span line gives and no others around them: \"over the last … days\" when it says \"the last … days\", \"from … to …\" as given when it says \"from … to …\", never \"over from\"; the reader sees the same words on the card.",
   "Call the subject by its name, as the Subject line gives it, wherever you would otherwise say \"the network\" or \"it\": \"the network\" alone is only for the whole network.",
   "Describe what the numbers show: never explain why, and never read a purpose or a cause into them.",
-  "Say nodes, never machines. Say snapshots or global snapshots, never ticks, never \"L1 snapshots\". Never say feeless. All the nodes together are the network, never the fleet.",
-  "A network's share of global snapshots is what it \"was part of\"; the whole network is part of nothing: it produces them.",
-  "A network creates its snapshots and anchors them into global snapshots. A network that creates snapshots is an active network, never an \"anchoring network\". A note about one network says nothing about other networks being active.",
+  "Say nodes, never machines. A network's own snapshots are metagraph snapshots and the DAG's are global snapshots: name the kind every time, never a bare \"snapshots\" (a fact that says snapshots without \"global\" means metagraph snapshots), never ticks, never \"L1 snapshots\". Never say feeless. All the nodes together are the network, never the fleet.",
+  "The DAG produces global snapshots and each metagraph produces its own metagraph snapshots: never say the whole network, or a metagraph, produced global snapshots. A network's share of global snapshots is what it \"was part of\"; the DAG is part of nothing: it produces them. A fact that says a network is \"in global snapshots\" is said as \"<network> was part of <figure> global snapshots per day\", with its change after it, never with another noun such as placements or appearances.",
+  "A network creates its metagraph snapshots and anchors them into global snapshots. A network that creates metagraph snapshots is an active network, never an \"anchoring network\". A note about one network says nothing about other networks being active.",
   "L0, currency L1 and data L1 are layers.",
   "Make no claim about how decentralised or distributed anything is.",
   "Never say which lost or gained the most: give the figures and let the reader compare them.",
   "Use no noun more than twice in a sentence: name a thing once and let the sentence carry it.",
+  "Start every sentence with a capital letter. When a count covers all of a group, say \"all\" with the number, or \"both\" for two, never the number twice.",
   "Punctuation: no dash clauses. Never use an em dash, and never a hyphen or en dash with a blank on each side. Use commas, colons and full stops.",
 ].join("\n");
 
@@ -76,14 +80,19 @@ export const VOICE = [
 // hosts N nodes in <country>", so the name lands as the sentence's subject, not as a label.
 type KindQuestions = Partial<Record<Exclude<SubjectKind, "view">, string>>;
 // The whole network's activity, in its own words (user, 2026-10-30): one string for both views.
-export const QUESTION_COMMON_WHOLE = "Last, in one sentence, how active the network was: open with the direction, up, down or steady, then the global snapshots it produced per day last week against the weeks before.";
+// WHO PRODUCES THEM (user, 2026-11-03: "DAG produces global snapshots, metagraphs produce metagraph
+// snapshots"): the sentence's subject is the DAG, never "the whole network".
+export const QUESTION_COMMON_WHOLE = "Last, in one sentence, how active the network was, in the shape \"Activity was <up, down or steady>: the DAG produced <last week's figure> global snapshots per day last week, <up or down> <change> on the weeks before\", the DAG as the one producing them, or \"held at\" the figure when it was steady.";
 // A SPAN AGAINST THE ONE BEFORE IT IS NOT A CLIMB INSIDE THE SPAN (user, 2026-11-02). Live: "Over the
 // last 30 days, global snapshots rose 86% from 4,021 to 7,478 per day", where both were 30-day
 // averages and the figure inside the span rose about a third. The gate holds the form, since the
 // figures alone are right (`noteHonesty.ts`).
-const SPAN_FIGURES = 'A figure for "this span" or the "previous span" is that whole span, as an average per day or a total, never a point in it: never say it rose or fell over the span, and never write the previous figure first. Write a per day figure in this shape, with "down from" for a fall: "<what> averaged <this span\'s figure> per day, up from <the previous span\'s figure with its unit> <the words of the Span before line>". Give the Span before words the first time only. A total or a spacing takes the same shape without "averaged". Figures "at the start of the span" and "at the end of the span" did move inside the span: write those as "from <start figure> to <end figure>". A ratio is for reading: never write it as a figure.';
+export function spanFigures(spanBefore?: string | null): string {
+  const before = spanBefore ? `"${spanBefore}"` : "the span before";
+  return `A figure for "this span" or the "previous span" is that whole span, as an average per day or a total, never a point in it: never say it rose or fell over the span. Give its change against ${before}, in one of two shapes: "<what> averaged <this span's figure> per day, up <change> on ${before}", or "<what> rose <change> to <this span's figure> per day on ${before}", with "down" or "fell" for a fall and the change from its "change against" fact, never the previous span's figure. After the first time, "on the span before" will do, or the averaged shape alone. A total or a spacing takes the same shapes without "averaged" and "per day". Figures "at the start of the span" and "at the end of the span" did move inside the span: write those as "<what> rose <change> to <end figure>" or "fell <change> to". A ratio is for reading: never write it as a figure. Count nothing yourself: a count the facts do not give, such as how many days are listed, is not written.`;
+}
 
-export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuestions; questionNow?: string; questionCommon?: string; system: (subjectLabel: string, lead?: NoteLead, common?: boolean, kind?: SubjectKind, whole?: boolean) => string }> = {
+export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuestions; questionNow?: string; questionCommon?: string; system: (subjectLabel: string, lead?: NoteLead, common?: boolean, kind?: SubjectKind, whole?: boolean, spanBefore?: string | null) => string }> = {
   hyper: {
     // A QUIET WEEK IS SAID (user, 2026-10-30): the facts count what changed even at 0, so the note
     // says the composition held rather than reaching for the node count, which is Geography's too.
@@ -96,23 +105,29 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
       // layers (the same day: "do they run the nodes on L0 or is the node composed out of it?").
       type: "Open with a plain sentence whose subject is the nodes, in the shape \"N of the M <network> nodes run <layers>\", M being all its nodes, the layers named exactly as the facts name them, with no possessive on the name (a node RUNS its layers, so the verb is run); then say in plain words where that group stands among the network's layer groups, as a reader would (\"its largest group\", \"the smaller of its two groups\", \"its only group\"), never \"share\", \"rank\" or a percentage; then how that changed over the span, or that it held.",
     },
-    questionCommon: "Last, in one sentence, how active it was: open with the direction, up, down or steady, then the global snapshots it was part of per day last week against the weeks before.",
+    questionCommon: "Last, in one sentence, how active it was, in the shape \"Activity was <up, down or steady>: <network> was part of <last week's figure> global snapshots per day last week, <up or down> <change> on the weeks before\", or \"held at\" the figure when it was steady.",
     system: (subjectLabel, _lead, common, kind, whole) =>
       `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${questionOf("hyper", kind)}${common ? ` ${whole ? QUESTION_COMMON_WHOLE : PROMPTS.hyper.questionCommon}` : ""}`,
   },
   geo: {
     questions: {
-      country: "Open with a plain sentence with the network as its actor, in the shape \"<network> hosts N nodes in <country>\"; then what share of the network's nodes that is and the country's place among the network's countries, or, when the facts count one country, that it is the network's only country, with no share and no place; then how that moved over the span, or that it held. Say nothing about speed.",
-      provider: "Open with a plain sentence with the provider as its actor, in the shape \"<provider> hosts N of <network>'s nodes\", network-wide, not for one place; then what share of the network's nodes with a known provider that is and its place among the network's providers, or, when the facts count one provider, that it is the network's only provider, with no share and no place; then how that moved over the span, or that it held. Say nothing about speed.",
+      // VARIED, NOT A TEMPLATE (user, 2026-11-03: "for country or provider the text is very similar, we
+      // can show some variation"): the shapes stay as guides, so the name is still the sentence's
+      // actor (2026-10-30), and the note opens on whatever is most telling for this subject.
+      country: "Say three things about this country, in whichever order reads best for it, opening on the most telling: if it gained or lost nodes, that move; else its place or its share. The three: how many of the network's nodes it hosts, with the network or the country as the sentence's actor (\"<network> runs N nodes in <country>\", \"<country> hosts N of <network>'s nodes\", or your own plain words); what share of the network's nodes that is and its place among the network's countries said in plain words (\"the network's largest\", \"its third\"), never \"rank\", or, when the facts count one country, that it is the network's only country, with no share and no place; and how that moved over the span, or that it held. A count of countries or providers is the network's, never this country's. Say nothing about speed.",
+      provider: "Say three things about this provider, network-wide and not for one place, in whichever order reads best for it, opening on the most telling: if it gained or lost nodes, that move; else its place or its share. The three: how many of the network's nodes it hosts, with the provider as the sentence's actor (\"<provider> hosts N of <network>'s nodes\", \"<provider> runs N nodes for <network>\", or your own plain words); what share of the network's nodes that is and its place among the network's providers said in plain words (\"the network's largest\", \"its third\"), never \"rank\", or, when the facts count one provider, that it is the network's only provider, with no share and no place; and how that moved over the span, or that it held. Say nothing about speed.",
     },
-    question: "First, how many nodes there are and how that moved, then where they run: the countries and hosting providers that gained or lost nodes and no others, or where the nodes are now when nothing moved. Say nothing about speed.",
-    questionCommon: "Last, in one sentence, how active the network was: open with the direction, up, down or steady, then its global snapshots per day last week against the weeks before.",
+    // ONE PLACE, NOT TWO (user, 2026-11-03: "Germany fell 6% to 31 and Hetzner Online fell 7% to 52":
+    // "the country and provider are closely related; so pick only one of the two with the most
+    // significant change"): a provider's nodes sit in a country, so the two moves are usually one.
+    question: "First, how many nodes there are and how that moved, then where they run: of the countries and hosting providers that gained or lost nodes, name only the ONE with the largest change, since a provider's nodes sit in a country and the two moves are usually the same nodes, with its current count, as \"<country or provider> fell <change> to <count>\", without calling it the largest; or where the nodes are now when nothing moved. Say nothing about speed.",
+    questionCommon: "Last, in one sentence, how active the network was, in the shape \"Activity was <up, down or steady>: <network> was part of <last week's figure> global snapshots per day last week, <up or down> <change> on the weeks before\", or \"held at\" the figure when it was steady.",
     system: (subjectLabel, _lead, common, kind, whole) =>
       `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${questionOf("geo", kind)}${common ? ` ${whole ? QUESTION_COMMON_WHOLE : PROMPTS.geo.questionCommon}` : ""}\nStay on where the nodes are located and who hosts them${common ? ", then the one sentence on activity" : ""}, and nothing else.`,
   },
   ledger: {
-    question: "Say what changed in the anchoring rhythm over the recent hours against the usual: what sped up or slowed down, from the usual figure to the recent one, and which networks did it. Then the reading itself: the longest gap, then, in one short clause: for the whole network, what each global snapshot holds, as \"N snapshots from M networks in each global snapshot\", never that it was part of anything; for one network, only the share of global snapshots it was part of.",
-    questionNow: "The recent hours ran close to the usual, so this note does not lead with what changed, whatever the rules above say: do not describe a change and do not mention the usual figures. Say what the anchoring rhythm looks like right now over the recent hours: how often snapshots are being anchored, their spacing, the longest gap, then, in one short clause: for the whole network, what each global snapshot holds, as \"N snapshots from M networks in each global snapshot\", never that it was part of anything; for one network, only the share of global snapshots it was part of.",
+    question: "Say what changed in the anchoring rhythm over the recent hours against the usual: what sped up or slowed down, as the recent figure and how far it is from the usual (\"<recent figure>, up <change> on the usual\"), and which networks did it. Then the reading itself: the longest gap, then, in one short clause: for the whole network, what each global snapshot holds, as \"N metagraph snapshots from M networks in each global snapshot\", never that it was part of anything; for one network, only the share of global snapshots it was part of.",
+    questionNow: "The recent hours ran close to the usual, so this note does not lead with what changed, whatever the rules above say: do not describe a change and do not mention the usual figures. Say what the anchoring rhythm looks like right now over the recent hours: how often metagraph snapshots are being anchored, their spacing, the longest gap, then, in one short clause: for the whole network, what each global snapshot holds, as \"N metagraph snapshots from M networks in each global snapshot\", never that it was part of anything; for one network, only the share of global snapshots it was part of.",
     system: (subjectLabel, lead) =>
       `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${lead?.kind === "now" ? PROMPTS.ledger.questionNow : PROMPTS.ledger.question}${
         lead?.kind === "change" ? `\nLead with what moved: ${lead.moved.join("; ")}. Every other figure held close to its usual: give it as a reading, never as a change.` : ""
@@ -127,8 +142,10 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
       // and ended" came back as the very rise the top card states.
       span: "Describe the span's shape, as a companion to a note above it that already states what rose and fell: the busiest day and the quietest day, each with its date and figure, and a typical day's figure, using only the facts named for those days. If the facts name none, say how quiet or steady the span was. Do not say what rose or fell overall.",
     },
-    system: (subjectLabel, _lead, _common, kind) =>
-      `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${questionOf("trend", kind)}\n${SPAN_FIGURES}`,
+    // THE SPAN-BEFORE WORDS ARE WRITTEN IN (live 2026-11-03: a placeholder naming the "Span before
+    // line" came back as "up 26% … on the Span before"): the rule carries the very words to use.
+    system: (subjectLabel, _lead, _common, kind, _whole, spanBefore) =>
+      `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${questionOf("trend", kind)}\n${spanFigures(spanBefore)}`,
   },
 };
 
@@ -191,11 +208,16 @@ export function spanWords(view: NoteView, span: NoteSpan, spanFrom: number, span
 /** THE CAPTION FORMAT. THE ROW SAYS THE DATE AND THE KIND (user, 2026-10-30, design B: "date and
  *  kind lead"), so a caption repeats neither: a short clause with the figure and whose it was. */
 export const CAPTION_FORMAT =
-  "Answer format: first a line starting NOTE: with the note, then exactly one line per listed day, starting DAY YYYY-MM-DD: with a caption of one short clause, at most ten words, using only numbers from the facts, in plain words a reader would say: never \"median\", never \"against\". The reader sees the day's date and what kind of day it was beside the caption, so the caption repeats neither: it gives the figure and whose it was, as the facts name the day. For a first or last day, the network and that nothing was anchored before, or since. For the span's busiest, quietest, longest wait or most networks, the day's figure, then the typical day's as \"usually …\". For a spike or a dip, the same shape: the day's figure, then the usual as \"usually …\". Nothing else.";
+  "Answer format: first a line starting NOTE: with the note, then exactly one line per listed day, starting DAY YYYY-MM-DD: with a caption of one short clause, at most ten words, using only numbers from the facts, in plain words a reader would say: never \"median\", never \"against\". The reader sees the day's date and what kind of day it was beside the caption, so the caption repeats neither: it gives the figure and whose it was, as the facts name the day. For a first or last day, the network and that nothing was anchored before, or since. For the span's busiest or quietest day, a spike or a dip: the day's figure and what it counts, then how far it stood from the usual, in the shape \"<figure> <what>, up <change> on a typical day\", with \"down\" for a fall and the change from the day's \"change against\" fact. For a pause or a longest gap: what paused and for how long, then the normal spacing it stood against, in the shape \"Global snapshots paused for <gap>, normally one every <spacing>\" for the hypergraph, or \"Anchoring paused for <gap>, normally a metagraph snapshot every <spacing>\" for a network. Never \"wait\". For the most networks: the day's figure, then the typical day's as \"usually …\". Start with a capital letter. Nothing else.";
+
+/** THE NOTABLE-CHANGE ROWS, IN THE MODEL'S WORDS (user, 2026-11-03: "the notable-change rows all must
+ *  come from AI"). Code picks each row and hands its brief; the model writes the line. */
+export const ROW_FORMAT =
+  "Then, after every other line, exactly one line per listed row, starting CHANGE n: with the row's line: one plain sentence of at most twelve words, without a full stop, that names the row's subject first and says what happened, using only that row's own figures as they are given. A count that moved reads like \"<subject> lost <nodes lost> nodes, now <end figure>\", with the place after the subject when the row names one, and no percentage: the note carries those; a pause like \"<subject> paused for <pause length>, normally one every <normal spacing>\"; a pace like \"<subject> sped up: a metagraph snapshot every <recent>, usually <usual>\"; an event with no figures says what happened in plain words. A row adds to the note, never repeats it (user: rows should not \"almost copy\" the note): use different words from the note, and when the note already gives the row's change, the row gives what the note leaves out, such as where it stands now or where it happened. Never \"wait\", never a figure the row does not give.";
 
 /** THE BRIEFING'S LINE: what the tour shows at this view's stop, in the note's own answer. */
 export const LINE_FORMAT =
-  "One more line belongs in this answer, whatever the format above says: directly after the note, a line starting LINE: with the note's main findings as one or two plain sentences, eighteen to twenty-two words in all. Keep the note's own wording for it: the span, what moved, and both numbers as the note writes them.";
+  "One more line belongs in this answer, whatever the format above says: directly after the note, a line starting LINE: with the note's main findings as one or two plain sentences, eighteen to twenty-two words in all, opening with the span in the Span line's own words. Keep the note's own wording for it: the span, what moved, and its figures and changes as the note writes them.";
 
 export function buildMessages(
   view: NoteView,
@@ -210,18 +232,24 @@ export function buildMessages(
   whole?: boolean,
   line?: boolean,
   spanBefore?: string | null,
+  rows?: readonly ChangeBrief[] | null,
 ): { role: "system" | "user"; content: string }[] {
   const withDays = !!days && days.length > 0;
-  const format = withDays
+  const withRows = !!rows && rows.length > 0;
+  const format = (withDays
     ? CAPTION_FORMAT
-    : "Answer format: one line starting NOTE: and nothing else.";
+    : withRows ? "Answer format: first a line starting NOTE: with the note." : "Answer format: one line starting NOTE: and nothing else.") + (withRows ? ` ${ROW_FORMAT}` : "");
   const spanLines = [...(span ? [`Span: ${span}`] : []), ...(spanBefore ? [`Span before: ${spanBefore}`] : [])];
   const parts = [...(spanLines.length ? [spanLines.join("\n")] : []), `Facts:\n${factsBlock}`];
   if (withDays) parts.push(`Days to caption, in order:\n${days.map((d) => `DAY ${utcDayKey(d.dayMs)}`).join("\n")}`);
+  // The note and its rows share one card, so the note keeps to the overall picture and leaves each
+  // row's own figures to the row (user, 2026-11-03: the rows "almost copy the card's own AI section").
+  if (withRows) parts.push("These rows stand under the note on the card: keep the note on the overall picture, and leave each row's own figures to its row rather than saying them twice.");
+  if (withRows) parts.push(`Rows to write, in order:\n${rows.map((r, i) => [`CHANGE ${i + 1}: ${r.about}`, ...r.facts.map((f) => `  ${f.label}: ${f.text}`)].join("\n")).join("\n")}`);
   if (retryReasons && retryReasons.length)
     parts.push(`Your previous answer was rejected: ${retryReasons.join("; ")}. Write it again and fix this.`);
   return [
-    { role: "system", content: `${PROMPTS[view].system(subjectLabel, lead, common, kind, whole)}\n\n${format}${line ? ` ${LINE_FORMAT}` : ""}` },
+    { role: "system", content: `${PROMPTS[view].system(subjectLabel, lead, common, kind, whole, spanBefore)}\n\n${format}${line ? ` ${LINE_FORMAT}` : ""}` },
     { role: "user", content: parts.join("\n\n") },
   ];
 }
@@ -231,6 +259,7 @@ const THINK_RE = /<think>[\s\S]*?(?:<\/think>|$)/gi;
 const NOTE_RE = /^[\s*_#]*NOTE[*_]*:[*_\s]*(.*)$/i;
 const DAY_RE = /^[\s*_#]*DAY\s+(\d{4}-\d{2}-\d{2})[*_]*\s*:[*_\s]*(.*)$/i;
 const LINE_RE = /^[\s*_#]*LINE[*_]*:[*_\s]*(.*?)[*_\s]*$/i;
+const CHANGE_RE = /^[\s*_#]*CHANGE\s+(\d+)[*_]*\s*:[*_\s]*(.*?)[*_\s]*$/i;
 /** A `LINE:` the model ran on from the note: put on its own line before anything reads it. */
 const LINE_RUN_ON_RE = /(?<=\S)[ \t]+(?=[*_]*LINE[*_]*:)/g;
 const FENCE_RE = /^```/;
@@ -242,13 +271,15 @@ const FENCE_RE = /^```/;
  *  `<date>#2`, so two notable days on a date keep their own. A note may run over several lines
  *  up to the first DAY line. With no `NOTE:` line at all the whole trimmed text is the note, and
  *  there are no captions. */
-export function parseAnswer(text: string): { note: string; captions: Map<string, string>; line: string | null } {
+export function parseAnswer(text: string): { note: string; captions: Map<string, string>; line: string | null; rows: Map<number, string> } {
   const lines = text.replace(THINK_RE, "").replace(LINE_RUN_ON_RE, "\n").trim().split("\n").map((l) => l.trim()).filter((l) => !FENCE_RE.test(l));
   const captions = new Map<string, string>();
+  const rows = new Map<number, string>();
   const start = lines.findIndex((l) => NOTE_RE.test(l));
   if (start < 0) {
     const said = lines.find((l) => LINE_RE.test(l));
-    return { note: lines.filter((l) => l !== said).join("\n").trim(), captions, line: said ? LINE_RE.exec(said)![1]!.trim() || null : null };
+    // A row or a caption line is never the note, even with no NOTE: line to say where it ends.
+    return { note: lines.filter((l) => l !== said && !CHANGE_RE.test(l) && !DAY_RE.test(l)).join("\n").trim(), captions, line: said ? LINE_RE.exec(said)![1]!.trim() || null : null, rows };
   }
   const note = [NOTE_RE.exec(lines[start]!)![1]!];
   const seen = new Map<string, number>();
@@ -257,7 +288,12 @@ export function parseAnswer(text: string): { note: string; captions: Map<string,
   for (const line of lines.slice(start + 1)) {
     const day = DAY_RE.exec(line);
     const said = LINE_RE.exec(line);
-    if (said) {
+    const change = CHANGE_RE.exec(line);
+    if (change) {
+      inNote = false;
+      const text = change[2]!.trim();
+      if (text) rows.set(Number(change[1]), text);
+    } else if (said) {
       inNote = false;
       brief = said[1]!.trim() || null;
     } else if (day) {
@@ -271,5 +307,5 @@ export function parseAnswer(text: string): { note: string; captions: Map<string,
       else if (note.some(Boolean)) inNote = false; // what follows a blank line is the model talking
     }
   }
-  return { note: note.join("\n").trim(), captions, line: brief };
+  return { note: note.join("\n").trim(), captions, line: brief, rows };
 }

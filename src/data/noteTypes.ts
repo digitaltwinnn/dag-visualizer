@@ -24,6 +24,9 @@ export interface Fact {
    *  list. The gate lets a value only a `from` end holds appear only beside its key's `to` end
    *  (R60, R63); the model never sees the key (`factsBlock` prints `label: text`). */
   pair?: FactPair;
+  /** A CHANGE fact's direction (`changeShare`): the gate refuses its percentage in a sentence that
+   *  moves the other way, since the model, not code, writes the verb (review, 2026-11-03). */
+  move?: "up" | "down";
 }
 
 export interface FactPair {
@@ -86,12 +89,27 @@ export type NoteChangeFind =
   | { chain: string | null; fromMs: number; toMs: number; count?: number; gapS?: number }
   | { chain: string | null; last: true };
 
-/** One row of a view note's notable changes. `text` is written here by code, never by the model: a
+/** One row of a view note's notable changes. `text` is the model's line, written from the row's brief: a
  *  row states one measured move in one plain sentence, so it has nothing to get wrong. */
+/** WHAT A ROW IS ABOUT, FOR THE MODEL TO WORD (user, 2026-11-03: "the notable-change rows all must
+ *  come from AI"): a short label naming the subject and what happened, and its measured figures. Code
+ *  picks the row; the model writes its line from this, held to the gate like any caption. Never
+ *  stored or served: the row's `text` is the model's line. */
+export interface ChangeBrief {
+  about: string;
+  facts: Fact[];
+  /** The subject the row commits, by name: its line must name it (`namesSubject`), since the gate
+   *  checks figures and the click goes to this subject (review, 2026-11-03). */
+  name?: string;
+}
+
 export interface NoteChange {
   kind: NoteChangeKind;
   subject: NoteChangeSubject;
+  /** The model's line for the row (empty until it is written; a row with no line is never stored). */
   text: string;
+  /** Present while the row is being written, gone once it is (`ChangeBrief`). */
+  brief?: ChangeBrief;
   /** How much it moved: nodes for a count, a rhythm's ratio off 1, which rows outrank which. */
   size: number;
   find?: NoteChangeFind;

@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { NotableKind } from "@/src/data/noteTypes";
-import { NOTABLE_CAPS, NOTABLE_FLOOR, isPause, notableDays, rangeExtremes, rangeNotableCap, withDayChange } from "@/src/data/notableDays";
+import { NOTABLE_CAPS, NOTABLE_FLOOR, isPause, notableDays, rangeExtremes, rangeNotableCap, spacingOver } from "@/src/data/notableDays";
 
 const DAY = 86_400_000;
 const T0 = Date.UTC(2026, 8, 1);
@@ -278,6 +277,28 @@ describe("notableDays: lead-in (from)", () => {
     const pause = notableDays({ days, covered, series, subject: "a", ids: ["a"], cap: 99, from: 30 }).filter((d) => d.kind === "pause");
     expect(pause.map((d) => d.dayMs)).toEqual([days[50]]);
   });
+
+  // user, 2026-11-03: "I don't think it's usually 3.5 minutes". A span that sped up states its own
+  // typical day, while the lead-in still steadies what counts as a pause.
+  // user, 2026-11-03: "don't compare gaps against other gaps; compare gaps against the normal spacing".
+  it("a pause is detected against the long run's gaps, but stated against the span's normal spacing", () => {
+    const { days, covered } = span(60);
+    const gap: number[] = Array.from({ length: 60 }, (_, i) => (i < 30 ? 600 : 100));
+    gap[50] = 8000;
+    const series = { "m.a.snaps": flat(60, 40), "m.a.gapMax": gap };
+    const [pause] = notableDays({ days, covered, series, subject: "a", ids: ["a"], cap: 99, from: 30 }).filter((d) => d.kind === "pause");
+    expect(pause).toMatchObject({ dayMs: days[50], value: 8000, level: 86_400 / 40 });
+  });
+
+  it("a network that began mid-span states its normal spacing over its own active days", () => {
+    const { days, covered } = span(60);
+    const snaps = Array.from({ length: 60 }, (_, i) => (i >= 40 ? 40 : 0));
+    const gap: number[] = Array.from({ length: 60 }, (_, i) => (i >= 40 ? 100 : 0));
+    gap[50] = 8000;
+    const series = { "m.a.snaps": snaps, "m.a.gapMax": gap };
+    const [pause] = notableDays({ days, covered, series, subject: "a", ids: ["a"], cap: 99, from: 30 }).filter((d) => d.kind === "pause");
+    expect(pause).toMatchObject({ dayMs: days[50], level: 86_400 / 40 });
+  });
 });
 
 describe("notableDays: whose days", () => {
@@ -306,7 +327,7 @@ describe("notableDays: pause", () => {
     const series = { "m.a.snaps": flat(30, 40), "m.a.gapMax": flat(30, 900, { 12: 7200 }) };
     const out = notableDays({ days, covered, series, subject: "a", ids: ["a"], cap: 5 });
     expect(out).toHaveLength(1);
-    expect(out[0]).toMatchObject({ dayMs: days[12], kind: "pause", networkId: "a", value: 7200, level: 900 });
+    expect(out[0]).toMatchObject({ dayMs: days[12], kind: "pause", networkId: "a", value: 7200, level: 86_400 / 40 });
   });
 
   it("6x the median but under an hour is not a pause", () => {
@@ -444,7 +465,7 @@ describe("notableDays: the floor", () => {
     expect(NOTABLE_FLOOR).toBe(3);
   });
 
-  it("a network with nothing notable gets its busiest, quietest and longest-wait day, in that order", () => {
+  it("a network with nothing notable gets its busiest, quietest and longest-gap day, in that order", () => {
     const { days, covered } = span(30);
     const out = notableDays({
       days, covered, subject: "a", ids: ["a"], cap: 5, floor: 3,
@@ -453,7 +474,8 @@ describe("notableDays: the floor", () => {
     expect(out.map((d) => [d.kind, d.dayMs, d.value, d.level, d.networkId, d.score])).toEqual([
       ["peak", days[10], 130, 100, "a", 0],
       ["trough", days[20], 80, 100, "a", 0],
-      ["longest", days[15], 900, 600, "a", 0],
+      // The longest gap is stated against the span's normal spacing, never another gap (user, 2026-11-03).
+      ["longest", days[15], 900, (30 * 86_400) / 3010, "a", 0],
     ]);
   });
 
@@ -519,29 +541,6 @@ describe("notableDays: the floor", () => {
   });
 });
 
-// HOW FAR OFF USUAL (user, 2026-10-31: "can you mention the increase / decrease in percentage also?").
-// Code adds it to the caption, so the figure is measured and the model cannot get it wrong.
-describe("withDayChange", () => {
-  const day = (kind: NotableKind, value: number, level: number) => ({ kind, value, level });
-  it("adds how far a day stood above or below usual", () => {
-    expect(withDayChange("53,959 snapshots anchored, usually 49,669", day("peak", 53959, 49669))).toBe("53,959 snapshots anchored, usually 49,669, up 9%");
-    expect(withDayChange("43,888 snapshots anchored, usually 49,669", day("low", 43888, 49669))).toBe("43,888 snapshots anchored, usually 49,669, down 12%");
-  });
-  it("takes a caption's closing full stop", () => {
-    expect(withDayChange("400 snapshots, usually 100.", day("high", 400, 100))).toBe("400 snapshots, usually 100, up 300%");
-  });
-  it("only counts have a percentage", () => {
-    for (const kind of ["first", "last", "pause", "longest", "broadest"] as const) expect(withDayChange("x", day(kind, 9, 3))).toBe("x");
-  });
-  it("says nothing when it rounds to no change, or there is no usual", () => {
-    expect(withDayChange("x", day("peak", 1002, 1000))).toBe("x");
-    expect(withDayChange("x", day("peak", 5, 0))).toBe("x");
-  });
-  it("never doubles a percentage the caption already states", () => {
-    expect(withDayChange("up 9% on usual", day("peak", 109, 100))).toBe("up 9% on usual");
-  });
-});
-
 // EVERY MEASURE GETS ITS OWN ANOMALIES (user, 2026-11-02: "check also cadence, size, fees, etc"). A
 // day's cadence is its snapshot count inverted, so a spike or dip there is already the count's; a gap
 // is the pause, and the rest are their own rows.
@@ -555,7 +554,7 @@ describe("the measures beyond the snapshot count", () => {
 
   it("the whole network pauses too", () => {
     const r = notableDays({ ...base({ "g.anchors": flat(50), "g.ticks": flat(50), "g.gapMax": at(60, 20, 8000) }), subject: "dag" });
-    expect(r).toMatchObject([{ dayMs: days[20], kind: "pause", networkId: null, value: 8000, level: 60 }]);
+    expect(r).toMatchObject([{ dayMs: days[20], kind: "pause", networkId: null, value: 8000, level: 86_400 / 50 }]);
   });
 
   it("leaves blocks to the charts: a normal day swings them twofold, which filled every slot live", () => {
@@ -626,5 +625,15 @@ describe("a range that ends before the record does", () => {
     const series = { "m.dor.snaps": at({ 25: 90, 35: 900, 36: 1 }) };
     const ext = rangeExtremes({ ...base, series, subject: "dor", until: 30 });
     expect(ext.find((d) => d.kind === "peak")?.dayMs).toBe(days[25]);
+  });
+});
+
+describe("spacingOver", () => {
+  it("is the covered days' seconds over the snapshots they held, skipping uncovered days", () => {
+    expect(spacingOver([40, 40, null, 80], [1, 1, null, 1], 0, 3)).toBe((3 * 86_400) / 160);
+  });
+  it("is NaN with nothing held", () => {
+    expect(spacingOver([0, 0], [1, 1], 0, 1)).toBeNaN();
+    expect(spacingOver(undefined, [1], 0, 0)).toBeNaN();
   });
 });

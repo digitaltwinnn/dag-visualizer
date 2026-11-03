@@ -20,6 +20,9 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 
 /** The product's name, wherever the AI signs its words. */
 export const AI_TITLE = "Constellation Gate AI";
+/** The card's head says it short (user, 2026-11-03: "'constellation gate AI' -> 'Gate AI' to save
+ *  space"): the rail is narrow, and the head also carries the span chip and now the −. */
+export const AI_CARD_TITLE = "Gate AI";
 
 export interface NoteSubjectState {
   /** `metagraphCardNetwork(state)`: the network the metagraph card stands on ("all" when none). */

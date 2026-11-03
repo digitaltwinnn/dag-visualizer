@@ -11,8 +11,9 @@ import useNote from "@/components/notes/useNote";
 import EcgMark from "@/components/topbar/EcgMark";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { VIEWS } from "@/components/views";
+import { breakpointOf } from "@/src/data/breakpoint";
 import { SITE_ORIGIN } from "@/src/data/site";
-import { BRIEFING_STOPS, BRIEFING_WORDS_OUT_MS, SCENE_WAIT_MS, STOP_MS, briefsOn, hasLanded, mayAdvance, nextStop, prevStop } from "@/src/engine/domain/briefing";
+import { BRIEFING_STOPS, BRIEFING_TYPE_SLOW, BRIEFING_WORDS_OUT_MS, SCENE_WAIT_MS, STOP_MS, briefsOn, hasLanded, mayAdvance, nextStop, prevStop } from "@/src/engine/domain/briefing";
 import { NET } from "@/src/net/current";
 import { useStore } from "@/src/store/store";
 
@@ -51,7 +52,15 @@ type End = "done" | "skip" | "key" | "back" | "unready";
 function endBriefing(stop: number, how: End): void {
   const s = useStore.getState();
   if (how === "done") s.setMode(BRIEFING_STOPS[0]);
+  // A tour played to its end hands the live view over (`components/TourHandover.tsx`); any other
+  // ending is the reader already taking it.
+  if (how === "done") s.setHandover(true);
   s.setBriefing(null); // after the mode, so the route publishes where the tour left off
+  // ON THE PHONE THE TOUR HANDS OVER TO THE EXPLORE SHEET (user, 2026-11-03: "after intro also open
+  // the 'explore' section by default"): the tour is the one arrival that ends with the reader on
+  // their own, and a bare globe over a closed dock left them to find the list. Not a pick, so the
+  // no-auto-open rule (a selection never opens a sheet) is untouched.
+  if (breakpointOf(window.innerWidth) === "phone") s.setPhoneDock("explore");
   track("briefing-end", { how, at: BRIEFING_STOPS[stop] });
 }
 
@@ -284,7 +293,7 @@ function Tour({ stop, leaving }: { stop: number; leaving: boolean }) {
           <div className="absolute inset-x-0 bottom-0 px-[max(16px,3.7vw)] pb-[calc(env(safe-area-inset-bottom)+22px)]">
             <div className="mb-1 flex min-h-5 justify-center max-[700px]:justify-start">{who}</div>
             <div aria-hidden className="mx-auto min-h-[2.52em] max-w-[79%] text-balance text-center text-briefing font-medium text-foreground max-[700px]:mx-0 max-[700px]:min-h-[3.8em] max-[700px]:max-w-full max-[700px]:text-left max-[700px]:text-wrap">
-              <TypedNote key={`${stop}:${words.text}`} text={words.text} always />
+              <TypedNote key={`${stop}:${words.text}`} text={words.text} always slow={BRIEFING_TYPE_SLOW} />
             </div>
           </div>
         </div>

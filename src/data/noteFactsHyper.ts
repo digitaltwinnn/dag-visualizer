@@ -230,7 +230,7 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
       const listed = ids.filter((id) => (d.series[`m.${id}.snaps`] ?? []).slice(lo).some((v) => (v ?? 0) > 0)).length;
       const padded = { [`m.${UNLISTED_ID}.snaps`]: [null, ...(d.series[`m.${UNLISTED_ID}.snaps`] ?? []).slice(lo), null] };
       const anchored = networksAnchored(listed, padded, d.stepMs);
-      facts.push(fact(`Networks that anchored snapshots in the last ${word}${anchored.atLeast ? ", at least" : ""}`, anchored.count, "count"));
+      facts.push(fact(`Networks that anchored metagraph snapshots in the last ${word}${anchored.atLeast ? ", at least" : ""}`, anchored.count, "count"));
     }
     if (n && coveredFrom(weekFrom)) {
       const quiet = withNodes.filter((id) => {
