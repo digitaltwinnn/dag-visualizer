@@ -50,11 +50,10 @@ import { SceneMark, type SceneMarkSpec } from "@/components/SceneMark";
 import { netKeyOf } from "@/src/engine/domain/pickActions";
 import { NODE_ID_GLYPHS } from "@/components/explorer/nodeRow";
 import { SCENE_GLASS } from "@/components/selection";
-import { QualifierChip, RoleChips, StatusMark, TickerChip } from "@/components/inspector/parts";
+import { QualifierChip, RoleChips, TickerChip } from "@/components/inspector/parts";
 // The lead line's codes come from the composition vocabulary's ONE home, rendered by the cards'
 // own RoleChips (user, 2026-08-15: "look at my cards — square pills").
 import { layerCodesOf } from "@/src/data/composition";
-import { nodeStatus } from "@/src/data/nodeStatus";
 import { useNowTick } from "@/components/useNowTick";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { relativeAge } from "@/src/util/relativeAge";
@@ -98,14 +97,10 @@ interface CalloutModel {
    *  both; with the same mark they pair at a glance. Same glyph home (`iconForPick`), same hue
    *  rule as the card head: a kind mark takes the filter's accent, a subject's own mark its hue. */
   mark?: SceneMarkSpec;
-  /** The OTHER networks sharing this subject's machine, after the title's ticker — the same
-   *  hued-ticker idiom, one each (user, 2026-08-18; in the head since 2026-11-03). */
-  also?: { text: string; hue: string }[];
-  /** The node's raw lifecycle state, set only when MEASURED (the scene's status fill channel
-   *  hollows a not-ready chip, so the label names the state beside it — user, 2026-09-11);
-   *  `unknown` stays absent, the callout's unmeasured-means-no-line rule. At the title row's
-   *  right edge, where the node card's head carries it (user, 2026-11-03, option B). */
-  status?: string;
+  /** NETWORK TAGS at the title row's right edge, one ticker chip per network the subject runs
+   *  on — a node's own network, then every other network on the same machine as an equal tag
+   *  (user, 2026-11-03: "don't say +DAG (for UP) but just show both as tags"). */
+  tags?: { text: string; hue: string }[];
   /** Words on the left (`ident` in its identity hue, then `text`), tags on the right (user,
    *  2026-11-03: "right align the tags"). */
   lead?: {
@@ -196,27 +191,12 @@ function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; className?
             {m.aside.text}
           </span>
         ) : null}
-        {/* CO-TENANTS — the other networks running on this same machine, each its own hued
-            ticker after this one's (user, 2026-08-18). The `+` says these are additional
-            networks. Rendered only when MEASURED — the builder passes nothing while both
-            cluster sides aren't live, so the callout never guesses a co-tenancy. */}
-        {m.also && m.also.length > 0 && (
-          <span className="inline-flex items-center gap-1.5 text-label">
-            <span className="opacity-60 text-muted-foreground">+</span>
-            {m.also.map((t) => (
-              <span key={t.text} className={cn("font-bold", IDENT_INK)} style={{ color: t.hue }}>
-                {t.text}
-              </span>
+        {m.tags && m.tags.length > 0 && (
+          <span className="ml-auto pl-3 inline-flex items-center gap-1.5">
+            {m.tags.map((t) => (
+              <TickerChip key={t.text} text={t.text} hue={t.hue} />
             ))}
           </span>
-        )}
-        {/* STATUS — the cards' one status chrome, for every MEASURED state, ready included: a
-            readout that only spoke up for trouble would be an alarm, not a reading. */}
-        {m.status && (
-          <>
-            <span className="flex-1 min-w-3" />
-            <StatusMark state={m.status} />
-          </>
         )}
       </div>
       {/* The card grammar's HEAD HAIRLINE at callout scale (user, 2026-08-15 — "cards have an
@@ -312,10 +292,7 @@ export default function SceneCallout() {
     const ip = (nodePick as { node?: { ip?: string } }).node?.ip;
     const coloReady = metaList.some((x) => x.isRoot) && metaList.some((x) => !x.isRoot);
     const colo = coloReady ? coLocatedNetworks(ip, netId, metaList) : [];
-    const also = colo.map((c) => ({ text: displayNetwork(c.id)?.ticker ?? c.name, hue: filterAccent(c.id) }));
-    // Status: only a MEASURED state gets the mark (unknown = no line, like co-location above).
-    const state = (nodePick as { node?: { state?: string | null } }).node?.state;
-    const status = state != null && nodeStatus(state).bucket !== "unknown" ? state : undefined;
+    const also = colo.map((c) => ({ text: displayNetwork(c.id)?.ticker ?? c.name, hue: displayNetwork(c.id)?.hue ?? filterAccent(c.id) }));
     const place = [g?.city, g?.isp].filter(Boolean).join(", ");
     return {
       key: `node|${id ?? `${g?.lat},${g?.lon}`}`,
@@ -325,11 +302,11 @@ export default function SceneCallout() {
       // informal, a content fact rather than the subject's name).
       title: id ? midHash(id, NODE_ID_GLYPHS) : g?.city ?? "Node",
       titleMono: !!id,
-      aside: nnet ? { text: nnet.ticker, hue: nnet.hue } : undefined,
+      // Its own network first, then the co-tenants — co-tenancy is MEASURED: the builder passes
+      // nothing while both cluster sides aren't live, so the callout never guesses one.
+      tags: [...(nnet ? [{ text: nnet.ticker, hue: nnet.hue }] : []), ...also],
       ring: nnet?.hue ?? "var(--primary)",
       mark: { icon: iconForPick("metanode"), hue: nnet?.hue ?? "var(--primary)" },
-      also,
-      status,
       // THE PLACE, in words, on the left of the layer tags (user, 2026-11-03, option B: the row
       // held tags alone). City then provider, each only where the lookup measured it.
       lead: place || codes.length ? { text: place || undefined, codes } : undefined,
