@@ -803,8 +803,11 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
           : rate("Snapshot fees", sparkOf("g.fee", activity?.feesSeries, activity?.feesPerHour, true),
                  `$DAG paid to anchor snapshots into the global chain, every network summed.${unlistedGap ? " Unlisted channels' fees are not counted where they were not read." : ""}`,
                  unlistedGap ? "without unlisted" : undefined)}
-      {/* Under Unlisted, their measured count (their own chains, folded by `withUnlisted`). */}
-      {rate("Snapshots", sparkOf(filter === UNLISTED_ID ? UNLISTED_SNAPS : scoped ? (cfg ? `m.${cfg.id}.snaps` : null) : "g.ticks", activity?.cadenceSeries, activity?.snapsPerHour))}
+      {/* Under Unlisted, their measured count (their own chains, folded by `withUnlisted`).
+          NAMED BY KIND (user, 2026-11-03: "should say 'global snapshots' instead of 'snapshots'?"):
+          unfiltered the card counts the DAG's global snapshots (`g.ticks`), scoped a network's own
+          metagraph snapshots, the same two names the notes and the History measures use. */}
+      {rate(scoped ? "Metagraph snapshots" : "Global snapshots", sparkOf(filter === UNLISTED_ID ? UNLISTED_SNAPS : scoped ? (cfg ? `m.${cfg.id}.snaps` : null) : "g.ticks", activity?.cadenceSeries, activity?.snapsPerHour))}
       {/* The chart states the same reach its rows do — it plots the very buckets the rate cards
           average, so a silent chart beside two captioned ones would read as a different window. */}
       <BandCard label="Anchors by metagraph" className="min-w-[220px]">
