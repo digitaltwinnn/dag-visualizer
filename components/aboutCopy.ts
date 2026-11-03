@@ -330,6 +330,6 @@ export const ABOUT: Record<Mode, { title: string; eyebrow: string; text: string;
     title: "What is coming next",
     eyebrow: "About",
     caption: "SOON",
-    text: "Three more views are on the way: network health, transactions between addresses, and delegated staking.",
+    text: "More views are on the way.",
   },
 };
