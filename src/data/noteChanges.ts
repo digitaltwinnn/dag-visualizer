@@ -31,7 +31,12 @@ const MOVED = /\b(?:rose|risen|rising|grew|grown|growing|climbed|climbing|increa
 /** HOW FAR A FIGURE MOVED, IN A NOTE (user, 2026-10-31: "also add percentages to these texts"). Code
  *  adds it to the checked note: asked of the model, a live trial wrote "[up 11%]" and failed the gate.
  *  Only where the note states a fact's own pair, as the facts write it and in its order, and a verb
- *  carries it, so the worst case is a sentence with no percentage. */
+ *  carries it, so the worst case is a sentence as the model wrote it.
+ *  …AND THE PERCENTAGE TAKES THE EARLIER FIGURE'S PLACE (user, 2026-11-03: "from x to y, up z% can be
+ *  shortened by saying just the current value and its increase"): "fell from 70 to 66" reads "fell 6%
+ *  to 66", and "averaged 7,553 per day, up from 4,072 in the 30 days before" reads "…, up 85% on the
+ *  30 days before". The model still writes both figures, so the gate checks both; code drops the
+ *  earlier one only where it put the percentage that replaces it. */
 export function withMovePercents(note: string, facts: readonly Fact[]): string {
   let out = note;
   for (const to of facts) {
@@ -39,23 +44,27 @@ export function withMovePercents(note: string, facts: readonly Fact[]): string {
     const from = facts.find((f) => f.pair?.key === to.pair!.key && f.pair.end === "from");
     const change = from ? changeWords(from.value, to.value) : null;
     if (!from || !change) continue;
-    const percent = change.split(" ")[1]!;
+    const [dir, percent] = change.split(" ") as [string, string];
     for (const said of [`from ${from.text} to ${to.text}`, `from ${from.text} in the weeks before to ${to.text}`]) {
-      for (let at = out.indexOf(said); at >= 0; at = out.indexOf(said, at + said.length)) {
-        if (/[\p{L}\p{N}]/u.test(out[at + said.length] ?? "") || !MOVED.test(out.slice(0, at))) continue;
-        out = `${out.slice(0, at)}${percent} ${out.slice(at)}`;
-        at += percent.length + 1;
+      for (let at = out.indexOf(said); at >= 0; at = out.indexOf(said, at)) {
+        if (/[\p{L}\p{N}]/u.test(out[at + said.length] ?? "") || !MOVED.test(out.slice(0, at))) {
+          at += said.length;
+          continue;
+        }
+        const short = `${percent} to ${to.text}`;
+        out = `${out.slice(0, at)}${short}${out.slice(at + said.length)}`;
+        at += short.length;
       }
     }
-    // A span against the one before it, the current figure first: "averaged Y, up from X".
-    const said = `${change.split(" ")[0]} from ${from.text}`;
-    for (let at = out.indexOf(said); at >= 0; at = out.indexOf(said, at + said.length)) {
-      if (/[\p{L}\p{N}]/u.test(out[at + said.length] ?? "")) continue;
+    // A span against the one before it, the current figure first: "averaged Y, up from X" reads
+    // "averaged Y, up P%", and the span-before words that named X's span now name the comparison.
+    const esc = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const comparison = new RegExp(`\\b${dir} from ${esc(from.text)}(?![\\d.,]\\d|\\d)((?: (?:DAG|MB|per|a|day))*)(?: (?:in|over) (the [^.,;]*? before))?`, "g");
+    out = out.replace(comparison, (whole: string, _tail: string, before: string | undefined, at: number) => {
       const sentence = out.slice(out.lastIndexOf(". ", at) + 1, at);
-      if (!new RegExp(`(?<![\\d.,])${to.text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\d])`).test(sentence)) continue;
-      out = `${out.slice(0, at)}${change} ${out.slice(at + change.split(" ")[0]!.length + 1)}`;
-      at += percent.length + 1;
-    }
+      if (!new RegExp(`(?<![\\d.,])${esc(to.text)}(?![\\d])`).test(sentence)) return whole;
+      return `${change}${before ? ` on ${before}` : ""}`;
+    });
   }
   return out;
 }

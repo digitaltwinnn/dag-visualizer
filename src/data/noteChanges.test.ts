@@ -137,18 +137,19 @@ describe("withMovePercents", () => {
     fact(`${key} now`, to, kind, undefined, { key, end: "to" }),
   ];
   const facts = [...pair("active", 1754, 1941), ...pair("located", 91, 83), ...pair("flat", 1000, 1001), ...pair("gap", 21, 12, "duration")];
-  it("puts the percentage on the verb", () => {
-    expect(withMovePercents("Active participation rose from 1,754 to 1,941 global snapshots per day.", facts)).toBe("Active participation rose 11% from 1,754 to 1,941 global snapshots per day.");
-    expect(withMovePercents("Located nodes fell from 91 to 83.", facts)).toBe("Located nodes fell 9% from 91 to 83.");
+  // THE PERCENTAGE TAKES THE EARLIER FIGURE'S PLACE (user, 2026-11-03): the current value and its change.
+  it("puts the percentage on the verb, in place of the earlier figure", () => {
+    expect(withMovePercents("Active participation rose from 1,754 to 1,941 global snapshots per day.", facts)).toBe("Active participation rose 11% to 1,941 global snapshots per day.");
+    expect(withMovePercents("Located nodes fell from 91 to 83.", facts)).toBe("Located nodes fell 9% to 83.");
   });
   it("reads the weeks-before form the activity sentence takes", () => {
-    expect(withMovePercents("Global snapshots rose from 1,754 in the weeks before to 1,941 last week.", facts)).toBe("Global snapshots rose 11% from 1,754 in the weeks before to 1,941 last week.");
+    expect(withMovePercents("Global snapshots rose from 1,754 in the weeks before to 1,941 last week.", facts)).toBe("Global snapshots rose 11% to 1,941 last week.");
   });
   it("takes a duration as the facts write it", () => {
-    expect(withMovePercents("Cadence fell from 21 seconds to 12 seconds.", facts)).toBe("Cadence fell 43% from 21 seconds to 12 seconds.");
+    expect(withMovePercents("Cadence fell from 21 seconds to 12 seconds.", facts)).toBe("Cadence fell 43% to 12 seconds.");
   });
   it("adds one to each change in a sentence", () => {
-    expect(withMovePercents("Nodes dropped from 91 to 83, and activity climbed from 1,754 to 1,941.", facts)).toBe("Nodes dropped 9% from 91 to 83, and activity climbed 11% from 1,754 to 1,941.");
+    expect(withMovePercents("Nodes dropped from 91 to 83, and activity climbed from 1,754 to 1,941.", facts)).toBe("Nodes dropped 9% to 83, and activity climbed 11% to 1,941.");
   });
   it("leaves a figure pair the facts do not state, and a wrong order", () => {
     expect(withMovePercents("Nodes fell from 91 to 80.", facts)).toBe("Nodes fell from 91 to 80.");
@@ -166,8 +167,9 @@ describe("withMovePercents", () => {
   // A SPAN AGAINST THE ONE BEFORE IT (user, 2026-11-02): the current figure first, since "rose from X
   // to Y" read as a climb inside the span.
   it("takes a comparison written current figure first", () => {
-    expect(withMovePercents("Activity averaged 1,941 per day, up from 1,754 in the 30 days before.", facts)).toBe("Activity averaged 1,941 per day, up 11% from 1,754 in the 30 days before.");
-    expect(withMovePercents("Cadence averaged 12 seconds, down from 21 seconds.", facts)).toBe("Cadence averaged 12 seconds, down 43% from 21 seconds.");
+    expect(withMovePercents("Activity averaged 1,941 per day, up from 1,754 in the 30 days before.", facts)).toBe("Activity averaged 1,941 per day, up 11% on the 30 days before.");
+    expect(withMovePercents("Cadence averaged 12 seconds, down from 21 seconds.", facts)).toBe("Cadence averaged 12 seconds, down 43%.");
+    expect(withMovePercents("Activity averaged 1,941 per day, up from 1,754 per day over the 7 days before, while cadence held.", facts)).toBe("Activity averaged 1,941 per day, up 11% on the 7 days before, while cadence held.");
   });
   it("leaves one whose direction or current figure is not the pair's", () => {
     expect(withMovePercents("Activity averaged 1,941 per day, down from 1,754.", facts)).toBe("Activity averaged 1,941 per day, down from 1,754.");
@@ -208,7 +210,7 @@ describe("withSpanComparisons", () => {
     expect(withSpanComparisons("Fees fell from 73 to 640.", facts, null)).toBe("Fees fell from 73 to 640.");
   });
   it("ends in a sentence the percentage reaches", () => {
-    expect(withMovePercents(withSpanComparisons("Fees fell to 64 from 73.", facts, null), facts)).toBe("Fees fell to 64, down 12% from 73.");
+    expect(withMovePercents(withSpanComparisons("Fees fell to 64 from 73.", facts, null), facts)).toBe("Fees fell to 64, down 12%.");
   });
 });
 

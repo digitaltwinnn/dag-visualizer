@@ -110,7 +110,7 @@ describe("generateNote", () => {
     const facts = { ...FACTS, facts: [...FACTS.facts, fact("Blocks, per day, this span", 64, "count", undefined, pair("to")), fact("Blocks, per day, previous span", 73, "count", undefined, pair("from"))] };
     const d = deps({ facts: async () => facts, answers: ["NOTE: Over the last 7 days, blocks fell to 64 per day from 73, and the network held."] });
     const res = await generateNote(REQ, d, "read");
-    expect(res.state === "ok" && res.text).toBe("Over the last 7 days, blocks fell to 64 per day, down 12% from 73 in the 7 days before, and the network held.");
+    expect(res.state === "ok" && res.text).toBe("Over the last 7 days, blocks fell to 64 per day, down 12% on the 7 days before, and the network held.");
   });
 
   it("starts a notable day's caption with a capital, as the note does", async () => {

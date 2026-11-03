@@ -10,7 +10,7 @@ import { pickRangeTier } from "@/src/data/trendWindow";
 //
 // Everything is UTC and the caller supplies the date strings; nothing here reads a clock.
 
-export const NOTES_VERSION = 54; // 54: a network's own snapshots are "metagraph snapshots", never a bare "snapshots" beside global ones (2026-11-03)
+export const NOTES_VERSION = 55; // 55: a change reads as the current figure and its percentage, the earlier figure dropped (2026-11-03)
 
 /** What a note covers. Hyper and Geography are a standing picture ("day"), the ledger the recent
  *  hours ("hours"); History's pills are the rest, and a brushed range is `r<fromMs>-<toMs>` after
