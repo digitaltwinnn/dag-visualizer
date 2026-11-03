@@ -45,6 +45,7 @@ export function withMovePercents(note: string, facts: readonly Fact[]): string {
     const change = from ? changeWords(from.value, to.value) : null;
     if (!from || !change) continue;
     const [dir, percent] = change.split(" ") as [string, string];
+    const esc = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     for (const said of [`from ${from.text} to ${to.text}`, `from ${from.text} in the weeks before to ${to.text}`]) {
       for (let at = out.indexOf(said); at >= 0; at = out.indexOf(said, at)) {
         if (/[\p{L}\p{N}]/u.test(out[at + said.length] ?? "") || !MOVED.test(out.slice(0, at))) {
@@ -56,9 +57,18 @@ export function withMovePercents(note: string, facts: readonly Fact[]): string {
         at += short.length;
       }
     }
+    // NO VERB TO CARRY IT ("taking the total from 90 to 86"): the current figure and the change after
+    // it, "taking the total to 86, down 4%". Not after "lost" or "gained", whose object stands between
+    // the verb and the figures ("lost nodes from 33 to 28"): that sentence stays as written.
+    const bare = new RegExp(`\\bfrom ${esc(from.text)} to ${esc(to.text)}(?![\\p{L}\\p{N}]|[.,]\\d)`, "gu");
+    out = out.replace(bare, (whole: string, at: number) =>
+      /\b(?:lost|gained|losing|gaining)\b(?:\s+\S+){0,2}\s$/i.test(out.slice(Math.max(0, at - 40), at)) ? whole : `to ${to.text}, ${change}`);
+    // THE ACTIVITY SENTENCE'S OWN SHAPE, "Y per day last week against X in the weeks before": the
+    // current figure stands, the earlier one gives way to its change.
+    const against = new RegExp(`(${esc(to.text)}[^.;]*?) against ${esc(from.text)}(?![\\d.,]\\d|\\d)((?: (?:DAG|MB|per|a|day))*)( in the weeks before)?`, "g");
+    out = out.replace(against, (_w: string, lead: string, _tail: string, weeks: string | undefined) => `${lead}, ${change}${weeks ? " on the weeks before" : ""}`);
     // A span against the one before it, the current figure first: "averaged Y, up from X" reads
     // "averaged Y, up P%", and the span-before words that named X's span now name the comparison.
-    const esc = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const comparison = new RegExp(`\\b${dir} from ${esc(from.text)}(?![\\d.,]\\d|\\d)((?: (?:DAG|MB|per|a|day))*)(?: (?:in|over) (the [^.,;]*? before))?`, "g");
     out = out.replace(comparison, (whole: string, _tail: string, before: string | undefined, at: number) => {
       const sentence = out.slice(out.lastIndexOf(". ", at) + 1, at);

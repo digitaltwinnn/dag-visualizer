@@ -155,8 +155,15 @@ describe("withMovePercents", () => {
     expect(withMovePercents("Nodes fell from 91 to 80.", facts)).toBe("Nodes fell from 91 to 80.");
     expect(withMovePercents("Nodes rose from 83 to 91.", facts)).toBe("Nodes rose from 83 to 91.");
   });
-  it("leaves a sentence with no verb to carry it", () => {
-    expect(withMovePercents("Nodes went from 91 to 83.", facts)).toBe("Nodes went from 91 to 83.");
+  it("puts the change after the current figure where no verb carries it", () => {
+    expect(withMovePercents("Nodes went from 91 to 83.", facts)).toBe("Nodes went to 83, down 9%.");
+    expect(withMovePercents("DAG fell, taking the total from 91 to 83, while the rest held.", facts)).toBe("DAG fell, taking the total to 83, down 9%, while the rest held.");
+  });
+  it("leaves a lost or gained sentence, whose object stands before the figures", () => {
+    expect(withMovePercents("Germany lost nodes from 91 to 83.", facts)).toBe("Germany lost nodes from 91 to 83.");
+  });
+  it("turns the activity sentence's against-form into the change", () => {
+    expect(withMovePercents("The network produced 1,941 global snapshots per day last week against 1,754 in the weeks before.", facts)).toBe("The network produced 1,941 global snapshots per day last week, up 11% on the weeks before.");
   });
   it("leaves a move that rounds to nothing", () => {
     expect(withMovePercents("Blocks rose from 1,000 to 1,001.", facts)).toBe("Blocks rose from 1,000 to 1,001.");
