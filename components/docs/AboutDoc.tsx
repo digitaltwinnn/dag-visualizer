@@ -146,12 +146,14 @@ export default function AboutDoc() {
       </section>
 
       <section id="questions" aria-label="Questions" className="mt-10 border-t border-border">
-        {/* The live-data promise, stated POSITIVELY (user, 2026-09-04), and scoped to NUMBERS: the
-            arcs are simulated motion (2026-08-12), so don't widen the claim to "everything". */}
-        <Question q="Are the numbers live?" open>
+        {/* WHERE IT COMES FROM, said generally (user, 2026-11-03: "rewrite and generalize this section
+            saying we use public resources"; the location-accuracy and NO SIGNAL questions folded away
+            with it). Still scoped to NUMBERS being live: the arcs are simulated motion (2026-08-12),
+            so don't widen the claim to "everything". */}
+        <Question q="Where does the data come from?" open>
           <p>
-            Yes. Every number on screen is read from the Constellation Network&apos;s own public endpoints — the global
-            snapshot stream, each metagraph&apos;s cluster and each node&apos;s status — and drawn as it comes in.
+            Only from public sources: the Constellation Network&apos;s own public endpoints, and public lookups for where
+            each node runs. Every number is live, drawn as it comes in.
           </p>
           <p>
             The one exception is a written note on a card, which is made from those same figures a little earlier and says
@@ -200,20 +202,6 @@ export default function AboutDoc() {
             A note with a number the figures can&apos;t back is thrown away, so it never passes for a measurement. Pick a
             country, a hosting provider, a kind of node or a stretch of time on a chart, and its own card carries a note of
             its own.
-          </p>
-        </Question>
-
-        <Question q="How accurate are the node locations?">
-          <p>
-            Each node is placed by its public internet address, so its location is accurate to a city and a hosting
-            provider, not to a street.
-          </p>
-        </Question>
-
-        <Question q="What if something can't be reached?">
-          <p>
-            The screen simply says so. You&apos;ll see a small label like <span className="font-mono">NO SIGNAL</span>{" "}
-            instead of a number, and it fills in again as soon as the network answers.
           </p>
         </Question>
 
