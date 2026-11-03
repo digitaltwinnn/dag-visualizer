@@ -112,7 +112,7 @@ the chain into tiered timeseries. Crons fire on the **production** deployment on
 preview renders the /trends charts read-only from the shared store and cannot write to it
 (the sampler fails closed without its secret). Real-user metrics come from **Vercel Speed
 Insights + Analytics**, and
-a social card is generated at `app/opengraph-image.tsx`. See `CLAUDE.md` →
+the social card is a frame of the intro tour, `app/opengraph-image.png`. See `CLAUDE.md` →
 *Deploying (Vercel)* for the full checklist (incl. the Pro-only extras to enable as
 traffic grows).
 

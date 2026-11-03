@@ -540,8 +540,11 @@ the backfill; or keep the new fields invisible to the deployed reader.
 ⚠️ Web Vitals do NOT capture the WebGL frame rate — use the engine's stats.js for that (dev-only, or in
 prod via `?stats`, so it never shows for real users).
 
-⚠️ **`app/opengraph-image.tsx` must stay ASCII + styled `<div>`s only**: a non-Latin glyph makes Satori
-fetch a font at render time, which fails and breaks the image.
+**The social card is a STATIC frame of the intro** (`app/opengraph-image.png` + `.alt.txt`, user
+2026-11-03): the Geography stop at 1200×630, globe turned to the US with Europe on the rim. It
+replaced a generated card (`opengraph-image.tsx`) whose Satori fallback font drew the title thin and
+the spacing uneven. Re-capture it from the running tour (hold a stop with a press on the canvas)
+rather than hand-making one; X caches a link's card, so a new image reaches new posts only.
 
 **Pro is active but its other levers are still unused** — Skew Protection (the app is a long-lived
 open tab and a deploy can break chunk loading in open tabs), a cron pre-warm for `/api/metagraphs`,
