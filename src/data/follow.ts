@@ -1,6 +1,6 @@
 import { getNetwork, getAnchor, metagraphById } from "@/src/data/network";
 import { ledgerLens } from "@/src/data/ledgerStory";
-import { UNLISTED_ID, latestUnlistedTick, unlistedLog } from "@/src/data/unlisted";
+import { LISTED_IDS, UNLISTED_ID, latestUnlistedTick, unlistedLog } from "@/src/data/unlisted";
 import { useStore } from "@/src/store/store";
 import type { GlobalSnapshot } from "@/src/data/types";
 
@@ -84,7 +84,7 @@ export function followLatest() {
     const row = unlistedLog([latest], useStore.getState().snapshotExact, net?.unlistedSnaps)[0];
     // Same guard as above: an unlisted row always names its channel, so `row.metaId` is present —
     // the check is what keeps a follow from ever advancing onto a subject that has no network.
-    const held = !!metaSnap?.held && metaSnap.globalOrdinal === latest.ordinal;
+    const held = !!metaSnap?.held && metaSnap.globalOrdinal === latest.ordinal && !LISTED_IDS.has(metaSnap.metaId);
     if (row?.metaId && !held && (metaSnap?.metaId !== row.metaId || metaSnap.ordinal !== row.ordinal)) {
       advanceMetaSnap({ metaId: row.metaId, ordinal: row.ordinal, hash: row.hash, globalOrdinal: latest.ordinal, ts: latest.timestamp });
     }

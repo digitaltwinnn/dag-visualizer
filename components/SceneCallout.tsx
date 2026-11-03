@@ -43,7 +43,7 @@ import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { displayNetwork } from "@/src/data/unlisted";
-import { coLocatedNetworks, filterAccent, getAnchor, isAnchorSettling, metagraphById } from "@/src/data/network";
+import { coLocatedNetworks, filterAccent, isAnchorSettling, ledgerAnchor, metagraphById } from "@/src/data/network";
 import { fmtKB, fmtShareKB, midHash } from "@/src/util/format";
 import { iconForPick } from "@/components/icons";
 import { SceneMark, type SceneMarkSpec } from "@/components/SceneMark";
@@ -236,6 +236,8 @@ export default function SceneCallout() {
   const filter = useStore(viewNetwork);
   const section = useStore((s) => s.section);
   const metaList = useStore((s) => s.metaList);
+  // Re-render when an old pin's window lands: the global label's share reads it (`ledgerSource`).
+  useStore((s) => s.pastWindow?.status);
   const inspect = useStore((s) => s.inspect);
   const cohort = useStore((s) => s.cohort);
   const country = useStore((s) => s.country);
@@ -446,7 +448,8 @@ export default function SceneCallout() {
       // gives a lane the catalog can't name. The ring keeps the network's hue, so the identity is
       // not lost, and the share appears the moment it is real. (The strip's own `?? 0` one surface
       // over drives a BAR HEIGHT, where an absent count is an honest gap, not a stated numeral.)
-      const share = mine ? getAnchor(snap.data.timestamp)?.metaCounts?.get(net) : undefined;
+      // The LEDGER SOURCE: an old pin's anchors live in its past window, not the live index.
+      const share = mine ? ledgerAnchor(snap.data.timestamp)?.metaCounts?.get(net) : undefined;
       // THE LABEL NAMES BOTH THINGS THE BAR SHOWS (user, 2026-10-03 — suggestion 1). The ring
       // points at this network's band, and a band's LENGTH is bytes (`domain/ledgerBands`) — the
       // label only counted. The count now says "snapshots", the card's word, and the size rides

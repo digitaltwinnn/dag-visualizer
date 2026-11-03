@@ -182,6 +182,10 @@ export interface MetaSnapRecord {
   subHeight: number;     // orders snapshots that share a height
   blocks: number;        // rare on mainnet; an honest 0 beats omitting it
   epochProgress: number;
+  /** The chain the record is from, set only when it is not the map key it is filed under: a past
+   *  window files a network's FORMER address under its current id (the chamber's lane), and a
+   *  selection must still name the real chain (`src/data/pastWindow.ts`, review 2026-11-03). */
+  chain?: string;
 }
 
 /** One explorer metagraph snapshot as the rolling buffer records it (fee/size kept, blocks counted). */

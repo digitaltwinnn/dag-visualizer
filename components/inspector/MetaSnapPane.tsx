@@ -5,7 +5,7 @@
 // is the application state — disclosed as a SHAPE here and as a payload in the raw layer.
 // Like the global snapshot card this is a card SLOT, not a focus-ladder rung: it has its own
 // store channel (`store.metaSnap`) and a fixed rail slot, and appears in no ladder.
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties } from "react";
 import LiveDot from "@/components/LiveDot";
 import { PinnedMark } from "@/components/state/StateAtoms";
 import CardHead, { RailPane } from "@/components/CardHead";
@@ -22,6 +22,9 @@ import { openSnapshotRecord } from "@/components/trendDoors";
 import { metaSnapDeepKey, metaSnapHoverKey } from "@/src/data/types";
 import type { ChannelSnapDeep, ChannelSnapRow } from "@/src/data/types";
 import { getNetwork, SIGNER_GROUPS, metagraphById } from "@/src/data/network";
+import { getPastWindow, ledgerSource, onPastWindow } from "@/src/data/pastWindow";
+import { currentIdOf } from "@/src/net/lineage";
+import { NET } from "@/src/net/current";
 import { UNLISTED_HUE } from "@/src/data/unlisted";
 import { snapsAtTick } from "@/src/data/anchorLog";
 import { PAYLOAD_LANES } from "@/src/data/payloadKinds";
@@ -87,14 +90,19 @@ export default function MetaSnapPane({
 
 
 
+  const past = useSyncExternalStore(onPastWindow, getPastWindow, () => null);
   // Tier 1 — the polled record this tile was named from (free: the metagraph snapshot buffers
   // are already in memory, keyed by the anchoring tick's timestamp).
   const polled = useMemo(() => {
     if (!sel) return null;
-    const net = getNetwork();
+    // The LEDGER SOURCE: an old pin's records are in its past window.
+    const net = ledgerSource(getNetwork());
     if (!net) return null;
-    return snapsAtTick(net.metaSnaps, sel.metaId, sel.ts).find((r) => r.ordinal === sel.ordinal) ?? null;
-  }, [sel]);
+    const own = snapsAtTick(net.metaSnaps, sel.metaId, sel.ts).find((r) => r.ordinal === sel.ordinal);
+    if (own) return own;
+    // A former address a past window filed under its network's current id (`MetaSnapRecord.chain`).
+    return snapsAtTick(net.metaSnaps, currentIdOf(NET, sel.metaId), sel.ts).find((r) => r.chain === sel.metaId && r.ordinal === sel.ordinal) ?? null;
+  }, [sel, past]);
 
   // Tier 2 — this snapshot's own row inside the tick's exact read.
   const row = useMemo(() => {

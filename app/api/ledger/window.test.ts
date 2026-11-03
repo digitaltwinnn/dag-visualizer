@@ -78,6 +78,13 @@ describe("readWindow", () => {
     expect(rows.length).toBe(2 * (WINDOW_BEFORE + WINDOW_AFTER + 1)); // two records per tick, the span whole
   });
 
+  it("fails, never answers \"anchored nothing\", when a chain read fails or a page is cut short", async () => {
+    const broken = deps({ getJson: async (url: string) => { if (/currency/.test(url)) throw new Error("be 503"); return deps().getJson(url); } });
+    await expect(readWindow(broken, 100)).rejects.toThrow();
+    const flaky = deps({ reader: { latest: async (chain) => { if (chain != null) throw new Error("timeout"); return read(glob(TIP)); }, at: deps().reader.at } });
+    await expect(readWindow(flaky, 100)).rejects.toThrow();
+  });
+
   it("is nothing for a pin the chain does not hold, and leaves a chain with nothing in the span out", async () => {
     expect(await readWindow(deps(), TIP + 5)).toBeNull();
     const quiet = deps({ reader: { latest: async (chain) => (chain == null ? read(glob(TIP)) : read(chainRec(4))), at: async (chain, o) => read(chain == null ? glob(o) : chainRec(o)) } });

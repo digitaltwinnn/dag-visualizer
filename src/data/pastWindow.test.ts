@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { MetaSnapRecord } from "@/src/data/api";
 import type { GlobalSnapshot, RawMetaSnapshot } from "@/src/data/types";
+import { CATALOG } from "@/src/engine/config";
+import { tickPolledRows } from "@/src/data/ladderLevels";
 import { buildPastWindow, foldAnchors, getPastWindow, ledgerSource, onPastWindow, pastWanted, setPastWindow, type LedgerSource } from "@/src/data/pastWindow";
 
 const g = (o: number): GlobalSnapshot => ({ ordinal: o, timestamp: `t${o}`, hash: `g${o}` });
@@ -28,6 +30,16 @@ describe("buildPastWindow", () => {
     expect(w.getAnchor("t12")).toBeNull();
     expect([w.holds(10), w.holds(12), w.holds(13)]).toEqual([true, true, false]);
     expect(w.unlistedSnaps.size).toBe(0);
+  });
+  it("files a former address under its network's current id, each record keeping its own chain", () => {
+    const row = CATALOG.mainnet.find((m) => m.formerIds?.length)!;
+    const former = row.formerIds![0]!;
+    const w = buildPastWindow({ globals: [g(10)], chains: { [former]: [raw(7, "t10")], [row.id]: [raw(3, "t10")] } }, "mainnet")!;
+    expect(w.metaSnaps.has(former)).toBe(false);
+    expect(w.metaSnaps.get(row.id)!.map((r) => [r.ordinal, r.chain])).toEqual([[3, undefined], [7, former]]);
+    // A selection names the real chain: ordinals are per chain.
+    expect(tickPolledRows(w.metaSnaps, g(10)).map((r) => [r.metaId, r.ordinal])).toEqual([[row.id, 3], [former, 7]]);
+    expect(w.getAnchor("t10")!.metaCounts.get(row.id)).toBe(2);
   });
   it("is nothing with no global snapshots", () => {
     expect(buildPastWindow({ globals: [], chains: {} }, "mainnet")).toBeNull();

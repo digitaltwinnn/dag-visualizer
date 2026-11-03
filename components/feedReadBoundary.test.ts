@@ -21,7 +21,7 @@ const TOKENS: { re: RegExp; feeds: string[] }[] = [
   { re: /\bs\.metaList\b/, feeds: ["api-metagraphs"] },
   { re: /\bs\.(selNodes|allNodes|leaderboard)\b/, feeds: ["clusters", "api-geo"] },
   { re: /\bs\.(latestSnapshot|activity)\b|\buseSnapshotFeed\(|\bgetNetwork\(/, feeds: ["global"] },
-  { re: /\bgetAnchor\(|\bisAnchorSettling\(/, feeds: ["metasnaps"] },
+  { re: /\bgetAnchor\(|\bledgerAnchor\(|\bisAnchorSettling\(/, feeds: ["metasnaps"] },
 ];
 
 // Files that read feed data but are PLUMBING, not a surface the reader sees — each with why.

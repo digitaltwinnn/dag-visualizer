@@ -76,22 +76,28 @@ async function readGlobals(d: WindowDeps, from: number, to: number): Promise<Glo
   return out;
 }
 
-/** One chain's records with an anchoring timestamp inside [firstMs, lastMs], newest first. */
+/** One chain's records with an anchoring timestamp inside [firstMs, lastMs], newest first. An EMPTY
+ *  list means the chain anchored nothing there; a read that fails THROWS (review, 2026-11-03), so the
+ *  route answers 503 rather than caching "anchored nothing" for a year on one upstream timeout. A
+ *  walk the page cap cuts short throws too: a truncated list would read as fewer snapshots. */
 async function readChain(d: WindowDeps, id: string, firstMs: number, lastMs: number): Promise<RawMetaSnapshot[]> {
-  const latest = await d.reader.latest(id).catch(() => null);
+  const latest = await d.reader.latest(id);
   if (!latest || Date.parse(latest.timestamp) < firstMs) return []; // quiet through the span, or not begun
   let top = latest.ordinal;
   if (Date.parse(latest.timestamp) > lastMs) {
-    const after = await ordinalAtOrAfter(d.reader, id, lastMs + 1, latest.ordinal).catch(() => null);
-    if (after == null || after <= 1) return [];
+    const after = await ordinalAtOrAfter(d.reader, id, lastMs + 1, latest.ordinal);
+    if (after == null) throw new Error(`chain ${id}: no ordinal search answer`);
+    if (after <= 1) return [];
     top = after - 1;
   }
-  const head = await d.reader.at(id, top).catch(() => null);
-  if (!head || Date.parse(head.timestamp) < firstMs) return [];
+  const head = await d.reader.at(id, top);
+  if (!head) throw new Error(`chain ${id}: no record ${top}`);
+  if (Date.parse(head.timestamp) < firstMs) return [];
   const out: RawMetaSnapshot[] = [];
   let cursor: string | undefined = chainCursor(head.hash);
-  for (let page = 0; cursor && page < CHAIN_PAGES_MAX; page++) {
-    const j: { data?: unknown; meta?: { next?: string } } | null = await d.getJson(`${d.be}/currency/${id}/snapshots?limit=${CHAIN_PAGE}&next=${encodeURIComponent(cursor)}`).catch(() => null);
+  for (let page = 0; cursor; page++) {
+    if (page >= CHAIN_PAGES_MAX) throw new Error(`chain ${id}: more than ${CHAIN_PAGES_MAX} pages`);
+    const j: { data?: unknown; meta?: { next?: string } } | null = await d.getJson(`${d.be}/currency/${id}/snapshots?limit=${CHAIN_PAGE}&next=${encodeURIComponent(cursor)}`);
     const rows = asList<RawMetaSnapshot>(j);
     let older = false;
     for (const r of rows) {
@@ -107,7 +113,7 @@ async function readChain(d: WindowDeps, id: string, firstMs: number, lastMs: num
 }
 
 /** The window around `pin`: its global snapshots and every chain's records in their span, or null
- *  when the global chain cannot be read whole. */
+ *  when the global chain cannot be read whole. A chain that cannot be read throws (`readChain`). */
 export async function readWindow(d: WindowDeps, pin: number): Promise<WindowAnswer | null> {
   const latest = await d.reader.latest(null);
   if (!latest || pin < 1 || pin > latest.ordinal) return null;

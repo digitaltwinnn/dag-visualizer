@@ -6,6 +6,7 @@ import { NET, netUrl } from "@/src/net/current";
 import { POLL } from "@/src/engine/config";
 import { buildPastWindow, getPastWindow, pastWanted, setPastWindow, type PastWindowAnswer } from "@/src/data/pastWindow";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
+import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 
 // THE ONE WRITER OF THE SNAPSHOTS VIEW'S PAST WINDOW (user, 2026-11-03: pinning a snapshot older
 // than the live feed should "go back in time"; `docs/superpowers/specs/2026-11-03-snapshots-past-window-design.md`).
@@ -15,7 +16,8 @@ import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 // `RawSnapshotBridge` does for exact reads. A failed read leaves the view on the live feed and says
 // so through the status; a pin the held window holds keeps it (the pager stepping inside).
 export default function PastWindowBridge() {
-  const ledger = useStore((s) => s.mode === "ledger");
+  // The views whose selections live inside a global snapshot (convention 7: the policy row, not a mode).
+  const ledger = useStore((s) => VIEW_POLICIES[s.mode].tickScoped);
   const following = useStore((s) => s.following);
   const pin = useStore((s) => s.snap?.data.ordinal ?? null);
   const setStatus = useStore((s) => s.setPastWindowStatus);
@@ -46,6 +48,8 @@ export default function PastWindowBridge() {
         if (!current()) return;
         const w = answer ? buildPastWindow(answer, NET) : null;
         if (!w) {
+          // A failed read stands the view back on the live feed (an earlier pin's window included).
+          setPastWindow(null);
           setStatus({ ordinal, from: null, to: null, status: "failed" });
           return;
         }
@@ -53,7 +57,9 @@ export default function PastWindowBridge() {
         setStatus({ ordinal, from: w.from, to: w.to, status: "ready" });
       })
       .catch(() => {
-        if (current()) setStatus({ ordinal, from: null, to: null, status: "failed" });
+        if (!current()) return;
+        setPastWindow(null);
+        setStatus({ ordinal, from: null, to: null, status: "failed" });
       });
   }, [ledger, following, pin, liveOldest, setStatus]);
 

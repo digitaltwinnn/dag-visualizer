@@ -745,7 +745,8 @@ export class Engine {
       if (!s) return null;
       return {
         kind: "metaSnap",
-        sel: { metaId, ordinal: s.ordinal, hash: s.hash, globalOrdinal: g.ordinal, ts },
+        // The record's own chain where a past window filed a former address under this lane.
+        sel: { metaId: s.chain ?? metaId, ordinal: s.ordinal, hash: s.hash, globalOrdinal: g.ordinal, ts },
         global,
       };
     });

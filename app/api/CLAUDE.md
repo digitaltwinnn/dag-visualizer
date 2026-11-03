@@ -200,6 +200,12 @@ them — but the Next Node server can.
   for their week ago, so they state no change until a week of it exists (from 2026-10-27). The
   subject cards ask AFTER A DWELL (`ASK_DWELL_MS`, `components/notes/SubjectNote.tsx`): a key that
   changes under paging or a deck rotation is never written, so browsing cannot burst the Gate.
+- **`/api/ledger/window?ordinal=N`** (2026-11-03) is the Snapshots view's PAST WINDOW around an old
+  pin (`window.ts`; the client side is in `src/data/CLAUDE.md`): the global snapshots 41 before to 10
+  after it (one crafted-cursor list read, per-ordinal below the list's 2025-05-20 floor) and every
+  catalog chain's records anchored in that span. Cached a year once its newest global is an hour old,
+  a minute before; a hole in the global chain or ANY chain read that fails answers 503 `no-store`, so
+  one upstream timeout is never cached as "that network anchored nothing".
 - **`/api/global/at?ts=`** binary-searches ~23 tiny per-ordinal records to find the global carrying
   that exact stamp (the anchor join is timestamp EQUALITY — which has exceptions: see the
   timestamp note in `src/data/CLAUDE.md`; such a row answers 404 here, honestly). Its one consumer is the anchor log's

@@ -322,16 +322,18 @@ export default function LedgerPanel() {
   // A PAST WINDOW states its own stretch of time, not "last N min" (which would be a claim about now);
   // while it is read, and if the read fails, the foot says that instead.
   const spanScope = {
-    word: past
-      ? windowWords(past.globalSnapshots)
-      : pastStatus === "loading"
-        ? "reading that time…"
-        : pastStatus === "failed"
-          ? "couldn't read that time"
+    // The status first: while another window loads, or after a read failed, the held window (if
+    // any) is not what the reader asked for.
+    word: pastStatus === "loading"
+      ? "reading that time…"
+      : pastStatus === "failed"
+        ? "couldn't read that time"
+        : past
+          ? windowWords(past.globalSnapshots)
           : spanWords(orderedSnaps),
   };
   const spanFooter =
-    live && orderedSnaps.length > 0 ? (
+    (live || past || pastStatus) && orderedSnaps.length > 0 ? (
       <ExplorerFoot left={spanScope.word} />
     ) : undefined;
   const levels: ExplorerLevelSpec[] = [

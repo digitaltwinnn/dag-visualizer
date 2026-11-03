@@ -53,14 +53,18 @@ export function foldAnchors(chains: ReadonlyMap<string, readonly MetaSnapRecord[
 }
 
 /** The window as a ledger source. A chain's former address joins its network's current one, the lane
- *  the chamber draws it on; records are kept oldest → newest, as the live buffer keeps them. */
+ *  the chamber draws it on (each record keeping its `chain`); records are kept oldest → newest, as
+ *  the live buffer keeps them. */
 export function buildPastWindow(answer: PastWindowAnswer, net: string): PastWindow | null {
   const globals = [...answer.globals].sort((a, b) => a.ordinal - b.ordinal);
   if (!globals.length) return null;
   const metaSnaps = new Map<string, MetaSnapRecord[]>();
   for (const [id, rows] of Object.entries(answer.chains)) {
     const key = currentIdOf(net, id);
-    metaSnaps.set(key, [...(metaSnaps.get(key) ?? []), ...rows.map(metaSnapRecord)].sort((a, b) => a.ordinal - b.ordinal));
+    // A former address files under its network's current id (the lane), each record keeping its own
+    // chain, so a selection names the real one (ordinals are per chain).
+    const recs = rows.map((r) => (key === id ? metaSnapRecord(r) : { ...metaSnapRecord(r), chain: id }));
+    metaSnaps.set(key, [...(metaSnaps.get(key) ?? []), ...recs].sort((a, b) => a.ts.localeCompare(b.ts) || a.ordinal - b.ordinal));
   }
   const anchors = foldAnchors(metaSnaps);
   const from = globals[0]!.ordinal;

@@ -41,7 +41,9 @@ them; today that is the focus TIER ranking alone. `dimModel`'s four resolvers al
 scaling the node to nothing — is geo's ISOLATE, not a mute. It only rode along because hyper's
 metagraph dim was then pinned to 0, so the shrink was never seen there; the moment the knob existed it
 was the first thing it did. The shrink is its own row field, `hide`, resolved by `hideFrac()`, and
-every row holds `0`: the globe's isolate went on 2026-11-02, so a dim mutes in place in every view.
+every row holds `0` but geo's, whose `hide: 1` applies only under a HELD top-bar filter
+(`DimContext.held`, user 2026-11-03: a filter hides the other networks' nodes, a browse dims them) —
+so a dim alone mutes in place in every view.
 Any new effect a dim number reaches must ask the same question before joining it.
 
 **The two are INDEPENDENT readings of the same raw ramp, not a knob and its fraction** (user,
