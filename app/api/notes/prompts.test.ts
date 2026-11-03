@@ -91,7 +91,7 @@ describe("PROMPTS", () => {
     expect(PROMPTS.geo.system("x")).toContain("Stay on where the nodes are located and who hosts them, and nothing else.");
     expect(PROMPTS.geo.system("x", undefined, true)).toContain("Stay on where the nodes are located and who hosts them, then the one sentence on activity, and nothing else.");
     expect(PROMPTS.ledger.question).toBe(
-      "Say what changed in the anchoring rhythm over the recent hours against the usual: what sped up or slowed down, from the usual figure to the recent one, and which networks did it. Then the reading itself: the longest gap, then, in one short clause: for the whole network, what each global snapshot holds, as \"N snapshots from M networks in each global snapshot\", never that it was part of anything; for one network, only the share of global snapshots it was part of.",
+      "Say what changed in the anchoring rhythm over the recent hours against the usual: what sped up or slowed down, from the usual figure to the recent one, and which networks did it. Then the reading itself: the longest gap, then, in one short clause: for the whole network, what each global snapshot holds, as \"N metagraph snapshots from M networks in each global snapshot\", never that it was part of anything; for one network, only the share of global snapshots it was part of.",
     );
     expect(PROMPTS.trend.question).toBe("Say what changed over the span: what rose, what fell and when, as the numbers show it.");
   });
@@ -103,7 +103,7 @@ describe("PROMPTS", () => {
     expect(now).toMatch(/do not mention the usual/i);
     expect(now).toMatch(/right now/i);
     expect(now).toMatch(/longest gap/i);
-    expect(now).toContain("N snapshots from M networks in each global snapshot");
+    expect(now).toContain("N metagraph snapshots from M networks in each global snapshot");
     expect(now).not.toMatch(/what they were part of/);
     const sysNow = PROMPTS.ledger.system("x", { kind: "now" });
     expect(sysNow).toContain(now);
@@ -296,7 +296,10 @@ describe("buildMessages", () => {
     // also steady no?"): the rule first stopped negatives only at a sentence's start.
     expect(VOICE).toMatch(/say what held steady, anywhere in a sentence/);
     // A network creates snapshots and anchors them (user, 2026-10-31): "anchoring networks" is jargon.
-    expect(VOICE).toMatch(/A network that creates snapshots is an active network, never an "anchoring network"/);
+    expect(VOICE).toMatch(/A network that creates metagraph snapshots is an active network, never an "anchoring network"/);
+    // user, 2026-11-03: a note said "global snapshot" and a bare "snapshot" side by side, the second
+    // meaning a metagraph's. The rule names both kinds; the facts name them too.
+    expect(VOICE).toMatch(/A network's own snapshots are metagraph snapshots and the hypergraph's are global snapshots: name the kind every time, never a bare "snapshots"/);
     expect(VOICE).toMatch(/never write that something did not happen, such as "no changes" or "no networks"/);
     expect(VOICE).toMatch(/State a fall plainly: never soften, hide or reframe it/);
   });

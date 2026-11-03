@@ -100,8 +100,8 @@ describe("hyperFacts on all", () => {
 
   it("counts the networks that anchored in the last day and the last week, and those with nodes that did not", () => {
     const r = hyperFacts(input())!;
-    expect(find(r, /^Networks that anchored snapshots in the last day$/)[0]!.value).toBe(2);
-    expect(find(r, /^Networks that anchored snapshots in the last week$/)[0]!.value).toBe(2);
+    expect(find(r, /^Networks that anchored metagraph snapshots in the last day$/)[0]!.value).toBe(2);
+    expect(find(r, /^Networks that anchored metagraph snapshots in the last week$/)[0]!.value).toBe(2);
     // The DAG has no anchoring row of its own, so it is neither anchoring nor quiet: nothing measured.
     expect(find(r, /^Networks with nodes that anchored nothing in the last week$/)[0]!.value).toBe(0);
     const dorAlive = hyperFacts(input({ fleet: fleet({ "f.nodes.dor": row(720, () => 5) }) }))!;
@@ -110,9 +110,9 @@ describe("hyperFacts on all", () => {
 
   it("makes the anchored count a floor when the unlisted chains were active", () => {
     const r = hyperFacts(input({ daily: daily({ "m.zz9.snaps": row(60, () => 7), "m.zz9.ticks": row(60, () => 7) }) }))!;
-    const [f] = find(r, /^Networks that anchored snapshots in the last week, at least$/);
+    const [f] = find(r, /^Networks that anchored metagraph snapshots in the last week, at least$/);
     expect(f!.value).toBe(3); // two listed, plus the unlisted chains as one
-    expect(find(r, /^Networks that anchored snapshots in the last day, at least$/)[0]!.value).toBe(3);
+    expect(find(r, /^Networks that anchored metagraph snapshots in the last day, at least$/)[0]!.value).toBe(3);
   });
 
   // What the warm pass compares (`planPass`): one read of the digest answers every network.
@@ -582,7 +582,7 @@ describe("hyperFacts on all: the movers and the whole network's activity", () =>
 describe("hyperFacts as a gate-passing source", () => {
   it("accepts an honest digest sentence and rejects one with a number the facts do not hold", () => {
     const r = hyperFacts(input())!;
-    expect(checkNote("Three networks have nodes, and two anchored snapshots in the last week.", r.facts, r.names)).toEqual({ ok: true });
+    expect(checkNote("Three networks have nodes, and two anchored metagraph snapshots in the last week.", r.facts, r.names)).toEqual({ ok: true });
     expect(checkNote("Constellation is the biggest network with 100 nodes.", r.facts, r.names)).toEqual({ ok: true });
     expect(checkNote("Nodes across all networks rose by 17%.", r.facts, r.names)).toEqual({ ok: true });
     expect(checkNote("Seven networks have nodes.", r.facts, r.names).ok).toBe(false);

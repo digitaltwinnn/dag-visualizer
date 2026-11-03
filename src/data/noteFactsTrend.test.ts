@@ -66,10 +66,10 @@ const find = (r: NonNullable<ReturnType<typeof trendFacts>>, re: RegExp, kind?: 
 describe("trendFacts on the hypergraph", () => {
   it("states the snapshots-anchored ratio as cur over prev, per day", () => {
     const r = trendFacts(input())!;
-    const [ratio] = find(r, /Snapshots anchored/, "ratio");
+    const [ratio] = find(r, /Metagraph snapshots anchored/, "ratio");
     expect(ratio!.value).toBeCloseTo(2, 9);
     expect(ratio!.text).toBe("2.00");
-    const [cur] = find(r, /^Snapshots anchored, per day, this span/);
+    const [cur] = find(r, /^Metagraph snapshots anchored, per day, this span/);
     expect(cur!.value).toBe(200);
   });
 
@@ -86,9 +86,9 @@ describe("trendFacts on the hypergraph", () => {
     expect(shares).toHaveLength(3);
     expect(shares.reduce((a, f) => a + f.value, 0)).toBeLessThanOrEqual(1 + 1e-9);
     expect(shares.map((f) => f.label)).toEqual([
-      "USDC.dag share of snapshots anchored, this span",
-      "BioFi share of snapshots anchored, this span",
-      "Dor share of snapshots anchored, this span",
+      "USDC.dag share of metagraph snapshots anchored, this span",
+      "BioFi share of metagraph snapshots anchored, this span",
+      "Dor share of metagraph snapshots anchored, this span",
     ]);
     // The whole is never smaller than its networks added up (204 here, the total says 200).
     expect(shares[0]!.value).toBeCloseTo(120 / 204, 9);
@@ -101,7 +101,7 @@ describe("trendFacts on the hypergraph", () => {
 
   it("gives a top network its own ratio, named in the label", () => {
     const r = trendFacts(input())!;
-    const f = r.facts.find((x) => x.kind === "ratio" && x.label === "USDC.dag snapshots anchored, ratio to previous span")!;
+    const f = r.facts.find((x) => x.kind === "ratio" && x.label === "USDC.dag metagraph snapshots anchored, ratio to previous span")!;
     expect(f.value).toBeCloseTo(2, 9);
   });
 
@@ -119,8 +119,8 @@ describe("trendFacts on the hypergraph", () => {
   it("is a gate-passing source: a sentence built from a ratio it emitted is accepted, a wrong one is not", () => {
     const r = trendFacts(input())!;
     // Snapshots anchored doubled: ratio 2.00, so "rose by 100%" is (r-1)*100.
-    expect(checkNote("Snapshots anchored rose by 100% against the span before.", r.facts, r.names)).toEqual({ ok: true });
-    expect(checkNote("Snapshots anchored rose by 70% against the span before.", r.facts, r.names).ok).toBe(false);
+    expect(checkNote("Metagraph snapshots anchored rose by 100% against the span before.", r.facts, r.names)).toEqual({ ok: true });
+    expect(checkNote("Metagraph snapshots anchored rose by 70% against the span before.", r.facts, r.names).ok).toBe(false);
     // A network's own ratio is attributed by name.
     expect(checkNote("USDC.dag more than doubled its snapshots.", r.facts, r.names).ok).toBe(false);
     expect(checkNote("USDC.dag doubled its snapshots.", r.facts, r.names)).toEqual({ ok: true });
@@ -130,8 +130,8 @@ describe("trendFacts on the hypergraph", () => {
 describe("trendFacts tags each change as a pair (R54)", () => {
   it("keys a counter's previous span and this span as one quantity's two ends, never a floor", () => {
     const p = pairsOf(trendFacts(input())!.facts);
-    expect(p.get("Snapshots anchored, per day")).toEqual([
-      "Snapshots anchored, per day, previous span", 100, "Snapshots anchored, per day, this span", 200,
+    expect(p.get("Metagraph snapshots anchored, per day")).toEqual([
+      "Metagraph snapshots anchored, per day, previous span", 100, "Metagraph snapshots anchored, per day, this span", 200,
     ]);
     for (const [k, [from, , to]] of p) {
       expect(from.startsWith(k) && /previous span$/.test(from), k).toBe(true);
@@ -139,7 +139,7 @@ describe("trendFacts tags each change as a pair (R54)", () => {
     }
     const floored = trendFacts(input({ cur: win(7, week(2, { "u.cov": row(7, (i) => (i === 3 ? null : 0)) })) }))!;
     for (const f of floored.facts.filter((x) => /^(Fees|Data),/.test(x.label))) expect(f.pair, f.label).toBeUndefined();
-    expect(pairsOf(floored.facts).has("Snapshots anchored, per day")).toBe(true);
+    expect(pairsOf(floored.facts).has("Metagraph snapshots anchored, per day")).toBe(true);
   });
 
   it("keys a gauge's start and end, and a late-starting gauge's lone end not at all", () => {
@@ -160,7 +160,7 @@ describe("trendFacts on a network", () => {
     const ratios = r.facts.filter((f) => f.kind === "ratio");
     expect(ratios.length).toBeGreaterThan(3);
     for (const f of ratios) expect(f.label.startsWith("USDC.dag ")).toBe(true);
-    const snaps = ratios.find((f) => /snapshots anchored/.test(f.label))!;
+    const snaps = ratios.find((f) => /metagraph snapshots anchored/.test(f.label))!;
     expect(snaps.value).toBeCloseTo(2, 9);
     // The full catalog, so a note naming a network the facts omit still counts as naming one.
     expect(r.names).toEqual(["USDC.dag", "BioFi", "Dor"]);
@@ -169,12 +169,12 @@ describe("trendFacts on a network", () => {
   it("states a measure whose previous side is not measured, but no previous value or ratio for it", () => {
     const r = trendFacts(input({ subject: "usdc", prev: win(7, { ...week(1), "m.usdc.blocks": row(7, () => null) }, T0 - 7 * DAY) }))!;
     expect(r.facts.filter((f) => /blocks/.test(f.label)).map((f) => f.label)).toEqual(["USDC.dag blocks, per day, this span"]);
-    expect(r.facts.some((f) => /snapshots anchored, ratio/.test(f.label))).toBe(true);
+    expect(r.facts.some((f) => /metagraph snapshots anchored, ratio/.test(f.label))).toBe(true);
   });
 
   it("derives cadence as a duration weighted by the snapshots it was measured over", () => {
     const r = trendFacts(input({ subject: "usdc" }))!;
-    const [c] = find(r, /cadence, between snapshots, this span/i, "duration");
+    const [c] = find(r, /cadence, between metagraph snapshots, this span/i, "duration");
     expect(c!.value).toBeCloseTo(12, 9);
     expect(c!.text).toBe("12 seconds");
   });
@@ -190,7 +190,7 @@ describe("trendFacts honesty", () => {
   it("states no ratio for 'all', which has no previous span", () => {
     const r = trendFacts(input({ zoom: "all", prev: null }))!;
     expect(r.facts.some((f) => f.kind === "ratio")).toBe(false);
-    expect(find(r, /^Snapshots anchored, per day, this span/)).toHaveLength(1);
+    expect(find(r, /^Metagraph snapshots anchored, per day, this span/)).toHaveLength(1);
     expect(r.facts.some((f) => /previous span/.test(f.label))).toBe(false);
   });
 
@@ -202,11 +202,11 @@ describe("trendFacts honesty", () => {
 
   it("counts unlisted chains as a floor: one more network, labelled at least", () => {
     const plain = trendFacts(input())!;
-    expect(find(plain, /^Networks that anchored snapshots, this span$/)[0]!.value).toBe(3);
+    expect(find(plain, /^Networks that anchored metagraph snapshots, this span$/)[0]!.value).toBe(3);
     const r = trendFacts(input({ cur: win(7, week(2, { "m.xyz.snaps": row(7, () => 4) })) }))!;
-    const [n] = find(r, /^Networks that anchored snapshots, this span, at least$/);
+    const [n] = find(r, /^Networks that anchored metagraph snapshots, this span, at least$/);
     expect(n!.value).toBe(4);
-    expect(find(r, /^Networks that anchored snapshots, this span$/)).toHaveLength(0);
+    expect(find(r, /^Networks that anchored metagraph snapshots, this span$/)).toHaveLength(0);
     expect(r.facts.some((f) => /listed/i.test(f.label))).toBe(false);
   });
 
@@ -245,7 +245,7 @@ describe("trendFacts notable days", () => {
     expect(dates).toHaveLength(1);
     expect(dates[0]!.value).toBe(T0 + 3 * DAY);
     expect(dates[0]!.text).toBe("Sep 4");
-    const value = r.facts.find((f) => /Notable day 1 spike, snapshots anchored that day/.test(f.label))!;
+    const value = r.facts.find((f) => /Notable day 1 spike, metagraph snapshots anchored that day/.test(f.label))!;
     expect(value.value).toBe(400);
     expect(r.facts.find((f) => /Notable day 1 spike, usual level/.test(f.label))!.value).toBe(100);
   });
@@ -253,7 +253,7 @@ describe("trendFacts notable days", () => {
   it("a note about the spike passes the gate", () => {
     const spike = row(37, (i) => (i === 33 ? 400 : 100));
     const r = trendFacts(input({ daily: daily({ "g.anchors": spike }) }))!;
-    expect(checkNote("Snapshots anchored peaked at 400 on Sep 4, against a usual 100.", r.facts, r.names)).toEqual({ ok: true });
+    expect(checkNote("Metagraph snapshots anchored peaked at 400 on Sep 4, against a usual 100.", r.facts, r.names)).toEqual({ ok: true });
   });
 
   it("reports nothing from the lead-in", () => {
@@ -267,7 +267,7 @@ describe("trendFacts notable days", () => {
     // The floor finds nothing to add: the total is flat, and the broadest day IS BioFi's first day.
     expect(r.days.map((d) => [d.kind, d.networkId])).toEqual([["first", "bio"]]);
     expect(r.blurbs).toEqual(["BioFi is: a lending app"]);
-    expect(r.facts.some((f) => f.kind === "date" && f.label === "Notable day 1 date (first day BioFi anchored a snapshot, none before)")).toBe(true);
+    expect(r.facts.some((f) => f.kind === "date" && f.label === "Notable day 1 date (first day BioFi anchored a metagraph snapshot, none before)")).toBe(true);
     expect(factsBlock(r.facts, r.blurbs).split("\n").at(-1)).toBe("BioFi is: a lending app");
   });
 
@@ -279,8 +279,8 @@ describe("trendFacts notable days", () => {
     const r = trendFacts(input({ daily: daily({ "m.bio.snaps": bio }) }))!;
     // …then the floor's broadest day: three networks anchored until BioFi stopped, two after.
     expect(r.days.map((d) => [d.kind, d.networkId, d.dayMs])).toEqual([["last", "bio", T0 + 2 * DAY], ["broadest", null, T0]]);
-    expect(r.facts.find((f) => f.kind === "date")!.label).toBe("Notable day 1 date (last day BioFi anchored a snapshot, none since)");
-    expect(r.facts.find((f) => /^Notable day 1 last day BioFi anchored a snapshot, none since, snapshots anchored that day$/.test(f.label))!.value).toBe(30);
+    expect(r.facts.find((f) => f.kind === "date")!.label).toBe("Notable day 1 date (last day BioFi anchored a metagraph snapshot, none since)");
+    expect(r.facts.find((f) => /^Notable day 1 last day BioFi anchored a metagraph snapshot, none since, metagraph snapshots anchored that day$/.test(f.label))!.value).toBe(30);
     expect(checkNote("BioFi's last day anchoring, nothing since.", r.facts, r.names, { maxSentences: 1 })).toEqual({ ok: true });
   });
 
@@ -311,13 +311,13 @@ describe("trendFacts notable days", () => {
     const labels = r.facts.filter((f) => /^Notable day/.test(f.label)).map((f) => [f.label, f.value, f.kind]);
     expect(labels).toEqual([
       ["Notable day 1 date (busiest day of the span)", T0 + 3 * DAY, "date"],
-      ["Notable day 1 busiest day of the span, snapshots anchored that day", 70, "count"],
+      ["Notable day 1 busiest day of the span, metagraph snapshots anchored that day", 70, "count"],
       ["Notable day 1 busiest day of the span, span median", 60, "count"],
       ["Notable day 2 date (quietest day of the span)", T0 + 4 * DAY, "date"],
-      ["Notable day 2 quietest day of the span, snapshots anchored that day", 50, "count"],
+      ["Notable day 2 quietest day of the span, metagraph snapshots anchored that day", 50, "count"],
       ["Notable day 2 quietest day of the span, span median", 60, "count"],
       ["Notable day 3 date (longest wait of the span)", T0 + 5 * DAY, "date"],
-      ["Notable day 3 longest wait of the span, longest wait between snapshots", 900, "duration"],
+      ["Notable day 3 longest wait of the span, longest wait between metagraph snapshots", 900, "duration"],
       ["Notable day 3 longest wait of the span, span median longest wait", 600, "duration"],
     ]);
     expect(checkNote("The busiest day of the span, with 70 snapshots against a median of 60.", r.facts, r.names, { maxSentences: 1 })).toEqual({ ok: true });
@@ -327,7 +327,7 @@ describe("trendFacts notable days", () => {
     const gap = row(37, (i) => (i === 33 ? 7200 : 30));
     const r = trendFacts(input({ subject: "usdc", daily: daily({ "m.usdc.gapMax": gap }) }))!;
     expect(r.days.map((d) => d.kind)).toEqual(["pause"]);
-    const v = r.facts.find((f) => /Notable day 1 pause, longest wait between snapshots/.test(f.label))!;
+    const v = r.facts.find((f) => /Notable day 1 pause, longest wait between metagraph snapshots/.test(f.label))!;
     expect(v.kind).toBe("duration");
     expect(v.text).toBe("2 hours");
   });
@@ -349,19 +349,19 @@ describe("trendFacts in the span facet's shape", () => {
     expect(r.facts.some((f) => /^Notable day/.test(f.label))).toBe(false);
     expect(r.facts.filter((f) => /of the span/.test(f.label)).map((f) => [f.label, f.value])).toEqual([
       ["Busiest day of the span, date", T0 + 3 * DAY],
-      ["Busiest day of the span, snapshots anchored", 70],
+      ["Busiest day of the span, metagraph snapshots anchored", 70],
       ["Quietest day of the span, date", T0 + 4 * DAY],
-      ["Quietest day of the span, snapshots anchored", 50],
-      ["Typical day of the span, snapshots anchored", 60],
+      ["Quietest day of the span, metagraph snapshots anchored", 50],
+      ["Typical day of the span, metagraph snapshots anchored", 60],
     ]);
   });
   it("a network's last day is no busiest day: the extremes are the span's, read over its activity", () => {
     const stopped = row(37, (i) => (i < 33 ? 100 : i === 33 ? 5 : 0));
     const r = trendFacts(input({ subject: "usdc", shape: true, daily: daily({ "m.usdc.snaps": stopped, "m.usdc.ticks": row(37, () => 1) }) }))!;
-    expect(r.facts.find((f) => f.label === "Quietest day of the span, snapshots anchored")?.value).toBe(5);
+    expect(r.facts.find((f) => f.label === "Quietest day of the span, metagraph snapshots anchored")?.value).toBe(5);
     // Every active day read 100, so no day was the busiest: it is the typical one.
     expect(r.facts.some((f) => f.label.startsWith("Busiest day"))).toBe(false);
-    expect(r.facts.find((f) => f.label === "Typical day of the span, snapshots anchored")?.value).toBe(100);
+    expect(r.facts.find((f) => f.label === "Typical day of the span, metagraph snapshots anchored")?.value).toBe(100);
   });
   // Review 2026-10-30: `ext[0]` was the longest wait when the counts were flat, so a gap in seconds
   // was stated as a typical day's snapshots, and the gate backed it (the figure was a real fact).
@@ -387,17 +387,17 @@ describe("trendFacts on the unlisted set", () => {
 
   it("names the set, states its measures, and tells the model what it is", () => {
     const facts = r();
-    const f = facts.facts.find((x) => /^Unlisted networks snapshots anchored.*this span$/.test(x.label))!;
+    const f = facts.facts.find((x) => /^Unlisted networks metagraph snapshots anchored.*this span$/.test(x.label))!;
     expect(f.value).toBe(80);
     expect(facts.names).toContain("Unlisted networks");
-    expect(facts.blurbs.join(" ")).toMatch(/^Unlisted networks are: chains that anchor snapshots into the hypergraph/);
+    expect(facts.blurbs.join(" ")).toMatch(/^Unlisted networks are: chains that anchor metagraph snapshots into the hypergraph/);
     expect(checkNote("Unlisted networks anchored 80 snapshots per day.", facts.facts, facts.names, { subject: "Unlisted networks" })).toEqual({ ok: true });
   });
 
   it("counts the chains behind the set and how much the busiest one carries, naming none", () => {
     const facts = r();
-    expect(facts.facts.find((x) => x.label === "Unlisted chains that anchored snapshots, this span")!.value).toBe(2);
-    const share = facts.facts.find((x) => x.label === "Busiest unlisted chain, share of the set's snapshots anchored, this span")!;
+    expect(facts.facts.find((x) => x.label === "Unlisted chains that anchored metagraph snapshots, this span")!.value).toBe(2);
+    const share = facts.facts.find((x) => x.label === "Busiest unlisted chain, share of the set's metagraph snapshots anchored, this span")!;
     expect(share.value).toBeCloseTo(0.75, 9);
     expect(share.kind).toBe("share");
     expect(facts.facts.some((x) => /DAGaaa|DAGbbb/.test(x.label))).toBe(false);
@@ -406,7 +406,7 @@ describe("trendFacts on the unlisted set", () => {
   it("one chain has no busiest share", () => {
     const one = { "u.cov": row(7, () => 1), "m.DAGaaa.snaps": row(7, () => 30) };
     const facts = trendFacts(input({ subject: "unlisted", cur: win(7, week(2, one)), prev: win(7, week(1, one), T0 - 7 * DAY) }))!;
-    expect(facts.facts.find((x) => x.label === "Unlisted chains that anchored snapshots, this span")!.value).toBe(1);
+    expect(facts.facts.find((x) => x.label === "Unlisted chains that anchored metagraph snapshots, this span")!.value).toBe(1);
     expect(facts.facts.some((x) => /Busiest unlisted/.test(x.label))).toBe(false);
   });
 
@@ -423,12 +423,12 @@ describe("trendFacts on the unlisted set", () => {
     }, T0 - 50 * DAY);
     const facts = trendFacts(input({ subject: "unlisted", cur: win(7, week(2, quiet)), prev: win(7, week(1, quiet), T0 - 7 * DAY), history }))!;
     expect(facts.facts.map((f) => f.label)).toEqual([
-      "Unlisted chains that anchored snapshots, this span",
-      "Last day an unlisted chain anchored a snapshot",
-      "Unlisted chains that anchored snapshots in all measured history",
+      "Unlisted chains that anchored metagraph snapshots, this span",
+      "Last day an unlisted chain anchored a metagraph snapshot",
+      "Unlisted chains that anchored metagraph snapshots in all measured history",
     ]);
     expect(facts.facts.map((f) => f.value)).toEqual([0, T0 - 20 * DAY, 2]);
-    expect(checkNote("No unlisted chain anchored a snapshot, and the last did on Aug 12.", facts.facts, facts.names)).toEqual({ ok: true });
+    expect(checkNote("No unlisted chain anchored a metagraph snapshot, and the last did on Aug 12.", facts.facts, facts.names)).toEqual({ ok: true });
   });
 
   // A span that stopped well before its end says when (live: the year's note never mentioned that
@@ -436,7 +436,7 @@ describe("trendFacts on the unlisted set", () => {
   it("a set that stopped before the span's end states its last day; one still running does not", () => {
     const history = win(60, { "g.ticks": row(60, () => 288), "u.cov": row(60, () => 1), "m.DAGaaa.snaps": row(60, (i) => (i <= 52 ? 40 : 0)) }, T0 - 50 * DAY);
     const facts = trendFacts(input({ subject: "unlisted", cur: win(7, week(2, chains(2))), prev: win(7, week(1, chains(1)), T0 - 7 * DAY), history }))!;
-    expect(facts.facts.find((f) => f.label === "Last day an unlisted chain anchored a snapshot")!.value).toBe(T0 + 2 * DAY);
+    expect(facts.facts.find((f) => f.label === "Last day an unlisted chain anchored a metagraph snapshot")!.value).toBe(T0 + 2 * DAY);
     expect(facts.facts.some((f) => /all measured history/.test(f.label))).toBe(false);
   });
 
@@ -545,10 +545,10 @@ describe("trendFacts: a span shorter than a day states totals", () => {
   it("labels counters 'this span' with the summed buckets, and never 'per day'", () => {
     const r = trendFacts(h1())!;
     expect(r.facts.some((f) => /per day/.test(f.label))).toBe(false);
-    const snaps = r.facts.find((f) => f.label === "Snapshots anchored, this span")!;
+    const snaps = r.facts.find((f) => f.label === "Metagraph snapshots anchored, this span")!;
     expect(snaps.value).toBe(36); // 12 complete five-minute buckets x 3
-    expect(r.facts.find((f) => f.label === "Snapshots anchored, previous span")!.value).toBe(18);
-    expect(r.facts.find((f) => f.label === "Snapshots anchored, ratio to previous span")!.value).toBeCloseTo(2, 9);
+    expect(r.facts.find((f) => f.label === "Metagraph snapshots anchored, previous span")!.value).toBe(18);
+    expect(r.facts.find((f) => f.label === "Metagraph snapshots anchored, ratio to previous span")!.value).toBeCloseTo(2, 9);
   });
 
   it("a day or more stays per day", () => {
@@ -565,7 +565,7 @@ describe("trendFacts names: the whole catalog", () => {
     expect(r.facts.some((f) => f.label.includes("Zeta Chain"))).toBe(false);
     expect(checkNote("Zeta Chain doubled.", r.facts, r.names).ok).toBe(false);
     // The hypergraph's own ratio is still citable by a nameless sentence.
-    expect(checkNote("Snapshots anchored doubled.", r.facts, r.names)).toEqual({ ok: true });
+    expect(checkNote("Metagraph snapshots anchored doubled.", r.facts, r.names)).toEqual({ ok: true });
   });
 });
 
@@ -651,20 +651,20 @@ describe("a network's silent span", () => {
   it("states the zero and the last day, in place of a row of zeros", () => {
     const r = silent({ history: history((d) => d < -3) }, { "m.bio.snaps": row(7, () => 0), "f.nodes.bio": row(7, () => 0) });
     expect(of(r)).toEqual([
-      ["BioFi snapshots anchored, this span", 0],
-      ["Last day BioFi anchored a snapshot, none since", T0 - 4 * DAY],
+      ["BioFi metagraph snapshots anchored, this span", 0],
+      ["Last day BioFi anchored a metagraph snapshot, none since", T0 - 4 * DAY],
     ]);
     expect(checkNote("BioFi was quiet over the span: its last day was Aug 28.", r.facts, r.names)).toEqual({ ok: true });
   });
 
   it("states the first day of a network that had not begun", () => {
-    expect(of(silent({ history: history((d) => d >= 20) }))).toContainEqual(["First day BioFi anchored a snapshot, none before", T0 + 20 * DAY]);
+    expect(of(silent({ history: history((d) => d >= 20) }))).toContainEqual(["First day BioFi anchored a metagraph snapshot, none before", T0 + 20 * DAY]);
   });
 
   it("states both sides of a pause", () => {
     const r = of(silent({ history: history((d) => d < -3 || d >= 20) }));
-    expect(r).toContainEqual(["Last day BioFi anchored a snapshot before this span", T0 - 4 * DAY]);
-    expect(r).toContainEqual(["First day BioFi anchored a snapshot after this span", T0 + 20 * DAY]);
+    expect(r).toContainEqual(["Last day BioFi anchored a metagraph snapshot before this span", T0 - 4 * DAY]);
+    expect(r).toContainEqual(["First day BioFi anchored a metagraph snapshot after this span", T0 + 20 * DAY]);
   });
 
   it("keeps a figure that is not zero: the nodes can outlast the anchoring", () => {
@@ -674,7 +674,7 @@ describe("a network's silent span", () => {
   });
 
   it("states the zero alone when nothing in the history says more", () => {
-    expect(of(silent({ history: null }))).toEqual([["BioFi snapshots anchored, this span", 0]]);
+    expect(of(silent({ history: null }))).toEqual([["BioFi metagraph snapshots anchored, this span", 0]]);
   });
 
   it("changes nothing for a network that anchored", () => {
@@ -684,7 +684,7 @@ describe("a network's silent span", () => {
 });
 
 describe("a notable day of global snapshots", () => {
-  it("names its measure, so the caption cannot call it snapshots anchored", () => {
+  it("names its measure, so the caption cannot call it metagraph snapshots anchored", () => {
     const n = 30;
     const daily = win(n, { "g.ticks": row(n, (i) => (i === 20 ? 1000 : 5000)), "g.anchors": row(n, () => 40000) }, T0 - 20 * DAY);
     const r = trendFacts(input({ zoom: "30d", span: { fromMs: T0 - 20 * DAY, toMs: T0 + 10 * DAY }, daily }))!;

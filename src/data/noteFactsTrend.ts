@@ -137,7 +137,7 @@ function floorOnly(data: TrendsWindowData): boolean {
 /** The unlisted chains, as a note calls them: a SET, never one network. The name the facts carry
  *  and the gate scopes by; the line beside the facts says what the set is. */
 const UNLISTED_SET_NAME = "Unlisted networks";
-const UNLISTED_SET_BLURB = `${UNLISTED_SET_NAME} are: chains that anchor snapshots into the hypergraph but are not in this app's catalog, so each is known only by its address and nothing is known of what it is for.`;
+const UNLISTED_SET_BLURB = `${UNLISTED_SET_NAME} are: chains that anchor metagraph snapshots into the hypergraph but are not in this app's catalog, so each is known only by its address and nothing is known of what it is for.`;
 
 /** Quiet this long before the span's end is a stop, not a slow day (the picker's own three). */
 const STOPPED_MS = 3 * DAY_MS;
@@ -177,8 +177,13 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
 
   /** A measure's label as seen from a subject: the hypergraph's is the bare measure, a network's
    *  starts with its name (the gate attributes a ratio by it). */
+  // A NETWORK'S OWN SNAPSHOTS ARE "METAGRAPH SNAPSHOTS" in a note (user, 2026-11-03: a note said
+  // "global snapshot" and a bare "snapshot" side by side, the second meaning a metagraph's). The
+  // chart keeps its short "Snapshots anchored"; the facts the model reads name the kind.
+  const label = (metric: TrendMetric, id: string): string =>
+    metric === "snapshots" ? "Metagraph snapshots anchored" : metricLabel(metric, id);
   const base = (metric: TrendMetric, id: string): string =>
-    id === "dag" ? metricLabel(metric, "dag") : `${mention(id)} ${metricLabel(metric, id).toLowerCase()}`;
+    id === "dag" ? label(metric, "dag") : `${mention(id)} ${label(metric, id).toLowerCase()}`;
 
   const facts: Fact[] = [];
 
@@ -202,7 +207,7 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
       continue;
     }
     const total = !perDay && metric !== "continuity";
-    const phrase = UNIT_PHRASE[metric][total ? "total" : "day"];
+    const phrase = metric === "continuity" ? `between ${subject === "dag" ? "global" : "metagraph"} snapshots` : UNIT_PHRASE[metric][total ? "total" : "day"];
     const unit = phrase ? `, ${phrase}` : "";
     const kind = valueKind(metric);
     const format = valueFormat(metric);
@@ -244,16 +249,16 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
       for (const [id, v] of ranked.slice(0, TOP_NETWORKS)) {
         const n = mention(id);
         const own = perDay ? v : spanTotal("snapshots", id, cur);
-        if (own != null) facts.push(fact(`${n} snapshots anchored${dayWord}, this span`, own, "count"));
-        facts.push(fact(`${n} share of snapshots anchored, this span`, v / denom, "share"));
+        if (own != null) facts.push(fact(`${n} metagraph snapshots anchored${dayWord}, this span`, own, "count"));
+        facts.push(fact(`${n} share of metagraph snapshots anchored, this span`, v / denom, "share"));
         const before = prev ? spanValue("snapshots", id, prev) : null;
-        if (before != null && before > 0) facts.push(fact(`${n} snapshots anchored, ratio to previous span`, v / before, "ratio"));
+        if (before != null && before > 0) facts.push(fact(`${n} metagraph snapshots anchored, ratio to previous span`, v / before, "ratio"));
       }
       const anchored = networksAnchored(ranked.length, cur.series, cur.stepMs);
-      facts.push(fact(`Networks that anchored snapshots, this span${anchored.atLeast ? ", at least" : ""}`, anchored.count, "count"));
+      facts.push(fact(`Networks that anchored metagraph snapshots, this span${anchored.atLeast ? ", at least" : ""}`, anchored.count, "count"));
       const [quietId, quietV] = ranked[ranked.length - 1]!;
       const quietOwn = perDay ? quietV : spanTotal("snapshots", quietId, cur);
-      if (quietOwn != null) facts.push(fact(`Quietest active network ${mention(quietId)}, snapshots anchored${dayWord}, this span`, quietOwn, "count"));
+      if (quietOwn != null) facts.push(fact(`Quietest active network ${mention(quietId)}, metagraph snapshots anchored${dayWord}, this span`, quietOwn, "count"));
     }
   }
 
@@ -271,22 +276,22 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
     // zeros go, and what a reader can use takes their place, when the set last anchored and how
     // many chains ever have.
     if (!carried.length) facts.length = 0;
-    facts.push(fact("Unlisted chains that anchored snapshots, this span", carried.length, "count"));
+    facts.push(fact("Unlisted chains that anchored metagraph snapshots, this span", carried.length, "count"));
     if (carried.length > 1) {
       const sum = carried.reduce((a, v) => a + v, 0);
-      facts.push(fact("Busiest unlisted chain, share of the set's snapshots anchored, this span", carried[0]! / sum, "share"));
+      facts.push(fact("Busiest unlisted chain, share of the set's metagraph snapshots anchored, this span", carried[0]! / sum, "share"));
     }
     if (input.history) {
       const h = fold(trimNewestPartial(input.history));
       const last = lastSeen(h.series[`m.${UNLISTED_ID}.snaps`] ?? [], h.buckets);
       // …and a set that stopped well before the span's end says when, active span or not (live: the
       // year's note never said the set went silent in August).
-      if (last != null && last < span.toMs - STOPPED_MS) facts.push(fact("Last day an unlisted chain anchored a snapshot", last, "date"));
+      if (last != null && last < span.toMs - STOPPED_MS) facts.push(fact("Last day an unlisted chain anchored a metagraph snapshot", last, "date"));
       const ever = Object.keys(h.series).filter((k) => {
         const id = /^m\.([^.]+)\.snaps$/.exec(k)?.[1];
         return id != null && id !== UNLISTED_ID && !isListed(id) && h.series[k]!.some((v) => (v ?? 0) > 0);
       }).length;
-      if (!carried.length && ever) facts.push(fact("Unlisted chains that anchored snapshots in all measured history", ever, "count"));
+      if (!carried.length && ever) facts.push(fact("Unlisted chains that anchored metagraph snapshots in all measured history", ever, "count"));
     }
   }
 
@@ -305,8 +310,8 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
       const before = seen.filter((b) => b < span.fromMs).at(-1);
       const after = seen.find((b) => b >= span.toMs);
       const who = mention(subject);
-      if (before != null) facts.push(fact(`Last day ${who} anchored a snapshot${after != null ? " before this span" : ", none since"}`, before, "date"));
-      if (after != null) facts.push(fact(`First day ${who} anchored a snapshot${before != null ? " after this span" : ", none before"}`, after, "date"));
+      if (before != null) facts.push(fact(`Last day ${who} anchored a metagraph snapshot${after != null ? " before this span" : ", none since"}`, before, "date"));
+      if (after != null) facts.push(fact(`First day ${who} anchored a metagraph snapshot${before != null ? " after this span" : ", none before"}`, after, "date"));
     }
   }
 
@@ -341,11 +346,11 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
         const day = ext.find((x) => x.kind === kind);
         if (!day) continue;
         facts.push(fact(`${name} day of the span, date`, day.dayMs, "date"));
-        facts.push(fact(`${name} day of the span, snapshots anchored`, day.value, "count"));
+        facts.push(fact(`${name} day of the span, metagraph snapshots anchored`, day.value, "count"));
       }
       // The snapshots' own median: `ext` also holds a longest wait or a broadest day, each with a level of its own.
       const counted = ext.find((x) => x.kind === "peak" || x.kind === "trough");
-      if (counted) facts.push(fact("Typical day of the span, snapshots anchored", counted.level, "count"));
+      if (counted) facts.push(fact("Typical day of the span, metagraph snapshots anchored", counted.level, "count"));
     }
     days = input.shape ? [] : notableDays(pick);
     days.forEach((day, i) => {
@@ -359,8 +364,8 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
       const what =
         day.kind === "high" ? "spike"
         : day.kind === "low" ? "dip"
-        : day.kind === "first" ? `first day ${who} anchored a snapshot, none before`
-        : day.kind === "last" ? `last day ${who} anchored a snapshot, none since`
+        : day.kind === "first" ? `first day ${who} anchored a metagraph snapshot, none before`
+        : day.kind === "last" ? `last day ${who} anchored a metagraph snapshot, none since`
         // THE RANGE'S EXTREMES (`NOTABLE_FLOOR`): named as the span's, never as a spike or a dip.
         : day.kind === "peak" ? "busiest day of the span"
         : day.kind === "trough" ? "quietest day of the span"
@@ -369,14 +374,14 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
         : "pause";
       const kind = dayMeasured(day);
       const measured =
-        day.kind === "pause" || day.kind === "longest" ? `longest wait between ${dag ? "global snapshots" : "snapshots"}`
+        day.kind === "pause" || day.kind === "longest" ? `longest wait between ${dag ? "global snapshots" : "metagraph snapshots"}`
         : day.kind === "broadest" ? "networks that anchored that day"
         : day.measure === "globals" ? "global snapshots that day"
         // The whole network's fees and data are read from the stored floors (`notableDays`), which
         // leave out what the unlisted chains paid and wrote.
         : day.measure === "fees" ? `DAG in fees that day${dag ? ", at least" : ""}`
         : day.measure === "kb" ? `MB of data that day${dag ? ", at least" : ""}`
-        : "snapshots anchored that day";
+        : "metagraph snapshots anchored that day";
       const metric = day.measure === "fees" || day.measure === "kb" ? TREND_METRICS[day.measure] : null;
       const read = (v: number) => (metric ? v * metric.scale : v);
       const format = metric?.format;

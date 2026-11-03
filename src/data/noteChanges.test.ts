@@ -56,7 +56,7 @@ describe("a row's size", () => {
 
 describe("the chamber's extremes (user, 2026-11-01)", () => {
   it("states the largest global snapshot by what it anchored, with no network to name", () => {
-    expect(largestGlobalChange(18)).toEqual({ kind: "peak", size: 0, subject: { kind: "self" }, text: "The largest global snapshot anchored 18 snapshots" });
+    expect(largestGlobalChange(18)).toEqual({ kind: "peak", size: 0, subject: { kind: "self" }, text: "The largest global snapshot anchored 18 metagraph snapshots" });
   });
 
   it("names who held the longest gap, the unit written out", () => {
@@ -74,8 +74,8 @@ describe("the chamber's extremes (user, 2026-11-01)", () => {
 
 describe("rhythmChange", () => {
   it("states a real change of pace against the usual one", () => {
-    expect(rhythmChange("Dor", 30, 12, NET)).toMatchObject({ kind: "faster", text: "Dor sped up: a snapshot every 12 seconds, usually 30 seconds" });
-    expect(rhythmChange("Dor", 60, 300, NET)).toMatchObject({ kind: "slower", text: "Dor slowed down: a snapshot every 5 minutes, usually 1 minute" });
+    expect(rhythmChange("Dor", 30, 12, NET)).toMatchObject({ kind: "faster", text: "Dor sped up: a metagraph snapshot every 12 seconds, usually 30 seconds" });
+    expect(rhythmChange("Dor", 60, 300, NET)).toMatchObject({ kind: "slower", text: "Dor slowed down: a metagraph snapshot every 5 minutes, usually 1 minute" });
   });
   it("is nothing under the threshold", () => {
     expect(rhythmChange("Dor", 100, 100 * (1 + RHYTHM_CHANGE) - 1, NET)).toBeNull();

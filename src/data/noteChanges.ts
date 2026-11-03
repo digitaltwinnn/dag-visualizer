@@ -157,14 +157,14 @@ export function rhythmChange(name: string, usualS: number, recentS: number, subj
   const usual = spacingWords(usualS);
   if (size < RHYTHM_CHANGE || now === usual) return null;
   const faster = recentS < usualS;
-  return { kind: faster ? "faster" : "slower", subject, size, text: `${name} ${faster ? "sped up" : "slowed down"}: a snapshot every ${now}, usually ${usual}` };
+  return { kind: faster ? "faster" : "slower", subject, size, text: `${name} ${faster ? "sped up" : "slowed down"}: a metagraph snapshot every ${now}, usually ${usual}` };
 }
 
 /** The span's largest global snapshot, by the snapshots it anchored (user, 2026-11-02: "more
  *  interesting" than a metagraph's). Its record is found with the note; until then, or where it
  *  cannot be, the row is a statement. */
 export function largestGlobalChange(anchored: number): NoteChange {
-  return { kind: "peak", subject: { kind: "self" }, size: 0, text: `The largest global snapshot anchored ${anchored} snapshots` };
+  return { kind: "peak", subject: { kind: "self" }, size: 0, text: `The largest global snapshot anchored ${anchored} metagraph snapshots` };
 }
 
 /** Who held the span's longest gap between snapshots. Below the largest snapshot on a tie of kinds. */

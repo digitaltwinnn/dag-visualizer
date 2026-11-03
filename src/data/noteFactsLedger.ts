@@ -193,7 +193,7 @@ export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: st
 
     // WHAT EACH ONE CARRIES: the snapshots anchored per global snapshot, over buckets where both counted.
     const carried = pairedSums(recent.series["g.anchors"] ?? [], recent.series["g.ticks"] ?? [], recent);
-    if (carried) facts.push(fact("Snapshots anchored per global snapshot, recent", carried.n / carried.d, "amount"));
+    if (carried) facts.push(fact("Metagraph snapshots anchored per global snapshot, recent", carried.n / carried.d, "amount"));
 
     // FEES AND DATA, per hour. The whole totals are only a floor where the unlisted channels were
     // not measured: labelled so, and given no ratio and no pair.
@@ -214,11 +214,11 @@ export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: st
       return [...snaps, ...carriedBy].some((v) => v != null && v > 0);
     });
     const anchored = networksAnchored(active.length, recent.series, recent.stepMs);
-    facts.push(fact(`Networks that anchored snapshots, recent${anchored.atLeast ? ", at least" : ""}`, anchored.count, "count"));
+    facts.push(fact(`Networks that anchored metagraph snapshots, recent${anchored.atLeast ? ", at least" : ""}`, anchored.count, "count"));
   } else {
     const name = catalog[subject] ?? subject;
     const own = (d: TrendsWindowData) => metricSeries("snapshots", subject, d.series).points;
-    rates(`${name} snapshots anchored per hour`, `${name} snapshots anchored per hour, ratio of recent to usual`, "snapshots", own);
+    rates(`${name} metagraph snapshots anchored per hour`, `${name} metagraph snapshots anchored per hour, ratio of recent to usual`, "snapshots", own);
 
     const spacing = (d: TrendsWindowData) => {
       const s = metricSeries("continuity", subject, d.series);
@@ -226,11 +226,11 @@ export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: st
     };
     const mean = spacing(recent);
     const usualMean = weekCovered ? spacing(week) : null;
-    const spaced = ends(`${name} mean spacing between snapshots`, mean != null && usualMean != null);
-    if (mean != null) facts.push(fact(`${name} mean spacing between snapshots, recent`, mean, "duration", undefined, spaced("to")));
-    if (usualMean != null) facts.push(fact(`${name} mean spacing between snapshots, usual`, usualMean, "duration", undefined, spaced("from")));
+    const spaced = ends(`${name} mean spacing between metagraph snapshots`, mean != null && usualMean != null);
+    if (mean != null) facts.push(fact(`${name} mean spacing between metagraph snapshots, recent`, mean, "duration", undefined, spaced("to")));
+    if (usualMean != null) facts.push(fact(`${name} mean spacing between metagraph snapshots, usual`, usualMean, "duration", undefined, spaced("from")));
     const widest = longestGap(metricSeries("continuity", subject, recent.series).gaps ?? [], recent);
-    if (widest != null) facts.push(fact(`${name} longest gap between snapshots, recent`, widest, "duration"));
+    if (widest != null) facts.push(fact(`${name} longest gap between metagraph snapshots, recent`, widest, "duration"));
 
     // WAS PART OF: the global snapshots that carried it, over all of them. The whole is never
     // smaller than the part.
