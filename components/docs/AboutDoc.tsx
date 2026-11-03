@@ -169,19 +169,21 @@ export default function AboutDoc() {
           ))}
         </Question>
 
+        {/* Short sentences, one idea each, a bold lead to scan by (user, 2026-11-03: "make it easier
+            to read"). The pinned-snapshot example and the "records" detail were cut: a first-time
+            reader meets them on screen. */}
         <Question q="How do I find my way around?">
           <p>
-            <B>One selection carries across every view.</B> Pick a network in the Hypergraph and the globe, the snapshot
-            chamber and the charts all open on it.
+            <B>Every view follows your pick.</B> Choose a network in the Hypergraph, then switch views: the globe, the
+            snapshots and the charts all open on that network.
           </p>
           <p>
-            Whatever you select gets its own card, and the cards <B>adapt to what you&apos;re looking at</B> rather than
-            reciting a fixed record: select a node while a snapshot is pinned and its card leads with how the two are
-            related, and a fact the card above already states isn&apos;t repeated below.
+            <B>Each pick gets its own card</B> on the right. The cards fit what you&apos;re looking at, and a fact the card
+            above already shows isn&apos;t repeated.
           </p>
           <p>
-            Every view has a <B>RAW</B> switch that drops one level down to the records underneath — the actual snapshots in
-            the live views, the stored measurements behind the charts in History — with the card you had open coming along.
+            <B>RAW shows what&apos;s underneath.</B> Every view has a RAW switch that opens the actual records behind it,
+            starting where you were looking.
           </p>
         </Question>
 
