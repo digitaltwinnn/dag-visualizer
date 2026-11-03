@@ -111,25 +111,17 @@ export function latestTickOf(
   return null;
 }
 
-/** ONE ROW PER MACHINE — the node pager's stops and the explorer's node rows. A node that runs two
- *  layers is two rows (one per layer), and a machine on two networks is a row per network (a DAG
- *  validator that also runs UP — user, 2026-11-03: "each DAG/UP node is listed twice"); both are one
- *  node, keyed by its address (`hoverKeyOf` keys a DAG pick by peer id and a metagraph pick by IP,
- *  so it cannot tell those two apart). The first row of a machine stands for it, unless `prefer`
- *  names another of its rows (the selected one, so the list and the pager keep the subject).
- *  A row with no address is neither listable nor steppable. */
-export function machinesOf(rows: readonly NodeRow[], prefer?: (r: NodeRow) => boolean): NodeRow[] {
-  const at = new Map<string, number>();
+/** THE NODE PAGER'S PROJECTION: a node that runs two layers is two explorer rows (one per layer) but
+ *  ONE pager stop — deduped by the shared hover key, the rule `hoverKeyOf` encodes for pairing.
+ *  A row without a key is neither pairable nor steppable. */
+export function machinesOf(rows: readonly NodeRow[]): NodeRow[] {
+  const seen = new Set<string>();
   const out: NodeRow[] = [];
   for (const r of rows) {
-    const p = r.pick as { node?: { ip?: string } | null };
-    const k = p.node?.ip || hoverKeyOf(r.pick);
-    if (!k) continue;
-    const i = at.get(k);
-    if (i == null) {
-      at.set(k, out.length);
-      out.push(r);
-    } else if (prefer && !prefer(out[i]!) && prefer(r)) out[i] = r;
+    const k = hoverKeyOf(r.pick);
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    out.push(r);
   }
   return out;
 }

@@ -355,8 +355,6 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
     case "node": {
       const curKey = hoverKeyOf(s.inspect);
       if (!curKey) return null;
-      // A machine's row in the set is the selected pick's own, so its key finds the position.
-      const isCur = (r: NodeRow) => hoverKeyOf(r.pick) === curKey;
 
       // Scope = the FINEST committed parent (cohort > country > composition > network) — the
       // same containment the ancestry rules commit, so the pager steps inside the lit group.
@@ -365,10 +363,10 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
       let groupOf: ((r: NodeRow) => CompositionSel | null) | null = null;
       if (s.cohort) {
         const c = s.cohort;
-        rows = machinesOf(cohortsIn(s, c.cc).find((g) => sameCohort(c, { cc: c.cc, city: g.city, isp: g.isp }))?.rows ?? [], isCur);
+        rows = machinesOf(cohortsIn(s, c.cc).find((g) => sameCohort(c, { cc: c.cc, city: g.city, isp: g.isp }))?.rows ?? []);
         parent = cohortLabel(c);
       } else if (s.country) {
-        rows = machinesOf(countryNodes(s.country, s.countries, byCountryOf(s)), isCur);
+        rows = machinesOf(countryNodes(s.country, s.countries, byCountryOf(s)));
         parent = s.countries.find((c) => c.cc === s.country)?.country ?? s.country;
       } else if (s.mode === "hyper") {
         // Hyper steps the explorer's own sequence — composition groups in size order, each row
@@ -395,7 +393,7 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
         parent = "Validators that signed";
       } else {
         // A network-wide node list has no explorer level; today's order is kept.
-        rows = machinesOf([...s.selNodes].sort(nodeOrder), isCur);
+        rows = machinesOf([...s.selNodes].sort(nodeOrder));
         parent = networkLabel(s);
       }
 

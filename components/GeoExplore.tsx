@@ -26,7 +26,7 @@ import { useStore } from "@/src/store/store";
 import { NO_SIGNAL_COPY, useNoSignal } from "@/components/useNoSignal";
 import { ccMark } from "@/src/util/format";
 import { levelMeasure } from "@/src/data/explorerMeasure";
-import { cohortsLevel, countriesLevel, countryNodes, machinesOf, nodesByCountry } from "@/src/data/ladderLevels";
+import { cohortsLevel, countriesLevel, countryNodes, nodesByCountry } from "@/src/data/ladderLevels";
 import { UNLISTED_ID } from "@/src/data/unlisted";
 import { useFeedRead } from "@/components/useFeedRead";
 
@@ -230,8 +230,7 @@ export default function GeoExplore() {
       // The live foot on every level (components/explorer/LiveFoot.tsx has the argument).
       pager: <LiveFoot />,
       // The one node row (`explorer/nodeRow.tsx`), ticker included, as in every explorer.
-      // One row per machine (`machinesOf`): a node on two networks is one row wearing both tickers.
-      rows: machinesOf(openCohort.rows, nodeOn).map((r, i) => {
+      rows: openCohort.rows.map((r, i) => {
         const on = nodeOn(r);
         const netId = r.pick.kind === "metanode" && r.pick.meta ? r.pick.meta.id : "dag";
         const hue = identityHudCss(netId);
