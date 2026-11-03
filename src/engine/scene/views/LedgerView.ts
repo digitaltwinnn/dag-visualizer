@@ -797,6 +797,28 @@ export class LedgerView implements SceneView {
     this._rebuildAllSlots();
   }
 
+  /** A SOURCE SWITCH — the live buffer ↔ a past window around an old pin (user, 2026-11-03: "go
+   *  back in time"; `src/data/pastWindow.ts`). The model only ever advances, so another stretch of
+   *  the chain starts a fresh one, which seeds itself from the next `setData` like a first entry.
+   *  The caller re-applies the selection, so the rewind lands the pin. */
+  resetHistory(): void {
+    this.model = new LedgerModel();
+    this._graceOrd = null;
+    this._graceT = 0;
+    this._advanced = false;
+    this._lastSnaps = null;
+    this._lastGetAnchor = null;
+  }
+
+  /** While a past window stands, "now" is not on screen: the live edge stands down and the newest
+   *  row is an ordinary row of the past (its exact read is a measurement, not a tick in flight). */
+  private _frozen = false;
+  setFrozen(on: boolean): void {
+    if (on === this._frozen) return;
+    this._frozen = on;
+    this._rebuildAllSlots();
+  }
+
   // Ordinals whose exact read FAILED (store.exactMiss, bridged by the Engine): the give-up
   // signal. A missed tick is no longer IN FLIGHT, so the live edge lets go of it and falls to
   // standby, and the tick becomes an ordinary unmeasured ROW — a still, dim seed in its own
@@ -962,7 +984,7 @@ export class LedgerView implements SceneView {
    *  seed in its own place in time. */
   private _liveOrd(): number | null {
     const snap = this._slotSnap[0];
-    if (!snap || this._exact[snap.ordinal] || this._missOrds.has(snap.ordinal)) return null;
+    if (this._frozen || !snap || this._exact[snap.ordinal] || this._missOrds.has(snap.ordinal)) return null;
     return snap.ordinal;
   }
 
@@ -1291,7 +1313,7 @@ export class LedgerView implements SceneView {
     // The chamber's boundary with NOW. Hue says "filtered" without a word — the committed
     // network's identity, the neutral core when the filter is "all".
     const liveOrd = this._liveOrd();
-    this._live.setState(liveEdgePhase(this.model.tickOrdinal != null, liveOrd));
+    this._live.setState(liveEdgePhase(!this._frozen && this.model.tickOrdinal != null, liveOrd));
     const lk = this._netDimKey();
     this._live.setHue(lk === "all" ? this._core : this._laneColor(lk).getHex());
     this._live.update(dt);

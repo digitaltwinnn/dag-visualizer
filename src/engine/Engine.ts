@@ -2,7 +2,8 @@ import * as THREE from "three";
 import Stats from "stats.js";
 import { useStore, type Mode } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
-import { metagraphById, initNetwork, getNetwork, getAnchor, DEFAULT_META_COLOR, resolveSignerIps } from "@/src/data/network";
+import { metagraphById, initNetwork, getNetwork, DEFAULT_META_COLOR, resolveSignerIps } from "@/src/data/network";
+import { getPastWindow, ledgerSource, onPastWindow } from "@/src/data/pastWindow";
 import { ledgerLens } from "@/src/data/ledgerStory";
 import { reportPoll, touchPoll } from "@/src/data/api";
 import { holdFeed } from "@/src/data/feedUse";
@@ -717,7 +718,8 @@ export class Engine {
     // bridge, so the lookup lives here and the model stays pure. A tile the buffer can't name is
     // anonymous: drawn, but not pickable. `k` is the tile's index within ITS TICK.
     this.ledger.setTileResolver((metaId, ts, k) => {
-      const net = getNetwork();
+      // The LEDGER SOURCE — the past window around an old pin, else the live buffer.
+      const net = ledgerSource(getNetwork());
       if (!net) return null;
       const g = net.globalSnapshots.find((gs) => gs.timestamp === ts);
       if (!g) return null;
@@ -1179,6 +1181,17 @@ export class Engine {
       if (arrived > 0) this.layers.pulseMeta(metaId, arrived);
       if (this.mode === "ledger") this._ledgerDirty = true; // the per-tick breakdown filled in
     });
+    // THE SOURCE SWITCH (`src/data/pastWindow.ts`, user 2026-11-03: an old pin goes "back in time"):
+    // the live buffer ↔ a past window around the pin. A fresh chamber history (the model only ever
+    // advances), the live edge frozen while past, and the pin re-applied so the rewind lands it.
+    this.unsub.push(
+      onPastWindow(() => {
+        this.ledger.resetHistory();
+        this.ledger.setFrozen(!!getPastWindow());
+        this._refreshLedger();
+        this.ledger.setSelected(useStore.getState().snap?.data?.ordinal ?? null);
+      }),
+    );
     net?.on("global", (evt: { latest: GlobalSnapshot | null }) => {
       if (this.mode === "ledger") this._ledgerDirty = true; // a new tick landed on the chain
       const ord = evt.latest?.ordinal;
@@ -1398,8 +1411,10 @@ export class Engine {
   // Re-read the ledger's live tick from the Global L0 buffer + the per-tick anchor index. Cheap
   // enough to call on each new tick / anchor fill, but only while the ledger view is showing.
   private _refreshLedger() {
-    const net = getNetwork() as unknown as { globalSnapshots?: GlobalSnapshot[] } | null;
-    this.ledger.setData(net?.globalSnapshots ?? [], (ts) => getAnchor(ts));
+    // The LEDGER SOURCE (`src/data/pastWindow.ts`): the past window around an old pin, else the
+    // live buffer. A past window is fixed, so a live event re-hands the same rows and moves nothing.
+    const src = ledgerSource(getNetwork());
+    this.ledger.setData(src?.globalSnapshots ?? [], (ts) => src?.getAnchor(ts) ?? null);
     // The byte bar measures ticks from the EXACT reads (spec §6.3) — re-hand the map on each
     // refresh so a tick that landed since the last one gets measured instead of staying a seam.
     this.ledger.setExact(useStore.getState().snapshotExact);
