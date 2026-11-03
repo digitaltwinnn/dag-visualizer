@@ -103,8 +103,9 @@ export const mayAdvance = (elapsedMs: number, phase: "out" | "in" | null): boole
 // across the scene. Only a tour that ENDED — Skip, Back, a key or a scene that never readied hand
 // nothing over. Played once; the reader's first gesture ends it.
 
-/** How long the hand-over stands, unless the reader moves first. */
-export const HANDOVER_MS = 8000;
+/** How long the hand-over stands, unless the reader moves first (8 → 6 seconds, user 2026-11-03:
+ *  "remove the text a bit earlier"). */
+export const HANDOVER_MS = 6000;
 
 /** A surface that pulses its edge on the hand-over: the desktop's explore card, card rail and vitals
  *  band, or the phone's open sheet and its dock bar. */

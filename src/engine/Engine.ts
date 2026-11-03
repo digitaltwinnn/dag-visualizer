@@ -954,6 +954,8 @@ export class Engine {
         // Read fresh: a view switch above (`setMode`) releases a browsed network while `st` still
         // holds it, and that is no network event, so nothing selected under it may drop.
         const standsOn = viewNetwork(useStore.getState());
+        // Held or browsed (`dimModel.hideFrac`): a browse and a filter on the same network differ only here.
+        this.globe.filterHeld = useStore.getState().filter !== "all";
         if (standsOn !== this.filter) {
           this.filter = standsOn;
           // Switching network clears any country drill-down (matches the old geo UX).

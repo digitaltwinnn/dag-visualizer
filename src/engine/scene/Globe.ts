@@ -233,6 +233,9 @@ export class Globe implements GeoViewHost {
   metaNodes: MetaNodeRecord[] = [];
   metaList: MetaLayout[] = [];
   filter = "all";
+  /** Is `filter` the top bar's own (held) rather than a browsed network? Only a held one hides the
+   *  rest (`dimModel.hideFrac`). Written by the Engine, the store bridge. */
+  filterHeld = false;
   private _hoverNodeId: string | null = null;
   // The hovered node's own record, resolved at hover time (see setHoverNode) — the stage light's
   // preview subject.
@@ -374,7 +377,7 @@ export class Globe implements GeoViewHost {
     this._ctx = {
       c: {
         morph: 0, hoverFilterActive: false, ledger: false, countryFilter: null,
-        countryMix: 0, hoverNodeId: null, hoverCohort: null, selectedNodeId: null, filter: "all",
+        countryMix: 0, hoverNodeId: null, hoverCohort: null, selectedNodeId: null, filter: "all", held: false,
       },
       dim: 0, clock: 0, camN: this._camN, hasCam: false,
       ledgerT: 0, dt: 0, flashDecay: 0, group: this.group,
@@ -1684,6 +1687,7 @@ export class Globe implements GeoViewHost {
       );
     c.selectedNodeId = this._selectedNodeId;
     c.filter = this.filter;
+    c.held = this.filterHeld && this.filter !== "all";
     ctx.dim = this.dim;
     ctx.clock = this.clock;
     ctx.hasCam = this._hasCam;
