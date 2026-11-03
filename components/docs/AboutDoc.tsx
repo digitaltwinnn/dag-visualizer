@@ -62,7 +62,7 @@ function ViewTile({ id, name, soon }: { id: Mode; name: string; soon?: boolean }
     // yet, the bar's dimmed "Coming soon" entry in the same voice.
     <Panel className={cn("h-full p-4", soon && "border-dashed")}>
       <Icon aria-hidden className={cn("size-5", soon ? "text-muted-foreground" : "text-primary")} />
-      <h2 className="mt-2.5 text-title font-semibold text-foreground">{name}</h2>
+      <h3 className="mt-2.5 text-title font-semibold text-foreground">{name}</h3>
       <p className="mt-1 text-body text-muted-foreground">{VIEW_QUESTION[id]}</p>
     </Panel>
   );
@@ -125,10 +125,15 @@ export default function AboutDoc() {
         Designed, built and integrated with Gate AI, Constellation&apos;s own AI product.
       </p>
 
-      <section id="explore" aria-label="The views" className="mt-8 grid grid-cols-5 gap-3 max-[900px]:grid-cols-3 max-[700px]:grid-cols-2">
-        {ROUTED_VIEWS.map((v) => (
-          <ViewTile key={v.id} id={v.id} name={v.name} soon={v.soon} />
-        ))}
+      {/* Named as views (user, 2026-11-03: "mention these are views"), in the house eyebrow — the
+          bare role word every card head wears — and never counted: more will come. */}
+      <section id="explore" className="mt-8">
+        <h2 className="text-label tracking-caps uppercase text-muted-foreground">Views</h2>
+        <div className="mt-3 grid grid-cols-5 gap-3 max-[900px]:grid-cols-3 max-[700px]:grid-cols-2">
+          {ROUTED_VIEWS.map((v) => (
+            <ViewTile key={v.id} id={v.id} name={v.name} soon={v.soon} />
+          ))}
+        </div>
       </section>
 
       <section id="questions" aria-label="Questions" className="mt-10 border-t border-border">
