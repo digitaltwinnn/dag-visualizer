@@ -250,6 +250,15 @@ export function measuredTx(
   return Array.from({ length: n }, (_, i) => (cov?.[i] == null ? null : row?.[i] ?? 0));
 }
 
+/** TRANSFER VOLUME (2026-11-04 — user: "will we also know the transferred value?", and "volume", the
+ *  common word): what a network's transfers moved per bucket, IN ITS OWN TOKEN — the DAG's in DAG
+ *  (`g.txAmt`), a network's in its token (`m.<id>.txAmt`) — measured where the transfers are
+ *  (`measuredTx`). Never a measure of its own: tokens are not one unit, so no list could rank them
+ *  and no shared scale could hold them. It rides the Transfers measure's head and moment instead. */
+export function transferVolume(id: string, series: Readonly<Record<string, (number | null)[]>>): (number | null)[] {
+  return measuredTx(series[id === "dag" ? "g.txAmt" : `m.${id}.txAmt`], series);
+}
+
 /** The newest value that was actually MEASURED — the last non-null, which is not the last
  *  bucket: a chain quiet for a week still has a reading, and it is a week old. */
 export function lastMeasured(points: readonly (number | null)[]): number | null {
@@ -643,13 +652,15 @@ export function holdOrder(held: readonly string[], ranked: readonly string[]): s
  *  which is CREATED (user, 2026-10-08: "I think they created one every 3s, but anchored it to global
  *  only occurs ~30sec"): the gap is between the chain's own snapshots, not between the global
  *  snapshots that carried them, and the anchoring cadence is not a stored series. */
-export function momentPhrase(metric: TrendMetric, stepMs: number, hypergraph = false): { verb: string; rest: string } {
+export function momentPhrase(metric: TrendMetric, stepMs: number, hypergraph = false, worth?: string): { verb: string; rest: string } {
   const inBucket = stepMs >= 86400000 ? "on that day" : stepMs >= 3600000 ? "in that hour" : "in those 5 minutes";
   switch (metric) {
     case "snapshots": return { verb: "anchored", rest: `snapshots ${inBucket}` };
     case "globals": return { verb: globalsVerb(hypergraph), rest: `global snapshots ${inBucket}` };
     case "blocks": return { verb: "produced", rest: `blocks ${inBucket}` };
-    case "transfers": return { verb: "recorded", rest: `transfers ${inBucket}` };
+    // WORTH, in the sentence (2026-11-04): what they moved, in the network's own token, already
+    // formatted by the caller ("worth 120K DOR"); absent where the volume was not measured.
+    case "transfers": return { verb: "recorded", rest: `transfers ${worth ? `worth ${worth} ` : ""}${inBucket}` };
     case "fees": return { verb: "paid", rest: `DAG in fees ${inBucket}` };
     case "kb": return { verb: "anchored", rest: `of data ${inBucket}` };
     case "nodes": return { verb: "ran", rest: "nodes" };

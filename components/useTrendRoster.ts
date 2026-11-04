@@ -17,6 +17,7 @@ import {
   rankOrder,
   spanAverage,
   stepFor,
+  transferVolume,
   trimCounterEdges,
   type MetricSeries,
   typeBands,
@@ -86,6 +87,12 @@ export interface TrendRosterRow {
   /** CONTINUITY only: the global snapshots that carried this chain per bucket, cut like `series`
    *  (`anchorSeries`) — the Moment lead's second cadence. Absent for every other measure. */
   anchors?: (number | null)[];
+  /** TRANSFERS only: what they MOVED, in the network's own token (`transferVolume`), on the head's
+   *  own basis — per day over a span, the latest full day under one — so "average" and "volume"
+   *  beside it are one unit (2026-11-04). Absent for every other measure; null where unmeasured. */
+  volume?: number | null;
+  /** TRANSFERS only: the volume per bucket, cut like `series` — the Moment's "worth …". */
+  volumePoints?: (number | null)[];
 }
 
 export interface TrendRosterView {
@@ -220,6 +227,19 @@ export default function useTrendRoster(
         anchors: metric === "continuity" && id !== "dag" ? cut(anchorSeries(id, series)) : undefined,
       };
       r.head = headKind === "span" ? r.span : r.day;
+      // The unlisted set folds many chains, each in its own token: no one volume to state.
+      if (metric === "transfers" && id !== UNLISTED_ID) {
+        const vol = cut(transferVolume(id, series));
+        r.volumePoints = vol;
+        r.volume =
+          headKind === "span"
+            ? spanAverage("transfers", vol, stepMs)
+            : stepMs >= 86_400_000
+              ? lastMeasured(vol)
+              : daily
+                ? lastMeasured(transferVolume(id, daily))
+                : null;
+      }
       return r;
     };
     for (const id of ids) rows.set(id, rowOf(id));

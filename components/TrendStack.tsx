@@ -74,7 +74,7 @@ import useTrendsSlice from "@/components/useTrendsSlice";
 import useStagedMeasure, { ROLL_CLASS, useHeldOrder } from "@/components/useStagedMeasure";
 import { cn } from "@/lib/utils";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
-import { headWord, metricCaption, metricLabel, peakReading, sharedCeiling, stepMetric } from "@/src/data/trendSeries";
+import { formatDag, headWord, metricCaption, metricLabel, peakReading, sharedCeiling, stepMetric } from "@/src/data/trendSeries";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { DUR_OUT } from "@/src/engine/domain/viewTransition";
 import { swipeIntent, swipeOf } from "@/src/engine/domain/planeSwipe";
@@ -87,7 +87,7 @@ import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 import TrendTether from "@/components/TrendTether";
 import { useBreakpoint } from "@/components/useBreakpoint";
-import { UNLISTED_ID } from "@/src/data/unlisted";
+import { displayNetwork, UNLISTED_ID } from "@/src/data/unlisted";
 
 const NOTE_DAY_MS = 86_400_000;
 
@@ -771,6 +771,13 @@ export default function TrendStack() {
                   pending: acquiring || slice.stale || (roster.headKind === "day" ? roster.dayPending : roster.pending),
                 }}
                 peak={acquiring || slice.stale || !pose.interactive ? null : peakReading(row.series.points, axis, step, metric, roster.headKind, row.series.weights)}
+                // TRANSFER VOLUME (2026-11-04 — "volume", the common word): what the transfers moved,
+                // in this network's own token and on the readout's basis (`TrendRosterRow.volume`).
+                extra={
+                  acquiring || slice.stale || !pose.interactive || row.volume == null
+                    ? null
+                    : { word: "volume", text: `${formatDag(row.volume)} ${displayNetwork(pose.id)?.ticker ?? ""}`.trim() }
+                }
                 format={roster.format}
                 note={acquiring ? "acquiring…" : pending ? "reading the hourly samples…" : undefined}
                 buckets={axis}

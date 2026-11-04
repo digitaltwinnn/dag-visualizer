@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { measuredTx, anchorClause, anchorSeries, headWord, lastSeen, momentPhrase, unlistedUnmeasured, withUnlisted, spanAverage, spanWord, typeBands,
+import { measuredTx, transferVolume, anchorClause, anchorSeries, headWord, lastSeen, momentPhrase, unlistedUnmeasured, withUnlisted, spanAverage, spanWord, typeBands,
   GLOBAL_METRIC_ROWS,
   GLOBAL_READING,
   TREND_METRICS,
@@ -887,5 +887,14 @@ describe("transfers — measured only where their lists were read (2026-11-04)",
     expect(seriesKey("transfers", "dor")).toBe("m.dor.tx");
     expect(METRIC_LABELS.transfers).toBe("Transfers");
     expect(momentPhrase("transfers", 300000)).toEqual({ verb: "recorded", rest: "transfers in those 5 minutes" });
+    expect(momentPhrase("transfers", 3600000, false, "120K DOR").rest).toBe("transfers worth 120K DOR in that hour");
+  });
+});
+
+describe("transferVolume — what the transfers moved, in the network's own token", () => {
+  const series = { "x.cov": [null, 0, 0], "g.txAmt": [0, 4.5, 0], "m.dor.txAmt": [0, 0, 120] };
+  it("reads the DAG's in DAG and a network's in its token, where the transfers were measured", () => {
+    expect(transferVolume("dag", series)).toEqual([null, 4.5, 0]);
+    expect(transferVolume("dor", series)).toEqual([null, 0, 120]);
   });
 });
