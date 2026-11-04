@@ -40,7 +40,7 @@ import { followToggleActions, metaSnapSelectActions, nodeSelectActions, sameMeta
 import { heldTicks, nextHoldTop } from "@/src/data/ledgerHold";
 import { CLOSED_PATH, pathViewChanged, syncLedgerPath, type LedgerPath, type LedgerPathView } from "@/src/data/ledgerPath";
 import LiveDot from "@/components/LiveDot";
-import { PinMark } from "@/components/state/StateAtoms";
+import { PinnedMark } from "@/components/state/StateAtoms";
 import { identityHudCss } from "@/src/palette/identity";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
@@ -297,10 +297,19 @@ export default function LedgerPanel() {
 
   // The shown tick's state mark (see the tick rows): the card's live dot while following, a pin
   // while pinned — the one state species the Global snapshot card's control and the callout
-  // already spell out. The MARK ALONE, CENTRED in the room the name column leaves after the
-  // ordinal (user, 2026-10-24: "center the live bullet / pinned icon in the column, it sits too
-  // close to the left edge; remove the text" — a word beside it had been tried the same day).
-  const followMark = following ? <LiveDot /> : <PinMark className="text-muted-foreground" />;
+  // already spell out. CENTRED in the room the name column leaves after the ordinal (user,
+  // 2026-10-24: "center the live bullet / pinned icon in the column, it sits too close to the left
+  // edge"). Live carries its WORD, as the callout's does (user, 2026-11-04: "the 'live' indicator
+  // has text on the callout but not in the explorer, it should fit there also"; `PinnedMark`'s
+  // rule: a dot alone says nothing); pinned is the icon alone, as everywhere.
+  const followMark = following ? (
+    <span className="inline-flex items-center gap-1.5 text-label text-muted-foreground">
+      <LiveDot />
+      live
+    </span>
+  ) : (
+    <PinnedMark className="text-muted-foreground" />
+  );
   const tickName = (ordinal: number, on: boolean) => (
     <span className="flex items-center tabular-nums">
       {ordinal.toLocaleString()}
