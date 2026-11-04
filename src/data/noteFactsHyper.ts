@@ -47,7 +47,9 @@ import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 //     every count in one facts object comes from it, so they agree;
 //   · node counts go through `gaugeChange`; a gauge that began after the span did (`firstIndex`
 //     beyond 10% of the buckets) states only its current level, never a start of the span's, and is
-//     never a mover. A gauge whose start and end levels are equal is no mover either;
+//     never a mover. A gauge whose start and end levels are equal is no mover either. A network's
+//     start of 0 is read against its last whole day before the span (`throughEdgeOutage`): nodes
+//     there make it an outage the span opened inside, never "its first nodes";
 //   · the sampler writes layer and combination rows only for the roles / types PRESENT, and a failed
 //     cluster fetch drops a role's row while `f.nodes.<id>` HOLDS (the lists merge by IP, so a
 //     hybrid is still counted through its other layer). So each layer and combination is a HELD
@@ -143,6 +145,16 @@ function spanChange(points: Points): { from: number; to: number; firstIndex: num
   return ch && ch.firstIndex <= LATE_START * points.length ? ch : null;
 }
 
+/** A START READ INSIDE AN OUTAGE (user, 2026-11-04: "Upside gained 3 nodes? Why?"). The median
+ *  reads through an outage inside the span, but one the span OPENS in fills the start's samples,
+ *  so a network that held its nodes all along reads 0 at the start and "gained its first nodes"
+ *  by the end. A start of 0 for a network with nodes now is therefore read against `before`, its
+ *  level on the last whole day before the span: nodes there make the 0 an outage and `before` the
+ *  start. No reading there, or 0, and the 0 stands: a first is a first. */
+function throughEdgeOutage<T extends { from: number; to: number }>(ch: T | null, before: number | null): T | null {
+  return ch && ch.from === 0 && ch.to > 0 && before != null && before > 0 ? { ...ch, from: before } : ch;
+}
+
 /** "L0", "L0 and cL1", "L0, cL1 and dL1". */
 function codeList(codes: readonly string[]): string {
   return codes.length < 2 ? (codes[0] ?? "") : `${codes.slice(0, -1).join(", ")} and ${codes[codes.length - 1]}`;
@@ -191,6 +203,14 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
   const weekFrom = weekStart(n);
   const coveredFrom = (lo: number) => covered.slice(lo).some((v) => v != null);
 
+  /** A network's nodes on the last WHOLE day before the span (`throughEdgeOutage`): a daily gauge
+   *  is the day's last hourly reading, so the day the span opens on reads past its start. */
+  const nodesBefore = (id: string): number | null => {
+    const pts = d.series[`f.nodes.${id}`] ?? [];
+    for (let i = n - 1; i >= 0; i--) if (d.buckets[i]! + d.stepMs <= span.fromMs && pts[i] != null) return pts[i]!;
+    return null;
+  };
+
   /** Activity per network over the last week: global snapshots it was part of, per day — the
    *  COMMON reading (`noteFactsActivity.ts`), so the rank and the change fact read one figure. */
   const activity = new Map<string, number>();
@@ -208,8 +228,8 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
   let counts: NoteChange[] = [];
 
   /** A gauge's start, end and ratio, or only its current level where it began late. */
-  const gaugeFacts = (label: string, points: Points): void => {
-    const ch = gaugeChange(points);
+  const gaugeFacts = (label: string, points: Points, before: number | null = null): void => {
+    const ch = throughEdgeOutage(gaugeChange(points), before);
     if (!ch) return;
     if (!spanChange(points)) {
       facts.push(fact(`${label} at the end of the span`, ch.to, "count"));
@@ -253,7 +273,7 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
     // HOW MANY MOVED is stated even at 0 (user, 2026-10-30: a quiet week is SAID, "no changes in
     // composition", rather than left to the node count): the question asks for it by name.
     const movers = ids
-      .map((id) => ({ id, ch: spanChange(fleet.series[`f.nodes.${id}`] ?? []) }))
+      .map((id) => ({ id, ch: throughEdgeOutage(spanChange(fleet.series[`f.nodes.${id}`] ?? []), nodesBefore(id)) }))
       .filter((m): m is { id: string; ch: NonNullable<typeof m.ch> } => !!m.ch && m.ch.to !== m.ch.from)
       .sort((a, b) => Math.abs(b.ch.to - b.ch.from) - Math.abs(a.ch.to - a.ch.from) || a.id.localeCompare(b.id));
     facts.push(fact("Networks whose node count changed over the span", movers.length, "count"));
@@ -330,12 +350,13 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
     const name = mention(subject);
     named.push(subject);
     const nodePoints = fleet.series[`f.nodes.${subject}`] ?? [];
-    gaugeFacts(`${name} nodes`, nodePoints);
+    gaugeFacts(`${name} nodes`, nodePoints, nodesBefore(subject));
 
     // THE CHANGE OF SHAPE: nodes per layer and per combination at the span's start and its end,
     // each a HELD level like the node count's own (see the header). Only what changed is stated,
-    // beside how many layers changed.
-    const ch = spanChange(nodePoints);
+    // beside how many layers changed. A start read through an edge outage has too few agreeing
+    // opening samples to read a shape from, so it states none.
+    const ch = throughEdgeOutage(spanChange(nodePoints), nodesBefore(subject));
     if (ch && ch.from > 0 && ch.to > 0) {
       const agrees = (i: number, level: number) => Math.abs(nodePoints[i]! - level) <= SHAPE_TOLERANCE * level;
       const measured = nodePoints.flatMap((v, i) => (v != null ? [i] : []));
