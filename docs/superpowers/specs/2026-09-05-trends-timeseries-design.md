@@ -70,11 +70,29 @@ present and NOT MEASURED elsewhere. It replaced "anchors minus every listed netw
 explorer timestamp skew (a global's snapshots stamped into the next bucket) turned into phantoms.
 `scripts/rebuild-trends.ts --backfill-unlisted` writes their whole history and the marker.
 
+**Transfers** (2026-11-04 — the user: transactions were "missing in the trends view"): the DAG's own
+transfers on the global row (`g.tx` count, `g.txAmt` DAG moved, `g.txFee` datum) and each chain's
+token transfers on its row (`m.<id>.tx`, `.txAmt` in its own token — never summed across networks —
+and `.txFee`), bucketed by the time of the snapshot that sealed them. A transfer list is keyed by
+that snapshot's ordinal, so the cron reads each list for exactly the ordinals the walk beside it
+passed, on its own cursors (`x`/`xTs` for the DAG, `x.<id>`/`xTs.<id>` per chain). `x.cov` = 0
+marks every bucket whose DAG list was read; elsewhere the transfers are NOT MEASURED, never zero
+(the covered-counter zero-fill would otherwise say every day since 2025 moved nothing). The past is
+written by `fill --from --to --recompute --transfers`, and every fill walks the transfers too.
+
 Deliberately absent: height/subHeight/epochProgress (counters that answer no trend question — the culled-facts rule).
 
 **Fleet gauges** (hourly + daily tiers only; last-write-wins point samples):
 - `nodes` total, `nodes:{id}` per network (12 incl. DAG), `layer:{l0|cl1|dl1}` totals
 - per-country `cc:{XX}` — **daily tier only** (cardinality control)
+
+**Delegated stake** (2026-11-04, hourly + daily tiers, last-write-wins): the Global L0 registry's
+`f.stake` (DAG delegated), `f.stake.live` (to validators in the cluster), `f.stake.delegations`
+(addresses delegating, per validator — not distinct delegators) and `f.stake.validators` (holding
+any). Each validator's own reading lives OUTSIDE the tiers, in `stake:{net}:{YYYY-MM}` (`MM-DD|
+f.stake.<v>`, `f.stakeAddrs.<v>`, `f.stakeLive.<v>`, `<v>` = 16 hex of the peer id, named in
+`stake:{net}:validators`), for the geo family's reasons. Like every fleet gauge it starts the day it
+shipped: no upstream keeps the registry's past.
 
 ≈ 40 fields per fine bucket (288 buckets/day at 5 min), ~56 hourly, ~90 daily.
 

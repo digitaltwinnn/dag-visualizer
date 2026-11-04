@@ -68,6 +68,21 @@ them — but the Next Node server can.
   **A notable row's exact snapshot is found when its note is written** (`app/api/notes/snapshotAt.ts`,
   2026-11-02): the store keeps the largest global and a chain's widest gap per bucket, never which snapshot it was, so the explorer is read by ordinal, best effort, and a row that cannot be resolved keeps
   its network. Nothing new is stored in the trends family.
+  **Transfers** (2026-11-04): the DAG's own (`g.tx` / `g.txAmt` in DAG / `g.txFee`) and each
+  chain's token (`m.<id>.tx` / `.txAmt` in its own token / `.txFee`), read from the explorer's
+  transfer lists for exactly the snapshot ordinals the walks beside them passed — a list keys a
+  transfer by the snapshot that sealed it — on their own cursors (`x`/`xTs`, `x.<id>`/`xTs.<id>`),
+  so a failed transfer read never stalls the spine or a chain's snapshots. `x.cov` (a `set`
+  marker) is the buckets the DAG list was read for: before it shipped, transfers are NOT MEASURED,
+  and `fill --from=2025-05-20 --to=<yesterday> --recompute --transfers` writes the past (every
+  fill walks them too; a `rebuild` does not — follow one with that fill). The deploy day's daily
+  bucket is the cron's partial count until that fill runs.
+  **Delegated stake** (2026-11-04, `stake.ts`): once an hour, on its own `f.stake` slot, the
+  Global L0's registry (`/node-params`) as `f.stake` / `.live` / `.delegations` / `.validators`
+  in the hourly and daily tiers, and each validator's reading in its own keep-forever family
+  `stake:{net}:{YYYY-MM}` with names in `stake:{net}:validators` (`keys.ts` `stakeSlotOf`).
+  No upstream keeps the registry's past, so stake begins the day it shipped. Nothing reads either
+  yet beyond History's RAW records.
   **Where the fleet runs has its own key family** (2026-10-27): once an hour, beside the fleet
   gauges, the sampler stores the whole fleet and each network by country and by hosting provider
   into `geo:{net}:{YYYY}` (day buckets, `f.cc.*` / `f.isp.*`, `fleetGeo.ts`), with provider names

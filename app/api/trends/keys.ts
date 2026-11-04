@@ -52,6 +52,24 @@ export function geoSitesSlotOf(net: string, tsMs: number): { key: string; bucket
   return { key: `geo:${net}:sites:${new Date(tsMs).toISOString().slice(0, 7)}`, bucket };
 }
 
+/** DELEGATED STAKE PER VALIDATOR (2026-11-04): `MM-DD|f.stake.<v>`, `f.stakeAddrs.<v>`,
+ *  `f.stakeLive.<v>` — each registered validator's delegated DAG, the addresses delegating to it
+ *  and whether it stood in the cluster, the day's last hourly reading. `<v>` is the first 16 hex
+ *  of the peer id (`stakeValidatorsKeyOf` maps it back). Its own keep-forever family for the geo
+ *  family's two reasons — stake has no upstream history, so a rebuild must never wipe it, and
+ *  ~550 fields a day would ride every History payload undrawn — one hash per month, like the
+ *  sites, so a reader of a week does not pull a year. */
+export function stakeSlotOf(net: string, tsMs: number): { key: string; bucket: string } {
+  const { bucket } = slotOf(net, "1d", tsMs);
+  return { key: `stake:${net}:${new Date(tsMs).toISOString().slice(0, 7)}`, bucket };
+}
+
+/** `<v>` → `{ id, name }` (the full peer id and the operator's own name), one hash per network,
+ *  so a reader can name a validator that has since left the registry. */
+export function stakeValidatorsKeyOf(net: string): string {
+  return `stake:${net}:validators`;
+}
+
 /** provider key → the lookup's provider name (`fleetGeo.ts` `providerNames`), one hash per
  *  network, so a reader can name a host whose nodes have since gone. */
 export function ispNamesKeyOf(net: string): string {

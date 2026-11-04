@@ -2,11 +2,16 @@
 // (never fetch time), which is what makes bucket resolution independent of run cadence.
 // The IncMap folds repeats WITHIN a run through the same merge ops the store applies
 // ACROSS runs, so both layers speak one semantics (merge.ts).
-import { TIERS, slotOf, fieldOf, geoSitesSlotOf, geoSlotOf, type Tier } from "./keys";
+import { TIERS, slotOf, fieldOf, geoSitesSlotOf, geoSlotOf, stakeSlotOf, type Tier } from "./keys";
 import type { FleetGeo } from "./fleetGeo";
+import type { StakeReading } from "./stake";
 import { mergeVals } from "./merge";
 
 export interface GlobalRec { ordinal: number; timestamp: string; metagraphSnapshotCount?: number; blocks?: unknown[] }
+/** One transfer, DAG or a network's token (2026-11-04): `snapshotOrdinal` is the snapshot that
+ *  carried it — the global for a DAG transfer, the network's own for a token transfer — and
+ *  `timestamp` that snapshot's time. Amount and fee are in datum (1e-8 of the token). */
+export interface TxRec { snapshotOrdinal: number; timestamp: string; amount?: number; fee?: number }
 export interface MetaRec { ordinal: number; timestamp: string; fee?: number; sizeInKB?: number; blocks?: unknown[] }
 export interface FleetCounts {
   /** The whole fleet — absent when the DAG's count is unknown this sample (its clusters could not
@@ -153,6 +158,55 @@ export function bucketFleetGeo(inc: IncMap, net: string, tsMs: number, geo: Flee
   for (const [site, n] of sites) {
     const field = fieldOf(slot.bucket, `f.site.${site}`);
     own.set(field, mergeVals(`f.site.${site}`, own.get(field), n));
+  }
+}
+
+/** TRANSFERS (2026-11-04 — user: transactions were "missing in the trends view"). Every transfer
+ *  a chain's list holds, bucketed by its snapshot's time: the DAG's own as `g.tx` (count),
+ *  `g.txAmt` (DAG moved) and `g.txFee` (datum), a network's token as `m.<id>.tx` / `.txAmt` (in its
+ *  own token, so never summed across networks) / `.txFee`. Counters, every tier. */
+export function bucketTransfers(inc: IncMap, net: string, chain: "dag" | string, recs: readonly TxRec[]): void {
+  const p = chain === "dag" ? "g" : `m.${chain}`;
+  for (const r of recs) {
+    const t = Date.parse(r.timestamp);
+    addInc(inc, net, t, `${p}.tx`, 1);
+    addInc(inc, net, t, `${p}.txAmt`, (Number(r.amount) || 0) / 1e8);
+    addInc(inc, net, t, `${p}.txFee`, Number(r.fee) || 0);
+  }
+}
+
+/** THE TRANSFERS' COVERAGE MARKER (2026-11-04): `x.cov` on every bucket, in every tier, from
+ *  `fromMs` to `toMs` (both ends' buckets included) — the span whose DAG transfer list was read,
+ *  so a bucket with no transfer reads as measured-none and a bucket nobody read (before the
+ *  sampler shipped, before the fill reached, a failed read) as not measured. History's
+ *  covered-counter zero-fill would otherwise claim every `g.ticks` bucket since 2025 transferred
+ *  nothing. A presence marker, so "set" (`merge.ts`). */
+export function markTransferCoverage(inc: IncMap, net: string, fromMs: number, toMs: number, tiers: Tier[] = TIERS): void {
+  if (!(toMs >= fromMs)) return;
+  for (const tier of tiers) {
+    const step = tier === "5m" ? 300_000 : tier === "1h" ? 3_600_000 : 86_400_000;
+    for (let t = fromMs; t <= toMs; t += step) addInc(inc, net, t, "x.cov", 0, [tier]);
+    addInc(inc, net, toMs, "x.cov", 0, [tier]);
+  }
+}
+
+/** DELEGATED STAKE (2026-11-04, `stake.ts`): the registry's totals as hourly + daily gauges —
+ *  `f.stake` (DAG delegated), `f.stake.live` (to validators in the cluster), `f.stake.delegations`,
+ *  `f.stake.validators` — and each validator's own reading in the stake family (`stakeSlotOf`),
+ *  the day's last hourly reading. */
+export function bucketStake(inc: IncMap, net: string, tsMs: number, s: StakeReading): void {
+  const tiers: Tier[] = ["1h", "1d"];
+  addInc(inc, net, tsMs, "f.stake", s.total, tiers);
+  addInc(inc, net, tsMs, "f.stake.live", s.live, tiers);
+  addInc(inc, net, tsMs, "f.stake.delegations", s.delegations, tiers);
+  addInc(inc, net, tsMs, "f.stake.validators", s.validators, tiers);
+  const { key, bucket } = stakeSlotOf(net, tsMs);
+  let m = inc.get(key);
+  if (!m) { m = new Map(); inc.set(key, m); }
+  for (const v of s.perValidator) {
+    m.set(fieldOf(bucket, `f.stake.${v.key}`), v.dag);
+    m.set(fieldOf(bucket, `f.stakeAddrs.${v.key}`), v.addrs);
+    m.set(fieldOf(bucket, `f.stakeLive.${v.key}`), v.live ? 1 : 0);
   }
 }
 

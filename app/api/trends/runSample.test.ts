@@ -192,3 +192,90 @@ describe("runSample", () => {
     expect(store.locked).toBe(false);
   });
 });
+
+describe("runSample transfers (2026-11-04)", () => {
+  // A warm store: the spine read through global 100, the chain through its snapshot 8.
+  const warm = () => {
+    const store = memStore();
+    store.data.set("t:mainnet:cursor", new Map([["g", "100"], ["gTs", String(Date.UTC(2026, 8, 6, 13, 59, 40))], ["m.abc", "8"], ["mTs.abc", String(Date.UTC(2026, 8, 6, 13, 59, 40))]]));
+    return store;
+  };
+  const dagTx = [
+    { snapshotOrdinal: 103, timestamp: iso(14, 1, 4), amount: 9e8 }, // newer than the spine read: next run's
+    { snapshotOrdinal: 102, timestamp: iso(14, 0, 36), amount: 2e8, fee: 1e6 },
+    { snapshotOrdinal: 101, timestamp: iso(14, 0, 8), amount: 1e8 },
+    { snapshotOrdinal: 99, timestamp: iso(13, 58, 0), amount: 5e8 }, // already counted
+  ];
+  const pageTransfers = (fail?: string) => async (chain: string) => {
+    if (chain === fail) throw new Error("504");
+    return { data: chain === "dag" ? dagTx : [{ snapshotOrdinal: 9, timestamp: iso(14, 0, 8), amount: 3e8 }, { snapshotOrdinal: 8, timestamp: iso(13, 59, 40), amount: 1e8 }] };
+  };
+  it("counts the DAG's transfers for the global span it read, marks those buckets measured, and moves its own cursor", async () => {
+    const store = warm();
+    const res = await runSample(deps(store, { pageTransfers: pageTransfers() }));
+    expect(res.txErrors).toEqual([]);
+    const five = store.data.get("t:mainnet:5m:2026-09-06")!;
+    expect(five.get("14:00|g.tx")).toBe("2");
+    expect(five.get("14:00|g.txAmt")).toBe("3");
+    expect(five.get("13:55|x.cov")).toBe("0"); // from the previous run's newest global
+    expect(five.get("14:00|x.cov")).toBe("0");
+    const cursor = store.data.get("t:mainnet:cursor")!;
+    expect(cursor.get("x")).toBe("102");
+    expect(cursor.get("xTs")).toBe(String(Date.UTC(2026, 8, 6, 14, 0, 36)));
+  });
+  it("counts a network's token transfers for the snapshots its walk passed, on its own cursor", async () => {
+    const store = warm();
+    await runSample(deps(store, { pageTransfers: pageTransfers() }));
+    expect(store.data.get("t:mainnet:5m:2026-09-06")!.get("14:00|m.abc.tx")).toBe("1");
+    expect(store.data.get("t:mainnet:cursor")!.get("x.abc")).toBe("9");
+  });
+  it("a failed DAG list keeps its cursor and claims no coverage; the spine still advances", async () => {
+    const store = warm();
+    const res = await runSample(deps(store, { pageTransfers: pageTransfers("dag") }));
+    expect(res.txErrors).toEqual(["dag"]);
+    const cursor = store.data.get("t:mainnet:cursor")!;
+    expect(cursor.get("x")).toBeUndefined();
+    expect(cursor.get("g")).toBe("102");
+    expect(store.data.get("t:mainnet:5m:2026-09-06")!.has("14:00|x.cov")).toBe(false);
+    // A warm x would hold, and the next run would read this span again; a FIRST run that fails has
+    // no x yet, so the next starts at the spine's cursor and this span stays unclaimed (the fill's).
+  });
+  it("a failed token list moves nothing for that chain's transfers, and its snapshots still land", async () => {
+    const store = warm();
+    const res = await runSample(deps(store, { pageTransfers: pageTransfers("abc") }));
+    expect(res.txErrors).toEqual(["abc"]);
+    expect(store.data.get("t:mainnet:cursor")!.get("x.abc")).toBeUndefined();
+    expect(store.data.get("t:mainnet:cursor")!.get("m.abc")).toBe("9");
+  });
+  it("a cold spine starts the transfer cursor at this run's newest global and claims nothing", async () => {
+    const store = memStore();
+    await runSample(deps(store, { pageTransfers: pageTransfers() }));
+    expect(store.data.get("t:mainnet:cursor")!.get("x")).toBe("102");
+    expect(store.data.get("t:mainnet:5m:2026-09-06")!.has("14:00|g.tx")).toBe(false);
+  });
+});
+
+describe("runSample stake (2026-11-04)", () => {
+  const reading = { total: 300, live: 250, delegations: 5, validators: 2, perValidator: [{ key: "aaaaaaaaaaaaaaaa", id: "a".repeat(128), name: "EUROPA", dag: 250, addrs: 4, live: true }] };
+  it("samples the registry once per hour, keep-forever, with each validator's name", async () => {
+    const store = memStore();
+    let calls = 0;
+    const d = deps(store, { stake: async () => { calls++; return reading; } });
+    await runSample(d);
+    await runSample({ ...d, pageGlobals: async () => ({ data: [] }), pageMeta: async () => ({ data: [] }) });
+    expect(calls).toBe(1);
+    expect(store.data.get("t:mainnet:1h:2026-09")!.get("06-14|f.stake")).toBe("300");
+    expect(store.data.get("stake:mainnet:2026-09")!.get("09-06|f.stake.aaaaaaaaaaaaaaaa")).toBe("250");
+    expect(JSON.parse(store.data.get("stake:mainnet:validators")!.get("aaaaaaaaaaaaaaaa")!)).toEqual({ id: "a".repeat(128), name: "EUROPA" });
+    expect(store.ttls.has("stake:mainnet:2026-09")).toBe(false);
+  });
+  it("an unread registry writes nothing and leaves the hour to the next run", async () => {
+    const store = memStore();
+    let calls = 0;
+    const d = deps(store, { stake: async () => { calls++; return calls === 1 ? null : reading; } });
+    await runSample(d);
+    expect(store.data.get("t:mainnet:1h:2026-09")!.has("06-14|f.stake")).toBe(false);
+    await runSample({ ...d, pageGlobals: async () => ({ data: [] }), pageMeta: async () => ({ data: [] }) });
+    expect(store.data.get("t:mainnet:1h:2026-09")!.get("06-14|f.stake")).toBe("300");
+  });
+});

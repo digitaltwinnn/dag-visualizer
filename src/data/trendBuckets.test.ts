@@ -29,6 +29,11 @@ describe("bucketColumns — the STORED fields a scope owns, in the vocabulary's 
     // Without the catalog's word on who is listed, the unlisted scope is just a network with no fields.
     expect(bucketColumns(KEYS, "unlisted")).toEqual(["m.unlisted.snaps", "m.unlisted.fee"]);
   });
+  it("places the transfers, the delegated stake and the transfers' coverage (2026-11-04)", () => {
+    const keys = ["g.ticks", "x.cov", "g.txFee", "g.tx", "u.cov", "f.stake.validators", "f.stake", "g.txAmt", "f.stake.live", "f.stake.delegations", `m.${ID}.txAmt`, `m.${ID}.tx`, `m.${ID}.snaps`];
+    expect(bucketColumns(keys, "all")).toEqual(["g.ticks", "g.tx", "g.txAmt", "g.txFee", "f.stake", "f.stake.live", "f.stake.delegations", "f.stake.validators", "u.cov", "x.cov"]);
+    expect(bucketColumns(keys, ID)).toEqual([`m.${ID}.snaps`, `m.${ID}.tx`, `m.${ID}.txAmt`]);
+  });
   it("is empty for a scope with nothing stored, and drops duplicates", () => {
     expect(bucketColumns(KEYS, "nobody")).toEqual([]);
     expect(bucketColumns(["g.ticks", "g.ticks"], "all")).toEqual(["g.ticks"]);

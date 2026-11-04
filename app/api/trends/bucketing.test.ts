@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { addInc, bucketGlobals, bucketMetas, bucketFleet, bucketFleetGeo, finalDays, stampRun, type IncMap } from "./bucketing";
+import { addInc, bucketGlobals, bucketMetas, bucketFleet, bucketFleetGeo, bucketStake, bucketTransfers, finalDays, markTransferCoverage, stampRun, type IncMap } from "./bucketing";
 import { slotOf, fieldOf } from "./keys";
 
 const ts = (h: number, m: number, s = 0) => new Date(Date.UTC(2026, 8, 6, h, m, s)).toISOString();
@@ -344,5 +344,65 @@ describe("bucketGlobals: the largest global snapshot", () => {
     bucketGlobals(inc, "mainnet", [rec(1, 4), rec(30, 11), rec(60, 7)], null);
     expect(get(inc, "t:mainnet:5m:2026-09-06", "14:00|g.anchorsMax")).toBe(11);
     expect(get(inc, "t:mainnet:5m:2026-09-06", "14:00|g.anchors")).toBe(22);
+  });
+});
+
+describe("bucketTransfers", () => {
+  const t = (h: number, m: number) => new Date(Date.UTC(2026, 10, 4, h, m)).toISOString();
+  it("counts the DAG's transfers on the global row, its amount in DAG and its fee in datum", () => {
+    const inc: IncMap = new Map();
+    bucketTransfers(inc, "mainnet", "dag", [
+      { snapshotOrdinal: 10, timestamp: t(9, 1), amount: 150_00000000, fee: 1_000_000 },
+      { snapshotOrdinal: 10, timestamp: t(9, 1), amount: 50_00000000 },
+    ]);
+    const five = inc.get("t:mainnet:5m:2026-11-04")!;
+    expect(five.get("09:00|g.tx")).toBe(2);
+    expect(five.get("09:00|g.txAmt")).toBe(200);
+    expect(five.get("09:00|g.txFee")).toBe(1_000_000);
+    expect(inc.get("t:mainnet:1d:2026")!.get("11-04|g.tx")).toBe(2);
+  });
+  it("counts a network's token transfers on its own row", () => {
+    const inc: IncMap = new Map();
+    bucketTransfers(inc, "mainnet", "DAGabc", [{ snapshotOrdinal: 3, timestamp: t(9, 7), amount: 1e8 }]);
+    expect(inc.get("t:mainnet:5m:2026-11-04")!.get("09:05|m.DAGabc.tx")).toBe(1);
+    expect(inc.get("t:mainnet:5m:2026-11-04")!.get("09:05|m.DAGabc.txAmt")).toBe(1);
+  });
+});
+
+describe("markTransferCoverage", () => {
+  it("marks every bucket of the span in every tier, both ends included", () => {
+    const inc: IncMap = new Map();
+    markTransferCoverage(inc, "mainnet", Date.UTC(2026, 10, 4, 9, 3), Date.UTC(2026, 10, 4, 9, 31));
+    const five = [...inc.get("t:mainnet:5m:2026-11-04")!.keys()].sort();
+    expect(five).toEqual(["09:00", "09:05", "09:10", "09:15", "09:20", "09:25", "09:30"].map((b) => `${b}|x.cov`));
+    expect(inc.get("t:mainnet:1h:2026-11")!.get("04-09|x.cov")).toBe(0);
+    expect(inc.get("t:mainnet:1d:2026")!.get("11-04|x.cov")).toBe(0);
+  });
+  it("marks nothing for an empty or reversed span", () => {
+    const inc: IncMap = new Map();
+    markTransferCoverage(inc, "mainnet", 2, 1);
+    expect(inc.size).toBe(0);
+  });
+});
+
+describe("bucketStake", () => {
+  it("writes the registry's totals as hourly and daily gauges, and each validator into the stake family", () => {
+    const inc: IncMap = new Map();
+    const ts = Date.UTC(2026, 10, 4, 14, 20);
+    bucketStake(inc, "mainnet", ts, {
+      total: 300, live: 250, delegations: 5, validators: 2,
+      perValidator: [{ key: "aaaaaaaaaaaaaaaa", id: "a", name: "EUROPA", dag: 250, addrs: 4, live: true }],
+    });
+    const hour = inc.get("t:mainnet:1h:2026-11")!;
+    expect(hour.get("04-14|f.stake")).toBe(300);
+    expect(hour.get("04-14|f.stake.live")).toBe(250);
+    expect(hour.get("04-14|f.stake.delegations")).toBe(5);
+    expect(hour.get("04-14|f.stake.validators")).toBe(2);
+    expect(inc.get("t:mainnet:1d:2026")!.get("11-04|f.stake")).toBe(300);
+    expect(inc.has("t:mainnet:5m:2026-11-04")).toBe(false); // a gauge, never the 5-minute tier
+    const fam = inc.get("stake:mainnet:2026-11")!;
+    expect(fam.get("11-04|f.stake.aaaaaaaaaaaaaaaa")).toBe(250);
+    expect(fam.get("11-04|f.stakeAddrs.aaaaaaaaaaaaaaaa")).toBe(4);
+    expect(fam.get("11-04|f.stakeLive.aaaaaaaaaaaaaaaa")).toBe(1);
   });
 });
