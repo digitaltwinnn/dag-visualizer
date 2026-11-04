@@ -6,6 +6,8 @@
 //   · SEVEN is 2 · 3 · 2 (2026-10-26, History's Global snapshots measure): three columns left one
 //     tile alone on a third row, and the two half-width rows give the two SNAPSHOT measures — the
 //     set's first two, and its two longest words — room for their whole names;
+//   · EIGHT is 2 · 3 · 3 (2026-11-04, History's Transfers): the two snapshot measures keep their
+//     half-width row, and the six after them fill two rows of three;
 //   · everything else fills rows of three (fewer than three take a column each).
 //
 // The grid behind it is SIX columns wide, so a row of 2 spans 3 each, of 3 spans 2, of 1 all six.
@@ -14,6 +16,7 @@ export function tileRows(n: number): number[] {
   if (n <= 0) return [];
   if (n === 4) return [2, 2];
   if (n === 7) return [2, 3, 2];
+  if (n === 8) return [2, 3, 3];
   const rows: number[] = [];
   for (let left = n; left > 0; left -= 3) rows.push(Math.min(3, left));
   return rows;

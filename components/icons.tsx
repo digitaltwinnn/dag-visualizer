@@ -4,6 +4,7 @@ import {
   Layers,
   HardDrive,
   Hexagon,
+  ArrowLeftRight,
   HeartPulse,
   CircleDashed,
   Info,
@@ -231,6 +232,8 @@ export const MEASURE_ICONS: Readonly<Record<MeasureId, LucideIcon>> = {
   snapshots: Boxes,
   globals: Layers,
   blocks: Blocks,
+  // A move from one address to another (2026-11-04).
+  transfers: ArrowLeftRight,
   fees: Coins,
   kb: HardDrive,
   nodes: NODE_ICON,

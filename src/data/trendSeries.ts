@@ -95,6 +95,10 @@ export const TREND_METRICS: Record<TrendMetric, MetricSpec> = {
   // is the field's absence before 2026-10-08, so it has no single key). The DAG's own is `g.ticks`.
   globals: { kind: "counter", key: null, scale: 1, unit: rate },
   blocks: { kind: "counter", key: (id) => `m.${id}.blocks`, scale: 1, unit: rate },
+  // TRANSFERS (2026-11-04 — user: transactions were "missing in the trends view"): a network's own
+  // token transfers, the DAG's own on its row (`g.tx`). Counted, never their amount: tokens are
+  // not one unit. Measured only where the sampler read the transfer lists (`x.cov`, `measuredTx`).
+  transfers: { kind: "counter", key: (id) => `m.${id}.tx`, scale: 1, unit: rate },
   // Stored in DATUMS, the chain's own integer unit; read in DAG.
   fees: { kind: "counter", key: (id) => `m.${id}.fee`, scale: 1e-8, unit: (per) => `DAG ${per}`, format: formatDag },
   // Stored in KB; read in MB, which is the scale a day of anchoring actually reaches.
@@ -223,10 +227,27 @@ export function metricSeries(
     };
   }
   if (metric === "globals") return { points: anchorSeries(id, series) };
+  if (metric === "transfers") return { points: measuredTx(series[`m.${id}.tx`], series) };
   const spec = TREND_METRICS[metric];
   const key = spec.key?.(id);
   const raw = (key != null ? series[key] : undefined) ?? [];
   return { points: spec.scale === 1 ? raw.slice() : raw.map((v) => (v == null ? null : v * spec.scale)) };
+}
+
+/** TRANSFERS ARE MEASURED WHERE THEIR LISTS WERE READ (2026-11-04): the read route zero-fills every
+ *  counter in a covered bucket, so a transfer row would read "none" on every day since the spine
+ *  began — long before the sampler read a transfer. `x.cov` is the sampler's word for the buckets it
+ *  read them in (`bucketing.ts` `markTransferCoverage`); everywhere else the reading is NULL, not
+ *  measured (rule 10). A copy, like every series handed out. */
+export function measuredTx(
+  row: readonly (number | null)[] | undefined,
+  series: Readonly<Record<string, (number | null)[]>>,
+): (number | null)[] {
+  // As long as the axis (any row of the payload is), so a payload with no coverage at all is a
+  // whole axis of not-measured, never a shorter series.
+  const n = Math.max(series["x.cov"]?.length ?? 0, row?.length ?? 0, series["g.ticks"]?.length ?? 0);
+  const cov = series["x.cov"];
+  return Array.from({ length: n }, (_, i) => (cov?.[i] == null ? null : row?.[i] ?? 0));
 }
 
 /** The newest value that was actually MEASURED — the last non-null, which is not the last
@@ -423,6 +444,8 @@ export const GLOBAL_METRIC_ROWS: Record<TrendMetric, { key: string | null; scale
   // The hypergraph's OWN snapshots — one per global tick (dagscan's figure).
   globals: { key: "g.ticks", scale: 1 },
   blocks: { key: "g.blocks", scale: 1 },
+  // The DAG's own transfers (`measuredTx` applies the transfers' coverage).
+  transfers: { key: "g.tx", scale: 1 },
   // The WHOLE totals (`withUnlisted`): the catalog floor plus the unlisted chains where measured.
   fees: { key: "g.fee", scale: 1e-8 },
   kb: { key: "g.kb", scale: 1 / 1024 },
@@ -449,6 +472,8 @@ export const GLOBAL_READING: Record<TrendMetric, "total" | "own"> = {
   kb: "total",
   nodes: "own",
   blocks: "own",
+  // The DAG's own transfers — a network's token transfers are another token's, never added in.
+  transfers: "own",
   continuity: "own",
 };
 
@@ -469,6 +494,7 @@ export function globalSeries(
       return v != null && n != null && n > 0 ? v / n : null;
     });
   }
+  if (metric === "transfers") return measuredTx(series["g.tx"], series);
   const row = GLOBAL_METRIC_ROWS[metric];
   const raw = (row.key != null ? series[row.key] : undefined) ?? [];
   return row.scale === 1 ? raw.slice() : raw.map((v) => (v == null ? null : v * row.scale));
@@ -556,6 +582,9 @@ export const METRIC_LABELS: Record<TrendMetric, string> = {
   snapshots: "Snapshots anchored",
   globals: "In global snapshots",
   blocks: "Blocks",
+  // "Transfers", not "Transactions" (2026-11-04): a data network's application records also ride
+  // its blocks as data transactions, and those are not these — a move of DAG or of a token.
+  transfers: "Transfers",
   fees: "Fees",
   kb: "Data",
   nodes: "Nodes",
@@ -620,6 +649,7 @@ export function momentPhrase(metric: TrendMetric, stepMs: number, hypergraph = f
     case "snapshots": return { verb: "anchored", rest: `snapshots ${inBucket}` };
     case "globals": return { verb: globalsVerb(hypergraph), rest: `global snapshots ${inBucket}` };
     case "blocks": return { verb: "produced", rest: `blocks ${inBucket}` };
+    case "transfers": return { verb: "recorded", rest: `transfers ${inBucket}` };
     case "fees": return { verb: "paid", rest: `DAG in fees ${inBucket}` };
     case "kb": return { verb: "anchored", rest: `of data ${inBucket}` };
     case "nodes": return { verb: "ran", rest: "nodes" };

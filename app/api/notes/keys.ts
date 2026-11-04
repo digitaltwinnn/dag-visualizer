@@ -10,7 +10,7 @@ import { pickRangeTier } from "@/src/data/trendWindow";
 //
 // Everything is UTC and the caller supplies the date strings; nothing here reads a clock.
 
-export const NOTES_VERSION = 70; // 70: the gate reads a change in its own direction; a row names its subject; a count row carries no percentage (review, 2026-11-03)
+export const NOTES_VERSION = 71; // 71: History facts carry the Transfers measure (2026-11-04). 70: the gate reads a change in its own direction; a row names its subject; a count row carries no percentage (review, 2026-11-03)
 
 /** What a note covers. Hyper and Geography are a standing picture ("day"), the ledger the recent
  *  hours ("hours"); History's pills are the rest, and a brushed range is `r<fromMs>-<toMs>` after

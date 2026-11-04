@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { anchorClause, anchorSeries, headWord, lastSeen, momentPhrase, unlistedUnmeasured, withUnlisted, spanAverage, spanWord, typeBands,
+import { measuredTx, anchorClause, anchorSeries, headWord, lastSeen, momentPhrase, unlistedUnmeasured, withUnlisted, spanAverage, spanWord, typeBands,
   GLOBAL_METRIC_ROWS,
   GLOBAL_READING,
   TREND_METRICS,
@@ -42,7 +42,7 @@ const DAY = 86400000;
 describe("the metric table", () => {
   it("covers every stored metric, and only fees and bytes rescale", () => {
     expect(Object.keys(TREND_METRICS).sort()).toEqual(
-      ["blocks", "continuity", "fees", "globals", "kb", "nodes", "snapshots"],
+      ["blocks", "continuity", "fees", "globals", "kb", "nodes", "snapshots", "transfers"],
     );
     // Fees are stored in datums (1e-8 DAG) and sizes in KB — the two places the stored unit is
     // not the unit a reader is shown.
@@ -859,5 +859,33 @@ describe("dagRowSeries — what the DAG row reads", () => {
     const series = { "g.anchors": [3, 4], "f.nodes": [70, 71], "f.nodes.dag": [24, 25] };
     expect(dagRowSeries("snapshots", series)).toEqual([3, 4]);
     expect(dagRowSeries("nodes", series)).toEqual([24, 25]);
+  });
+});
+
+describe("transfers — measured only where their lists were read (2026-11-04)", () => {
+  // x.cov marks the buckets the sampler read the transfer lists in; the read route zero-fills every
+  // covered counter, so the transfer row is 0 in buckets nobody read.
+  const series = {
+    "x.cov": [null, null, 0, 0, 0],
+    "g.tx": [0, 0, 12, 0, 7],
+    "m.dor.tx": [0, 0, 3, 0, 0],
+    "g.ticks": [5, 5, 5, 5, 5],
+  };
+  it("a network's transfers are null before the coverage, a measured zero inside it", () => {
+    expect(metricSeries("transfers", "dor", series).points).toEqual([null, null, 3, 0, 0]);
+    expect(measuredTx(undefined, series)).toEqual([null, null, 0, 0, 0]); // read, and the chain moved nothing
+  });
+  it("the DAG row reads its own transfers through the same coverage", () => {
+    expect(globalSeries("transfers", series)).toEqual([null, null, 12, 0, 7]);
+    expect(dagRowSeries("transfers", series)).toEqual([null, null, 12, 0, 7]);
+    expect(GLOBAL_READING.transfers).toBe("own");
+  });
+  it("no coverage in the payload is no reading at all", () => {
+    expect(metricSeries("transfers", "dor", { "m.dor.tx": [0, 4] }).points).toEqual([null, null]);
+  });
+  it("is a plain counter named Transfers, recorded in a bucket", () => {
+    expect(seriesKey("transfers", "dor")).toBe("m.dor.tx");
+    expect(METRIC_LABELS.transfers).toBe("Transfers");
+    expect(momentPhrase("transfers", 300000)).toEqual({ verb: "recorded", rest: "transfers in those 5 minutes" });
   });
 });
