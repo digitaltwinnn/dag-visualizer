@@ -588,6 +588,16 @@ describe("hyperFacts on all: the movers and the whole network's activity", () =>
       }
     });
 
+    it("puts its nodes back into the whole network's start: the rest read where they are, plus its day before", () => {
+      // The total dips by Dor's 5 for its outage hours: 115 at the opening samples, then 120.
+      const fl = fleet({ ...backAt9, "f.nodes": row(N, (i) => (i < 9 ? 115 : i < N / 2 ? 120 : 140)) });
+      const r = hyperFacts(input({ fleet: fl, daily: daily({ "f.nodes.dor": row(60, () => 5) }) }))!;
+      expect(find(r, /^Nodes across all networks at the start of the span$/)[0]!.value).toBe(120);
+      // No reading before the span: the total's start stays as measured.
+      const bare = hyperFacts(input({ fleet: fl }))!;
+      expect(find(bare, /^Nodes across all networks at the start of the span$/)[0]!.value).toBe(115);
+    });
+
     it("reads the last WHOLE day before the span: the span's own first day ends after it opened", () => {
       // A daily gauge is the day's last hourly reading, so the day the span opens on is no "before".
       const d = daily({ "f.nodes.dor": row(60, (i) => (i < 29 ? 0 : 5)) });

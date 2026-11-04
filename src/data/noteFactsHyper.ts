@@ -131,13 +131,16 @@ const TOP = 3;
 const LATE_START = 0.1;
 /** A sample's node count agrees with a level (the span's start or end) within this fraction. */
 const SHAPE_TOLERANCE = 0.1;
-/** A shape's level at either end is read from the gauge's first / last this-many measured samples
- *  (`gaugeChange`'s own LEVEL_SAMPLES), and needs at least SHAPE_MIN_SAMPLES of them to agree. */
+/** A level at either end (a shape's, or the whole network's restored start) is read from the
+ *  gauge's first / last this-many measured samples (`gaugeChange`'s own LEVEL_SAMPLES); a shape
+ *  needs at least SHAPE_MIN_SAMPLES of them to agree. */
 const SHAPE_SAMPLES = 6;
 const SHAPE_MIN_SAMPLES = 3;
 const RANK_WORD = ["", "second ", "third "] as const;
 
 type Points = readonly (number | null)[];
+
+type GaugeChange = NonNullable<ReturnType<typeof gaugeChange>>;
 
 /** A gauge's change over the span, or null when it has none or began after the span did. */
 function spanChange(points: Points): { from: number; to: number; firstIndex: number } | null {
@@ -227,9 +230,11 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
   let unread: string | null = null;
   let counts: NoteChange[] = [];
 
-  /** A gauge's start, end and ratio, or only its current level where it began late. */
-  const gaugeFacts = (label: string, points: Points, before: number | null = null): void => {
-    const ch = throughEdgeOutage(gaugeChange(points), before);
+  /** A gauge's start, end and ratio, or only its current level where it began late. `start` reads
+   *  the start again where an edge outage hid part of it (`throughEdgeOutage`). */
+  const gaugeFacts = (label: string, points: Points, start: (ch: GaugeChange) => GaugeChange = (ch) => ch): void => {
+    const read = gaugeChange(points);
+    const ch = read && start(read);
     if (!ch) return;
     if (!spanChange(points)) {
       facts.push(fact(`${label} at the end of the span`, ch.to, "count"));
@@ -272,9 +277,14 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
     // THE MOVERS: the networks whose node count changed most over the span, by how many nodes.
     // HOW MANY MOVED is stated even at 0 (user, 2026-10-30: a quiet week is SAID, "no changes in
     // composition", rather than left to the node count): the question asks for it by name.
-    const movers = ids
-      .map((id) => ({ id, ch: throughEdgeOutage(spanChange(fleet.series[`f.nodes.${id}`] ?? []), nodesBefore(id)) }))
-      .filter((m): m is { id: string; ch: NonNullable<typeof m.ch> } => !!m.ch && m.ch.to !== m.ch.from)
+    const reads = ids.map((id) => {
+      const raw = spanChange(fleet.series[`f.nodes.${id}`] ?? []);
+      return { id, raw, ch: throughEdgeOutage(raw, nodesBefore(id)) };
+    });
+    /** The networks whose start was read through an edge outage, with the level put back. */
+    const restored = reads.filter((m) => m.ch !== m.raw).map(({ id, ch }) => ({ id, from: ch!.from }));
+    const movers = reads
+      .filter((m): m is typeof m & { ch: GaugeChange } => !!m.ch && m.ch.to !== m.ch.from)
       .sort((a, b) => Math.abs(b.ch.to - b.ch.from) - Math.abs(a.ch.to - a.ch.from) || a.id.localeCompare(b.id));
     facts.push(fact("Networks whose node count changed over the span", movers.length, "count"));
     counts = movers.flatMap(({ id, ch }) => countChange(nameOf(id), ch.from, ch.to, { kind: "network", id }) ?? []);
@@ -288,7 +298,16 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
         facts.push(fact(`${key} at the end of the span`, ch.to, "count", undefined, { key, end: "to" }));
       });
 
-    gaugeFacts("Nodes across all networks", total);
+    // THE WHOLE NETWORK'S START, with each restored network's nodes put back: the rest of the
+    // network read where `gaugeChange` reads it (its opening six measured samples, those networks
+    // taken out), plus their restored levels. Their outage is in the total's samples too.
+    gaugeFacts("Nodes across all networks", total, (ch) => {
+      if (!restored.length) return ch;
+      const rows = restored.map(({ id }) => fleet.series[`f.nodes.${id}`] ?? []);
+      const rest = total.flatMap((v, i) => (v != null ? [v - rows.reduce((a, r) => a + (r[i] ?? 0), 0)] : []));
+      if (rest.length < SHAPE_SAMPLES) return ch;
+      return { ...ch, from: observedLevel(rest.slice(0, SHAPE_SAMPLES), "start") + restored.reduce((a, r) => a + r.from, 0) };
+    });
 
     // STARTED AND STOPPED: Task 2's first / last for every id, the 30-day lead-in before the span
     // marked via `from` so a network that began earlier, or merely resumed, is not a start.
@@ -350,7 +369,7 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
     const name = mention(subject);
     named.push(subject);
     const nodePoints = fleet.series[`f.nodes.${subject}`] ?? [];
-    gaugeFacts(`${name} nodes`, nodePoints, nodesBefore(subject));
+    gaugeFacts(`${name} nodes`, nodePoints, (ch) => throughEdgeOutage(ch, nodesBefore(subject))!);
 
     // THE CHANGE OF SHAPE: nodes per layer and per combination at the span's start and its end,
     // each a HELD level like the node count's own (see the header). Only what changed is stated,

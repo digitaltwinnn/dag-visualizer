@@ -833,6 +833,28 @@ describe("geoFacts counts nodes as the cards do", () => {
     const geoDays = run("2026-10-27", 8, () => fleet(34));
     expect(fleetCountries({ geoDays, ccDays: ccOf(geoDays) })).toEqual(["DE"]);
   });
+
+  // A day is ONE hourly reading, so a small network down at that hour is missing from a day that
+  // still passes as measured (34 of 37 is within 10%): Hypergraph's "gained 3 nodes", 2026-11-04.
+  describe("a network down at the hour a week ago was read", () => {
+    const withBio = (): DaySpec => {
+      const f = fleet(34);
+      return { cc: { ...f.cc, US: 3 }, isp: { ...f.isp, "amazon-com-inc": 3 }, net: { ...f.net, bio: { cc: { US: 3 }, isp: { "amazon-com-inc": 3 } } } };
+    };
+    it("reads that network from the day before, when it had nodes then", () => {
+      const geoDays = run("2026-10-27", 9, (i) => (i === 1 ? fleet(34) : withBio())); // Oct 20 is the week ago
+      const r = geoFacts(input({ geoDays, ccDays: ccOf(geoDays) }))!;
+      expect(one(r, /^Nodes in the network a week ago$/).value).toBe(37);
+      expect(find(r, /^United States, nodes a week ago$/)).toEqual([]); // it held: no change stated
+      expect(r.changes).toBeUndefined();
+    });
+    it("leaves a first a first when the day before had none either", () => {
+      const geoDays = run("2026-10-27", 9, (i) => (i <= 1 ? fleet(34) : withBio()));
+      const r = geoFacts(input({ geoDays, ccDays: ccOf(geoDays) }))!;
+      expect(one(r, /^Nodes in the network a week ago$/).value).toBe(34);
+      expect(r.changes?.map((c) => c.kind)).toEqual(expect.arrayContaining(["new"]));
+    });
+  });
 });
 
 describe("the only one has nothing to rank against", () => {
