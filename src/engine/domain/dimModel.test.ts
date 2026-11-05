@@ -14,13 +14,9 @@ import {
   GROUP_GROW,
   ancestryGlow,
   GROUP_FOCUS,
-  FOCUS_TUNE,
-  FOCUS_TUNE_DEFAULTS,
-  FOCUS_ROW_SCHEMA,
+  FOCUS_ROWS,
   FOCUS_SHARED,
-  FOCUS_SHARED_DEFAULTS,
   SNAP_HOLD,
-  FOCUS_SHARED_SCHEMA,
   dimTargetsFor,
   nodeDim,
   nodeGlow,
@@ -28,6 +24,7 @@ import {
   snapBright,
   snapFocusOf,
   type DimContext,
+  type FocusRow,
 } from "./dimModel";
 
 const ctx = (overrides: Partial<DimContext> = {}): DimContext => ({
@@ -51,10 +48,12 @@ const ctx = (overrides: Partial<DimContext> = {}): DimContext => ({
 // THE ROWS ARE READ, THE RELATIONS PINNED (review, 2026-10-24): a retune of a view's `dim` is a
 // design decision this file must not veto — what it guards is how the rows COMPOSE (the morph
 // ramp, the ledger's flat row, hover = commit) and the design facts about them (hyper mutes in
-// place, as geo does since 2026-11-02). `FOCUS_TUNE_DEFAULTS` is the shipped look, never the live knobs.
-const HYPER_DIM = FOCUS_TUNE_DEFAULTS.hyper.dim;
-const GEO_DIM = FOCUS_TUNE_DEFAULTS.geo.dim;
-const LEDGER_DIM = FOCUS_TUNE_DEFAULTS.ledger.dim;
+// place, as geo does since 2026-11-02).
+const HYPER_DIM = FOCUS_ROWS.hyper.dim;
+const GEO_DIM = FOCUS_ROWS.geo.dim;
+const LEDGER_DIM = FOCUS_ROWS.ledger.dim;
+// The rows are read-only by type; the knob-independence tests below move one field and restore it.
+const writable = (row: Readonly<FocusRow>): FocusRow => row as FocusRow;
 
 describe("nodeDimScale", () => {
   it("is the hyper row's dim at morph=0 — a mute in place, never a full dim", () => {
@@ -114,14 +113,14 @@ describe("hideFrac (the shrink, an independent reading of the same ramp as the d
   it("does NOT move when the dim strength moves — the two knobs are independent", () => {
     const c = ctx({ morph: 1 });
     const before = hideFrac(c, 1);
-    const restore = FOCUS_TUNE.geo.dim;
+    const restore = FOCUS_ROWS.geo.dim;
     try {
-      FOCUS_TUNE.geo.dim = 0.1;
+      writable(FOCUS_ROWS.geo).dim = 0.1;
       expect(hideFrac(c, 1)).toBeCloseTo(before, 10);
-      FOCUS_TUNE.geo.dim = 0;
+      writable(FOCUS_ROWS.geo).dim = 0;
       expect(hideFrac(c, 1)).toBeCloseTo(before, 10);
     } finally {
-      FOCUS_TUNE.geo.dim = restore;
+      writable(FOCUS_ROWS.geo).dim = restore;
     }
   });
 
@@ -157,7 +156,7 @@ describe("gatherRaw (the view-transition's escape hatch — it lifts the RAMP, n
     const geo = ctx({ morph: 1 });
     // At rest an off-filter chip is muted, in place; parked it is lit.
     expect(hideFrac(geo, gatherRaw(1, 0))).toBeCloseTo(0, 10);
-    expect(nodeDim(geo, gatherRaw(1, 0), null)).toBeCloseTo(FOCUS_TUNE_DEFAULTS.geo.dim, 10);
+    expect(nodeDim(geo, gatherRaw(1, 0), null)).toBeCloseTo(FOCUS_ROWS.geo.dim, 10);
     expect(hideFrac(geo, gatherRaw(1, 1))).toBeCloseTo(0, 10);
     expect(nodeDim(geo, gatherRaw(1, 1), null)).toBeCloseTo(0, 10);
   });
@@ -197,7 +196,7 @@ describe("offNetMul (the off-filter dim for a view's own FURNITURE, not its data
   // and moved onto the node's own `dim` (snapBright, below) — so hyper is now the only view that
   // actually draws per-network furniture.
   it("is one minus the hyper row's elem — some light survives, never all of it", () => {
-    expect(offNetMul("hyper")).toBeCloseTo(1 - FOCUS_TUNE_DEFAULTS.hyper.elem, 10);
+    expect(offNetMul("hyper")).toBeCloseTo(1 - FOCUS_ROWS.hyper.elem, 10);
     expect(offNetMul("hyper")).toBeGreaterThan(0);
     expect(offNetMul("hyper")).toBeLessThan(1);
   });
@@ -209,17 +208,16 @@ describe("offNetMul (the off-filter dim for a view's own FURNITURE, not its data
     expect(offNetMul("ledger")).toBeCloseTo(1, 10);
   });
 
-  // Same STRENGTH polarity as `dim` and `hide` — 0 is off — so a row reads consistently in the
-  // panel, and the resolver is what flips it into a surviving brightness.
+  // Same STRENGTH polarity as `dim` and `hide` — 0 is off — so a row reads consistently, and the resolver is what flips it into a surviving brightness.
   it("reads the strength row per view, with 0 meaning no dim at all", () => {
-    const prev = FOCUS_TUNE.ledger.elem;
+    const prev = FOCUS_ROWS.ledger.elem;
     try {
-      FOCUS_TUNE.ledger.elem = 0;
+      writable(FOCUS_ROWS.ledger).elem = 0;
       expect(offNetMul("ledger")).toBeCloseTo(1, 10);
-      FOCUS_TUNE.ledger.elem = 1;
+      writable(FOCUS_ROWS.ledger).elem = 1;
       expect(offNetMul("ledger")).toBeCloseTo(0, 10);
     } finally {
-      FOCUS_TUNE.ledger.elem = prev;
+      writable(FOCUS_ROWS.ledger).elem = prev;
     }
   });
 
@@ -234,7 +232,7 @@ describe("offNetMul (the off-filter dim for a view's own FURNITURE, not its data
 // `boost` the chips in the trays answer to, which is what makes a chip and the tile it signed dim
 // by exactly one number. The chamber keeps only its own resting level and its own COLOUR rule.
 describe("snapBright (the chamber's snapshots on the node vocabulary)", () => {
-  const { dim, back, boost } = FOCUS_TUNE_DEFAULTS.ledger;
+  const { dim, back, boost } = FOCUS_ROWS.ledger;
 
   it("leaves a resting on-filter snapshot at its own level", () => {
     expect(snapBright(0.1, false)).toBeCloseTo(0.1, 10);
@@ -281,17 +279,9 @@ describe("snapBright (the chamber's snapshots on the node vocabulary)", () => {
     expect(unfiltered).toBeGreaterThan(offFilter);
   });
 
-  // The live knob is seeded from the baked constant, and `?tune` edits FOCUS_SHARED in place —
-  // so the resolver must read the live struct, not the constant, or a tuned value would never land.
-  it("seeds the live hold from SNAP_HOLD and resolves through the live struct", () => {
-    expect(FOCUS_SHARED_DEFAULTS.snapHold).toBe(SNAP_HOLD);
-    const before = FOCUS_SHARED.snapHold;
-    try {
-      FOCUS_SHARED.snapHold = 2;
-      expect(snapBright(0.1, false, 0, true, true)).toBeCloseTo(0.2, 10);
-    } finally {
-      FOCUS_SHARED.snapHold = before;
-    }
+  it("holds a committed member at SNAP_HOLD × its resting weight", () => {
+    expect(FOCUS_SHARED.snapHold).toBe(SNAP_HOLD);
+    expect(snapBright(0.1, false, 0, true, true)).toBeCloseTo(0.1 * SNAP_HOLD, 10);
   });
 
   // `offFilter` and `onFilter` are not complements — under "all" neither is set.
@@ -342,26 +332,25 @@ describe("snapFocusOf (a row's focus reaches the committed network only)", () =>
 
 describe("focusDim / focusBoost (per-view hover/selection strength)", () => {
   // WIRING, not numbers: each resolver reads its own view's row, and hyper↔geo lerp by morph.
-  // Asserting against FOCUS_TUNE_DEFAULTS rather than re-stating the literals is what keeps a
-  // ?tune bake a one-file edit — the numbers are a look and are meant to move; the row a
-  // resolver reads is the design. (Still the DEFAULTS, never the live FOCUS_TUNE struct, so
-  // turning a knob can't make this pass or fail.) The ORDER is pinned separately below.
+  // Asserting against FOCUS_ROWS rather than re-stating the literals is what keeps a
+  // re-tune a one-file edit — the numbers are a look and are meant to move; the row a
+  // resolver reads is the design. The ORDER is pinned separately below.
   it("focusDim reads each view's own `back`", () => {
-    expect(focusDim(ctx({ morph: 0 }))).toBeCloseTo(FOCUS_TUNE_DEFAULTS.hyper.back, 10);
-    expect(focusDim(ctx({ morph: 1 }))).toBeCloseTo(FOCUS_TUNE_DEFAULTS.geo.back, 10);
-    expect(focusDim(ctx({ morph: 0, ledger: true }))).toBeCloseTo(FOCUS_TUNE_DEFAULTS.ledger.back, 10);
+    expect(focusDim(ctx({ morph: 0 }))).toBeCloseTo(FOCUS_ROWS.hyper.back, 10);
+    expect(focusDim(ctx({ morph: 1 }))).toBeCloseTo(FOCUS_ROWS.geo.back, 10);
+    expect(focusDim(ctx({ morph: 0, ledger: true }))).toBeCloseTo(FOCUS_ROWS.ledger.back, 10);
   });
 
   it("focusBoost reads each view's own `boost`", () => {
-    expect(focusBoost(ctx({ morph: 0 }))).toBeCloseTo(FOCUS_TUNE_DEFAULTS.hyper.boost, 10);
-    expect(focusBoost(ctx({ morph: 1 }))).toBeCloseTo(FOCUS_TUNE_DEFAULTS.geo.boost, 10);
-    expect(focusBoost(ctx({ morph: 0, ledger: true }))).toBeCloseTo(FOCUS_TUNE_DEFAULTS.ledger.boost, 10);
+    expect(focusBoost(ctx({ morph: 0 }))).toBeCloseTo(FOCUS_ROWS.hyper.boost, 10);
+    expect(focusBoost(ctx({ morph: 1 }))).toBeCloseTo(FOCUS_ROWS.geo.boost, 10);
+    expect(focusBoost(ctx({ morph: 0, ledger: true }))).toBeCloseTo(FOCUS_ROWS.ledger.boost, 10);
   });
 
   it("focusGrow reads each view's own `grow`", () => {
-    expect(focusGrow(ctx({ morph: 0 }))).toBeCloseTo(FOCUS_TUNE_DEFAULTS.hyper.grow, 10);
-    expect(focusGrow(ctx({ morph: 1 }))).toBeCloseTo(FOCUS_TUNE_DEFAULTS.geo.grow, 10);
-    expect(focusGrow(ctx({ morph: 0, ledger: true }))).toBeCloseTo(FOCUS_TUNE_DEFAULTS.ledger.grow, 10);
+    expect(focusGrow(ctx({ morph: 0 }))).toBeCloseTo(FOCUS_ROWS.hyper.grow, 10);
+    expect(focusGrow(ctx({ morph: 1 }))).toBeCloseTo(FOCUS_ROWS.geo.grow, 10);
+    expect(focusGrow(ctx({ morph: 0, ledger: true }))).toBeCloseTo(FOCUS_ROWS.ledger.grow, 10);
   });
 
   // The second emphasis channel reaches EVERY view since 2026-08-28 (the user reversed their
@@ -373,24 +362,24 @@ describe("focusDim / focusBoost (per-view hover/selection strength)", () => {
   // collides with neighbours), and every view's is SUBTLE (the user pulled hyper's own back
   // from 0.45: "keep it subtle but visible").
   it("gives every view a subtle grow, hyper loudest", () => {
-    expect(FOCUS_TUNE_DEFAULTS.geo.grow).toBeGreaterThan(0);
-    expect(FOCUS_TUNE_DEFAULTS.ledger.grow).toBeGreaterThan(0);
-    expect(FOCUS_TUNE_DEFAULTS.hyper.grow).toBeGreaterThan(FOCUS_TUNE_DEFAULTS.geo.grow);
-    expect(FOCUS_TUNE_DEFAULTS.hyper.grow).toBeGreaterThan(FOCUS_TUNE_DEFAULTS.ledger.grow);
+    expect(FOCUS_ROWS.geo.grow).toBeGreaterThan(0);
+    expect(FOCUS_ROWS.ledger.grow).toBeGreaterThan(0);
+    expect(FOCUS_ROWS.hyper.grow).toBeGreaterThan(FOCUS_ROWS.geo.grow);
+    expect(FOCUS_ROWS.hyper.grow).toBeGreaterThan(FOCUS_ROWS.ledger.grow);
     for (const v of ["hyper", "geo", "ledger"] as const)
-      expect(FOCUS_TUNE_DEFAULTS[v].grow).toBeLessThanOrEqual(0.45); // subtle: below the pre-reversal hyper value
+      expect(FOCUS_ROWS[v].grow).toBeLessThanOrEqual(0.45); // subtle: below the pre-reversal hyper value
     // the morph blend still mixes the two endpoint rows, so a transition inherits neither alone
     expect(focusGrow(ctx({ morph: 0.5 }))).toBeCloseTo(
-      (FOCUS_TUNE_DEFAULTS.hyper.grow + FOCUS_TUNE_DEFAULTS.geo.grow) / 2, 10);
+      (FOCUS_ROWS.hyper.grow + FOCUS_ROWS.geo.grow) / 2, 10);
   });
 
-  // The design relations the numbers must keep, whatever a ?tune session moves them to: the
+  // The design relations the numbers must keep, whatever a re-tune moves them to: the
   // focused node's glow pop is LOUDEST in hyper, where it sits over dim resting nodes, and
   // softer in geo/ledger, whose chips have a brighter base and blew out at hyper's value
   // (user, 2026-07-17); and hyper's dim-back is the SHALLOWEST, because its shells are dense
   // enough that muting them hard reads as the view going dark rather than as one node leading.
   it("keeps the per-view emphasis ranking", () => {
-    const d = FOCUS_TUNE_DEFAULTS;
+    const d = FOCUS_ROWS;
     expect(d.hyper.boost).toBeGreaterThan(d.geo.boost);
     expect(d.hyper.boost).toBeGreaterThan(d.ledger.boost);
     expect(d.hyper.back).toBeLessThan(d.geo.back);
@@ -425,7 +414,7 @@ describe("focusWeightOf / GROUP_FOCUS (the focus ranking)", () => {
     expect(growWeightOf(false, false)).toBe(0);
     expect(GROUP_GROW).toBeGreaterThan(GROUP_FOCUS);
     expect(GROUP_GROW).toBeLessThan(1); // the primary still stands out of its group by size too
-    expect(FOCUS_SHARED_DEFAULTS.groupGrow).toBe(GROUP_GROW);
+    expect(FOCUS_SHARED.groupGrow).toBe(GROUP_GROW);
   });
 
   it("the emissive function scales the boost by the weight, so the subject outshines its group", () => {
@@ -594,13 +583,13 @@ describe("nodeEmissive", () => {
   it("boosts the focused node by hyper's `boost`, ignoring anyFocus", () => {
     const c = ctx({ morph: 0 });
     const base = nodeEmissive(c, 0, 0, 0, false);
-    expect(nodeEmissive(c, 0, 0, 1, true)).toBeCloseTo(base + FOCUS_TUNE_DEFAULTS.hyper.boost, 10);
+    expect(nodeEmissive(c, 0, 0, 1, true)).toBeCloseTo(base + FOCUS_ROWS.hyper.boost, 10);
   });
 
   it("dims a non-focused node by hyper's `back` only when anyFocus is set", () => {
     const c = ctx({ morph: 0 });
     const base = nodeEmissive(c, 0, 0, 0, false);
-    expect(nodeEmissive(c, 0, 0, 0, true)).toBeCloseTo(base * FOCUS_TUNE_DEFAULTS.hyper.back, 10);
+    expect(nodeEmissive(c, 0, 0, 0, true)).toBeCloseTo(base * FOCUS_ROWS.hyper.back, 10);
   });
 
   it("does nothing extra when there's no focus target at all (isFocus and anyFocus both false)", () => {
@@ -609,48 +598,16 @@ describe("nodeEmissive", () => {
 });
 
 
-// The `?tune` surface (contract: src/engine/tune.ts). The formulas above were literals until the
-// dev panel needed to bind them; these tests are the regression guard for that move.
-describe("FOCUS_TUNE", () => {
-  it("starts live == defaults, so an untouched panel changes nothing", () => {
-    expect(FOCUS_TUNE).toEqual(FOCUS_TUNE_DEFAULTS);
-    expect(FOCUS_SHARED).toEqual(FOCUS_SHARED_DEFAULTS);
+// The rows. The formulas above were literals once; these tests guard that move.
+describe("FOCUS_ROWS", () => {
+  it("takes GROUP_FOCUS as its groupShare", () => {
+    expect(FOCUS_SHARED.groupShare).toBe(GROUP_FOCUS);
   });
 
-  // The live rows must be COPIES: the panel writes into them, and a shared reference would let a
-  // knob mutate the shipped look these tests pin.
-  it("holds its own row objects, not the frozen defaults", () => {
-    for (const view of ["hyper", "geo", "ledger"] as const) {
-      expect(FOCUS_TUNE[view]).not.toBe(FOCUS_TUNE_DEFAULTS[view]);
-    }
-    expect(FOCUS_SHARED).not.toBe(FOCUS_SHARED_DEFAULTS);
-  });
-
-  it("keeps GROUP_FOCUS as its groupShare default", () => {
-    expect(FOCUS_SHARED_DEFAULTS.groupShare).toBe(GROUP_FOCUS);
-  });
-
-  it("schemas every knob, and every knob's range contains its default", () => {
-    for (const row of Object.values(FOCUS_TUNE_DEFAULTS)) {
-      for (const [key, v] of Object.entries(row)) {
-        const knob = FOCUS_ROW_SCHEMA[key as keyof typeof row];
-        expect(knob, `no schema entry for ${key}`).toBeDefined();
-        expect(v).toBeGreaterThanOrEqual(knob!.min);
-        expect(v).toBeLessThanOrEqual(knob!.max);
-      }
-    }
-    for (const [key, v] of Object.entries(FOCUS_SHARED_DEFAULTS)) {
-      const knob = FOCUS_SHARED_SCHEMA[key as keyof typeof FOCUS_SHARED_DEFAULTS];
-      expect(knob, `no schema entry for ${key}`).toBeDefined();
-      expect(v).toBeGreaterThanOrEqual(knob!.min);
-      expect(v).toBeLessThanOrEqual(knob!.max);
-    }
-  });
-
-  // Every row carries the same fields, which is what lets ONE schema serve all three folders.
+  // Every row carries the same fields — one shape, every view.
   it("gives every 3D view a complete row", () => {
-    for (const row of Object.values(FOCUS_TUNE_DEFAULTS)) {
-      expect(Object.keys(row).sort()).toEqual(Object.keys(FOCUS_ROW_SCHEMA).sort());
+    for (const row of Object.values(FOCUS_ROWS)) {
+      expect(Object.keys(row).sort()).toEqual(["back", "boost", "dim", "elem", "grow", "hide"]);
     }
   });
 
@@ -663,7 +620,7 @@ describe("FOCUS_TUNE", () => {
   // design (see the ONE NODE MODEL header), so both pools now read this one `dim` row and there
   // is no second formula left to reproduce.
   it("blends hyper→geo linearly at every morph", () => {
-    const d = FOCUS_TUNE_DEFAULTS;
+    const d = FOCUS_ROWS;
     const at = (a: number, b: number, m: number) => a + (b - a) * m;
     for (const morph of [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]) {
       const c = ctx({ morph });
@@ -677,9 +634,9 @@ describe("FOCUS_TUNE", () => {
   // a knob, at 0 on every row, so the three views answer an off-scope node one way.
   // user, 2026-11-03: a browse dims, a held filter hides, and only on the globe.
   it("mutes in place everywhere but the globe, which hides only under a held filter", () => {
-    for (const [view, row] of Object.entries(FOCUS_TUNE_DEFAULTS)) expect(row.hide).toBe(view === "geo" ? 1 : 0);
-    expect(FOCUS_TUNE_DEFAULTS.geo.dim).toBeLessThan(1);
-    expect(FOCUS_TUNE_DEFAULTS.geo.dim).toBeGreaterThan(FOCUS_TUNE_DEFAULTS.hyper.dim);
+    for (const [view, row] of Object.entries(FOCUS_ROWS)) expect(row.hide).toBe(view === "geo" ? 1 : 0);
+    expect(FOCUS_ROWS.geo.dim).toBeLessThan(1);
+    expect(FOCUS_ROWS.geo.dim).toBeGreaterThan(FOCUS_ROWS.hyper.dim);
   });
 
   it("reproduces the pre-refactor ledger overrides", () => {

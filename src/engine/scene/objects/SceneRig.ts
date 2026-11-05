@@ -5,7 +5,7 @@
 // subject, strongest claim wins, not claiming IS off. The rig is a BLEND: every view is always
 // lighting the scene, weighted by the same per-view presence the light's claims are scaled by, so a
 // view transition cross-fades one room's lighting into the next instead of cutting. Both read their
-// numbers per frame, so a `?tune` edit lands with no reload and no re-push callback.
+// numbers per frame, so nothing about their staging is baked.
 //
 // ⚠️ DIRECTIONAL, NOT POSITIONAL — see the domain module's header. A directional light has ONE
 // direction for the whole field, which is what makes a hundred spheres read as one lit scene; the

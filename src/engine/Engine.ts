@@ -25,7 +25,7 @@ import { METAGRAPHS, NET, netUrl } from "@/src/net/current";
 import { COLORS, POLL } from "@/src/engine/config";
 import { BYTE_SCALE_KB, type RailGroup } from "./domain/ledgerLayout";
 import { HYPER_TILT, HYPER_TILT_FOCUS } from "./domain/hyperLayout";
-import { readSceneColors, type SceneColors, LIGHT_TUNE } from "./sceneColors";
+import { readSceneColors, type SceneColors, LIGHT_LOOK } from "./sceneColors";
 import { setNodeDimTarget, setNodeEnv } from "./scene/objects/NodeFabric";
 import { THEME_KEY, parseThemePref, resolveTheme, type Theme } from "@/src/theme/resolve";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
@@ -555,7 +555,7 @@ export class Engine {
   // which lifts every dark mark toward white and crushes its saturation. That veil, not any
   // material value, is what made the day look read as washed-out pastel (measured 2026-08-21:
   // turning it off dropped the scene's dark marks from 140 to 65 luminance and multiplied its
-  // strongly-coloured pixels 17×). The shipped `LIGHT_TUNE.bloomMul` is 0, so on paper the
+  // strongly-coloured pixels 17×). The shipped `LIGHT_LOOK.bloomMul` is 0, so on paper the
   // whole-frame pass is SKIPPED outright (`bloom.enabled = _bloomMul > 0`; `bloomFloor` is inert
   // while it is 0) and the identity marks halo through their own selective layer instead
   // (SceneContext's BLOOM_LAYER sub-pipeline). The knob stays: any value > 0 re-enables the
@@ -579,7 +579,7 @@ export class Engine {
       parseThemePref(safeRead(THEME_KEY)),
       typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches,
     );
-    this._bloomMul = this._theme === "light" ? LIGHT_TUNE.bloomMul : 1; // silver: calm pass (see the field)
+    this._bloomMul = this._theme === "light" ? LIGHT_LOOK.bloomMul : 1; // silver: calm pass (see the field)
     if (process.env.NODE_ENV === "development" && this._theme === "dark") {
       // Tolerant compare (±2 per channel): oklch→sRGB resolution rounds, so only a genuine token
       // change (a different colour) should warn — not a 1-bit rounding wobble.
@@ -704,9 +704,6 @@ export class Engine {
     });
     this.devTune = new DevTunePanel({
       ctx: this.ctx,
-      globe: this.globe,
-      ledger: this.ledger,
-      layers: this.layers,
       refreshTheme: () => this._refreshTheme(this._theme),
       disposed: () => this.disposed,
     });
@@ -839,7 +836,7 @@ export class Engine {
     this._slowmo = Number.isFinite(smVal) && smVal > 0 ? Math.min(20, Math.max(0.1, smVal)) : 1;
 
     // Live tuning panel — `?tune` (the ?stats idiom): tweakpane is dynamically imported so it
-    // never enters the normal bundle; the panel binds the scene's *TUNE_DEFAULTS-backed objects.
+    // never enters the normal bundle; its knobs are declared in devTune.ts's manifest alone.
     // In `next dev` a switch offers the same thing without a reload (see _tuneBtn).
     if (/[?#&]tune/.test(window.location.search + window.location.hash)) void this.devTune.open();
     if (process.env.NODE_ENV === "development") this.devTune.mountSwitch();
@@ -1261,7 +1258,7 @@ export class Engine {
     // `_colorConsumers` member: that list's contract is both setters, and the grid names no
     // network, so a no-op `setSceneColors` would be ceremony standing in for a fact.
     this.trends.setColors(this._colors);
-    this._bloomMul = theme === "light" ? LIGHT_TUNE.bloomMul : 1;
+    this._bloomMul = theme === "light" ? LIGHT_LOOK.bloomMul : 1;
   }
 
   private async refreshMeta(initial: boolean) {
@@ -2091,7 +2088,7 @@ export class Engine {
     this.ctx.bloom.strength = pb.strength * this._bloomMul;
     this.ctx.bloom.radius = pb.radius;
     // On silver the threshold floors high: only marks brighter than the ground may halo.
-    this.ctx.bloom.threshold = this._bloomMul < 1 ? Math.max(pb.threshold, LIGHT_TUNE.bloomFloor) : pb.threshold;
+    this.ctx.bloom.threshold = this._bloomMul < 1 ? Math.max(pb.threshold, LIGHT_LOOK.bloomFloor) : pb.threshold;
     // Paper skips the pass outright rather than running it at zero strength — the composer's own
     // `enabled` flag, the same lever the DoF pass sits behind (SceneContext). A plain boolean
     // write, so the frame body still allocates nothing.

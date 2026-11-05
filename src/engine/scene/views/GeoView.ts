@@ -2,7 +2,6 @@ import * as THREE from "three";
 import { feature } from "topojson-client";
 import { R, LAND_H, latLonToVec3 } from "../../domain/geoLayout";
 import { ringsToSegments, type Ring } from "../../domain/countryShape";
-import type { TuneSchema } from "../../tune";
 
 // Builds the geo globe SURFACE — the body sphere, graticule, atmosphere rim, and the raised
 // continents (+ glowing coastal cliffs) — into `globe.group`, and sets the handles the morph/fade
@@ -73,8 +72,8 @@ export interface GeoViewHost {
    *  disagree. Camera-relative by construction (domain/sceneRig aims every azimuth off the camera's
    *  bearing), which is the whole reason a geographically-honest sun was NOT built: the globe spins
    *  to face a selection, and a sun that left the viewed hemisphere dark would be the wrong kind of
-   *  honest. `uSunMix` carries the tunables (terminator softness, then the ink/glow pair for the
-   *  ground in force) so the look is live-tunable without a shader recompile. */
+   *  honest. `uSunMix` carries the look (terminator softness, then the ink/glow pair for the
+   *  ground in force) as a uniform rather than shader literals. */
   sunUniform?: { value: THREE.Vector3 };
   sunMixUniform?: { value: THREE.Vector3 };
   landFillMesh?: THREE.Mesh;
@@ -107,8 +106,8 @@ export interface GeoViewHost {
   oceanMesh?: THREE.Mesh;
 }
 
-/** THE SUN's look (contract: src/engine/tune.ts). Read per frame by Globe and pushed into
- *  `sunMixUniform`, so every knob is live with no recompile and no onChange.
+/** THE SUN's look. Read per frame by Globe and pushed into `sunMixUniform`, so the shader carries
+ *  no recompile-baked number.
  *
  *  `term` is the terminator's half-width in COSINE space, deliberately generous: at a hard edge the
  *  surface reads as a painted texture, and only a transition wide enough to cover most of the
@@ -116,20 +115,11 @@ export interface GeoViewHost {
  *  ground — dark's spread around 1 is small because the hologram's own glow is the subject and a
  *  strong terminator would read as a second light source; paper's is wider because ink is what the
  *  day look has to shade with, and the sphere has to come from somewhere. */
-export const SUN_TUNE = {
+export const SUN_LOOK = {
   term: 0.75,
   nightGlow: 0.72, dayGlow: 1.22,
   nightInk: 1.34, dayInk: 0.9,
-};
-export type SunTune = typeof SUN_TUNE;
-export const SUN_TUNE_DEFAULTS: Readonly<SunTune> = { ...SUN_TUNE };
-export const SUN_TUNE_SCHEMA: TuneSchema<SunTune> = {
-  term: { min: 0.05, max: 2, step: 0.01, label: "terminator" },
-  nightGlow: { min: 0, max: 2, step: 0.01, label: "dark · night" },
-  dayGlow: { min: 0, max: 3, step: 0.01, label: "dark · day" },
-  nightInk: { min: 0, max: 3, step: 0.01, label: "paper · night" },
-  dayInk: { min: 0, max: 2, step: 0.01, label: "paper · day" },
-};
+} as const;
 
 // HOLOGRAPHIC GLOBE: there is deliberately NO opaque body sphere and NO atmosphere halo.
 // The coastal wall rim is the defining stroke, the land glass + micro-grid carry the surface,
@@ -524,7 +514,7 @@ async function buildLand(globe: GeoViewHost) {
     // The sun starts straight up: a real direction arrives on the first frame Globe.setSun runs,
     // and "overhead" is the one default that can never look like a bug in the meantime.
     globe.sunUniform = { value: new THREE.Vector3(0, 1, 0) };
-    globe.sunMixUniform = { value: new THREE.Vector3(SUN_TUNE.term, 1, 1) };
+    globe.sunMixUniform = { value: new THREE.Vector3(SUN_LOOK.term, 1, 1) };
     globe.landWallUniforms = {
       uColor: { value: globe._edgeColor.clone() },
       uBase: { value: wallBase },

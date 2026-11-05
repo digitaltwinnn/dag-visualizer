@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { BAR_TUNE_DEFAULTS } from "./ByteBar";
-import { RIBBON_TUNE_DEFAULTS } from "./Ribbons";
-import { snapBright, snapFocusOf, focusWeightOf, FOCUS_TUNE_DEFAULTS } from "../../domain/dimModel";
-import { TILE_TUNE_DEFAULTS } from "../views/LedgerView";
+import { BAR_LOOK } from "./ByteBar";
+import { RIBBON_LOOK } from "./Ribbons";
+import { snapBright, snapFocusOf, focusWeightOf, FOCUS_ROWS } from "../../domain/dimModel";
+import { TILE_LOOK } from "../views/LedgerView";
 
 // The chamber's BRIGHTNESS-TIER CONTRACT. Since 2026-08-11 the snapshots read the NODE
 // vocabulary — a snapshot is data, so its off-filter dim, focus boost and dim-back are the ledger
@@ -24,8 +24,8 @@ const tiers = (rest: number) => ({
 
 describe("the ledger's brightness-tier hierarchy", () => {
   for (const [what, rest] of [
-    ["the byte bar's bands", BAR_TUNE_DEFAULTS.rest],
-    ["the lane tiles", TILE_TUNE_DEFAULTS.rest],
+    ["the byte bar's bands", BAR_LOOK.rest],
+    ["the lane tiles", TILE_LOOK.rest],
   ] as const) {
     it(`${what}: primary > hover preview > resting > stepped back`, () => {
       const t = tiers(rest);
@@ -73,8 +73,8 @@ describe("the ledger's brightness-tier hierarchy", () => {
   }
 
   it("ribbons rest visible, and dim on the same one knob", () => {
-    expect(RIBBON_TUNE_DEFAULTS.restOp).toBeGreaterThan(0);
-    expect(FOCUS_TUNE_DEFAULTS.ledger.dim).toBeGreaterThan(0);
-    expect(FOCUS_TUNE_DEFAULTS.ledger.dim).toBeLessThan(1);
+    expect(RIBBON_LOOK.restOp).toBeGreaterThan(0);
+    expect(FOCUS_ROWS.ledger.dim).toBeGreaterThan(0);
+    expect(FOCUS_ROWS.ledger.dim).toBeLessThan(1);
   });
 });

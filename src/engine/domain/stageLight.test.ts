@@ -1,8 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { STAGE_LIGHTS, STAGE_LIGHT_DEFAULTS, STAGE_LIGHT_SCHEMA } from "./stageLight";
+import { STAGE_LIGHTS } from "./stageLight";
 
-// The rows are pinned through STAGE_LIGHT_DEFAULTS, not the live STAGE_LIGHTS: the `?tune` panel
-// binds the live rows, and a test that asserted those would turn a dev knob into a red build.
 describe("STAGE_LIGHTS", () => {
   // Every 3D view has a row, and the placeholder views have none — `StagedView` makes the second
   // half a compile-time fact and this assertion is the runtime half. The ledger's row is the newest
@@ -19,7 +17,7 @@ describe("STAGE_LIGHTS", () => {
   // THE RELATIONS ARE PINNED, NOT THE NUMBERS (review, 2026-10-24): a retune is a design decision
   // the user makes on screen; what this file guards is the SHAPE of each row and the ladder in it.
   it("hyper's row stages three subjects at three scales — the finer the subject, the lower and tighter its stage", () => {
-    const h = STAGE_LIGHT_DEFAULTS.hyper;
+    const h = STAGE_LIGHTS.hyper;
     expect(h.heightNode).toBeDefined();
     expect(h.heightDag).toBeDefined();
     expect(h.angleNode).toBeDefined();
@@ -29,7 +27,7 @@ describe("STAGE_LIGHTS", () => {
   });
 
   it("every row is a live lamp: a positive cone, distance, intensity and height, the cone inside a hemisphere, a penumbra in [0, 1]", () => {
-    for (const [view, row] of Object.entries(STAGE_LIGHT_DEFAULTS)) {
+    for (const [view, row] of Object.entries(STAGE_LIGHTS)) {
       for (const k of ["angle", "distance", "intensity", "height"] as const) expect(row[k], `${view}.${k}`).toBeGreaterThan(0);
       expect(row.angle, `${view} cone`).toBeLessThan(Math.PI / 2);
       if (row.penumbra != null) {
@@ -40,8 +38,8 @@ describe("STAGE_LIGHTS", () => {
   });
 
   it("geo's lamp is tighter and closer than hyper's — one dense stack, not a ring of hubs", () => {
-    expect(STAGE_LIGHT_DEFAULTS.geo.angle).toBeLessThan(STAGE_LIGHT_DEFAULTS.hyper.angle);
-    expect(STAGE_LIGHT_DEFAULTS.geo.distance).toBeLessThan(STAGE_LIGHT_DEFAULTS.hyper.distance);
+    expect(STAGE_LIGHTS.geo.angle).toBeLessThan(STAGE_LIGHTS.hyper.angle);
+    expect(STAGE_LIGHTS.geo.distance).toBeLessThan(STAGE_LIGHTS.hyper.distance);
   });
 
   // A lamp is not the same instrument on both grounds: dark blooms the wash it lays on an emissive
@@ -51,32 +49,17 @@ describe("STAGE_LIGHTS", () => {
   // numbers are tuning. The ledger is exempt by construction: its claim is paper-only, so its one
   // `intensity` already is its paper number.
   it("asks MORE of a claim on paper, wherever a row states a paper level", () => {
-    for (const [view, row] of Object.entries(STAGE_LIGHT_DEFAULTS)) {
+    for (const [view, row] of Object.entries(STAGE_LIGHTS)) {
       if (row.intensityPaper == null) continue;
       expect(row.intensityPaper, `${view} paper level`).toBeGreaterThan(row.intensity);
     }
-    expect(STAGE_LIGHT_DEFAULTS.ledger.intensityPaper).toBeUndefined();
+    expect(STAGE_LIGHTS.ledger.intensityPaper).toBeUndefined();
   });
 
   it("the ledger's row is the day glass's LOW highlight: staged under hyper's hub height, with no node or core stage", () => {
-    const l = STAGE_LIGHT_DEFAULTS.ledger;
-    expect(l.height).toBeLessThan(STAGE_LIGHT_DEFAULTS.hyper.height);
+    const l = STAGE_LIGHTS.ledger;
+    expect(l.height).toBeLessThan(STAGE_LIGHTS.hyper.height);
     expect(l.heightNode).toBeUndefined();
     expect(l.heightDag).toBeUndefined();
-  });
-
-  it("starts live == defaults, so an untouched panel changes nothing", () => {
-    expect(STAGE_LIGHTS).toEqual(STAGE_LIGHT_DEFAULTS);
-  });
-
-  it("schemas every knob, and every knob's range contains its default", () => {
-    for (const row of Object.values(STAGE_LIGHT_DEFAULTS)) {
-      for (const [key, v] of Object.entries(row)) {
-        const knob = STAGE_LIGHT_SCHEMA[key as keyof typeof row];
-        expect(knob, `no schema entry for ${key}`).toBeDefined();
-        expect(v).toBeGreaterThanOrEqual(knob!.min);
-        expect(v).toBeLessThanOrEqual(knob!.max);
-      }
-    }
   });
 });

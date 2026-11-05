@@ -23,9 +23,8 @@
 // three allowlist entries and said nothing about what the numbers meant. A row carries a `temp` on a
 // −1 (cool) … 0 (neutral white) … +1 (warm) axis instead, resolved by `tempTint` below: no colour
 // literal anywhere, the guard's allowlist shrinks by three, and the knob a lighting session actually
-// wants to turn ("cooler fill") is the one the panel offers.
+// wants to turn ("cooler fill") is the one a row carries.
 import type { View3D } from "./viewTransition";
-import type { TuneSchema } from "../tune";
 
 /** One view's three-point staging. Azimuths are radians OFFSET FROM THE CAMERA's bearing (+ = to
  *  camera-right); elevations are radians above the horizon; temps ride the −1…+1 axis above. */
@@ -55,7 +54,7 @@ export interface RigRow {
 
 // The rows. Read them as three ratios rather than as absolute numbers: key:fill decides how deep the
 // core shadow goes, key:amb how black it bottoms out, rim:key how hard the silhouette separates.
-export const SCENE_RIG: Record<View3D, RigRow> = {
+export const SCENE_RIG: Readonly<Record<View3D, Readonly<RigRow>>> = {
   // hyper — the sphere field, so the strongest sculpt in the app: the deepest key:fill ratio and the
   // lowest ambient. These are round emissive orbs and the emissive already carries their identity;
   // what the rig adds is the shading gradient across each one that says "ball", not "dot".
@@ -115,7 +114,7 @@ export interface RigGround {
   rim: number;
 }
 
-export const RIG_PAPER: RigGround = { amb: 0.5, key: 0.82, fill: 0.7, rim: 0.42 };
+export const RIG_PAPER: Readonly<RigGround> = { amb: 0.5, key: 0.82, fill: 0.7, rim: 0.42 };
 
 /** A light's colour from its temperature. −1 is the cool blue-grey the scene has always used, 0 is
  *  neutral white, +1 is a warm daylight amber; the cool end's coefficients are the old ambient
@@ -129,44 +128,3 @@ export function tempTint(k: number, out: { r: number; g: number; b: number }): v
   out.g = 1 - c * 0.34 - w * 0.09;
   out.b = 1 - w * 0.26;
 }
-
-// ---- the `?tune` surface (contract: src/engine/tune.ts) --------------------------------------
-// The rows are plain mutable objects, so the panel binds them directly; the adapter re-reads the
-// blended row every frame, so no group here needs an onChange.
-export const SCENE_RIG_DEFAULTS: Readonly<Record<View3D, RigRow>> = {
-  hyper: { ...SCENE_RIG.hyper },
-  geo: { ...SCENE_RIG.geo },
-  ledger: { ...SCENE_RIG.ledger },
-  trend: { ...SCENE_RIG.trend },
-};
-
-export const RIG_PAPER_DEFAULTS: Readonly<RigGround> = { ...RIG_PAPER };
-
-const AZ = { min: -Math.PI, max: Math.PI, step: 0.01 };
-const EL = { min: -1.4, max: 1.4, step: 0.01 };
-const INT = { min: 0, max: 4, step: 0.05 };
-const TEMP = { min: -1, max: 1, step: 0.02 };
-
-export const RIG_ROW_SCHEMA: TuneSchema<RigRow> = {
-  keyAz: { ...AZ, label: "key · bearing" },
-  keyEl: { ...EL, label: "key · height" },
-  keyInt: { ...INT, label: "key" },
-  keyTemp: { ...TEMP, label: "key · temp" },
-  fillAz: { ...AZ, label: "fill · bearing" },
-  fillEl: { ...EL, label: "fill · height" },
-  fillInt: { ...INT, label: "fill" },
-  fillTemp: { ...TEMP, label: "fill · temp" },
-  rimAz: { ...AZ, label: "rim · bearing" },
-  rimEl: { ...EL, label: "rim · height" },
-  rimInt: { ...INT, label: "rim" },
-  rimTemp: { ...TEMP, label: "rim · temp" },
-  ambInt: { ...INT, label: "ambient" },
-  ambTemp: { ...TEMP, label: "ambient · temp" },
-};
-
-export const RIG_PAPER_SCHEMA: TuneSchema<RigGround> = {
-  amb: { min: 0, max: 2, step: 0.02, label: "ambient ×" },
-  key: { min: 0, max: 2, step: 0.02, label: "key ×" },
-  fill: { min: 0, max: 2, step: 0.02, label: "fill ×" },
-  rim: { min: 0, max: 2, step: 0.02, label: "rim ×" },
-};

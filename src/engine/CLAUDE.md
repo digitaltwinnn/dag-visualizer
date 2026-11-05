@@ -1,39 +1,45 @@
 # src/engine — working notes
 
-Engine-wide: live look-tuning under ?tune.
+Engine-wide: the look rows, the emphasis knobs, and the `?tune` panel shell.
 
 Split out of the root `CLAUDE.md` (2026-08-31) so it loads when you work here rather
 than on every session. The root file holds what this is, the twelve rules, run & test,
 the architecture map and the dev workflow; **its rules govern this file too**.
 
-## Tuning the look live
+## The look, and the `?tune` panel shell
 
-The dev **`?tune`** flag (present at page load, the `?stats` idiom) dynamic-imports a tweakpane panel
-from `src/engine/devTune.ts` — never in the normal bundle. The contract is `src/engine/tune.ts`; three
-rules make it non-intrusive, and the header comment there is their authoritative statement:
+**Production code carries no panel metadata** (user, 2026-11-05). A module that owns a look exports
+ONE plain constant, typed `Readonly<…>` and never `Object.freeze`d — `FOCUS_ROWS`/`FOCUS_SHARED`
+(`domain/dimModel.ts`), `STAGE_LIGHTS`, `SCENE_RIG`/`RIG_PAPER`, `LIGHT_LOOK` (`sceneColors.ts`),
+`SUN_LOOK`, `TETHER_LOOK`, `RIBBON_LOOK`, `BAR_LOOK`, `TILE_LOOK`, `GLOBAL_PLANE_LOOK`/`META_PLANE_LOOK`,
+`GLASS_LOOK`. No `*_DEFAULTS` twin, no live copy, no slider schema, no panel-only setter. Tests pin
+the constant itself.
 
-1. **`*_TUNE_DEFAULTS` is the shipped look and stays what tests pin** — they assert the DEFAULTS, never
-   the live struct, so turning a knob can never make a test pass or fail.
-2. **The hoist rule.** A tunable read inside a per-node loop is loaded into a local in that loop's
-   preamble, so the inner body reads a local exactly as it did when the value was a module const — one
-   property load per FRAME, not per node. Sibling discipline to `noFrameAllocations.test.ts`.
-3. **A knob's range is colocated with the constant it bounds** — a `*_TUNE_SCHEMA` next to its
-   `*_TUNE_DEFAULTS`, typed against its own values so a renamed field is a compile error rather than a
-   silently missing slider. `devTune.ts` is ONLY the manifest plus a generic walker, so adding a knob is
-   one line in the owning module and no edit there.
+The dev **`?tune`** flag (present at page load, the `?stats` idiom; in `next dev` also the corner
+switch) dynamic-imports a tweakpane panel from `src/engine/devTune.ts` — never in the normal bundle.
+**Its manifest is empty** (user, same day: "cleanup the ?tune attributes but keep the functionality
+for later"); what remains is the shell — the camera readout, export, reset and opt-in persistence.
+The contract is `src/engine/tune.ts`, whose header is the authoritative statement:
 
-**The tree is STATIC** — shared groups, then one collapsed folder per view, then the
-camera. A folder for a view you aren't in simply sits collapsed; that costs a click and saves the panel
-tracking `mode`, subscribing to anything, or rebuilding itself. Values that are BAKED rather than read
-per frame (the ribbons' vertex colours) carry an `onChange` that re-pushes them, so an edit shows
-without a reload — **prefer reading the row per frame and needing no callback at all**, which is what
-the stage light does. Persistence is **opt-in and default OFF** — a silently-restored session is a
-trap, because you would be looking at last week's knobs believing they were the shipped look.
+1. **The manifest is the one place a knob is declared.** A `TuneGroup` names the module's constant BY
+   REFERENCE plus a `TuneSchema` typed against the module's own row type (a renamed field is a
+   compile error, not a silently missing slider). The panel snapshots the shipped values itself at
+   mount, writes into the constant in place, and exports a paste-ready block naming its home.
+2. **The hoist rule.** A value read inside a per-node loop is loaded into a local in that loop's
+   preamble — one property load per FRAME, not per node. Sibling discipline to
+   `noFrameAllocations.test.ts`.
+3. **A baked value re-bakes through `refreshTheme`**, the Engine's whole theme thread (every view's
+   `setColors`), never through a panel-only method on the view. **Prefer reading the row per frame
+   and needing no callback at all**, which is what the stage light, the rig and the dim rows do.
+
+**The tree is STATIC** — shared groups, then one collapsed folder per view (empty ones skipped),
+then the camera. Persistence is **opt-in and default OFF** — a silently-restored session is a trap,
+because you would be looking at last week's knobs believing they were the shipped look.
 
 **A knob belongs to the view whose look it changes, even when central code applies it** (user,
-2026-08-11). Emphasis and lighting are both `Record<View3D, Row>` + ONE row schema — `FOCUS_TUNE`
-(`domain/dimModel.ts`) and `STAGE_LIGHTS` (`domain/stageLight.ts`) — so each view folder holds its own
-`focus & dim` and, where it stages one, its `spotlight`. Only what is genuinely cross-view stays above
+2026-08-11). Emphasis and lighting are both `Record<View3D, Row>`, one row shape per table — `FOCUS_ROWS`
+(`domain/dimModel.ts`) and `STAGE_LIGHTS` (`domain/stageLight.ts`) — so when they are bound again each
+view folder holds its own `focus & dim` and, where it stages one, its `spotlight`. Only what is genuinely cross-view stays above
 them; today that is the focus TIER ranking alone. `dimModel`'s four resolvers all go through one
 `viewMix(c, field)`, so a new emphasis number is a field on the row and nothing else.
 
@@ -97,7 +103,7 @@ ribbons — is a real snapshot, so it reads the NODE vocabulary instead. `snapBr
 `domain/dimModel.ts` is that one call: the ledger row's own `dim`, `boost` and `back`, exactly what the
 chips in its trays answer to, applied to whichever resting level the instrument owns (the bar's is an
 opacity, the tiles' a colour multiplier — two numbers, one per instrument, and nothing else left in
-those `*_TUNE_DEFAULTS`). So the chamber gained the focus boost and the dim-back it never had, and one
+`BAR_LOOK` / `TILE_LOOK`). So the chamber gained the focus boost and the dim-back it never had, and one
 knob moves one effect across nodes and snapshots alike. **COLOUR stays fully independent** — identity
 hue vs the neutral trail is the chamber's own second reading, decided at the call sites and untouched
 by any of these knobs.

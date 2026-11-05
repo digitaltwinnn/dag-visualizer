@@ -2,7 +2,6 @@
 // light, consumed by `scene/objects/StageLight.ts`'s per-frame claim. The per-view VALUES are
 // deliberate tuning; the MECHANISM is shared.
 import type { View3D } from "./viewTransition";
-import type { TuneSchema } from "../tune";
 
 /** The views that stage a light: the three STRUCTURAL 3D views, each with a row. History stages
  *  none — its planes are DOM charts, lit by nothing in the scene. The ledger's is claimed ONLY
@@ -16,8 +15,8 @@ import type { TuneSchema } from "../tune";
  *
  *  It is a real SpotLight in the scene as well as a shader uniform — nothing in the chamber is lit
  *  by three.js today, so the beam itself is invisible and only the glass reads it; that is why its
- *  intensity row is low. Keeping the row in this table rather than in the shader is what keeps the
- *  `?tune` spotlight folder working for it. */
+ *  intensity row is low. Keeping the row in this table rather than in the shader is what keeps it one
+ *  home with the other views' lamps. */
 export type StagedView = Extract<View3D, "hyper" | "geo" | "ledger">;
 
 export interface StageLightRow {
@@ -26,7 +25,7 @@ export interface StageLightRow {
   intensity: number; // full-on target the light eases toward (the DARK ground's level)
   /** THE SAME LAMP NEEDS A DIFFERENT LEVEL ON A GROUND IT CANNOT BLOOM INTO. In dark the spot's
    *  wash lands on an emissive node and the bloom pass then amplifies it; on paper the whole-frame
-   *  pass is skipped (`LIGHT_TUNE.bloomMul` 0) and the light ground competes, so the identical
+   *  pass is skipped (`LIGHT_LOOK.bloomMul` 0) and the light ground competes, so the identical
    *  claim reads as
    *  nothing. Measured on paper (2026-08-29, DOR's hybrid shell): at 2.4 the lit node was
    *  indistinguishable from its neighbours; at 12 it was unmistakable but visibly desaturating
@@ -46,7 +45,7 @@ export interface StageLightRow {
   angleNode?: number;
 }
 
-export const STAGE_LIGHTS: Record<StagedView, StageLightRow> = {
+export const STAGE_LIGHTS: Readonly<Record<StagedView, Readonly<StageLightRow>>> = {
   // hyper: cone covers the outer cL1 ring (5.4) with margin at height; the DAG core is the
   // same subject at a bigger scale (L1 shell 12.5) → its own higher stage (heightDag). A NODE is
   // the other end of that range: staged low and tight so the pool reads as emphasis on one bead
@@ -77,26 +76,4 @@ export const STAGE_LIGHTS: Record<StagedView, StageLightRow> = {
   // behind the lead slot. The cone and range only matter to a beam nothing here reads; the
   // intensity is what the glass's Blinn-Phong lobe spends.
   ledger: { angle: 0.7, distance: 60, intensity: 0.32, penumbra: 0.6, height: 5 },
-};
-
-// ---- the `?tune` surface (contract: src/engine/tune.ts) --------------------------------------
-// STAGE_LIGHTS' rows are already plain mutable objects, so the panel binds them directly and no
-// production code changes shape. What it needs on top is a defaults copy to reset/diff against —
-// snapshotted at module init, before any panel can exist, so it cannot be a turned knob.
-export const STAGE_LIGHT_DEFAULTS: Readonly<Record<StagedView, StageLightRow>> = {
-  hyper: { ...STAGE_LIGHTS.hyper },
-  geo: { ...STAGE_LIGHTS.geo },
-  ledger: { ...STAGE_LIGHTS.ledger },
-};
-
-export const STAGE_LIGHT_SCHEMA: TuneSchema<StageLightRow> = {
-  angle: { min: 0.05, max: 1.4, step: 0.01, label: "cone" },
-  distance: { min: 5, max: 80, step: 1, label: "range" },
-  intensity: { min: 0, max: 10, step: 0.1 },
-  intensityPaper: { min: 0, max: 10, step: 0.1, label: "intensity · paper" },
-  penumbra: { min: 0, max: 1, label: "soft edge" },
-  height: { min: 1, max: 40, step: 0.5, label: "stage height" },
-  heightDag: { min: 1, max: 40, step: 0.5, label: "stage height · DAG" },
-  heightNode: { min: 0.5, max: 20, step: 0.1, label: "stage height · node" },
-  angleNode: { min: 0.05, max: 1.4, step: 0.01, label: "cone · node" },
 };

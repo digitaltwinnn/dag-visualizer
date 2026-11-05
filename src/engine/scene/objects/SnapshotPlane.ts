@@ -10,48 +10,38 @@
 // zero-allocation loop), and their shared styling (lead row identity, neutral trail) is one code
 // path in LedgerView/ByteBar by construction. The plane owns the furniture, the pools own the data.
 //
-// Two tune channels (user, 2026-08-07): the GLOBAL plane and the METAGRAPH planes are tuned
-// separately (`?tune` folders) — same blueprint, each caller passes its own PlaneTune.
+// Two look channels (user, 2026-08-07): the GLOBAL plane and the METAGRAPH planes are tuned
+// separately — same blueprint, each caller passes its own PlaneLook.
 import * as THREE from "three";
 import { isLightGround, labelInk, type SceneColors } from "../../sceneColors";
 import { CONT_X } from "../../domain/ledgerLayout";
 import type { ContainerSpec } from "../../domain/ledgerRails";
 import { applyGlassTheme, makeGlassFill, type GlassFillUniforms } from "./glassFill";
-import type { TuneSchema } from "../../tune";
 
-/** One plane's live-tunable look (dev `?tune` panel binds it; the values are the shipped look). */
-export interface PlaneTune {
+/** One plane's look. */
+export interface PlaneLook {
   fillOp: number;  // the edge-band fill
   innerOp: number; // the flat centre level
   edge: number;    // drop-off start (1 = only the rim, 0 = solid)
   trayOp: number;  // the tray panel's flat fill
 }
 
-export const GLOBAL_PLANE_TUNE_DEFAULTS: PlaneTune = {
+export const GLOBAL_PLANE_LOOK: Readonly<PlaneLook> = {
   fillOp: 0.035, innerOp: 0.01, edge: 0.95, trayOp: 0.025,
 };
-export const META_PLANE_TUNE_DEFAULTS: PlaneTune = {
-  fillOp: 0.035, innerOp: 0.01, edge: 0.98, trayOp: 0.025, // edge+tray user-tuned via ?tune, 2026-08-07
-};
-
-/** The `?tune` knob ranges (contract: src/engine/tune.ts) — ONE schema for both plane channels,
- *  since they are the same blueprint tuned separately. */
-export const PLANE_TUNE_SCHEMA: TuneSchema<PlaneTune> = {
-  fillOp: { min: 0, max: 0.3, step: 0.005, label: "edge fill" },
-  innerOp: { min: 0, max: 0.1, step: 0.002, label: "centre fill" },
-  edge: { min: 0, max: 0.99, label: "drop-off" },
-  trayOp: { min: 0, max: 0.3, step: 0.005, label: "tray fill" },
+export const META_PLANE_LOOK: Readonly<PlaneLook> = {
+  fillOp: 0.035, innerOp: 0.01, edge: 0.98, trayOp: 0.025, // edge+tray user-tuned live, 2026-08-07
 };
 
 /** THE DAY GLASS — the LIGHT ground's own pane look (user, 2026-08-26: "the snapshot page panels
  *  look really ugly in light mode (ok in dark mode) […] can you make it a nice glass panel?").
  *
- *  It is ONE set for the whole chamber, not a per-channel one like PlaneTune above: PlaneTune tunes
- *  how much PRESENCE a storey has, and the two storeys legitimately differ; this tunes what GLASS
+ *  It is ONE set for the whole chamber, not a per-channel one like PlaneLook above: PlaneLook sets
+ *  how much PRESENCE a storey has, and the two storeys legitimately differ; this sets what GLASS
  *  IS, and a floor made of different glass from the lane above it is two materials, not one
  *  chamber. The channels still separate — every term below is multiplied by the caller's own
  *  furniture alpha and fill boost — so the committed lane still leads. */
-export interface GlassTune {
+export interface GlassLook {
   body: number;     // the pane's own tint: what the sheet costs the ground beneath it
   rim: number;      // the Fresnel sheen, CAPPED: a full mirror would hide the trail
   trayBody: number; // the trays face the camera head-on: little Fresnel, so a touch more body
@@ -62,7 +52,7 @@ export interface GlassTune {
   laneTint: number; // how far that tint moves from the neutral pane toward the lane's identity
 }
 
-export const GLASS_TUNE_DEFAULTS: Readonly<GlassTune> = Object.freeze({
+export const GLASS_LOOK: Readonly<GlassLook> = {
   // PRINT (design direction A, user 2026-10-09): the panes are SHEETS, not glass — a faint matte
   // tint of the furniture ink with a hairline along the rim, the HUD's card recipe one layer down.
   // A whisper of Fresnel survives so a pane read along its plane still firms a little. The day
@@ -71,17 +61,6 @@ export const GLASS_TUNE_DEFAULTS: Readonly<GlassTune> = Object.freeze({
   // same day: "clean dead code also"); git carries their history.
   body: 0.10, rim: 0.10, trayBody: 0.06, line: 0.55,
   laneBody: 1.75, laneTint: 1,
-});
-/** The live struct the `?tune` panel binds; DEFAULTS above is the shipped look and what tests pin. */
-export const GLASS_TUNE: GlassTune = { ...GLASS_TUNE_DEFAULTS };
-
-export const GLASS_TUNE_SCHEMA: TuneSchema<GlassTune> = {
-  body: { min: 0, max: 0.4, step: 0.005, label: "body tint" },
-  rim: { min: 0, max: 1.5, step: 0.02, label: "reflectance" },
-  trayBody: { min: 0, max: 0.5, step: 0.005, label: "tray body" },
-  line: { min: 0, max: 1, step: 0.02, label: "hairline (print)" },
-  laneBody: { min: 1, max: 4, step: 0.05, label: "lane body ×" },
-  laneTint: { min: 0, max: 1, step: 0.02, label: "lane tint" },
 };
 
 /** The planes' corner radius — SQUARE (rounded corners belong to the trays). */
@@ -253,13 +232,13 @@ export class SnapshotPlane {
     this._fillU.uFadeSpan.value = span;
   }
 
-  /** Per-frame look: the caller passes ITS tune channel (global vs metagraph planes) and the
+  /** Per-frame look: the caller passes ITS look channel (global vs metagraph planes) and the
    *  furniture alpha. `rimRef` is the shared drop-off reference depth so the rim reads as one
    *  width across planes; narrow pieces clamp it to stay a rim. `fillBoost` lifts the edge
    *  fill alone — the committed lane's plane glows a step brighter (user, 2026-08-07). `hue` is
-   *  the committed lane's identity, which only the day glass spends (see GlassTune.laneTint). */
-  applyAlpha(tune: PlaneTune, alpha: number, rimRef: number, fillBoost = 1, hue: number | null = null): void {
-    this._fillU.uEdgeW.value = Math.min((1 - tune.edge) * rimRef, 0.8 * this._minHalf);
+   *  the committed lane's identity, which only the day glass spends (see GlassLook.laneTint). */
+  applyAlpha(look: PlaneLook, alpha: number, rimRef: number, fillBoost = 1, hue: number | null = null): void {
+    this._fillU.uEdgeW.value = Math.min((1 - look.edge) * rimRef, 0.8 * this._minHalf);
     if (this._paper) {
       // THE DAY GLASS. The dark look's two flat fills are not dimmed here, they are REPLACED: an
       // additive whisper over black is a glow, and the same whisper shaded onto paper through
@@ -274,7 +253,7 @@ export class SnapshotPlane {
       // it without bleaching: `uBody`, which appears in the ALPHA term alone, so more of it is more
       // pane and no more light; and the pane's own tint, lerped toward the lane's identity so the
       // committed plane reads as ITS lane rather than as heat.
-      const g = GLASS_TUNE;
+      const g = GLASS_LOOK;
       const lane = fillBoost > 1;
       this._fillU.uOpacity.value = 0;
       this._fillU.uInner.value = 0;
@@ -293,12 +272,12 @@ export class SnapshotPlane {
       }
       return;
     }
-    this._fillU.uOpacity.value = tune.fillOp * fillBoost * alpha;
-    this._fillU.uInner.value = tune.innerOp * alpha;
+    this._fillU.uOpacity.value = look.fillOp * fillBoost * alpha;
+    this._fillU.uInner.value = look.innerOp * alpha;
     if (this._trayU && this._tray?.visible) {
       // FLAT tray fill: the rim channel stays off, the centre level carries the whole panel.
       this._trayU.uOpacity.value = 0;
-      this._trayU.uInner.value = tune.trayOp * alpha;
+      this._trayU.uInner.value = look.trayOp * alpha;
     }
   }
 

@@ -73,7 +73,7 @@ export interface RingLevels {
 // "angled to the centre instead of normal lines" (user, 2026-10-24).
 /** An arc's tier under the selectors: `rest` while nothing is selected (every arc at the ring's
  *  resting presence), `lit` for the subject's arcs, `dim` for the rest. The adapter turns the tier
- *  into presence with the geo view's OWN focus row (`dimModel.FOCUS_TUNE.geo` — boost and back, the
+ *  into presence with the geo view's OWN focus row (`dimModel.FOCUS_ROWS.geo` — boost and back, the
  *  numbers the chips answer to), so the ring never carries a dim of its own (user, 2026-10-23:
  *  "be careful with one-off deviations if there is a clear standard for the app"). */
 export type RingTier = "rest" | "lit" | "dim";

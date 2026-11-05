@@ -1,7 +1,4 @@
 import type { SceneCtx } from "./scene/SceneContext";
-import type { Globe } from "./scene/Globe";
-import type { LedgerView } from "./scene/views/LedgerView";
-import type { HyperView } from "./scene/views/HyperView";
 
 // THE DEV TUNING PANEL, lifted out of Engine.ts (2026-08-31).
 //
@@ -15,10 +12,7 @@ import type { HyperView } from "./scene/views/HyperView";
 
 export interface DevTuneHost {
   ctx: SceneCtx;
-  globe: Globe;
-  ledger: LedgerView;
-  layers: HyperView;
-  /** Re-runs the whole theme thread, so a light-look dial lands exactly like a real flip. */
+  /** Re-runs the whole theme thread — the panel's one re-bake lever (src/engine/tune.ts). */
   refreshTheme(): void;
   /** The Engine has been disposed — an in-flight open must throw its panel away. */
   disposed(): boolean;
@@ -55,12 +49,10 @@ export class DevTunePanel {
       const m = await import("./devTune");
       if (this.h.disposed()) return;
       this._devTune = await m.mountDevTune({
-        ledger: this.h.ledger,
-        hyper: this.h.layers,
         camera: this.h.ctx.camera,
         controls: this.h.ctx.controls,
-        // The light-look group's onChange re-runs the whole theme thread (token re-read, scene
-        // map rebuild, bloom re-apply) so every dial lands the same way a real flip does.
+        // Re-runs the whole theme thread (token re-read, scene map rebuild, bloom re-apply, every
+        // view's setColors), so a baked value lands the same way a real flip does.
         refreshTheme: () => this.h.refreshTheme(),
       });
       if (this.h.disposed()) this._devTune.dispose();

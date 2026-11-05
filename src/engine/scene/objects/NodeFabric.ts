@@ -565,7 +565,7 @@ export class NodeFabric {
     // hyper's shells pack the nodes closer than the bloom radius, so a focused node's halo merges
     // with its neighbours' and brightness alone can no longer say which one is the subject (a
     // measured finding, 2026-08-18). Size still owns its own silhouette. Hoisted here and read as
-    // a local in the loop — the tune hoist rule.
+    // a local in the loop — the hoist rule.
     const grow = focusGrow(c);
     for (const u of records) {
       // Snapshots (ledger) view: hard-place as standing CHIPS on the floor planes (the same
@@ -659,7 +659,7 @@ export class NodeFabric {
     const { c, dim, dt, flashDecay } = ctx;
     const cf = c.countryFilter, cmix = c.countryMix;
     // dimModel.emphasisK: emphasis EASES rather than snapping (user, 2026-08-11). Hoisted here,
-    // read as a local in the loop — the tune hoist rule.
+    // read as a local in the loop — the hoist rule.
     const ek = emphasisK(dt);
     // While a country drill-down is active, per-node dim varies, so recolour every frame; otherwise
     // only during a layer-dim transition. A view transition also varies it per node (each node's
@@ -763,7 +763,7 @@ export class NodeFabric {
     const e = smooth(m);                                              // flight progress
     const w = smooth(THREE.MathUtils.clamp((m - 0.82) / 0.16, 0, 1)); // sphere → chip squash phase
     const kk = Math.min(1, dt * 4);
-    const ek = emphasisK(dt); // emphasis easing — hoisted once per frame (the tune hoist rule)
+    const ek = emphasisK(dt); // emphasis easing — hoisted once per frame (the hoist rule)
     const grow = focusGrow(c); // the size channel — see placeValidators (one node model)
     const emi = this.metaEmi;
     const base = this.metaBaseArr;

@@ -29,7 +29,7 @@ import { armillaryFrame, ringFramePos, ringNormal, armillaryRings, armillaryPos,
 import { surfFade, extrasFade } from "../domain/morph";
 import { ArcSim, type ArcEndpoint } from "../domain/arcSim";
 import type { MetaNodeRecord, ValidatorRecord } from "../domain/records";
-import { buildGeoView, geoBlend, retintGeoView, setCountryBorder, setCountryFillMask, HOVER_MASK_BOOST, SUN_TUNE, BORDER_LEVELS, BORDER_LEVELS_PAPER, type GeoViewHost } from "./views/GeoView";
+import { buildGeoView, geoBlend, retintGeoView, setCountryBorder, setCountryFillMask, HOVER_MASK_BOOST, SUN_LOOK, BORDER_LEVELS, BORDER_LEVELS_PAPER, type GeoViewHost } from "./views/GeoView";
 import { BaseRing } from "./objects/BaseRing";
 import { ringLevels, type RingMachine, type RingNet } from "../domain/baseRing";
 
@@ -1839,15 +1839,15 @@ export class Globe implements GeoViewHost {
     // and each polar compass rose fades by its own pole's facing on top of the morph fade —
     // a far-side rose dims hard, so front vs back reads instantly (user).
     if (this.facingUniform && this._hasCam) this.facingUniform.value.copy(this._camN);
-    // THE SUN's look, pushed from its tune row every frame (the hoist rule: one read per frame, and
-    // the shader needs no recompile for a knob). `x` is the terminator's half-width; `yz` is the
+    // THE SUN's look, pushed from its row every frame (the hoist rule: one read per frame, and
+    // the shader needs no recompile for a number). `x` is the terminator's half-width; `yz` is the
     // (night, day) pair FOR THE GROUND IN FORCE — the polarity inversion between glow and ink is
     // decided here, so the shader carries one expression and no branch.
     if (this.sunMixUniform) {
       this.sunMixUniform.value.set(
-        SUN_TUNE.term,
-        paper ? SUN_TUNE.nightInk : SUN_TUNE.nightGlow,
-        paper ? SUN_TUNE.dayInk : SUN_TUNE.dayGlow,
+        SUN_LOOK.term,
+        paper ? SUN_LOOK.nightInk : SUN_LOOK.nightGlow,
+        paper ? SUN_LOOK.dayInk : SUN_LOOK.dayGlow,
       );
     }
     // Closeness (0 = overview, 1 = country/node zoom) from the camera altitude: the walls

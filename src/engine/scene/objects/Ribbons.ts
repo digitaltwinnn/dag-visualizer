@@ -4,15 +4,12 @@
 // what replaced the old cubic anchor links.
 //
 // The sheet is CURVED (finetune 2026-08-06): each ribbon is subdivided into SEG vertical segments
-// and its Z sweep eased (smootherstep, blended by `tune.curve`), so it falls from the lane, sweeps
+// and its Z sweep eased (smootherstep, blended by `RIBBON_LOOK.curve`), so it falls from the lane, sweeps
 // mid-run and lands vertically on its band instead of slicing diagonally across the chamber. Bands
 // follow lane order (fillBarSpec), and both edges of adjacent ribbons interpolate with the SAME
 // ease, so ribbons can never cross each other. A HIDDEN lane (another network is committed) draws
 // NO ribbon at all — its lane laid no tiles, so a sheet from its old position would just overlap
 // the committed lane's field (the caller's laneZ resolver returns null for it).
-//
-// Brightness/opacity are TUNABLE (RibbonTune) — the dev ?tune panel binds them live; the defaults
-// here are the shipped look.
 //
 // Drawn on FOUR rows only (see RIBBON_ROWS), so the trail stays calm.
 //
@@ -26,7 +23,6 @@
 // hairline threads.
 import * as THREE from "three";
 import { glowBlend, inkMix, inkPresence, isLightGround, type SceneColors } from "../../sceneColors";
-import type { TuneSchema } from "../../tune";
 import { METAGRAPHS } from "@/src/net/current";
 import { BAR_H, BAR_LIFT, FLOOR_Y, LEAD_X, TILE_LIFT } from "../../domain/ledgerLayout";
 import { SLOT_SP } from "../../domain/ledgerModel";
@@ -52,16 +48,16 @@ const RIBBON_SEG = 16;
 const PER_ROW = METAGRAPHS.length + 1;
 const VERTS_PER_RIBBON = RIBBON_SEG * 6; // two triangles per segment
 
-/** The live-tunable ribbon look (dev `?tune` panel binds these; the values are the shipped look). */
-export interface RibbonTune {
+/** The ribbon look. */
+export interface RibbonLook {
   restOp: number;    // resting sheet opacity (× view alpha)
   brightness: number; // vertex-colour multiplier (additive blending → perceived brightness)
   curve: number;     // 0 = straight diagonal sheet, 1 = full smootherstep S-sweep
   threadAlpha: number; // the committed network's hairline thread (setThreads) — a HINT, not a sheet
 }
 
-// User-tuned via ?tune, 2026-08-07.
-export const RIBBON_TUNE_DEFAULTS: RibbonTune = {
+// User-tuned live, 2026-08-07.
+export const RIBBON_LOOK: Readonly<RibbonLook> = {
   restOp: 0.21, // 0.25 → 0.21 with brightness 0.85 → 1.1 (user export, 2026-08-30): a touch less film, more vivid colour — beside the snapshots' new halo lift
   brightness: 1.1,
   curve: 1,
@@ -71,15 +67,6 @@ export const RIBBON_TUNE_DEFAULTS: RibbonTune = {
   // SHEETS' `restOp` (0.21) and this number multiplied it, so a "0.4" thread drew at 0.084 — a
   // hairline at 8% is not a hint, it is absent. The material takes this number directly now.
   threadAlpha: 0.5,
-};
-
-/** The `?tune` knob ranges (contract: src/engine/tune.ts) — colocated so a range sits next to the
- *  number it bounds. Type-only import: no runtime coupling to the panel. */
-export const RIBBON_TUNE_SCHEMA: TuneSchema<RibbonTune> = {
-  restOp: { min: 0, max: 1, label: "opacity" },
-  brightness: { min: 0.1, max: 2, step: 0.05 },
-  curve: { min: 0, max: 1, step: 0.05 },
-  threadAlpha: { min: 0, max: 1, step: 0.02, label: "thread alpha" },
 };
 
 /** The eased Z progress at vertical progress `t` — linear blended toward smootherstep. */
@@ -97,7 +84,6 @@ interface RowState {
 
 export class Ribbons {
   group = new THREE.Group();
-  tune: RibbonTune = { ...RIBBON_TUNE_DEFAULTS };
   private _geo = new THREE.BufferGeometry();
   private _pos: THREE.Float32BufferAttribute;
   private _col: THREE.Float32BufferAttribute;
@@ -207,12 +193,6 @@ export class Ribbons {
     this._writeGeometry(); // event-time: a theme flip, not a frame
   }
 
-  /** Live-tune the look (dev panel). Event-time: rewrites the sheet. */
-  setTune(t: Partial<RibbonTune>): void {
-    Object.assign(this.tune, t);
-    this._writeGeometry();
-  }
-
   /** `laneZ` returns the lane centre for a band key — null when the lane is HIDDEN (another
    *  network committed): a hidden lane laid no tiles, so it gets no ribbon either. The unlisted
    *  channels have a real lane of their own now (the "unknown" lane at the screen-left end,
@@ -279,7 +259,7 @@ export class Ribbons {
     const c = this._thCol.array as Float32Array;
     const yTop = FLOOR_Y.msnap + TILE_LIFT;
     const yBot = FLOOR_Y.gl0 + BAR_LIFT + BAR_H;
-    const curve = this.tune.curve;
+    const curve = RIBBON_LOOK.curve;
     let v = 0;
     if (z != null) {
       for (const { slot, spec } of slots) {
@@ -354,22 +334,21 @@ export class Ribbons {
    *  state and there is no `_alpha` to hold). It used to be eased toward at `dt * 5` — a fade of a
    *  fade: `a` is already the transition's own curve, and every sibling in the chamber (the floors,
    *  the bar, the tiles, the labels) multiplies by it as given, so the ease alone left the sheet
-   *  visibly trailing them out of the view by ~half a second. `restOp` is read per frame here like
-   *  every other tune row, so the knob still lives without an onChange. */
+   *  visibly trailing them out of the view by ~half a second. `restOp` is read per frame here. */
   setAlpha(a: number): void {
     // The threads ride the same view alpha as the sheets — one fade for the whole relation layer.
     // `restOp` is the level of an ADDITIVE sheet over black, where the bloom lifts it clear; the same
     // number as normal-blended ink on paper composites the (already ink-mixed) vertex colour at a
     // quarter strength, which is precisely how the ribbons read as white ghosts on the light ground.
     // Presence, so it asks the ground — see inkPresence.
-    this._mat.opacity = inkPresence(this.tune.restOp, this._paper) * a;
-    this._thMat.opacity = inkPresence(this.tune.threadAlpha, this._paper) * a;
+    this._mat.opacity = inkPresence(RIBBON_LOOK.restOp, this._paper) * a;
+    this._thMat.opacity = inkPresence(RIBBON_LOOK.threadAlpha, this._paper) * a;
   }
 
   /** COMMITTED filter → the other metagraphs' sheets take the COLORED dim (identity hue at the
    *  ledger row's `dim` — a ribbon states which bytes came from where, so it is DATA and answers
-   *  the same knob its snapshots do). Baked into vertex colours, so a change rewrites the sheet —
-   *  which is why the panel's ledger focus group carries an onChange (event-time). */
+   *  the same knob its snapshots do). Baked into vertex colours, so a change rewrites the sheet
+   *  (event-time). */
   setFilter(filter: string): void {
     const next = filter || "all";
     if (next === this._filter) return;
@@ -381,7 +360,7 @@ export class Ribbons {
   private _writeGeometry(): void {
     const p = this._pos.array as Float32Array;
     const c = this._col.array as Float32Array;
-    const { curve, brightness } = this.tune;
+    const { curve, brightness } = RIBBON_LOOK;
     let v = 0;
     const push = (x: number, z: number, y: number, r: number, g: number, b: number, a: number) => {
       p[v * 3] = x; p[v * 3 + 1] = y; p[v * 3 + 2] = z;

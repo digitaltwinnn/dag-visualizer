@@ -10,7 +10,7 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { BokehPass, type BokehPassParameters } from "three/addons/postprocessing/BokehPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
-import { isLightGround, LIGHT_TUNE, type SceneColors } from "../sceneColors";
+import { isLightGround, LIGHT_LOOK, type SceneColors } from "../sceneColors";
 
 /**
  * THE SELECTIVE-BLOOM LAYER — the day look's answer to a glow pass that cannot select ink.
@@ -152,7 +152,7 @@ const SEL_MIX_SHADER = {
       float m = max(b.r, max(b.g, b.b));
       vec3 ink = b / max(m, 1e-4);
       float a = clamp(bleed * m, 0.0, 1.0);
-      // The glow input is CAPPED like the bleed's: the mark-pass input lifts (BarTune/TileTune
+      // The glow input is CAPPED like the bleed's: the mark-pass input lifts (BarLook/TileLook
       // .halo) push b past 1 at a boosted lead, and an uncapped add there climbs to white — the
       // one thing paper emphasis must never do. Below 1 the term is byte-identical to before.
       vec3 rgb = base.rgb * mix(vec3(1.0), ink, a) + glow * min(b, vec3(1.0));
@@ -365,7 +365,7 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     c.addPass(rp);
     // threshold 0: the target is BLACK except the members, so there is nothing to reject — every
     // mark is above the floor by construction. This is the whole point of the layer (see above).
-    const bp = new UnrealBloomPass(new THREE.Vector2(w, h), 1, LIGHT_TUNE.selRadius, 0);
+    const bp = new UnrealBloomPass(new THREE.Vector2(w, h), 1, LIGHT_LOOK.selRadius, 0);
     c.addPass(bp);
     c.setSize(w, h);
     const mx = new ShaderPass(SEL_MIX_SHADER);
@@ -392,7 +392,7 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     // Both knobs at zero IS off, and off must cost nothing — the mark pass is a whole extra scene
     // render plus a blur, so disabling only the mix pass would leave the expensive half running to
     // feed a texture nobody samples. Same shape as the dark path below: skip, don't neutralise.
-    const on = isPaper && (LIGHT_TUNE.selBleed > 0 || LIGHT_TUNE.selGlow > 0);
+    const on = isPaper && (LIGHT_LOOK.selBleed > 0 || LIGHT_LOOK.selGlow > 0);
     if (!on) {
       if (sel) sel.mix.enabled = false;
       composer.render();
@@ -401,9 +401,9 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     }
     ensureSel();
     const s = sel!;
-    s.bloom.radius = LIGHT_TUNE.selRadius;
-    s.mix.uniforms.bleed.value = LIGHT_TUNE.selBleed;
-    s.mix.uniforms.glow.value = LIGHT_TUNE.selGlow;
+    s.bloom.radius = LIGHT_LOOK.selRadius;
+    s.mix.uniforms.bleed.value = LIGHT_LOOK.selBleed;
+    s.mix.uniforms.glow.value = LIGHT_LOOK.selGlow;
     s.mix.enabled = true;
 
     const bg = scene.background;

@@ -30,8 +30,8 @@ export const HUD_C = 0.19;
 // exactly the behaviour that lets one pair serve all of them. The HUD lane needs no light pair:
 // identityHudCss() defers L/C to the CSS tokens (--ident-l/--ident-c), which already carry both
 // themes' values, so the HUD retints for free with zero re-renders.
-export const SCENE_L_LIGHT = 0.57; // NOT 0.68 — that is SCENE_L's dark value, and a shared L makes gamut-capped hues chroma-reduce to identical hexes in both lanes (identity.test.ts pins that the lanes differ). ⚠️ ONE HOME: LIGHT_TUNE_DEFAULTS.laneL derives from THIS constant — bake a user's laneL export HERE (found 2026-08-30: the pair drifted, so a fresh load baked the lane at the old 0.70 and the shipped look only appeared after a slider touch). Settled 0.70 → 0.61 → 0.57 across the user's exports (2026-08-28/30).
-export const SCENE_C_LIGHT = 0.28; // one home likewise — LIGHT_TUNE_DEFAULTS.laneC derives from this (0.25 → 0.28, user export 2026-08-28)
+export const SCENE_L_LIGHT = 0.57; // NOT 0.68 — that is SCENE_L's dark value, and a shared L makes gamut-capped hues chroma-reduce to identical hexes in both lanes (identity.test.ts pins that the lanes differ). ONE HOME for the light lane's L. Settled 0.70 → 0.61 → 0.57 across the user's exports (2026-08-28/30).
+export const SCENE_C_LIGHT = 0.28; // the light lane's C, one home likewise (0.25 → 0.28, user export 2026-08-28)
 
 export interface IdentityHue {
   id: string;
@@ -152,23 +152,13 @@ export function identityHudCss(id: string): string {
 // widening IdentityHue with a second sceneHex field, so the dark path stays byte-identical to what
 // toEntry() has always produced.
 const _sceneLight = new Map<string, string>();
-// The LIVE light-lane L/C — the exported consts are the shipped defaults (what tests read); the
-// `?tune` panel drives these through setSceneLaneLight so a dial edit rebuilds the light memo
-// without touching the dark path.
-let _laneL = SCENE_L_LIGHT;
-let _laneC = SCENE_C_LIGHT;
-export function setSceneLaneLight(l: number, c: number): void {
-  _laneL = l;
-  _laneC = c;
-  _sceneLight.clear();
-}
 export function identitySceneHex(id: string, theme: Theme = "dark"): string {
   const r = resolve(id);
   if (theme === "dark") return r?.sceneHex ?? CORE_HEX;
   if (!r) return CORE_HEX;
   const cached = _sceneLight.get(id);
   if (cached) return cached;
-  const hex = oklchToHex(_laneL, _laneC, r.hueDeg);
+  const hex = oklchToHex(SCENE_L_LIGHT, SCENE_C_LIGHT, r.hueDeg);
   _sceneLight.set(id, hex);
   return hex;
 }
