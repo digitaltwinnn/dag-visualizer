@@ -310,7 +310,7 @@ async function main(): Promise<void> {
   const FLUSH_EVERY = 500_000; // records between flush+checkpoint rounds (user, 2026-09-11)
   const FLOOR_SERIES = new Set(["g.feeFloor", "g.kbFloor"]);
   type SerInc = [string, [string, number][]][];
-  interface ChainCkpt { done?: boolean; skipped?: "no-cursor"; cursor?: string; records?: number; minTs?: number; residualInc?: SerInc; residualStamps?: number[]; residualGlobals?: GlobalRec[]; floors?: SerInc }
+  interface ChainCkpt { done?: boolean; skipped?: "no-cursor"; cursor?: string; records?: number; minTs?: number; reached?: boolean; residualInc?: SerInc; residualStamps?: number[]; residualGlobals?: GlobalRec[]; floors?: SerInc }
   /** The fill's pin: its span, its mode and the unlisted chains it read at the start. */
   interface FillMeta { mode: "fill"; fromMs: number; toMs: number; recompute: boolean; chain: string | null; transfers?: boolean; unlisted: string[] }
   const serInc = (m: IncMap): SerInc => [...m.entries()].map(([k, f]) => [k, [...f.entries()]]);
@@ -605,26 +605,37 @@ async function main(): Promise<void> {
      *  the sampler's own `bucketTransfers`; each chain's buckets are HSET (an overwrite, so a rerun
      *  is the same write) as soon as the walk is two whole days past them (`flushFinal`), with a
      *  checkpoint every TX_FLUSH_EVERY records, so a killed fill resumes at the page it stopped on.
-     *  `x.cov` goes on every bucket of the span LAST, once every list is done: History reads
-     *  transfers as not measured until it lands, so a half-written span never shows. */
+     *  `x.cov` goes on the span LAST, once every list is done: History reads transfers as not
+     *  measured until it lands, so a half-written span never shows. And it is claimed only as far
+     *  down as the DAG's list was actually WALKED (review, 2026-11-05): a list that ends above
+     *  --from — a paging floor like the global list's — would otherwise mark days it never served
+     *  as "no transfers". The DAG has moved value every day since 2022, so ending above --from is
+     *  a floor, and the claim starts at the oldest day it served (said in the summary). */
     const TX_FLUSH_EVERY = Number(process.env.FILL_TX_FLUSH) || 30_000; // FILL_TX_FLUSH: a smaller round, to exercise a resume
-    const walkTxCkpt = async (chain: string): Promise<number> => {
+    interface TxWalk { records: number; minTs: number; reached: boolean }
+    const walkTxCkpt = async (chain: string): Promise<TxWalk> => {
       const label = `tx-${chain === "dag" ? "DAG" : chain.slice(0, 10)}`;
       const prev = readJson<ChainCkpt>(label);
-      if (prev?.done) { console.log(`  ${label}: complete in the checkpoint — skipped`); return prev.records ?? 0; }
+      if (prev?.done) {
+        console.log(`  ${label}: complete in the checkpoint — skipped`);
+        return { records: prev.records ?? 0, minTs: prev.minTs ?? Infinity, reached: prev.reached ?? false };
+      }
       const cinc = deserInc(prev?.residualInc);
       let minTs = prev?.minTs ?? Infinity;
+      // Whether the walk passed --from (saw an older record) rather than running off the list's end.
+      let reached = prev?.reached ?? false;
       let processed = prev?.records ?? 0;
       let sinceFlush = 0;
       const round = async (cursor: string | undefined, drain: boolean): Promise<void> => {
         const n = await flushFinal(cinc, cutOf(minTs, drain), null);
         writeJson(label, drain
-          ? { done: true, records: processed } satisfies ChainCkpt
-          : { cursor, records: processed, minTs, residualInc: serInc(cinc) } satisfies ChainCkpt);
+          ? { done: true, records: processed, minTs, reached } satisfies ChainCkpt
+          : { cursor, records: processed, minTs, reached, residualInc: serInc(cinc) } satisfies ChainCkpt);
         console.log(`\n  ${label}: ${drain ? "done" : "checkpoint"} at ${processed} records — ${n} fields flushed`);
       };
       const base = chain === "dag" ? `${be0}/transactions` : `${be0}/currency/${chain}/transactions`;
-      await walkChain<TxRec>(base, fromMs, (recs) => {
+      await walkChain<TxRec>(base, fromMs, (recs, older) => {
+        if (older.length) reached = true;
         const w = recs.filter((r) => Date.parse(r.timestamp) < spanEndMs);
         bucketTransfers(cinc, net, chain, w);
         for (const r of w) { const t = Date.parse(r.timestamp); if (t < minTs) minTs = t; }
@@ -634,15 +645,24 @@ async function main(): Promise<void> {
         if (sinceFlush >= TX_FLUSH_EVERY) { sinceFlush = 0; await round(cursor, false); }
       });
       await round(undefined, true);
-      return processed;
+      return { records: processed, minTs, reached };
     };
-    const fillTransfers = async (): Promise<{ records: number; fields: number }> => {
-      let records = 0;
-      for (const chain of ["dag", ...ids]) records += await walkTxCkpt(chain);
+    const fillTransfers = async (): Promise<{ records: number; fields: number; note: string | null }> => {
+      const dag = await walkTxCkpt("dag");
+      let records = dag.records;
+      for (const chain of ids) records += (await walkTxCkpt(chain)).records;
+      // The claim's floor: --from when the DAG walk passed it, else the oldest day the list served.
+      const covFrom = dag.reached ? fromMs : dag.minTs === Infinity ? spanEndMs : Math.max(fromMs, dayFloor(dag.minTs) + 86400000);
+      const note = covFrom > fromMs
+        ? covFrom >= spanEndMs
+          ? "the explorer's DAG transfer list served nothing in the span: no x.cov written, transfers stay not measured"
+          : `the explorer's DAG transfer list ends at ${isoDay(dag.minTs)}: x.cov covers ${isoDay(covFrom)} → ${isoDay(toMs)} only, and ${isoDay(fromMs)} → ${isoDay(covFrom - 86400000)} stays not measured`
+        : null;
+      if (note) console.log(`  ⚠️ ${note}`);
       const inc: IncMap = new Map();
       const STEP: Record<Tier, number> = { "5m": 300000, "1h": 3600000, "1d": 86400000 };
       for (const tier of tiers) {
-        for (let t = fromMs; t < spanEndMs; t += STEP[tier]) {
+        for (let t = covFrom; t < spanEndMs; t += STEP[tier]) {
           if (!tierExistsAt(tier, t)) continue;
           const slot = slotOf(net, tier, t);
           let m = inc.get(slot.key);
@@ -652,7 +672,7 @@ async function main(): Promise<void> {
       }
       const fields = await flushFinal(inc, -Infinity, null);
       console.log(`  x.cov: ${fields} coverage fields — the span's transfers now read as measured.`);
-      return { records, fields };
+      return { records, fields, note };
     };
     /** The global spine's seek and the list-floor probe: the crafted cursor at the span's end, and
      *  whether the list serves anything at or below it (one page). Null seed: nothing to walk. */
@@ -689,7 +709,7 @@ async function main(): Promise<void> {
       console.log(`fill ${net} ${summary}: the transfers alone, tiers ${tiers.join("/")}, no lock (flush + checkpoint every ${TX_FLUSH_EVERY / 1000}K records)`);
       const t = await fillTransfers();
       rmSync(CKPT_ROOT, { recursive: true, force: true });
-      console.log(`filled ${summary}: ${t.records} transfer(s) and ${t.fields} coverage fields; cursor untouched, checkpoint cleared.`);
+      console.log(`filled ${summary}: ${t.records} transfer(s) and ${t.fields} coverage fields${t.note ? ` — ⚠️ ${t.note}` : ""}; cursor untouched, checkpoint cleared.`);
       return;
     }
     if (dryRun) {
@@ -796,14 +816,15 @@ async function main(): Promise<void> {
         covFields += entries.length;
       }
     }
-    // The transfers, last: a short walk with no checkpoint of its own (an overwrite — a rerun is the
-    // same write), after everything the checkpoint protects has landed.
+    // The transfers, last, after everything else the checkpoint protects has landed: each list
+    // walked on its own checkpoint (walkTxCkpt), then x.cov over what the DAG walk reached.
     const tx = withTransfers ? await fillTransfers() : null;
     rmSync(CKPT_ROOT, { recursive: true, force: true });
     const notes = [
       only ? "floors, spine and u.cov untouched (--chain)" : null,
       suppressedBy ? `coverage NOT marked — unlisted chain ${suppressedBy} was skipped, so the span's unlisted figure stays "not measured"` : null,
       spineNote ? `⚠️ ${spineNote}` : null,
+      tx?.note ? `⚠️ ${tx.note}` : null,
     ].filter(Boolean);
     console.log(`filled ${summary}: ${ids.length} chain(s) (${ids.filter((c) => unlistedSet.has(c)).length} unlisted)${withSpine ? ", the global spine" : ""}${withFloors ? ", the floors" : ""}${covFields ? `, ${covFields} coverage fields` : ""}${tx ? `, ${tx.records} transfer(s)` : ""}${notes.length ? ` — ${notes.join("; ")}` : ""}; cursor untouched, checkpoint cleared.`);
     return;
