@@ -169,7 +169,7 @@ describe("latestUnlistedTick", () => {
 
   it("finds a tick from the POLLED unlisted buffers alone, before any exact read", () => {
     const snaps = [g(10, "a"), g(11, "b"), g(12, "c")];
-    const polled = new Map([["0xaaa", [{ ordinal: 5, hash: "h", parent: "", ts: "b", fee: 0, sizeInKB: 0, height: 0, subHeight: 0, blocks: 0, epochProgress: 0 }]]]);
+    const polled = new Map([["0xaaa", [{ ordinal: 5, hash: "h", parent: "", ts: "b", fee: 0, sizeInKB: 0, height: 0, subHeight: 0, blocks: 0, blockHashes: [], epochProgress: 0 }]]]);
     expect(latestUnlistedTick(snaps, {}, polled)?.ordinal).toBe(11);
     expect(unlistedLog(snaps, {}, polled).map((r) => [r.metaId, r.ordinal, r.hash])).toEqual([["0xaaa", 5, "h"]]);
   });

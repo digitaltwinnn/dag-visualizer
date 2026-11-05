@@ -181,11 +181,19 @@ export interface MetaSnapRecord {
   height: number;        // the metagraph's OWN block-DAG depth
   subHeight: number;     // orders snapshots that share a height
   blocks: number;        // rare on mainnet; an honest 0 beats omitting it
+  /** The block hashes this snapshot accepted: the explorer lists them, the Blocks register draws them. */
+  blockHashes: string[];
   epochProgress: number;
   /** The chain the record is from, set only when it is not the map key it is filed under: a past
    *  window files a network's FORMER address under its current id (the chamber's lane), and a
    *  selection must still name the real chain (`src/data/pastWindow.ts`, review 2026-11-03). */
   chain?: string;
+}
+
+/** The block hashes a snapshot record carries. Only strings are hashes: an absent list, or a
+ *  non-string entry, is no hash rather than a fabricated one. */
+export function blockHashesOf(r: { blocks?: unknown }): string[] {
+  return Array.isArray(r.blocks) ? r.blocks.filter((b): b is string => typeof b === "string") : [];
 }
 
 /** One explorer metagraph snapshot as the rolling buffer records it (fee/size kept, blocks counted). */
@@ -195,6 +203,7 @@ export function metaSnapRecord(s: RawMetaSnapshot): MetaSnapRecord {
     ts: s.timestamp, fee: s.fee || 0, sizeInKB: s.sizeInKB || 0,
     height: s.height || 0, subHeight: s.subHeight || 0,
     blocks: Array.isArray(s.blocks) ? s.blocks.length : 0,
+    blockHashes: blockHashesOf(s),
     epochProgress: s.epochProgress || 0,
   };
 }

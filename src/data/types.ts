@@ -54,7 +54,7 @@ export interface GlobalSnapshot {
   lastSnapshotHash?: string;
   epochProgress?: number;
   metagraphSnapshotCount?: number;
-  blocks?: unknown[];
+  blocks?: string[];
 }
 
 /** One anchored metagraph snapshot inside a global tick, from the exact read (spec §7.2 tier 2). */
@@ -306,7 +306,7 @@ export interface RawMetaSnapshot {
   sizeInKB?: number;
   height?: number;
   subHeight?: number;
-  blocks?: unknown[];
+  blocks?: string[];
   epochProgress?: number;
 }
 

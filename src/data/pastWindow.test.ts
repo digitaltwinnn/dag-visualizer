@@ -7,7 +7,7 @@ import { PAST_RETRY_MS, buildPastWindow, foldAnchors, pastRetryDelay, getPastWin
 
 const g = (o: number): GlobalSnapshot => ({ ordinal: o, timestamp: `t${o}`, hash: `g${o}` });
 const raw = (o: number, ts: string, fee = 10): RawMetaSnapshot => ({ ordinal: o, timestamp: ts, hash: `m${o}`, lastSnapshotHash: `m${o - 1}`, fee, sizeInKB: 1 } as RawMetaSnapshot);
-const rec = (o: number, ts: string, fee = 10): MetaSnapRecord => ({ ordinal: o, hash: `m${o}`, parent: "", ts, fee, sizeInKB: 1, height: 0, subHeight: 0, blocks: 0, epochProgress: 0 });
+const rec = (o: number, ts: string, fee = 10): MetaSnapRecord => ({ ordinal: o, hash: `m${o}`, parent: "", ts, fee, sizeInKB: 1, height: 0, subHeight: 0, blocks: 0, blockHashes: [], epochProgress: 0 });
 
 afterEach(() => setPastWindow(null));
 
