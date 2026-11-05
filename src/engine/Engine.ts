@@ -3,7 +3,8 @@ import Stats from "stats.js";
 import { useStore, type Mode } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { metagraphById, initNetwork, getNetwork, DEFAULT_META_COLOR, resolveSignerIps } from "@/src/data/network";
-import { getPastWindow, ledgerSource, onPastWindow } from "@/src/data/pastWindow";
+import { getBlockWindow, getPastWindow, ledgerSource, onBlockWindow, onPastWindow } from "@/src/data/pastWindow";
+import { blockWindowContinues } from "@/src/data/blockWindow";
 import { ledgerLens } from "@/src/data/ledgerStory";
 import { reportPoll, touchPoll } from "@/src/data/api";
 import { holdFeed } from "@/src/data/feedUse";
@@ -747,6 +748,17 @@ export class Engine {
         global,
       };
     });
+    // The Blocks register's inputs as they stand at boot (a `/blocks` deep link seeds the register
+    // before the Engine exists); the subscriptions below carry every later change.
+    {
+      const st = useStore.getState();
+      this.ledger.setRegister(st.ledgerRegister);
+      this._blockTo = getBlockWindow()?.to ?? null;
+      this.ledger.setBlockWindow(getBlockWindow());
+      this.ledger.setBlockReads(st.blockReads);
+      this.ledger.setSelectedBlock(st.block?.hash ?? null);
+      this.ledger.setHoveredBlock(st.hoverBlock);
+    }
     // The globe colours the DAG's own validator nodes (the L0/cL1 shells) with sceneColors["dag"]
     // (see globe.js setNodes) — seed it here, synchronously, so it's populated before the first
     // setNodes call (which can fire from the "cluster" event before refreshMeta's API round-trip
@@ -890,6 +902,13 @@ export class Engine {
         const prevEff = prev.docPage || prev.docClosing ? ("soon" as Mode) : prev.mode;
         if (eff !== prevEff) this.setMode(eff);
         else if (st.ledgerRegister !== prev.ledgerRegister) this._holdSceneFeeds();
+        // THE REGISTER IS THE TRAIL'S SOURCE (`ledgerSource`): the live buffer's ticks or the block
+        // window's, two different stretches of the chain — the chamber switches its cargo and starts
+        // a fresh history on the new one, exactly as a past window's arrival does.
+        if (st.ledgerRegister !== prev.ledgerRegister) {
+          this.ledger.setRegister(st.ledgerRegister);
+          this._reseatLedger();
+        }
         // The bare stage ARMS rather than hides (user, 2026-09-04: "shouldn't their nodes still
         // move to the gathering section at the top like they always do?"): the gather is the OUT
         // phase's job whatever the destination, and hiding the fleet is the DOC "view"'s own
@@ -1095,6 +1114,12 @@ export class Engine {
         if (st.hoverMetaSnap !== prev.hoverMetaSnap) {
           this.ledger.setHoveredMetaSnap(st.hoverMetaSnap);
         }
+        // THE BLOCKS REGISTER'S CHANNELS, mirroring the metagraph snapshot's: the committed block and
+        // the hovered one (each its own channel — a hover previews, never commits), and the full
+        // reads its links and tip states are drawn from.
+        if (st.block !== prev.block) this.ledger.setSelectedBlock(st.block?.hash ?? null);
+        if (st.hoverBlock !== prev.hoverBlock) this.ledger.setHoveredBlock(st.hoverBlock);
+        if (st.blockReads !== prev.blockReads) this.ledger.setBlockReads(st.blockReads);
         // A landing EXACT read is what turns a tick from an unmeasured seam into a measured byte
         // bar (spec §6.3), so re-hand the map the moment it changes. Ledger-only: nothing else
         // reads it from the scene, and the view re-reads it on entry via _refreshLedger.
@@ -1184,11 +1209,21 @@ export class Engine {
     // the live buffer ↔ a past window around the pin. A fresh chamber history (the model only ever
     // advances), the live edge frozen while past, and the pin re-applied so the rewind lands it.
     this.unsub.push(
-      onPastWindow(() => {
-        this.ledger.resetHistory();
-        this.ledger.setFrozen(!!getPastWindow());
-        this._refreshLedger();
-        this.ledger.setSelected(useStore.getState().snap?.data?.ordinal ?? null);
+      onPastWindow(() => this._reseatLedger()),
+    );
+    // THE BLOCK WINDOW (the Blocks register's trail, `components/BlockWindowBridge.tsx` its writer):
+    // a window that CONTINUES the one held (a refold, one new block tick at the front) advances the
+    // trail like a live tick; any other is another stretch, and the chamber starts fresh on it.
+    // `ledgerSource` answers the window only in the Blocks register, so in the other the refresh
+    // re-hands the live rows and moves nothing.
+    this.unsub.push(
+      onBlockWindow(() => {
+        const w = getBlockWindow();
+        const continues = blockWindowContinues(this._blockTo, w);
+        this._blockTo = w?.to ?? null;
+        this.ledger.setBlockWindow(w);
+        if (continues) this._refreshLedger();
+        else this._reseatLedger();
       }),
     );
     net?.on("global", (evt: { latest: GlobalSnapshot | null }) => {
@@ -1405,6 +1440,19 @@ export class Engine {
     this.layers.setMetaActive(this._activeMetaIds);
     // The live list decides which hubs EXIST in the Hypergraph (see MetaHubRec.present).
     this.layers.setMetaPresent(new Set(list.map((m) => m.id)));
+  }
+
+  /** The newest tick of the block window last handed to the chamber (`blockWindowContinues`). */
+  private _blockTo: number | null = null;
+
+  /** A SOURCE SWITCH (a past window, a block window, a register flip): a fresh chamber history —
+   *  the model only ever advances — the live edge frozen while past, and the pin re-applied so the
+   *  rewind lands it. */
+  private _reseatLedger(): void {
+    this.ledger.resetHistory();
+    this.ledger.setFrozen(!!getPastWindow());
+    this._refreshLedger();
+    this.ledger.setSelected(useStore.getState().snap?.data?.ordinal ?? null);
   }
 
   // Re-read the ledger's live tick from the Global L0 buffer + the per-tick anchor index. Cheap

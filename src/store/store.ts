@@ -1,6 +1,6 @@
 import { sameTickNet } from "@/src/engine/domain/tickNet";
 import { create } from "zustand";
-import type { GlobalSnapshot, LeaderboardData, MetaInfo, NodeRow, PickDescriptor, SnapshotExact, MetaSnapSel, TickNetSel, ChannelSnapDeep } from "@/src/data/types";
+import type { GlobalSnapshot, LeaderboardData, MetaInfo, NodeRow, PickDescriptor, SnapshotExact, MetaSnapSel, TickNetSel, ChannelSnapDeep, BlockSel } from "@/src/data/types";
 import { metaSnapDeepKey } from "@/src/data/types";
 import type { HoverSubject } from "@/src/data/hoverSubject";
 // Type-only — the store may not import domain VALUES (layerBoundaries rule), but a type-only
@@ -45,6 +45,8 @@ export type MotionCause =
   | { kind: "node"; title: string | null; sub?: string | null }
   | { kind: "snapshot"; ordinal: number | null }
   | { kind: "metaSnap"; metaId: string | null; ordinal?: number }
+  // A block in the Blocks register — a slot under its tick, so the cause says only on or off.
+  | { kind: "block"; on: boolean }
   | { kind: "country"; cc: string | null }
   | { kind: "cohort"; on: boolean }
   | { kind: "composition"; on: boolean }
@@ -59,9 +61,9 @@ export type MotionCause =
 // `globals` = the GLOBAL snapshots (2026-10-26): the DAG's own L0 count (dagscan's "snapshots"), and
 // per network the global snapshots that carried its snapshots. `snapshots` stays the metagraph
 // snapshots anchored — the two differ ~10× on the DAG row, which is why both are measures.
-// One block the Snapshots view's Blocks register has selected: `chain` is "dag" or a metagraph id,
-// `ordinal` the accepting snapshot's own, `anchorOrd` the global tick that carries it.
-export interface BlockSel { chain: string; hash: string; ordinal: number; anchorOrd: number }
+// One block the Snapshots view's Blocks register has selected — homed in `src/data/types.ts` beside
+// the block pick that carries it.
+export type { BlockSel } from "@/src/data/types";
 export type TrendMetric = "snapshots" | "globals" | "blocks" | "fees" | "kb" | "nodes" | "continuity" | "transfers";
 
 // One slot in the right-rail card stack (extend with future card types — e.g. "tx").

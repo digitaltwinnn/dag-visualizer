@@ -298,7 +298,16 @@ export type PickDescriptor =
   // pickable 3D subject with its own store channel and card slot, not a focus rung. It carries
   // the selection payload plus the GLOBAL tick descriptor it anchored into, so the click table
   // can commit the pair (tile + its tick) without a second lookup.
-  | (PickBase & { kind: "metaSnap"; sel: MetaSnapSel; global: Extract<PickDescriptor, { kind: "snapshot" }> });
+  | (PickBase & { kind: "metaSnap"; sel: MetaSnapSel; global: Extract<PickDescriptor, { kind: "snapshot" }> })
+  // A BLOCK in the Snapshots view's Blocks register — a slot under its accepting global, like the
+  // tile above: it carries the global tick that holds it, so the table can pin the tick and commit
+  // the block from one descriptor.
+  | (PickBase & { kind: "block"; sel: BlockSel; global: Extract<PickDescriptor, { kind: "snapshot" }> });
+
+/** One block the Blocks register has selected: `chain` is "dag" or a metagraph id, `ordinal` the
+ *  accepting snapshot's own, `anchorOrd` the global tick that carries it. Homed here beside the pick
+ *  that carries it (the store re-exports it). */
+export interface BlockSel { chain: string; hash: string; ordinal: number; anchorOrd: number }
 
 // Raw shape of a `/currency/{id}/snapshots` list entry (only the fields we read).
 export interface RawMetaSnapshot {

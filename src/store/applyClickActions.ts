@@ -88,6 +88,11 @@ export function applyClickActions(actions: ClickAction[], opts?: { quiet?: boole
       case "metaSnap":
         st.setMetaSnap(a.sel);
         break;
+      case "block":
+        // THE BLOCKS REGISTER'S SUBJECT — the one writer of `store.block` (rule 2). Its tick is
+        // pinned by the table's own snapshot action ahead of it, never here.
+        st.setBlock(a.sel);
+        break;
       case "trendFocus":
         // THE HISTORY VIEW'S PLANE FOCUS — one store effect, plus the paging that makes it
         // visible. `stackPoses` moves nothing for a focus outside the visible window (its own
@@ -155,6 +160,7 @@ function motionCauseOf(actions: readonly ClickAction[]): MotionCause | null {
       case "tickNet": return { kind: "filter", id: a.sel?.metaId ?? "all" };
       case "railNet": return { kind: "network", id: viewNetwork(useStore.getState()) };
       case "metaSnap": return a.sel ? { kind: "metaSnap", metaId: a.sel.metaId, ordinal: a.sel.ordinal } : { kind: "metaSnap", metaId: null };
+      case "block": return { kind: "block", on: a.sel != null };
       case "trendFocus": return { kind: "focus", id: a.id };
       // A cursor step moves no scene — the planes' line and the card answer it.
       case "trendCursor": return null;

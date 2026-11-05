@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
-import { netKeyOf, tickNetSelectActions, tickNetClearActions, viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, countryClearActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, trendPlaneActions, railNetActions, noteCohortActions, noteDayActions, snapshotClearActions, type ClickAction } from "./pickActions";
+import { netKeyOf, tickNetSelectActions, tickNetClearActions, viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, countryClearActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, trendPlaneActions, railNetActions, noteCohortActions, noteDayActions, snapshotClearActions, blockSelectActions, blockClearActions, type ClickAction } from "./pickActions";
 import { finerLevels } from "./focusLadder";
 import { METAGRAPHS } from "@/src/net/current";
-import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
+import type { PickDescriptor, MetaSnapSel, BlockSel } from "@/src/data/types";
 
 // Minimal pick fixtures — only the fields the table reads.
 const nodePick = (cc: string | null = "DE"): PickDescriptor =>
@@ -828,5 +828,50 @@ describe("a network picked in the view", () => {
   it("no gesture in the table sets the filter but the picker's own", () => {
     const src = readFileSync("src/engine/domain/pickActions.ts", "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
     expect(src.match(/\{ kind: "filter", id:[^}]*\}/g)).toEqual(['{ kind: "filter", id: id !== "all" && id === currentFilter ? "all" : id }']);
+  });
+});
+
+// THE BLOCKS REGISTER'S SUBJECT (2026-11-05): a block is a SLOT under its accepting global, like a
+// metagraph snapshot tile, not a focus rung. Selecting one pins the global that carries it, so the
+// tick is the card above; the same block again releases the block alone.
+describe("blockSelectActions / blockClearActions (a block in the Blocks register)", () => {
+  const b: BlockSel = { chain: "dag", hash: "h1", ordinal: 7241523, anchorOrd: 7241523 };
+  const global = { kind: "snapshot", data: { ordinal: 7241523 } } as unknown as SnapPick;
+  const blockPick = { kind: "block", sel: b, global } as unknown as PickDescriptor;
+  it("a new block pins its accepting global, then commits the block, in that order", () => {
+    const a = blockSelectActions(b, global, { block: null, snapOrd: null });
+    expect(a).toEqual([
+      { kind: "snapshot", pick: global, follow: false },
+      { kind: "block", sel: b },
+    ]);
+    expect(a[0].kind === "snapshot" && a[0].pick?.data.ordinal).toBe(7241523);
+  });
+  it("the same block again releases the block alone", () => {
+    expect(blockSelectActions(b, global, { block: { ...b }, snapOrd: 7241523 })).toEqual([{ kind: "block", sel: null }]);
+  });
+  it("another block in the tick already pinned commits the block without re-pinning", () => {
+    const other: BlockSel = { ...b, hash: "h2" };
+    expect(blockSelectActions(other, global, { block: b, snapOrd: 7241523 })).toEqual([{ kind: "block", sel: other }]);
+  });
+  it("a block on another tick drops the snapshot and network held under the old tick first", () => {
+    const ms = { metaId: "dor", ordinal: 5, hash: "x", globalOrdinal: 1, ts: "t" } as MetaSnapSel;
+    expect(kinds(blockSelectActions(b, global, { block: null, snapOrd: 1, metaSnap: ms, tickNet: { metaId: "dor", globalOrdinal: 1 } })))
+      .toEqual(["metaSnap", "tickNet", "snapshot", "block"]);
+  });
+  it("the clear releases the block alone, and nothing when none is held", () => {
+    expect(blockClearActions({ block: b })).toEqual([{ kind: "block", sel: null }]);
+    expect(blockClearActions({ block: null })).toEqual([]);
+  });
+  it("a scene click on a block runs the same builder (scene click = row select)", () => {
+    const current = { ...state(), pinnedOrdinal: null, metaSnap: null, block: null };
+    expect(clickActions({ mode: "ledger", pick: blockPick, countryCc: null, current })).toEqual(
+      blockSelectActions(b, global, { block: null, snapOrd: null, metaSnap: null }),
+    );
+  });
+  it("a tick select drops a block that tick cannot contain, and the tick's clear takes it along", () => {
+    const other = { kind: "snapshot", data: { ordinal: 9 } } as unknown as SnapPick;
+    expect(kinds(snapshotSelectActions(other, false, { pinnedOrdinal: null, metaSnap: null, block: b }))).toEqual(["block", "snapshot"]);
+    expect(kinds(snapshotSelectActions(global, false, { pinnedOrdinal: null, metaSnap: null, block: b }))).toEqual(["snapshot"]);
+    expect(kinds(snapshotClearActions({ metaSnap: null, block: b }))).toEqual(["block", "snapshot"]);
   });
 });

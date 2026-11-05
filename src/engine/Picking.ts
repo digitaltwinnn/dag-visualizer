@@ -113,7 +113,7 @@ export class Picking {
   /** The tile or band of a tick the filter's network is not in answers nothing, as its explorer
    *  row does (`ledgerStory.tickLocked`). The tick on screen always answers: it is the way back. */
   private tickHeldOut(p: PickDescriptor, st: ReturnType<typeof useStore.getState>): boolean {
-    const ordinal = p.kind === "snapshot" ? p.data.ordinal : p.kind === "metaSnap" ? p.global.data.ordinal : null;
+    const ordinal = p.kind === "snapshot" ? p.data.ordinal : p.kind === "metaSnap" || p.kind === "block" ? p.global.data.ordinal : null;
     return ordinal != null && ordinal !== st.snap?.data.ordinal && tickLocked(st.filter, st.snapshotExact[ordinal]);
   }
 
@@ -136,6 +136,7 @@ export class Picking {
     if (st.hoverNodeId != null) st.setHoverNodeId(null);
     if (st.hoverSnapOrd != null) st.setHoverSnapOrd(null);
     if (st.hoverMetaSnap != null) st.setHoverMetaSnap(null);
+    if (st.hoverBlock != null) st.setHoverBlock(null);
     if (st.hoverFilter != null) st.setHoverFilter(null);
     if (st.hoverCountry != null) st.setHoverCountry(null);
     if (st.hoverCohort != null) st.setHoverCohort(null);
@@ -163,6 +164,8 @@ export class Picking {
     // sibling that anchored into the same global tick — in the scene OR in the explorer/raw rows.
     const snapOrd = p?.kind === "snapshot" ? p.data.ordinal : null;
     const metaSnapKey = p?.kind === "metaSnap" ? metaSnapHoverKey(p.sel.metaId, p.sel.ordinal) : null;
+    // A BLOCK (the Blocks register) hovers on its own channel, by hash: one block, not its tick.
+    const blockHash = p?.kind === "block" ? p.sel.hash : null;
     const metaId = p?.kind === "meta" ? p.cfg?.id ?? null : null;    // hub → metagraph dim preview
     // Country under the cursor (policy-gated): the SCENE side of the bidirectional country
     // pairing — writes the same hoverCountry channel the explorer rows use, so the border
@@ -181,6 +184,7 @@ export class Picking {
     if (nodeKey !== st.hoverNodeId) st.setHoverNodeId(nodeKey);
     if (snapOrd !== st.hoverSnapOrd) st.setHoverSnapOrd(snapOrd);
     if (metaSnapKey !== st.hoverMetaSnap) st.setHoverMetaSnap(metaSnapKey);
+    if (blockHash !== st.hoverBlock) st.setHoverBlock(blockHash);
     if (metaId !== st.hoverFilter) st.setHoverFilter(metaId);
     if (countryCc !== st.hoverCountry) st.setHoverCountry(countryCc);
 
@@ -252,6 +256,7 @@ export class Picking {
           pinnedOrdinal: !st.following ? st.snap?.data?.ordinal ?? null : null,
           metaSnap: st.metaSnap,
           tickNet: st.tickNet,
+          block: st.block,
         },
       }),
     );

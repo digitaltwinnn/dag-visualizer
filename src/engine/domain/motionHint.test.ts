@@ -64,6 +64,11 @@ describe("motionHint", () => {
     expect(motionHint({ kind: "register", id: "snapshots" }, "ledger", NAMES)).toBe("Showing the snapshots");
   });
 
+  it("a block commit frames the block; its release returns to the snapshot that carries it", () => {
+    expect(motionHint({ kind: "block", on: true }, "ledger", NAMES)).toBe("Framing the block");
+    expect(motionHint({ kind: "block", on: false }, "ledger", NAMES)).toBe("Back to the global snapshot");
+  });
+
   it("a drag is the reader's own hand and needs no words", () => {
     expect(motionHint({ kind: "orbit" }, "hyper", NAMES)).toBeNull();
   });
@@ -74,7 +79,7 @@ describe("motionHint", () => {
       { kind: "snapshot", ordinal: null }, { kind: "metaSnap", metaId: null }, { kind: "country", cc: null },
       { kind: "cohort", on: true }, { kind: "cohort", on: false }, { kind: "composition", on: true }, { kind: "composition", on: false },
       { kind: "range", span: null }, { kind: "window", id: "1h" }, { kind: "measure", id: "nodes" }, { kind: "page" }, { kind: "orbit" },
-      { kind: "rung", level: "all" }, { kind: "register", id: "blocks" },
+      { kind: "rung", level: "all" }, { kind: "register", id: "blocks" }, { kind: "block", on: false },
     ];
     for (const c of causes) {
       const out = motionHint(c, "trend", NAMES);

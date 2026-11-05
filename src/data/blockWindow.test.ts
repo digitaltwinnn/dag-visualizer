@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BLOCK_WINDOW_TICKS, blockWanted, foldBlockWindow } from "@/src/data/blockWindow";
+import { BLOCK_WINDOW_TICKS, blockWanted, blockWindowContinues, foldBlockWindow } from "@/src/data/blockWindow";
 import type { RawMetaSnapshot, SnapshotExact } from "@/src/data/types";
 
 describe("foldBlockWindow", () => {
@@ -32,5 +32,20 @@ describe("blockWanted", () => {
     expect(blockWanted({ ledger: true, register: "blocks", pin: 50, held: { from: 400, to: 900 }, liveNewest: 900 })).toEqual({ kind: "fetch", around: 50 });
     expect(blockWanted({ ledger: true, register: "snapshots", pin: 50, held: null, liveNewest: 900 })).toEqual({ kind: "clear" });
     expect(blockWanted({ ledger: false, register: "blocks", pin: null, held: null, liveNewest: 900 })).toEqual({ kind: "clear" });
+  });
+});
+
+describe("blockWindowContinues", () => {
+  const tick = (ord: number) => ({ ord, ts: new Date(ord * 10_000).toISOString(), hash: "g" + ord, blocks: ["b" + ord], metaSnaps: {} });
+  const win = (...ords: number[]) => foldBlockWindow({ ticks: ords.map(tick), chains: ["dag"] }, {});
+  it("a window that keeps the newest tick and gains at most one advances the trail", () => {
+    expect(blockWindowContinues(300, win(100, 200, 300))).toBe(true); // a refold of the same ticks
+    expect(blockWindowContinues(300, win(200, 300, 400))).toBe(true); // one new block tick at the front
+  });
+  it("anything else is another stretch: none before, none now, a lost tick, a jump", () => {
+    expect(blockWindowContinues(null, win(100))).toBe(false);
+    expect(blockWindowContinues(300, null)).toBe(false);
+    expect(blockWindowContinues(300, win(10, 20, 30))).toBe(false);
+    expect(blockWindowContinues(300, win(300, 400, 500))).toBe(false);
   });
 });

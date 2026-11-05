@@ -541,6 +541,59 @@ common case of a signer whose machine isn't knowable, and a listed metagraph wit
 gets exactly the same answer. So no surface fabricates a node card, and no surface grows its own
 special-case for unlisted.
 
+### The Blocks register
+
+The chamber has a second REGISTER (`store.ledgerRegister`, a setting of the view, never a Mode —
+`docs/superpowers/specs/2026-11-05-block-dag-view-design.md`). It is the SAME chamber: floor, planes,
+tiles, bars, ribbons, labels, the rewind and the pose. Two things differ, and both answer through ONE
+keyed map, `LedgerView`'s `REGISTER_CARGO` (a new register is a compile error there):
+
+- **The trail's source.** `ledgerSource(live, register)` answers the block window
+  (`src/data/blockWindow.ts`) in Blocks, so the slots are the block-bearing ticks; the slot model is
+  unchanged. A register flip, a past window and a block window that does not CONTINUE the one held
+  (`blockWindowContinues` — a refold or one new block tick at the front advances like a live tick)
+  all re-seat the chamber through the Engine's one `_reseatLedger`. An EMPTY source is an empty trail
+  (`_emptyTrail`), so the Snapshots rows never stand in for a window still loading, and a shorter
+  trail clears the slots it leaves behind. The live edge stands down in Blocks (`liveEdge: false`):
+  the trail's newest tick is sealed, never forming.
+- **The cargo on top** (`blocks: true`): `objects/BlockTier.ts` and `objects/SilentStretch.ts`, drawn
+  per frame only in that register and CLEARED at the switch, so nothing of theirs is left to write.
+  The tier's mesh joins `pickables` in that register only (the raycaster ignores `visible`).
+
+**Where a block stands is layout data, placed at event time** (`_rebuildBlockTier`, on every slot
+rebuild, window and read): a DAG block on its tick's bar top, a token block on the tile of the
+metagraph snapshot that accepted it — `tileAnchorOf`, the k-th filled tile of that tick, `k` the
+tile resolver's own index. `_tileTop` is the ONE copy of the tile arithmetic: the per-frame draw and
+the selected tile's callout anchor add the frame's offsets to it. Across the width, **height is a
+LANE, never a stack** (user ruling): `laneOf` over the chain's lowest height in the WINDOW (not the
+slots, so a lane does not move as the trail holds more rows), across the bar field for the DAG and
+the plane's narrow width for a token; blocks sharing a tick and a lane step aside along the trail.
+A block whose read has not landed waits in the middle lane.
+
+**Honesty (rule 10).** A block is drawn from the FEED's hashes, so a tick whose full read has not
+landed, or failed (`blockReadMiss`), shows its blocks with no links; a link draws only where BOTH
+ends are on the trail (`linkEndpoints`) — a parent beyond the trail's held rows has no place, so no
+stub. A landed block with no parents is a data block and is not drawn. **Tips are read, never
+inferred**: the state is `tipStateOf` over the chain's FRONTIER read (`blockReads["<chain>:frontier"]`,
+the newest snapshot's tips), never a block-bearing snapshot's own (hours stale); with none the block
+draws the resting look, never "open". An open tip breathes on the live edge's calm beat
+(`LiveEdge.BREATHE_RATE`), a retired one reads quiet (`BLOCK_LOOK`).
+
+**The marks are the tiles' kind**: opaque, depth-writing instances in the chain's identity hue (the
+DAG's from `sceneColors.dag`), brightness through `snapBright` (the ledger row's dim, boost and back
+— a block is data) and `inkMix`/`inkPresence` with an ink floor on paper, joined to the bloom layer.
+A row is one object: blocks and each link END ask the trail's boundaries at their ROW's x (a block
+offset along a tile grid must not fade apart from its tile), dissolve by zero-scale, and drop with
+their slot's entry beat. Links are one `LineSegments`, positions at event time, alpha per vertex per
+frame, `glowBlend` on each ground. The silent stretch is one dashed `LineSegments` flush in the floor
+between two rows' bars, plus a flat edge label ("1,364 snapshots · 4h", `relativeAge` — the app's one
+short span) past 200 snapshots; flat, not a billboard, because the floor's text is flat everywhere.
+
+**The selection** is a slot under the tick, no focus rung and no pose (camera principle 2):
+`blockSelectActions` pins the accepting global and commits the block; the same block releases it
+alone; a tick select drops a block that tick cannot contain. Hover rides `hoverBlock` (a block, not its
+tick) and previews only.
+
 ### The unlisted network
 
 **`unlisted` is a first-class network with one home** (`src/data/unlisted.ts`): the module owns its

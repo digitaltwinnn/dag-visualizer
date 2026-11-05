@@ -79,6 +79,10 @@ export function motionHint(cause: MotionCause, mode: Mode, names: HintNames, pha
       return cause.metaId === null
         ? "Back to the global snapshot"
         : `Framing ${names.network(cause.metaId)}'s snapshot${cause.ordinal != null ? ` ${cause.ordinal.toLocaleString()}` : ""}`;
+    case "block":
+      // A block is a slot under its tick (no rung, no pose of its own): the release lands on the
+      // global snapshot that carries it, in the metaSnap release's own words.
+      return cause.on ? "Framing the block" : "Back to the global snapshot";
     case "country":
       return cause.cc === null ? "Back to the whole globe" : `Drilling into ${names.country(cause.cc)}`;
     case "cohort":

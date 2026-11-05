@@ -111,3 +111,15 @@ export function blockWanted(s: {
   if (s.held && s.pin >= s.held.from && s.pin <= s.held.to) return { kind: "keep" };
   return { kind: "fetch", around: s.pin };
 }
+
+/** Does `w` CONTINUE the window whose newest tick was `prevTo`, so the chamber advances its trail
+ *  rather than re-seeding it? Only when it still holds that tick and has at most one newer: the
+ *  chamber's model slides one slot per new lead, exactly as the live buffer gains a tick. Any other
+ *  change — the first window, none, a re-centred pin, a jump of several ticks — is another stretch
+ *  of the chain, and the chamber starts a fresh history for it (the past window's own rule). */
+export function blockWindowContinues(prevTo: number | null, w: BlockWindow | null): boolean {
+  if (prevTo == null || !w || !w.holds(prevTo)) return false;
+  let newer = 0;
+  for (const t of w.ticks) if (t.ord > prevTo) newer++;
+  return newer <= 1;
+}

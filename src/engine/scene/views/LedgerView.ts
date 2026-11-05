@@ -49,6 +49,8 @@ import {
   lanePlaneHalf,
   LEAD_X,
   TILE_LIFT,
+  BAR_H,
+  BAR_LIFT,
   laneSpan,
   type RailGroup,
 } from "../../domain/ledgerLayout";
@@ -62,7 +64,10 @@ import {
   HORIZON_SPAN,
   horizonAt,
   liveEdgePhase,
+  ROW_HALF_D,
+  type LaneBlock,
 } from "../../domain/ledgerModel";
+import { BRAID_LANES, laneOf, laneZ, linkEndpoints, silentRun, tipStateOf, type BlockRead, type TipRead } from "../../domain/blockBraid";
 import { ENTRY_STAG, entryStep, entryTotal } from "../../domain/entryBeat";
 import { makeBarSpec, fillBarSpec, UNLISTED_KEY, RIBBON_LANE_HALF, type BarSpec } from "../../domain/ledgerBands";
 import type { ContainerSpec } from "../../domain/ledgerRails";
@@ -73,6 +78,12 @@ import type {
   SnapshotExact,
 } from "@/src/data/types";
 import { metaSnapHoverKey } from "@/src/data/types";
+import type { BlockWindow } from "@/src/data/blockWindow";
+import type { ViewPolicy } from "../../domain/viewPolicy";
+/** A register of the Snapshots view — named through the policy row that lists them, since scene/
+ *  reaches nothing in the store, types included (`layerBoundaries.test.ts`). */
+type LedgerRegister = ViewPolicy["registers"][number];
+import { relativeAge } from "@/src/util/relativeAge"; // the app's one short span — "1,364 snapshots · 4h"
 import { fmtKB } from "@/src/util/format"; // the HUD's own size vocabulary — one formatter, so scene and cards can't disagree
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers"; // shared display copy — floor labels = panel rows
 import { ByteBar, SEED_W } from "../objects/ByteBar";
@@ -84,6 +95,8 @@ import { TrailRewind } from "../objects/TrailRewind";
 import type { StageLight } from "../objects/StageLight";
 import { STAGE_LIGHTS } from "../../domain/stageLight";
 import { FadeSet } from "../objects/FadeSet";
+import { BlockTier, type BlockItem } from "../objects/BlockTier";
+import { SilentStretch, type StretchItem } from "../objects/SilentStretch";
 import type { SceneView } from "./SceneView";
 import { joinBloom, inMarkPass } from "../SceneContext";
 
@@ -189,6 +202,34 @@ export interface TileLook {
 // rest user-tuned live, 2026-08-07. (`hot` retired 2026-08-11 — it was exactly the ledger
 // row's `boost`, and a snapshot is data, so it takes the node's focus knob instead.)
 export const TILE_LOOK: Readonly<TileLook> = { rest: 0.1, ink: 0.3, halo: 2.5 };
+
+/** THE REGISTER'S CARGO — the one keyed map for what the chamber draws per register (spec "Rules":
+ *  the places that differ by register answer through one keyed map, never a fall-through). A new
+ *  register is a compile error here. Everything not named stays the chamber's in both: the floor,
+ *  the planes, the bars, the tiles, the ribbons, the labels and the trail itself.
+ *  - `blocks`: the block tier and the silent stretches draw, and the blocks pick.
+ *  - `liveEdge`: whether the front can hold a FORMING tick. The Blocks trail is block-bearing
+ *    ticks only, each already sealed, so its newest row is never in flight. */
+const REGISTER_CARGO: Record<LedgerRegister, { blocks: boolean; liveEdge: boolean }> = {
+  snapshots: { blocks: false, liveEdge: true },
+  blocks: { blocks: true, liveEdge: false },
+};
+
+/** A block's edge on the floor (a DAG block) and on a tile (a token block — a tile is 0.48 at most). */
+const DAG_BLOCK = 0.62;
+const TOKEN_BLOCK = 0.36;
+/** The braid's width on the floor: the lane field the bars span. On a plane: its own narrow width. */
+const DAG_BRAID_W = LANE_HALF_Z * 2;
+/** Blocks that share a tick and a lane step aside along the trail by this much, alternately. */
+const BLOCK_STEP = 0.7;
+/** A block read's frontier key (`${chain}:frontier`, the tips read off each chain's NEWEST snapshot —
+ *  never the last block-bearing one, whose tips can be hours stale). Absent: no frontier read, so a
+ *  block's state is null and it draws the resting look. */
+const FRONTIER = "frontier";
+/** A silent run states its length in words only past this many snapshots (a short gap is just a gap). */
+const STRETCH_WORDS_MIN = 200;
+/** The tile mesh's own depth (the BoxGeometry's z, which becomes height under the -90° X spin). */
+const TILE_D = 0.35;
 
 // The view-entry drop's shape (see the VIEW-ENTRY DROP note in the class): fall height and
 // per-slot timing. The TOTAL is derived so _entryT in [0,1] maps onto real seconds.
@@ -338,6 +379,18 @@ export class LedgerView implements SceneView {
   private readonly _stageNormal = new THREE.Vector3();
   private readonly _spot: StageLight;
 
+  // ── THE BLOCKS REGISTER (spec 2026-11-05): the register the chamber reads, its cargo row, and the
+  // inputs the block tier is placed from. All event-time; the tier draws per frame from its own state.
+  private _register: LedgerRegister = "snapshots";
+  private _cargo = REGISTER_CARGO.snapshots;
+  private _blockWindow: BlockWindow | null = null;
+  private _blockReads: Readonly<Record<string, { blocks: BlockRead[]; tips: TipRead | null }>> = {};
+  private _hoverBlock: string | null = null;
+  private _selBlock: string | null = null;
+  private _blocks: BlockTier;
+  private _stretch: SilentStretch;
+  private readonly _tileScratch = new THREE.Vector3();
+
   constructor(
     scene: THREE.Scene,
     colors: SceneColors,
@@ -392,6 +445,10 @@ export class LedgerView implements SceneView {
     // with the trail.
     this._live = new LiveEdge();
     this.group.add(this._live.group);
+    // The Blocks register's tier and the silent stretches ride the rewind like the ribbons.
+    this._blocks = new BlockTier(colors);
+    this._stretch = new SilentStretch(colors);
+    this.group.add(this._blocks.group, this._stretch.group);
 
     this._buildMetaTrail();
     this._syncPickables();
@@ -405,7 +462,7 @@ export class LedgerView implements SceneView {
     // BRIGHTNESS (instance colour) carries the recency fade — the bloom pass still lights the
     // hot row, so the lead keeps its glow while the trail reads matte.
     this._metaTrailMesh = new THREE.InstancedMesh(
-      new THREE.BoxGeometry(1, 1, 0.35),
+      new THREE.BoxGeometry(1, 1, TILE_D),
       new THREE.MeshBasicMaterial({}),
       META_TRAIL_MAX,
     );
@@ -547,6 +604,7 @@ export class LedgerView implements SceneView {
     this._laneColors.clear();
     this._bar.setSceneColors(map);
     this._ribbons.setSceneColors(map);
+    this._rebuildBlockTier(); // the blocks carry their chain's hue, baked at placement
   }
 
   /** THEME FLIP — the chamber's construction-time captures of the STRUCTURAL palette. `_colors` is
@@ -564,6 +622,8 @@ export class LedgerView implements SceneView {
     for (const p of [...this._globalPlanes, ...this._metaPlanes.values()]) p.setColors(c);
     this._bar.setColors(c);
     this._ribbons.setColors(c);
+    this._blocks.setColors(c);
+    this._stretch.setColors(c);
     // The ordinal + kB columns are POOLED per visible row (recycled by ordinal), so the live set
     // is retinted in place; rows built after the flip read the new `_colors`/`_core` above.
     for (const o of this._ordLabels.values()) {
@@ -719,7 +779,12 @@ export class LedgerView implements SceneView {
     // reads the same end). Reading snaps[0] would pin _latest to the OLDEST tick, which never
     // changes while the buffer is below cap.
     const latest = snaps[snaps.length - 1];
-    if (!latest) return;
+    if (!latest) {
+      // AN EMPTY SOURCE IS AN EMPTY TRAIL (the Blocks register before its window lands, or a window
+      // holding no ticks): the rows of the stretch drawn before must not stand in for it.
+      if (this._latest) this._emptyTrail();
+      return;
+    }
     this._latest = latest;
 
     // event-time: one ordinal index per tick (the trail carries ordinals, not snapshots).
@@ -769,14 +834,38 @@ export class LedgerView implements SceneView {
     // exist as bars, specs and picks or the chamber empties behind the selection. Grown here, at
     // tick rate, never per frame.
     this._ensureSlotCapacity(this.model.trailCap);
+    const was = this._slotSnap.slice(); // event-time
     for (let s = 0; s < this._slotSnap.length; s++) this._slotSnap[s] = null;
     if (this.model.tickOrdinal != null)
       this._slotSnap[0] = this._byOrd.get(this.model.tickOrdinal) ?? null;
     for (const tr of this.model.trail)
       if (tr.slot >= 0 && tr.slot < this._slotSnap.length)
         this._slotSnap[tr.slot] = this._byOrd.get(tr.ordinal) ?? null;
+    // A slot the new stretch leaves empty draws nothing — after a source switch to a shorter trail
+    // (a Blocks window of a few ticks) its old bar must not linger.
+    for (let s = 0; s < was.length; s++) {
+      const old = was[s];
+      if (old && !this._slotSnap[s]) this._bar.setBar(s, old.ordinal, null, this._pickFor(old));
+    }
 
     this._recomputeHoverSlot();
+    this._rebuildAllSlots();
+  }
+
+  /** Every row gone: the bars, the tiles (a fresh model holds no lanes, so the frame zero-scales
+   *  them), the labels, the ribbons, the block tier. Event-time. */
+  private _emptyTrail(): void {
+    for (let s = 0; s < this._slotSnap.length; s++) {
+      const old = this._slotSnap[s];
+      if (old) this._bar.setBar(s, old.ordinal, null, this._pickFor(old));
+      this._slotSnap[s] = null;
+    }
+    this._latest = null;
+    this.model = new LedgerModel();
+    this._graceOrd = null;
+    this._graceT = 0;
+    this._lastSnaps = null;
+    this._lastGetAnchor = null;
     this._rebuildAllSlots();
   }
 
@@ -800,6 +889,195 @@ export class LedgerView implements SceneView {
     if (on === this._frozen) return;
     this._frozen = on;
     this._rebuildAllSlots();
+  }
+
+  // ── THE BLOCKS REGISTER ──────────────────────────────────────────────────
+
+  /** Which register the chamber reads (`store.ledgerRegister`). The Engine re-hands the source
+   *  around this call (the trail's ticks are the register's), so this only switches the cargo. */
+  setRegister(r: LedgerRegister): void {
+    if (r === this._register) return;
+    this._register = r;
+    this._cargo = REGISTER_CARGO[r];
+    this._rebuildAllSlots(); // the live edge's claim on the front, the tier, the pick list
+  }
+
+  /** The block window the Blocks register's trail is (`src/data/blockWindow.ts`), or none yet. */
+  setBlockWindow(w: BlockWindow | null): void {
+    this._blockWindow = w;
+    this._rebuildBlockTier();
+  }
+
+  /** The full reads (`store.blockReads`): a block's parents, and each chain's frontier. */
+  setBlockReads(r: Readonly<Record<string, { blocks: BlockRead[]; tips: TipRead | null }>>): void {
+    this._blockReads = r;
+    this._rebuildBlockTier();
+  }
+
+  /** The hovered block (`store.hoverBlock`) — previews, never commits (convention 9). */
+  setHoveredBlock(hash: string | null): void {
+    this._hoverBlock = hash;
+    this._blocks.setEmphasis(this._hoverBlock, this._selBlock);
+  }
+
+  /** The committed block (`store.block`), by hash. */
+  setSelectedBlock(hash: string | null): void {
+    this._selBlock = hash;
+    this._blocks.setEmphasis(this._hoverBlock, this._selBlock);
+  }
+
+  /** A tile's top centre AT REST — chamber-local, before the rewind offset and the entry drop. The
+   *  ONE copy of the tile arithmetic: the per-frame draw (and the selected tile's callout anchor)
+   *  adds the frame's offsets to it, and a token block stands on it. Layout data, never a rendered
+   *  transform (rule 6). */
+  private _tileTop(b: LaneBlock, cz: number, out: THREE.Vector3): THREE.Vector3 {
+    return out.set(LEAD_X - b.slot * SLOT_SP + b.ox, FLOOR_Y.msnap + TILE_LIFT + TILE_D * b.size, cz + b.oz);
+  }
+
+  /** The top of tile `k` of `metaId`'s lane block in the tick `tickTs` (the tile resolver's own
+   *  index: the k-th filled tile of that tick), at rest. False when the lane holds no such tile. */
+  tileAnchorOf(metaId: string, tickTs: string, k: number, out: THREE.Vector3): boolean {
+    const lane = this.model.lanes.get(metaId);
+    if (!lane) return false;
+    const cz = this._laneZ.get(metaId) ?? lane.z;
+    let j = 0;
+    for (const b of lane.blocks) {
+      if (b.ts !== tickTs || !b.filled) continue;
+      if (j === k) {
+        this._tileTop(b, cz, out);
+        return true;
+      }
+      j++;
+    }
+    return false;
+  }
+
+  /** EVENT-TIME: place every block the window's trail ticks hold, link the ones whose reads landed,
+   *  and mark the silent runs between adjacent ticks. Runs on every slot rebuild (a new tick, a
+   *  landing exact read), on a window, on reads. Outside the Blocks register it clears.
+   *
+   *  Honesty (rule 10): a block is drawn from the FEED's hashes (the window), so a tick whose full
+   *  read has not landed — or failed — still shows its blocks, with no links; a link draws only when
+   *  BOTH ends are held (`linkEndpoints`). A block the landed read shows with no parents is a DATA
+   *  block, not a DAG block, and is not drawn. A lane comes from a read's height; a block whose read
+   *  has not landed waits in the middle lane. Tip state is the chain's FRONTIER read, null without
+   *  one — the resting look, never "open". */
+  private _rebuildBlockTier(): void {
+    const w = this._blockWindow;
+    // The constructor builds the tier after the first slot rebuild can run.
+    if (!this._blocks || !this._stretch) return;
+    if (!this._cargo.blocks || !w) {
+      this._blocks.clear();
+      this._stretch.clear();
+      return;
+    }
+    const reads = this._blockReads;
+    // Pass 1 — every read the WINDOW holds, by `${chain}:${hash}`, and each chain's lowest height
+    // across it (the braid's lane origin — the window's, not the slots', so a block keeps its lane
+    // as the trail holds more or fewer rows).
+    const readOf = new Map<string, BlockRead>(); // event-time
+    const minH = new Map<string, number>(); // event-time
+    const note = (chain: string, key: string) => {
+      for (const b of reads[key]?.blocks ?? []) {
+        if (!b.hash) continue;
+        readOf.set(`${chain}:${b.hash}`, b);
+        if (b.parents.length) minH.set(chain, Math.min(minH.get(chain) ?? b.height, b.height));
+      }
+    };
+    for (const t of w.ticks) {
+      if (t.blocks.length) note("dag", `dag:${t.ord}`);
+      for (const [chain, rows] of Object.entries(t.metaSnaps)) for (const r of rows) if (r.blocks?.length) note(chain, `${chain}:${r.ordinal}`);
+    }
+    const mid = Math.floor(BRAID_LANES / 2);
+    const items: BlockItem[] = []; // event-time
+    const at = new Map<string, readonly [number, number, number]>(); // event-time
+    const taken = new Map<string, number>(); // event-time: blocks already standing per (slot, chain, lane)
+    const tokenW = 2 * lanePlaneHalf(this._laneOrder.length) * 0.8;
+    const place = (
+      chain: string, hash: string, slot: number, x: number, y: number, zMid: number, braidW: number, size: number,
+      clampZ: number, pick: PickDescriptor,
+    ) => {
+      const read = readOf.get(`${chain}:${hash}`);
+      if (read && read.parents.length === 0) return; // a data block: not a DAG block, not drawn
+      const lane = read && minH.has(chain) ? laneOf(read.height, minH.get(chain)!, BRAID_LANES) : mid;
+      const z = Math.max(-clampZ, Math.min(clampZ, laneZ(lane, BRAID_LANES, braidW)));
+      const key = `${slot}|${chain}|${lane}`;
+      const j = taken.get(key) ?? 0;
+      taken.set(key, j + 1);
+      const dx = j === 0 ? 0 : (j % 2 ? 1 : -1) * Math.ceil(j / 2) * BLOCK_STEP * (size / DAG_BLOCK);
+      const p = [x + dx, y, zMid + z] as const;
+      at.set(`${chain}:${hash}`, p);
+      items.push({
+        hash, chain, x: p[0], y: p[1], z: p[2], slot, size, pick,
+        state: tipStateOf(hash, reads[`${chain}:${FRONTIER}`]?.tips ?? null),
+        hue: this._laneColor(chain).getHex(),
+      });
+    };
+    for (let s = 0; s < this._slotSnap.length; s++) {
+      const snap = this._slotSnap[s];
+      const t = snap ? w.blockTick(snap.ordinal) : null;
+      if (!snap || !t) continue;
+      const global = this._pickFor(snap) as Extract<PickDescriptor, { kind: "snapshot" }>;
+      // A DAG block stands on its tick's slot, on the bar's top face.
+      const dagY = FLOOR_Y.gl0 + BAR_LIFT + BAR_H + DAG_BLOCK / 2 + 0.08;
+      for (const hash of t.blocks) {
+        place("dag", hash, s, LEAD_X - s * SLOT_SP, dagY, 0, DAG_BRAID_W, DAG_BLOCK, LANE_HALF_Z, {
+          kind: "block", sel: { chain: "dag", hash, ordinal: t.ord, anchorOrd: t.ord }, global, title: "Block",
+        });
+      }
+      // A token block stands on the tile of the metagraph snapshot that accepted it.
+      for (const [chain, rows] of Object.entries(t.metaSnaps)) {
+        const recs = w.metaSnaps.get(chain)?.filter((r) => r.ts === t.ts) ?? []; // the tile resolver's list
+        for (const r of rows) {
+          if (!r.blocks?.length) continue;
+          const k = recs.findIndex((x) => x.ordinal === r.ordinal);
+          if (k < 0 || !this.tileAnchorOf(chain, t.ts, k, this._tileScratch)) continue;
+          const tile = this._tileScratch;
+          const cz = this._laneZ.get(chain) ?? 0;
+          for (const hash of r.blocks) {
+            place(chain, hash, s, tile.x, tile.y + TOKEN_BLOCK / 2 + 0.03, cz, tokenW, TOKEN_BLOCK, tokenW / 2, {
+              kind: "block", sel: { chain, hash, ordinal: r.ordinal, anchorOrd: t.ord }, global, title: "Block",
+            });
+          }
+        }
+      }
+    }
+    // Links per chain, so each segment knows its colour and lens (a block's parents are its chain's).
+    const links: number[] = []; // event-time
+    const linkChains: string[] = []; // event-time
+    const linkHues: number[] = []; // event-time
+    const byChain = new Map<string, BlockRead[]>(); // event-time
+    for (const [key, b] of readOf) {
+      if (!at.has(key)) continue;
+      const chain = key.slice(0, key.indexOf(":"));
+      (byChain.get(chain) ?? byChain.set(chain, []).get(chain)!).push(b);
+    }
+    for (const [chain, blocks] of byChain) {
+      const seg = linkEndpoints(blocks, (hash) => at.get(`${chain}:${hash}`) ?? null);
+      const hue = this._laneColor(chain).getHex();
+      for (let i = 0; i < seg.length; i += 6) {
+        for (let k = 0; k < 6; k++) links.push(seg[i + k]);
+        linkChains.push(chain);
+        linkHues.push(hue);
+      }
+    }
+    this._blocks.rebuild(items, Float32Array.from(links), linkChains, linkHues); // re-resolves the held emphasis
+
+    // The silent runs between adjacent trail ticks — between the two rows' bars, flush in the glass.
+    const stretches: StretchItem[] = []; // event-time
+    const y = FLOOR_Y.gl0 + BAR_LIFT + 0.02;
+    for (let s = 0; s + 1 < this._slotSnap.length; s++) {
+      const newer = this._slotSnap[s];
+      const older = this._slotSnap[s + 1];
+      if (!newer || !older) continue;
+      const run = silentRun(older.ordinal, newer.ordinal, Date.parse(older.timestamp), Date.parse(newer.timestamp));
+      if (!run) continue;
+      const x1 = LEAD_X - s * SLOT_SP - ROW_HALF_D - 0.2;
+      const x0 = LEAD_X - (s + 1) * SLOT_SP + ROW_HALF_D + 0.2;
+      const label = run.snapshots > STRETCH_WORDS_MIN ? `${run.snapshots.toLocaleString()} snapshots · ${relativeAge(run.ms, true)}` : null;
+      stretches.push({ key: `${older.ordinal}-${newer.ordinal}`, x0, x1, y, label });
+    }
+    this._stretch.rebuild(stretches);
   }
 
   // Ordinals whose exact read FAILED (store.exactMiss, bridged by the Engine): the give-up
@@ -927,6 +1205,7 @@ export class LedgerView implements SceneView {
     // change of geometry — rule 9's pairing: a hover previews the thread a commit would draw.
     this._syncThreads();
     this._bar.setFilter(d);
+    this._blocks.setDim(d);
   }
 
 
@@ -967,7 +1246,7 @@ export class LedgerView implements SceneView {
    *  seed in its own place in time. */
   private _liveOrd(): number | null {
     const snap = this._slotSnap[0];
-    if (this._frozen || !snap || this._exact[snap.ordinal] || this._missOrds.has(snap.ordinal)) return null;
+    if (this._frozen || !this._cargo.liveEdge || !snap || this._exact[snap.ordinal] || this._missOrds.has(snap.ordinal)) return null;
     return snap.ordinal;
   }
 
@@ -1000,6 +1279,7 @@ export class LedgerView implements SceneView {
     this._syncRibbonRows();
     this._syncOrdLabels();
     this._rebuildTilePicks();
+    this._rebuildBlockTier();
     this._syncPickables();
   }
 
@@ -1205,6 +1485,9 @@ export class LedgerView implements SceneView {
     for (const o of this._bar.pickables) this.pickables.push(o);
     // Tiles only become raycast targets once a resolver can turn an instance id into a snapshot.
     if (this._tileResolver) this.pickables.push(this._metaTrailMesh);
+    // The blocks pick in their own register only — the raycaster ignores `visible`, and a cleared
+    // tier holds no instances, but the list is the honest statement of what can answer.
+    if (this._cargo.blocks) this.pickables.push(this._blocks.mesh);
   }
 
   // ── frame ────────────────────────────────────────────────────────────────
@@ -1228,7 +1511,11 @@ export class LedgerView implements SceneView {
         this._entryFade[si] = step.fade;
       }
       this._bar.setEntryDrop(this._entryDrop, this._entryFade);
-      if (this._entryT >= 1) this._bar.setEntryDrop(null, null); // park — steady frames write nothing
+      this._blocks.setEntryDrop(this._entryDrop, this._entryFade);
+      if (this._entryT >= 1) {
+        this._bar.setEntryDrop(null, null); // park — steady frames write nothing
+        this._blocks.setEntryDrop(null, null);
+      }
     }
 
     // ── the TRAIL REWIND (objects/TrailRewind.ts): the shown snapshot owns the front; rows
@@ -1300,10 +1587,20 @@ export class LedgerView implements SceneView {
     const lk = this._netDimKey();
     this._live.setHue(lk === "all" ? this._core : this._laneColor(lk).getHex());
     this._live.update(dt);
+    // THE REGISTER'S CARGO (one keyed map, `REGISTER_CARGO`): the block tier and the silent
+    // stretches draw in the Blocks register only — outside it they are cleared at the switch, so
+    // nothing of theirs is left to write.
+    if (this._cargo.blocks) {
+      this._blocks.setOffset(this._trailOff);
+      this._blocks.update(dt, this._fades.alpha);
+      this._stretch.setOffset(this._trailOff);
+      this._stretch.update(this._fades.alpha);
+    }
     // (no _ribbons.update: the sheet's only per-frame value is its opacity, and setViewAlpha —
     // called every frame — writes that directly now.)
 
-    if (!this._latest) return;
+    // Before any data, and after an emptied trail once its tiles are zero-scaled, there is nothing to draw.
+    if (!this._latest && this._metaLastDrawn === 0) return;
     const k = Math.min(1, dt * 3);
     const ek = emphasisK(dt); // emphasis easing — hoisted once per frame (the hoist rule)
 
@@ -1363,14 +1660,16 @@ export class LedgerView implements SceneView {
         }
         // Bottom just above the plane (user, 2026-08-07): the box is centred, so lift by half its
         // world height (geometry depth 0.35 × scale.z becomes the height under the -90° X spin).
-        const tileH = 0.35 * b.size;
+        const tileH = TILE_D * b.size;
         // The entry drop rides the slot (0 while settled — the array only holds values mid-ramp).
         const dropY = this._entryT < 1 && b.slot >= 0 && b.slot < SLOT_N ? this._entryDrop[b.slot] : 0;
         _dummy.position.set(wx + b.ox, FLOOR_Y.msnap + TILE_LIFT + tileH / 2 + dropY, cz + b.oz);
         // The subject callout anchors THE committed snapshot's tile, not the lane lead (user,
         // 2026-08-15) — record its live position (rewind/trail offsets included) as it draws.
         if (mi === this._selTileIndex) {
-          this._selTilePos.set(wx + b.ox, FLOOR_Y.msnap + TILE_LIFT + tileH + dropY, cz + b.oz);
+          this._tileTop(b, cz, this._selTilePos);
+          this._selTilePos.x += this._trailOff;
+          this._selTilePos.y += dropY;
           this._selTilePosOk = edge > 0;
         }
         _dummy.rotation.set(-Math.PI / 2, 0, 0);
@@ -1455,6 +1754,8 @@ export class LedgerView implements SceneView {
     this._bar.dispose();
     this._live.dispose();
     this._ribbons.dispose();
+    this._blocks.dispose();
+    this._stretch.dispose();
     for (const o of this.group.children.slice()) {
       this.group.remove(o);
       const obj = o as THREE.Mesh & { dispose?: () => void };

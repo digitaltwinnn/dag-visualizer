@@ -15,7 +15,7 @@
 //     from the ladder even though the drop list is hand-written per builder.
 import { heldOut } from "./viewNetwork";
 import type { Mode } from "@/src/store/store";
-import type { PickDescriptor, MetaSnapSel, TickNetSel } from "@/src/data/types";
+import type { PickDescriptor, MetaSnapSel, TickNetSel, BlockSel } from "@/src/data/types";
 import { METAGRAPHS } from "@/src/net/current";
 import type { CohortSel, CompositionSel } from "./focusLadder";
 import { UNLISTED_KEY } from "./ledgerBands";
@@ -36,6 +36,9 @@ export type ClickAction =
   // The network the rail is browsing (`domain/viewNetwork.ts`), never the filter.
   | { kind: "railNet"; id: string | null }
   | { kind: "metaSnap"; sel: MetaSnapSel | null }
+  // Commit/clear a BLOCK in the Snapshots view's Blocks register — a slot under its tick, not a
+  // ladder rung: see `blockSelectActions`.
+  | { kind: "block"; sel: BlockSel | null }
   // Bring a trend plane forward, or release the focused one (null) — a VIEW-LOCAL emphasis, not a
   // selection rung: see `trendPlaneActions`.
   | { kind: "trendFocus"; id: string | null }
@@ -281,8 +284,10 @@ export function railNetActions(id: string, current: string): ClickAction[] {
  *  beat and the × seemed to leave the children standing. That is simply what live means under a
  *  lens: the × releases the PIN, and the card goes back to following the filtered network's
  *  newest tick. The filter is cleared where it is set — the top bar. */
-export function snapshotClearActions(current: { metaSnap: MetaSnapSel | null; hasInspect?: boolean; tickNet?: TickNetSel | null }): ClickAction[] {
+export function snapshotClearActions(current: { metaSnap: MetaSnapSel | null; hasInspect?: boolean; tickNet?: TickNetSel | null; block?: BlockSel | null }): ClickAction[] {
   const out: ClickAction[] = [];
+  // A BLOCK hangs under its tick (it is in exactly one snapshot), so it goes with it, finest first.
+  if (current.block) out.push({ kind: "block", sel: null });
   // The NODE is the ledger ladder's finest rung (a metagraph snapshot's validator, `∨`), so a node
   // card left standing under a cleared tick would hang from nothing — and its pager, losing the
   // signer set, would fall back to walking every node.
@@ -303,6 +308,8 @@ export function snapshotSelectActions(
     hasInspect?: boolean;
     /** The network committed inside the pinned tick, if any — it belongs to THAT tick. */
     tickNet?: TickNetSel | null;
+    /** The committed block, if any — it is in exactly one tick. */
+    block?: BlockSel | null;
   },
 ): ClickAction[] {
   // RE-CLICKING the pinned tick DESELECTS (2026-08-07 — the toggle every other rung already
@@ -310,9 +317,14 @@ export function snapshotSelectActions(
   // default until something is clicked — the FollowController repopulates the card chain and
   // the trail slides back to the live front).
   if (!isLiveTip && current && current.pinnedOrdinal != null && current.pinnedOrdinal === p.data.ordinal) {
-    return snapshotClearActions({ metaSnap: current.metaSnap, hasInspect: current.hasInspect, tickNet: current.tickNet });
+    return snapshotClearActions({ metaSnap: current.metaSnap, hasInspect: current.hasInspect, tickNet: current.tickNet, block: current.block });
   }
   const out: ClickAction[] = [];
+  // A BLOCK IS IN EXACTLY ONE SNAPSHOT (spec, "Rules"), so committing another tick drops it — the
+  // metagraph snapshot's one-to-one rule below, one slot finer. Finest first.
+  if (current?.block && current.block.anchorOrd !== p.data.ordinal) {
+    out.push({ kind: "block", sel: null });
+  }
   // ⚠️ NO SELECTION IN SNAPSHOTS WRITES THE FILTER (user, 2026-10-02: "consistent, and a filter
   // should not be changed from the explorer, so no reset also"). "A filter is a story" (2026-08-07)
   // used to RELEASE the filter here when the pinned tick held nothing of the filtered network, so
@@ -468,6 +480,37 @@ export function metaSnapSelectActions(
   return out;
 }
 
+/** A BLOCK in the Snapshots view's Blocks register (2026-11-05) — a SLOT under the global that
+ *  accepted it (a DAG block) or anchored its metagraph snapshot (a token block), like a tile: no
+ *  focus rung, no pose of its own (camera principle 2: the chamber's one pose holds).
+ *
+ *  Selecting it PINS that global (`follow: false`), so the tick is the card above the block's — a
+ *  live follow would walk the card away from the block on the next beat. The pin is left alone
+ *  when it already stands on that tick, and what hangs under ANOTHER tick (its metagraph snapshot,
+ *  the network committed inside it) is released first, as `snapshotSelectActions` does: coarse
+ *  releases, then the tick, subject last. The same block again releases the block alone (the
+ *  toggle every rung speaks), leaving the tick pinned. */
+export function blockSelectActions(
+  b: BlockSel,
+  global: Extract<PickDescriptor, { kind: "snapshot" }>,
+  current: { block: BlockSel | null; snapOrd: number | null; metaSnap?: MetaSnapSel | null; tickNet?: TickNetSel | null },
+): ClickAction[] {
+  if (current.block && current.block.chain === b.chain && current.block.hash === b.hash) return [{ kind: "block", sel: null }];
+  const out: ClickAction[] = [];
+  if (current.snapOrd !== b.anchorOrd) {
+    if (current.metaSnap && current.metaSnap.globalOrdinal !== b.anchorOrd) out.push({ kind: "metaSnap", sel: null });
+    if (current.tickNet && current.tickNet.globalOrdinal !== b.anchorOrd) out.push({ kind: "tickNet", sel: null });
+    out.push({ kind: "snapshot", pick: global, follow: false });
+  }
+  out.push({ kind: "block", sel: b });
+  return out;
+}
+
+/** The Block card's × — releases the block alone; the tick it hangs under stays pinned. */
+export function blockClearActions(current: { block: BlockSel | null }): ClickAction[] {
+  return current.block ? [{ kind: "block", sel: null }] : [];
+}
+
 /** A PLANE in the History view's stack (2026-09-18) — and it is FOCUS ONLY.
  *
  *  ⚠️ The plane does NOT commit its network, and that is a decision rather than an omission. A
@@ -576,6 +619,9 @@ export function clickActions(input: {
     pinnedOrdinal?: number | null; metaSnap?: MetaSnapSel | null;
     // …and the network committed inside the pinned tick, which a different tick's click drops.
     tickNet?: TickNetSel | null;
+    // …and the committed block (the Blocks register), which a block click toggles and a different
+    // tick's click drops.
+    block?: BlockSel | null;
   };
 }): ClickAction[] {
   const { mode, pick: p, countryCc, current } = input;
@@ -595,6 +641,17 @@ export function clickActions(input: {
       pinnedOrdinal: current.pinnedOrdinal ?? null,
       metaSnap: current.metaSnap ?? null,
       hasInspect: current.hasInspect,
+      tickNet: current.tickNet,
+      block: current.block,
+    });
+
+  // A block (the Blocks register): the block AND the tick that carries it, one builder for the
+  // scene and the explorer's row alike.
+  if (p.kind === "block")
+    return blockSelectActions(p.sel, p.global, {
+      block: current.block ?? null,
+      snapOrd: current.pinnedOrdinal ?? null,
+      metaSnap: current.metaSnap ?? null,
       tickNet: current.tickNet,
     });
 
