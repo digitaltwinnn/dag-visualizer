@@ -19,6 +19,7 @@ export default function PastWindowBridge() {
   // The views whose selections live inside a global snapshot (convention 7: the policy row, not a mode).
   const ledger = useStore((s) => VIEW_POLICIES[s.mode].tickScoped);
   const following = useStore((s) => s.following);
+  const register = useStore((s) => s.ledgerRegister);
   const pin = useStore((s) => s.snap?.data.ordinal ?? null);
   const setStatus = useStore((s) => s.setPastWindowStatus);
   const { snaps } = useSnapshotFeed(POLL.maxSnapshots, ledger);
@@ -36,7 +37,7 @@ export default function PastWindowBridge() {
 
   useEffect(() => {
     const held = getPastWindow();
-    const want = pastWanted({ ledger, following, pin, liveOldest, held });
+    const want = pastWanted({ ledger, following, pin, liveOldest, held, register });
     if (want.kind === "keep") return;
     if (want.kind === "clear") {
       asked.current = null;
@@ -82,7 +83,7 @@ export default function PastWindowBridge() {
         .catch(() => failed(attempt));
     };
     read(0);
-  }, [ledger, following, pin, liveOldest, setStatus]);
+  }, [ledger, following, pin, liveOldest, register, setStatus]);
 
   return null;
 }

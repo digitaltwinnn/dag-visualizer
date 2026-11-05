@@ -3,13 +3,15 @@ import type { MetaSnapRecord } from "@/src/data/api";
 import type { GlobalSnapshot, RawMetaSnapshot } from "@/src/data/types";
 import { CATALOG } from "@/src/engine/config";
 import { tickPolledRows } from "@/src/data/ladderLevels";
-import { PAST_RETRY_MS, buildPastWindow, foldAnchors, pastRetryDelay, getPastWindow, ledgerSource, onPastWindow, pastWanted, setPastWindow, type LedgerSource } from "@/src/data/pastWindow";
+import { PAST_RETRY_MS, buildPastWindow, foldAnchors, pastRetryDelay, getPastWindow, ledgerSource, getBlockWindow, onBlockWindow, onPastWindow, pastWanted, setBlockWindow, setPastWindow, type LedgerSource } from "@/src/data/pastWindow";
 
 const g = (o: number): GlobalSnapshot => ({ ordinal: o, timestamp: `t${o}`, hash: `g${o}` });
 const raw = (o: number, ts: string, fee = 10): RawMetaSnapshot => ({ ordinal: o, timestamp: ts, hash: `m${o}`, lastSnapshotHash: `m${o - 1}`, fee, sizeInKB: 1 } as RawMetaSnapshot);
 const rec = (o: number, ts: string, fee = 10): MetaSnapRecord => ({ ordinal: o, hash: `m${o}`, parent: "", ts, fee, sizeInKB: 1, height: 0, subHeight: 0, blocks: 0, blockHashes: [], epochProgress: 0 });
 
-afterEach(() => setPastWindow(null));
+afterEach(() => { setPastWindow(null); setBlockWindow(null); });
+
+const LIVE_STUB: LedgerSource = { globalSnapshots: [], metaSnaps: new Map(), unlistedSnaps: new Map(), getAnchor: () => null };
 
 describe("foldAnchors", () => {
   it("folds each chain's records per anchoring timestamp, fees summed and each network counted", () => {
@@ -84,4 +86,23 @@ describe("pastRetryDelay", () => {
     expect(PAST_RETRY_MS[0]! < PAST_RETRY_MS[1]! && PAST_RETRY_MS[1]! < PAST_RETRY_MS[2]!).toBe(true);
     expect(pastRetryDelay(3)).toBeNull();
   });
+});
+
+it("pastWanted never fetches a past window in the Blocks register", () => {
+  expect(pastWanted({ ledger: true, following: false, pin: 5, liveOldest: 100, held: null, register: "blocks" })).toEqual({ kind: "clear" });
+});
+it("ledgerSource answers the block window alone in the Blocks register, never the live buffer", () => {
+  setBlockWindow(null);
+  expect(ledgerSource(LIVE_STUB, "blocks")).toBeNull();
+  expect(ledgerSource(LIVE_STUB, "snapshots")).toBe(LIVE_STUB);
+});
+it("the block window is held and announced like the past window", () => {
+  let n = 0;
+  const off = onBlockWindow(() => n++);
+  const w = { ...LIVE_STUB, ticks: [], from: 0, to: 0, holds: () => false, blockTick: () => null };
+  setBlockWindow(w);
+  expect(getBlockWindow()).toBe(w);
+  expect(ledgerSource(LIVE_STUB, "blocks")).toBe(w);
+  off();
+  expect(n).toBe(1);
 });

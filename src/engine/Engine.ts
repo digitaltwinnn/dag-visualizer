@@ -716,7 +716,7 @@ export class Engine {
     // anonymous: drawn, but not pickable. `k` is the tile's index within ITS TICK.
     this.ledger.setTileResolver((metaId, ts, k) => {
       // The LEDGER SOURCE — the past window around an old pin, else the live buffer.
-      const net = ledgerSource(getNetwork());
+      const net = ledgerSource(getNetwork(), useStore.getState().ledgerRegister);
       if (!net) return null;
       const g = net.globalSnapshots.find((gs) => gs.timestamp === ts);
       if (!g) return null;
@@ -1411,7 +1411,7 @@ export class Engine {
   private _refreshLedger() {
     // The LEDGER SOURCE (`src/data/pastWindow.ts`): the past window around an old pin, else the
     // live buffer. A past window is fixed, so a live event re-hands the same rows and moves nothing.
-    const src = ledgerSource(getNetwork());
+    const src = ledgerSource(getNetwork(), useStore.getState().ledgerRegister);
     this.ledger.setData(src?.globalSnapshots ?? [], (ts) => src?.getAnchor(ts) ?? null);
     // The byte bar measures ticks from the EXACT reads (spec §6.3) — re-hand the map on each
     // refresh so a tick that landed since the last one gets measured instead of staying a seam.
