@@ -1,4 +1,5 @@
 import type { BlockRead, TipRead } from "@/src/engine/domain/blockBraid";
+import { blockHashesOf } from "@/src/data/api";
 
 // The blocks and tips a snapshot VALUE carries — the same shape on a global snapshot and a
 // metagraph's: `blocks[].block.{value:{parent,transactions},proofs}` and
@@ -59,4 +60,17 @@ export function decodeBlocks(value: unknown): { blocks: BlockRead[]; tips: TipRe
       }
     : null;
   return { blocks, tips };
+}
+
+/** The explorer record's block hashes, or a throw when the record is absent — so a cache wrapped
+ *  around it never stores a miss. */
+export function recordBlockHashes(record: { blocks?: unknown } | undefined): string[] {
+  if (!record || !Array.isArray(record.blocks)) throw new Error("no record");
+  return blockHashesOf(record);
+}
+
+/** Names each decoded block by index. `complete` is false when the explorer listed fewer hashes
+ *  than there are blocks: the tail keeps `hash: ""` and the answer must not be cached for long. */
+export function pairHashes(blocks: BlockRead[], hashes: string[]): { blocks: BlockRead[]; complete: boolean } {
+  return { blocks: blocks.map((b, i) => ({ ...b, hash: hashes[i] ?? "" })), complete: hashes.length >= blocks.length };
 }

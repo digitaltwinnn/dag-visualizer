@@ -4,7 +4,7 @@ import { NETWORKS, type NetworkId } from "@/src/engine/config";
 import { lineageIds } from "@/src/net/lineage";
 import { netOf } from "@/src/net/request";
 import type { SnapshotExact, ChannelSnapRow } from "@/src/data/types";
-import { decodeBlocks } from "../decodeBlocks";
+import { decodeBlocks, pairHashes, recordBlockHashes } from "../decodeBlocks";
 import { decodeChannelContent } from "../decodeChannel";
 import { fetchGlobalJson } from "../fetchGlobal";
 import { withinServedWindow } from "../ordinalWindow";
@@ -134,9 +134,7 @@ async function fetchBlockHashes(net: NetworkId, ordinal: number): Promise<string
     signal: AbortSignal.timeout(6000),
   });
   if (!r.ok) throw new Error(`be ${r.status}`);
-  const d = ((await r.json()) as { data?: { blocks?: unknown } }).data;
-  if (!d || !Array.isArray(d.blocks)) throw new Error("no record");
-  return d.blocks.filter((h): h is string => typeof h === "string");
+  return recordBlockHashes(((await r.json()) as { data?: { blocks?: unknown } }).data);
 }
 
 const cachedBlockHashes = (net: NetworkId, ordinal: number) =>
@@ -165,16 +163,19 @@ export async function GET(req: Request, ctx: { params: Promise<{ ordinal: string
   }
   try {
     const data = await cachedExact(net, n);
+    let complete = true;
     if (data.blocks?.length) {
       const hashes = await cachedBlockHashes(net, n).catch(() => [] as string[]);
-      data.blocks = data.blocks.map((b, i) => ({ ...b, hash: hashes[i] ?? "" }));
+      ({ blocks: data.blocks, complete } = pairHashes(data.blocks, hashes));
     }
     return NextResponse.json(data, {
       // `s-maxage` too (2026-10-18): the live tip and the cold-load backfill ask every visitor for
       // the SAME ordinals, and with `max-age` alone only each browser kept them — the CDN missed
       // 96% of the week's 5,233 calls and every one reached the load balancer. An ordinal is
       // immutable, so the edge may keep it as long as the browser does; a 404 carries no header.
-      headers: { "Cache-Control": "public, max-age=86400, s-maxage=86400, immutable" },
+      // Blocks the explorer has not named yet carry `hash: ""`: a short edge life, so the CDN and the
+      // browser ask again soon rather than keeping the hashless answer for a day.
+      headers: { "Cache-Control": complete ? "public, max-age=86400, s-maxage=86400, immutable" : "public, max-age=0, s-maxage=30" },
     });
   } catch {
     // Transiently unavailable (not yet finalized / upstream blip) — client keeps the polled floor.

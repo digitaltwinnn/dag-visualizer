@@ -4,7 +4,7 @@ import { NETWORKS, type NetworkId } from "@/src/engine/config";
 import { isTracked } from "@/src/net/lineage";
 import { netOf } from "@/src/net/request";
 import { unlistedChains } from "../../../../unlistedChains";
-import { decodeBlocks } from "../../../../../snapshot/decodeBlocks";
+import { decodeBlocks, pairHashes, recordBlockHashes } from "../../../../../snapshot/decodeBlocks";
 
 // ONE METAGRAPH SNAPSHOT'S BLOCKS AND TIPS, read from the metagraph's own L0 (`urls.l0` from the
 // directory, as metagraphs/live.ts reads it) and decoded by the same `decodeBlocks` as the global
@@ -33,6 +33,7 @@ const cachedL0Url = (net: NetworkId, address: string) =>
 async function fetchBlocks(net: NetworkId, address: string, ordinal: number) {
   const l0 = await cachedL0Url(net, address);
   const snap = (await getJson(`${l0}/snapshots/${ordinal}`, 8000)) as { value?: unknown };
+  if (snap.value == null) throw new Error("no value"); // an empty body is a failed read, not "no blocks"
   return { ordinal, ...decodeBlocks(snap.value) };
 }
 
@@ -45,9 +46,7 @@ const cachedBlocks = (net: NetworkId, address: string, ordinal: number) =>
 // yet cannot pin empty hashes for a day inside the decoded answer; it throws, and the answer goes
 // out with `hash: ""` (rule 10) until a later read finds the record.
 async function fetchHashes(net: NetworkId, address: string, ordinal: number): Promise<string[]> {
-  const d = ((await getJson(`${NETWORKS[net].be}/currency/${address}/snapshots/${ordinal}`, 6000)) as { data?: { blocks?: unknown } }).data;
-  if (!d || !Array.isArray(d.blocks)) throw new Error("no record");
-  return d.blocks.filter((h): h is string => typeof h === "string");
+  return recordBlockHashes(((await getJson(`${NETWORKS[net].be}/currency/${address}/snapshots/${ordinal}`, 6000)) as { data?: { blocks?: unknown } }).data);
 }
 
 const cachedHashes = (net: NetworkId, address: string, ordinal: number) =>
@@ -66,9 +65,10 @@ export async function GET(req: Request, ctx: { params: Promise<{ address: string
   try {
     const read = await cachedBlocks(net, address, ordinal);
     const hashes = read.blocks.length ? await cachedHashes(net, address, ordinal).catch(() => [] as string[]) : [];
-    const body = { ...read, blocks: read.blocks.map((b, i) => ({ ...b, hash: hashes[i] ?? "" })) };
-    return NextResponse.json(body, {
-      headers: { "Cache-Control": "public, max-age=86400, s-maxage=86400, immutable" },
+    const { blocks, complete } = pairHashes(read.blocks, hashes);
+    return NextResponse.json({ ...read, blocks }, {
+      // Unnamed blocks (`hash: ""`) get a short edge life so they are asked again soon, not kept a day.
+      headers: { "Cache-Control": complete ? "public, max-age=86400, s-maxage=86400, immutable" : "public, max-age=0, s-maxage=30" },
     });
   } catch {
     return NextResponse.json({ error: "upstream unavailable" }, { status: 503, headers: { "Cache-Control": "no-store" } });

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import fixture from "./__fixtures__/global-7241523.json";
-import { decodeBlocks } from "./decodeBlocks";
+import { decodeBlocks, pairHashes, recordBlockHashes } from "./decodeBlocks";
 
 describe("decodeBlocks", () => {
   it("reads each block's two parents by height and hash, its transfers and signatures", () => {
@@ -20,5 +20,29 @@ describe("decodeBlocks", () => {
   });
   it("answers no blocks and null tips for a value that carries neither", () => {
     expect(decodeBlocks({ ordinal: 1 })).toEqual({ blocks: [], tips: null });
+  });
+});
+
+describe("hash pairing", () => {
+  const { blocks } = decodeBlocks({
+    blocks: [0, 1].map((i) => ({ block: { value: { parent: [{ height: i, hash: `p${i}` }], transactions: [] }, proofs: [] } })),
+  });
+  it("names each block by index when the explorer lists them all", () => {
+    const r = pairHashes(blocks, ["aa", "bb"]);
+    expect(r.blocks.map((b) => b.hash)).toEqual(["aa", "bb"]);
+    expect(r.complete).toBe(true);
+  });
+  it("leaves the tail unnamed and reports incomplete when the explorer lists fewer", () => {
+    const r = pairHashes(blocks, ["aa"]);
+    expect(r.blocks.map((b) => b.hash)).toEqual(["aa", ""]);
+    expect(r.complete).toBe(false);
+  });
+  it("decodes a block with one parent", () => {
+    expect(blocks[1].parents).toEqual([{ height: 1, hash: "p1" }]);
+    expect(blocks[1].height).toBe(2);
+  });
+  it("throws for an absent record so a miss is never cached", () => {
+    expect(() => recordBlockHashes(undefined)).toThrow();
+    expect(recordBlockHashes({ blocks: ["aa", 3] })).toEqual(["aa"]);
   });
 });
