@@ -131,7 +131,7 @@ for presence × morph × ground, `geoBlends` for the ground's blend, the DAG rem
 outer levels in the structural accent through `geoTints`), `Globe` the feed (machines with their
 `cc`/`isp` from the geo map at both arrivals) and the selectors (`_applyDim`'s network selector,
 `setCountry`/`setHoverCountry`'s country). The tiers come from the geo FOCUS ROW
-(`dimModel.FOCUS_TUNE.geo`: lit = base × (1 + boost), dim = base × (1 − back)) — no dim of the
+(`dimModel.FOCUS_ROWS.geo`: lit = base × (1 + boost), dim = base × (1 − back)) — no dim of the
 ring's own (user: "be careful with one-off deviations if there is a clear standard"). The group is
 the Globe's SIBLING in the scene, never a child: it must not turn with the globe. The outer arcs
 pick as the COUNTRY (`userData.country` — the Engine's pick loop keeps a country-tagged hit with no
@@ -293,8 +293,9 @@ own tray — instantiated per position. What it deliberately does not own is the
 and ribbons stay pooled instanced meshes spanning every plane, and the lead-identity/neutral-trail rule
 stays one shared code path.
 
-**The chamber's look is live-tunable.** Under `?tune` (see `src/engine/CLAUDE.md`) the `ledger` folder
-carries the ribbons, the byte bar, the lane tiles and the two plane channels.
+**The chamber's look is plain constants** — `RIBBON_LOOK`, `BAR_LOOK`, `TILE_LOOK` and the two plane
+channels `GLOBAL_PLANE_LOOK` / `META_PLANE_LOOK` — any of which `?tune` can bind again with one
+manifest entry (see `src/engine/CLAUDE.md`).
 
 **Node trays** hold each metagraph's machines under its own plane and the whole validator fleet under
 the global floor, with no role split. **Machines are deduped — a hybrid appears once**, since roles
@@ -379,8 +380,8 @@ of naming a network here is to trace it back through time, and a trail you canno
 that did nothing. It is a multiplier taken in the *else*-of the boost, never additive — added to the
 focused row's boost it would clip past 1 and flatten the row meant to lead.
 
-⚠️ **On paper the bands take an ink FLOOR** (`BarTune.ink`), exactly as the lane tiles have always
-taken `TileTune.ink`. The bands never had one, which is why an off-filter band composited at 0.165
+⚠️ **On paper the bands take an ink FLOOR** (`BarLook.ink`), exactly as the lane tiles have always
+taken `TileLook.ink`. The bands never had one, which is why an off-filter band composited at 0.165
 alpha while the tile beside it was already lifted into `[0.3, 1]` — the floor is affine, so every tier
 above it keeps its order and only the bottom of the span lifts off the glass. `dimTiers.test.ts`
 pins primary > preview > resting > stepped back, and that off-filter dims without vanishing. Exactly one
@@ -470,7 +471,7 @@ furniture half is the shared glass shader's `uFadeDir`/`uFadeAt`/`uFadeSpan` plu
 instrument may float on glass that has faded out**: the ordinal labels, their anchor lines, the lane
 tiles and the byte bars all multiply their own brightness by `horizonAt`, because a label hanging over
 dissolved floor is worse than a hard edge. The **node trays are deliberately exempt** — they sit at the
-front of the chamber, where an end is simply the truth. Deliberately **not** a `?tune` knob: it is the
+front of the chamber, where an end is simply the truth. Deliberately **not** a look constant: it is the
 frame's own shape, not a look.
 
 **The trail has TWO boundaries, one home each, and every row-riding instrument reads both** —

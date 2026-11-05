@@ -73,7 +73,7 @@ interface FlashRec {
  * wide soft sheet of near-identical ink, and blurred it would smear the whole swarm into one
  * coloured fog — the same reason the ledger's ribbons are excluded.
  */
-const HEAD_TUNE_DEFAULTS = Object.freeze({
+const HEAD_LOOK = Object.freeze({
   size: 5.5,     //  point diameter in CSS px at the resting geo distance
   sizeMin: 3,    //  px floor — a spark zoomed out must still be a spark, not a speck
   sizeMax: 26,   //  px ceiling — and zoomed in it must not become a blob
@@ -193,7 +193,7 @@ export class Arcs {
   // to outlive it. See glowBlend.
   private _blend: THREE.Blending = THREE.AdditiveBlending;
   // The comet HEADS — their own Points mesh, and the only member of BLOOM_LAYER here. See the
-  // HEAD_TUNE_DEFAULTS header for why the head is a separate mark from the trail it leads.
+  // HEAD_LOOK header for why the head is a separate mark from the trail it leads.
   private headMat: THREE.ShaderMaterial | null = null;
   private headPos: Float32Array = new Float32Array(0);
   private headCol: Float32Array = new Float32Array(0);
@@ -208,7 +208,7 @@ export class Arcs {
 
   /** Theme flip: plain data in — rule 1 untouched. Re-points the blend mode of the live material
    *  and of every one the next rebuild makes. The HEAD keeps its additive blend on both grounds
-   *  (see HEAD_TUNE_DEFAULTS) — only its weight themes, through the uniforms below. */
+   *  (see HEAD_LOOK) — only its weight themes, through the uniforms below. */
   setColors(c: SceneColors): void {
     this._blend = glowBlend(c);
     this._paper = isLightGround(c);
@@ -233,7 +233,7 @@ export class Arcs {
    *      inversion the ink lane hits everywhere else — so the head end deepens the hue instead.
    *
    *  The HEAD is not part of this: it stays additive on both grounds and spends the silver ground's
-   *  own headroom (see HEAD_TUNE_DEFAULTS). Trail = ink, head = light, on either ground. */
+   *  own headroom (see HEAD_LOOK). Trail = ink, head = light, on either ground. */
   private _stageTrail(m: THREE.ShaderMaterial): void {
     m.uniforms.uInk.value = this._paper ? 1 : 0;
   }
@@ -243,7 +243,7 @@ export class Arcs {
   // (2026-09-01): additive can only move toward white, so an additive head on silver had no way to
   // be anything but pale — see the header.
   private _stageHead(m: THREE.ShaderMaterial): void {
-    const t = HEAD_TUNE_DEFAULTS;
+    const t = HEAD_LOOK;
     m.uniforms.uSize.value = t.size * (this._paper ? t.paperMul : 1);
     m.uniforms.uInk.value = this._paper ? 1 : 0;
     m.blending = this._paper ? THREE.NormalBlending : THREE.AdditiveBlending;
@@ -384,7 +384,7 @@ export class Arcs {
     this.headPosAttr = hPosAttr;
     this.headColAttr = hColAttr;
 
-    const t = HEAD_TUNE_DEFAULTS;
+    const t = HEAD_LOOK;
     // gl_PointSize is in PHYSICAL pixels while the tune is authored in CSS px, so the size carries
     // the renderer's own pixel-ratio clamp (SceneContext: min(devicePixelRatio, 2)).
     const px = Math.min(typeof window === "undefined" ? 1 : window.devicePixelRatio, 2);
@@ -442,7 +442,7 @@ export class Arcs {
     });
     this._stageHead(this.headMat);
     const headPoints = new THREE.Points(hGeo, this.headMat);
-    joinBloom(headPoints); // the head is the spark — see HEAD_TUNE_DEFAULTS. The trail stays out.
+    joinBloom(headPoints); // the head is the spark — see HEAD_LOOK. The trail stays out.
     this.arcGroup.add(headPoints);
 
     this.hasArcs = true;

@@ -560,6 +560,62 @@ describe("hyperFacts on all: the movers and the whole network's activity", () =>
     expect(r.facts.filter((f) => /^\S+ nodes at the (start|end) of the span$/.test(f.label))).toEqual([]);
   });
 
+  // The Upsider AI, 2026-11-04: down for nine hours from 02:00 on Oct 28, its 3 nodes back by
+  // 12:00, and a week's span that opened at 08:07 read its start as 0 — "gained 3 nodes".
+  describe("a network back from an outage the span opened inside", () => {
+    const steady = { "f.nodes.usdc": row(N, () => 30) };
+    const backAt9 = { ...steady, "f.nodes.dor": row(N, (i) => (i < 9 ? 0 : 5)) };
+    const movers = (r: NonNullable<ReturnType<typeof hyperFacts>>) => r.facts.filter((f) => /^Dor nodes at the (start|end) of the span$/.test(f.label));
+
+    it("is no mover and no new row when the day before the span measured its nodes", () => {
+      const r = hyperFacts(input({ fleet: fleet(backAt9), daily: daily({ "f.nodes.dor": row(60, () => 5) }) }))!;
+      expect(movers(r)).toEqual([]);
+      expect(find(r, /^Networks whose node count changed over the span$/)[0]!.value).toBe(0);
+      expect(r.changes).toBeUndefined();
+    });
+
+    it("moves from the day before's level when that differs from the end's", () => {
+      const r = hyperFacts(input({ fleet: fleet(backAt9), daily: daily({ "f.nodes.dor": row(60, () => 3) }) }))!;
+      expect(movers(r).map((f) => f.value)).toEqual([3, 5]);
+      expect(r.changes?.[0]).toMatchObject({ kind: "gained", subject: { kind: "network", id: "dor" } });
+    });
+
+    it("is still a first when the day before measured none, or measured nothing", () => {
+      for (const d of [daily({ "f.nodes.dor": row(60, () => 0) }), daily()]) {
+        const r = hyperFacts(input({ fleet: fleet(backAt9), daily: d }))!;
+        expect(movers(r).map((f) => f.value)).toEqual([0, 5]);
+        expect(r.changes?.[0]).toMatchObject({ kind: "new", subject: { kind: "network", id: "dor" } });
+      }
+    });
+
+    it("puts its nodes back into the whole network's start: the rest read where they are, plus its day before", () => {
+      // The total dips by Dor's 5 for its outage hours: 115 at the opening samples, then 120.
+      const fl = fleet({ ...backAt9, "f.nodes": row(N, (i) => (i < 9 ? 115 : i < N / 2 ? 120 : 140)) });
+      const r = hyperFacts(input({ fleet: fl, daily: daily({ "f.nodes.dor": row(60, () => 5) }) }))!;
+      expect(find(r, /^Nodes across all networks at the start of the span$/)[0]!.value).toBe(120);
+      // No reading before the span: the total's start stays as measured.
+      const bare = hyperFacts(input({ fleet: fl }))!;
+      expect(find(bare, /^Nodes across all networks at the start of the span$/)[0]!.value).toBe(115);
+    });
+
+    it("reads the last WHOLE day before the span: the span's own first day ends after it opened", () => {
+      // A daily gauge is the day's last hourly reading, so the day the span opens on is no "before".
+      const d = daily({ "f.nodes.dor": row(60, (i) => (i < 29 ? 0 : 5)) });
+      const r = hyperFacts(input({ fleet: fleet(backAt9), daily: d, span: { fromMs: d.buckets[30]! + 8 * HOUR, toMs: d.buckets[59]! + DAY } }))!;
+      expect(movers(r)).toEqual([]); // day 29 is whole and measured 5: no mover
+      const early = daily({ "f.nodes.dor": row(60, (i) => (i < 30 ? 0 : 5)) });
+      const r2 = hyperFacts(input({ fleet: fleet(backAt9), daily: early, span: { fromMs: early.buckets[30]! + 8 * HOUR, toMs: early.buckets[59]! + DAY } }))!;
+      expect(movers(r2).map((f) => f.value)).toEqual([0, 5]); // only day 30, the span's own, read 5
+    });
+  });
+
+  it("states a network's own note from the day before's level when its span opened inside an outage", () => {
+    const fl = fleet({ "f.nodes.dor": row(N, (i) => (i < 9 ? 0 : 5)) });
+    const r = hyperFacts(input({ subject: "dor", fleet: fl, daily: daily({ "f.nodes.dor": row(60, () => 5) }) }))!;
+    expect(find(r, /^Dor nodes at the (start|end) of the span$/).map((f) => f.value)).toEqual([5, 5]);
+    expect(find(r, /^Dor nodes, ratio end to start$/)).toEqual([]);
+  });
+
   it("states global snapshots per day, last week against the weeks before, naming no network", () => {
     const r = hyperFacts(input({ daily: daily({ "g.ticks": row(60, (i) => (i >= 53 ? 30_000 : 24_000)) }) }))!;
     expect(find(r, /^Global snapshots per day, last week$/)[0]!.value).toBe(30_000);

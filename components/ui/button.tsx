@@ -11,12 +11,6 @@ const buttonVariants = cva(
       variant: {
         // `--primary-ink`, not the bare accent: white on the accent is 4.21:1 on paper (LogSearchBar's note).
         default: "bg-primary-ink text-primary-foreground hover:bg-primary-ink/90",
-        destructive:
-          "bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:bg-destructive/60 dark:focus-visible:ring-destructive/40",
-        outline:
-          "border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
-        secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         // THE ICON-CONTROL RECIPE (user, 2026-10-02: "the X buttons don't show a hover effect, the −
         // does and the chevrons show that effect plus a fill — I expect consistent behavior"). One
         // hover for every small control: ink to foreground on the app's wash ladder (`wash-hover`,

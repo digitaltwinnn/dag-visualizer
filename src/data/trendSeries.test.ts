@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { anchorClause, anchorSeries, headWord, lastSeen, momentPhrase, unlistedUnmeasured, withUnlisted, spanAverage, spanWord, typeBands,
+import { measuredTx, transferVolume, anchorClause, anchorSeries, headWord, lastSeen, momentPhrase, unlistedUnmeasured, withUnlisted, spanAverage, spanWord, typeBands,
   GLOBAL_METRIC_ROWS,
   GLOBAL_READING,
   TREND_METRICS,
@@ -42,7 +42,7 @@ const DAY = 86400000;
 describe("the metric table", () => {
   it("covers every stored metric, and only fees and bytes rescale", () => {
     expect(Object.keys(TREND_METRICS).sort()).toEqual(
-      ["blocks", "continuity", "fees", "globals", "kb", "nodes", "snapshots"],
+      ["blocks", "continuity", "fees", "globals", "kb", "nodes", "snapshots", "transfers"],
     );
     // Fees are stored in datums (1e-8 DAG) and sizes in KB — the two places the stored unit is
     // not the unit a reader is shown.
@@ -778,6 +778,15 @@ describe("withUnlisted — the unlisted chains folded into one network, and the 
   it("is NOT MEASURED (null) wherever the coverage marker is absent — before the sampler read them", () => {
     expect(withUnlisted({ "g.ticks": [3, 4], "m.A.snaps": [6, 7] }, listed, "unl")["m.unl.snaps"]).toEqual([null, null]);
   });
+  it("folds their TRANSFERS too, measured only where both the unlisted list (u.cov) and the transfer lists (x.cov) were read", () => {
+    const tx = withUnlisted({
+      "g.ticks": [3, 3, 3], "u.cov": [0, 0, null], "x.cov": [0, null, 0],
+      "m.A.tx": [9, 9, 9], "m.U1.tx": [2, 4, 6], "m.U2.tx": [1, null, 1], "m.U1.txAmt": [5, 5, 5],
+    }, listed, "unl");
+    expect(tx["m.unl.tx"]).toEqual([3, 4, null]);
+    expect(measuredTx(tx["m.unl.tx"], tx)).toEqual([3, null, null]);
+    expect(transferVolume("unl", tx)).toEqual([5, null, null]);
+  });
   it("a global's snapshots stamped into the next bucket can no longer appear as unlisted (the 2026-09-29 skew)", () => {
     expect(withUnlisted({ "u.cov": [0, 0], "g.anchors": [181, 201], "m.A.snaps": [143, 239] }, listed, "unl")["m.unl.snaps"]).toEqual([0, 0]);
   });
@@ -859,5 +868,46 @@ describe("dagRowSeries — what the DAG row reads", () => {
     const series = { "g.anchors": [3, 4], "f.nodes": [70, 71], "f.nodes.dag": [24, 25] };
     expect(dagRowSeries("snapshots", series)).toEqual([3, 4]);
     expect(dagRowSeries("nodes", series)).toEqual([24, 25]);
+  });
+});
+
+describe("transfers — measured only where their lists were read (2026-11-04)", () => {
+  // x.cov marks the buckets the sampler read the transfer lists in; the read route zero-fills every
+  // covered counter, so the transfer row is 0 in buckets nobody read.
+  const series = {
+    "x.cov": [null, null, 0, 0, 0],
+    "g.tx": [0, 0, 12, 0, 7],
+    "m.dor.tx": [0, 0, 3, 0, 0],
+    "g.ticks": [5, 5, 5, 5, 5],
+  };
+  it("a network's transfers are null before the coverage, a measured zero inside it", () => {
+    expect(metricSeries("transfers", "dor", series).points).toEqual([null, null, 3, 0, 0]);
+    expect(measuredTx(undefined, series)).toEqual([null, null, 0, 0, 0]); // read, and the chain moved nothing
+  });
+  it("the DAG row reads its own transfers through the same coverage", () => {
+    expect(globalSeries("transfers", series)).toEqual([null, null, 12, 0, 7]);
+    expect(dagRowSeries("transfers", series)).toEqual([null, null, 12, 0, 7]);
+    expect(GLOBAL_READING.transfers).toBe("own");
+  });
+  it("no coverage in the payload is no reading at all", () => {
+    expect(metricSeries("transfers", "dor", { "m.dor.tx": [0, 4] }).points).toEqual([null, null]);
+  });
+  it("a bucket the row itself holds null stays not measured under the coverage — only an absent reading is a zero", () => {
+    expect(measuredTx([null, 3, null], { "x.cov": [0, 0, 0] })).toEqual([null, 3, null]);
+    expect(measuredTx([2], { "x.cov": [0, 0] })).toEqual([2, 0]); // shorter than the axis: read, none
+  });
+  it("is a plain counter named Transfers, recorded in a bucket", () => {
+    expect(seriesKey("transfers", "dor")).toBe("m.dor.tx");
+    expect(METRIC_LABELS.transfers).toBe("Transfers");
+    expect(momentPhrase("transfers", 300000)).toEqual({ verb: "recorded", rest: "transfers in those 5 minutes" });
+    expect(momentPhrase("transfers", 3600000, false, "120K DOR").rest).toBe("transfers worth 120K DOR in that hour");
+  });
+});
+
+describe("transferVolume — what the transfers moved, in the network's own token", () => {
+  const series = { "x.cov": [null, 0, 0], "g.txAmt": [0, 4.5, 0], "m.dor.txAmt": [0, 0, 120] };
+  it("reads the DAG's in DAG and a network's in its token, where the transfers were measured", () => {
+    expect(transferVolume("dag", series)).toEqual([null, 4.5, 0]);
+    expect(transferVolume("dor", series)).toEqual([null, 0, 120]);
   });
 });

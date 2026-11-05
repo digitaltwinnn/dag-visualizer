@@ -16,7 +16,6 @@
 // `--primary`, so they match by construction).
 
 import * as THREE from "three";
-import { SCENE_L_LIGHT, SCENE_C_LIGHT } from "../palette/identity";
 
 export interface SceneColors {
   core: number; //    --primary   (accent cyan — the DAG spine, live/selected signals, the geo
@@ -216,7 +215,7 @@ const _ground = new THREE.Color();
  * which is what the multiply already lerps toward.
  *
  * A mark that loses its HUE on the way down is a different defect and takes a different fix: floor
- * the caller's own emphasis term (the tiles' `TileTune.ink`), never the target.
+ * the caller's own emphasis term (the tiles' `TileLook.ink`), never the target.
  *
  * The scratch is module-SCOPE, so this allocates nothing and is safe inside a frame body (rule 5,
  * noFrameAllocations): the ledger's lane tiles lerp per frame, while the ribbons and hyper's
@@ -237,40 +236,26 @@ export function inkMix(out: THREE.Color, s: number, c: SceneColors): THREE.Color
  * enough to lift a resting band clear of the page, high enough that the focus boost still has
  * somewhere to go. See `inkPresence`.
  */
-/** THE LIGHT-LOOK DIALS (the `?tune` "light look" group — tune.ts contract). Every field only
- *  reaches the LIGHT ground: the lane setter rewrites the light memo alone, the ground override
- *  keeps its dark face verbatim, and the Engine applies bloomMul/bloomFloor only while the theme
- *  is light. Defaults are the shipped look (2026-08-25's "extreme checkpoint", to be dialled in
- *  live); no test pins these — the dark look's pins live elsewhere and stay untouched. */
-export interface LightTune {
-  laneL: number; //   scene identity lane lightness (identity.ts consumes via setSceneLaneLight)
-  laneC: number; //   scene identity lane chroma (chroma-reduction still caps per hue)
-  groundL: number; // --scene-ground's light lightness (devTune writes the token override)
+/** THE LIGHT-LOOK DIALS. Every field only reaches the LIGHT ground: the ink curves are asked
+ *  behind `isLightGround`, and the Engine applies bloomMul/bloomFloor only while the theme is
+ *  light. No test pins these — the dark look's pins live elsewhere. (The light identity lane's
+ *  L/C live in `src/palette/identity.ts`, the ground's lightness in globals.css `--scene-ground`.) */
+export interface LightLook {
   inkGamma: number; // rest-presence curve: rest^gamma — lower = rest closer to full ink
   inkDimG: number; //  how hard a mark BELOW its resting weight drops (1 = proportional)
   inkLift: number; //  how much of the headroom above rest a focus claims
   bloomMul: number; // light bloom strength as a fraction of the view policy's
   bloomFloor: number; // minimum bloom threshold on light, so the ground never halos
   // The SELECTIVE bloom (scene/SceneContext.ts · BLOOM_LAYER). The whole-frame pass above cannot
-  // select ink darker than its ground; these drive the layer that can. Read per frame, no callback.
+  // select ink darker than its ground; these drive the layer that can. Read per frame.
   selBleed: number;  // how far the halo multiplies the ground toward the mark's own hue
   selGlow: number;   // the additive term beside it — light added at the mark's own core
   selRadius: number; // the halo's spread
 }
-export const LIGHT_TUNE_DEFAULTS: Readonly<LightTune> = Object.freeze({
+export const LIGHT_LOOK: Readonly<LightLook> = {
   // Settled from the user's own EXPORT (2026-08-28, second round): with the inactive marks
-  // thinned (inkDimG 1.1 → 1.35) the identity lane could come UP (laneL 0.51 → 0.61) —
-  // brighter ink reads right once the de-emphasized field around it is genuinely thin.
-  // ⚠️ laneL/laneC DERIVE from the palette's own SCENE_L_LIGHT/SCENE_C_LIGHT — one home
-  // (src/palette/identity.ts, where the lane is actually baked at boot). Two literals drifted
-  // once (found 2026-08-30: a fresh load baked the lane at a stale 0.70 and the shipped look
-  // only appeared after a slider touch, which routes through setSceneLaneLight); deriving makes
-  // boot and knob agree by construction. Bake a user's laneL/laneC export in identity.ts.
-  // PRINT (design direction A, user 2026-10-09): the light instrument is a printed sheet, not a lit
-  // wall. The ground is a flat plate one step below the white page (0.955 against the page's 0.985),
-  // with no sweep and no grid — the subject stands on paper. groundL had settled 0.72 → … → 0.88
-  // across the 2026-08 wall iterations; that whole ladder was the lit-stage direction this replaces.
-  laneL: SCENE_L_LIGHT, laneC: SCENE_C_LIGHT, groundL: 0.955, // keep globals.css --scene-ground AND devTune's override in sync (groundSync.test.ts holds the token)
+  // thinned (inkDimG 1.1 → 1.35) the identity lane could come UP — brighter ink reads right once
+  // the de-emphasized field around it is genuinely thin.
   inkGamma: 0.15, inkDimG: 1.35, inkLift: 0.6,
   // THE WHOLE-FRAME PASS IS OFF ON PAPER. It is a luminance highpass over the finished frame, and
   // on paper the marks are INK — darker than the ground they lie on — so no threshold selects them;
@@ -303,20 +288,6 @@ export const LIGHT_TUNE_DEFAULTS: Readonly<LightTune> = Object.freeze({
   selBleed: 0.18, selGlow: 0.05, selRadius: 1.35,
   // (The lit wall's backdrop knobs — bgTint, bgGrid, bgSweep — left with the cyclorama, 2026-10-09:
   // the Print plate is one flat colour, SceneContext.applyBackground.)
-});
-export const LIGHT_TUNE: LightTune = { ...LIGHT_TUNE_DEFAULTS };
-export const LIGHT_TUNE_SCHEMA: import("./tune").TuneSchema<LightTune> = {
-  laneL: { min: 0.4, max: 0.85, step: 0.01, label: "lane L" },
-  laneC: { min: 0.05, max: 0.3, step: 0.005, label: "lane C" },
-  groundL: { min: 0.5, max: 0.99, step: 0.005, label: "ground L" }, // max raised past the Print default (0.955)
-  inkGamma: { min: 0.05, max: 1, step: 0.01, label: "ink gamma" },
-  inkDimG: { min: 0.2, max: 2, step: 0.05, label: "ink dim curve" },
-  inkLift: { min: 0.1, max: 4, step: 0.05, label: "ink focus lift" },
-  bloomMul: { min: 0, max: 1.5, step: 0.05, label: "bloom ×" },
-  bloomFloor: { min: 0.3, max: 1, step: 0.01, label: "bloom floor" },
-  selBleed: { min: 0, max: 4, step: 0.05, label: "halo bleed" },
-  selGlow: { min: 0, max: 2, step: 0.05, label: "halo glow" },
-  selRadius: { min: 0.1, max: 1.5, step: 0.05, label: "halo spread" },
 };
 
 /**
@@ -371,16 +342,16 @@ export const LIGHT_TUNE_SCHEMA: import("./tune").TuneSchema<LightTune> = {
  * by construction, and only the three sites carrying a `snapBright` product pass one.
  *
  * Takes the ground as a BOOLEAN rather than the colours, so the per-frame call is plain arithmetic:
- * hoist `isLightGround(c)` into a field at event time (setColors), the same hoist rule the `?tune`
- * contract states for per-node loops.
+ * hoist `isLightGround(c)` into a field at event time (setColors), the same hoist rule
+ * src/engine/tune.ts states for per-node loops.
  */
 export function inkPresence(s: number, paper: boolean, ref = s): number {
   if (!paper || s <= 0 || s >= 1) return s;
-  const restA = Math.pow(Math.min(ref, 1), LIGHT_TUNE.inkGamma);
+  const restA = Math.pow(Math.min(ref, 1), LIGHT_LOOK.inkGamma);
   const r = ref > 0 ? s / ref : 1;
-  if (r < 1) return restA * Math.pow(r, LIGHT_TUNE.inkDimG);
+  if (r < 1) return restA * Math.pow(r, LIGHT_LOOK.inkDimG);
   // Saturating: contributes exactly 0 at r = 1, so the resting look is untouched by this branch.
-  return restA + (1 - restA) * (1 - 1 / (1 + (r - 1) * LIGHT_TUNE.inkLift));
+  return restA + (1 - restA) * (1 - 1 / (1 + (r - 1) * LIGHT_LOOK.inkLift));
 }
 
 // Read the four structural tokens from globals.css. Called once by the Engine at construction.

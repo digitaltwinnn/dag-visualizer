@@ -6,7 +6,7 @@
 // surface (`components/datasection/TrendBucketsSurface.tsx`) reads the same payload the planes
 // draw from and renders what this hands back. Field names are the sampler's own
 // (`app/api/trends/bucketing.ts`): `g.*` the global row, `m.{id}.*` a network's, `f.*` the fleet
-// gauges, `u.cov` the unlisted coverage.
+// gauges, `u.cov` the unlisted coverage, `x.cov` the transfers' (2026-11-04).
 //
 // ⚠️ STORED FIELDS ONLY (the PR review). The payload the app reads is FOLDED (`withUnlisted`): it
 // adds `m.{unlisted}.*` summed from the unlisted chains and rewrites `g.fee` / `g.kb` as floor plus
@@ -16,8 +16,8 @@
 
 /** The derived totals the fold writes over the payload — never stored, so never a record here. */
 const DERIVED = new Set(["g.fee", "g.kb"]);
-const GLOBAL_ORDER = ["g.ticks", "g.anchors", "g.blocks", "g.feeFloor", "g.kbFloor", "g.gapSum", "g.gapMax", "f.nodes", "f.layer.l0", "f.layer.cl1", "f.layer.dl1", "u.cov"];
-const NET_TAILS = ["snaps", "ticks", "blocks", "fee", "kb", "gapSum", "gapMax"];
+const GLOBAL_ORDER = ["g.ticks", "g.anchors", "g.blocks", "g.tx", "g.txAmt", "g.txFee", "g.feeFloor", "g.kbFloor", "g.gapSum", "g.gapMax", "f.nodes", "f.layer.l0", "f.layer.cl1", "f.layer.dl1", "f.stake", "f.stake.live", "f.stake.delegations", "f.stake.validators", "u.cov", "x.cov"];
+const NET_TAILS = ["snaps", "ticks", "blocks", "tx", "txAmt", "txFee", "fee", "kb", "gapSum", "gapMax"];
 const LAYERS = ["l0", "cl1", "dl1"];
 
 const isGlobalScope = (scope: string) => scope === "all" || scope === "dag";
@@ -52,7 +52,8 @@ export function bucketColumns(
   let own: (k: string) => boolean;
   if (isGlobalScope(scope)) {
     GLOBAL_ORDER.forEach((k, i) => rank.set(k, i));
-    const global = (k: string) => !DERIVED.has(k) && (k.startsWith("g.") || k === "u.cov" || k === "f.nodes" || /^f\.layer\.(l0|cl1|dl1)$/.test(k));
+    // The delegated stake (`f.stake*`, 2026-11-04) is the DAG's own registry, so it is the global row's.
+    const global = (k: string) => !DERIVED.has(k) && (k.startsWith("g.") || k === "u.cov" || k === "x.cov" || k === "f.nodes" || /^f\.layer\.(l0|cl1|dl1)$/.test(k) || /^f\.stake(\.(live|delegations|validators))?$/.test(k));
     own = scope === "dag" ? (k) => global(k) || ownFleet(scope, k) : global;
   } else if (unlisted && scope === unlisted.id) {
     const addrs = [...new Set(keys.map(netKey).filter((x): x is [string, string] => !!x).map(([a]) => a))]

@@ -18,7 +18,6 @@ import { ORB_FRESNEL_GLSL, ORB_FRESNEL_MIX } from "../objects/NodeFabric";
 import { offNetMul } from "../../domain/dimModel";
 import { makeRadialGradientTexture } from "../objects/gradientTexture";
 import { glowBlend, inkMix, inkPresence, isLightGround, structureInk, type SceneColors } from "../../sceneColors";
-import type { TuneSchema } from "../../tune";
 import type { SceneView } from "./SceneView";
 import { joinBloom } from "../SceneContext";
 
@@ -40,7 +39,7 @@ const _tcol = new THREE.Color(); // scratch for the tether colour bake (event-ti
 //
 // Positions stay pure lerps of the hub position, so the per-frame write is `hubPos × f` with `f`
 // precomputed below: one multiply per vertex, no allocation (rule 5). The COLOURS are baked once
-// (and on a ?tune edit — hence the group's onChange), because nothing about them moves. Every
+// (and again on a theme flip), because nothing about them moves. Every
 // tether's profile is identical, so the ten geometries SHARE one colour attribute.
 const TETHER_SEG = 24;
 /** `j / TETHER_SEG` for every vertex — the lerp fraction along core → hub, precomputed once. */
@@ -52,28 +51,19 @@ function smoothstep(e0: number, e1: number, x: number): number {
   return t * t * (3 - 2 * t);
 }
 
-/** The live-tunable tether look (dev `?tune` panel binds these; the values are the shipped look). */
-export interface TetherTune {
+/** The tether look. */
+export interface TetherLook {
   restOp: number;   // resting line opacity (× the per-hub fades) — the pre-existing 0.22
   coreFade: number; // fraction of the run spent fading UP out of the core (kills the convergence knot)
   hubFade: number;  // fraction spent fading DOWN into the hub orb
   brightness: number; // vertex-colour multiplier (additive blending → perceived brightness)
 }
 
-export const TETHER_TUNE_DEFAULTS: TetherTune = {
+export const TETHER_LOOK: Readonly<TetherLook> = {
   restOp: 0.34,
   coreFade: 0.25,
   hubFade: 0.14,
   brightness: 0.7,
-};
-
-/** The `?tune` knob ranges (contract: src/engine/tune.ts) — colocated so a range sits next to the
- *  number it bounds. Type-only import: no runtime coupling to the panel. */
-export const TETHER_TUNE_SCHEMA: TuneSchema<TetherTune> = {
-  restOp: { min: 0, max: 1, step: 0.01, label: "opacity" },
-  coreFade: { min: 0, max: 0.9, step: 0.01, label: "fade from core" },
-  hubFade: { min: 0, max: 0.5, step: 0.01, label: "fade into hub" },
-  brightness: { min: 0.1, max: 2, step: 0.05 },
 };
 
 // Resting opacity of the cyan structural hoops (subtle — structure, not a subject). Faded per
@@ -268,8 +258,6 @@ export class HyperView implements SceneView {
   // of the alpha; every site here is a DYNAMIC per-frame expression (verified — zero static
   // registrations in this view today), so they all just read `_fades.alpha`.
   private _fades = new FadeSet();
-  /** The live look of the core→hub tethers. Baked into vertex colours, so a `?tune` edit re-bakes. */
-  tetherTune: TetherTune = { ...TETHER_TUNE_DEFAULTS };
   /** The one baked tip-fade profile every tether's geometry references (see the block up top). */
   private _tetherCol = new THREE.Float32BufferAttribute(new Float32Array((TETHER_SEG + 1) * 3), 3);
 
@@ -578,13 +566,6 @@ export class HyperView implements SceneView {
     }
   }
 
-  /** Apply the tune knobs (see TETHER_TUNE_DEFAULTS) to the tether's baked look.
-   *  `setTetherTune({})` re-bakes with the values the panel has already mutated in place. */
-  setTetherTune(t: Partial<TetherTune>) {
-    Object.assign(this.tetherTune, t);
-    this._bakeTethers();
-  }
-
   // The tether colour attribute — the core's structural blue at the tip-fade profile, ONE buffer
   // shared by all ten lines (identical profiles; only the endpoints differ). The ALPHA lives in the
   // colour rather than in a per-vertex alpha because the material blends ADDITIVELY — black IS
@@ -592,7 +573,7 @@ export class HyperView implements SceneView {
   // `opacity` free to carry the per-frame fades. Baked, not per-frame: nothing here moves. (Not a
   // `_write*`/`_apply*` name on purpose — event-time work, outside the render loop rule 5 polices.)
   private _bakeTethers() {
-    const { coreFade, hubFade, brightness } = this.tetherTune;
+    const { coreFade, hubFade, brightness } = TETHER_LOOK;
     _tcol.setHex(this._ink);
     const col = this._tetherCol;
     for (let j = 0; j <= TETHER_SEG; j++) {
@@ -797,11 +778,11 @@ export class HyperView implements SceneView {
     const coreOpacity = 1;
     const metaOpacity = hubFade;
 
-    // Hoisted per frame (the tune hoist rule): ONE read for the core and all 10 hubs. The per-network
+    // Hoisted per frame (the hoist rule): ONE read for the core and all 10 hubs. The per-network
     // furniture's off-focus dim is hyper's `elem` knob — the same "the view's own ELEMENTS drop when
     // off-subject" number the ledger spends on its bands, tiles and ribbons.
     const hubOffMul = offNetMul("hyper");
-    const paper = this._paper; // hoisted: one field load per frame, not per hub (the `?tune` hoist rule)
+    const paper = this._paper; // hoisted: one field load per frame, not per hub (the hoist rule)
     // The hub BODY is the softer of the knob's two channels: glow/tether/hoops/fills take the
     // full drop, the solid body only HUB_BODY_SOFT of it, so an out-of-focus hub stays clearly
     // present while its light recedes. Derived, not a second magic number — at the shipped
@@ -882,7 +863,7 @@ export class HyperView implements SceneView {
     // The constellation holds still when a hub is focused (focusId) OR the view policy turns hub
     // orbits off (hubOrbits) — the two freezes are independent but drive the same hold.
     const frozen = this.focusId != null || !this.hubOrbits;
-    const tetherOp = this.tetherTune.restOp; // hoisted: one property load per frame, not per hub
+    const tetherOp = TETHER_LOOK.restOp; // hoisted: one property load per frame, not per hub
     // The preview dims the others only where a COMMIT would (review, 2026-10-24): a commit sets
     // `focusId` only for an id with a hub, so a hovered DAG or unlisted chip — which commits to
     // no hub at all — must not promise a dim the click will not deliver. One scan per frame.

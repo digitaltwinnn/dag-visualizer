@@ -4,6 +4,7 @@
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet fill --from=2023-11-13
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet fill --from=2026-09-01 --to=2026-09-10 --recompute
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet fill --from=2026-09-01 --to=2026-09-10 --recompute --chain=DAG0CyySf3
+//   npx tsx scripts/rebuild-trends.ts --net=mainnet fill --from=2025-05-20 --to=2026-11-04 --recompute --transfers
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet fill --from=2023-11-13 --dry-run
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet rebuild --days=90     # wipe + rebuild, asks first
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet wipe                  # asks first
@@ -29,8 +30,12 @@
 //     blocks/gapSum/gapMax/ticks; each UNLISTED chain's the same, outside the floors (one walk —
 //     the separate --backfill-unlisted that used to follow an extension was forgotten twice);
 //     the global spine's g.ticks/anchors/blocks/gapSum/gapMax; the floors g.feeFloor/g.kbFloor,
-//     every catalog chain folded; and u.cov on every bucket of the span — ONLY when every unlisted
-//     chain in the pinned list was walked, else suppressed for the span and said. Never: f.*
+//     every catalog chain folded; u.cov on every bucket of the span — ONLY when every unlisted
+//     chain in the pinned list was walked, else suppressed for the span and said; and, last, the
+//     TRANSFERS (2026-11-04): the DAG's list and every chain's token list, g.tx*/m.<id>.tx* plus
+//     x.cov, rewritten whole for the span, flushed per chain and checkpointed like the walks above,
+//     x.cov written last (`--transfers` with --recompute walks them alone; a --chain fix leaves
+//     them untouched). Never: f.*
 //     (the FLEET family has no historical record anywhere upstream; node counts, layers, make-ups,
 //     countries and providers begin the day their sampler shipped), today's buckets, any cron
 //     cursor, the lock.
@@ -104,7 +109,7 @@ function loadEnvLocal(): void {
   }
 }
 
-import { bucketWritable, coverageSuppressedBy, cursorsInsideSpan, FILL_POOL, parseCommand, resolveChain, seekBoundary, tierExistsAt, UsageError, type Command, type Parsed } from "../app/api/trends/fillPlan";
+import { bucketWritable, coverageSuppressedBy, cursorsInsideSpan, FILL_POOL, parseCommand, resolveChain, seekBoundary, tierExistsAt, transferCursorsInsideSpan, UsageError, type Command, type Parsed } from "../app/api/trends/fillPlan";
 
 
 // ---- the seekable cursor (probed live 2026-09-06/07): meta.next decodes to
@@ -217,7 +222,7 @@ async function main(): Promise<void> {
   const { fetchChainIds } = await import("../app/api/network/chainList");
   const { TTL_S, slotOf, cursorKeyOf, lockKeyOf } = await import("../app/api/trends/keys");
   const { TIER_SINCE } = await import("../src/data/trendWindow");
-  const { bucketGlobals, bucketMetas, addInc, markUnlistedCoverage } = await import("../app/api/trends/bucketing");
+  const { bucketGlobals, bucketMetas, bucketTransfers, addInc, markUnlistedCoverage } = await import("../app/api/trends/bucketing");
   const addIncGap = (inc: import("../app/api/trends/bucketing").IncMap, n: string, tsMs: number, id: string, gap: number) => {
     addInc(inc, n, tsMs, `m.${id}.gapSum`, gap);
     addInc(inc, n, tsMs, `m.${id}.gapMax`, gap);
@@ -226,6 +231,7 @@ async function main(): Promise<void> {
   type IncMap = import("../app/api/trends/bucketing").IncMap;
   type GlobalRec = import("../app/api/trends/bucketing").GlobalRec;
   type MetaRec = import("../app/api/trends/bucketing").MetaRec;
+  type TxRec = import("../app/api/trends/bucketing").TxRec;
   type Tier = import("../app/api/trends/keys").Tier;
 
   const redis = new Redis({
@@ -304,9 +310,9 @@ async function main(): Promise<void> {
   const FLUSH_EVERY = 500_000; // records between flush+checkpoint rounds (user, 2026-09-11)
   const FLOOR_SERIES = new Set(["g.feeFloor", "g.kbFloor"]);
   type SerInc = [string, [string, number][]][];
-  interface ChainCkpt { done?: boolean; skipped?: "no-cursor"; cursor?: string; records?: number; minTs?: number; residualInc?: SerInc; residualStamps?: number[]; residualGlobals?: GlobalRec[]; floors?: SerInc }
+  interface ChainCkpt { done?: boolean; skipped?: "no-cursor"; cursor?: string; records?: number; minTs?: number; reached?: boolean; residualInc?: SerInc; residualStamps?: number[]; residualGlobals?: GlobalRec[]; floors?: SerInc }
   /** The fill's pin: its span, its mode and the unlisted chains it read at the start. */
-  interface FillMeta { mode: "fill"; fromMs: number; toMs: number; recompute: boolean; chain: string | null; unlisted: string[] }
+  interface FillMeta { mode: "fill"; fromMs: number; toMs: number; recompute: boolean; chain: string | null; transfers?: boolean; unlisted: string[] }
   const serInc = (m: IncMap): SerInc => [...m.entries()].map(([k, f]) => [k, [...f.entries()]]);
   const deserInc = (s?: SerInc): IncMap => new Map((s ?? []).map(([k, f]) => [k, new Map(f)]));
   const addInto = (dst: IncMap, key: string, field: string, v: number): void => {
@@ -516,7 +522,7 @@ async function main(): Promise<void> {
     // A recompute is given both ends. Pinned once; a resume trusts the pin over the store.
     let toMs: number;
     if (pinned) {
-      if (pinned.mode !== "fill" || pinned.toMs == null || pinned.fromMs !== fromMs || pinned.recompute !== recompute || pinned.chain !== chainPrefix || (command.toMs != null && pinned.toMs !== command.toMs)) {
+      if (pinned.mode !== "fill" || pinned.toMs == null || pinned.fromMs !== fromMs || pinned.recompute !== recompute || pinned.chain !== chainPrefix || (pinned.transfers ?? false) !== command.transfers || (command.toMs != null && pinned.toMs !== command.toMs)) {
         const was = pinned.mode === "fill" && pinned.toMs != null ? `${isoDay(pinned.fromMs)} → ${isoDay(pinned.toMs)}${pinned.recompute ? " --recompute" : ""}${pinned.chain ? ` --chain=${pinned.chain}` : ""}` : "an older walk's";
         console.error(`a checkpoint for another fill stands in ${CKPT_ROOT} (${was}) — rerun that fill to finish it, or pass --fresh to discard it`);
         throw new Abort();
@@ -556,6 +562,10 @@ async function main(): Promise<void> {
     const withSpine = only == null;
     const withFloors = only == null;
     const withCoverage = only == null;
+    // TRANSFERS (2026-11-04): every fill walks them for its span; --transfers walks them ALONE.
+    // A --chain fix leaves them untouched (their coverage marker is the whole set's).
+    const transfersOnly = command.transfers;
+    const withTransfers = only == null;
 
     // THE CURSOR PRE-FLIGHT (header): refuse while the cron is still inside the span. A cursor
     // inside the span is only a candidate: a DORMANT chain's cursor sits at its own tip forever
@@ -577,7 +587,93 @@ async function main(): Promise<void> {
       throw new Abort();
     }
 
+    // The transfer cursors follow their snapshot cursors (`runSample`); one that lags inside the
+    // span is a list the cron still has to read there.
+    const txInside = withTransfers ? transferCursorsInsideSpan(cur, ids, spanEndMs) : [];
+    if (txInside.length) {
+      console.error(`fill: the sampler has not finished the transfers of ${isoDay(toMs)} yet — cursor ${txInside[0]} is at ${new Date(Number(cur[txInside[0]!])).toISOString().slice(0, 19)}Z${txInside.length > 1 ? ` (and ${txInside.length - 1} more)` : ""}; rerun once it passes`);
+      throw new Abort();
+    }
+
     const tiers = (["1d", "1h", "5m"] as const).filter((t) => tierExistsAt(t, spanEndMs - 1));
+
+    /** THE TRANSFERS OF THE SPAN, REWRITTEN WHOLE (2026-11-04), CRASH-SAFE LIKE EVERY OTHER WALK
+     *  HERE (user, the same day: "why not write to the store … feels like you're making the same
+     *  mistake again" — the first cut held 1.3M records in memory for a single write at the end, the
+     *  one-go write the 2026-10-26 correction retired). The DAG's list and every chain's token list
+     *  are walked from their tips down to --from — no seek: a transfer cursor is a {hash} — through
+     *  the sampler's own `bucketTransfers`; each chain's buckets are HSET (an overwrite, so a rerun
+     *  is the same write) as soon as the walk is two whole days past them (`flushFinal`), with a
+     *  checkpoint every TX_FLUSH_EVERY records, so a killed fill resumes at the page it stopped on.
+     *  `x.cov` goes on the span LAST, once every list is done: History reads transfers as not
+     *  measured until it lands, so a half-written span never shows. And it is claimed only as far
+     *  down as the DAG's list was actually WALKED (review, 2026-11-05): a list that ends above
+     *  --from — a paging floor like the global list's — would otherwise mark days it never served
+     *  as "no transfers". The DAG has moved value every day since 2022, so ending above --from is
+     *  a floor, and the claim starts at the oldest day it served (said in the summary). */
+    const TX_FLUSH_EVERY = Number(process.env.FILL_TX_FLUSH) || 30_000; // FILL_TX_FLUSH: a smaller round, to exercise a resume
+    interface TxWalk { records: number; minTs: number; reached: boolean }
+    const walkTxCkpt = async (chain: string): Promise<TxWalk> => {
+      const label = `tx-${chain === "dag" ? "DAG" : chain.slice(0, 10)}`;
+      const prev = readJson<ChainCkpt>(label);
+      if (prev?.done) {
+        console.log(`  ${label}: complete in the checkpoint — skipped`);
+        return { records: prev.records ?? 0, minTs: prev.minTs ?? Infinity, reached: prev.reached ?? false };
+      }
+      const cinc = deserInc(prev?.residualInc);
+      let minTs = prev?.minTs ?? Infinity;
+      // Whether the walk passed --from (saw an older record) rather than running off the list's end.
+      let reached = prev?.reached ?? false;
+      let processed = prev?.records ?? 0;
+      let sinceFlush = 0;
+      const round = async (cursor: string | undefined, drain: boolean): Promise<void> => {
+        const n = await flushFinal(cinc, cutOf(minTs, drain), null);
+        writeJson(label, drain
+          ? { done: true, records: processed, minTs, reached } satisfies ChainCkpt
+          : { cursor, records: processed, minTs, reached, residualInc: serInc(cinc) } satisfies ChainCkpt);
+        console.log(`\n  ${label}: ${drain ? "done" : "checkpoint"} at ${processed} records — ${n} fields flushed`);
+      };
+      const base = chain === "dag" ? `${be0}/transactions` : `${be0}/currency/${chain}/transactions`;
+      await walkChain<TxRec>(base, fromMs, (recs, older) => {
+        if (older.length) reached = true;
+        const w = recs.filter((r) => Date.parse(r.timestamp) < spanEndMs);
+        bucketTransfers(cinc, net, chain, w);
+        for (const r of w) { const t = Date.parse(r.timestamp); if (t < minTs) minTs = t; }
+        processed += w.length;
+        sinceFlush += w.length;
+      }, label, prev?.cursor, async (cursor) => {
+        if (sinceFlush >= TX_FLUSH_EVERY) { sinceFlush = 0; await round(cursor, false); }
+      });
+      await round(undefined, true);
+      return { records: processed, minTs, reached };
+    };
+    const fillTransfers = async (): Promise<{ records: number; fields: number; note: string | null }> => {
+      const dag = await walkTxCkpt("dag");
+      let records = dag.records;
+      for (const chain of ids) records += (await walkTxCkpt(chain)).records;
+      // The claim's floor: --from when the DAG walk passed it, else the oldest day the list served.
+      const covFrom = dag.reached ? fromMs : dag.minTs === Infinity ? spanEndMs : Math.max(fromMs, dayFloor(dag.minTs) + 86400000);
+      const note = covFrom > fromMs
+        ? covFrom >= spanEndMs
+          ? "the explorer's DAG transfer list served nothing in the span: no x.cov written, transfers stay not measured"
+          : `the explorer's DAG transfer list ends at ${isoDay(dag.minTs)}: x.cov covers ${isoDay(covFrom)} → ${isoDay(toMs)} only, and ${isoDay(fromMs)} → ${isoDay(covFrom - 86400000)} stays not measured`
+        : null;
+      if (note) console.log(`  ⚠️ ${note}`);
+      const inc: IncMap = new Map();
+      const STEP: Record<Tier, number> = { "5m": 300000, "1h": 3600000, "1d": 86400000 };
+      for (const tier of tiers) {
+        for (let t = covFrom; t < spanEndMs; t += STEP[tier]) {
+          if (!tierExistsAt(tier, t)) continue;
+          const slot = slotOf(net, tier, t);
+          let m = inc.get(slot.key);
+          if (!m) { m = new Map(); inc.set(slot.key, m); }
+          m.set(`${slot.bucket}|x.cov`, 0);
+        }
+      }
+      const fields = await flushFinal(inc, -Infinity, null);
+      console.log(`  x.cov: ${fields} coverage fields — the span's transfers now read as measured.`);
+      return { records, fields, note };
+    };
     /** The global spine's seek and the list-floor probe: the crafted cursor at the span's end, and
      *  whether the list serves anything at or below it (one page). Null seed: nothing to walk. */
     const seekSpine = async (): Promise<{ seed: string | undefined; listServes: boolean } | null> => {
@@ -598,7 +694,24 @@ async function main(): Promise<void> {
         : oldestServedMs > fromMs + 86400000
           ? `the explorer's global list ends at ${isoDay(oldestServedMs)}: the spine covers ${isoDay(oldestServedMs)} → ${isoDay(toMs)} only, and ${isoDay(fromMs)} → ${isoDay(oldestServedMs - 86400000)} stays uncovered (History trims by g.ticks)`
           : null;
-    const summary = `${isoDay(fromMs)} → ${isoDay(toMs)}${recompute ? " --recompute" : " (extension)"}${only ? ` --chain=${only.slice(0, 10)}` : ""}`;
+    const summary = `${isoDay(fromMs)} → ${isoDay(toMs)}${recompute ? " --recompute" : " (extension)"}${only ? ` --chain=${only.slice(0, 10)}` : ""}${transfersOnly ? " --transfers" : ""}`;
+    if (transfersOnly) {
+      if (dryRun) {
+        console.log(`fill ${net} ${summary} — dry run, nothing written`);
+        console.log(`  transfers: the DAG's list and ${ids.length} chain(s)' token lists, walked from their tips to ${isoDay(fromMs)}; x.cov on every bucket of the span; tiers ${tiers.join(", ")}`);
+        console.log(`  lock: none (spine, ${ids.length} chain and the transfer cursors past the span)`);
+        return;
+      }
+      if (!pinned) {
+        if (fresh) rmSync(CKPT_ROOT, { recursive: true, force: true });
+        writeJson("_meta", { mode: "fill", fromMs, toMs, recompute, chain: chainPrefix, transfers: true, unlisted: unlistedList } satisfies FillMeta);
+      }
+      console.log(`fill ${net} ${summary}: the transfers alone, tiers ${tiers.join("/")}, no lock (flush + checkpoint every ${TX_FLUSH_EVERY / 1000}K records)`);
+      const t = await fillTransfers();
+      rmSync(CKPT_ROOT, { recursive: true, force: true });
+      console.log(`filled ${summary}: ${t.records} transfer(s) and ${t.fields} coverage fields${t.note ? ` — ⚠️ ${t.note}` : ""}; cursor untouched, checkpoint cleared.`);
+      return;
+    }
     if (dryRun) {
       console.log(`fill ${net} ${summary} — dry run, nothing written`);
       console.log(`  chains: ${ids.length} (${catalog.filter((c) => ids.includes(c)).length} catalog, ${ids.filter((c) => unlistedSet.has(c)).length} unlisted)${withSpine ? " + the global spine" : ""}`);
@@ -609,12 +722,13 @@ async function main(): Promise<void> {
         const sp = await seekSpine();
         console.log(`  spine: ${!sp ? "no global at or after the span's end — nothing to walk" : sp.listServes ? "the list serves the span's end; how far down it reaches shows as the walk runs" : "⚠️ " + spineFloorNote(Infinity)}`);
       }
+      console.log(`  transfers: ${withTransfers ? "every list walked after the spine, rewritten whole with x.cov" : "untouched (--chain)"}`);
       console.log(`  checkpoint: ${pinned ? "resuming" : "fresh"} in ${CKPT_ROOT}`);
       return;
     }
     if (!pinned) {
       if (fresh) rmSync(CKPT_ROOT, { recursive: true, force: true });
-      writeJson("_meta", { mode: "fill", fromMs, toMs, recompute, chain: chainPrefix, unlisted: unlistedList } satisfies FillMeta);
+      writeJson("_meta", { mode: "fill", fromMs, toMs, recompute, chain: chainPrefix, transfers: command.transfers, unlisted: unlistedList } satisfies FillMeta);
       console.log(`fill ${net} ${summary}: ${ids.length} chain(s)${withSpine ? " + the global spine" : ""}, tiers ${tiers.join("/")}, no lock (flush + checkpoint every ${FLUSH_EVERY / 1000}K records)`);
     }
 
@@ -702,13 +816,17 @@ async function main(): Promise<void> {
         covFields += entries.length;
       }
     }
+    // The transfers, last, after everything else the checkpoint protects has landed: each list
+    // walked on its own checkpoint (walkTxCkpt), then x.cov over what the DAG walk reached.
+    const tx = withTransfers ? await fillTransfers() : null;
     rmSync(CKPT_ROOT, { recursive: true, force: true });
     const notes = [
       only ? "floors, spine and u.cov untouched (--chain)" : null,
       suppressedBy ? `coverage NOT marked — unlisted chain ${suppressedBy} was skipped, so the span's unlisted figure stays "not measured"` : null,
       spineNote ? `⚠️ ${spineNote}` : null,
+      tx?.note ? `⚠️ ${tx.note}` : null,
     ].filter(Boolean);
-    console.log(`filled ${summary}: ${ids.length} chain(s) (${ids.filter((c) => unlistedSet.has(c)).length} unlisted)${withSpine ? ", the global spine" : ""}${withFloors ? ", the floors" : ""}${covFields ? `, ${covFields} coverage fields` : ""}${notes.length ? ` — ${notes.join("; ")}` : ""}; cursor untouched, checkpoint cleared.`);
+    console.log(`filled ${summary}: ${ids.length} chain(s) (${ids.filter((c) => unlistedSet.has(c)).length} unlisted)${withSpine ? ", the global spine" : ""}${withFloors ? ", the floors" : ""}${covFields ? `, ${covFields} coverage fields` : ""}${tx ? `, ${tx.records} transfer(s)` : ""}${notes.length ? ` — ${notes.join("; ")}` : ""}; cursor untouched, checkpoint cleared.`);
     return;
   }
 

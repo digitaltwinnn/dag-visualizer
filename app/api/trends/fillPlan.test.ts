@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { TIER_SINCE } from "@/src/data/trendWindow";
-import { bucketWritable, coverageSuppressedBy, cursorsInsideSpan, FILL_POOL, parseCommand, resolveChain, seekBoundary, tierExistsAt, UsageError } from "./fillPlan";
+import { bucketWritable, coverageSuppressedBy, cursorsInsideSpan, FILL_POOL, parseCommand, resolveChain, seekBoundary, tierExistsAt, UsageError, transferCursorsInsideSpan } from "./fillPlan";
 
 // THE FILL'S PURE DECISIONS (spec 2026-10-30-trends-fill-design): what the script may not decide
 // inline because scripts/ has no test harness — the commands and their redirects, the span's
@@ -13,13 +13,13 @@ describe("parseCommand — fill", () => {
   it("an extension names only --from; its --to is derived later", () => {
     expect(parseCommand(["fill", "--from=2023-11-13"])).toEqual({
       net: "mainnet",
-      command: { kind: "fill", fromMs: day("2023-11-13"), toMs: null, recompute: false, chain: null, fresh: false, dryRun: false },
+      command: { kind: "fill", fromMs: day("2023-11-13"), toMs: null, recompute: false, chain: null, transfers: false, fresh: false, dryRun: false },
     });
   });
   it("a recompute names both ends, and may name one chain, --fresh and --dry-run", () => {
     expect(parseCommand(["--net=testnet", "fill", "--from=2026-09-01", "--to=2026-09-10", "--recompute", "--chain=DAG0Cy", "--fresh", "--dry-run"])).toEqual({
       net: "testnet",
-      command: { kind: "fill", fromMs: day("2026-09-01"), toMs: day("2026-09-10"), recompute: true, chain: "DAG0Cy", fresh: true, dryRun: true },
+      command: { kind: "fill", fromMs: day("2026-09-01"), toMs: day("2026-09-10"), recompute: true, chain: "DAG0Cy", transfers: false, fresh: true, dryRun: true },
     });
   });
   it("refuses --to without --recompute: the extension derives its own", () => {
@@ -153,5 +153,26 @@ describe("coverageSuppressedBy — a skipped unlisted chain is remembered across
     const ckpt: Record<string, { done?: boolean; skipped?: string } | null> = { "DAG0aaaaaa": { done: true }, "DAG0bbbbbb": { done: true, skipped: "no-cursor" }, "DAG0cccccc": null };
     expect(coverageSuppressedBy(["DAG0aaaaaaXYZ", "DAG0bbbbbbXYZ", "DAG0ccccccXYZ"], (label) => ckpt[label] ?? null)).toBe("DAG0bbbbbb");
     expect(coverageSuppressedBy(["DAG0aaaaaaXYZ"], (label) => ckpt[label] ?? null)).toBeNull();
+  });
+});
+
+describe("fill --transfers (2026-11-04)", () => {
+  const day = (d: string) => Date.parse(`${d}T00:00:00Z`);
+  it("narrows a recompute to the transfers", () => {
+    expect(parseCommand(["fill", "--from=2025-05-20", "--to=2026-11-04", "--recompute", "--transfers"]).command).toMatchObject({ kind: "fill", fromMs: day("2025-05-20"), toMs: day("2026-11-04"), recompute: true, transfers: true, chain: null });
+  });
+  it("is a recompute's narrowing alone, and never beside --chain", () => {
+    expect(() => parseCommand(["fill", "--from=2025-05-20", "--transfers"])).toThrow(/--recompute only/);
+    expect(() => parseCommand(["fill", "--from=2025-05-20", "--to=2025-06-01", "--recompute", "--transfers", "--chain=DAG0"])).toThrow(/drop --chain/);
+  });
+});
+
+describe("transferCursorsInsideSpan", () => {
+  const end = Date.UTC(2026, 10, 4);
+  it("names a transfer cursor inside the span that is behind its snapshot cursor", () => {
+    expect(transferCursorsInsideSpan({ xTs: end - 1, x: 99, g: 100, "xTs.a": end - 1, "x.a": 5, "m.a": 6 }, ["a"], end)).toEqual(["xTs", "xTs.a"]);
+  });
+  it("passes a caught-up cursor however old (a quiet chain), one past the span, and one not started", () => {
+    expect(transferCursorsInsideSpan({ xTs: end - 1, x: 100, g: 100, "xTs.a": end + 1, "x.a": 5, "m.a": 6 }, ["a", "b"], end)).toEqual([]);
   });
 });

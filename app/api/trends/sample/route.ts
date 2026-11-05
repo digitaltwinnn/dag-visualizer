@@ -7,7 +7,8 @@ import { fetchChainIds } from "@/app/api/network/chainList";
 import { getLiveGeo } from "@/app/api/geo/live";
 import { runSample } from "../runSample";
 import { writeStore } from "../store";
-import type { FleetCounts, GlobalRec, MetaRec } from "../bucketing";
+import type { FleetCounts, GlobalRec, MetaRec, TxRec } from "../bucketing";
+import { stakeReading } from "../stake";
 import { mergeDagClusters, type DagNode } from "@/src/data/dagCore";
 import type { ClusterNode } from "@/src/data/types";
 import { readClusters } from "@/app/api/live/upstream";
@@ -127,6 +128,17 @@ export async function GET(req: Request) {
         return { data: j.data ?? [], next: j.meta?.next } satisfies ChainPage<MetaRec>;
       },
       fleet: () => fleetCounts(net),
+      // TRANSFERS (2026-11-04): the DAG's own list and each network's token list, read only for the
+      // snapshots the walks above passed (`runSample`), so a quiet chain costs no request.
+      pageTransfers: async (chain, limit, next) => {
+        const path = chain === "dag" ? "/transactions" : `/currency/${chain}/transactions`;
+        const j = (await getJson(`${be}${path}?limit=${limit}${next ? `&next=${encodeURIComponent(next)}` : ""}`)) as { data?: TxRec[]; meta?: { next?: string } };
+        return { data: j.data ?? [], next: j.meta?.next } satisfies ChainPage<TxRec>;
+      },
+      // DELEGATED STAKE (2026-11-04): the Global L0's registry, once an hour — the list the
+      // node-names route reads for operator names, read uncached here so the hour's reading is the
+      // hour's (`stake.ts`).
+      stake: async () => stakeReading(await getJson(`${NETWORKS[net].l0}/node-params`, 10000)),
       now: () => Date.now(),
     });
     return NextResponse.json(res);

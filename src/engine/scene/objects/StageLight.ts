@@ -37,8 +37,8 @@ export class StageLight {
   private paper = false;
 
   constructor(scene: THREE.Scene) {
-    // Staging arrives per frame from STAGE_LIGHTS (so a `?tune` edit lands with no reload and no
-    // re-push callback) — nothing is baked here but the light's existence.
+    // Staging arrives per frame from STAGE_LIGHTS — nothing is baked here but the light's
+    // existence.
     this.light = new THREE.SpotLight(0xffffff, 0, 0, 0, 0.5, 0);
     this.light.visible = false;
     scene.add(this.light);

@@ -10,6 +10,12 @@ describe("trends merge ops", () => {
     expect(opOf("g.anchorsMax")).toBe("max");
     expect(opOf("f.nodes")).toBe("set");
     expect(opOf("f.cc.DE")).toBe("set");
+    // Presence markers never count (a counter's covered zero-fill would forge them), stake is a gauge.
+    expect(opOf("u.cov")).toBe("set");
+    expect(opOf("x.cov")).toBe("set");
+    expect(opOf("f.stake")).toBe("set");
+    expect(opOf("g.tx")).toBe("add");
+    expect(opOf("m.abc.txAmt")).toBe("add");
   });
   it("merges by op with undefined prev as identity", () => {
     expect(mergeVals("g.ticks", undefined, 3)).toBe(3);

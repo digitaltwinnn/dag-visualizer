@@ -10,7 +10,7 @@ export type Net = "mainnet" | "integrationnet" | "testnet";
 const NETS: readonly Net[] = ["mainnet", "integrationnet", "testnet"];
 
 export type Command =
-  | { kind: "fill"; fromMs: number; toMs: number | null; recompute: boolean; chain: string | null; fresh: boolean; dryRun: boolean }
+  | { kind: "fill"; fromMs: number; toMs: number | null; recompute: boolean; chain: string | null; transfers: boolean; fresh: boolean; dryRun: boolean }
   | { kind: "rebuild"; days: number; yes: boolean }
   | { kind: "wipe"; yes: boolean };
 export interface Parsed { net: Net; command: Command }
@@ -27,6 +27,7 @@ const USAGE = [
   "usage:",
   "  fill --from=YYYY-MM-DD                                  extend history back to that day (one walk)",
   "  fill --from=YYYY-MM-DD --to=YYYY-MM-DD --recompute [--chain=<id prefix>]   rewrite covered days (a data fix)",
+  "  fill --from=YYYY-MM-DD --to=YYYY-MM-DD --recompute --transfers            rewrite the transfers alone",
   "  fill … [--fresh] [--dry-run]",
   "  rebuild [--days=N] [--yes]                              wipe and rebuild N days (asks first)",
   "  wipe [--yes]                                            wipe alone (asks first)",
@@ -84,6 +85,7 @@ export function parseCommand(argv: readonly string[]): Parsed {
     const to = take("to");
     const recompute = has("recompute");
     const chain = take("chain");
+    const transfers = has("transfers");
     const fresh = has("fresh");
     const dryRun = has("dry-run");
     noneLeft();
@@ -93,9 +95,11 @@ export function parseCommand(argv: readonly string[]): Parsed {
     if (recompute && to == null) throw new UsageError("fill --recompute needs --to=YYYY-MM-DD (the newest day to rewrite, at most yesterday)");
     if (chain != null && !recompute) throw new UsageError("fill: --chain is for --recompute only (an extension walks every chain)");
     if (chain === "") throw new UsageError("fill: --chain wants an id prefix");
+    if (transfers && !recompute) throw new UsageError("fill: --transfers is for --recompute only (every fill walks the transfers too)");
+    if (transfers && chain != null) throw new UsageError("fill: --transfers rewrites every chain's transfers — drop --chain");
     const toMs = to != null ? dayOf("--to", to) : null;
     if (toMs != null && toMs < fromMs) throw new UsageError("fill: --to is before --from (--from is the oldest day, --to the newest)");
-    return { net, command: { kind: "fill", fromMs, toMs, recompute, chain, fresh, dryRun } };
+    return { net, command: { kind: "fill", fromMs, toMs, recompute, chain, transfers, fresh, dryRun } };
   }
   if (cmd === "rebuild") {
     const days = take("days");
@@ -126,6 +130,24 @@ export function cursorsInsideSpan(
 ): string[] {
   const names = [...(withSpine ? ["gTs"] : []), ...ids.map((id) => `mTs.${id}`)];
   return names.filter((n) => cursor[n] != null && Number(cursor[n]) < spanEndMs);
+}
+
+/** THE TRANSFER CURSORS' PRE-FLIGHT (2026-11-04): a transfer cursor (`xTs` for the DAG, `xTs.<id>`
+ *  for a network) still inside the span AND behind the snapshot cursor it follows is a list the
+ *  cron has yet to read there — a fill would overwrite buckets the cron then adds to. A transfer
+ *  cursor level with its snapshot cursor is caught up however old its time (a quiet chain), and an
+ *  absent one has not started: the cron begins it at the spine, past every span a fill writes. */
+export function transferCursorsInsideSpan(
+  cursor: Readonly<Record<string, string | number>>,
+  ids: readonly string[],
+  spanEndMs: number,
+): string[] {
+  const behind = (xs: string, x: string, of: string) =>
+    cursor[xs] != null && Number(cursor[xs]) < spanEndMs && Number(cursor[x] ?? 0) < Number(cursor[of] ?? 0);
+  return [
+    ...(behind("xTs", "x", "g") ? ["xTs"] : []),
+    ...ids.filter((id) => behind(`xTs.${id}`, `x.${id}`, `m.${id}`)).map((id) => `xTs.${id}`),
+  ];
 }
 
 /** Whether a bucket of this tier may exist at this instant: the fine tiers begin at `TIER_SINCE`,

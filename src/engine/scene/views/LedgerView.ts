@@ -79,14 +79,13 @@ import { ByteBar, SEED_W } from "../objects/ByteBar";
 import { LiveEdge } from "../objects/LiveEdge";
 import { snapBright, snapFocusOf, focusWeightOf, emphasisK } from "../../domain/dimModel";
 import { Ribbons } from "../objects/Ribbons";
-import { SnapshotPlane, makeEdgeLabel, retintEdgeLabel, GLOBAL_PLANE_TUNE_DEFAULTS, META_PLANE_TUNE_DEFAULTS, type PlaneTune } from "../objects/SnapshotPlane";
+import { SnapshotPlane, makeEdgeLabel, retintEdgeLabel, GLOBAL_PLANE_LOOK, META_PLANE_LOOK } from "../objects/SnapshotPlane";
 import { TrailRewind } from "../objects/TrailRewind";
 import type { StageLight } from "../objects/StageLight";
 import { STAGE_LIGHTS } from "../../domain/stageLight";
 import { FadeSet } from "../objects/FadeSet";
 import type { SceneView } from "./SceneView";
 import { joinBloom, inMarkPass } from "../SceneContext";
-import type { TuneSchema } from "../../tune";
 
 /** The lane-tile instance budget.
  *
@@ -164,13 +163,13 @@ const _col = new THREE.Color();
  *  knows returns null — it stays DRAWN but is left out of `pickables` (the anonymous tile, §6.1). */
 export type TilePickResolver = (metaId: string, tickTs: string, k: number) => PickDescriptor | null;
 
-/** The live-tunable metagraph-snapshot TILE look. `rest` is the resting brightness MULTIPLIER on
+/** The metagraph-snapshot TILE look. `rest` is the resting brightness MULTIPLIER on
  *  the tile's identity colour — the one number the tiles keep of their own, because the byte bar's
  *  matching `rest` is an opacity and the two are different quantities. Everything above rest is the
  *  shared snapshot vocabulary (domain/dimModel.ts · snapBright): a snapshot is DATA, so its
  *  off-filter dim, focus boost and dim-back are the ledger row's knobs — the same ones the node
  *  chips in the trays answer to. */
-export interface TileTune {
+export interface TileLook {
   rest: number; // a resting filled tile
   // ── THE HUE FLOOR, on paper only. A tile cannot be transparent (opaque + depthWrite is what makes
   // it a pick blocker), so its presence is a lerp toward the glass it lies on — and a lerp that runs
@@ -182,21 +181,14 @@ export interface TileTune {
   // fully dissolved row still zero-scales.
   ink: number;
   // Sub-pass input × for the selective paper halo (SceneContext.inMarkPass) — the bar's twin
-  // (ByteBar's BarTune.halo carries the same note): raised only while the mark pass renders, so
+  // (ByteBar's BarLook.halo carries the same note): raised only while the mark pass renders, so
   // the visible tile never changes.
   halo: number;
 }
 
-// rest user-tuned via ?tune, 2026-08-07. (`hot` retired 2026-08-11 — it was exactly the ledger
+// rest user-tuned live, 2026-08-07. (`hot` retired 2026-08-11 — it was exactly the ledger
 // row's `boost`, and a snapshot is data, so it takes the node's focus knob instead.)
-export const TILE_TUNE_DEFAULTS: TileTune = { rest: 0.1, ink: 0.3, halo: 2.5 };
-
-/** The `?tune` knob ranges (contract: src/engine/tune.ts), colocated with the numbers they bound. */
-export const TILE_TUNE_SCHEMA: TuneSchema<TileTune> = {
-  rest: { min: 0, max: 2, step: 0.05 },
-  ink: { min: 0, max: 0.8, step: 0.02, label: "hue floor (light)" },
-  halo: { min: 1, max: 6, step: 0.1, label: "halo input × (light)" },
-};
+export const TILE_LOOK: Readonly<TileLook> = { rest: 0.1, ink: 0.3, halo: 2.5 };
 
 // The view-entry drop's shape (see the VIEW-ENTRY DROP note in the class): fall height and
 // per-slot timing. The TOTAL is derived so _entryT in [0,1] maps onto real seconds.
@@ -257,15 +249,6 @@ export class LedgerView implements SceneView {
   private _bar: ByteBar;
   private _live: LiveEdge;
   private _ribbons: Ribbons;
-  /** Dev-only access for the ?tune panel (Engine.mountDevTune) — not part of the frame path. */
-  get ribbons(): Ribbons { return this._ribbons; }
-  get bar(): ByteBar { return this._bar; }
-  /** The tiles' live-tunable look — read per frame by update()'s tile pass. */
-  tiles: TileTune = { ...TILE_TUNE_DEFAULTS };
-  /** The two plane-tune channels (user, 2026-08-07): the global plane and the metagraph planes
-   *  are the SAME blueprint tuned separately — read per frame by _applyFloorAlpha. */
-  globalTune: PlaneTune = { ...GLOBAL_PLANE_TUNE_DEFAULTS };
-  metaTune: PlaneTune = { ...META_PLANE_TUNE_DEFAULTS };
 
   // ── the lane field (construction-time; never reallocated per frame) — the SHARED roster
   // (ledgerModel.LANE_IDS): every listed metagraph plus the "unknown" lane at the screen-left end.
@@ -427,12 +410,12 @@ export class LedgerView implements SceneView {
       META_TRAIL_MAX,
     );
     joinBloom(this._metaTrailMesh); // the lane tiles are the trail's identity marks — see BLOOM_LAYER
-    // The paper halo's input lift (TileTune.halo, the bar's twin): multiplied up only while the
+    // The paper halo's input lift (TileLook.halo, the bar's twin): multiplied up only while the
     // selective mark pass renders, un-multiplied inside the same pass — the main frame always
     // draws the tiles at their true colour (multiply, never set — the bar's rule).
     const tileMat = this._metaTrailMesh.material as THREE.MeshBasicMaterial;
-    this._metaTrailMesh.onBeforeRender = () => { if (inMarkPass()) tileMat.color.multiplyScalar(this.tiles.halo); };
-    this._metaTrailMesh.onAfterRender = () => { if (inMarkPass()) tileMat.color.multiplyScalar(1 / this.tiles.halo); };
+    this._metaTrailMesh.onBeforeRender = () => { if (inMarkPass()) tileMat.color.multiplyScalar(TILE_LOOK.halo); };
+    this._metaTrailMesh.onAfterRender = () => { if (inMarkPass()) tileMat.color.multiplyScalar(1 / TILE_LOOK.halo); };
     this._metaTrailMesh.frustumCulled = false;
     // ⚠️ Bounds three cannot reject with — the lane tiles are pickable AND they move (the trail
     // slides every tick, the rewind slides it further), so three's lazily-computed-once
@@ -515,7 +498,7 @@ export class LedgerView implements SceneView {
   }
 
   private _applyFloorAlpha(): void {
-    // Each plane applies ITS tune channel (the global floor vs the metagraph planes — same
+    // Each plane applies ITS look channel (the global floor vs the metagraph planes — same
     // blueprint, two knobs; user 2026-08-07). FLOOR_D/2 is the shared drop-off reference so the
     // rim reads as one width everywhere; narrow pieces clamp it inside SnapshotPlane.
     const a = this._fades.alpha;
@@ -529,13 +512,13 @@ export class LedgerView implements SceneView {
     if (this._paper) {
       this._spot.claim("ledger", this._stageSubject, this._stageNormal, STAGE_LIGHTS.ledger.height, a);
     }
-    for (const p of this._globalPlanes) p.applyAlpha(this.globalTune, a, FLOOR_D / 2);
+    for (const p of this._globalPlanes) p.applyAlpha(GLOBAL_PLANE_LOOK, a, FLOOR_D / 2);
     // The committed (or hover-previewed) network's OWN plane glows a step brighter — the
     // plane-level twin of the colored dim (user, 2026-08-07).
     const netKey = this._netDimKey();
     for (const [key, p] of this._metaPlanes) {
       const lane = key === netKey;
-      p.applyAlpha(this.metaTune, a, FLOOR_D / 2, lane ? LANE_FILL_BOOST : 1, lane ? this._laneColor(key).getHex() : null);
+      p.applyAlpha(META_PLANE_LOOK, a, FLOOR_D / 2, lane ? LANE_FILL_BOOST : 1, lane ? this._laneColor(key).getHex() : null);
     }
     // Both columns' resting level is a dark-ground opacity; on paper it is ink over the page, so
     // it asks the ground once, hoisted here — loop-invariant (the hoist rule).
@@ -1253,7 +1236,7 @@ export class LedgerView implements SceneView {
     this._rewind.update(dt, this._slotOfOrd, this._advanced);
     this._advanced = false;
     this._trailOff = this._rewind.offset;
-    // Hoisted per frame (the tune hoist rule): the SELECTED row — the one that owns the focus — or -1.
+    // Hoisted per frame (the hoist rule): the SELECTED row — the one that owns the focus — or -1.
     const pinSlot = this.model.selectedSlot;
     this._bar.setOffset(this._trailOff);
     // Pushed HERE, from the same read the lane tiles use, not once at select time: every new tick
@@ -1322,14 +1305,14 @@ export class LedgerView implements SceneView {
 
     if (!this._latest) return;
     const k = Math.min(1, dt * 3);
-    const ek = emphasisK(dt); // emphasis easing — hoisted once per frame (the tune hoist rule)
+    const ek = emphasisK(dt); // emphasis easing — hoisted once per frame (the hoist rule)
 
     // ── lane tiles on the metagraph-snapshot floor
     let mi = 0;
-    // Hoisted per frame (the tune hoist rule): one read for every lane's every tile.
+    // Hoisted per frame (the hoist rule): one read for every lane's every tile.
     const dimNet = this._netDimKey();
-    const tileRest = this.tiles.rest;
-    const tileInk = this.tiles.ink;
+    const tileRest = TILE_LOOK.rest;
+    const tileInk = TILE_LOOK.ink;
     // A focus is a SELECTED row (pinned or live-followed — how it was reached is not what it is),
     // a hovered row or a hovered tile. The bare lead is none of them: with nothing selected the
     // chamber is simply running, and stepping the whole trail back against a row it advanced onto
@@ -1428,7 +1411,7 @@ export class LedgerView implements SceneView {
         // `tileRest` is the curve's REFERENCE on paper — the tiles' own resting weight, taken
         // UNFADED so `b.fade` reads as the ratio it is rather than moving the reference itself.
         const emph = inkPresence(snapBright(tileRest * b.fade, offNet, focus, anyFocus && !rowFocus, mine), this._paper, tileRest);
-        // The hue floor (TileTune.ink) maps the emphasis into [ink, 1] on paper — affine, so the
+        // The hue floor (TileLook.ink) maps the emphasis into [ink, 1] on paper — affine, so the
         // tier ORDER above it is untouched and only the bottom of the span is lifted off the glass.
         const brightT = (this._paper ? tileInk + (1 - tileInk) * emph : emph) * edge * this._fades.alpha * entryF;
         // Emphasis EASES rather than snapping (dimModel.emphasisK). The state rides the BLOCK, next
@@ -1445,7 +1428,7 @@ export class LedgerView implements SceneView {
         // overshot the real backdrop by ~70/255 and every de-emphasized tile arrived BRIGHTER than the glass it
         // was supposed to sink into (user: "the snapshots in the trail are white"). The plane sits
         // within ~12/255 of `c.bg`, so the scene's own ground is the honest backdrop to measuring
-        // accuracy; what was actually missing is hue at the bottom of the span, which is TileTune.ink
+        // accuracy; what was actually missing is hue at the bottom of the span, which is TileLook.ink
         // above. Thin toward the ground, floor the tint — the two answer different halves.
         this._metaTrailMesh.setColorAt(mi, inkMix(_col.copy(ident ? laneColor : this._coreCol), bright, this._colors));
         mi++;

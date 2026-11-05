@@ -258,6 +258,7 @@ export default function TrendChart({
   unitInPlot = false,
   heading,
   peak,
+  extra,
   lineWidth = 2,
   className,
   headClassName,
@@ -429,6 +430,9 @@ export default function TrendChart({
   nameOnly?: boolean;
   /** The peak beside the readout, on the readout's own unit (see `peakReading`). */
   peak?: { word: string; value: number } | null;
+  /** A THIRD READING after the readout, already worded and formatted — the Transfers measure's
+   *  VOLUME in the network's own token ("volume 4.5M DAG", 2026-11-04), on the readout's basis. */
+  extra?: { word: string; text: string } | null;
   /** The series line's stroke, in CSS px at scale 1. The document's small charts draw at 2; a
    *  History card is drawn LARGER than authored (scale ~1.3 on a desktop), so the same 2 landed
    *  at 2.6px and read as heavy (user, 2026-10-03: "the trend card lines are too thick") — the
@@ -705,6 +709,12 @@ export default function TrendChart({
               {readout ? (readout.value != null ? format(readout.value) : readout.pending === false ? "—" : <NodeStars count={3} />) : format(last)}
             </span>
             </span>
+            {!compact && extra && (
+              <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap">
+                <span className="text-label text-muted-foreground">{extra.word}</span>
+                <span className="text-label text-foreground-dim tabular-nums">{extra.text}</span>
+              </span>
+            )}
           </span>
         )}
         </span>

@@ -1,24 +1,28 @@
 // The TUNABLE CONTRACT — the shared vocabulary behind the `?tune` dev panel (devTune.ts).
 //
-// A tunable is a MUTABLE VALUES OBJECT plus a COLOCATED SCHEMA, both living in the module that
-// owns the constant, so a knob's range sits next to the number it bounds instead of drifting in a
-// far-away panel file. `devTune.ts` holds only the MANIFEST (which groups appear in which view)
-// and a generic walker that renders any group.
+// PRODUCTION CODE CARRIES NO PANEL METADATA (user, 2026-11-05). A module that owns a look exports
+// ONE plain constant — `FOCUS_ROWS`, `STAGE_LIGHTS`, `BAR_LOOK` — typed `Readonly<…>` and never
+// `Object.freeze`d. Everything the panel needs on top of that lives on the panel side: the knob
+// ranges and labels (a `TuneSchema` in devTune.ts's manifest), the shipped defaults to reset and
+// diff against (snapshotted HERE at mount, before any knob can turn), persistence and export.
+// The panel writes into the module's constant in place — dev-only, behind a dynamic import, so
+// the read-only type is what production code sees and the panel is the one writer.
 //
-// Three rules hold it together — they are the reason this is non-intrusive:
+// Three rules hold it together:
 //
-//  1. `*_TUNE_DEFAULTS` is the SHIPPED LOOK and stays the thing tests pin. Tests assert the
-//     DEFAULTS, never the live struct, so turning a knob can never make a test pass or fail.
-//  2. THE HOIST RULE. A tunable read inside a per-node loop is loaded into a LOCAL in that loop's
-//     preamble (`const hexH = GEO_SIZE_TUNE.hexH;`), so the inner body reads a local exactly as it
-//     did when the value was a module const — one property load per FRAME, not per node. This is
-//     what makes "literals → mutable defaults" free rather than a slow leak, and it is the sibling
-//     discipline to `noFrameAllocations.test.ts`.
-//  3. The schema is TYPED AGAINST its values object, so a renamed field is a compile error rather
-//     than a silently missing slider.
+//  1. NO PANEL SHAPE IN A MODULE. No `*_DEFAULTS` twin, no live copy, no schema, no panel-only
+//     setter. Tests pin the constant itself — with no knob mounted it IS the shipped look.
+//  2. THE HOIST RULE. A value read inside a per-node loop is loaded into a LOCAL in that loop's
+//     preamble (`const rest = BAR_LOOK.rest;`), so the inner body reads a local — one property
+//     load per FRAME, not per node. It is what makes a constant OBJECT as cheap as a module
+//     literal, and it is the sibling discipline to `noFrameAllocations.test.ts`.
+//  3. The schema is TYPED AGAINST the module's own row type (`TuneSchema<FocusRow>`), so a
+//     renamed field is a compile error in the manifest rather than a silently missing slider.
 //
-// Nothing here is imported by production render paths — the values objects are, the schema and
-// this module's helpers are not (devTune is the only consumer, behind a dynamic import).
+// A value read per frame needs nothing else: the knob is live the moment it is in the manifest.
+// A value BAKED at construction or event time (vertex colours, a geometry) needs a re-bake, and
+// the panel has one generic lever for it — `refreshTheme`, the Engine's whole theme thread,
+// which re-runs every view's `setColors` — rather than a panel-only method on the view.
 import type { FolderApi, Pane } from "tweakpane";
 
 /** One knob's presentation. `reload: true` marks a value baked into geometry at construction — the
@@ -36,25 +40,44 @@ interface TuneKnob {
  *  rather than knobs, and only the schema'd keys get sliders. */
 export type TuneSchema<T> = Partial<Record<keyof T, TuneKnob>>;
 
-/** A renderable group: the live values, the defaults to reset/compare against, the schema, and an
- *  optional callback for values that are baked rather than read per frame (a ribbon sheet's vertex
- *  colours, a light's cone angle) and so must be pushed on change.
+/** A renderable group: the module's own constant, the panel-side schema, and an optional
+ *  callback for values that are baked rather than read per frame (see the header).
  *
  *  The default `object` is what lets the manifest hold groups of DIFFERENT shapes in one array:
- *  `TuneGroup<FocusTune>` and `TuneGroup<BarTune>` are both `TuneGroup`. The helpers below narrow
+ *  `TuneGroup<FocusRow>` and `TuneGroup<BarLook>` are both `TuneGroup`. The helpers below narrow
  *  to numbers at the point of use, so the erasure costs nothing — while each group's OWN schema
  *  stays typed against its own values, which is what makes a renamed field a compile error. */
 export interface TuneGroup<T extends object = object> {
   title: string;
-  values: T;
-  defaults: Readonly<T>;
+  /** The production constant itself. Read-only in its module's type; the panel writes it in place. */
+  values: Readonly<T>;
   schema: TuneSchema<T>;
   /** Called after any knob in this group changes. */
   onChange?: () => void;
-  /** Where the baked values belong, e.g. "domain/dimModel.ts · FOCUS_TUNE_DEFAULTS". Printed by
+  /** Where the baked values belong, e.g. "domain/dimModel.ts · FOCUS_ROWS.hyper". Printed by
    *  EXPORT so a dumped block says where to paste it. */
   home?: string;
 }
+
+/** The panel's one write path into a module's constant. */
+const live = (g: TuneGroup): Record<string, unknown> => g.values as Record<string, unknown>;
+
+// ---- the shipped defaults ---------------------------------------------------------------------
+// Snapshotted from the constant itself the FIRST time a panel mounts over it, before any restore or
+// knob — so it is the shipped look without the module keeping a copy. Keyed by the values object and
+// never overwritten: closing and reopening the panel must not adopt a turned knob as the default.
+const shipped = new WeakMap<object, Record<string, number>>();
+
+export function captureDefaults(groups: TuneGroup[]): void {
+  for (const g of groups) {
+    if (shipped.has(g.values)) continue;
+    const vals: Record<string, number> = {};
+    for (const [key, v] of Object.entries(live(g))) if (typeof v === "number") vals[key] = v;
+    shipped.set(g.values, vals);
+  }
+}
+
+const defaultOf = (g: TuneGroup, key: string): number | undefined => shipped.get(g.values)?.[key];
 
 // ---- persistence -----------------------------------------------------------------------------
 // OPT-IN (a toggle in the panel, default OFF) because a silently-restored session is a trap: you
@@ -92,7 +115,7 @@ function snapshot(groups: TuneGroup[]): Record<string, Record<string, number>> {
   for (const g of groups) {
     const vals: Record<string, number> = {};
     for (const key of Object.keys(g.schema)) {
-      const v = (g.values as Record<string, unknown>)[key];
+      const v = live(g)[key];
       if (typeof v === "number") vals[key] = v;
     }
     out[g.title] = vals;
@@ -112,8 +135,8 @@ export function restoreTuned(groups: TuneGroup[]): boolean {
     if (!stored) continue;
     for (const [key, v] of Object.entries(stored)) {
       if (!(key in g.schema)) continue;
-      if (typeof (g.values as Record<string, unknown>)[key] !== "number") continue;
-      (g.values as Record<string, number>)[key] = v;
+      if (typeof live(g)[key] !== "number") continue;
+      live(g)[key] = v;
       applied = true;
     }
     g.onChange?.();
@@ -133,27 +156,27 @@ export function savePersisted(groups: TuneGroup[]): void {
   writePersisted({ on: true, groups: snapshot(groups) });
 }
 
-/** Reset a group (or every group) back to its shipped defaults. */
-function resetGroup(g: TuneGroup): void {
+/** Reset a group back to its shipped defaults. */
+export function resetGroup(g: TuneGroup): void {
   for (const key of Object.keys(g.schema)) {
-    const d = (g.defaults as Record<string, unknown>)[key];
-    if (typeof d === "number") (g.values as Record<string, number>)[key] = d;
+    const d = defaultOf(g, key);
+    if (d !== undefined) live(g)[key] = d;
   }
   g.onChange?.();
 }
 
 // ---- export ----------------------------------------------------------------------------------
-/** Format a group's current values as a paste-ready TS object literal, shaped like the defaults
+/** Format a group's current values as a paste-ready TS object literal, shaped like the module
  *  constant it came from. The whole point of the panel is that chosen numbers get BAKED, so the
  *  bake step is a copy-paste rather than transcription from a screenshot. */
-function exportGroup(g: TuneGroup): string {
+export function exportGroup(g: TuneGroup): string {
   const keys = Object.keys(g.schema);
   const body = keys
     .map((k) => {
-      const v = (g.values as Record<string, unknown>)[k];
+      const v = live(g)[k];
       if (typeof v !== "number") return null;
-      const d = (g.defaults as Record<string, unknown>)[k];
-      const changed = typeof d === "number" && Math.abs(d - v) > 1e-9;
+      const d = defaultOf(g, k);
+      const changed = d !== undefined && Math.abs(d - v) > 1e-9;
       // Trim float noise: sliders step in hundredths, so 4 decimals is always enough.
       return `  ${k}: ${parseFloat(v.toFixed(4))},${changed ? ` // was ${d}` : ""}`;
     })
@@ -185,8 +208,8 @@ export function renderGroup(
 ): FolderApi {
   const f = pane.addFolder({ title: g.title, expanded });
   for (const [key, knob] of Object.entries(g.schema) as [string, TuneKnob][]) {
-    if (typeof (g.values as Record<string, unknown>)[key] !== "number") continue;
-    f.addBinding(g.values as Record<string, number>, key, {
+    if (typeof live(g)[key] !== "number") continue;
+    f.addBinding(live(g) as Record<string, number>, key, {
       min: knob.min,
       max: knob.max,
       step: knob.step ?? 0.01,

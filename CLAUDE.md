@@ -84,7 +84,7 @@ growing: a mechanical purity classifier was tried and rejected (its regex matche
 TEST-ONLY helpers shared by sibling tests (never imported by app code) and sits outside the scan,
 which reads `src/data/*.ts` only.
 
-Seventeen narrower boundary tests work the same way: `components/feedReadBoundary.test.ts` (every HUD read of a feed's data holds that feed, so the pulse strip's "in use here" is measured, not declared — `src/data/feedUse.ts`), `components/unlistedBoundary.test.ts` (the `"unlisted"`
+Eighteen narrower boundary tests work the same way: `components/feedReadBoundary.test.ts` (every HUD read of a feed's data holds that feed, so the pulse strip's "in use here" is measured, not declared — `src/data/feedUse.ts`), `components/unlistedBoundary.test.ts` (the `"unlisted"`
 id literal has exactly two homes), `components/railLadderBoundary.test.ts` (every committable focus
 rung maps to a hinted rail card slot), `components/railTierBoundary.test.ts` (`data-focus` has two
 homes and the slab's geometry — the pager included — keys on `data-tier`),
@@ -113,12 +113,15 @@ ledger row consults the trail's boundaries), `src/engine/entryBeatBoundary.test.
 entry owner still defines the arrival beat's begin/release pair — the wiring was silently lost once)
 `src/net/netUrlBoundary.test.ts` (every own-server fetch goes through `netUrl()`, or carries an
 exemption with a reason), `components/tooltipBoundary.test.ts` (no hover-only text: no `title=`
-on any HUD element — the UI explains itself on its surface, or not at all) and
+on any HUD element — the UI explains itself on its surface, or not at all),
+`src/engine/tunePanelBoundary.test.ts` (the `?tune` panel is one sealed corner: only its three files
+import the tune contract or tweakpane, so a look stays a plain constant and its knob lives in
+`devTune.ts`'s manifest alone) and
 `components/touchTierBoundary.test.ts` (the touch tier has ONE query — a coarse pointer on the
 phone or tablet tier — named once by the stylesheet's `touch:` variant and once by `useTouch`, and
 no utility rides Tailwind's pointer-only variant: a touch laptop's desktop rail is a mouse layout).
-`ls **/*Boundary.test.ts` is the live count: eighteen files, of which
-`components/selectionBoundary.test.ts` is rule 2's and the other seventeen are these.
+`ls **/*Boundary.test.ts` is the live count: nineteen files, of which
+`components/selectionBoundary.test.ts` is rule 2's and the other eighteen are these.
 
 Each of these files opens with a header comment giving the rationale, the scope and every exemption
 with its reason. **That header is the rule's authoritative statement** — read it rather than inferring
@@ -409,8 +412,8 @@ then **releases the claim**. So **not claiming IS off** — there is no `spotOff
 bug class the previous per-view-light + registry arrangement kept guarding against. A view's presence
 is already applied centrally, so a claim must not multiply by its own fade again.
 
-`StagedView` (`domain/stageLight.ts`) is the type that says which views stage a light, and the `?tune`
-panel builds a spotlight folder only for those — the three STRUCTURAL 3D views stage one, and History
+`StagedView` (`domain/stageLight.ts`) is the type that says which views stage a light — the three
+STRUCTURAL 3D views stage one, and History
 stages none: its only WebGL object is a hairline ground drawn with an unlit material, and the planes a
 lamp would want to reach are DOM. The ledger's claim is **paper-only** (its dark chamber stays lit by its own glass and emissive
 snapshots, and emphasis there is the four colour dim tiers — on paper those need the lobe's help, see
@@ -565,7 +568,7 @@ file, and the rules above govern them.
 | React HUD | `components/CLAUDE.md` | the four-zone shell, the slab/card grammar, Instrument-Glass, CSS traps, the subject callout |
 | Three adapters | `src/engine/scene/CLAUDE.md` | nodes/layers/the filter, the whole Snapshots chamber, and History's ground |
 | Pure logic | `src/engine/domain/CLAUDE.md` | the 3D↔3D transition, selection semantics |
-| Engine | `src/engine/CLAUDE.md` | live look-tuning under `?tune` |
+| Engine | `src/engine/CLAUDE.md` | the look rows, emphasis knobs and the empty `?tune` panel framework |
 | Data layer | `src/data/CLAUDE.md` | the snapshot stream, anchoring & fees, the tick lifecycle, the measured-history path the History view reads |
 | Networks | `src/net/CLAUDE.md` | `?net=` and the three networks |
 | Theme | `src/theme/CLAUDE.md` | light/dark and the ground questions it forces |

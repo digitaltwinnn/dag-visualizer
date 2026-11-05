@@ -39,7 +39,9 @@ import { utcDayKey } from "@/src/util/localTime";
 //     nodes on every card, and one IP in the fleet's stored `f.cc` / `f.isp`, so a note read 31
 //     beside a card's 34. Every fleet figure is each network's own nodes added up once `now` and a
 //     week ago are both measured that way (`fleetReading`), which needs a week of the geo family;
-//     until then R58 below holds at both ends. A change never takes one end from each;
+//     until then R58 below holds at both ends. A change never takes one end from each. A network
+//     missing from the week-ago day while it has nodes now is read from the day before it
+//     (`throughEdgeOutages`): the day is one hourly reading, and that hour can be its outage;
 //   · ONE FIGURE PER QUANTITY (R58). Every COUNTRY and FLEET figure — the fleet's located total,
 //     each country's count, every country share, rank and "Countries hosting nodes", and both ends
 //     of each week-ago pair — comes from the tiers' daily `f.cc` (`ccDays`), the one series with
@@ -237,9 +239,31 @@ function asNodes(d: Day): Day {
   return { ...d, cc, isp };
 }
 
+/** A WEEK AGO READ INSIDE AN OUTAGE (user, 2026-11-04, Hypergraph's `throughEdgeOutage`). A day is
+ *  one hourly reading, so a small network down at that hour is missing from a day that still passes
+ *  as measured. A network with nodes on `today` and none on `then` is read from the CALENDAR day
+ *  before `then`: nodes there make its absence an outage, and that day's countries and providers
+ *  stand in for it. None there, or no such day, and the absence stands: a first is a first. */
+function throughEdgeOutages(then: Day, today: Day, days: readonly Day[]): Day {
+  const prev = days.find((d) => d.ms === then.ms - DAY_MS);
+  if (!prev) return then;
+  const ids = [...today.netCc.keys()].filter((id) => sum(today.netCc.get(id)) > 0 && sum(then.netCc.get(id)) <= 0 && sum(prev.netCc.get(id)) > 0);
+  if (!ids.length) return then;
+  const netCc = new Map(then.netCc);
+  const netIsp = new Map(then.netIsp);
+  for (const id of ids) {
+    netCc.set(id, prev.netCc.get(id)!);
+    const isp = prev.netIsp.get(id);
+    if (isp) netIsp.set(id, isp);
+    else netIsp.delete(id);
+  }
+  return asNodes({ ...then, netCc, netIsp });
+}
+
 /** THE FLEET'S READING on `now`, one home, so the facts and the warm pass's country plan
  *  (`fleetCountries`) cannot read two sources. NODES (user, 2026-10-31) wherever `now` and a week ago
- *  are both measured in them, which needs a week of the geo family. Until then the older reading at
+ *  are both measured in them, which needs a week of the geo family, a network missing from the week
+ *  ago read through an outage (`throughEdgeOutages`). Until then the older reading at
  *  BOTH ends (R58): the tiers' newest day while it is measured and no older than `now`, else `now`'s
  *  own counts. Never one end from each: the two counts differ by every shared server. */
 function fleetReading(
@@ -249,7 +273,8 @@ function fleetReading(
 ): { fleetCc: Counts; fleetIsp: Counts; ccThen: Counts | null; geoThen: Day | null } {
   const nodes = measuredDays(geoDays.map(asNodes), (d) => sum(d.cc));
   const today = nodes.find((d) => d.ms === now.ms);
-  const then = today ? weekBefore(nodes, today) : null;
+  const measuredThen = today ? weekBefore(nodes, today) : null;
+  const then = today && measuredThen ? throughEdgeOutages(measuredThen, today, geoDays) : null;
   if (today && then) return { fleetCc: today.cc, fleetIsp: today.isp, ccThen: then.cc, geoThen: then };
   const tierMeasured = measuredDays(tierDays, (d) => sum(d.cc));
   const tierNewest = tierDays[tierDays.length - 1];

@@ -3,7 +3,7 @@
 // language). A rounded-rectangle signed-distance field in the plane's LOCAL units: outside the
 // rounded rect is clipped (the smooth corners), a rim band rises toward the edge over `uEdgeW`
 // units, and `uInner` is the flat centre whisper. The look is driven per frame from the owner's
-// PlaneTune channel (SnapshotPlane.applyAlpha) — this module owns only the shader.
+// PlaneLook channel (SnapshotPlane.applyAlpha) — this module owns only the shader.
 import * as THREE from "three";
 import { isLightGround, type SceneColors } from "../../sceneColors";
 
@@ -44,7 +44,7 @@ export interface GlassFillUniforms {
  * colour. On the dark ground it GLOWS: additive cyan at a whisper alpha, which is why "calm comes
  * from opacity" works there. On paper additive is invisible — adding light to near-white is a no-op
  * — so the same whisper has to SHADE instead: normal blending with the muted ink tone. Same
- * uniforms, same tune knobs, opposite direction of travel, and no new colour literal either way
+ * uniforms, same look fields, opposite direction of travel, and no new colour literal either way
  * (spec §5: "glass planes shade DARK at low alpha instead of glowing").
  *
  * Keyed on the GROUND, not on a theme name — `scene/` never learns the word (see isLightGround).

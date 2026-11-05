@@ -15,20 +15,19 @@ import { BAR_H, BAR_D, BAR_LIFT, FLOOR_Y, LEAD_X, SEED_W } from "../../domain/le
 import { type Band, type BarSpec } from "../../domain/ledgerBands";
 import { SLOT_SP, SLOT_N, horizonAt, frontAt, rowOnChamber } from "../../domain/ledgerModel";
 import { snapBright, snapFocusOf, emphasisK } from "../../domain/dimModel";
-import type { TuneSchema } from "../../tune";
 import { joinBloom, inMarkPass } from "../SceneContext";
 
 const BANDS_PER_SLOT = METAGRAPHS.length + 1;
 
-/** The live-tunable bar look. `rest` is the bands' own resting OPACITY — the one number the bar
+/** The bar look. `rest` is the bands' own resting OPACITY — the one number the bar
  *  still keeps of its own, because the tiles' matching `rest` is a colour multiplier and the two
  *  are different quantities. Everything above rest is the shared snapshot vocabulary
  *  (domain/dimModel.ts · snapBright): the off-filter dim, the focus boost and the dim-back are the
  *  ledger row's knobs, the same ones the node chips in the trays answer to. */
-export interface BarTune {
+export interface BarLook {
   rest: number; // a resting band's opacity
   /** PAPER ONLY — the floor the emphasis span is mapped onto, exactly as the lane tiles' own
-   *  `TileTune.ink` does for them. Affine, so the tier ORDER above it is untouched and only the
+   *  `TileLook.ink` does for them. Affine, so the tier ORDER above it is untouched and only the
    *  bottom of the span lifts off the glass. */
   ink: number;
   // Sub-pass input × for the selective paper halo (SceneContext.inMarkPass): a band's ink is
@@ -38,7 +37,7 @@ export interface BarTune {
   halo: number;
 }
 
-// rest user-tuned via ?tune, 2026-08-07; raised 0.05 → 0.12 (user, 2026-08-16): under a committed
+// rest user-tuned live, 2026-08-07; raised 0.05 → 0.12 (user, 2026-08-16): under a committed
 // filter an off-filter band answered `rest × (1 − dim)` = 0.025 opacity — invisible beside the
 // ribbon LANDING on it (0.85 × 0.5 additive), a 30× gap to the boosted band in the same bar. The
 // base was below the range any multiplicative dim can survive; the dim knob itself is untouched.
@@ -50,15 +49,8 @@ export interface BarTune {
 // 0.728, while the tile beside it was already being lifted into [0.3, 1]. The hold that now carries
 // a committed member up the trail widened that gap rather than causing it. 0.25 puts an off-filter
 // band near 0.37 — present as a neutral trail, still plainly behind its committed neighbour.
-export const BAR_TUNE_DEFAULTS: BarTune = { rest: 0.12, ink: 0.25, halo: 2.4 };
+export const BAR_LOOK: Readonly<BarLook> = { rest: 0.12, ink: 0.25, halo: 2.4 };
 
-
-/** The `?tune` knob ranges (contract: src/engine/tune.ts), colocated with the numbers they bound. */
-export const BAR_TUNE_SCHEMA: TuneSchema<BarTune> = {
-  rest: { min: 0, max: 1 },
-  ink: { min: 0, max: 0.9, step: 0.01, label: "ink floor (light)" },
-  halo: { min: 1, max: 6, step: 0.1, label: "halo input × (light)" },
-};
 
 interface Slot {
   ordinal: number;
@@ -117,7 +109,6 @@ const _seamBand: Band = { key: "", z0: 0, z1: 0, bytes: 0 };
 export class ByteBar {
   group = new THREE.Group();
   pickables: THREE.Object3D[] = [];
-  tune: BarTune = { ...BAR_TUNE_DEFAULTS };
   private _slots: Slot[] = [];
   private _geo = new THREE.BoxGeometry(1, BAR_H, 1);
   private _sceneColors: Record<string, number>;
@@ -153,14 +144,14 @@ export class ByteBar {
         mesh.scale.set(0, 0, 0);
         mesh.visible = false;
         joinBloom(mesh); // a band is the tick's own ink — see BLOOM_LAYER
-        // The paper halo's input lift (BarTune.halo): the material colour rides above its own
+        // The paper halo's input lift (BarLook.halo): the material colour rides above its own
         // value only while the selective mark pass renders, un-multiplied inside the same pass —
         // the main frame always draws the band's true colour. ⚠️ MULTIPLY, never set: a band's
         // identity lives IN mat.color (update() rewrites it per frame), so a setScalar restore
         // stomped every band to white (found live 2026-08-30). Both hooks gate on the flag so
         // dark pays nothing.
-        mesh.onBeforeRender = () => { if (inMarkPass()) mat.color.multiplyScalar(this.tune.halo); };
-        mesh.onAfterRender = () => { if (inMarkPass()) mat.color.multiplyScalar(1 / this.tune.halo); };
+        mesh.onBeforeRender = () => { if (inMarkPass()) mat.color.multiplyScalar(BAR_LOOK.halo); };
+        mesh.onAfterRender = () => { if (inMarkPass()) mat.color.multiplyScalar(1 / BAR_LOOK.halo); };
         this.group.add(mesh);
         bands.push(mesh);
         mats.push(mat);
@@ -430,11 +421,11 @@ export class ByteBar {
     // tiles. It replaces the local rate this bar used to ease its opacity at (slightly faster now);
     // `k` drives nothing geometric here, only `s.mats[i].opacity`.
     const k = emphasisK(dt);
-    // Hoisted once per frame (the tune hoist rule, src/engine/tune.ts): the band loop below
+    // Hoisted once per frame (the hoist rule, src/engine/tune.ts): the band loop below
     // reads a local, not a live-struct property per band.
-    const rest = this.tune.rest;
-    // Hoisted with `rest` (the tune hoist rule): paper's floor for the emphasis span, below.
-    const barInk = this.tune.ink;
+    const rest = BAR_LOOK.rest;
+    // Hoisted with `rest` (the hoist rule): paper's floor for the emphasis span, below.
+    const barInk = BAR_LOOK.ink;
     // A focus is a SELECTED row or a hovered one. The bare lead is neither: with nothing selected
     // the chamber is simply running, and stepping the whole trail back against a row it advanced
     // onto by itself would make `back` a second `rest` rather than a focus effect.
@@ -514,7 +505,7 @@ export class ByteBar {
         // instrument's own resting weight, or the tiers land within a few percent of each other.
         // `mine` last: a committed band never takes the row step-back (dimModel · snapBright).
         // The emphasis term, then PAPER'S FLOOR mapped over it — the lane tiles' own treatment
-        // (`TileTune.ink`), which the bands had never been given. Affine over [ink, 1], so every
+        // (`TileLook.ink`), which the bands had never been given. Affine over [ink, 1], so every
         // tier above it keeps its order and only the bottom of the span lifts off the glass. The
         // geometric ramps multiply in AFTER, ungamma'd and unfloored: they are geometry, not
         // weight, and flooring a dissolve would stop a row ever leaving the chamber.

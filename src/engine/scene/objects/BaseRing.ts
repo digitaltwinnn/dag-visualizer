@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { METAGRAPHS } from "@/src/net/current";
 import { R, LAND_H } from "../../domain/geoLayout";
 import { ringPresence, ringWedge, type RingLevels, type RingSegment, type RingTier, type WedgeState } from "../../domain/baseRing";
-import { FOCUS_TUNE } from "../../domain/dimModel";
+import { FOCUS_ROWS } from "../../domain/dimModel";
 import { joinBloom } from "../SceneContext";
 import { entryStep, entryTotal } from "../../domain/entryBeat";
 import { hookOcclusion } from "../occlusion";
@@ -103,9 +103,9 @@ export const RING_BASE = 0.12; // 0.13 → 0.12 with the network boost's step do
 /** A tier's presence, from the geo view's OWN focus row: the subject's arcs take the chips' boost,
  *  the rest drop by the chips' dim-back — brighter and dimmer by the app's standard, not the
  *  ring's (user, 2026-10-23: "the selection/hover a bit brighter while dimming down the others;
- *  do aim for consistency across views"). Read per call, so the `?tune` knobs reach it. */
+ *  do aim for consistency across views"). Read per call. */
 function tierPresence(t: RingTier): number {
-  const row = FOCUS_TUNE.geo;
+  const row = FOCUS_ROWS.geo;
   return RING_BASE * (t === "lit" ? 1 + row.boost : t === "dim" ? 1 - row.back : 1);
 }
 

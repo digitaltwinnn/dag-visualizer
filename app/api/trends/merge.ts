@@ -9,7 +9,7 @@ export function opOf(series: string): MergeOp {
   // The unlisted COVERAGE MARKER is a presence flag, not a counter: as "add" the read side's
   // covered-counter zero-fill made an ABSENT marker read 0, exactly what a present one reads, so
   // every bucket looked measured (the branch review, 2026-10-08). "set" keeps absence null.
-  if (series === "u.cov") return "set";
+  if (series === "u.cov" || series === "x.cov") return "set"; // and the transfers' (2026-11-04)
   if (series.endsWith("gapMax") || series === "g.anchorsMax") return "max"; // every gapMax, and the largest global snapshot
   return "add";
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { listSince, type ChainPage } from "./fetchSince";
+import { listBetween, listSince, type ChainPage } from "./fetchSince";
 
 // A fake chain served newest-first with exclusive cursors, the explorer's shape.
 const chain = (n: number) => Array.from({ length: n }, (_, i) => ({ ordinal: n - i }));
@@ -61,5 +61,48 @@ describe("listSince", () => {
     const { recs, gap } = await listSince(async () => ({ data: [] }), 100);
     expect(recs).toEqual([]);
     expect(gap).toBe(false);
+  });
+});
+
+describe("listBetween", () => {
+  // Transfers keyed by the snapshot that carried them: repeats and skips, newest first.
+  const keys = [90, 90, 88, 80, 80, 80, 71, 60, 52, 52, 40];
+  const recs = keys.map((k, i) => ({ k, i, timestamp: "2026-11-04T00:00:00.000Z" }));
+  const sparse = (all: typeof recs, calls: number[]) =>
+    async (limit: number, next?: string): Promise<ChainPage<(typeof recs)[number]>> => {
+      calls.push(limit);
+      const start = next ? Number(next) : 0;
+      const data = all.slice(start, start + limit);
+      const after = start + data.length;
+      return { data, next: after < all.length ? String(after) : undefined };
+    };
+  it("answers the records strictly after the cursor and at or below upTo, oldest first", async () => {
+    const calls: number[] = [];
+    const { recs: got, gap } = await listBetween(sparse(recs, calls), (r) => r.k, 71, 88);
+    expect(got.map((r) => r.k)).toEqual([80, 80, 80, 88]);
+    expect(gap).toBe(false);
+    expect(calls).toEqual([60]);
+  });
+  it("keeps a snapshot the walk beside it has not read for the next run", async () => {
+    const { recs: got } = await listBetween(sparse(recs, []), (r) => r.k, 85, 89);
+    expect(got.map((r) => r.k)).toEqual([88]);
+  });
+  it("reads a list that ends above the cursor whole, with no gap", async () => {
+    const { recs: got, gap } = await listBetween(sparse(recs, []), (r) => r.k, 10, 99);
+    expect(got.length).toBe(keys.length);
+    expect(gap).toBe(false);
+  });
+  it("walks older pages until a record at or below the cursor proves the boundary passed", async () => {
+    const long = Array.from({ length: 2500 }, (_, i) => ({ k: 3000 - i, i, timestamp: "2026-11-04T00:00:00.000Z" }));
+    const calls: number[] = [];
+    const { recs: got } = await listBetween(sparse(long, calls), (r) => r.k, 1000, 3000);
+    expect(calls).toEqual([60, 1000, 1000]); // 2,060 records reach k 941, past the cursor
+    expect(got[0]!.k).toBe(1001);
+    expect(got.length).toBe(2000);
+  });
+  it("says GAP when the self-heal depth runs out before the boundary", async () => {
+    const huge = Array.from({ length: 40000 }, (_, i) => ({ k: 50000 - i, i, timestamp: "2026-11-04T00:00:00.000Z" }));
+    const { gap } = await listBetween(sparse(huge, []), (r) => r.k, 1, 50000);
+    expect(gap).toBe(true);
   });
 });

@@ -54,3 +54,30 @@ export async function listSince<T extends { ordinal: number }>(
   const gap = all[all.length - 1].ordinal > sinceOrdinal + 1;
   return { recs: all.filter((r) => r.ordinal > sinceOrdinal).reverse(), gap };
 }
+
+/** THE SPARSE PAGER (2026-11-04, transfers). A transfer list is newest-first like a chain, but
+ *  its records are keyed by the SNAPSHOT that carried them (`snapshotOrdinal`: the global for a DAG
+ *  transfer, the network's own snapshot for a token transfer), so ordinals repeat and skip — the
+ *  gapless "reached" test above cannot hold. This one answers every record with
+ *  `after < key ≤ upTo`: the tip page, then older pages until a record at or below `after` proves
+ *  the boundary is passed, or the list ends (a list that ends above `after` simply has nothing
+ *  older — no gap). Past the self-heal depth the rest is the accepted gap it is, and `oldestMs`
+ *  says where the read records start, so coverage is claimed only for what was read. Records
+ *  newer than `upTo` (a snapshot the walk beside it has not read yet) are left for the next run. */
+export async function listBetween<T extends { timestamp: string }>(
+  page: (limit: number, next?: string) => Promise<ChainPage<T>>,
+  keyOf: (rec: T) => number,
+  after: number,
+  upTo: number,
+): Promise<{ recs: T[]; gap: boolean }> {
+  let res = await page(60);
+  let all = res.data;
+  const passed = () => all.length > 0 && keyOf(all[all.length - 1]!) <= after;
+  while (!passed() && all.length < CAP && res.next) {
+    res = await page(PAGE, res.next);
+    if (!res.data.length) break;
+    all = all.concat(res.data);
+  }
+  const gap = !passed() && res.next != null && all.length >= CAP;
+  return { recs: all.filter((r) => keyOf(r) > after && keyOf(r) <= upTo).reverse(), gap };
+}

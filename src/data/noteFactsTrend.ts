@@ -90,6 +90,7 @@ const UNIT_PHRASE: Record<TrendMetric, { day: string; total: string }> = {
   snapshots: { day: "per day", total: "" },
   globals: { day: "per day", total: "" },
   blocks: { day: "per day", total: "" },
+  transfers: { day: "per day", total: "" },
   fees: { day: "DAG per day", total: "DAG" },
   kb: { day: "MB per day", total: "MB" },
   nodes: { day: "", total: "" },

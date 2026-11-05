@@ -12,13 +12,14 @@ import { Separator } from "@/components/ui/separator";
 import { SELECTED_ROW, selectionHue } from "@/components/selection";
 import { spanOfWindow } from "@/components/trendDoors";
 import RecordsDoor from "@/components/inspector/RecordsDoor";
+import MomentSpark from "@/components/inspector/MomentSpark";
 import useTrendRoster from "@/components/useTrendRoster";
-import { UNLISTED_ID } from "@/src/data/unlisted";
+import { displayNetwork, UNLISTED_ID } from "@/src/data/unlisted";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { cn } from "@/lib/utils";
 import { metagraphById } from "@/src/data/network";
-import { anchorClause, GLOBAL_READING, instantNote, momentPhrase, orderAt, placeInstant, valueAt } from "@/src/data/trendSeries";
+import { anchorClause, formatDag, GLOBAL_READING, instantNote, momentPhrase, orderAt, placeInstant, valueAt } from "@/src/data/trendSeries";
 import { stampInstant } from "@/src/data/trendTimeline";
 import { bucketAt, spanPhrase } from "@/src/data/trendWindow";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
@@ -135,7 +136,11 @@ export default function TrendInstantPane({
   const who = subject
     ? metagraphById(subject)?.ticker || rows.get(subject)?.name || subject
     : GLOBAL_READING[metric] === "total" ? "All networks" : "The hypergraph";
-  const phrase = momentPhrase(metric, stepMs, !subject);
+  // TRANSFERS SAY WHAT THEY MOVED (2026-11-04): the moment's volume in the subject's own token —
+  // the DAG's in DAG when no network is the subject (its row is the hypergraph's own transfers).
+  const volumeAt = metric === "transfers" && cursorMs != null ? valueAt(rows.get(subject ?? "dag")?.volumePoints ?? [], buckets, stepMs, cursorMs) : null;
+  const worth = volumeAt != null && volumeAt > 0 ? `${formatDag(volumeAt)} ${displayNetwork(subject ?? "dag")?.ticker ?? ""}`.trim() : undefined;
+  const phrase = momentPhrase(metric, stepMs, !subject, worth);
   // The SECOND CADENCE beside the spacing (2026-10-08): how many global snapshots carried this
   // chain in the moment. Only a network has it (the global row IS the ticks), and only where the
   // store measured it — the sampler writes it since that day; before, the clause is simply absent.
@@ -252,6 +257,9 @@ export default function TrendInstantPane({
               )}
             </Lead>
           )}
+          {/* THE MOMENT'S SHAPE (user, 2026-11-05): the lead's reading in the next finer buckets,
+              where a finer tier holds it — steady or up and down, at a glance. */}
+          {bucket != null && lead != null && <MomentSpark metric={metric} subject={subject} stepMs={stepMs} bucket={bucket} />}
           {bucket != null && <Separator className="mb-2" />}
           {bucket == null ? (
             // AN HONEST TERMINAL, not an empty card. The sentence is `instantNote`'s: only the

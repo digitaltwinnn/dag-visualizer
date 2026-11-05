@@ -24,7 +24,6 @@
 
 import { lerp } from "./nodeLayout";
 import type { View3D } from "./viewTransition";
-import type { TuneSchema } from "../tune";
 
 export interface DimContext {
   morph: number;
@@ -122,7 +121,7 @@ export const dimTargetsFor = (sel: string, metaIds: string[]) => ({
 // unused: geo's globe has no per-network furniture at all — its off-filter answer is the nodes'
 // own dim — and everything the ledger draws per network is DATA, so its
 // bands, tiles and ribbons take the node's own `dim` through `snapBright` (user, 2026-08-11).
-export const offNetMul = (view: View3D): number => 1 - FOCUS_TUNE[view].elem;
+export const offNetMul = (view: View3D): number => 1 - FOCUS_ROWS[view].elem;
 
 // Per-view hover/selection DIM-BACK: how far the OTHER nodes drop when one node is the focus
 // (user): softer in geo (the rest stay brighter), a notch stronger in ledger, hyper unchanged.
@@ -155,7 +154,7 @@ export const focusGrow = (c: DimContext): number => viewMix(c, "grow");
 // 0.30 → 0.20, the same day (user: "the focus of the whole stack when selecting a provider also
 // adds to the brightness, reduce the focus effect a bit"): the primary subject keeps the whole
 // boost, so a node picked out of the group still stands clear of it.
-export const GROUP_FOCUS = 0.20; // share of focusBoost a group member gets (FOCUS_SHARED's default)
+export const GROUP_FOCUS = 0.20; // share of focusBoost a group member gets (FOCUS_SHARED.groupShare)
 export const focusWeightOf = (primary: boolean, group: boolean): number =>
   primary ? 1 : group ? FOCUS_SHARED.groupShare : 0;
 
@@ -197,13 +196,10 @@ export const ancestryGlow = (
   nodeSubject: string | null,
 ): ReadonlySet<string> | null => (nodeSubject ? null : ancestry);
 
-// ---- the EMPHASIS tunable (contract: src/engine/tune.ts) -------------------------------------
-// The dim/focus numbers, hoisted out of the formulas above into ONE ROW PER VIEW so the `?tune`
-// panel binds them inside that view's own folder — these read as view-specific even though the
-// code that applies them is central (user, 2026-08-11). Same shape as STAGE_LIGHTS: a Record
-// keyed by view plus one schema reused for every row. Three properties keep it non-intrusive:
-//   · `FOCUS_TUNE_DEFAULTS` is the SHIPPED LOOK and is what the tests pin — turning a knob can
-//     never make a test pass or fail.
+// ---- the EMPHASIS rows ---------------------------------------------------------------------
+// The dim/focus numbers, hoisted out of the formulas above into ONE ROW PER VIEW — they read as
+// view-specific even though the code that applies them is central (user, 2026-08-11). Same shape
+// as STAGE_LIGHTS: a Record keyed by view, every row one shape. Two properties keep it honest:
 //   · Every value is seeded from the literal (or the existing const) it replaced, so the resolved
 //     numbers are unchanged: `lerp(0.32, 1.0, morph)` IS `0.32 + 0.68 * morph`, and naming the
 //     ENDPOINTS is what makes the geo value readable at all.
@@ -237,7 +233,7 @@ export interface FocusShared {
   snapHold: number;
 }
 
-export const FOCUS_TUNE_DEFAULTS: Readonly<Record<View3D, Readonly<FocusRow>>> = {
+export const FOCUS_ROWS: Readonly<Record<View3D, Readonly<FocusRow>>> = {
   // hyper's `back`/`boost` re-tuned live (user, 2026-08-12): the shells are dense and evenly
   // lit, so a focused node needed both a louder boost and a deeper step-back from its
   // neighbours before it read as the subject rather than as one bright node among many.
@@ -274,37 +270,13 @@ export const FOCUS_TUNE_DEFAULTS: Readonly<Record<View3D, Readonly<FocusRow>>> =
 // legible and still comfortably behind the focused row. The lane tiles rest at 0.10 and land at
 // ~0.38 from the same number, which is why this is ONE knob rather than a per-surface constant.
 export const SNAP_HOLD = 3.75;
-export const FOCUS_SHARED_DEFAULTS: Readonly<FocusShared> = { groupShare: GROUP_FOCUS, groupGrow: GROUP_GROW, snapHold: SNAP_HOLD };
-
-export const FOCUS_TUNE: Record<View3D, FocusRow> = {
-  hyper: { ...FOCUS_TUNE_DEFAULTS.hyper },
-  geo: { ...FOCUS_TUNE_DEFAULTS.geo },
-  ledger: { ...FOCUS_TUNE_DEFAULTS.ledger },
-  trend: { ...FOCUS_TUNE_DEFAULTS.trend },
-};
-
-export const FOCUS_SHARED: FocusShared = { ...FOCUS_SHARED_DEFAULTS };
+export const FOCUS_SHARED: Readonly<FocusShared> = { groupShare: GROUP_FOCUS, groupGrow: GROUP_GROW, snapHold: SNAP_HOLD };
 
 // The one resolver every formula above goes through: the ledger takes its row flat (morph is
 // frozen there), hyper↔geo lerp by the morph. One shape for all four fields, so a new emphasis
 // number is a field on the row and nothing else.
 const viewMix = (c: DimContext, k: keyof FocusRow): number =>
-  c.ledger ? FOCUS_TUNE.ledger[k] : lerp(FOCUS_TUNE.hyper[k], FOCUS_TUNE.geo[k], c.morph);
-
-export const FOCUS_ROW_SCHEMA: TuneSchema<FocusRow> = {
-  dim: { min: 0, max: 1, label: "dim · off-filter" },
-  hide: { min: 0, max: 1, label: "hide · filter" },
-  elem: { min: 0, max: 1, label: "dim · elements" },
-  back: { min: 0, max: 1, label: "dim-back on focus" },
-  boost: { min: 0, max: 3, step: 0.05, label: "focus boost" },
-  grow: { min: 0, max: 1.5, step: 0.05, label: "focus grow" },
-};
-
-export const FOCUS_SHARED_SCHEMA: TuneSchema<FocusShared> = {
-  groupShare: { min: 0, max: 1, label: "group share" },
-  groupGrow: { min: 0, max: 1, label: "group swell share" },
-  snapHold: { min: 1, max: 8, step: 0.05, label: "committed hold ×" },
-};
+  c.ledger ? FOCUS_ROWS.ledger[k] : lerp(FOCUS_ROWS.hyper[k], FOCUS_ROWS.geo[k], c.morph);
 
 // Per-node dim: the record's own eased dim (the DAG core eases ONE value for the whole core — the
 // old per-layer {l0,l1} split always carried identical values and was collapsed; a metagraph eases
@@ -428,7 +400,7 @@ export function snapBright(
   anyFocus = false,
   onFilter = false,
 ): number {
-  const row = FOCUS_TUNE.ledger;
+  const row = FOCUS_ROWS.ledger;
   let v = base * (offFilter ? 1 - row.dim : 1);
   if (focus > 0) v += row.boost * focus;
   else if (onFilter) v *= FOCUS_SHARED.snapHold;
@@ -465,5 +437,5 @@ export function snapBright(
 export const EMPHASIS_EASE = 8;
 
 /** The per-frame lerp factor for `EMPHASIS_EASE`. HOIST IT ONCE PER FRAME, never per node — the
- *  tune hoist rule (src/engine/tune.ts): the inner body must read a local, not call per element. */
+ *  hoist rule (src/engine/tune.ts): the inner body must read a local, not call per element. */
 export const emphasisK = (dt: number): number => Math.min(1, dt * EMPHASIS_EASE);

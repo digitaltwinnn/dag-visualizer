@@ -53,7 +53,7 @@ and `_sceneColorMap` (the identity hex map) are both mutated by `_refreshTheme()
 per-frame reader that captured a reference at construction sees the new values with no code
 change; `_colorConsumers` is the fan-out array (`HyperView`, `Globe`, `LedgerView`) populated
 once in construction order, each exposing `setColors`/`setSceneColors`. `_bloomMul` (dark `1`,
-light `LIGHT_TUNE.bloomMul` — shipped `0`, which skips the whole-frame pass outright) is the same
+light `LIGHT_LOOK.bloomMul` — shipped `0`, which skips the whole-frame pass outright) is the same
 swap-in-place contract applied to a non-colour constant — decided once
 at construction and rewritten by the same `_refreshTheme()` call. The Engine never listens to
 `matchMedia` or the DOM itself; it detects a flip through a zustand store subscription registered
@@ -77,7 +77,7 @@ under light.
 `UnrealBloomPass` is a luminance highpass over the FINISHED frame, so it can only ever select
 what is BRIGHTER than its surroundings — and on paper an identity mark is INK (a DOR band sits
 at ~0.42 relative luminance against the ~0.95-L plate). No threshold reaches it, which is why
-`LIGHT_TUNE.bloomMul` is **0**: the whole-frame pass is skipped outright on light (Engine's
+`LIGHT_LOOK.bloomMul` is **0**: the whole-frame pass is skipped outright on light (Engine's
 `bloom.enabled = _bloomMul > 0`), and all it did there was blow the one place light DID clear it
 — the lead bar, the ribbon foot — to white. `bloomFloor` is inert while that is 0. The marks get
 their own layer instead (`BLOOM_LAYER` + `joinBloom()`, `scene/SceneContext.ts`): on a paper frame
@@ -129,7 +129,7 @@ rim fills are OFF (`FILL_OP_PAPER` — their stacked bands read as a milky disc 
 measured as contrast, not light), the globe's land is a fill (`LAND_GLASS_BODY` 0.35, the Fresnel
 ramp to the rim kept) over a paper-only OCEAN PLATE (`buildOcean`, 7% ink at sea level, hidden on
 dark, pick-inert because geo resolves its surface by sphere maths), and the chamber's panes are
-MATTE SHEETS: `GLASS_TUNE` holds body 0.10, a whisper of Fresnel (rim 0.10), the trays' body, and
+MATTE SHEETS: `GLASS_LOOK` holds body 0.10, a whisper of Fresnel (rim 0.10), the trays' body, and
 `line` — `glassFill.uLine`, an ink hairline ~1.5px inside every pane's rim measured in screen
 space (`fwidth`), the HUD card's edge recipe one layer down. The day glass's reflection terms
 (room, window, softboxes, polished lip, the lamp lobe and its uniform push) are deleted with the
@@ -141,4 +141,3 @@ tinted the plate blue inside the DAG's shells, which on paper is a stain, not em
 ⚠️ **What this leaves on the lamp rule above:** a claim's `intensityPaper` still has to be higher
 than its dark level (the test pins the direction), and on the sheet the stage light's pool is the
 one lit thing a paper view shows — judge any retune of it against the flat plate, not the old wall.
-Wave 8's record (`.superpowers/light-wave8-report.md`) is history: it describes the wall.

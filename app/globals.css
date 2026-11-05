@@ -904,12 +904,6 @@
      the phone bar-half sheet offset (RailDock) AND the LiveStrip's phone bottom offset. (Was
      16-responsive-shell.css `:root`, re-homed here when that file was retired in Task 9.) */
   --phone-dock-h: calc(56px + env(safe-area-inset-bottom, 0px));
-  /* The BAR half of that height — what the dock's content centres in; the inset below it is
-     the home indicator's band (viewport-fit=cover, layout.tsx). One token pair so every
-     consumer of --phone-dock-h (the sheets' offset, the footer's ride-above, the raw layer's
-     bottom) clears the indicator automatically; on flat-bottomed devices the env() is 0 and
-     both collapse to the shipped 56px. */
-  --phone-dock-bar-h: 56px;
   /* The ONE resting dim for rail instrument furniture (lines/ruler/spine at rest) — consumed by
      the desktop RailThreads' dim group AND the tablet/phone sheet's `.ig-sheet-edge` channel, so
      rest vs signal contrast is consistent everywhere. Brightness belongs to the signals (pulses)
@@ -928,7 +922,7 @@
      fork C of 2026-08-25 made it a deeper SILVER screen so a bloom could exceed it; that wall and
      its cyclorama are deleted.) Dark side is --background's dark verbatim, so the dark scene is
      byte-identical. */
-  --scene-ground: light-dark(oklch(0.955 0.01 250), oklch(0.09 0.02 265)); /* PRINT: a flat plate ONE step below the white page (0.955 vs 0.985), one flat colour — no sweep. Was the 0.88 cool-silver lit wall (2026-08-30). Keep LIGHT_TUNE.groundL AND devTune's ground override in sync — groundSync.test.ts holds this arm to the struct */
+  --scene-ground: light-dark(oklch(0.955 0.01 250), oklch(0.09 0.02 265)); /* PRINT: a flat plate ONE step below the white page (0.955 vs 0.985), one flat colour — no sweep. Was the 0.88 cool-silver lit wall (2026-08-30). This token is the light ground's one home. */
   /* The card elevation pair, ONE home for three recipes (`.ig-panel`, `.subject-paired`, the boxed
      rail rung) — they must keep matching, and a token matches by construction where the previous
      "restate the literal" arrangement matched by discipline. Theme-aware since 2026-08-29 (light
@@ -999,7 +993,6 @@
   --accent-foreground: var(--primary-foreground);
 
   --destructive: light-dark(oklch(0.50 0.18 25), oklch(0.63 0.20 25));        /* warn red — also the NO-SIGNAL dot (StateAtoms) */
-  --destructive-foreground: var(--foreground);
 
   /* Added beyond shadcn defaults (structural, still not identity) */
   --success: light-dark(oklch(0.45 0.10 165), oklch(0.80 0.15 165));           /* ready / green */
@@ -1033,10 +1026,7 @@
   --warn-soft: light-dark(oklch(0.55 0.17 55), oklch(0.78 0.16 60));
 
   --border: light-dark(rgba(22, 30, 60, 0.22), rgba(90, 140, 255, 0.22));        /* panel/hairline border (was the --panel-border alias). Light: a NEUTRAL ink hairline (Print, 2026-10-09 — was the blue-tinted rgba(30,60,140,.38)); with the drop shadow gone this line IS the card's edge. 0.30 → 0.16 the same day (user: white cards with a hard rule read as cut-outs "a thousand feet above" the page) — the rule whispers, and the card is a region of the SAME sheet, one step lighter. 0.16 → 0.22 an hour later (user: the ghost cards almost vanished — "slight increase in the left-card and top/bottom bars outline") */
-  --input: var(--border);
   --surface-muted: light-dark(oklch(0.92 0.01 265), oklch(0.18 0.03 265));
-  --secondary: var(--surface-muted);
-  --secondary-foreground: var(--foreground);
 
   /* The wash family — THE ACCENT in four strengths (2026-09-26; user: the blue-grey washes read
      as "boring gray", on the light ground especially, once the explorer's path took an accent
@@ -1109,13 +1099,6 @@
   --ghost-edge: light-dark(rgba(22, 30, 60, 0.30), rgba(90, 140, 255, 0.32));
   --panel-light: light-dark(rgba(246, 247, 250, 0.72), rgba(12, 16, 32, 0.35)); /* light: the ghost card's fill (Print, 2026-10-09) — a FOLDED ghost has no outline by design, so on the sheet its fill is what says it is there: the sheet tone at 0.72, a step below --panel-solid's 0.96 (was white at 0.40, which on the 0.955 plate was nothing) */
   --panel-solid: light-dark(rgba(246, 247, 250, 0.96), rgba(8, 12, 26, 0.92)); /* light: the Print sheet — one step above the 0.955 plate, never white (user, 2026-10-09) */
-  /* The SWITCH's OFF knob (components/ui/switch.tsx, 2026-09-14) — PALE ON BOTH LANES, which is
-     why it needs a token of its own. Off, the knob sits on the faint --border hairline over
-     whatever page is behind it, so it must read against a dark ground and a light one alike, and
-     every other pale surface here inverts with the lane by design (--foreground is ink,
-     --panel-solid is glass). Stated once, for both. The ON knob needs no token: its ground is
-     --primary, and --primary-foreground is already that ground's own ink. */
-  --switch-knob: light-dark(rgba(252, 253, 255, 0.98), rgba(226, 234, 252, 0.95));
   /* --panel-plate is the BASE PLATE a card's FOOT sits on (user, 2026-08-10: the foot's tier
      change "is only the font", asked for more). A NEUTRAL WHITE lift, and the mechanism is the
      whole point — measured live against both grounds: a dark scrim (tried first, at black 40%)
@@ -1130,28 +1113,20 @@
   /* Chrome surfaces that were raw literals in JSX (the old rule-3 allowlist): themed here so the
      theme reaches them; trap 3 — the gradient token is consumed as [background:var()], never
      bg-[var()]. --scrim mirrors the sheet overlay's own literal alpha (0.16, sheet.tsx's
-     "Deliberately faint scrim"); --scrim-shadow shares its base ink but keeps RailDock's sheet
-     title text-shadow at its OWN alpha (0.7) — same near-black tint, two different call-site
-     strengths, so one token can't serve both without shifting one of the looks. */
+     "Deliberately faint scrim"). */
   --topbar-glass: linear-gradient(180deg,
     light-dark(rgba(246, 247, 250, 0.94), rgba(20, 26, 46, 0.82)),
     light-dark(rgba(246, 247, 250, 0.94), rgba(10, 14, 28, 0.76))); /* light: the Print sheet, same as the cards */
   /* THE AI NOTES card's iridescence (2026-10-27) — cyan → violet → pink, the one surface in the HUD
-     whose text a model wrote, marked so it can never pass for a measured reading. Two tokens, one
-     sweep: --ai-edge is the card's 1px border (drawn as a border-box layer under a padding-box fill,
-     NotesCard.tsx), --ai-ink the eyebrow's clipped text. Gradients, so trap 3: consumed as
-     [background:var()], never bg-[var()]. Each stop is light-dark(): paper's stops sit far darker —
-     a hairline needs body on the 0.97 sheet and the eyebrow is caps at the label step, which wants
-     ink contrast (the --primary-ink argument); dark's are lamps, the ink a step brighter than the
-     edge so the caps read above the glass. */
+     whose text a model wrote, marked so it can never pass for a measured reading. --ai-edge is the
+     card's 1px border (drawn as a border-box layer under a padding-box fill, NotesCard.tsx). A
+     gradient, so trap 3: consumed as [background:var()], never bg-[var()]. Each stop is
+     light-dark(): paper's stops sit far darker — a hairline needs body on the 0.97 sheet; dark's
+     are lamps. */
   --ai-edge: linear-gradient(120deg,
     light-dark(oklch(0.54 0.13 205), oklch(0.80 0.12 205)),
     light-dark(oklch(0.48 0.20 295), oklch(0.70 0.16 295)),
     light-dark(oklch(0.52 0.19 350), oklch(0.74 0.15 350)));
-  --ai-ink: linear-gradient(120deg,
-    light-dark(oklch(0.48 0.09 210), oklch(0.88 0.12 205)),
-    light-dark(oklch(0.46 0.19 295), oklch(0.80 0.14 295)),
-    light-dark(oklch(0.50 0.19 350), oklch(0.82 0.13 350)));
   /* The AI card's KIND MARK (2026-10-29): the card wears the rail's own head grammar — an eyebrow
      and a title with a mark at its left, like the snapshot block or the dossier avatar — and the
      mark is what says "AI" on both tiers, so it takes the sweep's middle stop as one solid hue
@@ -1180,7 +1155,6 @@
      sheet overlay: one number can't serve both looks without shifting one of them. */
   --footer-glass: light-dark(rgba(250, 252, 255, 0.34), rgba(10, 14, 28, 0.46));
   --scrim: light-dark(rgba(235, 240, 250, 0.16), rgba(3, 5, 12, 0.16));
-  --scrim-shadow: light-dark(rgba(235, 240, 250, 0.7), rgba(3, 5, 12, 0.7));
   /* The thread's punch-through tone — the PAGE, so the ruler reads as cut out of the ground
      rather than drawn on it. It duplicates --background's light value on purpose (a var() here
      would resolve against the wrong element in the SVG); the two move together. */
