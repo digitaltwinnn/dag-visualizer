@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
-import { type NetworkId } from "@/src/engine/config";
+import { NETWORKS, type NetworkId } from "@/src/engine/config";
 import { lineageIds } from "@/src/net/lineage";
 import { netOf } from "@/src/net/request";
 import type { SnapshotExact, ChannelSnapRow } from "@/src/data/types";
+import { decodeBlocks } from "../decodeBlocks";
 import { decodeChannelContent } from "../decodeChannel";
 import { fetchGlobalJson } from "../fetchGlobal";
 import { withinServedWindow } from "../ordinalWindow";
@@ -118,13 +119,35 @@ async function fetchExact(net: NetworkId, ordinal: number): Promise<SnapshotExac
     signerCount,
     perMeta,
     rows,
+    ...decodeBlocks(v),
   };
 }
 
+// The block HASHES are the explorer's, not the snapshot's (a hash is not a field of what it
+// hashes). Read apart from the exact fetch and cached only on success: a tick the indexer has not
+// reached yet must not pin empty hashes for a day inside the exact answer — it throws here, and the
+// answer goes out with `hash: ""` (rule 10) until a later read finds the record.
+async function fetchBlockHashes(net: NetworkId, ordinal: number): Promise<string[]> {
+  const r = await fetch(`${NETWORKS[net].be}/global-snapshots/${ordinal}`, {
+    headers: { Accept: "application/json" },
+    cache: "no-store",
+    signal: AbortSignal.timeout(6000),
+  });
+  if (!r.ok) throw new Error(`be ${r.status}`);
+  const d = ((await r.json()) as { data?: { blocks?: unknown } }).data;
+  if (!d || !Array.isArray(d.blocks)) throw new Error("no record");
+  return d.blocks.filter((h): h is string => typeof h === "string");
+}
+
+const cachedBlockHashes = (net: NetworkId, ordinal: number) =>
+  unstable_cache(() => fetchBlockHashes(net, ordinal), ["snapshot-block-hashes-v1", net, String(ordinal)], {
+    revalidate: 86400,
+  })();
+
 const cachedExact = (net: NetworkId, ordinal: number) =>
-  // The cache key is versioned WITH the payload shape (v3: rows carry dataBytes, 2026-08-13;
+  // The cache key is versioned WITH the payload shape (v4: blocks + tips; v3: rows carry dataBytes, 2026-08-13;
   // v2: signerCount) — entries cached under an old key would otherwise miss fields for a day.
-  unstable_cache(() => fetchExact(net, ordinal), ["snapshot-exact-v3", net, String(ordinal)], {
+  unstable_cache(() => fetchExact(net, ordinal), ["snapshot-exact-v4", net, String(ordinal)], {
     revalidate: 86400, // ordinals are immutable; a day is plenty (success is cached, misses throw)
   })();
 
@@ -142,6 +165,10 @@ export async function GET(req: Request, ctx: { params: Promise<{ ordinal: string
   }
   try {
     const data = await cachedExact(net, n);
+    if (data.blocks?.length) {
+      const hashes = await cachedBlockHashes(net, n).catch(() => [] as string[]);
+      data.blocks = data.blocks.map((b, i) => ({ ...b, hash: hashes[i] ?? "" }));
+    }
     return NextResponse.json(data, {
       // `s-maxage` too (2026-10-18): the live tip and the cold-load backfill ask every visitor for
       // the SAME ordinals, and with `max-age` alone only each browser kept them — the CDN missed

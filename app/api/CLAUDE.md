@@ -256,6 +256,8 @@ them — but the Next Node server can.
   decode. **A deterministic miss (the channel provably isn't in this immutable global) is cached
   like a success** — throwing it made every repeat of the same bad `(ordinal, address)` re-download
   the whole global, an anonymous amplification loop; only transient failures throw and retry.
+- **`/api/snapshot/[ordinal]`** also answers the snapshot's `blocks` (parents by height and hash, transfers in DAG, signature count; hashes paired by index from the explorer record, `""` where it lists none) and `tips` (`decodeBlocks.ts`; cache key `snapshot-exact-v4`, the hashes read apart and cached on success only).
+- **`/api/network/[address]/snapshots/[ordinal]/blocks`** is a metagraph snapshot's blocks and tips, read from the chain's own L0 (`urls.l0` from the directory, 5 min) through the same `decodeBlocks`; the snapshots route's address gate (catalog + unlisted), `public, max-age=86400, s-maxage=86400, immutable`, 503 `no-store` on upstream failure.
 - **`/api/network/unlisted`** lists the UNLISTED chains — the explorer's `/currency` list less every
   tracked address — cached an hour (`app/api/network/unlistedChains.ts`, also the gate below).
 - **`/api/network/[address]/snapshots`** pages one CATALOG chain (retired networks and former

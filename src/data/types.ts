@@ -1,4 +1,5 @@
 // Shapes coming off the data layer (src/data/api.ts, typed). Loose where the source is loose.
+import type { BlockRead, TipRead } from "@/src/engine/domain/blockBraid";
 
 /** The full decode of ONE anchored metagraph snapshot (spec §7.3). Fetched only on a deliberate
  *  gesture — it re-downloads the ~2.5 MB global to reach one entry. */
@@ -102,6 +103,9 @@ export interface SnapshotExact {
   // expanded row — NOT derived from the fee.
   perMeta: Record<string, { count: number; fee: number; bytes: number }>;
   rows: ChannelSnapRow[];
+  /** The snapshot's blocks (hashes from the explorer, "" where it lists none) and its tips. */
+  blocks?: BlockRead[];
+  tips?: TipRead | null;
 }
 
 /** A selected METAGRAPH SNAPSHOT — a tile on the upper floor (redesign 2026-08-04, spec §7.1).

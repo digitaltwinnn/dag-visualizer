@@ -1,0 +1,62 @@
+import type { BlockRead, TipRead } from "@/src/engine/domain/blockBraid";
+
+// The blocks and tips a snapshot VALUE carries — the same shape on a global snapshot and a
+// metagraph's: `blocks[].block.{value:{parent,transactions},proofs}` and
+// `tips.{remainedActive,deprecated}`. Amounts and fees are datum (1e-8 DAG) on the wire and DAG
+// here. A block's own hash is not in the value (the indexer computes it), so every block comes
+// back with `hash: ""` and the route fills it from the explorer record, by index. Absent data
+// stays absent (rule 10): no blocks → [], no tips → null.
+
+const DATUM = 1e8;
+
+type Ref = { hash?: unknown; height?: unknown };
+type Tx = { value?: { amount?: unknown; fee?: unknown } };
+type RawBlock = { block?: { value?: { parent?: Ref[]; transactions?: Tx[] }; proofs?: unknown[] } };
+type RawTips = {
+  remainedActive?: { block?: Ref; usageCount?: unknown; introducedAt?: unknown }[];
+  deprecated?: { block?: Ref; deprecatedAt?: unknown }[];
+};
+
+const num = (x: unknown): number => (typeof x === "number" && Number.isFinite(x) ? x : 0);
+const str = (x: unknown): string => (typeof x === "string" ? x : "");
+
+export function decodeBlocks(value: unknown): { blocks: BlockRead[]; tips: TipRead | null } {
+  const v = (value ?? {}) as { blocks?: RawBlock[]; tips?: RawTips };
+  const blocks: BlockRead[] = (Array.isArray(v.blocks) ? v.blocks : []).map((b) => {
+    const inner = b?.block;
+    const parents = (inner?.value?.parent ?? []).map((p) => ({ height: num(p?.height), hash: str(p?.hash) }));
+    const txs = inner?.value?.transactions ?? [];
+    let amount = 0;
+    let fee = 0;
+    for (const t of txs) {
+      amount += num(t?.value?.amount);
+      fee += num(t?.value?.fee);
+    }
+    return {
+      hash: "",
+      height: parents.reduce((m, p) => Math.max(m, p.height), 0) + 1,
+      parents,
+      txCount: txs.length,
+      amount: amount / DATUM,
+      fee: fee / DATUM,
+      signers: Array.isArray(inner?.proofs) ? inner.proofs.length : 0,
+    };
+  });
+  const t = v.tips;
+  const tips: TipRead | null = t
+    ? {
+        active: (t.remainedActive ?? []).map((a) => ({
+          hash: str(a?.block?.hash),
+          height: num(a?.block?.height),
+          usage: num(a?.usageCount),
+          introducedAt: num(a?.introducedAt),
+        })),
+        deprecated: (t.deprecated ?? []).map((d) => ({
+          hash: str(d?.block?.hash),
+          height: num(d?.block?.height),
+          deprecatedAt: num(d?.deprecatedAt),
+        })),
+      }
+    : null;
+  return { blocks, tips };
+}
