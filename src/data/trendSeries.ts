@@ -238,7 +238,8 @@ export function metricSeries(
  *  counter in a covered bucket, so a transfer row would read "none" on every day since the spine
  *  began — long before the sampler read a transfer. `x.cov` is the sampler's word for the buckets it
  *  read them in (`bucketing.ts` `markTransferCoverage`); everywhere else the reading is NULL, not
- *  measured (rule 10). A copy, like every series handed out. */
+ *  measured (rule 10), and so is any bucket the row itself holds null. A copy, like every series
+ *  handed out. */
 export function measuredTx(
   row: readonly (number | null)[] | undefined,
   series: Readonly<Record<string, (number | null)[]>>,
@@ -247,7 +248,14 @@ export function measuredTx(
   // whole axis of not-measured, never a shorter series.
   const n = Math.max(series["x.cov"]?.length ?? 0, row?.length ?? 0, series["g.ticks"]?.length ?? 0);
   const cov = series["x.cov"];
-  return Array.from({ length: n }, (_, i) => (cov?.[i] == null ? null : row?.[i] ?? 0));
+  // A row's own NULL is a not-measured of its own (an unlisted fold outside `u.cov`, a bucket the
+  // spine never covered) and survives the coverage; only an ABSENT reading — no row at all, or a
+  // row shorter than the axis — is the read route's measured none.
+  return Array.from({ length: n }, (_, i) => {
+    if (cov?.[i] == null) return null;
+    const v = row?.[i];
+    return v === undefined ? 0 : v;
+  });
 }
 
 /** TRANSFER VOLUME (2026-11-04 — user: "will we also know the transferred value?", and "volume", the
@@ -834,7 +842,10 @@ export function typeBands(id: string, series: Readonly<Record<string, (number | 
 // and two unlisted chains riding the same global snapshot would count it twice — a sum of
 // per-chain counts is no count of the set (rule 10). The set has no stored distinct count, so it
 // shows no "In global snapshots" reading rather than an invented one.
-const UNLISTED_FIELDS = ["snaps", "fee", "kb", "blocks", "gapSum", "gapMax"] as const;
+// The transfers ride the fold too (review, 2026-11-05): without them `m.<unlisted>.tx` was absent,
+// and `measuredTx` read every `x.cov` bucket as a MEASURED 0 for the Unlisted set. Folded under
+// `u.cov` like the rest, then `measuredTx` adds `x.cov`: measured only where both lists were read.
+const UNLISTED_FIELDS = ["snaps", "fee", "kb", "blocks", "gapSum", "gapMax", "tx", "txAmt", "txFee"] as const;
 
 export function withUnlisted(
   series: Readonly<Record<string, (number | null)[]>>,

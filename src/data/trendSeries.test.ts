@@ -778,6 +778,15 @@ describe("withUnlisted — the unlisted chains folded into one network, and the 
   it("is NOT MEASURED (null) wherever the coverage marker is absent — before the sampler read them", () => {
     expect(withUnlisted({ "g.ticks": [3, 4], "m.A.snaps": [6, 7] }, listed, "unl")["m.unl.snaps"]).toEqual([null, null]);
   });
+  it("folds their TRANSFERS too, measured only where both the unlisted list (u.cov) and the transfer lists (x.cov) were read", () => {
+    const tx = withUnlisted({
+      "g.ticks": [3, 3, 3], "u.cov": [0, 0, null], "x.cov": [0, null, 0],
+      "m.A.tx": [9, 9, 9], "m.U1.tx": [2, 4, 6], "m.U2.tx": [1, null, 1], "m.U1.txAmt": [5, 5, 5],
+    }, listed, "unl");
+    expect(tx["m.unl.tx"]).toEqual([3, 4, null]);
+    expect(measuredTx(tx["m.unl.tx"], tx)).toEqual([3, null, null]);
+    expect(transferVolume("unl", tx)).toEqual([5, null, null]);
+  });
   it("a global's snapshots stamped into the next bucket can no longer appear as unlisted (the 2026-09-29 skew)", () => {
     expect(withUnlisted({ "u.cov": [0, 0], "g.anchors": [181, 201], "m.A.snaps": [143, 239] }, listed, "unl")["m.unl.snaps"]).toEqual([0, 0]);
   });
@@ -882,6 +891,10 @@ describe("transfers — measured only where their lists were read (2026-11-04)",
   });
   it("no coverage in the payload is no reading at all", () => {
     expect(metricSeries("transfers", "dor", { "m.dor.tx": [0, 4] }).points).toEqual([null, null]);
+  });
+  it("a bucket the row itself holds null stays not measured under the coverage — only an absent reading is a zero", () => {
+    expect(measuredTx([null, 3, null], { "x.cov": [0, 0, 0] })).toEqual([null, 3, null]);
+    expect(measuredTx([2], { "x.cov": [0, 0] })).toEqual([2, 0]); // shorter than the axis: read, none
   });
   it("is a plain counter named Transfers, recorded in a bucket", () => {
     expect(seriesKey("transfers", "dor")).toBe("m.dor.tx");
