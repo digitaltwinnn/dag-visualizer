@@ -141,4 +141,3 @@ tinted the plate blue inside the DAG's shells, which on paper is a stain, not em
 ⚠️ **What this leaves on the lamp rule above:** a claim's `intensityPaper` still has to be higher
 than its dark level (the test pins the direction), and on the sheet the stage light's pool is the
 one lit thing a paper view shows — judge any retune of it against the flat plate, not the old wall.
-Wave 8's record (`.superpowers/light-wave8-report.md`) is history: it describes the wall.
