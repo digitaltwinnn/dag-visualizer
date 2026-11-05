@@ -18,8 +18,9 @@ describe("block reads wanted by a window", () => {
     expect(wantedBlockReads(w, {}, {}).map((x) => x.key)).toEqual(["dag:300", "DOR:51", "dag:100"]);
     expect(wantedBlockReads(w, {}, {})[1]).toEqual({ key: "DOR:51", chain: "DOR", ordinal: 51 });
   });
-  it("skips what is held or missed", () => {
-    expect(wantedBlockReads(w, { "dag:300": {} }, { "dag:100": true }).map((x) => x.key)).toEqual(["DOR:51"]);
+  it("skips what is held; a missed token read is not asked again, a missed DAG read still is", () => {
+    expect(wantedBlockReads(w, { "dag:300": {} }, { "dag:100": true }).map((x) => x.key)).toEqual(["DOR:51", "dag:100"]);
+    expect(wantedBlockReads(w, {}, { "DOR:51": true }).map((x) => x.key)).toEqual(["dag:300", "dag:100"]);
   });
   it("windowBlockKeys holds every key the window could want", () => {
     expect([...windowBlockKeys(w)].sort()).toEqual(["DOR:51", "dag:100", "dag:300"]);

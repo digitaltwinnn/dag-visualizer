@@ -35,13 +35,17 @@ function allWants(w: BlockWindow): BlockReadWant[] {
   return out;
 }
 
-/** The reads still to make: newest first, leaving out what landed and what failed. */
+/** The reads still to make: newest first, leaving out what landed. A MISSED token read is left out
+ *  too (its one retry lives in the bridge, so a miss is final for the window); a missed DAG read is
+ *  NOT: it is displayed as a miss but still wanted, because `ensurePage` dedupes held and in-flight
+ *  reads itself and `RawSnapshotBridge` bounds its retries, so asking again is safe and lets a tick
+ *  whose earlier exact read failed recover. */
 export function wantedBlockReads(
   w: BlockWindow,
   have: Readonly<Record<string, unknown>>,
   miss: Readonly<Record<string, true>>,
 ): BlockReadWant[] {
-  return allWants(w).filter((x) => have[x.key] == null && miss[x.key] == null);
+  return allWants(w).filter((x) => have[x.key] == null && (x.chain === "dag" || miss[x.key] == null));
 }
 
 /** Every key the window could want, held or not (what retention keeps). */

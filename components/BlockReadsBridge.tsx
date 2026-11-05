@@ -29,7 +29,7 @@ export default function BlockReadsBridge() {
     let cancelDag: (() => void) | null = null;
     let timer: number | null = null;
     let g = 0;
-    let sig = "";
+    let sig: string | null = null;
     const stop = () => {
       g = ++gen.current;
       cancelDag?.();
@@ -53,11 +53,12 @@ export default function BlockReadsBridge() {
       }
     };
 
-    const readToken = async (x: BlockReadWant): Promise<boolean> => {
+    const readToken = async (x: BlockReadWant, mine: number): Promise<boolean> => {
       try {
         const r = await fetch(netUrl(`/api/network/${x.chain}/snapshots/${x.ordinal}/blocks`));
         if (!r.ok) return false;
         const d = (await r.json()) as { blocks: BlockRead[]; tips: TipRead | null };
+        if (mine !== gen.current) return false; // a cancelled read writes nothing
         if (!Array.isArray(d.blocks)) return false;
         reportPoll("api-blocks", true);
         useStore.getState().setBlockRead(x.key, { blocks: d.blocks, tips: d.tips ?? null });
@@ -70,7 +71,7 @@ export default function BlockReadsBridge() {
     const run = () => {
       const w = getBlockWindow();
       // A refold of the same ticks (the exact reads landing) is not a window change: keep the queue.
-      const now = w ? [...windowBlockKeys(w)].join(",") : "";
+      const now = w ? [...windowBlockKeys(w)].join(",") : null;
       if (w && now === sig) return;
       sig = now;
       stop();
@@ -90,15 +91,15 @@ export default function BlockReadsBridge() {
         if (mine !== gen.current || i >= tokens.length) return;
         const x = tokens[i++]!;
         void (async () => {
-          let ok = await readToken(x);
+          let ok = await readToken(x, mine);
           if (mine !== gen.current) return;
           if (!ok) {
             await new Promise<void>((res) => { timer = window.setTimeout(res, RETRY_MS); });
             timer = null;
             if (mine !== gen.current) return;
-            ok = await readToken(x);
+            ok = await readToken(x, mine);
             if (mine !== gen.current) return;
-            if (!ok) {
+            if (!ok && mine === gen.current) {
               reportPoll("api-blocks", false);
               useStore.getState().setBlockReadMiss(x.key);
             }
