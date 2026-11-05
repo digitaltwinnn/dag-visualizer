@@ -58,7 +58,6 @@
     "world-countries": "^5.1.0"
   },
   "overrides": {
-    "systeminformation": "^5.33.19",
-    "@hono/node-server": "^2.1.6"
+    "systeminformation": "^5.33.19"
   }
 }
