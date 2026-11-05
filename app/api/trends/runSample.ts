@@ -113,6 +113,10 @@ export async function runSample(deps: SampleDeps): Promise<SampleResult> {
           cursorNext.xTs = gNewTs;
         } catch {
           txErrors.push("dag");
+          // A FIRST read that fails pins the cursor where it started (review, 2026-11-05): with no
+          // `x` stored, the next run would start at the spine's NEW cursor and this span would
+          // never be read. A warm `x` holds by itself.
+          if (cur.x == null) { cursorNext.x = x; cursorNext.xTs = xTs; }
         }
       }
     }
@@ -129,15 +133,17 @@ export async function runSample(deps: SampleDeps): Promise<SampleResult> {
         const r = await listSince((limit, next) => deps.pageMeta(id, limit, next), since);
         // The chain's token transfers, for the snapshots its walk has now passed. A cold transfer
         // cursor starts at the chain's snapshot cursor (−1 for a chain never read: from genesis,
-        // as its snapshot walk did). A failed read is reported and moves nothing for transfers.
+        // as its snapshot walk did). A failed read is reported and keeps the transfer cursor where
+        // the read started — written below when it was cold, or the span would be skipped.
         const upTo = r.recs.length ? r.recs[r.recs.length - 1].ordinal : since;
         const upToTs = r.recs.length ? Date.parse(r.recs[r.recs.length - 1].timestamp) : cur[`mTs.${id}`] != null ? Number(cur[`mTs.${id}`]) : null;
         const xFrom = cur[`x.${id}`] != null ? Number(cur[`x.${id}`]) : since;
-        let tx: { recs: TxRec[]; upTo: number; upToTs: number | null } | "failed" | null = null;
+        const xFromTs = cur[`xTs.${id}`] != null ? Number(cur[`xTs.${id}`]) : cur[`mTs.${id}`] != null ? Number(cur[`mTs.${id}`]) : null;
+        let tx: { recs: TxRec[]; upTo: number; upToTs: number | null } | { failed: true; from: number; fromTs: number | null } | null = null;
         if (deps.pageTransfers && upTo > xFrom) {
           tx = await listBetween((limit, next) => deps.pageTransfers!(id, limit, next), txKey, xFrom, upTo)
             .then((t) => ({ recs: t.recs, upTo, upToTs }))
-            .catch(() => "failed" as const);
+            .catch(() => ({ failed: true as const, from: xFrom, fromTs: xFromTs }));
         }
         return { id, r, tx };
       }),
@@ -146,8 +152,16 @@ export async function runSample(deps: SampleDeps): Promise<SampleResult> {
       const s = settled[i];
       if (s.status === "rejected") { metaErrors.push(ids[i]); continue; }
       const { id, r, tx } = s.value;
-      if (tx === "failed") txErrors.push(id);
-      else if (tx) {
+      if (tx && "failed" in tx) {
+        txErrors.push(id);
+        // A cold transfer cursor is pinned where the read started, or the chain's NEW snapshot
+        // cursor would become the next run's start and this span would never be read (review,
+        // 2026-11-05: those buckets carry the DAG's `x.cov`, so the loss read as a measured undercount).
+        if (cur[`x.${id}`] == null) {
+          cursorNext[`x.${id}`] = tx.from;
+          if (tx.fromTs != null) cursorNext[`xTs.${id}`] = tx.fromTs;
+        }
+      } else if (tx) {
         bucketTransfers(inc, net, id, tx.recs);
         cursorNext[`x.${id}`] = tx.upTo;
         if (tx.upToTs != null) cursorNext[`xTs.${id}`] = tx.upToTs;

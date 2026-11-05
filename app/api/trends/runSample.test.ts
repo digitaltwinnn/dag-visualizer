@@ -234,18 +234,26 @@ describe("runSample transfers (2026-11-04)", () => {
     const res = await runSample(deps(store, { pageTransfers: pageTransfers("dag") }));
     expect(res.txErrors).toEqual(["dag"]);
     const cursor = store.data.get("t:mainnet:cursor")!;
-    expect(cursor.get("x")).toBeUndefined();
+    // A FIRST read that fails pins x where it started, so the next run reads this span again.
+    expect(cursor.get("x")).toBe("100");
     expect(cursor.get("g")).toBe("102");
     expect(store.data.get("t:mainnet:5m:2026-09-06")!.has("14:00|x.cov")).toBe(false);
-    // A warm x would hold, and the next run would read this span again; a FIRST run that fails has
-    // no x yet, so the next starts at the spine's cursor and this span stays unclaimed (the fill's).
+    const again = await runSample(deps(store, { pageTransfers: pageTransfers() }));
+    expect(again.txErrors).toEqual([]);
+    expect(store.data.get("t:mainnet:5m:2026-09-06")!.get("14:00|g.tx")).toBe("2");
+    expect(store.data.get("t:mainnet:cursor")!.get("x")).toBe("102");
   });
-  it("a failed token list moves nothing for that chain's transfers, and its snapshots still land", async () => {
+  it("a failed token list keeps that chain's transfer cursor where the read started, and its snapshots still land", async () => {
     const store = warm();
     const res = await runSample(deps(store, { pageTransfers: pageTransfers("abc") }));
     expect(res.txErrors).toEqual(["abc"]);
-    expect(store.data.get("t:mainnet:cursor")!.get("x.abc")).toBeUndefined();
+    // Cold before the run: pinned at the snapshot cursor the read started from, NOT the new one —
+    // otherwise snapshot 9's transfers would never be read (review, 2026-11-05).
+    expect(store.data.get("t:mainnet:cursor")!.get("x.abc")).toBe("8");
     expect(store.data.get("t:mainnet:cursor")!.get("m.abc")).toBe("9");
+    await runSample(deps(store, { pageTransfers: pageTransfers() }));
+    expect(store.data.get("t:mainnet:5m:2026-09-06")!.get("14:00|m.abc.tx")).toBe("1");
+    expect(store.data.get("t:mainnet:cursor")!.get("x.abc")).toBe("9");
   });
   it("a cold spine starts the transfer cursor at this run's newest global and claims nothing", async () => {
     const store = memStore();
