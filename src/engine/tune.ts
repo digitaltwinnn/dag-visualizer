@@ -157,7 +157,7 @@ export function savePersisted(groups: TuneGroup[]): void {
 }
 
 /** Reset a group back to its shipped defaults. */
-function resetGroup(g: TuneGroup): void {
+export function resetGroup(g: TuneGroup): void {
   for (const key of Object.keys(g.schema)) {
     const d = defaultOf(g, key);
     if (d !== undefined) live(g)[key] = d;
@@ -169,7 +169,7 @@ function resetGroup(g: TuneGroup): void {
 /** Format a group's current values as a paste-ready TS object literal, shaped like the module
  *  constant it came from. The whole point of the panel is that chosen numbers get BAKED, so the
  *  bake step is a copy-paste rather than transcription from a screenshot. */
-function exportGroup(g: TuneGroup): string {
+export function exportGroup(g: TuneGroup): string {
   const keys = Object.keys(g.schema);
   const body = keys
     .map((k) => {

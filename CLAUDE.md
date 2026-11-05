@@ -568,7 +568,7 @@ file, and the rules above govern them.
 | React HUD | `components/CLAUDE.md` | the four-zone shell, the slab/card grammar, Instrument-Glass, CSS traps, the subject callout |
 | Three adapters | `src/engine/scene/CLAUDE.md` | nodes/layers/the filter, the whole Snapshots chamber, and History's ground |
 | Pure logic | `src/engine/domain/CLAUDE.md` | the 3D↔3D transition, selection semantics |
-| Engine | `src/engine/CLAUDE.md` | the look rows, emphasis knobs and the `?tune` panel shell |
+| Engine | `src/engine/CLAUDE.md` | the look rows, emphasis knobs and the empty `?tune` panel framework |
 | Data layer | `src/data/CLAUDE.md` | the snapshot stream, anchoring & fees, the tick lifecycle, the measured-history path the History view reads |
 | Networks | `src/net/CLAUDE.md` | `?net=` and the three networks |
 | Theme | `src/theme/CLAUDE.md` | light/dark and the ground questions it forces |

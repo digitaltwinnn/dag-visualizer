@@ -1,6 +1,6 @@
 # src/engine — working notes
 
-Engine-wide: the look rows, the emphasis knobs, and the `?tune` panel shell.
+Engine-wide: the look rows, the emphasis knobs, and the empty `?tune` panel framework.
 
 Split out of the root `CLAUDE.md` (2026-08-31) so it loads when you work here rather
 than on every session. The root file holds what this is, the twelve rules, run & test,
@@ -17,8 +17,11 @@ the constant itself.
 
 The dev **`?tune`** flag (present at page load, the `?stats` idiom; in `next dev` also the corner
 switch) dynamic-imports a tweakpane panel from `src/engine/devTune.ts` — never in the normal bundle.
-**Its manifest is empty** (user, same day: "cleanup the ?tune attributes but keep the functionality
-for later"); what remains is the shell — the camera readout, export, reset and opt-in persistence.
+**The manifest and the panel are empty** (user, same day: "just an empty panel and framework,
+tests etc. as a placeholder for future tuning"); what remains is the framework — the generic walker,
+per-group export and reset, export ALL and opt-in persistence, pinned by `tune.test.ts` — and the
+panel-wide actions appear once the manifest holds a group. (A live camera readout with a
+`capture ← live` dump lived here until then; git has it.)
 The contract is `src/engine/tune.ts`, whose header is the authoritative statement:
 
 1. **The manifest is the one place a knob is declared.** A `TuneGroup` names the module's constant BY
@@ -32,8 +35,7 @@ The contract is `src/engine/tune.ts`, whose header is the authoritative statemen
    `setColors`), never through a panel-only method on the view. **Prefer reading the row per frame
    and needing no callback at all**, which is what the stage light, the rig and the dim rows do.
 
-**The tree is STATIC** — shared groups, then one collapsed folder per view (empty ones skipped),
-then the camera. Persistence is **opt-in and default OFF** — a silently-restored session is a trap,
+**The tree is STATIC** — shared groups, then one collapsed folder per view (empty ones skipped). Persistence is **opt-in and default OFF** — a silently-restored session is a trap,
 because you would be looking at last week's knobs believing they were the shipped look.
 
 **A knob belongs to the view whose look it changes, even when central code applies it** (user,
@@ -127,8 +129,3 @@ executable pin is in `dimModel.test.ts`. The core's own SPHERE follows
 the same rule and is now the shared `HUB_ORB` geometry at hub size (was r 1.5 vs the hubs' 0.9): *"its
 central position already tells it's a bit different from the others, not size"* (user, 2026-08-11).
 
-**The camera folder is a READOUT, not sliders**: poses are ~8 constants and each needs its own selection
-state to even see, so orbiting to a pose you like and reading it off beats dragging numbers.
-`capture ← live` dumps the raw `pos`/`target` **with a caution naming the levers the Engine composes on
-top** (`dollyBack`, `railsLean`, and the subject-relative hub framings). Deliberately raw — per-pose
-inverses would be a second home for pose knowledge that drifts silently.
