@@ -34,7 +34,19 @@ export interface TrailDeps {
   chains(): Promise<string[]>;
   /** Maps a chain address to its network's CURRENT id, so a former address folds under it. */
   currentId?(id: string): string;
+  /** The clock for the walk deadline (injectable). */
+  now?(): number;
 }
+
+/** The walk cannot reach the window asked for (a pin deeper than the page cap): an answer, not a failure. */
+export class BeyondReach extends Error {
+  constructor(chain: string) {
+    super(`chain ${chain}: beyond the walk`);
+  }
+}
+
+/** One overall deadline for the whole walk, under the route's 60 s. */
+export const TRAIL_DEADLINE_MS = 45_000;
 
 /** Pages one chain's walk may take before the window is called unreadable. */
 export const TRAIL_PAGES_MAX = 12;
@@ -43,6 +55,8 @@ type ChainTicks = Map<number, TrailRow[]>;
 
 export async function assembleTrail(deps: TrailDeps, around: number | null, n: number): Promise<BlockWindowAnswer> {
   const cur = deps.currentId ?? ((id: string) => id);
+  const now = deps.now ?? Date.now;
+  const started = now();
   const ids = await deps.chains();
   const found = new Map<string, ChainTicks>();
   const key = (chain: string, row: TrailRow): number | null => (chain === "dag" ? row.snapshotOrdinal : (row.globalSnapshotOrdinal ?? null));
@@ -58,7 +72,8 @@ export async function assembleTrail(deps: TrailDeps, around: number | null, n: n
     found.set(chain, ticks);
     let next: string | undefined;
     for (let page = 0; ; page++) {
-      if (page >= TRAIL_PAGES_MAX) throw new Error(`chain ${chain}: more than ${TRAIL_PAGES_MAX} pages`);
+      if (page >= TRAIL_PAGES_MAX) throw new BeyondReach(chain);
+      if (now() - started > TRAIL_DEADLINE_MS) throw new Error("trail walk deadline");
       const r = await deps.transfers(chain, next);
       for (const row of r.rows) {
         const k = key(chain, row);

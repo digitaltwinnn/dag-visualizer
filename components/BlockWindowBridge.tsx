@@ -14,8 +14,9 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 // sibling. It asks the one rule (`blockWanted`) whenever the view, the register, the pin or the live
 // feed's newest snapshot moves, fetches `/api/blocks/trail`, folds the answer against the exact
 // reads, and holds the window in the module beside `NetworkData` (`pastWindow.ts`). A failed read is
-// tried again on `pastRetryDelay`'s schedule and, once spent, leaves the chamber empty and says so
-// through the feed's health row (`api-blocks`). Following the live edge, it refreshes the live trail
+// tried again on `pastRetryDelay`'s schedule; once spent, or when the pin lies beyond the trail's
+// reach, the held window is CLEARED (the chamber never shows a window that does not hold the pin)
+// and `blockWindowStatus` says why; the feed's health row (`api-blocks`) tracks the reads. Following the live edge, it refreshes the live trail
 // every `LIVE_REFRESH_MS` and adds a tick the live feed has announced at once (its blocks are on the
 // global record), leaving its anchored records for the next refresh.
 const LIVE_REFRESH_MS = 30_000;
@@ -25,6 +26,7 @@ export default function BlockWindowBridge() {
   const register = useStore((s) => s.ledgerRegister);
   const following = useStore((s) => s.following);
   const pin = useStore((s) => s.snap?.data.ordinal ?? null);
+  const setStatus = useStore((s) => s.setBlockWindowStatus);
   const exact = useStore((s) => s.snapshotExact);
   const { snaps } = useSnapshotFeed(POLL.maxSnapshots, ledger && register === "blocks");
   const liveNewest = snaps.length ? snaps[snaps.length - 1]!.ordinal : null;
@@ -55,7 +57,15 @@ export default function BlockWindowBridge() {
         if (g !== gen.current) return;
         if (!a || !Array.isArray(a.ticks)) return failed(around, g, attempt);
         reportPoll("api-blocks", true);
+        if (a.beyond) {
+          // Too deep to walk to: the read worked, the answer is "beyond"; nothing to retry.
+          answer.current = null;
+          setBlockWindow(null);
+          setStatus({ around, status: "beyond" });
+          return;
+        }
         apply(a);
+        setStatus({ around, status: "ready" });
       })
       .catch(() => failed(around, g, attempt));
   };
@@ -63,7 +73,16 @@ export default function BlockWindowBridge() {
     if (g !== gen.current) return;
     reportPoll("api-blocks", false);
     const delay = pastRetryDelay(attempt);
-    if (delay == null) return;
+    if (delay == null) {
+      // Budget spent: stand the chamber empty for a pin (a window that lacks it would lie); the
+      // live edge keeps what it holds and tries again on its next refresh.
+      if (around != null) {
+        answer.current = null;
+        setBlockWindow(null);
+      }
+      setStatus({ around, status: "failed" });
+      return;
+    }
     retry.current = window.setTimeout(() => {
       retry.current = null;
       read(around, g, attempt + 1);
@@ -73,21 +92,26 @@ export default function BlockWindowBridge() {
   useEffect(() => {
     const held = getBlockWindow();
     const want = blockWanted({ ledger, register, pin, held: held ? { from: held.from, to: held.to } : null, liveNewest });
-    if (want.kind === "keep") return;
+    // Unpinning back to the live edge: the held window is the pin's, so ask for live at once.
+    const backToLive = want.kind === "keep" && pin == null && asked.current != null && asked.current !== "live";
+    if (want.kind === "keep" && !backToLive) return;
     if (want.kind === "clear") {
       gen.current++;
       asked.current = null;
       answer.current = null;
       dropRetry();
       setBlockWindow(null);
+      if (useStore.getState().blockWindowStatus) setStatus(null);
       return;
     }
-    const key = want.around == null ? "live" : String(want.around);
+    const around = want.kind === "fetch" ? want.around : null;
+    const key = around == null ? "live" : String(around);
     if (asked.current === key) return;
     asked.current = key;
+    setStatus({ around, status: "loading" });
     gen.current++;
     dropRetry();
-    read(want.around, gen.current, 0);
+    read(around, gen.current, 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ledger, register, pin, liveNewest]);
 

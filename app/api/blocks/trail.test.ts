@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GlobalSnapshot, RawMetaSnapshot } from "@/src/data/types";
-import { assembleTrail, type TrailDeps, type TrailRow } from "./trail";
+import { BeyondReach, TRAIL_DEADLINE_MS, assembleTrail, type TrailDeps, type TrailRow } from "./trail";
 
 // A fake explorer: the DAG's transfer list (key = the global snapshot) and a token chain's
 // (key = its own snapshot, tick = `globalSnapshotOrdinal`), both newest first, paged by a number cursor.
@@ -64,8 +64,18 @@ describe("assembleTrail", () => {
     await expect(assembleTrail(deps({ transfers: async () => { throw new Error("be 504"); } }), null, 10)).rejects.toThrow();
   });
 
-  it("fails when a walk reaches its page cap before the window is whole", async () => {
+  it("a dormant chain whose list is absent (the route answers it as no rows) adds nothing", async () => {
+    const d = deps({ chains: async () => ["dor", "old"] });
+    expect((await assembleTrail(d, null, 10)).ticks.map((t) => t.ord)).toEqual([300, 250, 200, 100]);
+  });
+
+  it("fails when the walk passes its deadline, never a short answer", async () => {
+    let t = 0;
+    await expect(assembleTrail(deps({ size: 1, now: () => (t += TRAIL_DEADLINE_MS / 2) }), null, 10)).rejects.toThrow(/deadline/);
+  });
+
+  it("is BeyondReach (not a failure) when a walk reaches its page cap before the window is whole", async () => {
     const endless: TrailDeps["transfers"] = async (chain, next) => ({ rows: chain === "dag" ? [{ snapshotOrdinal: 1e6 - Number(next ?? 0), blockHash: "h" }] : [], next: String(Number(next ?? 0) + 1) });
-    await expect(assembleTrail(deps({ transfers: endless }), 10, 5)).rejects.toThrow(/page/);
+    await expect(assembleTrail(deps({ transfers: endless }), 10, 5)).rejects.toBeInstanceOf(BeyondReach);
   });
 });

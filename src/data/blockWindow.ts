@@ -24,6 +24,8 @@ export interface BlockTick {
 export interface BlockWindowAnswer {
   ticks: BlockTick[];
   chains: string[];
+  /** The window asked for lies deeper than the trail can walk: no ticks, and not a failure. */
+  beyond?: true;
 }
 
 export interface BlockWindow extends LedgerSource {

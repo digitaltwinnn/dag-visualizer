@@ -3,7 +3,7 @@ import { NETWORKS } from "@/src/engine/config";
 import { currentIdOf, lineageIds } from "@/src/net/lineage";
 import { netOf } from "@/src/net/request";
 import type { GlobalSnapshot, RawMetaSnapshot } from "@/src/data/types";
-import { assembleTrail, type TrailRow } from "../trail";
+import { BeyondReach, assembleTrail, type TrailRow } from "../trail";
 
 // GET /api/blocks/trail?net=&around=<ordinal|live>&n=52 — the Blocks register's window: the newest
 // `n` global snapshots at or below `around` that hold a block (`../trail.ts`). `live` is the edge
@@ -20,8 +20,10 @@ const PAGE = 1000;
 const DEFAULT_N = 52;
 const MAX_N = 100;
 
-async function getJson(url: string): Promise<{ data?: unknown; meta?: { next?: string } }> {
+async function getJson(url: string, absentOk = false): Promise<{ data?: unknown; meta?: { next?: string } }> {
   const r = await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(8000), cache: "no-store" });
+  // A dormant former address has no list: 404 is no rows, not a failed read.
+  if (r.status === 404 && absentOk) return {};
   if (!r.ok) throw new Error(`be ${r.status}`);
   return (await r.json()) as { data?: unknown; meta?: { next?: string } };
 }
@@ -49,7 +51,7 @@ export async function GET(req: Request) {
       {
         transfers: async (chain, next) => {
           const path = chain === "dag" ? "/transactions" : `/currency/${chain}/transactions`;
-          const j = await getJson(`${be}${path}?limit=${PAGE}${next ? `&next=${encodeURIComponent(next)}` : ""}`);
+          const j = await getJson(`${be}${path}?limit=${PAGE}${next ? `&next=${encodeURIComponent(next)}` : ""}`, chain !== "dag");
           return { rows: Array.isArray(j.data) ? (j.data as TrailRow[]) : [], next: j.meta?.next };
         },
         global: (o) => getRecord<GlobalSnapshot>(`${be}/global-snapshots/${o}`),
@@ -65,7 +67,9 @@ export async function GET(req: Request) {
     const settled = around != null && newest != null && Date.now() - Date.parse(newest.ts) > SETTLED_MS;
     const cache = around == null ? "public, s-maxage=30, stale-while-revalidate=30" : settled ? "public, s-maxage=31536000, immutable" : "public, s-maxage=60, stale-while-revalidate=60";
     return NextResponse.json(answer, { headers: { "Cache-Control": cache } });
-  } catch {
+  } catch (e) {
+    // Too deep to walk to is an answer (a pin only gets deeper), cached an hour; any other failure is not.
+    if (e instanceof BeyondReach) return NextResponse.json({ ticks: [], chains: [], beyond: true }, { headers: { "Cache-Control": "public, s-maxage=3600" } });
     return NextResponse.json({ error: "unavailable" }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
 }

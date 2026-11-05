@@ -206,6 +206,8 @@ interface AppState {
   /** THE SNAPSHOTS VIEW'S PAST WINDOW — its status only (`src/data/pastWindow.ts` holds the data;
    *  `components/PastWindowBridge.tsx` is the one writer). `ordinal` is the pin it was asked for;
    *  `from`/`to` the global snapshots it holds once ready. Null while the view reads the live feed. */
+  /** The Blocks register's window status (`BlockWindowBridge` alone writes it; the data lives in `pastWindow.ts`). */
+  blockWindowStatus: { around: number | null; status: "loading" | "ready" | "failed" | "beyond" } | null;
   pastWindow: { ordinal: number; from: number | null; to: number | null; status: "loading" | "ready" | "failed" } | null;
   // Deep channel reads (full decode of one metagraph snapshot), keyed by metaSnapDeepKey(globalOrdinal, metaId).
   // Immutably cached — fetched from /api/snapshot/[ordinal]/channel/[address] on explicit gesture,
@@ -521,6 +523,7 @@ interface AppState {
   /** Record a FAILED exact read for this ordinal — the acquiring states' give-up signal. */
   setExactMiss: (ordinal: number) => void;
   setPastWindowStatus: (w: AppState["pastWindow"]) => void;
+  setBlockWindowStatus: (w: AppState["blockWindowStatus"]) => void;
   /** `key` defaults to the decode's own identity; the bridge passes the REQUESTED key when
    *  the route fell back to another entry (an undecodable row asks with ordinal 0). */
   setMetaSnapDeep: (d: ChannelSnapDeep, key?: string) => void;
@@ -654,6 +657,8 @@ export const useStore = create<AppState>((set) => ({
   exactMiss: {},
   pastWindow: null,
   setPastWindowStatus: (pastWindow) => set({ pastWindow }),
+  blockWindowStatus: null,
+  setBlockWindowStatus: (blockWindowStatus) => set({ blockWindowStatus }),
   metaSnapDeep: {},
   deepWanted: null,
   phoneDock: null,

@@ -241,4 +241,10 @@ describe("store.ledgerRegister / block", () => {
     useStore.getState().setBlockMeasure("height");
     expect(useStore.getState().blockMeasure).toBe("height");
   });
+  it("the block window's status is a plain data-bridge setting", () => {
+    useStore.getState().setBlockWindowStatus({ around: 5, status: "beyond" });
+    expect(useStore.getState().blockWindowStatus).toEqual({ around: 5, status: "beyond" });
+    useStore.getState().setBlockWindowStatus(null);
+    expect(useStore.getState().blockWindowStatus).toBeNull();
+  });
 });
