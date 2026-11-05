@@ -889,6 +889,7 @@ export class Engine {
         const eff = st.docPage || st.docClosing ? ("soon" as Mode) : st.mode;
         const prevEff = prev.docPage || prev.docClosing ? ("soon" as Mode) : prev.mode;
         if (eff !== prevEff) this.setMode(eff);
+        else if (st.ledgerRegister !== prev.ledgerRegister) this._holdSceneFeeds();
         // The bare stage ARMS rather than hides (user, 2026-09-04: "shouldn't their nodes still
         // move to the gathering section at the top like they always do?"): the gather is the OUT
         // phase's job whatever the destination, and hiding the fleet is the DOC "view"'s own
@@ -1455,13 +1456,19 @@ export class Engine {
     this.globe.setFleetVisible(!fleetFaded(leaving, entering, this._docFleetFaded), snap);
   }
 
+  /** Holds the feeds the current view draws; the chamber's register is part of the answer, so a
+   *  register flip re-holds too (the Blocks register adds the block trail). */
+  private _holdSceneFeeds() {
+    for (const r of this._sceneFeedHolds) r();
+    this._sceneFeedHolds = sceneFeeds(VIEW_POLICIES[this.mode], useStore.getState().ledgerRegister).map((f) => holdFeed(f, "3D scene"));
+  }
+
   setMode(mode: Mode) {
     const prevMode = this.mode; // capture BEFORE the reassignment — the choreography branches on it
     this.mode = mode;
     // THE SCENE'S READS FOR THE PULSE STRIP (src/data/feedUse.ts): the feeds this view draws, from
     // the same policy flags that switch the drawing on (`domain/sceneFeeds.ts`).
-    for (const r of this._sceneFeedHolds) r();
-    this._sceneFeedHolds = sceneFeeds(VIEW_POLICIES[mode]).map((f) => holdFeed(f, "3D scene"));
+    this._holdSceneFeeds();
     // A view switch lands the camera on the destination's own pose (the boundary re-derive),
     // so a pre-switch free orbit no longer holds it — see _onControlsStart.
     this._freeOrbit = false;

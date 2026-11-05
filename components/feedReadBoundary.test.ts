@@ -33,6 +33,7 @@ const EXEMPT: Record<string, string> = {
   "components/useSnapshotFeed.ts": "the accessor itself: its callers hold (the token above)",
   "components/useLedgerSource.ts": "an accessor over the feed, a past window or the block window: its callers hold",
   "components/PastWindowBridge.tsx": "the past window's FETCHER: reads the feed's oldest tick to decide, draws nothing",
+  "components/BlockWindowBridge.tsx": "the block window's FETCHER: reads the live feed's newest tick to decide, draws nothing",
   "components/railSiblings.ts": "pure resolver over state its caller passes in; the caller holds",
   "components/useFeedRead.ts": "the hold hook",
 };

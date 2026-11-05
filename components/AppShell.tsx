@@ -18,6 +18,7 @@ import RailScroll from "@/components/RailScroll";
 import FollowController from "@/components/FollowController";
 import RawSnapshotBridge from "@/components/RawSnapshotBridge";
 import PastWindowBridge from "@/components/PastWindowBridge";
+import BlockWindowBridge from "@/components/BlockWindowBridge";
 import RouteSync from "@/components/RouteSync";
 import Tooltip from "@/components/Tooltip";
 import MotionHint from "@/components/MotionHint";
@@ -127,6 +128,7 @@ export default function AppShell({ doc }: { doc?: DocPage }) {
       <FollowController />
       <RawSnapshotBridge />
       <PastWindowBridge />
+      <BlockWindowBridge />
       <RouteSync />
       <ThemeController />
       <Tooltip />
