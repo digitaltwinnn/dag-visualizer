@@ -420,6 +420,8 @@ interface AppState {
   hoverBlock: string | null;
   // Block reads, keyed `${chain}:${ordinal}`; "dag:<ord>" mirrors `snapshotExact`'s blocks and tips.
   blockReads: Record<string, { blocks: BlockRead[]; tips: TipRead | null }>;
+  // Block reads that FAILED (retry spent): the tick stays, its blocks draw with no links (rule 10).
+  blockReadMiss: Record<string, true>;
   // What the Geography explorer's country rows count — nodes, metagraphs or providers
   // (`src/data/geoMeasure.ts`). A setting, like the two above.
   geoMeasure: GeoMeasure;
@@ -558,6 +560,9 @@ interface AppState {
   setBlock: (b: BlockSel | null) => void;
   setHoverBlock: (hash: string | null) => void;
   setBlockRead: (key: string, v: { blocks: BlockRead[]; tips: TipRead | null }) => void;
+  setBlockReadMiss: (key: string) => void;
+  /** Drop every block read and miss outside `keep`, except the `:frontier` keys. Data-bridge setter. */
+  retainBlockReads: (keep: Set<string>) => void;
   setLedgerMeasure: (measure: LedgerMeasure) => void;
   setGeoMeasure: (measure: GeoMeasure) => void;
   setHyperMeasure: (measure: HyperMeasure) => void;
@@ -686,6 +691,7 @@ export const useStore = create<AppState>((set) => ({
   block: null,
   hoverBlock: null,
   blockReads: {},
+  blockReadMiss: {},
   geoMeasure: "nodes",
   hyperMeasure: "nodes",
   trendScroll: 0,
@@ -976,7 +982,26 @@ export const useStore = create<AppState>((set) => ({
   setBlockMeasure: (blockMeasure) => set({ blockMeasure }),
   setBlock: (block) => set({ block }),
   setHoverBlock: (hoverBlock) => set({ hoverBlock }),
-  setBlockRead: (key, v) => set((s) => ({ blockReads: { ...s.blockReads, [key]: v } })),
+  setBlockRead: (key, v) =>
+    set((s) => {
+      if (s.blockReadMiss[key] == null) return { blockReads: { ...s.blockReads, [key]: v } };
+      const miss = { ...s.blockReadMiss };
+      delete miss[key];
+      return { blockReads: { ...s.blockReads, [key]: v }, blockReadMiss: miss };
+    }),
+  setBlockReadMiss: (key) => set((s) => ({ blockReadMiss: { ...s.blockReadMiss, [key]: true } })),
+  retainBlockReads: (keep) =>
+    set((s) => {
+      const kept = (k: string) => keep.has(k) || k.endsWith(":frontier");
+      const reads = Object.keys(s.blockReads).filter((k) => !kept(k));
+      const miss = Object.keys(s.blockReadMiss).filter((k) => !kept(k));
+      if (!reads.length && !miss.length) return {};
+      const blockReads = { ...s.blockReads };
+      const blockReadMiss = { ...s.blockReadMiss };
+      for (const k of reads) delete blockReads[k];
+      for (const k of miss) delete blockReadMiss[k];
+      return { blockReads, blockReadMiss };
+    }),
   setGeoMeasure: (measure) => set({ geoMeasure: measure }),
   setHyperMeasure: (measure) => set({ hyperMeasure: measure }),
   setTrendScroll: (offset) => set({ trendScroll: offset, motionCause: { kind: "page" } }),

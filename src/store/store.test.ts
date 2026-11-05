@@ -229,6 +229,15 @@ describe("store.ledgerRegister / block", () => {
     useStore.getState().setBlockRead("dag:7241523", { blocks: [], tips: null });
     expect(useStore.getState().blockReads["dag:7241523"]).toEqual({ blocks: [], tips: null });
   });
+  it("retainBlockReads drops reads and misses outside the window, keeps the frontier", () => {
+    const st = useStore.getState();
+    for (const k of ["dag:1", "dag:2", "DOR:frontier"]) st.setBlockRead(k, { blocks: [], tips: null });
+    st.setBlockReadMiss("dag:2");
+    useStore.getState().retainBlockReads(new Set(["dag:1"]));
+    const n = useStore.getState();
+    expect(Object.keys(n.blockReads).sort()).toEqual(["DOR:frontier", "dag:1"]);
+    expect(n.blockReadMiss["dag:2"]).toBeUndefined();
+  });
   it("leaving the Snapshots view clears the block, as it clears the pin", () => {
     useStore.getState().setMode("ledger");
     useStore.getState().setBlock({ chain: "dag", hash: "h", ordinal: 1, anchorOrd: 1 });
