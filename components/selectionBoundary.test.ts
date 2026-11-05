@@ -16,7 +16,7 @@ import { join } from "node:path";
 //     executor like everything else.
 //
 // In scope: the selection setters (setFilter / setCountry / setInspect / setSnap / setLayer /
-// setFollowing / setCohort / setTrendFocus / setRailNet). NOT in scope: the hover channels (subjectPairing's
+// setFollowing / setCohort / setTrendFocus / setRailNet / setBlock). NOT in scope: the hover channels (subjectPairing's
 // lane), view/mode navigation, phone-UI chrome, and data-bridge setters — those are not
 // selections.
 //
@@ -26,7 +26,8 @@ import { join } from "node:path";
 // it carries a consequence beyond its own channel (an off-window plane pages into view first).
 // That consequence belongs in the executor, where every caller inherits it, which is exactly what
 // this boundary exists to guarantee. `trendPlaneActions` is the table entry;
-// `setTrendScroll` and `setTrendMetric` stay OUT — they are how the reader wants the stack drawn,
+// `setTrendScroll`, `setTrendMetric` and `setLedgerRegister` (which register the Snapshots view reads —
+// a setting, like the measures) stay OUT — they are how the reader wants the stack drawn,
 // not what it is about.
 //
 // Cheap grep over real source (the house pattern — see engine/layerBoundaries.test.ts and
@@ -38,7 +39,7 @@ const COMPONENTS = join(import.meta.dirname, ".");
 // not a user pick). Anything else that needs an exemption should instead get a table entry.
 const ALLOW = new Set(["FollowController.tsx"]);
 
-const SELECTION_SETTERS = /\bset(Filter|Country|Inspect|Snap|Layer|Following|Cohort|TrendFocus|RailNet)\b/;
+const SELECTION_SETTERS = /\bset(Filter|Country|Inspect|Snap|Layer|Following|Cohort|TrendFocus|RailNet|Block)\b/;
 
 function sourceFiles(dir: string): string[] {
   const out: string[] = [];

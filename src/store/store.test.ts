@@ -218,3 +218,27 @@ describe("setRailNet", () => {
     useStore.setState({ railNet: null, selStack: [] });
   });
 });
+
+describe("store.ledgerRegister / block", () => {
+  it("holds the ledger register as a setting with a motion cause, and a block selection", () => {
+    useStore.getState().setLedgerRegister("blocks");
+    expect(useStore.getState().ledgerRegister).toBe("blocks");
+    expect(useStore.getState().motionCause).toEqual({ kind: "register", id: "blocks" });
+    useStore.getState().setBlock({ chain: "dag", hash: "h", ordinal: 7241523, anchorOrd: 7241523 });
+    expect(useStore.getState().block?.hash).toBe("h");
+    useStore.getState().setBlockRead("dag:7241523", { blocks: [], tips: null });
+    expect(useStore.getState().blockReads["dag:7241523"]).toEqual({ blocks: [], tips: null });
+  });
+  it("leaving the Snapshots view clears the block, as it clears the pin", () => {
+    useStore.getState().setMode("ledger");
+    useStore.getState().setBlock({ chain: "dag", hash: "h", ordinal: 1, anchorOrd: 1 });
+    useStore.getState().setHoverBlock("h");
+    useStore.getState().setMode("geo");
+    expect(useStore.getState().block).toBeNull();
+    expect(useStore.getState().hoverBlock).toBeNull();
+  });
+  it("the block measure is a plain setting", () => {
+    useStore.getState().setBlockMeasure("height");
+    expect(useStore.getState().blockMeasure).toBe("height");
+  });
+});

@@ -229,4 +229,9 @@ describe("the trends view is registered and inert", () => {
     // the old expression's answer so wiring one up later changes nothing by accident.
     expect(VIEW_POLICIES.soon.autoRotate).toBe(true);
   });
+
+  it("only the Snapshots view offers the Blocks register", () => {
+    expect(VIEW_POLICIES.ledger.registers).toEqual(["snapshots", "blocks"]);
+    for (const m of ["hyper", "geo", "trend", "soon"] as const) expect(VIEW_POLICIES[m].registers).toEqual(["snapshots"]);
+  });
 });

@@ -23,11 +23,13 @@ import { UNLISTED_ID } from "@/src/data/unlistedId";
 // 2026-09-04 — three separate soon modes said the same nothing three times; the Blueprint
 // gallery inside it still previews each coming feature). `trend` (2026-09-18) is the measured
 // history view — chart planes as the scene, convention 12's MEASURED HISTORY rung made a view.
-import type { Mode } from "@/src/store/mode";
-export type { Mode };
+import type { Mode, LedgerRegister } from "@/src/store/mode";
+export type { Mode, LedgerRegister };
 
 // The stored metric every trend plane draws — one picker, one column (see `trendMetric` below).
 import type { LedgerMeasure } from "@/src/data/ledgerMeasure";
+import type { BlockMeasure } from "@/src/data/blockMeasure";
+import type { BlockRead, TipRead } from "@/src/engine/domain/blockBraid";
 import type { GeoMeasure } from "@/src/data/geoMeasure";
 import type { HyperMeasure } from "@/src/data/hyperMeasure";
 // WHY the scene is moving — the motion hint's cause (2026-09-26), stamped by the gesture's owner
@@ -49,6 +51,7 @@ export type MotionCause =
   | { kind: "range"; span: { fromMs: number; toMs: number } | null }
   | { kind: "window"; id: ZoomId }
   | { kind: "measure"; id: TrendMetric }
+  | { kind: "register"; id: LedgerRegister }
   | { kind: "page" }
   | { kind: "orbit" }
   // A rail card asking to be framed (`requestFocusRung`): the ladder rung, named by the reader.
@@ -56,6 +59,9 @@ export type MotionCause =
 // `globals` = the GLOBAL snapshots (2026-10-26): the DAG's own L0 count (dagscan's "snapshots"), and
 // per network the global snapshots that carried its snapshots. `snapshots` stays the metagraph
 // snapshots anchored — the two differ ~10× on the DAG row, which is why both are measures.
+// One block the Snapshots view's Blocks register has selected: `chain` is "dag" or a metagraph id,
+// `ordinal` the accepting snapshot's own, `anchorOrd` the global tick that carries it.
+export interface BlockSel { chain: string; hash: string; ordinal: number; anchorOrd: number }
 export type TrendMetric = "snapshots" | "globals" | "blocks" | "fees" | "kb" | "nodes" | "continuity" | "transfers";
 
 // One slot in the right-rail card stack (extend with future card types — e.g. "tx").
@@ -401,6 +407,17 @@ interface AppState {
   // What the Snapshots explorer's tick rows lead with — fee, anchors, metagraphs or size
   // (`src/data/ledgerMeasure.ts`). A setting, like `trendMetric`; its control is the card's heading.
   ledgerMeasure: LedgerMeasure;
+  // Which REGISTER the Snapshots view reads — its snapshots or the blocks inside them
+  // (`viewPolicy.registers`). A setting, like the measures: it moves the scene, so it stamps a cause.
+  ledgerRegister: LedgerRegister;
+  // What the Blocks register's rows lead with (`src/data/blockMeasure.ts`). A setting.
+  blockMeasure: BlockMeasure;
+  // The committed block — a SELECTION (written by the click executor only). Cleared on leaving the view.
+  block: BlockSel | null;
+  // The block the cursor is hovering (its hash) — a hover channel: previews, never commits.
+  hoverBlock: string | null;
+  // Block reads, keyed `${chain}:${ordinal}`; "dag:<ord>" mirrors `snapshotExact`'s blocks and tips.
+  blockReads: Record<string, { blocks: BlockRead[]; tips: TipRead | null }>;
   // What the Geography explorer's country rows count — nodes, metagraphs or providers
   // (`src/data/geoMeasure.ts`). A setting, like the two above.
   geoMeasure: GeoMeasure;
@@ -533,6 +550,11 @@ interface AppState {
   requestFocusRung: (level: FocusLevel) => void;
   setTrendCursor: (ms: number | null) => void;
   setTrendMetric: (metric: TrendMetric) => void;
+  setLedgerRegister: (r: LedgerRegister) => void;
+  setBlockMeasure: (m: BlockMeasure) => void;
+  setBlock: (b: BlockSel | null) => void;
+  setHoverBlock: (hash: string | null) => void;
+  setBlockRead: (key: string, v: { blocks: BlockRead[]; tips: TipRead | null }) => void;
   setLedgerMeasure: (measure: LedgerMeasure) => void;
   setGeoMeasure: (measure: GeoMeasure) => void;
   setHyperMeasure: (measure: HyperMeasure) => void;
@@ -654,6 +676,11 @@ export const useStore = create<AppState>((set) => ({
   trendCursorMs: null,
   trendMetric: "snapshots",
   ledgerMeasure: "fee",
+  ledgerRegister: "snapshots",
+  blockMeasure: "amount",
+  block: null,
+  hoverBlock: null,
+  blockReads: {},
   geoMeasure: "nodes",
   hyperMeasure: "nodes",
   trendScroll: 0,
@@ -704,7 +731,7 @@ export const useStore = create<AppState>((set) => ({
     set((s) => {
       const nav = { mode, navQuiet: false, docPage: null, docClosing: s.docPage != null || s.docClosing, rawReturnMode: null, motionCause: { kind: "view" as const, from: s.mode, to: mode } };
       if (mode === s.mode) return nav;
-      return { ...nav, trendRotation: 0, trendScroll: 0, ...focusPatch(s, entryFocus(VIEW_POLICIES[mode].entryPlane, s.filter), false) };
+      return { ...nav, block: null, hoverBlock: null, trendRotation: 0, trendScroll: 0, ...focusPatch(s, entryFocus(VIEW_POLICIES[mode].entryPlane, s.filter), false) };
     }),
   // Opening a doc also SURFACES THE SCENE POSE: the overlay sits at z-8, under the raw layer's
   // z-9 — a doc opened from the RAW pose rendered beneath the still-interactive table, with the
@@ -940,6 +967,11 @@ export const useStore = create<AppState>((set) => ({
   // The settings that MOVE the scene stamp their cause (the hint reads it while the stack eases).
   setTrendMetric: (metric) => set({ trendMetric: metric, motionCause: { kind: "measure", id: metric } }),
   setLedgerMeasure: (measure) => set({ ledgerMeasure: measure }),
+  setLedgerRegister: (ledgerRegister) => set({ ledgerRegister, motionCause: { kind: "register", id: ledgerRegister } }),
+  setBlockMeasure: (blockMeasure) => set({ blockMeasure }),
+  setBlock: (block) => set({ block }),
+  setHoverBlock: (hoverBlock) => set({ hoverBlock }),
+  setBlockRead: (key, v) => set((s) => ({ blockReads: { ...s.blockReads, [key]: v } })),
   setGeoMeasure: (measure) => set({ geoMeasure: measure }),
   setHyperMeasure: (measure) => set({ hyperMeasure: measure }),
   setTrendScroll: (offset) => set({ trendScroll: offset, motionCause: { kind: "page" } }),

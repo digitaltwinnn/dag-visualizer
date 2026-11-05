@@ -12,7 +12,7 @@
 //
 // This lives in domain/ (pure data, no THREE / no scene / no store VALUE import) so it stays
 // testable and side-effect-free; it only imports the `Mode` string-union TYPE from the store.
-import type { Mode } from "@/src/store/mode";
+import type { Mode, LedgerRegister } from "@/src/store/mode";
 
 export interface ViewPolicy {
   // Is the 3D canvas shown at all? false = a flat placeholder view (Blueprint schematic); the
@@ -160,6 +160,9 @@ export interface ViewPolicy {
   // span on screen and the scope its cards stand on. (It was a door onto the anchor log for one
   // day, 2026-10-07; the cards' "Snapshot records" still is.)
   rawSurface: "records" | "buckets";
+  // The REGISTERS this view offers — ways of reading the same scene (2026-11-05). Only the
+  // Snapshots chamber has a second, "blocks"; every other row reads one register.
+  registers: readonly LedgerRegister[];
   // Does this view carry an AI NOTE — the written context card (`components/notes/`) for the
   // subject on screen? The four 3D views do; the placeholder gallery shows no data, so no note.
   aiNotes: boolean;
@@ -247,6 +250,7 @@ const FLAT: ViewPolicy = {
   chipEnv: 1,
   fleet: "placed",
   rawSurface: "records",
+  registers: ["snapshots"],
   aiNotes: false,
   noteScope: "network",
   tickScoped: false,
@@ -304,6 +308,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     chipEnv: 1,
     fleet: "placed",
     rawSurface: "records",
+    registers: ["snapshots"],
     aiNotes: true,
     noteScope: "network",
     tickScoped: false,
@@ -354,6 +359,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     chipEnv: 0.35,
     fleet: "placed",
     rawSurface: "records",
+    registers: ["snapshots"],
     aiNotes: true,
     noteScope: "network",
     tickScoped: false,
@@ -394,6 +400,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     chipEnv: 0.5, // low, not zero — coplanar trays wash at full sheen, go bland at none (field note)
     fleet: "placed",
     rawSurface: "records",
+    registers: ["snapshots", "blocks"],
     aiNotes: true,
     noteScope: "chamber",
     tickScoped: true,
@@ -444,6 +451,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     chipEnv: 1,
     fleet: "parked",
     rawSurface: "buckets",
+    registers: ["snapshots"],
     aiNotes: true,
     noteScope: "history",
     tickScoped: false,

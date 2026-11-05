@@ -96,6 +96,8 @@ export function motionHint(cause: MotionCause, mode: Mode, names: HintNames, pha
       // The measure as a NAME, not lowercased into the clause (PR review, 2026-10-26: "Reordering
       // by in global snapshots" — a label that starts with a preposition reads as broken grammar).
       return mode === "trend" ? `Reordering by ${names.measure(cause.id)}, busiest network first` : null;
+    case "register":
+      return cause.id === "blocks" ? "Showing the blocks" : "Showing the snapshots";
     case "page":
       return "Paging the stack";
     case "rung":
