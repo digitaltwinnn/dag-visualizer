@@ -866,7 +866,11 @@ the dossier's ticker; "AI notes" stays the code's and these docs' name for
 the slot. **The top card is the VIEW's note on the metagraph card's network** (`metagraphCardNetwork`:
 everything, the filtered network, or the network a committed node or tick belongs to) and does not follow a drill — a country, a provider or a
 brushed range is a subject with a card of its own, below (user, 2026-10-29); History's top card is
-the window pill's note always. Every view that has a note (`viewPolicy.aiNotes`) leads its
+the window pill's note always. **A register reads its own note** (2026-11-06): in the Snapshots view's
+Blocks register the top card is the block DAG's note (view `blocks`, the whole network's whatever the
+rung stands on), the Snapshots register keeps the ledger's — `REGISTER_NOTES` in `noteSubject.ts`,
+read only where the view's policy offers the register, and the Briefing's stops ask through the same
+derivation. Every view that has a note (`viewPolicy.aiNotes`) leads its
 display lane with the `notes` slot (`DISPLAY_LANE` in `railCards.ts`), and the manifest leads with it
 too. It is **not a rung**: no ladder level, no camera pose, never in `selStack`, a static subject
 key so a view switch never lights the tray, and `isSubjectSlot` says no. So it is the FOCUS only at

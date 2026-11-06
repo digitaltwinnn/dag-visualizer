@@ -1,5 +1,5 @@
 import type { NoteResponse, NoteView } from "@/src/data/noteTypes";
-import { LINE_MAX, type BriefingStop } from "@/src/engine/domain/briefing";
+import { LINE_MAX, stopRegister, type BriefingStop } from "@/src/engine/domain/briefing";
 import type { NoteReq } from "./noteLoader";
 import { noteSubjectOf } from "./noteSubject";
 
@@ -10,12 +10,11 @@ import { noteSubjectOf } from "./noteSubject";
 /** The window History rests on. A visitor on the tour has not chosen one. */
 const TREND_SPAN = "30d";
 
-/** The note a stop reads: the view at its widest, as a visitor with no filter would see it. The
- *  blocks stop reads the block DAG's own note, its whole network. */
+/** The note a stop reads: the view at its widest, in the stop's register, as a visitor with no
+ *  filter would see it — the same note the top card shows there (the blocks stop's is the block DAG's). */
 export function briefingReq(stop: BriefingStop): NoteReq {
-  if (stop.register === "blocks") return { view: "blocks", subject: "all", span: null };
   const view = stop.mode;
-  const subject = noteSubjectOf(view, { metagraphNetwork: "all", unlisted: () => false })!;
+  const subject = noteSubjectOf(view, { metagraphNetwork: "all", unlisted: () => false, register: stopRegister(stop) })!;
   return { view: subject.view, subject: subject.subject, span: view === "trend" ? TREND_SPAN : null };
 }
 

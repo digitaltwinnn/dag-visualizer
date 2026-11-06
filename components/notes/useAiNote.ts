@@ -61,11 +61,13 @@ export function useAiNote(): { subject: NoteSubject | null; req: NoteReq | null;
   const trendFocus = useStore((s) => s.trendFocus);
   const trendFront = useStore((s) => s.trendFront);
   const trendWindow = useStore((s) => s.trendWindow);
+  const register = useStore((s) => s.ledgerRegister);
   const tickHasFilter = useTickHasFilter();
 
   const subject = noteSubjectOf(mode, {
     metagraphNetwork: metagraphCardNetwork({ mode, filter, railNet, tickNet, snap, tickHasFilter, trendFocus, trendFront, inspect }),
     unlisted: (id) => id === UNLISTED_ID,
+    register,
   });
   // History's note is over the WINDOW pill on screen, brushed or not: a brushed range's note is
   // the Range card's own (`SubjectNote`), so a brush never takes this card over.
