@@ -66,7 +66,7 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
     // metagraph snapshot → node (user, 2026-09-15). This order also drives the phone flat stack
     // and the tray icons, so the two can never disagree.
     const ids = detailsCards(details({ filter: "dor", inspect: nodePick, snap: snapPick })).map((c) => c.id);
-    expect(ids).toEqual(["notes", "snap", "context", "range", "instant", "country", "cohort", "composition", "metaSnap", "node"]);
+    expect(ids).toEqual(["notes", "snap", "context", "range", "instant", "country", "cohort", "composition", "metaSnap", "block", "node"]);
   });
   // THE AI NOTES CARD (2026-10-27): its own card, first, in every view whose policy opts in
   // (`aiNotes`) — present unless the note is absent (no subject, or the server answered `none`).
@@ -221,6 +221,49 @@ describe("the metagraph snapshot slot", () => {
   });
 });
 
+// THE BLOCK SLOT (the Blocks register, 2026-11-05): a card slot with no rung, the snapshot slots'
+// precedent, standing under the Global snapshot card in the one register that draws blocks.
+describe("the block slot", () => {
+  const block = { chain: "dag", hash: "abc", ordinal: 42, anchorOrd: 42 };
+  const blocks = (over: Partial<RailManifestState> = {}) => details({ mode: "ledger", ledgerRegister: "blocks", ...over });
+  const slot = (s: RailManifestState) => detailsCards(s).find((c) => c.id === "block")!;
+  it("is no rung", () => {
+    expect(ladderLevelOfSlot("block")).toBeNull();
+  });
+  it("ghosts in the Blocks register with the gesture that fills it", () => {
+    expect(slot(blocks()).present).toBe(false);
+    expect(slot(blocks()).hint).toBe("Click a block in the chamber or its row in the explorer.");
+    expect(slot(blocks({ coarse: true })).hint).toBe("Tap a block in the chamber or its row in the explorer.");
+  });
+  it("is present once a block is committed under its own tick", () => {
+    const c = slot(blocks({ snap: snapPick, block }));
+    expect(c.present).toBe(true);
+    expect(c.subjectKey).toBe("dag:abc");
+  });
+  it("is absent in the Snapshots register — no card, no ghost — whatever the store holds", () => {
+    for (const s of [details({ mode: "ledger" }), details({ mode: "ledger", ledgerRegister: "snapshots", snap: snapPick, block })]) {
+      expect(slot(s).present).toBe(false);
+      expect(slot(s).hint).toBeNull();
+    }
+  });
+  it("is absent outside Snapshots", () => {
+    for (const mode of ["hyper", "geo", "trend"] as const) {
+      expect(slot(details({ mode, ledgerRegister: "blocks", block })).present).toBe(false);
+      expect(slot(details({ mode, ledgerRegister: "blocks" })).hint).toBeNull();
+    }
+  });
+  it("states its parent: under another tick it stands down", () => {
+    const other = { kind: "snapshot", data: { ordinal: 43 } } as unknown as typeof snapPick;
+    expect(slot(blocks({ snap: other, block })).present).toBe(false);
+  });
+  it("a block commit is the focus slot", () => {
+    expect(focusSlotId({ ...blocks({ snap: snapPick, block }), selStack: ["block", "snap"] })).toBe("block");
+  });
+  it("Blocks' ghosts: the tick's, the network's, the tile's, the block's and the node's", () => {
+    expect(ghostIds(detailsCards(blocks()))).toEqual(["snap", "context", "metaSnap", "block", "node"]);
+  });
+});
+
 describe("parentHolds (a child card states its parent or does not render)", () => {
   const none = { snap: null, metaSnap: null, country: null, cohort: null };
   it("a cohort belongs to the committed country", () => {
@@ -319,7 +362,9 @@ describe("ladderSlotIds — the descent-spine lane (display order = reversed run
     // a tick at least contains the network's ANCHOR, and its card already lists exactly that;
     // the old lane asserted that a network contains a global tick. It also opens with a card
     // that speaks, since the tick follows live without any commit. Card slots, not focus rungs.
-    expect(ladderSlotIds("ledger")).toEqual(["notes", "snap", "context", "metaSnap", "node"]);
+    // The Blocks register's BLOCK slot sits under the metagraph snapshot: a block stands on its
+    // accepting snapshot, the tile's or the tick's own (2026-11-05). A slot, no rung.
+    expect(ladderSlotIds("ledger")).toEqual(["notes", "snap", "context", "metaSnap", "block", "node"]);
   });
   it("flat views have no ladder", () => {
     expect(ladderSlotIds("soon")).toEqual([]);
@@ -344,6 +389,7 @@ describe("ladderLevelOfSlot — the inverse read (which RUNG does a slot stand f
     // in the lane at all. Expanding one of these must not request a camera flight.
     expect(ladderLevelOfSlot("snap")).toBeNull();
     expect(ladderLevelOfSlot("metaSnap")).toBeNull();
+    expect(ladderLevelOfSlot("block")).toBeNull();
     expect(ladderLevelOfSlot("tool")).toBeNull();
     // …and the AI notes card, which tops the lane without being a subject: opening it asks no pose.
     expect(ladderLevelOfSlot("notes")).toBeNull();
@@ -352,7 +398,7 @@ describe("ladderLevelOfSlot — the inverse read (which RUNG does a slot stand f
     for (const view of ["geo", "hyper", "ledger", "trend"] as const)
       for (const slot of ladderSlotIds(view)) {
         const level = ladderLevelOfSlot(slot);
-        if (!level) expect(["notes", "snap", "metaSnap", "range", "instant"]).toContain(slot);
+        if (!level) expect(["notes", "snap", "metaSnap", "block", "range", "instant"]).toContain(slot);
         else expect(LADDERS[view].some((r) => r.level === level)).toBe(true);
       }
   });

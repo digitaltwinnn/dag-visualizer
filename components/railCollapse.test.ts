@@ -210,7 +210,7 @@ describe("displayOrder", () => {
   });
   it("closes a gap in the stack", () => {
     const lane = ladderSlotIds("ledger");
-    expect(displayOrder(lane, present(["notes", "snap", "node"]), "context")).toEqual(["notes", "snap", "node", "context", "metaSnap"]);
+    expect(displayOrder(lane, present(["notes", "snap", "node"]), "context")).toEqual(["notes", "snap", "node", "context", "metaSnap", "block"]);
   });
   it("is the lane itself with nothing chosen, and with everything", () => {
     expect(displayOrder(geo, present([]), null)).toEqual(geo);
@@ -238,5 +238,42 @@ describe("hasFoldControl — who wears the −", () => {
     expect(hasFoldControl("node", false)).toBe(false);
     expect(hasFoldControl("context", true)).toBe(true);
     expect(hasFoldControl("snap", true)).toBe(true);
+  });
+});
+
+// THE BLOCK CARD (the Blocks register, 2026-11-05): a block commit pins its tick and commits the
+// block, and the block's card is the box — under a folded Global snapshot entry, the note folded
+// above both. And the commit is a selection moment, so a hand-opened card above does not stay open
+// beside it.
+describe("a block commit opens its card", () => {
+  const block = { chain: "dag", hash: "abc", ordinal: 42, anchorOrd: 42 };
+  const blocks = (over: Partial<RailManifestState> = {}) => manifest({ mode: "ledger", ledgerRegister: "blocks", snap: snapPick, ...over });
+  it("the block slot is the box", () => {
+    const s = rail(blocks({ block }), {}, ["block", "snap"]);
+    expect(openBoxes(s)).toEqual(["block"]);
+    expect(boxedSlotOf(s)).toBe("block");
+    expect(isCollapsed(s, "snap")).toBe(true);
+    expect(isCollapsed(s, "notes")).toBe(true);
+  });
+  it("it stands under the Global snapshot card, ahead of every ghost", () => {
+    const s = rail(blocks({ block }), {}, ["block", "snap"]);
+    const order = displayOrder(s.lane, s.present, null);
+    expect(order.slice(0, 3)).toEqual(["notes", "snap", "block"]);
+  });
+  it("the commit is a new selection moment, and so is another block", () => {
+    const key = (b: typeof block | null): string =>
+      railSelectionKey({
+        mode: "ledger", filter: "all", railNet: null, country: null, cohort: null, composition: null, inspect: null,
+        trendCursorMs: null, trendRange: null, trendFocus: null, tickNet: null, following: false, snap: snapPick, metaSnap: null, block: b,
+      });
+    expect(key(block)).not.toBe(key(null));
+    expect(key({ ...block, hash: "def" })).not.toBe(key(block));
+  });
+  it("with the box opened by hand on the tick, the commit's moment drops the pin and the block opens", () => {
+    const before = rail(blocks(), {}, ["snap"]);
+    const opened = openByHand(before, "snap");
+    const after = rail(blocks({ block }), opened, ["block", "snap"]);
+    const dropped = apply(opened, overridesOnSelection(after));
+    expect(openBoxes(rail(blocks({ block }), dropped, ["block", "snap"]))).toEqual(["block"]);
   });
 });

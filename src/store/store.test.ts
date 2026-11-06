@@ -229,6 +229,14 @@ describe("store.ledgerRegister / block", () => {
     useStore.getState().setBlockRead("dag:7241523", { blocks: [], tips: null });
     expect(useStore.getState().blockReads["dag:7241523"]).toEqual({ blocks: [], tips: null });
   });
+  it("a block commit ranks in the recency stack, and its release leaves it", () => {
+    useStore.setState({ block: null, selStack: ["snap"] });
+    useStore.getState().setBlock({ chain: "dag", hash: "h", ordinal: 1, anchorOrd: 1 });
+    expect(useStore.getState().selStack).toEqual(["block", "snap"]);
+    useStore.getState().setBlock(null);
+    expect(useStore.getState().selStack).toEqual(["snap"]);
+    useStore.setState({ selStack: [] });
+  });
   it("retainBlockReads drops reads and misses outside the window, keeps the frontier", () => {
     const st = useStore.getState();
     for (const k of ["dag:1", "dag:2", "DOR:frontier"]) st.setBlockRead(k, { blocks: [], tips: null });

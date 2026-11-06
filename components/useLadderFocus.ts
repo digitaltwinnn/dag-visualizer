@@ -28,6 +28,9 @@ export function useLadderFocus(noteAbsent: boolean): string | null {
   const inspect = useStore((s) => s.inspect);
   const snap = useStore((s) => s.snap);
   const metaSnap = useStore((s) => s.metaSnap);
+  // The Blocks register's slot: its presence reads the register, so the focus must see both.
+  const ledgerRegister = useStore((s) => s.ledgerRegister);
+  const block = useStore((s) => s.block);
   const selStack = useStore((s) => s.selStack);
   // History's own slot: the committed time cursor (`instant`). It is in the lane, so the focus
   // derivation has to see it or the cursor card can never be the box.
@@ -36,5 +39,5 @@ export function useLadderFocus(noteAbsent: boolean): string | null {
   const trendFocus = useStore((s) => s.trendFocus);
   const tickHasFilter = useTickHasFilter();
   const nodeHere = useNodeHere();
-  return focusSlotId({ mode, filter, railNet, tickNet, tickHasFilter, nodeHere, country, cohort, composition, inspect, snap, metaSnap, trendCursorMs, trendRange, trendFocus, noteAbsent, selStack });
+  return focusSlotId({ mode, filter, railNet, tickNet, tickHasFilter, nodeHere, country, cohort, composition, inspect, snap, metaSnap, ledgerRegister, block, trendCursorMs, trendRange, trendFocus, noteAbsent, selStack });
 }

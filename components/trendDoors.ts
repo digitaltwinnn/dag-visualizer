@@ -90,3 +90,15 @@ export function openSnapshotRecord(metaId: string, ordinal: number, ts: string):
   st.setLogSeek({ metaId, fromMs: at, toMs: at, snapshot: ordinal });
   st.setSection("data");
 }
+
+/** THE GLOBAL SNAPSHOT DOOR (the Blocks register's Block card, 2026-11-05): a DAG block is accepted
+ *  into the global snapshot itself, so its records are that global's — the log's own global
+ *  snapshot search (the same one its Global field runs), opened in place like the snapshot door:
+ *  no mode step, no filter written. A token block's records are its metagraph snapshot's, through
+ *  `openSnapshotRecord`. */
+export function openGlobalRecord(ordinal: number, ts: string): void {
+  const st = useStore.getState();
+  const at = Date.parse(ts);
+  st.setLogSeek({ metaId: null, fromMs: at, toMs: at, tick: ordinal });
+  st.setSection("data");
+}

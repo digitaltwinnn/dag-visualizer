@@ -1,4 +1,4 @@
-import type { PickDescriptor, MetaSnapSel, TickNetSel } from "@/src/data/types";
+import type { BlockSel, PickDescriptor, MetaSnapSel, TickNetSel } from "@/src/data/types";
 import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder";
 import type { Mode } from "@/src/store/store";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
@@ -148,6 +148,8 @@ export interface SelectionKeyState {
   following: boolean;
   snap: { data: { ordinal: number } } | null;
   metaSnap: MetaSnapSel | null;
+  /** The committed block (the Blocks register). Optional: every other caller has none. */
+  block?: BlockSel | null;
 }
 
 /** THE SELECTION MOMENT — when this key changes, the rail's +/− overrides are dropped (after a view
@@ -190,5 +192,9 @@ export function railSelectionKey(s: SelectionKeyState): string {
     // unguarded ordinal re-materialized the focus card on every heartbeat in live metagraph mode).
     s.following ? (s.snap ? "live" : "") : (s.snap?.data.ordinal ?? ""),
     s.following ? (s.metaSnap ? "live" : "") : s.metaSnap ? `${s.metaSnap.metaId}:${s.metaSnap.ordinal}` : "",
+    // THE BLOCK (2026-11-05): a commit like the tile's, and it never advances by itself — a block
+    // commit pins its tick — so it needs no follow guard. Missing, a hand-opened Global snapshot
+    // box stayed open beside the arriving Block card.
+    s.block ? `${s.block.chain}:${s.block.hash}` : "",
   ].join("§");
 }

@@ -3,11 +3,12 @@ import { ledgerCardNetwork } from "@/src/engine/domain/tickNet";
 import { pickNetId } from "@/src/engine/domain/pickActions";
 import { cardNetwork } from "@/src/engine/domain/trendStack";
 import type { TickNetSel } from "@/src/data/types";
-import { AI_NOTES_ICON, EXPLORE_ICON, INSTANT_ICON, RANGE_ICON, iconForPick } from "@/components/icons";
+import { AI_NOTES_ICON, BLOCK_ICON, EXPLORE_ICON, INSTANT_ICON, RANGE_ICON, iconForPick } from "@/components/icons";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import type { Mode } from "@/src/store/store";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
-import type { MetaSnapSel, NodeRow, PickDescriptor } from "@/src/data/types";
+import type { BlockSel, MetaSnapSel, NodeRow, PickDescriptor } from "@/src/data/types";
+import type { LedgerRegister } from "@/src/store/mode";
 import type { NoteResponse } from "@/src/data/noteTypes";
 // LADDERS is plain DATA (the domain focus-ladder rung tables) — importing it keeps this module
 // data-only; CohortSel rides along type-only (the store mirrors the same import).
@@ -34,7 +35,7 @@ import { is3D } from "@/src/engine/domain/viewTransition";
 // Hue + active-flag stay with the tray builders (per-rail presentation), not here.
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-export type RailCardKind = "tool" | "context" | "range" | "instant" | "metaSnap" | "country" | "cohort" | "composition" | "node" | "snap" | "notes";
+export type RailCardKind = "tool" | "context" | "range" | "instant" | "metaSnap" | "block" | "country" | "cohort" | "composition" | "node" | "snap" | "notes";
 
 // ── The rail LADDER lane (Inspector's descent spine, variant-A redesign 2026-07-19) ──────────
 // Which facts-rail slot stands for each FOCUS-LADDER rung. The lane's ORDER lives in
@@ -104,7 +105,11 @@ const DISPLAY_LANE: Partial<Record<Mode, readonly string[]>> = {
   // (The chamber's storeys are unchanged: geometry still shows ribbons falling INTO the global
   // floor; the rail states the reading order.)
   // (The AI notes card sits above the tick — the one slot above it, and not a subject.)
-  ledger: ["notes", "snap", "context", "metaSnap", "node"],
+  // THE BLOCK (the Blocks register, 2026-11-05) sits under the metagraph snapshot: a block stands on
+  // its accepting snapshot — the tile's, or the tick's own — so it is the finest subject of the
+  // tick's chain. A card slot with no rung, like the two snapshot slots, and present in that
+  // register alone (`detailsCards`' `block`).
+  ledger: ["notes", "snap", "context", "metaSnap", "block", "node"],
   // HISTORY: the network dossier, then the INSTANT (2026-09-19). `instant` is a card slot with no
   // focus rung — the two snapshot slots' precedent, and `railLadderBoundary.test.ts` asserts
   // rung → slot rather than the reverse. It sits UNDER the dossier because the lane is a
@@ -139,7 +144,7 @@ export function isSubjectSlot(id: string): boolean {
  *  inputs (which can't change a slot's presence). */
 export type LadderState = Pick<
   RailManifestState,
-  "mode" | "filter" | "railNet" | "tickNet" | "tickHasFilter" | "nodeHere" | "inspect" | "snap" | "metaSnap" | "country" | "cohort" | "composition" | "trendCursorMs" | "trendRange" | "trendFocus" | "noteAbsent"
+  "mode" | "filter" | "railNet" | "tickNet" | "tickHasFilter" | "nodeHere" | "inspect" | "snap" | "metaSnap" | "ledgerRegister" | "block" | "country" | "cohort" | "composition" | "trendCursorMs" | "trendRange" | "trendFocus" | "noteAbsent"
 > & {
   /** The store's selection recency (most-recent-FIRST) — the collapse rule reads it (item 8):
    *  the most recently selected present card is the ACTIVE one; the rest rest collapsed. */
@@ -257,6 +262,11 @@ export interface RailManifestState {
    *  ladder rung. Optional: the ladder derivation (`LadderState`) and its callers never carry
    *  this field, so `detailsCards` treats an absent key the same as `null`. */
   metaSnap?: MetaSnapSel | null;
+  /** Which register the Snapshots view reads (`store.ledgerRegister`). The block slot's presence
+   *  reads it — never `mode`. Optional: absent reads as the Snapshots register. */
+  ledgerRegister?: LedgerRegister;
+  /** The committed block (`store.block`) — the Blocks register's own card slot, no rung. */
+  block?: BlockSel | null;
   /** THE AI NOTE IS ABSENT (2026-10-27): the view's subject has no note (`noteSubjectOf` answered
    *  null — the unlisted network) or the server answered `none` (not mainnet). The note itself is
    *  fetched in React (`useNote`), so the caller states the answer (`noteCardAbsent`), as it states
@@ -403,6 +413,16 @@ function rangeHint(s: RailManifestState): string | null {
 function metaSnapHint(s: RailManifestState): string | null {
   return s.mode === "ledger" ? `${CLICK(s)} a tile on a plane above the floor.` : null;
 }
+/** Does the view on screen read the Blocks register? The register is a setting of the Snapshots
+ *  view, so the question is the view's register list and the register — never a `mode` compare. */
+const inBlocks = (s: Pick<RailManifestState, "mode" | "ledgerRegister">): boolean =>
+  (s.ledgerRegister ?? "snapshots") === "blocks" && VIEW_POLICIES[s.mode].registers.includes("blocks");
+// A BLOCK — the Blocks register's own slot. Both routes are named, the scene's and the explorer's:
+// a block is a small mark on a bar or a tile, and its row is as much a route as the mark (the
+// refrain rule 2 guards against is a shared tail, and this is the one ghost that ends this way).
+function blockHint(s: RailManifestState): string | null {
+  return inBlocks(s) ? `${CLICK(s)} a block in the chamber or its row in the explorer.` : null;
+}
 
 // RIGHT rail (Details): FIXED slots in a stable order — the Context dossier, then country,
 // cohort, composition, the snapshot chain (global, then the metagraph snapshot that anchors into
@@ -469,8 +489,10 @@ export function nodeHereOf(
  *  stored parent key disagrees with the parent on screen stands down, exactly as it does when the
  *  parent is cleared. No parent on screen is no disagreement (the ledger's global card can be a
  *  ghost while its metagraph snapshot is populated — `MetaSnapPane`'s `sameTick` note). */
-export function parentHolds(s: Pick<RailManifestState, "snap" | "metaSnap" | "country" | "cohort">, child: "metaSnap" | "cohort"): boolean {
+export function parentHolds(s: Pick<RailManifestState, "snap" | "metaSnap" | "country" | "cohort" | "block">, child: "metaSnap" | "block" | "cohort"): boolean {
   if (child === "metaSnap") return !s.snap || !s.metaSnap || s.snap.data.ordinal === s.metaSnap.globalOrdinal;
+  // A block is in exactly one global snapshot: the tick that accepted it.
+  if (child === "block") return !s.snap || !s.block || s.snap.data.ordinal === s.block.anchorOrd;
   return !s.country || !s.cohort || s.country === s.cohort.cc;
 }
 
@@ -561,6 +583,17 @@ export function detailsCards(s: RailManifestState): RailCard[] {
     present: !!s.metaSnap && parentHolds(s, "metaSnap"),
     hint: metaSnapHint(s),
   };
+  // THE BLOCK (2026-11-05): a card slot with no rung, under its tick — present in the Blocks
+  // register alone (the register is the only one that draws blocks; `inBlocks` reads the register,
+  // never the mode), and only under the tick that accepted it (`parentHolds`).
+  const block: RailCard = {
+    id: "block",
+    kind: "block",
+    icon: BLOCK_ICON,
+    subjectKey: s.block ? `${s.block.chain}:${s.block.hash}` : null,
+    present: !!s.block && inBlocks(s) && parentHolds(s, "block"),
+    hint: blockHint(s),
+  };
   const country: RailCard = {
     id: "country",
     kind: "country",
@@ -625,7 +658,7 @@ export function detailsCards(s: RailManifestState): RailCard[] {
   // running off the rail). The SELECTION IS UNTOUCHED, the placeholder views' own rule above: this
   // only stops the view speaking for it, so going back restores the card in place.
   const lane = ladderSlotIds(s.mode);
-  return [notes, snap, context, range, instant, country, cohort, composition, metaSnap, node].map((c) =>
+  return [notes, snap, context, range, instant, country, cohort, composition, metaSnap, block, node].map((c) =>
     c.present && !lane.includes(c.id) ? { ...c, present: false } : c,
   );
 }

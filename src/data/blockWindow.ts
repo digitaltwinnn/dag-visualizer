@@ -123,3 +123,31 @@ export function blockWindowContinues(prevTo: number | null, w: BlockWindow | nul
   for (const t of w.ticks) if (t.ord > prevTo) newer++;
   return newer <= 1;
 }
+
+/** One block of the window, on its accepting snapshot: `ordinal` is that snapshot's own (the
+ *  global's for a DAG block, the metagraph snapshot's for a token block), `anchorOrd` and `ts` the
+ *  global tick that carries it. The `BlockSel` shape plus the tick's time. */
+export interface WindowBlock {
+  chain: string;
+  hash: string;
+  ordinal: number;
+  anchorOrd: number;
+  ts: string;
+}
+
+/** EVERY BLOCK THE WINDOW HOLDS, NEWEST FIRST — the Blocks register's explorer list. Newest tick
+ *  first; inside a tick its own DAG blocks in the feed's order, then each chain's token blocks,
+ *  newest snapshot first. A snapshot with no blocks lists nothing. */
+export function windowBlocks(w: BlockWindow | null): WindowBlock[] {
+  if (!w) return [];
+  const out: WindowBlock[] = [];
+  for (const t of [...w.ticks].sort((a, b) => b.ord - a.ord)) {
+    for (const hash of t.blocks) out.push({ chain: "dag", hash, ordinal: t.ord, anchorOrd: t.ord, ts: t.ts });
+    for (const [chain, rows] of Object.entries(t.metaSnaps)) {
+      for (const r of [...rows].sort((a, b) => b.ordinal - a.ordinal)) {
+        for (const hash of r.blocks ?? []) out.push({ chain, hash, ordinal: r.ordinal, anchorOrd: t.ord, ts: t.ts });
+      }
+    }
+  }
+  return out;
+}

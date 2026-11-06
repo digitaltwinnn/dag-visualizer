@@ -1239,6 +1239,26 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       setLogSeek(null);
       return;
     }
+    // ONE GLOBAL SNAPSHOT (the Block card's door, 2026-11-05): the log's own global snapshot search,
+    // as its Global field runs it — the snapshots that global carried, under the log's lens. It runs
+    // once the log can answer (`pendingTick`, the standing search's own re-run).
+    if (logSeek.tick != null) {
+      setSearchOpen(true);
+      setQSnapshot("");
+      setQFrom("");
+      setQTo("");
+      setDoorLabel(null);
+      setDoorSpan(null);
+      setTimeCut(null);
+      setGlobalSpans(null);
+      setQTick(String(logSeek.tick));
+      setMarked(null);
+      setJumpMiss(null);
+      landCommit.current = null;
+      pendingTick.current = true;
+      setLogSeek(null);
+      return;
+    }
     setSearchOpen(true);
     // The fields hold UTC DAYS (a day-only label is a UTC day for every reader); the span's end is
     // exclusive, so its last day is the one holding the instant just before it.

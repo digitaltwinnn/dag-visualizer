@@ -68,7 +68,7 @@ export type { BlockSel } from "@/src/data/types";
 export type TrendMetric = "snapshots" | "globals" | "blocks" | "fees" | "kb" | "nodes" | "continuity" | "transfers";
 
 // One slot in the right-rail card stack (extend with future card types — e.g. "tx").
-export type SelSlot = "network" | "node" | "snap" | "metaSnap" | "country" | "cohort" | "composition" | "range" | "instant";
+export type SelSlot = "network" | "node" | "snap" | "metaSnap" | "block" | "country" | "cohort" | "composition" | "range" | "instant";
 
 // Move `slot` to the FRONT of the recency stack when it becomes active, or drop it when cleared.
 //
@@ -242,7 +242,7 @@ interface AppState {
   // navigation bridge, not a selection (the network commit itself rides the pickActions table).
   /** A door's hand-off to the anchor log: a span to land in, or — with `snapshot` — one metagraph
    *  snapshot to find (its card's "Show the raw data", 2026-10-04). */
-  logSeek: { metaId: string | null; fromMs: number; toMs: number; snapshot?: number; label?: string } | null;
+  logSeek: { metaId: string | null; fromMs: number; toMs: number; snapshot?: number; tick?: number; label?: string } | null;
   /** THE SPAN THE RAW LOG IS CUT TO BY THE READER'S OWN DATE SEARCH (2026-10-09) — the reverse of
    *  `logSeek`: the log writes it, and closing a log a History door opened takes it back as the
    *  committed RANGE, the way a committed network comes back as the plane in front (one selection,
@@ -492,7 +492,7 @@ interface AppState {
   setActivity: (activity: Activity | null) => void;
   setMode: (mode: Mode) => void;
   setDocPage: (docPage: "about" | null) => void;
-  setLogSeek: (logSeek: { metaId: string | null; fromMs: number; toMs: number; snapshot?: number; label?: string } | null) => void;
+  setLogSeek: (logSeek: { metaId: string | null; fromMs: number; toMs: number; snapshot?: number; tick?: number; label?: string } | null) => void;
   setLogCut: (logCut: { fromMs: number; toMs: number | null } | null) => void;
   setDocStageReady: (ready: boolean) => void;
   setDocClosing: (closing: boolean) => void;
@@ -983,7 +983,9 @@ export const useStore = create<AppState>((set) => ({
   setLedgerMeasure: (measure) => set({ ledgerMeasure: measure }),
   setLedgerRegister: (ledgerRegister) => set({ ledgerRegister, motionCause: { kind: "register", id: ledgerRegister } }),
   setBlockMeasure: (blockMeasure) => set({ blockMeasure }),
-  setBlock: (block) => set({ block }),
+  // A block is a committed subject like the tile: it ranks in the recency stack, so its card is the
+  // box once committed (`focusSlotId`).
+  setBlock: (block) => set((s) => ({ block, selStack: bumpStack(s.selStack, "block", !!block) })),
   setHoverBlock: (hoverBlock) => set({ hoverBlock }),
   setBlockRead: (key, v) =>
     set((s) => {

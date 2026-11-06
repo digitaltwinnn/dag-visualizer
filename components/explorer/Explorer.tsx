@@ -124,6 +124,10 @@ export interface ExplorerProps {
   /** The card head's right-aligned slot — a CARD-level state that holds on every level (the
    *  snapshot explorer's LIVE/PINNED, since 2026-09-28), as opposed to a level's own `setting`. */
   aside?: ReactNode;
+  /** A CARD-level setting the reader SETS, at the top of the CONTROL BAND above the measure tiles
+   *  — what the list is OF (the Snapshots view's register switch, 2026-11-05). It holds on every
+   *  level, as `aside` does. */
+  control?: ReactNode;
 }
 
 /** A committed row's click: re-box its card when another card is the box (the accordion's own
@@ -135,7 +139,7 @@ function openOrToggle(rung: string, click: () => void): void {
   openRailCard(rung, [boxed]);
 }
 
-export default function Explorer({ id, title, hint, placeholder, levels: selected, onLeave, aside }: ExplorerProps) {
+export default function Explorer({ id, title, hint, placeholder, levels: selected, onLeave, aside, control }: ExplorerProps) {
   // The view hands every level its selection opens; the OPEN CARD decides how deep the path stands.
   const boxed = useStore((s) => s.boxedCard);
   const levels = levelsForBox(selected, boxed);
@@ -260,6 +264,7 @@ export default function Explorer({ id, title, hint, placeholder, levels: selecte
               the path — the segmented control's own frame already bounds it — and a 6px rhythm
               (was 8). 15px shorter, the same three pieces. */}
           <div className={cn("-mt-1.5 mb-2 pt-1.5 pb-1.5 bg-[var(--panel-plate)] border-b border-border flex flex-col gap-1.5", SHELL_BLEED_X, SHELL_INSET_X)}>
+            {control}
             {measure && measure.options.length > 1 && <MeasureTiles measure={measure} />}
             <ExplorerPath
               bare

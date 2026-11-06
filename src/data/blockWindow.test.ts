@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BLOCK_WINDOW_TICKS, blockWanted, blockWindowContinues, foldBlockWindow } from "@/src/data/blockWindow";
+import { BLOCK_WINDOW_TICKS, blockWanted, blockWindowContinues, foldBlockWindow, windowBlocks } from "@/src/data/blockWindow";
 import type { RawMetaSnapshot, SnapshotExact } from "@/src/data/types";
 
 describe("foldBlockWindow", () => {
@@ -47,5 +47,26 @@ describe("blockWindowContinues", () => {
     expect(blockWindowContinues(300, null)).toBe(false);
     expect(blockWindowContinues(300, win(10, 20, 30))).toBe(false);
     expect(blockWindowContinues(300, win(300, 400, 500))).toBe(false);
+  });
+});
+
+describe("windowBlocks", () => {
+  const tick = (ord: number, blocks: string[], meta: Record<string, RawMetaSnapshot[]> = {}) => ({ ord, ts: new Date(ord * 10_000).toISOString(), hash: "g" + ord, blocks, metaSnaps: meta });
+  const snap = (ordinal: number, blocks?: string[]) => ({ ordinal, hash: "m" + ordinal, lastSnapshotHash: "", timestamp: "", blocks }) as unknown as RawMetaSnapshot;
+  it("lists every block of the window newest first: a tick's DAG blocks, then its token blocks, each on its accepting snapshot", () => {
+    const w = foldBlockWindow({
+      ticks: [tick(100, ["d0"]), tick(300, ["d1", "d2"], { dor: [snap(51, ["t1"]), snap(52, ["t2", "t3"])], ded: [snap(9)] }), tick(200, [], { dor: [snap(40, ["t0"])] })],
+      chains: ["dag", "dor", "ded"],
+    }, {});
+    expect(windowBlocks(w).map((b) => `${b.chain}:${b.hash}@${b.ordinal}/${b.anchorOrd}`)).toEqual([
+      "dag:d1@300/300", "dag:d2@300/300", "dor:t2@52/300", "dor:t3@52/300", "dor:t1@51/300",
+      "dor:t0@40/200",
+      "dag:d0@100/100",
+    ]);
+    // Each carries its accepting tick's time, for the door onto its records.
+    expect(windowBlocks(w)[0]!.ts).toBe(new Date(300 * 10_000).toISOString());
+  });
+  it("an absent window lists nothing", () => {
+    expect(windowBlocks(null)).toEqual([]);
   });
 });

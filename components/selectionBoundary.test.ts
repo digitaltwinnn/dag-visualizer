@@ -16,7 +16,7 @@ import { join } from "node:path";
 //     executor like everything else.
 //
 // In scope: the selection setters (setFilter / setCountry / setInspect / setSnap / setLayer /
-// setFollowing / setCohort / setTrendFocus / setRailNet / setBlock). NOT in scope: the hover channels (subjectPairing's
+// setFollowing / setCohort / setTrendFocus / setRailNet / setBlock / setLedgerRegister). NOT in scope: the hover channels (subjectPairing's
 // lane), view/mode navigation, phone-UI chrome, and data-bridge setters — those are not
 // selections.
 //
@@ -26,9 +26,16 @@ import { join } from "node:path";
 // it carries a consequence beyond its own channel (an off-window plane pages into view first).
 // That consequence belongs in the executor, where every caller inherits it, which is exactly what
 // this boundary exists to guarantee. `trendPlaneActions` is the table entry;
-// `setTrendScroll`, `setTrendMetric` and `setLedgerRegister` (which register the Snapshots view reads —
-// a setting, like the measures) stay OUT — they are how the reader wants the stack drawn,
+// `setTrendScroll` and `setTrendMetric` stay OUT — they are how the reader wants the stack drawn,
 // not what it is about.
+//
+// ⚠️ `setLedgerRegister` is IN (2026-11-05), although the register is a setting of the Snapshots
+// view, for the same reason `setTrendFocus` is: switching it RELEASES what the register it leaves
+// drew and the other cannot (the block, or the metagraph snapshot — `registerSwitchActions`), and
+// that release goes through the executor. `switchLedgerRegister` (src/store/applyClickActions.ts)
+// is the one door; the raw setter is a plain field write that releases nothing, so a surface that
+// called it would strand a committed subject the scene can no longer draw. Its only writers are the
+// store's own definition, that door, and tests — the second case below holds the rest of src/ to it.
 //
 // Cheap grep over real source (the house pattern — see engine/layerBoundaries.test.ts and
 // engine/noHardcodedColors.test.ts).
@@ -39,7 +46,7 @@ const COMPONENTS = join(import.meta.dirname, ".");
 // not a user pick). Anything else that needs an exemption should instead get a table entry.
 const ALLOW = new Set(["FollowController.tsx"]);
 
-const SELECTION_SETTERS = /\bset(Filter|Country|Inspect|Snap|Layer|Following|Cohort|TrendFocus|RailNet|Block)\b/;
+const SELECTION_SETTERS = /\bset(Filter|Country|Inspect|Snap|Layer|Following|Cohort|TrendFocus|RailNet|Block|LedgerRegister)\b/;
 
 function sourceFiles(dir: string): string[] {
   const out: string[] = [];
@@ -63,6 +70,22 @@ describe("selection-write boundary (components → pickActions table → applyCl
       }
     }
     expect(bad, "selection writes must go through applyClickActions — add a pickActions builder instead").toEqual([]);
+  });
+
+  it("outside components/, the raw register setter is written only by the store and the one switch door", () => {
+    const SRC = join(import.meta.dirname, "..", "src");
+    const DOORS = new Set(["store/store.ts", "store/applyClickActions.ts"]);
+    const bad: string[] = [];
+    for (const file of sourceFiles(SRC)) {
+      const name = file.slice(SRC.length + 1).replace(/\\/g, "/");
+      if (DOORS.has(name) || /\.test\.tsx?$/.test(name)) continue;
+      const src = readFileSync(file, "utf8");
+      for (const [i, line] of src.split("\n").entries()) {
+        if (/\bsetLedgerRegister\b/.test(line)) bad.push(`src/${name}:${i + 1}  ${line.trim()}`);
+      }
+    }
+    expect(bad, "switch the register through switchLedgerRegister (src/store/applyClickActions.ts), which releases what the other register cannot draw").toEqual([]);
+    for (const door of DOORS) expect(existsSync(join(SRC, door)), `${door} vanished — drop it from DOORS`).toBe(true);
   });
 
   it("the allowlist only names files that still exist (no stale exemptions)", () => {

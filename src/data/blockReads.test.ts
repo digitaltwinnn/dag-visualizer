@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { BLOCK_FRONTIER, blockReadKey, frontierKey, isFrontierKey, wantedBlockReads, windowBlockKeys } from "@/src/data/blockReads";
+import { BLOCK_FRONTIER, blockChildren, blockReadKey, blockReadOf, frontierKey, isFrontierKey, wantedBlockReads, windowBlockKeys } from "@/src/data/blockReads";
+import type { BlockRead } from "@/src/engine/domain/blockBraid";
 import { foldBlockWindow } from "@/src/data/blockWindow";
 import type { RawMetaSnapshot } from "@/src/data/types";
 
@@ -32,5 +33,25 @@ describe("the frontier key", () => {
     expect(frontierKey("dag")).toBe(`dag:${BLOCK_FRONTIER}`);
     expect(isFrontierKey(frontierKey("DAG0x"))).toBe(true);
     expect(isFrontierKey(blockReadKey("dag", 7241523))).toBe(false);
+  });
+});
+
+describe("one block's read and its children", () => {
+  const b = (hash: string, parents: string[]): BlockRead => ({ hash, height: 1, parents: parents.map((p) => ({ hash: p, height: 0 })), txCount: 1, amount: 1, fee: 0, signers: 3 });
+  const reads = {
+    [blockReadKey("dag", 300)]: { blocks: [b("d1", ["d0", "x"]), b("d2", ["d0", "d1"])], tips: null },
+    [blockReadKey("dag", 100)]: { blocks: [b("d0", ["y", "z"])], tips: null },
+    [blockReadKey("dor", 52)]: { blocks: [b("t1", ["d0", "q"])], tips: null },
+    [frontierKey("dag")]: { blocks: [b("f", ["d0", "d1"])], tips: null },
+  };
+  it("finds the block in its accepting snapshot's read, or nothing before it lands", () => {
+    expect(blockReadOf(reads, { chain: "dag", hash: "d2", ordinal: 300 })?.parents.map((p) => p.hash)).toEqual(["d0", "d1"]);
+    expect(blockReadOf(reads, { chain: "dag", hash: "d9", ordinal: 300 })).toBeNull();
+    expect(blockReadOf(reads, { chain: "dag", hash: "d0", ordinal: 999 })).toBeNull();
+  });
+  it("counts the blocks of its own chain's block reads built on it — never another chain's, never the frontier", () => {
+    expect(blockChildren(reads, "dag", "d0")).toBe(2);
+    expect(blockChildren(reads, "dag", "d1")).toBe(1);
+    expect(blockChildren(reads, "dag", "d2")).toBe(0);
   });
 });

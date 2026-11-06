@@ -37,6 +37,7 @@ import {
   Hourglass,
   Network,
   Clock,
+  Ruler,
   type LucideIcon,
   Minus,
   Plus,
@@ -49,6 +50,8 @@ import type { TrendMetric } from "@/src/store/store";
 import type { HyperMeasure } from "@/src/data/hyperMeasure";
 import type { GeoMeasure } from "@/src/data/geoMeasure";
 import type { LedgerMeasure } from "@/src/data/ledgerMeasure";
+import type { BlockMeasure } from "@/src/data/blockMeasure";
+import type { LedgerRegister } from "@/src/store/mode";
 
 // ONE source of truth for the interface's VOCABULARY glyphs — each view kind → its lucide icon.
 // Consumed by the top-bar view switch (TopBar), the card-head kind marks (inspector/cards.tsx),
@@ -98,6 +101,19 @@ export const SNAPSHOT_ICON: LucideIcon = Box;
 // slot): a metagraph snapshot is one of the many sealed states a single global tick carries, so it
 // wears the plural cube — distinct from SNAPSHOT_ICON (the ONE global block it anchors into).
 export const METASNAP_ICON: LucideIcon = Boxes;
+
+// A BLOCK's mark (the Blocks register's card, ghost and dock tray, 2026-11-05): the same glyph the
+// History view's Blocks measure wears — one subject, one mark. Not the cubes: Box is the global
+// snapshot's, Boxes the metagraph snapshot's, and both stand in the same rail.
+export const BLOCK_ICON: LucideIcon = Blocks;
+
+/** THE SNAPSHOTS VIEW'S TWO REGISTERS, one mark each (the explorer's register switch): Snapshots
+ *  wears the view's own strata, Blocks the block's mark. Typed on the register vocabulary, so a new
+ *  register without a glyph is a compile error here. */
+export const REGISTER_ICONS: Readonly<Record<LedgerRegister, LucideIcon>> = {
+  snapshots: VIEW_ICONS.ledger,
+  blocks: BLOCK_ICON,
+};
 
 // THE COMMITTED INSTANT's mark (History's cursor card, 2026-09-19): the crosshair — one moment
 // marked across every plane at once, which is exactly what the timeline's cursor draws. Named
@@ -221,7 +237,7 @@ export function iconForPick(
  *  snapshot's boxes. Data and size (bytes) are the drive, not the state lane's database; nodes
  *  the honeycomb's hexagon — the geo view stacks them as cells — never the provider's server (a
  *  node is not its host). Cadence (`continuity`) is a heartbeat: the chain's rhythm. */
-export type MeasureId = TrendMetric | HyperMeasure | GeoMeasure | LedgerMeasure;
+export type MeasureId = TrendMetric | HyperMeasure | GeoMeasure | LedgerMeasure | BlockMeasure;
 /** Typed on the four measure vocabularies (review, 2026-10-24), so a new measure id without a glyph
  *  is a compile error here — the tune-schema idiom — while `measureIcon` keeps the lookup by the
  *  option's string id lenient for the tiles. */
@@ -250,6 +266,10 @@ export const MEASURE_ICONS: Readonly<Record<MeasureId, LucideIcon>> = {
   fee: Coins,
   anchors: Boxes,
   size: HardDrive,
+  // The Blocks register (`BlockMeasure`): fees above, then the amount a block moved — a move from
+  // one address to another, the transfers' own mark — and its height in its chain.
+  amount: ArrowLeftRight,
+  height: Ruler,
 };
 
 /** A measure option's glyph by its id — undefined for an id no vocabulary declares. */

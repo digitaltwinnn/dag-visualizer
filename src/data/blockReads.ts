@@ -1,3 +1,4 @@
+import type { BlockRead } from "@/src/engine/domain/blockBraid";
 import type { BlockWindow } from "@/src/data/blockWindow";
 
 // WHICH FULL READS THE BLOCKS REGISTER'S WINDOW WANTS. A block's hash comes from the live feed at
@@ -62,4 +63,30 @@ export function wantedBlockReads(
 /** Every key the window could want, held or not (what retention keeps). */
 export function windowBlockKeys(w: BlockWindow): Set<string> {
   return new Set(allWants(w).map((x) => x.key));
+}
+
+/** ONE BLOCK'S READ — the block in its accepting snapshot's full read, or null until that read lands
+ *  (or when the read does not list it). */
+export function blockReadOf(
+  reads: Readonly<Record<string, { blocks: readonly BlockRead[] } | undefined>>,
+  b: { chain: string; hash: string; ordinal: number },
+): BlockRead | null {
+  return reads[blockReadKey(b.chain, b.ordinal)]?.blocks.find((x) => x.hash === b.hash) ?? null;
+}
+
+/** HOW MANY BLOCKS ARE BUILT ON THIS ONE, as far as the held reads show: the blocks of its own
+ *  chain's block reads that name it as a parent. A frontier read is the tips, not blocks, so it
+ *  counts nothing; the reads are pruned with the window, so this is a count within the window. */
+export function blockChildren(
+  reads: Readonly<Record<string, { blocks: readonly BlockRead[] } | undefined>>,
+  chain: string,
+  hash: string,
+): number {
+  let n = 0;
+  for (const [key, r] of Object.entries(reads)) {
+    // The key's chain part, exactly (`blockReadKey`: `${chain}:${ordinal}`).
+    if (!r || isFrontierKey(key) || key.slice(0, key.lastIndexOf(":")) !== chain) continue;
+    for (const b of r.blocks) if (b.parents.some((p) => p.hash === hash)) n++;
+  }
+  return n;
 }

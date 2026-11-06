@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ledgerNetwork } from "@/src/engine/domain/tickNet";
 
 import Explorer, { type ExplorerLevelSpec, type ExplorerRowSpec } from "@/components/explorer/Explorer";
-import { NODE_GLYPH_W, nodeRowSpec, unknownNodeRowSpec } from "@/components/explorer/nodeRow";
+import { NODE_GLYPH_W, nodeRowSpec, tickerOf, unknownNodeRowSpec } from "@/components/explorer/nodeRow";
+import RegisterSwitch from "@/components/explorer/RegisterSwitch";
+import { IDENT_INK } from "@/components/identInk";
 import TablePager from "@/components/datasection/TablePager";
 import ExplorerFoot from "@/components/explorer/ExplorerFoot";
 import { pageHolding, pageOnResize } from "@/components/explorer/fitRows";
@@ -49,6 +51,13 @@ import { levelMeasure } from "@/src/data/explorerMeasure";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { tickNetworksLevel, tickPolledRows } from "@/src/data/ladderLevels";
 import { useFeedRead } from "@/components/useFeedRead";
+import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
+import { windowBlocks } from "@/src/data/blockWindow";
+import { blockReadOf } from "@/src/data/blockReads";
+import { BLOCK_MEASURE_OPTIONS, blockMeasureText, blockMeasureValue, type BlockMeasure } from "@/src/data/blockMeasure";
+import { NO_MEASURE } from "@/src/data/ledgerMeasure";
+import { blockSelectActions } from "@/src/engine/domain/pickActions";
+import { midHash } from "@/src/util/format";
 
 // THE SNAPSHOTS VIEW'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session
 // 2026-09-26; read `docs/superpowers/design/2026-09-26-explorer-card/README.md` first). This file
@@ -143,6 +152,21 @@ export default function LedgerPanel() {
   useFeedRead(["global", "metasnaps", "clusters", "api-metagraphs", "api-geo", "exact"], "LedgerPanel");
   const filter = useStore((s) => s.filter);
   const mode = useStore((s) => s.mode);
+  // THE REGISTER (the Blocks register, 2026-11-05): which register the chamber reads decides what
+  // this card lists — the global snapshots, or the blocks on them. The compare lives here, inside
+  // the view's own explorer, the way the records surface keeps its own (one keyed `levels` below).
+  const register = useStore((s) => s.ledgerRegister);
+  const inBlocks = register === "blocks";
+  useFeedRead(["api-blocks"], "LedgerPanel blocks", inBlocks);
+  const blockWin = useSyncExternalStore(onBlockWindow, getBlockWindow, () => null);
+  const blockStatus = useStore((s) => s.blockWindowStatus);
+  const blockReads = useStore((s) => s.blockReads);
+  const blockMeasure = useStore((s) => s.blockMeasure);
+  const setBlockMeasure = useStore((s) => s.setBlockMeasure);
+  const block = useStore((s) => s.block);
+  const hoverBlock = useStore((s) => s.hoverBlock);
+  const setHoverBlock = useStore((s) => s.setHoverBlock);
+  const [blockPage, setBlockPage] = useState(1);
   const hoverFilter = useStore((s) => s.hoverFilter);
   const setHoverFilter = useStore((s) => s.setHoverFilter);
   const hoverSnapOrd = useStore((s) => s.hoverSnapOrd);
@@ -227,7 +251,8 @@ export default function LedgerPanel() {
   const bp = useBreakpoint();
   // Phone keeps a fixed, shorter page (its sheet sizes to content): 10, not the old 15 (user,
   // 2026-09-28). Desktop and tablet fill their host.
-  const pageSize = useFitRows("ledger-view", bp !== "phone", openTick == null, bp === "phone" ? TICK_PAGE_PHONE : TICK_PAGE);
+  // The Blocks register's list pages at the same size: it is the root level whenever it shows.
+  const pageSize = useFitRows("ledger-view", bp !== "phone", inBlocks || openTick == null, bp === "phone" ? TICK_PAGE_PHONE : TICK_PAGE);
   const lastSize = useRef(pageSize);
   useEffect(() => {
     if (lastSize.current === pageSize) return;
@@ -245,7 +270,9 @@ export default function LedgerPanel() {
   const pagedSnaps = orderedSnaps.slice((page - 1) * pageSize, page * pageSize);
   // A PAGE IN VIEW IS A PAGE IN FOCUS: the exact reads (the figures) are fetched for the page the
   // reader is looking at, at the backfill's own pace, deduped against everything held or in flight.
-  const pagedKey = pagedSnaps.map((d) => d.ordinal).join(",");
+  // Only while the ticks ARE the list: in Blocks the page on screen is blocks, whose reads are the
+  // block reads' bridge's own.
+  const pagedKey = inBlocks ? "" : pagedSnaps.map((d) => d.ordinal).join(",");
   useEffect(() => {
     const ords = pagedKey ? pagedKey.split(",").map(Number) : [];
     return ensurePage(ords);
@@ -648,24 +675,127 @@ export default function LedgerPanel() {
     });
   }
 
+  // ---- THE BLOCKS REGISTER: one flat level, the window's blocks newest first ----------------------
+  // A row is a block on its accepting snapshot: the chain's ticker, the block's short hash, the
+  // measure's figure from its full read (absent until the read lands — the dash, rule 10). Its click
+  // is the chamber's own block pick (`blockSelectActions`: the block and the tick that carries it),
+  // its hover the block's own channel (`hoverBlock` — a block, not its tick).
+  const allBlocks = inBlocks ? windowBlocks(blockWin) : [];
+  const blockPages = Math.max(1, Math.ceil(allBlocks.length / pageSize));
+  const bPage = Math.min(blockPage, blockPages);
+  const pagedBlocks = allBlocks.slice((bPage - 1) * pageSize, bPage * pageSize);
+  const blockValues = pagedBlocks.map((b) => {
+    const read = blockReadOf(blockReads, b);
+    return read ? blockMeasureValue(blockMeasure, read) : null;
+  });
+  const maxBlock = Math.max(1e-9, ...blockValues.map((v) => v ?? 0));
+  const blockLens = ledgerLens(filter);
+  // The window's own stretch: "last N h" at the live edge, else its span and how long ago it ended
+  // (the past window's words — a window around an old pin makes no claim about now).
+  const blockGlobals = blockWin?.globalSnapshots ?? [];
+  const blockSpan =
+    blockStatus?.status === "loading" && blockGlobals.length
+      ? "reading that time…"
+      : blockStatus?.status === "failed" && blockGlobals.length
+        ? "couldn't read that time"
+        : blockStatus?.around == null
+          ? spanWords([...blockGlobals].reverse())
+          : windowWords(blockGlobals);
+  const blockLevel: ExplorerLevelSpec = {
+    key: "blocks",
+    crumb: { label: "Blocks" },
+    measure: { options: BLOCK_MEASURE_OPTIONS, value: blockMeasure, onPick: (id) => setBlockMeasure(id as BlockMeasure) },
+    hasFigure: true,
+    figureW: 48,
+    glyphW: NODE_GLYPH_W,
+    // An honest instrument state for each way the window is not here (rule 10): read, failed, or
+    // deeper than the trail walks — and a window that holds no block says so.
+    empty:
+      blockStatus?.status === "beyond"
+        ? "Blocks this far back are not reached"
+        : blockStatus?.status === "failed"
+          ? "couldn't read that time"
+          : blockWin
+            ? "No blocks in this stretch"
+            : "reading…",
+    rows: pagedBlocks.map((b, i): ExplorerRowSpec => {
+      const hue = identityHudCss(b.chain);
+      const on = block != null && block.chain === b.chain && block.hash === b.hash;
+      const v = blockValues[i];
+      const read = blockReadOf(blockReads, b);
+      const sel = { chain: b.chain, hash: b.hash, ordinal: b.ordinal, anchorOrd: b.anchorOrd };
+      const g = blockGlobals.find((x) => x.ordinal === b.anchorOrd);
+      return {
+        key: `${b.chain}:${b.hash}`,
+        // The chain's ticker in its own ink, the node rows' mark (no dot beside the hued bar).
+        glyph: (
+          <span className={cn("min-w-0 truncate text-label font-semibold", IDENT_INK)} style={{ color: hue }}>
+            {tickerOf(b.chain)}
+          </span>
+        ),
+        name: midHash(b.hash, 12),
+        nameMono: true,
+        share: v != null ? v / maxBlock : undefined,
+        hue,
+        figure: read ? blockMeasureText(blockMeasure, read) : NO_MEASURE,
+        on,
+        // A committed block's row re-boxes its card first (`openOrToggle`), as every subject row does.
+        rung: "block",
+        // A COMMITTED FILTER IS A LENS here too: another chain's blocks still list (they happened),
+        // stepped back.
+        faint: !on && blockLens !== "all" && blockLens !== b.chain,
+        onClick: g
+          ? () => {
+              const st = useStore.getState();
+              applyClickActions(
+                blockSelectActions(sel, { kind: "snapshot", title: `Global snapshot #${g.ordinal}`, data: g }, {
+                  block: st.block,
+                  snapOrd: !st.following && st.snap ? st.snap.data.ordinal : null,
+                  metaSnap: st.metaSnap,
+                  tickNet: st.tickNet,
+                }),
+              );
+            }
+          : undefined,
+        pair: subjectPairing(hoverBlock, b.hash, setHoverBlock, hue),
+      };
+    }),
+    pager:
+      allBlocks.length > 0 ? (
+        <TablePager
+          page={bPage}
+          pages={blockPages}
+          from={(bPage - 1) * pageSize + 1}
+          to={Math.min(bPage * pageSize, allBlocks.length)}
+          total={allBlocks.length}
+          compact
+          scope={{ word: blockSpan }}
+          onPage={(p) => setBlockPage(p)}
+        />
+      ) : undefined,
+  };
+
   return (
     <Explorer
       id="ledger-view"
-      title="Snapshots"
+      // The card says what it lists (a plural noun): the register decides which.
+      title={inBlocks ? "Blocks" : "Snapshots"}
+      control={VIEW_POLICIES[mode].registers.length > 1 ? <RegisterSwitch /> : undefined}
       // The sentence is the path's own placeholder now (user, 2026-10-08): one line beside the house.
       hint={null}
       // The sentence names the NEXT LEVEL, never a measure (user, 2026-10-24: "the hint in the
       // breadcrumb always refers to anchors, it should refer to the selected control button" —
       // "anchors" is also a tile's name, so under Fees it read as stale; the networks that
       // anchored are what a snapshot row opens whatever the figure column shows).
-      placeholder="Select a snapshot to view the networks that anchored into it."
-      levels={levels}
+      placeholder={inBlocks ? "Select a block to view the snapshot that accepted it." : "Select a snapshot to view the networks that anchored into it."}
+      levels={inBlocks ? [blockLevel] : levels}
       onLeave={() => {
         // Container-level hover backstop: leaving the card clears every channel its rows write.
         setHoverFilter(null);
         setHoverSnapOrd(null);
         setHoverMetaSnap(null);
         setHoverNodeId(null);
+        setHoverBlock(null);
       }}
     />
   );
