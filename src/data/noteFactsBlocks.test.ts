@@ -33,7 +33,7 @@ describe("blocksFacts", () => {
     expect(valueOf(r.facts, "DAG open tips")).toBe(12);
     expect(valueOf(r.facts, "Dor open tips")).toBe(12);
     expect(valueOf(r.facts, "DAG height")).toBe(51_234);
-    expect(valueOf(r.facts, "Global snapshots since the DAG height last rose")).toBe(1_904);
+    expect(valueOf(r.facts, "Global snapshots since the DAG height last moved")).toBe(1_904);
     // The gate names networks by the whole catalog, and the note reads the frontier as it is now.
     expect(r.names).toEqual(["DAG", "Dor", "USDC.dag"]);
     expect(r.lead).toEqual({ kind: "now" });

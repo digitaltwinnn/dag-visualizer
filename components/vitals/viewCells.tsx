@@ -36,7 +36,7 @@ import { nodesBySubregion } from "@/src/data/subregions";
 import { useFeedRead } from "@/components/useFeedRead";
 import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
 import { blocksPerBucket, blocksPerHour, frontierAge, openTipsByChain } from "@/src/data/blockStats";
-import { blockReadKey, frontierKey } from "@/src/data/blockReads";
+import { frontierKey } from "@/src/data/blockReads";
 import { windowBlocks } from "@/src/data/blockWindow";
 import { tickerOf } from "@/components/explorer/nodeRow";
 import { useNowTick } from "@/components/useNowTick";
@@ -962,7 +962,7 @@ function BlockLead({ figure, unit, prefix, empty = false }: { figure: React.Reac
 }
 
 export function BlocksCells({ accent }: { accent: string }) {
-  useFeedRead(["api-blocks"], "BlocksCells");
+  useFeedRead(["api-blocks", "global"], "BlocksCells");
   const win = useSyncExternalStore(onBlockWindow, getBlockWindow, () => null);
   const status = useStore((s) => s.blockWindowStatus);
   const reads = useStore((s) => s.blockReads);
@@ -976,11 +976,14 @@ export function BlocksCells({ accent }: { accent: string }) {
   const chains = ["dag", ...new Set(windowBlocks(win).map((b) => b.chain).filter((c) => c !== "dag"))];
   const tips = openTipsByChain(reads, chains);
 
-  // HEIGHT: the highest block of the newest DAG snapshot's read (a `BlockRead` carries a height and
-  // nothing finer — no sub-height is invented).
-  const newestDag = [...ticks].filter((t) => t.blocks.length).sort((a, b) => b.ord - a.ord)[0];
-  const heights = newestDag ? reads[blockReadKey("dag", newestDag.ord)]?.blocks.map((b) => b.height) : undefined;
-  const height = heights?.length && !pinned ? Math.max(...heights) : null;
+  // HEIGHT: the DAG's height as the protocol counts it — the newest global snapshot's own `height`,
+  // with its `subHeight` (the global snapshots since it last moved). ONE SOURCE for every surface
+  // (controller ruling, 2026-11-06): the block DAG's note states the same two fields of the same
+  // feed's record, so the band and the note never print two heights side by side. A Block card keeps
+  // its block's own height: another subject.
+  const latest = useStore((s) => s.latestSnapshot);
+  const height = !pinned && latest?.height != null ? latest.height : null;
+  const subHeight = height != null && latest?.subHeight != null ? latest.subHeight : null;
 
   // The DAG's frontier read carries its snapshot's stamp (until one is held: the empty value).
   const frontierTs = reads[frontierKey("dag")]?.ts;
@@ -1014,8 +1017,16 @@ export function BlocksCells({ accent }: { accent: string }) {
           {chains.length > 4 && <span className="text-label text-muted-foreground">+{chains.length - 4} more</span>}
         </span>
       </BandCard>
-      <BandCard label="Height" lead={<BlockLead figure={height != null ? height.toLocaleString() : null} unit="DAG blocks" empty={height == null} />}>
-        <span className="flex items-center self-stretch text-label text-muted-foreground">{pinned ? BLOCK_PINNED : height == null ? "Reading the newest block…" : "Newest DAG block"}</span>
+      <BandCard label="Height" lead={<BlockLead figure={height != null ? height.toLocaleString() : null} unit="DAG height" empty={height == null} />}>
+        <span className="flex items-center self-stretch text-label text-muted-foreground">
+          {pinned
+            ? BLOCK_PINNED
+            : height == null
+              ? "Reading the newest global snapshot…"
+              : subHeight != null
+                ? `${subHeight.toLocaleString()} global ${subHeight === 1 ? "snapshot" : "snapshots"} since it last moved`
+                : "The newest global snapshot's"}
+        </span>
       </BandCard>
       <BandCard
         label="Frontier age"

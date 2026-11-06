@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BLOCK_FRONTIER, blockChildren, blockReadKey, blockReadOf, frontierChains, frontierKey, isFrontierKey, wantedBlockReads, windowBlockKeys } from "@/src/data/blockReads";
+import { BLOCK_FRONTIER, blockChildren, blockReadKey, blockReadOf, frontierAdvances, frontierChains, frontierKey, isFrontierKey, unstampedFrontiers, wantedBlockReads, windowBlockKeys } from "@/src/data/blockReads";
 import type { BlockRead } from "@/src/engine/domain/blockBraid";
 import { foldBlockWindow } from "@/src/data/blockWindow";
 import type { RawMetaSnapshot } from "@/src/data/types";
@@ -67,5 +67,24 @@ describe("one block's read and its children", () => {
     expect(blockChildren(reads, "dag", "d0")).toBe(2);
     expect(blockChildren(reads, "dag", "d1")).toBe(1);
     expect(blockChildren(reads, "dag", "d2")).toBe(0);
+  });
+});
+
+describe("a frontier's honesty", () => {
+  it("is written only forward: an older answer never replaces a newer one", () => {
+    expect(frontierAdvances(null, 10)).toBe(true);
+    expect(frontierAdvances({}, 10)).toBe(true);
+    expect(frontierAdvances({ ordinal: 10 }, 11)).toBe(true);
+    expect(frontierAdvances({ ordinal: 10 }, 10)).toBe(true);
+    expect(frontierAdvances({ ordinal: 10 }, 9)).toBe(false);
+  });
+  it("names the token frontiers with no stamp, never the DAG's or a block read", () => {
+    const reads = {
+      [frontierKey("dag")]: { ts: undefined },
+      [frontierKey("DOR")]: {},
+      [frontierKey("USDC")]: { ts: "2026-11-06T12:00:00Z" },
+      [blockReadKey("DOR", 4)]: {},
+    };
+    expect(unstampedFrontiers(reads)).toEqual([frontierKey("DOR")]);
   });
 });

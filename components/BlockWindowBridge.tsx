@@ -6,7 +6,7 @@ import { netUrl } from "@/src/net/current";
 import { POLL } from "@/src/engine/config";
 import { reportPoll } from "@/src/data/api";
 import { getBlockWindow, onBlockWindow, pastRetryDelay, setBlockWindow } from "@/src/data/pastWindow";
-import { frontierChains, frontierKey } from "@/src/data/blockReads";
+import { frontierAdvances, frontierChains, frontierKey, unstampedFrontiers } from "@/src/data/blockReads";
 import type { TipRead } from "@/src/engine/domain/blockBraid";
 import { BLOCK_WINDOW_TICKS, blockWanted, foldBlockWindow, type BlockWindowAnswer } from "@/src/data/blockWindow";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
@@ -28,8 +28,13 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 // (`snapshotExact[live].tips`) — the chamber already makes it, so it costs no fetch — written as each
 // newer one lands. Each token chain the window covers (`frontierChains`: listed in the trail's
 // `chains`, holding a block in the window) is read from `/api/network/<id>/snapshots/latest/blocks`
-// on entering the register, when a new chain joins the window, and once a minute after. A failed
-// read leaves the held frontier, which keeps its own stamp (rule 10: the age says how old it is).
+// on entering the register, when a new chain joins the window, and once a minute after. Every
+// frontier is written only FORWARD (`frontierAdvances`, by the snapshot's ordinal). A failed read
+// leaves a STAMPED frontier (its age says how old it is) but drops an unstamped one, and leaving the
+// register drops every unstamped one (`unstampedFrontiers`; rule 10: no read is no tips).
+//
+// THE BRIEFING READS AHEAD: while the tour runs (`store.briefing` non-null) the LIVE window is
+// fetched even before the Blocks stop, so that stop opens on a drawn chamber, not a loading one.
 const LIVE_REFRESH_MS = 30_000;
 const FRONTIER_REFRESH_MS = 60_000;
 
@@ -40,10 +45,14 @@ export default function BlockWindowBridge() {
   // A PIN is a snapshot the reader holds — never the one a live follow walks forward each tick
   // (`pastWanted`'s own rule): read as a pin, the followed tick re-asked the trail on every global.
   const snapOrd = useStore((s) => s.snap?.data.ordinal ?? null);
-  const pin = following ? null : snapOrd;
+  // The Briefing reads the live window ahead (`blockWanted`'s `touring`): no pin stands during it.
+  const touring = useStore((s) => s.briefing != null);
+  const pin = following || touring ? null : snapOrd;
+  // Where the live window is wanted: the Blocks register, or anywhere while the tour runs.
+  const liveWanted = touring || (ledger && register === "blocks");
   const setStatus = useStore((s) => s.setBlockWindowStatus);
   const exact = useStore((s) => s.snapshotExact);
-  const { snaps } = useSnapshotFeed(POLL.maxSnapshots, ledger && register === "blocks");
+  const { snaps } = useSnapshotFeed(POLL.maxSnapshots, liveWanted);
   const liveNewest = snaps.length ? snaps[snaps.length - 1]!.ordinal : null;
   const liveTip = snaps.length ? snaps[snaps.length - 1]! : null;
 
@@ -106,7 +115,7 @@ export default function BlockWindowBridge() {
 
   useEffect(() => {
     const held = getBlockWindow();
-    const want = blockWanted({ ledger, register, pin, held: held ? { from: held.from, to: held.to } : null, liveNewest });
+    const want = blockWanted({ ledger, register, pin, held: held ? { from: held.from, to: held.to } : null, liveNewest, touring });
     // Unpinning back to the live edge: the held window is the pin's, so ask for live at once.
     const backToLive = want.kind === "keep" && pin == null && asked.current != null && asked.current !== "live";
     if (want.kind === "keep" && !backToLive) return;
@@ -128,7 +137,7 @@ export default function BlockWindowBridge() {
     dropRetry();
     read(around, gen.current, 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ledger, register, pin, liveNewest]);
+  }, [ledger, register, pin, liveNewest, touring]);
 
   // The exact reads change what a tick's anchor says: fold the same answer again (O(ticks)).
   useEffect(() => {
@@ -137,11 +146,11 @@ export default function BlockWindowBridge() {
 
   // The live edge: a fresh trail every 30 s while following it.
   useEffect(() => {
-    if (!ledger || register !== "blocks" || !following || pin != null) return;
+    if (!liveWanted || (!touring && !following) || pin != null) return;
     const id = window.setInterval(() => read(null, ++gen.current, 0), LIVE_REFRESH_MS);
     return () => window.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ledger, register, following, pin]);
+  }, [liveWanted, touring, following, pin]);
 
   // THE DAG'S FRONTIER: the live global's exact read, as each newer one lands.
   const latest = useStore((s) => s.latestSnapshot);
@@ -150,9 +159,8 @@ export default function BlockWindowBridge() {
     const tips = exact[latest.ordinal]?.tips;
     if (!tips) return;
     const st = useStore.getState();
-    const held = st.blockReads[frontierKey("dag")]?.ts;
-    if (held != null && Date.parse(held) >= Date.parse(latest.timestamp)) return;
-    st.setBlockRead(frontierKey("dag"), { blocks: [], tips, ts: latest.timestamp });
+    if (!frontierAdvances(st.blockReads[frontierKey("dag")], latest.ordinal)) return;
+    st.setBlockRead(frontierKey("dag"), { blocks: [], tips, ts: latest.timestamp, ordinal: latest.ordinal });
   }, [ledger, register, latest, exact]);
 
   // EACH TOKEN CHAIN'S FRONTIER: its newest snapshot from its own L0, once a minute while the register is on.
@@ -164,12 +172,19 @@ export default function BlockWindowBridge() {
       try {
         const r = await fetch(netUrl(`/api/network/${chain}/snapshots/latest/blocks`));
         if (!r.ok) throw new Error(String(r.status));
-        const d = (await r.json()) as { tips?: TipRead | null; ts?: string };
+        const d = (await r.json()) as { ordinal?: number; tips?: TipRead | null; ts?: string };
         if (!live) return;
+        if (typeof d.ordinal !== "number") throw new Error("no ordinal");
         reportPoll("api-blocks", true);
-        useStore.getState().setBlockRead(frontierKey(chain), { blocks: [], tips: d.tips ?? null, ...(d.ts ? { ts: d.ts } : {}) });
+        const st = useStore.getState();
+        if (!frontierAdvances(st.blockReads[frontierKey(chain)], d.ordinal)) return;
+        st.setBlockRead(frontierKey(chain), { blocks: [], tips: d.tips ?? null, ordinal: d.ordinal, ...(d.ts ? { ts: d.ts } : {}) });
       } catch {
-        if (live) reportPoll("api-blocks", false);
+        if (!live) return;
+        reportPoll("api-blocks", false);
+        // A frontier that cannot say how old it is goes with its failed refresh.
+        const st = useStore.getState();
+        if (unstampedFrontiers(st.blockReads).includes(frontierKey(chain))) st.dropBlockReads([frontierKey(chain)]);
       }
     };
     const chains = () => frontierChains(getBlockWindow(), answer.current?.chains ?? []);
@@ -192,6 +207,9 @@ export default function BlockWindowBridge() {
       live = false;
       off();
       window.clearInterval(id);
+      // Leaving the register: an unstamped frontier would read as current on a return.
+      const st = useStore.getState();
+      st.dropBlockReads(unstampedFrontiers(st.blockReads));
     };
   }, [ledger, register]);
 
@@ -199,13 +217,13 @@ export default function BlockWindowBridge() {
   // come with the next refresh.
   useEffect(() => {
     const a = answer.current;
-    if (!a || !liveTip || !following || pin != null || register !== "blocks") return;
+    if (!a || !liveTip || !liveWanted || (!touring && !following) || pin != null) return;
     const hashes = (liveTip.blocks ?? []).filter((b): b is string => typeof b === "string");
     if (!hashes.length || a.ticks.some((t) => t.ord === liveTip.ordinal)) return;
     if (a.ticks.length && liveTip.ordinal < a.ticks[0]!.ord) return;
     apply({ ...a, ticks: [{ ord: liveTip.ordinal, ts: liveTip.timestamp, hash: liveTip.hash, blocks: hashes, metaSnaps: {} }, ...a.ticks].slice(0, BLOCK_WINDOW_TICKS) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveTip, following, pin, register]);
+  }, [liveTip, following, pin, liveWanted, touring]);
 
   return null;
 }

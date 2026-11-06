@@ -22,6 +22,8 @@ export interface HeldBlockRead {
   blocks: BlockRead[];
   tips: TipRead | null;
   ts?: string;
+  /** A frontier read's snapshot ordinal (the chain's own), so an older answer never replaces a newer. */
+  ordinal?: number;
 }
 
 /** The store key of one block read: `${chain}:${ordinal}`. */
@@ -38,6 +40,21 @@ export function frontierKey(chain: string): string {
 }
 export function isFrontierKey(key: string): boolean {
   return key.endsWith(`:${BLOCK_FRONTIER}`);
+}
+
+/** A FRONTIER IS WRITTEN ONLY FORWARD: a read lands unless the held frontier is of a NEWER snapshot
+ *  (reads overlap; an older answer arriving late must not replace a newer one). A held read with no
+ *  ordinal is replaced. */
+export function frontierAdvances(held: Pick<HeldBlockRead, "ordinal"> | null | undefined, ordinal: number): boolean {
+  return held?.ordinal == null || ordinal >= held.ordinal;
+}
+
+/** THE TOKEN FRONTIERS THAT CANNOT SAY HOW OLD THEY ARE: held with no snapshot stamp (`ts`, absent
+ *  while the explorer's index lags the chain's L0). The bridge drops them on a failed read and on
+ *  leaving the register, so a return never shows an hour-old tip count as current (rule 10: no read
+ *  is no tips). The DAG's frontier is always stamped, so it is never among them. */
+export function unstampedFrontiers(reads: Readonly<Record<string, Pick<HeldBlockRead, "ts"> | undefined>>): string[] {
+  return Object.keys(reads).filter((k) => isFrontierKey(k) && k !== frontierKey("dag") && reads[k] != null && reads[k]!.ts == null);
 }
 
 /** THE TOKEN CHAINS WHOSE FRONTIER IS READ: the listed chains the window walked (`chains`, the trail's

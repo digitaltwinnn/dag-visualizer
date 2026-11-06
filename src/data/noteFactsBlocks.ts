@@ -74,7 +74,7 @@ export function blocksFacts(input: BlocksFactsInput): { facts: Fact[]; names: st
     facts.push(fact(`${nameOf(id)} open tips`, tips.active.length, "count"));
   }
   if (input.height != null) facts.push(fact("DAG height", input.height, "count"));
-  if (input.subHeight != null) facts.push(fact("Global snapshots since the DAG height last rose", input.subHeight, "count"));
+  if (input.subHeight != null) facts.push(fact("Global snapshots since the DAG height last moved", input.subHeight, "count"));
 
   // No pair here to have moved: the note reads the block DAG as it stands.
   return { facts, names: Object.values(names), lead: { kind: "now" } };

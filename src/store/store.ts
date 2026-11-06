@@ -564,6 +564,8 @@ interface AppState {
   setHoverBlock: (hash: string | null) => void;
   setBlockRead: (key: string, v: HeldBlockRead) => void;
   setBlockReadMiss: (key: string) => void;
+  /** Forget held block reads by key (a frontier that can no longer say how old it is). Data-bridge setter. */
+  dropBlockReads: (keys: readonly string[]) => void;
   /** Drop every block read and miss outside `keep`, except the `:frontier` keys. Data-bridge setter. */
   retainBlockReads: (keep: Set<string>) => void;
   setLedgerMeasure: (measure: LedgerMeasure) => void;
@@ -998,6 +1000,14 @@ export const useStore = create<AppState>((set) => ({
       return { blockReads: { ...s.blockReads, [key]: v }, blockReadMiss: miss };
     }),
   setBlockReadMiss: (key) => set((s) => ({ blockReadMiss: { ...s.blockReadMiss, [key]: true } })),
+  dropBlockReads: (keys) =>
+    set((s) => {
+      const gone = keys.filter((k) => k in s.blockReads);
+      if (!gone.length) return {};
+      const blockReads = { ...s.blockReads };
+      for (const k of gone) delete blockReads[k];
+      return { blockReads };
+    }),
   retainBlockReads: (keep) =>
     set((s) => {
       const kept = (k: string) => keep.has(k) || isFrontierKey(k);

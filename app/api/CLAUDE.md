@@ -161,8 +161,7 @@ them — but the Next Node server can.
   brushed range and a subject note), and
   `GET /api/notes/warm` is the quarter-hourly cron (three items at a time, 0.5 s between call
   starts, so the 122 warmed notes fill in one pass).
-  **The block DAG's note** (view `blocks`, subject `all`, span `hours`, NOTES_VERSION 72,
-  2026-11-06) is the Snapshots view's Blocks register's, which the Briefing's blocks stop reads: a
+  **The block DAG's note** (view `blocks`, subject `all`, span `hours`, 2026-11-06) is the Snapshots view's Blocks register's, which the Briefing's blocks stop reads: a
   register, not a Mode, so it is its own `NoteView` with the ledger's timing and is warmed beside
   it (`dag` folds into `all`, as the ledger's). Its facts (`src/data/noteFactsBlocks.ts`) are the
   blocks each chain accepted over the last 24 whole hours of the hourly tier — the sampler's own
@@ -170,7 +169,10 @@ them — but the Next Node server can.
   counts — and the frontier as it stands, read live when the note is written
   (`notes/blockFrontier.ts`: the DAG's height and sub-height from the explorer's newest global, its
   tips from that global's shared pull, each block-bearing chain's tips from its L0). Every live part
-  fails soft to "not stated"; no measured block series is no note. **The honesty gate (rule 10) is mechanical**
+  fails soft to "not stated"; no measured block series is no note. A new KIND needs no version bump:
+  its keys collide with nothing, and a bump would rewrite every warmed note for no gain. The DAG's
+  height and sub-height it states are the newest global's own fields, the same ones the Blocks
+  band's HEIGHT cell reads from the live feed: one height on every surface. **The honesty gate (rule 10) is mechanical**
   (`src/data/noteHonesty.ts`, the colocated test is its specification): every number the note
   states must match a fact the model was shown, within the precision it was written to, and a
   failing note is asked for once more with the reasons, then dropped and counted. A note that

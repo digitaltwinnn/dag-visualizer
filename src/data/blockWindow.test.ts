@@ -33,6 +33,13 @@ describe("blockWanted", () => {
     expect(blockWanted({ ledger: true, register: "snapshots", pin: 50, held: null, liveNewest: 900 })).toEqual({ kind: "clear" });
     expect(blockWanted({ ledger: false, register: "blocks", pin: null, held: null, liveNewest: 900 })).toEqual({ kind: "clear" });
   });
+  it("while the Briefing runs, the live window is read ahead in any view and register, and held", () => {
+    expect(blockWanted({ ledger: false, register: "snapshots", pin: null, held: null, liveNewest: 900, touring: true })).toEqual({ kind: "fetch", around: null });
+    expect(blockWanted({ ledger: true, register: "snapshots", pin: 50, held: null, liveNewest: 900, touring: true })).toEqual({ kind: "fetch", around: null });
+    expect(blockWanted({ ledger: false, register: "snapshots", pin: null, held: { from: 400, to: 900 }, liveNewest: 900, touring: true })).toEqual({ kind: "keep" });
+    // The tour over, a view outside the register lets it go.
+    expect(blockWanted({ ledger: false, register: "snapshots", pin: null, held: { from: 400, to: 900 }, liveNewest: 900, touring: false })).toEqual({ kind: "clear" });
+  });
 });
 
 describe("blockWindowContinues", () => {

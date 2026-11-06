@@ -98,14 +98,19 @@ export function foldBlockWindow(answer: BlockWindowAnswer, exact: Readonly<Recor
 }
 
 /** What the Blocks register wants of its window: none, the one it holds, or one around the pin
- *  (`around` null = the live edge). Entering the register fetches; a pin the held range covers keeps. */
+ *  (`around` null = the live edge). Entering the register fetches; a pin the held range covers keeps.
+ *  WHILE THE BRIEFING RUNS (`touring`) the LIVE window is wanted whatever the view, the register and
+ *  the pin, so the tour's Blocks stop opens on a drawn chamber (controller ruling, 2026-11-06); the
+ *  window is only held outside the register, which reads the live buffer there. */
 export function blockWanted(s: {
   ledger: boolean;
   register: LedgerRegister;
   pin: number | null;
   held: { from: number; to: number } | null;
   liveNewest: number | null;
+  touring?: boolean;
 }): { kind: "clear" } | { kind: "keep" } | { kind: "fetch"; around: number | null } {
+  if (s.touring) return s.held ? { kind: "keep" } : { kind: "fetch", around: null };
   if (!s.ledger || s.register !== "blocks") return { kind: "clear" };
   if (s.pin == null) return s.held ? { kind: "keep" } : { kind: "fetch", around: null };
   if (s.held && s.pin >= s.held.from && s.pin <= s.held.to) return { kind: "keep" };
