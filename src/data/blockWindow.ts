@@ -40,6 +40,19 @@ export interface BlockWindow extends LedgerSource {
 /** Ticks a block window holds (matches the live buffer's 52). */
 export const BLOCK_WINDOW_TICKS = 52;
 
+/** A LIVE REFRESH NEVER MOVES THE WINDOW BACKWARD. The route's edge cache and the explorer's lagging
+ *  index can answer with a trail older than a tick the bridge already holds (appended from the live
+ *  feed, or from an earlier answer): the held ticks newer than the answer's newest survive, unique by
+ *  `ord`, newest first, cut to the window. Only for `around=live` refreshes — a pinned answer replaces. */
+export function mergeLiveAnswer(held: BlockWindowAnswer | null, answer: BlockWindowAnswer): BlockWindowAnswer {
+  if (!held || !held.ticks.length) return answer;
+  const newest = answer.ticks.reduce((m, t) => Math.max(m, t.ord), -Infinity);
+  const kept = held.ticks.filter((t) => t.ord > newest && !answer.ticks.some((a) => a.ord === t.ord));
+  if (!kept.length) return answer;
+  const ticks = [...kept, ...answer.ticks].sort((a, b) => b.ord - a.ord).slice(0, BLOCK_WINDOW_TICKS);
+  return { ...answer, ticks };
+}
+
 /** The window as a ledger source, oldest → newest. A tick's anchor reads the exact fold where it has
  *  landed; otherwise it is the FLOOR folded from the tick's block-bearing snapshots (a chain with none
  *  here contributes nothing; `touched` 0 — a settled past). */

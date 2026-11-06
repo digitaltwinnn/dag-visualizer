@@ -8,7 +8,7 @@ import { reportPoll } from "@/src/data/api";
 import { getBlockWindow, onBlockWindow, pastRetryDelay, setBlockWindow } from "@/src/data/pastWindow";
 import { frontierAdvances, frontierChains, frontierKey, unstampedFrontiers } from "@/src/data/blockReads";
 import type { TipRead } from "@/src/engine/domain/blockBraid";
-import { BLOCK_WINDOW_TICKS, blockWanted, foldBlockWindow, type BlockWindowAnswer } from "@/src/data/blockWindow";
+import { BLOCK_WINDOW_TICKS, blockWanted, foldBlockWindow, mergeLiveAnswer, type BlockWindowAnswer } from "@/src/data/blockWindow";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 
@@ -88,7 +88,8 @@ export default function BlockWindowBridge() {
           setStatus({ around, status: "beyond" });
           return;
         }
-        apply(a);
+        // A live refresh never moves the window backward (`mergeLiveAnswer`); a pin replaces.
+        apply(around == null ? mergeLiveAnswer(answer.current, a) : a);
         setStatus({ around, status: "ready" });
       })
       .catch(() => failed(around, g, attempt));

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BLOCK_WINDOW_TICKS, blockWanted, blockWindowContinues, foldBlockWindow, windowBlocks } from "@/src/data/blockWindow";
+import { BLOCK_WINDOW_TICKS, blockWanted, blockWindowContinues, foldBlockWindow, mergeLiveAnswer, windowBlocks } from "@/src/data/blockWindow";
 import type { RawMetaSnapshot, SnapshotExact } from "@/src/data/types";
 
 describe("foldBlockWindow", () => {
@@ -75,5 +75,33 @@ describe("windowBlocks", () => {
   });
   it("an absent window lists nothing", () => {
     expect(windowBlocks(null)).toEqual([]);
+  });
+});
+
+describe("mergeLiveAnswer", () => {
+  const tick = (ord: number, blocks: string[] = ["b" + ord], metaSnaps: Record<string, RawMetaSnapshot[]> = {}) => ({ ord, ts: `2026-01-01T00:00:${String(ord % 60).padStart(2, "0")}Z`, hash: "h" + ord, blocks, metaSnaps });
+  const ans = (...ords: number[]) => ({ ticks: ords.map((o) => tick(o)), chains: [] as string[] });
+
+  it("keeps a held appended tick newer than the answer", () => {
+    const r = mergeLiveAnswer(ans(105, 104, 103), ans(104, 103, 102));
+    expect(r.ticks.map((t) => t.ord)).toEqual([105, 104, 103, 102]);
+  });
+  it("takes the answer's version of a tick both hold", () => {
+    const rich = { ...tick(105), metaSnaps: { m: [{} as RawMetaSnapshot] } };
+    const r = mergeLiveAnswer(ans(105, 104), { ticks: [rich, tick(104)], chains: ["m"] });
+    expect(r.ticks[0]).toBe(rich);
+    expect(r.ticks).toHaveLength(2);
+  });
+  it("cuts to the window", () => {
+    const held = ans(...Array.from({ length: BLOCK_WINDOW_TICKS }, (_, i) => 1000 - i));
+    const answer = ans(...Array.from({ length: BLOCK_WINDOW_TICKS }, (_, i) => 990 - i));
+    const r = mergeLiveAnswer(held, answer);
+    expect(r.ticks).toHaveLength(BLOCK_WINDOW_TICKS);
+    expect(r.ticks[0]!.ord).toBe(1000);
+  });
+  it("is the answer when nothing held is newer, or nothing is held", () => {
+    const a = ans(105, 104);
+    expect(mergeLiveAnswer(null, a)).toBe(a);
+    expect(mergeLiveAnswer(ans(104, 103), a)).toBe(a);
   });
 });
