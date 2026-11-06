@@ -18,14 +18,20 @@ export function blocksInTick(t: BlockTick): number {
   return n;
 }
 
-/** Blocks whose accepting global snapshot is within the last hour of `nowMs`, DAG + token. */
-export function blocksPerHour(ticks: readonly BlockTick[], nowMs: number): number {
-  let n = 0;
+/** Blocks whose accepting global snapshot is within the last hour of `nowMs`, DAG + token. `floor` is
+ *  true exactly when the window is FULL and its oldest tick is newer than an hour ago: it stopped at
+ *  its tick budget, so what came before is unknown and the count is "at least". A window below its cap
+ *  holds all history, so its count is complete. */
+export function blocksPerHour(ticks: readonly BlockTick[], nowMs: number): { count: number; floor: boolean } {
+  let count = 0;
+  let oldest = Infinity;
   for (const t of ticks) {
-    const age = nowMs - Date.parse(t.ts);
-    if (age >= 0 && age <= HOUR_MS) n += blocksInTick(t);
+    const at = Date.parse(t.ts);
+    oldest = Math.min(oldest, at);
+    const age = nowMs - at;
+    if (age >= 0 && age <= HOUR_MS) count += blocksInTick(t);
   }
-  return n;
+  return { count, floor: ticks.length >= BLOCK_WINDOW_TICKS && oldest > nowMs - HOUR_MS };
 }
 
 /** The last hour as `BLOCK_BUCKETS` bins, OLDEST first. A bin holding no tick is zero blocks (see the

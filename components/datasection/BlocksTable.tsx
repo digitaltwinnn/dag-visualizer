@@ -77,6 +77,16 @@ export default function BlocksTable() {
   const pinnedRow = useRef<HTMLTableRowElement | null>(null);
   const scrolled = useRef<string | null>(null);
   const pinKey = block ? `${block.chain}:${block.hash}` : null;
+  // A door pinning a block inside a group the reader folded opens that group.
+  useEffect(() => {
+    if (pinnedOrd == null) return;
+    setFolded((f) => {
+      if (!f.has(pinnedOrd)) return f;
+      const n = new Set(f);
+      n.delete(pinnedOrd);
+      return n;
+    });
+  }, [pinKey, pinnedOrd]);
   useEffect(() => {
     if (pinKey && pinnedRow.current && scrolled.current !== pinKey) {
       scrolled.current = pinKey;

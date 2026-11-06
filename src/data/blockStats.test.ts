@@ -18,10 +18,20 @@ describe("blocksInTick", () => {
 describe("blocksPerHour", () => {
   it("counts only blocks whose tick is within the last hour of now, DAG and token", () => {
     const ticks = [tick(3, 5, ["a"], { dor: [snap(["t1", "t2"])] }), tick(2, 59, ["b"]), tick(1, 61, ["c", "d"])];
-    expect(blocksPerHour(ticks, NOW)).toBe(4);
+    expect(blocksPerHour(ticks, NOW)).toEqual({ count: 4, floor: false });
   });
-  it("is 0 for an empty window", () => {
-    expect(blocksPerHour([], NOW)).toBe(0);
+  it("is 0, not a floor, for an empty window", () => {
+    expect(blocksPerHour([], NOW)).toEqual({ count: 0, floor: false });
+  });
+  const full = (spanMin: number) => Array.from({ length: BLOCK_WINDOW_TICKS }, (_, i) => tick(100 - i, 1 + (i * (spanMin - 1)) / (BLOCK_WINDOW_TICKS - 1), ["x"]));
+  it("is a floor when a FULL window does not reach back an hour", () => {
+    expect(blocksPerHour(full(30), NOW)).toEqual({ count: BLOCK_WINDOW_TICKS, floor: true });
+  });
+  it("is exact when a full window reaches back past an hour", () => {
+    expect(blocksPerHour(full(90), NOW).floor).toBe(false);
+  });
+  it("is exact when a window below the cap spans under an hour (it holds all history)", () => {
+    expect(blocksPerHour(full(30).slice(0, 10), NOW).floor).toBe(false);
   });
 });
 
@@ -41,6 +51,13 @@ describe("blocksPerBucket", () => {
     expect(oldest).toBeLessThan(60);
     expect(v[0]).toBeNull();
     expect(v[BLOCK_BUCKETS - 1]).not.toBeNull();
+    // The bin holding the oldest tick (26.5 min ago -> bin 6, spanning 25-30 min) is kept; the bins before it are gaps.
+    expect(v[6]).not.toBeNull();
+    expect(v[5]).toBeNull();
+  });
+  it("nulls no bin when the window is below its cap", () => {
+    const v = blocksPerBucket([tick(2, 1, ["a"]), tick(1, 20, ["b"])], NOW);
+    expect(v.every((x) => x != null)).toBe(true);
   });
 });
 

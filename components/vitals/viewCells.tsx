@@ -36,7 +36,7 @@ import { nodesBySubregion } from "@/src/data/subregions";
 import { useFeedRead } from "@/components/useFeedRead";
 import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
 import { blocksPerBucket, blocksPerHour, frontierAge, openTipsByChain } from "@/src/data/blockStats";
-import { frontierKey } from "@/src/data/blockReads";
+import { blockReadKey, frontierKey } from "@/src/data/blockReads";
 import { windowBlocks } from "@/src/data/blockWindow";
 import { tickerOf } from "@/components/explorer/nodeRow";
 import { useNowTick } from "@/components/useNowTick";
@@ -951,9 +951,10 @@ const BLOCK_LEAD = "font-mono font-bold text-figure tabular-nums whitespace-nowr
 const BLOCK_PINNED = "Window pinned to a past time";
 
 /** A stacked lead: the figure over its muted unit — the rate cards' own shape. */
-function BlockLead({ figure, unit, empty = false }: { figure: React.ReactNode; unit: string; empty?: boolean }) {
+function BlockLead({ figure, unit, prefix, empty = false }: { figure: React.ReactNode; unit: string; /** A floor says so ("at least"), in words. */ prefix?: string; empty?: boolean }) {
   return (
     <span className="flex flex-col items-start">
+      {prefix && !empty && <span className="text-label font-normal text-muted-foreground leading-none">{prefix}</span>}
       <span className={cn(BLOCK_LEAD, empty ? "text-muted-foreground" : "text-foreground")}>{empty ? <Empty why="Not held yet" /> : figure}</span>
       <span className="text-label text-muted-foreground leading-none">{unit}</span>
     </span>
@@ -968,7 +969,8 @@ export function BlocksCells({ accent }: { accent: string }) {
   const now = useNowTick(1000);
   const pinned = status?.around != null;
   const ticks = win?.ticks ?? [];
-  const hour = win && !pinned ? blocksPerHour(ticks, now) : null;
+  const hourRead = win && !pinned ? blocksPerHour(ticks, now) : null;
+  const hour = hourRead?.count ?? null;
 
   // Chains with a tip count to state: the DAG, then every chain the window holds a block of.
   const chains = ["dag", ...new Set(windowBlocks(win).map((b) => b.chain).filter((c) => c !== "dag"))];
@@ -977,10 +979,11 @@ export function BlocksCells({ accent }: { accent: string }) {
   // HEIGHT: the highest block of the newest DAG snapshot's read (a `BlockRead` carries a height and
   // nothing finer — no sub-height is invented).
   const newestDag = [...ticks].filter((t) => t.blocks.length).sort((a, b) => b.ord - a.ord)[0];
-  const heights = newestDag ? reads[`dag:${newestDag.ord}`]?.blocks.map((b) => b.height) : undefined;
+  const heights = newestDag ? reads[blockReadKey("dag", newestDag.ord)]?.blocks.map((b) => b.height) : undefined;
   const height = heights?.length && !pinned ? Math.max(...heights) : null;
 
   // The frontier read carries its snapshot's stamp once it is held (until then: the empty value).
+  // TODO(Task 10): the frontier read gains its snapshot timestamp then, and this cast goes.
   const frontier = reads[frontierKey("dag")] as ({ ts?: string } & object) | undefined;
   const age = frontierAge(frontier?.ts ? { ts: frontier.ts } : null, now);
 
@@ -988,7 +991,7 @@ export function BlocksCells({ accent }: { accent: string }) {
     <>
       <BandCard
         label="Blocks last hour"
-        lead={<BlockLead figure={hour != null ? <Odometer value={hour} int /> : null} unit="blocks" empty={hour == null} />}
+        lead={<BlockLead figure={hour != null ? <Odometer value={hour} int /> : null} prefix={hourRead?.floor ? "at least" : undefined} unit="blocks" empty={hour == null} />}
       >
         {win && !pinned ? (
           <span className="flex-1 min-w-0 self-center">
