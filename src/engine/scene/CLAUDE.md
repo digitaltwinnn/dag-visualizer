@@ -560,13 +560,15 @@ bars, labels, the rewind and the pose. What differs answers through ONE keyed ma
   tokens', one material each) and `objects/SilentStretch.ts`, drawn per frame only in that register
   and CLEARED at the switch, so nothing of theirs is left to write. The tiers' meshes join
   `pickables` in that register only (the raycaster ignores `visible`).
-- **Anchors are LINES, not sheets** (`anchors: "lines"`, user, design round D1: the sheets' width
-  states snapshot size, which the blocks have nothing to do with, and read as noise). The four sheet
-  rows stand empty and `Ribbons.setAnchorLines` draws the threads' own hairline species, one per
-  metagraph snapshot that carries a block, from ITS tile down to its network's band (the bar's
-  centre while the tick's exact read has not landed), in the lane's identity hue at the row's `dim`
-  off the lens. `_syncThreads` is the one dispatch, so a filter change redraws the lines, never the
-  committed-network threads.
+- **Anchors are LINES, not sheets** (`anchors: "lines"`, user, design rounds D1 and D2: the sheets'
+  width states snapshot size, which the blocks have nothing to do with, and read as noise). The four
+  sheet rows stand empty and `Ribbons.setAnchorLines` draws the threads' own hairline species: one
+  per metagraph snapshot that carries a block, from ITS tile down to its network's band (the bar's
+  centre while the tick's exact read has not landed), in the lane's identity hue; and one per DAG
+  block, from the block down to the CENTRE of its tick's data bar (the bar spec's own band extent),
+  on the same eased sweep, in the snapshots' neutral cyan. Off the lens
+  a line takes the row's `dim`. `_syncThreads` is the one dispatch, so a filter change redraws the
+  lines, never the committed-network threads.
 - **Bare tiles are not drawn** (`bareTiles: false`, same round): a metagraph snapshot carrying no
   block zero-scales and leaves the pick table (`_blockTiles`, rebuilt with the tier); a tile that
   carries a token block stands, with its line.
@@ -578,34 +580,49 @@ filled tile of that tick, `k` the tile resolver's own index (`tileAnchorOf`). `_
 copy of the tile arithmetic: the per-frame tile draw, the selected tile's callout anchor and the
 token placement all read it, the first two adding the frame's offsets.
 
-**The DAG's blocks are a BRAID above the floor** (user, design round D1: "make it look like a DAG,
-not linear blocks"). Each stands over its own tick, `DAG_LIFT` above the bars' top face, the braid
-centred over the floor's middle; ACROSS it the blocks of one height stand side by side as siblings
-(`blockBraid.siblingRanks`, fanned 0, +1, −1, +2, … by `fanOffset`, `DAG_PITCH` apart and folded
-inside `FAN_REACH`), so consecutive heights step along the trail and each child's two parent links
-fan across to the generation before it. **Height is never a stack** (user ruling, the spec's
-non-goal). They wear the global snapshot's own glass — normal-blended, translucent, no depth write,
-the chamber's neutral cyan (`SceneColors.core`) — at `BLOCK_GLASS` (dark 0.5, paper 0.85); their
-links take the same cyan.
+**The DAG's blocks are a LAYERED DAG DRAWING above the floor** (user, design rounds D1 and D2: "a
+DAG is shaped differently usually — isn't there some algo for it?" — the Sugiyama method, held to
+the chamber's time axis). Along the trail a block stands over its own tick — time, which never moves;
+ACROSS the floor it takes the BARYCENTER of its placed parents' places, and blocks of one height
+sharing that barycenter split symmetrically around it, one unit to each side for a pair
+(`blockBraid.layeredZ`, heights from the lowest up, so parents are placed first). So the main chain
+is a straight centre line, a fork opens into a diamond and closes where the blocks rejoin. **The
+braid occupies HALF THE PLANE'S WIDTH, centred** (user, D2): the window's widest fork maps to
+`DAG_HALF_W` (the global floor plane's half-width `PLANE_FIELD_HALF`, halved — layout data), a scale
+(`_braidScale`) that only ever tightens when a wider fork arrives and starts afresh with a window
+that shares no block with the last. It stands `DAG_LIFT` (4.2) above the bars' top face, its own
+storey, each block tied down to its bar by a hairline (above). **Height is never a stack** (user ruling, the spec's non-goal). The blocks wear
+the global snapshot's own glass — normal-blended, translucent, no depth write, the chamber's neutral
+cyan (`SceneColors.core`) — at `BLOCK_GLASS` (dark 0.5, paper 0.85); their links take the same cyan.
 
-**A block holds still** (same round). The rank is newest-first within a height, ties by hash, and
-the window's reads land newest first, so a later read (an older sibling) takes the NEXT rank and
-moves no block already placed; only the window itself gaining or losing a block tick re-deals a
-height. ⚠️ No place may hang off a WINDOW-wide quantity such as its lowest height: that moves every
-time a backfill read lands or the oldest tick leaves, and a lane cycled from it swings the whole
-braid across the floor on the read schedule. A block whose read has not landed stands on the centre
-line until it does (its height is the read's).
+**A block holds still** (rounds D1, D2). A block placed once KEEPS its place: the last layout is
+handed back to `layeredZ` as `prior` (`LedgerView._blockZ`, pruned to the window by every rebuild),
+so neither a newer block nor the window's oldest block leaving moves one already standing, and a
+re-seated window that overlaps the last (the live window's own 30 s refresh) keeps what both hold.
+A block with a parent whose read is still pending waits on the centre line, so it is never seated
+against a parent about to move. ⚠️ A layout recomputed from the window moves: D1's lane from the
+window's lowest height swung the whole braid as reads landed, and D2's first cut — a pure barycenter
+pass over the window — re-dealt every block whenever the window slid by one tick (found live both
+times). The prior is what holds it.
+
+**Every reference is drawn, always** (round D2: "each block in view draws the line in the direction
+of the child block … draw it always"). `blockBraid.referenceSegments` draws both of a block's
+references: to the parent where it is placed on the trail, else as a STUB toward the older side at
+the block's own place, ending one slot past the trail's deepest row with its far end faded to
+nothing (row −1 in `BlockTier`). Before the stubs a link drew only when its parent's row was on the
+trail, and the trail held only the visible rows until a selection grew its reach — so the links
+seemed to draw only for a selected block. A block whose read has not landed states no references
+and draws none.
 
 **A token block never leaves its tile** (user ruling): it stands ON the tile of the metagraph
-snapshot that accepted it, its sibling fan and its turn among the tile's blocks only nudging it
+snapshot that accepted it, its layered place and its turn among the tile's blocks only nudging it
 inside the tile's own footprint (`TOKEN_ON_TILE`, `TOKEN_NUDGE`), in the lane's hue, opaque like the
 tile; a snapshot whose tile is not drawn puts no block anywhere.
 
 **Honesty (rule 10).** A block is drawn from the FEED's hashes, so a tick whose full read has not
-landed, or failed (`blockReadMiss`), shows its blocks with no links; a link draws only where BOTH
-ends are on the trail (`linkEndpoints`) — a parent beyond the trail's held rows has no place, so no
-stub. A landed block with no parents is a data block and is not drawn. **Tips are read, never
-inferred**: the state is `tipStateOf` over the chain's FRONTIER read (`blockReads[frontierKey(chain)]`,
+landed, or failed (`blockReadMiss`), shows its blocks with no links; a link is drawn only from a
+landed read (`referenceSegments`), its far end a placed parent or a fading stub. A landed block
+with no parents is a data block and is not drawn. **Tips are read, never inferred**: the state is `tipStateOf` over the chain's FRONTIER read (`blockReads[frontierKey(chain)]`,
 `src/data/blockReads.ts` — the newest snapshot's tips), never a block-bearing snapshot's own (hours
 stale); with none the block draws the resting look, never "open". An open tip breathes on the live
 edge's calm beat (`LiveEdge.BREATHE_RATE`), a retired one reads quiet (`BLOCK_LOOK`).
@@ -615,7 +632,7 @@ and back — a block is data) and `inkMix`/`inkPresence` with an ink floor on pa
 bloom layer; a token block is opaque and depth-writing like its tile, a DAG block glass like its bar.
 A row is one object: blocks and each link END ask the trail's boundaries at their ROW's x (a block
 offset along a tile grid must not fade apart from its tile; an end's row is handed in beside the
-endpoints, resolved through the same `linkEndpoints` walk), dissolve by zero-scale, and drop with
+endpoints from the same `referenceSegments` walk), dissolve by zero-scale, and drop with
 their slot's entry beat. Links are one `LineSegments`, positions at event time, alpha per vertex per
 frame, `glowBlend` on each ground. The silent stretch is one dashed `LineSegments` flush in the floor
 between two rows' bars, plus a flat edge label ("1,364 snapshots · 4h", `relativeAge` — the app's one

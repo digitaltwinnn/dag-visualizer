@@ -60,11 +60,15 @@ export interface BlockLook {
   ink: number;
   /** The hovered or committed block's swell. */
   grow: number;
-  /** A link's resting opacity (a relation, not a subject: under the blocks it ties). */
+  /** A link's resting opacity, per ground — every reference is drawn AT REST, always (user, D2:
+   *  "draw it always"); a relation, not a subject, so under the blocks it ties. Dark 0.42 (an
+   *  additive cyan hairline over black reads at that); paper 0.7 (normal-blended ink on the plate
+   *  read as a pale ghost at 0.42, seen live in D2). */
   link: number;
+  linkPaper: number;
 }
 
-export const BLOCK_LOOK: Readonly<BlockLook> = { open: 0.95, retired: 0.35, rest: 0.6, breath: 0.22, ink: 0.35, grow: 0.35, link: 0.42 };
+export const BLOCK_LOOK: Readonly<BlockLook> = { open: 0.95, retired: 0.35, rest: 0.6, breath: 0.22, ink: 0.35, grow: 0.35, link: 0.42, linkPaper: 0.7 };
 
 /** THE DAG BLOCK'S GLASS (user, design round D1: "the block should match the transparent / cyan
  *  snapshot color"): the global snapshot's own material — normal-blended, translucent, no depth
@@ -163,9 +167,9 @@ export class BlockTier {
     return this.mesh.count;
   }
 
-  /** EVENT-TIME: the blocks the window holds, placed, and their links (`blockBraid.linkEndpoints`,
+  /** EVENT-TIME: the blocks the window holds, placed, and their links (`blockBraid.referenceSegments`,
    *  6 floats a segment) with each END's row (`linkSlots`, 2 a segment — the trail boundaries are
-   *  asked at a row's x) and each segment's chain and colour (a link never crosses chains: a
+   *  asked at a row's x; −1 is a STUB's far end, off the trail, which fades out to nothing) and each segment's chain and colour (a link never crosses chains: a
    *  block's parents are its own chain's). */
   rebuild(items: BlockItem[], links: Float32Array, linkSlots: readonly number[], linkChains: readonly string[], linkHues: readonly number[]): void {
     const prev = new Map<string, number>(); // event-time
@@ -298,6 +302,7 @@ export class BlockTier {
 
     if (this._linkCount === 0) return;
     const col = this._linkCol.array as Float32Array;
+    const linkRest = paper ? L.linkPaper : L.link;
     for (let s = 0; s < this._linkCount; s++) {
       // The off-filter chain's links take the ledger row's own dim — the ribbons' and threads' tier.
       const off = snapBright(1, dimNet !== "all" && this._linkChain[s] !== dimNet);
@@ -305,9 +310,10 @@ export class BlockTier {
         // Each end rides its own ROW's boundaries (the row its block stands in), and an end in a row
         // still held back by the entry drop is not there yet; neither is its link.
         const slot = this._linkSlot[s * 2 + v];
+        if (slot < 0) { col[s * 8 + v * 4 + 3] = 0; continue; } // a stub's far end: the reference leaves the trail
         const x = LEAD_X - slot * SLOT_SP + this._off;
-        const entryF = fade != null && slot >= 0 && slot < SLOT_N ? fade[slot] : 1;
-        col[s * 8 + v * 4 + 3] = L.link * off * frontAt(x) * horizonAt(x) * entryF * alpha;
+        const entryF = fade != null && slot < SLOT_N ? fade[slot] : 1;
+        col[s * 8 + v * 4 + 3] = linkRest * off * frontAt(x) * horizonAt(x) * entryF * alpha;
       }
     }
     this._linkCol.needsUpdate = true;

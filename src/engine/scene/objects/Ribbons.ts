@@ -39,7 +39,7 @@ import { snapBright } from "../../domain/dimModel";
 // immediate"). LedgerView owns the handoff timing; this row is just one more sheet.
 const RIBBON_ROWS = 4;
 /** Trail slots a thread can be drawn for — the retained window, so every visible row can carry one. */
-const MAX_THREADS = 64;
+const MAX_THREADS = 128;
 /** Subdivisions per thread, and the LineSegments vertex count that follows (two per segment). */
 const THREAD_SEG = 12;
 const VERTS_PER_THREAD = THREAD_SEG * 2;
@@ -80,6 +80,19 @@ interface RowState {
   count: number;
   keys: string[];
   quads: RibbonQuad[];
+}
+
+/** One anchor hairline of the Blocks register (`setAnchorLines`): its row, its network key, where it
+ *  starts (x, z at height `yTop`, chamber-local before the rewind offset), the band it lands on (null:
+ *  the bar's centre line under it), and whether it wears the neutral cyan rather than the key's hue. */
+export interface AnchorLine {
+  slot: number;
+  key: string;
+  x: number;
+  z: number;
+  yTop: number;
+  band: { z0: number; z1: number } | null;
+  neutral?: boolean;
 }
 
 export class Ribbons {
@@ -259,7 +272,7 @@ export class Ribbons {
         for (let i = 0; i < spec.bandCount; i++) if (spec.bands[i].key === key) { band = spec.bands[i]; break; }
         if (!band) continue; // this tick carried nothing for the committed network — no line
         ribbonQuad(z, topHalf(key), band, this._q);
-        v = this._pushThread(v, slot, 0);
+        v = this._pushThread(v, slot, 0, FLOOR_Y.msnap + TILE_LIFT);
       }
     }
     this._thPos.needsUpdate = true;
@@ -267,25 +280,26 @@ export class Ribbons {
     this._thGeo.setDrawRange(0, v);
   }
 
-  /** THE BLOCKS REGISTER'S ANCHORS — the same hairline species, one per metagraph snapshot that
-   *  carries a block, from ITS tile down to its network's band on the tick (user, design round D1:
-   *  the sheets' width states snapshot size, which the blocks have nothing to do with). Each line
-   *  takes its lane's identity hue, at the ledger row's dim when another network is the lens; a
-   *  tick whose exact read has not landed has no bands, so its line lands on the bar's centre.
-   *  Geometry is event-time; `setThreadFades` writes the per-frame alpha as for the threads. */
-  setAnchorLines(lines: readonly { slot: number; key: string; tileX: number; tileZ: number; band: { z0: number; z1: number } | null }[]): void {
+  /** THE BLOCKS REGISTER'S ANCHORS — the same hairline species, one per block-carrying mark (user,
+   *  design rounds D1 and D2: the sheets' width states snapshot size, which the blocks have nothing
+   *  to do with). A metagraph snapshot's line runs from ITS tile down to its network's band on the
+   *  tick (the bar's centre while the tick's exact read has not landed), in the lane's identity hue;
+   *  a DAG block's runs straight down from the block to its tick's bar, in the snapshots' neutral
+   *  cyan (`neutral`). Off the lens a line takes the ledger row's dim. Geometry is event-time;
+   *  `setThreadFades` writes the per-frame alpha as for the threads. */
+  setAnchorLines(lines: readonly AnchorLine[]): void {
     this._clearThreads();
     let v = 0;
     for (const l of lines) {
       if (this._thCount >= MAX_THREADS) break;
-      this._c.setHex(this._sceneColors[l.key] ?? this._neutral);
+      this._c.setHex(l.neutral ? this._neutral : this._sceneColors[l.key] ?? this._neutral);
       const off = this._filter !== "all" && l.key !== this._filter;
       if (off) this._c.multiplyScalar(snapBright(1, true));
-      this._q.topZ0 = l.tileZ;
-      this._q.topZ1 = l.tileZ;
+      this._q.topZ0 = l.z;
+      this._q.topZ1 = l.z;
       this._q.botZ0 = l.band ? l.band.z0 : 0;
       this._q.botZ1 = l.band ? l.band.z1 : 0;
-      v = this._pushThread(v, l.slot, l.tileX - (LEAD_X - l.slot * SLOT_SP));
+      v = this._pushThread(v, l.slot, l.x - (LEAD_X - l.slot * SLOT_SP), l.yTop);
     }
     this._thPos.needsUpdate = true;
     this._thCol.needsUpdate = true;
@@ -299,13 +313,13 @@ export class Ribbons {
     this._thAlpha.length = 0;
   }
 
-  /** One hairline down `_q`'s centre line on the sheets' own eased sweep, in `_c`, from vertex `v`;
+  /** One hairline down `_q`'s centre line on the sheets' own eased sweep, in `_c`, from vertex `v`
+   *  and height `yTop` down to the bars' top face;
    *  `dxTop` is the top end's offset along the trail (a tile in a grid), eased out on the same sweep
    *  so the line still lands vertically on its row. Returns the next free vertex. Event-time. */
-  private _pushThread(v: number, slot: number, dxTop: number): number {
+  private _pushThread(v: number, slot: number, dxTop: number, yTop: number): number {
     const p = this._thPos.array as Float32Array;
     const c = this._thCol.array as Float32Array;
-    const yTop = FLOOR_Y.msnap + TILE_LIFT;
     const yBot = FLOOR_Y.gl0 + BAR_LIFT + BAR_H;
     const curve = RIBBON_LOOK.curve;
     const x = LEAD_X - slot * SLOT_SP;
