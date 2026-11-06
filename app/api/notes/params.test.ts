@@ -34,6 +34,10 @@ describe("parseNoteParams", () => {
     expect(parseNoteParams(sp("view=ledger&subject=all"), NOW)).toEqual({ view: "ledger", subject: "all", span: "hours" });
     // The ledger's whole network is one subject: `dag` there IS `all` (identical facts, one note).
     expect(parseNoteParams(sp("view=ledger&subject=dag&span=hours"), NOW)).toEqual({ view: "ledger", subject: "all", span: "hours" });
+    // The block DAG's note (the Blocks register) reads like the ledger's: the hours, `dag` folded into `all`.
+    expect(parseNoteParams(sp("view=blocks&subject=all"), NOW)).toEqual({ view: "blocks", subject: "all", span: "hours" });
+    expect(parseNoteParams(sp("view=blocks&subject=dag"), NOW)).toEqual({ view: "blocks", subject: "all", span: "hours" });
+    expect(parseNoteParams(sp("view=blocks&subject=all&span=day"), NOW)).toHaveProperty("error");
     expect(parseNoteParams(sp("view=hyper&subject=dag&span=day"), NOW)).toEqual({ view: "hyper", subject: "dag", span: "day" });
   });
 

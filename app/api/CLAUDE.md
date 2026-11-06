@@ -147,11 +147,11 @@ them — but the Next Node server can.
   is parsed (it is checked against mainnet's catalog, so a testnet network would otherwise 400). Notes live in
   their OWN key family, `ai:{net}:v{NOTES_VERSION}:{view}:{subject}:{span}` (`keys.ts`), never under
   `t:` (a rebuild wipes that prefix) or `geo:`: a note is a losable cache entry, and the families
-  must not share a fate. The four notes the Briefing reads (`isBriefingNote`) also carry its one short `line`, asked for in
+  must not share a fate. The five notes the Briefing reads (`isBriefingNote`) also carry its one short `line`, asked for in
   the same answer and held to the same gate; a line that fails is dropped, never retried, and the
   tour reads the note's opening. ⚠️ **A prompt or a facts change bumps `NOTES_VERSION`**, which orphans every
   stored note at once (their TTLs reap them). Timing is `KIND_TIMING` in `keys.ts`: hyper and
-  geography refresh daily (3-day TTL), the ledger and History's 24-hour note hourly (6 hours),
+  geography refresh daily (3-day TTL), the ledger, the block DAG and History's 24-hour note hourly (6 hours),
   History's daily pills daily, the 1-hour pill only when asked through its door (15 minutes) and a
   brushed range when its card opens (30 days); a subject note (below) lives a day and is never warmed. `GET /api/notes` reads: `ok` and `none` are `public, s-maxage=300,
   stale-while-revalidate=600`; `request`, `pending`, `unavailable` and a 400 are `no-store` (a
@@ -160,7 +160,17 @@ them — but the Next Node server can.
   (the same facts: one note). `POST /api/notes/request` writes the on-request kinds (the 1h pill, a
   brushed range and a subject note), and
   `GET /api/notes/warm` is the quarter-hourly cron (three items at a time, 0.5 s between call
-  starts, so the 121 warmed notes fill in one pass). **The honesty gate (rule 10) is mechanical**
+  starts, so the 122 warmed notes fill in one pass).
+  **The block DAG's note** (view `blocks`, subject `all`, span `hours`, NOTES_VERSION 72,
+  2026-11-06) is the Snapshots view's Blocks register's, which the Briefing's blocks stop reads: a
+  register, not a Mode, so it is its own `NoteView` with the ledger's timing and is warmed beside
+  it (`dag` folds into `all`, as the ledger's). Its facts (`src/data/noteFactsBlocks.ts`) are the
+  blocks each chain accepted over the last 24 whole hours of the hourly tier — the sampler's own
+  `g.blocks` / `m.<id>.blocks`, the series History's Blocks measure draws, never the transfer
+  counts — and the frontier as it stands, read live when the note is written
+  (`notes/blockFrontier.ts`: the DAG's height and sub-height from the explorer's newest global, its
+  tips from that global's shared pull, each block-bearing chain's tips from its L0). Every live part
+  fails soft to "not stated"; no measured block series is no note. **The honesty gate (rule 10) is mechanical**
   (`src/data/noteHonesty.ts`, the colocated test is its specification): every number the note
   states must match a fact the model was shown, within the precision it was written to, and a
   failing note is asked for once more with the reasons, then dropped and counted. A note that
@@ -257,7 +267,14 @@ them — but the Next Node server can.
   like a success** — throwing it made every repeat of the same bad `(ordinal, address)` re-download
   the whole global, an anonymous amplification loop; only transient failures throw and retry.
 - **`/api/snapshot/[ordinal]`** also answers the snapshot's `blocks` (parents by height and hash, transfers in DAG, signature count; hashes paired by index from the explorer record, `""` where it lists none) and `tips` (`decodeBlocks.ts`; cache key `snapshot-exact-v4`, the hashes read apart and cached on success only).
-- **`/api/network/[address]/snapshots/[ordinal]/blocks`** is a metagraph snapshot's blocks and tips, read from the chain's own L0 (`urls.l0` from the directory, 5 min) through the same `decodeBlocks`; the snapshots route's address gate (catalog + unlisted), `public, max-age=86400, s-maxage=86400, immutable`, 503 `no-store` on upstream failure.
+- **`/api/network/[address]/snapshots/[ordinal]/blocks`** is a metagraph snapshot's blocks and tips, read from the chain's own L0 (`urls.l0` from the directory, 5 min; the L0 reads live in `network/metaL0.ts`) through the same `decodeBlocks`; the snapshots route's address gate (catalog + unlisted), `public, max-age=86400, s-maxage=86400, immutable`, 503 `no-store` on upstream failure.
+  **`latest` in place of the ordinal** (2026-11-06) is the chain's FRONTIER: its newest snapshot from
+  the L0's `/snapshots/latest`, plus the explorer record's block hashes and its `ts` where the
+  indexer has reached it, at `public, s-maxage=25` (it changes every snapshot: never immutable), 503
+  `no-store` on failure. The Blocks register reads it once a minute for each listed chain holding a
+  block in its window (`components/BlockWindowBridge.tsx`), into `blockReads` under
+  `${chain}:frontier` with the snapshot's stamp; the DAG's frontier is no fetch at all — the live
+  global's own exact read (`/api/snapshot/[ordinal]`'s `tips`), which the chamber already makes.
 - **`/api/network/unlisted`** lists the UNLISTED chains — the explorer's `/currency` list less every
   tracked address — cached an hour (`app/api/network/unlistedChains.ts`, also the gate below).
 - **`/api/network/[address]/snapshots`** pages one CATALOG chain (retired networks and former

@@ -48,10 +48,17 @@ export function noteSpanWords(view: NoteView): string | null {
     case "geo":
       return spanPhrase("7d", null);
     case "ledger":
+    case "blocks":
       return spanPhrase("24h", null);
     case "trend":
       return null;
   }
+}
+
+/** The view a note's words stand in: its own, except the block DAG's, which is the Snapshots view's
+ *  Blocks register (a register, not a Mode). */
+export function noteModeOf(view: NoteView): Mode {
+  return view === "blocks" ? "ledger" : view;
 }
 
 export function noteSubjectOf(mode: Mode, s: NoteSubjectState): NoteSubject | null {

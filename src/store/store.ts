@@ -29,8 +29,7 @@ export type { Mode, LedgerRegister };
 // The stored metric every trend plane draws — one picker, one column (see `trendMetric` below).
 import type { LedgerMeasure } from "@/src/data/ledgerMeasure";
 import type { BlockMeasure } from "@/src/data/blockMeasure";
-import { isFrontierKey } from "@/src/data/blockReads";
-import type { BlockRead, TipRead } from "@/src/engine/domain/blockBraid";
+import { isFrontierKey, type HeldBlockRead } from "@/src/data/blockReads";
 import type { GeoMeasure } from "@/src/data/geoMeasure";
 import type { HyperMeasure } from "@/src/data/hyperMeasure";
 // WHY the scene is moving — the motion hint's cause (2026-09-26), stamped by the gesture's owner
@@ -422,7 +421,8 @@ interface AppState {
   // The block the cursor is hovering (its hash) — a hover channel: previews, never commits.
   hoverBlock: string | null;
   // Block reads, keyed `${chain}:${ordinal}`; "dag:<ord>" mirrors `snapshotExact`'s blocks and tips.
-  blockReads: Record<string, { blocks: BlockRead[]; tips: TipRead | null }>;
+  // A frontier read (`${chain}:frontier`) also carries its snapshot's stamp (`HeldBlockRead.ts`).
+  blockReads: Record<string, HeldBlockRead>;
   // Block reads that FAILED (retry spent): the tick stays, its blocks draw with no links (rule 10).
   blockReadMiss: Record<string, true>;
   // What the Geography explorer's country rows count — nodes, metagraphs or providers
@@ -562,7 +562,7 @@ interface AppState {
   setBlockMeasure: (m: BlockMeasure) => void;
   setBlock: (b: BlockSel | null) => void;
   setHoverBlock: (hash: string | null) => void;
-  setBlockRead: (key: string, v: { blocks: BlockRead[]; tips: TipRead | null }) => void;
+  setBlockRead: (key: string, v: HeldBlockRead) => void;
   setBlockReadMiss: (key: string) => void;
   /** Drop every block read and miss outside `keep`, except the `:frontier` keys. Data-bridge setter. */
   retainBlockReads: (keep: Set<string>) => void;

@@ -5,7 +5,9 @@ import { useStore } from "@/src/store/store";
 import { netUrl } from "@/src/net/current";
 import { POLL } from "@/src/engine/config";
 import { reportPoll } from "@/src/data/api";
-import { getBlockWindow, pastRetryDelay, setBlockWindow } from "@/src/data/pastWindow";
+import { getBlockWindow, onBlockWindow, pastRetryDelay, setBlockWindow } from "@/src/data/pastWindow";
+import { frontierChains, frontierKey } from "@/src/data/blockReads";
+import type { TipRead } from "@/src/engine/domain/blockBraid";
 import { BLOCK_WINDOW_TICKS, blockWanted, foldBlockWindow, type BlockWindowAnswer } from "@/src/data/blockWindow";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
@@ -19,7 +21,17 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 // and `blockWindowStatus` says why; the feed's health row (`api-blocks`) tracks the reads. Following the live edge, it refreshes the live trail
 // every `LIVE_REFRESH_MS` and adds a tick the live feed has announced at once (its blocks are on the
 // global record), leaving its anchored records for the next refresh.
+//
+// THE FRONTIER READS (`${chain}:frontier` in `blockReads`, `src/data/blockReads.ts`): the tips of each
+// chain's NEWEST snapshot, with that snapshot's stamp (`ts`), which OPEN TIPS, FRONTIER AGE and the
+// chamber's breathing tips read. The DAG's is the live global's own exact read
+// (`snapshotExact[live].tips`) — the chamber already makes it, so it costs no fetch — written as each
+// newer one lands. Each token chain the window covers (`frontierChains`: listed in the trail's
+// `chains`, holding a block in the window) is read from `/api/network/<id>/snapshots/latest/blocks`
+// on entering the register, when a new chain joins the window, and once a minute after. A failed
+// read leaves the held frontier, which keeps its own stamp (rule 10: the age says how old it is).
 const LIVE_REFRESH_MS = 30_000;
+const FRONTIER_REFRESH_MS = 60_000;
 
 export default function BlockWindowBridge() {
   const ledger = useStore((s) => VIEW_POLICIES[s.mode].tickScoped);
@@ -130,6 +142,58 @@ export default function BlockWindowBridge() {
     return () => window.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ledger, register, following, pin]);
+
+  // THE DAG'S FRONTIER: the live global's exact read, as each newer one lands.
+  const latest = useStore((s) => s.latestSnapshot);
+  useEffect(() => {
+    if (!ledger || register !== "blocks" || !latest) return;
+    const tips = exact[latest.ordinal]?.tips;
+    if (!tips) return;
+    const st = useStore.getState();
+    const held = st.blockReads[frontierKey("dag")]?.ts;
+    if (held != null && Date.parse(held) >= Date.parse(latest.timestamp)) return;
+    st.setBlockRead(frontierKey("dag"), { blocks: [], tips, ts: latest.timestamp });
+  }, [ledger, register, latest, exact]);
+
+  // EACH TOKEN CHAIN'S FRONTIER: its newest snapshot from its own L0, once a minute while the register is on.
+  useEffect(() => {
+    if (!ledger || register !== "blocks") return;
+    let live = true;
+    let asked = new Set<string>();
+    const readOne = async (chain: string) => {
+      try {
+        const r = await fetch(netUrl(`/api/network/${chain}/snapshots/latest/blocks`));
+        if (!r.ok) throw new Error(String(r.status));
+        const d = (await r.json()) as { tips?: TipRead | null; ts?: string };
+        if (!live) return;
+        reportPoll("api-blocks", true);
+        useStore.getState().setBlockRead(frontierKey(chain), { blocks: [], tips: d.tips ?? null, ...(d.ts ? { ts: d.ts } : {}) });
+      } catch {
+        if (live) reportPoll("api-blocks", false);
+      }
+    };
+    const chains = () => frontierChains(getBlockWindow(), answer.current?.chains ?? []);
+    const readAll = () => {
+      const now = chains();
+      asked = new Set(now);
+      for (const c of now) void readOne(c);
+    };
+    // A chain that joins the window is read at once, not a minute later.
+    const onWindow = () => {
+      for (const c of chains()) if (!asked.has(c)) {
+        asked.add(c);
+        void readOne(c);
+      }
+    };
+    readAll();
+    const off = onBlockWindow(onWindow);
+    const id = window.setInterval(readAll, FRONTIER_REFRESH_MS);
+    return () => {
+      live = false;
+      off();
+      window.clearInterval(id);
+    };
+  }, [ledger, register]);
 
   // A global the live feed announces with blocks joins the window at once; its anchored records
   // come with the next refresh.

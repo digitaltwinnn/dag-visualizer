@@ -982,10 +982,9 @@ export function BlocksCells({ accent }: { accent: string }) {
   const heights = newestDag ? reads[blockReadKey("dag", newestDag.ord)]?.blocks.map((b) => b.height) : undefined;
   const height = heights?.length && !pinned ? Math.max(...heights) : null;
 
-  // The frontier read carries its snapshot's stamp once it is held (until then: the empty value).
-  // TODO(Task 10): the frontier read gains its snapshot timestamp then, and this cast goes.
-  const frontier = reads[frontierKey("dag")] as ({ ts?: string } & object) | undefined;
-  const age = frontierAge(frontier?.ts ? { ts: frontier.ts } : null, now);
+  // The DAG's frontier read carries its snapshot's stamp (until one is held: the empty value).
+  const frontierTs = reads[frontierKey("dag")]?.ts;
+  const age = frontierAge(frontierTs ? { ts: frontierTs } : null, now);
 
   return (
     <>

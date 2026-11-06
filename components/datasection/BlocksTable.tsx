@@ -20,6 +20,7 @@ import GroupPlate from "@/components/datasection/GroupToggle";
 import LiveDot from "@/components/LiveDot";
 import { PinnedMark } from "@/components/state/StateAtoms";
 import { useFeedRead } from "@/components/useFeedRead";
+import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { useNowTick } from "@/components/useNowTick";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -52,7 +53,8 @@ export default function BlocksTable() {
   const following = useStore((s) => s.following);
   const filter = useStore((s) => s.filter);
   const status = useStore((s) => s.blockWindowStatus);
-  const setHoverBlock = useStore((s) => s.setHoverBlock);
+  const hoverBlock = useStore((s) => s.hoverBlock);
+  const setHoverBlockRaw = useStore((s) => s.setHoverBlock);
   const setHoverSnapOrd = useStore((s) => s.setHoverSnapOrd);
   const now = useNowTick(1000);
   const phone = useBreakpoint() === "phone";
@@ -94,6 +96,11 @@ export default function BlocksTable() {
     }
   });
 
+  // A row is the block's own subject on `hoverBlock`, paired with the explorer row, the chamber's
+  // block and the Block card. A row that leaves under a resting pointer (a fold, a live refresh)
+  // releases the hover it set (`useHoverRelease`).
+  const setHoverBlock = useHoverRelease(hoverBlock, rows.filter((b) => !isFolded(b.anchorOrd)).map((b) => b.hash), setHoverBlockRaw);
+
   if (!rows.length) {
     const why =
       status?.status === "beyond" ? "Blocks this far back are not reached"
@@ -122,6 +129,7 @@ export default function BlocksTable() {
             const inSelGroup = snap?.data.ordinal === b.anchorOrd;
             const hue = identityHudCss(b.chain);
             const on = block != null && block.chain === b.chain && block.hash === b.hash;
+            const pair = subjectPairing(hoverBlock, b.hash, setHoverBlock, hue);
             const read = blockReadOf(reads, b);
             const unit = tickerOf(b.chain);
             const missed = miss[`${b.chain}:${b.ordinal}`] != null;
@@ -199,14 +207,16 @@ export default function BlocksTable() {
                       "max-[700px]:grid max-[700px]:grid-cols-[auto_minmax(0,1fr)_auto] max-[700px]:items-center max-[700px]:[&>td]:py-2",
                       "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                       on && "bg-[var(--sel-bg)] text-foreground",
+                      pair.className,
                       // A COMMITTED FILTER IS A LENS: another chain's blocks still list, stepped back.
                       !on && lens !== "all" && lens !== b.chain && "opacity-60",
                     )}
                     style={{ "--row-hue": hue, ...(on ? selectionHue(hue) : {}) } as React.CSSProperties}
-                    onMouseEnter={() => setHoverBlock(b.hash)}
-                    onMouseLeave={() => setHoverBlock(null)}
-                    onFocus={() => setHoverBlock(b.hash)}
-                    onBlur={() => setHoverBlock(null)}
+                    onMouseEnter={pair.onMouseEnter}
+                    onMouseMove={pair.onMouseMove}
+                    onMouseLeave={pair.onMouseLeave}
+                    onFocus={pair.onFocus}
+                    onBlur={pair.onBlur}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { noteSpanWords, noteSubjectOf, type NoteSubjectState } from "./noteSubject";
+import { noteModeOf, noteSpanWords, noteSubjectOf, type NoteSubjectState } from "./noteSubject";
 
 const base: NoteSubjectState = {
   metagraphNetwork: "all",
@@ -57,5 +57,13 @@ describe("noteSpanWords", () => {
     expect(noteSpanWords("geo")).toBe("last 7 days");
     expect(noteSpanWords("ledger")).toBe("last 24 hours");
     expect(noteSpanWords("trend")).toBeNull();
+    expect(noteSpanWords("blocks")).toBe("last 24 hours");
+  });
+});
+
+describe("noteModeOf", () => {
+  it("is the note's own view, and the block DAG's is the Snapshots view it is a register of", () => {
+    for (const v of ["hyper", "geo", "ledger", "trend"] as const) expect(noteModeOf(v)).toBe(v);
+    expect(noteModeOf("blocks")).toBe("ledger");
   });
 });

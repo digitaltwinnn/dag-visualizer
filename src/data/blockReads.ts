@@ -1,4 +1,4 @@
-import type { BlockRead } from "@/src/engine/domain/blockBraid";
+import type { BlockRead, TipRead } from "@/src/engine/domain/blockBraid";
 import type { BlockWindow } from "@/src/data/blockWindow";
 
 // WHICH FULL READS THE BLOCKS REGISTER'S WINDOW WANTS. A block's hash comes from the live feed at
@@ -15,6 +15,15 @@ export interface BlockReadWant {
   ordinal: number;
 }
 
+/** ONE HELD READ (`store.blockReads`): a snapshot's blocks and tips, and — on a FRONTIER read — `ts`,
+ *  the stamp of the snapshot it read, which FRONTIER AGE counts from. A block-bearing snapshot's
+ *  read carries no `ts` (its tick says when). */
+export interface HeldBlockRead {
+  blocks: BlockRead[];
+  tips: TipRead | null;
+  ts?: string;
+}
+
 /** The store key of one block read: `${chain}:${ordinal}`. */
 export function blockReadKey(chain: string, ordinal: number): string {
   return `${chain}:${ordinal}`;
@@ -29,6 +38,19 @@ export function frontierKey(chain: string): string {
 }
 export function isFrontierKey(key: string): boolean {
   return key.endsWith(`:${BLOCK_FRONTIER}`);
+}
+
+/** THE TOKEN CHAINS WHOSE FRONTIER IS READ: the listed chains the window walked (`chains`, the trail's
+ *  `BlockWindowAnswer.chains`) that hold a block in it — the chains the band's OPEN TIPS states and
+ *  the chamber draws tips for, in the window's newest-first order. The DAG's frontier is the live
+ *  global's own exact read, never a fetch, so it is never listed here. */
+export function frontierChains(w: BlockWindow | null, chains: readonly string[]): string[] {
+  if (!w) return [];
+  const listed = new Set(chains);
+  const out = new Set<string>();
+  for (const t of [...w.ticks].sort((a, b) => b.ord - a.ord))
+    for (const [chain, rows] of Object.entries(t.metaSnaps)) if (listed.has(chain) && rows.some((r) => r.blocks?.length)) out.add(chain);
+  return [...out];
 }
 
 /** Every read the window could want, newest tick first: the tick's DAG read when it holds a DAG

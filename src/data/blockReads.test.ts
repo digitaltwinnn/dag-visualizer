@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BLOCK_FRONTIER, blockChildren, blockReadKey, blockReadOf, frontierKey, isFrontierKey, wantedBlockReads, windowBlockKeys } from "@/src/data/blockReads";
+import { BLOCK_FRONTIER, blockChildren, blockReadKey, blockReadOf, frontierChains, frontierKey, isFrontierKey, wantedBlockReads, windowBlockKeys } from "@/src/data/blockReads";
 import type { BlockRead } from "@/src/engine/domain/blockBraid";
 import { foldBlockWindow } from "@/src/data/blockWindow";
 import type { RawMetaSnapshot } from "@/src/data/types";
@@ -33,6 +33,20 @@ describe("the frontier key", () => {
     expect(frontierKey("dag")).toBe(`dag:${BLOCK_FRONTIER}`);
     expect(isFrontierKey(frontierKey("DAG0x"))).toBe(true);
     expect(isFrontierKey(blockReadKey("dag", 7241523))).toBe(false);
+  });
+});
+
+describe("the token chains whose frontier is read", () => {
+  it("are the listed chains holding a block in the window, never the DAG (its frontier is the live exact read)", () => {
+    expect(frontierChains(w, ["dag", "DOR"])).toEqual(["DOR"]);
+  });
+  it("leave out a chain the trail did not list, and a chain whose snapshots in the window carry no block", () => {
+    expect(frontierChains(w, ["dag"])).toEqual([]);
+    const quiet = foldBlockWindow({ ticks: [tick(200, ["d0"], { DOR: [meta(40, [])], USDC: [meta(9, ["u1"])] })], chains: ["dag", "DOR", "USDC"] }, {});
+    expect(frontierChains(quiet, ["dag", "DOR", "USDC"])).toEqual(["USDC"]);
+  });
+  it("are none with no window", () => {
+    expect(frontierChains(null, ["DOR"])).toEqual([]);
   });
 });
 

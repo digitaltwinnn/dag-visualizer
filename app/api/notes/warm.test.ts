@@ -91,6 +91,17 @@ describe("planPass", () => {
     expect(plan.filter((i) => i.view === "ledger").map((i) => i.subject)).toEqual(["all", ...SUBJECTS]);
   });
 
+  it("the block DAG's note is warmed once, as `all`, with the ledger's and before History's 24h", () => {
+    const plan = planPass(NOW, ["all", "dag", ...SUBJECTS], [], SET, () => null);
+    expect(plan.filter((i) => i.view === "blocks")).toEqual([{ view: "blocks", subject: "all", span: "hours" }]);
+    const kinds = plan.map((i) => `${i.view}:${i.span}`);
+    expect(kinds.indexOf("blocks:hours")).toBeGreaterThan(kinds.lastIndexOf("ledger:hours"));
+    expect(kinds.indexOf("blocks:hours")).toBeLessThan(kinds.indexOf("trend:24h"));
+    // On the ledger's clock: a record two hours old is due again.
+    const old = planPass(NOW, ["all"], [], SET, (k) => (k.includes(":blocks:") ? { writtenAt: NOW - 2 * H } : null));
+    expect(old.some((i) => i.view === "blocks")).toBe(true);
+  });
+
   it("a hyper record written 2 h ago is not re-planned; a ledger one is", () => {
     const plan = planPass(NOW, SUBJECTS, [], SET, cacheOf(allCached(SUBJECTS, [], NOW - 2 * H)));
     expect(plan.some((i) => i.view === "hyper")).toBe(false);

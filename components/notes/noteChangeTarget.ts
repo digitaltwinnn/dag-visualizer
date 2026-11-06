@@ -16,6 +16,7 @@ import {
 } from "@/src/engine/domain/pickActions";
 import { heldOut, viewNetwork } from "@/src/engine/domain/viewNetwork";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
+import { noteModeOf } from "./noteSubject";
 
 // WHAT A NOTABLE CHANGE'S ROW IS ABOUT (user, 2026-10-31: "related to a clickable subject"): the
 // row commits what the view's own explorer row for that subject commits, through the same table
@@ -60,7 +61,7 @@ export function changeActions(
 ): ClickAction[] | null {
   switch (subject.kind) {
     case "network":
-      if (!VIEW_POLICIES[view].tickScoped)
+      if (!VIEW_POLICIES[noteModeOf(view)].tickScoped)
         return subject.id === viewNetwork(s) || heldOut(s.filter, subject.id) ? null : railNetActions(subject.id, s.filter);
       if (!tick || subject.id === "dag") return null; // the chamber's own row names no network to open
       return tickNetSelectActions(subject.id, { kind: "snapshot", title: `Global snapshot #${tick.ordinal}`, data: tick }, {

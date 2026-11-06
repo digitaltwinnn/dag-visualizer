@@ -5,8 +5,9 @@ import type { MetaSnapSel } from "@/src/data/types";
 // gate (`noteHonesty.ts`) checks a model's answer against them, the generator stores the answer
 // and the route serves a `NoteResponse`.
 
-/** The four 3D views a note can describe. */
-export type NoteView = "hyper" | "geo" | "ledger" | "trend";
+/** What a note can describe: the four 3D views, and the Snapshots view's Blocks register (the block
+ *  DAG, the Briefing's blocks stop) — a register, not a Mode, with its own facts and question. */
+export type NoteView = "hyper" | "geo" | "ledger" | "trend" | "blocks";
 
 /** What a note leads with (R71): the changes the builder found worth leading with, named by
  *  their pair keys, or the reading itself when nothing moved. The Snapshots builder decides it

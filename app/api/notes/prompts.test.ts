@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { NoteView, NotableDay } from "@/src/data/noteTypes";
 import { CAPTION_FORMAT, LINE_FORMAT, PROMPTS, QUESTION_COMMON_WHOLE, VOICE, buildMessages, parseAnswer, spanBeforeWords, spanFigures, spanWords } from "./prompts";
 
-const VIEWS: NoteView[] = ["hyper", "geo", "ledger", "trend"];
+const VIEWS: NoteView[] = ["hyper", "geo", "ledger", "trend", "blocks"];
 
 describe("VOICE", () => {
   it("carries the house voice", () => {
@@ -218,6 +218,19 @@ describe("PROMPTS", () => {
     }
     for (const [view, kind] of [["geo", "country"], ["geo", "provider"], ["hyper", "type"]] as const)
       expect(PROMPTS[view].system("x", undefined, false, kind)).not.toMatch(/—|\s[–-]\s/);
+  });
+
+  it("asks the block DAG its own question, in the ledger's voice, reading the frontier as it stands", () => {
+    const q = PROMPTS.blocks.question;
+    expect(q).toMatch(/^What has the block DAG been doing\?/);
+    // No earlier figure exists in its facts, so it says out loud it does not lead with change.
+    expect(q).toMatch(/does not lead with what changed/);
+    expect(q).not.toMatch(/\d/);
+    expect(q).not.toMatch(/\btick|machine|fleet/i);
+    expect(PROMPTS.blocks.system("the block DAG")).toContain("Subject: the block DAG.");
+    expect(PROMPTS.blocks.questions).toBeUndefined();
+    expect(spanWords("blocks", "hours", 0, 1)).toBe("the last 24 hours");
+    expect(spanBeforeWords("blocks", "hours")).toBeNull();
   });
 
   it("keeps its own copy free of dashes", () => {

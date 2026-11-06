@@ -133,6 +133,13 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
         lead?.kind === "change" ? `\nLead with what moved: ${lead.moved.join("; ")}. Every other figure held close to its usual: give it as a reading, never as a change.` : ""
       }`,
   },
+  // THE BLOCK DAG (the Snapshots view's Blocks register, the Briefing's blocks stop): the chamber's
+  // second clock, in the ledger's voice. Its facts hold no earlier figure, so, like the ledger's
+  // `questionNow`, it says out loud that it does not lead with change: VOICE asks every note to.
+  blocks: {
+    question: "What has the block DAG been doing? This note does not lead with what changed, whatever the rules above say: the facts hold no earlier figure, so never say anything rose or fell. Say how many blocks were accepted over the recent hours, the DAG's first, as \"the DAG accepted N blocks\", then each network's token blocks the same way. Then the frontier as it stands now, in one short sentence: how many tips are open, and where the DAG's height stands, with the global snapshots since it last moved. A block is a block, never a snapshot or a transfer.",
+    system: (subjectLabel) => `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${PROMPTS.blocks.question}`,
+  },
   trend: {
     question: "Say what changed over the span: what rose, what fell and when, as the numbers show it.",
     questions: {
@@ -192,7 +199,7 @@ export function spanBeforeWords(view: NoteView, span: NoteSpan): string | null {
 const utcDay = (ms: number) => new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 export function spanWords(view: NoteView, span: NoteSpan, spanFrom: number, spanTo: number): string {
   if (view === "hyper" || view === "geo") return "the last 7 days";
-  if (view === "ledger") return "the last 24 hours";
+  if (view === "ledger" || view === "blocks") return "the last 24 hours";
   if (span in PILL_WORDS) return PILL_WORDS[span]!;
   const a = utcDay(spanFrom);
   const b = utcDay(Math.max(spanFrom, spanTo - 1));

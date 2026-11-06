@@ -10,9 +10,10 @@ import { noteSubjectOf } from "./noteSubject";
 /** The window History rests on. A visitor on the tour has not chosen one. */
 const TREND_SPAN = "30d";
 
-/** The note a stop reads: the view at its widest, as a visitor with no filter would see it. */
-// (The blocks stop reads the ledger stop's note until the blocks note kind exists.)
+/** The note a stop reads: the view at its widest, as a visitor with no filter would see it. The
+ *  blocks stop reads the block DAG's own note, its whole network. */
 export function briefingReq(stop: BriefingStop): NoteReq {
+  if (stop.register === "blocks") return { view: "blocks", subject: "all", span: null };
   const view = stop.mode;
   const subject = noteSubjectOf(view, { metagraphNetwork: "all", unlisted: () => false })!;
   return { view: subject.view, subject: subject.subject, span: view === "trend" ? TREND_SPAN : null };
@@ -23,6 +24,7 @@ const PLAIN: Record<NoteView, string> = {
   ledger: "Every snapshot, anchored as it happens.",
   hyper: "Every network, by the nodes that run it.",
   trend: "The measured record of the network.",
+  blocks: "Every block, built on two before it.",
 };
 
 const SENTENCE_RE = /.*?[.!?](?=\s|$)/gs;

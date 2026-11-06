@@ -11,10 +11,19 @@ describe("the note a stop reads", () => {
     expect(briefingReq({ mode: "ledger" })).toEqual({ view: "ledger", subject: "all", span: null });
     expect(briefingReq({ mode: "hyper" })).toEqual({ view: "hyper", subject: "all", span: null });
     expect(briefingReq({ mode: "trend" })).toEqual({ view: "trend", subject: "dag", span: "30d" });
+    // The blocks stop reads the block DAG's own note, never the Snapshots register's.
+    expect(briefingReq({ mode: "ledger", register: "blocks" })).toEqual({ view: "blocks", subject: "all", span: null });
+    expect(briefingReq({ mode: "ledger", register: "snapshots" })).toEqual({ view: "ledger", subject: "all", span: null });
   });
 
-  it("exists for every stop", () => {
-    for (const stop of BRIEFING_STOPS) expect(briefingReq(stop).view).toBe(stop.mode);
+  it("exists for every stop, one note each", () => {
+    for (const stop of BRIEFING_STOPS) expect(briefingReq(stop).view).toBe(stop.register === "blocks" ? "blocks" : stop.mode);
+    expect(new Set(BRIEFING_STOPS.map((s) => briefingReq(s).view)).size).toBe(BRIEFING_STOPS.length);
+  });
+
+  it("a stop with no note to show says a plain sentence, the blocks stop's too", () => {
+    expect(briefingWords("blocks", null)).toEqual({ text: expect.any(String), ai: false });
+    expect(briefingWords("blocks", null).text).not.toMatch(/\d/);
   });
 });
 

@@ -10,10 +10,10 @@ import { pickRangeTier } from "@/src/data/trendWindow";
 //
 // Everything is UTC and the caller supplies the date strings; nothing here reads a clock.
 
-export const NOTES_VERSION = 71; // 71: History facts carry the Transfers measure (2026-11-04). 70: the gate reads a change in its own direction; a row names its subject; a count row carries no percentage (review, 2026-11-03)
+export const NOTES_VERSION = 72; // 72: the block DAG's note (2026-11-06). 71: History facts carry the Transfers measure (2026-11-04). 70: the gate reads a change in its own direction; a row names its subject; a count row carries no percentage (review, 2026-11-03)
 
-/** What a note covers. Hyper and Geography are a standing picture ("day"), the ledger the recent
- *  hours ("hours"); History's pills are the rest, and a brushed range is `r<fromMs>-<toMs>` after
+/** What a note covers. Hyper and Geography are a standing picture ("day"), the ledger and the block
+ *  DAG the recent hours ("hours"); History's pills are the rest, and a brushed range is `r<fromMs>-<toMs>` after
  *  `snapSpan`, so two brushes of the same buckets share one key. */
 export type NoteSpan = "day" | "hours" | "1h" | "24h" | "7d" | "30d" | "90d" | "1y" | "all" | `r${number}-${number}`;
 
@@ -21,8 +21,9 @@ export function noteKeyOf(net: string, view: NoteView, subject: string, span: No
   return `ai:${net}:v${NOTES_VERSION}:${view}:${subject}:${span}`;
 }
 
-/** THE FOUR NOTES THE BRIEFING READS (`components/notes/briefingNote.ts`), which also carry its one
- *  short line: every view at its widest, and History over its resting window. */
+/** THE FIVE NOTES THE BRIEFING READS (`components/notes/briefingNote.ts`), which also carry its one
+ *  short line: every view at its widest (the block DAG's included), and History over its resting
+ *  window. */
 export function isBriefingNote(view: NoteView, subject: string, span: NoteSpan): boolean {
   return view === "trend" ? subject === "dag" && span === "30d" : subject === "all";
 }
@@ -56,7 +57,7 @@ export function capKeyOf(net: string, dayIso: string): string {
   return `ai:${net}:cap:${dayIso}`;
 }
 
-export type NoteKind = "hyper" | "geo" | "ledger" | "trend24h" | "trendDaily" | "trend1h" | "range" | "subject";
+export type NoteKind = "hyper" | "geo" | "ledger" | "blocks" | "trend24h" | "trendDaily" | "trend1h" | "range" | "subject";
 
 /** What a subject names, for the prompt's question: the view itself (`all`, `dag`, a network), a
  *  country (`cc:XX`, `<net>/cc:XX`), a provider (`isp:<key>`, `<net>/isp:<key>`) or a network's
@@ -95,6 +96,8 @@ export const KIND_TIMING: Record<NoteKind, { refreshMs: number | null; ttlS: num
   hyper: { refreshMs: 24 * H, ttlS: 72 * 3600 },
   geo: { refreshMs: 24 * H, ttlS: 72 * 3600 },
   ledger: { refreshMs: H, ttlS: 6 * 3600 },
+  // The chamber's other register keeps its clock: a day of blocks and the frontier as it stands.
+  blocks: { refreshMs: H, ttlS: 6 * 3600 },
   trend24h: { refreshMs: H, ttlS: 6 * 3600 },
   trendDaily: { refreshMs: 24 * H, ttlS: 72 * 3600 },
   trend1h: { refreshMs: null, ttlS: 900 },
@@ -117,6 +120,7 @@ export function timingOf(view: NoteView, span: NoteSpan, subject = ""): { refres
   if (view === "hyper") return KIND_TIMING.hyper;
   if (view === "geo") return KIND_TIMING.geo;
   if (view === "ledger") return KIND_TIMING.ledger;
+  if (view === "blocks") return KIND_TIMING.blocks;
   if (span === "24h") return KIND_TIMING.trend24h;
   if (span === "1h") return KIND_TIMING.trend1h;
   return KIND_TIMING.trendDaily;

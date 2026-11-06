@@ -111,14 +111,16 @@ function Tour({ stop, leaving }: { stop: number; leaving: boolean }) {
   const ready = useStore((s) => s.sceneReady);
   // Every stop's note is asked for at the start, so a line is on hand when its view arrives.
   const geo = useNote(briefingReq({ mode: "geo" }));
-  const ledger = useNote(briefingReq(BRIEFING_STOPS[1]!));
+  const ledger = useNote(briefingReq({ mode: "ledger" }));
+  const blocks = useNote(briefingReq({ mode: "ledger", register: "blocks" }));
   const hyper = useNote(briefingReq({ mode: "hyper" }));
   const trend = useNote(briefingReq({ mode: "trend" }));
   const at = BRIEFING_STOPS[stop]!;
   const view = stopLabel(at);
-  // The blocks stop reads the ledger's note until the blocks note kind exists.
-  const noteView = at.mode as NoteView; // every stop is a 3D view, and each has its note
-  const words = briefingWords(noteView, { geo, ledger, hyper, trend }[noteView].res);
+  // Every stop has its own note, the blocks stop's the block DAG's.
+  const noteView = briefingReq(at).view;
+  const notes: Record<NoteView, ReturnType<typeof useNote>> = { geo, ledger, blocks, hyper, trend };
+  const words = briefingWords(noteView, notes[noteView].res);
   const name = stopName(at);
   const fill = useRef<HTMLElement | null>(null);
   // The last stop's time is up: the ending's three beats run from here.

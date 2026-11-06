@@ -597,3 +597,60 @@ describe("the store reads", () => {
     expect(asked).toEqual(["t:mainnet:cursor"]);
   });
 });
+
+// THE BLOCK DAG'S NOTE (the Blocks register, 2026-11-06): its builder runs for real here, since its
+// input is assembled from two reads — the store's hourly blocks and the live frontier.
+describe("the block DAG's note", () => {
+  const hours = (f: (i: number) => number | null) => Array.from({ length: 24 }, (_, i) => f(i));
+  const tips = (n: number) => ({ active: Array.from({ length: n }, (_, i) => ({ hash: `t${i}`, height: i, usage: 1, introducedAt: 1 })), deprecated: [] });
+
+  it("is the whole network's over the recent hours, nothing else", () => {
+    expect(noteSupported("blocks", "all", "hours")).toBe(true);
+    expect(noteSupported("blocks", USDC, "hours")).toBe(false);
+    expect(noteSupported("blocks", "all", "day")).toBe(false);
+  });
+
+  it("reads 24 whole hours of the hourly tier and the frontier of the DAG and every chain that accepted a token block", async () => {
+    const asked: string[][] = [];
+    const reads = fakeReads({
+      async span(_net, tier, from, to) {
+        reads.calls.push({ tier, from, to });
+        return payload("1h", hours((i) => from + i * H) as number[], {
+          "g.ticks": hours(() => 360),
+          "g.blocks": hours((i) => (i < 16 ? 2 : 1)), // 40
+          [`m.${USDC}.blocks`]: hours((i) => (i < 5 ? 1 : 0)), // 5
+        });
+      },
+      async blockFrontier(_net, chains) {
+        asked.push([...chains]);
+        return { frontier: { dag: tips(12), [USDC]: tips(3) }, height: 61_645, subHeight: 313 };
+      },
+    });
+    const out = (await factsFor("mainnet", "blocks", "all", "hours", NOW, reads))!;
+    const top = Math.floor(NOW / H) * H;
+    expect(reads.calls).toEqual([{ tier: "1h", from: top - 24 * H, to: top }]);
+    expect(asked).toEqual([[USDC]]);
+    const v = (label: string) => out.facts.find((f) => f.label === label)?.value;
+    expect(v("DAG blocks")).toBe(40);
+    expect(v("USDC.dag token blocks")).toBe(5);
+    expect(v("DAG open tips")).toBe(12);
+    expect(v("USDC.dag open tips")).toBe(3);
+    expect(v("DAG height")).toBe(61_645);
+    expect(v("Span length")).toBe(86_400);
+    expect(out.label).toBe("the block DAG");
+    expect(out.subjectName).toBeUndefined();
+    expect(out.lead).toEqual({ kind: "now" });
+    expect([out.spanFrom, out.spanTo]).toEqual([top - 24 * H, top]);
+  });
+
+  it("an hour the store did not cover is not a zero, and with no frontier read no tip is stated", async () => {
+    const reads = fakeReads({
+      async span(_net, _tier, from) {
+        return payload("1h", hours((i) => from + i * H) as number[], { "g.ticks": hours((i) => (i === 3 ? null : 360)) });
+      },
+    });
+    const out = (await factsFor("mainnet", "blocks", "all", "hours", NOW, reads))!;
+    expect(out.facts.find((f) => f.label.startsWith("DAG blocks"))).toMatchObject({ label: "DAG blocks, at least", value: 0 });
+    expect(out.facts.some((f) => /open tips|height/i.test(f.label))).toBe(false);
+  });
+});

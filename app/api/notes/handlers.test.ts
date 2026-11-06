@@ -344,12 +344,12 @@ describe("the warm budget leaves the worst item room inside maxDuration 300 s", 
     expect(WARM_BUDGET_MS + WARM_SPACING_MS + 2 * 20_000).toBeLessThan(300_000);
   });
 
-  it("is paced for the paid model: a cold store of 121 notes fills in one pass", () => {
+  it("is paced for the paid model: a cold store of 122 notes fills in one pass", () => {
     expect(WARM_SPACING_MS).toBe(500);
     expect(WARM_CONCURRENCY).toBe(3);
     const secondsAWrite = 2.7; // measured on the model, 2026-11-01
     const callsAPass = Math.min(WARM_BUDGET_MS / WARM_SPACING_MS, (WARM_BUDGET_MS / 1000 / secondsAWrite) * WARM_CONCURRENCY);
-    expect(callsAPass).toBeGreaterThan(121 * 1.3); // a third of the notes take a second attempt
+    expect(callsAPass).toBeGreaterThan(122 * 1.3); // a third of the notes take a second attempt
   });
 });
 
@@ -393,7 +393,7 @@ describe("GET /api/notes/warm (cron)", () => {
     const body = await (await warmNotes(warmReq("Bearer s3cret"), () => d)).json();
     const facts = d.facts as unknown as { mock: { calls: [string, string, string, string][] } };
     const kinds = new Set(facts.mock.calls.map(([, view, , span]) => `${view}:${span}`));
-    expect(kinds).toEqual(new Set(["ledger:hours", "trend:24h"]));
+    expect(kinds).toEqual(new Set(["ledger:hours", "blocks:hours", "trend:24h"]));
     expect(body.done).toBe(body.planned);
   });
 
