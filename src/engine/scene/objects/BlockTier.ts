@@ -66,6 +66,14 @@ export interface BlockLook {
 
 export const BLOCK_LOOK: Readonly<BlockLook> = { open: 0.95, retired: 0.35, rest: 0.6, breath: 0.22, ink: 0.35, grow: 0.35, link: 0.42 };
 
+/** THE DAG BLOCK'S GLASS (user, design round D1: "the block should match the transparent / cyan
+ *  snapshot color"): the global snapshot's own material — normal-blended, translucent, no depth
+ *  write, in the chamber's neutral cyan (`SceneColors.core`, the bar's `_neutral`) — at a presence
+ *  per ground. Dark 0.5: a block is a SUBJECT, so it stands above the bars' resting 0.12 the way a
+ *  focused band does. Paper 0.85: on the sheet the instance colour is already thinned toward the
+ *  ground (`inkMix`), and at 0.55 the cubes read as pale ghosts beside the bars (seen live, D1). */
+export const BLOCK_GLASS: Readonly<{ dark: number; paper: number }> = { dark: 0.5, paper: 0.85 };
+
 const _dummy = new THREE.Object3D();
 const _col = new THREE.Color();
 
@@ -104,14 +112,23 @@ export class BlockTier {
   private readonly _linkSlot: Int16Array;
   private _linkCount = 0;
 
-  constructor(colors: SceneColors, maxBlocks = 600) {
+  /** The DAG's tier wears the snapshot glass (`BLOCK_GLASS`); a token tier is opaque, like its tile. */
+  private readonly _glass: boolean;
+  private readonly _mat: THREE.MeshBasicMaterial;
+
+  constructor(colors: SceneColors, opts: { glass?: boolean; maxBlocks?: number } = {}) {
+    const maxBlocks = opts.maxBlocks ?? 600;
+    this._glass = opts.glass ?? false;
     this._max = maxBlocks;
     this._colors = colors;
     this._paper = isLightGround(colors);
     this._picks = new Array(maxBlocks).fill(null);
     this._bright = new Float32Array(maxBlocks);
 
-    this.mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({}), maxBlocks);
+    this._mat = this._glass
+      ? new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, opacity: this._glassOp() })
+      : new THREE.MeshBasicMaterial({});
+    this.mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), this._mat, maxBlocks);
     // Bounds three cannot reject with: the blocks ride the rewind and are pickable (NodeFabric.openBounds).
     this.mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e4);
     this.mesh.frustumCulled = false;
@@ -222,9 +239,14 @@ export class BlockTier {
     this._entryFade = fade;
   }
 
+  private _glassOp(): number {
+    return this._paper ? BLOCK_GLASS.paper : BLOCK_GLASS.dark;
+  }
+
   setColors(c: SceneColors): void {
     this._colors = c;
     this._paper = isLightGround(c);
+    if (this._glass) this._mat.opacity = this._glassOp();
     this._linkMat.blending = glowBlend(c);
     this._linkMat.needsUpdate = true; // three caches the program per blending mode
   }

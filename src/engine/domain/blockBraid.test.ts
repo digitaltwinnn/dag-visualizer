@@ -1,19 +1,31 @@
 import { describe, it, expect } from "vitest";
-import { BRAID_LANES, laneOf, laneZ, tipStateOf, linkEndpoints, silentRun } from "./blockBraid";
+import { FAN_REACH, fanOffset, siblingRanks, tipStateOf, linkEndpoints, silentRun } from "./blockBraid";
 
-describe("laneOf", () => {
-  it("cycles heights across the lanes from the window's lowest height", () => {
-    expect(laneOf(61633, 61633)).toBe(0);
-    expect(laneOf(61637, 61633)).toBe(4);
-    expect(laneOf(61638, 61633)).toBe(0);
-    expect(BRAID_LANES).toBe(5);
+describe("siblingRanks", () => {
+  const b = (hash: string, height: number, ord: number) => ({ hash, height, ord });
+  it("ranks the blocks of one height side by side, newest first, and starts every height at 0", () => {
+    const r = siblingRanks([b("a", 10, 1), b("b", 10, 3), b("c", 11, 4), b("d", 10, 2)]);
+    expect([r.get("b"), r.get("d"), r.get("a")]).toEqual([0, 1, 2]);
+    expect(r.get("c")).toBe(0);
+  });
+  it("breaks a tie on one tick by hash, so the order never depends on read arrival", () => {
+    expect(siblingRanks([b("y", 5, 9), b("x", 5, 9)]).get("x")).toBe(0);
+    expect(siblingRanks([b("x", 5, 9), b("y", 5, 9)]).get("x")).toBe(0);
+  });
+  it("an OLDER sibling arriving late takes the next rank and moves no block already placed", () => {
+    const before = siblingRanks([b("new", 7, 20), b("mid", 7, 15)]);
+    const after = siblingRanks([b("new", 7, 20), b("mid", 7, 15), b("old", 7, 3)]);
+    expect([after.get("new"), after.get("mid")]).toEqual([before.get("new"), before.get("mid")]);
+    expect(after.get("old")).toBe(2);
   });
 });
-describe("laneZ", () => {
-  it("centres the lanes on the plane and spreads them across its width", () => {
-    expect(laneZ(2, 5, 10)).toBe(0);
-    expect(laneZ(0, 5, 10)).toBe(-4);
-    expect(laneZ(4, 5, 10)).toBe(4);
+describe("fanOffset", () => {
+  it("fans the siblings out from the centre, alternately to each side", () => {
+    expect([0, 1, 2, 3, 4].map((k) => fanOffset(k))).toEqual([0, 1, -1, 2, -2]);
+  });
+  it("folds a rank past the fan's reach back inside it, so no block leaves the braid", () => {
+    for (let k = 0; k < 40; k++) expect(Math.abs(fanOffset(k))).toBeLessThanOrEqual(FAN_REACH);
+    expect(fanOffset(2 * FAN_REACH + 1)).toBe(0);
   });
 });
 describe("tipStateOf", () => {

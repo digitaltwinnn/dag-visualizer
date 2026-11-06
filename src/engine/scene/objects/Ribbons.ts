@@ -246,20 +246,11 @@ export class Ribbons {
     laneZ: (key: string) => number | null,
     topHalf: (key: string) => number,
   ): void {
-    this._thCount = 0;
-    this._thSlots.length = 0;
-    this._thStart.length = 0;
-    this._thAlpha.length = 0;
+    this._clearThreads();
     const key = this._filter;
     if (key === "all") { this._thGeo.setDrawRange(0, 0); return; }
-    const hex = this._sceneColors[key] ?? this._neutral;
-    this._c.setHex(hex);
+    this._c.setHex(this._sceneColors[key] ?? this._neutral);
     const z = laneZ(key);
-    const p = this._thPos.array as Float32Array;
-    const c = this._thCol.array as Float32Array;
-    const yTop = FLOOR_Y.msnap + TILE_LIFT;
-    const yBot = FLOOR_Y.gl0 + BAR_LIFT + BAR_H;
-    const curve = RIBBON_LOOK.curve;
     let v = 0;
     if (z != null) {
       for (const { slot, spec } of slots) {
@@ -268,34 +259,79 @@ export class Ribbons {
         for (let i = 0; i < spec.bandCount; i++) if (spec.bands[i].key === key) { band = spec.bands[i]; break; }
         if (!band) continue; // this tick carried nothing for the committed network — no line
         ribbonQuad(z, topHalf(key), band, this._q);
-        const x = LEAD_X - slot * SLOT_SP;
-        this._thSlots.push(slot);
-        this._thStart.push(v);
-        this._thAlpha.push(0);
-        this._thCount++;
-        // The thread is the quad's CENTRE line, so it stands exactly where the sheet's own middle
-        // would be if this row had one.
-        for (let j = 0; j < THREAD_SEG; j++) {
-          const t0 = j / THREAD_SEG, t1 = (j + 1) / THREAD_SEG;
-          const s0 = sweep(t0, curve), s1 = sweep(t1, curve);
-          const mid = (a: number) => {
-            const l = this._q.topZ0 + (this._q.botZ0 - this._q.topZ0) * a;
-            const r = this._q.topZ1 + (this._q.botZ1 - this._q.topZ1) * a;
-            return (l + r) / 2;
-          };
-          const y0 = yTop + (yBot - yTop) * t0, y1 = yTop + (yBot - yTop) * t1;
-          p[v * 3] = x; p[v * 3 + 1] = y0; p[v * 3 + 2] = mid(s0);
-          c[v * 4] = this._c.r; c[v * 4 + 1] = this._c.g; c[v * 4 + 2] = this._c.b; c[v * 4 + 3] = 0;
-          v++;
-          p[v * 3] = x; p[v * 3 + 1] = y1; p[v * 3 + 2] = mid(s1);
-          c[v * 4] = this._c.r; c[v * 4 + 1] = this._c.g; c[v * 4 + 2] = this._c.b; c[v * 4 + 3] = 0;
-          v++;
-        }
+        v = this._pushThread(v, slot, 0);
       }
     }
     this._thPos.needsUpdate = true;
     this._thCol.needsUpdate = true;
     this._thGeo.setDrawRange(0, v);
+  }
+
+  /** THE BLOCKS REGISTER'S ANCHORS — the same hairline species, one per metagraph snapshot that
+   *  carries a block, from ITS tile down to its network's band on the tick (user, design round D1:
+   *  the sheets' width states snapshot size, which the blocks have nothing to do with). Each line
+   *  takes its lane's identity hue, at the ledger row's dim when another network is the lens; a
+   *  tick whose exact read has not landed has no bands, so its line lands on the bar's centre.
+   *  Geometry is event-time; `setThreadFades` writes the per-frame alpha as for the threads. */
+  setAnchorLines(lines: readonly { slot: number; key: string; tileX: number; tileZ: number; band: { z0: number; z1: number } | null }[]): void {
+    this._clearThreads();
+    let v = 0;
+    for (const l of lines) {
+      if (this._thCount >= MAX_THREADS) break;
+      this._c.setHex(this._sceneColors[l.key] ?? this._neutral);
+      const off = this._filter !== "all" && l.key !== this._filter;
+      if (off) this._c.multiplyScalar(snapBright(1, true));
+      this._q.topZ0 = l.tileZ;
+      this._q.topZ1 = l.tileZ;
+      this._q.botZ0 = l.band ? l.band.z0 : 0;
+      this._q.botZ1 = l.band ? l.band.z1 : 0;
+      v = this._pushThread(v, l.slot, l.tileX - (LEAD_X - l.slot * SLOT_SP));
+    }
+    this._thPos.needsUpdate = true;
+    this._thCol.needsUpdate = true;
+    this._thGeo.setDrawRange(0, v);
+  }
+
+  private _clearThreads(): void {
+    this._thCount = 0;
+    this._thSlots.length = 0;
+    this._thStart.length = 0;
+    this._thAlpha.length = 0;
+  }
+
+  /** One hairline down `_q`'s centre line on the sheets' own eased sweep, in `_c`, from vertex `v`;
+   *  `dxTop` is the top end's offset along the trail (a tile in a grid), eased out on the same sweep
+   *  so the line still lands vertically on its row. Returns the next free vertex. Event-time. */
+  private _pushThread(v: number, slot: number, dxTop: number): number {
+    const p = this._thPos.array as Float32Array;
+    const c = this._thCol.array as Float32Array;
+    const yTop = FLOOR_Y.msnap + TILE_LIFT;
+    const yBot = FLOOR_Y.gl0 + BAR_LIFT + BAR_H;
+    const curve = RIBBON_LOOK.curve;
+    const x = LEAD_X - slot * SLOT_SP;
+    this._thSlots.push(slot);
+    this._thStart.push(v);
+    this._thAlpha.push(0);
+    this._thCount++;
+    // The thread is the quad's CENTRE line, so it stands exactly where the sheet's own middle
+    // would be if this row had one.
+    const mid = (a: number) => {
+      const l = this._q.topZ0 + (this._q.botZ0 - this._q.topZ0) * a;
+      const r = this._q.topZ1 + (this._q.botZ1 - this._q.topZ1) * a;
+      return (l + r) / 2;
+    };
+    for (let j = 0; j < THREAD_SEG; j++) {
+      const t0 = j / THREAD_SEG, t1 = (j + 1) / THREAD_SEG;
+      const s0 = sweep(t0, curve), s1 = sweep(t1, curve);
+      const y0 = yTop + (yBot - yTop) * t0, y1 = yTop + (yBot - yTop) * t1;
+      p[v * 3] = x + dxTop * (1 - s0); p[v * 3 + 1] = y0; p[v * 3 + 2] = mid(s0);
+      c[v * 4] = this._c.r; c[v * 4 + 1] = this._c.g; c[v * 4 + 2] = this._c.b; c[v * 4 + 3] = 0;
+      v++;
+      p[v * 3] = x + dxTop * (1 - s1); p[v * 3 + 1] = y1; p[v * 3 + 2] = mid(s1);
+      c[v * 4] = this._c.r; c[v * 4 + 1] = this._c.g; c[v * 4 + 2] = this._c.b; c[v * 4 + 3] = 0;
+      v++;
+    }
+    return v;
   }
 
   /** The per-frame half: `fadeOf(slot)` is the trail's own front/horizon ramp, so a thread leaves

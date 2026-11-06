@@ -545,8 +545,8 @@ special-case for unlisted.
 
 The chamber has a second REGISTER (`store.ledgerRegister`, a setting of the view, never a Mode —
 `docs/superpowers/specs/2026-11-05-block-dag-view-design.md`). It is the SAME chamber: floor, planes,
-tiles, bars, ribbons, labels, the rewind and the pose. Two things differ, and both answer through ONE
-keyed map, `LedgerView`'s `REGISTER_CARGO` (a new register is a compile error there):
+bars, labels, the rewind and the pose. What differs answers through ONE keyed map, `LedgerView`'s
+`REGISTER_CARGO` (a new register is a compile error there):
 
 - **The trail's source.** `ledgerSource(live, register)` answers the block window
   (`src/data/blockWindow.ts`) in Blocks, so the slots are the block-bearing ticks; the slot model is
@@ -556,22 +556,50 @@ keyed map, `LedgerView`'s `REGISTER_CARGO` (a new register is a compile error th
   (`_emptyTrail`), so the Snapshots rows never stand in for a window still loading, and a shorter
   trail clears the slots it leaves behind. The live edge stands down in Blocks (`liveEdge: false`):
   the trail's newest tick is sealed, never forming.
-- **The cargo on top** (`blocks: true`): `objects/BlockTier.ts` and `objects/SilentStretch.ts`, drawn
-  per frame only in that register and CLEARED at the switch, so nothing of theirs is left to write.
-  The tier's mesh joins `pickables` in that register only (the raycaster ignores `visible`).
+- **The cargo on top** (`blocks: true`): two `objects/BlockTier.ts` tiers (the DAG's and the
+  tokens', one material each) and `objects/SilentStretch.ts`, drawn per frame only in that register
+  and CLEARED at the switch, so nothing of theirs is left to write. The tiers' meshes join
+  `pickables` in that register only (the raycaster ignores `visible`).
+- **Anchors are LINES, not sheets** (`anchors: "lines"`, user, design round D1: the sheets' width
+  states snapshot size, which the blocks have nothing to do with, and read as noise). The four sheet
+  rows stand empty and `Ribbons.setAnchorLines` draws the threads' own hairline species, one per
+  metagraph snapshot that carries a block, from ITS tile down to its network's band (the bar's
+  centre while the tick's exact read has not landed), in the lane's identity hue at the row's `dim`
+  off the lens. `_syncThreads` is the one dispatch, so a filter change redraws the lines, never the
+  committed-network threads.
+- **Bare tiles are not drawn** (`bareTiles: false`, same round): a metagraph snapshot carrying no
+  block zero-scales and leaves the pick table (`_blockTiles`, rebuilt with the tier); a tile that
+  carries a token block stands, with its line.
 
 **Where a block stands is layout data, placed at event time** (`_rebuildBlockTier`, on every slot
-rebuild and read; a window change reaches it through the refresh that follows): a DAG block on its
-tick's bar top, a token block ON the tile of the metagraph snapshot that accepted it — the k-th
+rebuild and read; a window change reaches it through the refresh that follows): a DAG block above
+its tick's bar, a token block ON the tile of the metagraph snapshot that accepted it — the k-th
 filled tile of that tick, `k` the tile resolver's own index (`tileAnchorOf`). `_tileTop` is the ONE
 copy of the tile arithmetic: the per-frame tile draw, the selected tile's callout anchor and the
-token placement all read it, the first two adding the frame's offsets. Across the floor's width,
-**height is a LANE, never a stack** (user ruling): `laneOf` over the chain's lowest height in the
-WINDOW (not the slots, so a lane does not move as the trail holds more rows), and DAG blocks sharing
-a tick and a lane step aside along the trail. **A token block never leaves its tile** (user ruling):
-its lane and its turn among the tile's blocks only nudge it inside the tile's own footprint
-(`TOKEN_ON_TILE`, `TOKEN_NUDGE`); a snapshot whose tile is not drawn puts no block anywhere. A block
-whose read has not landed waits in the middle lane.
+token placement all read it, the first two adding the frame's offsets.
+
+**The DAG's blocks are a BRAID above the floor** (user, design round D1: "make it look like a DAG,
+not linear blocks"). Each stands over its own tick, `DAG_LIFT` above the bars' top face, the braid
+centred over the floor's middle; ACROSS it the blocks of one height stand side by side as siblings
+(`blockBraid.siblingRanks`, fanned 0, +1, −1, +2, … by `fanOffset`, `DAG_PITCH` apart and folded
+inside `FAN_REACH`), so consecutive heights step along the trail and each child's two parent links
+fan across to the generation before it. **Height is never a stack** (user ruling, the spec's
+non-goal). They wear the global snapshot's own glass — normal-blended, translucent, no depth write,
+the chamber's neutral cyan (`SceneColors.core`) — at `BLOCK_GLASS` (dark 0.5, paper 0.85); their
+links take the same cyan.
+
+**A block holds still** (same round). The rank is newest-first within a height, ties by hash, and
+the window's reads land newest first, so a later read (an older sibling) takes the NEXT rank and
+moves no block already placed; only the window itself gaining or losing a block tick re-deals a
+height. ⚠️ No place may hang off a WINDOW-wide quantity such as its lowest height: that moves every
+time a backfill read lands or the oldest tick leaves, and a lane cycled from it swings the whole
+braid across the floor on the read schedule. A block whose read has not landed stands on the centre
+line until it does (its height is the read's).
+
+**A token block never leaves its tile** (user ruling): it stands ON the tile of the metagraph
+snapshot that accepted it, its sibling fan and its turn among the tile's blocks only nudging it
+inside the tile's own footprint (`TOKEN_ON_TILE`, `TOKEN_NUDGE`), in the lane's hue, opaque like the
+tile; a snapshot whose tile is not drawn puts no block anywhere.
 
 **Honesty (rule 10).** A block is drawn from the FEED's hashes, so a tick whose full read has not
 landed, or failed (`blockReadMiss`), shows its blocks with no links; a link draws only where BOTH
@@ -579,12 +607,12 @@ ends are on the trail (`linkEndpoints`) — a parent beyond the trail's held row
 stub. A landed block with no parents is a data block and is not drawn. **Tips are read, never
 inferred**: the state is `tipStateOf` over the chain's FRONTIER read (`blockReads[frontierKey(chain)]`,
 `src/data/blockReads.ts` — the newest snapshot's tips), never a block-bearing snapshot's own (hours
-stale); with none the block draws the resting look, never "open". An open tip breathes on the live edge's calm beat
-(`LiveEdge.BREATHE_RATE`), a retired one reads quiet (`BLOCK_LOOK`).
+stale); with none the block draws the resting look, never "open". An open tip breathes on the live
+edge's calm beat (`LiveEdge.BREATHE_RATE`), a retired one reads quiet (`BLOCK_LOOK`).
 
-**The marks are the tiles' kind**: opaque, depth-writing instances in the chain's identity hue (the
-DAG's from `sceneColors.dag`), brightness through `snapBright` (the ledger row's dim, boost and back
-— a block is data) and `inkMix`/`inkPresence` with an ink floor on paper, joined to the bloom layer.
+**The marks' brightness is the snapshots' vocabulary**: `snapBright` (the ledger row's dim, boost
+and back — a block is data) and `inkMix`/`inkPresence` with an ink floor on paper, joined to the
+bloom layer; a token block is opaque and depth-writing like its tile, a DAG block glass like its bar.
 A row is one object: blocks and each link END ask the trail's boundaries at their ROW's x (a block
 offset along a tile grid must not fade apart from its tile; an end's row is handed in beside the
 endpoints, resolved through the same `linkEndpoints` walk), dissolve by zero-scale, and drop with

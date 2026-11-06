@@ -1,8 +1,12 @@
 // The block braid's arithmetic: pure rules for the Blocks register of the Snapshots view.
 //
 // Three rules, in plain words:
-//  1. Lanes by height. A block's lane is its height counted from the window's lowest height,
-//     cycled across a few lanes that are spread over the plane's width.
+//  1. A braid, not a column (user, design round D1). Along the trail a block stands on its own tick;
+//     ACROSS it, the blocks of one height stand side by side as siblings (`siblingRanks`), fanned out
+//     from the centre (`fanOffset`), so consecutive heights step along the trail and each child's
+//     two parent links fan across to the generation before it. A block's place depends on its own
+//     tick and its siblings only — never on the window's lowest height, which moved the whole braid
+//     every time a read landed or the window's oldest tick left.
 //  2. Links run block to block, and only where BOTH ends are held. A parent outside the window
 //     has no place to draw to, so it gets no segment, never a stub into nothing.
 //  3. Tips are read from a snapshot's own list, never inferred. A mock that inferred retirement
@@ -23,16 +27,34 @@ export interface TipRead {
   deprecated: { hash: string; height: number; deprecatedAt: number }[];
 }
 
-export const BRAID_LANES = 5;
+/** How far the fan reaches to each side, in sibling pitches. A rank past it folds back inside. */
+export const FAN_REACH = 4;
 
-/** 0..lanes-1: (height - minHeight) mod lanes. */
-export function laneOf(height: number, minHeight: number, lanes: number = BRAID_LANES): number {
-  return (((height - minHeight) % lanes) + lanes) % lanes;
+/**
+ * Each block's rank among the blocks of ITS height: newest tick first, a tie on one tick broken by
+ * hash. Newest first is what keeps the braid still: the window's reads land newest first, so an
+ * older sibling whose read lands later takes the NEXT rank and moves no block already placed; only
+ * a new block tick at the front (the window itself changing) re-deals a height.
+ */
+export function siblingRanks(blocks: readonly { hash: string; height: number; ord: number }[]): Map<string, number> {
+  const byHeight = new Map<number, { hash: string; ord: number }[]>();
+  for (const b of blocks) {
+    const list = byHeight.get(b.height) ?? [];
+    list.push(b);
+    byHeight.set(b.height, list);
+  }
+  const out = new Map<string, number>();
+  for (const list of byHeight.values()) {
+    list.sort((a, b) => b.ord - a.ord || (a.hash < b.hash ? -1 : a.hash > b.hash ? 1 : 0));
+    list.forEach((b, k) => out.set(b.hash, k));
+  }
+  return out;
 }
 
-/** Lane centre across the plane's width, the lanes centred on zero. */
-export function laneZ(lane: number, lanes: number, width: number): number {
-  return (lane - (lanes - 1) / 2) * (width / lanes);
+/** A sibling's place across the braid, in pitches: 0, +1, −1, +2, −2, … folded inside `FAN_REACH`. */
+export function fanOffset(rank: number): number {
+  const k = rank % (2 * FAN_REACH + 1);
+  return k === 0 ? 0 : k % 2 ? (k + 1) / 2 : -k / 2;
 }
 
 export type TipState = "open" | "retired";
