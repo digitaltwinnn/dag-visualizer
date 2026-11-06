@@ -102,3 +102,15 @@ export function openGlobalRecord(ordinal: number, ts: string): void {
   st.setLogSeek({ metaId: null, fromMs: at, toMs: at, tick: ordinal });
   st.setSection("data");
 }
+
+/** THE BLOCK DOOR (the Blocks register's Block card, 2026-11-06): the raw layer opens on the blocks
+ *  table, where the committed block is already the PINNED row and its accepting global's group
+ *  opens (`BlocksTable`). The table has no scope a door could leave behind, but a seek an earlier
+ *  door armed for the anchor log is spent here, so it can never land on the log later — a door after
+ *  another door carries none of the first one's context. One function for every block, DAG or token:
+ *  the block's own records are its row in the table, whichever chain accepted it. */
+export function openBlockRecord(): void {
+  const st = useStore.getState();
+  st.setLogSeek(null);
+  st.setSection("data");
+}

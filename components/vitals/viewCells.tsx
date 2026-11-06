@@ -15,7 +15,7 @@ import { BandCard, MicroBars, DonutTotal, TypeGlyph, TYPE_ORDER, compositionCoun
 import { useStore } from "@/src/store/store";
 import { metagraphById, getAnchor } from "@/src/data/network";
 import { displayNetwork, UNLISTED_HUE, UNLISTED_ID } from "@/src/data/unlisted";
-import { cap, metaType, rolesOf, IdentityDot, RoleChips, TickerChip } from "@/components/inspector/parts";
+import { cap, metaType, rolesOf, Empty, IdentityDot, RoleChips, TickerChip } from "@/components/inspector/parts";
 import { machineKey } from "@/src/data/composition";
 import { identityHudCss } from "@/src/palette/identity";
 import { METAGRAPHS } from "@/src/net/current";
@@ -30,10 +30,16 @@ import useTrendsWindow from "@/components/useTrendsWindow";
 import { sliceWindow, trimNewestPartial, type TrendsWindowData } from "@/src/data/trendWindow";
 import { ageWords } from "@/src/util/relativeAge";
 import { cn } from "@/lib/utils";
-import { useMemo } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import { unlistedUnmeasured } from "@/src/data/trendSeries";
 import { nodesBySubregion } from "@/src/data/subregions";
 import { useFeedRead } from "@/components/useFeedRead";
+import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
+import { blocksPerBucket, blocksPerHour, frontierAge, openTipsByChain } from "@/src/data/blockStats";
+import { frontierKey } from "@/src/data/blockReads";
+import { windowBlocks } from "@/src/data/blockWindow";
+import { tickerOf } from "@/components/explorer/nodeRow";
+import { useNowTick } from "@/components/useNowTick";
 
 export function HyperCells({ accent }: { accent: string }) {
   useFeedRead(["api-metagraphs"], "HyperCells");
@@ -934,3 +940,85 @@ function AnchoringNetworks({ windowed, snaps, filter }: { windowed: TrendsWindow
  *  strip row are billed as THE SAME cards, so their store reads and accent rule live once).
  *  Rule 3: structural cyan is the charts' resting hue; a committed filter re-points the accent
  *  at the identity hue (the strip's old rule, kept). */
+
+// ledger, BLOCKS REGISTER — four cells in the ledger row's own grammar (the lead is the reading, the
+// detail its instrument), over the block window and the block reads. The band states what it is
+// FOR: the live edge. A window pinned around a past time makes no claim about "the last hour", so
+// those readings step aside for a sentence (rule 10) rather than printing zeros. OPEN TIPS and
+// FRONTIER AGE read the chain's `${chain}:frontier` read, which is honestly absent until a
+// frontier read is held: the house empty value, never a 0.
+const BLOCK_LEAD = "font-mono font-bold text-figure tabular-nums whitespace-nowrap";
+const BLOCK_PINNED = "Window pinned to a past time";
+
+/** A stacked lead: the figure over its muted unit — the rate cards' own shape. */
+function BlockLead({ figure, unit, empty = false }: { figure: React.ReactNode; unit: string; empty?: boolean }) {
+  return (
+    <span className="flex flex-col items-start">
+      <span className={cn(BLOCK_LEAD, empty ? "text-muted-foreground" : "text-foreground")}>{empty ? <Empty why="Not held yet" /> : figure}</span>
+      <span className="text-label text-muted-foreground leading-none">{unit}</span>
+    </span>
+  );
+}
+
+export function BlocksCells({ accent }: { accent: string }) {
+  useFeedRead(["api-blocks"], "BlocksCells");
+  const win = useSyncExternalStore(onBlockWindow, getBlockWindow, () => null);
+  const status = useStore((s) => s.blockWindowStatus);
+  const reads = useStore((s) => s.blockReads);
+  const now = useNowTick(1000);
+  const pinned = status?.around != null;
+  const ticks = win?.ticks ?? [];
+  const hour = win && !pinned ? blocksPerHour(ticks, now) : null;
+
+  // Chains with a tip count to state: the DAG, then every chain the window holds a block of.
+  const chains = ["dag", ...new Set(windowBlocks(win).map((b) => b.chain).filter((c) => c !== "dag"))];
+  const tips = openTipsByChain(reads, chains);
+
+  // HEIGHT: the highest block of the newest DAG snapshot's read (a `BlockRead` carries a height and
+  // nothing finer — no sub-height is invented).
+  const newestDag = [...ticks].filter((t) => t.blocks.length).sort((a, b) => b.ord - a.ord)[0];
+  const heights = newestDag ? reads[`dag:${newestDag.ord}`]?.blocks.map((b) => b.height) : undefined;
+  const height = heights?.length && !pinned ? Math.max(...heights) : null;
+
+  // The frontier read carries its snapshot's stamp once it is held (until then: the empty value).
+  const frontier = reads[frontierKey("dag")] as ({ ts?: string } & object) | undefined;
+  const age = frontierAge(frontier?.ts ? { ts: frontier.ts } : null, now);
+
+  return (
+    <>
+      <BandCard
+        label="Blocks last hour"
+        lead={<BlockLead figure={hour != null ? <Odometer value={hour} int /> : null} unit="blocks" empty={hour == null} />}
+      >
+        {win && !pinned ? (
+          <span className="flex-1 min-w-0 self-center">
+            {/* Blocks per five minutes; the window lists only block-bearing snapshots, so a bin with
+                none is zero (blockStats), and bucketed, never sliced. */}
+            <Sparkline data={blocksPerBucket(ticks, now)} color={accent} height={42} maxPoints={20} stretch />
+          </span>
+        ) : (
+          <span className="flex items-center self-stretch text-label text-muted-foreground">{pinned ? BLOCK_PINNED : "Reading the window…"}</span>
+        )}
+      </BandCard>
+      <BandCard label="Open tips">
+        <span className="flex flex-wrap items-center content-center gap-x-3 gap-y-1 self-stretch min-w-0 overflow-hidden">
+          {chains.slice(0, 4).map((c) => (
+            <span key={c} className="inline-flex items-center gap-1.5 whitespace-nowrap text-body">
+              <IdentityDot hue={identityHudCss(c)} />
+              <span className="text-muted-foreground">{tickerOf(c)}</span>
+              <span className="font-mono tabular-nums">{tips[c] != null ? tips[c] : <Empty why="No frontier read held yet" />}</span>
+            </span>
+          ))}
+          {chains.length > 4 && <span className="text-label text-muted-foreground">+{chains.length - 4} more</span>}
+        </span>
+      </BandCard>
+      <BandCard label="Height" lead={<BlockLead figure={height != null ? height.toLocaleString() : null} unit="DAG blocks" empty={height == null} />}>
+        <span className="flex items-center self-stretch text-label text-muted-foreground">{pinned ? BLOCK_PINNED : height == null ? "Reading the newest block…" : "Newest DAG block"}</span>
+      </BandCard>
+      <BandCard
+        label="Frontier age"
+        lead={<BlockLead figure={age != null ? ageWords(age) : null} unit="since the newest snapshot" empty={age == null} />}
+      />
+    </>
+  );
+}

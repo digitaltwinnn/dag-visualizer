@@ -21,6 +21,7 @@ const TOKENS: { re: RegExp; feeds: string[] }[] = [
   { re: /\bs\.metaList\b/, feeds: ["api-metagraphs"] },
   { re: /\bs\.(selNodes|allNodes|leaderboard)\b/, feeds: ["clusters", "api-geo"] },
   { re: /\bs\.(latestSnapshot|activity)\b|\buseSnapshotFeed\(|\bgetNetwork\(/, feeds: ["global"] },
+  { re: /\bgetBlockWindow\b|\bs\.(blockReads|blockWindowStatus)\b/, feeds: ["api-blocks"] },
   { re: /\bgetAnchor\(|\bledgerAnchor\(|\bisAnchorSettling\(/, feeds: ["metasnaps"] },
 ];
 

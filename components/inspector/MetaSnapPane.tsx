@@ -93,6 +93,8 @@ export default function MetaSnapPane({
   const past = useSyncExternalStore(onPastWindow, getPastWindow, () => null);
   const register = useStore((s) => s.ledgerRegister);
   const blockWin = useSyncExternalStore(onBlockWindow, getBlockWindow, () => null);
+  // The Blocks register's records come from its window: reading it holds the block feed.
+  useFeedRead(["api-blocks"], "MetaSnapPane blocks", register === "blocks");
   // Tier 1 — the polled record this tile was named from (free: the metagraph snapshot buffers
   // are already in memory, keyed by the anchoring tick's timestamp).
   const polled = useMemo(() => {

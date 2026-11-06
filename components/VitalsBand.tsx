@@ -31,7 +31,7 @@ import { filterAccent } from "@/src/data/network";
 import { NoSignalDot } from "@/components/state/StateAtoms";
 import { useSceneYield } from "@/components/RailShade";
 import { cn } from "@/lib/utils";
-import { HyperCells, GeoCells, LedgerCells } from "@/components/vitals/viewCells";
+import { HyperCells, GeoCells, LedgerCells, BlocksCells } from "@/components/vitals/viewCells";
 import TrendTimeline from "@/components/TrendTimeline";
 import { QualifierChip } from "@/components/inspector/parts";
 import { spanPhrase } from "@/src/data/trendWindow";
@@ -55,7 +55,9 @@ function useVitalsScope() {
  *  lane for", and a view that never answers it would inherit "vitals" by silence. It belongs in
  *  this dispatch for the same reason the cells do — both presentations render it, so the band and
  *  the phone sheet can never hold different things. */
-function ViewCells({ mode, accent, filter, paused = false }: { mode: Mode; accent: string; filter: string; paused?: boolean }) {
+function ViewCells({ cells, accent, filter, paused = false }: { cells: CellsKey; accent: string; filter: string; paused?: boolean }) {
+  if (cells === "ledger:blocks") return <BlocksCells accent={accent} />;
+  const mode = cells;
   if (VIEW_POLICIES[mode].bandContent === "timeline") return <TrendTimeline />;
   return (
     <>
@@ -64,6 +66,14 @@ function ViewCells({ mode, accent, filter, paused = false }: { mode: Mode; accen
       {mode === "ledger" && <LedgerCells accent={accent} filter={filter} paused={paused} />}
     </>
   );
+}
+
+/** What the band's cells are swapped on: the view, and in the Snapshots view its REGISTER — the
+ *  Blocks register says different things in the same lane, so the swap rolls on it too. */
+type CellsKey = Mode | "ledger:blocks";
+function useCellsKey(mode: Mode): CellsKey {
+  const register = useStore((s) => s.ledgerRegister);
+  return mode === "ledger" && register === "blocks" ? "ledger:blocks" : mode;
 }
 
 // ⚠️ THE BAND CARRIES NO LINK TO THE HISTORY VIEW (user, 2026-09-19: "remove the 'history' pill
@@ -88,7 +98,9 @@ export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
   // — the same one read the RailShade dims on, at the recipe's own tempos (away 0.3s, the return
   // faster: it answers a gesture already finished).
   const yielding = useSceneYield();
-  const bandWindow = VIEW_POLICIES[mode].bandWindow;
+  const cells = useCellsKey(mode);
+  // The Blocks register's cells state their own reach ("last hour"), not the band's 24 hours.
+  const bandWindow = cells === "ledger:blocks" ? null : VIEW_POLICIES[mode].bandWindow;
   const dead = useNoSignal() && VIEW_POLICIES[mode].bandContent === "vitals";
   // THE BAND NEVER PAINTS UNDER AN OPEN SHEET (user, 2026-09-04 — "sometimes I see flickering
   // when the explore and bottom bar overlap"). The overlay decision above stands: the sheets
@@ -212,8 +224,8 @@ export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
           section above no longer carries them: an element between a `[&>*]` and its subjects
           silently retargets it at the wrapper. */}
       <RollSwap
-        swapKey={mode as Mode}
-        render={(m) => <ViewCells mode={m} accent={accent} filter={filter} paused={hidden} />}
+        swapKey={cells}
+        render={(c) => <ViewCells cells={c} accent={accent} filter={filter} paused={hidden} />}
         className={cn(
           "flex-1 min-w-0 flex items-stretch justify-center gap-0",
           "[&>*]:rounded-none [&>*]:border-0 [&>*]:backdrop-blur-none [&>*]:[background:none]",
@@ -240,6 +252,7 @@ export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
  *  width, which is what `[&>*]:flex-none [&>*]:basis-auto` on the wrapper below says. */
 export function VitalsSheetBody() {
   const { mode, live, filter, accent } = useVitalsScope();
+  const cells = useCellsKey(mode);
   const dead = useNoSignal() && VIEW_POLICIES[mode].bandContent === "vitals";
   // The band's own rule (see the desktop section): never-answered → one statement, no cells.
   if (dead) {
@@ -261,14 +274,14 @@ export function VitalsSheetBody() {
     >
       {!live && <span className="self-center flex-none mb-2"><NoSignalDot /></span>}
       {/* The band's shared window, once, at the sheet's top right — the desktop chip's phone home. */}
-      {VIEW_POLICIES[mode].bandWindow && (
+      {VIEW_POLICIES[mode].bandWindow && cells !== "ledger:blocks" && (
         <span className="self-end flex-none mb-2"><QualifierChip>{spanPhrase(VIEW_POLICIES[mode].bandWindow, null)}</QualifierChip></span>
       )}
       {/* The no-pop swap — the cell-targeting `[&>*]` rules ride the wrapper for the same
           retargeting reason the band's do (see the desktop section above). */}
       <RollSwap
-        swapKey={mode as Mode}
-        render={(m) => <ViewCells mode={m} accent={accent} filter={filter} />}
+        swapKey={cells}
+        render={(c) => <ViewCells cells={c} accent={accent} filter={filter} />}
         className={cn(
           "flex flex-col items-stretch gap-2 min-w-0",
           "[&>*]:w-full [&>*]:max-w-none [&>*]:flex-none [&>*]:basis-auto",

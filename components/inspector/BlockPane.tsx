@@ -14,8 +14,8 @@
 //               far as the held reads show), signatures, fees — "reading…" until the read lands, and
 //               a failed read says so. NO HEIGHT ROW: the head's chip states it, and a card never
 //               says one fact twice. No sub-height either: a block read carries none.
-//   doors     · "Snapshot records": the records of the snapshot that accepted it — the metagraph
-//               snapshot's row for a token block, the global's own for a DAG block (`trendDoors`)
+//   doors     · "Block records": the raw layer's blocks table, this block's row pinned in its
+//               accepting global's group (`trendDoors.openBlockRecord`)
 //   foot      · the hash and the parents' hashes, in full with copy
 import type { CSSProperties } from "react";
 import { ArrowUpRight } from "lucide-react";
@@ -24,11 +24,10 @@ import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { BLOCK_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { Door, Empty, Fact, FactGroup, Foot, FootRow, Lead, QualifierChip } from "@/components/inspector/parts";
 import { tickerOf } from "@/components/explorer/nodeRow";
-import { openGlobalRecord, openSnapshotRecord } from "@/components/trendDoors";
+import { openBlockRecord } from "@/components/trendDoors";
 import { useFeedRead } from "@/components/useFeedRead";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { blockChildren, blockReadKey, blockReadOf } from "@/src/data/blockReads";
-import { metagraphById } from "@/src/data/network";
 import { compactDag, midHash } from "@/src/util/format";
 import { identityHudCss } from "@/src/palette/identity";
 import { useStore } from "@/src/store/store";
@@ -40,7 +39,6 @@ export default function BlockPane({ onClose, collapsed, onToggle }: { onClose: (
   const sel = useStore((s) => s.block);
   const reads = useStore((s) => s.blockReads);
   const missed = useStore((s) => (s.block ? s.blockReadMiss[blockReadKey(s.block.chain, s.block.ordinal)] != null : false));
-  const snap = useStore((s) => s.snap);
   const hoverBlock = useStore((s) => s.hoverBlock);
   const setHoverBlock = useStore((s) => s.setHoverBlock);
   const pulseKey = useEdgePulse(sel ? `${sel.chain}:${sel.hash}` : null);
@@ -58,14 +56,6 @@ export default function BlockPane({ onClose, collapsed, onToggle }: { onClose: (
       ? `Moved ${compactDag(read.amount)} ${unit} in ${plural(read.txCount, "transfer", "transfers")}`
       : `Accepted into global ${anchor}`;
   const children = read ? blockChildren(reads, sel.chain, sel.hash) : null;
-  // The door's time is the accepting global's (the pinned tick IS it — a block's card stands only
-  // under its own tick, `railCards.parentHolds`).
-  const ts = snap && snap.data.ordinal === sel.anchorOrd ? snap.data.timestamp : null;
-  const openRecords = () => {
-    if (!ts) return;
-    if (sel.chain !== "dag" && metagraphById(sel.chain)) openSnapshotRecord(sel.chain, sel.ordinal, ts);
-    else openGlobalRecord(sel.anchorOrd, ts);
-  };
 
   return (
     <RailPane
@@ -122,13 +112,11 @@ export default function BlockPane({ onClose, collapsed, onToggle }: { onClose: (
               <Fact label="Block read">reading…</Fact>
             )}
           </FactGroup>
-          {ts && (
-            <div className="mt-2.5">
-              <Door onClick={openRecords} glyph={<ArrowUpRight className="size-3.5" />} flushFoot>
-                Snapshot records
-              </Door>
-            </div>
-          )}
+          <div className="mt-2.5">
+            <Door onClick={openBlockRecord} glyph={<ArrowUpRight className="size-3.5" />} flushFoot>
+              Block records
+            </Door>
+          </div>
           <Foot>
             <FootRow label="Hash" value={midHash(sel.hash, 23)} copy={sel.hash} copyName="hash" />
             {read?.parents.map((p, i) => (

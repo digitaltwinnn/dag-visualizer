@@ -1049,6 +1049,22 @@ a ghost can never split the stack. The lane stays the ladder's one order; this i
 day: "put it on the 1st row and directly show x newer") — it froze at the newest tick on screen
 from 2026-10-02; `src/data/ledgerHold.ts`.
 
+**The Blocks register (Snapshots view, 2026-11-06) is one control and four surfaces.** `RegisterSwitch`
+(the explorer card's control) picks `ledgerRegister`; in Blocks the explorer lists the window's blocks,
+the Block card stands under its tick (six slots, no breakdown, no sub-height — a `BlockRead` carries
+none), the vitals band swaps to `BlocksCells` and RAW to `datasection/BlocksTable`. The band's swap key
+is the view, or `"ledger:blocks"` in that register (`useCellsKey` in `VitalsBand.tsx`, the one dispatch
+for band and phone sheet, so the swap rolls). BLOCKS LAST HOUR, OPEN TIPS and FRONTIER AGE are pure
+arithmetic in `src/data/blockStats.ts`: the window lists only block-bearing global snapshots, so a stretch
+with no tick is zero blocks (a bin older than a FULL window's reach is a gap); OPEN TIPS and FRONTIER AGE
+read `${chain}:frontier` and show the house empty value until it is held, never 0. The table groups by
+accepting global with the log's own `GroupPlate` (the plate commits/releases the global, the chevron
+folds); a block row's click is `blockSelectActions`, the committed block says PINNED in mark and word and
+its group starts open. The Block card's door is `trendDoors.openBlockRecord` (spends any armed `logSeek`,
+so a door after a door inherits nothing). Pinned by `src/data/blockStats.test.ts`,
+`components/feedReadBoundary.test.ts` (`api-blocks` readers hold the feed) and
+`components/rawSurfaceBoundary.test.ts` (the register compare stays inside `RecordsSurface`).
+
 **The placeholder views host NO facts cards at all** — `detailsCards` returns `[]` outside the 3D
 views (user, 2026-08-10). A live node card, status pill and real ids beside a `preview · in development`
 wireframe is exactly the mixed signal rule 10 exists to prevent, and it arrived half-formed anyway: with

@@ -6,6 +6,7 @@ import { useStore } from "@/src/store/store";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import AnchorLogTable from "@/components/datasection/AnchorLogTable";
 import { ChannelStatePanel } from "@/components/datasection/ChannelStatePanel";
+import BlocksTable from "@/components/datasection/BlocksTable";
 import NodeRosterTable from "@/components/datasection/NodeRosterTable";
 
 // THE RAW LAYER'S RECORDS REGISTER (spec 2026-08-01) — the per-view raw-data table: ledger =
@@ -19,6 +20,9 @@ import NodeRosterTable from "@/components/datasection/NodeRosterTable";
 // the surface decision, which is why they live down here and the dispatch carries none.
 export default function RecordsSurface() {
   const mode = useStore((s) => s.mode);
+  // The Snapshots view's register decides which of its two tables the records are (the register
+  // compare lives here, as the mode compare does — `rawSurfaceBoundary` fences the dispatch above).
+  const blocksRegister = useStore((s) => s.ledgerRegister) === "blocks";
   // PHONE: THE LIST AND THE SNAPSHOT ARE TWO PAGES (user, 2026-10-02 — `docs/superpowers/design/
   // 2026-10-02-raw-phone`, option B). Stacked in one panel the log showed seven rows of hundreds
   // and the payload was read through a 250px window, each with a scroll of its own. A row tap
@@ -56,7 +60,10 @@ export default function RecordsSurface() {
         (mode === "ledger" ? "pr-6 max-[1099px]:pr-10" : "pr-10")
       }
     >
-      {mode === "ledger" ? (
+      {mode === "ledger" && blocksRegister ? (
+        // THE BLOCKS REGISTER'S RECORDS: the window's blocks, grouped by their accepting global.
+        <BlocksTable />
+      ) : mode === "ledger" ? (
         // MASTER–DETAIL (item 9, 2026-08-06): the anchor log is the index on the left; the right
         // pane renders the SELECTED metagraph snapshot's contents (the deep read + the JSON tree),
         // or its own quiet hint while nothing is selected. The pane is always present so the log
