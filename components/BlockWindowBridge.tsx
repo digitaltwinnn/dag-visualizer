@@ -25,7 +25,10 @@ export default function BlockWindowBridge() {
   const ledger = useStore((s) => VIEW_POLICIES[s.mode].tickScoped);
   const register = useStore((s) => s.ledgerRegister);
   const following = useStore((s) => s.following);
-  const pin = useStore((s) => s.snap?.data.ordinal ?? null);
+  // A PIN is a snapshot the reader holds — never the one a live follow walks forward each tick
+  // (`pastWanted`'s own rule): read as a pin, the followed tick re-asked the trail on every global.
+  const snapOrd = useStore((s) => s.snap?.data.ordinal ?? null);
+  const pin = following ? null : snapOrd;
   const setStatus = useStore((s) => s.setBlockWindowStatus);
   const exact = useStore((s) => s.snapshotExact);
   const { snaps } = useSnapshotFeed(POLL.maxSnapshots, ledger && register === "blocks");

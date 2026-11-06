@@ -24,7 +24,7 @@
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import type { Mode } from "@/src/store/store";
 import { ledgerNetwork } from "@/src/engine/domain/tickNet";
-import type { TickNetSel } from "@/src/data/types";
+import type { BlockSel, TickNetSel } from "@/src/data/types";
 import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder";
 import type {
   ChannelSnapRow,
@@ -71,6 +71,8 @@ export interface SiblingState {
   /** The network committed inside the pinned tick (ledger) — see `domain/tickNet.ts`. */
   tickNet: TickNetSel | null;
   metaSnap: MetaSnapSel | null;
+  /** The committed block (the Blocks register) — a step onto another tick releases it. Absent (tests), none. */
+  block?: BlockSel | null;
   selNodes: NodeRow[];
   metaList: MetaInfo[];
   /** Is this channel a CATALOGUED network? The caller's answer (the app catalog — `LISTED_IDS`),
@@ -315,7 +317,7 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
         // should not be changed from the explorer", and a pager is the same kind of gesture. The
         // step pins the tick and commits the neighbour INSIDE it; the filter is the reader's lens
         // and stays what they set.
-        const items = nets.map((m) => ({ key: m.id, label: m.name, actions: tickNetSelectActions(m.id, s.snap!, { metaSnap: s.metaSnap, hasInspect: s.inspect != null, net }) }));
+        const items = nets.map((m) => ({ key: m.id, label: m.name, actions: tickNetSelectActions(m.id, s.snap!, { metaSnap: s.metaSnap, hasInspect: s.inspect != null, net, block: s.block ?? null }) }));
         return finish(slot, items, nets.findIndex((m) => m.id === net), `Global ${s.snap!.data.ordinal.toLocaleString()}`);
       }
       // A FILTER HOLDS THE CARD (`domain/viewNetwork.heldOut`): only the top bar leaves it. So what
@@ -437,7 +439,7 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
         const items = wide.map(({ r, who }, i) => ({
           key: `${r.metaId}:${r.ordinal}:${i}`,
           label: `${who} ${ordinalLabel(r)}`,
-          actions: metaSnapSelectActions(metaSnapSelOf(r, cur.globalOrdinal), s.snap!, { metaSnap: cur, following: s.following, inspect: s.inspect }),
+          actions: metaSnapSelectActions(metaSnapSelOf(r, cur.globalOrdinal), s.snap!, { metaSnap: cur, following: s.following, inspect: s.inspect, block: s.block ?? null }),
         }));
         const index = wide.findIndex(({ r }) => r.metaId === cur.metaId && r.ordinal === cur.ordinal);
         return finish(slot, items, index, `Global ${cur.globalOrdinal.toLocaleString()}`);
@@ -455,7 +457,7 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
         // other rendered ordinal — and an undecodable payload says so rather than claiming 0
         // (the route's contract).
         label: ordinalLabel(r),
-        actions: metaSnapSelectActions(metaSnapSelOf(r, cur.globalOrdinal), s.snap!, { metaSnap: cur, following: s.following, inspect: s.inspect }),
+        actions: metaSnapSelectActions(metaSnapSelOf(r, cur.globalOrdinal), s.snap!, { metaSnap: cur, following: s.following, inspect: s.inspect, block: s.block ?? null }),
       }));
       const index = rows.findIndex((r) => r.metaId === cur.metaId && r.ordinal === cur.ordinal);
       return finish(slot, items, index, `${who} in global ${cur.globalOrdinal.toLocaleString()}`);
@@ -483,6 +485,7 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
             pinnedOrdinal: s.following ? null : cur.data.ordinal,
             metaSnap: s.metaSnap,
             tickNet: s.tickNet,
+            block: s.block,
           },
         ),
       }));
@@ -630,7 +633,7 @@ const anchoringNetworkChildren = (s: SiblingState, n: number): SiblingStep[] => 
   return (s.tickNets ?? []).slice(0, n).map((meta) => ({
     key: meta.id,
     label: meta.name,
-    actions: tickNetSelectActions(meta.id, snap, { metaSnap: s.metaSnap, hasInspect: s.inspect != null, net: null }),
+    actions: tickNetSelectActions(meta.id, snap, { metaSnap: s.metaSnap, hasInspect: s.inspect != null, net: null, block: s.block ?? null }),
   }));
 };
 /** ledger: the committed network's OWN snapshots in the shown tick — never the tick's first rows,
@@ -646,7 +649,7 @@ const metaSnapOfTickChildren = (s: SiblingState, n: number): SiblingStep[] => {
     return tickWideRows(s).slice(0, n).map(({ r, who }) => ({
       key: `${r.metaId}:${r.ordinal}`,
       label: `${who} ${ordinalLabel(r)}`,
-      actions: metaSnapSelectActions(metaSnapSelOf(r, snap.data.ordinal), snap, { metaSnap: s.metaSnap, inspect: s.inspect }),
+      actions: metaSnapSelectActions(metaSnapSelOf(r, snap.data.ordinal), snap, { metaSnap: s.metaSnap, inspect: s.inspect, block: s.block ?? null }),
     }));
   }
   // The explorer's own list for this network in this tick, NEWEST first — the ghost opens its top
@@ -656,7 +659,7 @@ const metaSnapOfTickChildren = (s: SiblingState, n: number): SiblingStep[] => {
   return tn.snaps.slice(0, n).map((r) => ({
     key: `${r.metaId}:${r.ordinal}`,
     label: ordinalLabel(r),
-    actions: metaSnapSelectActions(metaSnapSelOf(r, snap.data.ordinal), snap, { metaSnap: s.metaSnap, inspect: s.inspect }),
+    actions: metaSnapSelectActions(metaSnapSelOf(r, snap.data.ordinal), snap, { metaSnap: s.metaSnap, inspect: s.inspect, block: s.block ?? null }),
   }));
 };
 

@@ -2,7 +2,7 @@ import { compositionGroups, compositionKey, roleKeyLabel } from "@/src/data/comp
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { cohortOfProvider } from "@/src/data/ladderLevels";
 import type { NoteChange, NoteChangeSubject, NoteGlobal, NoteView } from "@/src/data/noteTypes";
-import { metaSnapHoverKey, type GlobalSnapshot, type MetaSnapSel, type NodeRow, type PickDescriptor, type TickNetSel } from "@/src/data/types";
+import { metaSnapHoverKey, type GlobalSnapshot, type MetaSnapSel, type NodeRow, type PickDescriptor, type TickNetSel, type BlockSel } from "@/src/data/types";
 import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder";
 import {
   compositionToggleActions,
@@ -29,6 +29,8 @@ export interface ChangeState {
   pinnedOrdinal?: number | null;
   inspect?: PickDescriptor | null;
   tickNet?: TickNetSel | null;
+  /** Snapshots: the committed block, which a commit on another tick releases. */
+  block?: BlockSel | null;
   railNet: string | null;
   country: string | null;
   cohort: CohortSel | null;
@@ -64,6 +66,7 @@ export function changeActions(
       return tickNetSelectActions(subject.id, { kind: "snapshot", title: `Global snapshot #${tick.ordinal}`, data: tick }, {
         metaSnap: s.metaSnap,
         hasInspect: s.hasInspect,
+        block: s.block ?? null,
         net: s.ledgerNet,
       });
     case "type":
@@ -75,13 +78,14 @@ export function changeActions(
       return c ? noteCohortActions({ cc: c.cc, city: c.city, isp: c.isp }, s) : null;
     }
     case "metaSnap":
-      return metaSnapSelectActions(subject.sel, globalPick(subject.global), { metaSnap: s.metaSnap, following: s.following, inspect: s.inspect ?? null });
+      return metaSnapSelectActions(subject.sel, globalPick(subject.global), { metaSnap: s.metaSnap, following: s.following, inspect: s.inspect ?? null, block: s.block ?? null });
     case "global":
       return snapshotSelectActions(globalPick(subject.global), false, {
         pinnedOrdinal: s.pinnedOrdinal ?? null,
         metaSnap: s.metaSnap,
         hasInspect: s.hasInspect,
         tickNet: s.tickNet,
+        block: s.block,
       });
     case "self":
       return null;

@@ -378,7 +378,7 @@ export default function LedgerPanel() {
               ),
               hue: "var(--primary)",
               className: "animate-in fade-in slide-in-from-top-2 duration-300 motion-reduce:animate-none",
-              onClick: () => applyClickActions(followToggleActions(snap, false)),
+              onClick: () => applyClickActions(followToggleActions(snap, false, useStore.getState().block)),
             } as ExplorerRowSpec,
           ]
         : ([] as ExplorerRowSpec[])
@@ -428,6 +428,7 @@ export default function LedgerPanel() {
                 pinnedOrdinal: !following && snap ? snap.data.ordinal : null,
                 metaSnap,
                 tickNet,
+                block: useStore.getState().block,
               }),
             );
             // Any other row selects its tick and opens it, the live tip included.
@@ -528,6 +529,7 @@ export default function LedgerPanel() {
                   tickNetSelectActions(n.id, { kind: "snapshot", title: `Global snapshot #${tick.ordinal}`, data: tick }, {
                     metaSnap,
                     hasInspect: !!selNode,
+                    block: useStore.getState().block,
                     net: ledgerNetwork({ filter, tickNet, snapOrdinal: activeSnapOrd ?? null }),
                   }),
                 );
@@ -588,7 +590,7 @@ export default function LedgerPanel() {
           on,
           rung: "metaSnap",
           onClick: () => {
-            applyClickActions(metaSnapSelectActions(sel, globalPick, { metaSnap, following, inspect: useStore.getState().inspect }));
+            applyClickActions(metaSnapSelectActions(sel, globalPick, { metaSnap, following, inspect: useStore.getState().inspect, block: useStore.getState().block }));
             // A select opens the snapshot's signers — the path follows the selection
             // (`syncLedgerPath`), so this states the same thing in the same commit — and the
             // deselect closes them. THE AFFORDANCE FOLLOWS THE DATA at the level itself: the

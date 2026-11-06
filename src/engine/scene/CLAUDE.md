@@ -561,29 +561,33 @@ keyed map, `LedgerView`'s `REGISTER_CARGO` (a new register is a compile error th
   The tier's mesh joins `pickables` in that register only (the raycaster ignores `visible`).
 
 **Where a block stands is layout data, placed at event time** (`_rebuildBlockTier`, on every slot
-rebuild, window and read): a DAG block on its tick's bar top, a token block on the tile of the
-metagraph snapshot that accepted it — `tileAnchorOf`, the k-th filled tile of that tick, `k` the
-tile resolver's own index. `_tileTop` is the ONE copy of the tile arithmetic: the per-frame draw and
-the selected tile's callout anchor add the frame's offsets to it. Across the width, **height is a
-LANE, never a stack** (user ruling): `laneOf` over the chain's lowest height in the WINDOW (not the
-slots, so a lane does not move as the trail holds more rows), across the bar field for the DAG and
-the plane's narrow width for a token; blocks sharing a tick and a lane step aside along the trail.
-A block whose read has not landed waits in the middle lane.
+rebuild and read; a window change reaches it through the refresh that follows): a DAG block on its
+tick's bar top, a token block ON the tile of the metagraph snapshot that accepted it — the k-th
+filled tile of that tick, `k` the tile resolver's own index (`tileAnchorOf`). `_tileTop` is the ONE
+copy of the tile arithmetic: the per-frame tile draw, the selected tile's callout anchor and the
+token placement all read it, the first two adding the frame's offsets. Across the floor's width,
+**height is a LANE, never a stack** (user ruling): `laneOf` over the chain's lowest height in the
+WINDOW (not the slots, so a lane does not move as the trail holds more rows), and DAG blocks sharing
+a tick and a lane step aside along the trail. **A token block never leaves its tile** (user ruling):
+its lane and its turn among the tile's blocks only nudge it inside the tile's own footprint
+(`TOKEN_ON_TILE`, `TOKEN_NUDGE`); a snapshot whose tile is not drawn puts no block anywhere. A block
+whose read has not landed waits in the middle lane.
 
 **Honesty (rule 10).** A block is drawn from the FEED's hashes, so a tick whose full read has not
 landed, or failed (`blockReadMiss`), shows its blocks with no links; a link draws only where BOTH
 ends are on the trail (`linkEndpoints`) — a parent beyond the trail's held rows has no place, so no
 stub. A landed block with no parents is a data block and is not drawn. **Tips are read, never
-inferred**: the state is `tipStateOf` over the chain's FRONTIER read (`blockReads["<chain>:frontier"]`,
-the newest snapshot's tips), never a block-bearing snapshot's own (hours stale); with none the block
-draws the resting look, never "open". An open tip breathes on the live edge's calm beat
+inferred**: the state is `tipStateOf` over the chain's FRONTIER read (`blockReads[frontierKey(chain)]`,
+`src/data/blockReads.ts` — the newest snapshot's tips), never a block-bearing snapshot's own (hours
+stale); with none the block draws the resting look, never "open". An open tip breathes on the live edge's calm beat
 (`LiveEdge.BREATHE_RATE`), a retired one reads quiet (`BLOCK_LOOK`).
 
 **The marks are the tiles' kind**: opaque, depth-writing instances in the chain's identity hue (the
 DAG's from `sceneColors.dag`), brightness through `snapBright` (the ledger row's dim, boost and back
 — a block is data) and `inkMix`/`inkPresence` with an ink floor on paper, joined to the bloom layer.
 A row is one object: blocks and each link END ask the trail's boundaries at their ROW's x (a block
-offset along a tile grid must not fade apart from its tile), dissolve by zero-scale, and drop with
+offset along a tile grid must not fade apart from its tile; an end's row is handed in beside the
+endpoints, resolved through the same `linkEndpoints` walk), dissolve by zero-scale, and drop with
 their slot's entry beat. Links are one `LineSegments`, positions at event time, alpha per vertex per
 frame, `glowBlend` on each ground. The silent stretch is one dashed `LineSegments` flush in the floor
 between two rows' bars, plus a flat edge label ("1,364 snapshots · 4h", `relativeAge` — the app's one
@@ -591,8 +595,11 @@ short span) past 200 snapshots; flat, not a billboard, because the floor's text 
 
 **The selection** is a slot under the tick, no focus rung and no pose (camera principle 2):
 `blockSelectActions` pins the accepting global and commits the block; the same block releases it
-alone; a tick select drops a block that tick cannot contain. Hover rides `hoverBlock` (a block, not its
-tick) and previews only.
+alone. **A block is in exactly one snapshot**, so EVERY builder that pins a tick (the tick, a tile,
+a band, a network inside a tick, the raw layer's arrival, the follow switch) releases a block of
+another tick first, through `pickActions.releaseBlock` (the tile, band, network, arrival and follow
+builders take the block as a REQUIRED argument, so no caller can forget it); resuming live releases
+it whatever tick is shown. Hover rides `hoverBlock` (a block, not its tick) and previews only.
 
 ### The unlisted network
 

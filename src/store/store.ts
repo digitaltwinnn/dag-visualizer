@@ -29,6 +29,7 @@ export type { Mode, LedgerRegister };
 // The stored metric every trend plane draws — one picker, one column (see `trendMetric` below).
 import type { LedgerMeasure } from "@/src/data/ledgerMeasure";
 import type { BlockMeasure } from "@/src/data/blockMeasure";
+import { isFrontierKey } from "@/src/data/blockReads";
 import type { BlockRead, TipRead } from "@/src/engine/domain/blockBraid";
 import type { GeoMeasure } from "@/src/data/geoMeasure";
 import type { HyperMeasure } from "@/src/data/hyperMeasure";
@@ -994,7 +995,7 @@ export const useStore = create<AppState>((set) => ({
   setBlockReadMiss: (key) => set((s) => ({ blockReadMiss: { ...s.blockReadMiss, [key]: true } })),
   retainBlockReads: (keep) =>
     set((s) => {
-      const kept = (k: string) => keep.has(k) || k.endsWith(":frontier");
+      const kept = (k: string) => keep.has(k) || isFrontierKey(k);
       const reads = Object.keys(s.blockReads).filter((k) => !kept(k));
       const miss = Object.keys(s.blockReadMiss).filter((k) => !kept(k));
       if (!reads.length && !miss.length) return {};

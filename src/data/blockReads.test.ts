@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { blockReadKey, wantedBlockReads, windowBlockKeys } from "@/src/data/blockReads";
+import { BLOCK_FRONTIER, blockReadKey, frontierKey, isFrontierKey, wantedBlockReads, windowBlockKeys } from "@/src/data/blockReads";
 import { foldBlockWindow } from "@/src/data/blockWindow";
 import type { RawMetaSnapshot } from "@/src/data/types";
 
@@ -24,5 +24,13 @@ describe("block reads wanted by a window", () => {
   });
   it("windowBlockKeys holds every key the window could want", () => {
     expect([...windowBlockKeys(w)].sort()).toEqual(["DOR:51", "dag:100", "dag:300"]);
+  });
+});
+
+describe("the frontier key", () => {
+  it("sits beside a chain's block reads and is told apart from them", () => {
+    expect(frontierKey("dag")).toBe(`dag:${BLOCK_FRONTIER}`);
+    expect(isFrontierKey(frontierKey("DAG0x"))).toBe(true);
+    expect(isFrontierKey(blockReadKey("dag", 7241523))).toBe(false);
   });
 });

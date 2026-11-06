@@ -46,6 +46,13 @@ export type ClickAction =
   // (2026-10-07). Like `trendFocus`, a view-local subject, not a ladder rung: no pose, no cascade.
   | { kind: "trendCursor"; ms: number | null };
 
+/** A BLOCK IS IN EXACTLY ONE SNAPSHOT (spec, "Rules"): every builder that pins a tick releases a
+ *  committed block that tick cannot contain, FIRST (finest first); a builder that keeps the block's
+ *  own tick (`anchorOrd`) keeps the block. The one home of that release, so no builder re-derives it. */
+function releaseBlock(out: ClickAction[], block: BlockSel | null | undefined, ordinal: number): void {
+  if (block && block.anchorOrd !== ordinal) out.push({ kind: "block", sel: null });
+}
+
 // The network a node pick belongs to: its metagraph, or the DAG core for a validator.
 export const pickNetId = (p: PickDescriptor): string | null =>
   p.kind === "metanode" ? p.meta?.id ?? null : p.kind === "l0" || p.kind === "l1" ? "dag" : null;
@@ -322,9 +329,7 @@ export function snapshotSelectActions(
   const out: ClickAction[] = [];
   // A BLOCK IS IN EXACTLY ONE SNAPSHOT (spec, "Rules"), so committing another tick drops it — the
   // metagraph snapshot's one-to-one rule below, one slot finer. Finest first.
-  if (current?.block && current.block.anchorOrd !== p.data.ordinal) {
-    out.push({ kind: "block", sel: null });
-  }
+  releaseBlock(out, current?.block, p.data.ordinal);
   // ⚠️ NO SELECTION IN SNAPSHOTS WRITES THE FILTER (user, 2026-10-02: "consistent, and a filter
   // should not be changed from the explorer, so no reset also"). "A filter is a story" (2026-08-07)
   // used to RELEASE the filter here when the pinned tick held nothing of the filtered network, so
@@ -367,9 +372,14 @@ export function snapshotSelectActions(
 export function tickNetSelectActions(
   metaId: string,
   global: Extract<PickDescriptor, { kind: "snapshot" }>,
-  current: { metaSnap: MetaSnapSel | null; hasInspect?: boolean; net?: string | null },
+  current: {
+    metaSnap: MetaSnapSel | null; hasInspect?: boolean; net?: string | null;
+    /** The committed block — REQUIRED, so no caller can forget that another tick drops it. */
+    block: BlockSel | null;
+  },
 ): ClickAction[] {
   const out: ClickAction[] = [];
+  releaseBlock(out, current.block, global.data.ordinal);
   // A NODE hangs under the network it was opened from, so moving to ANOTHER network drops it —
   // the filter's own cascade did this while the rung was the filter; a tick-local commit has no
   // such cascade, and a Dor validator left under "Metagraph Paca" states a membership nobody
@@ -448,6 +458,8 @@ export function metaSnapSelectActions(
     following?: boolean;
     /** The node card's pick, if one is held. REQUIRED, so no caller can forget the rule below. */
     inspect: PickDescriptor | null;
+    /** The committed block — REQUIRED, so no caller can forget that another tick drops it. */
+    block: BlockSel | null;
   },
 ): ClickAction[] {
   // The deselect-toggle applies only to a PINNED selection. While FOLLOWING, the shown subject
@@ -462,6 +474,7 @@ export function metaSnapSelectActions(
   // global arrives. The shown subject itself still converts to a pin (the rule above).
   const live = current.following ? current.metaSnap : null;
   if (live && !sameMetaSnap(live, sel) && live.metaId === sel.metaId && live.globalOrdinal === sel.globalOrdinal && global.data.ordinal === sel.globalOrdinal) {
+    releaseBlock(out, current.block, global.data.ordinal);
     if (current.inspect && !nodeIsOf(current.inspect, sel.metaId)) out.push({ kind: "inspect", pick: null });
     out.push({ kind: "metaSnap", sel: { ...sel, held: true } });
     return out;
@@ -473,6 +486,7 @@ export function metaSnapSelectActions(
   // the same rule for the commit that reaches the network THROUGH a snapshot. A node of the
   // snapshot's own network stays (its card says whether it signed). Finest first, like every
   // release.
+  releaseBlock(out, current.block, global.data.ordinal);
   if (current.inspect && !nodeIsOf(current.inspect, sel.metaId)) out.push({ kind: "inspect", pick: null });
   out.push({ kind: "snapshot", pick: global, follow: false });
   out.push({ kind: "tickNet", sel: tickNetOf(sel, global) });
@@ -555,8 +569,13 @@ export function noteDayActions(networkId: string | null, filter: string, current
 export function metaSnapArrivalActions(
   sel: MetaSnapSel | null,
   global: Extract<PickDescriptor, { kind: "snapshot" }>,
+  /** The committed block — REQUIRED, so no caller can forget that another tick drops it. */
+  block: BlockSel | null,
 ): ClickAction[] {
+  const out: ClickAction[] = [];
+  releaseBlock(out, block, global.data.ordinal);
   return [
+    ...out,
     { kind: "snapshot", pick: global, follow: false },
     // The full ancestry, as a click builds it — and a stale network from the same tick is replaced.
     { kind: "tickNet", sel: tickNetOf(sel, global) },
@@ -570,9 +589,14 @@ export function metaSnapArrivalActions(
 export function bandSelectActions(
   metaId: string,
   global: Extract<PickDescriptor, { kind: "snapshot" }>,
-  current: { metaSnap: MetaSnapSel | null; hasInspect?: boolean; net?: string | null },
+  current: {
+    metaSnap: MetaSnapSel | null; hasInspect?: boolean; net?: string | null;
+    /** The committed block — REQUIRED, so no caller can forget that another tick drops it. */
+    block: BlockSel | null;
+  },
 ): ClickAction[] {
   const out: ClickAction[] = [];
+  releaseBlock(out, current.block, global.data.ordinal);
   // Another network's band drops the node committed under the old one (see `tickNetSelectActions`).
   if (current.hasInspect && current.net !== metaId) out.push({ kind: "inspect", pick: null });
   // The UNLISTED band is the unlisted network's band (see `tickNetOf`), so it commits like any
@@ -594,12 +618,21 @@ export function bandSelectActions(
 export function followToggleActions(
   shown: Extract<PickDescriptor, { kind: "snapshot" }>,
   following: boolean,
+  /** The committed block — REQUIRED, so no caller can forget it hangs under one tick. */
+  block: BlockSel | null,
 ): ClickAction[] {
   // Resuming live releases the tick-local network first: it is "this network in THAT tick", and
   // left standing it kept the chamber dimmed for it until the next beat — and came back from a
-  // plain click on the same tick later.
-  if (!following) return [{ kind: "tickNet", sel: null }, { kind: "snapshot", pick: shown, follow: true }];
-  return [{ kind: "snapshot", pick: shown, follow: false }];
+  // plain click on the same tick later. A committed BLOCK goes for the same reason, whatever tick
+  // is shown: live walks the card off its tick on the next beat. Finest first.
+  if (!following) {
+    return [...(block ? [{ kind: "block", sel: null } as const] : []), { kind: "tickNet", sel: null }, { kind: "snapshot", pick: shown, follow: true }];
+  }
+  // Pinning what is on screen keeps a block of that tick and drops one of any other.
+  const out: ClickAction[] = [];
+  releaseBlock(out, block, shown.data.ordinal);
+  out.push({ kind: "snapshot", pick: shown, follow: false });
+  return out;
 }
 
 export function clickActions(input: {

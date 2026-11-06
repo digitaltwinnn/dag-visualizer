@@ -765,6 +765,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
           ? null
           : { metaId: windowFirst.metaId, ordinal: windowFirst.ordinal, hash: windowFirst.hash, globalOrdinal: windowFirst.global.ordinal, ts: windowFirst.ts },
         { kind: "snapshot", title: `Global snapshot #${windowFirst.global.ordinal}`, data: windowFirst.global },
+        useStore.getState().block,
       ),
     );
     // The first row advances with the feed; only its identity matters for re-running the guard.
@@ -1471,7 +1472,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       // A seam: nothing anchored here, so the only subject is the TICK — commit it alone rather
       // than inventing a metagraph snapshot the row does not have (rule 10).
       applyClickActions(
-        metaSnapArrivalActions(null, { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot }),
+        metaSnapArrivalActions(null, { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot }, useStore.getState().block),
       );
       return;
     }
@@ -1479,7 +1480,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       metaSnapSelectActions(
         { metaId: r.metaId, ordinal: r.ordinal, hash: r.hash, globalOrdinal: r.global.ordinal, ts: r.ts },
         { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot },
-        { metaSnap, following, inspect: useStore.getState().inspect },
+        { metaSnap, following, inspect: useStore.getState().inspect, block: useStore.getState().block },
       ),
     );
   };
@@ -1657,6 +1658,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       metaSnapArrivalActions(
         { metaId: hit.metaId, ordinal: hit.ordinal, hash: hit.hash, globalOrdinal: hit.global.ordinal, ts: hit.ts },
         { kind: "snapshot", title: `Global snapshot #${hit.global.ordinal}`, data: hit.global as GlobalSnapshot },
+        useStore.getState().block,
       ),
     );
   });
@@ -1890,7 +1892,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                             snapshotSelectActions(
                               { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot },
                               getNetwork()?.latest?.ordinal === r.global.ordinal,
-                              { pinnedOrdinal: !st.following && st.snap ? st.snap.data.ordinal : null, metaSnap: st.metaSnap, tickNet: st.tickNet },
+                              { pinnedOrdinal: !st.following && st.snap ? st.snap.data.ordinal : null, metaSnap: st.metaSnap, tickNet: st.tickNet, block: st.block },
                             ),
                           );
                         }}

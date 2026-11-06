@@ -115,6 +115,7 @@ function ChangeRow({ change, view, onCard }: { change: NoteChange; view: NoteVie
       pinnedOrdinal: s.following ? null : (s.snap?.data.ordinal ?? null),
       inspect: s.inspect,
       tickNet: s.tickNet,
+      block: s.block,
       ledgerNet: ledgerNetwork({ filter: s.filter, tickNet: s.tickNet, snapOrdinal: s.snap?.data.ordinal ?? null }),
     };
     const acts = changeActions(change, view, state, s.selNodes, net && id ? latestTickOf(net.metaSnaps, net.globalSnapshots, id) : null);

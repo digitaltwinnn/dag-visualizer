@@ -75,6 +75,11 @@ export class SilentStretch {
     this.group.add(this._lines);
   }
 
+  /** How many stretches are drawn — 0 is the cleared mark. */
+  get count(): number {
+    return this._items.length;
+  }
+
   /** EVENT-TIME: every stretch on the trail. Labels are kept by key, so a rebuild on each tick
    *  re-draws a canvas only for a stretch it has not drawn before. */
   rebuild(items: StretchItem[]): void {

@@ -222,7 +222,7 @@ export class Picking {
     // A metagraph-snapshot TILE: commit the tile AND pin the global tick it anchored into.
     if (p?.kind === "metaSnap") {
       applyClickActions(
-        metaSnapSelectActions(p.sel, p.global, { metaSnap: st.metaSnap, following: st.following, inspect: st.inspect }),
+        metaSnapSelectActions(p.sel, p.global, { metaSnap: st.metaSnap, following: st.following, inspect: st.inspect, block: st.block }),
       );
       return;
     }
@@ -235,6 +235,7 @@ export class Picking {
           metaSnap: st.metaSnap,
           hasInspect: st.inspect != null,
           net: this.h.ledgerNet(),
+          block: st.block,
         }),
       );
       return;

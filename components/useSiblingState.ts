@@ -34,6 +34,7 @@ export function useSiblingState(slot: RailCardKind | null): SiblingState {
   const inspect = useStore((s) => s.inspect);
   const snap = useStore((s) => s.snap);
   const metaSnap = useStore((s) => s.metaSnap);
+  const block = useStore((s) => s.block);
   const tickNet = useStore((s) => s.tickNet);
   const railNet = useStore((s) => s.railNet);
   const selNodes = useStore((s) => s.selNodes);
@@ -92,6 +93,7 @@ export function useSiblingState(slot: RailCardKind | null): SiblingState {
       tickNet,
       railNet,
       metaSnap,
+      block,
       selNodes,
       metaList,
       isListed: (id: string) => LISTED_IDS.has(id),
@@ -112,5 +114,5 @@ export function useSiblingState(slot: RailCardKind | null): SiblingState {
       trendCursorMs,
       trendWindow,
     };
-  }, [slot, mode, filter, country, cohort, composition, inspect, snap, tickNet, railNet, metaSnap, selNodes, metaList, leaderboard, snapshotExact, following, snapsForTicks, source, geoMeasure, hyperMeasure, allNodes, trendRange, trendCursorMs, trendWindow]);
+  }, [slot, mode, filter, country, cohort, composition, inspect, snap, tickNet, railNet, metaSnap, block, selNodes, metaList, leaderboard, snapshotExact, following, snapsForTicks, source, geoMeasure, hyperMeasure, allNodes, trendRange, trendCursorMs, trendWindow]);
 }

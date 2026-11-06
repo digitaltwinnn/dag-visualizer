@@ -19,6 +19,17 @@ export function blockReadKey(chain: string, ordinal: number): string {
   return `${chain}:${ordinal}`;
 }
 
+/** A chain's FRONTIER read — the tips of its NEWEST snapshot, never a block-bearing snapshot's own
+ *  (hours stale) — is held under `${chain}:frontier` beside its block reads. One home for the key:
+ *  the bridge writes it, retention keeps it, the chamber reads it. */
+export const BLOCK_FRONTIER = "frontier";
+export function frontierKey(chain: string): string {
+  return `${chain}:${BLOCK_FRONTIER}`;
+}
+export function isFrontierKey(key: string): boolean {
+  return key.endsWith(`:${BLOCK_FRONTIER}`);
+}
+
 /** Every read the window could want, newest tick first: the tick's DAG read when it holds a DAG
  *  block, then one per block-bearing metagraph snapshot anchored into it. */
 function allWants(w: BlockWindow): BlockReadWant[] {

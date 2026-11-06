@@ -83,7 +83,8 @@ import type { ViewPolicy } from "../../domain/viewPolicy";
 /** A register of the Snapshots view — named through the policy row that lists them, since scene/
  *  reaches nothing in the store, types included (`layerBoundaries.test.ts`). */
 type LedgerRegister = ViewPolicy["registers"][number];
-import { relativeAge } from "@/src/util/relativeAge"; // the app's one short span — "1,364 snapshots · 4h"
+import { relativeAge } from "@/src/util/relativeAge";
+import { frontierKey } from "@/src/data/blockReads"; // the app's one short span — "1,364 snapshots · 4h"
 import { fmtKB } from "@/src/util/format"; // the HUD's own size vocabulary — one formatter, so scene and cards can't disagree
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers"; // shared display copy — floor labels = panel rows
 import { ByteBar, SEED_W } from "../objects/ByteBar";
@@ -171,6 +172,7 @@ const KB_Z0 = -ORD_LINE_Z0;
 const _dummy = new THREE.Object3D();
 const _ordSeen = new Set<number>(); // scratch for _syncOrdLabels (event-time)
 const _col = new THREE.Color();
+const _tileV = new THREE.Vector3(); // per-frame scratch: a tile's top as the frame draws it
 
 /** Resolves a lane tile to the metagraph snapshot it stands for. A tile the polled buffer no longer
  *  knows returns null — it stays DRAWN but is left out of `pickables` (the anonymous tile, §6.1). */
@@ -222,10 +224,11 @@ const TOKEN_BLOCK = 0.36;
 const DAG_BRAID_W = LANE_HALF_Z * 2;
 /** Blocks that share a tick and a lane step aside along the trail by this much, alternately. */
 const BLOCK_STEP = 0.7;
-/** A block read's frontier key (`${chain}:frontier`, the tips read off each chain's NEWEST snapshot —
- *  never the last block-bearing one, whose tips can be hours stale). Absent: no frontier read, so a
- *  block's state is null and it draws the resting look. */
-const FRONTIER = "frontier";
+/** A token block's footprint on its tile, as fractions of the tile: its edge (`TOKEN_ON_TILE` of the
+ *  tile's), and how far a block may step off the tile's centre (`TOKEN_NUDGE` of the tile's half) —
+ *  across by lane, along by its turn on the tile. 0.6/2 + 0.3/2 < 1/2, so a block never leaves its tile. */
+const TOKEN_ON_TILE = 0.6;
+const TOKEN_NUDGE = 0.3;
 /** A silent run states its length in words only past this many snapshots (a short gap is just a gap). */
 const STRETCH_WORDS_MIN = 200;
 /** The tile mesh's own depth (the BoxGeometry's z, which becomes height under the -90° X spin). */
@@ -902,10 +905,16 @@ export class LedgerView implements SceneView {
     this._rebuildAllSlots(); // the live edge's claim on the front, the tier, the pick list
   }
 
-  /** The block window the Blocks register's trail is (`src/data/blockWindow.ts`), or none yet. */
+  /** Is the block window this register's trail (the cargo row, `REGISTER_CARGO`)? */
+  get readsBlockWindow(): boolean {
+    return this._cargo.blocks;
+  }
+
+  /** The block window the Blocks register's trail is (`src/data/blockWindow.ts`), or none yet.
+   *  Held only: the window is the trail's SOURCE, so the Engine's refresh that follows every window
+   *  change re-runs `setData`, whose slot rebuild draws the tier — one rebuild per window. */
   setBlockWindow(w: BlockWindow | null): void {
     this._blockWindow = w;
-    this._rebuildBlockTier();
   }
 
   /** The full reads (`store.blockReads`): a block's parents, and each chain's frontier. */
@@ -937,19 +946,28 @@ export class LedgerView implements SceneView {
   /** The top of tile `k` of `metaId`'s lane block in the tick `tickTs` (the tile resolver's own
    *  index: the k-th filled tile of that tick), at rest. False when the lane holds no such tile. */
   tileAnchorOf(metaId: string, tickTs: string, k: number, out: THREE.Vector3): boolean {
+    const b = this._tileOf(metaId, tickTs, k);
+    if (!b) return false;
+    this._tileTop(b, this._laneCz(metaId), out);
+    return true;
+  }
+
+  /** The k-th filled tile of `metaId`'s lane block in the tick `tickTs`, or null. */
+  private _tileOf(metaId: string, tickTs: string, k: number): LaneBlock | null {
     const lane = this.model.lanes.get(metaId);
-    if (!lane) return false;
-    const cz = this._laneZ.get(metaId) ?? lane.z;
+    if (!lane) return null;
     let j = 0;
     for (const b of lane.blocks) {
       if (b.ts !== tickTs || !b.filled) continue;
-      if (j === k) {
-        this._tileTop(b, cz, out);
-        return true;
-      }
+      if (j === k) return b;
       j++;
     }
-    return false;
+    return null;
+  }
+
+  /** A lane's centre across the field — the ONE lookup the tile draw and the tile anchor share. */
+  private _laneCz(metaId: string): number {
+    return this._laneZ.get(metaId) ?? this.model.lanes.get(metaId)?.z ?? 0;
   }
 
   /** EVENT-TIME: place every block the window's trail ticks hold, link the ones whose reads landed,
@@ -967,6 +985,8 @@ export class LedgerView implements SceneView {
     // The constructor builds the tier after the first slot rebuild can run.
     if (!this._blocks || !this._stretch) return;
     if (!this._cargo.blocks || !w) {
+      // Already empty (the Snapshots register rebuilds slots every tick): nothing to clear.
+      if (this._blocks.count === 0 && this._stretch.count === 0) return;
       this._blocks.clear();
       this._stretch.clear();
       return;
@@ -991,25 +1011,28 @@ export class LedgerView implements SceneView {
     const mid = Math.floor(BRAID_LANES / 2);
     const items: BlockItem[] = []; // event-time
     const at = new Map<string, readonly [number, number, number]>(); // event-time
-    const taken = new Map<string, number>(); // event-time: blocks already standing per (slot, chain, lane)
-    const tokenW = 2 * lanePlaneHalf(this._laneOrder.length) * 0.8;
-    const place = (
-      chain: string, hash: string, slot: number, x: number, y: number, zMid: number, braidW: number, size: number,
-      clampZ: number, pick: PickDescriptor,
-    ) => {
+    const slotAt = new Map<string, number>(); // event-time: the ROW each placed block stands in
+    const taken = new Map<string, number>(); // event-time: blocks already standing per place
+    // A block comes from the FEED's hash, so a failed or unlanded read still draws it, with no links;
+    // its height is unknown, so it waits in the middle lane. A landed read with no parents is a data
+    // block, not a DAG block, and is not drawn.
+    const laneOfHash = (chain: string, hash: string): number | null => {
       const read = readOf.get(`${chain}:${hash}`);
-      if (read && read.parents.length === 0) return; // a data block: not a DAG block, not drawn
-      const lane = read && minH.has(chain) ? laneOf(read.height, minH.get(chain)!, BRAID_LANES) : mid;
-      const z = Math.max(-clampZ, Math.min(clampZ, laneZ(lane, BRAID_LANES, braidW)));
-      const key = `${slot}|${chain}|${lane}`;
+      if (read && read.parents.length === 0) return null;
+      return read && minH.has(chain) ? laneOf(read.height, minH.get(chain)!, BRAID_LANES) : mid;
+    };
+    const turn = (key: string): number => {
       const j = taken.get(key) ?? 0;
       taken.set(key, j + 1);
-      const dx = j === 0 ? 0 : (j % 2 ? 1 : -1) * Math.ceil(j / 2) * BLOCK_STEP * (size / DAG_BLOCK);
-      const p = [x + dx, y, zMid + z] as const;
-      at.set(`${chain}:${hash}`, p);
+      return j === 0 ? 0 : (j % 2 ? 1 : -1) * Math.ceil(j / 2);
+    };
+    const push = (chain: string, hash: string, slot: number, x: number, y: number, z: number, size: number, pick: PickDescriptor) => {
+      const key = `${chain}:${hash}`;
+      at.set(key, [x, y, z]);
+      slotAt.set(key, slot);
       items.push({
-        hash, chain, x: p[0], y: p[1], z: p[2], slot, size, pick,
-        state: tipStateOf(hash, reads[`${chain}:${FRONTIER}`]?.tips ?? null),
+        hash, chain, x, y, z, slot, size, pick,
+        state: tipStateOf(hash, reads[frontierKey(chain)]?.tips ?? null),
         hue: this._laneColor(chain).getHex(),
       });
     };
@@ -1018,32 +1041,49 @@ export class LedgerView implements SceneView {
       const t = snap ? w.blockTick(snap.ordinal) : null;
       if (!snap || !t) continue;
       const global = this._pickFor(snap) as Extract<PickDescriptor, { kind: "snapshot" }>;
-      // A DAG block stands on its tick's slot, on the bar's top face.
+      // A DAG block stands on its tick's slot, on the bar's top face; across the floor its height is
+      // a LANE of the braid, and blocks sharing a lane step aside along the trail.
       const dagY = FLOOR_Y.gl0 + BAR_LIFT + BAR_H + DAG_BLOCK / 2 + 0.08;
       for (const hash of t.blocks) {
-        place("dag", hash, s, LEAD_X - s * SLOT_SP, dagY, 0, DAG_BRAID_W, DAG_BLOCK, LANE_HALF_Z, {
+        const lane = laneOfHash("dag", hash);
+        if (lane == null) continue;
+        const dx = turn(`${s}|dag|${lane}`) * BLOCK_STEP;
+        const z = Math.max(-LANE_HALF_Z, Math.min(LANE_HALF_Z, laneZ(lane, BRAID_LANES, DAG_BRAID_W)));
+        push("dag", hash, s, LEAD_X - s * SLOT_SP + dx, dagY, z, DAG_BLOCK, {
           kind: "block", sel: { chain: "dag", hash, ordinal: t.ord, anchorOrd: t.ord }, global, title: "Block",
         });
       }
-      // A token block stands on the tile of the metagraph snapshot that accepted it.
+      // A token block stands ON the tile of the metagraph snapshot that accepted it (user ruling):
+      // its lane only nudges it across the tile and its turn along it, both bounded inside the
+      // tile's own footprint (`TOKEN_ON_TILE`, `TOKEN_NUDGE`).
       for (const [chain, rows] of Object.entries(t.metaSnaps)) {
         const recs = w.metaSnaps.get(chain)?.filter((r) => r.ts === t.ts) ?? []; // the tile resolver's list
         for (const r of rows) {
           if (!r.blocks?.length) continue;
           const k = recs.findIndex((x) => x.ordinal === r.ordinal);
-          if (k < 0 || !this.tileAnchorOf(chain, t.ts, k, this._tileScratch)) continue;
-          const tile = this._tileScratch;
-          const cz = this._laneZ.get(chain) ?? 0;
+          // A snapshot whose tile is not drawn (no lane for the chain, the tick's tiles not laid)
+          // has nowhere to stand, so its blocks are not drawn either.
+          const tileB = k < 0 ? null : this._tileOf(chain, t.ts, k);
+          if (!tileB) continue;
+          const tile = this._tileTop(tileB, this._laneCz(chain), this._tileScratch);
+          const size = Math.min(TOKEN_BLOCK, tileB.size * TOKEN_ON_TILE);
+          const reach = (tileB.size / 2) * TOKEN_NUDGE;
           for (const hash of r.blocks) {
-            place(chain, hash, s, tile.x, tile.y + TOKEN_BLOCK / 2 + 0.03, cz, tokenW, TOKEN_BLOCK, tokenW / 2, {
+            const lane = laneOfHash(chain, hash);
+            if (lane == null) continue;
+            const across = mid > 0 ? (lane - mid) / mid : 0;
+            const along = Math.max(-1, Math.min(1, turn(`${chain}|${r.ordinal}`)));
+            push(chain, hash, s, tile.x + along * reach, tile.y + size / 2 + 0.03, tile.z + across * reach, size, {
               kind: "block", sel: { chain, hash, ordinal: r.ordinal, anchorOrd: t.ord }, global, title: "Block",
             });
           }
         }
       }
     }
-    // Links per chain, so each segment knows its colour and lens (a block's parents are its chain's).
+    // Links per chain, so each segment knows its colour and lens (a block's parents are its chain's),
+    // and the ROW of each end, resolved through the same `linkEndpoints` walk so the two line up.
     const links: number[] = []; // event-time
+    const linkSlots: number[] = []; // event-time
     const linkChains: string[] = []; // event-time
     const linkHues: number[] = []; // event-time
     const byChain = new Map<string, BlockRead[]>(); // event-time
@@ -1054,14 +1094,19 @@ export class LedgerView implements SceneView {
     }
     for (const [chain, blocks] of byChain) {
       const seg = linkEndpoints(blocks, (hash) => at.get(`${chain}:${hash}`) ?? null);
+      const rows = linkEndpoints(blocks, (hash) => {
+        const sl = slotAt.get(`${chain}:${hash}`);
+        return sl == null ? null : [sl, sl, sl];
+      });
       const hue = this._laneColor(chain).getHex();
       for (let i = 0; i < seg.length; i += 6) {
         for (let k = 0; k < 6; k++) links.push(seg[i + k]);
+        linkSlots.push(rows[i], rows[i + 3]);
         linkChains.push(chain);
         linkHues.push(hue);
       }
     }
-    this._blocks.rebuild(items, Float32Array.from(links), linkChains, linkHues); // re-resolves the held emphasis
+    this._blocks.rebuild(items, Float32Array.from(links), linkSlots, linkChains, linkHues); // re-resolves the held emphasis
 
     // The silent runs between adjacent trail ticks — between the two rows' bars, flush in the glass.
     const stretches: StretchItem[] = []; // event-time
@@ -1618,7 +1663,7 @@ export class LedgerView implements SceneView {
     this._selTilePosOk = false; // re-recorded below when the selected tile draws this frame
     for (const lane of this.model.lanes.values()) {
       const laneColor = this._laneColor(lane.id);
-      const cz = this._laneZ.get(lane.id) ?? lane.z;
+      const cz = this._laneCz(lane.id);
       for (const b of lane.blocks) {
         if (mi >= META_TRAIL_MAX) break;
         // A row is ONE object, so its tiles sit at EXACTLY the x its bar, ribbon and labels
@@ -1663,13 +1708,16 @@ export class LedgerView implements SceneView {
         const tileH = TILE_D * b.size;
         // The entry drop rides the slot (0 while settled — the array only holds values mid-ramp).
         const dropY = this._entryT < 1 && b.slot >= 0 && b.slot < SLOT_N ? this._entryDrop[b.slot] : 0;
-        _dummy.position.set(wx + b.ox, FLOOR_Y.msnap + TILE_LIFT + tileH / 2 + dropY, cz + b.oz);
+        // The tile's top at rest (`_tileTop`, the one copy of the tile arithmetic) plus this frame's
+        // offsets: the rewind along the trail, the entry drop above the plane.
+        this._tileTop(b, cz, _tileV);
+        _tileV.x += this._trailOff;
+        _tileV.y += dropY;
+        _dummy.position.set(_tileV.x, _tileV.y - tileH / 2, _tileV.z);
         // The subject callout anchors THE committed snapshot's tile, not the lane lead (user,
         // 2026-08-15) — record its live position (rewind/trail offsets included) as it draws.
         if (mi === this._selTileIndex) {
-          this._tileTop(b, cz, this._selTilePos);
-          this._selTilePos.x += this._trailOff;
-          this._selTilePos.y += dropY;
+          this._selTilePos.copy(_tileV);
           this._selTilePosOk = edge > 0;
         }
         _dummy.rotation.set(-Math.PI / 2, 0, 0);

@@ -1216,12 +1216,15 @@ export class Engine {
     // trail like a live tick; any other is another stretch, and the chamber starts fresh on it.
     // `ledgerSource` answers the window only in the Blocks register, so in the other the refresh
     // re-hands the live rows and moves nothing.
+    // Outside the Blocks register the window is only held: the chamber's source is the live buffer
+    // there, and the register flip itself re-seats (a Blocks → Snapshots flip used to re-seat twice).
     this.unsub.push(
       onBlockWindow(() => {
         const w = getBlockWindow();
         const continues = blockWindowContinues(this._blockTo, w);
         this._blockTo = w?.to ?? null;
         this.ledger.setBlockWindow(w);
+        if (!this.ledger.readsBlockWindow) return;
         if (continues) this._refreshLedger();
         else this._reseatLedger();
       }),

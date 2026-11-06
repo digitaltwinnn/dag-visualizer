@@ -141,10 +141,16 @@ export class BlockTier {
     this.group.add(lines);
   }
 
+  /** How many blocks are drawn — 0 is the cleared tier. */
+  get count(): number {
+    return this.mesh.count;
+  }
+
   /** EVENT-TIME: the blocks the window holds, placed, and their links (`blockBraid.linkEndpoints`,
-   *  6 floats a segment) with each segment's chain and colour (a link never crosses chains: a
+   *  6 floats a segment) with each END's row (`linkSlots`, 2 a segment — the trail boundaries are
+   *  asked at a row's x) and each segment's chain and colour (a link never crosses chains: a
    *  block's parents are its own chain's). */
-  rebuild(items: BlockItem[], links: Float32Array, linkChains: readonly string[], linkHues: readonly number[]): void {
+  rebuild(items: BlockItem[], links: Float32Array, linkSlots: readonly number[], linkChains: readonly string[], linkHues: readonly number[]): void {
     const prev = new Map<string, number>(); // event-time
     for (const [h, i] of this._index) prev.set(h, this._bright[i]);
     const n = Math.min(items.length, this._max);
@@ -163,15 +169,10 @@ export class BlockTier {
     const pos = this._linkPos.array as Float32Array;
     const col = this._linkCol.array as Float32Array;
     this._linkChain = linkChains.slice(0, segs); // event-time
-    // A link end IS a block's position (`linkEndpoints` copies it), so the block's row is found by it.
-    const slotAt = new Map<string, number>(); // event-time
-    for (const it of this._items) slotAt.set(`${Math.fround(it.x)},${Math.fround(it.y)},${Math.fround(it.z)}`, it.slot); // the links are float32
     for (let s = 0; s < segs; s++) {
       for (let k = 0; k < 6; k++) pos[s * 6 + k] = links[s * 6 + k];
-      for (let v = 0; v < 2; v++) {
-        const o = s * 6 + v * 3;
-        this._linkSlot[s * 2 + v] = slotAt.get(`${links[o]},${links[o + 1]},${links[o + 2]}`) ?? -1;
-      }
+      this._linkSlot[s * 2] = linkSlots[s * 2] ?? -1;
+      this._linkSlot[s * 2 + 1] = linkSlots[s * 2 + 1] ?? -1;
       _col.setHex(linkHues[s] ?? 0xffffff);
       for (let v = 0; v < 2; v++) {
         col[s * 8 + v * 4] = _col.r;
@@ -189,7 +190,7 @@ export class BlockTier {
 
   /** Nothing drawn, nothing pickable — the Snapshots register, or no window yet. */
   clear(): void {
-    this.rebuild([], new Float32Array(0), [], []); // event-time
+    this.rebuild([], new Float32Array(0), [], [], []); // event-time
   }
 
   /** The hovered and the committed block, by hash (convention 9: the hover previews). */

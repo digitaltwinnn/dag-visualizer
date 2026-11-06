@@ -79,7 +79,7 @@ export default function FollowControl({ className }: { className?: string }) {
       aria-pressed={following}
       onClick={() => {
         const target = snap ?? (latestSnapshot ? ({ kind: "snapshot", title: `Global snapshot #${latestSnapshot.ordinal}`, data: latestSnapshot } as const) : null);
-        if (target) applyClickActions(followToggleActions(target, following));
+        if (target) applyClickActions(followToggleActions(target, following, useStore.getState().block));
       }}
       // One box in every state, so the pill keeps its height and place as the state flips: the
       // padding is there when it is invisible (LIVE, transparent) as when the PINNED wash makes it
