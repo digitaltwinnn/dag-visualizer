@@ -36,7 +36,7 @@ describe("the notes card is part of the stack", () => {
     // The collapse decisions are the pure module's (`railCollapse.ts`, tested by outcome); Inspector
     // asks it rather than special-casing the notes slot inline (review M4/M5).
     expect(src).toMatch(/setRailCollapseMany\(overridesOnViewEntry\(live\)\)/);
-    expect(src).toMatch(/const deepestId = subjectRunEnd\(ladderIds, presentOf\);/);
+    expect(src).toMatch(/const deepestId = subjectRunEnd\(ladderIds, presentOf[,)]/);
     expect(src).not.toMatch(/=== "notes"|!== "notes"/);
   });
 

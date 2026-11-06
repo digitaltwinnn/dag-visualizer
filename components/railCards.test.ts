@@ -232,8 +232,8 @@ describe("the block slot", () => {
   });
   it("ghosts in the Blocks register with the gesture that fills it", () => {
     expect(slot(blocks()).present).toBe(false);
-    expect(slot(blocks()).hint).toBe("Click a block in the chamber or its row in the explorer.");
-    expect(slot(blocks({ coarse: true })).hint).toBe("Tap a block in the chamber or its row in the explorer.");
+    expect(slot(blocks()).hint).toBe("Click one on a bar or a tile.");
+    expect(slot(blocks({ coarse: true })).hint).toBe("Tap one on a bar or a tile.");
   });
   it("is present once a block is committed under its own tick", () => {
     const c = slot(blocks({ snap: snapPick, block }));
@@ -457,16 +457,20 @@ describe("focusSlotId — the focus rung both rails read", () => {
 // re-introduced by the very edit that fixed the first version of them, which is why they are here
 // rather than in a comment. The exact wording stays free: only the SHAPE is pinned.
 describe("ghost hints — the copy rule", () => {
-  const VIEWS = ["hyper", "geo", "ledger", "trend"] as const;
+  // Every STACK a reader can see: each view, and the Snapshots view's Blocks register (2026-11-05),
+  // whose block ghost exists in no other stack — a sweep of the default register alone never saw it.
+  const VIEWS = ["hyper", "geo", "ledger", "ledger/blocks", "trend"] as const;
+  const stack = (v: (typeof VIEWS)[number]): Partial<RailManifestState> =>
+    v === "ledger/blocks" ? { mode: "ledger", ledgerRegister: "blocks" } : { mode: v };
   // The noun each slot's own eyebrow already carries. A hint that repeats it has spent its one
   // sentence restating the label ("Country — Drill a country on the globe.").
   const OWN_NOUN: Record<string, string> = {
     context: "network", country: "country", cohort: "provider",
     composition: "composition", snap: "snapshot", metaSnap: "snapshot", node: "node",
-    instant: "instant", range: "range",
+    instant: "instant", range: "range", block: "block",
   };
   const hintsIn = (mode: (typeof VIEWS)[number]) =>
-    detailsCards(details({ mode })).filter((c) => !c.present && c.hint).map((c) => ({ id: c.id, hint: c.hint! }));
+    detailsCards(details(stack(mode))).filter((c) => !c.present && c.hint).map((c) => ({ id: c.id, hint: c.hint! }));
 
   it.each(VIEWS)("%s: no two ghosts in one stack share a trailing clause", (mode) => {
     const tails = hintsIn(mode).map(({ hint }) => hint.toLowerCase().split(/\s+/).slice(-3).join(" "));
@@ -494,7 +498,7 @@ describe("ghost hints — the copy rule", () => {
 
   // ── The pointer's own verb (2026-09-04) ──────────────────────────────────────────────────────
   const coarseHintsIn = (mode: (typeof VIEWS)[number]) =>
-    detailsCards({ ...details({ mode }), coarse: true }).filter((c) => !c.present && c.hint).map((c) => ({ id: c.id, hint: c.hint! }));
+    detailsCards({ ...details(stack(mode)), coarse: true }).filter((c) => !c.present && c.hint).map((c) => ({ id: c.id, hint: c.hint! }));
 
   it.each(VIEWS)("%s: a coarse pointer is never told to Click — the hints say Tap", (mode) => {
     for (const { id, hint } of coarseHintsIn(mode)) {

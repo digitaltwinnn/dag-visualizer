@@ -111,11 +111,15 @@ export function overridesOnNoteStandDown(s: LaneCollapseState): Record<string, n
 
 /** The deepest card of the UNBROKEN RUN OF SUBJECT CARDS from the first present one (Inspector's
  *  next-rung step: the ghost directly below it opens its first child). The AI notes card tops the
- *  lane but is no subject, so it neither starts the run nor leaves a gap that ends it. */
-export function subjectRunEnd(lane: readonly string[], present: (id: string) => boolean): string | null {
+ *  lane but is no subject, so it neither starts the run nor leaves a gap that ends it.
+ *  `ghosted` says which empty slots the rail DRAWS (as a ghost): a slot that is neither present nor
+ *  ghosted is not on screen at all — the Blocks register's block slot in the Snapshots register —
+ *  so it is no gap either. Omitted, every empty slot is one. */
+export function subjectRunEnd(lane: readonly string[], present: (id: string) => boolean, ghosted: (id: string) => boolean = () => true): string | null {
   let deepest: string | null = null;
   for (const id of lane) {
     if (!isSubjectSlot(id)) continue;
+    if (!present(id) && !ghosted(id)) continue;
     if (present(id)) deepest = id;
     else if (deepest !== null) break;
   }

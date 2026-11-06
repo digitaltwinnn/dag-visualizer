@@ -194,6 +194,19 @@ describe("subjectRunEnd — the run the next-rung step reads", () => {
     // A gap after the run still ends it.
     expect(subjectRunEnd(ladderSlotIds("geo"), present(["notes", "context", "node"]))).toBe("context");
   });
+  it("a slot the rail does not draw at all is no gap: the Snapshots register's block slot", () => {
+    const metaSnap = { metaId: "dor", ordinal: 7, hash: "h", globalOrdinal: 42, ts: "t" };
+    const m = manifest({ mode: "ledger", filter: "dor", snap: snapPick, metaSnap, inspect: nodePick, nodeHere: true, noteAbsent: true });
+    const cards = detailsCards(m);
+    const present = (id: string) => cards.find((c) => c.id === id)?.present ?? false;
+    const ghosted = (id: string) => cards.find((c) => c.id === id)?.hint != null;
+    for (const id of ["snap", "context", "metaSnap", "node"]) expect(present(id), id).toBe(true);
+    expect(present("block") || ghosted("block")).toBe(false);
+    expect(subjectRunEnd(ladderSlotIds("ledger"), present, ghosted)).toBe("node");
+    // In the Blocks register the same empty slot is a ghost, so it is a gap there.
+    const b = detailsCards({ ...m, ledgerRegister: "blocks" });
+    expect(subjectRunEnd(ladderSlotIds("ledger"), (id) => b.find((c) => c.id === id)?.present ?? false, (id) => b.find((c) => c.id === id)?.hint != null)).toBe("metaSnap");
+  });
 });
 
 // GHOSTS SINK (user, 2026-10-31, option B of four): a ghost holding its ladder slot could sit above

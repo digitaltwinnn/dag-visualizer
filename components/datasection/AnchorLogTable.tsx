@@ -1243,6 +1243,11 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     // as its Global field runs it — the snapshots that global carried, under the log's lens. It runs
     // once the log can answer (`pendingTick`, the standing search's own re-run).
     if (logSeek.tick != null) {
+      // A global snapshot is no chain's: drop an earlier door's scope (a token block's door leaves
+      // its chain as `doorMeta`, which outranks even the lens), and the log's own pick under "all" —
+      // `clearSearch`'s own two lines — or the search would run against that chain.
+      setDoorMeta(null);
+      if (!lensNet) setSearchMeta(null);
       setSearchOpen(true);
       setQSnapshot("");
       setQFrom("");

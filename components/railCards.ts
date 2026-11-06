@@ -417,11 +417,11 @@ function metaSnapHint(s: RailManifestState): string | null {
  *  view, so the question is the view's register list and the register — never a `mode` compare. */
 const inBlocks = (s: Pick<RailManifestState, "mode" | "ledgerRegister">): boolean =>
   (s.ledgerRegister ?? "snapshots") === "blocks" && VIEW_POLICIES[s.mode].registers.includes("blocks");
-// A BLOCK — the Blocks register's own slot. Both routes are named, the scene's and the explorer's:
-// a block is a small mark on a bar or a tile, and its row is as much a route as the mark (the
-// refrain rule 2 guards against is a shared tail, and this is the one ghost that ends this way).
+// A BLOCK — the Blocks register's own slot. The house shape: "one" for the label's noun, the
+// device's verb, and the scene PLACE — a DAG block stands on its global's bar, a token block on its
+// tile (controller ruling, 2026-11-06).
 function blockHint(s: RailManifestState): string | null {
-  return inBlocks(s) ? `${CLICK(s)} a block in the chamber or its row in the explorer.` : null;
+  return inBlocks(s) ? `${CLICK(s)} one on a bar or a tile.` : null;
 }
 
 // RIGHT rail (Details): FIXED slots in a stable order — the Context dossier, then country,

@@ -508,7 +508,7 @@ export default function Inspector() {
   // gap with no step). The run begins at the first present card and ends at the first gap after it.
   // …and the run is a run of SUBJECT cards: the AI notes card tops the lane (R57) but is no
   // subject, so it neither starts the run nor leaves a gap that ends it (`subjectRunEnd`).
-  const deepestId = subjectRunEnd(ladderIds, presentOf);
+  const deepestId = subjectRunEnd(ladderIds, presentOf, (id) => manifest.find((c) => c.id === id)?.hint != null);
   const deepestKind = deepestId ? (manifest.find((c) => c.id === deepestId)?.kind ?? null) : null;
   const siblingState = useSiblingState(deepestKind);
   const nextStep = useMemo(() => {

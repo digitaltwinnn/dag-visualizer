@@ -745,7 +745,10 @@ export const useStore = create<AppState>((set) => ({
     set((s) => {
       const nav = { mode, navQuiet: false, docPage: null, docClosing: s.docPage != null || s.docClosing, rawReturnMode: null, motionCause: { kind: "view" as const, from: s.mode, to: mode } };
       if (mode === s.mode) return nav;
-      return { ...nav, block: null, hoverBlock: null, trendRotation: 0, trendScroll: 0, ...focusPatch(s, entryFocus(VIEW_POLICIES[mode].entryPlane, s.filter), false) };
+      // The block leaves with its view, and its recency rank with it (the way `setBlock(null)` drops
+      // it) — the focus patch reads the stack it is handed, so it is handed the stack without it.
+      const selStack = bumpStack(s.selStack, "block", false);
+      return { ...nav, block: null, hoverBlock: null, trendRotation: 0, trendScroll: 0, ...focusPatch({ ...s, selStack }, entryFocus(VIEW_POLICIES[mode].entryPlane, s.filter), false) };
     }),
   // Opening a doc also SURFACES THE SCENE POSE: the overlay sits at z-8, under the raw layer's
   // z-9 — a doc opened from the RAW pose rendered beneath the still-interactive table, with the

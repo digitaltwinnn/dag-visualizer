@@ -229,6 +229,14 @@ describe("store.ledgerRegister / block", () => {
     useStore.getState().setBlockRead("dag:7241523", { blocks: [], tips: null });
     expect(useStore.getState().blockReads["dag:7241523"]).toEqual({ blocks: [], tips: null });
   });
+  it("leaving the view takes the block's rank with it", () => {
+    useStore.setState({ mode: "ledger", block: null, selStack: ["snap"] });
+    useStore.getState().setBlock({ chain: "dag", hash: "h", ordinal: 1, anchorOrd: 1 });
+    useStore.getState().setMode("geo");
+    expect(useStore.getState().block).toBeNull();
+    expect(useStore.getState().selStack).not.toContain("block");
+    useStore.setState({ selStack: [] });
+  });
   it("a block commit ranks in the recency stack, and its release leaves it", () => {
     useStore.setState({ block: null, selStack: ["snap"] });
     useStore.getState().setBlock({ chain: "dag", hash: "h", ordinal: 1, anchorOrd: 1 });

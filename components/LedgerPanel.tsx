@@ -693,11 +693,14 @@ export default function LedgerPanel() {
   // The window's own stretch: "last N h" at the live edge, else its span and how long ago it ended
   // (the past window's words — a window around an old pin makes no claim about now).
   const blockGlobals = blockWin?.globalSnapshots ?? [];
+  // A failed read names what failed: "that time" around a pin, the plain "read failed" at the live
+  // edge, which has no pinned time (the window it holds stays listed).
+  const blockFailed = blockStatus?.around == null ? "read failed" : "couldn't read that time";
   const blockSpan =
     blockStatus?.status === "loading" && blockGlobals.length
       ? "reading that time…"
       : blockStatus?.status === "failed" && blockGlobals.length
-        ? "couldn't read that time"
+        ? blockFailed
         : blockStatus?.around == null
           ? spanWords([...blockGlobals].reverse())
           : windowWords(blockGlobals);
@@ -710,14 +713,15 @@ export default function LedgerPanel() {
     glyphW: NODE_GLYPH_W,
     // An honest instrument state for each way the window is not here (rule 10): read, failed, or
     // deeper than the trail walks — and a window that holds no block says so.
+    // While a window is read the list says so, even over a held one that happens to hold no block.
     empty:
       blockStatus?.status === "beyond"
         ? "Blocks this far back are not reached"
         : blockStatus?.status === "failed"
-          ? "couldn't read that time"
-          : blockWin
-            ? "No blocks in this stretch"
-            : "reading…",
+          ? blockFailed
+          : blockStatus?.status === "loading" || !blockWin
+            ? "reading…"
+            : "No blocks in this stretch",
     rows: pagedBlocks.map((b, i): ExplorerRowSpec => {
       const hue = identityHudCss(b.chain);
       const on = block != null && block.chain === b.chain && block.hash === b.hash;
