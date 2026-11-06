@@ -26,7 +26,7 @@ describe("the tour before the scene is up", () => {
 describe("the tour's progress bar", () => {
   it("moves the tour to the stop clicked, without the click ending it", () => {
     expect(briefing).toMatch(/const goTo = \(i: number\) => \{/);
-    expect(briefing).toMatch(/s\.setMode\(BRIEFING_STOPS\[i\]!\);\s*s\.setBriefing\(i\);/);
+    expect(briefing).toMatch(/showStop\(BRIEFING_STOPS\[i\]!\);\s*s\.setBriefing\(i\);/);
     expect(briefing).toMatch(/onClick=\{\(\) => goTo\(i\)\}/);
   });
 
@@ -94,7 +94,7 @@ describe("the tour's three-beat ending", () => {
 
   it("starts the scene only once the words are gone", () => {
     expect(briefing).toMatch(/if \(!moved && since >= BRIEFING_WORDS_OUT_MS\) \{/);
-    expect(briefing).toMatch(/s\.setMode\(BRIEFING_STOPS\[0\]\);\s*s\.setBriefingLanding\(true\);/);
+    expect(briefing).toMatch(/s\.setMode\(BRIEFING_STOPS\[0\]!\.mode\);\s*s\.setBriefingLanding\(true\);/);
   });
 
   it("brings the HUD back when the scene has landed", () => {

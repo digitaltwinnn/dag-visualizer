@@ -1,13 +1,16 @@
 "use client";
 import { useEffect } from "react";
 import { track } from "@vercel/analytics";
+import { switchLedgerRegister } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 import {
   DOC_PATHS,
   DOC_TITLES,
   docForPath,
+  BLOCKS_PAGE,
   modeForPath,
-  pathForMode,
+  pathFor,
+  registerForPath,
   viewTitle,
   VIEWS,
 } from "@/components/views";
@@ -42,6 +45,9 @@ export default function RouteSync() {
   useEffect(() => {
     const seeded = modeForPath(location.pathname);
     if (seeded && seeded !== useStore.getState().mode) setMode(seeded);
+    // `/blocks` is the Snapshots view in its Blocks register: the register seeds with the mode.
+    const register = registerForPath(location.pathname);
+    if (register && register !== useStore.getState().ledgerRegister) switchLedgerRegister(register);
   }, [setMode]);
 
   useEffect(() => {
@@ -53,19 +59,21 @@ export default function RouteSync() {
     // skipped on back-steps, it pushed a wrong or stale view path — "/" → soon wrote
     // /hypergraph; back to /hypergraph then soon wrote /geography). Entering "soon" from a
     // clean view URL now leaves the address bar untouched, as the publish note promises.
-    let lastViewPath = modeForPath(location.pathname) ? location.pathname : (pathForMode(useStore.getState().mode) ?? "/");
+    let lastViewPath = modeForPath(location.pathname) ? location.pathname : (pathFor(useStore.getState().mode, useStore.getState().ledgerRegister) ?? "/");
 
     const unsub = useStore.subscribe((state, prev) => {
-      if (state.mode === prev.mode && state.docPage === prev.docPage && state.briefing === prev.briefing) return;
+      if (state.mode === prev.mode && state.docPage === prev.docPage && state.briefing === prev.briefing && state.ledgerRegister === prev.ledgerRegister) return;
       // A tour stop is not a page view: the address bar holds on `/` until the tour ends, and the
       // view it ended on then publishes as any switch does. On the globe that is nothing at all,
       // and `/` keeps its own title.
       if (state.briefing != null) return;
-      const landed = !state.docPage && modeForPath(location.pathname) === state.mode;
+      const modePath = pathFor(state.mode, state.ledgerRegister);
+      // Landed = the address bar already says this view (and, in the Snapshots view, its register).
+      const landed = !state.docPage && modeForPath(location.pathname) === state.mode && (modePath == null || modePath === location.pathname || state.mode !== "ledger");
       const view = VIEWS.find((v) => v.id === state.mode);
-      if (!landed || fromPop) document.title = state.docPage ? DOC_TITLES[state.docPage] : view ? viewTitle(view.name) : document.title;
+      const viewName = state.mode === "ledger" && state.ledgerRegister === "blocks" ? BLOCKS_PAGE.name : view?.name;
+      if (!landed || fromPop) document.title = state.docPage ? DOC_TITLES[state.docPage] : viewName ? viewTitle(viewName) : document.title;
       if (fromPop) return;
-      const modePath = pathForMode(state.mode);
       if (modePath) lastViewPath = modePath;
       const path = state.docPage
         ? DOC_PATHS[state.docPage]
@@ -91,7 +99,12 @@ export default function RouteSync() {
         const mode = modeForPath(location.pathname);
         // setMode also clears any open doc (the store rule), which is exactly what stepping
         // back from /about to /geography means.
-        if (mode) setMode(mode);
+        if (mode) {
+          setMode(mode);
+          // Back/forward between /snapshots and /blocks restores the register with the view.
+          const register = registerForPath(location.pathname);
+          if (register) switchLedgerRegister(register);
+        }
         else useStore.getState().setDocPage(null);
       }
       fromPop = false;

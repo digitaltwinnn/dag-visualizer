@@ -6,7 +6,8 @@
 import { heldOut } from "@/src/engine/domain/viewNetwork";
 import { useStore } from "./store";
 import { finestRung } from "@/src/engine/domain/focusLadder";
-import type { ClickAction } from "@/src/engine/domain/pickActions";
+import { registerSwitchActions, type ClickAction } from "@/src/engine/domain/pickActions";
+import type { LedgerRegister } from "@/src/store/mode";
 import { is3D } from "@/src/engine/domain/viewTransition";
 import { scrollToShow } from "@/src/engine/domain/trendStack";
 import { viewNetwork } from "@/src/engine/domain/viewNetwork";
@@ -167,4 +168,19 @@ function motionCauseOf(actions: readonly ClickAction[]): MotionCause | null {
     }
   }
   return null;
+}
+
+/** SWITCH THE SNAPSHOTS VIEW'S REGISTER (the one door: the footer, the URL and the tour all come
+ *  here). A register is a setting, but it RELEASES what the one it leaves drew and the other cannot
+ *  (`registerSwitchActions`), so the release goes through the executor BEFORE the field is set. The
+ *  store's own setter cannot do it: the executor imports the store, and the store importing it back
+ *  would be a cycle. The hover preview of a block goes with its register (a channel, not a commit);
+ *  the pin and the committed network stay. */
+export function switchLedgerRegister(to: LedgerRegister): void {
+  const st = useStore.getState();
+  if (st.ledgerRegister === to) return;
+  const actions = registerSwitchActions(to, { block: st.block, metaSnap: st.metaSnap });
+  if (actions.length) applyClickActions(actions);
+  if (to === "snapshots" && st.hoverBlock) st.setHoverBlock(null);
+  st.setLedgerRegister(to);
 }

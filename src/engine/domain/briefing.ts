@@ -1,4 +1,4 @@
-import type { Mode } from "@/src/store/mode";
+import type { LedgerRegister, Mode } from "@/src/store/mode";
 import { easeInOutQuad } from "./cameraRig";
 
 // THE BRIEFING (user, 2026-10-31): the tour every entry to `/` plays, one stop per 3D view, each
@@ -6,8 +6,22 @@ import { easeInOutQuad } from "./cameraRig";
 // Skip ends it. The design is `docs/superpowers/specs/2026-10-31-briefing-design.md`. This
 // module is the tour as data; `components/Briefing.tsx` runs it and `store.briefing` carries it.
 
-/** The route: where, then now, then who, then how it changed. */
-export const BRIEFING_STOPS = ["geo", "ledger", "hyper", "trend"] as const satisfies readonly Mode[];
+/** A stop: a view, and for the Snapshots view the register it stands in. */
+export type BriefingStop = { mode: Mode; register?: LedgerRegister };
+
+/** The route: where, then now (its snapshots, then the blocks they anchor), then who, then how it
+ *  changed. */
+export const BRIEFING_STOPS: readonly BriefingStop[] = [
+  { mode: "geo" },
+  { mode: "ledger" },
+  { mode: "ledger", register: "blocks" },
+  { mode: "hyper" },
+  { mode: "trend" },
+];
+
+/** The register a stop leaves the Snapshots view in. A stop with none names the Snapshots register,
+ *  so a back-step from the blocks stop never leaves the ledger stop showing blocks. */
+export const stopRegister = (stop: BriefingStop): LedgerRegister => stop.register ?? "snapshots";
 
 /** How long a stop stands, its scene's transition included. A quarter under 6500 went too far (user
  *  2026-11-01: "25% shorter"; 2026-11-02, after reading it against the live lines of 102 to 122

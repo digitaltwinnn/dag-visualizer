@@ -7,14 +7,14 @@ const ok = (text: string, line?: string): NoteResponse => ({ state: "ok", text, 
 
 describe("the note a stop reads", () => {
   it("is the same note a visitor with no filter gets", () => {
-    expect(briefingReq("geo")).toEqual({ view: "geo", subject: "all", span: null });
-    expect(briefingReq("ledger")).toEqual({ view: "ledger", subject: "all", span: null });
-    expect(briefingReq("hyper")).toEqual({ view: "hyper", subject: "all", span: null });
-    expect(briefingReq("trend")).toEqual({ view: "trend", subject: "dag", span: "30d" });
+    expect(briefingReq({ mode: "geo" })).toEqual({ view: "geo", subject: "all", span: null });
+    expect(briefingReq({ mode: "ledger" })).toEqual({ view: "ledger", subject: "all", span: null });
+    expect(briefingReq({ mode: "hyper" })).toEqual({ view: "hyper", subject: "all", span: null });
+    expect(briefingReq({ mode: "trend" })).toEqual({ view: "trend", subject: "dag", span: "30d" });
   });
 
   it("exists for every stop", () => {
-    for (const stop of BRIEFING_STOPS) expect(briefingReq(stop).view).toBe(stop);
+    for (const stop of BRIEFING_STOPS) expect(briefingReq(stop).view).toBe(stop.mode);
   });
 });
 

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
-import { netKeyOf, tickNetSelectActions, tickNetClearActions, viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, countryClearActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, trendPlaneActions, railNetActions, noteCohortActions, noteDayActions, snapshotClearActions, blockSelectActions, blockClearActions, type ClickAction } from "./pickActions";
+import { netKeyOf, tickNetSelectActions, tickNetClearActions, viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, countryClearActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, trendPlaneActions, railNetActions, noteCohortActions, noteDayActions, snapshotClearActions, blockSelectActions, blockClearActions, registerSwitchActions, type ClickAction } from "./pickActions";
 import { finerLevels } from "./focusLadder";
 import { METAGRAPHS } from "@/src/net/current";
 import type { PickDescriptor, MetaSnapSel, BlockSel } from "@/src/data/types";
@@ -904,5 +904,24 @@ describe("blockSelectActions / blockClearActions (a block in the Blocks register
     expect(kinds(snapshotSelectActions(other, false, { pinnedOrdinal: null, metaSnap: null, block: b }))).toEqual(["block", "snapshot"]);
     expect(kinds(snapshotSelectActions(global, false, { pinnedOrdinal: null, metaSnap: null, block: b }))).toEqual(["snapshot"]);
     expect(kinds(snapshotClearActions({ metaSnap: null, block: b }))).toEqual(["block", "snapshot"]);
+  });
+});
+
+describe("registerSwitchActions (switching the Snapshots view's register)", () => {
+  const b = { chain: "dag", hash: "h1", anchorOrd: 42 } as unknown as BlockSel;
+  const m = { metaId: "dor", ordinal: 7, globalOrdinal: 42 } as unknown as MetaSnapSel;
+
+  it("entering Blocks releases the metagraph snapshot, which that register cannot draw", () => {
+    expect(registerSwitchActions("blocks", { block: null, metaSnap: m })).toEqual([{ kind: "metaSnap", sel: null }]);
+  });
+
+  it("entering Snapshots releases the block", () => {
+    expect(registerSwitchActions("snapshots", { block: b, metaSnap: null })).toEqual([{ kind: "block", sel: null }]);
+  });
+
+  it("releases nothing when the subject belongs to the register being entered, or nothing is held", () => {
+    expect(registerSwitchActions("blocks", { block: b, metaSnap: null })).toEqual([]);
+    expect(registerSwitchActions("snapshots", { block: null, metaSnap: m })).toEqual([]);
+    expect(registerSwitchActions("blocks", { block: null, metaSnap: null })).toEqual([]);
   });
 });

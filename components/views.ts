@@ -1,4 +1,5 @@
 import type { Mode } from "@/src/store/store";
+import type { LedgerRegister } from "@/src/store/mode";
 
 // ONE home for the interface's VIEW VOCABULARY: id, user-facing name, and — for the three live
 // 3D views — the URL slug and the search-facing copy their route serves. Consumed by the top-bar
@@ -83,13 +84,43 @@ const MODE_BY_SLUG = new Map<string, Mode>(ROUTED_VIEWS.map((v) => [v.slug, v.id
 export function modeForPath(pathname: string): Mode | null {
   const seg = pathname.replace(/^\/+|\/+$/g, "");
   if (seg === "") return "geo";
+  const hit = REGISTER_PATHS[seg];
+  if (hit) return hit.mode;
   return MODE_BY_SLUG.get(seg) ?? null;
+}
+
+/** THE BLOCKS REGISTER'S PAGE (2026-11-06): `/blocks` is a routed path, not a view. A register is not
+ *  a Mode (the switch must not grow a sixth button), so it lives beside `VIEWS`: the routes, the
+ *  sitemap and the footer read it, the view switch does not. */
+export const BLOCKS_PAGE = {
+  name: "Blocks",
+  slug: "blocks",
+  desc: "The Constellation Network's block DAG in 3D: every transfer's block built on two before it, accepted into the snapshot chain.",
+};
+
+/** Paths that name a mode AND a register of it. */
+const REGISTER_PATHS: Record<string, { mode: Mode; register: LedgerRegister }> = {
+  [BLOCKS_PAGE.slug]: { mode: "ledger", register: "blocks" },
+};
+
+/** The register a pathname names: the Snapshots view's own `/snapshots` is the Snapshots register,
+ *  `/blocks` the Blocks one, any other path none. */
+export function registerForPath(pathname: string): LedgerRegister | null {
+  const seg = pathname.replace(/^\/+|\/+$/g, "");
+  const hit = REGISTER_PATHS[seg];
+  if (hit) return hit.register;
+  return modeForPath(pathname) === "ledger" ? "snapshots" : null;
 }
 
 /** The path a mode publishes to the address bar — null only for a mode with no slug (none today). */
 export function pathForMode(mode: Mode): string | null {
   const v = VIEWS.find((x) => x.id === mode);
   return v?.slug ? `/${v.slug}` : null;
+}
+
+/** The path the address bar shows for a mode and, in the Snapshots view, its register. */
+export function pathFor(mode: Mode, register: LedgerRegister): string | null {
+  return mode === "ledger" && register === "blocks" ? `/${BLOCKS_PAGE.slug}` : pathForMode(mode);
 }
 
 /** The document title a view carries once the app is past first load (RouteSync + route metadata). */

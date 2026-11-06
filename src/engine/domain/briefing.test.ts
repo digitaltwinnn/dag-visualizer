@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BRIEFING_COVER, BRIEFING_LAND_MAX_MS, BRIEFING_NO_MOTION_MS, BRIEFING_PACE, BRIEFING_RELEASE_MS, BRIEFING_SETTLE_MS, BRIEFING_STOPS, BRIEFING_TYPE_SLOW, BRIEFING_WORDS_OUT_MS, HANDOVER_MS, LINE_MAX, SCENE_WAIT_MS, STOP_MS, briefsOn, handoverHand, handoverPulses, hasLanded, liftSettling, mayAdvance, nextStop, prevStop } from "./briefing";
+import { BRIEFING_COVER, BRIEFING_LAND_MAX_MS, BRIEFING_NO_MOTION_MS, BRIEFING_PACE, BRIEFING_RELEASE_MS, BRIEFING_SETTLE_MS, BRIEFING_STOPS, BRIEFING_TYPE_SLOW, BRIEFING_WORDS_OUT_MS, HANDOVER_MS, LINE_MAX, SCENE_WAIT_MS, STOP_MS, briefsOn, handoverHand, handoverPulses, hasLanded, liftSettling, mayAdvance, nextStop, prevStop, stopRegister } from "./briefing";
 
 const on = { pathname: "/", net: "mainnet", seen: false };
 
@@ -14,16 +14,24 @@ describe("how long a stop stands", () => {
 
 describe("the tour's route", () => {
   it("visits every 3D view, starting on the globe", () => {
-    expect(BRIEFING_STOPS).toEqual(["geo", "ledger", "hyper", "trend"]);
+    expect(BRIEFING_STOPS).toEqual([{ mode: "geo" }, { mode: "ledger" }, { mode: "ledger", register: "blocks" }, { mode: "hyper" }, { mode: "trend" }]);
+    expect(BRIEFING_STOPS[2]).toEqual({ mode: "ledger", register: "blocks" });
+  });
+
+  it("puts the Snapshots view in the Snapshots register at any stop that names none", () => {
+    expect(stopRegister(BRIEFING_STOPS[1]!)).toBe("snapshots");
+    expect(stopRegister(BRIEFING_STOPS[2]!)).toBe("blocks");
+    expect(stopRegister(BRIEFING_STOPS[3]!)).toBe("snapshots");
   });
 
   it("steps through the stops and stops after the last", () => {
     expect(nextStop(0)).toBe(1);
-    expect(nextStop(2)).toBe(3);
-    expect(nextStop(3)).toBeNull();
+    expect(nextStop(3)).toBe(4);
+    expect(nextStop(4)).toBeNull();
   });
 
   it("steps back to the stop before, and no further than the first", () => {
+    expect(prevStop(4)).toBe(3);
     expect(prevStop(3)).toBe(2);
     expect(prevStop(1)).toBe(0);
     expect(prevStop(0)).toBeNull();

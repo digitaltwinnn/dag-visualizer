@@ -15,6 +15,7 @@
 //     from the ladder even though the drop list is hand-written per builder.
 import { heldOut } from "./viewNetwork";
 import type { Mode } from "@/src/store/store";
+import type { LedgerRegister } from "@/src/store/mode";
 import type { PickDescriptor, MetaSnapSel, TickNetSel, BlockSel } from "@/src/data/types";
 import { METAGRAPHS } from "@/src/net/current";
 import type { CohortSel, CompositionSel } from "./focusLadder";
@@ -518,6 +519,15 @@ export function blockSelectActions(
   }
   out.push({ kind: "block", sel: b });
   return out;
+}
+
+/** SWITCHING THE SNAPSHOTS VIEW'S REGISTER releases what the register it leaves drew and the one it
+ *  enters cannot: leaving Blocks drops the committed block, leaving Snapshots drops the committed
+ *  metagraph snapshot. The pin (`snap`) and the committed network (`tickNet`) are the tick's own
+ *  and stay. Finest first, like every release; `switchLedgerRegister` applies it through the executor. */
+export function registerSwitchActions(to: LedgerRegister, current: { block: BlockSel | null; metaSnap: MetaSnapSel | null }): ClickAction[] {
+  if (to === "snapshots") return current.block ? [{ kind: "block", sel: null }] : [];
+  return current.metaSnap ? [{ kind: "metaSnap", sel: null }] : [];
 }
 
 /** The Block card's × — releases the block alone; the tick it hangs under stays pinned. */
