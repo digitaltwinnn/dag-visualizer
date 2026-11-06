@@ -172,7 +172,8 @@ them — but the Next Node server can.
   fails soft to "not stated"; no measured block series is no note. A new KIND needs no version bump:
   its keys collide with nothing, and a bump would rewrite every warmed note for no gain. The DAG's
   height and sub-height it states are the newest global's own fields, the same ones the Blocks
-  band's HEIGHT cell reads from the live feed: one height on every surface. **The honesty gate (rule 10) is mechanical**
+  band's HEIGHT cell reads from the live feed: one height on every surface. The facts are pinned by
+  `src/data/noteFactsBlocks.test.ts`. **The honesty gate (rule 10) is mechanical**
   (`src/data/noteHonesty.ts`, the colocated test is its specification): every number the note
   states must match a fact the model was shown, within the precision it was written to, and a
   failing note is asked for once more with the reasons, then dropped and counted. A note that
@@ -233,6 +234,21 @@ them — but the Next Node server can.
   catalog chain's records anchored in that span. Cached a year once its newest global is an hour old,
   a minute before; a hole in the global chain or ANY chain read that fails answers 503 `no-store`, so
   one upstream timeout is never cached as "that network anchored nothing".
+- **`/api/blocks/trail?around=<ordinal|live>&n=52`** (2026-11-05) is the Snapshots view's BLOCKS
+  REGISTER window (`blocks/trail.ts`; the client side is in `src/data/CLAUDE.md`): the newest `n`
+  global snapshots at or below `around` that hold a block, each with its DAG block hashes and the
+  block-bearing metagraph snapshots anchored into it (a former chain address folded under its
+  network's current id). ⚠️ **The explorer's TRANSFER lists are the index**, and their cursor is a
+  row hash only (an ordinal or a timestamp cursor answers 500 or an empty page), so a window in the
+  past is found by walking each list from its tip — at most `TRAIL_PAGES_MAX` (12) pages a chain,
+  under one `TRAIL_DEADLINE_MS` (45 s) deadline. So
+  a block with no transfer is not found, and the reach is about three months: a pin the cap cannot
+  reach answers **beyond reach**, a 200 `{ ticks: [], chains, beyond: true }` at `s-maxage=3600`
+  (deeper only gets deeper), which the client states and never retries. `live` is
+  `s-maxage=30, stale-while-revalidate=30`; an explicit window a year once its newest tick is an hour
+  old, a minute before. A lineage address whose list answers 404 contributes no rows; any other failed
+  read, or the deadline, is a 503 `no-store` — a short answer would read as "no blocks there". Pinned
+  by `blocks/trail.test.ts`.
 - **`/api/global/at?ts=`** binary-searches ~23 tiny per-ordinal records to find the global carrying
   that exact stamp (the anchor join is timestamp EQUALITY — which has exceptions: see the
   timestamp note in `src/data/CLAUDE.md`; such a row answers 404 here, honestly). Its one consumer is the anchor log's
@@ -269,7 +285,8 @@ them — but the Next Node server can.
   like a success** — throwing it made every repeat of the same bad `(ordinal, address)` re-download
   the whole global, an anonymous amplification loop; only transient failures throw and retry.
 - **`/api/snapshot/[ordinal]`** also answers the snapshot's `blocks` (parents by height and hash, transfers in DAG, signature count; hashes paired by index from the explorer record, `""` where it lists none) and `tips` (`decodeBlocks.ts`; cache key `snapshot-exact-v4`, the hashes read apart and cached on success only).
-- **`/api/network/[address]/snapshots/[ordinal]/blocks`** is a metagraph snapshot's blocks and tips, read from the chain's own L0 (`urls.l0` from the directory, 5 min; the L0 reads live in `network/metaL0.ts`) through the same `decodeBlocks`; the snapshots route's address gate (catalog + unlisted), `public, max-age=86400, s-maxage=86400, immutable`, 503 `no-store` on upstream failure.
+- **`/api/network/[address]/snapshots/[ordinal]/blocks`** is a metagraph snapshot's blocks and tips, read from the chain's own L0 (`urls.l0` from the directory, 5 min; the L0 reads live in `network/metaL0.ts`) through the same `decodeBlocks`; the snapshots route's address gate (catalog + unlisted), `public, max-age=86400, s-maxage=86400, immutable`, 503 `no-store` on upstream failure (its
+  `route.test.ts` and `snapshot/decodeBlocks.test.ts` pin the answer).
   **`latest` in place of the ordinal** (2026-11-06) is the chain's FRONTIER: its newest snapshot from
   the L0's `/snapshots/latest`, plus the explorer record's block hashes and its `ts` where the
   indexer has reached it, at `public, s-maxage=25` (it changes every snapshot: never immutable), 503

@@ -609,10 +609,10 @@ times). The prior is what holds it.
 of the child block … draw it always"). `blockBraid.referenceSegments` draws both of a block's
 references: to the parent where it is placed on the trail, else as a STUB toward the older side at
 the block's own place, ending one slot past the trail's deepest row with its far end faded to
-nothing (row −1 in `BlockTier`). Before the stubs a link drew only when its parent's row was on the
-trail, and the trail held only the visible rows until a selection grew its reach — so the links
-seemed to draw only for a selected block. A block whose read has not landed states no references
-and draws none.
+nothing (row −1 in `BlockTier`). ⚠️ A link that needs both ends ON the trail draws only for a
+selected block: the trail holds only the visible rows until a selection grows its reach. Both ends
+must be READ facts, not both drawn — the stub is what keeps every reference on screen. A block whose
+read has not landed states no references and draws none.
 
 **A token block never leaves its tile** (user ruling): it stands ON the tile of the metagraph
 snapshot that accepted it, its layered place and its turn among the tile's blocks only nudging it
@@ -644,7 +644,13 @@ alone. **A block is in exactly one snapshot**, so EVERY builder that pins a tick
 a band, a network inside a tick, the raw layer's arrival, the follow switch) releases a block of
 another tick first, through `pickActions.releaseBlock` (the tile, band, network, arrival and follow
 builders take the block as a REQUIRED argument, so no caller can forget it); resuming live releases
-it whatever tick is shown. Hover rides `hoverBlock` (a block, not its tick) and previews only.
+it whatever tick is shown. Hover rides `hoverBlock` (a block, not its tick) and previews only; the
+explorer row, the Block card, RAW's row and the chamber pair on it (convention 9). The selection
+rules are `src/engine/domain/CLAUDE.md`'s.
+
+**Pinned by** `domain/blockBraid.test.ts` (`layeredZ`'s placement and its prior, every reference
+`referenceSegments` draws, `tipStateOf`, the silent run), `src/data/blockWindow.test.ts` (the source
+and when it continues) and `domain/pickActions.test.ts`'s block cases.
 
 ### The unlisted network
 

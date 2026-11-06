@@ -15,9 +15,11 @@ Present tense only. Git carries the history; `.superpowers/sdd/progress.md` carr
 An interactive 3D visualizer of the Constellation Network ($DAG). Next.js (App Router) + React +
 TypeScript + Zustand for the page and panels, driving a **vanilla Three.js engine** (not
 react-three-fiber) on one persistent canvas. The active view is `mode` in the store — and the four
-3D views are also real URLs (`/hypergraph` / `/geography` / `/snapshots` / `/trends`):
-`components/views.ts` is the one view-vocabulary home and `components/RouteSync.tsx` the URL↔mode
-bridge (shallow pushState, so a switch never reboots the engine; analytics see per-view routes).
+3D views are also real URLs (`/hypergraph` / `/geography` / `/snapshots` / `/trends`, plus `/blocks`,
+the Snapshots view's second register): `components/views.ts` is the one view-vocabulary home (the
+views, and `BLOCKS_PAGE` with `pathFor`/`registerForPath` for the register) and
+`components/RouteSync.tsx` the URL↔mode bridge (shallow pushState, so a switch never reboots the
+engine; analytics see per-view routes).
 
 Four views drive the 3D scene:
 
@@ -31,7 +33,15 @@ Four views drive the 3D scene:
   themselves; there is no heatmap layer.
 - **Snapshots** (`ledger`) — a 3D anchoring chamber: one global-ledger floor below, one narrow plane
   per metagraph above it. The gap between planes is the point — metagraphs are unrelated and only
-  come together on the global plane.
+  come together on the global plane. **It has a second REGISTER, Blocks** (`store.ledgerRegister`,
+  `/blocks`, 2026-11-06; `docs/superpowers/specs/2026-11-05-block-dag-view-design.md`): the same
+  chamber read as the block DAG inside the snapshots — the trail is the global snapshots that hold a
+  block, the DAG's blocks stand above the floor as a layered DAG drawing, token blocks on their
+  metagraph snapshot's tile. A register is a setting of a view, never a Mode (`viewPolicy.registers`
+  lists it; the view switch holds no sixth button), and `switchLedgerRegister`
+  (`src/store/applyClickActions.ts`) is its one door. The area files carry it: the chamber in
+  `src/engine/scene/CLAUDE.md`, the block window in `src/data/CLAUDE.md`, the routes in
+  `app/api/CLAUDE.md`, the HUD in `components/CLAUDE.md`, the selection in `src/engine/domain/CLAUDE.md`.
 - **History** (`trend`) — the measured past: one CHART PLANE per network, receding into depth over a
   ground that draws each plane's footprint, with a shared time cursor marking one instant on every
   plane at once. The planes are DOM, not WebGL — `TrendChart`, the app's one chart —
@@ -39,7 +49,8 @@ Four views drive the 3D scene:
 
 **The Briefing** (2026-10-31, `domain/briefing.ts`, `components/Briefing.tsx`,
 `docs/superpowers/specs/2026-10-31-briefing-design.md`): `/` opens on Geography and plays every 3D
-view once, one AI line per stop, on a cleared stage; a drag orbits the scene and holds the stop, and
+view once — five stops, the Snapshots view twice, its snapshots then its blocks (`BRIEFING_STOPS`) —
+one AI line per stop, on a cleared stage; a drag orbits the scene and holds the stop, and
 only Skip or Escape ends the tour. Only on `/`, on mainnet, once per browser session. `store.briefing` is the one channel: `useBootStage` stands the HUD
 down on it, `RouteSync` holds the URL so a stop is never a page view, and the Engine reads it for the
 tour's pace and a phone's lift.
@@ -50,7 +61,8 @@ wireframe GALLERY of the coming features, with no numbers, so it never reads as 
 doc page (/about) is an overlay over the same bare stage, not a Mode.
 
 **The four 3D views are complementary projections of the same network: hyper = who/what, geo =
-where, ledger = when, trend = how it changed.** Structure belongs to hyper. Activity belongs to the
+where, ledger = when, trend = how it changed.** The ledger's Blocks register is the same WHEN one
+level down — the blocks a snapshot accepts — not a fifth projection. Structure belongs to hyper. Activity belongs to the
 time pair, split by TENSE: the ledger is the live instrument — this tick, this anchoring, right now —
 and History is the measured record of the same quantities — one bucket per day, hour or five
 minutes, back to where the store's samples start. A rate you watch arrive is the ledger's; the
@@ -246,7 +258,7 @@ Gotchas worth knowing before you burn time on them:
   setters the executor would; to test a real gesture, dispatch real pointer events.
 
 - **The four 3D views ARE URL deep links** (2026-09-04): `/hypergraph`, `/geography`, `/snapshots`,
-  `/trends` boot straight into their view (`components/RouteSync.tsx` seeds the store from the pathname), so a
+  `/trends` boot straight into their view, and `/blocks` into the Snapshots view's Blocks register (`components/RouteSync.tsx` seeds the store from the pathname), so a
   one-shot screenshot of a view needs no store edit. In-app switches publish those paths by shallow
   pushState — never a navigation, the engine must survive. The placeholder is a URL too since
   2026-10-03 (`/soon` — a real static route, kept out of the sitemap and the footer's view links

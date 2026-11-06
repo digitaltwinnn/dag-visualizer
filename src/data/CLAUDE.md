@@ -101,6 +101,35 @@ status. A switch starts the chamber on a fresh history and the pin's rewind land
 the live edge stands down. The vitals band and the raw log stay live: the band is the live
 instrument, and the raw log pages any depth itself.
 
+**The Blocks register reads a THIRD ledger source: the block window** (2026-11-06,
+`blockWindow.ts`; the chamber side is in `src/engine/scene/CLAUDE.md`). `ledgerSource(live,
+register)` answers it ALONE in that register — the live buffer's ticks are the wrong set, so with no
+window yet the chamber draws nothing — and the past window or the live buffer in the Snapshots
+register (`pastWanted` stands down in Blocks). The window is the newest 52 global snapshots at or
+below the pin that HOLD a block (a DAG block, or an anchored metagraph snapshot carrying token
+blocks), from `/api/blocks/trail`, folded pure by `foldBlockWindow` into the live buffer's own
+shapes, so the slot model is unchanged. `blockWanted` is the one rule for when (entering the
+register, a pin outside the held range; the Briefing fetches the live window AHEAD, so its Blocks
+stop opens drawn); `components/BlockWindowBridge.tsx` is the one writer, and the store carries only
+`blockWindowStatus` (`loading | failed | ready | beyond`). Following, the live window refreshes every
+30 s and takes a tick the feed announces at once; **a live refresh never drops a newer tick it
+already holds** (`mergeLiveAnswer` — the edge cache and the explorer's lagging index can answer an
+older trail), while a pinned answer replaces. A pin deeper than the trail can walk is **beyond
+reach**: an answer, stated, never retried (`beyond: true`). Pinned by `blockWindow.test.ts`.
+
+**A block's parents come only from a FULL READ** of the snapshot that accepted it
+(`blockReads.ts`, `components/BlockReadsBridge.tsx`): one paced read per block-bearing snapshot in
+the window, newest first — the DAG's through the chamber's own exact read (`ensurePage`, mirrored
+into `store.blockReads`), a token chain's through the metagraph blocks route — pruned with the
+window. A failed read is a MISS (`blockReadMiss`, rule 10: blocks with no links, never invented
+ones); a DAG miss is displayed but never excluded, so a DAG ordinal is always re-asked of
+`ensurePage`, which bounds its own retries. Each chain's FRONTIER (`${chain}:frontier`, the tips of
+its NEWEST snapshot with its stamp) sits beside them: the DAG's is the live global's exact read, a
+token chain's the `latest` route once a minute; written only forward by ordinal, and an unstamped
+one is dropped on a failed read or on leaving the register (no read is no tips). The DAG's HEIGHT has
+ONE source on every surface — the global snapshot's own `height`/`subHeight`; a Block card states
+the block's own height, a different subject. Pinned by `blockReads.test.ts` and `blockStats.test.ts`.
+
 ## Anchoring, fees & the metagraph data layer
 
 ⚠️ **THE TIMESTAMP JOIN HAS EXCEPTIONS — measure a quantity from its OWN records, never as the

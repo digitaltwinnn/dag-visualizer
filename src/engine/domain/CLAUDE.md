@@ -154,6 +154,23 @@ The design rules behind the table, which the tests pin but don't explain:
   ADJACENCY IS CONTAINMENT — stating that tick B contains a snapshot that landed in tick A. It lives in
   `snapshotSelectActions`, so all remaining consumers (explorer row, the global card's pager,
   the 3D band click) inherit it.
+- **A block is a SLOT under its tick, and it is in exactly one snapshot** (the Blocks register,
+  2026-11-06). `blockSelectActions` pins the global that accepted it (`follow: false` — a live follow
+  would walk the card away from the block), releasing first what hangs under ANOTHER tick (its
+  metagraph snapshot, the network committed inside it), and commits the block; the same block again
+  releases the block alone. No focus rung and no pose (camera principle 2). Every builder that pins a
+  tick releases a block of another tick through the one `releaseBlock`, and the tile, band, network,
+  arrival and follow builders take the block as a REQUIRED argument, so no caller can forget it. The
+  Block card's × is `blockClearActions`.
+- **A register switch is a setting that RELEASES** (2026-11-06). `registerSwitchActions` drops what
+  the register being left drew and the other cannot draw — leaving Blocks drops the block, leaving
+  Snapshots the metagraph snapshot — and keeps the pin and the committed network, which are the
+  tick's own. `switchLedgerRegister` (`src/store/applyClickActions.ts`) is the ONE door: it applies
+  that release through the executor, clears a block's hover preview, then sets the field. The store's
+  raw `setLedgerRegister` releases nothing and cannot (the executor imports the store; the reverse is
+  a cycle), so `selectionBoundary.test.ts` holds every surface — the register control, the footer,
+  `RouteSync`, the Briefing — to the door. Pinned by `pickActions.test.ts`'s block and register cases
+  and `src/store/registerSwitch.test.ts`.
 - **A History plane click is FOCUS ONLY** (2026-09-18). `trendPlaneActions` emits exactly one
   `trendFocus`, toggling like every other rung's subject, and it deliberately does NOT commit the
   plane's network: a committed filter SCOPES the stack to that one network, so committing on a plane

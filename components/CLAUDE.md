@@ -1054,13 +1054,23 @@ day: "put it on the 1st row and directly show x newer") — it froze at the newe
 from 2026-10-02; `src/data/ledgerHold.ts`.
 
 **The Blocks register (Snapshots view, 2026-11-06) is one control and four surfaces.** `RegisterSwitch`
-(the explorer card's control) picks `ledgerRegister`; in Blocks the explorer lists the window's blocks,
-the Block card stands under its tick (six slots, no breakdown, no sub-height — a `BlockRead` carries
-none), the vitals band swaps to `BlocksCells` and RAW to `datasection/BlocksTable`. The band's swap key
+rides the explorer card's CONTROL band (`Explorer`'s `control` field) above the measure tiles, in the
+tiles' own segmented grammar, its cells the view's `viewPolicy.registers`; a press goes through
+`switchLedgerRegister`, the one door (`selectionBoundary.test.ts` holds every surface to it), and the
+URL follows (`/snapshots` ⇄ `/blocks`). In Blocks the explorer lists the window's blocks, and the
+Block card (`inspector/BlockPane.tsx`) stands under its tick: a card slot with NO rung, between the
+metagraph snapshot and the node in the ledger's lane (`DISPLAY_LANE`), present only in the Blocks
+register and only under the tick that accepted it (`parentHolds`), its ghost hint "one on a bar or a
+tile". The snapshot's child step passes over it (`railLadderBoundary.test.ts`'s `PASSES_OVER`): a
+block is a sibling subject of the tick, not the snapshot's child. Its six slots read only what is
+held — the height as the head's chip, what it moved as the lead, parents, children, signatures and
+fees as facts, the hashes in the foot — with no breakdown and no sub-height (a `BlockRead` carries
+neither); `railCards.test.ts`'s block cases pin the slot. The vitals band swaps to `BlocksCells` and RAW to `datasection/BlocksTable`. The band's swap key
 is the view, or `"ledger:blocks"` in that register (`useCellsKey` in `VitalsBand.tsx`, the one dispatch
 for band and phone sheet, so the swap rolls). BLOCKS LAST HOUR, OPEN TIPS and FRONTIER AGE are pure
 arithmetic in `src/data/blockStats.ts`: the window lists only block-bearing global snapshots, so a stretch
-with no tick is zero blocks (a bin older than a FULL window's reach is a gap); OPEN TIPS and FRONTIER AGE
+with no tick is zero blocks (a bin older than a FULL window's reach is a gap, and a full window that
+does not reach back an hour states BLOCKS LAST HOUR as a floor, "at least N" — rule 10); OPEN TIPS and FRONTIER AGE
 read `${chain}:frontier` and show the house empty value until it is held, never 0. The table groups by
 accepting global with the log's own `GroupPlate` (the plate commits/releases the global, the chevron
 folds); a block row's click is `blockSelectActions`, the committed block says PINNED in mark and word and
