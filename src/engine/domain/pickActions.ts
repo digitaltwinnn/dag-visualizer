@@ -16,7 +16,7 @@
 import { heldOut } from "./viewNetwork";
 import type { Mode } from "@/src/store/store";
 import type { LedgerRegister } from "@/src/store/mode";
-import type { PickDescriptor, MetaSnapSel, TickNetSel, BlockSel } from "@/src/data/types";
+import type { GlobalSnapshot, PickDescriptor, MetaSnapSel, TickNetSel, BlockSel } from "@/src/data/types";
 import { METAGRAPHS } from "@/src/net/current";
 import type { CohortSel, CompositionSel } from "./focusLadder";
 import { UNLISTED_KEY } from "./ledgerBands";
@@ -307,6 +307,37 @@ export function snapshotClearActions(current: { metaSnap: MetaSnapSel | null; ha
   return out;
 }
 
+/** A GLOBAL SNAPSHOT AS A PICK — the descriptor every surface hands the builders for a tick (its row,
+ *  its plate, its band, the follow's advance). One home for the shape and its title (refactor round
+ *  R1, P6: it was written inline sixteen times). */
+export function globalPick(g: GlobalSnapshot): Extract<PickDescriptor, { kind: "snapshot" }> {
+  return { kind: "snapshot", title: `Global snapshot #${g.ordinal}`, data: g };
+}
+
+/** THE TICK CONTEXT a builder reads off the selection as it stands: the pinned tick (none while
+ *  following — live is no pin), the metagraph snapshot and the network committed inside it, the
+ *  committed block and the follow. Every surface that hands a builder its `current` reads it here
+ *  rather than building it by hand (refactor round R1, P6: seven copies), so the next slot one rung
+ *  finer is one line, not a sweep. `block` is REQUIRED in the answer, so a builder that requires it
+ *  still gets it by construction. Structural over the store's own fields, so the engine, the scene's
+ *  pager model and the components all pass their state as it is. */
+export type TickContext = {
+  pinnedOrdinal: number | null;
+  metaSnap: MetaSnapSel | null;
+  tickNet: TickNetSel | null;
+  block: BlockSel | null;
+  following: boolean;
+};
+export function tickContextOf(s: {
+  following: boolean;
+  snap: { data: { ordinal: number } } | null;
+  metaSnap: MetaSnapSel | null;
+  tickNet?: TickNetSel | null;
+  block?: BlockSel | null;
+}): TickContext {
+  return { pinnedOrdinal: !s.following && s.snap ? s.snap.data.ordinal : null, metaSnap: s.metaSnap, tickNet: s.tickNet ?? null, block: s.block ?? null, following: s.following };
+}
+
 export function snapshotSelectActions(
   p: Extract<PickDescriptor, { kind: "snapshot" }>,
   isLiveTip: boolean,
@@ -510,7 +541,7 @@ export function blockSelectActions(
   global: Extract<PickDescriptor, { kind: "snapshot" }>,
   current: {
     block: BlockSel | null;
-    snapOrd: number | null;
+    pinnedOrdinal: number | null;
     metaSnap?: MetaSnapSel | null;
     tickNet?: TickNetSel | null;
     /** LIVE in the Blocks register follows the newest block (D3): the block shown while following
@@ -522,7 +553,7 @@ export function blockSelectActions(
   if (same && current.following) return [{ kind: "snapshot", pick: global, follow: false }, { kind: "block", sel: b }];
   if (same) return [{ kind: "block", sel: null }];
   const out: ClickAction[] = [];
-  if (current.snapOrd !== b.anchorOrd) {
+  if (current.pinnedOrdinal !== b.anchorOrd) {
     if (current.metaSnap && current.metaSnap.globalOrdinal !== b.anchorOrd) out.push({ kind: "metaSnap", sel: null });
     if (current.tickNet && current.tickNet.globalOrdinal !== b.anchorOrd) out.push({ kind: "tickNet", sel: null });
     out.push({ kind: "snapshot", pick: global, follow: false });
@@ -722,7 +753,7 @@ export function clickActions(input: {
   if (p.kind === "block")
     return blockSelectActions(p.sel, p.global, {
       block: current.block ?? null,
-      snapOrd: current.pinnedOrdinal ?? null,
+      pinnedOrdinal: current.pinnedOrdinal ?? null,
       metaSnap: current.metaSnap ?? null,
       tickNet: current.tickNet,
       following: current.following,

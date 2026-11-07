@@ -5,7 +5,7 @@ import { selectedRow, selectionHue } from "@/components/selection";
 import { NoSignalDot, PinMark, PinnedMark } from "@/components/state/StateAtoms";
 import { useNowTick } from "@/components/useNowTick";
 import { filterAccent } from "@/src/data/network";
-import { blockFollowActions, followToggleActions } from "@/src/engine/domain/pickActions";
+import { blockFollowActions, followToggleActions, globalPick } from "@/src/engine/domain/pickActions";
 import { registerOf } from "@/src/engine/domain/viewPolicy";
 import { liveControlCard } from "@/src/data/blockWindow";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -105,7 +105,7 @@ export default function FollowControl({ className, subject = "snapshot" }: { cla
       type="button"
       aria-pressed={following}
       onClick={() => {
-        const target = snap ?? (latestSnapshot ? ({ kind: "snapshot", title: `Global snapshot #${latestSnapshot.ordinal}`, data: latestSnapshot } as const) : null);
+        const target = snap ?? (latestSnapshot ? (globalPick(latestSnapshot)) : null);
         if (!target) return;
         const b = useStore.getState().block;
         if (subject === "block") {

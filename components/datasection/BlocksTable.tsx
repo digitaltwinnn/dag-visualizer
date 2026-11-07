@@ -8,7 +8,7 @@ import { blockReadOf } from "@/src/data/blockReads";
 import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
 import { blockAbsence } from "@/src/data/ledgerSpan";
 import type { GlobalSnapshot } from "@/src/data/types";
-import { blockSelectActions, snapshotSelectActions } from "@/src/engine/domain/pickActions";
+import { blockSelectActions, globalPick, snapshotSelectActions, tickContextOf } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { blockRowLocked, ledgerLens } from "@/src/data/ledgerStory";
 import { compactDag, midHash, shortBlockHash } from "@/src/util/format";
@@ -149,13 +149,7 @@ export default function BlocksTable() {
               if (!g || locked) return;
               const st = useStore.getState();
               applyClickActions(
-                blockSelectActions({ chain: b.chain, hash: b.hash, ordinal: b.ordinal, anchorOrd: b.anchorOrd }, { kind: "snapshot", title: `Global snapshot #${g.ordinal}`, data: g }, {
-                  block: st.block,
-                  snapOrd: !st.following && st.snap ? st.snap.data.ordinal : null,
-                  metaSnap: st.metaSnap,
-                  tickNet: st.tickNet,
-                  following: st.following,
-                }),
+                blockSelectActions({ chain: b.chain, hash: b.hash, ordinal: b.ordinal, anchorOrd: b.anchorOrd }, globalPick(g), tickContextOf(st)),
               );
             };
             // ONE ROW PER TRANSFER — or the one honest row: reading, failed, or none listed.
@@ -182,12 +176,7 @@ export default function BlocksTable() {
                             ? () => {
                                 const st = useStore.getState();
                                 applyClickActions(
-                                  snapshotSelectActions({ kind: "snapshot", title: `Global snapshot #${g.ordinal}`, data: g }, getNetwork()?.latest?.ordinal === g.ordinal, {
-                                    pinnedOrdinal: !st.following && st.snap ? st.snap.data.ordinal : null,
-                                    metaSnap: st.metaSnap,
-                                    tickNet: st.tickNet,
-                                    block: st.block,
-                                  }),
+                                  snapshotSelectActions(globalPick(g), getNetwork()?.latest?.ordinal === g.ordinal, tickContextOf(st)),
                                 );
                               }
                             : undefined

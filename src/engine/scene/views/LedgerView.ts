@@ -97,6 +97,7 @@ import { SnapshotPlane, makeEdgeLabel, retintEdgeLabel, GLOBAL_PLANE_LOOK, META_
 import { TrailRewind } from "../objects/TrailRewind";
 import type { StageLight } from "../objects/StageLight";
 import { STAGE_LIGHTS } from "../../domain/stageLight";
+import { globalPick } from "../../domain/pickActions";
 import { FadeSet } from "../objects/FadeSet";
 import { BlockTier, type BlockItem } from "../objects/BlockTier";
 import { SilentStretch, type StretchItem } from "../objects/SilentStretch";
@@ -1416,12 +1417,7 @@ export class LedgerView implements SceneView {
     const blk = Array.isArray(snap.blocks) ? snap.blocks.length : 0;
     const blkTxt = blk > 0 ? ` · ${blk} DAG-L1 block${blk === 1 ? "" : "s"}` : "";
     // event-time: one descriptor per slot per tick
-    return {
-      kind: "snapshot",
-      data: snap,
-      title: `Global snapshot #${snap.ordinal}`,
-      sub: `${total} metagraph snapshot${total === 1 ? "" : "s"} anchored${blkTxt}`,
-    } satisfies PickDescriptor;
+    return { ...globalPick(snap), sub: `${total} metagraph snapshot${total === 1 ? "" : "s"} anchored${blkTxt}` } satisfies PickDescriptor;
   }
 
   /** The tick the LIVE EDGE is naming: the newest one, while its exact read is genuinely in

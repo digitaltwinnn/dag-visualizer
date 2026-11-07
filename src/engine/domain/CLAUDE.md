@@ -78,7 +78,11 @@ asked.
 `domain/pickActions.ts` is the click/select decision table: what picking a subject means per view ×
 pick kind, as pure data-in/actions-out logic. Two kinds of executor consume it — the Engine's scene
 raycast clicks and the React components via named builders — so the scene and the panels can't drift
-in semantics. Every caller applies actions through the one executor `src/store/applyClickActions.ts`.
+in semantics. Every caller applies actions through the one executor `src/store/applyClickActions.ts`. Every
+caller also hands the builders the same two inputs from one home here: `globalPick(g)`, a global
+snapshot as a pick, and `tickContextOf(state)`, the `current` a tick builder reads (the pin — none
+while following — the metagraph snapshot, the network inside the tick, the block, the follow), so a
+new finer slot is one line there rather than a sweep of hand-built contexts.
 
 **`src/engine/domain/pickActions.test.ts` is the specification.** It pins every ordering contract, the
 full-ancestry rule, the deselect stepping, the release rules, and the scene-click-equals-row-select

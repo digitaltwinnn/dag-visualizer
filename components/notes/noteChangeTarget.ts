@@ -7,6 +7,7 @@ import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder"
 import {
   compositionToggleActions,
   countryToggleActions,
+  globalPick,
   metaSnapSelectActions,
   noteCohortActions,
   railNetActions,
@@ -42,8 +43,9 @@ export interface ChangeState {
   ledgerNet: string | null;
 }
 
-/** A global snapshot as a pick: the record a row carries, the road the raw log takes to an old tick. */
-const globalPick = (g: NoteGlobal): Extract<PickDescriptor, { kind: "snapshot" }> => ({ kind: "snapshot", title: `Global snapshot #${g.ordinal}`, data: g as GlobalSnapshot });
+/** A global snapshot as a pick (`pickActions.globalPick`): the record a row carries, the road the raw
+ *  log takes to an old tick. */
+const notePick = (g: NoteGlobal) => globalPick(g as GlobalSnapshot);
 
 const compKeyOf = (type: string): string => {
   const { label, codes } = roleKeyLabel(type);
@@ -64,7 +66,7 @@ export function changeActions(
       if (!VIEW_POLICIES[noteModeOf(view)].tickScoped)
         return subject.id === viewNetwork(s) || heldOut(s.filter, subject.id) ? null : railNetActions(subject.id, s.filter);
       if (!tick || subject.id === "dag") return null; // the chamber's own row names no network to open
-      return tickNetSelectActions(subject.id, { kind: "snapshot", title: `Global snapshot #${tick.ordinal}`, data: tick }, {
+      return tickNetSelectActions(subject.id, globalPick(tick), {
         metaSnap: s.metaSnap,
         hasInspect: s.hasInspect,
         block: s.block ?? null,
@@ -79,9 +81,9 @@ export function changeActions(
       return c ? noteCohortActions({ cc: c.cc, city: c.city, isp: c.isp }, s) : null;
     }
     case "metaSnap":
-      return metaSnapSelectActions(subject.sel, globalPick(subject.global), { metaSnap: s.metaSnap, following: s.following, inspect: s.inspect ?? null, block: s.block ?? null });
+      return metaSnapSelectActions(subject.sel, notePick(subject.global), { metaSnap: s.metaSnap, following: s.following, inspect: s.inspect ?? null, block: s.block ?? null });
     case "global":
-      return snapshotSelectActions(globalPick(subject.global), false, {
+      return snapshotSelectActions(notePick(subject.global), false, {
         pinnedOrdinal: s.pinnedOrdinal ?? null,
         metaSnap: s.metaSnap,
         hasInspect: s.hasInspect,

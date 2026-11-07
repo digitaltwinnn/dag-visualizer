@@ -208,9 +208,9 @@ describe("a pin newer than the live window (review I1)", () => {
 
 describe("which card carries LIVE / PINNED (review I1)", () => {
   it("in Transaction blocks the Block card while one stands, else the Global snapshot card", () => {
-    expect(liveControlCard("blocks", { hash: "b" })).toBe("block");
+    expect(liveControlCard("blocks", { chain: "dag", hash: "b", ordinal: 1, anchorOrd: 1 })).toBe("block");
     expect(liveControlCard("blocks", null)).toBe("snapshot");
-    expect(liveControlCard("snapshots", { hash: "b" })).toBe("snapshot");
+    expect(liveControlCard("snapshots", { chain: "dag", hash: "b", ordinal: 1, anchorOrd: 1 })).toBe("snapshot");
     expect(liveControlCard("data", null)).toBe("snapshot");
   });
 });

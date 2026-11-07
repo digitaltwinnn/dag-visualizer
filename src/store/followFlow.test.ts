@@ -174,7 +174,7 @@ describe("the follow flow in the Blocks register (D3)", () => {
     win([tick(300, ["b3"])]);
     followLatest();
     const b = st().block!;
-    applyClickActions(blockSelectActions(b, snapPick(300), { block: b, snapOrd: null, following: true }));
+    applyClickActions(blockSelectActions(b, snapPick(300), { block: b, pinnedOrdinal: null, following: true }));
     expect(st().following).toBe(false);
     expect(st().block?.hash).toBe("b3");
     expect(st().selStack[0]).toBe("block");
@@ -184,7 +184,7 @@ describe("the follow flow in the Blocks register (D3)", () => {
     win([tick(300, ["b3"]), tick(200, ["b2"])]);
     followLatest();
     const old = { chain: "dag", hash: "b2", ordinal: 200, anchorOrd: 200 };
-    applyClickActions(blockSelectActions(old, snapPick(200), { block: st().block, snapOrd: null, following: true }));
+    applyClickActions(blockSelectActions(old, snapPick(200), { block: st().block, pinnedOrdinal: null, following: true }));
     expect(st().following).toBe(false);
     expect(st().block?.hash).toBe("b2");
     expect(st().snap?.data.ordinal).toBe(200);
@@ -197,7 +197,7 @@ describe("the follow flow in the Blocks register (D3)", () => {
     expect(st().following).toBe(false);
     expect(st().selStack[0]).toBe("block");
     const old = { chain: "dag", hash: "b2", ordinal: 200, anchorOrd: 200 };
-    applyClickActions(blockSelectActions(old, snapPick(200), { block: st().block, snapOrd: 300, following: false }));
+    applyClickActions(blockSelectActions(old, snapPick(200), { block: st().block, pinnedOrdinal: 300, following: false }));
     applyClickActions(blockFollowActions(st().block!, snapPick(200), false));
     expect(st().following).toBe(true);
     followLatest(); // FollowController's `following` effect

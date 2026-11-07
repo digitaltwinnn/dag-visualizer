@@ -1,6 +1,6 @@
 import { metaSnapRecord, type MetaSnapRecord } from "@/src/data/api";
 import type { LedgerSource } from "@/src/data/ledgerSourceType";
-import type { Anchor, GlobalSnapshot, RawMetaSnapshot, SnapshotExact } from "@/src/data/types";
+import type { Anchor, BlockSel, GlobalSnapshot, RawMetaSnapshot, SnapshotExact } from "@/src/data/types";
 import type { LedgerRegister } from "@/src/store/mode";
 import { readsBlockWindow } from "@/src/engine/domain/viewPolicy";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
@@ -238,7 +238,7 @@ export function failedReadKeeps(held: { chain: string | null; around: number | n
  *  snapshot card only its age; with no Block card (a pin carried in from another register, the
  *  block's ×, a re-click releasing it) the Global card carries it again — else nothing on the
  *  scene layer would say PINNED or offer LIVE. Every other register: the Global card. */
-export function liveControlCard(register: LedgerRegister, block: unknown): "snapshot" | "block" {
+export function liveControlCard(register: LedgerRegister, block: BlockSel | null): "snapshot" | "block" {
   return readsBlockWindow(register) && block != null ? "block" : "snapshot";
 }
 

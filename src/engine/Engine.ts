@@ -40,7 +40,7 @@ import { elevationCap, isDrag, orbitAbout, orbitAllowed, orbitAngles } from "./d
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { ledgerNetwork } from "./domain/tickNet";
-import { pickNetId, viewEntryActions } from "./domain/pickActions";
+import { globalPick, pickNetId, viewEntryActions } from "./domain/pickActions";
 import { viewNetwork } from "./domain/viewNetwork";
 import { ViewTransition, is3D, fleetFaded, fleetHolder, type FleetPlacement } from "./domain/viewTransition";
 import { gatherBand, railGapPx, railGapShiftPx, type GatherBand } from "./domain/gatherLayout";
@@ -721,11 +721,7 @@ export class Engine {
       if (!net) return null;
       const g = net.globalSnapshots.find((gs) => gs.timestamp === ts);
       if (!g) return null;
-      const global = {
-        kind: "snapshot",
-        data: g,
-        title: `Global snapshot #${g.ordinal}`,
-      } as Extract<PickDescriptor, { kind: "snapshot" }>;
+      const global = globalPick(g);
       if (metaId === UNLISTED_KEY) {
         // The UNKNOWN lane's tiles (user, 2026-08-07: inspectable like any other): tile `k` is
         // the k-th unlisted row of this tick — the polled rows united with the exact read's

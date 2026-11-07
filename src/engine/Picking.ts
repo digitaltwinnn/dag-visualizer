@@ -7,7 +7,7 @@ import { metaSnapHoverKey, type PickDescriptor } from "@/src/data/types";
 import { VIEW_POLICIES } from "./domain/viewPolicy";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { tickLocked } from "@/src/data/ledgerStory";
-import { clickActions, pickActive, metaSnapSelectActions, bandSelectActions } from "./domain/pickActions";
+import { clickActions, pickActive, metaSnapSelectActions, bandSelectActions, tickContextOf } from "./domain/pickActions";
 import type { CohortSel, CompositionSel } from "./domain/focusLadder";
 import type { SceneCtx } from "./scene/SceneContext";
 import type { Globe } from "./scene/Globe";
@@ -254,11 +254,7 @@ export class Picking {
           country: st.country,
           hasInspect: !!st.inspect,
           cohort: this.h.cohortSel,
-          pinnedOrdinal: !st.following ? st.snap?.data?.ordinal ?? null : null,
-          metaSnap: st.metaSnap,
-          tickNet: st.tickNet,
-          block: st.block,
-          following: st.following,
+          ...tickContextOf(st),
         },
       }),
     );

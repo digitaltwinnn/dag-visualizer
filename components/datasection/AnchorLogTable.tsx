@@ -11,7 +11,7 @@ import { buildAnchorLog, snapsAtTick, sortAnchorLog, type AnchorLogRow, type Anc
 import { displayNetwork, unlistedLog, UNLISTED_ID } from "@/src/data/unlisted";
 import { ledgerLens } from "@/src/data/ledgerStory";
 import { metaSnapHoverKey, type GlobalSnapshot } from "@/src/data/types";
-import { metaSnapArrivalActions, metaSnapSelectActions, snapshotSelectActions } from "@/src/engine/domain/pickActions";
+import { globalPick, metaSnapArrivalActions, metaSnapSelectActions, snapshotSelectActions, tickContextOf } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { fmtDag, fmtKB } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
@@ -764,7 +764,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
         windowFirst.metaId == null
           ? null
           : { metaId: windowFirst.metaId, ordinal: windowFirst.ordinal, hash: windowFirst.hash, globalOrdinal: windowFirst.global.ordinal, ts: windowFirst.ts },
-        { kind: "snapshot", title: `Global snapshot #${windowFirst.global.ordinal}`, data: windowFirst.global },
+        globalPick(windowFirst.global),
         useStore.getState().block,
       ),
     );
@@ -1497,14 +1497,14 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       // A seam: nothing anchored here, so the only subject is the TICK — commit it alone rather
       // than inventing a metagraph snapshot the row does not have (rule 10).
       applyClickActions(
-        metaSnapArrivalActions(null, { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot }, useStore.getState().block),
+        metaSnapArrivalActions(null, globalPick(r.global as GlobalSnapshot), useStore.getState().block),
       );
       return;
     }
     applyClickActions(
       metaSnapSelectActions(
         { metaId: r.metaId, ordinal: r.ordinal, hash: r.hash, globalOrdinal: r.global.ordinal, ts: r.ts },
-        { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot },
+        globalPick(r.global as GlobalSnapshot),
         { metaSnap, following, inspect: useStore.getState().inspect, block: useStore.getState().block },
       ),
     );
@@ -1682,7 +1682,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     applyClickActions(
       metaSnapArrivalActions(
         { metaId: hit.metaId, ordinal: hit.ordinal, hash: hit.hash, globalOrdinal: hit.global.ordinal, ts: hit.ts },
-        { kind: "snapshot", title: `Global snapshot #${hit.global.ordinal}`, data: hit.global as GlobalSnapshot },
+        globalPick(hit.global as GlobalSnapshot),
         useStore.getState().block,
       ),
     );
@@ -1916,9 +1916,9 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                           const st = useStore.getState();
                           applyClickActions(
                             snapshotSelectActions(
-                              { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot },
+                              globalPick(r.global as GlobalSnapshot),
                               getNetwork()?.latest?.ordinal === r.global.ordinal,
-                              { pinnedOrdinal: !st.following && st.snap ? st.snap.data.ordinal : null, metaSnap: st.metaSnap, tickNet: st.tickNet, block: st.block },
+                              tickContextOf(st),
                             ),
                           );
                         }}

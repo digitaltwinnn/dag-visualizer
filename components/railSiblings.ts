@@ -24,6 +24,7 @@
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import type { Mode } from "@/src/store/store";
 import { ledgerNetwork } from "@/src/engine/domain/tickNet";
+import { globalPick, tickContextOf } from "@/src/engine/domain/pickActions";
 import type { BlockSel, TickNetSel } from "@/src/data/types";
 import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder";
 import type {
@@ -479,14 +480,9 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
         key: String(t.data.ordinal),
         label: t.data.ordinal.toLocaleString(),
         actions: snapshotSelectActions(
-          { kind: "snapshot", title: `Global snapshot #${t.data.ordinal}`, data: t.data },
+          globalPick(t.data),
           t.isLiveTip,
-          {
-            pinnedOrdinal: s.following ? null : cur.data.ordinal,
-            metaSnap: s.metaSnap,
-            tickNet: s.tickNet,
-            block: s.block,
-          },
+          tickContextOf(s),
         ),
       }));
       // A pin that has aged out of the retained window can't be located, so it gets no pager

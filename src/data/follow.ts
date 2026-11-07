@@ -6,6 +6,7 @@ import type { GlobalSnapshot } from "@/src/data/types";
 import { getBlockWindow } from "@/src/data/pastWindow";
 import { blockChainOf, newestBlock } from "@/src/data/blockWindow";
 import { readsBlockWindow, registerOf } from "@/src/engine/domain/viewPolicy";
+import { globalPick } from "@/src/engine/domain/pickActions";
 
 // The latest snapshot worth showing while following: for a metagraph filter, the
 // newest one it ACTUALLY anchored into — or null if it hasn't anchored in the buffered
@@ -74,7 +75,7 @@ export function followLatest() {
       }
       if (best) {
         const { m, g } = best;
-        if (snap?.data.ordinal !== g.ordinal) advanceSnap({ kind: "snapshot", title: `Global snapshot #${g.ordinal}`, data: g });
+        if (snap?.data.ordinal !== g.ordinal) advanceSnap(globalPick(g));
         // A snapshot the reader stepped to inside this live global is kept until the next one.
         const held = !!metaSnap?.held && metaSnap.metaId === filter && metaSnap.globalOrdinal === g.ordinal;
         if (!held && (metaSnap?.metaId !== filter || metaSnap.ordinal !== m.ordinal)) {
@@ -86,7 +87,7 @@ export function followLatest() {
   }
 
   const latest = latestRelevant(filter);
-  if (latest) advanceSnap({ kind: "snapshot", title: `Global snapshot #${latest.ordinal}`, data: latest });
+  if (latest) advanceSnap(globalPick(latest));
   else if (snap) advanceSnap(null);
   if (filter === UNLISTED_ID && latest) {
     // Same live card chain: the newest unlisted row (the one-home log source, newest first).
@@ -138,7 +139,7 @@ function followNewestBlock(): void {
     return;
   }
   const g = w.globalSnapshots.find((x) => x.ordinal === b.anchorOrd);
-  if (g && snap?.data.ordinal !== g.ordinal) advanceSnap({ kind: "snapshot", title: `Global snapshot #${g.ordinal}`, data: g });
+  if (g && snap?.data.ordinal !== g.ordinal) advanceSnap(globalPick(g));
   if (!block || block.chain !== b.chain || block.hash !== b.hash) {
     advanceBlock({ chain: b.chain, hash: b.hash, ordinal: b.ordinal, anchorOrd: b.anchorOrd });
   }

@@ -11,6 +11,7 @@ import { latestTickOf } from "@/src/data/ladderLevels";
 import { getNetwork } from "@/src/data/network";
 import type { NotableKind, NoteChange, NoteChangeKind, NoteDay, NoteResponse, NoteView } from "@/src/data/noteTypes";
 import { ledgerNetwork } from "@/src/engine/domain/tickNet";
+import { tickContextOf } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 import { rangeDays } from "@/src/util/localTime";
@@ -110,12 +111,8 @@ function ChangeRow({ change, view, onCard }: { change: NoteChange; view: NoteVie
       cohort: s.cohort,
       composition: s.composition,
       hasInspect: !!s.inspect,
-      metaSnap: s.metaSnap,
-      following: s.following,
-      pinnedOrdinal: s.following ? null : (s.snap?.data.ordinal ?? null),
+      ...tickContextOf(s),
       inspect: s.inspect,
-      tickNet: s.tickNet,
-      block: s.block,
       ledgerNet: ledgerNetwork({ filter: s.filter, tickNet: s.tickNet, snapOrdinal: s.snap?.data.ordinal ?? null }),
     };
     const acts = changeActions(change, view, state, s.selNodes, net && id ? latestTickOf(net.metaSnaps, net.globalSnapshots, id) : null);

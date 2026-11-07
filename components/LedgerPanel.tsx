@@ -63,7 +63,7 @@ import { windowBlocks } from "@/src/data/blockWindow";
 import { blockReadOf } from "@/src/data/blockReads";
 import { BLOCK_MEASURE_OPTIONS, blockMeasureText, blockMeasureValue, type BlockMeasure } from "@/src/data/blockMeasure";
 import { NO_MEASURE } from "@/src/data/ledgerMeasure";
-import { blockSelectActions } from "@/src/engine/domain/pickActions";
+import { blockSelectActions, globalPick, tickContextOf } from "@/src/engine/domain/pickActions";
 import { shortBlockHash } from "@/src/util/format";
 import { VIEWS } from "@/components/views";
 
@@ -440,7 +440,7 @@ export default function LedgerPanel() {
       ).concat(pagedSnaps.map((d, i): ExplorerRowSpec => {
         const count = tickFilterCount(d);
         const v = tickValues[i];
-        const globalPick = { kind: "snapshot", title: `Global snapshot #${d.ordinal}`, data: d } as const;
+        const tickPick = globalPick(d);
         const on = d.ordinal === activeSnapOrd;
         // A filter holds the chamber: a tick its network is not in answers nothing (`tickLocked`).
         const locked = !on && tickLocked(filter, snapshotExact[d.ordinal]);
@@ -480,12 +480,7 @@ export default function LedgerPanel() {
             // A pinned stream and the live tip's row: this click resumes live (see the effect above).
             const selfResume = !following && latestRelevant("all")?.ordinal === d.ordinal && !(on && !following);
             applyClickActions(
-              snapshotSelectActions(globalPick, latestRelevant("all")?.ordinal === d.ordinal, {
-                pinnedOrdinal: !following && snap ? snap.data.ordinal : null,
-                metaSnap,
-                tickNet,
-                block: useStore.getState().block,
-              }),
+              snapshotSelectActions(tickPick, latestRelevant("all")?.ordinal === d.ordinal, tickContextOf(useStore.getState())),
             );
             // Any other row selects its tick and opens it, the live tip included.
             setPath({ ...CLOSED_PATH, tick: d.ordinal, selfResume });
@@ -584,7 +579,7 @@ export default function LedgerPanel() {
             ? undefined
             : () => {
                 applyClickActions(
-                  tickNetSelectActions(n.id, { kind: "snapshot", title: `Global snapshot #${tick.ordinal}`, data: tick }, {
+                  tickNetSelectActions(n.id, globalPick(tick), {
                     metaSnap,
                     hasInspect: !!selNode,
                     block: useStore.getState().block,
@@ -608,7 +603,7 @@ export default function LedgerPanel() {
   const leafHue = openTickNet?.hue ?? accent;
   const leafName = openTickNet?.name ?? "";
   if (tick && openNet && (leaves.length > 0 || openNet === UNLISTED_ID)) {
-    const globalPick = { kind: "snapshot", title: `Global snapshot #${tick.ordinal}`, data: tick } as const;
+    const tickPick = globalPick(tick);
     const leafRows = leaves.map((r) => ({ ...r, dataTxCount: leafDataTx(exact, r.metaId, r.ordinal) }));
     const values = leafRows.map((r) => snapMeasureValue(snapPick, r));
     const maxLeaf = Math.max(1e-9, ...values.map((v) => v ?? 0));
@@ -651,7 +646,7 @@ export default function LedgerPanel() {
           faint: inData && leafRows[i]!.dataTxCount === 0 && !on,
           rung: "metaSnap",
           onClick: () => {
-            applyClickActions(metaSnapSelectActions(sel, globalPick, { metaSnap, following, inspect: useStore.getState().inspect, block: useStore.getState().block }));
+            applyClickActions(metaSnapSelectActions(sel, tickPick, { metaSnap, following, inspect: useStore.getState().inspect, block: useStore.getState().block }));
             // A select opens the snapshot's signers — the path follows the selection
             // (`syncLedgerPath`), so this states the same thing in the same commit — and the
             // deselect closes them. THE AFFORDANCE FOLLOWS THE DATA at the level itself: the
@@ -772,13 +767,7 @@ export default function LedgerPanel() {
           ? () => {
               const st = useStore.getState();
               applyClickActions(
-                blockSelectActions(sel, { kind: "snapshot", title: `Global snapshot #${g.ordinal}`, data: g }, {
-                  block: st.block,
-                  snapOrd: !st.following && st.snap ? st.snap.data.ordinal : null,
-                  metaSnap: st.metaSnap,
-                  tickNet: st.tickNet,
-                  following: st.following,
-                }),
+                blockSelectActions(sel, globalPick(g), tickContextOf(st)),
               );
             }
           : undefined,
