@@ -7,9 +7,14 @@
 // card's and the explorer's (`ChannelSnapRow.dataTxCount`); the mark says THAT a snapshot carried data
 // and roughly how much.
 //
+// A SNAPSHOT THAT CARRIED NO DATA BLOCK IS NOT THE REGISTER'S SUBJECT (user, 2026-11-07: "a
+// metagraph that anchored but had no datablock is still shown; don't show it"): its tile is not drawn,
+// no sheet or thread ties it to its tick, and the explorer does not list it — as the Transaction blocks
+// register draws no tile for a snapshot carrying no block. `carriesData` is that rule's one home.
+//
 // Honesty (rule 10): a tile whose read has not landed, or whose payload the decoder could not read,
-// shows no mark — never a guess; a snapshot whose data blocks hold no update still carried data, so it
-// stands at the floor height.
+// is UNKNOWN — not drawn yet, never a guess; a snapshot whose data blocks hold no update still carried
+// data, so it stands at the floor height.
 
 /** The mark's proportions, in chamber units: the floor height a single update stands at, the ceiling,
  *  how much height each decade of updates adds, and its footprint as a fraction of its tile's. */
@@ -25,6 +30,12 @@ export const DATA_MARK: Readonly<{ h0: number; perDecade: number; hMax: number; 
 export function dataMarkCount(row: { dataBlocks?: number; dataTxCount?: number } | null | undefined): number | null {
   if (!row || row.dataBlocks == null || row.dataBlocks <= 0) return null;
   return row.dataTxCount ?? 0;
+}
+
+/** Did this snapshot carry data blocks, as far as its exact read says? False while the read has not
+ *  landed or could not be read — the register's tile, sheet and explorer row all hang on this. */
+export function carriesData(row: { dataBlocks?: number; dataTxCount?: number } | null | undefined): boolean {
+  return dataMarkCount(row) != null;
 }
 
 /** The mark's height for a count of data updates — the floor at one (or none), a decade's step after. */

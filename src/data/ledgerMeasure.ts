@@ -196,8 +196,10 @@ export function snapMeasureValue(m: SnapLevelMeasure, row: { fee: number; bytes?
 
 /** A REGISTER'S MEASURE SET — what each level of the Snapshots explorer's tick ladder offers, and
  *  which of the store's picks it reads and writes (refactor round R1, L2: the explorer chose
- *  between the two registers' lists with seven `inData ? A : B` ternaries). `fadesDataless`: a row
- *  whose snapshots carried no data update steps back (faint, never hidden). */
+ *  between the two registers' lists with seven `inData ? A : B` ternaries). `dataOnly`: the tick's
+ *  levels list only the snapshots that carried data blocks (`ladderLevels.dataCarryingNetworks`; user,
+ *  2026-11-07: "a metagraph that anchored but had no datablock … don't show it"), and a tick none of
+ *  whose snapshots did steps back (faint — the tick itself is a global snapshot and stays). */
 export type RegisterMeasureSet = {
   order: readonly LedgerMeasure[];
   tickOptions: readonly { id: LedgerMeasure; label: string; unit: string }[];
@@ -208,7 +210,7 @@ export type RegisterMeasureSet = {
   /** The store field holding this register's pick, and its setter. */
   pick: "ledgerMeasure" | "dataMeasure";
   setPick: "setLedgerMeasure" | "setDataMeasure";
-  fadesDataless: boolean;
+  dataOnly: boolean;
 };
 const SNAPSHOT_MEASURES: RegisterMeasureSet = {
   order: LEDGER_MEASURE_ORDER,
@@ -219,7 +221,7 @@ const SNAPSHOT_MEASURES: RegisterMeasureSet = {
   snapOptions: SNAP_MEASURE_OPTIONS,
   pick: "ledgerMeasure",
   setPick: "setLedgerMeasure",
-  fadesDataless: false,
+  dataOnly: false,
 };
 /** Keyed by register, so a fourth register is a compile error here. Transaction blocks lists BLOCKS
  *  (its own set, `blockMeasure.ts`); the tick levels it never shows read the Metagraph snapshots set. */
@@ -235,7 +237,7 @@ export const REGISTER_MEASURES: Readonly<Record<LedgerRegister, RegisterMeasureS
     snapOptions: DATA_SNAP_MEASURE_OPTIONS,
     pick: "dataMeasure",
     setPick: "setDataMeasure",
-    fadesDataless: true,
+    dataOnly: true,
   },
 };
 

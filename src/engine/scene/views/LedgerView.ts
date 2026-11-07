@@ -70,7 +70,7 @@ import {
   type LaneBlock,
 } from "../../domain/ledgerModel";
 import { forkSpread, referenceSegments, silentRun, stretchLabel, type BlockRead } from "../../domain/blockBraid";
-import { DATA_MARK, dataMarkCount, dataMarkHeight } from "../../domain/dataMark";
+import { DATA_MARK, carriesData, dataMarkCount, dataMarkHeight } from "../../domain/dataMark";
 import { ENTRY_STAG, entryStep, entryTotal } from "../../domain/entryBeat";
 import { makeBarSpec, fillBarSpec, UNLISTED_KEY, RIBBON_LANE_HALF, type BarSpec } from "../../domain/ledgerBands";
 import type { ContainerSpec } from "../../domain/ledgerRails";
@@ -218,15 +218,19 @@ export const TILE_LOOK: Readonly<TileLook> = { rest: 0.1, ink: 0.3, halo: 2.5 };
  *  - `anchors`: how a metagraph snapshot is tied to its tick — the tapering SHEETS, whose width is
  *    the bytes it carried, or the hairline LINES, one per snapshot that carries a block (user,
  *    design round D1: size is irrelevant to the blocks, and the sheets were noise there).
- *  - `bareTiles`: whether a metagraph snapshot carrying no block is drawn (and picked) at all.
- *  - `dataMarks`: whether each tile whose exact read says it carried DATA BLOCKS wears a mark on its
- *    top, its height the count of data updates (`domain/dataMark.ts`; the Data blocks register, D6).
- *    Data blocks have no parents, so there is no braid and no link: the register is the Snapshots
- *    furniture as it stands — the same source, ribbons, tiles, bands and live edge — plus the marks. */
-const REGISTER_CARGO: Record<LedgerRegister, { blocks: boolean; liveEdge: boolean; anchors: "sheets" | "lines"; bareTiles: boolean; dataMarks: boolean }> = {
-  snapshots: { blocks: false, liveEdge: true, anchors: "sheets", bareTiles: true, dataMarks: false },
-  blocks: { blocks: true, liveEdge: false, anchors: "lines", bareTiles: false, dataMarks: false },
-  data: { blocks: false, liveEdge: true, anchors: "sheets", bareTiles: true, dataMarks: true },
+ *  - `tiles`: WHICH metagraph snapshots are drawn (and picked, and tied to their tick by a sheet or
+ *    thread) — `"all"` of them; `"blocks"`, only those carrying a token block (`_blockTiles`); or
+ *    `"data"`, only those whose exact read says they carried DATA BLOCKS (`domain/dataMark.carriesData`;
+ *    user, 2026-11-07: "a metagraph that anchored but had no datablock … don't show it"), each
+ *    wearing a mark on its top, its height the count of data updates (`domain/dataMark.ts`; the Data
+ *    blocks register, D6). Data blocks have no parents, so there is no braid and no link: the register
+ *    is the Snapshots furniture as it stands — the same source, ribbons, bands and live edge — with the
+ *    tiles kept to the data-carrying snapshots, plus the marks. A tile whose tick's read has not landed
+ *    is unknown and not drawn yet (rule 10) — as a Transaction blocks tile waits for its window. */
+const REGISTER_CARGO: Record<LedgerRegister, { blocks: boolean; liveEdge: boolean; anchors: "sheets" | "lines"; tiles: "all" | "blocks" | "data" }> = {
+  snapshots: { blocks: false, liveEdge: true, anchors: "sheets", tiles: "all" },
+  blocks: { blocks: true, liveEdge: false, anchors: "lines", tiles: "blocks" },
+  data: { blocks: false, liveEdge: true, anchors: "sheets", tiles: "data" },
 };
 /** A data mark's brightness over its tile's: a footnote on the tile, but one that must read on it. */
 const DATA_MARK_GAIN = 2.2;
@@ -429,7 +433,7 @@ export class LedgerView implements SceneView {
   private _braidScale: number | null = null;
   private _anchorLines: AnchorLine[] = [];
   private readonly _tileScratch = new THREE.Vector3();
-  /** THE DATA BLOCKS REGISTER'S MARKS (`REGISTER_CARGO.dataMarks`): one instance per tile, in the
+  /** THE DATA BLOCKS REGISTER'S MARKS (`REGISTER_CARGO.tiles === "data"`): one instance per tile, in the
    *  tile draw's own order, and per tile the count its mark states — -1 for none (no data blocks, or
    *  the read not landed). Filled at event time with the pick table (`_rebuildTilePicks`). */
   private _dataMarkMesh!: THREE.InstancedMesh;
@@ -974,8 +978,33 @@ export class LedgerView implements SceneView {
     if (r === this._register) return;
     this._register = r;
     this._cargo = REGISTER_CARGO[r];
+    // The sheets and threads tie only the tiles the register draws (`tiles: "data"` — a dataless
+    // snapshot has no tile, so no sheet may stand in for it).
+    this._ribbons.setBandGate(this._cargo.tiles === "data" ? this._dataBandGate : null);
     this._rebuildAllSlots(); // the live edge's claim on the front, the tier, the pick list
   }
+
+  /** Is this tile drawn in the register (`REGISTER_CARGO.tiles`)? `mi` is its instance index, the
+   *  mark table's key (`_dataMarkN`, resolved at event time with the picks). Per frame: a compare. */
+  private _tileDrawn(b: LaneBlock, mi: number): boolean {
+    const t = this._cargo.tiles;
+    return t === "all" || (t === "blocks" ? this._blockTiles.has(b) : this._dataMarkN[mi] >= 0);
+  }
+
+  /** The Data blocks register's band gate (`Ribbons.setBandGate`): a slot's band carries a sheet or
+   *  thread only when one of its network's snapshots in that tick carried data blocks, by the tick's
+   *  exact read — the tiles' own rule, at the band's grain (a band is a network, a tile a snapshot;
+   *  the unlisted band folds every address off the lane order, as `_bytesByKey` does). Event-time. */
+  private readonly _dataBandGate = (slot: number, key: string): boolean => {
+    const snap = this._slotSnap[slot];
+    const rows = snap ? this._exact[snap.ordinal]?.rows : undefined;
+    if (!rows) return false;
+    for (const r of rows) {
+      const k = this._laneOrder.includes(r.metaId) ? r.metaId : UNLISTED_KEY;
+      if (k === key && carriesData(r)) return true;
+    }
+    return false;
+  };
 
   /** Is the block window this register's trail (the cargo row, `REGISTER_CARGO`)? */
   get readsBlockWindow(): boolean {
@@ -1656,13 +1685,13 @@ export class LedgerView implements SceneView {
       for (const b of lane.blocks) {
         if (mi >= META_TRAIL_MAX) break;
         if (b.ts !== kTs) { kTs = b.ts; k = 0; }
-        // A tile the register does not draw (a bare one, in Blocks) is not pickable either.
-        const shown = b.filled && (this._cargo.bareTiles || this._blockTiles.has(b));
-        const pick = shown ? fn(lane.id, b.ts, k) : null; // event-time
-        this._tilePicks[mi] = pick;
+        const pick = b.filled ? fn(lane.id, b.ts, k) : null; // event-time
         // The Data blocks register's mark: the count from THIS snapshot's own exact row — the tile
-        // the resolver named — or none while that read has not landed (rule 10).
-        this._dataMarkN[mi] = this._cargo.dataMarks && pick?.kind === "metaSnap" ? this._dataMarkOf(pick.sel.globalOrdinal, pick.sel.metaId, pick.sel.ordinal) : -1;
+        // the resolver named — or none while that read has not landed (rule 10). Resolved BEFORE the
+        // pick is kept: in that register the mark decides whether the tile is drawn at all.
+        this._dataMarkN[mi] = this._cargo.tiles === "data" && pick?.kind === "metaSnap" ? this._dataMarkOf(pick.sel.globalOrdinal, pick.sel.metaId, pick.sel.ordinal) : -1;
+        // A tile the register does not draw (`_tileDrawn`) is not pickable either.
+        this._tilePicks[mi] = pick && this._tileDrawn(b, mi) ? pick : null;
         if (b.filled) k++;
         mi++;
       }
@@ -1818,7 +1847,7 @@ export class LedgerView implements SceneView {
     const dimNet = this._netDimKey();
     const tileRest = TILE_LOOK.rest;
     const tileInk = TILE_LOOK.ink;
-    const dataMarks = this._cargo.dataMarks;
+    const dataMarks = this._cargo.tiles === "data";
     // A focus is a SELECTED row (pinned or live-followed — how it was reached is not what it is),
     // a hovered row or a hovered tile. The bare lead is none of them: with nothing selected the
     // chamber is simply running, and stepping the whole trail back against a row it advanced onto
@@ -1857,9 +1886,9 @@ export class LedgerView implements SceneView {
         const entryF = this._entryT < 1 && b.slot >= 0 && b.slot < SLOT_N ? this._entryFade[b.slot] : 1;
         // A tick this lane anchored NOTHING into draws NOTHING (user, 2026-08-07 — the small
         // dimmed placeholder block is gone; the model keeps the slot, the mesh zero-scales).
-        // …and in the Blocks register a snapshot carrying no block is not drawn (`bareTiles`).
-        const bare = !this._cargo.bareTiles && !this._blockTiles.has(b);
-        if (!b.filled || bare || edge <= 0 || entryF <= 0) {
+        // …and a snapshot the register does not draw — carrying no block in Transaction blocks, no
+        // data block in Data blocks (`REGISTER_CARGO.tiles`, `_tileDrawn`) — draws nothing either.
+        if (!b.filled || !this._tileDrawn(b, mi) || edge <= 0 || entryF <= 0) {
           _dummy.position.set(0, 0, 0);
           _dummy.rotation.set(0, 0, 0);
           _dummy.scale.setScalar(0);

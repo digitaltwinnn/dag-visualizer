@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cohortOfProvider, cohortsLevel, countriesLevel, latestTickOf, countryNodes, machinesOf, networksLevel, nodeOrder, nodesByCountry, tickNetworksLevel, tickPolledRows } from "./ladderLevels";
+import { cohortOfProvider, cohortsLevel, countriesLevel, dataCarryingNetworks, latestTickOf, countryNodes, machinesOf, networksLevel, nodeOrder, nodesByCountry, tickNetworksLevel, tickPolledRows } from "./ladderLevels";
 import type { AnchorLogRow } from "./anchorLog";
 import type { MetaSnapRecord } from "./api";
 import type { CountryStat, GlobalSnapshot, MetaInfo, NodeRow } from "./types";
@@ -128,6 +128,24 @@ describe("tickNetworksLevel", () => {
   it("lists what is known while a read is missing (Review Focus 1)", () => {
     expect(tickNetworksLevel(tick, [polledRow("dor", 900)], null, listed).map((n) => n.id)).toEqual(["dor"]);
     expect(tickNetworksLevel(tick, [], undefined, listed)).toEqual([]);
+  });
+});
+
+describe("dataCarryingNetworks — the Data blocks register lists only snapshots that carried data blocks", () => {
+  const tick = { ordinal: 42, timestamp: "T42" } as unknown as GlobalSnapshot;
+  const listed = (id: string) => id === "dor" || id === "ded";
+  const ex = (metaId: string, ordinal: number, dataBlocks?: number) => ({ metaId, ordinal, fee: 2, bytes: 2048, dataBlocks, dataTxCount: dataBlocks ? 3 : 0 });
+  const rows = [ex("dor", 901, 0), ex("dor", 902, 2), ex("ded", 5, 1), ex("ded", 6, 0), ex("X1", 1, 0)];
+  const nets = tickNetworksLevel(tick, [], rows, listed);
+
+  it("keeps the carrying snapshots, drops a network (the unlisted set too) with none", () => {
+    const kept = dataCarryingNetworks(nets, rows);
+    expect(kept.map((n) => `${n.id}:${n.snaps.map((s) => s.ordinal).join(",")}`)).toEqual(["ded:5", "dor:902"]);
+  });
+  it("knows nothing before the exact read lands, and an undecodable row carries nothing it can claim (rule 10)", () => {
+    expect(dataCarryingNetworks(nets, null)).toEqual([]);
+    expect(dataCarryingNetworks(nets, undefined)).toEqual([]);
+    expect(dataCarryingNetworks(nets, [{ metaId: "dor", ordinal: 902 }])).toEqual([]);
   });
 });
 

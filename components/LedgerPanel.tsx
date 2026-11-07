@@ -45,7 +45,7 @@ import { useStore } from "@/src/store/store";
 import { NO_SIGNAL_COPY, useNoSignal } from "@/components/useNoSignal";
 import { levelMeasure } from "@/src/data/explorerMeasure";
 import { VIEW_POLICIES, readsBlockWindow } from "@/src/engine/domain/viewPolicy";
-import { tickNetworksLevel, tickPolledRows } from "@/src/data/ladderLevels";
+import { dataCarryingNetworks, tickNetworksLevel, tickPolledRows } from "@/src/data/ladderLevels";
 import { useFeedRead } from "@/components/useFeedRead";
 import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
 import { windowBlocks } from "@/src/data/blockWindow";
@@ -453,7 +453,7 @@ export default function LedgerPanel() {
           // No `rung`: a committed tick row's click also opens its tick in this card (local path
           // state), which a re-box would swallow — and its Global snapshot card is the box anyway.
           // …and in Data blocks a tick whose snapshots carried no data update steps back too.
-          faint: ((!!filterNet && count === 0) || (measures.fadesDataless && tickDataUpdates(snapshotExact[d.ordinal]) === 0)) && !on,
+          faint: ((!!filterNet && count === 0) || (measures.dataOnly && tickDataUpdates(snapshotExact[d.ordinal]) === 0)) && !on,
           // The count the bar's colour stands for, in words — colour is never the only carrier.
           onClick: locked ? undefined : () => {
             // THE SELECTED ROW DRILLS (user, 2026-10-07 — the explorer rests on this list, its axis,
@@ -500,7 +500,10 @@ export default function LedgerPanel() {
   // ---- level 1: the networks that anchored into the open tick ---------------------------------
   // The ONE list (src/data/ladderLevels.ts): the Metagraph card's ‹ › and the tick's ghost step the
   // same networks in the same order.
-  const tickNets = tick ? tickNetworksLevel(tick, net ? [...tickPolledRows(net.metaSnaps, tick), ...tickPolledRows(net.unlistedSnaps, tick)] : [], exact?.rows, (id) => LISTED_IDS.has(id)) : [];
+  // …and in Data blocks only the snapshots that carried data blocks, a network with none dropped
+  // (`dataCarryingNetworks`; the pager under the Metagraph card reads the same, `useSiblingState`).
+  const tickNetsAll = tick ? tickNetworksLevel(tick, net ? [...tickPolledRows(net.metaSnaps, tick), ...tickPolledRows(net.unlistedSnaps, tick)] : [], exact?.rows, (id) => LISTED_IDS.has(id)) : [];
+  const tickNets = measures.dataOnly ? dataCarryingNetworks(tickNetsAll, exact?.rows) : tickNetsAll;
   if (tick) {
     const netRows: { id: string; name: string; hue: string; count: number; italic?: boolean }[] = tickNets.map((n) => ({
       id: n.id,
@@ -509,7 +512,7 @@ export default function LedgerPanel() {
       count: n.snaps.length,
       ...(n.unlisted ? { italic: true } : {}),
     }));
-    const measured = netRows.map((n) => ({ n, per: perMetaOf(exact, n.id), m: tickNetMeasure(netPick, n.count, perMetaOf(exact, n.id)) }));
+    const measured = netRows.map((n) => ({ n, m: tickNetMeasure(netPick, n.count, perMetaOf(exact, n.id)) }));
     const maxNet = Math.max(1e-9, ...measured.map(({ m }) => m.value ?? 0));
     levels.push({
       pager: spanFooter,
@@ -533,10 +536,8 @@ export default function LedgerPanel() {
       // The polled buffer identified none of this tick's anchors (yet), and the exact read
       // counted no uncataloged ones — say so, never fabricate.
       empty: "No identified metagraph snapshots in this snapshot.",
-      rows: measured.map(({ n, per, m }): ExplorerRowSpec => {
+      rows: measured.map(({ n, m }): ExplorerRowSpec => {
         const lensedOut = outOfLens(filter, n.id);
-        // A network whose snapshots here carried no data update steps back in Data blocks.
-        const dataless = measures.fadesDataless && per?.dataTxCount === 0;
         return {
           key: n.id,
           // No dot beside a hued bar (user, 2026-10-23) — one hue carrier per row.
@@ -555,7 +556,7 @@ export default function LedgerPanel() {
           // explorer then steps to that card's children — rather than re-committing the network.
           rung: "context",
           // Out of the lens: listed (it really did anchor here), not drillable.
-          faint: lensedOut || dataless,
+          faint: lensedOut,
           // OPENS ITS CARD TOO (user, 2026-10-04: "clicking a row in the explorer should open the
           // related card; happens for some but not for all" — this row was the one that only
           // drilled, ruled "opens, never commits" on 2026-08-10, before a network could be
@@ -629,8 +630,6 @@ export default function LedgerPanel() {
           hue: leafHue,
           figure: snapMeasure(snapPick, leafRows[i]!),
           on,
-          // A snapshot whose data blocks carried nothing steps back in Data blocks (never hidden).
-          faint: measures.fadesDataless && leafRows[i]!.dataTxCount === 0 && !on,
           rung: "metaSnap",
           onClick: () => {
             applyClickActions(metaSnapSelectActions(sel, tickPick, { metaSnap, following, inspect: useStore.getState().inspect, block: useStore.getState().block }));

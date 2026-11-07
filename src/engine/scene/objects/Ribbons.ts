@@ -135,6 +135,10 @@ export class Ribbons {
    *  snapshot owns the front, and the HOVER-preview row rides below full (LedgerView drives). */
   private _rowFade = [1, 1, 1];
   private _filter = "all";
+  /** THE BAND GATE (`setBandGate`): which (slot, band) pairs may carry a sheet or a thread — the
+   *  Data blocks register's, so a band whose snapshots carried no data block is tied by nothing,
+   *  exactly as its tiles are not drawn. Null gates nothing. Consulted at event time only. */
+  private _bandGate: ((slot: number, key: string) => boolean) | null = null;
   private _c = new THREE.Color();
   /** Scratch quad for the thread pass — event-time only, never per frame. */
   private _q: RibbonQuad = { topZ0: 0, topZ1: 0, botZ0: 0, botZ1: 0 };
@@ -234,6 +238,11 @@ export class Ribbons {
    *  z-extent (user, 2026-08-30: the sheet used to span the whole plane while "the metagraph
    *  snapshots are smaller"), the same honesty the bottom edge always had from the band's z0/z1.
    *  The caller answers RIBBON_LANE_HALF where no tiles are knowable, which is the old look. */
+  /** The band gate (see `_bandGate`). The caller rebuilds the rows and threads after setting it. */
+  setBandGate(fn: ((slot: number, key: string) => boolean) | null): void {
+    this._bandGate = fn;
+  }
+
   setRow(row: 0 | 1 | 2 | 3, slot: number, spec: BarSpec | null, laneZ: (key: string) => number | null, topHalf: (key: string) => number): void {
     const st = this._rows[row];
     st.slot = slot;
@@ -244,6 +253,7 @@ export class Ribbons {
     for (let i = 0; i < spec.bandCount; i++) {
       const band = spec.bands[i];
       if (band.bytes <= 0) continue;
+      if (this._bandGate && !this._bandGate(slot, band.key)) continue; // the register ties no sheet to it
       const z = laneZ(band.key);
       if (z == null) continue; // hidden lane → no sheet
       ribbonQuad(z, topHalf(band.key), band, st.quads[st.count]);
@@ -289,6 +299,7 @@ export class Ribbons {
     if (z != null) {
       for (const { slot, spec } of slots) {
         if (!spec || this._thCount >= MAX_THREADS) continue;
+        if (this._bandGate && !this._bandGate(slot, key)) continue; // the register ties no thread to it
         let band: BarSpec["bands"][number] | null = null;
         for (let i = 0; i < spec.bandCount; i++) if (spec.bands[i].key === key) { band = spec.bands[i]; break; }
         if (!band) continue; // this tick carried nothing for the committed network — no line

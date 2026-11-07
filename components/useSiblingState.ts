@@ -5,7 +5,8 @@ import { useStore } from "@/src/store/store";
 import type { SiblingState } from "@/components/railSiblings";
 import { useLedgerSource } from "@/components/useLedgerSource";
 import { latestRelevant } from "@/src/data/follow";
-import { tickNetworksLevel, tickPolledRows } from "@/src/data/ladderLevels";
+import { dataCarryingNetworks, tickNetworksLevel, tickPolledRows } from "@/src/data/ladderLevels";
+import { REGISTER_MEASURES } from "@/src/data/ledgerMeasure";
 import { LISTED_IDS } from "@/src/data/unlisted";
 import { tickInStory, tickLocked } from "@/src/data/ledgerStory";
 import { POLL } from "@/src/engine/config";
@@ -41,6 +42,7 @@ export function useSiblingState(slot: RailCardKind | null): SiblingState {
   const metaList = useStore((s) => s.metaList);
   const leaderboard = useStore((s) => s.leaderboard);
   const snapshotExact = useStore((s) => s.snapshotExact);
+  const ledgerRegister = useStore((s) => s.ledgerRegister);
   const following = useStore((s) => s.following);
   const geoMeasure = useStore((s) => s.geoMeasure);
   const hyperMeasure = useStore((s) => s.hyperMeasure);
@@ -74,7 +76,9 @@ export function useSiblingState(slot: RailCardKind | null): SiblingState {
     const wantsTick = slot === "snap" || slot === "context" || slot === "metaSnap";
     const tickGlobal = mode === "ledger" && wantsTick ? (snap?.data ?? null) : null;
     const net = tickGlobal ? source : null;
-    const tickNets = tickGlobal
+    // …kept to the snapshots that carried data blocks in the Data blocks register (`dataOnly`), as
+    // the explorer's level is.
+    const tickNetsAll = tickGlobal
       ? tickNetworksLevel(
           tickGlobal,
           net ? [...tickPolledRows(net.metaSnaps, tickGlobal), ...tickPolledRows(net.unlistedSnaps, tickGlobal)] : [],
@@ -82,6 +86,7 @@ export function useSiblingState(slot: RailCardKind | null): SiblingState {
           (id) => LISTED_IDS.has(id),
         )
       : null;
+    const tickNets = tickNetsAll && REGISTER_MEASURES[ledgerRegister].dataOnly ? dataCarryingNetworks(tickNetsAll, snapshotExact[tickGlobal!.ordinal]?.rows) : tickNetsAll;
     return {
       mode,
       filter,
@@ -114,5 +119,5 @@ export function useSiblingState(slot: RailCardKind | null): SiblingState {
       trendCursorMs,
       trendWindow,
     };
-  }, [slot, mode, filter, country, cohort, composition, inspect, snap, tickNet, railNet, metaSnap, block, selNodes, metaList, leaderboard, snapshotExact, following, snapsForTicks, source, geoMeasure, hyperMeasure, allNodes, trendRange, trendCursorMs, trendWindow]);
+  }, [slot, mode, filter, country, cohort, composition, inspect, snap, tickNet, railNet, metaSnap, block, selNodes, metaList, leaderboard, snapshotExact, ledgerRegister, following, snapsForTicks, source, geoMeasure, hyperMeasure, allNodes, trendRange, trendCursorMs, trendWindow]);
 }

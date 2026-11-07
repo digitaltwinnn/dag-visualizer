@@ -18,6 +18,7 @@ import { providerKey } from "./providerKey";
 import type { CountryStat, GlobalSnapshot, MetaInfo, NodeRow } from "./types";
 import { UNLISTED_HUE, UNLISTED_ID, UNLISTED_LABEL } from "./unlisted";
 import { identityHudCss } from "@/src/palette/identity";
+import { carriesData } from "@/src/engine/domain/dataMark";
 
 // ── Geography ───────────────────────────────────────────────────────────────────────────────
 
@@ -223,4 +224,22 @@ export function tickNetworksLevel(
     .map(snapOf)
     .sort(newestFirst);
   return unl.length ? [...listed, { id: UNLISTED_ID, name: UNLISTED_LABEL, hue: UNLISTED_HUE, unlisted: true, snaps: unl }] : listed;
+}
+
+/** THE DATA BLOCKS REGISTER'S TICK NETWORKS (user, 2026-11-07: a snapshot that anchored but carried no
+ *  data block is not shown): the level above, kept to the snapshots whose exact row says they carried
+ *  data blocks (`domain/dataMark.carriesData`, the rule's one home), a network with none dropped. The
+ *  exact read is the ONLY source of that fact, so before it lands nothing is known to carry data and
+ *  the level is empty — unknown, never a guess (rule 10). */
+export function dataCarryingNetworks(
+  nets: readonly TickNetwork[],
+  exactRows: readonly { metaId: string; ordinal: number; dataBlocks?: number; dataTxCount?: number }[] | null | undefined,
+): TickNetwork[] {
+  if (!exactRows) return [];
+  const out: TickNetwork[] = [];
+  for (const n of nets) {
+    const snaps = n.snaps.filter((s) => carriesData(exactRows.find((r) => r.metaId === s.metaId && r.ordinal === s.ordinal)));
+    if (snaps.length) out.push({ ...n, snaps });
+  }
+  return out;
 }

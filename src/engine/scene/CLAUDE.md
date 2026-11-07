@@ -574,9 +574,9 @@ bars, labels, the rewind and the pose. What differs answers through ONE keyed ma
   trail, seals thin threads falling to the floor (grey from a DAG block, the network's hue from a tile). Off the lens a seal takes the row's `dim`.
   `_syncThreads` is the one dispatch, so a filter change redraws the seals, never the
   committed-network threads.
-- **Bare tiles are not drawn** (`bareTiles: false`, same round): a metagraph snapshot carrying no
-  block zero-scales and leaves the pick table (`_blockTiles`, rebuilt with the tier); a tile that
-  carries a token block stands, with its line.
+- **Bare tiles are not drawn** (`tiles: "blocks"`, same round): a metagraph snapshot carrying no
+  block zero-scales and leaves the pick table (`_blockTiles`, rebuilt with the tier; `_tileDrawn` is
+  the one question every pass asks); a tile that carries a token block stands, with its line.
 
 **Where a block stands is layout data, placed at event time** (`_rebuildBlockTier`, on every slot
 rebuild and read; a window change reaches it through the refresh that follows): a DAG block above
@@ -684,10 +684,17 @@ S-curve, every reference `referenceSegments` draws, the silent run), `src/data/b
 
 The third register (D6, 2026-11-07 — user: "a 3rd option 'data blocks' which can visualize the DED
 which would inherit the snapshot layout?" → "Threeway."). Its `REGISTER_CARGO` row says all of it:
-`blocks: false, liveEdge: true, anchors: "sheets", bareTiles: true` — the Metagraph snapshots
-chamber byte-identically (the same source, ribbons, tiles, bands and live edge) — and
-`dataMarks: true`. Data blocks have no parents, so there is no braid and no link; nothing else in
-`update` branches on the register.
+`blocks: false, liveEdge: true, anchors: "sheets"` — the Metagraph snapshots chamber (the same
+source, ribbons, bands and live edge) — and `tiles: "data"`: **only a snapshot whose exact read says
+it carried data blocks is drawn** (user, 2026-11-07: "a metagraph that anchored but had no datablock
+is still shown … don't show it"; `domain/dataMark.carriesData`, the rule's one home), its tile
+wearing the mark. A dataless snapshot has no tile, is not picked, and is tied to its tick by nothing:
+`Ribbons.setBandGate` takes the register's `_dataBandGate`, so a band none of whose snapshots carried
+data in that tick gets no sheet and no thread. A tick whose read has not landed is unknown, so none of
+its tiles stand yet (rule 10) — the chamber fills as the reads land, as the Transaction blocks trail
+fills from its window. The explorer and the Metagraph card's pager read the same rule
+(`ladderLevels.dataCarryingNetworks`, `REGISTER_MEASURES.data.dataOnly`). Data blocks have no
+parents, so there is no braid and no link; nothing else in `update` branches on the register.
 
 **The mark** is one `InstancedMesh` beside the tiles (`_dataMarkMesh`, the tiles' own species: solid,
 normal-blended, depth-writing, in the bloom set, not pickable — the tile under it answers the click),

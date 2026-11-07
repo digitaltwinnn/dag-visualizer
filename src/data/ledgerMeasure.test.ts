@@ -189,14 +189,14 @@ describe("REGISTER_MEASURES — each register's measure set, one keyed row (R1, 
     expect(REGISTER_MEASURES.snapshots.netOptions).toBe(TICK_NET_MEASURE_OPTIONS);
     expect(REGISTER_MEASURES.snapshots.snapMeasures).toBe(SNAP_MEASURES);
     expect(REGISTER_MEASURES.snapshots.snapOptions).toBe(SNAP_MEASURE_OPTIONS);
-    expect([REGISTER_MEASURES.snapshots.pick, REGISTER_MEASURES.snapshots.setPick, REGISTER_MEASURES.snapshots.fadesDataless]).toEqual(["ledgerMeasure", "setLedgerMeasure", false]);
+    expect([REGISTER_MEASURES.snapshots.pick, REGISTER_MEASURES.snapshots.setPick, REGISTER_MEASURES.snapshots.dataOnly]).toEqual(["ledgerMeasure", "setLedgerMeasure", false]);
     expect(REGISTER_MEASURES.data.order).toBe(DATA_MEASURE_ORDER);
     expect(REGISTER_MEASURES.data.tickOptions).toBe(DATA_MEASURE_OPTIONS);
     expect(REGISTER_MEASURES.data.netMeasures).toBe(DATA_TICK_NET_MEASURES);
     expect(REGISTER_MEASURES.data.netOptions).toBe(DATA_TICK_NET_MEASURE_OPTIONS);
     expect(REGISTER_MEASURES.data.snapMeasures).toBe(DATA_SNAP_MEASURES);
     expect(REGISTER_MEASURES.data.snapOptions).toBe(DATA_SNAP_MEASURE_OPTIONS);
-    expect([REGISTER_MEASURES.data.pick, REGISTER_MEASURES.data.setPick, REGISTER_MEASURES.data.fadesDataless]).toEqual(["dataMeasure", "setDataMeasure", true]);
+    expect([REGISTER_MEASURES.data.pick, REGISTER_MEASURES.data.setPick, REGISTER_MEASURES.data.dataOnly]).toEqual(["dataMeasure", "setDataMeasure", true]);
   });
   it("Transaction blocks' tick levels (never shown — it lists blocks) read the Metagraph snapshots set", () => {
     expect(REGISTER_MEASURES.blocks).toBe(REGISTER_MEASURES.snapshots);

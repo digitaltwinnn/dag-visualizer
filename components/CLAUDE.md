@@ -1171,10 +1171,14 @@ Anchors' place and leads, four tiles two by two so its name is whole; the networ
 updates · Fees · Size; `ledgerMeasure`'s `DATA_*` lists; the register's own pick, `store.dataMeasure`,
 starting on it; the Metagraph snapshots register keeps Fees · Anchors · Metagraphs · Size): a
 tick row's figure is its data updates, a network's and a snapshot's their own, read off the exact read
-(`ChannelSnapRow.dataTxCount`); a tick, network or snapshot that carried no data update is FAINT,
-never hidden (rule 10 — a lens never edits the facts), and a network one of whose snapshots there
-could not be decoded states no figure (the exact read leaves its `perMeta` count off — unknown,
-never 0, review M5). The card is the metagraph snapshot card, whose
+(`ChannelSnapRow.dataTxCount`); **the tick's levels list only the snapshots that carried data
+blocks** (user, 2026-11-07: "a metagraph that anchored but had no datablock … don't show it" — a
+dataless snapshot is not the register's subject, as a blockless one is not Transaction blocks';
+`ladderLevels.dataCarryingNetworks` under `REGISTER_MEASURES.data.dataOnly`, the same list the
+Metagraph card's pager steps in `useSiblingState`; before the tick's exact read lands nothing is known
+to carry data, so the level is empty, never guessed), a tick none of whose snapshots did is FAINT (it
+is a global snapshot and stays), and a network one of whose snapshots there could not be decoded
+states no figure (the exact read leaves its `perMeta` count off — unknown, never 0, review M5). The card is the metagraph snapshot card, whose
 Data tab states "Data updates N" from the exact read with no Decompress (`metaSnapDataCount.test.ts`).
 RAW is the Metagraph snapshots register's anchor log (its records are metagraph snapshots); the note
 is the ledger's. The band swaps to `DataCells` (`"ledger:data"`, `REGISTER_CELLS` in `VitalsBand.tsx`)

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { DATA_MARK, dataMarkCount, dataMarkHeight } from "./dataMark";
+import { DATA_MARK, carriesData, dataMarkCount, dataMarkHeight } from "./dataMark";
 
 // THE DATA BLOCKS REGISTER'S TILE MARK (D6, 2026-11-07): a mark on each metagraph snapshot tile whose
 // exact read says it carried data blocks, its height the count of data updates.
@@ -17,6 +17,19 @@ describe("dataMarkCount", () => {
     expect(dataMarkCount(undefined)).toBeNull();
     // An undecodable row states no count: unknown, never a guess.
     expect(dataMarkCount({})).toBeNull();
+  });
+});
+
+describe("carriesData", () => {
+  it("is the mark's own question: data blocks in the read, whatever their updates count", () => {
+    expect(carriesData({ dataBlocks: 1, dataTxCount: 0 })).toBe(true);
+    expect(carriesData({ dataBlocks: 3, dataTxCount: 12 })).toBe(true);
+  });
+  it("is false for a snapshot that carried none, and while the read has not landed (rule 10)", () => {
+    expect(carriesData({ dataBlocks: 0, dataTxCount: 0 })).toBe(false);
+    expect(carriesData({})).toBe(false);
+    expect(carriesData(null)).toBe(false);
+    expect(carriesData(undefined)).toBe(false);
   });
 });
 
