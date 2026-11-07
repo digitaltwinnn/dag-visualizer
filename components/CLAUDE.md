@@ -572,7 +572,8 @@ pointermove. Three rules are worth knowing before touching it:
   made inside the layer clears it too. Closing the log used to strand the reader in Snapshots.
 
 **The motion hint says what the scene is doing while it moves** (user, 2026-09-26 — `MotionHint`,
-one quiet sentence on a low plate, centred just under the command bar). Two store channels, and nothing else feeds it.
+one quiet sentence on a low plate, centred just under the command bar — or one line lower, under the
+register switch, where the view offers two registers: D3). Two store channels, and nothing else feeds it.
 `sceneMoving` is ENGINE → REACT: the Engine's `_publishMotion` derives it each frame from the four
 structures that already drive motion — `ViewTransition.active()`, `CameraDirector.flying`, the
 controls' `sceneDragging`, and `TrendStackSync.settled()` where the view has a stack — and writes it
@@ -1053,11 +1054,33 @@ a ghost can never split the stack. The lane stays the ladder's one order; this i
 day: "put it on the 1st row and directly show x newer") — it froze at the newest tick on screen
 from 2026-10-02; `src/data/ledgerHold.ts`.
 
-**The Blocks register (Snapshots view, 2026-11-06) is one control and four surfaces.** `RegisterSwitch`
-rides the explorer card's CONTROL band (`Explorer`'s `control` field) above the measure tiles, in the
-tiles' own segmented grammar, its cells the view's `viewPolicy.registers`; a press goes through
-`switchLedgerRegister`, the one door (`selectionBoundary.test.ts` holds every surface to it), and the
-URL follows (`/snapshots` ⇄ `/blocks`). In Blocks the explorer lists the window's blocks, and the
+**The Blocks register (Snapshots view, 2026-11-06) is one control and four surfaces.** The register
+switch stands ON THE SCENE (D3, 2026-11-07 — option A of the user's mock,
+`components/RegisterSwitch.tsx`): one glass segmented control centred under the command bar, each
+half carrying its own SPAN ("Snapshots · last 11 min", "Blocks · last 14 h"; a pinned stretch names
+itself, "9 min, 3d ago"; a window not held says its state in a word — "reading…", "not read", "not
+reached"). The span words are `src/data/ledgerSpan.ts`'s, the ONE home the explorer's foot reads too
+(`ledgerSpan.test.ts`), and the Blocks half reads the block window from either register
+(`blockWanted` holds the live window across the whole view). Its cells are the view's
+`viewPolicy.registers`, shown only where the row offers more than one; it waits out a view transition
+(`motionPhase`), the motion hint drops `REGISTER_SWITCH_H` beneath it, and `#register-switch` is a
+marker contract — a callout's free band starts under it (`ChromeBounds.sceneTop`). The explorer card's
+control band holds only the measure tiles (its `control` slot went with the switch). A press goes
+through `switchLedgerRegister`, the one door (`selectionBoundary.test.ts` holds every surface to it),
+and the URL follows (`/snapshots` ⇄ `/blocks`).
+**LIVE in this register follows the newest BLOCK** (D3, user: "live mode should be applied to the
+block and not the snapshot"): while following, `followLatest` (FollowController's heartbeat — every
+global, anchor and block-window change) seats the window's newest block of its network
+(`blockWindow.newestBlock`) and its accepting global through the non-bumping `advanceBlock` /
+`advanceSnap`; the Block card's head carries the LIVE / PINNED control (`FollowControl subject="block"`,
+its write `blockFollowActions`), the Global snapshot card keeps only its age there, a click on the live
+block PINS it, and the Block card is the register's DEFAULT BOX ahead of the note (`focusSlotId`; the
+view is entered on the auto rule, not the note's pin — `LaneCollapseState.seats`). Pinned by
+`src/store/followFlow.test.ts`'s Blocks cases, `selStack.test.ts`, `railCards.test.ts` and
+`railCollapse.test.ts`. **Its callout is the BLOCK's** (user: "no snapshot callout but a block
+callout"): one label on the Block card's subject, in its head's grammar (mark, short hash, height chip,
+live / pinned, then `blockLead`, the card's own lead), anchored at the block's place in the chamber
+(`LedgerView.selectedBlockAnchor`, layout data plus the rewind offset); `#callout-2` stands down. In Blocks the explorer lists the window's blocks, and the
 Block card (`inspector/BlockPane.tsx`) stands under its tick: a card slot with NO rung, between the
 metagraph snapshot and the node in the ledger's lane (`DISPLAY_LANE`), present only in the Blocks
 register and only under the tick that accepted it (`parentHolds`), its ghost hint "one on a bar or a
@@ -1073,7 +1096,8 @@ networks; unlisted networks' blocks are not read" — the trail reads the listed
 and under it, where a token chain's walk was cut by its page cap (`BlockWindow.partial`), the blocks
 not reached ("Older DOR blocks are not reached"). Under a network filter the window is that
 network's own blocks (`src/data/CLAUDE.md`), so its span can read "last 15 days"; under the unlisted
-filter the list, the band and RAW say "Unlisted networks' blocks are not read".
+filter the list, the band and RAW say "Unlisted networks' blocks are not read" (the list's empty state
+says it, so the heading's floor line stands down — once, not twice).
 A filter holds the rows as it holds the chamber: a block whose accepting global the filter's
 network is not in answers nothing — no commit, no hover, faint — in the explorer and in RAW
 (`ledgerStory.blockRowLocked`, the tick rows' `tickLocked` and `Picking.tickHeldOut`'s rule). The vitals band swaps to `BlocksCells` and RAW to `datasection/BlocksTable`. The band's swap key
@@ -1082,10 +1106,13 @@ for band and phone sheet, so the swap rolls). BLOCKS LAST HOUR, OPEN TIPS and FR
 arithmetic in `src/data/blockStats.ts`: the window lists only block-bearing global snapshots, so a stretch
 with no tick is zero blocks (a bin older than a FULL window's reach is a gap, and a full window that
 does not reach back an hour states BLOCKS LAST HOUR as a floor, "at least N" — rule 10); OPEN TIPS and FRONTIER AGE
-read `${chain}:frontier` and show the house empty value until it is held, never 0. The table groups by
-accepting global with the log's own `GroupPlate` (the plate commits/releases the global, the chevron
-folds); a block row's click is `blockSelectActions`, the committed block says PINNED in mark and word and
-its group starts open. The Block card's door is `trendDoors.openBlockRecord` (spends any armed `logSeek`,
+read `${chain}:frontier` and show the house empty value until it is held, never 0. RAW lists ONE ROW PER
+TRANSFER (D3, user: "per transfer is useful" — `BlockRead.transfers`): FROM · TO · AMOUNT · FEE · BLOCK
+· ACCEPTED INTO, grouped by accepting global with the log's own `GroupPlate` (the plate
+commits/releases the global, the chevron folds); a block whose read has not landed lists one row
+"reading…", a failed read says "read failed", and the phone keeps from, to and the block (the measures
+are the card's). A row's click commits its block (`blockSelectActions`), the committed block's rows
+say LIVE or PINNED in the state species, and its group starts open. The Block card's door is `trendDoors.openBlockRecord` (spends any armed `logSeek`,
 so a door after a door inherits nothing). Pinned by `src/data/blockStats.test.ts`,
 `components/feedReadBoundary.test.ts` (`api-blocks` readers hold the feed) and
 `components/rawSurfaceBoundary.test.ts` (the register compare stays inside `RecordsSurface`).
@@ -1809,7 +1836,8 @@ Every rail card leads with `CardHead`: eyebrow / title / inset hairline / body.
     needs nothing: a raw row click pins, and the explorer and card show the pin.
   · **State marks are one species.** `LiveDot` + "live", `PinnedMark` alone, the word for screen readers only (user, 2026-10-31; StateAtoms, 14px),
     on the explorer's tick row, the Global snapshot card's control, the scene callout, the raw log's
-    selected row and the raw pane's head. Since 2026-10-18 the METAGRAPH snapshot's label and card head
+    selected row and the raw pane's head — and in the Blocks register on the Block card's control,
+    the block callout and the committed block's RAW rows (D3: live follows the block there). Since 2026-10-18 the METAGRAPH snapshot's label and card head
     carry them too (user: "that's also pinned") — a committed pair is live or pinned together.
 
 - **`SELECTED_ROW`** is the one committed-selection language for list rows: the wash plus a 1px inset
@@ -2031,6 +2059,7 @@ seam and corner rules select on the same markers the thread measures:
 | `#topbar`, `#metapane`, `#tooltip` | Layout and positioning |
 | `canvas.scene-canvas` | `SceneCanvas` renders it; the engine's controls listen on it (the card-drag handoff that once queried it is retired) |
 | `#callout` (+ `data-on`) | The subject callout's 0-size anchor wrapper — `SceneCallout` renders it, `CalloutSync` writes its transform + `data-on` per frame (the Tooltip discipline: position never renders React) |
+| `#register-switch` | `RegisterSwitch` renders it (the Snapshots view's register switch on the scene); `ChromeBounds` reads its bottom edge as the callout's free-band top (`sceneTop`) |
 | `#callout-2` (+ `data-on`) | The same contract's second anchor — the GLOBAL snapshot's label in Snapshots. Same two homes, same per-frame writes, no multi-leader |
 | `#trend-stack` (+ `data-on`) | The trend view's chart-plane layer — `TrendStack` renders it, the engine queries it to find the planes. It waits at `opacity: 0` and `TrendStackSync` writes `data-on="1"` once the view has ARRIVED (policy `chartStack` + the trend furniture alpha at full), so the stack fades in with the room rather than riding the camera's flight — the `#callout` `data-on` precedent |
 | `[data-plane]` (the network id) | One chart plane, as an ANCHOR + a CHILD. The anchor is a **0-size box at the layer's top-left with `origin-top-left`**, mounted `invisible`; its one child is the plane, `planeFormat(tier).pxW` wide (640 on desktop and tablet; 360 on phone, so the card is drawn at about scale 1 and its type is legible — the projector divides by the same number, and on phone the head drops its unit into the front plot's caption, `unitInPlot`), centred on it by `-translate-x-1/2 -translate-y-1/2`. **React renders the plane and owns everything inside it** plus the anchor's `opacity` / `zIndex` / `pointer-events` (all from the same `PlanePose`); `TrendStackSync` (engine layer) writes the anchor's `transform` — a `matrix3d` translate + uniform scale, never a rotation — and its `style.visibility` per frame. The anchor's geometry IS that matrix's coordinate system, so don't give it a size, an origin or a transform of its own; `components/trendStackBoundary.test.ts` pins it |
@@ -2074,6 +2103,11 @@ hued ticker, the anchor ring and the `.edge-spine`). The design rules the test c
   the same state that renders the box), exactly as the camera answers it; the component picks the
   MODEL and the Engine the ANCHOR from one mirrored preference, falling through to the finest
   committed rung.
+- **The Blocks register stands ONE callout, the block's** (D3, user 2026-11-07: "In blocks, no
+  snapshot callout but a block callout"). `#callout` names the Block card's subject — the live
+  newest block or the pinned one — at the block's own place in the chamber; `#callout-2` stands
+  down (the live global is not drawn there). Its key is `blk|live` while following, so a newer block
+  re-points the label rather than replaying its entrance; a pin is a new subject.
 - **Snapshots stands TWO callouts, each on a FIXED anchor** (user, 2026-10-03: "2 callouts"). A
   committed metagraph snapshot is always read against a global snapshot, and one label could
   name only one of them. `#callout` is the metagraph snapshot's (its tile) and `#callout-2` the

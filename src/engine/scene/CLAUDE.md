@@ -579,7 +579,10 @@ rebuild and read; a window change reaches it through the refresh that follows): 
 its tick's bar, a token block ON the tile of the metagraph snapshot that accepted it — the k-th
 filled tile of that tick, `k` the tile resolver's own index (`tileAnchorOf`). `_tileTop` is the ONE
 copy of the tile arithmetic: the per-frame tile draw, the selected tile's callout anchor and the
-token placement all read it, the first two adding the frame's offsets.
+token placement all read it, the first two adding the frame's offsets. The BLOCK CALLOUT's anchor
+(D3) reads the same placed items: `BlockTier.anchorOf` is a block's placed top plus the rewind offset
+the view wrote, false while its row is off the trail, and `LedgerView.selectedBlockAnchor` asks it for
+the committed block (live or pinned) — layout data, rule 6.
 
 **The DAG's blocks are a LAYERED DAG DRAWING above the floor** (user, design rounds D1 and D2: "a
 DAG is shaped differently usually — isn't there some algo for it?" — the Sugiyama method, held to

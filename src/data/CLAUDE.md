@@ -109,8 +109,9 @@ register (`pastWanted` stands down in Blocks). The window is the newest 52 globa
 below the pin that HOLD a block (a DAG block, or an anchored metagraph snapshot carrying token
 blocks), from `/api/blocks/trail`, folded pure by `foldBlockWindow` into the live buffer's own
 shapes, so the slot model is unchanged. `blockWanted` is the one rule for when (entering the
-register, a pin outside the held range; the Briefing fetches the live window AHEAD, so its Blocks
-stop opens drawn); `components/BlockWindowBridge.tsx` is the one writer, and the store carries only
+view — the Snapshots register reads and holds the LIVE window too, for the register switch's Blocks
+span (D3), and only the Blocks register re-centres it on a pin outside the held range; the Briefing
+fetches the live window AHEAD, so its Blocks stop opens drawn); `components/BlockWindowBridge.tsx` is the one writer, and the store carries only
 `blockWindowStatus` (`loading | failed | ready | beyond | unread`). While the LIVE window is held
 (`liveWindowRuns`: following, touring, or a pin the held live window covers — the band is the live
 instrument, and a block or tick clicked inside the live window never freezes it) it refreshes every
@@ -128,8 +129,12 @@ merges two networks'); the live feed's announced tick joins only a window holdin
 (`tipJoins`). Under All it is every network's, as before. The unlisted filter reads nothing
 (`blockWanted`'s `unread`, status `unread`): the explorer, the band and RAW state the floor, never
 "no blocks". A token chain cut by its walk's page cap is named in the window's `partial`, and the
-band's readings count the window's own network's blocks, a cut window read like a full one
-(`blockStats`' `BlockScope`). Pinned by `blockWindow.test.ts` and `blockStats.test.ts`.
+band's readings count the window's own network's blocks, a cut window read like a full one — CUT only
+by the chain that drives it (`blockStats.blockScopeOf`: any chain under All, the filter's own under a
+filter). **Live in this register follows the newest block** (D3): `follow.ts`'s `followLatest` seats
+`blockWindow.newestBlock` — the window's newest block of the network it was read for — and its
+accepting global through the non-bumping `advanceBlock` / `advanceSnap`, never from a window read for
+another network or around a pin (pinned by `src/store/followFlow.test.ts`). Pinned by `blockWindow.test.ts` and `blockStats.test.ts`.
 
 **A block's parents come only from a FULL READ** of the snapshot that accepted it
 (`blockReads.ts`, `components/BlockReadsBridge.tsx`): one paced read per block-bearing snapshot in

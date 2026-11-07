@@ -162,7 +162,11 @@ The design rules behind the table, which the tests pin but don't explain:
   releases the block alone. No focus rung and no pose (camera principle 2). Every builder that pins a
   tick releases a block of another tick through the one `releaseBlock`, and the tile, band, network,
   arrival and follow builders take the block as a REQUIRED argument, so no caller can forget it. The
-  Block card's × is `blockClearActions`.
+  Block card's × is `blockClearActions`. **While following, a click on the live block PINS it**
+  (D3: live follows the newest block in the Blocks register, so the block on screen is the follow's,
+  not a pick — the auto-followed metagraph snapshot's rule), and the Block card's LIVE / PINNED
+  control is `blockFollowActions`, which re-commits the block LAST either way so its card stays the
+  box the reader pressed.
 - **A register switch is a setting that RELEASES** (2026-11-06). `registerSwitchActions` drops what
   the register being left drew and the other cannot draw — leaving Blocks drops the block, leaving
   Snapshots the metagraph snapshot — and keeps the pin and the committed network, which are the
