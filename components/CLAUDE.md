@@ -1059,7 +1059,9 @@ from 2026-10-02; `src/data/ledgerHold.ts`.
 (2026-11-07, user: "Threeway."), named on the switch **Metagraph snapshots | Transaction blocks | Data
 blocks** (`REGISTER_NAMES`, `components/views.ts` — user: "Since they all converge into snapshots, the
 control 'snapshots' should be 'metagraph snapshots'"; the VIEW stays "Snapshots"; "Blocks" in code and
-below is the Transaction blocks register). The explorer's title is the register's name. The register
+below is the Transaction blocks register). The explorer's title is the VIEW's axis word, "Snapshots"
+(the global snapshots it lists), in every register — the switch names the register's subject, the
+title does not repeat it (D6 carry ruling). The register
 switch stands ON THE SCENE (D3, 2026-11-07 — option A of the user's mock,
 `components/RegisterSwitch.tsx`): one glass segmented control centred under the command bar, each
 half carrying its own SPAN ("Metagraph snapshots · last 11 min", "Transaction blocks · last 14 h",
@@ -1068,11 +1070,17 @@ itself, "9 min, 3d ago"; a window not held says its state in a word — "reading
 reached"). **On a phone three full names do not fit one row**: each half shows its glyph and span, the
 lit half alone its name (each keeps it as its accessible name), with tighter padding there — measured
 at 390: 349px with "Metagraph snapshots" lit, 334 with "Transaction blocks", 281 with "Data blocks",
-inside the 16px gutters. The glyphs are `REGISTER_ICONS` (Data blocks wears `Database`: the metagraph
+inside the 16px gutters. **With a pinned stretch the UNLIT halves say WHEN alone** (D7, measured: the
+full "9 min, 1d ago" on both snapshot halves ran the switch to 370px, past the gutters): on the phone
+an unlit half states its short span — "1d ago" for a pinned stretch, "reading…" / "read failed" for
+a read state, a live span unchanged (`ledgerSpan`'s `short`, one rule for every half) — and the lit
+half keeps the full words; measured at 390 with a pin 1 day back: 320px (Metagraph snapshots lit),
+252 (Data blocks), 335 (Transaction blocks). The glyphs are `REGISTER_ICONS` (Data blocks wears `Database`: the metagraph
 kind "data" wears `Blocks`, the transaction block's own mark). The span words are
 `src/data/ledgerSpan.ts`'s, the ONE home the explorer's foot reads too
 (`ledgerSpan.test.ts`), and the Transaction blocks half reads the block window from every register
-(`blockWanted` holds the live window across the whole view). Its cells are the view's
+(`blockWanted` holds the live window across the whole view — read again every 5 minutes outside
+Transaction blocks, where the half needs only its reach, every 30 s inside it: `blockRefreshMs`). Its cells are the view's
 `viewPolicy.registers`, shown only where the row offers more than one; it waits out a view transition
 (`motionPhase`), the motion hint drops `REGISTER_SWITCH_H` beneath it, and `#register-switch` is a
 marker contract — a callout's free band starts under it (`ChromeBounds.sceneTop`). The explorer card's
@@ -1088,8 +1096,10 @@ block and not the snapshot"): while following, `followLatest` (FollowController'
 global, anchor and block-window change) seats the window's newest block of its network
 (`blockWindow.newestBlock`) and its accepting global through the non-bumping `advanceBlock` /
 `advanceSnap`; the Block card's head carries the LIVE / PINNED control (`FollowControl subject="block"`,
-its write `blockFollowActions`), the Global snapshot card keeps only its age there, a click on the live
-block PINS it, and the Block card is the register's DEFAULT BOX ahead of the note (`focusSlotId`; the
+its write `blockFollowActions`), the Global snapshot card keeps only its age there WHILE A BLOCK CARD
+STANDS — with none (a pin carried in from another register, the block's ×, a re-click releasing it)
+the Global card carries the control again (`blockWindow.liveControlCard`, review I1: else nothing said
+PINNED and nothing offered LIVE) — a click on the live block PINS it, and the Block card is the register's DEFAULT BOX ahead of the note (`focusSlotId`; the
 view is entered on the auto rule, not the note's pin — `LaneCollapseState.seats`). Pinned by
 `src/store/followFlow.test.ts`'s Blocks cases, `selStack.test.ts`, `railCards.test.ts` and
 `railCollapse.test.ts`. **A pin keeps saying PINNED while the feed is down** (ruling, 2026-11-07,
@@ -1123,12 +1133,13 @@ is the view, or `"ledger:blocks"` in that register (`useCellsKey` in `VitalsBand
 for band and phone sheet, so the swap rolls). Its four cells (design round D5, 2026-11-07 — user: "do
 your suggestion for vitals") are pure arithmetic in `src/data/blockStats.ts`: **BLOCKS**, the window's
 block count with a per-hour sparkline across its span; **MOVED**, the sum of its blocks' transfer
-amounts from LANDED reads only (`movedInWindow`; "12 of 30 blocks read" under the unit while any is
+amounts from LANDED reads only (each read's own `amount`, the decoder's transfer sum; `movedInWindow`; "12 of 30 blocks read" under the unit while any is
 pending or missed, an hour holding an unread block a gap in its sparkline) in ONE unit — the DAG's own
 under All or the DAG filter, labelled "DAG", since a sum across tokens would add unlike units, and the
 token's ticker under its filter (`tickerOf`, the Block card's home); **BY NETWORK**, a `MicroBars`
 share of the window's blocks per network in the catalog's order, named and hued, one row under a
-filter; **LAST BLOCK**, the age of the window's newest block in `ageWords` beside its network. BLOCKS and
+filter; **LAST BLOCK**, the age of the window's newest block in `ageWords` (seconds under a minute) beside
+its network. BLOCKS and
 MOVED state the window's reach in the aside, the register switch's own span words (`blockSpanWord`); a
 window pinned around a past time is read as that window (its frame ends at its newest tick), and only
 LAST BLOCK, a claim about now, says "Window pinned to a past time". The window lists only
@@ -1148,11 +1159,16 @@ so a door after a door inherits nothing). Pinned by `src/data/blockStats.test.ts
 `components/rawSurfaceBoundary.test.ts` (the register compare stays inside `RecordsSurface`).
 
 **The Data blocks register (D6, 2026-11-07) is the Metagraph snapshots register's surfaces with the
-DATA leading.** The explorer keeps every Snapshots level and leads with **Data updates**
-(`ledgerMeasure`'s `DATA_*` lists; the register's own pick, `store.dataMeasure`, starting on it): a
+DATA leading.** The explorer keeps every Snapshots level and its measure set is **Data updates · Fees · Metagraphs ·
+Size** (D7, user: "instead of adding 'data updates' use it to replace 'anchors'" — Data updates takes
+Anchors' place and leads, four tiles two by two so its name is whole; the network level is Data
+updates · Fees · Size; `ledgerMeasure`'s `DATA_*` lists; the register's own pick, `store.dataMeasure`,
+starting on it; the Metagraph snapshots register keeps Fees · Anchors · Metagraphs · Size): a
 tick row's figure is its data updates, a network's and a snapshot's their own, read off the exact read
 (`ChannelSnapRow.dataTxCount`); a tick, network or snapshot that carried no data update is FAINT,
-never hidden (rule 10 — a lens never edits the facts). The card is the metagraph snapshot card, whose
+never hidden (rule 10 — a lens never edits the facts), and a network one of whose snapshots there
+could not be decoded states no figure (the exact read leaves its `perMeta` count off — unknown,
+never 0, review M5). The card is the metagraph snapshot card, whose
 Data tab states "Data updates N" from the exact read with no Decompress (`metaSnapDataCount.test.ts`).
 RAW is the Metagraph snapshots register's anchor log (its records are metagraph snapshots); the note
 is the ledger's. The band swaps to `DataCells` (`"ledger:data"`, `REGISTER_CELLS` in `VitalsBand.tsx`)
@@ -1160,7 +1176,8 @@ is the ledger's. The band swaps to `DataCells` (`"ledger:data"`, `REGISTER_CELLS
 (the count over the snapshots read, "N of M snapshots read" under the unit as its floor, and a line
 of one point per global snapshot — the window spans minutes, so a tick is its bin, an unread tick a
 gap), **BY NETWORK** (`MicroBars` share of the data updates per network), **LAST DATA BLOCK** (the age
-of the newest read tick holding a data block, beside its network; "Window pinned to a past time" in a
+of the newest read tick holding a data block in `ageWords` — "12 seconds" under a minute, never
+"1 minute" for a block seconds old (D6 carry), beside its network; "Window pinned to a past time" in a
 past window). The Snapshots band's "Anchors by metagraph" chart is NOT a fourth cell: it plots the
 measured history's 24 hours, and the band states one window — here the source's minutes. Under the
 DAG filter every cell says "The DAG's own snapshots carry no data blocks".

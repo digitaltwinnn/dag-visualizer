@@ -116,10 +116,21 @@ shapes, so the slot model is unchanged. `blockWanted` is the one rule for when (
 view — the Snapshots register reads and holds the LIVE window too, for the register switch's Blocks
 span (D3), and only the Blocks register re-centres it on a pin outside the held range; the Briefing
 fetches the live window AHEAD, so its Blocks stop opens drawn); `components/BlockWindowBridge.tsx` is the one writer, and the store carries only
-`blockWindowStatus` (`loading | failed | ready | beyond | unread`). While the LIVE window is held
-(`liveWindowRuns`: following, touring, or a pin the held live window covers — the band is the live
-instrument, and a block or tick clicked inside the live window never freezes it) it refreshes every
-30 s and takes a tick the feed announces at once; a pin outside it is a past window, which holds
+`blockWindowStatus` (`loading | failed | ready | beyond | unread`) — the REQUEST's state. The held
+window carries its OWN provenance, `BlockWindow.around` (null: the live edge) and `.chain`, stamped by
+the bridge on every answer (review M1/M2): the follow, the Engine's front run, the band and the tip
+append ask the WINDOW, never the request in flight, which says "live" through a resume while the
+pinned window is still the one held; and a read that spends its retries keeps the window only when it
+is the live window of the network asked (`failedReadKeeps`) — a filter's failed refetch clears the
+other network's window (and the live block with it) rather than drawing its numbers under this
+filter. While the LIVE window is held (`liveWindowRuns`: following, touring, or a pin the held live
+window covers or lies NEWER than — the band is the live instrument, and a block or tick clicked inside
+the live window never freezes it) it refreshes on `blockRefreshMs` — every 30 s in Transaction blocks
+and while the tour reads ahead, every 5 minutes in the other registers, whose switch half needs only
+the window's reach (review M3) — and takes a tick the feed announces at once. **A pin newer than the
+held live window's newest block tick KEEPS the live window** (`blockWanted`, review I1): it lies in
+the live edge's silence, the front run, not in the past, so a seconds-old pin carried into
+Transaction blocks never reads as "a past time". A pin older than it is a past window, which holds
 still; **a live refresh never drops a newer tick it
 already holds** (`mergeLiveAnswer` — the edge cache and the explorer's lagging index can answer an
 older trail), while a pinned answer replaces. A pin deeper than the trail can walk is **beyond
@@ -146,7 +157,8 @@ the window, newest first — the DAG's through the chamber's own exact read (`en
 into `store.blockReads`), a token chain's through the metagraph blocks route — pruned with the
 window. The exact-read queue asks EVERY window tick (`wantedExactReads`), a token-only tick too, so
 every bar on the trail is measured. A read carries each transfer (`BlockRead.transfers`: from, to,
-amount, fee) beside the totals. A failed read is a MISS (`blockReadMiss`, rule 10: blocks with no links, never invented
+amount, fee) beside the totals; MOVED sums the read's own `amount` (the decoder's transfer sum), so a
+read cached before `transfers` was carried still counts (review M4). A failed read is a MISS (`blockReadMiss`, rule 10: blocks with no links, never invented
 ones); a DAG miss is displayed but never excluded, so a DAG ordinal is always re-asked of
 `ensurePage`, which bounds its own retries. A read is the blocks alone — a snapshot's `tips` are
 not read anywhere (design round D5, 2026-11-07: open tips left every surface), so retention keeps
@@ -248,7 +260,8 @@ source is the Metagraph snapshots register's own (`ledgerSource(live, "data")` a
 `snapshots`: the live buffer or a past window, never the block window), and its numbers are the rows'
 `dataTxCount` — the count of data transactions in a snapshot's data blocks, which IS an update count
 (unlike `content`'s length above). The explorer's lead measure (`ledgerMeasure.tickDataUpdates`, the
-`DATA_*` measure lists with "Data updates" first, the store's own `dataMeasure` pick) and the band's
+`DATA_*` measure lists — Data updates · Fees · Metagraphs · Size, Data updates in Anchors' place — the
+store's own `dataMeasure` pick) and the band's
 three readings (`dataStats.ts`: DATA UPDATES over the ticks read with "N of M snapshots read" as its
 floor, BY NETWORK, LAST DATA BLOCK) are pure arithmetic over them; a tick whose read has not landed is
 a gap, never a zero (rule 10). The explorer index lists no data blocks (DED's records carry
