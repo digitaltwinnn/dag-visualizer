@@ -65,7 +65,7 @@ export function BlocksAnchored({ ordinal }: { ordinal: number }) {
       {total > 0 && (
         <>
           <Separator className="mb-2" />
-          <SectionLabel label="Blocks" total={total} unit="moved" className="mb-1.5" />
+          <SectionLabel label="Blocks" total={total} className="mb-1.5" />
           <div className={cn("flex flex-col gap-y-1", CONTENT_EASE)} style={figWidth(figures)}>
             {rows.map((b, i) => {
               const hue = identityHudCss(b.chain);
