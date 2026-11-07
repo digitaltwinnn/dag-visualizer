@@ -99,6 +99,18 @@ export function wantedBlockReads(
   return allWants(w).filter((x) => have[x.key] == null && (x.chain === "dag" || miss[x.key] == null));
 }
 
+/** THE EXACT READS THE WINDOW WANTS: every tick's, newest first, a token-only tick too — so each
+ *  bar on the Blocks trail is MEASURED, not only the ticks holding a DAG block (whose exact read is
+ *  also their block read). What has landed is left out; a missed one is asked again, because
+ *  `ensurePage` dedupes and bounds its own retries. */
+export function wantedExactReads(w: BlockWindow | null, exact: Readonly<Record<number, unknown>>): number[] {
+  if (!w) return [];
+  return w.ticks
+    .map((t) => t.ord)
+    .filter((o) => exact[o] == null)
+    .sort((a, b) => b - a);
+}
+
 /** Every key the window could want, held or not (what retention keeps). */
 export function windowBlockKeys(w: BlockWindow): Set<string> {
   return new Set(allWants(w).map((x) => x.key));

@@ -53,7 +53,7 @@ describe("tipStateOf", () => {
   it("is null with no tips read — never inferred", () => { expect(tipStateOf("a", null)).toBeNull(); });
 });
 describe("referenceSegments — every reference a read states", () => {
-  const b = (hash: string, parents: string[]) => ({ hash, height: 1, parents: parents.map((p) => ({ hash: p, height: 0 })), txCount: 1, amount: 1, fee: 0, signers: 3 });
+  const b = (hash: string, parents: string[]) => ({ hash, height: 1, parents: parents.map((p) => ({ hash: p, height: 0 })), txCount: 1, amount: 1, fee: 0, signers: 3, transfers: [] });
   const at = (h: string) => (h === "p1" ? [0, 0, 0] as const : h === "c" ? [2, 0, 1] as const : null);
   it("runs a segment to every parent placed, child first, naming both ends", () => {
     const r = referenceSegments([b("c", ["p1"])], at, -6);

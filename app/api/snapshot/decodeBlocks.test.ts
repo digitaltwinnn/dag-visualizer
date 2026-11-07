@@ -13,6 +13,10 @@ describe("decodeBlocks", () => {
     expect(blocks[0].height).toBe(61636);
     expect(blocks[0].txCount).toBe(1);
     expect(blocks[0].amount).toBeCloseTo(8450.12, 2);
+    // Each transfer carries its own from, to, amount and fee, in DAG.
+    expect(blocks[0].transfers).toEqual([
+      { from: "DAG6Yxge8Tzd8DJDJeL4hMLntnhheHGR4DYSPQvf", to: "DAG8ctPAiuzE3KBsxayAMAZSawZazHkqi5morCdu", amount: expect.closeTo(8450.12, 2), fee: expect.closeTo(0.01, 8) },
+    ]);
     expect(blocks[0].signers).toBe(3);
     expect(blocks[0].hash).toBe("");
     expect(tips?.active.map((t) => t.introducedAt)).toContain(7241162);

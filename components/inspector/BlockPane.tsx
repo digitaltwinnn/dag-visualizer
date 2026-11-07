@@ -5,24 +5,26 @@
 // actually held (rule 10):
 //
 //   head      · "Block", the short hash, and the block's HEIGHT as the qualifier chip
-//   lead      · what it moved — "Moved N DAG in M transfers", in the chain's own unit — else, with
-//               nothing moved or its read not landed, the relation the feed already names:
+//   lead      · what it moved, in the chain's own unit — ONE transfer names it, "Moved N DAG from
+//               DAG1ab…cd to DAG9ef…01"; several are counted, "Moved N DAG in M transfers" — else,
+//               with nothing moved or its read not landed, the relation the feed already names:
 //               "Accepted into global N"
-//   breakdown · OMITTED: a block's full read (`BlockRead`) carries its totals, not its transfers,
-//               so there is no per-transfer row to draw
-//   facts     · parents (two short hashes), children (how many window blocks are built on it, as
-//               far as the held reads show), signatures, fees — "reading…" until the read lands, and
-//               a failed read says so. NO HEIGHT ROW: the head's chip states it, and a card never
-//               says one fact twice. No sub-height either: a block read carries none.
+//   breakdown · several transfers: one row each, from → to · amount · fee (the read's own
+//               `transfers`, the six-slot grammar's breakdown table); one transfer is the lead's
+//   facts     · parents (two short hashes), children IN VIEW (how many of the window's held reads
+//               are built on it — a count within the window, labelled so, never a total),
+//               signatures, fees — "reading…" until the read lands, and a failed read says so. NO
+//               HEIGHT ROW: the head's chip states it, and a card never says one fact twice. No
+//               sub-height either: a block read carries none.
 //   doors     · "Block records": the raw layer's blocks table, this block's row pinned in its
 //               accepting global's group (`trendDoors.openBlockRecord`)
 //   foot      · the hash and the parents' hashes, in full with copy
-import type { CSSProperties } from "react";
+import { Fragment, type CSSProperties } from "react";
 import { ArrowUpRight } from "lucide-react";
 import CardHead, { RailPane } from "@/components/CardHead";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { BLOCK_ICON, KIND_MARK_CLASS } from "@/components/icons";
-import { Door, Empty, Fact, FactGroup, Foot, FootRow, Lead, QualifierChip } from "@/components/inspector/parts";
+import { Door, Empty, Fact, FactGroup, Foot, FootRow, Lead, QualifierChip, SectionLabel } from "@/components/inspector/parts";
 import { tickerOf } from "@/components/explorer/nodeRow";
 import { openBlockRecord } from "@/components/trendDoors";
 import { useFeedRead } from "@/components/useFeedRead";
@@ -31,6 +33,11 @@ import { blockChildren, blockReadKey, blockReadOf } from "@/src/data/blockReads"
 import { compactDag, midHash } from "@/src/util/format";
 import { identityHudCss } from "@/src/palette/identity";
 import { useStore } from "@/src/store/store";
+
+/** A wallet address the card names in a sentence or a row: the app's one mid-ellipsis, head and tail kept. */
+const addr = (a: string) => midHash(a, 12);
+/** …and tighter in a breakdown row, where two share a line with an amount and a fee. */
+const rowAddr = (a: string) => midHash(a, 9);
 
 const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
 
@@ -51,9 +58,14 @@ export default function BlockPane({ onClose, collapsed, onToggle }: { onClose: (
   // The amount is in the CHAIN's unit: DAG for the DAG's own blocks, the token's ticker otherwise.
   const unit = tickerOf(sel.chain);
   const anchor = sel.anchorOrd.toLocaleString();
+  // The read's own transfers (a read cached before they were carried has none to list).
+  const transfers = read?.transfers ?? [];
+  const one = transfers.length === 1 ? transfers[0]! : null;
   const lead =
     read && read.txCount > 0 && read.amount > 0
-      ? `Moved ${compactDag(read.amount)} ${unit} in ${plural(read.txCount, "transfer", "transfers")}`
+      ? one && one.from && one.to
+        ? `Moved ${compactDag(one.amount)} ${unit} from ${addr(one.from)} to ${addr(one.to)}`
+        : `Moved ${compactDag(read.amount)} ${unit} in ${plural(read.txCount, "transfer", "transfers")}`
       : `Accepted into global ${anchor}`;
   const children = read ? blockChildren(reads, sel.chain, sel.hash) : null;
 
@@ -86,6 +98,26 @@ export default function BlockPane({ onClose, collapsed, onToggle }: { onClose: (
       {!collapsed && (
         <div>
           <Lead>{lead}</Lead>
+          {transfers.length > 1 && (
+            // THE BREAKDOWN: one row per transfer, from → to, then its amount and its fee.
+            <div className="mt-2 mb-2">
+              <SectionLabel label="Transfers" total={transfers.length.toLocaleString()} />
+              <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto_auto] items-baseline gap-x-2.5 gap-y-0.5 text-label">
+                <span className="text-muted-foreground">From → to</span>
+                <span className="text-right text-muted-foreground">Amount</span>
+                <span className="text-right text-muted-foreground">Fee</span>
+                {transfers.map((t, i) => (
+                  <Fragment key={i}>
+                    <span className="min-w-0 truncate font-mono text-foreground-dim">
+                      {t.from ? rowAddr(t.from) : <Empty />} → {t.to ? rowAddr(t.to) : <Empty />}
+                    </span>
+                    <span className="text-right font-mono tabular-nums whitespace-nowrap text-foreground">{compactDag(t.amount)} {unit}</span>
+                    <span className="text-right font-mono tabular-nums whitespace-nowrap text-foreground-dim">{compactDag(t.fee)}</span>
+                  </Fragment>
+                ))}
+              </div>
+            </div>
+          )}
           <FactGroup>
             {read ? (
               <>
@@ -96,7 +128,7 @@ export default function BlockPane({ onClose, collapsed, onToggle }: { onClose: (
                     <Empty why="This block names no parents" />
                   )}
                 </Fact>
-                <Fact label="Children">{children != null ? children.toLocaleString() : <Empty />}</Fact>
+                <Fact label="Children in view">{children != null ? children.toLocaleString() : <Empty />}</Fact>
                 <Fact label="Signatures">{read.signers.toLocaleString()}</Fact>
                 <Fact label="Fees paid">
                   <span className="whitespace-nowrap">{compactDag(read.fee)} {unit}</span>

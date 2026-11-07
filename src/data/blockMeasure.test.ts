@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BLOCK_MEASURE_LABELS, BLOCK_MEASURE_OPTIONS, BLOCK_MEASURE_ORDER, blockMeasureText, blockMeasureValue } from "./blockMeasure";
 import { formatDag } from "./trendSeries";
 
-const b = { hash: "h", height: 61636, parents: [], txCount: 1, amount: 8450.12, fee: 0.01, signers: 3 };
+const b = { hash: "h", height: 61636, parents: [], txCount: 1, amount: 8450.12, fee: 0.01, signers: 3, transfers: [] };
 
 describe("blockMeasure", () => {
   it("orders amount · fee · height and formats each", () => {

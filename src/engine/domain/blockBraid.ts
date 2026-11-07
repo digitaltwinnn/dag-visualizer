@@ -24,6 +24,17 @@ export interface BlockRead {
   amount: number;
   fee: number;
   signers: number;
+  /** Each transfer the block carries — source and destination addresses, amount and fee in the
+   *  chain's own unit (the totals above are their sums). */
+  transfers: BlockTransfer[];
+}
+
+/** One transfer inside a block. */
+export interface BlockTransfer {
+  from: string;
+  to: string;
+  amount: number;
+  fee: number;
 }
 
 export interface TipRead {

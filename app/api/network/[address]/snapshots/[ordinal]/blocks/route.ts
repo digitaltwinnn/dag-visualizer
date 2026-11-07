@@ -28,7 +28,7 @@ async function fetchBlocks(net: NetworkId, address: string, ordinal: number) {
 }
 
 const cachedBlocks = (net: NetworkId, address: string, ordinal: number) =>
-  unstable_cache(() => fetchBlocks(net, address, ordinal), ["metagraph-snap-blocks-v1", net, address, String(ordinal)], {
+  unstable_cache(() => fetchBlocks(net, address, ordinal), ["metagraph-snap-blocks-v2", net, address, String(ordinal)], {
     revalidate: 86400,
   })();
 

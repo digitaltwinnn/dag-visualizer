@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BLOCK_FRONTIER, blockChildren, blockReadKey, blockReadOf, frontierAdvances, frontierChains, frontierKey, isFrontierKey, unstampedFrontiers, wantedBlockReads, windowBlockKeys } from "@/src/data/blockReads";
+import { BLOCK_FRONTIER, blockChildren, blockReadKey, blockReadOf, frontierAdvances, frontierChains, frontierKey, isFrontierKey, unstampedFrontiers, wantedBlockReads, wantedExactReads, windowBlockKeys } from "@/src/data/blockReads";
 import type { BlockRead } from "@/src/engine/domain/blockBraid";
 import { foldBlockWindow } from "@/src/data/blockWindow";
 import type { RawMetaSnapshot } from "@/src/data/types";
@@ -22,6 +22,11 @@ describe("block reads wanted by a window", () => {
   it("skips what is held; a missed token read is not asked again, a missed DAG read still is", () => {
     expect(wantedBlockReads(w, { "dag:300": {} }, { "dag:100": true }).map((x) => x.key)).toEqual(["DOR:51", "dag:100"]);
     expect(wantedBlockReads(w, {}, { "DOR:51": true }).map((x) => x.key)).toEqual(["dag:300", "dag:100"]);
+  });
+  it("asks the exact read of EVERY window tick, a token-only tick too, newest first, leaving out what landed", () => {
+    expect(wantedExactReads(w, {})).toEqual([300, 200, 100]);
+    expect(wantedExactReads(w, { 200: {} })).toEqual([300, 100]);
+    expect(wantedExactReads(null, {})).toEqual([]);
   });
   it("windowBlockKeys holds every key the window could want", () => {
     expect([...windowBlockKeys(w)].sort()).toEqual(["DOR:51", "dag:100", "dag:300"]);
@@ -51,7 +56,7 @@ describe("the token chains whose frontier is read", () => {
 });
 
 describe("one block's read and its children", () => {
-  const b = (hash: string, parents: string[]): BlockRead => ({ hash, height: 1, parents: parents.map((p) => ({ hash: p, height: 0 })), txCount: 1, amount: 1, fee: 0, signers: 3 });
+  const b = (hash: string, parents: string[]): BlockRead => ({ hash, height: 1, parents: parents.map((p) => ({ hash: p, height: 0 })), txCount: 1, amount: 1, fee: 0, signers: 3, transfers: [] });
   const reads = {
     [blockReadKey("dag", 300)]: { blocks: [b("d1", ["d0", "x"]), b("d2", ["d0", "d1"])], tips: null },
     [blockReadKey("dag", 100)]: { blocks: [b("d0", ["y", "z"])], tips: null },

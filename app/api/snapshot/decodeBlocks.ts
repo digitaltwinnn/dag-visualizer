@@ -1,17 +1,18 @@
-import type { BlockRead, TipRead } from "@/src/engine/domain/blockBraid";
+import type { BlockRead, BlockTransfer, TipRead } from "@/src/engine/domain/blockBraid";
 import { blockHashesOf } from "@/src/data/api";
 
 // The blocks and tips a snapshot VALUE carries — the same shape on a global snapshot and a
 // metagraph's: `blocks[].block.{value:{parent,transactions},proofs}` and
 // `tips.{remainedActive,deprecated}`. Amounts and fees are datum (1e-8 DAG) on the wire and DAG
-// here. A block's own hash is not in the value (the indexer computes it), so every block comes
+// here; each transfer keeps its own source, destination, amount and fee (`transfers`), the totals
+// are their sums. A block's own hash is not in the value (the indexer computes it), so every block comes
 // back with `hash: ""` and the route fills it from the explorer record, by index. Absent data
 // stays absent (rule 10): no blocks → [], no tips → null.
 
 const DATUM = 1e8;
 
 type Ref = { hash?: unknown; height?: unknown };
-type Tx = { value?: { amount?: unknown; fee?: unknown } };
+type Tx = { value?: { source?: unknown; destination?: unknown; amount?: unknown; fee?: unknown } };
 type RawBlock = { block?: { value?: { parent?: Ref[]; transactions?: Tx[] }; proofs?: unknown[] } };
 type RawTips = {
   remainedActive?: { block?: Ref; usageCount?: unknown; introducedAt?: unknown }[];
@@ -29,9 +30,13 @@ export function decodeBlocks(value: unknown): { blocks: BlockRead[]; tips: TipRe
     const txs = inner?.value?.transactions ?? [];
     let amount = 0;
     let fee = 0;
+    const transfers: BlockTransfer[] = [];
     for (const t of txs) {
-      amount += num(t?.value?.amount);
-      fee += num(t?.value?.fee);
+      const a = num(t?.value?.amount);
+      const f = num(t?.value?.fee);
+      amount += a;
+      fee += f;
+      transfers.push({ from: str(t?.value?.source), to: str(t?.value?.destination), amount: a / DATUM, fee: f / DATUM });
     }
     return {
       hash: "",
@@ -41,6 +46,7 @@ export function decodeBlocks(value: unknown): { blocks: BlockRead[]; tips: TipRe
       amount: amount / DATUM,
       fee: fee / DATUM,
       signers: Array.isArray(inner?.proofs) ? inner.proofs.length : 0,
+      transfers,
     };
   });
   const t = v.tips;
