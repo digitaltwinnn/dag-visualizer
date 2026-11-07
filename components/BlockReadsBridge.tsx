@@ -7,7 +7,7 @@ import { reportPoll } from "@/src/data/api";
 import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
 import { blockReadKey, wantedBlockReads, wantedExactReads, windowBlockKeys, type BlockReadWant } from "@/src/data/blockReads";
 import { BACKFILL_GAP_MS, ensurePage } from "@/components/RawSnapshotBridge";
-import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
+import { registerOf } from "@/src/engine/domain/viewPolicy";
 import type { BlockRead } from "@/src/engine/domain/blockBraid";
 
 // THE BLOCK READS' FETCHER (`src/data/blockReads.ts` says which reads the window wants). A block's
@@ -22,7 +22,7 @@ import type { BlockRead } from "@/src/engine/domain/blockBraid";
 const RETRY_MS = 5000;
 
 export default function BlockReadsBridge() {
-  const on = useStore((s) => VIEW_POLICIES[s.mode].tickScoped && s.ledgerRegister === "blocks");
+  const on = useStore((s) => registerOf(s.mode, s.ledgerRegister) === "blocks");
   const gen = useRef(0);
 
   useEffect(() => {

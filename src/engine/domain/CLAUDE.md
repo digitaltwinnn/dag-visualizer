@@ -167,10 +167,11 @@ The design rules behind the table, which the tests pin but don't explain:
   not a pick — the auto-followed metagraph snapshot's rule), and the Block card's LIVE / PINNED
   control is `blockFollowActions`, which re-commits the block LAST either way so its card stays the
   box the reader pressed.
-- **A register switch is a setting that RELEASES** (2026-11-06). `registerSwitchActions` drops what
-  the register being left drew and the other cannot draw — leaving Blocks drops the block, leaving
-  Snapshots the metagraph snapshot — and keeps the pin and the committed network, which are the
-  tick's own. `switchLedgerRegister` (`src/store/applyClickActions.ts`) is the ONE door: it applies
+- **A register switch is a setting that RELEASES** (2026-11-06; three registers since D6). `registerSwitchActions`
+  drops what the register ENTERED cannot draw — entering Transaction blocks drops the metagraph
+  snapshot, entering either other (Metagraph snapshots or Data blocks) drops the block, and
+  Metagraph snapshots ↔ Data blocks keeps both, since Data blocks' subjects are the same snapshots —
+  and keeps the pin and the committed network, which are the tick's own. `switchLedgerRegister` (`src/store/applyClickActions.ts`) is the ONE door: it applies
   that release through the executor, clears a block's hover preview, then sets the field. The store's
   raw `setLedgerRegister` releases nothing and cannot (the executor imports the store; the reverse is
   a cycle), so `selectionBoundary.test.ts` holds every surface — the register control, the footer,
