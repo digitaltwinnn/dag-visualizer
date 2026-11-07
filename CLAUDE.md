@@ -33,12 +33,19 @@ Four views drive the 3D scene:
   themselves; there is no heatmap layer.
 - **Snapshots** (`ledger`) — a 3D anchoring chamber: one global-ledger floor below, one narrow plane
   per metagraph above it. The gap between planes is the point — metagraphs are unrelated and only
-  come together on the global plane. **It has a second REGISTER, Blocks** (`store.ledgerRegister`,
-  `/blocks`, 2026-11-06; `docs/superpowers/specs/2026-11-05-block-dag-view-design.md`): the same
-  chamber read as the block DAG inside the snapshots — the trail is the global snapshots that hold a
-  block, the DAG's blocks stand above the floor as a layered DAG drawing, token blocks on their
-  metagraph snapshot's tile. A register is a setting of a view, never a Mode (`viewPolicy.registers`
-  lists it; the view switch holds no sixth button), and `switchLedgerRegister`
+  come together on the global plane. **It reads three REGISTERS** (`store.ledgerRegister`; the switch
+  on the scene says **Metagraph snapshots | Transaction blocks | Data blocks** — the VIEW stays
+  "Snapshots"; `docs/superpowers/specs/2026-11-05-block-dag-view-design.md`): **Metagraph snapshots**
+  is the chamber as described; **Transaction blocks** (`/blocks`, 2026-11-06) the same chamber read as
+  the block DAG inside the snapshots — the trail is the global snapshots that hold a block, the DAG's
+  blocks stand above the floor as a layered DAG drawing, token blocks on their metagraph snapshot's
+  tile; **Data blocks** (`/data-blocks`, D6 2026-11-07 — user: "Threeway.") the Metagraph snapshots
+  chamber as it stands, same source, plus a mark on each tile whose exact read says it carried data
+  blocks, its height the count of data updates (a cL1 block holds transactions, a dL1 block data
+  updates — the protocol's own split). A register is a setting of a view, never a Mode
+  (`viewPolicy.registers` lists them; the view switch holds no sixth button), its pages live in ONE map
+  (`components/views.ts`' `REGISTER_PAGES`, pinned by `views.test.ts`), the chamber dispatches on ONE
+  keyed map (`LedgerView`'s `REGISTER_CARGO`), and `switchLedgerRegister`
   (`src/store/applyClickActions.ts`) is its one door. The area files carry it: the chamber in
   `src/engine/scene/CLAUDE.md`, the block window in `src/data/CLAUDE.md`, the routes in
   `app/api/CLAUDE.md`, the HUD in `components/CLAUDE.md`, the selection in `src/engine/domain/CLAUDE.md`.

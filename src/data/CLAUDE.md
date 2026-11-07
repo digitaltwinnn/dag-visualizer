@@ -66,7 +66,11 @@ never overridden.
 
 That pane is the metagraph-snapshot card's **two-step disclosure** — the CARD states the SHAPE of the
 application state, the pane renders the PAYLOAD one level down **on a second deliberate gesture, because
-one anchoring channel publishes personal records.** Arriving here IS that gesture, so the pane reads its
+one anchoring channel publishes personal records.** The gate guards payload RENDERING, not counting
+(ruling, 2026-11-07): the card's "Data updates" COUNT comes from the tick's exact read
+(`ChannelSnapRow.dataTxCount`, `app/api/snapshot/exactRow.ts`), so the card states it with no
+Decompress and no `/channel/` request (`components/inspector/metaSnapDataCount.test.ts`); the deep read
+serves the payload, the state's shape and the dL1 signers. Arriving here IS that gesture, so the pane reads its
 own subject's payload on arrival (the surface gate, in `src/engine/scene/CLAUDE.md`). Its shape is
 **ONE LANE AXIS** (2026-08-09): the
 snapshot's facts stay pinned at the top, and the payload sits behind `STATE · DATA · SIGNERS` tabs whose
@@ -238,6 +242,18 @@ The snapshot card renders the breakdown as colour-coded pills with the authorita
 from the exact read when available. It deliberately shows **no block count**, since blocks aren't the
 activity signal here. (A snapshot's `content` is the serialized snapshot as a *byte array*, not a list
 of records — don't surface its length as an update count.)
+
+**The Data blocks register reads the data updates off the same exact reads** (D6, 2026-11-07). Its
+source is the Metagraph snapshots register's own (`ledgerSource(live, "data")` answers as for
+`snapshots`: the live buffer or a past window, never the block window), and its numbers are the rows'
+`dataTxCount` — the count of data transactions in a snapshot's data blocks, which IS an update count
+(unlike `content`'s length above). The explorer's lead measure (`ledgerMeasure.tickDataUpdates`, the
+`DATA_*` measure lists with "Data updates" first, the store's own `dataMeasure` pick) and the band's
+three readings (`dataStats.ts`: DATA UPDATES over the ticks read with "N of M snapshots read" as its
+floor, BY NETWORK, LAST DATA BLOCK) are pure arithmetic over them; a tick whose read has not landed is
+a gap, never a zero (rule 10). The explorer index lists no data blocks (DED's records carry
+`blocks: []`), and a data chain anchors data in nearly every snapshot, so the snapshot trail IS the
+data trail — no window of its own is read.
 
 **A data metagraph's real payload rides in its blocks' `dataTransactions`, not necessarily in
 `onChainState`** — verified live. DED anchors fingerprint batch commitments (a batch id and a Merkle

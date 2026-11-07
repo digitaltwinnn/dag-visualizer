@@ -543,8 +543,9 @@ special-case for unlisted.
 
 ### The Blocks register
 
-The chamber has a second REGISTER (`store.ledgerRegister`, a setting of the view, never a Mode —
-`docs/superpowers/specs/2026-11-05-block-dag-view-design.md`). It is the SAME chamber: floor, planes,
+The chamber reads three REGISTERS (`store.ledgerRegister`, a setting of the view, never a Mode —
+`docs/superpowers/specs/2026-11-05-block-dag-view-design.md`): Metagraph snapshots, Transaction blocks
+(this section — "Blocks" in the code) and Data blocks (the next). It is the SAME chamber: floor, planes,
 bars, labels, the rewind and the pose. What differs answers through ONE keyed map, `LedgerView`'s
 `REGISTER_CARGO` (a new register is a compile error there):
 
@@ -664,6 +665,33 @@ rules are `src/engine/domain/CLAUDE.md`'s.
 **Pinned by** `domain/blockBraid.test.ts` (`layeredZ`'s placement and its prior, every reference
 `referenceSegments` draws, the silent run), `src/data/blockWindow.test.ts` (the source
 and when it continues) and `domain/pickActions.test.ts`'s block cases.
+
+### The Data blocks register
+
+The third register (D6, 2026-11-07 — user: "a 3rd option 'data blocks' which can visualize the DED
+which would inherit the snapshot layout?" → "Threeway."). Its `REGISTER_CARGO` row says all of it:
+`blocks: false, liveEdge: true, anchors: "sheets", bareTiles: true` — the Metagraph snapshots
+chamber byte-identically (the same source, ribbons, tiles, bands and live edge) — and
+`dataMarks: true`. Data blocks have no parents, so there is no braid and no link; nothing else in
+`update` branches on the register.
+
+**The mark** is one `InstancedMesh` beside the tiles (`_dataMarkMesh`, the tiles' own species: solid,
+normal-blended, depth-writing, in the bloom set, not pickable — the tile under it answers the click),
+one instance per tile in the tile draw's order. Its COUNT is resolved at event time with the pick table
+(`_rebuildTilePicks`): the tile resolver names the metagraph snapshot, and that snapshot's own row in
+its tick's exact read gives `dataMarkCount` (`domain/dataMark.ts`) — a mark only where the row says
+it carried data blocks; a tile whose read has not landed shows none (rule 10, never guessed). Per frame
+it stands on the tile's top as that frame draws it (`_tileTop` plus the rewind and the entry drop), its
+HEIGHT `dataMarkHeight(count)` (a floor at one update, a decade's step after, a ceiling — one network
+writes a handful per snapshot, another hundreds), its footprint `DATA_MARK.foot` of the tile's, in the
+lane's identity hue at the tile's own eased brightness lifted by `DATA_MARK_GAIN` — so the dim, the
+focus, the boundary fades and the entry beat all reach it through its tile. Every slot is written or
+zero-scaled each frame in the register; leaving it zero-scales every slot the last such frame wrote
+(rule 5's discipline). A switch between the two registers that read the same source re-lays the trail
+(`_refreshLedger`) rather than re-seating it; only a switch to or from Transaction blocks changes the
+source and re-seats (`Engine`, the register subscription).
+
+Pinned by `domain/dataMark.test.ts` (which snapshot is marked, the height scale).
 
 ### The unlisted network
 

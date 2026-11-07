@@ -573,7 +573,7 @@ pointermove. Three rules are worth knowing before touching it:
 
 **The motion hint says what the scene is doing while it moves** (user, 2026-09-26 — `MotionHint`,
 one quiet sentence on a low plate, centred just under the command bar — or one line lower, under the
-register switch, where the view offers two registers: D3). Two store channels, and nothing else feeds it.
+register switch, where the view offers more than one register: D3). Two store channels, and nothing else feeds it.
 `sceneMoving` is ENGINE → REACT: the Engine's `_publishMotion` derives it each frame from the four
 structures that already drive motion — `ViewTransition.active()`, `CameraDirector.flying`, the
 controls' `sceneDragging`, and `TrendStackSync.settled()` where the view has a stack — and writes it
@@ -869,7 +869,8 @@ everything, the filtered network, or the network a committed node or tick belong
 brushed range is a subject with a card of its own, below (user, 2026-10-29); History's top card is
 the window pill's note always. **A register reads its own note** (2026-11-06): in the Snapshots view's
 Blocks register the top card is the block DAG's note (view `blocks`, the whole network's whatever the
-rung stands on), the Snapshots register keeps the ledger's — `REGISTER_NOTES` in `noteSubject.ts`,
+rung stands on), the Metagraph snapshots and Data blocks registers keep the ledger's (Data blocks' records
+ARE metagraph snapshots, D6) — `REGISTER_NOTES` in `noteSubject.ts`,
 read only where the view's policy offers the register, and the Briefing's stops ask through the same
 derivation. Every view that has a note (`viewPolicy.aiNotes`) leads its
 display lane with the `notes` slot (`DISPLAY_LANE` in `railCards.ts`), and the manifest leads with it
@@ -1054,20 +1055,34 @@ a ghost can never split the stack. The lane stays the ladder's one order; this i
 day: "put it on the 1st row and directly show x newer") — it froze at the newest tick on screen
 from 2026-10-02; `src/data/ledgerHold.ts`.
 
-**The Blocks register (Snapshots view, 2026-11-06) is one control and four surfaces.** The register
+**The Snapshots view's registers are one control and four surfaces each.** Three registers since D6
+(2026-11-07, user: "Threeway."), named on the switch **Metagraph snapshots | Transaction blocks | Data
+blocks** (`REGISTER_NAMES`, `components/views.ts` — user: "Since they all converge into snapshots, the
+control 'snapshots' should be 'metagraph snapshots'"; the VIEW stays "Snapshots"; "Blocks" in code and
+below is the Transaction blocks register). The explorer's title is the register's name. The register
 switch stands ON THE SCENE (D3, 2026-11-07 — option A of the user's mock,
 `components/RegisterSwitch.tsx`): one glass segmented control centred under the command bar, each
-half carrying its own SPAN ("Snapshots · last 11 min", "Blocks · last 14 h"; a pinned stretch names
+half carrying its own SPAN ("Metagraph snapshots · last 11 min", "Transaction blocks · last 14 h",
+"Data blocks · last 11 min" — it reads the snapshots' source, so the same words; a pinned stretch names
 itself, "9 min, 3d ago"; a window not held says its state in a word — "reading…", "not read", "not
-reached"). The span words are `src/data/ledgerSpan.ts`'s, the ONE home the explorer's foot reads too
-(`ledgerSpan.test.ts`), and the Blocks half reads the block window from either register
+reached"). **On a phone three full names do not fit one row**: each half shows its glyph and span, the
+lit half alone its name (each keeps it as its accessible name), with tighter padding there — measured
+at 390: 349px with "Metagraph snapshots" lit, 334 with "Transaction blocks", 281 with "Data blocks",
+inside the 16px gutters. The glyphs are `REGISTER_ICONS` (Data blocks wears `Database`: the metagraph
+kind "data" wears `Blocks`, the transaction block's own mark). The span words are
+`src/data/ledgerSpan.ts`'s, the ONE home the explorer's foot reads too
+(`ledgerSpan.test.ts`), and the Transaction blocks half reads the block window from every register
 (`blockWanted` holds the live window across the whole view). Its cells are the view's
 `viewPolicy.registers`, shown only where the row offers more than one; it waits out a view transition
 (`motionPhase`), the motion hint drops `REGISTER_SWITCH_H` beneath it, and `#register-switch` is a
 marker contract — a callout's free band starts under it (`ChromeBounds.sceneTop`). The explorer card's
 control band holds only the measure tiles (its `control` slot went with the switch). A press goes
 through `switchLedgerRegister`, the one door (`selectionBoundary.test.ts` holds every surface to it),
-and the URL follows (`/snapshots` ⇄ `/blocks`).
+and the URL follows (`/snapshots`, `/blocks`, `/data-blocks` — `REGISTER_PAGES`, the one map the
+routes, the sitemap, the footer's "Transaction blocks" and "Data blocks" links and `RouteSync` read;
+`views.test.ts`). A switch releases what the register entered cannot draw: only Transaction blocks
+releases the metagraph snapshot, and either other register releases the block — Data blocks' subjects
+are the Metagraph snapshots register's own (`metaSnap`, `tickNet`, the pin).
 **LIVE in this register follows the newest BLOCK** (D3, user: "live mode should be applied to the
 block and not the snapshot"): while following, `followLatest` (FollowController's heartbeat — every
 global, anchor and block-window change) seats the window's newest block of its network
@@ -1081,7 +1096,7 @@ view is entered on the auto rule, not the note's pin — `LaneCollapseState.seat
 both subjects of `FollowControl`): the pin is a selection fact an unreachable feed does not change, and
 the feed's own state is the pulse strip's; only a control with nothing pinned, which would otherwise
 claim LIVE, says "no signal". **Its callout is the BLOCK's** (user: "no snapshot callout but a block
-callout"): one label on the Block card's subject, in its head's grammar (mark, short hash, height chip,
+callout"): one label on the Block card's subject, in its head's grammar (mark, short hash — `shortBlockHash`, `src/util/format.ts`, the ONE short form a block hash takes in the card's head, the callout, the explorer's and RAW's rows — height chip,
 live / pinned, then `blockLead`, the card's own lead), anchored at the block's place in the chamber
 (`LedgerView.selectedBlockAnchor`, layout data plus the rewind offset); `#callout-2` stands down. In Blocks the explorer lists the window's blocks, and the
 Block card (`inspector/BlockPane.tsx`) stands under its tick: a card slot with NO rung, between the
@@ -1131,6 +1146,24 @@ say LIVE or PINNED in the state species, and its group starts open. The Block ca
 so a door after a door inherits nothing). Pinned by `src/data/blockStats.test.ts`,
 `components/feedReadBoundary.test.ts` (`api-blocks` readers hold the feed) and
 `components/rawSurfaceBoundary.test.ts` (the register compare stays inside `RecordsSurface`).
+
+**The Data blocks register (D6, 2026-11-07) is the Metagraph snapshots register's surfaces with the
+DATA leading.** The explorer keeps every Snapshots level and leads with **Data updates**
+(`ledgerMeasure`'s `DATA_*` lists; the register's own pick, `store.dataMeasure`, starting on it): a
+tick row's figure is its data updates, a network's and a snapshot's their own, read off the exact read
+(`ChannelSnapRow.dataTxCount`); a tick, network or snapshot that carried no data update is FAINT,
+never hidden (rule 10 — a lens never edits the facts). The card is the metagraph snapshot card, whose
+Data tab states "Data updates N" from the exact read with no Decompress (`metaSnapDataCount.test.ts`).
+RAW is the Metagraph snapshots register's anchor log (its records are metagraph snapshots); the note
+is the ledger's. The band swaps to `DataCells` (`"ledger:data"`, `REGISTER_CELLS` in `VitalsBand.tsx`)
+— THREE cells, `src/data/dataStats.ts`'s arithmetic over the ledger source's ticks: **DATA UPDATES**
+(the count over the snapshots read, "N of M snapshots read" under the unit as its floor, and a line
+of one point per global snapshot — the window spans minutes, so a tick is its bin, an unread tick a
+gap), **BY NETWORK** (`MicroBars` share of the data updates per network), **LAST DATA BLOCK** (the age
+of the newest read tick holding a data block, beside its network; "Window pinned to a past time" in a
+past window). The Snapshots band's "Anchors by metagraph" chart is NOT a fourth cell: it plots the
+measured history's 24 hours, and the band states one window — here the source's minutes. Under the
+DAG filter every cell says "The DAG's own snapshots carry no data blocks".
 
 **The placeholder views host NO facts cards at all** — `detailsCards` returns `[]` outside the 3D
 views (user, 2026-08-10). A live node card, status pill and real ids beside a `preview · in development`
@@ -1204,14 +1237,10 @@ stand alone (geo's `NODES` is lead-only; `NETWORK LAYERS` and PulseStrip's poll 
 detail-only). Three rules keep the row from going ragged, and all three answer the same complaint
 ("the details are right next to the total while there is a lot of white space on the right"):
 
-- **`size` is the one width vocabulary** — `sm` (one reading, no breakdown) / `md` (a reading and its
-  breakdown) / `lg` (a chart that reads better wide). It replaced six hand-picked flex values that
-  each encoded a guess about one card's content. **Every tier keeps an `auto` basis**, never
-  `basis-0`: a share computed with no reference to the card's content is what clipped the rate cards'
-  extrapolation note off the plate at tablet width. **And every tier has a CEILING** — without one an
-  `md` card grows to whatever the viewport gives it, and at 1600px three of them each held ~500px
-  with a void between lead and breakdown. Past the ceilings the row centres; below them the cards
-  still span margin to margin, so the centring is a no-op wherever width is scarce.
+- **Every card takes an EQUAL share of the row** (`flex-1 basis-0` with `min-w-0`, `bandParts.tsx`'s
+  `BandCard`; it takes no width prop): a cell's share is its designated space and its content fills
+  it, the eyebrow truncating first when the card is tight. A `className` (e.g. a `min-w` floor for
+  the stacked chart) is the only per-card adjustment.
 - **`MicroBars`' track is proportional but CAPPED** (`BAR_TRACK_MAX`), and the block is sized to
   what its rows can spend and marked `data-fit`, so `BandCard` shrinks the detail to it and CENTRES
   the whole body — lead, hairline, breakdown — in the card's share (user, 2026-09-29: "centered in

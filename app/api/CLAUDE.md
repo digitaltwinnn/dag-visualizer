@@ -272,8 +272,14 @@ them — but the Next Node server can.
   walk for globals the payload host no longer serves, and that fallback was cut as a second mechanism
   for a case two other columns already cover. Don't re-add it without a consumer.
 - **`/api/snapshot/[ordinal]`** reads the raw L0 global snapshot (~2.5 MB) and returns a tiny exact
-  summary plus one row per anchored channel entry. **An `ordinal: 0` marks a payload the decoder
-  couldn't read, which the UI must show as undecoded rather than as zero.** Cached per ordinal
+  summary plus one row per anchored channel entry (`exactRow.ts`, its own module so the route stays route
+  exports only — `exactRow.test.ts`). **An `ordinal: 0` marks a payload the decoder
+  couldn't read, which the UI must show as undecoded rather than as zero.** Each row carries the DATA
+  UPDATES its data blocks hold (`dataTxCount`) and how many data blocks those were (`dataBlocks`), both
+  absent on an undecodable payload (unknown, never zero), and `perMeta` their sum per address (D6,
+  2026-11-07): the decoder already inflates every anchored channel per tick, so the count costs
+  nothing more here, and the metagraph snapshot card and the Data blocks register read it from this
+  row rather than from the deep read below. Cached per ordinal
   (immutable; a transient upstream failure throws so it retries). The pull (`fetchGlobal.ts`) tries the L0 LB first and falls back to the archival nodes on ANY LB failure — a 404, a CDN block, a 5xx or a timeout (2026-10-04: the LB's CDN 403'd one source IP while the archives served) — and after a non-404 failure skips the LB for `LB_BACKOFF_MS` (10 min), so a blocked source stops knocking on the shut door every tick. It's called for the live and
   selected tick only — never the whole chain, never a poll loop — plus a one-time paced backfill on a
   cold load, because the trail otherwise opens with its unmeasured rows drawing no bars. Each ordinal
@@ -299,7 +305,7 @@ them — but the Next Node server can.
   decode. **A deterministic miss (the channel provably isn't in this immutable global) is cached
   like a success** — throwing it made every repeat of the same bad `(ordinal, address)` re-download
   the whole global, an anonymous amplification loop; only transient failures throw and retry.
-- **`/api/snapshot/[ordinal]`** also answers the snapshot's `blocks` (parents by height and hash, the transfer totals in DAG and each transfer's `{ from, to, amount, fee }` in `transfers`, signature count; hashes paired by index from the explorer record, `""` where it lists none) — never its `tips`, which nothing reads (`decodeBlocks.ts`; cache key `snapshot-exact-v6`, the hashes read apart and cached on success only).
+- **`/api/snapshot/[ordinal]`** also answers the snapshot's `blocks` (parents by height and hash, the transfer totals in DAG and each transfer's `{ from, to, amount, fee }` in `transfers`, signature count; hashes paired by index from the explorer record, `""` where it lists none) — never its `tips`, which nothing reads (`decodeBlocks.ts`; cache key `snapshot-exact-v7` — v7 added the rows' data updates, the hashes read apart and cached on success only).
 - **`/api/network/[address]/snapshots/[ordinal]/blocks`** is a metagraph snapshot's blocks, read from the chain's own L0 (`urls.l0` from the directory, 5 min; `network/metaL0.ts`) through the same `decodeBlocks` (cache key `metagraph-snap-blocks-v3`); the snapshots route's address gate (catalog + unlisted), `public, max-age=86400, s-maxage=86400, immutable`, 503 `no-store` on upstream failure (its
   `route.test.ts` and `snapshot/decodeBlocks.test.ts` pin the answer). The ordinal is a number; anything else, `latest` included, is a 400 — the chain's newest snapshot is read nowhere.
 - **`/api/network/unlisted`** lists the UNLISTED chains — the explorer's `/currency` list less every
