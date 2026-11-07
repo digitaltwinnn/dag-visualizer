@@ -240,14 +240,18 @@ them — but the Next Node server can.
   block-bearing metagraph snapshots anchored into it (a former chain address folded under its
   network's current id). ⚠️ **The explorer's TRANSFER lists are the index**, and their cursor is a
   row hash only (an ordinal or a timestamp cursor answers 500 or an empty page), so a window in the
-  past is found by walking each list from its tip — at most `TRAIL_PAGES_MAX` (12) pages a chain,
-  under one `TRAIL_DEADLINE_MS` (45 s) deadline. So
-  a block with no transfer is not found, and the reach is about three months: a pin the cap cannot
-  reach answers **beyond reach**, a 200 `{ ticks: [], chains, beyond: true }` at `s-maxage=3600`
-  (deeper only gets deeper), which the client states and never retries. `live` is
+  past is found by walking each list from its tip — at most `TRAIL_PAGES_MAX` (12) pages a chain.
+  ONE `TRAIL_DEADLINE_MS` (45 s) deadline bounds the WHOLE request, the walk and the record reads
+  after it (every upstream read races what is left of it), under `maxDuration = 60`. So a block
+  with no transfer is not found, and the reach is the DAG's walk, about three months: a pin the
+  DAG's cap cannot reach answers **beyond reach**, a 200 `{ ticks: [], chains: [], beyond: true }`
+  at `s-maxage=3600` (deeper only gets deeper), which the client states and never retries. A TOKEN
+  chain past its cap contributes what it reached: its older blocks are the walk's floor, never a
+  void of the whole window. `live` is
   `s-maxage=30, stale-while-revalidate=30`; an explicit window a year once its newest tick is an hour
   old, a minute before. A lineage address whose list answers 404 contributes no rows; any other failed
-  read, or the deadline, is a 503 `no-store` — a short answer would read as "no blocks there". Pinned
+  read, or the deadline hit anywhere, is a 503 `no-store` — a short answer would read as "no blocks
+  there". Pinned
   by `blocks/trail.test.ts`.
 - **`/api/global/at?ts=`** binary-searches ~23 tiny per-ordinal records to find the global carrying
   that exact stamp (the anchor join is timestamp EQUALITY — which has exceptions: see the
@@ -284,8 +288,8 @@ them — but the Next Node server can.
   decode. **A deterministic miss (the channel provably isn't in this immutable global) is cached
   like a success** — throwing it made every repeat of the same bad `(ordinal, address)` re-download
   the whole global, an anonymous amplification loop; only transient failures throw and retry.
-- **`/api/snapshot/[ordinal]`** also answers the snapshot's `blocks` (parents by height and hash, transfers in DAG, signature count; hashes paired by index from the explorer record, `""` where it lists none) and `tips` (`decodeBlocks.ts`; cache key `snapshot-exact-v4`, the hashes read apart and cached on success only).
-- **`/api/network/[address]/snapshots/[ordinal]/blocks`** is a metagraph snapshot's blocks and tips, read from the chain's own L0 (`urls.l0` from the directory, 5 min; the L0 reads live in `network/metaL0.ts`) through the same `decodeBlocks`; the snapshots route's address gate (catalog + unlisted), `public, max-age=86400, s-maxage=86400, immutable`, 503 `no-store` on upstream failure (its
+- **`/api/snapshot/[ordinal]`** also answers the snapshot's `blocks` (parents by height and hash, the transfer totals in DAG and each transfer's `{ from, to, amount, fee }` in `transfers`, signature count; hashes paired by index from the explorer record, `""` where it lists none) and `tips` (`decodeBlocks.ts`; cache key `snapshot-exact-v5`, the hashes read apart and cached on success only).
+- **`/api/network/[address]/snapshots/[ordinal]/blocks`** is a metagraph snapshot's blocks and tips, read from the chain's own L0 (`urls.l0` from the directory, 5 min; the L0 reads live in `network/metaL0.ts`) through the same `decodeBlocks` (cache key `metagraph-snap-blocks-v2`); the snapshots route's address gate (catalog + unlisted), `public, max-age=86400, s-maxage=86400, immutable`, 503 `no-store` on upstream failure (its
   `route.test.ts` and `snapshot/decodeBlocks.test.ts` pin the answer).
   **`latest` in place of the ordinal** (2026-11-06) is the chain's FRONTIER: its newest snapshot from
   the L0's `/snapshots/latest`, plus the explorer record's block hashes and its `ts` where the

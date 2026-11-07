@@ -1063,9 +1063,16 @@ metagraph snapshot and the node in the ledger's lane (`DISPLAY_LANE`), present o
 register and only under the tick that accepted it (`parentHolds`), its ghost hint "one on a bar or a
 tile". The snapshot's child step passes over it (`railLadderBoundary.test.ts`'s `PASSES_OVER`): a
 block is a sibling subject of the tick, not the snapshot's child. Its six slots read only what is
-held — the height as the head's chip, what it moved as the lead, parents, children, signatures and
-fees as facts, the hashes in the foot — with no breakdown and no sub-height (a `BlockRead` carries
-neither); `railCards.test.ts`'s block cases pin the slot. The vitals band swaps to `BlocksCells` and RAW to `datasection/BlocksTable`. The band's swap key
+held — the height as the head's chip; what it moved as the lead, ONE transfer named from → to in
+short addresses (`midHash`), several counted; several transfers as the breakdown, one row each
+from → to · amount · fee (`BlockRead.transfers`); parents, CHILDREN IN VIEW (a count within the
+window's held reads, labelled so, never a total), signatures and fees as facts; the hashes in the
+foot — and no sub-height (a `BlockRead` carries none); `railCards.test.ts`'s block cases pin the
+slot. The explorer's Blocks level states its one FLOOR on the heading row ("The DAG and the listed
+networks; unlisted networks' blocks are not read" — the trail reads the listed transfer lists only).
+A filter holds the rows as it holds the chamber: a block whose accepting global the filter's
+network is not in answers nothing — no commit, no hover, faint — in the explorer and in RAW
+(`ledgerStory.blockRowLocked`, the tick rows' `tickLocked` and `Picking.tickHeldOut`'s rule). The vitals band swaps to `BlocksCells` and RAW to `datasection/BlocksTable`. The band's swap key
 is the view, or `"ledger:blocks"` in that register (`useCellsKey` in `VitalsBand.tsx`, the one dispatch
 for band and phone sheet, so the swap rolls). BLOCKS LAST HOUR, OPEN TIPS and FRONTIER AGE are pure
 arithmetic in `src/data/blockStats.ts`: the window lists only block-bearing global snapshots, so a stretch

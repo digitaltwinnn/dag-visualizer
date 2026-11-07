@@ -555,7 +555,8 @@ bars, labels, the rewind and the pose. What differs answers through ONE keyed ma
   all re-seat the chamber through the Engine's one `_reseatLedger`. An EMPTY source is an empty trail
   (`_emptyTrail`), so the Snapshots rows never stand in for a window still loading, and a shorter
   trail clears the slots it leaves behind. The live edge stands down in Blocks (`liveEdge: false`):
-  the trail's newest tick is sealed, never forming.
+  the trail's newest tick is sealed, never forming. What the front says there instead is the FRONT
+  RUN (below).
 - **The cargo on top** (`blocks: true`): two `objects/BlockTier.ts` tiers (the DAG's and the
   tokens', one material each) and `objects/SilentStretch.ts`, drawn per frame only in that register
   and CLEARED at the switch, so nothing of theirs is left to write. The tiers' meshes join
@@ -637,6 +638,15 @@ their slot's entry beat. Links are one `LineSegments`, positions at event time, 
 frame, `glowBlend` on each ground. The silent stretch is one dashed `LineSegments` flush in the floor
 between two rows' bars, plus a flat edge label ("1,364 snapshots · 4h", `relativeAge` — the app's one
 short span) past 200 snapshots; flat, not a billboard, because the floor's text is flat everywhere.
+**The live edge is the silent stretch growing at the front** (spec 2): in the LIVE window one more
+stretch, the FRONT RUN, stands ahead of the lead row's bar (`FRONT_RUN_X0` to `FRONT_INK_X`) for the
+globals since the newest block tick up to the live global, worded by the same rule. The Engine hands
+the live global (`setLiveGlobal`, null for a pinned past window) before each refresh, so it is
+rebuilt at event time on every live tick and its words grow with the silence. It rides the lead row
+(`ledgerModel.frontRunAt`): whole at rest, and gone before its far end reaches the rim when the
+rewind pushes the trail forward — never `frontAt`, which reads anything ahead of the lead as pushed
+off. It sits in the strip `LiveEdge.ts` measured as crowded (the floor's name, the front rim), so
+its words read faintly at the resting pose.
 
 **The selection** is a slot under the tick, no focus rung and no pose (camera principle 2):
 `blockSelectActions` pins the accepting global and commits the block; the same block releases it

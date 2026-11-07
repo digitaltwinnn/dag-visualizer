@@ -106,7 +106,8 @@ The design rules behind the table, which the tests pin but don't explain:
   under the globe re-partitions over the network in view instead of dimming the rest. Snapshots holds
   by the TICK instead: a global snapshot the filter's
   network is not in answers nothing, in the explorer, the scene and the pager, unless it is the one on
-  screen (`ledgerStory.tickLocked`), while a tick that holds it opens whole, its pager stepping that
+  screen (`ledgerStory.tickLocked`; the Blocks register's block rows ask the same through
+  `ledgerStory.blockRowLocked`), while a tick that holds it opens whole, its pager stepping that
   tick's own networks. ⚠️ Only a landed exact read can lock a tick: a polled zero is also what a tick
   looks like once the buffer has rolled past it, and no read means unknown, never none. **The
   ledger's SNAPSHOT rows never set it either** (design session 2026-09-26, decision 13):
