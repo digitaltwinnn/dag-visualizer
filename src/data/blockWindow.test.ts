@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BLOCK_WINDOW_TICKS, blockChainOf, blockWanted, blockWindowContinues, foldBlockWindow, liveWindowRuns, mergeLiveAnswer, tipJoins, trailPath, windowBlocks } from "@/src/data/blockWindow";
+import { BLOCK_WINDOW_TICKS, blockChainOf, blockWanted, blockWindowContinues, foldBlockWindow, liveWindowRuns, mergeLiveAnswer, newestBlock, tipJoins, trailPath, windowBlocks } from "@/src/data/blockWindow";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
 import type { RawMetaSnapshot, SnapshotExact } from "@/src/data/types";
 
@@ -31,7 +31,10 @@ describe("blockWanted", () => {
     expect(blockWanted({ ledger: true, register: "blocks", pin: null, held: null, liveNewest: 900 })).toEqual({ kind: "fetch", around: null });
     expect(blockWanted({ ledger: true, register: "blocks", pin: 500, held: { from: 400, to: 900 }, liveNewest: 900 })).toEqual({ kind: "keep" });
     expect(blockWanted({ ledger: true, register: "blocks", pin: 50, held: { from: 400, to: 900 }, liveNewest: 900 })).toEqual({ kind: "fetch", around: 50 });
-    expect(blockWanted({ ledger: true, register: "snapshots", pin: 50, held: null, liveNewest: 900 })).toEqual({ kind: "clear" });
+    // The Snapshots register reads the live window too (D3: the switch states its span), and a pin
+    // there never re-centres it; outside the view nothing is wanted.
+    expect(blockWanted({ ledger: true, register: "snapshots", pin: 50, held: null, liveNewest: 900 })).toEqual({ kind: "fetch", around: null });
+    expect(blockWanted({ ledger: true, register: "snapshots", pin: 50, held: { from: 400, to: 900 }, liveNewest: 900 })).toEqual({ kind: "keep" });
     expect(blockWanted({ ledger: false, register: "blocks", pin: null, held: null, liveNewest: 900 })).toEqual({ kind: "clear" });
   });
   it("while the Briefing runs, the live window is read ahead in any view and register, and held", () => {
@@ -76,6 +79,25 @@ describe("windowBlocks", () => {
   });
   it("an absent window lists nothing", () => {
     expect(windowBlocks(null)).toEqual([]);
+  });
+});
+
+describe("newestBlock — what LIVE follows in the Blocks register (D3)", () => {
+  const tick = (ord: number, blocks: string[], meta: Record<string, RawMetaSnapshot[]> = {}) => ({ ord, ts: new Date(ord * 10_000).toISOString(), hash: "g" + ord, blocks, metaSnaps: meta });
+  const snap = (ordinal: number, blocks?: string[]) => ({ ordinal, hash: "m" + ordinal, lastSnapshotHash: "", timestamp: "", blocks }) as unknown as RawMetaSnapshot;
+  it("under All: the window's newest block, whatever its chain", () => {
+    const w = foldBlockWindow({ ticks: [tick(300, [], { dor: [snap(52, ["t2"])] }), tick(200, ["d1"])], chains: ["dag", "dor"] }, {});
+    expect(newestBlock(w)).toEqual({ chain: "dor", hash: "t2", ordinal: 52, anchorOrd: 300, ts: new Date(300 * 10_000).toISOString() });
+  });
+  it("under a network's window: that network's newest block — the DAG blocks sharing its ticks are the lens's, not the follow's", () => {
+    const w = foldBlockWindow({ ticks: [tick(300, ["d2"]), tick(200, ["d1"], { dor: [snap(40, ["t0"])] })], chains: ["dor"], chain: "dor" }, {});
+    expect(newestBlock(w)?.hash).toBe("t0");
+    const dag = foldBlockWindow({ ticks: [tick(300, [], { dor: [snap(52, ["t2"])] }), tick(200, ["d1"])], chains: ["dag"], chain: "dag" }, {});
+    expect(newestBlock(dag)?.hash).toBe("d1");
+  });
+  it("no window, or a window with no block of its network: nothing to follow", () => {
+    expect(newestBlock(null)).toBeNull();
+    expect(newestBlock(foldBlockWindow({ ticks: [tick(300, ["d2"])], chains: ["dor"], chain: "dor" }, {}))).toBeNull();
   });
 });
 

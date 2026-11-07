@@ -5,7 +5,6 @@ import { ledgerNetwork } from "@/src/engine/domain/tickNet";
 
 import Explorer, { type ExplorerLevelSpec, type ExplorerRowSpec } from "@/components/explorer/Explorer";
 import { NODE_GLYPH_W, nodeRowSpec, tickerOf, unknownNodeRowSpec } from "@/components/explorer/nodeRow";
-import RegisterSwitch from "@/components/explorer/RegisterSwitch";
 import { IDENT_INK } from "@/components/identInk";
 import TablePager from "@/components/datasection/TablePager";
 import ExplorerFoot from "@/components/explorer/ExplorerFoot";
@@ -16,7 +15,7 @@ import { IdentityDot } from "@/components/inspector/parts";
 import { ensurePage } from "@/components/RawSnapshotBridge";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { useLedgerSource } from "@/components/useLedgerSource";
-import { relativeAge } from "@/src/util/relativeAge";
+import { blockSpanWord, snapshotSpanWord } from "@/src/data/ledgerSpan";
 import { cn } from "@/lib/utils";
 import { latestRelevant } from "@/src/data/follow";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
@@ -130,26 +129,8 @@ function perMetaOf(ex: SnapshotExact | undefined, id: string): { fee: number; by
   return any ? { fee, bytes } : undefined;
 }
 
-/** "last 12 min" / "last 2 h" / "last 9 days" — the time the listed snapshots span, newest back to
- *  oldest, or from `nowMs` back to the oldest: the live block window of a quiet network reaches back
- *  days, and its silence since its newest tick is part of the stretch it vouches for. */
-function spanWords(ordered: readonly GlobalSnapshot[], nowMs?: number): string {
-  if (ordered.length < (nowMs != null ? 1 : 2)) return "latest";
-  const ms = (nowMs ?? Date.parse(ordered[0]!.timestamp)) - Date.parse(ordered[ordered.length - 1]!.timestamp);
-  if (!(ms > 0)) return "latest";
-  const min = Math.max(1, Math.round(ms / 60_000));
-  const h = Math.round(min / 60);
-  return min < 90 ? `last ${min} min` : h < 48 ? `last ${h} h` : `last ${Math.round(h / 24)} days`;
-}
-
-/** A past window's own stretch, in the foot's room beside the pager: how long it spans and how long
- *  ago it ended — "8 min, 1d ago", the card head's age register. A clock span would not fit there,
- *  and the card above names the pinned snapshot's own time. */
-function windowWords(snaps: readonly GlobalSnapshot[]): string {
-  if (!snaps.length) return "";
-  const end = Date.parse(snaps[snaps.length - 1]!.timestamp);
-  return `${spanWords(snaps.slice().reverse()).replace("last ", "")}, ${relativeAge(Date.now() - end)}`;
-}
+// The span words ("last 11 min", "5 h, 2d ago") are `src/data/ledgerSpan.ts`'s — one home with the
+// register switch on the scene, which states each register's span on its own half.
 
 /** The Blocks register's stated floor — what its window reads, in plain words. */
 const BLOCKS_FLOOR = "The DAG and the listed networks; unlisted networks' blocks are not read";
@@ -382,13 +363,7 @@ export default function LedgerPanel() {
   const spanScope = {
     // The status first: while another window loads, or after a read failed, the held window (if
     // any) is not what the reader asked for.
-    word: pastStatus === "loading"
-      ? "reading that time…"
-      : pastStatus === "failed"
-        ? "couldn't read that time"
-        : past
-          ? windowWords(past.globalSnapshots)
-          : spanWords(orderedSnaps),
+    word: snapshotSpanWord({ pastStatus, past: past?.globalSnapshots ?? null, live: orderedSnaps }),
   };
   const spanFooter =
     (live || past || pastStatus) && orderedSnaps.length > 0 ? (
@@ -718,14 +693,7 @@ export default function LedgerPanel() {
   // A failed read names what failed: "that time" around a pin, the plain "read failed" at the live
   // edge, which has no pinned time (the window it holds stays listed).
   const blockFailed = blockStatus?.around == null ? "read failed" : "couldn't read that time";
-  const blockSpan =
-    blockStatus?.status === "loading" && blockGlobals.length
-      ? "reading that time…"
-      : blockStatus?.status === "failed" && blockGlobals.length
-        ? blockFailed
-        : blockStatus?.around == null
-          ? spanWords([...blockGlobals].reverse(), Date.now())
-          : windowWords(blockGlobals);
+  const blockSpan = blockSpanWord({ status: blockStatus, globals: blockGlobals, nowMs: Date.now() });
   const blockLevel: ExplorerLevelSpec = {
     key: "blocks",
     crumb: { label: "Blocks" },
@@ -785,6 +753,7 @@ export default function LedgerPanel() {
                   snapOrd: !st.following && st.snap ? st.snap.data.ordinal : null,
                   metaSnap: st.metaSnap,
                   tickNet: st.tickNet,
+                  following: st.following,
                 }),
               );
             }
@@ -812,12 +781,15 @@ export default function LedgerPanel() {
       id="ledger-view"
       // The card says what it lists (a plural noun): the register decides which.
       title={inBlocks ? "Blocks" : "Snapshots"}
-      control={VIEW_POLICIES[mode].registers.length > 1 ? <RegisterSwitch /> : undefined}
+      // (The register switch rides the scene, D3 — `components/RegisterSwitch.tsx`; this card's
+      // control band holds only the measure tiles.)
       // The sentence is the path's own placeholder now (user, 2026-10-08): one line beside the house.
       // The Blocks register states its one FLOOR here instead (rule 10): the trail reads the DAG's
       // and the listed networks' transfer lists, so an unlisted network's blocks are never in it,
       // and a silent stretch vouches only for what was read.
-      hint={inBlocks ? blocksFloor(blockWin?.partial ?? []) : null}
+      // Under the unlisted filter the list's own empty state says the floor (`BLOCKS_UNREAD`), so the
+      // heading does not say it a second time (D4 carry).
+      hint={inBlocks && blockStatus?.status !== "unread" ? blocksFloor(blockWin?.partial ?? []) : null}
       // The sentence names the NEXT LEVEL, never a measure (user, 2026-10-24: "the hint in the
       // breadcrumb always refers to anchors, it should refer to the selected control button" —
       // "anchors" is also a tile's name, so under Fees it read as stale; the networks that

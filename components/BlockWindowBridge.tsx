@@ -58,8 +58,9 @@ export default function BlockWindowBridge() {
   // The Briefing reads the live window ahead (`blockWanted`'s `touring`): no pin stands during it.
   const touring = useStore((s) => s.briefing != null);
   const pin = following || touring ? null : snapOrd;
-  // Where the live window is wanted: the Blocks register, or anywhere while the tour runs.
-  const liveWanted = touring || (ledger && register === "blocks");
+  // Where the live window is wanted: the Snapshots view in either register (D3: the scene's register
+  // switch states the Blocks span from the Snapshots register too), or anywhere while the tour runs.
+  const liveWanted = touring || ledger;
   // The network the window is read for: the top bar's committed filter (null under All).
   const chain = blockChainOf(useStore((s) => s.filter));
   const setStatus = useStore((s) => s.setBlockWindowStatus);
@@ -142,8 +143,10 @@ export default function BlockWindowBridge() {
       asked.current = "unread";
       answer.current = null;
       dropRetry();
-      setBlockWindow(null);
+      // The status first: the window's change is the follow's heartbeat (FollowController), and the
+      // follow reads the status to tell "not read" (the live block goes) from "not landed yet".
       setStatus({ around: null, status: "unread" });
+      setBlockWindow(null);
       return;
     }
     if (want.kind === "clear") {

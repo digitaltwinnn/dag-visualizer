@@ -508,9 +508,19 @@ export function metaSnapSelectActions(
 export function blockSelectActions(
   b: BlockSel,
   global: Extract<PickDescriptor, { kind: "snapshot" }>,
-  current: { block: BlockSel | null; snapOrd: number | null; metaSnap?: MetaSnapSel | null; tickNet?: TickNetSel | null },
+  current: {
+    block: BlockSel | null;
+    snapOrd: number | null;
+    metaSnap?: MetaSnapSel | null;
+    tickNet?: TickNetSel | null;
+    /** LIVE in the Blocks register follows the newest block (D3): the block shown while following
+     *  is the follow's, not a pick, so clicking it PINS it rather than releasing it. */
+    following?: boolean;
+  },
 ): ClickAction[] {
-  if (current.block && current.block.chain === b.chain && current.block.hash === b.hash) return [{ kind: "block", sel: null }];
+  const same = !!current.block && current.block.chain === b.chain && current.block.hash === b.hash;
+  if (same && current.following) return [{ kind: "snapshot", pick: global, follow: false }, { kind: "block", sel: b }];
+  if (same) return [{ kind: "block", sel: null }];
   const out: ClickAction[] = [];
   if (current.snapOrd !== b.anchorOrd) {
     if (current.metaSnap && current.metaSnap.globalOrdinal !== b.anchorOrd) out.push({ kind: "metaSnap", sel: null });
@@ -528,6 +538,21 @@ export function blockSelectActions(
 export function registerSwitchActions(to: LedgerRegister, current: { block: BlockSel | null; metaSnap: MetaSnapSel | null }): ClickAction[] {
   if (to === "snapshots") return current.block ? [{ kind: "block", sel: null }] : [];
   return current.metaSnap ? [{ kind: "metaSnap", sel: null }] : [];
+}
+
+/** THE BLOCK CARD'S LIVE / PINNED CONTROL (D3 — in the Blocks register live follows the newest
+ *  block, so the control rides the Block card, not the Global snapshot card). Either way the block
+ *  is re-committed LAST, so it RANKS and its card stays the box the reader pressed (the live advance
+ *  never ranks it, and the snapshot action ahead of it ranks the Global card). LIVE pins what is on
+ *  screen: the global pinned, the block kept. PINNED resumes: the tick-local network released, the
+ *  follow turned on, and the follow's next beat re-seats the newest block (`followLatest`). */
+export function blockFollowActions(
+  block: BlockSel,
+  global: Extract<PickDescriptor, { kind: "snapshot" }>,
+  following: boolean,
+): ClickAction[] {
+  if (!following) return [{ kind: "tickNet", sel: null }, { kind: "snapshot", pick: global, follow: true }, { kind: "block", sel: block }];
+  return [...followToggleActions(global, true, block), { kind: "block", sel: block }];
 }
 
 /** The Block card's × — releases the block alone; the tick it hangs under stays pinned. */
@@ -665,6 +690,8 @@ export function clickActions(input: {
     // …and the committed block (the Blocks register), which a block click toggles and a different
     // tick's click drops.
     block?: BlockSel | null;
+    // …and whether the view is following, which turns a click on the LIVE block into its pin (D3).
+    following?: boolean;
   };
 }): ClickAction[] {
   const { mode, pick: p, countryCc, current } = input;
@@ -696,6 +723,7 @@ export function clickActions(input: {
       snapOrd: current.pinnedOrdinal ?? null,
       metaSnap: current.metaSnap ?? null,
       tickNet: current.tickNet,
+      following: current.following,
     });
 
   // A node, in any view. (No autoRotate action: geo disables the controls' rotation at mode

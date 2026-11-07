@@ -780,6 +780,15 @@ export class LedgerView implements SceneView {
     return true;
   }
 
+  /** THE BLOCK CALLOUT'S ANCHOR (D3), chamber-LOCAL: the committed block (`setSelectedBlock` — the
+   *  live newest block or the pinned one) where its tier stands it this frame. False outside the
+   *  Blocks register, with no block, or while its row is off the trail. */
+  selectedBlockAnchor(out: THREE.Vector3): boolean {
+    if (!this._cargo.blocks || this._selBlock == null) return false;
+    for (const t of this._tiers) if (t.anchorOf(this._selBlock, out)) return true;
+    return false;
+  }
+
   /** The SUBJECT CALLOUT's anchor in chamber-LOCAL coordinates: the LEAD slot of the named
    *  lane's plane, or the global floor's lead bar (`laneId: null`). The rewind brings a
    *  committed row to the lead position, so the lead IS where the pinned subject settles —

@@ -41,7 +41,10 @@ import { useState, type CSSProperties } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
-import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
+import { VIEW_POLICIES, registerOf } from "@/src/engine/domain/viewPolicy";
+import { blockReadOf } from "@/src/data/blockReads";
+import { blockLead } from "@/components/inspector/blockLead";
+import { identityHudCss } from "@/src/palette/identity";
 import { displayNetwork } from "@/src/data/unlisted";
 import { coLocatedNetworks, filterAccent, isAnchorSettling, ledgerAnchor, metagraphById } from "@/src/data/network";
 import { fmtKB, fmtShareKB, midHash } from "@/src/util/format";
@@ -248,13 +251,18 @@ export default function SceneCallout() {
   const exact = useStore((s) => (s.snap ? s.snapshotExact[s.snap.data.ordinal] : undefined));
   const following = useStore((s) => s.following);
   const liveFeed = useStore((s) => s.live);
+  // THE BLOCKS REGISTER'S SUBJECT (D3): the Block card's — the live newest block or the pinned one.
+  const inBlocks = useStore((s) => registerOf(s.mode, s.ledgerRegister) === "blocks");
+  const block = useStore((s) => s.block);
+  const blockRead = useStore((s) => (s.block ? blockReadOf(s.blockReads, s.block) : null));
   // Holds only while a callout can SHOW — the view's policy allows one, the scene layer is up and
   // something is committed for it to name (mounted in every view, it reads nothing at rest).
   useFeedRead(
     ["metasnaps", "clusters", "api-metagraphs", "api-geo", "exact"],
     "SceneCallout",
-    VIEW_POLICIES[mode].callout && section === "scene" && (filter !== "all" || !!inspect || !!cohort || !!country || !!snap || !!metaSnap || !!tickNet),
+    VIEW_POLICIES[mode].callout && section === "scene" && (filter !== "all" || !!inspect || !!cohort || !!country || !!snap || !!metaSnap || !!tickNet || !!block),
   );
+  useFeedRead(["api-blocks"], "SceneCallout block", VIEW_POLICIES[mode].callout && section === "scene" && inBlocks && !!block);
   // THE BOX LEADS (user, 2026-08-15 — clicking a committed node's hub re-boxes the metagraph
   // card and "nothing happens in the scene"): the box is the subject (it gets the camera), so
   // the callout mirrors it. Inspector publishes the boxed slot; the Engine's anchor resolvers
@@ -516,7 +524,35 @@ export default function SceneCallout() {
     // The boxed NODE card leads, alone (user, 2026-08-16 — a tray node selected via the card
     // stack shows ITS callout).
     const node = nodeModel();
+    // IN THE BLOCKS REGISTER THE LABEL IS THE BLOCK'S (D3, user 2026-11-07: "In blocks, no snapshot
+    // callout but a block callout"). One label, on the Block card's subject — the live newest block
+    // or the pinned one — in the card head's own grammar: the block mark in its chain's hue, the short
+    // hash, the height chip and the live / pinned state, then the card's lead (`blockLead`). Never the
+    // global's label: the live global is not drawn in this register. CalloutSync anchors it on the
+    // block's own place in the chamber (`LedgerView.selectedBlockAnchor`).
+    const blockModel = (): Model | null => {
+      if (!block) return null;
+      const hue = identityHudCss(block.chain);
+      const height = blockRead ? `height ${blockRead.height.toLocaleString()}` : undefined;
+      return {
+        // The live-lane key rule (msModel above): while following the subject is THE LIVE BLOCK, so a
+        // newer block re-points the label rather than replaying its entrance; a pin is a new subject.
+        key: following ? "blk|live" : `blk|${block.chain}:${block.hash}`,
+        eyebrow: "Block",
+        title: midHash(block.hash, 12),
+        titleMono: true,
+        aside: following
+          ? liveFeed
+            ? { text: "live", live: true, chip: height }
+            : { text: "no signal" }
+          : { text: "", pinned: true, chip: height },
+        ring: hue,
+        mark: { icon: iconForPick("block"), hue },
+        lead: { text: blockLead(block, blockRead) },
+      };
+    };
     if (boxedCard === "node" && node) m = node;
+    else if (inBlocks) m = blockModel();
     else {
       // THE PAIR GETS TWO CALLOUTS (user, 2026-10-03: asked "should snapshot view have two
       // callouts, one for global- and one for metagraph snapshot?" — "2 callouts"). A committed

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { BLOCK_WINDOW_TICKS, type BlockTick } from "@/src/data/blockWindow";
-import { blocksInTick, blocksPerBucket, blocksPerHour, frontierAge, openTipsByChain, BLOCK_BUCKETS } from "@/src/data/blockStats";
+import { blockScopeOf, blocksInTick, blocksPerBucket, blocksPerHour, frontierAge, openTipsByChain, BLOCK_BUCKETS } from "@/src/data/blockStats";
 import { frontierKey } from "@/src/data/blockReads";
 import type { RawMetaSnapshot } from "@/src/data/types";
 
@@ -12,6 +12,16 @@ const snap = (blocks: string[]) => ({ ordinal: 1, blocks }) as unknown as RawMet
 describe("blocksInTick", () => {
   it("counts the global's own blocks and every anchored snapshot's token blocks", () => {
     expect(blocksInTick(tick(1, 1, ["a", "b"], { dor: [snap(["c"]), snap(["d", "e"])], x: [snap([])] }))).toBe(5);
+  });
+});
+
+describe("blockScopeOf — which chain's cut makes the window short (D4 carry, D3)", () => {
+  it("under All any cut chain does; under a network filter only that network's own", () => {
+    expect(blockScopeOf({ chain: null, partial: ["DOR"] })).toEqual({ chain: null, cut: true });
+    expect(blockScopeOf({ chain: "USDC", partial: ["DOR"] })).toEqual({ chain: "USDC", cut: false });
+    expect(blockScopeOf({ chain: "DOR", partial: ["DOR"] })).toEqual({ chain: "DOR", cut: true });
+    expect(blockScopeOf({ chain: "dag", partial: ["DOR"] })).toEqual({ chain: "dag", cut: false });
+    expect(blockScopeOf(null)).toEqual({ chain: null, cut: false });
   });
 });
 

@@ -35,7 +35,7 @@ import { unlistedUnmeasured } from "@/src/data/trendSeries";
 import { nodesBySubregion } from "@/src/data/subregions";
 import { useFeedRead } from "@/components/useFeedRead";
 import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
-import { blocksPerBucket, blocksPerHour, frontierAge, openTipsByChain } from "@/src/data/blockStats";
+import { blockScopeOf, blocksPerBucket, blocksPerHour, frontierAge, openTipsByChain } from "@/src/data/blockStats";
 import { frontierKey } from "@/src/data/blockReads";
 import { windowBlocks } from "@/src/data/blockWindow";
 import { tickerOf } from "@/components/explorer/nodeRow";
@@ -970,8 +970,9 @@ export function BlocksCells({ accent }: { accent: string }) {
   const pinned = status?.around != null;
   const ticks = win?.ticks ?? [];
   // The window's own network's blocks (under a network filter it also holds the DAG blocks sharing
-  // its ticks), and a window its walk cut short is read like a full one: a floor where it is short.
-  const scope = { chain: win?.chain ?? null, cut: (win?.partial.length ?? 0) > 0 };
+  // its ticks), and a window its DRIVING chain's walk cut short is read like a full one: a floor
+  // where it is short (`blockScopeOf`).
+  const scope = blockScopeOf(win);
   const unread = status?.status === "unread";
   const hourRead = win && !pinned ? blocksPerHour(ticks, now, scope) : null;
   const hour = hourRead?.count ?? null;

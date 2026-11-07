@@ -26,22 +26,33 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
-// THE BLOCKS REGISTER'S RAW TABLE (2026-11-06): the block window's blocks, newest first, GROUPED BY
-// THE GLOBAL SNAPSHOT THAT ACCEPTED THEM — the anchor log's own grouping, so the plate states the
-// global once and the "accepted into" column the brief names is the plate itself, not a repeat on
-// every row. The plate selects/releases its global (`snapshotSelectActions`, like the log's) and
-// its chevron folds; a row is a block and its click is the chamber's own block pick
-// (`blockSelectActions`). The committed block is the one PINNED row, said in mark AND word, and its
-// group starts open (the Block card's door lands here). Amount and fee are the block's full read
-// (stored fields only): a read not landed is the dash, never a number (rule 10).
+// THE BLOCKS REGISTER'S RAW TABLE (2026-11-06; ONE ROW PER TRANSFER since D3, user 2026-11-07: "per
+// transfer is useful"): every transfer the window's blocks carry, newest block first, GROUPED BY THE
+// GLOBAL SNAPSHOT THAT ACCEPTED THEM — the anchor log's own grouping. The plate selects/releases its
+// global (`snapshotSelectActions`, like the log's) and its chevron folds. A row is one transfer of a
+// block (`BlockRead.transfers`, the read's stored fields: from, to, amount, fee) beside its block and
+// the snapshot that accepted it (a DAG block's global, a token block's own metagraph snapshot); its
+// click commits the BLOCK (`blockSelectActions`, the chamber's own pick — while following, a click on
+// the live block pins it). The committed block's rows say LIVE or PINNED (the state species) and its
+// group starts open (the Block card's door lands here). Honest states (rule 10): a block whose read
+// has not landed lists ONE row saying "reading…", a failed read says so, and a read that lists no
+// transfer says that — never a number derived from elsewhere.
+//
+// ON A PHONE the columns that IDENTIFY a row stay — from, to and the block (the plate already names
+// the global) — and the MEASURES stand down: amount, fee and the accepting snapshot are the Block
+// card's readings, one tap away (the anchor log's phone rule, components/CLAUDE.md).
 const PHONE_HIDDEN = "max-[700px]:hidden";
 const COLUMNS: { label: string; right?: boolean; phone?: false }[] = [
-  { label: "Chain" },
-  { label: "Block" },
-  { label: "Amount", right: true },
+  { label: "From" },
+  { label: "To" },
+  { label: "Amount", right: true, phone: false },
   { label: "Fee", right: true, phone: false },
-  { label: "Height", right: true, phone: false },
+  { label: "Block" },
+  { label: "Accepted into", right: true, phone: false },
 ];
+/** A wallet address in a row: the app's one mid-ellipsis (`midHash`), head and tail kept — tighter on
+ *  a phone, where from, to and the block share one line. */
+const rowAddr = (a: string, phone: boolean) => midHash(a, phone ? 9 : 14);
 
 export default function BlocksTable() {
   useFeedRead(["api-blocks", "global", "exact"], "BlocksTable");
@@ -138,7 +149,6 @@ export default function BlocksTable() {
             const read = blockReadOf(reads, b);
             const unit = tickerOf(b.chain);
             const missed = miss[`${b.chain}:${b.ordinal}`] != null;
-            const none = <Empty why={missed ? "The read of the accepting snapshot failed" : "Not read yet"} />;
             const pick = () => {
               if (!g || locked) return;
               const st = useStore.getState();
@@ -148,9 +158,28 @@ export default function BlocksTable() {
                   snapOrd: !st.following && st.snap ? st.snap.data.ordinal : null,
                   metaSnap: st.metaSnap,
                   tickNet: st.tickNet,
+                  following: st.following,
                 }),
               );
             };
+            // ONE ROW PER TRANSFER — or the one honest row: reading, failed, or none listed.
+            const transfers = read?.transfers ?? [];
+            const state = !read ? (missed ? "read failed" : "reading…") : transfers.length ? null : "no transfers listed";
+            const lines: ({ from: string; to: string; amount: number; fee: number } | null)[] = state ? [null] : transfers;
+            // The snapshot that accepted the block: a DAG block's global, a token block's own snapshot.
+            const acceptedInto = `${b.chain === "dag" ? "Global" : unit} ${b.ordinal.toLocaleString()}`;
+            const stateMark = on && (
+              <span className="inline-flex items-center gap-1.5 font-sans text-label text-muted-foreground">
+                {following ? (
+                  <>
+                    <LiveDot />
+                    live
+                  </>
+                ) : (
+                  <PinnedMark className="text-muted-foreground" />
+                )}
+              </span>
+            );
             return (
               <Fragment key={`${b.chain}:${b.hash}`}>
                 {head && (
@@ -202,70 +231,57 @@ export default function BlocksTable() {
                     </TableCell>
                   </TableRow>
                 )}
-                {!isFolded(b.anchorOrd) && (
-                  <TableRow
-                    ref={on ? pinnedRow : undefined}
-                    tabIndex={locked ? -1 : 0}
-                    aria-disabled={locked || undefined}
-                    className={cn(
-                      "text-body touch:h-11",
-                      locked ? "cursor-default" : "cursor-pointer hover:bg-[color-mix(in_oklch,var(--row-hue)_12%,transparent)]",
-                      "max-[700px]:grid max-[700px]:grid-cols-[auto_minmax(0,1fr)_auto] max-[700px]:items-center max-[700px]:[&>td]:py-2",
-                      "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
-                      on && "bg-[var(--sel-bg)] text-foreground",
-                      pair.className,
-                      // A COMMITTED FILTER IS A LENS: another chain's blocks still list, stepped back.
-                      ((!on && lens !== "all" && lens !== b.chain) || locked) && "opacity-60",
-                    )}
-                    style={{ "--row-hue": hue, ...(on ? selectionHue(hue) : {}) } as React.CSSProperties}
-                    onMouseEnter={pair.onMouseEnter}
-                    onMouseMove={pair.onMouseMove}
-                    onMouseLeave={pair.onMouseLeave}
-                    onFocus={pair.onFocus}
-                    onBlur={pair.onBlur}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        pick();
-                      }
-                    }}
-                    onClick={pick}
-                  >
-                    <TableCell className={cn(on && "shadow-[inset_2px_0_0_var(--row-hue)]")}>
-                      <span className="flex items-center gap-2">
-                        <IdentityDot hue={hue} />
-                        <span>{unit}</span>
-                      </span>
-                    </TableCell>
-                    <TableCell className="font-mono tabular-nums text-foreground-dim">
-                      <span className="inline-flex items-center gap-1.5">
-                        {midHash(b.hash, 12)}
-                        {/* The selected row says whether it is live or pinned, as the log's row does. */}
-                        {on && (
-                          <span className="inline-flex items-center gap-1.5 font-sans text-label text-muted-foreground">
-                            {following ? (
-                              <>
-                                <LiveDot />
-                                live
-                              </>
-                            ) : (
-                              <PinnedMark className="text-muted-foreground" />
-                            )}
-                          </span>
-                        )}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {read ? <span className="whitespace-nowrap">{compactDag(read.amount)} {unit}</span> : none}
-                    </TableCell>
-                    <TableCell className={cn("text-right tabular-nums text-foreground-dim", PHONE_HIDDEN)}>
-                      {read ? <span className="whitespace-nowrap">{compactDag(read.fee)} {unit}</span> : none}
-                    </TableCell>
-                    <TableCell className={cn("text-right tabular-nums text-foreground-dim", PHONE_HIDDEN)}>
-                      {read ? read.height.toLocaleString() : none}
-                    </TableCell>
-                  </TableRow>
-                )}
+                {!isFolded(b.anchorOrd) &&
+                  lines.map((t, k) => (
+                    <TableRow
+                      key={k}
+                      ref={on && k === 0 ? pinnedRow : undefined}
+                      tabIndex={locked ? -1 : 0}
+                      aria-disabled={locked || undefined}
+                      className={cn(
+                        "text-body touch:h-11",
+                        locked ? "cursor-default" : "cursor-pointer hover:bg-[color-mix(in_oklch,var(--row-hue)_12%,transparent)]",
+                        "max-[700px]:grid max-[700px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] max-[700px]:items-center max-[700px]:[&>td]:py-2",
+                        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
+                        on && "bg-[var(--sel-bg)] text-foreground",
+                        pair.className,
+                        // A COMMITTED FILTER IS A LENS: another chain's blocks still list, stepped back.
+                        ((!on && lens !== "all" && lens !== b.chain) || locked) && "opacity-60",
+                      )}
+                      style={{ "--row-hue": hue, ...(on ? selectionHue(hue) : {}) } as React.CSSProperties}
+                      onMouseEnter={pair.onMouseEnter}
+                      onMouseMove={pair.onMouseMove}
+                      onMouseLeave={pair.onMouseLeave}
+                      onFocus={pair.onFocus}
+                      onBlur={pair.onBlur}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          pick();
+                        }
+                      }}
+                      onClick={pick}
+                    >
+                      <TableCell className={cn("min-w-0 truncate font-mono tabular-nums text-foreground-dim", on && "shadow-[inset_2px_0_0_var(--row-hue)]")}>
+                        {t ? rowAddr(t.from, phone) || <Empty /> : <span className="font-sans text-label text-muted-foreground">{state}</span>}
+                      </TableCell>
+                      <TableCell className="min-w-0 truncate font-mono tabular-nums text-foreground-dim">{t ? rowAddr(t.to, phone) || <Empty /> : <Empty />}</TableCell>
+                      <TableCell className={cn("text-right tabular-nums", PHONE_HIDDEN)}>
+                        {t ? <span className="whitespace-nowrap">{compactDag(t.amount)} {unit}</span> : <Empty />}
+                      </TableCell>
+                      <TableCell className={cn("text-right tabular-nums text-foreground-dim", PHONE_HIDDEN)}>
+                        {t ? <span className="whitespace-nowrap">{compactDag(t.fee)} {unit}</span> : <Empty />}
+                      </TableCell>
+                      <TableCell className="font-mono tabular-nums text-foreground-dim">
+                        <span className="inline-flex items-center gap-1.5">
+                          <IdentityDot hue={hue} />
+                          {midHash(b.hash, phone ? 9 : 12)}
+                          {stateMark}
+                        </span>
+                      </TableCell>
+                      <TableCell className={cn("text-right tabular-nums text-foreground-dim whitespace-nowrap", PHONE_HIDDEN)}>{acceptedInto}</TableCell>
+                    </TableRow>
+                  ))}
               </Fragment>
             );
           })}

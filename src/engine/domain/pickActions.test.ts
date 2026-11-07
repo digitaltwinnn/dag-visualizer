@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
-import { netKeyOf, tickNetSelectActions, tickNetClearActions, viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, countryClearActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, trendPlaneActions, railNetActions, noteCohortActions, noteDayActions, snapshotClearActions, blockSelectActions, blockClearActions, registerSwitchActions, type ClickAction } from "./pickActions";
+import { netKeyOf, tickNetSelectActions, tickNetClearActions, viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, countryClearActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, trendPlaneActions, railNetActions, noteCohortActions, noteDayActions, snapshotClearActions, blockSelectActions, blockClearActions, blockFollowActions, registerSwitchActions, type ClickAction } from "./pickActions";
 import { finerLevels } from "./focusLadder";
 import { METAGRAPHS } from "@/src/net/current";
 import type { PickDescriptor, MetaSnapSel, BlockSel } from "@/src/data/types";
@@ -857,6 +857,41 @@ describe("blockSelectActions / blockClearActions (a block in the Blocks register
     const ms = { metaId: "dor", ordinal: 5, hash: "x", globalOrdinal: 1, ts: "t" } as MetaSnapSel;
     expect(kinds(blockSelectActions(b, global, { block: null, snapOrd: 1, metaSnap: ms, tickNet: { metaId: "dor", globalOrdinal: 1 } })))
       .toEqual(["metaSnap", "tickNet", "snapshot", "block"]);
+  });
+  // LIVE FOLLOWS THE NEWEST BLOCK (D3): while following, the Block card shows the live block, which
+  // no reader picked — a click on it PINS it (the auto-followed metagraph snapshot's rule: never a
+  // silent deselect), and a click on another block pins that one.
+  it("while following, clicking the live block pins it in place (never a silent deselect)", () => {
+    expect(blockSelectActions(b, global, { block: { ...b }, snapOrd: null, following: true })).toEqual([
+      { kind: "snapshot", pick: global, follow: false },
+      { kind: "block", sel: b },
+    ]);
+  });
+  it("while following, another block pins its own global and commits it", () => {
+    const other: BlockSel = { ...b, hash: "h2" };
+    expect(blockSelectActions(other, global, { block: b, snapOrd: null, following: true })).toEqual([
+      { kind: "snapshot", pick: global, follow: false },
+      { kind: "block", sel: other },
+    ]);
+  });
+  it("the Block card's LIVE / PINNED control: LIVE pins the live block and ranks it, PINNED resumes live", () => {
+    expect(blockFollowActions(b, global, true)).toEqual([
+      { kind: "snapshot", pick: global, follow: false },
+      { kind: "block", sel: b },
+    ]);
+    // Resuming keeps the Block card the reader's box: the block is re-committed LAST (it ranks), and
+    // the follow's next beat re-seats it on the newest block.
+    expect(blockFollowActions(b, global, false)).toEqual([
+      { kind: "tickNet", sel: null },
+      { kind: "snapshot", pick: global, follow: true },
+      { kind: "block", sel: b },
+    ]);
+  });
+  it("a scene click on the live block runs the same builder", () => {
+    const current = { ...state(), pinnedOrdinal: null, metaSnap: null, block: b, following: true };
+    expect(clickActions({ mode: "ledger", pick: blockPick, countryCc: null, current })).toEqual(
+      blockSelectActions(b, global, { block: b, snapOrd: null, metaSnap: null, following: true }),
+    );
   });
   it("the clear releases the block alone, and nothing when none is held", () => {
     expect(blockClearActions({ block: b })).toEqual([{ kind: "block", sel: null }]);

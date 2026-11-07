@@ -23,6 +23,7 @@ import BlockReadsBridge from "@/components/BlockReadsBridge";
 import RouteSync from "@/components/RouteSync";
 import Tooltip from "@/components/Tooltip";
 import MotionHint from "@/components/MotionHint";
+import RegisterSwitch from "@/components/RegisterSwitch";
 import SceneCallout from "@/components/SceneCallout";
 import TrendStack from "@/components/TrendStack";
 import DevCssCanary from "@/components/DevCssCanary";
@@ -101,6 +102,8 @@ export default function AppShell({ doc }: { doc?: DocPage }) {
           <TrendStack />
           <StageGate>
             <SceneCallout />
+            {/* The Snapshots view's register switch (D3): on the scene, centred under the bar. */}
+            <RegisterSwitch />
             <MotionHint />
           </StageGate>
         </DocGate>

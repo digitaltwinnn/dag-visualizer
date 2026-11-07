@@ -4,7 +4,8 @@
 // slots (components/CLAUDE.md "Every right-rail card is the same SIX SLOTS"), each from what is
 // actually held (rule 10):
 //
-//   head      · "Block", the short hash, and the block's HEIGHT as the qualifier chip
+//   head      · "Block", the short hash, the block's HEIGHT as the qualifier chip, and the LIVE /
+//               PINNED control (D3: in the Blocks register live follows the newest block)
 //   lead      · what it moved, in the chain's own unit — ONE transfer names it, "Moved N DAG from
 //               DAG1ab…cd to DAG9ef…01"; several are counted, "Moved N DAG in M transfers" — else,
 //               with nothing moved or its read not landed, the relation the feed already names:
@@ -22,11 +23,13 @@
 import { Fragment, type CSSProperties } from "react";
 import { ArrowUpRight } from "lucide-react";
 import CardHead, { RailPane } from "@/components/CardHead";
+import FollowControl from "@/components/FollowControl";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { BLOCK_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { Door, Empty, Fact, FactGroup, Foot, FootRow, Lead, QualifierChip, SectionLabel } from "@/components/inspector/parts";
 import { tickerOf } from "@/components/explorer/nodeRow";
 import { openBlockRecord } from "@/components/trendDoors";
+import { blockLead } from "@/components/inspector/blockLead";
 import { useFeedRead } from "@/components/useFeedRead";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { blockChildren, blockReadKey, blockReadOf } from "@/src/data/blockReads";
@@ -34,12 +37,9 @@ import { compactDag, midHash } from "@/src/util/format";
 import { identityHudCss } from "@/src/palette/identity";
 import { useStore } from "@/src/store/store";
 
-/** A wallet address the card names in a sentence or a row: the app's one mid-ellipsis, head and tail kept. */
-const addr = (a: string) => midHash(a, 12);
-/** …and tighter in a breakdown row, where two share a line with an amount and a fee. */
+/** A wallet address in a breakdown row, where two share a line with an amount and a fee: the app's
+ *  one mid-ellipsis (the lead's sentence form is `blockLead`'s). */
 const rowAddr = (a: string) => midHash(a, 9);
-
-const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
 
 export default function BlockPane({ onClose, collapsed, onToggle }: { onClose: () => void; collapsed?: boolean; onToggle?: () => void }) {
   useFeedRead(["api-blocks"], "BlockPane");
@@ -57,16 +57,9 @@ export default function BlockPane({ onClose, collapsed, onToggle }: { onClose: (
   const read = blockReadOf(reads, sel);
   // The amount is in the CHAIN's unit: DAG for the DAG's own blocks, the token's ticker otherwise.
   const unit = tickerOf(sel.chain);
-  const anchor = sel.anchorOrd.toLocaleString();
   // The read's own transfers (a read cached before they were carried has none to list).
   const transfers = read?.transfers ?? [];
-  const one = transfers.length === 1 ? transfers[0]! : null;
-  const lead =
-    read && read.txCount > 0 && read.amount > 0
-      ? one && one.from && one.to
-        ? `Moved ${compactDag(one.amount)} ${unit} from ${addr(one.from)} to ${addr(one.to)}`
-        : `Moved ${compactDag(read.amount)} ${unit} in ${plural(read.txCount, "transfer", "transfers")}`
-      : `Accepted into global ${anchor}`;
+  const lead = blockLead(sel, read);
   const children = read ? blockChildren(reads, sel.chain, sel.hash) : null;
 
   return (
@@ -89,7 +82,18 @@ export default function BlockPane({ onClose, collapsed, onToggle }: { onClose: (
             <span className="truncate font-mono">{midHash(sel.hash, 12)}</span>
           </span>
         }
-        aside={read ? <QualifierChip className="tabular-nums">height {read.height.toLocaleString()}</QualifierChip> : undefined}
+        // The height chip, then the LIVE / PINNED control (D3): in the Blocks register live follows
+        // the newest block, so the control rides this card — the global card's own pill stands down.
+        aside={
+          <span className="inline-flex items-center gap-1.5">
+            {read && (
+              <span data-yields="" className="contents">
+                <QualifierChip className="tabular-nums">height {read.height.toLocaleString()}</QualifierChip>
+              </span>
+            )}
+            <FollowControl subject="block" />
+          </span>
+        }
         titleKey={`${sel.chain}:${sel.hash}`}
         onClose={onClose}
         collapsed={collapsed}

@@ -258,6 +258,7 @@ export class Picking {
           metaSnap: st.metaSnap,
           tickNet: st.tickNet,
           block: st.block,
+          following: st.following,
         },
       }),
     );

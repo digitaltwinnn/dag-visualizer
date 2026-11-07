@@ -23,6 +23,9 @@ export interface LaneCollapseState {
   focusId: string | null;
   /** `store.railCollapse`. */
   overrides: Readonly<Record<string, boolean | undefined>>;
+  /** A subject slot the view's register SEATS by itself as its default box — the Blocks register's
+   *  live block (D3: live follows the newest block there, `focusSlotId`). Absent everywhere else. */
+  seats?: string | null;
 }
 
 /** DOES THIS CARD WEAR THE − (`RailFold`; user, 2026-11-03)? The written-context card (the AI
@@ -86,6 +89,11 @@ export function overridesOnSelection(s: Pick<LaneCollapseState, "overrides">): R
  *  live tick pinned shut stayed shut). */
 export function overridesOnViewEntry(s: LaneCollapseState): Record<string, boolean | null> {
   const cleared = overridesOnSelection(s);
+  // A REGISTER THAT SEATS ITS OWN SUBJECT is entered on the auto rule (D3): the Blocks register's
+  // live block is its default box, and it lands a beat after the view (its window is read on
+  // arrival), so a note pinned open here stood beside it — two boxes. Unpinned, the note is the box
+  // while nothing stands and folds when the live block arrives.
+  if (s.seats) return cleared;
   const subjects = s.lane.filter((id) => isSubjectSlot(id) && s.present(id));
   const note = s.lane.find((id) => !isSubjectSlot(id) && s.present(id));
   if (note != null) return { ...cleared, [note]: false, ...Object.fromEntries(subjects.map((id) => [id, true])) };
@@ -196,9 +204,10 @@ export function railSelectionKey(s: SelectionKeyState): string {
     // unguarded ordinal re-materialized the focus card on every heartbeat in live metagraph mode).
     s.following ? (s.snap ? "live" : "") : (s.snap?.data.ordinal ?? ""),
     s.following ? (s.metaSnap ? "live" : "") : s.metaSnap ? `${s.metaSnap.metaId}:${s.metaSnap.ordinal}` : "",
-    // THE BLOCK (2026-11-05): a commit like the tile's, and it never advances by itself — a block
-    // commit pins its tick — so it needs no follow guard. Missing, a hand-opened Global snapshot
-    // box stayed open beside the arriving Block card.
-    s.block ? `${s.block.chain}:${s.block.hash}` : "",
+    // THE BLOCK (2026-11-05): a commit like the tile's. Missing, a hand-opened Global snapshot box
+    // stayed open beside the arriving Block card. Guarded while following like the two above (D3):
+    // in the Blocks register LIVE advances the block itself (`advanceBlock`), and a heartbeat must
+    // not drop the reader's +/−; a pinned block is a new moment.
+    s.following ? (s.block ? "live" : "") : s.block ? `${s.block.chain}:${s.block.hash}` : "",
   ].join("§");
 }

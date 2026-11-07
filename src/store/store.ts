@@ -562,6 +562,9 @@ interface AppState {
   setLedgerRegister: (r: LedgerRegister) => void;
   setBlockMeasure: (m: BlockMeasure) => void;
   setBlock: (b: BlockSel | null) => void;
+  /** The follow system's heartbeat advance for the Block card (the Blocks register's LIVE, D3) —
+   *  non-bumping, like advanceSnap: a block arriving is never a "new selection". */
+  advanceBlock: (b: BlockSel | null) => void;
   setHoverBlock: (hash: string | null) => void;
   setBlockRead: (key: string, v: HeldBlockRead) => void;
   setBlockReadMiss: (key: string) => void;
@@ -992,6 +995,16 @@ export const useStore = create<AppState>((set) => ({
   // A block is a committed subject like the tile: it ranks in the recency stack, so its card is the
   // box once committed (`focusSlotId`).
   setBlock: (block) => set((s) => ({ block, selStack: bumpStack(s.selStack, "block", !!block) })),
+  // LIVE IN THE BLOCKS REGISTER FOLLOWS THE NEWEST BLOCK (D3, user 2026-11-07: "live mode should be
+  // applied to the block and not the snapshot"). `followLatest`'s heartbeat write, advanceSnap's
+  // twin: the arrival rule (a NEW block lifts a stale quiet gesture, a re-point does not) and the
+  // stack rule (a live block never enters it; a block going away drops a pin that named it).
+  advanceBlock: (block) =>
+    set((s) => ({
+      block,
+      navQuiet: block && !(s.block && s.block.chain === block.chain && s.block.hash === block.hash) ? false : s.navQuiet,
+      selStack: !block ? s.selStack.filter((x) => x !== "block") : s.selStack,
+    })),
   setHoverBlock: (hoverBlock) => set({ hoverBlock }),
   setBlockRead: (key, v) =>
     set((s) => {

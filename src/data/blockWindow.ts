@@ -145,7 +145,9 @@ export function tipJoins(chain: string | null): boolean {
 
 /** What the Blocks register wants of its window: none, the one it holds, one around the pin
  *  (`around` null = the live edge), or — under an unlisted filter — NONE READ, the stated floor
- *  (`unread`: the trail reads the listed transfer lists only). Entering the register fetches; a pin
+ *  (`unread`: the trail reads the listed transfer lists only). Entering the Snapshots VIEW fetches
+ *  (D3, 2026-11-07: the register switch on the scene states the Blocks span from the Snapshots
+ *  register too, so there the live window is read and held, a pin never re-centring it); a pin
  *  the held range covers keeps, and only a window read for the SAME network (`chain`, `held.chain`)
  *  is held, so a filter change refetches. WHILE THE BRIEFING RUNS (`touring`) the LIVE window is
  *  wanted whatever the view, the register and the pin, so the tour's Blocks stop opens on a drawn
@@ -161,10 +163,13 @@ export function blockWanted(s: {
   chain?: string | null;
 }): { kind: "clear" } | { kind: "keep" } | { kind: "unread" } | { kind: "fetch"; around: number | null } {
   const chain = s.chain ?? null;
-  if (!s.touring && (!s.ledger || s.register !== "blocks")) return { kind: "clear" };
+  if (!s.touring && !s.ledger) return { kind: "clear" };
   if (chain === UNLISTED_ID) return { kind: "unread" };
   const held = s.held && (s.held.chain ?? null) === chain ? s.held : null;
-  if (s.touring) return held ? { kind: "keep" } : { kind: "fetch", around: null };
+  // The tour, and the Snapshots register (D3: the register switch on the scene names the Blocks
+  // register's span from either side), want the window the register would open on — held, else
+  // the live edge; only the Blocks register re-centres it on a pin.
+  if (s.touring || s.register !== "blocks") return held ? { kind: "keep" } : { kind: "fetch", around: null };
   if (s.pin == null) return held ? { kind: "keep" } : { kind: "fetch", around: null };
   if (held && s.pin >= held.from && s.pin <= held.to) return { kind: "keep" };
   return { kind: "fetch", around: s.pin };
@@ -228,4 +233,14 @@ export function windowBlocks(w: BlockWindow | null): WindowBlock[] {
     }
   }
   return out;
+}
+
+/** WHAT LIVE FOLLOWS IN THE BLOCKS REGISTER (D3, user 2026-11-07: "live mode should be applied to
+ *  the block and not the snapshot"): the window's NEWEST block of the network it was read for — any
+ *  chain's under All, the DAG's under the DAG filter, else that network's own (the DAG blocks its
+ *  ticks carry stay in its window, dimmed by the lens, but they are not what the reader follows).
+ *  Null with no window, or none of its network's blocks in it. */
+export function newestBlock(w: BlockWindow | null): WindowBlock | null {
+  for (const b of windowBlocks(w)) if (w!.chain == null || b.chain === w!.chain) return b;
+  return null;
 }

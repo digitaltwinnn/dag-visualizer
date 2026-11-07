@@ -231,6 +231,20 @@ export class BlockTier {
     this._dimNet = netKey;
   }
 
+  /** THE BLOCK CALLOUT'S ANCHOR (D3): the top of block `hash` where it stands this frame, in the
+   *  CHAMBER's frame — its placed position (layout data, `rebuild`'s items) plus the rewind offset the
+   *  view wrote (`setOffset`, the one source of trail motion). False when the tier draws no such block,
+   *  or its row is past the trail's front or horizon (the instance is zero-scaled there). */
+  anchorOf(hash: string, out: { set(x: number, y: number, z: number): unknown }): boolean {
+    const i = this._index.get(hash);
+    if (i == null || i >= this.mesh.count) return false;
+    const it = this._items[i];
+    const wx = LEAD_X - it.slot * SLOT_SP + this._off;
+    if (frontAt(wx) * horizonAt(wx) <= 0) return false;
+    out.set(it.x + this._off, it.y + it.size / 2, it.z);
+    return true;
+  }
+
   /** The trail rewind's offset — the one source of trail motion. */
   setOffset(x: number): void {
     this._off = x;

@@ -310,7 +310,8 @@ export class CalloutSync {
     return this.h.chrome.read().dockTop - 4;
   }
   private _freeTop(): number {
-    return this.h.chrome.read().top;
+    // Under the bar — and under the register switch where it stands on the scene (D3).
+    return this.h.chrome.read().sceneTop;
   }
 
   // THE MULTI-LEADER (user, 2026-08-30): a machine is SEVERAL beads in hyper — one per layer it
@@ -481,6 +482,14 @@ export class CalloutSync {
     const st = this.st;
     // THE BOX LEADS (user, 2026-08-15/16): the boxed NODE card anchors the node's own tray chip.
     if (st.boxedCard === "node" && isNodePick(st.inspect)) return this._ledgerNodeAnchor(st, v);
+    // IN THE BLOCKS REGISTER THE LABEL IS THE BLOCK'S (D3) — `SceneCallout`'s chain mirrored: the
+    // committed block (live or pinned) at its own place in the chamber, once its row has settled.
+    if (this.h.ledger.readsBlockWindow) {
+      if (!this.h.ledger.calloutSettled(st.following)) return false;
+      if (!this.h.ledger.selectedBlockAnchor(v)) return false;
+      this.h.ledger.group.localToWorld(v); // the rendered chamber transform — a label read. render-state OK
+      return true;
+    }
     // Otherwise this anchor is the UPPER STOREY's — `SceneCallout`'s chain, mirrored term for
     // term: the metagraph snapshot's tile, or its network's LANE when the Metagraph card is the
     // box or no snapshot of that network is committed (user, 2026-10-03: "the dossier on
@@ -521,6 +530,8 @@ export class CalloutSync {
   private _ledgerGlobalAnchor(v: THREE.Vector3): boolean {
     const st = this.st;
     if (!st.snap) return false;
+    // The Blocks register stands no global label (D3): the block's is the one label there.
+    if (this.h.ledger.readsBlockWindow) return false;
     if (st.boxedCard === "node" && isNodePick(st.inspect)) return false;
     if (!this.h.ledger.calloutSettled(st.following)) return false;
     this._ledgerBarAnchor(v);

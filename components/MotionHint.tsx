@@ -12,6 +12,7 @@ import { cardNetwork } from "@/src/engine/domain/trendStack";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { useStore } from "@/src/store/store";
 import { cn } from "@/lib/utils";
+import { REGISTER_SWITCH_H } from "@/components/RegisterSwitch";
 
 // THE MOTION HINT (user, 2026-09-26): one quiet sentence, in the scene a little under its centre —
 // where the work is being done — for exactly as long as the scene is moving. "Bringing Dor
@@ -53,6 +54,8 @@ const HOLD_MS = 1400;
  *  does. The motion's own end still cuts it short with the ordinary quick fade. */
 const EASE_MS = { flight: 900, transition: 3200 } as const;
 
+/** Clearance between the register switch and the hint's plate. */
+const SWITCH_GAP_PX = 8;
 /** Clearance between the staging band's last row and the hint's plate. */
 const GATHER_GAP_PX = 16;
 
@@ -120,6 +123,9 @@ export default function MotionHint() {
     };
   }, [moving, text]);
   if (!VIEW_POLICIES[mode].canvas) return null;
+  // THE REGISTER SWITCH TAKES THIS LINE where the view offers two registers (D3, option A — its cost,
+  // named in the mock: the hint drops one line). The same gate the switch renders on.
+  const switchShown = VIEW_POLICIES[mode].registers.length > 1;
   const on = moving && text != null;
   const state = !on ? "0" : easing ? "ease" : "1";
   return (
@@ -134,7 +140,9 @@ export default function MotionHint() {
         top:
           phase && gatherBottom != null
             ? `calc(${gatherBottom + GATHER_GAP_PX}px + var(--topbar-extra, 0px))`
-            : "calc(var(--rail-top) + var(--topbar-extra, 0px))",
+            : switchShown
+              ? `calc(var(--rail-top) + var(--topbar-extra, 0px) + ${REGISTER_SWITCH_H + SWITCH_GAP_PX}px)`
+              : "calc(var(--rail-top) + var(--topbar-extra, 0px))",
         ["--hint-ease" as string]: `${phase ? EASE_MS.transition : EASE_MS.flight}ms`,
       }}
       className={cn(

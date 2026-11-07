@@ -3,6 +3,9 @@ import { ledgerLens } from "@/src/data/ledgerStory";
 import { LISTED_IDS, UNLISTED_ID, latestUnlistedTick, unlistedLog } from "@/src/data/unlisted";
 import { useStore } from "@/src/store/store";
 import type { GlobalSnapshot } from "@/src/data/types";
+import { getBlockWindow } from "@/src/data/pastWindow";
+import { blockChainOf, newestBlock } from "@/src/data/blockWindow";
+import { registerOf } from "@/src/engine/domain/viewPolicy";
 
 // The latest snapshot worth showing while following: for a metagraph filter, the
 // newest one it ACTUALLY anchored into — or null if it hasn't anchored in the buffered
@@ -38,6 +41,12 @@ export function latestRelevant(rawFilter: string): GlobalSnapshot | null {
 // metagraph with no recent snapshots), clear a stale snapshot card rather than show a
 // misleading one — the metagraph context pane still conveys the selection.
 export function followLatest() {
+  // IN THE BLOCKS REGISTER LIVE FOLLOWS THE NEWEST BLOCK (D3), not the newest global: the chamber
+  // draws only the block-bearing ticks, so the live global is not even on screen there.
+  {
+    const st = useStore.getState();
+    if (registerOf(st.mode, st.ledgerRegister) === "blocks") return followNewestBlock();
+  }
   // `advanceSnap`, not `setSnap`: the heartbeat advance must not bump the selection recency the
   // facts rail's collapse rule reads (store.selStack — a tick is not a user act).
   const { filter: rawFilter, snap, metaSnap, advanceSnap, advanceMetaSnap } = useStore.getState();
@@ -93,4 +102,41 @@ export function followLatest() {
   // Not a metagraph follow (or nothing buffered): a followed card never shows a stale foreign
   // metagraph snapshot — clear it (explicit pins aren't in follow mode, so this can't fire there).
   if (metaSnap) advanceMetaSnap(null);
+}
+
+/** LIVE IN THE BLOCKS REGISTER (D3, user 2026-11-07: "live mode should be applied to the block and
+ *  not the snapshot (those aren't even shown given blocks are only occasional)"). While following,
+ *  the Block card rides the heartbeat: the window's NEWEST block of the network it was read for
+ *  (`newestBlock` — the filter's, else any) and its accepting global with it, each on a real change
+ *  only, both through the non-bumping advances (a live block is no reader's pick). The ONE writer of
+ *  `advanceBlock`; FollowController calls it on every global, anchor and block-window change.
+ *
+ *  No window yet (entering the register), or one read for another network (a filter's refetch in
+ *  flight): nothing is moved — the cards keep what they show until the window lands. Under the
+ *  unlisted filter no window is read (the stated floor) and the block goes. A window holding none of its network's blocks: the block goes,
+ *  the global it hung under stays (the explorer and the band say why the window is empty). A live
+ *  metagraph snapshot belongs to another tick's follow; it goes too, unless the reader stepped to it
+ *  inside the shown global (`held`). */
+function followNewestBlock(): void {
+  const { snap, block, metaSnap, filter, blockWindowStatus, advanceSnap, advanceBlock, advanceMetaSnap } = useStore.getState();
+  const w = getBlockWindow();
+  // The unlisted filter reads no window at all (the stated floor): nothing stands to follow.
+  if (!w && blockWindowStatus?.status === "unread") {
+    if (block) advanceBlock(null);
+    return;
+  }
+  // A window read for ANOTHER network (a filter change, before its refetch lands), or one read around
+  // a pin (a resume, before the live window lands), is not the live edge this follow walks.
+  if (!w || w.chain !== blockChainOf(filter) || blockWindowStatus?.around != null) return;
+  const b = newestBlock(w);
+  if (!b) {
+    if (block) advanceBlock(null);
+    return;
+  }
+  const g = w.globalSnapshots.find((x) => x.ordinal === b.anchorOrd);
+  if (g && snap?.data.ordinal !== g.ordinal) advanceSnap({ kind: "snapshot", title: `Global snapshot #${g.ordinal}`, data: g });
+  if (!block || block.chain !== b.chain || block.hash !== b.hash) {
+    advanceBlock({ chain: b.chain, hash: b.hash, ordinal: b.ordinal, anchorOrd: b.anchorOrd });
+  }
+  if (metaSnap && !(metaSnap.held && metaSnap.globalOrdinal === b.anchorOrd)) advanceMetaSnap(null);
 }

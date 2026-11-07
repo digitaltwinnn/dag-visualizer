@@ -207,6 +207,8 @@ export function iconForPick(
       return SNAPSHOT_ICON; // the block, not the whole-stack view mark (see its constant above)
     case "metaSnap":
       return METASNAP_ICON; // a metagraph snapshot tile (see its constant above)
+    case "block":
+      return BLOCK_ICON; // a block of the block DAG (the Blocks register, see its constant above)
     case "country":
       return COUNTRY_ICON; // the geo drill rung (see its constant above)
     case "cohort":

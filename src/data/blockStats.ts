@@ -21,6 +21,16 @@ export interface BlockScope {
   cut?: boolean;
 }
 
+/** THE WINDOW'S SCOPE (D4 carry, settled in D3): its own network, and whether it is CUT — only by
+ *  the chain that DRIVES it. Under All every network drives the window, so any chain its walk cut
+ *  short makes it short; under a network filter the window is that network's newest block ticks, so
+ *  another chain's cut (it carries none of them) says nothing about it. */
+export function blockScopeOf(w: { chain: string | null; partial: readonly string[] } | null): Required<BlockScope> {
+  const chain = w?.chain ?? null;
+  const partial = w?.partial ?? [];
+  return { chain, cut: chain == null ? partial.length > 0 : partial.includes(chain) };
+}
+
 /** Every block one tick holds — the global's own (DAG) and the token blocks of each anchored
  *  snapshot — or, with `chain`, that network's alone. */
 export function blocksInTick(t: BlockTick, chain: string | null = null): number {

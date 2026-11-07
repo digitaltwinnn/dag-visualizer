@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { Mode } from "@/src/store/store";
-import { VIEW_POLICIES } from "./viewPolicy";
+import { VIEW_POLICIES, registerOf } from "./viewPolicy";
 import { is3D } from "./viewTransition";
 
 const MODES: Mode[] = ["hyper", "geo", "ledger", "trend", "soon"];
@@ -233,5 +233,12 @@ describe("the trends view is registered and inert", () => {
   it("only the Snapshots view offers the Blocks register", () => {
     expect(VIEW_POLICIES.ledger.registers).toEqual(["snapshots", "blocks"]);
     for (const m of ["hyper", "geo", "trend", "soon"] as const) expect(VIEW_POLICIES[m].registers).toEqual(["snapshots"]);
+  });
+
+  it("registerOf: the setting where the view offers it, else the view's only register", () => {
+    expect(registerOf("ledger", "blocks")).toBe("blocks");
+    expect(registerOf("ledger", "snapshots")).toBe("snapshots");
+    // The setting persists across views; a view without the register reads its own.
+    for (const m of ["hyper", "geo", "trend", "soon"] as const) expect(registerOf(m, "blocks")).toBe("snapshots");
   });
 });

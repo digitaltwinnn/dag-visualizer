@@ -148,4 +148,23 @@ describe("what the view seats by itself is not in the stack (R70)", () => {
     useStore.getState().advanceSnap(null);
     expect(useStore.getState().selStack).toEqual([]);
   });
+  it("the LIVE BLOCK (the Blocks register's follow, D3) never enters the stack, and its arrival is loud; a pinned block ranks", () => {
+    const blk = (hash: string) => ({ chain: "dag", hash, ordinal: 7, anchorOrd: 7 });
+    useStore.setState({ selStack: [], block: null, navQuiet: true });
+    useStore.getState().advanceBlock(blk("a"));
+    expect(useStore.getState().block?.hash).toBe("a");
+    expect(useStore.getState().selStack).toEqual([]);
+    // A new block ARRIVING lifts a stale quiet gesture, as a new tick does (advanceSnap's rule)…
+    expect(useStore.getState().navQuiet).toBe(false);
+    // …and a re-advance onto the same block is not an arrival.
+    useStore.setState({ navQuiet: true });
+    useStore.getState().advanceBlock(blk("a"));
+    expect(useStore.getState().navQuiet).toBe(true);
+    useStore.getState().setBlock(blk("b"));
+    expect(useStore.getState().selStack).toEqual(["block"]);
+    useStore.getState().advanceBlock(blk("c"));
+    expect(useStore.getState().selStack).toEqual(["block"]);
+    useStore.getState().advanceBlock(null);
+    expect(useStore.getState().selStack).toEqual([]);
+  });
 });

@@ -183,6 +183,11 @@ export function focusSlotId(s: LadderState): string | null {
     const id = slot === "network" ? "context" : slot;
     if (present.includes(id)) return id;
   }
+  // Nothing chosen IN THE BLOCKS REGISTER: the LIVE BLOCK (D3, user 2026-11-07 — live follows the
+  // newest block there, and the Block card is the register's subject, the one its callout names).
+  // The one exception to R70's "a card the view seated by itself leaves the note the box": in this
+  // register the live global is not even drawn, so the block is what the scene is about at rest.
+  if (inBlocks(s) && present.includes("block")) return "block";
   // Nothing chosen: the note (R70), else the finest present slot — a lane the view seated by
   // itself in a view with no note (Snapshots' live tick off mainnet).
   if (present.includes(NOTES_SLOT)) return NOTES_SLOT;

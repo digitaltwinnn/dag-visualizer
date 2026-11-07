@@ -259,6 +259,15 @@ describe("the block slot", () => {
   it("a block commit is the focus slot", () => {
     expect(focusSlotId({ ...blocks({ snap: snapPick, block }), selStack: ["block", "snap"] })).toBe("block");
   });
+  // D3 (user, 2026-11-07): in the Blocks register live follows the newest block, so the Block card
+  // is the register's subject even when no reader picked it — the default box, ahead of the note.
+  it("the LIVE block (seated by the follow, unranked) is the default focus in the Blocks register, ahead of the note", () => {
+    expect(focusSlotId({ ...blocks({ snap: snapPick, block, noteAbsent: false }), selStack: [] })).toBe("block");
+    // A card the reader picked still wins.
+    expect(focusSlotId({ ...blocks({ snap: snapPick, block, noteAbsent: false }), selStack: ["snap"] })).toBe("snap");
+    // In the Snapshots register the rest stays the note's (R70).
+    expect(focusSlotId({ ...details({ mode: "ledger", snap: snapPick, noteAbsent: false }), selStack: [] })).toBe("notes");
+  });
   it("Blocks' ghosts: the tick's, the network's, the tile's, the block's and the node's", () => {
     expect(ghostIds(detailsCards(blocks()))).toEqual(["snap", "context", "metaSnap", "block", "node"]);
   });

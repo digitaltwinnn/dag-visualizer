@@ -118,6 +118,19 @@ describe("a view switch (`overridesOnViewEntry`)", () => {
     const pinnedTick = rail(manifest({ mode: "ledger", snap: snapPick }), after, ["snap"]);
     expect(openBoxes(rail(manifest({ mode: "ledger", snap: snapPick }), apply(after, overridesOnSelection(pinnedTick)), ["snap"]))).toEqual(["snap"]);
   });
+  // D3 (user, 2026-11-07): in the Blocks register live follows the newest block and the Block card
+  // is the register's default box. The note pinned open on arrival stood beside the live block's
+  // arriving box (two boxes, found live): where the register SEATS its own subject, the view is
+  // entered on the auto rule instead — the note while nothing stands, the live block once it lands.
+  it("D3: Blocks is entered on the auto rule, not the note's pin — the note alone, then the live block alone", () => {
+    const block = { chain: "dag", hash: "h", ordinal: 42, anchorOrd: 42 };
+    const blocks = (over: Partial<RailManifestState>) => manifest({ mode: "ledger", ledgerRegister: "blocks", ...over });
+    const hyper = rail(manifest({}), {});
+    const entry = { ...rail(blocks({}), hyper.overrides), seats: "block" };
+    const after = apply(hyper.overrides, overridesOnViewEntry(entry));
+    expect(openBoxes(rail(blocks({}), after))).toEqual(["notes"]);
+    expect(openBoxes(rail(blocks({ snap: snapPick, block }), after))).toEqual(["block"]);
+  });
   it("without a note (off mainnet, or none for the subject), a subject box the reader opened survives the switch, and nothing is pinned when the departing box was no subject", () => {
     const m = manifest({ filter: "dor", inspect: nodePick, noteAbsent: true });
     const hyper = rail(m, {}, ["node", "network"]);
@@ -179,6 +192,12 @@ describe("a new selection moment (`railSelectionKey` + `overridesOnSelection`)",
   it("while following, the live ordinals are not a new moment", () => {
     expect(key({ following: true, snap: snapPick })).toBe(key({ following: true, snap: { data: { ordinal: 43 } } }));
     expect(key({ following: false, snap: snapPick })).not.toBe(key({ following: false, snap: { data: { ordinal: 43 } } }));
+  });
+  it("while following in the Blocks register, the live BLOCK advancing is not a new moment either (D3); a pinned block's is", () => {
+    const a = { chain: "dag", hash: "a", ordinal: 1, anchorOrd: 1 };
+    const b = { ...a, hash: "b" };
+    expect(key({ following: true, block: a })).toBe(key({ following: true, block: b }));
+    expect(key({ following: false, block: a })).not.toBe(key({ following: false, block: b }));
   });
   it("clears every standing override", () => {
     expect(overridesOnSelection({ overrides: { notes: false, snap: true } })).toEqual({ notes: null, snap: null });

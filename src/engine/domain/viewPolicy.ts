@@ -469,3 +469,12 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
   },
   soon: FLAT,
 };
+
+/** THE REGISTER THE VIEW ON SCREEN READS (D3, 2026-11-07): the store's setting where the view's row
+ *  offers it, else the row's first — its only one. The register is a setting of the Snapshots view
+ *  that persists across views (the `/blocks` route seeds it), so a surface that behaves per register
+ *  asks this rather than comparing `mode` and the field itself (convention 7). */
+export function registerOf(mode: Mode, register: LedgerRegister): LedgerRegister {
+  const offered = VIEW_POLICIES[mode].registers;
+  return offered.includes(register) ? register : offered[0]!;
+}
