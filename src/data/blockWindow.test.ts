@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { BLOCK_WINDOW_TICKS, blockWanted, blockWindowContinues, foldBlockWindow, liveWindowRuns, mergeLiveAnswer, windowBlocks } from "@/src/data/blockWindow";
+import { BLOCK_WINDOW_TICKS, blockChainOf, blockWanted, blockWindowContinues, foldBlockWindow, liveWindowRuns, mergeLiveAnswer, tipJoins, trailPath, windowBlocks } from "@/src/data/blockWindow";
+import { UNLISTED_ID } from "@/src/data/unlistedId";
 import type { RawMetaSnapshot, SnapshotExact } from "@/src/data/types";
 
 describe("foldBlockWindow", () => {
@@ -131,5 +132,49 @@ describe("liveWindowRuns", () => {
     const tick = (ord: number) => ({ ord, ts: "t", hash: "h" + ord, blocks: ["b"], metaSnaps: {} });
     const held = { ticks: [tick(905), tick(900), tick(500)], chains: [] };
     expect(mergeLiveAnswer(held, { ticks: [tick(910), tick(900), tick(500)], chains: [] }).ticks.map((t) => t.ord)).toEqual([910, 900, 500]);
+  });
+});
+
+describe("the window under a network filter (D4)", () => {
+  it("the trail is asked for the filter's network; All asks for every network", () => {
+    expect(blockChainOf("all")).toBeNull();
+    expect(blockChainOf("dag")).toBe("dag");
+    expect(blockChainOf("DOR")).toBe("DOR");
+    expect(trailPath(null, null)).toBe(`/api/blocks/trail?around=live&n=${BLOCK_WINDOW_TICKS}`);
+    expect(trailPath(500, "DAG0x")).toBe(`/api/blocks/trail?around=500&n=${BLOCK_WINDOW_TICKS}&chain=DAG0x`);
+  });
+  it("a filter change refetches: a held window read for another network is not held", () => {
+    const base = { ledger: true, register: "blocks" as const, liveNewest: 900 };
+    const held = { from: 400, to: 900, chain: null };
+    expect(blockWanted({ ...base, pin: null, held, chain: null })).toEqual({ kind: "keep" });
+    expect(blockWanted({ ...base, pin: null, held, chain: "DOR" })).toEqual({ kind: "fetch", around: null });
+    expect(blockWanted({ ...base, pin: 500, held, chain: "DOR" })).toEqual({ kind: "fetch", around: 500 });
+    expect(blockWanted({ ...base, pin: 500, held: { ...held, chain: "DOR" }, chain: "DOR" })).toEqual({ kind: "keep" });
+  });
+  it("an unlisted network is not read: the window is the stated floor, never fetched", () => {
+    expect(blockWanted({ ledger: true, register: "blocks", pin: null, held: null, liveNewest: 900, chain: UNLISTED_ID })).toEqual({ kind: "unread" });
+    expect(blockWanted({ ledger: true, register: "blocks", pin: 50, held: null, liveNewest: 900, chain: UNLISTED_ID })).toEqual({ kind: "unread" });
+    // Outside the register nothing is wanted, unlisted or not.
+    expect(blockWanted({ ledger: false, register: "blocks", pin: null, held: null, liveNewest: 900, chain: UNLISTED_ID })).toEqual({ kind: "clear" });
+  });
+  it("a live refresh for another network replaces the window, never merges into it", () => {
+    const tick = (ord: number) => ({ ord, ts: "t", hash: "h" + ord, blocks: ["b"], metaSnaps: {} });
+    const held = { ticks: [tick(905), tick(900)], chains: [] };
+    const dor = { ticks: [tick(700), tick(600)], chains: ["DOR"], chain: "DOR" };
+    expect(mergeLiveAnswer(held, dor)).toBe(dor);
+    expect(mergeLiveAnswer({ ...dor, ticks: [tick(705), ...dor.ticks] }, dor).ticks.map((t) => t.ord)).toEqual([705, 700, 600]);
+  });
+  it("the window carries its network and the chains its walk cut short", () => {
+    const w = foldBlockWindow({ ticks: [], chains: ["DOR"], chain: "DOR", partial: ["DOR"] }, {});
+    expect(w.chain).toBe("DOR");
+    expect(w.partial).toEqual(["DOR"]);
+    const all = foldBlockWindow({ ticks: [], chains: [] }, {});
+    expect(all.chain).toBeNull();
+    expect(all.partial).toEqual([]);
+  });
+  it("the live feed's announced tick (DAG blocks) joins only a window that holds the DAG's own ticks", () => {
+    expect(tipJoins(null)).toBe(true);
+    expect(tipJoins("dag")).toBe(true);
+    expect(tipJoins("DOR")).toBe(false);
   });
 });

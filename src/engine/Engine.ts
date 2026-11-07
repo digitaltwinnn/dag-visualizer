@@ -1467,7 +1467,9 @@ export class Engine {
     const src = ledgerSource(getNetwork(), st.ledgerRegister);
     // The Blocks register's FRONT RUN reaches to the live global — only while the window held is the
     // live one (a pinned past window, `around` set, makes no claim about now).
-    this.ledger.setLiveGlobal(this.ledger.readsBlockWindow && st.blockWindowStatus?.around == null ? (getNetwork()?.latest ?? null) : null);
+    // Under the unlisted filter no window is read, so there is no front run to draw either.
+    const liveRun = this.ledger.readsBlockWindow && st.blockWindowStatus?.around == null && st.blockWindowStatus?.status !== "unread";
+    this.ledger.setLiveGlobal(liveRun ? (getNetwork()?.latest ?? null) : null);
     this.ledger.setData(src?.globalSnapshots ?? [], (ts) => src?.getAnchor(ts) ?? null);
     // The byte bar measures ticks from the EXACT reads (spec §6.3) — re-hand the map on each
     // refresh so a tick that landed since the last one gets measured instead of staying a seam.

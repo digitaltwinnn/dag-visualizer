@@ -234,7 +234,7 @@ them — but the Next Node server can.
   catalog chain's records anchored in that span. Cached a year once its newest global is an hour old,
   a minute before; a hole in the global chain or ANY chain read that fails answers 503 `no-store`, so
   one upstream timeout is never cached as "that network anchored nothing".
-- **`/api/blocks/trail?around=<ordinal|live>&n=52`** (2026-11-05) is the Snapshots view's BLOCKS
+- **`/api/blocks/trail?around=<ordinal|live>&n=52&chain=<id>`** (2026-11-05) is the Snapshots view's BLOCKS
   REGISTER window (`blocks/trail.ts`; the client side is in `src/data/CLAUDE.md`): the newest `n`
   global snapshots at or below `around` that hold a block, each with its DAG block hashes and the
   block-bearing metagraph snapshots anchored into it (a former chain address folded under its
@@ -247,7 +247,17 @@ them — but the Next Node server can.
   DAG's cap cannot reach answers **beyond reach**, a 200 `{ ticks: [], chains: [], beyond: true }`
   at `s-maxage=3600` (deeper only gets deeper), which the client states and never retries. A TOKEN
   chain past its cap contributes what it reached: its older blocks are the walk's floor, never a
-  void of the whole window. `live` is
+  void of the whole window, and the answer NAMES it (`partial`: the network's current id, when the
+  window is short or the chain's walk stopped at or above the window's oldest tick), which the
+  explorer's floor line states. **`chain`** (2026-11-07, the top bar's network filter: `dag` or a
+  listed network's id, a former address mapped to the current one; an untracked id is a 400 — an
+  unlisted network's blocks are not read) makes the window THAT network's newest `n` block ticks,
+  reaching back as far as its walk goes (days, for a quiet chain), and echoes `chain` in the answer.
+  Only that network's own lists are walked: the DAG blocks sharing its ticks come from each chosen
+  global's own record (`blocks`), read anyway for its stamp, so they cost no upstream read — walking
+  the DAG's list down to a quiet chain's oldest tick would cost pages per day and hit its cap within
+  a week. Under its own filter a token chain whose capped walk reached no tick is beyond reach. The
+  CDN keys each `chain` apart (a query parameter); the cache rules are the same. `live` is
   `s-maxage=30, stale-while-revalidate=30`; an explicit window a year once its newest tick is an hour
   old, a minute before. A lineage address whose list answers 404 contributes no rows; any other failed
   read, or the deadline hit anywhere, is a 503 `no-store` — a short answer would read as "no blocks

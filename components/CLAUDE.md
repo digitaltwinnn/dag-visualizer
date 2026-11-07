@@ -1069,7 +1069,11 @@ from → to · amount · fee (`BlockRead.transfers`); parents, CHILDREN IN VIEW 
 window's held reads, labelled so, never a total), signatures and fees as facts; the hashes in the
 foot — and no sub-height (a `BlockRead` carries none); `railCards.test.ts`'s block cases pin the
 slot. The explorer's Blocks level states its one FLOOR on the heading row ("The DAG and the listed
-networks; unlisted networks' blocks are not read" — the trail reads the listed transfer lists only).
+networks; unlisted networks' blocks are not read" — the trail reads the listed transfer lists only),
+and under it, where a token chain's walk was cut by its page cap (`BlockWindow.partial`), the blocks
+not reached ("Older DOR blocks are not reached"). Under a network filter the window is that
+network's own blocks (`src/data/CLAUDE.md`), so its span can read "last 15 days"; under the unlisted
+filter the list, the band and RAW say "Unlisted networks' blocks are not read".
 A filter holds the rows as it holds the chamber: a block whose accepting global the filter's
 network is not in answers nothing — no commit, no hover, faint — in the explorer and in RAW
 (`ledgerStory.blockRowLocked`, the tick rows' `tickLocked` and `Picking.tickHeldOut`'s rule). The vitals band swaps to `BlocksCells` and RAW to `datasection/BlocksTable`. The band's swap key

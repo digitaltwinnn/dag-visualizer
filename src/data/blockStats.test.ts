@@ -81,3 +81,20 @@ describe("frontierAge", () => {
     expect(frontierAge(undefined, NOW)).toBeNull();
   });
 });
+
+describe("the readings under a network filter (D4)", () => {
+  const t = tick(3, 5, ["a"], { dor: [snap(["t1", "t2"])], ded: [snap(["e1"])] });
+  it("count the window's network's own blocks: the DAG's on the global, a token chain's on its snapshots", () => {
+    expect(blocksInTick(t, "dor")).toBe(2);
+    expect(blocksInTick(t, "dag")).toBe(1);
+    expect(blocksInTick(t, null)).toBe(4);
+    expect(blocksPerHour([t, tick(2, 70, [], { dor: [snap(["old"])] })], NOW, { chain: "dor" })).toEqual({ count: 2, floor: false });
+    expect(blocksPerBucket([t], NOW, { chain: "dor" })[BLOCK_BUCKETS - 2]).toBe(2);
+  });
+  it("a window its walk cut short (`cut`) is a floor where it does not reach back an hour, like a full one", () => {
+    const short = [tick(2, 1, [], { dor: [snap(["a"])] }), tick(1, 20, [], { dor: [snap(["b"])] })];
+    expect(blocksPerHour(short, NOW, { chain: "dor", cut: true })).toEqual({ count: 2, floor: true });
+    expect(blocksPerBucket(short, NOW, { chain: "dor", cut: true })[0]).toBeNull();
+    expect(blocksPerHour(short, NOW, { chain: "dor" }).floor).toBe(false);
+  });
+});

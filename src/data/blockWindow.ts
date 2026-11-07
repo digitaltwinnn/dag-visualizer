@@ -2,6 +2,7 @@ import { metaSnapRecord, type MetaSnapRecord } from "@/src/data/api";
 import type { LedgerSource } from "@/src/data/ledgerSourceType";
 import type { Anchor, GlobalSnapshot, RawMetaSnapshot, SnapshotExact } from "@/src/data/types";
 import type { LedgerRegister } from "@/src/store/mode";
+import { UNLISTED_ID } from "@/src/data/unlistedId";
 
 // THE BLOCKS REGISTER'S LEDGER SOURCE: a window of only the global snapshots that hold a block
 // somewhere (a DAG block, or an anchored metagraph snapshot carrying token blocks). It answers the
@@ -26,10 +27,18 @@ export interface BlockWindowAnswer {
   chains: string[];
   /** The window asked for lies deeper than the trail can walk: no ticks, and not a failure. */
   beyond?: true;
+  /** The network the window was read for (the filter's; absent: every network). */
+  chain?: string;
+  /** Token chains whose walk was cut by its page cap: their older blocks are not reached (rule 10). */
+  partial?: string[];
 }
 
 export interface BlockWindow extends LedgerSource {
   ticks: BlockTick[];
+  /** The network the window was read for; null: every network. */
+  chain: string | null;
+  /** The chains whose walk was cut short by its page cap (current ids). */
+  partial: string[];
   from: number;
   to: number;
   /** Does the window hold this global snapshot? */
@@ -46,6 +55,8 @@ export const BLOCK_WINDOW_TICKS = 52;
  *  `ord`, newest first, cut to the window. Only for `around=live` refreshes — a pinned answer replaces. */
 export function mergeLiveAnswer(held: BlockWindowAnswer | null, answer: BlockWindowAnswer): BlockWindowAnswer {
   if (!held || !held.ticks.length) return answer;
+  // Another network's window is replaced, never merged: its ticks are not this one's.
+  if ((held.chain ?? null) !== (answer.chain ?? null)) return answer;
   const newest = answer.ticks.reduce((m, t) => Math.max(m, t.ord), -Infinity);
   const kept = held.ticks.filter((t) => t.ord > newest && !answer.ticks.some((a) => a.ord === t.ord));
   if (!kept.length) return answer;
@@ -99,6 +110,8 @@ export function foldBlockWindow(answer: BlockWindowAnswer, exact: Readonly<Recor
   const to = ticks[ticks.length - 1]?.ord ?? 0;
   return {
     ticks,
+    chain: answer.chain ?? null,
+    partial: answer.partial ?? [],
     from,
     to,
     globalSnapshots,
@@ -110,23 +123,50 @@ export function foldBlockWindow(answer: BlockWindowAnswer, exact: Readonly<Recor
   };
 }
 
-/** What the Blocks register wants of its window: none, the one it holds, or one around the pin
- *  (`around` null = the live edge). Entering the register fetches; a pin the held range covers keeps.
- *  WHILE THE BRIEFING RUNS (`touring`) the LIVE window is wanted whatever the view, the register and
- *  the pin, so the tour's Blocks stop opens on a drawn chamber (controller ruling, 2026-11-06); the
- *  window is only held outside the register, which reads the live buffer there. */
+/** THE NETWORK THE WINDOW IS READ FOR: the top bar's committed filter — null under All, else its
+ *  id (`dag`, a listed network, or the unlisted set, which `blockWanted` answers as not read). Under
+ *  a network filter the window is THAT network's newest block ticks, reaching back as far as its
+ *  walk goes; the DAG blocks sharing those ticks stay in it (the lens dims them). */
+export function blockChainOf(filter: string): string | null {
+  return filter === "all" ? null : filter;
+}
+
+/** The trail route's path for a window around `around` (null: the live edge) of `chain` (null: every network). */
+export function trailPath(around: number | null, chain: string | null): string {
+  return `/api/blocks/trail?around=${around ?? "live"}&n=${BLOCK_WINDOW_TICKS}${chain != null ? `&chain=${encodeURIComponent(chain)}` : ""}`;
+}
+
+/** Does a tick the live feed announces join the window? Its blocks are the global's own (DAG)
+ *  blocks, so only a window that holds the DAG's ticks — every network's, or the DAG's — takes it;
+ *  under a token network's filter it would put a tick that network is not in at the front. */
+export function tipJoins(chain: string | null): boolean {
+  return chain == null || chain === "dag";
+}
+
+/** What the Blocks register wants of its window: none, the one it holds, one around the pin
+ *  (`around` null = the live edge), or — under an unlisted filter — NONE READ, the stated floor
+ *  (`unread`: the trail reads the listed transfer lists only). Entering the register fetches; a pin
+ *  the held range covers keeps, and only a window read for the SAME network (`chain`, `held.chain`)
+ *  is held, so a filter change refetches. WHILE THE BRIEFING RUNS (`touring`) the LIVE window is
+ *  wanted whatever the view, the register and the pin, so the tour's Blocks stop opens on a drawn
+ *  chamber (controller ruling, 2026-11-06); the window is only held outside the register, which
+ *  reads the live buffer there. */
 export function blockWanted(s: {
   ledger: boolean;
   register: LedgerRegister;
   pin: number | null;
-  held: { from: number; to: number } | null;
+  held: { from: number; to: number; chain?: string | null } | null;
   liveNewest: number | null;
   touring?: boolean;
-}): { kind: "clear" } | { kind: "keep" } | { kind: "fetch"; around: number | null } {
-  if (s.touring) return s.held ? { kind: "keep" } : { kind: "fetch", around: null };
-  if (!s.ledger || s.register !== "blocks") return { kind: "clear" };
-  if (s.pin == null) return s.held ? { kind: "keep" } : { kind: "fetch", around: null };
-  if (s.held && s.pin >= s.held.from && s.pin <= s.held.to) return { kind: "keep" };
+  chain?: string | null;
+}): { kind: "clear" } | { kind: "keep" } | { kind: "unread" } | { kind: "fetch"; around: number | null } {
+  const chain = s.chain ?? null;
+  if (!s.touring && (!s.ledger || s.register !== "blocks")) return { kind: "clear" };
+  if (chain === UNLISTED_ID) return { kind: "unread" };
+  const held = s.held && (s.held.chain ?? null) === chain ? s.held : null;
+  if (s.touring) return held ? { kind: "keep" } : { kind: "fetch", around: null };
+  if (s.pin == null) return held ? { kind: "keep" } : { kind: "fetch", around: null };
+  if (held && s.pin >= held.from && s.pin <= held.to) return { kind: "keep" };
   return { kind: "fetch", around: s.pin };
 }
 

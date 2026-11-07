@@ -8,7 +8,7 @@ import { reportPoll } from "@/src/data/api";
 import { getBlockWindow, onBlockWindow, pastRetryDelay, setBlockWindow } from "@/src/data/pastWindow";
 import { frontierAdvances, frontierChains, frontierKey, unstampedFrontiers } from "@/src/data/blockReads";
 import type { TipRead } from "@/src/engine/domain/blockBraid";
-import { BLOCK_WINDOW_TICKS, blockWanted, foldBlockWindow, liveWindowRuns, mergeLiveAnswer, type BlockWindowAnswer } from "@/src/data/blockWindow";
+import { BLOCK_WINDOW_TICKS, blockChainOf, blockWanted, foldBlockWindow, liveWindowRuns, mergeLiveAnswer, tipJoins, trailPath, type BlockWindowAnswer } from "@/src/data/blockWindow";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 
@@ -36,6 +36,13 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 // leaves a STAMPED frontier (its age says how old it is) but drops an unstamped one, and leaving the
 // register drops every unstamped one (`unstampedFrontiers`; rule 10: no read is no tips).
 //
+// THE WINDOW IS THE FILTER'S NETWORK'S (`blockChainOf`, D4 2026-11-07): under a network filter the
+// trail is asked for THAT network's newest block ticks (`&chain=`), however far back they lie; a
+// filter change asks again and the answer REPLACES the window (`mergeLiveAnswer` never merges two
+// networks' windows). Under the unlisted filter nothing is read (`blockWanted`'s `unread`): the window
+// is cleared and the status says so, the explorer's stated floor. The live feed's announced tick is a
+// DAG tick, so it joins only a window that holds the DAG's ticks (`tipJoins`).
+//
 // THE BRIEFING READS AHEAD: while the tour runs (`store.briefing` non-null) the LIVE window is
 // fetched even before the Blocks stop, so that stop opens on a drawn chamber, not a loading one.
 const LIVE_REFRESH_MS = 30_000;
@@ -53,6 +60,8 @@ export default function BlockWindowBridge() {
   const pin = following || touring ? null : snapOrd;
   // Where the live window is wanted: the Blocks register, or anywhere while the tour runs.
   const liveWanted = touring || (ledger && register === "blocks");
+  // The network the window is read for: the top bar's committed filter (null under All).
+  const chain = blockChainOf(useStore((s) => s.filter));
   const setStatus = useStore((s) => s.setBlockWindowStatus);
   const exact = useStore((s) => s.snapshotExact);
   const { snaps } = useSnapshotFeed(POLL.maxSnapshots, liveWanted);
@@ -61,8 +70,10 @@ export default function BlockWindowBridge() {
 
   // The last answer the route gave (raw), so the exact reads re-fold it without a fetch.
   const answer = useRef<BlockWindowAnswer | null>(null);
-  // What was asked ("live" or an ordinal) and its generation: a reply applies only while it is still wanted.
+  // What was asked (`<chain>@live`, `<chain>@<ordinal>`, or "unread") and its generation: a reply
+  // applies only while it is still wanted.
   const asked = useRef<string | null>(null);
+  const askedLive = () => asked.current?.endsWith("@live") === true;
   const gen = useRef(0);
   const retry = useRef<number | null>(null);
   const dropRetry = () => {
@@ -76,13 +87,13 @@ export default function BlockWindowBridge() {
     setBlockWindow(foldBlockWindow(a, useStore.getState().snapshotExact));
   };
 
-  const read = (around: number | null, g: number, attempt: number) => {
+  const read = (around: number | null, ch: string | null, g: number, attempt: number) => {
     if (g !== gen.current) return;
-    fetch(netUrl(`/api/blocks/trail?around=${around ?? "live"}&n=${BLOCK_WINDOW_TICKS}`))
+    fetch(netUrl(trailPath(around, ch)))
       .then((r) => (r.ok ? (r.json() as Promise<BlockWindowAnswer>) : null))
       .then((a) => {
         if (g !== gen.current) return;
-        if (!a || !Array.isArray(a.ticks)) return failed(around, g, attempt);
+        if (!a || !Array.isArray(a.ticks)) return failed(around, ch, g, attempt);
         reportPoll("api-blocks", true);
         if (a.beyond) {
           // Too deep to walk to: the read worked, the answer is "beyond"; nothing to retry.
@@ -95,9 +106,9 @@ export default function BlockWindowBridge() {
         apply(around == null ? mergeLiveAnswer(answer.current, a) : a);
         setStatus({ around, status: "ready" });
       })
-      .catch(() => failed(around, g, attempt));
+      .catch(() => failed(around, ch, g, attempt));
   };
-  const failed = (around: number | null, g: number, attempt: number) => {
+  const failed = (around: number | null, ch: string | null, g: number, attempt: number) => {
     if (g !== gen.current) return;
     reportPoll("api-blocks", false);
     const delay = pastRetryDelay(attempt);
@@ -113,16 +124,28 @@ export default function BlockWindowBridge() {
     }
     retry.current = window.setTimeout(() => {
       retry.current = null;
-      read(around, g, attempt + 1);
+      read(around, ch, g, attempt + 1);
     }, delay);
   };
 
   useEffect(() => {
     const held = getBlockWindow();
-    const want = blockWanted({ ledger, register, pin, held: held ? { from: held.from, to: held.to } : null, liveNewest, touring });
+    const want = blockWanted({ ledger, register, pin, held: held ? { from: held.from, to: held.to, chain: held.chain } : null, liveNewest, touring, chain });
+    const chainKey = chain ?? "all";
     // Unpinning back to the live edge: the held window is the pin's, so ask for live at once.
-    const backToLive = want.kind === "keep" && pin == null && asked.current != null && asked.current !== "live";
+    const backToLive = want.kind === "keep" && pin == null && asked.current != null && asked.current !== `${chainKey}@live`;
     if (want.kind === "keep" && !backToLive) return;
+    if (want.kind === "unread") {
+      // An unlisted network's blocks are not read: no window, and the status states the floor.
+      if (asked.current === "unread") return;
+      gen.current++;
+      asked.current = "unread";
+      answer.current = null;
+      dropRetry();
+      setBlockWindow(null);
+      setStatus({ around: null, status: "unread" });
+      return;
+    }
     if (want.kind === "clear") {
       gen.current++;
       asked.current = null;
@@ -133,15 +156,15 @@ export default function BlockWindowBridge() {
       return;
     }
     const around = want.kind === "fetch" ? want.around : null;
-    const key = around == null ? "live" : String(around);
+    const key = `${chainKey}@${around == null ? "live" : String(around)}`;
     if (asked.current === key) return;
     asked.current = key;
     setStatus({ around, status: "loading" });
     gen.current++;
     dropRetry();
-    read(around, gen.current, 0);
+    read(around, chain, gen.current, 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ledger, register, pin, liveNewest, touring]);
+  }, [ledger, register, pin, liveNewest, touring, chain]);
 
   // The exact reads change what a tick's anchor says: fold the same answer again (O(ticks)).
   useEffect(() => {
@@ -152,7 +175,7 @@ export default function BlockWindowBridge() {
   // module's window at the moment, so the interval and the append re-ask it rather than closing over it.
   const liveRuns = () => {
     const held = getBlockWindow();
-    return liveWindowRuns({ liveWanted, touring, following, pin, held: held ? { from: held.from, to: held.to } : null, heldLive: asked.current === "live" });
+    return liveWindowRuns({ liveWanted, touring, following, pin, held: held ? { from: held.from, to: held.to } : null, heldLive: askedLive() });
   };
 
   // The live edge: a fresh trail every 30 s while the live window is held — under a pin inside it too.
@@ -160,12 +183,12 @@ export default function BlockWindowBridge() {
     if (!liveRuns()) return;
     const id = window.setInterval(() => {
       // A pin the window has since let go of (it aged out, or a pinned fetch replaced the window).
-      if (asked.current !== "live") return;
-      read(null, ++gen.current, 0);
+      if (!askedLive()) return;
+      read(null, chain, ++gen.current, 0);
     }, LIVE_REFRESH_MS);
     return () => window.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveWanted, touring, following, pin]);
+  }, [liveWanted, touring, following, pin, chain]);
 
   // THE DAG'S FRONTIER: the live global's exact read, as each newer one lands.
   const latest = useStore((s) => s.latestSnapshot);
@@ -232,7 +255,7 @@ export default function BlockWindowBridge() {
   // come with the next refresh.
   useEffect(() => {
     const a = answer.current;
-    if (!a || !liveTip || !liveRuns()) return;
+    if (!a || !liveTip || !liveRuns() || !tipJoins(a.chain ?? null)) return;
     const hashes = (liveTip.blocks ?? []).filter((b): b is string => typeof b === "string");
     if (!hashes.length || a.ticks.some((t) => t.ord === liveTip.ordinal)) return;
     if (a.ticks.length && liveTip.ordinal < a.ticks[0]!.ord) return;

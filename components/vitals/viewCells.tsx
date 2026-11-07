@@ -969,7 +969,11 @@ export function BlocksCells({ accent }: { accent: string }) {
   const now = useNowTick(1000);
   const pinned = status?.around != null;
   const ticks = win?.ticks ?? [];
-  const hourRead = win && !pinned ? blocksPerHour(ticks, now) : null;
+  // The window's own network's blocks (under a network filter it also holds the DAG blocks sharing
+  // its ticks), and a window its walk cut short is read like a full one: a floor where it is short.
+  const scope = { chain: win?.chain ?? null, cut: (win?.partial.length ?? 0) > 0 };
+  const unread = status?.status === "unread";
+  const hourRead = win && !pinned ? blocksPerHour(ticks, now, scope) : null;
   const hour = hourRead?.count ?? null;
 
   // Chains with a tip count to state: the DAG, then every chain the window holds a block of.
@@ -999,10 +1003,10 @@ export function BlocksCells({ accent }: { accent: string }) {
           <span className="flex-1 min-w-0 self-center">
             {/* Blocks per five minutes; the window lists only block-bearing snapshots, so a bin with
                 none is zero (blockStats), and bucketed, never sliced. */}
-            <Sparkline data={blocksPerBucket(ticks, now)} color={accent} height={42} maxPoints={20} stretch />
+            <Sparkline data={blocksPerBucket(ticks, now, scope)} color={accent} height={42} maxPoints={20} stretch />
           </span>
         ) : (
-          <span className="flex items-center self-stretch text-label text-muted-foreground">{pinned ? BLOCK_PINNED : "Reading the window…"}</span>
+          <span className="flex items-center self-stretch text-label text-muted-foreground">{pinned ? BLOCK_PINNED : unread ? "Unlisted networks' blocks are not read" : "Reading the window…"}</span>
         )}
       </BandCard>
       <BandCard label="Open tips">

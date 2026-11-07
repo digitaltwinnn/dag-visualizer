@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { ledgerNetwork } from "@/src/engine/domain/tickNet";
 
 import Explorer, { type ExplorerLevelSpec, type ExplorerRowSpec } from "@/components/explorer/Explorer";
@@ -130,13 +130,16 @@ function perMetaOf(ex: SnapshotExact | undefined, id: string): { fee: number; by
   return any ? { fee, bytes } : undefined;
 }
 
-/** "last 12 min" / "last 2 h" — the time the listed snapshots span, newest back to oldest. */
-function spanWords(ordered: readonly GlobalSnapshot[]): string {
-  if (ordered.length < 2) return "latest";
-  const ms = Date.parse(ordered[0]!.timestamp) - Date.parse(ordered[ordered.length - 1]!.timestamp);
+/** "last 12 min" / "last 2 h" / "last 9 days" — the time the listed snapshots span, newest back to
+ *  oldest, or from `nowMs` back to the oldest: the live block window of a quiet network reaches back
+ *  days, and its silence since its newest tick is part of the stretch it vouches for. */
+function spanWords(ordered: readonly GlobalSnapshot[], nowMs?: number): string {
+  if (ordered.length < (nowMs != null ? 1 : 2)) return "latest";
+  const ms = (nowMs ?? Date.parse(ordered[0]!.timestamp)) - Date.parse(ordered[ordered.length - 1]!.timestamp);
   if (!(ms > 0)) return "latest";
   const min = Math.max(1, Math.round(ms / 60_000));
-  return min < 90 ? `last ${min} min` : `last ${Math.round(min / 60)} h`;
+  const h = Math.round(min / 60);
+  return min < 90 ? `last ${min} min` : h < 48 ? `last ${h} h` : `last ${Math.round(h / 24)} days`;
 }
 
 /** A past window's own stretch, in the foot's room beside the pager: how long it spans and how long
@@ -150,6 +153,22 @@ function windowWords(snaps: readonly GlobalSnapshot[]): string {
 
 /** The Blocks register's stated floor — what its window reads, in plain words. */
 const BLOCKS_FLOOR = "The DAG and the listed networks; unlisted networks' blocks are not read";
+/** Under the unlisted filter the window reads nothing: the list says the floor, never "no blocks". */
+const BLOCKS_UNREAD = "Unlisted networks' blocks are not read";
+
+/** The floor, and — where a token chain's walk was cut by its page cap (`BlockWindow.partial`) — the
+ *  blocks it did not reach, by the networks' tickers ("Older DOR blocks are not reached", rule 10). */
+function blocksFloor(partial: readonly string[]): ReactNode {
+  if (!partial.length) return BLOCKS_FLOOR;
+  const names = partial.map(tickerOf);
+  const list = names.length < 3 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  return (
+    <>
+      <span className="block">{BLOCKS_FLOOR}</span>
+      <span className="block">Older {list} blocks are not reached</span>
+    </>
+  );
+}
 
 export default function LedgerPanel() {
   useFeedRead(["global", "metasnaps", "clusters", "api-metagraphs", "api-geo", "exact"], "LedgerPanel");
@@ -705,7 +724,7 @@ export default function LedgerPanel() {
       : blockStatus?.status === "failed" && blockGlobals.length
         ? blockFailed
         : blockStatus?.around == null
-          ? spanWords([...blockGlobals].reverse())
+          ? spanWords([...blockGlobals].reverse(), Date.now())
           : windowWords(blockGlobals);
   const blockLevel: ExplorerLevelSpec = {
     key: "blocks",
@@ -714,17 +733,20 @@ export default function LedgerPanel() {
     hasFigure: true,
     figureW: 48,
     glyphW: NODE_GLYPH_W,
-    // An honest instrument state for each way the window is not here (rule 10): read, failed, or
-    // deeper than the trail walks — and a window that holds no block says so.
-    // While a window is read the list says so, even over a held one that happens to hold no block.
+    // An honest instrument state for each way the window is not here (rule 10): not read (the
+    // unlisted filter: the floor), read, failed, or deeper than the trail walks — and a window that
+    // holds no block says so. While a window is read the list says so, even over a held one that
+    // happens to hold no block.
     empty:
-      blockStatus?.status === "beyond"
-        ? "Blocks this far back are not reached"
-        : blockStatus?.status === "failed"
-          ? blockFailed
-          : blockStatus?.status === "loading" || !blockWin
-            ? "reading…"
-            : "No blocks in this stretch",
+      blockStatus?.status === "unread"
+        ? BLOCKS_UNREAD
+        : blockStatus?.status === "beyond"
+          ? "Blocks this far back are not reached"
+          : blockStatus?.status === "failed"
+            ? blockFailed
+            : blockStatus?.status === "loading" || !blockWin
+              ? "reading…"
+              : "No blocks in this stretch",
     rows: pagedBlocks.map((b, i): ExplorerRowSpec => {
       const hue = identityHudCss(b.chain);
       const on = block != null && block.chain === b.chain && block.hash === b.hash;
@@ -795,7 +817,7 @@ export default function LedgerPanel() {
       // The Blocks register states its one FLOOR here instead (rule 10): the trail reads the DAG's
       // and the listed networks' transfer lists, so an unlisted network's blocks are never in it,
       // and a silent stretch vouches only for what was read.
-      hint={inBlocks ? BLOCKS_FLOOR : null}
+      hint={inBlocks ? blocksFloor(blockWin?.partial ?? []) : null}
       // The sentence names the NEXT LEVEL, never a measure (user, 2026-10-24: "the hint in the
       // breadcrumb always refers to anchors, it should refer to the selected control button" —
       // "anchors" is also a tile's name, so under Fees it read as stale; the networks that

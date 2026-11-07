@@ -111,14 +111,25 @@ blocks), from `/api/blocks/trail`, folded pure by `foldBlockWindow` into the liv
 shapes, so the slot model is unchanged. `blockWanted` is the one rule for when (entering the
 register, a pin outside the held range; the Briefing fetches the live window AHEAD, so its Blocks
 stop opens drawn); `components/BlockWindowBridge.tsx` is the one writer, and the store carries only
-`blockWindowStatus` (`loading | failed | ready | beyond`). While the LIVE window is held
+`blockWindowStatus` (`loading | failed | ready | beyond | unread`). While the LIVE window is held
 (`liveWindowRuns`: following, touring, or a pin the held live window covers — the band is the live
 instrument, and a block or tick clicked inside the live window never freezes it) it refreshes every
 30 s and takes a tick the feed announces at once; a pin outside it is a past window, which holds
 still; **a live refresh never drops a newer tick it
 already holds** (`mergeLiveAnswer` — the edge cache and the explorer's lagging index can answer an
 older trail), while a pinned answer replaces. A pin deeper than the trail can walk is **beyond
-reach**: an answer, stated, never retried (`beyond: true`). Pinned by `blockWindow.test.ts`.
+reach**: an answer, stated, never retried (`beyond: true`). **Under a network filter the window is
+THAT network's** (2026-11-07, user: "when I filter on a metagraph it should get the blocks to
+populate the furniture"): `blockChainOf(filter)` asks the trail for the filter's network
+(`trailPath`'s `&chain=`), so the window is its newest 52 block ticks however far back they lie, with
+the DAG blocks those ticks carry (the lens dims them); a filter change refetches (`blockWanted` holds
+only a window read for the same network) and the answer replaces the window (`mergeLiveAnswer` never
+merges two networks'); the live feed's announced tick joins only a window holding the DAG's ticks
+(`tipJoins`). Under All it is every network's, as before. The unlisted filter reads nothing
+(`blockWanted`'s `unread`, status `unread`): the explorer, the band and RAW state the floor, never
+"no blocks". A token chain cut by its walk's page cap is named in the window's `partial`, and the
+band's readings count the window's own network's blocks, a cut window read like a full one
+(`blockStats`' `BlockScope`). Pinned by `blockWindow.test.ts` and `blockStats.test.ts`.
 
 **A block's parents come only from a FULL READ** of the snapshot that accepted it
 (`blockReads.ts`, `components/BlockReadsBridge.tsx`): one paced read per block-bearing snapshot in

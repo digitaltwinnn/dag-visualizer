@@ -104,7 +104,8 @@ export default function BlocksTable() {
 
   if (!rows.length) {
     const why =
-      status?.status === "beyond" ? "Blocks this far back are not reached"
+      status?.status === "unread" ? "Unlisted networks' blocks are not read"
+      : status?.status === "beyond" ? "Blocks this far back are not reached"
       : status?.status === "failed" ? "The block window could not be read"
       : !win || status?.status === "loading" ? "reading…"
       : "No blocks in this stretch";

@@ -21,6 +21,19 @@ import type { GlobalSnapshot, RawMetaSnapshot } from "@/src/data/types";
 //
 // A block with NO transfer has no row, so a tick holding only empty blocks is not found here; the
 // route's answer is the blocks that carry transfers.
+//
+// UNDER A CHAIN (`chain`, the top bar's network filter — D4, 2026-11-07): the window is THAT
+// network's newest `n` block ticks, reaching back as far as its walk goes (days, for a quiet chain).
+// Only its own addresses (current and former) are walked; the DAG's list is NOT — the global record
+// each chosen tick is read for already lists its DAG blocks (`blocks`), so the DAG blocks sharing
+// those ticks come at no extra upstream read, where walking the DAG's list down to a quiet chain's
+// oldest tick would cost pages per day of span and hit its cap within a week. `chain = "dag"` walks
+// the DAG alone. A token chain under its own filter whose capped walk reached no tick at all is
+// `BeyondReach` (an empty window there is not "no blocks").
+//
+// A TOKEN CHAIN CUT BY ITS PAGE CAP IS NAMED (`partial`, its network's current id), so the floor is
+// stated (rule 10): when the window holds fewer than `n` ticks, or the chain's walk stopped at or
+// above the window's oldest tick — blocks of it the window would hold may lie below where it stopped.
 
 /** One row of a transfer list: the snapshot that carried it, and the block. */
 export interface TrailRow {
@@ -58,7 +71,7 @@ export const TRAIL_PAGES_MAX = 12;
 
 type ChainTicks = Map<number, TrailRow[]>;
 
-export async function assembleTrail(deps: TrailDeps, around: number | null, n: number): Promise<BlockWindowAnswer> {
+export async function assembleTrail(deps: TrailDeps, around: number | null, n: number, chain: string | null = null): Promise<BlockWindowAnswer> {
   const cur = deps.currentId ?? ((id: string) => id);
   const now = deps.now ?? Date.now;
   const started = now();
@@ -81,7 +94,12 @@ export async function assembleTrail(deps: TrailDeps, around: number | null, n: n
       clearTimeout(id);
     }
   };
-  const ids = await bounded(() => deps.chains());
+  const all = await bounded(() => deps.chains());
+  // The metagraph addresses this answer reads: every one, none under the DAG filter, or the network's own.
+  const ids = chain == null ? all : chain === "dag" ? [] : all.filter((id) => cur(id) === chain);
+  const walked = chain == null || chain === "dag" ? ["dag", ...ids] : ids;
+  // Token chains whose walk hit the page cap, with the oldest tick each reached (null: none).
+  const capped = new Map<string, number | null>();
   const found = new Map<string, ChainTicks>();
   const key = (chain: string, row: TrailRow): number | null => (chain === "dag" ? row.snapshotOrdinal : (row.globalSnapshotOrdinal ?? null));
   // The n-th newest tick gathered across every chain so far: a chain whose gathered ticks are all
@@ -91,19 +109,20 @@ export async function assembleTrail(deps: TrailDeps, around: number | null, n: n
     for (const t of found.values()) for (const k of t.keys()) all.add(k);
     return all.size >= n ? [...all].sort((a, b) => b - a)[n - 1]! : -Infinity;
   };
-  const walk = async (chain: string): Promise<void> => {
+  const walk = async (id: string): Promise<void> => {
     const ticks: ChainTicks = new Map();
-    found.set(chain, ticks);
+    found.set(id, ticks);
     let next: string | undefined;
     for (let page = 0; ; page++) {
       if (page >= TRAIL_PAGES_MAX) {
         // The DAG's cap is the reach; a token chain keeps what it reached (its floor).
-        if (chain === "dag") throw new BeyondReach(chain);
+        if (id === "dag") throw new BeyondReach(id);
+        capped.set(id, ticks.size ? Math.min(...ticks.keys()) : null);
         return;
       }
-      const r = await bounded(() => deps.transfers(chain, next));
+      const r = await bounded(() => deps.transfers(id, next));
       for (const row of r.rows) {
-        const k = key(chain, row);
+        const k = key(id, row);
         if (k == null || (around != null && k > around)) continue;
         const list = ticks.get(k) ?? [];
         list.push(row);
@@ -116,11 +135,21 @@ export async function assembleTrail(deps: TrailDeps, around: number | null, n: n
       if (ticks.size && oldest < cut()) return;
     }
   };
-  await Promise.all(["dag", ...ids].map(walk));
+  await Promise.all(walked.map(walk));
 
   const chosen = new Set<number>();
   for (const t of found.values()) for (const k of t.keys()) chosen.add(k);
   const ords = [...chosen].sort((a, b) => b - a).slice(0, n);
+  // Under its own filter, a capped token chain that reached nothing lies beyond the walk.
+  if (chain != null && chain !== "dag" && !ords.length && capped.size) throw new BeyondReach(chain);
+  const oldest = ords.length ? ords[ords.length - 1]! : null;
+  const partial = [
+    ...new Set(
+      [...capped]
+        .filter(([, reached]) => ords.length < n || reached == null || oldest == null || reached >= oldest)
+        .map(([id]) => cur(id)),
+    ),
+  ];
 
   const ticks = await Promise.all(
     ords.map(async (ord): Promise<BlockTick> => {
@@ -148,5 +177,10 @@ export async function assembleTrail(deps: TrailDeps, around: number | null, n: n
       return { ord, ts: g.timestamp, hash: g.hash, blocks: [...blocks], metaSnaps };
     }),
   );
-  return { ticks, chains: [...new Set(ids.map(cur))] };
+  return {
+    ticks,
+    chains: [...new Set(ids.map(cur))],
+    ...(chain != null ? { chain } : {}),
+    ...(partial.length ? { partial } : {}),
+  };
 }
