@@ -277,8 +277,9 @@ them — but the Next Node server can.
   couldn't read, which the UI must show as undecoded rather than as zero.** Each row carries the DATA
   UPDATES its data blocks hold (`dataTxCount`) and how many data blocks those were (`dataBlocks`), both
   absent on an undecodable payload (unknown, never zero), and `perMeta` their sum per address —
-  absent too when any of that address's rows could not be decoded (`exactRow.dataUpdatesOf`, review
-  M5: the network level says what the row level says) (D6, 2026-11-07): the decoder already inflates every anchored channel per tick, so the count costs
+  absent too when any of that address's rows could not be decoded (`dataUpdatesOf`, review
+  M5: the network level says what the row level says — its one home is `src/data/ledgerMeasure.ts`,
+  which the tick row and the Data blocks band ask too) (D6, 2026-11-07): the decoder already inflates every anchored channel per tick, so the count costs
   nothing more here, and the metagraph snapshot card and the Data blocks register read it from this
   row rather than from the deep read below. Cached per ordinal
   (immutable; a transient upstream failure throws so it retries). The pull (`fetchGlobal.ts`) tries the L0 LB first and falls back to the archival nodes on ANY LB failure — a 404, a CDN block, a 5xx or a timeout (2026-10-04: the LB's CDN 403'd one source IP while the archives served) — and after a non-404 failure skips the LB for `LB_BACKOFF_MS` (10 min), so a blocked source stops knocking on the shut door every tick. It's called for the live and

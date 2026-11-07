@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { brotliCompressSync } from "node:zlib";
-import { dataUpdatesOf, exactRowOf } from "./exactRow";
+import { exactRowOf } from "./exactRow";
 
 // The per-ordinal exact read's ROW for one anchored metagraph snapshot (`/api/snapshot/[ordinal]`).
 // The count of data updates rides the row (D6, 2026-11-07), so the metagraph snapshot card and the
@@ -35,16 +35,5 @@ describe("exactRowOf", () => {
     expect(r.decoded).toBe(false);
     expect(r.dataTxCount).toBeUndefined();
     expect(r.dataBlocks).toBeUndefined();
-  });
-});
-
-describe("dataUpdatesOf — a network's data updates in a tick (perMeta)", () => {
-  it("sums its rows' counts", () => {
-    expect(dataUpdatesOf([{ dataTxCount: 2 }, { dataTxCount: 0 }, { dataTxCount: 5 }])).toBe(7);
-    expect(dataUpdatesOf([])).toBe(0);
-  });
-  it("is UNKNOWN when any row could not be decoded — never the decodable rows' sum, never 0 (M5)", () => {
-    expect(dataUpdatesOf([{ dataTxCount: 2 }, {}])).toBeUndefined();
-    expect(dataUpdatesOf([{}])).toBeUndefined();
   });
 });

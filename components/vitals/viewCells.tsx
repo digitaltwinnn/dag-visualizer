@@ -1105,7 +1105,7 @@ export function DataCells({ accent, filter }: { accent: string; filter: string }
   const held = dataInWindow(snaps, reads, inScope);
   // The floor says itself under the unit, MOVED's grammar: the count covers the snapshots read so far.
   const heldNote = held.read < held.total ? `${held.read.toLocaleString()} of ${held.total.toLocaleString()} snapshots read` : undefined;
-  const nets = dataByNetwork(snaps, reads, netKeyOf, CATALOG_ORDER).filter((r) => filter === "all" || r.key === filter);
+  const nets = dataByNetwork(snaps, reads, inScope, netKeyOf, CATALOG_ORDER);
   const shown = nets.length > BY_NETWORK_ROWS ? nets.slice(0, BY_NETWORK_ROWS - 1) : nets;
   const rest = nets.length > BY_NETWORK_ROWS ? nets.slice(BY_NETWORK_ROWS - 1).reduce((n, r) => n + r.count, 0) : 0;
   const netRows = [

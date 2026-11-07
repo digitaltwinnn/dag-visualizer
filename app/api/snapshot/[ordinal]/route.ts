@@ -5,7 +5,8 @@ import { lineageIds } from "@/src/net/lineage";
 import { netOf } from "@/src/net/request";
 import type { SnapshotExact, ChannelSnapRow } from "@/src/data/types";
 import { decodeBlocks, pairHashes, recordBlockHashes } from "../decodeBlocks";
-import { dataUpdatesOf, exactRowOf, type StateChannelSnap } from "../exactRow";
+import { dataUpdatesOf } from "@/src/data/ledgerMeasure";
+import { exactRowOf, type StateChannelSnap } from "../exactRow";
 import { fetchGlobalJson } from "../fetchGlobal";
 import { withinServedWindow } from "../ordinalWindow";
 

@@ -1,4 +1,4 @@
-import type { GlobalSnapshot, SnapshotExact } from "@/src/data/types";
+import type { ChannelSnapRow, GlobalSnapshot, SnapshotExact } from "@/src/data/types";
 import { fmtDagShort } from "@/src/util/format";
 import { levelOptions } from "@/src/data/explorerMeasure";
 
@@ -57,14 +57,25 @@ export function kbFigure(kb: number): string {
   return kb >= 10 ? Math.round(kb).toLocaleString() : kb >= 1 ? kb.toFixed(1) : kb.toFixed(2);
 }
 
-/** A tick's DATA UPDATES — its anchored snapshots' counts summed off the exact read (each row's
- *  `dataTxCount`, `app/api/snapshot/exactRow.ts`), or null without the read. A row the decoder could
- *  not read adds nothing it could state. */
-export function tickDataUpdates(exact: Pick<SnapshotExact, "rows"> | undefined): number | null {
-  if (!exact) return null;
+/** DATA UPDATES OF THESE ROWS — their `dataTxCount` summed, or UNKNOWN (undefined) when any of them
+ *  could not be decoded (the row leaves the count off an undecodable payload,
+ *  `app/api/snapshot/exactRow.ts`). A sum that counted an unreadable payload as none would state a
+ *  zero (or a total) the payload never gave (rule 10, review M5). THE ONE HOME of the rule: the exact
+ *  read's per-network figure (`perMeta`), a tick row's figure below and the Data blocks band
+ *  (`dataStats.ts`) all ask it, so one undecodable snapshot reads as unknown on every surface. */
+export function dataUpdatesOf(rows: readonly Pick<ChannelSnapRow, "dataTxCount">[]): number | undefined {
   let n = 0;
-  for (const r of exact.rows) n += r.dataTxCount ?? 0;
+  for (const r of rows) {
+    if (r.dataTxCount == null) return undefined;
+    n += r.dataTxCount;
+  }
   return n;
+}
+
+/** A tick's DATA UPDATES — its anchored snapshots' counts summed off the exact read, or null without
+ *  the read AND when any of its snapshots could not be decoded (`dataUpdatesOf`): unknown, never 0. */
+export function tickDataUpdates(exact: Pick<SnapshotExact, "rows"> | undefined): number | null {
+  return exact ? (dataUpdatesOf(exact.rows) ?? null) : null;
 }
 
 /**

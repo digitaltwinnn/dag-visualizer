@@ -267,7 +267,9 @@ source is the Metagraph snapshots register's own (`ledgerSource(live, "data")` a
 store's own `dataMeasure` pick) and the band's
 three readings (`dataStats.ts`: DATA UPDATES over the ticks read with "N of M snapshots read" as its
 floor, BY NETWORK, LAST DATA BLOCK) are pure arithmetic over them; a tick whose read has not landed is
-a gap, never a zero (rule 10). The explorer index lists no data blocks (DED's records carry
+a gap, never a zero (rule 10). **Every sum of the counts asks ONE rule, `ledgerMeasure.dataUpdatesOf`**
+(the exact route's per-network figure, the tick row, the band's three): a row the decoder could not
+read makes its sum UNKNOWN, so a tick holding one reads as unread on every surface — never as 0. The explorer index lists no data blocks (DED's records carry
 `blocks: []`), and a data chain anchors data in nearly every snapshot, so the snapshot trail IS the
 data trail — no window of its own is read.
 

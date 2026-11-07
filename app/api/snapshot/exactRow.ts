@@ -8,7 +8,8 @@ import { decodeChannelContent } from "./decodeChannel";
 // channel per tick, so the count of the data transactions in its data blocks costs nothing more
 // here. The metagraph snapshot card's count and the Data blocks register's tile marks read it from
 // this row; the deep channel read is the RAW pane's payload alone (`src/data/CLAUDE.md`, the
-// two-step disclosure). A payload the decoder cannot read states no count — unknown is not zero.
+// two-step disclosure). A payload the decoder cannot read states no count — unknown is not zero; every
+// sum of these counts asks `dataUpdatesOf` (`src/data/ledgerMeasure.ts`), which says the same.
 
 /** The anchored entry's shape inside the global's `stateChannelSnapshots`. */
 export type StateChannelSnap = { value?: { fee?: number; content?: unknown[] } };
@@ -33,17 +34,4 @@ export async function exactRowOf(metaId: string, s: StateChannelSnap | null | un
     dataBytes: decoded?.dataBytes ?? 0,
     ...(decoded ? { dataTxCount: decoded.dataTxCount, dataBlocks: decoded.dataBlocks } : {}),
   };
-}
-
-/** ONE NETWORK'S DATA UPDATES IN A TICK — its rows' `dataTxCount` summed, or UNKNOWN (undefined) when
- *  any of its rows could not be decoded: a sum that counted an unreadable payload as none would state
- *  a zero (or a total) the payload never gave (rule 10, review M5). The row level already leaves the
- *  count off an undecodable payload; the network level says the same. */
-export function dataUpdatesOf(rows: readonly Pick<ChannelSnapRow, "dataTxCount">[]): number | undefined {
-  let n = 0;
-  for (const r of rows) {
-    if (r.dataTxCount == null) return undefined;
-    n += r.dataTxCount;
-  }
-  return n;
 }

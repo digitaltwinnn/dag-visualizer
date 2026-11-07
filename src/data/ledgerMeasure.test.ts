@@ -22,6 +22,7 @@ import {
   DATA_SNAP_MEASURES,
   DATA_SNAP_MEASURE_OPTIONS,
   tickDataUpdates,
+  dataUpdatesOf,
 } from "./ledgerMeasure";
 
 // The Snapshots explorer's tick-row figure, as a vocabulary (2026-09-26). The stepper walks the
@@ -145,6 +146,11 @@ describe("the Data blocks register's measure", () => {
   it("a tick's figure is its snapshots' data updates summed, from the exact read or the dash", () => {
     expect(tickDataUpdates(ex)).toBe(42);
     expect(tickDataUpdates(undefined)).toBeNull();
+    // A tick holding a snapshot the decoder could not read is UNKNOWN — the dash, never 0 (N1).
+    const odd = { ...rows[2], metaId: "odd", decoded: false, dataTxCount: undefined, dataBlocks: undefined };
+    expect(tickDataUpdates({ rows: [rows[0], odd] })).toBeNull();
+    expect(tickMeasure("data", {}, { ...EXACT, rows: [rows[0], odd] })).toBe(NO_MEASURE);
+    expect(tickMeasureValue("data", {}, { ...EXACT, rows: [odd] })).toBeNull();
     expect(tickMeasure("data", {}, ex)).toBe("42");
     expect(tickMeasureValue("data", {}, ex)).toBe(42);
     expect(tickMeasure("data", { metagraphSnapshotCount: 8 }, undefined)).toBe(NO_MEASURE);
@@ -160,5 +166,16 @@ describe("the Data blocks register's measure", () => {
     expect(snapMeasure("data", { fee: 0 })).toBe(NO_MEASURE);
     expect(snapMeasureValue("data", { fee: 0, dataTxCount: 7 })).toBe(7);
     expect(snapMeasureValue("data", { fee: 0 })).toBeNull();
+  });
+});
+
+describe("dataUpdatesOf — the one data-updates sum (the exact read's perMeta, the tick row, the band)", () => {
+  it("sums the rows' counts", () => {
+    expect(dataUpdatesOf([{ dataTxCount: 2 }, { dataTxCount: 0 }, { dataTxCount: 5 }])).toBe(7);
+    expect(dataUpdatesOf([])).toBe(0);
+  });
+  it("is UNKNOWN when any row could not be decoded — never the decodable rows' sum, never 0 (M5, N1)", () => {
+    expect(dataUpdatesOf([{ dataTxCount: 2 }, {}])).toBeUndefined();
+    expect(dataUpdatesOf([{}])).toBeUndefined();
   });
 });

@@ -30,16 +30,20 @@ const all = () => true;
 
 describe("dataInWindow", () => {
   it("sums the data updates of the ticks read, and says how many were", () => {
-    expect(dataInWindow(ticks, reads, all)).toEqual({ count: 50, read: 3, total: 4 });
+    // Tick 4 holds an undecodable snapshot ("odd"): its count is unknown, so under All the tick is
+    // UNREAD — outside the sum and the read count — never a 0 for that snapshot (review N1).
+    expect(dataInWindow(ticks, reads, all)).toEqual({ count: 42, read: 2, total: 4 });
   });
-  it("counts only the scope's networks", () => {
+  it("counts only the scope's networks — an undecodable row outside the scope leaves the tick read", () => {
     expect(dataInWindow(ticks, reads, (id) => id === "DOR")).toEqual({ count: 2, read: 3, total: 4 });
+    expect(dataInWindow(ticks, reads, (id) => id === "DED")).toEqual({ count: 48, read: 3, total: 4 });
+    expect(dataInWindow(ticks, reads, (id) => id === "odd")).toEqual({ count: 0, read: 2, total: 4 });
   });
 });
 
 describe("dataPerTick", () => {
-  it("one point per tick, oldest first, a gap where the read has not landed", () => {
-    expect(dataPerTick(ticks, reads, all)).toEqual([42, 0, null, 8]);
+  it("one point per tick, oldest first, a gap where the read has not landed or a row is undecodable", () => {
+    expect(dataPerTick(ticks, reads, all)).toEqual([42, 0, null, null]);
     expect(dataPerTick(ticks, reads, (id) => id === "DED")).toEqual([40, 0, null, 8]);
   });
 });
@@ -47,12 +51,16 @@ describe("dataPerTick", () => {
 describe("dataByNetwork", () => {
   it("shares the updates by network, in the given order, leaving out networks with none", () => {
     const key = (id: string) => (id === "odd" ? "unlisted" : id);
-    expect(dataByNetwork(ticks, reads, key, ["DOR", "DED"])).toEqual([
+    // Tick 4 is unread under All (its "odd" row is undecodable), so DED's 8 there is not counted: the
+    // bars read the ticks the lead reads and never sum past it.
+    expect(dataByNetwork(ticks, reads, all, key, ["DOR", "DED"])).toEqual([
       { key: "DOR", count: 2 },
-      { key: "DED", count: 48 },
+      { key: "DED", count: 40 },
     ]);
+    // Under a filter the lens is the scope's: DED's tick 4 is read there.
+    expect(dataByNetwork(ticks, reads, (id) => id === "DED", key, ["DOR", "DED"])).toEqual([{ key: "DED", count: 48 }]);
     // A network outside the order comes after it.
-    expect(dataByNetwork(ticks, { 1: exact(1, [row("NEW", 1, 3, 1), row("DED", 2, 1, 1)]) }, key, ["DED"])).toEqual([
+    expect(dataByNetwork(ticks, { 1: exact(1, [row("NEW", 1, 3, 1), row("DED", 2, 1, 1)]) }, all, key, ["DED"])).toEqual([
       { key: "DED", count: 1 },
       { key: "NEW", count: 3 },
     ]);
