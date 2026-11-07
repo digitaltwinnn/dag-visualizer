@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BLOCKS_UNREAD, blockAbsence, blockSpanWord, snapshotSpanWord, spanWords, windowWords } from "@/src/data/ledgerSpan";
+import { BLOCKS_UNREAD, blockAbsence, blockSpanWord, countWord, snapshotSpanWord, spanWords, windowWords } from "@/src/data/ledgerSpan";
 import type { GlobalSnapshot } from "@/src/data/types";
 
 const at = (ms: number, ordinal = ms) => ({ ordinal, timestamp: new Date(ms).toISOString(), hash: "h" }) as GlobalSnapshot;
@@ -98,3 +98,12 @@ describe("blockAbsence — the block window isn't here: one sentence per state, 
   });
 });
 
+describe("countWord — the switch's count beside a span", () => {
+  it("pluralises, and says nothing for none or while a span is a read state", () => {
+    expect(countWord(52, "snapshot")).toBe("52 snapshots");
+    expect(countWord(1, "block")).toBe("1 block");
+    expect(countWord(1234, "block")).toBe("1,234 blocks");
+    expect(countWord(0, "block")).toBeNull();
+    expect(countWord(null, "snapshot")).toBeNull();
+  });
+});

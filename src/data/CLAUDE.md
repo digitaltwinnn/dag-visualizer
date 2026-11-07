@@ -159,10 +159,11 @@ accepting global through the non-bumping `advanceBlock` / `advanceSnap`, never f
 another network or around a pin (pinned by `src/store/followFlow.test.ts`). Pinned by `blockWindow.test.ts` and `blockStats.test.ts`.
 
 **A block's parents come only from a FULL READ** of the snapshot that accepted it
-(`blockReads.ts`, `components/BlockReadsBridge.tsx`): one paced read per block-bearing snapshot in
-the window, newest first — the DAG's through the chamber's own exact read (`ensurePage`, mirrored
-into `store.blockReads`), a token chain's through the metagraph blocks route — pruned with the
-window. The exact-read queue asks EVERY window tick (`wantedExactReads`), a token-only tick too, so
+(`blockReads.ts`, `components/BlockReadsBridge.tsx`): one read per block-bearing snapshot in the
+window, newest first, `WINDOW_READ_POOL` (4) in flight with no gap (user, 2026-11-07: "do the exact
+reads need to be sequential?" — the paced one-per-450 ms queue took ~23 s over a 52-tick window) —
+the DAG's through the chamber's own exact read (`ensureMany`, mirrored into `store.blockReads`), a
+token chain's through the metagraph blocks route — pruned with the window. The exact-read queue asks EVERY window tick (`wantedExactReads`), a token-only tick too, so
 every bar on the trail is measured. A read carries each transfer (`BlockRead.transfers`: from, to,
 amount, fee) beside the totals; MOVED sums the read's own `amount` (the decoder's transfer sum), so a
 read cached before `transfers` was carried still counts (review M4). A failed read is a MISS (`blockReadMiss`, rule 10: blocks with no links, never invented

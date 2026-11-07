@@ -6,16 +6,17 @@ import { netUrl } from "@/src/net/current";
 import { reportPoll } from "@/src/data/api";
 import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
 import { blockReadKey, wantedBlockReads, wantedExactReads, windowBlockKeys, type BlockReadWant } from "@/src/data/blockReads";
-import { BACKFILL_GAP_MS, RETRY_BASE_MS, ensurePage } from "@/components/RawSnapshotBridge";
+import { RETRY_BASE_MS, WINDOW_READ_POOL, ensureMany } from "@/components/RawSnapshotBridge";
 import { readsBlockWindow, registerOf } from "@/src/engine/domain/viewPolicy";
 import type { BlockRead } from "@/src/engine/domain/blockBraid";
 
 // THE BLOCK READS' FETCHER (`src/data/blockReads.ts` says which reads the window wants). A block's
 // parents come only from a full read of the snapshot that accepted it: the DAG's through the
-// chamber's own paced exact read (`ensurePage`), mirrored into `blockReads` as it lands — and that
-// queue asks EVERY window tick's exact read, a token-only tick too, so every bar is measured; a token
-// chain's through `/api/network/<id>/snapshots/<ordinal>/blocks`, one at a time at the exact reads'
-// pace, newest first. A failed read is tried once more after `RETRY_BASE_MS` (5 s, the exact reads'
+// chamber's own exact read (`ensureMany`, `WINDOW_READ_POOL` in flight with no gap — user,
+// 2026-11-07: a 52-tick window read one every 450 ms took ~23 s), mirrored into `blockReads` as it
+// lands — and that queue asks EVERY window tick's exact read, a token-only tick too, so every bar is
+// measured; a token chain's through `/api/network/<id>/snapshots/<ordinal>/blocks`, the same pool,
+// newest first. A failed read is tried once more after `RETRY_BASE_MS` (5 s, the exact reads'
 // own retry step), then recorded as a MISS (rule 10:
 // the blocks draw with no links, never invented ones). Every window change prunes first, then
 // queues, and cancels the running queue (BlockWindowBridge's generation counter). Leaving the
@@ -28,15 +29,15 @@ export default function BlockReadsBridge() {
   useEffect(() => {
     if (!on) return;
     let cancelDag: (() => void) | null = null;
-    let timer: number | null = null;
+    const timers = new Set<number>(); // the retry waits in flight
     let g = 0;
     let sig: string | null = null;
     const stop = () => {
       g = ++gen.current;
       cancelDag?.();
       cancelDag = null;
-      if (timer != null) window.clearTimeout(timer);
-      timer = null;
+      for (const t of timers) window.clearTimeout(t);
+      timers.clear();
     };
 
     // Mirror a landed or missed DAG exact read into the block reads.
@@ -86,31 +87,30 @@ export default function BlockReadsBridge() {
       // The exact reads: every window tick's (`wantedExactReads`, a token-only tick too, so its bar
       // is measured), plus a DAG block read still unmirrored — one paced queue, newest first.
       const dag = [...new Set([...wantedExactReads(w, s2.snapshotExact), ...wants.filter((x) => x.chain === "dag").map((x) => x.ordinal)])].sort((a, b) => b - a);
-      if (dag.length) cancelDag = ensurePage(dag);
+      if (dag.length) cancelDag = ensureMany(dag);
+      // The token reads: the same pool, each worker taking the next read as its own settles.
       const tokens = wants.filter((x) => x.chain !== "dag");
       let i = 0;
-      const next = () => {
-        timer = null;
+      const next = (): void => {
         if (mine !== gen.current || i >= tokens.length) return;
         const x = tokens[i++]!;
         void (async () => {
           let ok = await readToken(x, mine);
           if (mine !== gen.current) return;
           if (!ok) {
-            await new Promise<void>((res) => { timer = window.setTimeout(res, RETRY_BASE_MS); });
-            timer = null;
+            await new Promise<void>((res) => { timers.add(window.setTimeout(res, RETRY_BASE_MS)); });
             if (mine !== gen.current) return;
             ok = await readToken(x, mine);
             if (mine !== gen.current) return;
-            if (!ok && mine === gen.current) {
+            if (!ok) {
               reportPoll("api-blocks", false);
               useStore.getState().setBlockReadMiss(x.key);
             }
           }
-          timer = window.setTimeout(next, BACKFILL_GAP_MS);
+          next();
         })();
       };
-      next();
+      for (let k = 0; k < WINDOW_READ_POOL; k++) next();
     };
 
     run();

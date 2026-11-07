@@ -613,8 +613,17 @@ glass — normal-blended, translucent, no depth write, the chamber's neutral cya
 handed back to `forkSpread` as `prior` (`LedgerView._blockZ`, pruned to the window by every rebuild),
 so neither a newer block nor the window's oldest block leaving moves one already standing, and a
 re-seated window that overlaps the last (the live window's own 30 s refresh) keeps what both hold.
-A block with a parent whose read is still pending waits on the centre line, so it is never seated
-against a parent about to move. ⚠️ A layout recomputed from the window moves: D1's lane from the
+**And it is laid out ONCE** (user, 2026-11-07: "the layout for the DAG shifts around before it
+finally settles; can't this just be calculated and once positions are determined draw it once
+properly"): a window sharing no block with the last starts UNLAID (`_laid`), and an unlaid window
+draws no block at all until every read it wants has landed or missed — `blockReads.windowReadsSettled`,
+handed with the reads by the Engine (`setBlockReads(reads, settled)`, re-handed on every read, miss
+and window change); the band's "N of M blocks read" is the wait's instrument. On that edge the whole
+window is laid out from every read at once and holds. After it, a block is drawn only once its own
+read has settled — a new live tick's lands onto the laid drawing, a missed one stands on the centre
+line with no links — so nothing placed ever moves. The reads themselves land `WINDOW_READ_POOL`
+(4) at a time (`ensureMany`; ~6 s for 52 ticks, measured, against ~23 s one every 450 ms).
+⚠️ A layout recomputed from the window moves: D1's lane from the
 window's lowest height swung the whole braid as reads landed, and D2's first cut — a pure barycenter
 pass over the window — re-dealt every block whenever the window slid by one tick (found live both
 times). The prior is what holds it.
@@ -699,6 +708,12 @@ its tiles stand yet (rule 10) — the chamber fills as the reads land, as the Tr
 fills from its window. The explorer and the Metagraph card's pager read the same rule
 (`ladderLevels.dataCarryingNetworks`, `REGISTER_MEASURES.data.dataOnly`). Data blocks have no
 parents, so there is no braid and no link; nothing else in `update` branches on the register.
+
+**A register switch plays the arrival beat at its own tempo** (user, 2026-11-07: "when switching
+modes within a view, I think we need a transition time as well, although shorter than the view in/out
+animation"): the Engine arms `beginEntry(REGISTER_BEAT)` (`domain/entryBeat.ts`, 2.2 — the one beat,
+~0.4–0.6 s instead of ~1.3 s) and releases it at once, since there is no choreography to wait out
+inside a view; the tiles, bars and the block tier all ride the same `_entryDrop` / `_entryFade`.
 
 **The mark** is one `InstancedMesh` beside the tiles (`_dataMarkMesh`, the tiles' own species: solid,
 normal-blended, depth-writing, in the bloom set, not pickable — the tile under it answers the click),

@@ -1069,7 +1069,11 @@ switch stands ON THE SCENE (D3, 2026-11-07 — option A of the user's mock,
 half carrying its own SPAN ("Metagraph snapshots · last 11 min", "Transaction blocks · last 14 h",
 "Data blocks · last 11 min" — it reads the snapshots' source, so the same words; a pinned stretch names
 itself, "9 min, 3d ago"; a window not held says its state in a word — "reading…", "not read", "not
-reached"). **On a phone three full names do not fit one row**: each half shows its glyph and span, the
+reached") **and, beside a stretch, its COUNT** (user, 2026-11-07: "last 9 min | 52 snapshots, last 15
+days | 53 blocks"): what fills the stretch — the source's ticks for the two snapshot registers (the live
+buffer's fixed depth, or the past window's), the window's blocks for Transaction blocks
+(`ledgerSpan.countWord`; none beside a read state; desktop only — on a phone the lit half's full words
+already reach the gutters), after a hairline rule, never a mid-dot. **On a phone three full names do not fit one row**: each half shows its glyph and span, the
 lit half alone its name (each keeps it as its accessible name), with tighter padding there — measured
 at 390: 349px with "Metagraph snapshots" lit, 334 with "Transaction blocks", 281 with "Data blocks",
 inside the 16px gutters. **With a pinned stretch the UNLIT halves say WHEN alone** (D7, measured: the

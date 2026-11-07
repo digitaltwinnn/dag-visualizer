@@ -415,6 +415,12 @@ export class LedgerView implements SceneView {
   private _cargo = REGISTER_CARGO.snapshots;
   private _blockWindow: BlockWindow | null = null;
   private _blockReads: Readonly<Record<string, { blocks: BlockRead[] }>> = {};
+  /** Have the window's reads all landed or missed (`blockReads.windowReadsSettled`, handed with the
+   *  reads)? The DAG is laid out ONCE, on this edge (`_laid`), never as the reads land one by one. */
+  private _readsSettled = false;
+  /** Whether the held window's DAG has been laid out — false until its reads first settle, and again
+   *  for a window sharing no block with the last (`kept === 0`). */
+  private _laid = false;
   private _hoverBlock: string | null = null;
   private _selBlock: string | null = null;
   /** The DAG's blocks in the snapshot glass, and the token blocks opaque on their tiles — two
@@ -715,6 +721,8 @@ export class LedgerView implements SceneView {
   // per-frame work is skipped entirely once settled.
   private _entryT = 1;
   private _entryHold = false;
+  /** The beat's tempo: 1 on a view arrival, `REGISTER_BEAT` on a register switch inside the view. */
+  private _entrySpeed = 1;
   private readonly _entryDrop = new Float32Array(SLOT_N);
   private readonly _entryFade = new Float32Array(SLOT_N);
   // ── THE TICK HANDOFF's GRACE SHEET (user, 2026-08-16 — "the ribbon and snapshot selection
@@ -732,9 +740,11 @@ export class LedgerView implements SceneView {
   private _leadRibOrd: number | null = null;
   private _leadRibT = 1;
 
-  /** Arm the drop (subjects held high and dark) — called on every arrival in this view. */
-  beginEntry(): void {
+  /** Arm the drop (subjects held high and dark) — called on every arrival in this view, and on a
+   *  register switch inside it at `speed` > 1 (the same beat, shorter). */
+  beginEntry(speed = 1): void {
     this._entryT = 0;
+    this._entrySpeed = speed;
     this._entryHold = true;
     this._entryDrop.fill(2.6);
     this._entryFade.fill(0);
@@ -1031,9 +1041,11 @@ export class LedgerView implements SceneView {
     this._liveGlobal = g;
   }
 
-  /** The full reads (`store.blockReads`): a block's parents. */
-  setBlockReads(r: Readonly<Record<string, { blocks: BlockRead[] }>>): void {
+  /** The full reads (`store.blockReads`): a block's parents — and whether the window's are all in
+   *  (`settled`), the edge the DAG is laid out on. */
+  setBlockReads(r: Readonly<Record<string, { blocks: BlockRead[] }>>, settled: boolean): void {
     this._blockReads = r;
+    this._readsSettled = settled;
     this._rebuildBlockTier();
   }
 
@@ -1139,23 +1151,35 @@ export class LedgerView implements SceneView {
     // It survives a re-seat too, since a re-seated window that overlaps the last (the live window's
     // own refresh) must not re-deal what both hold; a window sharing nothing with it (a pin far away)
     // starts afresh, the braid's scale with it.
-    const zOf = new Map<string, Map<string, number>>(); // event-time
+    // DRAWN ONCE (user, 2026-11-07: "the layout for the DAG shifts around before it finally settles;
+    // can't this just be calculated and once positions are determined draw it once properly"): a
+    // window sharing no block with the last starts unlaid, and an unlaid window draws NO block until
+    // every read it wants has landed or missed (`_readsSettled`) — the band says "N of M blocks read"
+    // meanwhile — then is laid out once, from every read at once, and holds (`prior`). After that a
+    // block is drawn only once its own read has settled (a new live tick's lands onto the laid
+    // drawing; a missed one stands on the centre line), so nothing placed ever moves.
     let kept = 0;
     for (const [chain, list] of layer) {
       const prior = this._blockZ.get(chain);
       if (prior) for (const b of list) if (prior.has(b.hash)) kept++;
-      zOf.set(chain, forkSpread(list, 1, prior, pending.get(chain)));
     }
-    if (kept === 0) { this._braidScale = null; this._tokenBraidScale = null; }
-    this._blockZ = zOf;
-    let widest = 0;
-    let widestToken = 0;
-    for (const [chain, m] of zOf) for (const u of m.values()) {
-      if (chain === "dag") widest = Math.max(widest, Math.abs(u));
-      else widestToken = Math.max(widestToken, Math.abs(u));
+    if (kept === 0) this._laid = false;
+    const hold = !this._laid && !this._readsSettled;
+    const zOf = new Map<string, Map<string, number>>(); // event-time
+    if (!hold) {
+      for (const [chain, list] of layer) zOf.set(chain, forkSpread(list, 1, this._blockZ.get(chain), pending.get(chain)));
+      if (kept === 0) { this._braidScale = null; this._tokenBraidScale = null; }
+      this._blockZ = zOf;
+      this._laid = true;
+      let widest = 0;
+      let widestToken = 0;
+      for (const [chain, m] of zOf) for (const u of m.values()) {
+        if (chain === "dag") widest = Math.max(widest, Math.abs(u));
+        else widestToken = Math.max(widestToken, Math.abs(u));
+      }
+      if (widest > 0) this._braidScale = Math.min(this._braidScale ?? Infinity, BRAID_HALF / widest);
+      if (widestToken > 0) this._tokenBraidScale = Math.min(this._tokenBraidScale ?? Infinity, TOKEN_BRAID_HALF / widestToken);
     }
-    if (widest > 0) this._braidScale = Math.min(this._braidScale ?? Infinity, BRAID_HALF / widest);
-    if (widestToken > 0) this._tokenBraidScale = Math.min(this._tokenBraidScale ?? Infinity, TOKEN_BRAID_HALF / widestToken);
     const braid = this._braidScale ?? 0;
     const tokenBraid = this._tokenBraidScale ?? 0;
     const tiers = { dag: { items: [] as BlockItem[] }, token: { items: [] as BlockItem[] } }; // event-time
@@ -1168,8 +1192,11 @@ export class LedgerView implements SceneView {
     // its height is unknown, so it stands on the centre line. A landed read with no parents is a data
     // block, not a DAG block, and is not drawn (null).
     const placeOf = (chain: string, hash: string): number | null => {
+      if (hold) return null; // the window's reads are still landing: nothing is drawn yet
       const read = readOf.get(`${chain}:${hash}`);
       if (read && read.parents.length === 0) return null;
+      // An unread block is drawn only once its read has settled — missed, it stands on the centre line.
+      if (!read && !this._readsSettled) return null;
       return zOf.get(chain)?.get(hash) ?? 0;
     };
     const turn = (key: string): number => {
@@ -1748,7 +1775,7 @@ export class LedgerView implements SceneView {
     // REVERSED: the far history lands first and the bright LEAD row last, at the front, so the
     // finale punctuates exactly where the eye rests. ~1.3s in total.
     if (this._entryT < 1) {
-      if (!this._entryHold) this._entryT = Math.min(1, this._entryT + dt / ENTRY_TOTAL);
+      if (!this._entryHold) this._entryT = Math.min(1, this._entryT + (dt * this._entrySpeed) / ENTRY_TOTAL);
       const tSec = this._entryT * ENTRY_TOTAL;
       for (let si = 0; si < SLOT_N; si++) {
         const start = (SLOT_N - 1 - si) * ENTRY_STAG; // reversed: the lead (slot 0) falls last

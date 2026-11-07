@@ -66,6 +66,21 @@ export function wantedExactReads(w: BlockWindow | null, exact: Readonly<Record<n
     .sort((a, b) => b - a);
 }
 
+/** HAVE THE WINDOW'S READS SETTLED — every read it wants landed or missed (a DAG read's miss is its
+ *  tick's exact miss)? The chamber lays the DAG out ONCE, on this edge, never as the reads land one
+ *  by one (user, 2026-11-07: "the layout shifts around before it finally settles; can't this just be
+ *  calculated and once positions are determined draw it once"). A newer window that re-asks one
+ *  tick unsettles it again; the chamber keeps what it laid and adds that tick's blocks as they land. */
+export function windowReadsSettled(
+  w: BlockWindow | null,
+  have: Readonly<Record<string, unknown>>,
+  miss: Readonly<Record<string, true>>,
+  exactMiss: Readonly<Record<number, unknown>>,
+): boolean {
+  if (!w) return false;
+  return allWants(w).every((x) => have[x.key] != null || (x.chain === "dag" ? exactMiss[x.ordinal] != null : miss[x.key] != null));
+}
+
 /** Every key the window could want, held or not (what retention keeps). */
 export function windowBlockKeys(w: BlockWindow): Set<string> {
   return new Set(allWants(w).map((x) => x.key));

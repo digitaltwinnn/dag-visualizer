@@ -7,7 +7,8 @@ import { useFeedRead } from "@/components/useFeedRead";
 import { useNowTick } from "@/components/useNowTick";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { POLL } from "@/src/engine/config";
-import { blockSpanWord, snapshotSpanWord } from "@/src/data/ledgerSpan";
+import { blockSpanWord, countWord, snapshotSpanWord } from "@/src/data/ledgerSpan";
+import { windowBlocks } from "@/src/data/blockWindow";
 import { getBlockWindow, getPastWindow, onBlockWindow, onPastWindow } from "@/src/data/pastWindow";
 import type { LedgerRegister } from "@/src/store/mode";
 import { switchLedgerRegister } from "@/src/store/applyClickActions";
@@ -69,6 +70,16 @@ export default function RegisterSwitch() {
     };
   };
   const span = spans(false);
+  // THE COUNT beside the span (user, 2026-11-07): what fills the stretch — the source's ticks (the
+  // live buffer's fixed depth, or the past window's) for the two snapshot registers, the window's
+  // blocks for Transaction blocks; none while a half says a read state. Desktop only: on a phone the
+  // lit half's full words already run to the gutters.
+  const snapCount = pastStatus === "loading" || pastStatus === "failed" ? null : countWord(past ? past.globalSnapshots.length : snaps.length, "snapshot");
+  const count: Record<LedgerRegister, string | null> = {
+    snapshots: snapCount,
+    blocks: blockStatus?.status === "ready" && blocks?.globalSnapshots.length ? countWord(windowBlocks(blocks).length, "block") : null,
+    data: snapCount,
+  };
   // The phone's short form for an UNLIT half (`ledgerSpan`'s `SpanOpts`): a pinned stretch by when
   // alone, a read state in one word — measured, the full words ran the switch past the gutters.
   const shortSpan = spans(true);
@@ -106,7 +117,7 @@ export default function RegisterSwitch() {
             key={r}
             type="button"
             aria-pressed={lit}
-            aria-label={`${REGISTER_NAMES[r]}, ${span[r]}`}
+            aria-label={count[r] ? `${REGISTER_NAMES[r]}, ${span[r]}, ${count[r]}` : `${REGISTER_NAMES[r]}, ${span[r]}`}
             onClick={() => switchLedgerRegister(r)}
             className={cn(
               "group flex flex-col justify-center gap-0.5 rounded-md px-3 max-[700px]:px-1.5 text-left cursor-pointer border-0",
@@ -121,6 +132,7 @@ export default function RegisterSwitch() {
             </span>
             <span className="font-mono text-label leading-none tabular-nums whitespace-nowrap">
               <span className="max-[700px]:hidden max-[700px]:group-aria-pressed:inline">{span[r]}</span>
+              {count[r] && <span className="max-[700px]:hidden ml-2 pl-2 border-l border-border">{count[r]}</span>}
               <span className="hidden max-[700px]:inline max-[700px]:group-aria-pressed:hidden">{shortSpan[r]}</span>
             </span>
           </button>

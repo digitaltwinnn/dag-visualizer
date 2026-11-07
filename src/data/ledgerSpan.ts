@@ -89,6 +89,15 @@ export function blockSpanWord(s: {
   return "reading…";
 }
 
+/** THE SWITCH'S COUNT beside a half's span (user, 2026-11-07: "last 9 min | 52 snapshots, last 15 days
+ *  | 53 blocks"): what fills the stretch — the source's ticks for the two snapshot registers (the live
+ *  buffer's depth, or a past window's), the window's blocks for Transaction blocks. Null for nothing
+ *  to count, or while the span is a read state rather than a stretch. */
+export function countWord(n: number | null, unit: "snapshot" | "block"): string | null {
+  if (n == null || n <= 0) return null;
+  return `${n.toLocaleString("en-US")} ${unit}${n === 1 ? "" : "s"}`;
+}
+
 /** Under the unlisted filter the block window reads nothing: every surface says the floor, never
  *  "no blocks". */
 export const BLOCKS_UNREAD = "Unlisted networks' blocks are not read";

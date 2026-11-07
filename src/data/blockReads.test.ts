@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { blockChildren, blockReadKey, blockReadOf, wantedBlockReads, wantedExactReads, windowBlockKeys } from "@/src/data/blockReads";
+import { blockChildren, blockReadKey, blockReadOf, wantedBlockReads, wantedExactReads, windowBlockKeys, windowReadsSettled } from "@/src/data/blockReads";
 import type { BlockRead } from "@/src/engine/domain/blockBraid";
 import { foldBlockWindow } from "@/src/data/blockWindow";
 import type { RawMetaSnapshot } from "@/src/data/types";
@@ -30,6 +30,18 @@ describe("block reads wanted by a window", () => {
   });
   it("windowBlockKeys holds every key the window could want", () => {
     expect([...windowBlockKeys(w)].sort()).toEqual(["DOR:51", "dag:100", "dag:300"]);
+  });
+});
+
+describe("windowReadsSettled — the DAG is laid out once, when every read has landed or missed", () => {
+  it("is settled when each wanted read is held, or missed (a DAG read by its tick's exact miss); never without a window", () => {
+    const held = { "dag:100": { blocks: [] }, "dag:300": { blocks: [] }, "DOR:51": { blocks: [] } };
+    expect(windowReadsSettled(w, held, {}, {})).toBe(true);
+    expect(windowReadsSettled(w, { "dag:100": { blocks: [] }, "DOR:51": { blocks: [] } }, {}, { 300: true })).toBe(true);
+    expect(windowReadsSettled(w, { "dag:100": { blocks: [] }, "dag:300": { blocks: [] } }, { "DOR:51": true }, {})).toBe(true);
+    expect(windowReadsSettled(w, { "dag:100": { blocks: [] }, "dag:300": { blocks: [] } }, {}, {})).toBe(false);
+    expect(windowReadsSettled(w, held, {}, {})).toBe(true);
+    expect(windowReadsSettled(null, held, {}, {})).toBe(false);
   });
 });
 

@@ -4,6 +4,8 @@ import { useStore, type Mode } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { metagraphById, initNetwork, getNetwork, DEFAULT_META_COLOR, resolveSignerIps } from "@/src/data/network";
 import { getBlockWindow, getPastWindow, ledgerSource, onBlockWindow, onPastWindow } from "@/src/data/pastWindow";
+import { windowReadsSettled } from "@/src/data/blockReads";
+import { REGISTER_BEAT } from "@/src/engine/domain/entryBeat";
 import { blockWindowContinues } from "@/src/data/blockWindow";
 import { ledgerLens } from "@/src/data/ledgerStory";
 import { reportPoll, touchPoll } from "@/src/data/api";
@@ -751,7 +753,7 @@ export class Engine {
       this.ledger.setRegister(st.ledgerRegister);
       this._blockTo = getBlockWindow()?.to ?? null;
       this.ledger.setBlockWindow(getBlockWindow());
-      this.ledger.setBlockReads(st.blockReads);
+      this.ledger.setBlockReads(st.blockReads, windowReadsSettled(getBlockWindow(), st.blockReads, st.blockReadMiss, st.exactMiss));
       this.ledger.setSelectedBlock(st.block?.hash ?? null);
       this.ledger.setHoveredBlock(st.hoverBlock);
     }
@@ -908,6 +910,12 @@ export class Engine {
           this.ledger.setRegister(st.ledgerRegister);
           if (wasBlockTrail !== this.ledger.readsBlockWindow) this._reseatLedger();
           else this._refreshLedger();
+          // THE SWITCH'S OWN BEAT (user, 2026-11-07): the chamber's arrival drop at `REGISTER_BEAT`
+          // tempo, released at once — there is no choreography to wait out inside a view.
+          if (this.mode === "ledger") {
+            this.ledger.beginEntry(REGISTER_BEAT);
+            this.ledger.releaseEntry();
+          }
         }
         // The bare stage ARMS rather than hides (user, 2026-09-04: "shouldn't their nodes still
         // move to the gathering section at the top like they always do?"): the gather is the OUT
@@ -1119,7 +1127,11 @@ export class Engine {
         // reads its links and tip states are drawn from.
         if (st.block !== prev.block) this.ledger.setSelectedBlock(st.block?.hash ?? null);
         if (st.hoverBlock !== prev.hoverBlock) this.ledger.setHoveredBlock(st.hoverBlock);
-        if (st.blockReads !== prev.blockReads) this.ledger.setBlockReads(st.blockReads);
+        // …with whether the window's reads are ALL in — the edge the DAG is laid out on, so a miss
+        // (either map) re-hands them too.
+        if (st.blockReads !== prev.blockReads || st.blockReadMiss !== prev.blockReadMiss || st.exactMiss !== prev.exactMiss) {
+          this.ledger.setBlockReads(st.blockReads, windowReadsSettled(getBlockWindow(), st.blockReads, st.blockReadMiss, st.exactMiss));
+        }
         // A landing EXACT read is what turns a tick from an unmeasured seam into a measured byte
         // bar (spec §6.3), so re-hand the map the moment it changes. Ledger-only: nothing else
         // reads it from the scene, and the view re-reads it on entry via _refreshLedger.
@@ -1224,6 +1236,9 @@ export class Engine {
         const continues = blockWindowContinues(this._blockTo, w);
         this._blockTo = w?.to ?? null;
         this.ledger.setBlockWindow(w);
+        // A new window wants new reads: re-hand the reads with their settledness against IT.
+        const st = useStore.getState();
+        this.ledger.setBlockReads(st.blockReads, windowReadsSettled(w, st.blockReads, st.blockReadMiss, st.exactMiss));
         if (!this.ledger.readsBlockWindow) return;
         if (continues) this._refreshLedger();
         else this._reseatLedger();
