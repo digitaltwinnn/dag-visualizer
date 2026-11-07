@@ -1,6 +1,7 @@
 import type { ChannelSnapRow, GlobalSnapshot, SnapshotExact } from "@/src/data/types";
 import { fmtDagShort } from "@/src/util/format";
 import { levelOptions } from "@/src/data/explorerMeasure";
+import type { LedgerRegister } from "@/src/store/mode";
 
 // WHAT A TICK ROW LEADS WITH (user, 2026-09-26: "Snapshots view, like the new trends view, could
 // benefit from the control you're moving to the explorer, to switch between different values shown
@@ -192,3 +193,49 @@ export function snapMeasureValue(m: SnapLevelMeasure, row: { fee: number; bytes?
   if (m === "data") return row.dataTxCount ?? null;
   return row.bytes ?? (row.sizeInKB != null ? row.sizeInKB * 1024 : null);
 }
+
+/** A REGISTER'S MEASURE SET — what each level of the Snapshots explorer's tick ladder offers, and
+ *  which of the store's picks it reads and writes (refactor round R1, L2: the explorer chose
+ *  between the two registers' lists with seven `inData ? A : B` ternaries). `fadesDataless`: a row
+ *  whose snapshots carried no data update steps back (faint, never hidden). */
+export type RegisterMeasureSet = {
+  order: readonly LedgerMeasure[];
+  tickOptions: readonly { id: LedgerMeasure; label: string; unit: string }[];
+  netMeasures: readonly (TickNetMeasure | "data")[];
+  netOptions: readonly { id: LedgerMeasure; label: string; unit: string }[];
+  snapMeasures: readonly SnapLevelMeasure[];
+  snapOptions: readonly { id: LedgerMeasure; label: string; unit: string }[];
+  /** The store field holding this register's pick, and its setter. */
+  pick: "ledgerMeasure" | "dataMeasure";
+  setPick: "setLedgerMeasure" | "setDataMeasure";
+  fadesDataless: boolean;
+};
+const SNAPSHOT_MEASURES: RegisterMeasureSet = {
+  order: LEDGER_MEASURE_ORDER,
+  tickOptions: LEDGER_MEASURE_OPTIONS,
+  netMeasures: TICK_NET_MEASURES,
+  netOptions: TICK_NET_MEASURE_OPTIONS,
+  snapMeasures: SNAP_MEASURES,
+  snapOptions: SNAP_MEASURE_OPTIONS,
+  pick: "ledgerMeasure",
+  setPick: "setLedgerMeasure",
+  fadesDataless: false,
+};
+/** Keyed by register, so a fourth register is a compile error here. Transaction blocks lists BLOCKS
+ *  (its own set, `blockMeasure.ts`); the tick levels it never shows read the Metagraph snapshots set. */
+export const REGISTER_MEASURES: Readonly<Record<LedgerRegister, RegisterMeasureSet>> = {
+  snapshots: SNAPSHOT_MEASURES,
+  blocks: SNAPSHOT_MEASURES,
+  data: {
+    order: DATA_MEASURE_ORDER,
+    tickOptions: DATA_MEASURE_OPTIONS,
+    netMeasures: DATA_TICK_NET_MEASURES,
+    netOptions: DATA_TICK_NET_MEASURE_OPTIONS,
+    snapMeasures: DATA_SNAP_MEASURES,
+    snapOptions: DATA_SNAP_MEASURE_OPTIONS,
+    pick: "dataMeasure",
+    setPick: "setDataMeasure",
+    fadesDataless: true,
+  },
+};
+

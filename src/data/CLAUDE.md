@@ -268,7 +268,8 @@ source is the Metagraph snapshots register's own (`ledgerSource(live, "data")` a
 `dataTxCount` — the count of data transactions in a snapshot's data blocks, which IS an update count
 (unlike `content`'s length above). The explorer's lead measure (`ledgerMeasure.tickDataUpdates`, the
 `DATA_*` measure lists — Data updates · Fees · Metagraphs · Size, Data updates in Anchors' place — the
-store's own `dataMeasure` pick) and the band's
+store's own `dataMeasure` pick; each register's lists, pick and fade are ONE keyed row,
+`ledgerMeasure.REGISTER_MEASURES`, which the explorer reads instead of choosing per register) and the band's
 three readings (`dataStats.ts`: DATA UPDATES over the ticks read with "N of M snapshots read" as its
 floor, BY NETWORK, LAST DATA BLOCK) are pure arithmetic over them; a tick whose read has not landed is
 a gap, never a zero (rule 10). **Every sum of the counts asks ONE rule, `ledgerMeasure.dataUpdatesOf`**

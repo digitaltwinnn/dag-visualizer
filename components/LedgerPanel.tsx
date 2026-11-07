@@ -20,16 +20,7 @@ import { cn } from "@/lib/utils";
 import { latestRelevant } from "@/src/data/follow";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import {
-  DATA_MEASURE_OPTIONS,
-  DATA_MEASURE_ORDER,
-  DATA_SNAP_MEASURE_OPTIONS,
-  DATA_SNAP_MEASURES,
-  DATA_TICK_NET_MEASURE_OPTIONS,
-  DATA_TICK_NET_MEASURES,
-  LEDGER_MEASURE_OPTIONS,
-  LEDGER_MEASURE_ORDER,
-  SNAP_MEASURE_OPTIONS,
-  TICK_NET_MEASURE_OPTIONS,
+  REGISTER_MEASURES,
   tickDataUpdates,
   snapMeasure,
   snapMeasureValue,
@@ -37,8 +28,6 @@ import {
   tickMeasureValue,
   tickNetMeasure,
   type LedgerMeasure,
-  SNAP_MEASURES,
-  TICK_NET_MEASURES,
 } from "@/src/data/ledgerMeasure";
 import { blockRowLocked, ledgerLens, storyCount, tickLocked } from "@/src/data/ledgerStory";
 import { filterAccent, resolveSigner, SIGNER_UNKNOWN, snapshotSigners } from "@/src/data/network";
@@ -184,7 +173,8 @@ export default function LedgerPanel() {
   // THE DATA BLOCKS REGISTER (D6, 2026-11-07) is this card's Snapshots levels with the DATA measure
   // leading — its own pick (`dataMeasure`), Data updates first in every level's list — and a snapshot
   // whose data blocks carried nothing FAINT, never hidden (rule 10: a lens never edits the facts).
-  const inData = register === "data";
+  // Each register's lists, pick and fade are ONE keyed row (`ledgerMeasure.REGISTER_MEASURES`).
+  const measures = REGISTER_MEASURES[register];
   useFeedRead(["api-blocks"], "LedgerPanel blocks", inBlocks);
   const blockWin = useSyncExternalStore(onBlockWindow, getBlockWindow, () => null);
   const blockStatus = useStore((s) => s.blockWindowStatus);
@@ -203,14 +193,11 @@ export default function LedgerPanel() {
   const setHoverMetaSnap = useStore((s) => s.setHoverMetaSnap);
   const hoverNodeId = useStore((s) => s.hoverNodeId);
   const setHoverNodeId = useStore((s) => s.setHoverNodeId);
-  const snapshotsMeasure = useStore((s) => s.ledgerMeasure);
-  const setSnapshotsMeasure = useStore((s) => s.setLedgerMeasure);
-  const dataMeasure = useStore((s) => s.dataMeasure);
-  const setDataMeasure = useStore((s) => s.setDataMeasure);
   // The register's own pick and its lists: one value per register, every level a subset of it.
-  const ledgerMeasure = levelMeasure(inData ? DATA_MEASURE_ORDER : LEDGER_MEASURE_ORDER, inData ? dataMeasure : snapshotsMeasure);
-  const setLedgerMeasure = inData ? setDataMeasure : setSnapshotsMeasure;
-  const tickOptions = inData ? DATA_MEASURE_OPTIONS : LEDGER_MEASURE_OPTIONS;
+  const registerPick = useStore((s) => s[measures.pick]);
+  const setLedgerMeasure = useStore((s) => s[measures.setPick]);
+  const ledgerMeasure = levelMeasure(measures.order, registerPick);
+  const tickOptions = measures.tickOptions;
   const snap = useStore((s) => s.snap);
   const following = useStore((s) => s.following);
   const dead = useNoSignal();
@@ -225,8 +212,8 @@ export default function LedgerPanel() {
   // show the tick level's `ledgerMeasure` where they can state it and their own first measure where
   // they can't, and a pick at any level writes that one value — so stepping down and back up never
   // loses what the reader chose.
-  const netPick = levelMeasure(inData ? DATA_TICK_NET_MEASURES : TICK_NET_MEASURES, ledgerMeasure);
-  const snapPick = levelMeasure(inData ? DATA_SNAP_MEASURES : SNAP_MEASURES, ledgerMeasure);
+  const netPick = levelMeasure(measures.netMeasures, ledgerMeasure);
+  const snapPick = levelMeasure(measures.snapMeasures, ledgerMeasure);
 
   const selNode = inspect && (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode") ? inspect : null;
   const selIp = selNode?.node?.ip ?? null;
@@ -466,7 +453,7 @@ export default function LedgerPanel() {
           // No `rung`: a committed tick row's click also opens its tick in this card (local path
           // state), which a re-box would swallow — and its Global snapshot card is the box anyway.
           // …and in Data blocks a tick whose snapshots carried no data update steps back too.
-          faint: ((!!filterNet && count === 0) || (inData && tickDataUpdates(snapshotExact[d.ordinal]) === 0)) && !on,
+          faint: ((!!filterNet && count === 0) || (measures.fadesDataless && tickDataUpdates(snapshotExact[d.ordinal]) === 0)) && !on,
           // The count the bar's colour stands for, in words — colour is never the only carrier.
           onClick: locked ? undefined : () => {
             // THE SELECTED ROW DRILLS (user, 2026-10-07 — the explorer rests on this list, its axis,
@@ -539,7 +526,7 @@ export default function LedgerPanel() {
         onRelease: () => setPath((p) => ({ ...p, net: null, snap: null })),
       },
       meaning: "Networks that anchored into it",
-      measure: { options: inData ? DATA_TICK_NET_MEASURE_OPTIONS : TICK_NET_MEASURE_OPTIONS, value: netPick, onPick: (id) => setLedgerMeasure(id as LedgerMeasure) },
+      measure: { options: measures.netOptions, value: netPick, onPick: (id) => setLedgerMeasure(id as LedgerMeasure) },
       hasFigure: true,
       nameW: 120,
       figureW: 48,
@@ -549,7 +536,7 @@ export default function LedgerPanel() {
       rows: measured.map(({ n, per, m }): ExplorerRowSpec => {
         const lensedOut = outOfLens(filter, n.id);
         // A network whose snapshots here carried no data update steps back in Data blocks.
-        const dataless = inData && per?.dataTxCount === 0;
+        const dataless = measures.fadesDataless && per?.dataTxCount === 0;
         return {
           key: n.id,
           // No dot beside a hued bar (user, 2026-10-23) — one hue carrier per row.
@@ -621,7 +608,7 @@ export default function LedgerPanel() {
         onRelease: () => setPath((p) => ({ ...p, snap: null })),
       },
       meaning: "Its snapshots anchored here",
-      measure: { options: inData ? DATA_SNAP_MEASURE_OPTIONS : SNAP_MEASURE_OPTIONS, value: snapPick, onPick: (id) => setLedgerMeasure(id as LedgerMeasure) },
+      measure: { options: measures.snapOptions, value: snapPick, onPick: (id) => setLedgerMeasure(id as LedgerMeasure) },
       hasFigure: true,
       figureW: 48,
       empty: "No snapshots identified for this network here.",
@@ -643,7 +630,7 @@ export default function LedgerPanel() {
           figure: snapMeasure(snapPick, leafRows[i]!),
           on,
           // A snapshot whose data blocks carried nothing steps back in Data blocks (never hidden).
-          faint: inData && leafRows[i]!.dataTxCount === 0 && !on,
+          faint: measures.fadesDataless && leafRows[i]!.dataTxCount === 0 && !on,
           rung: "metaSnap",
           onClick: () => {
             applyClickActions(metaSnapSelectActions(sel, tickPick, { metaSnap, following, inspect: useStore.getState().inspect, block: useStore.getState().block }));
