@@ -2,6 +2,7 @@ import type { PickDescriptor } from "./types";
 import { METAGRAPHS } from "@/src/net/current";
 import { identityHudCss } from "@/src/palette/identity";
 import { UNLISTED_HUE } from "@/src/data/unlistedId";
+import { shortBlockHash } from "@/src/util/format";
 
 // THE COLOUR IS THE HOVERED OBJECT'S OWN (user, 2026-10-03: "hover should take the color from the
 // object it hovers (not the filter color)"). The DAG's nodes, its core and a global snapshot are
@@ -31,7 +32,7 @@ export interface HoverSubject {
   /** WHAT the pointer is on — the hover card wears that kind's mark, the one its card wears
    *  (2026-10-03). Before it, a global snapshot and a metagraph snapshot both hovered as a bare
    *  number, and the global one borrowed an "L0" chip that read as a layer. */
-  kind: "node" | "network" | "snapshot" | "metaSnap" | "country";
+  kind: "node" | "network" | "snapshot" | "metaSnap" | "block" | "country";
   /** The network whose logo a `network` hover draws. */
   netId?: string;
   ident: string; // identity ticker: a metagraph symbol or "DAG"; "" where the subject has none
@@ -72,6 +73,11 @@ export function tooltipSubject(p: PickDescriptor | null | undefined): HoverSubje
       // of its own") had survived here, one surface over.
       return { kind: "metaSnap", ident, name: p.sel.ordinal.toLocaleString(), color: cfg ? identityHudCss(cfg.id) : UNLISTED_HUE, mono: false };
     }
+    case "block":
+      // A BLOCK in the Transaction blocks register (2026-11-07, user: "blocks are missing a hover
+      // card"): its chain's ticker as the identity in the chain's hue, its short hash as the subject —
+      // the Transaction block card's own head. The DAG's blocks hover in the DAG's hue, as its nodes do.
+      return { kind: "block", ident: p.sel.chain === "dag" ? "DAG" : (METAGRAPHS.find((m) => m.id === p.sel.chain)?.ticker ?? p.sel.chain.slice(0, 6) + "…"), name: shortBlockHash(p.sel.hash), color: p.sel.chain === "dag" ? DAG : identityHudCss(p.sel.chain), mono: true };
     default:
       return null; // geoLive is a rail-only proxy, never a 3D-hover subject
   }

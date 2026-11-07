@@ -1112,7 +1112,9 @@ are the Metagraph snapshots register's own (`metaSnap`, `tickNet`, the pin).
 block and not the snapshot"): while following, `followLatest` (FollowController's heartbeat — every
 global, anchor and block-window change) seats the window's newest block of its network
 (`blockWindow.newestBlock`) and its accepting global through the non-bumping `advanceBlock` /
-`advanceSnap`; the Block card is TRANSFER-LED (design round pick T1, 2026-11-07): its lead says only
+`advanceSnap`; **a block hovers like everything else** (`hoverSubject.tooltipSubject`'s `block`
+kind, 2026-11-07 — user: "blocks are missing a hover card"): the hover card wears the block mark in
+the chain's hue, the chain's ticker as the identity and the short hash, mono; the Block card is TRANSFER-LED (design round pick T1, 2026-11-07): its lead says only
 how much moved ("Moved 19K DAG", "… in 3 transfers" — no addresses, user: the sentence was "already
 shown in the table below"), the transfers are its one table — FROM · TO · <unit> under caps headers,
 each address a short mono token, the amount right-aligned, no per-row fee (Fees paid sums it) —
