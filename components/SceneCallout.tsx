@@ -45,6 +45,9 @@ import { VIEW_POLICIES, readsBlockWindow, registerOf } from "@/src/engine/domain
 import { blockReadOf } from "@/src/data/blockReads";
 import { REGISTER_MEASURES, dataUpdatesOf } from "@/src/data/ledgerMeasure";
 import { carriesData } from "@/src/engine/domain/dataMark";
+import { calloutSubjects } from "@/src/engine/domain/calloutSubjects";
+import { REGISTER_ICONS } from "@/components/icons";
+import { UNLISTED_ID } from "@/src/data/unlistedId";
 import { blockLead } from "@/components/inspector/blockLead";
 import { identityHudCss } from "@/src/palette/identity";
 import { displayNetwork } from "@/src/data/unlisted";
@@ -261,6 +264,13 @@ export default function SceneCallout() {
   const dataLead = useStore((s) => REGISTER_MEASURES[s.ledgerRegister].dataOnly);
   const block = useStore((s) => s.block);
   const blockRead = useStore((s) => (s.block ? blockReadOf(s.blockReads, s.block) : null));
+  const register = useStore((s) => s.ledgerRegister);
+  const dataBlock = useStore((s) => s.dataBlock);
+  const dataBlockRow = useStore((s) => {
+    const d = s.dataBlock;
+    if (!d) return null;
+    return s.snapshotExact[d.snap.globalOrdinal]?.rows.find((r) => r.metaId === d.snap.metaId && r.ordinal === d.snap.ordinal)?.dataBlockRows ?? null;
+  });
   // Holds only while a callout can SHOW — the view's policy allows one, the scene layer is up and
   // something is committed for it to name (mounted in every view, it reads nothing at rest).
   useFeedRead(
@@ -575,26 +585,47 @@ export default function SceneCallout() {
         lead: { text: blockLead(block, blockRead, true) },
       };
     };
-    if (boxedCard === "node" && node) m = node;
-    else if (inBlocks) m = blockModel();
-    else {
-      // THE PAIR GETS TWO CALLOUTS (user, 2026-10-03: asked "should snapshot view have two
-      // callouts, one for global- and one for metagraph snapshot?" — "2 callouts"). A committed
-      // metagraph snapshot always stands with the global snapshot it is read against, and one
-      // label could only name one of them: the tile, with nothing saying which bar it fell
-      // into, or the bar, with the tile unnamed.
-      // ⚠️ EACH HAS ITS OWN ANCHOR, FIXED: the global snapshot is always the second
-      // (`callout-2`), whichever card is boxed. The first cut handed the subject's anchor to the
-      // boxed card and the other to the second — so re-boxing swapped the two, both wrappers
-      // remounted, and both labels replayed their whole entrance over two subjects that had
-      // not changed (the 2026-09-11 complaint, "it re-draws the card while the subject is the
-      // same"). The subject's anchor (`callout`) is the upper storey's: the metagraph snapshot's
-      // tile, or its network's lane when the Metagraph card is the box or no snapshot of that
-      // network is committed — the two stand at the same end of the same lane, so they share
-      // the one anchor rather than stack two labels on it. CalloutSync mirrors this exactly.
-      m = boxedCard === "context" ? (laneModel() ?? msModel()) : (msModel() ?? laneModel() ?? (snap ? null : node));
-      m2 = gsModel();
-    }
+    // THE DATA BLOCK's label (the Data blocks register, 2026-11-07): on its snapshot's tile, in its
+    // card's head grammar — its place in the snapshot, the updates chip — and the short lead.
+    const dataBlockModel = (): Model | null => {
+      if (!dataBlock) return null;
+      const hue = identityHudCss(dataBlock.snap.metaId);
+      const b = dataBlockRow?.[dataBlock.index] ?? null;
+      const n = dataBlockRow?.length ?? 0;
+      return {
+        key: `db|${dataBlock.snap.metaId}:${dataBlock.snap.ordinal}:${dataBlock.index}`,
+        eyebrow: "Data block",
+        title: n > 0 ? `${dataBlock.index + 1} of ${n}` : `${dataBlock.index + 1}`,
+        titleMono: true,
+        aside: { text: "", pinned: true, chip: b ? `${b.updates.toLocaleString()} ${b.updates === 1 ? "update" : "updates"}` : undefined },
+        ring: hue,
+        mark: { icon: REGISTER_ICONS.data, hue },
+        lead: b ? { text: `Carried ${b.updates.toLocaleString()} ${b.updates === 1 ? "update" : "updates"}, signed by ${b.signers.toLocaleString()}` } : undefined,
+      };
+    };
+    // WHICH SUBJECTS THE VIEW LABELS — `domain/calloutSubjects`, the ONE chain CalloutSync anchors by
+    // too (2026-11-07: the two owners had each grown their own chain of ifs and drifted by register).
+    // THE PAIR GETS TWO CALLOUTS (user, 2026-10-03: "2 callouts"): the upper storey's subject
+    // (`callout`) and the global snapshot's bar (`callout-2`), each with its own fixed anchor, so a
+    // re-box never swaps the two and replays both entrances (the 2026-09-11 complaint).
+    const subjects = calloutSubjects({
+      register,
+      boxedCard,
+      hasNode: !!node,
+      hasSnap: !!snap,
+      hasMetaSnap: !!metaSnap,
+      hasBlock: !!block,
+      hasDataBlock: !!dataBlock,
+      lane: lnet !== "all" && lnet !== "dag" && lnet !== UNLISTED_ID,
+    });
+    m =
+      subjects.first === "node" ? node
+      : subjects.first === "block" ? blockModel()
+      : subjects.first === "dataBlock" ? dataBlockModel()
+      : subjects.first === "metaSnap" ? msModel()
+      : subjects.first === "lane" ? laneModel()
+      : null;
+    m2 = subjects.second === "global" ? gsModel() : null;
   }
   if (phone) {
     // One label on a phone — the subject's, else the global snapshot's — head only. The GLOBAL

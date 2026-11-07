@@ -1194,6 +1194,16 @@ so a door after a door inherits nothing). Pinned by `src/data/blockStats.test.ts
 `components/feedReadBoundary.test.ts` (`api-blocks` readers hold the feed) and
 `components/rawSurfaceBoundary.test.ts` (the register compare stays inside `RecordsSurface`).
 
+**WHICH SUBJECTS THE SNAPSHOTS VIEW LABELS ON THE SCENE is one pure decision**
+(`src/engine/domain/calloutSubjects.ts`, 2026-11-07 — user: the Data block "has no callout yet", and
+in Transaction blocks the block label stood "even if the metagraph rung is selected … needs proper
+code and testing"): `SceneCallout` draws the model it names and `CalloutSync` anchors the same
+subjects, so neither owner carries a chain of its own. The box leads (a boxed node alone; a boxed
+Metagraph card its lane, in every register); the register's own subject takes the upper label where
+committed (the Transaction block — and no global label there, D3; the Data block on its snapshot's
+tile, the snapshot's label stepping aside); else the metagraph snapshot, else the lane; the global's
+bar is the second label wherever the register draws it. Its test is the matrix.
+
 **The Data blocks register (D6, 2026-11-07) is the Metagraph snapshots register's surfaces with the
 DATA leading.** The global snapshot's scene label speaks the register's subject there (user,
 2026-11-07: "snapshot anchor should show information related to the sub-view"): "10 data blocks" with

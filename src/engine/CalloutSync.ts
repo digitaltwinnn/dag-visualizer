@@ -8,6 +8,8 @@ import { calloutHangs, calloutPhonePlacement, calloutPlacement, CALLOUT_OFF_X, C
 import { R as GEO_R, LAND_H, latLonToVec3 } from "./domain/geoLayout";
 import { ledgerLens } from "@/src/data/ledgerStory";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
+import { calloutSubjects } from "./domain/calloutSubjects";
+import type { LedgerRegister } from "@/src/store/mode";
 import type { SceneCtx } from "./scene/SceneContext";
 import type { Globe } from "./scene/Globe";
 import type { LedgerView } from "./scene/views/LedgerView";
@@ -37,6 +39,10 @@ export interface CalloutState {
   /** Live-follow flag — the settle gate skips the rewind term for it (LedgerView.calloutSettled). */
   following: boolean;
   boxedCard: string | null;
+  /** The Snapshots view's register and its two finer subjects — `calloutSubjects`' inputs. */
+  register: LedgerRegister;
+  hasBlock: boolean;
+  hasDataBlock: boolean;
   country: string | null;
   cohort: CohortSel | null;
   sceneCoverL: number;
@@ -478,42 +484,42 @@ export class CalloutSync {
   // global tick's byte-bar lead one storey down. The rewind brings a committed row to the lead
   // position, so the lead slot IS where the subject settles (LedgerView.calloutAnchor is pure
   // layout data). An uncataloged channel's rows live on the unlisted lane.
+  /** THE SUBJECTS THE SNAPSHOTS VIEW LABELS — `domain/calloutSubjects`, the ONE chain both owners
+   *  consult (2026-11-07): `SceneCallout` draws the label it names, this projector anchors it. */
+  private _ledgerSubjects() {
+    const st = this.st;
+    const net = this.h.ledgerNet;
+    return calloutSubjects({
+      register: st.register,
+      boxedCard: st.boxedCard,
+      hasNode: isNodePick(st.inspect),
+      hasSnap: !!st.snap,
+      hasMetaSnap: !!st.metaSnap,
+      hasBlock: st.hasBlock,
+      hasDataBlock: st.hasDataBlock,
+      lane: net !== "all" && net !== "dag" && net !== UNLISTED_ID,
+    });
+  }
+
   private _ledgerCalloutAnchor(v: THREE.Vector3): boolean {
     const st = this.st;
+    const first = this._ledgerSubjects().first;
     // THE BOX LEADS (user, 2026-08-15/16): the boxed NODE card anchors the node's own tray chip.
-    if (st.boxedCard === "node" && isNodePick(st.inspect)) return this._ledgerNodeAnchor(st, v);
-    // IN THE BLOCKS REGISTER THE LABEL IS THE BLOCK'S (D3) — `SceneCallout`'s chain mirrored: the
-    // committed block (live or pinned) at its own place in the chamber, once its row has settled.
-    if (this.h.ledger.readsBlockWindow) {
-      if (!this.h.ledger.calloutSettled(st.following)) return false;
-      if (!this.h.ledger.selectedBlockAnchor(v)) return false;
-      this.h.ledger.group.localToWorld(v); // the rendered chamber transform — a label read. render-state OK
-      return true;
-    }
-    // Otherwise this anchor is the UPPER STOREY's — `SceneCallout`'s chain, mirrored term for
-    // term: the metagraph snapshot's tile, or its network's LANE when the Metagraph card is the
-    // box or no snapshot of that network is committed (user, 2026-10-03: "the dossier on
-    // snapshots page has no callout on the scene"). The global snapshot's label has an anchor of
-    // its own (`_ledgerGlobalAnchor`).
-    const net = this.h.ledgerNet;
-    const lane = net !== "all" && net !== "dag" && net !== UNLISTED_ID;
-    if (lane && (st.boxedCard === "context" || !st.metaSnap)) {
-      // The lane's head — layout data, fixed for the session; false when the lane isn't in the
-      // field, and then the label stays down rather than borrow another subject's point.
-      if (!this.h.ledger.calloutAnchor(net, v)) return false;
-      this.h.ledger.group.localToWorld(v); // the rendered chamber transform — a label read. render-state OK
-      return true;
-    }
-    if (st.metaSnap) {
-      // A snapshot's label waits until its row is FIXED on the plane (LedgerView.calloutSettled
-      // — the chamber's own clocks; the tray-node paths stay exempt, chips don't ride the trail).
-      if (!this.h.ledger.calloutSettled(st.following)) return false;
-      if (!this._ledgerTileAnchor(st.metaSnap, v)) return false;
-      this.h.ledger.group.localToWorld(v); // the rendered chamber transform — a label read. render-state OK
-      return true;
-    }
-    if (st.snap) return false;
-    return this._ledgerNodeAnchor(st, v);
+    if (first === "node") return this._ledgerNodeAnchor(st, v);
+    if (first === null) return false;
+    // Every other upper label rides the chamber's trail: it waits until its row is FIXED on the plane
+    // (LedgerView.calloutSettled — the chamber's own clocks; the tray-node path above stays exempt).
+    if (!this.h.ledger.calloutSettled(st.following)) return false;
+    // The TRANSACTION BLOCK (D3) at its own place in the chamber; the DATA BLOCK on its snapshot's
+    // tile (one label per tile — the snapshot's steps aside); the METAGRAPH SNAPSHOT's tile; the
+    // network's LANE head (user, 2026-10-03: "the dossier on snapshots page has no callout on the
+    // scene") — layout data, fixed for the session; false when the lane isn't in the field, and then
+    // the label stays down rather than borrow another subject's point.
+    if (first === "block") { if (!this.h.ledger.selectedBlockAnchor(v)) return false; }
+    else if (first === "dataBlock" || first === "metaSnap") { if (!st.metaSnap || !this._ledgerTileAnchor(st.metaSnap, v)) return false; }
+    else if (!this.h.ledger.calloutAnchor(this.h.ledgerNet, v)) return false;
+    this.h.ledger.group.localToWorld(v); // the rendered chamber transform — a label read. render-state OK
+    return true;
   }
 
   // THE committed snapshot's tile (user, 2026-08-15), rewind offsets included; the lane lead
@@ -529,10 +535,9 @@ export class CalloutSync {
   // points at the snapshot's bar, or at the resolved network's own segment of it.
   private _ledgerGlobalAnchor(v: THREE.Vector3): boolean {
     const st = this.st;
-    if (!st.snap) return false;
-    // The Blocks register stands no global label (D3): the block's is the one label there.
-    if (this.h.ledger.readsBlockWindow) return false;
-    if (st.boxedCard === "node" && isNodePick(st.inspect)) return false;
+    // The same chain's second label: the global's bar wherever the register draws it, never under a
+    // boxed node (its own label owns the scene) — `calloutSubjects` says when.
+    if (this._ledgerSubjects().second !== "global") return false;
     if (!this.h.ledger.calloutSettled(st.following)) return false;
     this._ledgerBarAnchor(v);
     this.h.ledger.group.localToWorld(v); // the rendered chamber transform — a label read. render-state OK

@@ -11,7 +11,9 @@ import { join } from "node:path";
 //     queries it. A third home would be a second positioning or content path.
 //  2. BOTH owners consult `boxedCard`. The box-led subject preference is deliberately mirrored
 //     (the component picks the MODEL, CalloutSync picks the ANCHOR); an owner that stops reading
-//     the channel would label one subject while pointing at another.
+//     the channel would label one subject while pointing at another. In the Snapshots view the
+//     whole chain is ONE pure decision both call — `domain/calloutSubjects.ts` (2026-11-07: the
+//     two owners had each grown their own ifs and drifted by register) — and its test is the spec.
 //  3. `SCENE_GLASS` (components/selection.tsx, the shared-recipe home) is the ONE container
 //     for scene-anchored labels: SceneCallout and Tooltip both wear it (user, 2026-08-15 —
 //     "align the hover and the click card"). Neither may re-grow its own glass recipe.
