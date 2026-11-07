@@ -1185,7 +1185,8 @@ so a door after a door inherits nothing). Pinned by `src/data/blockStats.test.ts
 DATA leading.** The global snapshot's scene label speaks the register's subject there (user,
 2026-11-07: "snapshot anchor should show information related to the sub-view"): "10 data blocks" with
 a "23 updates" chip from the exact read (`SceneCallout`'s `dataLead`, keyed on
-`REGISTER_MEASURES[register].dataOnly`; under a committed network, that network's own), where the
+`REGISTER_MEASURES[register].dataOnly`; under a committed network, that network's own; NO lead until
+the read lands — never the other register's anchors fact, user 2026-11-07 on a reload), where the
 Metagraph snapshots register says "N metagraph snapshots" and its size. **The Global snapshot
 CARD's body opens with the register's section too** (user: "work on the global snapshot body also"):
 `inspector/SnapshotRegister.tsx` (the design round's picks, data 1 / transaction 1) —

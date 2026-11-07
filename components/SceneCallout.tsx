@@ -502,8 +502,14 @@ export default function SceneCallout() {
         // (user, 2026-08-16 — "if filter, select the correct segment of the byte bar").
         ring: net !== "all" ? filterAccent(net) : "var(--core)",
         mark: { icon: iconForPick("snapshot"), hue: filterAccent(filter) },
+        // In Data blocks the lead is the exact read's or NOTHING (user, 2026-11-07, on a reload of
+        // /data-blocks: "some things are based on the default snapshot" — before the read landed the
+        // label fell back to the Metagraph snapshots register's anchors lead): unknown until read,
+        // never the other register's fact (rule 10).
         lead:
-          dataLead && exact
+          dataLead && !exact
+            ? undefined
+            : dataLead && exact
             ? (() => {
                 const rows = exact.rows.filter((r) => (mine ? netKeyOf(r.metaId) === netKeyOf(net) : true));
                 const nb = rows.reduce((n, r) => n + (carriesData(r) ? r.dataBlocks! : 0), 0);

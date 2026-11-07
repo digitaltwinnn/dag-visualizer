@@ -170,7 +170,11 @@ The design rules behind the table, which the tests pin but don't explain:
   and the snapshot before the block — coarse to fine, the block LAST so it ranks and its card is the
   box; a node of another network is released first, as the tile click does. A DAG block's
   accepting snapshot is the global itself, so it commits nothing more. The live follow seats a token
-  block's snapshot the same way (`followNewestBlock`, the non-bumping advance). No focus rung and no pose (camera principle 2). Every builder that pins a
+  block's snapshot the same way (`followNewestBlock`, the non-bumping advance). **In Transaction
+  blocks a BAR click is its tick's first block** (`Picking`, 2026-11-07, user: the register "loses
+  its block card often" — a bar click pinned the tick and released the block): the trail draws only
+  block-bearing ticks, so the bar commits the tick and its first block through the same builder, the
+  Block ghost's own step; a band click stays a band's. No focus rung and no pose (camera principle 2). Every builder that pins a
   tick releases a block of another tick through the one `releaseBlock`, and the tile, band, network,
   arrival and follow builders take the block as a REQUIRED argument, so no caller can forget it. The
   Block card's × is `blockClearActions`. **While following, a click on the live block PINS it**

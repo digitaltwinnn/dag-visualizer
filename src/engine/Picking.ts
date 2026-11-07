@@ -7,7 +7,9 @@ import { metaSnapHoverKey, type PickDescriptor } from "@/src/data/types";
 import { VIEW_POLICIES } from "./domain/viewPolicy";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { tickLocked } from "@/src/data/ledgerStory";
-import { clickActions, pickActive, metaSnapSelectActions, bandSelectActions, tickContextOf } from "./domain/pickActions";
+import { clickActions, pickActive, metaSnapSelectActions, bandSelectActions, blockSelectActions, tickContextOf } from "./domain/pickActions";
+import { blockMetaSnap, windowBlocks } from "@/src/data/blockWindow";
+import { getBlockWindow } from "@/src/data/pastWindow";
 import type { CohortSel, CompositionSel } from "./domain/focusLadder";
 import type { SceneCtx } from "./scene/SceneContext";
 import type { Globe } from "./scene/Globe";
@@ -239,6 +241,20 @@ export class Picking {
         }),
       );
       return;
+    }
+    // IN TRANSACTION BLOCKS A BAR IS ITS FIRST BLOCK (user, 2026-11-07: "transaction blocks still
+    // loses its block card often" — a bar click pinned the tick and released the block, so the
+    // register's subject vanished): the trail draws only block-bearing ticks, so a tick there IS a
+    // block's tick, and clicking its bar commits the tick AND its first block, the Block ghost's own
+    // step (`railSiblings.blockStep`), a token block's snapshot with it. A band click stays a band's.
+    if (p?.kind === "snapshot" && this.h.ledger.readsBlockWindow) {
+      const w = getBlockWindow();
+      const first = windowBlocks(w).find((b) => b.anchorOrd === p.data.ordinal);
+      if (first) {
+        const sel = { chain: first.chain, hash: first.hash, ordinal: first.ordinal, anchorOrd: first.anchorOrd };
+        applyClickActions(blockSelectActions(sel, p, tickContextOf(st), blockMetaSnap(w, sel)));
+        return;
+      }
     }
     applyClickActions(
       clickActions({

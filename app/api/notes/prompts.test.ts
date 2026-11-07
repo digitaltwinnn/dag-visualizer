@@ -162,7 +162,7 @@ describe("PROMPTS", () => {
     // over the window, complementary to the top card's "what changed", never a copy of it.
     expect(Object.keys(PROMPTS.trend.questions!)).toEqual(["span"]);
     expect(PROMPTS.trend.questions!.span).toBe(
-      "Describe the span's shape, as a companion to a note above it that already states what rose and fell: the busiest day and the quietest day, each with its date and figure, and a typical day's figure, using only the facts named for those days. If the facts name none, say how quiet or steady the span was. Do not say what rose or fell overall.",
+      "Describe the range's shape, as a companion to a note above it that already states what rose and fell: the busiest day and the quietest day, each with its date and figure, and a typical day's figure, using only the facts named for those days. If the facts name none, say how quiet or steady the range was. Do not say what rose or fell overall.",
     );
     expect(PROMPTS.trend.system("the hypergraph", undefined, false, "span")).toContain(PROMPTS.trend.questions!.span);
     expect(PROMPTS.trend.system("the hypergraph", undefined, false, "span")).not.toContain(PROMPTS.trend.question);
@@ -172,7 +172,7 @@ describe("PROMPTS", () => {
     expect(geo.country).toMatch(/^Say three things about this country, in whichever order reads best for it, opening on the most telling/);
     expect(geo.provider).toMatch(/^Say three things about this provider, network-wide and not for one place/);
     expect(hyper.type).toBe(
-      "Open with a plain sentence whose subject is the nodes, in the shape \"N of the M <network> nodes run <layers>\", M being all its nodes, the layers named exactly as the facts name them, with no possessive on the name (a node RUNS its layers, so the verb is run); then say in plain words where that group stands among the network's layer groups, as a reader would (\"its largest group\", \"the smaller of its two groups\", \"its only group\"), never \"share\", \"rank\" or a percentage; then how that changed over the span, or that it held.",
+      "Open with a plain sentence whose subject is the nodes, in the shape \"N of the M <network> nodes run <layers>\", M being all its nodes, the layers named exactly as the facts name them, with no possessive on the name (a node RUNS its layers, so the verb is run); then say in plain words where that group stands among the network's layer groups, as a reader would (\"its largest group\", \"the smaller of its two groups\", \"its only group\"), never \"share\", \"rank\" or a percentage; then how that changed over the range, or that it held.",
     );
     // The opening is a plain sentence with an actor, never the Subject line used as a noun
     // ("Dor Technologies nodes in Finland run 2" — user, 2026-10-30: "not really logical").
@@ -267,14 +267,14 @@ describe("the span before", () => {
   });
   it("tells History's note what those figures are, and how to write them, in the span-before words themselves", () => {
     const system = PROMPTS.trend.system("x", undefined, undefined, undefined, undefined, "the 30 days before");
-    expect(system).toMatch(/a figure for "this span" or the "previous span" is that whole span/i);
-    expect(system).toMatch(/never say it rose or fell over the span/i);
-    expect(system).toContain('"<what> rose <change> to <this span\'s figure> per day on "the 30 days before""');
+    expect(system).toMatch(/a figure for "this range" or the "previous range" is that whole range/i);
+    expect(system).toMatch(/never say it rose or fell over the range/i);
+    expect(system).toContain('"<what> rose <change> to <this range\'s figure> per day on "the 30 days before""');
     // live 2026-11-03: a placeholder naming the "Span before line" was copied as "on the Span before".
     expect(system).not.toContain("Span before line");
-    expect(system).toContain('averaged <this span\'s figure> per day, up <change> on "the 30 days before"');
-    expect(system).toMatch(/never the previous span's figure/);
-    expect(spanFigures(null)).toContain("on the span before");
+    expect(system).toContain('averaged <this range\'s figure> per day, up <change> on "the 30 days before"');
+    expect(system).toMatch(/never the previous range's figure/);
+    expect(spanFigures(null)).toContain("on the range before");
   });
   it("leaves the tour's line to write figures as the note does", () => {
     expect(LINE_FORMAT).not.toContain("from X to Y");
@@ -329,7 +329,9 @@ describe("buildMessages", () => {
   it("hands the span's words to the model and asks for them in the first sentence (user, 2026-10-30)", () => {
     const m = buildMessages("hyper", "Mainnet", FACTS, null, undefined, undefined, undefined, undefined, "the last 7 days");
     expect(m[1]!.content).toContain("Span: the last 7 days");
-    expect(VOICE).toMatch(/Name the span in your first sentence/);
+    expect(VOICE).toMatch(/Name the range in your first sentence/);
+    // The reader's word (user, 2026-11-07): a stretch of time is a range, never a span.
+    expect(VOICE).toMatch(/never a span/);
     // Live 2026-10-30: "Over from Mar 6 to May 25" — the two examples were read as one template.
     expect(VOICE).toMatch(/never "over from"/);
     // …and the subject by its name, never "the network" for one network (user, 2026-10-30).
