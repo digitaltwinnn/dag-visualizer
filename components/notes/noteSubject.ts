@@ -38,8 +38,10 @@ export interface NoteSubjectState {
  *  Keyed by the register, read only where the view's policy offers it (`registers`), so no view is
  *  named here. The block DAG's note is the whole network's alone (`sources.ts`): its subject is `all`
  *  whatever the rung stands on — a filter is a lens on the chamber, and the note reads every chain. */
-// The Data blocks register reads the ledger's note (D6): its records ARE metagraph snapshots.
-const REGISTER_NOTES: Record<LedgerRegister, NoteView | null> = { snapshots: null, blocks: "blocks", data: null };
+// Each register its own note (user, 2026-11-07: "it makes a lot of sense to focus on each separately"):
+// the block DAG's for Transaction blocks, the data blocks' for Data blocks (the live window, read
+// when written — option 2), the ledger's for Metagraph snapshots.
+const REGISTER_NOTES: Record<LedgerRegister, NoteView | null> = { snapshots: null, blocks: "blocks", data: "data" };
 
 export interface NoteSubject {
   view: NoteView;
@@ -60,6 +62,9 @@ export function noteSpanWords(view: NoteView): string | null {
     case "ledger":
     case "blocks":
       return spanPhrase("24h", null);
+    case "data":
+      // The chamber's own window, read when the note was written: a few minutes, not a fixed span.
+      return "the live window";
     case "trend":
       return null;
   }
@@ -68,7 +73,7 @@ export function noteSpanWords(view: NoteView): string | null {
 /** The view a note's words stand in: its own, except the block DAG's, which is the Snapshots view's
  *  Blocks register (a register, not a Mode). */
 export function noteModeOf(view: NoteView): Mode {
-  return view === "blocks" ? "ledger" : view;
+  return view === "blocks" || view === "data" ? "ledger" : view;
 }
 
 export function noteSubjectOf(mode: Mode, s: NoteSubjectState): NoteSubject | null {

@@ -55,9 +55,9 @@ describe("the note a register carries", () => {
   it("differs by register in the Snapshots view", () => {
     expect(noteSubjectOf("ledger", s({ register: "blocks" }))).toEqual({ view: "blocks", subject: "all" });
     expect(noteSubjectOf("ledger", s({ register: "snapshots" }))).toEqual({ view: "ledger", subject: "all" });
-    // The Data blocks register's records are metagraph snapshots: the ledger's note (D6).
-    expect(noteSubjectOf("ledger", s({ register: "data" }))).toEqual({ view: "ledger", subject: "all" });
-    expect(noteSubjectOf("ledger", s({ register: "data", metagraphNetwork: "DAG123" }))).toEqual({ view: "ledger", subject: "DAG123" });
+    // The Data blocks register's own note (2026-11-07): the data blocks', the whole network's.
+    expect(noteSubjectOf("ledger", s({ register: "data" }))).toEqual({ view: "data", subject: "all" });
+    expect(noteSubjectOf("ledger", s({ register: "data", metagraphNetwork: "DAG123" }))).toEqual({ view: "data", subject: "all" });
     expect(noteSubjectOf("ledger", s({}))).toEqual({ view: "ledger", subject: "all" });
   });
   it("is the block DAG's whole network whatever the rung stands on", () => {

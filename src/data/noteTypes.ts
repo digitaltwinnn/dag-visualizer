@@ -7,7 +7,7 @@ import type { MetaSnapSel } from "@/src/data/types";
 
 /** What a note can describe: the four 3D views, and the Snapshots view's Blocks register (the block
  *  DAG) — a register, not a Mode, with its own facts and question. */
-export type NoteView = "hyper" | "geo" | "ledger" | "trend" | "blocks";
+export type NoteView = "hyper" | "geo" | "ledger" | "trend" | "blocks" | "data";
 
 /** What a note leads with (R71): the changes the builder found worth leading with, named by
  *  their pair keys, or the reading itself when nothing moved. The Snapshots builder decides it

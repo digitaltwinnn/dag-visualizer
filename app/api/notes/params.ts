@@ -19,8 +19,8 @@ import { CC_TAIL_RE, ISP_TAIL_RE, KIND_TIMING, TYPE_TAIL_RE, isSubjectNote, snap
 // mainnet's; whether this particular view writes a note for this subject is the generator's call
 // (`noteSupported`), which answers `none` rather than an error.
 
-const VIEWS: readonly NoteView[] = ["hyper", "geo", "ledger", "trend", "blocks"];
-const FIXED_SPAN: Partial<Record<NoteView, NoteSpan>> = { hyper: "day", geo: "day", ledger: "hours", blocks: "hours" };
+const VIEWS: readonly NoteView[] = ["hyper", "geo", "ledger", "trend", "blocks", "data"];
+const FIXED_SPAN: Partial<Record<NoteView, NoteSpan>> = { hyper: "day", geo: "day", ledger: "hours", blocks: "hours", data: "hours" };
 const PILLS: readonly NoteSpan[] = ["1h", "24h", "7d", "30d", "90d", "1y", "all"];
 /** History's one on-request pill (`timingOf` says on-request); the request route writes it, a
  *  brushed range and the subject notes. */
@@ -59,7 +59,7 @@ function subjectOf(view: NoteView, raw: string | null): string | null {
   if (raw == null) return null;
   if (raw === "all") return raw;
   // The ledger reads `dag` as the whole network, the same facts as `all`: ONE subject, one note.
-  if (raw === "dag") return view === "ledger" || view === "blocks" ? "all" : raw;
+  if (raw === "dag") return view === "ledger" || view === "blocks" || view === "data" ? "all" : raw;
   // THE UNLISTED SET is History's alone: the sampler measures its chains, which publish no nodes.
   if (raw === UNLISTED_ID) return view === "trend" ? raw : null;
   if (CC_TAIL_RE.test(raw) || ISP_TAIL_RE.test(raw)) return view === "geo" ? raw : null;

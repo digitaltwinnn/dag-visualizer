@@ -61,7 +61,7 @@ export function driftKeyOf(item: WarmItem, drift: DriftKeys | null): string | nu
 }
 
 // The block DAG's note is warmed with the ledger's: the chamber's two registers, one clock.
-const HOURLY: [NoteView, NoteSpan][] = [["ledger", "hours"], ["blocks", "hours"], ["trend", "24h"]];
+const HOURLY: [NoteView, NoteSpan][] = [["ledger", "hours"], ["blocks", "hours"], ["data", "hours"], ["trend", "24h"]];
 const DAILY: [NoteView, NoteSpan][] = [["hyper", "day"], ["geo", "day"], ["trend", "7d"], ["trend", "30d"], ["trend", "90d"], ["trend", "1y"], ["trend", "all"]];
 
 /** Every warmable note for these subjects and countries (`["DE", …]`), in pass order. */

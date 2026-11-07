@@ -142,8 +142,14 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
     question: "What has the block DAG been doing? This note does not lead with what changed, whatever the rules above say: the facts hold no earlier figure, so never say anything rose or fell. Say how many blocks were accepted over the recent hours, the DAG's first, as \"the DAG accepted N blocks\", then each network's token blocks the same way. Then, in one short sentence, where the DAG's height stands now, with the global snapshots since it last moved. A block is a block, never a snapshot or a transfer.",
     system: (subjectLabel) => `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${PROMPTS.blocks.question}`,
   },
+  // THE DATA BLOCKS (the Snapshots view's Data blocks register, 2026-11-07): the live window, read
+  // when the note is written — a few minutes of the chamber, no earlier figure, so nothing moved.
+  data: {
+    question: "What data are the networks writing right now? This note does not lead with what changed, whatever the rules above say: the facts hold no earlier figure, so never say anything rose or fell. Say how many data blocks were carried over the window and how many updates they held, then each network that carried any, as \"<network> carried N data blocks with M updates\". Say in one clause how many of the window's global snapshots were read when fewer than all were. A data block carries updates, never transactions or transfers.",
+    system: (subjectLabel) => `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${PROMPTS.data.question}`,
+  },
   trend: {
-    question: "Say what changed over the span: what rose, what fell and when, as the numbers show it.",
+    question: "Say what changed over the range: what rose, what fell and when, as the numbers show it.",
     questions: {
       // THE SPAN FACET (user, 2026-10-30: the Range card on the window must not copy the top card's
       // note — "we should be able to write something complementary"): the same facts, the range read
@@ -202,6 +208,8 @@ const utcDay = (ms: number) => new Date(ms).toLocaleDateString("en-US", { month:
 export function spanWords(view: NoteView, span: NoteSpan, spanFrom: number, spanTo: number): string {
   if (view === "hyper" || view === "geo") return "the last 7 days";
   if (view === "ledger" || view === "blocks") return "the last 24 hours";
+  // The data note's window is the chamber's: a few minutes, measured when the note was written.
+  if (view === "data") { const min = Math.max(1, Math.round((spanTo - spanFrom) / 60_000)); return `the last ${min} ${min === 1 ? "minute" : "minutes"}`; }
   if (span in PILL_WORDS) return PILL_WORDS[span]!;
   const a = utcDay(spanFrom);
   const b = utcDay(Math.max(spanFrom, spanTo - 1));

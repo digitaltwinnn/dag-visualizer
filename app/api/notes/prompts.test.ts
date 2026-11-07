@@ -99,7 +99,7 @@ describe("PROMPTS", () => {
     expect(PROMPTS.ledger.question).toBe(
       "Say what changed in the anchoring rhythm over the recent hours against the usual: what sped up or slowed down, as the recent figure and how far it is from the usual (\"<recent figure>, up <change> on the usual\"), and which networks did it. Then the reading itself: the longest gap, then, in one short clause: for the whole network, what each global snapshot holds, as \"N metagraph snapshots from M networks in each global snapshot\", never that it was part of anything; for one network, only the share of global snapshots it was part of.",
     );
-    expect(PROMPTS.trend.question).toBe("Say what changed over the span: what rose, what fell and when, as the numbers show it.");
+    expect(PROMPTS.trend.question).toBe("Say what changed over the range: what rose, what fell and when, as the numbers show it.");
   });
 
   // R71 (user, 2026-10-29): "change, else now" — the Snapshots builder picks the question.

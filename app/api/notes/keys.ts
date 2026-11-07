@@ -26,7 +26,7 @@ export function noteKeyOf(net: string, view: NoteView, subject: string, span: No
  *  resting window. The block DAG's note is the Transaction blocks register's own card note, warmed
  *  on its timing, not a tour line. */
 export function isBriefingNote(view: NoteView, subject: string, span: NoteSpan): boolean {
-  if (view === "blocks") return false;
+  if (view === "blocks" || view === "data") return false;
   return view === "trend" ? subject === "dag" && span === "30d" : subject === "all";
 }
 
@@ -59,7 +59,7 @@ export function capKeyOf(net: string, dayIso: string): string {
   return `ai:${net}:cap:${dayIso}`;
 }
 
-export type NoteKind = "hyper" | "geo" | "ledger" | "blocks" | "trend24h" | "trendDaily" | "trend1h" | "range" | "subject";
+export type NoteKind = "hyper" | "geo" | "ledger" | "blocks" | "data" | "trend24h" | "trendDaily" | "trend1h" | "range" | "subject";
 
 /** What a subject names, for the prompt's question: the view itself (`all`, `dag`, a network), a
  *  country (`cc:XX`, `<net>/cc:XX`), a provider (`isp:<key>`, `<net>/isp:<key>`) or a network's
@@ -100,6 +100,8 @@ export const KIND_TIMING: Record<NoteKind, { refreshMs: number | null; ttlS: num
   ledger: { refreshMs: H, ttlS: 6 * 3600 },
   // The chamber's other register keeps its clock: a day of blocks and the DAG's height as it stands.
   blocks: { refreshMs: H, ttlS: 6 * 3600 },
+  // The data blocks' note keeps the same clock: the chamber's third register, one hour, one read.
+  data: { refreshMs: H, ttlS: 6 * 3600 },
   trend24h: { refreshMs: H, ttlS: 6 * 3600 },
   trendDaily: { refreshMs: 24 * H, ttlS: 72 * 3600 },
   trend1h: { refreshMs: null, ttlS: 900 },
@@ -123,6 +125,7 @@ export function timingOf(view: NoteView, span: NoteSpan, subject = ""): { refres
   if (view === "geo") return KIND_TIMING.geo;
   if (view === "ledger") return KIND_TIMING.ledger;
   if (view === "blocks") return KIND_TIMING.blocks;
+  if (view === "data") return KIND_TIMING.data;
   if (span === "24h") return KIND_TIMING.trend24h;
   if (span === "1h") return KIND_TIMING.trend1h;
   return KIND_TIMING.trendDaily;

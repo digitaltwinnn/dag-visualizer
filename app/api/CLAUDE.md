@@ -1,4 +1,12 @@
-# app/api — working notes
+# app/api
+
+> 2026-11-07 — `app/api/snapshot/cachedExact.ts` holds the exact read's fetcher and its day-long
+> `unstable_cache` (moved out of `[ordinal]/route.ts`, which stays route exports only), so the Data
+> blocks note's live-window reader (`app/api/notes/dataWindow.ts`, 52 ticks, 8 in flight) and the
+> route fill ONE cache per ordinal. The notes' hourly warm (`warm.ts`) writes four kinds now: the
+> ledger's, the block DAG's, the data blocks' (`data:hours`, `KIND_TIMING.data` = the ledger's clock)
+> and History's 24h. Cost of the data note: one model call an hour plus up to 52 exact reads, most of
+> them already cached by visitors' tabs (3.5 s cold, measured locally). — working notes
 
 The server-side routes.
 

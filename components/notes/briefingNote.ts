@@ -24,6 +24,7 @@ const PLAIN: Record<NoteView, string> = {
   hyper: "Every network, by the nodes that run it.",
   trend: "The measured record of the network.",
   blocks: "Every block, built on two before it.",
+  data: "Every data block, as its network writes it.",
 };
 
 const SENTENCE_RE = /.*?[.!?](?=\s|$)/gs;

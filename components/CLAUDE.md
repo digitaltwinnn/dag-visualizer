@@ -1246,8 +1246,16 @@ to carry data, so the level is empty, never guessed), a tick none of whose snaps
 is a global snapshot and stays), and a network one of whose snapshots there could not be decoded
 states no figure (the exact read leaves its `perMeta` count off — unknown, never 0, review M5). The card is the metagraph snapshot card, whose
 Data tab states "Data updates N" from the exact read with no Decompress (`metaSnapDataCount.test.ts`).
-RAW is the Metagraph snapshots register's anchor log (its records are metagraph snapshots); the note
-is the ledger's. The band swaps to `DataCells` (`"ledger:data"`, `REGISTER_CELLS` in `VitalsBand.tsx`)
+RAW is the Metagraph snapshots register's anchor log (its records are metagraph snapshots). **The
+note is the register's own** (2026-11-07, user: "AI card content for each sub-view … focus on each
+separately" → option 2): `noteSubject`'s `REGISTER_NOTES.data` is the `data` NoteView — the DATA
+BLOCKS note, written from the LIVE WINDOW (the newest 52 global snapshots' exact reads,
+`app/api/notes/dataWindow.ts` through the route's own day-long cache, `app/api/snapshot/cachedExact.ts`)
+when the note is written, hourly with the ledger's and the block DAG's (`warm.ts` HOURLY): which
+networks carried data blocks over those minutes, how many, with how many updates, over the ticks
+read (`src/data/noteFactsData.ts`, a floor where a read did not land). Its span chip reads "the live
+window"; the note names the minutes itself ("over the last 11 minutes"). No sampled series holds a
+data-block count, which is why it is the live window and not the last 24 hours. The band swaps to `DataCells` (`"ledger:data"`, `REGISTER_CELLS` in `VitalsBand.tsx`)
 — THREE cells, `src/data/dataStats.ts`'s arithmetic over the ledger source's ticks: **DATA UPDATES**
 (the count over the snapshots read, "N of M snapshots read" under the unit as its floor, and a line
 of one point per global snapshot — the window spans minutes, so a tick is its bin, an unread tick a

@@ -8,6 +8,9 @@ import { comboWords, hyperFacts } from "@/src/data/noteFactsHyper";
 import { commonIsWhole, hasCommonReading } from "@/src/data/noteFactsActivity";
 import { ledgerFacts } from "@/src/data/noteFactsLedger";
 import { BLOCK_NOTE_HOURS, blocksFacts } from "@/src/data/noteFactsBlocks";
+import { dataFacts } from "@/src/data/noteFactsData";
+import { readDataWindow, type DataWindowRead } from "./dataWindow";
+import { currentIdOf, isTracked } from "@/src/net/lineage";
 import { rangeNotableCap } from "@/src/data/notableDays";
 import { trendFacts, trendSilent, type TrendFactsInput } from "@/src/data/noteFactsTrend";
 import type { Fact, NotableDay, NoteChange, NoteView, NoteLead } from "@/src/data/noteTypes";
@@ -67,6 +70,8 @@ export interface NoteReads {
   /** The DAG's height and sub-height as they stand (`dagHeight.ts`). Absent, the block note
    *  states no height. */
   dagHeight?(net: string): Promise<DagHeightRead>;
+  /** The newest window of exact reads (`dataWindow.ts`). Absent, the data note is not written. */
+  dataWindow?(net: string): Promise<DataWindowRead>;
 }
 
 /** ONE TIER over [fromMs, toMs): the tile route's body, at any span. */
@@ -161,6 +166,7 @@ export function storeReads(nowMs: number, store: HashReader = readStore()): Note
     chainReads: async (net) => chainReadsOf(await once.hgetall(cursorKeyOf(net))),
     chain: explorerReader,
     dagHeight: readDagHeight,
+    dataWindow: readDataWindow,
   };
 }
 
@@ -494,6 +500,23 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
       const live = reads.dagHeight ? await reads.dagHeight(net) : { height: null, subHeight: null };
       const built = blocksFacts({ blocks, ...live, names });
       return { built, spanFrom: fromMs, spanTo: toMs, windows: [["Span length", secondsOf(fromMs, toMs)]] };
+    },
+  },
+  // THE DATA BLOCKS (the Snapshots view's Data blocks register, 2026-11-07): the live window the
+  // chamber holds — its newest ticks' exact reads — which networks carried data blocks over those
+  // minutes, how many, with how many updates. Read live when the note is written (option 2: no
+  // sampled series holds a data-block count).
+  data: {
+    accepts: (_net, subject, span) => span === "hours" && subject === "all",
+    label: () => "the data blocks",
+    whole: () => true,
+    async read({ net, nowMs, reads, names }) {
+      if (!reads.dataWindow) return null;
+      const w = await reads.dataWindow(net);
+      const built = dataFacts({ ticks: w.ticks, names, keyOf: (id) => (isTracked(net, id) ? currentIdOf(net, id) : null) });
+      const spanFrom = w.fromMs ?? nowMs;
+      const spanTo = w.toMs ?? nowMs;
+      return { built, spanFrom, spanTo, windows: [["Span length", secondsOf(spanFrom, spanTo)]] };
     },
   },
   // HOW IT CHANGED: the pill's (or the brushed range's) span, the equal span before it, and for the

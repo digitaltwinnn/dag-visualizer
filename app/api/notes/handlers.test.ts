@@ -393,7 +393,7 @@ describe("GET /api/notes/warm (cron)", () => {
     const body = await (await warmNotes(warmReq("Bearer s3cret"), () => d)).json();
     const facts = d.facts as unknown as { mock: { calls: [string, string, string, string][] } };
     const kinds = new Set(facts.mock.calls.map(([, view, , span]) => `${view}:${span}`));
-    expect(kinds).toEqual(new Set(["ledger:hours", "blocks:hours", "trend:24h"]));
+    expect(kinds).toEqual(new Set(["ledger:hours", "blocks:hours", "data:hours", "trend:24h"]));
     expect(body.done).toBe(body.planned);
   });
 
