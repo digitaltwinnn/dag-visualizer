@@ -136,12 +136,23 @@ export function subjectRunEnd(lane: readonly string[], present: (id: string) => 
 
 /** THE ORDER THE LANE IS DRAWN IN (user, 2026-10-31, option B of four: a Node card "detached from
  *  the stack"). Chosen cards close up in lane order and the ghosts wait below them, so a ghost can
- *  never split the stack. `stepId`, the ghost that is the next step, leads the ghosts: it opens the
- *  deepest card's first child, so it belongs directly under the stack. The lane stays the one order
- *  of the ladder; this is only how it is laid out. */
-export function displayOrder(lane: readonly string[], present: (id: string) => boolean, stepId: string | null): string[] {
+ *  never split the stack. The NEXT STEP's ghost (`stepIds[0]`, the deepest card's next rung) leads
+ *  the ghosts — it opens that card's first child, so it belongs directly under the stack — but it
+ *  never passes another ghost that is itself a step (`stepIds[1…]`: the Transaction blocks
+ *  register's Block ghost, which opens the tick's first block — user, 2026-11-07: the node "sits
+ *  above it"); those keep their lane place. The lane stays the one order of the ladder; this is only
+ *  how it is laid out. */
+export function displayOrder(lane: readonly string[], present: (id: string) => boolean, stepIds: readonly string[]): string[] {
   const waiting = lane.filter((id) => !present(id));
-  return [...lane.filter(present), ...waiting.filter((id) => id === stepId), ...waiting.filter((id) => id !== stepId)];
+  const primary = stepIds[0];
+  const at = primary ? waiting.indexOf(primary) : -1;
+  if (at < 0) return [...lane.filter(present), ...waiting];
+  // The last step ghost ahead of the primary in the lane: the primary moves up to just after it.
+  let floor = -1;
+  for (let i = 0; i < at; i++) if (stepIds.includes(waiting[i]!)) floor = i;
+  const rest = waiting.filter((id) => id !== primary);
+  rest.splice(floor + 1, 0, primary);
+  return [...lane.filter(present), ...rest];
 }
 
 /** The slice of the store a SELECTION MOMENT is made of. */

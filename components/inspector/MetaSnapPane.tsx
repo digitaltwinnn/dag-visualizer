@@ -14,7 +14,7 @@ import { subjectPairing } from "@/components/useSubjectPairing";
 import { Door, Empty, Fact, FactGroup, Foot, FootRow, LayerWho, Lead } from "@/components/inspector/parts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CABINET_BODY, CABINET_LIST, CABINET_TRIGGER } from "@/components/cabinetTabs";
-import { ArrowDownToLine, ArrowUpRight } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { useSnapRecord } from "@/components/useArchive";
 import { Separator } from "@/components/ui/separator";
 import { useStore } from "@/src/store/store";
@@ -36,8 +36,7 @@ import { useNowTick } from "@/components/useNowTick";
 import { identityHudCss } from "@/src/palette/identity";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { METASNAP_ICON, KIND_MARK_CLASS } from "@/components/icons";
-import { metaSnapSelectActions, netKeyOf } from "@/src/engine/domain/pickActions";
-import { applyClickActions } from "@/src/store/applyClickActions";
+import { netKeyOf } from "@/src/engine/domain/pickActions";
 import { cn } from "@/lib/utils";
 import { selectedRow, selectionHue } from "@/components/selection";
 import { useFeedRead } from "@/components/useFeedRead";
@@ -80,7 +79,6 @@ export default function MetaSnapPane({
   const snap = useStore((s) => s.snap);
   const appFilter = useStore((s) => s.filter);
   const setSection = useStore((s) => s.setSection);
-  const setDeepWanted = useStore((s) => s.setDeepWanted);
   const deepWanted = useStore((s) => s.deepWanted);
   // Has a deep read been ASKED FOR for this exact snapshot? Selecting one is not asking — the card
   // states the SHAPE and only reads on its button, so a pager skim costs nothing (user, 2026-08-10;
@@ -368,7 +366,7 @@ export default function MetaSnapPane({
                 button. With the basis named, the verb closes the loop the old copy left open
                 (WHY a read is needed at all).
                 "Read"/"decoding" made three word families for one action. */}
-            {deep != null ? (
+            {deep != null || (row?.decoded === true && snap && sel) ? (
               <div className="mt-2.5">
                 <Door
                   // THE LOG OPENS ON THIS SNAPSHOT (user, 2026-10-04: "it should filter on that
@@ -383,25 +381,10 @@ export default function MetaSnapPane({
                   Show the raw data
                 </Door>
               </div>
-            ) : !deepAsked && row?.decoded === true && snap && sel ? (
-              <div className="mt-2.5">
-                <Door
-                  glyph={<ArrowDownToLine className="size-3.5" />}
-                  flushFoot
-                  onClick={() => {
-                  // Pin FIRST, and only while following — the read must not answer about a
-                  // snapshot the next heartbeat has already replaced. Pinned already, the pin is
-                  // not just unnecessary but wrong: `metaSnapSelectActions`' deselect early-return
-                  // needs `!current.following`, so re-committing the selected snapshot would CLEAR
-                  // it, on a button that says `read this`.
-                  if (following) applyClickActions(metaSnapSelectActions(sel, snap, { metaSnap: sel, following, inspect: useStore.getState().inspect, block: useStore.getState().block }));
-                  setDeepWanted(metaSnapDeepKey(sel.globalOrdinal, sel.metaId, sel.ordinal));
-                }}
-                >
-                  Decompress this snapshot
-                </Door>
-              </div>
             ) : null}
+            {/* The card's own "Decompress this snapshot" door went on 2026-11-07 (user: "is it still
+                needed? … it already did it"): everything the card states is on the exact row now,
+                and the RAW pane reads the payload on arrival, so the door above is the only step. */}
 
             {/* ── FOOT: the artifact's CHAIN IDENTITY ─────────────────────────────────────
                 What it is, what it links to, what it proves — and nothing else. The three
@@ -505,13 +488,18 @@ function PayloadBlock({
 }) {
   // State's shape is computed server-side (`stateKeys`); Data's is the same mechanical read the
   // raw layer's data lane uses, so the two sections' rows mean the same thing.
+  // THE SHAPE IS THE EXACT ROW'S (2026-11-07, user: "'decompress this snapshot' — is it still
+  // needed? for data blocks it already did it"): the tick's exact read inflates every channel, so
+  // the row carries the state's keys and the dL1 signers, and the card asks no deep read at all. The
+  // deep read (the RAW pane's) still wins where it is held.
+  const stateKeys = deep?.stateKeys ?? row?.stateKeys;
   const stateRows = useMemo(
-    () =>
-      deep
-        ? [...deep.stateKeys].sort((a, b) => b.count - a.count).map((k) => ({ name: k.key, count: k.count }))
-        : [],
-    [deep],
+    () => (stateKeys ? [...stateKeys].sort((a, b) => b.count - a.count).map((k) => ({ name: k.key, count: k.count })) : []),
+    [stateKeys],
   );
+  const dataBlockSigners = deep?.dataBlockSigners ?? row?.dataBlockSigners ?? [];
+  /** The payload is READ once the row states its shape (or the deep read has landed). */
+  const shapeRead = stateKeys != null || !!deep;
   // Data's one shape row is the COUNT, never the attribute kinds (user, 2026-08-13 — "instead of
   // showing the data attributes just say 'records'"): the kinds are the raw layer's reading, where
   // the payload actually renders. THE COUNT IS THE EXACT READ'S (D6, 2026-11-07 — the ruling on the
@@ -550,7 +538,7 @@ function PayloadBlock({
 
   return (
     <div className="mt-1.5">
-      {deep && stateRows.length === 0 && dataRows.length === 0 && deep.dataBlockSigners.length === 0 && deep.stateBytes === 0 && (
+      {shapeRead && stateRows.length === 0 && dataRows.length === 0 && dataBlockSigners.length === 0 && (deep?.stateBytes ?? row?.stateBytes ?? 0) === 0 && (
         // THE IDLE SNAPSHOT, NAMED — and FIRST (user, 2026-08-13: "it should be the 1st thing
         // to read so that the rest of the card is easy to ignore"). Post-read only: idleness is
         // a verified whole-snapshot reading — the anchored bytes are the envelope (chain header
@@ -576,7 +564,7 @@ function PayloadBlock({
         </TabsList>
         <div className={cn(CABINET_BODY, "pt-2")}>
           <TabsContent value="state">
-            <PayloadSection rows={stateRows} read={!!deep} pending={pending} />
+            <PayloadSection rows={stateRows} read={shapeRead} pending={pending} />
           </TabsContent>
           <TabsContent value="data">
             <PayloadSection
@@ -585,11 +573,7 @@ function PayloadBlock({
               pending={pending}
               // "Signed by" here as in the body (user, 2026-08-13): the layer word carries the
               // difference (dL1 vs the body's L0), SIGNER_GROUPS owns the words.
-              signers={
-                deep && deep.dataBlockSigners.length > 0
-                  ? { label: "Signed by", count: deep.dataBlockSigners.length, who: SIGNER_GROUPS.dataBlocks.who }
-                  : null
-              }
+              signers={dataBlockSigners.length > 0 ? { label: "Signed by", count: dataBlockSigners.length, who: SIGNER_GROUPS.dataBlocks.who } : null}
             />
           </TabsContent>
         </div>

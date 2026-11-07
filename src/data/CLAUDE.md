@@ -159,6 +159,12 @@ accepting global through the non-bumping `advanceBlock` / `advanceSnap`, never f
 another network or around a pin (pinned by `src/store/followFlow.test.ts`). Pinned by `blockWindow.test.ts` and `blockStats.test.ts`.
 
 **A block's parents come only from a FULL READ** of the snapshot that accepted it
+**The exact row carries the state's SHAPE and the dL1 signers too** (`stateKeys`, `dataBlockSigners`;
+2026-11-07, user: "'decompress this snapshot', is it still needed?" — no: the decoder had both, so
+the metagraph snapshot card states its State tab, Data tab and dL1 signer count off the row and its
+"Decompress this snapshot" door went; `snapshot-exact-v9`). The deep channel read is the RAW pane's
+payload alone, read on arrival there.
+
 (`blockReads.ts`, `components/BlockReadsBridge.tsx`): one read per block-bearing snapshot in the
 window, newest first, `WINDOW_READ_POOL` (8) in flight with no gap (user, 2026-11-07: "do the exact
 reads need to be sequential?" — the paced one-per-450 ms queue took ~23 s over a 52-tick window) —

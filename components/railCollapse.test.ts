@@ -235,18 +235,23 @@ describe("displayOrder", () => {
   const present = (ids: string[]) => (id: string) => ids.includes(id);
   const geo = ladderSlotIds("geo");
   it("draws the chosen cards first, in lane order, then the ghosts", () => {
-    expect(displayOrder(geo, present(["notes", "country"]), null)).toEqual(["notes", "country", "context", "cohort", "node"]);
+    expect(displayOrder(geo, present(["notes", "country"]), [])).toEqual(["notes", "country", "context", "cohort", "node"]);
   });
   it("the next step's ghost leads the ghosts", () => {
-    expect(displayOrder(geo, present(["notes", "country"]), "cohort")).toEqual(["notes", "country", "cohort", "context", "node"]);
+    expect(displayOrder(geo, present(["notes", "country"]), ["cohort"])).toEqual(["notes", "country", "cohort", "context", "node"]);
   });
   it("closes a gap in the stack", () => {
     const lane = ladderSlotIds("ledger");
-    expect(displayOrder(lane, present(["notes", "snap", "node"]), "context")).toEqual(["notes", "snap", "node", "context", "metaSnap", "block"]);
+    expect(displayOrder(lane, present(["notes", "snap", "node"]), ["context"])).toEqual(["notes", "snap", "node", "context", "metaSnap", "block"]);
+  });
+  it("the next step never passes another step ghost: the Block ghost keeps its place above the node, and under the snapshot", () => {
+    const lane = ladderSlotIds("ledger");
+    expect(displayOrder(lane, present(["notes", "snap", "context", "metaSnap"]), ["node", "block"])).toEqual(["notes", "snap", "context", "metaSnap", "block", "node"]);
+    expect(displayOrder(lane, present(["notes", "snap"]), ["context", "block"])).toEqual(["notes", "snap", "context", "metaSnap", "block", "node"]);
   });
   it("is the lane itself with nothing chosen, and with everything", () => {
-    expect(displayOrder(geo, present([]), null)).toEqual(geo);
-    expect(displayOrder(geo, present(geo), null)).toEqual(geo);
+    expect(displayOrder(geo, present([]), [])).toEqual(geo);
+    expect(displayOrder(geo, present(geo), [])).toEqual(geo);
   });
 });
 
@@ -289,7 +294,7 @@ describe("a block commit opens its card", () => {
   });
   it("it stands under the Global snapshot card, ahead of every ghost", () => {
     const s = rail(blocks({ block }), {}, ["block", "snap"]);
-    const order = displayOrder(s.lane, s.present, null);
+    const order = displayOrder(s.lane, s.present, []);
     expect(order.slice(0, 3)).toEqual(["notes", "snap", "block"]);
   });
   it("the commit is a new selection moment, and so is another block", () => {

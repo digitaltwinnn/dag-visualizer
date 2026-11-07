@@ -135,7 +135,7 @@ const cachedExact = (net: NetworkId, ordinal: number) =>
   // D6 2026-11-07; v6: no tips, 2026-11-07; v5: each block's
   // transfers; v4: blocks + tips; v3: rows carry dataBytes, 2026-08-13; v2: signerCount) — entries
   // cached under an old key would otherwise carry a shape the client no longer reads for a day.
-  unstable_cache(() => fetchExact(net, ordinal), ["snapshot-exact-v8", net, String(ordinal)], {
+  unstable_cache(() => fetchExact(net, ordinal), ["snapshot-exact-v9", net, String(ordinal)], {
     revalidate: 86400, // ordinals are immutable; a day is plenty (success is cached, misses throw)
   })();
 

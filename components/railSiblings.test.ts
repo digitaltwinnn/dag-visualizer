@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CHILD_OF, childStep, positionMarks, rootStep, siblingSet, type SiblingState } from "@/components/railSiblings";
+import { CHILD_OF, blockStep, childStep, positionMarks, rootStep, siblingSet, type SiblingState } from "@/components/railSiblings";
 import {
   cohortToggleActions,
   compositionToggleActions,
@@ -935,5 +935,24 @@ describe("a filter holds the global snapshot pager", () => {
     const set = siblingSet("snap", ledger([tick(41), { ...tick(42), locked: true }, tick(43)]));
     expect(set?.items.map((i) => i.key)).toEqual(["41", "42", "43"]);
     expect(set?.index).toBe(1);
+  });
+});
+
+describe("blockStep — the Block ghost opens the shown tick's first block (2026-11-07)", () => {
+  const snap = { kind: "snapshot", data: { ordinal: 300, timestamp: "T300" } } as unknown as SiblingState["snap"];
+  it("steps the first block through the block click's builder, its snapshot with it", () => {
+    const sel = { chain: "dor", hash: "t1", ordinal: 5, anchorOrd: 300 };
+    const ms = { metaId: "dor", ordinal: 5, hash: "m5", globalOrdinal: 300, ts: "T300" };
+    // The tick already pinned: the network and the snapshot, then the block (the box).
+    const step = blockStep(base({ mode: "ledger", snap, tickBlocks: [{ sel, snap: ms }] }));
+    expect(step?.key).toBe("dor:t1");
+    expect(step?.actions.map((a) => a.kind)).toEqual(["tickNet", "metaSnap", "block"]);
+    // Following, the tick is pinned first.
+    expect(blockStep(base({ mode: "ledger", snap, following: true, tickBlocks: [{ sel, snap: ms }] }))?.actions.map((a) => a.kind)).toEqual(["snapshot", "tickNet", "metaSnap", "block"]);
+  });
+  it("nothing with no tick, no window, or a tick holding no block", () => {
+    expect(blockStep(base({ mode: "ledger", snap: null, tickBlocks: [{ sel: { chain: "dag", hash: "d", ordinal: 300, anchorOrd: 300 }, snap: null }] }))).toBeNull();
+    expect(blockStep(base({ mode: "ledger", snap, tickBlocks: null }))).toBeNull();
+    expect(blockStep(base({ mode: "ledger", snap, tickBlocks: [] }))).toBeNull();
   });
 });

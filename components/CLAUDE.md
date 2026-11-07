@@ -1126,7 +1126,13 @@ Block card (`inspector/BlockPane.tsx`) stands under its tick: a card slot with N
 metagraph snapshot and the node in the ledger's lane (`DISPLAY_LANE`), present only in the Blocks
 register and only under the tick that accepted it (`parentHolds`), its ghost hint "one on a bar or a
 tile". The snapshot's child step passes over it (`railLadderBoundary.test.ts`'s `PASSES_OVER`): a
-block is a sibling subject of the tick, not the snapshot's child. Its six slots read only what is
+block is a sibling subject of the tick, not the snapshot's child — so **its ghost has a step of its
+own** (`railSiblings.blockStep`, 2026-11-07, user: "when clicked nothing happens"): the shown tick's
+first block from the window (`useSiblingState`'s `tickBlocks`), through the block click's builder,
+and the ghost keeps its lane place — `railCollapse.displayOrder` promotes the next-step ghost but
+never past another step ghost (user: the node "sits above it"). Data blocks has no block slot: a
+data block has no identity to select (not indexed, no parents, counted by the exact read), so its
+subject is the snapshot's tile with the mark, and the Metagraph snapshot card's Data tab says the rest. Its six slots read only what is
 held — the height as the head's chip; what it moved as the lead, ONE transfer named from → to in
 short addresses (`midHash`), several counted; several transfers as the breakdown, one row each
 from → to · amount · fee (`BlockRead.transfers`); parents, CHILDREN IN VIEW (a count within the

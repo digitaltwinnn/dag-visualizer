@@ -8,7 +8,8 @@ import { decodeChannelContent } from "./decodeChannel";
 // channel per tick, so the count of the data transactions in its data blocks costs nothing more
 // here. The metagraph snapshot card's count and the Data blocks register's tile marks read it from
 // this row; the deep channel read is the RAW pane's payload alone (`src/data/CLAUDE.md`, the
-// two-step disclosure). A payload the decoder cannot read states no count — unknown is not zero; every
+// two-step disclosure). So do the STATE'S SHAPE and the dL1 SIGNERS (2026-11-07): the card used to
+// ask a ~2.5 MB deep read for them ("Decompress this snapshot") that the decoder had already done. A payload the decoder cannot read states no count — unknown is not zero; every
 // sum of these counts asks `dataUpdatesOf` (`src/data/ledgerMeasure.ts`), which says the same.
 
 /** The anchored entry's shape inside the global's `stateChannelSnapshots`. */
@@ -32,6 +33,6 @@ export async function exactRowOf(metaId: string, s: StateChannelSnap | null | un
     stateBytes: decoded?.stateBytes ?? 0,
     stateProof: decoded?.stateProof ?? null,
     dataBytes: decoded?.dataBytes ?? 0,
-    ...(decoded ? { dataTxCount: decoded.dataTxCount, dataBlocks: decoded.dataBlocks } : {}),
+    ...(decoded ? { dataTxCount: decoded.dataTxCount, dataBlocks: decoded.dataBlocks, stateKeys: decoded.stateKeys, dataBlockSigners: decoded.dataBlockSigners } : {}),
   };
 }

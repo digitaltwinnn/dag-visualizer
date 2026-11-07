@@ -24,7 +24,9 @@
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import type { Mode } from "@/src/store/store";
 import { ledgerNetwork } from "@/src/engine/domain/tickNet";
-import { globalPick, tickContextOf } from "@/src/engine/domain/pickActions";
+import { blockSelectActions, globalPick, tickContextOf } from "@/src/engine/domain/pickActions";
+import { shortBlockHash } from "@/src/util/format";
+import { tickerOf } from "@/components/explorer/nodeRow";
 import type { BlockSel, TickNetSel } from "@/src/data/types";
 import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder";
 import type {
@@ -74,6 +76,11 @@ export interface SiblingState {
   metaSnap: MetaSnapSel | null;
   /** The committed block (the Blocks register) — a step onto another tick releases it. Absent (tests), none. */
   block?: BlockSel | null;
+  /** THE SHOWN TICK'S BLOCKS (the Transaction blocks register, from its window — the caller's, since
+   *  the window lives outside this module), newest first, each with the metagraph snapshot that
+   *  accepted it (null for a DAG block). The Block ghost's step opens the first (user, 2026-11-07:
+   *  the ghost "when clicked nothing happens"). Absent or null: no window, or not that register. */
+  tickBlocks?: { sel: BlockSel; snap: MetaSnapSel | null }[] | null;
   selNodes: NodeRow[];
   metaList: MetaInfo[];
   /** Is this channel a CATALOGUED network? The caller's answer (the app catalog — `LISTED_IDS`),
@@ -698,6 +705,21 @@ export const rootOf = (mode: Mode): ChildEntry | null => (VIEW_POLICIES[mode].ra
 
 /** Nothing while a drill is held: a network change clears a country and a provider, and in
  *  Hypergraph it would drop the node. The ghost then only opens its hint. */
+/** THE BLOCK GHOST'S STEP (the Transaction blocks register, 2026-11-07): the shown tick's first
+ *  block, through the block click's own builder — the block last so its card is the box, a token
+ *  block's snapshot with it. A block is a sibling subject of the tick, not a child of the snapshot
+ *  (`railLadderBoundary`'s `PASSES_OVER`), so it is not `CHILD_OF`'s step but its own, and the ghost
+ *  stays where the lane puts it — above the node. Null with no tick, or no block in it. */
+export function blockStep(s: SiblingState): SiblingStep | null {
+  const first = s.snap ? s.tickBlocks?.[0] : null;
+  if (!s.snap || !first) return null;
+  return {
+    key: `${first.sel.chain}:${first.sel.hash}`,
+    label: `${tickerOf(first.sel.chain)} ${shortBlockHash(first.sel.hash)}`,
+    actions: blockSelectActions(first.sel, s.snap, { ...tickContextOf({ following: s.following, snap: s.snap, metaSnap: s.metaSnap, tickNet: s.tickNet, block: s.block, inspect: s.inspect }) }, first.snap),
+  };
+}
+
 export function rootStep(s: SiblingState): SiblingStep | null {
   if (s.inspect || s.country || s.cohort || s.filter !== "all") return null;
   return rootOf(s.mode)?.steps(s, 1)[0] ?? null;

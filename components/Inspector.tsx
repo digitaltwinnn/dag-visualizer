@@ -26,7 +26,7 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 import { useTouch } from "@/components/useTouch";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { detailsCards, ladderSlotIds, noteCardAbsent, type RailCard } from "@/components/railCards";
-import { CHILD_OF, childStep, rootOf, rootStep, type SiblingStep } from "@/components/railSiblings";
+import { CHILD_OF, childStep, rootOf, rootStep, type SiblingStep, blockStep } from "@/components/railSiblings";
 import { displayOrder, hasFoldControl, isCollapsed, boxedSlotOf, overridesOnNoteStandDown, overridesOnSelection, overridesOnViewEntry, railSelectionKey, subjectRunEnd, type LaneCollapseState } from "@/components/railCollapse";
 import { useSiblingState } from "@/components/useSiblingState";
 import { openRailCard } from "@/components/railOpen";
@@ -531,7 +531,12 @@ export default function Inspector() {
   // to step from, so it would only open its hint.
   const rootId = rootOf(mode)?.to ?? null;
   const rootGhost = rootId && !presentOf(rootId) ? rootStep(siblingState) : null;
-  const ghostStep = (id: string) => (id === nextStep?.id ? nextStep.step : id === rootId ? (rootGhost ?? undefined) : undefined);
+  // THE BLOCK GHOST'S OWN STEP (user, 2026-11-07: "when clicked nothing happens"): the shown tick's
+  // first block (`blockStep`) — its own, not `CHILD_OF`'s, since a block is the tick's sibling subject.
+  const blockGhost = !presentOf("block") && manifest.find((c) => c.id === "block")?.hint != null ? blockStep(siblingState) : null;
+  const ghostStep = (id: string) =>
+    id === nextStep?.id ? nextStep.step : id === rootId ? (rootGhost ?? undefined) : id === "block" ? (blockGhost ?? undefined) : undefined;
+  const stepIds = [nextStep?.id, blockGhost ? "block" : null].filter((x): x is string => !!x);
   // An entry's stretched toggle OPENS `id` (single-open folds the rest). The box's − FOLDS it, and
   // that may leave no box open: the − exists only where `RailFold` puts it (the AI card, every card
   // on the phone — user, 2026-11-03), and folding is the reader's own choice, an override like any
@@ -727,7 +732,7 @@ export default function Inspector() {
   };
   const ladderLane = (
     <div className="rail-ladder flex flex-col" style={{ ["--entry-col"]: VIEW_POLICIES[mode].entryColumn } as CSSProperties}>
-      {displayOrder(ladderIds, presentOf, nextStep?.id ?? null).map((id, depth) => {
+      {displayOrder(ladderIds, presentOf, stepIds).map((id, depth) => {
         const card = manifest.find((c) => c.id === id);
         if (!card) return null;
         const body: ReactNode =

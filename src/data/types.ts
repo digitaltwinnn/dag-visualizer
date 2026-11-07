@@ -79,6 +79,12 @@ export interface ChannelSnapRow {
   dataTxCount?: number;
   /** How many data blocks (app blocks) it carried; absent where undecodable. */
   dataBlocks?: number;
+  /** The application state's SHAPE — top-level keys and record counts — and the dL1 signers of its
+   *  data blocks (2026-11-07, user: "'decompress this snapshot', is it still needed?" — the decoder
+   *  already had both, so the card reads them here and the deep read is the RAW pane's alone).
+   *  Absent where undecodable, and on rows cached before the fields existed. */
+  stateKeys?: { key: string; count: number }[];
+  dataBlockSigners?: string[];
 }
 
 // EXACT per-tick anchor totals read straight from the raw L0 snapshot's stateChannelSnapshots
