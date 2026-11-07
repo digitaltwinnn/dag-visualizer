@@ -5,7 +5,7 @@ import { lineageIds } from "@/src/net/lineage";
 import { netOf } from "@/src/net/request";
 import type { SnapshotExact, ChannelSnapRow } from "@/src/data/types";
 import { decodeBlocks, pairHashes, recordBlockHashes } from "../decodeBlocks";
-import { decodeChannelContent } from "../decodeChannel";
+import { exactRowOf, type StateChannelSnap } from "../exactRow";
 import { fetchGlobalJson } from "../fetchGlobal";
 import { withinServedWindow } from "../ordinalWindow";
 
@@ -24,8 +24,6 @@ export const maxDuration = 60;
 
 // Addresses we track (the public catalog, config.METAGRAPHS — the canonical list the
 // Hypergraph hubs are built from) — used to split listed vs unlisted.
-
-type StateChannelSnap = { value?: { fee?: number; content?: unknown[] } };
 
 async function fetchExact(net: NetworkId, ordinal: number): Promise<SnapshotExact> {
   const LISTED = new Set(lineageIds(net));
@@ -62,46 +60,33 @@ async function fetchExact(net: NetworkId, ordinal: number): Promise<SnapshotExac
     anchored = 0,
     listedCount = 0,
     unlistedCount = 0;
-  const perMeta: Record<string, { count: number; fee: number; bytes: number }> = {};
+  const perMeta: SnapshotExact["perMeta"] = {};
   const rows: ChannelSnapRow[] = [];
   for (const [addr, snaps] of Object.entries(sc)) {
     const listed = LISTED.has(addr);
     let count = 0,
       fee = 0,
-      metaBytes = 0;
+      metaBytes = 0,
+      dataTx = 0;
     for (const s of snaps) {
-      const f = s?.value?.fee ?? 0;
-      // Actual serialized size — `content` is the snapshot's content as a byte array, so its
-      // length is the real byte count anchored. NOT derived from the fee (the fee is computed by
-      // Constellation's own non-trivial fee logic — don't assume a formula).
-      const bytes = Array.isArray(s?.value?.content) ? s.value!.content!.length : 0;
+      // The row (`exactRow.ts`): the fee, the byte length anchored, the decoded facts and the data
+      // updates its data blocks carry.
+      const row = await exactRowOf(addr, s);
+      rows.push(row);
       count++;
-      fee += f;
-      metaBytes += bytes;
-      totalBytes += bytes;
+      fee += row.fee;
+      metaBytes += row.bytes;
+      dataTx += row.dataTxCount ?? 0;
+      totalBytes += row.bytes;
       anchored++;
-      totalFee += f;
-      if (listed) listedFee += f;
-      else unlistedFee += f;
-
-      const decoded = await decodeChannelContent(s?.value?.content);
-      rows.push({
-        metaId: addr,
-        ordinal: decoded?.ordinal ?? 0,
-        decoded: !!decoded,
-        fee: f,
-        bytes,
-        signers: decoded?.signers ?? [],
-        blocks: decoded?.blocks ?? 0,
-        hasState: decoded?.hasState ?? false,
-        stateBytes: decoded?.stateBytes ?? 0,
-        stateProof: decoded?.stateProof ?? null,
-        dataBytes: decoded?.dataBytes ?? 0,
-      });
+      totalFee += row.fee;
+      if (listed) listedFee += row.fee;
+      else unlistedFee += row.fee;
     }
     // Per-metagraph size (bytes) alongside count + fee — the snapshot card reveals it as KB on the
     // selected/expanded row. Measured from content byte length, same as the total (not fee-derived).
-    perMeta[addr] = { count, fee, bytes: metaBytes };
+    // `dataTxCount`: its snapshots' data updates summed (a snapshot it could not decode adds none).
+    perMeta[addr] = { count, fee, bytes: metaBytes, dataTxCount: dataTx };
     if (listed) listedCount += count;
     else unlistedCount += count;
   }
@@ -143,10 +128,11 @@ const cachedBlockHashes = (net: NetworkId, ordinal: number) =>
   })();
 
 const cachedExact = (net: NetworkId, ordinal: number) =>
-  // The cache key is versioned WITH the payload shape (v6: no tips, 2026-11-07; v5: each block's
+  // The cache key is versioned WITH the payload shape (v7: rows and perMeta carry the data updates,
+  // D6 2026-11-07; v6: no tips, 2026-11-07; v5: each block's
   // transfers; v4: blocks + tips; v3: rows carry dataBytes, 2026-08-13; v2: signerCount) — entries
   // cached under an old key would otherwise carry a shape the client no longer reads for a day.
-  unstable_cache(() => fetchExact(net, ordinal), ["snapshot-exact-v6", net, String(ordinal)], {
+  unstable_cache(() => fetchExact(net, ordinal), ["snapshot-exact-v7", net, String(ordinal)], {
     revalidate: 86400, // ordinals are immutable; a day is plenty (success is cached, misses throw)
   })();
 

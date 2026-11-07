@@ -511,13 +511,26 @@ function PayloadBlock({
         : [],
     [deep],
   );
-  // Data's one shape row is the RECORD COUNT (user, 2026-08-13 — "instead of showing the data
-  // attributes just say 'records'"): the attribute kinds are the raw layer's reading, where the
-  // payload actually renders; on the card they were a truncated field list nobody could finish.
+  // Data's one shape row is the COUNT, never the attribute kinds (user, 2026-08-13 — "instead of
+  // showing the data attributes just say 'records'"): the kinds are the raw layer's reading, where
+  // the payload actually renders. THE COUNT IS THE EXACT READ'S (D6, 2026-11-07 — the ruling on the
+  // two-step gate: it guards payload RENDERING, not counting): the tick's exact read already inflates
+  // every anchored channel, so the row carries the data updates and the card states them with no
+  // Decompress at all. "Data updates", the protocol's word for what a dL1 validates (`composition.ts`).
+  // A snapshot whose data blocks carry no update still names its blocks; none of either is `none`.
+  const dataTx = row?.dataTxCount;
+  const dataBlocks = row?.dataBlocks;
   const dataRows = useMemo(
-    () => (deep && deep.dataTxCount > 0 ? [{ name: "records", count: deep.dataTxCount }] : []),
-    [deep],
+    () =>
+      dataTx != null && dataTx > 0
+        ? [{ name: "Data updates", count: dataTx }]
+        : dataBlocks != null && dataBlocks > 0
+          ? [{ name: "Data blocks", count: dataBlocks }]
+          : [],
+    [dataTx, dataBlocks],
   );
+  /** The data section is READ once the exact row states its count, or the deep read has landed. */
+  const dataRead = dataTx != null || !!deep;
 
   if (row && !row.decoded && !deep) {
     // An undecodable exact row is a terminal for the whole block (both surfaces apply one
@@ -567,7 +580,7 @@ function PayloadBlock({
           <TabsContent value="data">
             <PayloadSection
               rows={dataRows}
-              read={!!deep}
+              read={dataRead}
               pending={pending}
               // "Signed by" here as in the body (user, 2026-08-13): the layer word carries the
               // difference (dL1 vs the body's L0), SIGNER_GROUPS owns the words.

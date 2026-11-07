@@ -38,6 +38,9 @@ export interface DecodedChannel {
    *  MetagraphBatchMessage batch roots, while onChainState may stay empty). Count + the
    *  decoded values as JSON text for the raw layer's tree. */
   dataTxCount: number;
+  /** How many DATA BLOCKS (the dL1's app blocks) the snapshot carried — the blocks the data
+   *  updates above ride in (D6, 2026-11-07: the Data blocks register marks a tile by them). */
+  dataBlocks: number;
   dataTx: string;
   /** The data blocks' measured serialized size — Σ of the app blocks' byte lengths, the same
    *  bytes-as-carried reading `stateBytes` gives the state (2026-08-13: the card's two payload
@@ -85,10 +88,12 @@ export async function decodeChannelContent(content: unknown): Promise<DecodedCha
   const dataBlockSigners: string[] = [];
   const dataTxValues: unknown[] = [];
   let dataBytes = 0;
+  let dataBlocks = 0;
   for (const b of appBlocks) {
     const buf = asBytes(b);
     if (!buf) continue;
     dataBytes += buf.length;
+    dataBlocks++;
     try {
       const blk = JSON.parse(buf.toString("utf8")) as {
         proofs?: { id?: string }[];
@@ -121,6 +126,7 @@ export async function decodeChannelContent(content: unknown): Promise<DecodedCha
     state: stateText,
     dataBlockSigners: [...new Set(dataBlockSigners)],
     dataTxCount: dataTxValues.length,
+    dataBlocks,
     dataTx: dataTxValues.length ? JSON.stringify(dataTxValues) : "",
     dataBytes,
   };

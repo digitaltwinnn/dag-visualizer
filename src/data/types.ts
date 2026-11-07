@@ -73,6 +73,12 @@ export interface ChannelSnapRow {
   /** Measured size of this snapshot's data blocks (Σ block byte lengths) — 0 when it carried
    *  none, or on rows cached before the field existed (an absent lane, not a reading). */
   dataBytes?: number;
+  /** The DATA UPDATES this snapshot's data blocks carry (D6, 2026-11-07 — the data transactions the
+   *  dL1 validated; cache key `snapshot-exact-v7`). Absent where the payload could not be decoded:
+   *  unknown, never zero. The card's count and the Data blocks register's tile marks read it. */
+  dataTxCount?: number;
+  /** How many data blocks (app blocks) it carried; absent where undecodable. */
+  dataBlocks?: number;
 }
 
 // EXACT per-tick anchor totals read straight from the raw L0 snapshot's stateChannelSnapshots
@@ -101,7 +107,8 @@ export interface SnapshotExact {
   // unlistedCount). This is the exact, complete answer to "which metagraphs anchored here". `bytes`
   // is that metagraph's measured serialized size (Σ content byte length), shown as KB on the
   // expanded row — NOT derived from the fee.
-  perMeta: Record<string, { count: number; fee: number; bytes: number }>;
+  // `dataTxCount` is its snapshots' data updates summed (D6; absent on entries cached before v7).
+  perMeta: Record<string, { count: number; fee: number; bytes: number; dataTxCount?: number }>;
   rows: ChannelSnapRow[];
   /** The snapshot's blocks (hashes from the explorer, "" where it lists none). */
   blocks?: BlockRead[];
