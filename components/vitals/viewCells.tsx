@@ -14,7 +14,7 @@ import { viewNetwork } from "@/src/engine/domain/viewNetwork";
 import { BandCard, MicroBars, DonutTotal, TypeGlyph, TYPE_ORDER, compositionCounts, staleFor, windowSpan, windowNote } from "@/components/vitals/bandParts";
 import { useStore } from "@/src/store/store";
 import { metagraphById, getAnchor } from "@/src/data/network";
-import { displayNetwork, UNLISTED_HUE, UNLISTED_ID } from "@/src/data/unlisted";
+import { displayNetwork, UNLISTED_HUE, UNLISTED_ID, UNLISTED_LABEL } from "@/src/data/unlisted";
 import { cap, metaType, rolesOf, Empty, IdentityDot, RoleChips, TickerChip } from "@/components/inspector/parts";
 import { machineKey } from "@/src/data/composition";
 import { identityHudCss } from "@/src/palette/identity";
@@ -40,6 +40,10 @@ import { blockSpanWord } from "@/src/data/ledgerSpan";
 import { compactDag } from "@/src/util/format";
 import { tickerOf } from "@/components/explorer/nodeRow";
 import { useNowTick } from "@/components/useNowTick";
+import { useLedgerSource } from "@/components/useLedgerSource";
+import { dataByNetwork, dataInWindow, dataPerTick, lastDataTick } from "@/src/data/dataStats";
+import { snapshotSpanWord } from "@/src/data/ledgerSpan";
+import { netKeyOf } from "@/src/engine/domain/pickActions";
 
 export function HyperCells({ accent }: { accent: string }) {
   useFeedRead(["api-metagraphs"], "HyperCells");
@@ -1075,3 +1079,84 @@ export function BlocksCells({ accent }: { accent: string }) {
     </>
   );
 }
+
+/** THE DATA BLOCKS REGISTER'S BAND (D6, 2026-11-07): DATA UPDATES · BY NETWORK · LAST DATA BLOCK, over
+ *  the ticks the ledger source holds — the Metagraph snapshots register's own source (the live buffer
+ *  or a past window), read off their exact reads (`src/data/dataStats.ts`). THREE cells, not four: the
+ *  Snapshots band's "Anchors by metagraph" chart plots the measured history's last 24 hours, and the
+ *  band states ONE window — here the source's minutes, the switch's own span words — so a 24-hour
+ *  chart beside them would be a second window in one lane. The DAG's own global snapshots carry no
+ *  data block, so under the DAG filter the cells say so instead of a zero. */
+export function DataCells({ accent, filter }: { accent: string; filter: string }) {
+  useFeedRead(["global", "exact"], "DataCells");
+  const { snaps, past } = useLedgerSource(POLL.maxSnapshots);
+  const pastStatus = useStore((s) => s.pastWindow?.status ?? null);
+  const reads = useStore((s) => s.snapshotExact);
+  const now = useNowTick(1000);
+  const span = snapshotSpanWord({ pastStatus, past: past?.globalSnapshots ?? null, live: [...snaps].reverse(), nowMs: now });
+  // The filter's lens as a predicate over an address: one network's addresses (its former ones
+  // included — `netKeyOf`), the unlisted set's, or every network under All.
+  const inScope = (metaId: string): boolean => filter === "all" || netKeyOf(metaId) === filter;
+  const stateLine = (text: string) => <span className="flex items-center self-stretch text-label text-muted-foreground">{text}</span>;
+  const noData = filter === "dag" ? "The DAG's own snapshots carry no data blocks" : null;
+  const empty = snaps.length === 0;
+
+  const held = dataInWindow(snaps, reads, inScope);
+  // The floor says itself under the unit, MOVED's grammar: the count covers the snapshots read so far.
+  const heldNote = held.read < held.total ? `${held.read.toLocaleString()} of ${held.total.toLocaleString()} snapshots read` : undefined;
+  const nets = dataByNetwork(snaps, reads, netKeyOf, CATALOG_ORDER).filter((r) => filter === "all" || r.key === filter);
+  const shown = nets.length > BY_NETWORK_ROWS ? nets.slice(0, BY_NETWORK_ROWS - 1) : nets;
+  const rest = nets.length > BY_NETWORK_ROWS ? nets.slice(BY_NETWORK_ROWS - 1).reduce((n, r) => n + r.count, 0) : 0;
+  const netRows = [
+    ...shown.map((r) => ({ key: r.key, label: r.key === UNLISTED_ID ? UNLISTED_LABEL : tickerOf(r.key), count: r.count, hue: r.key === UNLISTED_ID ? UNLISTED_HUE : identityHudCss(r.key) })),
+    ...(rest > 0 ? [{ key: "other", label: "other", count: rest, hue: "var(--muted-foreground)" }] : []),
+  ];
+  // A past window makes no claim about now: LAST DATA BLOCK, the one claim about now, says so.
+  const pinned = past != null || pastStatus != null;
+  const last = !pinned ? lastDataTick(snaps, reads, inScope) : null;
+
+  return (
+    <>
+      <BandCard
+        label="Data updates"
+        aside={!empty ? span : undefined}
+        lead={noData ? undefined : <BlockLead figure={<Odometer value={held.count} int />} unit="updates" note={heldNote} empty={empty || held.read === 0} />}
+      >
+        {noData ? (
+          stateLine(noData)
+        ) : !empty ? (
+          <span className="flex-1 min-w-0 self-center">
+            {/* One point per global snapshot across the window (its natural bin — the window spans
+                minutes); a snapshot whose exact read has not landed is a gap, never a dip. */}
+            <Sparkline data={dataPerTick(snaps, reads, inScope)} color={accent} height={42} maxPoints={24} stretch />
+          </span>
+        ) : (
+          stateLine("Waiting for snapshots…")
+        )}
+      </BandCard>
+      <BandCard label="By network">
+        {noData ? stateLine(noData) : netRows.length ? <MicroBars accent={accent} labelW={64} rows={netRows} /> : stateLine(held.read ? "No data updates in the window" : "Reading the window…")}
+      </BandCard>
+      <BandCard
+        label="Last data block"
+        lead={pinned || noData ? undefined : <BlockLead figure={last ? ageWords(Math.max(0, now - Date.parse(last.ts))) : null} unit="ago" empty={last == null} />}
+      >
+        {noData ? (
+          stateLine(noData)
+        ) : pinned ? (
+          stateLine(BLOCK_PINNED)
+        ) : last ? (
+          <span className="flex items-center self-stretch gap-1.5 text-body whitespace-nowrap">
+            <IdentityDot hue={LISTED_KEY(last.metaId) ? identityHudCss(netKeyOf(last.metaId)) : UNLISTED_HUE} />
+            <span className="text-muted-foreground">{LISTED_KEY(last.metaId) ? tickerOf(netKeyOf(last.metaId)) : UNLISTED_LABEL}</span>
+          </span>
+        ) : (
+          stateLine(held.read ? "No data block in the window" : "Reading the window…")
+        )}
+      </BandCard>
+    </>
+  );
+}
+
+/** Is this address a catalog network's (its key not the unlisted set's)? */
+const LISTED_KEY = (metaId: string): boolean => netKeyOf(metaId) !== UNLISTED_ID;

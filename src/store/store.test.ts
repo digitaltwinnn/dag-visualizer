@@ -266,6 +266,13 @@ describe("store.ledgerRegister / block", () => {
     useStore.getState().setBlockMeasure("height");
     expect(useStore.getState().blockMeasure).toBe("height");
   });
+  it("the Data blocks register's measure is its own plain setting, and starts on its data updates (D6)", () => {
+    expect(useStore.getInitialState().dataMeasure).toBe("data");
+    useStore.getState().setDataMeasure("fee");
+    expect(useStore.getState().dataMeasure).toBe("fee");
+    expect(useStore.getState().ledgerMeasure).toBe(useStore.getInitialState().ledgerMeasure);
+    useStore.getState().setDataMeasure("data");
+  });
   it("the block window's status is a plain data-bridge setting", () => {
     useStore.getState().setBlockWindowStatus({ around: 5, status: "beyond" });
     expect(useStore.getState().blockWindowStatus).toEqual({ around: 5, status: "beyond" });

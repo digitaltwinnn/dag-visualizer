@@ -2,7 +2,8 @@
 import { switchLedgerRegister } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 import NetLink from "@/components/NetLink";
-import { BLOCKS_PAGE, LISTED_VIEWS } from "@/components/views";
+import { LISTED_VIEWS, REGISTER_PAGES } from "@/components/views";
+import type { LedgerRegister } from "@/src/store/mode";
 
 // THE FOOTER'S VIEW LINKS (user, 2026-09-04 — "shouldn't a footer be a consistent anchor?"):
 // the same three destinations on every surface. A plain left-click COMMITS through the store —
@@ -15,11 +16,14 @@ import { BLOCKS_PAGE, LISTED_VIEWS } from "@/components/views";
 // hides as ONE span, separators included, so no dangling mid-dot survives.
 export default function FooterViewLinks() {
   const setMode = useStore((s) => s.setMode);
-  // The Blocks register follows its view, Snapshots: a destination of its own in the footer, though
-  // the bar's switch holds no sixth button.
+  // The Snapshots view's register pages follow their view: destinations of their own in the footer
+  // ("Transaction blocks", "Data blocks" — `REGISTER_PAGES`, the one map), though the bar's switch
+  // holds no sixth button.
+  const registerLinks = (Object.entries(REGISTER_PAGES) as [LedgerRegister, (typeof REGISTER_PAGES)[LedgerRegister]][])
+    .flatMap(([register, p]) => (p ? [{ key: p.slug, name: p.name, slug: p.slug, mode: "ledger" as const, register }] : []));
   const links = LISTED_VIEWS.flatMap((v) => [
-    { key: v.id, name: v.name, slug: v.slug, mode: v.id, register: "snapshots" as const },
-    ...(v.id === "ledger" ? [{ key: BLOCKS_PAGE.slug, name: BLOCKS_PAGE.name, slug: BLOCKS_PAGE.slug, mode: v.id, register: "blocks" as const }] : []),
+    { key: v.id, name: v.name, slug: v.slug, mode: v.id, register: "snapshots" as LedgerRegister },
+    ...(v.id === "ledger" ? registerLinks : []),
   ]);
   return (
     <span className="flex items-center gap-2 max-[1100px]:hidden">

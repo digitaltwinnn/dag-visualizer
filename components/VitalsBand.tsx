@@ -25,13 +25,14 @@
 // jobs. Splitting it changed no behaviour: the three cell sets were already separate components.
 
 import { useStore, type Mode } from "@/src/store/store";
-import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
+import { VIEW_POLICIES, registerOf } from "@/src/engine/domain/viewPolicy";
+import type { LedgerRegister } from "@/src/store/mode";
 import RollSwap from "@/components/RollSwap";
 import { filterAccent } from "@/src/data/network";
 import { NoSignalDot } from "@/components/state/StateAtoms";
 import { useSceneYield } from "@/components/RailShade";
 import { cn } from "@/lib/utils";
-import { HyperCells, GeoCells, LedgerCells, BlocksCells } from "@/components/vitals/viewCells";
+import { HyperCells, GeoCells, LedgerCells, BlocksCells, DataCells } from "@/components/vitals/viewCells";
 import TrendTimeline from "@/components/TrendTimeline";
 import { QualifierChip } from "@/components/inspector/parts";
 import { spanPhrase } from "@/src/data/trendWindow";
@@ -57,6 +58,7 @@ function useVitalsScope() {
  *  the phone sheet can never hold different things. */
 function ViewCells({ cells, accent, filter, paused = false }: { cells: CellsKey; accent: string; filter: string; paused?: boolean }) {
   if (cells === "ledger:blocks") return <BlocksCells accent={accent} />;
+  if (cells === "ledger:data") return <DataCells accent={accent} filter={filter} />;
   const mode = cells;
   if (VIEW_POLICIES[mode].bandContent === "timeline") return <TrendTimeline />;
   return (
@@ -69,11 +71,13 @@ function ViewCells({ cells, accent, filter, paused = false }: { cells: CellsKey;
 }
 
 /** What the band's cells are swapped on: the view, and in the Snapshots view its REGISTER — the
- *  Blocks register says different things in the same lane, so the swap rolls on it too. */
-type CellsKey = Mode | "ledger:blocks";
+ *  Transaction blocks and Data blocks registers say different things in the same lane, so the swap
+ *  rolls on it too. The Metagraph snapshots register IS the view's own cells. */
+type CellsKey = Mode | "ledger:blocks" | "ledger:data";
+const REGISTER_CELLS: Readonly<Record<LedgerRegister, CellsKey | null>> = { snapshots: null, blocks: "ledger:blocks", data: "ledger:data" };
 function useCellsKey(mode: Mode): CellsKey {
-  const register = useStore((s) => s.ledgerRegister);
-  return mode === "ledger" && register === "blocks" ? "ledger:blocks" : mode;
+  const register = registerOf(mode, useStore((s) => s.ledgerRegister));
+  return REGISTER_CELLS[register] ?? mode;
 }
 
 // ⚠️ THE BAND CARRIES NO LINK TO THE HISTORY VIEW (user, 2026-09-19: "remove the 'history' pill
@@ -99,8 +103,8 @@ export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
   // faster: it answers a gesture already finished).
   const yielding = useSceneYield();
   const cells = useCellsKey(mode);
-  // The Blocks register's cells state their own reach ("last hour"), not the band's 24 hours.
-  const bandWindow = cells === "ledger:blocks" ? null : VIEW_POLICIES[mode].bandWindow;
+  // A register's cells state their own reach ("last hour", "last 11 min"), not the band's 24 hours.
+  const bandWindow = cells === "ledger:blocks" || cells === "ledger:data" ? null : VIEW_POLICIES[mode].bandWindow;
   const dead = useNoSignal() && VIEW_POLICIES[mode].bandContent === "vitals";
   // THE BAND NEVER PAINTS UNDER AN OPEN SHEET (user, 2026-09-04 — "sometimes I see flickering
   // when the explore and bottom bar overlap"). The overlay decision above stands: the sheets

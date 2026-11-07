@@ -21,11 +21,16 @@ import { levelOptions } from "@/src/data/explorerMeasure";
 // A SETTING, not a selection — like `trendMetric`, it writes its store setter directly and stays
 // outside the click decision table (`selectionBoundary.test.ts`'s scope note).
 
-export type LedgerMeasure = "fee" | "anchors" | "metagraphs" | "size";
+export type LedgerMeasure = "fee" | "anchors" | "metagraphs" | "size" | "data";
 
 /** The heading control's order — the reader steps through these with the chevrons, ends inactive. Fees
  *  first: it is the figure the rows have led with since 2026-09-13, so the default is unchanged. */
 export const LEDGER_MEASURE_ORDER: readonly LedgerMeasure[] = ["fee", "anchors", "metagraphs", "size"];
+
+/** THE DATA BLOCKS REGISTER'S ORDER (D6, 2026-11-07): the Snapshots measures with "Data updates"
+ *  added, and LEADING — that register is read for the data its snapshots carry. The Metagraph
+ *  snapshots register's own list does not grow. */
+export const DATA_MEASURE_ORDER: readonly LedgerMeasure[] = ["data", ...LEDGER_MEASURE_ORDER];
 
 /** The word the heading control shows — what every tick row's figure IS. */
 export const LEDGER_MEASURE_LABELS: Readonly<Record<LedgerMeasure, string>> = {
@@ -33,6 +38,8 @@ export const LEDGER_MEASURE_LABELS: Readonly<Record<LedgerMeasure, string>> = {
   anchors: "Anchors",
   metagraphs: "Metagraphs",
   size: "Size",
+  // The protocol's word for what a dL1 validates (`composition.ts`, the metagraph snapshot card's row).
+  data: "Data updates",
 };
 
 
@@ -46,6 +53,16 @@ export const NO_MEASURE = "—";
  *  a 14-byte state is "0.01", never "0". */
 export function kbFigure(kb: number): string {
   return kb >= 10 ? Math.round(kb).toLocaleString() : kb >= 1 ? kb.toFixed(1) : kb.toFixed(2);
+}
+
+/** A tick's DATA UPDATES — its anchored snapshots' counts summed off the exact read (each row's
+ *  `dataTxCount`, `app/api/snapshot/exactRow.ts`), or null without the read. A row the decoder could
+ *  not read adds nothing it could state. */
+export function tickDataUpdates(exact: Pick<SnapshotExact, "rows"> | undefined): number | null {
+  if (!exact) return null;
+  let n = 0;
+  for (const r of exact.rows) n += r.dataTxCount ?? 0;
+  return n;
 }
 
 /**
@@ -71,6 +88,10 @@ export function tickMeasure(m: LedgerMeasure, snap: Pick<GlobalSnapshot, "metagr
       return exact?.channels != null ? exact.channels.toLocaleString() : NO_MEASURE;
     case "size":
       return exact?.totalSizeKB != null ? kbFigure(exact.totalSizeKB) : NO_MEASURE;
+    case "data": {
+      const n = tickDataUpdates(exact);
+      return n != null ? n.toLocaleString() : NO_MEASURE;
+    }
   }
 }
 
@@ -83,19 +104,20 @@ export function tickMeasure(m: LedgerMeasure, snap: Pick<GlobalSnapshot, "metagr
  * a 14-byte snapshot never rounds to "0.0 KB" (`fmtBytes`'s own rule), and a row with neither
  * answers the dash rather than a number (rule 10).
  */
-export function snapMeasure(m: SnapLevelMeasure, row: { fee: number; bytes?: number; sizeInKB?: number }): string {
+export function snapMeasure(m: SnapLevelMeasure, row: { fee: number; bytes?: number; sizeInKB?: number; dataTxCount?: number }): string {
   if (m === "fee") return fmtDagShort(row.fee);
+  if (m === "data") return row.dataTxCount != null ? row.dataTxCount.toLocaleString() : NO_MEASURE;
   const kb = row.sizeInKB ?? (row.bytes != null ? row.bytes / 1024 : undefined);
   return kb != null ? kbFigure(kb) : NO_MEASURE;
 }
 
 /** The heading control's list for the TICK level — each measure with the unit its figure is in. */
-const LEDGER_MEASURE_UNITS: Readonly<Record<LedgerMeasure, string>> = { fee: "DAG", anchors: "count", metagraphs: "count", size: "KB" };
-export const LEDGER_MEASURE_OPTIONS: readonly { id: LedgerMeasure; label: string; unit: string }[] = LEDGER_MEASURE_ORDER.map((id) => ({
-  id,
-  label: LEDGER_MEASURE_LABELS[id],
-  unit: LEDGER_MEASURE_UNITS[id],
-}));
+const LEDGER_MEASURE_UNITS: Readonly<Record<LedgerMeasure, string>> = { fee: "DAG", anchors: "count", metagraphs: "count", size: "KB", data: "count" };
+const optionsOf = (order: readonly LedgerMeasure[]): readonly { id: LedgerMeasure; label: string; unit: string }[] =>
+  order.map((id) => ({ id, label: LEDGER_MEASURE_LABELS[id], unit: LEDGER_MEASURE_UNITS[id] }));
+export const LEDGER_MEASURE_OPTIONS = optionsOf(LEDGER_MEASURE_ORDER);
+/** The Data blocks register's tick list — Data updates first. */
+export const DATA_MEASURE_OPTIONS = optionsOf(DATA_MEASURE_ORDER);
 
 /** The tick's figure as a NUMBER, for the bar — the same reads `tickMeasure` formats, or null
  *  where it would answer the dash. A bar drawn from a number the row does not state is the
@@ -110,6 +132,8 @@ export function tickMeasureValue(m: LedgerMeasure, snap: Pick<GlobalSnapshot, "m
       return exact?.channels ?? null;
     case "size":
       return exact?.totalSizeKB ?? null;
+    case "data":
+      return tickDataUpdates(exact);
   }
 }
 
@@ -121,8 +145,17 @@ export function tickMeasureValue(m: LedgerMeasure, snap: Pick<GlobalSnapshot, "m
 export const TICK_NET_MEASURES = ["fee", "anchors", "size"] as const satisfies readonly LedgerMeasure[];
 export type TickNetMeasure = (typeof TICK_NET_MEASURES)[number];
 export const TICK_NET_MEASURE_OPTIONS = levelOptions(LEDGER_MEASURE_OPTIONS, TICK_NET_MEASURES);
-export function tickNetMeasure(m: TickNetMeasure, count: number, per: { fee: number; bytes: number } | undefined): { value: number | null; text: string } {
+/** …and in the Data blocks register, its data updates first (the exact breakdown's `dataTxCount`). */
+export const DATA_TICK_NET_MEASURES = ["data", ...TICK_NET_MEASURES] as const satisfies readonly LedgerMeasure[];
+export const DATA_TICK_NET_MEASURE_OPTIONS = levelOptions(DATA_MEASURE_OPTIONS, DATA_TICK_NET_MEASURES);
+export function tickNetMeasure(
+  m: TickNetMeasure | "data",
+  count: number,
+  per: { fee: number; bytes: number; dataTxCount?: number } | undefined,
+): { value: number | null; text: string } {
   switch (m) {
+    case "data":
+      return per?.dataTxCount != null ? { value: per.dataTxCount, text: per.dataTxCount.toLocaleString() } : { value: null, text: NO_MEASURE };
     case "anchors":
       return { value: count, text: count.toLocaleString() };
     case "fee":
@@ -135,9 +168,13 @@ export function tickNetMeasure(m: TickNetMeasure, count: number, per: { fee: num
 /** A METAGRAPH SNAPSHOT — the third level: its own fee, or its own size, in the tick level's words.
  *  It IS one anchor of one metagraph, so the two counts do not apply. */
 export const SNAP_MEASURES = ["fee", "size"] as const satisfies readonly LedgerMeasure[];
-export type SnapLevelMeasure = (typeof SNAP_MEASURES)[number];
 export const SNAP_MEASURE_OPTIONS = levelOptions(LEDGER_MEASURE_OPTIONS, SNAP_MEASURES);
-export function snapMeasureValue(m: SnapLevelMeasure, row: { fee: number; bytes?: number; sizeInKB?: number }): number | null {
+/** …and in the Data blocks register, its own data updates first (its exact row's `dataTxCount`). */
+export const DATA_SNAP_MEASURES = ["data", ...SNAP_MEASURES] as const satisfies readonly LedgerMeasure[];
+export const DATA_SNAP_MEASURE_OPTIONS = levelOptions(DATA_MEASURE_OPTIONS, DATA_SNAP_MEASURES);
+export type SnapLevelMeasure = (typeof DATA_SNAP_MEASURES)[number];
+export function snapMeasureValue(m: SnapLevelMeasure, row: { fee: number; bytes?: number; sizeInKB?: number; dataTxCount?: number }): number | null {
   if (m === "fee") return row.fee;
+  if (m === "data") return row.dataTxCount ?? null;
   return row.bytes ?? (row.sizeInKB != null ? row.sizeInKB * 1024 : null);
 }

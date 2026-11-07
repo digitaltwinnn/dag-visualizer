@@ -161,7 +161,7 @@ export interface ViewPolicy {
   // day, 2026-10-07; the cards' "Snapshot records" still is.)
   rawSurface: "records" | "buckets";
   // The REGISTERS this view offers — ways of reading the same scene (2026-11-05). Only the
-  // Snapshots chamber has a second, "blocks"; every other row reads one register.
+  // Snapshots chamber has more — "blocks" and, since D6 (2026-11-07), "data"; every other row reads one.
   registers: readonly LedgerRegister[];
   // Does this view carry an AI NOTE — the written context card (`components/notes/`) for the
   // subject on screen? The four 3D views do; the placeholder gallery shows no data, so no note.
@@ -400,7 +400,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     chipEnv: 0.5, // low, not zero — coplanar trays wash at full sheen, go bland at none (field note)
     fleet: "placed",
     rawSurface: "records",
-    registers: ["snapshots", "blocks"],
+    registers: ["snapshots", "blocks", "data"],
     aiNotes: true,
     noteScope: "chamber",
     tickScoped: true,

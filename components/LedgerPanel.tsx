@@ -20,9 +20,17 @@ import { cn } from "@/lib/utils";
 import { latestRelevant } from "@/src/data/follow";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import {
+  DATA_MEASURE_OPTIONS,
+  DATA_MEASURE_ORDER,
+  DATA_SNAP_MEASURE_OPTIONS,
+  DATA_SNAP_MEASURES,
+  DATA_TICK_NET_MEASURE_OPTIONS,
+  DATA_TICK_NET_MEASURES,
   LEDGER_MEASURE_OPTIONS,
+  LEDGER_MEASURE_ORDER,
   SNAP_MEASURE_OPTIONS,
   TICK_NET_MEASURE_OPTIONS,
+  tickDataUpdates,
   snapMeasure,
   snapMeasureValue,
   tickMeasure,
@@ -56,7 +64,8 @@ import { blockReadOf } from "@/src/data/blockReads";
 import { BLOCK_MEASURE_OPTIONS, blockMeasureText, blockMeasureValue, type BlockMeasure } from "@/src/data/blockMeasure";
 import { NO_MEASURE } from "@/src/data/ledgerMeasure";
 import { blockSelectActions } from "@/src/engine/domain/pickActions";
-import { midHash } from "@/src/util/format";
+import { shortBlockHash } from "@/src/util/format";
+import { REGISTER_NAMES } from "@/components/views";
 
 // THE SNAPSHOTS VIEW'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session
 // 2026-09-26; read `docs/superpowers/design/2026-09-26-explorer-card/README.md` first). This file
@@ -114,19 +123,28 @@ const signersOf = (ex: SnapshotExact | undefined, metaId: string, ordinal: numbe
 
 /** The exact read's per-network fee and size for one row of the network level — a listed
  *  network's own entry, or the SUM of every uncataloged address for the unlisted row. */
-function perMetaOf(ex: SnapshotExact | undefined, id: string): { fee: number; bytes: number } | undefined {
+function perMetaOf(ex: SnapshotExact | undefined, id: string): { fee: number; bytes: number; dataTxCount?: number } | undefined {
   if (!ex) return undefined;
   if (id !== UNLISTED_ID) return ex.perMeta[id];
   let fee = 0;
   let bytes = 0;
+  // The data updates sum only while every address states its own (an entry cached before v7 does not).
+  let data: number | undefined = 0;
   let any = false;
   for (const [addr, v] of Object.entries(ex.perMeta)) {
     if (LISTED_IDS.has(addr)) continue;
     any = true;
     fee += v.fee;
     bytes += v.bytes;
+    data = data != null && v.dataTxCount != null ? data + v.dataTxCount : undefined;
   }
-  return any ? { fee, bytes } : undefined;
+  return any ? { fee, bytes, ...(data != null ? { dataTxCount: data } : {}) } : undefined;
+}
+
+/** One metagraph snapshot's DATA UPDATES off its tick's exact row (`ChannelSnapRow.dataTxCount`), or
+ *  undefined while that read has not landed — the Data blocks register's leaf figure. */
+function leafDataTx(ex: SnapshotExact | undefined, metaId: string, ordinal: number): number | undefined {
+  return ex?.rows.find((r) => r.metaId === metaId && r.ordinal === ordinal)?.dataTxCount;
 }
 
 // The span words ("last 11 min", "5 h, 2d ago") are `src/data/ledgerSpan.ts`'s — one home with the
@@ -160,6 +178,10 @@ export default function LedgerPanel() {
   // the view's own explorer, the way the records surface keeps its own (one keyed `levels` below).
   const register = useStore((s) => s.ledgerRegister);
   const inBlocks = register === "blocks";
+  // THE DATA BLOCKS REGISTER (D6, 2026-11-07) is this card's Snapshots levels with the DATA measure
+  // leading — its own pick (`dataMeasure`), Data updates first in every level's list — and a snapshot
+  // whose data blocks carried nothing FAINT, never hidden (rule 10: a lens never edits the facts).
+  const inData = register === "data";
   useFeedRead(["api-blocks"], "LedgerPanel blocks", inBlocks);
   const blockWin = useSyncExternalStore(onBlockWindow, getBlockWindow, () => null);
   const blockStatus = useStore((s) => s.blockWindowStatus);
@@ -178,8 +200,14 @@ export default function LedgerPanel() {
   const setHoverMetaSnap = useStore((s) => s.setHoverMetaSnap);
   const hoverNodeId = useStore((s) => s.hoverNodeId);
   const setHoverNodeId = useStore((s) => s.setHoverNodeId);
-  const ledgerMeasure = useStore((s) => s.ledgerMeasure);
-  const setLedgerMeasure = useStore((s) => s.setLedgerMeasure);
+  const snapshotsMeasure = useStore((s) => s.ledgerMeasure);
+  const setSnapshotsMeasure = useStore((s) => s.setLedgerMeasure);
+  const dataMeasure = useStore((s) => s.dataMeasure);
+  const setDataMeasure = useStore((s) => s.setDataMeasure);
+  // The register's own pick and its lists: one value per register, every level a subset of it.
+  const ledgerMeasure = levelMeasure(inData ? DATA_MEASURE_ORDER : LEDGER_MEASURE_ORDER, inData ? dataMeasure : snapshotsMeasure);
+  const setLedgerMeasure = inData ? setDataMeasure : setSnapshotsMeasure;
+  const tickOptions = inData ? DATA_MEASURE_OPTIONS : LEDGER_MEASURE_OPTIONS;
   const snap = useStore((s) => s.snap);
   const following = useStore((s) => s.following);
   const dead = useNoSignal();
@@ -194,8 +222,8 @@ export default function LedgerPanel() {
   // show the tick level's `ledgerMeasure` where they can state it and their own first measure where
   // they can't, and a pick at any level writes that one value — so stepping down and back up never
   // loses what the reader chose.
-  const netPick = levelMeasure(TICK_NET_MEASURES, ledgerMeasure);
-  const snapPick = levelMeasure(SNAP_MEASURES, ledgerMeasure);
+  const netPick = levelMeasure(inData ? DATA_TICK_NET_MEASURES : TICK_NET_MEASURES, ledgerMeasure);
+  const snapPick = levelMeasure(inData ? DATA_SNAP_MEASURES : SNAP_MEASURES, ledgerMeasure);
 
   const selNode = inspect && (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode") ? inspect : null;
   const selIp = selNode?.node?.ip ?? null;
@@ -376,7 +404,7 @@ export default function LedgerPanel() {
         label: "Snapshots",
         onRelease: () => setPath(CLOSED_PATH),
       },
-      measure: { options: LEDGER_MEASURE_OPTIONS, value: ledgerMeasure, onPick: (id) => setLedgerMeasure(id as LedgerMeasure) },
+      measure: { options: tickOptions, value: ledgerMeasure, onPick: (id) => setLedgerMeasure(id as LedgerMeasure) },
       hasFigure: true,
       // A 4-decimal fee ("0.0680") needs the wider figure column; the width holds across the
       // level's measures so the columns never shift when the heading's pick changes.
@@ -434,7 +462,8 @@ export default function LedgerPanel() {
           on,
           // No `rung`: a committed tick row's click also opens its tick in this card (local path
           // state), which a re-box would swallow — and its Global snapshot card is the box anyway.
-          faint: !!filterNet && count === 0 && !on,
+          // …and in Data blocks a tick whose snapshots carried no data update steps back too.
+          faint: ((!!filterNet && count === 0) || (inData && tickDataUpdates(snapshotExact[d.ordinal]) === 0)) && !on,
           // The count the bar's colour stands for, in words — colour is never the only carrier.
           onClick: locked ? undefined : () => {
             // THE SELECTED ROW DRILLS (user, 2026-10-07 — the explorer rests on this list, its axis,
@@ -495,7 +524,7 @@ export default function LedgerPanel() {
       count: n.snaps.length,
       ...(n.unlisted ? { italic: true } : {}),
     }));
-    const measured = netRows.map((n) => ({ n, m: tickNetMeasure(netPick, n.count, perMetaOf(exact, n.id)) }));
+    const measured = netRows.map((n) => ({ n, per: perMetaOf(exact, n.id), m: tickNetMeasure(netPick, n.count, perMetaOf(exact, n.id)) }));
     const maxNet = Math.max(1e-9, ...measured.map(({ m }) => m.value ?? 0));
     levels.push({
       pager: spanFooter,
@@ -512,15 +541,17 @@ export default function LedgerPanel() {
         onRelease: () => setPath((p) => ({ ...p, net: null, snap: null })),
       },
       meaning: "Networks that anchored into it",
-      measure: { options: TICK_NET_MEASURE_OPTIONS, value: netPick, onPick: (id) => setLedgerMeasure(id as LedgerMeasure) },
+      measure: { options: inData ? DATA_TICK_NET_MEASURE_OPTIONS : TICK_NET_MEASURE_OPTIONS, value: netPick, onPick: (id) => setLedgerMeasure(id as LedgerMeasure) },
       hasFigure: true,
       nameW: 120,
       figureW: 48,
       // The polled buffer identified none of this tick's anchors (yet), and the exact read
       // counted no uncataloged ones — say so, never fabricate.
       empty: "No identified metagraph snapshots in this snapshot.",
-      rows: measured.map(({ n, m }): ExplorerRowSpec => {
+      rows: measured.map(({ n, per, m }): ExplorerRowSpec => {
         const lensedOut = outOfLens(filter, n.id);
+        // A network whose snapshots here carried no data update steps back in Data blocks.
+        const dataless = inData && per?.dataTxCount === 0;
         return {
           key: n.id,
           // No dot beside a hued bar (user, 2026-10-23) — one hue carrier per row.
@@ -539,7 +570,7 @@ export default function LedgerPanel() {
           // explorer then steps to that card's children — rather than re-committing the network.
           rung: "context",
           // Out of the lens: listed (it really did anchor here), not drillable.
-          faint: lensedOut,
+          faint: lensedOut || dataless,
           // OPENS ITS CARD TOO (user, 2026-10-04: "clicking a row in the explorer should open the
           // related card; happens for some but not for all" — this row was the one that only
           // drilled, ruled "opens, never commits" on 2026-08-10, before a network could be
@@ -575,7 +606,8 @@ export default function LedgerPanel() {
   const leafName = openTickNet?.name ?? "";
   if (tick && openNet && (leaves.length > 0 || openNet === UNLISTED_ID)) {
     const globalPick = { kind: "snapshot", title: `Global snapshot #${tick.ordinal}`, data: tick } as const;
-    const values = leaves.map((r) => snapMeasureValue(snapPick, r));
+    const leafRows = leaves.map((r) => ({ ...r, dataTxCount: leafDataTx(exact, r.metaId, r.ordinal) }));
+    const values = leafRows.map((r) => snapMeasureValue(snapPick, r));
     const maxLeaf = Math.max(1e-9, ...values.map((v) => v ?? 0));
     levels.push({
       pager: spanFooter,
@@ -591,7 +623,7 @@ export default function LedgerPanel() {
         onRelease: () => setPath((p) => ({ ...p, snap: null })),
       },
       meaning: "Its snapshots anchored here",
-      measure: { options: SNAP_MEASURE_OPTIONS, value: snapPick, onPick: (id) => setLedgerMeasure(id as LedgerMeasure) },
+      measure: { options: inData ? DATA_SNAP_MEASURE_OPTIONS : SNAP_MEASURE_OPTIONS, value: snapPick, onPick: (id) => setLedgerMeasure(id as LedgerMeasure) },
       hasFigure: true,
       figureW: 48,
       empty: "No snapshots identified for this network here.",
@@ -610,8 +642,10 @@ export default function LedgerPanel() {
           tag: isUnlisted && r.ordinal > 0 ? r.metaId.slice(0, 7) : undefined,
           share: values[i] != null ? values[i]! / maxLeaf : undefined,
           hue: leafHue,
-          figure: snapMeasure(snapPick, r),
+          figure: snapMeasure(snapPick, leafRows[i]!),
           on,
+          // A snapshot whose data blocks carried nothing steps back in Data blocks (never hidden).
+          faint: inData && leafRows[i]!.dataTxCount === 0 && !on,
           rung: "metaSnap",
           onClick: () => {
             applyClickActions(metaSnapSelectActions(sel, globalPick, { metaSnap, following, inspect: useStore.getState().inspect, block: useStore.getState().block }));
@@ -733,7 +767,7 @@ export default function LedgerPanel() {
             {tickerOf(b.chain)}
           </span>
         ),
-        name: midHash(b.hash, 12),
+        name: shortBlockHash(b.hash),
         nameMono: true,
         share: v != null ? v / maxBlock : undefined,
         hue,
@@ -780,7 +814,8 @@ export default function LedgerPanel() {
     <Explorer
       id="ledger-view"
       // The card says what it lists (a plural noun): the register decides which.
-      title={inBlocks ? "Blocks" : "Snapshots"}
+      // The register's own name (`REGISTER_NAMES`, the switch's words).
+      title={REGISTER_NAMES[register]}
       // (The register switch rides the scene, D3 — `components/RegisterSwitch.tsx`; this card's
       // control band holds only the measure tiles.)
       // The sentence is the path's own placeholder now (user, 2026-10-08): one line beside the house.

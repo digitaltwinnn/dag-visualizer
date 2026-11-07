@@ -107,12 +107,16 @@ export const METASNAP_ICON: LucideIcon = Boxes;
 // snapshot's, Boxes the metagraph snapshot's, and both stand in the same rail.
 export const BLOCK_ICON: LucideIcon = Blocks;
 
-/** THE SNAPSHOTS VIEW'S TWO REGISTERS, one mark each (the explorer's register switch): Snapshots
- *  wears the view's own strata, Blocks the block's mark. Typed on the register vocabulary, so a new
- *  register without a glyph is a compile error here. */
+/** THE SNAPSHOTS VIEW'S THREE REGISTERS, one mark each (the register switch on the scene): Metagraph
+ *  snapshots wears the view's own strata, Transaction blocks the block's mark, Data blocks the
+ *  database (D6, 2026-11-07 — the metagraph kind "data" already wears `Blocks`, the transaction
+ *  block's own glyph, so the two halves would read alike; `Database` is the app's mark for what a
+ *  chain stores). Typed on the register vocabulary, so a new register without a glyph is a compile
+ *  error here. */
 export const REGISTER_ICONS: Readonly<Record<LedgerRegister, LucideIcon>> = {
   snapshots: VIEW_ICONS.ledger,
   blocks: BLOCK_ICON,
+  data: Database,
 };
 
 // THE COMMITTED INSTANT's mark (History's cursor card, 2026-09-19): the crosshair — one moment
@@ -268,6 +272,8 @@ export const MEASURE_ICONS: Readonly<Record<MeasureId, LucideIcon>> = {
   fee: Coins,
   anchors: Boxes,
   size: HardDrive,
+  // The Data blocks register's lead measure (D6): its register's own mark, what a chain stores.
+  data: Database,
   // The Blocks register (`BlockMeasure`): fees above, then the amount a block moved — a move from
   // one address to another, the transfers' own mark — and its height in its chain.
   amount: ArrowLeftRight,

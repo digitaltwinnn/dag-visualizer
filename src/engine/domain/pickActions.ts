@@ -531,13 +531,15 @@ export function blockSelectActions(
   return out;
 }
 
-/** SWITCHING THE SNAPSHOTS VIEW'S REGISTER releases what the register it leaves drew and the one it
- *  enters cannot: leaving Blocks drops the committed block, leaving Snapshots drops the committed
- *  metagraph snapshot. The pin (`snap`) and the committed network (`tickNet`) are the tick's own
- *  and stay. Finest first, like every release; `switchLedgerRegister` applies it through the executor. */
+/** SWITCHING THE SNAPSHOTS VIEW'S REGISTER releases what the register it enters cannot draw: only
+ *  Transaction blocks draws a block, and it is the one register that draws no metagraph snapshot —
+ *  entering it drops the committed metagraph snapshot, entering either other (Metagraph snapshots or
+ *  Data blocks, whose subjects are the same snapshots — D6) drops the block. The pin (`snap`) and the
+ *  committed network (`tickNet`) are the tick's own and stay. Finest first, like every release;
+ *  `switchLedgerRegister` applies it through the executor. */
 export function registerSwitchActions(to: LedgerRegister, current: { block: BlockSel | null; metaSnap: MetaSnapSel | null }): ClickAction[] {
-  if (to === "snapshots") return current.block ? [{ kind: "block", sel: null }] : [];
-  return current.metaSnap ? [{ kind: "metaSnap", sel: null }] : [];
+  if (to === "blocks") return current.metaSnap ? [{ kind: "metaSnap", sel: null }] : [];
+  return current.block ? [{ kind: "block", sel: null }] : [];
 }
 
 /** THE BLOCK CARD'S LIVE / PINNED CONTROL (D3 — in the Blocks register live follows the newest

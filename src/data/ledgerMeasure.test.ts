@@ -15,6 +15,13 @@ import {
   NO_MEASURE,
   snapMeasure,
   tickMeasure,
+  DATA_MEASURE_OPTIONS,
+  DATA_MEASURE_ORDER,
+  DATA_TICK_NET_MEASURES,
+  DATA_TICK_NET_MEASURE_OPTIONS,
+  DATA_SNAP_MEASURES,
+  DATA_SNAP_MEASURE_OPTIONS,
+  tickDataUpdates,
 } from "./ledgerMeasure";
 
 // The Snapshots explorer's tick-row figure, as a vocabulary (2026-09-26). The stepper walks the
@@ -104,5 +111,48 @@ describe("the levels' lists and their numbers (design 2026-09-26: each level has
     expect(snapMeasureValue("size", { fee: 0, sizeInKB: 2 })).toBe(2048);
     expect(snapMeasureValue("size", { fee: 0, bytes: 14 })).toBe(14);
     expect(snapMeasureValue("size", { fee: 0 })).toBeNull();
+  });
+});
+
+// THE DATA BLOCKS REGISTER'S MEASURE (D6, 2026-11-07): the Snapshots measures with "Data updates"
+// added, and leading — every level's figure the data updates the exact read counts.
+describe("the Data blocks register's measure", () => {
+  const rows = [
+    { metaId: "DED", ordinal: 1, decoded: true, fee: 0, bytes: 0, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null, dataTxCount: 40, dataBlocks: 1 },
+    { metaId: "DOR", ordinal: 9, decoded: true, fee: 0, bytes: 0, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null, dataTxCount: 2, dataBlocks: 1 },
+    { metaId: "NDT", ordinal: 3, decoded: true, fee: 0, bytes: 0, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null, dataTxCount: 0, dataBlocks: 0 },
+  ];
+  const ex: SnapshotExact = { ...EXACT, rows };
+
+  it("leads with Data updates, then the Snapshots register's measures in their order", () => {
+    expect(DATA_MEASURE_ORDER).toEqual(["data", ...LEDGER_MEASURE_ORDER]);
+    expect(DATA_MEASURE_OPTIONS[0]).toEqual({ id: "data", label: "Data updates", unit: "count" });
+    expect(DATA_MEASURE_OPTIONS.map((o) => o.id)).toEqual([...DATA_MEASURE_ORDER]);
+    // The Snapshots register's list does not grow.
+    expect(LEDGER_MEASURE_ORDER).not.toContain("data");
+    expect(DATA_TICK_NET_MEASURES).toEqual(["data", ...TICK_NET_MEASURES]);
+    expect(DATA_TICK_NET_MEASURE_OPTIONS.map((o) => o.label)).toEqual(["Data updates", "Fees", "Anchors", "Size"]);
+    expect(DATA_SNAP_MEASURES).toEqual(["data", ...SNAP_MEASURES]);
+    expect(DATA_SNAP_MEASURE_OPTIONS.map((o) => o.label)).toEqual(["Data updates", "Fees", "Size"]);
+  });
+
+  it("a tick's figure is its snapshots' data updates summed, from the exact read or the dash", () => {
+    expect(tickDataUpdates(ex)).toBe(42);
+    expect(tickDataUpdates(undefined)).toBeNull();
+    expect(tickMeasure("data", {}, ex)).toBe("42");
+    expect(tickMeasureValue("data", {}, ex)).toBe(42);
+    expect(tickMeasure("data", { metagraphSnapshotCount: 8 }, undefined)).toBe(NO_MEASURE);
+    // A tick whose snapshots carried none states 0 — measured, not absent.
+    expect(tickMeasure("data", {}, { ...EXACT, rows: [rows[2]] })).toBe("0");
+  });
+
+  it("a network and a snapshot under a tick state their own data updates", () => {
+    expect(tickNetMeasure("data", 2, { fee: 0, bytes: 0, dataTxCount: 40 })).toEqual({ value: 40, text: "40" });
+    expect(tickNetMeasure("data", 2, { fee: 0, bytes: 0 })).toEqual({ value: null, text: NO_MEASURE });
+    expect(tickNetMeasure("data", 2, undefined)).toEqual({ value: null, text: NO_MEASURE });
+    expect(snapMeasure("data", { fee: 0, dataTxCount: 7 })).toBe("7");
+    expect(snapMeasure("data", { fee: 0 })).toBe(NO_MEASURE);
+    expect(snapMeasureValue("data", { fee: 0, dataTxCount: 7 })).toBe(7);
+    expect(snapMeasureValue("data", { fee: 0 })).toBeNull();
   });
 });

@@ -38,7 +38,8 @@ export interface NoteSubjectState {
  *  Keyed by the register, read only where the view's policy offers it (`registers`), so no view is
  *  named here. The block DAG's note is the whole network's alone (`sources.ts`): its subject is `all`
  *  whatever the rung stands on — a filter is a lens on the chamber, and the note reads every chain. */
-const REGISTER_NOTES: Record<LedgerRegister, NoteView | null> = { snapshots: null, blocks: "blocks" };
+// The Data blocks register reads the ledger's note (D6): its records ARE metagraph snapshots.
+const REGISTER_NOTES: Record<LedgerRegister, NoteView | null> = { snapshots: null, blocks: "blocks", data: null };
 
 export interface NoteSubject {
   view: NoteView;

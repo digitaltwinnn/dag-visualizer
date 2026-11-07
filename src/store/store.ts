@@ -412,8 +412,12 @@ interface AppState {
   // What the Snapshots explorer's tick rows lead with — fee, anchors, metagraphs or size
   // (`src/data/ledgerMeasure.ts`). A setting, like `trendMetric`; its control is the card's heading.
   ledgerMeasure: LedgerMeasure;
-  // Which REGISTER the Snapshots view reads — its snapshots or the blocks inside them
-  // (`viewPolicy.registers`). A setting, like the measures: it moves the scene, so it stamps a cause.
+  // What the Data blocks register's rows lead with — the Snapshots measures with "Data updates" first
+  // (`DATA_MEASURE_ORDER`, D6). Its own pick, as the Blocks register's is, so entering the register
+  // reads its data updates whatever the Snapshots register was left on. A setting.
+  dataMeasure: LedgerMeasure;
+  // Which REGISTER the Snapshots view reads — its metagraph snapshots, the transaction blocks inside
+  // them or the data blocks they carry (`viewPolicy.registers`). A setting, like the measures: it moves the scene, so it stamps a cause.
   ledgerRegister: LedgerRegister;
   // What the Blocks register's rows lead with (`src/data/blockMeasure.ts`). A setting.
   blockMeasure: BlockMeasure;
@@ -570,6 +574,7 @@ interface AppState {
   /** Drop every block read and miss outside `keep`. Data-bridge setter. */
   retainBlockReads: (keep: Set<string>) => void;
   setLedgerMeasure: (measure: LedgerMeasure) => void;
+  setDataMeasure: (measure: LedgerMeasure) => void;
   setGeoMeasure: (measure: GeoMeasure) => void;
   setHyperMeasure: (measure: HyperMeasure) => void;
   setTrendScroll: (offset: number) => void;
@@ -692,6 +697,7 @@ export const useStore = create<AppState>((set) => ({
   trendCursorMs: null,
   trendMetric: "snapshots",
   ledgerMeasure: "fee",
+  dataMeasure: "data",
   ledgerRegister: "snapshots",
   blockMeasure: "amount",
   block: null,
@@ -987,6 +993,7 @@ export const useStore = create<AppState>((set) => ({
   // The settings that MOVE the scene stamp their cause (the hint reads it while the stack eases).
   setTrendMetric: (metric) => set({ trendMetric: metric, motionCause: { kind: "measure", id: metric } }),
   setLedgerMeasure: (measure) => set({ ledgerMeasure: measure }),
+  setDataMeasure: (dataMeasure) => set({ dataMeasure }),
   setLedgerRegister: (ledgerRegister) => set({ ledgerRegister, motionCause: { kind: "register", id: ledgerRegister } }),
   setBlockMeasure: (blockMeasure) => set({ blockMeasure }),
   // A block is a committed subject like the tile: it ranks in the recency stack, so its card is the

@@ -3,6 +3,15 @@
 import type { Mode, MotionCause, TrendMetric } from "@/src/store/store";
 import type { FocusLevel } from "./focusLadder";
 import type { ZoomId } from "@/src/data/trendWindow";
+import type { LedgerRegister } from "@/src/store/mode";
+
+/** What a register switch says the chamber is showing — the switch's own names, in the clause's case
+ *  (`components/views.ts`' `REGISTER_NAMES`; a new register is a compile error here). */
+const REGISTER_CLAUSE: Readonly<Record<LedgerRegister, string>> = {
+  snapshots: "the metagraph snapshots",
+  blocks: "the transaction blocks",
+  data: "the data blocks",
+};
 
 // THE MOTION HINT'S COPY — what the scene is doing while it moves, in one sentence (user,
 // 2026-09-26: "during the time the trend cards re-order, give a subtle hint somewhere on screen to
@@ -101,7 +110,7 @@ export function motionHint(cause: MotionCause, mode: Mode, names: HintNames, pha
       // by in global snapshots" — a label that starts with a preposition reads as broken grammar).
       return mode === "trend" ? `Reordering by ${names.measure(cause.id)}, busiest network first` : null;
     case "register":
-      return cause.id === "blocks" ? "Showing the blocks" : "Showing the snapshots";
+      return `Showing ${REGISTER_CLAUSE[cause.id]}`;
     case "page":
       return "Paging the stack";
     case "rung":

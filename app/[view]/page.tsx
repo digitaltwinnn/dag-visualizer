@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import AppShell from "@/components/AppShell";
-import { BLOCKS_PAGE, ROUTED_VIEWS, viewTitle } from "@/components/views";
+import { REGISTER_PAGE_LIST, ROUTED_VIEWS, viewTitle } from "@/components/views";
 
 // The routed 3D views (2026-09-04): /hypergraph, /geography, /snapshots — the same AppShell as
 // `/`, differing only in metadata. The routes exist so analytics see per-view traffic, links
@@ -14,8 +14,8 @@ import { BLOCKS_PAGE, ROUTED_VIEWS, viewTitle } from "@/components/views";
 export const dynamicParams = false;
 
 export function generateStaticParams() {
-  // `/blocks` is the Snapshots view's second register: routed, but not a view (`BLOCKS_PAGE`).
-  return [...ROUTED_VIEWS, BLOCKS_PAGE].map((v) => ({ view: v.slug }));
+  // `/blocks` and `/data-blocks` are the Snapshots view's registers: routed, but not views (`REGISTER_PAGES`).
+  return [...ROUTED_VIEWS, ...REGISTER_PAGE_LIST].map((v) => ({ view: v.slug }));
 }
 
 /** The root's share image, at its plain path (the root itself gets it from the file convention). */
@@ -28,7 +28,7 @@ const SHARE_IMAGE = {
 
 export async function generateMetadata({ params }: { params: Promise<{ view: string }> }): Promise<Metadata> {
   const { view } = await params;
-  const def: { name: string; slug: string; desc: string; soon?: boolean } = view === BLOCKS_PAGE.slug ? BLOCKS_PAGE : ROUTED_VIEWS.find((v) => v.slug === view)!;
+  const def: { name: string; slug: string; desc: string; soon?: boolean } = REGISTER_PAGE_LIST.find((p) => p.slug === view) ?? ROUTED_VIEWS.find((v) => v.slug === view)!;
   const title = viewTitle(def.name);
   return {
     title,

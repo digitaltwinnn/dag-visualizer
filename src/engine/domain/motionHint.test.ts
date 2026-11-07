@@ -60,8 +60,9 @@ describe("motionHint", () => {
   });
 
   it("a register switch says which register the chamber is showing", () => {
-    expect(motionHint({ kind: "register", id: "blocks" }, "ledger", NAMES)).toBe("Showing the blocks");
-    expect(motionHint({ kind: "register", id: "snapshots" }, "ledger", NAMES)).toBe("Showing the snapshots");
+    expect(motionHint({ kind: "register", id: "snapshots" }, "ledger", NAMES)).toBe("Showing the metagraph snapshots");
+    expect(motionHint({ kind: "register", id: "blocks" }, "ledger", NAMES)).toBe("Showing the transaction blocks");
+    expect(motionHint({ kind: "register", id: "data" }, "ledger", NAMES)).toBe("Showing the data blocks");
   });
 
   it("a block commit frames the block; its release returns to the snapshot that carries it", () => {

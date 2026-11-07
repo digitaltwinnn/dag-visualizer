@@ -70,6 +70,7 @@ import {
   type LaneBlock,
 } from "../../domain/ledgerModel";
 import { layeredZ, referenceSegments, silentRun, type BlockRead } from "../../domain/blockBraid";
+import { DATA_MARK, dataMarkCount, dataMarkHeight } from "../../domain/dataMark";
 import { ENTRY_STAG, entryStep, entryTotal } from "../../domain/entryBeat";
 import { makeBarSpec, fillBarSpec, UNLISTED_KEY, RIBBON_LANE_HALF, type BarSpec } from "../../domain/ledgerBands";
 import type { ContainerSpec } from "../../domain/ledgerRails";
@@ -217,11 +218,18 @@ export const TILE_LOOK: Readonly<TileLook> = { rest: 0.1, ink: 0.3, halo: 2.5 };
  *  - `anchors`: how a metagraph snapshot is tied to its tick — the tapering SHEETS, whose width is
  *    the bytes it carried, or the hairline LINES, one per snapshot that carries a block (user,
  *    design round D1: size is irrelevant to the blocks, and the sheets were noise there).
- *  - `bareTiles`: whether a metagraph snapshot carrying no block is drawn (and picked) at all. */
-const REGISTER_CARGO: Record<LedgerRegister, { blocks: boolean; liveEdge: boolean; anchors: "sheets" | "lines"; bareTiles: boolean }> = {
-  snapshots: { blocks: false, liveEdge: true, anchors: "sheets", bareTiles: true },
-  blocks: { blocks: true, liveEdge: false, anchors: "lines", bareTiles: false },
+ *  - `bareTiles`: whether a metagraph snapshot carrying no block is drawn (and picked) at all.
+ *  - `dataMarks`: whether each tile whose exact read says it carried DATA BLOCKS wears a mark on its
+ *    top, its height the count of data updates (`domain/dataMark.ts`; the Data blocks register, D6).
+ *    Data blocks have no parents, so there is no braid and no link: the register is the Snapshots
+ *    furniture as it stands — the same source, ribbons, tiles, bands and live edge — plus the marks. */
+const REGISTER_CARGO: Record<LedgerRegister, { blocks: boolean; liveEdge: boolean; anchors: "sheets" | "lines"; bareTiles: boolean; dataMarks: boolean }> = {
+  snapshots: { blocks: false, liveEdge: true, anchors: "sheets", bareTiles: true, dataMarks: false },
+  blocks: { blocks: true, liveEdge: false, anchors: "lines", bareTiles: false, dataMarks: false },
+  data: { blocks: false, liveEdge: true, anchors: "sheets", bareTiles: true, dataMarks: true },
 };
+/** A data mark's brightness over its tile's: a footnote on the tile, but one that must read on it. */
+const DATA_MARK_GAIN = 2.2;
 
 /** A block's edge above the floor (a DAG block) and on a tile (a token block — a tile is 0.48 at most). */
 const DAG_BLOCK = 0.62;
@@ -422,6 +430,12 @@ export class LedgerView implements SceneView {
   private _braidScale: number | null = null;
   private _anchorLines: AnchorLine[] = [];
   private readonly _tileScratch = new THREE.Vector3();
+  /** THE DATA BLOCKS REGISTER'S MARKS (`REGISTER_CARGO.dataMarks`): one instance per tile, in the
+   *  tile draw's own order, and per tile the count its mark states — -1 for none (no data blocks, or
+   *  the read not landed). Filled at event time with the pick table (`_rebuildTilePicks`). */
+  private _dataMarkMesh!: THREE.InstancedMesh;
+  private readonly _dataMarkN = new Float32Array(META_TRAIL_MAX).fill(-1);
+  private _dataMarkLastDrawn = 0;
 
   constructor(
     scene: THREE.Scene,
@@ -524,6 +538,21 @@ export class LedgerView implements SceneView {
     // already implements for every instanced pool (Globe uses the same key).
     this._metaTrailMesh.userData.picks = this._tilePicks;
     this.group.add(this._metaTrailMesh);
+
+    // The Data blocks register's marks: the tiles' own species (solid, normal-blended, depth-writing,
+    // in the bloom set), one unit box scaled per instance onto its tile's top. Not pickable — a mark
+    // is part of its tile, and the tile under it answers the click.
+    this._dataMarkMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({}), META_TRAIL_MAX);
+    joinBloom(this._dataMarkMesh);
+    this._dataMarkMesh.frustumCulled = false;
+    this._dataMarkMesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e4);
+    this._dataMarkMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    for (let i = 0; i < META_TRAIL_MAX; i++) {
+      this._dataMarkMesh.setColorAt(i, _col.set(0xffffff));
+      this._dataMarkMesh.setMatrixAt(i, _dummy.matrix); // still the zero-scale matrix from above
+    }
+    this._dataMarkMesh.instanceMatrix.needsUpdate = true;
+    this.group.add(this._dataMarkMesh);
   }
 
   private _laneColor(id: string): THREE.Color {
@@ -1635,16 +1664,29 @@ export class LedgerView implements SceneView {
         if (b.ts !== kTs) { kTs = b.ts; k = 0; }
         // A tile the register does not draw (a bare one, in Blocks) is not pickable either.
         const shown = b.filled && (this._cargo.bareTiles || this._blockTiles.has(b));
-        this._tilePicks[mi] = shown ? fn(lane.id, b.ts, k) : null; // event-time
+        const pick = shown ? fn(lane.id, b.ts, k) : null; // event-time
+        this._tilePicks[mi] = pick;
+        // The Data blocks register's mark: the count from THIS snapshot's own exact row — the tile
+        // the resolver named — or none while that read has not landed (rule 10).
+        this._dataMarkN[mi] = this._cargo.dataMarks && pick?.kind === "metaSnap" ? this._dataMarkOf(pick.sel.globalOrdinal, pick.sel.metaId, pick.sel.ordinal) : -1;
         if (b.filled) k++;
         mi++;
       }
     }
-    for (let j = mi; j < META_TRAIL_MAX; j++) this._tilePicks[j] = null;
+    for (let j = mi; j < META_TRAIL_MAX; j++) { this._tilePicks[j] = null; this._dataMarkN[j] = -1; }
     // A held hover's tile index is only valid against THIS table — and so is the selected
     // tile's (the callout anchor).
     this._syncHoverTile();
     this._resolveSelTile();
+  }
+
+  /** A metagraph snapshot's data-mark count from its tick's exact read (`dataMark.dataMarkCount`),
+   *  or -1 for no mark. Event-time, beside the pick it belongs to. */
+  private _dataMarkOf(globalOrdinal: number, metaId: string, ordinal: number): number {
+    const rows = this._exact[globalOrdinal]?.rows;
+    if (!rows) return -1;
+    for (const r of rows) if (r.metaId === metaId && r.ordinal === ordinal) return dataMarkCount(r) ?? -1;
+    return -1;
   }
 
   private _syncPickables(): void {
@@ -1782,6 +1824,7 @@ export class LedgerView implements SceneView {
     const dimNet = this._netDimKey();
     const tileRest = TILE_LOOK.rest;
     const tileInk = TILE_LOOK.ink;
+    const dataMarks = this._cargo.dataMarks;
     // A focus is a SELECTED row (pinned or live-followed — how it was reached is not what it is),
     // a hovered row or a hovered tile. The bare lead is none of them: with nothing selected the
     // chamber is simply running, and stepping the whole trail back against a row it advanced onto
@@ -1828,6 +1871,7 @@ export class LedgerView implements SceneView {
           _dummy.scale.setScalar(0);
           _dummy.updateMatrix();
           this._metaTrailMesh.setMatrixAt(mi, _dummy.matrix);
+          if (dataMarks) this._dataMarkMesh.setMatrixAt(mi, _dummy.matrix); // its mark goes with it
           b.bright = 0; // a slot that comes back eases up from dark, not from a stale row
           mi++;
           continue;
@@ -1907,6 +1951,22 @@ export class LedgerView implements SceneView {
         // accuracy; what was actually missing is hue at the bottom of the span, which is TileLook.ink
         // above. Thin toward the ground, floor the tint — the two answer different halves.
         this._metaTrailMesh.setColorAt(mi, inkMix(_col.copy(ident ? laneColor : this._coreCol), bright, this._colors));
+        // THE DATA MARK (the Data blocks register's cargo): on the tile's top as this frame draws it,
+        // in the lane's identity hue at the tile's own eased brightness (lifted so it reads on it), so
+        // the dim, the focus and the boundary fades all reach it through its tile.
+        if (dataMarks) {
+          const n = this._dataMarkN[mi];
+          if (n >= 0) {
+            const h = dataMarkHeight(n);
+            const w = b.size * DATA_MARK.foot;
+            _dummy.position.set(_tileV.x, _tileV.y + h / 2, _tileV.z);
+            _dummy.rotation.set(0, 0, 0);
+            _dummy.scale.set(w, h, w);
+            _dummy.updateMatrix();
+            this._dataMarkMesh.setMatrixAt(mi, _dummy.matrix);
+            this._dataMarkMesh.setColorAt(mi, inkMix(_col.copy(laneColor), Math.min(1, bright * DATA_MARK_GAIN), this._colors));
+          } else this._zeroDataMark(mi);
+        }
         mi++;
       }
     }
@@ -1920,6 +1980,24 @@ export class LedgerView implements SceneView {
     this._metaLastDrawn = mi;
     this._metaTrailMesh.instanceMatrix.needsUpdate = true;
     if (this._metaTrailMesh.instanceColor) this._metaTrailMesh.instanceColor.needsUpdate = true;
+    // Every mark slot this frame did not write is zero-scaled: past the tiles drawn, and — outside the
+    // register that draws them — every slot the last such frame wrote (rule 5's discipline: no stale
+    // instance from another register lingers).
+    const markTo = dataMarks ? mi : 0;
+    if (markTo < this._dataMarkLastDrawn) for (let j = markTo; j < this._dataMarkLastDrawn; j++) this._zeroDataMark(j);
+    if (dataMarks || this._dataMarkLastDrawn > 0) {
+      this._dataMarkMesh.instanceMatrix.needsUpdate = true;
+      if (this._dataMarkMesh.instanceColor) this._dataMarkMesh.instanceColor.needsUpdate = true;
+    }
+    this._dataMarkLastDrawn = markTo;
+  }
+
+  private _zeroDataMark(i: number): void {
+    _dummy.position.set(0, 0, 0);
+    _dummy.rotation.set(0, 0, 0);
+    _dummy.scale.setScalar(0);
+    _dummy.updateMatrix();
+    this._dataMarkMesh.setMatrixAt(i, _dummy.matrix);
   }
 
   dispose() {

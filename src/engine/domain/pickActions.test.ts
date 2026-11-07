@@ -959,4 +959,11 @@ describe("registerSwitchActions (switching the Snapshots view's register)", () =
     expect(registerSwitchActions("snapshots", { block: null, metaSnap: m })).toEqual([]);
     expect(registerSwitchActions("blocks", { block: null, metaSnap: null })).toEqual([]);
   });
+
+  it("entering Data blocks releases the block and KEEPS the metagraph snapshot — its subjects are the Snapshots register's own (D6)", () => {
+    expect(registerSwitchActions("data", { block: b, metaSnap: null })).toEqual([{ kind: "block", sel: null }]);
+    expect(registerSwitchActions("data", { block: null, metaSnap: m })).toEqual([]);
+    // …and leaving it for Metagraph snapshots releases nothing new.
+    expect(registerSwitchActions("snapshots", { block: null, metaSnap: m })).toEqual([]);
+  });
 });

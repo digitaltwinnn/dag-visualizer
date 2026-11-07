@@ -39,4 +39,26 @@ describe("switchLedgerRegister", () => {
     expect(s.block).toBeNull();
     expect(s.hoverBlock).toBeNull();
   });
+
+  it("Data blocks keeps the metagraph snapshot and the pin, and drops a block's hover preview (D6)", () => {
+    const pin = { kind: "snapshot", data: { ordinal: 90 } } as never;
+    useStore.getState().setSnap(pin);
+    useStore.getState().setMetaSnap(metaSnap);
+    switchLedgerRegister("data");
+    let s = useStore.getState();
+    expect(s.ledgerRegister).toBe("data");
+    expect(s.metaSnap).toBe(metaSnap);
+    expect(s.snap).toBe(pin);
+    switchLedgerRegister("snapshots");
+    s = useStore.getState();
+    expect(s.metaSnap).toBe(metaSnap);
+    // From Blocks into Data: the block and its hover go.
+    switchLedgerRegister("blocks");
+    useStore.getState().setBlock(block);
+    useStore.getState().setHoverBlock({ chain: "dag", hash: "h1" } as never);
+    switchLedgerRegister("data");
+    s = useStore.getState();
+    expect(s.block).toBeNull();
+    expect(s.hoverBlock).toBeNull();
+  });
 });

@@ -904,10 +904,14 @@ export class Engine {
         else if (st.ledgerRegister !== prev.ledgerRegister) this._holdSceneFeeds();
         // THE REGISTER IS THE TRAIL'S SOURCE (`ledgerSource`): the live buffer's ticks or the block
         // window's, two different stretches of the chain — the chamber switches its cargo and starts
-        // a fresh history on the new one, exactly as a past window's arrival does.
+        // a fresh history on the new one, exactly as a past window's arrival does. Between the two
+        // registers that read the SAME source (Metagraph snapshots and Data blocks, D6) the trail is
+        // the one on screen: only the cargo changes, and a refresh re-lays it.
         if (st.ledgerRegister !== prev.ledgerRegister) {
+          const wasBlockTrail = this.ledger.readsBlockWindow;
           this.ledger.setRegister(st.ledgerRegister);
-          this._reseatLedger();
+          if (wasBlockTrail !== this.ledger.readsBlockWindow) this._reseatLedger();
+          else this._refreshLedger();
         }
         // The bare stage ARMS rather than hides (user, 2026-09-04: "shouldn't their nodes still
         // move to the gathering section at the top like they always do?"): the gather is the OUT

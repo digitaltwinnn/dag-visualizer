@@ -7,12 +7,11 @@ import {
   DOC_PATHS,
   DOC_TITLES,
   docForPath,
-  BLOCKS_PAGE,
   modeForPath,
   pathFor,
   registerForPath,
+  titleNameFor,
   viewTitle,
-  VIEWS,
 } from "@/components/views";
 
 // The URL↔state bridge (2026-09-04, extended for the doc overlay): the four 3D views AND the
@@ -45,7 +44,7 @@ export default function RouteSync() {
   useEffect(() => {
     const seeded = modeForPath(location.pathname);
     if (seeded && seeded !== useStore.getState().mode) setMode(seeded);
-    // `/blocks` is the Snapshots view in its Blocks register: the register seeds with the mode.
+    // `/blocks` and `/data-blocks` are the Snapshots view in a register: the register seeds with the mode.
     const register = registerForPath(location.pathname);
     if (register && register !== useStore.getState().ledgerRegister) switchLedgerRegister(register);
   }, [setMode]);
@@ -70,8 +69,8 @@ export default function RouteSync() {
       const modePath = pathFor(state.mode, state.ledgerRegister);
       // Landed = the address bar already says this view (and, in the Snapshots view, its register).
       const landed = !state.docPage && modeForPath(location.pathname) === state.mode && (modePath == null || modePath === location.pathname || state.mode !== "ledger");
-      const view = VIEWS.find((v) => v.id === state.mode);
-      const viewName = state.mode === "ledger" && state.ledgerRegister === "blocks" ? BLOCKS_PAGE.name : view?.name;
+      // A register page carries its own name (`REGISTER_PAGES`), the view its own.
+      const viewName = titleNameFor(state.mode, state.ledgerRegister);
       if (!landed || fromPop) document.title = state.docPage ? DOC_TITLES[state.docPage] : viewName ? viewTitle(viewName) : document.title;
       if (fromPop) return;
       if (modePath) lastViewPath = modePath;
@@ -101,7 +100,7 @@ export default function RouteSync() {
         // back from /about to /geography means.
         if (mode) {
           setMode(mode);
-          // Back/forward between /snapshots and /blocks restores the register with the view.
+          // Back/forward between the register pages restores the register with the view.
           const register = registerForPath(location.pathname);
           if (register) switchLedgerRegister(register);
         }

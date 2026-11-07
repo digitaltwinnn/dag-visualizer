@@ -181,6 +181,7 @@ export function switchLedgerRegister(to: LedgerRegister): void {
   if (st.ledgerRegister === to) return;
   const actions = registerSwitchActions(to, { block: st.block, metaSnap: st.metaSnap });
   if (actions.length) applyClickActions(actions);
-  if (to === "snapshots" && st.hoverBlock) st.setHoverBlock(null);
+  // Only Transaction blocks draws a block, so every other register drops its hover preview.
+  if (to !== "blocks" && st.hoverBlock) st.setHoverBlock(null);
   st.setLedgerRegister(to);
 }
