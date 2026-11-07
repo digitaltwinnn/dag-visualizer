@@ -478,3 +478,22 @@ export function registerOf(mode: Mode, register: LedgerRegister): LedgerRegister
   const offered = VIEW_POLICIES[mode].registers;
   return offered.includes(register) ? register : offered[0]!;
 }
+
+/** WHICH LEDGER SOURCE A REGISTER READS — the one behavioural question the three registers differ
+ *  on below presentation (refactor round R1, P2). Metagraph snapshots and Data blocks read the
+ *  snapshot source (the live buffer, or a past window around an old pin — `src/data/pastWindow.ts`);
+ *  Transaction blocks reads the block window (`src/data/blockWindow.ts`), and its subjects are
+ *  blocks. A keyed row, so a fourth register is a compile error here rather than a register that
+ *  silently inherits "not blocks, so act like snapshots" at every call site (convention 7). It lives
+ *  in the domain because the pick table and the scene's feed set ask it too, and the domain reads no
+ *  `src/data` value (rule 1); the scene keeps its own row (`LedgerView`'s `REGISTER_CARGO`). */
+export type RegisterSource = "snapshots" | "blocks";
+export const REGISTER_SOURCE: Readonly<Record<LedgerRegister, RegisterSource>> = {
+  snapshots: "snapshots",
+  blocks: "blocks",
+  data: "snapshots",
+};
+/** Does this register read the block window (and draw blocks as its subjects)? */
+export function readsBlockWindow(register: LedgerRegister): boolean {
+  return REGISTER_SOURCE[register] === "blocks";
+}

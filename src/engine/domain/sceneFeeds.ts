@@ -1,6 +1,6 @@
 import type { FeedId } from "@/src/data/api";
 import type { LedgerRegister } from "@/src/store/mode";
-import type { ViewPolicy } from "./viewPolicy";
+import { readsBlockWindow, type ViewPolicy } from "./viewPolicy";
 
 // WHICH FEEDS A 3D VIEW DRAWS (2026-10-25, the pulse strip's "in use here" — src/data/feedUse.ts).
 // The HUD's readers hold their feeds by mounting; the scene's readers are the Engine's drawing
@@ -25,6 +25,6 @@ export function sceneFeeds(p: Pick<ViewPolicy, "canvas" | "fleet" | "morph" | "s
   if (p.fleet === "placed") { out.add("clusters"); out.add("api-metagraphs"); }
   if (p.morph === "toGeo") out.add("api-geo");
   if (p.morph === "toHyper") { out.add("api-metagraphs"); out.add("api-geo"); out.add("global"); out.add("metasnaps"); }
-  if (p.show.ledger) { out.add("global"); out.add("metasnaps"); out.add("exact"); if (register === "blocks") out.add("api-blocks"); }
+  if (p.show.ledger) { out.add("global"); out.add("metasnaps"); out.add("exact"); if (readsBlockWindow(register)) out.add("api-blocks"); }
   return [...out];
 }

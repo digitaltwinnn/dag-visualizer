@@ -106,7 +106,11 @@ the live edge stands down. The vitals band and the raw log stay live: the band i
 instrument, and the raw log pages any depth itself.
 
 **The Blocks register reads a THIRD ledger source: the block window** (2026-11-06,
-`blockWindow.ts`; the chamber side is in `src/engine/scene/CLAUDE.md`). `ledgerSource(live,
+`blockWindow.ts`; the chamber side is in `src/engine/scene/CLAUDE.md`). WHICH source a register reads
+is ONE keyed row, `viewPolicy.REGISTER_SOURCE` (asked as `readsBlockWindow(register)` by the data
+layer, the pick table, the feed set and every component — never a `register === "blocks"` compare;
+it sits in the domain because the domain asks it too, rule 1), and `useLedgerSource` calls
+`ledgerSource()` rather than re-deriving it. `ledgerSource(live,
 register)` answers it ALONE in that register — the live buffer's ticks are the wrong set, so with no
 window yet the chamber draws nothing — and the past window or the live buffer in the Snapshots
 register (`pastWanted` stands down in Blocks). The window is the newest 52 global snapshots at or

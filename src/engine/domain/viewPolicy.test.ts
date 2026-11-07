@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { Mode } from "@/src/store/store";
-import { VIEW_POLICIES, registerOf } from "./viewPolicy";
+import type { LedgerRegister } from "@/src/store/mode";
+import { REGISTER_SOURCE, VIEW_POLICIES, readsBlockWindow, registerOf } from "./viewPolicy";
 import { is3D } from "./viewTransition";
 
 const MODES: Mode[] = ["hyper", "geo", "ledger", "trend", "soon"];
@@ -244,5 +245,17 @@ describe("the trends view is registered and inert", () => {
       expect(registerOf(m, "blocks")).toBe("snapshots");
       expect(registerOf(m, "data")).toBe("snapshots");
     }
+  });
+
+  it("REGISTER_SOURCE: every register names its ledger source — only Transaction blocks reads the block window", () => {
+    // Exhaustive by type: a register missing from this literal (or from the map) is a compile error.
+    const every: Record<LedgerRegister, true> = { snapshots: true, blocks: true, data: true };
+    expect(Object.keys(REGISTER_SOURCE).sort()).toEqual(Object.keys(every).sort());
+    expect(REGISTER_SOURCE).toEqual({ snapshots: "snapshots", blocks: "blocks", data: "snapshots" });
+    // Every register the Snapshots view offers is in the map.
+    for (const r of VIEW_POLICIES.ledger.registers) expect(REGISTER_SOURCE[r]).toBeDefined();
+    expect(readsBlockWindow("blocks")).toBe(true);
+    expect(readsBlockWindow("snapshots")).toBe(false);
+    expect(readsBlockWindow("data")).toBe(false);
   });
 });

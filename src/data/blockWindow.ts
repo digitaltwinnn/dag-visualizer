@@ -2,6 +2,7 @@ import { metaSnapRecord, type MetaSnapRecord } from "@/src/data/api";
 import type { LedgerSource } from "@/src/data/ledgerSourceType";
 import type { Anchor, GlobalSnapshot, RawMetaSnapshot, SnapshotExact } from "@/src/data/types";
 import type { LedgerRegister } from "@/src/store/mode";
+import { readsBlockWindow } from "@/src/engine/domain/viewPolicy";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
 
 // THE BLOCKS REGISTER'S LEDGER SOURCE: a window of only the global snapshots that hold a block
@@ -184,7 +185,7 @@ export function blockWanted(s: {
   // The Snapshots register (D3: the register switch on the scene names the Blocks
   // register's span from either side) wants the window the register would open on — held, else
   // the live edge; only the Blocks register re-centres it on a pin.
-  if (s.register !== "blocks") return held ? { kind: "keep" } : { kind: "fetch", around: null };
+  if (!readsBlockWindow(s.register)) return held ? { kind: "keep" } : { kind: "fetch", around: null };
   if (s.pin == null) return held ? { kind: "keep" } : { kind: "fetch", around: null };
   if (held && s.pin >= held.from && s.pin <= held.to) return { kind: "keep" };
   // A pin NEWER than the held LIVE window's newest block tick lies in the live edge's silence (the
@@ -219,7 +220,7 @@ export function liveWindowRuns(s: {
  *  about once a block tick: every 5 minutes. The live feed's announced tick still joins at once. */
 export const BLOCK_REFRESH_MS = { drawn: 30_000, span: 5 * 60_000 } as const;
 export function blockRefreshMs(register: LedgerRegister): number {
-  return register === "blocks" ? BLOCK_REFRESH_MS.drawn : BLOCK_REFRESH_MS.span;
+  return readsBlockWindow(register) ? BLOCK_REFRESH_MS.drawn : BLOCK_REFRESH_MS.span;
 }
 
 /** A READ THAT SPENT ITS RETRIES: does the held window stay drawn (review M2)? Only when it IS the
@@ -238,7 +239,7 @@ export function failedReadKeeps(held: { chain: string | null; around: number | n
  *  block's ×, a re-click releasing it) the Global card carries it again — else nothing on the
  *  scene layer would say PINNED or offer LIVE. Every other register: the Global card. */
 export function liveControlCard(register: LedgerRegister, block: unknown): "snapshot" | "block" {
-  return register === "blocks" && block != null ? "block" : "snapshot";
+  return readsBlockWindow(register) && block != null ? "block" : "snapshot";
 }
 
 /** Does `w` CONTINUE the window whose newest tick was `prevTo`, so the chamber advances its trail

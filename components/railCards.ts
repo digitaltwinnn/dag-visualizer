@@ -6,7 +6,7 @@ import type { TickNetSel } from "@/src/data/types";
 import { AI_NOTES_ICON, BLOCK_ICON, EXPLORE_ICON, INSTANT_ICON, RANGE_ICON, iconForPick } from "@/components/icons";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import type { Mode } from "@/src/store/store";
-import { VIEW_POLICIES, registerOf } from "@/src/engine/domain/viewPolicy";
+import { VIEW_POLICIES, readsBlockWindow, registerOf } from "@/src/engine/domain/viewPolicy";
 import type { BlockSel, MetaSnapSel, NodeRow, PickDescriptor } from "@/src/data/types";
 import type { LedgerRegister } from "@/src/store/mode";
 import type { NoteResponse } from "@/src/data/noteTypes";
@@ -421,7 +421,7 @@ function metaSnapHint(s: RailManifestState): string | null {
 /** Does the view on screen read the Blocks register? The register is a setting of the Snapshots
  *  view, so the question is the view's register list and the register — never a `mode` compare. */
 const inBlocks = (s: Pick<RailManifestState, "mode" | "ledgerRegister">): boolean =>
-  registerOf(s.mode, s.ledgerRegister ?? "snapshots") === "blocks";
+  readsBlockWindow(registerOf(s.mode, s.ledgerRegister ?? "snapshots"));
 // A BLOCK — the Blocks register's own slot. The house shape: "one" for the label's noun, the
 // device's verb, and the scene PLACE — a DAG block stands on its global's bar, a token block on its
 // tile (controller ruling, 2026-11-06).

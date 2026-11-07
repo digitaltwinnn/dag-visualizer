@@ -5,7 +5,7 @@ import { useStore } from "@/src/store/store";
 import type { GlobalSnapshot } from "@/src/data/types";
 import { getBlockWindow } from "@/src/data/pastWindow";
 import { blockChainOf, newestBlock } from "@/src/data/blockWindow";
-import { registerOf } from "@/src/engine/domain/viewPolicy";
+import { readsBlockWindow, registerOf } from "@/src/engine/domain/viewPolicy";
 
 // The latest snapshot worth showing while following: for a metagraph filter, the
 // newest one it ACTUALLY anchored into — or null if it hasn't anchored in the buffered
@@ -45,7 +45,7 @@ export function followLatest() {
   // draws only the block-bearing ticks, so the live global is not even on screen there.
   {
     const st = useStore.getState();
-    if (registerOf(st.mode, st.ledgerRegister) === "blocks") return followNewestBlock();
+    if (readsBlockWindow(registerOf(st.mode, st.ledgerRegister))) return followNewestBlock();
   }
   // `advanceSnap`, not `setSnap`: the heartbeat advance must not bump the selection recency the
   // facts rail's collapse rule reads (store.selStack — a tick is not a user act).

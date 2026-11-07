@@ -41,6 +41,7 @@ import { applyClickActions } from "@/src/store/applyClickActions";
 import { cn } from "@/lib/utils";
 import { selectedRow, selectionHue } from "@/components/selection";
 import { useFeedRead } from "@/components/useFeedRead";
+import { readsBlockWindow } from "@/src/engine/domain/viewPolicy";
 
 // The body's row grammar and its three weights live in ./parts (`Fact` / `FactGroup` / `Foot`)
 // — shared with every other rail card, so this one can't drift into a dialect of its own. The
@@ -94,7 +95,7 @@ export default function MetaSnapPane({
   const register = useStore((s) => s.ledgerRegister);
   const blockWin = useSyncExternalStore(onBlockWindow, getBlockWindow, () => null);
   // The Blocks register's records come from its window: reading it holds the block feed.
-  useFeedRead(["api-blocks"], "MetaSnapPane blocks", register === "blocks");
+  useFeedRead(["api-blocks"], "MetaSnapPane blocks", readsBlockWindow(register));
   // Tier 1 — the polled record this tile was named from (free: the metagraph snapshot buffers
   // are already in memory, keyed by the anchoring tick's timestamp).
   const polled = useMemo(() => {

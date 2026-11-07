@@ -8,6 +8,7 @@ import { useStore } from "./store";
 import { finestRung } from "@/src/engine/domain/focusLadder";
 import { registerSwitchActions, type ClickAction } from "@/src/engine/domain/pickActions";
 import type { LedgerRegister } from "@/src/store/mode";
+import { readsBlockWindow } from "@/src/engine/domain/viewPolicy";
 import { is3D } from "@/src/engine/domain/viewTransition";
 import { scrollToShow } from "@/src/engine/domain/trendStack";
 import { viewNetwork } from "@/src/engine/domain/viewNetwork";
@@ -182,6 +183,6 @@ export function switchLedgerRegister(to: LedgerRegister): void {
   const actions = registerSwitchActions(to, { block: st.block, metaSnap: st.metaSnap });
   if (actions.length) applyClickActions(actions);
   // Only Transaction blocks draws a block, so every other register drops its hover preview.
-  if (to !== "blocks" && st.hoverBlock) st.setHoverBlock(null);
+  if (!readsBlockWindow(to) && st.hoverBlock) st.setHoverBlock(null);
   st.setLedgerRegister(to);
 }

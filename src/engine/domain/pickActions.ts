@@ -20,7 +20,7 @@ import type { PickDescriptor, MetaSnapSel, TickNetSel, BlockSel } from "@/src/da
 import { METAGRAPHS } from "@/src/net/current";
 import type { CohortSel, CompositionSel } from "./focusLadder";
 import { UNLISTED_KEY } from "./ledgerBands";
-import { VIEW_POLICIES } from "./viewPolicy";
+import { VIEW_POLICIES, readsBlockWindow } from "./viewPolicy";
 
 export type ClickAction =
   | { kind: "filter"; id: string }                                             // commit the network filter
@@ -538,7 +538,7 @@ export function blockSelectActions(
  *  committed network (`tickNet`) are the tick's own and stay. Finest first, like every release;
  *  `switchLedgerRegister` applies it through the executor. */
 export function registerSwitchActions(to: LedgerRegister, current: { block: BlockSel | null; metaSnap: MetaSnapSel | null }): ClickAction[] {
-  if (to === "blocks") return current.metaSnap ? [{ kind: "metaSnap", sel: null }] : [];
+  if (readsBlockWindow(to)) return current.metaSnap ? [{ kind: "metaSnap", sel: null }] : [];
   return current.block ? [{ kind: "block", sel: null }] : [];
 }
 

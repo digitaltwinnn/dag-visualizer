@@ -41,7 +41,7 @@ import { useState, type CSSProperties } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
-import { VIEW_POLICIES, registerOf } from "@/src/engine/domain/viewPolicy";
+import { VIEW_POLICIES, readsBlockWindow, registerOf } from "@/src/engine/domain/viewPolicy";
 import { blockReadOf } from "@/src/data/blockReads";
 import { blockLead } from "@/components/inspector/blockLead";
 import { identityHudCss } from "@/src/palette/identity";
@@ -252,7 +252,7 @@ export default function SceneCallout() {
   const following = useStore((s) => s.following);
   const liveFeed = useStore((s) => s.live);
   // THE BLOCKS REGISTER'S SUBJECT (D3): the Block card's — the live newest block or the pinned one.
-  const inBlocks = useStore((s) => registerOf(s.mode, s.ledgerRegister) === "blocks");
+  const inBlocks = useStore((s) => readsBlockWindow(registerOf(s.mode, s.ledgerRegister)));
   const block = useStore((s) => s.block);
   const blockRead = useStore((s) => (s.block ? blockReadOf(s.blockReads, s.block) : null));
   // Holds only while a callout can SHOW — the view's policy allows one, the scene layer is up and

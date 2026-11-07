@@ -4,6 +4,7 @@ import { currentIdOf } from "@/src/net/lineage";
 import type { LedgerSource } from "@/src/data/ledgerSourceType";
 import type { BlockWindow } from "@/src/data/blockWindow";
 import type { LedgerRegister } from "@/src/store/mode";
+import { readsBlockWindow } from "@/src/engine/domain/viewPolicy";
 
 // THE SNAPSHOTS VIEW'S PAST WINDOW (user, 2026-11-03: pinning an old snapshot should "go back in time";
 // `docs/superpowers/specs/2026-11-03-snapshots-past-window-design.md`). Every Snapshots surface reads
@@ -84,7 +85,7 @@ export type PastWant = { kind: "clear" } | { kind: "keep" } | { kind: "fetch"; o
  *  than the live buffer's oldest. A pin the held window holds keeps it (the pager stepping inside);
  *  following live, leaving the view, or a pin the live buffer holds releases it. */
 export function pastWanted(s: { ledger: boolean; following: boolean; pin: number | null; liveOldest: number | null; held: { from: number; to: number } | null; register?: LedgerRegister }): PastWant {
-  if (!s.ledger || s.register === "blocks" || s.following || s.pin == null || s.liveOldest == null) return { kind: "clear" };
+  if (!s.ledger || (s.register != null && readsBlockWindow(s.register)) || s.following || s.pin == null || s.liveOldest == null) return { kind: "clear" };
   if (s.pin >= s.liveOldest) return { kind: "clear" };
   if (s.held && s.pin >= s.held.from && s.pin <= s.held.to) return { kind: "keep" };
   return { kind: "fetch", ordinal: s.pin };
@@ -147,5 +148,5 @@ export function onBlockWindow(l: () => void): () => void {
  *  Blocks register the block window alone (the live buffer's ticks are the wrong set, so with no
  *  window yet the chamber draws nothing). */
 export function ledgerSource(live: LedgerSource | null, register: LedgerRegister = "snapshots"): LedgerSource | null {
-  return register === "blocks" ? (heldBlocks ?? null) : (held ?? live);
+  return readsBlockWindow(register) ? (heldBlocks ?? null) : (held ?? live);
 }

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from "
 import { viewNetwork } from "@/src/engine/domain/viewNetwork";
 import { useStore } from "@/src/store/store";
 import { cn } from "@/lib/utils";
-import { VIEW_POLICIES, registerOf } from "@/src/engine/domain/viewPolicy";
+import { VIEW_POLICIES, readsBlockWindow, registerOf } from "@/src/engine/domain/viewPolicy";
 import { displayNetwork } from "@/src/data/unlisted";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { filterAccent } from "@/src/data/network";
@@ -478,7 +478,7 @@ export default function Inspector() {
   // fold, the box.
   // The Blocks register SEATS the live block as its default box (D3, `focusSlotId`), which the
   // view-entry pins must not fight (`overridesOnViewEntry`).
-  const seats = registerOf(mode, ledgerRegister) === "blocks" ? "block" : null;
+  const seats = readsBlockWindow(registerOf(mode, ledgerRegister)) ? "block" : null;
   const collapseState: LaneCollapseState = { lane: ladderIds, present: presentOf, focusId, overrides: railCollapse, seats };
   const effCollapsed = (id: string) => isCollapsed(collapseState, id);
   // Publish which slot is the BOX (store.boxedCard) — the same `present && !effCollapsed` that

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ChevronLeft, X } from "lucide-react";
 import { useStore } from "@/src/store/store";
+import { readsBlockWindow } from "@/src/engine/domain/viewPolicy";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import AnchorLogTable from "@/components/datasection/AnchorLogTable";
 import { ChannelStatePanel } from "@/components/datasection/ChannelStatePanel";
@@ -20,9 +21,10 @@ import NodeRosterTable from "@/components/datasection/NodeRosterTable";
 // the surface decision, which is why they live down here and the dispatch carries none.
 export default function RecordsSurface() {
   const mode = useStore((s) => s.mode);
-  // The Snapshots view's register decides which of its two tables the records are (the register
-  // compare lives here, as the mode compare does — `rawSurfaceBoundary` fences the dispatch above).
-  const blocksRegister = useStore((s) => s.ledgerRegister) === "blocks";
+  // The Snapshots view's register decides which of its two tables the records are — its source,
+  // `viewPolicy.readsBlockWindow` (asked here, as the mode compare is — `rawSurfaceBoundary` fences
+  // the dispatch above).
+  const blocksRegister = readsBlockWindow(useStore((s) => s.ledgerRegister));
   // PHONE: THE LIST AND THE SNAPSHOT ARE TWO PAGES (user, 2026-10-02 — `docs/superpowers/design/
   // 2026-10-02-raw-phone`, option B). Stacked in one panel the log showed seven rows of hundreds
   // and the payload was read through a 250px window, each with a scroll of its own. A row tap

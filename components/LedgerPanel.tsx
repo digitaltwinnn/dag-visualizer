@@ -55,7 +55,7 @@ import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 import { NO_SIGNAL_COPY, useNoSignal } from "@/components/useNoSignal";
 import { levelMeasure } from "@/src/data/explorerMeasure";
-import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
+import { VIEW_POLICIES, readsBlockWindow } from "@/src/engine/domain/viewPolicy";
 import { tickNetworksLevel, tickPolledRows } from "@/src/data/ladderLevels";
 import { useFeedRead } from "@/components/useFeedRead";
 import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
@@ -177,10 +177,11 @@ export default function LedgerPanel() {
   const filter = useStore((s) => s.filter);
   const mode = useStore((s) => s.mode);
   // THE REGISTER (the Blocks register, 2026-11-05): which register the chamber reads decides what
-  // this card lists — the global snapshots, or the blocks on them. The compare lives here, inside
-  // the view's own explorer, the way the records surface keeps its own (one keyed `levels` below).
+  // this card lists — the global snapshots, or the blocks on them. The question is the register's
+  // source (`viewPolicy.readsBlockWindow`, one keyed row), asked here inside the view's own explorer,
+  // the way the records surface asks it (one keyed `levels` below).
   const register = useStore((s) => s.ledgerRegister);
-  const inBlocks = register === "blocks";
+  const inBlocks = readsBlockWindow(register);
   // THE DATA BLOCKS REGISTER (D6, 2026-11-07) is this card's Snapshots levels with the DATA measure
   // leading — its own pick (`dataMeasure`), Data updates first in every level's list — and a snapshot
   // whose data blocks carried nothing FAINT, never hidden (rule 10: a lens never edits the facts).

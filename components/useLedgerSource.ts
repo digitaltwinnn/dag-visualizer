@@ -2,7 +2,8 @@
 
 import { useSyncExternalStore } from "react";
 import { getNetwork } from "@/src/data/network";
-import { getBlockWindow, getPastWindow, onBlockWindow, onPastWindow, type LedgerSource, type PastWindow } from "@/src/data/pastWindow";
+import { getBlockWindow, getPastWindow, ledgerSource, onBlockWindow, onPastWindow, type LedgerSource, type PastWindow } from "@/src/data/pastWindow";
+import { readsBlockWindow } from "@/src/engine/domain/viewPolicy";
 import type { GlobalSnapshot } from "@/src/data/types";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { useStore } from "@/src/store/store";
@@ -24,6 +25,9 @@ export function useLedgerSource(max: number, enabled = true): {
   const past = useSyncExternalStore(onPastWindow, getPastWindow, () => null);
   const blocks = useSyncExternalStore(onBlockWindow, getBlockWindow, () => null);
   const register = useStore((s) => s.ledgerRegister);
-  if (register === "blocks") return { snaps: blocks ? blocks.globalSnapshots : NONE, liveSnaps, source: blocks, past: null };
-  return { snaps: past ? past.globalSnapshots : liveSnaps, liveSnaps, source: past ?? getNetwork(), past };
+  // The source is `ledgerSource`'s answer (its one home); the subscriptions above are what re-render
+  // this hook when a window lands, and `snaps` / `past` are the same windows read for the surface.
+  const source = ledgerSource(getNetwork(), register);
+  if (readsBlockWindow(register)) return { snaps: blocks ? blocks.globalSnapshots : NONE, liveSnaps, source, past: null };
+  return { snaps: past ? past.globalSnapshots : liveSnaps, liveSnaps, source, past };
 }
