@@ -6,7 +6,7 @@ import type { MetaSnapSel } from "@/src/data/types";
 // and the route serves a `NoteResponse`.
 
 /** What a note can describe: the four 3D views, and the Snapshots view's Blocks register (the block
- *  DAG, the Briefing's blocks stop) — a register, not a Mode, with its own facts and question. */
+ *  DAG) — a register, not a Mode, with its own facts and question. */
 export type NoteView = "hyper" | "geo" | "ledger" | "trend" | "blocks";
 
 /** What a note leads with (R71): the changes the builder found worth leading with, named by

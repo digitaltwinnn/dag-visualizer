@@ -21,10 +21,12 @@ export function noteKeyOf(net: string, view: NoteView, subject: string, span: No
   return `ai:${net}:v${NOTES_VERSION}:${view}:${subject}:${span}`;
 }
 
-/** THE FIVE NOTES THE BRIEFING READS (`components/notes/briefingNote.ts`), which also carry its one
- *  short line: every view at its widest (the block DAG's included), and History over its resting
- *  window. */
+/** THE FOUR NOTES THE BRIEFING READS (`components/notes/briefingNote.ts`), which also carry its one
+ *  short line: the Geography, Snapshots and Hypergraph notes at their widest, and History over its
+ *  resting window. The block DAG's note is the Transaction blocks register's own card note, warmed
+ *  on its timing, not a tour line. */
 export function isBriefingNote(view: NoteView, subject: string, span: NoteSpan): boolean {
+  if (view === "blocks") return false;
   return view === "trend" ? subject === "dag" && span === "30d" : subject === "all";
 }
 

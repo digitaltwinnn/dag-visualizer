@@ -9,18 +9,17 @@ import { easeInOutQuad } from "./cameraRig";
 /** A stop: a view, and for the Snapshots view the register it stands in. */
 export type BriefingStop = { mode: Mode; register?: LedgerRegister };
 
-/** The route: where, then now (its snapshots, then the blocks they anchor), then who, then how it
- *  changed. */
+/** The route: where, then now (the Snapshots view in its own register), then who, then how it
+ *  changed. One stop per view: a register inside a view is not a stop of its own. */
 export const BRIEFING_STOPS: readonly BriefingStop[] = [
   { mode: "geo" },
   { mode: "ledger" },
-  { mode: "ledger", register: "blocks" },
   { mode: "hyper" },
   { mode: "trend" },
 ];
 
 /** The register a stop leaves the Snapshots view in. A stop with none names the Snapshots register,
- *  so a back-step from the blocks stop never leaves the ledger stop showing blocks. */
+ *  so a stop that carries a register never leaves the next one showing it. */
 export const stopRegister = (stop: BriefingStop): LedgerRegister => stop.register ?? "snapshots";
 
 /** How long a stop stands, its scene's transition included. A quarter under 6500 went too far (user

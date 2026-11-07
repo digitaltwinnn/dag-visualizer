@@ -1168,7 +1168,7 @@ export class LedgerView implements SceneView {
         });
         // The hairline lands on the CENTRE of its tick's data bar (user, D2), on the same eased sweep
         // the metagraph snapshots' lines take — layout data, the bar spec's own band extent.
-        anchors.push({ slot: s, key: "dag", x, z, yTop: y - DAG_BLOCK / 2, band: { z0: barMid, z1: barMid } });
+        anchors.push({ slot: s, key: "dag", x, z, yTop: y - DAG_BLOCK / 2, band: { z0: barMid, z1: barMid }, hue: null });
       }
       // A token block stands ON the tile of the metagraph snapshot that accepted it (user ruling):
       // its layered place only nudges it across the tile and its turn along it, both bounded inside
@@ -1201,7 +1201,7 @@ export class LedgerView implements SceneView {
           const spec = this._specs[s];
           let band: { z0: number; z1: number } | null = null;
           if (spec?.measured) for (let i = 0; i < spec.bandCount; i++) if (spec.bands[i].key === chain) { band = spec.bands[i]; break; }
-          anchors.push({ slot: s, key: chain, x: tile.x, z: tile.z, yTop: FLOOR_Y.msnap + TILE_LIFT, band });
+          anchors.push({ slot: s, key: chain, x: tile.x, z: tile.z, yTop: FLOOR_Y.msnap + TILE_LIFT, band, hue: this._laneColor(chain).getHex() });
         }
       }
     }

@@ -167,9 +167,7 @@ export function tipJoins(chain: string | null): boolean {
  *  (D3, 2026-11-07: the register switch on the scene states the Blocks span from the Snapshots
  *  register too, so there the live window is read and held, a pin never re-centring it); a pin
  *  the held range covers keeps, and only a window read for the SAME network (`chain`, `held.chain`)
- *  is held, so a filter change refetches. WHILE THE BRIEFING RUNS (`touring`) the LIVE window is
- *  wanted whatever the view, the register and the pin, so the tour's Blocks stop opens on a drawn
- *  chamber (controller ruling, 2026-11-06); the window is only held outside the register, which
+ *  is held, so a filter change refetches. The window is only held outside the register, which
  *  reads the live buffer there. */
 export function blockWanted(s: {
   ledger: boolean;
@@ -177,17 +175,16 @@ export function blockWanted(s: {
   pin: number | null;
   held: { from: number; to: number; chain?: string | null; around?: number | null } | null;
   liveNewest: number | null;
-  touring?: boolean;
   chain?: string | null;
 }): { kind: "clear" } | { kind: "keep" } | { kind: "unread" } | { kind: "fetch"; around: number | null } {
   const chain = s.chain ?? null;
-  if (!s.touring && !s.ledger) return { kind: "clear" };
+  if (!s.ledger) return { kind: "clear" };
   if (chain === UNLISTED_ID) return { kind: "unread" };
   const held = s.held && (s.held.chain ?? null) === chain ? s.held : null;
-  // The tour, and the Snapshots register (D3: the register switch on the scene names the Blocks
-  // register's span from either side), want the window the register would open on — held, else
+  // The Snapshots register (D3: the register switch on the scene names the Blocks
+  // register's span from either side) wants the window the register would open on — held, else
   // the live edge; only the Blocks register re-centres it on a pin.
-  if (s.touring || s.register !== "blocks") return held ? { kind: "keep" } : { kind: "fetch", around: null };
+  if (s.register !== "blocks") return held ? { kind: "keep" } : { kind: "fetch", around: null };
   if (s.pin == null) return held ? { kind: "keep" } : { kind: "fetch", around: null };
   if (held && s.pin >= held.from && s.pin <= held.to) return { kind: "keep" };
   // A pin NEWER than the held LIVE window's newest block tick lies in the live edge's silence (the
@@ -198,7 +195,7 @@ export function blockWanted(s: {
 }
 
 /** DOES THE LIVE WINDOW KEEP MOVING — the bridge's 30 s refresh (`mergeLiveAnswer`) and its
- *  live-tip append? While the register (or the tour) wants the live window: following, touring, or
+ *  live-tip append? While the register wants the live window: following, or
  *  under a pin the held LIVE window covers (`heldLive`: the window held was asked for as "live",
  *  and `blockWanted` keeps it for that pin). The band is the live instrument, so a block or tick
  *  clicked inside the live window never freezes it (the Snapshots register's own rule: a pin never
@@ -207,24 +204,22 @@ export function blockWanted(s: {
  *  (`blockWanted` fetches around the pin), and that window holds still. */
 export function liveWindowRuns(s: {
   liveWanted: boolean;
-  touring: boolean;
   following: boolean;
   pin: number | null;
   held: { from: number; to: number } | null;
   heldLive: boolean;
 }): boolean {
   if (!s.liveWanted) return false;
-  if (s.touring || s.following) return true;
+  if (s.following) return true;
   return s.pin != null && s.heldLive && s.held != null && s.pin >= s.held.from;
 }
 
-/** HOW OFTEN THE LIVE WINDOW IS READ AGAIN (review M3). Inside Transaction blocks (and while the tour
- *  reads ahead for its Blocks stop) the window is what the register draws: every 30 s. In the other
+/** HOW OFTEN THE LIVE WINDOW IS READ AGAIN (review M3). Inside Transaction blocks the window is what the register draws: every 30 s. In the other
  *  registers only the switch's span reads it, and that needs only the window's reach, which moves
  *  about once a block tick: every 5 minutes. The live feed's announced tick still joins at once. */
 export const BLOCK_REFRESH_MS = { drawn: 30_000, span: 5 * 60_000 } as const;
-export function blockRefreshMs(register: LedgerRegister, touring: boolean): number {
-  return touring || register === "blocks" ? BLOCK_REFRESH_MS.drawn : BLOCK_REFRESH_MS.span;
+export function blockRefreshMs(register: LedgerRegister): number {
+  return register === "blocks" ? BLOCK_REFRESH_MS.drawn : BLOCK_REFRESH_MS.span;
 }
 
 /** A READ THAT SPENT ITS RETRIES: does the held window stay drawn (review M2)? Only when it IS the

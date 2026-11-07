@@ -11,7 +11,7 @@ describe("the note a stop reads", () => {
     expect(briefingReq({ mode: "ledger" })).toEqual({ view: "ledger", subject: "all", span: null });
     expect(briefingReq({ mode: "hyper" })).toEqual({ view: "hyper", subject: "all", span: null });
     expect(briefingReq({ mode: "trend" })).toEqual({ view: "trend", subject: "dag", span: "30d" });
-    // The blocks stop reads the block DAG's own note, never the Snapshots register's.
+    // A stop that names the blocks register would read the block DAG's own note (no stop does now).
     expect(briefingReq({ mode: "ledger", register: "blocks" })).toEqual({ view: "blocks", subject: "all", span: null });
     expect(briefingReq({ mode: "ledger", register: "snapshots" })).toEqual({ view: "ledger", subject: "all", span: null });
   });
@@ -21,7 +21,7 @@ describe("the note a stop reads", () => {
     expect(new Set(BRIEFING_STOPS.map((s) => briefingReq(s).view)).size).toBe(BRIEFING_STOPS.length);
   });
 
-  it("a stop with no note to show says a plain sentence, the blocks stop's too", () => {
+  it("a stop with no note to show says a plain sentence, the block DAG's too", () => {
     expect(briefingWords("blocks", null)).toEqual({ text: expect.any(String), ai: false });
     expect(briefingWords("blocks", null).text).not.toMatch(/\d/);
   });

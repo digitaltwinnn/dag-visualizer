@@ -137,15 +137,15 @@ describe("keys", () => {
 });
 
 describe("the notes the Briefing reads", () => {
-  it("are every view's widest note and History's resting window", () => {
+  it("are the three views' widest notes and History's resting window", () => {
     expect(isBriefingNote("hyper", "all", "day")).toBe(true);
     expect(isBriefingNote("geo", "all", "day")).toBe(true);
     expect(isBriefingNote("ledger", "all", "hours")).toBe(true);
     expect(isBriefingNote("trend", "dag", "30d")).toBe(true);
-    expect(isBriefingNote("blocks", "all", "hours")).toBe(true);
   });
 
   it("are no other note, so no other write pays for a line", () => {
+    expect(isBriefingNote("blocks", "all", "hours")).toBe(false);
     expect(isBriefingNote("hyper", "dor", "day")).toBe(false);
     expect(isBriefingNote("trend", "dag", "7d")).toBe(false);
     expect(isBriefingNote("trend", "dor", "30d")).toBe(false);

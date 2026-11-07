@@ -147,7 +147,7 @@ them — but the Next Node server can.
   is parsed (it is checked against mainnet's catalog, so a testnet network would otherwise 400). Notes live in
   their OWN key family, `ai:{net}:v{NOTES_VERSION}:{view}:{subject}:{span}` (`keys.ts`), never under
   `t:` (a rebuild wipes that prefix) or `geo:`: a note is a losable cache entry, and the families
-  must not share a fate. The five notes the Briefing reads (`isBriefingNote`) also carry its one short `line`, asked for in
+  must not share a fate. The four notes the Briefing reads (`isBriefingNote`) also carry its one short `line`, asked for in
   the same answer and held to the same gate; a line that fails is dropped, never retried, and the
   tour reads the note's opening. ⚠️ **A prompt or a facts change bumps `NOTES_VERSION`**, which orphans every
   stored note at once (their TTLs reap them). Timing is `KIND_TIMING` in `keys.ts`: hyper and
@@ -161,7 +161,7 @@ them — but the Next Node server can.
   brushed range and a subject note), and
   `GET /api/notes/warm` is the quarter-hourly cron (three items at a time, 0.5 s between call
   starts, so the 122 warmed notes fill in one pass).
-  **The block DAG's note** (view `blocks`, subject `all`, span `hours`, 2026-11-06) is the Snapshots view's Blocks register's, which the Briefing's blocks stop reads: a
+  **The block DAG's note** (view `blocks`, subject `all`, span `hours`, 2026-11-06) is the Snapshots view's Blocks register's own card note, warmed beside the ledger's and not a Briefing note (the tour is one stop per view, so `isBriefingNote` drops it and it carries no tour `line`; the key family and `NOTES_VERSION` are untouched): a
   register, not a Mode, so it is its own `NoteView` with the ledger's timing and is warmed beside
   it (`dag` folds into `all`, as the ledger's). Its facts (`src/data/noteFactsBlocks.ts`) are the
   blocks each chain accepted over the last 24 whole hours of the hourly tier — the sampler's own

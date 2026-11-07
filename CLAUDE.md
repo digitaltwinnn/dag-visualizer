@@ -56,7 +56,7 @@ Four views drive the 3D scene:
 
 **The Briefing** (2026-10-31, `domain/briefing.ts`, `components/Briefing.tsx`,
 `docs/superpowers/specs/2026-10-31-briefing-design.md`): `/` opens on Geography and plays every 3D
-view once — five stops, the Snapshots view twice, its snapshots then its blocks (`BRIEFING_STOPS`) —
+view once — four stops, one per view, the Snapshots view in its Metagraph snapshots register (`BRIEFING_STOPS`; a register inside a view is not a stop) —
 one AI line per stop, on a cleared stage; a drag orbits the scene and holds the stop, and
 only Skip or Escape ends the tour. Only on `/`, on mainnet, once per browser session. `store.briefing` is the one channel: `useBootStage` stands the HUD
 down on it, `RouteSync` holds the URL so a stop is never a page view, and the Engine reads it for the

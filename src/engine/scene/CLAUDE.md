@@ -568,10 +568,10 @@ bars, labels, the rewind and the pose. What differs answers through ONE keyed ma
   geometry on its OWN material (`SEAL_LOOK`): one per metagraph snapshot that carries a block, from
   ITS tile down to its network's band (the bar's centre while the tick's exact read has not landed),
   and one per DAG block, from the block down to the CENTRE of its tick's data bar (the bar spec's own
-  band extent), all on the sheets' eased sweep, in the chamber's muted NEUTRAL (`SceneColors.muted`),
-  at dark 0.28 / paper 0.5. It is a different species from the block links on purpose (D8: "the line
+  band extent), all on the sheets' eased sweep, a DAG block's line in the chamber's muted NEUTRAL (`SceneColors.muted`) and a token block's
+  tile line in its NETWORK HUE (the tile's own lane colour), both at the thin seal weight dark 0.28 / paper 0.5. It is a different species from the block links on purpose (D8: "the line
   that 'seals' the block … looks the same"): links are the blocks' cyan S-curves running along the
-  trail, seals pale grey threads falling to the floor. Off the lens a seal takes the row's `dim`.
+  trail, seals thin threads falling to the floor (grey from a DAG block, the network's hue from a tile). Off the lens a seal takes the row's `dim`.
   `_syncThreads` is the one dispatch, so a filter change redraws the seals, never the
   committed-network threads.
 - **Bare tiles are not drawn** (`bareTiles: false`, same round): a metagraph snapshot carrying no

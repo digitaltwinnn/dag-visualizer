@@ -37,13 +37,6 @@ describe("blockWanted", () => {
     expect(blockWanted({ ledger: true, register: "snapshots", pin: 50, held: { from: 400, to: 900 }, liveNewest: 900 })).toEqual({ kind: "keep" });
     expect(blockWanted({ ledger: false, register: "blocks", pin: null, held: null, liveNewest: 900 })).toEqual({ kind: "clear" });
   });
-  it("while the Briefing runs, the live window is read ahead in any view and register, and held", () => {
-    expect(blockWanted({ ledger: false, register: "snapshots", pin: null, held: null, liveNewest: 900, touring: true })).toEqual({ kind: "fetch", around: null });
-    expect(blockWanted({ ledger: true, register: "snapshots", pin: 50, held: null, liveNewest: 900, touring: true })).toEqual({ kind: "fetch", around: null });
-    expect(blockWanted({ ledger: false, register: "snapshots", pin: null, held: { from: 400, to: 900 }, liveNewest: 900, touring: true })).toEqual({ kind: "keep" });
-    // The tour over, a view outside the register lets it go.
-    expect(blockWanted({ ledger: false, register: "snapshots", pin: null, held: { from: 400, to: 900 }, liveNewest: 900, touring: false })).toEqual({ kind: "clear" });
-  });
 });
 
 describe("blockWindowContinues", () => {
@@ -130,10 +123,9 @@ describe("mergeLiveAnswer", () => {
 });
 
 describe("liveWindowRuns", () => {
-  const base = { liveWanted: true, touring: false, following: true, pin: null as number | null, held: { from: 400, to: 900 } as { from: number; to: number } | null, heldLive: true };
-  it("keeps the live refresh and append running while following, and while the tour reads ahead", () => {
+  const base = { liveWanted: true, following: true, pin: null as number | null, held: { from: 400, to: 900 } as { from: number; to: number } | null, heldLive: true };
+  it("keeps the live refresh and append running while following", () => {
     expect(liveWindowRuns(base)).toBe(true);
-    expect(liveWindowRuns({ ...base, following: false, touring: true })).toBe(true);
   });
   it("keeps them running under a pin the held LIVE window covers — the band is the live instrument", () => {
     expect(liveWindowRuns({ ...base, following: false, pin: 500 })).toBe(true);
@@ -206,7 +198,7 @@ describe("a pin newer than the live window (review I1)", () => {
   it("a pin newer than the held LIVE window's newest block tick keeps the live window — no past-window fetch", () => {
     expect(blockWanted({ ledger: true, register: "blocks", pin: 950, held: live, liveNewest: 960 })).toEqual({ kind: "keep" });
     // …and it keeps the live refresh running (LAST BLOCK stays live, the front run stays drawn).
-    expect(liveWindowRuns({ liveWanted: true, touring: false, following: false, pin: 950, held: live, heldLive: true })).toBe(true);
+    expect(liveWindowRuns({ liveWanted: true, following: false, pin: 950, held: live, heldLive: true })).toBe(true);
   });
   it("a pin older than the live window still reads the past around it; a held PINNED window is no live edge", () => {
     expect(blockWanted({ ledger: true, register: "blocks", pin: 50, held: live, liveNewest: 960 })).toEqual({ kind: "fetch", around: 50 });
@@ -247,12 +239,11 @@ describe("the window's own provenance (review M1, M2)", () => {
 });
 
 describe("blockRefreshMs — the trail's cadence (review M3)", () => {
-  it("30 s where the register draws the window (and while the tour reads ahead), 5 min where only the switch's span reads it", () => {
+  it("30 s where the register draws the window, 5 min where only the switch's span reads it", () => {
     expect(BLOCK_REFRESH_MS).toEqual({ drawn: 30_000, span: 300_000 });
-    expect(blockRefreshMs("blocks", false)).toBe(30_000);
-    expect(blockRefreshMs("snapshots", true)).toBe(30_000);
-    expect(blockRefreshMs("snapshots", false)).toBe(300_000);
-    expect(blockRefreshMs("data", false)).toBe(300_000);
+    expect(blockRefreshMs("blocks")).toBe(30_000);
+    expect(blockRefreshMs("snapshots")).toBe(300_000);
+    expect(blockRefreshMs("data")).toBe(300_000);
   });
 });
 

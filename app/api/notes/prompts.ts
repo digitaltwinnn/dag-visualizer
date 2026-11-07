@@ -133,7 +133,7 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
         lead?.kind === "change" ? `\nLead with what moved: ${lead.moved.join("; ")}. Every other figure held close to its usual: give it as a reading, never as a change.` : ""
       }`,
   },
-  // THE BLOCK DAG (the Snapshots view's Blocks register, the Briefing's blocks stop): the chamber's
+  // THE BLOCK DAG (the Snapshots view's Blocks register): the chamber's
   // second clock, in the ledger's voice. Its facts hold no earlier figure, so, like the ledger's
   // `questionNow`, it says out loud that it does not lead with change: VOICE asks every note to.
   blocks: {

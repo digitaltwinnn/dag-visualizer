@@ -114,8 +114,7 @@ below the pin that HOLD a block (a DAG block, or an anchored metagraph snapshot 
 blocks), from `/api/blocks/trail`, folded pure by `foldBlockWindow` into the live buffer's own
 shapes, so the slot model is unchanged. `blockWanted` is the one rule for when (entering the
 view — the Snapshots register reads and holds the LIVE window too, for the register switch's Blocks
-span (D3), and only the Blocks register re-centres it on a pin outside the held range; the Briefing
-fetches the live window AHEAD, so its Blocks stop opens drawn); `components/BlockWindowBridge.tsx` is the one writer, and the store carries only
+span (D3), and only the Blocks register re-centres it on a pin outside the held range); `components/BlockWindowBridge.tsx` is the one writer, and the store carries only
 `blockWindowStatus` (`loading | failed | ready | beyond | unread`) — the REQUEST's state. The held
 window carries its OWN provenance, `BlockWindow.around` (null: the live edge) and `.chain`, stamped by
 the bridge on every answer (review M1/M2): the follow, the Engine's front run, the band and the tip
@@ -123,10 +122,10 @@ append ask the WINDOW, never the request in flight, which says "live" through a 
 pinned window is still the one held; and a read that spends its retries keeps the window only when it
 is the live window of the network asked (`failedReadKeeps`) — a filter's failed refetch clears the
 other network's window (and the live block with it) rather than drawing its numbers under this
-filter. While the LIVE window is held (`liveWindowRuns`: following, touring, or a pin the held live
+filter. While the LIVE window is held (`liveWindowRuns`: following, or a pin the held live
 window covers or lies NEWER than — the band is the live instrument, and a block or tick clicked inside
-the live window never freezes it) it refreshes on `blockRefreshMs` — every 30 s in Transaction blocks
-and while the tour reads ahead, every 5 minutes in the other registers, whose switch half needs only
+the live window never freezes it) it refreshes on `blockRefreshMs` — every 30 s in Transaction blocks,
+every 5 minutes in the other registers, whose switch half needs only
 the window's reach (review M3) — and takes a tick the feed announces at once. **A pin newer than the
 held live window's newest block tick KEEPS the live window** (`blockWanted`, review I1): it lies in
 the live edge's silence, the front run, not in the past, so a seconds-old pin carried into

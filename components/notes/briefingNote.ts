@@ -11,7 +11,7 @@ import { noteSubjectOf } from "./noteSubject";
 const TREND_SPAN = "30d";
 
 /** The note a stop reads: the view at its widest, in the stop's register, as a visitor with no
- *  filter would see it — the same note the top card shows there (the blocks stop's is the block DAG's). */
+ *  filter would see it — the same note the top card shows there . */
 export function briefingReq(stop: BriefingStop): NoteReq {
   const view = stop.mode;
   const subject = noteSubjectOf(view, { metagraphNetwork: "all", unlisted: () => false, register: stopRegister(stop) })!;

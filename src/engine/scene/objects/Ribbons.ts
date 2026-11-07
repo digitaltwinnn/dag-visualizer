@@ -73,7 +73,7 @@ export const RIBBON_LOOK: Readonly<RibbonLook> = {
  *  block links]; we need to distinguish them much more clearly"): the Transaction blocks register's
  *  anchors — a DAG block down to its bar, a block-carrying tile down to its band — are a species of
  *  their own, not the links': the chamber's muted NEUTRAL (`SceneColors.muted`, the floor labels'
- *  tone, never an identity hue or the blocks' cyan) on their own material, quieter than the links
+ *  tone, never the blocks' cyan; a token block's tile line keeps its network's hue) on their own material, quieter than the links
  *  (0.42 dark / 0.7 paper). WebGL draws every line one pixel wide, so "thinner" is presence: dark
  *  0.28 reads as a pale structural thread under the cyan links; paper 0.5 holds it as grey ink. */
 export const SEAL_LOOK: Readonly<{ dark: number; paper: number }> = { dark: 0.28, paper: 0.5 };
@@ -101,6 +101,9 @@ export interface AnchorLine {
   z: number;
   yTop: number;
   band: { z0: number; z1: number } | null;
+  /** The line's identity colour (a token block's tile line wears its network's hue); null takes the
+   *  chamber's muted neutral (a DAG block's line down to its bar). */
+  hue: number | null;
 }
 
 export class Ribbons {
@@ -187,7 +190,7 @@ export class Ribbons {
       depthWrite: false, blending: glowBlend(colors),
     });
     this._sealMat = new THREE.LineBasicMaterial({
-      color: colors.muted, vertexColors: true, transparent: true, opacity: 0,
+      vertexColors: true, transparent: true, opacity: 0,
       depthWrite: false, blending: glowBlend(colors),
     });
     this._thLines = new THREE.LineSegments(this._thGeo, this._thMat);
@@ -218,7 +221,6 @@ export class Ribbons {
     this._mat.needsUpdate = true; // three caches the program per blending mode
     this._thMat.blending = glowBlend(c);
     this._thMat.needsUpdate = true;
-    this._sealMat.color.setHex(c.muted);
     this._sealMat.blending = glowBlend(c);
     this._sealMat.needsUpdate = true;
     this._writeGeometry(); // event-time: a theme flip, not a frame
@@ -302,17 +304,17 @@ export class Ribbons {
   /** THE TRANSACTION BLOCKS REGISTER'S SEAL LINES — the threads' hairline geometry on the SEAL
    *  material (`SEAL_LOOK`, rounds D1, D2, D8): one per DAG block, from the block down to the centre
    *  of its tick's bar, and one per block-carrying tile, from the tile down to its network's band (the
-   *  bar's centre while the tick's exact read has not landed), all on the sheets' eased sweep and in
+   *  bar's centre while the tick's exact read has not landed), all on the sheets' eased sweep, the tile lines in their network's hue and the bar lines in
    *  the chamber's muted neutral. Off the lens a line takes the ledger row's dim. Geometry is
    *  event-time; `setThreadFades` writes the per-frame alpha as for the threads. */
   setAnchorLines(lines: readonly AnchorLine[]): void {
     this._clearThreads();
-    // The SEAL species (`SEAL_LOOK`): the material carries the muted neutral, the vertex the lens.
+    // The SEAL species (`SEAL_LOOK`): the vertex carries the colour (a token tile line its network hue, a DAG block line the muted neutral) and the lens.
     this._thLines.material = this._sealMat;
     let v = 0;
     for (const l of lines) {
       if (this._thCount >= MAX_THREADS) break;
-      this._c.setRGB(1, 1, 1);
+      this._c.setHex(l.hue ?? this._colors.muted);
       const off = this._filter !== "all" && l.key !== this._filter;
       if (off) this._c.multiplyScalar(snapBright(1, true));
       this._q.topZ0 = l.z;

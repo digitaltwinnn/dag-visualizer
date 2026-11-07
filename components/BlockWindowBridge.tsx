@@ -21,9 +21,9 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 // what it was asked, and a read that spends its retries keeps the window only when it is the live
 // window of the network asked (`failedReadKeeps`) — another network's window, or a pin's, is cleared
 // rather than drawn under this filter. While the live window is held (`liveWindowRuns`: following,
-// touring, or a pin the held LIVE window covers or lies newer than — the band is the live instrument,
+// or a pin the held LIVE window covers or lies newer than — the band is the live instrument,
 // so a click inside the live window never freezes it), it refreshes the live trail on
-// `blockRefreshMs` — every 30 s in Transaction blocks (and the tour), every 5 min in the other
+// `blockRefreshMs` — every 30 s in Transaction blocks, every 5 min in the other
 // registers, whose switch needs only the window's reach (review M3) — and adds a tick the live feed
 // has announced at once (its blocks are on the global record), leaving its anchored records for the
 // next refresh. A pin older than it is a past window, which holds still.
@@ -35,8 +35,6 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 // is cleared and the status says so, the explorer's stated floor. The live feed's announced tick is a
 // DAG tick, so it joins only a window that holds the DAG's ticks (`tipJoins`).
 //
-// THE BRIEFING READS AHEAD: while the tour runs (`store.briefing` non-null) the LIVE window is
-// fetched even before the Blocks stop, so that stop opens on a drawn chamber, not a loading one.
 export default function BlockWindowBridge() {
   const ledger = useStore((s) => VIEW_POLICIES[s.mode].tickScoped);
   const register = useStore((s) => s.ledgerRegister);
@@ -44,12 +42,10 @@ export default function BlockWindowBridge() {
   // A PIN is a snapshot the reader holds — never the one a live follow walks forward each tick
   // (`pastWanted`'s own rule): read as a pin, the followed tick re-asked the trail on every global.
   const snapOrd = useStore((s) => s.snap?.data.ordinal ?? null);
-  // The Briefing reads the live window ahead (`blockWanted`'s `touring`): no pin stands during it.
-  const touring = useStore((s) => s.briefing != null);
-  const pin = following || touring ? null : snapOrd;
+  const pin = following ? null : snapOrd;
   // Where the live window is wanted: the Snapshots view in either register (D3: the scene's register
-  // switch states the Blocks span from the Snapshots register too), or anywhere while the tour runs.
-  const liveWanted = touring || ledger;
+  // switch states the Blocks span from the Snapshots register too).
+  const liveWanted = ledger;
   // The network the window is read for: the top bar's committed filter (null under All).
   const chain = blockChainOf(useStore((s) => s.filter));
   const setStatus = useStore((s) => s.setBlockWindowStatus);
@@ -131,7 +127,7 @@ export default function BlockWindowBridge() {
 
   useEffect(() => {
     const held = getBlockWindow();
-    const want = blockWanted({ ledger, register, pin, held: held ? { from: held.from, to: held.to, chain: held.chain, around: held.around } : null, liveNewest, touring, chain });
+    const want = blockWanted({ ledger, register, pin, held: held ? { from: held.from, to: held.to, chain: held.chain, around: held.around } : null, liveNewest, chain });
     const chainKey = chain ?? "all";
     // Unpinning back to the live edge: the held window is the pin's, so ask for live at once.
     const backToLive = want.kind === "keep" && pin == null && asked.current != null && asked.current !== `${chainKey}@live`;
@@ -167,7 +163,7 @@ export default function BlockWindowBridge() {
     dropRetry();
     read(around, chain, gen.current, 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ledger, register, pin, liveNewest, touring, chain]);
+  }, [ledger, register, pin, liveNewest, chain]);
 
   // The exact reads change what a tick's anchor says: fold the same answer again (O(ticks)).
   useEffect(() => {
@@ -178,7 +174,7 @@ export default function BlockWindowBridge() {
   // module's window at the moment, so the interval and the append re-ask it rather than closing over it.
   const liveRuns = () => {
     const held = getBlockWindow();
-    return liveWindowRuns({ liveWanted, touring, following, pin, held: held ? { from: held.from, to: held.to } : null, heldLive: held != null && held.around == null && askedLive() });
+    return liveWindowRuns({ liveWanted, following, pin, held: held ? { from: held.from, to: held.to } : null, heldLive: held != null && held.around == null && askedLive() });
   };
 
   // The live edge: a fresh trail on `blockRefreshMs` while the live window is held — under a pin it
@@ -186,7 +182,7 @@ export default function BlockWindowBridge() {
   // Transaction blocks catches up at once on a window read on the 5-minute beat.
   useEffect(() => {
     if (!liveRuns()) return;
-    const every = blockRefreshMs(register, touring);
+    const every = blockRefreshMs(register);
     const beat = () => {
       // A pin the window has since let go of (it aged out, or a pinned fetch replaced the window).
       if (!askedLive()) return;
@@ -202,7 +198,7 @@ export default function BlockWindowBridge() {
       if (id != null) window.clearInterval(id);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveWanted, touring, following, pin, chain, register]);
+  }, [liveWanted, following, pin, chain, register]);
 
   // A global the live feed announces with blocks joins the window at once; its anchored records
   // come with the next refresh.
@@ -215,7 +211,7 @@ export default function BlockWindowBridge() {
     if (a.ticks.length && liveTip.ordinal < a.ticks[0]!.ord) return;
     apply({ ...a, ticks: [{ ord: liveTip.ordinal, ts: liveTip.timestamp, hash: liveTip.hash, blocks: hashes, metaSnaps: {} }, ...a.ticks].slice(0, BLOCK_WINDOW_TICKS) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveTip, following, pin, liveWanted, touring]);
+  }, [liveTip, following, pin, liveWanted]);
 
   return null;
 }

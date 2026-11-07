@@ -71,7 +71,7 @@ const stopLabel = (stop: BriefingStop): string => (stop.register === "blocks" ? 
 const stopName = (stop: BriefingStop): string => (stop.register === "blocks" ? BLOCKS_PAGE.name : VIEWS.find((v) => v.id === stop.mode)!.name);
 
 /** Show a stop: its view, then its register (a stop with none puts the Snapshots view back in its
- *  own, so a back-step from the blocks stop does not leave the ledger stop showing blocks). */
+ *  own, so a stop that carries a register never leaves the next one showing it). */
 function showStop(stop: BriefingStop): void {
   const s = useStore.getState();
   s.setMode(stop.mode);
@@ -112,15 +112,14 @@ function Tour({ stop, leaving }: { stop: number; leaving: boolean }) {
   // Every stop's note is asked for at the start, so a line is on hand when its view arrives.
   const geo = useNote(briefingReq({ mode: "geo" }));
   const ledger = useNote(briefingReq({ mode: "ledger" }));
-  const blocks = useNote(briefingReq({ mode: "ledger", register: "blocks" }));
   const hyper = useNote(briefingReq({ mode: "hyper" }));
   const trend = useNote(briefingReq({ mode: "trend" }));
   const at = BRIEFING_STOPS[stop]!;
   const view = stopLabel(at);
-  // Every stop has its own note, the blocks stop's the block DAG's.
+  // Every stop has its own note.
   const noteView = briefingReq(at).view;
-  const notes: Record<NoteView, ReturnType<typeof useNote>> = { geo, ledger, blocks, hyper, trend };
-  const words = briefingWords(noteView, notes[noteView].res);
+  const notes: Partial<Record<NoteView, ReturnType<typeof useNote>>> = { geo, ledger, hyper, trend };
+  const words = briefingWords(noteView, notes[noteView]?.res ?? null);
   const name = stopName(at);
   const fill = useRef<HTMLElement | null>(null);
   // The last stop's time is up: the ending's three beats run from here.

@@ -14,25 +14,25 @@ describe("how long a stop stands", () => {
 
 describe("the tour's route", () => {
   it("visits every 3D view, starting on the globe", () => {
-    expect(BRIEFING_STOPS).toEqual([{ mode: "geo" }, { mode: "ledger" }, { mode: "ledger", register: "blocks" }, { mode: "hyper" }, { mode: "trend" }]);
-    expect(BRIEFING_STOPS[2]).toEqual({ mode: "ledger", register: "blocks" });
+    expect(BRIEFING_STOPS).toEqual([{ mode: "geo" }, { mode: "ledger" }, { mode: "hyper" }, { mode: "trend" }]);
+    expect(BRIEFING_STOPS[2]).toEqual({ mode: "hyper" });
   });
 
   it("puts the Snapshots view in the Snapshots register at any stop that names none", () => {
     expect(stopRegister(BRIEFING_STOPS[1]!)).toBe("snapshots");
-    expect(stopRegister(BRIEFING_STOPS[2]!)).toBe("blocks");
-    expect(stopRegister(BRIEFING_STOPS[3]!)).toBe("snapshots");
+    expect(stopRegister(BRIEFING_STOPS[2]!)).toBe("snapshots");
+    expect(stopRegister({ mode: "ledger", register: "blocks" })).toBe("blocks");
   });
 
   it("steps through the stops and stops after the last", () => {
     expect(nextStop(0)).toBe(1);
-    expect(nextStop(3)).toBe(4);
-    expect(nextStop(4)).toBeNull();
+    expect(nextStop(2)).toBe(3);
+    expect(nextStop(3)).toBeNull();
   });
 
   it("steps back to the stop before, and no further than the first", () => {
-    expect(prevStop(4)).toBe(3);
     expect(prevStop(3)).toBe(2);
+    expect(prevStop(2)).toBe(1);
     expect(prevStop(1)).toBe(0);
     expect(prevStop(0)).toBeNull();
   });

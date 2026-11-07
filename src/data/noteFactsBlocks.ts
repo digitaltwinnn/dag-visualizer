@@ -1,7 +1,7 @@
 import { fact } from "@/src/data/noteFacts";
 import type { Fact, NoteLead } from "@/src/data/noteTypes";
 
-// THE BLOCK DAG'S FACTS BUILDER — what the Blocks register's note (the Briefing's blocks stop) is
+// THE BLOCK DAG'S FACTS BUILDER — what the Blocks register's note is
 // shown. Its subject is the second clock in the chamber: the blocks that move value, against the
 // snapshot chain that ticks whatever happens. So it states how many blocks each chain accepted over
 // the last day and where the DAG's height stands. It states no open tips (design round D5,
