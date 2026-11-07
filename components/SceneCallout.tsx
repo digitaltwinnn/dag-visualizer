@@ -527,7 +527,8 @@ export default function SceneCallout() {
     // IN THE BLOCKS REGISTER THE LABEL IS THE BLOCK'S (D3, user 2026-11-07: "In blocks, no snapshot
     // callout but a block callout"). One label, on the Block card's subject — the live newest block
     // or the pinned one — in the card head's own grammar: the block mark in its chain's hue, the short
-    // hash, the height chip and the live / pinned state, then the card's lead (`blockLead`). Never the
+    // hash, the height chip and the live / pinned state, then the card's lead in its SHORT form (`blockLead`,
+    // how much moved and nothing more — user, 2026-11-07). Never the
     // global's label: the live global is not drawn in this register. CalloutSync anchors it on the
     // block's own place in the chamber (`LedgerView.selectedBlockAnchor`).
     const blockModel = (): Model | null => {
@@ -548,7 +549,7 @@ export default function SceneCallout() {
           : { text: "", pinned: true, chip: height },
         ring: hue,
         mark: { icon: iconForPick("block"), hue },
-        lead: { text: blockLead(block, blockRead) },
+        lead: { text: blockLead(block, blockRead, true) },
       };
     };
     if (boxedCard === "node" && node) m = node;
