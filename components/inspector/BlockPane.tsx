@@ -39,7 +39,7 @@ import { useStore } from "@/src/store/store";
 
 /** A wallet address in a breakdown row, where two share a line with an amount and a fee: the app's
  *  one mid-ellipsis (the lead's sentence form is `blockLead`'s). */
-const rowAddr = (a: string) => midHash(a, 9);
+const rowAddr = (a: string) => midHash(a, 10);
 
 export default function BlockPane({ onClose, collapsed, onToggle }: { onClose: () => void; collapsed?: boolean; onToggle?: () => void }) {
   useFeedRead(["api-blocks"], "BlockPane");
@@ -109,20 +109,22 @@ export default function BlockPane({ onClose, collapsed, onToggle }: { onClose: (
               every transfer, one row or many, the moved total on its label; the DAG facts (parents,
               children in view) left the body — the scene draws the DAG and the foot keeps the parent
               hashes. One row per transfer: from → to, then its amount and its fee. */}
+          {/* A TABLE THAT READS AS ONE (user, 2026-11-07: "it does not really look like a table and
+              has lots of text"): three columns under caps headers — FROM, TO, the amount in the
+              chain's unit — each address a short mono token, the amount right-aligned; the per-row
+              fee is gone (Fees paid below sums it), and the lead no longer repeats the addresses. */}
           {transfers.length > 0 && read && (
             <div className="mt-2 mb-2">
-              <SectionLabel label="Transfers" total={transfers.length.toLocaleString()} unit={`${compactDag(read.amount)} ${unit}`} />
-              <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto_auto] items-baseline gap-x-2.5 gap-y-0.5 text-label">
-                <span className="text-muted-foreground">From → to</span>
-                <span className="text-right text-muted-foreground">Amount</span>
-                <span className="text-right text-muted-foreground">Fee</span>
+              <SectionLabel label="Transfers" total={transfers.length.toLocaleString()} />
+              <div className="mt-1 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-1">
+                <span className="text-label tracking-caps uppercase text-muted-foreground">From</span>
+                <span className="text-label tracking-caps uppercase text-muted-foreground">To</span>
+                <span className="text-label tracking-caps uppercase text-right text-muted-foreground">{unit}</span>
                 {transfers.map((t, i) => (
                   <Fragment key={i}>
-                    <span className="min-w-0 truncate font-mono text-foreground-dim">
-                      {t.from ? rowAddr(t.from) : <Empty />} → {t.to ? rowAddr(t.to) : <Empty />}
-                    </span>
-                    <span className="text-right font-mono tabular-nums whitespace-nowrap text-foreground">{compactDag(t.amount)} {unit}</span>
-                    <span className="text-right font-mono tabular-nums whitespace-nowrap text-foreground-dim">{compactDag(t.fee)}</span>
+                    <span className="min-w-0 truncate font-mono text-label text-foreground-dim">{t.from ? rowAddr(t.from) : <Empty />}</span>
+                    <span className="min-w-0 truncate font-mono text-label text-foreground-dim">{t.to ? rowAddr(t.to) : <Empty />}</span>
+                    <span className="text-right font-mono text-label tabular-nums whitespace-nowrap text-foreground">{compactDag(t.amount)}</span>
                   </Fragment>
                 ))}
               </div>

@@ -1112,9 +1112,11 @@ are the Metagraph snapshots register's own (`metaSnap`, `tickNet`, the pin).
 block and not the snapshot"): while following, `followLatest` (FollowController's heartbeat — every
 global, anchor and block-window change) seats the window's newest block of its network
 (`blockWindow.newestBlock`) and its accepting global through the non-bumping `advanceBlock` /
-`advanceSnap`; the Block card is TRANSFER-LED (design round pick T1, 2026-11-07): the transfers are
-its one table, one row or many, the moved total on the section label; "Signed by N L1/cL1" and Fees
-paid are its facts; Parents and Children in view left the body (the scene draws the DAG, the foot
+`advanceSnap`; the Block card is TRANSFER-LED (design round pick T1, 2026-11-07): its lead says only
+how much moved ("Moved 19K DAG", "… in 3 transfers" — no addresses, user: the sentence was "already
+shown in the table below"), the transfers are its one table — FROM · TO · <unit> under caps headers,
+each address a short mono token, the amount right-aligned, no per-row fee (Fees paid sums it) —
+"Signed by N L1/cL1" and Fees paid are its facts; Parents and Children in view left the body (the scene draws the DAG, the foot
 keeps the parent hashes). The explorer's committed block row carries the LIVE / PINNED mark the tick
 rows carry (user: "'live' is fine in the header but is not shown in the explorer"). Its head carries the LIVE / PINNED control (`FollowControl subject="block"`,
 its write `blockFollowActions`), the Global snapshot card keeps only its age there WHILE A BLOCK CARD
