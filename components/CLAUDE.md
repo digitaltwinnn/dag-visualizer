@@ -1073,7 +1073,10 @@ reached") **and, beside a stretch, its COUNT** (user, 2026-11-07: "last 9 min | 
 days | 53 blocks"): what fills the stretch — the source's ticks for the two snapshot registers (the live
 buffer's fixed depth, or the past window's), the window's blocks for Transaction blocks
 (`ledgerSpan.countWord`; none beside a read state; desktop only — on a phone the lit half's full words
-already reach the gutters), after a hairline rule, never a mid-dot. **Each half counts ITS OWN
+already reach the gutters), after a hairline rule, never a mid-dot. **The lit station is a WASH, not a frame** (user,
+2026-11-07, design round: option 5 without the underline): the unlit halves' second line recedes
+(`opacity-75`), the lit half carries the selection wash alone — no inset ring — its name and count in
+the accent, its span in the foreground ink. **Each half counts ITS OWN
 SUBJECT** (user, same day: "its subject is metagraph snapshots, count those instead of global, same
 for data blocks"): the metagraph snapshots the source's ticks anchored (the feed's per-tick count,
 "333 snapshots"), the data blocks their exact reads carry (`dataStats.dataBlocksInWindow`, a labelled
@@ -1179,11 +1182,13 @@ a "23 updates" chip from the exact read (`SceneCallout`'s `dataLead`, keyed on
 `REGISTER_MEASURES[register].dataOnly`; under a committed network, that network's own), where the
 Metagraph snapshots register says "N metagraph snapshots" and its size. **The Global snapshot
 CARD's body opens with the register's section too** (user: "work on the global snapshot body also"):
-`inspector/SnapshotRegister.tsx` — `BlocksAnchored` in Transaction blocks (the tick's blocks by
-chain, from the block window: "Accepted N blocks", DAG and each token chain), `DataAnchored` in Data
-blocks (its data blocks by network from the exact read, the updates beside each count, a network
-with none left out) — else `AnchoredTags`; all three draw `AnchoredTags.BreakdownRows`, the one
-breakdown-table row. The explorer keeps every Snapshots level and its measure set is **Data updates · Fees · Metagraphs ·
+`inspector/SnapshotRegister.tsx` (the design round's picks, data 1 / transaction 1) —
+`BlocksAnchored` in Transaction blocks: "Accepted N blocks" and THE BLOCKS THEMSELVES as rows
+(the explorer's block row: ticker in its hue, short hash, amount moved — a dash until the read
+lands), each a door that commits the block (`blockSelectActions`, its snapshot too); `DataAnchored`
+in Data blocks: "Carried N data blocks with M updates" and a DATA UPDATES breakdown by network
+(`AnchoredTags.BreakdownRows`, the one breakdown-table row; a network with none left out) — else
+`AnchoredTags`. The explorer keeps every Snapshots level and its measure set is **Data updates · Fees · Metagraphs ·
 Size** (D7, user: "instead of adding 'data updates' use it to replace 'anchors'" — Data updates takes
 Anchors' place and leads, four tiles two by two so its name is whole; the network level is Data
 updates · Fees · Size; `ledgerMeasure`'s `DATA_*` lists; the register's own pick, `store.dataMeasure`,

@@ -1,6 +1,5 @@
 "use client";
 
-import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { ledgerNetwork } from "@/src/engine/domain/tickNet";
@@ -28,16 +27,13 @@ import { useFeedRead } from "@/components/useFeedRead";
 // network the chamber is resolved against stays highlighted in place, in its hue.
 /** THE BREAKDOWN TABLE'S ROWS (`visuals.html`, user 2026-10-02): name, one square per unit while the
  *  total is countable (a share bar above that), count — in the dossier's columns. Shared by the
- *  anchored breakdown and the register sections of the Global snapshot card (Transaction blocks'
- *  blocks by chain, Data blocks' data blocks by network — user, 2026-11-07: "work on the global
- *  snapshot body also"). `focusId` is the row the chamber resolves against: highlighted in place
+ *  anchored breakdown and the Data blocks register's section of the Global snapshot card (its data
+ *  updates by network — user, 2026-11-07: "work on the global snapshot body also"). `focusId` is the row the chamber resolves against: highlighted in place
  *  by a faint identity-hue wash, its name in the hue. Unlisted (no hue) wears the CORE tone. */
-export function BreakdownRows({ rows, denom, focusId, figure }: {
+export function BreakdownRows({ rows, denom, focusId }: {
   rows: readonly { id: string; label: string; hue: string | null; n: number }[];
   denom: number;
   focusId: string | null;
-  /** A second figure beside the count (Data blocks: the updates), by row id. */
-  figure?: (id: string) => ReactNode;
 }) {
   const pct = (n: number) => (denom > 0 ? (n / denom) * 100 : 0);
   const units = countable(denom);
@@ -60,10 +56,7 @@ export function BreakdownRows({ rows, denom, focusId, figure }: {
               {r.label}
             </span>
             <UnitMarks count={r.n} color={r.hue ?? "var(--core)"} units={units} frac={pct(r.n) / 100} />
-            <span className="font-mono tabular-nums text-right text-foreground">
-              {r.n}
-              {figure?.(r.id)}
-            </span>
+            <span className="font-mono tabular-nums text-right text-foreground">{r.n}</span>
           </div>
         );
       })}
