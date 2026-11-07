@@ -76,6 +76,14 @@ export function fact(
   return pair ? { label, value, kind, text, pair: { ...pair } } : { label, value, kind, text };
 }
 
+/** AN AVERAGE OF WHOLE THINGS is stated rounded, as "about N" (user, 2026-11-07: "5.9 metagraphs, they
+ *  can not have decimals"). A count of snapshots, networks or nodes averaged over buckets has a
+ *  fractional mean no reader can picture, so the fact carries the whole number and ", about" in its
+ *  label. A continuous average (a duration, a fee, data) keeps its precision and does not come here. */
+export function wholeMean(label: string, mean: number, pair?: FactPair): Fact {
+  return fact(`${label}, about`, Math.round(mean), "count", undefined, pair);
+}
+
 /** HOW MANY NETWORKS ANCHORED, counting the unlisted ones honestly. `listed` is the catalog networks
  *  that anchored; `series` is the FOLDED payload (`withUnlisted`), whose `m.unlisted.snaps` is the
  *  sum of every chain outside the catalog. Unlisted is at least one chain and how many is unknown,

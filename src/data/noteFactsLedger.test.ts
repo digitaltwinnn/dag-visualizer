@@ -77,11 +77,12 @@ describe("ledgerFacts on the whole chamber", () => {
     expect(longest!.text).toBe("40 seconds");
   });
 
-  it("states the metagraph snapshots anchored per global snapshot with one decimal, fees and data per hour, and the networks that anchored", () => {
+  it("states the metagraph snapshots anchored per global snapshot as a rounded whole, fees and data per hour, and the networks that anchored", () => {
     const r = ledgerFacts(input())!;
     const [per] = find(r, /anchored per global snapshot/);
-    expect(per!.kind).toBe("amount");
-    expect(per!.value).toBeCloseTo(3, 9);
+    expect(per!.kind).toBe("count");
+    expect(per!.label).toBe("Metagraph snapshots anchored per global snapshot, recent, about");
+    expect(per!.value).toBe(3);
     expect(per!.text).toBe("3");
     expect(find(r, /^Fees in DAG per hour, recent/)).toHaveLength(1);
     expect(find(r, /^Fees in DAG per hour, usual/)).toHaveLength(1);

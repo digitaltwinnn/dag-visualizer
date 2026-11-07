@@ -1,5 +1,5 @@
 import { isPause } from "@/src/data/notableDays";
-import { chainReadThrough, fact, median, networksAnchored, spanMeasured, type ChainReads } from "@/src/data/noteFacts";
+import { chainReadThrough, fact, median, networksAnchored, spanMeasured, wholeMean, type ChainReads } from "@/src/data/noteFacts";
 import { eventChange, largestGlobalChange, longestGapChange, pauseChange, pickChanges, rateChange, rhythmChange, withExtremes } from "@/src/data/noteChanges";
 import type { Fact, FactPair, NoteChange, NoteChangeFind, NoteLead } from "@/src/data/noteTypes";
 import { anchorSeries, formatDag, globalSeries, metricSeries, spanAverage, TREND_METRICS, trimCounterEdges, unlistedUnmeasured, withUnlisted } from "@/src/data/trendSeries";
@@ -193,7 +193,7 @@ export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: st
 
     // WHAT EACH ONE CARRIES: the snapshots anchored per global snapshot, over buckets where both counted.
     const carried = pairedSums(recent.series["g.anchors"] ?? [], recent.series["g.ticks"] ?? [], recent);
-    if (carried) facts.push(fact("Metagraph snapshots anchored per global snapshot, recent", carried.n / carried.d, "amount"));
+    if (carried) facts.push(wholeMean("Metagraph snapshots anchored per global snapshot, recent", carried.n / carried.d));
 
     // FEES AND DATA, per hour. The whole totals are only a floor where the unlisted channels were
     // not measured: labelled so, and given no ratio and no pair.

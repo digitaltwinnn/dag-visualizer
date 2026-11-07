@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { READ_SLACK_MS, chainReadThrough, fact, factsBlock, gaugeChange, heldLevel, median, networksAnchored, observedLevel, spanMeasured, pairChange, spellDurations, withChangeFacts, changeShare } from "@/src/data/noteFacts";
+import { READ_SLACK_MS, chainReadThrough, fact, factsBlock, gaugeChange, heldLevel, median, networksAnchored, observedLevel, spanMeasured, pairChange, spellDurations, withChangeFacts, changeShare, wholeMean } from "@/src/data/noteFacts";
 import { checkNote } from "@/src/data/noteHonesty";
 import { formatDag } from "@/src/data/trendSeries";
 
@@ -281,5 +281,20 @@ describe("withChangeFacts", () => {
   it("adds nothing for a pair that rounds to no change, or has nothing to move from", () => {
     expect(withChangeFacts(pair("k", "k before", 1000, "k now", 1002))).toHaveLength(2);
     expect(withChangeFacts(pair("k", "k before", 0, "k now", 5))).toHaveLength(2);
+  });
+});
+
+describe("wholeMean", () => {
+  it("states an average of whole things rounded, with about in the label", () => {
+    const six = wholeMean("Metagraph snapshots anchored per global snapshot, recent", 5.9);
+    expect(six.label).toBe("Metagraph snapshots anchored per global snapshot, recent, about");
+    expect(six.value).toBe(6);
+    expect(six.text).toBe("6");
+    expect(wholeMean("x", 5.4).text).toBe("5");
+    expect(wholeMean("x", 7).text).toBe("7");
+  });
+  it("lets the gate accept the house-style note", () => {
+    const f = wholeMean("Metagraph snapshots anchored per global snapshot, recent", 5.9);
+    expect(checkNote("Each global snapshot anchored about 6 metagraph snapshots.", [f], []).ok).toBe(true);
   });
 });
