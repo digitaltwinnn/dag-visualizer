@@ -74,6 +74,24 @@ describe("assembleTrail", () => {
     await expect(assembleTrail(deps({ size: 1, now: () => (t += TRAIL_DEADLINE_MS / 2) }), null, 10)).rejects.toThrow(/deadline/);
   });
 
+  it("the deadline bounds the WHOLE request: a hit in the record reads after the walk is a failure too", async () => {
+    let t = 0;
+    // The walk is quick; the clock passes the deadline while the global records are read.
+    const d = deps({ now: () => t, global: async (o) => ((t += TRAIL_DEADLINE_MS), glob(o)) });
+    await expect(assembleTrail(d, null, 10)).rejects.toThrow(/deadline/);
+  });
+
+  it("a TOKEN chain past its page cap contributes what it reached — only the DAG's cap is BeyondReach", async () => {
+    // DOR's list never ends and every row sits above the pin; the DAG reaches the pin at once.
+    const transfers: TrailDeps["transfers"] = async (chain, next) =>
+      chain === "dag"
+        ? { rows: [{ snapshotOrdinal: 10, blockHash: "d10" }, { snapshotOrdinal: 5, blockHash: "d5" }] }
+        : { rows: [{ snapshotOrdinal: 1e6, globalSnapshotOrdinal: 1e6 - Number(next ?? 0), blockHash: "k" }], next: String(Number(next ?? 0) + 1) };
+    const a = await assembleTrail(deps({ transfers }), 10, 5);
+    expect(a.ticks.map((t) => t.ord)).toEqual([10, 5]);
+    expect(a.beyond).toBeUndefined();
+  });
+
   it("is BeyondReach (not a failure) when a walk reaches its page cap before the window is whole", async () => {
     const endless: TrailDeps["transfers"] = async (chain, next) => ({ rows: chain === "dag" ? [{ snapshotOrdinal: 1e6 - Number(next ?? 0), blockHash: "h" }] : [], next: String(Number(next ?? 0) + 1) });
     await expect(assembleTrail(deps({ transfers: endless }), 10, 5)).rejects.toBeInstanceOf(BeyondReach);

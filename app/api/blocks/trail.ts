@@ -11,8 +11,13 @@ import type { GlobalSnapshot, RawMetaSnapshot } from "@/src/data/types";
 // ⚠️ A transfer list's cursor is a row HASH only (probed 2026-11-05: an ordinal or a timestamp
 // cursor answers 500 or an empty page), so "at or below an ordinal" cannot be crafted: a window in
 // the past is found by walking from the tip past the rows above it. A busy chain pages ~1000 rows
-// (a few days of the DAG) per ~2 s, so the walk is capped; a window the cap cuts short THROWS (the
-// route answers 503) — never a short answer that would read as "no blocks there" (rule 10).
+// (a few days of the DAG) per ~2 s, so the walk is capped at `TRAIL_PAGES_MAX` pages a chain. The
+// DAG's cap is the walk's REACH: a pin it cannot walk to is `BeyondReach`, an answer the route
+// states. A TOKEN chain past its cap contributes what it reached — its blocks older than that are
+// the walk's stated floor, never a void of the whole window (a busy token chain no longer sets the
+// reach for every other chain). ONE deadline (`TRAIL_DEADLINE_MS`) bounds the WHOLE request — the
+// walk and the record reads after it — under the route's 60 s; a deadline hit anywhere THROWS (the
+// route answers 503), never a short answer that would read as "no blocks there" (rule 10).
 //
 // A block with NO transfer has no row, so a tick holding only empty blocks is not found here; the
 // route's answer is the blocks that carry transfers.
@@ -38,14 +43,14 @@ export interface TrailDeps {
   now?(): number;
 }
 
-/** The walk cannot reach the window asked for (a pin deeper than the page cap): an answer, not a failure. */
+/** The DAG's walk cannot reach the window asked for (a pin deeper than its page cap): an answer, not a failure. */
 export class BeyondReach extends Error {
   constructor(chain: string) {
     super(`chain ${chain}: beyond the walk`);
   }
 }
 
-/** One overall deadline for the whole walk, under the route's 60 s. */
+/** One overall deadline for the whole request (the walk and the record reads), under the route's 60 s. */
 export const TRAIL_DEADLINE_MS = 45_000;
 
 /** Pages one chain's walk may take before the window is called unreadable. */
@@ -57,7 +62,26 @@ export async function assembleTrail(deps: TrailDeps, around: number | null, n: n
   const cur = deps.currentId ?? ((id: string) => id);
   const now = deps.now ?? Date.now;
   const started = now();
-  const ids = await deps.chains();
+  const DEADLINE = "trail deadline";
+  const past = () => now() - started > TRAIL_DEADLINE_MS;
+  // Every upstream read races what is left of the one deadline, and the clock is asked again when
+  // it settles — so a read that ends past it fails the request too, wherever it sits.
+  const bounded = async <T>(p: () => Promise<T>): Promise<T> => {
+    if (past()) throw new Error(DEADLINE);
+    const left = TRAIL_DEADLINE_MS - (now() - started);
+    let id: ReturnType<typeof setTimeout> | undefined;
+    const timer = new Promise<never>((_, rej) => {
+      id = setTimeout(() => rej(new Error(DEADLINE)), left);
+    });
+    try {
+      const v = await Promise.race([p(), timer]);
+      if (past()) throw new Error(DEADLINE);
+      return v;
+    } finally {
+      clearTimeout(id);
+    }
+  };
+  const ids = await bounded(() => deps.chains());
   const found = new Map<string, ChainTicks>();
   const key = (chain: string, row: TrailRow): number | null => (chain === "dag" ? row.snapshotOrdinal : (row.globalSnapshotOrdinal ?? null));
   // The n-th newest tick gathered across every chain so far: a chain whose gathered ticks are all
@@ -72,9 +96,12 @@ export async function assembleTrail(deps: TrailDeps, around: number | null, n: n
     found.set(chain, ticks);
     let next: string | undefined;
     for (let page = 0; ; page++) {
-      if (page >= TRAIL_PAGES_MAX) throw new BeyondReach(chain);
-      if (now() - started > TRAIL_DEADLINE_MS) throw new Error("trail walk deadline");
-      const r = await deps.transfers(chain, next);
+      if (page >= TRAIL_PAGES_MAX) {
+        // The DAG's cap is the reach; a token chain keeps what it reached (its floor).
+        if (chain === "dag") throw new BeyondReach(chain);
+        return;
+      }
+      const r = await bounded(() => deps.transfers(chain, next));
       for (const row of r.rows) {
         const k = key(chain, row);
         if (k == null || (around != null && k > around)) continue;
@@ -97,7 +124,7 @@ export async function assembleTrail(deps: TrailDeps, around: number | null, n: n
 
   const ticks = await Promise.all(
     ords.map(async (ord): Promise<BlockTick> => {
-      const g = await deps.global(ord);
+      const g = await bounded(() => deps.global(ord));
       const blocks = new Set<string>();
       for (const row of found.get("dag")?.get(ord) ?? []) if (row.blockHash) blocks.add(row.blockHash);
       for (const b of g.blocks ?? []) blocks.add(b);
@@ -109,7 +136,7 @@ export async function assembleTrail(deps: TrailDeps, around: number | null, n: n
           const own = [...new Set(rows.map((r) => r.snapshotOrdinal))].sort((a, b) => a - b);
           const recs = await Promise.all(
             own.map(async (o) => {
-              const rec = await deps.metaSnap(id, o);
+              const rec = await bounded(() => deps.metaSnap(id, o));
               const hashes = rows.filter((r) => r.snapshotOrdinal === o).map((r) => r.blockHash);
               return rec.blocks?.length ? rec : { ...rec, blocks: hashes };
             }),
