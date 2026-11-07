@@ -1135,7 +1135,10 @@ live / pinned, then `blockLead`'s SHORT form — how much moved, no from/to; use
 Block card (`inspector/BlockPane.tsx`; its eyebrow, ghost, callout and pick title say "Transaction block" — user, 2026-11-07) stands under its tick: a card slot with NO rung, between the
 metagraph snapshot and the node in the ledger's lane (`DISPLAY_LANE`), present only in the Blocks
 register and only under the tick that accepted it (`parentHolds`), its ghost hint "one on a bar or a
-tile". The snapshot's child step passes over it (`railLadderBoundary.test.ts`'s `PASSES_OVER`): a
+tile". **No Node card there** (user, 2026-11-07: "node is really out of place in this view"): the
+ledger's node is a metagraph snapshot's signer and the register draws no metagraph snapshot, so the
+node slot is neither card nor ghost in Transaction blocks — the selection is untouched, and the other
+registers restore the card in place. The snapshot's child step passes over it (`railLadderBoundary.test.ts`'s `PASSES_OVER`): a
 block is a sibling subject of the tick, not the snapshot's child — so **its ghost has a step of its
 own** (`railSiblings.blockStep`, 2026-11-07, user: "when clicked nothing happens"): the shown tick's
 first block from the window (`useSiblingState`'s `tickBlocks`), through the block click's builder,

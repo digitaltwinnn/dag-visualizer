@@ -649,13 +649,18 @@ export function detailsCards(s: RailManifestState): RailCard[] {
     present: s.composition != null,
     hint: compositionHint(s),
   };
+  // NO NODE CARD IN TRANSACTION BLOCKS (user, 2026-11-07: "node is really out of place in this view"):
+  // the ledger's node is a metagraph snapshot's signer, and that register draws no metagraph
+  // snapshot — a node carried in stood between the Metagraph and the Transaction block. The
+  // selection is untouched (the placeholder views' own rule): the register only stops speaking for
+  // it, and the other registers restore the card in place.
   const node: RailCard = {
     id: "node",
     kind: "node",
     icon: iconForPick("geoLive"),
     subjectKey: hoverKeyOf(s.inspect),
-    present: isNodePick(s.inspect) && s.nodeHere !== false,
-    hint: nodeHint(s),
+    present: isNodePick(s.inspect) && s.nodeHere !== false && !inBlocks(s),
+    hint: inBlocks(s) ? null : nodeHint(s),
   };
   const snap: RailCard = {
     id: "snap",

@@ -268,8 +268,8 @@ describe("the block slot", () => {
     // In the Snapshots register the rest stays the note's (R70).
     expect(focusSlotId({ ...details({ mode: "ledger", snap: snapPick, noteAbsent: false }), selStack: [] })).toBe("notes");
   });
-  it("Blocks' ghosts: the tick's, the network's, the tile's, the block's and the node's", () => {
-    expect(ghostIds(detailsCards(blocks()))).toEqual(["snap", "context", "metaSnap", "block", "node"]); // the data block ghosts in its own register alone
+  it("Blocks' ghosts: the tick's, the network's, the tile's and the block's — no node's", () => {
+    expect(ghostIds(detailsCards(blocks()))).toEqual(["snap", "context", "metaSnap", "block"]); // no node (no signer rung there); the data block ghosts in its own register alone
   });
 });
 
@@ -723,5 +723,19 @@ describe("the data block slot", () => {
   });
   it("a data block commit is the focus slot", () => {
     expect(focusSlotId({ ...data({ snap: snapPick, metaSnap: ms, dataBlock }), selStack: ["dataBlock", "metaSnap", "snap"] })).toBe("dataBlock");
+  });
+});
+
+// NO NODE CARD IN TRANSACTION BLOCKS (2026-11-07): the register draws no metagraph snapshot, so its
+// signer rung has nothing to hang from — no card, no ghost; the selection itself is untouched.
+describe("the node slot in Transaction blocks", () => {
+  it("is absent, card and ghost, in the Blocks register — and present in the others", () => {
+    const inBlocks = detailsCards(details({ mode: "ledger", ledgerRegister: "blocks", inspect: nodePick })).find((c) => c.id === "node")!;
+    expect(inBlocks.present).toBe(false);
+    expect(inBlocks.hint).toBeNull();
+    for (const r of ["snapshots", "data"] as const) {
+      const c = detailsCards(details({ mode: "ledger", ledgerRegister: r, inspect: nodePick })).find((x) => x.id === "node")!;
+      expect(c.present).toBe(true);
+    }
   });
 });
