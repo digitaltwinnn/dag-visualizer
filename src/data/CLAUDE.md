@@ -144,10 +144,10 @@ window. The exact-read queue asks EVERY window tick (`wantedExactReads`), a toke
 every bar on the trail is measured. A read carries each transfer (`BlockRead.transfers`: from, to,
 amount, fee) beside the totals. A failed read is a MISS (`blockReadMiss`, rule 10: blocks with no links, never invented
 ones); a DAG miss is displayed but never excluded, so a DAG ordinal is always re-asked of
-`ensurePage`, which bounds its own retries. Each chain's FRONTIER (`${chain}:frontier`, the tips of
-its NEWEST snapshot with its stamp) sits beside them: the DAG's is the live global's exact read, a
-token chain's the `latest` route once a minute; written only forward by ordinal, and an unstamped
-one is dropped on a failed read or on leaving the register (no read is no tips). The DAG's HEIGHT has
+`ensurePage`, which bounds its own retries. A read is the blocks alone — a snapshot's `tips` are
+not read anywhere (design round D5, 2026-11-07: open tips left every surface), so retention keeps
+exactly the window's reads and nothing beside them. The band's MOVED sums only landed reads and
+states how many it read. The DAG's HEIGHT has
 ONE source on every surface — the global snapshot's own `height`/`subHeight`; a Block card states
 the block's own height, a different subject. Pinned by `blockReads.test.ts` and `blockStats.test.ts`.
 

@@ -1077,7 +1077,10 @@ its write `blockFollowActions`), the Global snapshot card keeps only its age the
 block PINS it, and the Block card is the register's DEFAULT BOX ahead of the note (`focusSlotId`; the
 view is entered on the auto rule, not the note's pin — `LaneCollapseState.seats`). Pinned by
 `src/store/followFlow.test.ts`'s Blocks cases, `selStack.test.ts`, `railCards.test.ts` and
-`railCollapse.test.ts`. **Its callout is the BLOCK's** (user: "no snapshot callout but a block
+`railCollapse.test.ts`. **A pin keeps saying PINNED while the feed is down** (ruling, 2026-11-07,
+both subjects of `FollowControl`): the pin is a selection fact an unreachable feed does not change, and
+the feed's own state is the pulse strip's; only a control with nothing pinned, which would otherwise
+claim LIVE, says "no signal". **Its callout is the BLOCK's** (user: "no snapshot callout but a block
 callout"): one label on the Block card's subject, in its head's grammar (mark, short hash, height chip,
 live / pinned, then `blockLead`, the card's own lead), anchored at the block's place in the chamber
 (`LedgerView.selectedBlockAnchor`, layout data plus the rewind offset); `#callout-2` stands down. In Blocks the explorer lists the window's blocks, and the
@@ -1102,11 +1105,23 @@ A filter holds the rows as it holds the chamber: a block whose accepting global 
 network is not in answers nothing — no commit, no hover, faint — in the explorer and in RAW
 (`ledgerStory.blockRowLocked`, the tick rows' `tickLocked` and `Picking.tickHeldOut`'s rule). The vitals band swaps to `BlocksCells` and RAW to `datasection/BlocksTable`. The band's swap key
 is the view, or `"ledger:blocks"` in that register (`useCellsKey` in `VitalsBand.tsx`, the one dispatch
-for band and phone sheet, so the swap rolls). BLOCKS LAST HOUR, OPEN TIPS and FRONTIER AGE are pure
-arithmetic in `src/data/blockStats.ts`: the window lists only block-bearing global snapshots, so a stretch
-with no tick is zero blocks (a bin older than a FULL window's reach is a gap, and a full window that
-does not reach back an hour states BLOCKS LAST HOUR as a floor, "at least N" — rule 10); OPEN TIPS and FRONTIER AGE
-read `${chain}:frontier` and show the house empty value until it is held, never 0. RAW lists ONE ROW PER
+for band and phone sheet, so the swap rolls). Its four cells (design round D5, 2026-11-07 — user: "do
+your suggestion for vitals") are pure arithmetic in `src/data/blockStats.ts`: **BLOCKS**, the window's
+block count with a per-hour sparkline across its span; **MOVED**, the sum of its blocks' transfer
+amounts from LANDED reads only (`movedInWindow`; "12 of 30 blocks read" under the unit while any is
+pending or missed, an hour holding an unread block a gap in its sparkline) in ONE unit — the DAG's own
+under All or the DAG filter, labelled "DAG", since a sum across tokens would add unlike units, and the
+token's ticker under its filter (`tickerOf`, the Block card's home); **BY NETWORK**, a `MicroBars`
+share of the window's blocks per network in the catalog's order, named and hued, one row under a
+filter; **LAST BLOCK**, the age of the window's newest block in `ageWords` beside its network. BLOCKS and
+MOVED state the window's reach in the aside, the register switch's own span words (`blockSpanWord`); a
+window pinned around a past time is read as that window (its frame ends at its newest tick), and only
+LAST BLOCK, a claim about now, says "Window pinned to a past time". The window lists only
+block-bearing global snapshots, so an hour with no tick is zero blocks; a bin wholly older than a FULL
+(or cut) window's oldest tick is a gap, and a full window that does not reach back an hour states
+BLOCKS as a floor, "at least N" (rule 10). The DAG's height is not on the band: the Block card's chip
+and the note state it. No tip is shown anywhere (user: "Open tips remove it from the AI note and also
+from the vitals"). RAW lists ONE ROW PER
 TRANSFER (D3, user: "per transfer is useful" — `BlockRead.transfers`): FROM · TO · AMOUNT · FEE · BLOCK
 · ACCEPTED INTO, grouped by accepting global with the log's own `GroupPlate` (the plate
 commits/releases the global, the chevron folds); a block whose read has not landed lists one row

@@ -166,13 +166,14 @@ them — but the Next Node server can.
   it (`dag` folds into `all`, as the ledger's). Its facts (`src/data/noteFactsBlocks.ts`) are the
   blocks each chain accepted over the last 24 whole hours of the hourly tier — the sampler's own
   `g.blocks` / `m.<id>.blocks`, the series History's Blocks measure draws, never the transfer
-  counts — and the frontier as it stands, read live when the note is written
-  (`notes/blockFrontier.ts`: the DAG's height and sub-height from the explorer's newest global, its
-  tips from that global's shared pull, each block-bearing chain's tips from its L0). Every live part
-  fails soft to "not stated"; no measured block series is no note. A new KIND needs no version bump:
+  counts — and the DAG's height and sub-height as they stand, read live from the explorer's newest
+  global when the note is written (`notes/dagHeight.ts`). It states no open tips (design round D5,
+  2026-11-07, `NOTES_VERSION` 73: tips left every surface). The live read fails soft to "not
+  stated"; no measured block series is no note. A new KIND needs no version bump:
   its keys collide with nothing, and a bump would rewrite every warmed note for no gain. The DAG's
-  height and sub-height it states are the newest global's own fields, the same ones the Blocks
-  band's HEIGHT cell reads from the live feed: one height on every surface. The facts are pinned by
+  height and sub-height it states are the newest global's own fields, the one source for the DAG's
+  height on every surface (a Block card's chip states its own block's height, another subject). The
+  facts are pinned by
   `src/data/noteFactsBlocks.test.ts`. **The honesty gate (rule 10) is mechanical**
   (`src/data/noteHonesty.ts`, the colocated test is its specification): every number the note
   states must match a fact the model was shown, within the precision it was written to, and a
@@ -298,16 +299,9 @@ them — but the Next Node server can.
   decode. **A deterministic miss (the channel provably isn't in this immutable global) is cached
   like a success** — throwing it made every repeat of the same bad `(ordinal, address)` re-download
   the whole global, an anonymous amplification loop; only transient failures throw and retry.
-- **`/api/snapshot/[ordinal]`** also answers the snapshot's `blocks` (parents by height and hash, the transfer totals in DAG and each transfer's `{ from, to, amount, fee }` in `transfers`, signature count; hashes paired by index from the explorer record, `""` where it lists none) and `tips` (`decodeBlocks.ts`; cache key `snapshot-exact-v5`, the hashes read apart and cached on success only).
-- **`/api/network/[address]/snapshots/[ordinal]/blocks`** is a metagraph snapshot's blocks and tips, read from the chain's own L0 (`urls.l0` from the directory, 5 min; the L0 reads live in `network/metaL0.ts`) through the same `decodeBlocks` (cache key `metagraph-snap-blocks-v2`); the snapshots route's address gate (catalog + unlisted), `public, max-age=86400, s-maxage=86400, immutable`, 503 `no-store` on upstream failure (its
-  `route.test.ts` and `snapshot/decodeBlocks.test.ts` pin the answer).
-  **`latest` in place of the ordinal** (2026-11-06) is the chain's FRONTIER: its newest snapshot from
-  the L0's `/snapshots/latest`, plus the explorer record's block hashes and its `ts` where the
-  indexer has reached it, at `public, s-maxage=25` (it changes every snapshot: never immutable), 503
-  `no-store` on failure. The Blocks register reads it once a minute for each listed chain holding a
-  block in its window (`components/BlockWindowBridge.tsx`), into `blockReads` under
-  `${chain}:frontier` with the snapshot's stamp; the DAG's frontier is no fetch at all — the live
-  global's own exact read (`/api/snapshot/[ordinal]`'s `tips`), which the chamber already makes.
+- **`/api/snapshot/[ordinal]`** also answers the snapshot's `blocks` (parents by height and hash, the transfer totals in DAG and each transfer's `{ from, to, amount, fee }` in `transfers`, signature count; hashes paired by index from the explorer record, `""` where it lists none) — never its `tips`, which nothing reads (`decodeBlocks.ts`; cache key `snapshot-exact-v6`, the hashes read apart and cached on success only).
+- **`/api/network/[address]/snapshots/[ordinal]/blocks`** is a metagraph snapshot's blocks, read from the chain's own L0 (`urls.l0` from the directory, 5 min; `network/metaL0.ts`) through the same `decodeBlocks` (cache key `metagraph-snap-blocks-v3`); the snapshots route's address gate (catalog + unlisted), `public, max-age=86400, s-maxage=86400, immutable`, 503 `no-store` on upstream failure (its
+  `route.test.ts` and `snapshot/decodeBlocks.test.ts` pin the answer). The ordinal is a number; anything else, `latest` included, is a 400 — the chain's newest snapshot is read nowhere.
 - **`/api/network/unlisted`** lists the UNLISTED chains — the explorer's `/currency` list less every
   tracked address — cached an hour (`app/api/network/unlistedChains.ts`, also the gate below).
 - **`/api/network/[address]/snapshots`** pages one CATALOG chain (retired networks and former

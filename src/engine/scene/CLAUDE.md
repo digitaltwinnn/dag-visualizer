@@ -626,10 +626,10 @@ tile; a snapshot whose tile is not drawn puts no block anywhere.
 **Honesty (rule 10).** A block is drawn from the FEED's hashes, so a tick whose full read has not
 landed, or failed (`blockReadMiss`), shows its blocks with no links; a link is drawn only from a
 landed read (`referenceSegments`), its far end a placed parent or a fading stub. A landed block
-with no parents is a data block and is not drawn. **Tips are read, never inferred**: the state is `tipStateOf` over the chain's FRONTIER read (`blockReads[frontierKey(chain)]`,
-`src/data/blockReads.ts` — the newest snapshot's tips), never a block-bearing snapshot's own (hours
-stale); with none the block draws the resting look, never "open". An open tip breathes on the live
-edge's calm beat (`LiveEdge.BREATHE_RATE`), a retired one reads quiet (`BLOCK_LOOK`).
+with no parents is a data block and is not drawn. **A block has ONE resting look** (`BLOCK_LOOK.rest`;
+design round D5, user on breathing the open tips: "don't"): the chamber states no tip state, so no
+block breathes, and a block's only emphasis is the hover and the selection below. Nothing reads a
+snapshot's `tips`.
 
 **The marks' brightness is the snapshots' vocabulary**: `snapBright` (the ledger row's dim, boost
 and back — a block is data) and `inkMix`/`inkPresence` with an ink floor on paper, joined to the
@@ -662,7 +662,7 @@ explorer row, the Block card, RAW's row and the chamber pair on it (convention 9
 rules are `src/engine/domain/CLAUDE.md`'s.
 
 **Pinned by** `domain/blockBraid.test.ts` (`layeredZ`'s placement and its prior, every reference
-`referenceSegments` draws, `tipStateOf`, the silent run), `src/data/blockWindow.test.ts` (the source
+`referenceSegments` draws, the silent run), `src/data/blockWindow.test.ts` (the source
 and when it continues) and `domain/pickActions.test.ts`'s block cases.
 
 ### The unlisted network
