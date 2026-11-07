@@ -11,6 +11,9 @@ import { relativeAge } from "@/src/util/relativeAge";
 import type { GlobalSnapshot, MetaCfg, PickDescriptor } from "@/src/data/types";
 import { metaSnapDeepKey } from "@/src/data/types";
 import AnchoredTags from "./AnchoredTags";
+import { BlocksAnchored, DataAnchored } from "./SnapshotRegister";
+import { REGISTER_MEASURES } from "@/src/data/ledgerMeasure";
+import { readsBlockWindow, registerOf } from "@/src/engine/domain/viewPolicy";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import Odometer from "@/components/Odometer";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -227,6 +230,8 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
   // later trigger (reselecting, the next live tick) retries.
   const exact = useStore((s) => s.snapshotExact[d.ordinal]);
   const missed = useStore((s) => s.exactMiss[d.ordinal] != null);
+  const inBlocks = useStore((s) => readsBlockWindow(registerOf(s.mode, s.ledgerRegister)));
+  const inData = useStore((s) => REGISTER_MEASURES[s.ledgerRegister].dataOnly);
   const live = useStore((s) => s.live);
   const lastGoodAt = useStore((s) => s.lastGoodAt);
   const awaitingExact = exact == null && !missed;
@@ -264,8 +269,10 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
   // Hover pairing (synced 3D glow) lives on the OUTER pane (Inspector.CardPane), not here.
   return (
     <div>
-      {/* Anchored block (exact share breakdown, or "reading…" until it lands). */}
-      <AnchoredTags ordinal={d.ordinal} anchored={anchored} awaiting={awaitingExact} />
+      {/* THE REGISTER'S SECTION (user, 2026-11-07): the tick's blocks by chain in Transaction blocks,
+          its data blocks by network in Data blocks, else the anchored breakdown (exact share
+          breakdown, or "reading…" until it lands). */}
+      {inBlocks ? <BlocksAnchored ordinal={d.ordinal} /> : inData ? <DataAnchored ordinal={d.ordinal} /> : <AnchoredTags ordinal={d.ordinal} anchored={anchored} awaiting={awaitingExact} />}
 
       {/* Settlement — the exact fee + measured size + rewards (each an independent fact). While the
           exact read is still in flight (ACQUIRING), the fee row shows twinkling node-stars so the

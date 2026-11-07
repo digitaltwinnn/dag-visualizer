@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { ledgerNetwork } from "@/src/engine/domain/tickNet";
@@ -25,6 +26,51 @@ import { useFeedRead } from "@/components/useFeedRead";
 // second, smaller card inside the card, restating what the rung below it is for. The row says who
 // anchored and how many; the network's own card, one step down the ladder, says the rest. The
 // network the chamber is resolved against stays highlighted in place, in its hue.
+/** THE BREAKDOWN TABLE'S ROWS (`visuals.html`, user 2026-10-02): name, one square per unit while the
+ *  total is countable (a share bar above that), count — in the dossier's columns. Shared by the
+ *  anchored breakdown and the register sections of the Global snapshot card (Transaction blocks'
+ *  blocks by chain, Data blocks' data blocks by network — user, 2026-11-07: "work on the global
+ *  snapshot body also"). `focusId` is the row the chamber resolves against: highlighted in place
+ *  by a faint identity-hue wash, its name in the hue. Unlisted (no hue) wears the CORE tone. */
+export function BreakdownRows({ rows, denom, focusId, figure }: {
+  rows: readonly { id: string; label: string; hue: string | null; n: number }[];
+  denom: number;
+  focusId: string | null;
+  /** A second figure beside the count (Data blocks: the updates), by row id. */
+  figure?: (id: string) => ReactNode;
+}) {
+  const pct = (n: number) => (denom > 0 ? (n / denom) * 100 : 0);
+  const units = countable(denom);
+  return (
+    <div className={cn("flex flex-col gap-y-1", CONTENT_EASE)} style={figWidth(rows.map((r) => r.n))}>
+      {rows.map((r) => {
+        const isSel = r.id === focusId;
+        return (
+          // The wash overhangs the content by 6px on both sides (`w-[calc(100%+12px)]`, never
+          // `w-full` under a negative margin — that stops the counts 12px short of the total).
+          <div
+            key={r.id}
+            className={cn(CUT_ROW, "w-[calc(100%+12px)] -mx-1.5 px-1.5 py-[3px] rounded-sm")}
+            style={isSel ? ({ background: `color-mix(in oklch, ${r.hue ?? "var(--primary)"} 16%, transparent)` } as const) : undefined}
+          >
+            <span
+              className={cn("min-w-0 truncate", !r.hue ? "italic text-muted-foreground" : isSel ? "font-semibold" : "text-foreground-dim")}
+              style={isSel && r.hue ? { color: r.hue } : undefined}
+            >
+              {r.label}
+            </span>
+            <UnitMarks count={r.n} color={r.hue ?? "var(--core)"} units={units} frac={pct(r.n) / 100} />
+            <span className="font-mono tabular-nums text-right text-foreground">
+              {r.n}
+              {figure?.(r.id)}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function AnchoredTags({
   ordinal,
   anchored,
@@ -117,48 +163,15 @@ export default function AnchoredTags({
   const rows: Row[] = [...listed];
   if (exact.unlistedCount > 0) rows.push({ id: UNLISTED_ID, label: UNLISTED_ID, hue: null, n: exact.unlistedCount });
 
-  const denom = total ?? exact.anchored;
-  const pct = (n: number) => (denom > 0 ? (n / denom) * 100 : 0);
-  // One square per anchored snapshot while the tick's total is countable, a share bar above that.
-  const units = countable(denom);
-
   return (
     <div className="mt-1">
       {header}
-
       {/* The list EASES IN on every reveal (the no-pop rule's arrival ease): following live,
           each tick swaps this block to "resolving" and back, and the rows popped with slightly
           different members every ~4s — the container mounts fresh at each acquiring→rows flip,
           so the mount entrance is exactly per-reveal. Bar widths carry no transition: the
           remount means there is never an old width to ease from. */}
-      <div className={cn("flex flex-col gap-y-1", CONTENT_EASE)} style={figWidth(rows.map((r) => r.n))}>
-        {rows.map((r) => {
-          const isSel = r.id === focusId;
-          return (
-            // THE BREAKDOWN TABLE'S ROW (`visuals.html`, user 2026-10-02): name, one square per
-            // anchored snapshot, count — in the dossier's columns. Unlisted wears the CORE tone
-            // (2026-08-07), the same neutral-blue it carries on the filter chip. The wash overhangs
-            // the content by 6px on both sides (`w-[calc(100%+12px)]`, never `w-full` under a
-            // negative margin — that stops the counts 12px short of the section's total).
-            <div
-              key={r.id}
-              className={cn(CUT_ROW, "w-[calc(100%+12px)] -mx-1.5 px-1.5 py-[3px] rounded-sm")}
-              // The network the chamber resolves against: highlighted in place by a faint
-              // identity-hue wash and its name in the hue.
-              style={isSel ? ({ background: `color-mix(in oklch, ${r.hue ?? "var(--primary)"} 16%, transparent)` } as const) : undefined}
-            >
-              <span
-                className={cn("min-w-0 truncate", !r.hue ? "italic text-muted-foreground" : isSel ? "font-semibold" : "text-foreground-dim")}
-                style={isSel && r.hue ? { color: r.hue } : undefined}
-              >
-                {r.label}
-              </span>
-              <UnitMarks count={r.n} color={r.hue ?? "var(--core)"} units={units} frac={pct(r.n) / 100} />
-              <span className="font-mono tabular-nums text-right text-foreground">{r.n}</span>
-            </div>
-          );
-        })}
-      </div>
+      <BreakdownRows rows={rows} denom={total ?? exact.anchored} focusId={focusId} />
     </div>
   );
 }

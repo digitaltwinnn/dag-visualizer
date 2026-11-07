@@ -1177,7 +1177,13 @@ DATA leading.** The global snapshot's scene label speaks the register's subject 
 2026-11-07: "snapshot anchor should show information related to the sub-view"): "10 data blocks" with
 a "23 updates" chip from the exact read (`SceneCallout`'s `dataLead`, keyed on
 `REGISTER_MEASURES[register].dataOnly`; under a committed network, that network's own), where the
-Metagraph snapshots register says "N metagraph snapshots" and its size. The explorer keeps every Snapshots level and its measure set is **Data updates · Fees · Metagraphs ·
+Metagraph snapshots register says "N metagraph snapshots" and its size. **The Global snapshot
+CARD's body opens with the register's section too** (user: "work on the global snapshot body also"):
+`inspector/SnapshotRegister.tsx` — `BlocksAnchored` in Transaction blocks (the tick's blocks by
+chain, from the block window: "Accepted N blocks", DAG and each token chain), `DataAnchored` in Data
+blocks (its data blocks by network from the exact read, the updates beside each count, a network
+with none left out) — else `AnchoredTags`; all three draw `AnchoredTags.BreakdownRows`, the one
+breakdown-table row. The explorer keeps every Snapshots level and its measure set is **Data updates · Fees · Metagraphs ·
 Size** (D7, user: "instead of adding 'data updates' use it to replace 'anchors'" — Data updates takes
 Anchors' place and leads, four tiles two by two so its name is whole; the network level is Data
 updates · Fees · Size; `ledgerMeasure`'s `DATA_*` lists; the register's own pick, `store.dataMeasure`,
