@@ -58,7 +58,8 @@ export function snapshotSpanWord(s: {
 
 /** THE BLOCKS REGISTER'S SPAN: the block window's stretch — "last N h" at the live edge (measured to
  *  now: the silence since its newest block tick is part of it), a pinned window's own stretch — and,
- *  while a window is held, its read state ("reading that time…", or what failed). With no window
+ *  while a window is held, its read state ("reading that time…" around a pin, "reading…" for a live
+ *  read such as a filter's refetch, or what failed). With no window
  *  held, the instrument state in a word or two, for the switch's half (rule 10): "not read" (the
  *  unlisted filter), "not reached" (deeper than the trail walks), "reading…", "read failed", or
  *  "no blocks" for a read that held none. */
@@ -76,7 +77,8 @@ export function blockSpanWord(s: {
   const failed = s.short ? "read failed" : asked ? "couldn't read that time" : "read failed";
   if (s.globals.length) {
     const pinned = s.around !== undefined ? s.around != null : asked;
-    if (st === "loading") return s.short ? "reading…" : "reading that time…";
+    // "that time" only for a read around a pin: a live read (a filter's refetch) has no time (N5).
+    if (st === "loading") return s.short || !asked ? "reading…" : "reading that time…";
     if (st === "failed") return failed;
     return pinned ? windowWords(s.globals, s.nowMs, s.short) : spanWords([...s.globals].reverse(), s.nowMs);
   }
@@ -85,4 +87,26 @@ export function blockSpanWord(s: {
   if (st === "failed") return failed;
   if (st === "ready") return "no blocks";
   return "reading…";
+}
+
+/** Under the unlisted filter the block window reads nothing: every surface says the floor, never
+ *  "no blocks". */
+export const BLOCKS_UNREAD = "Unlisted networks' blocks are not read";
+
+/** THE BLOCK WINDOW ISN'T HERE — one sentence per instrument state (rule 10), shared by the
+ *  explorer's list, RAW's table and the band's cells (refactor round R1, P3: the three had drifted —
+ *  "Too far back for the block trail" beside "Blocks this far back are not reached"). Not read (the
+ *  unlisted filter), deeper than the trail walks, a read that failed (around a pin, or at the live
+ *  edge), a read still running or nothing held yet, and a held window that holds no block. `held`:
+ *  is a window held (`getBlockWindow()`)? */
+export function blockAbsence(
+  status: { around: number | null; status: "loading" | "ready" | "failed" | "beyond" | "unread" } | null,
+  held: boolean,
+): string {
+  const st = status?.status ?? null;
+  if (st === "unread") return BLOCKS_UNREAD;
+  if (st === "beyond") return "Blocks this far back are not reached";
+  if (st === "failed") return status?.around != null ? "The blocks at that time could not be read" : "The block window could not be read";
+  if (st === "loading" || !held) return "Reading the blocks…";
+  return "No blocks in this stretch";
 }

@@ -6,6 +6,7 @@ import { getNetwork } from "@/src/data/network";
 import { windowBlocks } from "@/src/data/blockWindow";
 import { blockReadOf } from "@/src/data/blockReads";
 import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
+import { blockAbsence } from "@/src/data/ledgerSpan";
 import type { GlobalSnapshot } from "@/src/data/types";
 import { blockSelectActions, snapshotSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -114,12 +115,8 @@ export default function BlocksTable() {
   const setHoverBlock = useHoverRelease(hoverBlock, rows.filter((b) => !isFolded(b.anchorOrd)).map((b) => b.hash), setHoverBlockRaw);
 
   if (!rows.length) {
-    const why =
-      status?.status === "unread" ? "Unlisted networks' blocks are not read"
-      : status?.status === "beyond" ? "Blocks this far back are not reached"
-      : status?.status === "failed" ? "The block window could not be read"
-      : !win || status?.status === "loading" ? "reading…"
-      : "No blocks in this stretch";
+    // The instrument state, in the explorer's and the band's own sentence (`blockAbsence`).
+    const why = blockAbsence(status, !!win);
     return <p className="m-auto text-label text-muted-foreground uppercase tracking-caps">{why}</p>;
   }
 

@@ -36,13 +36,12 @@ import { nodesBySubregion } from "@/src/data/subregions";
 import { useFeedRead } from "@/components/useFeedRead";
 import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
 import { blockScopeOf, blocksByNetwork, blocksInWindow, blocksPerHourBins, lastBlockAt, movedChainOf, movedInWindow, movedPerHourBins } from "@/src/data/blockStats";
-import { blockSpanWord } from "@/src/data/ledgerSpan";
+import { blockAbsence, blockSpanWord, snapshotSpanWord } from "@/src/data/ledgerSpan";
 import { compactDag } from "@/src/util/format";
 import { tickerOf } from "@/components/explorer/nodeRow";
 import { useNowTick } from "@/components/useNowTick";
 import { useLedgerSource } from "@/components/useLedgerSource";
 import { dataByNetwork, dataInWindow, dataPerTick, lastDataTick } from "@/src/data/dataStats";
-import { snapshotSpanWord } from "@/src/data/ledgerSpan";
 import { netKeyOf } from "@/src/engine/domain/pickActions";
 
 export function HyperCells({ accent }: { accent: string }) {
@@ -990,12 +989,8 @@ export function BlocksCells({ accent }: { accent: string }) {
   // about the time since).
   const endMs = pinned && ticks.length ? Math.max(...ticks.map((t) => Date.parse(t.ts))) : now;
   const span = blockSpanWord({ status, globals: win?.globalSnapshots ?? [], nowMs: now, around: win ? win.around : undefined });
-  // No window held: the instrument state, in the switch's own words where it has them.
-  const absent =
-    status?.status === "unread" ? "Unlisted networks' blocks are not read"
-    : status?.status === "beyond" ? "Too far back for the block trail"
-    : status?.status === "failed" ? "The block window could not be read"
-    : "Reading the window…";
+  // No window held: the instrument state, in the explorer's and RAW's own sentence (`blockAbsence`).
+  const absent = blockAbsence(status, !!win);
   const stateLine = (text: string) => <span className="flex items-center self-stretch text-label text-muted-foreground">{text}</span>;
 
   // BLOCKS — every block the window holds (DAG + token, or the filter's network's).

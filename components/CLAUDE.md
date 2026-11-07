@@ -1125,7 +1125,9 @@ and under it, where a token chain's walk was cut by its page cap (`BlockWindow.p
 not reached ("Older DOR blocks are not reached"). Under a network filter the window is that
 network's own blocks (`src/data/CLAUDE.md`), so its span can read "last 15 days"; under the unlisted
 filter the list, the band and RAW say "Unlisted networks' blocks are not read" (the list's empty state
-says it, so the heading's floor line stands down — once, not twice).
+says it, so the heading's floor line stands down — once, not twice). Every way the block window is
+not here — not read, not reached, a failed read (around a pin or live), reading, a window holding no
+block — is ONE sentence on all three surfaces, `ledgerSpan.blockAbsence` (beside the span words).
 A filter holds the rows as it holds the chamber: a block whose accepting global the filter's
 network is not in answers nothing — no commit, no hover, faint — in the explorer and in RAW
 (`ledgerStory.blockRowLocked`, the tick rows' `tickLocked` and `Picking.tickHeldOut`'s rule). The vitals band swaps to `BlocksCells` and RAW to `datasection/BlocksTable`. The band's swap key

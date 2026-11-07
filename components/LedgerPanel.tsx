@@ -15,7 +15,7 @@ import { IdentityDot } from "@/components/inspector/parts";
 import { ensurePage } from "@/components/RawSnapshotBridge";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { useLedgerSource } from "@/components/useLedgerSource";
-import { blockSpanWord, snapshotSpanWord } from "@/src/data/ledgerSpan";
+import { BLOCKS_UNREAD, blockAbsence, blockSpanWord, snapshotSpanWord } from "@/src/data/ledgerSpan";
 import { cn } from "@/lib/utils";
 import { latestRelevant } from "@/src/data/follow";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
@@ -153,10 +153,9 @@ function leafDataTx(ex: SnapshotExact | undefined, metaId: string, ordinal: numb
 // The span words ("last 11 min", "5 h, 2d ago") are `src/data/ledgerSpan.ts`'s — one home with the
 // register switch on the scene, which states each register's span on its own half.
 
-/** The Blocks register's stated floor — what its window reads, in plain words. */
-const BLOCKS_FLOOR = "The DAG and the listed networks; unlisted networks' blocks are not read";
-/** Under the unlisted filter the window reads nothing: the list says the floor, never "no blocks". */
-const BLOCKS_UNREAD = "Unlisted networks' blocks are not read";
+/** The Blocks register's stated floor — what its window reads, in plain words (the unlisted half is
+ *  `BLOCKS_UNREAD`, the sentence the list itself states under the unlisted filter). */
+const BLOCKS_FLOOR = `The DAG and the listed networks; ${BLOCKS_UNREAD.charAt(0).toLowerCase()}${BLOCKS_UNREAD.slice(1)}`;
 
 /** The floor, and — where a token chain's walk was cut by its page cap (`BlockWindow.partial`) — the
  *  blocks it did not reach, by the networks' tickers ("Older DOR blocks are not reached", rule 10). */
@@ -728,9 +727,6 @@ export default function LedgerPanel() {
   // The window's own stretch: "last N h" at the live edge, else its span and how long ago it ended
   // (the past window's words — a window around an old pin makes no claim about now).
   const blockGlobals = blockWin?.globalSnapshots ?? [];
-  // A failed read names what failed: "that time" around a pin, the plain "read failed" at the live
-  // edge, which has no pinned time (the window it holds stays listed).
-  const blockFailed = blockStatus?.around == null ? "read failed" : "couldn't read that time";
   const blockSpan = blockSpanWord({ status: blockStatus, globals: blockGlobals, nowMs: Date.now(), around: blockWin ? blockWin.around : undefined });
   const blockLevel: ExplorerLevelSpec = {
     key: "blocks",
@@ -739,20 +735,10 @@ export default function LedgerPanel() {
     hasFigure: true,
     figureW: 48,
     glyphW: NODE_GLYPH_W,
-    // An honest instrument state for each way the window is not here (rule 10): not read (the
-    // unlisted filter: the floor), read, failed, or deeper than the trail walks — and a window that
-    // holds no block says so. While a window is read the list says so, even over a held one that
-    // happens to hold no block.
-    empty:
-      blockStatus?.status === "unread"
-        ? BLOCKS_UNREAD
-        : blockStatus?.status === "beyond"
-          ? "Blocks this far back are not reached"
-          : blockStatus?.status === "failed"
-            ? blockFailed
-            : blockStatus?.status === "loading" || !blockWin
-              ? "reading…"
-              : "No blocks in this stretch",
+    // An honest instrument state for each way the window is not here (rule 10) — the band's and
+    // RAW's own sentences (`blockAbsence`, one home). While a window is read the list says so, even
+    // over a held one that happens to hold no block.
+    empty: blockAbsence(blockStatus, !!blockWin),
     rows: pagedBlocks.map((b, i): ExplorerRowSpec => {
       const hue = identityHudCss(b.chain);
       const on = block != null && block.chain === b.chain && block.hash === b.hash;
