@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ledgerLens, storyCount, tickInStory, tickLocked, STORY_SETTLE_MS } from "./ledgerStory";
+import { blockRowLocked, ledgerLens, storyCount, tickInStory, tickLocked, STORY_SETTLE_MS } from "./ledgerStory";
 import { METAGRAPHS } from "@/src/net/current";
 import type { Anchor, SnapshotExact } from "@/src/data/types";
 
@@ -107,5 +107,24 @@ describe("tickLocked: only a read can say a tick does not hold the filter", () =
   it("never locks with no story to hold: All, and the DAG that every tick is", () => {
     expect(tickLocked("all", read({}))).toBe(false);
     expect(tickLocked("dag", read({}))).toBe(false);
+  });
+});
+
+describe("blockRowLocked", () => {
+  // DED, a listed network; a tick's landed exact read is its manifest.
+  const ded = "DAG0eQr94qUQSUhmYGNXt6CoBKWu5K6htvRMGC6M";
+  const read = (perMeta: Record<string, { count: number; fee: number; bytes: number }>) => ({ ordinal: 500, perMeta }) as unknown as SnapshotExact;
+  const b = { anchorOrd: 500 };
+  const out = read({ other: { count: 2, fee: 0, bytes: 0 } });
+  it("a block on a tick the filter's network is not in answers nothing, as that tick's row does", () => {
+    expect(blockRowLocked(ded, out, b, { on: false, shownOrd: null })).toBe(true);
+    expect(blockRowLocked(ded, read({ [ded]: { count: 1, fee: 0, bytes: 0 } }), b, { on: false, shownOrd: null })).toBe(false);
+  });
+  it("never locks without a filter story, without a landed read, the committed block, or a block on the tick on screen", () => {
+    expect(blockRowLocked("all", out, b, { on: false, shownOrd: null })).toBe(false);
+    expect(blockRowLocked("dag", out, b, { on: false, shownOrd: null })).toBe(false);
+    expect(blockRowLocked(ded, undefined, b, { on: false, shownOrd: null })).toBe(false);
+    expect(blockRowLocked(ded, out, b, { on: true, shownOrd: null })).toBe(false);
+    expect(blockRowLocked(ded, out, b, { on: false, shownOrd: 500 })).toBe(false);
   });
 });

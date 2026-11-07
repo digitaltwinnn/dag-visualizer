@@ -33,7 +33,7 @@ import {
   SNAP_MEASURES,
   TICK_NET_MEASURES,
 } from "@/src/data/ledgerMeasure";
-import { ledgerLens, storyCount, tickLocked } from "@/src/data/ledgerStory";
+import { blockRowLocked, ledgerLens, storyCount, tickLocked } from "@/src/data/ledgerStory";
 import { filterAccent, resolveSigner, SIGNER_UNKNOWN, snapshotSigners } from "@/src/data/network";
 import { metaSnapHoverKey, type GlobalSnapshot, type NodeRow, type SnapshotExact } from "@/src/data/types";
 import { displayNetwork, LISTED_IDS, UNLISTED_HUE, UNLISTED_ID } from "@/src/data/unlisted";
@@ -147,6 +147,9 @@ function windowWords(snaps: readonly GlobalSnapshot[]): string {
   const end = Date.parse(snaps[snaps.length - 1]!.timestamp);
   return `${spanWords(snaps.slice().reverse()).replace("last ", "")}, ${relativeAge(Date.now() - end)}`;
 }
+
+/** The Blocks register's stated floor — what its window reads, in plain words. */
+const BLOCKS_FLOOR = "The DAG and the listed networks; unlisted networks' blocks are not read";
 
 export default function LedgerPanel() {
   useFeedRead(["global", "metasnaps", "clusters", "api-metagraphs", "api-geo", "exact"], "LedgerPanel");
@@ -729,6 +732,9 @@ export default function LedgerPanel() {
       const read = blockReadOf(blockReads, b);
       const sel = { chain: b.chain, hash: b.hash, ordinal: b.ordinal, anchorOrd: b.anchorOrd };
       const g = blockGlobals.find((x) => x.ordinal === b.anchorOrd);
+      // A filter holds the chamber: a block on a tick its network is not in answers nothing, as
+      // that tick's row and the chamber's pick do (`blockRowLocked`).
+      const locked = blockRowLocked(filter, snapshotExact[b.anchorOrd], b, { on, shownOrd: snap?.data.ordinal ?? null });
       return {
         key: `${b.chain}:${b.hash}`,
         // The chain's ticker in its own ink, the node rows' mark (no dot beside the hued bar).
@@ -747,8 +753,8 @@ export default function LedgerPanel() {
         rung: "block",
         // A COMMITTED FILTER IS A LENS here too: another chain's blocks still list (they happened),
         // stepped back.
-        faint: !on && blockLens !== "all" && blockLens !== b.chain,
-        onClick: g
+        faint: (!on && blockLens !== "all" && blockLens !== b.chain) || locked,
+        onClick: g && !locked
           ? () => {
               const st = useStore.getState();
               applyClickActions(
@@ -761,7 +767,7 @@ export default function LedgerPanel() {
               );
             }
           : undefined,
-        pair: subjectPairing(hoverBlock, b.hash, setHoverBlock, hue),
+        pair: locked ? undefined : subjectPairing(hoverBlock, b.hash, setHoverBlock, hue),
       };
     }),
     pager:
@@ -786,7 +792,10 @@ export default function LedgerPanel() {
       title={inBlocks ? "Blocks" : "Snapshots"}
       control={VIEW_POLICIES[mode].registers.length > 1 ? <RegisterSwitch /> : undefined}
       // The sentence is the path's own placeholder now (user, 2026-10-08): one line beside the house.
-      hint={null}
+      // The Blocks register states its one FLOOR here instead (rule 10): the trail reads the DAG's
+      // and the listed networks' transfer lists, so an unlisted network's blocks are never in it,
+      // and a silent stretch vouches only for what was read.
+      hint={inBlocks ? BLOCKS_FLOOR : null}
       // The sentence names the NEXT LEVEL, never a measure (user, 2026-10-24: "the hint in the
       // breadcrumb always refers to anchors, it should refer to the selected control button" —
       // "anchors" is also a tile's name, so under Fees it read as stale; the networks that

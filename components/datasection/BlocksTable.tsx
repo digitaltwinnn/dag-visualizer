@@ -9,7 +9,7 @@ import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
 import type { GlobalSnapshot } from "@/src/data/types";
 import { blockSelectActions, snapshotSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
-import { ledgerLens } from "@/src/data/ledgerStory";
+import { blockRowLocked, ledgerLens } from "@/src/data/ledgerStory";
 import { compactDag, midHash } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { identityHudCss } from "@/src/palette/identity";
@@ -44,7 +44,7 @@ const COLUMNS: { label: string; right?: boolean; phone?: false }[] = [
 ];
 
 export default function BlocksTable() {
-  useFeedRead(["api-blocks", "global"], "BlocksTable");
+  useFeedRead(["api-blocks", "global", "exact"], "BlocksTable");
   const win = useSyncExternalStore(onBlockWindow, getBlockWindow, () => null);
   const reads = useStore((s) => s.blockReads);
   const miss = useStore((s) => s.blockReadMiss);
@@ -52,6 +52,7 @@ export default function BlocksTable() {
   const snap = useStore((s) => s.snap);
   const following = useStore((s) => s.following);
   const filter = useStore((s) => s.filter);
+  const exact = useStore((s) => s.snapshotExact);
   const status = useStore((s) => s.blockWindowStatus);
   const hoverBlock = useStore((s) => s.hoverBlock);
   const setHoverBlockRaw = useStore((s) => s.setHoverBlock);
@@ -129,13 +130,16 @@ export default function BlocksTable() {
             const inSelGroup = snap?.data.ordinal === b.anchorOrd;
             const hue = identityHudCss(b.chain);
             const on = block != null && block.chain === b.chain && block.hash === b.hash;
-            const pair = subjectPairing(hoverBlock, b.hash, setHoverBlock, hue);
+            // A filter holds the chamber: a block on a tick its network is not in answers nothing —
+            // no commit, no hover — as the tick's own row and the chamber's pick do (`blockRowLocked`).
+            const locked = blockRowLocked(filter, exact[b.anchorOrd], b, { on, shownOrd: snap?.data.ordinal ?? null });
+            const pair = locked ? subjectPairing<string>(null, null, () => {}, hue) : subjectPairing(hoverBlock, b.hash, setHoverBlock, hue);
             const read = blockReadOf(reads, b);
             const unit = tickerOf(b.chain);
             const missed = miss[`${b.chain}:${b.ordinal}`] != null;
             const none = <Empty why={missed ? "The read of the accepting snapshot failed" : "Not read yet"} />;
             const pick = () => {
-              if (!g) return;
+              if (!g || locked) return;
               const st = useStore.getState();
               applyClickActions(
                 blockSelectActions({ chain: b.chain, hash: b.hash, ordinal: b.ordinal, anchorOrd: b.anchorOrd }, { kind: "snapshot", title: `Global snapshot #${g.ordinal}`, data: g }, {
@@ -200,16 +204,17 @@ export default function BlocksTable() {
                 {!isFolded(b.anchorOrd) && (
                   <TableRow
                     ref={on ? pinnedRow : undefined}
-                    tabIndex={0}
+                    tabIndex={locked ? -1 : 0}
+                    aria-disabled={locked || undefined}
                     className={cn(
-                      "text-body cursor-pointer touch:h-11",
-                      "hover:bg-[color-mix(in_oklch,var(--row-hue)_12%,transparent)]",
+                      "text-body touch:h-11",
+                      locked ? "cursor-default" : "cursor-pointer hover:bg-[color-mix(in_oklch,var(--row-hue)_12%,transparent)]",
                       "max-[700px]:grid max-[700px]:grid-cols-[auto_minmax(0,1fr)_auto] max-[700px]:items-center max-[700px]:[&>td]:py-2",
                       "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                       on && "bg-[var(--sel-bg)] text-foreground",
                       pair.className,
                       // A COMMITTED FILTER IS A LENS: another chain's blocks still list, stepped back.
-                      !on && lens !== "all" && lens !== b.chain && "opacity-60",
+                      ((!on && lens !== "all" && lens !== b.chain) || locked) && "opacity-60",
                     )}
                     style={{ "--row-hue": hue, ...(on ? selectionHue(hue) : {}) } as React.CSSProperties}
                     onMouseEnter={pair.onMouseEnter}
