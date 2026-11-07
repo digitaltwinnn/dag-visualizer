@@ -250,12 +250,14 @@ const BRAID_Y = (BRAID_LO + BRAID_HI) / 2;
 const BRAID_HALF = (BRAID_HI - BRAID_LO) / 2;
 /** Blocks that share a tick and a place step aside along the trail by this much, alternately. */
 const BLOCK_STEP = 0.7;
-/** A token block's footprint on its tile, as fractions of the tile: its edge (`TOKEN_ON_TILE` of the
- *  tile's), and how far a block may step off the tile's centre (`TOKEN_NUDGE` of the tile's half) —
- *  across by its sibling fan, along by its turn on the tile. 0.6/2 + 0.3/2 < 1/2, so a block never
- *  leaves its tile. */
-const TOKEN_ON_TILE = 0.6;
-const TOKEN_NUDGE = 0.3;
+/** THE TOKEN BRAID OPENS VERTICALLY OVER ITS TILE, the DAG braid's own layout at the tile's grain
+ *  (user, 2026-11-07: "identical to how they are laid out for $DAG, so vertical, no long
+ *  horizontal"): the chain's main line `TOKEN_BRAID_LIFT` above the tile's top, centred over it, the
+ *  window's widest token fork filling `TOKEN_BRAID_HALF` above and below; blocks sharing a tile and a
+ *  height step aside along the trail by `TOKEN_STEP` (`BLOCK_STEP` at the token block's scale). */
+const TOKEN_BRAID_LIFT = 0.9;
+const TOKEN_BRAID_HALF = 0.55;
+const TOKEN_STEP = BLOCK_STEP * (TOKEN_BLOCK / DAG_BLOCK);
 /** The tile mesh's own depth (the BoxGeometry's z, which becomes height under the -90° X spin). */
 const TILE_D = 0.35;
 
@@ -431,6 +433,9 @@ export class LedgerView implements SceneView {
    *  `BRAID_HALF`. Fixed for the window — it only ever tightens, when a fork wider than it fits
    *  arrives — so a newer block that widens nothing re-scales nothing. Null until a fork exists. */
   private _braidScale: number | null = null;
+  /** The token braid's, over every token chain at once (the same fork depth stands at the same height
+   *  on every tile): the widest token fork fitted to `TOKEN_BRAID_HALF`, held as `_braidScale` is. */
+  private _tokenBraidScale: number | null = null;
   private _anchorLines: AnchorLine[] = [];
   private readonly _tileScratch = new THREE.Vector3();
   /** THE DATA BLOCKS REGISTER'S MARKS (`REGISTER_CARGO.tiles === "data"`): one instance per tile, in the
@@ -1141,12 +1146,18 @@ export class LedgerView implements SceneView {
       if (prior) for (const b of list) if (prior.has(b.hash)) kept++;
       zOf.set(chain, forkSpread(list, 1, prior, pending.get(chain)));
     }
-    if (kept === 0) this._braidScale = null;
+    if (kept === 0) { this._braidScale = null; this._tokenBraidScale = null; }
     this._blockZ = zOf;
     let widest = 0;
-    for (const u of zOf.get("dag")?.values() ?? []) widest = Math.max(widest, Math.abs(u));
+    let widestToken = 0;
+    for (const [chain, m] of zOf) for (const u of m.values()) {
+      if (chain === "dag") widest = Math.max(widest, Math.abs(u));
+      else widestToken = Math.max(widestToken, Math.abs(u));
+    }
     if (widest > 0) this._braidScale = Math.min(this._braidScale ?? Infinity, BRAID_HALF / widest);
+    if (widestToken > 0) this._tokenBraidScale = Math.min(this._tokenBraidScale ?? Infinity, TOKEN_BRAID_HALF / widestToken);
     const braid = this._braidScale ?? 0;
+    const tokenBraid = this._tokenBraidScale ?? 0;
     const tiers = { dag: { items: [] as BlockItem[] }, token: { items: [] as BlockItem[] } }; // event-time
     const at = new Map<string, readonly [number, number, number]>(); // event-time
     const slotAt = new Map<string, number>(); // event-time: the ROW each placed block stands in
@@ -1197,10 +1208,11 @@ export class LedgerView implements SceneView {
         // the metagraph snapshots' lines take — layout data, the bar spec's own band extent.
         anchors.push({ slot: s, key: "dag", x, z, yTop: y - DAG_BLOCK / 2, band: { z0: barMid, z1: barMid }, hue: null });
       }
-      // A token block stands ON the tile of the metagraph snapshot that accepted it (user ruling):
-      // its layered place only nudges it across the tile and its turn along it, both bounded inside
-      // the tile's own footprint (`TOKEN_ON_TILE`, `TOKEN_NUDGE`). That tile is the one the
-      // register draws, tied to its tick by an anchor line.
+      // A token block stands OVER the tile of the metagraph snapshot that accepted it, laid out as
+      // the DAG blocks are over their bar (user, 2026-11-07): centred on the tile, its fork's height
+      // in the token band above it (`TOKEN_BRAID_LIFT`, `TOKEN_BRAID_HALF`), siblings stepping aside
+      // along the trail; a hairline falls from each block, through its tile, to its network's band.
+      // That tile is the one the register draws.
       for (const [chain, rows] of Object.entries(t.metaSnaps)) {
         const recs = w.metaSnaps.get(chain)?.filter((r) => r.ts === t.ts) ?? []; // the tile resolver's list
         for (const r of rows) {
@@ -1211,24 +1223,23 @@ export class LedgerView implements SceneView {
           const tileB = k < 0 ? null : this._tileOf(chain, t.ts, k);
           if (!tileB) continue;
           const tile = this._tileTop(tileB, this._laneCz(chain), this._tileScratch);
-          const size = Math.min(TOKEN_BLOCK, tileB.size * TOKEN_ON_TILE);
-          const reach = (tileB.size / 2) * TOKEN_NUDGE;
+          const hue = this._laneColor(chain).getHex();
+          const spec = this._specs[s];
+          let band: { z0: number; z1: number } | null = null;
+          if (spec?.measured) for (let i = 0; i < spec.bandCount; i++) if (spec.bands[i].key === chain) { band = spec.bands[i]; break; }
           let placed = false;
           for (const hash of r.blocks) {
             const f = placeOf(chain, hash);
             if (f == null) continue;
             placed = true;
-            const along = Math.max(-1, Math.min(1, turn(`${chain}|${r.ordinal}`)));
-            push("token", chain, hash, s, tile.x + along * reach, tile.y + size / 2 + 0.03, tile.z + Math.max(-1, Math.min(1, f)) * reach, size, this._laneColor(chain).getHex(), {
+            const y = tile.y + TOKEN_BRAID_LIFT + Math.max(-TOKEN_BRAID_HALF, Math.min(TOKEN_BRAID_HALF, f * tokenBraid));
+            const x = tile.x + turn(`${s}|${chain}|${y.toFixed(3)}`) * TOKEN_STEP;
+            push("token", chain, hash, s, x, y, tile.z, TOKEN_BLOCK, hue, {
               kind: "block", sel: { chain, hash, ordinal: r.ordinal, anchorOrd: t.ord }, global, title: "Block",
             });
+            anchors.push({ slot: s, key: chain, x, z: tile.z, yTop: y - TOKEN_BLOCK / 2, band, hue });
           }
-          if (!placed) continue;
-          this._blockTiles.add(tileB);
-          const spec = this._specs[s];
-          let band: { z0: number; z1: number } | null = null;
-          if (spec?.measured) for (let i = 0; i < spec.bandCount; i++) if (spec.bands[i].key === chain) { band = spec.bands[i]; break; }
-          anchors.push({ slot: s, key: chain, x: tile.x, z: tile.z, yTop: FLOOR_Y.msnap + TILE_LIFT, band, hue: this._laneColor(chain).getHex() });
+          if (placed) this._blockTiles.add(tileB);
         }
       }
     }

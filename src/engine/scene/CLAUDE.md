@@ -580,7 +580,7 @@ bars, labels, the rewind and the pose. What differs answers through ONE keyed ma
 
 **Where a block stands is layout data, placed at event time** (`_rebuildBlockTier`, on every slot
 rebuild and read; a window change reaches it through the refresh that follows): a DAG block above
-its tick's bar, a token block ON the tile of the metagraph snapshot that accepted it — the k-th
+its tick's bar, a token block OVER the tile of the metagraph snapshot that accepted it — the k-th
 filled tile of that tick, `k` the tile resolver's own index (`tileAnchorOf`). `_tileTop` is the ONE
 copy of the tile arithmetic: the per-frame tile draw, the selected tile's callout anchor and the
 token placement all read it, the first two adding the frame's offsets. The BLOCK CALLOUT's anchor
@@ -626,16 +626,20 @@ the block's own place, ending one slot past the trail's deepest row with its far
 nothing (row −1 in `BlockTier`). **A link is an S-CURVE** (D8: "start horizontal, curve, end
 horizontal"): `blockBraid.sCurve`, a cubic whose control points lie along the trail only
 (`LINK_BEND` × the run), sampled into `LINK_SAMPLES` segments at event time, its alpha eased from one
-end's row weight to the other's per frame; at rest it draws at `BLOCK_LOOK.link` (dark 0.42, paper
-0.7) in the blocks' cyan. ⚠️ A link that needs both ends ON the trail draws only for a
+end's row weight to the other's per frame; at rest it draws at `BLOCK_LOOK.link` (dark 0.8, paper
+0.92) in the blocks' cyan. ⚠️ A link that needs both ends ON the trail draws only for a
 selected block: the trail holds only the visible rows until a selection grows its reach. Both ends
 must be READ facts, not both drawn — the stub is what keeps every reference on screen. A block whose
 read has not landed states no references and draws none.
 
-**A token block never leaves its tile** (user ruling): it stands ON the tile of the metagraph
-snapshot that accepted it, its layered place and its turn among the tile's blocks only nudging it
-inside the tile's own footprint (`TOKEN_ON_TILE`, `TOKEN_NUDGE`), in the lane's hue, opaque like the
-tile; a snapshot whose tile is not drawn puts no block anywhere.
+**A token block stands OVER its tile, laid out as the DAG blocks are** (user, 2026-11-07:
+"identical to how they are laid out for $DAG, so vertical, no long horizontal" — it superseded the
+on-the-tile nudge): centred on the tile of the metagraph snapshot that accepted it, its fork's height
+in a band `TOKEN_BRAID_LIFT` above the tile's top (`forkSpread` over every token chain at once, the
+widest token fork fitted to `TOKEN_BRAID_HALF` — `_tokenBraidScale`, held as `_braidScale` is),
+siblings at one height stepping aside along the trail by `TOKEN_STEP`, in the lane's hue, opaque
+like the tile; one seal line falls from each block's bottom through its tile to its network's band.
+A snapshot whose tile is not drawn puts no block anywhere.
 
 **Honesty (rule 10).** A block is drawn from the FEED's hashes, so a tick whose full read has not
 landed, or failed (`blockReadMiss`), shows its blocks with no links; a link is drawn only from a

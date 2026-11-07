@@ -53,14 +53,14 @@ export interface BlockLook {
   /** The hovered or committed block's swell. */
   grow: number;
   /** A link's resting opacity, per ground — every reference is drawn AT REST, always (user, D2:
-   *  "draw it always"); a relation, not a subject, so under the blocks it ties. Dark 0.42 (an
-   *  additive cyan hairline over black reads at that); paper 0.7 (normal-blended ink on the plate
-   *  read as a pale ghost at 0.42, seen live in D2). */
+   *  "draw it always"). Dark 0.8, paper 0.92 (user, 2026-11-07: "make the lines from block to its
+   *  children more visible / stand out more" — at 0.42 / 0.7 the hairline read as a ghost beside the
+   *  blocks it ties; a line is one pixel wide whatever its alpha, so alpha is the lever). */
   link: number;
   linkPaper: number;
 }
 
-export const BLOCK_LOOK: Readonly<BlockLook> = { rest: 0.6, ink: 0.35, grow: 0.35, link: 0.42, linkPaper: 0.7 };
+export const BLOCK_LOOK: Readonly<BlockLook> = { rest: 0.6, ink: 0.35, grow: 0.35, link: 0.8, linkPaper: 0.92 };
 
 /** THE DAG BLOCK'S GLASS (user, design round D1: "the block should match the transparent / cyan
  *  snapshot color"): the global snapshot's own material — normal-blended, translucent, no depth
