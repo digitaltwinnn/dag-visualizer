@@ -238,7 +238,7 @@ function Tour({ stop, leaving }: { stop: number; leaving: boolean }) {
           onClick={() => goTo(i)}
           className="group -my-3 flex-1 py-3 touch:-my-5 touch:py-5"
         >
-          <span className="block h-[3px] overflow-hidden rounded-full bg-foreground/20 group-hover:bg-foreground/40">
+          <span className="block h-[5px] overflow-hidden rounded-full bg-foreground/20 group-hover:bg-foreground/40">
             <i
               key={stop}
               ref={i === stop ? fill : undefined}
