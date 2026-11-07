@@ -72,14 +72,17 @@ export default function FollowControl({ className, subject = "snapshot" }: { cla
     ) : null;
   }
 
-  if (!live)
+  const pinned = !following && (subject === "block" ? block != null : snap != null);
+  // A PIN KEEPS SAYING PINNED WHILE THE FEED IS DOWN (ruling, 2026-11-07): the pin is a selection
+  // fact, which an unreachable feed does not change — the feed's own state is the pulse strip's. Only
+  // a control with nothing pinned, which would otherwise claim LIVE, says "no signal".
+  if (!live && !pinned)
     return (
       <span className={cn("inline-flex items-center gap-1.5 text-label text-muted-foreground whitespace-nowrap", className)}>
         <NoSignalDot /> no signal
       </span>
     );
 
-  const pinned = !following && (subject === "block" ? block != null : snap != null);
   const washed = pinned;
   // The age is the SHOWN snapshot's — the committed one whether pinned or following. Under a
   // metagraph filter, following lands on the newest tick THAT network anchored into

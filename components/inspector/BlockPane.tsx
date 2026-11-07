@@ -76,10 +76,14 @@ export default function BlockPane({ onClose, collapsed, onToggle }: { onClose: (
       <CardHead
         eyebrow="Block"
         title={
-          <span className="inline-flex items-center gap-2 min-w-0">
+          // `max-w-full`: an inline-flex title is not held to the h3's width by `min-w-0` alone, so
+          // a hash wider than the row's share ran under the height chip (measured at 1600: the
+          // head's 8px gap read as −1px). Ten characters fit beside the chip and the live control;
+          // a narrower rail truncates inside the title rather than closing the gap.
+          <span className="inline-flex items-center gap-2 min-w-0 max-w-full">
             {/* A subject-specific mark carries its OWN subject's hue (the node-mark idiom). */}
             <BLOCK_ICON aria-hidden className={KIND_MARK_CLASS} style={{ color: hue } as CSSProperties} />
-            <span className="truncate font-mono">{midHash(sel.hash, 12)}</span>
+            <span className="truncate font-mono">{midHash(sel.hash, 10)}</span>
           </span>
         }
         // The height chip, then the LIVE / PINNED control (D3): in the Blocks register live follows
