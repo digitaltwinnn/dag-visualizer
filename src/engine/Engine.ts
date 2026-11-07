@@ -1469,10 +1469,13 @@ export class Engine {
     // live buffer. A past window is fixed, so a live event re-hands the same rows and moves nothing.
     const st = useStore.getState();
     const src = ledgerSource(getNetwork(), st.ledgerRegister);
-    // The Blocks register's FRONT RUN reaches to the live global — only while the window held is the
-    // live one (a pinned past window, `around` set, makes no claim about now).
+    // The Blocks register's FRONT RUN reaches to the live global — only while the window HELD is the
+    // live one (a pinned past window, its own `around` set, makes no claim about now; asked of the
+    // window, never the request in flight — review M1). With none held yet, the request says.
     // Under the unlisted filter no window is read, so there is no front run to draw either.
-    const liveRun = this.ledger.readsBlockWindow && st.blockWindowStatus?.around == null && st.blockWindowStatus?.status !== "unread";
+    const bw = getBlockWindow();
+    const heldLive = bw ? bw.around == null : st.blockWindowStatus?.around == null;
+    const liveRun = this.ledger.readsBlockWindow && heldLive && st.blockWindowStatus?.status !== "unread";
     this.ledger.setLiveGlobal(liveRun ? (getNetwork()?.latest ?? null) : null);
     this.ledger.setData(src?.globalSnapshots ?? [], (ts) => src?.getAnchor(ts) ?? null);
     // The byte bar measures ticks from the EXACT reads (spec §6.3) — re-hand the map on each

@@ -126,8 +126,10 @@ function followNewestBlock(): void {
     return;
   }
   // A window read for ANOTHER network (a filter change, before its refetch lands), or one read around
-  // a pin (a resume, before the live window lands), is not the live edge this follow walks.
-  if (!w || w.chain !== blockChainOf(filter) || blockWindowStatus?.around != null) return;
+  // a pin (a resume, before the live window lands), is not the live edge this follow walks — asked
+  // of the HELD window's own provenance, never the request in flight (review M1: a resume flips the
+  // request to "live" while the pinned window is still the one held).
+  if (!w || w.chain !== blockChainOf(filter) || w.around != null) return;
   const b = newestBlock(w);
   if (!b) {
     if (block) advanceBlock(null);

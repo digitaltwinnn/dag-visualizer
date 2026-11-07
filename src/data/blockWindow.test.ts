@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BLOCK_WINDOW_TICKS, blockChainOf, blockWanted, blockWindowContinues, foldBlockWindow, liveWindowRuns, mergeLiveAnswer, newestBlock, tipJoins, trailPath, windowBlocks } from "@/src/data/blockWindow";
+import { BLOCK_REFRESH_MS, BLOCK_WINDOW_TICKS, blockChainOf, blockRefreshMs, blockWanted, blockWindowContinues, failedReadKeeps, foldBlockWindow, liveControlCard, liveWindowRuns, mergeLiveAnswer, newestBlock, tipJoins, trailPath, windowBlocks } from "@/src/data/blockWindow";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
 import type { RawMetaSnapshot, SnapshotExact } from "@/src/data/types";
 
@@ -198,5 +198,60 @@ describe("the window under a network filter (D4)", () => {
     expect(tipJoins(null)).toBe(true);
     expect(tipJoins("dag")).toBe(true);
     expect(tipJoins("DOR")).toBe(false);
+  });
+});
+
+describe("a pin newer than the live window (review I1)", () => {
+  const live = { from: 400, to: 900, chain: null, around: null };
+  it("a pin newer than the held LIVE window's newest block tick keeps the live window — no past-window fetch", () => {
+    expect(blockWanted({ ledger: true, register: "blocks", pin: 950, held: live, liveNewest: 960 })).toEqual({ kind: "keep" });
+    // …and it keeps the live refresh running (LAST BLOCK stays live, the front run stays drawn).
+    expect(liveWindowRuns({ liveWanted: true, touring: false, following: false, pin: 950, held: live, heldLive: true })).toBe(true);
+  });
+  it("a pin older than the live window still reads the past around it; a held PINNED window is no live edge", () => {
+    expect(blockWanted({ ledger: true, register: "blocks", pin: 50, held: live, liveNewest: 960 })).toEqual({ kind: "fetch", around: 50 });
+    expect(blockWanted({ ledger: true, register: "blocks", pin: 950, held: { ...live, around: 600 }, liveNewest: 960 })).toEqual({ kind: "fetch", around: 950 });
+  });
+});
+
+describe("which card carries LIVE / PINNED (review I1)", () => {
+  it("in Transaction blocks the Block card while one stands, else the Global snapshot card", () => {
+    expect(liveControlCard("blocks", { hash: "b" })).toBe("block");
+    expect(liveControlCard("blocks", null)).toBe("snapshot");
+    expect(liveControlCard("snapshots", { hash: "b" })).toBe("snapshot");
+    expect(liveControlCard("data", null)).toBe("snapshot");
+  });
+});
+
+describe("the window's own provenance (review M1, M2)", () => {
+  const tick = (ord: number) => ({ ord, ts: "t", hash: "h" + ord, blocks: ["b" + ord], metaSnaps: {} });
+  it("the window carries the ordinal it was read around (null: the live edge), and its network", () => {
+    expect(foldBlockWindow({ ticks: [tick(200)], chains: [], around: 200 }, {}).around).toBe(200);
+    expect(foldBlockWindow({ ticks: [tick(200)], chains: [], around: null }, {}).around).toBeNull();
+    expect(foldBlockWindow({ ticks: [tick(200)], chains: [] }, {}).around).toBeNull();
+    expect(foldBlockWindow({ ticks: [tick(200)], chains: [], chain: "DOR" }, {}).chain).toBe("DOR");
+  });
+  it("a spent read keeps only the live window of the network asked", () => {
+    expect(failedReadKeeps({ chain: null, around: null }, { around: null, chain: null })).toBe(true);
+    expect(failedReadKeeps({ chain: "DOR", around: null }, { around: null, chain: "DOR" })).toBe(true);
+  });
+  it("a filter's failed refetch clears the other network's window — never All's numbers under DOR", () => {
+    expect(failedReadKeeps({ chain: null, around: null }, { around: null, chain: "DOR" })).toBe(false);
+    expect(failedReadKeeps({ chain: "DOR", around: null }, { around: null, chain: null })).toBe(false);
+  });
+  it("a failed pinned read clears, and so does a failed resume over a pinned window", () => {
+    expect(failedReadKeeps({ chain: null, around: null }, { around: 50, chain: null })).toBe(false);
+    expect(failedReadKeeps({ chain: null, around: 50 }, { around: null, chain: null })).toBe(false);
+    expect(failedReadKeeps(null, { around: null, chain: null })).toBe(false);
+  });
+});
+
+describe("blockRefreshMs — the trail's cadence (review M3)", () => {
+  it("30 s where the register draws the window (and while the tour reads ahead), 5 min where only the switch's span reads it", () => {
+    expect(BLOCK_REFRESH_MS).toEqual({ drawn: 30_000, span: 300_000 });
+    expect(blockRefreshMs("blocks", false)).toBe(30_000);
+    expect(blockRefreshMs("snapshots", true)).toBe(30_000);
+    expect(blockRefreshMs("snapshots", false)).toBe(300_000);
+    expect(blockRefreshMs("data", false)).toBe(300_000);
   });
 });

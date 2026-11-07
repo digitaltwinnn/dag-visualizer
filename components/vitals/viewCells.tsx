@@ -979,7 +979,8 @@ export function BlocksCells({ accent }: { accent: string }) {
   const status = useStore((s) => s.blockWindowStatus);
   const reads = useStore((s) => s.blockReads);
   const now = useNowTick(1000);
-  const pinned = status?.around != null;
+  // A pinned window by the WINDOW's own provenance (review M1), the request's only while none is held.
+  const pinned = win ? win.around != null : status?.around != null;
   const ticks = win?.ticks ?? [];
   // The window's own network's blocks (under a network filter it also holds the DAG blocks sharing
   // its ticks), and a window its DRIVING chain's walk cut short is read like a full one: a floor

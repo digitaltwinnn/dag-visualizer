@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { useStore } from "./store";
-import { applyClickActions } from "./applyClickActions";
+import { applyClickActions, switchLedgerRegister } from "./applyClickActions";
 import {
   snapshotSelectActions,
   followToggleActions,
@@ -9,8 +9,8 @@ import {
   blockFollowActions,
 } from "@/src/engine/domain/pickActions";
 import { followLatest } from "@/src/data/follow";
-import { setBlockWindow } from "@/src/data/pastWindow";
-import { foldBlockWindow } from "@/src/data/blockWindow";
+import { getBlockWindow, setBlockWindow } from "@/src/data/pastWindow";
+import { blockWanted, foldBlockWindow, liveControlCard } from "@/src/data/blockWindow";
 import { METAGRAPHS } from "@/src/net/current";
 import type { GlobalSnapshot, MetaSnapSel, PickDescriptor, RawMetaSnapshot } from "@/src/data/types";
 
@@ -146,7 +146,7 @@ describe("the follow flow decision table", () => {
 describe("the follow flow in the Blocks register (D3)", () => {
   const tick = (ord: number, blocks: string[], meta: Record<string, RawMetaSnapshot[]> = {}) => ({ ord, ts: `T${ord}`, hash: `h${ord}`, blocks, metaSnaps: meta });
   const tokenSnap = (ordinal: number, blocks: string[]) => ({ ordinal, hash: `m${ordinal}`, lastSnapshotHash: "", timestamp: "", blocks }) as unknown as RawMetaSnapshot;
-  const win = (ticks: ReturnType<typeof tick>[], chain?: string) => setBlockWindow(foldBlockWindow({ ticks, chains: ["dag"], ...(chain ? { chain } : {}) }, {}));
+  const win = (ticks: ReturnType<typeof tick>[], chain?: string, around?: number) => setBlockWindow(foldBlockWindow({ ticks, chains: ["dag"], ...(chain ? { chain } : {}), ...(around != null ? { around } : {}) }, {}));
   beforeEach(() => {
     useStore.setState({ mode: "ledger", ledgerRegister: "blocks", following: true, snap: null, block: null, metaSnap: null, tickNet: null, filter: "all", selStack: [], blockWindowStatus: null });
     setBlockWindow(null);
@@ -208,7 +208,7 @@ describe("the follow flow in the Blocks register (D3)", () => {
   });
 
   it("a window read around a pin is not the live edge: a resume waits for the live window", () => {
-    win([tick(200, ["b2"])]);
+    win([tick(200, ["b2"])], undefined, 200);
     useStore.setState({ blockWindowStatus: { around: 200, status: "ready" }, block: { chain: "dag", hash: "b2", ordinal: 200, anchorOrd: 200 } });
     followLatest();
     expect(st().block?.hash).toBe("b2");
@@ -216,6 +216,48 @@ describe("the follow flow in the Blocks register (D3)", () => {
     win([tick(300, ["b3"]), tick(200, ["b2"])]);
     followLatest();
     expect(st().block?.hash).toBe("b3");
+  });
+
+  it("THE RESUME GAP (review M1): the request already says live, the held window is still the pin's — nothing is seated from it", () => {
+    win([tick(200, ["b2"]), tick(150, ["b1"])], undefined, 200);
+    useStore.setState({ snap: snapPick(150), block: { chain: "dag", hash: "b1", ordinal: 150, anchorOrd: 150 } });
+    // The bridge flips the request to the live edge the moment the resume asks…
+    useStore.setState({ blockWindowStatus: { around: null, status: "loading" } });
+    followLatest();
+    // …but the window held is the PAST one: its newest block is not live, so the cards hold still.
+    expect(st().block?.hash).toBe("b1");
+    expect(st().snap?.data.ordinal).toBe(150);
+    // The live window lands: the follow seats its newest block.
+    win([tick(300, ["b3"])]);
+    useStore.setState({ blockWindowStatus: { around: null, status: "ready" } });
+    followLatest();
+    expect(st().block?.hash).toBe("b3");
+  });
+
+  it("A PIN CARRIED IN FROM ANOTHER REGISTER (review I1): the Global card says PINNED and offers LIVE; LIVE seats the newest block", () => {
+    win([tick(300, ["b3"])]);
+    useStore.setState({ ledgerRegister: "snapshots", following: true });
+    // Pin a recent global in Metagraph snapshots, newer than the window's newest block tick…
+    applyClickActions(snapshotSelectActions(snapPick(310), false, { pinnedOrdinal: null, metaSnap: null, block: null }));
+    expect(st().following).toBe(false);
+    expect(st().snap?.data.ordinal).toBe(310);
+    // …then press "Transaction blocks" on the scene switch.
+    switchLedgerRegister("blocks");
+    expect(st().ledgerRegister).toBe("blocks");
+    expect(st().block).toBeNull();
+    // No Block card stands, so the Global snapshot card carries the control: it reads PINNED.
+    expect(liveControlCard(st().ledgerRegister, st().block)).toBe("snapshot");
+    // The pin lies in the live edge's silence: the live window is kept, no past-window fetch.
+    const w = getBlockWindow()!;
+    expect(blockWanted({ ledger: true, register: "blocks", pin: 310, held: { from: w.from, to: w.to, chain: w.chain, around: w.around }, liveNewest: 320 })).toEqual({ kind: "keep" });
+    // Its LIVE: the card's own write (`followToggleActions`) resumes, and the next beat seats the newest block.
+    applyClickActions(followToggleActions(snapPick(310), st().following, st().block));
+    expect(st().following).toBe(true);
+    followLatest();
+    expect(st().block?.hash).toBe("b3");
+    expect(st().snap?.data.ordinal).toBe(300);
+    // A Block card stands again: the control rides it.
+    expect(liveControlCard(st().ledgerRegister, st().block)).toBe("block");
   });
 
   it("under a network filter LIVE follows THAT network's newest block, never another network's window", () => {

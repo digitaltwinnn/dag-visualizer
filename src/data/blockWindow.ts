@@ -31,12 +31,19 @@ export interface BlockWindowAnswer {
   chain?: string;
   /** Token chains whose walk was cut by its page cap: their older blocks are not reached (rule 10). */
   partial?: string[];
+  /** The ordinal the window was asked around (absent or null: the live edge) — stamped by the bridge
+   *  on the answer it holds, so a refold keeps it (the route does not echo it). */
+  around?: number | null;
 }
 
 export interface BlockWindow extends LedgerSource {
   ticks: BlockTick[];
   /** The network the window was read for; null: every network. */
   chain: string | null;
+  /** The ordinal the window was read AROUND; null: it is the live edge's (review M1). Its own
+   *  provenance — the follow, the front run and a failed read ask THIS, never the request in flight,
+   *  which can say "live" while a pinned window is still the one held. */
+  around: number | null;
   /** The chains whose walk was cut short by its page cap (current ids). */
   partial: string[];
   from: number;
@@ -111,6 +118,7 @@ export function foldBlockWindow(answer: BlockWindowAnswer, exact: Readonly<Recor
   return {
     ticks,
     chain: answer.chain ?? null,
+    around: answer.around ?? null,
     partial: answer.partial ?? [],
     from,
     to,
@@ -157,7 +165,7 @@ export function blockWanted(s: {
   ledger: boolean;
   register: LedgerRegister;
   pin: number | null;
-  held: { from: number; to: number; chain?: string | null } | null;
+  held: { from: number; to: number; chain?: string | null; around?: number | null } | null;
   liveNewest: number | null;
   touring?: boolean;
   chain?: string | null;
@@ -172,6 +180,10 @@ export function blockWanted(s: {
   if (s.touring || s.register !== "blocks") return held ? { kind: "keep" } : { kind: "fetch", around: null };
   if (s.pin == null) return held ? { kind: "keep" } : { kind: "fetch", around: null };
   if (held && s.pin >= held.from && s.pin <= held.to) return { kind: "keep" };
+  // A pin NEWER than the held LIVE window's newest block tick lies in the live edge's silence (the
+  // front run), not in the past: the live window holds it (review I1 — a pin seconds old carried
+  // into Transaction blocks must not read as "a past time").
+  if (held && (held.around ?? null) == null && s.pin > held.to) return { kind: "keep" };
   return { kind: "fetch", around: s.pin };
 }
 
@@ -180,8 +192,9 @@ export function blockWanted(s: {
  *  under a pin the held LIVE window covers (`heldLive`: the window held was asked for as "live",
  *  and `blockWanted` keeps it for that pin). The band is the live instrument, so a block or tick
  *  clicked inside the live window never freezes it (the Snapshots register's own rule: a pin never
- *  freezes the band). A pin outside it is a past window (`blockWanted` fetches around the pin), and
- *  that window holds still. */
+ *  freezes the band). A pin newer than its newest tick is in the live edge's silence and keeps it
+ *  moving too (`blockWanted` keeps the live window for it). A pin older than it is a past window
+ *  (`blockWanted` fetches around the pin), and that window holds still. */
 export function liveWindowRuns(s: {
   liveWanted: boolean;
   touring: boolean;
@@ -192,7 +205,35 @@ export function liveWindowRuns(s: {
 }): boolean {
   if (!s.liveWanted) return false;
   if (s.touring || s.following) return true;
-  return s.pin != null && s.heldLive && s.held != null && s.pin >= s.held.from && s.pin <= s.held.to;
+  return s.pin != null && s.heldLive && s.held != null && s.pin >= s.held.from;
+}
+
+/** HOW OFTEN THE LIVE WINDOW IS READ AGAIN (review M3). Inside Transaction blocks (and while the tour
+ *  reads ahead for its Blocks stop) the window is what the register draws: every 30 s. In the other
+ *  registers only the switch's span reads it, and that needs only the window's reach, which moves
+ *  about once a block tick: every 5 minutes. The live feed's announced tick still joins at once. */
+export const BLOCK_REFRESH_MS = { drawn: 30_000, span: 5 * 60_000 } as const;
+export function blockRefreshMs(register: LedgerRegister, touring: boolean): number {
+  return touring || register === "blocks" ? BLOCK_REFRESH_MS.drawn : BLOCK_REFRESH_MS.span;
+}
+
+/** A READ THAT SPENT ITS RETRIES: does the held window stay drawn (review M2)? Only when it IS the
+ *  live window of the network that was asked — the live edge keeps what it holds and tries again on
+ *  its next refresh. A failed pinned read clears (a window that lacks the pin would lie), and so does
+ *  a held window read for ANOTHER network (a filter's failed refetch: that network's numbers under
+ *  this filter would be a false statement) or around a pin (a failed resume). */
+export function failedReadKeeps(held: { chain: string | null; around: number | null } | null, asked: { around: number | null; chain: string | null }): boolean {
+  if (!held || asked.around != null) return false;
+  return held.chain === asked.chain && held.around == null;
+}
+
+/** WHICH CARD CARRIES LIVE / PINNED in the Snapshots view (review I1). In Transaction blocks live
+ *  follows the newest block, so while a Block card stands IT carries the control and the Global
+ *  snapshot card only its age; with no Block card (a pin carried in from another register, the
+ *  block's ×, a re-click releasing it) the Global card carries it again — else nothing on the
+ *  scene layer would say PINNED or offer LIVE. Every other register: the Global card. */
+export function liveControlCard(register: LedgerRegister, block: unknown): "snapshot" | "block" {
+  return register === "blocks" && block != null ? "block" : "snapshot";
 }
 
 /** Does `w` CONTINUE the window whose newest tick was `prevTo`, so the chamber advances its trail

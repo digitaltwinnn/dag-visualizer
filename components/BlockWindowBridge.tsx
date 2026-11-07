@@ -6,7 +6,7 @@ import { netUrl } from "@/src/net/current";
 import { POLL } from "@/src/engine/config";
 import { reportPoll } from "@/src/data/api";
 import { getBlockWindow, pastRetryDelay, setBlockWindow } from "@/src/data/pastWindow";
-import { BLOCK_WINDOW_TICKS, blockChainOf, blockWanted, foldBlockWindow, liveWindowRuns, mergeLiveAnswer, tipJoins, trailPath, type BlockWindowAnswer } from "@/src/data/blockWindow";
+import { BLOCK_WINDOW_TICKS, blockChainOf, blockRefreshMs, blockWanted, failedReadKeeps, foldBlockWindow, liveWindowRuns, mergeLiveAnswer, tipJoins, trailPath, type BlockWindowAnswer } from "@/src/data/blockWindow";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 
@@ -16,12 +16,17 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 // reads, and holds the window in the module beside `NetworkData` (`pastWindow.ts`). A failed read is
 // tried again on `pastRetryDelay`'s schedule; once spent, or when the pin lies beyond the trail's
 // reach, the held window is CLEARED (the chamber never shows a window that does not hold the pin)
-// and `blockWindowStatus` says why; the feed's health row (`api-blocks`) tracks the reads. While the
-// live window is held (`liveWindowRuns`: following, touring, or a pin the held LIVE window covers —
-// the band is the live instrument, so a click inside the live window never freezes it), it
-// refreshes the live trail every `LIVE_REFRESH_MS` and adds a tick the live feed has announced at
-// once (its blocks are on the global record), leaving its anchored records for the next refresh. A
-// pin outside it is a past window, which holds still.
+// and `blockWindowStatus` says why; the feed's health row (`api-blocks`) tracks the reads. The held
+// window carries its OWN provenance (`around`, `chain` — review M1/M2): every answer is stamped with
+// what it was asked, and a read that spends its retries keeps the window only when it is the live
+// window of the network asked (`failedReadKeeps`) — another network's window, or a pin's, is cleared
+// rather than drawn under this filter. While the live window is held (`liveWindowRuns`: following,
+// touring, or a pin the held LIVE window covers or lies newer than — the band is the live instrument,
+// so a click inside the live window never freezes it), it refreshes the live trail on
+// `blockRefreshMs` — every 30 s in Transaction blocks (and the tour), every 5 min in the other
+// registers, whose switch needs only the window's reach (review M3) — and adds a tick the live feed
+// has announced at once (its blocks are on the global record), leaving its anchored records for the
+// next refresh. A pin older than it is a past window, which holds still.
 //
 // THE WINDOW IS THE FILTER'S NETWORK'S (`blockChainOf`, D4 2026-11-07): under a network filter the
 // trail is asked for THAT network's newest block ticks (`&chain=`), however far back they lie; a
@@ -32,8 +37,6 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 //
 // THE BRIEFING READS AHEAD: while the tour runs (`store.briefing` non-null) the LIVE window is
 // fetched even before the Blocks stop, so that stop opens on a drawn chamber, not a loading one.
-const LIVE_REFRESH_MS = 30_000;
-
 export default function BlockWindowBridge() {
   const ledger = useStore((s) => VIEW_POLICIES[s.mode].tickScoped);
   const register = useStore((s) => s.ledgerRegister);
@@ -69,6 +72,10 @@ export default function BlockWindowBridge() {
   };
   useEffect(() => dropRetry, []);
 
+  // Last time a live read was started (ms): the refresh's first beat is due from it, so entering
+  // Transaction blocks with a window read minutes ago refreshes at once rather than 30 s later.
+  const lastLiveRead = useRef(0);
+
   const apply = (a: BlockWindowAnswer) => {
     answer.current = a;
     setBlockWindow(foldBlockWindow(a, useStore.getState().snapshotExact));
@@ -76,6 +83,7 @@ export default function BlockWindowBridge() {
 
   const read = (around: number | null, ch: string | null, g: number, attempt: number) => {
     if (g !== gen.current) return;
+    if (around == null) lastLiveRead.current = Date.now();
     fetch(netUrl(trailPath(around, ch)))
       .then((r) => (r.ok ? (r.json() as Promise<BlockWindowAnswer>) : null))
       .then((a) => {
@@ -89,8 +97,12 @@ export default function BlockWindowBridge() {
           setStatus({ around, status: "beyond" });
           return;
         }
-        // A live refresh never moves the window backward (`mergeLiveAnswer`); a pin replaces.
-        apply(around == null ? mergeLiveAnswer(answer.current, a) : a);
+        // Stamped with what was asked — the window's own provenance (`BlockWindow.around`).
+        const stamped: BlockWindowAnswer = { ...a, around };
+        // A live refresh never moves the window backward (`mergeLiveAnswer` — only into a held LIVE
+        // answer: a pin's window is replaced, never merged forward); a pin replaces.
+        const heldLive = answer.current && (answer.current.around ?? null) == null ? answer.current : null;
+        apply(around == null ? { ...mergeLiveAnswer(heldLive, stamped), around: null } : stamped);
         setStatus({ around, status: "ready" });
       })
       .catch(() => failed(around, ch, g, attempt));
@@ -100,9 +112,11 @@ export default function BlockWindowBridge() {
     reportPoll("api-blocks", false);
     const delay = pastRetryDelay(attempt);
     if (delay == null) {
-      // Budget spent: stand the chamber empty for a pin (a window that lacks it would lie); the
-      // live edge keeps what it holds and tries again on its next refresh.
-      if (around != null) {
+      // Budget spent: the live edge keeps the window it holds — the live window of the network asked —
+      // and tries again on its next refresh; anything else is cleared (`failedReadKeeps`): a window
+      // that lacks the pin would lie, and another network's under this filter would too (M2).
+      const held = getBlockWindow();
+      if (!failedReadKeeps(held ? { chain: held.chain, around: held.around } : null, { around, chain: ch })) {
         answer.current = null;
         setBlockWindow(null);
       }
@@ -117,7 +131,7 @@ export default function BlockWindowBridge() {
 
   useEffect(() => {
     const held = getBlockWindow();
-    const want = blockWanted({ ledger, register, pin, held: held ? { from: held.from, to: held.to, chain: held.chain } : null, liveNewest, touring, chain });
+    const want = blockWanted({ ledger, register, pin, held: held ? { from: held.from, to: held.to, chain: held.chain, around: held.around } : null, liveNewest, touring, chain });
     const chainKey = chain ?? "all";
     // Unpinning back to the live edge: the held window is the pin's, so ask for live at once.
     const backToLive = want.kind === "keep" && pin == null && asked.current != null && asked.current !== `${chainKey}@live`;
@@ -164,26 +178,38 @@ export default function BlockWindowBridge() {
   // module's window at the moment, so the interval and the append re-ask it rather than closing over it.
   const liveRuns = () => {
     const held = getBlockWindow();
-    return liveWindowRuns({ liveWanted, touring, following, pin, held: held ? { from: held.from, to: held.to } : null, heldLive: askedLive() });
+    return liveWindowRuns({ liveWanted, touring, following, pin, held: held ? { from: held.from, to: held.to } : null, heldLive: held != null && held.around == null && askedLive() });
   };
 
-  // The live edge: a fresh trail every 30 s while the live window is held — under a pin inside it too.
+  // The live edge: a fresh trail on `blockRefreshMs` while the live window is held — under a pin it
+  // covers too. The first beat is due from the last live read, so a register switch into
+  // Transaction blocks catches up at once on a window read on the 5-minute beat.
   useEffect(() => {
     if (!liveRuns()) return;
-    const id = window.setInterval(() => {
+    const every = blockRefreshMs(register, touring);
+    const beat = () => {
       // A pin the window has since let go of (it aged out, or a pinned fetch replaced the window).
       if (!askedLive()) return;
       read(null, chain, ++gen.current, 0);
-    }, LIVE_REFRESH_MS);
-    return () => window.clearInterval(id);
+    };
+    let id: number | null = null;
+    const first = window.setTimeout(() => {
+      beat();
+      id = window.setInterval(beat, every);
+    }, Math.max(0, lastLiveRead.current + every - Date.now()));
+    return () => {
+      window.clearTimeout(first);
+      if (id != null) window.clearInterval(id);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveWanted, touring, following, pin, chain]);
+  }, [liveWanted, touring, following, pin, chain, register]);
 
   // A global the live feed announces with blocks joins the window at once; its anchored records
   // come with the next refresh.
   useEffect(() => {
     const a = answer.current;
-    if (!a || !liveTip || !liveRuns() || !tipJoins(a.chain ?? null)) return;
+    // Only into the LIVE window held: a pinned window still held through a resume is not the live edge.
+    if (!a || (a.around ?? null) != null || !liveTip || !liveRuns() || !tipJoins(a.chain ?? null)) return;
     const hashes = (liveTip.blocks ?? []).filter((b): b is string => typeof b === "string");
     if (!hashes.length || a.ticks.some((t) => t.ord === liveTip.ordinal)) return;
     if (a.ticks.length && liveTip.ordinal < a.ticks[0]!.ord) return;

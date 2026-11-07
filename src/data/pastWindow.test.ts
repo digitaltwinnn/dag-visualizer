@@ -99,7 +99,7 @@ it("ledgerSource answers the block window alone in the Blocks register, never th
 it("the block window is held and announced like the past window", () => {
   let n = 0;
   const off = onBlockWindow(() => n++);
-  const w = { ...LIVE_STUB, ticks: [], chain: null, partial: [], from: 0, to: 0, holds: () => false, blockTick: () => null };
+  const w = { ...LIVE_STUB, ticks: [], chain: null, around: null, partial: [], from: 0, to: 0, holds: () => false, blockTick: () => null };
   setBlockWindow(w);
   expect(getBlockWindow()).toBe(w);
   expect(ledgerSource(LIVE_STUB, "blocks")).toBe(w);

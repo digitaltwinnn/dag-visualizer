@@ -7,6 +7,7 @@ import { useNowTick } from "@/components/useNowTick";
 import { filterAccent } from "@/src/data/network";
 import { blockFollowActions, followToggleActions } from "@/src/engine/domain/pickActions";
 import { registerOf } from "@/src/engine/domain/viewPolicy";
+import { liveControlCard } from "@/src/data/blockWindow";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 import { relativeAge } from "@/src/util/relativeAge";
@@ -52,7 +53,9 @@ function Age({ ts }: { ts: string }) {
 // Global snapshot card carries the control (`subject: "snapshot"`); in the Blocks register live follows
 // the newest BLOCK, so the Block card carries it (`subject: "block"`, its write `blockFollowActions`)
 // and the Global snapshot card keeps only its age — it shows the block's accepting global, and its
-// live or pinned state is the block's, said once on the card that owns it.
+// live or pinned state is the block's, said once on the card that owns it. With NO Block card in that
+// register (review I1: a pin carried in from another register, the block's ×) the Global card carries
+// the control again, so a pin is never left with nothing saying PINNED and nothing offering LIVE.
 export default function FollowControl({ className, subject = "snapshot" }: { className?: string; subject?: "snapshot" | "block" }) {
   useFeedRead(["global"], "FollowControl");
   const live = useStore((s) => s.live);
@@ -61,10 +64,11 @@ export default function FollowControl({ className, subject = "snapshot" }: { cla
   const block = useStore((s) => s.block);
   const latestSnapshot = useStore((s) => s.latestSnapshot);
   const filter = useStore((s) => s.filter);
-  const blocksRegister = useStore((s) => registerOf(s.mode, s.ledgerRegister) === "blocks");
+  const register = useStore((s) => registerOf(s.mode, s.ledgerRegister));
 
-  // The Global snapshot card in the Blocks register: its age, no control (the Block card has it).
-  if (subject === "snapshot" && blocksRegister) {
+  // The Global snapshot card while a Block card stands in Transaction blocks: its age, no control
+  // (the Block card has it). With no Block card it carries the control again (`liveControlCard`).
+  if (subject === "snapshot" && liveControlCard(register, block) === "block") {
     return snap ? (
       <span className={cn("inline-flex items-center gap-1.5 whitespace-nowrap", className)}>
         <Age ts={snap.data.timestamp} />
