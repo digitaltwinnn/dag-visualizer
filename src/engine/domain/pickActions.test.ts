@@ -893,6 +893,28 @@ describe("blockSelectActions / blockClearActions (a block in the Blocks register
       blockSelectActions(b, global, { block: b, pinnedOrdinal: null, metaSnap: null, following: true }),
     );
   });
+  // A TOKEN BLOCK COMMITS ITS SNAPSHOT TOO (user, 2026-11-07): the rail reads Metagraph → Metagraph
+  // snapshot → Block, the block last so its card is the box.
+  it("a token block pins its global, commits its network and snapshot, then the block", () => {
+    const tb: BlockSel = { chain: "dor", hash: "t1", ordinal: 51, anchorOrd: 7241523 };
+    const snap = { metaId: "dor", ordinal: 51, hash: "m51", globalOrdinal: 7241523, ts: "t" } as MetaSnapSel;
+    expect(blockSelectActions(tb, global, { block: null, pinnedOrdinal: null }, snap)).toEqual([
+      { kind: "snapshot", pick: global, follow: false },
+      { kind: "tickNet", sel: { metaId: netKeyOf("dor"), globalOrdinal: 7241523 } },
+      { kind: "metaSnap", sel: snap },
+      { kind: "block", sel: tb },
+    ]);
+    // Its snapshot already committed: the network is restated, the snapshot not re-committed.
+    expect(kinds(blockSelectActions(tb, global, { block: null, pinnedOrdinal: 7241523, metaSnap: snap }, snap))).toEqual(["tickNet", "block"]);
+    // A node of another network cannot sit under the snapshot: released first, as the tile click does.
+    const node = { kind: "l0", node: { ip: "1", id: "n" } } as unknown as PickDescriptor; // a DAG validator: not DOR's
+    expect(kinds(blockSelectActions(tb, global, { block: null, pinnedOrdinal: null, inspect: node }, snap))).toEqual(["inspect", "snapshot", "tickNet", "metaSnap", "block"]);
+    // A scene pick carries the snapshot; the builder reads it.
+    const tokenPick = { kind: "block", sel: tb, global, snap } as unknown as PickDescriptor;
+    expect(clickActions({ mode: "ledger", pick: tokenPick, countryCc: null, current: { ...state(), pinnedOrdinal: null, metaSnap: null, block: null } })).toEqual(
+      blockSelectActions(tb, global, { block: null, pinnedOrdinal: null, metaSnap: null, inspect: null }, snap),
+    );
+  });
   it("the clear releases the block alone, and nothing when none is held", () => {
     expect(blockClearActions({ block: b })).toEqual([{ kind: "block", sel: null }]);
     expect(blockClearActions({ block: null })).toEqual([]);
@@ -976,7 +998,7 @@ describe("globalPick and tickContextOf — the descriptor and the context every 
   it("tickContextOf: the pin only while pinned; live is no pin; the finer slots as they stand, block always present", () => {
     const snap = globalPick(g);
     const block: BlockSel = { chain: "dag", hash: "b", ordinal: 42, anchorOrd: 42 };
-    expect(tickContextOf({ following: false, snap, metaSnap: null, tickNet: null, block })).toEqual({ pinnedOrdinal: 42, metaSnap: null, tickNet: null, block, following: false });
+    expect(tickContextOf({ following: false, snap, metaSnap: null, tickNet: null, block })).toEqual({ pinnedOrdinal: 42, metaSnap: null, tickNet: null, block, following: false, inspect: null });
     expect(tickContextOf({ following: true, snap, metaSnap: null, tickNet: null, block: null }).pinnedOrdinal).toBeNull();
     expect(tickContextOf({ following: false, snap: null, metaSnap: null }).pinnedOrdinal).toBeNull();
     // An absent finer slot is null, never undefined — the builders that require `block` get one.

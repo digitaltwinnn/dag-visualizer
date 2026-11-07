@@ -103,6 +103,7 @@ describe("countWord — the switch's count beside a span", () => {
     expect(countWord(52, "snapshot")).toBe("52 snapshots");
     expect(countWord(1, "block")).toBe("1 block");
     expect(countWord(1234, "block")).toBe("1,234 blocks");
+    expect(countWord(31, "data block", true)).toBe("31+ data blocks");
     expect(countWord(0, "block")).toBeNull();
     expect(countWord(null, "snapshot")).toBeNull();
   });

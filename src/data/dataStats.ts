@@ -36,6 +36,21 @@ export function dataInWindow(ticks: readonly Tick[], reads: Reads, inScope: (met
   return { count, read, total: ticks.length };
 }
 
+/** DATA BLOCKS in the window — the count of data blocks over the ticks read, and how many of its
+ *  ticks were (the register switch's count, user 2026-11-07: "data blocks, count those"). An unread
+ *  tick adds nothing and is outside `read`, so a caller states the floor while reads are landing. */
+export function dataBlocksInWindow(ticks: readonly Tick[], reads: Reads, inScope: (metaId: string) => boolean): { count: number; read: number; total: number } {
+  let count = 0;
+  let read = 0;
+  for (const t of ticks) {
+    const ex = reads[t.ordinal];
+    if (!ex) continue;
+    read++;
+    for (const r of ex.rows) if (inScope(r.metaId)) count += r.dataBlocks ?? 0;
+  }
+  return { count, read, total: ticks.length };
+}
+
 /** The line under it: one point per tick, oldest first — the window spans minutes, so a tick is its
  *  natural bin — and null where the tick's read has not landed. */
 export function dataPerTick(ticks: readonly Tick[], reads: Reads, inScope: (metaId: string) => boolean): (number | null)[] {

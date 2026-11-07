@@ -308,7 +308,10 @@ export type PickDescriptor =
   // A BLOCK in the Snapshots view's Blocks register — a slot under its accepting global, like the
   // tile above: it carries the global tick that holds it, so the table can pin the tick and commit
   // the block from one descriptor.
-  | (PickBase & { kind: "block"; sel: BlockSel; global: Extract<PickDescriptor, { kind: "snapshot" }> });
+  // …and, for a TOKEN block, the metagraph snapshot that accepted it (user, 2026-11-07: a block click
+  // also commits its snapshot, so the rail reads Metagraph → Metagraph snapshot → Block); absent on a
+  // DAG block, whose accepting snapshot is the global itself.
+  | (PickBase & { kind: "block"; sel: BlockSel; global: Extract<PickDescriptor, { kind: "snapshot" }>; snap?: MetaSnapSel });
 
 /** One block the Blocks register has selected: `chain` is "dag" or a metagraph id, `ordinal` the
  *  accepting snapshot's own, `anchorOrd` the global tick that carries it. Homed here beside the pick

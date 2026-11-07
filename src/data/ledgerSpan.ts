@@ -93,9 +93,10 @@ export function blockSpanWord(s: {
  *  | 53 blocks"): what fills the stretch — the source's ticks for the two snapshot registers (the live
  *  buffer's depth, or a past window's), the window's blocks for Transaction blocks. Null for nothing
  *  to count, or while the span is a read state rather than a stretch. */
-export function countWord(n: number | null, unit: "snapshot" | "block"): string | null {
+export function countWord(n: number | null, unit: "snapshot" | "block" | "data block", floor = false): string | null {
   if (n == null || n <= 0) return null;
-  return `${n.toLocaleString("en-US")} ${unit}${n === 1 ? "" : "s"}`;
+  // A FLOOR is labelled (rule 10): "31+ data blocks" while the window's reads are still landing.
+  return `${n.toLocaleString("en-US")}${floor ? "+" : ""} ${unit}${n === 1 ? "" : "s"}`;
 }
 
 /** Under the unlisted filter the block window reads nothing: every surface says the floor, never

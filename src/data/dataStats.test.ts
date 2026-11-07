@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { ChannelSnapRow, SnapshotExact } from "@/src/data/types";
-import { dataByNetwork, dataInWindow, dataPerTick, lastDataTick } from "./dataStats";
+import { dataBlocksInWindow, dataByNetwork, dataInWindow, dataPerTick, lastDataTick } from "./dataStats";
 
 // THE DATA BLOCKS REGISTER'S BAND (D6, 2026-11-07): DATA UPDATES · BY NETWORK · LAST DATA BLOCK, read
 // off the exact reads of the ticks the ledger source holds. A tick whose read has not landed is
@@ -38,6 +38,14 @@ describe("dataInWindow", () => {
     expect(dataInWindow(ticks, reads, (id) => id === "DOR")).toEqual({ count: 2, read: 3, total: 4 });
     expect(dataInWindow(ticks, reads, (id) => id === "DED")).toEqual({ count: 48, read: 3, total: 4 });
     expect(dataInWindow(ticks, reads, (id) => id === "odd")).toEqual({ count: 0, read: 2, total: 4 });
+  });
+});
+
+describe("dataBlocksInWindow — the switch's count", () => {
+  it("sums the data blocks of the ticks read, in scope, and says how many ticks were read", () => {
+    expect(dataBlocksInWindow(ticks, reads, all)).toEqual({ count: 3, read: 3, total: 4 });
+    expect(dataBlocksInWindow(ticks, reads, (id) => id === "DED")).toEqual({ count: 2, read: 3, total: 4 });
+    expect(dataBlocksInWindow(ticks, {}, all)).toEqual({ count: 0, read: 0, total: 4 });
   });
 });
 

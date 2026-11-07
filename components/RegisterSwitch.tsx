@@ -9,6 +9,7 @@ import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { POLL } from "@/src/engine/config";
 import { blockSpanWord, countWord, snapshotSpanWord } from "@/src/data/ledgerSpan";
 import { windowBlocks } from "@/src/data/blockWindow";
+import { dataBlocksInWindow } from "@/src/data/dataStats";
 import { getBlockWindow, getPastWindow, onBlockWindow, onPastWindow } from "@/src/data/pastWindow";
 import type { LedgerRegister } from "@/src/store/mode";
 import { switchLedgerRegister } from "@/src/store/applyClickActions";
@@ -47,11 +48,12 @@ export default function RegisterSwitch() {
   const mode = useStore((s) => s.mode);
   const registers = VIEW_POLICIES[mode].registers;
   const on = registers.length > 1;
-  useFeedRead(["global", "api-blocks"], "RegisterSwitch", on);
+  useFeedRead(["global", "api-blocks", "exact"], "RegisterSwitch", on); // the data-block count reads the exact reads
   const register = useStore((s) => s.ledgerRegister);
   const phase = useStore((s) => s.motionPhase);
   const pastStatus = useStore((s) => s.pastWindow?.status ?? null);
   const blockStatus = useStore((s) => s.blockWindowStatus);
+  const snapshotExact = useStore((s) => s.snapshotExact);
   const { snaps } = useSnapshotFeed(POLL.maxSnapshots, on);
   const past = useSyncExternalStore(onPastWindow, getPastWindow, () => null);
   const blocks = useSyncExternalStore(onBlockWindow, getBlockWindow, () => null);
@@ -74,11 +76,18 @@ export default function RegisterSwitch() {
   // live buffer's fixed depth, or the past window's) for the two snapshot registers, the window's
   // blocks for Transaction blocks; none while a half says a read state. Desktop only: on a phone the
   // lit half's full words already run to the gutters.
-  const snapCount = pastStatus === "loading" || pastStatus === "failed" ? null : countWord(past ? past.globalSnapshots.length : snaps.length, "snapshot");
+  // Each half counts ITS OWN SUBJECT (user, 2026-11-07: "its subject is metagraph snapshots, count
+  // those instead of global, same for data blocks"): the METAGRAPH SNAPSHOTS the source's ticks
+  // anchored (the feed's own per-tick count), the DATA BLOCKS their exact reads carry (a floor,
+  // "31+", while reads are still landing — rule 10), the window's BLOCKS.
+  const sourceTicks = past ? past.globalSnapshots : [...snaps].reverse();
+  const reading = pastStatus === "loading" || pastStatus === "failed";
+  const metaSnaps = sourceTicks.reduce((n, g) => n + (g.metagraphSnapshotCount ?? 0), 0);
+  const data = dataBlocksInWindow(sourceTicks, snapshotExact, () => true);
   const count: Record<LedgerRegister, string | null> = {
-    snapshots: snapCount,
+    snapshots: reading ? null : countWord(metaSnaps, "snapshot"),
     blocks: blockStatus?.status === "ready" && blocks?.globalSnapshots.length ? countWord(windowBlocks(blocks).length, "block") : null,
-    data: snapCount,
+    data: reading ? null : countWord(data.count, "data block", data.read < data.total),
   };
   // The phone's short form for an UNLIT half (`ledgerSpan`'s `SpanOpts`): a pinned stretch by when
   // alone, a read state in one word — measured, the full words ran the switch past the gutters.

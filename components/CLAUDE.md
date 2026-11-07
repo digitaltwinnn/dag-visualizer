@@ -1073,7 +1073,11 @@ reached") **and, beside a stretch, its COUNT** (user, 2026-11-07: "last 9 min | 
 days | 53 blocks"): what fills the stretch — the source's ticks for the two snapshot registers (the live
 buffer's fixed depth, or the past window's), the window's blocks for Transaction blocks
 (`ledgerSpan.countWord`; none beside a read state; desktop only — on a phone the lit half's full words
-already reach the gutters), after a hairline rule, never a mid-dot. **On a phone three full names do not fit one row**: each half shows its glyph and span, the
+already reach the gutters), after a hairline rule, never a mid-dot. **Each half counts ITS OWN
+SUBJECT** (user, same day: "its subject is metagraph snapshots, count those instead of global, same
+for data blocks"): the metagraph snapshots the source's ticks anchored (the feed's per-tick count,
+"333 snapshots"), the data blocks their exact reads carry (`dataStats.dataBlocksInWindow`, a labelled
+floor "77+ data blocks" while reads are landing — rule 10), the window's blocks ("52 blocks"). **On a phone three full names do not fit one row**: each half shows its glyph and span, the
 lit half alone its name (each keeps it as its accessible name), with tighter padding there — measured
 at 390: 349px with "Metagraph snapshots" lit, 334 with "Transaction blocks", 281 with "Data blocks",
 inside the 16px gutters. **With a pinned stretch the UNLIT halves say WHEN alone** (D7, measured: the
@@ -1169,7 +1173,11 @@ so a door after a door inherits nothing). Pinned by `src/data/blockStats.test.ts
 `components/rawSurfaceBoundary.test.ts` (the register compare stays inside `RecordsSurface`).
 
 **The Data blocks register (D6, 2026-11-07) is the Metagraph snapshots register's surfaces with the
-DATA leading.** The explorer keeps every Snapshots level and its measure set is **Data updates · Fees · Metagraphs ·
+DATA leading.** The global snapshot's scene label speaks the register's subject there (user,
+2026-11-07: "snapshot anchor should show information related to the sub-view"): "10 data blocks" with
+a "23 updates" chip from the exact read (`SceneCallout`'s `dataLead`, keyed on
+`REGISTER_MEASURES[register].dataOnly`; under a committed network, that network's own), where the
+Metagraph snapshots register says "N metagraph snapshots" and its size. The explorer keeps every Snapshots level and its measure set is **Data updates · Fees · Metagraphs ·
 Size** (D7, user: "instead of adding 'data updates' use it to replace 'anchors'" — Data updates takes
 Anchors' place and leads, four tiles two by two so its name is whole; the network level is Data
 updates · Fees · Size; `ledgerMeasure`'s `DATA_*` lists; the register's own pick, `store.dataMeasure`,

@@ -48,7 +48,7 @@ import { VIEW_POLICIES, readsBlockWindow } from "@/src/engine/domain/viewPolicy"
 import { dataCarryingNetworks, tickNetworksLevel, tickPolledRows } from "@/src/data/ladderLevels";
 import { useFeedRead } from "@/components/useFeedRead";
 import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
-import { windowBlocks } from "@/src/data/blockWindow";
+import { blockMetaSnap, windowBlocks } from "@/src/data/blockWindow";
 import { blockReadOf } from "@/src/data/blockReads";
 import { BLOCK_MEASURE_OPTIONS, blockMeasureText, blockMeasureValue, type BlockMeasure } from "@/src/data/blockMeasure";
 import { NO_MEASURE } from "@/src/data/ledgerMeasure";
@@ -753,7 +753,7 @@ export default function LedgerPanel() {
           ? () => {
               const st = useStore.getState();
               applyClickActions(
-                blockSelectActions(sel, globalPick(g), tickContextOf(st)),
+                blockSelectActions(sel, globalPick(g), tickContextOf(st), blockMetaSnap(blockWin, sel)),
               );
             }
           : undefined,

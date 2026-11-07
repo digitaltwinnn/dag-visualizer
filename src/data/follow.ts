@@ -4,7 +4,7 @@ import { LISTED_IDS, UNLISTED_ID, latestUnlistedTick, unlistedLog } from "@/src/
 import { useStore } from "@/src/store/store";
 import type { GlobalSnapshot } from "@/src/data/types";
 import { getBlockWindow } from "@/src/data/pastWindow";
-import { blockChainOf, newestBlock } from "@/src/data/blockWindow";
+import { blockChainOf, blockMetaSnap, newestBlock } from "@/src/data/blockWindow";
 import { readsBlockWindow, registerOf } from "@/src/engine/domain/viewPolicy";
 import { globalPick } from "@/src/engine/domain/pickActions";
 
@@ -143,5 +143,12 @@ function followNewestBlock(): void {
   if (!block || block.chain !== b.chain || block.hash !== b.hash) {
     advanceBlock({ chain: b.chain, hash: b.hash, ordinal: b.ordinal, anchorOrd: b.anchorOrd });
   }
-  if (metaSnap && !(metaSnap.held && metaSnap.globalOrdinal === b.anchorOrd)) advanceMetaSnap(null);
+  // A TOKEN block's accepting snapshot rides the follow with it (user, 2026-11-07: a block's rail
+  // reads Metagraph → Metagraph snapshot → Block, the live block's too), through the same non-bumping
+  // advance; a DAG block's snapshot is the global itself, so the live metagraph snapshot goes unless
+  // the reader stepped to it inside the shown global (`held`).
+  const ms = blockMetaSnap(w, b);
+  if (ms) {
+    if (!metaSnap || metaSnap.metaId !== ms.metaId || metaSnap.ordinal !== ms.ordinal) advanceMetaSnap(ms);
+  } else if (metaSnap && !(metaSnap.held && metaSnap.globalOrdinal === b.anchorOrd)) advanceMetaSnap(null);
 }

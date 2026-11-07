@@ -622,7 +622,7 @@ and window change); the band's "N of M blocks read" is the wait's instrument. On
 window is laid out from every read at once and holds. After it, a block is drawn only once its own
 read has settled — a new live tick's lands onto the laid drawing, a missed one stands on the centre
 line with no links — so nothing placed ever moves. The reads themselves land `WINDOW_READ_POOL`
-(4) at a time (`ensureMany`; ~6 s for 52 ticks, measured, against ~23 s one every 450 ms).
+(8) at a time (`ensureMany`; ~6 s for 52 ticks at 4, measured, against ~23 s one every 450 ms).
 ⚠️ A layout recomputed from the window moves: D1's lane from the
 window's lowest height swung the whole braid as reads landed, and D2's first cut — a pure barycenter
 pass over the window — re-dealt every block whenever the window slid by one tick (found live both
@@ -636,7 +636,8 @@ nothing (row −1 in `BlockTier`). **A link is an S-CURVE** (D8: "start horizont
 horizontal"): `blockBraid.sCurve`, a cubic whose control points lie along the trail only
 (`LINK_BEND` × the run), sampled into `LINK_SAMPLES` segments at event time, its alpha eased from one
 end's row weight to the other's per frame; at rest it draws at `BLOCK_LOOK.link` (dark 0.8, paper
-0.92) in the blocks' cyan. ⚠️ A link that needs both ends ON the trail draws only for a
+0.92) in the blocks' cyan, IN the bloom layer (user, 2026-11-07: "add a bit of bloom" — its alpha is
+what meters the glow). ⚠️ A link that needs both ends ON the trail draws only for a
 selected block: the trail holds only the visible rows until a selection grows its reach. Both ends
 must be READ facts, not both drawn — the stub is what keeps every reference on screen. A block whose
 read has not landed states no references and draws none.
@@ -644,8 +645,10 @@ read has not landed states no references and draws none.
 **A token block stands OVER its tile, laid out as the DAG blocks are** (user, 2026-11-07:
 "identical to how they are laid out for $DAG, so vertical, no long horizontal" — it superseded the
 on-the-tile nudge): centred on the tile of the metagraph snapshot that accepted it, its fork's height
-in a band `TOKEN_BRAID_LIFT` above the tile's top (`forkSpread` over every token chain at once, the
-widest token fork fitted to `TOKEN_BRAID_HALF` — `_tokenBraidScale`, held as `_braidScale` is),
+in THE SAME BAND the DAG braid uses, re-based on the tile (`BRAID_GAP` of clear room above the tile's
+top, `BRAID_HALF` either side of the centre line — one structure, user: "use the same height for the
+metagraph"; `forkSpread` over every token chain at once, the widest token fork fitted to that half —
+`_tokenBraidScale`, held as `_braidScale` is),
 siblings at one height stepping aside along the trail by `TOKEN_STEP`, in the lane's hue, opaque
 like the tile; one seal line falls from each block's bottom through its tile to its network's band.
 A snapshot whose tile is not drawn puts no block anywhere.

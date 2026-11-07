@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BLOCK_REFRESH_MS, BLOCK_WINDOW_TICKS, blockChainOf, blockRefreshMs, blockWanted, blockWindowContinues, failedReadKeeps, foldBlockWindow, liveControlCard, liveWindowRuns, mergeLiveAnswer, newestBlock, tipJoins, trailPath, windowBlocks } from "@/src/data/blockWindow";
+import { BLOCK_REFRESH_MS, BLOCK_WINDOW_TICKS, blockChainOf, blockRefreshMs, blockWanted, blockWindowContinues, failedReadKeeps, foldBlockWindow, liveControlCard, liveWindowRuns, mergeLiveAnswer, newestBlock, blockMetaSnap, tipJoins, trailPath, windowBlocks } from "@/src/data/blockWindow";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
 import type { RawMetaSnapshot, SnapshotExact } from "@/src/data/types";
 
@@ -72,6 +72,19 @@ describe("windowBlocks", () => {
   });
   it("an absent window lists nothing", () => {
     expect(windowBlocks(null)).toEqual([]);
+  });
+});
+
+describe("blockMetaSnap — the snapshot that accepted a token block, as the window names it", () => {
+  const tick = (ord: number, blocks: string[], meta: Record<string, RawMetaSnapshot[]> = {}) => ({ ord, ts: new Date(ord * 10_000).toISOString(), hash: "g" + ord, blocks, metaSnaps: meta });
+  const dor = (ordinal: number, blocks: string[]) => ({ ordinal, hash: "m" + ordinal, lastSnapshotHash: "", timestamp: "", blocks }) as unknown as RawMetaSnapshot;
+  it("names a token block's snapshot with its tick; nothing for a DAG block or an unheld one", () => {
+    const w = foldBlockWindow({ ticks: [tick(200, ["d1"], { dor: [dor(5, ["t1"])] }), tick(100, ["d0"])], chains: ["dag", "dor"] }, {});
+    const sel = blockMetaSnap(w, { chain: "dor", ordinal: 5, anchorOrd: 200 });
+    expect(sel).toEqual({ metaId: "dor", ordinal: 5, hash: dor(5, ["t1"]).hash, globalOrdinal: 200, ts: w.blockTick(200)!.ts });
+    expect(blockMetaSnap(w, { chain: "dag", ordinal: 200, anchorOrd: 200 })).toBeNull();
+    expect(blockMetaSnap(w, { chain: "dor", ordinal: 6, anchorOrd: 200 })).toBeNull();
+    expect(blockMetaSnap(null, { chain: "dor", ordinal: 5, anchorOrd: 200 })).toBeNull();
   });
 });
 

@@ -238,25 +238,28 @@ const DATA_MARK_GAIN = 2.2;
 /** A block's edge above the floor (a DAG block) and on a tile (a token block — a tile is 0.48 at most). */
 const DAG_BLOCK = 0.62;
 const TOKEN_BLOCK = 0.36;
-/** THE DAG BRAID OPENS VERTICALLY over the floor's centre line (user, design round D8: "no horizontal
- *  space … use the height instead"): its main chain runs along the trail at z = the floor's centre and
- *  y = the middle of the band between the bars' top face and the metagraph planes; the window's
- *  widest fork fills that band, above and below. Both bounds are layout data (`FLOOR_Y`, the bar's
- *  `BAR_LIFT + BAR_H`), each pulled in by a block's edge so a block at the fork's reach never touches
- *  a bar or a plane's tile. */
-const BRAID_LO = FLOOR_Y.gl0 + BAR_LIFT + BAR_H + DAG_BLOCK;
-const BRAID_HI = FLOOR_Y.msnap - DAG_BLOCK;
+/** THE BRAID BAND — ONE SHAPE FOR BOTH BRAIDS (user, 2026-11-07: "make the DAG layout a bit tighter so
+ *  that it has some room at the bottom and top between the planes; use the same height for the
+ *  metagraph"). The DAG braid opens VERTICALLY over the floor's centre line (design round D8: "no
+ *  horizontal space … use the height instead"): its main chain runs along the trail at z = the floor's
+ *  centre and y = the middle of the band between the bars' top face and the metagraph planes, the
+ *  window's widest fork filling the band above and below. The band keeps `BRAID_GAP` of clear room
+ *  between a block's EDGE and the plane at either end, so a block at the fork's reach never nears a
+ *  bar or a tile. Both bounds are layout data (`FLOOR_Y`, the bar's `BAR_LIFT + BAR_H`). */
+const BRAID_GAP = 1.2;
+const BRAID_LO = FLOOR_Y.gl0 + BAR_LIFT + BAR_H + BRAID_GAP + DAG_BLOCK / 2;
+const BRAID_HI = FLOOR_Y.msnap - BRAID_GAP - DAG_BLOCK / 2;
 const BRAID_Y = (BRAID_LO + BRAID_HI) / 2;
 const BRAID_HALF = (BRAID_HI - BRAID_LO) / 2;
 /** Blocks that share a tick and a place step aside along the trail by this much, alternately. */
 const BLOCK_STEP = 0.7;
-/** THE TOKEN BRAID OPENS VERTICALLY OVER ITS TILE, the DAG braid's own layout at the tile's grain
- *  (user, 2026-11-07: "identical to how they are laid out for $DAG, so vertical, no long
- *  horizontal"): the chain's main line `TOKEN_BRAID_LIFT` above the tile's top, centred over it, the
- *  window's widest token fork filling `TOKEN_BRAID_HALF` above and below; blocks sharing a tile and a
- *  height step aside along the trail by `TOKEN_STEP` (`BLOCK_STEP` at the token block's scale). */
-const TOKEN_BRAID_LIFT = 0.9;
-const TOKEN_BRAID_HALF = 0.55;
+/** THE TOKEN BRAID is the same band stood on the TILE (user, 2026-11-07: "identical to how they are
+ *  laid out for $DAG … use the same height for the metagraph"): the same `BRAID_GAP` above the tile's
+ *  top, the same `BRAID_HALF` either side of its centre line — one structure, re-based from the plane
+ *  the chain settles on; blocks sharing a tile and a height step aside along the trail by `TOKEN_STEP`
+ *  (`BLOCK_STEP` at the token block's scale). */
+const TOKEN_BRAID_LIFT = BRAID_GAP + TOKEN_BLOCK / 2 + BRAID_HALF;
+const TOKEN_BRAID_HALF = BRAID_HALF;
 const TOKEN_STEP = BLOCK_STEP * (TOKEN_BLOCK / DAG_BLOCK);
 /** The tile mesh's own depth (the BoxGeometry's z, which becomes height under the -90° X spin). */
 const TILE_D = 0.35;
@@ -1263,6 +1266,8 @@ export class LedgerView implements SceneView {
             const x = tile.x + turn(`${s}|${chain}|${y.toFixed(3)}`) * TOKEN_STEP;
             push("token", chain, hash, s, x, y, tile.z, TOKEN_BLOCK, hue, {
               kind: "block", sel: { chain, hash, ordinal: r.ordinal, anchorOrd: t.ord }, global, title: "Block",
+              // The snapshot that accepted it, committed with the block (`blockSelectActions`' `snapOf`).
+              snap: { metaId: chain, ordinal: r.ordinal, hash: r.hash, globalOrdinal: t.ord, ts: t.ts },
             });
             anchors.push({ slot: s, key: chain, x, z: tile.z, yTop: y - TOKEN_BLOCK / 2, band, hue });
           }

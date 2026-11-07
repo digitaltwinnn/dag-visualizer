@@ -147,11 +147,13 @@ export class BlockTier {
     this._linkGeo.setAttribute("position", this._linkPos);
     this._linkGeo.setAttribute("color", this._linkCol);
     this._linkGeo.setDrawRange(0, 0);
-    // A line, and out of the bloom layer: a relation between two marks, never a mark of its own.
+    // A line IN the bloom layer (user, 2026-11-07: "add a bit of bloom" — the brighter hairline alone
+    // still read thin beside the blocks it ties); its alpha (`BLOCK_LOOK.link`) is what meters the glow.
     this._linkMat = new THREE.LineBasicMaterial({
       vertexColors: true, transparent: true, opacity: 1, depthWrite: false, blending: glowBlend(colors),
     });
     const lines = new THREE.LineSegments(this._linkGeo, this._linkMat);
+    joinBloom(lines);
     lines.frustumCulled = false;
     this.group.add(lines);
   }

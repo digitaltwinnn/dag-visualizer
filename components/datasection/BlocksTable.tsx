@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useStore } from "@/src/store/store";
 import { getNetwork } from "@/src/data/network";
-import { windowBlocks } from "@/src/data/blockWindow";
+import { blockMetaSnap, windowBlocks } from "@/src/data/blockWindow";
 import { blockReadOf } from "@/src/data/blockReads";
 import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
 import { blockAbsence } from "@/src/data/ledgerSpan";
@@ -148,9 +148,8 @@ export default function BlocksTable() {
             const pick = () => {
               if (!g || locked) return;
               const st = useStore.getState();
-              applyClickActions(
-                blockSelectActions({ chain: b.chain, hash: b.hash, ordinal: b.ordinal, anchorOrd: b.anchorOrd }, globalPick(g), tickContextOf(st)),
-              );
+              const sel = { chain: b.chain, hash: b.hash, ordinal: b.ordinal, anchorOrd: b.anchorOrd };
+              applyClickActions(blockSelectActions(sel, globalPick(g), tickContextOf(st), blockMetaSnap(win, sel)));
             };
             // ONE ROW PER TRANSFER — or the one honest row: reading, failed, or none listed.
             const transfers = read?.transfers ?? [];

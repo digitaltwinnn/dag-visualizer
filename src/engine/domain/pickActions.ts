@@ -327,6 +327,8 @@ export type TickContext = {
   tickNet: TickNetSel | null;
   block: BlockSel | null;
   following: boolean;
+  /** The node card's pick, if one is held — a token block's snapshot drops a node of another network. */
+  inspect: PickDescriptor | null;
 };
 export function tickContextOf(s: {
   following: boolean;
@@ -334,8 +336,9 @@ export function tickContextOf(s: {
   metaSnap: MetaSnapSel | null;
   tickNet?: TickNetSel | null;
   block?: BlockSel | null;
+  inspect?: PickDescriptor | null;
 }): TickContext {
-  return { pinnedOrdinal: !s.following && s.snap ? s.snap.data.ordinal : null, metaSnap: s.metaSnap, tickNet: s.tickNet ?? null, block: s.block ?? null, following: s.following };
+  return { pinnedOrdinal: !s.following && s.snap ? s.snap.data.ordinal : null, metaSnap: s.metaSnap, tickNet: s.tickNet ?? null, block: s.block ?? null, following: s.following, inspect: s.inspect ?? null };
 }
 
 export function snapshotSelectActions(
@@ -547,16 +550,34 @@ export function blockSelectActions(
     /** LIVE in the Blocks register follows the newest block (D3): the block shown while following
      *  is the follow's, not a pick, so clicking it PINS it rather than releasing it. */
     following?: boolean;
+    /** The node card's pick, if one is held: a token block's snapshot drops a node of another
+     *  network, as the tile click does (`metaSnapSelectActions`). */
+    inspect?: PickDescriptor | null;
   },
+  /** A TOKEN block's accepting metagraph snapshot (`blockWindow.blockMetaSnap`; the scene pick carries
+   *  it): committed with the block — its network too — so the rail reads Metagraph → Metagraph
+   *  snapshot → Block, the block the box (user, 2026-11-07: "automatically also populate its
+   *  metagraph snapshot card, but open the block card as that's the subject"). Null for a DAG block:
+   *  its accepting snapshot is the global itself, the card already above it. */
+  snapOf: MetaSnapSel | null = null,
 ): ClickAction[] {
   const same = !!current.block && current.block.chain === b.chain && current.block.hash === b.hash;
-  if (same && current.following) return [{ kind: "snapshot", pick: global, follow: false }, { kind: "block", sel: b }];
-  if (same) return [{ kind: "block", sel: null }];
+  if (same && !current.following) return [{ kind: "block", sel: null }];
   const out: ClickAction[] = [];
-  if (current.pinnedOrdinal !== b.anchorOrd) {
-    if (current.metaSnap && current.metaSnap.globalOrdinal !== b.anchorOrd) out.push({ kind: "metaSnap", sel: null });
-    if (current.tickNet && current.tickNet.globalOrdinal !== b.anchorOrd) out.push({ kind: "tickNet", sel: null });
+  // THE BLOCK'S CHAIN, coarse to fine, the block last so it ranks (its card is the box): the node a
+  // token block's network cannot contain is released first, the global pinned, then the network and
+  // the snapshot the window names, then the block.
+  if (snapOf && current.inspect && !nodeIsOf(current.inspect, snapOf.metaId)) out.push({ kind: "inspect", pick: null });
+  if (same || current.pinnedOrdinal !== b.anchorOrd) {
+    if (!snapOf) {
+      if (current.metaSnap && current.metaSnap.globalOrdinal !== b.anchorOrd) out.push({ kind: "metaSnap", sel: null });
+      if (current.tickNet && current.tickNet.globalOrdinal !== b.anchorOrd) out.push({ kind: "tickNet", sel: null });
+    }
     out.push({ kind: "snapshot", pick: global, follow: false });
+  }
+  if (snapOf) {
+    out.push({ kind: "tickNet", sel: tickNetOf(snapOf, global) });
+    if (!sameMetaSnap(current.metaSnap ?? null, snapOf)) out.push({ kind: "metaSnap", sel: snapOf });
   }
   out.push({ kind: "block", sel: b });
   return out;
@@ -725,6 +746,8 @@ export function clickActions(input: {
     block?: BlockSel | null;
     // …and whether the view is following, which turns a click on the LIVE block into its pin (D3).
     following?: boolean;
+    // …and the node card's pick (a token block's snapshot drops a node of another network).
+    inspect?: PickDescriptor | null;
   };
 }): ClickAction[] {
   const { mode, pick: p, countryCc, current } = input;
@@ -757,7 +780,8 @@ export function clickActions(input: {
       metaSnap: current.metaSnap ?? null,
       tickNet: current.tickNet,
       following: current.following,
-    });
+      inspect: current.inspect ?? null,
+    }, p.snap ?? null);
 
   // A node, in any view. (No autoRotate action: geo disables the controls' rotation at mode
   // entry and the inspect subscription re-asserts it on the node flight.)

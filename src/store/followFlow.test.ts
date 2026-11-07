@@ -161,6 +161,14 @@ describe("the follow flow in the Blocks register (D3)", () => {
     expect(st().selStack).toEqual([]);
   });
 
+  it("LIVE seats a token block's accepting metagraph snapshot with it — neither ranks", () => {
+    setBlockWindow(foldBlockWindow({ ticks: [tick(300, [], { dor: [tokenSnap(5, ["t1"])] })], chains: ["dag", "dor"] }, {}));
+    followLatest();
+    expect(st().block).toEqual({ chain: "dor", hash: "t1", ordinal: 5, anchorOrd: 300 });
+    expect(st().metaSnap).toEqual({ metaId: "dor", ordinal: 5, hash: "m5", globalOrdinal: 300, ts: "T300" });
+    expect(st().selStack).toEqual([]);
+  });
+
   it("a newer block tick in the window advances the live block on the next beat", () => {
     win([tick(300, ["b3"])]);
     followLatest();

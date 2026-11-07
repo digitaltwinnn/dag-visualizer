@@ -160,7 +160,7 @@ another network or around a pin (pinned by `src/store/followFlow.test.ts`). Pinn
 
 **A block's parents come only from a FULL READ** of the snapshot that accepted it
 (`blockReads.ts`, `components/BlockReadsBridge.tsx`): one read per block-bearing snapshot in the
-window, newest first, `WINDOW_READ_POOL` (4) in flight with no gap (user, 2026-11-07: "do the exact
+window, newest first, `WINDOW_READ_POOL` (8) in flight with no gap (user, 2026-11-07: "do the exact
 reads need to be sequential?" — the paced one-per-450 ms queue took ~23 s over a 52-tick window) —
 the DAG's through the chamber's own exact read (`ensureMany`, mirrored into `store.blockReads`), a
 token chain's through the metagraph blocks route — pruned with the window. The exact-read queue asks EVERY window tick (`wantedExactReads`), a token-only tick too, so

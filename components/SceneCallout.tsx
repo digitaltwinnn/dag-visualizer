@@ -43,6 +43,8 @@ import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { VIEW_POLICIES, readsBlockWindow, registerOf } from "@/src/engine/domain/viewPolicy";
 import { blockReadOf } from "@/src/data/blockReads";
+import { REGISTER_MEASURES, dataUpdatesOf } from "@/src/data/ledgerMeasure";
+import { carriesData } from "@/src/engine/domain/dataMark";
 import { blockLead } from "@/components/inspector/blockLead";
 import { identityHudCss } from "@/src/palette/identity";
 import { displayNetwork } from "@/src/data/unlisted";
@@ -253,6 +255,10 @@ export default function SceneCallout() {
   const liveFeed = useStore((s) => s.live);
   // THE BLOCKS REGISTER'S SUBJECT (D3): the Block card's — the live newest block or the pinned one.
   const inBlocks = useStore((s) => readsBlockWindow(registerOf(s.mode, s.ledgerRegister)));
+  // THE SNAPSHOT'S LABEL SPEAKS THE REGISTER'S SUBJECT (user, 2026-11-07: "snapshot anchor should
+  // show information related to the sub-view"): in Data blocks the data blocks it carried and their
+  // updates, from the exact read (`dataOnly`, the register's own measure row); else its anchors.
+  const dataLead = useStore((s) => REGISTER_MEASURES[s.ledgerRegister].dataOnly);
   const block = useStore((s) => s.block);
   const blockRead = useStore((s) => (s.block ? blockReadOf(s.blockReads, s.block) : null));
   // Holds only while a callout can SHOW — the view's policy allows one, the scene layer is up and
@@ -497,7 +503,18 @@ export default function SceneCallout() {
         ring: net !== "all" ? filterAccent(net) : "var(--core)",
         mark: { icon: iconForPick("snapshot"), hue: filterAccent(filter) },
         lead:
-          typeof total !== "number"
+          dataLead && exact
+            ? (() => {
+                const rows = exact.rows.filter((r) => (mine ? netKeyOf(r.metaId) === netKeyOf(net) : true));
+                const nb = rows.reduce((n, r) => n + (carriesData(r) ? r.dataBlocks! : 0), 0);
+                const nu = dataUpdatesOf(rows);
+                return {
+                  ...(mine ? { ident: { text: mine.ticker || mine.name, hue: filterAccent(net) } } : {}),
+                  text: `${nb} data ${nb === 1 ? "block" : "blocks"}`,
+                  chip: nu != null ? `${nu} ${nu === 1 ? "update" : "updates"}` : undefined,
+                };
+              })()
+            : typeof total !== "number"
             ? undefined
             : mine && !settling
               ? {

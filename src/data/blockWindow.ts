@@ -1,6 +1,6 @@
 import { metaSnapRecord, type MetaSnapRecord } from "@/src/data/api";
 import type { LedgerSource } from "@/src/data/ledgerSourceType";
-import type { Anchor, BlockSel, GlobalSnapshot, RawMetaSnapshot, SnapshotExact } from "@/src/data/types";
+import type { Anchor, BlockSel, GlobalSnapshot, RawMetaSnapshot, SnapshotExact, MetaSnapSel } from "@/src/data/types";
 import type { LedgerRegister } from "@/src/store/mode";
 import { readsBlockWindow } from "@/src/engine/domain/viewPolicy";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
@@ -280,6 +280,18 @@ export function windowBlocks(w: BlockWindow | null): WindowBlock[] {
     }
   }
   return out;
+}
+
+/** THE METAGRAPH SNAPSHOT THAT ACCEPTED A TOKEN BLOCK, as the window names it (user, 2026-11-07: a
+ *  block click commits its snapshot too, so the rail reads Metagraph → Metagraph snapshot → Block
+ *  with the block the box). Null for a DAG block — its accepting snapshot is the global itself — and
+ *  for a block the window does not hold. */
+export function blockMetaSnap(w: BlockWindow | null, b: { chain: string; ordinal: number; anchorOrd: number }): MetaSnapSel | null {
+  if (b.chain === "dag") return null;
+  const t = w?.blockTick(b.anchorOrd);
+  const row = t?.metaSnaps[b.chain]?.find((r) => r.ordinal === b.ordinal);
+  if (!t || !row) return null;
+  return { metaId: b.chain, ordinal: row.ordinal, hash: row.hash, globalOrdinal: t.ord, ts: t.ts };
 }
 
 /** WHAT LIVE FOLLOWS IN THE BLOCKS REGISTER (D3, user 2026-11-07: "live mode should be applied to
