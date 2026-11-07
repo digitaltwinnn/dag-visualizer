@@ -10,7 +10,7 @@ import { pickRangeTier } from "@/src/data/trendWindow";
 //
 // Everything is UTC and the caller supplies the date strings; nothing here reads a clock.
 
-export const NOTES_VERSION = 72; // 72: an average of whole things is a rounded fact, about N (2026-11-07). 71: History facts carry the Transfers measure (2026-11-04). 70: the gate reads a change in its own direction; a row names its subject; a count row carries no percentage (review, 2026-11-03)
+export const NOTES_VERSION = 73; // 73: the block DAG's note states no open tips (2026-11-07). 72: an average of whole things is a rounded fact, about N (2026-11-07). 71: History facts carry the Transfers measure (2026-11-04). 70: the gate reads a change in its own direction; a row names its subject; a count row carries no percentage (review, 2026-11-03)
 
 /** What a note covers. Hyper and Geography are a standing picture ("day"), the ledger and the block
  *  DAG the recent hours ("hours"); History's pills are the rest, and a brushed range is `r<fromMs>-<toMs>` after
@@ -96,7 +96,7 @@ export const KIND_TIMING: Record<NoteKind, { refreshMs: number | null; ttlS: num
   hyper: { refreshMs: 24 * H, ttlS: 72 * 3600 },
   geo: { refreshMs: 24 * H, ttlS: 72 * 3600 },
   ledger: { refreshMs: H, ttlS: 6 * 3600 },
-  // The chamber's other register keeps its clock: a day of blocks and the frontier as it stands.
+  // The chamber's other register keeps its clock: a day of blocks and the DAG's height as it stands.
   blocks: { refreshMs: H, ttlS: 6 * 3600 },
   trend24h: { refreshMs: H, ttlS: 6 * 3600 },
   trendDaily: { refreshMs: 24 * H, ttlS: 72 * 3600 },

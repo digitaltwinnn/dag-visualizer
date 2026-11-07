@@ -220,8 +220,10 @@ describe("PROMPTS", () => {
       expect(PROMPTS[view].system("x", undefined, false, kind)).not.toMatch(/—|\s[–-]\s/);
   });
 
-  it("asks the block DAG its own question, in the ledger's voice, reading the frontier as it stands", () => {
+  it("asks the block DAG its own question, in the ledger's voice, reading the height as it stands — never tips", () => {
     const q = PROMPTS.blocks.question;
+    // Open tips left every surface (design round D5, 2026-11-07): the facts hold none to ask after.
+    expect(q).not.toMatch(/\btips?\b|frontier/i);
     expect(q).toMatch(/^What has the block DAG been doing\?/);
     // No earlier figure exists in its facts, so it says out loud it does not lead with change.
     expect(q).toMatch(/does not lead with what changed/);

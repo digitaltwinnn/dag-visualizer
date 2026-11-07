@@ -226,8 +226,8 @@ describe("store.ledgerRegister / block", () => {
     expect(useStore.getState().motionCause).toEqual({ kind: "register", id: "blocks" });
     useStore.getState().setBlock({ chain: "dag", hash: "h", ordinal: 7241523, anchorOrd: 7241523 });
     expect(useStore.getState().block?.hash).toBe("h");
-    useStore.getState().setBlockRead("dag:7241523", { blocks: [], tips: null });
-    expect(useStore.getState().blockReads["dag:7241523"]).toEqual({ blocks: [], tips: null });
+    useStore.getState().setBlockRead("dag:7241523", { blocks: [] });
+    expect(useStore.getState().blockReads["dag:7241523"]).toEqual({ blocks: [] });
   });
   it("leaving the view takes the block's rank with it", () => {
     useStore.setState({ mode: "ledger", block: null, selStack: ["snap"] });
@@ -245,13 +245,13 @@ describe("store.ledgerRegister / block", () => {
     expect(useStore.getState().selStack).toEqual(["snap"]);
     useStore.setState({ selStack: [] });
   });
-  it("retainBlockReads drops reads and misses outside the window, keeps the frontier", () => {
+  it("retainBlockReads drops every read and miss outside the window — no key is exempt", () => {
     const st = useStore.getState();
-    for (const k of ["dag:1", "dag:2", "DOR:frontier"]) st.setBlockRead(k, { blocks: [], tips: null });
+    for (const k of ["dag:1", "dag:2", "DOR:frontier"]) st.setBlockRead(k, { blocks: [] });
     st.setBlockReadMiss("dag:2");
     useStore.getState().retainBlockReads(new Set(["dag:1"]));
     const n = useStore.getState();
-    expect(Object.keys(n.blockReads).sort()).toEqual(["DOR:frontier", "dag:1"]);
+    expect(Object.keys(n.blockReads).sort()).toEqual(["dag:1"]);
     expect(n.blockReadMiss["dag:2"]).toBeUndefined();
   });
   it("leaving the Snapshots view clears the block, as it clears the pin", () => {

@@ -69,7 +69,7 @@ import {
   FRONT_RUN_X0,
   type LaneBlock,
 } from "../../domain/ledgerModel";
-import { layeredZ, referenceSegments, silentRun, tipStateOf, type BlockRead, type TipRead } from "../../domain/blockBraid";
+import { layeredZ, referenceSegments, silentRun, type BlockRead } from "../../domain/blockBraid";
 import { ENTRY_STAG, entryStep, entryTotal } from "../../domain/entryBeat";
 import { makeBarSpec, fillBarSpec, UNLISTED_KEY, RIBBON_LANE_HALF, type BarSpec } from "../../domain/ledgerBands";
 import type { ContainerSpec } from "../../domain/ledgerRails";
@@ -85,8 +85,7 @@ import type { ViewPolicy } from "../../domain/viewPolicy";
 /** A register of the Snapshots view — named through the policy row that lists them, since scene/
  *  reaches nothing in the store, types included (`layerBoundaries.test.ts`). */
 type LedgerRegister = ViewPolicy["registers"][number];
-import { relativeAge } from "@/src/util/relativeAge";
-import { frontierKey } from "@/src/data/blockReads"; // the app's one short span — "1,364 snapshots · 4h"
+import { relativeAge } from "@/src/util/relativeAge"; // the app's one short span — "1,364 snapshots · 4h"
 import { fmtKB } from "@/src/util/format"; // the HUD's own size vocabulary — one formatter, so scene and cards can't disagree
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers"; // shared display copy — floor labels = panel rows
 import { ByteBar, SEED_W } from "../objects/ByteBar";
@@ -402,7 +401,7 @@ export class LedgerView implements SceneView {
   private _register: LedgerRegister = "snapshots";
   private _cargo = REGISTER_CARGO.snapshots;
   private _blockWindow: BlockWindow | null = null;
-  private _blockReads: Readonly<Record<string, { blocks: BlockRead[]; tips: TipRead | null }>> = {};
+  private _blockReads: Readonly<Record<string, { blocks: BlockRead[] }>> = {};
   private _hoverBlock: string | null = null;
   private _selBlock: string | null = null;
   /** The DAG's blocks in the snapshot glass, and the token blocks opaque on their tiles — two
@@ -970,8 +969,8 @@ export class LedgerView implements SceneView {
     this._liveGlobal = g;
   }
 
-  /** The full reads (`store.blockReads`): a block's parents, and each chain's frontier. */
-  setBlockReads(r: Readonly<Record<string, { blocks: BlockRead[]; tips: TipRead | null }>>): void {
+  /** The full reads (`store.blockReads`): a block's parents. */
+  setBlockReads(r: Readonly<Record<string, { blocks: BlockRead[] }>>): void {
     this._blockReads = r;
     this._rebuildBlockTier();
   }
@@ -1032,8 +1031,7 @@ export class LedgerView implements SceneView {
    *  landed read states is drawn (`referenceSegments`: to a placed parent, else a stub toward the
    *  older side). A block the landed read shows with no parents is a DATA block, not a DAG block,
    *  and is not drawn. Its place across is the layered DAG drawing's (`layeredZ`); a block whose read
-   *  has not landed stands on the centre line. Tip state is the chain's FRONTIER read, null without
-   *  one — the resting look, never "open". */
+   *  has not landed stands on the centre line. */
   private _rebuildBlockTier(): void {
     const w = this._blockWindow;
     // The constructor builds the tier after the first slot rebuild can run.
@@ -1115,10 +1113,7 @@ export class LedgerView implements SceneView {
       const key = `${chain}:${hash}`;
       at.set(key, [x, y, z]);
       slotAt.set(key, slot);
-      tiers[tier].items.push({
-        hash, chain, x, y, z, slot, size, pick, hue,
-        state: tipStateOf(hash, reads[frontierKey(chain)]?.tips ?? null),
-      });
+      tiers[tier].items.push({ hash, chain, x, y, z, slot, size, pick, hue });
     };
     let deepest = -1;
     for (let s = 0; s < this._slotSnap.length; s++) {

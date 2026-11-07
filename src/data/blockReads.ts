@@ -1,4 +1,4 @@
-import type { BlockRead, TipRead } from "@/src/engine/domain/blockBraid";
+import type { BlockRead } from "@/src/engine/domain/blockBraid";
 import type { BlockWindow } from "@/src/data/blockWindow";
 
 // WHICH FULL READS THE BLOCKS REGISTER'S WINDOW WANTS. A block's hash comes from the live feed at
@@ -15,59 +15,14 @@ export interface BlockReadWant {
   ordinal: number;
 }
 
-/** ONE HELD READ (`store.blockReads`): a snapshot's blocks and tips, and — on a FRONTIER read — `ts`,
- *  the stamp of the snapshot it read, which FRONTIER AGE counts from. A block-bearing snapshot's
- *  read carries no `ts` (its tick says when). */
+/** ONE HELD READ (`store.blockReads`): a block-bearing snapshot's blocks. */
 export interface HeldBlockRead {
   blocks: BlockRead[];
-  tips: TipRead | null;
-  ts?: string;
-  /** A frontier read's snapshot ordinal (the chain's own), so an older answer never replaces a newer. */
-  ordinal?: number;
 }
 
 /** The store key of one block read: `${chain}:${ordinal}`. */
 export function blockReadKey(chain: string, ordinal: number): string {
   return `${chain}:${ordinal}`;
-}
-
-/** A chain's FRONTIER read — the tips of its NEWEST snapshot, never a block-bearing snapshot's own
- *  (hours stale) — is held under `${chain}:frontier` beside its block reads. One home for the key:
- *  the bridge writes it, retention keeps it, the chamber reads it. */
-export const BLOCK_FRONTIER = "frontier";
-export function frontierKey(chain: string): string {
-  return `${chain}:${BLOCK_FRONTIER}`;
-}
-export function isFrontierKey(key: string): boolean {
-  return key.endsWith(`:${BLOCK_FRONTIER}`);
-}
-
-/** A FRONTIER IS WRITTEN ONLY FORWARD: a read lands unless the held frontier is of a NEWER snapshot
- *  (reads overlap; an older answer arriving late must not replace a newer one). A held read with no
- *  ordinal is replaced. */
-export function frontierAdvances(held: Pick<HeldBlockRead, "ordinal"> | null | undefined, ordinal: number): boolean {
-  return held?.ordinal == null || ordinal >= held.ordinal;
-}
-
-/** THE TOKEN FRONTIERS THAT CANNOT SAY HOW OLD THEY ARE: held with no snapshot stamp (`ts`, absent
- *  while the explorer's index lags the chain's L0). The bridge drops them on a failed read and on
- *  leaving the register, so a return never shows an hour-old tip count as current (rule 10: no read
- *  is no tips). The DAG's frontier is always stamped, so it is never among them. */
-export function unstampedFrontiers(reads: Readonly<Record<string, Pick<HeldBlockRead, "ts"> | undefined>>): string[] {
-  return Object.keys(reads).filter((k) => isFrontierKey(k) && k !== frontierKey("dag") && reads[k] != null && reads[k]!.ts == null);
-}
-
-/** THE TOKEN CHAINS WHOSE FRONTIER IS READ: the listed chains the window walked (`chains`, the trail's
- *  `BlockWindowAnswer.chains`) that hold a block in it — the chains the band's OPEN TIPS states and
- *  the chamber draws tips for, in the window's newest-first order. The DAG's frontier is the live
- *  global's own exact read, never a fetch, so it is never listed here. */
-export function frontierChains(w: BlockWindow | null, chains: readonly string[]): string[] {
-  if (!w) return [];
-  const listed = new Set(chains);
-  const out = new Set<string>();
-  for (const t of [...w.ticks].sort((a, b) => b.ord - a.ord))
-    for (const [chain, rows] of Object.entries(t.metaSnaps)) if (listed.has(chain) && rows.some((r) => r.blocks?.length)) out.add(chain);
-  return [...out];
 }
 
 /** Every read the window could want, newest tick first: the tick's DAG read when it holds a DAG
@@ -126,8 +81,8 @@ export function blockReadOf(
 }
 
 /** HOW MANY BLOCKS ARE BUILT ON THIS ONE, as far as the held reads show: the blocks of its own
- *  chain's block reads that name it as a parent. A frontier read is the tips, not blocks, so it
- *  counts nothing; the reads are pruned with the window, so this is a count within the window. */
+ *  chain's block reads that name it as a parent; the reads are pruned with the window, so this is a
+ *  count within the window. */
 export function blockChildren(
   reads: Readonly<Record<string, { blocks: readonly BlockRead[] } | undefined>>,
   chain: string,
@@ -136,7 +91,7 @@ export function blockChildren(
   let n = 0;
   for (const [key, r] of Object.entries(reads)) {
     // The key's chain part, exactly (`blockReadKey`: `${chain}:${ordinal}`).
-    if (!r || isFrontierKey(key) || key.slice(0, key.lastIndexOf(":")) !== chain) continue;
+    if (!r || key.slice(0, key.lastIndexOf(":")) !== chain) continue;
     for (const b of r.blocks) if (b.parents.some((p) => p.hash === hash)) n++;
   }
   return n;

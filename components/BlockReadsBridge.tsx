@@ -8,7 +8,7 @@ import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
 import { blockReadKey, wantedBlockReads, wantedExactReads, windowBlockKeys, type BlockReadWant } from "@/src/data/blockReads";
 import { BACKFILL_GAP_MS, ensurePage } from "@/components/RawSnapshotBridge";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
-import type { BlockRead, TipRead } from "@/src/engine/domain/blockBraid";
+import type { BlockRead } from "@/src/engine/domain/blockBraid";
 
 // THE BLOCK READS' FETCHER (`src/data/blockReads.ts` says which reads the window wants). A block's
 // parents come only from a full read of the snapshot that accepted it: the DAG's through the
@@ -49,7 +49,7 @@ export default function BlockReadsBridge() {
         const key = blockReadKey("dag", t.ord);
         if (st.blockReads[key]) continue;
         const exact = st.snapshotExact[t.ord];
-        if (exact) st.setBlockRead(key, { blocks: exact.blocks ?? [], tips: exact.tips ?? null });
+        if (exact) st.setBlockRead(key, { blocks: exact.blocks ?? [] });
         else if (st.exactMiss[t.ord] != null && st.blockReadMiss[key] == null) st.setBlockReadMiss(key);
       }
     };
@@ -58,11 +58,11 @@ export default function BlockReadsBridge() {
       try {
         const r = await fetch(netUrl(`/api/network/${x.chain}/snapshots/${x.ordinal}/blocks`));
         if (!r.ok) return false;
-        const d = (await r.json()) as { blocks: BlockRead[]; tips: TipRead | null };
+        const d = (await r.json()) as { blocks: BlockRead[] };
         if (mine !== gen.current) return false; // a cancelled read writes nothing
         if (!Array.isArray(d.blocks)) return false;
         reportPoll("api-blocks", true);
-        useStore.getState().setBlockRead(x.key, { blocks: d.blocks, tips: d.tips ?? null });
+        useStore.getState().setBlockRead(x.key, { blocks: d.blocks });
         return true;
       } catch {
         return false;

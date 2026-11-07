@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { layeredZ, referenceSegments, tipStateOf, silentRun } from "./blockBraid";
+import { layeredZ, referenceSegments, silentRun } from "./blockBraid";
 
 describe("layeredZ — a layered DAG drawing on the chamber's time axis", () => {
   const b = (hash: string, height: number, ord: number, parents: string[] = []) => ({ hash, height, ord, parents });
@@ -42,15 +42,6 @@ describe("layeredZ — a layered DAG drawing on the chamber's time axis", () => 
     const z = layeredZ([b("c", 3, 13, ["p"])], 1, new Map(), new Set(["p"]));
     expect(z.has("c")).toBe(false);
   });
-});
-describe("tipStateOf", () => {
-  const tips = { active: [{ hash: "a", height: 1, usage: 1, introducedAt: 10 }], deprecated: [{ hash: "b", height: 1, deprecatedAt: 12 }] };
-  it("is open for an active tip, retired for a deprecated one or one in neither list", () => {
-    expect(tipStateOf("a", tips)).toBe("open");
-    expect(tipStateOf("b", tips)).toBe("retired");
-    expect(tipStateOf("c", tips)).toBe("retired");
-  });
-  it("is null with no tips read — never inferred", () => { expect(tipStateOf("a", null)).toBeNull(); });
 });
 describe("referenceSegments — every reference a read states", () => {
   const b = (hash: string, parents: string[]) => ({ hash, height: 1, parents: parents.map((p) => ({ hash: p, height: 0 })), txCount: 1, amount: 1, fee: 0, signers: 3, transfers: [] });

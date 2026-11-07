@@ -18,7 +18,7 @@ import { explorerReader, locateRows, type ChainReader } from "./snapshotAt";
 import { chainReadsOf, cursorKeyOf, geoSitesSlotOf, geoSlotOf, ispNamesKeyOf, slotsInWindow, type Tier } from "../trends/keys";
 import { readStore, type TrendsStore } from "../trends/store";
 import { CC_TAIL_RE, ISP_TAIL_RE, TYPE_TAIL_RE, isSubjectNote, subjectKindOf, type NoteSpan, type SubjectKind } from "./keys";
-import { readBlockFrontier, type BlockFrontierRead } from "./blockFrontier";
+import { readDagHeight, type DagHeightRead } from "./dagHeight";
 
 // THE SOURCES OF AI NOTES — the impure half of the facts: which stored payloads each view's note
 // is written from, read and handed to that view's pure builder (`src/data/noteFacts*.ts`). The
@@ -64,9 +64,9 @@ export interface NoteReads {
   chainReads(net: string): Promise<ChainReads>;
   /** The explorer's records, for a row that names one snapshot. Absent, a row keeps its network. */
   chain?(net: string): ChainReader;
-  /** The block DAG's frontier as it stands: the DAG's and these chains' open tips, the DAG's
-   *  height and sub-height (`blockFrontier.ts`). Absent, the block note states no frontier. */
-  blockFrontier?(net: string, chains: readonly string[]): Promise<BlockFrontierRead>;
+  /** The DAG's height and sub-height as they stand (`dagHeight.ts`). Absent, the block note
+   *  states no height. */
+  dagHeight?(net: string): Promise<DagHeightRead>;
 }
 
 /** ONE TIER over [fromMs, toMs): the tile route's body, at any span. */
@@ -160,7 +160,7 @@ export function storeReads(nowMs: number, store: HashReader = readStore()): Note
     geoDays: (net, fromMs, toMs) => readGeoDays(net, fromMs, toMs, once),
     chainReads: async (net) => chainReadsOf(await once.hgetall(cursorKeyOf(net))),
     chain: explorerReader,
-    blockFrontier: readBlockFrontier,
+    dagHeight: readDagHeight,
   };
 }
 
@@ -474,8 +474,7 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
   },
   // THE BLOCK DAG (the Snapshots view's Blocks register): the blocks each chain accepted over the
   // last 24 WHOLE hours of the hourly tier — the sampler's own `g.blocks` / `m.<id>.blocks`, the
-  // series History's Blocks measure draws — and the frontier as it stands, read live for the DAG and
-  // every chain that accepted a token block over the span.
+  // series History's Blocks measure draws — and the DAG's height as it stands, read live.
   blocks: {
     accepts: (_net, subject, span) => span === "hours" && subject === "all",
     label: () => "the block DAG",
@@ -492,8 +491,7 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
         const points = id === "dag" ? null : series[`m.${id}.blocks`];
         if (points) blocks[id] = points;
       }
-      const busy = Object.keys(blocks).filter((id) => id !== "dag" && blocks[id]!.some((v) => v != null && v > 0));
-      const live = reads.blockFrontier ? await reads.blockFrontier(net, busy) : { frontier: {}, height: null, subHeight: null };
+      const live = reads.dagHeight ? await reads.dagHeight(net) : { height: null, subHeight: null };
       const built = blocksFacts({ blocks, ...live, names });
       return { built, spanFrom: fromMs, spanTo: toMs, windows: [["Span length", secondsOf(fromMs, toMs)]] };
     },

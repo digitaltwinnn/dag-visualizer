@@ -1,29 +1,25 @@
-import type { BlockRead, BlockTransfer, TipRead } from "@/src/engine/domain/blockBraid";
+import type { BlockRead, BlockTransfer } from "@/src/engine/domain/blockBraid";
 import { blockHashesOf } from "@/src/data/api";
 
-// The blocks and tips a snapshot VALUE carries — the same shape on a global snapshot and a
-// metagraph's: `blocks[].block.{value:{parent,transactions},proofs}` and
-// `tips.{remainedActive,deprecated}`. Amounts and fees are datum (1e-8 DAG) on the wire and DAG
-// here; each transfer keeps its own source, destination, amount and fee (`transfers`), the totals
-// are their sums. A block's own hash is not in the value (the indexer computes it), so every block comes
-// back with `hash: ""` and the route fills it from the explorer record, by index. Absent data
-// stays absent (rule 10): no blocks → [], no tips → null.
+// The blocks a snapshot VALUE carries — the same shape on a global snapshot and a metagraph's:
+// `blocks[].block.{value:{parent,transactions},proofs}`. The value's `tips` are not read: no
+// surface states them (design round D5, 2026-11-07 — open tips left every surface). Amounts and
+// fees are datum (1e-8 DAG) on the wire and DAG here; each transfer keeps its own source,
+// destination, amount and fee (`transfers`), the totals are their sums. A block's own hash is not in
+// the value (the indexer computes it), so every block comes back with `hash: ""` and the route fills
+// it from the explorer record, by index. Absent data stays absent (rule 10): no blocks → [].
 
 const DATUM = 1e8;
 
 type Ref = { hash?: unknown; height?: unknown };
 type Tx = { value?: { source?: unknown; destination?: unknown; amount?: unknown; fee?: unknown } };
 type RawBlock = { block?: { value?: { parent?: Ref[]; transactions?: Tx[] }; proofs?: unknown[] } };
-type RawTips = {
-  remainedActive?: { block?: Ref; usageCount?: unknown; introducedAt?: unknown }[];
-  deprecated?: { block?: Ref; deprecatedAt?: unknown }[];
-};
 
 const num = (x: unknown): number => (typeof x === "number" && Number.isFinite(x) ? x : 0);
 const str = (x: unknown): string => (typeof x === "string" ? x : "");
 
-export function decodeBlocks(value: unknown): { blocks: BlockRead[]; tips: TipRead | null } {
-  const v = (value ?? {}) as { blocks?: RawBlock[]; tips?: RawTips };
+export function decodeBlocks(value: unknown): { blocks: BlockRead[] } {
+  const v = (value ?? {}) as { blocks?: RawBlock[] };
   const blocks: BlockRead[] = (Array.isArray(v.blocks) ? v.blocks : []).map((b) => {
     const inner = b?.block;
     const parents = (inner?.value?.parent ?? []).map((p) => ({ height: num(p?.height), hash: str(p?.hash) }));
@@ -49,23 +45,7 @@ export function decodeBlocks(value: unknown): { blocks: BlockRead[]; tips: TipRe
       transfers,
     };
   });
-  const t = v.tips;
-  const tips: TipRead | null = t
-    ? {
-        active: (t.remainedActive ?? []).map((a) => ({
-          hash: str(a?.block?.hash),
-          height: num(a?.block?.height),
-          usage: num(a?.usageCount),
-          introducedAt: num(a?.introducedAt),
-        })),
-        deprecated: (t.deprecated ?? []).map((d) => ({
-          hash: str(d?.block?.hash),
-          height: num(d?.block?.height),
-          deprecatedAt: num(d?.deprecatedAt),
-        })),
-      }
-    : null;
-  return { blocks, tips };
+  return { blocks };
 }
 
 /** The explorer record's block hashes, or a throw when the record is absent — so a cache wrapped

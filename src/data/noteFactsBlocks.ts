@@ -1,17 +1,16 @@
 import { fact } from "@/src/data/noteFacts";
 import type { Fact, NoteLead } from "@/src/data/noteTypes";
-import type { TipRead } from "@/src/engine/domain/blockBraid";
 
 // THE BLOCK DAG'S FACTS BUILDER — what the Blocks register's note (the Briefing's blocks stop) is
 // shown. Its subject is the second clock in the chamber: the blocks that move value, against the
 // snapshot chain that ticks whatever happens. So it states how many blocks each chain accepted over
-// the last day, the tips its frontier holds open right now, and where the DAG's height stands.
+// the last day and where the DAG's height stands. It states no open tips (design round D5,
+// 2026-11-07: tips left every surface).
 //
 // The block counts are the SAMPLER'S OWN SERIES — `g.blocks` (the DAG's, a field of each global's
 // record) and `m.<id>.blocks` (a network's token blocks) — read from the hourly tier over the last 24
-// whole hours, so the note and History's Blocks measure state one figure. The frontier is a live read
-// of each chain's newest snapshot (`app/api/notes/blockFrontier.ts`); the height and sub-height are
-// the newest global's own fields.
+// whole hours, so the note and History's Blocks measure state one figure. The height and sub-height
+// are the newest global's own fields, read live when the note is written (`app/api/notes/dagHeight.ts`).
 //
 // HONESTY (rule 10):
 //   · a null bucket is NOT MEASURED: a chain whose every hour is null states nothing; one with an
@@ -19,8 +18,7 @@ import type { TipRead } from "@/src/engine/domain/blockBraid";
 //   · a token chain with no block over the span is not listed (a network that moved no value is no
 //     news, and twenty zeros would bury the two that did); the DAG's own zero is a reading and
 //     stands;
-//   · a frontier that could not be read (null) states no tips: no read is not zero tips; likewise
-//     an unread height or sub-height is left out, never a zero;
+//   · an unread height or sub-height is left out, never a zero;
 //   · null when no block series was measured at all: no note rather than a note about nothing.
 //
 // Counts only, so no ratio needs attributing: a label still starts with its chain's display name, the
@@ -34,8 +32,6 @@ export const BLOCK_NOTE_HOURS = 24;
 export interface BlocksFactsInput {
   /** Per chain (`dag` or a catalog id), the hourly block counts over the span; null = not measured. */
   blocks: Record<string, (number | null)[]>;
-  /** Per chain, the tips of its newest snapshot; null where the read failed. */
-  frontier: Record<string, TipRead | null>;
   /** The newest global snapshot's height and sub-height (the DAG's), null when unread. */
   height: number | null;
   subHeight: number | null;
@@ -68,11 +64,6 @@ export function blocksFacts(input: BlocksFactsInput): { facts: Fact[]; names: st
   }
   if (!measured) return null;
 
-  for (const id of chainOrder(Object.keys(input.frontier), names)) {
-    const tips = input.frontier[id];
-    if (!tips) continue;
-    facts.push(fact(`${nameOf(id)} open tips`, tips.active.length, "count"));
-  }
   if (input.height != null) facts.push(fact("DAG height", input.height, "count"));
   if (input.subHeight != null) facts.push(fact("Global snapshots since the DAG height last moved", input.subHeight, "count"));
 

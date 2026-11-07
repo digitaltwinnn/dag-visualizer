@@ -4,7 +4,7 @@ import { decodeBlocks, pairHashes, recordBlockHashes } from "./decodeBlocks";
 
 describe("decodeBlocks", () => {
   it("reads each block's two parents by height and hash, its transfers and signatures", () => {
-    const { blocks, tips } = decodeBlocks(fixture);
+    const { blocks } = decodeBlocks(fixture);
     expect(blocks).toHaveLength(1);
     expect(blocks[0].parents).toEqual([
       { height: 61635, hash: expect.stringMatching(/^8352a78d04/) },
@@ -19,11 +19,10 @@ describe("decodeBlocks", () => {
     ]);
     expect(blocks[0].signers).toBe(3);
     expect(blocks[0].hash).toBe("");
-    expect(tips?.active.map((t) => t.introducedAt)).toContain(7241162);
-    expect(tips?.deprecated.length).toBe(13);
   });
-  it("answers no blocks and null tips for a value that carries neither", () => {
-    expect(decodeBlocks({ ordinal: 1 })).toEqual({ blocks: [], tips: null });
+  it("answers no blocks for a value that carries none, and carries no tips (nothing reads them, D5)", () => {
+    expect(decodeBlocks({ ordinal: 1 })).toEqual({ blocks: [] });
+    expect(Object.keys(decodeBlocks(fixture))).toEqual(["blocks"]);
   });
 });
 

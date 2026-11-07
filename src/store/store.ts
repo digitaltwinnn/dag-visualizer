@@ -29,7 +29,7 @@ export type { Mode, LedgerRegister };
 // The stored metric every trend plane draws — one picker, one column (see `trendMetric` below).
 import type { LedgerMeasure } from "@/src/data/ledgerMeasure";
 import type { BlockMeasure } from "@/src/data/blockMeasure";
-import { isFrontierKey, type HeldBlockRead } from "@/src/data/blockReads";
+import type { HeldBlockRead } from "@/src/data/blockReads";
 import type { GeoMeasure } from "@/src/data/geoMeasure";
 import type { HyperMeasure } from "@/src/data/hyperMeasure";
 // WHY the scene is moving — the motion hint's cause (2026-09-26), stamped by the gesture's owner
@@ -421,8 +421,7 @@ interface AppState {
   block: BlockSel | null;
   // The block the cursor is hovering (its hash) — a hover channel: previews, never commits.
   hoverBlock: string | null;
-  // Block reads, keyed `${chain}:${ordinal}`; "dag:<ord>" mirrors `snapshotExact`'s blocks and tips.
-  // A frontier read (`${chain}:frontier`) also carries its snapshot's stamp (`HeldBlockRead.ts`).
+  // Block reads, keyed `${chain}:${ordinal}`; "dag:<ord>" mirrors `snapshotExact`'s blocks.
   blockReads: Record<string, HeldBlockRead>;
   // Block reads that FAILED (retry spent): the tick stays, its blocks draw with no links (rule 10).
   blockReadMiss: Record<string, true>;
@@ -568,9 +567,7 @@ interface AppState {
   setHoverBlock: (hash: string | null) => void;
   setBlockRead: (key: string, v: HeldBlockRead) => void;
   setBlockReadMiss: (key: string) => void;
-  /** Forget held block reads by key (a frontier that can no longer say how old it is). Data-bridge setter. */
-  dropBlockReads: (keys: readonly string[]) => void;
-  /** Drop every block read and miss outside `keep`, except the `:frontier` keys. Data-bridge setter. */
+  /** Drop every block read and miss outside `keep`. Data-bridge setter. */
   retainBlockReads: (keep: Set<string>) => void;
   setLedgerMeasure: (measure: LedgerMeasure) => void;
   setGeoMeasure: (measure: GeoMeasure) => void;
@@ -1014,19 +1011,10 @@ export const useStore = create<AppState>((set) => ({
       return { blockReads: { ...s.blockReads, [key]: v }, blockReadMiss: miss };
     }),
   setBlockReadMiss: (key) => set((s) => ({ blockReadMiss: { ...s.blockReadMiss, [key]: true } })),
-  dropBlockReads: (keys) =>
-    set((s) => {
-      const gone = keys.filter((k) => k in s.blockReads);
-      if (!gone.length) return {};
-      const blockReads = { ...s.blockReads };
-      for (const k of gone) delete blockReads[k];
-      return { blockReads };
-    }),
   retainBlockReads: (keep) =>
     set((s) => {
-      const kept = (k: string) => keep.has(k) || isFrontierKey(k);
-      const reads = Object.keys(s.blockReads).filter((k) => !kept(k));
-      const miss = Object.keys(s.blockReadMiss).filter((k) => !kept(k));
+      const reads = Object.keys(s.blockReads).filter((k) => !keep.has(k));
+      const miss = Object.keys(s.blockReadMiss).filter((k) => !keep.has(k));
       if (!reads.length && !miss.length) return {};
       const blockReads = { ...s.blockReads };
       const blockReadMiss = { ...s.blockReadMiss };

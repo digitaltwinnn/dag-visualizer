@@ -82,8 +82,11 @@ const FEEDS = {
   // "per snapshot", not "each tick" (user, 2026-10-25: "what does 'each tick' mean?") — the read
   // fires once for every new global snapshot, and "tick" is code vocabulary no reader sees.
   exact: { label: "Snapshot reads", everyMs: null, when: "per snapshot", tempoMs: POLL.pollMs },
-  // The Blocks register's trail (/api/blocks/trail): read only while that register is on the chamber,
-  // refreshed every 30 s at the live edge, so it has no cadence of its own to go STALE on.
+  // The Blocks register's reads — its trail (/api/blocks/trail) and the block-bearing snapshots' full
+  // reads: read only while the Snapshots view is shown (either register: the switch states the Blocks
+  // span) or the Briefing runs, the trail refreshed every 30 s at the live edge, so it has no cadence
+  // of its own to go STALE on. Nothing polls beside it (the per-chain frontier read left with the open
+  // tips, D5 2026-11-07).
   "api-blocks": { label: "Block reads", everyMs: null, when: "while shown", tempoMs: 30_000 },
 } as const;
 export type FeedId = keyof typeof FEEDS;

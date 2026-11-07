@@ -137,7 +137,7 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
   // second clock, in the ledger's voice. Its facts hold no earlier figure, so, like the ledger's
   // `questionNow`, it says out loud that it does not lead with change: VOICE asks every note to.
   blocks: {
-    question: "What has the block DAG been doing? This note does not lead with what changed, whatever the rules above say: the facts hold no earlier figure, so never say anything rose or fell. Say how many blocks were accepted over the recent hours, the DAG's first, as \"the DAG accepted N blocks\", then each network's token blocks the same way. Then the frontier as it stands now, in one short sentence: how many tips are open, and where the DAG's height stands, with the global snapshots since it last moved. A block is a block, never a snapshot or a transfer.",
+    question: "What has the block DAG been doing? This note does not lead with what changed, whatever the rules above say: the facts hold no earlier figure, so never say anything rose or fell. Say how many blocks were accepted over the recent hours, the DAG's first, as \"the DAG accepted N blocks\", then each network's token blocks the same way. Then, in one short sentence, where the DAG's height stands now, with the global snapshots since it last moved. A block is a block, never a snapshot or a transfer.",
     system: (subjectLabel) => `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${PROMPTS.blocks.question}`,
   },
   trend: {

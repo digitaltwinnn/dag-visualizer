@@ -1,6 +1,6 @@
 // The block braid's arithmetic: pure rules for the Blocks register of the Snapshots view.
 //
-// Three rules, in plain words:
+// Two rules, in plain words:
 //  1. A LAYERED DAG DRAWING on the chamber's time axis (user, design round D2: "a DAG is shaped
 //     differently usually, isn't there some algo for it?" — the Sugiyama method). Along the trail a
 //     block stands on its own tick, which is time and never moves; ACROSS it, a block takes the
@@ -13,8 +13,6 @@
 //  2. Every reference a read states is drawn (`referenceSegments`): to the parent where it is
 //     placed, else as a STUB toward the older side at the block's own place — the reference is a
 //     read fact, only its far end is off the trail. A block whose read has not landed draws none.
-//  3. Tips are read from a snapshot's own list, never inferred. A mock that inferred retirement
-//     over-counted open tips by half. With no list read, the state is unknown (null).
 
 export interface BlockRead {
   hash: string;
@@ -35,11 +33,6 @@ export interface BlockTransfer {
   to: string;
   amount: number;
   fee: number;
-}
-
-export interface TipRead {
-  active: { hash: string; height: number; usage: number; introducedAt: number }[];
-  deprecated: { hash: string; height: number; deprecatedAt: number }[];
 }
 
 /**
@@ -111,14 +104,6 @@ export function layeredZ(
     }
   }
   return out;
-}
-
-export type TipState = "open" | "retired";
-
-/** open if listed active; retired otherwise; null when the tips were not read. */
-export function tipStateOf(hash: string, tips: TipRead | null): TipState | null {
-  if (!tips) return null;
-  return tips.active.some((t) => t.hash === hash) ? "open" : "retired";
 }
 
 /**

@@ -13,20 +13,16 @@
 // 2026-08-11). Instances past `count` are not drawn at all, so a rebuild that holds fewer blocks
 // leaves no stale slot behind.
 //
-// The tips are READ, never inferred (spec "Rules"): `state` comes from `tipStateOf` over the
-// chain's frontier read, and with no frontier read it is null — the resting look, never "open".
-// An open tip breathes on the calm beat the live edge uses (`LiveEdge.BREATHE_RATE`); a retired
-// block reads quiet.
+// A block has ONE resting look (user, design round D5: no open tips anywhere — "don't" breathe
+// them); a hovered or committed block takes the snapshots' emphasis on top of it.
 
 import * as THREE from "three";
 import { frontAt, horizonAt, SLOT_N, SLOT_SP } from "../../domain/ledgerModel";
 import { LEAD_X } from "../../domain/ledgerLayout";
-import type { TipState } from "../../domain/blockBraid";
 import { snapBright, emphasisK } from "../../domain/dimModel";
 import { glowBlend, inkMix, inkPresence, isLightGround, type SceneColors } from "../../sceneColors";
 import type { PickDescriptor } from "@/src/data/types";
 import { joinBloom } from "../SceneContext";
-import { BREATHE_RATE } from "./LiveEdge";
 
 /** One block, placed by the view (chamber-local, before the rewind offset). */
 export interface BlockItem {
@@ -36,7 +32,6 @@ export interface BlockItem {
   x: number;
   y: number;
   z: number;
-  state: TipState | null;
   /** The chain's identity colour, as the tiles resolve it. */
   hue: number;
   /** The trail slot it rides — the entry drop is per slot. */
@@ -47,15 +42,11 @@ export interface BlockItem {
   pick: PickDescriptor | null;
 }
 
-/** The block mark's look: resting brightness per tip state (a multiplier on the identity hue, the
- *  tiles' `rest` idiom), the open tip's breath, the paper ink floor, the focus swell, the links. */
+/** The block mark's look: its resting brightness (a multiplier on the identity hue, the tiles'
+ *  `rest` idiom), the paper ink floor, the focus swell, the links. */
 export interface BlockLook {
-  open: number;
-  retired: number;
-  /** No frontier read: the resting block, between the two. */
+  /** The resting block. */
   rest: number;
-  /** The open tip's breath, as a fraction of its brightness. */
-  breath: number;
   /** Paper only: how far a block may thin before it stops being a mark (`TileLook.ink`'s twin). */
   ink: number;
   /** The hovered or committed block's swell. */
@@ -68,7 +59,7 @@ export interface BlockLook {
   linkPaper: number;
 }
 
-export const BLOCK_LOOK: Readonly<BlockLook> = { open: 0.95, retired: 0.35, rest: 0.6, breath: 0.22, ink: 0.35, grow: 0.35, link: 0.42, linkPaper: 0.7 };
+export const BLOCK_LOOK: Readonly<BlockLook> = { rest: 0.6, ink: 0.35, grow: 0.35, link: 0.42, linkPaper: 0.7 };
 
 /** THE DAG BLOCK'S GLASS (user, design round D1: "the block should match the transparent / cyan
  *  snapshot color"): the global snapshot's own material — normal-blended, translucent, no depth
@@ -99,7 +90,6 @@ export class BlockTier {
   private _selHash: string | null = null;
   private _dimNet = "all";
   private _off = 0;
-  private _t = 0;
   private _colors: SceneColors;
   private _paper: boolean;
   private _entryDrop: Float32Array | null = null;
@@ -271,10 +261,8 @@ export class BlockTier {
 
   /** Per frame: every live instance written or zero-scaled; link alpha per vertex. No allocation. */
   update(dt: number, alpha: number): void {
-    this._t += dt;
     const L = BLOCK_LOOK;
     const ek = emphasisK(dt);
-    const breathe = 1 + L.breath * Math.sin(this._t * BREATHE_RATE);
     const dimNet = this._dimNet;
     const anyFocus = this._hov >= 0 || this._sel >= 0;
     const paper = this._paper;
@@ -298,7 +286,7 @@ export class BlockTier {
         continue;
       }
       const focus = i === this._sel || i === this._hov ? 1 : 0;
-      const base = it.state === "open" ? L.open * breathe : it.state === "retired" ? L.retired : L.rest;
+      const base = L.rest;
       const offNet = dimNet !== "all" && it.chain !== dimNet;
       const mine = dimNet !== "all" && !offNet;
       const emph = inkPresence(snapBright(base, offNet, focus, anyFocus && focus === 0, mine), paper, base);

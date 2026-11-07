@@ -35,9 +35,9 @@ import { unlistedUnmeasured } from "@/src/data/trendSeries";
 import { nodesBySubregion } from "@/src/data/subregions";
 import { useFeedRead } from "@/components/useFeedRead";
 import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
-import { blockScopeOf, blocksPerBucket, blocksPerHour, frontierAge, openTipsByChain } from "@/src/data/blockStats";
-import { frontierKey } from "@/src/data/blockReads";
-import { windowBlocks } from "@/src/data/blockWindow";
+import { blockScopeOf, blocksByNetwork, blocksInWindow, blocksPerHourBins, lastBlockAt, movedChainOf, movedInWindow, movedPerHourBins } from "@/src/data/blockStats";
+import { blockSpanWord } from "@/src/data/ledgerSpan";
+import { compactDag } from "@/src/util/format";
 import { tickerOf } from "@/components/explorer/nodeRow";
 import { useNowTick } from "@/components/useNowTick";
 
@@ -942,21 +942,29 @@ function AnchoringNetworks({ windowed, snaps, filter }: { windowed: TrendsWindow
  *  at the identity hue (the strip's old rule, kept). */
 
 // ledger, BLOCKS REGISTER — four cells in the ledger row's own grammar (the lead is the reading, the
-// detail its instrument), over the block window and the block reads. The band states what it is
-// FOR: the live edge. A window pinned around a past time makes no claim about "the last hour", so
-// those readings step aside for a sentence (rule 10) rather than printing zeros. OPEN TIPS and
-// FRONTIER AGE read the chain's `${chain}:frontier` read, which is honestly absent until a
-// frontier read is held: the house empty value, never a 0.
+// detail its instrument), over the block window and the block reads (design round D5, 2026-11-07 —
+// user: "do your suggestion for vitals"): BLOCKS, what the window holds; MOVED, what its transfers
+// carried; BY NETWORK, whose blocks they are; LAST BLOCK, how long since one. Every reading is pure
+// arithmetic in `src/data/blockStats.ts`. The window is the band's subject, so BLOCKS and MOVED state
+// its reach in the aside — the register switch's own span words (`blockSpanWord`) — and a window
+// pinned around a past time is read as that window; only LAST BLOCK, a claim about now, steps aside
+// for the pinned sentence (rule 10). The DAG's height is not here: the Block card's chip and the
+// note state it.
 const BLOCK_LEAD = "font-mono font-bold text-figure tabular-nums whitespace-nowrap";
 const BLOCK_PINNED = "Window pinned to a past time";
+/** BY NETWORK's rows before the rest fold into "other" — the band's four-row height. */
+const BY_NETWORK_ROWS = 4;
+const CATALOG_ORDER: string[] = METAGRAPHS.map((m) => m.id);
 
-/** A stacked lead: the figure over its muted unit — the rate cards' own shape. */
-function BlockLead({ figure, unit, prefix, empty = false }: { figure: React.ReactNode; unit: string; /** A floor says so ("at least"), in words. */ prefix?: string; empty?: boolean }) {
+/** A stacked lead: the figure over its muted unit — the rate cards' own shape — with an optional
+ *  floor line under the unit ("12 of 30 blocks read"). */
+function BlockLead({ figure, unit, prefix, note, empty = false }: { figure: React.ReactNode; unit: string; /** A floor says so ("at least"), in words. */ prefix?: string; note?: string; empty?: boolean }) {
   return (
     <span className="flex flex-col items-start">
       {prefix && !empty && <span className="text-label font-normal text-muted-foreground leading-none">{prefix}</span>}
       <span className={cn(BLOCK_LEAD, empty ? "text-muted-foreground" : "text-foreground")}>{empty ? <Empty why="Not held yet" /> : figure}</span>
       <span className="text-label text-muted-foreground leading-none">{unit}</span>
+      {note && !empty && <span className="mt-0.5 text-label text-muted-foreground leading-none whitespace-nowrap">{note}</span>}
     </span>
   );
 }
@@ -973,70 +981,97 @@ export function BlocksCells({ accent }: { accent: string }) {
   // its ticks), and a window its DRIVING chain's walk cut short is read like a full one: a floor
   // where it is short (`blockScopeOf`).
   const scope = blockScopeOf(win);
-  const unread = status?.status === "unread";
-  const hourRead = win && !pinned ? blocksPerHour(ticks, now, scope) : null;
-  const hour = hourRead?.count ?? null;
+  // The frame ends NOW at the live edge, and at a pinned window's own newest tick (it makes no claim
+  // about the time since).
+  const endMs = pinned && ticks.length ? Math.max(...ticks.map((t) => Date.parse(t.ts))) : now;
+  const span = blockSpanWord({ status, globals: win?.globalSnapshots ?? [], nowMs: now });
+  // No window held: the instrument state, in the switch's own words where it has them.
+  const absent =
+    status?.status === "unread" ? "Unlisted networks' blocks are not read"
+    : status?.status === "beyond" ? "Too far back for the block trail"
+    : status?.status === "failed" ? "The block window could not be read"
+    : "Reading the window…";
+  const stateLine = (text: string) => <span className="flex items-center self-stretch text-label text-muted-foreground">{text}</span>;
 
-  // Chains with a tip count to state: the DAG, then every chain the window holds a block of.
-  const chains = ["dag", ...new Set(windowBlocks(win).map((b) => b.chain).filter((c) => c !== "dag"))];
-  const tips = openTipsByChain(reads, chains);
+  // BLOCKS — every block the window holds (DAG + token, or the filter's network's).
+  const held = win ? blocksInWindow(ticks, endMs, scope) : null;
 
-  // HEIGHT: the DAG's height as the protocol counts it — the newest global snapshot's own `height`,
-  // with its `subHeight` (the global snapshots since it last moved). ONE SOURCE for every surface
-  // (controller ruling, 2026-11-06): the block DAG's note states the same two fields of the same
-  // feed's record, so the band and the note never print two heights side by side. A Block card keeps
-  // its block's own height: another subject.
-  const latest = useStore((s) => s.latestSnapshot);
-  const height = !pinned && latest?.height != null ? latest.height : null;
-  const subHeight = height != null && latest?.subHeight != null ? latest.subHeight : null;
+  // MOVED — the window's transfer amounts, in ONE unit: the DAG's own under All or the DAG filter (a
+  // sum across tokens would add unlike units), the token's under its filter (`tickerOf`, the one home
+  // the Block card's amounts read). Only landed reads are summed; a pending or missed read is stated.
+  const movedChain = movedChainOf(scope.chain);
+  const unit = tickerOf(movedChain);
+  const moved = win ? movedInWindow(ticks, reads, movedChain) : null;
+  const movedNote = moved && moved.read < moved.total ? `${moved.read.toLocaleString()} of ${moved.total.toLocaleString()} blocks read` : undefined;
 
-  // The DAG's frontier read carries its snapshot's stamp (until one is held: the empty value).
-  const frontierTs = reads[frontierKey("dag")]?.ts;
-  const age = frontierAge(frontierTs ? { ts: frontierTs } : null, now);
+  // BY NETWORK — the share of the window's blocks per network, the catalog's order, one row under a
+  // filter; past three networks the rest fold into "other" so the rows still partition the count.
+  const nets = win ? blocksByNetwork(ticks, scope.chain, CATALOG_ORDER) : [];
+  const shown = nets.length > BY_NETWORK_ROWS ? nets.slice(0, BY_NETWORK_ROWS - 1) : nets;
+  const rest = nets.length > BY_NETWORK_ROWS ? nets.slice(BY_NETWORK_ROWS - 1).reduce((n, r) => n + r.count, 0) : 0;
+  const netRows = [
+    ...shown.map((r) => ({ key: r.chain, label: tickerOf(r.chain), count: r.count, hue: identityHudCss(r.chain) })),
+    ...(rest > 0 ? [{ key: "other", label: "other", count: rest, hue: "var(--muted-foreground)" }] : []),
+  ];
+
+  // LAST BLOCK — the age of the window's newest block of its network (`ageWords`, the app's one
+  // long-form age), and whose it is: the name beside the dot, never colour alone.
+  const last = win && !pinned ? lastBlockAt(ticks, scope.chain) : null;
 
   return (
     <>
       <BandCard
-        label="Blocks last hour"
-        lead={<BlockLead figure={hour != null ? <Odometer value={hour} int /> : null} prefix={hourRead?.floor ? "at least" : undefined} unit="blocks" empty={hour == null} />}
+        label="Blocks"
+        aside={win ? span : undefined}
+        lead={<BlockLead figure={held ? <Odometer value={held.count} int /> : null} prefix={held?.floor ? "at least" : undefined} unit="blocks" empty={held == null} />}
       >
-        {win && !pinned ? (
+        {win ? (
           <span className="flex-1 min-w-0 self-center">
-            {/* Blocks per five minutes; the window lists only block-bearing snapshots, so a bin with
-                none is zero (blockStats), and bucketed, never sliced. */}
-            <Sparkline data={blocksPerBucket(ticks, now, scope)} color={accent} height={42} maxPoints={20} stretch />
+            {/* Blocks per hour across the window's span; the window lists only block-bearing
+                snapshots, so an hour with none is zero (blockStats), and bucketed, never sliced. */}
+            <Sparkline data={blocksPerHourBins(ticks, endMs, scope)} color={accent} height={42} maxPoints={24} stretch />
           </span>
         ) : (
-          <span className="flex items-center self-stretch text-label text-muted-foreground">{pinned ? BLOCK_PINNED : unread ? "Unlisted networks' blocks are not read" : "Reading the window…"}</span>
+          stateLine(absent)
         )}
       </BandCard>
-      <BandCard label="Open tips">
-        <span className="flex flex-wrap items-center content-center gap-x-3 gap-y-1 self-stretch min-w-0 overflow-hidden">
-          {chains.slice(0, 4).map((c) => (
-            <span key={c} className="inline-flex items-center gap-1.5 whitespace-nowrap text-body">
-              <IdentityDot hue={identityHudCss(c)} />
-              <span className="text-muted-foreground">{tickerOf(c)}</span>
-              <span className="font-mono tabular-nums">{tips[c] != null ? tips[c] : <Empty why="No frontier read held yet" />}</span>
+      <BandCard
+        label="Moved"
+        aside={win ? span : undefined}
+        lead={<BlockLead figure={moved?.amount != null ? compactDag(moved.amount) : null} unit={unit} note={movedNote} empty={moved?.amount == null} />}
+      >
+        {win ? (
+          moved && moved.total > 0 ? (
+            <span className="flex-1 min-w-0 self-center">
+              {/* The moved amount per hour on the same frame; an hour holding a block whose read has
+                  not landed is a gap, never a dip. */}
+              <Sparkline data={movedPerHourBins(ticks, reads, endMs, movedChain, scope)} color={accent} height={42} maxPoints={24} stretch />
             </span>
-          ))}
-          {chains.length > 4 && <span className="text-label text-muted-foreground">+{chains.length - 4} more</span>}
-        </span>
+          ) : (
+            stateLine(`No ${unit} blocks in the window`)
+          )
+        ) : (
+          stateLine(absent)
+        )}
       </BandCard>
-      <BandCard label="Height" lead={<BlockLead figure={height != null ? height.toLocaleString() : null} unit="DAG height" empty={height == null} />}>
-        <span className="flex items-center self-stretch text-label text-muted-foreground">
-          {pinned
-            ? BLOCK_PINNED
-            : height == null
-              ? "Reading the newest global snapshot…"
-              : subHeight != null
-                ? `${subHeight.toLocaleString()} global ${subHeight === 1 ? "snapshot" : "snapshots"} since it last moved`
-                : "The newest global snapshot's"}
-        </span>
+      <BandCard label="By network">
+        {win ? <MicroBars accent={accent} labelW={64} rows={netRows} /> : stateLine(absent)}
       </BandCard>
       <BandCard
-        label="Frontier age"
-        lead={<BlockLead figure={age != null ? ageWords(age) : null} unit="since the newest snapshot" empty={age == null} />}
-      />
+        label="Last block"
+        lead={pinned ? undefined : <BlockLead figure={last ? ageWords(Math.max(0, now - Date.parse(last.ts))) : null} unit="ago" empty={last == null} />}
+      >
+        {pinned ? (
+          stateLine(BLOCK_PINNED)
+        ) : last ? (
+          <span className="flex items-center self-stretch gap-1.5 text-body whitespace-nowrap">
+            <IdentityDot hue={identityHudCss(last.chain)} />
+            <span className="text-muted-foreground">{tickerOf(last.chain)}</span>
+          </span>
+        ) : (
+          stateLine(win ? "No block in the window" : absent)
+        )}
+      </BandCard>
     </>
   );
 }

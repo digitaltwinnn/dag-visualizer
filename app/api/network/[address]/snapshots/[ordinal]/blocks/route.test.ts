@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CATALOG } from "@/src/engine/config";
 
-// The blocks route's two paths: a numeric ordinal (immutable, a day) and `latest`, the chain's
-// FRONTIER (25 s at the edge, never immutable). The platform cache is a pass-through here and every
-// upstream read is a stubbed fetch, keyed by URL.
+// The blocks route: one numeric ordinal, immutable, a day — and nothing else (the `latest` frontier
+// read left with the open tips, design round D5). The platform cache is a pass-through here and
+// every upstream read is a stubbed fetch, keyed by URL.
 vi.mock("next/cache", () => ({ unstable_cache: (fn: () => unknown) => fn }));
 
 const { GET } = await import("./route");
@@ -28,39 +28,6 @@ const call = (ordinal: string) =>
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe("the latest snapshot's blocks: the chain's frontier", () => {
-  it("is read from the L0's /snapshots/latest, named by the explorer record, stamped, and held 25 s", async () => {
-    stub({
-      [`/metagraphs/${ADDRESS}`]: { data: { urls: { l0: L0 } } },
-      [`${L0}/snapshots/latest`]: { value: VALUE },
-      [`/currency/${ADDRESS}/snapshots/2973`]: { data: { blocks: ["b0"], timestamp: "2026-11-06T12:00:00.000Z" } },
-    });
-    const r = await call("latest");
-    expect(r.status).toBe(200);
-    expect(r.headers.get("Cache-Control")).toBe("public, s-maxage=25");
-    const d = await r.json();
-    expect(d.ordinal).toBe(2973);
-    expect(d.ts).toBe("2026-11-06T12:00:00.000Z");
-    expect(d.blocks[0].hash).toBe("b0");
-    expect(d.tips.active).toEqual([{ hash: "t0", height: 6, usage: 1, introducedAt: 2970 }]);
-  });
-
-  it("still answers when the indexer has not reached the newest record: no hashes, no stamp", async () => {
-    stub({ [`/metagraphs/${ADDRESS}`]: { data: { urls: { l0: L0 } } }, [`${L0}/snapshots/latest`]: { value: VALUE } });
-    const d = await (await call("latest")).json();
-    expect(d.blocks[0].hash).toBe("");
-    expect(d.ts).toBeUndefined();
-    expect(d.tips.active).toHaveLength(1);
-  });
-
-  it("a failed L0 read is a 503 that is never cached", async () => {
-    stub({ [`/metagraphs/${ADDRESS}`]: { data: { urls: { l0: L0 } } } });
-    const r = await call("latest");
-    expect(r.status).toBe(503);
-    expect(r.headers.get("Cache-Control")).toBe("no-store");
-  });
-});
-
 describe("a numeric ordinal", () => {
   it("keeps its immutable day", async () => {
     stub({
@@ -70,10 +37,14 @@ describe("a numeric ordinal", () => {
     });
     const r = await call("2973");
     expect(r.headers.get("Cache-Control")).toBe("public, max-age=86400, s-maxage=86400, immutable");
-    expect((await r.json()).blocks[0].hash).toBe("b0");
+    const d = await r.json();
+    expect(d.blocks[0].hash).toBe("b0");
+    // The answer is the ordinal and its blocks: the value's tips are not read (D5).
+    expect(Object.keys(d).sort()).toEqual(["blocks", "ordinal"]);
   });
 
-  it("refuses anything else", async () => {
+  it("refuses anything else — `latest` included", async () => {
     expect((await call("newest")).status).toBe(400);
+    expect((await call("latest")).status).toBe(400);
   });
 });
