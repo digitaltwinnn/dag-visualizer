@@ -730,7 +730,7 @@ export default function LedgerPanel() {
   // A failed read names what failed: "that time" around a pin, the plain "read failed" at the live
   // edge, which has no pinned time (the window it holds stays listed).
   const blockFailed = blockStatus?.around == null ? "read failed" : "couldn't read that time";
-  const blockSpan = blockSpanWord({ status: blockStatus, globals: blockGlobals, nowMs: Date.now() });
+  const blockSpan = blockSpanWord({ status: blockStatus, globals: blockGlobals, nowMs: Date.now(), around: blockWin ? blockWin.around : undefined });
   const blockLevel: ExplorerLevelSpec = {
     key: "blocks",
     crumb: { label: "Blocks" },

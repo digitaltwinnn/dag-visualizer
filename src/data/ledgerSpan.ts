@@ -24,10 +24,20 @@ export function spanWords(ordered: readonly GlobalSnapshot[], nowMs?: number): s
 /** A past window's own stretch (`snaps` OLDEST FIRST): how long it spans and how long ago it ended —
  *  "8 min, 1d ago", the card head's age register. A clock span would not fit the foot's room, and
  *  the card names the pinned snapshot's own time. Empty for no window. */
-export function windowWords(snaps: readonly GlobalSnapshot[], nowMs: number = Date.now()): string {
+export function windowWords(snaps: readonly GlobalSnapshot[], nowMs: number = Date.now(), short = false): string {
   if (!snaps.length) return "";
   const end = Date.parse(snaps[snaps.length - 1]!.timestamp);
+  if (short) return relativeAge(nowMs - end);
   return `${spanWords(snaps.slice().reverse()).replace("last ", "")}, ${relativeAge(nowMs - end)}`;
+}
+
+/** THE PHONE'S SHORT FORM (D6 carry, measured 2026-11-07): at 390px the switch with "Metagraph
+ *  snapshots" lit and both snapshot halves on a pinned stretch ("9 min, 1d ago") ran 370px, past the
+ *  16px gutters. So on the phone an UNLIT half states a pinned stretch by WHEN alone ("1d ago" — the
+ *  lit half and the explorer's foot keep its length) and a read state in one word ("reading…", "read
+ *  failed"); a live span is short already and is unchanged. One rule, both halves' words. */
+export interface SpanOpts {
+  short?: boolean;
 }
 
 /** THE SNAPSHOTS REGISTER'S SPAN: a past window's read state while it is read or failed, its stretch
@@ -39,10 +49,10 @@ export function snapshotSpanWord(s: {
   /** The live list, NEWEST FIRST. */
   live: readonly GlobalSnapshot[];
   nowMs?: number;
-}): string {
-  if (s.pastStatus === "loading") return "reading that time…";
-  if (s.pastStatus === "failed") return "couldn't read that time";
-  if (s.past) return windowWords(s.past, s.nowMs);
+} & SpanOpts): string {
+  if (s.pastStatus === "loading") return s.short ? "reading…" : "reading that time…";
+  if (s.pastStatus === "failed") return s.short ? "read failed" : "couldn't read that time";
+  if (s.past) return windowWords(s.past, s.nowMs, s.short);
   return spanWords(s.live);
 }
 
@@ -57,14 +67,18 @@ export function blockSpanWord(s: {
   /** The held block window's globals, oldest first (empty with none held). */
   globals: readonly GlobalSnapshot[];
   nowMs: number;
-}): string {
+  /** The HELD window's own `around` (review M1) — whether its stretch is a pinned one; the request's
+   *  when not given. */
+  around?: number | null;
+} & SpanOpts): string {
   const st = s.status?.status ?? null;
-  const pinned = s.status?.around != null;
-  const failed = pinned ? "couldn't read that time" : "read failed";
+  const asked = s.status?.around != null;
+  const failed = s.short ? "read failed" : asked ? "couldn't read that time" : "read failed";
   if (s.globals.length) {
-    if (st === "loading") return "reading that time…";
+    const pinned = s.around !== undefined ? s.around != null : asked;
+    if (st === "loading") return s.short ? "reading…" : "reading that time…";
     if (st === "failed") return failed;
-    return pinned ? windowWords(s.globals, s.nowMs) : spanWords([...s.globals].reverse(), s.nowMs);
+    return pinned ? windowWords(s.globals, s.nowMs, s.short) : spanWords([...s.globals].reverse(), s.nowMs);
   }
   if (st === "unread") return "not read";
   if (st === "beyond") return "not reached";

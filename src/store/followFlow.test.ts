@@ -272,6 +272,18 @@ describe("the follow flow in the Blocks register (D3)", () => {
     expect(st().snap?.data.ordinal).toBe(250);
   });
 
+  it("a filter's refetch that fails clears the old network's window, and the live block goes with it (review M2)", () => {
+    win([tick(300, ["b3"])]);
+    followLatest();
+    expect(st().block?.hash).toBe("b3");
+    useStore.setState({ filter: LISTED });
+    // The bridge's spent read (`failedReadKeeps` false: the held window is All's) clears the window.
+    setBlockWindow(null);
+    useStore.setState({ blockWindowStatus: { around: null, status: "failed" } });
+    followLatest();
+    expect(st().block).toBeNull();
+  });
+
   it("in the Snapshots register the same beat follows the newest global, as before", () => {
     win([tick(300, ["b3"])]);
     useStore.setState({ ledgerRegister: "snapshots" });

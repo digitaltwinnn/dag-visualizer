@@ -50,3 +50,26 @@ describe("the register switch's two halves", () => {
     expect(blockSpanWord({ status: null, globals: [], nowMs: NOW })).toBe("reading…");
   });
 });
+
+describe("the phone's short form (D6 carry: the switch with a pinned stretch ran past the gutters)", () => {
+  const live = [at(NOW), at(NOW - 11 * MIN)];
+  const past = [at(NOW - 25 * H - 8 * MIN), at(NOW - 25 * H)];
+  it("a pinned stretch says WHEN alone, a read state one word; a live span is unchanged", () => {
+    expect(windowWords(past, NOW, true)).toBe("1d ago");
+    expect(snapshotSpanWord({ pastStatus: "ready", past, live, nowMs: NOW, short: true })).toBe("1d ago");
+    expect(snapshotSpanWord({ pastStatus: "loading", past: null, live, short: true })).toBe("reading…");
+    expect(snapshotSpanWord({ pastStatus: "failed", past: null, live, short: true })).toBe("read failed");
+    expect(snapshotSpanWord({ pastStatus: null, past: null, live, short: true })).toBe("last 11 min");
+    const globals = [at(NOW - 13 * H), at(NOW - 20 * MIN)];
+    expect(blockSpanWord({ status: { around: 5, status: "ready" }, globals, nowMs: NOW, short: true })).toBe("20m ago");
+    expect(blockSpanWord({ status: { around: 5, status: "loading" }, globals, nowMs: NOW, short: true })).toBe("reading…");
+    expect(blockSpanWord({ status: { around: 5, status: "failed" }, globals: [], nowMs: NOW, short: true })).toBe("read failed");
+    expect(blockSpanWord({ status: { around: null, status: "ready" }, globals, nowMs: NOW, short: true })).toBe("last 13 h");
+  });
+  it("whether a block stretch is pinned is the HELD window's own provenance when given (review M1)", () => {
+    const globals = [at(NOW - 13 * H), at(NOW - 20 * MIN)];
+    // A resume: the request says live, the window held is still the pin's.
+    expect(blockSpanWord({ status: { around: null, status: "ready" }, globals, nowMs: NOW, around: 5 })).toBe("13 h, 20m ago");
+    expect(blockSpanWord({ status: { around: 5, status: "ready" }, globals, nowMs: NOW, around: null })).toBe("last 13 h");
+  });
+});

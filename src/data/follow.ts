@@ -120,8 +120,10 @@ export function followLatest() {
 function followNewestBlock(): void {
   const { snap, block, metaSnap, filter, blockWindowStatus, advanceSnap, advanceBlock, advanceMetaSnap } = useStore.getState();
   const w = getBlockWindow();
-  // The unlisted filter reads no window at all (the stated floor): nothing stands to follow.
-  if (!w && blockWindowStatus?.status === "unread") {
+  // The unlisted filter reads no window at all (the stated floor), and a read that spent its retries
+  // cleared the window it could not replace (review M2 — another network's window is never drawn
+  // under this filter): nothing stands to follow, so the live block goes with it.
+  if (!w && (blockWindowStatus?.status === "unread" || blockWindowStatus?.status === "failed")) {
     if (block) advanceBlock(null);
     return;
   }

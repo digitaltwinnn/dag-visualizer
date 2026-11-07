@@ -60,12 +60,18 @@ export default function RegisterSwitch() {
 
   // The Data blocks register reads the Metagraph snapshots register's own source (the live buffer or
   // a past window), so its half says the same span in the same words.
-  const snapshotSpan = snapshotSpanWord({ pastStatus, past: past?.globalSnapshots ?? null, live: [...snaps].reverse(), nowMs: now });
-  const span: Record<LedgerRegister, string> = {
-    snapshots: snapshotSpan,
-    blocks: blockSpanWord({ status: blockStatus, globals: blocks?.globalSnapshots ?? [], nowMs: now }),
-    data: snapshotSpan,
+  const spans = (short: boolean): Record<LedgerRegister, string> => {
+    const snapshotSpan = snapshotSpanWord({ pastStatus, past: past?.globalSnapshots ?? null, live: [...snaps].reverse(), nowMs: now, short });
+    return {
+      snapshots: snapshotSpan,
+      blocks: blockSpanWord({ status: blockStatus, globals: blocks?.globalSnapshots ?? [], nowMs: now, around: blocks ? blocks.around : undefined, short }),
+      data: snapshotSpan,
+    };
   };
+  const span = spans(false);
+  // The phone's short form for an UNLIT half (`ledgerSpan`'s `SpanOpts`): a pinned stretch by when
+  // alone, a read state in one word — measured, the full words ran the switch past the gutters.
+  const shortSpan = spans(true);
 
   return (
     <div
@@ -85,6 +91,8 @@ export default function RegisterSwitch() {
         // half names itself; the others keep their glyph and span — and their accessible name.
         // Measured at 390 (D6): with the longest name lit ("Metagraph snapshots") the desktop padding ran
         // the frame to 392px; the phone's tighter padding holds it to ~350, inside the 16px gutters.
+        // With a PINNED stretch on the snapshot halves (D7, measured): 370px, so on the phone an unlit
+        // half states its short span ("1d ago", "reading…") and the lit half keeps the full one.
         "absolute left-1/2 z-[5] -translate-x-1/2 w-max grid grid-flow-col auto-cols-fr max-[700px]:auto-cols-auto gap-1 p-1 max-[700px]:gap-0.5 max-[700px]:p-0.5",
         "rounded-lg border border-border bg-[var(--panel-solid)] backdrop-blur-[8px]",
         "transition-opacity duration-200 data-[on='0']:opacity-0 data-[on='0']:pointer-events-none motion-reduce:transition-none",
@@ -111,7 +119,10 @@ export default function RegisterSwitch() {
               <Icon aria-hidden className="size-3.5 flex-none group-aria-pressed:text-primary" />
               <span className="max-[700px]:hidden max-[700px]:group-aria-pressed:inline">{REGISTER_NAMES[r]}</span>
             </span>
-            <span className="font-mono text-label leading-none tabular-nums whitespace-nowrap">{span[r]}</span>
+            <span className="font-mono text-label leading-none tabular-nums whitespace-nowrap">
+              <span className="max-[700px]:hidden max-[700px]:group-aria-pressed:inline">{span[r]}</span>
+              <span className="hidden max-[700px]:inline max-[700px]:group-aria-pressed:hidden">{shortSpan[r]}</span>
+            </span>
           </button>
         );
       })}

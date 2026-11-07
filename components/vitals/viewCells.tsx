@@ -989,7 +989,7 @@ export function BlocksCells({ accent }: { accent: string }) {
   // The frame ends NOW at the live edge, and at a pinned window's own newest tick (it makes no claim
   // about the time since).
   const endMs = pinned && ticks.length ? Math.max(...ticks.map((t) => Date.parse(t.ts))) : now;
-  const span = blockSpanWord({ status, globals: win?.globalSnapshots ?? [], nowMs: now });
+  const span = blockSpanWord({ status, globals: win?.globalSnapshots ?? [], nowMs: now, around: win ? win.around : undefined });
   // No window held: the instrument state, in the switch's own words where it has them.
   const absent =
     status?.status === "unread" ? "Unlisted networks' blocks are not read"
