@@ -18,7 +18,7 @@ import { relativeAge } from "@/src/util/relativeAge";
 import { Empty, IdentityDot } from "@/components/inspector/parts";
 import { selectionHue } from "@/components/selection";
 import { cn } from "@/lib/utils";
-import GroupPlate from "@/components/datasection/GroupToggle";
+import GroupPlate, { GlobalGroupPlate } from "@/components/datasection/GroupToggle";
 import { useNowTick } from "@/components/useNowTick";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -38,7 +38,7 @@ import { useUnlistedChains } from "@/components/datasection/useUnlistedChains";
 import { useChainSpan } from "@/components/useArchive";
 import LiveDot from "@/components/LiveDot";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { NodeStars, PinnedMark } from "@/components/state/StateAtoms";
+import { NodeStars, StateMark } from "@/components/state/StateAtoms";
 import { isRetired } from "@/src/net/lineage";
 import { useFeedRead } from "@/components/useFeedRead";
 
@@ -1902,15 +1902,16 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                   // global in the scene (rule 9: hover what a click commits).
                   <TableRow className="max-[700px]:block border-0 hover:bg-transparent">
                     <TableCell colSpan={columns.length} className="p-0 pt-2.5 max-[700px]:px-0 max-[700px]:block">
-                      {/* THE HEADER IS A PLATE (user, 2026-10-08, design B1): accent-tinted band +
-                          accent hairline; the SELECTED global deepens to the selection accent — the
-                          group's head carries that selection, never its rows. The plate lives on the
-                          cell's inner block, not the row: a <tr> takes neither margin nor radius, and
-                          the gap ABOVE it is what separates two groups. "17s ago" names itself. */}
-                      <GroupPlate
+                      {/* THE HEADER IS A PLATE (`GlobalGroupPlate`, shared with the Blocks table). It
+                          lives on the cell's inner block, not the row: a <tr> takes neither margin
+                          nor radius, and the gap ABOVE it is what separates two groups. */}
+                      <GlobalGroupPlate
+                        ordinal={r.global.ordinal}
+                        age={<LiveAge ts={r.ts} />}
+                        selected={inSelGroup}
+                        following={following}
                         open={!isFolded(String(r.global.ordinal))}
                         onToggle={() => toggleFold(String(r.global.ordinal))}
-                        selected={inSelGroup && !following}
                         onSelect={() => {
                           const st = useStore.getState();
                           applyClickActions(
@@ -1922,33 +1923,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                           );
                         }}
                         onHover={(on) => setHoverSnapOrd(on ? r.global.ordinal : null)}
-                        className={cn(
-                          // px matches the rows' own cell inset, so "GLOBAL" stands on the identity dots' edge.
-                          "h-[34px] px-2 max-[700px]:px-1.5 rounded-t-md border-b text-label transition-colors",
-                          inSelGroup
-                            ? "bg-[color-mix(in_oklch,var(--primary)_20%,transparent)] border-[var(--primary)] text-primary-ink"
-                            : "bg-[color-mix(in_oklch,var(--primary)_9%,var(--panel-plate))] border-[color-mix(in_oklch,var(--primary)_35%,transparent)] hover:bg-[color-mix(in_oklch,var(--primary)_14%,var(--panel-plate))] text-muted-foreground",
-                        )}
-                      >
-                        <span className={cn("uppercase tracking-caps", inSelGroup ? "text-primary-ink" : "text-[color-mix(in_oklch,var(--primary-ink)_80%,var(--muted-foreground))]")}>Global</span>
-                        <span className={cn("font-mono tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground")}>{r.global.ordinal.toLocaleString()}</span>
-                        {/* The mark FOLLOWS THE NUMBER IT QUALIFIES, as the row's pin follows its
-                            snapshot number (user, same day: the plate's sat at the right edge while
-                            the row's sat by its number). */}
-                        {inSelGroup && (
-                          <span className="inline-flex items-center gap-1.5 text-label normal-case tracking-normal text-muted-foreground">
-                            {following ? (
-                              <>
-                                <LiveDot />
-                                live
-                              </>
-                            ) : (
-                              <PinnedMark className="text-muted-foreground" />
-                            )}
-                          </span>
-                        )}
-                        <span className={cn("ml-auto tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground-dim")}><LiveAge ts={r.ts} /></span>
-                      </GroupPlate>
+                      />
                     </TableCell>
                   </TableRow>
                 )}
@@ -2046,18 +2021,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                     <span className="inline-flex items-center gap-1.5">
                       {seam ? <Dash /> : r.ordinal.toLocaleString()}
                       {/* As the global plate says it: the live dot and word, or the pin alone. */}
-                      {rowSel && !seam && (
-                        <span className="inline-flex items-center gap-1.5 font-sans text-label text-muted-foreground">
-                          {following ? (
-                            <>
-                              <LiveDot />
-                              live
-                            </>
-                          ) : (
-                            <PinnedMark className="text-muted-foreground" />
-                          )}
-                        </span>
-                      )}
+                      {rowSel && !seam && <StateMark following={following} className="font-sans" />}
                     </span>
                   </TableCell>
                   <TableCell className={cn("text-right tabular-nums", PHONE_HIDDEN)}>{seam ? <Dash /> : fmtDag(r.fee)}</TableCell>

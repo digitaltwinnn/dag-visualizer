@@ -17,9 +17,8 @@ import { identityHudCss } from "@/src/palette/identity";
 import { Empty, IdentityDot } from "@/components/inspector/parts";
 import { tickerOf } from "@/components/explorer/nodeRow";
 import { selectionHue } from "@/components/selection";
-import GroupPlate from "@/components/datasection/GroupToggle";
-import LiveDot from "@/components/LiveDot";
-import { PinnedMark } from "@/components/state/StateAtoms";
+import { GlobalGroupPlate } from "@/components/datasection/GroupToggle";
+import { StateMark } from "@/components/state/StateAtoms";
 import { useFeedRead } from "@/components/useFeedRead";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { useNowTick } from "@/components/useNowTick";
@@ -165,27 +164,19 @@ export default function BlocksTable() {
             const lines: ({ from: string; to: string; amount: number; fee: number } | null)[] = state ? [null] : transfers;
             // The snapshot that accepted the block: a DAG block's global, a token block's own snapshot.
             const acceptedInto = `${b.chain === "dag" ? "Global" : unit} ${b.ordinal.toLocaleString()}`;
-            const stateMark = on && (
-              <span className="inline-flex items-center gap-1.5 font-sans text-label text-muted-foreground">
-                {following ? (
-                  <>
-                    <LiveDot />
-                    live
-                  </>
-                ) : (
-                  <PinnedMark className="text-muted-foreground" />
-                )}
-              </span>
-            );
+            const stateMark = on && <StateMark following={following} className="font-sans" />;
             return (
               <Fragment key={`${b.chain}:${b.hash}`}>
                 {head && (
                   <TableRow className="max-[700px]:block border-0 hover:bg-transparent">
                     <TableCell colSpan={COLUMNS.length} className="p-0 pt-2.5 max-[700px]:px-0 max-[700px]:block">
-                      <GroupPlate
+                      <GlobalGroupPlate
+                        ordinal={b.anchorOrd}
+                        age={relativeAge(now - Date.parse(b.ts))}
+                        selected={inSelGroup}
+                        following={following}
                         open={!isFolded(b.anchorOrd)}
                         onToggle={() => toggleFold(b.anchorOrd)}
-                        selected={inSelGroup && !following}
                         onSelect={
                           g
                             ? () => {
@@ -202,29 +193,7 @@ export default function BlocksTable() {
                             : undefined
                         }
                         onHover={(h) => setHoverSnapOrd(h ? b.anchorOrd : null)}
-                        className={cn(
-                          "h-[34px] px-2 max-[700px]:px-1.5 rounded-t-md border-b text-label transition-colors",
-                          inSelGroup
-                            ? "bg-[color-mix(in_oklch,var(--primary)_20%,transparent)] border-[var(--primary)] text-primary-ink"
-                            : "bg-[color-mix(in_oklch,var(--primary)_9%,var(--panel-plate))] border-[color-mix(in_oklch,var(--primary)_35%,transparent)] hover:bg-[color-mix(in_oklch,var(--primary)_14%,var(--panel-plate))] text-muted-foreground",
-                        )}
-                      >
-                        <span className={cn("uppercase tracking-caps", inSelGroup ? "text-primary-ink" : "text-[color-mix(in_oklch,var(--primary-ink)_80%,var(--muted-foreground))]")}>Global</span>
-                        <span className={cn("font-mono tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground")}>{b.anchorOrd.toLocaleString()}</span>
-                        {inSelGroup && (
-                          <span className="inline-flex items-center gap-1.5 text-label normal-case tracking-normal text-muted-foreground">
-                            {following ? (
-                              <>
-                                <LiveDot />
-                                live
-                              </>
-                            ) : (
-                              <PinnedMark className="text-muted-foreground" />
-                            )}
-                          </span>
-                        )}
-                        <span className={cn("ml-auto tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground-dim")}>{relativeAge(now - Date.parse(b.ts))}</span>
-                      </GroupPlate>
+                      />
                     </TableCell>
                   </TableRow>
                 )}

@@ -2,6 +2,7 @@
 
 import { Pin } from "lucide-react";
 import { cn } from "@/lib/utils";
+import LiveDot from "@/components/LiveDot";
 
 // Shared empty/loading-state ATOMS — built from the app's own marks (node-dot, ring, halo) so a
 // loading/absent state reads as part of the instrument, not a bolt-on. Motion keyframes live in
@@ -70,3 +71,23 @@ export function PinnedMark({ className }: { className?: string }) {
     </>
   );
 }
+
+/** THE LIVE / PINNED STATE MARK — the live dot and its word, or the pin alone (`PinnedMark`), in
+ *  muted ink. ONE atom for every place a selected row or plate says which it is (refactor round R1,
+ *  P5: RAW's two tables wrote it four times). `className` adds the caller's typography context (a
+ *  mono cell's `font-sans`, a caps plate's `normal-case tracking-normal`). */
+export function StateMark({ following, className }: { following: boolean; className?: string }) {
+  return (
+    <span className={cn("inline-flex items-center gap-1.5 text-label text-muted-foreground", className)}>
+      {following ? (
+        <>
+          <LiveDot />
+          live
+        </>
+      ) : (
+        <PinnedMark className="text-muted-foreground" />
+      )}
+    </span>
+  );
+}
+

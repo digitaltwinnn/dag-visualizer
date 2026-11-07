@@ -985,7 +985,9 @@ the order is the country's; another header sort flattens it), Hypergraph's phone
 History's records by UTC day. One component draws every plate (`datasection/GroupToggle.tsx`,
 shadcn's data-table pattern: a native button with `aria-expanded`, since Radix Collapsible cannot
 wrap table rows). A plate whose group is a SUBJECT the raw layer may commit — the global snapshot
-— selects and releases it on a click and folds on its chevron; every other plate (country,
+— selects and releases it on a click and folds on its chevron (the global snapshot's plate itself,
+its number, LIVE / PINNED mark and age, is ONE component, `GlobalGroupPlate`, beside it, which the
+anchor log and the Blocks table both draw); every other plate (country,
 network, day) ONLY folds. ⚠️ **A plate never reloads its own list**: History's day plate committed
 the day as the range for an hour, which re-read the records at a finer tier under the click
 ("the whole dataset changes … looks different from what I clicked on"). Groups fold by default
@@ -1151,7 +1153,7 @@ BLOCKS as a floor, "at least N" (rule 10). The DAG's height is not on the band: 
 and the note state it. No tip is shown anywhere (user: "Open tips remove it from the AI note and also
 from the vitals"). RAW lists ONE ROW PER
 TRANSFER (D3, user: "per transfer is useful" — `BlockRead.transfers`): FROM · TO · AMOUNT · FEE · BLOCK
-· ACCEPTED INTO, grouped by accepting global with the log's own `GroupPlate` (the plate
+· ACCEPTED INTO, grouped by accepting global with the log's own `GlobalGroupPlate` (the plate
 commits/releases the global, the chevron folds); a block whose read has not landed lists one row
 "reading…", a failed read says "read failed", and the phone keeps from, to and the block (the measures
 are the card's). A row's click commits its block (`blockSelectActions`), the committed block's rows
@@ -1897,7 +1899,7 @@ Every rail card leads with `CardHead`: eyebrow / title / inset hairline / body.
     front — and takes the reader's OWN date search as the committed range (`store.logCut`, written
     by the log's `cutIsOwn` mirror; a door's span never writes it, it came from History). Snapshots
     needs nothing: a raw row click pins, and the explorer and card show the pin.
-  · **State marks are one species.** `LiveDot` + "live", `PinnedMark` alone, the word for screen readers only (user, 2026-10-31; StateAtoms, 14px),
+  · **State marks are one species.** `LiveDot` + "live", `PinnedMark` alone, the word for screen readers only (user, 2026-10-31; StateAtoms, 14px; RAW's rows and plates draw both through StateAtoms' `StateMark`),
     on the explorer's tick row, the Global snapshot card's control, the scene callout, the raw log's
     selected row and the raw pane's head — and in the Blocks register on the Block card's control,
     the block callout and the committed block's RAW rows (D3: live follows the block there). Since 2026-10-18 the METAGRAPH snapshot's label and card head
