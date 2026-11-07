@@ -1463,7 +1463,11 @@ export class Engine {
   private _refreshLedger() {
     // The LEDGER SOURCE (`src/data/pastWindow.ts`): the past window around an old pin, else the
     // live buffer. A past window is fixed, so a live event re-hands the same rows and moves nothing.
-    const src = ledgerSource(getNetwork(), useStore.getState().ledgerRegister);
+    const st = useStore.getState();
+    const src = ledgerSource(getNetwork(), st.ledgerRegister);
+    // The Blocks register's FRONT RUN reaches to the live global — only while the window held is the
+    // live one (a pinned past window, `around` set, makes no claim about now).
+    this.ledger.setLiveGlobal(this.ledger.readsBlockWindow && st.blockWindowStatus?.around == null ? (getNetwork()?.latest ?? null) : null);
     this.ledger.setData(src?.globalSnapshots ?? [], (ts) => src?.getAnchor(ts) ?? null);
     // The byte bar measures ticks from the EXACT reads (spec §6.3) — re-hand the map on each
     // refresh so a tick that landed since the last one gets measured instead of staying a seam.

@@ -65,6 +65,8 @@ import {
   horizonAt,
   liveEdgePhase,
   ROW_HALF_D,
+  FRONT_INK_X,
+  FRONT_RUN_X0,
   type LaneBlock,
 } from "../../domain/ledgerModel";
 import { layeredZ, referenceSegments, silentRun, tipStateOf, type BlockRead, type TipRead } from "../../domain/blockBraid";
@@ -211,7 +213,8 @@ export const TILE_LOOK: Readonly<TileLook> = { rest: 0.1, ink: 0.3, halo: 2.5 };
  *  the planes, the bars, the tiles, the ribbons, the labels and the trail itself.
  *  - `blocks`: the block tier and the silent stretches draw, and the blocks pick.
  *  - `liveEdge`: whether the front can hold a FORMING tick. The Blocks trail is block-bearing
- *    ticks only, each already sealed, so its newest row is never in flight.
+ *    ticks only, each already sealed, so its newest row is never in flight; its front says the live
+ *    edge's silence instead (the FRONT RUN, `_rebuildBlockTier`).
  *  - `anchors`: how a metagraph snapshot is tied to its tick — the tapering SHEETS, whose width is
  *    the bytes it carried, or the hairline LINES, one per snapshot that carries a block (user,
  *    design round D1: size is irrelevant to the blocks, and the sheets were noise there).
@@ -920,6 +923,7 @@ export class LedgerView implements SceneView {
   /** While a past window stands, "now" is not on screen: the live edge stands down and the newest
    *  row is an ordinary row of the past (its exact read is a measurement, not a tick in flight). */
   private _frozen = false;
+  private _liveGlobal: GlobalSnapshot | null = null;
   setFrozen(on: boolean): void {
     if (on === this._frozen) return;
     this._frozen = on;
@@ -947,6 +951,14 @@ export class LedgerView implements SceneView {
    *  change re-runs `setData`, whose slot rebuild draws the tier — one rebuild per window. */
   setBlockWindow(w: BlockWindow | null): void {
     this._blockWindow = w;
+  }
+
+  /** THE LIVE GLOBAL the Blocks register's front run reaches to (`SilentStretch`'s front run), or
+   *  null when the window held is not the live one (a pinned past window makes no claim about now).
+   *  Held only: the Engine hands it before each refresh, whose slot rebuild draws the run — so it
+   *  grows on each live tick, at event time. */
+  setLiveGlobal(g: GlobalSnapshot | null): void {
+    this._liveGlobal = g;
   }
 
   /** The full reads (`store.blockReads`): a block's parents, and each chain's frontier. */
@@ -1204,6 +1216,18 @@ export class LedgerView implements SceneView {
       const x0 = LEAD_X - (s + 1) * SLOT_SP + ROW_HALF_D + 0.2;
       const label = run.snapshots > STRETCH_WORDS_MIN ? `${run.snapshots.toLocaleString()} snapshots · ${relativeAge(run.ms, true)}` : null;
       stretches.push({ key: `${older.ordinal}-${newer.ordinal}`, x0, x1, y, label });
+    }
+    // THE FRONT RUN — the live edge's silence (spec 2: "the silent stretch growing at the front"):
+    // the globals after the newest block tick up to the live one, ahead of the lead row's bar.
+    // Only in the live window (`_liveGlobal` is null for a pinned past one); none while the live
+    // global is itself the newest block tick.
+    const lead = this._slotSnap[0];
+    const live = this._liveGlobal;
+    if (lead && live && live.ordinal > lead.ordinal) {
+      const n = live.ordinal - lead.ordinal;
+      const ms = Math.max(0, Date.parse(live.timestamp) - Date.parse(lead.timestamp));
+      const label = n > STRETCH_WORDS_MIN ? `${n.toLocaleString()} snapshots · ${relativeAge(ms, true)}` : null;
+      stretches.push({ key: `${lead.ordinal}-live`, x0: FRONT_RUN_X0, x1: FRONT_INK_X, y, label, front: true });
     }
     this._stretch.rebuild(stretches);
   }

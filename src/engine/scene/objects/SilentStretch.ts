@@ -11,9 +11,14 @@
 //
 // The view places every stretch from layout data at event time; the per-frame half only rides the
 // trail's two boundaries, so a stretch leaves the chamber exactly where the rows it joins do.
+//
+// THE FRONT RUN (spec 2: "the live edge is the silent stretch growing at the front"): in the LIVE
+// window one more stretch stands ahead of the lead row, from its bar toward the rim, for the globals
+// since the newest block tick up to the live global — rebuilt on each live tick, so its words grow
+// with the silence. It rides the lead row (`frontRunAt`), never the front boundary it stands past.
 
 import * as THREE from "three";
-import { frontAt, horizonAt } from "../../domain/ledgerModel";
+import { frontAt, frontRunAt, horizonAt } from "../../domain/ledgerModel";
 import { inkPresence, isLightGround, labelInk, type SceneColors } from "../../sceneColors";
 import { makeEdgeLabel, retintEdgeLabel } from "./SnapshotPlane";
 
@@ -26,6 +31,9 @@ export interface StretchItem {
   x1: number;
   y: number;
   label: string | null;
+  /** The FRONT RUN — the live-edge silence ahead of the lead row (`frontRunAt`): it rides the lead
+   *  row rather than reading its own x against the front boundary, which it stands past by design. */
+  front?: boolean;
 }
 
 /** The dash's and the words' resting opacity (dark-ground values; `inkPresence` asks the paper). */
@@ -47,7 +55,7 @@ export class SilentStretch {
   private readonly _mat: THREE.LineDashedMaterial;
   private readonly _lines: THREE.LineSegments;
   private _items: StretchItem[] = [];
-  private _labels = new Map<string, { mesh: THREE.Mesh; xMid: number }>();
+  private _labels = new Map<string, { mesh: THREE.Mesh; xMid: number; front: boolean; x1: number }>();
   private _colors: SceneColors;
   private _paper: boolean;
   private _off = 0;
@@ -105,10 +113,12 @@ export class SilentStretch {
         const mesh = makeEdgeLabel(this._colors, s.label, 0, s.y, LABEL_Z, LABEL_H, "left", "readout");
         (mesh.material as THREE.MeshBasicMaterial).opacity = 0;
         this.group.add(mesh);
-        l = { mesh, xMid };
+        l = { mesh, xMid, front: false, x1: s.x1 };
         this._labels.set(key, l);
       }
       l.xMid = xMid;
+      l.front = !!s.front;
+      l.x1 = s.x1;
       // The plane's centre on the gap between the two rows (its text runs across the floor).
       l.mesh.position.x = xMid;
     }
@@ -142,15 +152,19 @@ export class SilentStretch {
     const col = this._col.array as Float32Array;
     for (let i = 0; i < this._items.length; i++) {
       const s = this._items[i];
-      const a0 = frontAt(s.x0 + this._off) * horizonAt(s.x0 + this._off);
-      const a1 = frontAt(s.x1 + this._off) * horizonAt(s.x1 + this._off);
+      // The front run rides the lead row (whole at rest, gone before its far end reaches the rim);
+      // every other stretch reads both boundaries at its own two ends.
+      const run = s.front ? frontRunAt(s.x1, this._off) : -1;
+      const a0 = run >= 0 ? run : frontAt(s.x0 + this._off) * horizonAt(s.x0 + this._off);
+      const a1 = run >= 0 ? run : frontAt(s.x1 + this._off) * horizonAt(s.x1 + this._off);
       col[i * 8 + 3] = dashOp * a0 * alpha;
       col[i * 8 + 7] = dashOp * a1 * alpha;
     }
     this._col.needsUpdate = true;
     for (const l of this._labels.values()) {
       const x = l.xMid + this._off;
-      (l.mesh.material as THREE.MeshBasicMaterial).opacity = labelOp * frontAt(x) * horizonAt(x) * alpha;
+      const a = l.front ? frontRunAt(l.x1, this._off) : frontAt(x) * horizonAt(x);
+      (l.mesh.material as THREE.MeshBasicMaterial).opacity = labelOp * a * alpha;
     }
   }
 
