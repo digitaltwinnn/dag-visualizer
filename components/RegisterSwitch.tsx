@@ -16,6 +16,7 @@ import { switchLedgerRegister } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { cn } from "@/lib/utils";
+import { StateMark } from "@/components/state/StateAtoms";
 
 // THE REGISTER SWITCH, ON THE SCENE (D3, user 2026-11-07 — option A of
 // `.superpowers/brainstorm/521282-1794046091/content/register-switch-v2.html`: "a glass switch at the
@@ -50,6 +51,12 @@ export default function RegisterSwitch() {
   const on = registers.length > 1;
   useFeedRead(["global", "api-blocks", "exact"], "RegisterSwitch", on); // the data-block count reads the exact reads
   const register = useStore((s) => s.ledgerRegister);
+  // THE LIT HALF SAYS LIVE OR PINNED (user, 2026-11-07, design round option 2 "with the 'live' text
+  // also"): one live mode per view, read per register — the newest global (and the filtered
+  // network's newest snapshot) in Metagraph snapshots and Data blocks, the newest block (and its
+  // global) in Transaction blocks — so the register's own half wears the state mark the card heads
+  // wear (`StateMark`: the live dot and its word, or the pin alone), at the end of its name line.
+  const following = useStore((s) => s.following);
   const phase = useStore((s) => s.motionPhase);
   const pastStatus = useStore((s) => s.pastWindow?.status ?? null);
   const blockStatus = useStore((s) => s.blockWindowStatus);
@@ -141,6 +148,7 @@ export default function RegisterSwitch() {
             <span className="flex items-center gap-1.5 text-body font-semibold leading-none whitespace-nowrap">
               <Icon aria-hidden className="size-3.5 flex-none group-aria-pressed:text-primary" />
               <span className="max-[700px]:hidden max-[700px]:group-aria-pressed:inline">{REGISTER_NAMES[r]}</span>
+              {lit && <StateMark following={following} className="ml-auto pl-2 font-normal" />}
             </span>
             <span className="font-mono text-label leading-none tabular-nums whitespace-nowrap opacity-75 group-aria-pressed:opacity-100 group-aria-pressed:text-foreground">
               <span className="max-[700px]:hidden max-[700px]:group-aria-pressed:inline">{span[r]}</span>

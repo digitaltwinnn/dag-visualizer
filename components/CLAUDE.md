@@ -1076,7 +1076,11 @@ buffer's fixed depth, or the past window's), the window's blocks for Transaction
 already reach the gutters), after a hairline rule, never a mid-dot. **The lit station is a WASH, not a frame** (user,
 2026-11-07, design round: option 5 without the underline): the unlit halves' second line recedes
 (`opacity-75`), the lit half carries the selection wash alone — no inset ring — its name and count in
-the accent, its span in the foreground ink. **Each half counts ITS OWN
+the accent, its span in the foreground ink, **and the state mark at the end of its name line**
+(`StateMark`: the live dot and its word, or the pin — user, same day, option 2 "with the 'live' text
+also"): one live mode per view, read per register — the newest global (and the filtered network's
+newest snapshot) in Metagraph snapshots and Data blocks, the newest block (and its global) in
+Transaction blocks — so the register's own half says which state its subject is in. **Each half counts ITS OWN
 SUBJECT** (user, same day: "its subject is metagraph snapshots, count those instead of global, same
 for data blocks"): the metagraph snapshots the source's ticks anchored (the feed's per-tick count,
 "333 snapshots"), the data blocks their exact reads carry (`dataStats.dataBlocksInWindow`, a labelled
