@@ -20,6 +20,7 @@ import * as THREE from "three";
 import { frontAt, horizonAt, SLOT_N, SLOT_SP } from "../../domain/ledgerModel";
 import { LEAD_X } from "../../domain/ledgerLayout";
 import { snapBright, emphasisK } from "../../domain/dimModel";
+import { LINK_SAMPLES, sCurve } from "../../domain/blockBraid";
 import { glowBlend, inkMix, inkPresence, isLightGround, type SceneColors } from "../../sceneColors";
 import type { PickDescriptor } from "@/src/data/types";
 import { joinBloom } from "../SceneContext";
@@ -71,6 +72,8 @@ export const BLOCK_GLASS: Readonly<{ dark: number; paper: number }> = { dark: 0.
 
 const _dummy = new THREE.Object3D();
 const _col = new THREE.Color();
+/** Event-time scratch: one link's sampled S-curve, (LINK_SAMPLES + 1) points. */
+const _curve = new Float32Array((LINK_SAMPLES + 1) * 3);
 
 export class BlockTier {
   /** Rides the trail rewind: the view writes its offset once per frame (`setOffset`). */
@@ -136,8 +139,9 @@ export class BlockTier {
     // Two parents per block: a link budget of twice the blocks.
     this._maxLinks = maxBlocks * 2;
     this._linkSlot = new Int16Array(this._maxLinks * 2);
-    this._linkPos = new THREE.Float32BufferAttribute(new Float32Array(this._maxLinks * 6), 3);
-    this._linkCol = new THREE.Float32BufferAttribute(new Float32Array(this._maxLinks * 8), 4);
+    // Each link is an S-curve of LINK_SAMPLES segments (`blockBraid.sCurve`): 2 vertices a segment.
+    this._linkPos = new THREE.Float32BufferAttribute(new Float32Array(this._maxLinks * LINK_SAMPLES * 6), 3);
+    this._linkCol = new THREE.Float32BufferAttribute(new Float32Array(this._maxLinks * LINK_SAMPLES * 8), 4);
     this._linkPos.setUsage(THREE.DynamicDrawUsage);
     this._linkCol.setUsage(THREE.DynamicDrawUsage);
     this._linkGeo.setAttribute("position", this._linkPos);
@@ -180,22 +184,34 @@ export class BlockTier {
     const pos = this._linkPos.array as Float32Array;
     const col = this._linkCol.array as Float32Array;
     this._linkChain = linkChains.slice(0, segs); // event-time
+    const N = LINK_SAMPLES;
     for (let s = 0; s < segs; s++) {
-      for (let k = 0; k < 6; k++) pos[s * 6 + k] = links[s * 6 + k];
+      // The link's polyline: its S-curve sampled, laid out as N segments (each vertex twice inside).
+      sCurve([links[s * 6], links[s * 6 + 1], links[s * 6 + 2]], [links[s * 6 + 3], links[s * 6 + 4], links[s * 6 + 5]], N, _curve);
+      const base = s * N * 2;
+      for (let j = 0; j < N; j++) {
+        for (let e = 0; e < 2; e++) {
+          const p = (j + e) * 3;
+          const v = (base + j * 2 + e) * 3;
+          pos[v] = _curve[p];
+          pos[v + 1] = _curve[p + 1];
+          pos[v + 2] = _curve[p + 2];
+        }
+      }
       this._linkSlot[s * 2] = linkSlots[s * 2] ?? -1;
       this._linkSlot[s * 2 + 1] = linkSlots[s * 2 + 1] ?? -1;
       _col.setHex(linkHues[s] ?? 0xffffff);
-      for (let v = 0; v < 2; v++) {
-        col[s * 8 + v * 4] = _col.r;
-        col[s * 8 + v * 4 + 1] = _col.g;
-        col[s * 8 + v * 4 + 2] = _col.b;
-        col[s * 8 + v * 4 + 3] = 0;
+      for (let v = base; v < base + N * 2; v++) {
+        col[v * 4] = _col.r;
+        col[v * 4 + 1] = _col.g;
+        col[v * 4 + 2] = _col.b;
+        col[v * 4 + 3] = 0;
       }
     }
     this._linkCount = segs;
     this._linkPos.needsUpdate = true;
     this._linkCol.needsUpdate = true;
-    this._linkGeo.setDrawRange(0, segs * 2);
+    this._linkGeo.setDrawRange(0, segs * N * 2);
     this._resolveEmphasis();
   }
 
@@ -305,17 +321,30 @@ export class BlockTier {
     if (this._linkCount === 0) return;
     const col = this._linkCol.array as Float32Array;
     const linkRest = paper ? L.linkPaper : L.link;
+    const N = LINK_SAMPLES;
     for (let s = 0; s < this._linkCount; s++) {
       // The off-filter chain's links take the ledger row's own dim — the ribbons' and threads' tier.
       const off = snapBright(1, dimNet !== "all" && this._linkChain[s] !== dimNet);
-      for (let v = 0; v < 2; v++) {
-        // Each end rides its own ROW's boundaries (the row its block stands in), and an end in a row
-        // still held back by the entry drop is not there yet; neither is its link.
-        const slot = this._linkSlot[s * 2 + v];
-        if (slot < 0) { col[s * 8 + v * 4 + 3] = 0; continue; } // a stub's far end: the reference leaves the trail
-        const x = LEAD_X - slot * SLOT_SP + this._off;
-        const entryF = fade != null && slot < SLOT_N ? fade[slot] : 1;
-        col[s * 8 + v * 4 + 3] = linkRest * off * frontAt(x) * horizonAt(x) * entryF * alpha;
+      // Each END rides its own ROW's boundaries (the row its block stands in), and an end in a row
+      // still held back by the entry drop is not there yet; the curve between eases from one end's
+      // weight to the other's. A stub's far end (row −1) is the reference leaving the trail: 0.
+      let a0 = 0;
+      let a1 = 0;
+      for (let e = 0; e < 2; e++) {
+        const slot = this._linkSlot[s * 2 + e];
+        let a = 0;
+        if (slot >= 0) {
+          const x = LEAD_X - slot * SLOT_SP + this._off;
+          const entryF = fade != null && slot < SLOT_N ? fade[slot] : 1;
+          a = linkRest * off * frontAt(x) * horizonAt(x) * entryF * alpha;
+        }
+        if (e === 0) a0 = a;
+        else a1 = a;
+      }
+      const base = s * N * 2;
+      for (let j = 0; j < N; j++) {
+        col[(base + j * 2) * 4 + 3] = a0 + (a1 - a0) * (j / N);
+        col[(base + j * 2 + 1) * 4 + 3] = a0 + (a1 - a0) * ((j + 1) / N);
       }
     }
     this._linkCol.needsUpdate = true;

@@ -73,9 +73,19 @@ export function mergeLiveAnswer(held: BlockWindowAnswer | null, answer: BlockWin
 
 /** The window as a ledger source, oldest → newest. A tick's anchor reads the exact fold where it has
  *  landed; otherwise it is the FLOOR folded from the tick's block-bearing snapshots (a chain with none
- *  here contributes nothing; `touched` 0 — a settled past). */
+ *  here contributes nothing; `touched` 0 — a settled past).
+ *
+ *  A window read for a METAGRAPH holds that network's blocks ONLY (design round D8, user: "If we
+ *  filter on a metagraph, does it make sense to show the DAG blocks? They are unrelated right"): the
+ *  trail may carry the DAG blocks its ticks also accepted, and the fold drops them, so no surface that
+ *  reads the window — the chamber, the explorer, RAW, the band — states a DAG block there. A window
+ *  read for the DAG, or for every network, keeps them. */
 export function foldBlockWindow(answer: BlockWindowAnswer, exact: Readonly<Record<number, SnapshotExact>>): BlockWindow {
-  const ticks = [...answer.ticks].sort((a, b) => a.ord - b.ord);
+  const metagraph = answer.chain != null && answer.chain !== "dag";
+  const ticks = [...answer.ticks]
+    .map((t) => (metagraph && t.blocks.length ? { ...t, blocks: [] } : t))
+    .filter((t) => t.blocks.length || Object.values(t.metaSnaps).some((rows) => rows.length))
+    .sort((a, b) => a.ord - b.ord);
   const globalSnapshots: GlobalSnapshot[] = ticks.map((t) => ({ ordinal: t.ord, timestamp: t.ts, hash: t.hash, blocks: t.blocks }));
   const metaSnaps = new Map<string, MetaSnapRecord[]>();
   const anchors = new Map<string, Anchor>();
@@ -134,7 +144,7 @@ export function foldBlockWindow(answer: BlockWindowAnswer, exact: Readonly<Recor
 /** THE NETWORK THE WINDOW IS READ FOR: the top bar's committed filter — null under All, else its
  *  id (`dag`, a listed network, or the unlisted set, which `blockWanted` answers as not read). Under
  *  a network filter the window is THAT network's newest block ticks, reaching back as far as its
- *  walk goes; the DAG blocks sharing those ticks stay in it (the lens dims them). */
+ *  walk goes, and — for a metagraph — its blocks alone (`foldBlockWindow` drops the DAG's). */
 export function blockChainOf(filter: string): string | null {
   return filter === "all" ? null : filter;
 }

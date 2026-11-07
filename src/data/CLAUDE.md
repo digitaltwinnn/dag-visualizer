@@ -137,8 +137,12 @@ older trail), while a pinned answer replaces. A pin deeper than the trail can wa
 reach**: an answer, stated, never retried (`beyond: true`). **Under a network filter the window is
 THAT network's** (2026-11-07, user: "when I filter on a metagraph it should get the blocks to
 populate the furniture"): `blockChainOf(filter)` asks the trail for the filter's network
-(`trailPath`'s `&chain=`), so the window is its newest 52 block ticks however far back they lie, with
-the DAG blocks those ticks carry (the lens dims them); a filter change refetches (`blockWanted` holds
+(`trailPath`'s `&chain=`), so the window is its newest 52 block ticks however far back they lie. **A
+metagraph's window holds its own blocks ONLY** (design round D8, user: "If we filter on a metagraph,
+does it make sense to show the DAG blocks? They are unrelated right"): the trail may carry the DAG
+blocks its ticks also accepted, and `foldBlockWindow` drops them (and a tick left with nothing), so
+the chamber, the explorer, RAW and the band — all of which read the window — state no DAG block
+there; the DAG's window is the braid alone, and All keeps both. A filter change refetches (`blockWanted` holds
 only a window read for the same network) and the answer replaces the window (`mergeLiveAnswer` never
 merges two networks'); the live feed's announced tick joins only a window holding the DAG's ticks
 (`tipJoins`). Under All it is every network's, as before. The unlisted filter reads nothing

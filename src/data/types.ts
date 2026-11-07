@@ -74,7 +74,7 @@ export interface ChannelSnapRow {
    *  none, or on rows cached before the field existed (an absent lane, not a reading). */
   dataBytes?: number;
   /** The DATA UPDATES this snapshot's data blocks carry (D6, 2026-11-07 — the data transactions the
-   *  dL1 validated; cache key `snapshot-exact-v7`). Absent where the payload could not be decoded:
+   *  dL1 validated; cache key `snapshot-exact-v8`). Absent where the payload could not be decoded:
    *  unknown, never zero. The card's count and the Data blocks register's tile marks read it. */
   dataTxCount?: number;
   /** How many data blocks (app blocks) it carried; absent where undecodable. */

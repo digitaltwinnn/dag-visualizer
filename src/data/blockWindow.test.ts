@@ -255,3 +255,20 @@ describe("blockRefreshMs — the trail's cadence (review M3)", () => {
     expect(blockRefreshMs("data", false)).toBe(300_000);
   });
 });
+
+describe("foldBlockWindow under a network filter (D8)", () => {
+  const tick = (ord: number, blocks: string[], meta: Record<string, RawMetaSnapshot[]> = {}) => ({ ord, ts: new Date(ord * 10_000).toISOString(), hash: "g" + ord, blocks, metaSnaps: meta });
+  const dor = (ordinal: number, blocks: string[]) => ({ ordinal, hash: "m" + ordinal, lastSnapshotHash: "", timestamp: "", blocks }) as unknown as RawMetaSnapshot;
+  const answer = (chain?: string) => ({ ticks: [tick(300, ["d3"], { dor: [dor(7, ["t7"])] }), tick(200, ["d2"])], chains: ["dag", "dor"], chain });
+  it("a metagraph's window holds its own blocks only: the DAG's are dropped, and a tick left empty with them", () => {
+    const w = foldBlockWindow(answer("dor"), {});
+    expect(w.ticks.map((t) => t.ord)).toEqual([300]);
+    expect(w.blockTick(300)?.blocks).toEqual([]);
+    expect(w.globalSnapshots[0].blocks).toEqual([]);
+    expect(w.metaSnaps.get("dor")?.[0].blockHashes).toEqual(["t7"]);
+  });
+  it("the DAG's window and every network's keep the DAG blocks", () => {
+    expect(foldBlockWindow(answer("dag"), {}).blockTick(300)?.blocks).toEqual(["d3"]);
+    expect(foldBlockWindow(answer(), {}).ticks.map((t) => t.blocks)).toEqual([["d2"], ["d3"]]);
+  });
+});

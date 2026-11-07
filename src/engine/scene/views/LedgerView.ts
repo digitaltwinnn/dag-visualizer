@@ -69,7 +69,7 @@ import {
   FRONT_RUN_X0,
   type LaneBlock,
 } from "../../domain/ledgerModel";
-import { layeredZ, referenceSegments, silentRun, type BlockRead } from "../../domain/blockBraid";
+import { forkSpread, referenceSegments, silentRun, type BlockRead } from "../../domain/blockBraid";
 import { DATA_MARK, dataMarkCount, dataMarkHeight } from "../../domain/dataMark";
 import { ENTRY_STAG, entryStep, entryTotal } from "../../domain/entryBeat";
 import { makeBarSpec, fillBarSpec, UNLISTED_KEY, RIBBON_LANE_HALF, type BarSpec } from "../../domain/ledgerBands";
@@ -234,15 +234,16 @@ const DATA_MARK_GAIN = 2.2;
 /** A block's edge above the floor (a DAG block) and on a tile (a token block — a tile is 0.48 at most). */
 const DAG_BLOCK = 0.62;
 const TOKEN_BLOCK = 0.36;
-/** THE DAG BRAID stands ABOVE the global snapshots, centred over the floor's middle (user, design
- *  rounds D1 and D2: "a bit more up"): its blocks' centres this far over the bars' top face — high
- *  enough that the braid and its links read as their own storey with the hairlines to the bars
- *  plainly visible under them, low enough to stay clear of the metagraph planes' tiles. */
-const DAG_LIFT = 4.2;
-/** …and it OCCUPIES HALF THE PLANE'S WIDTH, centred (user, D2): the window's widest fork in the
- *  layered drawing (`layeredZ` units) maps to this half-extent — the global floor plane's own
- *  half-width (`PLANE_FIELD_HALF`), halved. Layout data, never a hand-picked spacing. */
-const DAG_HALF_W = PLANE_FIELD_HALF / 2;
+/** THE DAG BRAID OPENS VERTICALLY over the floor's centre line (user, design round D8: "no horizontal
+ *  space … use the height instead"): its main chain runs along the trail at z = the floor's centre and
+ *  y = the middle of the band between the bars' top face and the metagraph planes; the window's
+ *  widest fork fills that band, above and below. Both bounds are layout data (`FLOOR_Y`, the bar's
+ *  `BAR_LIFT + BAR_H`), each pulled in by a block's edge so a block at the fork's reach never touches
+ *  a bar or a plane's tile. */
+const BRAID_LO = FLOOR_Y.gl0 + BAR_LIFT + BAR_H + DAG_BLOCK;
+const BRAID_HI = FLOOR_Y.msnap - DAG_BLOCK;
+const BRAID_Y = (BRAID_LO + BRAID_HI) / 2;
+const BRAID_HALF = (BRAID_HI - BRAID_LO) / 2;
 /** Blocks that share a tick and a place step aside along the trail by this much, alternately. */
 const BLOCK_STEP = 0.7;
 /** A token block's footprint on its tile, as fractions of the tile: its edge (`TOKEN_ON_TILE` of the
@@ -421,11 +422,11 @@ export class LedgerView implements SceneView {
   /** The tiles that carry a block (the Blocks register draws no other), and the anchor lines from
    *  them — both rebuilt with the tier, at event time. */
   private readonly _blockTiles = new Set<LaneBlock>();
-  /** The DAG drawing's last layout per chain (`layeredZ`'s `prior`), so a placed block holds still.
+  /** The DAG drawing's last layout per chain (`forkSpread`'s `prior`), so a placed block holds still.
    *  Pruned to the window by every rebuild; a window sharing no block with it starts it afresh. */
   private _blockZ = new Map<string, Map<string, number>>();
-  /** World units per `layeredZ` unit for the DAG braid: the window's widest fork fitted to
-   *  `DAG_HALF_W`. Fixed for the window — it only ever tightens, when a fork wider than it fits
+  /** World units per `forkSpread` unit for the DAG braid: the window's widest fork fitted to
+   *  `BRAID_HALF`. Fixed for the window — it only ever tightens, when a fork wider than it fits
    *  arrives — so a newer block that widens nothing re-scales nothing. Null until a fork exists. */
   private _braidScale: number | null = null;
   private _anchorLines: AnchorLine[] = [];
@@ -1059,7 +1060,7 @@ export class LedgerView implements SceneView {
    *  read has not landed — or failed — still shows its blocks, with no links; every reference a
    *  landed read states is drawn (`referenceSegments`: to a placed parent, else a stub toward the
    *  older side). A block the landed read shows with no parents is a DATA block, not a DAG block,
-   *  and is not drawn. Its place across is the layered DAG drawing's (`layeredZ`); a block whose read
+   *  and is not drawn. Its place across is the layered DAG drawing's (`forkSpread`); a block whose read
    *  has not landed stands on the centre line. */
   private _rebuildBlockTier(): void {
     const w = this._blockWindow;
@@ -1078,7 +1079,7 @@ export class LedgerView implements SceneView {
     }
     const reads = this._blockReads;
     // Pass 1 — every read the WINDOW holds, by `${chain}:${hash}`, and each chain's layered DAG
-    // drawing (`layeredZ`: a block at the barycenter of its parents, siblings split around it,
+    // drawing (`forkSpread`: a block at the barycenter of its parents, siblings split around it,
     // parents first). Window-wide on purpose, so a block keeps its place as the trail holds more or
     // fewer rows; a block whose parent's read is still pending waits on the centre line.
     const readOf = new Map<string, BlockRead>(); // event-time
@@ -1111,13 +1112,13 @@ export class LedgerView implements SceneView {
     for (const [chain, list] of layer) {
       const prior = this._blockZ.get(chain);
       if (prior) for (const b of list) if (prior.has(b.hash)) kept++;
-      zOf.set(chain, layeredZ(list, 1, prior, pending.get(chain)));
+      zOf.set(chain, forkSpread(list, 1, prior, pending.get(chain)));
     }
     if (kept === 0) this._braidScale = null;
     this._blockZ = zOf;
     let widest = 0;
     for (const u of zOf.get("dag")?.values() ?? []) widest = Math.max(widest, Math.abs(u));
-    if (widest > 0) this._braidScale = Math.min(this._braidScale ?? Infinity, DAG_HALF_W / widest);
+    if (widest > 0) this._braidScale = Math.min(this._braidScale ?? Infinity, BRAID_HALF / widest);
     const braid = this._braidScale ?? 0;
     const tiers = { dag: { items: [] as BlockItem[] }, token: { items: [] as BlockItem[] } }; // event-time
     const at = new Map<string, readonly [number, number, number]>(); // event-time
@@ -1151,23 +1152,23 @@ export class LedgerView implements SceneView {
       if (!snap || !t) continue;
       deepest = s;
       const global = this._pickFor(snap) as Extract<PickDescriptor, { kind: "snapshot" }>;
-      // A DAG block stands ABOVE its tick's bar, the braid centred over the floor's middle, in the
-      // snapshots' own glass and cyan, at its layered place across (`layeredZ`); blocks sharing a
-      // tick and a place step aside along the trail. A hairline ties it down to its bar.
-      const dagY = FLOOR_Y.gl0 + BAR_LIFT + BAR_H + DAG_LIFT;
+      // A DAG block stands ABOVE its tick's bar over the floor's centre line, in the snapshots' own
+      // glass and cyan, at its fork's height in the band (`forkSpread`); blocks sharing a tick and a
+      // place step aside along the trail. A hairline ties it down to its bar.
       const spec = this._specs[s];
       const barMid = spec?.measured && spec.bandCount > 0 ? (spec.bands[0].z0 + spec.bands[spec.bandCount - 1].z1) / 2 : 0;
       for (const hash of t.blocks) {
         const f = placeOf("dag", hash);
         if (f == null) continue;
-        const z = Math.max(-DAG_HALF_W, Math.min(DAG_HALF_W, f * braid));
-        const x = LEAD_X - s * SLOT_SP + turn(`${s}|dag|${z.toFixed(3)}`) * BLOCK_STEP;
-        push("dag", "dag", hash, s, x, dagY, z, DAG_BLOCK, this._core, {
+        const y = BRAID_Y + Math.max(-BRAID_HALF, Math.min(BRAID_HALF, f * braid));
+        const z = 0;
+        const x = LEAD_X - s * SLOT_SP + turn(`${s}|dag|${y.toFixed(3)}`) * BLOCK_STEP;
+        push("dag", "dag", hash, s, x, y, z, DAG_BLOCK, this._core, {
           kind: "block", sel: { chain: "dag", hash, ordinal: t.ord, anchorOrd: t.ord }, global, title: "Block",
         });
         // The hairline lands on the CENTRE of its tick's data bar (user, D2), on the same eased sweep
         // the metagraph snapshots' lines take — layout data, the bar spec's own band extent.
-        anchors.push({ slot: s, key: "dag", x, z, yTop: dagY - DAG_BLOCK / 2, band: { z0: barMid, z1: barMid }, neutral: true });
+        anchors.push({ slot: s, key: "dag", x, z, yTop: y - DAG_BLOCK / 2, band: { z0: barMid, z1: barMid } });
       }
       // A token block stands ON the tile of the metagraph snapshot that accepted it (user ruling):
       // its layered place only nudges it across the tile and its turn along it, both bounded inside

@@ -69,6 +69,15 @@ export const RIBBON_LOOK: Readonly<RibbonLook> = {
   threadAlpha: 0.5,
 };
 
+/** THE SEAL LINE (design round D8, user: "the line that 'seals' the block … looks the same [as the
+ *  block links]; we need to distinguish them much more clearly"): the Transaction blocks register's
+ *  anchors — a DAG block down to its bar, a block-carrying tile down to its band — are a species of
+ *  their own, not the links': the chamber's muted NEUTRAL (`SceneColors.muted`, the floor labels'
+ *  tone, never an identity hue or the blocks' cyan) on their own material, quieter than the links
+ *  (0.42 dark / 0.7 paper). WebGL draws every line one pixel wide, so "thinner" is presence: dark
+ *  0.28 reads as a pale structural thread under the cyan links; paper 0.5 holds it as grey ink. */
+export const SEAL_LOOK: Readonly<{ dark: number; paper: number }> = { dark: 0.28, paper: 0.5 };
+
 /** The eased Z progress at vertical progress `t` — linear blended toward smootherstep. */
 function sweep(t: number, curve: number): number {
   const s = t * t * t * (t * (t * 6 - 15) + 10); // smootherstep
@@ -82,9 +91,9 @@ interface RowState {
   quads: RibbonQuad[];
 }
 
-/** One anchor hairline of the Blocks register (`setAnchorLines`): its row, its network key, where it
- *  starts (x, z at height `yTop`, chamber-local before the rewind offset), the band it lands on (null:
- *  the bar's centre line under it), and whether it wears the neutral cyan rather than the key's hue. */
+/** One seal line of the Transaction blocks register (`setAnchorLines`): its row, its network key (the
+ *  lens dims it), where it starts (x, z at height `yTop`, chamber-local before the rewind offset), and
+ *  the band it lands on (null: the bar's centre line under it). */
 export interface AnchorLine {
   slot: number;
   key: string;
@@ -92,7 +101,6 @@ export interface AnchorLine {
   z: number;
   yTop: number;
   band: { z0: number; z1: number } | null;
-  neutral?: boolean;
 }
 
 export class Ribbons {
@@ -108,6 +116,9 @@ export class Ribbons {
   private _thPos: THREE.Float32BufferAttribute;
   private _thCol: THREE.Float32BufferAttribute;
   private _thMat: THREE.LineBasicMaterial;
+  /** The seal lines' own material (`SEAL_LOOK`): the hairline geometry wears it while it holds
+   *  anchor lines (`setAnchorLines`), the threads' while it holds threads. */
+  private _sealMat: THREE.LineBasicMaterial;
   private _thLines: THREE.LineSegments;
   /** One entry per drawn thread: the slot it belongs to and its first vertex, so the per-frame
    *  fade pass can write alpha without recomputing any geometry. */
@@ -175,6 +186,10 @@ export class Ribbons {
       vertexColors: true, transparent: true, opacity: 0,
       depthWrite: false, blending: glowBlend(colors),
     });
+    this._sealMat = new THREE.LineBasicMaterial({
+      color: colors.muted, vertexColors: true, transparent: true, opacity: 0,
+      depthWrite: false, blending: glowBlend(colors),
+    });
     this._thLines = new THREE.LineSegments(this._thGeo, this._thMat);
     this._thLines.frustumCulled = false;
     this.group.add(this._thLines);
@@ -203,6 +218,9 @@ export class Ribbons {
     this._mat.needsUpdate = true; // three caches the program per blending mode
     this._thMat.blending = glowBlend(c);
     this._thMat.needsUpdate = true;
+    this._sealMat.color.setHex(c.muted);
+    this._sealMat.blending = glowBlend(c);
+    this._sealMat.needsUpdate = true;
     this._writeGeometry(); // event-time: a theme flip, not a frame
   }
 
@@ -260,6 +278,7 @@ export class Ribbons {
     topHalf: (key: string) => number,
   ): void {
     this._clearThreads();
+    this._thLines.material = this._thMat;
     const key = this._filter;
     if (key === "all") { this._thGeo.setDrawRange(0, 0); return; }
     this._c.setHex(this._sceneColors[key] ?? this._neutral);
@@ -280,19 +299,20 @@ export class Ribbons {
     this._thGeo.setDrawRange(0, v);
   }
 
-  /** THE BLOCKS REGISTER'S ANCHORS — the same hairline species, one per block-carrying mark (user,
-   *  design rounds D1 and D2: the sheets' width states snapshot size, which the blocks have nothing
-   *  to do with). A metagraph snapshot's line runs from ITS tile down to its network's band on the
-   *  tick (the bar's centre while the tick's exact read has not landed), in the lane's identity hue;
-   *  a DAG block's runs straight down from the block to its tick's bar, in the snapshots' neutral
-   *  cyan (`neutral`). Off the lens a line takes the ledger row's dim. Geometry is event-time;
-   *  `setThreadFades` writes the per-frame alpha as for the threads. */
+  /** THE TRANSACTION BLOCKS REGISTER'S SEAL LINES — the threads' hairline geometry on the SEAL
+   *  material (`SEAL_LOOK`, rounds D1, D2, D8): one per DAG block, from the block down to the centre
+   *  of its tick's bar, and one per block-carrying tile, from the tile down to its network's band (the
+   *  bar's centre while the tick's exact read has not landed), all on the sheets' eased sweep and in
+   *  the chamber's muted neutral. Off the lens a line takes the ledger row's dim. Geometry is
+   *  event-time; `setThreadFades` writes the per-frame alpha as for the threads. */
   setAnchorLines(lines: readonly AnchorLine[]): void {
     this._clearThreads();
+    // The SEAL species (`SEAL_LOOK`): the material carries the muted neutral, the vertex the lens.
+    this._thLines.material = this._sealMat;
     let v = 0;
     for (const l of lines) {
       if (this._thCount >= MAX_THREADS) break;
-      this._c.setHex(l.neutral ? this._neutral : this._sceneColors[l.key] ?? this._neutral);
+      this._c.setRGB(1, 1, 1);
       const off = this._filter !== "all" && l.key !== this._filter;
       if (off) this._c.multiplyScalar(snapBright(1, true));
       this._q.topZ0 = l.z;
@@ -393,6 +413,7 @@ export class Ribbons {
     // Presence, so it asks the ground — see inkPresence.
     this._mat.opacity = inkPresence(RIBBON_LOOK.restOp, this._paper) * a;
     this._thMat.opacity = inkPresence(RIBBON_LOOK.threadAlpha, this._paper) * a;
+    this._sealMat.opacity = (this._paper ? SEAL_LOOK.paper : SEAL_LOOK.dark) * a;
   }
 
   /** COMMITTED filter → the other metagraphs' sheets take the COLORED dim (identity hue at the
@@ -468,6 +489,7 @@ export class Ribbons {
   dispose(): void {
     this._thGeo.dispose();
     this._thMat.dispose();
+    this._sealMat.dispose();
     this._geo.dispose();
     this._mat.dispose();
     this._rows.length = 0;

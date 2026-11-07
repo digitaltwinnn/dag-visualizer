@@ -562,15 +562,18 @@ bars, labels, the rewind and the pose. What differs answers through ONE keyed ma
   tokens', one material each) and `objects/SilentStretch.ts`, drawn per frame only in that register
   and CLEARED at the switch, so nothing of theirs is left to write. The tiers' meshes join
   `pickables` in that register only (the raycaster ignores `visible`).
-- **Anchors are LINES, not sheets** (`anchors: "lines"`, user, design rounds D1 and D2: the sheets'
-  width states snapshot size, which the blocks have nothing to do with, and read as noise). The four
-  sheet rows stand empty and `Ribbons.setAnchorLines` draws the threads' own hairline species: one
-  per metagraph snapshot that carries a block, from ITS tile down to its network's band (the bar's
-  centre while the tick's exact read has not landed), in the lane's identity hue; and one per DAG
-  block, from the block down to the CENTRE of its tick's data bar (the bar spec's own band extent),
-  on the same eased sweep, in the snapshots' neutral cyan. Off the lens
-  a line takes the row's `dim`. `_syncThreads` is the one dispatch, so a filter change redraws the
-  lines, never the committed-network threads.
+- **Anchors are SEAL LINES, not sheets** (`anchors: "lines"`, user, design rounds D1, D2 and D8:
+  the sheets' width states snapshot size, which the blocks have nothing to do with, and read as
+  noise). The four sheet rows stand empty and `Ribbons.setAnchorLines` draws the threads' hairline
+  geometry on its OWN material (`SEAL_LOOK`): one per metagraph snapshot that carries a block, from
+  ITS tile down to its network's band (the bar's centre while the tick's exact read has not landed),
+  and one per DAG block, from the block down to the CENTRE of its tick's data bar (the bar spec's own
+  band extent), all on the sheets' eased sweep, in the chamber's muted NEUTRAL (`SceneColors.muted`),
+  at dark 0.28 / paper 0.5. It is a different species from the block links on purpose (D8: "the line
+  that 'seals' the block … looks the same"): links are the blocks' cyan S-curves running along the
+  trail, seals pale grey threads falling to the floor. Off the lens a seal takes the row's `dim`.
+  `_syncThreads` is the one dispatch, so a filter change redraws the seals, never the
+  committed-network threads.
 - **Bare tiles are not drawn** (`bareTiles: false`, same round): a metagraph snapshot carrying no
   block zero-scales and leaves the pick table (`_blockTiles`, rebuilt with the tier); a tile that
   carries a token block stands, with its line.
@@ -585,23 +588,27 @@ token placement all read it, the first two adding the frame's offsets. The BLOCK
 the view wrote, false while its row is off the trail, and `LedgerView.selectedBlockAnchor` asks it for
 the committed block (live or pinned) — layout data, rule 6.
 
-**The DAG's blocks are a LAYERED DAG DRAWING above the floor** (user, design rounds D1 and D2: "a
-DAG is shaped differently usually — isn't there some algo for it?" — the Sugiyama method, held to
-the chamber's time axis). Along the trail a block stands over its own tick — time, which never moves;
-ACROSS the floor it takes the BARYCENTER of its placed parents' places, and blocks of one height
-sharing that barycenter split symmetrically around it, one unit to each side for a pair
-(`blockBraid.layeredZ`, heights from the lowest up, so parents are placed first). So the main chain
-is a straight centre line, a fork opens into a diamond and closes where the blocks rejoin. **The
-braid occupies HALF THE PLANE'S WIDTH, centred** (user, D2): the window's widest fork maps to
-`DAG_HALF_W` (the global floor plane's half-width `PLANE_FIELD_HALF`, halved — layout data), a scale
-(`_braidScale`) that only ever tightens when a wider fork arrives and starts afresh with a window
-that shares no block with the last. It stands `DAG_LIFT` (4.2) above the bars' top face, its own
-storey, each block tied down to its bar by a hairline (above). **Height is never a stack** (user ruling, the spec's non-goal). The blocks wear
-the global snapshot's own glass — normal-blended, translucent, no depth write, the chamber's neutral
-cyan (`SceneColors.core`) — at `BLOCK_GLASS` (dark 0.5, paper 0.85); their links take the same cyan.
+**The DAG's blocks are a LAYERED DAG DRAWING that opens VERTICALLY over the floor's centre line**
+(user, design rounds D2 and D8: "a DAG is shaped differently usually — isn't there some algo for
+it?" — the Sugiyama method, held to the chamber's time axis; then "no horizontal space … use the
+height instead"). Along the trail a block stands over its own tick — time, which never moves; its
+FORK SPREAD (`blockBraid.forkSpread`, heights from the lowest up, so parents are placed first) is the
+vertical: a block takes the LATTICE place nearest the mean of its placed parents' places (a pure
+mean decays every fork into a sliver of a lane down a long chain, and the trail read flat — found
+live), and blocks of one height sharing that place split symmetrically around it, one unit above
+and one below for a pair. So the main chain is a straight line, a fork opens into a diamond and
+closes where the blocks rejoin. The braid stands at z = the floor's centre, its centre line MID-WAY
+in the band between the bars' top face and the metagraph planes (`BRAID_LO` = bar top + a block's
+edge, `BRAID_HI` = the planes' y − a block's edge, `BRAID_Y` their middle — all layout data), and
+the window's widest fork fills that band above and below (`_braidScale`, which only ever tightens
+when a wider fork arrives and starts afresh with a window that shares no block with the last). Each
+block is tied down to its bar by a seal line (above). **The spread is the FORK's, never the
+protocol's block height** (user: "ignore the height"). The blocks wear the global snapshot's own
+glass — normal-blended, translucent, no depth write, the chamber's neutral cyan (`SceneColors.core`)
+— at `BLOCK_GLASS` (dark 0.5, paper 0.85).
 
 **A block holds still** (rounds D1, D2). A block placed once KEEPS its place: the last layout is
-handed back to `layeredZ` as `prior` (`LedgerView._blockZ`, pruned to the window by every rebuild),
+handed back to `forkSpread` as `prior` (`LedgerView._blockZ`, pruned to the window by every rebuild),
 so neither a newer block nor the window's oldest block leaving moves one already standing, and a
 re-seated window that overlaps the last (the live window's own 30 s refresh) keeps what both hold.
 A block with a parent whose read is still pending waits on the centre line, so it is never seated
@@ -614,7 +621,11 @@ times). The prior is what holds it.
 of the child block … draw it always"). `blockBraid.referenceSegments` draws both of a block's
 references: to the parent where it is placed on the trail, else as a STUB toward the older side at
 the block's own place, ending one slot past the trail's deepest row with its far end faded to
-nothing (row −1 in `BlockTier`). ⚠️ A link that needs both ends ON the trail draws only for a
+nothing (row −1 in `BlockTier`). **A link is an S-CURVE** (D8: "start horizontal, curve, end
+horizontal"): `blockBraid.sCurve`, a cubic whose control points lie along the trail only
+(`LINK_BEND` × the run), sampled into `LINK_SAMPLES` segments at event time, its alpha eased from one
+end's row weight to the other's per frame; at rest it draws at `BLOCK_LOOK.link` (dark 0.42, paper
+0.7) in the blocks' cyan. ⚠️ A link that needs both ends ON the trail draws only for a
 selected block: the trail holds only the visible rows until a selection grows its reach. Both ends
 must be READ facts, not both drawn — the stub is what keeps every reference on screen. A block whose
 read has not landed states no references and draws none.
@@ -662,9 +673,10 @@ it whatever tick is shown. Hover rides `hoverBlock` (a block, not its tick) and 
 explorer row, the Block card, RAW's row and the chamber pair on it (convention 9). The selection
 rules are `src/engine/domain/CLAUDE.md`'s.
 
-**Pinned by** `domain/blockBraid.test.ts` (`layeredZ`'s placement and its prior, every reference
-`referenceSegments` draws, the silent run), `src/data/blockWindow.test.ts` (the source
-and when it continues) and `domain/pickActions.test.ts`'s block cases.
+**Pinned by** `domain/blockBraid.test.ts` (`forkSpread`'s placement, its lattice and its prior, the
+S-curve, every reference `referenceSegments` draws, the silent run), `src/data/blockWindow.test.ts`
+(the source, when it continues, and a metagraph's window holding its own blocks only) and
+`domain/pickActions.test.ts`'s block cases.
 
 ### The Data blocks register
 

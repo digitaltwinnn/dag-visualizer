@@ -3,13 +3,16 @@
 // Two rules, in plain words:
 //  1. A LAYERED DAG DRAWING on the chamber's time axis (user, design round D2: "a DAG is shaped
 //     differently usually, isn't there some algo for it?" — the Sugiyama method). Along the trail a
-//     block stands on its own tick, which is time and never moves; ACROSS it, a block takes the
-//     BARYCENTER (mean) of its placed parents' places, and blocks of one height sharing that
-//     barycenter split symmetrically around it (`layeredZ`). So the main chain is a straight centre
-//     line, a fork opens into a diamond, and it closes where the blocks rejoin. A block placed once
-//     KEEPS its place (the caller hands the last layout back as `prior`), so the window sliding a
-//     block tick at a time moves nothing already standing — a layout recomputed from the window
-//     re-dealt every block whenever its oldest tick left (found live, D2).
+//     block stands on its own tick, which is time and never moves; its FORK SPREAD (`forkSpread`)
+//     is the other axis — the chamber lays it VERTICALLY (round D8: "use the height instead"), so a
+//     fork opens up and down over the floor's centre line. A block takes the BARYCENTER (mean) of
+//     its placed parents' places, and blocks of one height sharing that barycenter split
+//     symmetrically around it, so the main chain is a straight centre line, a fork opens into a
+//     diamond, and it closes where the blocks rejoin. A block placed once KEEPS its place (the
+//     caller hands the last layout back as `prior`), so the window sliding a block tick at a time
+//     moves nothing already standing — a layout recomputed from the window re-dealt every block
+//     whenever its oldest tick left (found live, D2). The spread is the FORK's, never the protocol's
+//     block height (the user: "ignore the height").
 //  2. Every reference a read states is drawn (`referenceSegments`): to the parent where it is
 //     placed, else as a STUB toward the older side at the block's own place — the reference is a
 //     read fact, only its far end is off the trail. A block whose read has not landed draws none.
@@ -36,18 +39,19 @@ export interface BlockTransfer {
 }
 
 /**
- * Each block's place across the braid, in units of `spacing` (a layered drawing, heights from the
- * lowest up, so a parent is always placed before its child):
+ * Each block's place in the fork spread, in units of `spacing` (a layered drawing, heights from the
+ * lowest up, so a parent is always placed before its child; the chamber lays it vertically):
  *  - a block placed before (`prior`) KEEPS its place — so neither a newer block arriving nor the
  *    window's oldest block leaving moves one already standing;
  *  - a block with a parent whose read is still `pending` waits (no place yet), so it is never seated
  *    against a parent that is about to move;
- *  - a new block takes the mean place of its parents found (else the centre line); new blocks of one
+ *  - a new block takes the lattice place nearest the mean of its parents found (else the centre
+ *    line) — the mean alone decays every fork into a fraction of a lane down a chain; new blocks of one
  *    height sharing that barycenter split symmetrically around it — `spacing` to each side for a
  *    pair — and where siblings already stand there, each new one takes the nearest free place
  *    (0, +1, −1, +2, … spacings), in tick order (hash on a tie).
  */
-export function layeredZ(
+export function forkSpread(
   blocks: readonly { hash: string; height: number; ord: number; parents: readonly string[] }[],
   spacing: number,
   prior: ReadonlyMap<string, number> = new Map(),
@@ -73,7 +77,9 @@ export function layeredZ(
         sum += z;
         n++;
       }
-      const bary = n ? sum / n : 0;
+      // The LATTICE place nearest the parents' mean: a pure mean decays every fork into a sliver of a
+      // lane down a long chain (each block averages two branches), so the trail read flat (D8).
+      const bary = n ? Math.round(sum / n) + 0 : 0;
       const key = bary.toFixed(6);
       (groups.get(key) ?? groups.set(key, { bary, list: [] }).get(key)!).list.push(b);
     }
@@ -132,6 +138,41 @@ export function referenceSegments(
     }
   }
   return { pos: Float32Array.from(out), ends };
+}
+
+/** How far a link's control points reach along the trail, as a share of the link's own run: the
+ *  S-curve's shoulders (design round D8: "start horizontal, curve, end horizontal"). */
+export const LINK_BEND = 0.4;
+/** The segments one link is drawn in. */
+export const LINK_SAMPLES = 12;
+
+/**
+ * One reference link as an S-CURVE: a cubic from `a` to `b` whose control points sit along the
+ * trail's own axis only (`bend` × the run in x), so the curve LEAVES `a` and ARRIVES at `b`
+ * horizontally and bends between them. `n + 1` points (xyz) into `out` from `offset`, the first
+ * exactly `a` and the last exactly `b`; returns the next free offset. Event-time — the caller hands
+ * a scratch array.
+ */
+export function sCurve(
+  a: readonly [number, number, number],
+  b: readonly [number, number, number],
+  n: number,
+  out: Float32Array | number[],
+  offset = 0,
+  bend: number = LINK_BEND,
+): number {
+  const k = bend * (b[0] - a[0]);
+  const p1x = a[0] + k;
+  const p2x = b[0] - k;
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const u = 1 - t;
+    const w0 = u * u * u, w1 = 3 * u * u * t, w2 = 3 * u * t * t, w3 = t * t * t;
+    out[offset++] = w0 * a[0] + w1 * p1x + w2 * p2x + w3 * b[0];
+    out[offset++] = (w0 + w1) * a[1] + (w2 + w3) * b[1];
+    out[offset++] = (w0 + w1) * a[2] + (w2 + w3) * b[2];
+  }
+  return offset;
 }
 
 /** The snapshots and time between two block ticks; null when they are adjacent. */
