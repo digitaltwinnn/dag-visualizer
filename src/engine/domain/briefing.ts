@@ -121,6 +121,11 @@ export const mayAdvance = (elapsedMs: number, phase: "out" | "in" | null): boole
  *  "remove the text a bit earlier"). */
 export const HANDOVER_MS = 6000;
 
+/** The phone Explore sheet's grow, when the tour hands over (user, 2026-11-05: "animate in like it
+ *  usually does but a bit slower"). The sheet's usual entry is the 550 ms navigation tempo; this
+ *  arrival, onto a cleared stage, takes a touch longer. */
+export const HANDOVER_SHEET_GROW_MS = 750;
+
 /** A surface that pulses its edge on the hand-over: the desktop's explore card, card rail and vitals
  *  band, or the phone's open sheet and its dock bar. */
 export type HandoverTarget = "explore" | "rail" | "band" | "sheet" | "dock";

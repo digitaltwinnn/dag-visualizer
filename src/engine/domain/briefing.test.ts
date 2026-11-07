@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BRIEFING_COVER, BRIEFING_LAND_MAX_MS, BRIEFING_NO_MOTION_MS, BRIEFING_PACE, BRIEFING_RELEASE_MS, BRIEFING_SETTLE_MS, BRIEFING_STOPS, BRIEFING_TYPE_SLOW, BRIEFING_WORDS_OUT_MS, HANDOVER_MS, LINE_MAX, SCENE_WAIT_MS, STOP_MS, briefsOn, handoverHand, handoverPulses, hasLanded, liftSettling, mayAdvance, nextStop, prevStop, stopRegister } from "./briefing";
+import { BRIEFING_COVER, BRIEFING_LAND_MAX_MS, BRIEFING_NO_MOTION_MS, BRIEFING_PACE, BRIEFING_RELEASE_MS, BRIEFING_SETTLE_MS, BRIEFING_STOPS, BRIEFING_TYPE_SLOW, BRIEFING_WORDS_OUT_MS, HANDOVER_MS, HANDOVER_SHEET_GROW_MS, LINE_MAX, SCENE_WAIT_MS, STOP_MS, briefsOn, handoverHand, handoverPulses, hasLanded, liftSettling, mayAdvance, nextStop, prevStop, stopRegister } from "./briefing";
 
 const on = { pathname: "/", net: "mainnet", seen: false };
 
@@ -182,5 +182,12 @@ describe("the hand-over", () => {
 describe("the tour's typing", () => {
   it("runs 15% slower than a note's", () => {
     expect(BRIEFING_TYPE_SLOW).toBe(1.15);
+  });
+});
+
+describe("the hand-over's sheet grow", () => {
+  it("is slower than the dock's usual 550 ms entry and ends inside the hand-over", () => {
+    expect(HANDOVER_SHEET_GROW_MS).toBeGreaterThan(550);
+    expect(HANDOVER_SHEET_GROW_MS).toBeLessThan(HANDOVER_MS);
   });
 });
