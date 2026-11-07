@@ -196,6 +196,16 @@ const BAR_TRACK_MAX = 150;
  *  2026-09-01). The ladder stays where it earns its keep: on the DONUT, whose slices are adjacent
  *  arcs of a single colour and genuinely need separating. A bar row does not — every row is NAMED,
  *  and the ring's slices are in the same order, which is how a legend works. */
+/** THE "TOP N + OTHER" FOLD — a share-of-whole list past `max` rows keeps its first `max − 1` and
+ *  folds the rest into ONE muted "other" row, so the rows still partition the whole (a list that
+ *  showed only the top rows would draw them as all of it). The band's one fold: Geography's regions,
+ *  the Blocks and Data blocks registers' BY NETWORK (refactor round R1, P4). */
+export function foldOther<R extends { key: string; count: number }>(rows: readonly R[], max: number): (R | { key: "other"; label: "other"; count: number; hue: string })[] {
+  if (rows.length <= max) return [...rows];
+  const rest = rows.slice(max - 1).reduce((n, r) => n + r.count, 0);
+  return [...rows.slice(0, max - 1), ...(rest > 0 ? [{ key: "other" as const, label: "other" as const, count: rest, hue: "var(--muted-foreground)" }] : [])];
+}
+
 export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key: string; label: React.ReactNode; count: number; hue?: string }[]; accent: string; labelW?: number; dashZero?: boolean }) {
   // ⚠️ THE CALLER'S ORDER STANDS — see `Donut` for the full reasoning. In short: a magnitude sort
   // here would re-shuffle the structural cards (type, composition, layers) every time the subject

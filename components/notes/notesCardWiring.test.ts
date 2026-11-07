@@ -206,7 +206,9 @@ describe("the notes card's own behaviour", () => {
     // A tag the AI's note produced wears the AI's edge (user, 2026-10-30).
     expect(chip).toMatch(/<QualifierChip className=\{AI_SWEEP\}>/);
     // The unlisted set keeps its mandated neutral: `identityHudCss` would hash it a saturated hue.
-    expect(chip).toMatch(/UNLISTED_ID \? UNLISTED_HUE : identityHudCss/);
+    // The rule's one home is `networkMark` (refactor round R1, P4), which the chip asks.
+    expect(chip).toMatch(/networkMark\(day\.networkId\)\.hue/);
+    expect(read("components/explorer/nodeRow.tsx")).toMatch(/key === UNLISTED_ID \? \{ label: UNLISTED_LABEL, hue: UNLISTED_HUE \} : \{ label: tickerOf\(key\), hue: identityHudCss\(key\) \}/);
     const stack = read("components/TrendStack.tsx");
     expect(stack).toMatch(/const marksById = useMemo\(/);
     expect(stack).toMatch(/marks=\{marksById\.get\(pose\.id\)\}/);

@@ -3,8 +3,7 @@
 import { NOTE_KIND_ICONS } from "@/components/icons";
 import { QualifierChip } from "@/components/inspector/parts";
 import type { NoteDay } from "@/src/data/noteTypes";
-import { UNLISTED_HUE, UNLISTED_ID } from "@/src/data/unlisted";
-import { identityHudCss } from "@/src/palette/identity";
+import { networkMark } from "@/components/explorer/nodeRow";
 import { AI_SWEEP } from "./aiSweep";
 import { NOTE_KIND_WORD } from "./noteDays";
 
@@ -15,7 +14,7 @@ import { NOTE_KIND_WORD } from "./noteDays";
 export default function NoteKindChip({ day }: { day: NoteDay }) {
   const Mark = NOTE_KIND_ICONS[day.kind];
   // The unlisted set keeps its mandated neutral: no single identity can speak for a mixed set.
-  const hue = day.networkId ? (day.networkId === UNLISTED_ID ? UNLISTED_HUE : identityHudCss(day.networkId)) : undefined;
+  const hue = day.networkId ? networkMark(day.networkId).hue : undefined;
   return (
     // THE AI'S OWN EDGE (user, 2026-10-30: "if the tag comes from AI give it that color outline
     // also"): the card's iridescent sweep (`AI_SWEEP`), so a chip a model's note produced is

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { shortHash, metagraphById, getNetwork, SIGNER_GROUPS, nodeSigned, coLocatedNetworks, filterAccent } from "@/src/data/network";
-import { UNLISTED_ID, UNLISTED_HUE, observedUnlistedIds } from "@/src/data/unlisted";
+import { UNLISTED_ID, observedUnlistedIds } from "@/src/data/unlisted";
 import { identityHudCss } from "@/src/palette/identity";
 import { fmtDagShort, fmtKB, midHash } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
@@ -29,7 +29,7 @@ import { netKeyOf, pickNetId } from "@/src/engine/domain/pickActions";
 import { ladderSlotIds } from "@/components/railCards";
 import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder";
 import FollowControl from "@/components/FollowControl";
-import { NODE_ID_GLYPHS } from "@/components/explorer/nodeRow";
+import { NODE_ID_GLYPHS, networkMark } from "@/components/explorer/nodeRow";
 import { IDENT_INK } from "@/components/identInk";
 import { useFeedRead } from "@/components/useFeedRead";
 import SubjectNote from "@/components/notes/SubjectNote";
@@ -94,10 +94,8 @@ export function MetaTitle({ cfg }: { cfg: MetaCfg }) {
   useFeedRead(["api-metagraphs"], "MetaTitle");
   const metaList = useStore((s) => s.metaList);
   const mg = metaList.find((x) => x.id === cfg.id) || null;
-  // The unlisted pseudo-network keeps its mandated neutral — identityHudCss would hash-assign a
-  // saturated hue to the "unlisted" id, and no single identity can speak for a mixed set. Same
-  // guard LedgerPanel applies (UNLISTED_HUE is the one home, src/data/unlisted.ts).
-  const hue = cfg.id === UNLISTED_ID ? UNLISTED_HUE : identityHudCss(cfg.id);
+  // The unlisted pseudo-network keeps its mandated neutral (`networkMark`, the one rule).
+  const hue = networkMark(cfg.id).hue;
   const iconUrl = mg?.iconUrl || cfg.iconUrl; // live metagraph icon, or the core's bundled logo
   const monogram = (cfg.ticker || cfg.name).slice(0, 3).toUpperCase();
   return (
@@ -553,7 +551,7 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   // own probed universe (its roster isn't `nodes`); a metagraph counts against its live fleet.
   // Memoized — archiveSchedule walks every census entry with date parsing, and this card
   // re-renders on every poll and hover.
-  const hue = cfg.id === UNLISTED_ID ? UNLISTED_HUE : identityHudCss(cfg.id);
+  const hue = networkMark(cfg.id).hue;
   const archSched = useMemo(
     () =>
       archCensus

@@ -11,10 +11,10 @@ import { viewNetwork } from "@/src/engine/domain/viewNetwork";
 // and micro-instruments are in ./bandParts. This file is the CONTENT — the half that changes
 // when a view learns to say something new.
 
-import { BandCard, MicroBars, DonutTotal, TypeGlyph, TYPE_ORDER, compositionCounts, staleFor, windowSpan, windowNote } from "@/components/vitals/bandParts";
+import { BandCard, MicroBars, foldOther, DonutTotal, TypeGlyph, TYPE_ORDER, compositionCounts, staleFor, windowSpan, windowNote } from "@/components/vitals/bandParts";
 import { useStore } from "@/src/store/store";
 import { metagraphById, getAnchor } from "@/src/data/network";
-import { displayNetwork, UNLISTED_HUE, UNLISTED_ID, UNLISTED_LABEL } from "@/src/data/unlisted";
+import { displayNetwork, UNLISTED_HUE, UNLISTED_ID } from "@/src/data/unlisted";
 import { cap, metaType, rolesOf, Empty, IdentityDot, RoleChips, TickerChip } from "@/components/inspector/parts";
 import { machineKey } from "@/src/data/composition";
 import { identityHudCss } from "@/src/palette/identity";
@@ -38,7 +38,7 @@ import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
 import { blockScopeOf, blocksByNetwork, blocksInWindow, blocksPerHourBins, lastBlockAt, movedChainOf, movedInWindow, movedPerHourBins } from "@/src/data/blockStats";
 import { blockAbsence, blockSpanWord, snapshotSpanWord } from "@/src/data/ledgerSpan";
 import { compactDag } from "@/src/util/format";
-import { tickerOf } from "@/components/explorer/nodeRow";
+import { networkMark, tickerOf } from "@/components/explorer/nodeRow";
 import { useNowTick } from "@/components/useNowTick";
 import { useLedgerSource } from "@/components/useLedgerSource";
 import { dataByNetwork, dataInWindow, dataPerTick, lastDataTick } from "@/src/data/dataStats";
@@ -269,10 +269,7 @@ export function GeoCells({ accent }: { accent: string }) {
   // The regions ring: the named rows, the folded remainder and the unplaced, so it partitions
   // the whole selection like the two rings beside it.
   const regionRows = [
-    ...byRegion.rows.slice(0, byRegion.rows.length > 4 ? 3 : 4).map((c) => ({ key: c.region, label: c.region, count: c.count })),
-    ...(byRegion.rows.length > 4
-      ? [{ key: "other", label: "other", count: byRegion.rows.slice(3).reduce((n, c) => n + c.count, 0), hue: "var(--muted-foreground)" }]
-      : []),
+    ...foldOther(byRegion.rows.map((c) => ({ key: c.region, label: c.region, count: c.count })), 4),
     ...(byRegion.unplaced > 0 ? [{ key: "unplaced", label: "unplaced", count: byRegion.unplaced, hue: "var(--muted-foreground)" }] : []),
   ];
   const regionRing: Record<string, number> = Object.fromEntries(regionRows.map((r) => [r.key, r.count]));
@@ -953,7 +950,7 @@ function AnchoringNetworks({ windowed, snaps, filter }: { windowed: TrendsWindow
 // pinned around a past time is read as that window; only LAST BLOCK, a claim about now, steps aside
 // for the pinned sentence (rule 10). The DAG's height is not here: the Block card's chip and the
 // note state it.
-const BLOCK_LEAD = "font-mono font-bold text-figure tabular-nums whitespace-nowrap";
+const STACKED_LEAD = "font-mono font-bold text-figure tabular-nums whitespace-nowrap";
 const BLOCK_PINNED = "Window pinned to a past time";
 /** BY NETWORK's rows before the rest fold into "other" — the band's four-row height. */
 const BY_NETWORK_ROWS = 4;
@@ -961,11 +958,11 @@ const CATALOG_ORDER: string[] = METAGRAPHS.map((m) => m.id);
 
 /** A stacked lead: the figure over its muted unit — the rate cards' own shape — with an optional
  *  floor line under the unit ("12 of 30 blocks read"). */
-function BlockLead({ figure, unit, prefix, note, empty = false }: { figure: React.ReactNode; unit: string; /** A floor says so ("at least"), in words. */ prefix?: string; note?: string; empty?: boolean }) {
+function StackedLead({ figure, unit, prefix, note, empty = false }: { figure: React.ReactNode; unit: string; /** A floor says so ("at least"), in words. */ prefix?: string; note?: string; empty?: boolean }) {
   return (
     <span className="flex flex-col items-start">
       {prefix && !empty && <span className="text-label font-normal text-muted-foreground leading-none">{prefix}</span>}
-      <span className={cn(BLOCK_LEAD, empty ? "text-muted-foreground" : "text-foreground")}>{empty ? <Empty why="Not held yet" /> : figure}</span>
+      <span className={cn(STACKED_LEAD, empty ? "text-muted-foreground" : "text-foreground")}>{empty ? <Empty why="Not held yet" /> : figure}</span>
       <span className="text-label text-muted-foreground leading-none">{unit}</span>
       {note && !empty && <span className="mt-0.5 text-label text-muted-foreground leading-none whitespace-nowrap">{note}</span>}
     </span>
@@ -1007,12 +1004,7 @@ export function BlocksCells({ accent }: { accent: string }) {
   // BY NETWORK — the share of the window's blocks per network, the catalog's order, one row under a
   // filter; past three networks the rest fold into "other" so the rows still partition the count.
   const nets = win ? blocksByNetwork(ticks, scope.chain, CATALOG_ORDER) : [];
-  const shown = nets.length > BY_NETWORK_ROWS ? nets.slice(0, BY_NETWORK_ROWS - 1) : nets;
-  const rest = nets.length > BY_NETWORK_ROWS ? nets.slice(BY_NETWORK_ROWS - 1).reduce((n, r) => n + r.count, 0) : 0;
-  const netRows = [
-    ...shown.map((r) => ({ key: r.chain, label: tickerOf(r.chain), count: r.count, hue: identityHudCss(r.chain) })),
-    ...(rest > 0 ? [{ key: "other", label: "other", count: rest, hue: "var(--muted-foreground)" }] : []),
-  ];
+  const netRows = foldOther(nets.map((r) => ({ key: r.chain, ...networkMark(r.chain), count: r.count })), BY_NETWORK_ROWS);
 
   // LAST BLOCK — the age of the window's newest block of its network (`ageWords`, the app's one
   // long-form age), and whose it is: the name beside the dot, never colour alone.
@@ -1023,7 +1015,7 @@ export function BlocksCells({ accent }: { accent: string }) {
       <BandCard
         label="Blocks"
         aside={win ? span : undefined}
-        lead={<BlockLead figure={held ? <Odometer value={held.count} int /> : null} prefix={held?.floor ? "at least" : undefined} unit="blocks" empty={held == null} />}
+        lead={<StackedLead figure={held ? <Odometer value={held.count} int /> : null} prefix={held?.floor ? "at least" : undefined} unit="blocks" empty={held == null} />}
       >
         {win ? (
           <span className="flex-1 min-w-0 self-center">
@@ -1038,7 +1030,7 @@ export function BlocksCells({ accent }: { accent: string }) {
       <BandCard
         label="Moved"
         aside={win ? span : undefined}
-        lead={<BlockLead figure={moved?.amount != null ? compactDag(moved.amount) : null} unit={unit} note={movedNote} empty={moved?.amount == null} />}
+        lead={<StackedLead figure={moved?.amount != null ? compactDag(moved.amount) : null} unit={unit} note={movedNote} empty={moved?.amount == null} />}
       >
         {win ? (
           moved && moved.total > 0 ? (
@@ -1059,14 +1051,14 @@ export function BlocksCells({ accent }: { accent: string }) {
       </BandCard>
       <BandCard
         label="Last block"
-        lead={pinned ? undefined : <BlockLead figure={last ? ageWords(Math.max(0, now - Date.parse(last.ts))) : null} unit="ago" empty={last == null} />}
+        lead={pinned ? undefined : <StackedLead figure={last ? ageWords(Math.max(0, now - Date.parse(last.ts))) : null} unit="ago" empty={last == null} />}
       >
         {pinned ? (
           stateLine(BLOCK_PINNED)
         ) : last ? (
           <span className="flex items-center self-stretch gap-1.5 text-body whitespace-nowrap">
-            <IdentityDot hue={identityHudCss(last.chain)} />
-            <span className="text-muted-foreground">{tickerOf(last.chain)}</span>
+            <IdentityDot hue={networkMark(last.chain).hue} />
+            <span className="text-muted-foreground">{networkMark(last.chain).label}</span>
           </span>
         ) : (
           stateLine(win ? "No block in the window" : absent)
@@ -1101,12 +1093,7 @@ export function DataCells({ accent, filter }: { accent: string; filter: string }
   // The floor says itself under the unit, MOVED's grammar: the count covers the snapshots read so far.
   const heldNote = held.read < held.total ? `${held.read.toLocaleString()} of ${held.total.toLocaleString()} snapshots read` : undefined;
   const nets = dataByNetwork(snaps, reads, inScope, netKeyOf, CATALOG_ORDER);
-  const shown = nets.length > BY_NETWORK_ROWS ? nets.slice(0, BY_NETWORK_ROWS - 1) : nets;
-  const rest = nets.length > BY_NETWORK_ROWS ? nets.slice(BY_NETWORK_ROWS - 1).reduce((n, r) => n + r.count, 0) : 0;
-  const netRows = [
-    ...shown.map((r) => ({ key: r.key, label: r.key === UNLISTED_ID ? UNLISTED_LABEL : tickerOf(r.key), count: r.count, hue: r.key === UNLISTED_ID ? UNLISTED_HUE : identityHudCss(r.key) })),
-    ...(rest > 0 ? [{ key: "other", label: "other", count: rest, hue: "var(--muted-foreground)" }] : []),
-  ];
+  const netRows = foldOther(nets.map((r) => ({ key: r.key, ...networkMark(r.key), count: r.count })), BY_NETWORK_ROWS);
   // A past window makes no claim about now: LAST DATA BLOCK, the one claim about now, says so.
   const pinned = past != null || pastStatus != null;
   const last = !pinned ? lastDataTick(snaps, reads, inScope) : null;
@@ -1116,7 +1103,7 @@ export function DataCells({ accent, filter }: { accent: string; filter: string }
       <BandCard
         label="Data updates"
         aside={!empty ? span : undefined}
-        lead={noData ? undefined : <BlockLead figure={<Odometer value={held.count} int />} unit="updates" note={heldNote} empty={empty || held.read === 0} />}
+        lead={noData ? undefined : <StackedLead figure={<Odometer value={held.count} int />} unit="updates" note={heldNote} empty={empty || held.read === 0} />}
       >
         {noData ? (
           stateLine(noData)
@@ -1135,7 +1122,7 @@ export function DataCells({ accent, filter }: { accent: string; filter: string }
       </BandCard>
       <BandCard
         label="Last data block"
-        lead={pinned || noData ? undefined : <BlockLead figure={last ? ageWords(Math.max(0, now - Date.parse(last.ts))) : null} unit="ago" empty={last == null} />}
+        lead={pinned || noData ? undefined : <StackedLead figure={last ? ageWords(Math.max(0, now - Date.parse(last.ts))) : null} unit="ago" empty={last == null} />}
       >
         {noData ? (
           stateLine(noData)
@@ -1143,8 +1130,8 @@ export function DataCells({ accent, filter }: { accent: string; filter: string }
           stateLine(BLOCK_PINNED)
         ) : last ? (
           <span className="flex items-center self-stretch gap-1.5 text-body whitespace-nowrap">
-            <IdentityDot hue={LISTED_KEY(last.metaId) ? identityHudCss(netKeyOf(last.metaId)) : UNLISTED_HUE} />
-            <span className="text-muted-foreground">{LISTED_KEY(last.metaId) ? tickerOf(netKeyOf(last.metaId)) : UNLISTED_LABEL}</span>
+            <IdentityDot hue={networkMark(netKeyOf(last.metaId)).hue} />
+            <span className="text-muted-foreground">{networkMark(netKeyOf(last.metaId)).label}</span>
           </span>
         ) : (
           stateLine(held.read ? "No data block in the window" : "Reading the window…")
@@ -1154,5 +1141,3 @@ export function DataCells({ accent, filter }: { accent: string; filter: string }
   );
 }
 
-/** Is this address a catalog network's (its key not the unlisted set's)? */
-const LISTED_KEY = (metaId: string): boolean => netKeyOf(metaId) !== UNLISTED_ID;

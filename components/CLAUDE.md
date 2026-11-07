@@ -1141,7 +1141,9 @@ amounts from LANDED reads only (each read's own `amount`, the decoder's transfer
 pending or missed, an hour holding an unread block a gap in its sparkline) in ONE unit — the DAG's own
 under All or the DAG filter, labelled "DAG", since a sum across tokens would add unlike units, and the
 token's ticker under its filter (`tickerOf`, the Block card's home); **BY NETWORK**, a `MicroBars`
-share of the window's blocks per network in the catalog's order, named and hued, one row under a
+share of the window's blocks per network in the catalog's order, named and hued (`nodeRow.networkMark`,
+the one label-and-hue rule, the unlisted set's neutral included), past four rows folded by
+`bandParts.foldOther` (Geography's regions and Data blocks' BY NETWORK fold through it too), one row under a
 filter; **LAST BLOCK**, the age of the window's newest block in `ageWords` (seconds under a minute) beside
 its network. BLOCKS and
 MOVED state the window's reach in the aside, the register switch's own span words (`blockSpanWord`); a
@@ -1248,7 +1250,7 @@ nodes-by-country and `PROVIDERS` into top-providers, and hyper's `NODES` went en
 composition donut already totalled the same fleet. The merged shape is `DonutTotal` + `MicroBars`:
 ring, then the total at the band's own number size, then the rows. Two rules hold it honest — the
 ring must PARTITION the population, so a top-N chart carries its remainder as an `other` segment
-rather than drawing three slices as the whole; and the total is the LARGEST type in the card, never
+rather than drawing three slices as the whole (a list's fold is `bandParts.foldOther`); and the total is the LARGEST type in the card, never
 the smallest (it briefly sat in the 44px donut hole at 11px, which made merging a demotion).
 
 **A card is TWO SEGMENTS: a LEAD and a DETAIL, split by a hairline** (user, 2026-09-01). The lead is
