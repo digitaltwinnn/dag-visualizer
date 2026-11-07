@@ -10,7 +10,7 @@ import type { GlobalSnapshot } from "@/src/data/types";
 import { blockSelectActions, snapshotSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { blockRowLocked, ledgerLens } from "@/src/data/ledgerStory";
-import { compactDag, midHash } from "@/src/util/format";
+import { compactDag, midHash, shortBlockHash } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { identityHudCss } from "@/src/palette/identity";
 import { Empty, IdentityDot } from "@/components/inspector/parts";
@@ -275,7 +275,7 @@ export default function BlocksTable() {
                       <TableCell className="font-mono tabular-nums text-foreground-dim">
                         <span className="inline-flex items-center gap-1.5">
                           <IdentityDot hue={hue} />
-                          {midHash(b.hash, phone ? 9 : 12)}
+                          {shortBlockHash(b.hash)}
                           {stateMark}
                         </span>
                       </TableCell>

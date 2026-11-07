@@ -33,7 +33,7 @@ import { blockLead } from "@/components/inspector/blockLead";
 import { useFeedRead } from "@/components/useFeedRead";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { blockChildren, blockReadKey, blockReadOf } from "@/src/data/blockReads";
-import { compactDag, midHash } from "@/src/util/format";
+import { compactDag, midHash, shortBlockHash } from "@/src/util/format";
 import { identityHudCss } from "@/src/palette/identity";
 import { useStore } from "@/src/store/store";
 
@@ -83,7 +83,7 @@ export default function BlockPane({ onClose, collapsed, onToggle }: { onClose: (
           <span className="inline-flex items-center gap-2 min-w-0 max-w-full">
             {/* A subject-specific mark carries its OWN subject's hue (the node-mark idiom). */}
             <BLOCK_ICON aria-hidden className={KIND_MARK_CLASS} style={{ color: hue } as CSSProperties} />
-            <span className="truncate font-mono">{midHash(sel.hash, 10)}</span>
+            <span className="truncate font-mono">{shortBlockHash(sel.hash)}</span>
           </span>
         }
         // The height chip, then the LIVE / PINNED control (D3): in the Blocks register live follows

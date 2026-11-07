@@ -47,7 +47,7 @@ import { blockLead } from "@/components/inspector/blockLead";
 import { identityHudCss } from "@/src/palette/identity";
 import { displayNetwork } from "@/src/data/unlisted";
 import { coLocatedNetworks, filterAccent, isAnchorSettling, ledgerAnchor, metagraphById } from "@/src/data/network";
-import { fmtKB, fmtShareKB, midHash } from "@/src/util/format";
+import { fmtKB, fmtShareKB, midHash, shortBlockHash } from "@/src/util/format";
 import { iconForPick } from "@/components/icons";
 import { SceneMark, type SceneMarkSpec } from "@/components/SceneMark";
 import { netKeyOf } from "@/src/engine/domain/pickActions";
@@ -539,7 +539,7 @@ export default function SceneCallout() {
         // newer block re-points the label rather than replaying its entrance; a pin is a new subject.
         key: following ? "blk|live" : `blk|${block.chain}:${block.hash}`,
         eyebrow: "Block",
-        title: midHash(block.hash, 12),
+        title: shortBlockHash(block.hash),
         titleMono: true,
         aside: following
           ? liveFeed
