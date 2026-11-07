@@ -6,7 +6,7 @@ import { netUrl } from "@/src/net/current";
 import { reportPoll } from "@/src/data/api";
 import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
 import { blockReadKey, wantedBlockReads, wantedExactReads, windowBlockKeys, type BlockReadWant } from "@/src/data/blockReads";
-import { BACKFILL_GAP_MS, ensurePage } from "@/components/RawSnapshotBridge";
+import { BACKFILL_GAP_MS, RETRY_BASE_MS, ensurePage } from "@/components/RawSnapshotBridge";
 import { readsBlockWindow, registerOf } from "@/src/engine/domain/viewPolicy";
 import type { BlockRead } from "@/src/engine/domain/blockBraid";
 
@@ -15,11 +15,11 @@ import type { BlockRead } from "@/src/engine/domain/blockBraid";
 // chamber's own paced exact read (`ensurePage`), mirrored into `blockReads` as it lands — and that
 // queue asks EVERY window tick's exact read, a token-only tick too, so every bar is measured; a token
 // chain's through `/api/network/<id>/snapshots/<ordinal>/blocks`, one at a time at the exact reads'
-// pace, newest first. A failed read is tried once more after 5 s, then recorded as a MISS (rule 10:
+// pace, newest first. A failed read is tried once more after `RETRY_BASE_MS` (5 s, the exact reads'
+// own retry step), then recorded as a MISS (rule 10:
 // the blocks draw with no links, never invented ones). Every window change prunes first, then
 // queues, and cancels the running queue (BlockWindowBridge's generation counter). Leaving the
 // register stops the queue but keeps what landed.
-const RETRY_MS = 5000;
 
 export default function BlockReadsBridge() {
   const on = useStore((s) => readsBlockWindow(registerOf(s.mode, s.ledgerRegister)));
@@ -97,7 +97,7 @@ export default function BlockReadsBridge() {
           let ok = await readToken(x, mine);
           if (mine !== gen.current) return;
           if (!ok) {
-            await new Promise<void>((res) => { timer = window.setTimeout(res, RETRY_MS); });
+            await new Promise<void>((res) => { timer = window.setTimeout(res, RETRY_BASE_MS); });
             timer = null;
             if (mine !== gen.current) return;
             ok = await readToken(x, mine);

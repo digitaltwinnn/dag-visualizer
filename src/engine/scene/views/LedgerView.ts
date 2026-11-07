@@ -69,7 +69,7 @@ import {
   FRONT_RUN_X0,
   type LaneBlock,
 } from "../../domain/ledgerModel";
-import { forkSpread, referenceSegments, silentRun, type BlockRead } from "../../domain/blockBraid";
+import { forkSpread, referenceSegments, silentRun, stretchLabel, type BlockRead } from "../../domain/blockBraid";
 import { DATA_MARK, dataMarkCount, dataMarkHeight } from "../../domain/dataMark";
 import { ENTRY_STAG, entryStep, entryTotal } from "../../domain/entryBeat";
 import { makeBarSpec, fillBarSpec, UNLISTED_KEY, RIBBON_LANE_HALF, type BarSpec } from "../../domain/ledgerBands";
@@ -86,7 +86,6 @@ import type { ViewPolicy } from "../../domain/viewPolicy";
 /** A register of the Snapshots view — named through the policy row that lists them, since scene/
  *  reaches nothing in the store, types included (`layerBoundaries.test.ts`). */
 type LedgerRegister = ViewPolicy["registers"][number];
-import { relativeAge } from "@/src/util/relativeAge"; // the app's one short span — "1,364 snapshots · 4h"
 import { fmtKB } from "@/src/util/format"; // the HUD's own size vocabulary — one formatter, so scene and cards can't disagree
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers"; // shared display copy — floor labels = panel rows
 import { ByteBar, SEED_W } from "../objects/ByteBar";
@@ -253,8 +252,6 @@ const BLOCK_STEP = 0.7;
  *  leaves its tile. */
 const TOKEN_ON_TILE = 0.6;
 const TOKEN_NUDGE = 0.3;
-/** A silent run states its length in words only past this many snapshots (a short gap is just a gap). */
-const STRETCH_WORDS_MIN = 200;
 /** The tile mesh's own depth (the BoxGeometry's z, which becomes height under the -90° X spin). */
 const TILE_D = 0.35;
 
@@ -1249,7 +1246,7 @@ export class LedgerView implements SceneView {
       if (!run) continue;
       const x1 = LEAD_X - s * SLOT_SP - ROW_HALF_D - 0.2;
       const x0 = LEAD_X - (s + 1) * SLOT_SP + ROW_HALF_D + 0.2;
-      const label = run.snapshots > STRETCH_WORDS_MIN ? `${run.snapshots.toLocaleString()} snapshots · ${relativeAge(run.ms, true)}` : null;
+      const label = stretchLabel(run.snapshots, run.ms);
       stretches.push({ key: `${older.ordinal}-${newer.ordinal}`, x0, x1, y, label });
     }
     // THE FRONT RUN — the live edge's silence (spec 2: "the silent stretch growing at the front"):
@@ -1261,7 +1258,7 @@ export class LedgerView implements SceneView {
     if (lead && live && live.ordinal > lead.ordinal) {
       const n = live.ordinal - lead.ordinal;
       const ms = Math.max(0, Date.parse(live.timestamp) - Date.parse(lead.timestamp));
-      const label = n > STRETCH_WORDS_MIN ? `${n.toLocaleString()} snapshots · ${relativeAge(ms, true)}` : null;
+      const label = stretchLabel(n, ms);
       stretches.push({ key: `${lead.ordinal}-live`, x0: FRONT_RUN_X0, x1: FRONT_INK_X, y, label, front: true });
     }
     this._stretch.rebuild(stretches);

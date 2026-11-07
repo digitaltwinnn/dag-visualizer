@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { LINK_BEND, LINK_SAMPLES, forkSpread, referenceSegments, sCurve, silentRun } from "./blockBraid";
+import { LINK_BEND, LINK_SAMPLES, STRETCH_WORDS_MIN, forkSpread, referenceSegments, sCurve, silentRun, stretchLabel } from "./blockBraid";
 
 describe("forkSpread — a layered DAG drawing on the chamber's time axis, its forks opening up and down", () => {
   const b = (hash: string, height: number, ord: number, parents: string[] = []) => ({ hash, height, ord, parents });
@@ -43,7 +43,41 @@ describe("forkSpread — a layered DAG drawing on the chamber's time axis, its f
     // down a long chain cannot shrink every fork to a sliver of a lane (found live, D8).
     const z = forkSpread([b("a", 1, 10), b("s1", 2, 11, ["a"]), b("s2", 2, 12, ["a"]), b("c", 3, 13, ["s2", "a"])], 1);
     expect(Number.isInteger(z.get("c"))).toBe(true);
-    expect(z.get("c")).toBe(1);
+    // A half rounds toward the centre line (review N2): the centre and the lane above merge ON it.
+    expect(z.get("c")).toBe(0);
+  });
+  it("rounds a merge SYMMETRICALLY: a merge with the lane above and its mirror below land the same distance from the centre (N2)", () => {
+    // s1 stands below (−1), s2 above (+1). The centre block `a` merges with each in turn.
+    const up = forkSpread([b("a", 1, 10), b("s1", 2, 11, ["a"]), b("s2", 2, 12, ["a"]), b("c", 3, 13, ["s2", "a"])], 1);
+    const down = forkSpread([b("a", 1, 10), b("s1", 2, 11, ["a"]), b("s2", 2, 12, ["a"]), b("c", 3, 13, ["s1", "a"])], 1);
+    expect([up.get("s1"), up.get("s2")]).toEqual([-1, 1]);
+    expect(Math.abs(up.get("c")!)).toBe(Math.abs(down.get("c")!));
+    expect(up.get("c")).toBe(0);
+    expect(down.get("c")).toBe(0);
+    expect(Object.is(down.get("c"), -0)).toBe(false);
+    // Off the centre too: lanes +1 and +2 merge onto +1, and their mirror −1 and −2 onto −1.
+    const far = (lo: number, hi: number) => {
+      const prior = new Map([["p", lo], ["q", hi]]);
+      return forkSpread([b("p", 1, 10), b("q", 1, 11), b("c", 2, 12, ["p", "q"])], 1, prior).get("c");
+    };
+    expect(far(1, 2)).toBe(1);
+    expect(far(-1, -2)).toBe(-1);
+  });
+  it("a long chain merging a side lane, above then below, does not drift off the centre line (N2)", () => {
+    // The main chain m0 → m1 → …; each m_i merges m_(i−1) with a sibling standing a lane ABOVE on odd
+    // steps and a lane BELOW on even ones (seated through `prior`, as a later-read sibling is). Every
+    // merge is a half: the main chain must stay on 0 — `Math.round` lifted it a lane on the first
+    // merge above, and the chain then rode off-centre.
+    const blocks: { hash: string; height: number; ord: number; parents: string[] }[] = [b("m0", 0, 0)];
+    const prior = new Map<string, number>([["m0", 0]]);
+    for (let i = 1; i <= 12; i++) {
+      prior.set(`f${i}`, i % 2 ? 1 : -1);
+      blocks.push(b(`f${i}`, 2 * i - 1, 2 * i - 1, [`m${i - 1}`]));
+      blocks.push(b(`m${i}`, 2 * i, 2 * i, [`m${i - 1}`, `f${i}`]));
+    }
+    const z = forkSpread(blocks, 1, prior);
+    const main = Array.from({ length: 13 }, (_, i) => z.get(`m${i}`)! + 0);
+    expect(main).toEqual(Array(13).fill(0));
   });
   it("waits to place a block while a parent's read is still pending", () => {
     const z = forkSpread([b("c", 3, 13, ["p"])], 1, new Map(), new Set(["p"]));
@@ -67,6 +101,14 @@ describe("referenceSegments — every reference a read states", () => {
     expect(referenceSegments([b("x", ["p1"])], at, -6).pos.length).toBe(0);
   });
 });
+describe("stretchLabel — a silent stretch's words", () => {
+  it("states the run past the floor in the app's one short span, and nothing for a short gap", () => {
+    expect(stretchLabel(1364, 4 * 3_600_000)).toBe("1,364 snapshots · 4h");
+    expect(stretchLabel(STRETCH_WORDS_MIN, 3_600_000)).toBeNull();
+    expect(stretchLabel(STRETCH_WORDS_MIN + 1, 60_000)).toMatch(/^201 snapshots · /);
+  });
+});
+
 describe("silentRun", () => {
   it("states the snapshots and time between two block ticks, and nothing for adjacent ticks", () => {
     expect(silentRun(100, 859, 0, 7_920_000)).toEqual({ snapshots: 758, ms: 7_920_000 });

@@ -593,7 +593,9 @@ the committed block (live or pinned) — layout data, rule 6.
 it?" — the Sugiyama method, held to the chamber's time axis; then "no horizontal space … use the
 height instead"). Along the trail a block stands over its own tick — time, which never moves; its
 FORK SPREAD (`blockBraid.forkSpread`, heights from the lowest up, so parents are placed first) is the
-vertical: a block takes the LATTICE place nearest the mean of its placed parents' places (a pure
+vertical: a block takes the LATTICE place nearest the mean of its placed parents' places, a half
+rounding TOWARD the centre line so a merge above and its mirror below land alike and the main
+chain never drifts off its line (review N2) (a pure
 mean decays every fork into a sliver of a lane down a long chain, and the trail read flat — found
 live), and blocks of one height sharing that place split symmetrically around it, one unit above
 and one below for a pair. So the main chain is a straight line, a fork opens into a diamond and
@@ -652,7 +654,7 @@ endpoints from the same `referenceSegments` walk), dissolve by zero-scale, and d
 their slot's entry beat. Links are one `LineSegments`, positions at event time, alpha per vertex per
 frame, `glowBlend` on each ground. The silent stretch is one dashed `LineSegments` flush in the floor
 between two rows' bars, plus a flat edge label ("1,364 snapshots · 4h", `relativeAge` — the app's one
-short span) past 200 snapshots; flat, not a billboard, because the floor's text is flat everywhere.
+short span) past 200 snapshots (`blockBraid.stretchLabel`, the one home for both stretches' words); flat, not a billboard, because the floor's text is flat everywhere.
 **The live edge is the silent stretch growing at the front** (spec 2): in the LIVE window one more
 stretch, the FRONT RUN, stands ahead of the lead row's bar (`FRONT_RUN_X0` to `FRONT_INK_X`) for the
 globals since the newest block tick up to the live global, worded by the same rule. The Engine hands

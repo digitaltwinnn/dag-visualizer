@@ -1,3 +1,4 @@
+import { relativeAge } from "@/src/util/relativeAge";
 // The block braid's arithmetic: pure rules for the Blocks register of the Snapshots view.
 //
 // Two rules, in plain words:
@@ -51,6 +52,15 @@ export interface BlockTransfer {
  *    pair — and where siblings already stand there, each new one takes the nearest free place
  *    (0, +1, −1, +2, … spacings), in tick order (hash on a tie).
  */
+/** The lattice place nearest `m`, a half rounding TOWARD THE CENTRE LINE (review N2): `Math.round`
+ *  sends +0.5 up to 1 but −0.5 up to 0, so a merge with the lane above rose off the centre while
+ *  its mirror returned to it, and the braid drifted upward. Toward zero, a merge with either
+ *  neighbour of the centre lands back on it, and every merge lands the same distance from the centre
+ *  as its mirror. `+ 0` turns a −0 into 0. */
+function latticeOf(m: number): number {
+  return Math.sign(m) * Math.ceil(Math.abs(m) - 0.5) + 0;
+}
+
 export function forkSpread(
   blocks: readonly { hash: string; height: number; ord: number; parents: readonly string[] }[],
   spacing: number,
@@ -79,7 +89,7 @@ export function forkSpread(
       }
       // The LATTICE place nearest the parents' mean: a pure mean decays every fork into a sliver of a
       // lane down a long chain (each block averages two branches), so the trail read flat (D8).
-      const bary = n ? Math.round(sum / n) + 0 : 0;
+      const bary = n ? latticeOf(sum / n) : 0;
       const key = bary.toFixed(6);
       (groups.get(key) ?? groups.set(key, { bary, list: [] }).get(key)!).list.push(b);
     }
@@ -179,4 +189,13 @@ export function sCurve(
 export function silentRun(prevOrd: number, ord: number, prevTs: number, ts: number): { snapshots: number; ms: number } | null {
   if (ord - prevOrd <= 1) return null;
   return { snapshots: ord - prevOrd - 1, ms: ts - prevTs };
+}
+
+/** A silent run states its length in words only past this many snapshots (a short gap is just a gap). */
+export const STRETCH_WORDS_MIN = 200;
+/** A silent stretch's flat label — "1,364 snapshots · 4h", the app's one short span (`relativeAge`)
+ *  — or null for a run too short to word. ONE home for the between-ticks stretch and the front run
+ *  (the live edge's silence), which the chamber wrote twice. */
+export function stretchLabel(snapshots: number, ms: number): string | null {
+  return snapshots > STRETCH_WORDS_MIN ? `${snapshots.toLocaleString()} snapshots · ${relativeAge(ms, true)}` : null;
 }
