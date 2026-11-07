@@ -8,7 +8,7 @@ import { reportPoll } from "@/src/data/api";
 import { getBlockWindow, onBlockWindow, pastRetryDelay, setBlockWindow } from "@/src/data/pastWindow";
 import { frontierAdvances, frontierChains, frontierKey, unstampedFrontiers } from "@/src/data/blockReads";
 import type { TipRead } from "@/src/engine/domain/blockBraid";
-import { BLOCK_WINDOW_TICKS, blockWanted, foldBlockWindow, mergeLiveAnswer, type BlockWindowAnswer } from "@/src/data/blockWindow";
+import { BLOCK_WINDOW_TICKS, blockWanted, foldBlockWindow, liveWindowRuns, mergeLiveAnswer, type BlockWindowAnswer } from "@/src/data/blockWindow";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 
@@ -18,9 +18,12 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 // reads, and holds the window in the module beside `NetworkData` (`pastWindow.ts`). A failed read is
 // tried again on `pastRetryDelay`'s schedule; once spent, or when the pin lies beyond the trail's
 // reach, the held window is CLEARED (the chamber never shows a window that does not hold the pin)
-// and `blockWindowStatus` says why; the feed's health row (`api-blocks`) tracks the reads. Following the live edge, it refreshes the live trail
-// every `LIVE_REFRESH_MS` and adds a tick the live feed has announced at once (its blocks are on the
-// global record), leaving its anchored records for the next refresh.
+// and `blockWindowStatus` says why; the feed's health row (`api-blocks`) tracks the reads. While the
+// live window is held (`liveWindowRuns`: following, touring, or a pin the held LIVE window covers —
+// the band is the live instrument, so a click inside the live window never freezes it), it
+// refreshes the live trail every `LIVE_REFRESH_MS` and adds a tick the live feed has announced at
+// once (its blocks are on the global record), leaving its anchored records for the next refresh. A
+// pin outside it is a past window, which holds still.
 //
 // THE FRONTIER READS (`${chain}:frontier` in `blockReads`, `src/data/blockReads.ts`): the tips of each
 // chain's NEWEST snapshot, with that snapshot's stamp (`ts`), which OPEN TIPS, FRONTIER AGE and the
@@ -145,10 +148,21 @@ export default function BlockWindowBridge() {
     if (answer.current && getBlockWindow()) setBlockWindow(foldBlockWindow(answer.current, exact));
   }, [exact]);
 
-  // The live edge: a fresh trail every 30 s while following it.
+  // Is the held window the live one, still moving (`liveWindowRuns`)? Asked of the refs and the
+  // module's window at the moment, so the interval and the append re-ask it rather than closing over it.
+  const liveRuns = () => {
+    const held = getBlockWindow();
+    return liveWindowRuns({ liveWanted, touring, following, pin, held: held ? { from: held.from, to: held.to } : null, heldLive: asked.current === "live" });
+  };
+
+  // The live edge: a fresh trail every 30 s while the live window is held — under a pin inside it too.
   useEffect(() => {
-    if (!liveWanted || (!touring && !following) || pin != null) return;
-    const id = window.setInterval(() => read(null, ++gen.current, 0), LIVE_REFRESH_MS);
+    if (!liveRuns()) return;
+    const id = window.setInterval(() => {
+      // A pin the window has since let go of (it aged out, or a pinned fetch replaced the window).
+      if (asked.current !== "live") return;
+      read(null, ++gen.current, 0);
+    }, LIVE_REFRESH_MS);
     return () => window.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveWanted, touring, following, pin]);
@@ -218,7 +232,7 @@ export default function BlockWindowBridge() {
   // come with the next refresh.
   useEffect(() => {
     const a = answer.current;
-    if (!a || !liveTip || !liveWanted || (!touring && !following) || pin != null) return;
+    if (!a || !liveTip || !liveRuns()) return;
     const hashes = (liveTip.blocks ?? []).filter((b): b is string => typeof b === "string");
     if (!hashes.length || a.ticks.some((t) => t.ord === liveTip.ordinal)) return;
     if (a.ticks.length && liveTip.ordinal < a.ticks[0]!.ord) return;

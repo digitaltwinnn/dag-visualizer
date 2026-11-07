@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BLOCK_WINDOW_TICKS, blockWanted, blockWindowContinues, foldBlockWindow, mergeLiveAnswer, windowBlocks } from "@/src/data/blockWindow";
+import { BLOCK_WINDOW_TICKS, blockWanted, blockWindowContinues, foldBlockWindow, liveWindowRuns, mergeLiveAnswer, windowBlocks } from "@/src/data/blockWindow";
 import type { RawMetaSnapshot, SnapshotExact } from "@/src/data/types";
 
 describe("foldBlockWindow", () => {
@@ -103,5 +103,33 @@ describe("mergeLiveAnswer", () => {
     const a = ans(105, 104);
     expect(mergeLiveAnswer(null, a)).toBe(a);
     expect(mergeLiveAnswer(ans(104, 103), a)).toBe(a);
+  });
+});
+
+describe("liveWindowRuns", () => {
+  const base = { liveWanted: true, touring: false, following: true, pin: null as number | null, held: { from: 400, to: 900 } as { from: number; to: number } | null, heldLive: true };
+  it("keeps the live refresh and append running while following, and while the tour reads ahead", () => {
+    expect(liveWindowRuns(base)).toBe(true);
+    expect(liveWindowRuns({ ...base, following: false, touring: true })).toBe(true);
+  });
+  it("keeps them running under a pin the held LIVE window covers — the band is the live instrument", () => {
+    expect(liveWindowRuns({ ...base, following: false, pin: 500 })).toBe(true);
+    expect(liveWindowRuns({ ...base, following: false, pin: 900 })).toBe(true);
+  });
+  it("stops them for a pin outside the window, or a held window that is a pin's own (a past window)", () => {
+    expect(liveWindowRuns({ ...base, following: false, pin: 50 })).toBe(false);
+    expect(liveWindowRuns({ ...base, following: false, pin: 500, heldLive: false })).toBe(false);
+    expect(liveWindowRuns({ ...base, following: false, pin: 500, held: null })).toBe(false);
+  });
+  it("stops them outside the register, and with neither a follow nor a pin", () => {
+    expect(liveWindowRuns({ ...base, liveWanted: false })).toBe(false);
+    expect(liveWindowRuns({ ...base, following: false })).toBe(false);
+  });
+  it("a pin inside the live window agrees with blockWanted's keep, so the merge refresh is what moves it", () => {
+    expect(blockWanted({ ledger: true, register: "blocks", pin: 500, held: base.held, liveNewest: 950 })).toEqual({ kind: "keep" });
+    // …and the 30 s refresh it keeps running merges forward, never dropping the newer held ticks.
+    const tick = (ord: number) => ({ ord, ts: "t", hash: "h" + ord, blocks: ["b"], metaSnaps: {} });
+    const held = { ticks: [tick(905), tick(900), tick(500)], chains: [] };
+    expect(mergeLiveAnswer(held, { ticks: [tick(910), tick(900), tick(500)], chains: [] }).ticks.map((t) => t.ord)).toEqual([910, 900, 500]);
   });
 });

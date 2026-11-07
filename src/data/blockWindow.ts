@@ -130,6 +130,26 @@ export function blockWanted(s: {
   return { kind: "fetch", around: s.pin };
 }
 
+/** DOES THE LIVE WINDOW KEEP MOVING — the bridge's 30 s refresh (`mergeLiveAnswer`) and its
+ *  live-tip append? While the register (or the tour) wants the live window: following, touring, or
+ *  under a pin the held LIVE window covers (`heldLive`: the window held was asked for as "live",
+ *  and `blockWanted` keeps it for that pin). The band is the live instrument, so a block or tick
+ *  clicked inside the live window never freezes it (the Snapshots register's own rule: a pin never
+ *  freezes the band). A pin outside it is a past window (`blockWanted` fetches around the pin), and
+ *  that window holds still. */
+export function liveWindowRuns(s: {
+  liveWanted: boolean;
+  touring: boolean;
+  following: boolean;
+  pin: number | null;
+  held: { from: number; to: number } | null;
+  heldLive: boolean;
+}): boolean {
+  if (!s.liveWanted) return false;
+  if (s.touring || s.following) return true;
+  return s.pin != null && s.heldLive && s.held != null && s.pin >= s.held.from && s.pin <= s.held.to;
+}
+
 /** Does `w` CONTINUE the window whose newest tick was `prevTo`, so the chamber advances its trail
  *  rather than re-seeding it? Only when it still holds that tick and has at most one newer: the
  *  chamber's model slides one slot per new lead, exactly as the live buffer gains a tick. Any other
