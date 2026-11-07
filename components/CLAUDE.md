@@ -1185,7 +1185,8 @@ CARD's body opens with the register's section too** (user: "work on the global s
 `inspector/SnapshotRegister.tsx` (the design round's picks, data 1 / transaction 1) —
 `BlocksAnchored` in Transaction blocks: "Accepted N blocks" and THE BLOCKS THEMSELVES as rows
 (the explorer's block row: ticker in its hue, short hash, amount moved — a dash until the read
-lands), each a door that commits the block (`blockSelectActions`, its snapshot too); `DataAnchored`
+lands) — READINGS, not doors, like every breakdown row (user: the block rows were "clickable /
+colored" where the others are not), the committed block highlighted in place in its hue; `DataAnchored`
 in Data blocks: "Carried N data blocks with M updates" and a DATA UPDATES breakdown by network
 (`AnchoredTags.BreakdownRows`, the one breakdown-table row; a network with none left out) — else
 `AnchoredTags`. The explorer keeps every Snapshots level and its measure set is **Data updates · Fees · Metagraphs ·

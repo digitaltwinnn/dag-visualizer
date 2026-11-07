@@ -5,19 +5,15 @@ import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { ledgerNetwork } from "@/src/engine/domain/tickNet";
 import { carriesData } from "@/src/engine/domain/dataMark";
-import { blockSelectActions, globalPick, tickContextOf } from "@/src/engine/domain/pickActions";
-import { applyClickActions } from "@/src/store/applyClickActions";
 import { metagraphById } from "@/src/data/network";
 import { dataUpdatesOf } from "@/src/data/ledgerMeasure";
 import { blockReadOf } from "@/src/data/blockReads";
-import { blockMetaSnap } from "@/src/data/blockWindow";
 import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
 import { UNLISTED_ID } from "@/src/data/unlisted";
 import { identityHudCss } from "@/src/palette/identity";
 import { shortBlockHash } from "@/src/util/format";
 import { blockMeasureText } from "@/src/data/blockMeasure";
 import { useFeedRead } from "@/components/useFeedRead";
-import { subjectPairing } from "@/components/useSubjectPairing";
 import { tickerOf } from "@/components/explorer/nodeRow";
 import { IDENT_INK } from "@/components/identInk";
 import { BreakdownRows } from "@/components/inspector/AnchoredTags";
@@ -30,7 +26,10 @@ import { Separator } from "@/components/ui/separator";
 // register's subject, as its scene label does:
 //  · Transaction blocks — THE BLOCKS THEMSELVES, one row each (the explorer's block row: the chain's
 //    ticker in its hue, the short hash, how much it moved — a dash until its read lands), newest
-//    first; a row is the block's door, the same commit the explorer's row makes.
+//    first. THE ROWS ARE READINGS, NOT DOORS (user, 2026-11-07: "blocks is designed as a clickable /
+//    colored row while in the other variations it's not" — the anchored breakdown's 2026-10-03 rule:
+//    the row says what was accepted, the Block card one rung down says the rest); the committed
+//    block is highlighted in place in its chain's hue, as the resolved network is in the breakdown.
 //  · Data blocks — the DATA UPDATES by network, the breakdown table's rows (one square per update
 //    while countable); the data-block count is a fact of the whole tick and lives in the lead
 //    ("Carried 10 data blocks with 23 updates"). A network that carried none is left out (the
@@ -39,16 +38,13 @@ import { Separator } from "@/components/ui/separator";
 // tick the window does not hold, or whose exact read has not landed, says so in the lead and lists
 // nothing.
 
-/** Transaction blocks: the tick's blocks, each a row and a door. */
+/** Transaction blocks: the tick's blocks, one reading per row. */
 export function BlocksAnchored({ ordinal }: { ordinal: number }) {
   useFeedRead(["api-blocks"], "BlocksAnchored");
   const w = useSyncExternalStore(onBlockWindow, getBlockWindow, () => null);
   const reads = useStore((s) => s.blockReads);
   const block = useStore((s) => s.block);
-  const hoverBlock = useStore((s) => s.hoverBlock);
-  const setHoverBlock = useStore((s) => s.setHoverBlock);
   const t = w?.blockTick(ordinal) ?? null;
-  const g = w?.globalSnapshots.find((x) => x.ordinal === ordinal) ?? null;
   const rows: { chain: string; hash: string; ordinal: number }[] = [];
   for (const hash of t?.blocks ?? []) rows.push({ chain: "dag", hash, ordinal });
   for (const [chain, snaps] of Object.entries(t?.metaSnaps ?? {})) {
@@ -70,30 +66,17 @@ export function BlocksAnchored({ ordinal }: { ordinal: number }) {
             {rows.map((b, i) => {
               const hue = identityHudCss(b.chain);
               const on = !!block && block.chain === b.chain && block.hash === b.hash;
-              const sel = { chain: b.chain, hash: b.hash, ordinal: b.ordinal, anchorOrd: ordinal };
-              const pair = subjectPairing(hoverBlock, b.hash, setHoverBlock, hue);
               return (
-                <button
+                // The breakdown row's wash and overhang (`BreakdownRows`), for the committed block.
+                <div
                   key={`${b.chain}:${b.hash}`}
-                  type="button"
-                  aria-pressed={on}
-                  // THE ROW IS THE BLOCK'S DOOR: the explorer's own commit, the block last so its card is the box.
-                  onClick={() => {
-                    if (!g) return;
-                    applyClickActions(blockSelectActions(sel, globalPick(g), tickContextOf(useStore.getState()), blockMetaSnap(w, sel)));
-                  }}
-                  className={cn(CUT_ROW, "w-[calc(100%+12px)] -mx-1.5 px-1.5 py-[3px] rounded-sm text-left cursor-pointer border-0 bg-transparent hover:bg-wash-soft", pair.className)}
-                  style={{ ...(on ? ({ background: `color-mix(in oklch, ${hue} 16%, transparent)` } as const) : {}), ...pair.style }}
-                  onMouseEnter={pair.onMouseEnter}
-                  onMouseMove={pair.onMouseMove}
-                  onMouseLeave={pair.onMouseLeave}
-                  onFocus={pair.onFocus}
-                  onBlur={pair.onBlur}
+                  className={cn(CUT_ROW, "w-[calc(100%+12px)] -mx-1.5 px-1.5 py-[3px] rounded-sm")}
+                  style={on ? ({ background: `color-mix(in oklch, ${hue} 16%, transparent)` } as const) : undefined}
                 >
-                  <span className={cn("min-w-0 truncate font-semibold", IDENT_INK)} style={{ color: hue }}>{tickerOf(b.chain)}</span>
+                  <span className={cn("min-w-0 truncate", IDENT_INK, on ? "font-semibold" : "text-foreground-dim")} style={on ? { color: hue } : undefined}>{tickerOf(b.chain)}</span>
                   <span className={cn("min-w-0 truncate font-mono tabular-nums text-right", on ? "text-foreground" : "text-foreground-dim")}>{shortBlockHash(b.hash)}</span>
                   <span className={cn("font-mono tabular-nums text-right", figures[i] === "—" ? "text-muted-foreground" : "text-foreground")}>{figures[i]}</span>
-                </button>
+                </div>
               );
             })}
           </div>
