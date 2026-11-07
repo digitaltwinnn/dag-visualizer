@@ -120,6 +120,12 @@ describe("movedInWindow — MOVED, the sum of the window's transfer amounts", ()
   it("is 0 for a window holding none of the chain's blocks", () => {
     expect(movedInWindow(ticks, reads, "DED")).toEqual({ amount: 0, read: 0, total: 0 });
   });
+  it("sums the read's own `amount` (the decoder's transfer sum) — a read cached before `transfers` was carried still counts (M4)", () => {
+    const old = { ...read("a", []), amount: 40, transfers: undefined } as unknown as BlockRead;
+    const r = { [blockReadKey("dag", 3)]: { blocks: [old] } };
+    expect(movedInWindow([tick(3, 10, ["a"])], r, "dag")).toEqual({ amount: 40, read: 1, total: 1 });
+    expect(movedPerHourBins([tick(3, 10, ["a"])], r, NOW, "dag")).toEqual([40]);
+  });
 });
 
 describe("movedPerHourBins — the MOVED sparkline", () => {

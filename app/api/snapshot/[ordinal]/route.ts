@@ -5,7 +5,7 @@ import { lineageIds } from "@/src/net/lineage";
 import { netOf } from "@/src/net/request";
 import type { SnapshotExact, ChannelSnapRow } from "@/src/data/types";
 import { decodeBlocks, pairHashes, recordBlockHashes } from "../decodeBlocks";
-import { exactRowOf, type StateChannelSnap } from "../exactRow";
+import { dataUpdatesOf, exactRowOf, type StateChannelSnap } from "../exactRow";
 import { fetchGlobalJson } from "../fetchGlobal";
 import { withinServedWindow } from "../ordinalWindow";
 
@@ -66,17 +66,17 @@ async function fetchExact(net: NetworkId, ordinal: number): Promise<SnapshotExac
     const listed = LISTED.has(addr);
     let count = 0,
       fee = 0,
-      metaBytes = 0,
-      dataTx = 0;
+      metaBytes = 0;
+    const own: ChannelSnapRow[] = [];
     for (const s of snaps) {
       // The row (`exactRow.ts`): the fee, the byte length anchored, the decoded facts and the data
       // updates its data blocks carry.
       const row = await exactRowOf(addr, s);
       rows.push(row);
+      own.push(row);
       count++;
       fee += row.fee;
       metaBytes += row.bytes;
-      dataTx += row.dataTxCount ?? 0;
       totalBytes += row.bytes;
       anchored++;
       totalFee += row.fee;
@@ -85,8 +85,10 @@ async function fetchExact(net: NetworkId, ordinal: number): Promise<SnapshotExac
     }
     // Per-metagraph size (bytes) alongside count + fee — the snapshot card reveals it as KB on the
     // selected/expanded row. Measured from content byte length, same as the total (not fee-derived).
-    // `dataTxCount`: its snapshots' data updates summed (a snapshot it could not decode adds none).
-    perMeta[addr] = { count, fee, bytes: metaBytes, dataTxCount: dataTx };
+    // `dataTxCount`: its snapshots' data updates summed — absent (unknown, never zero) when any of
+    // them could not be decoded (`dataUpdatesOf`).
+    const dataTx = dataUpdatesOf(own);
+    perMeta[addr] = { count, fee, bytes: metaBytes, ...(dataTx != null ? { dataTxCount: dataTx } : {}) };
     if (listed) listedCount += count;
     else unlistedCount += count;
   }

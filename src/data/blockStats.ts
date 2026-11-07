@@ -119,8 +119,6 @@ function chainBlocks(t: BlockTick, chain: string): { hash: string; ordinal: numb
   return out;
 }
 
-const transferSum = (b: BlockRead) => b.transfers.reduce((s, x) => s + x.amount, 0);
-
 type Reads = Readonly<Record<string, { blocks: readonly BlockRead[] } | undefined>>;
 
 /** MOVED: the sum of the transfer amounts of `chain`'s blocks in the window, from LANDED reads only
@@ -137,7 +135,7 @@ export function movedInWindow(ticks: readonly BlockTick[], reads: Reads, chain: 
       const r = blockReadOf(reads, { chain, ...b });
       if (!r) continue;
       read++;
-      amount += transferSum(r);
+      amount += r.amount;
     }
   }
   return { amount: total > 0 && read === 0 ? null : amount, read, total };
@@ -156,7 +154,7 @@ export function movedPerHourBins(ticks: readonly BlockTick[], reads: Reads, endM
     for (const b of chainBlocks(t, chain)) {
       const r = blockReadOf(reads, { chain, ...b });
       if (!r) out[i] = null;
-      else if (out[i] != null) out[i] = out[i]! + transferSum(r);
+      else if (out[i] != null) out[i] = out[i]! + r.amount;
     }
   }
   gapBeyondReach(out, ticks, endMs, f.oldest, scope);

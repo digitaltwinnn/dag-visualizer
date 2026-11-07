@@ -293,6 +293,16 @@ describe("wholeMean", () => {
     expect(wholeMean("x", 5.4).text).toBe("5");
     expect(wholeMean("x", 7).text).toBe("7");
   });
+  it("states a mean below one half as under 1, never about 0 — something did anchor (M6)", () => {
+    const quiet = wholeMean("Metagraph snapshots anchored per global snapshot, recent", 0.3);
+    expect(quiet.label).toBe("Metagraph snapshots anchored per global snapshot, recent, under");
+    expect(quiet.value).toBe(1);
+    expect(quiet.text).toBe("1");
+    expect(checkNote("Each global snapshot anchored under 1 metagraph snapshot.", [quiet], []).ok).toBe(true);
+    // None at all is a plain zero, and one half up rounds as before.
+    expect(wholeMean("x", 0)).toMatchObject({ label: "x", value: 0 });
+    expect(wholeMean("x", 0.5)).toMatchObject({ label: "x, about", value: 1 });
+  });
   it("lets the gate accept the house-style note", () => {
     const f = wholeMean("Metagraph snapshots anchored per global snapshot, recent", 5.9);
     expect(checkNote("Each global snapshot anchored about 6 metagraph snapshots.", [f], []).ok).toBe(true);

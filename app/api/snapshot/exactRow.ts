@@ -34,3 +34,16 @@ export async function exactRowOf(metaId: string, s: StateChannelSnap | null | un
     ...(decoded ? { dataTxCount: decoded.dataTxCount, dataBlocks: decoded.dataBlocks } : {}),
   };
 }
+
+/** ONE NETWORK'S DATA UPDATES IN A TICK — its rows' `dataTxCount` summed, or UNKNOWN (undefined) when
+ *  any of its rows could not be decoded: a sum that counted an unreadable payload as none would state
+ *  a zero (or a total) the payload never gave (rule 10, review M5). The row level already leaves the
+ *  count off an undecodable payload; the network level says the same. */
+export function dataUpdatesOf(rows: readonly Pick<ChannelSnapRow, "dataTxCount">[]): number | undefined {
+  let n = 0;
+  for (const r of rows) {
+    if (r.dataTxCount == null) return undefined;
+    n += r.dataTxCount;
+  }
+  return n;
+}

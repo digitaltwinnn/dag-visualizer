@@ -79,8 +79,13 @@ export function fact(
 /** AN AVERAGE OF WHOLE THINGS is stated rounded, as "about N" (user, 2026-11-07: "5.9 metagraphs, they
  *  can not have decimals"). A count of snapshots, networks or nodes averaged over buckets has a
  *  fractional mean no reader can picture, so the fact carries the whole number and ", about" in its
- *  label. A continuous average (a duration, a fee, data) keeps its precision and does not come here. */
+ *  label. A continuous average (a duration, a fee, data) keeps its precision and does not come here.
+ *  Below one half it is "under 1" (", under" in the label, value 1), never "about 0"; none is 0. */
 export function wholeMean(label: string, mean: number, pair?: FactPair): Fact {
+  // A quiet stretch (testnet, a lull) averages below one half: rounded it would be "about 0" while
+  // things did happen, so the fact says "under 1" (review M6). None at all is a plain 0.
+  if (mean > 0 && mean < 0.5) return fact(`${label}, under`, 1, "count", undefined, pair);
+  if (mean === 0) return fact(label, 0, "count", undefined, pair);
   return fact(`${label}, about`, Math.round(mean), "count", undefined, pair);
 }
 
