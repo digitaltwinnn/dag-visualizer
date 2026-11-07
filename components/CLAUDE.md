@@ -1132,7 +1132,7 @@ claim LIVE, says "no signal". **Its callout is the BLOCK's** (user: "no snapshot
 callout"): one label on the Block card's subject, in its head's grammar (mark, short hash — `shortBlockHash`, `src/util/format.ts`, the ONE short form a block hash takes in the card's head, the callout, the explorer's and RAW's rows — height chip,
 live / pinned, then `blockLead`'s SHORT form — how much moved, no from/to; user, 2026-11-07), anchored at the block's place in the chamber
 (`LedgerView.selectedBlockAnchor`, layout data plus the rewind offset); `#callout-2` stands down. In Blocks the explorer lists the window's blocks, and the
-Block card (`inspector/BlockPane.tsx`) stands under its tick: a card slot with NO rung, between the
+Block card (`inspector/BlockPane.tsx`; its eyebrow, ghost, callout and pick title say "Transaction block" — user, 2026-11-07) stands under its tick: a card slot with NO rung, between the
 metagraph snapshot and the node in the ledger's lane (`DISPLAY_LANE`), present only in the Blocks
 register and only under the tick that accepted it (`parentHolds`), its ghost hint "one on a bar or a
 tile". The snapshot's child step passes over it (`railLadderBoundary.test.ts`'s `PASSES_OVER`): a

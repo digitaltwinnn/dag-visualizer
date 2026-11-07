@@ -73,7 +73,7 @@ export default function BlockPane({ onClose, collapsed, onToggle }: { onClose: (
       onBlur={pair.onBlur}
     >
       <CardHead
-        eyebrow="Block"
+        eyebrow="Transaction block"
         title={
           // `max-w-full`: an inline-flex title is not held to the h3's width by `min-w-0` alone, so
           // a hash wider than the row's share ran under the height chip (measured at 1600: the

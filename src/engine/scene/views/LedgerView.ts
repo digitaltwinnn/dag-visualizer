@@ -1232,7 +1232,7 @@ export class LedgerView implements SceneView {
         const z = 0;
         const x = LEAD_X - s * SLOT_SP + turn(`${s}|dag|${y.toFixed(3)}`) * BLOCK_STEP;
         push("dag", "dag", hash, s, x, y, z, DAG_BLOCK, this._core, {
-          kind: "block", sel: { chain: "dag", hash, ordinal: t.ord, anchorOrd: t.ord }, global, title: "Block",
+          kind: "block", sel: { chain: "dag", hash, ordinal: t.ord, anchorOrd: t.ord }, global, title: "Transaction block",
         });
         // The hairline lands on the CENTRE of its tick's data bar (user, D2), on the same eased sweep
         // the metagraph snapshots' lines take — layout data, the bar spec's own band extent.
@@ -1265,7 +1265,7 @@ export class LedgerView implements SceneView {
             const y = tile.y + TOKEN_BRAID_LIFT + Math.max(-TOKEN_BRAID_HALF, Math.min(TOKEN_BRAID_HALF, f * tokenBraid));
             const x = tile.x + turn(`${s}|${chain}|${y.toFixed(3)}`) * TOKEN_STEP;
             push("token", chain, hash, s, x, y, tile.z, TOKEN_BLOCK, hue, {
-              kind: "block", sel: { chain, hash, ordinal: r.ordinal, anchorOrd: t.ord }, global, title: "Block",
+              kind: "block", sel: { chain, hash, ordinal: r.ordinal, anchorOrd: t.ord }, global, title: "Transaction block",
               // The snapshot that accepted it, committed with the block (`blockSelectActions`' `snapOf`).
               snap: { metaId: chain, ordinal: r.ordinal, hash: r.hash, globalOrdinal: t.ord, ts: t.ts },
             });

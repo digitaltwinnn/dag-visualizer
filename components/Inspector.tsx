@@ -301,7 +301,7 @@ function CompositionPane({ sel, onClose, collapsed, onToggle }: { sel: Compositi
 // same single source of truth the dock trays read.
 const GHOST_EYEBROW: Record<string, string> = {
   context: "Metagraph", country: "Country", cohort: "Provider", composition: "Composition", node: "Node", snap: "Global snapshot",
-  metaSnap: "Metagraph snapshot", block: "Block", dataBlock: "Data block", range: "Range", instant: "Moment",
+  metaSnap: "Metagraph snapshot", block: "Transaction block", dataBlock: "Data block", range: "Range", instant: "Moment",
 };
 /** An EMPTY RUNG, drawn as a card like every other (user, 2026-10-04 — option A of
  *  `docs/superpowers/design/2026-10-04-ghost-cards`, with "like any other card it can be expanded

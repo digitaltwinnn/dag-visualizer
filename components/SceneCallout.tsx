@@ -562,7 +562,7 @@ export default function SceneCallout() {
         // The live-lane key rule (msModel above): while following the subject is THE LIVE BLOCK, so a
         // newer block re-points the label rather than replaying its entrance; a pin is a new subject.
         key: following ? "blk|live" : `blk|${block.chain}:${block.hash}`,
-        eyebrow: "Block",
+        eyebrow: "Transaction block",
         title: shortBlockHash(block.hash),
         titleMono: true,
         aside: following
