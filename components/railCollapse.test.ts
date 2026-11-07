@@ -242,12 +242,12 @@ describe("displayOrder", () => {
   });
   it("closes a gap in the stack", () => {
     const lane = ladderSlotIds("ledger");
-    expect(displayOrder(lane, present(["notes", "snap", "node"]), ["context"])).toEqual(["notes", "snap", "node", "context", "metaSnap", "block"]);
+    expect(displayOrder(lane, present(["notes", "snap", "node"]), ["context"])).toEqual(["notes", "snap", "node", "context", "metaSnap", "block", "dataBlock"]);
   });
   it("the next step never passes another step ghost: the Block ghost keeps its place above the node, and under the snapshot", () => {
     const lane = ladderSlotIds("ledger");
-    expect(displayOrder(lane, present(["notes", "snap", "context", "metaSnap"]), ["node", "block"])).toEqual(["notes", "snap", "context", "metaSnap", "block", "node"]);
-    expect(displayOrder(lane, present(["notes", "snap"]), ["context", "block"])).toEqual(["notes", "snap", "context", "metaSnap", "block", "node"]);
+    expect(displayOrder(lane, present(["notes", "snap", "context", "metaSnap"]), ["node", "block"])).toEqual(["notes", "snap", "context", "metaSnap", "block", "node", "dataBlock"]);
+    expect(displayOrder(lane, present(["notes", "snap"]), ["context", "block"])).toEqual(["notes", "snap", "context", "metaSnap", "block", "dataBlock", "node"]);
   });
   it("is the lane itself with nothing chosen, and with everything", () => {
     expect(displayOrder(geo, present([]), [])).toEqual(geo);

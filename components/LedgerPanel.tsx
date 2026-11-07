@@ -738,7 +738,15 @@ export default function LedgerPanel() {
             {tickerOf(b.chain)}
           </span>
         ),
-        name: shortBlockHash(b.hash),
+        // THE LIVE / PINNED MARK rides the committed block's row, as it rides the committed tick's in
+        // the snapshot registers (user, 2026-11-07: "'live' is fine in the header but is not shown
+        // in the explorer, should be shown there also") — `followMark`, the one mark.
+        name: (
+          <span className="flex items-center tabular-nums">
+            {shortBlockHash(b.hash)}
+            {on && <span className="flex-1 flex justify-center">{followMark}</span>}
+          </span>
+        ),
         nameMono: true,
         share: v != null ? v / maxBlock : undefined,
         hue,

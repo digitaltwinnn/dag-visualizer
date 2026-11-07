@@ -90,7 +90,9 @@ const PASSES_OVER: Partial<Record<string, Partial<Record<string, readonly string
   // The Blocks register's BLOCK (2026-11-05) stands under the metagraph snapshot in the lane, but a
   // snapshot's children are its signers: the block is a sibling subject of the tick, not a child of
   // the snapshot, and in the Snapshots register — where the signers step lives — it holds no slot.
-  ledger: { metaSnap: ["block"] },
+  // …and the Data blocks register's DATA BLOCK (2026-11-07) the same way: carried inside the
+  // snapshot, a subject of its own, not the snapshot's child rung (its ghost has its own step).
+  ledger: { metaSnap: ["block", "dataBlock"] },
 };
 
 describe("child steps descend exactly one rung of the lane", () => {

@@ -33,6 +33,6 @@ export async function exactRowOf(metaId: string, s: StateChannelSnap | null | un
     stateBytes: decoded?.stateBytes ?? 0,
     stateProof: decoded?.stateProof ?? null,
     dataBytes: decoded?.dataBytes ?? 0,
-    ...(decoded ? { dataTxCount: decoded.dataTxCount, dataBlocks: decoded.dataBlocks, stateKeys: decoded.stateKeys, dataBlockSigners: decoded.dataBlockSigners } : {}),
+    ...(decoded ? { dataTxCount: decoded.dataTxCount, dataBlocks: decoded.dataBlocks, stateKeys: decoded.stateKeys, dataBlockSigners: decoded.dataBlockSigners, dataBlockRows: decoded.dataBlockRows } : {}),
   };
 }

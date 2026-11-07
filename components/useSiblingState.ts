@@ -28,7 +28,7 @@ export function useSiblingState(slot: RailCardKind | null): SiblingState {
   // snapshot chain steps the global window, the metagraph snapshot its tick's reads, the place
   // and node rungs the located fleet.
   useFeedRead(["global", "metasnaps", "exact"], "Card pager", slot === "snap");
-  useFeedRead(["metasnaps", "exact"], "Card pager", slot === "metaSnap");
+  useFeedRead(["metasnaps", "exact"], "Card pager", slot === "metaSnap" || slot === "dataBlock");
   // The Block ghost's step reads the tick's blocks off the window (`tickBlocks`).
   useFeedRead(["api-blocks"], "Block ghost step", slot === "snap");
   useFeedRead(["clusters", "api-metagraphs", "api-geo"], "Card pager", slot === "context" || slot === "country" || slot === "cohort" || slot === "composition" || slot === "node");
@@ -41,6 +41,7 @@ export function useSiblingState(slot: RailCardKind | null): SiblingState {
   const snap = useStore((s) => s.snap);
   const metaSnap = useStore((s) => s.metaSnap);
   const block = useStore((s) => s.block);
+  const dataBlock = useStore((s) => s.dataBlock);
   const tickNet = useStore((s) => s.tickNet);
   const railNet = useStore((s) => s.railNet);
   const selNodes = useStore((s) => s.selNodes);
@@ -113,6 +114,7 @@ export function useSiblingState(slot: RailCardKind | null): SiblingState {
       railNet,
       metaSnap,
       block,
+      dataBlock,
       tickBlocks,
       selNodes,
       metaList,
@@ -134,5 +136,5 @@ export function useSiblingState(slot: RailCardKind | null): SiblingState {
       trendCursorMs,
       trendWindow,
     };
-  }, [slot, mode, filter, country, cohort, composition, inspect, snap, tickNet, railNet, metaSnap, block, selNodes, metaList, leaderboard, snapshotExact, ledgerRegister, blockWin, following, snapsForTicks, source, geoMeasure, hyperMeasure, allNodes, trendRange, trendCursorMs, trendWindow]);
+  }, [slot, mode, filter, country, cohort, composition, inspect, snap, tickNet, railNet, metaSnap, block, selNodes, metaList, leaderboard, snapshotExact, ledgerRegister, blockWin, dataBlock, following, snapsForTicks, source, geoMeasure, hyperMeasure, allNodes, trendRange, trendCursorMs, trendWindow]);
 }

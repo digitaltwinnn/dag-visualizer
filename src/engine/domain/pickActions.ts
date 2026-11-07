@@ -16,7 +16,7 @@
 import { heldOut } from "./viewNetwork";
 import type { Mode } from "@/src/store/store";
 import type { LedgerRegister } from "@/src/store/mode";
-import type { GlobalSnapshot, PickDescriptor, MetaSnapSel, TickNetSel, BlockSel } from "@/src/data/types";
+import type { GlobalSnapshot, PickDescriptor, MetaSnapSel, TickNetSel, BlockSel, DataBlockSel } from "@/src/data/types";
 import { METAGRAPHS } from "@/src/net/current";
 import type { CohortSel, CompositionSel } from "./focusLadder";
 import { UNLISTED_KEY } from "./ledgerBands";
@@ -40,6 +40,7 @@ export type ClickAction =
   // Commit/clear a BLOCK in the Snapshots view's Blocks register — a slot under its tick, not a
   // ladder rung: see `blockSelectActions`.
   | { kind: "block"; sel: BlockSel | null }
+  | { kind: "dataBlock"; sel: DataBlockSel | null }
   // Bring a trend plane forward, or release the focused one (null) — a VIEW-LOCAL emphasis, not a
   // selection rung: see `trendPlaneActions`.
   | { kind: "trendFocus"; id: string | null }
@@ -53,6 +54,14 @@ export type ClickAction =
 function releaseBlock(out: ClickAction[], block: BlockSel | null | undefined, ordinal: number): void {
   if (block && block.anchorOrd !== ordinal) out.push({ kind: "block", sel: null });
 }
+
+/** A DATA BLOCK IS IN EXACTLY ONE METAGRAPH SNAPSHOT (the Data block card, 2026-11-07): a builder
+ *  that commits another snapshot, or none, releases it first — the one home of that release. */
+function releaseDataBlock(out: ClickAction[], dataBlock: DataBlockSel | null | undefined, keep: MetaSnapSel | null): void {
+  if (dataBlock && !(keep && sameMetaSnap(keep, dataBlock.snap))) out.push({ kind: "dataBlock", sel: null });
+}
+export const sameDataBlock = (a: DataBlockSel | null, b: DataBlockSel | null): boolean =>
+  !!a && !!b && a.index === b.index && sameMetaSnap(a.snap, b.snap);
 
 // The network a node pick belongs to: its metagraph, or the DAG core for a validator.
 export const pickNetId = (p: PickDescriptor): string | null =>
@@ -292,9 +301,11 @@ export function railNetActions(id: string, current: string): ClickAction[] {
  *  beat and the × seemed to leave the children standing. That is simply what live means under a
  *  lens: the × releases the PIN, and the card goes back to following the filtered network's
  *  newest tick. The filter is cleared where it is set — the top bar. */
-export function snapshotClearActions(current: { metaSnap: MetaSnapSel | null; hasInspect?: boolean; tickNet?: TickNetSel | null; block?: BlockSel | null }): ClickAction[] {
+export function snapshotClearActions(current: { metaSnap: MetaSnapSel | null; hasInspect?: boolean; tickNet?: TickNetSel | null; block?: BlockSel | null; dataBlock?: DataBlockSel | null }): ClickAction[] {
   const out: ClickAction[] = [];
-  // A BLOCK hangs under its tick (it is in exactly one snapshot), so it goes with it, finest first.
+  // A BLOCK hangs under its tick (it is in exactly one snapshot), so it goes with it, finest first —
+  // and a DATA BLOCK under its metagraph snapshot, finer still.
+  if (current.dataBlock) out.push({ kind: "dataBlock", sel: null });
   if (current.block) out.push({ kind: "block", sel: null });
   // The NODE is the ledger ladder's finest rung (a metagraph snapshot's validator, `∨`), so a node
   // card left standing under a cleared tick would hang from nothing — and its pager, losing the
@@ -495,6 +506,9 @@ export function metaSnapSelectActions(
     inspect: PickDescriptor | null;
     /** The committed block — REQUIRED, so no caller can forget that another tick drops it. */
     block: BlockSel | null;
+    /** The committed data block: another snapshot's commit releases it (optional — a surface that
+     *  cannot hold one leaves it; presence stands it down regardless, `parentHolds`). */
+    dataBlock?: DataBlockSel | null;
   },
 ): ClickAction[] {
   // The deselect-toggle applies only to a PINNED selection. While FOLLOWING, the shown subject
@@ -510,6 +524,7 @@ export function metaSnapSelectActions(
   const live = current.following ? current.metaSnap : null;
   if (live && !sameMetaSnap(live, sel) && live.metaId === sel.metaId && live.globalOrdinal === sel.globalOrdinal && global.data.ordinal === sel.globalOrdinal) {
     releaseBlock(out, current.block, global.data.ordinal);
+    releaseDataBlock(out, current.dataBlock, sel);
     if (current.inspect && !nodeIsOf(current.inspect, sel.metaId)) out.push({ kind: "inspect", pick: null });
     out.push({ kind: "metaSnap", sel: { ...sel, held: true } });
     return out;
@@ -522,11 +537,36 @@ export function metaSnapSelectActions(
   // snapshot's own network stays (its card says whether it signed). Finest first, like every
   // release.
   releaseBlock(out, current.block, global.data.ordinal);
+  releaseDataBlock(out, current.dataBlock, sel);
   if (current.inspect && !nodeIsOf(current.inspect, sel.metaId)) out.push({ kind: "inspect", pick: null });
   out.push({ kind: "snapshot", pick: global, follow: false });
   out.push({ kind: "tickNet", sel: tickNetOf(sel, global) });
   out.push({ kind: "metaSnap", sel });
   return out;
+}
+
+/** A DATA BLOCK in the Data blocks register (2026-11-07, user: "a data block is just like a tx block")
+ *  — a slot under the metagraph snapshot that carried it: committing it commits that snapshot's
+ *  chain first (the tick pinned, the network, the snapshot — `metaSnapSelectActions`, unless the
+ *  snapshot already stands pinned), then the data block, last so it ranks and its card is the box.
+ *  The same data block again releases the data block alone. No rung, no pose. */
+export function dataBlockSelectActions(
+  sel: DataBlockSel,
+  global: Extract<PickDescriptor, { kind: "snapshot" }>,
+  current: { dataBlock: DataBlockSel | null; metaSnap: MetaSnapSel | null; following?: boolean; inspect: PickDescriptor | null; block: BlockSel | null },
+): ClickAction[] {
+  if (sameDataBlock(current.dataBlock, sel)) return [{ kind: "dataBlock", sel: null }];
+  const out: ClickAction[] = [];
+  const pinnedHere = sameMetaSnap(current.metaSnap, sel.snap) && !current.following;
+  if (!pinnedHere) out.push(...metaSnapSelectActions(sel.snap, global, { metaSnap: current.metaSnap, following: current.following, inspect: current.inspect, block: current.block, dataBlock: current.dataBlock }));
+  else if (current.dataBlock) out.push({ kind: "dataBlock", sel: null });
+  out.push({ kind: "dataBlock", sel });
+  return out;
+}
+
+/** The Data block card's ×: the data block alone, its snapshot stays. */
+export function dataBlockClearActions(current: { dataBlock: DataBlockSel | null }): ClickAction[] {
+  return current.dataBlock ? [{ kind: "dataBlock", sel: null }] : [];
 }
 
 /** A BLOCK in the Snapshots view's Blocks register (2026-11-05) — a SLOT under the global that
@@ -589,9 +629,13 @@ export function blockSelectActions(
  *  Data blocks, whose subjects are the same snapshots — D6) drops the block. The pin (`snap`) and the
  *  committed network (`tickNet`) are the tick's own and stay. Finest first, like every release;
  *  `switchLedgerRegister` applies it through the executor. */
-export function registerSwitchActions(to: LedgerRegister, current: { block: BlockSel | null; metaSnap: MetaSnapSel | null }): ClickAction[] {
-  if (readsBlockWindow(to)) return current.metaSnap ? [{ kind: "metaSnap", sel: null }] : [];
-  return current.block ? [{ kind: "block", sel: null }] : [];
+export function registerSwitchActions(to: LedgerRegister, current: { block: BlockSel | null; metaSnap: MetaSnapSel | null; dataBlock?: DataBlockSel | null }): ClickAction[] {
+  const out: ClickAction[] = [];
+  // A data block is the Data blocks register's alone: any other register drops it, finest first.
+  if (current.dataBlock && to !== "data") out.push({ kind: "dataBlock", sel: null });
+  if (readsBlockWindow(to)) { if (current.metaSnap) out.push({ kind: "metaSnap", sel: null }); return out; }
+  if (current.block) out.push({ kind: "block", sel: null });
+  return out;
 }
 
 /** THE BLOCK CARD'S LIVE / PINNED CONTROL (D3 — in the Blocks register live follows the newest

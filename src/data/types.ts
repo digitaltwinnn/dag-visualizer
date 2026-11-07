@@ -85,6 +85,19 @@ export interface ChannelSnapRow {
    *  Absent where undecodable, and on rows cached before the fields existed. */
   stateKeys?: { key: string; count: number }[];
   dataBlockSigners?: string[];
+  /** ONE SUMMARY PER DATA BLOCK, in the snapshot's own order (the Data block card, 2026-11-07, user:
+   *  "a data block is just like a tx block"): its updates by kind (`payloadKinds`' mechanical
+   *  names), its dL1 signers, its bytes, and a DIGEST the server takes over its bytes — the chain
+   *  publishes no hash for a data block, so it is never called one. Absent where undecodable. */
+  dataBlockRows?: DataBlockSummary[];
+}
+
+export interface DataBlockSummary {
+  updates: number;
+  kinds: { kind: string; count: number }[];
+  signers: number;
+  bytes: number;
+  digest: string;
 }
 
 // EXACT per-tick anchor totals read straight from the raw L0 snapshot's stateChannelSnapshots
@@ -323,6 +336,10 @@ export type PickDescriptor =
  *  accepting snapshot's own, `anchorOrd` the global tick that carries it. Homed here beside the pick
  *  that carries it (the store re-exports it). */
 export interface BlockSel { chain: string; hash: string; ordinal: number; anchorOrd: number }
+
+/** One DATA BLOCK the Data blocks register has selected: the metagraph snapshot that carried it and
+ *  its place in that snapshot's blocks (a data block has no published hash — `DataBlockSummary`). */
+export interface DataBlockSel { snap: MetaSnapSel; index: number }
 
 // Raw shape of a `/currency/{id}/snapshots` list entry (only the fields we read).
 export interface RawMetaSnapshot {

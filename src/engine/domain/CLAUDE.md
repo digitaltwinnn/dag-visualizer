@@ -177,7 +177,15 @@ The design rules behind the table, which the tests pin but don't explain:
   Block ghost's own step; a band click stays a band's. No focus rung and no pose (camera principle 2). Every builder that pins a
   tick releases a block of another tick through the one `releaseBlock`, and the tile, band, network,
   arrival and follow builders take the block as a REQUIRED argument, so no caller can forget it. The
-  Block card's × is `blockClearActions`. **While following, a click on the live block PINS it**
+  Block card's × is `blockClearActions`. **A DATA BLOCK is a slot under its metagraph snapshot, in
+  exactly one** (the Data blocks register, 2026-11-07, user: "a data block is just like a tx
+  block"): `dataBlockSelectActions` commits the snapshot's chain through `metaSnapSelectActions`
+  (unless that snapshot already stands pinned), then the data block, last so its card is the box;
+  the same again releases it alone (`dataBlockClearActions` is the card's ×). `releaseDataBlock`
+  is the one home of its release — another snapshot's commit, the tick's clear
+  (`snapshotClearActions`), a register switch out of Data blocks (`registerSwitchActions`) — and the
+  store's `advanceMetaSnap` drops it on a live advance onto another snapshot. The block cause and
+  the data-block cause each have their own motion-hint words. **While following, a click on the live block PINS it**
   (D3: live follows the newest block in the Blocks register, so the block on screen is the follow's,
   not a pick — the auto-followed metagraph snapshot's rule), and the Block card's LIVE / PINNED
   control is `blockFollowActions`, which re-commits the block LAST either way so its card stays the

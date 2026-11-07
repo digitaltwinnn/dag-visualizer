@@ -24,10 +24,10 @@
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import type { Mode } from "@/src/store/store";
 import { ledgerNetwork } from "@/src/engine/domain/tickNet";
-import { blockSelectActions, globalPick, tickContextOf } from "@/src/engine/domain/pickActions";
+import { blockSelectActions, dataBlockSelectActions, globalPick, tickContextOf } from "@/src/engine/domain/pickActions";
 import { shortBlockHash } from "@/src/util/format";
 import { tickerOf } from "@/components/explorer/nodeRow";
-import type { BlockSel, TickNetSel } from "@/src/data/types";
+import type { BlockSel, DataBlockSel, TickNetSel } from "@/src/data/types";
 import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder";
 import type {
   ChannelSnapRow,
@@ -81,6 +81,8 @@ export interface SiblingState {
    *  accepted it (null for a DAG block). The Block ghost's step opens the first (user, 2026-11-07:
    *  the ghost "when clicked nothing happens"). Absent or null: no window, or not that register. */
   tickBlocks?: { sel: BlockSel; snap: MetaSnapSel | null }[] | null;
+  /** The committed data block (the Data blocks register). Absent (tests), none. */
+  dataBlock?: DataBlockSel | null;
   selNodes: NodeRow[];
   metaList: MetaInfo[];
   /** Is this channel a CATALOGUED network? The caller's answer (the app catalog — `LISTED_IDS`),
@@ -411,6 +413,14 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
       return finish(slot, items, items.findIndex((it) => it.key === curKey), parent);
     }
 
+    case "dataBlock": {
+      // The snapshot's data blocks, in its order — the pager steps them (1 of N … N of N).
+      const cur = s.dataBlock;
+      if (!cur) return null;
+      const items = dataBlocksOf(s);
+      if (items.length < 2) return null;
+      return finish(slot, items, cur.index, "This snapshot's data blocks");
+    }
     case "metaSnap": {
       const cur = s.metaSnap;
       if (!cur) return null;
@@ -718,6 +728,26 @@ export function blockStep(s: SiblingState): SiblingStep | null {
     label: `${tickerOf(first.sel.chain)} ${shortBlockHash(first.sel.hash)}`,
     actions: blockSelectActions(first.sel, s.snap, { ...tickContextOf({ following: s.following, snap: s.snap, metaSnap: s.metaSnap, tickNet: s.tickNet, block: s.block, inspect: s.inspect }) }, first.snap),
   };
+}
+
+/** THE COMMITTED METAGRAPH SNAPSHOT'S DATA BLOCKS, as its exact row summarises them (the Data block
+ *  card's set): one step per block, in the snapshot's order. Empty with no snapshot, no read, or none. */
+function dataBlocksOf(s: SiblingState): SiblingStep[] {
+  const ms = s.metaSnap;
+  if (!ms || !s.snap || s.snap.data.ordinal !== ms.globalOrdinal) return [];
+  const row = s.exactRows?.find((r) => r.metaId === ms.metaId && r.ordinal === ms.ordinal);
+  const rows = row?.dataBlockRows ?? [];
+  return rows.map((_b, i) => ({
+    key: `${ms.metaId}:${ms.ordinal}:${i}`,
+    label: `${i + 1} of ${rows.length}`,
+    actions: dataBlockSelectActions({ snap: ms, index: i }, s.snap!, { dataBlock: s.dataBlock ?? null, metaSnap: s.metaSnap, following: s.following, inspect: s.inspect, block: s.block ?? null }),
+  }));
+}
+
+/** THE DATA BLOCK GHOST'S STEP (the Data blocks register, 2026-11-07): the committed metagraph
+ *  snapshot's first data block; null with no snapshot pinned, or none carried. */
+export function dataBlockStep(s: SiblingState): SiblingStep | null {
+  return s.following ? null : (dataBlocksOf(s)[0] ?? null);
 }
 
 export function rootStep(s: SiblingState): SiblingStep | null {

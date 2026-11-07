@@ -22,6 +22,10 @@ describe("exactRowOf", () => {
     expect(r.dataTxCount).toBe(3);
     expect(r.dataBlocks).toBe(2);
     expect(r.dataBytes).toBeGreaterThan(0);
+    // One summary per block (the Data block card): updates, kinds, signers, bytes, a digest of ours.
+    expect(r.dataBlockRows?.map((b) => [b.updates, b.signers, b.kinds])).toEqual([[2, 1, [{ kind: "a", count: 2 }]], [1, 1, [{ kind: "a", count: 1 }]]]);
+    expect(r.dataBlockRows?.[0]?.digest).toMatch(/^[0-9a-f]{64}$/);
+    expect(r.dataBlockRows?.[0]?.bytes).toBeGreaterThan(0);
   });
 
   it("says zero for a snapshot that carried no data blocks", async () => {

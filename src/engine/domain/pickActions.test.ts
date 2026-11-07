@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
-import { netKeyOf, tickNetSelectActions, tickNetClearActions, viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, countryClearActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, trendPlaneActions, railNetActions, noteCohortActions, noteDayActions, snapshotClearActions, blockSelectActions, blockClearActions, blockFollowActions, registerSwitchActions, globalPick, tickContextOf, type ClickAction } from "./pickActions";
+import { netKeyOf, tickNetSelectActions, tickNetClearActions, viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, countryClearActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, trendPlaneActions, railNetActions, noteCohortActions, noteDayActions, snapshotClearActions, blockSelectActions, blockClearActions, blockFollowActions, dataBlockSelectActions, dataBlockClearActions, sameDataBlock, registerSwitchActions, globalPick, tickContextOf, type ClickAction } from "./pickActions";
 import { finerLevels } from "./focusLadder";
 import { METAGRAPHS } from "@/src/net/current";
 import type { PickDescriptor, MetaSnapSel, BlockSel } from "@/src/data/types";
@@ -1010,3 +1010,35 @@ describe("globalPick and tickContextOf — the descriptor and the context every 
   });
 });
 
+// THE DATA BLOCK (the Data blocks register, 2026-11-07): a slot under the metagraph snapshot that
+// carried it — the snapshot's chain first, the data block last so its card is the box.
+describe("dataBlockSelectActions / dataBlockClearActions", () => {
+  const global = { kind: "snapshot", data: { ordinal: 42 } } as unknown as SnapPick;
+  const ms = { metaId: "dor", ordinal: 5, hash: "m5", globalOrdinal: 42, ts: "t" } as MetaSnapSel;
+  const db = { snap: ms, index: 1 };
+  it("commits the snapshot's chain then the data block; the same snapshot pinned, the data block alone", () => {
+    expect(kinds(dataBlockSelectActions(db, global, { dataBlock: null, metaSnap: null, inspect: null, block: null }))).toEqual(["snapshot", "tickNet", "metaSnap", "dataBlock"]);
+    expect(dataBlockSelectActions(db, global, { dataBlock: null, metaSnap: ms, following: false, inspect: null, block: null })).toEqual([{ kind: "dataBlock", sel: db }]);
+    // Another block of the same pinned snapshot: the old one released first, finest first.
+    expect(kinds(dataBlockSelectActions({ snap: ms, index: 0 }, global, { dataBlock: db, metaSnap: ms, following: false, inspect: null, block: null }))).toEqual(["dataBlock", "dataBlock"]);
+  });
+  it("the same data block again releases it alone; following, the snapshot is pinned first", () => {
+    expect(dataBlockSelectActions(db, global, { dataBlock: db, metaSnap: ms, inspect: null, block: null })).toEqual([{ kind: "dataBlock", sel: null }]);
+    expect(kinds(dataBlockSelectActions(db, global, { dataBlock: null, metaSnap: ms, following: true, inspect: null, block: null }))).toEqual(["snapshot", "tickNet", "metaSnap", "dataBlock"]);
+  });
+  it("another snapshot's commit releases the data block first (metaSnapSelectActions), and so does the tick's clear and a register switch", () => {
+    const other = { ...ms, ordinal: 6 };
+    expect(kinds(metaSnapSelectActions(other, global, { metaSnap: ms, inspect: null, block: null, dataBlock: db }))).toContain("dataBlock");
+    expect(kinds(metaSnapSelectActions(ms, global, { metaSnap: null, inspect: null, block: null, dataBlock: db }))).not.toContain("dataBlock");
+    expect(kinds(snapshotClearActions({ metaSnap: ms, dataBlock: db }))[0]).toBe("dataBlock");
+    expect(registerSwitchActions("snapshots", { block: null, metaSnap: ms, dataBlock: db })).toEqual([{ kind: "dataBlock", sel: null }]);
+    expect(registerSwitchActions("data", { block: null, metaSnap: ms, dataBlock: db })).toEqual([]);
+  });
+  it("the clear and the identity", () => {
+    expect(dataBlockClearActions({ dataBlock: db })).toEqual([{ kind: "dataBlock", sel: null }]);
+    expect(dataBlockClearActions({ dataBlock: null })).toEqual([]);
+    expect(sameDataBlock(db, { snap: { ...ms }, index: 1 })).toBe(true);
+    expect(sameDataBlock(db, { snap: ms, index: 2 })).toBe(false);
+    expect(sameDataBlock(null, db)).toBe(false);
+  });
+});

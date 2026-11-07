@@ -92,6 +92,9 @@ export function motionHint(cause: MotionCause, mode: Mode, names: HintNames, pha
       // A block is a slot under its tick (no rung, no pose of its own): the release lands on the
       // global snapshot that carries it, in the metaSnap release's own words.
       return cause.on ? "Framing the block" : "Back to the global snapshot";
+    case "dataBlock":
+      // A data block is a slot under its metagraph snapshot; its release lands back on that snapshot.
+      return cause.on ? "Framing the data block" : "Back to the metagraph snapshot";
     case "country":
       return cause.cc === null ? "Back to the whole globe" : `Drilling into ${names.country(cause.cc)}`;
     case "cohort":

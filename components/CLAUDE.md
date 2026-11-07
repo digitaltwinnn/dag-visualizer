@@ -1112,7 +1112,11 @@ are the Metagraph snapshots register's own (`metaSnap`, `tickNet`, the pin).
 block and not the snapshot"): while following, `followLatest` (FollowController's heartbeat — every
 global, anchor and block-window change) seats the window's newest block of its network
 (`blockWindow.newestBlock`) and its accepting global through the non-bumping `advanceBlock` /
-`advanceSnap`; the Block card's head carries the LIVE / PINNED control (`FollowControl subject="block"`,
+`advanceSnap`; the Block card is TRANSFER-LED (design round pick T1, 2026-11-07): the transfers are
+its one table, one row or many, the moved total on the section label; "Signed by N L1/cL1" and Fees
+paid are its facts; Parents and Children in view left the body (the scene draws the DAG, the foot
+keeps the parent hashes). The explorer's committed block row carries the LIVE / PINNED mark the tick
+rows carry (user: "'live' is fine in the header but is not shown in the explorer"). Its head carries the LIVE / PINNED control (`FollowControl subject="block"`,
 its write `blockFollowActions`), the Global snapshot card keeps only its age there WHILE A BLOCK CARD
 STANDS — with none (a pin carried in from another register, the block's ×, a re-click releasing it)
 the Global card carries the control again (`blockWindow.liveControlCard`, review I1: else nothing said
@@ -1191,8 +1195,18 @@ DATA leading.** The global snapshot's scene label speaks the register's subject 
 a "23 updates" chip from the exact read (`SceneCallout`'s `dataLead`, keyed on
 `REGISTER_MEASURES[register].dataOnly`; under a committed network, that network's own; NO lead until
 the read lands — never the other register's anchors fact, user 2026-11-07 on a reload), where the
-Metagraph snapshots register says "N metagraph snapshots" and its size. **The Global snapshot
-CARD's body opens with the register's section too** (user: "work on the global snapshot body also"):
+Metagraph snapshots register says "N metagraph snapshots" and its size. **The DATA BLOCK card**
+(`inspector/DataBlockPane.tsx`, 2026-11-07 — design round pick D2, "the batch"): the register's
+own slot under the Metagraph snapshot (`DISPLAY_LANE.ledger`, between `block` and `node`; `PASSES_OVER`
+lists it with the block: a subject of its own, not the snapshot's child rung), present in Data
+blocks alone and only under the snapshot that carried it (`parentHolds`), named by its place in
+that snapshot ("3 of 10"), its UPDATES BY KIND as the body, "Signed by N dL1 validators" and Size as
+facts (a fact row, as the global and metagraph snapshot cards state theirs — the explorer's signer
+level is the list), a "Block records" door onto the snapshot's RAW record, and a foot with the
+snapshot's ordinal and the DIGEST (`DataBlockSummary`, never a hash). Its ghost's step is the pinned
+snapshot's first data block (`railSiblings.dataBlockStep`), its pager the snapshot's blocks
+(`siblingSet("dataBlock")`), and it has no live follow: a picked subject, released with its snapshot.
+**The Global snapshot CARD's body opens with the register's section too** (user: "work on the global snapshot body also"):
 `inspector/SnapshotRegister.tsx` (the design round's picks, data 1 / transaction 1) —
 `BlocksAnchored` in Transaction blocks: "Accepted N blocks" and THE BLOCKS THEMSELVES as rows
 (the explorer's block row: ticker in its hue, short hash, amount moved — a dash until the read

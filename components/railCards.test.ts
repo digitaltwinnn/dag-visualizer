@@ -66,7 +66,7 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
     // metagraph snapshot → node (user, 2026-09-15). This order also drives the phone flat stack
     // and the tray icons, so the two can never disagree.
     const ids = detailsCards(details({ filter: "dor", inspect: nodePick, snap: snapPick })).map((c) => c.id);
-    expect(ids).toEqual(["notes", "snap", "context", "range", "instant", "country", "cohort", "composition", "metaSnap", "block", "node"]);
+    expect(ids).toEqual(["notes", "snap", "context", "range", "instant", "country", "cohort", "composition", "metaSnap", "block", "dataBlock", "node"]);
   });
   // THE AI NOTES CARD (2026-10-27): its own card, first, in every view whose policy opts in
   // (`aiNotes`) — present unless the note is absent (no subject, or the server answered `none`).
@@ -269,7 +269,7 @@ describe("the block slot", () => {
     expect(focusSlotId({ ...details({ mode: "ledger", snap: snapPick, noteAbsent: false }), selStack: [] })).toBe("notes");
   });
   it("Blocks' ghosts: the tick's, the network's, the tile's, the block's and the node's", () => {
-    expect(ghostIds(detailsCards(blocks()))).toEqual(["snap", "context", "metaSnap", "block", "node"]);
+    expect(ghostIds(detailsCards(blocks()))).toEqual(["snap", "context", "metaSnap", "block", "node"]); // the data block ghosts in its own register alone
   });
 });
 
@@ -373,7 +373,7 @@ describe("ladderSlotIds — the descent-spine lane (display order = reversed run
     // that speaks, since the tick follows live without any commit. Card slots, not focus rungs.
     // The Blocks register's BLOCK slot sits under the metagraph snapshot: a block stands on its
     // accepting snapshot, the tile's or the tick's own (2026-11-05). A slot, no rung.
-    expect(ladderSlotIds("ledger")).toEqual(["notes", "snap", "context", "metaSnap", "block", "node"]);
+    expect(ladderSlotIds("ledger")).toEqual(["notes", "snap", "context", "metaSnap", "block", "dataBlock", "node"]);
   });
   it("flat views have no ladder", () => {
     expect(ladderSlotIds("soon")).toEqual([]);
@@ -407,7 +407,7 @@ describe("ladderLevelOfSlot — the inverse read (which RUNG does a slot stand f
     for (const view of ["geo", "hyper", "ledger", "trend"] as const)
       for (const slot of ladderSlotIds(view)) {
         const level = ladderLevelOfSlot(slot);
-        if (!level) expect(["notes", "snap", "metaSnap", "block", "range", "instant"]).toContain(slot);
+        if (!level) expect(["notes", "snap", "metaSnap", "block", "dataBlock", "range", "instant"]).toContain(slot);
         else expect(LADDERS[view].some((r) => r.level === level)).toBe(true);
       }
   });
@@ -692,5 +692,36 @@ describe("the Metagraph card in Geography", () => {
   it("stands on the browsed network over a node's, else as it did", () => {
     expect(metagraphCardNetwork({ mode: "geo", filter: "all", railNet: "dor", inspect: node })).toBe("dor");
     expect(metagraphCardNetwork({ mode: "geo", filter: "all", inspect: node })).toBe("bio");
+  });
+});
+
+// THE DATA BLOCK SLOT (2026-11-07): the Data blocks register's own, under the metagraph snapshot that
+// carried it, the block slot's precedent one register over.
+describe("the data block slot", () => {
+  const ms = { metaId: "dor", ordinal: 5, hash: "m5", globalOrdinal: 42, ts: "t" };
+  const dataBlock = { snap: ms, index: 2 };
+  const data = (over: Partial<RailManifestState> = {}) => details({ mode: "ledger", ledgerRegister: "data", ...over });
+  const slot = (s: RailManifestState) => detailsCards(s).find((c) => c.id === "dataBlock")!;
+  it("is no rung, and ghosts in the Data blocks register with the snapshot it needs", () => {
+    expect(ladderLevelOfSlot("dataBlock")).toBeNull();
+    expect(slot(data()).present).toBe(false);
+    expect(slot(data()).hint).toBe("Click a metagraph snapshot that carried data.");
+  });
+  it("is present once a data block is committed under its own snapshot, and stands down under another", () => {
+    const c = slot(data({ snap: snapPick, metaSnap: ms, dataBlock }));
+    expect(c.present).toBe(true);
+    expect(c.subjectKey).toBe("dor:5:2");
+    expect(slot(data({ snap: snapPick, metaSnap: { ...ms, ordinal: 6 }, dataBlock })).present).toBe(false);
+    expect(slot(data({ snap: snapPick, metaSnap: null, dataBlock })).present).toBe(false);
+  });
+  it("is absent in the other two registers — no card, no ghost", () => {
+    for (const r of ["snapshots", "blocks"] as const) {
+      const s = details({ mode: "ledger", ledgerRegister: r, snap: snapPick, metaSnap: ms, dataBlock });
+      expect(slot(s).present).toBe(false);
+      expect(slot(s).hint).toBeNull();
+    }
+  });
+  it("a data block commit is the focus slot", () => {
+    expect(focusSlotId({ ...data({ snap: snapPick, metaSnap: ms, dataBlock }), selStack: ["dataBlock", "metaSnap", "snap"] })).toBe("dataBlock");
   });
 });

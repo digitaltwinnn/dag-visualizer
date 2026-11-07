@@ -32,7 +32,7 @@ import { openBlockRecord } from "@/components/trendDoors";
 import { blockLead } from "@/components/inspector/blockLead";
 import { useFeedRead } from "@/components/useFeedRead";
 import { subjectPairing } from "@/components/useSubjectPairing";
-import { blockChildren, blockReadKey, blockReadOf } from "@/src/data/blockReads";
+import { blockReadKey, blockReadOf } from "@/src/data/blockReads";
 import { compactDag, midHash, shortBlockHash } from "@/src/util/format";
 import { identityHudCss } from "@/src/palette/identity";
 import { useStore } from "@/src/store/store";
@@ -60,7 +60,6 @@ export default function BlockPane({ onClose, collapsed, onToggle }: { onClose: (
   // The read's own transfers (a read cached before they were carried has none to list).
   const transfers = read?.transfers ?? [];
   const lead = blockLead(sel, read);
-  const children = read ? blockChildren(reads, sel.chain, sel.hash) : null;
 
   return (
     <RailPane
@@ -106,10 +105,13 @@ export default function BlockPane({ onClose, collapsed, onToggle }: { onClose: (
       {!collapsed && (
         <div>
           <Lead>{lead}</Lead>
-          {transfers.length > 1 && (
-            // THE BREAKDOWN: one row per transfer, from → to, then its amount and its fee.
+          {/* TRANSFER-LED (user, 2026-11-07, design round T1): what a block is FOR is the one table —
+              every transfer, one row or many, the moved total on its label; the DAG facts (parents,
+              children in view) left the body — the scene draws the DAG and the foot keeps the parent
+              hashes. One row per transfer: from → to, then its amount and its fee. */}
+          {transfers.length > 0 && read && (
             <div className="mt-2 mb-2">
-              <SectionLabel label="Transfers" total={transfers.length.toLocaleString()} />
+              <SectionLabel label="Transfers" total={transfers.length.toLocaleString()} unit={`${compactDag(read.amount)} ${unit}`} />
               <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto_auto] items-baseline gap-x-2.5 gap-y-0.5 text-label">
                 <span className="text-muted-foreground">From → to</span>
                 <span className="text-right text-muted-foreground">Amount</span>
@@ -129,15 +131,11 @@ export default function BlockPane({ onClose, collapsed, onToggle }: { onClose: (
           <FactGroup>
             {read ? (
               <>
-                <Fact label="Parents">
-                  {read.parents.length ? (
-                    <span className="font-mono">{read.parents.map((p) => midHash(p.hash, 9)).join("  ")}</span>
-                  ) : (
-                    <Empty why="This block names no parents" />
-                  )}
+                {/* A transaction block IS signed (user: "T1 is not signed right?" — it is, by the
+                    chain's L1 validators): a fact row, as the snapshot cards state theirs. */}
+                <Fact label="Signed by">
+                  <span className="inline-flex items-center gap-1">{read.signers.toLocaleString()} <QualifierChip>{sel.chain === "dag" ? "L1" : "cL1"}</QualifierChip></span>
                 </Fact>
-                <Fact label="Children in view">{children != null ? children.toLocaleString() : <Empty />}</Fact>
-                <Fact label="Signatures">{read.signers.toLocaleString()}</Fact>
                 <Fact label="Fees paid">
                   <span className="whitespace-nowrap">{compactDag(read.fee)} {unit}</span>
                 </Fact>

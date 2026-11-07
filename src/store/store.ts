@@ -1,6 +1,6 @@
 import { sameTickNet } from "@/src/engine/domain/tickNet";
 import { create } from "zustand";
-import type { GlobalSnapshot, LeaderboardData, MetaInfo, NodeRow, PickDescriptor, SnapshotExact, MetaSnapSel, TickNetSel, ChannelSnapDeep, BlockSel } from "@/src/data/types";
+import type { GlobalSnapshot, LeaderboardData, MetaInfo, NodeRow, PickDescriptor, SnapshotExact, MetaSnapSel, TickNetSel, ChannelSnapDeep, BlockSel, DataBlockSel } from "@/src/data/types";
 import { metaSnapDeepKey } from "@/src/data/types";
 import type { HoverSubject } from "@/src/data/hoverSubject";
 // Type-only — the store may not import domain VALUES (layerBoundaries rule), but a type-only
@@ -47,6 +47,7 @@ export type MotionCause =
   | { kind: "metaSnap"; metaId: string | null; ordinal?: number }
   // A block in the Blocks register — a slot under its tick, so the cause says only on or off.
   | { kind: "block"; on: boolean }
+  | { kind: "dataBlock"; on: boolean }
   | { kind: "country"; cc: string | null }
   | { kind: "cohort"; on: boolean }
   | { kind: "composition"; on: boolean }
@@ -63,11 +64,11 @@ export type MotionCause =
 // snapshots anchored — the two differ ~10× on the DAG row, which is why both are measures.
 // One block the Snapshots view's Blocks register has selected — homed in `src/data/types.ts` beside
 // the block pick that carries it.
-export type { BlockSel } from "@/src/data/types";
+export type { BlockSel, DataBlockSel } from "@/src/data/types";
 export type TrendMetric = "snapshots" | "globals" | "blocks" | "fees" | "kb" | "nodes" | "continuity" | "transfers";
 
 // One slot in the right-rail card stack (extend with future card types — e.g. "tx").
-export type SelSlot = "network" | "node" | "snap" | "metaSnap" | "block" | "country" | "cohort" | "composition" | "range" | "instant";
+export type SelSlot = "network" | "node" | "snap" | "metaSnap" | "block" | "dataBlock" | "country" | "cohort" | "composition" | "range" | "instant";
 
 // Move `slot` to the FRONT of the recency stack when it becomes active, or drop it when cleared.
 //
@@ -423,6 +424,10 @@ interface AppState {
   blockMeasure: BlockMeasure;
   // The committed block — a SELECTION (written by the click executor only). Cleared on leaving the view.
   block: BlockSel | null;
+  // The committed DATA block (the Data blocks register, 2026-11-07) — a selection under its metagraph
+  // snapshot, in exactly one snapshot: it goes when that snapshot does (`advanceMetaSnap`, the
+  // builders' release, the view switch).
+  dataBlock: DataBlockSel | null;
   // The block the cursor is hovering (its hash) — a hover channel: previews, never commits.
   hoverBlock: string | null;
   // Block reads, keyed `${chain}:${ordinal}`; "dag:<ord>" mirrors `snapshotExact`'s blocks.
@@ -565,6 +570,7 @@ interface AppState {
   setLedgerRegister: (r: LedgerRegister) => void;
   setBlockMeasure: (m: BlockMeasure) => void;
   setBlock: (b: BlockSel | null) => void;
+  setDataBlock: (b: DataBlockSel | null) => void;
   /** The follow system's heartbeat advance for the Block card (the Blocks register's LIVE, D3) —
    *  non-bumping, like advanceSnap: a block arriving is never a "new selection". */
   advanceBlock: (b: BlockSel | null) => void;
@@ -701,6 +707,7 @@ export const useStore = create<AppState>((set) => ({
   ledgerRegister: "snapshots",
   blockMeasure: "amount",
   block: null,
+  dataBlock: null,
   hoverBlock: null,
   blockReads: {},
   blockReadMiss: {},
@@ -756,8 +763,8 @@ export const useStore = create<AppState>((set) => ({
       if (mode === s.mode) return nav;
       // The block leaves with its view, and its recency rank with it (the way `setBlock(null)` drops
       // it) — the focus patch reads the stack it is handed, so it is handed the stack without it.
-      const selStack = bumpStack(s.selStack, "block", false);
-      return { ...nav, block: null, hoverBlock: null, trendRotation: 0, trendScroll: 0, ...focusPatch({ ...s, selStack }, entryFocus(VIEW_POLICIES[mode].entryPlane, s.filter), false) };
+      const selStack = bumpStack(bumpStack(s.selStack, "block", false), "dataBlock", false);
+      return { ...nav, block: null, dataBlock: null, hoverBlock: null, trendRotation: 0, trendScroll: 0, ...focusPatch({ ...s, selStack }, entryFocus(VIEW_POLICIES[mode].entryPlane, s.filter), false) };
     }),
   // Opening a doc also SURFACES THE SCENE POSE: the overlay sits at z-8, under the raw layer's
   // z-9 — a doc opened from the RAW pose rendered beneath the still-interactive table, with the
@@ -815,14 +822,18 @@ export const useStore = create<AppState>((set) => ({
   advanceMetaSnap: (metaSnap) =>
     set((s) => ({
       metaSnap,
+      // A data block is in exactly one snapshot: a live advance onto another drops it.
+      dataBlock: s.dataBlock && metaSnap && metaSnap.metaId === s.dataBlock.snap.metaId && metaSnap.ordinal === s.dataBlock.snap.ordinal ? s.dataBlock : null,
       // Same arrival rule as advanceSnap above — identity is metaId+ordinal (sameMetaSnap's).
       navQuiet:
         metaSnap && !(s.metaSnap && s.metaSnap.metaId === metaSnap.metaId && s.metaSnap.ordinal === metaSnap.ordinal)
           ? false
           : s.navQuiet,
       // …and the same stack rule (R70): a live advance never enters the stack; a pin
-      // (`setMetaSnap`) ranks, and a snapshot going away drops its pin.
-      selStack: !metaSnap ? s.selStack.filter((x) => x !== "metaSnap") : s.selStack,
+      // (`setMetaSnap`) ranks, and a snapshot going away drops its pin — and its data block's.
+      selStack: (!metaSnap ? s.selStack.filter((x) => x !== "metaSnap") : s.selStack).filter(
+        (x) => x !== "dataBlock" || !!(s.dataBlock && metaSnap && metaSnap.metaId === s.dataBlock.snap.metaId && metaSnap.ordinal === s.dataBlock.snap.ordinal),
+      ),
     })),
   setHoverSnapOrd: (hoverSnapOrd) => set({ hoverSnapOrd }),
   setHoverMetaSnap: (hoverMetaSnap) => set({ hoverMetaSnap }),
@@ -999,6 +1010,8 @@ export const useStore = create<AppState>((set) => ({
   // A block is a committed subject like the tile: it ranks in the recency stack, so its card is the
   // box once committed (`focusSlotId`).
   setBlock: (block) => set((s) => ({ block, selStack: bumpStack(s.selStack, "block", !!block) })),
+  // A data block ranks like the block: its card is the box once committed.
+  setDataBlock: (dataBlock) => set((s) => ({ dataBlock, selStack: bumpStack(s.selStack, "dataBlock", !!dataBlock) })),
   // LIVE IN THE BLOCKS REGISTER FOLLOWS THE NEWEST BLOCK (D3, user 2026-11-07: "live mode should be
   // applied to the block and not the snapshot"). `followLatest`'s heartbeat write, advanceSnap's
   // twin: the arrival rule (a NEW block lifts a stale quiet gesture, a re-point does not) and the

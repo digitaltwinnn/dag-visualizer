@@ -7,6 +7,9 @@
 // per-channel route (the full read) share it, so the two can never disagree.
 import { brotliDecompress } from "node:zlib";
 import { promisify } from "node:util";
+import { createHash } from "node:crypto";
+import { payloadKinds } from "@/src/data/payloadKinds";
+import type { DataBlockSummary } from "@/src/data/types";
 
 const inflate = promisify(brotliDecompress);
 
@@ -42,6 +45,8 @@ export interface DecodedChannel {
    *  updates above ride in (D6, 2026-11-07: the Data blocks register marks a tile by them). */
   dataBlocks: number;
   dataTx: string;
+  /** One summary per data block (`DataBlockSummary`): the Data block card's facts. */
+  dataBlockRows: DataBlockSummary[];
   /** The data blocks' measured serialized size — Σ of the app blocks' byte lengths, the same
    *  bytes-as-carried reading `stateBytes` gives the state (2026-08-13: the card's two payload
    *  sections headline in one unit). A block that can't be decoded still carried its bytes. */
@@ -87,6 +92,7 @@ export async function decodeChannelContent(content: unknown): Promise<DecodedCha
   const appBlocks = app && Array.isArray(app.blocks) ? (app.blocks as unknown[]) : [];
   const dataBlockSigners: string[] = [];
   const dataTxValues: unknown[] = [];
+  const dataBlockRows: DataBlockSummary[] = [];
   let dataBytes = 0;
   let dataBlocks = 0;
   for (const b of appBlocks) {
@@ -94,21 +100,28 @@ export async function decodeChannelContent(content: unknown): Promise<DecodedCha
     if (!buf) continue;
     dataBytes += buf.length;
     dataBlocks++;
+    // The block's own summary (the Data block card): a digest over its bytes — the chain publishes
+    // no hash for a data block, so this is ours and is named so — its updates by kind, its signers.
+    const row: DataBlockSummary = { updates: 0, kinds: [], signers: 0, bytes: buf.length, digest: createHash("sha256").update(buf).digest("hex") };
     try {
       const blk = JSON.parse(buf.toString("utf8")) as {
         proofs?: { id?: string }[];
         value?: { dataTransactions?: unknown[]; updates?: unknown[] };
       };
-      for (const p of blk.proofs ?? []) if (p.id) dataBlockSigners.push(shortSigner(p.id));
+      for (const p of blk.proofs ?? []) if (p.id) { dataBlockSigners.push(shortSigner(p.id)); row.signers++; }
       // The transactions arrive as (possibly nested) arrays of signed updates — flatten one
       // level and keep each update's VALUE (the app record, e.g. a batch-root commitment);
       // the proofs stay behind (the signers above already witness the block).
       const txs = blk.value?.dataTransactions ?? blk.value?.updates ?? [];
+      const own: unknown[] = [];
       for (const t of (Array.isArray(txs) ? txs : []).flat()) {
         const v = (t as { value?: unknown })?.value ?? t;
-        if (v != null) dataTxValues.push(v);
+        if (v != null) { dataTxValues.push(v); own.push(v); }
       }
+      row.updates = own.length;
+      row.kinds = payloadKinds(own).map((k) => ({ kind: k.fields ? "records" : k.kind, count: k.count }));
     } catch { /* a block we can't read is one we don't claim */ }
+    dataBlockRows.push(row);
   }
 
   return {
@@ -127,6 +140,7 @@ export async function decodeChannelContent(content: unknown): Promise<DecodedCha
     dataBlockSigners: [...new Set(dataBlockSigners)],
     dataTxCount: dataTxValues.length,
     dataBlocks,
+    dataBlockRows,
     dataTx: dataTxValues.length ? JSON.stringify(dataTxValues) : "",
     dataBytes,
   };

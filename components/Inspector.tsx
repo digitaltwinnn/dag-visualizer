@@ -26,16 +26,17 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 import { useTouch } from "@/components/useTouch";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { detailsCards, ladderSlotIds, noteCardAbsent, type RailCard } from "@/components/railCards";
-import { CHILD_OF, childStep, rootOf, rootStep, type SiblingStep, blockStep } from "@/components/railSiblings";
+import { CHILD_OF, childStep, rootOf, rootStep, type SiblingStep, blockStep, dataBlockStep } from "@/components/railSiblings";
 import { displayOrder, hasFoldControl, isCollapsed, boxedSlotOf, overridesOnNoteStandDown, overridesOnSelection, overridesOnViewEntry, railSelectionKey, subjectRunEnd, type LaneCollapseState } from "@/components/railCollapse";
 import { useSiblingState } from "@/components/useSiblingState";
 import { openRailCard } from "@/components/railOpen";
 import { useLadderFocus } from "@/components/useLadderFocus";
 import { useTrayActives } from "@/components/useTrayActives";
-import { blockClearActions, countryClearActions, cohortToggleActions, compositionToggleActions, snapshotClearActions } from "@/src/engine/domain/pickActions";
+import { blockClearActions, countryClearActions, cohortToggleActions, compositionToggleActions, snapshotClearActions, dataBlockClearActions } from "@/src/engine/domain/pickActions";
 import { CountryTitle, CountryAside, CountryCard, ProviderTitle, ProviderCard, ProviderAside, CompositionTitle, CompositionCard, CompositionAside } from "@/components/inspector/cards";
 import MetaSnapPane from "@/components/inspector/MetaSnapPane";
 import BlockPane from "@/components/inspector/BlockPane";
+import DataBlockPane from "@/components/inspector/DataBlockPane";
 import TrendRangePane from "@/components/inspector/TrendRangePane";
 import TrendInstantPane from "@/components/inspector/TrendInstantPane";
 import NotesCard from "@/components/notes/NotesCard";
@@ -300,7 +301,7 @@ function CompositionPane({ sel, onClose, collapsed, onToggle }: { sel: Compositi
 // same single source of truth the dock trays read.
 const GHOST_EYEBROW: Record<string, string> = {
   context: "Metagraph", country: "Country", cohort: "Provider", composition: "Composition", node: "Node", snap: "Global snapshot",
-  metaSnap: "Metagraph snapshot", block: "Block", range: "Range", instant: "Moment",
+  metaSnap: "Metagraph snapshot", block: "Block", dataBlock: "Data block", range: "Range", instant: "Moment",
 };
 /** An EMPTY RUNG, drawn as a card like every other (user, 2026-10-04 — option A of
  *  `docs/superpowers/design/2026-10-04-ghost-cards`, with "like any other card it can be expanded
@@ -403,6 +404,7 @@ export default function Inspector() {
   const metaSnap = useStore((s) => s.metaSnap);
   const ledgerRegister = useStore((s) => s.ledgerRegister);
   const block = useStore((s) => s.block);
+  const dataBlock = useStore((s) => s.dataBlock);
   const tickNet = useStore((s) => s.tickNet);
   const country = useStore((s) => s.country);
   const cohort = useStore((s) => s.cohort);
@@ -448,7 +450,7 @@ export default function Inspector() {
   const aiNote = useAiNote();
   const noteAbsent = noteCardAbsent(aiNote.req != null, aiNote.note.res, aiNote.note.via);
   const manifest = detailsCards({
-    mode, filter, railNet, tickNet, tickHasFilter, nodeHere, inspect, snap, country, cohort, composition, metaSnap, ledgerRegister, block, coarse, trendCursorMs, trendRange, trendFocus, trendFront, trendWindow,
+    mode, filter, railNet, tickNet, tickHasFilter, nodeHere, inspect, snap, country, cohort, composition, metaSnap, ledgerRegister, block, dataBlock, coarse, trendCursorMs, trendRange, trendFocus, trendFront, trendWindow,
     noteAbsent,
     selNodesCount: selNodes.length,
     filterLabel: displayNetwork(railNet ?? filter)?.ticker ?? null, // one lookup — catalog + the unlisted pseudo-network
@@ -534,9 +536,11 @@ export default function Inspector() {
   // THE BLOCK GHOST'S OWN STEP (user, 2026-11-07: "when clicked nothing happens"): the shown tick's
   // first block (`blockStep`) — its own, not `CHILD_OF`'s, since a block is the tick's sibling subject.
   const blockGhost = !presentOf("block") && manifest.find((c) => c.id === "block")?.hint != null ? blockStep(siblingState) : null;
+  // …and the DATA BLOCK ghost's (2026-11-07): the pinned metagraph snapshot's first data block.
+  const dataBlockGhost = !presentOf("dataBlock") && manifest.find((c) => c.id === "dataBlock")?.hint != null ? dataBlockStep(siblingState) : null;
   const ghostStep = (id: string) =>
-    id === nextStep?.id ? nextStep.step : id === rootId ? (rootGhost ?? undefined) : id === "block" ? (blockGhost ?? undefined) : undefined;
-  const stepIds = [nextStep?.id, blockGhost ? "block" : null].filter((x): x is string => !!x);
+    id === nextStep?.id ? nextStep.step : id === rootId ? (rootGhost ?? undefined) : id === "block" ? (blockGhost ?? undefined) : id === "dataBlock" ? (dataBlockGhost ?? undefined) : undefined;
+  const stepIds = [nextStep?.id, blockGhost ? "block" : null, dataBlockGhost ? "dataBlock" : null].filter((x): x is string => !!x);
   // An entry's stretched toggle OPENS `id` (single-open folds the rest). The box's − FOLDS it, and
   // that may leave no box open: the − exists only where `RailFold` puts it (the AI card, every card
   // on the phone — user, 2026-11-03), and folding is the reader's own choice, an override like any
@@ -701,6 +705,11 @@ export default function Inspector() {
     // block alone (`blockClearActions`) — the tick it hangs under stays pinned.
     block: block ? (
       <BlockPane key="block" onClose={() => applyClickActions(blockClearActions({ block: useStore.getState().block }))} {...cx("block")} />
+    ) : null,
+    // The Data blocks register's DATA BLOCK: a slot under its metagraph snapshot; its × releases the
+    // data block alone (`dataBlockClearActions`).
+    dataBlock: dataBlock ? (
+      <DataBlockPane key="dataBlock" onClose={() => applyClickActions(dataBlockClearActions({ dataBlock: useStore.getState().dataBlock }))} {...cx("dataBlock")} />
     ) : null,
     // The AI notes card: the lane's top slot, no rung, no ×, no ghost — it renders while the
     // manifest says a note stands.

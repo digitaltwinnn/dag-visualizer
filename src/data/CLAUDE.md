@@ -163,7 +163,11 @@ another network or around a pin (pinned by `src/store/followFlow.test.ts`). Pinn
 2026-11-07, user: "'decompress this snapshot', is it still needed?" — no: the decoder had both, so
 the metagraph snapshot card states its State tab, Data tab and dL1 signer count off the row and its
 "Decompress this snapshot" door went; `snapshot-exact-v9`). The deep channel read is the RAW pane's
-payload alone, read on arrival there.
+payload alone, read on arrival there. **And ONE SUMMARY PER DATA BLOCK** (`ChannelSnapRow.dataBlockRows`,
+`DataBlockSummary`: updates by kind — `payloadKinds`' mechanical names, "records" for a flat record —
+dL1 signers, bytes, and a sha256 DIGEST the decoder takes over the block's bytes, never called a hash
+since the chain publishes none; `snapshot-exact-v10`): the Data block card reads it, so no surface
+reads deep for a data block.
 
 (`blockReads.ts`, `components/BlockReadsBridge.tsx`): one read per block-bearing snapshot in the
 window, newest first, `WINDOW_READ_POOL` (8) in flight with no gap (user, 2026-11-07: "do the exact

@@ -95,6 +95,10 @@ export function applyClickActions(actions: ClickAction[], opts?: { quiet?: boole
         // pinned by the table's own snapshot action ahead of it, never here.
         st.setBlock(a.sel);
         break;
+      case "dataBlock":
+        // THE DATA BLOCKS REGISTER'S SUBJECT — the one writer of `store.dataBlock` (rule 2).
+        st.setDataBlock(a.sel);
+        break;
       case "trendFocus":
         // THE HISTORY VIEW'S PLANE FOCUS — one store effect, plus the paging that makes it
         // visible. `stackPoses` moves nothing for a focus outside the visible window (its own
@@ -163,6 +167,7 @@ function motionCauseOf(actions: readonly ClickAction[]): MotionCause | null {
       case "railNet": return { kind: "network", id: viewNetwork(useStore.getState()) };
       case "metaSnap": return a.sel ? { kind: "metaSnap", metaId: a.sel.metaId, ordinal: a.sel.ordinal } : { kind: "metaSnap", metaId: null };
       case "block": return { kind: "block", on: a.sel != null };
+      case "dataBlock": return { kind: "dataBlock", on: a.sel != null };
       case "trendFocus": return { kind: "focus", id: a.id };
       // A cursor step moves no scene — the planes' line and the card answer it.
       case "trendCursor": return null;
@@ -180,7 +185,7 @@ function motionCauseOf(actions: readonly ClickAction[]): MotionCause | null {
 export function switchLedgerRegister(to: LedgerRegister): void {
   const st = useStore.getState();
   if (st.ledgerRegister === to) return;
-  const actions = registerSwitchActions(to, { block: st.block, metaSnap: st.metaSnap });
+  const actions = registerSwitchActions(to, { block: st.block, metaSnap: st.metaSnap, dataBlock: st.dataBlock });
   if (actions.length) applyClickActions(actions);
   // Only Transaction blocks draws a block, so every other register drops its hover preview.
   if (!readsBlockWindow(to) && st.hoverBlock) st.setHoverBlock(null);
