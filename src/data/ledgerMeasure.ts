@@ -27,10 +27,12 @@ export type LedgerMeasure = "fee" | "anchors" | "metagraphs" | "size" | "data";
  *  first: it is the figure the rows have led with since 2026-09-13, so the default is unchanged. */
 export const LEDGER_MEASURE_ORDER: readonly LedgerMeasure[] = ["fee", "anchors", "metagraphs", "size"];
 
-/** THE DATA BLOCKS REGISTER'S ORDER (D6, 2026-11-07): the Snapshots measures with "Data updates"
- *  added, and LEADING — that register is read for the data its snapshots carry. The Metagraph
- *  snapshots register's own list does not grow. */
-export const DATA_MEASURE_ORDER: readonly LedgerMeasure[] = ["data", ...LEDGER_MEASURE_ORDER];
+/** THE DATA BLOCKS REGISTER'S SET (D6, 2026-11-07; D7, user: "instead of adding 'data updates' use
+ *  it to replace 'anchors'"): Data updates · Fees · Metagraphs · Size — "Data updates" takes Anchors'
+ *  place in the four and LEADS, since that register is read for the data its snapshots carry. Four
+ *  tiles sit two by two (`explorer/tileRows.ts`), so its longest word has a half-row to itself. The
+ *  Metagraph snapshots register keeps Fees · Anchors · Metagraphs · Size. */
+export const DATA_MEASURE_ORDER: readonly LedgerMeasure[] = ["data", "fee", "metagraphs", "size"];
 
 /** The word the heading control shows — what every tick row's figure IS. */
 export const LEDGER_MEASURE_LABELS: Readonly<Record<LedgerMeasure, string>> = {
@@ -145,8 +147,9 @@ export function tickMeasureValue(m: LedgerMeasure, snap: Pick<GlobalSnapshot, "m
 export const TICK_NET_MEASURES = ["fee", "anchors", "size"] as const satisfies readonly LedgerMeasure[];
 export type TickNetMeasure = (typeof TICK_NET_MEASURES)[number];
 export const TICK_NET_MEASURE_OPTIONS = levelOptions(LEDGER_MEASURE_OPTIONS, TICK_NET_MEASURES);
-/** …and in the Data blocks register, its data updates first (the exact breakdown's `dataTxCount`). */
-export const DATA_TICK_NET_MEASURES = ["data", ...TICK_NET_MEASURES] as const satisfies readonly LedgerMeasure[];
+/** …and in the Data blocks register, its data updates first (the exact breakdown's `dataTxCount`) and
+ *  no Anchors — the register's set has none (D7). */
+export const DATA_TICK_NET_MEASURES = ["data", "fee", "size"] as const satisfies readonly LedgerMeasure[];
 export const DATA_TICK_NET_MEASURE_OPTIONS = levelOptions(DATA_MEASURE_OPTIONS, DATA_TICK_NET_MEASURES);
 export function tickNetMeasure(
   m: TickNetMeasure | "data",

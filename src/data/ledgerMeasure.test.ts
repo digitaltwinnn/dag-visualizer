@@ -124,14 +124,20 @@ describe("the Data blocks register's measure", () => {
   ];
   const ex: SnapshotExact = { ...EXACT, rows };
 
-  it("leads with Data updates, then the Snapshots register's measures in their order", () => {
-    expect(DATA_MEASURE_ORDER).toEqual(["data", ...LEDGER_MEASURE_ORDER]);
+  it("is Data updates · Fees · Metagraphs · Size — Data updates in Anchors' place, leading (D7)", () => {
+    expect(DATA_MEASURE_ORDER).toEqual(["data", "fee", "metagraphs", "size"]);
+    expect(DATA_MEASURE_OPTIONS.map((o) => o.label)).toEqual(["Data updates", "Fees", "Metagraphs", "Size"]);
+    expect(DATA_MEASURE_ORDER).not.toContain("anchors");
+    // Four tiles, which `explorer/tileRows` lays two by two, so the long word has a half-row.
+    expect(DATA_MEASURE_ORDER).toHaveLength(4);
+    // The Metagraph snapshots register keeps its own four.
+    expect(LEDGER_MEASURE_OPTIONS.map((o) => o.label)).toEqual(["Fees", "Anchors", "Metagraphs", "Size"]);
     expect(DATA_MEASURE_OPTIONS[0]).toEqual({ id: "data", label: "Data updates", unit: "count" });
     expect(DATA_MEASURE_OPTIONS.map((o) => o.id)).toEqual([...DATA_MEASURE_ORDER]);
     // The Snapshots register's list does not grow.
     expect(LEDGER_MEASURE_ORDER).not.toContain("data");
-    expect(DATA_TICK_NET_MEASURES).toEqual(["data", ...TICK_NET_MEASURES]);
-    expect(DATA_TICK_NET_MEASURE_OPTIONS.map((o) => o.label)).toEqual(["Data updates", "Fees", "Anchors", "Size"]);
+    expect(DATA_TICK_NET_MEASURES).toEqual(["data", "fee", "size"]);
+    expect(DATA_TICK_NET_MEASURE_OPTIONS.map((o) => o.label)).toEqual(["Data updates", "Fees", "Size"]);
     expect(DATA_SNAP_MEASURES).toEqual(["data", ...SNAP_MEASURES]);
     expect(DATA_SNAP_MEASURE_OPTIONS.map((o) => o.label)).toEqual(["Data updates", "Fees", "Size"]);
   });
