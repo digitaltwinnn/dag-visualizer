@@ -420,7 +420,7 @@ export default function LedgerPanel() {
               ),
               hue: "var(--primary)",
               className: "animate-in fade-in slide-in-from-top-2 duration-300 motion-reduce:animate-none",
-              onClick: () => applyClickActions(followToggleActions(snap, false, useStore.getState().block)),
+              onClick: () => applyClickActions(followToggleActions(snap, false, useStore.getState().block, useStore.getState().inspect != null)),
             } as ExplorerRowSpec,
           ]
         : ([] as ExplorerRowSpec[])

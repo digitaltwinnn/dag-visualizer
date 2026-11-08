@@ -334,6 +334,9 @@ describe("the shared component builders (GeoExplore rows + LiveStrip bars run th
     // Resuming live releases the tick-local network first — it names a network in the tick being left.
     expect(followToggleActions(p, false, null)).toEqual([{ kind: "tickNet", sel: null }, { kind: "snapshot", pick: p, follow: true }]);
     expect(followToggleActions(p, true, null)).toEqual([{ kind: "snapshot", pick: p, follow: false }]);
+    // …and the held NODE (a snapshot's signer) is released first on a resume (user, 2026-11-08).
+    expect(kinds(followToggleActions(p, false, null, true))).toEqual(["inspect", "tickNet", "snapshot"]);
+    expect(kinds(followToggleActions(p, true, null, true))).toEqual(["snapshot"]);
   });
 });
 

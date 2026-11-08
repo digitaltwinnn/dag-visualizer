@@ -753,13 +753,23 @@ export function followToggleActions(
   following: boolean,
   /** The committed block — REQUIRED, so no caller can forget it hangs under one tick. */
   block: BlockSel | null,
+  /** Is a node card held? Resuming live releases it (below). Optional: a caller with no node slot. */
+  hasInspect = false,
 ): ClickAction[] {
   // Resuming live releases the tick-local network first: it is "this network in THAT tick", and
   // left standing it kept the chamber dimmed for it until the next beat — and came back from a
   // plain click on the same tick later. A committed BLOCK goes for the same reason, whatever tick
-  // is shown: live walks the card off its tick on the next beat. Finest first.
+  // is shown: live walks the card off its tick on the next beat. And the NODE (user, 2026-11-08:
+  // "select a node (signed its parent metagraph snapshot) and then back to live mode … the node
+  // card should be cleared as it's not in the rung anymore"): the ledger's node is a metagraph
+  // snapshot's signer, and live lets go of the snapshot it signed. Finest first.
   if (!following) {
-    return [...(block ? [{ kind: "block", sel: null } as const] : []), { kind: "tickNet", sel: null }, { kind: "snapshot", pick: shown, follow: true }];
+    return [
+      ...(hasInspect ? [{ kind: "inspect", pick: null } as const] : []),
+      ...(block ? [{ kind: "block", sel: null } as const] : []),
+      { kind: "tickNet", sel: null },
+      { kind: "snapshot", pick: shown, follow: true },
+    ];
   }
   // Pinning what is on screen keeps a block of that tick and drops one of any other.
   const out: ClickAction[] = [];

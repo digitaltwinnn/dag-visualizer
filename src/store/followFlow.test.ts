@@ -85,6 +85,14 @@ describe("the follow flow decision table", () => {
     expect(st().following).toBe(true);
   });
 
+  it("PINNED → LIVE with a signer node held: the node card goes with the snapshot it signed (user, 2026-11-08)", () => {
+    const node = { kind: "metanode", meta: { id: LISTED }, node: { ip: "1.2.3.4", id: "n1" }, title: "n", sub: "" } as unknown as PickDescriptor;
+    useStore.setState({ following: false, snap: snapPick(100), metaSnap: child(100), inspect: node });
+    applyClickActions(followToggleActions(snapPick(100), false, st().block, st().inspect != null));
+    expect(st().following).toBe(true);
+    expect(st().inspect).toBeNull();
+  });
+
   it("LIVE → clicking the auto-followed metagraph snapshot CONVERTS it to a pin (never a silent deselect)", () => {
     useStore.setState({ following: true, snap: snapPick(100), metaSnap: child(100), filter: LISTED });
     applyClickActions(

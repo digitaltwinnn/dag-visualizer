@@ -190,6 +190,10 @@ The design rules behind the table, which the tests pin but don't explain:
   not a pick — the auto-followed metagraph snapshot's rule), and the Block card's LIVE / PINNED
   control is `blockFollowActions`, which re-commits the block LAST either way so its card stays the
   box the reader pressed.
+- **Resuming LIVE releases the signer node** (user, 2026-11-08): `followToggleActions(…, hasInspect)`
+  drops the node card first on a resume — the ledger's node is a metagraph snapshot's signer, and
+  live lets go of the snapshot it signed, so a node left standing would hang from a rung that has
+  moved on. Both callers (the Global snapshot card's control, the explorer's live row) pass it.
 - **A register switch is a setting that RELEASES** (2026-11-06; three registers since D6). `registerSwitchActions`
   drops what the register ENTERED cannot draw — entering Transaction blocks drops the metagraph
   snapshot, entering either other (Metagraph snapshots or Data blocks) drops the block, and

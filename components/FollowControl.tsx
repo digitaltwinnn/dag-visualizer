@@ -112,7 +112,7 @@ export default function FollowControl({ className, subject = "snapshot" }: { cla
           if (b) applyClickActions(blockFollowActions(b, target, following));
           return;
         }
-        applyClickActions(followToggleActions(target, following, b));
+        applyClickActions(followToggleActions(target, following, b, useStore.getState().inspect != null));
       }}
       // One box in every state, so the pill keeps its height and place as the state flips: the
       // padding is there when it is invisible (LIVE, transparent) as when the PINNED wash makes it
