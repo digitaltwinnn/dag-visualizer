@@ -92,7 +92,8 @@ import { ByteBar, SEED_W } from "../objects/ByteBar";
 import { LiveEdge } from "../objects/LiveEdge";
 import { snapBright, snapFocusOf, focusWeightOf, emphasisK } from "../../domain/dimModel";
 import { Ribbons, type AnchorLine } from "../objects/Ribbons";
-import { SnapshotPlane, makeEdgeLabel, retintEdgeLabel, GLOBAL_PLANE_LOOK, META_PLANE_LOOK, BRAID_PANE_LOOK } from "../objects/SnapshotPlane";
+import { SnapshotPlane, makeEdgeLabel, retintEdgeLabel, GLOBAL_PLANE_LOOK, META_PLANE_LOOK } from "../objects/SnapshotPlane";
+import { BraidPane } from "../objects/BraidPane";
 import { TrailRewind } from "../objects/TrailRewind";
 import type { StageLight } from "../objects/StageLight";
 import { STAGE_LIGHTS } from "../../domain/stageLight";
@@ -250,7 +251,10 @@ const BRAID_GAP = 1.2;
 const BRAID_LO = FLOOR_Y.gl0 + BAR_LIFT + BAR_H + BRAID_GAP + DAG_BLOCK / 2;
 const BRAID_HI = FLOOR_Y.msnap - BRAID_GAP - DAG_BLOCK / 2;
 const BRAID_Y = (BRAID_LO + BRAID_HI) / 2;
-const BRAID_HALF = (BRAID_HI - BRAID_LO) / 2;
+/** The band's reach about its centre line, a FIFTH short of the room (user, 2026-11-08: "make the
+ *  braid glass sheet and DAG 20 narrower"); the token band and the pane derive from it. */
+const BRAID_FIT = 0.8;
+const BRAID_HALF = ((BRAID_HI - BRAID_LO) / 2) * BRAID_FIT;
 /** Blocks that share a tick and a place step aside along the trail by this much, alternately. */
 const BLOCK_STEP = 0.7;
 /** THE TOKEN BRAID is a SHORT band stood on the TILE (user, 2026-11-07: "identical to how they are
@@ -320,9 +324,9 @@ export class LedgerView implements SceneView {
   private _floorBlockers: THREE.Object3D[] = [];
   /** The plane blueprint instances: the global floor (main + gutter) and one per metagraph lane. */
   private _globalPlanes: SnapshotPlane[] = [];
-  /** THE BRAID PANE (2026-11-08): a vertical sheet in the DAG braid's plane, just behind the blocks,
-   *  drawn in Transaction blocks while DAG blocks stand (`BRAID_PANE_LOOK`). */
-  private _braidPane!: SnapshotPlane;
+  /** THE BRAID PANE (2026-11-08): a soft sheet in the DAG braid's plane, just behind the blocks,
+   *  drawn in Transaction blocks while DAG blocks stand (`objects/BraidPane.ts`). */
+  private _braidPane!: BraidPane;
   private _metaPlanes = new Map<string, SnapshotPlane>();
 
   // ── the adapters (spec §4.2–§4.4)
@@ -627,13 +631,12 @@ export class LedgerView implements SceneView {
       // they sit at the front, where an end is honest.
       p.setHorizon(HORIZON_X, HORIZON_SPAN);
     }
-    // The braid pane: the band the DAG braid opens in (`BRAID_LO`..`BRAID_HI`, a block's edge of room
-    // either side), standing just behind the blocks on the camera's far side of their centre line.
-    this._braidPane = new SnapshotPlane(this.group, this._colors, {
-      w: W, d: BRAID_HI - BRAID_LO + DAG_BLOCK * 2, y: BRAID_Y, cx, cz: -(DAG_BLOCK / 2 + 0.15), vertical: true,
+    // The braid pane: the band the DAG braid opens in (`BRAID_HALF` about `BRAID_Y`, a block's edge of
+    // room either side), standing just behind the blocks on the camera's far side of their centre line.
+    this._braidPane = new BraidPane(this.group, this._colors, {
+      w: W, h: BRAID_HALF * 2 + DAG_BLOCK * 2, cx, cy: BRAID_Y, cz: -(DAG_BLOCK / 2 + 0.15),
     });
     this._braidPane.setHorizon(HORIZON_X, HORIZON_SPAN);
-    this._braidPane.fill.visible = false;
 
   }
 
@@ -665,9 +668,7 @@ export class LedgerView implements SceneView {
     for (const p of this._globalPlanes) p.applyAlpha(GLOBAL_PLANE_LOOK, a, FLOOR_D / 2);
     // The braid pane stands only while DAG blocks do (the register's, and not under a token filter,
     // whose window holds no DAG block); it fades with the furniture.
-    const paneOn = this._cargo.blocks && this._dagTier.count > 0;
-    this._braidPane.fill.visible = paneOn;
-    if (paneOn) this._braidPane.applyAlpha(BRAID_PANE_LOOK, a, FLOOR_D / 2);
+    this._braidPane.apply(this._cargo.blocks && this._dagTier.count > 0, a);
     // The committed (or hover-previewed) network's OWN plane glows a step brighter — the
     // plane-level twin of the colored dim (user, 2026-08-07).
     const netKey = this._netDimKey();
@@ -717,7 +718,8 @@ export class LedgerView implements SceneView {
     this._paper = isLightGround(c);
     this._core = c.core;
     this._coreCol.setHex(c.core);
-    for (const p of [...this._globalPlanes, ...this._metaPlanes.values(), this._braidPane]) p.setColors(c);
+    for (const p of [...this._globalPlanes, ...this._metaPlanes.values()]) p.setColors(c);
+    this._braidPane.setColors(c);
     this._bar.setColors(c);
     this._ribbons.setColors(c);
     for (const t of this._tiers) t.setColors(c);
@@ -2119,7 +2121,8 @@ export class LedgerView implements SceneView {
   dispose() {
     for (const o of this._ordLabels.values()) this._disposeOrd(o);
     this._ordLabels.clear();
-    for (const p of [...this._globalPlanes, ...this._metaPlanes.values(), this._braidPane]) p.dispose();
+    for (const p of [...this._globalPlanes, ...this._metaPlanes.values()]) p.dispose();
+    this._braidPane.dispose();
     this._globalPlanes.length = 0;
     this._metaPlanes.clear();
     this._bar.dispose();
