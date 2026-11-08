@@ -1127,7 +1127,9 @@ rows carry (user: "'live' is fine in the header but is not shown in the explorer
 its write `blockFollowActions`), the Global snapshot card keeps only its age there WHILE A BLOCK CARD
 STANDS — with none (a pin carried in from another register, the block's ×, a re-click releasing it)
 the Global card carries the control again (`blockWindow.liveControlCard`, review I1: else nothing said
-PINNED and nothing offered LIVE) — a click on the live block PINS it, and the Block card is the register's DEFAULT BOX ahead of the note (`focusSlotId`; the
+PINNED and nothing offered LIVE) — a click on the live block PINS it, and the Block card is the register's DEFAULT BOX ahead of the note — and ahead of a NETWORK FILTER's card
+(user, 2026-11-08: under a DOR filter the Metagraph dossier opened as the box and pushed the live
+block out of the rail; the filter is a lens there, so its card stands folded above the block) (`focusSlotId`; the
 view is entered on the auto rule, not the note's pin — `LaneCollapseState.seats`). Pinned by
 `src/store/followFlow.test.ts`'s Blocks cases, `selStack.test.ts`, `railCards.test.ts` and
 `railCollapse.test.ts`. **A pin keeps saying PINNED while the feed is down** (ruling, 2026-11-07,

@@ -185,6 +185,12 @@ export function focusSlotId(s: LadderState): string | null {
     // the network selection's card is the CONTEXT dossier (user, 2026-08-14: a filter
     // commit focuses the metagraph card, not whatever snapshot the follow pinned).
     const id = slot === "network" ? "context" : slot;
+    // IN TRANSACTION BLOCKS THE FILTER IS A LENS, NOT THE BOX (user, 2026-11-08: "filter on DOR,
+    // transaction blocks, live → the right card rung layout breaks" — the Metagraph dossier opened
+    // as the box, 550px tall, and pushed the register's own subject, the live block, out of the rail).
+    // The block stays the box while the filter's network card stands folded above it; a card chosen
+    // INSIDE the view (a pin, a snapshot) still ranks as it does everywhere.
+    if (id === "context" && inBlocks(s) && present.includes("block")) continue;
     if (present.includes(id)) return id;
   }
   // Nothing chosen IN THE BLOCKS REGISTER: the LIVE BLOCK (D3, user 2026-11-07 — live follows the

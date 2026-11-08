@@ -259,6 +259,12 @@ describe("the block slot", () => {
   it("a block commit is the focus slot", () => {
     expect(focusSlotId({ ...blocks({ snap: snapPick, block }), selStack: ["block", "snap"] })).toBe("block");
   });
+  it("under a network FILTER the live block stays the box — the filter is a lens, its card folds above (2026-11-08)", () => {
+    const s = { ...blocks({ snap: snapPick, block, filter: "dor", filterLabel: "DOR" }), selStack: ["network" as const] };
+    expect(focusSlotId(s)).toBe("block");
+    // The same stack in Metagraph snapshots boxes the Metagraph card as it always did.
+    expect(focusSlotId({ ...details({ mode: "ledger", ledgerRegister: "snapshots", snap: snapPick, filter: "dor", filterLabel: "DOR" }), selStack: ["network" as const] })).toBe("context");
+  });
   // D3 (user, 2026-11-07): in the Blocks register live follows the newest block, so the Block card
   // is the register's subject even when no reader picked it — the default box, ahead of the note.
   it("the LIVE block (seated by the follow, unranked) is the default focus in the Blocks register, ahead of the note", () => {
