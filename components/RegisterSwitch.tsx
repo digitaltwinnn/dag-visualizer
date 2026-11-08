@@ -154,7 +154,9 @@ export default function RegisterSwitch() {
             </span>
             <span className="flex items-center justify-center font-mono text-label leading-none tabular-nums whitespace-nowrap opacity-75 group-aria-pressed:opacity-100 group-aria-pressed:text-foreground">
               <span className="max-[700px]:hidden max-[700px]:group-aria-pressed:inline">{span[r]}</span>
-              {count[r] && <span className="max-[700px]:hidden ml-2 pl-2 border-l border-border group-aria-pressed:text-primary">{count[r]}</span>}
+              {/* The divider is the TEXT's own ink at a third (user, 2026-11-08: "the | is hardly visible" — the
+                  structural hairline, further dimmed by the unlit half's opacity, vanished on the glass). */}
+              {count[r] && <span className="max-[700px]:hidden ml-2 pl-2 border-l border-current/35 group-aria-pressed:text-primary">{count[r]}</span>}
               <span className="hidden max-[700px]:inline max-[700px]:group-aria-pressed:hidden">{shortSpan[r]}</span>
             </span>
           </button>
