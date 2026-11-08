@@ -1,6 +1,6 @@
 import { fact, median } from "@/src/data/noteFacts";
 import { WHOLE_ACTIVITY_LABEL, activityFacts } from "@/src/data/noteFactsActivity";
-import { countChange, pickChanges, siteMoves, siteOfChange } from "@/src/data/noteChanges";
+import { WEEK_WORDS, countChange, pickChanges, siteMoves, siteOfChange } from "@/src/data/noteChanges";
 import type { Fact, FactPair, NoteChange, NoteChangeSubject } from "@/src/data/noteTypes";
 import { anchorSeries } from "@/src/data/trendSeries";
 import { trimNewestPartial, type TrendsWindowData } from "@/src/data/trendWindow";
@@ -431,7 +431,7 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     const then = weekBefore(ownMeasured(id), now);
     // A measured day of the network lists every country it had nodes in, so one absent there held none.
     const was = then ? (then.netCc.get(id)?.get(subjectNetCc) ?? 0) : null;
-    if (was != null) ownRow = countChange(netName, was, here, { kind: "self" }, { city: country, was });
+    if (was != null) ownRow = countChange(netName, was, here, { kind: "self" }, { city: country, was }, WEEK_WORDS);
     const key = `${id}:cc:${subjectNetCc}`;
     facts.push(fact(`${netName}, nodes in ${country}`, here, "count", undefined, was != null ? { key, end: "to" } : undefined));
     // THE ONLY ONE HAS NOTHING TO RANK AGAINST (user, 2026-10-31: "100% of its located nodes and
@@ -463,7 +463,7 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     // field that day says nothing about this provider.
     const thenIsp = then?.netIsp.get(id);
     const was = thenIsp ? (providersOf(thenIsp, providerNames).get(p.group)?.count ?? 0) : null;
-    if (was != null) ownRow = countChange(provider, was, p.count, { kind: "self" });
+    if (was != null) ownRow = countChange(provider, was, p.count, { kind: "self" }, null, WEEK_WORDS);
     const key = `${id}:provider:${p.group}`;
     facts.push(fact(`${netName}, nodes with ${provider}`, p.count, "count", undefined, was != null ? { key, end: "to" } : undefined));
     if (ownProv.length > 1) {
@@ -483,7 +483,7 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     const provider = pn(p);
     subjectName = provider;
     const before = geoThen ? providersOf(geoThen.isp, providerNames).get(p.group)?.count : undefined;
-    if (before) ownRow = countChange(provider, before, p.count, { kind: "self" });
+    if (before) ownRow = countChange(provider, before, p.count, { kind: "self" }, null, WEEK_WORDS);
     const key = `provider:${p.group}`;
     facts.push(fact(`${provider}, nodes`, p.count, "count", undefined, before ? { key, end: "to" } : undefined));
     facts.push(fact(`${provider}, share of the network's nodes`, p.count / knownFleet, "share"));
@@ -498,7 +498,7 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     if (!here) return null;
     const name = cn(subjectCc);
     const wasHere = ccWas(subjectCc);
-    if (wasHere) ownRow = countChange(name, wasHere, here, { kind: "self" });
+    if (wasHere) ownRow = countChange(name, wasHere, here, { kind: "self" }, null, WEEK_WORDS);
     facts.push(fact(`${name}, nodes`, here, "count", undefined, ccNowEnd(subjectCc)));
     facts.push(fact(`${name}, share of the network's nodes`, here / locatedFleet, "share"));
     facts.push(fact(`${name}, rank by nodes`, 1 + countries.filter((c) => c.count > here).length, "count"));
@@ -587,7 +587,7 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     // A SUBJECT CARD'S ROWS (user, 2026-11-02): its own move, then where inside it that happened,
     // each opening that provider there. Only the fleet's sites name a place.
     const inside = subjectCc || subjectIsp ? siteMoves(sitesOn(now), sitesOn(geoThen), (cc, key) => (subjectCc ? cc === subjectCc : key === subjectIsp || providers.find((x) => x.keys.has(subjectIsp!))?.keys.has(key) === true)) : [];
-    const rows = inside.flatMap((m) => countChange(pn(providersOf(new Map([[m.key, 1]]), providerNames).values().next().value!), m.from, m.to, { kind: "provider", keys: [m.key], cc: m.cc, city: m.city }, { city: m.city, was: m.from }) ?? []);
+    const rows = inside.flatMap((m) => countChange(pn(providersOf(new Map([[m.key, 1]]), providerNames).values().next().value!), m.from, m.to, { kind: "provider", keys: [m.key], cc: m.cc, city: m.city }, { city: m.city, was: m.from }, WEEK_WORDS) ?? []);
     changes = pickChanges(ownRow ? [ownRow] : [], rows);
   } else {
     const ownThen = subjectNet ? weekBefore(ownMeasured(subjectNet), now) : null;
@@ -597,7 +597,7 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     const ispThen = subjectNet ? ownThen?.netIsp.get(subjectNet) : geoThen?.isp;
     const countryRows = ccThen
       ? [...new Set([...ccNow.keys(), ...ccThen.keys()])].flatMap((cc) =>
-          countChange(countryOf(cc), ccThen.get(cc) ?? 0, ccNow.get(cc) ?? 0, { kind: "country", cc }) ?? [],
+          countChange(countryOf(cc), ccThen.get(cc) ?? 0, ccNow.get(cc) ?? 0, { kind: "country", cc }, null, WEEK_WORDS) ?? [],
         )
       : [];
     const was = ispThen ? providersOf(ispThen, providerNames) : null;
@@ -614,7 +614,7 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
           const keys = new Set([...(a?.keys ?? []), ...(b?.keys ?? [])]);
           const site = siteOfChange(keys, sitesNow, sitesThen, to - from);
           const subject: NoteChangeSubject = { kind: "provider", keys: [...keys], cc: site?.cc ?? null, city: site?.city ?? null };
-          return countChange(p.name, from, to, subject, site) ?? [];
+          return countChange(p.name, from, to, subject, site, WEEK_WORDS) ?? [];
         })
       : [];
     changes = pickChanges(countryRows, providerRows);

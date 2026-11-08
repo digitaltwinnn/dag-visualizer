@@ -1,6 +1,6 @@
 import { isPause } from "@/src/data/notableDays";
 import { chainReadThrough, fact, median, networksAnchored, spanMeasured, wholeMean, type ChainReads } from "@/src/data/noteFacts";
-import { eventChange, largestGlobalChange, longestGapChange, pauseChange, pickChanges, rateChange, rhythmChange, withExtremes } from "@/src/data/noteChanges";
+import { DAY_WORDS, eventChange, largestGlobalChange, longestGapChange, pauseChange, pickChanges, rateChange, rhythmChange, withExtremes } from "@/src/data/noteChanges";
 import type { Fact, FactPair, NoteChange, NoteChangeFind, NoteLead } from "@/src/data/noteTypes";
 import { anchorSeries, formatDag, globalSeries, metricSeries, spanAverage, TREND_METRICS, trimCounterEdges, unlistedUnmeasured, withUnlisted } from "@/src/data/trendSeries";
 import type { TrendsWindowData } from "@/src/data/trendWindow";
@@ -274,8 +274,8 @@ export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: st
       const name = catalog[id] ?? id;
       const sure = dayMeasured && chainReadThrough(input.chainReads, id, recent.now);
       const daily = spanAverage("snapshots", trimmed(snaps(week), week), week.stepMs) ?? 0;
-      if (sure && now === 0 && daily >= EVENT_MIN_SNAPS) events.push({ ...eventChange(name, "quiet", at), find: { chain: id, last: true } });
-      else if (sure && now >= EVENT_MIN_SNAPS && usual <= now) events.push(eventChange(name, "active", at)); // the week's snapshots are all the day's
+      if (sure && now === 0 && daily >= EVENT_MIN_SNAPS) events.push({ ...eventChange(name, "quiet", at, DAY_WORDS), find: { chain: id, last: true } });
+      else if (sure && now >= EVENT_MIN_SNAPS && usual <= now) events.push(eventChange(name, "active", at, DAY_WORDS)); // the week's snapshots are all the day's
       else {
         const change = rhythmChange(name, spacing(week) ?? 0, spacing(recent) ?? 0, at);
         if (change) paces.push(change);
@@ -293,20 +293,20 @@ export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: st
       }
     }
   }
-  // THE CHAMBER'S EXTREMES: the span's largest global snapshot and its longest gap, so a quiet day
+  // THE CHAMBER'S EXTREMES: the range's largest global snapshot and its longest gap, so a quiet day
   // still has something to click. Each network's own widest reading for the gap, which is why a
   // stopped one stands out of it. No `g.anchorsMax` is the store from before the sampler kept one.
   const extremes: NoteChange[] = [];
   if (whole) {
     const largest = peakOf(recent.series["g.anchorsMax"] ?? [], recent);
-    if (largest) extremes.push({ ...largestGlobalChange(largest.v), find: { chain: null, fromMs: largest.fromMs, toMs: largest.toMs, count: largest.v } });
+    if (largest) extremes.push({ ...largestGlobalChange(largest.v, DAY_WORDS), find: { chain: null, fromMs: largest.fromMs, toMs: largest.toMs, count: largest.v } });
     let gap: { id: string; v: number; fromMs: number; toMs: number } | null = null;
     for (const id of ids) {
       const peak = peakOf(recent.series[`m.${id}.gapMax`] ?? [], recent);
       if (peak && (!gap || peak.v > gap.v)) gap = { id, ...peak };
     }
     const widest = gap as { id: string; v: number; fromMs: number; toMs: number } | null;
-    if (widest && !paused.length) extremes.push({ ...longestGapChange(catalog[widest.id] ?? widest.id, widest.v, { kind: "network", id: widest.id }), find: { chain: widest.id, fromMs: widest.fromMs, toMs: widest.toMs, gapS: widest.v } }); // a pause is that gap
+    if (widest && !paused.length) extremes.push({ ...longestGapChange(catalog[widest.id] ?? widest.id, widest.v, { kind: "network", id: widest.id }, DAY_WORDS), find: { chain: widest.id, fromMs: widest.fromMs, toMs: widest.toMs, gapS: widest.v } }); // a pause is that gap
   }
   const changes = withExtremes(pickChanges(events, paused, paces, rateRows), extremes);
   return { facts, names: [...new Set(Object.values(catalog))], lead: leadOf(facts), ...(changes.length ? { changes } : {}) };

@@ -317,8 +317,14 @@ export const ABOUT: Record<Mode, { title: string; eyebrow: string; text: string;
   ledger: {
     title: "When the network anchors",
     eyebrow: "About",
+    // REWRITTEN 2026-11-08 (user: "mention how snapshots store state — anchored metagraph snapshots,
+    // proof of that snapshot but not the snapshot itself —, data blocks … and transaction blocks").
+    // The three registers of the view, in order: what a global snapshot holds, what a metagraph
+    // snapshot holds (proofs of its state, not the state), and the two kinds of block that change
+    // that state, each signed by its own validators before the snapshot seals it. Plain words, no
+    // layer codes; the scene and the cards carry those.
     text:
-      "Snapshots happen at two levels. Each network creates its own, on its own schedule and in its own format, and anchors into the global snapshot whatever it wants kept, while the base ledger creates one global snapshot for all of them. Every snapshot is signed by the validators that created it, so it stays provable, and how often a network anchors, and how much, depends on what it does.",
+      "Snapshots happen at two levels. Each network creates its own, on its own schedule, and the base ledger creates one global snapshot that anchors all of them. A global snapshot holds each network's snapshot for that moment, not its ledger: a metagraph snapshot carries proofs of the network's state, signed by the validators that created it, so the state can be checked against it without being copied. What changes that state are blocks. Transaction blocks move value; data blocks carry a network's own data updates. Each block is signed by its own validators before the network accepts it into a snapshot, so a change is vouched for twice: by the validators that made it, and by the snapshot that sealed it.",
   },
   trend: {
     eyebrow: "Measured history",

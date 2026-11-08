@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { BookOpen, ChevronDown, ExternalLink, Settings } from "lucide-react";
 import { ABOUT_ICON as AboutIcon } from "@/components/icons";
-import { CONSTELLATION, GITHUB, GithubMark } from "@/components/SiteFooter";
+import { CONSTELLATION } from "@/components/SiteFooter";
 import { metagraphById } from "@/src/data/network";
 import { useStore } from "@/src/store/store";
 import { DOC_PATHS } from "@/components/views";
@@ -91,10 +91,6 @@ export default function SettingsMenu({ onAboutView }: { onAboutView?: () => void
         <div className="min-[700px]:hidden">
           <SectionRule />
           <SectionLabel>Links</SectionLabel>
-          <MenuRow href={GITHUB} external>
-            <GithubMark />
-            Source code
-          </MenuRow>
           <MenuRow href={dag?.siteUrl ?? CONSTELLATION} external>
             {dag?.iconUrl ? <img src={dag.iconUrl} alt="" width={16} height={16} className="rounded-full flex-none" /> : <ExternalLink aria-hidden className="size-3.5" />}
             Constellation

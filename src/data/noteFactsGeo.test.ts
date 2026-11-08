@@ -724,13 +724,13 @@ describe("geoFacts' notable changes", () => {
   it("a row for a country and one for a provider that moved, read as the facts read them", () => {
     const r = geoFacts(input(week))!;
     expect(r.changes).toMatchObject([{ kind: "lost", size: 2, subject: { kind: "provider", keys: ["ovh-sas"], cc: null, city: null } }]);
-    expect(r.changes?.map(briefLine)).toEqual(["OVH's nodes | Nodes lost 2 · Nodes at the start of the span 12 · Nodes at the end of the span 10"]);
+    expect(r.changes?.map(briefLine)).toEqual(["OVH's nodes | Nodes lost 2 · Nodes 7 days ago 12 · Nodes now 10"]);
   });
   it("names the city only where the sites measured it at both ends", () => {
     const site = (n: number) => ({ "f.site.DE.Falkenstein.ovh-sas": n });
     const r = geoFacts(input({ ...week, siteDays: { "2026-10-20": site(12), "2026-10-27": site(10) } }))!;
     expect(r.changes?.[0]).toMatchObject({ subject: { cc: "DE", city: "Falkenstein" } });
-    expect(briefLine(r.changes?.[0])).toBe("OVH's nodes in Falkenstein | Nodes lost 2 · Nodes in Falkenstein at the start of the span 12 · Nodes in Falkenstein at the end of the span 10");
+    expect(briefLine(r.changes?.[0])).toBe("OVH's nodes in Falkenstein | Nodes lost 2 · Nodes in Falkenstein 7 days ago 12 · Nodes in Falkenstein now 10");
   });
   it("a move too small for its count has no row, though the note can state it", () => {
     const r = geoFacts(input(week))!;
@@ -770,11 +770,11 @@ describe("geoFacts' notable changes", () => {
     it("then the provider and city that moved inside it, which open that group", () => {
       const r = geoFacts(input({ ...bigWeek, ...sites, subject: { cc: "DE" } }))!;
       expect(r.changes?.[1]).toMatchObject({ subject: { kind: "provider", keys: ["ovh-sas"], cc: "DE", city: "Falkenstein" } });
-      expect(briefLine(r.changes?.[1])).toBe("OVH's nodes in Falkenstein | Nodes lost 2 · Nodes in Falkenstein at the start of the span 12 · Nodes in Falkenstein at the end of the span 10");
+      expect(briefLine(r.changes?.[1])).toBe("OVH's nodes in Falkenstein | Nodes lost 2 · Nodes in Falkenstein 7 days ago 12 · Nodes in Falkenstein now 10");
     });
     it("a provider says its own move and where", () => {
       const r = geoFacts(input({ ...week, ...sites, subject: { isp: "ovh-sas" } }))!;
-      expect(r.changes?.map(briefLine)).toEqual(["OVH's nodes | Nodes lost 2 · Nodes at the start of the span 12 · Nodes at the end of the span 10", "OVH's nodes in Falkenstein | Nodes lost 2 · Nodes in Falkenstein at the start of the span 12 · Nodes in Falkenstein at the end of the span 10"]);
+      expect(r.changes?.map(briefLine)).toEqual(["OVH's nodes | Nodes lost 2 · Nodes 7 days ago 12 · Nodes now 10", "OVH's nodes in Falkenstein | Nodes lost 2 · Nodes in Falkenstein 7 days ago 12 · Nodes in Falkenstein now 10"]);
       expect(r.changes?.[0]!.subject).toEqual({ kind: "self" });
     });
     it("a network's country or provider says its own move: nothing stores a network by place", () => {

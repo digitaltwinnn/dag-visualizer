@@ -1,5 +1,5 @@
 import type { Fact, FactPair } from "@/src/data/noteTypes";
-import { formatSeconds, trimCounterEdges } from "@/src/data/trendSeries";
+import { trimCounterEdges } from "@/src/data/trendSeries";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
 
 // THE SHARED HELPERS OF EVERY VIEW'S FACTS BUILDER — one home. A builder (History's is
@@ -46,6 +46,24 @@ export function spellDurations(text: string): string {
   return text.replace(SHORT_DURATION_RE, (_, n: string, u: string) => `${n} ${UNIT_WORDS[u]}${n === "1" ? "" : "s"}`);
 }
 
+/** A DURATION IN A NOTE IS SAID THE WAY A READER SAYS IT (user, 2026-11-08: "avoid numbers in Gate
+ *  AI cards saying 1.x minutes … what is the common way?"): seconds under a minute ("45 seconds"),
+ *  then whole minutes, hours or days, rounded, with "about" where the rounding moved the figure by
+ *  more than a twentieth ("about 1 minute" for 66 seconds, "about 2 minutes" for 1.9, "2 hours" for
+ *  2.02) — never "1.5 minutes". The chart's `formatSeconds` keeps its decimal: an axis is read, not said. */
+export function durationWords(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) return "—";
+  const unit = (n: number, word: string) => `${n.toLocaleString("en-US")} ${word}${n === 1 ? "" : "s"}`;
+  const said = (v: number, word: string) => {
+    const n = Math.max(1, Math.round(v));
+    return `${Math.abs(n - v) / v > 0.05 ? "about " : ""}${unit(n, word)}`;
+  };
+  if (Math.round(seconds) < 60) return unit(Math.round(seconds), "second");
+  if (Math.round(seconds / 60) < 60) return said(seconds / 60, "minute");
+  if (Math.round(seconds / 3600) < 48) return said(seconds / 3600, "hour");
+  return said(seconds / 86_400, "day");
+}
+
 /** One fact. `kind` picks the notation: count (12,159), amount (one decimal at most, two
  *  significant digits under 1), share (a rounded %), ratio (2 decimals), duration
  *  (`formatSeconds`, written out, seconds in), date (UTC "Oct 19", epoch ms in). `format` replaces an amount's
@@ -66,7 +84,7 @@ export function fact(
       break;
     case "share": text = `${Math.round(value * 100)}%`; break;
     case "ratio": text = value.toFixed(2); break;
-    case "duration": text = spellDurations(formatSeconds(value)); break;
+    case "duration": text = durationWords(value); break;
     case "date": {
       const d = new Date(value);
       text = `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;

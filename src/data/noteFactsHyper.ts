@@ -2,7 +2,7 @@ import { ROLE_SHORT, roleKeyLabel } from "@/src/data/composition";
 import { fact, gaugeChange, heldLevel, networksAnchored, observedLevel } from "@/src/data/noteFacts";
 import { WHOLE_ACTIVITY_LABEL, activityFacts, lastWeekMean, weekStart } from "@/src/data/noteFactsActivity";
 import { notableDays } from "@/src/data/notableDays";
-import { countChange, eventChange, pickChanges } from "@/src/data/noteChanges";
+import { WEEK_WORDS, countChange, eventChange, pickChanges } from "@/src/data/noteChanges";
 import type { Fact, NoteChange } from "@/src/data/noteTypes";
 import { anchorSeries, typeBands, withUnlisted } from "@/src/data/trendSeries";
 import { trimNewestPartial, type TrendsWindowData } from "@/src/data/trendWindow";
@@ -237,11 +237,11 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
     const ch = read && start(read);
     if (!ch) return;
     if (!spanChange(points)) {
-      facts.push(fact(`${label} at the end of the span`, ch.to, "count"));
+      facts.push(fact(`${label} ${WEEK_WORDS.end}`, ch.to, "count"));
       return;
     }
-    facts.push(fact(`${label} at the start of the span`, ch.from, "count", undefined, { key: label, end: "from" }));
-    facts.push(fact(`${label} at the end of the span`, ch.to, "count", undefined, { key: label, end: "to" }));
+    facts.push(fact(`${label} ${WEEK_WORDS.start}`, ch.from, "count", undefined, { key: label, end: "from" }));
+    facts.push(fact(`${label} ${WEEK_WORDS.end}`, ch.to, "count", undefined, { key: label, end: "to" }));
     if (ch.from > 0 && ch.to !== ch.from) facts.push(fact(`${label}, ratio end to start`, ch.to / ch.from, "ratio"));
   };
 
@@ -286,16 +286,16 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
     const movers = reads
       .filter((m): m is typeof m & { ch: GaugeChange } => !!m.ch && m.ch.to !== m.ch.from)
       .sort((a, b) => Math.abs(b.ch.to - b.ch.from) - Math.abs(a.ch.to - a.ch.from) || a.id.localeCompare(b.id));
-    facts.push(fact("Networks whose node count changed over the span", movers.length, "count"));
-    counts = movers.flatMap(({ id, ch }) => countChange(nameOf(id), ch.from, ch.to, { kind: "network", id }) ?? []);
+    facts.push(fact(`Networks whose node count changed in ${WEEK_WORDS.range}`, movers.length, "count"));
+    counts = movers.flatMap(({ id, ch }) => countChange(nameOf(id), ch.from, ch.to, { kind: "network", id }, null, WEEK_WORDS) ?? []);
     movers
       .slice(0, TOP)
       .forEach(({ id, ch }) => {
         named.push(id);
         const name = mention(id);
         const key = `${name} nodes`;
-        facts.push(fact(`${key} at the start of the span`, ch.from, "count", undefined, { key, end: "from" }));
-        facts.push(fact(`${key} at the end of the span`, ch.to, "count", undefined, { key, end: "to" }));
+        facts.push(fact(`${key} ${WEEK_WORDS.start}`, ch.from, "count", undefined, { key, end: "from" }));
+        facts.push(fact(`${key} ${WEEK_WORDS.end}`, ch.to, "count", undefined, { key, end: "to" }));
       });
 
     // THE WHOLE NETWORK'S START, with each restored network's nodes put back: the rest of the
@@ -322,8 +322,8 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
         cap: ids.length * 2, // a network has at most one first and one last
         from: from < 0 ? n : from,
       }).filter((day) => (day.kind === "first" || day.kind === "last") && day.networkId);
-      facts.push(fact("Networks that became active or went quiet over the span", days.length, "count"));
-      events = days.map((day) => eventChange(nameOf(day.networkId!), day.kind === "first" ? "active" : "quiet", { kind: "network", id: day.networkId! }));
+      facts.push(fact(`Networks that became active or went quiet in ${WEEK_WORDS.range}`, days.length, "count"));
+      events = days.map((day) => eventChange(nameOf(day.networkId!), day.kind === "first" ? "active" : "quiet", { kind: "network", id: day.networkId! }, WEEK_WORDS));
       for (const day of days) {
         const id = day.networkId!;
         named.push(id);
@@ -349,7 +349,7 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
     const words = comboWords(type);
     gaugeFacts(`${name} nodes ${words}`, points);
     const level = levelOf(net)!; // measured: the network's own samples were checked above
-    facts.push(fact(`${name} nodes at the end of the span`, level, "count"));
+    facts.push(fact(`${name} nodes ${WEEK_WORDS.end}`, level, "count"));
     const held = bands.map((b) => heldLevel(b.points) ?? 0);
     const groups = held.filter((v) => v > 0).length;
     // A share is a part of a whole: a make-up read above the network's level (a partial hour at
@@ -363,8 +363,8 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
     if (groups > 1) facts.push(fact(`${name}, rank among its layer groups by nodes`, 1 + held.filter((v) => v > own).length, "count"));
     // A group whose series began inside the week has no start of the span's to move from.
     const moved = spanChange(points);
-    if (moved) counts = [countChange(`${roleKeyLabel(type).label} group`, moved.from, moved.to, { kind: "self" })].filter((c) => c != null);
-    else unread = `${name} nodes ${words} has no reading from the start of the span: say nothing about whether it moved or held.`;
+    if (moved) counts = [countChange(`${roleKeyLabel(type).label} group`, moved.from, moved.to, { kind: "self" }, null, WEEK_WORDS)].filter((c) => c != null);
+    else unread = `${name} nodes ${words} has no reading from ${WEEK_WORDS.start}: say nothing about whether it moved or held.`;
   } else {
     const name = mention(subject);
     named.push(subject);
@@ -400,12 +400,12 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
         const is = roles.map((_, k) => held(endAt, "end", layerAt(k)));
         if (was.every((v) => v != null) && is.every((v) => v != null)) {
           const moved = roles.filter((_, k) => was[k] !== is[k]);
-          facts.push(fact(`${name} layers whose node count changed over the span`, moved.length, "count"));
+          facts.push(fact(`${name} layers whose node count changed in ${WEEK_WORDS.range}`, moved.length, "count"));
           for (const role of moved) {
             const k = roles.indexOf(role);
             const key = `${name} nodes on the ${ROLE_SHORT[role]} layer`;
-            facts.push(fact(`${key} at the start of the span`, was[k]!, "count", undefined, { key, end: "from" }));
-            facts.push(fact(`${key} at the end of the span`, is[k]!, "count", undefined, { key, end: "to" }));
+            facts.push(fact(`${key} ${WEEK_WORDS.start}`, was[k]!, "count", undefined, { key, end: "from" }));
+            facts.push(fact(`${key} ${WEEK_WORDS.end}`, is[k]!, "count", undefined, { key, end: "to" }));
           }
         }
         // The make-ups read at both ends, and how many of them changed, stated even at 0 so a quiet
@@ -418,14 +418,14 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
           }))
           .filter((b): b is { key: string; from: number; to: number } => b.from != null && b.to != null);
         const changedBands = bands.filter((b) => b.from !== b.to);
-        facts.push(fact(`${name} layer groups whose node count changed over the span`, changedBands.length, "count"));
+        facts.push(fact(`${name} layer groups whose node count changed in ${WEEK_WORDS.range}`, changedBands.length, "count"));
         counts = changedBands.flatMap(({ key: type, from, to }) =>
-          countChange(`${roleKeyLabel(type).label} group`, from, to, { kind: "type", netId: subject, type }) ?? [],
+          countChange(`${roleKeyLabel(type).label} group`, from, to, { kind: "type", netId: subject, type }, null, WEEK_WORDS) ?? [],
         );
         for (const { key: type, from, to } of changedBands) {
           const key = `${name} nodes ${comboWords(type)}`;
-          facts.push(fact(`${key} at the start of the span`, from, "count", undefined, { key, end: "from" }));
-          facts.push(fact(`${key} at the end of the span`, to, "count", undefined, { key, end: "to" }));
+          facts.push(fact(`${key} ${WEEK_WORDS.start}`, from, "count", undefined, { key, end: "from" }));
+          facts.push(fact(`${key} ${WEEK_WORDS.end}`, to, "count", undefined, { key, end: "to" }));
         }
       }
     }

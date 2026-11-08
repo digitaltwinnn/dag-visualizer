@@ -130,8 +130,8 @@ describe("hyperFacts on all", () => {
 
   it("states the total nodes through gaugeChange: start, end and the ratio, naming no network", () => {
     const r = hyperFacts(input())!;
-    expect(find(r, /^Nodes across all networks at the start of the span$/)[0]!.value).toBe(120);
-    expect(find(r, /^Nodes across all networks at the end of the span$/)[0]!.value).toBe(140);
+    expect(find(r, /^Nodes across all networks 7 days ago$/)[0]!.value).toBe(120);
+    expect(find(r, /^Nodes across all networks now$/)[0]!.value).toBe(140);
     const [ratio] = find(r, /^Nodes across all networks, ratio end to start$/, "ratio");
     expect(ratio!.value).toBeCloseTo(140 / 120, 9);
     for (const n of Object.values(NAMES)) expect(ratio!.label).not.toContain(n);
@@ -142,20 +142,20 @@ describe("hyperFacts on all", () => {
   // so the note can say nothing moved rather than fall back on the node count.
   it("counts the networks whose node count changed and those that started or stopped, 0 in a quiet week", () => {
     const r = hyperFacts(input())!;
-    expect(find(r, /^Networks whose node count changed over the span$/)[0]!.value).toBe(1); // USDC.dag, 10 to 30
-    expect(find(r, /^Networks that became active or went quiet over the span$/)[0]!.value).toBe(0);
+    expect(find(r, /^Networks whose node count changed in the last 7 days$/)[0]!.value).toBe(1); // USDC.dag, 10 to 30
+    expect(find(r, /^Networks that became active or went quiet in the last 7 days$/)[0]!.value).toBe(0);
     const quiet = hyperFacts(input({ fleet: fleet({ "f.nodes": row(720, () => 140), "f.nodes.usdc": row(720, () => 30) }) }))!;
-    const [changed] = find(quiet, /^Networks whose node count changed over the span$/);
+    const [changed] = find(quiet, /^Networks whose node count changed in the last 7 days$/);
     expect([changed!.value, changed!.text]).toEqual([0, "0"]);
-    expect(find(quiet, /^Networks that became active or went quiet over the span$/)[0]!.value).toBe(0);
-    expect(find(quiet, /nodes at the (start|end) of the span$/).filter((f) => !/^Nodes across/.test(f.label))).toEqual([]); // no movers
+    expect(find(quiet, /^Networks that became active or went quiet in the last 7 days$/)[0]!.value).toBe(0);
+    expect(find(quiet, /nodes (7 days ago|now)$/).filter((f) => !/^Nodes across/.test(f.label))).toEqual([]); // no movers
   });
 
   it("states only the current level of a total that began after the span did", () => {
     const late = fleet({ "f.nodes": row(720, (i) => (i < 400 ? null : 140)) });
     const r = hyperFacts(input({ fleet: late }))!;
-    expect(find(r, /^Nodes across all networks at the end of the span$/)[0]!.value).toBe(140);
-    expect(find(r, /^Nodes across all networks at the start of the span$/)).toEqual([]);
+    expect(find(r, /^Nodes across all networks now$/)[0]!.value).toBe(140);
+    expect(find(r, /^Nodes across all networks 7 days ago$/)).toEqual([]);
     expect(find(r, /^Nodes across all networks, ratio end to start$/)).toEqual([]);
   });
 
@@ -174,7 +174,7 @@ describe("hyperFacts on all", () => {
     expect(started[0]!.value).toBe(T0 + 45 * DAY);
     const stopped = find(r, /stopped anchoring, last day/);
     expect(stopped.map((f) => f.label)).toEqual(["Dor stopped anchoring, last day"]);
-    expect(find(r, /^Networks that became active or went quiet over the span$/)[0]!.value).toBe(2);
+    expect(find(r, /^Networks that became active or went quiet in the last 7 days$/)[0]!.value).toBe(2);
     expect(stopped[0]!.value).toBe(T0 + 49 * DAY);
     // A network that was running before the span (USDC.dag) has no beginning to report.
     expect(find(r, /USDC\.dag (started|stopped)/)).toEqual([]);
@@ -241,7 +241,7 @@ describe("hyperFacts reads nodes through an outage-robust level", () => {
     expect(find(r, /rank by nodes/)).toEqual([]);
   });
 
-  it("reads the end of the span's shape at the last agreeing sample when a layer's roles vanish for an hour", () => {
+  it("reads the end of the range's shape at the last agreeing sample when a layer's roles vanish for an hour", () => {
     // The last hour: nodes low (the cL1 fetch failed) and its role / type rows absent. L0 grew
     // from 25 to 30 early in the span; the bad hour's 10 and its missing cL1 row are never read.
     const r = hyperFacts(
@@ -256,11 +256,11 @@ describe("hyperFacts reads nodes through an outage-robust level", () => {
         }),
       }),
     )!;
-    expect(find(r, /^USDC\.dag nodes on the L0 layer at the start of the span$/)[0]!.value).toBe(25);
-    expect(find(r, /^USDC\.dag nodes on the L0 layer at the end of the span$/)[0]!.value).toBe(30);
+    expect(find(r, /^USDC\.dag nodes on the L0 layer 7 days ago$/)[0]!.value).toBe(25);
+    expect(find(r, /^USDC\.dag nodes on the L0 layer now$/)[0]!.value).toBe(30);
     expect(find(r, /cL1 layer/)).toEqual([]);
     expect(find(r, /nodes running/)).toEqual([]);
-    expect(find(r, /^USDC\.dag layers whose node count changed over the span$/)[0]!.value).toBe(1);
+    expect(find(r, /^USDC\.dag layers whose node count changed in the last 7 days$/)[0]!.value).toBe(1);
   });
 });
 
@@ -269,8 +269,8 @@ describe("hyperFacts on a network", () => {
 
   it("states the node count and what it did", () => {
     const r = usdc();
-    expect(find(r, /^USDC\.dag nodes at the start of the span$/)[0]!.value).toBe(10);
-    expect(find(r, /^USDC\.dag nodes at the end of the span$/)[0]!.value).toBe(30);
+    expect(find(r, /^USDC\.dag nodes 7 days ago$/)[0]!.value).toBe(10);
+    expect(find(r, /^USDC\.dag nodes now$/)[0]!.value).toBe(30);
     expect(find(r, /^USDC\.dag nodes, ratio end to start$/, "ratio")[0]!.value).toBeCloseTo(3, 9);
   });
 
@@ -292,8 +292,8 @@ describe("hyperFacts on a network", () => {
         }),
       }),
     )!;
-    expect(find(r, /^USDC\.dag nodes on the dL1 layer at the start of the span$/)[0]!.value).toBe(4);
-    const [end] = find(r, /^USDC\.dag nodes on the dL1 layer at the end of the span$/);
+    expect(find(r, /^USDC\.dag nodes on the dL1 layer 7 days ago$/)[0]!.value).toBe(4);
+    const [end] = find(r, /^USDC\.dag nodes on the dL1 layer now$/);
     expect(end!.value).toBe(0);
     expect(end!.text).toBe("0");
   });
@@ -319,7 +319,7 @@ describe("hyperFacts on a network", () => {
 
   it("has no activity rank for a network with no anchoring row, and treats the DAG as a network", () => {
     const r = hyperFacts(input({ subject: "dag" }))!;
-    expect(find(r, /^Constellation nodes at the end of the span$/)[0]!.value).toBe(100);
+    expect(find(r, /^Constellation nodes now$/)[0]!.value).toBe(100);
     expect(find(r, /^Constellation rank by nodes$/)[0]!.value).toBe(1);
     expect(find(r, /rank by global snapshots/)).toEqual([]);
   });
@@ -345,20 +345,20 @@ describe("hyperFacts on a network: the change of shape", () => {
 
   it("states a changed layer at both ends, counts the changed layers, and leaves an unchanged layer out", () => {
     const r = hyperFacts(input({ subject: "dor", fleet: dor() }))!;
-    expect(find(r, /^Dor nodes on the dL1 layer at the start of the span$/)[0]!.value).toBe(3);
-    expect(find(r, /^Dor nodes on the dL1 layer at the end of the span$/)[0]!.value).toBe(5);
+    expect(find(r, /^Dor nodes on the dL1 layer 7 days ago$/)[0]!.value).toBe(3);
+    expect(find(r, /^Dor nodes on the dL1 layer now$/)[0]!.value).toBe(5);
     expect(find(r, /L0 layer|cL1 layer/)).toEqual([]);
-    const [changed] = find(r, /^Dor layers whose node count changed over the span$/, "count");
+    const [changed] = find(r, /^Dor layers whose node count changed in the last 7 days$/, "count");
     expect(changed!.value).toBe(1);
   });
 
   it("states a changed combination at both ends, a type absent at a recorded sample a measured 0", () => {
     const r = hyperFacts(input({ subject: "dor", fleet: dor() }))!;
-    const [from] = find(r, /^Dor nodes running only dL1 at the start of the span$/);
+    const [from] = find(r, /^Dor nodes running only dL1 7 days ago$/);
     expect(from!.value).toBe(0);
-    expect(find(r, /^Dor nodes running only dL1 at the end of the span$/)[0]!.value).toBe(2);
+    expect(find(r, /^Dor nodes running only dL1 now$/)[0]!.value).toBe(2);
     expect(find(r, /running L0, cL1 and dL1/)).toEqual([]);
-    expect(find(r, /^Dor layer groups whose node count changed over the span$/)[0]!.value).toBe(1);
+    expect(find(r, /^Dor layer groups whose node count changed in the last 7 days$/)[0]!.value).toBe(1);
   });
 
   it("states a combination unknown at the start (no type recorded) not at all", () => {
@@ -366,16 +366,16 @@ describe("hyperFacts on a network: the change of shape", () => {
       input({ subject: "dor", fleet: dor({ "f.type.dor.l0+cl1+dl1": row(N, (i) => (i < 5 ? null : 3)) }) }),
     )!;
     expect(find(r, /nodes running/)).toEqual([]);
-    expect(find(r, /^Dor layers whose node count changed over the span$/)[0]!.value).toBe(1);
+    expect(find(r, /^Dor layers whose node count changed in the last 7 days$/)[0]!.value).toBe(1);
   });
 
   it("states the count 0 and no layer rows for a shape that held", () => {
     const r = hyperFacts(input({ subject: "bio", fleet: fleet({ "f.layer.bio.l0": row(N, () => 10), "f.type.bio.l0": row(N, () => 10) }) }))!;
-    const [changed] = find(r, /^BioFi layers whose node count changed over the span$/);
+    const [changed] = find(r, /^BioFi layers whose node count changed in the last 7 days$/);
     expect(changed!.value).toBe(0);
     expect(changed!.text).toBe("0");
     expect(find(r, /layer at the/)).toEqual([]);
-    expect(find(r, /^BioFi layer groups whose node count changed over the span$/)[0]!.value).toBe(0);
+    expect(find(r, /^BioFi layer groups whose node count changed in the last 7 days$/)[0]!.value).toBe(0);
     expect(find(r, /nodes running/)).toEqual([]);
   });
 
@@ -392,7 +392,7 @@ describe("hyperFacts on a network: the change of shape", () => {
         }),
       }),
     )!;
-    expect(find(r, /^Dor nodes on the dL1 layer at the start of the span$/)[0]!.value).toBe(3);
+    expect(find(r, /^Dor nodes on the dL1 layer 7 days ago$/)[0]!.value).toBe(3);
     expect(find(r, /L0 layer|cL1 layer/)).toEqual([]);
   });
 
@@ -400,7 +400,7 @@ describe("hyperFacts on a network: the change of shape", () => {
     const r = hyperFacts(input({ subject: "dor", fleet: dor({ "f.nodes.dor": row(N, (i) => (i < 400 ? null : 5)) }) }))!;
     expect(find(r, /layer/)).toEqual([]);
     expect(find(r, /nodes running/)).toEqual([]);
-    expect(find(r, /^Dor nodes at the end of the span$/)[0]!.value).toBe(5);
+    expect(find(r, /^Dor nodes now$/)[0]!.value).toBe(5);
   });
 
   it("reads each layer and combination through a held level: one hour's failed role fetch is no change (I1)", () => {
@@ -420,10 +420,10 @@ describe("hyperFacts on a network: the change of shape", () => {
       const r = hyperFacts(input({ subject: "usdc", fleet: at(hour) }))!;
       expect(find(r, /cL1 layer/), `hour ${hour}`).toEqual([]);
       expect(find(r, /running L0 and cL1/), `hour ${hour}`).toEqual([]);
-      expect(find(r, /^USDC\.dag nodes running only L0 at the start of the span$/)[0]!.value).toBe(8);
-      expect(find(r, /^USDC\.dag nodes running only L0 at the end of the span$/)[0]!.value).toBe(10);
-      expect(find(r, /^USDC\.dag nodes on the L0 layer at the end of the span$/)[0]!.value).toBe(30);
-      expect(find(r, /^USDC\.dag layers whose node count changed over the span$/)[0]!.value).toBe(1);
+      expect(find(r, /^USDC\.dag nodes running only L0 7 days ago$/)[0]!.value).toBe(8);
+      expect(find(r, /^USDC\.dag nodes running only L0 now$/)[0]!.value).toBe(10);
+      expect(find(r, /^USDC\.dag nodes on the L0 layer now$/)[0]!.value).toBe(30);
+      expect(find(r, /^USDC\.dag layers whose node count changed in the last 7 days$/)[0]!.value).toBe(1);
       expect(checkNote("USDC.dag dropped its cL1 layer, from 20 nodes to 0.", r.facts, r.names).ok).toBe(false);
     }
   });
@@ -442,9 +442,9 @@ describe("hyperFacts on a network: the change of shape", () => {
         }),
       }),
     )!;
-    expect(find(r, /^Dor nodes on the dL1 layer at the start of the span$/)[0]!.value).toBe(2);
-    expect(find(r, /^Dor nodes running L0, cL1 and dL1 at the start of the span$/)[0]!.value).toBe(2);
-    expect(find(r, /^Dor nodes running L0, cL1 and dL1 at the end of the span$/)[0]!.value).toBe(3);
+    expect(find(r, /^Dor nodes on the dL1 layer 7 days ago$/)[0]!.value).toBe(2);
+    expect(find(r, /^Dor nodes running L0, cL1 and dL1 7 days ago$/)[0]!.value).toBe(2);
+    expect(find(r, /^Dor nodes running L0, cL1 and dL1 now$/)[0]!.value).toBe(3);
   });
 
   it("states a layer end that splits evenly as a whole count, the more recent observed sample (R52, R55)", () => {
@@ -453,7 +453,7 @@ describe("hyperFacts on a network: the change of shape", () => {
     const r = hyperFacts(
       input({ subject: "dor", fleet: dor({ "f.layer.dor.dl1": row(N, (i) => (i < N / 2 ? 3 : i < N - 3 ? 4 : 5)) }) }),
     )!;
-    const [end] = find(r, /^Dor nodes on the dL1 layer at the end of the span$/);
+    const [end] = find(r, /^Dor nodes on the dL1 layer now$/);
     expect(end!.value).toBe(5);
     for (const f of r.facts.filter((x) => x.kind === "count" && / nodes/.test(x.label))) expect(Number.isInteger(f.value), f.label).toBe(true);
   });
@@ -542,14 +542,14 @@ describe("hyperFacts on all: the movers and the whole network's activity", () =>
       "f.nodes.late": row(N, (i) => (i < 400 ? null : 100)), // began after the span: out
     });
     const r = hyperFacts(input({ fleet: fl, names }))!;
-    const movers = r.facts.filter((f) => /^\S+ nodes at the (start|end) of the span$/.test(f.label));
+    const movers = r.facts.filter((f) => /^\S+ nodes (7 days ago|now)$/.test(f.label));
     expect(movers.map((f) => [f.label, f.value])).toEqual([
-      ["USDC.dag nodes at the start of the span", 10],
-      ["USDC.dag nodes at the end of the span", 30],
-      ["Ext nodes at the start of the span", 50],
-      ["Ext nodes at the end of the span", 44],
-      ["Dor nodes at the start of the span", 0],
-      ["Dor nodes at the end of the span", 5],
+      ["USDC.dag nodes 7 days ago", 10],
+      ["USDC.dag nodes now", 30],
+      ["Ext nodes 7 days ago", 50],
+      ["Ext nodes now", 44],
+      ["Dor nodes 7 days ago", 0],
+      ["Dor nodes now", 5],
     ]);
     expect(find(r, /^(Constellation|BioFi|Late) nodes at the/)).toEqual([]);
     expect(r.blurbs).toEqual(expect.arrayContaining(["Dor is: a data marketplace"]));
@@ -557,7 +557,7 @@ describe("hyperFacts on all: the movers and the whole network's activity", () =>
 
   it("names no mover when no network's count changed", () => {
     const r = hyperFacts(input({ fleet: fleet({ "f.nodes.usdc": row(N, () => 30) }) }))!;
-    expect(r.facts.filter((f) => /^\S+ nodes at the (start|end) of the span$/.test(f.label))).toEqual([]);
+    expect(r.facts.filter((f) => /^\S+ nodes (7 days ago|now)$/.test(f.label))).toEqual([]);
   });
 
   // The Upsider AI, 2026-11-04: down for nine hours from 02:00 on Oct 28, its 3 nodes back by
@@ -565,12 +565,12 @@ describe("hyperFacts on all: the movers and the whole network's activity", () =>
   describe("a network back from an outage the span opened inside", () => {
     const steady = { "f.nodes.usdc": row(N, () => 30) };
     const backAt9 = { ...steady, "f.nodes.dor": row(N, (i) => (i < 9 ? 0 : 5)) };
-    const movers = (r: NonNullable<ReturnType<typeof hyperFacts>>) => r.facts.filter((f) => /^Dor nodes at the (start|end) of the span$/.test(f.label));
+    const movers = (r: NonNullable<ReturnType<typeof hyperFacts>>) => r.facts.filter((f) => /^Dor nodes (7 days ago|now)$/.test(f.label));
 
     it("is no mover and no new row when the day before the span measured its nodes", () => {
       const r = hyperFacts(input({ fleet: fleet(backAt9), daily: daily({ "f.nodes.dor": row(60, () => 5) }) }))!;
       expect(movers(r)).toEqual([]);
-      expect(find(r, /^Networks whose node count changed over the span$/)[0]!.value).toBe(0);
+      expect(find(r, /^Networks whose node count changed in the last 7 days$/)[0]!.value).toBe(0);
       expect(r.changes).toBeUndefined();
     });
 
@@ -592,10 +592,10 @@ describe("hyperFacts on all: the movers and the whole network's activity", () =>
       // The total dips by Dor's 5 for its outage hours: 115 at the opening samples, then 120.
       const fl = fleet({ ...backAt9, "f.nodes": row(N, (i) => (i < 9 ? 115 : i < N / 2 ? 120 : 140)) });
       const r = hyperFacts(input({ fleet: fl, daily: daily({ "f.nodes.dor": row(60, () => 5) }) }))!;
-      expect(find(r, /^Nodes across all networks at the start of the span$/)[0]!.value).toBe(120);
+      expect(find(r, /^Nodes across all networks 7 days ago$/)[0]!.value).toBe(120);
       // No reading before the span: the total's start stays as measured.
       const bare = hyperFacts(input({ fleet: fl }))!;
-      expect(find(bare, /^Nodes across all networks at the start of the span$/)[0]!.value).toBe(115);
+      expect(find(bare, /^Nodes across all networks 7 days ago$/)[0]!.value).toBe(115);
     });
 
     it("reads the last WHOLE day before the span: the span's own first day ends after it opened", () => {
@@ -612,7 +612,7 @@ describe("hyperFacts on all: the movers and the whole network's activity", () =>
   it("states a network's own note from the day before's level when its span opened inside an outage", () => {
     const fl = fleet({ "f.nodes.dor": row(N, (i) => (i < 9 ? 0 : 5)) });
     const r = hyperFacts(input({ subject: "dor", fleet: fl, daily: daily({ "f.nodes.dor": row(60, () => 5) }) }))!;
-    expect(find(r, /^Dor nodes at the (start|end) of the span$/).map((f) => f.value)).toEqual([5, 5]);
+    expect(find(r, /^Dor nodes (7 days ago|now)$/).map((f) => f.value)).toEqual([5, 5]);
     expect(find(r, /^Dor nodes, ratio end to start$/)).toEqual([]);
   });
 
@@ -663,7 +663,7 @@ describe("hyperFacts as a gate-passing source", () => {
     });
     const r = hyperFacts(input({ subject: "dor", fleet: fl }))!;
     expect(checkNote("Dor grew from 3 to 5 nodes, and one layer changed: dL1 went from 3 to 5.", r.facts, r.names)).toEqual({ ok: true });
-    expect(checkNote("Dor had 6 nodes on the dL1 layer at the start of the span.", r.facts, r.names).ok).toBe(false);
+    expect(checkNote("Dor had 6 nodes on the dL1 layer 7 days ago.", r.facts, r.names).ok).toBe(false);
     expect(checkNote("Dor grew from 3 to 5 nodes, and two layers changed.", r.facts, r.names).ok).toBe(false);
   });
 
@@ -688,9 +688,9 @@ describe("hyperFacts tags each change as a pair (R54)", () => {
     const d = daily({ "m.dor.ticks": row(60, (i) => (i >= 53 ? 60 : 40)), "m.dor.snaps": row(60, () => 5) });
     const p = pairsOf(hyperFacts(input({ subject: "dor", fleet: fl, daily: d }))!.facts);
     expect([...p.values()]).toEqual([
-      ["Dor nodes at the start of the span", 3, "Dor nodes at the end of the span", 5],
-      ["Dor nodes on the dL1 layer at the start of the span", 3, "Dor nodes on the dL1 layer at the end of the span", 5],
-      ["Dor nodes running only dL1 at the start of the span", 0, "Dor nodes running only dL1 at the end of the span", 2],
+      ["Dor nodes 7 days ago", 3, "Dor nodes now", 5],
+      ["Dor nodes on the dL1 layer 7 days ago", 3, "Dor nodes on the dL1 layer now", 5],
+      ["Dor nodes running only dL1 7 days ago", 0, "Dor nodes running only dL1 now", 2],
       ["Dor global snapshots it was part of per day, the weeks before", 40, "Dor global snapshots it was part of per day, last week", 60],
     ]);
   });
@@ -700,9 +700,9 @@ describe("hyperFacts tags each change as a pair (R54)", () => {
     const d = daily({ "g.ticks": row(60, (i) => (i >= 53 ? 30_000 : 24_000)) });
     const p = pairsOf(hyperFacts(input({ fleet: fl, daily: d }))!.facts);
     expect([...p.values()]).toEqual([
-      ["USDC.dag nodes at the start of the span", 10, "USDC.dag nodes at the end of the span", 30],
-      ["Dor nodes at the start of the span", 0, "Dor nodes at the end of the span", 5],
-      ["Nodes across all networks at the start of the span", 120, "Nodes across all networks at the end of the span", 140],
+      ["USDC.dag nodes 7 days ago", 10, "USDC.dag nodes now", 30],
+      ["Dor nodes 7 days ago", 0, "Dor nodes now", 5],
+      ["Nodes across all networks 7 days ago", 120, "Nodes across all networks now", 140],
       ["Global snapshots per day, the weeks before", 24_000, "Global snapshots per day, last week", 30_000],
     ]);
   });
@@ -725,10 +725,10 @@ describe("hyperFacts on a network's make-up", () => {
     })!;
     const key = "USDC.dag nodes running L0 and cL1";
     expect(r.facts.map((f) => [f.label, f.value, f.kind, f.pair ?? null])).toEqual([
-      [`${key} at the start of the span`, 5, "count", { key, end: "from" }],
-      [`${key} at the end of the span`, 20, "count", { key, end: "to" }],
+      [`${key} 7 days ago`, 5, "count", { key, end: "from" }],
+      [`${key} now`, 20, "count", { key, end: "to" }],
       [`${key}, ratio end to start`, 4, "ratio", null],
-      ["USDC.dag nodes at the end of the span", 30, "count", null],
+      ["USDC.dag nodes now", 30, "count", null],
       ["USDC.dag, share of its nodes running L0 and cL1", 20 / 30, "share", null],
       ["Layer groups in USDC.dag", 2, "count", null],
       // Its place among them, like a country's or a provider's rank (user, 2026-10-30: "how that
@@ -746,28 +746,28 @@ describe("hyperFacts on a network's make-up", () => {
 
   it("a make-up that held states its level at both ends and no ratio", () => {
     const r = makeUp("l0+cl1")!; // 20 throughout
-    expect(find(r, /^USDC\.dag nodes running L0 and cL1 at the (start|end) of the span$/).map((f) => f.value)).toEqual([20, 20]);
+    expect(find(r, /^USDC\.dag nodes running L0 and cL1 (7 days ago|now)$/).map((f) => f.value)).toEqual([20, 20]);
     expect(find(r, /ratio/)).toEqual([]);
     expect(find(r, /^USDC\.dag, share of its nodes running L0 and cL1$/)[0]!.value).toBeCloseTo(20 / 30, 9);
     // A make-up read above the network's level is no part of it: no share is stated.
     const over = makeUp("l0+cl1", { "f.type.usdc.l0+cl1": row(N, () => 40) })!;
     expect(find(over, /share/)).toEqual([]);
-    expect(find(over, /^USDC\.dag nodes running L0 and cL1 at the end of the span$/)[0]!.value).toBe(40);
+    expect(find(over, /^USDC\.dag nodes running L0 and cL1 now$/)[0]!.value).toBe(40);
   });
 
   it("a make-up that began after the span did states only its end level", () => {
     // No type was recorded before hour 400: the make-up's start is unknown, never a 0.
     const late = (v: number) => row(N, (i) => (i < 400 ? null : v));
     const r = makeUp("l0+cl1", { "f.type.usdc.l0+cl1": late(20), "f.type.usdc.l0": late(10) })!;
-    expect(find(r, /^USDC\.dag nodes running L0 and cL1 at the end of the span$/)[0]!.value).toBe(20);
+    expect(find(r, /^USDC\.dag nodes running L0 and cL1 now$/)[0]!.value).toBe(20);
     expect(find(r, /running L0 and cL1 at the start/)).toEqual([]);
     expect(find(r, /ratio/)).toEqual([]);
   });
 
   it("a make-up absent while others were recorded is a measured 0 at the start, never unknown", () => {
     const r = makeUp("dl1", { "f.type.usdc.dl1": row(N, (i) => (i < N / 2 ? null : 3)) })!;
-    expect(find(r, /^USDC\.dag nodes running only dL1 at the start of the span$/)[0]!.value).toBe(0);
-    expect(find(r, /^USDC\.dag nodes running only dL1 at the end of the span$/)[0]!.value).toBe(3);
+    expect(find(r, /^USDC\.dag nodes running only dL1 7 days ago$/)[0]!.value).toBe(0);
+    expect(find(r, /^USDC\.dag nodes running only dL1 now$/)[0]!.value).toBe(3);
     expect(find(r, /^Layer groups in USDC\.dag$/)[0]!.value).toBe(3);
     expect(find(r, /^USDC\.dag, rank among its layer groups by nodes$/)[0]!.value).toBe(3); // behind L0+cL1 (20) and L0 (10)
   });
@@ -784,7 +784,7 @@ describe("hyperFacts on a network's make-up", () => {
   it("the none make-up reads f.type.<net>.none", () => {
     expect(comboWords("none")).toBe("with no stated layer");
     const r = makeUp("none", { "f.type.usdc.none": row(N, () => 4) })!;
-    expect(find(r, /^USDC\.dag nodes with no stated layer at the end of the span$/)[0]!.value).toBe(4);
+    expect(find(r, /^USDC\.dag nodes with no stated layer now$/)[0]!.value).toBe(4);
     expect(find(r, /^USDC\.dag, share of its nodes with no stated layer$/)[0]!.value).toBeCloseTo(4 / 30, 9);
   });
 });
@@ -802,7 +802,7 @@ describe("hyperFacts' notable changes", () => {
     const d = daily({ "m.dor.snaps": row(60, (i) => (i < 40 ? 0 : 5)), "m.dor.ticks": row(60, (i) => (i < 40 ? 0 : 1)) });
     const r = hyperFacts(input({ daily: d }))!;
     expect(r.changes?.[0]).toMatchObject({ kind: "active", subject: { kind: "network", id: "dor" } });
-    expect(briefLine(r.changes?.[0])).toBe("Dor became active over the span");
+    expect(briefLine(r.changes?.[0])).toBe("Dor became active in the last 7 days");
   });
   it("a week where nothing moved has no rows, never filler", () => {
     expect(hyperFacts(input({ fleet: fleet(steady) }))!.changes).toBeUndefined();
@@ -827,7 +827,7 @@ describe("hyperFacts' notable changes", () => {
     const late = row(N, (i) => (i < N / 2 ? null : i < (3 * N) / 4 ? 20 : 19));
     const r = hyperFacts(input({ subject: { net: "usdc", type: "l0+cl1" }, fleet: fleet({ ...steady, ...Object.fromEntries(Object.keys(fleet().series).filter((k) => k.startsWith("f.type.usdc.")).map((k) => [k, row(N, () => null)])), "f.type.usdc.l0+cl1": late, "f.type.usdc.l0": row(N, (i) => (i < N / 2 ? null : 10)) }) }))!;
     expect(r.changes).toBeUndefined();
-    expect(r.blurbs.join(" ")).toMatch(/has no reading from the start of the span: say nothing about whether it moved or held/);
+    expect(r.blurbs.join(" ")).toMatch(/has no reading from 7 days ago: say nothing about whether it moved or held/);
   });
   it("a layer group that held has no rows", () => {
     expect(hyperFacts(input({ subject: { net: "usdc", type: "l0" }, fleet: fleet(steady) }))!.changes).toBeUndefined();

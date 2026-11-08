@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { READ_SLACK_MS, chainReadThrough, fact, factsBlock, gaugeChange, heldLevel, median, networksAnchored, observedLevel, spanMeasured, pairChange, spellDurations, withChangeFacts, changeShare, wholeMean } from "@/src/data/noteFacts";
+import { READ_SLACK_MS, chainReadThrough, durationWords, fact, factsBlock, gaugeChange, heldLevel, median, networksAnchored, observedLevel, spanMeasured, pairChange, spellDurations, withChangeFacts, changeShare, wholeMean } from "@/src/data/noteFacts";
 import { checkNote } from "@/src/data/noteHonesty";
 import { formatDag } from "@/src/data/trendSeries";
 
@@ -238,7 +238,16 @@ describe("networksAnchored", () => {
 describe("a duration in a note is written out", () => {
   it("as a fact the model can copy", () => {
     expect(fact("x", 10, "duration").text).toBe("10 seconds");
-    expect(fact("x", 66, "duration").text).toBe("1.1 minutes");
+    expect(fact("x", 66, "duration").text).toBe("about 1 minute");
+    expect(fact("x", 45, "duration").text).toBe("45 seconds");
+    expect(fact("x", 60, "duration").text).toBe("1 minute");
+    expect(fact("x", 114, "duration").text).toBe("about 2 minutes");
+    expect(fact("x", 120, "duration").text).toBe("2 minutes");
+    expect(fact("x", 8280, "duration").text).toBe("about 2 hours");
+    expect(durationWords(90)).toBe("about 2 minutes");
+    expect(durationWords(3570)).toBe("1 hour");
+    expect(durationWords(36 * 3600)).toBe("36 hours");
+    expect(durationWords(53 * 3600)).toBe("about 2 days");
     expect(fact("x", 3600, "duration").text).toBe("1 hour");
     expect(fact("x", 604_800, "duration").text).toBe("7 days");
   });
