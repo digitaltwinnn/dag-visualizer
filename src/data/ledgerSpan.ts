@@ -38,6 +38,15 @@ export function windowWords(snaps: readonly GlobalSnapshot[], nowMs: number = Da
  *  failed"); a live span is short already and is unchanged. One rule, both halves' words. */
 export interface SpanOpts {
   short?: boolean;
+  /** THE SWITCH'S BARE SPAN (user, 2026-11-08, design option A: "too much text … '8 mins' and some
+   *  range icon"): a live span without its "last" — the clock glyph before it says that — "8 min",
+   *  "16 h"; a pinned stretch and a read state are unchanged. The explorer's foot keeps the word. */
+  bare?: boolean;
+}
+
+/** A live span's words, bare of "last" when asked. */
+function bareOf(words: string, bare: boolean | undefined): string {
+  return bare ? words.replace(/^last /, "") : words;
 }
 
 /** THE SNAPSHOTS REGISTER'S SPAN: a past window's read state while it is read or failed, its stretch
@@ -53,7 +62,7 @@ export function snapshotSpanWord(s: {
   if (s.pastStatus === "loading") return s.short ? "reading…" : "reading that time…";
   if (s.pastStatus === "failed") return s.short ? "read failed" : "couldn't read that time";
   if (s.past) return windowWords(s.past, s.nowMs, s.short);
-  return spanWords(s.live);
+  return bareOf(spanWords(s.live), s.bare);
 }
 
 /** THE BLOCKS REGISTER'S SPAN: the block window's stretch — "last N h" at the live edge (measured to
@@ -80,7 +89,7 @@ export function blockSpanWord(s: {
     // "that time" only for a read around a pin: a live read (a filter's refetch) has no time (N5).
     if (st === "loading") return s.short || !asked ? "reading…" : "reading that time…";
     if (st === "failed") return failed;
-    return pinned ? windowWords(s.globals, s.nowMs, s.short) : spanWords([...s.globals].reverse(), s.nowMs);
+    return pinned ? windowWords(s.globals, s.nowMs, s.short) : bareOf(spanWords([...s.globals].reverse(), s.nowMs), s.bare);
   }
   if (st === "unread") return "not read";
   if (st === "beyond") return "not reached";
@@ -97,6 +106,14 @@ export function countWord(n: number | null, unit: "snapshot" | "block" | "data b
   if (n == null || n <= 0) return null;
   // A FLOOR is labelled (rule 10): "31+ data blocks" while the window's reads are still landing.
   return `${n.toLocaleString("en-US")}${floor ? "+" : ""} ${unit}${n === 1 ? "" : "s"}`;
+}
+
+/** THE SWITCH'S BARE COUNT (user, 2026-11-08, design option A): the figure alone — "244", "1,234",
+ *  a floor "37+" — the register's own glyph before it names what is counted, and the half's name
+ *  line says it in words. Null as `countWord` is. */
+export function countFigure(n: number | null, floor = false): string | null {
+  if (n == null || n <= 0) return null;
+  return `${n.toLocaleString("en-US")}${floor ? "+" : ""}`;
 }
 
 /** Under the unlisted filter the block window reads nothing: every surface says the floor, never

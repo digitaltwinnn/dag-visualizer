@@ -1,5 +1,6 @@
 "use client";
 
+import { Clock } from "lucide-react";
 import { useSyncExternalStore } from "react";
 import { REGISTER_ICONS } from "@/components/icons";
 import { REGISTER_NAMES } from "@/components/views";
@@ -7,7 +8,7 @@ import { useFeedRead } from "@/components/useFeedRead";
 import { useNowTick } from "@/components/useNowTick";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { POLL } from "@/src/engine/config";
-import { blockSpanWord, countWord, snapshotSpanWord } from "@/src/data/ledgerSpan";
+import { blockSpanWord, countFigure, countWord, snapshotSpanWord } from "@/src/data/ledgerSpan";
 import { windowBlocks } from "@/src/data/blockWindow";
 import { dataBlocksInWindow } from "@/src/data/dataStats";
 import { getBlockWindow, getPastWindow, onBlockWindow, onPastWindow } from "@/src/data/pastWindow";
@@ -23,11 +24,14 @@ import { StateMark } from "@/components/state/StateAtoms";
 // top of the scene"). Which register the Snapshots view reads — its metagraph snapshots, the
 // transaction blocks on them, or the data blocks they carry (D6, three-way) — as ONE segmented control
 // centred just under the command bar, each half carrying its own SPAN so the reader sees every range
-// before choosing: "Metagraph snapshots · last 11 min", "Transaction blocks · last 13 hours", "Data
-// blocks · last 11 min" (it reads the snapshots' source); with a pin, a half names the pinned stretch
-// ("5 h, 2d ago"). The words are
-// `src/data/ledgerSpan.ts`'s, the one home the explorer's foot reads too. It rode the explorer card's
-// control band until then; that band keeps only the measure tiles.
+// before choosing — since 2026-11-08 (user: "too much text … '8 mins' and some range icon? | is just
+// text", design option A of four) as TWO GLYPHED READINGS and no divider: a clock before the bare span
+// ("8 min", "16 h"; a pinned stretch "5 h, 2d ago", a read state in its words) and the register's own
+// glyph before the bare count ("244", a floor "37+") — the name line says what is counted, the glyphs
+// carry the units, and the accessible name keeps every word ("Transaction blocks, last 16 h, 55
+// blocks"). The words are `src/data/ledgerSpan.ts`'s, the one home the explorer's foot reads too (its
+// foot keeps "last"). It rode the explorer card's control band until D3; that band keeps only the
+// measure tiles.
 //
 // A press goes through `switchLedgerRegister` (src/store/applyClickActions.ts), the one door: it
 // releases what the register being left drew and the other cannot draw, then sets the field — the
@@ -70,15 +74,16 @@ export default function RegisterSwitch() {
 
   // The Data blocks register reads the Metagraph snapshots register's own source (the live buffer or
   // a past window), so its half says the same span in the same words.
-  const spans = (short: boolean): Record<LedgerRegister, string> => {
-    const snapshotSpan = snapshotSpanWord({ pastStatus, past: past?.globalSnapshots ?? null, live: [...snaps].reverse(), nowMs: now, short });
+  const spans = (short: boolean, bare = false): Record<LedgerRegister, string> => {
+    const snapshotSpan = snapshotSpanWord({ pastStatus, past: past?.globalSnapshots ?? null, live: [...snaps].reverse(), nowMs: now, short, bare });
     return {
       snapshots: snapshotSpan,
-      blocks: blockSpanWord({ status: blockStatus, globals: blocks?.globalSnapshots ?? [], nowMs: now, around: blocks ? blocks.around : undefined, short }),
+      blocks: blockSpanWord({ status: blockStatus, globals: blocks?.globalSnapshots ?? [], nowMs: now, around: blocks ? blocks.around : undefined, short, bare }),
       data: snapshotSpan,
     };
   };
-  const span = spans(false);
+  const span = spans(false); // the full words: the accessible name
+  const bareSpan = spans(false, true); // on the glass: the clock glyph says "last"
   // THE COUNT beside the span (user, 2026-11-07): what fills the stretch — the source's ticks (the
   // live buffer's fixed depth, or the past window's) for the two snapshot registers, the window's
   // blocks for Transaction blocks; none while a half says a read state. Desktop only: on a phone the
@@ -91,14 +96,21 @@ export default function RegisterSwitch() {
   const reading = pastStatus === "loading" || pastStatus === "failed";
   const metaSnaps = sourceTicks.reduce((n, g) => n + (g.metagraphSnapshotCount ?? 0), 0);
   const data = dataBlocksInWindow(sourceTicks, snapshotExact, () => true);
+  const blockCount = blockStatus?.status === "ready" && blocks?.globalSnapshots.length ? windowBlocks(blocks).length : null;
   const count: Record<LedgerRegister, string | null> = {
     snapshots: reading ? null : countWord(metaSnaps, "snapshot"),
-    blocks: blockStatus?.status === "ready" && blocks?.globalSnapshots.length ? countWord(windowBlocks(blocks).length, "block") : null,
+    blocks: countWord(blockCount, "block"),
     data: reading ? null : countWord(data.count, "data block", data.read < data.total),
+  };
+  // The bare figure on the glass (option A): the register's glyph before it names the unit.
+  const figure: Record<LedgerRegister, string | null> = {
+    snapshots: reading ? null : countFigure(metaSnaps),
+    blocks: countFigure(blockCount),
+    data: reading ? null : countFigure(data.count, data.read < data.total),
   };
   // The phone's short form for an UNLIT half (`ledgerSpan`'s `SpanOpts`): a pinned stretch by when
   // alone, a read state in one word — measured, the full words ran the switch past the gutters.
-  const shortSpan = spans(true);
+  const shortSpan = spans(true, true);
 
   return (
     <div
@@ -156,11 +168,18 @@ export default function RegisterSwitch() {
                   carries it invisible; the phone's unlit half, which hides its name, hides it too. */}
               <StateMark following={following} className={cn("pl-1 font-normal", !lit && "invisible max-[700px]:hidden")} />
             </span>
-            <span className="flex items-center justify-center font-mono text-label leading-none tabular-nums whitespace-nowrap opacity-75 group-aria-pressed:opacity-100 group-aria-pressed:text-foreground">
-              <span className="max-[700px]:hidden max-[700px]:group-aria-pressed:inline">{span[r]}</span>
-              {/* The divider is the TEXT's own ink at a third (user, 2026-11-08: "the | is hardly visible" — the
-                  structural hairline, further dimmed by the unlit half's opacity, vanished on the glass). */}
-              {count[r] && <span className="max-[700px]:hidden ml-2 pl-2 border-l border-current/35 group-aria-pressed:text-primary">{count[r]}</span>}
+            <span className="flex items-center justify-center gap-1 font-mono text-label leading-none tabular-nums whitespace-nowrap opacity-75 group-aria-pressed:opacity-100 group-aria-pressed:text-foreground">
+              {/* TWO GLYPHED READINGS, NO DIVIDER (option A, 2026-11-08): the clock says "the last", the
+                  register's glyph says what is counted; a gap parts them (a typed `|` read as text,
+                  and a hairline rule vanished on the glass). */}
+              <Clock aria-hidden className="size-3 flex-none opacity-80" />
+              <span className="max-[700px]:hidden max-[700px]:group-aria-pressed:inline">{bareSpan[r]}</span>
+              {figure[r] && (
+                <span className="max-[700px]:hidden ml-2 inline-flex items-center gap-1 group-aria-pressed:text-primary">
+                  <Icon aria-hidden className="size-3 flex-none opacity-80" />
+                  {figure[r]}
+                </span>
+              )}
               <span className="hidden max-[700px]:inline max-[700px]:group-aria-pressed:hidden">{shortSpan[r]}</span>
             </span>
           </button>

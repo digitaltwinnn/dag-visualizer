@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BLOCKS_UNREAD, blockAbsence, blockSpanWord, countWord, snapshotSpanWord, spanWords, windowWords } from "@/src/data/ledgerSpan";
+import { BLOCKS_UNREAD, blockAbsence, blockSpanWord, countFigure, countWord, snapshotSpanWord, spanWords, windowWords } from "@/src/data/ledgerSpan";
 import type { GlobalSnapshot } from "@/src/data/types";
 
 const at = (ms: number, ordinal = ms) => ({ ordinal, timestamp: new Date(ms).toISOString(), hash: "h" }) as GlobalSnapshot;
@@ -95,6 +95,26 @@ describe("blockAbsence — the block window isn't here: one sentence per state, 
     for (const st of states) for (const around of [null, 5]) for (const held of [false, true]) {
       expect(blockAbsence({ around, status: st }, held)).not.toMatch(/tick|cache/i);
     }
+  });
+});
+
+describe("the switch's bare form (design option A, 2026-11-08)", () => {
+  const g = (iso: string): GlobalSnapshot => ({ ordinal: 1, hash: "", timestamp: iso } as unknown as GlobalSnapshot);
+  const live = [g("2026-11-08T10:08:00Z"), g("2026-11-08T10:00:00Z")]; // newest first
+  it("drops 'last' from a live span and leaves a pinned stretch and a read state as they are", () => {
+    expect(snapshotSpanWord({ pastStatus: null, past: null, live, bare: true })).toBe("8 min");
+    expect(snapshotSpanWord({ pastStatus: null, past: null, live })).toBe("last 8 min");
+    const now = Date.parse("2026-11-09T10:08:00Z");
+    expect(snapshotSpanWord({ pastStatus: "ready", past: [...live].reverse(), live, nowMs: now, bare: true })).toBe("8 min, 1d ago");
+    expect(snapshotSpanWord({ pastStatus: "loading", past: null, live, bare: true })).toBe("reading that time…");
+    expect(blockSpanWord({ status: { around: null, status: "ready" }, globals: [...live].reverse(), nowMs: Date.parse("2026-11-08T10:16:00Z"), around: null, bare: true })).toBe("16 min");
+  });
+  it("counts bare, with the floor mark", () => {
+    expect(countFigure(244)).toBe("244");
+    expect(countFigure(1234)).toBe("1,234");
+    expect(countFigure(37, true)).toBe("37+");
+    expect(countFigure(0)).toBeNull();
+    expect(countFigure(null)).toBeNull();
   });
 });
 

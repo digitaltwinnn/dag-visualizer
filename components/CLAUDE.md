@@ -1076,7 +1076,16 @@ reached") **and, beside a stretch, its COUNT** (user, 2026-11-07: "last 9 min | 
 days | 53 blocks"): what fills the stretch — the source's ticks for the two snapshot registers (the live
 buffer's fixed depth, or the past window's), the window's blocks for Transaction blocks
 (`ledgerSpan.countWord`; none beside a read state; desktop only — on a phone the lit half's full words
-already reach the gutters), after a hairline rule, never a mid-dot. **The lit station is a WASH, not a frame** (user,
+already reach the gutters). **The second line is TWO GLYPHED READINGS and no divider** (user,
+2026-11-08: "too much text … '8 mins' and some range icon? | is just text" — design option A of four):
+a clock glyph before the BARE span ("8 min", "16 h" — `SpanOpts.bare` drops "last", the clock says it;
+a pinned stretch "9 min, 3d ago" and a read state keep their words) and the register's own glyph
+before the BARE count ("244", a floor "37+", `ledgerSpan.countFigure`), a gap between them — a typed
+`|` read as text and a hairline rule vanished on the glass. The name line says what is counted, the
+glyphs carry the units, and the button's accessible name keeps every word ("Transaction blocks, last
+16 h, 55 blocks"); the explorer's foot keeps "last". **The state mark's room is reserved on every half**
+(same day: the frame's width shifted with each switch, since only the lit half rendered the mark and the
+halves are equal columns as wide as the widest): an unlit half carries it invisible. **The lit station is a WASH, not a frame** (user,
 2026-11-07, design round: option 5 without the underline): the unlit halves' second line recedes
 (`opacity-75`), the lit half carries the selection wash alone — no inset ring — its name and count in
 the accent, its span in the foreground ink, **and the state mark at the end of its name line**
