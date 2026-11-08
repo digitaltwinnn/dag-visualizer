@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { blockCarryingNetworks, cohortOfProvider, cohortsLevel, countriesLevel, dataCarryingNetworks, latestTickOf, countryNodes, machinesOf, networksLevel, nodeOrder, nodesByCountry, registerNetworks, tickNetworksLevel, tickPolledRows } from "./ladderLevels";
+import { blockCarryingNetworks, snapshotIsSubject, cohortOfProvider, cohortsLevel, countriesLevel, dataCarryingNetworks, latestTickOf, countryNodes, machinesOf, networksLevel, nodeOrder, nodesByCountry, registerNetworks, tickNetworksLevel, tickPolledRows } from "./ladderLevels";
 import type { AnchorLogRow } from "./anchorLog";
 import type { MetaSnapRecord } from "./api";
 import type { CountryStat, GlobalSnapshot, MetaInfo, NodeRow } from "./types";
@@ -160,6 +160,15 @@ describe("the register's subjects — one tick level per register (2026-11-08)",
     expect(ids(blockCarryingNetworks(nets, [{ metaId: "dor", ordinal: 901 }]))).toEqual(["dor:901"]);
     expect(blockCarryingNetworks(nets, [])).toEqual([]);
     expect(blockCarryingNetworks(nets, null)).toEqual([]);
+  });
+  it("snapshotIsSubject judges one snapshot the same way — and says undefined where nothing can judge it", () => {
+    expect(snapshotIsSubject("all", { metaId: "dor", ordinal: 901 }, undefined, null)).toBe(true);
+    expect(snapshotIsSubject("data", { metaId: "dor", ordinal: 901 }, rows[0], null)).toBe(false);
+    expect(snapshotIsSubject("data", { metaId: "dor", ordinal: 902 }, rows[1], null)).toBe(true);
+    expect(snapshotIsSubject("data", { metaId: "dor", ordinal: 902 }, undefined, null)).toBeUndefined();
+    expect(snapshotIsSubject("blocks", { metaId: "ded", ordinal: 6 }, undefined, [{ metaId: "ded", ordinal: 6 }])).toBe(true);
+    expect(snapshotIsSubject("blocks", { metaId: "ded", ordinal: 5 }, undefined, [{ metaId: "ded", ordinal: 6 }])).toBe(false);
+    expect(snapshotIsSubject("blocks", { metaId: "ded", ordinal: 5 }, undefined, null)).toBeUndefined();
   });
   it("registerNetworks dispatches on the register's subjects: all, the block-carrying, the data-carrying", () => {
     expect(ids(registerNetworks("all", nets, rows, null))).toEqual(["ded:6,5", "dor:902,901"]);

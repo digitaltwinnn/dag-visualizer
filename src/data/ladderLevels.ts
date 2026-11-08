@@ -259,6 +259,22 @@ export function blockCarryingNetworks(nets: readonly TickNetwork[], blockSnaps: 
   return out;
 }
 
+/** IS THIS METAGRAPH SNAPSHOT A SUBJECT OF THE REGISTER (2026-11-08)? Every anchored one in Metagraph
+ *  snapshots; a block-carrying one in Transaction blocks (the window's word); a data-carrying one in
+ *  Data blocks (the exact read's). UNKNOWN KEEPS: with no read or window to judge by, `undefined` — a
+ *  register switch releases only a snapshot KNOWN not to be its subject (`registerSwitchActions`),
+ *  never one whose read has not landed. */
+export function snapshotIsSubject(
+  subjects: RegisterSubjects,
+  sel: { metaId: string; ordinal: number },
+  exactRow: { dataBlocks?: number; dataTxCount?: number } | null | undefined,
+  blockSnaps: readonly { metaId: string; ordinal: number }[] | null,
+): boolean | undefined {
+  if (subjects === "all") return true;
+  if (subjects === "data") return exactRow === undefined || exactRow === null ? undefined : carriesData(exactRow);
+  return blockSnaps ? blockSnaps.some((b) => b.metaId === sel.metaId && b.ordinal === sel.ordinal) : undefined;
+}
+
 /** ONE TICK LEVEL PER REGISTER (`REGISTER_SUBJECTS`): every anchored snapshot, the block-carrying
  *  ones, or the data-carrying ones — the explorer's level and the rail's steps and pagers all ask
  *  this, so they list what the chamber draws. */

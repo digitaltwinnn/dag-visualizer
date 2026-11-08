@@ -9,6 +9,10 @@ import { finestRung } from "@/src/engine/domain/focusLadder";
 import { registerSwitchActions, type ClickAction } from "@/src/engine/domain/pickActions";
 import type { LedgerRegister } from "@/src/store/mode";
 import { readsBlockWindow } from "@/src/engine/domain/viewPolicy";
+import { snapshotIsSubject } from "@/src/data/ladderLevels";
+import { REGISTER_SUBJECTS } from "@/src/data/ledgerMeasure";
+import { tickBlockSnaps } from "@/src/data/blockWindow";
+import { getBlockWindow } from "@/src/data/pastWindow";
 import { is3D } from "@/src/engine/domain/viewTransition";
 import { scrollToShow } from "@/src/engine/domain/trendStack";
 import { viewNetwork } from "@/src/engine/domain/viewNetwork";
@@ -185,7 +189,13 @@ function motionCauseOf(actions: readonly ClickAction[]): MotionCause | null {
 export function switchLedgerRegister(to: LedgerRegister): void {
   const st = useStore.getState();
   if (st.ledgerRegister === to) return;
-  const actions = registerSwitchActions(to, { block: st.block, metaSnap: st.metaSnap, dataBlock: st.dataBlock });
+  // Whether the held metagraph snapshot is a subject the register entered draws (`REGISTER_SUBJECTS`):
+  // judged against the exact read and the block window the store and the window singleton hold.
+  const ms = st.metaSnap;
+  const isSubject = ms
+    ? snapshotIsSubject(REGISTER_SUBJECTS[to], ms, st.snapshotExact[ms.globalOrdinal]?.rows.find((r) => r.metaId === ms.metaId && r.ordinal === ms.ordinal), tickBlockSnaps(getBlockWindow(), ms.globalOrdinal))
+    : undefined;
+  const actions = registerSwitchActions(to, { block: st.block, metaSnap: st.metaSnap, dataBlock: st.dataBlock }, isSubject);
   if (actions.length) applyClickActions(actions);
   // Only Transaction blocks draws a block, so every other register drops its hover preview.
   if (!readsBlockWindow(to) && st.hoverBlock) st.setHoverBlock(null);

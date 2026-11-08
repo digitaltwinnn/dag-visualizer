@@ -672,12 +672,22 @@ export function blockSelectActions(
  *  Data blocks, whose subjects are the same snapshots — D6) drops the block. The pin (`snap`) and the
  *  committed network (`tickNet`) are the tick's own and stay. Finest first, like every release;
  *  `switchLedgerRegister` applies it through the executor. */
-export function registerSwitchActions(to: LedgerRegister, current: { block: BlockSel | null; metaSnap: MetaSnapSel | null; dataBlock?: DataBlockSel | null }): ClickAction[] {
+export function registerSwitchActions(
+  to: LedgerRegister,
+  current: { block: BlockSel | null; metaSnap: MetaSnapSel | null; dataBlock?: DataBlockSel | null },
+  /** Is the held metagraph snapshot a SUBJECT of the register entered (`ladderLevels.snapshotIsSubject`
+   *  — the caller judges it against the exact read and the block window)? `false` releases it: a tile
+   *  the register does not draw can hold no card (2026-11-08). `undefined` (unknown) keeps it. */
+  metaSnapIsSubject: boolean | undefined = true,
+): ClickAction[] {
   const out: ClickAction[] = [];
   // A data block is the Data blocks register's alone: any other register drops it, finest first.
   if (current.dataBlock && to !== "data") out.push({ kind: "dataBlock", sel: null });
-  if (readsBlockWindow(to)) { if (current.metaSnap) out.push({ kind: "metaSnap", sel: null }); return out; }
-  if (current.block) out.push({ kind: "block", sel: null });
+  // A block is Transaction blocks' alone.
+  if (current.block && !readsBlockWindow(to)) out.push({ kind: "block", sel: null });
+  // The metagraph snapshot stays wherever it is the register's subject (a block-carrying one in
+  // Transaction blocks stands under its token block); one the register cannot draw goes.
+  if (current.metaSnap && metaSnapIsSubject === false) out.push({ kind: "metaSnap", sel: null });
   return out;
 }
 

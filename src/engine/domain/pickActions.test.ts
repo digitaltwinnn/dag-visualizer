@@ -1007,8 +1007,11 @@ describe("registerSwitchActions (switching the Snapshots view's register)", () =
   const b = { chain: "dag", hash: "h1", anchorOrd: 42 } as unknown as BlockSel;
   const m = { metaId: "dor", ordinal: 7, globalOrdinal: 42 } as unknown as MetaSnapSel;
 
-  it("entering Blocks releases the metagraph snapshot, which that register cannot draw", () => {
-    expect(registerSwitchActions("blocks", { block: null, metaSnap: m })).toEqual([{ kind: "metaSnap", sel: null }]);
+  it("entering a register releases a metagraph snapshot KNOWN not to be its subject, keeps one that is or one not yet judged (2026-11-08)", () => {
+    expect(registerSwitchActions("blocks", { block: null, metaSnap: m }, false)).toEqual([{ kind: "metaSnap", sel: null }]);
+    expect(registerSwitchActions("blocks", { block: null, metaSnap: m }, true)).toEqual([]);
+    expect(registerSwitchActions("blocks", { block: null, metaSnap: m }, undefined)).toEqual([]);
+    expect(registerSwitchActions("data", { block: null, metaSnap: m }, false)).toEqual([{ kind: "metaSnap", sel: null }]);
   });
 
   it("entering Snapshots releases the block", () => {
@@ -1019,6 +1022,10 @@ describe("registerSwitchActions (switching the Snapshots view's register)", () =
     expect(registerSwitchActions("blocks", { block: b, metaSnap: null })).toEqual([]);
     expect(registerSwitchActions("snapshots", { block: null, metaSnap: m })).toEqual([]);
     expect(registerSwitchActions("blocks", { block: null, metaSnap: null })).toEqual([]);
+    // Finest first: the data block, the block, then the snapshot.
+    const db = { snap: m, index: 0 };
+    expect(registerSwitchActions("snapshots", { block: b, metaSnap: m, dataBlock: db }, true).map((a) => a.kind)).toEqual(["dataBlock", "block"]);
+    expect(registerSwitchActions("blocks", { block: null, metaSnap: m, dataBlock: db }, false).map((a) => a.kind)).toEqual(["dataBlock", "metaSnap"]);
   });
 
   it("entering Data blocks releases the block and KEEPS the metagraph snapshot — its subjects are the Snapshots register's own (D6)", () => {
