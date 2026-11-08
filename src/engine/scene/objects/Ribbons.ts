@@ -93,13 +93,16 @@ interface RowState {
 
 /** One seal line of the Transaction blocks register (`setAnchorLines`): its row, its network key (the
  *  lens dims it), where it starts (x, z at height `yTop`, chamber-local before the rewind offset), and
- *  the band it lands on (null: the bar's centre line under it). */
+ *  where it ends — on the floor, at the band it lands on (null: the bar's centre line under it), on
+ *  the sheets' eased sweep; or, with `yBot`, STRAIGHT DOWN to that height at its own x and z (a token
+ *  block's line to its tile, 2026-11-08). */
 export interface AnchorLine {
   slot: number;
   key: string;
   x: number;
   z: number;
   yTop: number;
+  yBot?: number;
   band: { z0: number; z1: number } | null;
   /** The line's identity colour (a token block's tile line wears its network's hue); null takes the
    *  chamber's muted neutral (a DAG block's line down to its bar). */
@@ -330,9 +333,9 @@ export class Ribbons {
       if (off) this._c.multiplyScalar(snapBright(1, true));
       this._q.topZ0 = l.z;
       this._q.topZ1 = l.z;
-      this._q.botZ0 = l.band ? l.band.z0 : 0;
-      this._q.botZ1 = l.band ? l.band.z1 : 0;
-      v = this._pushThread(v, l.slot, l.x - (LEAD_X - l.slot * SLOT_SP), l.yTop);
+      this._q.botZ0 = l.yBot != null ? l.z : l.band ? l.band.z0 : 0;
+      this._q.botZ1 = l.yBot != null ? l.z : l.band ? l.band.z1 : 0;
+      v = this._pushThread(v, l.slot, l.x - (LEAD_X - l.slot * SLOT_SP), l.yTop, l.yBot);
     }
     this._thPos.needsUpdate = true;
     this._thCol.needsUpdate = true;
@@ -347,13 +350,15 @@ export class Ribbons {
   }
 
   /** One hairline down `_q`'s centre line on the sheets' own eased sweep, in `_c`, from vertex `v`
-   *  and height `yTop` down to the bars' top face;
+   *  and height `yTop` down to the bars' top face — or, given `yBot`, to that height, keeping its x
+   *  (a line that ends above the floor is a block's to its tile, and stands straight);
    *  `dxTop` is the top end's offset along the trail (a tile in a grid), eased out on the same sweep
-   *  so the line still lands vertically on its row. Returns the next free vertex. Event-time. */
-  private _pushThread(v: number, slot: number, dxTop: number, yTop: number): number {
+   *  so a floor-bound line still lands vertically on its row. Returns the next free vertex. Event-time. */
+  private _pushThread(v: number, slot: number, dxTop: number, yTop: number, yBotAt?: number): number {
     const p = this._thPos.array as Float32Array;
     const c = this._thCol.array as Float32Array;
-    const yBot = FLOOR_Y.gl0 + BAR_LIFT + BAR_H;
+    const yBot = yBotAt ?? (FLOOR_Y.gl0 + BAR_LIFT + BAR_H);
+    const dxBot = yBotAt == null ? 0 : dxTop;
     const curve = RIBBON_LOOK.curve;
     const x = LEAD_X - slot * SLOT_SP;
     this._thSlots.push(slot);
@@ -371,10 +376,10 @@ export class Ribbons {
       const t0 = j / THREAD_SEG, t1 = (j + 1) / THREAD_SEG;
       const s0 = sweep(t0, curve), s1 = sweep(t1, curve);
       const y0 = yTop + (yBot - yTop) * t0, y1 = yTop + (yBot - yTop) * t1;
-      p[v * 3] = x + dxTop * (1 - s0); p[v * 3 + 1] = y0; p[v * 3 + 2] = mid(s0);
+      p[v * 3] = x + dxTop + (dxBot - dxTop) * s0; p[v * 3 + 1] = y0; p[v * 3 + 2] = mid(s0);
       c[v * 4] = this._c.r; c[v * 4 + 1] = this._c.g; c[v * 4 + 2] = this._c.b; c[v * 4 + 3] = 0;
       v++;
-      p[v * 3] = x + dxTop * (1 - s1); p[v * 3 + 1] = y1; p[v * 3 + 2] = mid(s1);
+      p[v * 3] = x + dxTop + (dxBot - dxTop) * s1; p[v * 3 + 1] = y1; p[v * 3 + 2] = mid(s1);
       c[v * 4] = this._c.r; c[v * 4 + 1] = this._c.g; c[v * 4 + 2] = this._c.b; c[v * 4 + 3] = 0;
       v++;
     }

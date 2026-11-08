@@ -567,9 +567,11 @@ bars, labels, the rewind and the pose. What differs answers through ONE keyed ma
   noise). The four sheet rows stand empty and `Ribbons.setAnchorLines` draws the threads' hairline
   geometry on its OWN material (`SEAL_LOOK`): one per metagraph snapshot that carries a block, from
   ITS tile down to its network's band (the bar's centre while the tick's exact read has not landed),
+  one per TOKEN block, STRAIGHT down from the block to its tile (`AnchorLine.yBot`, 2026-11-08 —
+  block → metagraph snapshot, then the tile's line says snapshot → global, each step once),
   and one per DAG block, from the block down to the CENTRE of its tick's data bar (the bar spec's own
-  band extent), all on the sheets' eased sweep, a DAG block's line in the chamber's muted NEUTRAL (`SceneColors.muted`) and a token block's
-  tile line in its NETWORK HUE (the tile's own lane colour), both at the thin seal weight dark 0.28 / paper 0.5. It is a different species from the block links on purpose (D8: "the line
+  band extent), the floor-bound ones on the sheets' eased sweep, a DAG block's line in the chamber's muted NEUTRAL (`SceneColors.muted`) and a token block's
+  and tile's lines in its NETWORK HUE (the tile's own lane colour), all at the thin seal weight dark 0.28 / paper 0.5. It is a different species from the block links on purpose (D8: "the line
   that 'seals' the block … looks the same"): links are the blocks' cyan S-curves running along the
   trail, seals thin threads falling to the floor (grey from a DAG block, the network's hue from a tile). Off the lens a seal takes the row's `dim`.
   `_syncThreads` is the one dispatch, so a filter change redraws the seals, never the
@@ -642,16 +644,20 @@ selected block: the trail holds only the visible rows until a selection grows it
 must be READ facts, not both drawn — the stub is what keeps every reference on screen. A block whose
 read has not landed states no references and draws none.
 
-**A token block stands OVER its tile, laid out as the DAG blocks are** (user, 2026-11-07:
-"identical to how they are laid out for $DAG, so vertical, no long horizontal" — it superseded the
-on-the-tile nudge): centred on the tile of the metagraph snapshot that accepted it, its fork's height
-in THE SAME BAND the DAG braid uses, re-based on the tile (`BRAID_GAP` of clear room above the tile's
-top, `BRAID_HALF` either side of the centre line — one structure, user: "use the same height for the
-metagraph"; `forkSpread` over every token chain at once, the widest token fork fitted to that half —
-`_tokenBraidScale`, held as `_braidScale` is),
-siblings at one height stepping aside along the trail by `TOKEN_STEP`, in the lane's hue, opaque
-like the tile; one seal line falls from each block's bottom through its tile to its network's band.
-A snapshot whose tile is not drawn puts no block anywhere.
+**A token block stands OVER its tile, laid out as the DAG blocks are, in a SHORT band** (user,
+2026-11-07: "identical to how they are laid out for $DAG, so vertical, no long horizontal" — it
+superseded the on-the-tile nudge; 2026-11-08: the band was the DAG band's height, re-based on the tile,
+and it climbed out of the chamber's frame while every block's line ran on to the floor, so the blocks
+read as hung off the GLOBAL snapshots — "it attached to the global snapshots … not shown correctly"):
+centred on the tile of the metagraph snapshot that accepted it, its fork's height in a band a QUARTER
+of the DAG's (`TOKEN_BRAID_HALF`), `TOKEN_GAP` of clear room above the tile's top (`forkSpread` over
+every token chain at once, the widest token fork fitted to that half — `_tokenBraidScale`, held as
+`_braidScale` is), siblings at one height stepping aside along the trail by `TOKEN_STEP`, in the
+lane's hue, opaque like the tile. The protocol's two steps are drawn once each: a seal line falls
+STRAIGHT from each block to its tile (block → metagraph snapshot), and one line per block-carrying
+tile falls on to its network's band (snapshot → global). The DAG braid keeps its floor-bound lines:
+a DAG block is accepted straight into the global snapshot. A snapshot whose tile is not drawn puts no
+block anywhere.
 
 **Honesty (rule 10).** A block is drawn from the FEED's hashes, so a tick whose full read has not
 landed, or failed (`blockReadMiss`), shows its blocks with no links; a link is drawn only from a

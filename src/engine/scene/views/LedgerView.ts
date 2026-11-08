@@ -253,13 +253,16 @@ const BRAID_Y = (BRAID_LO + BRAID_HI) / 2;
 const BRAID_HALF = (BRAID_HI - BRAID_LO) / 2;
 /** Blocks that share a tick and a place step aside along the trail by this much, alternately. */
 const BLOCK_STEP = 0.7;
-/** THE TOKEN BRAID is the same band stood on the TILE (user, 2026-11-07: "identical to how they are
- *  laid out for $DAG … use the same height for the metagraph"): the same `BRAID_GAP` above the tile's
- *  top, the same `BRAID_HALF` either side of its centre line — one structure, re-based from the plane
- *  the chain settles on; blocks sharing a tile and a height step aside along the trail by `TOKEN_STEP`
- *  (`BLOCK_STEP` at the token block's scale). */
-const TOKEN_BRAID_LIFT = BRAID_GAP + TOKEN_BLOCK / 2 + BRAID_HALF;
-const TOKEN_BRAID_HALF = BRAID_HALF;
+/** THE TOKEN BRAID is a SHORT band stood on the TILE (user, 2026-11-07: "identical to how they are
+ *  laid out for $DAG"; 2026-11-08: a fork the DAG band's height climbed out of the chamber's frame and
+ *  read as hung off the global floor — "it attached to the global snapshots … not shown correctly"):
+ *  a quarter of the DAG band, `TOKEN_GAP` of clear room above the tile's top, so the blocks visibly sit
+ *  on the snapshot that accepted them; blocks sharing a tile and a height step aside along the trail by
+ *  `TOKEN_STEP` (`BLOCK_STEP` at the token block's scale). A block's seal line ends at ITS TILE; the
+ *  tile's own line carries on to the global band, one per tile. */
+const TOKEN_GAP = 0.6;
+const TOKEN_BRAID_HALF = BRAID_HALF / 4;
+const TOKEN_BRAID_LIFT = TOKEN_GAP + TOKEN_BLOCK / 2 + TOKEN_BRAID_HALF;
 const TOKEN_STEP = BLOCK_STEP * (TOKEN_BLOCK / DAG_BLOCK);
 /** The tile mesh's own depth (the BoxGeometry's z, which becomes height under the -90° X spin). */
 const TILE_D = 0.35;
@@ -1260,9 +1263,11 @@ export class LedgerView implements SceneView {
       }
       // A token block stands OVER the tile of the metagraph snapshot that accepted it, laid out as
       // the DAG blocks are over their bar (user, 2026-11-07): centred on the tile, its fork's height
-      // in the token band above it (`TOKEN_BRAID_LIFT`, `TOKEN_BRAID_HALF`), siblings stepping aside
-      // along the trail; a hairline falls from each block, through its tile, to its network's band.
-      // That tile is the one the register draws.
+      // in the short token band above it (`TOKEN_BRAID_LIFT`, `TOKEN_BRAID_HALF`), siblings stepping
+      // aside along the trail. Its seal line falls straight to ITS TILE (block → metagraph snapshot),
+      // and ONE line per tile falls on from the tile to its network's band (snapshot → global): the
+      // protocol's own two steps, each said once (user, 2026-11-08). That tile is the one the register
+      // draws.
       for (const [chain, rows] of Object.entries(t.metaSnaps)) {
         const recs = w.metaSnaps.get(chain)?.filter((r) => r.ts === t.ts) ?? []; // the tile resolver's list
         for (const r of rows) {
@@ -1289,9 +1294,12 @@ export class LedgerView implements SceneView {
               // The snapshot that accepted it, committed with the block (`blockSelectActions`' `snapOf`).
               snap: { metaId: chain, ordinal: r.ordinal, hash: r.hash, globalOrdinal: t.ord, ts: t.ts },
             });
-            anchors.push({ slot: s, key: chain, x, z: tile.z, yTop: y - TOKEN_BLOCK / 2, band, hue });
+            anchors.push({ slot: s, key: chain, x, z: tile.z, yTop: y - TOKEN_BLOCK / 2, yBot: tile.y, band: null, hue });
           }
-          if (placed) this._blockTiles.add(tileB);
+          if (placed) {
+            this._blockTiles.add(tileB);
+            anchors.push({ slot: s, key: chain, x: tile.x, z: tile.z, yTop: tile.y, band, hue });
+          }
         }
       }
     }
