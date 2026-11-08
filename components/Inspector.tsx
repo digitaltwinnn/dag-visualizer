@@ -567,7 +567,7 @@ export default function Inspector() {
   // "only the focus rung is open" default governs again. Within one selection the +/− still holds.
   const following = useStore((s) => s.following);
   // One pure key (`railCollapse.railSelectionKey` carries every member's reason).
-  const selectionKey = railSelectionKey({ mode, filter, railNet, country, cohort, composition, inspect, trendCursorMs, trendRange, trendFocus, tickNet, following, snap, metaSnap, block });
+  const selectionKey = railSelectionKey({ mode, filter, railNet, country, cohort, composition, inspect, trendCursorMs, trendRange, trendFocus, tickNet, following, snap, metaSnap, block, dataBlock });
   // Arms HeightEase's growIn for slots that JOIN the lane after boot (false on the first
   // render pass, true on every later one — a mounting slot's wrapper then eases from 0
   // instead of shoving the pile in one frame). DESKTOP ONLY, as ExploreRail's (its note has

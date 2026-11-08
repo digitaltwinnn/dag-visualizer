@@ -1,4 +1,4 @@
-import type { BlockSel, PickDescriptor, MetaSnapSel, TickNetSel } from "@/src/data/types";
+import type { BlockSel, DataBlockSel, PickDescriptor, MetaSnapSel, TickNetSel } from "@/src/data/types";
 import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder";
 import type { Mode } from "@/src/store/store";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
@@ -173,6 +173,8 @@ export interface SelectionKeyState {
   metaSnap: MetaSnapSel | null;
   /** The committed block (the Blocks register). Optional: every other caller has none. */
   block?: BlockSel | null;
+  /** The committed data block (the Data blocks register). Optional likewise. */
+  dataBlock?: DataBlockSel | null;
 }
 
 /** THE SELECTION MOMENT — when this key changes, the rail's +/− overrides are dropped (after a view
@@ -220,5 +222,10 @@ export function railSelectionKey(s: SelectionKeyState): string {
     // in the Blocks register LIVE advances the block itself (`advanceBlock`), and a heartbeat must
     // not drop the reader's +/−; a pinned block is a new moment.
     s.following ? (s.block ? "live" : "") : s.block ? `${s.block.chain}:${s.block.hash}` : "",
+    // THE DATA BLOCK (user, 2026-11-08: "when I click a data block it does not collapse its parent
+    // metagraph snapshot"): a commit like the block's. Missing, the ghost's own open override and a
+    // hand-opened snapshot box survived the commit, and the Data block card arrived beside them. A
+    // data block is picked, never advanced by the heartbeat, so it needs no follow guard.
+    s.dataBlock ? `${s.dataBlock.snap.metaId}:${s.dataBlock.snap.ordinal}:${s.dataBlock.index}` : "",
   ].join("§");
 }

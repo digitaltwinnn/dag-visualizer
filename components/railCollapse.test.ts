@@ -189,6 +189,13 @@ describe("a new selection moment (`railSelectionKey` + `overridesOnSelection`)",
     const after = apply(opened, overridesOnSelection({ overrides: opened }));
     expect(openBoxes(stepped(after))).toEqual(["context"]);
   });
+  it("a data block's commit is a new selection moment, and so is its neighbour (user, 2026-11-08: the snapshot box stayed open)", () => {
+    const snap = { metaId: "dor", ordinal: 7, hash: "h", globalOrdinal: 42, ts: "t" };
+    const d1 = { snap, index: 0, digest: "d1", updates: 3, kinds: {}, signers: 1, bytes: 10 } as unknown as NonNullable<SelectionKeyState["dataBlock"]>;
+    const d2 = { ...d1, index: 1 };
+    expect(key({ dataBlock: d1 })).not.toBe(key({}));
+    expect(key({ dataBlock: d2 })).not.toBe(key({ dataBlock: d1 }));
+  });
   it("while following, the live ordinals are not a new moment", () => {
     expect(key({ following: true, snap: snapPick })).toBe(key({ following: true, snap: { data: { ordinal: 43 } } }));
     expect(key({ following: false, snap: snapPick })).not.toBe(key({ following: false, snap: { data: { ordinal: 43 } } }));
