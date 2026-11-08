@@ -253,7 +253,10 @@ function Tour({ stop, leaving }: { stop: number; leaving: boolean }) {
     <button
       type="button"
       onClick={() => endBriefing(stop, "skip")}
-      className={cn("h-10 rounded-full bg-foreground px-6 text-body font-semibold text-background hover:bg-foreground/85 max-[700px]:px-3 touch:min-h-11", live)}
+      // A PILL, never a circle (user, 2026-11-08: "give the 'skip' button a minimal width, it becomes a
+      // circle sometimes"): the row it sits in squeezed it to its padding — a fixed minimum width and
+      // no shrink hold its shape at every tier.
+      className={cn("h-10 min-w-[5.5rem] shrink-0 rounded-full bg-foreground px-6 text-body font-semibold text-background hover:bg-foreground/85 max-[700px]:px-3 touch:min-h-11", live)}
     >
       Skip
     </button>
