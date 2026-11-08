@@ -122,6 +122,11 @@ export function MeasureTiles({ measure }: { measure: MeasureControl }) {
           >
             {Icon && <Icon aria-hidden className="size-3.5 flex-none group-data-[state=on]:text-primary" />}
             <span className="truncate">{o.label}</span>
+            {/* A UNIT SYMBOL rides its tile (user, 2026-11-08: "size control should say also 'kb' not
+                just the number"): the rows state bare figures and the tile is their one heading, so a
+                measure in a real unit — a ticker or bytes, the all-caps symbols — shows it, small and
+                muted; a count says nothing more (what it counts is the label). */}
+            {/^[A-Z]{2,}$/.test(o.unit ?? "") && <span className="flex-none text-[0.85em] opacity-70 tabular-nums">{o.unit}</span>}
           </ToggleGroupItem>
         );
       })}

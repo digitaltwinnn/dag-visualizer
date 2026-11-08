@@ -373,10 +373,13 @@ one in the view switch's on-state; four sit two by two, seven 2 · 3 · 2 (`expl
 `MEASURE_ICONS` in `components/icons.tsx` is the one glyph map, keyed by measure id across the
 four measure modules — **ONE SEGMENTED CONTROL since 2026-10-25**, design pass: one hairline
 frame around the set, dividers between columns, a hairline between rows, the lit cell filled;
-user: the card "reads like lots and lots of buttons"), then the PATH, bare, directly beneath (the
-hairline between them left the same day — the control's frame already bounds it, and the band's
-rhythm tightened 8 → 6px; `ExplorerPath bare` — its own accent-tinted plate under the band was a
-third surface in a second tint; the house keeps its wash as the band's one accent mark). The list sits on the glass. The pager or span sits on the PLATE FOOT, full-bleed to the
+user: the card "reads like lots and lots of buttons"; **a tile shows its UNIT SYMBOL** where the
+measure is in one — a ticker or KB, the all-caps units — small and muted after the word, since the
+rows state bare figures and the tile is their one heading: user, 2026-11-08, "size control should say
+also 'kb'"). **The PATH stands on the glass directly above the list, not in the band** (user,
+2026-11-08: "it should be below the divider and attached to the row section" — it rode the band under
+the tiles from 2026-10-23 to then; `ExplorerPath bare`, the house keeps its wash as the one accent
+mark, and a level with one measure has no band at all). The list sits on the glass. The pager or span sits on the PLATE FOOT, full-bleed to the
 card's bottom edge, the right-rail foot's own device — and EVERY card ends in one: Hypergraph's
 and Geography's lists are the live poll, so their foot is the live atom (`explorer/LiveFoot.tsx`,
 `LiveDot` + "live"); Snapshots keeps "last N min" because there "live" is a SELECTION state
