@@ -32,6 +32,10 @@ export const GLOBAL_PLANE_LOOK: Readonly<PlaneLook> = {
 export const META_PLANE_LOOK: Readonly<PlaneLook> = {
   fillOp: 0.035, innerOp: 0.01, edge: 0.98, trayOp: 0.025, // edge+tray user-tuned live, 2026-08-07
 };
+/** THE BRAID PANE (the Transaction blocks register, 2026-11-08 — user: "give the vertical plane that
+ *  the DAG layouts sit on a subtle transparent fill"): a sheet standing in the DAG braid's own plane
+ *  behind it, a touch more body than a floor so it reads as a surface the blocks lie on. */
+export const BRAID_PANE_LOOK: Readonly<PlaneLook> = { fillOp: 0.05, innerOp: 0.02, edge: 0.95, trayOp: 0 };
 
 /** THE DAY GLASS — the LIGHT ground's own pane look (user, 2026-08-26: "the snapshot page panels
  *  look really ugly in light mode (ok in dark mode) […] can you make it a nice glass panel?").
@@ -145,6 +149,10 @@ export interface SnapshotPlaneOpts {
   /** The plane's name at its front edge; omit for an anonymous piece. `align` defaults left
    *  (text starts at z); "center" centres the text on z. */
   label?: { text: string; x: number; z: number; height?: number; align?: "left" | "center" };
+  /** A VERTICAL pane (the braid's, 2026-11-08): it stands in the x–y plane at `cz`, `d` its HEIGHT
+   *  and `y` its centre, facing +z (the camera's side). Not a pick blocker: it stands behind the
+   *  blocks, and the bars behind it must still answer. */
+  vertical?: boolean;
 }
 
 export class SnapshotPlane {
@@ -171,10 +179,10 @@ export class SnapshotPlane {
     this._paper = isLightGround(colors);
     const fm = makeGlassFill(colors, o.w / 2, o.d / 2, PLANE_CORNER_R);
     this.fill = new THREE.Mesh(new THREE.PlaneGeometry(o.w, o.d), fm);
-    this.fill.rotation.x = -Math.PI / 2;
+    if (!o.vertical) this.fill.rotation.x = -Math.PI / 2; // a floor lies flat; a vertical pane keeps the geometry's +z face
     this.fill.position.set(o.cx, o.y, o.cz);
     this.fill.renderOrder = -2;
-    this.fill.userData.blocker = true; // a normal surface: rays stop here (no pick, no pass-through)
+    this.fill.userData.blocker = !o.vertical; // a floor is a normal surface: rays stop here (no pick, no pass-through)
     this._fillU = fm.uniforms as unknown as GlassFillUniforms;
     this._base = this._fillU.uColor.value.getHex();
     this._minHalf = Math.min(o.w, o.d) / 2;
