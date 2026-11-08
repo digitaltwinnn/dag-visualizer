@@ -150,7 +150,11 @@ export default function RegisterSwitch() {
             <span className="flex items-center justify-center gap-1.5 text-body font-semibold leading-none whitespace-nowrap">
               <Icon aria-hidden className="size-3.5 flex-none group-aria-pressed:text-primary" />
               <span className="max-[700px]:hidden max-[700px]:group-aria-pressed:inline">{REGISTER_NAMES[r]}</span>
-              {lit && <StateMark following={following} className="pl-1 font-normal" />}
+              {/* THE MARK'S ROOM IS RESERVED ON EVERY HALF (user, 2026-11-08: the control's width shifted "a
+                  bit because of live indicator"): the halves are equal columns as wide as the widest, so a
+                  mark only the lit half rendered moved the whole frame with each switch. An unlit half
+                  carries it invisible; the phone's unlit half, which hides its name, hides it too. */}
+              <StateMark following={following} className={cn("pl-1 font-normal", !lit && "invisible max-[700px]:hidden")} />
             </span>
             <span className="flex items-center justify-center font-mono text-label leading-none tabular-nums whitespace-nowrap opacity-75 group-aria-pressed:opacity-100 group-aria-pressed:text-foreground">
               <span className="max-[700px]:hidden max-[700px]:group-aria-pressed:inline">{span[r]}</span>
