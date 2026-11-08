@@ -1156,8 +1156,16 @@ live / pinned, then `blockLead`'s SHORT form — how much moved, no from/to; use
 (`LedgerView.selectedBlockAnchor`, layout data plus the rewind offset). In Blocks the explorer lists the window's blocks, and the
 Block card (`inspector/BlockPane.tsx`; its eyebrow, ghost, callout and pick title say "Transaction block" — user, 2026-11-07) stands under its tick: a card slot with NO rung, between the
 metagraph snapshot and the node in the ledger's lane (`DISPLAY_LANE`), present only in the Blocks
-register and only under the tick that accepted it (`parentHolds`), its ghost hint "one on a bar or a
-tile". **Under a committed block the Metagraph snapshot slot is card or nothing** (user, 2026-11-08:
+register and only IN ITS PLACE (`parentHolds` → `pickActions.blockInPlace`, 2026-11-08: a DAG block
+under the global alone, a token block under its own snapshot — the one rule the releases, the ghost's
+step and the card share; `src/engine/domain/CLAUDE.md`), its ghost hint "one on a bar or a
+tile". **A register's tick levels list ITS subjects** (`ledgerMeasure.REGISTER_SUBJECTS`, the same day
+— the Global card's next ghost offered DED under a tick whose only blocks were the DAG's): every
+anchored snapshot in Metagraph snapshots, the block-carrying ones in Transaction blocks (the block
+window's `tickBlockSnaps`), the data-carrying ones in Data blocks — `ladderLevels.registerNetworks`,
+read by the explorer's level, the Metagraph card's pager and the tick ghost's step alike, and the
+scene's tiles are the same row (`LedgerView`'s cargo reads it), so no surface lists a snapshot the
+chamber does not draw. **Under a committed block the Metagraph snapshot slot is card or nothing** (user, 2026-11-08:
 the two cards "switch places" — a DAG block commits no snapshot, and the slot's ghost dropped below
 the block card, since ghosts wait under the chosen cards): a token block's snapshot is present, a DAG
 block's slot shows no ghost, so the lane holds still. **No Node card there** (user, 2026-11-07: "node is really out of place in this view") —

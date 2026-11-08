@@ -6,7 +6,7 @@ import type { GlobalSnapshot } from "@/src/data/types";
 import { getBlockWindow } from "@/src/data/pastWindow";
 import { blockChainOf, blockMetaSnap, newestBlock } from "@/src/data/blockWindow";
 import { readsBlockWindow, registerOf } from "@/src/engine/domain/viewPolicy";
-import { globalPick, netKeyOf } from "@/src/engine/domain/pickActions";
+import { blockInPlace, globalPick, netKeyOf } from "@/src/engine/domain/pickActions";
 import { REGISTER_MEASURES } from "@/src/data/ledgerMeasure";
 import { carriesData } from "@/src/engine/domain/dataMark";
 
@@ -184,9 +184,14 @@ function followNewestBlock(): void {
   }
   const g = w.globalSnapshots.find((x) => x.ordinal === b.anchorOrd);
   if (g && snap?.data.ordinal !== g.ordinal) advanceSnap(globalPick(g));
-  if (!block || block.chain !== b.chain || block.hash !== b.hash) {
-    advanceBlock({ chain: b.chain, hash: b.hash, ordinal: b.ordinal, anchorOrd: b.anchorOrd });
+  const sel = { chain: b.chain, hash: b.hash, ordinal: b.ordinal, anchorOrd: b.anchorOrd };
+  // A snapshot the reader stepped to inside the live global holds (`held`); a live block that has no
+  // place under it (`blockInPlace` — a DAG block under a metagraph snapshot) is not seated there.
+  if (metaSnap?.held && metaSnap.globalOrdinal === b.anchorOrd && !blockInPlace(sel, { metaSnap })) {
+    if (block) advanceBlock(null);
+    return;
   }
+  if (!block || block.chain !== b.chain || block.hash !== b.hash) advanceBlock(sel);
   // A TOKEN block's accepting snapshot rides the follow with it (user, 2026-11-07: a block's rail
   // reads Metagraph → Metagraph snapshot → Block, the live block's too), through the same non-bumping
   // advance; a DAG block's snapshot is the global itself, so the live metagraph snapshot goes unless

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cohortOfProvider, cohortsLevel, countriesLevel, dataCarryingNetworks, latestTickOf, countryNodes, machinesOf, networksLevel, nodeOrder, nodesByCountry, tickNetworksLevel, tickPolledRows } from "./ladderLevels";
+import { blockCarryingNetworks, cohortOfProvider, cohortsLevel, countriesLevel, dataCarryingNetworks, latestTickOf, countryNodes, machinesOf, networksLevel, nodeOrder, nodesByCountry, registerNetworks, tickNetworksLevel, tickPolledRows } from "./ladderLevels";
 import type { AnchorLogRow } from "./anchorLog";
 import type { MetaSnapRecord } from "./api";
 import type { CountryStat, GlobalSnapshot, MetaInfo, NodeRow } from "./types";
@@ -146,6 +146,25 @@ describe("dataCarryingNetworks — the Data blocks register lists only snapshots
     expect(dataCarryingNetworks(nets, null)).toEqual([]);
     expect(dataCarryingNetworks(nets, undefined)).toEqual([]);
     expect(dataCarryingNetworks(nets, [{ metaId: "dor", ordinal: 902 }])).toEqual([]);
+  });
+});
+
+describe("the register's subjects — one tick level per register (2026-11-08)", () => {
+  const tick = { ordinal: 42, timestamp: "T42" } as unknown as GlobalSnapshot;
+  const listed = (id: string) => id === "dor" || id === "ded";
+  const ex = (metaId: string, ordinal: number, dataBlocks?: number) => ({ metaId, ordinal, fee: 2, bytes: 2048, dataBlocks, dataTxCount: dataBlocks ? 3 : 0 });
+  const rows = [ex("dor", 901, 0), ex("dor", 902, 2), ex("ded", 5, 1), ex("ded", 6, 0)];
+  const nets = tickNetworksLevel(tick, [], rows, listed);
+  const ids = (ns: ReturnType<typeof registerNetworks>) => ns.map((n) => `${n.id}:${n.snaps.map((s) => s.ordinal).join(",")}`);
+  it("blockCarryingNetworks keeps the snapshots the window says carried a block, drops a network with none, and knows nothing without the window", () => {
+    expect(ids(blockCarryingNetworks(nets, [{ metaId: "dor", ordinal: 901 }]))).toEqual(["dor:901"]);
+    expect(blockCarryingNetworks(nets, [])).toEqual([]);
+    expect(blockCarryingNetworks(nets, null)).toEqual([]);
+  });
+  it("registerNetworks dispatches on the register's subjects: all, the block-carrying, the data-carrying", () => {
+    expect(ids(registerNetworks("all", nets, rows, null))).toEqual(["ded:6,5", "dor:902,901"]);
+    expect(ids(registerNetworks("blocks", nets, rows, [{ metaId: "ded", ordinal: 6 }]))).toEqual(["ded:6"]);
+    expect(ids(registerNetworks("data", nets, rows, null))).toEqual(["ded:5", "dor:902"]);
   });
 });
 

@@ -935,6 +935,18 @@ describe("blockStep — the Block ghost opens the shown tick's first block (2026
     // Following, the tick is pinned first.
     expect(blockStep(base({ mode: "ledger", snap, following: true, tickBlocks: [{ sel, snap: ms }] }))?.actions.map((a) => a.kind)).toEqual(["snapshot", "tickNet", "metaSnap", "block"]);
   });
+  it("offers only a block IN PLACE under what the rail shows (2026-11-08): never a DAG block under a metagraph snapshot or network card; that snapshot's own instead", () => {
+    const dag = { sel: { chain: "dag", hash: "d", ordinal: 300, anchorOrd: 300 }, snap: null };
+    const dorSel = { chain: "dor", hash: "t1", ordinal: 5, anchorOrd: 300 };
+    const dorSnap = { metaId: "dor", ordinal: 5, hash: "m5", globalOrdinal: 300, ts: "T300" };
+    const dedSnap = { metaId: "ded", ordinal: 7, hash: "m7", globalOrdinal: 300, ts: "T300" };
+    const blocks = [dag, { sel: dorSel, snap: dorSnap }];
+    expect(blockStep(base({ mode: "ledger", snap, tickBlocks: blocks }))?.key).toBe("dag:d");
+    expect(blockStep(base({ mode: "ledger", snap, metaSnap: dedSnap, tickBlocks: blocks }))).toBeNull();
+    expect(blockStep(base({ mode: "ledger", snap, metaSnap: dorSnap, tickBlocks: blocks }))?.key).toBe("dor:t1");
+    expect(blockStep(base({ mode: "ledger", snap, tickNet: { metaId: "dor", globalOrdinal: 300 }, tickBlocks: blocks }))?.key).toBe("dor:t1");
+    expect(blockStep(base({ mode: "ledger", snap, tickNet: { metaId: "ded", globalOrdinal: 300 }, tickBlocks: blocks }))).toBeNull();
+  });
   it("nothing with no tick, no window, or a tick holding no block", () => {
     expect(blockStep(base({ mode: "ledger", snap: null, tickBlocks: [{ sel: { chain: "dag", hash: "d", ordinal: 300, anchorOrd: 300 }, snap: null }] }))).toBeNull();
     expect(blockStep(base({ mode: "ledger", snap, tickBlocks: null }))).toBeNull();

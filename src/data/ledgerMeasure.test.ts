@@ -24,6 +24,7 @@ import {
   tickDataUpdates,
   dataUpdatesOf,
   REGISTER_MEASURES,
+  REGISTER_SUBJECTS,
 } from "./ledgerMeasure";
 
 // The Snapshots explorer's tick-row figure, as a vocabulary (2026-09-26). The stepper walks the
@@ -178,6 +179,13 @@ describe("dataUpdatesOf — the one data-updates sum (the exact read's perMeta, 
   it("is UNKNOWN when any row could not be decoded — never the decodable rows' sum, never 0 (M5, N1)", () => {
     expect(dataUpdatesOf([{ dataTxCount: 2 }, {}])).toBeUndefined();
     expect(dataUpdatesOf([{}])).toBeUndefined();
+  });
+});
+
+describe("REGISTER_SUBJECTS — which snapshots a register is about (2026-11-08)", () => {
+  it("every anchored snapshot, the block-carrying ones, the data-carrying ones — and Data blocks' measures agree", () => {
+    expect(REGISTER_SUBJECTS).toEqual({ snapshots: "all", blocks: "blocks", data: "data" });
+    expect(REGISTER_MEASURES.data.dataOnly).toBe(REGISTER_SUBJECTS.data === "data");
   });
 });
 

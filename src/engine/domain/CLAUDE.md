@@ -174,10 +174,22 @@ The design rules behind the table, which the tests pin but don't explain:
   blocks a BAR click is its tick's first block** (`Picking`, 2026-11-07, user: the register "loses
   its block card often" — a bar click pinned the tick and released the block): the trail draws only
   block-bearing ticks, so the bar commits the tick and its first block through the same builder, the
-  Block ghost's own step; a band click stays a band's. No focus rung and no pose (camera principle 2). Every builder that pins a
-  tick releases a block of another tick through the one `releaseBlock`, and the tile, band, network,
-  arrival and follow builders take the block as a REQUIRED argument, so no caller can forget it. The
-  Block card's × is `blockClearActions`. **A DATA BLOCK is a slot under its metagraph snapshot, in
+  Block ghost's own step; a band click stays a band's. No focus rung and no pose (camera principle 2).
+  **A BLOCK STANDS ONLY IN ITS PLACE** (`blockInPlace`, 2026-11-08 — user: a Global snapshot holding
+  only DAG blocks opened the DED metagraph as its child, then a DAG block under DED's snapshot, "this
+  must be much more structurally sound"): a DAG block is the global's own — Global → Block, no
+  network or metagraph snapshot between; a token block is its accepting snapshot's — Global →
+  Metagraph → Metagraph snapshot → Block. Every builder that commits a parent releases a block that
+  parent leaves out of place through the one `releaseBlock` (another tick; a metagraph snapshot or a
+  network's band or card that is not the block's — a DAG block under ANY metagraph snapshot), the tile,
+  band, network, arrival and follow builders take the block as a REQUIRED argument so no caller can
+  forget it, a DAG block's own commit releases a snapshot or foreign network standing in its tick, the
+  card renders only in place (`railCards.parentHolds`), the Block ghost offers only a block in place
+  under what the rail shows (`railSiblings.blockStep`: the tick's first under the Global alone, the
+  network's under its card, the snapshot's own under its card), and the live follow never seats a
+  block out of place under a snapshot the reader holds. The Metagraph snapshot card's × is
+  `metaSnapClearActions` (its data block and a token block it accepted go with it; a DAG block is the
+  global's and stays). The Block card's × is `blockClearActions`. **A DATA BLOCK is a slot under its metagraph snapshot, in
   exactly one** (the Data blocks register, 2026-11-07, user: "a data block is just like a tx
   block"): `dataBlockSelectActions` commits the snapshot's chain through `metaSnapSelectActions`
   (unless that snapshot already stands pinned), then the data block, last so its card is the box;

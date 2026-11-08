@@ -282,6 +282,17 @@ export function windowBlocks(w: BlockWindow | null): WindowBlock[] {
   return out;
 }
 
+/** THE BLOCK-CARRYING METAGRAPH SNAPSHOTS OF ONE TICK, as the window names them (the Transaction
+ *  blocks register's subjects in that tick — `ladderLevels.blockCarryingNetworks`). Null with no
+ *  window or a tick the window does not hold: unknown, not none. */
+export function tickBlockSnaps(w: BlockWindow | null, ord: number): { metaId: string; ordinal: number }[] | null {
+  const t = w?.blockTick(ord);
+  if (!t) return null;
+  const out: { metaId: string; ordinal: number }[] = [];
+  for (const [chain, rows] of Object.entries(t.metaSnaps)) for (const r of rows) if (r.blocks?.length) out.push({ metaId: chain, ordinal: r.ordinal });
+  return out;
+}
+
 /** THE METAGRAPH SNAPSHOT THAT ACCEPTED A TOKEN BLOCK, as the window names it (user, 2026-11-07: a
  *  block click commits its snapshot too, so the rail reads Metagraph → Metagraph snapshot → Block
  *  with the block the box). Null for a DAG block — its accepting snapshot is the global itself — and

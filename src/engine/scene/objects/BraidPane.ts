@@ -13,7 +13,7 @@ import { glowBlend, isLightGround, type SceneColors } from "../../sceneColors";
 
 /** The pane's look — one plain constant (src/engine/CLAUDE.md). `alpha` is the dark ground's
  *  whisper, `alphaPaper` the ink's; `soft` the edge falloff as a fraction of each half extent. */
-export const BRAID_PANE_LOOK: Readonly<{ alpha: number; alphaPaper: number; soft: number }> = { alpha: 0.028, alphaPaper: 0.05, soft: 0.45 };
+export const BRAID_PANE_LOOK: Readonly<{ alpha: number; alphaPaper: number; soft: number }> = { alpha: 0.028, alphaPaper: 0.16, soft: 0.45 };
 
 interface PaneUniforms {
   uColor: { value: THREE.Color };

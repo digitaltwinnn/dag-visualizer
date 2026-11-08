@@ -19,16 +19,7 @@ import { BLOCKS_UNREAD, blockAbsence, blockSpanWord, snapshotSpanWord } from "@/
 import { cn } from "@/lib/utils";
 import { latestRelevant } from "@/src/data/follow";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
-import {
-  REGISTER_MEASURES,
-  tickDataUpdates,
-  snapMeasure,
-  snapMeasureValue,
-  tickMeasure,
-  tickMeasureValue,
-  tickNetMeasure,
-  type LedgerMeasure,
-} from "@/src/data/ledgerMeasure";
+import { REGISTER_MEASURES, tickDataUpdates, snapMeasure, snapMeasureValue, tickMeasure, tickMeasureValue, tickNetMeasure, type LedgerMeasure, REGISTER_SUBJECTS } from "@/src/data/ledgerMeasure";
 import { blockRowLocked, ledgerLens, storyCount, tickLocked } from "@/src/data/ledgerStory";
 import { filterAccent, resolveSigner, SIGNER_UNKNOWN, snapshotSigners } from "@/src/data/network";
 import { metaSnapHoverKey, type GlobalSnapshot, type SnapshotExact } from "@/src/data/types";
@@ -45,10 +36,10 @@ import { useStore } from "@/src/store/store";
 import { NO_SIGNAL_COPY, useNoSignal } from "@/components/useNoSignal";
 import { levelMeasure } from "@/src/data/explorerMeasure";
 import { VIEW_POLICIES, readsBlockWindow } from "@/src/engine/domain/viewPolicy";
-import { dataCarryingNetworks, tickNetworksLevel, tickPolledRows } from "@/src/data/ladderLevels";
+import { registerNetworks, tickNetworksLevel, tickPolledRows } from "@/src/data/ladderLevels";
 import { useFeedRead } from "@/components/useFeedRead";
 import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
-import { blockMetaSnap, windowBlocks } from "@/src/data/blockWindow";
+import { blockMetaSnap, windowBlocks, tickBlockSnaps } from "@/src/data/blockWindow";
 import { blockReadOf } from "@/src/data/blockReads";
 import { BLOCK_MEASURE_OPTIONS, blockMeasureText, blockMeasureValue, type BlockMeasure } from "@/src/data/blockMeasure";
 import { NO_MEASURE } from "@/src/data/ledgerMeasure";
@@ -496,10 +487,11 @@ export default function LedgerPanel() {
   // ---- level 1: the networks that anchored into the open tick ---------------------------------
   // The ONE list (src/data/ladderLevels.ts): the Metagraph card's ‹ › and the tick's ghost step the
   // same networks in the same order.
-  // …and in Data blocks only the snapshots that carried data blocks, a network with none dropped
-  // (`dataCarryingNetworks`; the pager under the Metagraph card reads the same, `useSiblingState`).
+  // …kept to the REGISTER'S SUBJECTS (`REGISTER_SUBJECTS`, 2026-11-08): the data-carrying snapshots in
+  // Data blocks, the block-carrying ones in Transaction blocks (the pager under the Metagraph card and
+  // the tick ghost's step read the same, `useSiblingState`).
   const tickNetsAll = tick ? tickNetworksLevel(tick, net ? [...tickPolledRows(net.metaSnaps, tick), ...tickPolledRows(net.unlistedSnaps, tick)] : [], exact?.rows, (id) => LISTED_IDS.has(id)) : [];
-  const tickNets = measures.dataOnly ? dataCarryingNetworks(tickNetsAll, exact?.rows) : tickNetsAll;
+  const tickNets = tick ? registerNetworks(REGISTER_SUBJECTS[register], tickNetsAll, exact?.rows, tickBlockSnaps(blockWin, tick.ordinal)) : tickNetsAll;
   if (tick) {
     const netRows: { id: string; name: string; hue: string; count: number; italic?: boolean }[] = tickNets.map((n) => ({
       id: n.id,

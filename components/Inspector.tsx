@@ -32,7 +32,7 @@ import { useSiblingState } from "@/components/useSiblingState";
 import { openRailCard } from "@/components/railOpen";
 import { useLadderFocus } from "@/components/useLadderFocus";
 import { useTrayActives } from "@/components/useTrayActives";
-import { blockClearActions, countryClearActions, cohortToggleActions, compositionToggleActions, snapshotClearActions, dataBlockClearActions } from "@/src/engine/domain/pickActions";
+import { blockClearActions, countryClearActions, cohortToggleActions, compositionToggleActions, metaSnapClearActions, snapshotClearActions, dataBlockClearActions } from "@/src/engine/domain/pickActions";
 import { CountryTitle, CountryAside, CountryCard, ProviderTitle, ProviderCard, ProviderAside, CompositionTitle, CompositionCard, CompositionAside } from "@/components/inspector/cards";
 import MetaSnapPane from "@/components/inspector/MetaSnapPane";
 import BlockPane from "@/components/inspector/BlockPane";
@@ -699,7 +699,7 @@ export default function Inspector() {
     // The metagraph-snapshot tile: a card slot with no ladder rung (spec §7.1), so its × just
     // clears its own channel — there is no coarser rung for it to step back to.
     metaSnap: metaSnap ? (
-      <MetaSnapPane key="metaSnap" onClose={() => applyClickActions([{ kind: "metaSnap", sel: null }])} {...cx("metaSnap")} />
+      <MetaSnapPane key="metaSnap" onClose={() => applyClickActions(metaSnapClearActions({ metaSnap, block: useStore.getState().block, dataBlock }))} {...cx("metaSnap")} />
     ) : null,
     // The Blocks register's BLOCK: a card slot with no rung, under its tick; its × releases the
     // block alone (`blockClearActions`) — the tick it hangs under stays pinned.

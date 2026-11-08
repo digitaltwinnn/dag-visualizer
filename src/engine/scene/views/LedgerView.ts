@@ -82,6 +82,7 @@ import type {
 } from "@/src/data/types";
 import { metaSnapHoverKey } from "@/src/data/types";
 import type { BlockWindow } from "@/src/data/blockWindow";
+import { REGISTER_SUBJECTS, type RegisterSubjects } from "@/src/data/ledgerMeasure";
 import type { ViewPolicy } from "../../domain/viewPolicy";
 /** A register of the Snapshots view — named through the policy row that lists them, since scene/
  *  reaches nothing in the store, types included (`layerBoundaries.test.ts`). */
@@ -228,10 +229,12 @@ export const TILE_LOOK: Readonly<TileLook> = { rest: 0.1, ink: 0.3, halo: 2.5 };
  *    is the Snapshots furniture as it stands — the same source, ribbons, bands and live edge — with the
  *    tiles kept to the data-carrying snapshots, plus the marks. A tile whose tick's read has not landed
  *    is unknown and not drawn yet (rule 10) — as a Transaction blocks tile waits for its window. */
-const REGISTER_CARGO: Record<LedgerRegister, { blocks: boolean; liveEdge: boolean; anchors: "sheets" | "lines"; tiles: "all" | "blocks" | "data" }> = {
-  snapshots: { blocks: false, liveEdge: true, anchors: "sheets", tiles: "all" },
-  blocks: { blocks: true, liveEdge: false, anchors: "lines", tiles: "blocks" },
-  data: { blocks: false, liveEdge: true, anchors: "sheets", tiles: "data" },
+const REGISTER_CARGO: Record<LedgerRegister, { blocks: boolean; liveEdge: boolean; anchors: "sheets" | "lines"; tiles: RegisterSubjects }> = {
+  // `tiles` IS the register's subjects (`REGISTER_SUBJECTS`, 2026-11-08): the explorer's and the rail's
+  // tick levels list exactly the snapshots the chamber draws.
+  snapshots: { blocks: false, liveEdge: true, anchors: "sheets", tiles: REGISTER_SUBJECTS.snapshots },
+  blocks: { blocks: true, liveEdge: false, anchors: "lines", tiles: REGISTER_SUBJECTS.blocks },
+  data: { blocks: false, liveEdge: true, anchors: "sheets", tiles: REGISTER_SUBJECTS.data },
 };
 /** A data mark's brightness over its tile's: a footnote on the tile, but one that must read on it. */
 const DATA_MARK_GAIN = 2.2;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BLOCK_REFRESH_MS, BLOCK_WINDOW_TICKS, blockChainOf, blockRefreshMs, blockWanted, blockWindowContinues, failedReadKeeps, foldBlockWindow, liveControlCard, liveWindowRuns, mergeLiveAnswer, newestBlock, blockMetaSnap, tipJoins, trailPath, windowBlocks } from "@/src/data/blockWindow";
+import { BLOCK_REFRESH_MS, BLOCK_WINDOW_TICKS, blockChainOf, blockRefreshMs, blockWanted, blockWindowContinues, failedReadKeeps, foldBlockWindow, liveControlCard, liveWindowRuns, mergeLiveAnswer, newestBlock, blockMetaSnap, tickBlockSnaps, tipJoins, trailPath, windowBlocks } from "@/src/data/blockWindow";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
 import type { RawMetaSnapshot, SnapshotExact } from "@/src/data/types";
 
@@ -85,6 +85,13 @@ describe("blockMetaSnap — the snapshot that accepted a token block, as the win
     expect(blockMetaSnap(w, { chain: "dag", ordinal: 200, anchorOrd: 200 })).toBeNull();
     expect(blockMetaSnap(w, { chain: "dor", ordinal: 6, anchorOrd: 200 })).toBeNull();
     expect(blockMetaSnap(null, { chain: "dor", ordinal: 5, anchorOrd: 200 })).toBeNull();
+  });
+  it("tickBlockSnaps — the block-carrying snapshots of one tick (the Transaction blocks register's subjects); null for a tick the window does not hold", () => {
+    const w = foldBlockWindow({ ticks: [tick(200, ["d1"], { dor: [dor(5, ["t1"]), dor(4, [])], ded: [dor(9, [])] }), tick(100, ["d0"])], chains: ["dag", "dor", "ded"] }, {});
+    expect(tickBlockSnaps(w, 200)).toEqual([{ metaId: "dor", ordinal: 5 }]);
+    expect(tickBlockSnaps(w, 100)).toEqual([]);
+    expect(tickBlockSnaps(w, 150)).toBeNull();
+    expect(tickBlockSnaps(null, 200)).toBeNull();
   });
 });
 

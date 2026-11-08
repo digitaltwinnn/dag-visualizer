@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
-import { netKeyOf, tickNetSelectActions, tickNetClearActions, viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, countryClearActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, trendPlaneActions, railNetActions, noteCohortActions, noteDayActions, snapshotClearActions, blockSelectActions, blockClearActions, blockFollowActions, dataBlockSelectActions, dataBlockClearActions, sameDataBlock, registerSwitchActions, globalPick, tickContextOf, type ClickAction } from "./pickActions";
+import { blockInPlace, metaSnapClearActions, netKeyOf, tickNetSelectActions, tickNetClearActions, viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, countryClearActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, trendPlaneActions, railNetActions, noteCohortActions, noteDayActions, snapshotClearActions, blockSelectActions, blockClearActions, blockFollowActions, dataBlockSelectActions, dataBlockClearActions, sameDataBlock, registerSwitchActions, globalPick, tickContextOf, type ClickAction } from "./pickActions";
 import { finerLevels } from "./focusLadder";
 import { METAGRAPHS } from "@/src/net/current";
 import type { PickDescriptor, MetaSnapSel, BlockSel } from "@/src/data/types";
@@ -931,22 +931,59 @@ describe("blockSelectActions / blockClearActions (a block in the Blocks register
   // tick, finest first, and keeps a block of the tick it pins.
   const other = { kind: "snapshot", data: { ordinal: 9 } } as unknown as SnapPick;
   const ms9: MetaSnapSel = { metaId: "dor", ordinal: 5, hash: "x", globalOrdinal: 9, ts: "t" };
-  it("a tile on another tick drops the block first; a tile on the block's own tick keeps it", () => {
+  // A BLOCK STANDS ONLY IN ITS PLACE (`blockInPlace`, 2026-11-08 — user: a DAG block had been opened
+  // under a DED metagraph snapshot): a DAG block is the global's own, a token block its snapshot's.
+  // Every builder that commits a parent releases a block the parent leaves out of place.
+  const tb: BlockSel = { chain: "dor", hash: "t1", ordinal: 5, anchorOrd: 7241523 };
+  const tbSnap: MetaSnapSel = { metaId: "dor", ordinal: 5, hash: "m5", globalOrdinal: 7241523, ts: "t" };
+  it("blockInPlace — a DAG block under the global alone; a token block under its own snapshot and network", () => {
+    expect(blockInPlace(b, { globalOrdinal: 7241523 })).toBe(true);
+    expect(blockInPlace(b, { globalOrdinal: 9 })).toBe(false);
+    expect(blockInPlace(b, { metaSnap: tbSnap })).toBe(false); // a DAG block under a metagraph snapshot
+    expect(blockInPlace(b, { tickNet: { metaId: "dor" } })).toBe(false); // …or under a network's card
+    expect(blockInPlace(b, { tickNet: { metaId: "dag" } })).toBe(true);
+    expect(blockInPlace(tb, { globalOrdinal: 7241523, metaSnap: tbSnap, tickNet: { metaId: "dor" } })).toBe(true);
+    expect(blockInPlace(tb, { metaSnap: { ...tbSnap, ordinal: 6 } })).toBe(false); // another snapshot of its network
+    expect(blockInPlace(tb, { tickNet: { metaId: "ded" } })).toBe(false); // another network
+    expect(blockInPlace(tb, { metaSnap: null })).toBe(true); // no snapshot shown yet: nothing contradicts it
+    expect(blockInPlace(tb, {})).toBe(true);
+  });
+  it("a tile on another tick drops the block; a tile of another network or of the DAG's own tick drops a DAG block too; a token block's own tile keeps it", () => {
     expect(kinds(metaSnapSelectActions(ms9, other, { metaSnap: null, inspect: null, block: b }))).toEqual(["block", "snapshot", "tickNet", "metaSnap"]);
     const own: MetaSnapSel = { ...ms9, globalOrdinal: 7241523 };
-    expect(kinds(metaSnapSelectActions(own, global, { metaSnap: null, inspect: null, block: b }))).toEqual(["snapshot", "tickNet", "metaSnap"]);
+    expect(kinds(metaSnapSelectActions(own, global, { metaSnap: null, inspect: null, block: b }))).toEqual(["block", "snapshot", "tickNet", "metaSnap"]);
+    expect(kinds(metaSnapSelectActions(tbSnap, global, { metaSnap: null, inspect: null, block: tb }))).toEqual(["snapshot", "tickNet", "metaSnap"]);
+    expect(kinds(metaSnapSelectActions({ ...tbSnap, ordinal: 6 }, global, { metaSnap: null, inspect: null, block: tb }))).toEqual(["block", "snapshot", "tickNet", "metaSnap"]);
   });
-  it("a step inside the live pair on another tick drops the block too", () => {
+  it("a step inside the live pair drops a block the new snapshot cannot hold", () => {
     const live: MetaSnapSel = { ...ms9, ordinal: 4 };
     expect(kinds(metaSnapSelectActions(ms9, other, { metaSnap: live, following: true, inspect: null, block: b }))).toEqual(["block", "metaSnap"]);
+    const liveOwn: MetaSnapSel = { ...tbSnap, ordinal: 4 };
+    expect(kinds(metaSnapSelectActions(tbSnap, global, { metaSnap: liveOwn, following: true, inspect: null, block: tb }))).toEqual(["metaSnap"]);
   });
-  it("a band on another tick drops the block first; a band on the block's own tick keeps it", () => {
+  it("a band drops a block of another tick or another chain; a token block's own network keeps it", () => {
     expect(kinds(bandSelectActions("dor", other, { metaSnap: null, block: b }))).toEqual(["block", "snapshot", "tickNet"]);
-    expect(kinds(bandSelectActions("dor", global, { metaSnap: null, block: b }))).toEqual(["snapshot", "tickNet"]);
+    expect(kinds(bandSelectActions("dor", global, { metaSnap: null, block: b }))).toEqual(["block", "snapshot", "tickNet"]);
+    expect(kinds(bandSelectActions("dor", global, { metaSnap: null, block: tb }))).toEqual(["snapshot", "tickNet"]);
+    expect(kinds(bandSelectActions("ded", global, { metaSnap: null, block: tb }))).toEqual(["block", "snapshot", "tickNet"]);
   });
-  it("a network inside another tick drops the block first; inside the block's own tick keeps it", () => {
+  it("a network inside a tick drops a block that is not that network's; its own keeps it", () => {
     expect(kinds(tickNetSelectActions("dor", other, { metaSnap: null, block: b }))).toEqual(["block", "snapshot", "tickNet"]);
-    expect(kinds(tickNetSelectActions("dor", global, { metaSnap: null, block: b }))).toEqual(["snapshot", "tickNet"]);
+    expect(kinds(tickNetSelectActions("dor", global, { metaSnap: null, block: b }))).toEqual(["block", "snapshot", "tickNet"]);
+    expect(kinds(tickNetSelectActions("dor", global, { metaSnap: null, block: tb }))).toEqual(["snapshot", "tickNet"]);
+  });
+  it("a DAG block's commit releases a metagraph snapshot or network standing in its own tick (its place is the global alone)", () => {
+    const ms = { metaId: "ded", ordinal: 5, hash: "x", globalOrdinal: 7241523, ts: "t" } as MetaSnapSel;
+    expect(kinds(blockSelectActions(b, global, { block: null, pinnedOrdinal: 7241523, metaSnap: ms, tickNet: { metaId: "ded", globalOrdinal: 7241523 } }))).toEqual(["metaSnap", "tickNet", "block"]);
+    // A token block restates its own parents and leaves a foreign one through them.
+    expect(kinds(blockSelectActions(tb, global, { block: null, pinnedOrdinal: 7241523, metaSnap: ms, tickNet: { metaId: "ded", globalOrdinal: 7241523 } }, tbSnap))).toEqual(["tickNet", "metaSnap", "block"]);
+  });
+  it("the metagraph snapshot card's × takes what hangs under it: its data block, a token block it accepted — never a DAG block, which is the global's", () => {
+    const db = { snap: tbSnap, index: 0 };
+    expect(kinds(metaSnapClearActions({ metaSnap: tbSnap, block: tb, dataBlock: db }))).toEqual(["dataBlock", "block", "metaSnap"]);
+    expect(kinds(metaSnapClearActions({ metaSnap: tbSnap, block: b }))).toEqual(["metaSnap"]);
+    expect(kinds(metaSnapClearActions({ metaSnap: { ...tbSnap, ordinal: 6 }, block: tb }))).toEqual(["metaSnap"]);
+    expect(metaSnapClearActions({ metaSnap: null, block: tb })).toEqual([]);
   });
   it("the raw layer's arrival on another tick drops the block; on its own tick keeps it", () => {
     expect(kinds(metaSnapArrivalActions(null, other, b))).toEqual(["block", "snapshot", "tickNet", "metaSnap"]);

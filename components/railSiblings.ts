@@ -24,7 +24,7 @@
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import type { Mode } from "@/src/store/store";
 import { ledgerNetwork } from "@/src/engine/domain/tickNet";
-import { blockSelectActions, dataBlockSelectActions, globalPick, tickContextOf } from "@/src/engine/domain/pickActions";
+import { blockSelectActions, dataBlockSelectActions, globalPick, tickContextOf, blockInPlace } from "@/src/engine/domain/pickActions";
 import { shortBlockHash } from "@/src/util/format";
 import { tickerOf } from "@/components/explorer/nodeRow";
 import type { BlockSel, DataBlockSel, TickNetSel } from "@/src/data/types";
@@ -703,8 +703,13 @@ export const rootOf = (mode: Mode): ChildEntry | null => (VIEW_POLICIES[mode].ra
  *  (`railLadderBoundary`'s `PASSES_OVER`), so it is not `CHILD_OF`'s step but its own, and the ghost
  *  stays where the lane puts it — above the node. Null with no tick, or no block in it. */
 export function blockStep(s: SiblingState): SiblingStep | null {
-  const first = s.snap ? s.tickBlocks?.[0] : null;
-  if (!s.snap || !first) return null;
+  if (!s.snap) return null;
+  // Only a block IN PLACE under what the rail shows (`blockInPlace`, 2026-11-08): under the Global
+  // alone the tick's first block; under a Metagraph card that network's; under a Metagraph snapshot
+  // card that snapshot's own — a DAG block is never offered under a metagraph snapshot.
+  const ord = s.snap.data.ordinal;
+  const first = s.tickBlocks?.find((b) => blockInPlace(b.sel, { globalOrdinal: ord, metaSnap: s.metaSnap, tickNet: s.tickNet })) ?? null;
+  if (!first) return null;
   return {
     key: `${first.sel.chain}:${first.sel.hash}`,
     label: `${tickerOf(first.sel.chain)} ${shortBlockHash(first.sel.hash)}`,

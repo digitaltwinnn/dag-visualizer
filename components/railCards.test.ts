@@ -290,6 +290,20 @@ describe("parentHolds (a child card states its parent or does not render)", () =
     const metaSnap = { metaId: "DAG0", ordinal: 1, hash: "", globalOrdinal: 9, ts: "t" };
     expect(parentHolds({ ...none, metaSnap }, "metaSnap")).toBe(true);
   });
+  it("a block stands only in its place (2026-11-08): a DAG block under the global alone, a token block under its own snapshot", () => {
+    const dag = { chain: "dag", hash: "d", ordinal: 9, anchorOrd: 9 };
+    const tok = { chain: "dor", hash: "t", ordinal: 5, anchorOrd: 9 };
+    const snapAt = (ordinal: number) => ({ kind: "snapshot", data: { ordinal } }) as unknown as RailManifestState["snap"];
+    const dorSnap = { metaId: "dor", ordinal: 5, hash: "", globalOrdinal: 9, ts: "t" };
+    const dedSnap = { metaId: "ded", ordinal: 7, hash: "", globalOrdinal: 9, ts: "t" };
+    expect(parentHolds({ ...none, snap: snapAt(9), block: dag }, "block")).toBe(true);
+    expect(parentHolds({ ...none, snap: snapAt(8), block: dag }, "block")).toBe(false);
+    expect(parentHolds({ ...none, snap: snapAt(9), metaSnap: dedSnap, block: dag }, "block")).toBe(false);
+    expect(parentHolds({ ...none, snap: snapAt(9), tickNet: { metaId: "ded", globalOrdinal: 9 }, block: dag }, "block")).toBe(false);
+    expect(parentHolds({ ...none, snap: snapAt(9), metaSnap: dorSnap, tickNet: { metaId: "dor", globalOrdinal: 9 }, block: tok }, "block")).toBe(true);
+    expect(parentHolds({ ...none, snap: snapAt(9), metaSnap: dedSnap, block: tok }, "block")).toBe(false);
+    expect(parentHolds({ ...none, block: null }, "block")).toBe(true);
+  });
 });
 
 // ── THE HISTORY VIEW'S CURSOR SLOT (2026-09-19) ─────────────────────────────────────────────

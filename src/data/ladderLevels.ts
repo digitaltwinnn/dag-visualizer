@@ -19,6 +19,7 @@ import type { CountryStat, GlobalSnapshot, MetaInfo, NodeRow } from "./types";
 import { UNLISTED_HUE, UNLISTED_ID, UNLISTED_LABEL } from "./unlisted";
 import { identityHudCss } from "@/src/palette/identity";
 import { carriesData } from "@/src/engine/domain/dataMark";
+import type { RegisterSubjects } from "./ledgerMeasure";
 
 // ── Geography ───────────────────────────────────────────────────────────────────────────────
 
@@ -242,4 +243,32 @@ export function dataCarryingNetworks(
     if (snaps.length) out.push({ ...n, snaps });
   }
   return out;
+}
+
+/** THE TRANSACTION BLOCKS REGISTER'S TICK NETWORKS (2026-11-08): the level kept to the snapshots the
+ *  block window says carried a block (`blockWindow.tickBlockSnaps`), a network with none dropped —
+ *  the register's tiles, so a Global snapshot holding only DAG blocks opens no metagraph. The window
+ *  is the only source of that fact: before it lands (`null`) nothing is known, and the level is empty. */
+export function blockCarryingNetworks(nets: readonly TickNetwork[], blockSnaps: readonly { metaId: string; ordinal: number }[] | null): TickNetwork[] {
+  if (!blockSnaps) return [];
+  const out: TickNetwork[] = [];
+  for (const n of nets) {
+    const snaps = n.snaps.filter((s) => blockSnaps.some((b) => b.metaId === s.metaId && b.ordinal === s.ordinal));
+    if (snaps.length) out.push({ ...n, snaps });
+  }
+  return out;
+}
+
+/** ONE TICK LEVEL PER REGISTER (`REGISTER_SUBJECTS`): every anchored snapshot, the block-carrying
+ *  ones, or the data-carrying ones — the explorer's level and the rail's steps and pagers all ask
+ *  this, so they list what the chamber draws. */
+export function registerNetworks(
+  subjects: RegisterSubjects,
+  nets: readonly TickNetwork[],
+  exactRows: readonly { metaId: string; ordinal: number; dataBlocks?: number; dataTxCount?: number }[] | null | undefined,
+  blockSnaps: readonly { metaId: string; ordinal: number }[] | null,
+): TickNetwork[] {
+  if (subjects === "data") return dataCarryingNetworks(nets, exactRows);
+  if (subjects === "blocks") return blockCarryingNetworks(nets, blockSnaps);
+  return [...nets];
 }

@@ -5,11 +5,11 @@ import { useStore } from "@/src/store/store";
 import type { SiblingState } from "@/components/railSiblings";
 import { useLedgerSource } from "@/components/useLedgerSource";
 import { latestRelevant } from "@/src/data/follow";
-import { dataCarryingNetworks, tickNetworksLevel, tickPolledRows } from "@/src/data/ladderLevels";
-import { blockMetaSnap, windowBlocks } from "@/src/data/blockWindow";
+import { registerNetworks, tickNetworksLevel, tickPolledRows } from "@/src/data/ladderLevels";
+import { blockMetaSnap, tickBlockSnaps, windowBlocks } from "@/src/data/blockWindow";
 import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
 import { readsBlockWindow, registerOf } from "@/src/engine/domain/viewPolicy";
-import { REGISTER_MEASURES } from "@/src/data/ledgerMeasure";
+import { REGISTER_SUBJECTS } from "@/src/data/ledgerMeasure";
 import { LISTED_IDS } from "@/src/data/unlisted";
 import { tickInStory, tickLocked } from "@/src/data/ledgerStory";
 import { POLL } from "@/src/engine/config";
@@ -83,8 +83,8 @@ export function useSiblingState(slot: RailCardKind | null): SiblingState {
     const wantsTick = slot === "snap" || slot === "context" || slot === "metaSnap";
     const tickGlobal = mode === "ledger" && wantsTick ? (snap?.data ?? null) : null;
     const net = tickGlobal ? source : null;
-    // …kept to the snapshots that carried data blocks in the Data blocks register (`dataOnly`), as
-    // the explorer's level is.
+    // …kept to the REGISTER'S SUBJECTS (`REGISTER_SUBJECTS`, 2026-11-08): the data-carrying snapshots in
+    // Data blocks, the block-carrying ones in Transaction blocks — the same list the explorer's level is.
     const tickNetsAll = tickGlobal
       ? tickNetworksLevel(
           tickGlobal,
@@ -93,7 +93,7 @@ export function useSiblingState(slot: RailCardKind | null): SiblingState {
           (id) => LISTED_IDS.has(id),
         )
       : null;
-    const tickNets = tickNetsAll && REGISTER_MEASURES[ledgerRegister].dataOnly ? dataCarryingNetworks(tickNetsAll, snapshotExact[tickGlobal!.ordinal]?.rows) : tickNetsAll;
+    const tickNets = tickNetsAll && tickGlobal ? registerNetworks(REGISTER_SUBJECTS[ledgerRegister], tickNetsAll, snapshotExact[tickGlobal.ordinal]?.rows, tickBlockSnaps(blockWin, tickGlobal.ordinal)) : tickNetsAll;
     // THE SHOWN TICK'S BLOCKS (the Block ghost's step, `blockStep`): the window's blocks on that tick,
     // each with its accepting snapshot — only where the register reads the window.
     const tickBlocks =

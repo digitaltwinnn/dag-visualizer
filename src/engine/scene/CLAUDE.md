@@ -576,7 +576,8 @@ bars, labels, the rewind and the pose. What differs answers through ONE keyed ma
   trail, seals thin threads falling to the floor (grey from a DAG block, the network's hue from a tile). Off the lens a seal takes the row's `dim`.
   `_syncThreads` is the one dispatch, so a filter change redraws the seals, never the
   committed-network threads.
-- **Bare tiles are not drawn** (`tiles: "blocks"`, same round): a metagraph snapshot carrying no
+- **Bare tiles are not drawn** (`tiles: "blocks"` — the register's SUBJECTS, `ledgerMeasure.REGISTER_SUBJECTS`,
+  the one row the explorer's and the rail's tick levels read too, 2026-11-08; same round): a metagraph snapshot carrying no
   block zero-scales and leaves the pick table (`_blockTiles`, rebuilt with the tier; `_tileDrawn` is
   the one question every pass asks); a tile that carries a token block stands, with its line.
 

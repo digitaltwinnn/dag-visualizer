@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import { ledgerCardNetwork } from "@/src/engine/domain/tickNet";
-import { pickNetId } from "@/src/engine/domain/pickActions";
+import { pickNetId, blockInPlace } from "@/src/engine/domain/pickActions";
 import { cardNetwork } from "@/src/engine/domain/trendStack";
 import type { TickNetSel } from "@/src/data/types";
 import { AI_NOTES_ICON, BLOCK_ICON, EXPLORE_ICON, INSTANT_ICON, RANGE_ICON, iconForPick } from "@/components/icons";
@@ -503,10 +503,11 @@ export function metagraphCardNetwork(s: {
  *  stored parent key disagrees with the parent on screen stands down, exactly as it does when the
  *  parent is cleared. No parent on screen is no disagreement (the ledger's global card can be a
  *  ghost while its metagraph snapshot is populated — `MetaSnapPane`'s `sameTick` note). */
-export function parentHolds(s: Pick<RailManifestState, "snap" | "metaSnap" | "country" | "cohort" | "block" | "dataBlock">, child: "metaSnap" | "block" | "dataBlock" | "cohort"): boolean {
+export function parentHolds(s: Pick<RailManifestState, "snap" | "metaSnap" | "tickNet" | "country" | "cohort" | "block" | "dataBlock">, child: "metaSnap" | "block" | "dataBlock" | "cohort"): boolean {
   if (child === "metaSnap") return !s.snap || !s.metaSnap || s.snap.data.ordinal === s.metaSnap.globalOrdinal;
-  // A block is in exactly one global snapshot: the tick that accepted it.
-  if (child === "block") return !s.snap || !s.block || s.snap.data.ordinal === s.block.anchorOrd;
+  // A block stands only IN ITS PLACE (`pickActions.blockInPlace`, 2026-11-08): its own tick, a DAG
+  // block under no metagraph snapshot or foreign network, a token block under its own snapshot.
+  if (child === "block") return !s.block || blockInPlace(s.block, { globalOrdinal: s.snap?.data.ordinal ?? null, metaSnap: s.metaSnap, tickNet: s.tickNet });
   // A data block is in exactly one metagraph snapshot: the one on screen must be its own.
   if (child === "dataBlock") return !!s.dataBlock && !!s.metaSnap && s.metaSnap.metaId === s.dataBlock.snap.metaId && s.metaSnap.ordinal === s.dataBlock.snap.ordinal;
   return !s.country || !s.cohort || s.country === s.cohort.cc;

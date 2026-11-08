@@ -225,6 +225,15 @@ const SNAPSHOT_MEASURES: RegisterMeasureSet = {
 };
 /** Keyed by register, so a fourth register is a compile error here. Transaction blocks lists BLOCKS
  *  (its own set, `blockMeasure.ts`); the tick levels it never shows read the Metagraph snapshots set. */
+/** A REGISTER'S SUBJECTS (2026-11-08 — user: in Transaction blocks a Global snapshot holding only DAG
+ *  blocks still opened the DED metagraph as its child, "this must be much more structurally sound"):
+ *  which metagraph snapshots a register is ABOUT — every anchored one, the block-carrying ones, the
+ *  data-carrying ones. ONE home for the scene's tiles (`LedgerView`'s cargo), the explorer's and the
+ *  rail's tick levels (`ladderLevels.registerNetworks`), so no surface lists a snapshot the chamber
+ *  does not draw. */
+export type RegisterSubjects = "all" | "blocks" | "data";
+export const REGISTER_SUBJECTS: Readonly<Record<LedgerRegister, RegisterSubjects>> = { snapshots: "all", blocks: "blocks", data: "data" };
+
 export const REGISTER_MEASURES: Readonly<Record<LedgerRegister, RegisterMeasureSet>> = {
   snapshots: SNAPSHOT_MEASURES,
   blocks: SNAPSHOT_MEASURES,
