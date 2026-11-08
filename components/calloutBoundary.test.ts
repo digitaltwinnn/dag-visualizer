@@ -49,9 +49,7 @@ describe("subject-callout boundary", () => {
         const norm = file.replace(/\\/g, "/");
         if (CALLOUT_HOMES.has(norm)) continue;
         const code = stripComments(read(file));
-        // `callout-2` is the same contract's second anchor (the other snapshot of a committed
-        // pair in Snapshots, 2026-10-03): rendered by the one component, placed by the one sync.
-        if (/["'`]callout(-2)?["'`]/.test(code)) offenders.push(norm);
+        if (/["'`]callout["'`]/.test(code)) offenders.push(norm);
       }
     }
     expect(
@@ -91,7 +89,7 @@ describe("subject-callout boundary", () => {
     // writes them onto each callout (`--co-off-x/y`, `--co-hang-k`, `--co-phone-k`). A literal
     // in a callout rule would be a second home that drifts (2026-10-04, review item 6).
     const css = read("app/globals.css");
-    const rules = css.split("\n").filter((l) => /^:is\(#callout, #callout-2\)/.test(l));
+    const rules = css.split("\n").filter((l) => /^#callout\b/.test(l));
     expect(rules.length).toBeGreaterThan(0);
     for (const l of rules) {
       // `--co-k: 1` is the identity (the standing label), not a copy of anything.

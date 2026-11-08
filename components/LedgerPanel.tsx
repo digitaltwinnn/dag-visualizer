@@ -31,10 +31,10 @@ import {
 } from "@/src/data/ledgerMeasure";
 import { blockRowLocked, ledgerLens, storyCount, tickLocked } from "@/src/data/ledgerStory";
 import { filterAccent, resolveSigner, SIGNER_UNKNOWN, snapshotSigners } from "@/src/data/network";
-import { metaSnapHoverKey, type GlobalSnapshot, type NodeRow, type SnapshotExact } from "@/src/data/types";
+import { metaSnapHoverKey, type GlobalSnapshot, type SnapshotExact } from "@/src/data/types";
 import { displayNetwork, LISTED_IDS, UNLISTED_HUE, UNLISTED_ID } from "@/src/data/unlisted";
 import { POLL } from "@/src/engine/config";
-import { followToggleActions, metaSnapSelectActions, nodeSelectActions, sameMetaSnap, snapshotSelectActions, tickNetSelectActions } from "@/src/engine/domain/pickActions";
+import { followToggleActions, metaSnapSelectActions, sameMetaSnap, snapshotSelectActions, tickNetSelectActions } from "@/src/engine/domain/pickActions";
 import { heldTicks, nextHoldTop } from "@/src/data/ledgerHold";
 import { CLOSED_PATH, pathViewChanged, syncLedgerPath, type LedgerPath, type LedgerPathView } from "@/src/data/ledgerPath";
 import LiveDot from "@/components/LiveDot";
@@ -215,9 +215,6 @@ export default function LedgerPanel() {
   const snapPick = levelMeasure(measures.snapMeasures, ledgerMeasure);
 
   const selNode = inspect && (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode") ? inspect : null;
-  const selIp = selNode?.node?.ip ?? null;
-  const selLayer = selNode ? (selNode.kind === "metanode" ? selNode.node?.layer ?? null : selNode.kind) : null;
-  const nodeOn = (r: NodeRow) => selIp != null && r.layer === selLayer && "node" in r.pick && r.pick.node?.ip === selIp;
 
   // ⚠️ THE LIST IS THE LIVE BUFFER, PAGED — not the 3D trail (user, 2026-09-13: nine rows made
   // the explorer look like the whole chain rather than a peephole onto it). `POLL.maxSnapshots`
@@ -674,15 +671,16 @@ export default function LedgerPanel() {
           return unknownNodeRowSpec({ key: sid, id: sid, label: w.label, hue: UNLISTED_HUE });
         }
         const row = r.row;
-        const on = nodeOn(row);
         const hue = identityHudCss(leaf.metaId);
+        // A READING, not a door (user, 2026-11-08: the node card left the Snapshots view): the row
+        // names the signer and pairs with its chip in the tray on hover, and commits nothing — the
+        // view has no node rung to stand a card on.
         return nodeRowSpec({
           metaList,
           key: sid,
           row,
           hue,
-          on,
-          onClick: () => applyClickActions(nodeSelectActions(row.pick, { mode: "ledger", currentFilter: filter, deselect: on })),
+          on: false,
           pair: subjectPairing(hoverNodeId, hoverKeyOf(row.pick), setHoverNodeId, hue),
         });
       }),

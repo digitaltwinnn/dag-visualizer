@@ -110,7 +110,8 @@ export function nodeRowSpec(args: {
    *  ALL of it, never a filtered list, so a committed filter cannot hide a co-tenant. */
   metaList: readonly MetaInfo[];
   on: boolean;
-  onClick: () => void;
+  /** Absent for a READING row (the Snapshots signer level, 2026-11-08): no door, hover pairing only. */
+  onClick?: () => void;
   pair: ExplorerRowSpec["pair"];
 }): ExplorerRowSpec {
   const { row, hue } = args;

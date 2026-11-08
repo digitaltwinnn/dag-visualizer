@@ -1,6 +1,7 @@
 import type { BlockSel, DataBlockSel, PickDescriptor, MetaSnapSel, TickNetSel } from "@/src/data/types";
 import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder";
 import type { Mode } from "@/src/store/store";
+import type { LedgerRegister } from "@/src/store/mode";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { isSubjectSlot } from "@/components/railCards";
 
@@ -175,6 +176,9 @@ export interface SelectionKeyState {
   block?: BlockSel | null;
   /** The committed data block (the Data blocks register). Optional likewise. */
   dataBlock?: DataBlockSel | null;
+  /** The Snapshots view's register (2026-11-08): a switch is a new moment, so a hand-opened box in
+   *  one register does not hold the next register's own card folded. Optional likewise. */
+  ledgerRegister?: LedgerRegister;
 }
 
 /** THE SELECTION MOMENT — when this key changes, the rail's +/− overrides are dropped (after a view
@@ -227,5 +231,8 @@ export function railSelectionKey(s: SelectionKeyState): string {
     // hand-opened snapshot box survived the commit, and the Data block card arrived beside them. A
     // data block is picked, never advanced by the heartbeat, so it needs no follow guard.
     s.dataBlock ? `${s.dataBlock.snap.metaId}:${s.dataBlock.snap.ordinal}:${s.dataBlock.index}` : "",
+    // THE REGISTER (user, 2026-11-08: entering Transaction blocks showed the Global snapshot card
+    // where the block's was due): a switch is a new moment — the register seats its own box.
+    s.ledgerRegister ?? "",
   ].join("§");
 }

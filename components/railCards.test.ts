@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { exploreCards, detailsCards, isSubjectSlot, metagraphCardNetwork, nodeHereOf, noteCardAbsent, parentHolds, focusSlotId, ladderLevelOfSlot, ladderSlotIds, type RailManifestState } from "@/components/railCards";
+import { exploreCards, detailsCards, isSubjectSlot, metagraphCardNetwork, noteCardAbsent, parentHolds, focusSlotId, ladderLevelOfSlot, ladderSlotIds, type RailManifestState } from "@/components/railCards";
 import { LADDERS } from "@/src/engine/domain/focusLadder";
 import type { PickDescriptor } from "@/src/data/types";
 
@@ -7,7 +7,6 @@ import type { PickDescriptor } from "@/src/data/types";
 const presentKinds = (cards: { kind: string; present: boolean }[]) =>
   cards.filter((c) => c.present).map((c) => c.kind);
 
-import type { MetaSnapSel, NodeRow } from "@/src/data/types";
 import type { Mode } from "@/src/store/store";
 
 const nodePick = { kind: "metanode", node: { ip: "9.9.9.9" } } as unknown as PickDescriptor;
@@ -121,8 +120,8 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
     );
     expect(new Set(keys).size).toBe(1);
   });
-  it("ledger ghosts: snapshot + context + metaSnap + node invites (nodes pick in the chamber too)", () => {
-    expect(ghostIds(detailsCards(details({})))).toEqual(["snap", "context", "metaSnap", "node"]);
+  it("ledger ghosts: snapshot + context + metaSnap — no node (the card left the Snapshots view, 2026-11-08)", () => {
+    expect(ghostIds(detailsCards(details({})))).toEqual(["snap", "context", "metaSnap"]);
   });
   it("hyper ghosts: context + composition + node (the snapshot slot is ledger-scoped, spec 2026-08-01)", () => {
     expect(ghostIds(detailsCards(details({ mode: "hyper" })))).toEqual(["context", "composition", "node"]);
@@ -378,8 +377,9 @@ describe("ladderSlotIds — the descent-spine lane (display order = reversed run
     // the old lane asserted that a network contains a global tick. It also opens with a card
     // that speaks, since the tick follows live without any commit. Card slots, not focus rungs.
     // The Blocks register's BLOCK slot sits under the metagraph snapshot: a block stands on its
-    // accepting snapshot, the tile's or the tick's own (2026-11-05). A slot, no rung.
-    expect(ladderSlotIds("ledger")).toEqual(["notes", "snap", "context", "metaSnap", "block", "dataBlock", "node"]);
+    // accepting snapshot, the tile's or the tick's own (2026-11-05). A slot, no rung. NO NODE SLOT
+    // (user, 2026-11-08): a node is a snapshot's signer here, the explorer's and the card's reading.
+    expect(ladderSlotIds("ledger")).toEqual(["notes", "snap", "context", "metaSnap", "block", "dataBlock"]);
   });
   it("flat views have no ladder", () => {
     expect(ladderSlotIds("soon")).toEqual([]);
@@ -439,15 +439,16 @@ describe("focusSlotId — the focus rung both rails read", () => {
   });
   it("a pinned snapshot IS a ledger lane slot now (item 8) — and recency decides the active card", () => {
     expect(focusSlotId(details({ mode: "ledger", snap: snapPick }))).toBe("snap");
-    // With both a node and a snapshot present, the most recently selected one is active…
+    // With both a node and a snapshot present, the most recently selected one is active — in a view
+    // that holds a node slot (Geography); Snapshots has none, so a carried node never takes the box.
     expect(
-      focusSlotId({ ...details({ mode: "ledger", filter: "dag", snap: snapPick, inspect: nodePick }), selStack: ["snap", "node"] }),
-    ).toBe("snap");
+      focusSlotId({ ...details({ mode: "geo", filter: "dag", snap: snapPick, inspect: nodePick }), selStack: ["node", "network"] }),
+    ).toBe("node");
     expect(
       focusSlotId({ ...details({ mode: "ledger", filter: "dag", snap: snapPick, inspect: nodePick }), selStack: ["node", "snap"] }),
-    ).toBe("node");
-    // …and with no recency data, the finest present slot wins (the old rule).
-    expect(focusSlotId(details({ mode: "ledger", filter: "dag", snap: snapPick, inspect: nodePick }))).toBe("node");
+    ).toBe("snap");
+    // …and with no recency data, the finest present slot wins (the old rule): here the filter's card.
+    expect(focusSlotId(details({ mode: "ledger", filter: "dag", snap: snapPick, inspect: nodePick }))).toBe("context");
   });
   it("a filter commit focuses the CONTEXT dossier over a follow-pinned snapshot (2026-08-14)", () => {
     // The user's gesture was the network; the snap/metaSnap pins arrived from the live follow
@@ -628,43 +629,15 @@ describe("focusSlotId with the AI notes card on top of the lane", () => {
 
 // A CARD THE VIEW CAN'T PRODUCE (user, 2026-10-31, option B of four): a card speaks only in a view
 // whose lane holds it. The selection stays, so going back restores it, as the placeholder views do.
-describe("a node in Snapshots", () => {
-  const key = "9.9.9.9";
-  const signers = (ips: string[]) => ips.map((ip) => ({ pick: { kind: "metanode", node: { ip } } })) as unknown as NodeRow[];
-  const at = (over: Partial<Parameters<typeof nodeHereOf>[0]>) =>
-    nodeHereOf({ mode: "ledger", inspect: nodePick, inspectView: "geo", metaSnap: null, following: false, ...over }, () => signers([key]));
-  const held = { metaId: "dor", ordinal: 1, globalOrdinal: 2 } as MetaSnapSel;
-  it("stands when it was picked there", () => {
-    expect(at({ inspectView: "ledger" })).toBe(true);
-  });
-  it("stands when it signed the snapshot on screen, and not when it did not", () => {
-    expect(at({ metaSnap: held })).toBe(true);
-    expect(nodeHereOf({ mode: "ledger", inspect: nodePick, inspectView: "geo", metaSnap: held, following: false }, () => signers(["1.1.1.1"]))).toBe(false);
-  });
-  it("a live snapshot nobody picked is no reason to stand: it would come and go with every tick", () => {
-    expect(at({ metaSnap: held, following: true })).toBe(false);
-  });
-  it("leaves when it was carried in with no snapshot to have signed", () => {
-    expect(at({})).toBe(false);
-  });
-  it("is no question in any other view, or with no node", () => {
-    expect(at({ mode: "geo" })).toBeUndefined();
-    expect(at({ inspect: null })).toBeUndefined();
-  });
-});
-
 describe("a card leaves the rail in a view that can't show it", () => {
   const cards = (mode: Mode, over: Partial<RailManifestState> = {}) =>
     detailsCards({ mode, filter: "all", inspect: nodePick, ...over } as RailManifestState);
   const node = (mode: Mode, over: Partial<RailManifestState> = {}) => cards(mode, over).find((c) => c.id === "node")?.present;
-  it("a node stands in Hypergraph and Geography, and never in History", () => {
+  it("a node stands in Hypergraph and Geography, and never in History or Snapshots (2026-11-08)", () => {
     expect(node("hyper")).toBe(true);
     expect(node("geo")).toBe(true);
     expect(node("trend")).toBe(false);
-  });
-  it("in Snapshots a node stands unless the caller says it does not belong there", () => {
-    expect(node("ledger", { nodeHere: true })).toBe(true);
-    expect(node("ledger", { nodeHere: false })).toBe(false);
+    expect(node("ledger")).toBe(false);
   });
   it("the focus passes to what the view holds", () => {
     const stack = { selStack: ["node"] } as Partial<RailManifestState>;
@@ -734,14 +707,12 @@ describe("the data block slot", () => {
 
 // NO NODE CARD IN TRANSACTION BLOCKS (2026-11-07): the register draws no metagraph snapshot, so its
 // signer rung has nothing to hang from — no card, no ghost; the selection itself is untouched.
-describe("the node slot in Transaction blocks", () => {
-  it("is absent, card and ghost, in the Blocks register — and present in the others", () => {
-    const inBlocks = detailsCards(details({ mode: "ledger", ledgerRegister: "blocks", inspect: nodePick })).find((c) => c.id === "node")!;
-    expect(inBlocks.present).toBe(false);
-    expect(inBlocks.hint).toBeNull();
-    for (const r of ["snapshots", "data"] as const) {
+describe("the node slot in Snapshots", () => {
+  it("is absent, card and ghost, in every register (2026-11-07 Transaction blocks; 2026-11-08 the whole view)", () => {
+    for (const r of ["snapshots", "blocks", "data"] as const) {
       const c = detailsCards(details({ mode: "ledger", ledgerRegister: r, inspect: nodePick })).find((x) => x.id === "node")!;
-      expect(c.present).toBe(true);
+      expect(c.present, r).toBe(false);
+      expect(ghostIds(detailsCards(details({ mode: "ledger", ledgerRegister: r }))), r).not.toContain("node");
     }
   });
 });

@@ -33,7 +33,7 @@ export interface SelectionSnapshot {
 export type ResolverKey =
   | "geoNode" | "geoCohort" | "geoCountry" | "geoNetwork" | "geoOverview"
   | "hyperNode" | "hyperComposition" | "hyperNetwork" | "hyperOverview"
-  | "ledgerNode" | "ledgerNetwork" | "ledgerOverview"
+  | "ledgerNetwork" | "ledgerOverview"
   | "trendNetwork" | "trendOverview";
 
 export interface Rung {
@@ -63,9 +63,12 @@ export const LADDERS: Record<View3D, Rung[]> = {
   ],
   // The LAYER rung is RETIRED (user, 2026-08-06): the chamber's floors and node containers are
   // pure visual aid now — the ledger's committable subjects are the snapshots themselves (the
-  // snapshot/metaSnap card slots, which are not rungs) plus the universal node + network.
+  // snapshot/metaSnap card slots, which are not rungs) plus the network. THE NODE RUNG IS RETIRED
+  // TOO (user, 2026-11-08: "remove the node card entirely from the snapshots view"): a node is a
+  // snapshot's signer here, read on the explorer and the card, never a committed subject — so a
+  // node click in the chamber commits nothing (`clickActions`), the signer rows are readings, and a
+  // carried node holds its selection for the views that have the rung.
   ledger: [
-    { level: "node",    active: (s) => s.inspectIsNode,    resolver: "ledgerNode" },
     { level: "network", active: (s) => s.filter !== "all", resolver: "ledgerNetwork" },
     { level: "all",     active: () => true,                resolver: "ledgerOverview" },
   ],

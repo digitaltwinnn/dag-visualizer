@@ -4,8 +4,10 @@
 // slots (components/CLAUDE.md "Every right-rail card is the same SIX SLOTS"), each from what is
 // actually held (rule 10):
 //
-//   head      · "Block", the short hash, the block's HEIGHT as the qualifier chip, and the LIVE /
-//               PINNED control (D3: in the Blocks register live follows the newest block)
+//   head      · "Transaction block", the short hash, the block's AGE as the qualifier chip (user,
+//               2026-11-08: "instead of 'height' use the 'x seconds ago' tag" — the age of the global
+//               snapshot that accepted it, the Global snapshot card's own register, ticking), and the
+//               LIVE / PINNED control (D3: in the Blocks register live follows the newest block)
 //   lead      · what it moved, in the chain's own unit — ONE transfer names it, "Moved N DAG from
 //               DAG1ab…cd to DAG9ef…01"; several are counted, "Moved N DAG in M transfers" — else,
 //               with nothing moved or its read not landed, the relation the feed already names:
@@ -14,13 +16,13 @@
 //               `transfers`, the six-slot grammar's breakdown table); one transfer is the lead's
 //   facts     · parents (two short hashes), children IN VIEW (how many of the window's held reads
 //               are built on it — a count within the window, labelled so, never a total),
-//               signatures, fees — "reading…" until the read lands, and a failed read says so. NO
-//               HEIGHT ROW: the head's chip states it, and a card never says one fact twice. No
-//               sub-height either: a block read carries none.
+//               signatures, fees, and the HEIGHT (a fact row since the head's chip became the age;
+//               a card never says one fact twice) — "reading…" until the read lands, and a failed
+//               read says so. No sub-height: a block read carries none.
 //   doors     · "Block records": the raw layer's blocks table, this block's row pinned in its
 //               accepting global's group (`trendDoors.openBlockRecord`)
 //   foot      · the hash and the parents' hashes, in full with copy
-import { Fragment, type CSSProperties } from "react";
+import { Fragment, useSyncExternalStore, type CSSProperties } from "react";
 import { ArrowUpRight } from "lucide-react";
 import CardHead, { RailPane } from "@/components/CardHead";
 import FollowControl from "@/components/FollowControl";
@@ -33,6 +35,9 @@ import { blockLead } from "@/components/inspector/blockLead";
 import { useFeedRead } from "@/components/useFeedRead";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { blockReadKey, blockReadOf } from "@/src/data/blockReads";
+import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
+import { useNowTick } from "@/components/useNowTick";
+import { relativeAge } from "@/src/util/relativeAge";
 import { compactDag, midHash, shortBlockHash } from "@/src/util/format";
 import { identityHudCss } from "@/src/palette/identity";
 import { useStore } from "@/src/store/store";
@@ -49,7 +54,12 @@ export default function BlockPane({ onClose, collapsed, onToggle }: { onClose: (
   const hoverBlock = useStore((s) => s.hoverBlock);
   const setHoverBlock = useStore((s) => s.setHoverBlock);
   const pulseKey = useEdgePulse(sel ? `${sel.chain}:${sel.hash}` : null);
+  // The block's time is its accepting global snapshot's (the window's tick), read on the shared clock.
+  const win = useSyncExternalStore(onBlockWindow, getBlockWindow, () => null);
+  const now = useNowTick(1000);
   if (!sel) return null;
+  const tickTs = win?.blockTick(sel.anchorOrd)?.ts ?? null;
+  const age = tickTs ? relativeAge(now - Date.parse(tickTs)) : null;
 
   const hue = identityHudCss(sel.chain);
   // The scene's block, the explorer's row and this card light one another on the block's own channel.
@@ -85,13 +95,13 @@ export default function BlockPane({ onClose, collapsed, onToggle }: { onClose: (
             <span className="truncate font-mono">{shortBlockHash(sel.hash)}</span>
           </span>
         }
-        // The height chip, then the LIVE / PINNED control (D3): in the Blocks register live follows
+        // The age chip, then the LIVE / PINNED control (D3): in the Blocks register live follows
         // the newest block, so the control rides this card — the global card's own pill stands down.
         aside={
           <span className="inline-flex items-center gap-1.5">
-            {read && (
+            {age && (
               <span data-yields="" className="contents">
-                <QualifierChip className="tabular-nums">height {read.height.toLocaleString()}</QualifierChip>
+                <QualifierChip className="tabular-nums">{age}</QualifierChip>
               </span>
             )}
             <FollowControl subject="block" />
@@ -140,6 +150,9 @@ export default function BlockPane({ onClose, collapsed, onToggle }: { onClose: (
                 </Fact>
                 <Fact label="Fees paid">
                   <span className="whitespace-nowrap">{compactDag(read.fee)} {unit}</span>
+                </Fact>
+                <Fact label="Height">
+                  <span className="tabular-nums">{read.height.toLocaleString()}</span>
                 </Fact>
               </>
             ) : missed ? (

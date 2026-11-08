@@ -13,7 +13,6 @@ import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { compositionGroups } from "@/src/data/composition";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import CardHead, { RailFold, RailPane } from "@/components/CardHead";
-import { useNodeHere } from "@/components/useNodeHere";
 import { useTickHasFilter } from "@/components/useTickHasFilter";
 import InspectorCard from "@/components/InspectorCard";
 import ContextCard from "@/components/ContextCard";
@@ -442,7 +441,6 @@ export default function Inspector() {
   const trendFront = useStore((s) => s.trendFront);
   const trendWindow = useStore((s) => s.trendWindow);
   const tickHasFilter = useTickHasFilter();
-  const nodeHere = useNodeHere();
   // The AI note on screen (the card shares this fetch): its card — the top slot of the lane —
   // stands down when the view's subject has no note (off mainnet none has) or when the server
   // answered `none`, or `unavailable` to a read (R67; to the reader's own "Write notes" it stays and
@@ -450,7 +448,7 @@ export default function Inspector() {
   const aiNote = useAiNote();
   const noteAbsent = noteCardAbsent(aiNote.req != null, aiNote.note.res, aiNote.note.via);
   const manifest = detailsCards({
-    mode, filter, railNet, tickNet, tickHasFilter, nodeHere, inspect, snap, country, cohort, composition, metaSnap, ledgerRegister, block, dataBlock, coarse, trendCursorMs, trendRange, trendFocus, trendFront, trendWindow,
+    mode, filter, railNet, tickNet, tickHasFilter, inspect, snap, country, cohort, composition, metaSnap, ledgerRegister, block, dataBlock, coarse, trendCursorMs, trendRange, trendFocus, trendFront, trendWindow,
     noteAbsent,
     selNodesCount: selNodes.length,
     filterLabel: displayNetwork(railNet ?? filter)?.ticker ?? null, // one lookup — catalog + the unlisted pseudo-network
@@ -567,7 +565,7 @@ export default function Inspector() {
   // "only the focus rung is open" default governs again. Within one selection the +/− still holds.
   const following = useStore((s) => s.following);
   // One pure key (`railCollapse.railSelectionKey` carries every member's reason).
-  const selectionKey = railSelectionKey({ mode, filter, railNet, country, cohort, composition, inspect, trendCursorMs, trendRange, trendFocus, tickNet, following, snap, metaSnap, block, dataBlock });
+  const selectionKey = railSelectionKey({ mode, filter, railNet, country, cohort, composition, inspect, trendCursorMs, trendRange, trendFocus, tickNet, following, snap, metaSnap, block, dataBlock, ledgerRegister });
   // Arms HeightEase's growIn for slots that JOIN the lane after boot (false on the first
   // render pass, true on every later one — a mounting slot's wrapper then eases from 0
   // instead of shoving the pile in one frame). DESKTOP ONLY, as ExploreRail's (its note has

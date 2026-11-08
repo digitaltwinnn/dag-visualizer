@@ -1,63 +1,61 @@
 import { describe, it, expect } from "vitest";
-import { calloutSubjects, type CalloutSubjectsInput } from "./calloutSubjects";
+import { calloutSubject, type CalloutSubjectInput } from "./calloutSubjects";
 
-// THE SNAPSHOTS VIEW'S SCENE LABELS, as one decision both owners consult (2026-11-07): which subject
-// the upper label names, and whether the global's label stands beside it.
+// THE SNAPSHOTS VIEW'S ONE SCENE LABEL, as one decision both owners consult (2026-11-07; one label
+// since 2026-11-08 — user: "Two callouts is too much … 1 callout that relates to the subject").
 
-const base: CalloutSubjectsInput = {
+const base: CalloutSubjectInput = {
   register: "snapshots",
   boxedCard: null,
-  hasNode: false,
   hasSnap: true,
   hasMetaSnap: false,
   hasBlock: false,
   hasDataBlock: false,
   lane: false,
 };
-const at = (over: Partial<CalloutSubjectsInput>) => calloutSubjects({ ...base, ...over });
+const at = (over: Partial<CalloutSubjectInput>) => calloutSubject({ ...base, ...over });
 
-describe("calloutSubjects — the box leads", () => {
-  it("a boxed node owns the scene alone, in every register", () => {
-    for (const register of ["snapshots", "blocks", "data"] as const) {
-      expect(at({ register, boxedCard: "node", hasNode: true, hasMetaSnap: true, hasBlock: true, hasDataBlock: true, lane: true })).toEqual({ first: "node", second: null });
-    }
+describe("calloutSubject — the box leads", () => {
+  it("the open card's subject is the label: global bar, snapshot tile, block, data block", () => {
+    expect(at({ boxedCard: "snap", hasMetaSnap: true })).toBe("global");
+    expect(at({ boxedCard: "metaSnap", hasMetaSnap: true })).toBe("metaSnap");
+    expect(at({ register: "blocks", boxedCard: "block", hasBlock: true, hasMetaSnap: true })).toBe("block");
+    expect(at({ register: "data", boxedCard: "dataBlock", hasDataBlock: true, hasMetaSnap: true })).toBe("dataBlock");
   });
-  it("a boxed Metagraph card labels its lane — in Transaction blocks too (the block label stood there)", () => {
-    expect(at({ boxedCard: "context", lane: true, hasMetaSnap: true })).toEqual({ first: "lane", second: "global" });
-    expect(at({ register: "blocks", boxedCard: "context", lane: true, hasBlock: true })).toEqual({ first: "lane", second: null });
-    expect(at({ register: "data", boxedCard: "context", lane: true, hasDataBlock: true, hasMetaSnap: true })).toEqual({ first: "lane", second: "global" });
-    // No lane to point at (the DAG, the unlisted set): the snapshot, else nothing.
-    expect(at({ boxedCard: "context", lane: false, hasMetaSnap: true }).first).toBe("metaSnap");
-    expect(at({ boxedCard: "context", lane: false }).first).toBeNull();
+  it("a boxed Metagraph card labels its lane — else the snapshot inside it, else the global", () => {
+    expect(at({ boxedCard: "context", lane: true, hasMetaSnap: true })).toBe("lane");
+    expect(at({ register: "blocks", boxedCard: "context", lane: true, hasBlock: true })).toBe("lane");
+    expect(at({ boxedCard: "context", lane: false, hasMetaSnap: true })).toBe("metaSnap");
+    expect(at({ boxedCard: "context", lane: false })).toBe("global");
+    expect(at({ register: "blocks", boxedCard: "context", lane: false })).toBeNull();
   });
   it("a boxed Metagraph snapshot card labels the snapshot, over a finer block or data block", () => {
-    expect(at({ register: "blocks", boxedCard: "metaSnap", hasMetaSnap: true, hasBlock: true }).first).toBe("metaSnap");
-    expect(at({ register: "data", boxedCard: "metaSnap", hasMetaSnap: true, hasDataBlock: true }).first).toBe("metaSnap");
+    expect(at({ register: "blocks", boxedCard: "metaSnap", hasMetaSnap: true, hasBlock: true })).toBe("metaSnap");
+    expect(at({ register: "data", boxedCard: "metaSnap", hasMetaSnap: true, hasDataBlock: true })).toBe("metaSnap");
+  });
+  it("a box whose subject is not committed falls to the rest rule", () => {
+    expect(at({ boxedCard: "metaSnap", hasMetaSnap: false })).toBe("global");
+    expect(at({ register: "blocks", boxedCard: "block", hasBlock: false, hasMetaSnap: true })).toBe("metaSnap");
   });
 });
 
-describe("calloutSubjects — the registers' own subjects", () => {
-  it("Metagraph snapshots: the pair — the snapshot (else the lane) above, the global below", () => {
-    expect(at({ hasMetaSnap: true, lane: true })).toEqual({ first: "metaSnap", second: "global" });
-    expect(at({ lane: true })).toEqual({ first: "lane", second: "global" });
-    expect(at({})).toEqual({ first: null, second: "global" });
-    // No global shown: a carried node may be named; with a global, the global's label is the one.
-    expect(at({ hasSnap: false, hasNode: true })).toEqual({ first: "node", second: null });
-    expect(at({ hasSnap: true, hasNode: true })).toEqual({ first: null, second: "global" });
+describe("calloutSubject — at rest, the register's live subject, and never two", () => {
+  it("Metagraph snapshots and Data blocks: the global snapshot (its lead speaks the register); else the snapshot, else the lane", () => {
+    expect(at({ hasMetaSnap: true, lane: true })).toBe("global");
+    expect(at({ register: "data", hasDataBlock: true, hasMetaSnap: true })).toBe("global");
+    expect(at({ hasSnap: false, hasMetaSnap: true, lane: true })).toBe("metaSnap");
+    expect(at({ hasSnap: false, lane: true })).toBe("lane");
+    expect(at({ hasSnap: false })).toBeNull();
   });
-  it("Transaction blocks: the block's label alone (no global drawn there); the snapshot's when a token block's is committed and boxed", () => {
-    expect(at({ register: "blocks", hasBlock: true })).toEqual({ first: "block", second: null });
-    expect(at({ register: "blocks", hasBlock: true, hasMetaSnap: true, boxedCard: "block" })).toEqual({ first: "block", second: null });
-    expect(at({ register: "blocks", hasBlock: true, hasMetaSnap: true, boxedCard: "metaSnap" })).toEqual({ first: "metaSnap", second: null });
-    expect(at({ register: "blocks", hasMetaSnap: true })).toEqual({ first: "metaSnap", second: null });
-    expect(at({ register: "blocks" })).toEqual({ first: null, second: null });
+  it("Transaction blocks: the block (no global is drawn there); else the snapshot, else the lane", () => {
+    expect(at({ register: "blocks", hasBlock: true, hasMetaSnap: true })).toBe("block");
+    expect(at({ register: "blocks", hasMetaSnap: true })).toBe("metaSnap");
+    expect(at({ register: "blocks", lane: true })).toBe("lane");
+    expect(at({ register: "blocks" })).toBeNull();
+    expect(at({ register: "blocks", boxedCard: "snap" })).toBeNull();
   });
-  it("Data blocks: the data block's label on its tile with the global below; the pair otherwise", () => {
-    expect(at({ register: "data", hasDataBlock: true, hasMetaSnap: true })).toEqual({ first: "dataBlock", second: "global" });
-    expect(at({ register: "data", hasDataBlock: true, hasMetaSnap: true, boxedCard: "dataBlock" })).toEqual({ first: "dataBlock", second: "global" });
-    expect(at({ register: "data", hasMetaSnap: true })).toEqual({ first: "metaSnap", second: "global" });
-    // A data block is never a Transaction blocks or Metagraph snapshots subject.
-    expect(at({ register: "snapshots", hasDataBlock: true, hasMetaSnap: true }).first).toBe("metaSnap");
-    expect(at({ register: "blocks", hasDataBlock: true, hasBlock: true }).first).toBe("block");
+  it("a data block is never a Transaction blocks or Metagraph snapshots subject", () => {
+    expect(at({ register: "snapshots", boxedCard: "dataBlock", hasDataBlock: true, hasMetaSnap: true })).toBe("global");
+    expect(at({ register: "blocks", boxedCard: "dataBlock", hasDataBlock: true, hasBlock: true })).toBe("block");
   });
 });

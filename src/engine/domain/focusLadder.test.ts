@@ -11,9 +11,10 @@ describe("focusLadder — the per-view rung tables (spec 2026-07-18)", () => {
   it("pins each view's rung order, finest→coarsest", () => {
     expect(LADDERS.geo.map((r) => r.level)).toEqual(["node", "cohort", "country", "network", "all"]);
     expect(LADDERS.hyper.map((r) => r.level)).toEqual(["node", "composition", "network", "all"]);
-    // The ledger's LAYER rung is retired (2026-08-06): floors/containers are visual aid, so the
-    // ledger's committable levels are the universal node + network alone.
-    expect(LADDERS.ledger.map((r) => r.level)).toEqual(["node", "network", "all"]);
+    // The ledger's LAYER rung is retired (2026-08-06): floors/containers are visual aid; its NODE
+    // rung too (2026-11-08: the node card left the Snapshots view), so its one committable level is
+    // the network.
+    expect(LADDERS.ledger.map((r) => r.level)).toEqual(["network", "all"]);
   });
 
   it("every ladder ends in an unconditional 'all' rung (the walk always resolves)", () => {
@@ -42,9 +43,8 @@ describe("focusLadder — the per-view rung tables (spec 2026-07-18)", () => {
     expect(LADDERS.hyper[1].active(sel())).toBe(false);
     expect(LADDERS.hyper[2].active(sel({ filter: "dag" }))).toBe(true);
     expect(LADDERS.hyper[2].active(sel())).toBe(false);
-    expect(LADDERS.ledger[0].active(sel({ inspectIsNode: true }))).toBe(true);
-    expect(LADDERS.ledger[1].active(sel({ filter: "dor" }))).toBe(true);
-    expect(LADDERS.ledger[1].active(sel({ filter: "all" }))).toBe(false);
+    expect(LADDERS.ledger[0].active(sel({ filter: "dor" }))).toBe(true);
+    expect(LADDERS.ledger[0].active(sel({ filter: "all" }))).toBe(false);
   });
 
   it("resolver keys are view-prefixed and unique within a view", () => {
@@ -59,7 +59,7 @@ describe("focusLadder — the per-view rung tables (spec 2026-07-18)", () => {
     expect(finerLevels("geo", "country")).toEqual(["node", "cohort"]);
     expect(finerLevels("geo", "cohort")).toEqual(["node"]);
     expect(finerLevels("geo", "node")).toEqual([]);
-    expect(finerLevels("ledger", "network")).toEqual(["node"]);
+    expect(finerLevels("ledger", "network")).toEqual([]);
     expect(finerLevels("hyper", "network")).toEqual(["node", "composition"]);
     expect(finerLevels("hyper", "composition")).toEqual(["node"]);
   });
@@ -69,7 +69,7 @@ describe("focusLadder — the per-view rung tables (spec 2026-07-18)", () => {
     expect(hasLevel("geo", "composition")).toBe(false);
     expect(hasLevel("ledger", "composition")).toBe(false);
     expect(hasLevel("geo", "cohort")).toBe(true);
-    expect(hasLevel("ledger", "node")).toBe(true);
+    expect(hasLevel("ledger", "node")).toBe(false);
   });
 
   it("carry policy — universal subjects carry, view-scoped rungs clear (spec Part 2)", () => {

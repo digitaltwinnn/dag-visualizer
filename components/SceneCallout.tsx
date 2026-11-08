@@ -37,15 +37,16 @@
 // - ledger: the pinned metagraph snapshot's own tile (rewind included), else the committed
 //   global tick's byte-bar lead.
 import { viewNetwork } from "@/src/engine/domain/viewNetwork";
-import { useState, type CSSProperties } from "react";
+import { useState, type CSSProperties, useSyncExternalStore } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { VIEW_POLICIES, readsBlockWindow, registerOf } from "@/src/engine/domain/viewPolicy";
 import { blockReadOf } from "@/src/data/blockReads";
+import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
 import { REGISTER_MEASURES, dataUpdatesOf } from "@/src/data/ledgerMeasure";
 import { carriesData } from "@/src/engine/domain/dataMark";
-import { calloutSubjects } from "@/src/engine/domain/calloutSubjects";
+import { calloutSubject } from "@/src/engine/domain/calloutSubjects";
 import { REGISTER_ICONS } from "@/components/icons";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
 import { blockLead } from "@/components/inspector/blockLead";
@@ -264,6 +265,7 @@ export default function SceneCallout() {
   const dataLead = useStore((s) => REGISTER_MEASURES[s.ledgerRegister].dataOnly);
   const block = useStore((s) => s.block);
   const blockRead = useStore((s) => (s.block ? blockReadOf(s.blockReads, s.block) : null));
+  const blockWin = useSyncExternalStore(onBlockWindow, getBlockWindow, () => null);
   const register = useStore((s) => s.ledgerRegister);
   const dataBlock = useStore((s) => s.dataBlock);
   const dataBlockRow = useStore((s) => {
@@ -369,7 +371,6 @@ export default function SceneCallout() {
   };
 
   let m: Model | null = null;
-  let m2: Model | null = null;
   if (mode === "hyper") {
     m = boxedCard === "context" ? (netModel() ?? nodeModel()) : (nodeModel() ?? netModel());
     if (!m) return null;
@@ -554,9 +555,6 @@ export default function SceneCallout() {
     // the network picked inside this global snapshot, else the filter.
     const lnet = ledgerNetwork({ filter, tickNet, snapOrdinal: snap?.data.ordinal ?? null });
     const laneModel = (): Model | null => (lnet === "all" || lnet === "dag" ? null : netModel(lnet));
-    // The boxed NODE card leads, alone (user, 2026-08-16 — a tray node selected via the card
-    // stack shows ITS callout).
-    const node = nodeModel();
     // IN THE BLOCKS REGISTER THE LABEL IS THE BLOCK'S (D3, user 2026-11-07: "In blocks, no snapshot
     // callout but a block callout"). One label, on the Block card's subject — the live newest block
     // or the pinned one — in the card head's own grammar: the block mark in its chain's hue, the short
@@ -567,7 +565,10 @@ export default function SceneCallout() {
     const blockModel = (): Model | null => {
       if (!block) return null;
       const hue = identityHudCss(block.chain);
-      const height = blockRead ? `height ${blockRead.height.toLocaleString()}` : undefined;
+      // The block's AGE (user, 2026-11-08: "instead of 'height' use the 'x seconds ago' tag"): its
+      // accepting global snapshot's, the global label's own register.
+      const tickTs = blockWin?.blockTick(block.anchorOrd)?.ts;
+      const height = tickTs ? relativeAge(now - Date.parse(tickTs)) : undefined;
       return {
         // The live-lane key rule (msModel above): while following the subject is THE LIVE BLOCK, so a
         // newer block re-points the label rather than replaying its entrance; a pin is a new subject.
@@ -603,15 +604,15 @@ export default function SceneCallout() {
         lead: b ? { text: `Carried ${b.updates.toLocaleString()} ${b.updates === 1 ? "update" : "updates"}, signed by ${b.signers.toLocaleString()}` } : undefined,
       };
     };
-    // WHICH SUBJECTS THE VIEW LABELS — `domain/calloutSubjects`, the ONE chain CalloutSync anchors by
+    // WHICH SUBJECT THE VIEW LABELS — `domain/calloutSubjects`, the ONE chain CalloutSync anchors by
     // too (2026-11-07: the two owners had each grown their own chain of ifs and drifted by register).
-    // THE PAIR GETS TWO CALLOUTS (user, 2026-10-03: "2 callouts"): the upper storey's subject
-    // (`callout`) and the global snapshot's bar (`callout-2`), each with its own fixed anchor, so a
-    // re-box never swaps the two and replays both entrances (the 2026-09-11 complaint).
-    const subjects = calloutSubjects({
+    // ONE LABEL, THE BOX'S (user, 2026-11-08: "Two callouts is too much in the snapshot view, 1
+    // callout that relates to the subject, nothing else" — the pair's second label, the global's bar
+    // under the snapshot's tile since 2026-10-03, is retired): the open card's subject, else the
+    // register's live one.
+    const subject = calloutSubject({
       register,
       boxedCard,
-      hasNode: !!node,
       hasSnap: !!snap,
       hasMetaSnap: !!metaSnap,
       hasBlock: !!block,
@@ -619,50 +620,31 @@ export default function SceneCallout() {
       lane: lnet !== "all" && lnet !== "dag" && lnet !== UNLISTED_ID,
     });
     m =
-      subjects.first === "node" ? node
-      : subjects.first === "block" ? blockModel()
-      : subjects.first === "dataBlock" ? dataBlockModel()
-      : subjects.first === "metaSnap" ? msModel()
-      : subjects.first === "lane" ? laneModel()
+      subject === "global" ? gsModel()
+      : subject === "block" ? blockModel()
+      : subject === "dataBlock" ? dataBlockModel()
+      : subject === "metaSnap" ? msModel()
+      : subject === "lane" ? laneModel()
       : null;
-    m2 = subjects.second === "global" ? gsModel() : null;
   }
-  if (phone) {
-    // One label on a phone — the subject's, else the global snapshot's — head only. The GLOBAL
-    // label wins while the Global snapshot card is the box (user, 2026-10-08: the metagraph's
-    // anchor "is shown when global snapshot card is active"): the one label points at the open card's
-    // subject, as the two-label desktop pairs each with its card.
-    if (m && m2 && boxedCard === "snap") m = null;
-    if (m) m2 = null;
-    if (m) m = { ...m, lead: undefined };
-    if (m2) m2 = { ...m2, lead: undefined };
-  }
-  // Closed for this view and subject (each Snapshots label has its own ×, so each is keyed). Once
-  // the slot shows ANY other subject — or none — the closure is spent, so re-selecting the closed
-  // subject brings its label back (review, 2026-10-04: "until something in that view changes").
-  const stale = (["callout", "callout-2"] as const).filter((slot) => {
-    const k = dismissed[`${mode}|${slot}`];
-    const cur = (slot === "callout" ? m : m2)?.key ?? null;
-    return k != null && k !== cur;
-  });
-  if (stale.length) {
+  // One label on a phone, head only.
+  if (phone && m) m = { ...m, lead: undefined };
+  // Closed for this view and subject. Once the slot shows ANY other subject — or none — the closure
+  // is spent, so re-selecting the closed subject brings its label back (review, 2026-10-04: "until
+  // something in that view changes").
+  const closed = dismissed[`${mode}|callout`];
+  if (closed != null && closed !== (m?.key ?? null)) {
     setDismissed((d) => {
       const n = { ...d };
-      for (const slot of stale) delete n[`${mode}|${slot}`];
+      delete n[`${mode}|callout`];
       return n;
     });
   }
-  if (m && dismissed[`${mode}|callout`] === m.key) m = null;
-  if (m2 && dismissed[`${mode}|callout-2`] === m2.key) m2 = null;
-  if (!m && !m2) return null;
-  const dismiss = (slot: "callout" | "callout-2") => (key: string) => setDismissed((d) => ({ ...d, [`${mode}|${slot}`]: key }));
+  if (m && closed === m.key) m = null;
+  if (!m) return null;
+  const dismiss = (key: string) => setDismissed((d) => ({ ...d, [`${mode}|callout`]: key }));
 
-  return (
-    <>
-      {m && <CalloutMark m={m} id="callout" multi phone={phone} onDismiss={dismiss("callout")} />}
-      {m2 && <CalloutMark m={m2} id="callout-2" phone={phone} onDismiss={dismiss("callout-2")} />}
-    </>
-  );
+  return <CalloutMark m={m} id="callout" multi phone={phone} onDismiss={dismiss} />;
 }
 
 /** The callout geometry the stylesheet reads, written once from the TS constants. */
@@ -673,11 +655,9 @@ const CALLOUT_VARS = {
   "--co-phone-k": String(CALLOUT_PHONE_K),
 } as CSSProperties;
 
-/** One callout: the 0-size anchor wrapper CalloutSync positions, its ring, leader and panel.
- *  `id` is the marker the engine queries (`callout` for the subject, `callout-2` for the global
- *  snapshot in Snapshots); `multi` mounts the hyper node's extra legs, which only the subject's
- *  callout ever draws. */
-function CalloutMark({ m, id, multi, phone, onDismiss }: { m: Model; id: "callout" | "callout-2"; multi?: boolean; phone?: boolean; onDismiss?: (key: string) => void }) {
+/** The callout: the 0-size anchor wrapper CalloutSync positions, its ring, leader and panel.
+ *  `id` is the marker the engine queries; `multi` mounts the hyper node's extra legs. */
+function CalloutMark({ m, id, multi, phone, onDismiss }: { m: Model; id: "callout"; multi?: boolean; phone?: boolean; onDismiss?: (key: string) => void }) {
   // The leader's two ends in the anchor's frame. On a PHONE it runs STRAIGHT UP into the panel
   // standing over the subject (`calloutPhonePlacement`), drawn as its own vertical line — scaling
   // the diagonal flat also flattened the draw-on mask to nothing, so the leader never showed.

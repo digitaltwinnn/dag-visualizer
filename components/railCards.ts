@@ -7,7 +7,7 @@ import { AI_NOTES_ICON, BLOCK_ICON, EXPLORE_ICON, INSTANT_ICON, RANGE_ICON, icon
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import type { Mode } from "@/src/store/store";
 import { VIEW_POLICIES, readsBlockWindow, registerOf } from "@/src/engine/domain/viewPolicy";
-import type { BlockSel, DataBlockSel, MetaSnapSel, NodeRow, PickDescriptor } from "@/src/data/types";
+import type { BlockSel, DataBlockSel, MetaSnapSel, PickDescriptor } from "@/src/data/types";
 import { REGISTER_MEASURES } from "@/src/data/ledgerMeasure";
 import { REGISTER_ICONS } from "@/components/icons";
 import type { LedgerRegister } from "@/src/store/mode";
@@ -113,7 +113,12 @@ const DISPLAY_LANE: Partial<Record<Mode, readonly string[]>> = {
   // register alone (`detailsCards`' `block`).
   // THE DATA BLOCK (the Data blocks register, 2026-11-07) sits under the metagraph snapshot too: it
   // is carried inside one, so it is that snapshot's finest subject. Present in its register alone.
-  ledger: ["notes", "snap", "context", "metaSnap", "block", "dataBlock", "node"],
+  // NO NODE CARD IN SNAPSHOTS (user, 2026-11-08: "remove the node card entirely from the snapshots
+  // view" — it left Transaction blocks on 2026-11-07 and the other two registers today): the
+  // chamber's subjects are the snapshots and what they carry; a node is a signer, read on the
+  // explorer's signer level and the snapshot card's "Signed by". The selection is untouched (a
+  // carried node returns with its view); the ladder has no node rung here either (`LADDERS.ledger`).
+  ledger: ["notes", "snap", "context", "metaSnap", "block", "dataBlock"],
   // HISTORY: the network dossier, then the INSTANT (2026-09-19). `instant` is a card slot with no
   // focus rung — the two snapshot slots' precedent, and `railLadderBoundary.test.ts` asserts
   // rung → slot rather than the reverse. It sits UNDER the dossier because the lane is a
@@ -148,7 +153,7 @@ export function isSubjectSlot(id: string): boolean {
  *  inputs (which can't change a slot's presence). */
 export type LadderState = Pick<
   RailManifestState,
-  "mode" | "filter" | "railNet" | "tickNet" | "tickHasFilter" | "nodeHere" | "inspect" | "snap" | "metaSnap" | "ledgerRegister" | "block" | "dataBlock" | "country" | "cohort" | "composition" | "trendCursorMs" | "trendRange" | "trendFocus" | "noteAbsent"
+  "mode" | "filter" | "railNet" | "tickNet" | "tickHasFilter" | "inspect" | "snap" | "metaSnap" | "ledgerRegister" | "block" | "dataBlock" | "country" | "cohort" | "composition" | "trendCursorMs" | "trendRange" | "trendFocus" | "noteAbsent"
 > & {
   /** The store's selection recency (most-recent-FIRST) — the collapse rule reads it (item 8):
    *  the most recently selected present card is the ACTIVE one; the rest rest collapsed. */
@@ -241,9 +246,6 @@ export interface RailManifestState {
   tickHasFilter?: boolean;
   /** The network Hypergraph's rail is browsing (`domain/viewNetwork.ts`). */
   railNet?: string | null;
-  /** Does the committed node belong to what this view shows (`useNodeHere`)? ⚠️ Only an explicit
-   *  `false` stands the card down, as `tickHasFilter`'s does. */
-  nodeHere?: boolean;
   inspect: PickDescriptor | null;
   snap: Extract<PickDescriptor, { kind: "snapshot" }> | null;
   /** How many nodes the current selection plots in geo (store.selNodes.length). */
@@ -385,11 +387,7 @@ function nodeHint(s: RailManifestState): string | null {
     // gesture with no visible affordance: nothing in the scene says a still press previews.
     return s.coarse ? "Tap one in a stack — or press and hold to preview it." : "Click one in a stack.";
   }
-  // Nodes are pickable in the chamber too (user, 2026-07-12 — the standing chips are a real pick
-  // target), so the slot announces it. "in a container under a floor" was stale jargon from the
-  // retired per-role split (src/data/ledgerLayers.ts) — the house word is TRAY, and there are many.
-  if (s.mode === "ledger") return `${CLICK(s)} one in any of the trays.`;
-  return null;
+  return null; // Snapshots holds no node slot (its lane); History none either
 }
 function snapHint(s: RailManifestState): string | null {
   // LEDGER-SCOPED (spec 2026-08-01, a deliberate reversal of the old carry-across-views rule):
@@ -491,25 +489,6 @@ export function metagraphCardNetwork(s: {
   // them (`siblingSet("context")`).
   if (from === "node" && s.filter === "all" && s.inspect) return pickNetId(s.inspect) ?? s.filter;
   return s.filter;
-}
-
-/** DOES THE COMMITTED NODE BELONG TO WHAT THIS VIEW SHOWS? Hypergraph and Geography show every node
- *  and History holds no node slot, so only Snapshots has a question (undefined elsewhere). There a
- *  node is a validator of a snapshot, so its card stands when it was picked there or it signed the
- *  metagraph snapshot on screen. A node carried in leaves the rail, stays selected and returns with
- *  its view (user, 2026-10-31: "often detached from the stack"). `signers` is lazy: it reads the
- *  snapshot's exact rows, only worth reading for a carried node. */
-export function nodeHereOf(
-  s: { mode: Mode; inspect: PickDescriptor | null; inspectView: Mode | null; metaSnap: MetaSnapSel | null; following: boolean },
-  signers: (sel: MetaSnapSel) => readonly NodeRow[],
-): boolean | undefined {
-  if (!VIEW_POLICIES[s.mode].tickScoped || !s.inspect) return undefined;
-  if (s.inspectView === s.mode) return true;
-  // Only a snapshot the reader PICKED. One following live changes every tick, so the card came and
-  // went with the signers, and it is no selection moment, so it opened beside the entry's box.
-  if (!s.metaSnap || s.following) return false;
-  const key = hoverKeyOf(s.inspect);
-  return signers(s.metaSnap).some((r) => hoverKeyOf(r.pick) === key);
 }
 
 /** A CHILD CARD STATES ITS PARENT OR IT DOES NOT RENDER (user, 2026-10-08: "I had a metagraph
@@ -662,18 +641,15 @@ export function detailsCards(s: RailManifestState): RailCard[] {
     present: s.composition != null,
     hint: compositionHint(s),
   };
-  // NO NODE CARD IN TRANSACTION BLOCKS (user, 2026-11-07: "node is really out of place in this view"):
-  // the ledger's node is a metagraph snapshot's signer, and that register draws no metagraph
-  // snapshot — a node carried in stood between the Metagraph and the Transaction block. The
-  // selection is untouched (the placeholder views' own rule): the register only stops speaking for
-  // it, and the other registers restore the card in place.
+  // The node card: Hypergraph's and Geography's (the lane gate below states it absent in Snapshots
+  // and History — `DISPLAY_LANE`).
   const node: RailCard = {
     id: "node",
     kind: "node",
     icon: iconForPick("geoLive"),
     subjectKey: hoverKeyOf(s.inspect),
-    present: isNodePick(s.inspect) && s.nodeHere !== false && !inBlocks(s),
-    hint: inBlocks(s) ? null : nodeHint(s),
+    present: isNodePick(s.inspect),
+    hint: nodeHint(s),
   };
   const snap: RailCard = {
     id: "snap",

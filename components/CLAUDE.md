@@ -1050,10 +1050,16 @@ flashing a false invite. The ghost only appears where the view can actually prod
 
 **The rail browses in Hypergraph and Geography** (user, 2026-10-31: "open the 1st of that set and allow left/right swipe without setting the filter"): the Metagraph ghost opens the first network (`ROOT_OF`, `rootStep`), unless a node is held, a swipe steps that list, and what hangs under it reads the same network, all without writing the filter. The store's `railNet` holds it and `domain/viewNetwork.ts` is the one reading: the card, the scene, the explorer, the band and the callout stand on it, the top bar and the accent hue stay the filter's. A real filter commit replaces it, the card's × releases it, and leaving the view clears it without dropping what was selected under it. **A card speaks only in a view whose lane holds it** (user, 2026-10-31, option B of four, replacing a
 hairline above a full card running off the rail): `detailsCards` states a card off its view's lane
-as absent, so a node carried into History leaves the rail. In Snapshots it stands when it was picked
-there or signed the metagraph snapshot on screen (`nodeHereOf`). The SELECTION is untouched, so going
-back restores the card, as the placeholder views do; a pinned snapshot needs no such rule, since
-leaving Snapshots clears the pin. **Ghosts sink** (same day, option B of four): chosen cards close up
+as absent, so a node carried into History leaves the rail — **and into Snapshots** (user, 2026-11-08:
+"remove the node card entirely from the snapshots view"; it stood there when picked there or when it
+signed the snapshot on screen, `nodeHereOf`, from 2026-10-31 until then). The chamber's subjects are
+the snapshots and what they carry; a node is a signer, read on the explorer's signer level (rows that
+are READINGS now, hover-paired with their tray chips, committing nothing) and the snapshot card's
+"Signed by". The ledger's ladder has no node rung (`LADDERS.ledger`), a tray chip's click commits
+nothing (`clickActions`: a node commits only where the view's ladder has the rung), and the metagraph
+snapshot is the lane's last rung (no child step). The SELECTION is untouched, so going back restores
+the card, as the placeholder views do; a pinned snapshot needs no such rule, since leaving Snapshots
+clears the pin. **Ghosts sink** (same day, option B of four): chosen cards close up
 at the top and the ghosts wait below in lane order, the next step's ghost first (`displayOrder`), so
 a ghost can never split the stack. The lane stays the ladder's one order; this is only its layout.
 **And the Snapshots explorer's held head is the PIN itself** (same
@@ -1145,20 +1151,23 @@ view is entered on the auto rule, not the note's pin — `LaneCollapseState.seat
 both subjects of `FollowControl`): the pin is a selection fact an unreachable feed does not change, and
 the feed's own state is the pulse strip's; only a control with nothing pinned, which would otherwise
 claim LIVE, says "no signal". **Its callout is the BLOCK's** (user: "no snapshot callout but a block
-callout"): one label on the Block card's subject, in its head's grammar (mark, short hash — `shortBlockHash`, `src/util/format.ts`, the ONE short form a block hash takes in the card's head, the callout, the explorer's and RAW's rows — height chip,
+callout"): one label on the Block card's subject, in its head's grammar (mark, short hash — `shortBlockHash`, `src/util/format.ts`, the ONE short form a block hash takes in the card's head, the callout, the explorer's and RAW's rows — the AGE chip (user, 2026-11-08: "instead of 'height' use the 'x seconds ago' tag" — the accepting global's age on the shared clock, the Global card's own register; the height is a fact row),
 live / pinned, then `blockLead`'s SHORT form — how much moved, no from/to; user, 2026-11-07), anchored at the block's place in the chamber
-(`LedgerView.selectedBlockAnchor`, layout data plus the rewind offset); `#callout-2` stands down. In Blocks the explorer lists the window's blocks, and the
+(`LedgerView.selectedBlockAnchor`, layout data plus the rewind offset). In Blocks the explorer lists the window's blocks, and the
 Block card (`inspector/BlockPane.tsx`; its eyebrow, ghost, callout and pick title say "Transaction block" — user, 2026-11-07) stands under its tick: a card slot with NO rung, between the
 metagraph snapshot and the node in the ledger's lane (`DISPLAY_LANE`), present only in the Blocks
 register and only under the tick that accepted it (`parentHolds`), its ghost hint "one on a bar or a
 tile". **Under a committed block the Metagraph snapshot slot is card or nothing** (user, 2026-11-08:
 the two cards "switch places" — a DAG block commits no snapshot, and the slot's ghost dropped below
 the block card, since ghosts wait under the chosen cards): a token block's snapshot is present, a DAG
-block's slot shows no ghost, so the lane holds still. **No Node card there** (user, 2026-11-07: "node is really out of place in this view"): the
-ledger's node is a metagraph snapshot's signer and the register draws no metagraph snapshot, so the
-node slot is neither card nor ghost in Transaction blocks — the selection is untouched, and the other
-registers restore the card in place. The snapshot's child step passes over it (`railLadderBoundary.test.ts`'s `PASSES_OVER`): a
-block is a sibling subject of the tick, not the snapshot's child — so **its ghost has a step of its
+block's slot shows no ghost, so the lane holds still. **No Node card there** (user, 2026-11-07: "node is really out of place in this view") —
+nor anywhere in the view since 2026-11-08 (above). **Entering the register opens the Block card**
+(user, 2026-11-08: "the callout says transaction block while the right rail card shows the global
+snapshot card → transaction block is the best card to open when we enter this view/mode"): the
+store's `setLedgerRegister` drops the tick's rank on the way in, so the register's rest rule seats
+the block, and the switch is a selection moment (`railSelectionKey` carries the register), so a
+hand-opened box does not hold the next register's card folded. A block is a sibling subject of the
+tick, not the snapshot's child — so **its ghost has a step of its
 own** (`railSiblings.blockStep`, 2026-11-07, user: "when clicked nothing happens"): the shown tick's
 first block from the window (`useSiblingState`'s `tickBlocks`), through the block click's builder,
 and the ghost keeps its lane place — `railCollapse.displayOrder` promotes the next-step ghost but
@@ -1213,15 +1222,17 @@ so a door after a door inherits nothing). Pinned by `src/data/blockStats.test.ts
 `components/feedReadBoundary.test.ts` (`api-blocks` readers hold the feed) and
 `components/rawSurfaceBoundary.test.ts` (the register compare stays inside `RecordsSurface`).
 
-**WHICH SUBJECTS THE SNAPSHOTS VIEW LABELS ON THE SCENE is one pure decision**
+**WHICH SUBJECT THE SNAPSHOTS VIEW LABELS ON THE SCENE is one pure decision**
 (`src/engine/domain/calloutSubjects.ts`, 2026-11-07 — user: the Data block "has no callout yet", and
 in Transaction blocks the block label stood "even if the metagraph rung is selected … needs proper
 code and testing"): `SceneCallout` draws the model it names and `CalloutSync` anchors the same
-subjects, so neither owner carries a chain of its own. The box leads (a boxed node alone; a boxed
-Metagraph card its lane, in every register); the register's own subject takes the upper label where
-committed (the Transaction block — and no global label there, D3; the Data block on its snapshot's
-tile, the snapshot's label stepping aside); else the metagraph snapshot, else the lane; the global's
-bar is the second label wherever the register draws it. Its test is the matrix.
+subject, so neither owner carries a chain of its own. **ONE LABEL, THE BOX'S** (user, 2026-11-08: "Two
+callouts is too much in the snapshot view, 1 callout that relates to the subject, nothing else" — the
+pair's second label on the global's bar, 2026-10-03, is retired with `#callout-2`): the open card's
+subject — the Global snapshot card's bar, the Metagraph snapshot card's tile, the Transaction block's
+place, the Data block's mark, the Metagraph card's lane (else the snapshot inside it, else the global);
+with no subject card open, the register's live subject — the newest block in Transaction blocks (no
+global is drawn there, D3), the global snapshot in the other two. Its test is the matrix.
 
 **The Data blocks register (D6, 2026-11-07) is the Metagraph snapshots register's surfaces with the
 DATA leading.** The global snapshot's scene label speaks the register's subject there (user,
@@ -1231,8 +1242,8 @@ a "23 updates" chip from the exact read (`SceneCallout`'s `dataLead`, keyed on
 the read lands — never the other register's anchors fact, user 2026-11-07 on a reload), where the
 Metagraph snapshots register says "N metagraph snapshots" and its size. **The DATA BLOCK card**
 (`inspector/DataBlockPane.tsx`, 2026-11-07 — design round pick D2, "the batch"): the register's
-own slot under the Metagraph snapshot (`DISPLAY_LANE.ledger`, between `block` and `node`; `PASSES_OVER`
-lists it with the block: a subject of its own, not the snapshot's child rung), present in Data
+own slot under the Metagraph snapshot (`DISPLAY_LANE.ledger`, after `block`, the lane's last; a
+subject of its own, not the snapshot's child rung), present in Data
 blocks alone and only under the snapshot that carried it (`parentHolds`), named by its place in
 that snapshot ("3 of 10"), its UPDATES BY KIND as the body, "Signed by N dL1 validators" and Size as
 facts (a fact row, as the global and metagraph snapshot cards state theirs — the explorer's signer
@@ -2222,7 +2233,6 @@ seam and corner rules select on the same markers the thread measures:
 | `canvas.scene-canvas` | `SceneCanvas` renders it; the engine's controls listen on it (the card-drag handoff that once queried it is retired) |
 | `#callout` (+ `data-on`) | The subject callout's 0-size anchor wrapper — `SceneCallout` renders it, `CalloutSync` writes its transform + `data-on` per frame (the Tooltip discipline: position never renders React) |
 | `#register-switch` | `RegisterSwitch` renders it (the Snapshots view's register switch on the scene); `ChromeBounds` reads its bottom edge as the callout's free-band top (`sceneTop`) |
-| `#callout-2` (+ `data-on`) | The same contract's second anchor — the GLOBAL snapshot's label in Snapshots. Same two homes, same per-frame writes, no multi-leader |
 | `#trend-stack` (+ `data-on`) | The trend view's chart-plane layer — `TrendStack` renders it, the engine queries it to find the planes. It waits at `opacity: 0` and `TrendStackSync` writes `data-on="1"` once the view has ARRIVED (policy `chartStack` + the trend furniture alpha at full), so the stack fades in with the room rather than riding the camera's flight — the `#callout` `data-on` precedent |
 | `[data-plane]` (the network id) | One chart plane, as an ANCHOR + a CHILD. The anchor is a **0-size box at the layer's top-left with `origin-top-left`**, mounted `invisible`; its one child is the plane, `planeFormat(tier).pxW` wide (640 on desktop and tablet; 360 on phone, so the card is drawn at about scale 1 and its type is legible — the projector divides by the same number, and on phone the head drops its unit into the front plot's caption, `unitInPlot`), centred on it by `-translate-x-1/2 -translate-y-1/2`. **React renders the plane and owns everything inside it** plus the anchor's `opacity` / `zIndex` / `pointer-events` (all from the same `PlanePose`); `TrendStackSync` (engine layer) writes the anchor's `transform` — a `matrix3d` translate + uniform scale, never a rotation — and its `style.visibility` per frame. The anchor's geometry IS that matrix's coordinate system, so don't give it a size, an origin or a transform of its own; `components/trendStackBoundary.test.ts` pins it |
 
@@ -2267,25 +2277,28 @@ hued ticker, the anchor ring and the `.edge-spine`). The design rules the test c
   committed rung.
 - **The Blocks register stands ONE callout, the block's** (D3, user 2026-11-07: "In blocks, no
   snapshot callout but a block callout"). `#callout` names the Block card's subject — the live
-  newest block or the pinned one — at the block's own place in the chamber; `#callout-2` stands
-  down (the live global is not drawn there). Its key is `blk|live` while following, so a newer block
-  re-points the label rather than replaying its entrance; a pin is a new subject.
-- **Snapshots stands TWO callouts, each on a FIXED anchor** (user, 2026-10-03: "2 callouts"). A
-  committed metagraph snapshot is always read against a global snapshot, and one label could
-  name only one of them. `#callout` is the metagraph snapshot's (its tile) and `#callout-2` the
-  global snapshot's (its bar, or the resolved network's segment of it) — whichever card is boxed.
-  Handing the subject's anchor to the boxed card was the first cut and it re-drew both labels on
-  every re-box, over two subjects that had not changed. A boxed node's label still stands alone.
+  newest block or the pinned one — at the block's own place in the chamber (the live global is not
+  drawn there). Its key is `blk|live` while following, so a newer block re-points the label rather
+  than replaying its entrance; a pin is a new subject.
+- **Snapshots stands ONE callout, the box's** (user, 2026-11-08: "Two callouts is too much in the
+  snapshot view, 1 callout that relates to the subject, nothing else"). From 2026-10-03 until then
+  it stood TWO on fixed anchors — the metagraph snapshot's tile and, under it, the global's bar
+  (`#callout-2`, retired) — on the argument that a committed snapshot is always read against its
+  global; the user's eye said the second label was noise. Now `#callout` follows the open card
+  (`domain/calloutSubjects.ts`, one decision both owners consult), so a re-box moves the one label
+  to the new subject, which is the acknowledgement; the global's bar is one of the anchors it may
+  take (`_ledgerBarAnchor`), the resolved network's segment of it under a lens.
   **The Metagraph card has a label too** (user, same day: "the dossier on snapshots page has no
   callout on the scene" — reversing 2026-08-16's "a lane gets no label", which read as a
   forgotten card once both snapshots were labelled): the hyper dossier's own model, at the head
   of the network's lane. It SHARES `#callout` with the metagraph snapshot — the two stand at
   the same end of the same lane — and takes it when the Metagraph card is the box or no
   snapshot of that network is committed.
-  **The global one HANGS** (design A of `docs/superpowers/design/2026-10-03-snapshot-callouts`,
-  user: "ok A, but make the angle of the lines the same"): below-left of its bar, into the strip
-  between the floor and the bottom band, on the standing label's own diagonal turned half a
-  circle — `--co-k` shortens both axes by one factor, so the two leaders are parallel. Standing
+  **The global's label HANGS** (design A of `docs/superpowers/design/2026-10-03-snapshot-callouts`,
+  user: "ok A, but make the angle of the lines the same"; kept for the one label when its subject
+  is the global): below-left of its bar, into the strip between the floor and the bottom band, on
+  the standing label's own diagonal turned half a circle — `--co-k` shortens both axes by one
+  factor, so a hanging and a standing leader are parallel. Standing
   up-right from the floor put its panel over the ribbons. `calloutHangs` (domain, tested) says
   whether the strip has room; where it has not, the label stands as it always did.
 - **The HOVER card is the name of the thing with its mark** (user, 2026-10-03 — all three of

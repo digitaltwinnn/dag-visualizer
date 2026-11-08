@@ -1,31 +1,27 @@
 import type { LedgerRegister } from "@/src/store/mode";
 
-// WHICH SUBJECTS THE SNAPSHOTS VIEW LABELS ON THE SCENE (2026-11-07, user: the Data block "has no
+// WHICH SUBJECT THE SNAPSHOTS VIEW LABELS ON THE SCENE (2026-11-07, user: the Data block "has no
 // callout yet, instead I see both global and metagraph snapshot callouts", and in Transaction blocks
-// the block label stood "even if the metagraph rung is selected" — "needs proper code and testing").
-// The decision used to live twice, inline: `SceneCallout` chose the MODEL and `CalloutSync` chose
-// the ANCHOR, each with its own chain of ifs, and the two drifted by register. This is the one chain
-// both consult: the component draws the label the `first`/`second` name, the projector anchors the
-// same subjects, so a label can never point at one thing while naming another.
+// the block label stood "even if the metagraph rung is selected" — "needs proper code and testing";
+// 2026-11-08: "Two callouts is too much in the snapshot view, 1 callout that relates to the subject,
+// nothing else"). The decision used to live twice, inline: `SceneCallout` chose the MODEL and
+// `CalloutSync` chose the ANCHOR, each with its own chain of ifs, and the two drifted by register.
+// This is the one chain both consult: the component draws the label it names, the projector anchors
+// the same subject, so a label can never point at one thing while naming another.
 //
-// The rules, coarse to fine:
-//  · THE BOX LEADS (2026-08-15/16): the boxed NODE card owns the scene alone; a boxed METAGRAPH card
-//    labels its lane, not the snapshot inside it.
-//  · THE PAIR GETS TWO LABELS (2026-10-03): a metagraph snapshot stands with the global it is read
-//    against, so the global is the second label — in every register that draws the global's bar.
-//  · A REGISTER'S OWN SUBJECT TAKES THE UPPER LABEL where it is committed: the TRANSACTION BLOCK
-//    (D3 — and the register draws no global, so no second label there), the DATA BLOCK (on its
-//    snapshot's tile, the snapshot's own label stepping aside — one label per tile).
-//  · With nothing finer committed, the upper label is the metagraph snapshot's, else the lane's.
+// ONE LABEL, THE BOX'S: the open card is the subject, so its label is the scene's one — the Global
+// snapshot card's bar, the Metagraph snapshot card's tile, the Transaction block's place, the Data
+// block's mark on its tile, the Metagraph card's lane (else, with no lane, the snapshot inside it,
+// else the global). With no subject card open (the note is the box, or none is), the register's
+// LIVE subject: the newest block in Transaction blocks (the live global is not drawn there, D3), the
+// global snapshot in the other two (its lead speaks the register's subject), else the snapshot, else
+// the lane. The pair's second label (2026-10-03, the global under the snapshot) is retired.
 
-export type CalloutFirst = "node" | "block" | "dataBlock" | "metaSnap" | "lane" | null;
-export type CalloutSecond = "global" | null;
+export type CalloutSubject = "global" | "block" | "dataBlock" | "metaSnap" | "lane" | null;
 
-export interface CalloutSubjectsInput {
+export interface CalloutSubjectInput {
   register: LedgerRegister;
   boxedCard: string | null;
-  /** The committed node is a node pick (`isNodePick(inspect)`). */
-  hasNode: boolean;
   hasSnap: boolean;
   hasMetaSnap: boolean;
   hasBlock: boolean;
@@ -35,35 +31,18 @@ export interface CalloutSubjectsInput {
   lane: boolean;
 }
 
-export interface CalloutSubjects {
-  first: CalloutFirst;
-  second: CalloutSecond;
-}
-
-/** The upper label's subject, the box leading. */
-function upperOf(i: CalloutSubjectsInput, inBlocks: boolean): CalloutFirst {
-  if (i.boxedCard === "context") return i.lane ? "lane" : i.hasMetaSnap ? "metaSnap" : null;
-  if (i.boxedCard === "metaSnap" && i.hasMetaSnap) return "metaSnap";
-  if (inBlocks && i.hasBlock) return "block";
-  if (i.register === "data" && i.hasDataBlock) return "dataBlock";
-  if (i.hasMetaSnap) return "metaSnap";
-  if (i.lane) return "lane";
-  // Nothing committed up the ladder: a carried node may still be named (the Snapshots pair's own
-  // fallback), unless a global stands — then the global's label is the scene's one.
-  return !i.hasSnap && i.hasNode ? "node" : null;
-}
-
-/** `out`, when given, is written and returned — the projector asks once per frame (rule 5). */
-export function calloutSubjects(i: CalloutSubjectsInput, out: CalloutSubjects = { first: null, second: null }): CalloutSubjects {
-  if (i.boxedCard === "node" && i.hasNode) {
-    out.first = "node";
-    out.second = null;
-    return out;
-  }
+/** The one subject the scene labels, or null for no label. */
+export function calloutSubject(i: CalloutSubjectInput): CalloutSubject {
   const inBlocks = i.register === "blocks";
-  // The second label: the global's bar, wherever the register draws it (never in Transaction
-  // blocks — the live global is not even drawn there, D3).
-  out.second = i.hasSnap && !inBlocks ? "global" : null;
-  out.first = upperOf(i, inBlocks);
-  return out;
+  const global = i.hasSnap && !inBlocks ? "global" : null;
+  switch (i.boxedCard) {
+    case "snap": if (global) return global; break;
+    case "metaSnap": if (i.hasMetaSnap) return "metaSnap"; break;
+    case "block": if (inBlocks && i.hasBlock) return "block"; break;
+    case "dataBlock": if (i.register === "data" && i.hasDataBlock) return "dataBlock"; break;
+    case "context": return i.lane ? "lane" : i.hasMetaSnap ? "metaSnap" : global;
+  }
+  // No subject card open: the register's live subject.
+  if (inBlocks) return i.hasBlock ? "block" : i.hasMetaSnap ? "metaSnap" : i.lane ? "lane" : null;
+  return global ?? (i.hasMetaSnap ? "metaSnap" : i.lane ? "lane" : null);
 }

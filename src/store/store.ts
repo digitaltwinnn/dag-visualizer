@@ -91,6 +91,7 @@ function bumpStack(stack: SelSlot[], slot: SelSlot, active: boolean): SelSlot[] 
 // the new field type-errored against a type that no longer described the value it held.
 import type { Activity } from "@/src/data/api";
 import { snapRange } from "@/src/data/trendWindow";
+import { readsBlockWindow } from "@/src/engine/domain/viewPolicy";
 
 // Panel-facing state only (Lane B). The 60fps scene + per-snapshot visuals subscribe
 // to NetworkData directly (Lane A) and never touch this store, so React renders stay
@@ -1005,7 +1006,17 @@ export const useStore = create<AppState>((set) => ({
   setTrendMetric: (metric) => set({ trendMetric: metric, motionCause: { kind: "measure", id: metric } }),
   setLedgerMeasure: (measure) => set({ ledgerMeasure: measure }),
   setDataMeasure: (dataMeasure) => set({ dataMeasure }),
-  setLedgerRegister: (ledgerRegister) => set({ ledgerRegister, motionCause: { kind: "register", id: ledgerRegister } }),
+  // ENTERING TRANSACTION BLOCKS OPENS THE BLOCK CARD (user, 2026-11-08: "the callout says transaction
+  // block while the right rail card shows the global snapshot card → transaction block is the best
+  // card to open when we enter this view/mode"): a tick ranked in another register (a pin, a row click)
+  // loses its rank here, so the register's rest rule seats the block (`focusSlotId`); the pin itself
+  // stays. The switch is a selection moment too (`railSelectionKey`), so hand-made folds drop.
+  setLedgerRegister: (ledgerRegister) =>
+    set((s) => ({
+      ledgerRegister,
+      motionCause: { kind: "register", id: ledgerRegister },
+      selStack: readsBlockWindow(ledgerRegister) ? bumpStack(s.selStack, "snap", false) : s.selStack,
+    })),
   setBlockMeasure: (blockMeasure) => set({ blockMeasure }),
   // A block is a committed subject like the tile: it ranks in the recency stack, so its card is the
   // box once committed (`focusSlotId`).

@@ -113,11 +113,10 @@ describe("clickActions — node clicks (the ordering contracts)", () => {
       "inspect",
     ]);
   });
-  it("LEDGER: inspect only — NO filter (user, 2026-09-29: the explorer's signer row set it), no floor ancestry, no geo drills", () => {
+  it("LEDGER: nothing — the Snapshots view has no node rung (user, 2026-11-08: the node card left it); a tray chip previews on hover and commits nothing", () => {
     const p = nodePick("DE");
-    expect(kinds(clickActions({ mode: "ledger", pick: p, countryCc: null, current: state() }))).toEqual(["inspect"]);
-    // …whatever the committed filter: a node never moves it here, as in geo.
-    expect(kinds(clickActions({ mode: "ledger", pick: p, countryCc: null, current: state({ filter: "ded" }) }))).toEqual(["inspect"]);
+    expect(clickActions({ mode: "ledger", pick: p, countryCc: null, current: state() })).toEqual([]);
+    expect(clickActions({ mode: "ledger", pick: p, countryCc: null, current: state({ filter: "ded" }) })).toEqual([]);
   });
 });
 

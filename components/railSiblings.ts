@@ -53,7 +53,6 @@ import {
 } from "@/src/engine/domain/pickActions";
 import { compositionGroups, type CompGroup } from "@/src/data/composition";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
-import { snapshotSignerRows } from "@/src/data/network";
 import { UNLISTED_ID } from "@/src/data/unlisted";
 import type { RailCardKind } from "@/components/railCards";
 import { rangeBuckets, spanPhrase, spanStep, windowSpan, type SpanStep, type ZoomId } from "@/src/data/trendWindow";
@@ -391,19 +390,9 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
         parent = s.composition
           ? (scoped[0]?.label ?? networkLabel(s))
           : networkLabel(s);
-      } else if (
-        s.mode === "ledger" &&
-        s.metaSnap &&
-        snapshotSignerRows(s.selNodes, s.exactRows, s.metaSnap).some((r) => hoverKeyOf(r.pick) === curKey)
-      ) {
-        // UNDER A METAGRAPH SNAPSHOT the node's parent is that snapshot, so the pager steps the
-        // nodes that SIGNED it (user, 2026-09-29: "filtered based who actually was the validators,
-        // like explorer shows") — `snapshotSignerRows`, the explorer's own list, in its order.
-        // Only when this node IS one of them: a tray node that did not sign is still committable,
-        // and for it the snapshot is not its parent — it pages its network, as it always did.
-        rows = snapshotSignerRows(s.selNodes, s.exactRows, s.metaSnap);
-        parent = "Validators that signed";
       } else {
+        // (The Snapshots view paged a snapshot's SIGNERS here until 2026-11-08, when its node card
+        // and rung left; the signer level is the explorer's reading now.)
         // A network-wide node list has no explorer level; today's order is kept.
         rows = machinesOf([...s.selNodes].sort(nodeOrder));
         parent = networkLabel(s);
@@ -676,14 +665,6 @@ const metaSnapOfTickChildren = (s: SiblingState, n: number): SiblingStep[] => {
   }));
 };
 
-/** ledger: a metagraph snapshot's validators (user, 2026-09-29 — "from the metagraph snapshot …
- *  go to its validators"). The same list and order as the explorer's signer level
- *  (`snapshotSignerRows`); a signature no known node carries has nothing to open, so only KNOWN
- *  ones are offered. */
-const signerOfMetaSnapChildren = (s: SiblingState, n: number): SiblingStep[] => {
-  if (!s.metaSnap) return [];
-  return snapshotSignerRows(s.selNodes, s.exactRows, s.metaSnap).slice(0, n).map((r) => nodeItem(r, s));
-};
 
 export const CHILD_OF: Partial<Record<Mode, Partial<Record<RailCardKind, ChildEntry>>>> = {
   geo: {
@@ -698,7 +679,8 @@ export const CHILD_OF: Partial<Record<Mode, Partial<Record<RailCardKind, ChildEn
   ledger: {
     snap: { to: "context", steps: anchoringNetworkChildren },
     context: { to: "metaSnap", steps: metaSnapOfTickChildren },
-    metaSnap: { to: "node", steps: signerOfMetaSnapChildren },
+    // The metagraph snapshot is the ledger's last rung: its signers are the explorer's reading and the
+    // card's fact, no card of their own (2026-11-08); the block and the data block have steps of their own.
   },
   trend: {
     range: { to: "instant", steps: momentOfRangeChildren },

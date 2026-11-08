@@ -87,12 +87,9 @@ describe("ladder↔lane boundary — the lane still agrees with the rung tables"
 // on the first slot of its kind below (Inspector's `nextStep`), so a slot listed here sits between a
 // parent and its child without being either.
 const PASSES_OVER: Partial<Record<string, Partial<Record<string, readonly string[]>>>> = {
-  // The Blocks register's BLOCK (2026-11-05) stands under the metagraph snapshot in the lane, but a
-  // snapshot's children are its signers: the block is a sibling subject of the tick, not a child of
-  // the snapshot, and in the Snapshots register — where the signers step lives — it holds no slot.
-  // …and the Data blocks register's DATA BLOCK (2026-11-07) the same way: carried inside the
-  // snapshot, a subject of its own, not the snapshot's child rung (its ghost has its own step).
-  ledger: { metaSnap: ["block", "dataBlock"] },
+  // (The ledger's metagraph snapshot passed over the block and the data block to its signers' node
+  // slot until 2026-11-08, when the node card left the Snapshots view; the snapshot is the last rung
+  // there now and declares no child, and the block and data block keep their own steps.)
 };
 
 describe("child steps descend exactly one rung of the lane", () => {

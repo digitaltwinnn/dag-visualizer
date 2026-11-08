@@ -222,13 +222,13 @@ describe("subjectRunEnd — the run the next-rung step reads", () => {
   });
   it("a slot the rail does not draw at all is no gap: the Snapshots register's block slot", () => {
     const metaSnap = { metaId: "dor", ordinal: 7, hash: "h", globalOrdinal: 42, ts: "t" };
-    const m = manifest({ mode: "ledger", filter: "dor", snap: snapPick, metaSnap, inspect: nodePick, nodeHere: true, noteAbsent: true });
+    const m = manifest({ mode: "ledger", filter: "dor", snap: snapPick, metaSnap, inspect: nodePick, noteAbsent: true });
     const cards = detailsCards(m);
     const present = (id: string) => cards.find((c) => c.id === id)?.present ?? false;
     const ghosted = (id: string) => cards.find((c) => c.id === id)?.hint != null;
-    for (const id of ["snap", "context", "metaSnap", "node"]) expect(present(id), id).toBe(true);
+    for (const id of ["snap", "context", "metaSnap"]) expect(present(id), id).toBe(true);
     expect(present("block") || ghosted("block")).toBe(false);
-    expect(subjectRunEnd(ladderSlotIds("ledger"), present, ghosted)).toBe("node");
+    expect(subjectRunEnd(ladderSlotIds("ledger"), present, ghosted)).toBe("metaSnap");
     // In the Blocks register the same empty slot is a ghost, so it is a gap there.
     const b = detailsCards({ ...m, ledgerRegister: "blocks" });
     expect(subjectRunEnd(ladderSlotIds("ledger"), (id) => b.find((c) => c.id === id)?.present ?? false, (id) => b.find((c) => c.id === id)?.hint != null)).toBe("metaSnap");
@@ -249,12 +249,13 @@ describe("displayOrder", () => {
   });
   it("closes a gap in the stack", () => {
     const lane = ladderSlotIds("ledger");
-    expect(displayOrder(lane, present(["notes", "snap", "node"]), ["context"])).toEqual(["notes", "snap", "node", "context", "metaSnap", "block", "dataBlock"]);
+    expect(displayOrder(lane, present(["notes", "snap", "metaSnap"]), ["context"])).toEqual(["notes", "snap", "metaSnap", "context", "block", "dataBlock"]);
   });
-  it("the next step never passes another step ghost: the Block ghost keeps its place above the node, and under the snapshot", () => {
+  it("the next step never passes another step ghost: the Block ghost keeps its place under the snapshot", () => {
     const lane = ladderSlotIds("ledger");
-    expect(displayOrder(lane, present(["notes", "snap", "context", "metaSnap"]), ["node", "block"])).toEqual(["notes", "snap", "context", "metaSnap", "block", "node", "dataBlock"]);
-    expect(displayOrder(lane, present(["notes", "snap"]), ["context", "block"])).toEqual(["notes", "snap", "context", "metaSnap", "block", "dataBlock", "node"]);
+    expect(displayOrder(lane, present(["notes", "snap", "context"]), ["metaSnap", "block"])).toEqual(["notes", "snap", "context", "metaSnap", "block", "dataBlock"]);
+    expect(displayOrder(lane, present(["notes", "snap"]), ["context", "block"])).toEqual(["notes", "snap", "context", "metaSnap", "block", "dataBlock"]);
+    expect(displayOrder(lane, present(["notes", "snap"]), ["dataBlock", "block"])).toEqual(["notes", "snap", "context", "metaSnap", "block", "dataBlock"]);
   });
   it("is the lane itself with nothing chosen, and with everything", () => {
     expect(displayOrder(geo, present([]), [])).toEqual(geo);

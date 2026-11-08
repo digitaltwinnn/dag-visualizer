@@ -18,7 +18,8 @@ import type { Mode } from "@/src/store/store";
 import type { LedgerRegister } from "@/src/store/mode";
 import type { GlobalSnapshot, PickDescriptor, MetaSnapSel, TickNetSel, BlockSel, DataBlockSel } from "@/src/data/types";
 import { METAGRAPHS } from "@/src/net/current";
-import type { CohortSel, CompositionSel } from "./focusLadder";
+import { hasLevel, type CohortSel, type CompositionSel } from "./focusLadder";
+import { is3D } from "./viewTransition";
 import { UNLISTED_KEY } from "./ledgerBands";
 import { VIEW_POLICIES, readsBlockWindow } from "./viewPolicy";
 
@@ -837,7 +838,10 @@ export function clickActions(input: {
       inspect: current.inspect ?? null,
     }, p.snap ?? null);
 
-  // A node, in any view. (No autoRotate action: geo disables the controls' rotation at mode
-  // entry and the inspect subscription re-asserts it on the node flight.)
+  // A node, in a view whose ladder HAS a node rung (user, 2026-11-08: the Snapshots view lost its
+  // node card and rung — a tray chip there previews on hover and commits nothing; the signer rows
+  // are readings). No autoRotate action: geo disables the controls' rotation at mode entry and the
+  // inspect subscription re-asserts it on the node flight.
+  if (!is3D(mode) || !hasLevel(mode, "node")) return [];
   return nodeSelectActions(p, { mode, currentFilter: current.filter, compositionSel: input.compositionSel });
 }

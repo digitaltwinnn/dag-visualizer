@@ -8,7 +8,7 @@ import { calloutHangs, calloutPhonePlacement, calloutPlacement, CALLOUT_OFF_X, C
 import { R as GEO_R, LAND_H, latLonToVec3 } from "./domain/geoLayout";
 import { ledgerLens } from "@/src/data/ledgerStory";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
-import { calloutSubjects, type CalloutSubjects, type CalloutSubjectsInput } from "./domain/calloutSubjects";
+import { calloutSubject, type CalloutSubject, type CalloutSubjectInput } from "./domain/calloutSubjects";
 import type { LedgerRegister } from "@/src/store/mode";
 import type { SceneCtx } from "./scene/SceneContext";
 import type { Globe } from "./scene/Globe";
@@ -77,16 +77,12 @@ export interface CalloutHost {
   dofMeta(): { group: THREE.Object3D } | null;
 }
 
-const isNodePick = (p: PickDescriptor | null): boolean =>
-  !!p && (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode");
-
 export class CalloutSync {
   private readonly h: CalloutHost;
   private st!: CalloutState;
 
   // scratch — all of it was Engine-private and callout-only before the move
   private _calloutV = new THREE.Vector3();
-  private _calloutV2 = new THREE.Vector3();
   private _calloutSibs = [new THREE.Vector3(), new THREE.Vector3()];
   private _calloutNodeAnchor = false;
   private _geoNodePick: unknown = null;
@@ -106,10 +102,10 @@ export class CalloutSync {
     if (this.h.mode === "ledger") {
       const i = this._subjIn;
       const net = this.h.ledgerNet;
-      i.register = st.register; i.boxedCard = st.boxedCard; i.hasNode = isNodePick(st.inspect); i.hasSnap = !!st.snap;
+      i.register = st.register; i.boxedCard = st.boxedCard; i.hasSnap = !!st.snap;
       i.hasMetaSnap = !!st.metaSnap; i.hasBlock = st.hasBlock; i.hasDataBlock = st.hasDataBlock;
       i.lane = net !== "all" && net !== "dag" && net !== UNLISTED_ID;
-      calloutSubjects(i, this._subjects);
+      this._subject = calloutSubject(i);
     }
     this._syncCallout();
   }
@@ -136,14 +132,11 @@ export class CalloutSync {
   // `breakpointOf` is the ONE home for the tier (the component reads the same call through
   // `useBreakpoint`), so the two owners cannot drift apart at the boundary.
   private _syncCallout(): void {
+    // ONE LABEL (user, 2026-11-08: "Two callouts is too much in the snapshot view"): the second
+    // anchor the Snapshots pair carried from 2026-10-03, `callout-2` on the global's bar, is retired;
+    // the global's bar is now one of the subjects `callout` itself may point at.
     const el = document.getElementById("callout");
-    // THE SECOND ANCHOR (user, 2026-10-03: "2 callouts"). In Snapshots a committed metagraph
-    // snapshot stands with the global snapshot it is read against, and each gets its own label:
-    // `callout` is the metagraph snapshot's (or a boxed node's), `callout-2` the global
-    // snapshot's, at `_ledgerGlobalAnchor`. Either may be absent — a global snapshot alone
-    // renders only the second.
-    const el2 = document.getElementById("callout-2");
-    if (!el && !el2) return;
+    if (!el) return;
     const allowed =
       this.h.calloutAllowed() &&
       !this.h.transitionActive() &&
@@ -154,32 +147,26 @@ export class CalloutSync {
       // camera leans, and the label tracks its unchanged subject per frame.
       (!this.h.flyingNow() || this.h.sameSubjectFlight());
     const phone = breakpointOf(window.innerWidth) === "phone";
-    if (el) {
-      const v = this._calloutV;
-      const on =
-        allowed &&
-        (this.h.mode === "geo"
-          ? this._geoCalloutAnchor(v)
-          : this.h.mode === "ledger"
-            ? this._ledgerCalloutAnchor(v)
-            : this._hyperCalloutAnchor(v)) &&
-        this._placeCallout(el, v, false, phone);
-      // The multi-leader on a phone fans from the VERTICAL leader's panel end (user, 2026-10-08: a
-      // hybrid node "should be multiple" spheres there too) — `_placePhone`'s own length, not the
-      // diagonal standoff's corner.
-      if (on) this._syncCalloutMulti(el, this._placedX, this._placedY, this._placedRect, this._placedFlip, this._placedDrop, phone ? this._ppLen : 0);
-      else this._syncCalloutMulti(el, 0, 0, null, false, false, 0);
-      // Guard on the ELEMENT's own attribute, not a cached flag: React remounts the wrapper on a
-      // subject change (fresh data-on="0"), so a field would go stale exactly then.
-      const flag = on ? "1" : "0";
-      if (el.dataset.on !== flag) el.dataset.on = flag;
-    }
-    if (el2) {
-      const v = this._calloutV2;
-      const on = allowed && this.h.mode === "ledger" && this._ledgerGlobalAnchor(v) && this._placeCallout(el2, v, true, phone);
-      const flag = on ? "1" : "0";
-      if (el2.dataset.on !== flag) el2.dataset.on = flag;
-    }
+    const v = this._calloutV;
+    const on =
+      allowed &&
+      (this.h.mode === "geo"
+        ? this._geoCalloutAnchor(v)
+        : this.h.mode === "ledger"
+          ? this._ledgerCalloutAnchor(v)
+          : this._hyperCalloutAnchor(v)) &&
+      // The global snapshot's label HANGS below its bar where the strip has room (design A,
+      // 2026-10-03: standing up from the floor it covered the ribbons); every other subject stands.
+      this._placeCallout(el, v, this.h.mode === "ledger" && this._subject === "global", phone);
+    // The multi-leader on a phone fans from the VERTICAL leader's panel end (user, 2026-10-08: a
+    // hybrid node "should be multiple" spheres there too) — `_placePhone`'s own length, not the
+    // diagonal standoff's corner.
+    if (on) this._syncCalloutMulti(el, this._placedX, this._placedY, this._placedRect, this._placedFlip, this._placedDrop, phone ? this._ppLen : 0);
+    else this._syncCalloutMulti(el, 0, 0, null, false, false, 0);
+    // Guard on the ELEMENT's own attribute, not a cached flag: React remounts the wrapper on a
+    // subject change (fresh data-on="0"), so a field would go stale exactly then.
+    const flag = on ? "1" : "0";
+    if (el.dataset.on !== flag) el.dataset.on = flag;
   }
 
   // Where the last `_placeCallout` put its anchor — read back by the multi-leader, which draws
@@ -496,28 +483,25 @@ export class CalloutSync {
   /** THE SUBJECTS THE SNAPSHOTS VIEW LABELS — `domain/calloutSubjects`, the ONE chain both owners
    *  consult (2026-11-07): `SceneCallout` draws the label it names, this projector anchors it.
    *  Resolved once per `sync` (perf review: two calls a frame allocated six objects). */
-  private readonly _subjIn: CalloutSubjectsInput = { register: "snapshots", boxedCard: null, hasNode: false, hasSnap: false, hasMetaSnap: false, hasBlock: false, hasDataBlock: false, lane: false };
-  private readonly _subjects: CalloutSubjects = { first: null, second: null };
-  private _ledgerSubjects(): CalloutSubjects {
-    return this._subjects;
-  }
+  private readonly _subjIn: CalloutSubjectInput = { register: "snapshots", boxedCard: null, hasSnap: false, hasMetaSnap: false, hasBlock: false, hasDataBlock: false, lane: false };
+  private _subject: CalloutSubject = null;
 
   private _ledgerCalloutAnchor(v: THREE.Vector3): boolean {
     const st = this.st;
-    const first = this._ledgerSubjects().first;
-    // THE BOX LEADS (user, 2026-08-15/16): the boxed NODE card anchors the node's own tray chip.
-    if (first === "node") return this._ledgerNodeAnchor(st, v);
-    if (first === null) return false;
-    // Every other upper label rides the chamber's trail: it waits until its row is FIXED on the plane
-    // (LedgerView.calloutSettled — the chamber's own clocks; the tray-node path above stays exempt).
+    const subject = this._subject;
+    if (subject === null) return false;
+    // Every label rides the chamber's trail: it waits until its row is FIXED on the plane
+    // (LedgerView.calloutSettled — the chamber's own clocks).
     if (!this.h.ledger.calloutSettled(st.following)) return false;
-    // The TRANSACTION BLOCK (D3) at its own place in the chamber; the DATA BLOCK on its snapshot's
-    // tile (one label per tile — the snapshot's steps aside); the METAGRAPH SNAPSHOT's tile; the
-    // network's LANE head (user, 2026-10-03: "the dossier on snapshots page has no callout on the
-    // scene") — layout data, fixed for the session; false when the lane isn't in the field, and then
-    // the label stays down rather than borrow another subject's point.
-    if (first === "block") { if (!this.h.ledger.selectedBlockAnchor(v)) return false; }
-    else if (first === "dataBlock" || first === "metaSnap") { if (!st.metaSnap || !this._ledgerTileAnchor(st.metaSnap, v)) return false; }
+    // The GLOBAL SNAPSHOT's bar (or the resolved network's own segment of it); the TRANSACTION BLOCK
+    // (D3) at its own place in the chamber; the DATA BLOCK on its snapshot's tile (one label per tile
+    // — the snapshot's steps aside); the METAGRAPH SNAPSHOT's tile; the network's LANE head (user,
+    // 2026-10-03: "the dossier on snapshots page has no callout on the scene") — layout data, fixed
+    // for the session; false when the lane isn't in the field, and then the label stays down rather
+    // than borrow another subject's point.
+    if (subject === "global") this._ledgerBarAnchor(v);
+    else if (subject === "block") { if (!this.h.ledger.selectedBlockAnchor(v)) return false; }
+    else if (subject === "dataBlock" || subject === "metaSnap") { if (!st.metaSnap || !this._ledgerTileAnchor(st.metaSnap, v)) return false; }
     else if (!this.h.ledger.calloutAnchor(this.h.ledgerNet, v)) return false;
     this.h.ledger.group.localToWorld(v); // the rendered chamber transform — a label read. render-state OK
     return true;
@@ -531,33 +515,11 @@ export class CalloutSync {
     return this.h.ledger.calloutAnchor(sel.metaId, v) || this.h.ledger.calloutAnchor(UNLISTED_ID, v);
   }
 
-  // The GLOBAL SNAPSHOT's label — the second anchor, `SceneCallout`'s `m2` gate mirrored: a
-  // global snapshot is shown and the box is not a node (its own label owns the scene). It
-  // points at the snapshot's bar, or at the resolved network's own segment of it.
-  private _ledgerGlobalAnchor(v: THREE.Vector3): boolean {
-    const st = this.st;
-    // The same chain's second label: the global's bar wherever the register draws it, never under a
-    // boxed node (its own label owns the scene) — `calloutSubjects` says when.
-    if (this._ledgerSubjects().second !== "global") return false;
-    if (!this.h.ledger.calloutSettled(st.following)) return false;
-    this._ledgerBarAnchor(v);
-    this.h.ledger.group.localToWorld(v); // the rendered chamber transform — a label read. render-state OK
-    return true;
-  }
-
+  // The GLOBAL SNAPSHOT's bar, or the resolved network's own segment of it.
   private _ledgerBarAnchor(v: THREE.Vector3): void {
     const lens = ledgerLens(this.h.ledgerNet);
     if (lens !== "all" && this.h.ledger.bandAnchor(lens, v)) return;
     this.h.ledger.calloutAnchor(null, v);
   }
 
-  // The committed node's tray chip — the same `ledgerPos` its instance lerps to. The chips
-  // live in the GLOBE group's space (the fabric is shared), so the lift goes through it.
-  private _ledgerNodeAnchor(st: CalloutState, v: THREE.Vector3): boolean {
-    const p = st.inspect;
-    if (!p || (p.kind !== "l0" && p.kind !== "l1" && p.kind !== "metanode")) return false;
-    if (!this.h.globe.selectedNodeLedgerAnchor(v)) return false;
-    this.h.globe.group.localToWorld(v); // render-state OK
-    return true;
-  }
 }
