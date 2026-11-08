@@ -816,6 +816,28 @@ Four decisions are recorded in the file's header and worth knowing before touchi
   four planes out of five — a cursor that misstates the data (rule 10). It is drawn per plane, in the
   plane's own coordinate system, by the chart that owns the scale.
 
+## Uploads are ranged, pools draw their count
+
+**A pooled attribute uploads only the slots written** (perf review, 2026-11-07, applied the same
+day). three uploads a `BufferAttribute` WHOLE when it has no update range, and every pool here is
+sized for its cap (6,000 tiles, 1,200 links) while drawing a few dozen — so the chamber shipped
+~1 MB a frame doing nothing. Every per-frame or event-time write to a pooled attribute now adds its
+range before the flag (`clearUpdateRanges(); addUpdateRange(0, n × itemSize); needsUpdate = true` —
+three clears the range after each upload, so the flag re-adds it every time): the lane tiles and the
+data marks (`LedgerView`), the two block tiers' matrices, colours and link buffers (`BlockTier`), the
+silent stretch's positions, distances and alphas (`SilentStretch`, whose line distances are a
+preallocated attribute written at rebuild — `computeLineDistances` allocated a fresh one per rebuild).
+A pool at zero twice in a row uploads nothing. **And a pool DRAWS its `count`**: the data marks draw
+the tiles drawn in the Data blocks register and none elsewhere (`_dataMarkMesh.count = markTo` — the
+pool's 6,000 zero-scaled boxes were 45% of the chamber's submitted triangles in every register).
+Measured after: Transaction blocks 2 KB a pass against ~1 MB, one 50 ms task per 10 s against ten of
+113–236 ms (the RAW blocks table re-rendering while hidden — it mounts only while the layer is up
+now). The block tier REBUILDS ONCE PER FRAME (`_tierDirty`, set by `setBlockReads`, run at the top
+of `update`): a landing exact read reached it three ways. The window REFOLDS only when a tick IN it
+changed (`BlockWindowBridge`'s `foldSig`). `CalloutSync` resolves the Snapshots view's label
+subjects once per `sync` into reused structs. The Engine's three feed listeners come off with it and
+it disposes the chamber (dev: a recreated Engine used to leave the old one's handlers running).
+
 ## The instance audit (dev only)
 
 `scene/instanceAudit.ts` + `Engine._auditPass` sweep what the frame ACTUALLY wrote into the node

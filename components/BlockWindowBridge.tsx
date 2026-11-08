@@ -165,9 +165,17 @@ export default function BlockWindowBridge() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ledger, register, pin, liveNewest, chain]);
 
-  // The exact reads change what a tick's anchor says: fold the same answer again (O(ticks)).
+  // The exact reads change what a tick's anchor says: fold the same answer again (O(ticks)) — but
+  // only when a read for a tick IN the window changed (perf review, 2026-11-07: every exact read in
+  // the view, window tick or not, re-folded the window and re-laid the whole trail).
+  const foldSig = useRef<string | null>(null);
   useEffect(() => {
-    if (answer.current && getBlockWindow()) setBlockWindow(foldBlockWindow(answer.current, exact));
+    const held = getBlockWindow();
+    if (!answer.current || !held) return;
+    const sig = held.ticks.map((t) => (exact[t.ord] ? "1" : "0")).join("");
+    if (sig === foldSig.current) return;
+    foldSig.current = sig;
+    setBlockWindow(foldBlockWindow(answer.current, exact));
   }, [exact]);
 
   // Is the held window the live one, still moving (`liveWindowRuns`)? Asked of the refs and the

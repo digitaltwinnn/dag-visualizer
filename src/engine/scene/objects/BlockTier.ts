@@ -108,6 +108,8 @@ export class BlockTier {
   /** Each link end's ROW (the slot of the block it ends on), resolved at event time. */
   private readonly _linkSlot: Int16Array;
   private _linkCount = 0;
+  /** How many blocks the last frame uploaded — a tier at 0 twice in a row uploads nothing. */
+  private _lastN = 0;
 
   /** The DAG's tier wears the snapshot glass (`BLOCK_GLASS`); a token tier is opaque, like its tile. */
   private readonly _glass: boolean;
@@ -211,8 +213,18 @@ export class BlockTier {
       }
     }
     this._linkCount = segs;
-    this._linkPos.needsUpdate = true;
-    this._linkCol.needsUpdate = true;
+    // UPLOAD ONLY WHAT IS DRAWN (perf review, 2026-11-07): three uploads an attribute WHOLE when it
+    // has no update range — the link buffers are sized for the cap (1,200 links), so 18 drawn links
+    // shipped 460 KB a frame. The range is the drawn segments' vertices; three clears it after each
+    // upload, so every flag re-adds it.
+    if (segs > 0) {
+      this._linkPos.clearUpdateRanges();
+      this._linkPos.addUpdateRange(0, segs * N * 2 * 3);
+      this._linkPos.needsUpdate = true;
+      this._linkCol.clearUpdateRanges();
+      this._linkCol.addUpdateRange(0, segs * N * 2 * 4);
+      this._linkCol.needsUpdate = true;
+    }
     this._linkGeo.setDrawRange(0, segs * N * 2);
     this._resolveEmphasis();
   }
@@ -317,8 +329,19 @@ export class BlockTier {
       this.mesh.setMatrixAt(i, _dummy.matrix);
       this.mesh.setColorAt(i, inkMix(_col.setHex(it.hue), bright, this._colors));
     }
-    this.mesh.instanceMatrix.needsUpdate = true;
-    if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+    // The drawn instances' matrices and colours only (`count` is `n`); an empty tier that was empty
+    // last frame uploads nothing at all (the token tier under All, the DAG tier under a filter).
+    if (n > 0 || this._lastN > 0) {
+      this.mesh.instanceMatrix.clearUpdateRanges();
+      this.mesh.instanceMatrix.addUpdateRange(0, n * 16);
+      this.mesh.instanceMatrix.needsUpdate = true;
+      if (this.mesh.instanceColor) {
+        this.mesh.instanceColor.clearUpdateRanges();
+        this.mesh.instanceColor.addUpdateRange(0, n * 3);
+        this.mesh.instanceColor.needsUpdate = true;
+      }
+    }
+    this._lastN = n;
 
     if (this._linkCount === 0) return;
     const col = this._linkCol.array as Float32Array;
@@ -349,6 +372,8 @@ export class BlockTier {
         col[(base + j * 2 + 1) * 4 + 3] = a0 + (a1 - a0) * ((j + 1) / N);
       }
     }
+    this._linkCol.clearUpdateRanges();
+    this._linkCol.addUpdateRange(0, this._linkCount * N * 2 * 4);
     this._linkCol.needsUpdate = true;
   }
 

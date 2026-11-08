@@ -1202,21 +1202,28 @@ export class Engine {
     const net = initNetwork(); // idempotent; guarantees a NetworkData instance
     const n = net as unknown as { dagCore?: DagCore | null };
     if (n?.dagCore) this.dagCore = n.dagCore;
-    net?.on("cluster", ({ dag }: { l0: ClusterNode[]; l1: ClusterNode[]; dag: DagCore }) => {
+    // THE FEED LISTENERS COME OFF WITH THE ENGINE (perf review, 2026-11-07, dev-only: a recreated
+    // Engine — a Fast Refresh remount of the shell — left the old one's handlers running against the
+    // singleton, rebuilding its globe on every cluster poll and flashing its core on every tick).
+    const onCluster = ({ dag }: { l0: ClusterNode[]; l1: ClusterNode[]; dag: DagCore }) => {
       this.dagCore = dag;
       this._buildGlobe();
       this._publishMetaList(); // the DAG core lives in the metaList — refresh it when clusters change
-    });
+    };
+    net?.on("cluster", onCluster);
+    this.unsub.push(() => net?.off("cluster", onCluster));
     // Data-driven Hypergraph pulses: when a metagraph records a snapshot that anchored into a
     // global tick, fire a packet from its hub along the tether into the core; flash the core
     // itself on each new global snapshot (scaled by how many metagraphs it anchored).
-    net?.on("anchor", ({ metaId, timestamps, seed }: { metaId: string; timestamps: string[]; seed: boolean }) => {
+    const onAnchor = ({ metaId, timestamps, seed }: { metaId: string; timestamps: string[]; seed: boolean }) => {
       // One packet per snapshot that ARRIVED — not per snapshot a catch-up batch recorded (the
       // history seed, and the backlog a background tab's throttled polls pile up: `liveArrivals`).
       const arrived = seed ? 0 : liveArrivals(timestamps ?? []);
       if (arrived > 0) this.layers.pulseMeta(metaId, arrived);
       if (this.mode === "ledger") this._ledgerDirty = true; // the per-tick breakdown filled in
-    });
+    };
+    net?.on("anchor", onAnchor);
+    this.unsub.push(() => net?.off("anchor", onAnchor));
     // THE SOURCE SWITCH (`src/data/pastWindow.ts`, user 2026-11-03: an old pin goes "back in time"):
     // the live buffer ↔ a past window around the pin. A fresh chamber history (the model only ever
     // advances), the live edge frozen while past, and the pin re-applied so the rewind lands it.
@@ -1244,14 +1251,16 @@ export class Engine {
         else this._reseatLedger();
       }),
     );
-    net?.on("global", (evt: { latest: GlobalSnapshot | null }) => {
+    const onGlobal = (evt: { latest: GlobalSnapshot | null }) => {
       if (this.mode === "ledger") this._ledgerDirty = true; // a new tick landed on the chain
       const ord = evt.latest?.ordinal;
       if (ord == null || ord === this._lastFlashOrdinal) return;
       this._lastFlashOrdinal = ord;
       const anchored = evt.latest?.metagraphSnapshotCount ?? 0;
       this.layers.flashCore(Math.min(1.3, 0.5 + anchored * 0.06)); // brighter when it anchored more
-    });
+    };
+    net?.on("global", onGlobal);
+    this.unsub.push(() => net?.off("global", onGlobal));
 
     // Validator geo seed (instant plot); merged, not replaced, so it doesn't clobber
     // the metagraph IP geo that arrives from /api/metagraphs.
@@ -2691,6 +2700,7 @@ export class Engine {
     if (useStore.getState().cameraFlying) useStore.getState().setCameraFlying(false);
     this.stats?.dom.remove();
     this.trends.dispose();
+    this.ledger.dispose(); // the chamber's pools (two block tiers, the marks) go with the engine
     this.devTune.dispose();
     this.unsub.forEach((u) => u());
     cancelAnimationFrame(this.raf);

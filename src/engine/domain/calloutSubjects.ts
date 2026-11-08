@@ -35,22 +35,35 @@ export interface CalloutSubjectsInput {
   lane: boolean;
 }
 
-export function calloutSubjects(i: CalloutSubjectsInput): { first: CalloutFirst; second: CalloutSecond } {
-  if (i.boxedCard === "node" && i.hasNode) return { first: "node", second: null };
+export interface CalloutSubjects {
+  first: CalloutFirst;
+  second: CalloutSecond;
+}
+
+/** The upper label's subject, the box leading. */
+function upperOf(i: CalloutSubjectsInput, inBlocks: boolean): CalloutFirst {
+  if (i.boxedCard === "context") return i.lane ? "lane" : i.hasMetaSnap ? "metaSnap" : null;
+  if (i.boxedCard === "metaSnap" && i.hasMetaSnap) return "metaSnap";
+  if (inBlocks && i.hasBlock) return "block";
+  if (i.register === "data" && i.hasDataBlock) return "dataBlock";
+  if (i.hasMetaSnap) return "metaSnap";
+  if (i.lane) return "lane";
+  // Nothing committed up the ladder: a carried node may still be named (the Snapshots pair's own
+  // fallback), unless a global stands — then the global's label is the scene's one.
+  return !i.hasSnap && i.hasNode ? "node" : null;
+}
+
+/** `out`, when given, is written and returned — the projector asks once per frame (rule 5). */
+export function calloutSubjects(i: CalloutSubjectsInput, out: CalloutSubjects = { first: null, second: null }): CalloutSubjects {
+  if (i.boxedCard === "node" && i.hasNode) {
+    out.first = "node";
+    out.second = null;
+    return out;
+  }
   const inBlocks = i.register === "blocks";
   // The second label: the global's bar, wherever the register draws it (never in Transaction
   // blocks — the live global is not even drawn there, D3).
-  const second: CalloutSecond = i.hasSnap && !inBlocks ? "global" : null;
-  const upper = (): CalloutFirst => {
-    if (i.boxedCard === "context") return i.lane ? "lane" : i.hasMetaSnap ? "metaSnap" : null;
-    if (i.boxedCard === "metaSnap" && i.hasMetaSnap) return "metaSnap";
-    if (inBlocks && i.hasBlock) return "block";
-    if (i.register === "data" && i.hasDataBlock) return "dataBlock";
-    if (i.hasMetaSnap) return "metaSnap";
-    if (i.lane) return "lane";
-    // Nothing committed up the ladder: a carried node may still be named (the Snapshots pair's own
-    // fallback), unless a global stands — then the global's label is the scene's one.
-    return !i.hasSnap && i.hasNode ? "node" : null;
-  };
-  return { first: upper(), second };
+  out.second = i.hasSnap && !inBlocks ? "global" : null;
+  out.first = upperOf(i, inBlocks);
+  return out;
 }

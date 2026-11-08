@@ -1049,8 +1049,12 @@ export class LedgerView implements SceneView {
   setBlockReads(r: Readonly<Record<string, { blocks: BlockRead[] }>>, settled: boolean): void {
     this._blockReads = r;
     this._readsSettled = settled;
-    this._rebuildBlockTier();
+    // ONE REBUILD PER FRAME (perf review, 2026-11-07): a landing exact read reached the tier three
+    // ways (the exact write, the block-read mirror, the window refold); the reads mark the tier
+    // dirty and `update` rebuilds it once, before anything reads a block's place.
+    this._tierDirty = true;
   }
+  private _tierDirty = false;
 
   /** The hovered block (`store.hoverBlock`) — previews, never commits (convention 9). */
   setHoveredBlock(hash: string | null): void {
@@ -1110,6 +1114,7 @@ export class LedgerView implements SceneView {
    *  and is not drawn. Its place across is the layered DAG drawing's (`forkSpread`); a block whose read
    *  has not landed stands on the centre line. */
   private _rebuildBlockTier(): void {
+    this._tierDirty = false;
     const w = this._blockWindow;
     // The constructor builds the tier after the first slot rebuild can run.
     if (!this._tiers.length || !this._stretch) return;
@@ -1772,6 +1777,7 @@ export class LedgerView implements SceneView {
 
   update(dt: number) {
     this.t += dt;
+    if (this._tierDirty) this._rebuildBlockTier(); // event-time, coalesced: see setBlockReads
 
     // The entry ramp (see beginEntry): held at full lift while the transition runs, then the
     // DROP once released — retuned 2026-08-16 after the first cut read as a mere fade: the
@@ -2043,17 +2049,37 @@ export class LedgerView implements SceneView {
       _dummy.updateMatrix();
       for (let j = mi; j < prevMeta; j++) this._metaTrailMesh.setMatrixAt(j, _dummy.matrix);
     }
+    // UPLOAD ONLY THE SLOTS WRITTEN (perf review, 2026-11-07: the pool is `META_TRAIL_MAX`, and three
+    // uploads an attribute whole without an update range — 456 KB a frame for a few dozen tiles).
+    // The range covers this frame's tiles and any the last frame drew past them (zeroed above).
+    const metaUp = Math.max(mi, prevMeta);
     this._metaLastDrawn = mi;
-    this._metaTrailMesh.instanceMatrix.needsUpdate = true;
-    if (this._metaTrailMesh.instanceColor) this._metaTrailMesh.instanceColor.needsUpdate = true;
-    // Every mark slot this frame did not write is zero-scaled: past the tiles drawn, and — outside the
-    // register that draws them — every slot the last such frame wrote (rule 5's discipline: no stale
-    // instance from another register lingers).
+    if (metaUp > 0) {
+      this._metaTrailMesh.instanceMatrix.clearUpdateRanges();
+      this._metaTrailMesh.instanceMatrix.addUpdateRange(0, metaUp * 16);
+      this._metaTrailMesh.instanceMatrix.needsUpdate = true;
+      if (this._metaTrailMesh.instanceColor) {
+        this._metaTrailMesh.instanceColor.clearUpdateRanges();
+        this._metaTrailMesh.instanceColor.addUpdateRange(0, metaUp * 3);
+        this._metaTrailMesh.instanceColor.needsUpdate = true;
+      }
+    }
+    // The marks DRAW `count` instances — the tiles drawn in the Data blocks register, none elsewhere
+    // (the review found the pool's 6,000 zero-scaled boxes submitted every frame in every register,
+    // 45% of the chamber's triangles drawing nothing). Every slot below `count` this frame did not
+    // write is zero-scaled (rule 5's discipline), and the upload covers only those.
     const markTo = dataMarks ? mi : 0;
     if (markTo < this._dataMarkLastDrawn) for (let j = markTo; j < this._dataMarkLastDrawn; j++) this._zeroDataMark(j);
-    if (dataMarks || this._dataMarkLastDrawn > 0) {
+    this._dataMarkMesh.count = markTo;
+    if (markTo > 0) {
+      this._dataMarkMesh.instanceMatrix.clearUpdateRanges();
+      this._dataMarkMesh.instanceMatrix.addUpdateRange(0, markTo * 16);
       this._dataMarkMesh.instanceMatrix.needsUpdate = true;
-      if (this._dataMarkMesh.instanceColor) this._dataMarkMesh.instanceColor.needsUpdate = true;
+      if (this._dataMarkMesh.instanceColor) {
+        this._dataMarkMesh.instanceColor.clearUpdateRanges();
+        this._dataMarkMesh.instanceColor.addUpdateRange(0, markTo * 3);
+        this._dataMarkMesh.instanceColor.needsUpdate = true;
+      }
     }
     this._dataMarkLastDrawn = markTo;
   }

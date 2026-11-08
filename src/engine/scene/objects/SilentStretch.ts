@@ -52,6 +52,9 @@ export class SilentStretch {
   private readonly _geo = new THREE.BufferGeometry();
   private readonly _pos: THREE.Float32BufferAttribute;
   private readonly _col: THREE.Float32BufferAttribute;
+  /** The dashed material's per-vertex line distances, written at rebuild (perf review, 2026-11-07:
+   *  `computeLineDistances` allocated a fresh attribute — and a fresh GL buffer — per rebuild). */
+  private readonly _dist: THREE.Float32BufferAttribute;
   private readonly _mat: THREE.LineDashedMaterial;
   private readonly _lines: THREE.LineSegments;
   private _items: StretchItem[] = [];
@@ -68,8 +71,11 @@ export class SilentStretch {
     this._col = new THREE.Float32BufferAttribute(new Float32Array(maxStretches * 8).fill(1), 4);
     this._pos.setUsage(THREE.DynamicDrawUsage);
     this._col.setUsage(THREE.DynamicDrawUsage);
+    this._dist = new THREE.Float32BufferAttribute(new Float32Array(maxStretches * 2), 1);
+    this._dist.setUsage(THREE.DynamicDrawUsage);
     this._geo.setAttribute("position", this._pos);
     this._geo.setAttribute("color", this._col);
+    this._geo.setAttribute("lineDistance", this._dist);
     this._geo.setDrawRange(0, 0);
     // The ink is the material's colour (the ordinal column's readout ink); the vertex alpha is the
     // per-stretch boundary ramp.
@@ -94,14 +100,23 @@ export class SilentStretch {
     const n = Math.min(items.length, this._max);
     this._items = items.slice(0, n); // event-time
     const pos = this._pos.array as Float32Array;
+    const dist = this._dist.array as Float32Array;
     for (let i = 0; i < n; i++) {
       const s = this._items[i];
       pos.set([s.x0, s.y, 0, s.x1, s.y, 0], i * 6); // event-time
+      // A dashed line needs its distances per segment: each runs from 0 to its own length.
+      dist[i * 2] = 0;
+      dist[i * 2 + 1] = Math.abs(s.x1 - s.x0);
     }
-    this._pos.needsUpdate = true;
+    if (n > 0) {
+      this._pos.clearUpdateRanges();
+      this._pos.addUpdateRange(0, n * 6);
+      this._pos.needsUpdate = true;
+      this._dist.clearUpdateRanges();
+      this._dist.addUpdateRange(0, n * 2);
+      this._dist.needsUpdate = true;
+    }
     this._geo.setDrawRange(0, n * 2);
-    // A dashed line needs its distances, per segment, after every move.
-    this._lines.computeLineDistances();
     const seen = new Set<string>(); // event-time
     for (const s of this._items) {
       if (!s.label) continue;
@@ -160,7 +175,11 @@ export class SilentStretch {
       col[i * 8 + 3] = dashOp * a0 * alpha;
       col[i * 8 + 7] = dashOp * a1 * alpha;
     }
-    this._col.needsUpdate = true;
+    if (this._items.length > 0) {
+      this._col.clearUpdateRanges();
+      this._col.addUpdateRange(0, this._items.length * 8);
+      this._col.needsUpdate = true;
+    }
     for (const l of this._labels.values()) {
       const x = l.xMid + this._off;
       const a = l.front ? frontRunAt(l.x1, this._off) : frontAt(x) * horizonAt(x);

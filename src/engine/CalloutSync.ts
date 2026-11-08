@@ -8,7 +8,7 @@ import { calloutHangs, calloutPhonePlacement, calloutPlacement, CALLOUT_OFF_X, C
 import { R as GEO_R, LAND_H, latLonToVec3 } from "./domain/geoLayout";
 import { ledgerLens } from "@/src/data/ledgerStory";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
-import { calloutSubjects } from "./domain/calloutSubjects";
+import { calloutSubjects, type CalloutSubjects, type CalloutSubjectsInput } from "./domain/calloutSubjects";
 import type { LedgerRegister } from "@/src/store/mode";
 import type { SceneCtx } from "./scene/SceneContext";
 import type { Globe } from "./scene/Globe";
@@ -102,6 +102,15 @@ export class CalloutSync {
   /** Called once per frame from the Engine's scene-write phase. */
   sync(st: CalloutState): void {
     this.st = st;
+    // The Snapshots view's label subjects, resolved ONCE per frame into reused structs (rule 5).
+    if (this.h.mode === "ledger") {
+      const i = this._subjIn;
+      const net = this.h.ledgerNet;
+      i.register = st.register; i.boxedCard = st.boxedCard; i.hasNode = isNodePick(st.inspect); i.hasSnap = !!st.snap;
+      i.hasMetaSnap = !!st.metaSnap; i.hasBlock = st.hasBlock; i.hasDataBlock = st.hasDataBlock;
+      i.lane = net !== "all" && net !== "dag" && net !== UNLISTED_ID;
+      calloutSubjects(i, this._subjects);
+    }
     this._syncCallout();
   }
 
@@ -485,20 +494,12 @@ export class CalloutSync {
   // position, so the lead slot IS where the subject settles (LedgerView.calloutAnchor is pure
   // layout data). An uncataloged channel's rows live on the unlisted lane.
   /** THE SUBJECTS THE SNAPSHOTS VIEW LABELS — `domain/calloutSubjects`, the ONE chain both owners
-   *  consult (2026-11-07): `SceneCallout` draws the label it names, this projector anchors it. */
-  private _ledgerSubjects() {
-    const st = this.st;
-    const net = this.h.ledgerNet;
-    return calloutSubjects({
-      register: st.register,
-      boxedCard: st.boxedCard,
-      hasNode: isNodePick(st.inspect),
-      hasSnap: !!st.snap,
-      hasMetaSnap: !!st.metaSnap,
-      hasBlock: st.hasBlock,
-      hasDataBlock: st.hasDataBlock,
-      lane: net !== "all" && net !== "dag" && net !== UNLISTED_ID,
-    });
+   *  consult (2026-11-07): `SceneCallout` draws the label it names, this projector anchors it.
+   *  Resolved once per `sync` (perf review: two calls a frame allocated six objects). */
+  private readonly _subjIn: CalloutSubjectsInput = { register: "snapshots", boxedCard: null, hasNode: false, hasSnap: false, hasMetaSnap: false, hasBlock: false, hasDataBlock: false, lane: false };
+  private readonly _subjects: CalloutSubjects = { first: null, second: null };
+  private _ledgerSubjects(): CalloutSubjects {
+    return this._subjects;
   }
 
   private _ledgerCalloutAnchor(v: THREE.Vector3): boolean {

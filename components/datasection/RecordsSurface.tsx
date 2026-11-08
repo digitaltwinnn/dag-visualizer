@@ -63,8 +63,10 @@ export default function RecordsSurface() {
       }
     >
       {mode === "ledger" && blocksRegister ? (
-        // THE BLOCKS REGISTER'S RECORDS: the window's blocks, grouped by their accepting global.
-        <BlocksTable />
+        // THE BLOCKS REGISTER'S RECORDS: the window's blocks, grouped by their accepting global —
+        // mounted only while the raw layer is UP (perf review, 2026-11-07: hidden behind the scene,
+        // its 1 s age clock re-rendered every plate and row — one ~120 ms task a second).
+        section === "data" ? <BlocksTable /> : null
       ) : mode === "ledger" ? (
         // MASTER–DETAIL (item 9, 2026-08-06): the anchor log is the index on the left; the right
         // pane renders the SELECTED metagraph snapshot's contents (the deep read + the JSON tree),
