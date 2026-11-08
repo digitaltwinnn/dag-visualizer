@@ -7,6 +7,11 @@
 // card's and the explorer's (`ChannelSnapRow.dataTxCount`); the mark says THAT a snapshot carried data
 // and roughly how much.
 //
+// THE MARK IS THE TILE'S OWN SIZE (user, 2026-11-08: "make the data blocks on the metagraph planes
+// the same size as the snapshot block"): a second tile standing on the first, the same footprint and
+// the same height, in the lane's hue — a presence mark, no longer a bar; the count of updates is the
+// card's and the explorer's. (It was a log-scaled bar at 0.42 of the tile's footprint, D6.)
+//
 // A SNAPSHOT THAT CARRIED NO DATA BLOCK IS NOT THE REGISTER'S SUBJECT (user, 2026-11-07: "a
 // metagraph that anchored but had no datablock is still shown; don't show it"): its tile is not drawn,
 // no sheet or thread ties it to its tick, and the explorer does not list it — as the Transaction blocks
@@ -16,14 +21,9 @@
 // is UNKNOWN — not drawn yet, never a guess; a snapshot whose data blocks hold no update still carried
 // data, so it stands at the floor height.
 
-/** The mark's proportions, in chamber units: the floor height a single update stands at, the ceiling,
- *  how much height each decade of updates adds, and its footprint as a fraction of its tile's. */
-export const DATA_MARK: Readonly<{ h0: number; perDecade: number; hMax: number; foot: number }> = {
-  h0: 0.1,
-  perDecade: 0.12,
-  hMax: 0.58,
-  foot: 0.42,
-};
+/** The mark's proportions as fractions of its TILE's: its footprint and its height. 1 and 1 — the
+ *  snapshot block's own size, user 2026-11-08. */
+export const DATA_MARK: Readonly<{ foot: number; height: number }> = { foot: 1, height: 1 };
 
 /** What a tile's mark counts: the data updates of a snapshot that carried data blocks, or null where
  *  it carried none or its read has not landed. */
@@ -36,10 +36,4 @@ export function dataMarkCount(row: { dataBlocks?: number; dataTxCount?: number }
  *  landed or could not be read — the register's tile, sheet and explorer row all hang on this. */
 export function carriesData(row: { dataBlocks?: number; dataTxCount?: number } | null | undefined): boolean {
   return dataMarkCount(row) != null;
-}
-
-/** The mark's height for a count of data updates — the floor at one (or none), a decade's step after. */
-export function dataMarkHeight(count: number): number {
-  if (count <= 1) return DATA_MARK.h0;
-  return Math.min(DATA_MARK.hMax, DATA_MARK.h0 + DATA_MARK.perDecade * Math.log10(count));
 }

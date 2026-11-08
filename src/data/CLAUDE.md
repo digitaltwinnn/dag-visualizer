@@ -153,7 +153,14 @@ merges two networks'); the live feed's announced tick joins only a window holdin
 "no blocks". A token chain cut by its walk's page cap is named in the window's `partial`, and the
 band's readings count the window's own network's blocks, a cut window read like a full one — CUT only
 by the chain that drives it (`blockStats.blockScopeOf`: any chain under All, the filter's own under a
-filter). **Live in this register follows the newest block** (D3): `follow.ts`'s `followLatest` seats
+filter). **Live in DATA BLOCKS follows the newest tick that carried data** (2026-11-08, user: "similar to a
+metagraph filter … keep the global snapshot that actually has a data block as the live element; fast
+forward when there is a new snapshot with a data block"): `follow.ts`'s `followNewestData` seats the
+newest buffered global whose exact read holds a data-carrying snapshot in the filter's scope, and that
+tick's newest such snapshot (so the rung below is always open — the Metagraph ghost's step had nothing
+to open under a dataless live tick), through the non-bumping advances; a landing exact read is a beat
+there (`FollowController`), since a tick is known to carry data only once read. With no read tick
+carrying data the plain follow stands. **Live in the Blocks register follows the newest block** (D3): `follow.ts`'s `followLatest` seats
 `blockWindow.newestBlock` — the window's newest block of the network it was read for — and its
 accepting global through the non-bumping `advanceBlock` / `advanceSnap`, never from a window read for
 another network or around a pin (pinned by `src/store/followFlow.test.ts`). Pinned by `blockWindow.test.ts` and `blockStats.test.ts`.

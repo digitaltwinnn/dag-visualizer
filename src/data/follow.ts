@@ -6,7 +6,9 @@ import type { GlobalSnapshot } from "@/src/data/types";
 import { getBlockWindow } from "@/src/data/pastWindow";
 import { blockChainOf, blockMetaSnap, newestBlock } from "@/src/data/blockWindow";
 import { readsBlockWindow, registerOf } from "@/src/engine/domain/viewPolicy";
-import { globalPick } from "@/src/engine/domain/pickActions";
+import { globalPick, netKeyOf } from "@/src/engine/domain/pickActions";
+import { REGISTER_MEASURES } from "@/src/data/ledgerMeasure";
+import { carriesData } from "@/src/engine/domain/dataMark";
 
 // The latest snapshot worth showing while following: for a metagraph filter, the
 // newest one it ACTUALLY anchored into — or null if it hasn't anchored in the buffered
@@ -47,6 +49,12 @@ export function followLatest() {
   {
     const st = useStore.getState();
     if (readsBlockWindow(registerOf(st.mode, st.ledgerRegister))) return followNewestBlock();
+    // IN DATA BLOCKS LIVE FOLLOWS THE NEWEST TICK THAT CARRIED DATA (user, 2026-11-08: "similar to a
+    // metagraph filter … keep the global snapshot that actually has a data block as the live and
+    // visible element; fast forward when there is a new snapshot with a data block"), and seats that
+    // tick's newest data-carrying snapshot, so the rung below is always open. A tick is known to
+    // carry data only once its exact read lands, so the follow moves as the reads do.
+    if (st.mode === "ledger" && REGISTER_MEASURES[st.ledgerRegister].dataOnly && followNewestData()) return;
   }
   // `advanceSnap`, not `setSnap`: the heartbeat advance must not bump the selection recency the
   // facts rail's collapse rule reads (store.selStack — a tick is not a user act).
@@ -103,6 +111,33 @@ export function followLatest() {
   // Not a metagraph follow (or nothing buffered): a followed card never shows a stale foreign
   // metagraph snapshot — clear it (explicit pins aren't in follow mode, so this can't fire there).
   if (metaSnap) advanceMetaSnap(null);
+}
+
+/** THE DATA BLOCKS REGISTER'S LIVE (2026-11-08): the newest buffered global whose exact read holds a
+ *  data-carrying snapshot in the filter's scope, and that tick's newest such snapshot, both through
+ *  the non-bumping advances. False when no read tick carries data yet — the caller then falls back to
+ *  the plain follow, so the chamber is never left behind the live edge for want of a read. */
+function followNewestData(): boolean {
+  const { filter: rawFilter, snap, metaSnap, snapshotExact, advanceSnap, advanceMetaSnap } = useStore.getState();
+  const filter = ledgerLens(rawFilter);
+  const net = getNetwork();
+  const globals = net?.globalSnapshots ?? [];
+  const inScope = (metaId: string) => filter === "all" || (filter === UNLISTED_ID ? !LISTED_IDS.has(metaId) : netKeyOf(metaId) === netKeyOf(filter));
+  for (let i = globals.length - 1; i >= 0; i--) {
+    const g = globals[i]!;
+    const rows = snapshotExact[g.ordinal]?.rows.filter((r) => inScope(r.metaId) && carriesData(r));
+    if (!rows?.length) continue;
+    const r = rows.reduce((a, b) => (b.ordinal > a.ordinal ? b : a));
+    if (snap?.data.ordinal !== g.ordinal) advanceSnap(globalPick(g));
+    // A snapshot the reader stepped to inside this live global is kept until the next one.
+    const held = !!metaSnap?.held && metaSnap.globalOrdinal === g.ordinal;
+    if (!held && (metaSnap?.metaId !== r.metaId || metaSnap.ordinal !== r.ordinal)) {
+      const hash = net?.metaSnaps?.get(r.metaId)?.find((m) => m.ordinal === r.ordinal)?.hash ?? "";
+      advanceMetaSnap({ metaId: r.metaId, ordinal: r.ordinal, hash, globalOrdinal: g.ordinal, ts: g.timestamp });
+    }
+    return true;
+  }
+  return false;
 }
 
 /** LIVE IN THE BLOCKS REGISTER (D3, user 2026-11-07: "live mode should be applied to the block and

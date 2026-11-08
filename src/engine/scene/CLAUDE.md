@@ -720,7 +720,9 @@ inside a view; the tiles, bars and the block tier all ride the same `_entryDrop`
 
 **The mark** is one `InstancedMesh` beside the tiles (`_dataMarkMesh`, the tiles' own species: solid,
 normal-blended, depth-writing, in the bloom set, not pickable — the tile under it answers the click),
-one instance per tile in the tile draw's order. Its COUNT is resolved at event time with the pick table
+one instance per tile in the tile draw's order — **the tile's own size** since 2026-11-08 (user: "the
+same size as the snapshot block"; `DATA_MARK` foot 1, height 1): a second tile standing on the
+first in the lane's hue, a presence mark; the count of updates is the card's and the explorer's. Its COUNT is resolved at event time with the pick table
 (`_rebuildTilePicks`): the tile resolver names the metagraph snapshot, and that snapshot's own row in
 its tick's exact read gives `dataMarkCount` (`domain/dataMark.ts`) — a mark only where the row says
 it carried data blocks; a tile whose read has not landed shows none (rule 10, never guessed). Per frame

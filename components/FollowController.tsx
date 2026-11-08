@@ -29,7 +29,13 @@ export default function FollowController() {
     // block WINDOW (the bridge's 30 s refresh, the live feed's announced tick, a filter's refetch),
     // so the window's change is a heartbeat too. `followLatest` decides what a beat moves.
     const offBlocks = onBlockWindow(tick);
+    // IN DATA BLOCKS a landing EXACT READ is a beat too (2026-11-08): a tick is known to carry data
+    // only once its read lands, so the follow moves as the reads do (`followNewestData`).
+    const offExact = useStore.subscribe((s, p) => {
+      if (s.snapshotExact !== p.snapshotExact && s.following && s.mode === "ledger" && s.ledgerRegister === "data") tick();
+    });
     return () => {
+      offExact();
       net.off("global", tick);
       net.off("anchor", onAnchor);
       offBlocks();

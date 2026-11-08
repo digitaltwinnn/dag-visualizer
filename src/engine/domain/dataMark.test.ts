@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { DATA_MARK, carriesData, dataMarkCount, dataMarkHeight } from "./dataMark";
+import { DATA_MARK, carriesData, dataMarkCount } from "./dataMark";
 
 // THE DATA BLOCKS REGISTER'S TILE MARK (D6, 2026-11-07): a mark on each metagraph snapshot tile whose
 // exact read says it carried data blocks, its height the count of data updates.
@@ -33,19 +33,9 @@ describe("carriesData", () => {
   });
 });
 
-describe("dataMarkHeight", () => {
-  it("grows with the count on a log scale, from a visible floor to a ceiling", () => {
-    expect(dataMarkHeight(0)).toBe(DATA_MARK.h0);
-    expect(dataMarkHeight(1)).toBe(DATA_MARK.h0);
-    expect(dataMarkHeight(10)).toBeGreaterThan(dataMarkHeight(1));
-    expect(dataMarkHeight(1000)).toBeGreaterThan(dataMarkHeight(10));
-    expect(dataMarkHeight(1e9)).toBe(DATA_MARK.hMax);
-  });
-
-  it("is a footnote to its tile: the floor reads, the ceiling stays under a tile's own height ladder", () => {
-    expect(DATA_MARK.h0).toBeGreaterThan(0);
-    expect(DATA_MARK.hMax).toBeGreaterThan(DATA_MARK.h0);
-    expect(DATA_MARK.foot).toBeGreaterThan(0);
-    expect(DATA_MARK.foot).toBeLessThan(1);
+describe("DATA_MARK — the tile's own size (user, 2026-11-08)", () => {
+  it("is a second tile on the first: the same footprint and height", () => {
+    expect(DATA_MARK.foot).toBe(1);
+    expect(DATA_MARK.height).toBe(1);
   });
 });

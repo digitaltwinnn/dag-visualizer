@@ -1,5 +1,13 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { useStore } from "./store";
+
+// THE NETWORK SINGLETON, FAKED (2026-11-08): `followLatest` reads the live buffer off it, and the real
+// one needs a window and polls. The fake holds what the follow reads — empty until a test fills it.
+const fakeNet = vi.hoisted(() => ({ globalSnapshots: [] as unknown[], metaSnaps: new Map(), unlistedSnaps: new Map(), latest: null as unknown }));
+vi.mock("@/src/data/network", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("@/src/data/network")>();
+  return { ...mod, getNetwork: () => fakeNet };
+});
 import { applyClickActions, switchLedgerRegister } from "./applyClickActions";
 import {
   snapshotSelectActions,
@@ -12,7 +20,7 @@ import { followLatest } from "@/src/data/follow";
 import { getBlockWindow, setBlockWindow } from "@/src/data/pastWindow";
 import { blockWanted, foldBlockWindow, liveControlCard } from "@/src/data/blockWindow";
 import { METAGRAPHS } from "@/src/net/current";
-import type { GlobalSnapshot, MetaSnapSel, PickDescriptor, RawMetaSnapshot } from "@/src/data/types";
+import type { GlobalSnapshot, MetaSnapSel, PickDescriptor, RawMetaSnapshot, SnapshotExact } from "@/src/data/types";
 
 // The FOLLOW FLOW as a tested decision table (2026-08-08 — the retrospective's ask: the
 // following/pinned/idle transitions span FollowController, pickActions and an Engine
@@ -305,5 +313,28 @@ describe("the follow flow in the Blocks register (D3)", () => {
     useStore.setState({ ledgerRegister: "snapshots" });
     followLatest();
     expect(st().block).toBeNull();
+  });
+});
+
+// THE DATA BLOCKS REGISTER'S LIVE (2026-11-08): the newest read tick that carried data, and its newest
+// data-carrying snapshot — a tick with none is skipped, as a metagraph filter skips its empty ticks.
+describe("the follow flow in the Data blocks register", () => {
+  const g = (ordinal: number) => ({ ordinal, timestamp: `T${ordinal}`, hash: `h${ordinal}` }) as GlobalSnapshot;
+  const row = (metaId: string, ordinal: number, dataBlocks: number) => ({ metaId, ordinal, decoded: true, fee: 0, bytes: 0, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null, dataBlocks, dataTxCount: dataBlocks * 3 });
+  const exact = (ordinal: number, rows: ReturnType<typeof row>[]) => ({ ordinal, anchored: rows.length, channels: 1, totalFee: 0, totalSizeKB: 0, rewardsDatum: 0, listedFee: 0, unlistedFee: 0, listedCount: 0, unlistedCount: 0, perMeta: {}, rows }) as unknown as SnapshotExact;
+  beforeEach(() => {
+    useStore.setState({ mode: "ledger", ledgerRegister: "data", following: true, snap: null, metaSnap: null, filter: "all", selStack: [], snapshotExact: {} });
+    fakeNet.globalSnapshots = [g(100), g(101), g(102)];
+  });
+  it("seats the newest tick that carried data and its newest data-carrying snapshot; a dataless newer tick is skipped", () => {
+    useStore.setState({ snapshotExact: { 101: exact(101, [row(LISTED, 7, 1), row(LISTED, 8, 2)]), 102: exact(102, [row(LISTED, 9, 0)]) } });
+    followLatest();
+    expect(st().snap?.data.ordinal).toBe(101);
+    expect(st().metaSnap).toMatchObject({ metaId: LISTED, ordinal: 8, globalOrdinal: 101 });
+    expect(st().selStack).toEqual([]);
+  });
+  it("with no read tick carrying data yet, the plain follow stands (never behind the live edge for want of a read)", () => {
+    followLatest();
+    expect(st().snap?.data.ordinal).toBe(102);
   });
 });
