@@ -11,6 +11,7 @@ import type { BlockSel, DataBlockSel, MetaSnapSel, PickDescriptor } from "@/src/
 import { REGISTER_MEASURES } from "@/src/data/ledgerMeasure";
 import { REGISTER_ICONS } from "@/components/icons";
 import type { LedgerRegister } from "@/src/store/mode";
+import { REGISTER_SEAT } from "@/src/store/mode";
 import type { NoteResponse } from "@/src/data/noteTypes";
 // LADDERS is plain DATA (the domain focus-ladder rung tables) — importing it keeps this module
 // data-only; CohortSel rides along type-only (the store mirrors the same import).
@@ -182,6 +183,7 @@ export function focusSlotId(s: LadderState): string | null {
   const lane = ladderSlotIds(s.mode);
   const present = lane.filter((id) => cards.find((c) => c.id === id)?.present);
   if (!present.length) return null;
+  const seat = s.mode === "ledger" ? REGISTER_SEAT[s.ledgerRegister ?? "snapshots"] : null;
   // The ACTIVE card is the most recently selected present one (store.selStack, item 8 —
   // "keep the active card open, collapse the others"); the slot ids match the SelSlot names
   // except the ladder's node slot.
@@ -190,19 +192,20 @@ export function focusSlotId(s: LadderState): string | null {
     // the network selection's card is the CONTEXT dossier (user, 2026-08-14: a filter
     // commit focuses the metagraph card, not whatever snapshot the follow pinned).
     const id = slot === "network" ? "context" : slot;
-    // IN TRANSACTION BLOCKS THE FILTER IS A LENS, NOT THE BOX (user, 2026-11-08: "filter on DOR,
-    // transaction blocks, live → the right card rung layout breaks" — the Metagraph dossier opened
-    // as the box, 550px tall, and pushed the register's own subject, the live block, out of the rail).
-    // The block stays the box while the filter's network card stands folded above it; a card chosen
-    // INSIDE the view (a pin, a snapshot) still ranks as it does everywhere.
-    if (id === "context" && inBlocks(s) && present.includes("block")) continue;
+    // WHERE A REGISTER SEATS ITS OWN SUBJECT THE FILTER IS A LENS, NOT THE BOX (user, 2026-11-08:
+    // "filter on DOR, transaction blocks, live → the right card rung layout breaks" — the Metagraph
+    // dossier opened as the box, 550px tall, and pushed the register's own subject, the live block,
+    // out of the rail). The seated card stays the box while the filter's network card stands folded
+    // above it; a card chosen INSIDE the view (a pin, a snapshot) still ranks as it does everywhere.
+    if (id === "context" && seat && present.includes(seat)) continue;
     if (present.includes(id)) return id;
   }
-  // Nothing chosen IN THE BLOCKS REGISTER: the LIVE BLOCK (D3, user 2026-11-07 — live follows the
-  // newest block there, and the Block card is the register's subject, the one its callout names).
-  // The one exception to R70's "a card the view seated by itself leaves the note the box": in this
-  // register the live global is not even drawn, so the block is what the scene is about at rest.
-  if (inBlocks(s) && present.includes("block")) return "block";
+  // Nothing chosen IN A REGISTER THAT SEATS ITS OWN SUBJECT: that subject's card — the live BLOCK in
+  // Transaction blocks (D3, user 2026-11-07 — live follows the newest block there, and the Block card
+  // is the register's subject, the one its callout names), the live DATA BLOCK in Data blocks (user,
+  // 2026-11-08: "entering data blocks, open the data block card"). The one exception to R70's "a card
+  // the view seated by itself leaves the note the box": these registers are ABOUT that subject.
+  if (seat && present.includes(seat)) return seat;
   // Nothing chosen: the note (R70), else the finest present slot — a lane the view seated by
   // itself in a view with no note (Snapshots' live tick off mainnet).
   if (present.includes(NOTES_SLOT)) return NOTES_SLOT;

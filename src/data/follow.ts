@@ -118,7 +118,7 @@ export function followLatest() {
  *  the non-bumping advances. False when no read tick carries data yet — the caller then falls back to
  *  the plain follow, so the chamber is never left behind the live edge for want of a read. */
 function followNewestData(): boolean {
-  const { filter: rawFilter, snap, metaSnap, snapshotExact, advanceSnap, advanceMetaSnap } = useStore.getState();
+  const { filter: rawFilter, snap, metaSnap, dataBlock, snapshotExact, advanceSnap, advanceMetaSnap, advanceDataBlock } = useStore.getState();
   const filter = ledgerLens(rawFilter);
   const net = getNetwork();
   const globals = net?.globalSnapshots ?? [];
@@ -131,9 +131,18 @@ function followNewestData(): boolean {
     if (snap?.data.ordinal !== g.ordinal) advanceSnap(globalPick(g));
     // A snapshot the reader stepped to inside this live global is kept until the next one.
     const held = !!metaSnap?.held && metaSnap.globalOrdinal === g.ordinal;
-    if (!held && (metaSnap?.metaId !== r.metaId || metaSnap.ordinal !== r.ordinal)) {
+    if (held) return true;
+    let sel = metaSnap;
+    if (metaSnap?.metaId !== r.metaId || metaSnap.ordinal !== r.ordinal) {
       const hash = net?.metaSnaps?.get(r.metaId)?.find((m) => m.ordinal === r.ordinal)?.hash ?? "";
-      advanceMetaSnap({ metaId: r.metaId, ordinal: r.ordinal, hash, globalOrdinal: g.ordinal, ts: g.timestamp });
+      sel = { metaId: r.metaId, ordinal: r.ordinal, hash, globalOrdinal: g.ordinal, ts: g.timestamp };
+      advanceMetaSnap(sel);
+    }
+    // THE LIVE DATA BLOCK (user, 2026-11-08: "entering data blocks, open the data block card"): the
+    // seated snapshot's FIRST data block rides the follow, as the Blocks register's newest block does
+    // — the register's own subject, so its card is the box on entry (`REGISTER_SEAT`). Non-bumping.
+    if (sel && (!dataBlock || dataBlock.snap.metaId !== sel.metaId || dataBlock.snap.ordinal !== sel.ordinal)) {
+      advanceDataBlock({ snap: sel, index: 0 });
     }
     return true;
   }

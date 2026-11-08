@@ -1250,7 +1250,13 @@ facts (a fact row, as the global and metagraph snapshot cards state theirs — t
 level is the list), a "Block records" door onto the snapshot's RAW record, and a foot with the
 snapshot's ordinal and the DIGEST (`DataBlockSummary`, never a hash). Its ghost's step is the pinned
 snapshot's first data block (`railSiblings.dataBlockStep`), its pager the snapshot's blocks
-(`siblingSet("dataBlock")`), and it has no live follow: a picked subject, released with its snapshot.
+(`siblingSet("dataBlock")`), **and LIVE seats it** (user, 2026-11-08: "entering data blocks, open the
+data block card"): the register's follow rides the live snapshot's FIRST data block through the
+non-bumping `advanceDataBlock`, as Transaction blocks rides its newest block, so the Data block card
+is the register's own box on entry — `REGISTER_SEAT` (`src/store/mode.ts`) is the one home of which
+subject a register seats, read by the store (a tick's rank drops on the way in), `focusSlotId`'s rest
+rule and the view-entry pins; a reader's step to another block holds, and a release re-seats on the
+next beat, the live block's own rule.
 **The Global snapshot CARD's body opens with the register's section too** (user: "work on the global snapshot body also"):
 `inspector/SnapshotRegister.tsx` (the design round's picks, data 1 / transaction 1) —
 `BlocksAnchored` in Transaction blocks: "Accepted N blocks" and THE BLOCKS THEMSELVES as rows

@@ -24,6 +24,7 @@ import { UNLISTED_ID } from "@/src/data/unlistedId";
 // gallery inside it still previews each coming feature). `trend` (2026-09-18) is the measured
 // history view — chart planes as the scene, convention 12's MEASURED HISTORY rung made a view.
 import type { Mode, LedgerRegister } from "@/src/store/mode";
+import { REGISTER_SEAT } from "@/src/store/mode";
 export type { Mode, LedgerRegister };
 
 // The stored metric every trend plane draws — one picker, one column (see `trendMetric` below).
@@ -78,6 +79,9 @@ export type SelSlot = "network" | "node" | "snap" | "metaSnap" | "block" | "data
 // click and it is not free for `setTrendCursor`, which writes at BUCKET frequency during a scrub
 // with `instant` already at the front. Returning the incoming array unchanged when nothing moved
 // costs one comparison over a list that is never longer than the ladder.
+const sameDataBlockSel = (a: DataBlockSel, b: DataBlockSel): boolean =>
+  a.snap.metaId === b.snap.metaId && a.snap.ordinal === b.snap.ordinal && a.index === b.index;
+
 function bumpStack(stack: SelSlot[], slot: SelSlot, active: boolean): SelSlot[] {
   const without = stack.filter((s) => s !== slot);
   const next = active ? [slot, ...without] : without;
@@ -91,7 +95,6 @@ function bumpStack(stack: SelSlot[], slot: SelSlot, active: boolean): SelSlot[] 
 // the new field type-errored against a type that no longer described the value it held.
 import type { Activity } from "@/src/data/api";
 import { snapRange } from "@/src/data/trendWindow";
-import { readsBlockWindow } from "@/src/engine/domain/viewPolicy";
 
 // Panel-facing state only (Lane B). The 60fps scene + per-snapshot visuals subscribe
 // to NetworkData directly (Lane A) and never touch this store, so React renders stay
@@ -575,6 +578,9 @@ interface AppState {
   /** The follow system's heartbeat advance for the Block card (the Blocks register's LIVE, D3) —
    *  non-bumping, like advanceSnap: a block arriving is never a "new selection". */
   advanceBlock: (b: BlockSel | null) => void;
+  /** The Data blocks register's heartbeat advance for the Data block card — non-bumping likewise:
+   *  the live snapshot's first data block arriving is no reader's pick (2026-11-08). */
+  advanceDataBlock: (b: DataBlockSel | null) => void;
   setHoverBlock: (hash: string | null) => void;
   setBlockRead: (key: string, v: HeldBlockRead) => void;
   setBlockReadMiss: (key: string) => void;
@@ -1015,7 +1021,7 @@ export const useStore = create<AppState>((set) => ({
     set((s) => ({
       ledgerRegister,
       motionCause: { kind: "register", id: ledgerRegister },
-      selStack: readsBlockWindow(ledgerRegister) ? bumpStack(s.selStack, "snap", false) : s.selStack,
+      selStack: REGISTER_SEAT[ledgerRegister] ? bumpStack(s.selStack, "snap", false) : s.selStack,
     })),
   setBlockMeasure: (blockMeasure) => set({ blockMeasure }),
   // A block is a committed subject like the tile: it ranks in the recency stack, so its card is the
@@ -1032,6 +1038,12 @@ export const useStore = create<AppState>((set) => ({
       block,
       navQuiet: block && !(s.block && s.block.chain === block.chain && s.block.hash === block.hash) ? false : s.navQuiet,
       selStack: !block ? s.selStack.filter((x) => x !== "block") : s.selStack,
+    })),
+  advanceDataBlock: (dataBlock) =>
+    set((s) => ({
+      dataBlock,
+      navQuiet: dataBlock && !(s.dataBlock && sameDataBlockSel(s.dataBlock, dataBlock)) ? false : s.navQuiet,
+      selStack: !dataBlock ? s.selStack.filter((x) => x !== "dataBlock") : s.selStack,
     })),
   setHoverBlock: (hoverBlock) => set({ hoverBlock }),
   setBlockRead: (key, v) =>

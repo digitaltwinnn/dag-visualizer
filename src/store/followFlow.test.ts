@@ -331,7 +331,15 @@ describe("the follow flow in the Data blocks register", () => {
     followLatest();
     expect(st().snap?.data.ordinal).toBe(101);
     expect(st().metaSnap).toMatchObject({ metaId: LISTED, ordinal: 8, globalOrdinal: 101 });
+    // …and that snapshot's FIRST data block (user, 2026-11-08: "entering data blocks, open the data
+    // block card"), through the non-bumping advance: no rank, so the card is the register's own box.
+    expect(st().dataBlock).toMatchObject({ snap: { metaId: LISTED, ordinal: 8 }, index: 0 });
     expect(st().selStack).toEqual([]);
+    // A second beat on the same snapshot keeps the data block (a reader's step to another index holds).
+    useStore.getState().setDataBlock({ snap: st().metaSnap!, index: 1 });
+    useStore.setState({ selStack: [] });
+    followLatest();
+    expect(st().dataBlock?.index).toBe(1);
   });
   it("with no read tick carrying data yet, the plain follow stands (never behind the live edge for want of a read)", () => {
     followLatest();

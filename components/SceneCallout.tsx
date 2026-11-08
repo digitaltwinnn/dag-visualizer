@@ -594,11 +594,15 @@ export default function SceneCallout() {
       const b = dataBlockRow?.[dataBlock.index] ?? null;
       const n = dataBlockRow?.length ?? 0;
       return {
-        key: `db|${dataBlock.snap.metaId}:${dataBlock.snap.ordinal}:${dataBlock.index}`,
+        // The live-lane key rule (msModel): while following the subject is THE LIVE DATA BLOCK (the live
+        // snapshot's first, 2026-11-08), so a new tick re-points the label; a pick is a new subject.
+        key: following ? "db|live" : `db|${dataBlock.snap.metaId}:${dataBlock.snap.ordinal}:${dataBlock.index}`,
         eyebrow: "Data block",
         title: n > 0 ? `${dataBlock.index + 1} of ${n}` : `${dataBlock.index + 1}`,
         titleMono: true,
-        aside: { text: "", pinned: true, chip: b ? `${b.updates.toLocaleString()} ${b.updates === 1 ? "update" : "updates"}` : undefined },
+        aside: following
+          ? { text: "live", live: true, chip: b ? `${b.updates.toLocaleString()} ${b.updates === 1 ? "update" : "updates"}` : undefined }
+          : { text: "", pinned: true, chip: b ? `${b.updates.toLocaleString()} ${b.updates === 1 ? "update" : "updates"}` : undefined },
         ring: hue,
         mark: { icon: REGISTER_ICONS.data, hue },
         lead: b ? { text: `Carried ${b.updates.toLocaleString()} ${b.updates === 1 ? "update" : "updates"}, signed by ${b.signers.toLocaleString()}` } : undefined,

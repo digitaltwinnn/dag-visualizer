@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from "
 import { viewNetwork } from "@/src/engine/domain/viewNetwork";
 import { useStore } from "@/src/store/store";
 import { cn } from "@/lib/utils";
-import { VIEW_POLICIES, readsBlockWindow, registerOf } from "@/src/engine/domain/viewPolicy";
+import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
+import { REGISTER_SEAT } from "@/src/store/mode";
 import { displayNetwork } from "@/src/data/unlisted";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { filterAccent } from "@/src/data/network";
@@ -476,9 +477,10 @@ export default function Inspector() {
   // nothing else can produce. With no focus rung the FIRST present ladder card opens by default.
   // The decision itself is pure (`railCollapse.ts`, tested by outcome): the default card, the auto
   // fold, the box.
-  // The Blocks register SEATS the live block as its default box (D3, `focusSlotId`), which the
-  // view-entry pins must not fight (`overridesOnViewEntry`).
-  const seats = readsBlockWindow(registerOf(mode, ledgerRegister)) ? "block" : null;
+  // A register that SEATS its own subject (the Blocks register's live block, D3; the Data blocks
+  // register's live data block, 2026-11-08 — `REGISTER_SEAT`, `focusSlotId`'s rest rule) is entered
+  // on the auto rule, which the view-entry pins must not fight (`overridesOnViewEntry`).
+  const seats = mode === "ledger" ? REGISTER_SEAT[ledgerRegister] : null;
   const collapseState: LaneCollapseState = { lane: ladderIds, present: presentOf, focusId, overrides: railCollapse, seats };
   const effCollapsed = (id: string) => isCollapsed(collapseState, id);
   // Publish which slot is the BOX (store.boxedCard) — the same `present && !effCollapsed` that
