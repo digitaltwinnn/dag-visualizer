@@ -422,7 +422,14 @@ function rangeHint(s: RailManifestState): string | null {
   return s.mode === "trend" ? "Drag across a chart or the timeline." : null;
 }
 function metaSnapHint(s: RailManifestState): string | null {
-  return s.mode === "ledger" ? `${CLICK(s)} a tile on a plane above the floor.` : null;
+  if (s.mode !== "ledger") return null;
+  // IN TRANSACTION BLOCKS A COMMITTED BLOCK SETTLES THE SLOT (user, 2026-11-08: the Metagraph
+  // snapshot and Transaction block cards "switch places" — with a DAG block committed the snapshot
+  // slot stood as a ghost, and a ghost waits BELOW the chosen cards, so it dropped under the block it
+  // precedes in the lane). A token block commits its snapshot, so the card is present; a DAG block
+  // has none to commit, so no ghost: the slot is neither card nor ghost, and the lane holds still.
+  if (inBlocks(s) && s.block) return null;
+  return `${CLICK(s)} a tile on a plane above the floor.`;
 }
 /** Does the view on screen read the Blocks register? The register is a setting of the Snapshots
  *  view, so the question is the view's register list and the register — never a `mode` compare. */

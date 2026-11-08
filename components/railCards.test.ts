@@ -739,3 +739,23 @@ describe("the node slot in Transaction blocks", () => {
     }
   });
 });
+
+// THE LANE HOLDS STILL IN TRANSACTION BLOCKS (2026-11-08): a DAG block commits no metagraph snapshot,
+// and its empty slot used to ghost BELOW the block card (a ghost waits under the chosen cards), which
+// read as the two cards swapping places. With a block committed the snapshot slot is card or nothing.
+describe("the metagraph snapshot slot under a committed block", () => {
+  const block = { chain: "dag", hash: "abc", ordinal: 42, anchorOrd: 42 };
+  const ms = { metaId: "dor", ordinal: 5, hash: "m5", globalOrdinal: 42, ts: "t" };
+  const slot = (s: RailManifestState) => detailsCards(s).find((c) => c.id === "metaSnap")!;
+  it("ghosts with no block, is nothing under a DAG block, and is the card under a token block", () => {
+    expect(slot(details({ mode: "ledger", ledgerRegister: "blocks", snap: snapPick })).hint).not.toBeNull();
+    const dag = slot(details({ mode: "ledger", ledgerRegister: "blocks", snap: snapPick, block }));
+    expect(dag.present).toBe(false);
+    expect(dag.hint).toBeNull();
+    const tok = slot(details({ mode: "ledger", ledgerRegister: "blocks", snap: snapPick, block: { ...block, chain: "dor", ordinal: 5 }, metaSnap: ms }));
+    expect(tok.present).toBe(true);
+  });
+  it("the other registers keep their ghost whatever is held", () => {
+    expect(slot(details({ mode: "ledger", ledgerRegister: "snapshots", snap: snapPick, block })).hint).not.toBeNull();
+  });
+});
