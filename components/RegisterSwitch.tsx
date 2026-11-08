@@ -139,18 +139,20 @@ export default function RegisterSwitch() {
               // THE LIT STATION IS A WASH, NOT A FRAME (user, 2026-11-07, option 5 without the underline):
               // the unlit halves recede a step, the lit one carries the selection wash alone — no inset
               // ring — with its name and count in the accent and its span in the foreground ink.
-              "group flex flex-col justify-center gap-0.5 rounded-md px-3 max-[700px]:px-1.5 text-left cursor-pointer border-0",
+              // CENTRED (user, 2026-11-08: "centre 'metagraph snapshots' / 'transaction blocks' … and the section
+              // below as well"): both lines sit on the half's own axis.
+              "group flex flex-col items-center justify-center gap-0.5 rounded-md px-3 max-[700px]:px-1.5 text-center cursor-pointer border-0",
               "bg-transparent text-muted-foreground hover:text-foreground hover:bg-wash-soft",
               "aria-pressed:bg-[var(--sel-bg)] aria-pressed:text-primary-ink aria-pressed:hover:bg-[var(--sel-bg)]",
               "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
             )}
           >
-            <span className="flex items-center gap-1.5 text-body font-semibold leading-none whitespace-nowrap">
+            <span className="flex items-center justify-center gap-1.5 text-body font-semibold leading-none whitespace-nowrap">
               <Icon aria-hidden className="size-3.5 flex-none group-aria-pressed:text-primary" />
               <span className="max-[700px]:hidden max-[700px]:group-aria-pressed:inline">{REGISTER_NAMES[r]}</span>
-              {lit && <StateMark following={following} className="ml-auto pl-2 font-normal" />}
+              {lit && <StateMark following={following} className="pl-1 font-normal" />}
             </span>
-            <span className="font-mono text-label leading-none tabular-nums whitespace-nowrap opacity-75 group-aria-pressed:opacity-100 group-aria-pressed:text-foreground">
+            <span className="flex items-center justify-center font-mono text-label leading-none tabular-nums whitespace-nowrap opacity-75 group-aria-pressed:opacity-100 group-aria-pressed:text-foreground">
               <span className="max-[700px]:hidden max-[700px]:group-aria-pressed:inline">{span[r]}</span>
               {count[r] && <span className="max-[700px]:hidden ml-2 pl-2 border-l border-border group-aria-pressed:text-primary">{count[r]}</span>}
               <span className="hidden max-[700px]:inline max-[700px]:group-aria-pressed:hidden">{shortSpan[r]}</span>
