@@ -812,7 +812,15 @@ export const useStore = create<AppState>((set) => ({
       navQuiet: snap && s.snap?.data.ordinal !== snap.data.ordinal ? false : s.navQuiet,
       selStack: !snap ? s.selStack.filter((x) => x !== "snap") : s.selStack,
     })),
-  setMetaSnap: (metaSnap) => set((s) => ({ metaSnap, selStack: bumpStack(s.selStack, "metaSnap", !!metaSnap) })),
+  // A data block is in exactly one snapshot (the `advanceMetaSnap` rule, 2026-11-08: a pin from the
+  // explorer released the snapshot and left its live-seated data block in the store): a snapshot
+  // commit, or release, that is not the data block's own drops it, and its rank.
+  setMetaSnap: (metaSnap) =>
+    set((s) => {
+      const keeps = !!(s.dataBlock && metaSnap && metaSnap.metaId === s.dataBlock.snap.metaId && metaSnap.ordinal === s.dataBlock.snap.ordinal);
+      const selStack = bumpStack(s.selStack, "metaSnap", !!metaSnap);
+      return { metaSnap, dataBlock: keeps ? s.dataBlock : null, selStack: keeps ? selStack : selStack.filter((x) => x !== "dataBlock") };
+    }),
   // A NO-OP WRITE IS A NO-OP REFERENCE: the Engine's subscription re-resolves the chamber's lens
   // and the camera on a change, so re-committing the same network in the same tick (a tile under
   // an already-open network) must not hand it a fresh object.

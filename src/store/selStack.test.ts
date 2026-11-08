@@ -168,3 +168,18 @@ describe("what the view seats by itself is not in the stack (R70)", () => {
     expect(useStore.getState().selStack).toEqual([]);
   });
 });
+
+describe("a data block is in exactly one snapshot — the store's setters keep it so (2026-11-08)", () => {
+  const ms = { metaId: "dor", ordinal: 7, hash: "h", globalOrdinal: 42, ts: "t" };
+  it("setMetaSnap onto another snapshot, or onto none, drops the data block and its rank; its own snapshot keeps it", () => {
+    useStore.setState({ metaSnap: ms, dataBlock: { snap: ms, index: 0 }, selStack: ["dataBlock", "metaSnap"] });
+    useStore.getState().setMetaSnap({ ...ms, ordinal: 8 });
+    expect(useStore.getState().dataBlock).toBeNull();
+    expect(useStore.getState().selStack).not.toContain("dataBlock");
+    useStore.setState({ metaSnap: ms, dataBlock: { snap: ms, index: 0 }, selStack: ["dataBlock", "metaSnap"] });
+    useStore.getState().setMetaSnap(ms);
+    expect(useStore.getState().dataBlock).toEqual({ snap: ms, index: 0 });
+    useStore.getState().setMetaSnap(null);
+    expect(useStore.getState().dataBlock).toBeNull();
+  });
+});

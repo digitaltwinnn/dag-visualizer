@@ -371,6 +371,8 @@ export type TickContext = {
   following: boolean;
   /** The node card's pick, if one is held — a token block's snapshot drops a node of another network. */
   inspect: PickDescriptor | null;
+  /** The committed data block, if one is held — another tick's pin drops it (2026-11-08). */
+  dataBlock: DataBlockSel | null;
 };
 export function tickContextOf(s: {
   following: boolean;
@@ -379,8 +381,9 @@ export function tickContextOf(s: {
   tickNet?: TickNetSel | null;
   block?: BlockSel | null;
   inspect?: PickDescriptor | null;
+  dataBlock?: DataBlockSel | null;
 }): TickContext {
-  return { pinnedOrdinal: !s.following && s.snap ? s.snap.data.ordinal : null, metaSnap: s.metaSnap, tickNet: s.tickNet ?? null, block: s.block ?? null, following: s.following, inspect: s.inspect ?? null };
+  return { pinnedOrdinal: !s.following && s.snap ? s.snap.data.ordinal : null, metaSnap: s.metaSnap, tickNet: s.tickNet ?? null, block: s.block ?? null, following: s.following, inspect: s.inspect ?? null, dataBlock: s.dataBlock ?? null };
 }
 
 export function snapshotSelectActions(
@@ -394,6 +397,9 @@ export function snapshotSelectActions(
     tickNet?: TickNetSel | null;
     /** The committed block, if any — it is in exactly one tick. */
     block?: BlockSel | null;
+    /** The committed data block, if any — in exactly one snapshot, so another tick's pin drops it
+     *  (2026-11-08: a pin from the explorer left a live-seated data block in the store). */
+    dataBlock?: DataBlockSel | null;
   },
 ): ClickAction[] {
   // RE-CLICKING the pinned tick DESELECTS (2026-08-07 — the toggle every other rung already
@@ -404,6 +410,8 @@ export function snapshotSelectActions(
     return snapshotClearActions({ metaSnap: current.metaSnap, hasInspect: current.hasInspect, tickNet: current.tickNet, block: current.block });
   }
   const out: ClickAction[] = [];
+  // A DATA BLOCK IS IN EXACTLY ONE SNAPSHOT, finest of all: another tick's pin drops it first.
+  if (current?.dataBlock && current.dataBlock.snap.globalOrdinal !== p.data.ordinal) out.push({ kind: "dataBlock", sel: null });
   // A BLOCK IS IN EXACTLY ONE SNAPSHOT (spec, "Rules"), so committing another tick drops it — the
   // metagraph snapshot's one-to-one rule below, one slot finer. Finest first.
   releaseBlock(out, current?.block, { globalOrdinal: p.data.ordinal });

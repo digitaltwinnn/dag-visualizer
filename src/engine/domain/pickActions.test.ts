@@ -1044,7 +1044,7 @@ describe("globalPick and tickContextOf — the descriptor and the context every 
   it("tickContextOf: the pin only while pinned; live is no pin; the finer slots as they stand, block always present", () => {
     const snap = globalPick(g);
     const block: BlockSel = { chain: "dag", hash: "b", ordinal: 42, anchorOrd: 42 };
-    expect(tickContextOf({ following: false, snap, metaSnap: null, tickNet: null, block })).toEqual({ pinnedOrdinal: 42, metaSnap: null, tickNet: null, block, following: false, inspect: null });
+    expect(tickContextOf({ following: false, snap, metaSnap: null, tickNet: null, block })).toEqual({ pinnedOrdinal: 42, metaSnap: null, tickNet: null, block, following: false, inspect: null, dataBlock: null });
     expect(tickContextOf({ following: true, snap, metaSnap: null, tickNet: null, block: null }).pinnedOrdinal).toBeNull();
     expect(tickContextOf({ following: false, snap: null, metaSnap: null }).pinnedOrdinal).toBeNull();
     // An absent finer slot is null, never undefined — the builders that require `block` get one.
@@ -1078,6 +1078,10 @@ describe("dataBlockSelectActions / dataBlockClearActions", () => {
     expect(kinds(metaSnapSelectActions(ms, global, { metaSnap: null, inspect: null, block: null, dataBlock: db }))).not.toContain("dataBlock");
     expect(kinds(snapshotClearActions({ metaSnap: ms, dataBlock: db }))[0]).toBe("dataBlock");
     expect(registerSwitchActions("snapshots", { block: null, metaSnap: ms, dataBlock: db })).toEqual([{ kind: "dataBlock", sel: null }]);
+    // Another tick's pin drops it first (2026-11-08: a pin from the explorer left a live-seated data block behind); its own tick keeps it.
+    const otherTick = { kind: "snapshot", data: { ordinal: 9 } } as unknown as SnapPick;
+    expect(kinds(snapshotSelectActions(otherTick, false, { pinnedOrdinal: null, metaSnap: ms, dataBlock: db }))[0]).toBe("dataBlock");
+    expect(kinds(snapshotSelectActions(global, false, { pinnedOrdinal: null, metaSnap: ms, dataBlock: db }))).not.toContain("dataBlock");
     expect(registerSwitchActions("data", { block: null, metaSnap: ms, dataBlock: db })).toEqual([]);
   });
   it("the clear and the identity", () => {
