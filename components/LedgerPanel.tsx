@@ -53,7 +53,6 @@ import { blockReadOf } from "@/src/data/blockReads";
 import { BLOCK_MEASURE_OPTIONS, blockMeasureText, blockMeasureValue, type BlockMeasure } from "@/src/data/blockMeasure";
 import { NO_MEASURE } from "@/src/data/ledgerMeasure";
 import { blockSelectActions, globalPick, tickContextOf } from "@/src/engine/domain/pickActions";
-import { shortBlockHash } from "@/src/util/format";
 import { VIEWS } from "@/components/views";
 
 // The explorer's title: the Snapshots VIEW's own name, its axis word.
@@ -715,7 +714,6 @@ export default function LedgerPanel() {
     measure: { options: BLOCK_MEASURE_OPTIONS, value: blockMeasure, onPick: (id) => setBlockMeasure(id as BlockMeasure) },
     hasFigure: true,
     figureW: 48,
-    glyphW: NODE_GLYPH_W,
     // An honest instrument state for each way the window is not here (rule 10) — the band's and
     // RAW's own sentences (`blockAbsence`, one home). While a window is read the list says so, even
     // over a held one that happens to hold no block.
@@ -732,22 +730,19 @@ export default function LedgerPanel() {
       const locked = blockRowLocked(filter, snapshotExact[b.anchorOrd], b, { on, shownOrd: snap?.data.ordinal ?? null });
       return {
         key: `${b.chain}:${b.hash}`,
-        // The chain's ticker in its own ink, the node rows' mark (no dot beside the hued bar).
-        glyph: (
-          <span className={cn("min-w-0 truncate text-label font-semibold", IDENT_INK)} style={{ color: hue }}>
-            {tickerOf(b.chain)}
-          </span>
-        ),
-        // THE LIVE / PINNED MARK rides the committed block's row, as it rides the committed tick's in
-        // the snapshot registers (user, 2026-11-07: "'live' is fine in the header but is not shown
-        // in the explorer, should be shown there also") — `followMark`, the one mark.
+        // THE ROW IS THE CHAIN AND THE AMOUNT (user, 2026-11-08: "remove the 'c3ff7e…00b', there is
+        // not enough space for it"): a short hash reads nothing a reader can use in a list, so the
+        // row names its chain in its own ink and lets the bar and the figure say the rest; the hash
+        // is the Transaction block card's. THE LIVE / PINNED MARK rides the committed block's row, as
+        // it rides the committed tick's in the snapshot registers (user, 2026-11-07) — `followMark`.
         name: (
-          <span className="flex items-center tabular-nums">
-            {shortBlockHash(b.hash)}
+          <span className="flex items-center gap-2">
+            <span className={cn("min-w-0 truncate text-label font-semibold", IDENT_INK)} style={{ color: hue }}>
+              {tickerOf(b.chain)}
+            </span>
             {on && <span className="flex-1 flex justify-center">{followMark}</span>}
           </span>
         ),
-        nameMono: true,
         share: v != null ? v / maxBlock : undefined,
         hue,
         figure: read ? blockMeasureText(blockMeasure, read) : NO_MEASURE,
