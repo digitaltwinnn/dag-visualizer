@@ -21,9 +21,12 @@
 // is UNKNOWN — not drawn yet, never a guess; a snapshot whose data blocks hold no update still carried
 // data, so it stands at the floor height.
 
-/** The mark's proportions as fractions of its TILE's: its footprint and its height. 1 and 1 — the
- *  snapshot block's own size, user 2026-11-08. */
-export const DATA_MARK: Readonly<{ foot: number; height: number }> = { foot: 1, height: 1 };
+/** The mark's proportions as fractions of its TILE's: its footprint, its height, and the LIFT between
+ *  the tile's top and the mark's underside. 1 and 1 — the snapshot block's own size — and a lift of
+ *  one tile's height (user 2026-11-08: "on top of the metagraph snapshot, slightly elevated"; half a
+ *  tile vanished under the bloom at the chamber's pose), so the mark hovers over its snapshot rather
+ *  than doubling it. */
+export const DATA_MARK: Readonly<{ foot: number; height: number; lift: number }> = { foot: 1, height: 1, lift: 1 };
 
 /** What a tile's mark counts: the data updates of a snapshot that carried data blocks, or null where
  *  it carried none or its read has not landed. */

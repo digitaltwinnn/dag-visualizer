@@ -2044,10 +2044,10 @@ export class LedgerView implements SceneView {
         if (dataMarks) {
           const n = this._dataMarkN[mi];
           if (n >= 0) {
-            // The tile's own size (user, 2026-11-08): a second tile standing on the first.
+            // The tile's own size (user, 2026-11-08): a second tile hovering a little over the first.
             const h = tileH * DATA_MARK.height;
             const w = b.size * DATA_MARK.foot;
-            _dummy.position.set(_tileV.x, _tileV.y + h / 2, _tileV.z);
+            _dummy.position.set(_tileV.x, _tileV.y + tileH * DATA_MARK.lift + h / 2, _tileV.z);
             _dummy.rotation.set(0, 0, 0);
             _dummy.scale.set(w, h, w);
             _dummy.updateMatrix();
