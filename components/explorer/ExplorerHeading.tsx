@@ -125,8 +125,9 @@ export function MeasureTiles({ measure }: { measure: MeasureControl }) {
             {/* A UNIT SYMBOL rides its tile (user, 2026-11-08: "size control should say also 'kb' not
                 just the number"): the rows state bare figures and the tile is their one heading, so a
                 measure in a real unit — a ticker or bytes, the all-caps symbols — shows it, small and
-                muted; a count says nothing more (what it counts is the label). */}
-            {/^[A-Z]{2,}$/.test(o.unit ?? "") && <span className="flex-none text-[0.85em] opacity-70 tabular-nums">{o.unit}</span>}
+                muted, at the tile's RIGHT edge (user, same day: "right align the kb / dag element"), so
+                the units line up down the column as the figures do; a count says nothing more. */}
+            {/^[A-Z]{2,}$/.test(o.unit ?? "") && <span className="ml-auto flex-none pl-1 text-[0.85em] opacity-70 tabular-nums">{o.unit}</span>}
           </ToggleGroupItem>
         );
       })}
