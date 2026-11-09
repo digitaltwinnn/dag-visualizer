@@ -108,13 +108,13 @@ describe("calloutPlacement against an overlaying sheet", () => {
 
   it("flips into the room the sheet leaves instead of declining", () => {
     // Explore open, anchor near the right of a wide-enough band: no room right, plenty left.
-    expect(at(720, TABLET_EXPLORE)).toEqual({ show: true, flip: true, drop: false }); // 720 − 404 = 316 ≥ 300
+    expect(at(700, TABLET_EXPLORE)).toEqual({ show: true, flip: true, drop: false }); // 700 − 372 = 328 ≥ 300
   });
 
   it("never flips into the sheet it just avoided", () => {
-    const p = at(410, { l: 300, r: 820 });
+    const p = at(440, { l: 300, r: 820 });
     expect(p.show).toBe(true);
-    expect(p.flip).toBe(false); // 410 + 404 = 814 fits right; flipping would land at 6, under the sheet
+    expect(p.flip).toBe(false); // 440 + 372 = 812 fits right; flipping would land at 68, under the sheet
   });
 
   it("on the desktop rails' SOFT band a panel that fits on neither side takes the roomier side", () => {

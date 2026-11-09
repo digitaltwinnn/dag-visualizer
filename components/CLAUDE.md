@@ -2415,7 +2415,7 @@ hued ticker, the anchor ring and the `.edge-spine`). The design rules the test c
   tabular, so the width held at one value across four live ticks (measured).
 - **Every callout is ONE SIZE** (user, 2026-11-09: "callout still re-size when data changes … As a
   general rule, give callouts a fixed width and height to avoid the resize"): `CALLOUT_W` ×
-  `CALLOUT_H` (320 × 86 — 288 until the global's "N metagraphs anchored M snapshots" lead, same day) on the desktop, `CALLOUT_H_PHONE` (56) on a phone, where the lead is dropped —
+  `CALLOUT_H` (288 × 86; the global's "N metagraphs anchored M snapshots" lead carries no size chip so it fits) on the desktop, `CALLOUT_H_PHONE` (56) on a phone, where the lead is dropped —
   one home, `domain/calloutPlacement.ts`, whose reach constants derive from them, so the flip/drop
   tests and the drawn box agree. A line too long for the box truncates (a node's "Boardman, Amazon.com,
   Inc."); a label with no reading of its own gets one (the metagraph snapshot's "Anchored to N" and its

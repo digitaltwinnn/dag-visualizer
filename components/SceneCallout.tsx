@@ -602,7 +602,8 @@ export default function SceneCallout() {
                       : exact
                         ? `${exact.channels} ${exact.channels === 1 ? "metagraph" : "metagraphs"} anchored ${total} ${total === 1 ? "snapshot" : "snapshots"}`
                         : undefined,
-                  chip: exact && total !== 0 ? fmtKB(exact.totalSizeKB) : undefined,
+                  // No size chip here (user, 2026-11-09, option 1): the sentence carries the line at the
+                  // callout's one width, and the size stays a fact of the Global snapshot card.
                 },
       };
     };
