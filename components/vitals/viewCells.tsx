@@ -15,7 +15,7 @@ import { BandCard, MicroBars, foldOther, DonutTotal, TypeGlyph, TYPE_ORDER, comp
 import { useStore } from "@/src/store/store";
 import { metagraphById, getAnchor } from "@/src/data/network";
 import { displayNetwork, UNLISTED_HUE, UNLISTED_ID } from "@/src/data/unlisted";
-import { cap, metaType, rolesOf, Empty, IdentityDot, RoleChips, TickerChip } from "@/components/inspector/parts";
+import { cap, metaType, rolesOf, Empty, IdentityDot, RoleChips } from "@/components/inspector/parts";
 import { machineKey } from "@/src/data/composition";
 import { identityHudCss } from "@/src/palette/identity";
 import { METAGRAPHS } from "@/src/net/current";
@@ -763,11 +763,10 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
     </BandCard>
     );
   };
-  // WHO anchors, HOW MUCH, HOW OFTEN, then the attribution picture (user ordering, 2026-08-30):
-  // the roster leads, the anchor rate beside it, the cadence, and the chart closes the row.
+  // HOW MUCH, HOW OFTEN, WHO and how many, then the picture over time (user ordering, 2026-08-30;
+  // 2026-11-09: the roster, now with counts, moved after Global snapshots to stand beside its chart).
   return (
     <>
-      <AnchoringNetworks windowed={barData} snaps={snaps} filter={filter} />
       {/* ⚠️ ONE QUANTITY, ONE LABEL, SCOPED BY THE FILTER — the slot no longer changes what it
           measures (user, 2026-09-14: "filter DAG, vitals stop showing fees but now anchors count
           instead; keep it consistent"). It used to swap between a FEE and a COUNT, which is not a
@@ -814,6 +813,8 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
           unfiltered the card counts the DAG's global snapshots (`g.ticks`), scoped a network's own
           metagraph snapshots, the same two names the notes and the History measures use. */}
       {rate(scoped ? "Metagraph snapshots" : "Global snapshots", sparkOf(filter === UNLISTED_ID ? UNLISTED_SNAPS : scoped ? (cfg ? `m.${cfg.id}.snaps` : null) : "g.ticks", activity?.cadenceSeries, activity?.snapsPerHour))}
+      {/* WHO ANCHORED, HOW MANY — the chart's numeric legend, right before it (2026-11-09). */}
+      <AnchoringNetworks windowed={barData} snaps={snaps} filter={filter} accent={accent} />
       {/* The chart states the same reach its rows do — it plots the very buckets the rate cards
           average, so a silent chart beside two captioned ones would read as a different window. */}
       <BandCard label="Anchors by metagraph" className="min-w-[220px]">
@@ -834,103 +835,53 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
 // While the store hasn't answered, the LIVE window's exact id set stands in (the anchor
 // index), with no window words — the honest silence. A committed filter stays a LENS: the
 // count is the window's whole truth, the dim says which network you are looking through.
-function AnchoringNetworks({ windowed, snaps, filter }: { windowed: TrendsWindowData | null; snaps: Snaps; filter: string }) {
+function AnchoringNetworks({ windowed, snaps, filter, accent }: { windowed: TrendsWindowData | null; snaps: Snaps; filter: string; accent: string }) {
   useFeedRead(["metasnaps"], "AnchoringNetworks");
-  // Memoized on the payload: the ranking's input changes per 5-minute fetch while the
-  // component re-renders on every activity tick (review's efficiency pass).
-  const ranked = useMemo(() => {
-    if (!windowed) return null;
+  // HOW MANY EACH ANCHORED, THE TOTAL ON THE LEFT (user, 2026-11-09: "can we show how many each
+  // metagraph anchored with the total on the left? Place it after global snapshots"). Each network's
+  // metagraph snapshots summed over the chart's own window (`m.<id>.snaps`, the very series the
+  // stacked chart plots per hour) — so this card is the chart's NUMERIC LEGEND, standing right
+  // before it: the chart says when, this says how many. Busiest first, folded past four rows into
+  // "other" so the rows still partition the total. While the store has not answered, the live
+  // buffer's anchors stand in (the anchor index), the honest smaller window. Memoized on the payload.
+  const counts = useMemo(() => {
     const totals = new Map<string, number>();
-    for (const [name, series] of Object.entries(windowed.series)) {
-      const m = /^m\.(.+)\.snaps$/.exec(name);
-      if (!m) continue;
-      const sum = series.reduce<number>((a, v) => a + (v ?? 0), 0);
-      if (sum > 0) totals.set(m[1], sum);
+    if (windowed) {
+      for (const [name, series] of Object.entries(windowed.series)) {
+        const m = /^m\.(.+)\.snaps$/.exec(name);
+        if (!m) continue;
+        const sum = series.reduce<number>((a, v) => a + (v ?? 0), 0);
+        if (sum > 0) totals.set(m[1]!, sum);
+      }
+    } else {
+      for (const d of snaps) {
+        const mc = getAnchor(d.timestamp)?.metaCounts;
+        if (mc) for (const [id, n] of mc) totals.set(id, (totals.get(id) ?? 0) + n);
+      }
     }
-    return [...totals.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
-  }, [windowed]);
-  let list: string[];
-  if (ranked) {
-    list = ranked;
-  } else {
-    const ids = new Set<string>();
-    for (const d of snaps) {
-      const mc = getAnchor(d.timestamp)?.metaCounts;
-      if (mc) for (const id of mc.keys()) ids.add(id);
-    }
-    list = [...ids];
-  }
+    return [...totals.entries()].sort((a, b) => b[1] - a[1]);
+  }, [windowed, snaps]);
+  const total = counts.reduce((n, [, c]) => n + c, 0);
+  // THE LENS DIMS, IT DOES NOT EDIT (user, 2026-09-01): every network that anchored is still a row
+  // and the total stays the window's whole truth; under a filter the others step back to the lens's
+  // 0.65 and the committed one keeps full ink.
+  const rows = foldOther(
+    counts.map(([id, count]) => {
+      const mark = networkMark(id);
+      const back = filter !== "all" && id !== filter;
+      return { key: id, label: <span className={cn(back && "opacity-65")}>{mark.label}</span>, hue: mark.hue, count };
+    }),
+    BY_NETWORK_ROWS,
+  );
   return (
-    // AN EQUAL SHARE LIKE EVERY OTHER CELL (2026-09-13). This card is why the tiers existed —
-    // a fixed run of dots left ~200px of quiet plate beside them — but quiet plate inside an
-    // even lane reads as breathing room, while an uneven lane reads as cards that disagree
-    // about how wide they should be. The dots keep their own `max-w` wrap below, so the slack
-    // collects around the roster rather than stretching it.
     <BandCard
       label="Metagraphs anchoring"
-      lead={<span className="font-mono font-bold text-figure text-foreground tabular-nums"><Odometer int value={list.length || null} /></span>}
+      lead={<StackedLead figure={total > 0 ? <Odometer int value={total} /> : null} unit={total === 1 ? "snapshot" : "snapshots"} empty={total === 0} />}
     >
-      {/* ⚠️ THE LENS DIMS, IT DOES NOT EDIT (user, 2026-09-01: "if we filter, should we then also
-          dim the filtered bullets?"). Yes — this roster was the one surface in the band ignoring the
-          committed filter while every chart beside it re-tinted. But the COUNT above stays the
-          honest total: five networks really did anchor in this window, and a lens is not allowed to
-          change that (the explorer draws the same line — a tick still LISTS every contributor under
-          a commit, it just makes only one of them drillable). So the number says how many anchored
-          and the dim says which one you are looking through.
-          `opacity-65` is the app's existing "present, but not your subject" step (0.45 → 0.65,
-          design review 2026-10-02: at 0.45 the dimmed text measured 3.9:1 on dark, and paper loses
-          more to dimming than dark does — 0.55 still read 3.6 there; 0.65 measures 4.75 on paper,
-          7.3 on dark, and still reads as stepped back) — the same one the
-          filter picker's 0-count rows and hyper's 0-node networks wear. */}
-      {/* TWO CHANNELS FOR ONE LENS: the others step back, the subject steps FORWARD (user,
-          2026-09-01). Dimming alone left the committed network the same size as the four it was
-          being distinguished from — the eye had to find the bright one among five identical marks
-          rather than being handed it. `items-center` keeps the row's baseline steady while one dot
-          grows, so nothing below it shifts. */}
-      {/* ⚠️ EVERY BULLET IS NAMED, AND THE RUN IS CENTRED (user, 2026-09-14: "metagraphs anchoring
-          can be centre-aligned and each bullet has room for a label"). The dots were bare and
-          capped at 120px because the card was `sm` and had no width to spend; on an equal share it
-          has plenty, and a bare dot made this the one roster in the app naming its subjects by
-          colour alone — which is the rule the sr-only line below existed to paper over. The TICKER
-          is the label: it is what the rest of the band already calls a network ("following DOR"),
-          and it stays short enough that four or five pairs wrap cleanly at a third of the plate.
-          ⚠️ THE CAP DROPS 12 → 8 with the labels: twelve NAMED entries is a list, not a legend,
-          and the honest total is the lead numeral beside them, not the length of this run. */}
-      {/* ⚠️ TICKERS ARE CHIPS (user, 2026-10-04: "based on our design change should they be dots or
-          pills?" — pills). Since the card redesign a network's ticker standing on its own is the
-          head's `TickerChip` everywhere — card heads, callouts, node rows — and the dot is the mark
-          that stands BESIDE a full name (the explorer rows). This roster is bare tickers, so it
-          wears the chip. The committed network steps forward with its chip's border in its own hue;
-          the others step back to the lens's 0.65. */}
-      <span className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 flex-1 min-w-0">
-        {list.slice(0, 8).map((id) => {
-          const on = filter !== "all" && id === filter;
-          const label = metagraphById(id)?.ticker ?? displayNetwork(id)?.ticker ?? null;
-          const hue = identityHudCss(id);
-          return (
-            <span key={id} className={cn("inline-flex min-w-0", filter !== "all" && !on && "opacity-65")}>
-              {/* No hand-written fallback label — `displayNetwork` is the one home for what an
-                  uncatalogued channel is CALLED (unlistedBoundary.test.ts enforces that the id
-                  literal has two homes, and this is not one of them). With no name to give, the
-                  dot stands alone rather than being captioned with a guess. */}
-              {label ? (
-                <TickerChip text={label} hue={hue} className={on ? "border-current bg-[color-mix(in_oklch,currentColor_14%,transparent)]" : undefined} />
-              ) : (
-                <IdentityDot hue={hue} />
-              )}
-            </span>
-          );
-        })}
-      </span>
-      {/* Identity is never colour-alone, and the lens has to reach the spoken form too, or a
-          screen reader hears five equal names where the eye sees one subject among four others. */}
+      <MicroBars accent={accent} labelW={64} rows={rows} />
+      {/* Identity is never colour-alone, and the counts reach the spoken form too. */}
       <span className="sr-only">
-        {list
-          .map((id) => {
-            const name = metagraphById(id)?.name ?? id;
-            return filter !== "all" && id === filter ? `${name} (filtered)` : name;
-          })
-          .join(", ")}
+        {counts.map(([id, n]) => `${metagraphById(id)?.name ?? networkMark(id).label}: ${n}${filter !== "all" && id === filter ? " (filtered)" : ""}`).join(", ")}
       </span>
     </BandCard>
   );

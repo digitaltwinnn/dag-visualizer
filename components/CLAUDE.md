@@ -1374,8 +1374,11 @@ is the boring case by construction and that split is the one breakdown belonging
 than its neighbours — a node the lookup could not place sits in no country ring and no provider ring,
 so it is also the basis both cards beside it silently assume; and "nodes by country" became "top
 countries", since the card shows three plus a remainder and the old name promised the whole
-distribution); the ledger leads with WHO (METAGRAPHS ANCHORING, exact from the anchor index, with
-identity dots) then the rates (number + stretch sparkline, units spelled `/hour`) and the
+distribution); the ledger reads the rates first (number + stretch sparkline, units spelled `/hour`),
+then WHO AND HOW MANY — METAGRAPHS ANCHORING, the total of metagraph snapshots anchored over the
+window on the left and each network's count as a bar row, busiest first, folded to four rows (user,
+2026-11-09: "show how many each metagraph anchored with the total on the left … after global
+snapshots"; it was a roster of ticker chips with the NUMBER of networks as its lead) — then the
 declicked tick bar-chart, which is **STACKED per metagraph when unfiltered** (user pick,
 2026-09-01 — every metagraph, always, not a top-N). The bar's HEIGHT is unchanged, so it reads as it
 always did at a glance and gains WHO underneath. Three rules keep it honest: the segments must SUM
@@ -1384,8 +1387,9 @@ than dropped (the donuts' `other` rule); a tick with no attribution is not a tic
 so it paints whole in the accent — "this many anchored, by whom is not known here"; and order is the
 CATALOG's, never the per-tick counts, since sorting by size repaints every bar as the window shifts
 and a segment that moves cannot be followed. Identity is not colour-alone: the METAGRAPHS ANCHORING
-card immediately to its left is the legend, reading the same `getAnchor(...).metaCounts` and the same
-`identityHudCss` hues, named sr-only.
+card immediately to its left is its NUMERIC legend — the same `m.<id>.snaps` series summed over the
+same window (the live anchor index's `metaCounts` until the store answers), the same `identityHudCss`
+hues — so the pair reads "how many, by whom" then "when".
 
 **A TOTAL LIVES INSIDE ITS OWN BREAKDOWN, AND LEADS IT** (user, 2026-08-31): a bare number card
 beside the list that breaks that number down says the same thing twice, so `COUNTRIES` folded into

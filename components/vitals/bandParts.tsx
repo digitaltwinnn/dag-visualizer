@@ -295,7 +295,8 @@ export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key
               column; `tabular-nums` then holds it exactly, and a wider count simply grows the
               column rather than breaking it. */}
           <span className="font-mono text-label leading-none tabular-nums text-foreground flex-none text-right min-w-[26px]">
-            {dashZero && r.count === 0 ? <span className="text-muted-foreground italic opacity-60">—</span> : r.count}
+            {/* Grouped (2026-11-09): the Snapshots band's per-network counts run to tens of thousands. */}
+            {dashZero && r.count === 0 ? <span className="text-muted-foreground italic opacity-60">—</span> : r.count.toLocaleString()}
           </span>
         </span>
       ))}
