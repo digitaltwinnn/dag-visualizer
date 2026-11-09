@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } fro
 import { ledgerNetwork } from "@/src/engine/domain/tickNet";
 
 import Explorer, { type ExplorerLevelSpec, type ExplorerRowSpec } from "@/components/explorer/Explorer";
-import { NODE_GLYPH_W, nodeRowSpec, tickerOf, unknownNodeRowSpec } from "@/components/explorer/nodeRow";
+import { tickerOf } from "@/components/explorer/nodeRow";
 import { IDENT_INK } from "@/components/identInk";
 import TablePager from "@/components/datasection/TablePager";
 import ExplorerFoot from "@/components/explorer/ExplorerFoot";
@@ -18,12 +18,11 @@ import { useLedgerSource } from "@/components/useLedgerSource";
 import { BLOCKS_UNREAD, blockAbsence, blockSpanWord, snapshotSpanWord } from "@/src/data/ledgerSpan";
 import { cn } from "@/lib/utils";
 import { latestRelevant } from "@/src/data/follow";
-import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { REGISTER_MEASURES, tickDataUpdates, snapMeasure, snapMeasureValue, tickMeasure, tickMeasureValue, tickNetMeasure, type LedgerMeasure, REGISTER_SUBJECTS } from "@/src/data/ledgerMeasure";
 import { blockRowLocked, ledgerLens, storyCount, tickLocked } from "@/src/data/ledgerStory";
-import { filterAccent, resolveSigner, SIGNER_UNKNOWN, snapshotSigners } from "@/src/data/network";
+import { filterAccent } from "@/src/data/network";
 import { metaSnapHoverKey, type GlobalSnapshot, type SnapshotExact } from "@/src/data/types";
-import { displayNetwork, LISTED_IDS, UNLISTED_HUE, UNLISTED_ID } from "@/src/data/unlisted";
+import { displayNetwork, LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 import { POLL } from "@/src/engine/config";
 import { followToggleActions, metaSnapSelectActions, sameMetaSnap, snapshotSelectActions, tickNetSelectActions } from "@/src/engine/domain/pickActions";
 import { heldTicks, nextHoldTop } from "@/src/data/ledgerHold";
@@ -62,8 +61,8 @@ const LEDGER_AXIS_TITLE = VIEWS.find((v) => v.id === "ledger")!.name;
 //                        moved the app-wide filter "will often happen accidentally"), previews the
 //                        lane in the chamber on hover
 //       snapshot       → commits the metagraph snapshot itself (metaSnapSelectActions — tick and
-//                        snapshot, never the filter: design decision 13) and opens its signers
-//         signer       → the node that sealed it, the same node row every explorer ends in
+//                        snapshot, never the filter: design decision 13) — the leaf (its signers
+//                        left with the view's node rung, 2026-11-09)
 //
 // The PER-NETWORK axis (network → its ordinals across the window) was a second tree once and was
 // retired the same day the one axis was named: two trees over the same rows made the reader pick
@@ -80,8 +79,8 @@ const LEDGER_AXIS_TITLE = VIEWS.find((v) => v.id === "ledger")!.name;
 //
 // Rule 9: a tick row previews on `hoverSnapOrd` (a global tick), a network row on `hoverFilter`
 // (its lane in the chamber), a snapshot row on `hoverMetaSnap` (ONE snapshot — a row is a
-// snapshot, not its tick, and the tick channel would light every band of the anchoring global),
-// a signer on `hoverNodeId`. Hovers preview, never commit.
+// snapshot, not its tick, and the tick channel would light every band of the anchoring global).
+// Hovers preview, never commit.
 
 /** How many ticks a page of the explorer shows before the first measure: on the desktop rail and
  *  the tablet sheet the page FILLS to its host's bottom (`useFitRows`, 2026-09-28 — user:
@@ -98,10 +97,6 @@ function outOfLens(filter: string, id: string): boolean {
   const f = ledgerLens(filter);
   return f !== "all" && f !== id;
 }
-
-// A snapshot's signers: `snapshotSigners` (src/data/network.ts) — one home, shared with the node
-// rung's ∨ step and pager (railSiblings), so the three list the same validators.
-const signersOf = (ex: SnapshotExact | undefined, metaId: string, ordinal: number) => snapshotSigners(ex?.rows, metaId, ordinal);
 
 /** The exact read's per-network fee and size for one row of the network level — a listed
  *  network's own entry, or the SUM of every uncataloged address for the unlisted row. */
@@ -181,7 +176,6 @@ export default function LedgerPanel() {
   const setHoverSnapOrd = useStore((s) => s.setHoverSnapOrd);
   const hoverMetaSnap = useStore((s) => s.hoverMetaSnap);
   const setHoverMetaSnap = useStore((s) => s.setHoverMetaSnap);
-  const hoverNodeId = useStore((s) => s.hoverNodeId);
   const setHoverNodeId = useStore((s) => s.setHoverNodeId);
   // The register's own pick and its lists: one value per register, every level a subset of it.
   const registerPick = useStore((s) => s[measures.pick]);
@@ -195,8 +189,6 @@ export default function LedgerPanel() {
   const metaSnap = useStore((s) => s.metaSnap);
   const tickNet = useStore((s) => s.tickNet);
   const snapshotExact = useStore((s) => s.snapshotExact);
-  const selNodes = useStore((s) => s.selNodes);
-  const metaList = useStore((s) => s.metaList); // co-location reads the full catalog (nodeRowSpec)
   const inspect = useStore((s) => s.inspect);
   // ONE PICK FOR EVERY LEVEL (user, 2026-09-29 — `src/data/explorerMeasure.ts`): the lower levels
   // show the tick level's `ledgerMeasure` where they can state it and their own first measure where
@@ -252,7 +244,6 @@ export default function LedgerPanel() {
   const [path, setPath] = useState<LedgerPath>(CLOSED_PATH);
   const openTick = path.tick;
   const openNet = path.net;
-  const openSnap = path.snap;
   // THE PAGE SIZE FILLS THE RAIL on desktop (`useFitRows`): measured only while the tick level is
   // the one on screen, and when it changes the reader keeps their place — the page holding the
   // row that was first on screen (`pageKeepingRow`), so a resize never throws them to page 1.
@@ -621,11 +612,8 @@ export default function LedgerPanel() {
           rung: "metaSnap",
           onClick: () => {
             applyClickActions(metaSnapSelectActions(sel, tickPick, { metaSnap, following, inspect: useStore.getState().inspect, block: useStore.getState().block }));
-            // A select opens the snapshot's signers — the path follows the selection
-            // (`syncLedgerPath`), so this states the same thing in the same commit — and the
-            // deselect closes them. THE AFFORDANCE FOLLOWS THE DATA at the level itself: the
-            // signer level renders only once the exact read names them, so until then the row
-            // commits and stays, and the level appears when they arrive.
+            // The path follows the selection (`syncLedgerPath`), so this states the same thing in
+            // the same commit, and the deselect releases it.
             setPath((p) => ({ ...p, snap: on ? null : key }));
           },
           // The pairing wash follows the FILTER, as the snapshot's card does (2026-10-03) — the
@@ -636,48 +624,10 @@ export default function LedgerPanel() {
     });
   }
 
-  // ---- level 3: the signers of the open snapshot — the same node row every explorer ends in ----
-  const leaf = openSnap ? leaves.find((r) => `${r.metaId}|${r.ordinal}` === openSnap) ?? null : null;
-  const signers = signersOf(leaf ? exact : undefined, leaf?.metaId ?? "", leaf?.ordinal ?? 0); // no leaf → the shared empty list
-  if (leaf && signers.length > 0) {
-    levels.push({
-      pager: spanFooter,
-      key: "signers",
-      parent: "metaSnap",
-      crumb: { label: <span className="tabular-nums">{leaf.ordinal > 0 ? leaf.ordinal.toLocaleString() : `${leaf.metaId.slice(0, 10)}…`}</span> },
-      // The cards' own phrase ("Signed by N L0 validators") — the producing layer named before
-      // the rows, because the constant count is most puzzling here (3 rows under a 20-node network).
-      // The user's words (2026-09-26); the count is the rows, the layer is the tag beside each.
-      meaning: "Validators that signed",
-      glyphW: NODE_GLYPH_W,
-      measure: null,
-      hasFigure: false,
-      // The one node row (`explorer/nodeRow.tsx`), ticker included, as in every explorer.
-      rows: signers.map((sid): ExplorerRowSpec => {
-        const r = resolveSigner(selNodes, leaf.metaId, sid);
-        if (!r.known) {
-          // No node to commit, so no affordance: a signature that states what isn't known
-          // (`resolveSigner` + `SIGNER_UNKNOWN`, the one shared rule). Every unlisted channel's
-          // signers take this branch by construction; a listed network's can too.
-          const w = SIGNER_UNKNOWN[r.reason];
-          return unknownNodeRowSpec({ key: sid, id: sid, label: w.label, hue: UNLISTED_HUE });
-        }
-        const row = r.row;
-        const hue = identityHudCss(leaf.metaId);
-        // A READING, not a door (user, 2026-11-08: the node card left the Snapshots view): the row
-        // names the signer and pairs with its chip in the tray on hover, and commits nothing — the
-        // view has no node rung to stand a card on.
-        return nodeRowSpec({
-          metaList,
-          key: sid,
-          row,
-          hue,
-          on: false,
-          pair: subjectPairing(hoverNodeId, hoverKeyOf(row.pick), setHoverNodeId, hue),
-        });
-      }),
-    });
-  }
+  // (Level 3, the snapshot's SIGNERS, left with the node rung — user, 2026-11-09: "when the node rung
+  // removed from snapshot view right rail, remove it also from the explorer level". A metagraph
+  // snapshot is this explorer's leaf: its card has no child level, so the explorer rests on the
+  // snapshot's own list, the row lit (`levelsForBox`). Its signer COUNT stays the card's fact.)
 
   // ---- THE BLOCKS REGISTER: one flat level, the window's blocks newest first ----------------------
   // A row is a block on its accepting snapshot: the chain's ticker, the block's short hash, the

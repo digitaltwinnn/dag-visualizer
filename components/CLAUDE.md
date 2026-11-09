@@ -801,8 +801,7 @@ the rung's FIRST child. That one unique job moved into the **NEXT GHOST**: the g
 the deepest committed rung IS the step — a click commits that rung's first child — the first row of
 the explorer's own list for that level (`src/data/ladderLevels.ts`, read by `childStep` through
 `useSiblingState`) through the one executor, and the ghost becomes the real card (user, 2026-10-07;
-the three quick picks it opened to on 2026-10-04 are retired). A metagraph snapshot's next ghost
-opens its first validator (`snapshotSignerRows`, the explorer's signer order). Only a ghost with no
+the three quick picks it opened to on 2026-10-04 are retired). Only a ghost with no
 committed parent above it is a true ghost: it opens to its hint and offers no choice. The plank is `‹` at the card's left edge, the
 position squares centred, `›` at its right edge — the position DRAWN, never written: one small square
 per sibling with the current one lit, a set past fifteen sliding a fifteen-wide window whose ends
@@ -1058,9 +1057,10 @@ hairline above a full card running off the rail): `detailsCards` states a card o
 as absent, so a node carried into History leaves the rail — **and into Snapshots** (user, 2026-11-08:
 "remove the node card entirely from the snapshots view"; it stood there when picked there or when it
 signed the snapshot on screen, `nodeHereOf`, from 2026-10-31 until then). The chamber's subjects are
-the snapshots and what they carry; a node is a signer, read on the explorer's signer level (rows that
-are READINGS now, hover-paired with their tray chips, committing nothing) and the snapshot card's
-"Signed by". The ledger's ladder has no node rung (`LADDERS.ledger`), a tray chip's click commits
+the snapshots and what they carry; a node is a signer, stated as the snapshot card's "Signed by N L0
+validators" — the explorer's signer level left with the rung (user, 2026-11-09: "remove it also from
+the explorer level"), so a metagraph snapshot is the explorer's leaf and it rests on the snapshot list,
+the row lit. The ledger's ladder has no node rung (`LADDERS.ledger`), a tray chip's click commits
 nothing (`clickActions`: a node commits only where the view's ladder has the rung), and the metagraph
 snapshot is the lane's last rung (no child step). The SELECTION is untouched, so going back restores
 the card, as the placeholder views do; a pinned snapshot needs no such rule, since leaving Snapshots
@@ -1276,8 +1276,7 @@ own slot under the Metagraph snapshot (`DISPLAY_LANE.ledger`, after `block`, the
 subject of its own, not the snapshot's child rung), present in Data
 blocks alone and only under the snapshot that carried it (`parentHolds`), named by its place in
 that snapshot ("3 of 10"), its UPDATES BY KIND as the body, "Signed by N dL1 validators" and Size as
-facts (a fact row, as the global and metagraph snapshot cards state theirs — the explorer's signer
-level is the list), a "Block records" door onto the snapshot's RAW record, and a foot with the
+facts (a fact row, as the global and metagraph snapshot cards state theirs), a "Block records" door onto the snapshot's RAW record, and a foot with the
 snapshot's ordinal and the DIGEST (`DataBlockSummary`, never a hash). Its ghost's step is the pinned
 snapshot's first data block (`railSiblings.dataBlockStep`), its pager EVERY data block of its global snapshot,
 across the tick's data-carrying snapshots, oldest snapshot first — a step into another snapshot commits
