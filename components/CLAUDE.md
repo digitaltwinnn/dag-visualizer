@@ -1276,8 +1276,11 @@ that snapshot ("3 of 10"), its UPDATES BY KIND as the body, "Signed by N dL1 val
 facts (a fact row, as the global and metagraph snapshot cards state theirs — the explorer's signer
 level is the list), a "Block records" door onto the snapshot's RAW record, and a foot with the
 snapshot's ordinal and the DIGEST (`DataBlockSummary`, never a hash). Its ghost's step is the pinned
-snapshot's first data block (`railSiblings.dataBlockStep`), its pager the snapshot's blocks
-(`siblingSet("dataBlock")`), **and LIVE seats it** (user, 2026-11-08: "entering data blocks, open the
+snapshot's first data block (`railSiblings.dataBlockStep`), its pager EVERY data block of its global snapshot,
+across the tick's data-carrying snapshots, oldest snapshot first — a step into another snapshot commits
+it, the click's own builder (`siblingSet("dataBlock")`; user, 2026-11-09: "ensure they have the range to
+swipe of >1 blocks in its parent global snapshot" — it paged its own snapshot only, and the Block card
+had no pager at all: `siblingSet("block")` now steps every block of the tick), **and LIVE seats it** (user, 2026-11-08: "entering data blocks, open the
 data block card"): the register's follow rides the live snapshot's FIRST data block through the
 non-bumping `advanceDataBlock`, as Transaction blocks rides its newest block, so the Data block card
 is the register's seat (`REGISTER_SEAT`, `src/store/mode.ts`, the one home of which subject a register's

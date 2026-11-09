@@ -402,13 +402,28 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
       return finish(slot, items, items.findIndex((it) => it.key === curKey), parent);
     }
 
+    // THE TWO BLOCK CARDS PAGE THEIR GLOBAL SNAPSHOT (user, 2026-11-09: "Global snapshot 7274965 has 3
+    // blocks, but the 'transaction block' card has no swipe left/right. Check the block cards (tx,
+    // data) and ensure they have the range to swipe of >1 blocks in its parent global snapshot"). The
+    // Block card had no set at all, and the Data block card's stopped at its own metagraph snapshot.
+    // A step to a block of another snapshot in the tick commits that snapshot with it — the click's
+    // own builder, so the rungs above stay true.
+    case "block": {
+      const cur = s.block;
+      if (!cur || !s.snap || s.snap.data.ordinal !== cur.anchorOrd) return null;
+      const items = (s.tickBlocks ?? []).map((b) => ({
+        key: `${b.sel.chain}:${b.sel.hash}`,
+        label: `${tickerOf(b.sel.chain)} ${shortBlockHash(b.sel.hash)}`,
+        actions: blockSelectActions(b.sel, s.snap!, { ...tickContextOf({ following: s.following, snap: s.snap, metaSnap: s.metaSnap, tickNet: s.tickNet, block: s.block, inspect: s.inspect }) }, b.snap),
+      }));
+      return finish(slot, items, items.findIndex((it) => it.key === `${cur.chain}:${cur.hash}`), `Global ${cur.anchorOrd.toLocaleString()}`);
+    }
     case "dataBlock": {
-      // The snapshot's data blocks, in its order — the pager steps them (1 of N … N of N).
       const cur = s.dataBlock;
       if (!cur) return null;
-      const items = dataBlocksOf(s);
-      if (items.length < 2) return null;
-      return finish(slot, items, cur.index, "This snapshot's data blocks");
+      const items = tickDataBlocksOf(s);
+      const at = items.findIndex((it) => it.key === `${cur.snap.metaId}:${cur.snap.ordinal}:${cur.index}`);
+      return finish(slot, items, at, `Global ${cur.snap.globalOrdinal.toLocaleString()}`);
     }
     case "metaSnap": {
       const cur = s.metaSnap;
@@ -729,6 +744,28 @@ function dataBlocksOf(s: SiblingState): SiblingStep[] {
     label: `${i + 1} of ${rows.length}`,
     actions: dataBlockSelectActions({ snap: ms, index: i }, s.snap!, { dataBlock: s.dataBlock ?? null, metaSnap: s.metaSnap, following: s.following, inspect: s.inspect, block: s.block ?? null }),
   }));
+}
+
+/** EVERY DATA BLOCK IN THE SHOWN GLOBAL SNAPSHOT (the Data block card's set, 2026-11-09): each
+ *  data-carrying snapshot of the tick in turn, oldest first, and its blocks in order — under a
+ *  network filter, that network's alone (a filter holds the view). Empty with no tick or no read. */
+function tickDataBlocksOf(s: SiblingState): SiblingStep[] {
+  const snap = s.snap;
+  if (!snap) return [];
+  const g = snap.data.ordinal;
+  const net = s.filter === "all" || s.filter === DAG_CORE ? null : keyOf(s, s.filter);
+  const rows = (s.exactRows ?? [])
+    .filter((r) => (r.dataBlockRows?.length ?? 0) > 0 && (net == null || keyOf(s, r.metaId) === net))
+    .sort((a, b) => (a.metaId === b.metaId ? a.ordinal - b.ordinal : a.metaId < b.metaId ? -1 : 1));
+  return rows.flatMap((r) => {
+    const polled = s.tickNets?.flatMap((tn) => tn.snaps).find((x) => x.metaId === r.metaId && x.ordinal === r.ordinal);
+    const ms: MetaSnapSel = { metaId: r.metaId, ordinal: r.ordinal, hash: polled?.hash ?? "", globalOrdinal: g, ts: polled?.ts ?? snap.data.timestamp };
+    return r.dataBlockRows!.map((b, i) => ({
+      key: `${r.metaId}:${r.ordinal}:${i}`,
+      label: `${tickerOf(r.metaId)} ${shortBlockHash(b.digest)}`,
+      actions: dataBlockSelectActions({ snap: ms, index: i }, snap, { dataBlock: s.dataBlock ?? null, metaSnap: s.metaSnap, following: s.following, inspect: s.inspect, block: s.block ?? null }),
+    }));
+  });
 }
 
 /** THE DATA BLOCK GHOST'S STEP (the Data blocks register, 2026-11-07): the committed metagraph

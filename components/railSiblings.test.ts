@@ -953,3 +953,31 @@ describe("blockStep — the Block ghost opens the shown tick's first block (2026
     expect(blockStep(base({ mode: "ledger", snap, tickBlocks: [] }))).toBeNull();
   });
 });
+
+// User, 2026-11-09: "Global snapshot 7274965 has 3 blocks, but the 'transaction block' card has no
+// swipe left/right … ensure they have the range to swipe of >1 blocks in its parent global snapshot".
+describe("siblingSet — the block cards page their global snapshot", () => {
+  const snap = { kind: "snapshot", data: { ordinal: 300, timestamp: "T300" } } as unknown as SiblingState["snap"];
+  const d = (h: string) => ({ sel: { chain: "dag", hash: h, ordinal: 300, anchorOrd: 300 }, snap: null });
+  it("the Block card steps every block of its tick, through the block click's builder", () => {
+    const set = siblingSet("block", base({ mode: "ledger", snap, block: d("b").sel, tickBlocks: [d("a"), d("b"), d("c")] }))!;
+    expect(set.items.map((i) => i.key)).toEqual(["dag:a", "dag:b", "dag:c"]);
+    expect(set.index).toBe(1);
+    expect(set.items[2]!.actions.at(-1)).toMatchObject({ kind: "block", sel: { hash: "c" } });
+  });
+  it("one block in the tick is no set, and a block of another tick pages nothing", () => {
+    expect(siblingSet("block", base({ mode: "ledger", snap, block: d("a").sel, tickBlocks: [d("a")] }))).toBeNull();
+    const other = { chain: "dag", hash: "z", ordinal: 299, anchorOrd: 299 };
+    expect(siblingSet("block", base({ mode: "ledger", snap, block: other, tickBlocks: [d("a"), d("b")] }))).toBeNull();
+  });
+  it("the Data block card steps every data block of its tick, across its snapshots, oldest snapshot first", () => {
+    const row = (metaId: string, ordinal: number, n: number) => ({ metaId, ordinal, dataBlockRows: Array.from({ length: n }, (_, i) => ({ digest: `${metaId}${ordinal}${i}` })) });
+    const exactRows = [row("ded", 9, 1), row("ded", 8, 2), row("dor", 4, 0)] as unknown as SiblingState["exactRows"];
+    const cur = { snap: { metaId: "ded", ordinal: 9, hash: "", globalOrdinal: 300, ts: "T300" }, index: 0 };
+    const set = siblingSet("dataBlock", base({ mode: "ledger", snap, dataBlock: cur, exactRows, metaList: [{ id: "ded" }, { id: "dor" }] as unknown as SiblingState["metaList"] }))!;
+    expect(set.items.map((i) => i.key)).toEqual(["ded:8:0", "ded:8:1", "ded:9:0"]);
+    expect(set.index).toBe(2);
+    // A step into the other snapshot commits that snapshot, then the data block (the click's builder).
+    expect(set.items[0]!.actions.at(-1)).toMatchObject({ kind: "dataBlock", sel: { snap: { ordinal: 8 }, index: 0 } });
+  });
+});
