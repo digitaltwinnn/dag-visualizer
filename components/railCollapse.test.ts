@@ -212,6 +212,14 @@ describe("a new selection moment (`railSelectionKey` + `overridesOnSelection`)",
     expect(key({ dataBlock: d1 })).not.toBe(key({}));
     expect(key({ dataBlock: d2 })).not.toBe(key({ dataBlock: d1 }));
   });
+  // User, 2026-11-09: in Data blocks, live, the reader opened the Global snapshot card and the next
+  // tick's data block dropped it — the callout fell back to the register's seat.
+  it("while following in Data blocks, the live DATA BLOCK advancing is not a new moment; a pinned one's is", () => {
+    const d1 = { snap: { metaId: "dor", ordinal: 7, hash: "h", globalOrdinal: 42, ts: "t" }, index: 0 } as unknown as NonNullable<SelectionKeyState["dataBlock"]>;
+    const d2 = { snap: { metaId: "dor", ordinal: 8, hash: "h2", globalOrdinal: 43, ts: "t2" }, index: 0 } as unknown as NonNullable<SelectionKeyState["dataBlock"]>;
+    expect(key({ following: true, dataBlock: d1 })).toBe(key({ following: true, dataBlock: d2 }));
+    expect(key({ following: false, dataBlock: d1 })).not.toBe(key({ following: false, dataBlock: d2 }));
+  });
   it("while following, the live ordinals are not a new moment", () => {
     expect(key({ following: true, snap: snapPick })).toBe(key({ following: true, snap: { data: { ordinal: 43 } } }));
     expect(key({ following: false, snap: snapPick })).not.toBe(key({ following: false, snap: { data: { ordinal: 43 } } }));

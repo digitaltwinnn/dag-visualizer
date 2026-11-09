@@ -232,8 +232,11 @@ export function railSelectionKey(s: SelectionKeyState): string {
     // THE DATA BLOCK (user, 2026-11-08: "when I click a data block it does not collapse its parent
     // metagraph snapshot"): a commit like the block's. Missing, the ghost's own open override and a
     // hand-opened snapshot box survived the commit, and the Data block card arrived beside them. A
-    // data block is picked, never advanced by the heartbeat, so it needs no follow guard.
-    s.dataBlock ? `${s.dataBlock.snap.metaId}:${s.dataBlock.snap.ordinal}:${s.dataBlock.index}` : "",
+    // data block is picked — and since 2026-11-08 also ADVANCED by the Data blocks register's live
+    // follow, so it takes the same follow guard (user, 2026-11-09: "Live mode, click the global
+    // snapshot card, the callout leaves the global snapshot and goes to the sub-view's default card
+    // anchor when a new live tick arrives" — the heartbeat's data block dropped the reader's open card).
+    s.following ? (s.dataBlock ? "live" : "") : s.dataBlock ? `${s.dataBlock.snap.metaId}:${s.dataBlock.snap.ordinal}:${s.dataBlock.index}` : "",
     // THE REGISTER (user, 2026-11-08: entering Transaction blocks showed the Global snapshot card
     // where the block's was due): a switch is a new moment — the register seats its own box.
     s.ledgerRegister ?? "",
