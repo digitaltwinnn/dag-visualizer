@@ -64,9 +64,19 @@ export default function useFitRows(cardId: string, fill: boolean, measuring: boo
     // variables is a write to the root's style attribute, so that is what is watched.
     const mo = new MutationObserver(measure);
     mo.observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
+    // …AND MEASURES AGAIN WHEN THE RAIL HAS ARRIVED (review I3, 2026-11-09): the column slides its
+    // `top` over 0.25s while its max-height jumps at once, so the measure above reads the old top
+    // against the new cap — off by the strip's height. The slide's end is the settled reading.
+    const settled = (e: TransitionEvent) => {
+      if (e.target === rail && e.propertyName === "top") measure();
+    };
+    rail.addEventListener("transitionend", settled);
+    rail.addEventListener("transitioncancel", settled);
     return () => {
       ro.disconnect();
       mo.disconnect();
+      rail.removeEventListener("transitionend", settled);
+      rail.removeEventListener("transitioncancel", settled);
       window.removeEventListener("resize", measure);
     };
   }, [cardId, fill, measuring, fallback]);

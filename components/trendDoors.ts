@@ -1,6 +1,8 @@
 "use client";
 
 import { useStore } from "@/src/store/store";
+import { switchLedgerRegister } from "@/src/store/applyClickActions";
+import { readsBlockWindow } from "@/src/engine/domain/viewPolicy";
 
 // THE MEASURED HISTORY'S TWO DOORS — ONE HOME (2026-09-19).
 //
@@ -37,6 +39,11 @@ export function spanOfWindow(buckets: readonly number[], stepMs: number): Record
   return { fromMs: buckets[0], toMs: buckets[buckets.length - 1] + stepMs };
 }
 
+/** Step to a register whose RAW is the anchor log (`readsBlockWindow` registers read the blocks table). */
+function toAnchorLog(): void {
+  if (readsBlockWindow(useStore.getState().ledgerRegister)) switchLedgerRegister("snapshots");
+}
+
 /** ONE RUNG DOWN — the anchor log's records for `metaId` over `span`.
  *
  *  `metaId` null is the unscoped log: the global charts have no chain of their own, and neither
@@ -65,6 +72,11 @@ export function openRecords(metaId: string | null, span: RecordSpan | null): voi
   // and every other view keep the lens the reader chose.
   // A null span (History's ALL window has none to hand over) opens the log on its newest page,
   // with no seek — the door still lands on the records.
+  // THE LOG IS THE METAGRAPH SNAPSHOTS REGISTER'S RECORDS (review I1, 2026-11-09): a register that
+  // reads the block window shows the blocks table in RAW, so the door would land there with its
+  // seek left armed for a later switch. It steps the register first, through the one door — before
+  // the mode, so the URL is pushed once (review I2's rule).
+  toAnchorLog();
   if (span) st.setLogSeek({ metaId: scoped, fromMs: span.fromMs, toMs: span.toMs, ...(span.label ? { label: span.label } : {}) });
   if (st.mode !== "ledger") {
     // Remember WHERE THE DOOR WAS (user, 2026-09-26): closing the layer goes back there, not to
@@ -85,21 +97,10 @@ export function openRecords(metaId: string | null, span: RecordSpan | null): voi
  *  view and selection are untouched, so there is no mode step and no return to remember. The log
  *  pages the door's network even under another filter (AnchorLogTable's `doorMeta`). */
 export function openSnapshotRecord(metaId: string, ordinal: number, ts: string): void {
+  toAnchorLog();
   const st = useStore.getState();
   const at = Date.parse(ts);
   st.setLogSeek({ metaId, fromMs: at, toMs: at, snapshot: ordinal });
-  st.setSection("data");
-}
-
-/** THE GLOBAL SNAPSHOT DOOR (the Blocks register's Block card, 2026-11-05): a DAG block is accepted
- *  into the global snapshot itself, so its records are that global's — the log's own global
- *  snapshot search (the same one its Global field runs), opened in place like the snapshot door:
- *  no mode step, no filter written. A token block's records are its metagraph snapshot's, through
- *  `openSnapshotRecord`. */
-export function openGlobalRecord(ordinal: number, ts: string): void {
-  const st = useStore.getState();
-  const at = Date.parse(ts);
-  st.setLogSeek({ metaId: null, fromMs: at, toMs: at, tick: ordinal });
   st.setSection("data");
 }
 

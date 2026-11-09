@@ -41,8 +41,11 @@ export default function FooterViewLinks() {
               // Modified clicks keep native anchor behaviour (new tab etc.).
               if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
               e.preventDefault();
-              setMode(v.mode);
+              // THE REGISTER FIRST, THEN THE VIEW (review I2, 2026-11-09): outside the view a register
+              // write publishes nothing, so `setMode` pushes the one path, tracks one switch and
+              // keeps the view switch's motion cause; the other order pushed two entries.
               if (v.mode === "ledger") switchLedgerRegister(v.register);
+              setMode(v.mode);
             }}
           >
             {v.name}

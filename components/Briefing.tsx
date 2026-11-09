@@ -73,9 +73,9 @@ const stopName = (stop: BriefingStop): string => (stop.register === "blocks" ? B
 /** Show a stop: its view, then its register (a stop with none puts the Snapshots view back in its
  *  own, so a stop that carries a register never leaves the next one showing it). */
 function showStop(stop: BriefingStop): void {
-  const s = useStore.getState();
-  s.setMode(stop.mode);
+  // The register first, then the view (review I2): one URL write, the view's motion cause kept.
   switchLedgerRegister(stopRegister(stop));
+  useStore.getState().setMode(stop.mode);
 }
 
 /** Move the tour to a stop: the clock starts over there, so a stop stepped to gets its full time. */

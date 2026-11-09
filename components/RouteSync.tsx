@@ -99,10 +99,11 @@ export default function RouteSync() {
         // setMode also clears any open doc (the store rule), which is exactly what stepping
         // back from /about to /geography means.
         if (mode) {
-          setMode(mode);
-          // Back/forward between the register pages restores the register with the view.
+          // Back/forward between the register pages restores the register with the view — the
+          // register first, so the view switch keeps its own motion cause (review I2).
           const register = registerForPath(location.pathname);
           if (register) switchLedgerRegister(register);
+          setMode(mode);
         }
         else useStore.getState().setDocPage(null);
       }
