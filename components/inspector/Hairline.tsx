@@ -10,6 +10,10 @@ import type { SparkGeometry } from "@/src/data/momentSpark";
 // peak dot and caption type. The geometry is pure and the caller's (`momentSpark.ts`,
 // `rangeSpark.ts`); this only draws it. `context` is the faint part of a line whose emphasised part
 // is `geometry` — the Range card's frame around its range; the Moment's line has none.
+// THE LINE WEARS ITS SUBJECT'S COLOUR (user, 2026-11-09: "color the chartline based on the metagraph
+// (parent card and/or filter)"): `hue` is the network the card's figure is about — the focused plane
+// or the filter, the parent Metagraph card's subject (`cardNetwork`) — and the roster's own `hue`, so
+// the line matches its plane; the whole network's line keeps the filter accent, else the primary.
 
 /** The drawing's own box; the SVG stretches it to the card's width. */
 export const HAIRLINE_W = 300;
@@ -34,6 +38,7 @@ export default function Hairline({
   context,
   label,
   caption,
+  hue,
 }: {
   geometry: SparkGeometry;
   context?: SparkGeometry;
@@ -41,6 +46,8 @@ export default function Hairline({
   label: string;
   /** The caption row under the line, in the caption's own type (positioned by the caller). */
   caption: ReactNode;
+  /** The subject network's identity hue; absent for the whole network. */
+  hue?: string;
 }) {
   return (
     <figure className="mt-2 mb-2" aria-label={label}>
@@ -48,7 +55,7 @@ export default function Hairline({
         viewBox={`0 0 ${HAIRLINE_W} ${HAIRLINE_H}`}
         preserveAspectRatio="none"
         className="block w-full overflow-visible text-[var(--filter-accent,var(--primary))]"
-        style={{ height: HAIRLINE_H }}
+        style={{ height: HAIRLINE_H, ...(hue ? { color: hue } : {}) }}
         aria-hidden
       >
         {context && <Ink g={context} faint />}

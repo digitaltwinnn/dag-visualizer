@@ -58,6 +58,7 @@ export default function RangeSpark({
   return (
     <Hairline
       geometry={g.lit}
+      hue={subject ? roster.rows.get(subject)?.hue : undefined}
       context={g.context}
       label={`${subject ? "This network's" : "The whole network's"} readings around this range, the range itself drawn bolder`}
       caption={

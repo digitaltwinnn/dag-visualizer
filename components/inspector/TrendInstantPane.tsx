@@ -259,7 +259,7 @@ export default function TrendInstantPane({
           )}
           {/* THE MOMENT'S SHAPE (user, 2026-11-05): the lead's reading in the next finer buckets,
               where a finer tier holds it — steady or up and down, at a glance. */}
-          {bucket != null && lead != null && <MomentSpark metric={metric} subject={subject} stepMs={stepMs} bucket={bucket} />}
+          {bucket != null && lead != null && <MomentSpark metric={metric} subject={subject} stepMs={stepMs} bucket={bucket} hue={subject ? rows.get(subject)?.hue : undefined} />}
           {bucket != null && <Separator className="mb-2" />}
           {bucket == null ? (
             // AN HONEST TERMINAL, not an empty card. The sentence is `instantNote`'s: only the

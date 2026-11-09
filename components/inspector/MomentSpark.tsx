@@ -30,12 +30,15 @@ export default function MomentSpark({
   subject,
   stepMs,
   bucket,
+  hue,
 }: {
   metric: TrendMetric;
   /** The network the lead sentence is about, or null for the whole network (the lead's own rule). */
   subject: string | null;
   stepMs: number;
   bucket: number;
+  /** The subject network's identity hue (the roster row's), absent for the whole network. */
+  hue?: string;
 }) {
   const plan = sparkPlan(metric, stepMs, bucket);
   const { data } = useTrendsRange(plan, "Moment card");
@@ -46,6 +49,7 @@ export default function MomentSpark({
   return (
     <Hairline
       geometry={g}
+      hue={hue}
       label={`The ${plan.tier === "5m" ? "five-minute" : "hourly"} readings inside this moment`}
       caption={
         <>
