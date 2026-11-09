@@ -668,6 +668,7 @@ export default function SceneCallout() {
       if (!dataBlock) return null;
       const hue = identityHudCss(dataBlock.snap.metaId);
       const b = dataBlockRow?.[dataBlock.index] ?? null;
+      const updatesChip = b && !b.unread ? `${b.updates.toLocaleString()} ${b.updates === 1 ? "update" : "updates"}` : undefined;
       return {
         // The live-lane key rule (msModel): while following the subject is THE LIVE DATA BLOCK (the live
         // snapshot's first, 2026-11-08), so a new tick re-points the label; a pick is a new subject.
@@ -679,12 +680,14 @@ export default function SceneCallout() {
         titleMono: true,
         aside: following
           ? liveFeed
-            ? { text: "live", live: true, chip: b ? `${b.updates.toLocaleString()} ${b.updates === 1 ? "update" : "updates"}` : undefined }
+            ? { text: "live", live: true, chip: updatesChip }
             : { text: "no signal" } // the global's and the block's third state (review, 2026-11-09)
-          : { text: "", pinned: true, chip: b ? `${b.updates.toLocaleString()} ${b.updates === 1 ? "update" : "updates"}` : undefined },
+          : { text: "", pinned: true, chip: updatesChip },
         ring: hue,
         mark: { icon: REGISTER_ICONS.data, hue },
-        lead: b ? { text: `Carried ${b.updates.toLocaleString()} ${b.updates === 1 ? "update" : "updates"}, signed by ${b.signers.toLocaleString()}` } : undefined,
+        // An UNREAD block (the decoder could not read it) states no count: its `updates` is a 0 that
+        // means nothing (rule 10; the data review's M3).
+        lead: b ? { text: b.unread ? "Its updates could not be read" : `Carried ${b.updates.toLocaleString()} ${b.updates === 1 ? "update" : "updates"}, signed by ${b.signers.toLocaleString()}` } : undefined,
       };
     };
     // WHICH SUBJECT THE VIEW LABELS — `domain/calloutSubjects`, the ONE chain CalloutSync anchors by

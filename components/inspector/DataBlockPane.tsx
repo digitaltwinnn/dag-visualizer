@@ -78,7 +78,7 @@ export default function DataBlockPane({ onClose, collapsed, onToggle }: { onClos
             <span className="truncate font-mono tabular-nums">{b ? shortBlockHash(b.digest) : `${index + 1}`}</span>
           </span>
         }
-        aside={b ? <QualifierChip className="tabular-nums">{b.updates.toLocaleString()} {b.updates === 1 ? "update" : "updates"}</QualifierChip> : undefined}
+        aside={b && !b.unread ? <QualifierChip className="tabular-nums">{b.updates.toLocaleString()} {b.updates === 1 ? "update" : "updates"}</QualifierChip> : undefined}
         titleKey={`${snap.metaId}:${snap.ordinal}:${index}`}
         onClose={onClose}
         collapsed={collapsed}
@@ -87,7 +87,11 @@ export default function DataBlockPane({ onClose, collapsed, onToggle }: { onClos
       {!collapsed && (
         <div>
           <Lead>
-            {b
+            {b?.unread
+              ? // UNREAD, NEVER 0 (rule 10; the data review's M3): the decoder could not read this block,
+                // so its updates, kinds and signers are unknown — said once, with no count.
+                "The decoder could not read this block's updates"
+              : b
               ? `Carried ${b.updates.toLocaleString()} ${b.updates === 1 ? "update" : "updates"} for ${unit}, signed by ${b.signers.toLocaleString()} ${b.signers === 1 ? "validator" : "validators"}`
               : exact
                 ? "This snapshot's read names no such block"
@@ -95,7 +99,7 @@ export default function DataBlockPane({ onClose, collapsed, onToggle }: { onClos
                   ? "Read failed"
                   : "Reading the snapshot that carried it"}
           </Lead>
-          {b && b.kinds.length > 0 && (
+          {b && !b.unread && b.kinds.length > 0 && (
             <div className="mt-2 mb-2">
               <SectionLabel label="Updates" total={b.updates.toLocaleString()} className="mb-0.5" />
               {/* COUNTS BY KIND (option A, 2026-11-09): the card table, each kind's share marked in the
@@ -114,9 +118,11 @@ export default function DataBlockPane({ onClose, collapsed, onToggle }: { onClos
           )}
           {b && (
             <FactGroup>
-              <Fact label="Signed by">
-                <span className="inline-flex items-center gap-1">{b.signers.toLocaleString()} <LayerWho who={SIGNER_GROUPS.dataBlocks.who} /></span>
-              </Fact>
+              {!b.unread && (
+                <Fact label="Signed by">
+                  <span className="inline-flex items-center gap-1">{b.signers.toLocaleString()} <LayerWho who={SIGNER_GROUPS.dataBlocks.who} /></span>
+                </Fact>
+              )}
               <Fact label="Size">{fmtKB(b.bytes / 1024)}</Fact>
             </FactGroup>
           )}
