@@ -21,7 +21,7 @@ import { METAGRAPHS } from "@/src/net/current";
 import { hasLevel, type CohortSel, type CompositionSel } from "./focusLadder";
 import { is3D } from "./viewTransition";
 import { UNLISTED_KEY } from "./ledgerBands";
-import { VIEW_POLICIES, readsBlockWindow } from "./viewPolicy";
+import { VIEW_POLICIES, drawsDataBlocks, readsBlockWindow } from "./viewPolicy";
 
 export type ClickAction =
   | { kind: "filter"; id: string }                                             // commit the network filter
@@ -49,9 +49,6 @@ export type ClickAction =
   // (2026-10-07). Like `trendFocus`, a view-local subject, not a ladder rung: no pose, no cascade.
   | { kind: "trendCursor"; ms: number | null };
 
-/** A BLOCK IS IN EXACTLY ONE SNAPSHOT (spec, "Rules"): every builder that pins a tick releases a
- *  committed block that tick cannot contain, FIRST (finest first); a builder that keeps the block's
- *  own tick (`anchorOrd`) keeps the block. The one home of that release, so no builder re-derives it. */
 /** A BLOCK'S PLACE IN THE RAIL (2026-11-08 — user: a DAG block reached under a DED metagraph snapshot,
  *  "this must be much more structurally sound"). A DAG block is the global's own: Global → Block, no
  *  network or metagraph snapshot between. A token block is its accepting metagraph snapshot's:
@@ -77,7 +74,10 @@ export function blockInPlace(
   return !tn || sameNet(tn.metaId, block.chain);
 }
 
-/** The one release of a block a commit leaves out of place (`blockInPlace`). */
+/** A BLOCK IS IN EXACTLY ONE SNAPSHOT (spec, "Rules"): every builder that pins a tick releases a
+ *  committed block that tick cannot contain, FIRST (finest first); a builder that keeps the block's
+ *  own tick (`anchorOrd`) keeps the block. The one release of a block a commit leaves out of place
+ *  (`blockInPlace`), so no builder re-derives it. */
 function releaseBlock(
   out: ClickAction[],
   block: BlockSel | null | undefined,
@@ -722,7 +722,7 @@ export function registerSwitchActions(
 ): ClickAction[] {
   const out: ClickAction[] = [];
   // A data block is the Data blocks register's alone: any other register drops it, finest first.
-  if (current.dataBlock && to !== "data") out.push({ kind: "dataBlock", sel: null });
+  if (current.dataBlock && !drawsDataBlocks(to)) out.push({ kind: "dataBlock", sel: null });
   // A block is Transaction blocks' alone.
   if (current.block && !readsBlockWindow(to)) out.push({ kind: "block", sel: null });
   // The metagraph snapshot stays wherever it is the register's subject (a block-carrying one in

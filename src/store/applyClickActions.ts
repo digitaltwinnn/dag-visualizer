@@ -8,7 +8,7 @@ import { useStore } from "./store";
 import { finestRung } from "@/src/engine/domain/focusLadder";
 import { registerSwitchActions, type ClickAction } from "@/src/engine/domain/pickActions";
 import type { LedgerRegister } from "@/src/store/mode";
-import { readsBlockWindow } from "@/src/engine/domain/viewPolicy";
+import { drawsDataBlocks, readsBlockWindow } from "@/src/engine/domain/viewPolicy";
 import { snapshotIsSubject } from "@/src/data/ladderLevels";
 import { REGISTER_SUBJECTS } from "@/src/data/ledgerMeasure";
 import { tickBlockSnaps } from "@/src/data/blockWindow";
@@ -200,6 +200,6 @@ export function switchLedgerRegister(to: LedgerRegister): void {
   // Only Transaction blocks draws a block, so every other register drops its hover preview.
   if (!readsBlockWindow(to) && st.hoverBlock) st.setHoverBlock(null);
   // …and only Data blocks draws a data block's mark.
-  if (to !== "data" && st.hoverDataBlock) st.setHoverDataBlock(null);
+  if (!drawsDataBlocks(to) && st.hoverDataBlock) st.setHoverDataBlock(null);
   st.setLedgerRegister(to);
 }

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { Mode } from "@/src/store/store";
 import type { LedgerRegister } from "@/src/store/mode";
-import { REGISTER_SOURCE, VIEW_POLICIES, readsBlockWindow, registerOf } from "./viewPolicy";
+import { REGISTER_DATA_BLOCKS, REGISTER_SOURCE, VIEW_POLICIES, drawsDataBlocks, readsBlockWindow, registerOf } from "./viewPolicy";
 import { is3D } from "./viewTransition";
 
 const MODES: Mode[] = ["hyper", "geo", "ledger", "trend", "soon"];
@@ -255,6 +255,8 @@ describe("the trends view is registered and inert", () => {
     // Every register the Snapshots view offers is in the map.
     for (const r of VIEW_POLICIES.ledger.registers) expect(REGISTER_SOURCE[r]).toBeDefined();
     expect(readsBlockWindow("blocks")).toBe(true);
+    expect([drawsDataBlocks("data"), drawsDataBlocks("snapshots"), drawsDataBlocks("blocks")]).toEqual([true, false, false]);
+    expect(Object.keys(REGISTER_DATA_BLOCKS).sort()).toEqual(Object.keys(REGISTER_SOURCE).sort());
     expect(readsBlockWindow("snapshots")).toBe(false);
     expect(readsBlockWindow("data")).toBe(false);
   });

@@ -1,4 +1,5 @@
 import type { LedgerRegister } from "@/src/store/mode";
+import { drawsDataBlocks, readsBlockWindow } from "./viewPolicy";
 
 // WHICH SUBJECT THE SNAPSHOTS VIEW LABELS ON THE SCENE (2026-11-07, user: the Data block "has no
 // callout yet, instead I see both global and metagraph snapshot callouts", and in Transaction blocks
@@ -36,13 +37,13 @@ export interface CalloutSubjectInput {
 
 /** The one subject the scene labels, or null for no label. */
 export function calloutSubject(i: CalloutSubjectInput): CalloutSubject {
-  const inBlocks = i.register === "blocks";
+  const inBlocks = readsBlockWindow(i.register);
   const global = i.hasSnap && !inBlocks ? "global" : null;
   switch (i.boxedCard) {
     case "snap": if (global) return global; break;
     case "metaSnap": if (i.hasMetaSnap) return "metaSnap"; break;
     case "block": if (inBlocks && i.hasBlock) return "block"; break;
-    case "dataBlock": if (i.register === "data" && i.hasDataBlock) return "dataBlock"; break;
+    case "dataBlock": if (drawsDataBlocks(i.register) && i.hasDataBlock) return "dataBlock"; break;
     case "context": return i.lane ? "lane" : i.hasMetaSnap ? "metaSnap" : global;
   }
   // No subject card open: the register's rest card, then the nearest rung that stands.

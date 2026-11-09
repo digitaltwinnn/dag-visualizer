@@ -497,3 +497,15 @@ export const REGISTER_SOURCE: Readonly<Record<LedgerRegister, RegisterSource>> =
 export function readsBlockWindow(register: LedgerRegister): boolean {
   return REGISTER_SOURCE[register] === "blocks";
 }
+/** WHICH REGISTERS DRAW DATA BLOCKS as subjects (review M8, 2026-11-09): a keyed row like
+ *  `REGISTER_SOURCE`, so the data-block release, the hover clear and the callout subject ask it
+ *  rather than comparing `register === "data"` — a fourth register is a compile error here. */
+export const REGISTER_DATA_BLOCKS: Readonly<Record<LedgerRegister, boolean>> = {
+  snapshots: false,
+  blocks: false,
+  data: true,
+};
+/** Does this register draw data blocks (and commit them as its subjects)? */
+export function drawsDataBlocks(register: LedgerRegister): boolean {
+  return REGISTER_DATA_BLOCKS[register];
+}
