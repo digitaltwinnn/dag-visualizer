@@ -264,14 +264,23 @@ describe("the block slot", () => {
     // The same stack in Metagraph snapshots boxes the Metagraph card as it always did.
     expect(focusSlotId({ ...details({ mode: "ledger", ledgerRegister: "snapshots", snap: snapPick, filter: "dor", filterLabel: "DOR" }), selStack: ["network" as const] })).toBe("context");
   });
-  // D3 (user, 2026-11-07): in the Blocks register live follows the newest block, so the Block card
-  // is the register's subject even when no reader picked it — the default box, ahead of the note.
-  it("the LIVE block (seated by the follow, unranked) is the default focus in the Blocks register, ahead of the note", () => {
-    expect(focusSlotId({ ...blocks({ snap: snapPick, block, noteAbsent: false }), selStack: [] })).toBe("block");
+  // User, 2026-11-09: "Each view opens on the Gate AI cards, each sub-view should do the same" — the
+  // 2026-11-07 rule that boxed the live block ahead of the note is retired; the seat is what the note
+  // folds onto, and the box only where no note stands.
+  it("every register rests on the note; the live seat (unranked) is the focus only with no note", () => {
+    expect(focusSlotId({ ...blocks({ snap: snapPick, block, noteAbsent: false }), selStack: [] })).toBe("notes");
+    expect(focusSlotId({ ...blocks({ snap: snapPick, block, noteAbsent: true }), selStack: [] })).toBe("block");
     // A card the reader picked still wins.
     expect(focusSlotId({ ...blocks({ snap: snapPick, block, noteAbsent: false }), selStack: ["snap"] })).toBe("snap");
-    // In the Snapshots register the rest stays the note's (R70).
-    expect(focusSlotId({ ...details({ mode: "ledger", snap: snapPick, noteAbsent: false }), selStack: [] })).toBe("notes");
+    // Metagraph snapshots' seat is its live metagraph snapshot.
+    const metaSnap = { metaId: "dor", ordinal: 5, hash: "", globalOrdinal: 42, ts: "t" };
+    expect(focusSlotId({ ...details({ mode: "ledger", snap: snapPick, metaSnap, noteAbsent: false }), selStack: [] })).toBe("notes");
+    expect(focusSlotId({ ...details({ mode: "ledger", snap: snapPick, metaSnap, noteAbsent: true }), selStack: [] })).toBe("metaSnap");
+  });
+  it("a network committed INSIDE the tick is the reader's choice, never a lens: its card is the box over the seat", () => {
+    const metaSnap = { metaId: "dor", ordinal: 5, hash: "", globalOrdinal: 42, ts: "t" };
+    const s = { ...details({ mode: "ledger", snap: snapPick, metaSnap, tickNet: { metaId: "dor", globalOrdinal: 42 } }), selStack: ["network" as const] };
+    expect(focusSlotId(s)).toBe("context");
   });
   it("Blocks' ghosts: the tick's, the network's, the tile's and the block's — no node's", () => {
     expect(ghostIds(detailsCards(blocks()))).toEqual(["snap", "context", "metaSnap", "block"]); // no node (no signer rung there); the data block ghosts in its own register alone

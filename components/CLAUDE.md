@@ -188,9 +188,11 @@ footer's About link is their one door. One state survives on the trigger by rule
 network CODE in the live accent off mainnet — "which chain am I looking at" never goes missing.
 One mount at every width; the filter strip's second row, the trio's old phone home, retired with it). The bar has **one grow-downward slot with four tenants** (a which-strip enum makes
 them mutually exclusive by construction): the FILTER button opens the network-chip strip (hovering
-previews the dim, picking closes it), **The phone face's name is a step up (title size) and SLIDES SIDEWAYS on a ‹ › press or a swipe**
-(user, 2026-10-19: "the text has the odometer effect while here it should animate horizontally") —
-`faceFrom` in TopBar; a pick from the list keeps the roll-in. **on phone the view switch is ONE face — the current view's
+previews the dim, picking closes it), **The phone face's name is a step up (title size) and ROLLS SIDEWAYS on a ‹ › press or a swipe**
+(user, 2026-10-19: "the text has the odometer effect while here it should animate horizontally";
+2026-11-09: "too fast") — a horizontal ODOMETER, `components/SlideFace.tsx`, shared with the register
+face: the old name leaves as the new one arrives, on `--tempo-roll` and `--ease-roll`, each travelling
+the mean of the two widths so they abut and never cross; a pick from the list keeps the roll-in. **on phone the view switch is ONE face — the current view's
 icon and name, FLANKED BY ‹ › since 2026-10-18 (Vercel analytics: three quarters of visitors on a
 phone and most never leaving "/"; the swipe and the pip row were the only hints that other views
 exist, and neither reads as a control — the chevrons step through the same `stepView`, dimmed at
@@ -1111,8 +1113,11 @@ halves never fit 360px (from D6 to then the unlit ones were cut to a glyph and a
 crowded the row), so the face carries the lit register WHOLE — glyph, name, live / pinned, the clock
 span and the count, the desktop half's exact content — and the chevrons step the registers in the
 view's order through the one door, dimmed at an end, the view face's own chevron (`TopBar`'s
-`viewChevron`: 24px box, 16px muted glyph, `TOUCH_HIT`), the name sliding in from the side it came
-from. No pip row: the view face retired its pips for the chevrons (user, 2026-10-18: "has both … the
+`viewChevron`: 24px box, 16px muted glyph, `TOUCH_HIT`), the face rolling in from the side it came
+from on the view face's horizontal odometer (`SlideFace`). **The face rests UNWASHED** (user,
+2026-11-09: "it keeps the focus while idle"): the selection wash marks the lit station among three
+on the desktop; on a lone face it read as a pressed button that never let go — the glyph in the
+accent and the name in the foreground ink, as the view face. No pip row: the view face retired its pips for the chevrons (user, 2026-10-18: "has both … the
 <> is more intuitive"). Both presentations stay in the DOM and CSS picks at 700px. The glyphs are `REGISTER_ICONS` (Data blocks wears `Database`: the metagraph
 kind "data" wears `Blocks`, the transaction block's own mark). The span words are
 `src/data/ledgerSpan.ts`'s, the ONE home the explorer's foot reads too
@@ -1145,10 +1150,10 @@ rows carry (user: "'live' is fine in the header but is not shown in the explorer
 its write `blockFollowActions`), the Global snapshot card keeps only its age there WHILE A BLOCK CARD
 STANDS — with none (a pin carried in from another register, the block's ×, a re-click releasing it)
 the Global card carries the control again (`blockWindow.liveControlCard`, review I1: else nothing said
-PINNED and nothing offered LIVE) — a click on the live block PINS it, and the Block card is the register's DEFAULT BOX ahead of the note — and ahead of a NETWORK FILTER's card
+PINNED and nothing offered LIVE) — a click on the live block PINS it, and the Block card is the register's SEAT: the card the AI note folds onto, ahead of a NETWORK FILTER's card
 (user, 2026-11-08: under a DOR filter the Metagraph dossier opened as the box and pushed the live
-block out of the rail; the filter is a lens there, so its card stands folded above the block) (`focusSlotId`; the
-view is entered on the auto rule, not the note's pin — `LaneCollapseState.seats`). Pinned by
+block out of the rail; the filter is a lens there, so its card stands folded above the block) (`focusSlotId`;
+the register is entered on its note — **A REGISTER OPENS ON ITS NOTE**, below). Pinned by
 `src/store/followFlow.test.ts`'s Blocks cases, `selStack.test.ts`, `railCards.test.ts` and
 `railCollapse.test.ts`. **A pin keeps saying PINNED while the feed is down** (ruling, 2026-11-07,
 both subjects of `FollowControl`): the pin is a selection fact an unreachable feed does not change, and
@@ -1172,12 +1177,19 @@ chamber does not draw. **Under a committed block the Metagraph snapshot slot is 
 the two cards "switch places" — a DAG block commits no snapshot, and the slot's ghost dropped below
 the block card, since ghosts wait under the chosen cards): a token block's snapshot is present, a DAG
 block's slot shows no ghost, so the lane holds still. **No Node card there** (user, 2026-11-07: "node is really out of place in this view") —
-nor anywhere in the view since 2026-11-08 (above). **Entering the register opens the Block card**
-(user, 2026-11-08: "the callout says transaction block while the right rail card shows the global
-snapshot card → transaction block is the best card to open when we enter this view/mode"): the
-store's `setLedgerRegister` drops the tick's rank on the way in, so the register's rest rule seats
-the block, and the switch is a selection moment (`railSelectionKey` carries the register), so a
-hand-opened box does not hold the next register's card folded. A block is a sibling subject of the
+nor anywhere in the view since 2026-11-08 (above). **A REGISTER OPENS ON ITS NOTE, AND THE NOTE
+FOLDS ONTO ITS SEAT** (user, 2026-11-09: "Each view opens on the Gate AI cards, each sub-view should
+do the same. The 'default' callout should be a 'metagraph snapshot' | 'transaction block' | 'data
+block', when we close the AI card … the actual called out subject should be shown" — superseding
+2026-11-08's "transaction block is the best card to open when we enter this view/mode"). Each
+register's live follow seats its own subject (`REGISTER_SEAT`, `src/store/mode.ts`: the newest
+metagraph snapshot, the newest block, the live snapshot's first data block); a register switch is an
+ENTRY like a view's (Inspector counts it as one, so `overridesOnViewEntry` pins the note open); the
+note is the box while nothing is chosen (`focusSlotId`) and the callout names the seat meanwhile
+(`calloutSubject`'s rest rule); the note's − opens the card under it (`overridesOnNoteFold`, the
+focus the lane has without its note — `useLadderFocus(true)`), so the callout and the box never
+disagree. The store's `setLedgerRegister` drops the tick's rank on the way in, so a Global snapshot
+card carried in is not the card under the note. A block is a sibling subject of the
 tick, not the snapshot's child — so **its ghost has a step of its
 own** (`railSiblings.blockStep`, 2026-11-07, user: "when clicked nothing happens"): the shown tick's
 first block from the window (`useSiblingState`'s `tickBlocks`), through the block click's builder,
@@ -1264,9 +1276,8 @@ snapshot's first data block (`railSiblings.dataBlockStep`), its pager the snapsh
 (`siblingSet("dataBlock")`), **and LIVE seats it** (user, 2026-11-08: "entering data blocks, open the
 data block card"): the register's follow rides the live snapshot's FIRST data block through the
 non-bumping `advanceDataBlock`, as Transaction blocks rides its newest block, so the Data block card
-is the register's own box on entry — `REGISTER_SEAT` (`src/store/mode.ts`) is the one home of which
-subject a register seats, read by the store (a tick's rank drops on the way in), `focusSlotId`'s rest
-rule and the view-entry pins; a reader's step to another block holds, and a release re-seats on the
+is the register's seat, the card its note folds onto — `REGISTER_SEAT` (`src/store/mode.ts`) is the one
+home of which subject a register seats; a reader's step to another block holds, and a release re-seats on the
 next beat, the live block's own rule.
 **The Global snapshot CARD's body opens with the register's section too** (user: "work on the global snapshot body also"):
 `inspector/SnapshotRegister.tsx` (the design round's picks, data 1 / transaction 1) —

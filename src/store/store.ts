@@ -24,7 +24,6 @@ import { UNLISTED_ID } from "@/src/data/unlistedId";
 // gallery inside it still previews each coming feature). `trend` (2026-09-18) is the measured
 // history view — chart planes as the scene, convention 12's MEASURED HISTORY rung made a view.
 import type { Mode, LedgerRegister } from "@/src/store/mode";
-import { REGISTER_SEAT } from "@/src/store/mode";
 export type { Mode, LedgerRegister };
 
 // The stored metric every trend plane draws — one picker, one column (see `trendMetric` below).
@@ -1020,16 +1019,15 @@ export const useStore = create<AppState>((set) => ({
   setTrendMetric: (metric) => set({ trendMetric: metric, motionCause: { kind: "measure", id: metric } }),
   setLedgerMeasure: (measure) => set({ ledgerMeasure: measure }),
   setDataMeasure: (dataMeasure) => set({ dataMeasure }),
-  // ENTERING TRANSACTION BLOCKS OPENS THE BLOCK CARD (user, 2026-11-08: "the callout says transaction
-  // block while the right rail card shows the global snapshot card → transaction block is the best
-  // card to open when we enter this view/mode"): a tick ranked in another register (a pin, a row click)
-  // loses its rank here, so the register's rest rule seats the block (`focusSlotId`); the pin itself
-  // stays. The switch is a selection moment too (`railSelectionKey`), so hand-made folds drop.
+  // A REGISTER IS ENTERED ON ITS NOTE, AND THE NOTE FOLDS ONTO ITS SEAT (user, 2026-11-08 and
+  // 2026-11-09 — `REGISTER_SEAT`): a tick ranked in another register (a pin, a row click) loses its
+  // rank here, so the card under the note is the register's own subject, not a Global snapshot card
+  // carried in; the pin itself stays. The switch is an ENTRY (Inspector's, like a view's).
   setLedgerRegister: (ledgerRegister) =>
     set((s) => ({
       ledgerRegister,
       motionCause: { kind: "register", id: ledgerRegister },
-      selStack: REGISTER_SEAT[ledgerRegister] ? bumpStack(s.selStack, "snap", false) : s.selStack,
+      selStack: bumpStack(s.selStack, "snap", false),
     })),
   setBlockMeasure: (blockMeasure) => set({ blockMeasure }),
   // A block is a committed subject like the tile: it ranks in the recency stack, so its card is the

@@ -40,12 +40,18 @@ describe("calloutSubject — the box leads", () => {
 });
 
 describe("calloutSubject — at rest, the register's live subject, and never two", () => {
-  it("Metagraph snapshots and Data blocks: the global snapshot (its lead speaks the register); else the snapshot, else the lane", () => {
-    expect(at({ hasMetaSnap: true, lane: true })).toBe("global");
-    expect(at({ register: "data", hasDataBlock: true, hasMetaSnap: true })).toBe("global");
-    expect(at({ hasSnap: false, hasMetaSnap: true, lane: true })).toBe("metaSnap");
+  // User, 2026-11-09: "the 'default' callout should be a 'metagraph snapshot' | 'transaction block' |
+  // 'data block'" — the register's seat, the card the note folds onto.
+  it("Metagraph snapshots: the live metagraph snapshot; else the global, else the lane", () => {
+    expect(at({ hasMetaSnap: true, lane: true })).toBe("metaSnap");
+    expect(at({ hasSnap: true, hasMetaSnap: false, lane: true })).toBe("global");
     expect(at({ hasSnap: false, lane: true })).toBe("lane");
     expect(at({ hasSnap: false })).toBeNull();
+  });
+  it("Data blocks: the live data block; else its snapshot, else the global", () => {
+    expect(at({ register: "data", hasDataBlock: true, hasMetaSnap: true })).toBe("dataBlock");
+    expect(at({ register: "data", hasMetaSnap: true })).toBe("metaSnap");
+    expect(at({ register: "data" })).toBe("global");
   });
   it("Transaction blocks: the block (no global is drawn there); else the snapshot, else the lane", () => {
     expect(at({ register: "blocks", hasBlock: true, hasMetaSnap: true })).toBe("block");
@@ -55,7 +61,7 @@ describe("calloutSubject — at rest, the register's live subject, and never two
     expect(at({ register: "blocks", boxedCard: "snap" })).toBeNull();
   });
   it("a data block is never a Transaction blocks or Metagraph snapshots subject", () => {
-    expect(at({ register: "snapshots", boxedCard: "dataBlock", hasDataBlock: true, hasMetaSnap: true })).toBe("global");
+    expect(at({ register: "snapshots", boxedCard: "dataBlock", hasDataBlock: true, hasMetaSnap: true })).toBe("metaSnap");
     expect(at({ register: "blocks", boxedCard: "dataBlock", hasDataBlock: true, hasBlock: true })).toBe("block");
   });
 });

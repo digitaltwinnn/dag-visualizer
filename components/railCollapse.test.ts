@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  boxedSlotOf, displayOrder, hasFoldControl, isCollapsed, openBoxes, openDefaultOf, overridesOnNoteStandDown, overridesOnSelection, overridesOnViewEntry, railSelectionKey, subjectRunEnd,
+  boxedSlotOf, displayOrder, hasFoldControl, isCollapsed, openBoxes, openDefaultOf, overridesOnNoteFold, overridesOnNoteStandDown, overridesOnSelection, overridesOnViewEntry, railSelectionKey, subjectRunEnd,
   type LaneCollapseState, type SelectionKeyState,
 } from "@/components/railCollapse";
 import { detailsCards, focusSlotId, ladderSlotIds, type RailManifestState } from "@/components/railCards";
@@ -118,18 +118,15 @@ describe("a view switch (`overridesOnViewEntry`)", () => {
     const pinnedTick = rail(manifest({ mode: "ledger", snap: snapPick }), after, ["snap"]);
     expect(openBoxes(rail(manifest({ mode: "ledger", snap: snapPick }), apply(after, overridesOnSelection(pinnedTick)), ["snap"]))).toEqual(["snap"]);
   });
-  // D3 (user, 2026-11-07): in the Blocks register live follows the newest block and the Block card
-  // is the register's default box. The note pinned open on arrival stood beside the live block's
-  // arriving box (two boxes, found live): where the register SEATS its own subject, the view is
-  // entered on the auto rule instead — the note while nothing stands, the live block once it lands.
-  it("D3: Blocks is entered on the auto rule, not the note's pin — the note alone, then the live block alone", () => {
+  // User, 2026-11-09: "each sub-view should do the same" — a register is entered on its note like a
+  // view; its live subject lands a beat later, unpinned, and the auto rule folds it under the note.
+  it("a register is entered on its note: the note alone, then the live block lands folded beneath it", () => {
     const block = { chain: "dag", hash: "h", ordinal: 42, anchorOrd: 42 };
     const blocks = (over: Partial<RailManifestState>) => manifest({ mode: "ledger", ledgerRegister: "blocks", ...over });
     const hyper = rail(manifest({}), {});
-    const entry = { ...rail(blocks({}), hyper.overrides), seats: "block" };
-    const after = apply(hyper.overrides, overridesOnViewEntry(entry));
+    const after = apply(hyper.overrides, overridesOnViewEntry(rail(blocks({}), hyper.overrides)));
     expect(openBoxes(rail(blocks({}), after))).toEqual(["notes"]);
-    expect(openBoxes(rail(blocks({ snap: snapPick, block }), after))).toEqual(["block"]);
+    expect(openBoxes(rail(blocks({ snap: snapPick, block }), after))).toEqual(["notes"]);
   });
   it("without a note (off mainnet, or none for the subject), a subject box the reader opened survives the switch, and nothing is pinned when the departing box was no subject", () => {
     const m = manifest({ filter: "dor", inspect: nodePick, noteAbsent: true });
@@ -142,6 +139,25 @@ describe("a view switch (`overridesOnViewEntry`)", () => {
     const noteOpen = openByHand(withNote, "notes");
     const arrivingBare = (o: Overrides) => rail(manifest({ mode: "geo", filter: "dor", noteAbsent: true }), o, ["network"]);
     expect(openBoxes(arrivingBare(apply(noteOpen, overridesOnViewEntry(arrivingBare(noteOpen)))))).toEqual(["context"]);
+  });
+});
+
+// User, 2026-11-09: "when we close the AI card … the actual called out subject should be shown".
+describe("folding the note (`overridesOnNoteFold`)", () => {
+  const block = { chain: "dag", hash: "h", ordinal: 42, anchorOrd: 42 };
+  const blocks = manifest({ mode: "ledger", ledgerRegister: "blocks", snap: snapPick, block });
+  it("opens the card under it — the register's seat — and drops the entry's pins: one box, the subject's", () => {
+    const entered = apply({}, overridesOnViewEntry(rail(blocks, {})));
+    const r = rail(blocks, entered);
+    expect(openBoxes(r)).toEqual(["notes"]);
+    const folded = apply(entered, overridesOnNoteFold(r, "notes", "block"));
+    expect(openBoxes(rail(blocks, folded))).toEqual(["block"]);
+    expect(folded.notes).toBe(true);
+  });
+  it("with nothing under the note (or the note itself named) it only folds", () => {
+    const r = rail(manifest({ mode: "ledger" }), { notes: false });
+    expect(overridesOnNoteFold(r, "notes", null)).toEqual({ notes: true });
+    expect(overridesOnNoteFold(r, "notes", "notes")).toEqual({ notes: true });
   });
 });
 

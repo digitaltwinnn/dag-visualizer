@@ -24,9 +24,6 @@ export interface LaneCollapseState {
   focusId: string | null;
   /** `store.railCollapse`. */
   overrides: Readonly<Record<string, boolean | undefined>>;
-  /** A subject slot the view's register SEATS by itself as its default box — the Blocks register's
-   *  live block (D3: live follows the newest block there, `focusSlotId`). Absent everywhere else. */
-  seats?: string | null;
 }
 
 /** DOES THIS CARD WEAR THE − (`RailFold`; user, 2026-11-03)? The written-context card (the AI
@@ -90,11 +87,8 @@ export function overridesOnSelection(s: Pick<LaneCollapseState, "overrides">): R
  *  live tick pinned shut stayed shut). */
 export function overridesOnViewEntry(s: LaneCollapseState): Record<string, boolean | null> {
   const cleared = overridesOnSelection(s);
-  // A REGISTER THAT SEATS ITS OWN SUBJECT is entered on the auto rule (D3): the Blocks register's
-  // live block is its default box, and it lands a beat after the view (its window is read on
-  // arrival), so a note pinned open here stood beside it — two boxes. Unpinned, the note is the box
-  // while nothing stands and folds when the live block arrives.
-  if (s.seats) return cleared;
+  // A REGISTER is entered here too (user, 2026-11-09: "each sub-view should do the same"); its live
+  // subject lands a beat later with no pin, and the auto rule folds it under the note (`focusSlotId`).
   const subjects = s.lane.filter((id) => isSubjectSlot(id) && s.present(id));
   const note = s.lane.find((id) => !isSubjectSlot(id) && s.present(id));
   if (note != null) return { ...cleared, [note]: false, ...Object.fromEntries(subjects.map((id) => [id, true])) };
@@ -102,6 +96,15 @@ export function overridesOnViewEntry(s: LaneCollapseState): Record<string, boole
   // lane has none: pin nothing (I1).
   if (Object.entries(s.overrides).some(([id, v]) => v === false && !isSubjectSlot(id))) return cleared;
   return { ...cleared, ...Object.fromEntries(subjects.map((id) => [id, isCollapsed(s, id)])) };
+}
+
+/** WHAT FOLDING THE NOTE WRITES (user, 2026-11-09: "when we close the AI card … the actual called
+ *  out subject should be shown"). The note is the box on arrival and the callout meanwhile names the
+ *  subject under it — a register's seat, a chosen card — so the fold OPENS that card: the entry's pins
+ *  drop, the note is pinned folded, and `next` (the focus the lane has without its note,
+ *  `focusSlotId` with `noteAbsent`) is pinned open. With nothing under the note it only folds. */
+export function overridesOnNoteFold(s: LaneCollapseState, note: string, next: string | null): Record<string, boolean | null> {
+  return { ...overridesOnSelection(s), [note]: true, ...(next && next !== note && s.present(next) ? { [next]: false } : {}) };
 }
 
 /** WHAT THE NOTE'S STAND-DOWN WRITES (review 2026-10-29). A view is entered while its note is still

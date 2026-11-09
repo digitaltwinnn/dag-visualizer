@@ -346,3 +346,29 @@ describe("the follow flow in the Data blocks register", () => {
     expect(st().snap?.data.ordinal).toBe(102);
   });
 });
+
+// METAGRAPH SNAPSHOTS' LIVE SEAT (user, 2026-11-09: the default callout is "a 'metagraph snapshot'"):
+// unfiltered, the follow seats the newest read tick's newest metagraph snapshot — the Data blocks
+// rule with every snapshot counting — and no data block; before any read lands, the plain follow.
+describe("the follow flow in the Metagraph snapshots register", () => {
+  const g = (ordinal: number) => ({ ordinal, timestamp: `T${ordinal}`, hash: `h${ordinal}` }) as GlobalSnapshot;
+  const row = (metaId: string, ordinal: number) => ({ metaId, ordinal, decoded: true, fee: 0, bytes: 0, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null, dataBlocks: 0, dataTxCount: 0 });
+  const exact = (ordinal: number, rows: ReturnType<typeof row>[]) => ({ ordinal, anchored: rows.length, channels: 1, totalFee: 0, totalSizeKB: 0, rewardsDatum: 0, listedFee: 0, unlistedFee: 0, listedCount: 0, unlistedCount: 0, perMeta: {}, rows }) as unknown as SnapshotExact;
+  beforeEach(() => {
+    useStore.setState({ mode: "ledger", ledgerRegister: "snapshots", following: true, snap: null, metaSnap: null, dataBlock: null, filter: "all", selStack: [], snapshotExact: {} });
+    fakeNet.globalSnapshots = [g(100), g(101), g(102)];
+  });
+  it("seats the newest read tick's newest snapshot, unranked, with no data block", () => {
+    useStore.setState({ snapshotExact: { 101: exact(101, [row(LISTED, 7), row(LISTED, 8)]) } });
+    followLatest();
+    expect(st().snap?.data.ordinal).toBe(101);
+    expect(st().metaSnap).toMatchObject({ metaId: LISTED, ordinal: 8, globalOrdinal: 101 });
+    expect(st().dataBlock).toBeNull();
+    expect(st().selStack).toEqual([]);
+  });
+  it("with no read tick yet, the plain follow stands on the newest global", () => {
+    followLatest();
+    expect(st().snap?.data.ordinal).toBe(102);
+    expect(st().metaSnap).toBeNull();
+  });
+});

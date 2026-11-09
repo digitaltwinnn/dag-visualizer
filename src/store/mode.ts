@@ -10,11 +10,13 @@ export type Mode = "hyper" | "geo" | "ledger" | "trend" | "soon";
 // a type import back into the store would close a cycle. The store re-exports it.
 export type LedgerRegister = "snapshots" | "blocks" | "data";
 
-/** THE SUBJECT A REGISTER SEATS BY ITSELF — the card slot its live follow fills and the register is
- *  ENTERED on (user, 2026-11-08: "transaction block is the best card to open when we enter this
- *  view/mode"; "entering data blocks, open the data block card"): the Blocks register's live block,
- *  the Data blocks register's live data block (the live snapshot's first). Metagraph snapshots seats
- *  none: its live global and snapshot leave the note the box (R70). One home for the store (a tick's
- *  rank drops on the way in), the rail's focus (`focusSlotId`'s rest rule) and the view-entry pins
- *  (`LaneCollapseState.seats`). */
-export const REGISTER_SEAT: Readonly<Record<LedgerRegister, "block" | "dataBlock" | null>> = { snapshots: null, blocks: "block", data: "dataBlock" };
+/** THE SUBJECT A REGISTER SEATS BY ITSELF — the card slot its live follow fills and the callout
+ *  names while the AI note is the box: the Metagraph snapshots register's live METAGRAPH SNAPSHOT
+ *  (the newest read tick's newest), the Blocks register's live block, the Data blocks register's live
+ *  data block (the live snapshot's first). Every register is ENTERED ON ITS NOTE, as every view is
+ *  (user, 2026-11-09: "Each view opens on the Gate AI cards, each sub-view should do the same. The
+ *  'default' callout should be a 'metagraph snapshot' | 'transaction block' | 'data block', when we
+ *  close the AI card … the actual called out subject should be shown"): the seat is the card that
+ *  opens when the note folds. One home for the store (a tick's rank drops on the way in), the
+ *  rail's focus (`focusSlotId` — the filter is a lens beside a seat) and the live follow. */
+export const REGISTER_SEAT: Readonly<Record<LedgerRegister, "metaSnap" | "block" | "dataBlock">> = { snapshots: "metaSnap", blocks: "block", data: "dataBlock" };

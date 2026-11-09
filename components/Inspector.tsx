@@ -5,7 +5,6 @@ import { viewNetwork } from "@/src/engine/domain/viewNetwork";
 import { useStore } from "@/src/store/store";
 import { cn } from "@/lib/utils";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
-import { REGISTER_SEAT } from "@/src/store/mode";
 import { displayNetwork } from "@/src/data/unlisted";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { filterAccent } from "@/src/data/network";
@@ -25,9 +24,9 @@ import HeightEase from "@/components/HeightEase";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { useTouch } from "@/components/useTouch";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { detailsCards, ladderSlotIds, noteCardAbsent, type RailCard } from "@/components/railCards";
+import { detailsCards, isSubjectSlot, ladderSlotIds, noteCardAbsent, type RailCard } from "@/components/railCards";
 import { CHILD_OF, childStep, rootOf, rootStep, type SiblingStep, blockStep, dataBlockStep } from "@/components/railSiblings";
-import { displayOrder, hasFoldControl, isCollapsed, boxedSlotOf, overridesOnNoteStandDown, overridesOnSelection, overridesOnViewEntry, railSelectionKey, subjectRunEnd, type LaneCollapseState } from "@/components/railCollapse";
+import { displayOrder, hasFoldControl, isCollapsed, boxedSlotOf, overridesOnNoteFold, overridesOnNoteStandDown, overridesOnSelection, overridesOnViewEntry, railSelectionKey, subjectRunEnd, type LaneCollapseState } from "@/components/railCollapse";
 import { useSiblingState } from "@/components/useSiblingState";
 import { openRailCard } from "@/components/railOpen";
 import { useLadderFocus } from "@/components/useLadderFocus";
@@ -477,11 +476,10 @@ export default function Inspector() {
   // nothing else can produce. With no focus rung the FIRST present ladder card opens by default.
   // The decision itself is pure (`railCollapse.ts`, tested by outcome): the default card, the auto
   // fold, the box.
-  // A register that SEATS its own subject (the Blocks register's live block, D3; the Data blocks
-  // register's live data block, 2026-11-08 — `REGISTER_SEAT`, `focusSlotId`'s rest rule) is entered
-  // on the auto rule, which the view-entry pins must not fight (`overridesOnViewEntry`).
-  const seats = mode === "ledger" ? REGISTER_SEAT[ledgerRegister] : null;
-  const collapseState: LaneCollapseState = { lane: ladderIds, present: presentOf, focusId, overrides: railCollapse, seats };
+  const collapseState: LaneCollapseState = { lane: ladderIds, present: presentOf, focusId, overrides: railCollapse };
+  // …and the focus the lane has WITHOUT its note: the card folding the note opens (user, 2026-11-09 —
+  // `overridesOnNoteFold`), the subject the callout names while the note is the box.
+  const underNote = useLadderFocus(true);
   const effCollapsed = (id: string) => isCollapsed(collapseState, id);
   // Publish which slot is the BOX (store.boxedCard) — the same `present && !effCollapsed` that
   // renders it, so channel and render can't disagree (the data-tier lesson). The subject
@@ -549,7 +547,10 @@ export default function Inspector() {
     effCollapsed(id)
       // The one open-a-card routine (railOpen.ts). A non-ladder card (the snapshot slots) folds nothing.
       ? openRailCard(id, ladderIds.includes(id) ? presentLadderIds : [])
-      : setRailCollapse(id, true);
+      // FOLDING THE NOTE OPENS ITS SUBJECT (user, 2026-11-09): the card under it, never a lane of folds.
+      : !isSubjectSlot(id) && ladderIds.includes(id)
+        ? setRailCollapseMany(overridesOnNoteFold({ ...collapseState, overrides: useStore.getState().railCollapse }, id, underNote))
+        : setRailCollapse(id, true);
   const cx = (id: string) => ({ collapsed: effCollapsed(id), onToggle: () => toggleCollapse(id) });
   // A GHOST's disclosure (GhostCard's header has the why): its own override, outside the
   // single-open accordion — folded by default, `false` = open, cleared back to folded.
@@ -579,13 +580,16 @@ export default function Inspector() {
   }, []);
   const lastSelection = useRef(selectionKey);
   const lastMode = useRef(mode);
+  // A REGISTER is entered like a view (user, 2026-11-09: "each sub-view should do the same"): on its note.
+  const lastRegister = useRef(ledgerRegister);
   const modeEnteredAt = useRef(0);
   const lastCommits = useRef(0);
   useEffect(() => {
     if (lastSelection.current === selectionKey) return;
     lastSelection.current = selectionKey;
-    const modeChanged = lastMode.current !== mode;
+    const modeChanged = lastMode.current !== mode || (mode === "ledger" && lastRegister.current !== ledgerRegister);
     lastMode.current = mode;
+    lastRegister.current = ledgerRegister;
     // The reader's commits, counted ahead of the entry's return: the window below is for what ARRIVAL
     // commits, and a reader's commit inside it has to drop the pins, or the note the view was entered
     // on stands open beside the new card.
