@@ -261,7 +261,13 @@ function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; className?
               {m.lead.ident.text}
             </span>
           )}
-          {m.lead.pending && <NodeStars count={3} />}
+          {/* ONE TEXT LINE TALL (`h-[1lh]`, 2026-11-09: the stars alone made a 5px row, so they sat
+              against the rule instead of on the line their words land on). */}
+          {m.lead.pending && (
+            <span className="inline-flex h-[1lh] items-center">
+              <NodeStars count={3} />
+            </span>
+          )}
           {m.lead.text && <span className="min-w-0 truncate">{m.lead.text}</span>}
           {(!!m.lead.codes?.length || !!m.lead.chip) && <span className="flex-1 min-w-3" />}
           {m.lead.codes && m.lead.codes.length > 0 && <RoleChips codes={m.lead.codes} />}
