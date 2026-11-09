@@ -1,10 +1,9 @@
 import { ROLE_SHORT, roleKeyLabel } from "@/src/data/composition";
 import { fact, gaugeChange, heldLevel, networksAnchored, observedLevel } from "@/src/data/noteFacts";
-import { WHOLE_ACTIVITY_LABEL, activityFacts, lastWeekMean, weekStart } from "@/src/data/noteFactsActivity";
 import { notableDays } from "@/src/data/notableDays";
 import { WEEK_WORDS, countChange, eventChange, pickChanges } from "@/src/data/noteChanges";
 import type { Fact, NoteChange } from "@/src/data/noteTypes";
-import { anchorSeries, typeBands, withUnlisted } from "@/src/data/trendSeries";
+import { typeBands, withUnlisted } from "@/src/data/trendSeries";
 import { trimNewestPartial, type TrendsWindowData } from "@/src/data/trendWindow";
 import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 
@@ -12,14 +11,12 @@ import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 // WHAT, and the note leads with what CHANGED (user, 2026-10-27: a note that restates the breakdown
 // the card already shows "just describes the raw data in words"). The default note (subject `all`)
 // is the daily digest of the whole network — how many networks have nodes, which anchored lately
-// and which were quiet, the biggest by nodes and the most active, the up-to-three MOVERS (the
+// and which were quiet, the biggest by nodes, the up-to-three MOVERS (the
 // networks whose node count changed most over the span, start and end), anything that started or
-// stopped, how the node count moved, and global snapshots per day last week against the weeks
-// before. A network's note says who that network is (its catalog blurb, a non-numeric line),
+// stopped and how the node count moved. A network's note says who that network is (its catalog blurb, a non-numeric line),
 // how its SHAPE CHANGED (the layers and node combinations whose count differs between the span's
 // start and its end, both ends stated, plus how many layers changed — an exact 0 when the shape
-// held), how its node count moved, how its activity compares with the weeks before, and how
-// it ranks. A MAKE-UP'S note (a subject note: `{ net, type }`, the node-type card's selection) says
+// held), how its node count moved, and how it ranks by nodes. A MAKE-UP'S note (a subject note: `{ net, type }`, the node-type card's selection) says
 // how many of one network's nodes run that make-up over the span, beside the network's own level,
 // the make-up's share of it and how many make-ups the network has. `noteFactsTrend.ts` is the
 // reference builder and this one mirrors its idiom.
@@ -63,18 +60,10 @@ import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 //     role at all (unread); a combination band null at a sample (no type recorded) is unread; a
 //     level read from fewer than three samples is unknown and states nothing. Only the layers and
 //     combinations whose count DIFFERS are stated; an unchanged breakdown is the card's, not news;
-//   · activity is the global snapshots a network WAS PART OF per day (`m.<id>.ticks` through
-//     `anchorSeries`, which reads a pre-2026-10-08 zero as "not measured") over the last week of
-//     COMPLETE days, at least 4 of them measured, else no last-week reading, comparison or rank;
-//     "anchored" reads `m.<id>.snaps`. A network with no row is not ranked. "The
-//     weeks before" is the mean over the 21 complete days before that week, measured days
-//     only and at least 7 of them, else no fact; the ratio is stated only when both are above 0
-//     and differ. The whole network's is `g.ticks` (one per global snapshot), covered days only,
-//     under the same floors;
-//   · THE VIEW'S OWN FACTS FIRST, THE COMMON READING LAST (user, 2026-10-29; R74): a note "starts
-//     from its key view focus, then adds info about more app-common topics like snapshots". The
-//     structure (nodes, layers, movers, started / stopped) is this view's; the activity facts are
-//     the shared `noteFactsActivity.ts` and are appended after it, where the prompt asks for them;
+//   · NO ACTIVITY SENTENCE (user, 2026-11-09; the R74 common reading is retired): activity belongs
+//     to the Snapshots and History views, and here it repeated the same sentence. "anchored" reads
+//     `m.<id>.snaps` over the last week of complete days (WEEK_DAYS); the facts hold no global
+//     snapshots per day, no activity rank and no "most active network";
 //   · HOW MANY NETWORKS ANCHORED goes through `networksAnchored` on the folded series, so measured
 //     unlisted activity makes the count a floor (", at least");
 //   · "started" and "stopped" are Task 2's `first` / `last` read for every id, with the 30-day
@@ -89,8 +78,8 @@ import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 //     network's level and the make-up count are held levels, and the share is the make-up's end
 //     level over the network's, stated only when it is one (the level above 0, the part within it).
 //     Null when the make-up has no change to read (no sample, too few, or still moving at the end)
-//     or ends at 0: a make-up the network no longer runs is no subject. No activity, rank or
-//     common reading: the note is one card's, never the network's;
+//     or ends at 0: a make-up the network no longer runs is no subject. No activity or rank:
+//     the note is one card's, never the network's;
 //   · null when the fleet has no measured sample (and, for a network, none of its own).
 //
 // Pure: no store values, react or I/O (the colocated test is the specification — rule 4).
@@ -137,6 +126,9 @@ const SHAPE_TOLERANCE = 0.1;
 const SHAPE_SAMPLES = 6;
 const SHAPE_MIN_SAMPLES = 3;
 const RANK_WORD = ["", "second ", "third "] as const;
+
+/** "The last week": the complete days the who-anchored week reads. */
+const WEEK_DAYS = 7;
 
 type Points = readonly (number | null)[];
 
@@ -203,7 +195,7 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
   const d = trimNewestPartial({ ...input.daily, series: withUnlisted(input.daily.series, isListed, UNLISTED_ID) });
   const n = d.buckets.length;
   const covered = d.series["g.ticks"] ?? [];
-  const weekFrom = weekStart(n);
+  const weekFrom = Math.max(0, n - WEEK_DAYS);
   const coveredFrom = (lo: number) => covered.slice(lo).some((v) => v != null);
 
   /** A network's nodes on the last WHOLE day before the span (`throughEdgeOutage`): a daily gauge
@@ -213,15 +205,6 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
     for (let i = n - 1; i >= 0; i--) if (d.buckets[i]! + d.stepMs <= span.fromMs && pts[i] != null) return pts[i]!;
     return null;
   };
-
-  /** Activity per network over the last week: global snapshots it was part of, per day — the
-   *  COMMON reading (`noteFactsActivity.ts`), so the rank and the change fact read one figure. */
-  const activity = new Map<string, number>();
-  for (const id of ids) {
-    const v = lastWeekMean(anchorSeries(id, d.series));
-    if (v != null) activity.set(id, v);
-  }
-  const byActivity = [...activity].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 
   const facts: Fact[] = [];
   /** The card's rows, per kind of move (`pickChanges`): what started or stopped, then the counts. */
@@ -268,10 +251,6 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
     byNodes.slice(0, TOP).forEach((id, i) => {
       named.push(id);
       facts.push(fact(`${mention(id)}, nodes (${RANK_WORD[i]}biggest network)`, levelOf(id)!, "count"));
-    });
-    byActivity.slice(0, TOP).forEach(([id, v], i) => {
-      named.push(id);
-      facts.push(fact(`${mention(id)}, global snapshots it was part of per day, last week (${RANK_WORD[i]}most active network)`, v, "count"));
     });
 
     // THE MOVERS: the networks whose node count changed most over the span, by how many nodes.
@@ -331,9 +310,6 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
       }
     }
 
-    // THE COMMON READING, LAST (R74): the whole network's global snapshots per day (`g.ticks`
-    // counts them, one per global snapshot), covered days only — an uncovered day is null.
-    facts.push(...activityFacts(WHOLE_ACTIVITY_LABEL, covered));
   } else if (typeof subject === "object") {
     // ONE LAYER GROUP OF ONE NETWORK ("layer group" in every label a reader meets, never the code's
     // "make-up" — user, 2026-10-30: "not understandable for a human"; the rail's ghost hint already
@@ -435,13 +411,6 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
     if (own != null && own > 0) {
       facts.push(fact(`${name} rank by nodes`, 1 + byNodes.filter((id) => levelOf(id)! > own).length, "count"));
       facts.push(fact("Networks with nodes", withNodes.length, "count"));
-    }
-    // THE COMMON READING, LAST (R74): its activity, the same facts Geography appends.
-    const mine = activity.get(subject);
-    facts.push(...activityFacts(`${name} global snapshots it was part of per day`, anchorSeries(subject, d.series)));
-    if (mine != null && mine > 0) {
-      facts.push(fact(`${name} rank by global snapshots it was part of`, 1 + byActivity.filter(([, v]) => v > mine).length, "count"));
-      facts.push(fact("Networks that were part of global snapshots in the last week", byActivity.length, "count"));
     }
   }
 

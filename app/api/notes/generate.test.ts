@@ -18,8 +18,6 @@ const DAY_ISO = "2026-10-27";
 
 const FACTS: NoteFacts = {
   kind: "view",
-  common: false,
-  whole: false,
   facts: [
     fact("Snapshots anchored, per day, this span", 1200, "count"),
     fact("Snapshots anchored, ratio to previous span", 1.37, "ratio"),
@@ -288,7 +286,7 @@ describe("generateNote", () => {
   });
 
   it("a subject note's facts kind reaches the prompt", async () => {
-    const d = deps({ facts: async () => ({ ...FACTS, kind: "country" as const, common: false }) });
+    const d = deps({ facts: async () => ({ ...FACTS, kind: "country" as const }) });
     await generateNote({ net: "mainnet", view: "geo", subject: "isp:hetzner", span: "day" }, d, "request");
     expect(d.chat).toHaveBeenCalledTimes(1);
     const [system] = d.chat.mock.calls[0]![0];
@@ -506,12 +504,14 @@ describe("the span length reaches the model and backs its window (R20)", () => {
     expect(checkNote("Over the last 7 days the hypergraph held its pace.", shown!.facts, shown!.names)).toEqual({ ok: true });
   });
 
-  it("the whole network's Hypergraph note is asked for the global snapshots the DAG produced, not was part of", async () => {
-    const d = deps({ facts: async () => ({ ...FACTS, label: "the whole network", common: true, whole: true }), answers: ["NOTE: Over the last 7 days the network held at 97 nodes."] });
-    await generateNote({ ...REQ, view: "hyper", subject: "all", span: "day" }, d, "read");
-    const sys = d.chat.mock.calls[0]![0][0]!.content;
-    expect(sys).toContain("the DAG produced <last week's figure> global snapshots per day last week");
-    expect(sys).not.toContain("it was part of per day");
+  it("neither Hypergraph nor Geography asks for an activity sentence (user, 2026-11-09)", async () => {
+    for (const view of ["hyper", "geo"] as const) {
+      const d = deps({ facts: async () => ({ ...FACTS, label: "the whole network" }), answers: ["NOTE: Over the last 7 days the network held at 97 nodes."] });
+      await generateNote({ ...REQ, view, subject: "all", span: "day" }, d, "read");
+      const sys = d.chat.mock.calls[0]![0][0]!.content;
+      expect(sys).not.toContain("Activity was");
+      expect(sys).not.toContain("global snapshots per day last week");
+    }
   });
 });
 

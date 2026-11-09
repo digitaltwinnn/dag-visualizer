@@ -263,7 +263,7 @@ async function write(
     if (attempt > 0) await count("retried");
     let answer: string;
     try {
-      answer = await chat(buildMessages(req.view, input.label, block, days, reasons, input.lead, input.common, input.kind, span, input.whole, wantsLine, spanBeforeWords(req.view, req.span), briefs), wantsLine || briefs.length ? { maxTokens: LINE_TOKENS } : undefined);
+      answer = await chat(buildMessages(req.view, input.label, block, days, reasons, input.lead, input.kind, span, wantsLine, spanBeforeWords(req.view, req.span), briefs), wantsLine || briefs.length ? { maxTokens: LINE_TOKENS } : undefined);
       await count("calls");
     } catch (e) {
       if (!(e instanceof GateError)) throw e; // not the Gate's: `generateNote` counts it as `error`

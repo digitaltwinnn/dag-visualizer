@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { NoteView, NotableDay } from "@/src/data/noteTypes";
-import { CAPTION_FORMAT, LINE_FORMAT, PROMPTS, QUESTION_COMMON_WHOLE, VOICE, buildMessages, parseAnswer, spanBeforeWords, spanFigures, spanWords } from "./prompts";
+import { CAPTION_FORMAT, LINE_FORMAT, PROMPTS, VOICE, buildMessages, parseAnswer, spanBeforeWords, spanFigures, spanWords } from "./prompts";
 
 const VIEWS: NoteView[] = ["hyper", "geo", "ledger", "trend", "blocks"];
 
@@ -20,8 +20,8 @@ describe("VOICE", () => {
     expect(VOICE).toMatch(/feeless/);
   });
 
-  it("answers in the question's order: the view's own subject first, the common reading last (R74), and leads each part with what changed", () => {
-    expect(VOICE).toContain("what it asks for first is what this view shows and comes first, even when it held; what it asks for last comes last, in one sentence.");
+  it("answers in the question's order, and leads each part with what changed", () => {
+    expect(VOICE).toContain("Answer the question in its order: what it asks for first comes first, even when it held.");
     expect(VOICE).toContain(
       "Within each part, lead with what changed. Do not restate a breakdown the reader can already see on screen, such as how many nodes run each layer, unless it changed.",
     );
@@ -59,12 +59,11 @@ describe("PROMPTS", () => {
     }
   });
 
-  it("keeps Geography to where, then one sentence of activity, never pace, and the other views to theirs", () => {
+  it("keeps Geography to where, never pace or activity, and the other views to theirs", () => {
     const geo = PROMPTS.geo.system("the network");
     expect(geo).not.toContain("pace");
     expect(geo).toMatch(/where/i);
     expect(geo).toMatch(/decentrali/i); // it is told to leave the subject alone
-    expect(PROMPTS.geo.system("the network", undefined, true)).toMatch(/then the one sentence on activity/);
     expect(geo).not.toMatch(/activity/);
     expect(PROMPTS.hyper.question).toMatch(/who|what/i);
     expect(PROMPTS.ledger.question).toMatch(/anchoring/i);
@@ -72,30 +71,23 @@ describe("PROMPTS", () => {
     expect(PROMPTS.trend.question).toMatch(/changed/i);
   });
 
-  it("asks Hypergraph and Geography their own subject first and activity last (R74); the ledger and History keep their questions", () => {
+  it("asks Hypergraph and Geography their own subject alone, no activity sentence (user, 2026-11-09); the ledger and History keep their questions", () => {
     expect(PROMPTS.hyper.question).toBe(
       "First, who and what is on the network over the span: networks or layers that gained or lost nodes, and a network that became active or went quiet only when one did; if nothing changed there, say plainly that it was a steady week: the node count held at its level and the layers held steady, and for the whole network so did the number of active networks.",
     );
-    expect(PROMPTS.hyper.questionCommon).toBe('Last, in one sentence, how active it was, in the shape "Activity was <up, down or steady>: <network> was part of <last week\'s figure> global snapshots per day last week, <up or down> <change> on the weeks before", or "held at" the figure when it was steady.');
     expect(PROMPTS.geo.question).toBe(
       "First, how many nodes there are and how that moved, then where they run: of the countries and hosting providers that gained or lost nodes, name only the ONE with the largest change, since a provider's nodes sit in a country and the two moves are usually the same nodes, with its current count, as \"<country or provider> fell <change> to <count>\", without calling it the largest; or where the nodes are now when nothing moved. Say nothing about speed.",
     );
-    expect(PROMPTS.geo.questionCommon).toBe('Last, in one sentence, how active the network was, in the shape "Activity was <up, down or steady>: <network> was part of <last week\'s figure> global snapshots per day last week, <up or down> <change> on the weeks before", or "held at" the figure when it was steady.');
-    // The whole network PRODUCES its global snapshots (user, 2026-10-30: "there is no specific
-    // network, so 'all' should probably have some different wording").
-    expect(QUESTION_COMMON_WHOLE).toBe('Last, in one sentence, how active the network was, in the shape "Activity was <up, down or steady>: the DAG produced <last week\'s figure> global snapshots per day last week, <up or down> <change> on the weeks before", the DAG as the one producing them, or "held at" the figure when it was steady.');
     for (const v of ["hyper", "geo"] as const) {
-      expect(PROMPTS[v].system("the whole network", undefined, true, undefined, true)).toContain(`${PROMPTS[v].question} ${QUESTION_COMMON_WHOLE}`);
-      expect(PROMPTS[v].system("the whole network", undefined, true, undefined, true)).not.toContain(PROMPTS[v].questionCommon!);
-      expect(PROMPTS[v].system("the whole network", undefined, false, undefined, true)).not.toContain(QUESTION_COMMON_WHOLE);
+      expect(PROMPTS[v].system("the whole network")).not.toContain("Activity was");
+      expect(PROMPTS[v].system("the whole network")).not.toMatch(/activity/i);
+      expect(buildMessages(v, "the whole network", "Facts", null)[0]!.content).not.toContain("Activity was");
     }
     expect(VOICE).toMatch(/The DAG produces global snapshots and each metagraph produces its own metagraph snapshots/);
     expect(VOICE).toMatch(/the DAG is part of nothing: it produces them/);
     // live 2026-11-03: "Dor Technologies averaged 5,403 global snapshot placements per day".
     expect(VOICE).toContain('"<network> was part of <figure> global snapshots per day"');
-    expect(buildMessages("hyper", "the whole network", "Facts", null, undefined, undefined, true, undefined, null, true)[0]!.content).toContain(QUESTION_COMMON_WHOLE);
     expect(PROMPTS.geo.system("x")).toContain("Stay on where the nodes are located and who hosts them, and nothing else.");
-    expect(PROMPTS.geo.system("x", undefined, true)).toContain("Stay on where the nodes are located and who hosts them, then the one sentence on activity, and nothing else.");
     expect(PROMPTS.ledger.question).toBe(
       "Say what changed in the anchoring rhythm over the recent hours against the usual: what sped up or slowed down, as the recent figure and how far it is from the usual (\"<recent figure>, up <change> on the usual\"), and which networks did it. Then the reading itself: the longest gap, then, in one short clause: for the whole network, what each global snapshot holds, as \"N metagraph snapshots from M networks in each global snapshot\", never that it was part of anything; for one network, only the share of global snapshots it was part of.",
     );
@@ -134,25 +126,9 @@ describe("PROMPTS", () => {
     expect(buildMessages("ledger", "Mainnet", "Facts", null, undefined, { kind: "change", moved: ["Fees in DAG per hour"] })[0]!.content).toContain("Lead with what moved: Fees in DAG per hour.");
   });
 
-  // R74: the common part is asked only while the facts hold it — a country, or a network short of
-  // measured days, has none, and asked anyway the model wrote one from a share ratio (live 2026-10-29).
-  it("asks for the common reading only when the facts hold it, in Hypergraph and Geography alone", () => {
-    for (const v of ["hyper", "geo"] as const) {
-      expect(PROMPTS[v].system("x", undefined, false)).not.toContain(PROMPTS[v].questionCommon!);
-      expect(PROMPTS[v].system("x")).not.toContain(PROMPTS[v].questionCommon!);
-      expect(PROMPTS[v].system("x", undefined, true)).toContain(`${PROMPTS[v].question} ${PROMPTS[v].questionCommon}`);
-    }
-    for (const v of ["ledger", "trend"] as const) {
-      expect(PROMPTS[v].questionCommon).toBeUndefined();
-      expect(PROMPTS[v].system("x", undefined, true)).toBe(PROMPTS[v].system("x"));
-    }
-    expect(buildMessages("geo", "Germany", "Facts", null, undefined, undefined, false)[0]!.content).not.toContain("activity");
-    expect(buildMessages("geo", "the network", "Facts", null, undefined, undefined, true)[0]!.content).toContain(PROMPTS.geo.questionCommon!);
-  });
-
   // A subject note (a country, a provider, a make-up) asks its kind's question: the card's own lead
-  // sets the frame, and the common reading is the network's, so a subject's facts hold none.
-  it("asks a country, a provider and a make-up their own question, with no common part", () => {
+  // sets the frame.
+  it("asks a country, a provider and a make-up their own question", () => {
     const geo = PROMPTS.geo.questions!;
     const hyper = PROMPTS.hyper.questions!;
     expect(Object.keys(geo).sort()).toEqual(["country", "provider"]);
@@ -164,8 +140,8 @@ describe("PROMPTS", () => {
     expect(PROMPTS.trend.questions!.span).toBe(
       "Describe the range's shape, as a companion to a note above it that already states what rose and fell: the busiest day and the quietest day, each with its date and figure, and a typical day's figure, using only the facts named for those days. If the facts name none, say how quiet or steady the range was. Do not say what rose or fell overall.",
     );
-    expect(PROMPTS.trend.system("the hypergraph", undefined, false, "span")).toContain(PROMPTS.trend.questions!.span);
-    expect(PROMPTS.trend.system("the hypergraph", undefined, false, "span")).not.toContain(PROMPTS.trend.question);
+    expect(PROMPTS.trend.system("the hypergraph", undefined, "span")).toContain(PROMPTS.trend.questions!.span);
+    expect(PROMPTS.trend.system("the hypergraph", undefined, "span")).not.toContain(PROMPTS.trend.question);
     expect(PROMPTS.trend.system("the hypergraph")).toContain(PROMPTS.trend.question);
     // VARIED, NOT A TEMPLATE (user, 2026-11-03: country and provider notes read "very similar"): each
     // opens on what is most telling for it, with the name still the sentence's actor.
@@ -186,26 +162,24 @@ describe("PROMPTS", () => {
     // Nothing the model is handed says "make-up" (user, 2026-10-30: not a human's word).
     for (const q of [VOICE, hyper.type, PROMPTS.hyper.question, CAPTION_FORMAT]) expect(q).not.toMatch(/make-up/);
     for (const [view, kind] of [["geo", "country"], ["geo", "provider"], ["hyper", "type"]] as const) {
-      const sys = PROMPTS[view].system("Germany", undefined, false, kind);
+      const sys = PROMPTS[view].system("Germany", undefined, kind);
       expect(sys).toContain(VOICE);
       expect(sys).toContain("Subject: Germany.");
       expect(sys).toContain(PROMPTS[view].questions![kind]!);
       expect(sys).not.toContain(PROMPTS[view].question);
-      expect(sys).not.toContain(PROMPTS[view].questionCommon!);
-      expect(buildMessages(view, "Germany", "Facts", null, undefined, undefined, false, kind)[0]!.content).toContain(PROMPTS[view].questions![kind]!);
+      expect(buildMessages(view, "Germany", "Facts", null, undefined, undefined, kind)[0]!.content).toContain(PROMPTS[view].questions![kind]!);
     }
   });
 
   it("a view kind asks the view's question, unchanged, and a kind without a question falls back to it", () => {
     for (const v of VIEWS) {
-      expect(PROMPTS[v].system("x", undefined, false, "view")).toBe(PROMPTS[v].system("x"));
-      expect(buildMessages(v, "x", "Facts", null, undefined, undefined, false, "view")).toEqual(buildMessages(v, "x", "Facts", null));
+      expect(PROMPTS[v].system("x", undefined, "view")).toBe(PROMPTS[v].system("x"));
+      expect(buildMessages(v, "x", "Facts", null, undefined, undefined, "view")).toEqual(buildMessages(v, "x", "Facts", null));
     }
-    expect(PROMPTS.hyper.system("x", undefined, true, "view")).toContain(`${PROMPTS.hyper.question} ${PROMPTS.hyper.questionCommon}`);
     // Only geo has country and provider, only hyper has type; elsewhere the view's question stands.
-    expect(PROMPTS.hyper.system("x", undefined, false, "country")).toContain(PROMPTS.hyper.question);
-    expect(PROMPTS.geo.system("x", undefined, false, "type")).toContain(PROMPTS.geo.question);
-    expect(PROMPTS.ledger.system("x", undefined, false, "provider")).toContain(PROMPTS.ledger.question);
+    expect(PROMPTS.hyper.system("x", undefined, "country")).toContain(PROMPTS.hyper.question);
+    expect(PROMPTS.geo.system("x", undefined, "type")).toContain(PROMPTS.geo.question);
+    expect(PROMPTS.ledger.system("x", undefined, "provider")).toContain(PROMPTS.ledger.question);
   });
 
   it("the kind questions keep the house copy: no digits, no dashes, no fleet or machines", () => {
@@ -217,7 +191,7 @@ describe("PROMPTS", () => {
       expect(q).not.toMatch(/fleet|machine/i);
     }
     for (const [view, kind] of [["geo", "country"], ["geo", "provider"], ["hyper", "type"]] as const)
-      expect(PROMPTS[view].system("x", undefined, false, kind)).not.toMatch(/—|\s[–-]\s/);
+      expect(PROMPTS[view].system("x", undefined, kind)).not.toMatch(/—|\s[–-]\s/);
   });
 
   it("asks the block DAG its own question, in the ledger's voice: blocks and what they carried — never tips or height", () => {
@@ -245,7 +219,6 @@ describe("PROMPTS", () => {
 
   it("keeps its own copy free of dashes", () => {
     for (const v of VIEWS) expect(PROMPTS[v].system("x")).not.toMatch(/—|\s[–-]\s/);
-    for (const v of VIEWS) expect(PROMPTS[v].system("x", undefined, true)).not.toMatch(/—|\s[–-]\s/);
     expect(PROMPTS.ledger.system("x", { kind: "now" })).not.toMatch(/—|\s[–-]\s/);
     expect(VOICE).not.toMatch(/—|\s[–-]\s/);
   });
@@ -270,11 +243,11 @@ describe("the span before", () => {
     expect(spanBeforeWords("ledger", "hours")).toBeNull();
   });
   it("reaches the model beside the span", () => {
-    const user = buildMessages("trend", "x", "Facts", null, undefined, undefined, undefined, undefined, "the last 30 days", undefined, undefined, "the 30 days before")[1]!.content;
+    const user = buildMessages("trend", "x", "Facts", null, undefined, undefined, undefined, "the last 30 days", undefined, "the 30 days before")[1]!.content;
     expect(user).toContain("Span: the last 30 days\nSpan before: the 30 days before\n\nFacts:");
   });
   it("tells History's note what those figures are, and how to write them, in the span-before words themselves", () => {
-    const system = PROMPTS.trend.system("x", undefined, undefined, undefined, undefined, "the 30 days before");
+    const system = PROMPTS.trend.system("x", undefined, undefined, "the 30 days before");
     expect(system).toMatch(/a figure for "this range" or the "previous range" is that whole range/i);
     expect(system).toMatch(/never say it rose or fell over the range/i);
     expect(system).toContain('"<what> rose <change> to <this range\'s figure> per day on "the 30 days before""');
@@ -335,7 +308,7 @@ describe("buildMessages", () => {
   });
 
   it("hands the span's words to the model and asks for them in the first sentence (user, 2026-10-30)", () => {
-    const m = buildMessages("hyper", "Mainnet", FACTS, null, undefined, undefined, undefined, undefined, "the last 7 days");
+    const m = buildMessages("hyper", "Mainnet", FACTS, null, undefined, undefined, undefined, "the last 7 days");
     expect(m[1]!.content).toContain("Span: the last 7 days");
     expect(VOICE).toMatch(/Name the range in your first sentence/);
     // The reader's word (user, 2026-11-07): a stretch of time is a range, never a span.
@@ -447,7 +420,7 @@ describe("parseAnswer", () => {
 
 describe("the Briefing's line", () => {
   it("is asked for only when wanted", () => {
-    const asked = (line?: boolean) => buildMessages("geo", "x", "Facts", null, undefined, undefined, false, undefined, null, false, line)[0]!.content;
+    const asked = (line?: boolean) => buildMessages("geo", "x", "Facts", null, undefined, undefined, undefined, null, line)[0]!.content;
     expect(asked(true)).toContain(LINE_FORMAT);
     expect(asked()).not.toContain(LINE_FORMAT);
   });

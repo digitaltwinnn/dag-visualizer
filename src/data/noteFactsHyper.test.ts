@@ -84,7 +84,7 @@ describe("hyperFacts on all", () => {
     expect(hyperFacts(input({ fleet: grown }))!.setKey).toBe("bio,dag,dor,usdc");
   });
 
-  it("names the three biggest by nodes, biggest first, and the three most active by global snapshots", () => {
+  it("names the three biggest by nodes, biggest first, and no most active network", () => {
     const r = hyperFacts(input())!;
     const big = r.facts.filter((f) => /biggest network\)$/.test(f.label));
     expect(big.map((f) => [f.label, f.value])).toEqual([
@@ -92,11 +92,7 @@ describe("hyperFacts on all", () => {
       ["USDC.dag, nodes (second biggest network)", 30],
       ["BioFi, nodes (third biggest network)", 10],
     ]);
-    const act = r.facts.filter((f) => /most active network\)$/.test(f.label));
-    expect(act.map((f) => [f.label, f.value])).toEqual([
-      ["USDC.dag, global snapshots it was part of per day, last week (most active network)", 50],
-      ["BioFi, global snapshots it was part of per day, last week (second most active network)", 8],
-    ]);
+    expect(r.facts.filter((f) => /most active network/.test(f.label))).toEqual([]);
   });
 
   it("counts the networks that anchored in the last day and the last week, and those with nodes that did not", () => {
@@ -298,13 +294,11 @@ describe("hyperFacts on a network", () => {
     expect(end!.text).toBe("0");
   });
 
-  it("ranks the network by nodes and by activity among the networks", () => {
+  it("ranks the network by nodes, and states no activity or activity rank", () => {
     const r = usdc();
     expect(find(r, /^USDC\.dag rank by nodes$/)[0]!.value).toBe(2);
     expect(find(r, /^Networks with nodes$/)[0]!.value).toBe(3);
-    expect(find(r, /^USDC\.dag rank by global snapshots it was part of$/)[0]!.value).toBe(1);
-    expect(find(r, /^Networks that were part of global snapshots in the last week$/)[0]!.value).toBe(2);
-    expect(find(r, /^USDC\.dag global snapshots it was part of per day, last week$/)[0]!.value).toBe(50);
+    expect(find(r, /global snapshots|per day|weeks before/i)).toEqual([]);
   });
 
   it("puts the blurb in blurbs, never in facts", () => {
@@ -317,11 +311,11 @@ describe("hyperFacts on a network", () => {
     expect(usdc().setKey).toBeUndefined();
   });
 
-  it("has no activity rank for a network with no anchoring row, and treats the DAG as a network", () => {
+  it("treats the DAG as a network", () => {
     const r = hyperFacts(input({ subject: "dag" }))!;
     expect(find(r, /^Constellation nodes now$/)[0]!.value).toBe(100);
     expect(find(r, /^Constellation rank by nodes$/)[0]!.value).toBe(1);
-    expect(find(r, /rank by global snapshots/)).toEqual([]);
+    expect(find(r, /global snapshots|per day|weeks before/i)).toEqual([]);
   });
 
   it("returns null for a network with nothing measured", () => {
@@ -488,49 +482,7 @@ describe("hyperFacts on a network: the change of shape", () => {
   });
 });
 
-describe("hyperFacts on a network: the change of activity", () => {
-  it("states the weeks before beside the last week, and their ratio when they differ", () => {
-    const d = daily({ "m.usdc.ticks": row(60, (i) => (i >= 53 ? 60 : 40)) });
-    const r = hyperFacts(input({ subject: "usdc", daily: d }))!;
-    expect(find(r, /^USDC\.dag global snapshots it was part of per day, last week$/)[0]!.value).toBe(60);
-    expect(find(r, /^USDC\.dag global snapshots it was part of per day, the weeks before$/)[0]!.value).toBe(40);
-    const [ratio] = find(r, /^USDC\.dag global snapshots it was part of per day, ratio last week to the weeks before$/, "ratio");
-    expect(ratio!.value).toBeCloseTo(1.5, 9);
-  });
-
-  it("states no ratio when the two are equal", () => {
-    const r = hyperFacts(input({ subject: "usdc" }))!;
-    expect(find(r, /the weeks before$/)[0]!.value).toBe(50);
-    expect(find(r, /ratio last week/)).toEqual([]);
-  });
-
-  it("states nothing for the weeks before with fewer than seven measured days", () => {
-    // Days 32..46 read 0 beside created snapshots: the field's absence, not none (anchorSeries).
-    const d = daily({ "m.usdc.ticks": row(60, (i) => (i >= 53 ? 60 : i >= 47 ? 40 : 0)) });
-    const r = hyperFacts(input({ subject: "usdc", daily: d }))!;
-    expect(find(r, /weeks before/)).toEqual([]);
-    expect(find(r, /per day, last week$/)[0]!.value).toBe(60);
-  });
-});
-
-describe("hyperFacts: a last week needs four measured days (M7)", () => {
-  it("states no last-week activity, comparison or rank for a network measured on three days of it", () => {
-    // Days 53..56 read 0 beside created snapshots: the field's absence (anchorSeries), not none.
-    const d = daily({ "m.usdc.ticks": row(60, (i) => (i >= 57 ? 60 : i >= 53 ? 0 : 40)) });
-    const r = hyperFacts(input({ subject: "usdc", daily: d }))!;
-    expect(find(r, /global snapshots it was part of/)).toEqual([]);
-    const four = hyperFacts(input({ subject: "usdc", daily: daily({ "m.usdc.ticks": row(60, (i) => (i >= 56 ? 60 : i >= 53 ? 0 : 40)) }) }))!;
-    expect(find(four, /^USDC\.dag global snapshots it was part of per day, last week$/)[0]!.value).toBe(60);
-    expect(find(four, /ratio last week/, "ratio")[0]!.value).toBeCloseTo(1.5, 9);
-  });
-
-  it("states no whole-network last week from three covered days", () => {
-    const r = hyperFacts(input({ daily: daily({ "g.ticks": row(60, (i) => (i >= 57 || i < 53 ? 28_800 : null)) }) }))!;
-    expect(find(r, /^Global snapshots per day/)).toEqual([]);
-  });
-});
-
-describe("hyperFacts on all: the movers and the whole network's activity", () => {
+describe("hyperFacts on all: the movers", () => {
   const N = 720;
   const names = { ...NAMES, ext: "Ext", late: "Late" };
 
@@ -616,23 +568,10 @@ describe("hyperFacts on all: the movers and the whole network's activity", () =>
     expect(find(r, /^Dor nodes, ratio end to start$/)).toEqual([]);
   });
 
-  it("states global snapshots per day, last week against the weeks before, naming no network", () => {
+  it("states no global snapshots per day, naming no network or the whole", () => {
     const r = hyperFacts(input({ daily: daily({ "g.ticks": row(60, (i) => (i >= 53 ? 30_000 : 24_000)) }) }))!;
-    expect(find(r, /^Global snapshots per day, last week$/)[0]!.value).toBe(30_000);
-    expect(find(r, /^Global snapshots per day, the weeks before$/)[0]!.value).toBe(24_000);
-    const [ratio] = find(r, /^Global snapshots per day, ratio last week to the weeks before$/, "ratio");
-    expect(ratio!.value).toBeCloseTo(1.25, 9);
-    for (const n of Object.values(NAMES)) expect(ratio!.label).not.toContain(n);
-  });
-
-  it("reads covered days only, and states nothing for the weeks before under seven of them", () => {
-    const r = hyperFacts(input({ daily: daily({ "g.ticks": row(60, (i) => (i >= 53 ? 30_000 : i >= 47 ? 24_000 : null)) }) }))!;
-    expect(find(r, /^Global snapshots per day, last week$/)[0]!.value).toBe(30_000);
-    expect(find(r, /^Global snapshots per day, the weeks before$/)).toEqual([]);
-    expect(find(r, /^Global snapshots per day, ratio/)).toEqual([]);
-    const same = hyperFacts(input())!;
-    expect(find(same, /^Global snapshots per day, the weeks before$/)[0]!.value).toBe(28_800);
-    expect(find(same, /^Global snapshots per day, ratio/)).toEqual([]);
+    expect(find(r, /global snapshots|per day|weeks before|most active/i)).toEqual([]);
+    expect(find(r, /^Networks that anchored metagraph snapshots in the last week/)).toHaveLength(1); // who anchored stays
   });
 });
 
@@ -676,7 +615,7 @@ describe("hyperFacts as a gate-passing source", () => {
 
 describe("hyperFacts tags each change as a pair (R54)", () => {
   const N = 720;
-  it("keys a network's node count, changed layer, changed combination and activity, start to end", () => {
+  it("keys a network's node count, changed layer and changed combination, start to end", () => {
     const fl = fleet({
       "f.nodes.dor": row(N, (i) => (i < N / 2 ? 3 : 5)),
       "f.layer.dor.l0": row(N, () => 3),
@@ -691,11 +630,10 @@ describe("hyperFacts tags each change as a pair (R54)", () => {
       ["Dor nodes 7 days ago", 3, "Dor nodes now", 5],
       ["Dor nodes on the dL1 layer 7 days ago", 3, "Dor nodes on the dL1 layer now", 5],
       ["Dor nodes running only dL1 7 days ago", 0, "Dor nodes running only dL1 now", 2],
-      ["Dor global snapshots it was part of per day, the weeks before", 40, "Dor global snapshots it was part of per day, last week", 60],
     ]);
   });
 
-  it("keys each mover, the total node count and the whole network's activity on the digest", () => {
+  it("keys each mover and the total node count on the digest", () => {
     const fl = fleet({ "f.nodes.dor": row(N, (i) => (i < N / 2 ? 0 : 5)) });
     const d = daily({ "g.ticks": row(60, (i) => (i >= 53 ? 30_000 : 24_000)) });
     const p = pairsOf(hyperFacts(input({ fleet: fl, daily: d }))!.facts);
@@ -703,7 +641,6 @@ describe("hyperFacts tags each change as a pair (R54)", () => {
       ["USDC.dag nodes 7 days ago", 10, "USDC.dag nodes now", 30],
       ["Dor nodes 7 days ago", 0, "Dor nodes now", 5],
       ["Nodes across all networks 7 days ago", 120, "Nodes across all networks now", 140],
-      ["Global snapshots per day, the weeks before", 24_000, "Global snapshots per day, last week", 30_000],
     ]);
   });
 });
@@ -735,7 +672,7 @@ describe("hyperFacts on a network's make-up", () => {
       // selected subject relates to the overall distribution within the rung").
       ["USDC.dag, rank among its layer groups by nodes", 1, "count", null],
     ]);
-    expect(find(r, /global snapshots|Networks/)).toEqual([]); // no activity, no common reading
+    expect(find(r, /global snapshots|Networks/)).toEqual([]); // no activity
     expect(r.facts.some((f) => /make-up/.test(f.label))).toBe(false);
     expect(r.blurbs).toEqual(["USDC.dag is: a stablecoin on the DAG"]);
     expect(r.names).toEqual(expect.arrayContaining(Object.values(NAMES)));

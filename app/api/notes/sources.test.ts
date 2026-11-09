@@ -104,7 +104,7 @@ describe("factsFor — the subject's display name for the gate (R39)", () => {
 // SUBJECT NOTES (2026-10-29): Geography's country × network and provider notes, scoped as their
 // cards are, labelled scope-first so the gate's attribution by name keeps working.
 describe("factsFor — Geography's subject notes", () => {
-  it("factsFor accepts the geo subject notes, labels them scope-first, names the subject and the kind, with no common reading", async () => {
+  it("factsFor accepts the geo subject notes, labels them scope-first, names the subject and the kind", async () => {
     // The last column is the provider as the builder's facts spell it (its `subjectName`).
     const cases: [string, unknown, string, string, string, string?][] = [
       [`${USDC}/cc:DE`, { cc: "DE", net: USDC }, "USDC.dag nodes in Germany", "USDC.dag", "country"],
@@ -119,8 +119,7 @@ describe("factsFor — Geography's subject notes", () => {
       expect(out, subject).not.toBeNull();
       const input = vi.mocked(geoFacts).mock.calls[0]![0];
       expect(input.subject, subject).toEqual(parsed);
-      expect(input.daily, subject).toBeUndefined();
-      expect({ label: out!.label, subjectName: out!.subjectName, kind: out!.kind, common: out!.common }, subject).toEqual({ label, subjectName, kind, common: false });
+      expect({ label: out!.label, subjectName: out!.subjectName, kind: out!.kind }, subject).toEqual({ label, subjectName, kind });
     }
     // A country note's country is named for the builder even when no stored day holds it.
     await factsFor("mainnet", "geo", "dag/cc:JP", "day", NOW, fakeReads());
@@ -185,7 +184,7 @@ describe("factsFor — Geography's subject notes", () => {
 
 // SUBJECT NOTES (2026-10-29): Hypergraph's make-up × network, the node-type card's selection.
 describe("factsFor — Hypergraph's make-up notes", () => {
-  it("factsFor accepts a network's make-up, labels it, kind `type`, no common reading", async () => {
+  it("factsFor accepts a network's make-up, labels it, kind `type`", async () => {
     const cases: [string, unknown, string, string][] = [
       [`${USDC}/type:l0+cl1`, { net: USDC, type: "l0+cl1" }, "USDC.dag nodes running L0 and cL1", "USDC.dag"],
       [`${USDC}/type:dl1`, { net: USDC, type: "dl1" }, "USDC.dag nodes running only dL1", "USDC.dag"],
@@ -196,7 +195,7 @@ describe("factsFor — Hypergraph's make-up notes", () => {
       const out = await factsFor("mainnet", "hyper", subject, "day", NOW, fakeReads());
       expect(out, subject).not.toBeNull();
       expect(vi.mocked(hyperFacts).mock.calls[0]![0].subject, subject).toEqual(parsed);
-      expect({ label: out!.label, subjectName: out!.subjectName, kind: out!.kind, common: out!.common }, subject).toEqual({ label, subjectName, kind: "type", common: false });
+      expect({ label: out!.label, subjectName: out!.subjectName, kind: out!.kind }, subject).toEqual({ label, subjectName, kind: "type" });
     }
     // The view notes keep their labels and their question.
     const net = (await factsFor("mainnet", "hyper", USDC, "day", NOW, fakeReads()))!;
@@ -216,18 +215,6 @@ describe("factsFor — Hypergraph's make-up notes", () => {
       expect(noteSupported("ledger", s, "hours"), s).toBe(false);
       expect(noteSupported("trend", s, "7d"), s).toBe(false);
     }
-  });
-});
-
-describe("factsFor — whether the facts hold the common reading (R74)", () => {
-  it("is true only when the builder stated it", async () => {
-    expect((await factsFor("mainnet", "geo", "cc:DE", "day", NOW, fakeReads()))!.common).toBe(false);
-    vi.mocked(geoFacts).mockReturnValue({ facts: [FACT, { label: "Global snapshots per day, last week", value: 8000, kind: "count", text: "8,000" }], names: [] });
-    expect((await factsFor("mainnet", "geo", "all", "day", NOW, fakeReads()))!.common).toBe(true);
-    expect((await factsFor("mainnet", "geo", "all", "day", NOW, fakeReads()))!.whole).toBe(true);
-    vi.mocked(geoFacts).mockReturnValue({ facts: [FACT, { label: "USDC.dag global snapshots it was part of per day, last week", value: 800, kind: "count", text: "800" }], names: [] });
-    const net = (await factsFor("mainnet", "geo", USDC, "day", NOW, fakeReads()))!;
-    expect([net.common, net.whole]).toEqual([true, false]);
   });
 });
 
@@ -392,16 +379,16 @@ describe("factsFor — the per-view read table", () => {
     expect(out!.facts).toContainEqual(expect.objectContaining({ label: "Week", value: 604_800, kind: "duration" }));
   });
 
-  it("geo: the geo family and the tiers' 1d over 28 days (the common activity reading's four weeks, R74, past R29's 14), pivoted by day; a country subject", async () => {
+  it("geo: the geo family and the tiers' 1d over R29's 14 days, pivoted by day; a country subject", async () => {
     const day = Date.UTC(2026, 9, 26);
     const tiers = { buckets: [day - D, day], stepMs: D, now: NOW, series: { "f.cc.DE": [4, null], "f.cc.US": [2, 3], "g.ticks": [1, 1], "f.nodes": [9, 9] } };
     const r = fakeReads({ async span(_n, tier, from, to) { r.calls.push({ tier, from, to }); return tiers; } });
     const out = await factsFor("mainnet", "geo", "cc:DE", "day", NOW, r);
-    expect(r.geoCalls).toEqual([{ from: NOW - 28 * D, to: NOW }]);
-    expect(r.calls).toEqual([{ tier: "1d", from: NOW - 28 * D, to: NOW }]);
+    expect(r.geoCalls).toEqual([{ from: NOW - 14 * D, to: NOW }]);
+    expect(r.calls).toEqual([{ tier: "1d", from: NOW - 14 * D, to: NOW }]);
     const input = vi.mocked(geoFacts).mock.calls[0]![0];
     expect(input.subject).toEqual({ cc: "DE" });
-    expect(input.daily).toBe(tiers); // the same read, unfolded, is the common activity reading's (R74)
+    expect("daily" in input).toBe(false); // no activity reading: the builder is handed no daily tier
     expect(input.ccDays).toEqual({ "2026-10-25": { "f.cc.DE": 4, "f.cc.US": 2 }, "2026-10-26": { "f.cc.US": 3 } });
     expect(input.geoDays).toEqual({ "2026-10-27": { "f.cc.DE": 3, "f.cc.dag.FR": 1 } });
     expect(input.providerNames).toEqual({ hetzner: "Hetzner" });
@@ -417,9 +404,9 @@ describe("factsFor — the per-view read table", () => {
     const tiers = { buckets: [day - D, day], stepMs: D, now: NOW, series: { "f.cc.DE": [4, null], "f.cc.US": [2, 3], "g.ticks": [1, 1] } };
     const r = fakeReads({ async span(_n, tier, from, to) { r.calls.push({ tier, from, to }); return tiers; } });
     const got = await geoInputs("mainnet", NOW, r);
-    expect(r.geoCalls).toEqual([{ from: NOW - 28 * D, to: NOW }]);
-    expect(r.calls).toEqual([{ tier: "1d", from: NOW - 28 * D, to: NOW }]);
-    expect(got.daily).toBe(tiers);
+    expect(r.geoCalls).toEqual([{ from: NOW - 14 * D, to: NOW }]);
+    expect(r.calls).toEqual([{ tier: "1d", from: NOW - 14 * D, to: NOW }]);
+    expect("daily" in got).toBe(false);
     expect(got.ccDays).toEqual({ "2026-10-25": { "f.cc.DE": 4, "f.cc.US": 2 }, "2026-10-26": { "f.cc.US": 3 } });
     expect(got.geoDays).toEqual({ "2026-10-27": { "f.cc.DE": 3, "f.cc.dag.FR": 1 } });
     expect(got.providerNames).toEqual({ hetzner: "Hetzner" });
@@ -459,7 +446,7 @@ describe("factsFor — the per-view read table", () => {
     const short = realGeo.geoFacts({ subject: "all", geoDays: head.geoDays, ccDays: ccDays8, providerNames: {}, countryNames: { DE: "Germany", US: "United States" }, names: {} })!;
     expect(weekAgo(short.facts).some((f) => f.label.endsWith("now against a week ago") && f.value === 2.5)).toBe(true);
 
-    // The fix: the read reaches past the pair (28 days now), it is judged against the week before it and
+    // The fix: the read reaches past the pair (14 days), it is judged against the week before it and
     // fails, and no change fact reads from it.
     const out = await factsFor("mainnet", "geo", "all", "day", NOW, reads);
     const changes = weekAgo(out!.facts);

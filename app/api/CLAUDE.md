@@ -227,7 +227,8 @@ them — but the Next Node server can.
   `<net>/isp:<key>` (the provider across the scope, named network-wide), `<net>/type:<roleKey>`,
   with `<net>` a tracked network id or `dag`. `NoteFacts.kind` is the QUESTION kind: every view
   note is `"view"`, except the fleet country `cc:XX`, which asks the country question (2026-11-03); `PROMPTS[view].questions[kind]` asks a subject kind's own
-  question with no common reading. `KIND_TIMING.subject` is `{ refreshMs: null, ttlS: 24h }` and
+  question. Hypergraph and Geography notes carry no activity sentence (user, 2026-11-09: activity is the
+  Snapshots and History views' subject; the R74 common reading is retired). `KIND_TIMING.subject` is `{ refreshMs: null, ttlS: 24h }` and
   `timingOf` lets the subject decide first, so a subject note has one timing whatever its view:
   never warmed, written when someone first asks and rewritten at most once a day. The fleet
   country `cc:XX` is the exception that stays warmed. **A subject note is the request route's

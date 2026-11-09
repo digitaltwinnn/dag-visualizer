@@ -5,7 +5,6 @@ import { fact, type ChainReads } from "@/src/data/noteFacts";
 import { bannedWords, undash } from "@/src/data/noteHonesty";
 import { geoFacts } from "@/src/data/noteFactsGeo";
 import { comboWords, hyperFacts } from "@/src/data/noteFactsHyper";
-import { commonIsWhole, hasCommonReading } from "@/src/data/noteFactsActivity";
 import { ledgerFacts } from "@/src/data/noteFactsLedger";
 import { BLOCK_NOTE_HOURS, blocksFacts } from "@/src/data/noteFactsBlocks";
 import { dataFacts } from "@/src/data/noteFactsData";
@@ -128,7 +127,7 @@ export async function readGeoDays(
 /** GEOGRAPHY'S READ — the geo family's days and the tiers' daily fleet `f.cc` (`ccDays`, pivoted by
  *  day) over `GEO_READ_MS`. The geo note's facts and the warm pass's country plan both read through
  *  it, so the countries warmed are the countries a note states (M5). */
-export async function geoInputs(net: string, nowMs: number, reads: NoteReads): Promise<GeoDaysRead & { ccDays: Record<string, Record<string, number>>; daily: TrendsWindowData }> {
+export async function geoInputs(net: string, nowMs: number, reads: NoteReads): Promise<GeoDaysRead & { ccDays: Record<string, Record<string, number>> }> {
   const from = nowMs - GEO_READ_MS;
   const [{ geoDays, providerNames, siteDays }, tiers] = await Promise.all([
     reads.geoDays(net, from, nowMs),
@@ -141,8 +140,7 @@ export async function geoInputs(net: string, nowMs: number, reads: NoteReads): P
       if (k.startsWith("f.cc.") && v != null) (ccDays[utcDayKey(b)] ??= {})[k] = v;
     }
   });
-  // The same daily read is the common activity reading's (R74), unfolded, as the builder wants it.
-  return { geoDays, providerNames, ...(siteDays ? { siteDays } : {}), ccDays, daily: tiers };
+  return { geoDays, providerNames, ...(siteDays ? { siteDays } : {}), ccDays };
 }
 
 /** The default reads for ONE note, or one warm pass: the trends store's read client, each hash read
@@ -317,9 +315,8 @@ interface ViewSource {
 
 const WHOLE = "the whole network";
 /** Geography's read: the week its changes are read over, its one-day slack, and the 6 days the
- *  earliest candidate's own week needs before it (R29) — and, longer, the four weeks the common
- *  activity reading compares (R74: last week against the three before; `noteFactsActivity.ts`). */
-const GEO_READ_MS = Math.max((7 + 1 + 6) * D, 28 * D);
+ *  earliest candidate's own week needs before it (R29). */
+const GEO_READ_MS = (7 + 1 + 6) * D;
 const secondsOf = (fromMs: number, toMs: number) => (toMs - fromMs) / 1000;
 
 type TrendPill = "1h" | "24h" | "7d" | "30d" | "90d" | "1y";
@@ -431,19 +428,16 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
     },
     whole: (subject) => subject === "all",
     async read({ net, subject, nowMs, reads, names }) {
-      const { geoDays, providerNames, siteDays, ccDays, daily } = await geoInputs(net, nowMs, reads);
+      const { geoDays, providerNames, siteDays, ccDays } = await geoInputs(net, nowMs, reads);
       const ccs = new Set<string>();
       for (const day of [...Object.values(geoDays), ...Object.values(ccDays)])
         for (const k of Object.keys(day)) if (k.startsWith("f.cc.")) ccs.add(k.slice(k.lastIndexOf(".") + 1));
       const sel = geoSelectionOf(net, subject);
       if (sel && "cc" in sel) ccs.add(sel.cc);
       const countryNames = Object.fromEntries([...ccs].map((c) => [c, countryName(c)]));
-      // A subject note is handed no daily read: the common reading is a network's or the whole
-      // network's, never one card's.
       const subjectNote = isSubjectNote(subject);
-      const built = geoFacts({ subject: sel ?? subject, geoDays, siteDays, ccDays, providerNames, countryNames, names, ...(subjectNote ? {} : { daily }) });
+      const built = geoFacts({ subject: sel ?? subject, geoDays, siteDays, ccDays, providerNames, countryNames, names });
       const spanFrom = nowMs - 7 * D;
-      // The common reading speaks of the last week (R74), so that window is stated beside the span.
       const windows: [string, number][] = [["Span length", secondsOf(spanFrom, nowMs)], ["Week", (7 * D) / 1000]];
       return { built, spanFrom, spanTo: nowMs, windows, ...(subjectNote && sel ? geoSubjectLabel(sel, names, built?.subjectName) : {}) };
     },
@@ -568,12 +562,6 @@ export interface NoteFacts {
   driftKeys?: Record<string, string>;
   /** Snapshots only (R71): "change" when a pair moved, else "now" — the prompt's question follows. */
   lead?: NoteLead;
-  /** Whether the facts hold the COMMON reading (R74, `noteFactsActivity.ts`): the prompt asks for
-   *  its last sentence only then. */
-  common: boolean;
-  /** Whether that common reading is the WHOLE network's (`commonIsWhole`): it produces its global
-   *  snapshots rather than being "part of" them, and the prompt asks for it in those words. */
-  whole: boolean;
 }
 
 /** THE FACTS FOR ONE NOTE: that view's reads, its builder, and the span's length. Null when the
@@ -610,8 +598,6 @@ export async function factsFor(
     // with the network's figures. Its facts are the country's place in the whole network, which is what
     // the country question asks for.
     kind: isSubjectNote(subject) || subjectKindOf(subject) === "country" ? subjectKindOf(subject) : "view",
-    common: hasCommonReading(built.facts),
-    whole: commonIsWhole(built.facts),
     ...(subjectName != null ? { subjectName } : {}),
     ...(built.setKey != null ? { setKey: built.setKey } : {}),
     ...(built.driftKeys != null ? { driftKeys: built.driftKeys } : {}),

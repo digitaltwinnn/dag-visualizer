@@ -20,7 +20,7 @@ import type { NoteSpan, SubjectKind } from "./keys";
 export const VOICE = [
   "You write one short note about a live network dashboard: the reader can see the numbers; say what stands out, in two or three plain sentences.",
   "Be concise and to the point: name the two biggest moves, not every one, drop any figure or clause the point can stand without, and keep the whole note under forty-five words.",
-  "Answer the question in its order: what it asks for first is what this view shows and comes first, even when it held; what it asks for last comes last, in one sentence.",
+  "Answer the question in its order: what it asks for first comes first, even when it held.",
   "Within each part, lead with what changed. Do not restate a breakdown the reader can already see on screen, such as how many nodes run each layer, unless it changed.",
   // THE CURRENT FIGURE AND HOW FAR IT MOVED (user, 2026-11-03: "from x to y, up z% can be shortened
   // by saying just the current value and its increase"). Every measured change has a "change
@@ -53,12 +53,11 @@ export const VOICE = [
   "Punctuation: no dash clauses. Never use an em dash, and never a hyphen or en dash with a blank on each side. Use commas, colons and full stops.",
 ].join("\n");
 
-// THE VIEW'S OWN SUBJECT FIRST, THE COMMON READING LAST (user, 2026-10-29; R74): a Hypergraph note
-// opened on snapshots ("Digital Evidence was part of 7,329 global snapshots per day… The node count
-// held at 3") because VOICE said "lead with what changed" and the nodes had not. Each question now
-// has two parts in order — what the view shows, then the one common reading, activity
-// (`src/data/noteFactsActivity.ts`) — and VOICE says the order is the question's. Snapshots and
-// History ask one question: the ledger's subject is activity itself, History measures everything.
+// THE COMMON READING IS RETIRED (user, 2026-11-09; it was R74, 2026-10-29): Hypergraph and Geography
+// notes closed on one sentence of activity, "Activity was up: the DAG produced N global snapshots
+// per day last week, up 3% on the weeks before". Activity is the Snapshots and History views'
+// subject; in these two it repeated the same sentence, so neither the facts nor the question carry
+// it. Each question asks for what its view shows, and VOICE says the order is the question's.
 //
 // THE SNAPSHOTS NOTE ASKS ONE OF TWO QUESTIONS (R71, user 2026-10-29: "change, else now"). Its
 // subject is a live rhythm that mostly holds, and a note made to lead with change then opens on
@@ -66,16 +65,13 @@ export const VOICE = [
 // NAMES the pairs that moved, so the model leads with those and not with a one-percent drift
 // beside them; `questionNow` is the reading itself, and it has to say so out loud because VOICE
 // asks every note to lead with what changed.
-// `questionCommon` is the LAST part (R74), asked only while the facts hold the common reading
-// (`common`): asked without it, the model wrote one from a share ratio.
 //
 // A SUBJECT NOTE ASKS ITS KIND'S QUESTION (a country, a provider, a node make-up). The card the
 // reader pressed already sets the frame (which country, which provider, which make-up), so the
 // question asks for that subject's count, ITS PLACE IN ITS RUNG — share and rank among the other
 // countries, providers or make-ups, always, not only when nothing moved (user, 2026-10-30: the note
 // replaces the card's measured lead, "how that selected subject relates to the overall distribution
-// within the rung") — and how it moved over the range. The common reading is the NETWORK's, not the subject's, so a subject note has
-// none: its facts answer `common: false` and the part is never asked. `kind` is the kind of
+// within the rung") — and how it moved over the range. `kind` is the kind of
 // QUESTION (`NoteFacts.kind`), so the warmed network-wide country, a view note, asks the view's own.
 // A kind a view has no question for falls back to the view's: only geo has country and provider,
 // only hyper has type.
@@ -85,10 +81,6 @@ export const VOICE = [
 // logical". Each kind's question now gives the first sentence's shape with an ACTOR, "<network>
 // hosts N nodes in <country>", so the name lands as the sentence's subject, not as a label.
 type KindQuestions = Partial<Record<Exclude<SubjectKind, "view">, string>>;
-// The whole network's activity, in its own words (user, 2026-10-30): one string for both views.
-// WHO PRODUCES THEM (user, 2026-11-03: "DAG produces global snapshots, metagraphs produce metagraph
-// snapshots"): the sentence's subject is the DAG, never "the whole network".
-export const QUESTION_COMMON_WHOLE = "Last, in one sentence, how active the network was, in the shape \"Activity was <up, down or steady>: the DAG produced <last week's figure> global snapshots per day last week, <up or down> <change> on the weeks before\", the DAG as the one producing them, or \"held at\" the figure when it was steady.";
 // A SPAN AGAINST THE ONE BEFORE IT IS NOT A CLIMB INSIDE THE SPAN (user, 2026-11-02). Live: "Over the
 // last 30 days, global snapshots rose 86% from 4,021 to 7,478 per day", where both were 30-day
 // averages and the figure inside the range rose about a third. The gate holds the form, since the
@@ -98,7 +90,7 @@ export function spanFigures(spanBefore?: string | null): string {
   return `A figure for "this range" or the "previous range" is that whole range, as an average per day or a total, never a point in it: never say it rose or fell over the range. Give its change against ${before}, in one of two shapes: "<what> averaged <this range's figure> per day, up <change> on ${before}", or "<what> rose <change> to <this range's figure> per day on ${before}", with "down" or "fell" for a fall and the change from its "change against" fact, never the previous range's figure. After the first time, "on the range before" will do, or the averaged shape alone. A total or a spacing takes the same shapes without "averaged" and "per day". Figures "at the start of the range" and "at the end of the range" did move inside the span: write those as "<what> rose <change> to <end figure>" or "fell <change> to". A ratio is for reading: never write it as a figure. Count nothing yourself: a count the facts do not give, such as how many days are listed, is not written.`;
 }
 
-export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuestions; questionNow?: string; questionCommon?: string; system: (subjectLabel: string, lead?: NoteLead, common?: boolean, kind?: SubjectKind, whole?: boolean, spanBefore?: string | null) => string }> = {
+export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuestions; questionNow?: string; system: (subjectLabel: string, lead?: NoteLead, kind?: SubjectKind, spanBefore?: string | null) => string }> = {
   hyper: {
     // A QUIET WEEK IS SAID (user, 2026-10-30): the facts count what changed even at 0, so the note
     // says the composition held rather than reaching for the node count, which is Geography's too.
@@ -113,9 +105,8 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
       // layers (the same day: "do they run the nodes on L0 or is the node composed out of it?").
       type: "Open with a plain sentence whose subject is the nodes, in the shape \"N of the M <network> nodes run <layers>\", M being all its nodes, the layers named exactly as the facts name them, with no possessive on the name (a node RUNS its layers, so the verb is run); then say in plain words where that group stands among the network's layer groups, as a reader would (\"its largest group\", \"the smaller of its two groups\", \"its only group\"), never \"share\", \"rank\" or a percentage; then how that changed over the range, or that it held.",
     },
-    questionCommon: "Last, in one sentence, how active it was, in the shape \"Activity was <up, down or steady>: <network> was part of <last week's figure> global snapshots per day last week, <up or down> <change> on the weeks before\", or \"held at\" the figure when it was steady.",
-    system: (subjectLabel, _lead, common, kind, whole) =>
-      `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${questionOf("hyper", kind)}${common ? ` ${whole ? QUESTION_COMMON_WHOLE : PROMPTS.hyper.questionCommon}` : ""}`,
+    system: (subjectLabel, _lead, kind) =>
+      `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${questionOf("hyper", kind)}`,
   },
   geo: {
     questions: {
@@ -129,9 +120,8 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
     // "the country and provider are closely related; so pick only one of the two with the most
     // significant change"): a provider's nodes sit in a country, so the two moves are usually one.
     question: "First, how many nodes there are and how that moved, then where they run: of the countries and hosting providers that gained or lost nodes, name only the ONE with the largest change, since a provider's nodes sit in a country and the two moves are usually the same nodes, with its current count, as \"<country or provider> fell <change> to <count>\", without calling it the largest; or where the nodes are now when nothing moved. Say nothing about speed.",
-    questionCommon: "Last, in one sentence, how active the network was, in the shape \"Activity was <up, down or steady>: <network> was part of <last week's figure> global snapshots per day last week, <up or down> <change> on the weeks before\", or \"held at\" the figure when it was steady.",
-    system: (subjectLabel, _lead, common, kind, whole) =>
-      `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${questionOf("geo", kind)}${common ? ` ${whole ? QUESTION_COMMON_WHOLE : PROMPTS.geo.questionCommon}` : ""}\nStay on where the nodes are located and who hosts them${common ? ", then the one sentence on activity" : ""}, and nothing else.`,
+    system: (subjectLabel, _lead, kind) =>
+      `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${questionOf("geo", kind)}\nStay on where the nodes are located and who hosts them, and nothing else.`,
   },
   ledger: {
     question: "Say what changed in the anchoring rhythm over the recent hours against the usual: what sped up or slowed down, as the recent figure and how far it is from the usual (\"<recent figure>, up <change> on the usual\"), and which networks did it. Then the reading itself: the longest gap, then, in one short clause: for the whole network, what each global snapshot holds, as \"N metagraph snapshots from M networks in each global snapshot\", never that it was part of anything; for one network, only the share of global snapshots it was part of.",
@@ -167,7 +157,7 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
     },
     // THE SPAN-BEFORE WORDS ARE WRITTEN IN (live 2026-11-03: a placeholder naming the "Span before
     // line" came back as "up 26% … on the Span before"): the rule carries the very words to use.
-    system: (subjectLabel, _lead, _common, kind, _whole, spanBefore) =>
+    system: (subjectLabel, _lead, kind, spanBefore) =>
       `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${questionOf("trend", kind)}\n${spanFigures(spanBefore)}`,
   },
 };
@@ -228,7 +218,6 @@ export function spanWords(view: NoteView, span: NoteSpan, spanFrom: number, span
  *  line per notable day, in the order given; the facts already describe each day, numbered the
  *  same way. `retryReasons` names why the previous answer was rejected, so the second attempt can
  *  correct it. `lead` is the Snapshots builder's choice of question (R71); the other views ignore it.
- *  `common` says the facts hold the common reading, so Hypergraph and Geography ask for it (R74).
  *  `kind` is the kind of question (`NoteFacts.kind`): a subject note asks its own. */
 /** THE CAPTION FORMAT. THE ROW SAYS THE DATE AND THE KIND (user, 2026-10-30, design B: "date and
  *  kind lead"), so a caption repeats neither: a short clause with the figure and whose it was. */
@@ -251,10 +240,8 @@ export function buildMessages(
   days: NotableDay[] | null,
   retryReasons?: string[],
   lead?: NoteLead,
-  common?: boolean,
   kind?: SubjectKind,
   span?: string | null,
-  whole?: boolean,
   line?: boolean,
   spanBefore?: string | null,
   rows?: readonly ChangeBrief[] | null,
@@ -274,7 +261,7 @@ export function buildMessages(
   if (retryReasons && retryReasons.length)
     parts.push(`Your previous answer was rejected: ${retryReasons.join("; ")}. Write it again and fix this.`);
   return [
-    { role: "system", content: `${PROMPTS[view].system(subjectLabel, lead, common, kind, whole, spanBefore)}\n\n${format}${line ? ` ${LINE_FORMAT}` : ""}` },
+    { role: "system", content: `${PROMPTS[view].system(subjectLabel, lead, kind, spanBefore)}\n\n${format}${line ? ` ${LINE_FORMAT}` : ""}` },
     { role: "user", content: parts.join("\n\n") },
   ];
 }
