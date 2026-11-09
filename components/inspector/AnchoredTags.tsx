@@ -6,7 +6,7 @@ import { ledgerNetwork } from "@/src/engine/domain/tickNet";
 import { UNLISTED_ID } from "@/src/data/unlisted";
 import { metagraphById } from "@/src/data/network";
 import { identityHudCss } from "@/src/palette/identity";
-import { NodeStars } from "@/components/state/StateAtoms";
+import { NodeStars, Resolving } from "@/components/state/StateAtoms";
 import { useMinHold } from "@/components/useMinHold";
 import { CONTENT_EASE } from "@/components/RollSwap";
 import { Lead, SectionLabel, TableHead, TABLE_ROW, UnitMarks, CUT_ROW, countable, figWidth } from "@/components/inspector/parts";
@@ -70,11 +70,9 @@ export function BreakdownRows({ rows, denom, focusId, head = { name: "Network", 
 export default function AnchoredTags({
   ordinal,
   anchored,
-  awaiting,
 }: {
   ordinal: number;
   anchored: number | null;
-  awaiting?: boolean;
 }) {
   useFeedRead(["exact"], "AnchoredTags");
   // The highlighted row is the network the chamber resolves against: the one picked INSIDE this
@@ -122,7 +120,11 @@ export default function AnchoredTags({
               ? // Two words (user, 2026-10-04: "why so much text, just say 'read failed'"); the
                 // lead is the failure's one statement, so the line under the label is gone.
                 "Read failed"
-              : "Reading which metagraphs anchored into it"}
+              : // THE READ IN FLIGHT IS THE LEAD'S OWN CUE (user, 2026-11-09: "the same treatment" as the
+                // scene callout): the shared `Resolving` atom where the sentence will land — it was a
+                // sentence here and a second stars-and-word row under the section label, two cues
+                // for one read. It holds one calm cycle (`resolveHold`) and fades out, as the row did.
+                <Resolving className={cn(resolveHold.fading && "animate-hold-fade-out motion-reduce:animate-none")} />}
       </Lead>
       <Separator className="mb-2" />
       <SectionLabel label="Snapshots anchored" total={total != null ? total : <NodeStars count={3} />} className="mb-0.5" />
@@ -133,13 +135,6 @@ export default function AnchoredTags({
     return (
       <div className="mt-1">
         {header}
-        {/* A failed read is stated once, by the lead above; only a read in flight draws here. */}
-        {!(missed && !resolveHold.show) && (awaiting || resolveHold.show) && (
-          <div className={cn("flex items-center gap-2 mt-1", resolveHold.fading && "animate-hold-fade-out motion-reduce:animate-none")}>
-            <NodeStars count={4} />
-            <span className="text-label tracking-[0.08em] uppercase text-muted-foreground">resolving</span>
-          </div>
-        )}
       </div>
     );
   }

@@ -32,6 +32,20 @@ export function NodeStars({ count = 5, tone }: { count?: number; tone?: "ai" }) 
 
 // NO SIGNAL — the small breathing red dot next to "no signal" (Vitals + the snapshot card's
 // title row) — reuses the shared `breathe` beat, same treatment as the "live now" cyan dot.
+/** THE READ IN FLIGHT, ON THE LINE ITS WORDS WILL TAKE (user, 2026-11-09: "instead of 'reading' in
+ *  text can't we use the visual cue?", then "the global snapshot card should have the same treatment
+ *  … the 'resolving' text is missing in the callout"): the node-stars and the one word, in the
+ *  label's caps. One species for the card's lead and the scene callout's, never a sentence about
+ *  reading. Sits one text line tall (`h-[1lh]`), so it rides the line it stands in for. */
+export function Resolving({ count = 3, className }: { count?: number; className?: string }) {
+  return (
+    <span className={cn("inline-flex h-[1lh] items-center gap-2", className)}>
+      <NodeStars count={count} />
+      <span className="text-label tracking-[0.08em] uppercase text-muted-foreground">resolving</span>
+    </span>
+  );
+}
+
 export function NoSignalDot() {
   return (
     <span className="w-[7px] h-[7px] rounded-full flex-none bg-destructive shadow-[0_0_0_3px_color-mix(in_oklch,var(--destructive)_22%,transparent)] animate-breathe motion-reduce:animate-none" />

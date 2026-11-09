@@ -18,6 +18,7 @@ import { tickerOf } from "@/components/explorer/nodeRow";
 import { IDENT_INK } from "@/components/identInk";
 import { BreakdownRows } from "@/components/inspector/AnchoredTags";
 import { CUT_ROW, Lead, SectionLabel, TABLE_ROW, TableHead, figWidth } from "@/components/inspector/parts";
+import { Resolving } from "@/components/state/StateAtoms";
 import { CONTENT_EASE } from "@/components/RollSwap";
 import { Separator } from "@/components/ui/separator";
 
@@ -113,7 +114,7 @@ export function DataAnchored({ ordinal }: { ordinal: number }) {
     .filter((r) => r.n > 0)
     .sort((a, b) => b.n - a.n);
   const lead = !exact
-    ? missed ? "Read failed" : "Reading which data blocks it carried"
+    ? missed ? "Read failed" : <Resolving /> // the read in flight: the shared atom, not a sentence (2026-11-09)
     : blocks === 0
       ? "No data block in this snapshot"
       : `Carried ${blocks} data block${blocks === 1 ? "" : "s"}${updates != null ? ` with ${updates} update${updates === 1 ? "" : "s"}` : ""}`;

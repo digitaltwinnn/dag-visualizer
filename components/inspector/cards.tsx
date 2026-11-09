@@ -272,7 +272,7 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
       {/* THE REGISTER'S SECTION (user, 2026-11-07): the tick's blocks by chain in Transaction blocks,
           its data blocks by network in Data blocks, else the anchored breakdown (exact share
           breakdown, or "reading…" until it lands). */}
-      {inBlocks ? <BlocksAnchored ordinal={d.ordinal} /> : inData ? <DataAnchored ordinal={d.ordinal} /> : <AnchoredTags ordinal={d.ordinal} anchored={anchored} awaiting={awaitingExact} />}
+      {inBlocks ? <BlocksAnchored ordinal={d.ordinal} /> : inData ? <DataAnchored ordinal={d.ordinal} /> : <AnchoredTags ordinal={d.ordinal} anchored={anchored} />}
 
       {/* Settlement — the exact fee + measured size + rewards (each an independent fact). While the
           exact read is still in flight (ACQUIRING), the fee row shows twinkling node-stars so the
