@@ -14,7 +14,9 @@ import PresentationToggle, { SEG } from "@/components/topbar/PresentationToggle"
 import AboutStrip from "@/components/topbar/AboutStrip";
 import SettingsMenu from "@/components/topbar/SettingsMenu";
 import ViewPicker from "@/components/topbar/ViewPicker";
-import { NET_SWITCH_VIEW } from "@/components/topbar/NetworkSwitch";
+import { NET_SWITCH_REGISTER, NET_SWITCH_VIEW } from "@/components/topbar/NetworkSwitch";
+import { switchLedgerRegister } from "@/src/store/applyClickActions";
+import type { LedgerRegister } from "@/src/store/mode";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { useSceneYield } from "@/components/RailShade";
 import { DOC_PAGES, LISTED_VIEWS, VIEWS } from "@/components/views";
@@ -108,13 +110,21 @@ export default function TopBar() {
   // regenerating the tree (the data-net trap, CLAUDE.md "The three networks").
   useEffect(() => {
     let saved: string | null = null;
+    let register: string | null = null;
     try {
       saved = sessionStorage.getItem(NET_SWITCH_VIEW);
+      register = sessionStorage.getItem(NET_SWITCH_REGISTER);
       if (saved != null) sessionStorage.removeItem(NET_SWITCH_VIEW);
+      if (register != null) sessionStorage.removeItem(NET_SWITCH_REGISTER);
     } catch {
       return; /* storage unavailable — nothing carried */
     }
-    if (saved != null && VIEWS.some((v) => v.id === saved)) setMode(saved as Mode);
+    if (saved == null || !VIEWS.some((v) => v.id === saved)) return;
+    // The register first (the footer's order): outside the view it writes no URL, so the view's
+    // own write is the one push. Only a register the saved view offers.
+    const offered = VIEW_POLICIES[saved as Mode].registers as readonly string[];
+    if (register != null && offered.length > 1 && offered.includes(register)) switchLedgerRegister(register as LedgerRegister);
+    setMode(saved as Mode);
   }, [setMode]);
 
   const face = filterFace(filter);

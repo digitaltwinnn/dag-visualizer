@@ -5,6 +5,7 @@ import useTrendRoster from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { captionMarks, litIndices, rangeFrame, rangeGeometry } from "@/src/data/rangeSpark";
 import type { TrendMetric } from "@/src/store/store";
+import { stampParts } from "@/src/util/localTime";
 
 // THE RANGE'S HAIRLINE (user, 2026-11-09, design H) — the Range card's Start and End drawn: the
 // subject's line over a frame around the range (`rangeFrame`: the shortest window pill holding it
@@ -47,7 +48,9 @@ export default function RangeSpark({
   const daily = span.toMs - span.fromMs >= 2 * D;
   // The end is exclusive: a day-named range names the day it reaches into.
   const start = mark(span.fromMs, daily);
-  const end = mark(daily ? span.toMs - 1 : span.toMs, daily);
+  // A clock time names its zone (`localTime`'s rule; review 2026-11-09): the card's title is a UTC day,
+  // so the zone rides the end mark, once.
+  const end = mark(daily ? span.toMs - 1 : span.toMs, daily) + (daily ? "" : ` ${stampParts(span.toMs).zone}`);
   const m = captionMarks(points.length, lit);
   // A mark is centred on its point but kept inside the line's width: at 0% it starts there, at 100% it ends there.
   const at = (f: number) => ({ left: `${f * 100}%`, transform: `translateX(-${f * 100}%)` });

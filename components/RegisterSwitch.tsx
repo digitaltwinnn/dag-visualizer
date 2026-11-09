@@ -243,7 +243,9 @@ export default function RegisterSwitch() {
             key={r}
             type="button"
             aria-pressed={lit}
-            aria-label={count[r] ? `${REGISTER_NAMES[r]}, ${span[r]}, ${count[r]}` : `${REGISTER_NAMES[r]}, ${span[r]}`}
+            // NO aria-label (review, 2026-11-09): one overrode the content and dropped the lit half's
+            // LIVE / PINNED state; the content is the name, the readings and the state mark, whose
+            // screen-reader word lives in `PinnedMark` alone (`pinnedMark.test.ts`).
             onClick={() => switchLedgerRegister(r)}
             className={cn(
               // THE LIT STATION IS A WASH, NOT A FRAME (user, 2026-11-07, option 5 without the underline):

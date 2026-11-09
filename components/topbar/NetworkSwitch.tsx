@@ -15,6 +15,9 @@ import type { NetworkId } from "@/src/engine/config";
 // /?net= link stays clean; a new tab (middle-click) is a fresh entry and starts at the
 // default view, which is exactly what a fresh entry is.
 export const NET_SWITCH_VIEW = "dagviz:net-switch-view";
+/** The view's REGISTER rides along (review, 2026-11-09: from /blocks a network switch landed on
+ *  Metagraph snapshots), restored before the view so the URL is written once. */
+export const NET_SWITCH_REGISTER = "dagviz:net-switch-register";
 
 // The network rows — SECTION of the SettingsMenu since 2026-09-08 (user consolidation; the
 // standalone rightmost trigger retired with it). ⚠️ "Which chain am I looking at" must not go
@@ -43,6 +46,7 @@ export default function NetworkRows() {
           onClick={() => {
             try {
               sessionStorage.setItem(NET_SWITCH_VIEW, useStore.getState().mode);
+              sessionStorage.setItem(NET_SWITCH_REGISTER, useStore.getState().ledgerRegister);
             } catch {
               /* storage unavailable (private mode) — the switch still works, view resets */
             }

@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { useStore } from "@/src/store/store";
 import { netUrl } from "@/src/net/current";
 import { POLL } from "@/src/engine/config";
 import { reportPoll } from "@/src/data/api";
-import { getBlockWindow, pastRetryDelay, setBlockWindow } from "@/src/data/pastWindow";
+import { getBlockWindow, onBlockWindow, pastRetryDelay, setBlockWindow } from "@/src/data/pastWindow";
 import { BLOCK_WINDOW_TICKS, blockChainOf, blockRefreshMs, blockWanted, failedReadKeeps, foldBlockWindow, liveWindowRuns, mergeLiveAnswer, tipJoins, trailPath, type BlockWindowAnswer } from "@/src/data/blockWindow";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
@@ -180,6 +180,14 @@ export default function BlockWindowBridge() {
 
   // Is the held window the live one, still moving (`liveWindowRuns`)? Asked of the refs and the
   // module's window at the moment, so the interval and the append re-ask it rather than closing over it.
+  // WHICH window is held — none, the live edge, or one around an ordinal — as a render input (review,
+  // 2026-11-09): a pin set while the live window was still loading found `liveRuns()` false, and the
+  // live answer's landing changed none of the refresh effect's deps, so the 30 s refresh never began.
+  const heldKind = useSyncExternalStore(
+    onBlockWindow,
+    () => { const w = getBlockWindow(); return w == null ? "none" : w.around == null ? "live" : `around:${w.around}`; },
+    () => "none",
+  );
   const liveRuns = () => {
     const held = getBlockWindow();
     return liveWindowRuns({ liveWanted, following, pin, held: held ? { from: held.from, to: held.to } : null, heldLive: held != null && held.around == null && askedLive() });
@@ -206,7 +214,7 @@ export default function BlockWindowBridge() {
       if (id != null) window.clearInterval(id);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [liveWanted, following, pin, chain, register]);
+  }, [liveWanted, following, pin, chain, register, heldKind]);
 
   // A global the live feed announces with blocks joins the window at once; its anchored records
   // come with the next refresh.

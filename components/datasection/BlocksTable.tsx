@@ -67,7 +67,8 @@ export default function BlocksTable() {
   const status = useStore((s) => s.blockWindowStatus);
   const hoverBlock = useStore((s) => s.hoverBlock);
   const setHoverBlockRaw = useStore((s) => s.setHoverBlock);
-  const setHoverSnapOrd = useStore((s) => s.setHoverSnapOrd);
+  const hoverSnapOrd = useStore((s) => s.hoverSnapOrd);
+  const setHoverSnapOrdRaw = useStore((s) => s.setHoverSnapOrd);
   const now = useNowTick(1000);
   const phone = useBreakpoint() === "phone";
   // Folded groups, as the log keeps them: open on the wider tiers, folded on the phone — except the
@@ -112,6 +113,10 @@ export default function BlocksTable() {
   // block and the Block card. A row that leaves under a resting pointer (a fold, a live refresh)
   // releases the hover it set (`useHoverRelease`).
   const setHoverBlock = useHoverRelease(hoverBlock, rows.filter((b) => !isFolded(b.anchorOrd)).map((b) => b.hash), setHoverBlockRaw);
+  // The group PLATES hover their global (convention 9) and release it on unmount too (review,
+  // 2026-11-09): the table mounts only while RAW is up, so closing it under the pointer left the
+  // scene's global lit until the next hover.
+  const setHoverSnapOrd = useHoverRelease(hoverSnapOrd, [...new Set(rows.map((b) => b.anchorOrd))], setHoverSnapOrdRaw);
 
   if (!rows.length) {
     // The instrument state, in the explorer's and the band's own sentence (`blockAbsence`).

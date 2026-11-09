@@ -170,6 +170,7 @@ export default function LedgerPanel() {
   const hoverBlock = useStore((s) => s.hoverBlock);
   const setHoverBlock = useStore((s) => s.setHoverBlock);
   const [blockPage, setBlockPage] = useState(1);
+  const turnedBlock = useRef<string | null>(null); // the committed block the list last turned to
   const hoverFilter = useStore((s) => s.hoverFilter);
   const setHoverFilter = useStore((s) => s.setHoverFilter);
   const hoverSnapOrd = useStore((s) => s.hoverSnapOrd);
@@ -635,6 +636,18 @@ export default function LedgerPanel() {
   // is the chamber's own block pick (`blockSelectActions`: the block and the tick that carries it),
   // its hover the block's own channel (`hoverBlock` — a block, not its tick).
   const allBlocks = inBlocks ? windowBlocks(blockWin) : [];
+  // THE LIST TURNS TO A COMMITTED BLOCK (review, 2026-11-09): a block committed from the scene or the
+  // card pager on another page was not brought on screen, as the tick list's `turnTo` does for a pin.
+  // Once per committed block, when the list holds it (a window still loading turns when it lands);
+  // a page the reader turns afterwards is theirs. Render-time state adjustment, guarded by the ref.
+  if ((block?.hash ?? null) !== turnedBlock.current) {
+    const i = block ? allBlocks.findIndex((b) => b.chain === block.chain && b.hash === block.hash) : -1;
+    if (!block || i >= 0) {
+      turnedBlock.current = block?.hash ?? null;
+      const want = i >= 0 ? Math.floor(i / pageSize) + 1 : null;
+      if (want != null && want !== blockPage) setBlockPage(want);
+    }
+  }
   const blockPages = Math.max(1, Math.ceil(allBlocks.length / pageSize));
   const bPage = Math.min(blockPage, blockPages);
   const pagedBlocks = allBlocks.slice((bPage - 1) * pageSize, bPage * pageSize);
