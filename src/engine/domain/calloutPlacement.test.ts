@@ -4,6 +4,9 @@ import {
   CALLOUT_OFF_X,
   CALLOUT_OFF_Y,
   CALLOUT_REACH_X,
+  CALLOUT_W,
+  CALLOUT_H,
+  CALLOUT_H_PHONE,
   CALLOUT_REACH_Y,
   CALLOUT_HANG_K,
   CALLOUT_HANG_REACH_X,
@@ -24,6 +27,17 @@ const TABLET_BOTH = { l: 300, r: 580 };
 
 const at = (x: number, band: { l: number; r: number }, y = 500, top = 0) =>
   calloutPlacement(x, y, band.l, band.r, top);
+
+// The one size (user, 2026-11-09: "give callouts a fixed width and height to avoid the resize").
+describe("the panel's one size", () => {
+  it("the reach is the standoff plus the size, so placement and the drawn box agree", () => {
+    expect(CALLOUT_REACH_X).toBe(CALLOUT_OFF_X + CALLOUT_W);
+    expect(CALLOUT_REACH_Y).toBe(CALLOUT_OFF_Y + CALLOUT_H);
+  });
+  it("the phone label (no lead line) is shorter than the desktop one", () => {
+    expect(CALLOUT_H_PHONE).toBeLessThan(CALLOUT_H);
+  });
+});
 
 describe("callout standoff", () => {
   it("derives the reach from the standoff, never the other way round", () => {
@@ -98,9 +112,9 @@ describe("calloutPlacement against an overlaying sheet", () => {
   });
 
   it("never flips into the sheet it just avoided", () => {
-    const p = at(450, { l: 300, r: 820 });
+    const p = at(440, { l: 300, r: 820 });
     expect(p.show).toBe(true);
-    expect(p.flip).toBe(false); // 450 + 360 = 810 fits right; flipping would land at 90, under the sheet
+    expect(p.flip).toBe(false); // 440 + 372 = 812 fits right; flipping would land at 68, under the sheet
   });
 
   it("on the desktop rails' SOFT band a panel that fits on neither side takes the roomier side", () => {

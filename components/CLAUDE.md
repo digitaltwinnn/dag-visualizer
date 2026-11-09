@@ -2397,6 +2397,14 @@ hued ticker, the anchor ring and the `.edge-spine`). The design rules the test c
   it and rolls the title (`Odometer`'s `text` mode); a new kind still rolls the whole panel in. The
   age chip and the lead's size chip stand on a tabular floor (`min-w` in `ch`) and the lead row is
   tabular, so the width held at one value across four live ticks (measured).
+- **Every callout is ONE SIZE** (user, 2026-11-09: "callout still re-size when data changes … As a
+  general rule, give callouts a fixed width and height to avoid the resize"): `CALLOUT_W` ×
+  `CALLOUT_H` (288 × 86) on the desktop, `CALLOUT_H_PHONE` (56) on a phone, where the lead is dropped —
+  one home, `domain/calloutPlacement.ts`, whose reach constants derive from them, so the flip/drop
+  tests and the drawn box agree. A line too long for the box truncates (a node's "Boardman, Amazon.com,
+  Inc."); a label with no reading of its own gets one (the metagraph snapshot's "Anchored to N" and its
+  size), so no kind comes up short. Measured: global, metagraph snapshot, block, data block and a
+  hyper node all 288 × 86, the global unchanged through 16 s of live ticks.
 - **The phone declines it** (user, 2026-08-18). Co-location is the whole promise — the panel stands
   beside its subject and points at it — and a phone has no width to stand beside anything: the panel
   is a third of the viewport, so it lands ON the subject or over the dock, and the flip rule has no

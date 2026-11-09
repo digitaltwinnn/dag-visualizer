@@ -67,7 +67,7 @@ import { layerCodesOf } from "@/src/data/composition";
 import { useNowTick } from "@/components/useNowTick";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { relativeAge } from "@/src/util/relativeAge";
-import { CALLOUT_OFF_X, CALLOUT_OFF_Y, CALLOUT_LEG_INSET, CALLOUT_PHONE_K, CALLOUT_HANG_K } from "@/src/engine/domain/calloutPlacement";
+import { CALLOUT_OFF_X, CALLOUT_OFF_Y, CALLOUT_LEG_INSET, CALLOUT_PHONE_K, CALLOUT_HANG_K, CALLOUT_W, CALLOUT_H, CALLOUT_H_PHONE } from "@/src/engine/domain/calloutPlacement";
 import type { GeoInfo } from "@/src/data/types";
 import LiveDot from "@/components/LiveDot";
 import { PinnedMark } from "@/components/state/StateAtoms";
@@ -155,7 +155,16 @@ function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; className?
     // headers, for example global snapshot #"): a new subject of the same kind — a live tick, a pager
     // step — keeps the panel and rolls its title on the odometer; a new KIND (a global to a block)
     // still rolls the whole panel in.
-    <div key={m.eyebrow} className={cn("roll-in whitespace-nowrap", SCENE_GLASS, className)}>
+    // THE ONE SIZE (`CALLOUT_W` / `CALLOUT_H`, 2026-11-09): a fixed box, so no reading — an age
+    // ticking down, a size chip arriving — can resize the label; a line too long for it truncates.
+    <div
+      key={m.eyebrow}
+      className={cn(
+        "roll-in whitespace-nowrap flex flex-col overflow-hidden w-(--co-w) h-(--co-h) [[data-phone]_&]:h-(--co-h-phone)",
+        SCENE_GLASS,
+        className,
+      )}
+    >
       {/* The identity EDGE SPINE (user, 2026-08-15 — "the rails/hairline effect on the left
           side, attached", then "let it fade into the corners"): the sheets' single-identity-
           cue language at callout scale, as the shared `.edge-spine` recipe (globals.css) — a
@@ -196,7 +205,7 @@ function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; className?
           on this row, and the anchor ring is the subject mark at the scene end of the tie. */}
       <div className="flex items-center gap-[7px]">
         {m.mark && <SceneMark mark={m.mark} />}
-        <Odometer text={m.title} className={cn("text-body font-semibold text-foreground tabular-nums", m.titleMono && "font-mono")} />
+        <Odometer text={m.title} className={cn("min-w-0 text-body font-semibold text-foreground tabular-nums", m.titleMono && "font-mono")} />
         {/* A hued aside is a TICKER beside a title, so it is the card head's own chip
             (`TickerChip`, 2026-10-02); the un-hued one is a state line and stays text. Both sit
             at the row's right edge (user, 2026-11-03: "right align the tags (pinned, network,
@@ -249,7 +258,7 @@ function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; className?
               {m.lead.ident.text}
             </span>
           )}
-          {m.lead.text && <span>{m.lead.text}</span>}
+          {m.lead.text && <span className="min-w-0 truncate">{m.lead.text}</span>}
           {(!!m.lead.codes?.length || !!m.lead.chip) && <span className="flex-1 min-w-3" />}
           {m.lead.codes && m.lead.codes.length > 0 && <RoleChips codes={m.lead.codes} />}
           {m.lead.chip && <QualifierChip className="tabular-nums min-w-[calc(6ch+12px)] justify-center">{m.lead.chip}</QualifierChip>}
@@ -287,6 +296,12 @@ export default function SceneCallout() {
   const blockWin = useSyncExternalStore(onBlockWindow, getBlockWindow, () => null);
   const register = useStore((s) => s.ledgerRegister);
   const dataBlock = useStore((s) => s.dataBlock);
+  // The committed metagraph snapshot's exact BYTES (its own row), for its label's lead chip.
+  const metaSnapBytes = useStore((s) => {
+    const m = s.metaSnap;
+    if (!m) return null;
+    return s.snapshotExact[m.globalOrdinal]?.rows.find((r) => r.metaId === m.metaId && r.ordinal === m.ordinal)?.bytes ?? null;
+  });
   const dataBlockRow = useStore((s) => {
     const d = s.dataBlock;
     if (!d) return null;
@@ -464,6 +479,9 @@ export default function SceneCallout() {
         aside: nnet ? { text: nnet.ticker, hue: nnet.hue, live: following, pinned: !following } : undefined,
         ring: nnet?.hue ?? "var(--primary)",
         mark: { icon: iconForPick("metaSnap"), hue: nnet?.hue ?? "var(--primary)" },
+        // A LEAD LIKE EVERY OTHER LABEL (2026-11-09, the one size): the global it was anchored to — the
+        // card's own first fact — and its size once the tick's exact read has landed (rule 10).
+        lead: { text: `Anchored to ${metaSnap.globalOrdinal.toLocaleString()}`, chip: metaSnapBytes != null ? fmtKB(metaSnapBytes / 1024) : undefined },
       };
     };
     const gsModel = (): Model | null => {
@@ -681,6 +699,9 @@ const CALLOUT_VARS = {
   "--co-off-y": `${CALLOUT_OFF_Y}px`,
   "--co-hang-k": String(CALLOUT_HANG_K),
   "--co-phone-k": String(CALLOUT_PHONE_K),
+  "--co-w": `${CALLOUT_W}px`,
+  "--co-h": `${CALLOUT_H}px`,
+  "--co-h-phone": `${CALLOUT_H_PHONE}px`,
 } as CSSProperties;
 
 /** The callout: the 0-size anchor wrapper CalloutSync positions, its ring, leader and panel.

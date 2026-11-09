@@ -28,13 +28,22 @@ export const CALLOUT_OFF_Y = 118;
  *  the two literals held in sync only by memory (review, 2026-08-31). */
 export const CALLOUT_LEG_INSET = 2;
 
+/** THE PANEL'S ONE SIZE (user, 2026-11-09: "callout still re-size when data changes, for example
+ *  also when a size tag is added to the bottom part. As a general rule, give callouts a fixed width
+ *  and height to avoid the resize"). Every desktop callout is this box, whatever it names and however
+ *  its readings change — measured that day, they ran 226–310px wide and 86px tall with a lead line;
+ *  a longer line truncates rather than widening the box. The phone label drops its lead, so it has its
+ *  own height (`CALLOUT_H_PHONE`). The stylesheet reads both through SceneCallout's variables. */
+export const CALLOUT_W = 288;
+export const CALLOUT_H = 86;
+export const CALLOUT_H_PHONE = 56;
+
 /**
- * The panel's full reach from the anchor on each axis — the standoff plus the widest / tallest
- * panel the callout renders. These are what a placement is tested against, so they move with the
- * standoff above and never on their own.
+ * The panel's full reach from the anchor on each axis — the standoff plus the panel's one size, so
+ * they move with either and never on their own.
  */
-export const CALLOUT_REACH_X = 344;
-export const CALLOUT_REACH_Y = 198;
+export const CALLOUT_REACH_X = CALLOUT_OFF_X + CALLOUT_W;
+export const CALLOUT_REACH_Y = CALLOUT_OFF_Y + CALLOUT_H;
 
 export type CalloutPlacement = {
   /** False when the callout must not render at all — the band can't hold it honestly. */
@@ -120,9 +129,9 @@ export function calloutPlacement(
 
 /** The hanging standoff, as a share of the standing one (the stylesheet reads it as `--co-hang-k`). */
 export const CALLOUT_HANG_K = 0.55;
-/** The tallest panel the hanging label renders (eyebrow, title row, rule, lead) — 88px measured.
- *  The air under it is the caller's (`bottom` already stops short of the band). */
-const HANG_PANEL_H = 88;
+/** The hanging label's panel — the one size (`CALLOUT_H`). The air under it is the caller's
+ *  (`bottom` already stops short of the band). */
+const HANG_PANEL_H = CALLOUT_H;
 /** The hanging panel's full reach from its anchor: leftward and downward. */
 export const CALLOUT_HANG_REACH_X = Math.round(CALLOUT_OFF_X * CALLOUT_HANG_K) + (CALLOUT_REACH_X - CALLOUT_OFF_X);
 export const CALLOUT_HANG_REACH_Y = Math.round(CALLOUT_OFF_Y * CALLOUT_HANG_K) + HANG_PANEL_H;
