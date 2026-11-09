@@ -6,9 +6,8 @@ import type { TickNetSel } from "@/src/data/types";
 import { AI_NOTES_ICON, BLOCK_ICON, EXPLORE_ICON, INSTANT_ICON, RANGE_ICON, iconForPick } from "@/components/icons";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import type { Mode } from "@/src/store/store";
-import { VIEW_POLICIES, readsBlockWindow, registerOf } from "@/src/engine/domain/viewPolicy";
+import { VIEW_POLICIES, drawsDataBlocks, readsBlockWindow, registerOf } from "@/src/engine/domain/viewPolicy";
 import type { BlockSel, DataBlockSel, MetaSnapSel, PickDescriptor } from "@/src/data/types";
-import { REGISTER_MEASURES } from "@/src/data/ledgerMeasure";
 import { REGISTER_ICONS } from "@/components/icons";
 import type { LedgerRegister } from "@/src/store/mode";
 import { REGISTER_REST, REGISTER_SEAT } from "@/src/store/mode";
@@ -449,7 +448,7 @@ function blockHint(s: RailManifestState): string | null {
 }
 /** Does the view on screen read the Data blocks register? */
 const inData = (s: Pick<RailManifestState, "mode" | "ledgerRegister">): boolean =>
-  s.mode === "ledger" && REGISTER_MEASURES[s.ledgerRegister ?? "snapshots"].dataOnly;
+  drawsDataBlocks(registerOf(s.mode, s.ledgerRegister ?? "snapshots"));
 // A DATA BLOCK — the Data blocks register's own slot: its ghost opens the committed snapshot's first
 // data block (`railSiblings.dataBlockStep`), so the hint names the snapshot it needs.
 function dataBlockHint(s: RailManifestState): string | null {

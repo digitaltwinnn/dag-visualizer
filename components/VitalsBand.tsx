@@ -104,7 +104,7 @@ export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
   const yielding = useSceneYield();
   const cells = useCellsKey(mode);
   // A register's cells state their own reach ("last hour", "last 11 min"), not the band's 24 hours.
-  const bandWindow = cells === "ledger:blocks" || cells === "ledger:data" ? null : VIEW_POLICIES[mode].bandWindow;
+  const bandWindow = bandWindowOf(mode, cells);
   const dead = useNoSignal() && VIEW_POLICIES[mode].bandContent === "vitals";
   // THE BAND NEVER PAINTS UNDER AN OPEN SHEET (user, 2026-09-04 — "sometimes I see flickering
   // when the explore and bottom bar overlap"). The overlay decision above stands: the sheets
@@ -254,9 +254,17 @@ export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
  *  because the sheet has height to spend and a stacked read beats a sideways thumb-scroll; the
  *  band's equal horizontal share is overridden — in a column every card takes the sheet's full
  *  width, which is what `[&>*]:flex-none [&>*]:basis-auto` on the wrapper below says. */
+/** The band's shared window chip, or null where the cells state their own reach — ONE rule for the
+ *  desktop band and the phone sheet (review, 2026-11-09: the sheet excluded Transaction blocks only,
+ *  so Data blocks' minute-span cells sat under "last 24 hours"). */
+function bandWindowOf(mode: Mode, cells: CellsKey) {
+  return cells === "ledger:blocks" || cells === "ledger:data" ? null : VIEW_POLICIES[mode].bandWindow;
+}
+
 export function VitalsSheetBody() {
   const { mode, live, filter, accent } = useVitalsScope();
   const cells = useCellsKey(mode);
+  const sheetWindow = bandWindowOf(mode, cells);
   const dead = useNoSignal() && VIEW_POLICIES[mode].bandContent === "vitals";
   // The band's own rule (see the desktop section): never-answered → one statement, no cells.
   if (dead) {
@@ -278,8 +286,8 @@ export function VitalsSheetBody() {
     >
       {!live && <span className="self-center flex-none mb-2"><NoSignalDot /></span>}
       {/* The band's shared window, once, at the sheet's top right — the desktop chip's phone home. */}
-      {VIEW_POLICIES[mode].bandWindow && cells !== "ledger:blocks" && (
-        <span className="self-end flex-none mb-2"><QualifierChip>{spanPhrase(VIEW_POLICIES[mode].bandWindow, null)}</QualifierChip></span>
+      {sheetWindow && (
+        <span className="self-end flex-none mb-2"><QualifierChip>{spanPhrase(sheetWindow, null)}</QualifierChip></span>
       )}
       {/* The no-pop swap — the cell-targeting `[&>*]` rules ride the wrapper for the same
           retargeting reason the band's do (see the desktop section above). */}

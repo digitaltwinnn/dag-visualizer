@@ -678,7 +678,9 @@ export default function SceneCallout() {
         title: b ? shortBlockHash(b.digest) : `${dataBlock.index + 1}`,
         titleMono: true,
         aside: following
-          ? { text: "live", live: true, chip: b ? `${b.updates.toLocaleString()} ${b.updates === 1 ? "update" : "updates"}` : undefined }
+          ? liveFeed
+            ? { text: "live", live: true, chip: b ? `${b.updates.toLocaleString()} ${b.updates === 1 ? "update" : "updates"}` : undefined }
+            : { text: "no signal" } // the global's and the block's third state (review, 2026-11-09)
           : { text: "", pinned: true, chip: b ? `${b.updates.toLocaleString()} ${b.updates === 1 ? "update" : "updates"}` : undefined },
         ring: hue,
         mark: { icon: REGISTER_ICONS.data, hue },

@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { getNetwork } from "@/src/data/network";
 import { useStore } from "@/src/store/store";
+import { drawsDataBlocks, registerOf } from "@/src/engine/domain/viewPolicy";
 import { followLatest } from "@/src/data/follow";
 import { onBlockWindow } from "@/src/data/pastWindow";
 
@@ -32,7 +33,7 @@ export default function FollowController() {
     // IN DATA BLOCKS a landing EXACT READ is a beat too (2026-11-08): a tick is known to carry data
     // only once its read lands, so the follow moves as the reads do (`followNewestData`).
     const offExact = useStore.subscribe((s, p) => {
-      if (s.snapshotExact !== p.snapshotExact && s.following && s.mode === "ledger" && s.ledgerRegister === "data") tick();
+      if (s.snapshotExact !== p.snapshotExact && s.following && drawsDataBlocks(registerOf(s.mode, s.ledgerRegister))) tick();
     });
     return () => {
       offExact();

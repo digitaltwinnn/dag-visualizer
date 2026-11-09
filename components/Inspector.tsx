@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from "
 import { viewNetwork } from "@/src/engine/domain/viewNetwork";
 import { useStore } from "@/src/store/store";
 import { cn } from "@/lib/utils";
-import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
+import { VIEW_POLICIES, registerOf } from "@/src/engine/domain/viewPolicy";
 import { displayNetwork } from "@/src/data/unlisted";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { filterAccent } from "@/src/data/network";
@@ -587,7 +587,8 @@ export default function Inspector() {
   useEffect(() => {
     if (lastSelection.current === selectionKey) return;
     lastSelection.current = selectionKey;
-    const modeChanged = lastMode.current !== mode || (mode === "ledger" && lastRegister.current !== ledgerRegister);
+    // A register switch is a change of what the view shows, in the views that offer one (`registerOf`).
+    const modeChanged = lastMode.current !== mode || registerOf(mode, lastRegister.current) !== registerOf(mode, ledgerRegister);
     lastMode.current = mode;
     lastRegister.current = ledgerRegister;
     // The reader's commits, counted ahead of the entry's return: the window below is for what ARRIVAL

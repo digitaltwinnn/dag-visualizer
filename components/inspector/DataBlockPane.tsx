@@ -24,7 +24,9 @@ import { useStore } from "@/src/store/store";
 // door to the snapshot's RAW record, and a foot with the snapshot's ordinal and the DIGEST the server
 // takes over the block's bytes — never called a hash: the chain publishes none for a data block.
 // Everything is the exact row's (`ChannelSnapRow.dataBlockRows`), so the card never reads deep.
-// A data block has no live follow: it is a picked subject, released when its snapshot goes.
+// Its live follow is the register's (`follow.ts`'s `followNewestData` seats the newest data-carrying
+// snapshot, and the scene callout says "live" for it); the card itself carries no state mark — the
+// Global snapshot card above it holds the LIVE / PINNED control.
 
 const DATA_ICON = REGISTER_ICONS.data;
 
@@ -32,6 +34,9 @@ export default function DataBlockPane({ onClose, collapsed, onToggle }: { onClos
   useFeedRead(["exact"], "DataBlockPane");
   const sel = useStore((s) => s.dataBlock);
   const exact = useStore((s) => (s.dataBlock ? s.snapshotExact[s.dataBlock.snap.globalOrdinal] : undefined));
+  // The read's give-up signal (rule 10, review 2026-11-09): a failed read ends on an honest word,
+  // never a "reading" that waits forever — the snapshot cards' own `exactMiss` rule.
+  const missed = useStore((s) => (s.dataBlock ? s.exactMiss[s.dataBlock.snap.globalOrdinal] != null : false));
   const hoverDataBlock = useStore((s) => s.hoverDataBlock);
   const setHoverDataBlock = useStore((s) => s.setHoverDataBlock);
   const pulseKey = useEdgePulse(sel ? `${sel.snap.metaId}:${sel.snap.ordinal}:${sel.index}` : null);
@@ -86,7 +91,9 @@ export default function DataBlockPane({ onClose, collapsed, onToggle }: { onClos
               ? `Carried ${b.updates.toLocaleString()} ${b.updates === 1 ? "update" : "updates"} for ${unit}, signed by ${b.signers.toLocaleString()} ${b.signers === 1 ? "validator" : "validators"}`
               : exact
                 ? "This snapshot's read names no such block"
-                : "Reading the snapshot that carried it"}
+                : missed
+                  ? "Read failed"
+                  : "Reading the snapshot that carried it"}
           </Lead>
           {b && b.kinds.length > 0 && (
             <div className="mt-2 mb-2">
