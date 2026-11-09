@@ -734,7 +734,15 @@ inside a view; the tiles, bars and the block tier all ride the same `_entryDrop`
 normal-blended, depth-writing, in the bloom set, not pickable — the tile under it answers the click),
 one instance per tile in the tile draw's order — **the tile's own size** since 2026-11-08 (user: "the
 same size as the snapshot block"; `DATA_MARK` foot 1, height 1): a second tile standing on the
-first in the lane's hue, a presence mark; the count of updates is the card's and the explorer's. Its COUNT is resolved at event time with the pick table
+first in the lane's hue, a presence mark; the count of updates is the card's and the explorer's.
+**It is LIFTED 2.5 tiles' height off its tile and TETHERED to it** (user, 2026-11-09: "raise the
+datablocks from their snapshots more, like 2x to 3x current distance with a line attaching the
+blocks"; `DATA_MARK.lift`, was 1): one `SoftLines` hairline per mark (`_dataTether`, the same
+antialiased strip as the Transaction blocks links, since a GL line steps and fringes under the bloom),
+from the tile's top to the mark's underside, in the mark's own ink each frame, its alpha
+`DATA_TETHER` per ground (dark 0.7, paper 0.9) times the entry fade; written and committed in the
+mark's slots with the same `count`, zeroed with it. Not in the bloom set, and not pickable — the tile
+under it answers the click, as for the mark. Its COUNT is resolved at event time with the pick table
 (`_rebuildTilePicks`): the tile resolver names the metagraph snapshot, and that snapshot's own row in
 its tick's exact read gives `dataMarkCount` (`domain/dataMark.ts`) — a mark only where the row says
 it carried data blocks; a tile whose read has not landed shows none (rule 10, never guessed). Per frame

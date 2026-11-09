@@ -38,8 +38,8 @@ describe("DATA_MARK — the tile's own size (user, 2026-11-08)", () => {
     expect(DATA_MARK.foot).toBe(1);
     expect(DATA_MARK.height).toBe(1);
   });
-  it("hovers over its tile: a lift of one tile between the tile's top and the mark (user, 2026-11-08: 'slightly elevated')", () => {
-    expect(DATA_MARK.lift).toBeGreaterThan(0);
-    expect(DATA_MARK.lift).toBeLessThanOrEqual(DATA_MARK.height);
+  it("stands clear of its tile: 2–3× the one-tile lift it had (user, 2026-11-09: 'like 2x to 3x current distance')", () => {
+    expect(DATA_MARK.lift).toBeGreaterThanOrEqual(2 * DATA_MARK.height);
+    expect(DATA_MARK.lift).toBeLessThanOrEqual(3 * DATA_MARK.height);
   });
 });

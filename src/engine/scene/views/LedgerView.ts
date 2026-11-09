@@ -89,6 +89,7 @@ import type { ViewPolicy } from "../../domain/viewPolicy";
 type LedgerRegister = ViewPolicy["registers"][number];
 import { fmtKB } from "@/src/util/format"; // the HUD's own size vocabulary — one formatter, so scene and cards can't disagree
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers"; // shared display copy — floor labels = panel rows
+import { SoftLines } from "../objects/SoftLines";
 import { ByteBar, SEED_W } from "../objects/ByteBar";
 import { LiveEdge } from "../objects/LiveEdge";
 import { snapBright, snapFocusOf, focusWeightOf, emphasisK } from "../../domain/dimModel";
@@ -238,6 +239,12 @@ const REGISTER_CARGO: Record<LedgerRegister, { blocks: boolean; liveEdge: boolea
 };
 /** A data mark's brightness over its tile's: a footnote on the tile, but one that must read on it. */
 const DATA_MARK_GAIN = 2.2;
+/** THE MARK'S TETHER (user, 2026-11-09: "raise the datablocks from their snapshots more … with a line
+ *  attaching the blocks"): one soft hairline from the tile's top to its lifted mark's underside, in the
+ *  mark's own ink, so the lift reads as "this block came off THAT snapshot" rather than a block adrift.
+ *  Its alpha per ground: on the dark ground the additive line glows, on paper an ink line needs more
+ *  presence to read at all (the lamp rule's direction, `src/engine/CLAUDE.md`). */
+const DATA_TETHER: Readonly<{ alpha: number; alphaPaper: number }> = { alpha: 0.7, alphaPaper: 0.9 };
 
 /** A block's edge above the floor (a DAG block) and on a tile (a token block — a tile is 0.48 at most). */
 const DAG_BLOCK = 0.62;
@@ -471,6 +478,8 @@ export class LedgerView implements SceneView {
   private _dataMarkMesh!: THREE.InstancedMesh;
   private readonly _dataMarkN = new Float32Array(META_TRAIL_MAX).fill(-1);
   private _dataMarkLastDrawn = 0;
+  /** One tether per mark, in the same slot order (`DATA_TETHER`). */
+  private _dataTether!: SoftLines;
 
   constructor(
     scene: THREE.Scene,
@@ -588,6 +597,8 @@ export class LedgerView implements SceneView {
     }
     this._dataMarkMesh.instanceMatrix.needsUpdate = true;
     this.group.add(this._dataMarkMesh);
+    this._dataTether = new SoftLines(META_TRAIL_MAX, this._colors);
+    this.group.add(this._dataTether.mesh);
   }
 
   private _laneColor(id: string): THREE.Color {
@@ -730,6 +741,7 @@ export class LedgerView implements SceneView {
     this._braidPane.setColors(c);
     this._bar.setColors(c);
     this._ribbons.setColors(c);
+    this._dataTether?.setColors(c);
     for (const t of this._tiers) t.setColors(c);
     this._stretch.setColors(c);
     this._rebuildBlockTier(); // the DAG's blocks and links bake the structural cyan (`_core`)
@@ -1995,7 +2007,10 @@ export class LedgerView implements SceneView {
           _dummy.scale.setScalar(0);
           _dummy.updateMatrix();
           this._metaTrailMesh.setMatrixAt(mi, _dummy.matrix);
-          if (dataMarks) this._dataMarkMesh.setMatrixAt(mi, _dummy.matrix); // its mark goes with it
+          if (dataMarks) {
+            this._dataMarkMesh.setMatrixAt(mi, _dummy.matrix); // its mark goes with it
+            this._dataTether.setAlpha(mi, 0, 0); // and its tether
+          }
           b.bright = 0; // a slot that comes back eases up from dark, not from a stale row
           mi++;
           continue;
@@ -2084,14 +2099,25 @@ export class LedgerView implements SceneView {
             // The tile's own size (user, 2026-11-08): a second tile hovering a little over the first.
             const h = tileH * DATA_MARK.height;
             const w = b.size * DATA_MARK.foot;
-            _dummy.position.set(_tileV.x, _tileV.y + tileH * DATA_MARK.lift + h / 2, _tileV.z);
+            const under = _tileV.y + tileH * DATA_MARK.lift;
+            _dummy.position.set(_tileV.x, under + h / 2, _tileV.z);
             _dummy.rotation.set(0, 0, 0);
             _dummy.scale.set(w, h, w);
             _dummy.updateMatrix();
             this._dataMarkMesh.setMatrixAt(mi, _dummy.matrix);
             // A hovered data block's mark takes the subject's full weight (its tile keeps its own).
-            this._dataMarkMesh.setColorAt(mi, inkMix(_col.copy(laneColor), mi === this._hoverMark ? 1 : Math.min(1, bright * DATA_MARK_GAIN), this._colors));
-          } else this._zeroDataMark(mi);
+            inkMix(_col.copy(laneColor), mi === this._hoverMark ? 1 : Math.min(1, bright * DATA_MARK_GAIN), this._colors);
+            this._dataMarkMesh.setColorAt(mi, _col);
+            // Its tether, tile top to mark underside, in the mark's ink; the entry beat reaches it as
+            // it reaches the tile, through the same fade.
+            this._dataTether.setSegment(mi, _tileV.x, _tileV.y, _tileV.z, _tileV.x, under, _tileV.z);
+            this._dataTether.setColor(mi, _col.r, _col.g, _col.b);
+            const ta = (this._paper ? DATA_TETHER.alphaPaper : DATA_TETHER.alpha) * entryF;
+            this._dataTether.setAlpha(mi, ta, ta);
+          } else {
+            this._zeroDataMark(mi);
+            this._dataTether.setAlpha(mi, 0, 0);
+          }
         }
         mi++;
       }
@@ -2136,6 +2162,9 @@ export class LedgerView implements SceneView {
       }
     }
     this._dataMarkLastDrawn = markTo;
+    // The tethers draw the same slots: positions and colours move with the trail every frame, so both
+    // upload, ranged to what is drawn (`SoftLines.commit`); 0 draws none.
+    this._dataTether.commit(markTo, true, true);
   }
 
   private _zeroDataMark(i: number): void {
@@ -2156,6 +2185,7 @@ export class LedgerView implements SceneView {
     this._bar.dispose();
     this._live.dispose();
     this._ribbons.dispose();
+    this._dataTether.dispose();
     for (const t of this._tiers) t.dispose();
     this._stretch.dispose();
     for (const o of this.group.children.slice()) {

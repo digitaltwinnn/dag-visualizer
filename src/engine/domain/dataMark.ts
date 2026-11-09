@@ -23,10 +23,11 @@
 
 /** The mark's proportions as fractions of its TILE's: its footprint, its height, and the LIFT between
  *  the tile's top and the mark's underside. 1 and 1 — the snapshot block's own size — and a lift of
- *  one tile's height (user 2026-11-08: "on top of the metagraph snapshot, slightly elevated"; half a
- *  tile vanished under the bloom at the chamber's pose), so the mark hovers over its snapshot rather
- *  than doubling it. */
-export const DATA_MARK: Readonly<{ foot: number; height: number; lift: number }> = { foot: 1, height: 1, lift: 1 };
+ *  two and a half tiles' height (user 2026-11-09: "raise the datablocks from their snapshots more,
+ *  like 2x to 3x current distance with a line attaching the blocks"; it was one tile, 2026-11-08 —
+ *  "slightly elevated" — and half a tile vanished under the bloom), so the mark stands clear of its
+ *  snapshot, tied to it by a tether (`LedgerView`'s `DATA_TETHER`). */
+export const DATA_MARK: Readonly<{ foot: number; height: number; lift: number }> = { foot: 1, height: 1, lift: 2.5 };
 
 /** What a tile's mark counts: the data updates of a snapshot that carried data blocks, or null where
  *  it carried none or its read has not landed. */
