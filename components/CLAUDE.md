@@ -2387,6 +2387,12 @@ hued ticker, the anchor ring and the `.edge-spine`). The design rules the test c
   (`getAnimations`, event-time) and play from the top when the label reappears; a glide the label is
   hidden through ends the same way. Measured live: a pager step kept the element and the finished
   leader draw and moved the anchor over ~0.6 s; a geo country step behind its flight drew in fresh.
+  **The title is an ODOMETER and the panel holds its width** (user, 2026-11-09: "use the odometer on
+  the callout headers, for example global snapshot #, also avoid that the width jumps when 10s goes
+  to 1s"): the panel is keyed by its subject's KIND (`eyebrow`), so a live tick or a pager step keeps
+  it and rolls the title (`Odometer`'s `text` mode); a new kind still rolls the whole panel in. The
+  age chip and the lead's size chip stand on a tabular floor (`min-w` in `ch`) and the lead row is
+  tabular, so the width held at one value across four live ticks (measured).
 - **The phone declines it** (user, 2026-08-18). Co-location is the whole promise — the panel stands
   beside its subject and points at it — and a phone has no width to stand beside anything: the panel
   is a third of the viewport, so it lands ON the subject or over the dock, and the flip rule has no

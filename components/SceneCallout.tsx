@@ -56,6 +56,7 @@ import { coLocatedNetworks, filterAccent, isAnchorSettling, ledgerAnchor, metagr
 import { fmtKB, fmtShareKB, midHash, shortBlockHash } from "@/src/util/format";
 import { iconForPick } from "@/components/icons";
 import { SceneMark, type SceneMarkSpec } from "@/components/SceneMark";
+import Odometer from "@/components/Odometer";
 import { netKeyOf } from "@/src/engine/domain/pickActions";
 import { NODE_ID_GLYPHS } from "@/components/explorer/nodeRow";
 import { SCENE_GLASS } from "@/components/selection";
@@ -142,12 +143,15 @@ const geoOf = (p: { kind: string }): GeoInfo | undefined =>
   "geo" in p ? (p as { geo?: GeoInfo }).geo : undefined;
 
 
-/** The callout PANEL alone — the eyebrow / title+aside / lead grammar on SCENE_GLASS — shared
- *  with the LiveStrip's bar hover (user, 2026-08-16: "fully re-use the one from the scene"),
- *  which wraps it in its own cursor-follow box instead of the Engine-anchored `.co-panel`. */
+/** The callout PANEL alone — the eyebrow / title+aside / lead grammar on SCENE_GLASS, placed by
+ *  the Engine-anchored `.co-panel`. */
 function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; className?: string; onDismiss?: () => void }) {
   return (
-    <div key={m.key} className={cn("roll-in whitespace-nowrap", SCENE_GLASS, className)}>
+    // KEYED BY THE SUBJECT'S KIND, not the subject (user, 2026-11-09: "use the odometer on the callout
+    // headers, for example global snapshot #"): a new subject of the same kind — a live tick, a pager
+    // step — keeps the panel and rolls its title on the odometer; a new KIND (a global to a block)
+    // still rolls the whole panel in.
+    <div key={m.eyebrow} className={cn("roll-in whitespace-nowrap", SCENE_GLASS, className)}>
       {/* The identity EDGE SPINE (user, 2026-08-15 — "the rails/hairline effect on the left
           side, attached", then "let it fade into the corners"): the sheets' single-identity-
           cue language at callout scale, as the shared `.edge-spine` recipe (globals.css) — a
@@ -188,7 +192,7 @@ function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; className?
           on this row, and the anchor ring is the subject mark at the scene end of the tie. */}
       <div className="flex items-center gap-[7px]">
         {m.mark && <SceneMark mark={m.mark} />}
-        <span className={cn("text-body font-semibold text-foreground", m.titleMono && "font-mono tabular-nums")}>{m.title}</span>
+        <Odometer text={m.title} className={cn("text-body font-semibold text-foreground tabular-nums", m.titleMono && "font-mono")} />
         {/* A hued aside is a TICKER beside a title, so it is the card head's own chip
             (`TickerChip`, 2026-10-02); the un-hued one is a state line and stays text. Both sit
             at the row's right edge (user, 2026-11-03: "right align the tags (pinned, network,
@@ -209,7 +213,10 @@ function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; className?
         ) : m.aside ? (
           // Age, then state — the order the card's own head reads (2026-10-03).
           <span className="ml-auto pl-3 inline-flex items-center gap-1.5 text-label text-muted-foreground">
-            {m.aside.chip && <QualifierChip className="mr-0.5 tabular-nums">{m.aside.chip}</QualifierChip>}
+            {/* A FIXED FLOOR UNDER THE AGE (user, 2026-11-09: "avoid that the width jumps when 10s goes to
+                1s when new data arrived"): two digits, the unit and " ago" at tabular width, so the
+                panel holds its size as the age ticks and resets. */}
+            {m.aside.chip && <QualifierChip className="mr-0.5 tabular-nums min-w-[calc(7ch+12px)] justify-center">{m.aside.chip}</QualifierChip>}
             {m.aside.live && <LiveDot />}
             {m.aside.pinned && <PinnedMark />}
             {m.aside.text}
@@ -230,7 +237,9 @@ function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; className?
           CardHead applies when collapsed. Inside the padded box, so it shares the content
           edge like every resting division. */}
       {m.lead && (
-        <div className="mt-1.5 pt-1.5 border-t border-border flex items-center gap-1.5 text-label text-muted-foreground">
+        // TABULAR, with a floor under the size (2026-11-09, the age chip's rule): the live lead's count
+        // and size change every tick, and proportional digits nudged the panel's width with them.
+        <div className="mt-1.5 pt-1.5 border-t border-border flex items-center gap-1.5 text-label text-muted-foreground tabular-nums">
           {m.lead.ident && (
             <span className={cn("font-bold", IDENT_INK)} style={{ color: m.lead.ident.hue }}>
               {m.lead.ident.text}
@@ -239,7 +248,7 @@ function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; className?
           {m.lead.text && <span>{m.lead.text}</span>}
           {(!!m.lead.codes?.length || !!m.lead.chip) && <span className="flex-1 min-w-3" />}
           {m.lead.codes && m.lead.codes.length > 0 && <RoleChips codes={m.lead.codes} />}
-          {m.lead.chip && <QualifierChip className="tabular-nums">{m.lead.chip}</QualifierChip>}
+          {m.lead.chip && <QualifierChip className="tabular-nums min-w-[calc(6ch+12px)] justify-center">{m.lead.chip}</QualifierChip>}
         </div>
       )}
     </div>
