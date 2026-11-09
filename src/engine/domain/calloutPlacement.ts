@@ -34,7 +34,9 @@ export const CALLOUT_LEG_INSET = 2;
  *  its readings change — measured that day, they ran 226–310px wide and 86px tall with a lead line;
  *  a longer line truncates rather than widening the box. The phone label drops its lead, so it has its
  *  own height (`CALLOUT_H_PHONE`). The stylesheet reads both through SceneCallout's variables. */
-export const CALLOUT_W = 288;
+// 288 → 320 the same day: the global snapshot's lead became "3 metagraphs anchored 7 snapshots" (user,
+// "can we say x metagraphs anchored y snapshots?") beside its size chip, which needs ~310 at 1600px.
+export const CALLOUT_W = 320;
 export const CALLOUT_H = 86;
 export const CALLOUT_H_PHONE = 56;
 

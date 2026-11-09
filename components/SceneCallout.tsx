@@ -580,7 +580,18 @@ export default function SceneCallout() {
                   text: `${share ?? 0} of ${total} metagraph ${total === 1 ? "snapshot" : "snapshots"}`,
                   chip: mineKB != null && exact ? fmtShareKB(mineKB, exact.totalSizeKB) : undefined,
                 }
-              : { text: `${total} metagraph ${total === 1 ? "snapshot" : "snapshots"}`, chip: exact ? fmtKB(exact.totalSizeKB) : undefined },
+              : {
+                  // WHO AND HOW MANY (user, 2026-11-09: "can we say x metagraphs anchored y snapshots?"):
+                  // the metagraphs come from the exact read, so until it lands the count stands alone
+                  // (rule 10 — no guessed number of metagraphs).
+                  text:
+                    total === 0
+                      ? "No metagraph anchored"
+                      : exact
+                        ? `${exact.channels} ${exact.channels === 1 ? "metagraph" : "metagraphs"} anchored ${total} ${total === 1 ? "snapshot" : "snapshots"}`
+                        : `${total} metagraph ${total === 1 ? "snapshot" : "snapshots"}`,
+                  chip: exact ? fmtKB(exact.totalSizeKB) : undefined,
+                },
       };
     };
     // THE NETWORK'S OWN LABEL, on its lane (user, 2026-10-03: "the dossier on snapshots page has
