@@ -173,14 +173,17 @@ them — but the Next Node server can.
   register, not a Mode, so it is its own `NoteView` with the ledger's timing and is warmed beside
   it (`dag` folds into `all`, as the ledger's). Its facts (`src/data/noteFactsBlocks.ts`) are the
   blocks each chain accepted over the last 24 whole hours of the hourly tier — the sampler's own
-  `g.blocks` / `m.<id>.blocks`, the series History's Blocks measure draws, never the transfer
-  counts — and the DAG's height and sub-height as they stand, read live from the explorer's newest
-  global when the note is written (`notes/dagHeight.ts`). It states no open tips (design round D5,
-  2026-11-07, `NOTES_VERSION` 73: tips left every surface). The live read fails soft to "not
-  stated"; no measured block series is no note. A new KIND needs no version bump:
-  its keys collide with nothing, and a bump would rewrite every warmed note for no gain. The DAG's
-  height and sub-height it states are the newest global's own fields, the one source for the DAG's
-  height on every surface (a Block card's chip states its own block's height, another subject). The
+  `g.blocks` / `m.<id>.blocks`, the series History's Blocks measure draws — and the TRANSFERS those
+  blocks carried (`g.tx` / `m.<id>.tx` through `measuredTx`, so an hour whose transfer lists were not
+  read makes the sum a floor; counted, never their amount, since the tokens are not one unit). It
+  states no open tips (design round D5, 2026-11-07) and NO DAG HEIGHT (user, 2026-11-09,
+  `NOTES_VERSION` 76: a technical confirmation "of no use to the reader; focus on the core message" —
+  the live height read, `notes/dagHeight.ts`, is deleted); no measured block series is no note. **The
+  same round's rule for every note: each sentence is a finding** — VOICE forbids describing the view
+  or confirming what was counted or read, the data blocks' facts state their read count only when a
+  read is missing (the floor's label), and Hypergraph names a network that started or stopped only
+  when one did. A new KIND needs no version bump:
+  its keys collide with nothing, and a bump would rewrite every warmed note for no gain. The
   facts are pinned by
   `src/data/noteFactsBlocks.test.ts`. **The honesty gate (rule 10) is mechanical**
   (`src/data/noteHonesty.ts`, the colocated test is its specification): every number the note

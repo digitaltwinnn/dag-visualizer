@@ -14,7 +14,8 @@ import { UNLISTED_ID } from "@/src/data/unlistedId";
 //
 // HONESTY (rule 10):
 //   · a tick whose exact read did not land is NOT READ: the counts are a floor over the ticks read,
-//     stated as "N of M global snapshots read" — never scaled up;
+//     stated as "N of M global snapshots read" — never scaled up; with every read landed there is no
+//     floor and the read count is not stated at all;
 //   · a network that carried no data block over the window is not listed (a network that wrote
 //     nothing is no news); the whole network's zero is a reading and stands;
 //   · an undecodable row states no count, so a network with one is stated as a floor (", at least");
@@ -44,8 +45,13 @@ export function dataFacts(input: DataFactsInput): { facts: Fact[]; names: string
   const read = input.ticks.filter((t) => t.rows != null);
   if (!read.length) return null;
   const facts: Fact[] = [];
-  facts.push(fact("Global snapshots read", read.length, "count"));
-  facts.push(fact("Global snapshots in the window", input.ticks.length, "count"));
+  // THE READ COUNT IS A FLOOR'S LABEL, NOT NEWS (user, 2026-11-09: "'all 52 global snapshots' read …
+  // a technical confirmation which is of no use to the reader; focus on the core message"). Stated
+  // only when a read is missing, which is the one time the counts below need it.
+  if (read.length < input.ticks.length) {
+    facts.push(fact("Global snapshots read", read.length, "count"));
+    facts.push(fact("Global snapshots in the window", input.ticks.length, "count"));
+  }
 
   const by = new Map<string, { blocks: number; updates: number; floor: boolean }>();
   let blocks = 0;

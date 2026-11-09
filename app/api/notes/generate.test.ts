@@ -787,7 +787,7 @@ describe("the style slips are asked for once more, never edited", () => {
   it("a whole span written as a climb with nothing it is measured against", async () => {
     const d = deps({ facts: async () => structuredClone(BLOCKS), answers: ["NOTE: The hypergraph anchored 1,200 snapshots a day, and blocks fell 12% to 64 per day.", CLEAN] });
     await generateNote(REQ, d, "read");
-    expect(second(d)).toContain('"64" is a whole span\'s figure');
+    expect(second(d)).toContain('"64" is a whole range\'s figure');
   });
 
   it("but not when the comparison follows it", async () => {

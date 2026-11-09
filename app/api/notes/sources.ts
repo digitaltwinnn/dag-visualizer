@@ -15,13 +15,13 @@ import { rangeNotableCap } from "@/src/data/notableDays";
 import { trendFacts, trendSilent, type TrendFactsInput } from "@/src/data/noteFactsTrend";
 import type { Fact, NotableDay, NoteChange, NoteView, NoteLead } from "@/src/data/noteTypes";
 import { leadingTrim, pickRangeTier, type TrendsWindowData } from "@/src/data/trendWindow";
+import { measuredTx } from "@/src/data/trendSeries";
 import { CATALOG, type NetworkId } from "@/src/engine/config";
 import { assembleSpan, WINDOWS } from "../trends/assemble";
 import { explorerReader, locateRows, type ChainReader } from "./snapshotAt";
 import { chainReadsOf, cursorKeyOf, geoSitesSlotOf, geoSlotOf, ispNamesKeyOf, slotsInWindow, type Tier } from "../trends/keys";
 import { readStore, type TrendsStore } from "../trends/store";
 import { CC_TAIL_RE, ISP_TAIL_RE, TYPE_TAIL_RE, isSubjectNote, subjectKindOf, type NoteSpan, type SubjectKind } from "./keys";
-import { readDagHeight, type DagHeightRead } from "./dagHeight";
 
 // THE SOURCES OF AI NOTES — the impure half of the facts: which stored payloads each view's note
 // is written from, read and handed to that view's pure builder (`src/data/noteFacts*.ts`). The
@@ -67,9 +67,6 @@ export interface NoteReads {
   chainReads(net: string): Promise<ChainReads>;
   /** The explorer's records, for a row that names one snapshot. Absent, a row keeps its network. */
   chain?(net: string): ChainReader;
-  /** The DAG's height and sub-height as they stand (`dagHeight.ts`). Absent, the block note
-   *  states no height. */
-  dagHeight?(net: string): Promise<DagHeightRead>;
   /** The newest window of exact reads (`dataWindow.ts`). Absent, the data note is not written. */
   dataWindow?(net: string): Promise<DataWindowRead>;
 }
@@ -165,7 +162,6 @@ export function storeReads(nowMs: number, store: HashReader = readStore()): Note
     geoDays: (net, fromMs, toMs) => readGeoDays(net, fromMs, toMs, once),
     chainReads: async (net) => chainReadsOf(await once.hgetall(cursorKeyOf(net))),
     chain: explorerReader,
-    dagHeight: readDagHeight,
     dataWindow: readDataWindow,
   };
 }
@@ -480,7 +476,7 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
   },
   // THE BLOCK DAG (the Snapshots view's Blocks register): the blocks each chain accepted over the
   // last 24 WHOLE hours of the hourly tier — the sampler's own `g.blocks` / `m.<id>.blocks`, the
-  // series History's Blocks measure draws — and the DAG's height as it stands, read live.
+  // series History's Blocks measure draws — and the transfers they carried (`g.tx` / `m.<id>.tx`).
   blocks: {
     accepts: (_net, subject, span) => span === "hours" && subject === "all",
     label: () => "the block DAG",
@@ -497,8 +493,10 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
         const points = id === "dag" ? null : series[`m.${id}.blocks`];
         if (points) blocks[id] = points;
       }
-      const live = reads.dagHeight ? await reads.dagHeight(net) : { height: null, subHeight: null };
-      const built = blocksFacts({ blocks, ...live, names });
+      // Their transfers, counted where the sampler read the transfer lists (`measuredTx`, `x.cov`).
+      const transfers: Record<string, (number | null)[]> = {};
+      for (const id of Object.keys(blocks)) transfers[id] = measuredTx(series[id === "dag" ? "g.tx" : `m.${id}.tx`], series);
+      const built = blocksFacts({ blocks, transfers, names });
       return { built, spanFrom: fromMs, spanTo: toMs, windows: [["Span length", secondsOf(fromMs, toMs)]] };
     },
   },

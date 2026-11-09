@@ -204,7 +204,7 @@ function styleSlips(text: string, facts: readonly Fact[]): string[] {
     // true; the same rise with no "on …" after it reads as a climb inside the span.
     const climb = new RegExp(`\\b(?:rose|fell|grew|dropped|climbed|declined|increased|decreased|slipped)\\b[^.;]{0,40}?\\bto ${esc}(?![\\d]|[.,]\\d)([^.;,]*)`, "i").exec(text);
     if (climb && !/\bon\b/.test(climb[1] ?? ""))
-      out.push(`"${to.text}" is a whole span's figure: say what it is measured against ("on the span before"), or write "averaged ${to.text} per day" with its change`);
+      out.push(`"${to.text}" is a whole range's figure: say what it is measured against ("on the range before"), or write "averaged ${to.text} per day" with its change`);
   }
   // A NETWORK'S GLOBAL SNAPSHOTS AS A SHARE OR ANOTHER NOUN ("its share of global snapshots rose 5%",
   // "placements", live 2026-11-03): the figure is the global snapshots it was part of.

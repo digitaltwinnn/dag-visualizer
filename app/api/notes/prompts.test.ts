@@ -74,7 +74,7 @@ describe("PROMPTS", () => {
 
   it("asks Hypergraph and Geography their own subject first and activity last (R74); the ledger and History keep their questions", () => {
     expect(PROMPTS.hyper.question).toBe(
-      "First, who and what is on the network over the span: networks or layers that gained or lost nodes, networks that became active or went quiet; if nothing changed there, say so plainly: a steady week: the node count held at its level and the layers held steady, and for the whole network so did the active networks.",
+      "First, who and what is on the network over the span: networks or layers that gained or lost nodes, and a network that became active or went quiet only when one did; if nothing changed there, say plainly that it was a steady week: the node count held at its level and the layers held steady, and for the whole network so did the number of active networks.",
     );
     expect(PROMPTS.hyper.questionCommon).toBe('Last, in one sentence, how active it was, in the shape "Activity was <up, down or steady>: <network> was part of <last week\'s figure> global snapshots per day last week, <up or down> <change> on the weeks before", or "held at" the figure when it was steady.');
     expect(PROMPTS.geo.question).toBe(
@@ -220,10 +220,12 @@ describe("PROMPTS", () => {
       expect(PROMPTS[view].system("x", undefined, false, kind)).not.toMatch(/—|\s[–-]\s/);
   });
 
-  it("asks the block DAG its own question, in the ledger's voice, reading the height as it stands — never tips", () => {
+  it("asks the block DAG its own question, in the ledger's voice: blocks and what they carried — never tips or height", () => {
     const q = PROMPTS.blocks.question;
-    // Open tips left every surface (design round D5, 2026-11-07): the facts hold none to ask after.
-    expect(q).not.toMatch(/\btips?\b|frontier/i);
+    // Open tips left every surface (design round D5, 2026-11-07), and the height is no news to a
+    // reader (user, 2026-11-09): the facts hold neither to ask after.
+    expect(q).not.toMatch(/\btips?\b|frontier|height/i);
+    expect(q).toMatch(/carrying M transfers/);
     expect(q).toMatch(/^What has the block DAG been doing\?/);
     // No earlier figure exists in its facts, so it says out loud it does not lead with change.
     expect(q).toMatch(/does not lead with what changed/);
@@ -233,6 +235,12 @@ describe("PROMPTS", () => {
     expect(PROMPTS.blocks.questions).toBeUndefined();
     expect(spanWords("blocks", "hours", 0, 1)).toBe("the last 24 hours");
     expect(spanBeforeWords("blocks", "hours")).toBeNull();
+  });
+
+  it("asks every sentence to be a finding: no view description, no read confirmation (user, 2026-11-09)", () => {
+    expect(VOICE).toContain("never describe the view, the dashboard or what it shows, and never confirm what was counted or read");
+    // The data note names the read count only as a floor's label, when the facts carry one.
+    expect(PROMPTS.data.question).toContain("Only when the facts say how many of the window's global snapshots were read");
   });
 
   it("keeps its own copy free of dashes", () => {

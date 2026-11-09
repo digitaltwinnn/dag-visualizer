@@ -599,7 +599,7 @@ describe("the store reads", () => {
 });
 
 // THE BLOCK DAG'S NOTE (the Blocks register, 2026-11-06): its builder runs for real here, since its
-// input is assembled from two reads — the store's hourly blocks and the DAG's height, read live.
+// input is assembled from the store's hourly blocks and the transfers they carried.
 describe("the block DAG's note", () => {
   const hours = (f: (i: number) => number | null) => Array.from({ length: 24 }, (_, i) => f(i));
 
@@ -609,8 +609,7 @@ describe("the block DAG's note", () => {
     expect(noteSupported("blocks", "all", "day")).toBe(false);
   });
 
-  it("reads 24 whole hours of the hourly tier and the DAG's height, and states no open tips", async () => {
-    let asked = 0;
+  it("reads 24 whole hours of the hourly tier, blocks and transfers, and states no open tips or height", async () => {
     const reads = fakeReads({
       async span(_net, tier, from, to) {
         reads.calls.push({ tier, from, to });
@@ -618,23 +617,22 @@ describe("the block DAG's note", () => {
           "g.ticks": hours(() => 360),
           "g.blocks": hours((i) => (i < 16 ? 2 : 1)), // 40
           [`m.${USDC}.blocks`]: hours((i) => (i < 5 ? 1 : 0)), // 5
+          "x.cov": hours(() => 1),
+          "g.tx": hours((i) => (i < 10 ? 3 : 0)), // 30
+          [`m.${USDC}.tx`]: hours((i) => (i < 5 ? 2 : 0)), // 10
         });
-      },
-      async dagHeight() {
-        asked++;
-        return { height: 61_645, subHeight: 313 };
       },
     });
     const out = (await factsFor("mainnet", "blocks", "all", "hours", NOW, reads))!;
     const top = Math.floor(NOW / H) * H;
     expect(reads.calls).toEqual([{ tier: "1h", from: top - 24 * H, to: top }]);
-    expect(asked).toBe(1);
     const v = (label: string) => out.facts.find((f) => f.label === label)?.value;
     expect(v("DAG blocks")).toBe(40);
     expect(v("USDC.dag token blocks")).toBe(5);
     expect(out.facts.some((f) => /\btips?\b|frontier/i.test(f.label))).toBe(false);
-    expect(v("DAG height")).toBe(61_645);
-    expect(v("Global snapshots since the DAG height last moved")).toBe(313);
+    expect(out.facts.some((f) => /height/i.test(f.label))).toBe(false);
+    expect(v("DAG transfers")).toBe(30);
+    expect(v("USDC.dag token transfers")).toBe(10);
     expect(v("Span length")).toBe(86_400);
     expect(out.label).toBe("the block DAG");
     expect(out.subjectName).toBeUndefined();
@@ -642,7 +640,7 @@ describe("the block DAG's note", () => {
     expect([out.spanFrom, out.spanTo]).toEqual([top - 24 * H, top]);
   });
 
-  it("an hour the store did not cover is not a zero, and with no height read no height is stated", async () => {
+  it("an hour the store did not cover is not a zero, and unread transfer lists state no transfers", async () => {
     const reads = fakeReads({
       async span(_net, _tier, from) {
         return payload("1h", hours((i) => from + i * H) as number[], { "g.ticks": hours((i) => (i === 3 ? null : 360)) });
@@ -650,6 +648,6 @@ describe("the block DAG's note", () => {
     });
     const out = (await factsFor("mainnet", "blocks", "all", "hours", NOW, reads))!;
     expect(out.facts.find((f) => f.label.startsWith("DAG blocks"))).toMatchObject({ label: "DAG blocks, at least", value: 0 });
-    expect(out.facts.some((f) => /height/i.test(f.label))).toBe(false);
+    expect(out.facts.some((f) => /transfers/i.test(f.label))).toBe(false);
   });
 });

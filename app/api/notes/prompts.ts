@@ -33,6 +33,9 @@ export const VOICE = [
   "",
   "Rules:",
   "Plain, present tense, no hype, no advice. No meta-commentary: never mention the facts, the data, the note or yourself.",
+  // EVERY SENTENCE A FINDING (user, 2026-11-09: "check … if sometimes you're not saying anything of
+  // added value"): live, a History note opened "The hypergraph view shows network activity."
+  "Every sentence states a finding about the subject: never describe the view, the dashboard or what it shows, and never confirm what was counted or read.",
   "Write figures exactly as the facts give them: use only numbers from the facts, and never round a small figure to zero.",
   "Do not use quantity words the facts do not state: no \"half\", \"hundreds\", \"thousands\", \"dozens\", no \"-fold\", no \"doubles\" or \"doubling\". \"Doubled\", \"tripled\" and \"halved\" are fine only when a ratio in the facts supports them.",
   "Only use durations the facts give, with the unit written out as they give it: seconds, minutes, hours, days, never a single letter and never a decimal point in a duration: the facts say a duration whole, with \"about\" where it was rounded, and so do you. Do not name a range length with digits unless a fact states it.",
@@ -99,7 +102,9 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
   hyper: {
     // A QUIET WEEK IS SAID (user, 2026-10-30): the facts count what changed even at 0, so the note
     // says the composition held rather than reaching for the node count, which is Geography's too.
-    question: "First, who and what is on the network over the span: networks or layers that gained or lost nodes, networks that became active or went quiet; if nothing changed there, say so plainly: a steady week: the node count held at its level and the layers held steady, and for the whole network so did the active networks.",
+    // NOTHING THAT DID NOT HAPPEN (user, 2026-11-09): live, "no network became active or went quiet"
+    // ended a sentence about the DAG's nodes. A network that started or stopped is named only when one did.
+    question: "First, who and what is on the network over the span: networks or layers that gained or lost nodes, and a network that became active or went quiet only when one did; if nothing changed there, say plainly that it was a steady week: the node count held at its level and the layers held steady, and for the whole network so did the number of active networks.",
     questions: {
       // "LAYER GROUP", never "make-up" (user, 2026-10-30): the Composition rung's own word. And the
       // group's place is said as a reader would ("its largest group"), not as a share and a rank
@@ -140,13 +145,15 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
   // second clock, in the ledger's voice. Its facts hold no earlier figure, so, like the ledger's
   // `questionNow`, it says out loud that it does not lead with change: VOICE asks every note to.
   blocks: {
-    question: "What has the block DAG been doing? This note does not lead with what changed, whatever the rules above say: the facts hold no earlier figure, so never say anything rose or fell. Say how many blocks were accepted over the recent hours, the DAG's first, as \"the DAG accepted N blocks\", then each network's token blocks the same way. Then, in one short sentence, where the DAG's height stands now, with the global snapshots since it last moved. A block is a block, never a snapshot or a transfer.",
+    // WHAT THE BLOCKS CARRIED, NOT THE HEIGHT (user, 2026-11-09: a technical confirmation is "of no
+    // use to the reader; focus on the core message"): a block exists to carry transfers.
+    question: "What has the block DAG been doing? This note does not lead with what changed, whatever the rules above say: the facts hold no earlier figure, so never say anything rose or fell. Say how many blocks were accepted over the recent hours and the transfers they carried, the DAG's first, as \"the DAG accepted N blocks carrying M transfers\", then each network's token blocks the same way. A block carries transfers: never call a block a snapshot or a transfer.",
     system: (subjectLabel) => `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${PROMPTS.blocks.question}`,
   },
   // THE DATA BLOCKS (the Snapshots view's Data blocks register, 2026-11-07): the live window, read
   // when the note is written — a few minutes of the chamber, no earlier figure, so nothing moved.
   data: {
-    question: "What data are the networks writing right now? This note does not lead with what changed, whatever the rules above say: the facts hold no earlier figure, so never say anything rose or fell. Say how many data blocks were carried over the window and how many updates they held, then each network that carried any, as \"<network> carried N data blocks with M updates\". Say in one clause how many of the window's global snapshots were read when fewer than all were. A data block carries updates, never transactions or transfers.",
+    question: "What data are the networks writing right now? This note does not lead with what changed, whatever the rules above say: the facts hold no earlier figure, so never say anything rose or fell. Say how many data blocks were carried over the window and how many updates they held, then each network that carried any, as \"<network> carried N data blocks with M updates\". Only when the facts say how many of the window's global snapshots were read, add in one clause that the counts cover those; otherwise say nothing about reading. A data block carries updates, never transactions or transfers.",
     system: (subjectLabel) => `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${PROMPTS.data.question}`,
   },
   trend: {
