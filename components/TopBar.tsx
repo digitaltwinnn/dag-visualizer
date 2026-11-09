@@ -21,6 +21,7 @@ import { DOC_PAGES, LISTED_VIEWS, VIEWS } from "@/components/views";
 import { stepView, swipeDirection } from "@/src/engine/domain/viewSwipe";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import type { Mode } from "@/src/store/store";
+import { SlideFace } from "@/components/SlideFace";
 
 // Collapsed filter face: a small identity dot + the network name in neutral text (no filled
 // chip). All → a neutral cyan dot. Identity is the ONLY colour the filter carries.
@@ -512,13 +513,9 @@ export default function TopBar() {
               The 2026-09-28 "VIEW" word went with it: it named the control's role because the
               centred cell had 74px, and A1 freed the room by moving About out of the bar. */}
           <span className="flex flex-col items-center gap-[3px]">
-            <span
-              key={doc ?? mode}
-              className={cn(
-                "flex items-center gap-1.5",
-                faceFrom ? cn("animate-in fade-in duration-300 motion-reduce:animate-none", faceFrom === "right" ? "slide-in-from-right-4" : "slide-in-from-left-4") : "roll-in",
-              )}
-            >
+            {/* THE NAME ROLLS SIDEWAYS ON THE ODOMETER'S CLOCK (user, 2026-11-09: "too fast (also for
+                the view selector)") — `SlideFace` has the grammar, shared with the register face. */}
+            <SlideFace id={doc ?? mode} from={faceFrom} clipClassName="py-0.5 -my-0.5" className="flex items-center gap-1.5">
               {(() => {
                 const Icon = VIEW_ICONS[mode];
                 return <Icon aria-hidden className="size-4 flex-none text-primary" />;
@@ -531,7 +528,7 @@ export default function TopBar() {
               <span className={cn("text-title font-semibold leading-none", strip === "views" ? "text-primary-ink" : "text-foreground")}>
                 {doc ? DOC_PAGES[doc].label : VIEWS.find((v) => v.id === mode)?.name}
               </span>
-            </span>
+            </SlideFace>
             {/* The pip row that sat here (2026-10-08) retired with the chevrons (user, 2026-10-18:
                 "has both … the <> is more intuitive"): two position cues were one too many. */}
           </span>

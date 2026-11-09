@@ -18,6 +18,7 @@ import { useStore } from "@/src/store/store";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { cn, TOUCH_HIT } from "@/lib/utils";
 import { StateMark } from "@/components/state/StateAtoms";
+import { SlideFace } from "@/components/SlideFace";
 
 // THE REGISTER SWITCH, ON THE SCENE (D3, user 2026-11-07 — option A of
 // `.superpowers/brainstorm/521282-1794046091/content/register-switch-v2.html`: "a glass switch at the
@@ -170,14 +171,17 @@ export default function RegisterSwitch() {
           presentation, both stay in the DOM (the view switch's precedent). */}
       <div role="group" aria-label="Register" className={cn("hidden max-[700px]:flex h-full items-center gap-0.5 px-1", FRAME)}>
         {chevron(-1)}
-        <div
-          key={register}
-          className={cn(
-            "flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md bg-[var(--sel-bg)] text-primary-ink",
-            slideFrom ? cn("animate-in fade-in duration-300 motion-reduce:animate-none", slideFrom === "right" ? "slide-in-from-right-4" : "slide-in-from-left-4") : "roll-in",
-          )}
+        {/* THE FACE RESTS UNWASHED (user, 2026-11-09: "it keeps the focus while idle"): the selection
+            wash marks the lit station among three on the desktop; on a lone face it only read as a
+            pressed button that never let go. The view face above it wears none either — the glyph in
+            the accent and the name in the foreground ink say which one is shown. */}
+        <SlideFace
+          id={register}
+          from={slideFrom}
+          clipClassName="px-2 py-1"
+          className="flex flex-col items-center justify-center gap-0.5"
         >
-          <span className="flex items-center justify-center gap-1.5 text-body font-semibold leading-none whitespace-nowrap">
+          <span className="flex items-center justify-center gap-1.5 text-body font-semibold leading-none whitespace-nowrap text-foreground">
             <LitIcon aria-hidden className="size-3.5 flex-none text-primary" />
             {REGISTER_NAMES[register]}
             <StateMark following={following} className="pl-1 font-normal" />
@@ -194,7 +198,7 @@ export default function RegisterSwitch() {
             {/* The readings in words for assistive tech (the desktop half's own accessible name). */}
             <span className="sr-only">{count[register] ? `${span[register]}, ${count[register]}` : span[register]}</span>
           </span>
-        </div>
+        </SlideFace>
         {chevron(1)}
       </div>
 
