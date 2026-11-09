@@ -32,13 +32,13 @@ export const CALLOUT_LEG_INSET = 2;
  *  also when a size tag is added to the bottom part. As a general rule, give callouts a fixed width
  *  and height to avoid the resize"). Every desktop callout is this box, whatever it names and however
  *  its readings change — measured that day, they ran 226–310px wide and 86px tall with a lead line;
- *  a longer line truncates rather than widening the box. The phone label drops its lead, so it has its
- *  own height (`CALLOUT_H_PHONE`). The stylesheet reads both through SceneCallout's variables. */
+ *  a longer line truncates rather than widening the box. The phone label is the same box since it
+ *  carries its lead again (user, 2026-11-09). The stylesheet reads both through SceneCallout's
+ *  variables. */
 // (320 for an hour the same day, for the global's "N metagraphs anchored M snapshots" beside a size
 // chip; the chip left that line instead — user: "can we make it shorter", option 1.)
 export const CALLOUT_W = 288;
 export const CALLOUT_H = 86;
-export const CALLOUT_H_PHONE = 56;
 
 /**
  * The panel's full reach from the anchor on each axis — the standoff plus the panel's one size, so

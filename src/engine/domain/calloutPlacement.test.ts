@@ -6,7 +6,6 @@ import {
   CALLOUT_REACH_X,
   CALLOUT_W,
   CALLOUT_H,
-  CALLOUT_H_PHONE,
   CALLOUT_REACH_Y,
   CALLOUT_HANG_K,
   CALLOUT_HANG_REACH_X,
@@ -33,9 +32,6 @@ describe("the panel's one size", () => {
   it("the reach is the standoff plus the size, so placement and the drawn box agree", () => {
     expect(CALLOUT_REACH_X).toBe(CALLOUT_OFF_X + CALLOUT_W);
     expect(CALLOUT_REACH_Y).toBe(CALLOUT_OFF_Y + CALLOUT_H);
-  });
-  it("the phone label (no lead line) is shorter than the desktop one", () => {
-    expect(CALLOUT_H_PHONE).toBeLessThan(CALLOUT_H);
   });
 });
 

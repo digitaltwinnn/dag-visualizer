@@ -68,7 +68,7 @@ import { useNowTick } from "@/components/useNowTick";
 import { useMinHold } from "@/components/useMinHold";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { relativeAge } from "@/src/util/relativeAge";
-import { CALLOUT_OFF_X, CALLOUT_OFF_Y, CALLOUT_LEG_INSET, CALLOUT_PHONE_K, CALLOUT_HANG_K, CALLOUT_W, CALLOUT_H, CALLOUT_H_PHONE } from "@/src/engine/domain/calloutPlacement";
+import { CALLOUT_OFF_X, CALLOUT_OFF_Y, CALLOUT_LEG_INSET, CALLOUT_PHONE_K, CALLOUT_HANG_K, CALLOUT_W, CALLOUT_H } from "@/src/engine/domain/calloutPlacement";
 import type { GeoInfo } from "@/src/data/types";
 import LiveDot from "@/components/LiveDot";
 import { PinnedMark, Resolving } from "@/components/state/StateAtoms";
@@ -166,7 +166,7 @@ function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; className?
     <div
       key={m.eyebrow}
       className={cn(
-        "roll-in whitespace-nowrap flex flex-col overflow-hidden w-(--co-w) h-(--co-h) [[data-phone]_&]:h-(--co-h-phone)",
+        "roll-in whitespace-nowrap flex flex-col overflow-hidden w-(--co-w) h-(--co-h)",
         SCENE_GLASS,
         className,
       )}
@@ -344,8 +344,8 @@ export default function SceneCallout() {
   const now = useNowTick(1000);
   // ON A PHONE, ONE COMPACT LABEL STRAIGHT ABOVE ITS SUBJECT (user, 2026-10-04 — reversing
   // 2026-08-18's phone decline: "it should fit, can also shorten the line … perhaps add an x").
-  // The placement is CalloutSync's (`calloutPhonePlacement`); here the phone variant keeps the head
-  // only (no lead row), shows one label rather than Snapshots' pair, and carries an × that hides
+  // The placement is CalloutSync's (`calloutPhonePlacement`); here the phone variant shows one label
+  // rather than Snapshots' pair (its lead back since 2026-11-09, below), and carries an × that hides
   // the label until the subject changes. `breakpointOf` is the one home for the tier (through
   // `useBreakpoint`), so both owners answer the same call.
   const bp = useBreakpoint();
@@ -709,8 +709,9 @@ export default function SceneCallout() {
       : null;
     if (m && subject) m = { ...m, kind: subject };
   }
-  // One label on a phone, head only.
-  if (phone && m) m = { ...m, lead: undefined };
+  // One label on a phone — WITH its lead since 2026-11-09 (user: "on phone the callouts are missing
+  // the bottom section, can you add it?"): the head-only phone label (2026-10-04) said what the
+  // subject is but not what it holds, and the lead is the line that does.
   // Closed for this view and subject. Once the slot shows ANY other subject — or none — the closure
   // is spent, so re-selecting the closed subject brings its label back (review, 2026-10-04: "until
   // something in that view changes").
@@ -743,7 +744,6 @@ const CALLOUT_VARS = {
   "--co-phone-k": String(CALLOUT_PHONE_K),
   "--co-w": `${CALLOUT_W}px`,
   "--co-h": `${CALLOUT_H}px`,
-  "--co-h-phone": `${CALLOUT_H_PHONE}px`,
 } as CSSProperties;
 
 /** The callout: the 0-size anchor wrapper CalloutSync positions, its ring, leader and panel.
