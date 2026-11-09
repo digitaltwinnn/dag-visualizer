@@ -1099,9 +1099,11 @@ glyphs carry the units, and the button's accessible name keeps every word ("Tran
 halves are equal columns as wide as the widest): an unlit half carries it invisible. **The lit station is a WASH, not a frame** (user,
 2026-11-07, design round: option 5 without the underline): the unlit halves' second line recedes
 (`opacity-75`), the lit half carries the selection wash alone — no inset ring — its name and count in
-the accent, its span in the foreground ink, **and the state mark at the end of its name line**
-(`StateMark`: the live dot and its word, or the pin — user, same day, option 2 "with the 'live' text
-also"): one live mode per view, read per register — the newest global (and the filtered network's
+the accent, its span in the foreground ink, **and the state mark as the third column of its readings
+row**, after the span and the count, its room reserved invisibly on the unlit halves (`StateMark`: the
+live dot and its word, or the pin — user, same day, option 2 "with the 'live' text also"; it ended the
+name line until 2026-11-09: "Move the live / pinned indicator … to the bottom row, so a 3rd column
+there" — the phone face reads the same): one live mode per view, read per register — the newest global (and the filtered network's
 newest snapshot) in Metagraph snapshots and Data blocks, the newest block (and its global) in
 Transaction blocks — so the register's own half says which state its subject is in. **Each half counts ITS OWN
 SUBJECT** (user, same day: "its subject is metagraph snapshots, count those instead of global, same

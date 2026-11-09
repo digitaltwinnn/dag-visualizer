@@ -60,7 +60,7 @@ export default function RegisterSwitch() {
   // also"): one live mode per view, read per register — the newest global (and the filtered
   // network's newest snapshot) in Metagraph snapshots and Data blocks, the newest block (and its
   // global) in Transaction blocks — so the register's own half wears the state mark the card heads
-  // wear (`StateMark`: the live dot and its word, or the pin alone), at the end of its name line.
+  // wear (`StateMark`: the live dot and its word, or the pin alone), as the third column of its readings row (2026-11-09; it ended the name line before).
   const following = useStore((s) => s.following);
   const phase = useStore((s) => s.motionPhase);
   const pastStatus = useStore((s) => s.pastWindow?.status ?? null);
@@ -184,7 +184,6 @@ export default function RegisterSwitch() {
           <span className="flex items-center justify-center gap-1.5 text-body font-semibold leading-none whitespace-nowrap text-foreground">
             <LitIcon aria-hidden className="size-3.5 flex-none text-primary" />
             {REGISTER_NAMES[register]}
-            <StateMark following={following} className="pl-1 font-normal" />
           </span>
           <span className="flex items-center justify-center gap-1 font-mono text-label leading-none tabular-nums whitespace-nowrap text-foreground">
             <Clock aria-hidden className="size-3 flex-none opacity-80" />
@@ -195,6 +194,8 @@ export default function RegisterSwitch() {
                 {figure[register]}
               </span>
             )}
+            {/* The state, the row's third column — the desktop half's own order (2026-11-09). */}
+            <StateMark following={following} className="ml-2 font-sans" />
             {/* The readings in words for assistive tech (the desktop half's own accessible name). */}
             <span className="sr-only">{count[register] ? `${span[register]}, ${count[register]}` : span[register]}</span>
           </span>
@@ -231,11 +232,6 @@ export default function RegisterSwitch() {
             <span className="flex items-center justify-center gap-1.5 text-body font-semibold leading-none whitespace-nowrap">
               <Icon aria-hidden className="size-3.5 flex-none group-aria-pressed:text-primary" />
               <span>{REGISTER_NAMES[r]}</span>
-              {/* THE MARK'S ROOM IS RESERVED ON EVERY HALF (user, 2026-11-08: the control's width shifted "a
-                  bit because of live indicator"): the halves are equal columns as wide as the widest, so a
-                  mark only the lit half rendered moved the whole frame with each switch. An unlit half
-                  carries it invisible. */}
-              <StateMark following={following} className={cn("pl-1 font-normal", !lit && "invisible")} />
             </span>
             <span className="flex items-center justify-center gap-1 font-mono text-label leading-none tabular-nums whitespace-nowrap opacity-75 group-aria-pressed:opacity-100 group-aria-pressed:text-foreground">
               {/* TWO GLYPHED READINGS, NO DIVIDER (option A, 2026-11-08): the clock says "the last", the
@@ -249,6 +245,11 @@ export default function RegisterSwitch() {
                   {figure[r]}
                 </span>
               )}
+              {/* THE STATE IS THE ROW'S THIRD COLUMN (user, 2026-11-09: "Move the live / pinned indicator
+                  in the view-mode control to the bottom row, so a 3rd column there"): the name line
+                  carries the name alone. Its room is reserved on every half (2026-11-08: the control's
+                  width shifted "a bit because of live indicator"), an unlit half carrying it invisible. */}
+              <StateMark following={following} className={cn("ml-2 font-sans", !lit && "invisible")} />
             </span>
           </button>
         );
