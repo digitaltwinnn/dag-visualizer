@@ -12,8 +12,10 @@ import { join } from "node:path";
 //  2. BOTH owners consult `boxedCard`. The box-led subject preference is deliberately mirrored
 //     (the component picks the MODEL, CalloutSync picks the ANCHOR); an owner that stops reading
 //     the channel would label one subject while pointing at another. In the Snapshots view the
-//     whole chain is ONE pure decision both call — `domain/calloutSubjects.ts` (2026-11-07: the
-//     two owners had each grown their own ifs and drifted by register) — and its test is the spec.
+//     subject is decided ONCE, by the component (`domain/calloutSubjects.ts`, whose test is the
+//     spec), and handed to CalloutSync on the label itself as `data-kind` (2026-11-09: two owners
+//     calling the same chain still drifted — a hot-reloaded component beside a long-lived engine
+//     ran two versions of the rule, and the global snapshot's label hung on a metagraph tile).
 //  3. `SCENE_GLASS` (components/selection.tsx, the shared-recipe home) is the ONE container
 //     for scene-anchored labels: SceneCallout and Tooltip both wear it (user, 2026-08-15 —
 //     "align the hover and the click card"). Neither may re-grow its own glass recipe.
@@ -73,6 +75,13 @@ describe("subject-callout boundary", () => {
     }
   });
 
+  it("in the Snapshots view the anchor reads the label's kind; it never decides a subject of its own", () => {
+    const sync = stripComments(read("src/engine/CalloutSync.ts"));
+    expect(sync.includes("dataset.kind"), "CalloutSync anchors the kind the label wrote").toBe(true);
+    expect(/\bcalloutSubject\(/.test(sync), "CalloutSync must not call calloutSubject — a second decider drifts").toBe(false);
+    const comp = stripComments(read("components/SceneCallout.tsx"));
+    expect(comp.includes("data-kind"), "SceneCallout writes the subject it labels").toBe(true);
+  });
   it("both callout owners read the phone tier through the shared breakpoint home", () => {
     for (const home of CALLOUT_HOMES) {
       const code = stripComments(read(home));

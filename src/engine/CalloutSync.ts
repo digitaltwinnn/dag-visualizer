@@ -9,8 +9,7 @@ import { R as GEO_R, LAND_H, latLonToVec3 } from "./domain/geoLayout";
 import { ledgerLens } from "@/src/data/ledgerStory";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
 import { glideMix } from "./domain/calloutGlide";
-import { calloutSubject, type CalloutSubject, type CalloutSubjectInput } from "./domain/calloutSubjects";
-import type { LedgerRegister } from "@/src/store/mode";
+import type { CalloutSubject } from "./domain/calloutSubjects";
 import type { SceneCtx } from "./scene/SceneContext";
 import type { Globe } from "./scene/Globe";
 import type { LedgerView } from "./scene/views/LedgerView";
@@ -40,10 +39,6 @@ export interface CalloutState {
   /** Live-follow flag — the settle gate skips the rewind term for it (LedgerView.calloutSettled). */
   following: boolean;
   boxedCard: string | null;
-  /** The Snapshots view's register and its two finer subjects — `calloutSubjects`' inputs. */
-  register: LedgerRegister;
-  hasBlock: boolean;
-  hasDataBlock: boolean;
   country: string | null;
   cohort: CohortSel | null;
   sceneCoverL: number;
@@ -78,6 +73,10 @@ export interface CalloutHost {
   dofMeta(): { group: THREE.Object3D } | null;
 }
 
+/** The anchor kind the label wrote (`data-kind`), or null — no label, no point. */
+const KINDS: ReadonlySet<string> = new Set(["global", "block", "dataBlock", "metaSnap", "lane"]);
+const kindOf = (k: string | undefined): CalloutSubject => (k != null && KINDS.has(k) ? (k as CalloutSubject) : null);
+
 export class CalloutSync {
   private readonly h: CalloutHost;
   private st!: CalloutState;
@@ -99,15 +98,6 @@ export class CalloutSync {
   /** Called once per frame from the Engine's scene-write phase. */
   sync(st: CalloutState): void {
     this.st = st;
-    // The Snapshots view's label subjects, resolved ONCE per frame into reused structs (rule 5).
-    if (this.h.mode === "ledger") {
-      const i = this._subjIn;
-      const net = this.h.ledgerNet;
-      i.register = st.register; i.boxedCard = st.boxedCard; i.hasSnap = !!st.snap;
-      i.hasMetaSnap = !!st.metaSnap; i.hasBlock = st.hasBlock; i.hasDataBlock = st.hasDataBlock;
-      i.lane = net !== "all" && net !== "dag" && net !== UNLISTED_ID;
-      this._subject = calloutSubject(i);
-    }
     this._syncCallout();
   }
 
@@ -138,6 +128,13 @@ export class CalloutSync {
     // the global's bar is now one of the subjects `callout` itself may point at.
     const el = document.getElementById("callout");
     if (!el) return;
+    // THE SNAPSHOTS VIEW ANCHORS WHAT THE LABEL NAMES (user, 2026-11-09: the global snapshot's label
+    // "attached … to the metagraph snapshot? That's wrong and should never happen"). The subject was
+    // decided twice — the component for the words, this class for the point — from the same pure
+    // chain (`calloutSubject`), and two deciders drift: a hot-reloaded component beside this
+    // long-lived instance ran two versions of the rule at once. Now the component decides and writes
+    // its answer to `data-kind`; this reads it, so the words and the point are one decision.
+    if (this.h.mode === "ledger") this._subject = kindOf(el.dataset.kind);
     // A NEW SUBJECT ON A STANDING LABEL GLIDES (user, 2026-11-09 — `domain/calloutGlide.ts`): the
     // wrapper is no longer remounted per subject; React writes the subject's exact identity to
     // `data-subject`, and a change while the label is shown moves the anchor from where it stood. A
@@ -527,10 +524,6 @@ export class CalloutSync {
   // global tick's byte-bar lead one storey down. The rewind brings a committed row to the lead
   // position, so the lead slot IS where the subject settles (LedgerView.calloutAnchor is pure
   // layout data). An uncataloged channel's rows live on the unlisted lane.
-  /** THE SUBJECTS THE SNAPSHOTS VIEW LABELS — `domain/calloutSubjects`, the ONE chain both owners
-   *  consult (2026-11-07): `SceneCallout` draws the label it names, this projector anchors it.
-   *  Resolved once per `sync` (perf review: two calls a frame allocated six objects). */
-  private readonly _subjIn: CalloutSubjectInput = { register: "snapshots", boxedCard: null, hasSnap: false, hasMetaSnap: false, hasBlock: false, hasDataBlock: false, lane: false };
   private _subject: CalloutSubject = null;
 
   private _ledgerCalloutAnchor(v: THREE.Vector3): boolean {

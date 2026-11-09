@@ -46,7 +46,7 @@ import { blockReadOf } from "@/src/data/blockReads";
 import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
 import { REGISTER_MEASURES, dataUpdatesOf } from "@/src/data/ledgerMeasure";
 import { carriesData } from "@/src/engine/domain/dataMark";
-import { calloutSubject } from "@/src/engine/domain/calloutSubjects";
+import { calloutSubject, type CalloutSubject } from "@/src/engine/domain/calloutSubjects";
 import { REGISTER_ICONS } from "@/components/icons";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
 import { blockLead } from "@/components/inspector/blockLead";
@@ -102,6 +102,10 @@ interface CalloutModel {
    *  `data-subject`; a change glides the standing label to it (`CalloutSync`, 2026-11-09). Absent:
    *  the key. */
   at?: string;
+  /** THE SNAPSHOTS VIEW'S SUBJECT KIND (`calloutSubject`'s answer), written to `data-kind`: the anchor
+   *  the Engine reads, so the label and the point it hangs on are ONE decision (user, 2026-11-09: the
+   *  global snapshot's label "attached … to the metagraph snapshot … should never happen"). */
+  kind?: Exclude<CalloutSubject, null>;
   eyebrow: string;
   title: string;
   /** `chip` is a second, separate fact beside the state — an age — never a clause after a dot. */
@@ -649,6 +653,7 @@ export default function SceneCallout() {
       : subject === "metaSnap" ? msModel()
       : subject === "lane" ? laneModel()
       : null;
+    if (m && subject) m = { ...m, kind: subject };
   }
   // One label on a phone, head only.
   if (phone && m) m = { ...m, lead: undefined };
@@ -702,6 +707,8 @@ function CalloutMark({ m, id, multi, phone, onDismiss }: { m: Model; id: "callou
       // still draws in as one unit where it reappears. The animations are PAUSED until the Engine
       // flips `data-on` (globals.css). React writes `data-on` only at mount.
       data-subject={m.at ?? m.key}
+      // The Snapshots view's anchor KIND — CalloutSync anchors exactly what this label names.
+      data-kind={m.kind}
       data-on="0"
       aria-hidden
       // The standoff and both of its factors, from their one home (`calloutPlacement.ts`) — the
