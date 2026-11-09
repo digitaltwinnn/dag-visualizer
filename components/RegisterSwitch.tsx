@@ -77,6 +77,10 @@ export default function RegisterSwitch() {
   // level and away tempo. Every tier, as the band: it floats over the scene the drag is turning.
   // (Above the `!on` return: a hook after it would change the hook order when the view switches.)
   const yielding = useSceneYield();
+  // SCENE MODE TAKES IT WITH THE BAR (user, 2026-11-09: "yes"): a register is a setting of the view,
+  // and the view switch it belongs beside leaves with the bar, so the scene stands alone with the one
+  // toggle back. It slides out through the top on the bar's own tempos (0.3s away, 0.18s back).
+  const sceneOnly = useStore((s) => s.railsHidden);
   // WHERE THE PHONE FACE'S NAME ARRIVES FROM — the view face's own rule (TopBar's `faceSlide`): a ›
   // brings the next register in from the right, ‹ from the left, keyed by the register it was armed
   // for, so a switch from anywhere else (the desktop grid, a footer link) rolls in plainly.
@@ -185,9 +189,10 @@ export default function RegisterSwitch() {
       style={{ top: "calc(var(--rail-top) + var(--topbar-extra, 0px))", height: REGISTER_SWITCH_H }}
       className={cn(
         "absolute left-1/2 z-[5] -translate-x-1/2 w-max",
-        "transition-opacity duration-200 data-[on='0']:opacity-0 data-[on='0']:pointer-events-none motion-reduce:transition-none",
+        "transition-[opacity,translate] duration-200 data-[on='0']:opacity-0 data-[on='0']:pointer-events-none motion-reduce:transition-none",
         // Off (data-on 0) still wins: its attribute variant outranks the plain utility.
         yielding && "opacity-40 duration-300",
+        sceneOnly && "-translate-y-[calc(100%+var(--rail-top)+var(--topbar-extra,0px))] opacity-0 pointer-events-none duration-300 ease-[ease]",
       )}
     >
       {/* THE PHONE FACE (option A): the lit register whole, ‹ › stepping the others. CSS picks the
