@@ -70,7 +70,7 @@ import { relativeAge } from "@/src/util/relativeAge";
 import { CALLOUT_OFF_X, CALLOUT_OFF_Y, CALLOUT_LEG_INSET, CALLOUT_PHONE_K, CALLOUT_HANG_K, CALLOUT_W, CALLOUT_H, CALLOUT_H_PHONE } from "@/src/engine/domain/calloutPlacement";
 import type { GeoInfo } from "@/src/data/types";
 import LiveDot from "@/components/LiveDot";
-import { PinnedMark } from "@/components/state/StateAtoms";
+import { NodeStars, PinnedMark } from "@/components/state/StateAtoms";
 import { IDENT_INK } from "@/components/identInk";
 import { ledgerNetwork } from "@/src/engine/domain/tickNet";
 import { useFeedRead } from "@/components/useFeedRead";
@@ -129,6 +129,9 @@ interface CalloutModel {
     codes?: string[];
     /** A second measure of the same subject, on the right — a size beside a count. */
     chip?: string;
+    /** THE READ IS IN FLIGHT (user, 2026-11-09: "instead of 'reading' in text can't we use the visual
+     *  cue?"): the line draws the app's acquiring atom, `NodeStars`, where its words will land. */
+    pending?: boolean;
   };
 }
 type Model = CalloutModel;
@@ -258,6 +261,7 @@ function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; className?
               {m.lead.ident.text}
             </span>
           )}
+          {m.lead.pending && <NodeStars count={3} />}
           {m.lead.text && <span className="min-w-0 truncate">{m.lead.text}</span>}
           {(!!m.lead.codes?.length || !!m.lead.chip) && <span className="flex-1 min-w-3" />}
           {m.lead.codes && m.lead.codes.length > 0 && <RoleChips codes={m.lead.codes} />}
@@ -558,7 +562,7 @@ export default function SceneCallout() {
         // never the other register's fact (rule 10).
         lead:
           dataLead && !exact
-            ? undefined
+            ? { pending: true }
             : dataLead && exact
             ? (() => {
                 const rows = exact.rows.filter((r) => (mine ? netKeyOf(r.metaId) === netKeyOf(net) : true));
@@ -582,15 +586,16 @@ export default function SceneCallout() {
                 }
               : {
                   // WHO AND HOW MANY (user, 2026-11-09: "can we say x metagraphs anchored y snapshots?"):
-                  // the metagraphs come from the exact read, so until it lands the lead says it is
-                  // READING (same day: "shows two texts after each other, say 'loading' instead of
-                  // the 1st") — the Data blocks lead's own wording, never a guessed count (rule 10).
+                  // the metagraphs come from the exact read, so until it lands the lead shows the
+                  // acquiring atom (same day: "say 'loading' instead of the 1st", then "can't we use
+                  // the visual cue?") — never a guessed count (rule 10).
+                  pending: total !== 0 && !exact,
                   text:
                     total === 0
                       ? "No metagraph anchored"
                       : exact
                         ? `${exact.channels} ${exact.channels === 1 ? "metagraph" : "metagraphs"} anchored ${total} ${total === 1 ? "snapshot" : "snapshots"}`
-                        : "Reading which metagraphs anchored",
+                        : undefined,
                   chip: exact && total !== 0 ? fmtKB(exact.totalSizeKB) : undefined,
                 },
       };
