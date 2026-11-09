@@ -41,6 +41,8 @@ export interface MeasureControl {
    *  inactive? I don't like it just disappears" — the plank's rule, an exhausted control dims).
    *  The band always shows the explorer's whole set; a node level shows every tile inactive. */
   inactive?: ReadonlySet<string>;
+  /** The set's own row plan (`tileRows.planFor`) — Hypergraph's "All nodes" over its three layers. */
+  rows?: readonly number[];
 }
 
 /** A single measure: the caps word, muted, in the head's aside — a label, not a control. */
@@ -60,7 +62,7 @@ export function MeasureLabel({ label }: { label: string }) {
 export function MeasureTiles({ measure }: { measure: MeasureControl }) {
   // THE ROW PLAN (`tileRows`): four two by two, seven 2 · 3 · 2, else rows of three, on a six-column
   // grid — so the corner and divider rules below read each cell's ROW, not one fixed column count.
-  const cells = tileCells(measure.options.length);
+  const cells = tileCells(measure.options.length, measure.rows);
   const SPAN: Record<number, string> = { 1: "col-span-6", 2: "col-span-3", 3: "col-span-2" };
   return (
     <ToggleGroup

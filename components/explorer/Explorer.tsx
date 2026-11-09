@@ -222,6 +222,8 @@ export default function Explorer({ id, title, hint, placeholder, levels: selecte
           value: levelMeasure?.value ?? "",
           onPick: levelMeasure?.onPick ?? (() => {}),
           inactive: new Set(rootOptions.filter((o) => !levelMeasure?.options.some((l) => l.id === o.id)).map((o) => o.id)),
+          // The root's own row plan holds on every level, as its options do.
+          rows: rootMeasure && "options" in rootMeasure ? rootMeasure.rows : undefined,
         }
       : null;
   return (

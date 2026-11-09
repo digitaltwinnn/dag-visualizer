@@ -369,7 +369,10 @@ lots and lots of buttons, lines and values … all the same padding and no very 
 and "what about design consistency??" when the first cut was History's alone). The CONTROL BAND
 is one full-bleed `--panel-plate` under the head holding what the reader SETS: the MEASURE
 CONTROL (`MeasureTiles` — every measure of the level named at once, glyph and word, the current
-one in the view switch's on-state; four sit two by two, seven 2 · 3 · 2 (`explorer/tileRows.ts`), two/three/six in three columns;
+one in the view switch's on-state; four sit two by two, seven 2 · 3 · 2 (`explorer/tileRows.ts`), two/three/six in three columns,
+and a set may state its own plan (`MeasureControl.rows`, `tileRows.planFor`): Hypergraph's is WHOLE OVER PARTS, 1 · 3 —
+"All nodes" alone on the top row, Consensus · Currency · Data under it (user, 2026-11-08: "nodes is a different shape
+because it's all of the other 3"; `hyperMeasure.HYPER_MEASURE_ROWS`);
 `MEASURE_ICONS` in `components/icons.tsx` is the one glyph map, keyed by measure id across the
 four measure modules — **ONE SEGMENTED CONTROL since 2026-10-25**, design pass: one hairline
 frame around the set, dividers between columns, a hairline between rows, the lit cell filled;

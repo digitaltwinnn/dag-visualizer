@@ -23,14 +23,20 @@ export const HYPER_MEASURE_ORDER: readonly HyperMeasure[] = ["nodes", "l0", "cl1
 
 /** The word the heading control shows — what each layer DOES (`LAYER_WORD`: Consensus, Currency,
  *  Data), not its code (user, 2026-10-30: "instead of L0 use words like 'consensus layer'"); the
- *  codes stay on the chips, where a sentence of them is the point. */
+ *  codes stay on the chips, where a sentence of them is the point. The first is "ALL NODES" (user,
+ *  2026-11-08: "nodes is a different shape because it's all of the other 3"): the three layer tiles
+ *  count the nodes running one layer, the first counts every node — the whole over its parts. */
 export const HYPER_MEASURE_LABELS: Readonly<Record<HyperMeasure, string>> = {
-  nodes: "Nodes",
+  nodes: "All nodes",
   l0: LAYER_WORD.l0!,
   cl1: LAYER_WORD.cl1!,
   dl1: LAYER_WORD.dl1!,
 };
 
+
+/** THE TILES' ROW PLAN — WHOLE OVER PARTS (user, 2026-11-08): "All nodes" spans the top row, the three
+ *  layers sit under it, so the control's own shape says the first is the set the others divide. */
+export const HYPER_MEASURE_ROWS: readonly number[] = [1, 3];
 
 /** The heading control's list — every measure counts nodes. */
 export const HYPER_MEASURE_OPTIONS: readonly { id: HyperMeasure; label: string; unit: string }[] = HYPER_MEASURE_ORDER.map((id) => ({
