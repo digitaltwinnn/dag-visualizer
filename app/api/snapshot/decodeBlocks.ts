@@ -56,7 +56,13 @@ export function recordBlockHashes(record: { blocks?: unknown } | undefined): str
 }
 
 /** Names each decoded block by index. `complete` is false when the explorer listed fewer hashes
- *  than there are blocks: the tail keeps `hash: ""` and the answer must not be cached for long. */
+ *  than there are blocks: the tail keeps `hash: ""` and the answer must not be cached for long.
+ *  ⚠️ BY INDEX, VERIFIED ON A MULTI-BLOCK SNAPSHOT (review M1, 2026-11-09): global 7278049 carries two
+ *  DAG blocks; each paired hash's decoded transfer (from, to, amount) matched the explorer's own
+ *  transfer rows for that hash (`/global-snapshots/7278049/transactions`: 0.004 DAG = 400000 datum,
+ *  149988.08 DAG = 14998808000000). The explorer lists a record's hashes in the snapshot value's own
+ *  order. Token snapshots pair through this same function; none with several blocks was in the live
+ *  window to check against. */
 export function pairHashes(blocks: BlockRead[], hashes: string[]): { blocks: BlockRead[]; complete: boolean } {
   return { blocks: blocks.map((b, i) => ({ ...b, hash: hashes[i] ?? "" })), complete: hashes.length >= blocks.length };
 }
