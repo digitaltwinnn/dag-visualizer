@@ -19,9 +19,9 @@ const D = 86_400_000;
 
 /** A caption date, compact: the title above names the year. A span of two days or more is named
  *  by its UTC days (`localTime`'s rule); a shorter one by the reader's clock. */
-function mark(ms: number, daily: boolean): string {
+function mark(ms: number, daily: boolean, year = false): string {
   return daily
-    ? new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" })
+    ? new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric", ...(year ? { year: "numeric" } : {}), timeZone: "UTC" })
     : new Date(ms).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 }
 
@@ -53,12 +53,19 @@ export default function RangeSpark({
   const at = (f: number) => ({ left: `${f * 100}%`, transform: `translateX(-${f * 100}%)` });
   const ends = m.kind === "ends" ? m.at : [m.at, m.at];
   // The frame's own ends, quiet, only where a range mark leaves them room.
-  const frameStart = ends[0] > 0.22 ? mark(roster.buckets[0]!, roster.stepMs >= D) : null;
+  // A frame reaching into another year names it: "Nov 10" a year back reads as this November.
+  const f0 = roster.buckets[0]!;
+  const otherYear = new Date(f0).getUTCFullYear() !== new Date(span.toMs).getUTCFullYear();
+  const frameStart = ends[0] > (otherYear ? 0.32 : 0.22) ? mark(f0, roster.stepMs >= D, otherYear) : null;
+  const n = points.length;
+  const bx = (i: number) => (n > 1 ? (i / (n - 1)) * HAIRLINE_W : HAIRLINE_W / 2);
   const frameEnd = ends[1] < 0.84 ? "now" : null;
   return (
     <Hairline
       geometry={g.lit}
-      hue={subject ? roster.rows.get(subject)?.hue : undefined}
+      // The DAG's own hue for the whole network (the plane it stands for), as a network's for its own.
+      hue={subject ? roster.rows.get(subject)?.hue : roster.total?.hue}
+      band={[bx(lit[0]), bx(lit[1])]}
       context={g.context}
       label={`${subject ? "This network's" : "The whole network's"} readings around this range, the range itself drawn bolder`}
       caption={

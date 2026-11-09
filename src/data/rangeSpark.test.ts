@@ -16,6 +16,9 @@ describe("rangeFrame — the shortest pill that holds the range with context", (
     // 30 days ending now reaches back exactly 30 days, but 3 × 30 is 90.
     expect(rangeFrame({ fromMs: NOW - 30 * D, toMs: NOW }, NOW)).toBe("90d");
   });
+  it("holds the 90-day window for the trailing 30 days, which start a little over 30 days back", () => {
+    expect(rangeFrame({ fromMs: Math.floor((NOW - 30 * D) / D) * D, toMs: NOW }, NOW)).toBe("90d");
+  });
   it("reaches back to an old range however short it is", () => {
     expect(rangeFrame({ fromMs: NOW - 200 * D, toMs: NOW - 200 * D + 4 * H }, NOW)).toBe("1y");
   });
@@ -45,6 +48,8 @@ describe("rangeGeometry — two parts of one line, on one scale", () => {
     expect(g.context.path).toBe("M0,10L10,0L20,6L30,4L40,8"); // meets the range at both its ends
     expect(rangeGeometry([0, 10, 4, 6, 2], [1, 3], 40, 10)!.context.path).toBe("M0,10L10,0M30,4L40,8"); // and leaves its inside to it
     expect(g.context.peak).toBeNull();
+    expect(g.lit.area).toBe("M20,10L20,6L30,4L30,10Z"); // the range alone is filled
+    expect(g.context.area).toBe("");
   });
   it("keeps a lone in-range point as a dot", () => {
     expect(rangeGeometry([1, 2, 3], [1, 1], 20, 10)!.lit.dots).toEqual([{ x: 10, y: 5 }]);

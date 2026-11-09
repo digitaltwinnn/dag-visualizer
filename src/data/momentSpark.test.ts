@@ -73,6 +73,10 @@ describe("sparkGeometry — stretched to fit, the line alone", () => {
     expect(sparkGeometry([7, 7, 7], 20, 10).path).toBe("M0,5L10,5L20,5");
   });
   it("draws nothing for no measurement", () => {
-    expect(sparkGeometry([null, null], 20, 10)).toEqual({ path: "", peak: null, dots: [] });
+    expect(sparkGeometry([null, null], 20, 10)).toEqual({ path: "", area: "", peak: null, dots: [] });
+  });
+  it("fills each run down to the floor, and a lone point not at all", () => {
+    expect(sparkGeometry([1, 2, null, 3, 4], 40, 10).area).toBe("M0,10L0,10L10,6.67L10,10ZM30,10L30,3.33L40,0L40,10Z");
+    expect(sparkGeometry([null, 5, null, 2, 3], 40, 10).area).toBe("M30,10L30,10L40,6.67L40,10Z");
   });
 });

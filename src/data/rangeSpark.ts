@@ -35,7 +35,10 @@ export const FRAME_CONTEXT = 3;
  *  now — the right edge of the line is the present. */
 export function rangeFrame(lit: { fromMs: number; toMs: number }, nowMs: number): ZoomId {
   const need = Math.max(FRAME_CONTEXT * (lit.toMs - lit.fromMs), nowMs - lit.fromMs);
-  for (const [id, ms] of FRAME_MS) if (ms >= need) return id;
+  // WITH A BUCKET'S SLACK (user, 2026-11-09: the card read "Nov 10 … Oct 10 – Nov 9"): the trailing
+  // 30 days start on a bucket edge, a little over 30 days back, and three of those missed the 90-day
+  // window by minutes, so the frame jumped to a year. A window within a twentieth of the need holds.
+  for (const [id, ms] of FRAME_MS) if (ms * 1.05 >= need) return id;
   return ZOOMS[ZOOMS.length - 1]!.id;
 }
 
@@ -70,7 +73,9 @@ export function rangeGeometry(
   const [i0, i1] = lit;
   const inside = points.map((v, i) => (i >= i0 && i <= i1 ? v : null));
   const around = points.map((v, i) => (i > i0 && i < i1 ? null : v));
-  return { lit: sparkGeometry(inside, w, h, scale), context: { ...sparkGeometry(around, w, h, scale), peak: null } };
+  // The frame around the range is a faint line alone: the fill is the range's, so the range reads
+  // as the one filled stretch (user, 2026-11-09: "only the line is brighter but not extra fill").
+  return { lit: sparkGeometry(inside, w, h, scale), context: { ...sparkGeometry(around, w, h, scale), area: "", peak: null } };
 }
 
 /** Under this share of the line's width the range's two dates would collide, and are said once,

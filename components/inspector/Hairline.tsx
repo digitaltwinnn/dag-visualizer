@@ -22,6 +22,8 @@ export const HAIRLINE_H = 28;
 function Ink({ g, faint }: { g: SparkGeometry; faint?: boolean }) {
   return (
     <g strokeOpacity={faint ? 0.35 : 1}>
+      {/* The fill under the line, in its own ink (2026-11-09): the measured stretch reads as a shape. */}
+      {g.area && <path d={g.area} fill="currentColor" fillOpacity={0.14} stroke="none" />}
       <path d={g.path} fill="none" stroke="currentColor" strokeWidth={faint ? 1 : 1.25} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
       {/* Points on the line drawn as zero-length round-capped strokes, so the SVG's horizontal
           stretch cannot squash them into ellipses: the busiest point, and any lone reading
@@ -39,6 +41,7 @@ export default function Hairline({
   label,
   caption,
   hue,
+  band,
 }: {
   geometry: SparkGeometry;
   context?: SparkGeometry;
@@ -48,6 +51,9 @@ export default function Hairline({
   caption: ReactNode;
   /** The subject network's identity hue; absent for the whole network. */
   hue?: string;
+  /** A stretch of the box to wash, `[x0, x1]` in the box's units — the Range card's range, so it
+   *  stands out from its frame as a region and not only as a brighter line. */
+  band?: [number, number];
 }) {
   return (
     <figure className="mt-2 mb-2" aria-label={label}>
@@ -58,6 +64,7 @@ export default function Hairline({
         style={{ height: HAIRLINE_H, ...(hue ? { color: hue } : {}) }}
         aria-hidden
       >
+        {band && <rect x={band[0]} width={Math.max(2, band[1] - band[0])} y={-2} height={HAIRLINE_H + 4} fill="currentColor" fillOpacity={0.07} />}
         {context && <Ink g={context} faint />}
         <Ink g={geometry} />
       </svg>
