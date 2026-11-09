@@ -9,7 +9,7 @@ import { identityHudCss } from "@/src/palette/identity";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { useMinHold } from "@/components/useMinHold";
 import { CONTENT_EASE } from "@/components/RollSwap";
-import { Lead, SectionLabel, UnitMarks, CUT_ROW, countable, figWidth } from "@/components/inspector/parts";
+import { Lead, SectionLabel, TableHead, TABLE_ROW, UnitMarks, CUT_ROW, countable, figWidth } from "@/components/inspector/parts";
 import { Separator } from "@/components/ui/separator";
 import { useFeedRead } from "@/components/useFeedRead";
 
@@ -30,15 +30,18 @@ import { useFeedRead } from "@/components/useFeedRead";
  *  anchored breakdown and the Data blocks register's section of the Global snapshot card (its data
  *  updates by network — user, 2026-11-07: "work on the global snapshot body also"). `focusId` is the row the chamber resolves against: highlighted in place
  *  by a faint identity-hue wash, its name in the hue. Unlisted (no hue) wears the CORE tone. */
-export function BreakdownRows({ rows, denom, focusId }: {
+export function BreakdownRows({ rows, denom, focusId, head = { name: "Network", figure: "#" } }: {
   rows: readonly { id: string; label: string; hue: string | null; n: number }[];
   denom: number;
   focusId: string | null;
+  /** The card table's column row (option A, 2026-11-09) — a count by network unless said. */
+  head?: { name: string; figure: string };
 }) {
   const pct = (n: number) => (denom > 0 ? (n / denom) * 100 : 0);
   const units = countable(denom);
   return (
-    <div className={cn("flex flex-col gap-y-1", CONTENT_EASE)} style={figWidth(rows.map((r) => r.n))}>
+    <div className={cn("flex flex-col text-label", CONTENT_EASE)} style={figWidth(rows.map((r) => r.n))}>
+      <TableHead name={head.name} figure={head.figure} />
       {rows.map((r) => {
         const isSel = r.id === focusId;
         return (
@@ -46,7 +49,7 @@ export function BreakdownRows({ rows, denom, focusId }: {
           // `w-full` under a negative margin — that stops the counts 12px short of the total).
           <div
             key={r.id}
-            className={cn(CUT_ROW, "w-[calc(100%+12px)] -mx-1.5 px-1.5 py-[3px] rounded-sm")}
+            className={cn(CUT_ROW, TABLE_ROW, "w-[calc(100%+12px)] -mx-1.5 px-1.5 rounded-sm")}
             style={isSel ? ({ background: `color-mix(in oklch, ${r.hue ?? "var(--primary)"} 16%, transparent)` } as const) : undefined}
           >
             <span
@@ -122,7 +125,7 @@ export default function AnchoredTags({
               : "Reading which metagraphs anchored into it"}
       </Lead>
       <Separator className="mb-2" />
-      <SectionLabel label="Snapshots anchored" total={total != null ? total : <NodeStars count={3} />} className="mb-1.5" />
+      <SectionLabel label="Snapshots anchored" total={total != null ? total : <NodeStars count={3} />} className="mb-0.5" />
     </>
   );
 

@@ -1839,7 +1839,17 @@ Moment's readings, a provider's and a country's nodes by network; the compositio
 fact card — its strip and status row were built and removed the same day). Rows that are their own controls wear `CUT_ROW` themselves and
 draw `UnitMarks`, so every card shares the columns. It replaced the stacked bars with a wrapping dot
 legend, the dot · name · track · count rows and the inline network dots — three recipes. A zero part
-is a muted row with no mark. **A FOLD IS MARKED ON ITS LABEL, never by a glyph beside the figure** (`foldLabel`,
+is a muted row with no mark. **EVERY CARD TABLE IS ONE SECTION, STANDARDIZED BY DATA TYPE** (user, 2026-11-09,
+option A of the brainstorm's `card-tables.html` — "one table: header rule, column caps, hairline rows"):
+`SectionLabel` stands on the border rule (every section, so a Node card's Runs and Archive too), a
+`TableHead` caps row names the columns (the name column's noun, the figure column's unit — `#` for a
+count; a unit wider than its figures reaches left into the mark column), and rows divide on `TABLE_ROW`'s
+faint hairline. The mark follows the data: COUNTS by category (snapshots anchored, data updates by
+network, a data block's updates by kind, a country's nodes by provider, a provider's by network) draw
+`UnitMarks`; READINGS (the Moment's "At that moment", its hand-built header retired) a bar against the
+largest; RECORDS (a block's transfers, a global snapshot's blocks) their own field columns. The
+multi-cut `ScheduleTable` (the Metagraph card's layer / status / depth) keeps its axis column, which
+already names each cut. **A FOLD IS MARKED ON ITS LABEL, never by a glyph beside the figure** (`foldLabel`,
 user 2026-10-03, two rounds): a chevron in the row's flow pushed that row's figure left of every row
 without one ("numbers should be on the right side and aligned … a structural solution for the >
 space being taken sometimes"), and hung in the card's padding it "touches the edge, there is simply

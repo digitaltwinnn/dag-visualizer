@@ -2,10 +2,11 @@
 
 import type { CSSProperties } from "react";
 import { ArrowUpRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 import CardHead, { RailPane } from "@/components/CardHead";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { KIND_MARK_CLASS, REGISTER_ICONS } from "@/components/icons";
-import { Door, Fact, FactGroup, Foot, FootRow, LayerWho, Lead, QualifierChip, SectionLabel } from "@/components/inspector/parts";
+import { CUT_ROW, Door, Fact, FactGroup, Foot, FootRow, LayerWho, Lead, QualifierChip, SectionLabel, TABLE_ROW, TableHead, UnitMarks, countable, figWidth } from "@/components/inspector/parts";
 import { tickerOf } from "@/components/explorer/nodeRow";
 import { openSnapshotRecord } from "@/components/trendDoors";
 import { useFeedRead } from "@/components/useFeedRead";
@@ -89,12 +90,16 @@ export default function DataBlockPane({ onClose, collapsed, onToggle }: { onClos
           </Lead>
           {b && b.kinds.length > 0 && (
             <div className="mt-2 mb-2">
-              <SectionLabel label="Updates" total={b.updates.toLocaleString()} />
-              <div className="mt-1 flex flex-col gap-y-0.5 text-label">
+              <SectionLabel label="Updates" total={b.updates.toLocaleString()} className="mb-0.5" />
+              {/* COUNTS BY KIND (option A, 2026-11-09): the card table, each kind's share marked in the
+                  network's hue — squares while countable, a bar beyond. */}
+              <div className="flex flex-col text-label" style={figWidth(b.kinds.map((k) => k.count.toLocaleString()))}>
+                <TableHead name="Kind" figure="#" />
                 {b.kinds.map((k) => (
-                  <div key={k.kind} className="flex items-start justify-between gap-2.5">
+                  <div key={k.kind} className={cn(CUT_ROW, TABLE_ROW)}>
                     <span className="min-w-0 truncate text-foreground-dim">{k.kind}</span>
-                    <span className="shrink-0 font-mono tabular-nums text-foreground">{k.count.toLocaleString()}</span>
+                    <UnitMarks count={k.count} color={hue} units={countable(b.updates)} frac={k.count / Math.max(1, b.updates)} />
+                    <span className="font-mono tabular-nums text-right text-foreground">{k.count.toLocaleString()}</span>
                   </div>
                 ))}
               </div>

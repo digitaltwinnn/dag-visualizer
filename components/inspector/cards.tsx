@@ -1122,8 +1122,9 @@ export function CountryCard({ cc }: { cc: string }) {
           provider card below it by NETWORK — whose nodes these are: place → host → network down
           the pile, nothing repeated. */}
       <Separator className="mb-2" />
-      <SectionLabel label="Nodes" unit="by provider" total={rows.length} className="mb-1.5" />
-      <ScheduleTable parts={parts} />
+      {/* The cut is named by the table's column row (option A, 2026-11-09), so the label says "Nodes". */}
+      <SectionLabel label="Nodes" total={rows.length} className="mb-0.5" />
+      <ScheduleTable parts={parts} head={{ name: "Provider", figure: "#" }} />
     </>
   );
 }
@@ -1260,8 +1261,8 @@ export function ProviderCard({ sel }: { sel: CohortSel }) {
     {/* THE BREAKDOWN: the cohort's nodes cut by NETWORK — whose nodes these are — the level below
         the country card's cut by provider. */}
     <Separator className="mb-2" />
-    <SectionLabel label="Nodes" unit="by network" total={members.length} className="mb-1.5" />
-    {parts.length > 0 && <ScheduleTable parts={parts} />}
+    <SectionLabel label="Nodes" total={members.length} className="mb-0.5" />
+    {parts.length > 0 && <ScheduleTable parts={parts} head={{ name: "Network", figure: "#" }} />}
     <Separator className="my-2" />
     <FactGroup>
       {/* ASN — the provider's REFERENCE, in the slot the city vacated when it moved to the head

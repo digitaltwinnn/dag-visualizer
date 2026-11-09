@@ -22,13 +22,17 @@
 //   doors     · "Block records": the raw layer's blocks table, this block's row pinned in its
 //               accepting global's group (`trendDoors.openBlockRecord`)
 //   foot      · the hash and the parents' hashes, in full with copy
-import { Fragment, useSyncExternalStore, type CSSProperties } from "react";
+import { useSyncExternalStore, type CSSProperties } from "react";
+import { cn } from "@/lib/utils";
 import { ArrowUpRight } from "lucide-react";
 import CardHead, { RailPane } from "@/components/CardHead";
 import FollowControl from "@/components/FollowControl";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { BLOCK_ICON, KIND_MARK_CLASS } from "@/components/icons";
-import { Door, Empty, Fact, FactGroup, Foot, FootRow, Lead, QualifierChip, SectionLabel } from "@/components/inspector/parts";
+import { Door, Empty, Fact, FactGroup, Foot, FootRow, Lead, QualifierChip, SectionLabel, TABLE_ROW } from "@/components/inspector/parts";
+
+/** A transfer row's three columns: from, to, the amount on the card's right edge. */
+const TRANSFER_ROW = "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-baseline gap-x-3";
 import { tickerOf } from "@/components/explorer/nodeRow";
 import { openBlockRecord } from "@/components/trendDoors";
 import { blockLead } from "@/components/inspector/blockLead";
@@ -125,17 +129,21 @@ export default function BlockPane({ onClose, collapsed, onToggle }: { onClose: (
               fee is gone (Fees paid below sums it), and the lead no longer repeats the addresses. */}
           {transfers.length > 0 && read && (
             <div className="mt-2 mb-2">
-              <SectionLabel label="Transfers" total={transfers.length.toLocaleString()} />
-              <div className="mt-1 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-1">
-                <span className="text-label tracking-caps uppercase text-muted-foreground">From</span>
-                <span className="text-label tracking-caps uppercase text-muted-foreground">To</span>
-                <span className="text-label tracking-caps uppercase text-right text-muted-foreground">{unit}</span>
+              <SectionLabel label="Transfers" total={transfers.length.toLocaleString()} className="mb-0.5" />
+              {/* RECORDS (option A, 2026-11-09): the card table's caps row and hairline rows, in the
+                  record's own three columns. */}
+              <div className="flex flex-col text-label">
+                <div aria-hidden className={cn(TRANSFER_ROW, "pt-1 pb-0.5 tracking-caps uppercase text-muted-foreground [font-size:calc(var(--text-label)*0.86)]")}>
+                  <span>From</span>
+                  <span>To</span>
+                  <span className="text-right">{unit}</span>
+                </div>
                 {transfers.map((t, i) => (
-                  <Fragment key={i}>
-                    <span className="min-w-0 truncate font-mono text-label text-foreground-dim">{t.from ? rowAddr(t.from) : <Empty />}</span>
-                    <span className="min-w-0 truncate font-mono text-label text-foreground-dim">{t.to ? rowAddr(t.to) : <Empty />}</span>
-                    <span className="text-right font-mono text-label tabular-nums whitespace-nowrap text-foreground">{compactDag(t.amount)}</span>
-                  </Fragment>
+                  <div key={i} className={cn(TRANSFER_ROW, TABLE_ROW)}>
+                    <span className="min-w-0 truncate font-mono text-foreground-dim">{t.from ? rowAddr(t.from) : <Empty />}</span>
+                    <span className="min-w-0 truncate font-mono text-foreground-dim">{t.to ? rowAddr(t.to) : <Empty />}</span>
+                    <span className="text-right font-mono tabular-nums whitespace-nowrap text-foreground">{compactDag(t.amount)}</span>
+                  </div>
                 ))}
               </div>
             </div>

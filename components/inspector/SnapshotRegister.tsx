@@ -17,7 +17,7 @@ import { useFeedRead } from "@/components/useFeedRead";
 import { tickerOf } from "@/components/explorer/nodeRow";
 import { IDENT_INK } from "@/components/identInk";
 import { BreakdownRows } from "@/components/inspector/AnchoredTags";
-import { CUT_ROW, Lead, SectionLabel, figWidth } from "@/components/inspector/parts";
+import { CUT_ROW, Lead, SectionLabel, TABLE_ROW, TableHead, figWidth } from "@/components/inspector/parts";
 import { CONTENT_EASE } from "@/components/RollSwap";
 import { Separator } from "@/components/ui/separator";
 
@@ -61,8 +61,10 @@ export function BlocksAnchored({ ordinal }: { ordinal: number }) {
       {total > 0 && (
         <>
           <Separator className="mb-2" />
-          <SectionLabel label="Blocks" total={total} className="mb-1.5" />
-          <div className={cn("flex flex-col gap-y-1", CONTENT_EASE)} style={figWidth(figures)}>
+          <SectionLabel label="Blocks" total={total} className="mb-0.5" />
+          <div className={cn("flex flex-col text-label", CONTENT_EASE)} style={figWidth(figures)}>
+            {/* RECORDS (option A, 2026-11-09): a block per row, its fields in columns. */}
+            <TableHead name="Chain" figure="Moved" />
             {rows.map((b, i) => {
               const hue = identityHudCss(b.chain);
               const on = !!block && block.chain === b.chain && block.hash === b.hash;
@@ -70,7 +72,7 @@ export function BlocksAnchored({ ordinal }: { ordinal: number }) {
                 // The breakdown row's wash and overhang (`BreakdownRows`), for the committed block.
                 <div
                   key={`${b.chain}:${b.hash}`}
-                  className={cn(CUT_ROW, "w-[calc(100%+12px)] -mx-1.5 px-1.5 py-[3px] rounded-sm")}
+                  className={cn(CUT_ROW, TABLE_ROW, "w-[calc(100%+12px)] -mx-1.5 px-1.5 rounded-sm")}
                   style={on ? ({ background: `color-mix(in oklch, ${hue} 16%, transparent)` } as const) : undefined}
                 >
                   <span className={cn("min-w-0 truncate", IDENT_INK, on ? "font-semibold" : "text-foreground-dim")} style={on ? { color: hue } : undefined}>{tickerOf(b.chain)}</span>
@@ -121,7 +123,7 @@ export function DataAnchored({ ordinal }: { ordinal: number }) {
       {updates != null && updates > 0 && (
         <>
           <Separator className="mb-2" />
-          <SectionLabel label="Data updates" total={updates} className="mb-1.5" />
+          <SectionLabel label="Data updates" total={updates} className="mb-0.5" />
           <BreakdownRows rows={rows} denom={updates} focusId={metagraphById(focus)?.id ?? null} />
         </>
       )}
