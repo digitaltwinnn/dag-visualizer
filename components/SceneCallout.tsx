@@ -65,6 +65,7 @@ import { QualifierChip, RoleChips, TickerChip } from "@/components/inspector/par
 // own RoleChips (user, 2026-08-15: "look at my cards — square pills").
 import { layerCodesOf } from "@/src/data/composition";
 import { useNowTick } from "@/components/useNowTick";
+import { useMinHold } from "@/components/useMinHold";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { relativeAge } from "@/src/util/relativeAge";
 import { CALLOUT_OFF_X, CALLOUT_OFF_Y, CALLOUT_LEG_INSET, CALLOUT_PHONE_K, CALLOUT_HANG_K, CALLOUT_W, CALLOUT_H, CALLOUT_H_PHONE } from "@/src/engine/domain/calloutPlacement";
@@ -132,6 +133,8 @@ interface CalloutModel {
     /** THE READ IS IN FLIGHT (user, 2026-11-09: "instead of 'reading' in text can't we use the visual
      *  cue?"): the line draws the app's acquiring atom, `NodeStars`, where its words will land. */
     pending?: boolean;
+    /** The held cue's fade-out (`useMinHold`), as the card's. */
+    pendingFading?: boolean;
   };
 }
 type Model = CalloutModel;
@@ -262,7 +265,7 @@ function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; className?
             </span>
           )}
           {/* The read in flight: the shared atom, one text line tall (2026-11-09). */}
-          {m.lead.pending && <Resolving />}
+          {m.lead.pending && <Resolving className={cn(m.lead.pendingFading && "animate-hold-fade-out motion-reduce:animate-none")} />}
           {m.lead.text && <span className="min-w-0 truncate">{m.lead.text}</span>}
           {(!!m.lead.codes?.length || !!m.lead.chip) && <span className="flex-1 min-w-3" />}
           {m.lead.codes && m.lead.codes.length > 0 && <RoleChips codes={m.lead.codes} />}
@@ -288,6 +291,13 @@ export default function SceneCallout() {
   const snap = useStore((s) => s.snap);
   const tickNet = useStore((s) => s.tickNet);
   const exact = useStore((s) => (s.snap ? s.snapshotExact[s.snap.data.ordinal] : undefined));
+  const exactMissed = useStore((s) => (s.snap ? s.exactMiss[s.snap.data.ordinal] != null : false));
+  // THE CARD'S HOLD (user, 2026-11-09: "the card holds the cue about a second longer than the callout
+  // — apply the same rule"): the tick's read in flight shows its `Resolving` cue for one calm cycle
+  // even when the read lands sooner, then fades — `useMinHold`, the Global card's own (AnchoredTags).
+  const resolveHold = useMinHold(snap != null && exact == null && !exactMissed);
+  // A read that failed stops resolving and says so, as the card's lead does ("Read failed").
+  const resolving = (exact == null && !exactMissed) || resolveHold.show;
   const following = useStore((s) => s.following);
   const liveFeed = useStore((s) => s.live);
   // THE BLOCKS REGISTER'S SUBJECT (D3): the Block card's — the live newest block or the pinned one.
@@ -562,8 +572,10 @@ export default function SceneCallout() {
         // label fell back to the Metagraph snapshots register's anchors lead): unknown until read,
         // never the other register's fact (rule 10).
         lead:
-          dataLead && !exact
-            ? { pending: true }
+          dataLead && resolving
+            ? { pending: true, pendingFading: resolveHold.fading }
+            : dataLead && !exact
+            ? { text: "Read failed" }
             : dataLead && exact
             ? (() => {
                 const rows = exact.rows.filter((r) => (mine ? netKeyOf(r.metaId) === netKeyOf(net) : true));
@@ -590,13 +602,16 @@ export default function SceneCallout() {
                   // the metagraphs come from the exact read, so until it lands the lead shows the
                   // acquiring atom (same day: "say 'loading' instead of the 1st", then "can't we use
                   // the visual cue?") — never a guessed count (rule 10).
-                  pending: total !== 0 && !exact,
+                  pending: total !== 0 && resolving,
+                  pendingFading: resolveHold.fading,
                   text:
                     total === 0
                       ? "No metagraph anchored"
-                      : exact
+                      : exact && !resolving
                         ? `${exact.channels} ${exact.channels === 1 ? "metagraph" : "metagraphs"} anchored ${total} ${total === 1 ? "snapshot" : "snapshots"}`
-                        : undefined,
+                        : !resolving
+                          ? "Read failed"
+                          : undefined,
                   // No size chip here (user, 2026-11-09, option 1): the sentence carries the line at the
                   // callout's one width, and the size stays a fact of the Global snapshot card.
                 },
