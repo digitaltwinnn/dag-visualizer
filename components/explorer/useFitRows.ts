@@ -55,8 +55,18 @@ export default function useFitRows(cardId: string, fill: boolean, measuring: boo
     ro.observe(rail);
     ro.observe(card);
     window.addEventListener("resize", measure);
+    // ⚠️ THE CAP MOVES WITHOUT A RESIZE (user, 2026-11-09: "only 6 rows (with 1/9 pages) while there
+    // is a lot of room left"). The rail's max-height is a CSS calc over root custom properties —
+    // `--topbar-extra` (the filter strip, `TopBar`), `--bottom-reserve` (the band, `BottomStream`) —
+    // written on `<html style>`. A cap that SHRINKS clips the rail, which resizes it, and the page
+    // shrinks; a cap that GROWS back resizes nothing (the rail is content-sized under it), so the
+    // page never grew back: a ratchet down, one filter strip at a time. Every write to those
+    // variables is a write to the root's style attribute, so that is what is watched.
+    const mo = new MutationObserver(measure);
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
     return () => {
       ro.disconnect();
+      mo.disconnect();
       window.removeEventListener("resize", measure);
     };
   }, [cardId, fill, measuring, fallback]);
