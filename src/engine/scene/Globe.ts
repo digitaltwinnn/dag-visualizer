@@ -1441,17 +1441,6 @@ export class Globe implements GeoViewHost {
     return true;
   }
 
-  /** The SELECTED node's LEDGER tray-chip position in globe-LOCAL coordinates — the same
-   *  `ledgerPos` the instance write lerps to, so the chamber callout can point at the machine's
-   *  own chip in its tray (user, 2026-08-16). False when nothing is selected or the chip is
-   *  hidden with its lane. */
-  selectedNodeLedgerAnchor(out: THREE.Vector3): boolean {
-    const rec = this._selNodeRec;
-    if (!rec || rec.ledgerHide) return false;
-    out.copy(rec.ledgerPos);
-    return true;
-  }
-
   // Commit/clear the cohort selection: resolve member ids + the representative direction from
   // the CURRENT node records by cc+city+isp match (event-time — re-run by the data-rebuild
   // sites exactly like setSelectedNode's re-resolve). Membership matching mirrors

@@ -599,6 +599,9 @@ export class LedgerView implements SceneView {
       this._dataMarkMesh.setMatrixAt(i, _dummy.matrix); // still the zero-scale matrix from above
     }
     this._dataMarkMesh.instanceMatrix.needsUpdate = true;
+    // Nothing is drawn until the first data frame sets the count (review M5): `update` returns early
+    // before any data, and the pool would submit all META_TRAIL_MAX zero-scaled boxes every frame.
+    this._dataMarkMesh.count = 0;
     this.group.add(this._dataMarkMesh);
     this._dataTether = new SoftLines(META_TRAIL_MAX, this._colors);
     this.group.add(this._dataTether.mesh);
@@ -1118,15 +1121,6 @@ export class LedgerView implements SceneView {
    *  transform (rule 6). */
   private _tileTop(b: LaneBlock, cz: number, out: THREE.Vector3): THREE.Vector3 {
     return out.set(LEAD_X - b.slot * SLOT_SP + b.ox, FLOOR_Y.msnap + TILE_LIFT + TILE_D * b.size, cz + b.oz);
-  }
-
-  /** The top of tile `k` of `metaId`'s lane block in the tick `tickTs` (the tile resolver's own
-   *  index: the k-th filled tile of that tick), at rest. False when the lane holds no such tile. */
-  tileAnchorOf(metaId: string, tickTs: string, k: number, out: THREE.Vector3): boolean {
-    const b = this._tileOf(metaId, tickTs, k);
-    if (!b) return false;
-    this._tileTop(b, this._laneCz(metaId), out);
-    return true;
   }
 
   /** The k-th filled tile of `metaId`'s lane block in the tick `tickTs`, or null. */

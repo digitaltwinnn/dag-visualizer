@@ -39,7 +39,11 @@ import { snapBright } from "../../domain/dimModel";
 // immediate"). LedgerView owns the handoff timing; this row is just one more sheet.
 const RIBBON_ROWS = 4;
 /** Trail slots a thread can be drawn for — the retained window, so every visible row can carry one. */
-const MAX_THREADS = 128;
+// 128 → 512 (review M4, 2026-11-09): the Transaction blocks seal lines are one per DAG block, per
+// token block and per block-carrying tile over the 52-tick block window — about two a tick and more
+// on a burst tick, so 128 cut the oldest rows' seals with no sign. 512 is ~10 a tick across the
+// whole window; geometry is event-time, so the cost is buffer size alone.
+const MAX_THREADS = 512;
 /** Subdivisions per thread, and the LineSegments vertex count that follows (two per segment). */
 const THREAD_SEG = 32;
 const VERTS_PER_THREAD = THREAD_SEG * 2;
@@ -198,6 +202,10 @@ export class Ribbons {
   private _thStart: number[] = [];
   private _thCount = 0;
   private _thAlpha: number[] = [];
+  /** Per thread, its ALPHA share of the row ramp — the paper lens dim (review M2): on paper the
+   *  seal material is normal-blended ink, so a colour taken toward black read LOUDER; the dim rides
+   *  alpha there, as every other paper dim in the chamber does. 1 on the dark ground. */
+  private _thMul: number[] = [];
   private _sceneColors: Record<string, number>;
   private _neutral: number;
   /** Per-row brightness scale — the trail REWIND fades the live lead row's sheet while an older
@@ -425,7 +433,9 @@ export class Ribbons {
       if (this._thCount >= MAX_THREADS) break;
       this._c.setHex(l.hue ?? this._colors.muted);
       const off = this._filter !== "all" && l.key !== this._filter;
-      if (off) this._c.multiplyScalar(snapBright(1, true));
+      // Dark: additive glow, so a darker colour IS a dimmer line. Paper: the dim rides alpha.
+      if (off && !this._paper) this._c.multiplyScalar(snapBright(1, true));
+      this._thMulNext = off && this._paper ? snapBright(1, true) : 1;
       this._q.topZ0 = l.z;
       this._q.topZ1 = l.z;
       this._q.botZ0 = l.yBot != null ? l.z : l.band ? l.band.z0 : 0;
@@ -442,7 +452,11 @@ export class Ribbons {
     this._thSlots.length = 0;
     this._thStart.length = 0;
     this._thAlpha.length = 0;
+    this._thMul.length = 0;
+    this._thMulNext = 1;
   }
+  /** The alpha share the next `_pushThread` records (event-time scratch). */
+  private _thMulNext = 1;
 
   /** One hairline down `_q`'s centre line on the sheets' own eased sweep, in `_c`, from vertex `v`
    *  and height `yTop` down to the bars' top face — or, given `yBot`, to that height, keeping its x
@@ -459,6 +473,7 @@ export class Ribbons {
     this._thSlots.push(slot);
     this._thStart.push(v);
     this._thAlpha.push(0);
+    this._thMul.push(this._thMulNext);
     this._thCount++;
     // The thread is the quad's CENTRE line, so it stands exactly where the sheet's own middle
     // would be if this row had one.
@@ -489,7 +504,7 @@ export class Ribbons {
     const c = this._thCol.array as Float32Array;
     let dirty = false;
     for (let i = 0; i < this._thCount; i++) {
-      const a = fadeOf(this._thSlots[i]); // the row's own ramp; the LEVEL is the material's (setAlpha)
+      const a = fadeOf(this._thSlots[i]) * this._thMul[i]; // the row's own ramp × its lens share; the LEVEL is the material's (setAlpha)
       if (Math.abs(a - this._thAlpha[i]) < 0.004) continue;
       this._thAlpha[i] = a;
       dirty = true;

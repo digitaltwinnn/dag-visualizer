@@ -102,7 +102,8 @@ the root is morph-scaled, so a world position would aim at the origin mid-morph.
 while focused, and picking is filter-gated to the in-focus selection's nodes. Depth of field is wired
 but no view opts in — the bokeh read as fuzz on the selected atom.
 
-**Snapshots** — the ladder is node → network → all. The chamber has one pose, at a subtle angle, and
+**Snapshots** — the ladder is network → all (the node rung retired 2026-11-08: a node is a
+snapshot's signer here, a reading, never a committed subject). The chamber has one pose, at a subtle angle, and
 a commit moves neither it nor the lanes; floors and trays are visual aid, and the real subjects are
 the snapshots themselves.
 
@@ -601,7 +602,7 @@ bars, labels, the rewind and the pose. What differs answers through ONE keyed ma
 **Where a block stands is layout data, placed at event time** (`_rebuildBlockTier`, on every slot
 rebuild and read; a window change reaches it through the refresh that follows): a DAG block above
 its tick's bar, a token block OVER the tile of the metagraph snapshot that accepted it — the k-th
-filled tile of that tick, `k` the tile resolver's own index (`tileAnchorOf`). `_tileTop` is the ONE
+filled tile of that tick, `k` the tile resolver's own index (`_tileOf`). `_tileTop` is the ONE
 copy of the tile arithmetic: the per-frame tile draw, the selected tile's callout anchor and the
 token placement all read it, the first two adding the frame's offsets. The BLOCK CALLOUT's anchor
 (D3) reads the same placed items: `BlockTier.anchorOf` is a block's placed top plus the rewind offset

@@ -1923,11 +1923,11 @@ export class Engine {
     //     aid: machines FILLING the chamber, not the actors in it. The snapshots are the subjects,
     //     so a node pick commits its cards and leaves the room where it is.
     //
-    // Kept as its own resolver key rather than dropped from LADDERS.ledger — the rung still
-    // drives deselect stepping and its rail slot — and it returns TRUE so the walk stops here.
+    // The network rung keeps its own resolver key rather than leaving LADDERS.ledger — the rung
+    // still drives deselect stepping and its rail slot — and it returns TRUE so the walk stops here.
     // View entry runs through `_resolveFocus`, so falling through would reach this very pose under
     // another name, and a `false` would read as "no pose available" when there is exactly one.
-    // (The node rung left the ledger's ladder on 2026-11-08 with its card.)
+    // (The node rung left the ledger's ladder on 2026-11-08 with its card; it has no key.)
     ledgerNetwork: () => this._resolvers.ledgerOverview(),
     ledgerOverview: () => {
       this.cam.focus("ledger");
