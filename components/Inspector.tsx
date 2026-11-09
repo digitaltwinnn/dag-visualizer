@@ -744,7 +744,11 @@ export default function Inspector() {
     return Math.max(ENTRY_DIM_FLOOR, 1 - ENTRY_DIM_STEP * dist);
   };
   const ladderLane = (
-    <div className="rail-ladder flex flex-col" style={{ ["--entry-col"]: VIEW_POLICIES[mode].entryColumn } as CSSProperties}>
+    // NO TEXT SELECTION ANYWHERE IN THE LANE (user, 2026-11-09: "all text elements are selectable,
+    // while in other cards I get the regular mousepointer"): the pager's swipe turned selection off
+    // on a card WITH siblings (`RailPager`), so a card without one — a lone block — answered the
+    // pointer with a text caret. One rule for the lane: a value worth taking has its copy control.
+    <div className="rail-ladder flex flex-col select-none" style={{ ["--entry-col"]: VIEW_POLICIES[mode].entryColumn } as CSSProperties}>
       {displayOrder(ladderIds, presentOf, stepIds).map((id, depth) => {
         const card = manifest.find((c) => c.id === id);
         if (!card) return null;
