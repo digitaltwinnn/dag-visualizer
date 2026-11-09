@@ -19,6 +19,23 @@ export const NET_SWITCH_VIEW = "dagviz:net-switch-view";
  *  Metagraph snapshots), restored before the view so the URL is written once. */
 export const NET_SWITCH_REGISTER = "dagviz:net-switch-register";
 
+/** CONSUME THE HANDOFF, once (RouteSync's boot seed calls it — review, 2026-11-09). It lived in a
+ *  TopBar effect, which ran BEFORE RouteSync's seed of `/` as Geography (#79's landing), so the
+ *  carried view was overwritten on every network switch. Null when nothing (valid) was carried. */
+export function consumeNetSwitch(isMode: (v: string) => boolean): { mode: string; register: string | null } | null {
+  let saved: string | null = null;
+  let register: string | null = null;
+  try {
+    saved = sessionStorage.getItem(NET_SWITCH_VIEW);
+    register = sessionStorage.getItem(NET_SWITCH_REGISTER);
+    if (saved != null) sessionStorage.removeItem(NET_SWITCH_VIEW);
+    if (register != null) sessionStorage.removeItem(NET_SWITCH_REGISTER);
+  } catch {
+    return null; /* storage unavailable — nothing carried */
+  }
+  return saved != null && isMode(saved) ? { mode: saved, register } : null;
+}
+
 // The network rows — SECTION of the SettingsMenu since 2026-09-08 (user consolidation; the
 // standalone rightmost trigger retired with it). ⚠️ "Which chain am I looking at" must not go
 // missing (the old face's rule): the SettingsMenu trigger carries the network CODE in the live
