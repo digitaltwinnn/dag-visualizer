@@ -43,7 +43,8 @@ describe("dataInWindow", () => {
 
 describe("dataBlocksInWindow — the switch's count", () => {
   it("sums the data blocks of the ticks read, in scope, and says how many ticks were read", () => {
-    expect(dataBlocksInWindow(ticks, reads, all)).toEqual({ count: 3, read: 3, total: 4 });
+    // Tick 4's undecodable "odd" row makes it unread under All — never counted as 0 (review M3).
+    expect(dataBlocksInWindow(ticks, reads, all)).toEqual({ count: 2, read: 2, total: 4 });
     expect(dataBlocksInWindow(ticks, reads, (id) => id === "DED")).toEqual({ count: 2, read: 3, total: 4 });
     expect(dataBlocksInWindow(ticks, {}, all)).toEqual({ count: 0, read: 0, total: 4 });
   });

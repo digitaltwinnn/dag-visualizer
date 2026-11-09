@@ -39,8 +39,12 @@ export interface DecodedChannel {
   /** The data TRANSACTIONS inside the blocks (2026-08-07 — the missing link for data
    *  metagraphs like DED: the app's real payload rides here as signed batch commitments, e.g.
    *  MetagraphBatchMessage batch roots, while onChainState may stay empty). Count + the
-   *  decoded values as JSON text for the raw layer's tree. */
-  dataTxCount: number;
+   *  decoded values as JSON text for the raw layer's tree. UNDEFINED when any data block could not
+   *  be read (review M3): its updates are unknown, so the snapshot's count is too — never a 0. */
+  dataTxCount: number | undefined;
+  /** The data transactions actually decoded (what `dataTx` holds) — the raw tree's own count, which
+   *  an unread block leaves short; never the snapshot's count. */
+  dataTxDecoded: number;
   /** How many DATA BLOCKS (the dL1's app blocks) the snapshot carried — the blocks the data
    *  updates above ride in (D6, 2026-11-07: the Data blocks register marks a tile by them). */
   dataBlocks: number;
@@ -95,6 +99,7 @@ export async function decodeChannelContent(content: unknown): Promise<DecodedCha
   const dataBlockRows: DataBlockSummary[] = [];
   let dataBytes = 0;
   let dataBlocks = 0;
+  let unreadBlock = false;
   for (const b of appBlocks) {
     const buf = asBytes(b);
     if (!buf) continue;
@@ -120,7 +125,12 @@ export async function decodeChannelContent(content: unknown): Promise<DecodedCha
       }
       row.updates = own.length;
       row.kinds = payloadKinds(own).map((k) => ({ kind: k.fields ? "records" : k.kind, count: k.count }));
-    } catch { /* a block we can't read is one we don't claim */ }
+    } catch {
+      // A block we can't read is one we don't claim (review M3): it is marked UNREAD, and the
+      // snapshot's update count becomes unknown, so no surface states "0 updates" for it.
+      row.unread = true;
+      unreadBlock = true;
+    }
     dataBlockRows.push(row);
   }
 
@@ -138,7 +148,8 @@ export async function decodeChannelContent(content: unknown): Promise<DecodedCha
     hasState: shape.has,
     state: stateText,
     dataBlockSigners: [...new Set(dataBlockSigners)],
-    dataTxCount: dataTxValues.length,
+    dataTxCount: unreadBlock ? undefined : dataTxValues.length,
+    dataTxDecoded: dataTxValues.length,
     dataBlocks,
     dataBlockRows,
     dataTx: dataTxValues.length ? JSON.stringify(dataTxValues) : "",

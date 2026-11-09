@@ -45,8 +45,12 @@ export function dataBlocksInWindow(ticks: readonly Tick[], reads: Reads, inScope
   for (const t of ticks) {
     const ex = reads[t.ordinal];
     if (!ex) continue;
+    const rows = ex.rows.filter((r) => inScope(r.metaId));
+    // A row the decoder could not read has an unknown count (review M3, `dataUpdatesOf`'s rule):
+    // the tick is UNREAD — outside the sum and the read count — never a 0 for that snapshot.
+    if (rows.some((r) => r.dataBlocks == null)) continue;
     read++;
-    for (const r of ex.rows) if (inScope(r.metaId)) count += r.dataBlocks ?? 0;
+    for (const r of rows) count += r.dataBlocks!;
   }
   return { count, read, total: ticks.length };
 }

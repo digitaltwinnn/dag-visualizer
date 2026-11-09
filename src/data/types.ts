@@ -84,7 +84,7 @@ export interface ChannelSnapRow {
    *  none, or on rows cached before the field existed (an absent lane, not a reading). */
   dataBytes?: number;
   /** The DATA UPDATES this snapshot's data blocks carry (D6, 2026-11-07 — the data transactions the
-   *  dL1 validated; cache key `snapshot-exact-v8`). Absent where the payload could not be decoded:
+   *  dL1 validated; cache key `snapshot-exact-v8`, now v11 — `cachedExact.ts` carries the history). Absent where the payload could not be decoded:
    *  unknown, never zero. The card's count and the Data blocks register's tile marks read it. */
   dataTxCount?: number;
   /** How many data blocks (app blocks) it carried; absent where undecodable. */
@@ -103,7 +103,10 @@ export interface ChannelSnapRow {
 }
 
 export interface DataBlockSummary {
+  /** The block's updates — 0 when `unread`, which a surface states as unread, never as 0. */
   updates: number;
+  /** The decoder could not read this block (review M3): its updates, kinds and signers are unknown. */
+  unread?: true;
   kinds: { kind: string; count: number }[];
   signers: number;
   bytes: number;

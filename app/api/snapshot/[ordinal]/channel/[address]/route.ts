@@ -58,7 +58,8 @@ async function fetchDeep(net: NetworkId, ordinal: number, address: string, snapO
       stateProof: d.stateProof,
       state: d.state,
       dataBlockSigners: d.dataBlockSigners,
-      dataTxCount: d.dataTxCount,
+      // The RAW pane's count is of the transactions it shows (`dataTx`), decoded ones only.
+      dataTxCount: d.dataTxDecoded,
       dataTx: d.dataTx,
       dataBytes: d.dataBytes,
     };
