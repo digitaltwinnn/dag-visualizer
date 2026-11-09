@@ -94,7 +94,13 @@ import { useFeedRead } from "@/components/useFeedRead";
 interface CalloutModel {
   /** The title is an id (a node's), set in the mono register ids wear everywhere else. */
   titleMono?: boolean;
+  /** The PANEL's subject: a change re-rolls its words (a live subject keys by its lane, so a
+   *  heartbeat does not). */
   key: string;
+  /** The ANCHOR's subject, exactly — the live block's hash, the live snapshot's ordinal — written to
+   *  `data-subject`; a change glides the standing label to it (`CalloutSync`, 2026-11-09). Absent:
+   *  the key. */
+  at?: string;
   eyebrow: string;
   title: string;
   /** `chip` is a second, separate fact beside the state — an age — never a clause after a dot. */
@@ -437,6 +443,7 @@ export default function SceneCallout() {
         // selectionKey applies to both live-advancing cards. A pin keys by ordinal: that IS
         // a new subject, and the replay is the acknowledgement.
         key: following ? `ms|${metaSnap.metaId}|live` : `ms|${metaSnap.metaId}|${metaSnap.ordinal}`,
+        at: `ms|${metaSnap.metaId}|${metaSnap.ordinal}`,
         eyebrow: "Metagraph snapshot",
         title: metaSnap.ordinal.toLocaleString(),
         // The state mark the global's label carries (user, 2026-10-18: "pinned is not shown on the
@@ -497,6 +504,7 @@ export default function SceneCallout() {
         // The live-lane key rule — see msModel above (the follow advances this ordinal ~every
         // tick; only a PIN is a new subject).
         key: following ? "gs|live" : `gs|${snap.data.ordinal}`,
+        at: `gs|${snap.data.ordinal}`,
         eyebrow: "Global snapshot",
         title: snap.data.ordinal.toLocaleString(),
         // The card's THIRD state, mirrored too (test pass, 2026-10-03): with the feed down the
@@ -573,6 +581,7 @@ export default function SceneCallout() {
         // The live-lane key rule (msModel above): while following the subject is THE LIVE BLOCK, so a
         // newer block re-points the label rather than replaying its entrance; a pin is a new subject.
         key: following ? "blk|live" : `blk|${block.chain}:${block.hash}`,
+        at: `blk|${block.chain}:${block.hash}`,
         eyebrow: "Transaction block",
         title: shortBlockHash(block.hash),
         titleMono: true,
@@ -597,6 +606,7 @@ export default function SceneCallout() {
         // The live-lane key rule (msModel): while following the subject is THE LIVE DATA BLOCK (the live
         // snapshot's first, 2026-11-08), so a new tick re-points the label; a pick is a new subject.
         key: following ? "db|live" : `db|${dataBlock.snap.metaId}:${dataBlock.snap.ordinal}:${dataBlock.index}`,
+        at: `db|${dataBlock.snap.metaId}:${dataBlock.snap.ordinal}:${dataBlock.index}`,
         eyebrow: "Data block",
         title: n > 0 ? `${dataBlock.index + 1} of ${n}` : `${dataBlock.index + 1}`,
         titleMono: true,
@@ -674,14 +684,15 @@ function CalloutMark({ m, id, multi, phone, onDismiss }: { m: Model; id: "callou
   return (
     <div
       id={id}
-      // Keyed by SUBJECT (user, 2026-09-05 — the leader was already drawn while the panel was
-      // still rolling in): a subject change remounts the whole wrapper, so the entrance
-      // choreography below (panel roll → leader draw → ring landing) replays as one unit, and
-      // CalloutSync's documented assumptions hold by construction — fresh `data-on="0"`, and a
-      // fresh element for its multi-leg ref cache. The animations are PAUSED until the Engine
-      // flips `data-on` (globals.css), so after a camera flight the entrance plays when the
-      // callout actually appears instead of finishing invisibly mid-flight.
-      key={m.key}
+      // NOT KEYED BY SUBJECT (user, 2026-11-09: "can we avoid the re-draw and animate it to its new
+      // location?"). From 2026-09-05 a subject change remounted the wrapper so the entrance (panel
+      // roll → leader draw → ring landing) replayed as one unit; now the wrapper stays, its subject
+      // rides `data-subject`, and the Engine decides (`CalloutSync`): a label standing on screen
+      // GLIDES its anchor to the new subject while only the panel's words re-roll (the panel keeps
+      // its own key); a label hidden at the change (a camera flight) has its entrance rewound, so it
+      // still draws in as one unit where it reappears. The animations are PAUSED until the Engine
+      // flips `data-on` (globals.css). React writes `data-on` only at mount.
+      data-subject={m.at ?? m.key}
       data-on="0"
       aria-hidden
       // The standoff and both of its factors, from their one home (`calloutPlacement.ts`) — the
@@ -695,7 +706,7 @@ function CalloutMark({ m, id, multi, phone, onDismiss }: { m: Model; id: "callou
         // A CASING IN THE GROUND'S COLOUR (2026-10-03): the ring wears its subject's hue and
         // lands on a block of that same hue — the Dor ring on Dor's lit bar read as nothing.
         // A thin ground-coloured line outside and inside it is what a map puts round a symbol.
-        className="co-tip absolute -translate-x-1/2 -translate-y-1/2 w-[9px] h-[9px] rounded-full border-[1.5px] [box-shadow:0_0_0_1.5px_color-mix(in_oklch,var(--background)_78%,transparent),inset_0_0_0_1px_color-mix(in_oklch,var(--background)_78%,transparent)]"
+        className="co-tip absolute -translate-x-1/2 -translate-y-1/2 w-[9px] h-[9px] rounded-full border-[1.5px] transition-[border-color] duration-(--tempo-roll) [box-shadow:0_0_0_1.5px_color-mix(in_oklch,var(--background)_78%,transparent),inset_0_0_0_1px_color-mix(in_oklch,var(--background)_78%,transparent)]"
         style={{ borderColor: m.ring }}
       />
       {/* Dashed leader from the anchor to the panel's near corner — the ordinal-label language,

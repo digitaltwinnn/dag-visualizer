@@ -8,6 +8,7 @@ import { calloutHangs, calloutPhonePlacement, calloutPlacement, CALLOUT_OFF_X, C
 import { R as GEO_R, LAND_H, latLonToVec3 } from "./domain/geoLayout";
 import { ledgerLens } from "@/src/data/ledgerStory";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
+import { glideMix } from "./domain/calloutGlide";
 import { calloutSubject, type CalloutSubject, type CalloutSubjectInput } from "./domain/calloutSubjects";
 import type { LedgerRegister } from "@/src/store/mode";
 import type { SceneCtx } from "./scene/SceneContext";
@@ -137,6 +138,21 @@ export class CalloutSync {
     // the global's bar is now one of the subjects `callout` itself may point at.
     const el = document.getElementById("callout");
     if (!el) return;
+    // A NEW SUBJECT ON A STANDING LABEL GLIDES (user, 2026-11-09 — `domain/calloutGlide.ts`): the
+    // wrapper is no longer remounted per subject; React writes the subject's exact identity to
+    // `data-subject`, and a change while the label is shown moves the anchor from where it stood. A
+    // change while it is hidden (a camera flight, a view switch) rewinds the entrance instead, so the
+    // label draws in at its new subject when it appears, as a fresh mount did.
+    const subj = el.dataset.subject ?? null;
+    if (subj !== this._subjKey) {
+      this._subjKey = subj;
+      this._ppIn = 0; // the panel's words changed: re-measure its reach now, not on the cadence
+      if (el.dataset.on === "1" && this._placedEl === el) {
+        this._glideAt = performance.now();
+        this._glideFromX = this._placedX;
+        this._glideFromY = this._placedY;
+      } else this._replayEntrance(el);
+    }
     const allowed =
       this.h.calloutAllowed() &&
       !this.h.transitionActive() &&
@@ -161,12 +177,33 @@ export class CalloutSync {
     // The multi-leader on a phone fans from the VERTICAL leader's panel end (user, 2026-10-08: a
     // hybrid node "should be multiple" spheres there too) — `_placePhone`'s own length, not the
     // diagonal standoff's corner.
+    // A glide the label is hidden through (the commit's flight began a frame after the change) ends,
+    // and the label draws in fresh where it reappears.
+    if (!on && this._glideAt >= 0) {
+      this._glideAt = -1;
+      this._replayEntrance(el);
+    }
     if (on) this._syncCalloutMulti(el, this._placedX, this._placedY, this._placedRect, this._placedFlip, this._placedDrop, phone ? this._ppLen : 0);
     else this._syncCalloutMulti(el, 0, 0, null, false, false, 0);
-    // Guard on the ELEMENT's own attribute, not a cached flag: React remounts the wrapper on a
-    // subject change (fresh data-on="0"), so a field would go stale exactly then.
+    // Guard on the ELEMENT's own attribute, not a cached flag: React mounts the wrapper fresh
+    // (data-on="0") whenever the label returns from absence, so a field would go stale exactly then.
     const flag = on ? "1" : "0";
     if (el.dataset.on !== flag) el.dataset.on = flag;
+  }
+
+  // The glide's state: the subject identity last seen, and when the running glide began (−1: none).
+  // It starts from `_placedX/_placedY`, the anchor as last drawn.
+  private _subjKey: string | null = null;
+  private _glideAt = -1;
+  private _glideFromX = 0;
+  private _glideFromY = 0;
+  private _placedEl: HTMLElement | null = null;
+
+  /** Rewind the label's entrance (panel roll, leader draw, ring landing) to its start: the CSS
+   *  animations hold paused while `data-on` is 0 (globals.css), so they play from the top when the
+   *  label is next shown. Event-time (a subject change), never per frame. */
+  private _replayEntrance(el: HTMLElement): void {
+    for (const a of el.getAnimations({ subtree: true })) if (a instanceof CSSAnimation) a.currentTime = 0;
   }
 
   // Where the last `_placeCallout` put its anchor — read back by the multi-leader, which draws
@@ -184,8 +221,16 @@ export class CalloutSync {
     if (v.z > -0.1) return false; // behind (or grazing) the camera plane
     v.applyMatrix4(this.h.ctx.camera.projectionMatrix); // view → NDC (w-divide included)
     const r = this.h.ctx.renderer.domElement.getBoundingClientRect();
-    const x = r.left + (v.x * 0.5 + 0.5) * r.width;
-    const y = r.top + (-v.y * 0.5 + 0.5) * r.height;
+    let x = r.left + (v.x * 0.5 + 0.5) * r.width;
+    let y = r.top + (-v.y * 0.5 + 0.5) * r.height;
+    // GLIDING: the label stands between where it was and its subject's anchor this frame (the target
+    // keeps moving with the scene, so the glide closes on it rather than on a stale point).
+    if (this._glideAt >= 0) {
+      const k = glideMix((performance.now() - this._glideAt) / 1000);
+      x = this._glideFromX + (x - this._glideFromX) * k;
+      y = this._glideFromY + (y - this._glideFromY) * k;
+      if (k >= 1) this._glideAt = -1;
+    }
     // Placement is `domain/calloutPlacement.ts` — the flip/drop rules and the panel's reach
     // live there with their test, and globals.css mirrors the geometry off the attributes
     // written below (guarded writes, like data-on).
@@ -234,6 +279,7 @@ export class CalloutSync {
       if (hang) el.dataset.hang = "";
       else delete el.dataset.hang;
     }
+    this._placedEl = el;
     this._placedX = x;
     this._placedY = y;
     this._placedRect = r;
@@ -286,6 +332,7 @@ export class CalloutSync {
         line.setAttribute(line.classList.contains("co-draw") ? "y1" : "y2", end);
       }
     }
+    this._placedEl = el;
     this._placedX = x;
     this._placedY = y;
     this._placedRect = r;
@@ -330,8 +377,8 @@ export class CalloutSync {
   // flip/drop the placement just decided), so the primary's leader and the sibling legs all
   // meet at one point and the beads read as peers.
   // The legs are STATIC children React renders once per wrapper mount, so the DOM refs are
-  // cached per element identity (a subject change remounts the wrapper — fresh element, fresh
-  // cache, every leg back at its hidden default) and the hidden steady state — most frames, in
+  // cached per element identity (a label returning from absence mounts a fresh wrapper — fresh
+  // cache, every leg back at its hidden default; a subject change keeps it) and the hidden steady state — most frames, in
   // every view — costs one flag check with NO DOM reads. querySelectorAll ran here per frame
   // before, on the !on path included (review, 2026-08-31 — rule-5 discipline applied to DOM).
   private _mlegHost: HTMLElement | null = null;

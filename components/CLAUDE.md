@@ -2371,9 +2371,22 @@ hued ticker, the anchor ring and the `.edge-spine`). The design rules the test c
 - **The entrance is a sequence: panel rolls in, THEN the leader draws panel→anchor, THEN the ring
   lands** (user, 2026-09-05 — the tie was fully drawn while the panel was still arriving). An
   SVG-mask ink line (`.co-draw`) eases its normalized dash offset so the dashes reveal without
-  crawling; the wrapper is keyed by subject so the choreography replays as one unit, and it's
-  PAUSED until the Engine's `data-on` — after a commit flight it plays at reveal, not invisibly
-  mid-flight. Clock is the panel's own (lag + rise, then --tempo-roll); reduced motion snaps it.
+  crawling, and it's PAUSED until the Engine's `data-on` — after a commit flight it plays at
+  reveal, not invisibly mid-flight. Clock is the panel's own (lag + rise, then --tempo-roll);
+  reduced motion snaps it.
+- **A label already standing GLIDES to a new subject** (user, 2026-11-09: "can we avoid the re-draw
+  and animate it to its new location? This happens in live mode for example, or when users swipes
+  left / right on the subject's card"). The wrapper is no longer keyed by subject (it was from
+  2026-09-05, so every change replayed the whole entrance): it carries the subject's exact identity in
+  `data-subject` (`CalloutModel.at` — a live snapshot's ordinal, a live block's hash, where the panel's
+  `key` says `live`), and `CalloutSync` answers a change by WHERE THE LABEL IS. Shown → the anchor
+  moves from its last drawn point to the new subject's over `domain/calloutGlide.ts` (0.65 s, the
+  odometer's clock, in-out cubic, closing on the moving target), the leader and ring carried with it,
+  the ring's hue easing, only the panel's words re-rolling (the panel keeps its `key`). Hidden (a
+  commit's camera flight, a view switch) → the entrance's CSS animations are rewound
+  (`getAnimations`, event-time) and play from the top when the label reappears; a glide the label is
+  hidden through ends the same way. Measured live: a pager step kept the element and the finished
+  leader draw and moved the anchor over ~0.6 s; a geo country step behind its flight drew in fresh.
 - **The phone declines it** (user, 2026-08-18). Co-location is the whole promise — the panel stands
   beside its subject and points at it — and a phone has no width to stand beside anything: the panel
   is a third of the viewport, so it lands ON the subject or over the dock, and the flip rule has no
