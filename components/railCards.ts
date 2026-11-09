@@ -11,7 +11,7 @@ import type { BlockSel, DataBlockSel, MetaSnapSel, PickDescriptor } from "@/src/
 import { REGISTER_MEASURES } from "@/src/data/ledgerMeasure";
 import { REGISTER_ICONS } from "@/components/icons";
 import type { LedgerRegister } from "@/src/store/mode";
-import { REGISTER_SEAT } from "@/src/store/mode";
+import { REGISTER_REST, REGISTER_SEAT } from "@/src/store/mode";
 import type { NoteResponse } from "@/src/data/noteTypes";
 // LADDERS is plain DATA (the domain focus-ladder rung tables) — importing it keeps this module
 // data-only; CohortSel rides along type-only (the store mirrors the same import).
@@ -192,8 +192,7 @@ export function focusSlotId(s: LadderState): string | null {
     // the network selection's card is the CONTEXT dossier (user, 2026-08-14: a filter
     // commit focuses the metagraph card, not whatever snapshot the follow pinned).
     const id = slot === "network" ? "context" : slot;
-    // WHERE A REGISTER SEATS ITS OWN SUBJECT THE FILTER IS A LENS, NOT THE BOX — every register since
-    // 2026-11-09, when Metagraph snapshots took its live snapshot as its seat (user, 2026-11-08:
+    // WHERE A REGISTER SEATS ITS OWN SUBJECT THE FILTER IS A LENS, NOT THE BOX (user, 2026-11-08:
     // "filter on DOR, transaction blocks, live → the right card rung layout breaks" — the Metagraph
     // dossier opened as the box, 550px tall, and pushed the register's own subject, the live block,
     // out of the rail). The seated card stays the box while the filter's network card stands folded
@@ -204,10 +203,11 @@ export function focusSlotId(s: LadderState): string | null {
   }
   // Nothing chosen: the note (R70) — in every register too (user, 2026-11-09: "each sub-view should
   // do the same"; the 2026-11-08 rule that sat the register's own card ahead of it is retired) —
-  // else the register's seat (off mainnet, no note: the card the note would fold onto), else the
-  // finest present slot.
+  // else the card under the register's note (`REGISTER_REST`: the card the note folds onto, the
+  // subject the callout names meanwhile), else the finest present slot.
   if (present.includes(NOTES_SLOT)) return NOTES_SLOT;
-  if (seat && present.includes(seat)) return seat;
+  const rest = s.mode === "ledger" ? REGISTER_REST[s.ledgerRegister ?? "snapshots"] : null;
+  if (rest && present.includes(rest)) return rest;
   return present[present.length - 1];
 }
 

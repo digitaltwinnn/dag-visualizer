@@ -1181,14 +1181,16 @@ nor anywhere in the view since 2026-11-08 (above). **A REGISTER OPENS ON ITS NOT
 FOLDS ONTO ITS SEAT** (user, 2026-11-09: "Each view opens on the Gate AI cards, each sub-view should
 do the same. The 'default' callout should be a 'metagraph snapshot' | 'transaction block' | 'data
 block', when we close the AI card … the actual called out subject should be shown" — superseding
-2026-11-08's "transaction block is the best card to open when we enter this view/mode"). Each
-register's live follow seats its own subject (`REGISTER_SEAT`, `src/store/mode.ts`: the newest
-metagraph snapshot, the newest block, the live snapshot's first data block); a register switch is an
-ENTRY like a view's (Inspector counts it as one, so `overridesOnViewEntry` pins the note open); the
-note is the box while nothing is chosen (`focusSlotId`) and the callout names the seat meanwhile
-(`calloutSubject`'s rest rule); the note's − opens the card under it (`overridesOnNoteFold`, the
-focus the lane has without its note — `useLadderFocus(true)`), so the callout and the box never
-disagree. The store's `setLedgerRegister` drops the tick's rank on the way in, so a Global snapshot
+2026-11-08's "transaction block is the best card to open when we enter this view/mode"; then, the
+same day: "changed my mind, for view-mode metagraph snapshots and data blocks the default callout when
+AI cards is shown should be the global snapshot"). The card under the note is `REGISTER_REST`
+(`src/store/mode.ts`): the GLOBAL SNAPSHOT in Metagraph snapshots and Data blocks, the live BLOCK in
+Transaction blocks. A register switch is an ENTRY like a view's (Inspector counts it as one, so
+`overridesOnViewEntry` pins the note open); the note is the box while nothing is chosen
+(`focusSlotId`) and the callout names the rest card meanwhile (`calloutSubject`'s rest rule); the
+note's − opens the card under it (`overridesOnNoteFold`, the focus the lane has without its note —
+`useLadderFocus(true)`), so the callout and the box never disagree. `REGISTER_SEAT` stays what the
+live follow seats (the block, the data block) and the lens-proof box under a filter. The store's `setLedgerRegister` drops the tick's rank on the way in, so a Global snapshot
 card carried in is not the card under the note. A block is a sibling subject of the
 tick, not the snapshot's child — so **its ghost has a step of its
 own** (`railSiblings.blockStep`, 2026-11-07, user: "when clicked nothing happens"): the shown tick's
@@ -1276,8 +1278,8 @@ snapshot's first data block (`railSiblings.dataBlockStep`), its pager the snapsh
 (`siblingSet("dataBlock")`), **and LIVE seats it** (user, 2026-11-08: "entering data blocks, open the
 data block card"): the register's follow rides the live snapshot's FIRST data block through the
 non-bumping `advanceDataBlock`, as Transaction blocks rides its newest block, so the Data block card
-is the register's seat, the card its note folds onto — `REGISTER_SEAT` (`src/store/mode.ts`) is the one
-home of which subject a register seats; a reader's step to another block holds, and a release re-seats on the
+is the register's seat (`REGISTER_SEAT`, `src/store/mode.ts`, the one home of which subject a register's
+live follow seats; the card under the note is the global snapshot's, `REGISTER_REST`); a reader's step to another block holds, and a release re-seats on the
 next beat, the live block's own rule.
 **The Global snapshot CARD's body opens with the register's section too** (user: "work on the global snapshot body also"):
 `inspector/SnapshotRegister.tsx` (the design round's picks, data 1 / transaction 1) —

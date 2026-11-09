@@ -10,13 +10,16 @@ export type Mode = "hyper" | "geo" | "ledger" | "trend" | "soon";
 // a type import back into the store would close a cycle. The store re-exports it.
 export type LedgerRegister = "snapshots" | "blocks" | "data";
 
-/** THE SUBJECT A REGISTER SEATS BY ITSELF — the card slot its live follow fills and the callout
- *  names while the AI note is the box: the Metagraph snapshots register's live METAGRAPH SNAPSHOT
- *  (the newest read tick's newest), the Blocks register's live block, the Data blocks register's live
- *  data block (the live snapshot's first). Every register is ENTERED ON ITS NOTE, as every view is
- *  (user, 2026-11-09: "Each view opens on the Gate AI cards, each sub-view should do the same. The
- *  'default' callout should be a 'metagraph snapshot' | 'transaction block' | 'data block', when we
- *  close the AI card … the actual called out subject should be shown"): the seat is the card that
- *  opens when the note folds. One home for the store (a tick's rank drops on the way in), the
- *  rail's focus (`focusSlotId` — the filter is a lens beside a seat) and the live follow. */
-export const REGISTER_SEAT: Readonly<Record<LedgerRegister, "metaSnap" | "block" | "dataBlock">> = { snapshots: "metaSnap", blocks: "block", data: "dataBlock" };
+/** THE SUBJECT A REGISTER'S LIVE FOLLOW SEATS BY ITSELF — the Blocks register's live block, the Data
+ *  blocks register's live data block (the live snapshot's first). Metagraph snapshots seats none of
+ *  its own: its live global and snapshot are the plain follow's. A seat is a LENS-PROOF card: under
+ *  a network filter it stays the box below the filter's folded Metagraph card (`focusSlotId`). */
+export const REGISTER_SEAT: Readonly<Record<LedgerRegister, "block" | "dataBlock" | null>> = { snapshots: null, blocks: "block", data: "dataBlock" };
+
+/** THE CARD UNDER A REGISTER'S AI NOTE — the subject the callout names while the note is the box and
+ *  the card folding the note opens (user, 2026-11-09: "the 'default' callout should be a … 'transaction
+ *  block' …", then "changed my mind, for view-mode metagraph snapshots and data blocks the default
+ *  callout when AI cards is shown should be the global snapshot"): the global snapshot in Metagraph
+ *  snapshots and Data blocks, the live block in Transaction blocks (no global is drawn there, D3).
+ *  One home for `focusSlotId`'s rest and `calloutSubject`'s rest rule, so the two never disagree. */
+export const REGISTER_REST: Readonly<Record<LedgerRegister, "snap" | "block">> = { snapshots: "snap", blocks: "block", data: "snap" };

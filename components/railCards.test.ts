@@ -272,10 +272,11 @@ describe("the block slot", () => {
     expect(focusSlotId({ ...blocks({ snap: snapPick, block, noteAbsent: true }), selStack: [] })).toBe("block");
     // A card the reader picked still wins.
     expect(focusSlotId({ ...blocks({ snap: snapPick, block, noteAbsent: false }), selStack: ["snap"] })).toBe("snap");
-    // Metagraph snapshots' seat is its live metagraph snapshot.
+    // Metagraph snapshots' (and Data blocks') card under the note is the GLOBAL snapshot (user,
+    // 2026-11-09: "changed my mind … should be the global snapshot"), a live snapshot under it or not.
     const metaSnap = { metaId: "dor", ordinal: 5, hash: "", globalOrdinal: 42, ts: "t" };
     expect(focusSlotId({ ...details({ mode: "ledger", snap: snapPick, metaSnap, noteAbsent: false }), selStack: [] })).toBe("notes");
-    expect(focusSlotId({ ...details({ mode: "ledger", snap: snapPick, metaSnap, noteAbsent: true }), selStack: [] })).toBe("metaSnap");
+    expect(focusSlotId({ ...details({ mode: "ledger", snap: snapPick, metaSnap, noteAbsent: true }), selStack: [] })).toBe("snap");
   });
   it("a network committed INSIDE the tick is the reader's choice, never a lens: its card is the box over the seat", () => {
     const metaSnap = { metaId: "dor", ordinal: 5, hash: "", globalOrdinal: 42, ts: "t" };
@@ -470,8 +471,9 @@ describe("focusSlotId — the focus rung both rails read", () => {
     expect(
       focusSlotId({ ...details({ mode: "ledger", filter: "dag", snap: snapPick, inspect: nodePick }), selStack: ["node", "snap"] }),
     ).toBe("snap");
-    // …and with no recency data, the finest present slot wins (the old rule): here the filter's card.
-    expect(focusSlotId(details({ mode: "ledger", filter: "dag", snap: snapPick, inspect: nodePick }))).toBe("context");
+    // …and with no recency data, the register's REST card (`REGISTER_REST`, 2026-11-09: the global
+    // snapshot in Metagraph snapshots), not the finest present slot — the card the note folds onto.
+    expect(focusSlotId(details({ mode: "ledger", filter: "dag", snap: snapPick, inspect: nodePick }))).toBe("snap");
   });
   it("a filter commit focuses the CONTEXT dossier over a follow-pinned snapshot (2026-08-14)", () => {
     // The user's gesture was the network; the snap/metaSnap pins arrived from the live follow

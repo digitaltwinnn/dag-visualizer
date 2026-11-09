@@ -155,7 +155,7 @@ scope from the table.
    click semantics → `domain/pickActions.ts`, the unlisted network → `src/data/unlisted.ts`, the stage
    light → `scene/objects/StageLight.ts`. Don't grow a second copy in the Engine or a component.
 9. **The scene↔HUD hover pairing is sacrosanct.** The shared store channels (`hoverFilter`,
-   `hoverNodeId`, `hoverSnapOrd`, `hoverMetaSnap`, `hoverCountry`, `hoverCohort`, `hoverNoteDay`),
+   `hoverNodeId`, `hoverSnapOrd`, `hoverMetaSnap`, `hoverBlock`, `hoverDataBlock`, `hoverCountry`, `hoverCohort`, `hoverNoteDay`),
    `.subject-paired`
    and the marker classes survive every refactor. Hovers preview, never commit. **A surface hovers the
    subject it would COMMIT** — `hoverSnapOrd` is a global tick, `hoverMetaSnap` one metagraph

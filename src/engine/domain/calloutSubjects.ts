@@ -13,11 +13,12 @@ import type { LedgerRegister } from "@/src/store/mode";
 // snapshot card's bar, the Metagraph snapshot card's tile, the Transaction block's place, the Data
 // block's mark on its tile, the Metagraph card's lane (else, with no lane, the snapshot inside it,
 // else the global). With no subject card open (the note is the box, or none is), the register's
-// OWN subject, its seat (user, 2026-11-09: "the 'default' callout should be a 'metagraph snapshot' |
-// 'transaction block' | 'data block'" — the card the note folds onto, `REGISTER_SEAT`): the live
-// metagraph snapshot, block or data block; else the snapshot, else the global (never in Transaction
-// blocks, where the live global is not drawn, D3), else the lane. The pair's second label
-// (2026-10-03, the global under the snapshot) is retired.
+// REST card (`REGISTER_REST` — the card the note folds onto; user, 2026-11-09, after a morning on the
+// register's own subject: "for view-mode metagraph snapshots and data blocks the default callout when
+// AI cards is shown should be the global snapshot"): the live block in Transaction blocks (the live
+// global is not drawn there, D3), else the snapshot, else the lane; the global snapshot in the other
+// two, else the snapshot, else the lane. The pair's second label (2026-10-03, the global under the
+// snapshot) is retired.
 
 export type CalloutSubject = "global" | "block" | "dataBlock" | "metaSnap" | "lane" | null;
 
@@ -44,8 +45,7 @@ export function calloutSubject(i: CalloutSubjectInput): CalloutSubject {
     case "dataBlock": if (i.register === "data" && i.hasDataBlock) return "dataBlock"; break;
     case "context": return i.lane ? "lane" : i.hasMetaSnap ? "metaSnap" : global;
   }
-  // No subject card open: the register's own subject, then up its ladder.
-  if (inBlocks && i.hasBlock) return "block";
-  if (i.register === "data" && i.hasDataBlock) return "dataBlock";
-  return i.hasMetaSnap ? "metaSnap" : (global ?? (i.lane ? "lane" : null));
+  // No subject card open: the register's rest card, then the nearest rung that stands.
+  if (inBlocks) return i.hasBlock ? "block" : i.hasMetaSnap ? "metaSnap" : i.lane ? "lane" : null;
+  return global ?? (i.hasMetaSnap ? "metaSnap" : i.lane ? "lane" : null);
 }
