@@ -1105,15 +1105,15 @@ Transaction blocks — so the register's own half says which state its subject i
 SUBJECT** (user, same day: "its subject is metagraph snapshots, count those instead of global, same
 for data blocks"): the metagraph snapshots the source's ticks anchored (the feed's per-tick count,
 "333 snapshots"), the data blocks their exact reads carry (`dataStats.dataBlocksInWindow`, a labelled
-floor "77+ data blocks" while reads are landing — rule 10), the window's blocks ("52 blocks"). **On a phone three full names do not fit one row**: each half shows its glyph and span, the
-lit half alone its name (each keeps it as its accessible name), with tighter padding there — measured
-at 390: 349px with "Metagraph snapshots" lit, 334 with "Transaction blocks", 281 with "Data blocks",
-inside the 16px gutters. **With a pinned stretch the UNLIT halves say WHEN alone** (D7, measured: the
-full "9 min, 1d ago" on both snapshot halves ran the switch to 370px, past the gutters): on the phone
-an unlit half states its short span — "1d ago" for a pinned stretch, "reading…" / "read failed" for
-a read state, a live span unchanged (`ledgerSpan`'s `short`, one rule for every half) — and the lit
-half keeps the full words; measured at 390 with a pin 1 day back: 320px (Metagraph snapshots lit),
-252 (Data blocks), 335 (Transaction blocks). The glyphs are `REGISTER_ICONS` (Data blocks wears `Database`: the metagraph
+floor "77+ data blocks" while reads are landing — rule 10), the window's blocks ("52 blocks"). **On a phone the switch is ONE FACE with ‹ › either side** (user, 2026-11-08, option A of the
+brainstorm's `phone-register-switch.html` — the phone view switch's own grammar one row down): three
+halves never fit 360px (from D6 to then the unlit ones were cut to a glyph and a short span and still
+crowded the row), so the face carries the lit register WHOLE — glyph, name, live / pinned, the clock
+span and the count, the desktop half's exact content — and the chevrons step the registers in the
+view's order through the one door, dimmed at an end, the view face's own chevron (`TopBar`'s
+`viewChevron`: 24px box, 16px muted glyph, `TOUCH_HIT`), the name sliding in from the side it came
+from. No pip row: the view face retired its pips for the chevrons (user, 2026-10-18: "has both … the
+<> is more intuitive"). Both presentations stay in the DOM and CSS picks at 700px. The glyphs are `REGISTER_ICONS` (Data blocks wears `Database`: the metagraph
 kind "data" wears `Blocks`, the transaction block's own mark). The span words are
 `src/data/ledgerSpan.ts`'s, the ONE home the explorer's foot reads too
 (`ledgerSpan.test.ts`), and the Transaction blocks half reads the block window from every register

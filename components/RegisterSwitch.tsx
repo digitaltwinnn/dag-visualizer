@@ -1,7 +1,7 @@
 "use client";
 
-import { Clock } from "lucide-react";
-import { useSyncExternalStore } from "react";
+import { ChevronLeft, ChevronRight, Clock } from "lucide-react";
+import { useState, useSyncExternalStore } from "react";
 import { REGISTER_ICONS } from "@/components/icons";
 import { REGISTER_NAMES } from "@/components/views";
 import { useFeedRead } from "@/components/useFeedRead";
@@ -16,7 +16,7 @@ import type { LedgerRegister } from "@/src/store/mode";
 import { switchLedgerRegister } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
-import { cn } from "@/lib/utils";
+import { cn, TOUCH_HIT } from "@/lib/utils";
 import { StateMark } from "@/components/state/StateAtoms";
 
 // THE REGISTER SWITCH, ON THE SCENE (D3, user 2026-11-07 — option A of
@@ -70,6 +70,10 @@ export default function RegisterSwitch() {
   const blocks = useSyncExternalStore(onBlockWindow, getBlockWindow, () => null);
   // The live block window's span runs to NOW (its silence since the newest block tick is part of it).
   const now = useNowTick(30_000);
+  // WHERE THE PHONE FACE'S NAME ARRIVES FROM — the view face's own rule (TopBar's `faceSlide`): a ›
+  // brings the next register in from the right, ‹ from the left, keyed by the register it was armed
+  // for, so a switch from anywhere else (the desktop grid, a footer link) rolls in plainly.
+  const [slide, setSlide] = useState<{ to: LedgerRegister; from: "left" | "right" } | null>(null);
   if (!on) return null;
 
   // The Data blocks register reads the Metagraph snapshots register's own source (the live buffer or
@@ -108,35 +112,96 @@ export default function RegisterSwitch() {
     blocks: countFigure(blockCount),
     data: reading ? null : countFigure(data.count, data.read < data.total),
   };
-  // The phone's short form for an UNLIT half (`ledgerSpan`'s `SpanOpts`): a pinned stretch by when
-  // alone, a read state in one word — measured, the full words ran the switch past the gutters.
-  const shortSpan = spans(true, true);
+  // ON A PHONE: ONE FACE, ‹ › EITHER SIDE (user, 2026-11-08, option A of
+  // `.superpowers/brainstorm/…/phone-register-switch.html` — the phone view switch's own grammar one
+  // row down). Three halves never fit 360px: the unlit ones were cut to a glyph and a short span and
+  // still crowded the row. The face carries the lit register whole — glyph, name, live / pinned, the
+  // clock span and the count, the desktop half's exact content — and the chevrons step the registers
+  // in the view's order through the one door, dimmed at an end (the plank's rule, never vanishing).
+  // No pip row: the view face retired its pips for the chevrons (user, 2026-10-18: "has both … the
+  // <> is more intuitive"), and this is that control.
+  const at = registers.indexOf(register);
+  const step = (dir: -1 | 1) => {
+    const to = registers[at + dir];
+    if (!to) return;
+    setSlide({ to, from: dir === 1 ? "right" : "left" });
+    switchLedgerRegister(to);
+  };
+  const slideFrom = slide && slide.to === register ? slide.from : null;
+  const chevron = (dir: -1 | 1) => {
+    const to = registers[at + dir];
+    const Glyph = dir === -1 ? ChevronLeft : ChevronRight;
+    return (
+      <button
+        type="button"
+        disabled={!to}
+        aria-label={to ? REGISTER_NAMES[to] : dir === -1 ? "First register" : "Last register"}
+        onClick={() => step(dir)}
+        className={cn(
+          // The view face's chevron exactly (TopBar's `viewChevron`): a 24px box, a 16px muted glyph,
+          // dimmed at an end, `TOUCH_HIT`'s invisible pad for a thumb, flush to the face.
+          "inline-flex items-center justify-center size-6 flex-none rounded-btn bg-transparent border-0 cursor-pointer",
+          "text-muted-foreground hover:text-foreground hover:bg-wash-soft",
+          "disabled:opacity-30 disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-muted-foreground",
+          "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
+          TOUCH_HIT,
+        )}
+      >
+        <Glyph aria-hidden className="size-4" />
+      </button>
+    );
+  };
+  const LitIcon = REGISTER_ICONS[register];
+  // The scene's glass (`SCENE_GLASS`'s ground and blur), as a control — both presentations wear it.
+  const FRAME = "rounded-lg border border-border bg-[var(--panel-solid)] backdrop-blur-[8px]";
 
   return (
     <div
       // A marker contract: the callout's free band starts under it (`ChromeBounds.sceneTop`).
       id="register-switch"
-      role="group"
-      aria-label="Register"
       data-on={phase ? "0" : "1"}
       style={{ top: "calc(var(--rail-top) + var(--topbar-extra, 0px))", height: REGISTER_SWITCH_H }}
       className={cn(
-        // The scene's glass (`SCENE_GLASS`'s ground and blur), as a control: one frame around the
-        // halves, the lit half in the selection fill and ring — the view switch's own on-state.
-        // EQUAL halves as wide as the widest one's content (implicit `1fr` columns keep their
-        // content minimum, and the frame sizes to content), one per register the row offers.
-        // ON A PHONE three full names do not fit one row (user, D6: "glyph + span per half, the full
-        // name on the lit half only"), so each half sizes to its own content there and only the lit
-        // half names itself; the others keep their glyph and span — and their accessible name.
-        // Measured at 390 (D6): with the longest name lit ("Metagraph snapshots") the desktop padding ran
-        // the frame to 392px; the phone's tighter padding holds it to ~350, inside the 16px gutters.
-        // With a PINNED stretch on the snapshot halves (D7, measured): 370px, so on the phone an unlit
-        // half states its short span ("1d ago", "reading…") and the lit half keeps the full one.
-        "absolute left-1/2 z-[5] -translate-x-1/2 w-max grid grid-flow-col auto-cols-fr max-[700px]:auto-cols-auto gap-1 p-1 max-[700px]:gap-0.5 max-[700px]:p-0.5",
-        "rounded-lg border border-border bg-[var(--panel-solid)] backdrop-blur-[8px]",
+        "absolute left-1/2 z-[5] -translate-x-1/2 w-max",
         "transition-opacity duration-200 data-[on='0']:opacity-0 data-[on='0']:pointer-events-none motion-reduce:transition-none",
       )}
     >
+      {/* THE PHONE FACE (option A): the lit register whole, ‹ › stepping the others. CSS picks the
+          presentation, both stay in the DOM (the view switch's precedent). */}
+      <div role="group" aria-label="Register" className={cn("hidden max-[700px]:flex h-full items-center gap-0.5 px-1", FRAME)}>
+        {chevron(-1)}
+        <div
+          key={register}
+          className={cn(
+            "flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md bg-[var(--sel-bg)] text-primary-ink",
+            slideFrom ? cn("animate-in fade-in duration-300 motion-reduce:animate-none", slideFrom === "right" ? "slide-in-from-right-4" : "slide-in-from-left-4") : "roll-in",
+          )}
+        >
+          <span className="flex items-center justify-center gap-1.5 text-body font-semibold leading-none whitespace-nowrap">
+            <LitIcon aria-hidden className="size-3.5 flex-none text-primary" />
+            {REGISTER_NAMES[register]}
+            <StateMark following={following} className="pl-1 font-normal" />
+          </span>
+          <span className="flex items-center justify-center gap-1 font-mono text-label leading-none tabular-nums whitespace-nowrap text-foreground">
+            <Clock aria-hidden className="size-3 flex-none opacity-80" />
+            <span aria-hidden>{bareSpan[register]}</span>
+            {figure[register] && (
+              <span aria-hidden className="ml-2 inline-flex items-center gap-1 text-primary">
+                <LitIcon aria-hidden className="size-3 flex-none opacity-80" />
+                {figure[register]}
+              </span>
+            )}
+            {/* The readings in words for assistive tech (the desktop half's own accessible name). */}
+            <span className="sr-only">{count[register] ? `${span[register]}, ${count[register]}` : span[register]}</span>
+          </span>
+        </div>
+        {chevron(1)}
+      </div>
+
+      {/* FROM 700px UP: the segmented control, one half per register. EQUAL halves as wide as the
+          widest one's content (implicit `1fr` columns keep their content minimum, and the frame sizes
+          to content); the lit half in the selection fill — the view switch's own on-state. */}
+      <div role="group" aria-label="Register" className={cn("max-[700px]:hidden h-full grid grid-flow-col auto-cols-fr gap-1 p-1", FRAME)}>
       {registers.map((r) => {
         const Icon = REGISTER_ICONS[r];
         const lit = register === r;
@@ -153,7 +218,7 @@ export default function RegisterSwitch() {
               // ring — with its name and count in the accent and its span in the foreground ink.
               // CENTRED (user, 2026-11-08: "centre 'metagraph snapshots' / 'transaction blocks' … and the section
               // below as well"): both lines sit on the half's own axis.
-              "group flex flex-col items-center justify-center gap-0.5 rounded-md px-3 max-[700px]:px-1.5 text-center cursor-pointer border-0",
+              "group flex flex-col items-center justify-center gap-0.5 rounded-md px-3 text-center cursor-pointer border-0",
               "bg-transparent text-muted-foreground hover:text-foreground hover:bg-wash-soft",
               "aria-pressed:bg-[var(--sel-bg)] aria-pressed:text-primary-ink aria-pressed:hover:bg-[var(--sel-bg)]",
               "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
@@ -161,30 +226,30 @@ export default function RegisterSwitch() {
           >
             <span className="flex items-center justify-center gap-1.5 text-body font-semibold leading-none whitespace-nowrap">
               <Icon aria-hidden className="size-3.5 flex-none group-aria-pressed:text-primary" />
-              <span className="max-[700px]:hidden max-[700px]:group-aria-pressed:inline">{REGISTER_NAMES[r]}</span>
+              <span>{REGISTER_NAMES[r]}</span>
               {/* THE MARK'S ROOM IS RESERVED ON EVERY HALF (user, 2026-11-08: the control's width shifted "a
                   bit because of live indicator"): the halves are equal columns as wide as the widest, so a
                   mark only the lit half rendered moved the whole frame with each switch. An unlit half
-                  carries it invisible; the phone's unlit half, which hides its name, hides it too. */}
-              <StateMark following={following} className={cn("pl-1 font-normal", !lit && "invisible max-[700px]:hidden")} />
+                  carries it invisible. */}
+              <StateMark following={following} className={cn("pl-1 font-normal", !lit && "invisible")} />
             </span>
             <span className="flex items-center justify-center gap-1 font-mono text-label leading-none tabular-nums whitespace-nowrap opacity-75 group-aria-pressed:opacity-100 group-aria-pressed:text-foreground">
               {/* TWO GLYPHED READINGS, NO DIVIDER (option A, 2026-11-08): the clock says "the last", the
                   register's glyph says what is counted; a gap parts them (a typed `|` read as text,
                   and a hairline rule vanished on the glass). */}
               <Clock aria-hidden className="size-3 flex-none opacity-80" />
-              <span className="max-[700px]:hidden max-[700px]:group-aria-pressed:inline">{bareSpan[r]}</span>
+              <span>{bareSpan[r]}</span>
               {figure[r] && (
-                <span className="max-[700px]:hidden ml-2 inline-flex items-center gap-1 group-aria-pressed:text-primary">
+                <span className="ml-2 inline-flex items-center gap-1 group-aria-pressed:text-primary">
                   <Icon aria-hidden className="size-3 flex-none opacity-80" />
                   {figure[r]}
                 </span>
               )}
-              <span className="hidden max-[700px]:inline max-[700px]:group-aria-pressed:hidden">{shortSpan[r]}</span>
             </span>
           </button>
         );
       })}
+      </div>
     </div>
   );
 }
