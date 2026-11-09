@@ -582,15 +582,16 @@ export default function SceneCallout() {
                 }
               : {
                   // WHO AND HOW MANY (user, 2026-11-09: "can we say x metagraphs anchored y snapshots?"):
-                  // the metagraphs come from the exact read, so until it lands the count stands alone
-                  // (rule 10 — no guessed number of metagraphs).
+                  // the metagraphs come from the exact read, so until it lands the lead says it is
+                  // READING (same day: "shows two texts after each other, say 'loading' instead of
+                  // the 1st") — the Data blocks lead's own wording, never a guessed count (rule 10).
                   text:
                     total === 0
                       ? "No metagraph anchored"
                       : exact
                         ? `${exact.channels} ${exact.channels === 1 ? "metagraph" : "metagraphs"} anchored ${total} ${total === 1 ? "snapshot" : "snapshots"}`
-                        : `${total} metagraph ${total === 1 ? "snapshot" : "snapshots"}`,
-                  chip: exact ? fmtKB(exact.totalSizeKB) : undefined,
+                        : "Reading which metagraphs anchored",
+                  chip: exact && total !== 0 ? fmtKB(exact.totalSizeKB) : undefined,
                 },
       };
     };

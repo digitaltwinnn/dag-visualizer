@@ -152,6 +152,21 @@ export default function RegisterSwitch() {
       </button>
     );
   };
+  // TWO GLYPHED READINGS, NO DIVIDER (option A, 2026-11-08): the clock says "the last", the register's
+  // glyph says what is counted; a gap parts them. NOT COLOUR-CODED (user, 2026-11-09): the count reads
+  // in the row's own ink, as the span beside it.
+  const readings = (r: LedgerRegister, Icon: (typeof REGISTER_ICONS)[LedgerRegister]) => (
+    <>
+      <Clock aria-hidden className="size-3 flex-none opacity-80" />
+      <span>{bareSpan[r]}</span>
+      {figure[r] && (
+        <span className="ml-2 inline-flex items-center gap-1">
+          <Icon aria-hidden className="size-3 flex-none opacity-80" />
+          {figure[r]}
+        </span>
+      )}
+    </>
+  );
   const LitIcon = REGISTER_ICONS[register];
   // The scene's glass (`SCENE_GLASS`'s ground and blur), as a control — both presentations wear it.
   const FRAME = "rounded-lg border border-border bg-[var(--panel-solid)] backdrop-blur-[8px]";
@@ -179,7 +194,7 @@ export default function RegisterSwitch() {
           id={register}
           from={slideFrom}
           clipClassName="px-2 py-1"
-          className="flex flex-col items-center justify-center gap-0.5"
+          className="flex flex-col items-center justify-center gap-1"
         >
           <span className="flex items-center justify-center gap-1.5 text-body font-semibold leading-none whitespace-nowrap text-foreground">
             <LitIcon aria-hidden className="size-3.5 flex-none text-primary" />
@@ -223,7 +238,7 @@ export default function RegisterSwitch() {
               // ring — with its name and count in the accent and its span in the foreground ink.
               // CENTRED (user, 2026-11-08: "centre 'metagraph snapshots' / 'transaction blocks' … and the section
               // below as well"): both lines sit on the half's own axis.
-              "group flex flex-col items-center justify-center gap-0.5 rounded-md px-3 text-center cursor-pointer border-0",
+              "group flex flex-col items-center justify-center rounded-md px-3 text-center cursor-pointer border-0",
               "bg-transparent text-muted-foreground hover:text-foreground hover:bg-wash-soft",
               "aria-pressed:bg-[var(--sel-bg)] aria-pressed:text-primary-ink aria-pressed:hover:bg-[var(--sel-bg)]",
               "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
@@ -233,28 +248,23 @@ export default function RegisterSwitch() {
               <Icon aria-hidden className="size-3.5 flex-none group-aria-pressed:text-primary" />
               <span>{REGISTER_NAMES[r]}</span>
             </span>
-            <span className="flex items-center justify-center gap-1 font-mono text-label leading-none tabular-nums whitespace-nowrap opacity-75 group-aria-pressed:opacity-100 group-aria-pressed:text-foreground">
-              {/* TWO GLYPHED READINGS, NO DIVIDER (option A, 2026-11-08): the clock says "the last", the
-                  register's glyph says what is counted; a gap parts them (a typed `|` read as text,
-                  and a hairline rule vanished on the glass). */}
-              <Clock aria-hidden className="size-3 flex-none opacity-80" />
-              <span>{bareSpan[r]}</span>
-              {figure[r] && (
-                // NOT COLOUR-CODED (user, 2026-11-09: "don't color-code the middle element when the mode is
-                // selected"): the count reads in the row's own ink, as the span beside it.
-                <span className="ml-2 inline-flex items-center gap-1">
-                  <Icon aria-hidden className="size-3 flex-none opacity-80" />
-                  {figure[r]}
-                </span>
-              )}
-              {/* THE STATE IS THE ROW'S THIRD COLUMN (user, 2026-11-09: "Move the live / pinned indicator
-                  in the view-mode control to the bottom row, so a 3rd column there"): the name line
-                  carries the name alone. Its room is reserved on every half (2026-11-08: the control's
-                  width shifted "a bit because of live indicator"), an unlit half carrying it invisible. */}
-              {/* ON THE ROW'S LINE (2026-11-09: "the bottom row elements are not properly aligned"): the
-                  mark's word sat on its own 17px line box beside the readings' 12px one, so it rode
-                  low; `leading-none` puts all four on one line. */}
-              <StateMark following={following} className={cn("ml-2 font-sans leading-none", !lit && "invisible")} />
+            {/* THE READINGS ROW (user, 2026-11-09: "give bottom section some margin; it almost touches the
+                title; if live mode (3rd column) is not applicable (mode not selected) have the 2 columns
+                centered instead of 3"). Two layers in one grid cell: an invisible SIZER holding all
+                three columns — so every half is as wide as its widest form and the control never moves
+                (2026-11-08: its width shifted "a bit because of live indicator") — and the visible row,
+                centred over it, with the state mark on the lit half only. */}
+            <span className="mt-1 grid font-mono text-label leading-none tabular-nums whitespace-nowrap">
+              <span aria-hidden className="invisible [grid-area:1/1] flex items-center gap-1">
+                {readings(r, Icon)}
+                <StateMark following={following} className="ml-2 font-sans leading-none" />
+              </span>
+              <span className="[grid-area:1/1] justify-self-center flex items-center gap-1 opacity-75 group-aria-pressed:opacity-100 group-aria-pressed:text-foreground">
+                {readings(r, Icon)}
+                {/* THE STATE IS THE ROW'S THIRD COLUMN, on the lit half only (user, 2026-11-09), on the
+                    row's line (`leading-none`: its 17px line box rode low beside the readings). */}
+                {lit && <StateMark following={following} className="ml-2 font-sans leading-none" />}
+              </span>
             </span>
           </button>
         );
