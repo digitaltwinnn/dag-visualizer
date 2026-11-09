@@ -103,7 +103,7 @@ growing: a mechanical purity classifier was tried and rejected (its regex matche
 TEST-ONLY helpers shared by sibling tests (never imported by app code) and sits outside the scan,
 which reads `src/data/*.ts` only.
 
-Eighteen narrower boundary tests work the same way: `components/feedReadBoundary.test.ts` (every HUD read of a feed's data holds that feed, so the pulse strip's "in use here" is measured, not declared — `src/data/feedUse.ts`), `components/unlistedBoundary.test.ts` (the `"unlisted"`
+Nineteen narrower boundary tests work the same way: `components/cardHoverBoundary.test.ts` (every rail subject card pairs on its own subject's hover channel, never a parent's — convention 9), `components/feedReadBoundary.test.ts` (every HUD read of a feed's data holds that feed, so the pulse strip's "in use here" is measured, not declared — `src/data/feedUse.ts`), `components/unlistedBoundary.test.ts` (the `"unlisted"`
 id literal has exactly two homes), `components/railLadderBoundary.test.ts` (every committable focus
 rung maps to a hinted rail card slot), `components/railTierBoundary.test.ts` (`data-focus` has two
 homes and the slab's geometry — the pager included — keys on `data-tier`),
@@ -139,8 +139,8 @@ import the tune contract or tweakpane, so a look stays a plain constant and its 
 `components/touchTierBoundary.test.ts` (the touch tier has ONE query — a coarse pointer on the
 phone or tablet tier — named once by the stylesheet's `touch:` variant and once by `useTouch`, and
 no utility rides Tailwind's pointer-only variant: a touch laptop's desktop rail is a mouse layout).
-`ls **/*Boundary.test.ts` is the live count: nineteen files, of which
-`components/selectionBoundary.test.ts` is rule 2's and the other eighteen are these.
+`ls **/*Boundary.test.ts` is the live count: twenty files, of which
+`components/selectionBoundary.test.ts` is rule 2's and the other nineteen are these.
 
 Each of these files opens with a header comment giving the rationale, the scope and every exemption
 with its reason. **That header is the rule's authoritative statement** — read it rather than inferring
@@ -161,7 +161,9 @@ scope from the table.
    subject it would COMMIT** — `hoverSnapOrd` is a global tick, `hoverMetaSnap` one metagraph
    snapshot (keyed by `metaSnapHoverKey(metaId, ordinal)`), so the anchor-log row, the explorer's leaf
    row and the scene's tile all ride `hoverMetaSnap`: a row is a snapshot, not its tick, and the tick
-   channel would light every band of the anchoring global.
+   channel would light every band of the anchoring global. A data block rides `hoverDataBlock`
+   (2026-11-09), lighting its snapshot's data mark, never the tile; every subject card's channel is
+   pinned by `components/cardHoverBoundary.test.ts`.
 10. **Honesty over decoration.** Every visual quantity comes from live data; absent data is an
     instrument state (NO SIGNAL / acquiring / standby), never a fabricated number; floors are labelled
     floors. Don't "fix" an honest gap.
