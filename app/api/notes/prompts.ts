@@ -144,7 +144,11 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
   blocks: {
     // WHAT THE BLOCKS CARRIED, NOT THE HEIGHT (user, 2026-11-09: a technical confirmation is "of no
     // use to the reader; focus on the core message"): a block exists to carry transfers.
-    question: "What has the block DAG been doing? This note does not lead with what changed, whatever the rules above say: the facts hold no earlier figure, so never say anything rose or fell. Say how many blocks were accepted over the recent hours and the transfers they carried, the DAG's first, as \"the DAG accepted N blocks carrying M transfers\", then each network's token blocks the same way. A block carries transfers: never call a block a snapshot or a transfer.",
+    // THE DAG IS THE ACTOR, NEVER "THE BLOCK DAG" (user, 2026-11-09: "the block DAG accepted 123
+    // blocks … sounds strange"): the subject label said "the block DAG" and the model made it the
+    // sentence's subject. The label is the blocks now, and the question names the DAG as the one
+    // that accepts them, a network's token blocks the same way.
+    question: "How many transaction blocks were accepted, and what did they carry? This note does not lead with what changed, whatever the rules above say: the facts hold no earlier figure, so never say anything rose or fell. Say how many transaction blocks the DAG accepted over the range and the transfers they carried, first, as \"the DAG accepted N transaction blocks carrying M transfers\", then each network's token blocks the same way, as \"<network>'s token blocks carried M transfers in N blocks\" or your own plain words with the network as the actor. Never write \"the block DAG\". A block carries transfers: never call a block a snapshot or a transfer.",
     system: (subjectLabel) => `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${PROMPTS.blocks.question}`,
   },
   // THE DATA BLOCKS (the Snapshots view's Data blocks register, 2026-11-07): the live window, read

@@ -618,7 +618,7 @@ describe("the block DAG's note", () => {
     expect(v("DAG transfers")).toBe(30);
     expect(v("USDC.dag token transfers")).toBe(10);
     expect(v("Span length")).toBe(86_400);
-    expect(out.label).toBe("the block DAG");
+    expect(out.label).toBe("transaction blocks");
     expect(out.subjectName).toBeUndefined();
     expect(out.lead).toEqual({ kind: "now" });
     expect([out.spanFrom, out.spanTo]).toEqual([top - 24 * H, top]);

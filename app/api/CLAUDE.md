@@ -178,7 +178,10 @@ them — but the Next Node server can.
   read makes the sum a floor; counted, never their amount, since the tokens are not one unit). It
   states no open tips (design round D5, 2026-11-07) and NO DAG HEIGHT (user, 2026-11-09,
   `NOTES_VERSION` 76: a technical confirmation "of no use to the reader; focus on the core message" —
-  the live height read, `notes/dagHeight.ts`, is deleted); no measured block series is no note. **The
+  the live height read, `notes/dagHeight.ts`, is deleted); no measured block series is no note. Its
+  Subject is "transaction blocks" and its actor the DAG — "the DAG accepted N transaction blocks
+  carrying M transfers", never "the block DAG", which the model echoed from the old label as the
+  sentence's subject (user, 2026-11-09: "sounds strange"; `NOTES_VERSION` 80). **The
   same round's rule for every note: each sentence is a finding** — VOICE forbids describing the view
   or confirming what was counted or read, the data blocks' facts state their read count only when a
   read is missing (the floor's label), and Hypergraph names a network that started or stopped only

@@ -473,7 +473,9 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
   // series History's Blocks measure draws — and the transfers they carried (`g.tx` / `m.<id>.tx`).
   blocks: {
     accepts: (_net, subject, span) => span === "hours" && subject === "all",
-    label: () => "the block DAG",
+    // The blocks, not "the block DAG": the label is the prompt's Subject, and the model echoed it as
+    // the sentence's actor (user, 2026-11-09). The DAG accepts them, as the question says.
+    label: () => "transaction blocks",
     whole: () => true,
     async read({ net, nowMs, reads, names }) {
       const toMs = Math.floor(nowMs / H) * H;

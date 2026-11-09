@@ -194,18 +194,21 @@ describe("PROMPTS", () => {
       expect(PROMPTS[view].system("x", undefined, kind)).not.toMatch(/—|\s[–-]\s/);
   });
 
-  it("asks the block DAG its own question, in the ledger's voice: blocks and what they carried — never tips or height", () => {
+  it("asks the Transaction blocks note its own question, in the ledger's voice: blocks and what they carried — never tips or height", () => {
     const q = PROMPTS.blocks.question;
     // Open tips left every surface (design round D5, 2026-11-07), and the height is no news to a
     // reader (user, 2026-11-09): the facts hold neither to ask after.
     expect(q).not.toMatch(/\btips?\b|frontier|height/i);
     expect(q).toMatch(/carrying M transfers/);
-    expect(q).toMatch(/^What has the block DAG been doing\?/);
+    expect(q).toMatch(/^How many transaction blocks were accepted, and what did they carry\?/);
+    // The DAG is the actor; "the block DAG" read strangely as a subject (user, 2026-11-09).
+    expect(q).toContain('"the DAG accepted N transaction blocks carrying M transfers"');
+    expect(q).toContain('Never write "the block DAG".');
     // No earlier figure exists in its facts, so it says out loud it does not lead with change.
     expect(q).toMatch(/does not lead with what changed/);
     expect(q).not.toMatch(/\d/);
     expect(q).not.toMatch(/\btick|machine|fleet/i);
-    expect(PROMPTS.blocks.system("the block DAG")).toContain("Subject: the block DAG.");
+    expect(PROMPTS.blocks.system("transaction blocks")).toContain("Subject: transaction blocks.");
     expect(PROMPTS.blocks.questions).toBeUndefined();
     expect(spanWords("blocks", "hours", 0, 1)).toBe("the last 24 hours");
     expect(spanBeforeWords("blocks", "hours")).toBeNull();
