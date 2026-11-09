@@ -156,6 +156,14 @@ describe("siblingSet — cohort (provider) rung", () => {
       cohortToggleActions({ cc: "de", city: "Berlin", isp: "AWS" }, { cohort, hasInspect: false }),
     );
   });
+  // User, 2026-11-09: swiping the provider with a node held emptied the Metagraph card above it.
+  it("with a node held, a step carries a node of the new provider, the provider committed last", () => {
+    const set = siblingSet("cohort", base({ mode: "geo", country: "de", cohort, inspect: deA.pick }))!;
+    expect(set.items[1]!.actions).toEqual([
+      { kind: "inspect", pick: deC.pick },
+      { kind: "cohort", sel: { cc: "de", city: "Berlin", isp: "AWS" } },
+    ]);
+  });
 });
 
 describe("siblingSet — composition rung (hyper)", () => {

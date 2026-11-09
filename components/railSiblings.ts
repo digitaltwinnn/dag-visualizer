@@ -40,7 +40,9 @@ import type {
 } from "@/src/data/types";
 import {
   type ClickAction,
+  cohortStepActions,
   cohortToggleActions,
+  countryStepActions,
   compositionToggleActions,
   countryToggleActions,
   railNetActions,
@@ -181,20 +183,38 @@ function finish(
 // lives once (review fix, 2026-09-11: the pair had already begun to drift — the node key's
 // fallback differed between the two copies).
 
-const countryItem = (c: CountryStat, s: SiblingState): SiblingStep => ({
-  key: c.cc,
-  label: c.country,
-  actions: countryToggleActions(c.cc, { country: s.country, hasInspect: !!s.inspect, cohort: s.cohort }),
-});
+// THE NODE A STEP CARRIES (user, 2026-11-09 — `pickActions.cohortStepActions`): with a node held, a
+// provider or country step lands on a node of the new scope so the Metagraph card above it keeps a
+// subject — the held node's network where the scope has one, else the scope's first node. Only the
+// sibling SET carries: a parent's first-child step (`childStep`) opens a rung with nothing held below.
+const carryIn = (s: SiblingState, groups: readonly Cohort[]): { pick: PickDescriptor; cohort: Cohort } | null => {
+  if (!s.inspect) return null;
+  const net = pickNetId(s.inspect);
+  for (const g of groups) for (const r of g.rows) if (net && pickNetId(r.pick) === net) return { pick: r.pick, cohort: g };
+  const g = groups.find((x) => x.rows.length > 0);
+  return g ? { pick: g.rows[0]!.pick, cohort: g } : null;
+};
 
-const cohortItem = (cc: string, g: Cohort, s: SiblingState): SiblingStep => ({
-  key: `${cc}|${g.city}|${g.isp}`,
-  label: cohortLabel(g),
-  actions: cohortToggleActions(
-    { cc, city: g.city, isp: g.isp },
-    { cohort: s.cohort, hasInspect: !!s.inspect },
-  ),
-});
+const countryItem = (c: CountryStat, s: SiblingState, carry = false): SiblingStep => {
+  const hit = carry ? carryIn(s, cohortsIn(s, c.cc)) : null;
+  return {
+    key: c.cc,
+    label: c.country,
+    actions: hit
+      ? countryStepActions(c.cc, { country: s.country, hasInspect: !!s.inspect, cohort: s.cohort }, { pick: hit.pick, cohort: { cc: c.cc, city: hit.cohort.city, isp: hit.cohort.isp } })
+      : countryToggleActions(c.cc, { country: s.country, hasInspect: !!s.inspect, cohort: s.cohort }),
+  };
+};
+
+const cohortItem = (cc: string, g: Cohort, s: SiblingState, carry = false): SiblingStep => {
+  const sel = { cc, city: g.city, isp: g.isp };
+  const hit = carry ? carryIn(s, [g]) : null;
+  return {
+    key: `${cc}|${g.city}|${g.isp}`,
+    label: cohortLabel(g),
+    actions: hit ? cohortStepActions(sel, { cohort: s.cohort, hasInspect: !!s.inspect }, hit.pick) : cohortToggleActions(sel, { cohort: s.cohort, hasInspect: !!s.inspect }),
+  };
+};
 
 const compositionItem = (g: CompGroup, s: SiblingState): SiblingStep => ({
   key: g.key,
@@ -342,7 +362,7 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
     case "country": {
       if (!s.country) return null;
       const cs = countriesOf(s);
-      const items = cs.map((c) => countryItem(c, s));
+      const items = cs.map((c) => countryItem(c, s, c.cc !== s.country));
       return finish(slot, items, cs.findIndex((c) => c.cc === s.country), networkLabel(s));
     }
 
@@ -350,8 +370,8 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
       if (!s.cohort) return null;
       const cc = s.cohort.cc;
       const groups = cohortsIn(s, cc);
-      const items = groups.map((g) => cohortItem(cc, g, s));
       const index = groups.findIndex((g) => sameCohort(s.cohort, { cc, city: g.city, isp: g.isp }));
+      const items = groups.map((g, i) => cohortItem(cc, g, s, i !== index));
       const parent = s.countries.find((c) => c.cc === cc)?.country ?? cc;
       return finish(slot, items, index, parent);
     }

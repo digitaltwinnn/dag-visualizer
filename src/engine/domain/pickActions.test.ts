@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
-import { blockInPlace, metaSnapClearActions, netKeyOf, tickNetSelectActions, tickNetClearActions, viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, countryClearActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, trendPlaneActions, railNetActions, noteCohortActions, noteDayActions, snapshotClearActions, blockSelectActions, blockClearActions, blockFollowActions, dataBlockSelectActions, dataBlockClearActions, sameDataBlock, registerSwitchActions, globalPick, tickContextOf, type ClickAction } from "./pickActions";
+import { blockInPlace, metaSnapClearActions, netKeyOf, tickNetSelectActions, tickNetClearActions, viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, countryClearActions, cohortStepActions, countryStepActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, trendPlaneActions, railNetActions, noteCohortActions, noteDayActions, snapshotClearActions, blockSelectActions, blockClearActions, blockFollowActions, dataBlockSelectActions, dataBlockClearActions, sameDataBlock, registerSwitchActions, globalPick, tickContextOf, type ClickAction } from "./pickActions";
 import { finerLevels } from "./focusLadder";
 import { METAGRAPHS } from "@/src/net/current";
 import type { PickDescriptor, MetaSnapSel, BlockSel } from "@/src/data/types";
@@ -414,6 +414,24 @@ describe("filterToggleActions (the remaining rail interaction)", () => {
 });
 
 const CO = { cc: "DE", city: "Falkenstein", isp: "Hetzner" };
+
+// User, 2026-11-09: "provider card, swipe it, metagraph content drops and it becomes a ghost".
+describe("cohortStepActions / countryStepActions — a pager step carries the held node", () => {
+  const pick = { kind: "l0", title: "n" } as unknown as PickDescriptor;
+  it("with a node held: the carried node first, the swiped rung LAST (it keeps the box)", () => {
+    expect(cohortStepActions(CO, { cohort: null, hasInspect: true }, pick)).toEqual([{ kind: "inspect", pick }, { kind: "cohort", sel: CO }]);
+    expect(countryStepActions("fr", { country: "de", hasInspect: true, cohort: CO }, { pick, cohort: { cc: "fr", city: "Paris", isp: "OVH" } })).toEqual([
+      { kind: "inspect", pick },
+      { kind: "cohort", sel: { cc: "fr", city: "Paris", isp: "OVH" } },
+      { kind: "country", cc: "fr" },
+    ]);
+  });
+  it("with nothing held, or nothing to carry: the plain toggle", () => {
+    expect(cohortStepActions(CO, { cohort: null, hasInspect: false }, pick)).toEqual(cohortToggleActions(CO, { cohort: null, hasInspect: false }));
+    expect(cohortStepActions(CO, { cohort: null, hasInspect: true }, null)).toEqual(cohortToggleActions(CO, { cohort: null, hasInspect: true }));
+    expect(countryStepActions("fr", { country: "de", hasInspect: false, cohort: null }, null)).toEqual(countryToggleActions("fr", { country: "de", hasInspect: false, cohort: null }));
+  });
+});
 
 describe("cohortToggleActions — the provider/cohort rung toggle (spec Part 4)", () => {
   it("commits the cohort, dropping a selected node first (zoom-level rule)", () => {

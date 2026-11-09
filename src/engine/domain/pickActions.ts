@@ -169,6 +169,25 @@ export function cohortToggleActions(
   return acts;
 }
 
+/** A PAGER STEP CARRIES THE NODE (user, 2026-11-09: "provider card, swipe it, metagraph content drops
+ *  and it becomes a ghost at the bottom"). In Geography the Metagraph card is the held NODE's network,
+ *  so a provider or country step that released the node emptied the card above it. With a node held
+ *  the step commits `carry` (a node of the new scope, its cohort with it for a country step) and the
+ *  swiped rung LAST, so that rung keeps the box; with none it is the plain toggle. A step is never the
+ *  same subject (the pager steps away), so it never toggles off. */
+export function cohortStepActions(c: CohortSel, current: { cohort: CohortSel | null; hasInspect: boolean }, carry: PickDescriptor | null): ClickAction[] {
+  if (!current.hasInspect || !carry) return cohortToggleActions(c, current);
+  return [{ kind: "inspect", pick: carry }, { kind: "cohort", sel: c }];
+}
+export function countryStepActions(
+  cc: string,
+  current: { country: string | null; hasInspect: boolean; cohort: CohortSel | null },
+  carry: { pick: PickDescriptor; cohort: CohortSel } | null,
+): ClickAction[] {
+  if (!current.hasInspect || !carry) return countryToggleActions(cc, current);
+  return [{ kind: "inspect", pick: carry.pick }, { kind: "cohort", sel: carry.cohort }, { kind: "country", cc }];
+}
+
 /** THE AI CARD'S PROVIDER ROW (user, 2026-10-31): the cohort rung's toggle, for a row that names a
  *  provider rather than sitting under a drilled country, so it brings its country along. The node
  *  goes first, as `cohortToggleActions`; the country before its cohort, which hangs under it. */
