@@ -61,15 +61,25 @@ export function sparkPoints(
  *  lowest measured point on the floor, the highest on the ceiling; a moment whose points are all
  *  equal sits flat across the middle. A point measured alone between two gaps has no segment, so
  *  it is drawn as a dot of its own (`dots`) rather than silently vanishing. */
+export interface SparkGeometry {
+  path: string;
+  peak: { x: number; y: number } | null;
+  dots: { x: number; y: number }[];
+}
+
 export function sparkGeometry(
   points: readonly (number | null)[],
   w: number,
   h: number,
-): { path: string; peak: { x: number; y: number } | null; dots: { x: number; y: number }[] } {
+  /** A SHARED SCALE, for two lines drawn as one (the Range card's in-range and context parts,
+   *  `rangeSpark.ts`): they stretch against the whole frame, while the peak stays this line's own. */
+  scale?: { lo: number; hi: number },
+): SparkGeometry {
   const vals = points.filter((v): v is number => v != null);
   if (!vals.length) return { path: "", peak: null, dots: [] };
-  const lo = Math.min(...vals);
-  const hi = Math.max(...vals);
+  const top = Math.max(...vals);
+  const lo = scale?.lo ?? Math.min(...vals);
+  const hi = scale?.hi ?? top;
   const x = (i: number) => (points.length > 1 ? (i / (points.length - 1)) * w : w / 2);
   const y = (v: number) => (hi === lo ? h / 2 : h - ((v - lo) / (hi - lo)) * h);
   const r = (n: number) => Math.round(n * 100) / 100;
@@ -82,7 +92,7 @@ export function sparkGeometry(
     const py = r(y(v));
     path += `${i > 0 && points[i - 1] != null ? "L" : "M"}${px},${py}`;
     if ((i === 0 || points[i - 1] == null) && (i === points.length - 1 || points[i + 1] == null)) dots.push({ x: px, y: py });
-    if (peak == null && v === hi) peak = { x: px, y: py };
+    if (peak == null && v === top) peak = { x: px, y: py };
   });
   return { path, peak, dots };
 }

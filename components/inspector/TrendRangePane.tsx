@@ -5,8 +5,8 @@ import { RANGE_ICON } from "@/components/icons";
 import CardHead, { RailPane } from "@/components/CardHead";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { Fact, FactGroup, QualifierChip } from "@/components/inspector/parts";
-import Stamp from "@/components/Stamp";
 import RecordsDoor from "@/components/inspector/RecordsDoor";
+import RangeSpark from "@/components/inspector/RangeSpark";
 import NoteKindChip from "@/components/notes/NoteKindChip";
 import SubjectNote from "@/components/notes/SubjectNote";
 import { notableDayOfRange } from "@/components/notes/noteDays";
@@ -29,7 +29,7 @@ import { useStore } from "@/src/store/store";
 // and the × clears the range through its setter (a setting's, exactly as the timeline's × does).
 //
 // The card says three things and nothing else: WHICH span (the title, in the explorer's own span
-// words — `spanPhrase`), what that span was TO THE NETWORK ABOVE (a brushed range's own Gate AI
+// words — `spanPhrase` — and drawn on its frame by the hairline), what that span was TO THE NETWORK ABOVE (a brushed range's own Gate AI
 // note, `SubjectNote`, in the lead's place — the measured one-sentence lead it replaced went on
 // 2026-10-30, user: "no fallback"), and the door to its records. The per-network breakdown is
 // deliberately absent: the Networks list in the left rail already IS that list over this span.
@@ -91,10 +91,9 @@ export default function TrendRangePane({
   // "keep the N months ago on the range").
   const endAge = span ? Date.now() - span.toMs : null;
   const aside = endAge == null ? undefined : endAge < stepMs ? "until now" : `${ageWords(endAge)} ago`;
-  // THE SPAN'S OWN ROWS (user, 2026-10-07: "Start and end date should be in the card I think for
-  // clarity"): a span of two days or more is named by its UTC days, with the year (a day-only label
-  // is a UTC day); a shorter one by its clock times, drawn by `Stamp` with the zone as a tag.
-  const longSpan = span ? span.toMs - span.fromMs >= 2 * 86_400_000 : false;
+  // THE SPAN'S START AND END (user, 2026-10-07: "Start and end date should be in the card I think
+  // for clarity") are DRAWN since 2026-11-09 (design H, `RangeSpark`): the dates under the range's
+  // two ends on the subject's own line, the Moment's hairline.
   // THE EXPLORER'S OWN FIGURE, AS A ROW (user, 2026-10-25: "add one line to the range card saying
   // the average per day — basically the exact same figure that is shown in the explorer bottom
   // section"): the subject row's `head` from the ONE roster pass the Networks list reads, in the
@@ -104,8 +103,6 @@ export default function TrendRangePane({
   // the latest full day (the roster's `headKind`), exactly as the list's then is.
   const headRow = subject ? rows.get(subject) : roster.total;
   const headValue = headRow?.head ?? null;
-  const edge = (ms: number) =>
-    longSpan ? new Date(ms).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" }) : <Stamp ms={ms} />;
 
   // AN EMPTY SPAN SAYS SO (rule 10; review 2026-10-30): the note's `none` renders nothing, so with
   // no figure either the card would state nothing at all. Only once the read has landed.
@@ -145,11 +142,10 @@ export default function TrendRangePane({
               pill, always (`rangeCardNoteReq`; user, 2026-10-30) — on the plane the deck stands on
               (`cardNetwork`), asked as it lands. */}
           <SubjectNote req={rangeCardNoteReq(cardNetwork(filter, focus, front), range, windowId)} />
+          {/* START AND END, DRAWN (user, 2026-11-09, design H): the subject's line around the range,
+              the range bolder and its dates under its ends — the Moment's own hairline. */}
+          <RangeSpark metric={metric} filter={filter} subject={subject} span={span} />
           <FactGroup>
-            <Fact label="Start">{edge(span.fromMs)}</Fact>
-            {/* The end is exclusive, so a day-named span names the day it reaches into. A trailing
-                window ends now, and says so rather than printing a clock that drifts each poll. */}
-            <Fact label="End">{range ? edge(longSpan ? span.toMs - 1 : span.toMs) : "now"}</Fact>
             <Fact label="Length">{ageWords(span.toMs - span.fromMs)}</Fact>
             {headValue != null ? (
               <Fact label={spanWord(metric)}>
