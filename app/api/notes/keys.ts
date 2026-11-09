@@ -98,7 +98,7 @@ export const KIND_TIMING: Record<NoteKind, { refreshMs: number | null; ttlS: num
   hyper: { refreshMs: 24 * H, ttlS: 72 * 3600 },
   geo: { refreshMs: 24 * H, ttlS: 72 * 3600 },
   ledger: { refreshMs: H, ttlS: 6 * 3600 },
-  // The chamber's other register keeps its clock: a day of blocks and the DAG's height as it stands.
+  // The chamber's other register keeps its clock: a day of blocks and the transfers they carried.
   blocks: { refreshMs: H, ttlS: 6 * 3600 },
   // The data blocks' note keeps the same clock: the chamber's third register, one hour, one read.
   data: { refreshMs: H, ttlS: 6 * 3600 },

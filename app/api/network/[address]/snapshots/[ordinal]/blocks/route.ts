@@ -13,7 +13,9 @@ import { cachedL0Url, getJson } from "../../../../metaL0";
 // `hash: ""`. Served for the same addresses the snapshots route serves (catalog + unlisted list).
 // The snapshot is immutable, so the answer caches for a day.
 
-export const maxDuration = 15;
+// Above the reads' own timeouts in sequence — the L0 URL (6 s), the snapshot (8 s), the explorer's
+// block hashes (6 s) — so a slow chain answers the route's own 503, never a platform 504 (review M7).
+export const maxDuration = 25;
 
 async function fetchBlocks(net: NetworkId, address: string, ordinal: number) {
   const l0 = await cachedL0Url(net, address);

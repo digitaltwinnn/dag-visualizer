@@ -165,7 +165,6 @@ carrying data the plain follow stands. **Live in the Blocks register follows the
 accepting global through the non-bumping `advanceBlock` / `advanceSnap`, never from a window read for
 another network or around a pin (pinned by `src/store/followFlow.test.ts`). Pinned by `blockWindow.test.ts` and `blockStats.test.ts`.
 
-**A block's parents come only from a FULL READ** of the snapshot that accepted it
 **The exact row carries the state's SHAPE and the dL1 signers too** (`stateKeys`, `dataBlockSigners`;
 2026-11-07, user: "'decompress this snapshot', is it still needed?" — no: the decoder had both, so
 the metagraph snapshot card states its State tab, Data tab and dL1 signer count off the row and its
@@ -174,8 +173,12 @@ payload alone, read on arrival there. **And ONE SUMMARY PER DATA BLOCK** (`Chann
 `DataBlockSummary`: updates by kind — `payloadKinds`' mechanical names, "records" for a flat record —
 dL1 signers, bytes, and a sha256 DIGEST the decoder takes over the block's bytes, never called a hash
 since the chain publishes none; `snapshot-exact-v10`): the Data block card reads it, so no surface
-reads deep for a data block.
+reads deep for a data block. **A data block the decoder cannot read is UNREAD** (`unread: true`,
+review M3, 2026-11-09; `snapshot-exact-v11`): its snapshot's `dataTxCount` is absent (unknown), so
+every sum of data updates and the register switch's data-block count read that tick as unread, never
+a 0.
 
+**A block's parents come only from a FULL READ** of the snapshot that accepted it
 (`blockReads.ts`, `components/BlockReadsBridge.tsx`): one read per block-bearing snapshot in the
 window, newest first, `WINDOW_READ_POOL` (8) in flight with no gap (user, 2026-11-07: "do the exact
 reads need to be sequential?" — the paced one-per-450 ms queue took ~23 s over a 52-tick window) —

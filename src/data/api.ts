@@ -84,7 +84,7 @@ const FEEDS = {
   exact: { label: "Snapshot reads", everyMs: null, when: "per snapshot", tempoMs: POLL.pollMs },
   // The Blocks register's reads — its trail (/api/blocks/trail) and the block-bearing snapshots' full
   // reads: read only while the Snapshots view is shown (either register: the switch states the Blocks
-  // span) or the Briefing runs, the trail refreshed at the live edge every 30 s in Transaction blocks
+  // span), the trail refreshed at the live edge every 30 s in Transaction blocks
   // and every 5 min in the other registers (`blockRefreshMs`; the tempo below is the fast one, for
   // the lane order alone), so it has no cadence of its own to go STALE on. Nothing polls beside it (the per-chain frontier read left with the open
   // tips, D5 2026-11-07).

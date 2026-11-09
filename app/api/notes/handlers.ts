@@ -53,7 +53,8 @@ const CAP_TTL_S = 2 * 86_400;
  *  Gate attempts at their 20 s timeout plus its reads and row lookups, so 210 s leaves it room to finish. */
 export const WARM_BUDGET_MS = 210_000;
 /** Paced for the paid model, whose calls take under 3 s and which never refused three at once in the
- *  trial (2026-11-01): the whole set of 122 notes fills in one pass (121 until the block DAG's joined, 2026-11-06). */
+ *  trial (2026-11-01): the whole set of 123 notes fills in one pass (122 until the data blocks' joined, 2026-11-07; 121
+ *  until the block DAG's, 2026-11-06). */
 export const WARM_CONCURRENCY = 3;
 export const WARM_SPACING_MS = 500;
 

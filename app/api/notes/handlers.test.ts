@@ -342,12 +342,12 @@ describe("the warm budget leaves the worst item room inside maxDuration 300 s", 
     expect(WARM_BUDGET_MS + WARM_SPACING_MS + 2 * 20_000).toBeLessThan(300_000);
   });
 
-  it("is paced for the paid model: a cold store of 122 notes fills in one pass", () => {
+  it("is paced for the paid model: a cold store of 123 notes fills in one pass", () => {
     expect(WARM_SPACING_MS).toBe(500);
     expect(WARM_CONCURRENCY).toBe(3);
     const secondsAWrite = 2.7; // measured on the model, 2026-11-01
     const callsAPass = Math.min(WARM_BUDGET_MS / WARM_SPACING_MS, (WARM_BUDGET_MS / 1000 / secondsAWrite) * WARM_CONCURRENCY);
-    expect(callsAPass).toBeGreaterThan(122 * 1.3); // a third of the notes take a second attempt
+    expect(callsAPass).toBeGreaterThan(123 * 1.3); // a third of the notes take a second attempt
   });
 });
 
