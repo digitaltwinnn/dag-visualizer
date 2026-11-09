@@ -184,7 +184,10 @@ window, newest first, `WINDOW_READ_POOL` (8) in flight with no gap (user, 2026-1
 reads need to be sequential?" — the paced one-per-450 ms queue took ~23 s over a 52-tick window) —
 the DAG's through the chamber's own exact read (`ensureMany`, mirrored into `store.blockReads`), a
 token chain's through the metagraph blocks route — pruned with the window. The exact-read queue asks EVERY window tick (`wantedExactReads`), a token-only tick too, so
-every bar on the trail is measured. A read carries each transfer (`BlockRead.transfers`: from, to,
+every bar on the trail is measured — and the bounded exact cache never evicts a HELD window's ordinal
+(`blockReads.exactEvictions` over `pastWindow.heldOrdinals`, review I3 2026-11-09: it dropped the lowest
+ordinals, which a window's ticks always are, so its bars decayed to a block-only floor within half an
+hour, and nothing re-asked). A read carries each transfer (`BlockRead.transfers`: from, to,
 amount, fee) beside the totals; MOVED sums the read's own `amount` (the decoder's transfer sum), so a
 read cached before `transfers` was carried still counts (review M4). A failed read is a MISS (`blockReadMiss`, rule 10: blocks with no links, never invented
 ones); a DAG miss is displayed but never excluded, so a DAG ordinal is always re-asked of
