@@ -10,9 +10,9 @@ import { tickerOf } from "@/components/explorer/nodeRow";
 import { openSnapshotRecord } from "@/components/trendDoors";
 import { useFeedRead } from "@/components/useFeedRead";
 import { subjectPairing } from "@/components/useSubjectPairing";
-import { metaSnapHoverKey } from "@/src/data/types";
+import { dataBlockHoverKey } from "@/src/data/types";
 import { SIGNER_GROUPS, metagraphById } from "@/src/data/network";
-import { fmtKB, midHash } from "@/src/util/format";
+import { fmtKB, midHash, shortBlockHash } from "@/src/util/format";
 import { identityHudCss } from "@/src/palette/identity";
 import { useStore } from "@/src/store/store";
 
@@ -31,20 +31,22 @@ export default function DataBlockPane({ onClose, collapsed, onToggle }: { onClos
   useFeedRead(["exact"], "DataBlockPane");
   const sel = useStore((s) => s.dataBlock);
   const exact = useStore((s) => (s.dataBlock ? s.snapshotExact[s.dataBlock.snap.globalOrdinal] : undefined));
-  const hoverMetaSnap = useStore((s) => s.hoverMetaSnap);
-  const setHoverMetaSnap = useStore((s) => s.setHoverMetaSnap);
+  const hoverDataBlock = useStore((s) => s.hoverDataBlock);
+  const setHoverDataBlock = useStore((s) => s.setHoverDataBlock);
   const pulseKey = useEdgePulse(sel ? `${sel.snap.metaId}:${sel.snap.ordinal}:${sel.index}` : null);
   if (!sel) return null;
 
   const { snap, index } = sel;
   const hue = identityHudCss(snap.metaId);
   const unit = metagraphById(snap.metaId)?.ticker ?? tickerOf(snap.metaId);
-  // The card lights its snapshot's tile and rows: a data block is read on its snapshot's channel.
-  const pair = subjectPairing<string>(hoverMetaSnap, metaSnapHoverKey(snap.metaId, snap.ordinal), setHoverMetaSnap, hue);
+  // THE CARD HOVERS ITS OWN SUBJECT (user, 2026-11-09: "hover on 'data block' card but metagraph
+  // snapshot gets the hover; fix structurally"): the data block's channel, which lights the data
+  // mark on its snapshot's tile — the snapshot's own tile and card answer `hoverMetaSnap` alone.
+  // `components/cardHoverBoundary.test.ts` holds every subject card to its own channel.
+  const pair = subjectPairing<string>(hoverDataBlock, dataBlockHoverKey(snap.metaId, snap.ordinal, index), setHoverDataBlock, hue);
   const row = exact?.rows.find((r) => r.metaId === snap.metaId && r.ordinal === snap.ordinal) ?? null;
   const rows = row?.dataBlockRows ?? [];
   const b = rows[index] ?? null;
-  const n = rows.length;
 
   return (
     <RailPane
@@ -62,7 +64,12 @@ export default function DataBlockPane({ onClose, collapsed, onToggle }: { onClos
         title={
           <span className="inline-flex items-center gap-2 min-w-0 max-w-full">
             <DATA_ICON aria-hidden className={KIND_MARK_CLASS} style={{ color: hue } as CSSProperties} />
-            <span className="truncate font-mono tabular-nums">{n > 0 ? `${index + 1} of ${n}` : `${index + 1}`}</span>
+            {/* ITS ID, as every snapshot and block card heads with its own (user, 2026-11-09: "says '1 of
+                1', unlike a metagraph snapshot or global snapshot that says the id; use id"): the
+                digest over its bytes, short — the chain publishes no hash for a data block, so the
+                foot names it a digest. Its place in the snapshot is the pager's. Before the row
+                lands, the place stands in. */}
+            <span className="truncate font-mono tabular-nums">{b ? shortBlockHash(b.digest) : `${index + 1}`}</span>
           </span>
         }
         aside={b ? <QualifierChip className="tabular-nums">{b.updates.toLocaleString()} {b.updates === 1 ? "update" : "updates"}</QualifierChip> : undefined}

@@ -610,14 +610,14 @@ export default function SceneCallout() {
       if (!dataBlock) return null;
       const hue = identityHudCss(dataBlock.snap.metaId);
       const b = dataBlockRow?.[dataBlock.index] ?? null;
-      const n = dataBlockRow?.length ?? 0;
       return {
         // The live-lane key rule (msModel): while following the subject is THE LIVE DATA BLOCK (the live
         // snapshot's first, 2026-11-08), so a new tick re-points the label; a pick is a new subject.
         key: following ? "db|live" : `db|${dataBlock.snap.metaId}:${dataBlock.snap.ordinal}:${dataBlock.index}`,
         at: `db|${dataBlock.snap.metaId}:${dataBlock.snap.ordinal}:${dataBlock.index}`,
         eyebrow: "Data block",
-        title: n > 0 ? `${dataBlock.index + 1} of ${n}` : `${dataBlock.index + 1}`,
+        // Its ID, the card's title (user, 2026-11-09: "use id"): the digest, short.
+        title: b ? shortBlockHash(b.digest) : `${dataBlock.index + 1}`,
         titleMono: true,
         aside: following
           ? { text: "live", live: true, chip: b ? `${b.updates.toLocaleString()} ${b.updates === 1 ? "update" : "updates"}` : undefined }

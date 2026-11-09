@@ -80,7 +80,7 @@ import type {
   PickDescriptor,
   SnapshotExact,
 } from "@/src/data/types";
-import { metaSnapHoverKey } from "@/src/data/types";
+import { dataBlockSnapKey, metaSnapHoverKey } from "@/src/data/types";
 import type { BlockWindow } from "@/src/data/blockWindow";
 import { REGISTER_SUBJECTS, type RegisterSubjects } from "@/src/data/ledgerMeasure";
 import type { ViewPolicy } from "../../domain/viewPolicy";
@@ -411,6 +411,11 @@ export class LedgerView implements SceneView {
    *  `_hoverTile` is the instance index it resolves to, so the frame body compares integers. */
   private _hoverMetaKey: string | null = null;
   private _hoverTile = -1;
+  /** The hovered DATA BLOCK (`dataBlockHoverKey`) and the instance whose MARK stands for it — the
+   *  mark is its snapshot's data blocks in the scene, so a data block's hover lights the mark and
+   *  leaves the tile, which is the snapshot's (2026-11-09). Event-time, as `_hoverTile`. */
+  private _hoverDataKey: string | null = null;
+  private _hoverMark = -1;
   /** Filter-chip / metagraph-row HOVER — previews the colored network dim at commit strength. */
   private _hoverNet: string | null = null;
 
@@ -1443,10 +1448,28 @@ export class LedgerView implements SceneView {
     this._syncHoverTile();
   }
 
+  /** The hovered DATA BLOCK — lights the mark on its snapshot's tile. */
+  setHoveredDataBlock(key: string | null) {
+    this._hoverDataKey = key; // event-time
+    this._syncHoverTile();
+  }
+
   /** Resolve the hovered snapshot to its INSTANCE INDEX over the pick table update() draws in
    *  lockstep with. Event-time only — on a hover change and on every pick-table rebuild, since a
    *  data refresh reshuffles the indices under a held hover. */
   private _syncHoverTile(): void {
+    // The data block's mark: the tile of the snapshot its key begins with.
+    this._hoverMark = -1;
+    const dk = this._hoverDataKey == null ? null : dataBlockSnapKey(this._hoverDataKey);
+    if (dk != null) {
+      for (let i = 0; i < META_TRAIL_MAX; i++) {
+        const p = this._tilePicks[i];
+        if (p != null && p.kind === "metaSnap" && metaSnapHoverKey(p.sel.metaId, p.sel.ordinal) === dk) {
+          this._hoverMark = i;
+          break;
+        }
+      }
+    }
     const key = this._hoverMetaKey;
     if (key == null) { this._hoverTile = -1; return; }
     for (let i = 0; i < META_TRAIL_MAX; i++) {
@@ -1749,6 +1772,7 @@ export class LedgerView implements SceneView {
     if (!fn) {
       this._tilePicks.fill(null);
       this._hoverTile = -1;
+      this._hoverMark = -1;
       return;
     }
     let mi = 0;
@@ -2065,7 +2089,8 @@ export class LedgerView implements SceneView {
             _dummy.scale.set(w, h, w);
             _dummy.updateMatrix();
             this._dataMarkMesh.setMatrixAt(mi, _dummy.matrix);
-            this._dataMarkMesh.setColorAt(mi, inkMix(_col.copy(laneColor), Math.min(1, bright * DATA_MARK_GAIN), this._colors));
+            // A hovered data block's mark takes the subject's full weight (its tile keeps its own).
+            this._dataMarkMesh.setColorAt(mi, inkMix(_col.copy(laneColor), mi === this._hoverMark ? 1 : Math.min(1, bright * DATA_MARK_GAIN), this._colors));
           } else this._zeroDataMark(mi);
         }
         mi++;

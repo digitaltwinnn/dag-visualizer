@@ -199,5 +199,7 @@ export function switchLedgerRegister(to: LedgerRegister): void {
   if (actions.length) applyClickActions(actions);
   // Only Transaction blocks draws a block, so every other register drops its hover preview.
   if (!readsBlockWindow(to) && st.hoverBlock) st.setHoverBlock(null);
+  // …and only Data blocks draws a data block's mark.
+  if (to !== "data" && st.hoverDataBlock) st.setHoverDataBlock(null);
   st.setLedgerRegister(to);
 }

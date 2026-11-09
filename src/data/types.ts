@@ -45,6 +45,16 @@ export const metaSnapDeepKey = (globalOrdinal: number, metaId: string, snapOrdin
 export const metaSnapHoverKey = (metaId: string, snapOrdinal: number): string =>
   `${metaId}|${snapOrdinal}`;
 
+/** The HOVER key of ONE data block (user, 2026-11-09: "hover on 'data block' card but metagraph
+ *  snapshot gets the hover; fix structurally") — its snapshot's key and its place in it, so the
+ *  key names the block and still says which snapshot's mark stands for it in the scene. */
+export const dataBlockHoverKey = (metaId: string, snapOrdinal: number, index: number): string =>
+  `${metaSnapHoverKey(metaId, snapOrdinal)}|${index}`;
+
+/** The snapshot a data block's hover key belongs to, as `metaSnapHoverKey` — the scene's mark is
+ *  per snapshot, so it compares this exactly. */
+export const dataBlockSnapKey = (key: string): string => key.slice(0, key.lastIndexOf("|"));
+
 export interface GlobalSnapshot {
   ordinal: number;
   timestamp: string;

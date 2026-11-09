@@ -1127,6 +1127,8 @@ export class Engine {
         // reads its links and tip states are drawn from.
         if (st.block !== prev.block) this.ledger.setSelectedBlock(st.block?.hash ?? null);
         if (st.hoverBlock !== prev.hoverBlock) this.ledger.setHoveredBlock(st.hoverBlock);
+        // …and the hovered DATA BLOCK, which lights its snapshot's mark, never the tile (2026-11-09).
+        if (st.hoverDataBlock !== prev.hoverDataBlock) this.ledger.setHoveredDataBlock(st.hoverDataBlock);
         // …with whether the window's reads are ALL in — the edge the DAG is laid out on, so a miss
         // (either map) re-hands them too.
         if (st.blockReads !== prev.blockReads || st.blockReadMiss !== prev.blockReadMiss || st.exactMiss !== prev.exactMiss) {

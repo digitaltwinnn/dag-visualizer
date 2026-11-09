@@ -433,6 +433,9 @@ interface AppState {
   dataBlock: DataBlockSel | null;
   // The block the cursor is hovering (its hash) — a hover channel: previews, never commits.
   hoverBlock: string | null;
+  // The DATA BLOCK the cursor is hovering (`dataBlockHoverKey`) — its own channel (2026-11-09): the
+  // Data block card hovered its snapshot's, so the snapshot lit for a data block.
+  hoverDataBlock: string | null;
   // Block reads, keyed `${chain}:${ordinal}`; "dag:<ord>" mirrors `snapshotExact`'s blocks.
   blockReads: Record<string, HeldBlockRead>;
   // Block reads that FAILED (retry spent): the tick stays, its blocks draw with no links (rule 10).
@@ -581,6 +584,7 @@ interface AppState {
    *  the live snapshot's first data block arriving is no reader's pick (2026-11-08). */
   advanceDataBlock: (b: DataBlockSel | null) => void;
   setHoverBlock: (hash: string | null) => void;
+  setHoverDataBlock: (key: string | null) => void;
   setBlockRead: (key: string, v: HeldBlockRead) => void;
   setBlockReadMiss: (key: string) => void;
   /** Drop every block read and miss outside `keep`. Data-bridge setter. */
@@ -715,6 +719,7 @@ export const useStore = create<AppState>((set) => ({
   block: null,
   dataBlock: null,
   hoverBlock: null,
+  hoverDataBlock: null,
   blockReads: {},
   blockReadMiss: {},
   geoMeasure: "nodes",
@@ -770,7 +775,7 @@ export const useStore = create<AppState>((set) => ({
       // The block leaves with its view, and its recency rank with it (the way `setBlock(null)` drops
       // it) — the focus patch reads the stack it is handed, so it is handed the stack without it.
       const selStack = bumpStack(bumpStack(s.selStack, "block", false), "dataBlock", false);
-      return { ...nav, block: null, dataBlock: null, hoverBlock: null, trendRotation: 0, trendScroll: 0, ...focusPatch({ ...s, selStack }, entryFocus(VIEW_POLICIES[mode].entryPlane, s.filter), false) };
+      return { ...nav, block: null, dataBlock: null, hoverBlock: null, hoverDataBlock: null, trendRotation: 0, trendScroll: 0, ...focusPatch({ ...s, selStack }, entryFocus(VIEW_POLICIES[mode].entryPlane, s.filter), false) };
     }),
   // Opening a doc also SURFACES THE SCENE POSE: the overlay sits at z-8, under the raw layer's
   // z-9 — a doc opened from the RAW pose rendered beneath the still-interactive table, with the
@@ -1052,6 +1057,7 @@ export const useStore = create<AppState>((set) => ({
       selStack: !dataBlock ? s.selStack.filter((x) => x !== "dataBlock") : s.selStack,
     })),
   setHoverBlock: (hoverBlock) => set({ hoverBlock }),
+  setHoverDataBlock: (hoverDataBlock) => set({ hoverDataBlock }),
   setBlockRead: (key, v) =>
     set((s) => {
       if (s.blockReadMiss[key] == null) return { blockReads: { ...s.blockReads, [key]: v } };
