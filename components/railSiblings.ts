@@ -41,10 +41,8 @@ import type {
 import {
   type ClickAction,
   cohortStepActions,
-  cohortToggleActions,
   countryStepActions,
   compositionToggleActions,
-  countryToggleActions,
   railNetActions,
   metaSnapSelectActions,
   tickNetSelectActions,
@@ -184,16 +182,19 @@ function finish(
 // fallback differed between the two copies).
 
 // THE NODE A STEP CARRIES (user, 2026-11-09 — `pickActions.cohortStepActions`): with a node held, a
-// provider or country step lands on a node of the new scope so the Metagraph card above it keeps a
-// subject — the held node's network where the scope has one, else the scope's first node. Only the
-// sibling SET carries: a parent's first-child step (`childStep`) opens a rung with nothing held below.
+// provider or country step lands on a node of the SAME network in the new scope, so the Metagraph card
+// above it keeps its subject; where the scope has none, the node closes and the network stays as the
+// rail's browse (`keepNetOf` — "close the node, don't switch the network"). Only the sibling SET
+// carries: a parent's first-child step (`childStep`) opens a rung with nothing held below.
 const carryIn = (s: SiblingState, groups: readonly Cohort[]): { pick: PickDescriptor; cohort: Cohort } | null => {
   if (!s.inspect) return null;
   const net = pickNetId(s.inspect);
   for (const g of groups) for (const r of g.rows) if (net && pickNetId(r.pick) === net) return { pick: r.pick, cohort: g };
-  const g = groups.find((x) => x.rows.length > 0);
-  return g ? { pick: g.rows[0]!.pick, cohort: g } : null;
+  return null;
 };
+/** The held node's network, to keep as the browse when the step closes the node — none under a
+ *  committed filter, which already holds the card's network. */
+const keepNetOf = (s: SiblingState): string | null => (s.inspect && s.filter === "all" ? pickNetId(s.inspect) : null);
 
 const countryItem = (c: CountryStat, s: SiblingState, carry = false): SiblingStep => {
   const hit = carry ? carryIn(s, cohortsIn(s, c.cc)) : null;
@@ -202,7 +203,7 @@ const countryItem = (c: CountryStat, s: SiblingState, carry = false): SiblingSte
     label: c.country,
     actions: hit
       ? countryStepActions(c.cc, { country: s.country, hasInspect: !!s.inspect, cohort: s.cohort }, { pick: hit.pick, cohort: { cc: c.cc, city: hit.cohort.city, isp: hit.cohort.isp } })
-      : countryToggleActions(c.cc, { country: s.country, hasInspect: !!s.inspect, cohort: s.cohort }),
+      : countryStepActions(c.cc, { country: s.country, hasInspect: !!s.inspect, cohort: s.cohort }, null, carry ? keepNetOf(s) : null),
   };
 };
 
@@ -212,7 +213,7 @@ const cohortItem = (cc: string, g: Cohort, s: SiblingState, carry = false): Sibl
   return {
     key: `${cc}|${g.city}|${g.isp}`,
     label: cohortLabel(g),
-    actions: hit ? cohortStepActions(sel, { cohort: s.cohort, hasInspect: !!s.inspect }, hit.pick) : cohortToggleActions(sel, { cohort: s.cohort, hasInspect: !!s.inspect }),
+    actions: cohortStepActions(sel, { cohort: s.cohort, hasInspect: !!s.inspect }, hit?.pick ?? null, carry ? keepNetOf(s) : null),
   };
 };
 

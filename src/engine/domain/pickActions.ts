@@ -169,23 +169,36 @@ export function cohortToggleActions(
   return acts;
 }
 
-/** A PAGER STEP CARRIES THE NODE (user, 2026-11-09: "provider card, swipe it, metagraph content drops
- *  and it becomes a ghost at the bottom"). In Geography the Metagraph card is the held NODE's network,
- *  so a provider or country step that released the node emptied the card above it. With a node held
- *  the step commits `carry` (a node of the new scope, its cohort with it for a country step) and the
- *  swiped rung LAST, so that rung keeps the box; with none it is the plain toggle. A step is never the
- *  same subject (the pager steps away), so it never toggles off. */
-export function cohortStepActions(c: CohortSel, current: { cohort: CohortSel | null; hasInspect: boolean }, carry: PickDescriptor | null): ClickAction[] {
-  if (!current.hasInspect || !carry) return cohortToggleActions(c, current);
-  return [{ kind: "inspect", pick: carry }, { kind: "cohort", sel: c }];
+/** A PAGER STEP KEEPS THE NETWORK (user, 2026-11-09: "provider card, swipe it, metagraph content drops
+ *  and it becomes a ghost at the bottom"; then, of a first cut that fell back to another network's
+ *  node: "close the node, don't switch the network"). In Geography the Metagraph card is the held
+ *  NODE's network, so a provider or country step that released the node emptied the card above it.
+ *  With a node held the step either CARRIES it — `carry`, a node of the SAME network in the new scope
+ *  (its cohort with it for a country step) — or, where the scope has none, closes the node and keeps
+ *  its network as the rail's browse (`keepNet`, `railNet`: never the filter). The swiped rung goes
+ *  LAST either way, so it keeps the box. With no node held it is the plain toggle; a step is never
+ *  the same subject (the pager steps away), so it never toggles off. */
+export function cohortStepActions(
+  c: CohortSel,
+  current: { cohort: CohortSel | null; hasInspect: boolean },
+  carry: PickDescriptor | null,
+  keepNet: string | null = null,
+): ClickAction[] {
+  if (current.hasInspect && carry) return [{ kind: "inspect", pick: carry }, { kind: "cohort", sel: c }];
+  // The browse goes FIRST: a network change clears the country drill (the Engine's network-switch
+  // clear), so the provider's country is re-committed after it, then the provider.
+  if (current.hasInspect && keepNet) return [{ kind: "inspect", pick: null }, { kind: "railNet", id: keepNet }, { kind: "country", cc: c.cc }, { kind: "cohort", sel: c }];
+  return cohortToggleActions(c, current);
 }
 export function countryStepActions(
   cc: string,
   current: { country: string | null; hasInspect: boolean; cohort: CohortSel | null },
   carry: { pick: PickDescriptor; cohort: CohortSel } | null,
+  keepNet: string | null = null,
 ): ClickAction[] {
-  if (!current.hasInspect || !carry) return countryToggleActions(cc, current);
-  return [{ kind: "inspect", pick: carry.pick }, { kind: "cohort", sel: carry.cohort }, { kind: "country", cc }];
+  if (current.hasInspect && carry) return [{ kind: "inspect", pick: carry.pick }, { kind: "cohort", sel: carry.cohort }, { kind: "country", cc }];
+  if (current.hasInspect && keepNet) return [...countryToggleActions(cc, current).slice(0, -1), { kind: "railNet", id: keepNet }, { kind: "country", cc }];
+  return countryToggleActions(cc, current);
 }
 
 /** THE AI CARD'S PROVIDER ROW (user, 2026-10-31): the cohort rung's toggle, for a row that names a

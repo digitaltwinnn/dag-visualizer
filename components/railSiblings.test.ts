@@ -157,10 +157,24 @@ describe("siblingSet — cohort (provider) rung", () => {
     );
   });
   // User, 2026-11-09: swiping the provider with a node held emptied the Metagraph card above it.
-  it("with a node held, a step carries a node of the new provider, the provider committed last", () => {
-    const set = siblingSet("cohort", base({ mode: "geo", country: "de", cohort, inspect: deA.pick }))!;
-    expect(set.items[1]!.actions).toEqual([
-      { kind: "inspect", pick: deC.pick },
+  // The fixture nodes are metanodes; give the held one and its Berlin peer a network.
+  const onNet = (r: typeof deA, id: string) => ({ ...r, pick: { ...r.pick, meta: { id } } }) as typeof deA;
+  it("with a node held, a step carries the new provider's node of the SAME network, the provider committed last", () => {
+    const held = onNet(deA, "dor");
+    const peer = onNet(deC, "dor");
+    const s = base({ mode: "geo", country: "de", cohort, inspect: held.pick, selNodes: [held, deB, peer, fiA], allNodes: [held, deB, peer, fiA] });
+    expect(siblingSet("cohort", s)!.items[1]!.actions).toEqual([
+      { kind: "inspect", pick: peer.pick },
+      { kind: "cohort", sel: { cc: "de", city: "Berlin", isp: "AWS" } },
+    ]);
+  });
+  it("…and where the new provider has none of that network, closes the node and keeps the network as the browse", () => {
+    const held = onNet(deA, "dor");
+    const s = base({ mode: "geo", country: "de", cohort, inspect: held.pick, selNodes: [held, deB, deC, fiA], allNodes: [held, deB, deC, fiA] });
+    expect(siblingSet("cohort", s)!.items[1]!.actions).toEqual([
+      { kind: "inspect", pick: null },
+      { kind: "railNet", id: "dor" },
+      { kind: "country", cc: "de" },
       { kind: "cohort", sel: { cc: "de", city: "Berlin", isp: "AWS" } },
     ]);
   });

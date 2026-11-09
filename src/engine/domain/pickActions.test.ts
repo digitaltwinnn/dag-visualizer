@@ -426,6 +426,21 @@ describe("cohortStepActions / countryStepActions — a pager step carries the he
       { kind: "country", cc: "fr" },
     ]);
   });
+  it("no node of that network in the new scope: the node closes and its network stays as the browse (\"don't switch the network\")", () => {
+    // The browse first (a network change clears the country), then the country, then the provider.
+    expect(cohortStepActions(CO, { cohort: null, hasInspect: true }, null, "dor")).toEqual([
+      { kind: "inspect", pick: null },
+      { kind: "railNet", id: "dor" },
+      { kind: "country", cc: CO.cc },
+      { kind: "cohort", sel: CO },
+    ]);
+    expect(countryStepActions("fr", { country: "de", hasInspect: true, cohort: CO }, null, "dor")).toEqual([
+      { kind: "inspect", pick: null },
+      { kind: "cohort", sel: null },
+      { kind: "railNet", id: "dor" },
+      { kind: "country", cc: "fr" },
+    ]);
+  });
   it("with nothing held, or nothing to carry: the plain toggle", () => {
     expect(cohortStepActions(CO, { cohort: null, hasInspect: false }, pick)).toEqual(cohortToggleActions(CO, { cohort: null, hasInspect: false }));
     expect(cohortStepActions(CO, { cohort: null, hasInspect: true }, null)).toEqual(cohortToggleActions(CO, { cohort: null, hasInspect: true }));
