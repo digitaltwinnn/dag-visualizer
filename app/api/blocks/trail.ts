@@ -1,5 +1,6 @@
 import type { BlockTick, BlockWindowAnswer } from "@/src/data/blockWindow";
 import type { GlobalSnapshot, RawMetaSnapshot } from "@/src/data/types";
+import { blockHashesOf } from "@/src/data/api";
 
 // THE BLOCK TRAIL (the Blocks register of the Snapshots view): the newest `n` global snapshots that
 // hold a block somewhere — a DAG block, or an anchored metagraph snapshot carrying token blocks.
@@ -54,6 +55,27 @@ export interface TrailDeps {
   currentId?(id: string): string;
   /** The clock for the walk deadline (injectable). */
   now?(): number;
+}
+
+/** Age past which a window AROUND an ordinal is final: the pin itself must be this old (review I1). */
+export const TRAIL_SETTLED_MS = 3_600_000;
+
+/** THE TRAIL ANSWER'S CACHE (review I1, 2026-11-09). The live edge refreshes every 30 s. A window
+ *  around an ordinal is final only once the PIN ITSELF is an hour old — read from the pin's own
+ *  global record (`pinTs`), never from the window's newest tick: blocks come in bursts, so that tick
+ *  is often hours older than a seconds-old pin, and a block the explorer has not indexed yet would
+ *  have been cached as absent for a year. Not yet final: a minute. */
+export function trailCacheControl(around: number | null, pinTs: string | null, nowMs: number): string {
+  if (around == null) return "public, s-maxage=30, stale-while-revalidate=30";
+  const settled = pinTs != null && nowMs - Date.parse(pinTs) > TRAIL_SETTLED_MS;
+  return settled ? "public, s-maxage=31536000, immutable" : "public, s-maxage=60, stale-while-revalidate=60";
+}
+
+/** A 404 on a chain's transfer list is "no rows" only on a TOKEN chain's FIRST page — a dormant
+ *  former address has no list. After a cursor it is a failed read (a cursor that expired mid-walk),
+ *  never the end of the list: read as the end, it cut that chain silently (review I1). */
+export function absentIsEmpty(chain: string, next: string | undefined): boolean {
+  return chain !== "dag" && next == null;
 }
 
 /** The DAG's walk cannot reach the window asked for (a pin deeper than its page cap): an answer, not a failure. */
@@ -156,7 +178,8 @@ export async function assembleTrail(deps: TrailDeps, around: number | null, n: n
       const g = await bounded(() => deps.global(ord));
       const blocks = new Set<string>();
       for (const row of found.get("dag")?.get(ord) ?? []) if (row.blockHash) blocks.add(row.blockHash);
-      for (const b of g.blocks ?? []) blocks.add(b);
+      // `blockHashesOf`: an absent list, or a non-string entry, is no hash (review M2).
+      for (const b of blockHashesOf(g)) blocks.add(b);
       const metaSnaps: Record<string, RawMetaSnapshot[]> = {};
       await Promise.all(
         ids.map(async (id) => {

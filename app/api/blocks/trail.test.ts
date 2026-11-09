@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GlobalSnapshot, RawMetaSnapshot } from "@/src/data/types";
-import { BeyondReach, TRAIL_DEADLINE_MS, assembleTrail, type TrailDeps, type TrailRow } from "./trail";
+import { BeyondReach, TRAIL_DEADLINE_MS, TRAIL_SETTLED_MS, absentIsEmpty, assembleTrail, trailCacheControl, type TrailDeps, type TrailRow } from "./trail";
 
 // A fake explorer: the DAG's transfer list (key = the global snapshot) and a token chain's
 // (key = its own snapshot, tick = `globalSnapshotOrdinal`), both newest first, paged by a number cursor.
@@ -185,5 +185,50 @@ describe("assembleTrail", () => {
       expect((await assembleTrail(deps({ transfers, currentId: (id) => (id === "dor" ? "DOR" : id) }), null, 52)).partial).toEqual(["DOR"]);
       expect((await assembleTrail(deps(), null, 10)).partial).toBeUndefined();
     });
+  });
+});
+
+describe("trailCacheControl — a pinned window is final only once the pin itself is an hour old (review I1)", () => {
+  const NOW = Date.parse("2026-11-09T12:00:00Z");
+  const ago = (ms: number) => new Date(NOW - ms).toISOString();
+  it("refreshes the live edge every 30 s", () => {
+    expect(trailCacheControl(null, null, NOW)).toBe("public, s-maxage=30, stale-while-revalidate=30");
+  });
+  it("caches a window a year once its pin is over an hour old", () => {
+    expect(trailCacheControl(100, ago(TRAIL_SETTLED_MS + 1), NOW)).toBe("public, s-maxage=31536000, immutable");
+  });
+  it("holds a minute while the pin is younger — whatever the window's newest block tick", () => {
+    expect(trailCacheControl(100, ago(5_000), NOW)).toBe("public, s-maxage=60, stale-while-revalidate=60");
+  });
+  it("never calls a window final without the pin's own time", () => {
+    expect(trailCacheControl(100, null, NOW)).toBe("public, s-maxage=60, stale-while-revalidate=60");
+  });
+});
+
+describe("absentIsEmpty — a 404 is an empty list only on a token chain's first page", () => {
+  it("reads a dormant former address's first-page 404 as no rows", () => {
+    expect(absentIsEmpty("DAG0abc", undefined)).toBe(true);
+  });
+  it("reads a 404 after a cursor as a failed read, never the end of the list", () => {
+    expect(absentIsEmpty("DAG0abc", "cursor")).toBe(false);
+  });
+  it("never reads the DAG's own list as absent", () => {
+    expect(absentIsEmpty("dag", undefined)).toBe(false);
+  });
+});
+
+describe("assembleTrail — the global record's block list is guarded (review M2)", () => {
+  it("drops a non-string entry in a global's blocks", async () => {
+    const answer = await assembleTrail(
+      {
+        transfers: async (c) => (c === "dag" ? { rows: [{ snapshotOrdinal: 10, blockHash: "a" }] } : { rows: [] }),
+        global: async (o) => ({ ordinal: o, timestamp: "2026-11-09T00:00:00Z", hash: "h", blocks: ["a", 7, null, "b"] }) as unknown as GlobalSnapshot,
+        metaSnap: async () => ({}) as RawMetaSnapshot,
+        chains: async () => [],
+      },
+      null,
+      52,
+    );
+    expect(answer.ticks[0]!.blocks.sort()).toEqual(["a", "b"]);
   });
 });
