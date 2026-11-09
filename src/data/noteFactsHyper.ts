@@ -301,7 +301,9 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
         cap: ids.length * 2, // a network has at most one first and one last
         from: from < 0 ? n : from,
       }).filter((day) => (day.kind === "first" || day.kind === "last") && day.networkId);
-      facts.push(fact(`Networks that became active or went quiet in ${WEEK_WORDS.range}`, days.length, "count"));
+      // Only when one did (user, 2026-11-09): a 0 here came back as "no network became active or went
+      // quiet", a sentence about nothing. The node-count movers above still count a quiet week at 0.
+      if (days.length) facts.push(fact(`Networks that became active or went quiet in ${WEEK_WORDS.range}`, days.length, "count"));
       events = days.map((day) => eventChange(nameOf(day.networkId!), day.kind === "first" ? "active" : "quiet", { kind: "network", id: day.networkId! }, WEEK_WORDS));
       for (const day of days) {
         const id = day.networkId!;

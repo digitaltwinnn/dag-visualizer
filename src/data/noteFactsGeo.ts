@@ -41,8 +41,8 @@ import { utcDayKey } from "@/src/util/localTime";
 //     (`throughEdgeOutages`): the day is one hourly reading, and that hour can be its outage;
 //   · ONE FIGURE PER QUANTITY (R58). Every COUNTRY and FLEET figure — the fleet's located total,
 //     each country's count, every country share, rank and "Countries hosting nodes", and both ends
-//     of each week-ago pair — comes from the tiers' daily `f.cc` (`ccDays`), the one series with
-//     a week ago, so the count now IS its pair's `to` (live 2026-10-27 the geo family located 80
+//     of each country's week-ago pair — comes from the tiers' daily `f.cc` (`ccDays`), the one series
+//     with a week ago, so a country's count now IS its pair's `to` (live 2026-10-27 the geo family located 80
 //     while the tiers counted 86 against 173: two figures for one quantity). That holds while the
 //     tiers' NEWEST day is measured and no older than the geo reading; otherwise the geo family's
 //     counts are stated and no week-ago figure is. PROVIDERS stay on the geo family (the tiers
@@ -50,8 +50,7 @@ import { utcDayKey } from "@/src/util/localTime";
 //     provider's change reads `geoDays` only when BOTH ends are measured. A NETWORK's note stays
 //     wholly on the geo family (the tiers hold no per-network countries), its fleet denominators
 //     included, so a share never divides one reading by another: its change reads its OWN
-//     measured days there (its located nodes and countries a week ago, and the located ratio
-//     when both are above 0 and differ). The geo family began 2026-10-27, so a network states no
+//     measured days there (its countries a week ago). The geo family began 2026-10-27, so a network states no
 //     change until a week of it exists — honest absence, never a substitute series;
 //   · NO "KNOWN" OR "LOCATED" IN A LABEL (user, 2026-11-03: "all providers are known and all nodes are
 //     located so we don't have to say things like 'known' or 'located'"): the data is kept complete,
@@ -68,9 +67,15 @@ import { utcDayKey } from "@/src/util/localTime";
 //     figures read the geo family alone, a week ago only from the network's own measured day;
 //   · NO ACTIVITY SENTENCE (user, 2026-11-09; the R74 common reading is retired): where the nodes
 //     run is this view's, and activity belongs to the Snapshots and History views;
+//   · NO NODE-COUNT CHANGE ON A VIEW NOTE (user, 2026-11-09: "say something complementary instead
+//     of saying the same on other data"): live, Hypergraph read the week "down 3% to 83" from the
+//     hourly gauge and Geography "up 2%" from the geo family, one after the other in the Briefing.
+//     How many nodes the network (or a network) has and how that moved is Hypergraph's — who is on
+//     it. Geography states no total (its shares still divide by it), and its changes are WHERE: a
+//     country's, a provider's, a network's count of countries. A subject note (a country, a
+//     provider) keeps its own count's move: that is a place;
 //   · A CHANGE IS A PAIR (R54). A week ago and now are the `from` and `to` of one key per
-//     quantity (the fleet's located total, each country, each provider, a network's located nodes
-//     and countries), the standing "now" fact is the `to` end, and the ratio is `to / from`.
+//     quantity (each country, each provider, a network's countries), the standing "now" fact is the `to` end, and the ratio is `to / from`.
 //
 // THE GATE'S INTERFACE (`noteHonesty.ts`): a ratio belongs to a network (or country, or provider)
 // only by that name in the fact's LABEL; the fleet's own ratio names none. A share is matched by
@@ -378,7 +383,6 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     const then = weekBefore(ownMeasured(subjectNet), now);
     const pairOf = (what: string, end: FactPair["end"]): FactPair | undefined => (then ? { key: `${subjectNet}:${what}`, end } : undefined);
 
-    facts.push(fact(`${name}, nodes`, located, "count", undefined, pairOf("located", "to")));
     facts.push(fact(`${name}, countries with nodes`, own.length, "count", undefined, pairOf("countries", "to")));
     // Its fleet denominators are the geo family's, the reading its own counts come from (R58), and
     // in nodes: a part and its whole are one count.
@@ -402,11 +406,7 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     }
     if (then) {
       const was = then.netCc.get(subjectNet)!;
-      const locatedThen = sum(was);
-      facts.push(fact(`${name}, nodes a week ago`, locatedThen, "count", undefined, pairOf("located", "from")));
       facts.push(fact(`${name}, countries with nodes a week ago`, was.size, "count", undefined, pairOf("countries", "from")));
-      if (located > 0 && locatedThen > 0 && located !== locatedThen)
-        facts.push(fact(`${name}, nodes now against a week ago`, located / locatedThen, "ratio"));
     }
   } else if (subjectNetCc && subjectScopeNet) {
     // A NETWORK'S NODES IN ONE COUNTRY: the geo family's reading of that network alone (the tiers
@@ -515,10 +515,8 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     }
     countryChange(subjectCc);
   } else {
-    // The fleet's week ago, from the same reading as its count now.
-    const thenTotal = fleetCcThen ? sum(fleetCcThen) : 0;
-    const fleetPair = (end: FactPair["end"]): FactPair | undefined => (thenTotal > 0 && locatedFleet > 0 ? { key: "fleet", end } : undefined);
-    facts.push(fact("Nodes in the network", locatedFleet, "count", undefined, fleetPair("to")));
+    // No total: how many nodes the network has, and how that moved, is Hypergraph's. The shares
+    // below still divide by it (`locatedFleet`).
     facts.push(fact("Countries hosting nodes", countries.length, "count"));
     facts.push(fact("Providers hosting nodes", providers.length, "count"));
     countries.slice(0, TOP).forEach((c, i) => {
@@ -537,10 +535,6 @@ export function geoFacts(input: GeoFactsInput): { facts: Fact[]; names: string[]
     // CHANGE. Countries from the tiers' history; providers from the geo family, both ends measured.
     // The earlier count beside the ratio, as every other "a week ago" here: a note says how much
     // it moved (from … to …), never only the direction (user, 2026-10-27).
-    if (fleetPair("from")) {
-      facts.push(fact("Nodes in the network a week ago", thenTotal, "count", undefined, fleetPair("from")));
-      facts.push(fact("Nodes in the network, now against a week ago", locatedFleet / thenTotal, "ratio"));
-    }
     const moved = (now: number, was: number): boolean => Math.abs(now - was) >= MIN_MOVE;
     for (const c of countries.slice(0, TOP)) if (moved(c.count, ccWas(c.cc) ?? c.count)) countryChange(c.cc);
     if (wasProviders) {

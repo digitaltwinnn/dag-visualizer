@@ -93,10 +93,12 @@ export function spanFigures(spanBefore?: string | null): string {
 export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuestions; questionNow?: string; system: (subjectLabel: string, lead?: NoteLead, kind?: SubjectKind, spanBefore?: string | null) => string }> = {
   hyper: {
     // A QUIET WEEK IS SAID (user, 2026-10-30): the facts count what changed even at 0, so the note
-    // says the composition held rather than reaching for the node count, which is Geography's too.
+    // says the composition held. The node count and its move are this note's alone (Geography says where).
     // NOTHING THAT DID NOT HAPPEN (user, 2026-11-09): live, "no network became active or went quiet"
-    // ended a sentence about the DAG's nodes. A network that started or stopped is named only when one did.
-    question: "First, who and what is on the network over the span: networks or layers that gained or lost nodes, and a network that became active or went quiet only when one did; if nothing changed there, say plainly that it was a steady week: the node count held at its level and the layers held steady, and for the whole network so did the number of active networks.",
+    // ended a sentence about the DAG's nodes. A network that started or stopped is named only when one did,
+    // and the steady week no longer asks the active networks to have "held": the model read that as
+    // "no network became active or went quiet" (live, the same day).
+    question: "First, who and what is on the network over the span: networks or layers that gained or lost nodes, and a network that became active or went quiet only when one did; if nothing changed there, say plainly that it was a steady week: the node count held at its level and the layers held steady.",
     questions: {
       // "LAYER GROUP", never "make-up" (user, 2026-10-30): the Composition rung's own word. And the
       // group's place is said as a reader would ("its largest group"), not as a share and a rank
@@ -119,7 +121,12 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
     // ONE PLACE, NOT TWO (user, 2026-11-03: "Germany fell 6% to 31 and Hetzner Online fell 7% to 52":
     // "the country and provider are closely related; so pick only one of the two with the most
     // significant change"): a provider's nodes sit in a country, so the two moves are usually one.
-    question: "First, how many nodes there are and how that moved, then where they run: of the countries and hosting providers that gained or lost nodes, name only the ONE with the largest change, since a provider's nodes sit in a country and the two moves are usually the same nodes, with its current count, as \"<country or provider> fell <change> to <count>\", without calling it the largest; or where the nodes are now when nothing moved. Say nothing about speed.",
+    // COMPLEMENTARY, NOT THE SAME COUNT TWICE (user, 2026-11-09: "can they say something complementary
+    // instead of saying the same on other data?"): live, Hypergraph said the week "down 3% to 83" and
+    // Geography "up 2%", from two stored series, one stop apart in the Briefing. The node count and
+    // its move are Hypergraph's (who); this note opens on the countries and providers (where), and
+    // its facts hold no week-ago total (`noteFactsGeo.ts`).
+    question: "Say where the nodes run, never how many nodes there are or how that count moved: the Hypergraph note says that. First, the countries and hosting providers that hold them: how many of each, and the largest country and the largest provider with their share of the nodes; then, of the countries and hosting providers that gained or lost nodes, name only the ONE with the largest change, since a provider's nodes sit in a country and the two moves are usually the same nodes, with its current count, as \"<country or provider> fell <change> to <count>\", without calling it the largest; or say that where the nodes run held when nothing moved. Say nothing about speed.",
     system: (subjectLabel, _lead, kind) =>
       `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${questionOf("geo", kind)}\nStay on where the nodes are located and who hosts them, and nothing else.`,
   },

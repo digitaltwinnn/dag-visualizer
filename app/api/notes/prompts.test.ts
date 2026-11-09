@@ -71,12 +71,12 @@ describe("PROMPTS", () => {
     expect(PROMPTS.trend.question).toMatch(/changed/i);
   });
 
-  it("asks Hypergraph and Geography their own subject alone, no activity sentence (user, 2026-11-09); the ledger and History keep their questions", () => {
+  it("asks Hypergraph and Geography their own subject alone: no activity sentence, the node count Hypergraph's (user, 2026-11-09); the ledger and History keep their questions", () => {
     expect(PROMPTS.hyper.question).toBe(
-      "First, who and what is on the network over the span: networks or layers that gained or lost nodes, and a network that became active or went quiet only when one did; if nothing changed there, say plainly that it was a steady week: the node count held at its level and the layers held steady, and for the whole network so did the number of active networks.",
+      "First, who and what is on the network over the span: networks or layers that gained or lost nodes, and a network that became active or went quiet only when one did; if nothing changed there, say plainly that it was a steady week: the node count held at its level and the layers held steady.",
     );
     expect(PROMPTS.geo.question).toBe(
-      "First, how many nodes there are and how that moved, then where they run: of the countries and hosting providers that gained or lost nodes, name only the ONE with the largest change, since a provider's nodes sit in a country and the two moves are usually the same nodes, with its current count, as \"<country or provider> fell <change> to <count>\", without calling it the largest; or where the nodes are now when nothing moved. Say nothing about speed.",
+      "Say where the nodes run, never how many nodes there are or how that count moved: the Hypergraph note says that. First, the countries and hosting providers that hold them: how many of each, and the largest country and the largest provider with their share of the nodes; then, of the countries and hosting providers that gained or lost nodes, name only the ONE with the largest change, since a provider's nodes sit in a country and the two moves are usually the same nodes, with its current count, as \"<country or provider> fell <change> to <count>\", without calling it the largest; or say that where the nodes run held when nothing moved. Say nothing about speed.",
     );
     for (const v of ["hyper", "geo"] as const) {
       expect(PROMPTS[v].system("the whole network")).not.toContain("Activity was");

@@ -136,14 +136,16 @@ describe("hyperFacts on all", () => {
   // A QUIET WEEK IS SAID, NOT LEFT UNSAID (user, 2026-10-30: "what about actually saying it's a
   // quiet week with no changes in composition"): the counts of what changed are stated even at 0,
   // so the note can say nothing moved rather than fall back on the node count.
-  it("counts the networks whose node count changed and those that started or stopped, 0 in a quiet week", () => {
+  // Started or stopped is counted only when one did (user, 2026-11-09): its 0 read back as a sentence
+  // about nothing.
+  it("counts the networks whose node count changed, 0 in a quiet week, and states no started-or-stopped 0", () => {
     const r = hyperFacts(input())!;
     expect(find(r, /^Networks whose node count changed in the last 7 days$/)[0]!.value).toBe(1); // USDC.dag, 10 to 30
-    expect(find(r, /^Networks that became active or went quiet in the last 7 days$/)[0]!.value).toBe(0);
+    expect(find(r, /^Networks that became active or went quiet/)).toEqual([]);
     const quiet = hyperFacts(input({ fleet: fleet({ "f.nodes": row(720, () => 140), "f.nodes.usdc": row(720, () => 30) }) }))!;
     const [changed] = find(quiet, /^Networks whose node count changed in the last 7 days$/);
     expect([changed!.value, changed!.text]).toEqual([0, "0"]);
-    expect(find(quiet, /^Networks that became active or went quiet in the last 7 days$/)[0]!.value).toBe(0);
+    expect(find(quiet, /^Networks that became active or went quiet/)).toEqual([]);
     expect(find(quiet, /nodes (7 days ago|now)$/).filter((f) => !/^Nodes across/.test(f.label))).toEqual([]); // no movers
   });
 

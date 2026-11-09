@@ -447,14 +447,11 @@ describe("factsFor — the per-view read table", () => {
     expect(weekAgo(short.facts).some((f) => f.label.endsWith("now against a week ago") && f.value === 2.5)).toBe(true);
 
     // The fix: the read reaches past the pair (14 days), it is judged against the week before it and
-    // fails, and no change fact reads from it.
+    // fails, and no change fact reads from it: against a normal week ago every country held, so no
+    // change is stated at all (the network total's move is Hypergraph's, never a geo fact).
     const out = await factsFor("mainnet", "geo", "all", "day", NOW, reads);
-    const changes = weekAgo(out!.facts);
-    expect(changes.length).toBeGreaterThan(0);
-    for (const f of changes) {
-      if (f.label.endsWith("now against a week ago")) expect(f.value).toBe(1);
-      else expect([NORMAL.DE, NORMAL.US, NORMAL.DE + NORMAL.US]).toContain(f.value); // a country, or the fleet's located total
-    }
+    expect(weekAgo(out!.facts)).toEqual([]);
+    expect(out!.facts.some((f) => f.value === 2.5)).toBe(false);
   });
 
   it("a builder's null is no note", async () => {
