@@ -193,7 +193,12 @@ export function calloutPhonePlacement(
   const fitsUp = up >= rise;
   const fitsDown = down >= rise;
   if (!fitsUp && !fitsDown) return hidden;
-  const drop = fitsDown && (!fitsUp || down < up);
+  // BELOW FIRST (user, 2026-11-09: the Transaction block's label "sits at the top but does not
+  // appear to consider that has the new view-control also, position on the bottom like most other
+  // callouts?"): the top strip holds the command bar and, in Snapshots, the register switch, so a
+  // label there crowds the controls; the label drops whenever the bottom strip has room, and stands
+  // under the bar only when it does not. (It took the NEARER strip until then.)
+  const drop = fitsDown;
   const lo = bandL + PHONE_AIR - x;
   const hi = bandR - PHONE_AIR - panelW - x;
   const left = Math.max(lo, Math.min(hi, -panelW / 2));

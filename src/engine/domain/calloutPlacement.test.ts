@@ -193,13 +193,16 @@ describe("calloutPhonePlacement — the label in the free strip above or below i
   const rise = Math.round(CALLOUT_OFF_Y * CALLOUT_PHONE_K);
   const place = (x: number, y: number) => calloutPhonePlacement(x, y, 0, W, TOP, BOTTOM, PW, PH);
 
-  it("stands the panel just under the command bar when the top edge is nearer", () => {
-    const p = place(195, 200);
-    expect(p).toEqual({ show: true, drop: false, left: -PW / 2, leader: 200 - (TOP + AIR + PH) });
-  });
-  it("drops the panel just above the dock when the bottom edge is nearer", () => {
+  // BELOW FIRST (user, 2026-11-09): the top strip holds the controls, so the label drops wherever
+  // the bottom strip has room, even when the top one is nearer.
+  it("drops the panel toward the dock whenever the bottom strip has room, even when the top is nearer", () => {
+    expect(place(195, 200)).toMatchObject({ show: true, drop: true, leader: rise * CALLOUT_PHONE_MAX_K });
     const p = place(195, 350);
     expect(p).toMatchObject({ show: true, drop: true, leader: BOTTOM - AIR - PH - 350 });
+  });
+  it("stands the panel just under the command bar only when the bottom strip has no room", () => {
+    const y = BOTTOM - AIR - PH - rise + 1;
+    expect(place(195, y)).toEqual({ show: true, drop: false, left: -PW / 2, leader: Math.min(y - (TOP + AIR + PH), rise * CALLOUT_PHONE_MAX_K) });
   });
   it("…but never further than twice the old standoff — the label stays attached", () => {
     const p = calloutPhonePlacement(195, 300, 0, W, TOP, 900, PW, PH);
