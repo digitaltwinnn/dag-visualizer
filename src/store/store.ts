@@ -29,7 +29,8 @@ export type { Mode, LedgerRegister };
 // The stored metric every trend plane draws — one picker, one column (see `trendMetric` below).
 import type { LedgerMeasure } from "@/src/data/ledgerMeasure";
 import type { BlockMeasure } from "@/src/data/blockMeasure";
-import type { HeldBlockRead } from "@/src/data/blockReads";
+import { exactEvictions, type HeldBlockRead } from "@/src/data/blockReads";
+import { heldOrdinals } from "@/src/data/pastWindow";
 import type { GeoMeasure } from "@/src/data/geoMeasure";
 import type { HyperMeasure } from "@/src/data/hyperMeasure";
 // WHY the scene is moving — the motion hint's cause (2026-09-26), stamped by the gesture's owner
@@ -875,16 +876,8 @@ export const useStore = create<AppState>((set) => ({
     set((s) => {
       if (s.snapshotExact[data.ordinal]) return {}; // immutable per ordinal — keep the first
       const next = { ...s.snapshotExact, [data.ordinal]: data };
-      const keys = Object.keys(next);
-      if (keys.length > EXACT_MAX) {
-        // Integer-like object keys iterate in numeric order, not insertion order — sort to be safe.
-        for (const k of keys
-          .map(Number)
-          .sort((a, b) => a - b)
-          .slice(0, keys.length - EXACT_MAX)) {
-          delete next[k];
-        }
-      }
+      // Bounded, but never past a HELD window's ordinals (review I3, `exactEvictions`).
+      for (const k of exactEvictions(Object.keys(next).map(Number), EXACT_MAX, heldOrdinals())) delete next[k];
       // A landed read supersedes any recorded miss for its ordinal — the give-up state must
       // never outlive the data it was giving up on.
       if (s.exactMiss[data.ordinal] == null) return { snapshotExact: next };

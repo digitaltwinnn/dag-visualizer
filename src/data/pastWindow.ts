@@ -131,6 +131,15 @@ export function getBlockWindow(): BlockWindow | null {
   return heldBlocks;
 }
 
+/** Every global ordinal a held window draws — the past window's globals and the block window's
+ *  ticks: the exact-read cache keeps these (`blockReads.exactEvictions`, review I3). */
+export function heldOrdinals(): Set<number> {
+  const out = new Set<number>();
+  for (const g of held?.globalSnapshots ?? []) out.add(g.ordinal);
+  for (const t of heldBlocks?.ticks ?? []) out.add(t.ord);
+  return out;
+}
+
 /** Hold a block window, or none. The bridge is the one caller. */
 export function setBlockWindow(w: BlockWindow | null): void {
   if (w === heldBlocks) return;

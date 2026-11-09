@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { blockChildren, blockReadKey, blockReadOf, wantedBlockReads, wantedExactReads, windowBlockKeys, windowReadsSettled } from "@/src/data/blockReads";
+import { blockReadKey, blockReadOf, exactEvictions, wantedBlockReads, wantedExactReads, windowBlockKeys, windowReadsSettled } from "@/src/data/blockReads";
 import type { BlockRead } from "@/src/engine/domain/blockBraid";
 import { foldBlockWindow } from "@/src/data/blockWindow";
 import type { RawMetaSnapshot } from "@/src/data/types";
@@ -45,7 +45,7 @@ describe("windowReadsSettled — the DAG is laid out once, when every read has l
   });
 });
 
-describe("one block's read and its children", () => {
+describe("one block's read", () => {
   const b = (hash: string, parents: string[]): BlockRead => ({ hash, height: 1, parents: parents.map((p) => ({ hash: p, height: 0 })), txCount: 1, amount: 1, fee: 0, signers: 3, transfers: [] });
   const reads = {
     [blockReadKey("dag", 300)]: { blocks: [b("d1", ["d0", "x"]), b("d2", ["d0", "d1"])] },
@@ -57,9 +57,20 @@ describe("one block's read and its children", () => {
     expect(blockReadOf(reads, { chain: "dag", hash: "d9", ordinal: 300 })).toBeNull();
     expect(blockReadOf(reads, { chain: "dag", hash: "d0", ordinal: 999 })).toBeNull();
   });
-  it("counts the blocks of its own chain's block reads built on it — never another chain's", () => {
-    expect(blockChildren(reads, "dag", "d0")).toBe(2);
-    expect(blockChildren(reads, "dag", "d1")).toBe(1);
-    expect(blockChildren(reads, "dag", "d2")).toBe(0);
+});
+
+describe("exactEvictions — the bounded exact cache never drops a held window's ordinal (review I3)", () => {
+  it("drops nothing within the cap", () => {
+    expect(exactEvictions([1, 2, 3], 3, new Set())).toEqual([]);
+  });
+  it("drops the lowest ordinals past the cap", () => {
+    expect(exactEvictions([5, 1, 4, 2, 3], 3, new Set())).toEqual([1, 2]);
+  });
+  it("skips a held window's ordinals and drops the next lowest instead", () => {
+    expect(exactEvictions([1, 2, 3, 4, 5], 3, new Set([1, 2]))).toEqual([3, 4]);
+  });
+  it("keeps every held ordinal even past the cap — the window is bounded, the live tip is not", () => {
+    expect(exactEvictions([1, 2, 3, 4], 2, new Set([1, 2, 3]))).toEqual([4]);
+    expect(exactEvictions([1, 2, 3], 1, new Set([1, 2, 3]))).toEqual([]);
   });
 });

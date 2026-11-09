@@ -66,6 +66,20 @@ export function wantedExactReads(w: BlockWindow | null, exact: Readonly<Record<n
     .sort((a, b) => b - a);
 }
 
+/** WHICH EXACT READS THE BOUNDED CACHE DROPS (review I3, 2026-11-09): the lowest ordinals past `max`,
+ *  never one a HELD window still draws (`keep` — the block window's ticks, the past window's). The
+ *  cache evicted the lowest ordinals, and a held window's ticks ARE the lowest (the live tip is read
+ *  on every new global), so within half an hour on /blocks every window tick older than the live
+ *  buffer lost its read and its bar fell to a block-only floor, unlabelled — and nothing re-asked,
+ *  since the window's reads are asked only when its key set changes. Held ordinals cost at most a
+ *  window over the cap (52 + the past window's 52), which the cap's "one small object per ordinal"
+ *  affords. */
+export function exactEvictions(ords: readonly number[], max: number, keep: ReadonlySet<number>): number[] {
+  if (ords.length <= max) return [];
+  const free = [...ords].filter((o) => !keep.has(o)).sort((a, b) => a - b);
+  return free.slice(0, Math.max(0, Math.min(free.length, ords.length - max)));
+}
+
 /** HAVE THE WINDOW'S READS SETTLED — every read it wants landed or missed (a DAG read's miss is its
  *  tick's exact miss)? The chamber lays the DAG out ONCE, on this edge, never as the reads land one
  *  by one (user, 2026-11-07: "the layout shifts around before it finally settles; can't this just be
@@ -95,19 +109,3 @@ export function blockReadOf(
   return reads[blockReadKey(b.chain, b.ordinal)]?.blocks.find((x) => x.hash === b.hash) ?? null;
 }
 
-/** HOW MANY BLOCKS ARE BUILT ON THIS ONE, as far as the held reads show: the blocks of its own
- *  chain's block reads that name it as a parent; the reads are pruned with the window, so this is a
- *  count within the window. */
-export function blockChildren(
-  reads: Readonly<Record<string, { blocks: readonly BlockRead[] } | undefined>>,
-  chain: string,
-  hash: string,
-): number {
-  let n = 0;
-  for (const [key, r] of Object.entries(reads)) {
-    // The key's chain part, exactly (`blockReadKey`: `${chain}:${ordinal}`).
-    if (!r || key.slice(0, key.lastIndexOf(":")) !== chain) continue;
-    for (const b of r.blocks) if (b.parents.some((p) => p.hash === hash)) n++;
-  }
-  return n;
-}

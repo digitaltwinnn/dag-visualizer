@@ -3,7 +3,7 @@ import type { MetaSnapRecord } from "@/src/data/api";
 import type { GlobalSnapshot, RawMetaSnapshot } from "@/src/data/types";
 import { CATALOG } from "@/src/engine/config";
 import { tickPolledRows } from "@/src/data/ladderLevels";
-import { PAST_RETRY_MS, buildPastWindow, foldAnchors, pastRetryDelay, getPastWindow, ledgerSource, getBlockWindow, onBlockWindow, onPastWindow, pastWanted, setBlockWindow, setPastWindow, type LedgerSource } from "@/src/data/pastWindow";
+import { PAST_RETRY_MS, buildPastWindow, foldAnchors, pastRetryDelay, getPastWindow, ledgerSource, getBlockWindow, heldOrdinals, onBlockWindow, onPastWindow, pastWanted, setBlockWindow, setPastWindow, type LedgerSource } from "@/src/data/pastWindow";
 
 const g = (o: number): GlobalSnapshot => ({ ordinal: o, timestamp: `t${o}`, hash: `g${o}` });
 const raw = (o: number, ts: string, fee = 10): RawMetaSnapshot => ({ ordinal: o, timestamp: ts, hash: `m${o}`, lastSnapshotHash: `m${o - 1}`, fee, sizeInKB: 1 } as RawMetaSnapshot);
@@ -77,6 +77,19 @@ describe("the held window", () => {
     off();
     setPastWindow(w);
     expect(heard).toBe(2);
+  });
+});
+
+describe("heldOrdinals — what the exact cache keeps (review I3)", () => {
+  afterEach(() => {
+    setPastWindow(null);
+    setBlockWindow(null);
+  });
+  it("is every global a held window draws: the past window's and the block window's ticks", () => {
+    expect([...heldOrdinals()]).toEqual([]);
+    setPastWindow(buildPastWindow({ globals: [g(7), g(8)], chains: {} }, "mainnet")!);
+    setBlockWindow({ ticks: [{ ord: 3 }, { ord: 5 }] } as unknown as Parameters<typeof setBlockWindow>[0]);
+    expect([...heldOrdinals()].sort((a, b) => a - b)).toEqual([3, 5, 7, 8]);
   });
 });
 
