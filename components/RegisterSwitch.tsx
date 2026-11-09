@@ -18,6 +18,7 @@ import { useStore } from "@/src/store/store";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { cn, TOUCH_HIT } from "@/lib/utils";
 import { StateMark } from "@/components/state/StateAtoms";
+import { useSceneYield } from "@/components/RailShade";
 import { SlideFace } from "@/components/SlideFace";
 
 // THE REGISTER SWITCH, ON THE SCENE (D3, user 2026-11-07 — option A of
@@ -71,6 +72,11 @@ export default function RegisterSwitch() {
   const blocks = useSyncExternalStore(onBlockWindow, getBlockWindow, () => null);
   // The live block window's span runs to NOW (its silence since the newest block tick is part of it).
   const now = useNowTick(30_000);
+  // IT STEPS BACK WITH THE BAND WHILE THE HAND IS ON THE CAMERA (user, 2026-11-09: "when we drag
+  // the view, also dim the new view-mode control"): the one read (`useSceneYield`) at the band's own
+  // level and away tempo. Every tier, as the band: it floats over the scene the drag is turning.
+  // (Above the `!on` return: a hook after it would change the hook order when the view switches.)
+  const yielding = useSceneYield();
   // WHERE THE PHONE FACE'S NAME ARRIVES FROM — the view face's own rule (TopBar's `faceSlide`): a ›
   // brings the next register in from the right, ‹ from the left, keyed by the register it was armed
   // for, so a switch from anywhere else (the desktop grid, a footer link) rolls in plainly.
@@ -180,6 +186,8 @@ export default function RegisterSwitch() {
       className={cn(
         "absolute left-1/2 z-[5] -translate-x-1/2 w-max",
         "transition-opacity duration-200 data-[on='0']:opacity-0 data-[on='0']:pointer-events-none motion-reduce:transition-none",
+        // Off (data-on 0) still wins: its attribute variant outranks the plain utility.
+        yielding && "opacity-40 duration-300",
       )}
     >
       {/* THE PHONE FACE (option A): the lit register whole, ‹ › stepping the others. CSS picks the
