@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { LINK_BEND, LINK_SAMPLES, STRETCH_WORDS_MIN, forkSpread, referenceSegments, sCurve, silentRun, stretchLabel } from "./blockBraid";
+import { LINK_BEND, LINK_SAMPLES, STRETCH_WORDS_MIN, blockPlace, forkSpread, referenceSegments, sCurve, silentRun, stretchLabel } from "./blockBraid";
 
 describe("forkSpread — a layered DAG drawing on the chamber's time axis, its forks opening up and down", () => {
   const b = (hash: string, height: number, ord: number, parents: string[] = []) => ({ hash, height, ord, parents });
@@ -138,5 +138,26 @@ describe("sCurve — a reference link that starts and ends horizontal", () => {
     const buf = new Float32Array(3 + 3 * 3);
     expect(sCurve(a, b, 2, buf, 3)).toBe(12);
     expect(Array.from(buf.slice(9))).toEqual([-10, 4, 2]);
+  });
+});
+
+describe("blockPlace — a block is placed once, never moved after it is drawn", () => {
+  const read = { parents: ["p"] };
+  it("draws nothing while the window holds", () => {
+    expect(blockPlace(true, read, false, 2)).toBeNull();
+  });
+  it("never draws a parentless read (a data block)", () => {
+    expect(blockPlace(false, { parents: [] }, true, 0)).toBeNull();
+  });
+  it("stands a placed block at its place", () => {
+    expect(blockPlace(false, read, false, -1)).toBe(-1);
+  });
+  it("waits for a read block whose parent is still in flight, rather than drawing it on the centre line", () => {
+    expect(blockPlace(false, read, false, undefined)).toBeNull();
+  });
+  it("puts a block on the centre line only once the reads have settled (a missed read or parent)", () => {
+    expect(blockPlace(false, undefined, false, undefined)).toBeNull();
+    expect(blockPlace(false, undefined, true, undefined)).toBe(0);
+    expect(blockPlace(false, read, true, undefined)).toBe(0);
   });
 });

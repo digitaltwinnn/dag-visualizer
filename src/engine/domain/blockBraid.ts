@@ -199,3 +199,18 @@ export const STRETCH_WORDS_MIN = 200;
 export function stretchLabel(snapshots: number, ms: number): string | null {
   return snapshots > STRETCH_WORDS_MIN ? `${snapshots.toLocaleString()} snapshots · ${relativeAge(ms, true)}` : null;
 }
+
+/** WHERE A BLOCK STANDS ACROSS THE BRAID, or null for not drawn (yet). `hold`: the window's reads
+ *  are still landing; `read`: the block's own read (absent while unread or missed); `settled`: the
+ *  window's reads have all landed; `z`: its place from `forkSpread`, absent where none was given.
+ *  A read with no parents is a data block, never drawn. An unread block waits for the settle, then
+ *  stands on the centre line (missed). ⚠️ A read block `forkSpread` left unplaced has a parent still
+ *  in flight (review I1, 2026-11-09): it waits too — drawn on the centre line meanwhile, it jumped
+ *  to its lattice place when the parent landed, breaking "laid out once" — and only after the
+ *  settle (a parent that never lands) does it take the centre line. */
+export function blockPlace(hold: boolean, read: { parents: readonly unknown[] } | undefined, settled: boolean, z: number | undefined): number | null {
+  if (hold) return null;
+  if (read && read.parents.length === 0) return null;
+  if (!settled && (!read || z == null)) return null;
+  return z ?? 0;
+}

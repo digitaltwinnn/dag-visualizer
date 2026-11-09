@@ -69,7 +69,7 @@ import {
   FRONT_RUN_X0,
   type LaneBlock,
 } from "../../domain/ledgerModel";
-import { forkSpread, referenceSegments, silentRun, stretchLabel, type BlockRead } from "../../domain/blockBraid";
+import { blockPlace, forkSpread, referenceSegments, silentRun, stretchLabel, type BlockRead } from "../../domain/blockBraid";
 import { DATA_MARK, carriesData, dataMarkCount } from "../../domain/dataMark";
 import { ENTRY_STAG, entryStep, entryTotal } from "../../domain/entryBeat";
 import { makeBarSpec, fillBarSpec, UNLISTED_KEY, RIBBON_LANE_HALF, type BarSpec } from "../../domain/ledgerBands";
@@ -1243,14 +1243,9 @@ export class LedgerView implements SceneView {
     // A block comes from the FEED's hash, so a failed or unlanded read still draws it, with no links;
     // its height is unknown, so it stands on the centre line. A landed read with no parents is a data
     // block, not a DAG block, and is not drawn (null).
-    const placeOf = (chain: string, hash: string): number | null => {
-      if (hold) return null; // the window's reads are still landing: nothing is drawn yet
-      const read = readOf.get(`${chain}:${hash}`);
-      if (read && read.parents.length === 0) return null;
-      // An unread block is drawn only once its read has settled — missed, it stands on the centre line.
-      if (!read && !this._readsSettled) return null;
-      return zOf.get(chain)?.get(hash) ?? 0;
-    };
+    // The rule is `blockPlace`'s (pure, tested): a block waits until it has a place, so it is laid once.
+    const placeOf = (chain: string, hash: string): number | null =>
+      blockPlace(hold, readOf.get(`${chain}:${hash}`), this._readsSettled, zOf.get(chain)?.get(hash));
     const turn = (key: string): number => {
       const j = taken.get(key) ?? 0;
       taken.set(key, j + 1);
