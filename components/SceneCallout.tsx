@@ -567,10 +567,13 @@ export default function SceneCallout() {
         // (user, 2026-08-16 — "if filter, select the correct segment of the byte bar").
         ring: net !== "all" ? filterAccent(net) : "var(--core)",
         mark: { icon: iconForPick("snapshot"), hue: filterAccent(filter) },
-        // In Data blocks the lead is the exact read's or NOTHING (user, 2026-11-07, on a reload of
-        // /data-blocks: "some things are based on the default snapshot" — before the read landed the
-        // label fell back to the Metagraph snapshots register's anchors lead): unknown until read,
-        // never the other register's fact (rule 10).
+        // ONE STRUCTURE IN BOTH REGISTERS (user, 2026-11-09: "the bottom content changes based on the
+        // view-mode, but keep the same structure; x metagraphs anchored | y snapshots | data blocks |
+        // transactions"): the sentence is WHO anchored, the chip is the register's own count — the
+        // metagraph snapshots in Metagraph snapshots, the data blocks in Data blocks. (Transaction
+        // blocks labels the block, not the global: D3.) Both come from the exact read, so until it
+        // lands the lead shows the acquiring atom, and a failed read says so — never the other
+        // register's fact or a guessed count (rule 10; user, 2026-11-07, on a reload of /data-blocks).
         lead:
           dataLead && resolving
             ? { pending: true, pendingFading: resolveHold.fading }
@@ -580,12 +583,12 @@ export default function SceneCallout() {
             ? (() => {
                 const rows = exact.rows.filter((r) => (mine ? netKeyOf(r.metaId) === netKeyOf(net) : true));
                 const nb = rows.reduce((n, r) => n + (carriesData(r) ? r.dataBlocks! : 0), 0);
-                const nu = dataUpdatesOf(rows);
-                return {
-                  ...(mine ? { ident: { text: mine.ticker || mine.name, hue: filterAccent(net) } } : {}),
-                  text: `${nb} data ${nb === 1 ? "block" : "blocks"}`,
-                  chip: nu != null ? `${nu} ${nu === 1 ? "update" : "updates"}` : undefined,
-                };
+                // A row the decoder could not read makes the count unknown: no chip, never a short one.
+                const known = dataUpdatesOf(rows) != null;
+                const chip = known ? `${nb} data ${nb === 1 ? "block" : "blocks"}` : undefined;
+                return mine
+                  ? { ident: { text: mine.ticker || mine.name, hue: filterAccent(net) }, text: `${rows.length} metagraph ${rows.length === 1 ? "snapshot" : "snapshots"}`, chip }
+                  : { text: anchoredText(exact.channels, total), chip };
               })()
             : typeof total !== "number"
             ? undefined
@@ -598,22 +601,21 @@ export default function SceneCallout() {
                   chip: mineKB != null && exact ? fmtShareKB(mineKB, exact.totalSizeKB) : undefined,
                 }
               : {
-                  // WHO AND HOW MANY (user, 2026-11-09: "can we say x metagraphs anchored y snapshots?"):
-                  // the metagraphs come from the exact read, so until it lands the lead shows the
-                  // acquiring atom (same day: "say 'loading' instead of the 1st", then "can't we use
-                  // the visual cue?") — never a guessed count (rule 10).
+                  // WHO AND HOW MANY (user, 2026-11-09: "can we say x metagraphs anchored y snapshots?"),
+                  // the how-many as the chip since the same day (above). The metagraphs come from the
+                  // exact read, so until it lands the lead shows the acquiring atom — never a guessed
+                  // count (rule 10).
                   pending: total !== 0 && resolving,
                   pendingFading: resolveHold.fading,
                   text:
                     total === 0
                       ? "No metagraph anchored"
                       : exact && !resolving
-                        ? `${exact.channels} ${exact.channels === 1 ? "metagraph" : "metagraphs"} anchored ${total} ${total === 1 ? "snapshot" : "snapshots"}`
+                        ? anchoredText(exact.channels, total)
                         : !resolving
                           ? "Read failed"
                           : undefined,
-                  // No size chip here (user, 2026-11-09, option 1): the sentence carries the line at the
-                  // callout's one width, and the size stays a fact of the Global snapshot card.
+                  chip: total !== 0 && exact && !resolving ? `${total} ${total === 1 ? "snapshot" : "snapshots"}` : undefined,
                 },
       };
     };
@@ -725,6 +727,12 @@ export default function SceneCallout() {
   const dismiss = (key: string) => setDismissed((d) => ({ ...d, [`${mode}|callout`]: key }));
 
   return <CalloutMark m={m} id="callout" multi phone={phone} onDismiss={dismiss} />;
+}
+
+/** The global label's sentence, the same in both registers that draw it: who anchored. */
+function anchoredText(channels: number, total: number | undefined): string {
+  if (total === 0) return "No metagraph anchored";
+  return `${channels} ${channels === 1 ? "metagraph" : "metagraphs"} anchored`;
 }
 
 /** The callout geometry the stylesheet reads, written once from the TS constants. */
