@@ -189,13 +189,13 @@ export default function RegisterSwitch() {
             <Clock aria-hidden className="size-3 flex-none opacity-80" />
             <span aria-hidden>{bareSpan[register]}</span>
             {figure[register] && (
-              <span aria-hidden className="ml-2 inline-flex items-center gap-1 text-primary">
+              <span aria-hidden className="ml-2 inline-flex items-center gap-1">
                 <LitIcon aria-hidden className="size-3 flex-none opacity-80" />
                 {figure[register]}
               </span>
             )}
             {/* The state, the row's third column — the desktop half's own order (2026-11-09). */}
-            <StateMark following={following} className="ml-2 font-sans" />
+            <StateMark following={following} className="ml-2 font-sans leading-none" />
             {/* The readings in words for assistive tech (the desktop half's own accessible name). */}
             <span className="sr-only">{count[register] ? `${span[register]}, ${count[register]}` : span[register]}</span>
           </span>
@@ -240,7 +240,9 @@ export default function RegisterSwitch() {
               <Clock aria-hidden className="size-3 flex-none opacity-80" />
               <span>{bareSpan[r]}</span>
               {figure[r] && (
-                <span className="ml-2 inline-flex items-center gap-1 group-aria-pressed:text-primary">
+                // NOT COLOUR-CODED (user, 2026-11-09: "don't color-code the middle element when the mode is
+                // selected"): the count reads in the row's own ink, as the span beside it.
+                <span className="ml-2 inline-flex items-center gap-1">
                   <Icon aria-hidden className="size-3 flex-none opacity-80" />
                   {figure[r]}
                 </span>
@@ -249,7 +251,10 @@ export default function RegisterSwitch() {
                   in the view-mode control to the bottom row, so a 3rd column there"): the name line
                   carries the name alone. Its room is reserved on every half (2026-11-08: the control's
                   width shifted "a bit because of live indicator"), an unlit half carrying it invisible. */}
-              <StateMark following={following} className={cn("ml-2 font-sans", !lit && "invisible")} />
+              {/* ON THE ROW'S LINE (2026-11-09: "the bottom row elements are not properly aligned"): the
+                  mark's word sat on its own 17px line box beside the readings' 12px one, so it rode
+                  low; `leading-none` puts all four on one line. */}
+              <StateMark following={following} className={cn("ml-2 font-sans leading-none", !lit && "invisible")} />
             </span>
           </button>
         );
