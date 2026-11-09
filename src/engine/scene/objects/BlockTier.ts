@@ -21,9 +21,10 @@ import { frontAt, horizonAt, SLOT_N, SLOT_SP } from "../../domain/ledgerModel";
 import { LEAD_X } from "../../domain/ledgerLayout";
 import { snapBright, emphasisK } from "../../domain/dimModel";
 import { LINK_SAMPLES, sCurve } from "../../domain/blockBraid";
-import { glowBlend, inkMix, inkPresence, isLightGround, type SceneColors } from "../../sceneColors";
+import { inkMix, inkPresence, isLightGround, type SceneColors } from "../../sceneColors";
 import type { PickDescriptor } from "@/src/data/types";
 import { joinBloom } from "../SceneContext";
+import { SoftLines } from "./SoftLines";
 
 /** One block, placed by the view (chamber-local, before the rewind offset). */
 export interface BlockItem {
@@ -98,12 +99,12 @@ export class BlockTier {
   private _entryDrop: Float32Array | null = null;
   private _entryFade: Float32Array | null = null;
 
-  // ── links: one LineSegments, positions written at event time, alpha per frame (the threads' idiom)
+  // ── links: SOFT LINES (antialiased strips, `SoftLines`), positions written at event time, alpha per
+  // frame (the threads' idiom). They were a LineSegments until 2026-11-09 (user: "color/jagged
+  // artifacts for the lines from certain angles … more with the bloom"): a 1px GL line is a stair-step
+  // without MSAA, and the whole-frame bloom haloed each step.
   private readonly _maxLinks: number;
-  private readonly _linkGeo = new THREE.BufferGeometry();
-  private readonly _linkPos: THREE.Float32BufferAttribute;
-  private readonly _linkCol: THREE.Float32BufferAttribute;
-  private readonly _linkMat: THREE.LineBasicMaterial;
+  private readonly _links: SoftLines;
   private _linkChain: string[] = [];
   /** Each link end's ROW (the slot of the block it ends on), resolved at event time. */
   private readonly _linkSlot: Int16Array;
@@ -141,23 +142,12 @@ export class BlockTier {
     // Two parents per block: a link budget of twice the blocks.
     this._maxLinks = maxBlocks * 2;
     this._linkSlot = new Int16Array(this._maxLinks * 2);
-    // Each link is an S-curve of LINK_SAMPLES segments (`blockBraid.sCurve`): 2 vertices a segment.
-    this._linkPos = new THREE.Float32BufferAttribute(new Float32Array(this._maxLinks * LINK_SAMPLES * 6), 3);
-    this._linkCol = new THREE.Float32BufferAttribute(new Float32Array(this._maxLinks * LINK_SAMPLES * 8), 4);
-    this._linkPos.setUsage(THREE.DynamicDrawUsage);
-    this._linkCol.setUsage(THREE.DynamicDrawUsage);
-    this._linkGeo.setAttribute("position", this._linkPos);
-    this._linkGeo.setAttribute("color", this._linkCol);
-    this._linkGeo.setDrawRange(0, 0);
-    // A line IN the bloom layer (user, 2026-11-07: "add a bit of bloom" — the brighter hairline alone
-    // still read thin beside the blocks it ties); its alpha (`BLOCK_LOOK.link`) is what meters the glow.
-    this._linkMat = new THREE.LineBasicMaterial({
-      vertexColors: true, transparent: true, opacity: 1, depthWrite: false, blending: glowBlend(colors),
-    });
-    const lines = new THREE.LineSegments(this._linkGeo, this._linkMat);
-    joinBloom(lines);
-    lines.frustumCulled = false;
-    this.group.add(lines);
+    // Each link is an S-curve of LINK_SAMPLES segments (`blockBraid.sCurve`), one soft segment each.
+    // IN the bloom layer (user, 2026-11-07: "add a bit of bloom" — the brighter hairline alone still
+    // read thin beside the blocks it ties); its alpha (`BLOCK_LOOK.link`) is what meters the glow.
+    this._links = new SoftLines(this._maxLinks * LINK_SAMPLES, colors);
+    joinBloom(this._links.mesh);
+    this.group.add(this._links.mesh);
   }
 
   /** How many blocks are drawn — 0 is the cleared tier. */
@@ -185,47 +175,26 @@ export class BlockTier {
     this.mesh.count = n;
 
     const segs = Math.min(links.length / 6, this._maxLinks, linkChains.length);
-    const pos = this._linkPos.array as Float32Array;
-    const col = this._linkCol.array as Float32Array;
     this._linkChain = linkChains.slice(0, segs); // event-time
     const N = LINK_SAMPLES;
     for (let s = 0; s < segs; s++) {
-      // The link's polyline: its S-curve sampled, laid out as N segments (each vertex twice inside).
+      // The link's polyline: its S-curve sampled, laid out as N soft segments.
       sCurve([links[s * 6], links[s * 6 + 1], links[s * 6 + 2]], [links[s * 6 + 3], links[s * 6 + 4], links[s * 6 + 5]], N, _curve);
-      const base = s * N * 2;
-      for (let j = 0; j < N; j++) {
-        for (let e = 0; e < 2; e++) {
-          const p = (j + e) * 3;
-          const v = (base + j * 2 + e) * 3;
-          pos[v] = _curve[p];
-          pos[v + 1] = _curve[p + 1];
-          pos[v + 2] = _curve[p + 2];
-        }
-      }
       this._linkSlot[s * 2] = linkSlots[s * 2] ?? -1;
       this._linkSlot[s * 2 + 1] = linkSlots[s * 2 + 1] ?? -1;
       _col.setHex(linkHues[s] ?? 0xffffff);
-      for (let v = base; v < base + N * 2; v++) {
-        col[v * 4] = _col.r;
-        col[v * 4 + 1] = _col.g;
-        col[v * 4 + 2] = _col.b;
-        col[v * 4 + 3] = 0;
+      for (let j = 0; j < N; j++) {
+        const p = j * 3;
+        const k = s * N + j;
+        this._links.setSegment(k, _curve[p], _curve[p + 1], _curve[p + 2], _curve[p + 3], _curve[p + 4], _curve[p + 5]);
+        this._links.setColor(k, _col.r, _col.g, _col.b);
+        this._links.setAlpha(k, 0, 0);
       }
     }
     this._linkCount = segs;
-    // UPLOAD ONLY WHAT IS DRAWN (perf review, 2026-11-07): three uploads an attribute WHOLE when it
-    // has no update range — the link buffers are sized for the cap (1,200 links), so 18 drawn links
-    // shipped 460 KB a frame. The range is the drawn segments' vertices; three clears it after each
-    // upload, so every flag re-adds it.
-    if (segs > 0) {
-      this._linkPos.clearUpdateRanges();
-      this._linkPos.addUpdateRange(0, segs * N * 2 * 3);
-      this._linkPos.needsUpdate = true;
-      this._linkCol.clearUpdateRanges();
-      this._linkCol.addUpdateRange(0, segs * N * 2 * 4);
-      this._linkCol.needsUpdate = true;
-    }
-    this._linkGeo.setDrawRange(0, segs * N * 2);
+    // UPLOAD ONLY WHAT IS DRAWN (perf review, 2026-11-07): `SoftLines.commit` ranges every upload to
+    // the drawn segments — the buffers are sized for the cap (1,200 links).
+    this._links.commit(segs * N, true, true);
     this._resolveEmphasis();
   }
 
@@ -285,8 +254,7 @@ export class BlockTier {
     this._colors = c;
     this._paper = isLightGround(c);
     if (this._glass) this._mat.opacity = this._glassOp();
-    this._linkMat.blending = glowBlend(c);
-    this._linkMat.needsUpdate = true; // three caches the program per blending mode
+    this._links.setColors(c);
   }
 
   /** Per frame: every live instance written or zero-scaled; link alpha per vertex. No allocation. */
@@ -344,7 +312,6 @@ export class BlockTier {
     this._lastN = n;
 
     if (this._linkCount === 0) return;
-    const col = this._linkCol.array as Float32Array;
     const linkRest = paper ? L.linkPaper : L.link;
     const N = LINK_SAMPLES;
     for (let s = 0; s < this._linkCount; s++) {
@@ -366,22 +333,15 @@ export class BlockTier {
         if (e === 0) a0 = a;
         else a1 = a;
       }
-      const base = s * N * 2;
-      for (let j = 0; j < N; j++) {
-        col[(base + j * 2) * 4 + 3] = a0 + (a1 - a0) * (j / N);
-        col[(base + j * 2 + 1) * 4 + 3] = a0 + (a1 - a0) * ((j + 1) / N);
-      }
+      for (let j = 0; j < N; j++) this._links.setAlpha(s * N + j, a0 + (a1 - a0) * (j / N), a0 + (a1 - a0) * ((j + 1) / N));
     }
-    this._linkCol.clearUpdateRanges();
-    this._linkCol.addUpdateRange(0, this._linkCount * N * 2 * 4);
-    this._linkCol.needsUpdate = true;
+    this._links.commit(this._linkCount * N, false, true);
   }
 
   dispose(): void {
     this.mesh.geometry.dispose();
     (this.mesh.material as THREE.Material).dispose();
     this.mesh.dispose();
-    this._linkGeo.dispose();
-    this._linkMat.dispose();
+    this._links.dispose();
   }
 }

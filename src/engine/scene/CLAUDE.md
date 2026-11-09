@@ -674,8 +674,13 @@ bloom layer; a token block is opaque and depth-writing like its tile, a DAG bloc
 A row is one object: blocks and each link END ask the trail's boundaries at their ROW's x (a block
 offset along a tile grid must not fade apart from its tile; an end's row is handed in beside the
 endpoints from the same `referenceSegments` walk), dissolve by zero-scale, and drop with
-their slot's entry beat. Links are one `LineSegments`, positions at event time, alpha per vertex per
-frame, `glowBlend` on each ground. The silent stretch is one dashed `LineSegments` flush in the floor
+their slot's entry beat. Links are SOFT LINES (`objects/SoftLines.ts`, 2026-11-09 — user: "color/jagged artifacts for the lines
+from certain angles … more with the bloom"): each segment a screen-space strip whose alpha falls off
+linearly to 0 one DEVICE pixel from its centre, so a link carries a 1px line's light without the
+stair-step the MSAA-less renderer gave a GL line — the step the whole-frame bloom haloed into a
+crawling fringe. FXAA over the whole frame was tried and dropped the same day: it smeared every 1px
+mark (the floor's ordinals, the dotted anchor lines). Positions at event time, alpha per segment end
+per frame, ranged uploads, `glowBlend` on each ground. The silent stretch is one dashed `LineSegments` flush in the floor
 between two rows' bars, plus a flat edge label ("1,364 snapshots · 4h", `relativeAge` — the app's one
 short span) past 200 snapshots (`blockBraid.stretchLabel`, the one home for both stretches' words); flat, not a billboard, because the floor's text is flat everywhere.
 **The live edge is the silent stretch growing at the front** (spec 2): in the LIVE window one more
