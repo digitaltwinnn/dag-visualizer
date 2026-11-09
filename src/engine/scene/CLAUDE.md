@@ -272,6 +272,23 @@ identically so adjacent ribbons can't cross, and a **hidden lane draws no ribbon
 sheet would overlap the committed lane's field). Only FOUR rows get a sheet — lead, hot, hover
 preview, grace — because N networks × every row is a wall of glass.
 
+**Each register wears its own sheet** (user, 2026-11-09: "the ribbon for metagraph snapshots and data
+blocks to the global snapshot is identical"; `REGISTER_CARGO.anchors` → `Ribbons.setStriped`, two
+uniforms, no rewrite or recompile). The **Metagraph snapshots** sheet is LINED ("can we give it a outer
+lining?"): a hairline along both long sides at 1 + `liningLine` (1.8) = 2.8× the fill's level, so the
+sheet reads as a defined shape. The **Data blocks** sheet is STRIPED (design option A): fine stripes
+running along its fall, `round(top width / stripeSp)` of them (0.22 world units, at least 3),
+converging with the sheet on its own sweep, over a fill at `stripeFill` (0.6) of the snapshot sheet's
+level and peaking at 0.6 + `stripeLine` (1.6) = 2.2× it — items in a stream on a quieter film, against
+one continuous state. It takes no lining: the stripes already draw its shape, and the two registers stay
+apart. Both are **one fragment term over a per-vertex across-sheet coordinate** (0 → n), antialiased
+in screen space with `fwidth` — the triangular 1-device-pixel profile of `SoftLines` — because the
+renderer has no MSAA and the half-res bloom haloes a hard step into a crawling fringe. The lining sits
+one pixel INSIDE each edge, never on the polygon's own stepped edge; stripes closer than ~3 px hand
+over to their average and linings on a sheet under ~6 px wide hand over to the plain sheet, so nothing
+aliases as the camera moves. Both ride the sheet's alpha, so `inkPresence` on paper and the dims and
+row fades apply unchanged.
+
 ⚠️ **That cap answers the UNFILTERED chamber, and it used to be inherited by the filtered one.** This
 paragraph claimed for months that "older ticks keep a hairline strut"; there was no such strut — it had
 been retired and the sentence outlived it — so under a commit the two readings that run the length of
@@ -712,8 +729,8 @@ S-curve, every reference `referenceSegments` draws, the silent run), `src/data/b
 
 The third register (D6, 2026-11-07 — user: "a 3rd option 'data blocks' which can visualize the DED
 which would inherit the snapshot layout?" → "Threeway."). Its `REGISTER_CARGO` row says all of it:
-`blocks: false, liveEdge: true, anchors: "sheets"` — the Metagraph snapshots chamber (the same
-source, ribbons, bands and live edge) — and `tiles: "data"`: **only a snapshot whose exact read says
+`blocks: false, liveEdge: true, anchors: "striped"` — the Metagraph snapshots chamber (the same
+source, ribbons, bands and live edge; its sheets striped, see *Each register wears its own sheet*) — and `tiles: "data"`: **only a snapshot whose exact read says
 it carried data blocks is drawn** (user, 2026-11-07: "a metagraph that anchored but had no datablock
 is still shown … don't show it"; `domain/dataMark.carriesData`, the rule's one home), its tile
 wearing the mark. A dataless snapshot has no tile, is not picked, and is tied to its tick by nothing:

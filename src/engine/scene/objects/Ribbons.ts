@@ -54,6 +54,19 @@ export interface RibbonLook {
   brightness: number; // vertex-colour multiplier (additive blending → perceived brightness)
   curve: number;     // 0 = straight diagonal sheet, 1 = full smootherstep S-sweep
   threadAlpha: number; // the committed network's hairline thread (setThreads) — a HINT, not a sheet
+  /** THE STRIPED SHEET (`setStriped`, the Data blocks register): the fill under the stripes, as a
+   *  fraction of the sheet's own level — SUBTLER than the snapshot sheet (user, 2026-11-09: "keep also
+   *  a subtle fill, but a bit more subtle than the fill used for the metagraph ribbon"). */
+  stripeFill: number;
+  /** A stripe's added level on its centre line, as a multiple of the sheet's own level. */
+  stripeLine: number;
+  /** The stripes' spacing across the sheet's TOP edge, in world units: a lane's sheet carries
+   *  `round(width / stripeSp)` stripes (at least `STRIPES_MIN`), and they converge with the sheet. */
+  stripeSp: number;
+  /** THE LINED SHEET (the Metagraph snapshots register; user, 2026-11-09: "can we give it a outer
+   *  lining?"): the hairline along the sheet's two long sides, its added level on its centre line as
+   *  a multiple of the sheet's own — a step above the fill, so the sheet reads as a defined shape. */
+  liningLine: number;
 }
 
 // User-tuned live, 2026-08-07.
@@ -67,7 +80,46 @@ export const RIBBON_LOOK: Readonly<RibbonLook> = {
   // SHEETS' `restOp` (0.21) and this number multiplied it, so a "0.4" thread drew at 0.084 — a
   // hairline at 8% is not a hint, it is absent. The material takes this number directly now.
   threadAlpha: 0.5,
+  // Data blocks (design round, 2026-11-09, option A): the fill at 0.6 of the sheet's level (0.126
+  // against 0.21 on dark), the stripes peaking at 0.6 + 1.6 = 2.2× it — items in a stream on a
+  // quieter film, so the register reads apart from the snapshots' continuous one.
+  stripeFill: 0.6,
+  stripeLine: 1.6,
+  stripeSp: 0.22,
+  // The lining peaks at 1 + 1.8 = 2.8× the sheet's level (≈0.59 on dark against the 0.21 fill):
+  // a defined edge, still well under the tiles' full ink.
+  liningLine: 1.8,
 };
+
+/** The fewest stripes a sheet carries — a narrow lane still reads as a stream, not a bar. */
+export const STRIPES_MIN = 3;
+
+/** The stripes, in the sheet's own fragment (`setStriped`). `vStripe` runs 0 → n across the sheet
+ *  (one unit per stripe; a stripe stands at each half-integer), so a stripe follows the sheet's own
+ *  eased sweep and converges with it. ANTIALIASED IN SCREEN SPACE, not by geometry: the renderer has
+ *  no MSAA and the half-res bloom haloes a hard 1px step into a crawling fringe (the soft-lines
+ *  lesson, `SoftLines.ts`), so a stripe's coverage falls off linearly to 0 one device pixel from its
+ *  centre (`fwidth`), the same triangular profile. Where the stripes crowd closer than ~3 pixels
+ *  (the sheet's narrow foot, a far row) they hand over to their own average, so nothing aliases or
+ *  shimmers as the camera moves. */
+//
+// THE LINING (the Metagraph snapshots register) rides the same coordinate: a hairline one device pixel
+// INSIDE each long edge (`vStripe.y` is n, the right edge), with the same triangular profile — kept
+// off the edge itself, because the polygon's own edge is a hard, stepped one (no MSAA), and a bright
+// line laid on it would light every step. Where the sheet narrows to under ~6 pixels the two linings
+// would merge into a bar, so they hand over to the plain sheet there.
+const STRIPE_GLSL = `{
+  float st = vStripe.x;
+  float w = max(fwidth(st), 1e-4);
+  float d = abs(fract(st) - 0.5);
+  float cov = clamp(1.0 - d / w, 0.0, 1.0);
+  float crowd = smoothstep(0.2, 0.45, w);
+  float line = mix(cov, min(w, 1.0), crowd);
+  float e = min(st, vStripe.y - st);
+  float edge = clamp(1.0 - abs(e - w) / w, 0.0, 1.0) * smoothstep(4.0, 8.0, vStripe.y / w); // n / w: the sheet's width in pixels
+  float sheet = mix(1.0, uStripeFill + uStripeLine * line, uStriped) + uLined * uLiningLine * edge;
+  diffuseColor.a = min(diffuseColor.a * sheet, 1.0);
+}`;
 
 /** THE SEAL LINE (design round D8, user: "the line that 'seals' the block … looks the same [as the
  *  block links]; we need to distinguish them much more clearly"): the Transaction blocks register's
@@ -114,7 +166,17 @@ export class Ribbons {
   private _geo = new THREE.BufferGeometry();
   private _pos: THREE.Float32BufferAttribute;
   private _col: THREE.Float32BufferAttribute;
+  /** Per vertex: (the stripe coordinate across the sheet, 0 at its left edge and n at its right; n). */
+  private _stripe: THREE.Float32BufferAttribute;
   private _mat: THREE.MeshBasicMaterial;
+  /** The striped look's uniforms (`setStriped`), shared with the compiled program by reference. */
+  private _stripeU = {
+    uStriped: { value: 0 },
+    uStripeFill: { value: RIBBON_LOOK.stripeFill },
+    uStripeLine: { value: RIBBON_LOOK.stripeLine },
+    uLined: { value: 1 },
+    uLiningLine: { value: RIBBON_LOOK.liningLine },
+  };
   private _mesh: THREE.Mesh;
   private _rows: RowState[] = [];
   // ── the committed network's hairline THREADS (2026-09-01) ────────────────────────────────────
@@ -166,15 +228,31 @@ export class Ribbons {
     // as opposed to making the colors look washed out"). On dark it stays 1 everywhere and the
     // colour multiply does the fading, exactly as before — byte-identical.
     this._col = new THREE.Float32BufferAttribute(new Float32Array(verts * 4), 4);
+    this._stripe = new THREE.Float32BufferAttribute(new Float32Array(verts * 2), 2);
     this._pos.setUsage(THREE.DynamicDrawUsage);
     this._col.setUsage(THREE.DynamicDrawUsage);
+    this._stripe.setUsage(THREE.DynamicDrawUsage);
     this._geo.setAttribute("position", this._pos);
     this._geo.setAttribute("color", this._col);
+    this._geo.setAttribute("aStripe", this._stripe);
     this._geo.setDrawRange(0, 0);
     this._mat = new THREE.MeshBasicMaterial({
       vertexColors: true, transparent: true, opacity: 0,
       side: THREE.DoubleSide, depthWrite: false, blending: glowBlend(colors),
     });
+    // The stripe term rides the stock material (its blend, vertex colour and alpha paths unchanged):
+    // with `uStriped` 0 and `uLined` 0 the expression is the sheet's own alpha.
+    const u = this._stripeU;
+    this._mat.onBeforeCompile = (sh) => {
+      Object.assign(sh.uniforms, u);
+      sh.vertexShader = sh.vertexShader
+        .replace("#include <common>", "attribute vec2 aStripe;\nvarying vec2 vStripe;\n#include <common>")
+        .replace("#include <begin_vertex>", "#include <begin_vertex>\nvStripe = aStripe;");
+      sh.fragmentShader = sh.fragmentShader
+        .replace("#include <common>", "uniform float uStriped;\nuniform float uStripeFill;\nuniform float uStripeLine;\nuniform float uLined;\nuniform float uLiningLine;\nvarying vec2 vStripe;\n#include <common>")
+        .replace("#include <alphamap_fragment>", `#include <alphamap_fragment>\n${STRIPE_GLSL}`);
+    };
+    this._mat.customProgramCacheKey = () => "ribbon-striped";
     this._mesh = new THREE.Mesh(this._geo, this._mat);
     this._mesh.frustumCulled = false;
     this.group.add(this._mesh);
@@ -244,6 +322,19 @@ export class Ribbons {
   /** The band gate (see `_bandGate`). The caller rebuilds the rows and threads after setting it. */
   setBandGate(fn: ((slot: number, key: string) => boolean) | null): void {
     this._bandGate = fn;
+  }
+
+  /** THE REGISTER'S SHEET (`REGISTER_CARGO.anchors`): the Data blocks register's STRIPED one, else the
+   *  Metagraph snapshots register's LINED one — two registers, two distinct sheets (the stripes already
+   *  draw the data sheet's shape). Uniforms, so the switch costs no rewrite and no recompile. The
+   *  look's numbers are read here too, so the constant stays the one home. */
+  setStriped(on: boolean): void {
+    const u = this._stripeU;
+    u.uStriped.value = on ? 1 : 0;
+    u.uLined.value = on ? 0 : 1;
+    u.uStripeFill.value = RIBBON_LOOK.stripeFill;
+    u.uStripeLine.value = RIBBON_LOOK.stripeLine;
+    u.uLiningLine.value = RIBBON_LOOK.liningLine;
   }
 
   setRow(row: 0 | 1 | 2 | 3, slot: number, spec: BarSpec | null, laneZ: (key: string) => number | null, topHalf: (key: string) => number): void {
@@ -449,11 +540,14 @@ export class Ribbons {
   private _writeGeometry(): void {
     const p = this._pos.array as Float32Array;
     const c = this._col.array as Float32Array;
-    const { curve, brightness } = RIBBON_LOOK;
+    const sa = this._stripe.array as Float32Array;
+    const { curve, brightness, stripeSp } = RIBBON_LOOK;
     let v = 0;
-    const push = (x: number, z: number, y: number, r: number, g: number, b: number, a: number) => {
+    let nn = 0; // the current sheet's stripe count, carried on every vertex (the lining's right edge)
+    const push = (x: number, z: number, y: number, r: number, g: number, b: number, a: number, st: number) => {
       p[v * 3] = x; p[v * 3 + 1] = y; p[v * 3 + 2] = z;
       c[v * 4] = r; c[v * 4 + 1] = g; c[v * 4 + 2] = b; c[v * 4 + 3] = a;
+      sa[v * 2] = st; sa[v * 2 + 1] = nn;
       v++;
     };
     for (let r = 0; r < RIBBON_ROWS; r++) {
@@ -488,20 +582,24 @@ export class Ribbons {
         if (!this._paper) inkMix(this._c, emph * rowFade, this._colors);
         const cr = this._c.r, cg = this._c.g, cb = this._c.b;
         const ca = this._paper ? emph * rowFade : 1;
+        // The stripe coordinate: 0 on the sheet's left edge, n on its right, n from its top width.
+        const n = Math.max(STRIPES_MIN, Math.round(Math.abs(q.topZ1 - q.topZ0) / stripeSp));
+        nn = n;
         for (let j = 0; j < RIBBON_SEG; j++) {
           const t0 = j / RIBBON_SEG, t1 = (j + 1) / RIBBON_SEG;
           const s0 = sweep(t0, curve), s1 = sweep(t1, curve);
           const y0 = yTop + (yBot - yTop) * t0, y1 = yTop + (yBot - yTop) * t1;
           const l0 = q.topZ0 + (q.botZ0 - q.topZ0) * s0, r0 = q.topZ1 + (q.botZ1 - q.topZ1) * s0;
           const l1 = q.topZ0 + (q.botZ0 - q.topZ0) * s1, r1 = q.topZ1 + (q.botZ1 - q.topZ1) * s1;
-          push(x, l0, y0, cr, cg, cb, ca); push(x, r0, y0, cr, cg, cb, ca); push(x, r1, y1, cr, cg, cb, ca);
-          push(x, l0, y0, cr, cg, cb, ca); push(x, r1, y1, cr, cg, cb, ca); push(x, l1, y1, cr, cg, cb, ca);
+          push(x, l0, y0, cr, cg, cb, ca, 0); push(x, r0, y0, cr, cg, cb, ca, n); push(x, r1, y1, cr, cg, cb, ca, n);
+          push(x, l0, y0, cr, cg, cb, ca, 0); push(x, r1, y1, cr, cg, cb, ca, n); push(x, l1, y1, cr, cg, cb, ca, 0);
         }
       }
     }
     this._geo.setDrawRange(0, v);
     this._pos.needsUpdate = true;
     this._col.needsUpdate = true;
+    this._stripe.needsUpdate = true;
   }
 
   dispose(): void {

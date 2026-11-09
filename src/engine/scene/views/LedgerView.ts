@@ -220,7 +220,10 @@ export const TILE_LOOK: Readonly<TileLook> = { rest: 0.1, ink: 0.3, halo: 2.5 };
  *    edge's silence instead (the FRONT RUN, `_rebuildBlockTier`).
  *  - `anchors`: how a metagraph snapshot is tied to its tick — the tapering SHEETS, whose width is
  *    the bytes it carried, or the hairline LINES, one per snapshot that carries a block (user,
- *    design round D1: size is irrelevant to the blocks, and the sheets were noise there).
+ *    design round D1: size is irrelevant to the blocks, and the sheets were noise there), or the
+ *    STRIPED sheets — the same sheet carrying fine stripes along its fall over a subtler fill, data
+ *    blocks being items in a stream rather than one state (user, 2026-11-09, design option A:
+ *    "the ribbon for metagraph snapshots and data blocks … is identical").
  *  - `tiles`: WHICH metagraph snapshots are drawn (and picked, and tied to their tick by a sheet or
  *    thread) — `"all"` of them; `"blocks"`, only those carrying a token block (`_blockTiles`); or
  *    `"data"`, only those whose exact read says they carried DATA BLOCKS (`domain/dataMark.carriesData`;
@@ -230,12 +233,12 @@ export const TILE_LOOK: Readonly<TileLook> = { rest: 0.1, ink: 0.3, halo: 2.5 };
  *    is the Snapshots furniture as it stands — the same source, ribbons, bands and live edge — with the
  *    tiles kept to the data-carrying snapshots, plus the marks. A tile whose tick's read has not landed
  *    is unknown and not drawn yet (rule 10) — as a Transaction blocks tile waits for its window. */
-const REGISTER_CARGO: Record<LedgerRegister, { blocks: boolean; liveEdge: boolean; anchors: "sheets" | "lines"; tiles: RegisterSubjects }> = {
+const REGISTER_CARGO: Record<LedgerRegister, { blocks: boolean; liveEdge: boolean; anchors: "sheets" | "striped" | "lines"; tiles: RegisterSubjects }> = {
   // `tiles` IS the register's subjects (`REGISTER_SUBJECTS`, 2026-11-08): the explorer's and the rail's
   // tick levels list exactly the snapshots the chamber draws.
   snapshots: { blocks: false, liveEdge: true, anchors: "sheets", tiles: REGISTER_SUBJECTS.snapshots },
   blocks: { blocks: true, liveEdge: false, anchors: "lines", tiles: REGISTER_SUBJECTS.blocks },
-  data: { blocks: false, liveEdge: true, anchors: "sheets", tiles: REGISTER_SUBJECTS.data },
+  data: { blocks: false, liveEdge: true, anchors: "striped", tiles: REGISTER_SUBJECTS.data },
 };
 /** A data mark's brightness over its tile's: a footnote on the tile, but one that must read on it. */
 const DATA_MARK_GAIN = 2.2;
@@ -1039,6 +1042,7 @@ export class LedgerView implements SceneView {
     // The sheets and threads tie only the tiles the register draws (`tiles: "data"` — a dataless
     // snapshot has no tile, so no sheet may stand in for it).
     this._ribbons.setBandGate(this._cargo.tiles === "data" ? this._dataBandGate : null);
+    this._ribbons.setStriped(this._cargo.anchors === "striped");
     this._rebuildAllSlots(); // the live edge's claim on the front, the tier, the pick list
   }
 

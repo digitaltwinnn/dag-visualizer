@@ -72,6 +72,22 @@ describe("the ledger's brightness-tier hierarchy", () => {
     });
   }
 
+  // THE DATA BLOCKS SHEET (user, 2026-11-09, option A): stripes over a fill SUBTLER than the
+  // snapshot sheet's, the stripes themselves standing above it.
+  it("the striped sheet's fill is quieter than the snapshot sheet, and its stripes louder", () => {
+    expect(RIBBON_LOOK.stripeFill).toBeGreaterThan(0);
+    expect(RIBBON_LOOK.stripeFill).toBeLessThan(1);
+    expect(RIBBON_LOOK.stripeFill + RIBBON_LOOK.stripeLine).toBeGreaterThan(1);
+    expect(RIBBON_LOOK.stripeSp).toBeGreaterThan(0);
+  });
+
+  // THE SNAPSHOT SHEET'S LINING (user, 2026-11-09: "can we give it a outer lining?"): a step above
+  // the fill, so the sheet reads as a shape, and still short of full ink.
+  it("the snapshot sheet's lining stands above its fill and below full ink", () => {
+    expect(RIBBON_LOOK.liningLine).toBeGreaterThan(0);
+    expect(RIBBON_LOOK.restOp * (1 + RIBBON_LOOK.liningLine)).toBeLessThan(1);
+  });
+
   it("ribbons rest visible, and dim on the same one knob", () => {
     expect(RIBBON_LOOK.restOp).toBeGreaterThan(0);
     expect(FOCUS_ROWS.ledger.dim).toBeGreaterThan(0);
