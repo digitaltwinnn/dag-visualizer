@@ -41,10 +41,14 @@ const RIBBON_ROWS = 4;
 /** Trail slots a thread can be drawn for — the retained window, so every visible row can carry one. */
 const MAX_THREADS = 128;
 /** Subdivisions per thread, and the LineSegments vertex count that follows (two per segment). */
-const THREAD_SEG = 12;
+const THREAD_SEG = 32;
 const VERTS_PER_THREAD = THREAD_SEG * 2;
-/** Vertical subdivisions per ribbon — enough for the eased sweep to read as a curve. */
-const RIBBON_SEG = 16;
+/** Vertical subdivisions per ribbon — enough for the eased sweep to read as a curve. 16 → 48
+ *  (user, 2026-11-09: "the ribbon curve looks a bit blocky … add more 'steps'"): with the lining
+ *  drawing the sheet's edge, each straight segment showed as a corner. Event-time geometry, a few
+ *  rows of sheets: the cost is buffer size, never per-frame work. Threads follow it (12 → 32), so a
+ *  thread never runs straighter than the sheet it stands in for. */
+const RIBBON_SEG = 48;
 const PER_ROW = METAGRAPHS.length + 1;
 const VERTS_PER_RIBBON = RIBBON_SEG * 6; // two triangles per segment
 
