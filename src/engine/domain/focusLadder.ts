@@ -115,3 +115,17 @@ export function finestRung(view: View3D, sel: SelectionSnapshot): FocusLevel {
 export function hasLevel(view: View3D, level: FocusLevel): boolean {
   return LADDERS[view].some((r) => r.level === level);
 }
+
+/** Does the SCENE emphasise a committed node (the chip's boost and swell, the rest's dim-back, the
+ *  borrowed group and signer glows yielding to it)? Only a view whose ladder has the NODE rung — the
+ *  same allow-list the click table reads (user, 2026-11-10: a node carried into Snapshots is shown
+ *  nowhere there, while its selection survives for the views that have the rung). A switch holds TWO
+ *  views: `held`, whose layout the scene still draws until the transition boundary, and `entering`,
+ *  whose ancestry re-commits at the click — so either one's rung keeps the node. Leaving Geography for
+ *  Snapshots keeps it through the gather and drops it at the boundary, where every chip is gathered
+ *  and the dim ramps sit at zero; returning restores it at the click, beside the country and provider
+ *  it re-commits, so the provider's borrowed glow never flashes over the trays first. A flat
+ *  destination enters nothing (`null`): the parked grids keep what the view that left them showed. */
+export function sceneShowsNode(held: View3D | null, entering: View3D | null): boolean {
+  return (held != null && hasLevel(held, "node")) || (entering != null && hasLevel(entering, "node"));
+}

@@ -150,8 +150,9 @@ The design rules behind the table, which the tests pin but don't explain:
   SIGNER set reads the same gate** (user, 2026-08-18): it was exempt on the argument that it is not
   ancestry but a relation from a different subject — true, and beside the point, because a metagraph
   that seals with its whole 3-machine cluster left a committed node reading as one bright chip among
-  three. The rule's own reasoning governs it, and nothing true is lost: the snapshot's lane tile still
-  carries the relation and the node card still states `signed`.
+  three. The rule's own reasoning governs it. Since the chamber lost its node rung (2026-11-08) a
+  COMMITTED node never reaches the scene there (the carried-node bullet below), so in Snapshots the signers yield only
+  to a hovered chip, a preview.
 - **A tick drops the metagraph snapshot it can't contain** (user, 2026-08-10). Stronger than the story
   rule one rung up: that one is about set membership, this is a one-to-one join
   (`metagraph.timestamp === global.timestamp`), so committing a DIFFERENT tick provably means the held
@@ -211,6 +212,13 @@ The design rules behind the table, which the tests pin but don't explain:
   take no node as an input at all, and `pickActions.test.ts`' "no Snapshots builder releases the
   node" block pins it, with `followFlow.test.ts` running a held node through a tile, a band, both ×s
   and LIVE. Only the top bar's filter switch still drops a node (a network-level event, in any view).
+  **The SCENE holds the same line** (final review 4, I1): the Engine hands the globe the committed
+  node only while the view it draws, or the one it is entering, has the node rung
+  (`focusLadder.sceneShowsNode`, `Engine._syncSceneNode`), so in the chamber no tray chip takes the
+  focus boost or swell, no other chip steps back, and a snapshot's signers glow. Leaving for
+  Snapshots the node stands down at the transition boundary (every chip gathered); returning it is
+  back at the click, beside the ancestry the entry re-commits, so the provider's borrowed glow
+  never flashes first.
 - **A register switch is a setting that RELEASES** (2026-11-06; three registers since D6). `registerSwitchActions`
   drops what the register ENTERED cannot draw — entering Transaction blocks drops the metagraph
   snapshot, entering either other (Metagraph snapshots or Data blocks) drops the block, and

@@ -43,9 +43,9 @@ import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { ledgerNetwork } from "./domain/tickNet";
 import { globalPick, pickNetId, viewEntryActions } from "./domain/pickActions";
 import { viewNetwork } from "./domain/viewNetwork";
-import { ViewTransition, is3D, fleetFaded, fleetHolder, type FleetPlacement } from "./domain/viewTransition";
+import { ViewTransition, is3D, fleetFaded, fleetHolder, type FleetPlacement, type View3D } from "./domain/viewTransition";
 import { gatherBand, railGapPx, railGapShiftPx, type GatherBand } from "./domain/gatherLayout";
-import { LADDERS, LEVEL_CARRY, hasLevel, type CohortSel, type CompositionSel, type FocusLevel, type SelectionSnapshot, type ResolverKey } from "./domain/focusLadder";
+import { LADDERS, LEVEL_CARRY, hasLevel, sceneShowsNode, type CohortSel, type CompositionSel, type FocusLevel, type SelectionSnapshot, type ResolverKey } from "./domain/focusLadder";
 import { compositionGroups, compositionKey, compositionRows } from "@/src/data/composition";
 import { metaSnapDeepKey } from "@/src/data/types";
 import { snapsAtTick } from "@/src/data/anchorLog";
@@ -188,6 +188,7 @@ export class Engine {
   private _gatherU2 = new THREE.Vector3(); // scratch: staging-plane up (world)
   private _gatherBand: GatherBand = { topFrac: 0, halfWidthFrac: 0, heightFrac: 0 }; // scratch: the measured band
   private _pendingBoundary: Mode | null = null; // destination whose layout applies at the boundary
+  private _sceneView: View3D | null = null; // the 3D view whose layout the scene draws — adopted at the boundary (`_syncSceneNode`)
   // The DOC overlay's deferred bare-stage hide: armed by the doc fold, applied by the frame loop
   // the first frame the transition is past its OUT phase (see the tick site).
   private _docHideArmed = false;
@@ -1036,8 +1037,9 @@ export class Engine {
           this.globe.setSelectedGroup(this._compositionIds(st.composition, st.selNodes));
           if (st.composition !== prev.composition && st.mode === "hyper") this._resolveFocus();
         }
-        // The selected node card (geo or hyper) keeps that node's layer shells lit on the globe.
-        if (st.inspect !== prev.inspect) this.globe.setSelectedNode(this._pickNodeId(st.inspect));
+        // The selected node card (geo or hyper) keeps that node's layer shells lit on the globe —
+        // only where the scene's view has the node rung (`_syncSceneNode`).
+        if (st.inspect !== prev.inspect) this._syncSceneNode();
         // A PLANE FOCUS is the History view's commit, and the camera answers it like any other
         // (camera principle 3): the settled pose leans in toward the front of the stack, and
         // releasing it leans back out. Gated on the policy row for the view the behaviour is FOR
@@ -1606,6 +1608,10 @@ export class Engine {
     // whole OUT phase. The same table, the same executor, one tick earlier — and the ONE call
     // (the boundary's `_applyDestLayout` no longer repeats it). Camera reframes a HUD commit asks
     // for are held through the OUT phase anyway (the boundary re-derives the pose).
+    // The scene's node emphasis answers the destination too, BEFORE its ancestry lands: entering a
+    // view with the node rung restores it now, so the provider the entry re-commits never borrows
+    // its members' glow first; leaving for one without it holds the node until the boundary.
+    this._syncSceneNode();
     if (dest3D) this._commitViewEntryAncestry(mode);
     // The snapshot card is LEDGER-SCOPED too (spec 2026-08-01): the pin no longer carries out
     // of the view — leaving ledger clears it. `following` stays with the FollowController,
@@ -1730,6 +1736,10 @@ export class Engine {
     const inLedger = mode === "ledger";
     this.layers.setLedger(inLedger);
     this.globe.applyLedgerLayout(inLedger);
+    // The scene now draws THIS view, so the node emphasis is its ladder's alone (`_syncSceneNode`):
+    // leaving Geography for Snapshots, the carried node stands down here, with every chip gathered.
+    this._sceneView = is3D(mode) ? mode : null;
+    this._syncSceneNode();
     // The Snapshots view: keep the reused meshes visible (the render loop places them into the
     // planar rows + shows the centered live snapshot); just dim non-selected columns and frame it.
     if (mode === "ledger") {
@@ -2044,6 +2054,19 @@ export class Engine {
   // pick that passes them to `Picking`, which owns the raycast, the hover channels and the click's
   // decision table. `_pickSuppressed` stays here because the render loop and the tap recogniser
   // read it too.
+  // THE SCENE'S NODE SELECTION (final review 4, I1; user 2026-11-10): a node carried into a view
+  // whose ladder has no node rung — Snapshots — is shown nowhere there, though its selection holds
+  // for the views that have it. So the globe gets the committed node only while the view the scene
+  // draws (`_sceneView`, adopted at the boundary) or the one it is entering has the rung
+  // (`focusLadder.sceneShowsNode`) — and with it go the chip's boost and swell, the trays'
+  // dim-back and the signer glow's yield (`Globe._frameCtx`'s `ancestryGlow`). Re-run on an
+  // `inspect` change, at the switch and at the boundary.
+  private _syncSceneNode(): void {
+    const entering = is3D(this.mode) ? this.mode : null;
+    const id = sceneShowsNode(this._sceneView, entering) ? this._pickNodeId(useStore.getState().inspect) : null;
+    this.globe.setSelectedNode(id);
+  }
+
   // The stable per-machine id of a node pick (a validator by its node id, a metagraph node by
   // its ip) — keys the persistent selection glow, matching the hover-pairing in _handleMove.
   private _pickNodeId(p: PickDescriptor | null): string | null {

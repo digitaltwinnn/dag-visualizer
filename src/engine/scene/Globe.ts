@@ -1665,9 +1665,10 @@ export class Globe implements GeoViewHost {
     // left the other two at the group tier (resting + 0.45 × boost ≈ 0.79 against the subject's
     // 1.17, while the rest of the fleet sat at 0.14) and the selection was unreadable. The
     // ancestry rule's own reasoning covers it: a borrowed glow is honest while the group IS the
-    // subject and a lie once the click lands on a node. Nothing true is lost — the snapshot's own
-    // lane tile still carries the relation in the scene, the node card still states `signed`, and
-    // each deselect visibly widens the lit set again.
+    // subject and a lie once the click lands on a node. Since 2026-11-08 the chamber has no node
+    // rung and no node card, and a node carried into it is never handed to this class there (the
+    // Engine's `_syncSceneNode`, review I1), so in the chamber the signer set yields only to a
+    // HOVERED chip — a preview, and the snapshot's own lane tile still carries the relation.
     c.hoverCohort =
       this._hoverCohort ??
       ancestryGlow(

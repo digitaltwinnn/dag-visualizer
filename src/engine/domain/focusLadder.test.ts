@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { LADDERS, LEVEL_CARRY, finerLevels, finestRung, hasLevel, type SelectionSnapshot } from "./focusLadder";
+import { LADDERS, LEVEL_CARRY, finerLevels, finestRung, hasLevel, sceneShowsNode, type SelectionSnapshot } from "./focusLadder";
 
 const sel = (over: Partial<SelectionSnapshot> = {}): SelectionSnapshot => ({
   inspectIsNode: false, cohort: null, composition: null, country: null, filter: "all", ...over,
@@ -89,5 +89,34 @@ describe("finestRung — where a deselect lands", () => {
     expect(finestRung("geo", sel({ country: "DE" }))).toBe("country");
     expect(finestRung("ledger", sel({ filter: "dor" }))).toBe("network");
     expect(finestRung("trend", sel())).toBe("all");
+  });
+});
+
+// A NODE CARRIED INTO SNAPSHOTS IS SHOWN NOWHERE THERE (user, 2026-11-10; final review 4, I1): the
+// selection survives (LEVEL_CARRY.node), but the scene emphasises it only in a view whose ladder has
+// the node rung — the same allow-list the click table reads, never a view name.
+describe("sceneShowsNode — the scene's node emphasis follows the ladder", () => {
+  it("a settled view shows the node exactly when its ladder has the node rung", () => {
+    for (const v of Object.keys(LADDERS) as (keyof typeof LADDERS)[]) {
+      expect(sceneShowsNode(v, v)).toBe(hasLevel(v, "node"));
+    }
+    expect(sceneShowsNode("geo", "geo")).toBe(true);
+    expect(sceneShowsNode("hyper", "hyper")).toBe(true);
+    expect(sceneShowsNode("ledger", "ledger")).toBe(false);
+    expect(sceneShowsNode("trend", "trend")).toBe(false);
+  });
+  it("leaving a node view keeps the node until the boundary hands the scene over", () => {
+    expect(sceneShowsNode("geo", "ledger")).toBe(true); // the OUT phase: geo's layout is still drawn
+    expect(sceneShowsNode("ledger", "ledger")).toBe(false); // the boundary: the chamber holds it
+  });
+  it("entering a node view restores it at the click, beside the ancestry it re-commits", () => {
+    expect(sceneShowsNode("ledger", "geo")).toBe(true);
+    expect(sceneShowsNode("ledger", "hyper")).toBe(true);
+    expect(sceneShowsNode("ledger", "trend")).toBe(false);
+  });
+  it("a flat destination enters nothing: the parked grids keep what the view that left them showed", () => {
+    expect(sceneShowsNode("geo", null)).toBe(true);
+    expect(sceneShowsNode("ledger", null)).toBe(false);
+    expect(sceneShowsNode(null, null)).toBe(false); // boot, before any 3D layout
   });
 });
