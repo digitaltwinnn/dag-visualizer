@@ -95,7 +95,7 @@ export interface GeoFactsInput {
   siteDays?: Record<string, Record<string, number>>;
   /** "YYYY-MM-DD" → the tiers' fleet `f.cc.<cc>` (since 2026-09-07). */
   ccDays: Record<string, Record<string, number>>;
-  providerNames: Record<string, string>; // provider key → display name (`geo:{net}:isp`)
+  providerNames: Record<string, string>; // provider key → display name (`geo:mainnet:isp`)
   countryNames: Record<string, string>; // cc → English name
   names: Record<string, string>; // catalog id → display name
 }

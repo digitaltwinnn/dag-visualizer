@@ -390,7 +390,8 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     rotate: true,
     dragOrbitsSubject: false,
     metagraphCard: "tickNet",
-    // The Snapshots node browser (LedgerPanel's floor disclosures) reads store.selNodes.
+    // RAW's SIGNERS lane (ChannelStatePanel's signer roster) names a snapshot's signers against
+    // store.selNodes. LedgerPanel no longer reads it — its signer level left on 2026-11-09 (review M4).
     nodeList: true,
     vitalsLane: true,
     bandContent: "vitals",

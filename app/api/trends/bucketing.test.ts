@@ -318,7 +318,7 @@ describe("bucketFleetGeo", () => {
     perNetProviders: { dor: { "hetzner-online-gmbh": 3 } },
     providerNames: { "hetzner-online-gmbh": "Hetzner Online GmbH" },
   };
-  it("writes the day's gauges into the geo family only — never a t:{net}:* tier", () => {
+  it("writes the day's gauges into the geo family only — never a t:mainnet:* tier", () => {
     const inc: IncMap = new Map();
     bucketFleetGeo(inc, Date.UTC(2026, 9, 27, 14, 30), geo);
     expect([...inc.keys()]).toEqual(["geo:mainnet:2026"]);

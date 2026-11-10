@@ -75,8 +75,8 @@ export function stakeValidatorsKeyOf(): string {
   return `stake:${STORE_NS}:validators`;
 }
 
-/** provider key → the lookup's provider name (`fleetGeo.ts` `providerNames`), one hash per
- *  network, so a reader can name a host whose nodes have since gone. */
+/** provider key → the lookup's provider name (`fleetGeo.ts` `providerNames`), one hash for the
+ *  store, so a reader can name a host whose nodes have since gone. */
 export function ispNamesKeyOf(): string {
   return `geo:${STORE_NS}:isp`;
 }

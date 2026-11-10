@@ -49,7 +49,7 @@ export type HashReader = Pick<TrendsStore, "hgetall">;
 export interface GeoDaysRead {
   /** "YYYY-MM-DD" → that day's geo fields (`f.cc.*`, `f.isp.*`, per network `f.cc.<id>.*`, `f.isp.<id>.*`). */
   geoDays: Record<string, Record<string, number>>;
-  /** provider key → display name (`geo:{net}:isp`). */
+  /** provider key → display name (`geo:mainnet:isp`). */
   providerNames: Record<string, string>;
   /** "YYYY-MM-DD" → that day's `f.site.<cc>.<city>.<key>` (`geoSitesSlotOf`), where it was sampled. */
   siteDays?: Record<string, Record<string, number>>;
@@ -87,7 +87,7 @@ export async function readSpan(
 }
 
 
-/** THE GEO FAMILY over the UTC days [fromMs's day, toMs]: one `geo:{net}:{YYYY}` hash per year the
+/** THE GEO FAMILY over the UTC days [fromMs's day, toMs]: one `geo:mainnet:{YYYY}` hash per year the
  *  window touches and one sites hash per month (fields `MM-DD|<series>`), regrouped by day, plus the
  *  provider names. */
 export async function readGeoDays(
