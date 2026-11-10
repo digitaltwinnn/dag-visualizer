@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { FRAME_CONTEXT, JOIN_BELOW, captionMarks, litIndices, rangeFrame, rangeGeometry } from "./rangeSpark";
+import { FRAME_CONTEXT, JOIN_BELOW, captionMarks, litIndices, pendingPlacement, rangeFrame, rangeGeometry } from "./rangeSpark";
 
 const H = 3_600_000;
 const D = 24 * H;
@@ -68,5 +68,29 @@ describe("captionMarks — the dates under the range's ends", () => {
   });
   it("reads a whole-frame range end to end", () => {
     expect(captionMarks(5, [0, 4])).toEqual({ kind: "ends", at: [0, 1] });
+  });
+});
+
+describe("pendingPlacement — the range's dates and band before the frame's line lands", () => {
+  it("places the range by its own fractions of the frame, which ends now", () => {
+    // 30 days ending 15 days ago in the 90-day frame: 45/90 → 75/90 of the way along.
+    const p = pendingPlacement({ fromMs: NOW - 45 * D, toMs: NOW - 15 * D }, "90d", NOW);
+    expect(p.marks.kind).toBe("ends");
+    expect(p.marks.kind === "ends" && p.marks.at.map((x) => +x.toFixed(4))).toEqual([0.5, 0.8333]);
+    expect(p.band!.map((x) => +x.toFixed(4))).toEqual([0.5, 0.8333]);
+  });
+  it(`joins a range narrower than ${JOIN_BELOW * 100}% of the frame under its middle, as the loaded caption does`, () => {
+    const p = pendingPlacement({ fromMs: NOW - 6 * H, toMs: NOW - 2 * H }, "24h", NOW);
+    expect(p.marks).toEqual({ kind: "joined", at: (18 / 24 + 22 / 24) / 2 });
+  });
+  it("agrees with the frame the card fetches: the range's own frame always holds it", () => {
+    const span = { fromMs: NOW - 28 * D, toMs: NOW - 6 * D };
+    const p = pendingPlacement(span, rangeFrame(span, NOW), NOW);
+    expect(p.band![0]).toBeGreaterThan(0);
+    expect(p.band![1]).toBeLessThan(1);
+  });
+  it("clamps to the frame, and the everything-measured frame says the range once, joined, with no band", () => {
+    expect(pendingPlacement({ fromMs: NOW - 40 * D, toMs: NOW }, "30d", NOW).band).toEqual([0, 1]);
+    expect(pendingPlacement({ fromMs: NOW - 400 * D, toMs: NOW - 390 * D }, "all", NOW)).toEqual({ marks: { kind: "joined", at: 0.5 }, band: null });
   });
 });

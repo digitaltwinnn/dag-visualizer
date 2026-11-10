@@ -14,6 +14,8 @@ import type { SparkGeometry } from "@/src/data/momentSpark";
 // (parent card and/or filter)"): `hue` is the network the card's figure is about — the focused plane
 // or the filter, the parent Metagraph card's subject (`cardNetwork`) — and the roster's own `hue`, so
 // the line matches its plane; the whole network's line keeps the filter accent, else the primary.
+// A NULL `geometry` is the line still loading (user, 2026-11-10): the same box at the same height,
+// its band and caption standing, no ink — the line draws in over them when it lands, no jump.
 
 /** The drawing's own box; the SVG stretches it to the card's width. */
 export const HAIRLINE_W = 300;
@@ -43,7 +45,8 @@ export default function Hairline({
   hue,
   band,
 }: {
-  geometry: SparkGeometry;
+  /** The line; null while it loads — the box keeps its height and draws no ink. */
+  geometry: SparkGeometry | null;
   context?: SparkGeometry;
   /** The figure's accessible name: what the line is. */
   label: string;
@@ -66,9 +69,11 @@ export default function Hairline({
       >
         {band && <rect x={band[0]} width={Math.max(2, band[1] - band[0])} y={-2} height={HAIRLINE_H + 4} fill="currentColor" fillOpacity={0.07} />}
         {context && <Ink g={context} faint />}
-        <Ink g={geometry} />
+        {geometry && <Ink g={geometry} />}
       </svg>
-      <figcaption className="relative mt-0.5 flex justify-between text-label text-muted-foreground tabular-nums">{caption}</figcaption>
+      {/* One line tall whatever it holds: its marks are absolute, so a caption with neither frame end would
+          collapse — and the box would jump when the line lands (user, 2026-11-10). */}
+      <figcaption className="relative mt-0.5 flex min-h-[1lh] justify-between text-label text-muted-foreground tabular-nums">{caption}</figcaption>
     </figure>
   );
 }

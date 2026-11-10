@@ -85,9 +85,29 @@ export const JOIN_BELOW = 0.3;
 /** Where the caption's marks sit, as fractions of the line's width (the same `i / (n − 1)` the
  *  geometry places a point at): the range's start and end under its two ends, or one joined label
  *  under its middle when the range is too narrow for two. */
-export function captionMarks(n: number, lit: [number, number]): { kind: "ends"; at: [number, number] } | { kind: "joined"; at: number } {
+export type CaptionMarks = { kind: "ends"; at: [number, number] } | { kind: "joined"; at: number };
+export function captionMarks(n: number, lit: [number, number]): CaptionMarks {
   const x = (i: number) => (n > 1 ? i / (n - 1) : 0.5);
-  const a = x(lit[0]);
-  const b = x(lit[1]);
-  return b - a >= JOIN_BELOW ? { kind: "ends", at: [a, b] } : { kind: "joined", at: (a + b) / 2 };
+  return marksAt(x(lit[0]), x(lit[1]));
+}
+const marksAt = (a: number, b: number): CaptionMarks => (b - a >= JOIN_BELOW ? { kind: "ends", at: [a, b] } : { kind: "joined", at: (a + b) / 2 });
+
+/** WHILE THE FRAME'S LINE LOADS (user, 2026-11-10: the card showed no dates until it landed). The
+ *  range's two dates need no fetch — they are the span's own — and the frame is a window pill
+ *  ending now (`rangeFrame`), so where the range sits in it is the span's own FRACTIONS of that
+ *  window: the caption's marks by `captionMarks`' rule, and the range's band to wash. The loaded
+ *  line places them by its buckets, which can sit a bucket's width apart; that is the line landing.
+ *  The everything-measured frame (`all`) has no length until its buckets land, so its range is said
+ *  once, joined, under the middle, and no band is placed. */
+export function pendingPlacement(
+  span: { fromMs: number; toMs: number },
+  frame: ZoomId,
+  nowMs: number,
+): { marks: CaptionMarks; band: [number, number] | null } {
+  const len = FRAME_MS.find(([id]) => id === frame)?.[1];
+  if (len == null) return { marks: { kind: "joined", at: 0.5 }, band: null };
+  const f = (ms: number) => Math.min(1, Math.max(0, (ms - (nowMs - len)) / len));
+  const a = f(span.fromMs);
+  const b = f(span.toMs);
+  return { marks: marksAt(a, b), band: [a, b] };
 }

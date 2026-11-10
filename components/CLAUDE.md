@@ -482,7 +482,14 @@ already IS that list over the span. Under a range the Moment's ‹ › steps the
 (`rangeBuckets` — the charts trim the part-buckets at the edges, so they are no moments), through
 the executor's `trendCursor` action, and the Range's next ghost opens its first moment. The Moment's
 lead is the same sentence shape for one bucket (`momentPhrase`: "DED anchored 7 snapshots in those
-5 minutes" — never a rate, never a rank).
+5 minutes" — never a rate, never a rank). **Its Start and End are DRAWN** (`inspector/RangeSpark.tsx` over the Moment's
+`Hairline`, design H, 2026-11-09): the subject's line over a FRAME around the range (`rangeSpark.rangeFrame`,
+a window pill ending now), the range in full ink and its dates under its ends. **The dates show while
+the line loads** (user, 2026-11-10): the box stands at once at the line's own height, the range's band
+and its two dates — the span's own, no fetch — placed by the span's FRACTIONS of the frame
+(`rangeSpark.pendingPlacement`), muted like the acquiring state, no ink; the line draws in over them
+(the frame's own start date waits for its buckets). A frame that measured nothing, or a failed read,
+still draws nothing. The caption row is one line tall whatever it holds, so nothing jumps.
 
 **The Metagraph card is the committed subject's network, in every view** (2026-10-18, one rule
 after the user asked for Geography's node to "also populate the dossier card"): Snapshots' is the
