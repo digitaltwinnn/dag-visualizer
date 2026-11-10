@@ -153,8 +153,10 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
   },
   // THE DATA BLOCKS (the Snapshots view's Data blocks register, 2026-11-07): the live window, read
   // when the note is written — a few minutes of the chamber, no earlier figure, so nothing moved.
+  // NEVER "RIGHT NOW" (user, 2026-11-10): the note is written hourly and read for up to an hour after,
+  // so it names the window the Span line gives and its end, the "Window end" fact, as a UTC clock time.
   data: {
-    question: "What data are the networks writing right now? This note does not lead with what changed, whatever the rules above say: the facts hold no earlier figure, so never say anything rose or fell. Say how many data blocks were carried over the window and how many updates they held, then each network that carried any, as \"<network> carried N data blocks with M updates\". Only when the facts say how many of the window's global snapshots were read, add in one clause that the counts cover those; otherwise say nothing about reading. A data block carries updates, never transactions or transfers.",
+    question: "What data did the networks write over the window? Open with the window in the Span line's own words and its end as the Window end fact gives it, as \"Over the last N minutes to 14:05 UTC\", with that fact's time. Never say \"now\", \"right now\" or \"currently\": the note is read up to an hour after the window. This note does not lead with what changed, whatever the rules above say: the facts hold no earlier figure, so never say anything rose or fell. Say how many data blocks were carried over the window and how many updates they held, then each network that carried any, as \"<network> carried N data blocks with M updates\". Only when the facts say how many of the window's global snapshots were read, add in one clause that the counts cover those; otherwise say nothing about reading. A data block carries updates, never transactions or transfers.",
     system: (subjectLabel) => `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${PROMPTS.data.question}`,
   },
   trend: {

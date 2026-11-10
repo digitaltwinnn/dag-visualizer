@@ -504,7 +504,7 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
     async read({ nowMs, reads, names }) {
       if (!reads.dataWindow) return null;
       const w = await reads.dataWindow();
-      const built = dataFacts({ ticks: w.ticks, names, keyOf: (id) => (isTracked(id) ? currentIdOf(id) : null) });
+      const built = dataFacts({ ticks: w.ticks, names, keyOf: (id) => (isTracked(id) ? currentIdOf(id) : null), endMs: w.toMs });
       const spanFrom = w.fromMs ?? nowMs;
       const spanTo = w.toMs ?? nowMs;
       return { built, spanFrom, spanTo, windows: [["Span length", secondsOf(spanFrom, spanTo)]] };

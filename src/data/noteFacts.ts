@@ -66,7 +66,9 @@ export function durationWords(seconds: number): string {
 
 /** One fact. `kind` picks the notation: count (12,159), amount (one decimal at most, two
  *  significant digits under 1), share (a rounded %), ratio (2 decimals), duration
- *  (`formatSeconds`, written out, seconds in), date (UTC "Oct 19", epoch ms in). `format` replaces an amount's
+ *  (`formatSeconds`, written out, seconds in), date (UTC "Oct 19", epoch ms in), time (a UTC clock time
+ *  with its zone named, "14:05 UTC", epoch ms in — a note is written for every reader, so the zone is
+ *  the one they share). `format` replaces an amount's
  *  notation with the chart's own formatter (fees are written by `formatDag`). `pair` marks the fact
  *  as one end of a measured change (`Fact.pair`, R54); a fact with none carries no `pair` key. */
 export function fact(
@@ -88,6 +90,11 @@ export function fact(
     case "date": {
       const d = new Date(value);
       text = `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
+      break;
+    }
+    case "time": {
+      const d = new Date(value);
+      text = `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")} UTC`;
       break;
     }
   }

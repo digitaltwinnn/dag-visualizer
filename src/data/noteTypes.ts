@@ -18,7 +18,7 @@ export type NoteLead = { kind: "change"; moved: string[] } | { kind: "now" };
 export interface Fact {
   label: string;
   value: number;
-  kind: "count" | "amount" | "ratio" | "share" | "duration" | "date";
+  kind: "count" | "amount" | "ratio" | "share" | "duration" | "date" | "time";
   text: string;
   /** THE PAIR (R54): this fact is the earlier (`from`) or later (`to`) reading of ONE quantity,
    *  and `key` names that quantity — the same key on both ends, unique to it within one facts

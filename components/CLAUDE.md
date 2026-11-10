@@ -1324,7 +1324,10 @@ BLOCKS note, written from the LIVE WINDOW (the newest 52 global snapshots' exact
 when the note is written, hourly with the ledger's and the block DAG's (`warm.ts` HOURLY): which
 networks carried data blocks over those minutes, how many, with how many updates, over the ticks
 read (`src/data/noteFactsData.ts`, a floor where a read did not land). Its span chip reads "the live
-window"; the note names the minutes itself ("over the last 11 minutes"). No sampled series holds a
+window"; the note names the minutes itself and the window's END, never "right now" (user,
+2026-11-10: it is written hourly and read for up to an hour after) — "Over the last 8 minutes to
+07:21 UTC, …", the end a `time` fact (a UTC clock time, the zone named, since a note is written for
+every reader) that the honesty gate reads as a phrase, not as numbers. No sampled series holds a
 data-block count, which is why it is the live window and not the last 24 hours. The band swaps to `DataCells` (`"ledger:data"`, `REGISTER_CELLS` in `VitalsBand.tsx`)
 — THREE cells, `src/data/dataStats.ts`'s arithmetic over the ledger source's ticks: **DATA UPDATES**
 (the count over the snapshots read, "N of M snapshots read" under the unit as its floor, and a line

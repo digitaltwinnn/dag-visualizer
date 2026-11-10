@@ -21,6 +21,11 @@ import { UNLISTED_ID } from "@/src/data/unlistedId";
 //   · an undecodable row states no count, so a network with one is stated as a floor (", at least");
 //   · null when no tick was read at all: no note rather than a note about nothing.
 //
+// THE WINDOW'S END IS A FACT (user, 2026-11-10): the note is written hourly and read for up to an hour
+// after, so it never says "right now". The newest global snapshot's time is stated as a UTC clock
+// time ("14:05 UTC", the `time` kind — a note is written for every reader, so the zone is the one
+// they share), and the note says the counts are as of then.
+//
 // Pure: no store values, react or I/O (the colocated test is the specification — rule 4).
 
 /** The global snapshots the note reads: the chamber's own window (`BLOCK_WINDOW_TICKS`, 52). */
@@ -39,12 +44,15 @@ export interface DataFactsInput {
   names: Record<string, string>;
   /** `netKeyOf`: the catalog id a row's address belongs to, or null for an uncataloged one. */
   keyOf: (metaId: string) => string | null;
+  /** The window's END: the newest global snapshot's time (epoch ms), or null when it is unknown. */
+  endMs?: number | null;
 }
 
 export function dataFacts(input: DataFactsInput): { facts: Fact[]; names: string[]; lead: NoteLead } | null {
   const read = input.ticks.filter((t) => t.rows != null);
   if (!read.length) return null;
   const facts: Fact[] = [];
+  if (input.endMs != null && Number.isFinite(input.endMs)) facts.push(fact("Window end, the newest global snapshot", input.endMs, "time"));
   // THE READ COUNT IS A FLOOR'S LABEL, NOT NEWS (user, 2026-11-09: "'all 52 global snapshots' read …
   // a technical confirmation which is of no use to the reader; focus on the core message"). Stated
   // only when a read is missing, which is the one time the counts below need it.

@@ -94,6 +94,9 @@ describe("fact", () => {
 
   it("reads a date in UTC, whatever the zone", () => {
     expect(fact("x", Date.UTC(2026, 0, 1, 23, 59), "date").text).toBe("Jan 1");
+    // A clock time is UTC with its zone named, to the minute (the Data blocks note's window end).
+    expect(fact("x", Date.UTC(2026, 0, 1, 23, 59, 59), "time").text).toBe("23:59 UTC");
+    expect(fact("x", Date.UTC(2026, 0, 1, 0, 5), "time").text).toBe("00:05 UTC");
   });
 });
 

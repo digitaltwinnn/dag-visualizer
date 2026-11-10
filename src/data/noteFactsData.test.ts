@@ -49,4 +49,11 @@ describe("dataFacts", () => {
     const out = dataFacts({ ticks: [{ ordinal: 1, rows: [row("dor", 2, 30)] }, { ordinal: 2, rows: [row("ded", 1, 4)] }], names, keyOf })!;
     expect(out.facts.some((f) => /global snapshots/i.test(f.label))).toBe(false);
   });
+  it("states the window's END as a UTC clock time, first, so the note says \"as of\" and never \"right now\" (user, 2026-11-10)", () => {
+    const end = Date.UTC(2026, 10, 10, 14, 5, 41);
+    const out = dataFacts({ ticks: [{ ordinal: 1, rows: [row("dor", 2, 30)] }], names, keyOf, endMs: end })!;
+    expect(out.facts[0]).toMatchObject({ label: "Window end, the newest global snapshot", kind: "time", value: end, text: "14:05 UTC" });
+    // Unknown end: no fact, never a guessed clock.
+    expect(dataFacts({ ticks: [{ ordinal: 1, rows: [row("dor", 2, 30)] }], names, keyOf, endMs: null })!.facts.some((f) => f.kind === "time")).toBe(false);
+  });
 });

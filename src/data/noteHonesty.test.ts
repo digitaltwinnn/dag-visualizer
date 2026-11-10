@@ -515,3 +515,25 @@ describe("checkNote — a past value stands beside its own current figure (R60, 
     expect(gate("The network fell to 86, from 173; Germany has 33.")).toEqual({ ok: true }); // the figure before it is its own
   });
 });
+
+describe("checkNote — a clock time a time fact holds is not a number (the Data blocks note's window end)", () => {
+  const timed = [fact("Window end, the newest global snapshot", Date.UTC(2026, 10, 10, 14, 5, 41), "time"), F("Data blocks", 412, "count", "412")];
+  const timedOk = (t: string) => checkNote(t, timed, []).ok;
+  it("reads the fact's minute in UTC, in its 24-hour and 12-hour forms", () => {
+    expect(timed[0]!.text).toBe("14:05 UTC");
+    expect(timedOk("Over the last 11 minutes to 14:05 UTC, 412 data blocks were carried.")).toBe(false); // 11 minutes has no fact here
+    expect(checkNote("Over the window to 14:05 UTC, 412 data blocks were carried.", timed, []).ok).toBe(true);
+    expect(timedOk("As of 14:05, 412 data blocks were carried.")).toBe(true);
+    expect(timedOk("As of 2:05 PM UTC, 412 data blocks were carried.")).toBe(true);
+  });
+  it("leaves a time no fact holds to be checked as numbers", () => {
+    expect(timedOk("As of 14:06 UTC, 412 data blocks were carried.")).toBe(false);
+    expect(timedOk("As of 15:05 UTC, 412 data blocks were carried.")).toBe(false);
+  });
+  it("an early hour reads with or without its leading zero", () => {
+    const early = [fact("Window end", Date.UTC(2026, 10, 10, 9, 0), "time"), F("Data blocks", 5, "count", "5")];
+    expect(early[0]!.text).toBe("09:00 UTC");
+    expect(checkNote("As of 9:00 UTC, 5 data blocks were carried.", early, []).ok).toBe(true);
+    expect(checkNote("As of 09:00 UTC, 5 data blocks were carried.", early, []).ok).toBe(true);
+  });
+});

@@ -198,7 +198,11 @@ holds years of history under it, and both `keys.test.ts` files pin the strings.
   when one did. A new KIND needs no version bump:
   its keys collide with nothing, and a bump would rewrite every warmed note for no gain. The
   facts are pinned by
-  `src/data/noteFactsBlocks.test.ts`. **The honesty gate (rule 10) is mechanical**
+  `src/data/noteFactsBlocks.test.ts`. **The data blocks' note** (view `data`) states its window's END
+  as a fact (`noteFactsData`'s "Window end", the `time` kind: a UTC clock time, "14:05 UTC") and its
+  question asks for the window and that end, never "right now" — it is written hourly and read for up
+  to an hour after (user, 2026-11-10; `NOTES_VERSION` 81). The gate strips a clock time a `time` fact
+  holds, as it strips a fact's date. **The honesty gate (rule 10) is mechanical**
   (`src/data/noteHonesty.ts`, the colocated test is its specification): every number the note
   states must match a fact the model was shown, within the precision it was written to, and a
   failing note is asked for once more with the reasons, then dropped and counted. A note that

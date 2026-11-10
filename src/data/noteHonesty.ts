@@ -33,8 +33,9 @@ import type { Fact } from "@/src/data/noteTypes";
 // WHAT IT STRIPS FIRST: the currency unit after a number ("1.2K DAG"), so it is never read as the
 // DAG network; then, so they are never read as numbers: the names it is handed (they carry dots
 // and digits), the layer tokens (L0, L1, cL1, dL1, L0s), and any date phrase a `date` fact holds
-// ("Oct 19", "October 19, 2026", "19 Oct", "2026-10-19"). A date NO fact holds is left in, and its
-// day-of-month then has to back itself as a number — which it cannot.
+// ("Oct 19", "October 19, 2026", "19 Oct", "2026-10-19"), and the clock time a `time` fact holds
+// ("14:05 UTC", "14:05", "2:05 PM UTC" — the same minute, in UTC). A date or time NO fact holds is
+// left in, and its digits then have to back themselves as numbers — which they cannot.
 //
 // DIRECTION: a sentence with a falling verb (fell, dropped, down, slowed ...) reads a `%` against a
 // ratio as (1-r)*100 only; a rising verb (rose, grew, up, climbed ...) as (r-1)*100 or r*100; with
@@ -290,6 +291,20 @@ function rankBacked(word: string, facts: readonly Fact[]): boolean {
 function datePhrases(facts: readonly Fact[]): RegExp[] {
   const out: RegExp[] = [];
   for (const f of facts) {
+    if (f.kind === "time") {
+      // A clock time is UTC (`fact`'s "time"): its 24-hour form, the hour with or without a leading
+      // zero, or the 12-hour form, each with an optional ":ss" and "UTC" after it.
+      const d = new Date(f.value);
+      const h = d.getUTCHours();
+      const mm = String(d.getUTCMinutes()).padStart(2, "0");
+      const h12 = h % 12 === 0 ? 12 : h % 12;
+      const utc = "(?:\\s*UTC)?";
+      out.push(
+        new RegExp(`(?<![\\d:])0?${h}:${mm}(?::\\d{2})?${utc}(?![\\d:])`, "gi"),
+        new RegExp(`(?<![\\d:])${h12}:${mm}\\s*[ap]\\.?m\\.?${utc}(?!\\w)`, "gi"),
+      );
+      continue;
+    }
     if (f.kind !== "date") continue;
     const d = new Date(f.value);
     const [short, long] = MONTHS[d.getUTCMonth()];
