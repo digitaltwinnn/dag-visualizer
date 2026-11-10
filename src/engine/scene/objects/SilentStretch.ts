@@ -16,6 +16,8 @@
 // window one more stretch stands ahead of the lead row, from its bar toward the rim, for the globals
 // since the newest block tick up to the live global — rebuilt on each live tick, so its words grow
 // with the silence. It rides the lead row (`frontRunAt`), never the front boundary it stands past.
+// Over a PINNED PAST window (user, 2026-11-10) the front claims no now: the same place carries the
+// window's AGE ("3h ago") as words alone, an item with `dash: false`, on the same fade.
 
 import * as THREE from "three";
 import { frontAt, frontRunAt, horizonAt } from "../../domain/ledgerModel";
@@ -34,6 +36,9 @@ export interface StretchItem {
   /** The FRONT RUN — the live-edge silence ahead of the lead row (`frontRunAt`): it rides the lead
    *  row rather than reading its own x against the front boundary, which it stands past by design. */
   front?: boolean;
+  /** `false`: words alone, no dash — the FRONT over a pinned past window, its age (`frontMark`),
+   *  which states no silence up to now and so draws no run. */
+  dash?: boolean;
 }
 
 /** The dash's and the words' resting opacity (dark-ground values; `inkPresence` asks the paper). */
@@ -172,8 +177,9 @@ export class SilentStretch {
       const run = s.front ? frontRunAt(s.x1, this._off) : -1;
       const a0 = run >= 0 ? run : frontAt(s.x0 + this._off) * horizonAt(s.x0 + this._off);
       const a1 = run >= 0 ? run : frontAt(s.x1 + this._off) * horizonAt(s.x1 + this._off);
-      col[i * 8 + 3] = dashOp * a0 * alpha;
-      col[i * 8 + 7] = dashOp * a1 * alpha;
+      const d = s.dash === false ? 0 : dashOp;
+      col[i * 8 + 3] = d * a0 * alpha;
+      col[i * 8 + 7] = d * a1 * alpha;
     }
     if (this._items.length > 0) {
       this._col.clearUpdateRanges();

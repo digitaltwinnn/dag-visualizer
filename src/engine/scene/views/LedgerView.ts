@@ -69,7 +69,7 @@ import {
   FRONT_RUN_X0,
   type LaneBlock,
 } from "../../domain/ledgerModel";
-import { blockPlace, forkSpread, referenceSegments, silentRun, stretchLabel, type BlockRead } from "../../domain/blockBraid";
+import { blockPlace, forkSpread, frontMark, referenceSegments, silentRun, stretchLabel, type BlockRead } from "../../domain/blockBraid";
 import { DATA_MARK, carriesData, dataMarkCount } from "../../domain/dataMark";
 import { ENTRY_STAG, entryStep, entryTotal } from "../../domain/entryBeat";
 import { makeBarSpec, fillBarSpec, UNLISTED_KEY, RIBBON_LANE_HALF, type BarSpec } from "../../domain/ledgerBands";
@@ -1091,6 +1091,22 @@ export class LedgerView implements SceneView {
     this._liveGlobal = g;
   }
 
+  /** A PINNED PAST block window's clock (user, 2026-11-10): non-null while the window held is one
+   *  pinned around a past time, the instant its AGE is read against; null in the live window. Over a
+   *  past window nothing claims "now" — no front run, no live line — and the front states the
+   *  window's age instead (`blockBraid.frontMark`). Event-time: the Engine hands it with each refresh,
+   *  and the front is re-laid only when its words change (an age moves a unit at a time). */
+  setPastFront(nowMs: number | null): void {
+    this._pastNow = nowMs;
+    if (!this._cargo.blocks || !this._blockWindow || !this._stretch) return;
+    const m = frontMark(this._slotSnap[0] ?? null, this._liveGlobal, nowMs);
+    const words = m ? `${m.kind}|${m.label}` : "";
+    if (words !== this._frontWords) this._rebuildStretches();
+  }
+  private _pastNow: number | null = null;
+  /** The front's words as last laid (`_rebuildStretches`), so a refresh re-lays only a change. */
+  private _frontWords = "";
+
   /** The full reads (`store.blockReads`): a block's parents — and whether the window's are all in
    *  (`settled`), the edge the DAG is laid out on. */
   setBlockReads(r: Readonly<Record<string, { blocks: BlockRead[] }>>, settled: boolean): void {
@@ -1350,6 +1366,12 @@ export class LedgerView implements SceneView {
     this._rebuildTilePicks();
     this._syncRibbonRows();
 
+    this._rebuildStretches();
+  }
+
+  /** The silent stretches and the FRONT (event-time): the runs between adjacent trail ticks, and
+   *  ahead of the lead row the front run (live) or the window's age (pinned past) — `frontMark`. */
+  private _rebuildStretches(): void {
     // The silent runs between adjacent trail ticks — between the two rows' bars, flush in the glass.
     const stretches: StretchItem[] = []; // event-time
     const y = FLOOR_Y.gl0 + BAR_LIFT + 0.02;
@@ -1364,17 +1386,18 @@ export class LedgerView implements SceneView {
       const label = stretchLabel(run.snapshots, run.ms);
       stretches.push({ key: `${older.ordinal}-${newer.ordinal}`, x0, x1, y, label });
     }
-    // THE FRONT RUN — the live edge's silence (spec 2: "the silent stretch growing at the front"):
-    // the globals after the newest block tick up to the live one, ahead of the lead row's bar.
-    // Only in the live window (`_liveGlobal` is null for a pinned past one); none while the live
-    // global is itself the newest block tick.
+    // THE FRONT — in the LIVE window the front run, the live edge's silence (spec 2: "the silent
+    // stretch growing at the front"): the globals after the newest block tick up to the live one,
+    // ahead of the lead row's bar (none while the live global is itself the newest block tick).
+    // Over a PINNED PAST window (user, 2026-11-10) nothing claims "now": no run, and in its place
+    // one quiet label, the window's age, words alone (no dash) on the run's own place and fade.
     const lead = this._slotSnap[0];
-    const live = this._liveGlobal;
-    if (lead && live && live.ordinal > lead.ordinal) {
-      const n = live.ordinal - lead.ordinal;
-      const ms = Math.max(0, Date.parse(live.timestamp) - Date.parse(lead.timestamp));
-      const label = stretchLabel(n, ms);
-      stretches.push({ key: `${lead.ordinal}-live`, x0: FRONT_RUN_X0, x1: FRONT_INK_X, y, label, front: true });
+    const front = frontMark(lead ?? null, this._liveGlobal, this._pastNow);
+    this._frontWords = front ? `${front.kind}|${front.label}` : "";
+    if (lead && front?.kind === "run") {
+      stretches.push({ key: `${lead.ordinal}-live`, x0: FRONT_RUN_X0, x1: FRONT_INK_X, y, label: front.label, front: true });
+    } else if (lead && front?.kind === "age") {
+      stretches.push({ key: `${lead.ordinal}-age`, x0: FRONT_RUN_X0, x1: FRONT_INK_X, y, label: front.label, front: true, dash: false });
     }
     this._stretch.rebuild(stretches);
   }
@@ -1924,7 +1947,8 @@ export class LedgerView implements SceneView {
     // The chamber's boundary with NOW. Hue says "filtered" without a word — the committed
     // network's identity, the neutral core when the filter is "all".
     const liveOrd = this._liveOrd();
-    this._live.setState(liveEdgePhase(!this._frozen && this.model.tickOrdinal != null, liveOrd));
+    // A pinned past block window claims no now either (`setPastFront`): the line stands down there.
+    this._live.setState(liveEdgePhase(!this._frozen && this._pastNow == null && this.model.tickOrdinal != null, liveOrd));
     const lk = this._netDimKey();
     this._live.setHue(lk === "all" ? this._core : this._laneColor(lk).getHex());
     this._live.update(dt);

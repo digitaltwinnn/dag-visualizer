@@ -709,7 +709,15 @@ rebuilt at event time on every live tick and its words grow with the silence. It
 (`ledgerModel.frontRunAt`): whole at rest, and gone before its far end reaches the rim when the
 rewind pushes the trail forward — never `frontAt`, which reads anything ahead of the lead as pushed
 off. It sits in the strip `LiveEdge.ts` measured as crowded (the floor's name, the front rim), so
-its words read faintly at the resting pose.
+its words read faintly at the resting pose. **Over a PINNED PAST window the front claims no NOW**
+(user, 2026-11-10): no front run and no live line (`LedgerView.setPastFront`, which the Engine hands
+the clock while the held window's own `around` is set; the line's phase reads it beside `_frozen`),
+and in their place ONE quiet label at the run's own place — the window's AGE, its newest tick's age
+in the app's one short span ("18h ago", `relativeAge`), words alone with no dash (`dash: false`), the
+stretch's own recipe, opacity and `frontRunAt` ride. `blockBraid.frontMark` is the one decision —
+run, age or nothing — and its test the spec; the label is re-laid at event time only when its words
+change. The other two registers already claim nothing over a past window (`setFrozen`: the live
+edge is off, and they draw no front run), so they carry no age label.
 
 **The selection** is a slot under the tick, no focus rung and no pose (camera principle 2):
 `blockSelectActions` pins the accepting global and commits the block; the same block releases it

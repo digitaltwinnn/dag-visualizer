@@ -200,6 +200,28 @@ export function stretchLabel(snapshots: number, ms: number): string | null {
   return snapshots > STRETCH_WORDS_MIN ? `${snapshots.toLocaleString()} snapshots · ${relativeAge(ms, true)}` : null;
 }
 
+/** WHAT THE FRONT OF THE TRANSACTION BLOCKS TRAIL STATES (user, 2026-11-10). In the LIVE window the
+ *  FRONT RUN: the silence since the lead block tick up to the live global (`run`, worded by
+ *  `stretchLabel`; none while the live global is itself the lead). Over a PINNED PAST window nothing
+ *  may claim "now" — no front run, no live line — so the front states the window's AGE instead, ONE
+ *  quiet label: how long ago its newest tick was, in the app's one short span ("3h ago",
+ *  `relativeAge`). `pastNowMs` is the clock the age is read against, non-null only while a pinned
+ *  past window is held; null: the live window. Ticks carry their own timestamp, parsed here. */
+export type FrontMark = { kind: "run"; label: string | null } | { kind: "age"; label: string } | null;
+export function frontMark(
+  lead: { ordinal: number; timestamp: string } | null,
+  live: { ordinal: number; timestamp: string } | null,
+  pastNowMs: number | null,
+): FrontMark {
+  if (!lead) return null;
+  if (pastNowMs != null) {
+    const label = relativeAge(pastNowMs - Date.parse(lead.timestamp));
+    return label ? { kind: "age", label } : null;
+  }
+  if (!live || live.ordinal <= lead.ordinal) return null;
+  return { kind: "run", label: stretchLabel(live.ordinal - lead.ordinal, Math.max(0, Date.parse(live.timestamp) - Date.parse(lead.timestamp))) };
+}
+
 /** WHERE A BLOCK STANDS ACROSS THE BRAID, or null for not drawn (yet). `hold`: the window's reads
  *  are still landing; `read`: the block's own read (absent while unread or missed); `settled`: the
  *  window's reads have all landed; `z`: its place from `forkSpread`, absent where none was given.

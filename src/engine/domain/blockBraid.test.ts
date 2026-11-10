@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { LINK_BEND, LINK_SAMPLES, STRETCH_WORDS_MIN, blockPlace, forkSpread, referenceSegments, sCurve, silentRun, stretchLabel } from "./blockBraid";
+import { LINK_BEND, LINK_SAMPLES, STRETCH_WORDS_MIN, blockPlace, forkSpread, referenceSegments, sCurve, silentRun, stretchLabel, frontMark } from "./blockBraid";
 
 describe("forkSpread — a layered DAG drawing on the chamber's time axis, its forks opening up and down", () => {
   const b = (hash: string, height: number, ord: number, parents: string[] = []) => ({ hash, height, ord, parents });
@@ -159,5 +159,29 @@ describe("blockPlace — a block is placed once, never moved after it is drawn",
     expect(blockPlace(false, undefined, false, undefined)).toBeNull();
     expect(blockPlace(false, undefined, true, undefined)).toBe(0);
     expect(blockPlace(false, read, true, undefined)).toBe(0);
+  });
+});
+
+describe("frontMark — what the front of the Transaction blocks trail states (user, 2026-11-10)", () => {
+  const lead = { ordinal: 1000, timestamp: "2026-11-10T09:00:00.000Z" };
+  const live = { ordinal: 1500, timestamp: "2026-11-10T12:00:00.000Z" };
+  const NOW = Date.parse("2026-11-10T12:00:05.000Z");
+  it("the LIVE window: the front run up to the live global, worded like a stretch", () => {
+    expect(frontMark(lead, live, null)).toEqual({ kind: "run", label: "500 snapshots · 3h" });
+    expect(frontMark(lead, { ordinal: 1010, timestamp: live.timestamp }, null)).toEqual({ kind: "run", label: null });
+    // The live global IS the lead: nothing stands ahead of it.
+    expect(frontMark(lead, lead, null)).toBeNull();
+    expect(frontMark(lead, null, null)).toBeNull();
+  });
+  it("a PINNED PAST window claims no now: never a run, the window's age in one short span", () => {
+    expect(frontMark(lead, live, NOW)).toEqual({ kind: "age", label: "3h ago" });
+    expect(frontMark(lead, null, NOW)).toEqual({ kind: "age", label: "3h ago" });
+    expect(frontMark(lead, live, Date.parse("2026-11-12T09:00:00.000Z"))).toEqual({ kind: "age", label: "2d ago" });
+  });
+  it("no lead tick, or an unreadable age, states nothing", () => {
+    expect(frontMark(null, live, NOW)).toBeNull();
+    expect(frontMark(null, live, null)).toBeNull();
+    expect(frontMark({ ordinal: 1, timestamp: "not a time" }, null, NOW)).toBeNull();
+    expect(frontMark({ ordinal: 1, timestamp: "2026-11-11T00:00:00.000Z" }, null, NOW)).toBeNull(); // a clock behind the tick
   });
 });

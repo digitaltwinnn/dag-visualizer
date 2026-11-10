@@ -1497,6 +1497,9 @@ export class Engine {
     const liveRun = this.ledger.readsBlockWindow && heldLive && st.blockWindowStatus?.status !== "unread";
     this.ledger.setLiveGlobal(liveRun ? (getNetwork()?.latest ?? null) : null);
     this.ledger.setData(src?.globalSnapshots ?? [], (ts) => src?.getAnchor(ts) ?? null);
+    // …and over a PINNED PAST window (the held window's own `around`) the front claims no now: its
+    // age instead, read against this clock (user, 2026-11-10; `LedgerView.setPastFront`).
+    this.ledger.setPastFront(this.ledger.readsBlockWindow && bw != null && bw.around != null ? Date.now() : null);
     // The byte bar measures ticks from the EXACT reads (spec §6.3) — re-hand the map on each
     // refresh so a tick that landed since the last one gets measured instead of staying a seam.
     this.ledger.setExact(useStore.getState().snapshotExact);
