@@ -181,12 +181,10 @@ and its contents are view-specific examples that keep changing.
 
 **Top — the command bar.** One full-width glass bar, edges aligned with the rail columns: the ECG +
 wordmark + filter on the left, the view switch centered, and on the right the view-scoped pair
-(SCENE⇄HUD + RAW + ABOUT) followed by ONE settings gear (2026-09-08 — the theme/pages/network trio
-folded into `topbar/SettingsMenu.tsx`, labeled sections of one popover; their files are rows-only
-modules now. **The pages section left on 2026-09-28** — user: "doc pages are not settings"; the
-footer's About link is their one door. One state survives on the trigger by rule: the
-network CODE in the live accent off mainnet — "which chain am I looking at" never goes missing.
-One mount at every width; the filter strip's second row, the trio's old phone home, retired with it). The bar has **one grow-downward slot with four tenants** (a which-strip enum makes
+(SCENE⇄HUD + RAW + ABOUT) followed by ONE settings gear (2026-09-08 — the app-wide settings
+folded into `topbar/SettingsMenu.tsx`, labeled sections of one popover; `ThemeToggle` is the theme
+section's rows. **The pages section left on 2026-09-28** — user: "doc pages are not settings"; the
+footer's About link is their one door. One mount at every width; the filter strip's second row, the trio's old phone home, retired with it). The bar has **one grow-downward slot with four tenants** (a which-strip enum makes
 them mutually exclusive by construction): the FILTER button opens the network-chip strip (hovering
 previews the dim, picking closes it), **The phone face's name is a step up (title size) and ROLLS SIDEWAYS on a ‹ › press or a swipe**
 (user, 2026-10-19: "the text has the odometer effect while here it should animate horizontally";
@@ -940,10 +938,10 @@ inside the card, "not embedded enough"): no box, no fill, no edge, the mark unde
 mark and the words on the title's column, no label row, and the head's rule stands down while it
 stands (`data-note-lead`), so a card with no note keeps its rule. The mark and the writing say AI. `aiSweep.ts`
 is the chips' ring alone. The note's place shows "reading…" while the note is in flight (ONE word, user 2026-10-30: held or still
-being written is the cache's business); `none` and off-mainnet render
+being written is the cache's business); `none` renders
 nothing (no note to have), and `unavailable` renders "no note right now", muted, with no door (user,
 2026-10-30: the Gate refused a brushed range's write and the note was simply missing for the 15
-minutes `FAIL_TTL_S` remembers it; a card with no lead and no reason read as broken). **A note's network names wear their colour** (user, 2026-10-31; `src/data/noteNames.ts`, `NoteText`): code finds them against mainnet's catalog after the note is written, whole words, full names, tickers of three letters or more and two hand-picked short forms, never "333 DAG" the amount; the text ink (`IDENT_INK`), same weight, no link. **A note writes itself in** (user, 2026-10-31: "appear letter by letter as if it's written by the
+minutes `FAIL_TTL_S` remembers it; a card with no lead and no reason read as broken). **A note's network names wear their colour** (user, 2026-10-31; `src/data/noteNames.ts`, `NoteText`): code finds them against the catalog after the note is written, whole words, full names, tickers of three letters or more and two hand-picked short forms, never "333 DAG" the amount; the text ink (`IDENT_INK`), same weight, no link. **A note writes itself in** (user, 2026-10-31: "appear letter by letter as if it's written by the
 AI", the AI card and the cards' notes alike; `TypedNote`, `typedNote.ts`): at most 2.4s, only for a note the
 reader watched arrive, never for one already held and never under reduced motion. The full text
 holds the height invisibly, so the card grows once, and a screen reader gets it whole. **A head with

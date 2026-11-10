@@ -58,7 +58,7 @@ Four views drive the 3D scene:
 `docs/superpowers/specs/2026-10-31-briefing-design.md`): `/` opens on Geography and plays every 3D
 view once — four stops, one per view, the Snapshots view in its Metagraph snapshots register (`BRIEFING_STOPS`; a register inside a view is not a stop) —
 one AI line per stop, on a cleared stage; a drag orbits the scene and holds the stop, and
-only Skip or Escape ends the tour. Only on `/`, on mainnet, once per browser session. `store.briefing` is the one channel: `useBootStage` stands the HUD
+only Skip or Escape ends the tour. Only on `/`, once per browser session. `store.briefing` is the one channel: `useBootStage` stands the HUD
 down on it, `RouteSync` holds the URL so a stop is never a page view, and the Engine reads it for the
 tour's pace and a phone's lift.
 
@@ -103,7 +103,7 @@ growing: a mechanical purity classifier was tried and rejected (its regex matche
 TEST-ONLY helpers shared by sibling tests (never imported by app code) and sits outside the scan,
 which reads `src/data/*.ts` only.
 
-Nineteen narrower boundary tests work the same way: `components/cardHoverBoundary.test.ts` (every rail subject card pairs on its own subject's hover channel, never a parent's — convention 9), `components/feedReadBoundary.test.ts` (every HUD read of a feed's data holds that feed, so the pulse strip's "in use here" is measured, not declared — `src/data/feedUse.ts`), `components/unlistedBoundary.test.ts` (the `"unlisted"`
+Eighteen narrower boundary tests work the same way: `components/cardHoverBoundary.test.ts` (every rail subject card pairs on its own subject's hover channel, never a parent's — convention 9), `components/feedReadBoundary.test.ts` (every HUD read of a feed's data holds that feed, so the pulse strip's "in use here" is measured, not declared — `src/data/feedUse.ts`), `components/unlistedBoundary.test.ts` (the `"unlisted"`
 id literal has exactly two homes), `components/railLadderBoundary.test.ts` (every committable focus
 rung maps to a hinted rail card slot), `components/railTierBoundary.test.ts` (`data-focus` has two
 homes and the slab's geometry — the pager included — keys on `data-tier`),
@@ -129,9 +129,8 @@ container), `components/breakpointArmBoundary.test.ts` (CSS trap 8 — a tier bo
 number on both arms), `src/data/signerMatchBoundary.test.ts` (a peer-id prefix comparison lives only
 in `src/data/network.ts`), `src/engine/scene/rowBoundary.test.ts` (a scene module that places a
 ledger row consults the trail's boundaries), `src/engine/entryBeatBoundary.test.ts` (every 3D view's
-entry owner still defines the arrival beat's begin/release pair — the wiring was silently lost once)
-`src/net/netUrlBoundary.test.ts` (every own-server fetch goes through `netUrl()`, or carries an
-exemption with a reason), `components/tooltipBoundary.test.ts` (no hover-only text: no `title=`
+entry owner still defines the arrival beat's begin/release pair — the wiring was silently lost once),
+`components/tooltipBoundary.test.ts` (no hover-only text: no `title=`
 on any HUD element — the UI explains itself on its surface, or not at all),
 `src/engine/tunePanelBoundary.test.ts` (the `?tune` panel is one sealed corner: only its three files
 import the tune contract or tweakpane, so a look stays a plain constant and its knob lives in
@@ -139,8 +138,8 @@ import the tune contract or tweakpane, so a look stays a plain constant and its 
 `components/touchTierBoundary.test.ts` (the touch tier has ONE query — a coarse pointer on the
 phone or tablet tier — named once by the stylesheet's `touch:` variant and once by `useTouch`, and
 no utility rides Tailwind's pointer-only variant: a touch laptop's desktop rail is a mouse layout).
-`ls **/*Boundary.test.ts` is the live count: twenty files, of which
-`components/selectionBoundary.test.ts` is rule 2's and the other nineteen are these.
+`ls **/*Boundary.test.ts` is the live count: nineteen files, of which
+`components/selectionBoundary.test.ts` is rule 2's and the other eighteen are these.
 
 Each of these files opens with a header comment giving the rationale, the scope and every exemption
 with its reason. **That header is the rule's authoritative statement** — read it rather than inferring
@@ -233,7 +232,7 @@ error is this trap, nothing else.
 
 `next build` and `next dev` don't conflict (dev outputs to `.next/dev`), so the production check can
 run alongside the dev server. Do it at phase boundaries: the build should be clean;
-`/api/metagraphs` is `ƒ` (Dynamic — it reads `?net=`) and must answer with
+`/api/metagraphs` is `ƒ` (Dynamic — it calls `connection()`) and must answer with
 `Cache-Control: public, s-maxage=300` so the CDN still caches it per URL.
 
 ### Verifying changes
@@ -559,7 +558,10 @@ of the busiest chain) with no hole; beyond that the gap is accepted and
 (learned 2026-10-08). A backfill run from a branch wrote new fields the deployed code then
 misread (its derivation subtracted them), and production's History was wrong until the branch
 shipped. Order: deploy the code that READS the new fields (and tolerates their absence), then run
-the backfill; or keep the new fields invisible to the deployed reader.
+the backfill; or keep the new fields invisible to the deployed reader. For the same reason every
+key keeps its fixed `mainnet` segment (`t:mainnet:…`, `geo:mainnet:…`, `stake:mainnet:…`,
+`ai:mainnet:…`): it is one constant, `STORE_NS` in `app/api/trends/keys.ts`, and both families'
+`keys.test.ts` pin the strings — a changed segment orphans years of history.
 
 ⚠️ Web Vitals do NOT capture the WebGL frame rate — use the engine's stats.js for that (dev-only, or in
 prod via `?stats`, so it never shows for real users).
@@ -591,7 +593,7 @@ file, and the rules above govern them.
 | Pure logic | `src/engine/domain/CLAUDE.md` | the 3D↔3D transition, selection semantics |
 | Engine | `src/engine/CLAUDE.md` | the look rows, emphasis knobs and the empty `?tune` panel framework |
 | Data layer | `src/data/CLAUDE.md` | the snapshot stream, anchoring & fees, the tick lifecycle, the measured-history path the History view reads |
-| Networks | `src/net/CLAUDE.md` | `?net=` and the three networks |
+| Networks | `src/net/CLAUDE.md` | a metagraph's address lineage and its retirement |
 | Theme | `src/theme/CLAUDE.md` | light/dark and the ground questions it forces |
 | Server routes | `app/api/CLAUDE.md` | every `/api/*` route and its caching |
 

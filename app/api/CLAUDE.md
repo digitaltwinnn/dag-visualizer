@@ -19,6 +19,17 @@ the architecture map and the dev workflow; **its rules govern this file too**.
 Metagraph cluster endpoints are plain HTTP on custom ports with **no CORS**, so the browser can't fetch
 them — but the Next Node server can.
 
+Every route reads the mainnet hosts (`HOSTS`, `src/engine/config.ts`). ⚠️ **A static-path GET that
+reads nothing of its request calls `connection()`** (`/api/metagraphs`, `/api/geo`, `/api/live`,
+`/api/live/clusters`, `/api/archive`, `/api/node-names`, `/api/network/unlisted`): it keeps the route
+per-request (`ƒ`) — without it a `revalidate` export would prerender it at build — and the CDN caches
+it by its own `Cache-Control`. Never `dynamic = "force-dynamic"` for that: in Next 16 it sets
+`fetchCache = 'force-no-store'`, which bypasses every `unstable_cache` the route leans on. A test
+calling such a handler mocks `connection` (`app/api/live/routes.test.ts`): it throws outside a
+request scope. ⚠️ **Every store key embeds the fixed `mainnet` segment** — one constant, `STORE_NS`
+in `app/api/trends/keys.ts`, which the notes keys import; the store is shared with production and
+holds years of history under it, and both `keys.test.ts` files pin the strings.
+
 - **`/api/metagraphs`** lists the directory, fetches each cluster's info server-side, geolocates IPs,
   computes identity hues, and returns `{ metagraphs, geo }`. **On failure it answers an honest 503** —
   no pre-baked fallback; the client keeps its last good data and re-pulls next cycle. The inner fetches
@@ -38,7 +49,7 @@ them — but the Next Node server can.
   under them): the edge a little under the poll (4s for the 5s feeds, 25s for the 30s one), the
   memo at most 5s, because the two caches STACK — the oldest answer a tab can get is memo + edge +
   stale-while-revalidate, 10s and 35s today (`worstAgeMs`, tested). Each route holds a
-  **module-level memo** (`upstream.ts`, per network) that checks its own
+  **module-level memo** (`upstream.ts`) that checks its own
   timestamp and shares one in-flight promise between concurrent misses;
   never `unstable_cache`, whose revalidate is too coarse for a 4 s window. The memo drops an expired
   entry when it is read and sweeps expired entries once it holds more than 256. **`?limit=` rounds UP
@@ -88,14 +99,14 @@ them — but the Next Node server can.
   **Delegated stake** (2026-11-04, `stake.ts`): once an hour, on its own `f.stake` slot, the
   Global L0's registry (`/node-params`) as `f.stake` / `.live` / `.delegations` / `.validators`
   in the hourly and daily tiers, and each validator's reading in its own keep-forever family
-  `stake:{net}:{YYYY-MM}` with names in `stake:{net}:validators` (`keys.ts` `stakeSlotOf`).
+  `stake:mainnet:{YYYY-MM}` with names in `stake:mainnet:validators` (`keys.ts` `stakeSlotOf`).
   No upstream keeps the registry's past, so stake begins the day it shipped. Nothing reads either
   yet beyond History's RAW records.
   **Where the fleet runs has its own key family** (2026-10-27): once an hour, beside the fleet
   gauges, the sampler stores the whole fleet and each network by country and by hosting provider
-  into `geo:{net}:{YYYY}` (day buckets, `f.cc.*` / `f.isp.*`, `fleetGeo.ts`), with provider names
-  in `geo:{net}:isp` and the fleet by city and provider in `geo:{net}:sites:{YYYY-MM}` (`f.site.*`,
-  2026-10-31, each network's nodes added up, one hash per month since a note reads a week of it). ⚠️ **It lives outside `t:{net}:*` on purpose:** a rebuild wipes that prefix
+  into `geo:mainnet:{YYYY}` (day buckets, `f.cc.*` / `f.isp.*`, `fleetGeo.ts`), with provider names
+  in `geo:mainnet:isp` and the fleet by city and provider in `geo:mainnet:sites:{YYYY-MM}` (`f.site.*`,
+  2026-10-31, each network's nodes added up, one hash per month since a note reads a week of it). ⚠️ **It lives outside `t:mainnet:*` on purpose:** a rebuild wipes that prefix
   and a location gauge can never be re-derived, and `/api/trends` ships every series a tier hash
   holds, so ~50 location series a day would ride every History payload undrawn. Nothing reads it
   yet; it exists so Geography has a past when something does (the AI notes design).
@@ -151,9 +162,8 @@ them — but the Next Node server can.
   consumer.
 - **`/api/notes`, `/api/notes/request`, `/api/notes/warm`** (2026-10-27) are the AI notes: a few
   sentences a paid model (the Constellation Gate, `GATE_API_KEY`, `GATE_MODEL`, default `z-ai/glm-5-3-flash` with thinking held low, `gate.ts`) writes about the
-  figures a view is showing. **Mainnet only**; any other `?net=` answers `none`, before the subject
-  is parsed (it is checked against mainnet's catalog, so a testnet network would otherwise 400). Notes live in
-  their OWN key family, `ai:{net}:v{NOTES_VERSION}:{view}:{subject}:{span}` (`keys.ts`), never under
+  figures a view is showing. Notes live in
+  their OWN key family, `ai:mainnet:v{NOTES_VERSION}:{view}:{subject}:{span}` (`keys.ts`), never under
   `t:` (a rebuild wipes that prefix) or `geo:`: a note is a losable cache entry, and the families
   must not share a fate. The four notes the Briefing reads (`isBriefingNote`) also carry its one short `line`, asked for in
   the same answer and held to the same gate; a line that fails is dropped, never retried, and the
