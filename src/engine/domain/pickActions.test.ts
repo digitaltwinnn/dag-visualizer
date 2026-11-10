@@ -284,8 +284,6 @@ describe("the shared component builders (GeoExplore rows + LiveStrip bars run th
       { kind: "snapshot", pick: null, follow: true },
     ]);
     expect(a.some((x) => x.kind === "filter")).toBe(false);
-    // A validator opened under the snapshot (∨) is the finest rung: it clears first.
-    expect(snapshotClearActions({ metaSnap: child, hasInspect: true })[0]).toEqual({ kind: "inspect", pick: null });
     // Only what is there: a bare tick clears alone.
     expect(snapshotClearActions({ metaSnap: null })).toEqual([{ kind: "snapshot", pick: null, follow: true }]);
   });
@@ -333,9 +331,6 @@ describe("the shared component builders (GeoExplore rows + LiveStrip bars run th
     // Resuming live releases the tick-local network first — it names a network in the tick being left.
     expect(followToggleActions(p, false, null)).toEqual([{ kind: "tickNet", sel: null }, { kind: "snapshot", pick: p, follow: true }]);
     expect(followToggleActions(p, true, null)).toEqual([{ kind: "snapshot", pick: p, follow: false }]);
-    // …and the held NODE (a snapshot's signer) is released first on a resume (user, 2026-11-08).
-    expect(kinds(followToggleActions(p, false, null, true))).toEqual(["inspect", "tickNet", "snapshot"]);
-    expect(kinds(followToggleActions(p, true, null, true))).toEqual(["snapshot"]);
   });
 });
 
@@ -567,37 +562,21 @@ describe("metaSnapSelectActions (a tile on the upper floor)", () => {
   // the Metagraph rung between the tick and the snapshot EMPTY — that rung had no state but the
   // filter. It has one now: the tick-local network (`tickNet`), so the pile is tick → network →
   // snapshot and the top bar is never written.
-  // A SNAPSHOT DROPS THE NODE IT CANNOT CONTAIN (user, 2026-10-03: "remove node"). A node carried
-  // in from another view stayed in the pile under a snapshot of a different network, where
-  // adjacency is containment.
-  it("drops a held node of ANOTHER network first, and keeps one of the snapshot's own", () => {
-    const dagNode = { kind: "l0", title: "n" } as unknown as PickDescriptor;
-    const other = { kind: "metanode", title: "n", meta: { id: "some-other-metagraph" } } as unknown as PickDescriptor;
-    const own = { kind: "metanode", title: "n", meta: { id: SEL.metaId } } as unknown as PickDescriptor;
-    for (const foreign of [dagNode, other]) {
-      const a = metaSnapSelectActions(SEL, GLOBAL, { block: null, metaSnap: null, inspect: foreign });
-      expect(a[0]).toEqual({ kind: "inspect", pick: null }); // finest first
-      expect(a.map((x) => x.kind)).toEqual(["inspect", "snapshot", "tickNet", "metaSnap"]);
-    }
-    const kept = metaSnapSelectActions(SEL, GLOBAL, { block: null, metaSnap: null, inspect: own });
-    expect(kept.map((x) => x.kind)).toEqual(["snapshot", "tickNet", "metaSnap"]);
-    expect(kept.some((x) => x.kind === "filter")).toBe(false);
-  });
 
   it("a step inside the LIVE pair holds the snapshot and pins nothing; another tick or network still pins", () => {
     const live = { ...SEL, ordinal: 745191, hash: "h2" };
-    expect(metaSnapSelectActions(SEL, GLOBAL, { block: null, metaSnap: live, following: true, inspect: null })).toEqual([
+    expect(metaSnapSelectActions(SEL, GLOBAL, { block: null, metaSnap: live, following: true })).toEqual([
       { kind: "metaSnap", sel: { ...SEL, held: true } },
     ]);
     // The shown subject converts to a pin, as ever; a step while pinned pins.
-    expect(metaSnapSelectActions(live, GLOBAL, { block: null, metaSnap: live, following: true, inspect: null })[0]).toMatchObject({ kind: "snapshot", follow: false });
-    expect(metaSnapSelectActions(SEL, GLOBAL, { block: null, metaSnap: live, following: false, inspect: null })[0]).toMatchObject({ kind: "snapshot", follow: false });
+    expect(metaSnapSelectActions(live, GLOBAL, { block: null, metaSnap: live, following: true })[0]).toMatchObject({ kind: "snapshot", follow: false });
+    expect(metaSnapSelectActions(SEL, GLOBAL, { block: null, metaSnap: live, following: false })[0]).toMatchObject({ kind: "snapshot", follow: false });
     // Another network in the same global is a different story: it pins.
-    expect(metaSnapSelectActions({ ...SEL, metaId: "other" }, GLOBAL, { block: null, metaSnap: live, following: true, inspect: null })[0]).toMatchObject({ kind: "snapshot", follow: false });
+    expect(metaSnapSelectActions({ ...SEL, metaId: "other" }, GLOBAL, { block: null, metaSnap: live, following: true })[0]).toMatchObject({ kind: "snapshot", follow: false });
   });
 
   it("commits the tick, then the network INSIDE that tick, then the subject — and NEVER the filter", () => {
-    const a = metaSnapSelectActions(SEL, GLOBAL, { block: null, metaSnap: null, inspect: null });
+    const a = metaSnapSelectActions(SEL, GLOBAL, { block: null, metaSnap: null });
     expect(a).toEqual([
       { kind: "snapshot", pick: GLOBAL, follow: false },
       { kind: "tickNet", sel: { metaId: LISTED, globalOrdinal: 4200 } },
@@ -608,7 +587,7 @@ describe("metaSnapSelectActions (a tile on the upper floor)", () => {
 
   it("an UNKNOWN-lane tile (raw unlisted address) commits the UNLISTED network as its rung", () => {
     const un: MetaSnapSel = { metaId: "DAGunlisted123", ordinal: 9, hash: "", globalOrdinal: 4200, ts: "t" };
-    const a = metaSnapSelectActions(un, GLOBAL, { block: null, metaSnap: null, inspect: null });
+    const a = metaSnapSelectActions(un, GLOBAL, { block: null, metaSnap: null });
     expect(netKeyOf("DAGunlisted123")).toBe("unlisted");
     expect(a).toEqual([
       { kind: "snapshot", pick: GLOBAL, follow: false },
@@ -618,12 +597,12 @@ describe("metaSnapSelectActions (a tile on the upper floor)", () => {
   });
 
   it("steps back ONE rung — to the network in the tick — when the same tile is picked again", () => {
-    const a = metaSnapSelectActions(SEL, GLOBAL, { block: null, metaSnap: { ...SEL }, inspect: null });
+    const a = metaSnapSelectActions(SEL, GLOBAL, { block: null, metaSnap: { ...SEL } });
     expect(a).toEqual([{ kind: "metaSnap", sel: null }]);
   });
 
   it("while FOLLOWING, re-picking the auto-selected tile converts it to a pin rather than deselecting", () => {
-    const a = metaSnapSelectActions(SEL, GLOBAL, { block: null, metaSnap: { ...SEL }, following: true, inspect: null });
+    const a = metaSnapSelectActions(SEL, GLOBAL, { block: null, metaSnap: { ...SEL }, following: true });
     // The pin commits the same full ancestry a fresh select does: tick → network → snapshot.
     expect(a.map((x) => x.kind)).toEqual(["snapshot", "tickNet", "metaSnap"]);
   });
@@ -654,12 +633,6 @@ describe("metaSnapArrivalActions (the raw layer opens on a subject)", () => {
       { kind: "tickNet", sel: null },
       { kind: "metaSnap", sel: null },
     ]);
-  });
-
-  it("moving to another network in the tick drops a node committed under the old one", () => {
-    const a = tickNetSelectActions("paca", GLOBAL, { block: null, metaSnap: null, hasInspect: true, net: "dor" });
-    expect(a[0]).toEqual({ kind: "inspect", pick: null });
-    expect(tickNetSelectActions("dor", GLOBAL, { block: null, metaSnap: null, hasInspect: true, net: "dor" }).some((x) => x.kind === "inspect")).toBe(false);
   });
 
   it("follow is false so the pane's deep read actually fires — the arrival IS the gesture", () => {
@@ -734,8 +707,7 @@ describe("the tick-local network (the ledger's Metagraph rung without the filter
   });
 
   it("tickNetClearActions: the card's × clears what hangs under it, finest first, and leaves the tick", () => {
-    expect(tickNetClearActions({ metaSnap: CHILD, hasInspect: true })).toEqual([
-      { kind: "inspect", pick: null },
+    expect(tickNetClearActions({ metaSnap: CHILD })).toEqual([
       { kind: "metaSnap", sel: null },
       { kind: "tickNet", sel: null },
     ]);
@@ -941,13 +913,10 @@ describe("blockSelectActions / blockClearActions (a block in the Blocks register
     ]);
     // Its snapshot already committed: the network is restated, the snapshot not re-committed.
     expect(kinds(blockSelectActions(tb, global, { block: null, pinnedOrdinal: 7241523, metaSnap: snap }, snap))).toEqual(["tickNet", "block"]);
-    // A node of another network cannot sit under the snapshot: released first, as the tile click does.
-    const node = { kind: "l0", node: { ip: "1", id: "n" } } as unknown as PickDescriptor; // a DAG validator: not DOR's
-    expect(kinds(blockSelectActions(tb, global, { block: null, pinnedOrdinal: null, inspect: node }, snap))).toEqual(["inspect", "snapshot", "tickNet", "metaSnap", "block"]);
     // A scene pick carries the snapshot; the builder reads it.
     const tokenPick = { kind: "block", sel: tb, global, snap } as unknown as PickDescriptor;
     expect(clickActions({ mode: "ledger", pick: tokenPick, countryCc: null, current: { ...state(), pinnedOrdinal: null, metaSnap: null, block: null } })).toEqual(
-      blockSelectActions(tb, global, { block: null, pinnedOrdinal: null, metaSnap: null, inspect: null }, snap),
+      blockSelectActions(tb, global, { block: null, pinnedOrdinal: null, metaSnap: null }, snap),
     );
   });
   it("the clear releases the block alone, and nothing when none is held", () => {
@@ -982,17 +951,17 @@ describe("blockSelectActions / blockClearActions (a block in the Blocks register
     expect(blockInPlace(tb, {})).toBe(true);
   });
   it("a tile on another tick drops the block; a tile of another network or of the DAG's own tick drops a DAG block too; a token block's own tile keeps it", () => {
-    expect(kinds(metaSnapSelectActions(ms9, other, { metaSnap: null, inspect: null, block: b }))).toEqual(["block", "snapshot", "tickNet", "metaSnap"]);
+    expect(kinds(metaSnapSelectActions(ms9, other, { metaSnap: null, block: b }))).toEqual(["block", "snapshot", "tickNet", "metaSnap"]);
     const own: MetaSnapSel = { ...ms9, globalOrdinal: 7241523 };
-    expect(kinds(metaSnapSelectActions(own, global, { metaSnap: null, inspect: null, block: b }))).toEqual(["block", "snapshot", "tickNet", "metaSnap"]);
-    expect(kinds(metaSnapSelectActions(tbSnap, global, { metaSnap: null, inspect: null, block: tb }))).toEqual(["snapshot", "tickNet", "metaSnap"]);
-    expect(kinds(metaSnapSelectActions({ ...tbSnap, ordinal: 6 }, global, { metaSnap: null, inspect: null, block: tb }))).toEqual(["block", "snapshot", "tickNet", "metaSnap"]);
+    expect(kinds(metaSnapSelectActions(own, global, { metaSnap: null, block: b }))).toEqual(["block", "snapshot", "tickNet", "metaSnap"]);
+    expect(kinds(metaSnapSelectActions(tbSnap, global, { metaSnap: null, block: tb }))).toEqual(["snapshot", "tickNet", "metaSnap"]);
+    expect(kinds(metaSnapSelectActions({ ...tbSnap, ordinal: 6 }, global, { metaSnap: null, block: tb }))).toEqual(["block", "snapshot", "tickNet", "metaSnap"]);
   });
   it("a step inside the live pair drops a block the new snapshot cannot hold", () => {
     const live: MetaSnapSel = { ...ms9, ordinal: 4 };
-    expect(kinds(metaSnapSelectActions(ms9, other, { metaSnap: live, following: true, inspect: null, block: b }))).toEqual(["block", "metaSnap"]);
+    expect(kinds(metaSnapSelectActions(ms9, other, { metaSnap: live, following: true, block: b }))).toEqual(["block", "metaSnap"]);
     const liveOwn: MetaSnapSel = { ...tbSnap, ordinal: 4 };
-    expect(kinds(metaSnapSelectActions(tbSnap, global, { metaSnap: liveOwn, following: true, inspect: null, block: tb }))).toEqual(["metaSnap"]);
+    expect(kinds(metaSnapSelectActions(tbSnap, global, { metaSnap: liveOwn, following: true, block: tb }))).toEqual(["metaSnap"]);
   });
   it("a band drops a block of another tick or another chain; a token block's own network keeps it", () => {
     expect(kinds(bandSelectActions("dor", other, { metaSnap: null, block: b }))).toEqual(["block", "snapshot", "tickNet"]);
@@ -1077,7 +1046,7 @@ describe("globalPick and tickContextOf — the descriptor and the context every 
   it("tickContextOf: the pin only while pinned; live is no pin; the finer slots as they stand, block always present", () => {
     const snap = globalPick(g);
     const block: BlockSel = { chain: "dag", hash: "b", ordinal: 42, anchorOrd: 42 };
-    expect(tickContextOf({ following: false, snap, metaSnap: null, tickNet: null, block })).toEqual({ pinnedOrdinal: 42, metaSnap: null, tickNet: null, block, following: false, inspect: null, dataBlock: null });
+    expect(tickContextOf({ following: false, snap, metaSnap: null, tickNet: null, block })).toEqual({ pinnedOrdinal: 42, metaSnap: null, tickNet: null, block, following: false, dataBlock: null });
     expect(tickContextOf({ following: true, snap, metaSnap: null, tickNet: null, block: null }).pinnedOrdinal).toBeNull();
     expect(tickContextOf({ following: false, snap: null, metaSnap: null }).pinnedOrdinal).toBeNull();
     // An absent finer slot is null, never undefined — the builders that require `block` get one.
@@ -1096,19 +1065,19 @@ describe("dataBlockSelectActions / dataBlockClearActions", () => {
   const ms = { metaId: "dor", ordinal: 5, hash: "m5", globalOrdinal: 42, ts: "t" } as MetaSnapSel;
   const db = { snap: ms, index: 1 };
   it("commits the snapshot's chain then the data block; the same snapshot pinned, the data block alone", () => {
-    expect(kinds(dataBlockSelectActions(db, global, { dataBlock: null, metaSnap: null, inspect: null, block: null }))).toEqual(["snapshot", "tickNet", "metaSnap", "dataBlock"]);
-    expect(dataBlockSelectActions(db, global, { dataBlock: null, metaSnap: ms, following: false, inspect: null, block: null })).toEqual([{ kind: "dataBlock", sel: db }]);
+    expect(kinds(dataBlockSelectActions(db, global, { dataBlock: null, metaSnap: null, block: null }))).toEqual(["snapshot", "tickNet", "metaSnap", "dataBlock"]);
+    expect(dataBlockSelectActions(db, global, { dataBlock: null, metaSnap: ms, following: false, block: null })).toEqual([{ kind: "dataBlock", sel: db }]);
     // Another block of the same pinned snapshot: the old one released first, finest first.
-    expect(kinds(dataBlockSelectActions({ snap: ms, index: 0 }, global, { dataBlock: db, metaSnap: ms, following: false, inspect: null, block: null }))).toEqual(["dataBlock", "dataBlock"]);
+    expect(kinds(dataBlockSelectActions({ snap: ms, index: 0 }, global, { dataBlock: db, metaSnap: ms, following: false, block: null }))).toEqual(["dataBlock", "dataBlock"]);
   });
   it("the same data block again releases it alone; following, the snapshot is pinned first", () => {
-    expect(dataBlockSelectActions(db, global, { dataBlock: db, metaSnap: ms, inspect: null, block: null })).toEqual([{ kind: "dataBlock", sel: null }]);
-    expect(kinds(dataBlockSelectActions(db, global, { dataBlock: null, metaSnap: ms, following: true, inspect: null, block: null }))).toEqual(["snapshot", "tickNet", "metaSnap", "dataBlock"]);
+    expect(dataBlockSelectActions(db, global, { dataBlock: db, metaSnap: ms, block: null })).toEqual([{ kind: "dataBlock", sel: null }]);
+    expect(kinds(dataBlockSelectActions(db, global, { dataBlock: null, metaSnap: ms, following: true, block: null }))).toEqual(["snapshot", "tickNet", "metaSnap", "dataBlock"]);
   });
   it("another snapshot's commit releases the data block first (metaSnapSelectActions), and so does the tick's clear and a register switch", () => {
     const other = { ...ms, ordinal: 6 };
-    expect(kinds(metaSnapSelectActions(other, global, { metaSnap: ms, inspect: null, block: null, dataBlock: db }))).toContain("dataBlock");
-    expect(kinds(metaSnapSelectActions(ms, global, { metaSnap: null, inspect: null, block: null, dataBlock: db }))).not.toContain("dataBlock");
+    expect(kinds(metaSnapSelectActions(other, global, { metaSnap: ms, block: null, dataBlock: db }))).toContain("dataBlock");
+    expect(kinds(metaSnapSelectActions(ms, global, { metaSnap: null, block: null, dataBlock: db }))).not.toContain("dataBlock");
     expect(kinds(snapshotClearActions({ metaSnap: ms, dataBlock: db }))[0]).toBe("dataBlock");
     expect(registerSwitchActions("snapshots", { block: null, metaSnap: ms, dataBlock: db })).toEqual([{ kind: "dataBlock", sel: null }]);
     // Another tick's pin drops it first (2026-11-08: a pin from the explorer left a live-seated data block behind); its own tick keeps it.
@@ -1123,5 +1092,54 @@ describe("dataBlockSelectActions / dataBlockClearActions", () => {
     expect(sameDataBlock(db, { snap: { ...ms }, index: 1 })).toBe(true);
     expect(sameDataBlock(db, { snap: ms, index: 2 })).toBe(false);
     expect(sameDataBlock(null, db)).toBe(false);
+  });
+});
+
+// ⚠️ A CARRIED NODE HOLDS THROUGH SNAPSHOTS (user, 2026-11-10): a node picked in Hypergraph or
+// Geography is shown nowhere in the Snapshots view (no node card, no node rung in `LADDERS.ledger`),
+// but its SELECTION survives, so going back brings it back. The releases that used to drop it under a
+// tile, a band, a network, a tick's × or a resume of LIVE protected a rung the ledger no longer has.
+describe("no Snapshots builder releases the node (a carried node holds)", () => {
+  const G = { kind: "snapshot", title: "Global snapshot #42", data: { ordinal: 42 } } as unknown as SnapPick;
+  const G2 = { kind: "snapshot", title: "Global snapshot #43", data: { ordinal: 43 } } as unknown as SnapPick;
+  const MS: MetaSnapSel = { metaId: METAGRAPHS[0].id, ordinal: 5, hash: "m5", globalOrdinal: 42, ts: "t" };
+  const OTHER: MetaSnapSel = { ...MS, metaId: METAGRAPHS[1].id, ordinal: 9 };
+  const DAG_B: BlockSel = { chain: "dag", hash: "b1", ordinal: 1, anchorOrd: 42 };
+  const TOKEN_B: BlockSel = { chain: MS.metaId, hash: "t1", ordinal: 5, anchorOrd: 42 };
+  const TN = { metaId: MS.metaId, globalOrdinal: 42 };
+  it("every builder of the view, over held and foreign subjects alike, emits no inspect", () => {
+    const all: ClickAction[][] = [
+      snapshotClearActions({ metaSnap: MS, tickNet: TN, block: TOKEN_B }),
+      snapshotSelectActions(G, false, { pinnedOrdinal: 42, metaSnap: MS, tickNet: TN }),
+      snapshotSelectActions(G2, false, { pinnedOrdinal: 42, metaSnap: MS, tickNet: TN, block: DAG_B }),
+      tickNetSelectActions(OTHER.metaId, G, { metaSnap: MS, block: TOKEN_B }),
+      tickNetClearActions({ metaSnap: MS }),
+      metaSnapSelectActions(OTHER, G, { metaSnap: MS, block: DAG_B }),
+      metaSnapSelectActions(OTHER, G, { metaSnap: MS, following: true, block: null }),
+      metaSnapArrivalActions(OTHER, G2, TOKEN_B),
+      dataBlockSelectActions({ snap: OTHER, index: 0 }, G, { dataBlock: null, metaSnap: MS, block: null }),
+      blockSelectActions(TOKEN_B, G2, { block: DAG_B, pinnedOrdinal: 42, metaSnap: OTHER, tickNet: TN }, MS),
+      blockSelectActions(DAG_B, G2, { block: null, pinnedOrdinal: null, metaSnap: MS, tickNet: TN }),
+      bandSelectActions(OTHER.metaId, G, { metaSnap: MS, block: TOKEN_B }),
+      followToggleActions(G, false, DAG_B),
+      followToggleActions(G, true, DAG_B),
+      blockFollowActions(DAG_B, G, false),
+      blockFollowActions(DAG_B, G, true),
+      registerSwitchActions("blocks", { block: DAG_B, metaSnap: MS }, false),
+      metaSnapClearActions({ metaSnap: MS, block: TOKEN_B }),
+      clickActions({ mode: "ledger", pick: G, countryCc: null, current: { ...state({ hasInspect: true }), pinnedOrdinal: 42, metaSnap: MS, tickNet: TN } }),
+      clickActions({ mode: "ledger", pick: validatorPick(), countryCc: null, current: state({ hasInspect: true }) }),
+    ];
+    for (const acts of all) expect(kinds(acts)).not.toContain("inspect");
+  });
+  it("the builders take no node at all: a held node is not an input to the view's table", () => {
+    // A signature that reads the node again would come back as a property here and fail to compile.
+    const src = readFileSync(new URL("./pickActions.ts", import.meta.url), "utf8");
+    for (const fn of ["snapshotClearActions", "tickNetSelectActions", "tickNetClearActions", "metaSnapSelectActions", "dataBlockSelectActions", "blockSelectActions", "bandSelectActions", "followToggleActions"]) {
+      const start = src.indexOf(`export function ${fn}(`);
+      expect(start).toBeGreaterThan(-1);
+      const body = src.slice(start, src.indexOf("\nexport ", start + 10));
+      expect(body, fn).not.toMatch(/kind: "inspect"/);
+    }
   });
 });

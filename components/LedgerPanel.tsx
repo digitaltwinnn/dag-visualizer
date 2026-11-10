@@ -190,15 +190,12 @@ export default function LedgerPanel() {
   const metaSnap = useStore((s) => s.metaSnap);
   const tickNet = useStore((s) => s.tickNet);
   const snapshotExact = useStore((s) => s.snapshotExact);
-  const inspect = useStore((s) => s.inspect);
   // ONE PICK FOR EVERY LEVEL (user, 2026-09-29 — `src/data/explorerMeasure.ts`): the lower levels
   // show the tick level's `ledgerMeasure` where they can state it and their own first measure where
   // they can't, and a pick at any level writes that one value — so stepping down and back up never
   // loses what the reader chose.
   const netPick = levelMeasure(measures.netMeasures, ledgerMeasure);
   const snapPick = levelMeasure(measures.snapMeasures, ledgerMeasure);
-
-  const selNode = inspect && (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode") ? inspect : null;
 
   // ⚠️ THE LIST IS THE LIVE BUFFER, PAGED — not the 3D trail (user, 2026-09-13: nine rows made
   // the explorer look like the whole chain rather than a peephole onto it). `POLL.maxSnapshots`
@@ -399,7 +396,7 @@ export default function LedgerPanel() {
               ),
               hue: "var(--primary)",
               className: "animate-in fade-in slide-in-from-top-2 duration-300 motion-reduce:animate-none",
-              onClick: () => applyClickActions(followToggleActions(snap, false, useStore.getState().block, useStore.getState().inspect != null)),
+              onClick: () => applyClickActions(followToggleActions(snap, false, useStore.getState().block)),
             } as ExplorerRowSpec,
           ]
         : ([] as ExplorerRowSpec[])
@@ -549,9 +546,7 @@ export default function LedgerPanel() {
                 applyClickActions(
                   tickNetSelectActions(n.id, globalPick(tick), {
                     metaSnap,
-                    hasInspect: !!selNode,
                     block: useStore.getState().block,
-                    net: ledgerNetwork({ filter, tickNet, snapOrdinal: activeSnapOrd ?? null }),
                   }),
                 );
                 setPath((p) => ({ ...p, net: n.id, snap: null }));
@@ -612,7 +607,7 @@ export default function LedgerPanel() {
           on,
           rung: "metaSnap",
           onClick: () => {
-            applyClickActions(metaSnapSelectActions(sel, tickPick, { metaSnap, following, inspect: useStore.getState().inspect, block: useStore.getState().block }));
+            applyClickActions(metaSnapSelectActions(sel, tickPick, { metaSnap, following, block: useStore.getState().block }));
             // The path follows the selection (`syncLedgerPath`), so this states the same thing in
             // the same commit, and the deselect releases it.
             setPath((p) => ({ ...p, snap: on ? null : key }));

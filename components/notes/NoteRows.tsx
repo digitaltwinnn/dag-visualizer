@@ -10,7 +10,6 @@ import { focusPreviews } from "@/components/useSubjectPairing";
 import { latestTickOf } from "@/src/data/ladderLevels";
 import { getNetwork } from "@/src/data/network";
 import type { NotableKind, NoteChange, NoteChangeKind, NoteDay, NoteResponse, NoteView } from "@/src/data/noteTypes";
-import { ledgerNetwork } from "@/src/engine/domain/tickNet";
 import { tickContextOf } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
@@ -112,8 +111,6 @@ function ChangeRow({ change, view, onCard }: { change: NoteChange; view: NoteVie
       composition: s.composition,
       hasInspect: !!s.inspect,
       ...tickContextOf(s),
-      inspect: s.inspect,
-      ledgerNet: ledgerNetwork({ filter: s.filter, tickNet: s.tickNet, snapOrdinal: s.snap?.data.ordinal ?? null }),
     };
     const acts = changeActions(change, view, state, s.selNodes, net && id ? latestTickOf(net.metaSnaps, net.globalSnapshots, id) : null);
     return onCard && acts && !staysOnCard(acts) ? null : acts;

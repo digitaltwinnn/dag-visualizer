@@ -2,7 +2,7 @@ import { compositionGroups, compositionKey, roleKeyLabel } from "@/src/data/comp
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { cohortOfProvider } from "@/src/data/ladderLevels";
 import type { NoteChange, NoteChangeSubject, NoteGlobal, NoteView } from "@/src/data/noteTypes";
-import { metaSnapHoverKey, type GlobalSnapshot, type MetaSnapSel, type NodeRow, type PickDescriptor, type TickNetSel, type BlockSel } from "@/src/data/types";
+import { metaSnapHoverKey, type GlobalSnapshot, type MetaSnapSel, type NodeRow, type TickNetSel, type BlockSel } from "@/src/data/types";
 import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder";
 import {
   compositionToggleActions,
@@ -29,7 +29,6 @@ export interface ChangeState {
   /** Snapshots: the tick and the follow state its rows commit against. */
   following?: boolean;
   pinnedOrdinal?: number | null;
-  inspect?: PickDescriptor | null;
   tickNet?: TickNetSel | null;
   /** Snapshots: the committed block, which a commit on another tick releases. */
   block?: BlockSel | null;
@@ -39,8 +38,6 @@ export interface ChangeState {
   composition: CompositionSel | null;
   hasInspect: boolean;
   metaSnap: MetaSnapSel | null;
-  /** The network the Snapshots card stands on (`ledgerNetwork`). */
-  ledgerNet: string | null;
 }
 
 /** A global snapshot as a pick (`pickActions.globalPick`): the record a row carries, the road the raw
@@ -68,9 +65,7 @@ export function changeActions(
       if (!tick || subject.id === "dag") return null; // the chamber's own row names no network to open
       return tickNetSelectActions(subject.id, globalPick(tick), {
         metaSnap: s.metaSnap,
-        hasInspect: s.hasInspect,
         block: s.block ?? null,
-        net: s.ledgerNet,
       });
     case "type":
       return compositionToggleActions({ netId: subject.netId, key: compKeyOf(subject.type) }, { ...s, filter: s.railNet ?? s.filter });
@@ -81,12 +76,11 @@ export function changeActions(
       return c ? noteCohortActions({ cc: c.cc, city: c.city, isp: c.isp }, s) : null;
     }
     case "metaSnap":
-      return metaSnapSelectActions(subject.sel, notePick(subject.global), { metaSnap: s.metaSnap, following: s.following, inspect: s.inspect ?? null, block: s.block ?? null });
+      return metaSnapSelectActions(subject.sel, notePick(subject.global), { metaSnap: s.metaSnap, following: s.following, block: s.block ?? null });
     case "global":
       return snapshotSelectActions(notePick(subject.global), false, {
         pinnedOrdinal: s.pinnedOrdinal ?? null,
         metaSnap: s.metaSnap,
-        hasInspect: s.hasInspect,
         tickNet: s.tickNet,
         block: s.block,
       });

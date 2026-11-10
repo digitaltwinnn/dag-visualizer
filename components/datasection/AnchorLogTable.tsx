@@ -1504,7 +1504,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       metaSnapSelectActions(
         { metaId: r.metaId, ordinal: r.ordinal, hash: r.hash, globalOrdinal: r.global.ordinal, ts: r.ts },
         globalPick(r.global as GlobalSnapshot),
-        { metaSnap, following, inspect: useStore.getState().inspect, block: useStore.getState().block },
+        { metaSnap, following, block: useStore.getState().block },
       ),
     );
   };

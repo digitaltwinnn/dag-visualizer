@@ -653,7 +653,6 @@ export class Engine {
       get morph() { return engineSelf.morph; },
       get activeMetaIds() { return engineSelf._activeMetaIds; },
       get cohortSel() { return engineSelf.cohortSel; },
-      ledgerNet: () => this._ledgerNet(),
       compositionOf: (p) => this._compositionOf(p),
     });
     this.callout = new CalloutSync({

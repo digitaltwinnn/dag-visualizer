@@ -318,7 +318,7 @@ describe("siblingSet — metagraph snapshot rung", () => {
       metaSnapSelectActions(
         { metaId: "ded", ordinal: 101, hash: "", globalOrdinal: 42, ts: "T" },
         snapPick,
-        { block: null, metaSnap: cur, inspect: null },
+        { block: null, metaSnap: cur },
       ),
     );
   });
@@ -335,7 +335,7 @@ describe("siblingSet — metagraph snapshot rung", () => {
     expect(set.parentLabel).toBe("Global 42");
     const toDor = set.items[2]!.actions;
     expect(toDor.some((a) => a.kind === "filter")).toBe(false);
-    expect(toDor).toEqual(metaSnapSelectActions({ metaId: "dor", ordinal: 900, hash: "", globalOrdinal: 42, ts: "T" }, snapPick, { block: null, metaSnap: cur, inspect: null }));
+    expect(toDor).toEqual(metaSnapSelectActions({ metaId: "dor", ordinal: 900, hash: "", globalOrdinal: 42, ts: "T" }, snapPick, { block: null, metaSnap: cur }));
     // Standing on DOR's snapshot inside the tick, the set is still the whole tick's.
     const onDor = ledger({ filter: "dag", metaSnap: { ...cur, metaId: "dor", ordinal: 900 }, tickNet: { metaId: "dor", globalOrdinal: 42 }, snap: snapPick, exactRows: rows });
     expect(siblingSet("metaSnap", onDor)!.index).toBe(2);
@@ -538,7 +538,7 @@ describe("childStep — the first-child DOWN step", () => {
       metaSnapSelectActions(
         { metaId: "ded", ordinal: 500, hash: "", globalOrdinal: 42, ts: "T" },
         snapPick,
-        { block: null, metaSnap: null, inspect: null },
+        { block: null, metaSnap: null },
       ),
     );
   });
@@ -552,7 +552,7 @@ describe("childStep — the first-child DOWN step", () => {
     const step = childStep("context", ledger({ filter: "dag", snap: snapPick, exactRows: rows }))!;
     expect(step.label).toBe("DED 56"); // the busiest network's newest row, as the explorer lists it
     expect(step.actions).toEqual(
-      metaSnapSelectActions({ metaId: "ded", ordinal: 56, hash: "", globalOrdinal: 42, ts: "T" }, snapPick, { block: null, metaSnap: null, inspect: null }),
+      metaSnapSelectActions({ metaId: "ded", ordinal: 56, hash: "", globalOrdinal: 42, ts: "T" }, snapPick, { block: null, metaSnap: null }),
     );
     expect(step.actions.some((a) => a.kind === "filter")).toBe(false);
   });
@@ -628,7 +628,7 @@ describe("siblingSet — context rung under a ledger tick", () => {
   });
   it("a swipe commits the neighbour INSIDE the tick and pins it — never the filter", () => {
     const set = siblingSet("context", s)!;
-    expect(set.items.find((i) => i.key === "dor")!.actions).toEqual(tickNetSelectActions("dor", snapPick, { block: null, metaSnap: null, hasInspect: false, net: "ded" }));
+    expect(set.items.find((i) => i.key === "dor")!.actions).toEqual(tickNetSelectActions("dor", snapPick, { block: null, metaSnap: null }));
     expect(set.items.every((i) => i.actions.every((a) => a.kind !== "filter"))).toBe(true);
   });
   it("…and from LIVE a swipe pins the tick it steps inside (a network in a tick needs its tick)", () => {

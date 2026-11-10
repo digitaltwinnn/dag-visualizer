@@ -168,7 +168,7 @@ The design rules behind the table, which the tests pin but don't explain:
   that's the subject"): the scene pick carries it (`PickDescriptor.block.snap`), the explorer and RAW
   rows ask the window (`blockWindow.blockMetaSnap`), and the builder's `snapOf` commits the network
   and the snapshot before the block — coarse to fine, the block LAST so it ranks and its card is the
-  box; a node of another network is released first, as the tile click does. A DAG block's
+  box. A DAG block's
   accepting snapshot is the global itself, so it commits nothing more. The live follow seats a token
   block's snapshot the same way (`followNewestBlock`, the non-bumping advance). **In Transaction
   blocks a BAR click is its tick's first block** (`Picking`, 2026-11-07, user: the register "loses
@@ -202,10 +202,15 @@ The design rules behind the table, which the tests pin but don't explain:
   not a pick — the auto-followed metagraph snapshot's rule), and the Block card's LIVE / PINNED
   control is `blockFollowActions`, which re-commits the block LAST either way so its card stays the
   box the reader pressed.
-- **Resuming LIVE releases the signer node** (user, 2026-11-08): `followToggleActions(…, hasInspect)`
-  drops the node card first on a resume — the ledger's node is a metagraph snapshot's signer, and
-  live lets go of the snapshot it signed, so a node left standing would hang from a rung that has
-  moved on. Both callers (the Global snapshot card's control, the explorer's live row) pass it.
+- **A CARRIED NODE HOLDS THROUGH SNAPSHOTS** (user, 2026-11-10): a node selected in Hypergraph or
+  Geography and carried into Snapshots is shown nowhere there — the ledger's ladder has no node rung
+  and the view no node card (2026-11-08) — but its SELECTION survives, so going back brings the card,
+  its country, provider or group back (`LEVEL_CARRY.node` is `"always"`; the destination's ancestry
+  re-commits on entry). So no Snapshots builder releases `inspect`: not a tile, a band, a network in
+  a tick or its ×, a block, a data block, the tick's × or re-click, nor resuming LIVE. The builders
+  take no node as an input at all, and `pickActions.test.ts`' "no Snapshots builder releases the
+  node" block pins it, with `followFlow.test.ts` running a held node through a tile, a band, both ×s
+  and LIVE. Only the top bar's filter switch still drops a node (a network-level event, in any view).
 - **A register switch is a setting that RELEASES** (2026-11-06; three registers since D6). `registerSwitchActions`
   drops what the register ENTERED cannot draw — entering Transaction blocks drops the metagraph
   snapshot, entering either other (Metagraph snapshots or Data blocks) drops the block, and

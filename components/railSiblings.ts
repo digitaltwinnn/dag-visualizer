@@ -347,7 +347,7 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
         // should not be changed from the explorer", and a pager is the same kind of gesture. The
         // step pins the tick and commits the neighbour INSIDE it; the filter is the reader's lens
         // and stays what they set.
-        const items = nets.map((m) => ({ key: m.id, label: m.name, actions: tickNetSelectActions(m.id, s.snap!, { metaSnap: s.metaSnap, hasInspect: s.inspect != null, net, block: s.block ?? null }) }));
+        const items = nets.map((m) => ({ key: m.id, label: m.name, actions: tickNetSelectActions(m.id, s.snap!, { metaSnap: s.metaSnap, block: s.block ?? null }) }));
         return finish(slot, items, nets.findIndex((m) => m.id === net), `Global ${s.snap!.data.ordinal.toLocaleString()}`);
       }
       // A FILTER HOLDS THE CARD (`domain/viewNetwork.heldOut`): only the top bar leaves it. So what
@@ -435,7 +435,7 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
       const items = (s.tickBlocks ?? []).map((b) => ({
         key: `${b.sel.chain}:${b.sel.hash}`,
         label: `${tickerOf(b.sel.chain)} ${shortBlockHash(b.sel.hash)}`,
-        actions: blockSelectActions(b.sel, s.snap!, { ...tickContextOf({ following: s.following, snap: s.snap, metaSnap: s.metaSnap, tickNet: s.tickNet, block: s.block, inspect: s.inspect }) }, b.snap),
+        actions: blockSelectActions(b.sel, s.snap!, { ...tickContextOf({ following: s.following, snap: s.snap, metaSnap: s.metaSnap, tickNet: s.tickNet, block: s.block }) }, b.snap),
       }));
       return finish(slot, items, items.findIndex((it) => it.key === `${cur.chain}:${cur.hash}`), `Global ${cur.anchorOrd.toLocaleString()}`);
     }
@@ -482,7 +482,7 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
         const items = wide.map(({ r, who }, i) => ({
           key: `${r.metaId}:${r.ordinal}:${i}`,
           label: `${who} ${ordinalLabel(r)}`,
-          actions: metaSnapSelectActions(metaSnapSelOf(r, cur.globalOrdinal), s.snap!, { metaSnap: cur, following: s.following, inspect: s.inspect, block: s.block ?? null }),
+          actions: metaSnapSelectActions(metaSnapSelOf(r, cur.globalOrdinal), s.snap!, { metaSnap: cur, following: s.following, block: s.block ?? null }),
         }));
         const index = wide.findIndex(({ r }) => r.metaId === cur.metaId && r.ordinal === cur.ordinal);
         return finish(slot, items, index, `Global ${cur.globalOrdinal.toLocaleString()}`);
@@ -500,7 +500,7 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
         // other rendered ordinal — and an undecodable payload says so rather than claiming 0
         // (the route's contract).
         label: ordinalLabel(r),
-        actions: metaSnapSelectActions(metaSnapSelOf(r, cur.globalOrdinal), s.snap!, { metaSnap: cur, following: s.following, inspect: s.inspect, block: s.block ?? null }),
+        actions: metaSnapSelectActions(metaSnapSelOf(r, cur.globalOrdinal), s.snap!, { metaSnap: cur, following: s.following, block: s.block ?? null }),
       }));
       const index = rows.findIndex((r) => r.metaId === cur.metaId && r.ordinal === cur.ordinal);
       return finish(slot, items, index, `${who} in global ${cur.globalOrdinal.toLocaleString()}`);
@@ -671,7 +671,7 @@ const anchoringNetworkChildren = (s: SiblingState, n: number): SiblingStep[] => 
   return (s.tickNets ?? []).slice(0, n).map((meta) => ({
     key: meta.id,
     label: meta.name,
-    actions: tickNetSelectActions(meta.id, snap, { metaSnap: s.metaSnap, hasInspect: s.inspect != null, net: null, block: s.block ?? null }),
+    actions: tickNetSelectActions(meta.id, snap, { metaSnap: s.metaSnap, block: s.block ?? null }),
   }));
 };
 /** ledger: the committed network's OWN snapshots in the shown tick — never the tick's first rows,
@@ -687,7 +687,7 @@ const metaSnapOfTickChildren = (s: SiblingState, n: number): SiblingStep[] => {
     return tickWideRows(s).slice(0, n).map(({ r, who }) => ({
       key: `${r.metaId}:${r.ordinal}`,
       label: `${who} ${ordinalLabel(r)}`,
-      actions: metaSnapSelectActions(metaSnapSelOf(r, snap.data.ordinal), snap, { metaSnap: s.metaSnap, inspect: s.inspect, block: s.block ?? null }),
+      actions: metaSnapSelectActions(metaSnapSelOf(r, snap.data.ordinal), snap, { metaSnap: s.metaSnap, block: s.block ?? null }),
     }));
   }
   // The explorer's own list for this network in this tick, NEWEST first — the ghost opens its top
@@ -697,7 +697,7 @@ const metaSnapOfTickChildren = (s: SiblingState, n: number): SiblingStep[] => {
   return tn.snaps.slice(0, n).map((r) => ({
     key: `${r.metaId}:${r.ordinal}`,
     label: ordinalLabel(r),
-    actions: metaSnapSelectActions(metaSnapSelOf(r, snap.data.ordinal), snap, { metaSnap: s.metaSnap, inspect: s.inspect, block: s.block ?? null }),
+    actions: metaSnapSelectActions(metaSnapSelOf(r, snap.data.ordinal), snap, { metaSnap: s.metaSnap, block: s.block ?? null }),
   }));
 };
 
@@ -749,7 +749,7 @@ export function blockStep(s: SiblingState): SiblingStep | null {
   return {
     key: `${first.sel.chain}:${first.sel.hash}`,
     label: `${tickerOf(first.sel.chain)} ${shortBlockHash(first.sel.hash)}`,
-    actions: blockSelectActions(first.sel, s.snap, { ...tickContextOf({ following: s.following, snap: s.snap, metaSnap: s.metaSnap, tickNet: s.tickNet, block: s.block, inspect: s.inspect }) }, first.snap),
+    actions: blockSelectActions(first.sel, s.snap, { ...tickContextOf({ following: s.following, snap: s.snap, metaSnap: s.metaSnap, tickNet: s.tickNet, block: s.block }) }, first.snap),
   };
 }
 
@@ -763,7 +763,7 @@ function dataBlocksOf(s: SiblingState): SiblingStep[] {
   return rows.map((_b, i) => ({
     key: `${ms.metaId}:${ms.ordinal}:${i}`,
     label: `${i + 1} of ${rows.length}`,
-    actions: dataBlockSelectActions({ snap: ms, index: i }, s.snap!, { dataBlock: s.dataBlock ?? null, metaSnap: s.metaSnap, following: s.following, inspect: s.inspect, block: s.block ?? null }),
+    actions: dataBlockSelectActions({ snap: ms, index: i }, s.snap!, { dataBlock: s.dataBlock ?? null, metaSnap: s.metaSnap, following: s.following, block: s.block ?? null }),
   }));
 }
 
@@ -784,7 +784,7 @@ function tickDataBlocksOf(s: SiblingState): SiblingStep[] {
     return r.dataBlockRows!.map((b, i) => ({
       key: `${r.metaId}:${r.ordinal}:${i}`,
       label: `${tickerOf(r.metaId)} ${shortBlockHash(b.digest)}`,
-      actions: dataBlockSelectActions({ snap: ms, index: i }, snap, { dataBlock: s.dataBlock ?? null, metaSnap: s.metaSnap, following: s.following, inspect: s.inspect, block: s.block ?? null }),
+      actions: dataBlockSelectActions({ snap: ms, index: i }, snap, { dataBlock: s.dataBlock ?? null, metaSnap: s.metaSnap, following: s.following, block: s.block ?? null }),
     }));
   });
 }

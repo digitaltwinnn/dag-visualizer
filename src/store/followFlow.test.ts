@@ -15,6 +15,9 @@ import {
   metaSnapSelectActions,
   blockSelectActions,
   blockFollowActions,
+  bandSelectActions,
+  tickNetClearActions,
+  snapshotClearActions,
 } from "@/src/engine/domain/pickActions";
 import { followLatest } from "@/src/data/follow";
 import { getBlockWindow, setBlockWindow } from "@/src/data/pastWindow";
@@ -71,7 +74,7 @@ describe("the follow flow decision table", () => {
   it("LIVE → step to another snapshot of the live pair: still following, the global unpinned, the step held", () => {
     const live = { ...child(100), ordinal: 2, hash: "mh2" };
     useStore.setState({ following: true, snap: snapPick(100), metaSnap: live });
-    applyClickActions(metaSnapSelectActions(child(100), snapPick(100), { block: null, metaSnap: live, following: true, inspect: null }));
+    applyClickActions(metaSnapSelectActions(child(100), snapPick(100), { block: null, metaSnap: live, following: true }));
     expect(st().following).toBe(true);
     expect(st().snap?.data.ordinal).toBe(100);
     expect(st().metaSnap).toEqual({ ...child(100), held: true });
@@ -93,18 +96,31 @@ describe("the follow flow decision table", () => {
     expect(st().following).toBe(true);
   });
 
-  it("PINNED → LIVE with a signer node held: the node card goes with the snapshot it signed (user, 2026-11-08)", () => {
-    const node = { kind: "metanode", meta: { id: LISTED }, node: { ip: "1.2.3.4", id: "n1" }, title: "n", sub: "" } as unknown as PickDescriptor;
-    useStore.setState({ following: false, snap: snapPick(100), metaSnap: child(100), inspect: node });
-    applyClickActions(followToggleActions(snapPick(100), false, st().block, st().inspect != null));
+  it("A CARRIED NODE HOLDS THROUGH SNAPSHOTS: a tile, a band, a tick's ×, the network's × and LIVE leave it (user, 2026-11-10)", () => {
+    // A node picked in Geography (a DAG validator) and carried into Snapshots is shown nowhere there,
+    // but it is that view's selection: going back must find it.
+    const node = { kind: "l0", node: { ip: "1.2.3.4", id: "n1" }, title: "n", sub: "" } as unknown as PickDescriptor;
+    useStore.setState({ mode: "ledger", following: true, snap: snapPick(100), metaSnap: null, inspect: node });
+    applyClickActions(metaSnapSelectActions(child(100), snapPick(100), { block: null, metaSnap: null, following: true }));
+    expect(st().following).toBe(false);
+    expect(st().inspect).toBe(node);
+    applyClickActions(bandSelectActions(LISTED, snapPick(100), { metaSnap: st().metaSnap, block: null }));
+    expect(st().inspect).toBe(node);
+    applyClickActions(tickNetClearActions({ metaSnap: st().metaSnap }));
+    expect(st().inspect).toBe(node);
+    applyClickActions(snapshotClearActions({ metaSnap: st().metaSnap, tickNet: st().tickNet, block: st().block }));
     expect(st().following).toBe(true);
-    expect(st().inspect).toBeNull();
+    expect(st().inspect).toBe(node);
+    applyClickActions(followToggleActions(snapPick(100), true, null));
+    applyClickActions(followToggleActions(snapPick(100), false, null));
+    expect(st().following).toBe(true);
+    expect(st().inspect).toBe(node);
   });
 
   it("LIVE → clicking the auto-followed metagraph snapshot CONVERTS it to a pin (never a silent deselect)", () => {
     useStore.setState({ following: true, snap: snapPick(100), metaSnap: child(100), filter: LISTED });
     applyClickActions(
-      metaSnapSelectActions(child(100), snapPick(100), { block: null, metaSnap: child(100), following: true, inspect: null }),
+      metaSnapSelectActions(child(100), snapPick(100), { block: null, metaSnap: child(100), following: true }),
     );
     expect(st().following).toBe(false);
     expect(st().metaSnap?.globalOrdinal).toBe(100);
@@ -114,7 +130,7 @@ describe("the follow flow decision table", () => {
   it("PINNED → re-click the pinned metagraph snapshot: only the finer slot drops (parent stays)", () => {
     useStore.setState({ following: false, snap: snapPick(100), metaSnap: child(100), filter: LISTED });
     applyClickActions(
-      metaSnapSelectActions(child(100), snapPick(100), { block: null, metaSnap: child(100), following: false, inspect: null }),
+      metaSnapSelectActions(child(100), snapPick(100), { block: null, metaSnap: child(100), following: false }),
     );
     expect(st().metaSnap).toBeNull();
     expect(st().snap?.data.ordinal).toBe(100); // the anchoring global holds
@@ -140,7 +156,7 @@ describe("the follow flow decision table", () => {
     // tick, and the filter is a lens only the top bar's picker (and hyper's hubs) may move. The
     // ordered pin still beats the live follow.
     useStore.setState({ following: true, snap: snapPick(100), filter: "all" });
-    applyClickActions(metaSnapSelectActions(child(100), snapPick(100), { block: null, metaSnap: null, following: true, inspect: null }));
+    applyClickActions(metaSnapSelectActions(child(100), snapPick(100), { block: null, metaSnap: null, following: true }));
     expect(st().filter).toBe("all");
     expect(st().following).toBe(false);
     expect(st().metaSnap?.globalOrdinal).toBe(100);

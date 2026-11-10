@@ -43,8 +43,6 @@ export interface PickHost {
   /** Metagraphs with a located node — `pickActive` skips the others' hubs. */
   activeMetaIds: Set<string> | null;
   cohortSel: CohortSel | null;
-  /** The network the LEDGER resolves against — `domain/tickNet.ledgerNetwork`, one home. */
-  ledgerNet(): string;
   /** The composition group a node pick belongs to in the current view's ladder. */
   compositionOf(p: PickDescriptor | null): CompositionSel | null;
 }
@@ -225,7 +223,7 @@ export class Picking {
     // A metagraph-snapshot TILE: commit the tile AND pin the global tick it anchored into.
     if (p?.kind === "metaSnap") {
       applyClickActions(
-        metaSnapSelectActions(p.sel, p.global, { metaSnap: st.metaSnap, following: st.following, inspect: st.inspect, block: st.block }),
+        metaSnapSelectActions(p.sel, p.global, { metaSnap: st.metaSnap, following: st.following, block: st.block }),
       );
       return;
     }
@@ -236,8 +234,6 @@ export class Picking {
       applyClickActions(
         bandSelectActions(bandKey, p, {
           metaSnap: st.metaSnap,
-          hasInspect: st.inspect != null,
-          net: this.h.ledgerNet(),
           block: st.block,
         }),
       );
