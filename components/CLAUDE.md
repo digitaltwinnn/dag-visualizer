@@ -1214,7 +1214,13 @@ short addresses (`midHash`), several counted; several transfers as the breakdown
 from → to · amount · fee (`BlockRead.transfers`); parents, CHILDREN IN VIEW (a count within the
 window's held reads, labelled so, never a total), signatures and fees as facts; the hashes in the
 foot — and no sub-height (a `BlockRead` carries none); `railCards.test.ts`'s block cases pin the
-slot. The explorer's Blocks level states its one FLOOR on the heading row ("The DAG and the listed
+slot. **The Blocks level's Amount and Fees count ONE chain** (user, 2026-11-10): a block's amount
+and fee are in its chain's unit, so the list bars and states only the window's own network's —
+the DAG's under All and the DAG filter, the token's under its filter (`blockMeasure.blockMeasureCounts`,
+the band MOVED's rule, `movedChainOf`); under All a token block's row states neither (no bar, no
+figure) and the two tiles say "DAG only" (`blockMeasureUnit` — the tile grammar's unit symbol takes an
+"only"), the ticker under a filter; the set's row plan is Amount · Fees, then Height
+(`BLOCK_MEASURE_ROWS`), so the tag never cuts a name. The explorer's Blocks level states its one FLOOR on the heading row ("The DAG and the listed
 networks; unlisted networks' blocks are not read" — the trail reads the listed transfer lists only),
 and under it, where a token chain's walk was cut by its page cap (`BlockWindow.partial`), the blocks
 not reached ("Older DOR blocks are not reached"). Under a network filter the window is that

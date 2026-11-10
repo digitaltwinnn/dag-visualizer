@@ -38,9 +38,9 @@ import { VIEW_POLICIES, readsBlockWindow } from "@/src/engine/domain/viewPolicy"
 import { registerNetworks, tickNetworksLevel, tickPolledRows } from "@/src/data/ladderLevels";
 import { useFeedRead } from "@/components/useFeedRead";
 import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
-import { blockMetaSnap, windowBlocks, tickBlockSnaps } from "@/src/data/blockWindow";
+import { blockChainOf, blockMetaSnap, windowBlocks, tickBlockSnaps } from "@/src/data/blockWindow";
 import { blockReadOf } from "@/src/data/blockReads";
-import { BLOCK_MEASURE_OPTIONS, blockMeasureText, blockMeasureValue, type BlockMeasure } from "@/src/data/blockMeasure";
+import { BLOCK_MEASURE_ROWS, blockMeasureCounts, blockMeasureOptions, blockMeasureText, blockMeasureValue, type BlockMeasure } from "@/src/data/blockMeasure";
 import { NO_MEASURE } from "@/src/data/ledgerMeasure";
 import { blockSelectActions, globalPick, tickContextOf } from "@/src/engine/domain/pickActions";
 import { VIEWS } from "@/components/views";
@@ -646,9 +646,15 @@ export default function LedgerPanel() {
   const blockPages = Math.max(1, Math.ceil(allBlocks.length / pageSize));
   const bPage = Math.min(blockPage, blockPages);
   const pagedBlocks = allBlocks.slice((bPage - 1) * pageSize, bPage * pageSize);
+  // ONE UNIT PER LIST (user, 2026-11-10): an amount or a fee is in its chain's unit, so the list counts
+  // the window's own chain alone — the DAG's under All, the tile saying "DAG only" — and a token block
+  // there states neither (no bar, no figure; `blockMeasureCounts`). Under a filter every row counts.
+  // The held window's own network (its provenance, review M1), else the one the filter will read.
+  const blockChain = blockWin ? blockWin.chain : blockChainOf(filter);
+  const counts = (b: { chain: string }) => blockMeasureCounts(blockMeasure, b.chain, blockChain);
   const blockValues = pagedBlocks.map((b) => {
     const read = blockReadOf(blockReads, b);
-    return read ? blockMeasureValue(blockMeasure, read) : null;
+    return read && counts(b) ? blockMeasureValue(blockMeasure, read) : null;
   });
   const maxBlock = Math.max(1e-9, ...blockValues.map((v) => v ?? 0));
   const blockLens = ledgerLens(filter);
@@ -659,7 +665,7 @@ export default function LedgerPanel() {
   const blockLevel: ExplorerLevelSpec = {
     key: "blocks",
     crumb: { label: "Blocks" },
-    measure: { options: BLOCK_MEASURE_OPTIONS, value: blockMeasure, onPick: (id) => setBlockMeasure(id as BlockMeasure) },
+    measure: { options: blockMeasureOptions(blockChain, tickerOf), rows: BLOCK_MEASURE_ROWS, value: blockMeasure, onPick: (id) => setBlockMeasure(id as BlockMeasure) },
     hasFigure: true,
     figureW: 48,
     // An honest instrument state for each way the window is not here (rule 10) — the band's and
@@ -693,7 +699,7 @@ export default function LedgerPanel() {
         ),
         share: v != null ? v / maxBlock : undefined,
         hue,
-        figure: read ? blockMeasureText(blockMeasure, read) : NO_MEASURE,
+        figure: !counts(b) ? undefined : read ? blockMeasureText(blockMeasure, read) : NO_MEASURE,
         on,
         // A committed block's row re-boxes its card first (`openOrToggle`), as every subject row does.
         rung: "block",

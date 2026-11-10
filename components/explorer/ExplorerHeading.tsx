@@ -128,8 +128,10 @@ export function MeasureTiles({ measure }: { measure: MeasureControl }) {
                 just the number"): the rows state bare figures and the tile is their one heading, so a
                 measure in a real unit — a ticker or bytes, the all-caps symbols — shows it, small and
                 muted, at the tile's RIGHT edge (user, same day: "right align the kb / dag element"), so
-                the units line up down the column as the figures do; a count says nothing more. */}
-            {/^[A-Z]{2,}$/.test(o.unit ?? "") && <span className="ml-auto flex-none pl-1 text-[0.85em] opacity-70 tabular-nums">{o.unit}</span>}
+                the units line up down the column as the figures do; a count says nothing more. A
+                symbol may carry "only" (user, 2026-11-10: "DAG only" — a Transaction blocks list under
+                All counts the DAG's own blocks' amounts alone, `blockMeasure.blockMeasureUnit`). */}
+            {/^[A-Z]{2,}(?: only)?$/.test(o.unit ?? "") && <span className="ml-auto flex-none pl-1 text-[0.85em] opacity-70 tabular-nums whitespace-nowrap">{o.unit}</span>}
           </ToggleGroupItem>
         );
       })}
