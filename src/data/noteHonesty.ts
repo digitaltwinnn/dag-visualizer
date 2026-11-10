@@ -293,15 +293,20 @@ function datePhrases(facts: readonly Fact[]): RegExp[] {
   for (const f of facts) {
     if (f.kind === "time") {
       // A clock time is UTC (`fact`'s "time"): its 24-hour form, the hour with or without a leading
-      // zero, or the 12-hour form, each with an optional ":ss" and "UTC" after it.
+      // zero, or the 12-hour form in the fact's OWN half of the day (a 14:05 fact backs "2:05 PM",
+      // never "2:05 AM"; a 00:30 fact "12:30 AM", never "PM" — review M1), each with an optional
+      // "UTC" after it. The 24-hour form takes no meridiem after it, or "12:30" and "9:00" would back
+      // either half. No seconds: the fact states its minute ("14:05 UTC"), so a ":ss" after it is a
+      // figure no fact holds, and the lookahead leaves it to be checked as numbers.
       const d = new Date(f.value);
       const h = d.getUTCHours();
       const mm = String(d.getUTCMinutes()).padStart(2, "0");
       const h12 = h % 12 === 0 ? 12 : h % 12;
+      const half = h < 12 ? "a" : "p";
       const utc = "(?:\\s*UTC)?";
       out.push(
-        new RegExp(`(?<![\\d:])0?${h}:${mm}(?::\\d{2})?${utc}(?![\\d:])`, "gi"),
-        new RegExp(`(?<![\\d:])${h12}:${mm}\\s*[ap]\\.?m\\.?${utc}(?!\\w)`, "gi"),
+        new RegExp(`(?<![\\d:])0?${h}:${mm}${utc}(?![\\d:]|\\s*[ap]\\.?m\\b)`, "gi"),
+        new RegExp(`(?<![\\d:])${h12}:${mm}\\s*${half}\\.?m\\.?${utc}(?!\\w)`, "gi"),
       );
       continue;
     }

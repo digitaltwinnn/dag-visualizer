@@ -7,10 +7,10 @@ const DAY = 86_400_000;
 
 describe("keys", () => {
   it("writes a note key in its own family", () => {
-    expect(NOTES_VERSION).toBe(81);
-    expect(noteKeyOf("trend", "dag", "7d")).toBe("ai:mainnet:v81:trend:dag:7d");
-    expect(noteKeyOf("hyper", "all", "day")).toBe("ai:mainnet:v81:hyper:all:day");
-    expect(noteKeyOf("blocks", "all", "hours")).toBe("ai:mainnet:v81:blocks:all:hours");
+    expect(NOTES_VERSION).toBe(82);
+    expect(noteKeyOf("trend", "dag", "7d")).toBe("ai:mainnet:v82:trend:dag:7d");
+    expect(noteKeyOf("hyper", "all", "day")).toBe("ai:mainnet:v82:hyper:all:day");
+    expect(noteKeyOf("blocks", "all", "hours")).toBe("ai:mainnet:v82:blocks:all:hours");
   });
 
   it("keeps lock, stats, rate and cap keys inside the ai: family and apart from note keys", () => {

@@ -530,6 +530,24 @@ describe("checkNote — a clock time a time fact holds is not a number (the Data
     expect(timedOk("As of 14:06 UTC, 412 data blocks were carried.")).toBe(false);
     expect(timedOk("As of 15:05 UTC, 412 data blocks were carried.")).toBe(false);
   });
+  it("a 12-hour form backs only the fact's own half of the day (review M1)", () => {
+    expect(timedOk("As of 2:05 AM UTC, 412 data blocks were carried.")).toBe(false); // the fact is 14:05 — PM
+    expect(timedOk("As of 2:05 p.m. UTC, 412 data blocks were carried.")).toBe(true);
+    const noon = [fact("Window end", Date.UTC(2026, 10, 10, 12, 30), "time"), F("Data blocks", 5, "count", "5")];
+    expect(checkNote("As of 12:30 PM UTC, 5 data blocks were carried.", noon, []).ok).toBe(true);
+    expect(checkNote("As of 12:30 AM UTC, 5 data blocks were carried.", noon, []).ok).toBe(false);
+    const midnight = [fact("Window end", Date.UTC(2026, 10, 10, 0, 30), "time"), F("Data blocks", 5, "count", "5")];
+    expect(checkNote("As of 12:30 AM UTC, 5 data blocks were carried.", midnight, []).ok).toBe(true);
+    expect(checkNote("As of 12:30 PM UTC, 5 data blocks were carried.", midnight, []).ok).toBe(false);
+    const morning = [fact("Window end", Date.UTC(2026, 10, 10, 9, 0), "time"), F("Data blocks", 5, "count", "5")];
+    expect(checkNote("As of 9:00 AM UTC, 5 data blocks were carried.", morning, []).ok).toBe(true);
+    expect(checkNote("As of 9:00 PM UTC, 5 data blocks were carried.", morning, []).ok).toBe(false);
+  });
+  it("seconds are a figure no fact holds: the fact states its minute (review M1)", () => {
+    expect(timedOk("As of 14:05:59 UTC, 412 data blocks were carried.")).toBe(false);
+    expect(timedOk("As of 14:05:41 UTC, 412 data blocks were carried.")).toBe(false); // the fact's own seconds, unstated
+    expect(timedOk("As of 2:05:41 PM UTC, 412 data blocks were carried.")).toBe(false);
+  });
   it("an early hour reads with or without its leading zero", () => {
     const early = [fact("Window end", Date.UTC(2026, 10, 10, 9, 0), "time"), F("Data blocks", 5, "count", "5")];
     expect(early[0]!.text).toBe("09:00 UTC");

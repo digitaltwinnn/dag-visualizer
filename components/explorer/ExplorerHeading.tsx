@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 
 import { measureIcon } from "@/components/icons";
 import { tileCells } from "@/components/explorer/tileRows";
+import { showsTileUnit } from "@/src/data/explorerMeasure";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 
@@ -126,12 +127,12 @@ export function MeasureTiles({ measure }: { measure: MeasureControl }) {
             <span className="truncate">{o.label}</span>
             {/* A UNIT SYMBOL rides its tile (user, 2026-11-08: "size control should say also 'kb' not
                 just the number"): the rows state bare figures and the tile is their one heading, so a
-                measure in a real unit — a ticker or bytes, the all-caps symbols — shows it, small and
+                measure in a real unit — a ticker or bytes (`explorerMeasure.showsTileUnit`) — shows it, small and
                 muted, at the tile's RIGHT edge (user, same day: "right align the kb / dag element"), so
                 the units line up down the column as the figures do; a count says nothing more. A
                 symbol may carry "only" (user, 2026-11-10: "DAG only" — a Transaction blocks list under
                 All counts the DAG's own blocks' amounts alone, `blockMeasure.blockMeasureUnit`). */}
-            {/^[A-Z]{2,}(?: only)?$/.test(o.unit ?? "") && <span className="ml-auto flex-none pl-1 text-[0.85em] opacity-70 tabular-nums whitespace-nowrap">{o.unit}</span>}
+            {showsTileUnit(o.unit) && <span className="ml-auto flex-none pl-1 text-[0.85em] opacity-70 tabular-nums whitespace-nowrap">{o.unit}</span>}
           </ToggleGroupItem>
         );
       })}
