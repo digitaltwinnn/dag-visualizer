@@ -1,0 +1,192 @@
+"use client";
+// THE BLOCK card (the Blocks register, 2026-11-05) — one block of the block DAG as a subject: a
+// card slot under the Global snapshot card, no rung (the two snapshot slots' precedent). The six
+// slots (components/CLAUDE.md "Every right-rail card is the same SIX SLOTS"), each from what is
+// actually held (rule 10):
+//
+//   head      · "Transaction block", the short hash, the block's AGE as the qualifier chip (user,
+//               2026-11-08: "instead of 'height' use the 'x seconds ago' tag" — the age of the global
+//               snapshot that accepted it, the Global snapshot card's own register, ticking), and the
+//               LIVE / PINNED control (D3: in the Blocks register live follows the newest block)
+//   lead      · what it moved, in the chain's own unit — ONE transfer names it, "Moved N DAG from
+//               DAG1ab…cd to DAG9ef…01"; several are counted, "Moved N DAG in M transfers" — else,
+//               with nothing moved or its read not landed, the relation the feed already names:
+//               "Accepted into global N"
+//   breakdown · several transfers: one row each, from → to · amount · fee (the read's own
+//               `transfers`, the six-slot grammar's breakdown table); one transfer is the lead's
+//   facts     · parents (two short hashes), children IN VIEW (how many of the window's held reads
+//               are built on it — a count within the window, labelled so, never a total),
+//               signatures, fees, and the HEIGHT (a fact row since the head's chip became the age;
+//               a card never says one fact twice) — "reading…" until the read lands, and a failed
+//               read says so. No sub-height: a block read carries none.
+//   doors     · "Block records": the raw layer's blocks table, this block's row pinned in its
+//               accepting global's group (`trendDoors.openBlockRecord`)
+//   foot      · the hash and the parents' hashes, in full with copy
+import { useSyncExternalStore, type CSSProperties } from "react";
+import { cn } from "@/lib/utils";
+import { ArrowUpRight } from "lucide-react";
+import CardHead, { RailPane } from "@/components/CardHead";
+import FollowControl from "@/components/FollowControl";
+import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
+import { BLOCK_ICON, KIND_MARK_CLASS } from "@/components/icons";
+import { Door, Empty, Fact, FactGroup, Foot, FootRow, Lead, QualifierChip, SectionLabel, TABLE_ROW } from "@/components/inspector/parts";
+
+/** A transfer row's three columns: from, to, the amount on the card's right edge. */
+const TRANSFER_ROW = "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-baseline gap-x-3";
+import { tickerOf } from "@/components/explorer/nodeRow";
+import { openBlockRecord } from "@/components/trendDoors";
+import { blockLead } from "@/components/inspector/blockLead";
+import { useFeedRead } from "@/components/useFeedRead";
+import { subjectPairing } from "@/components/useSubjectPairing";
+import { blockReadKey, blockReadOf } from "@/src/data/blockReads";
+import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
+import { useNowTick } from "@/components/useNowTick";
+import { relativeAge } from "@/src/util/relativeAge";
+import { compactDag, midHash, shortBlockHash } from "@/src/util/format";
+import { identityHudCss } from "@/src/palette/identity";
+import { useStore } from "@/src/store/store";
+
+/** A wallet address in a breakdown row, where two share a line with an amount and a fee: the app's
+ *  one mid-ellipsis (the lead's sentence form is `blockLead`'s). */
+const rowAddr = (a: string) => midHash(a, 10);
+
+export default function BlockPane({ onClose, collapsed, onToggle }: { onClose: () => void; collapsed?: boolean; onToggle?: () => void }) {
+  useFeedRead(["api-blocks"], "BlockPane");
+  const sel = useStore((s) => s.block);
+  const reads = useStore((s) => s.blockReads);
+  const missed = useStore((s) => (s.block ? s.blockReadMiss[blockReadKey(s.block.chain, s.block.ordinal)] != null : false));
+  const hoverBlock = useStore((s) => s.hoverBlock);
+  const setHoverBlock = useStore((s) => s.setHoverBlock);
+  const pulseKey = useEdgePulse(sel ? `${sel.chain}:${sel.hash}` : null);
+  // The block's time is its accepting global snapshot's (the window's tick), read on the shared clock.
+  const win = useSyncExternalStore(onBlockWindow, getBlockWindow, () => null);
+  const now = useNowTick(1000);
+  if (!sel) return null;
+  const tickTs = win?.blockTick(sel.anchorOrd)?.ts ?? null;
+  const age = tickTs ? relativeAge(now - Date.parse(tickTs)) : null;
+
+  const hue = identityHudCss(sel.chain);
+  // The scene's block, the explorer's row and this card light one another on the block's own channel.
+  const pair = subjectPairing<string>(hoverBlock, sel.hash, setHoverBlock, hue);
+  const read = blockReadOf(reads, sel);
+  // The amount is in the CHAIN's unit: DAG for the DAG's own blocks, the token's ticker otherwise.
+  const unit = tickerOf(sel.chain);
+  // The read's own transfers (a read cached before they were carried has none to list).
+  const transfers = read?.transfers ?? [];
+  const lead = blockLead(sel, read);
+
+  return (
+    <RailPane
+      entry={collapsed}
+      className={pair.className}
+      style={pair.style}
+      onMouseEnter={pair.onMouseEnter}
+      onMouseMove={pair.onMouseMove}
+      onMouseLeave={pair.onMouseLeave}
+      onFocus={pair.onFocus}
+      onBlur={pair.onBlur}
+    >
+      <CardHead
+        eyebrow="Transaction block"
+        title={
+          // `max-w-full`: an inline-flex title is not held to the h3's width by `min-w-0` alone, so
+          // a hash wider than the row's share ran under the height chip (measured at 1600: the
+          // head's 8px gap read as −1px). Ten characters fit beside the chip and the live control;
+          // a narrower rail truncates inside the title rather than closing the gap.
+          <span className="inline-flex items-center gap-2 min-w-0 max-w-full">
+            {/* A subject-specific mark carries its OWN subject's hue (the node-mark idiom). */}
+            <BLOCK_ICON aria-hidden className={KIND_MARK_CLASS} style={{ color: hue } as CSSProperties} />
+            <span className="truncate font-mono">{shortBlockHash(sel.hash)}</span>
+          </span>
+        }
+        // The age chip, then the LIVE / PINNED control (D3): in the Blocks register live follows
+        // the newest block, so the control rides this card — the global card's own pill stands down.
+        aside={
+          <span className="inline-flex items-center gap-1.5">
+            {age && (
+              <span data-yields="" className="contents">
+                <QualifierChip className="tabular-nums">{age}</QualifierChip>
+              </span>
+            )}
+            <FollowControl subject="block" />
+          </span>
+        }
+        titleKey={`${sel.chain}:${sel.hash}`}
+        onClose={onClose}
+        collapsed={collapsed}
+        onToggle={onToggle}
+      />
+      {!collapsed && (
+        <div>
+          <Lead>{lead}</Lead>
+          {/* TRANSFER-LED (user, 2026-11-07, design round T1): what a block is FOR is the one table —
+              every transfer, one row or many, the moved total on its label; the DAG facts (parents,
+              children in view) left the body — the scene draws the DAG and the foot keeps the parent
+              hashes. One row per transfer: from → to, then its amount and its fee. */}
+          {/* A TABLE THAT READS AS ONE (user, 2026-11-07: "it does not really look like a table and
+              has lots of text"): three columns under caps headers — FROM, TO, the amount in the
+              chain's unit — each address a short mono token, the amount right-aligned; the per-row
+              fee is gone (Fees paid below sums it), and the lead no longer repeats the addresses. */}
+          {transfers.length > 0 && read && (
+            <div className="mt-2 mb-2">
+              <SectionLabel label="Transfers" total={transfers.length.toLocaleString()} className="mb-0.5" />
+              {/* RECORDS (option A, 2026-11-09): the card table's caps row and hairline rows, in the
+                  record's own three columns. */}
+              <div className="flex flex-col text-label">
+                <div aria-hidden className={cn(TRANSFER_ROW, "pt-1 pb-0.5 tracking-caps uppercase text-muted-foreground [font-size:calc(var(--text-label)*0.86)]")}>
+                  <span>From</span>
+                  <span>To</span>
+                  <span className="text-right">{unit}</span>
+                </div>
+                {transfers.map((t, i) => (
+                  <div key={i} className={cn(TRANSFER_ROW, TABLE_ROW)}>
+                    <span className="min-w-0 truncate font-mono text-foreground-dim">{t.from ? rowAddr(t.from) : <Empty />}</span>
+                    <span className="min-w-0 truncate font-mono text-foreground-dim">{t.to ? rowAddr(t.to) : <Empty />}</span>
+                    <span className="text-right font-mono tabular-nums whitespace-nowrap text-foreground">{compactDag(t.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <FactGroup>
+            {read ? (
+              <>
+                {/* A transaction block IS signed (user: "T1 is not signed right?" — it is, by the
+                    chain's L1 validators): a fact row, as the snapshot cards state theirs. */}
+                <Fact label="Signed by">
+                  <span className="inline-flex items-center gap-1">{read.signers.toLocaleString()} <QualifierChip>{sel.chain === "dag" ? "L1" : "cL1"}</QualifierChip></span>
+                </Fact>
+                <Fact label="Fees paid">
+                  <span className="whitespace-nowrap">{compactDag(read.fee)} {unit}</span>
+                </Fact>
+                <Fact label="Height">
+                  <span className="tabular-nums">{read.height.toLocaleString()}</span>
+                </Fact>
+              </>
+            ) : missed ? (
+              <Fact label="Block read">
+                <span className="text-muted-foreground">
+                  <Empty why="The read of the snapshot that accepted this block failed" /> <span className="text-label">read failed</span>
+                </span>
+              </Fact>
+            ) : (
+              <Fact label="Block read">reading…</Fact>
+            )}
+          </FactGroup>
+          <div className="mt-2.5">
+            <Door onClick={openBlockRecord} glyph={<ArrowUpRight className="size-3.5" />} flushFoot>
+              Block records
+            </Door>
+          </div>
+          <Foot>
+            <FootRow label="Hash" value={midHash(sel.hash, 23)} copy={sel.hash} copyName="hash" />
+            {read?.parents.map((p, i) => (
+              <FootRow key={p.hash} label={read.parents.length > 1 ? `Parent ${i + 1}` : "Parent"} value={midHash(p.hash, 18)} copy={p.hash} copyName={`parent hash ${i + 1}`} />
+            ))}
+          </Foot>
+        </div>
+      )}
+      <PulseEdge pulseKey={pulseKey} rail="right" off={collapsed} />
+    </RailPane>
+  );
+}

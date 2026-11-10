@@ -5,7 +5,9 @@ import { selectedRow, selectionHue } from "@/components/selection";
 import { NoSignalDot, PinMark, PinnedMark } from "@/components/state/StateAtoms";
 import { useNowTick } from "@/components/useNowTick";
 import { filterAccent } from "@/src/data/network";
-import { followToggleActions } from "@/src/engine/domain/pickActions";
+import { blockFollowActions, followToggleActions, globalPick } from "@/src/engine/domain/pickActions";
+import { registerOf } from "@/src/engine/domain/viewPolicy";
+import { liveControlCard } from "@/src/data/blockWindow";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 import { relativeAge } from "@/src/util/relativeAge";
@@ -46,30 +48,55 @@ function Age({ ts }: { ts: string }) {
   ) : null;
 }
 
-export default function FollowControl({ className }: { className?: string }) {
+// THE CONTROL RIDES THE SUBJECT LIVE FOLLOWS (D3, user 2026-11-07: "live mode should be applied to
+// the block and not the snapshot"). In the Snapshots register live follows the newest global, so the
+// Global snapshot card carries the control (`subject: "snapshot"`); in the Blocks register live follows
+// the newest BLOCK, so the Block card carries it (`subject: "block"`, its write `blockFollowActions`)
+// and the Global snapshot card keeps only its age — it shows the block's accepting global, and its
+// live or pinned state is the block's, said once on the card that owns it. With NO Block card in that
+// register (review I1: a pin carried in from another register, the block's ×) the Global card carries
+// the control again, so a pin is never left with nothing saying PINNED and nothing offering LIVE.
+export default function FollowControl({ className, subject = "snapshot" }: { className?: string; subject?: "snapshot" | "block" }) {
   useFeedRead(["global"], "FollowControl");
   const live = useStore((s) => s.live);
   const following = useStore((s) => s.following);
   const snap = useStore((s) => s.snap);
+  const block = useStore((s) => s.block);
   const latestSnapshot = useStore((s) => s.latestSnapshot);
   const filter = useStore((s) => s.filter);
+  const register = useStore((s) => registerOf(s.mode, s.ledgerRegister));
 
-  if (!live)
+  // The Global snapshot card while a Block card stands in Transaction blocks: its age, no control
+  // (the Block card has it). With no Block card it carries the control again (`liveControlCard`).
+  if (subject === "snapshot" && liveControlCard(register, block) === "block") {
+    return snap ? (
+      <span className={cn("inline-flex items-center gap-1.5 whitespace-nowrap", className)}>
+        <Age ts={snap.data.timestamp} />
+      </span>
+    ) : null;
+  }
+
+  const pinned = !following && (subject === "block" ? block != null : snap != null);
+  // A PIN KEEPS SAYING PINNED WHILE THE FEED IS DOWN (ruling, 2026-11-07): the pin is a selection
+  // fact, which an unreachable feed does not change — the feed's own state is the pulse strip's. Only
+  // a control with nothing pinned, which would otherwise claim LIVE, says "no signal".
+  if (!live && !pinned)
     return (
       <span className={cn("inline-flex items-center gap-1.5 text-label text-muted-foreground whitespace-nowrap", className)}>
         <NoSignalDot /> no signal
       </span>
     );
 
-  const pinned = !following && snap != null;
   const washed = pinned;
   // The age is the SHOWN snapshot's — the committed one whether pinned or following. Under a
   // metagraph filter, following lands on the newest tick THAT network anchored into
   // (`followLatest`), which may be minutes behind the global tip; the tip's age there would read
   // "live · 3s" beside a four-minute-old snapshot (rule 10: the label never overstates).
   const shown = snap?.data ?? latestSnapshot;
+  // The Block card's head already states the block's height as its chip; the age is its tick's,
+  // and the Global snapshot card states it — the control stands alone there.
   const sub =
-    shown ? <Age ts={shown.timestamp} /> : null;
+    shown && subject === "snapshot" ? <Age ts={shown.timestamp} /> : null;
 
   return (
     <span className={cn("inline-flex items-center gap-1.5 whitespace-nowrap", className)}>
@@ -78,8 +105,14 @@ export default function FollowControl({ className }: { className?: string }) {
       type="button"
       aria-pressed={following}
       onClick={() => {
-        const target = snap ?? (latestSnapshot ? ({ kind: "snapshot", title: `Global snapshot #${latestSnapshot.ordinal}`, data: latestSnapshot } as const) : null);
-        if (target) applyClickActions(followToggleActions(target, following));
+        const target = snap ?? (latestSnapshot ? (globalPick(latestSnapshot)) : null);
+        if (!target) return;
+        const b = useStore.getState().block;
+        if (subject === "block") {
+          if (b) applyClickActions(blockFollowActions(b, target, following));
+          return;
+        }
+        applyClickActions(followToggleActions(target, following, b));
       }}
       // One box in every state, so the pill keeps its height and place as the state flips: the
       // padding is there when it is invisible (LIVE, transparent) as when the PINNED wash makes it

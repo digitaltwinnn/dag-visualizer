@@ -14,6 +14,12 @@ export const ENTRY_FALL = 0.45;
 /** Between one row's start and the next's, seconds. */
 export const ENTRY_STAG = 0.04;
 
+/** A REGISTER SWITCH inside the Snapshots view plays the same arrival beat this much faster (user,
+ *  2026-11-07: "when switching modes within a view, I think we need a transition time as well,
+ *  although shorter than the view in/out animation") — the one beat at a second tempo, ~0.6 s for
+ *  the chamber's 1.3 s. */
+export const REGISTER_BEAT = 2.2;
+
 /** The whole beat for `rows` rows staggered `stag` apart. */
 export function entryTotal(rows: number, stag: number = ENTRY_STAG): number {
   return ENTRY_FALL + stag * Math.max(0, rows - 1);

@@ -2,7 +2,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { NoteVia } from "@/components/railCards";
 import type { NoteResponse } from "@/src/data/noteTypes";
-import { netUrl } from "@/src/net/current";
 import { afterReread, createNoteLoader, queryOf, REREAD_MS, type NoteReq } from "./noteLoader";
 
 // The AI note, client side. NOT a network feed (no `FEEDS` row, no `useFeedRead`): it is written
@@ -13,7 +12,6 @@ import { afterReread, createNoteLoader, queryOf, REREAD_MS, type NoteReq } from 
 // subject notes and a brushed range, where the selection itself was the gesture.
 
 const loader = createNoteLoader({
-  urlOf: netUrl,
   fetchImpl: (url, init) => fetch(url, init),
   sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   now: Date.now,

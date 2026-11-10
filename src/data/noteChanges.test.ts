@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { NOTE_CHANGES_CAP, RHYTHM_CHANGE, countChange, eventChange, largestGlobalChange, longestGapChange, namesSubject, pauseChange, pickChanges, siteMoves, rateChange, rhythmChange, siteOfChange, withExtremes } from "@/src/data/noteChanges";
+import { NOTE_CHANGES_CAP, RHYTHM_CHANGE, countChange, eventChange, largestGlobalChange, longestGapChange, namesSubject, pauseChange, pickChanges, siteMoves, rateChange, rhythmChange, siteOfChange, withExtremes, WEEK_WORDS, DAY_WORDS } from "@/src/data/noteChanges";
 import type { NoteChange } from "@/src/data/noteTypes";
 
 const NET = { kind: "network", id: "dor" } as const;
@@ -11,62 +11,62 @@ const briefOf = (c: NoteChange | null) => c && { about: c.brief!.about, facts: c
 
 describe("countChange", () => {
   it("hands over the move: what moved, by how many, both ends and how far", () => {
-    expect(countChange("Germany", 34, 30, NET)).toMatchObject({ kind: "lost", text: "", size: 4 });
-    expect(briefOf(countChange("Germany", 34, 30, NET))).toEqual({
+    expect(countChange("Germany", 34, 30, NET, null, WEEK_WORDS)).toMatchObject({ kind: "lost", text: "", size: 4 });
+    expect(briefOf(countChange("Germany", 34, 30, NET, null, WEEK_WORDS))).toEqual({
       about: "Germany's nodes",
-      facts: [["Nodes lost", "4"], ["Nodes at the start of the span", "34"], ["Nodes at the end of the span", "30"]],
+      facts: [["Nodes lost", "4"], ["Nodes 7 days ago", "34"], ["Nodes now", "30"]],
     });
-    expect(countChange("Germany", 30, 34, NET)).toMatchObject({ kind: "gained", size: 4 });
+    expect(countChange("Germany", 30, 34, NET, null, WEEK_WORDS)).toMatchObject({ kind: "gained", size: 4 });
   });
   it("names a place when it was measured, and its counts are that place's", () => {
-    expect(briefOf(countChange("Hetzner", 51, 48, NET, { city: "Falkenstein", was: 12 }))).toEqual({
+    expect(briefOf(countChange("Hetzner", 51, 48, NET, { city: "Falkenstein", was: 12 }, WEEK_WORDS))).toEqual({
       about: "Hetzner's nodes in Falkenstein",
-      facts: [["Nodes lost", "3"], ["Nodes in Falkenstein at the start of the span", "12"], ["Nodes in Falkenstein at the end of the span", "9"]],
+      facts: [["Nodes lost", "3"], ["Nodes in Falkenstein 7 days ago", "12"], ["Nodes in Falkenstein now", "9"]],
     });
   });
   it("tells a first arrival and a last departure apart from a move, with no change against a start", () => {
-    expect(briefOf(countChange("Japan", 0, 2, NET))).toEqual({ about: "Japan gained its first nodes", facts: [["Nodes gained", "2"]] });
-    expect(briefOf(countChange("Japan", 2, 0, NET))).toEqual({ about: "Japan lost its last nodes", facts: [["Nodes lost", "2"]] });
+    expect(briefOf(countChange("Japan", 0, 2, NET, null, WEEK_WORDS))).toEqual({ about: "Japan gained its first nodes", facts: [["Nodes gained", "2"]] });
+    expect(briefOf(countChange("Japan", 2, 0, NET, null, WEEK_WORDS))).toEqual({ about: "Japan lost its last nodes", facts: [["Nodes lost", "2"]] });
     // A provider's first nodes in a city: its own move, with no change against a start of nothing.
-    expect(briefOf(countChange("Hetzner", 48, 51, NET, { city: "Falkenstein", was: 0 }))).toEqual({
+    expect(briefOf(countChange("Hetzner", 48, 51, NET, { city: "Falkenstein", was: 0 }, WEEK_WORDS))).toEqual({
       about: "Hetzner's nodes in Falkenstein",
-      facts: [["Nodes gained", "3"], ["Nodes in Falkenstein at the start of the span", "0"], ["Nodes in Falkenstein at the end of the span", "3"]],
+      facts: [["Nodes gained", "3"], ["Nodes in Falkenstein 7 days ago", "0"], ["Nodes in Falkenstein now", "3"]],
     });
   });
   it("is nothing when nothing moved", () => {
-    expect(countChange("Germany", 30, 30, NET)).toBeNull();
+    expect(countChange("Germany", 30, 30, NET, null, WEEK_WORDS)).toBeNull();
   });
 });
 
 describe("eventChange", () => {
   it("states a network starting and stopping", () => {
-    expect(briefOf(eventChange("Dor", "active", NET))).toEqual({ about: "Dor became active over the span", facts: [] });
-    expect(briefOf(eventChange("Dor", "quiet", NET))).toEqual({ about: "Dor went quiet over the span", facts: [] });
+    expect(briefOf(eventChange("Dor", "active", NET, WEEK_WORDS))).toEqual({ about: "Dor became active in the last 7 days", facts: [] });
+    expect(briefOf(eventChange("Dor", "quiet", NET, WEEK_WORDS))).toEqual({ about: "Dor went quiet in the last 7 days", facts: [] });
   });
 });
 
 describe("a row's size", () => {
   it("survives the note's JSON, and an event still outranks any count", () => {
-    const event = eventChange("Dor", "quiet", NET);
+    const event = eventChange("Dor", "quiet", NET, WEEK_WORDS);
     expect(JSON.parse(JSON.stringify(event)).size).toBe(event.size);
-    expect(event.size).toBeGreaterThan(countChange("Germany", 100000, 0, NET)!.size);
+    expect(event.size).toBeGreaterThan(countChange("Germany", 100000, 0, NET, null, WEEK_WORDS)!.size);
   });
 });
 
 describe("the chamber's extremes (user, 2026-11-01)", () => {
   it("states the largest global snapshot by what it anchored, with no network to name", () => {
-    expect(largestGlobalChange(18)).toMatchObject({ kind: "peak", size: 0, subject: { kind: "self" } });
-    expect(briefOf(largestGlobalChange(18))).toEqual({ about: "The span's largest global snapshot", facts: [["Metagraph snapshots it anchored", "18"]] });
+    expect(largestGlobalChange(18, DAY_WORDS)).toMatchObject({ kind: "peak", size: 0, subject: { kind: "self" } });
+    expect(briefOf(largestGlobalChange(18, DAY_WORDS))).toEqual({ about: "The largest global snapshot in the last 24 hours", facts: [["Metagraph snapshots it anchored", "18"]] });
   });
 
   it("names who held the longest gap, the unit written out", () => {
-    expect(longestGapChange("Dor", 720, NET)).toMatchObject({ kind: "longest", subject: NET });
-    expect(briefOf(longestGapChange("Dor", 720, NET))).toEqual({ about: "Dor had the span's longest gap", facts: [["Longest gap", "12 minutes"]] });
+    expect(longestGapChange("Dor", 720, NET, DAY_WORDS)).toMatchObject({ kind: "longest", subject: NET });
+    expect(briefOf(longestGapChange("Dor", 720, NET, DAY_WORDS))).toEqual({ about: "Dor had the longest gap in the last 24 hours", facts: [["Longest gap", "12 minutes"]] });
   });
 
   it("gives way to anything that moved, and leads with the snapshot", () => {
-    const moved = [eventChange("BioFi", "quiet", NET), eventChange("Dor", "active", NET), eventChange("USDC", "quiet", NET)];
-    const extremes = [longestGapChange("Dor", 720, NET), largestGlobalChange(18)];
+    const moved = [eventChange("BioFi", "quiet", NET, WEEK_WORDS), eventChange("Dor", "active", NET, WEEK_WORDS), eventChange("USDC", "quiet", NET, WEEK_WORDS)];
+    const extremes = [longestGapChange("Dor", 720, NET, DAY_WORDS), largestGlobalChange(18, DAY_WORDS)];
     expect(withExtremes(moved, extremes).map((c) => c.kind)).toEqual(["quiet", "active", "quiet"]);
     expect(withExtremes(moved.slice(0, 2), extremes).map((c) => c.kind)).toEqual(["quiet", "active", "peak"]);
     expect(withExtremes([], extremes).map((c) => c.kind)).toEqual(["peak", "longest"]);
@@ -136,7 +136,7 @@ describe("a pause and a rate, as rows", () => {
     expect(pauseChange("Digital Evidence's anchoring", 8280, 7, "its metagraph snapshots", NET)).toMatchObject({ kind: "pause", subject: NET, size: 8280 });
     expect(briefOf(pauseChange("Digital Evidence's anchoring", 8280, 7, "its metagraph snapshots", NET))).toEqual({
       about: "Digital Evidence's anchoring paused",
-      facts: [["Pause length", "2.3 hours"], ["Normal spacing between its metagraph snapshots", "7 seconds"]],
+      facts: [["Pause length", "about 2 hours"], ["Normal spacing between its metagraph snapshots", "7 seconds"]],
     });
   });
   it("states a rate at least twice or at most 0.4 of its usual one", () => {
@@ -170,27 +170,27 @@ describe("siteMoves", () => {
 // is that notable?"). The note can still say it; a row says something happened.
 describe("countChange's bar", () => {
   it("drops a move of one node, or under a twentieth of the count", () => {
-    expect(countChange("United States", 36, 35, NET)).toBeNull();
-    expect(countChange("Finland", 19, 18, NET)).toBeNull();
-    expect(countChange("Germany", 46, 44, NET)).toBeNull();
-    expect(countChange("Hetzner", 100, 104, NET)).toBeNull();
+    expect(countChange("United States", 36, 35, NET, null, WEEK_WORDS)).toBeNull();
+    expect(countChange("Finland", 19, 18, NET, null, WEEK_WORDS)).toBeNull();
+    expect(countChange("Germany", 46, 44, NET, null, WEEK_WORDS)).toBeNull();
+    expect(countChange("Hetzner", 100, 104, NET, null, WEEK_WORDS)).toBeNull();
   });
   it("keeps a move of two or more that clears it", () => {
-    expect(countChange("Germany", 33, 29, NET)).toMatchObject({ kind: "lost", size: 4 });
-    expect(countChange("DAG", 70, 64, NET)).toMatchObject({ kind: "lost", size: 6 });
+    expect(countChange("Germany", 33, 29, NET, null, WEEK_WORDS)).toMatchObject({ kind: "lost", size: 4 });
+    expect(countChange("DAG", 70, 64, NET, null, WEEK_WORDS)).toMatchObject({ kind: "lost", size: 6 });
   });
   it("keeps one node that is a large part of a small count", () => {
-    expect(countChange("BioFi", 3, 2, NET)).toMatchObject({ kind: "lost" });
-    expect(countChange("BioFi", 5, 6, NET)).toMatchObject({ kind: "gained" });
-    expect(countChange("Dor", 6, 5, NET)).toBeNull();
+    expect(countChange("BioFi", 3, 2, NET, null, WEEK_WORDS)).toMatchObject({ kind: "lost" });
+    expect(countChange("BioFi", 5, 6, NET, null, WEEK_WORDS)).toMatchObject({ kind: "gained" });
+    expect(countChange("Dor", 6, 5, NET, null, WEEK_WORDS)).toBeNull();
   });
   it("always keeps a first and a last", () => {
-    expect(countChange("Japan", 0, 1, NET)).toMatchObject({ kind: "new" });
-    expect(countChange("Japan", 1, 0, NET)).toMatchObject({ kind: "gone" });
+    expect(countChange("Japan", 0, 1, NET, null, WEEK_WORDS)).toMatchObject({ kind: "new" });
+    expect(countChange("Japan", 1, 0, NET, null, WEEK_WORDS)).toMatchObject({ kind: "gone" });
   });
   it("judges a place by that place's own count", () => {
-    expect(briefOf(countChange("OVH", 40, 38, NET, { city: "Falkenstein", was: 12 }))?.facts.at(-1)).toEqual(["Nodes in Falkenstein at the end of the span", "10"]);
-    expect(countChange("OVH", 40, 39, NET, { city: "Falkenstein", was: 30 })).toBeNull();
+    expect(briefOf(countChange("OVH", 40, 38, NET, { city: "Falkenstein", was: 12 }, WEEK_WORDS))?.facts.at(-1)).toEqual(["Nodes in Falkenstein now", "10"]);
+    expect(countChange("OVH", 40, 39, NET, { city: "Falkenstein", was: 30 }, WEEK_WORDS)).toBeNull();
   });
 });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { tileCells, tileRows } from "./tileRows";
+import { planFor, tileCells, tileRows } from "./tileRows";
 
 describe("tileRows — the measure control's row plan", () => {
   it("places every tile exactly once", () => {
@@ -16,6 +16,18 @@ describe("tileRows — the measure control's row plan", () => {
   });
   it("every row's span divides the six-column grid", () => {
     for (let n = 1; n <= 9; n++) for (const r of tileRows(n)) expect(6 % r).toBe(0);
+  });
+});
+
+describe("planFor — a set's own plan, when it fits", () => {
+  it("takes a plan that places every tile in rows the grid divides (Hypergraph's whole over parts)", () => {
+    expect(planFor(4, [1, 3])).toEqual([1, 3]);
+    expect(tileCells(4, [1, 3]).map((c) => [c.row, c.rowSize])).toEqual([[0, 1], [1, 3], [1, 3], [1, 3]]);
+  });
+  it("falls back to the count's default for a plan that miscounts or a row the grid cannot divide", () => {
+    expect(planFor(4, [1, 2])).toEqual([2, 2]);
+    expect(planFor(5, [1, 4])).toEqual(tileRows(5));
+    expect(planFor(4, null)).toEqual([2, 2]);
   });
 });
 

@@ -1,7 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextResponse, connection } from "next/server";
 import { unstable_cache } from "next/cache";
-import { NETWORKS, type NetworkId } from "@/src/engine/config";
-import { netOf } from "@/src/net/request";
+import { HOSTS } from "@/src/engine/config";
 
 // VALIDATOR NAMES + DELEGATED-STAKING OPT-IN from the Global L0's delegated-staking registry
 // (`/node-params` — probed 2026-08-14: ~181 entries of peerId + nodeMetadataParameters.name,
@@ -20,10 +19,10 @@ interface RegistryEntry {
   nodeMetadataParameters?: { name?: string };
 }
 
-const getNames = (net: NetworkId) =>
+const getNames = () =>
   unstable_cache(
   async (): Promise<Record<string, string>> => {
-    const r = await fetch(NETWORKS[net].l0 + "/node-params", { cache: "no-store", signal: AbortSignal.timeout(8000) });
+    const r = await fetch(HOSTS.l0 + "/node-params", { cache: "no-store", signal: AbortSignal.timeout(8000) });
     if (!r.ok) throw new Error(`registry ${r.status}`);
     const arr = (await r.json()) as RegistryEntry[];
     const map: Record<string, string> = {};
@@ -33,14 +32,15 @@ const getNames = (net: NetworkId) =>
     if (!Object.keys(map).length) throw new Error("registry empty");
     return map;
   },
-  ["node-names-v2", net],
+  ["node-names-v2"],
   { revalidate },
   )();
 
-export async function GET(req: Request) {
+export async function GET() {
+  // Per request, never prerendered: the CDN caches the answer by its own Cache-Control.
+  await connection();
   try {
-    const names = await getNames(netOf(req));
-    // Dynamic since ?net= — the CDN caches per URL via s-maxage (multi-network design §3).
+    const names = await getNames();
     return NextResponse.json(
       { names },
       { headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=7200" } },

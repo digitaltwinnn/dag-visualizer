@@ -1,4 +1,5 @@
 // Shapes coming off the data layer (src/data/api.ts, typed). Loose where the source is loose.
+import type { BlockRead } from "@/src/engine/domain/blockBraid";
 
 /** The full decode of ONE anchored metagraph snapshot (spec §7.3). Fetched only on a deliberate
  *  gesture — it re-downloads the ~2.5 MB global to reach one entry. */
@@ -44,6 +45,16 @@ export const metaSnapDeepKey = (globalOrdinal: number, metaId: string, snapOrdin
 export const metaSnapHoverKey = (metaId: string, snapOrdinal: number): string =>
   `${metaId}|${snapOrdinal}`;
 
+/** The HOVER key of ONE data block (user, 2026-11-09: "hover on 'data block' card but metagraph
+ *  snapshot gets the hover; fix structurally") — its snapshot's key and its place in it, so the
+ *  key names the block and still says which snapshot's mark stands for it in the scene. */
+export const dataBlockHoverKey = (metaId: string, snapOrdinal: number, index: number): string =>
+  `${metaSnapHoverKey(metaId, snapOrdinal)}|${index}`;
+
+/** The snapshot a data block's hover key belongs to, as `metaSnapHoverKey` — the scene's mark is
+ *  per snapshot, so it compares this exactly. */
+export const dataBlockSnapKey = (key: string): string => key.slice(0, key.lastIndexOf("|"));
+
 export interface GlobalSnapshot {
   ordinal: number;
   timestamp: string;
@@ -54,7 +65,7 @@ export interface GlobalSnapshot {
   lastSnapshotHash?: string;
   epochProgress?: number;
   metagraphSnapshotCount?: number;
-  blocks?: unknown[];
+  blocks?: string[];
 }
 
 /** One anchored metagraph snapshot inside a global tick, from the exact read (spec §7.2 tier 2). */
@@ -72,6 +83,34 @@ export interface ChannelSnapRow {
   /** Measured size of this snapshot's data blocks (Σ block byte lengths) — 0 when it carried
    *  none, or on rows cached before the field existed (an absent lane, not a reading). */
   dataBytes?: number;
+  /** The DATA UPDATES this snapshot's data blocks carry (D6, 2026-11-07 — the data transactions the
+   *  dL1 validated; cache key `snapshot-exact-v8`, now v11 — `cachedExact.ts` carries the history). Absent where the payload could not be decoded:
+   *  unknown, never zero. The card's count and the Data blocks register's tile marks read it. */
+  dataTxCount?: number;
+  /** How many data blocks (app blocks) it carried; absent where undecodable. */
+  dataBlocks?: number;
+  /** The application state's SHAPE — top-level keys and record counts — and the dL1 signers of its
+   *  data blocks (2026-11-07, user: "'decompress this snapshot', is it still needed?" — the decoder
+   *  already had both, so the card reads them here and the deep read is the RAW pane's alone).
+   *  Absent where undecodable, and on rows cached before the fields existed. */
+  stateKeys?: { key: string; count: number }[];
+  dataBlockSigners?: string[];
+  /** ONE SUMMARY PER DATA BLOCK, in the snapshot's own order (the Data block card, 2026-11-07, user:
+   *  "a data block is just like a tx block"): its updates by kind (`payloadKinds`' mechanical
+   *  names), its dL1 signers, its bytes, and a DIGEST the server takes over its bytes — the chain
+   *  publishes no hash for a data block, so it is never called one. Absent where undecodable. */
+  dataBlockRows?: DataBlockSummary[];
+}
+
+export interface DataBlockSummary {
+  /** The block's updates — 0 when `unread`, which a surface states as unread, never as 0. */
+  updates: number;
+  /** The decoder could not read this block (review M3): its updates, kinds and signers are unknown. */
+  unread?: true;
+  kinds: { kind: string; count: number }[];
+  signers: number;
+  bytes: number;
+  digest: string;
 }
 
 // EXACT per-tick anchor totals read straight from the raw L0 snapshot's stateChannelSnapshots
@@ -100,8 +139,11 @@ export interface SnapshotExact {
   // unlistedCount). This is the exact, complete answer to "which metagraphs anchored here". `bytes`
   // is that metagraph's measured serialized size (Σ content byte length), shown as KB on the
   // expanded row — NOT derived from the fee.
-  perMeta: Record<string, { count: number; fee: number; bytes: number }>;
+  // `dataTxCount` is its snapshots' data updates summed (D6; absent on entries cached before v7).
+  perMeta: Record<string, { count: number; fee: number; bytes: number; dataTxCount?: number }>;
   rows: ChannelSnapRow[];
+  /** The snapshot's blocks (hashes from the explorer, "" where it lists none). */
+  blocks?: BlockRead[];
 }
 
 /** A selected METAGRAPH SNAPSHOT — a tile on the upper floor (redesign 2026-08-04, spec §7.1).
@@ -294,7 +336,23 @@ export type PickDescriptor =
   // pickable 3D subject with its own store channel and card slot, not a focus rung. It carries
   // the selection payload plus the GLOBAL tick descriptor it anchored into, so the click table
   // can commit the pair (tile + its tick) without a second lookup.
-  | (PickBase & { kind: "metaSnap"; sel: MetaSnapSel; global: Extract<PickDescriptor, { kind: "snapshot" }> });
+  | (PickBase & { kind: "metaSnap"; sel: MetaSnapSel; global: Extract<PickDescriptor, { kind: "snapshot" }> })
+  // A BLOCK in the Snapshots view's Blocks register — a slot under its accepting global, like the
+  // tile above: it carries the global tick that holds it, so the table can pin the tick and commit
+  // the block from one descriptor.
+  // …and, for a TOKEN block, the metagraph snapshot that accepted it (user, 2026-11-07: a block click
+  // also commits its snapshot, so the rail reads Metagraph → Metagraph snapshot → Block); absent on a
+  // DAG block, whose accepting snapshot is the global itself.
+  | (PickBase & { kind: "block"; sel: BlockSel; global: Extract<PickDescriptor, { kind: "snapshot" }>; snap?: MetaSnapSel });
+
+/** One block the Blocks register has selected: `chain` is "dag" or a metagraph id, `ordinal` the
+ *  accepting snapshot's own, `anchorOrd` the global tick that carries it. Homed here beside the pick
+ *  that carries it (the store re-exports it). */
+export interface BlockSel { chain: string; hash: string; ordinal: number; anchorOrd: number }
+
+/** One DATA BLOCK the Data blocks register has selected: the metagraph snapshot that carried it and
+ *  its place in that snapshot's blocks (a data block has no published hash — `DataBlockSummary`). */
+export interface DataBlockSel { snap: MetaSnapSel; index: number }
 
 // Raw shape of a `/currency/{id}/snapshots` list entry (only the fields we read).
 export interface RawMetaSnapshot {
@@ -306,7 +364,7 @@ export interface RawMetaSnapshot {
   sizeInKB?: number;
   height?: number;
   subHeight?: number;
-  blocks?: unknown[];
+  blocks?: string[];
   epochProgress?: number;
 }
 

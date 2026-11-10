@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { lineageIds } from "@/src/net/lineage";
 
 vi.mock("../network/unlistedChains", () => ({ unlistedChains: vi.fn() }));
+// The routes call `connection()` to stay per-request; a test calls them outside any request scope.
+vi.mock("next/server", async (orig) => ({ ...(await orig<typeof import("next/server")>()), connection: async () => {} }));
 
 // Each test loads the routes fresh (vi.resetModules), so `upstream.ts`'s module-level memo and
 // `quiet.ts`'s sets never carry an answer from one test into the next.
@@ -43,22 +45,22 @@ describe("/api/live/globals", () => {
   });
 
   it("rounds a low or junk limit to the smallest rung (12), and a mid one up to 52", async () => {
-    await globalsGET(req("/api/live/globals?limit=0&net=testnet"));
+    await globalsGET(req("/api/live/globals?limit=0"));
     expect(String(fetchMock.mock.calls[0][0])).toContain("limit=12");
-    await globalsGET(req("/api/live/globals?limit=13&net=testnet"));
+    await globalsGET(req("/api/live/globals?limit=13"));
     expect(String(fetchMock.mock.calls[1][0])).toContain("limit=52");
   });
 
   it("503 no-store on upstream failure", async () => {
     fetchMock.mockResolvedValue(new Response("x", { status: 500 }));
-    const res = await globalsGET(req("/api/live/globals?limit=3&net=integrationnet"));
+    const res = await globalsGET(req("/api/live/globals?limit=3"));
     expect(res.status).toBe(503);
     expect(res.headers.get("Cache-Control")).toBe("no-store");
   });
 });
 
 describe("/api/live/meta/[id]", () => {
-  const tracked = lineageIds("mainnet")[0];
+  const tracked = lineageIds()[0];
 
   it("404s an untracked, unlisted id without fetching", async () => {
     vi.mocked(unlistedChains).mockResolvedValue([]);
@@ -102,17 +104,17 @@ describe("/api/live/meta/[id]", () => {
 describe("/api/live/clusters", () => {
   it("503 no-store when l1 is empty", async () => {
     fetchMock.mockImplementation(async (u: string) => ok(String(u).includes("l0-lb") ? [{ id: "a" }] : []));
-    const res = await clustersGET(req("/api/live/clusters?net=testnet"));
+    const res = await clustersGET(req("/api/live/clusters"));
     expect(res.status).toBe(503);
     expect(res.headers.get("Cache-Control")).toBe("no-store");
   });
 
-  it("reads the requested network and sets the clusters header", async () => {
+  it("reads the mainnet load balancers and sets the clusters header", async () => {
     fetchMock.mockImplementation(async () => ok([{ id: "a" }]));
-    const res = await clustersGET(req("/api/live/clusters?net=integrationnet"));
+    const res = await clustersGET(req("/api/live/clusters"));
     expect(res.status).toBe(200);
     expect(fetchMock.mock.calls.map((c) => String(c[0]))).toContain(
-      "https://l0-lb-integrationnet.constellationnetwork.io/cluster/info",
+      "https://l0-lb-mainnet.constellationnetwork.io/cluster/info",
     );
     expect(res.headers.get("Cache-Control")).toBe("public, s-maxage=25, stale-while-revalidate=5");
     expect(await res.json()).toMatchObject({ l0: [{ id: "a" }], l1: [{ id: "a" }], memoAgeMs: 0 });

@@ -1,29 +1,33 @@
 import type { NoteView } from "@/src/data/noteTypes";
 import { pickRangeTier } from "@/src/data/trendWindow";
+import { STORE_NS } from "@/app/api/trends/keys";
 
 // THE KEY GRAMMAR OF AI NOTES — one home. Notes live in their OWN key family, `ai:*`, never under
 // `t:` (a trends rebuild wipes that prefix) or `geo:` (a location gauge cannot be re-derived): a
 // note is a cache entry, losable and rewritable, and the families must not share a fate.
 //
-// A note's key is `ai:{net}:v{NOTES_VERSION}:{view}:{subject}:{span}`. Changing a prompt or a facts
+// A note's key is `ai:mainnet:v{NOTES_VERSION}:{view}:{subject}:{span}`. Changing a prompt or a facts
 // shape bumps NOTES_VERSION, which orphans every stored note at once (their TTLs reap them).
 //
 // Everything is UTC and the caller supplies the date strings; nothing here reads a clock.
 
-export const NOTES_VERSION = 71; // 71: History facts carry the Transfers measure (2026-11-04). 70: the gate reads a change in its own direction; a row names its subject; a count row carries no percentage (review, 2026-11-03)
+export const NOTES_VERSION = 82; // 82: the Data blocks prompt's window-end example is a placeholder ("HH:MM UTC"), not a real-looking time a model may copy (review M1, 2026-11-10). 81: the Data blocks note never says "right now": it names its window and the window's end as a UTC clock time, a `time` fact the gate reads (user, 2026-11-10). 80: the Transaction blocks note's subject is the blocks and its actor the DAG, never "the block DAG" (user, 2026-11-09). 79: Geography says where, never the node count or its move: that is Hypergraph's; a started-or-stopped 0 is no fact (user, 2026-11-09). (78 was never shipped.) 77: Hypergraph and Geography state no activity sentence (user, 2026-11-09). 76: every sentence a finding: no read count, no DAG height, no "none became active", the block DAG's transfers (user, 2026-11-09). 75: a stretch of time is a range, never a span (user, 2026-11-07). 74: a whole-things mean below one half is "under 1", never "about 0" (review M6, 2026-11-07). 73: the block DAG's note states no open tips (2026-11-07). 72: an average of whole things is a rounded fact, about N (2026-11-07). 71: History facts carry the Transfers measure (2026-11-04). 70: the gate reads a change in its own direction; a row names its subject; a count row carries no percentage (review, 2026-11-03)
 
-/** What a note covers. Hyper and Geography are a standing picture ("day"), the ledger the recent
- *  hours ("hours"); History's pills are the rest, and a brushed range is `r<fromMs>-<toMs>` after
+/** What a note covers. Hyper and Geography are a standing picture ("day"), the ledger and the block
+ *  DAG the recent hours ("hours"); History's pills are the rest, and a brushed range is `r<fromMs>-<toMs>` after
  *  `snapSpan`, so two brushes of the same buckets share one key. */
 export type NoteSpan = "day" | "hours" | "1h" | "24h" | "7d" | "30d" | "90d" | "1y" | "all" | `r${number}-${number}`;
 
-export function noteKeyOf(net: string, view: NoteView, subject: string, span: NoteSpan): string {
-  return `ai:${net}:v${NOTES_VERSION}:${view}:${subject}:${span}`;
+export function noteKeyOf(view: NoteView, subject: string, span: NoteSpan): string {
+  return `ai:${STORE_NS}:v${NOTES_VERSION}:${view}:${subject}:${span}`;
 }
 
 /** THE FOUR NOTES THE BRIEFING READS (`components/notes/briefingNote.ts`), which also carry its one
- *  short line: every view at its widest, and History over its resting window. */
+ *  short line: the Geography, Snapshots and Hypergraph notes at their widest, and History over its
+ *  resting window. The block DAG's note is the Transaction blocks register's own card note, warmed
+ *  on its timing, not a tour line. */
 export function isBriefingNote(view: NoteView, subject: string, span: NoteSpan): boolean {
+  if (view === "blocks" || view === "data") return false;
   return view === "trend" ? subject === "dag" && span === "30d" : subject === "all";
 }
 
@@ -40,23 +44,23 @@ export function failKeyOf(noteKey: string): string {
 }
 
 /** The day's counters (a hash: generated, rejected, capped, ...), by UTC day `YYYY-MM-DD`. */
-export function statsKeyOf(net: string, dayIso: string): string {
-  return `ai:${net}:stats:${dayIso}`;
+export function statsKeyOf(dayIso: string): string {
+  return `ai:${STORE_NS}:stats:${dayIso}`;
 }
 
 /** One visitor's count of limited notes (a brushed range, a subject note) for one UTC hour (`YYYY-MM-DDTHH`); `ipHash` is the first
  *  16 hex characters of HMAC-SHA256(CRON_SECRET, ip), or sha256(ip) with no secret. The raw IP
  *  is never a key. */
-export function rateKeyOf(net: string, ipHash: string, hourIso: string): string {
-  return `ai:${net}:rate:${ipHash}:${hourIso}`;
+export function rateKeyOf(ipHash: string, hourIso: string): string {
+  return `ai:${STORE_NS}:rate:${ipHash}:${hourIso}`;
 }
 
 /** The global tripwire for the limited notes (a brushed range, a subject note) for one UTC day. */
-export function capKeyOf(net: string, dayIso: string): string {
-  return `ai:${net}:cap:${dayIso}`;
+export function capKeyOf(dayIso: string): string {
+  return `ai:${STORE_NS}:cap:${dayIso}`;
 }
 
-export type NoteKind = "hyper" | "geo" | "ledger" | "trend24h" | "trendDaily" | "trend1h" | "range" | "subject";
+export type NoteKind = "hyper" | "geo" | "ledger" | "blocks" | "data" | "trend24h" | "trendDaily" | "trend1h" | "range" | "subject";
 
 /** What a subject names, for the prompt's question: the view itself (`all`, `dag`, a network), a
  *  country (`cc:XX`, `<net>/cc:XX`), a provider (`isp:<key>`, `<net>/isp:<key>`) or a network's
@@ -95,6 +99,10 @@ export const KIND_TIMING: Record<NoteKind, { refreshMs: number | null; ttlS: num
   hyper: { refreshMs: 24 * H, ttlS: 72 * 3600 },
   geo: { refreshMs: 24 * H, ttlS: 72 * 3600 },
   ledger: { refreshMs: H, ttlS: 6 * 3600 },
+  // The chamber's other register keeps its clock: a day of blocks and the transfers they carried.
+  blocks: { refreshMs: H, ttlS: 6 * 3600 },
+  // The data blocks' note keeps the same clock: the chamber's third register, one hour, one read.
+  data: { refreshMs: H, ttlS: 6 * 3600 },
   trend24h: { refreshMs: H, ttlS: 6 * 3600 },
   trendDaily: { refreshMs: 24 * H, ttlS: 72 * 3600 },
   trend1h: { refreshMs: null, ttlS: 900 },
@@ -117,6 +125,8 @@ export function timingOf(view: NoteView, span: NoteSpan, subject = ""): { refres
   if (view === "hyper") return KIND_TIMING.hyper;
   if (view === "geo") return KIND_TIMING.geo;
   if (view === "ledger") return KIND_TIMING.ledger;
+  if (view === "blocks") return KIND_TIMING.blocks;
+  if (view === "data") return KIND_TIMING.data;
   if (span === "24h") return KIND_TIMING.trend24h;
   if (span === "1h") return KIND_TIMING.trend1h;
   return KIND_TIMING.trendDaily;

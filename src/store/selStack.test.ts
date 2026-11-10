@@ -148,4 +148,38 @@ describe("what the view seats by itself is not in the stack (R70)", () => {
     useStore.getState().advanceSnap(null);
     expect(useStore.getState().selStack).toEqual([]);
   });
+  it("the LIVE BLOCK (the Blocks register's follow, D3) never enters the stack, and its arrival is loud; a pinned block ranks", () => {
+    const blk = (hash: string) => ({ chain: "dag", hash, ordinal: 7, anchorOrd: 7 });
+    useStore.setState({ selStack: [], block: null, navQuiet: true });
+    useStore.getState().advanceBlock(blk("a"));
+    expect(useStore.getState().block?.hash).toBe("a");
+    expect(useStore.getState().selStack).toEqual([]);
+    // A new block ARRIVING lifts a stale quiet gesture, as a new tick does (advanceSnap's rule)…
+    expect(useStore.getState().navQuiet).toBe(false);
+    // …and a re-advance onto the same block is not an arrival.
+    useStore.setState({ navQuiet: true });
+    useStore.getState().advanceBlock(blk("a"));
+    expect(useStore.getState().navQuiet).toBe(true);
+    useStore.getState().setBlock(blk("b"));
+    expect(useStore.getState().selStack).toEqual(["block"]);
+    useStore.getState().advanceBlock(blk("c"));
+    expect(useStore.getState().selStack).toEqual(["block"]);
+    useStore.getState().advanceBlock(null);
+    expect(useStore.getState().selStack).toEqual([]);
+  });
+});
+
+describe("a data block is in exactly one snapshot — the store's setters keep it so (2026-11-08)", () => {
+  const ms = { metaId: "dor", ordinal: 7, hash: "h", globalOrdinal: 42, ts: "t" };
+  it("setMetaSnap onto another snapshot, or onto none, drops the data block and its rank; its own snapshot keeps it", () => {
+    useStore.setState({ metaSnap: ms, dataBlock: { snap: ms, index: 0 }, selStack: ["dataBlock", "metaSnap"] });
+    useStore.getState().setMetaSnap({ ...ms, ordinal: 8 });
+    expect(useStore.getState().dataBlock).toBeNull();
+    expect(useStore.getState().selStack).not.toContain("dataBlock");
+    useStore.setState({ metaSnap: ms, dataBlock: { snap: ms, index: 0 }, selStack: ["dataBlock", "metaSnap"] });
+    useStore.getState().setMetaSnap(ms);
+    expect(useStore.getState().dataBlock).toEqual({ snap: ms, index: 0 });
+    useStore.getState().setMetaSnap(null);
+    expect(useStore.getState().dataBlock).toBeNull();
+  });
 });

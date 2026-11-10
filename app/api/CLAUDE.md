@@ -1,4 +1,12 @@
-# app/api — working notes
+# app/api
+
+> 2026-11-07 — `app/api/snapshot/cachedExact.ts` holds the exact read's fetcher and its day-long
+> `unstable_cache` (moved out of `[ordinal]/route.ts`, which stays route exports only), so the Data
+> blocks note's live-window reader (`app/api/notes/dataWindow.ts`, 52 ticks, 8 in flight) and the
+> route fill ONE cache per ordinal. The notes' hourly warm (`warm.ts`) writes four kinds now: the
+> ledger's, the block DAG's, the data blocks' (`data:hours`, `KIND_TIMING.data` = the ledger's clock)
+> and History's 24h. Cost of the data note: one model call an hour plus up to 52 exact reads, most of
+> them already cached by visitors' tabs (3.5 s cold, measured locally). — working notes
 
 The server-side routes.
 
@@ -10,6 +18,17 @@ the architecture map and the dev workflow; **its rules govern this file too**.
 
 Metagraph cluster endpoints are plain HTTP on custom ports with **no CORS**, so the browser can't fetch
 them — but the Next Node server can.
+
+Every route reads the mainnet hosts (`HOSTS`, `src/engine/config.ts`). ⚠️ **A static-path GET that
+reads nothing of its request calls `connection()`** (`/api/metagraphs`, `/api/geo`, `/api/live`,
+`/api/live/clusters`, `/api/archive`, `/api/node-names`, `/api/network/unlisted`): it keeps the route
+per-request (`ƒ`) — without it a `revalidate` export would prerender it at build — and the CDN caches
+it by its own `Cache-Control`. Never `dynamic = "force-dynamic"` for that: in Next 16 it sets
+`fetchCache = 'force-no-store'`, which bypasses every `unstable_cache` the route leans on. A test
+calling such a handler mocks `connection` (`app/api/live/routes.test.ts`): it throws outside a
+request scope. ⚠️ **Every store key embeds the fixed `mainnet` segment** — one constant, `STORE_NS`
+in `app/api/trends/keys.ts`, which the notes keys import; the store is shared with production and
+holds years of history under it, and both `keys.test.ts` files pin the strings.
 
 - **`/api/metagraphs`** lists the directory, fetches each cluster's info server-side, geolocates IPs,
   computes identity hues, and returns `{ metagraphs, geo }`. **On failure it answers an honest 503** —
@@ -30,7 +49,7 @@ them — but the Next Node server can.
   under them): the edge a little under the poll (4s for the 5s feeds, 25s for the 30s one), the
   memo at most 5s, because the two caches STACK — the oldest answer a tab can get is memo + edge +
   stale-while-revalidate, 10s and 35s today (`worstAgeMs`, tested). Each route holds a
-  **module-level memo** (`upstream.ts`, per network) that checks its own
+  **module-level memo** (`upstream.ts`) that checks its own
   timestamp and shares one in-flight promise between concurrent misses;
   never `unstable_cache`, whose revalidate is too coarse for a 4 s window. The memo drops an expired
   entry when it is read and sweeps expired entries once it holds more than 256. **`?limit=` rounds UP
@@ -80,14 +99,14 @@ them — but the Next Node server can.
   **Delegated stake** (2026-11-04, `stake.ts`): once an hour, on its own `f.stake` slot, the
   Global L0's registry (`/node-params`) as `f.stake` / `.live` / `.delegations` / `.validators`
   in the hourly and daily tiers, and each validator's reading in its own keep-forever family
-  `stake:{net}:{YYYY-MM}` with names in `stake:{net}:validators` (`keys.ts` `stakeSlotOf`).
+  `stake:mainnet:{YYYY-MM}` with names in `stake:mainnet:validators` (`keys.ts` `stakeSlotOf`).
   No upstream keeps the registry's past, so stake begins the day it shipped. Nothing reads either
   yet beyond History's RAW records.
   **Where the fleet runs has its own key family** (2026-10-27): once an hour, beside the fleet
   gauges, the sampler stores the whole fleet and each network by country and by hosting provider
-  into `geo:{net}:{YYYY}` (day buckets, `f.cc.*` / `f.isp.*`, `fleetGeo.ts`), with provider names
-  in `geo:{net}:isp` and the fleet by city and provider in `geo:{net}:sites:{YYYY-MM}` (`f.site.*`,
-  2026-10-31, each network's nodes added up, one hash per month since a note reads a week of it). ⚠️ **It lives outside `t:{net}:*` on purpose:** a rebuild wipes that prefix
+  into `geo:mainnet:{YYYY}` (day buckets, `f.cc.*` / `f.isp.*`, `fleetGeo.ts`), with provider names
+  in `geo:mainnet:isp` and the fleet by city and provider in `geo:mainnet:sites:{YYYY-MM}` (`f.site.*`,
+  2026-10-31, each network's nodes added up, one hash per month since a note reads a week of it). ⚠️ **It lives outside `t:mainnet:*` on purpose:** a rebuild wipes that prefix
   and a location gauge can never be re-derived, and `/api/trends` ships every series a tier hash
   holds, so ~50 location series a day would ride every History payload undrawn. Nothing reads it
   yet; it exists so Geography has a past when something does (the AI notes design).
@@ -143,15 +162,14 @@ them — but the Next Node server can.
   consumer.
 - **`/api/notes`, `/api/notes/request`, `/api/notes/warm`** (2026-10-27) are the AI notes: a few
   sentences a paid model (the Constellation Gate, `GATE_API_KEY`, `GATE_MODEL`, default `z-ai/glm-5-3-flash` with thinking held low, `gate.ts`) writes about the
-  figures a view is showing. **Mainnet only**; any other `?net=` answers `none`, before the subject
-  is parsed (it is checked against mainnet's catalog, so a testnet network would otherwise 400). Notes live in
-  their OWN key family, `ai:{net}:v{NOTES_VERSION}:{view}:{subject}:{span}` (`keys.ts`), never under
+  figures a view is showing. Notes live in
+  their OWN key family, `ai:mainnet:v{NOTES_VERSION}:{view}:{subject}:{span}` (`keys.ts`), never under
   `t:` (a rebuild wipes that prefix) or `geo:`: a note is a losable cache entry, and the families
   must not share a fate. The four notes the Briefing reads (`isBriefingNote`) also carry its one short `line`, asked for in
   the same answer and held to the same gate; a line that fails is dropped, never retried, and the
   tour reads the note's opening. ⚠️ **A prompt or a facts change bumps `NOTES_VERSION`**, which orphans every
   stored note at once (their TTLs reap them). Timing is `KIND_TIMING` in `keys.ts`: hyper and
-  geography refresh daily (3-day TTL), the ledger and History's 24-hour note hourly (6 hours),
+  geography refresh daily (3-day TTL), the ledger, the block DAG and History's 24-hour note hourly (6 hours),
   History's daily pills daily, the 1-hour pill only when asked through its door (15 minutes) and a
   brushed range when its card opens (30 days); a subject note (below) lives a day and is never warmed. `GET /api/notes` reads: `ok` and `none` are `public, s-maxage=300,
   stale-while-revalidate=600`; `request`, `pending`, `unavailable` and a 400 are `no-store` (a
@@ -160,7 +178,31 @@ them — but the Next Node server can.
   (the same facts: one note). `POST /api/notes/request` writes the on-request kinds (the 1h pill, a
   brushed range and a subject note), and
   `GET /api/notes/warm` is the quarter-hourly cron (three items at a time, 0.5 s between call
-  starts, so the 121 warmed notes fill in one pass). **The honesty gate (rule 10) is mechanical**
+  starts, so the 122 warmed notes fill in one pass).
+  **The block DAG's note** (view `blocks`, subject `all`, span `hours`, 2026-11-06) is the Snapshots view's Blocks register's own card note, warmed beside the ledger's and not a Briefing note (the tour is one stop per view, so `isBriefingNote` drops it and it carries no tour `line`; the key family and `NOTES_VERSION` are untouched): a
+  register, not a Mode, so it is its own `NoteView` with the ledger's timing and is warmed beside
+  it (`dag` folds into `all`, as the ledger's). Its facts (`src/data/noteFactsBlocks.ts`) are the
+  blocks each chain accepted over the last 24 whole hours of the hourly tier — the sampler's own
+  `g.blocks` / `m.<id>.blocks`, the series History's Blocks measure draws — and the TRANSFERS those
+  blocks carried (`g.tx` / `m.<id>.tx` through `measuredTx`, so an hour whose transfer lists were not
+  read makes the sum a floor; counted, never their amount, since the tokens are not one unit). It
+  states no open tips (design round D5, 2026-11-07) and NO DAG HEIGHT (user, 2026-11-09,
+  `NOTES_VERSION` 76: a technical confirmation "of no use to the reader; focus on the core message" —
+  the live height read, `notes/dagHeight.ts`, is deleted); no measured block series is no note. Its
+  Subject is "transaction blocks" and its actor the DAG — "the DAG accepted N transaction blocks
+  carrying M transfers", never "the block DAG", which the model echoed from the old label as the
+  sentence's subject (user, 2026-11-09: "sounds strange"; `NOTES_VERSION` 80). **The
+  same round's rule for every note: each sentence is a finding** — VOICE forbids describing the view
+  or confirming what was counted or read, the data blocks' facts state their read count only when a
+  read is missing (the floor's label), and Hypergraph names a network that started or stopped only
+  when one did. A new KIND needs no version bump:
+  its keys collide with nothing, and a bump would rewrite every warmed note for no gain. The
+  facts are pinned by
+  `src/data/noteFactsBlocks.test.ts`. **The data blocks' note** (view `data`) states its window's END
+  as a fact (`noteFactsData`'s "Window end", the `time` kind: a UTC clock time, "14:05 UTC") and its
+  question asks for the window and that end, never "right now" — it is written hourly and read for up
+  to an hour after (user, 2026-11-10; `NOTES_VERSION` 81). The gate strips a clock time a `time` fact
+  holds, as it strips a fact's date. **The honesty gate (rule 10) is mechanical**
   (`src/data/noteHonesty.ts`, the colocated test is its specification): every number the note
   states must match a fact the model was shown, within the precision it was written to, and a
   failing note is asked for once more with the reasons, then dropped and counted. A note that
@@ -202,7 +244,8 @@ them — but the Next Node server can.
   `<net>/isp:<key>` (the provider across the scope, named network-wide), `<net>/type:<roleKey>`,
   with `<net>` a tracked network id or `dag`. `NoteFacts.kind` is the QUESTION kind: every view
   note is `"view"`, except the fleet country `cc:XX`, which asks the country question (2026-11-03); `PROMPTS[view].questions[kind]` asks a subject kind's own
-  question with no common reading. `KIND_TIMING.subject` is `{ refreshMs: null, ttlS: 24h }` and
+  question. Hypergraph and Geography notes carry no activity sentence (user, 2026-11-09: activity is the
+  Snapshots and History views' subject; the R74 common reading is retired). `KIND_TIMING.subject` is `{ refreshMs: null, ttlS: 24h }` and
   `timingOf` lets the subject decide first, so a subject note has one timing whatever its view:
   never warmed, written when someone first asks and rewritten at most once a day. The fleet
   country `cc:XX` is the exception that stays warmed. **A subject note is the request route's
@@ -221,6 +264,35 @@ them — but the Next Node server can.
   catalog chain's records anchored in that span. Cached a year once its newest global is an hour old,
   a minute before; a hole in the global chain or ANY chain read that fails answers 503 `no-store`, so
   one upstream timeout is never cached as "that network anchored nothing".
+- **`/api/blocks/trail?around=<ordinal|live>&n=52&chain=<id>`** (2026-11-05) is the Snapshots view's BLOCKS
+  REGISTER window (`blocks/trail.ts`; the client side is in `src/data/CLAUDE.md`): the newest `n`
+  global snapshots at or below `around` that hold a block, each with its DAG block hashes and the
+  block-bearing metagraph snapshots anchored into it (a former chain address folded under its
+  network's current id). ⚠️ **The explorer's TRANSFER lists are the index**, and their cursor is a
+  row hash only (an ordinal or a timestamp cursor answers 500 or an empty page), so a window in the
+  past is found by walking each list from its tip — at most `TRAIL_PAGES_MAX` (12) pages a chain.
+  ONE `TRAIL_DEADLINE_MS` (45 s) deadline bounds the WHOLE request, the walk and the record reads
+  after it (every upstream read races what is left of it), under `maxDuration = 60`. So a block
+  with no transfer is not found, and the reach is the DAG's walk, about three months: a pin the
+  DAG's cap cannot reach answers **beyond reach**, a 200 `{ ticks: [], chains: [], beyond: true }`
+  at `s-maxage=3600` (deeper only gets deeper), which the client states and never retries. A TOKEN
+  chain past its cap contributes what it reached: its older blocks are the walk's floor, never a
+  void of the whole window, and the answer NAMES it (`partial`: the network's current id, when the
+  window is short or the chain's walk stopped at or above the window's oldest tick), which the
+  explorer's floor line states. **`chain`** (2026-11-07, the top bar's network filter: `dag` or a
+  listed network's id, a former address mapped to the current one; an untracked id is a 400 — an
+  unlisted network's blocks are not read) makes the window THAT network's newest `n` block ticks,
+  reaching back as far as its walk goes (days, for a quiet chain), and echoes `chain` in the answer.
+  Only that network's own lists are walked: the DAG blocks sharing its ticks come from each chosen
+  global's own record (`blocks`), read anyway for its stamp, so they cost no upstream read — walking
+  the DAG's list down to a quiet chain's oldest tick would cost pages per day and hit its cap within
+  a week. Under its own filter a token chain whose capped walk reached no tick is beyond reach. The
+  CDN keys each `chain` apart (a query parameter); the cache rules are the same. `live` is
+  `s-maxage=30, stale-while-revalidate=30`; an explicit window a year once its newest tick is an hour
+  old, a minute before. A lineage address whose list answers 404 contributes no rows; any other failed
+  read, or the deadline hit anywhere, is a 503 `no-store` — a short answer would read as "no blocks
+  there". Pinned
+  by `blocks/trail.test.ts`.
 - **`/api/global/at?ts=`** binary-searches ~23 tiny per-ordinal records to find the global carrying
   that exact stamp (the anchor join is timestamp EQUALITY — which has exceptions: see the
   timestamp note in `src/data/CLAUDE.md`; such a row answers 404 here, honestly). Its one consumer is the anchor log's
@@ -229,8 +301,16 @@ them — but the Next Node server can.
   walk for globals the payload host no longer serves, and that fallback was cut as a second mechanism
   for a case two other columns already cover. Don't re-add it without a consumer.
 - **`/api/snapshot/[ordinal]`** reads the raw L0 global snapshot (~2.5 MB) and returns a tiny exact
-  summary plus one row per anchored channel entry. **An `ordinal: 0` marks a payload the decoder
-  couldn't read, which the UI must show as undecoded rather than as zero.** Cached per ordinal
+  summary plus one row per anchored channel entry (`exactRow.ts`, its own module so the route stays route
+  exports only — `exactRow.test.ts`). **An `ordinal: 0` marks a payload the decoder
+  couldn't read, which the UI must show as undecoded rather than as zero.** Each row carries the DATA
+  UPDATES its data blocks hold (`dataTxCount`) and how many data blocks those were (`dataBlocks`), both
+  absent on an undecodable payload (unknown, never zero), and `perMeta` their sum per address —
+  absent too when any of that address's rows could not be decoded (`dataUpdatesOf`, review
+  M5: the network level says what the row level says — its one home is `src/data/ledgerMeasure.ts`,
+  which the tick row and the Data blocks band ask too) (D6, 2026-11-07): the decoder already inflates every anchored channel per tick, so the count costs
+  nothing more here, and the metagraph snapshot card and the Data blocks register read it from this
+  row rather than from the deep read below. Cached per ordinal
   (immutable; a transient upstream failure throws so it retries). The pull (`fetchGlobal.ts`) tries the L0 LB first and falls back to the archival nodes on ANY LB failure — a 404, a CDN block, a 5xx or a timeout (2026-10-04: the LB's CDN 403'd one source IP while the archives served) — and after a non-404 failure skips the LB for `LB_BACKOFF_MS` (10 min), so a blocked source stops knocking on the shut door every tick. It's called for the live and
   selected tick only — never the whole chain, never a poll loop — plus a one-time paced backfill on a
   cold load, because the trail otherwise opens with its unmeasured rows drawing no bars. Each ordinal
@@ -256,6 +336,9 @@ them — but the Next Node server can.
   decode. **A deterministic miss (the channel provably isn't in this immutable global) is cached
   like a success** — throwing it made every repeat of the same bad `(ordinal, address)` re-download
   the whole global, an anonymous amplification loop; only transient failures throw and retry.
+- **`/api/snapshot/[ordinal]`** also answers the snapshot's `blocks` (parents by height and hash, the transfer totals in DAG and each transfer's `{ from, to, amount, fee }` in `transfers`, signature count; hashes paired by index from the explorer record, `""` where it lists none) — never its `tips`, which nothing reads (`decodeBlocks.ts`; cache key `snapshot-exact-v11` — v7 added the rows' data updates, the hashes read apart and cached on success only; v8 re-keys after an undecodable row's data updates became unknown rather than 0, so no cached entry still states the 0; v9 the state's shape and dL1 signers; v10 one summary per data block; v11 an unreadable data block is `unread` and its snapshot's data updates unknown — `cachedExact.ts` keeps the history).
+- **`/api/network/[address]/snapshots/[ordinal]/blocks`** is a metagraph snapshot's blocks, read from the chain's own L0 (`urls.l0` from the directory, 5 min; `network/metaL0.ts`) through the same `decodeBlocks` (cache key `metagraph-snap-blocks-v3`); the snapshots route's address gate (catalog + unlisted), `public, max-age=86400, s-maxage=86400, immutable`, 503 `no-store` on upstream failure (its
+  `route.test.ts` and `snapshot/decodeBlocks.test.ts` pin the answer). The ordinal is a number; anything else, `latest` included, is a 400 — the chain's newest snapshot is read nowhere.
 - **`/api/network/unlisted`** lists the UNLISTED chains — the explorer's `/currency` list less every
   tracked address — cached an hour (`app/api/network/unlistedChains.ts`, also the gate below).
 - **`/api/network/[address]/snapshots`** pages one CATALOG chain (retired networks and former

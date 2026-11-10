@@ -108,9 +108,12 @@ export function Empty({ why }: { why?: string }) {
 
 /** A SECTION'S LABEL — caps, muted, with the section's one headline figure on the right. The
  *  breakdown slot's heading: the card's total lives here rather than in a sentence above it. */
+// THE SECTION SITS ON A RULE (user, 2026-11-09, option A of `card-tables.html`: "one table — header
+// rule, column caps, hairline rows"): every card section's label and total stand on the card's
+// border hairline, so a section reads as a table's head wherever it opens one.
 export function SectionLabel({ label, total, unit, className }: { label: ReactNode; total?: ReactNode; unit?: ReactNode; className?: string }) {
   return (
-    <div className={cn("flex items-baseline justify-between gap-2.5 text-label tracking-caps uppercase text-muted-foreground", className)}>
+    <div className={cn("flex items-baseline justify-between gap-2.5 pb-1 border-b border-border text-label tracking-caps uppercase text-muted-foreground", className)}>
       <span className="min-w-0 truncate">{label}</span>
       {(total != null || unit != null) && (
         <span className="flex-none inline-flex items-baseline gap-1.5">
@@ -670,6 +673,29 @@ export function UnitMarks({ count, color, units, frac }: { count: number; color:
   );
 }
 
+/** THE CARD TABLE (user, 2026-11-09, option A — "standardized still based on the data type"). Every
+ *  table in a card is one section: `SectionLabel` on its rule, then `TableHead`'s caps row naming the
+ *  columns, then rows divided by `TABLE_ROW`'s faint hairline. The row's MARK follows the data type:
+ *  COUNTS by category (parts of one total — snapshots anchored, updates by kind, nodes by network)
+ *  draw `UnitMarks`' squares, a share bar past `UNIT_MAX`; READINGS by category (the Moment's rates)
+ *  a bar against the largest; RECORDS (transfers, a tick's blocks) are columns of their own fields.
+ *  The figure column is the card's right edge in every type (`CUT_ROW`, `figWidth`). */
+export const TABLE_ROW = "border-t border-border/40 first:border-t-0 py-[3px]";
+
+/** The caps column row over a `CUT_ROW` table: the name column's noun, the mark column's (usually
+ *  none), the figure column's unit — `#` for a count. Sits inside the element that sets `figWidth`. */
+export function TableHead({ name, mark, figure, className, style }: { name: ReactNode; mark?: ReactNode; figure: ReactNode; className?: string; style?: CSSProperties }) {
+  return (
+    <div aria-hidden style={style} className={cn(CUT_ROW, "pt-1 pb-0.5 tracking-caps uppercase text-muted-foreground [font-size:calc(var(--text-label)*0.86)]", className)}>
+      <span className="min-w-0 truncate">{name}</span>
+      <span className="min-w-0 truncate text-right">{mark}</span>
+      {/* A unit wider than its figures (MOVED over "100K") reaches LEFT into the mark column: the
+          figure column is sized to its figures, and `justify-self-end` overflows on the start side. */}
+      <span className="justify-self-end whitespace-nowrap text-right">{figure}</span>
+    </div>
+  );
+}
+
 /** Whether a cut of this size draws squares (countable) or bars. */
 export const countable = (total: number) => total <= UNIT_MAX;
 
@@ -701,24 +727,35 @@ export const figWidth = (figures: readonly (string | number)[]): CSSProperties =
  *  divided by a hairline, which makes the three cuts read as one table. A zero part is a plain
  *  muted row with no squares (it draws nothing, and is still named). Without an `axis` the table
  *  is the three-column `CUT_ROW` form. */
-export function ScheduleTable({ axis, parts, className }: { axis?: string; parts: SchedulePart[]; className?: string }) {
+export function ScheduleTable({ axis, parts, className, head }: { axis?: string; parts: SchedulePart[]; className?: string; head?: { name: ReactNode; figure: ReactNode } }) {
   const total = parts.reduce((n, p) => n + p.count, 0);
   const units = countable(total);
+  // ONE CUT is the card table (option A, 2026-11-09): its column row, then a row per part on the
+  // hairline. The multi-cut form keeps its axis column, which already names each cut.
+  if (axis == null)
+    return (
+      <div className={cn("flex flex-col text-label", className)} style={figWidth(parts.map((p) => p.count))}>
+        {head && <TableHead name={head.name} figure={head.figure} />}
+        {parts.map((p, i) => (
+          <div key={i} className={cn(CUT_ROW, TABLE_ROW)}>
+            <span className={cn("min-w-0 truncate", p.count > 0 ? "text-foreground-dim" : "text-muted-foreground")}>{p.label}</span>
+            <UnitMarks count={p.count} color={p.color} units={units} frac={p.count / Math.max(1, total)} />
+            <span className={cn("font-mono tabular-nums text-right", p.count > 0 ? "text-foreground" : "text-muted-foreground")}>{p.count}</span>
+          </div>
+        ))}
+      </div>
+    );
   return (
     <div
       className={cn(
-        axis != null
-          ? "grid grid-cols-[6.9em_7.4em_minmax(0,1fr)_var(--cut-fig,2.4em)] items-start gap-x-1.5 gap-y-0.5 py-1.5 text-label border-t border-border first:border-t-0"
-          : cn(CUT_ROW, "gap-y-0.5"),
+        "grid grid-cols-[6.9em_7.4em_minmax(0,1fr)_var(--cut-fig,2.4em)] items-start gap-x-1.5 gap-y-0.5 py-1.5 text-label border-t border-border first:border-t-0",
         className,
       )}
       style={figWidth(parts.map((p) => p.count))}
     >
-      {axis != null && (
-        <span className="text-muted-foreground" style={{ gridRow: `span ${Math.max(1, parts.length)}` }}>
-          {axis}
-        </span>
-      )}
+      <span className="text-muted-foreground" style={{ gridRow: `span ${Math.max(1, parts.length)}` }}>
+        {axis}
+      </span>
       {parts.map((p, i) => (
         <Fragment key={i}>
           <span className={cn("min-w-0 truncate", p.count > 0 ? "text-foreground-dim" : "text-muted-foreground")}>

@@ -4,13 +4,16 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { shortHash, metagraphById, getNetwork, SIGNER_GROUPS, nodeSigned, coLocatedNetworks, filterAccent } from "@/src/data/network";
-import { UNLISTED_ID, UNLISTED_HUE, observedUnlistedIds } from "@/src/data/unlisted";
+import { UNLISTED_ID, observedUnlistedIds } from "@/src/data/unlisted";
 import { identityHudCss } from "@/src/palette/identity";
 import { fmtDagShort, fmtKB, midHash } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import type { GlobalSnapshot, MetaCfg, PickDescriptor } from "@/src/data/types";
 import { metaSnapDeepKey } from "@/src/data/types";
 import AnchoredTags from "./AnchoredTags";
+import { BlocksAnchored, DataAnchored } from "./SnapshotRegister";
+import { REGISTER_MEASURES } from "@/src/data/ledgerMeasure";
+import { readsBlockWindow, registerOf } from "@/src/engine/domain/viewPolicy";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import Odometer from "@/components/Odometer";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -29,7 +32,7 @@ import { netKeyOf, pickNetId } from "@/src/engine/domain/pickActions";
 import { ladderSlotIds } from "@/components/railCards";
 import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder";
 import FollowControl from "@/components/FollowControl";
-import { NODE_ID_GLYPHS } from "@/components/explorer/nodeRow";
+import { NODE_ID_GLYPHS, networkMark } from "@/components/explorer/nodeRow";
 import { IDENT_INK } from "@/components/identInk";
 import { useFeedRead } from "@/components/useFeedRead";
 import SubjectNote from "@/components/notes/SubjectNote";
@@ -94,10 +97,8 @@ export function MetaTitle({ cfg }: { cfg: MetaCfg }) {
   useFeedRead(["api-metagraphs"], "MetaTitle");
   const metaList = useStore((s) => s.metaList);
   const mg = metaList.find((x) => x.id === cfg.id) || null;
-  // The unlisted pseudo-network keeps its mandated neutral — identityHudCss would hash-assign a
-  // saturated hue to the "unlisted" id, and no single identity can speak for a mixed set. Same
-  // guard LedgerPanel applies (UNLISTED_HUE is the one home, src/data/unlisted.ts).
-  const hue = cfg.id === UNLISTED_ID ? UNLISTED_HUE : identityHudCss(cfg.id);
+  // The unlisted pseudo-network keeps its mandated neutral (`networkMark`, the one rule).
+  const hue = networkMark(cfg.id).hue;
   const iconUrl = mg?.iconUrl || cfg.iconUrl; // live metagraph icon, or the core's bundled logo
   const monogram = (cfg.ticker || cfg.name).slice(0, 3).toUpperCase();
   return (
@@ -229,6 +230,8 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
   // later trigger (reselecting, the next live tick) retries.
   const exact = useStore((s) => s.snapshotExact[d.ordinal]);
   const missed = useStore((s) => s.exactMiss[d.ordinal] != null);
+  const inBlocks = useStore((s) => readsBlockWindow(registerOf(s.mode, s.ledgerRegister)));
+  const inData = useStore((s) => REGISTER_MEASURES[s.ledgerRegister].dataOnly);
   const live = useStore((s) => s.live);
   const lastGoodAt = useStore((s) => s.lastGoodAt);
   const awaitingExact = exact == null && !missed;
@@ -266,8 +269,10 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
   // Hover pairing (synced 3D glow) lives on the OUTER pane (Inspector.CardPane), not here.
   return (
     <div>
-      {/* Anchored block (exact share breakdown, or "reading…" until it lands). */}
-      <AnchoredTags ordinal={d.ordinal} anchored={anchored} awaiting={awaitingExact} />
+      {/* THE REGISTER'S SECTION (user, 2026-11-07): the tick's blocks by chain in Transaction blocks,
+          its data blocks by network in Data blocks, else the anchored breakdown (exact share
+          breakdown, or "reading…" until it lands). */}
+      {inBlocks ? <BlocksAnchored ordinal={d.ordinal} /> : inData ? <DataAnchored ordinal={d.ordinal} /> : <AnchoredTags ordinal={d.ordinal} anchored={anchored} />}
 
       {/* Settlement — the exact fee + measured size + rewards (each an independent fact). While the
           exact read is still in flight (ACQUIRING), the fee row shows twinkling node-stars so the
@@ -553,7 +558,7 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   // own probed universe (its roster isn't `nodes`); a metagraph counts against its live fleet.
   // Memoized — archiveSchedule walks every census entry with date parsing, and this card
   // re-renders on every poll and hover.
-  const hue = cfg.id === UNLISTED_ID ? UNLISTED_HUE : identityHudCss(cfg.id);
+  const hue = networkMark(cfg.id).hue;
   const archSched = useMemo(
     () =>
       archCensus
@@ -1117,8 +1122,9 @@ export function CountryCard({ cc }: { cc: string }) {
           provider card below it by NETWORK — whose nodes these are: place → host → network down
           the pile, nothing repeated. */}
       <Separator className="mb-2" />
-      <SectionLabel label="Nodes" unit="by provider" total={rows.length} className="mb-1.5" />
-      <ScheduleTable parts={parts} />
+      {/* The cut is named by the table's column row (option A, 2026-11-09), so the label says "Nodes". */}
+      <SectionLabel label="Nodes" total={rows.length} className="mb-0.5" />
+      <ScheduleTable parts={parts} head={{ name: "Provider", figure: "#" }} />
     </>
   );
 }
@@ -1255,8 +1261,8 @@ export function ProviderCard({ sel }: { sel: CohortSel }) {
     {/* THE BREAKDOWN: the cohort's nodes cut by NETWORK — whose nodes these are — the level below
         the country card's cut by provider. */}
     <Separator className="mb-2" />
-    <SectionLabel label="Nodes" unit="by network" total={members.length} className="mb-1.5" />
-    {parts.length > 0 && <ScheduleTable parts={parts} />}
+    <SectionLabel label="Nodes" total={members.length} className="mb-0.5" />
+    {parts.length > 0 && <ScheduleTable parts={parts} head={{ name: "Network", figure: "#" }} />}
     <Separator className="my-2" />
     <FactGroup>
       {/* ASN — the provider's REFERENCE, in the slot the city vacated when it moved to the head

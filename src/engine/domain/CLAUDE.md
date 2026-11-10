@@ -78,7 +78,11 @@ asked.
 `domain/pickActions.ts` is the click/select decision table: what picking a subject means per view ×
 pick kind, as pure data-in/actions-out logic. Two kinds of executor consume it — the Engine's scene
 raycast clicks and the React components via named builders — so the scene and the panels can't drift
-in semantics. Every caller applies actions through the one executor `src/store/applyClickActions.ts`.
+in semantics. Every caller applies actions through the one executor `src/store/applyClickActions.ts`. Every
+caller also hands the builders the same two inputs from one home here: `globalPick(g)`, a global
+snapshot as a pick, and `tickContextOf(state)`, the `current` a tick builder reads (the pin — none
+while following — the metagraph snapshot, the network inside the tick, the block, the follow), so a
+new finer slot is one line there rather than a sweep of hand-built contexts.
 
 **`src/engine/domain/pickActions.test.ts` is the specification.** It pins every ordering contract, the
 full-ancestry rule, the deselect stepping, the release rules, and the scene-click-equals-row-select
@@ -106,7 +110,8 @@ The design rules behind the table, which the tests pin but don't explain:
   under the globe re-partitions over the network in view instead of dimming the rest. Snapshots holds
   by the TICK instead: a global snapshot the filter's
   network is not in answers nothing, in the explorer, the scene and the pager, unless it is the one on
-  screen (`ledgerStory.tickLocked`), while a tick that holds it opens whole, its pager stepping that
+  screen (`ledgerStory.tickLocked`; the Blocks register's block rows ask the same through
+  `ledgerStory.blockRowLocked`), while a tick that holds it opens whole, its pager stepping that
   tick's own networks. ⚠️ Only a landed exact read can lock a tick: a polled zero is also what a tick
   looks like once the buffer has rolled past it, and no read means unknown, never none. **The
   ledger's SNAPSHOT rows never set it either** (design session 2026-09-26, decision 13):
@@ -145,8 +150,9 @@ The design rules behind the table, which the tests pin but don't explain:
   SIGNER set reads the same gate** (user, 2026-08-18): it was exempt on the argument that it is not
   ancestry but a relation from a different subject — true, and beside the point, because a metagraph
   that seals with its whole 3-machine cluster left a committed node reading as one bright chip among
-  three. The rule's own reasoning governs it, and nothing true is lost: the snapshot's lane tile still
-  carries the relation and the node card still states `signed`.
+  three. The rule's own reasoning governs it. Since the chamber lost its node rung (2026-11-08) a
+  COMMITTED node never reaches the scene there (the carried-node bullet below), so in Snapshots the signers yield only
+  to a hovered chip, a preview.
 - **A tick drops the metagraph snapshot it can't contain** (user, 2026-08-10). Stronger than the story
   rule one rung up: that one is about set membership, this is a one-to-one join
   (`metagraph.timestamp === global.timestamp`), so committing a DIFFERENT tick provably means the held
@@ -154,6 +160,75 @@ The design rules behind the table, which the tests pin but don't explain:
   ADJACENCY IS CONTAINMENT — stating that tick B contains a snapshot that landed in tick A. It lives in
   `snapshotSelectActions`, so all remaining consumers (explorer row, the global card's pager,
   the 3D band click) inherit it.
+- **A block is a SLOT under its tick, and it is in exactly one snapshot** (the Blocks register,
+  2026-11-06). `blockSelectActions` pins the global that accepted it (`follow: false` — a live follow
+  would walk the card away from the block), releasing first what hangs under ANOTHER tick (its
+  metagraph snapshot, the network committed inside it), and commits the block; the same block again
+  releases the block alone. **A TOKEN block commits its accepting metagraph snapshot too** (user,
+  2026-11-07: "automatically also populate its metagraph snapshot card, but open the block card as
+  that's the subject"): the scene pick carries it (`PickDescriptor.block.snap`), the explorer and RAW
+  rows ask the window (`blockWindow.blockMetaSnap`), and the builder's `snapOf` commits the network
+  and the snapshot before the block — coarse to fine, the block LAST so it ranks and its card is the
+  box. A DAG block's
+  accepting snapshot is the global itself, so it commits nothing more. The live follow seats a token
+  block's snapshot the same way (`followNewestBlock`, the non-bumping advance). **In Transaction
+  blocks a BAR click is its tick's first block** (`Picking`, 2026-11-07, user: the register "loses
+  its block card often" — a bar click pinned the tick and released the block): the trail draws only
+  block-bearing ticks, so the bar commits the tick and its first block through the same builder, the
+  Block ghost's own step; a band click stays a band's. No focus rung and no pose (camera principle 2).
+  **A BLOCK STANDS ONLY IN ITS PLACE** (`blockInPlace`, 2026-11-08 — user: a Global snapshot holding
+  only DAG blocks opened the DED metagraph as its child, then a DAG block under DED's snapshot, "this
+  must be much more structurally sound"): a DAG block is the global's own — Global → Block, no
+  network or metagraph snapshot between; a token block is its accepting snapshot's — Global →
+  Metagraph → Metagraph snapshot → Block. Every builder that commits a parent releases a block that
+  parent leaves out of place through the one `releaseBlock` (another tick; a metagraph snapshot or a
+  network's band or card that is not the block's — a DAG block under ANY metagraph snapshot), the tile,
+  band, network, arrival and follow builders take the block as a REQUIRED argument so no caller can
+  forget it, a DAG block's own commit releases a snapshot or foreign network standing in its tick, the
+  card renders only in place (`railCards.parentHolds`), the Block ghost offers only a block in place
+  under what the rail shows (`railSiblings.blockStep`: the tick's first under the Global alone, the
+  network's under its card, the snapshot's own under its card), and the live follow never seats a
+  block out of place under a snapshot the reader holds. The Metagraph snapshot card's × is
+  `metaSnapClearActions` (its data block and a token block it accepted go with it; a DAG block is the
+  global's and stays). The Block card's × is `blockClearActions`. **A DATA BLOCK is a slot under its metagraph snapshot, in
+  exactly one** (the Data blocks register, 2026-11-07, user: "a data block is just like a tx
+  block"): `dataBlockSelectActions` commits the snapshot's chain through `metaSnapSelectActions`
+  (unless that snapshot already stands pinned), then the data block, last so its card is the box;
+  the same again releases it alone (`dataBlockClearActions` is the card's ×). `releaseDataBlock`
+  is the one home of its release — another snapshot's commit, the tick's clear
+  (`snapshotClearActions`), a register switch out of Data blocks (`registerSwitchActions`) — and the
+  store's `advanceMetaSnap` drops it on a live advance onto another snapshot. The block cause and
+  the data-block cause each have their own motion-hint words. **While following, a click on the live block PINS it**
+  (D3: live follows the newest block in the Blocks register, so the block on screen is the follow's,
+  not a pick — the auto-followed metagraph snapshot's rule), and the Block card's LIVE / PINNED
+  control is `blockFollowActions`, which re-commits the block LAST either way so its card stays the
+  box the reader pressed.
+- **A CARRIED NODE HOLDS THROUGH SNAPSHOTS** (user, 2026-11-10): a node selected in Hypergraph or
+  Geography and carried into Snapshots is shown nowhere there — the ledger's ladder has no node rung
+  and the view no node card (2026-11-08) — but its SELECTION survives, so going back brings the card,
+  its country, provider or group back (`LEVEL_CARRY.node` is `"always"`; the destination's ancestry
+  re-commits on entry). So no Snapshots builder releases `inspect`: not a tile, a band, a network in
+  a tick or its ×, a block, a data block, the tick's × or re-click, nor resuming LIVE. The builders
+  take no node as an input at all, and `pickActions.test.ts`' "no Snapshots builder releases the
+  node" block pins it, with `followFlow.test.ts` running a held node through a tile, a band, both ×s
+  and LIVE. Only the top bar's filter switch still drops a node (a network-level event, in any view).
+  **The SCENE holds the same line** (final review 4, I1): the Engine hands the globe the committed
+  node only while the view it draws, or the one it is entering, has the node rung
+  (`focusLadder.sceneShowsNode`, `Engine._syncSceneNode`), so in the chamber no tray chip takes the
+  focus boost or swell, no other chip steps back, and a snapshot's signers glow. Leaving for
+  Snapshots the node stands down at the transition boundary (every chip gathered); returning it is
+  back at the click, beside the ancestry the entry re-commits, so the provider's borrowed glow
+  never flashes first.
+- **A register switch is a setting that RELEASES** (2026-11-06; three registers since D6). `registerSwitchActions`
+  drops what the register ENTERED cannot draw — entering Transaction blocks drops the metagraph
+  snapshot, entering either other (Metagraph snapshots or Data blocks) drops the block, and
+  Metagraph snapshots ↔ Data blocks keeps both, since Data blocks' subjects are the same snapshots —
+  and keeps the pin and the committed network, which are the tick's own. `switchLedgerRegister` (`src/store/applyClickActions.ts`) is the ONE door: it applies
+  that release through the executor, clears a block's hover preview, then sets the field. The store's
+  raw `setLedgerRegister` releases nothing and cannot (the executor imports the store; the reverse is
+  a cycle), so `selectionBoundary.test.ts` holds every surface — the register control, the footer,
+  `RouteSync`, the Briefing — to the door. Pinned by `pickActions.test.ts`'s block and register cases
+  and `src/store/registerSwitch.test.ts`.
 - **A History plane click is FOCUS ONLY** (2026-09-18). `trendPlaneActions` emits exactly one
   `trendFocus`, toggling like every other rung's subject, and it deliberately does NOT commit the
   plane's network: a committed filter SCOPES the stack to that one network, so committing on a plane

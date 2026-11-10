@@ -1,5 +1,4 @@
-import { NextResponse } from "next/server";
-import { netOf } from "@/src/net/request";
+import { NextResponse, connection } from "next/server";
 import { getLiveGeo } from "./live";
 
 // LIVE validator IP→geo map (user decision, 2026-07-10: the pre-baked data/geo.json seed
@@ -15,11 +14,11 @@ export const runtime = "nodejs";
 export const revalidate = 3600;
 export const maxDuration = 30;
 
-export async function GET(req: Request) {
-  // Reading ?net= makes the route dynamic (ƒ) — the CDN caches it per URL via s-maxage
-  // instead, so mainnet's hit behaviour is preserved (multi-network design §3).
+export async function GET() {
+  // Per request, never prerendered: the CDN caches the answer by its own Cache-Control.
+  await connection();
   try {
-    return NextResponse.json(await getLiveGeo(netOf(req)), {
+    return NextResponse.json(await getLiveGeo(), {
       headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=7200" },
     });
   } catch {

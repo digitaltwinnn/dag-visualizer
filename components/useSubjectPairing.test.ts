@@ -1,4 +1,7 @@
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { useStore } from "@/src/store/store";
 import { focusPreviews, noteInput, shouldRelease, subjectPairing } from "./useSubjectPairing";
 
 describe("subjectPairing", () => {
@@ -121,5 +124,35 @@ describe("focusPreviews", () => {
     expect(focusPreviews()).toBe(true);
     noteInput("mouse");
     expect(focusPreviews()).toBe(true);
+  });
+});
+
+// THE BLOCK'S OWN CHANNEL (Blocks register, 2026-11-06): a block is hovered by its hash on
+// `hoverBlock`, never by its tick, so the explorer row, the chamber's block, the RAW row and the
+// Block card light one another and nothing else (convention 9: a surface hovers what it would
+// commit). Every HUD end pairs through this one function, so each wears `.subject-paired`.
+describe("the hoverBlock channel", () => {
+  const HASH = "4f1c0a9e";
+  afterEach(() => useStore.setState({ hoverBlock: null }));
+
+  it("hovering a block row writes the block's hash and leaving releases it", () => {
+    noteInput("mouse");
+    const st = () => useStore.getState();
+    const row = () => subjectPairing<string>(st().hoverBlock, HASH, st().setHoverBlock, "#fff");
+    expect(row().paired).toBe(false);
+    row().onMouseEnter();
+    expect(st().hoverBlock).toBe(HASH);
+    // Every other surface rendering this block now reads it paired.
+    expect(row().paired).toBe(true);
+    expect(row().className).toBe("subject-paired");
+    row().onMouseLeave();
+    expect(st().hoverBlock).toBeNull();
+  });
+
+  it("every HUD end of the pairing pairs on hoverBlock through subjectPairing", () => {
+    for (const file of ["components/LedgerPanel.tsx", "components/datasection/BlocksTable.tsx", "components/inspector/BlockPane.tsx"]) {
+      const src = readFileSync(join(process.cwd(), file), "utf8");
+      expect(src, file).toMatch(/subjectPairing(?:<string>)?\(\s*hoverBlock,/);
+    }
   });
 });

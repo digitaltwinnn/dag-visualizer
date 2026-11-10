@@ -1,4 +1,5 @@
 import type { Mode } from "@/src/store/store";
+import type { LedgerRegister } from "@/src/store/mode";
 
 // ONE home for the interface's VIEW VOCABULARY: id, user-facing name, and — for the three live
 // 3D views — the URL slug and the search-facing copy their route serves. Consumed by the top-bar
@@ -83,13 +84,81 @@ const MODE_BY_SLUG = new Map<string, Mode>(ROUTED_VIEWS.map((v) => [v.slug, v.id
 export function modeForPath(pathname: string): Mode | null {
   const seg = pathname.replace(/^\/+|\/+$/g, "");
   if (seg === "") return "geo";
+  const hit = REGISTER_PATHS[seg];
+  if (hit) return hit.mode;
   return MODE_BY_SLUG.get(seg) ?? null;
+}
+
+/** THE SNAPSHOTS VIEW'S REGISTER PAGES (2026-11-06; three registers since D6, 2026-11-07): a register
+ *  beyond the view's own is a routed PATH, not a view. A register is not a Mode (the switch must not
+ *  grow a sixth button), so it lives beside `VIEWS`: the routes, the sitemap, the footer, the title
+ *  and the URL bridge read this ONE map, the view switch does not. The Metagraph snapshots register
+ *  IS the view (`/snapshots`), so it has no page of its own (null). */
+export type RegisterPage = { name: string; slug: string; desc: string };
+export const REGISTER_PAGES: Readonly<Record<LedgerRegister, RegisterPage | null>> = {
+  snapshots: null,
+  // The protocol's split names the two (user, 2026-11-07): a cL1 block holds `transactions`, a dL1
+  // block holds data updates.
+  blocks: {
+    name: "Transaction blocks",
+    slug: "blocks",
+    desc: "The Constellation Network's block DAG in 3D: every transfer's block built on two before it, accepted into the snapshot chain.",
+  },
+  data: {
+    name: "Data blocks",
+    slug: "data-blocks",
+    desc: "The Constellation Network's data blocks in 3D: every metagraph snapshot that carried data updates, marked on the snapshot chain as it anchors.",
+  },
+};
+
+/** The register pages in the switch's order — the routes, the sitemap and the footer list these. */
+export const REGISTER_PAGE_LIST: readonly RegisterPage[] = Object.values(REGISTER_PAGES).filter((p): p is RegisterPage => p != null);
+
+/** The Transaction blocks register's page — the name the Briefing's stop says. */
+export const BLOCKS_PAGE = REGISTER_PAGES.blocks!;
+
+/** EACH REGISTER'S NAME (user, 2026-11-07: "Since they all converge into snapshots, the control
+ *  'snapshots' should be 'metagraph snapshots'"): the switch's halves and the explorer's title. The
+ *  VIEW stays "Snapshots"; only its first register is named for what it reads. */
+export const REGISTER_NAMES: Readonly<Record<LedgerRegister, string>> = {
+  snapshots: "Metagraph snapshots",
+  blocks: REGISTER_PAGES.blocks!.name,
+  data: REGISTER_PAGES.data!.name,
+};
+
+/** Paths that name a mode AND a register of it. */
+const REGISTER_PATHS: Record<string, { mode: Mode; register: LedgerRegister }> = Object.fromEntries(
+  (Object.entries(REGISTER_PAGES) as [LedgerRegister, RegisterPage | null][])
+    .filter(([, p]) => p != null)
+    .map(([register, p]) => [p!.slug, { mode: "ledger" as Mode, register }]),
+);
+
+/** The register a pathname names: the Snapshots view's own `/snapshots` is its first register,
+ *  a register page its register, any other path none. */
+export function registerForPath(pathname: string): LedgerRegister | null {
+  const seg = pathname.replace(/^\/+|\/+$/g, "");
+  const hit = REGISTER_PATHS[seg];
+  if (hit) return hit.register;
+  return modeForPath(pathname) === "ledger" ? "snapshots" : null;
 }
 
 /** The path a mode publishes to the address bar — null only for a mode with no slug (none today). */
 export function pathForMode(mode: Mode): string | null {
   const v = VIEWS.find((x) => x.id === mode);
   return v?.slug ? `/${v.slug}` : null;
+}
+
+/** The path the address bar shows for a mode and, in the Snapshots view, its register. */
+export function pathFor(mode: Mode, register: LedgerRegister): string | null {
+  const page = mode === "ledger" ? REGISTER_PAGES[register] : null;
+  return page ? `/${page.slug}` : pathForMode(mode);
+}
+
+/** The name the document title carries for a mode and its register: a register page's own name,
+ *  else the view's. */
+export function titleNameFor(mode: Mode, register: LedgerRegister): string | undefined {
+  const page = mode === "ledger" ? REGISTER_PAGES[register] : null;
+  return page?.name ?? VIEWS.find((v) => v.id === mode)?.name;
 }
 
 /** The document title a view carries once the app is past first load (RouteSync + route metadata). */

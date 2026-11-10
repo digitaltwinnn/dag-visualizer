@@ -27,13 +27,12 @@ import { noteSupported } from "./sources";
 // pass, and a pass cut short by its budget hands the rest to the next. An item whose record another
 // writer refreshed since the plan is served, not rewritten (`seenWrittenAt`).
 //
-// Order: the HOURLY kinds first (ledger, History's 24h), so a pass cut short by its time budget
+// Order: the HOURLY kinds first (ledger, the block DAG, History's 24h), so a pass cut short by its time budget
 // still refreshes what goes stale fastest; then the daily kinds (hyper, Geography and its
 // countries, History's 7d / 30d / 1y / all). Only what a note exists for is planned
 // (`noteSupported`): History has no `all` subject, and the unlisted set has a note in History alone.
 // On-request kinds (the 1h pill, a brushed range) are never warmed.
 
-const NET = "mainnet";
 /** How early a warmed note is due: more than a pass's length (300 s at most), and under the
  *  15-minute cron step (see the header), so its shortest refresh is never cut a step short. */
 export const WARM_SLACK_MS = 10 * 60_000;
@@ -60,7 +59,8 @@ export function driftKeyOf(item: WarmItem, drift: DriftKeys | null): string | nu
   return drift?.[item.subject] ?? null;
 }
 
-const HOURLY: [NoteView, NoteSpan][] = [["ledger", "hours"], ["trend", "24h"]];
+// The block DAG's note is warmed with the ledger's: the chamber's two registers, one clock.
+const HOURLY: [NoteView, NoteSpan][] = [["ledger", "hours"], ["blocks", "hours"], ["data", "hours"], ["trend", "24h"]];
 const DAILY: [NoteView, NoteSpan][] = [["hyper", "day"], ["geo", "day"], ["trend", "7d"], ["trend", "30d"], ["trend", "90d"], ["trend", "1y"], ["trend", "all"]];
 
 /** Every warmable note for these subjects and countries (`["DE", …]`), in pass order. */
@@ -68,13 +68,13 @@ export function warmCandidates(subjects: string[], countries: string[]): WarmIte
   const out: WarmItem[] = [];
   for (const [view, span] of [...HOURLY, ...DAILY]) {
     const subs = view === "geo" ? [...subjects, ...countries.map((cc) => `cc:${cc}`)] : subjects;
-    for (const subject of subs) if (noteSupported(view, subject, span, NET)) out.push({ view, subject, span });
+    for (const subject of subs) if (noteSupported(view, subject, span)) out.push({ view, subject, span });
   }
   return out;
 }
 
 export function warmKeyOf(item: WarmItem): string {
-  return noteKeyOf(NET, item.view, item.subject, item.span);
+  return noteKeyOf(item.view, item.subject, item.span);
 }
 
 /** THE PASS: the candidates that are due. `setKey` is the current networks-with-nodes key (sorted

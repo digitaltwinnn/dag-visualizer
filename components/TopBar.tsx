@@ -14,13 +14,13 @@ import PresentationToggle, { SEG } from "@/components/topbar/PresentationToggle"
 import AboutStrip from "@/components/topbar/AboutStrip";
 import SettingsMenu from "@/components/topbar/SettingsMenu";
 import ViewPicker from "@/components/topbar/ViewPicker";
-import { NET_SWITCH_VIEW } from "@/components/topbar/NetworkSwitch";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { useSceneYield } from "@/components/RailShade";
 import { DOC_PAGES, LISTED_VIEWS, VIEWS } from "@/components/views";
 import { stepView, swipeDirection } from "@/src/engine/domain/viewSwipe";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import type { Mode } from "@/src/store/store";
+import { SlideFace } from "@/components/SlideFace";
 
 // Collapsed filter face: a small identity dot + the network name in neutral text (no filled
 // chip). All → a neutral cyan dot. Identity is the ONLY colour the filter carries.
@@ -98,23 +98,6 @@ export default function TopBar() {
   useEffect(() => {
     if (!viewControls) setStrip((cur) => (cur === "about" ? null : cur));
   }, [viewControls]);
-
-  // Consume the NetworkSwitch's one-shot view handoff (see its header): a network switch is a
-  // hard reload, and the view you were on survives it. Runs once on mount, BEFORE the engine's
-  // dynamic import resolves, so the scene boots straight into the carried view rather than
-  // transitioning to it. An effect, not a store initial value — SSR renders the default view,
-  // and a differing first client render is a hydration mismatch, which React 19 answers by
-  // regenerating the tree (the data-net trap, CLAUDE.md "The three networks").
-  useEffect(() => {
-    let saved: string | null = null;
-    try {
-      saved = sessionStorage.getItem(NET_SWITCH_VIEW);
-      if (saved != null) sessionStorage.removeItem(NET_SWITCH_VIEW);
-    } catch {
-      return; /* storage unavailable — nothing carried */
-    }
-    if (saved != null && VIEWS.some((v) => v.id === saved)) setMode(saved as Mode);
-  }, [setMode]);
 
   const face = filterFace(filter);
 
@@ -322,8 +305,7 @@ export default function TopBar() {
           // A 3-zone grid at EVERY width (left cluster | view switch | right cluster) so the
           // switch is TRULY centred in the bar. Flex spacers only centre it when the side
           // clusters are equal-width — they never are (the phone measured the symptom first:
-          // ECG + filter ≈ 100px vs a 44px toggle pushed the switch ~28px right of centre) —
-          // and the NetworkSwitch made the right zone heavier still. THE SIDES ARE
+          // ECG + filter ≈ 100px vs a 44px toggle pushed the switch ~28px right of centre). THE SIDES ARE
           // `minmax(0,1fr)`, NOT `1fr` (user, 2026-09-28: "the view control must always be
           // centered by design"): a bare `1fr` is minmax(auto,1fr), which lets a heavier side
           // grow past its share and shove the switch off centre — the phone showed it the day
@@ -512,13 +494,9 @@ export default function TopBar() {
               The 2026-09-28 "VIEW" word went with it: it named the control's role because the
               centred cell had 74px, and A1 freed the room by moving About out of the bar. */}
           <span className="flex flex-col items-center gap-[3px]">
-            <span
-              key={doc ?? mode}
-              className={cn(
-                "flex items-center gap-1.5",
-                faceFrom ? cn("animate-in fade-in duration-300 motion-reduce:animate-none", faceFrom === "right" ? "slide-in-from-right-4" : "slide-in-from-left-4") : "roll-in",
-              )}
-            >
+            {/* THE NAME ROLLS SIDEWAYS ON THE ODOMETER'S CLOCK (user, 2026-11-09: "too fast (also for
+                the view selector)") — `SlideFace` has the grammar, shared with the register face. */}
+            <SlideFace id={doc ?? mode} from={faceFrom} clipClassName="py-0.5 -my-0.5" className="flex items-center gap-1.5">
               {(() => {
                 const Icon = VIEW_ICONS[mode];
                 return <Icon aria-hidden className="size-4 flex-none text-primary" />;
@@ -531,7 +509,7 @@ export default function TopBar() {
               <span className={cn("text-title font-semibold leading-none", strip === "views" ? "text-primary-ink" : "text-foreground")}>
                 {doc ? DOC_PAGES[doc].label : VIEWS.find((v) => v.id === mode)?.name}
               </span>
-            </span>
+            </SlideFace>
             {/* The pip row that sat here (2026-10-08) retired with the chevrons (user, 2026-10-18:
                 "has both … the <> is more intuitive"): two position cues were one too many. */}
           </span>
@@ -630,15 +608,12 @@ export default function TopBar() {
         </div>
         <span className={cn("w-px self-stretch bg-border my-1 max-[860px]:hidden", !viewControls && "hidden")} />
 
-        {/* SETTINGS — the shared trio (theme · pages · network) folded under ONE control
-            (user, 2026-09-08: "the right section gets busy with many icons; keep the
-            HUD/scene toggle and RAW, move the rest underneath a settings button"). The
-            2026-09-04 divider regrouping already said the scope split in hairlines; this says
-            it in weight — the view-scoped island, then one app-wide button at the bar's edge.
-            The network face's "never goes missing" rule survives on the trigger: the gear
-            carries the network CODE in the live accent off mainnet. One mount at EVERY width —
-            a single icon fits the phone bar, which the trio never did (the old strip-row
-            homes retired with this). */}
+        {/* SETTINGS — the app-wide settings folded under ONE control (user, 2026-09-08: "the
+            right section gets busy with many icons; keep the HUD/scene toggle and RAW, move the
+            rest underneath a settings button"). The 2026-09-04 divider regrouping already said
+            the scope split in hairlines; this says it in weight — the view-scoped island, then
+            one app-wide button at the bar's edge. One mount at EVERY width — a single icon fits
+            the phone bar. */}
         <SettingsMenu onAboutView={viewControls ? () => setStrip("about") : undefined} />
         </div>
       </div>

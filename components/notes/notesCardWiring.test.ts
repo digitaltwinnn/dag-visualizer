@@ -13,9 +13,7 @@ import { join } from "node:path";
 //     box's ONE edge on paper too (no slab box rule inside it);
 //   · Inspector asks the pure collapse module (`railCollapse.ts`, whose test drives the box
 //     invariant by outcome) rather than special-casing the notes slot inline;
-//   · History's notable days start FOLDED, and their rows mount only when opened;
-//   · notes are asked for on mainnet only, through the hydration-safe `useNet()` — never `NET`
-//     alone in render, which differs between the server (always mainnet) and a dev network.
+//   · History's notable days start FOLDED, and their rows mount only when opened.
 
 const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
 /** The source of one top-level function, from its declaration to the next top-level one. */
@@ -36,7 +34,7 @@ describe("the notes card is part of the stack", () => {
     // The collapse decisions are the pure module's (`railCollapse.ts`, tested by outcome); Inspector
     // asks it rather than special-casing the notes slot inline (review M4/M5).
     expect(src).toMatch(/setRailCollapseMany\(overridesOnViewEntry\(live\)\)/);
-    expect(src).toMatch(/const deepestId = subjectRunEnd\(ladderIds, presentOf\);/);
+    expect(src).toMatch(/const deepestId = subjectRunEnd\(ladderIds, presentOf[,)]/);
     expect(src).not.toMatch(/=== "notes"|!== "notes"/);
   });
 
@@ -206,7 +204,9 @@ describe("the notes card's own behaviour", () => {
     // A tag the AI's note produced wears the AI's edge (user, 2026-10-30).
     expect(chip).toMatch(/<QualifierChip className=\{AI_SWEEP\}>/);
     // The unlisted set keeps its mandated neutral: `identityHudCss` would hash it a saturated hue.
-    expect(chip).toMatch(/UNLISTED_ID \? UNLISTED_HUE : identityHudCss/);
+    // The rule's one home is `networkMark` (refactor round R1, P4), which the chip asks.
+    expect(chip).toMatch(/networkMark\(day\.networkId\)\.hue/);
+    expect(read("components/explorer/nodeRow.tsx")).toMatch(/key === UNLISTED_ID \? \{ label: UNLISTED_LABEL, hue: UNLISTED_HUE \} : \{ label: tickerOf\(key\), hue: identityHudCss\(key\) \}/);
     const stack = read("components/TrendStack.tsx");
     expect(stack).toMatch(/const marksById = useMemo\(/);
     expect(stack).toMatch(/marks=\{marksById\.get\(pose\.id\)\}/);
@@ -279,26 +279,6 @@ describe("the notes card's own behaviour", () => {
 
   it("draws ONE edge on both grounds: the slab's paper box rule is stated away on the box (review M1)", () => {
     expect(card).toMatch(/collapsed\s*\?\s*undefined\s*:\s*"[^"]*\[--box-rule:transparent\][^"]*"/);
-  });
-
-  it("asks for notes on mainnet only, the network read through useNet()", () => {
-    const body = fnBody(read("components/notes/useAiNote.ts"), "export function useAiNote(");
-    expect(body).toMatch(/const net = useNet\(\);/);
-    expect(body).toMatch(/subject && net === "mainnet"/);
-    expect(body).not.toMatch(/NET === "mainnet"/);
-    // The fetch goes through the one mainnet gate, which never runs it on a dev network's
-    // mainnet-faced first frame.
-    expect(body).toMatch(/useMainnetNote\(req\)/);
-    const gate = fnBody(read("components/notes/useAiNote.ts"), "export function useMainnetNote(");
-    expect(gate).toMatch(/const net = useNet\(\);/);
-    expect(gate).toMatch(/useNote\(NET === net \? req : null\)/);
-  });
-
-  it("a subject card's note stands only on mainnet, through the same gate", () => {
-    const src = read("components/notes/SubjectNote.tsx");
-    expect(src).toMatch(/useNet\(\) === "mainnet"/);
-    expect(src).toMatch(/useMainnetNote\(/);
-    expect(src).not.toMatch(/\buseNote\(/);
   });
 });
 

@@ -6,10 +6,9 @@
 import { dataTime } from "./liveAge";
 import { META_CATCHUP_MAX, chainNeedsCatchUp, chainToRecord, globalsToAppend, missedGlobals, nextCatchUpLimit } from "./liveMerge";
 import type { LiveAnswer } from "@/src/data/types";
-import { METAGRAPHS, netUrl } from "@/src/net/current";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
 import { mergeDagClusters } from "@/src/data/dagCore";
-import { COLORS, POLL } from "@/src/engine/config";
+import { COLORS, POLL, METAGRAPHS } from "@/src/engine/config";
 import type { Anchor, ClusterNode, DagCore, GlobalSnapshot, RawMetaSnapshot } from "@/src/data/types";
 import { activeRows } from "@/src/net/lineage";
 
@@ -82,6 +81,13 @@ const FEEDS = {
   // "per snapshot", not "each tick" (user, 2026-10-25: "what does 'each tick' mean?") — the read
   // fires once for every new global snapshot, and "tick" is code vocabulary no reader sees.
   exact: { label: "Snapshot reads", everyMs: null, when: "per snapshot", tempoMs: POLL.pollMs },
+  // The Blocks register's reads — its trail (/api/blocks/trail) and the block-bearing snapshots' full
+  // reads: read only while the Snapshots view is shown (either register: the switch states the Blocks
+  // span), the trail refreshed at the live edge every 30 s in Transaction blocks
+  // and every 5 min in the other registers (`blockRefreshMs`; the tempo below is the fast one, for
+  // the lane order alone), so it has no cadence of its own to go STALE on. Nothing polls beside it (the per-chain frontier read left with the open
+  // tips, D5 2026-11-07).
+  "api-blocks": { label: "Block reads", everyMs: null, when: "while shown", tempoMs: 30_000 },
 } as const;
 export type FeedId = keyof typeof FEEDS;
 const POLL_HEALTH = new Map<string, PollHealth>();
@@ -181,11 +187,19 @@ export interface MetaSnapRecord {
   height: number;        // the metagraph's OWN block-DAG depth
   subHeight: number;     // orders snapshots that share a height
   blocks: number;        // rare on mainnet; an honest 0 beats omitting it
+  /** The block hashes this snapshot accepted: the explorer lists them, the Blocks register draws them. */
+  blockHashes: string[];
   epochProgress: number;
   /** The chain the record is from, set only when it is not the map key it is filed under: a past
    *  window files a network's FORMER address under its current id (the chamber's lane), and a
    *  selection must still name the real chain (`src/data/pastWindow.ts`, review 2026-11-03). */
   chain?: string;
+}
+
+/** The block hashes a snapshot record carries. Only strings are hashes: an absent list, or a
+ *  non-string entry, is no hash rather than a fabricated one. */
+export function blockHashesOf(r: { blocks?: unknown }): string[] {
+  return Array.isArray(r.blocks) ? r.blocks.filter((b): b is string => typeof b === "string") : [];
 }
 
 /** One explorer metagraph snapshot as the rolling buffer records it (fee/size kept, blocks counted). */
@@ -195,6 +209,7 @@ export function metaSnapRecord(s: RawMetaSnapshot): MetaSnapRecord {
     ts: s.timestamp, fee: s.fee || 0, sizeInKB: s.sizeInKB || 0,
     height: s.height || 0, subHeight: s.subHeight || 0,
     blocks: Array.isArray(s.blocks) ? s.blocks.length : 0,
+    blockHashes: blockHashesOf(s),
     epochProgress: s.epochProgress || 0,
   };
 }
@@ -316,7 +331,7 @@ export class NetworkData {
     // chains a round trip after their list), so a slow upstream answers late rather than flapping.
     const t = setTimeout(() => ctrl.abort(), 10_000);
     try {
-      const res = await fetch(netUrl(path), { signal: ctrl.signal });
+      const res = await fetch(path, { signal: ctrl.signal });
       if (!res.ok) throw new Error(String(res.status));
       const json = await res.json();
       return { json, at: dataTime(Date.now(), res.headers.get("age"), json?.memoAgeMs) };

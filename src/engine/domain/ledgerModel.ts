@@ -32,7 +32,7 @@
 // nothing left to diff against. `_selectedSlot` itself still follows the quirk on the anchor-ful
 // path; only the reach crosses it.
 
-import { METAGRAPHS } from "@/src/net/current";
+import { METAGRAPHS } from "@/src/engine/config";
 import { ledgerSite, lanePlaneHalf, BAR_D, FLOOR_BACK_X, FLOOR_FRONT_X, LEAD_X } from "./ledgerLayout";
 import { UNLISTED_KEY } from "./ledgerBands";
 import type { GlobalSnapshot, Anchor } from "@/src/data/types";
@@ -123,6 +123,17 @@ export const frontAt = (x: number): number => {
   const over = (x - LEAD_X) / (FRONT_INK_X - LEAD_X);
   return over <= 0 ? 1 : Math.max(0, 1 - over);
 };
+
+/** THE FRONT RUN — the Blocks register's live-edge silence (spec "What the visitor gets" 2: "the
+ *  live edge is the silent stretch growing at the front"): the globals since the newest block tick,
+ *  drawn AHEAD of the lead row, from just past its bar (`FRONT_RUN_X0`) to the last x a row may put
+ *  ink (`FRONT_INK_X`). It stands ahead of the lead by design, so `frontAt` — which reads ahead of
+ *  the lead as pushed off — is not its fade: it RIDES the lead row, whole at rest, and as the rewind
+ *  pushes the trail forward by `off` it is gone by the time its far end `x1` reaches the rim, so no
+ *  ink is ever past the glass. */
+export const FRONT_RUN_X0 = LEAD_X + ROW_HALF_D + 0.2;
+export const frontRunAt = (x1: number, off: number): number =>
+  off <= 0 ? 1 : Math.max(0, 1 - off / Math.max(1e-6, FLOOR_FRONT_X - x1));
 
 /** Is a row at group-X `x` still ON the chamber — inside BOTH boundaries, so any of it is drawn?
  *

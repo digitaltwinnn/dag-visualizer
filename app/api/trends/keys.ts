@@ -3,6 +3,11 @@
 // Everything is UTC: explorer timestamps are ISO-8601 Z, and a bucket label must mean the
 // same instant regardless of which server derives it.
 
+/** THE STORE'S NAMESPACE — the segment every key of every family embeds (`t:mainnet:…`,
+ *  `geo:mainnet:…`, `stake:mainnet:…`, `ai:mainnet:…`). The store is shared by every deployment and
+ *  holds years of data under it, so it is a fixed string, never derived: `keys.test.ts` pins it. */
+export const STORE_NS = "mainnet";
+
 export type Tier = "5m" | "1h" | "1d";
 export const TIERS: Tier[] = ["5m", "1h", "1d"];
 
@@ -23,33 +28,33 @@ export function stepMsOf(tier: Tier): number {
 const p2 = (n: number) => String(n).padStart(2, "0");
 
 /** The (redis key, bucket label) a timestamp lands in, per tier. */
-export function slotOf(net: string, tier: Tier, tsMs: number): { key: string; bucket: string } {
+export function slotOf(tier: Tier, tsMs: number): { key: string; bucket: string } {
   const d = new Date(Math.floor(tsMs / STEP_MS[tier]) * STEP_MS[tier]);
   const y = d.getUTCFullYear(), mo = p2(d.getUTCMonth() + 1), da = p2(d.getUTCDate());
   const h = p2(d.getUTCHours()), mi = p2(d.getUTCMinutes());
-  if (tier === "5m") return { key: `t:${net}:5m:${y}-${mo}-${da}`, bucket: `${h}:${mi}` };
-  if (tier === "1h") return { key: `t:${net}:1h:${y}-${mo}`, bucket: `${da}-${h}` };
-  return { key: `t:${net}:1d:${y}`, bucket: `${mo}-${da}` };
+  if (tier === "5m") return { key: `t:${STORE_NS}:5m:${y}-${mo}-${da}`, bucket: `${h}:${mi}` };
+  if (tier === "1h") return { key: `t:${STORE_NS}:1h:${y}-${mo}`, bucket: `${da}-${h}` };
+  return { key: `t:${STORE_NS}:1d:${y}`, bucket: `${mo}-${da}` };
 }
 
-/** THE GEO FAMILY (2026-10-27) — where the fleet runs, one bucket per UTC day: `geo:{net}:{YYYY}`,
+/** THE GEO FAMILY (2026-10-27) — where the fleet runs, one bucket per UTC day: `geo:mainnet:{YYYY}`,
  *  fields `MM-DD|f.cc.<cc>`, `f.cc.<id>.<cc>`, `f.isp.<key>`, `f.isp.<id>.<key>` (`fleetGeo.ts`).
- *  OUTSIDE the `t:{net}:*` tiers on purpose, twice over: a rebuild WIPES that prefix
+ *  OUTSIDE the `t:mainnet:*` tiers on purpose, twice over: a rebuild WIPES that prefix
  *  (`scripts/rebuild-trends.ts`), and a gauge can never be re-derived — where nodes ran on a past
  *  day least of all; and `/api/trends` ships every series a tier hash holds, so History's payload
  *  would carry ~150 series it never draws. Keeps forever, like every tier. */
-export function geoSlotOf(net: string, tsMs: number): { key: string; bucket: string } {
-  const { bucket } = slotOf(net, "1d", tsMs);
-  return { key: `geo:${net}:${new Date(tsMs).getUTCFullYear()}`, bucket };
+export function geoSlotOf(tsMs: number): { key: string; bucket: string } {
+  const { bucket } = slotOf("1d", tsMs);
+  return { key: `geo:${STORE_NS}:${new Date(tsMs).getUTCFullYear()}`, bucket };
 }
 
 /** A PROVIDER'S CITIES (2026-10-31): the fleet by city and provider, `MM-DD|f.site.<cc>.<city>.<key>`,
  *  so a note can say "Hetzner lost 3 nodes in Falkenstein" from a measurement. In the geo family's
  *  keep-forever prefix but its own hash, one per month: it is the family's widest series and only
  *  the last week is ever read, so a note's yearly read does not carry it. */
-export function geoSitesSlotOf(net: string, tsMs: number): { key: string; bucket: string } {
-  const { bucket } = slotOf(net, "1d", tsMs);
-  return { key: `geo:${net}:sites:${new Date(tsMs).toISOString().slice(0, 7)}`, bucket };
+export function geoSitesSlotOf(tsMs: number): { key: string; bucket: string } {
+  const { bucket } = slotOf("1d", tsMs);
+  return { key: `geo:${STORE_NS}:sites:${new Date(tsMs).toISOString().slice(0, 7)}`, bucket };
 }
 
 /** DELEGATED STAKE PER VALIDATOR (2026-11-04): `MM-DD|f.stake.<v>`, `f.stakeAddrs.<v>`,
@@ -59,21 +64,21 @@ export function geoSitesSlotOf(net: string, tsMs: number): { key: string; bucket
  *  family's two reasons — stake has no upstream history, so a rebuild must never wipe it, and
  *  ~550 fields a day would ride every History payload undrawn — one hash per month, like the
  *  sites, so a reader of a week does not pull a year. */
-export function stakeSlotOf(net: string, tsMs: number): { key: string; bucket: string } {
-  const { bucket } = slotOf(net, "1d", tsMs);
-  return { key: `stake:${net}:${new Date(tsMs).toISOString().slice(0, 7)}`, bucket };
+export function stakeSlotOf(tsMs: number): { key: string; bucket: string } {
+  const { bucket } = slotOf("1d", tsMs);
+  return { key: `stake:${STORE_NS}:${new Date(tsMs).toISOString().slice(0, 7)}`, bucket };
 }
 
-/** `<v>` → `{ id, name }` (the full peer id and the operator's own name), one hash per network,
+/** `<v>` → `{ id, name }` (the full peer id and the operator's own name), one hash,
  *  so a reader can name a validator that has since left the registry. */
-export function stakeValidatorsKeyOf(net: string): string {
-  return `stake:${net}:validators`;
+export function stakeValidatorsKeyOf(): string {
+  return `stake:${STORE_NS}:validators`;
 }
 
-/** provider key → the lookup's provider name (`fleetGeo.ts` `providerNames`), one hash per
- *  network, so a reader can name a host whose nodes have since gone. */
-export function ispNamesKeyOf(net: string): string {
-  return `geo:${net}:isp`;
+/** provider key → the lookup's provider name (`fleetGeo.ts` `providerNames`), one hash for the
+ *  store, so a reader can name a host whose nodes have since gone. */
+export function ispNamesKeyOf(): string {
+  return `geo:${STORE_NS}:isp`;
 }
 
 export function fieldOf(bucket: string, series: string): string {
@@ -82,18 +87,18 @@ export function fieldOf(bucket: string, series: string): string {
 
 /** Every slot from `fromMs` to `toMs` inclusive, oldest first — the read side's enumeration. */
 export function slotsInWindow(
-  net: string, tier: Tier, fromMs: number, toMs: number,
+  tier: Tier, fromMs: number, toMs: number,
 ): { key: string; bucket: string; tsMs: number }[] {
   const step = STEP_MS[tier];
   const out: { key: string; bucket: string; tsMs: number }[] = [];
   for (let t = Math.floor(fromMs / step) * step; t <= toMs; t += step) {
-    out.push({ ...slotOf(net, tier, t), tsMs: t });
+    out.push({ ...slotOf(tier, t), tsMs: t });
   }
   return out;
 }
 
-export function cursorKeyOf(net: string): string {
-  return `t:${net}:cursor`;
+export function cursorKeyOf(): string {
+  return `t:${STORE_NS}:cursor`;
 }
 
 /** The cursor hash's field for when a run last READ a catalog chain, new records or none. Silence
@@ -110,6 +115,6 @@ export function chainReadsOf(cursor: Record<string, string | number> | null): Re
   }
   return reads;
 }
-export function lockKeyOf(net: string): string {
-  return `t:${net}:lock`;
+export function lockKeyOf(): string {
+  return `t:${STORE_NS}:lock`;
 }

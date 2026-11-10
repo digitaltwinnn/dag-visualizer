@@ -26,7 +26,7 @@ describe("the tour before the scene is up", () => {
 describe("the tour's progress bar", () => {
   it("moves the tour to the stop clicked, without the click ending it", () => {
     expect(briefing).toMatch(/const goTo = \(i: number\) => \{/);
-    expect(briefing).toMatch(/s\.setMode\(BRIEFING_STOPS\[i\]!\);\s*s\.setBriefing\(i\);/);
+    expect(briefing).toMatch(/showStop\(BRIEFING_STOPS\[i\]!\);\s*s\.setBriefing\(i\);/);
     expect(briefing).toMatch(/onClick=\{\(\) => goTo\(i\)\}/);
   });
 
@@ -94,7 +94,7 @@ describe("the tour's three-beat ending", () => {
 
   it("starts the scene only once the words are gone", () => {
     expect(briefing).toMatch(/if \(!moved && since >= BRIEFING_WORDS_OUT_MS\) \{/);
-    expect(briefing).toMatch(/s\.setMode\(BRIEFING_STOPS\[0\]\);\s*s\.setBriefingLanding\(true\);/);
+    expect(briefing).toMatch(/s\.setMode\(BRIEFING_STOPS\[0\]!\.mode\);\s*s\.setBriefingLanding\(true\);/);
   });
 
   it("brings the HUD back when the scene has landed", () => {
@@ -148,7 +148,8 @@ describe("the scene behind the tour", () => {
 
 describe("the tour's Skip", () => {
   it("is large and solid enough not to be missed", () => {
-    expect(briefing).toMatch(/h-10 rounded-full bg-foreground px-6 text-body font-semibold text-background/);
+    // …and it keeps a minimum width and never shrinks (user, 2026-11-08: it "becomes a circle sometimes").
+    expect(briefing).toMatch(/h-10 min-w-\[5\.5rem\] shrink-0 rounded-full bg-foreground px-6 text-body font-semibold text-background/);
   });
 });
 
@@ -192,7 +193,7 @@ describe("the tour's chrome", () => {
 
   // 320 wide: the line and a full Skip are 14 pixels more than the phone's row holds.
   it("narrows Skip on a phone, so the line beside it fits", () => {
-    expect(briefing).toMatch(/className=\{cn\("h-10 rounded-full [^"]*px-6 [^"]*max-\[700px\]:px-3/);
+    expect(briefing).toMatch(/className=\{cn\("h-10 min-w-\[5\.5rem\] shrink-0 rounded-full [^"]*px-6 [^"]*max-\[700px\]:px-3/);
   });
 
   it("sets that credit one step up the scale, in body type", () => {

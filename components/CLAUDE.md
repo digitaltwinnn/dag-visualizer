@@ -181,16 +181,16 @@ and its contents are view-specific examples that keep changing.
 
 **Top — the command bar.** One full-width glass bar, edges aligned with the rail columns: the ECG +
 wordmark + filter on the left, the view switch centered, and on the right the view-scoped pair
-(SCENE⇄HUD + RAW + ABOUT) followed by ONE settings gear (2026-09-08 — the theme/pages/network trio
-folded into `topbar/SettingsMenu.tsx`, labeled sections of one popover; their files are rows-only
-modules now. **The pages section left on 2026-09-28** — user: "doc pages are not settings"; the
-footer's About link is their one door. One state survives on the trigger by rule: the
-network CODE in the live accent off mainnet — "which chain am I looking at" never goes missing.
-One mount at every width; the filter strip's second row, the trio's old phone home, retired with it). The bar has **one grow-downward slot with four tenants** (a which-strip enum makes
+(SCENE⇄HUD + RAW + ABOUT) followed by ONE settings gear (2026-09-08 — the app-wide settings
+folded into `topbar/SettingsMenu.tsx`, labeled sections of one popover; `ThemeToggle` is the theme
+section's rows. **The pages section left on 2026-09-28** — user: "doc pages are not settings"; the
+footer's About link is their one door. One mount at every width; the filter strip's second row, the trio's old phone home, retired with it). The bar has **one grow-downward slot with four tenants** (a which-strip enum makes
 them mutually exclusive by construction): the FILTER button opens the network-chip strip (hovering
-previews the dim, picking closes it), **The phone face's name is a step up (title size) and SLIDES SIDEWAYS on a ‹ › press or a swipe**
-(user, 2026-10-19: "the text has the odometer effect while here it should animate horizontally") —
-`faceFrom` in TopBar; a pick from the list keeps the roll-in. **on phone the view switch is ONE face — the current view's
+previews the dim, picking closes it), **The phone face's name is a step up (title size) and ROLLS SIDEWAYS on a ‹ › press or a swipe**
+(user, 2026-10-19: "the text has the odometer effect while here it should animate horizontally";
+2026-11-09: "too fast") — a horizontal ODOMETER, `components/SlideFace.tsx`, shared with the register
+face: the old name leaves as the new one arrives, on `--tempo-roll` and `--ease-roll`, each travelling
+the mean of the two widths so they abut and never cross; a pick from the list keeps the roll-in. **on phone the view switch is ONE face — the current view's
 icon and name, FLANKED BY ‹ › since 2026-10-18 (Vercel analytics: three quarters of visitors on a
 phone and most never leaving "/"; the swipe and the pip row were the only hints that other views
 exist, and neither reads as a control — the chevrons step through the same `stepView`, dimmed at
@@ -369,14 +369,20 @@ lots and lots of buttons, lines and values … all the same padding and no very 
 and "what about design consistency??" when the first cut was History's alone). The CONTROL BAND
 is one full-bleed `--panel-plate` under the head holding what the reader SETS: the MEASURE
 CONTROL (`MeasureTiles` — every measure of the level named at once, glyph and word, the current
-one in the view switch's on-state; four sit two by two, seven 2 · 3 · 2 (`explorer/tileRows.ts`), two/three/six in three columns;
+one in the view switch's on-state; four sit two by two, seven 2 · 3 · 2 (`explorer/tileRows.ts`), two/three/six in three columns,
+and a set may state its own plan (`MeasureControl.rows`, `tileRows.planFor`): Hypergraph's is WHOLE OVER PARTS, 1 · 3 —
+"All nodes" alone on the top row, Consensus · Currency · Data under it (user, 2026-11-08: "nodes is a different shape
+because it's all of the other 3"; `hyperMeasure.HYPER_MEASURE_ROWS`);
 `MEASURE_ICONS` in `components/icons.tsx` is the one glyph map, keyed by measure id across the
 four measure modules — **ONE SEGMENTED CONTROL since 2026-10-25**, design pass: one hairline
 frame around the set, dividers between columns, a hairline between rows, the lit cell filled;
-user: the card "reads like lots and lots of buttons"), then the PATH, bare, directly beneath (the
-hairline between them left the same day — the control's frame already bounds it, and the band's
-rhythm tightened 8 → 6px; `ExplorerPath bare` — its own accent-tinted plate under the band was a
-third surface in a second tint; the house keeps its wash as the band's one accent mark). The list sits on the glass. The pager or span sits on the PLATE FOOT, full-bleed to the
+user: the card "reads like lots and lots of buttons"; **a tile shows its UNIT SYMBOL** where the
+measure is in one — a ticker or KB, the all-caps units — small and muted after the word, since the
+rows state bare figures and the tile is their one heading: user, 2026-11-08, "size control should say
+also 'kb'"). **The PATH stands on the glass directly above the list, not in the band** (user,
+2026-11-08: "it should be below the divider and attached to the row section" — it rode the band under
+the tiles from 2026-10-23 to then; `ExplorerPath bare`, the house keeps its wash as the one accent
+mark, and a level with one measure has no band at all). The list sits on the glass. The pager or span sits on the PLATE FOOT, full-bleed to the
 card's bottom edge, the right-rail foot's own device — and EVERY card ends in one: Hypergraph's
 and Geography's lists are the live poll, so their foot is the live atom (`explorer/LiveFoot.tsx`,
 `LiveDot` + "live"); Snapshots keeps "last N min" because there "live" is a SELECTION state
@@ -476,7 +482,14 @@ already IS that list over the span. Under a range the Moment's ‹ › steps the
 (`rangeBuckets` — the charts trim the part-buckets at the edges, so they are no moments), through
 the executor's `trendCursor` action, and the Range's next ghost opens its first moment. The Moment's
 lead is the same sentence shape for one bucket (`momentPhrase`: "DED anchored 7 snapshots in those
-5 minutes" — never a rate, never a rank).
+5 minutes" — never a rate, never a rank). **Its Start and End are DRAWN** (`inspector/RangeSpark.tsx` over the Moment's
+`Hairline`, design H, 2026-11-09): the subject's line over a FRAME around the range (`rangeSpark.rangeFrame`,
+a window pill ending now), the range in full ink and its dates under its ends. **The dates show while
+the line loads** (user, 2026-11-10): the box stands at once at the line's own height, the range's band
+and its two dates — the span's own, no fetch — placed by the span's FRACTIONS of the frame
+(`rangeSpark.pendingPlacement`), muted like the acquiring state, no ink; the line draws in over them
+(the frame's own start date waits for its buckets). A frame that measured nothing, or a failed read,
+still draws nothing. The caption row is one line tall whatever it holds, so nothing jumps.
 
 **The Metagraph card is the committed subject's network, in every view** (2026-10-18, one rule
 after the user asked for Geography's node to "also populate the dossier card"): Snapshots' is the
@@ -572,7 +585,8 @@ pointermove. Three rules are worth knowing before touching it:
   made inside the layer clears it too. Closing the log used to strand the reader in Snapshots.
 
 **The motion hint says what the scene is doing while it moves** (user, 2026-09-26 — `MotionHint`,
-one quiet sentence on a low plate, centred just under the command bar). Two store channels, and nothing else feeds it.
+one quiet sentence on a low plate, centred just under the command bar — or one line lower, under the
+register switch, where the view offers more than one register: D3). Two store channels, and nothing else feeds it.
 `sceneMoving` is ENGINE → REACT: the Engine's `_publishMotion` derives it each frame from the four
 structures that already drive motion — `ViewTransition.active()`, `CameraDirector.flying`, the
 controls' `sceneDragging`, and `TrendStackSync.settled()` where the view has a stack — and writes it
@@ -792,8 +806,7 @@ the rung's FIRST child. That one unique job moved into the **NEXT GHOST**: the g
 the deepest committed rung IS the step — a click commits that rung's first child — the first row of
 the explorer's own list for that level (`src/data/ladderLevels.ts`, read by `childStep` through
 `useSiblingState`) through the one executor, and the ghost becomes the real card (user, 2026-10-07;
-the three quick picks it opened to on 2026-10-04 are retired). A metagraph snapshot's next ghost
-opens its first validator (`snapshotSignerRows`, the explorer's signer order). Only a ghost with no
+the three quick picks it opened to on 2026-10-04 are retired). Only a ghost with no
 committed parent above it is a true ghost: it opens to its hint and offers no choice. The plank is `‹` at the card's left edge, the
 position squares centred, `›` at its right edge — the position DRAWN, never written: one small square
 per sibling with the current one lit, a set past fifteen sliding a fifteen-wide window whose ends
@@ -866,7 +879,12 @@ the dossier's ticker; "AI notes" stays the code's and these docs' name for
 the slot. **The top card is the VIEW's note on the metagraph card's network** (`metagraphCardNetwork`:
 everything, the filtered network, or the network a committed node or tick belongs to) and does not follow a drill — a country, a provider or a
 brushed range is a subject with a card of its own, below (user, 2026-10-29); History's top card is
-the window pill's note always. Every view that has a note (`viewPolicy.aiNotes`) leads its
+the window pill's note always. **A register reads its own note** (2026-11-06): in the Snapshots view's
+Blocks register the top card is the block DAG's note (view `blocks`, the whole network's whatever the
+rung stands on), the Metagraph snapshots and Data blocks registers keep the ledger's (Data blocks' records
+ARE metagraph snapshots, D6) — `REGISTER_NOTES` in `noteSubject.ts`,
+read only where the view's policy offers the register, and the Briefing's stops ask through the same
+derivation. Every view that has a note (`viewPolicy.aiNotes`) leads its
 display lane with the `notes` slot (`DISPLAY_LANE` in `railCards.ts`), and the manifest leads with it
 too. It is **not a rung**: no ladder level, no camera pose, never in `selStack`, a static subject
 key so a view switch never lights the tray, and `isSubjectSlot` says no. So it is the FOCUS only at
@@ -927,10 +945,10 @@ inside the card, "not embedded enough"): no box, no fill, no edge, the mark unde
 mark and the words on the title's column, no label row, and the head's rule stands down while it
 stands (`data-note-lead`), so a card with no note keeps its rule. The mark and the writing say AI. `aiSweep.ts`
 is the chips' ring alone. The note's place shows "reading…" while the note is in flight (ONE word, user 2026-10-30: held or still
-being written is the cache's business); `none` and off-mainnet render
+being written is the cache's business); `none` renders
 nothing (no note to have), and `unavailable` renders "no note right now", muted, with no door (user,
 2026-10-30: the Gate refused a brushed range's write and the note was simply missing for the 15
-minutes `FAIL_TTL_S` remembers it; a card with no lead and no reason read as broken). **A note's network names wear their colour** (user, 2026-10-31; `src/data/noteNames.ts`, `NoteText`): code finds them against mainnet's catalog after the note is written, whole words, full names, tickers of three letters or more and two hand-picked short forms, never "333 DAG" the amount; the text ink (`IDENT_INK`), same weight, no link. **A note writes itself in** (user, 2026-10-31: "appear letter by letter as if it's written by the
+minutes `FAIL_TTL_S` remembers it; a card with no lead and no reason read as broken). **A note's network names wear their colour** (user, 2026-10-31; `src/data/noteNames.ts`, `NoteText`): code finds them against the catalog after the note is written, whole words, full names, tickers of three letters or more and two hand-picked short forms, never "333 DAG" the amount; the text ink (`IDENT_INK`), same weight, no link. **A note writes itself in** (user, 2026-10-31: "appear letter by letter as if it's written by the
 AI", the AI card and the cards' notes alike; `TypedNote`, `typedNote.ts`): at most 2.4s, only for a note the
 reader watched arrive, never for one already held and never under reduced motion. The full text
 holds the height invisibly, so the card grows once, and a screen reader gets it whole. **A head with
@@ -979,7 +997,9 @@ the order is the country's; another header sort flattens it), Hypergraph's phone
 History's records by UTC day. One component draws every plate (`datasection/GroupToggle.tsx`,
 shadcn's data-table pattern: a native button with `aria-expanded`, since Radix Collapsible cannot
 wrap table rows). A plate whose group is a SUBJECT the raw layer may commit — the global snapshot
-— selects and releases it on a click and folds on its chevron; every other plate (country,
+— selects and releases it on a click and folds on its chevron (the global snapshot's plate itself,
+its number, LIVE / PINNED mark and age, is ONE component, `GlobalGroupPlate`, beside it, which the
+anchor log and the Blocks table both draw); every other plate (country,
 network, day) ONLY folds. ⚠️ **A plate never reloads its own list**: History's day plate committed
 the day as the range for an hour, which re-read the records at a finer tier under the click
 ("the whole dataset changes … looks different from what I clicked on"). Groups fold by default
@@ -1039,15 +1059,291 @@ flashing a false invite. The ghost only appears where the view can actually prod
 
 **The rail browses in Hypergraph and Geography** (user, 2026-10-31: "open the 1st of that set and allow left/right swipe without setting the filter"): the Metagraph ghost opens the first network (`ROOT_OF`, `rootStep`), unless a node is held, a swipe steps that list, and what hangs under it reads the same network, all without writing the filter. The store's `railNet` holds it and `domain/viewNetwork.ts` is the one reading: the card, the scene, the explorer, the band and the callout stand on it, the top bar and the accent hue stay the filter's. A real filter commit replaces it, the card's × releases it, and leaving the view clears it without dropping what was selected under it. **A card speaks only in a view whose lane holds it** (user, 2026-10-31, option B of four, replacing a
 hairline above a full card running off the rail): `detailsCards` states a card off its view's lane
-as absent, so a node carried into History leaves the rail. In Snapshots it stands when it was picked
-there or signed the metagraph snapshot on screen (`nodeHereOf`). The SELECTION is untouched, so going
-back restores the card, as the placeholder views do; a pinned snapshot needs no such rule, since
-leaving Snapshots clears the pin. **Ghosts sink** (same day, option B of four): chosen cards close up
+as absent, so a node carried into History leaves the rail — **and into Snapshots** (user, 2026-11-08:
+"remove the node card entirely from the snapshots view"; it stood there when picked there or when it
+signed the snapshot on screen, `nodeHereOf`, from 2026-10-31 until then). The chamber's subjects are
+the snapshots and what they carry; a node is a signer, stated as the snapshot card's "Signed by N L0
+validators" — the explorer's signer level left with the rung (user, 2026-11-09: "remove it also from
+the explorer level"), so a metagraph snapshot is the explorer's leaf and it rests on the snapshot list,
+the row lit. The ledger's ladder has no node rung (`LADDERS.ledger`), a tray chip's click commits
+nothing (`clickActions`: a node commits only where the view's ladder has the rung), and the metagraph
+snapshot is the lane's last rung (no child step). The SELECTION is untouched, so going back restores
+the card, as the placeholder views do; a pinned snapshot needs no such rule, since leaving Snapshots
+clears the pin. **Ghosts sink** (same day, option B of four): chosen cards close up
 at the top and the ghosts wait below in lane order, the next step's ghost first (`displayOrder`), so
 a ghost can never split the stack. The lane stays the ladder's one order; this is only its layout.
 **And the Snapshots explorer's held head is the PIN itself** (same
 day: "put it on the 1st row and directly show x newer") — it froze at the newest tick on screen
 from 2026-10-02; `src/data/ledgerHold.ts`.
+
+**The Snapshots view's registers are one control and four surfaces each.** Three registers since D6
+(2026-11-07, user: "Threeway."), named on the switch **Metagraph snapshots | Transaction blocks | Data
+blocks** (`REGISTER_NAMES`, `components/views.ts` — user: "Since they all converge into snapshots, the
+control 'snapshots' should be 'metagraph snapshots'"; the VIEW stays "Snapshots"; "Blocks" in code and
+below is the Transaction blocks register). The explorer's title is the VIEW's axis word, "Snapshots"
+(the global snapshots it lists), in every register — the switch names the register's subject, the
+title does not repeat it (D6 carry ruling). The register
+switch stands ON THE SCENE (D3, 2026-11-07 — option A of the user's mock,
+`components/RegisterSwitch.tsx`): one glass segmented control centred under the command bar, each
+half carrying its own SPAN ("Metagraph snapshots · last 11 min", "Transaction blocks · last 14 h",
+"Data blocks · last 11 min" — it reads the snapshots' source, so the same words; a pinned stretch names
+itself, "9 min, 3d ago"; a window not held says its state in a word — "reading…", "not read", "not
+reached") **and, beside a stretch, its COUNT** (user, 2026-11-07: "last 9 min | 52 snapshots, last 15
+days | 53 blocks"): what fills the stretch — the source's ticks for the two snapshot registers (the live
+buffer's fixed depth, or the past window's), the window's blocks for Transaction blocks
+(`ledgerSpan.countWord`; none beside a read state; desktop only — on a phone the lit half's full words
+already reach the gutters). **The second line is TWO GLYPHED READINGS and no divider** (user,
+2026-11-08: "too much text … '8 mins' and some range icon? | is just text" — design option A of four):
+a clock glyph before the BARE span ("8 min", "16 h" — `SpanOpts.bare` drops "last", the clock says it;
+a pinned stretch "9 min, 3d ago" and a read state keep their words) and the register's own glyph
+before the BARE count ("244", a floor "37+", `ledgerSpan.countFigure`), a gap between them — a typed
+`|` read as text and a hairline rule vanished on the glass. The name line says what is counted, the
+glyphs carry the units, and the button's accessible name keeps every word ("Transaction blocks, last
+16 h, 55 blocks"); the explorer's foot keeps "last". **The state mark's room is reserved on every half**
+(same day: the frame's width shifted with each switch, since only the lit half rendered the mark and the
+halves are equal columns as wide as the widest): an unlit half carries it invisible. **The lit station is a WASH, not a frame** (user,
+2026-11-07, design round: option 5 without the underline): the unlit halves' second line recedes
+(`opacity-75`), the lit half carries the selection wash alone — no inset ring — its name and count in
+the accent, its span in the foreground ink, **and the state mark as the third column of its readings
+row**, after the span and the count, its room reserved invisibly on the unlit halves (`StateMark`: the
+live dot and its word, or the pin — user, same day, option 2 "with the 'live' text also"; it ended the
+name line until 2026-11-09: "Move the live / pinned indicator … to the bottom row, so a 3rd column
+there" — the phone face reads the same; and the same day, "if live mode … is not applicable have the 2
+columns centered": the row is two layers in one grid cell, an invisible sizer holding all three columns
+so the halves stay equal, the visible row centred over it with the mark on the lit half alone, `mt-1`
+under the name): one live mode per view, read per register — the newest global (and the filtered network's
+newest snapshot) in Metagraph snapshots and Data blocks, the newest block (and its global) in
+Transaction blocks — so the register's own half says which state its subject is in. **Each half counts ITS OWN
+SUBJECT** (user, same day: "its subject is metagraph snapshots, count those instead of global, same
+for data blocks"): the metagraph snapshots the source's ticks anchored (the feed's per-tick count,
+"333 snapshots"), the data blocks their exact reads carry (`dataStats.dataBlocksInWindow`, a labelled
+floor "77+ data blocks" while reads are landing — rule 10), the window's blocks ("52 blocks"). **On a phone the switch is ONE FACE with ‹ › either side** (user, 2026-11-08, option A of the
+brainstorm's `phone-register-switch.html` — the phone view switch's own grammar one row down): three
+halves never fit 360px (from D6 to then the unlit ones were cut to a glyph and a short span and still
+crowded the row), so the face carries the lit register WHOLE — glyph, name, live / pinned, the clock
+span and the count, the desktop half's exact content — and the chevrons step the registers in the
+view's order through the one door, dimmed at an end, the view face's own chevron (`TopBar`'s
+`viewChevron`: 24px box, 16px muted glyph, `TOUCH_HIT`), the face rolling in from the side it came
+from on the view face's horizontal odometer (`SlideFace`). **The face rests UNWASHED** (user,
+2026-11-09: "it keeps the focus while idle"): the selection wash marks the lit station among three
+on the desktop; on a lone face it read as a pressed button that never let go — the glyph in the
+accent and the name in the foreground ink, as the view face. No pip row: the view face retired its pips for the chevrons (user, 2026-10-18: "has both … the
+<> is more intuitive"). Both presentations stay in the DOM and CSS picks at 700px. The glyphs are `REGISTER_ICONS` (Data blocks wears `Database`: the metagraph
+kind "data" wears `Blocks`, the transaction block's own mark). The span words are
+`src/data/ledgerSpan.ts`'s, the ONE home the explorer's foot reads too
+(`ledgerSpan.test.ts`), and the Transaction blocks half reads the block window from every register
+(`blockWanted` holds the live window across the whole view — read again every 5 minutes outside
+Transaction blocks, where the half needs only its reach, every 30 s inside it: `blockRefreshMs`). Its cells are the view's
+`viewPolicy.registers`, shown only where the row offers more than one; it waits out a view transition
+(`motionPhase`), the motion hint drops `REGISTER_SWITCH_H` beneath it, and `#register-switch` is a
+marker contract — a callout's free band starts under it (`ChromeBounds.sceneTop`). The explorer card's
+control band holds only the measure tiles (its `control` slot went with the switch). A press goes
+through `switchLedgerRegister`, the one door (`selectionBoundary.test.ts` holds every surface to it),
+and the URL follows (`/snapshots`, `/blocks`, `/data-blocks` — `REGISTER_PAGES`, the one map the
+routes, the sitemap, the footer's "Transaction blocks" and "Data blocks" links and `RouteSync` read;
+`views.test.ts`). A switch releases what the register entered cannot draw: only Transaction blocks
+releases the metagraph snapshot, and either other register releases the block — Data blocks' subjects
+are the Metagraph snapshots register's own (`metaSnap`, `tickNet`, the pin).
+**LIVE in this register follows the newest BLOCK** (D3, user: "live mode should be applied to the
+block and not the snapshot"): while following, `followLatest` (FollowController's heartbeat — every
+global, anchor and block-window change) seats the window's newest block of its network
+(`blockWindow.newestBlock`) and its accepting global through the non-bumping `advanceBlock` /
+`advanceSnap`; **a block hovers like everything else** (`hoverSubject.tooltipSubject`'s `block`
+kind, 2026-11-07 — user: "blocks are missing a hover card"): the hover card wears the block mark in
+the chain's hue, the chain's ticker as the identity and the short hash, mono; the Block card is TRANSFER-LED (design round pick T1, 2026-11-07): its lead says only
+how much moved ("Moved 19K DAG", "… in 3 transfers" — no addresses, user: the sentence was "already
+shown in the table below"), the transfers are its one table — FROM · TO · <unit> under caps headers,
+each address a short mono token, the amount right-aligned, no per-row fee (Fees paid sums it) —
+"Signed by N L1/cL1" and Fees paid are its facts; Parents and Children in view left the body (the scene draws the DAG, the foot
+keeps the parent hashes). The explorer's committed block row carries the LIVE / PINNED mark the tick
+rows carry (user: "'live' is fine in the header but is not shown in the explorer"). Its head carries the LIVE / PINNED control (`FollowControl subject="block"`,
+its write `blockFollowActions`), the Global snapshot card keeps only its age there WHILE A BLOCK CARD
+STANDS — with none (a pin carried in from another register, the block's ×, a re-click releasing it)
+the Global card carries the control again (`blockWindow.liveControlCard`, review I1: else nothing said
+PINNED and nothing offered LIVE) — a click on the live block PINS it, and the Block card is the register's SEAT: the card the AI note folds onto, ahead of a NETWORK FILTER's card
+(user, 2026-11-08: under a DOR filter the Metagraph dossier opened as the box and pushed the live
+block out of the rail; the filter is a lens there, so its card stands folded above the block) (`focusSlotId`;
+the register is entered on its note — **A REGISTER OPENS ON ITS NOTE**, below). Pinned by
+`src/store/followFlow.test.ts`'s Blocks cases, `selStack.test.ts`, `railCards.test.ts` and
+`railCollapse.test.ts`. **A pin keeps saying PINNED while the feed is down** (ruling, 2026-11-07,
+both subjects of `FollowControl`): the pin is a selection fact an unreachable feed does not change, and
+the feed's own state is the pulse strip's; only a control with nothing pinned, which would otherwise
+claim LIVE, says "no signal". **Its callout is the BLOCK's** (user: "no snapshot callout but a block
+callout"): one label on the Block card's subject, in its head's grammar (mark, short hash — `shortBlockHash`, `src/util/format.ts`, the ONE short form a block hash takes in the card's head, the callout, the explorer's and RAW's rows — the AGE chip (user, 2026-11-08: "instead of 'height' use the 'x seconds ago' tag" — the accepting global's age on the shared clock, the Global card's own register; the height is a fact row),
+live / pinned, then `blockLead`'s SHORT form — how much moved, no from/to; user, 2026-11-07), anchored at the block's place in the chamber
+(`LedgerView.selectedBlockAnchor`, layout data plus the rewind offset). In Blocks the explorer lists the window's blocks, and the
+Block card (`inspector/BlockPane.tsx`; its eyebrow, ghost, callout and pick title say "Transaction block" — user, 2026-11-07) stands under its tick: a card slot with NO rung, between the
+metagraph snapshot and the node in the ledger's lane (`DISPLAY_LANE`), present only in the Blocks
+register and only IN ITS PLACE (`parentHolds` → `pickActions.blockInPlace`, 2026-11-08: a DAG block
+under the global alone, a token block under its own snapshot — the one rule the releases, the ghost's
+step and the card share; `src/engine/domain/CLAUDE.md`), its ghost hint "one on a bar or a
+tile". **A register's tick levels list ITS subjects** (`ledgerMeasure.REGISTER_SUBJECTS`, the same day
+— the Global card's next ghost offered DED under a tick whose only blocks were the DAG's): every
+anchored snapshot in Metagraph snapshots, the block-carrying ones in Transaction blocks (the block
+window's `tickBlockSnaps`), the data-carrying ones in Data blocks — `ladderLevels.registerNetworks`,
+read by the explorer's level, the Metagraph card's pager and the tick ghost's step alike, and the
+scene's tiles are the same row (`LedgerView`'s cargo reads it), so no surface lists a snapshot the
+chamber does not draw. **Under a committed block the Metagraph snapshot slot is card or nothing** (user, 2026-11-08:
+the two cards "switch places" — a DAG block commits no snapshot, and the slot's ghost dropped below
+the block card, since ghosts wait under the chosen cards): a token block's snapshot is present, a DAG
+block's slot shows no ghost, so the lane holds still. **No Node card there** (user, 2026-11-07: "node is really out of place in this view") —
+nor anywhere in the view since 2026-11-08 (above). **A REGISTER OPENS ON ITS NOTE, AND THE NOTE
+FOLDS ONTO ITS SEAT** (user, 2026-11-09: "Each view opens on the Gate AI cards, each sub-view should
+do the same. The 'default' callout should be a 'metagraph snapshot' | 'transaction block' | 'data
+block', when we close the AI card … the actual called out subject should be shown" — superseding
+2026-11-08's "transaction block is the best card to open when we enter this view/mode"; then, the
+same day: "changed my mind, for view-mode metagraph snapshots and data blocks the default callout when
+AI cards is shown should be the global snapshot"). The card under the note is `REGISTER_REST`
+(`src/store/mode.ts`): the GLOBAL SNAPSHOT in Metagraph snapshots and Data blocks, the live BLOCK in
+Transaction blocks. A register switch is an ENTRY like a view's (Inspector counts it as one, so
+`overridesOnViewEntry` pins the note open); the note is the box while nothing is chosen
+(`focusSlotId`) and the callout names the rest card meanwhile (`calloutSubject`'s rest rule); the
+note's − opens the card under it (`overridesOnNoteFold`, the focus the lane has without its note —
+`useLadderFocus(true)`), so the callout and the box never disagree. `REGISTER_SEAT` stays what the
+live follow seats (the block, the data block) and the lens-proof box under a filter. The store's `setLedgerRegister` drops the tick's rank on the way in, so a Global snapshot
+card carried in is not the card under the note. A block is a sibling subject of the
+tick, not the snapshot's child — so **its ghost has a step of its
+own** (`railSiblings.blockStep`, 2026-11-07, user: "when clicked nothing happens"): the shown tick's
+first block from the window (`useSiblingState`'s `tickBlocks`), through the block click's builder,
+and the ghost keeps its lane place — `railCollapse.displayOrder` promotes the next-step ghost but
+never past another step ghost (user: the node "sits above it"). Data blocks has no block slot: a
+data block has no identity to select (not indexed, no parents, counted by the exact read), so its
+subject is the snapshot's tile with the mark, and the Metagraph snapshot card's Data tab says the rest. Its six slots read only what is
+held — the height as the head's chip; what it moved as the lead, ONE transfer named from → to in
+short addresses (`midHash`), several counted; several transfers as the breakdown, one row each
+from → to · amount · fee (`BlockRead.transfers`); parents, CHILDREN IN VIEW (a count within the
+window's held reads, labelled so, never a total), signatures and fees as facts; the hashes in the
+foot — and no sub-height (a `BlockRead` carries none); `railCards.test.ts`'s block cases pin the
+slot. **The Blocks level's Amount and Fees count ONE chain** (user, 2026-11-10): a block's amount
+and fee are in its chain's unit, so the list bars and states only the window's own network's —
+the DAG's under All and the DAG filter, the token's under its filter (`blockMeasure.blockMeasureCounts`,
+the band MOVED's rule, `movedChainOf`); under All a token block's row states neither (no bar, no
+figure) and the two tiles say "DAG only" (`blockMeasureUnit` — the tile grammar's unit symbol takes an
+"only"), the ticker under a filter; the set's row plan is Amount · Fees, then Height
+(`BLOCK_MEASURE_ROWS`), so the tag never cuts a name. The explorer's Blocks level states its one FLOOR on the heading row ("The DAG and the listed
+networks; unlisted networks' blocks are not read" — the trail reads the listed transfer lists only),
+and under it, where a token chain's walk was cut by its page cap (`BlockWindow.partial`), the blocks
+not reached ("Older DOR blocks are not reached"). Under a network filter the window is that
+network's own blocks (`src/data/CLAUDE.md`), so its span can read "last 15 days"; under the unlisted
+filter the list, the band and RAW say "Unlisted networks' blocks are not read" (the list's empty state
+says it, so the heading's floor line stands down — once, not twice). Every way the block window is
+not here — not read, not reached, a failed read (around a pin or live), reading, a window holding no
+block — is ONE sentence on all three surfaces, `ledgerSpan.blockAbsence` (beside the span words).
+A filter holds the rows as it holds the chamber: a block whose accepting global the filter's
+network is not in answers nothing — no commit, no hover, faint — in the explorer and in RAW
+(`ledgerStory.blockRowLocked`, the tick rows' `tickLocked` and `Picking.tickHeldOut`'s rule). The vitals band swaps to `BlocksCells` and RAW to `datasection/BlocksTable`. The band's swap key
+is the view, or `"ledger:blocks"` in that register (`useCellsKey` in `VitalsBand.tsx`, the one dispatch
+for band and phone sheet, so the swap rolls). Its four cells (design round D5, 2026-11-07 — user: "do
+your suggestion for vitals") are pure arithmetic in `src/data/blockStats.ts`: **BLOCKS**, the window's
+block count with a per-hour sparkline across its span; **MOVED**, the sum of its blocks' transfer
+amounts from LANDED reads only (each read's own `amount`, the decoder's transfer sum; `movedInWindow`; "12 of 30 blocks read" under the unit while any is
+pending or missed, an hour holding an unread block a gap in its sparkline) in ONE unit — the DAG's own
+under All or the DAG filter, labelled "DAG", since a sum across tokens would add unlike units, and the
+token's ticker under its filter (`tickerOf`, the Block card's home); **BY NETWORK**, a `MicroBars`
+share of the window's blocks per network in the catalog's order, named and hued (`nodeRow.networkMark`,
+the one label-and-hue rule, the unlisted set's neutral included), past four rows folded by
+`bandParts.foldOther` (Geography's regions and Data blocks' BY NETWORK fold through it too), one row under a
+filter; **LAST BLOCK**, the age of the window's newest block in `ageWords` (seconds under a minute) beside
+its network. BLOCKS and
+MOVED state the window's reach in the aside, the register switch's own span words (`blockSpanWord`); a
+window pinned around a past time is read as that window (its frame ends at its newest tick), and only
+LAST BLOCK, a claim about now, says "Window pinned to a past time". The window lists only
+block-bearing global snapshots, so an hour with no tick is zero blocks; a bin wholly older than a FULL
+(or cut) window's oldest tick is a gap, and a full window that does not reach back an hour states
+BLOCKS as a floor, "at least N" (rule 10). The DAG's height is not on the band: the Block card's chip
+and the note state it. No tip is shown anywhere (user: "Open tips remove it from the AI note and also
+from the vitals"). RAW lists ONE ROW PER
+TRANSFER (D3, user: "per transfer is useful" — `BlockRead.transfers`): FROM · TO · AMOUNT · FEE · BLOCK
+· ACCEPTED INTO, grouped by accepting global with the log's own `GlobalGroupPlate` (the plate
+commits/releases the global, the chevron folds); a block whose read has not landed lists one row
+"reading…", a failed read says "read failed", and the phone keeps from, to and the block (the measures
+are the card's). A row's click commits its block (`blockSelectActions`), the committed block's rows
+say LIVE or PINNED in the state species, and its group starts open. The Block card's door is `trendDoors.openBlockRecord` (spends any armed `logSeek`,
+so a door after a door inherits nothing). Pinned by `src/data/blockStats.test.ts`,
+`components/feedReadBoundary.test.ts` (`api-blocks` readers hold the feed) and
+`components/rawSurfaceBoundary.test.ts` (the register compare stays inside `RecordsSurface`).
+
+**WHICH SUBJECT THE SNAPSHOTS VIEW LABELS ON THE SCENE is one pure decision**
+(`src/engine/domain/calloutSubjects.ts`, 2026-11-07 — user: the Data block "has no callout yet", and
+in Transaction blocks the block label stood "even if the metagraph rung is selected … needs proper
+code and testing"): `SceneCallout` draws the model it names and `CalloutSync` anchors the same
+subject, so neither owner carries a chain of its own. **ONE LABEL, THE BOX'S** (user, 2026-11-08: "Two
+callouts is too much in the snapshot view, 1 callout that relates to the subject, nothing else" — the
+pair's second label on the global's bar, 2026-10-03, is retired with `#callout-2`): the open card's
+subject — the Global snapshot card's bar, the Metagraph snapshot card's tile, the Transaction block's
+place, the Data block's mark, the Metagraph card's lane (else the snapshot inside it, else the global);
+with no subject card open, the register's live subject — the newest block in Transaction blocks (no
+global is drawn there, D3), the global snapshot in the other two. Its test is the matrix.
+
+**The Data blocks register (D6, 2026-11-07) is the Metagraph snapshots register's surfaces with the
+DATA leading.** The global snapshot's scene label speaks the register's subject there (user,
+2026-11-07: "snapshot anchor should show information related to the sub-view"): "10 data blocks" with
+a "23 updates" chip from the exact read (`SceneCallout`'s `dataLead`, keyed on
+`REGISTER_MEASURES[register].dataOnly`; under a committed network, that network's own; NO lead until
+the read lands — never the other register's anchors fact, user 2026-11-07 on a reload), where the
+Metagraph snapshots register says "N metagraph snapshots" and its size. **The DATA BLOCK card**
+(`inspector/DataBlockPane.tsx`, 2026-11-07 — design round pick D2, "the batch"): the register's
+own slot under the Metagraph snapshot (`DISPLAY_LANE.ledger`, after `block`, the lane's last; a
+subject of its own, not the snapshot's child rung), present in Data
+blocks alone and only under the snapshot that carried it (`parentHolds`), named by its place in
+that snapshot ("3 of 10"), its UPDATES BY KIND as the body, "Signed by N dL1 validators" and Size as
+facts (a fact row, as the global and metagraph snapshot cards state theirs), a "Block records" door onto the snapshot's RAW record, and a foot with the
+snapshot's ordinal and the DIGEST (`DataBlockSummary`, never a hash). Its ghost's step is the pinned
+snapshot's first data block (`railSiblings.dataBlockStep`), its pager EVERY data block of its global snapshot,
+across the tick's data-carrying snapshots, oldest snapshot first — a step into another snapshot commits
+it, the click's own builder (`siblingSet("dataBlock")`; user, 2026-11-09: "ensure they have the range to
+swipe of >1 blocks in its parent global snapshot" — it paged its own snapshot only, and the Block card
+had no pager at all: `siblingSet("block")` now steps every block of the tick), **and LIVE seats it** (user, 2026-11-08: "entering data blocks, open the
+data block card"): the register's follow rides the live snapshot's FIRST data block through the
+non-bumping `advanceDataBlock`, as Transaction blocks rides its newest block, so the Data block card
+is the register's seat (`REGISTER_SEAT`, `src/store/mode.ts`, the one home of which subject a register's
+live follow seats; the card under the note is the global snapshot's, `REGISTER_REST`); a reader's step to another block holds, and a release re-seats on the
+next beat, the live block's own rule.
+**The Global snapshot CARD's body opens with the register's section too** (user: "work on the global snapshot body also"):
+`inspector/SnapshotRegister.tsx` (the design round's picks, data 1 / transaction 1) —
+`BlocksAnchored` in Transaction blocks: "Accepted N blocks" and THE BLOCKS THEMSELVES as rows
+(the explorer's block row: ticker in its hue, short hash, amount moved — a dash until the read
+lands) — READINGS, not doors, like every breakdown row (user: the block rows were "clickable /
+colored" where the others are not), the committed block highlighted in place in its hue; `DataAnchored`
+in Data blocks: "Carried N data blocks with M updates" and a DATA UPDATES breakdown by network
+(`AnchoredTags.BreakdownRows`, the one breakdown-table row; a network with none left out) — else
+`AnchoredTags`. The explorer keeps every Snapshots level and its measure set is **Data updates · Fees · Metagraphs ·
+Size** (D7, user: "instead of adding 'data updates' use it to replace 'anchors'" — Data updates takes
+Anchors' place and leads, four tiles two by two so its name is whole; the network level is Data
+updates · Fees · Size; `ledgerMeasure`'s `DATA_*` lists; the register's own pick, `store.dataMeasure`,
+starting on it; the Metagraph snapshots register keeps Fees · Anchors · Metagraphs · Size): a
+tick row's figure is its data updates, a network's and a snapshot's their own, read off the exact read
+(`ChannelSnapRow.dataTxCount`); **the tick's levels list only the snapshots that carried data
+blocks** (user, 2026-11-07: "a metagraph that anchored but had no datablock … don't show it" — a
+dataless snapshot is not the register's subject, as a blockless one is not Transaction blocks';
+`ladderLevels.dataCarryingNetworks` under `REGISTER_MEASURES.data.dataOnly`, the same list the
+Metagraph card's pager steps in `useSiblingState`; before the tick's exact read lands nothing is known
+to carry data, so the level is empty, never guessed), a tick none of whose snapshots did is FAINT (it
+is a global snapshot and stays), and a network one of whose snapshots there could not be decoded
+states no figure (the exact read leaves its `perMeta` count off — unknown, never 0, review M5). The card is the metagraph snapshot card, whose
+Data tab states "Data updates N" from the exact read with no Decompress (`metaSnapDataCount.test.ts`).
+RAW is the Metagraph snapshots register's anchor log (its records are metagraph snapshots). **The
+note is the register's own** (2026-11-07, user: "AI card content for each sub-view … focus on each
+separately" → option 2): `noteSubject`'s `REGISTER_NOTES.data` is the `data` NoteView — the DATA
+BLOCKS note, written from the LIVE WINDOW (the newest 52 global snapshots' exact reads,
+`app/api/notes/dataWindow.ts` through the route's own day-long cache, `app/api/snapshot/cachedExact.ts`)
+when the note is written, hourly with the ledger's and the block DAG's (`warm.ts` HOURLY): which
+networks carried data blocks over those minutes, how many, with how many updates, over the ticks
+read (`src/data/noteFactsData.ts`, a floor where a read did not land). Its span chip reads "the live
+window"; the note names the minutes itself and the window's END, never "right now" (user,
+2026-11-10: it is written hourly and read for up to an hour after) — "Over the last 8 minutes to
+07:21 UTC, …", the end a `time` fact (a UTC clock time, the zone named, since a note is written for
+every reader) that the honesty gate reads as a phrase, not as numbers. No sampled series holds a
+data-block count, which is why it is the live window and not the last 24 hours. The band swaps to `DataCells` (`"ledger:data"`, `REGISTER_CELLS` in `VitalsBand.tsx`)
+— THREE cells, `src/data/dataStats.ts`'s arithmetic over the ledger source's ticks: **DATA UPDATES**
+(the count over the snapshots read, "N of M snapshots read" under the unit as its floor, and a line
+of one point per global snapshot — the window spans minutes, so a tick is its bin, an unread tick a
+gap), **BY NETWORK** (`MicroBars` share of the data updates per network), **LAST DATA BLOCK** (the age
+of the newest read tick holding a data block in `ageWords` — "12 seconds" under a minute, never
+"1 minute" for a block seconds old (D6 carry), beside its network; "Window pinned to a past time" in a
+past window). The Snapshots band's "Anchors by metagraph" chart is NOT a fourth cell: it plots the
+measured history's 24 hours, and the band states one window — here the source's minutes. Under the
+DAG filter every cell says "The DAG's own snapshots carry no data blocks".
 
 **The placeholder views host NO facts cards at all** — `detailsCards` returns `[]` outside the 3D
 views (user, 2026-08-10). A live node card, status pill and real ids beside a `preview · in development`
@@ -1092,8 +1388,11 @@ is the boring case by construction and that split is the one breakdown belonging
 than its neighbours — a node the lookup could not place sits in no country ring and no provider ring,
 so it is also the basis both cards beside it silently assume; and "nodes by country" became "top
 countries", since the card shows three plus a remainder and the old name promised the whole
-distribution); the ledger leads with WHO (METAGRAPHS ANCHORING, exact from the anchor index, with
-identity dots) then the rates (number + stretch sparkline, units spelled `/hour`) and the
+distribution); the ledger reads the rates first (number + stretch sparkline, units spelled `/hour`),
+then WHO AND HOW MANY — METAGRAPHS ANCHORING, the total of metagraph snapshots anchored over the
+window on the left and each network's count as a bar row, busiest first, folded to four rows (user,
+2026-11-09: "show how many each metagraph anchored with the total on the left … after global
+snapshots"; it was a roster of ticker chips with the NUMBER of networks as its lead) — then the
 declicked tick bar-chart, which is **STACKED per metagraph when unfiltered** (user pick,
 2026-09-01 — every metagraph, always, not a top-N). The bar's HEIGHT is unchanged, so it reads as it
 always did at a glance and gains WHO underneath. Three rules keep it honest: the segments must SUM
@@ -1102,8 +1401,9 @@ than dropped (the donuts' `other` rule); a tick with no attribution is not a tic
 so it paints whole in the accent — "this many anchored, by whom is not known here"; and order is the
 CATALOG's, never the per-tick counts, since sorting by size repaints every bar as the window shifts
 and a segment that moves cannot be followed. Identity is not colour-alone: the METAGRAPHS ANCHORING
-card immediately to its left is the legend, reading the same `getAnchor(...).metaCounts` and the same
-`identityHudCss` hues, named sr-only.
+card immediately to its left is its NUMERIC legend — the same `m.<id>.snaps` series summed over the
+same window (the live anchor index's `metaCounts` until the store answers), the same `identityHudCss`
+hues — so the pair reads "how many, by whom" then "when".
 
 **A TOTAL LIVES INSIDE ITS OWN BREAKDOWN, AND LEADS IT** (user, 2026-08-31): a bare number card
 beside the list that breaks that number down says the same thing twice, so `COUNTRIES` folded into
@@ -1111,7 +1411,7 @@ nodes-by-country and `PROVIDERS` into top-providers, and hyper's `NODES` went en
 composition donut already totalled the same fleet. The merged shape is `DonutTotal` + `MicroBars`:
 ring, then the total at the band's own number size, then the rows. Two rules hold it honest — the
 ring must PARTITION the population, so a top-N chart carries its remainder as an `other` segment
-rather than drawing three slices as the whole; and the total is the LARGEST type in the card, never
+rather than drawing three slices as the whole (a list's fold is `bandParts.foldOther`); and the total is the LARGEST type in the card, never
 the smallest (it briefly sat in the 44px donut hole at 11px, which made merging a demotion).
 
 **A card is TWO SEGMENTS: a LEAD and a DETAIL, split by a hairline** (user, 2026-09-01). The lead is
@@ -1121,14 +1421,10 @@ stand alone (geo's `NODES` is lead-only; `NETWORK LAYERS` and PulseStrip's poll 
 detail-only). Three rules keep the row from going ragged, and all three answer the same complaint
 ("the details are right next to the total while there is a lot of white space on the right"):
 
-- **`size` is the one width vocabulary** — `sm` (one reading, no breakdown) / `md` (a reading and its
-  breakdown) / `lg` (a chart that reads better wide). It replaced six hand-picked flex values that
-  each encoded a guess about one card's content. **Every tier keeps an `auto` basis**, never
-  `basis-0`: a share computed with no reference to the card's content is what clipped the rate cards'
-  extrapolation note off the plate at tablet width. **And every tier has a CEILING** — without one an
-  `md` card grows to whatever the viewport gives it, and at 1600px three of them each held ~500px
-  with a void between lead and breakdown. Past the ceilings the row centres; below them the cards
-  still span margin to margin, so the centring is a no-op wherever width is scarce.
+- **Every card takes an EQUAL share of the row** (`flex-1 basis-0` with `min-w-0`, `bandParts.tsx`'s
+  `BandCard`; it takes no width prop): a cell's share is its designated space and its content fills
+  it, the eyebrow truncating first when the card is tight. A `className` (e.g. a `min-w` floor for
+  the stacked chart) is the only per-card adjustment.
 - **`MicroBars`' track is proportional but CAPPED** (`BAR_TRACK_MAX`), and the block is sized to
   what its rows can spend and marked `data-fit`, so `BandCard` shrinks the detail to it and CENTRES
   the whole body — lead, hairline, breakdown — in the card's share (user, 2026-09-29: "centered in
@@ -1563,7 +1859,17 @@ Moment's readings, a provider's and a country's nodes by network; the compositio
 fact card — its strip and status row were built and removed the same day). Rows that are their own controls wear `CUT_ROW` themselves and
 draw `UnitMarks`, so every card shares the columns. It replaced the stacked bars with a wrapping dot
 legend, the dot · name · track · count rows and the inline network dots — three recipes. A zero part
-is a muted row with no mark. **A FOLD IS MARKED ON ITS LABEL, never by a glyph beside the figure** (`foldLabel`,
+is a muted row with no mark. **EVERY CARD TABLE IS ONE SECTION, STANDARDIZED BY DATA TYPE** (user, 2026-11-09,
+option A of the brainstorm's `card-tables.html` — "one table: header rule, column caps, hairline rows"):
+`SectionLabel` stands on the border rule (every section, so a Node card's Runs and Archive too), a
+`TableHead` caps row names the columns (the name column's noun, the figure column's unit — `#` for a
+count; a unit wider than its figures reaches left into the mark column), and rows divide on `TABLE_ROW`'s
+faint hairline. The mark follows the data: COUNTS by category (snapshots anchored, data updates by
+network, a data block's updates by kind, a country's nodes by provider, a provider's by network) draw
+`UnitMarks`; READINGS (the Moment's "At that moment", its hand-built header retired) a bar against the
+largest; RECORDS (a block's transfers, a global snapshot's blocks) their own field columns. The
+multi-cut `ScheduleTable` (the Metagraph card's layer / status / depth) keeps its axis column, which
+already names each cut. **A FOLD IS MARKED ON ITS LABEL, never by a glyph beside the figure** (`foldLabel`,
 user 2026-10-03, two rounds): a chevron in the row's flow pushed that row's figure left of every row
 without one ("numbers should be on the right side and aligned … a structural solution for the >
 space being taken sometimes"), and hung in the card's padding it "touches the edge, there is simply
@@ -1766,9 +2072,10 @@ Every rail card leads with `CardHead`: eyebrow / title / inset hairline / body.
     front — and takes the reader's OWN date search as the committed range (`store.logCut`, written
     by the log's `cutIsOwn` mirror; a door's span never writes it, it came from History). Snapshots
     needs nothing: a raw row click pins, and the explorer and card show the pin.
-  · **State marks are one species.** `LiveDot` + "live", `PinnedMark` alone, the word for screen readers only (user, 2026-10-31; StateAtoms, 14px),
+  · **State marks are one species.** `LiveDot` + "live", `PinnedMark` alone, the word for screen readers only (user, 2026-10-31; StateAtoms, 14px; RAW's rows and plates draw both through StateAtoms' `StateMark`),
     on the explorer's tick row, the Global snapshot card's control, the scene callout, the raw log's
-    selected row and the raw pane's head. Since 2026-10-18 the METAGRAPH snapshot's label and card head
+    selected row and the raw pane's head — and in the Blocks register on the Block card's control,
+    the block callout and the committed block's RAW rows (D3: live follows the block there). Since 2026-10-18 the METAGRAPH snapshot's label and card head
     carry them too (user: "that's also pinned") — a committed pair is live or pinned together.
 
 - **`SELECTED_ROW`** is the one committed-selection language for list rows: the wash plus a 1px inset
@@ -1990,7 +2297,7 @@ seam and corner rules select on the same markers the thread measures:
 | `#topbar`, `#metapane`, `#tooltip` | Layout and positioning |
 | `canvas.scene-canvas` | `SceneCanvas` renders it; the engine's controls listen on it (the card-drag handoff that once queried it is retired) |
 | `#callout` (+ `data-on`) | The subject callout's 0-size anchor wrapper — `SceneCallout` renders it, `CalloutSync` writes its transform + `data-on` per frame (the Tooltip discipline: position never renders React) |
-| `#callout-2` (+ `data-on`) | The same contract's second anchor — the GLOBAL snapshot's label in Snapshots. Same two homes, same per-frame writes, no multi-leader |
+| `#register-switch` | `RegisterSwitch` renders it (the Snapshots view's register switch on the scene); `ChromeBounds` reads its bottom edge as the callout's free-band top (`sceneTop`) |
 | `#trend-stack` (+ `data-on`) | The trend view's chart-plane layer — `TrendStack` renders it, the engine queries it to find the planes. It waits at `opacity: 0` and `TrendStackSync` writes `data-on="1"` once the view has ARRIVED (policy `chartStack` + the trend furniture alpha at full), so the stack fades in with the room rather than riding the camera's flight — the `#callout` `data-on` precedent |
 | `[data-plane]` (the network id) | One chart plane, as an ANCHOR + a CHILD. The anchor is a **0-size box at the layer's top-left with `origin-top-left`**, mounted `invisible`; its one child is the plane, `planeFormat(tier).pxW` wide (640 on desktop and tablet; 360 on phone, so the card is drawn at about scale 1 and its type is legible — the projector divides by the same number, and on phone the head drops its unit into the front plot's caption, `unitInPlot`), centred on it by `-translate-x-1/2 -translate-y-1/2`. **React renders the plane and owns everything inside it** plus the anchor's `opacity` / `zIndex` / `pointer-events` (all from the same `PlanePose`); `TrendStackSync` (engine layer) writes the anchor's `transform` — a `matrix3d` translate + uniform scale, never a rotation — and its `style.visibility` per frame. The anchor's geometry IS that matrix's coordinate system, so don't give it a size, an origin or a transform of its own; `components/trendStackBoundary.test.ts` pins it |
 
@@ -2033,22 +2340,30 @@ hued ticker, the anchor ring and the `.edge-spine`). The design rules the test c
   the same state that renders the box), exactly as the camera answers it; the component picks the
   MODEL and the Engine the ANCHOR from one mirrored preference, falling through to the finest
   committed rung.
-- **Snapshots stands TWO callouts, each on a FIXED anchor** (user, 2026-10-03: "2 callouts"). A
-  committed metagraph snapshot is always read against a global snapshot, and one label could
-  name only one of them. `#callout` is the metagraph snapshot's (its tile) and `#callout-2` the
-  global snapshot's (its bar, or the resolved network's segment of it) — whichever card is boxed.
-  Handing the subject's anchor to the boxed card was the first cut and it re-drew both labels on
-  every re-box, over two subjects that had not changed. A boxed node's label still stands alone.
+- **The Blocks register stands ONE callout, the block's** (D3, user 2026-11-07: "In blocks, no
+  snapshot callout but a block callout"). `#callout` names the Block card's subject — the live
+  newest block or the pinned one — at the block's own place in the chamber (the live global is not
+  drawn there). Its key is `blk|live` while following, so a newer block re-points the label rather
+  than replaying its entrance; a pin is a new subject.
+- **Snapshots stands ONE callout, the box's** (user, 2026-11-08: "Two callouts is too much in the
+  snapshot view, 1 callout that relates to the subject, nothing else"). From 2026-10-03 until then
+  it stood TWO on fixed anchors — the metagraph snapshot's tile and, under it, the global's bar
+  (`#callout-2`, retired) — on the argument that a committed snapshot is always read against its
+  global; the user's eye said the second label was noise. Now `#callout` follows the open card
+  (`domain/calloutSubjects.ts`, one decision both owners consult), so a re-box moves the one label
+  to the new subject, which is the acknowledgement; the global's bar is one of the anchors it may
+  take (`_ledgerBarAnchor`), the resolved network's segment of it under a lens.
   **The Metagraph card has a label too** (user, same day: "the dossier on snapshots page has no
   callout on the scene" — reversing 2026-08-16's "a lane gets no label", which read as a
   forgotten card once both snapshots were labelled): the hyper dossier's own model, at the head
   of the network's lane. It SHARES `#callout` with the metagraph snapshot — the two stand at
   the same end of the same lane — and takes it when the Metagraph card is the box or no
   snapshot of that network is committed.
-  **The global one HANGS** (design A of `docs/superpowers/design/2026-10-03-snapshot-callouts`,
-  user: "ok A, but make the angle of the lines the same"): below-left of its bar, into the strip
-  between the floor and the bottom band, on the standing label's own diagonal turned half a
-  circle — `--co-k` shortens both axes by one factor, so the two leaders are parallel. Standing
+  **The global's label HANGS** (design A of `docs/superpowers/design/2026-10-03-snapshot-callouts`,
+  user: "ok A, but make the angle of the lines the same"; kept for the one label when its subject
+  is the global): below-left of its bar, into the strip between the floor and the bottom band, on
+  the standing label's own diagonal turned half a circle — `--co-k` shortens both axes by one
+  factor, so a hanging and a standing leader are parallel. Standing
   up-right from the floor put its panel over the ribbons. `calloutHangs` (domain, tested) says
   whether the strip has room; where it has not, the label stands as it always did.
 - **The HOVER card is the name of the thing with its mark** (user, 2026-10-03 — all three of
@@ -2093,9 +2408,36 @@ hued ticker, the anchor ring and the `.edge-spine`). The design rules the test c
 - **The entrance is a sequence: panel rolls in, THEN the leader draws panel→anchor, THEN the ring
   lands** (user, 2026-09-05 — the tie was fully drawn while the panel was still arriving). An
   SVG-mask ink line (`.co-draw`) eases its normalized dash offset so the dashes reveal without
-  crawling; the wrapper is keyed by subject so the choreography replays as one unit, and it's
-  PAUSED until the Engine's `data-on` — after a commit flight it plays at reveal, not invisibly
-  mid-flight. Clock is the panel's own (lag + rise, then --tempo-roll); reduced motion snaps it.
+  crawling, and it's PAUSED until the Engine's `data-on` — after a commit flight it plays at
+  reveal, not invisibly mid-flight. Clock is the panel's own (lag + rise, then --tempo-roll);
+  reduced motion snaps it.
+- **A label already standing GLIDES to a new subject** (user, 2026-11-09: "can we avoid the re-draw
+  and animate it to its new location? This happens in live mode for example, or when users swipes
+  left / right on the subject's card"). The wrapper is no longer keyed by subject (it was from
+  2026-09-05, so every change replayed the whole entrance): it carries the subject's exact identity in
+  `data-subject` (`CalloutModel.at` — a live snapshot's ordinal, a live block's hash, where the panel's
+  `key` says `live`), and `CalloutSync` answers a change by WHERE THE LABEL IS. Shown → the anchor
+  moves from its last drawn point to the new subject's over `domain/calloutGlide.ts` (0.65 s, the
+  odometer's clock, in-out cubic, closing on the moving target), the leader and ring carried with it,
+  the ring's hue easing, only the panel's words re-rolling (the panel keeps its `key`). Hidden (a
+  commit's camera flight, a view switch) → the entrance's CSS animations are rewound
+  (`getAnimations`, event-time) and play from the top when the label reappears; a glide the label is
+  hidden through ends the same way. Measured live: a pager step kept the element and the finished
+  leader draw and moved the anchor over ~0.6 s; a geo country step behind its flight drew in fresh.
+  **The title is an ODOMETER and the panel holds its width** (user, 2026-11-09: "use the odometer on
+  the callout headers, for example global snapshot #, also avoid that the width jumps when 10s goes
+  to 1s"): the panel is keyed by its subject's KIND (`eyebrow`), so a live tick or a pager step keeps
+  it and rolls the title (`Odometer`'s `text` mode); a new kind still rolls the whole panel in. The
+  age chip and the lead's size chip stand on a tabular floor (`min-w` in `ch`) and the lead row is
+  tabular, so the width held at one value across four live ticks (measured).
+- **Every callout is ONE SIZE** (user, 2026-11-09: "callout still re-size when data changes … As a
+  general rule, give callouts a fixed width and height to avoid the resize"): `CALLOUT_W` ×
+  `CALLOUT_H` (288 × 86; the global's "N metagraphs anchored M snapshots" lead carries no size chip so it fits) on the desktop, `CALLOUT_H_PHONE` (56) on a phone, where the lead is dropped —
+  one home, `domain/calloutPlacement.ts`, whose reach constants derive from them, so the flip/drop
+  tests and the drawn box agree. A line too long for the box truncates (a node's "Boardman, Amazon.com,
+  Inc."); a label with no reading of its own gets one (the metagraph snapshot's "Anchored to N" and its
+  size), so no kind comes up short. Measured: global, metagraph snapshot, block, data block and a
+  hyper node all 288 × 86, the global unchanged through 16 s of live ticks.
 - **The phone declines it** (user, 2026-08-18). Co-location is the whole promise — the panel stands
   beside its subject and points at it — and a phone has no width to stand beside anything: the panel
   is a third of the viewport, so it lands ON the subject or over the dock, and the flip rule has no

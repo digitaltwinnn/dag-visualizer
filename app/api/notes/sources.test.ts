@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TrendsWindowData } from "@/src/data/trendWindow";
 import { pickRangeTier } from "@/src/data/trendWindow";
-import { CATALOG } from "@/src/engine/config";
+import { METAGRAPHS } from "@/src/engine/config";
 import type { NoteReads } from "./sources";
 
 // The builders are mocked here: these tests pin what `factsFor` READS (the per-view table: tiers
@@ -23,7 +23,7 @@ const realGeo = await vi.importActual<typeof import("@/src/data/noteFactsGeo")>(
 const H = 3_600_000;
 const D = 86_400_000;
 const NOW = Date.UTC(2026, 9, 27, 12, 30);
-const USDC = CATALOG.mainnet.find((m) => m.name === "USDC.dag")?.id ?? CATALOG.mainnet[0]!.id;
+const USDC = METAGRAPHS.find((m) => m.name === "USDC.dag")?.id ?? METAGRAPHS[0]!.id;
 
 /** A payload tagged by what was asked for, so a builder input can be traced to its read. */
 function payload(tag: string, buckets: number[] = [0], series: Record<string, (number | null)[]> = {}): TrendsWindowData & { tag: string } {
@@ -37,11 +37,11 @@ function fakeReads(over: Partial<NoteReads> = {}): NoteReads & { calls: Call[]; 
   return {
     calls,
     geoCalls,
-    async span(_net, tier, from, to) {
+    async span(tier, from, to) {
       calls.push({ tier, from, to });
       return payload(`${tier}:${from}:${to}`, [0], { [`m.${USDC}.snaps`]: [1] }); // an active network: a silent one reads more
     },
-    async geoDays(_net, from, to) {
+    async geoDays(from, to) {
       geoCalls.push({ from, to });
       return { geoDays: { "2026-10-27": { "f.cc.DE": 3, "f.cc.dag.FR": 1 } }, providerNames: { hetzner: "Hetzner" } };
     },
@@ -88,7 +88,7 @@ describe("noteSupported", () => {
 describe("factsFor — the subject's display name for the gate (R39)", () => {
   it("names one network or one country; the whole network has none", async () => {
     const name = async (view: "hyper" | "geo" | "ledger" | "trend", subject: string, span: "day" | "hours" | "7d") =>
-      (await factsFor("mainnet", view, subject, span, NOW, fakeReads()))!.subjectName;
+      (await factsFor(view, subject, span, NOW, fakeReads()))!.subjectName;
     expect(await name("trend", "dag", "7d")).toBeUndefined();
     expect(await name("trend", USDC, "7d")).toBe("USDC.dag");
     expect(await name("hyper", "all", "day")).toBeUndefined();
@@ -104,7 +104,7 @@ describe("factsFor — the subject's display name for the gate (R39)", () => {
 // SUBJECT NOTES (2026-10-29): Geography's country × network and provider notes, scoped as their
 // cards are, labelled scope-first so the gate's attribution by name keeps working.
 describe("factsFor — Geography's subject notes", () => {
-  it("factsFor accepts the geo subject notes, labels them scope-first, names the subject and the kind, with no common reading", async () => {
+  it("factsFor accepts the geo subject notes, labels them scope-first, names the subject and the kind", async () => {
     // The last column is the provider as the builder's facts spell it (its `subjectName`).
     const cases: [string, unknown, string, string, string, string?][] = [
       [`${USDC}/cc:DE`, { cc: "DE", net: USDC }, "USDC.dag nodes in Germany", "USDC.dag", "country"],
@@ -115,30 +115,29 @@ describe("factsFor — Geography's subject notes", () => {
     ];
     for (const [subject, parsed, label, subjectName, kind, stem] of cases) {
       vi.mocked(geoFacts).mockClear().mockReturnValue({ facts: [FACT], names: ["USDC.dag"], ...(stem ? { subjectName: stem } : {}) });
-      const out = await factsFor("mainnet", "geo", subject, "day", NOW, fakeReads());
+      const out = await factsFor("geo", subject, "day", NOW, fakeReads());
       expect(out, subject).not.toBeNull();
       const input = vi.mocked(geoFacts).mock.calls[0]![0];
       expect(input.subject, subject).toEqual(parsed);
-      expect(input.daily, subject).toBeUndefined();
-      expect({ label: out!.label, subjectName: out!.subjectName, kind: out!.kind, common: out!.common }, subject).toEqual({ label, subjectName, kind, common: false });
+      expect({ label: out!.label, subjectName: out!.subjectName, kind: out!.kind }, subject).toEqual({ label, subjectName, kind });
     }
     // A country note's country is named for the builder even when no stored day holds it.
-    await factsFor("mainnet", "geo", "dag/cc:JP", "day", NOW, fakeReads());
+    await factsFor("geo", "dag/cc:JP", "day", NOW, fakeReads());
     expect(vi.mocked(geoFacts).mock.calls.at(-1)![0].countryNames).toMatchObject({ JP: "Japan" });
   });
 
   it("a provider is named by the stem its facts use, never the stored display name with its legal suffix", async () => {
     const reads = fakeReads({ async geoDays() { return { geoDays: { "2026-10-27": { "f.cc.DE": 3 } }, providerNames: { "hetzner-online-gmbh": "Hetzner Online GmbH" } }; } });
     vi.mocked(geoFacts).mockReturnValue({ facts: [FACT], names: [], subjectName: "Hetzner Online" });
-    const fleet = (await factsFor("mainnet", "geo", "isp:hetzner-online-gmbh", "day", NOW, reads))!;
+    const fleet = (await factsFor("geo", "isp:hetzner-online-gmbh", "day", NOW, reads))!;
     expect([fleet.label, fleet.subjectName]).toEqual(["Hetzner Online", "Hetzner Online"]);
-    const scoped = (await factsFor("mainnet", "geo", `${USDC}/isp:hetzner-online-gmbh`, "day", NOW, reads))!;
+    const scoped = (await factsFor("geo", `${USDC}/isp:hetzner-online-gmbh`, "day", NOW, reads))!;
     expect([scoped.label, scoped.subjectName]).toEqual(["USDC.dag nodes with Hetzner Online", "USDC.dag"]);
   });
 
   it("every view's facts carry the subject's kind; the view notes are unchanged", async () => {
     const got = async (view: "hyper" | "geo" | "ledger" | "trend", subject: string, span: "day" | "hours" | "7d" | "30d") =>
-      (await factsFor("mainnet", view, subject, span, NOW, fakeReads()))!;
+      (await factsFor(view, subject, span, NOW, fakeReads()))!;
     expect((await got("hyper", "all", "day")).kind).toBe("view");
     expect((await got("ledger", USDC, "hours")).kind).toBe("view");
     expect((await got("trend", "dag", "7d")).kind).toBe("view");
@@ -185,7 +184,7 @@ describe("factsFor — Geography's subject notes", () => {
 
 // SUBJECT NOTES (2026-10-29): Hypergraph's make-up × network, the node-type card's selection.
 describe("factsFor — Hypergraph's make-up notes", () => {
-  it("factsFor accepts a network's make-up, labels it, kind `type`, no common reading", async () => {
+  it("factsFor accepts a network's make-up, labels it, kind `type`", async () => {
     const cases: [string, unknown, string, string][] = [
       [`${USDC}/type:l0+cl1`, { net: USDC, type: "l0+cl1" }, "USDC.dag nodes running L0 and cL1", "USDC.dag"],
       [`${USDC}/type:dl1`, { net: USDC, type: "dl1" }, "USDC.dag nodes running only dL1", "USDC.dag"],
@@ -193,13 +192,13 @@ describe("factsFor — Hypergraph's make-up notes", () => {
     for (const [subject, parsed, label, subjectName] of cases) {
       expect(noteSupported("hyper", subject, "day"), subject).toBe(true);
       vi.mocked(hyperFacts).mockClear();
-      const out = await factsFor("mainnet", "hyper", subject, "day", NOW, fakeReads());
+      const out = await factsFor("hyper", subject, "day", NOW, fakeReads());
       expect(out, subject).not.toBeNull();
       expect(vi.mocked(hyperFacts).mock.calls[0]![0].subject, subject).toEqual(parsed);
-      expect({ label: out!.label, subjectName: out!.subjectName, kind: out!.kind, common: out!.common }, subject).toEqual({ label, subjectName, kind: "type", common: false });
+      expect({ label: out!.label, subjectName: out!.subjectName, kind: out!.kind }, subject).toEqual({ label, subjectName, kind: "type" });
     }
     // The view notes keep their labels and their question.
-    const net = (await factsFor("mainnet", "hyper", USDC, "day", NOW, fakeReads()))!;
+    const net = (await factsFor("hyper", USDC, "day", NOW, fakeReads()))!;
     expect([net.label, net.subjectName, net.kind]).toEqual(["USDC.dag", "USDC.dag", "view"]);
   });
 
@@ -219,23 +218,11 @@ describe("factsFor — Hypergraph's make-up notes", () => {
   });
 });
 
-describe("factsFor — whether the facts hold the common reading (R74)", () => {
-  it("is true only when the builder stated it", async () => {
-    expect((await factsFor("mainnet", "geo", "cc:DE", "day", NOW, fakeReads()))!.common).toBe(false);
-    vi.mocked(geoFacts).mockReturnValue({ facts: [FACT, { label: "Global snapshots per day, last week", value: 8000, kind: "count", text: "8,000" }], names: [] });
-    expect((await factsFor("mainnet", "geo", "all", "day", NOW, fakeReads()))!.common).toBe(true);
-    expect((await factsFor("mainnet", "geo", "all", "day", NOW, fakeReads()))!.whole).toBe(true);
-    vi.mocked(geoFacts).mockReturnValue({ facts: [FACT, { label: "USDC.dag global snapshots it was part of per day, last week", value: 800, kind: "count", text: "800" }], names: [] });
-    const net = (await factsFor("mainnet", "geo", USDC, "day", NOW, fakeReads()))!;
-    expect([net.common, net.whole]).toEqual([true, false]);
-  });
-});
-
 describe("factsFor — what the note leads with (R71)", () => {
   it("carries the Snapshots builder's lead through, and the other views none", async () => {
-    expect((await factsFor("mainnet", "ledger", "all", "hours", NOW, fakeReads()))!.lead).toEqual({ kind: "now" });
-    expect((await factsFor("mainnet", "hyper", "all", "day", NOW, fakeReads()))!.lead).toBeUndefined();
-    expect((await factsFor("mainnet", "trend", "dag", "7d", NOW, fakeReads()))!.lead).toBeUndefined();
+    expect((await factsFor("ledger", "all", "hours", NOW, fakeReads()))!.lead).toEqual({ kind: "now" });
+    expect((await factsFor("hyper", "all", "day", NOW, fakeReads()))!.lead).toBeUndefined();
+    expect((await factsFor("trend", "dag", "7d", NOW, fakeReads()))!.lead).toBeUndefined();
   });
 });
 
@@ -249,7 +236,7 @@ describe("noteSupported — the ledger's whole network is ONE subject", () => {
 describe("factsFor — the per-view read table", () => {
   it("trend 7d: 1h for the span and the one before, 1d with a 30-day lead-in for the days", async () => {
     const r = fakeReads();
-    const out = await factsFor("mainnet", "trend", "dag", "7d", NOW, r);
+    const out = await factsFor("trend", "dag", "7d", NOW, r);
     expect(r.calls).toEqual([
       { tier: "1h", from: NOW - 7 * D, to: NOW },
       { tier: "1h", from: NOW - 14 * D, to: NOW - 7 * D },
@@ -264,7 +251,7 @@ describe("factsFor — the per-view read table", () => {
     expect((input.daily as { tag?: string }).tag).toBe(`1d:${NOW - 37 * D}:${NOW}`);
     expect(input.names.dag).toBe("DAG");
     expect(input.names[USDC]).toBe("USDC.dag");
-    const BIOFI = CATALOG.mainnet.find((m) => m.name === "BioFi")!.id;
+    const BIOFI = METAGRAPHS.find((m) => m.name === "BioFi")!.id;
     expect(input.blurbs[BIOFI]).toBeTruthy();
     expect(out!.spanFrom).toBe(NOW - 7 * D);
     expect(out!.spanTo).toBe(NOW);
@@ -275,7 +262,7 @@ describe("factsFor — the per-view read table", () => {
 
   it("trend 24h reads 1h and no days; 1h reads 5m", async () => {
     const r = fakeReads();
-    await factsFor("mainnet", "trend", USDC, "24h", NOW, r);
+    await factsFor("trend", USDC, "24h", NOW, r);
     expect(r.calls).toEqual([
       { tier: "1h", from: NOW - D, to: NOW },
       { tier: "1h", from: NOW - 2 * D, to: NOW - D },
@@ -284,7 +271,7 @@ describe("factsFor — the per-view read table", () => {
     expect(vi.mocked(trendFacts).mock.calls[0]![0].zoom).toBe("24h");
 
     const r2 = fakeReads();
-    const out = await factsFor("mainnet", "trend", USDC, "1h", NOW, r2);
+    const out = await factsFor("trend", USDC, "1h", NOW, r2);
     expect(r2.calls).toEqual([
       { tier: "5m", from: NOW - H, to: NOW },
       { tier: "5m", from: NOW - 2 * H, to: NOW - H },
@@ -296,7 +283,7 @@ describe("factsFor — the per-view read table", () => {
   it("trend 30d and 1y read 1d with the days' lead-in", async () => {
     for (const [span, ms] of [["30d", 30 * D], ["1y", 365 * D]] as const) {
       const r = fakeReads();
-      await factsFor("mainnet", "trend", "dag", span, NOW, r);
+      await factsFor("trend", "dag", span, NOW, r);
       expect(r.calls).toEqual([
         { tier: "1d", from: NOW - ms, to: NOW },
         { tier: "1d", from: NOW - 2 * ms, to: NOW - ms },
@@ -309,8 +296,8 @@ describe("factsFor — the per-view read table", () => {
     const day0 = Date.UTC(2025, 6, 1);
     const buckets = [day0 - 2 * D, day0 - D, day0, day0 + D];
     const raw = { buckets, stepMs: D, now: NOW, series: { "g.ticks": [null, null, 5, 6] } };
-    const r = fakeReads({ async span(_n, tier, from, to) { r.calls.push({ tier, from, to }); return raw; } });
-    const out = await factsFor("mainnet", "trend", "dag", "all", NOW, r);
+    const r = fakeReads({ async span(tier, from, to) { r.calls.push({ tier, from, to }); return raw; } });
+    const out = await factsFor("trend", "dag", "all", NOW, r);
     expect(r.calls).toHaveLength(1);
     expect(r.calls[0]!.tier).toBe("1d");
     const input = vi.mocked(trendFacts).mock.calls[0]![0];
@@ -324,7 +311,7 @@ describe("factsFor — the per-view read table", () => {
 
   it("trend all with nothing measured is no note", async () => {
     const raw = { buckets: [NOW - D], stepMs: D, now: NOW, series: { "g.ticks": [null] } };
-    const out = await factsFor("mainnet", "trend", "dag", "all", NOW, fakeReads({ span: async () => raw }));
+    const out = await factsFor("trend", "dag", "all", NOW, fakeReads({ span: async () => raw }));
     expect(out).toBeNull();
     expect(trendFacts).not.toHaveBeenCalled();
   });
@@ -333,7 +320,7 @@ describe("factsFor — the per-view read table", () => {
     const from = Date.UTC(2026, 9, 1);
     const to = Date.UTC(2026, 9, 6);
     const r = fakeReads();
-    await factsFor("mainnet", "trend", "dag", `r${from}-${to}`, NOW, r);
+    await factsFor("trend", "dag", `r${from}-${to}`, NOW, r);
     const tier = pickRangeTier(from, to);
     expect(r.calls).toEqual([
       { tier, from, to },
@@ -347,16 +334,16 @@ describe("factsFor — the per-view read table", () => {
   it("a brushed range's facts carry its first and last UTC day as dates, so the note may name them (user, 2026-10-30)", async () => {
     const from = Date.UTC(2026, 9, 1);
     const to = Date.UTC(2026, 9, 11);
-    const out = await factsFor("mainnet", "trend", "dag", `r${from}-${to}`, NOW, fakeReads());
+    const out = await factsFor("trend", "dag", `r${from}-${to}`, NOW, fakeReads());
     const dates = out!.facts.filter((f) => f.kind === "date").map((f) => [f.label, f.value]);
     expect(dates).toEqual([["Span start", from], ["Span end", to - 1]]);
-    const pill = await factsFor("mainnet", "trend", "dag", "7d", NOW, fakeReads());
+    const pill = await factsFor("trend", "dag", "7d", NOW, fakeReads());
     expect(pill!.facts.some((f) => f.label === "Span start")).toBe(false);
   });
 
   it("ledger: 5m over 24 hours (R79) and 1h over 7 days; both windows stated", async () => {
     const r = fakeReads();
-    const out = await factsFor("mainnet", "ledger", "all", "hours", NOW, r);
+    const out = await factsFor("ledger", "all", "hours", NOW, r);
     expect(r.calls).toEqual([
       { tier: "5m", from: NOW - 24 * H, to: NOW },
       { tier: "1h", from: NOW - 7 * D, to: NOW },
@@ -375,7 +362,7 @@ describe("factsFor — the per-view read table", () => {
 
   it("hyper: 1h over the last week (R72), 1d over 37 days (a 30-day lead-in), the span the last 7 days; setKey passes through", async () => {
     const r = fakeReads();
-    const out = await factsFor("mainnet", "hyper", "all", "day", NOW, r);
+    const out = await factsFor("hyper", "all", "day", NOW, r);
     expect(r.calls).toEqual([
       { tier: "1h", from: NOW - 7 * D, to: NOW },
       { tier: "1d", from: NOW - 37 * D, to: NOW },
@@ -392,16 +379,16 @@ describe("factsFor — the per-view read table", () => {
     expect(out!.facts).toContainEqual(expect.objectContaining({ label: "Week", value: 604_800, kind: "duration" }));
   });
 
-  it("geo: the geo family and the tiers' 1d over 28 days (the common activity reading's four weeks, R74, past R29's 14), pivoted by day; a country subject", async () => {
+  it("geo: the geo family and the tiers' 1d over R29's 14 days, pivoted by day; a country subject", async () => {
     const day = Date.UTC(2026, 9, 26);
     const tiers = { buckets: [day - D, day], stepMs: D, now: NOW, series: { "f.cc.DE": [4, null], "f.cc.US": [2, 3], "g.ticks": [1, 1], "f.nodes": [9, 9] } };
-    const r = fakeReads({ async span(_n, tier, from, to) { r.calls.push({ tier, from, to }); return tiers; } });
-    const out = await factsFor("mainnet", "geo", "cc:DE", "day", NOW, r);
-    expect(r.geoCalls).toEqual([{ from: NOW - 28 * D, to: NOW }]);
-    expect(r.calls).toEqual([{ tier: "1d", from: NOW - 28 * D, to: NOW }]);
+    const r = fakeReads({ async span(tier, from, to) { r.calls.push({ tier, from, to }); return tiers; } });
+    const out = await factsFor("geo", "cc:DE", "day", NOW, r);
+    expect(r.geoCalls).toEqual([{ from: NOW - 14 * D, to: NOW }]);
+    expect(r.calls).toEqual([{ tier: "1d", from: NOW - 14 * D, to: NOW }]);
     const input = vi.mocked(geoFacts).mock.calls[0]![0];
     expect(input.subject).toEqual({ cc: "DE" });
-    expect(input.daily).toBe(tiers); // the same read, unfolded, is the common activity reading's (R74)
+    expect("daily" in input).toBe(false); // no activity reading: the builder is handed no daily tier
     expect(input.ccDays).toEqual({ "2026-10-25": { "f.cc.DE": 4, "f.cc.US": 2 }, "2026-10-26": { "f.cc.US": 3 } });
     expect(input.geoDays).toEqual({ "2026-10-27": { "f.cc.DE": 3, "f.cc.dag.FR": 1 } });
     expect(input.providerNames).toEqual({ hetzner: "Hetzner" });
@@ -415,11 +402,11 @@ describe("factsFor — the per-view read table", () => {
   it("geoInputs is the geo note's own read, so the warm pass plans its countries from the same reading (M5)", async () => {
     const day = Date.UTC(2026, 9, 26);
     const tiers = { buckets: [day - D, day], stepMs: D, now: NOW, series: { "f.cc.DE": [4, null], "f.cc.US": [2, 3], "g.ticks": [1, 1] } };
-    const r = fakeReads({ async span(_n, tier, from, to) { r.calls.push({ tier, from, to }); return tiers; } });
-    const got = await geoInputs("mainnet", NOW, r);
-    expect(r.geoCalls).toEqual([{ from: NOW - 28 * D, to: NOW }]);
-    expect(r.calls).toEqual([{ tier: "1d", from: NOW - 28 * D, to: NOW }]);
-    expect(got.daily).toBe(tiers);
+    const r = fakeReads({ async span(tier, from, to) { r.calls.push({ tier, from, to }); return tiers; } });
+    const got = await geoInputs(NOW, r);
+    expect(r.geoCalls).toEqual([{ from: NOW - 14 * D, to: NOW }]);
+    expect(r.calls).toEqual([{ tier: "1d", from: NOW - 14 * D, to: NOW }]);
+    expect("daily" in got).toBe(false);
     expect(got.ccDays).toEqual({ "2026-10-25": { "f.cc.DE": 4, "f.cc.US": 2 }, "2026-10-26": { "f.cc.US": 3 } });
     expect(got.geoDays).toEqual({ "2026-10-27": { "f.cc.DE": 3, "f.cc.dag.FR": 1 } });
     expect(got.providerNames).toEqual({ hetzner: "Hetzner" });
@@ -441,10 +428,10 @@ describe("factsFor — the per-view read table", () => {
       async chainReads() {
         return {};
       },
-      async geoDays(_n, from) {
+      async geoDays(from) {
         return { geoDays: Object.fromEntries(daysIn(from).map((t) => [new Date(t).toISOString().slice(0, 10), geoField(level(t))])), providerNames: {} };
       },
-      async span(_n, _tier, from) {
+      async span(_tier, from) {
         const buckets = daysIn(from);
         return { buckets, stepMs: D, now: NOW, series: { "g.ticks": buckets.map(() => 1), "f.cc.DE": buckets.map((t) => level(t).DE), "f.cc.US": buckets.map((t) => level(t).US) } };
       },
@@ -453,55 +440,52 @@ describe("factsFor — the per-view read table", () => {
 
     // The defect, shown: over an 8-day read the outage pair sits at the read's head, is judged
     // against itself, and becomes the anchor ("Germany rose 150%").
-    const head = await reads.geoDays("mainnet", NOW - 8 * D, NOW);
-    const ccHead = await reads.span("mainnet", "1d", NOW - 8 * D, NOW);
+    const head = await reads.geoDays(NOW - 8 * D, NOW);
+    const ccHead = await reads.span("1d", NOW - 8 * D, NOW);
     const ccDays8 = Object.fromEntries(ccHead.buckets.map((b, i) => [new Date(b).toISOString().slice(0, 10), { "f.cc.DE": ccHead.series["f.cc.DE"]![i]!, "f.cc.US": ccHead.series["f.cc.US"]![i]! }]));
     const short = realGeo.geoFacts({ subject: "all", geoDays: head.geoDays, ccDays: ccDays8, providerNames: {}, countryNames: { DE: "Germany", US: "United States" }, names: {} })!;
     expect(weekAgo(short.facts).some((f) => f.label.endsWith("now against a week ago") && f.value === 2.5)).toBe(true);
 
-    // The fix: the read reaches past the pair (28 days now), it is judged against the week before it and
-    // fails, and no change fact reads from it.
-    const out = await factsFor("mainnet", "geo", "all", "day", NOW, reads);
-    const changes = weekAgo(out!.facts);
-    expect(changes.length).toBeGreaterThan(0);
-    for (const f of changes) {
-      if (f.label.endsWith("now against a week ago")) expect(f.value).toBe(1);
-      else expect([NORMAL.DE, NORMAL.US, NORMAL.DE + NORMAL.US]).toContain(f.value); // a country, or the fleet's located total
-    }
+    // The fix: the read reaches past the pair (14 days), it is judged against the week before it and
+    // fails, and no change fact reads from it: against a normal week ago every country held, so no
+    // change is stated at all (the network total's move is Hypergraph's, never a geo fact).
+    const out = await factsFor("geo", "all", "day", NOW, reads);
+    expect(weekAgo(out!.facts)).toEqual([]);
+    expect(out!.facts.some((f) => f.value === 2.5)).toBe(false);
   });
 
   it("a builder's null is no note", async () => {
     vi.mocked(ledgerFacts).mockReturnValue(null);
-    expect(await factsFor("mainnet", "ledger", "all", "hours", NOW, fakeReads())).toBeNull();
+    expect(await factsFor("ledger", "all", "hours", NOW, fakeReads())).toBeNull();
   });
 
   it("an unsupported request reads nothing", async () => {
     const r = fakeReads();
-    expect(await factsFor("mainnet", "hyper", "unlisted", "day", NOW, r)).toBeNull();
+    expect(await factsFor("hyper", "unlisted", "day", NOW, r)).toBeNull();
     expect(r.calls).toEqual([]);
   });
 
   it("the unlisted set reads the whole daily history as well, so a silent span can say when it last anchored", async () => {
     const r = fakeReads();
-    await factsFor("mainnet", "trend", "unlisted", "30d", NOW, r);
+    await factsFor("trend", "unlisted", "30d", NOW, r);
     const tiers = r.calls.map((c) => c.tier);
     expect(tiers.filter((t) => t === "1d").length).toBeGreaterThan(1); // the pill's own daily read, and the history
     const before = fakeReads();
-    await factsFor("mainnet", "trend", USDC, "30d", NOW, before);
+    await factsFor("trend", USDC, "30d", NOW, before);
     expect(before.calls.length).toBeLessThan(r.calls.length); // a network pays for no such read
   });
 
   it("a network pays for that read only when its span is silent", async () => {
     const quiet = fakeReads();
-    await factsFor("mainnet", "trend", "DAG06z64ifT2HzXoHfMexRfrcnpYFEwMqjFiPKze", "30d", NOW, quiet); // NDT, absent from the fake store
+    await factsFor("trend", "DAG06z64ifT2HzXoHfMexRfrcnpYFEwMqjFiPKze", "30d", NOW, quiet); // NDT, absent from the fake store
     const active = fakeReads();
-    await factsFor("mainnet", "trend", USDC, "30d", NOW, active);
+    await factsFor("trend", USDC, "30d", NOW, active);
     expect(quiet.calls.length).toBe(active.calls.length + 1);
   });
 
   it("a read that throws propagates (the generator counts it as a store outage)", async () => {
     const r = fakeReads({ span: async () => { throw new Error("down"); } });
-    await expect(factsFor("mainnet", "ledger", "all", "hours", NOW, r)).rejects.toThrow("down");
+    await expect(factsFor("ledger", "all", "hours", NOW, r)).rejects.toThrow("down");
   });
 });
 
@@ -517,7 +501,7 @@ describe("cleanBlurb — a catalog blurb in the house voice", () => {
     expect(cleanBlurb("Swaps tokens. Decentralized and feeless. Runs on L0.")).toBe("Swaps tokens. Runs on L0.");
   });
   it("cleans the catalog the model is shown: no banned word or dash clause reaches a builder", async () => {
-    await factsFor("mainnet", "trend", "dag", "7d", NOW, fakeReads());
+    await factsFor("trend", "dag", "7d", NOW, fakeReads());
     const { blurbs } = vi.mocked(trendFacts).mock.calls[0]![0];
     expect(Object.keys(blurbs).length).toBeGreaterThan(0);
     for (const b of Object.values(blurbs)) {
@@ -539,7 +523,7 @@ describe("the store reads", () => {
       },
     };
     const from = Date.UTC(2026, 9, 27, 10);
-    const out = await readSpan("mainnet", "1h", from, from + 3 * H, store, NOW);
+    const out = await readSpan("1h", from, from + 3 * H, store, NOW);
     expect(asked).toEqual(["t:mainnet:1h:2026-10"]);
     expect(out.buckets).toEqual([from, from + H, from + 2 * H]);
     expect(out.stepMs).toBe(H);
@@ -558,7 +542,7 @@ describe("the store reads", () => {
       "geo:mainnet:sites:2026-01": { "01-02|f.site.DE.Falkenstein.hetzner": 1 },
     };
     const store = { async hgetall(key: string) { asked.push(key); return (hashes[key] as Record<string, string>) ?? null; } };
-    const out = await readGeoDays("mainnet", Date.UTC(2025, 11, 31, 6), Date.UTC(2026, 0, 2, 6), store);
+    const out = await readGeoDays(Date.UTC(2025, 11, 31, 6), Date.UTC(2026, 0, 2, 6), store);
     expect(asked.sort()).toEqual(["geo:mainnet:2025", "geo:mainnet:2026", "geo:mainnet:isp", "geo:mainnet:sites:2025-12", "geo:mainnet:sites:2026-01"]);
     expect(out.siteDays).toEqual({ // a month's hash holds days outside the window: left out
       "2025-12-31": { "f.site.DE.Falkenstein.hetzner": 2 },
@@ -576,24 +560,78 @@ describe("the store reads", () => {
     let n = 0;
     const store = { async hgetall() { n++; return null; } };
     const reads = storeReads(NOW, store);
-    await reads.span("mainnet", "1d", NOW - 30 * D, NOW);
-    await reads.span("mainnet", "1d", NOW - 60 * D, NOW - 30 * D);
+    await reads.span("1d", NOW - 30 * D, NOW);
+    await reads.span("1d", NOW - 60 * D, NOW - 30 * D);
     expect(n).toBe(1); // one year hash, read once
   });
 
   it("a brushed range of a week or more reads the daily tier through today, for what came after it", async () => {
     const reads = fakeReads();
-    await factsFor("mainnet", "trend", "dag", `r${NOW - 40 * D}-${NOW - 20 * D}`, NOW, reads);
+    await factsFor("trend", "dag", `r${NOW - 40 * D}-${NOW - 20 * D}`, NOW, reads);
     expect(reads.calls.some((c) => c.tier === "1d" && c.to === NOW)).toBe(true);
     const short = fakeReads();
-    await factsFor("mainnet", "trend", "dag", `r${NOW - 25 * D}-${NOW - 22 * D}`, NOW, short);
+    await factsFor("trend", "dag", `r${NOW - 25 * D}-${NOW - 22 * D}`, NOW, short);
     expect(short.calls.some((c) => c.to === NOW)).toBe(false);
   });
 
   it("storeReads answers each chain's last read from the cursor hash", async () => {
     const asked: string[] = [];
     const store = { async hgetall(key: string) { asked.push(key); return { g: "1", "read.dor": "1000" }; } };
-    expect(await storeReads(NOW, store).chainReads("mainnet")).toEqual({ dor: 1000 });
+    expect(await storeReads(NOW, store).chainReads()).toEqual({ dor: 1000 });
     expect(asked).toEqual(["t:mainnet:cursor"]);
+  });
+});
+
+// THE BLOCK DAG'S NOTE (the Blocks register, 2026-11-06): its builder runs for real here, since its
+// input is assembled from the store's hourly blocks and the transfers they carried.
+describe("the block DAG's note", () => {
+  const hours = (f: (i: number) => number | null) => Array.from({ length: 24 }, (_, i) => f(i));
+
+  it("is the whole network's over the recent hours, nothing else", () => {
+    expect(noteSupported("blocks", "all", "hours")).toBe(true);
+    expect(noteSupported("blocks", USDC, "hours")).toBe(false);
+    expect(noteSupported("blocks", "all", "day")).toBe(false);
+  });
+
+  it("reads 24 whole hours of the hourly tier, blocks and transfers, and states no open tips or height", async () => {
+    const reads = fakeReads({
+      async span(tier, from, to) {
+        reads.calls.push({ tier, from, to });
+        return payload("1h", hours((i) => from + i * H) as number[], {
+          "g.ticks": hours(() => 360),
+          "g.blocks": hours((i) => (i < 16 ? 2 : 1)), // 40
+          [`m.${USDC}.blocks`]: hours((i) => (i < 5 ? 1 : 0)), // 5
+          "x.cov": hours(() => 1),
+          "g.tx": hours((i) => (i < 10 ? 3 : 0)), // 30
+          [`m.${USDC}.tx`]: hours((i) => (i < 5 ? 2 : 0)), // 10
+        });
+      },
+    });
+    const out = (await factsFor("blocks", "all", "hours", NOW, reads))!;
+    const top = Math.floor(NOW / H) * H;
+    expect(reads.calls).toEqual([{ tier: "1h", from: top - 24 * H, to: top }]);
+    const v = (label: string) => out.facts.find((f) => f.label === label)?.value;
+    expect(v("DAG blocks")).toBe(40);
+    expect(v("USDC.dag token blocks")).toBe(5);
+    expect(out.facts.some((f) => /\btips?\b|frontier/i.test(f.label))).toBe(false);
+    expect(out.facts.some((f) => /height/i.test(f.label))).toBe(false);
+    expect(v("DAG transfers")).toBe(30);
+    expect(v("USDC.dag token transfers")).toBe(10);
+    expect(v("Span length")).toBe(86_400);
+    expect(out.label).toBe("transaction blocks");
+    expect(out.subjectName).toBeUndefined();
+    expect(out.lead).toEqual({ kind: "now" });
+    expect([out.spanFrom, out.spanTo]).toEqual([top - 24 * H, top]);
+  });
+
+  it("an hour the store did not cover is not a zero, and unread transfer lists state no transfers", async () => {
+    const reads = fakeReads({
+      async span(_tier, from) {
+        return payload("1h", hours((i) => from + i * H) as number[], { "g.ticks": hours((i) => (i === 3 ? null : 360)) });
+      },
+    });
+    const out = (await factsFor("blocks", "all", "hours", NOW, reads))!;
+    expect(out.facts.find((f) => f.label.startsWith("DAG blocks"))).toMatchObject({ label: "DAG blocks, at least", value: 0 });
+    expect(out.facts.some((f) => /transfers/i.test(f.label))).toBe(false);
   });
 });

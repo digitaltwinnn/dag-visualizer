@@ -1,10 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { assignPalette, oklchToHex, IDENTITY_L, IDENTITY_C, allowedFor, guardsFor, ALLOWED, SLOT_STEP } from "./palette";
-import { CATALOG } from "@/src/engine/config";
+import { assignPalette, oklchToHex, IDENTITY_L, IDENTITY_C, GUARDS, ALLOWED, SLOT_STEP } from "./palette";
+import { METAGRAPHS } from "@/src/engine/config";
 
-// The guard bands are PER NETWORK (multi-network design §2): five centres are guarded
-// everywhere, the sixth is the network's own accent. ±16° around each.
-const NETS = ["mainnet", "integrationnet", "testnet"] as const;
+// Six structural hue centres are guarded, ±16° around each.
 const GUARD = 16;
 function inGuardBand(h: number, guards: number[]): boolean {
   return guards.some((r) => {
@@ -30,32 +28,21 @@ const IDS = [
 describe("assignPalette", () => {
   it("keeps every hue out of the reserved guard bands", () => {
     for (const e of assignPalette(IDS).values()) {
-      expect(inGuardBand(e.hueDeg, guardsFor("mainnet")), `hue ${e.hueDeg} for ${e.id}`).toBe(false);
+      expect(inGuardBand(e.hueDeg, GUARDS), `hue ${e.hueDeg} for ${e.id}`).toBe(false);
     }
   });
 
-  it("mainnet's derived ranges equal the historical literal — mainnet hues are byte-identical", () => {
-    expect(allowedFor("mainnet")).toEqual([[41, 74], [106, 149], [211, 249], [316, 369]]);
-    expect(ALLOWED).toEqual(allowedFor("mainnet")); // Node resolves mainnet
+  it("the derived ranges equal the literal the hues were assigned against", () => {
+    expect(ALLOWED).toEqual([[41, 74], [106, 149], [211, 249], [316, 369]]);
   });
 
-  it("keeps every slot out of that network's OWN guard bands", () => {
-    for (const net of NETS)
-      for (const h of slotsOf(allowedFor(net)))
-        expect(inGuardBand(h, guardsFor(net)), `${net}: slot ${h}`).toBe(false);
+  it("keeps every slot out of the guard bands", () => {
+    for (const h of slotsOf(ALLOWED)) expect(inGuardBand(h, GUARDS), `slot ${h}`).toBe(false);
   });
 
-  it("slot capacity covers every network's catalog plus the DAG core", () => {
-    expect(slotsOf(allowedFor("mainnet")).length).toBe(23); // unchanged
-    expect(slotsOf(allowedFor("integrationnet")).length).toBe(27); // violet band pre-existed: freeing cyan is a pure +4
-    expect(slotsOf(allowedFor("testnet")).length).toBe(24); // +9 freeing cyan, −4 to the 327 guard… net +1
-    for (const net of NETS) expect(slotsOf(allowedFor(net)).length).toBeGreaterThanOrEqual(CATALOG[net].length + 1);
-  });
-
-  it("assigns per-network ranges when passed explicitly (the server route's path)", () => {
-    for (const e of assignPalette(IDS, {}, allowedFor("testnet")).values()) {
-      expect(inGuardBand(e.hueDeg, guardsFor("testnet")), `testnet hue ${e.hueDeg} for ${e.id}`).toBe(false);
-    }
+  it("slot capacity covers the catalog plus the DAG core", () => {
+    expect(slotsOf(ALLOWED).length).toBe(23);
+    expect(slotsOf(ALLOWED).length).toBeGreaterThanOrEqual(METAGRAPHS.length + 1);
   });
 
   it("is deterministic and order-independent", () => {

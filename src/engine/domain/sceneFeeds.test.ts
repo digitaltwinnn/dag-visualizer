@@ -14,6 +14,11 @@ describe("sceneFeeds (the feeds a 3D view draws, from its own policy flags)", ()
   it("Snapshots draws the chamber, the exact reads and the nodes in their trays — not their geolocations", () => {
     expect(sorted(sceneFeeds(VIEW_POLICIES.ledger))).toEqual(sorted(["clusters", "api-metagraphs", "global", "metasnaps", "exact"]));
   });
+  it("the Blocks register adds the block trail to the chamber, and only there", () => {
+    expect(sorted(sceneFeeds(VIEW_POLICIES.ledger, "blocks"))).toEqual(sorted(["clusters", "api-metagraphs", "global", "metasnaps", "exact", "api-blocks"]));
+    expect(sceneFeeds(VIEW_POLICIES.ledger, "snapshots")).not.toContain("api-blocks");
+    expect(sceneFeeds(VIEW_POLICIES.hyper, "blocks")).not.toContain("api-blocks");
+  });
   it("History parks the fleet and draws no feed in the scene (its charts are HUD readers)", () => {
     expect(sceneFeeds(VIEW_POLICIES.trend)).toEqual([]);
   });

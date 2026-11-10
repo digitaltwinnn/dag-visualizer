@@ -72,8 +72,6 @@ export function afterReread(held: NoteResponse | null, next: NoteResponse): Note
 }
 
 export interface NoteLoaderDeps {
-  /** The GET / POST target, already through `netUrl()`. */
-  urlOf: (path: string) => string;
   fetchImpl: (url: string, init?: RequestInit) => Promise<Response>;
   sleep: (ms: number) => Promise<void>;
   now: () => number;
@@ -108,7 +106,7 @@ export function createNoteLoader(deps: NoteLoaderDeps) {
 
   async function getOnce(key: string): Promise<NoteResponse> {
     try {
-      return await readAnswer(await deps.fetchImpl(deps.urlOf(`/api/notes?${key}`)));
+      return await readAnswer(await deps.fetchImpl(`/api/notes?${key}`));
     } catch {
       return UNAVAILABLE;
     }
@@ -189,7 +187,7 @@ export function createNoteLoader(deps: NoteLoaderDeps) {
           let first: NoteResponse;
           try {
             first = await readAnswer(
-              await deps.fetchImpl(deps.urlOf("/api/notes/request"), {
+              await deps.fetchImpl("/api/notes/request", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(bodyOf(req)),

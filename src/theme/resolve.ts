@@ -1,4 +1,4 @@
-// THE one theme resolver (the src/net/parse.ts pattern). Both the ThemeController (runtime)
+// THE one theme resolver. Both the ThemeController (runtime)
 // and the pre-paint inline script in app/layout.tsx (which cannot import — it mirrors the
 // three-value check textually) must agree with this.
 //

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { Mode } from "@/src/store/store";
-import { VIEW_POLICIES } from "./viewPolicy";
+import type { LedgerRegister } from "@/src/store/mode";
+import { REGISTER_DATA_BLOCKS, REGISTER_SOURCE, VIEW_POLICIES, drawsDataBlocks, readsBlockWindow, registerOf } from "./viewPolicy";
 import { is3D } from "./viewTransition";
 
 const MODES: Mode[] = ["hyper", "geo", "ledger", "trend", "soon"];
@@ -228,5 +229,35 @@ describe("the trends view is registered and inert", () => {
     // The flat placeholder never applies a destination layout, so nothing reads its row — it keeps
     // the old expression's answer so wiring one up later changes nothing by accident.
     expect(VIEW_POLICIES.soon.autoRotate).toBe(true);
+  });
+
+  it("only the Snapshots view offers more than one register — three, in the switch's order", () => {
+    expect(VIEW_POLICIES.ledger.registers).toEqual(["snapshots", "blocks", "data"]);
+    for (const m of ["hyper", "geo", "trend", "soon"] as const) expect(VIEW_POLICIES[m].registers).toEqual(["snapshots"]);
+  });
+
+  it("registerOf: the setting where the view offers it, else the view's only register", () => {
+    expect(registerOf("ledger", "blocks")).toBe("blocks");
+    expect(registerOf("ledger", "snapshots")).toBe("snapshots");
+    expect(registerOf("ledger", "data")).toBe("data");
+    // The setting persists across views; a view without the register reads its own.
+    for (const m of ["hyper", "geo", "trend", "soon"] as const) {
+      expect(registerOf(m, "blocks")).toBe("snapshots");
+      expect(registerOf(m, "data")).toBe("snapshots");
+    }
+  });
+
+  it("REGISTER_SOURCE: every register names its ledger source — only Transaction blocks reads the block window", () => {
+    // Exhaustive by type: a register missing from this literal (or from the map) is a compile error.
+    const every: Record<LedgerRegister, true> = { snapshots: true, blocks: true, data: true };
+    expect(Object.keys(REGISTER_SOURCE).sort()).toEqual(Object.keys(every).sort());
+    expect(REGISTER_SOURCE).toEqual({ snapshots: "snapshots", blocks: "blocks", data: "snapshots" });
+    // Every register the Snapshots view offers is in the map.
+    for (const r of VIEW_POLICIES.ledger.registers) expect(REGISTER_SOURCE[r]).toBeDefined();
+    expect(readsBlockWindow("blocks")).toBe(true);
+    expect([drawsDataBlocks("data"), drawsDataBlocks("snapshots"), drawsDataBlocks("blocks")]).toEqual([true, false, false]);
+    expect(Object.keys(REGISTER_DATA_BLOCKS).sort()).toEqual(Object.keys(REGISTER_SOURCE).sort());
+    expect(readsBlockWindow("snapshots")).toBe(false);
+    expect(readsBlockWindow("data")).toBe(false);
   });
 });

@@ -1,3 +1,5 @@
+import { METAGRAPHS } from "@/src/engine/config";
+
 // ONE VOCABULARY PER EXPLORER, EACH LEVEL A SUBSET OF IT (user, 2026-09-29: "The explorer control
 // in snapshot page first has fees / anchors / metagraphs / size but then when we go one level lower
 // it has snapshots (anchors?) / fees / size. I would expect the values to be exactly the same for
@@ -37,4 +39,17 @@ export function levelMeasure<L extends string>(applies: readonly L[], pick: stri
  *  selection (`geoMeasure.footTotal`), never this sum. Null for an empty list — nothing to read. */
 export function listTotal(values: readonly number[]): number | null {
   return values.length === 0 ? null : values.reduce((a, v) => a + v, 0);
+}
+
+/** THE TILE'S UNIT SYMBOLS (the explorer's tile grammar): a measure in a real unit — the DAG, bytes,
+ *  or a catalog network's own ticker — shows it at the tile's right edge; a count says nothing more.
+ *  Read from the catalog rather than from the symbol's shape (review M2, 2026-11-10): an all-caps
+ *  test dropped USDC.dag's unit, the one ticker with a lowercase part. */
+const TILE_UNITS: ReadonlySet<string> = new Set(["DAG", "KB", ...METAGRAPHS.map((m) => m.ticker)]);
+
+/** Does a measure tile show `unit`? A symbol, or a symbol with "only" (a Transaction blocks list under
+ *  All counts the DAG's own blocks alone — `blockMeasure.blockMeasureUnit`'s "DAG only"). */
+export function showsTileUnit(unit: string | undefined): boolean {
+  if (!unit) return false;
+  return TILE_UNITS.has(unit.endsWith(" only") ? unit.slice(0, -" only".length) : unit);
 }

@@ -24,7 +24,10 @@
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import type { Mode } from "@/src/store/store";
 import { ledgerNetwork } from "@/src/engine/domain/tickNet";
-import type { TickNetSel } from "@/src/data/types";
+import { blockSelectActions, dataBlockSelectActions, globalPick, tickContextOf, blockInPlace } from "@/src/engine/domain/pickActions";
+import { shortBlockHash } from "@/src/util/format";
+import { tickerOf } from "@/components/explorer/nodeRow";
+import type { BlockSel, DataBlockSel, TickNetSel } from "@/src/data/types";
 import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder";
 import type {
   ChannelSnapRow,
@@ -37,9 +40,9 @@ import type {
 } from "@/src/data/types";
 import {
   type ClickAction,
-  cohortToggleActions,
+  cohortStepActions,
+  countryStepActions,
   compositionToggleActions,
-  countryToggleActions,
   railNetActions,
   metaSnapSelectActions,
   tickNetSelectActions,
@@ -50,7 +53,6 @@ import {
 } from "@/src/engine/domain/pickActions";
 import { compositionGroups, type CompGroup } from "@/src/data/composition";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
-import { snapshotSignerRows } from "@/src/data/network";
 import { UNLISTED_ID } from "@/src/data/unlisted";
 import type { RailCardKind } from "@/components/railCards";
 import { rangeBuckets, spanPhrase, spanStep, windowSpan, type SpanStep, type ZoomId } from "@/src/data/trendWindow";
@@ -71,6 +73,15 @@ export interface SiblingState {
   /** The network committed inside the pinned tick (ledger) — see `domain/tickNet.ts`. */
   tickNet: TickNetSel | null;
   metaSnap: MetaSnapSel | null;
+  /** The committed block (the Blocks register) — a step onto another tick releases it. Absent (tests), none. */
+  block?: BlockSel | null;
+  /** THE SHOWN TICK'S BLOCKS (the Transaction blocks register, from its window — the caller's, since
+   *  the window lives outside this module), newest first, each with the metagraph snapshot that
+   *  accepted it (null for a DAG block). The Block ghost's step opens the first (user, 2026-11-07:
+   *  the ghost "when clicked nothing happens"). Absent or null: no window, or not that register. */
+  tickBlocks?: { sel: BlockSel; snap: MetaSnapSel | null }[] | null;
+  /** The committed data block (the Data blocks register). Absent (tests), none. */
+  dataBlock?: DataBlockSel | null;
   selNodes: NodeRow[];
   metaList: MetaInfo[];
   /** Is this channel a CATALOGUED network? The caller's answer (the app catalog — `LISTED_IDS`),
@@ -170,20 +181,41 @@ function finish(
 // lives once (review fix, 2026-09-11: the pair had already begun to drift — the node key's
 // fallback differed between the two copies).
 
-const countryItem = (c: CountryStat, s: SiblingState): SiblingStep => ({
-  key: c.cc,
-  label: c.country,
-  actions: countryToggleActions(c.cc, { country: s.country, hasInspect: !!s.inspect, cohort: s.cohort }),
-});
+// THE NODE A STEP CARRIES (user, 2026-11-09 — `pickActions.cohortStepActions`): with a node held, a
+// provider or country step lands on a node of the SAME network in the new scope, so the Metagraph card
+// above it keeps its subject; where the scope has none, the node closes and the network stays as the
+// rail's browse (`keepNetOf` — "close the node, don't switch the network"). Only the sibling SET
+// carries: a parent's first-child step (`childStep`) opens a rung with nothing held below.
+const carryIn = (s: SiblingState, groups: readonly Cohort[]): { pick: PickDescriptor; cohort: Cohort } | null => {
+  if (!s.inspect) return null;
+  const net = pickNetId(s.inspect);
+  for (const g of groups) for (const r of g.rows) if (net && pickNetId(r.pick) === net) return { pick: r.pick, cohort: g };
+  return null;
+};
+/** The held node's network, to keep as the browse when the step closes the node — none under a
+ *  committed filter, which already holds the card's network. */
+const keepNetOf = (s: SiblingState): string | null => (s.inspect && s.filter === "all" ? pickNetId(s.inspect) : null);
 
-const cohortItem = (cc: string, g: Cohort, s: SiblingState): SiblingStep => ({
-  key: `${cc}|${g.city}|${g.isp}`,
-  label: cohortLabel(g),
-  actions: cohortToggleActions(
-    { cc, city: g.city, isp: g.isp },
-    { cohort: s.cohort, hasInspect: !!s.inspect },
-  ),
-});
+const countryItem = (c: CountryStat, s: SiblingState, carry = false): SiblingStep => {
+  const hit = carry ? carryIn(s, cohortsIn(s, c.cc)) : null;
+  return {
+    key: c.cc,
+    label: c.country,
+    actions: hit
+      ? countryStepActions(c.cc, { country: s.country, hasInspect: !!s.inspect, cohort: s.cohort }, { pick: hit.pick, cohort: { cc: c.cc, city: hit.cohort.city, isp: hit.cohort.isp } })
+      : countryStepActions(c.cc, { country: s.country, hasInspect: !!s.inspect, cohort: s.cohort }, null, carry ? keepNetOf(s) : null),
+  };
+};
+
+const cohortItem = (cc: string, g: Cohort, s: SiblingState, carry = false): SiblingStep => {
+  const sel = { cc, city: g.city, isp: g.isp };
+  const hit = carry ? carryIn(s, [g]) : null;
+  return {
+    key: `${cc}|${g.city}|${g.isp}`,
+    label: cohortLabel(g),
+    actions: cohortStepActions(sel, { cohort: s.cohort, hasInspect: !!s.inspect }, hit?.pick ?? null, carry ? keepNetOf(s) : null),
+  };
+};
 
 const compositionItem = (g: CompGroup, s: SiblingState): SiblingStep => ({
   key: g.key,
@@ -315,7 +347,7 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
         // should not be changed from the explorer", and a pager is the same kind of gesture. The
         // step pins the tick and commits the neighbour INSIDE it; the filter is the reader's lens
         // and stays what they set.
-        const items = nets.map((m) => ({ key: m.id, label: m.name, actions: tickNetSelectActions(m.id, s.snap!, { metaSnap: s.metaSnap, hasInspect: s.inspect != null, net }) }));
+        const items = nets.map((m) => ({ key: m.id, label: m.name, actions: tickNetSelectActions(m.id, s.snap!, { metaSnap: s.metaSnap, block: s.block ?? null }) }));
         return finish(slot, items, nets.findIndex((m) => m.id === net), `Global ${s.snap!.data.ordinal.toLocaleString()}`);
       }
       // A FILTER HOLDS THE CARD (`domain/viewNetwork.heldOut`): only the top bar leaves it. So what
@@ -331,7 +363,7 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
     case "country": {
       if (!s.country) return null;
       const cs = countriesOf(s);
-      const items = cs.map((c) => countryItem(c, s));
+      const items = cs.map((c) => countryItem(c, s, c.cc !== s.country));
       return finish(slot, items, cs.findIndex((c) => c.cc === s.country), networkLabel(s));
     }
 
@@ -339,8 +371,8 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
       if (!s.cohort) return null;
       const cc = s.cohort.cc;
       const groups = cohortsIn(s, cc);
-      const items = groups.map((g) => cohortItem(cc, g, s));
       const index = groups.findIndex((g) => sameCohort(s.cohort, { cc, city: g.city, isp: g.isp }));
+      const items = groups.map((g, i) => cohortItem(cc, g, s, i !== index));
       const parent = s.countries.find((c) => c.cc === cc)?.country ?? cc;
       return finish(slot, items, index, parent);
     }
@@ -379,19 +411,9 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
         parent = s.composition
           ? (scoped[0]?.label ?? networkLabel(s))
           : networkLabel(s);
-      } else if (
-        s.mode === "ledger" &&
-        s.metaSnap &&
-        snapshotSignerRows(s.selNodes, s.exactRows, s.metaSnap).some((r) => hoverKeyOf(r.pick) === curKey)
-      ) {
-        // UNDER A METAGRAPH SNAPSHOT the node's parent is that snapshot, so the pager steps the
-        // nodes that SIGNED it (user, 2026-09-29: "filtered based who actually was the validators,
-        // like explorer shows") — `snapshotSignerRows`, the explorer's own list, in its order.
-        // Only when this node IS one of them: a tray node that did not sign is still committable,
-        // and for it the snapshot is not its parent — it pages its network, as it always did.
-        rows = snapshotSignerRows(s.selNodes, s.exactRows, s.metaSnap);
-        parent = "Validators that signed";
       } else {
+        // (The Snapshots view paged a snapshot's SIGNERS here until 2026-11-08, when its node card
+        // and rung left; the signer level is the explorer's reading now.)
         // A network-wide node list has no explorer level; today's order is kept.
         rows = machinesOf([...s.selNodes].sort(nodeOrder));
         parent = networkLabel(s);
@@ -401,6 +423,29 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
       return finish(slot, items, items.findIndex((it) => it.key === curKey), parent);
     }
 
+    // THE TWO BLOCK CARDS PAGE THEIR GLOBAL SNAPSHOT (user, 2026-11-09: "Global snapshot 7274965 has 3
+    // blocks, but the 'transaction block' card has no swipe left/right. Check the block cards (tx,
+    // data) and ensure they have the range to swipe of >1 blocks in its parent global snapshot"). The
+    // Block card had no set at all, and the Data block card's stopped at its own metagraph snapshot.
+    // A step to a block of another snapshot in the tick commits that snapshot with it — the click's
+    // own builder, so the rungs above stay true.
+    case "block": {
+      const cur = s.block;
+      if (!cur || !s.snap || s.snap.data.ordinal !== cur.anchorOrd) return null;
+      const items = (s.tickBlocks ?? []).map((b) => ({
+        key: `${b.sel.chain}:${b.sel.hash}`,
+        label: `${tickerOf(b.sel.chain)} ${shortBlockHash(b.sel.hash)}`,
+        actions: blockSelectActions(b.sel, s.snap!, { ...tickContextOf({ following: s.following, snap: s.snap, metaSnap: s.metaSnap, tickNet: s.tickNet, block: s.block }) }, b.snap),
+      }));
+      return finish(slot, items, items.findIndex((it) => it.key === `${cur.chain}:${cur.hash}`), `Global ${cur.anchorOrd.toLocaleString()}`);
+    }
+    case "dataBlock": {
+      const cur = s.dataBlock;
+      if (!cur) return null;
+      const items = tickDataBlocksOf(s);
+      const at = items.findIndex((it) => it.key === `${cur.snap.metaId}:${cur.snap.ordinal}:${cur.index}`);
+      return finish(slot, items, at, `Global ${cur.snap.globalOrdinal.toLocaleString()}`);
+    }
     case "metaSnap": {
       const cur = s.metaSnap;
       if (!cur) return null;
@@ -437,7 +482,7 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
         const items = wide.map(({ r, who }, i) => ({
           key: `${r.metaId}:${r.ordinal}:${i}`,
           label: `${who} ${ordinalLabel(r)}`,
-          actions: metaSnapSelectActions(metaSnapSelOf(r, cur.globalOrdinal), s.snap!, { metaSnap: cur, following: s.following, inspect: s.inspect }),
+          actions: metaSnapSelectActions(metaSnapSelOf(r, cur.globalOrdinal), s.snap!, { metaSnap: cur, following: s.following, block: s.block ?? null }),
         }));
         const index = wide.findIndex(({ r }) => r.metaId === cur.metaId && r.ordinal === cur.ordinal);
         return finish(slot, items, index, `Global ${cur.globalOrdinal.toLocaleString()}`);
@@ -455,7 +500,7 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
         // other rendered ordinal — and an undecodable payload says so rather than claiming 0
         // (the route's contract).
         label: ordinalLabel(r),
-        actions: metaSnapSelectActions(metaSnapSelOf(r, cur.globalOrdinal), s.snap!, { metaSnap: cur, following: s.following, inspect: s.inspect }),
+        actions: metaSnapSelectActions(metaSnapSelOf(r, cur.globalOrdinal), s.snap!, { metaSnap: cur, following: s.following, block: s.block ?? null }),
       }));
       const index = rows.findIndex((r) => r.metaId === cur.metaId && r.ordinal === cur.ordinal);
       return finish(slot, items, index, `${who} in global ${cur.globalOrdinal.toLocaleString()}`);
@@ -477,13 +522,9 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
         key: String(t.data.ordinal),
         label: t.data.ordinal.toLocaleString(),
         actions: snapshotSelectActions(
-          { kind: "snapshot", title: `Global snapshot #${t.data.ordinal}`, data: t.data },
+          globalPick(t.data),
           t.isLiveTip,
-          {
-            pinnedOrdinal: s.following ? null : cur.data.ordinal,
-            metaSnap: s.metaSnap,
-            tickNet: s.tickNet,
-          },
+          tickContextOf(s),
         ),
       }));
       // A pin that has aged out of the retained window can't be located, so it gets no pager
@@ -630,7 +671,7 @@ const anchoringNetworkChildren = (s: SiblingState, n: number): SiblingStep[] => 
   return (s.tickNets ?? []).slice(0, n).map((meta) => ({
     key: meta.id,
     label: meta.name,
-    actions: tickNetSelectActions(meta.id, snap, { metaSnap: s.metaSnap, hasInspect: s.inspect != null, net: null }),
+    actions: tickNetSelectActions(meta.id, snap, { metaSnap: s.metaSnap, block: s.block ?? null }),
   }));
 };
 /** ledger: the committed network's OWN snapshots in the shown tick — never the tick's first rows,
@@ -646,7 +687,7 @@ const metaSnapOfTickChildren = (s: SiblingState, n: number): SiblingStep[] => {
     return tickWideRows(s).slice(0, n).map(({ r, who }) => ({
       key: `${r.metaId}:${r.ordinal}`,
       label: `${who} ${ordinalLabel(r)}`,
-      actions: metaSnapSelectActions(metaSnapSelOf(r, snap.data.ordinal), snap, { metaSnap: s.metaSnap, inspect: s.inspect }),
+      actions: metaSnapSelectActions(metaSnapSelOf(r, snap.data.ordinal), snap, { metaSnap: s.metaSnap, block: s.block ?? null }),
     }));
   }
   // The explorer's own list for this network in this tick, NEWEST first — the ghost opens its top
@@ -656,18 +697,10 @@ const metaSnapOfTickChildren = (s: SiblingState, n: number): SiblingStep[] => {
   return tn.snaps.slice(0, n).map((r) => ({
     key: `${r.metaId}:${r.ordinal}`,
     label: ordinalLabel(r),
-    actions: metaSnapSelectActions(metaSnapSelOf(r, snap.data.ordinal), snap, { metaSnap: s.metaSnap, inspect: s.inspect }),
+    actions: metaSnapSelectActions(metaSnapSelOf(r, snap.data.ordinal), snap, { metaSnap: s.metaSnap, block: s.block ?? null }),
   }));
 };
 
-/** ledger: a metagraph snapshot's validators (user, 2026-09-29 — "from the metagraph snapshot …
- *  go to its validators"). The same list and order as the explorer's signer level
- *  (`snapshotSignerRows`); a signature no known node carries has nothing to open, so only KNOWN
- *  ones are offered. */
-const signerOfMetaSnapChildren = (s: SiblingState, n: number): SiblingStep[] => {
-  if (!s.metaSnap) return [];
-  return snapshotSignerRows(s.selNodes, s.exactRows, s.metaSnap).slice(0, n).map((r) => nodeItem(r, s));
-};
 
 export const CHILD_OF: Partial<Record<Mode, Partial<Record<RailCardKind, ChildEntry>>>> = {
   geo: {
@@ -682,7 +715,8 @@ export const CHILD_OF: Partial<Record<Mode, Partial<Record<RailCardKind, ChildEn
   ledger: {
     snap: { to: "context", steps: anchoringNetworkChildren },
     context: { to: "metaSnap", steps: metaSnapOfTickChildren },
-    metaSnap: { to: "node", steps: signerOfMetaSnapChildren },
+    // The metagraph snapshot is the ledger's last rung: its signers are the explorer's reading and the
+    // card's fact, no card of their own (2026-11-08); the block and the data block have steps of their own.
   },
   trend: {
     range: { to: "instant", steps: momentOfRangeChildren },
@@ -699,6 +733,68 @@ export const rootOf = (mode: Mode): ChildEntry | null => (VIEW_POLICIES[mode].ra
 
 /** Nothing while a drill is held: a network change clears a country and a provider, and in
  *  Hypergraph it would drop the node. The ghost then only opens its hint. */
+/** THE BLOCK GHOST'S STEP (the Transaction blocks register, 2026-11-07): the shown tick's first
+ *  block, through the block click's own builder — the block last so its card is the box, a token
+ *  block's snapshot with it. A block is a sibling subject of the tick, not a child of the snapshot
+ *  (`railLadderBoundary`'s `PASSES_OVER`), so it is not `CHILD_OF`'s step but its own, and the ghost
+ *  stays where the lane puts it — above the node. Null with no tick, or no block in it. */
+export function blockStep(s: SiblingState): SiblingStep | null {
+  if (!s.snap) return null;
+  // Only a block IN PLACE under what the rail shows (`blockInPlace`, 2026-11-08): under the Global
+  // alone the tick's first block; under a Metagraph card that network's; under a Metagraph snapshot
+  // card that snapshot's own — a DAG block is never offered under a metagraph snapshot.
+  const ord = s.snap.data.ordinal;
+  const first = s.tickBlocks?.find((b) => blockInPlace(b.sel, { globalOrdinal: ord, metaSnap: s.metaSnap, tickNet: s.tickNet })) ?? null;
+  if (!first) return null;
+  return {
+    key: `${first.sel.chain}:${first.sel.hash}`,
+    label: `${tickerOf(first.sel.chain)} ${shortBlockHash(first.sel.hash)}`,
+    actions: blockSelectActions(first.sel, s.snap, { ...tickContextOf({ following: s.following, snap: s.snap, metaSnap: s.metaSnap, tickNet: s.tickNet, block: s.block }) }, first.snap),
+  };
+}
+
+/** THE COMMITTED METAGRAPH SNAPSHOT'S DATA BLOCKS, as its exact row summarises them (the Data block
+ *  card's set): one step per block, in the snapshot's order. Empty with no snapshot, no read, or none. */
+function dataBlocksOf(s: SiblingState): SiblingStep[] {
+  const ms = s.metaSnap;
+  if (!ms || !s.snap || s.snap.data.ordinal !== ms.globalOrdinal) return [];
+  const row = s.exactRows?.find((r) => r.metaId === ms.metaId && r.ordinal === ms.ordinal);
+  const rows = row?.dataBlockRows ?? [];
+  return rows.map((_b, i) => ({
+    key: `${ms.metaId}:${ms.ordinal}:${i}`,
+    label: `${i + 1} of ${rows.length}`,
+    actions: dataBlockSelectActions({ snap: ms, index: i }, s.snap!, { dataBlock: s.dataBlock ?? null, metaSnap: s.metaSnap, following: s.following, block: s.block ?? null }),
+  }));
+}
+
+/** EVERY DATA BLOCK IN THE SHOWN GLOBAL SNAPSHOT (the Data block card's set, 2026-11-09): each
+ *  data-carrying snapshot of the tick in turn, oldest first, and its blocks in order — under a
+ *  network filter, that network's alone (a filter holds the view). Empty with no tick or no read. */
+function tickDataBlocksOf(s: SiblingState): SiblingStep[] {
+  const snap = s.snap;
+  if (!snap) return [];
+  const g = snap.data.ordinal;
+  const net = s.filter === "all" || s.filter === DAG_CORE ? null : keyOf(s, s.filter);
+  const rows = (s.exactRows ?? [])
+    .filter((r) => (r.dataBlockRows?.length ?? 0) > 0 && (net == null || keyOf(s, r.metaId) === net))
+    .sort((a, b) => (a.metaId === b.metaId ? a.ordinal - b.ordinal : a.metaId < b.metaId ? -1 : 1));
+  return rows.flatMap((r) => {
+    const polled = s.tickNets?.flatMap((tn) => tn.snaps).find((x) => x.metaId === r.metaId && x.ordinal === r.ordinal);
+    const ms: MetaSnapSel = { metaId: r.metaId, ordinal: r.ordinal, hash: polled?.hash ?? "", globalOrdinal: g, ts: polled?.ts ?? snap.data.timestamp };
+    return r.dataBlockRows!.map((b, i) => ({
+      key: `${r.metaId}:${r.ordinal}:${i}`,
+      label: `${tickerOf(r.metaId)} ${shortBlockHash(b.digest)}`,
+      actions: dataBlockSelectActions({ snap: ms, index: i }, snap, { dataBlock: s.dataBlock ?? null, metaSnap: s.metaSnap, following: s.following, block: s.block ?? null }),
+    }));
+  });
+}
+
+/** THE DATA BLOCK GHOST'S STEP (the Data blocks register, 2026-11-07): the committed metagraph
+ *  snapshot's first data block; null with no snapshot pinned, or none carried. */
+export function dataBlockStep(s: SiblingState): SiblingStep | null {
+  return s.following ? null : (dataBlocksOf(s)[0] ?? null);
+}
+
 export function rootStep(s: SiblingState): SiblingStep | null {
   if (s.inspect || s.country || s.cohort || s.filter !== "all") return null;
   return rootOf(s.mode)?.steps(s, 1)[0] ?? null;

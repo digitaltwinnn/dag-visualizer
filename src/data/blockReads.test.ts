@@ -1,0 +1,76 @@
+import { describe, expect, it } from "vitest";
+import { blockReadKey, blockReadOf, exactEvictions, wantedBlockReads, wantedExactReads, windowBlockKeys, windowReadsSettled } from "@/src/data/blockReads";
+import type { BlockRead } from "@/src/engine/domain/blockBraid";
+import { foldBlockWindow } from "@/src/data/blockWindow";
+import type { RawMetaSnapshot } from "@/src/data/types";
+
+const meta = (ordinal: number, blocks: string[]) => ({ ordinal, hash: "m" + ordinal, lastSnapshotHash: "", timestamp: "", blocks }) as unknown as RawMetaSnapshot;
+const tick = (ord: number, blocks: string[], m: Record<string, RawMetaSnapshot[]> = {}) => ({ ord, ts: new Date(ord * 10_000).toISOString(), hash: "g" + ord, blocks, metaSnaps: m });
+const w = foldBlockWindow({
+  ticks: [tick(100, ["d0"]), tick(300, ["d1"], { DOR: [meta(51, ["t1"])] }), tick(200, [], { DOR: [meta(40, [])] })],
+  chains: ["dag", "DOR"],
+}, {});
+
+describe("block reads wanted by a window", () => {
+  it("keys a read chain:ordinal", () => {
+    expect(blockReadKey("dag", 7)).toBe("dag:7");
+  });
+  it("newest tick first: the DAG read, then each block-bearing metagraph snapshot; none for an empty one", () => {
+    expect(wantedBlockReads(w, {}, {}).map((x) => x.key)).toEqual(["dag:300", "DOR:51", "dag:100"]);
+    expect(wantedBlockReads(w, {}, {})[1]).toEqual({ key: "DOR:51", chain: "DOR", ordinal: 51 });
+  });
+  it("skips what is held; a missed token read is not asked again, a missed DAG read still is", () => {
+    expect(wantedBlockReads(w, { "dag:300": {} }, { "dag:100": true }).map((x) => x.key)).toEqual(["DOR:51", "dag:100"]);
+    expect(wantedBlockReads(w, {}, { "DOR:51": true }).map((x) => x.key)).toEqual(["dag:300", "dag:100"]);
+  });
+  it("asks the exact read of EVERY window tick, a token-only tick too, newest first, leaving out what landed", () => {
+    expect(wantedExactReads(w, {})).toEqual([300, 200, 100]);
+    expect(wantedExactReads(w, { 200: {} })).toEqual([300, 100]);
+    expect(wantedExactReads(null, {})).toEqual([]);
+  });
+  it("windowBlockKeys holds every key the window could want", () => {
+    expect([...windowBlockKeys(w)].sort()).toEqual(["DOR:51", "dag:100", "dag:300"]);
+  });
+});
+
+describe("windowReadsSettled — the DAG is laid out once, when every read has landed or missed", () => {
+  it("is settled when each wanted read is held, or missed (a DAG read by its tick's exact miss); never without a window", () => {
+    const held = { "dag:100": { blocks: [] }, "dag:300": { blocks: [] }, "DOR:51": { blocks: [] } };
+    expect(windowReadsSettled(w, held, {}, {})).toBe(true);
+    expect(windowReadsSettled(w, { "dag:100": { blocks: [] }, "DOR:51": { blocks: [] } }, {}, { 300: true })).toBe(true);
+    expect(windowReadsSettled(w, { "dag:100": { blocks: [] }, "dag:300": { blocks: [] } }, { "DOR:51": true }, {})).toBe(true);
+    expect(windowReadsSettled(w, { "dag:100": { blocks: [] }, "dag:300": { blocks: [] } }, {}, {})).toBe(false);
+    expect(windowReadsSettled(w, held, {}, {})).toBe(true);
+    expect(windowReadsSettled(null, held, {}, {})).toBe(false);
+  });
+});
+
+describe("one block's read", () => {
+  const b = (hash: string, parents: string[]): BlockRead => ({ hash, height: 1, parents: parents.map((p) => ({ hash: p, height: 0 })), txCount: 1, amount: 1, fee: 0, signers: 3, transfers: [] });
+  const reads = {
+    [blockReadKey("dag", 300)]: { blocks: [b("d1", ["d0", "x"]), b("d2", ["d0", "d1"])] },
+    [blockReadKey("dag", 100)]: { blocks: [b("d0", ["y", "z"])] },
+    [blockReadKey("dor", 52)]: { blocks: [b("t1", ["d0", "q"])] },
+  };
+  it("finds the block in its accepting snapshot's read, or nothing before it lands", () => {
+    expect(blockReadOf(reads, { chain: "dag", hash: "d2", ordinal: 300 })?.parents.map((p) => p.hash)).toEqual(["d0", "d1"]);
+    expect(blockReadOf(reads, { chain: "dag", hash: "d9", ordinal: 300 })).toBeNull();
+    expect(blockReadOf(reads, { chain: "dag", hash: "d0", ordinal: 999 })).toBeNull();
+  });
+});
+
+describe("exactEvictions — the bounded exact cache never drops a held window's ordinal (review I3)", () => {
+  it("drops nothing within the cap", () => {
+    expect(exactEvictions([1, 2, 3], 3, new Set())).toEqual([]);
+  });
+  it("drops the lowest ordinals past the cap", () => {
+    expect(exactEvictions([5, 1, 4, 2, 3], 3, new Set())).toEqual([1, 2]);
+  });
+  it("skips a held window's ordinals and drops the next lowest instead", () => {
+    expect(exactEvictions([1, 2, 3, 4, 5], 3, new Set([1, 2]))).toEqual([3, 4]);
+  });
+  it("keeps every held ordinal even past the cap — the window is bounded, the live tip is not", () => {
+    expect(exactEvictions([1, 2, 3, 4], 2, new Set([1, 2, 3]))).toEqual([4]);
+    expect(exactEvictions([1, 2, 3], 1, new Set([1, 2, 3]))).toEqual([]);
+  });
+});

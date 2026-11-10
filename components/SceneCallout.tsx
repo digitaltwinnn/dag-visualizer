@@ -37,16 +37,26 @@
 // - ledger: the pinned metagraph snapshot's own tile (rewind included), else the committed
 //   global tick's byte-bar lead.
 import { viewNetwork } from "@/src/engine/domain/viewNetwork";
-import { useState, type CSSProperties } from "react";
+import { useState, type CSSProperties, useSyncExternalStore } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
-import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
+import { VIEW_POLICIES, readsBlockWindow, registerOf } from "@/src/engine/domain/viewPolicy";
+import { blockReadOf } from "@/src/data/blockReads";
+import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
+import { REGISTER_MEASURES, dataUpdatesOf } from "@/src/data/ledgerMeasure";
+import { carriesData } from "@/src/engine/domain/dataMark";
+import { calloutSubject, type CalloutSubject } from "@/src/engine/domain/calloutSubjects";
+import { REGISTER_ICONS } from "@/components/icons";
+import { UNLISTED_ID } from "@/src/data/unlistedId";
+import { blockLead } from "@/components/inspector/blockLead";
+import { identityHudCss } from "@/src/palette/identity";
 import { displayNetwork } from "@/src/data/unlisted";
 import { coLocatedNetworks, filterAccent, isAnchorSettling, ledgerAnchor, metagraphById } from "@/src/data/network";
-import { fmtKB, fmtShareKB, midHash } from "@/src/util/format";
+import { fmtKB, fmtShareKB, midHash, shortBlockHash } from "@/src/util/format";
 import { iconForPick } from "@/components/icons";
 import { SceneMark, type SceneMarkSpec } from "@/components/SceneMark";
+import Odometer from "@/components/Odometer";
 import { netKeyOf } from "@/src/engine/domain/pickActions";
 import { NODE_ID_GLYPHS } from "@/components/explorer/nodeRow";
 import { SCENE_GLASS } from "@/components/selection";
@@ -55,12 +65,13 @@ import { QualifierChip, RoleChips, TickerChip } from "@/components/inspector/par
 // own RoleChips (user, 2026-08-15: "look at my cards — square pills").
 import { layerCodesOf } from "@/src/data/composition";
 import { useNowTick } from "@/components/useNowTick";
+import { useMinHold } from "@/components/useMinHold";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { relativeAge } from "@/src/util/relativeAge";
-import { CALLOUT_OFF_X, CALLOUT_OFF_Y, CALLOUT_LEG_INSET, CALLOUT_PHONE_K, CALLOUT_HANG_K } from "@/src/engine/domain/calloutPlacement";
+import { CALLOUT_OFF_X, CALLOUT_OFF_Y, CALLOUT_LEG_INSET, CALLOUT_PHONE_K, CALLOUT_HANG_K, CALLOUT_W, CALLOUT_H } from "@/src/engine/domain/calloutPlacement";
 import type { GeoInfo } from "@/src/data/types";
 import LiveDot from "@/components/LiveDot";
-import { PinnedMark } from "@/components/state/StateAtoms";
+import { PinnedMark, Resolving } from "@/components/state/StateAtoms";
 import { IDENT_INK } from "@/components/identInk";
 import { ledgerNetwork } from "@/src/engine/domain/tickNet";
 import { useFeedRead } from "@/components/useFeedRead";
@@ -85,7 +96,17 @@ import { useFeedRead } from "@/components/useFeedRead";
 interface CalloutModel {
   /** The title is an id (a node's), set in the mono register ids wear everywhere else. */
   titleMono?: boolean;
+  /** The PANEL's subject: a change re-rolls its words (a live subject keys by its lane, so a
+   *  heartbeat does not). */
   key: string;
+  /** The ANCHOR's subject, exactly — the live block's hash, the live snapshot's ordinal — written to
+   *  `data-subject`; a change glides the standing label to it (`CalloutSync`, 2026-11-09). Absent:
+   *  the key. */
+  at?: string;
+  /** THE SNAPSHOTS VIEW'S SUBJECT KIND (`calloutSubject`'s answer), written to `data-kind`: the anchor
+   *  the Engine reads, so the label and the point it hangs on are ONE decision (user, 2026-11-09: the
+   *  global snapshot's label "attached … to the metagraph snapshot … should never happen"). */
+  kind?: Exclude<CalloutSubject, null>;
   eyebrow: string;
   title: string;
   /** `chip` is a second, separate fact beside the state — an age — never a clause after a dot. */
@@ -109,6 +130,11 @@ interface CalloutModel {
     codes?: string[];
     /** A second measure of the same subject, on the right — a size beside a count. */
     chip?: string;
+    /** THE READ IS IN FLIGHT (user, 2026-11-09: "instead of 'reading' in text can't we use the visual
+     *  cue?"): the line draws the app's acquiring atom, `NodeStars`, where its words will land. */
+    pending?: boolean;
+    /** The held cue's fade-out (`useMinHold`), as the card's. */
+    pendingFading?: boolean;
   };
 }
 type Model = CalloutModel;
@@ -127,12 +153,24 @@ const geoOf = (p: { kind: string }): GeoInfo | undefined =>
   "geo" in p ? (p as { geo?: GeoInfo }).geo : undefined;
 
 
-/** The callout PANEL alone — the eyebrow / title+aside / lead grammar on SCENE_GLASS — shared
- *  with the LiveStrip's bar hover (user, 2026-08-16: "fully re-use the one from the scene"),
- *  which wraps it in its own cursor-follow box instead of the Engine-anchored `.co-panel`. */
+/** The callout PANEL alone — the eyebrow / title+aside / lead grammar on SCENE_GLASS, placed by
+ *  the Engine-anchored `.co-panel`. */
 function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; className?: string; onDismiss?: () => void }) {
   return (
-    <div key={m.key} className={cn("roll-in whitespace-nowrap", SCENE_GLASS, className)}>
+    // KEYED BY THE SUBJECT'S KIND, not the subject (user, 2026-11-09: "use the odometer on the callout
+    // headers, for example global snapshot #"): a new subject of the same kind — a live tick, a pager
+    // step — keeps the panel and rolls its title on the odometer; a new KIND (a global to a block)
+    // still rolls the whole panel in.
+    // THE ONE SIZE (`CALLOUT_W` / `CALLOUT_H`, 2026-11-09): a fixed box, so no reading — an age
+    // ticking down, a size chip arriving — can resize the label; a line too long for it truncates.
+    <div
+      key={m.eyebrow}
+      className={cn(
+        "roll-in whitespace-nowrap flex flex-col overflow-hidden w-(--co-w) h-(--co-h)",
+        SCENE_GLASS,
+        className,
+      )}
+    >
       {/* The identity EDGE SPINE (user, 2026-08-15 — "the rails/hairline effect on the left
           side, attached", then "let it fade into the corners"): the sheets' single-identity-
           cue language at callout scale, as the shared `.edge-spine` recipe (globals.css) — a
@@ -173,7 +211,7 @@ function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; className?
           on this row, and the anchor ring is the subject mark at the scene end of the tie. */}
       <div className="flex items-center gap-[7px]">
         {m.mark && <SceneMark mark={m.mark} />}
-        <span className={cn("text-body font-semibold text-foreground", m.titleMono && "font-mono tabular-nums")}>{m.title}</span>
+        <Odometer text={m.title} className={cn("min-w-0 text-body font-semibold text-foreground tabular-nums", m.titleMono && "font-mono")} />
         {/* A hued aside is a TICKER beside a title, so it is the card head's own chip
             (`TickerChip`, 2026-10-02); the un-hued one is a state line and stays text. Both sit
             at the row's right edge (user, 2026-11-03: "right align the tags (pinned, network,
@@ -194,7 +232,10 @@ function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; className?
         ) : m.aside ? (
           // Age, then state — the order the card's own head reads (2026-10-03).
           <span className="ml-auto pl-3 inline-flex items-center gap-1.5 text-label text-muted-foreground">
-            {m.aside.chip && <QualifierChip className="mr-0.5 tabular-nums">{m.aside.chip}</QualifierChip>}
+            {/* A FIXED FLOOR UNDER THE AGE (user, 2026-11-09: "avoid that the width jumps when 10s goes to
+                1s when new data arrived"): two digits, the unit and " ago" at tabular width, so the
+                panel holds its size as the age ticks and resets. */}
+            {m.aside.chip && <QualifierChip className="mr-0.5 tabular-nums min-w-[calc(7ch+12px)] justify-center">{m.aside.chip}</QualifierChip>}
             {m.aside.live && <LiveDot />}
             {m.aside.pinned && <PinnedMark />}
             {m.aside.text}
@@ -215,16 +256,20 @@ function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; className?
           CardHead applies when collapsed. Inside the padded box, so it shares the content
           edge like every resting division. */}
       {m.lead && (
-        <div className="mt-1.5 pt-1.5 border-t border-border flex items-center gap-1.5 text-label text-muted-foreground">
+        // TABULAR, with a floor under the size (2026-11-09, the age chip's rule): the live lead's count
+        // and size change every tick, and proportional digits nudged the panel's width with them.
+        <div className="mt-1.5 pt-1.5 border-t border-border flex items-center gap-1.5 text-label text-muted-foreground tabular-nums">
           {m.lead.ident && (
             <span className={cn("font-bold", IDENT_INK)} style={{ color: m.lead.ident.hue }}>
               {m.lead.ident.text}
             </span>
           )}
-          {m.lead.text && <span>{m.lead.text}</span>}
+          {/* The read in flight: the shared atom, one text line tall (2026-11-09). */}
+          {m.lead.pending && <Resolving className={cn(m.lead.pendingFading && "animate-hold-fade-out motion-reduce:animate-none")} />}
+          {m.lead.text && <span className="min-w-0 truncate">{m.lead.text}</span>}
           {(!!m.lead.codes?.length || !!m.lead.chip) && <span className="flex-1 min-w-3" />}
           {m.lead.codes && m.lead.codes.length > 0 && <RoleChips codes={m.lead.codes} />}
-          {m.lead.chip && <QualifierChip className="tabular-nums">{m.lead.chip}</QualifierChip>}
+          {m.lead.chip && <QualifierChip className="tabular-nums min-w-[calc(6ch+12px)] justify-center">{m.lead.chip}</QualifierChip>}
         </div>
       )}
     </div>
@@ -246,15 +291,45 @@ export default function SceneCallout() {
   const snap = useStore((s) => s.snap);
   const tickNet = useStore((s) => s.tickNet);
   const exact = useStore((s) => (s.snap ? s.snapshotExact[s.snap.data.ordinal] : undefined));
+  const exactMissed = useStore((s) => (s.snap ? s.exactMiss[s.snap.data.ordinal] != null : false));
+  // THE CARD'S HOLD (user, 2026-11-09: "the card holds the cue about a second longer than the callout
+  // — apply the same rule"): the tick's read in flight shows its `Resolving` cue for one calm cycle
+  // even when the read lands sooner, then fades — `useMinHold`, the Global card's own (AnchoredTags).
+  const resolveHold = useMinHold(snap != null && exact == null && !exactMissed);
+  // A read that failed stops resolving and says so, as the card's lead does ("Read failed").
+  const resolving = (exact == null && !exactMissed) || resolveHold.show;
   const following = useStore((s) => s.following);
   const liveFeed = useStore((s) => s.live);
+  // THE BLOCKS REGISTER'S SUBJECT (D3): the Block card's — the live newest block or the pinned one.
+  const inBlocks = useStore((s) => readsBlockWindow(registerOf(s.mode, s.ledgerRegister)));
+  // THE SNAPSHOT'S LABEL SPEAKS THE REGISTER'S SUBJECT (user, 2026-11-07: "snapshot anchor should
+  // show information related to the sub-view"): in Data blocks the data blocks it carried and their
+  // updates, from the exact read (`dataOnly`, the register's own measure row); else its anchors.
+  const dataLead = useStore((s) => REGISTER_MEASURES[s.ledgerRegister].dataOnly);
+  const block = useStore((s) => s.block);
+  const blockRead = useStore((s) => (s.block ? blockReadOf(s.blockReads, s.block) : null));
+  const blockWin = useSyncExternalStore(onBlockWindow, getBlockWindow, () => null);
+  const register = useStore((s) => s.ledgerRegister);
+  const dataBlock = useStore((s) => s.dataBlock);
+  // The committed metagraph snapshot's exact BYTES (its own row), for its label's lead chip.
+  const metaSnapBytes = useStore((s) => {
+    const m = s.metaSnap;
+    if (!m) return null;
+    return s.snapshotExact[m.globalOrdinal]?.rows.find((r) => r.metaId === m.metaId && r.ordinal === m.ordinal)?.bytes ?? null;
+  });
+  const dataBlockRow = useStore((s) => {
+    const d = s.dataBlock;
+    if (!d) return null;
+    return s.snapshotExact[d.snap.globalOrdinal]?.rows.find((r) => r.metaId === d.snap.metaId && r.ordinal === d.snap.ordinal)?.dataBlockRows ?? null;
+  });
   // Holds only while a callout can SHOW — the view's policy allows one, the scene layer is up and
   // something is committed for it to name (mounted in every view, it reads nothing at rest).
   useFeedRead(
     ["metasnaps", "clusters", "api-metagraphs", "api-geo", "exact"],
     "SceneCallout",
-    VIEW_POLICIES[mode].callout && section === "scene" && (filter !== "all" || !!inspect || !!cohort || !!country || !!snap || !!metaSnap || !!tickNet),
+    VIEW_POLICIES[mode].callout && section === "scene" && (filter !== "all" || !!inspect || !!cohort || !!country || !!snap || !!metaSnap || !!tickNet || !!block),
   );
+  useFeedRead(["api-blocks"], "SceneCallout block", VIEW_POLICIES[mode].callout && section === "scene" && inBlocks && !!block);
   // THE BOX LEADS (user, 2026-08-15 — clicking a committed node's hub re-boxes the metagraph
   // card and "nothing happens in the scene"): the box is the subject (it gets the camera), so
   // the callout mirrors it. Inspector publishes the boxed slot; the Engine's anchor resolvers
@@ -269,8 +344,8 @@ export default function SceneCallout() {
   const now = useNowTick(1000);
   // ON A PHONE, ONE COMPACT LABEL STRAIGHT ABOVE ITS SUBJECT (user, 2026-10-04 — reversing
   // 2026-08-18's phone decline: "it should fit, can also shorten the line … perhaps add an x").
-  // The placement is CalloutSync's (`calloutPhonePlacement`); here the phone variant keeps the head
-  // only (no lead row), shows one label rather than Snapshots' pair, and carries an × that hides
+  // The placement is CalloutSync's (`calloutPhonePlacement`); here the phone variant shows one label
+  // rather than Snapshots' pair (its lead back since 2026-11-09, below), and carries an × that hides
   // the label until the subject changes. `breakpointOf` is the one home for the tier (through
   // `useBreakpoint`), so both owners answer the same call.
   const bp = useBreakpoint();
@@ -345,7 +420,6 @@ export default function SceneCallout() {
   };
 
   let m: Model | null = null;
-  let m2: Model | null = null;
   if (mode === "hyper") {
     m = boxedCard === "context" ? (netModel() ?? nodeModel()) : (nodeModel() ?? netModel());
     if (!m) return null;
@@ -412,6 +486,7 @@ export default function SceneCallout() {
         // selectionKey applies to both live-advancing cards. A pin keys by ordinal: that IS
         // a new subject, and the replay is the acknowledgement.
         key: following ? `ms|${metaSnap.metaId}|live` : `ms|${metaSnap.metaId}|${metaSnap.ordinal}`,
+        at: `ms|${metaSnap.metaId}|${metaSnap.ordinal}`,
         eyebrow: "Metagraph snapshot",
         title: metaSnap.ordinal.toLocaleString(),
         // The state mark the global's label carries (user, 2026-10-18: "pinned is not shown on the
@@ -419,6 +494,9 @@ export default function SceneCallout() {
         aside: nnet ? { text: nnet.ticker, hue: nnet.hue, live: following, pinned: !following } : undefined,
         ring: nnet?.hue ?? "var(--primary)",
         mark: { icon: iconForPick("metaSnap"), hue: nnet?.hue ?? "var(--primary)" },
+        // A LEAD LIKE EVERY OTHER LABEL (2026-11-09, the one size): the global it was anchored to — the
+        // card's own first fact — and its size once the tick's exact read has landed (rule 10).
+        lead: { text: `Anchored to ${metaSnap.globalOrdinal.toLocaleString()}`, chip: metaSnapBytes != null ? fmtKB(metaSnapBytes / 1024) : undefined },
       };
     };
     const gsModel = (): Model | null => {
@@ -472,6 +550,7 @@ export default function SceneCallout() {
         // The live-lane key rule — see msModel above (the follow advances this ordinal ~every
         // tick; only a PIN is a new subject).
         key: following ? "gs|live" : `gs|${snap.data.ordinal}`,
+        at: `gs|${snap.data.ordinal}`,
         eyebrow: "Global snapshot",
         title: snap.data.ordinal.toLocaleString(),
         // The card's THIRD state, mirrored too (test pass, 2026-10-03): with the feed down the
@@ -488,8 +567,30 @@ export default function SceneCallout() {
         // (user, 2026-08-16 — "if filter, select the correct segment of the byte bar").
         ring: net !== "all" ? filterAccent(net) : "var(--core)",
         mark: { icon: iconForPick("snapshot"), hue: filterAccent(filter) },
+        // ONE STRUCTURE IN BOTH REGISTERS (user, 2026-11-09: "the bottom content changes based on the
+        // view-mode, but keep the same structure; x metagraphs anchored | y snapshots | data blocks |
+        // transactions"): the sentence is WHO anchored, the chip is the register's own count — the
+        // metagraph snapshots in Metagraph snapshots, the data blocks in Data blocks. (Transaction
+        // blocks labels the block, not the global: D3.) Both come from the exact read, so until it
+        // lands the lead shows the acquiring atom, and a failed read says so — never the other
+        // register's fact or a guessed count (rule 10; user, 2026-11-07, on a reload of /data-blocks).
         lead:
-          typeof total !== "number"
+          dataLead && resolving
+            ? { pending: true, pendingFading: resolveHold.fading }
+            : dataLead && !exact
+            ? { text: "Read failed" }
+            : dataLead && exact
+            ? (() => {
+                const rows = exact.rows.filter((r) => (mine ? netKeyOf(r.metaId) === netKeyOf(net) : true));
+                const nb = rows.reduce((n, r) => n + (carriesData(r) ? r.dataBlocks! : 0), 0);
+                // A row the decoder could not read makes the count unknown: no chip, never a short one.
+                const known = dataUpdatesOf(rows) != null;
+                const chip = known ? `${nb} data ${nb === 1 ? "block" : "blocks"}` : undefined;
+                return mine
+                  ? { ident: { text: mine.ticker || mine.name, hue: filterAccent(net) }, text: `${rows.length} metagraph ${rows.length === 1 ? "snapshot" : "snapshots"}`, chip }
+                  : { text: anchoredText(exact.channels, total), chip };
+              })()
+            : typeof total !== "number"
             ? undefined
             : mine && !settling
               ? {
@@ -499,7 +600,23 @@ export default function SceneCallout() {
                   text: `${share ?? 0} of ${total} metagraph ${total === 1 ? "snapshot" : "snapshots"}`,
                   chip: mineKB != null && exact ? fmtShareKB(mineKB, exact.totalSizeKB) : undefined,
                 }
-              : { text: `${total} metagraph ${total === 1 ? "snapshot" : "snapshots"}`, chip: exact ? fmtKB(exact.totalSizeKB) : undefined },
+              : {
+                  // WHO AND HOW MANY (user, 2026-11-09: "can we say x metagraphs anchored y snapshots?"),
+                  // the how-many as the chip since the same day (above). The metagraphs come from the
+                  // exact read, so until it lands the lead shows the acquiring atom — never a guessed
+                  // count (rule 10).
+                  pending: total !== 0 && resolving,
+                  pendingFading: resolveHold.fading,
+                  text:
+                    total === 0
+                      ? "No metagraph anchored"
+                      : exact && !resolving
+                        ? anchoredText(exact.channels, total)
+                        : !resolving
+                          ? "Read failed"
+                          : undefined,
+                  chip: total !== 0 && exact && !resolving ? `${total} ${total === 1 ? "snapshot" : "snapshots"}` : undefined,
+                },
       };
     };
     // THE NETWORK'S OWN LABEL, on its lane (user, 2026-10-03: "the dossier on snapshots page has
@@ -513,65 +630,115 @@ export default function SceneCallout() {
     // the network picked inside this global snapshot, else the filter.
     const lnet = ledgerNetwork({ filter, tickNet, snapOrdinal: snap?.data.ordinal ?? null });
     const laneModel = (): Model | null => (lnet === "all" || lnet === "dag" ? null : netModel(lnet));
-    // The boxed NODE card leads, alone (user, 2026-08-16 — a tray node selected via the card
-    // stack shows ITS callout).
-    const node = nodeModel();
-    if (boxedCard === "node" && node) m = node;
-    else {
-      // THE PAIR GETS TWO CALLOUTS (user, 2026-10-03: asked "should snapshot view have two
-      // callouts, one for global- and one for metagraph snapshot?" — "2 callouts"). A committed
-      // metagraph snapshot always stands with the global snapshot it is read against, and one
-      // label could only name one of them: the tile, with nothing saying which bar it fell
-      // into, or the bar, with the tile unnamed.
-      // ⚠️ EACH HAS ITS OWN ANCHOR, FIXED: the global snapshot is always the second
-      // (`callout-2`), whichever card is boxed. The first cut handed the subject's anchor to the
-      // boxed card and the other to the second — so re-boxing swapped the two, both wrappers
-      // remounted, and both labels replayed their whole entrance over two subjects that had
-      // not changed (the 2026-09-11 complaint, "it re-draws the card while the subject is the
-      // same"). The subject's anchor (`callout`) is the upper storey's: the metagraph snapshot's
-      // tile, or its network's lane when the Metagraph card is the box or no snapshot of that
-      // network is committed — the two stand at the same end of the same lane, so they share
-      // the one anchor rather than stack two labels on it. CalloutSync mirrors this exactly.
-      m = boxedCard === "context" ? (laneModel() ?? msModel()) : (msModel() ?? laneModel() ?? (snap ? null : node));
-      m2 = gsModel();
-    }
+    // IN THE BLOCKS REGISTER THE LABEL IS THE BLOCK'S (D3, user 2026-11-07: "In blocks, no snapshot
+    // callout but a block callout"). One label, on the Block card's subject — the live newest block
+    // or the pinned one — in the card head's own grammar: the block mark in its chain's hue, the short
+    // hash, the height chip and the live / pinned state, then the card's lead in its SHORT form (`blockLead`,
+    // how much moved and nothing more — user, 2026-11-07). Never the
+    // global's label: the live global is not drawn in this register. CalloutSync anchors it on the
+    // block's own place in the chamber (`LedgerView.selectedBlockAnchor`).
+    const blockModel = (): Model | null => {
+      if (!block) return null;
+      const hue = identityHudCss(block.chain);
+      // The block's AGE (user, 2026-11-08: "instead of 'height' use the 'x seconds ago' tag"): its
+      // accepting global snapshot's, the global label's own register.
+      const tickTs = blockWin?.blockTick(block.anchorOrd)?.ts;
+      const height = tickTs ? relativeAge(now - Date.parse(tickTs)) : undefined;
+      return {
+        // The live-lane key rule (msModel above): while following the subject is THE LIVE BLOCK, so a
+        // newer block re-points the label rather than replaying its entrance; a pin is a new subject.
+        key: following ? "blk|live" : `blk|${block.chain}:${block.hash}`,
+        at: `blk|${block.chain}:${block.hash}`,
+        eyebrow: "Transaction block",
+        title: shortBlockHash(block.hash),
+        titleMono: true,
+        aside: following
+          ? liveFeed
+            ? { text: "live", live: true, chip: height }
+            : { text: "no signal" }
+          : { text: "", pinned: true, chip: height },
+        ring: hue,
+        mark: { icon: iconForPick("block"), hue },
+        lead: { text: blockLead(block, blockRead, true) },
+      };
+    };
+    // THE DATA BLOCK's label (the Data blocks register, 2026-11-07): on its snapshot's tile, in its
+    // card's head grammar — its place in the snapshot, the updates chip — and the short lead.
+    const dataBlockModel = (): Model | null => {
+      if (!dataBlock) return null;
+      const hue = identityHudCss(dataBlock.snap.metaId);
+      const b = dataBlockRow?.[dataBlock.index] ?? null;
+      const updatesChip = b && !b.unread ? `${b.updates.toLocaleString()} ${b.updates === 1 ? "update" : "updates"}` : undefined;
+      return {
+        // The live-lane key rule (msModel): while following the subject is THE LIVE DATA BLOCK (the live
+        // snapshot's first, 2026-11-08), so a new tick re-points the label; a pick is a new subject.
+        key: following ? "db|live" : `db|${dataBlock.snap.metaId}:${dataBlock.snap.ordinal}:${dataBlock.index}`,
+        at: `db|${dataBlock.snap.metaId}:${dataBlock.snap.ordinal}:${dataBlock.index}`,
+        eyebrow: "Data block",
+        // Its ID, the card's title (user, 2026-11-09: "use id"): the digest, short.
+        title: b ? shortBlockHash(b.digest) : `${dataBlock.index + 1}`,
+        titleMono: true,
+        aside: following
+          ? liveFeed
+            ? { text: "live", live: true, chip: updatesChip }
+            : { text: "no signal" } // the global's and the block's third state (review, 2026-11-09)
+          : { text: "", pinned: true, chip: updatesChip },
+        ring: hue,
+        mark: { icon: REGISTER_ICONS.data, hue },
+        // An UNREAD block (the decoder could not read it) states no count: its `updates` is a 0 that
+        // means nothing (rule 10; the data review's M3).
+        lead: b ? { text: b.unread ? "Its updates could not be read" : `Carried ${b.updates.toLocaleString()} ${b.updates === 1 ? "update" : "updates"}, signed by ${b.signers.toLocaleString()}` } : undefined,
+      };
+    };
+    // WHICH SUBJECT THE VIEW LABELS — `domain/calloutSubjects`, the ONE chain CalloutSync anchors by
+    // too (2026-11-07: the two owners had each grown their own chain of ifs and drifted by register).
+    // ONE LABEL, THE BOX'S (user, 2026-11-08: "Two callouts is too much in the snapshot view, 1
+    // callout that relates to the subject, nothing else" — the pair's second label, the global's bar
+    // under the snapshot's tile since 2026-10-03, is retired): the open card's subject, else the
+    // register's live one.
+    const subject = calloutSubject({
+      register,
+      boxedCard,
+      hasSnap: !!snap,
+      hasMetaSnap: !!metaSnap,
+      hasBlock: !!block,
+      hasDataBlock: !!dataBlock,
+      lane: lnet !== "all" && lnet !== "dag" && lnet !== UNLISTED_ID,
+    });
+    m =
+      subject === "global" ? gsModel()
+      : subject === "block" ? blockModel()
+      : subject === "dataBlock" ? dataBlockModel()
+      : subject === "metaSnap" ? msModel()
+      : subject === "lane" ? laneModel()
+      : null;
+    if (m && subject) m = { ...m, kind: subject };
   }
-  if (phone) {
-    // One label on a phone — the subject's, else the global snapshot's — head only. The GLOBAL
-    // label wins while the Global snapshot card is the box (user, 2026-10-08: the metagraph's
-    // anchor "is shown when global snapshot card is active"): the one label points at the open card's
-    // subject, as the two-label desktop pairs each with its card.
-    if (m && m2 && boxedCard === "snap") m = null;
-    if (m) m2 = null;
-    if (m) m = { ...m, lead: undefined };
-    if (m2) m2 = { ...m2, lead: undefined };
-  }
-  // Closed for this view and subject (each Snapshots label has its own ×, so each is keyed). Once
-  // the slot shows ANY other subject — or none — the closure is spent, so re-selecting the closed
-  // subject brings its label back (review, 2026-10-04: "until something in that view changes").
-  const stale = (["callout", "callout-2"] as const).filter((slot) => {
-    const k = dismissed[`${mode}|${slot}`];
-    const cur = (slot === "callout" ? m : m2)?.key ?? null;
-    return k != null && k !== cur;
-  });
-  if (stale.length) {
+  // One label on a phone — WITH its lead since 2026-11-09 (user: "on phone the callouts are missing
+  // the bottom section, can you add it?"): the head-only phone label (2026-10-04) said what the
+  // subject is but not what it holds, and the lead is the line that does.
+  // Closed for this view and subject. Once the slot shows ANY other subject — or none — the closure
+  // is spent, so re-selecting the closed subject brings its label back (review, 2026-10-04: "until
+  // something in that view changes").
+  const closed = dismissed[`${mode}|callout`];
+  if (closed != null && closed !== (m?.key ?? null)) {
     setDismissed((d) => {
       const n = { ...d };
-      for (const slot of stale) delete n[`${mode}|${slot}`];
+      delete n[`${mode}|callout`];
       return n;
     });
   }
-  if (m && dismissed[`${mode}|callout`] === m.key) m = null;
-  if (m2 && dismissed[`${mode}|callout-2`] === m2.key) m2 = null;
-  if (!m && !m2) return null;
-  const dismiss = (slot: "callout" | "callout-2") => (key: string) => setDismissed((d) => ({ ...d, [`${mode}|${slot}`]: key }));
+  if (m && closed === m.key) m = null;
+  if (!m) return null;
+  const dismiss = (key: string) => setDismissed((d) => ({ ...d, [`${mode}|callout`]: key }));
 
-  return (
-    <>
-      {m && <CalloutMark m={m} id="callout" multi phone={phone} onDismiss={dismiss("callout")} />}
-      {m2 && <CalloutMark m={m2} id="callout-2" phone={phone} onDismiss={dismiss("callout-2")} />}
-    </>
-  );
+  return <CalloutMark m={m} id="callout" multi phone={phone} onDismiss={dismiss} />;
+}
+
+/** The global label's sentence, the same in both registers that draw it: who anchored. */
+function anchoredText(channels: number, total: number | undefined): string {
+  if (total === 0) return "No metagraph anchored";
+  return `${channels} ${channels === 1 ? "metagraph" : "metagraphs"} anchored`;
 }
 
 /** The callout geometry the stylesheet reads, written once from the TS constants. */
@@ -580,13 +747,13 @@ const CALLOUT_VARS = {
   "--co-off-y": `${CALLOUT_OFF_Y}px`,
   "--co-hang-k": String(CALLOUT_HANG_K),
   "--co-phone-k": String(CALLOUT_PHONE_K),
+  "--co-w": `${CALLOUT_W}px`,
+  "--co-h": `${CALLOUT_H}px`,
 } as CSSProperties;
 
-/** One callout: the 0-size anchor wrapper CalloutSync positions, its ring, leader and panel.
- *  `id` is the marker the engine queries (`callout` for the subject, `callout-2` for the global
- *  snapshot in Snapshots); `multi` mounts the hyper node's extra legs, which only the subject's
- *  callout ever draws. */
-function CalloutMark({ m, id, multi, phone, onDismiss }: { m: Model; id: "callout" | "callout-2"; multi?: boolean; phone?: boolean; onDismiss?: (key: string) => void }) {
+/** The callout: the 0-size anchor wrapper CalloutSync positions, its ring, leader and panel.
+ *  `id` is the marker the engine queries; `multi` mounts the hyper node's extra legs. */
+function CalloutMark({ m, id, multi, phone, onDismiss }: { m: Model; id: "callout"; multi?: boolean; phone?: boolean; onDismiss?: (key: string) => void }) {
   // The leader's two ends in the anchor's frame. On a PHONE it runs STRAIGHT UP into the panel
   // standing over the subject (`calloutPhonePlacement`), drawn as its own vertical line — scaling
   // the diagonal flat also flattened the draw-on mask to nothing, so the leader never showed.
@@ -599,14 +766,17 @@ function CalloutMark({ m, id, multi, phone, onDismiss }: { m: Model; id: "callou
   return (
     <div
       id={id}
-      // Keyed by SUBJECT (user, 2026-09-05 — the leader was already drawn while the panel was
-      // still rolling in): a subject change remounts the whole wrapper, so the entrance
-      // choreography below (panel roll → leader draw → ring landing) replays as one unit, and
-      // CalloutSync's documented assumptions hold by construction — fresh `data-on="0"`, and a
-      // fresh element for its multi-leg ref cache. The animations are PAUSED until the Engine
-      // flips `data-on` (globals.css), so after a camera flight the entrance plays when the
-      // callout actually appears instead of finishing invisibly mid-flight.
-      key={m.key}
+      // NOT KEYED BY SUBJECT (user, 2026-11-09: "can we avoid the re-draw and animate it to its new
+      // location?"). From 2026-09-05 a subject change remounted the wrapper so the entrance (panel
+      // roll → leader draw → ring landing) replayed as one unit; now the wrapper stays, its subject
+      // rides `data-subject`, and the Engine decides (`CalloutSync`): a label standing on screen
+      // GLIDES its anchor to the new subject while only the panel's words re-roll (the panel keeps
+      // its own key); a label hidden at the change (a camera flight) has its entrance rewound, so it
+      // still draws in as one unit where it reappears. The animations are PAUSED until the Engine
+      // flips `data-on` (globals.css). React writes `data-on` only at mount.
+      data-subject={m.at ?? m.key}
+      // The Snapshots view's anchor KIND — CalloutSync anchors exactly what this label names.
+      data-kind={m.kind}
       data-on="0"
       aria-hidden
       // The standoff and both of its factors, from their one home (`calloutPlacement.ts`) — the
@@ -620,7 +790,7 @@ function CalloutMark({ m, id, multi, phone, onDismiss }: { m: Model; id: "callou
         // A CASING IN THE GROUND'S COLOUR (2026-10-03): the ring wears its subject's hue and
         // lands on a block of that same hue — the Dor ring on Dor's lit bar read as nothing.
         // A thin ground-coloured line outside and inside it is what a map puts round a symbol.
-        className="co-tip absolute -translate-x-1/2 -translate-y-1/2 w-[9px] h-[9px] rounded-full border-[1.5px] [box-shadow:0_0_0_1.5px_color-mix(in_oklch,var(--background)_78%,transparent),inset_0_0_0_1px_color-mix(in_oklch,var(--background)_78%,transparent)]"
+        className="co-tip absolute -translate-x-1/2 -translate-y-1/2 w-[9px] h-[9px] rounded-full border-[1.5px] transition-[border-color] duration-(--tempo-roll) [box-shadow:0_0_0_1.5px_color-mix(in_oklch,var(--background)_78%,transparent),inset_0_0_0_1px_color-mix(in_oklch,var(--background)_78%,transparent)]"
         style={{ borderColor: m.ring }}
       />
       {/* Dashed leader from the anchor to the panel's near corner — the ordinal-label language,

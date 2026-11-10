@@ -102,7 +102,8 @@ the root is morph-scaled, so a world position would aim at the origin mid-morph.
 while focused, and picking is filter-gated to the in-focus selection's nodes. Depth of field is wired
 but no view opts in — the bokeh read as fuzz on the selected atom.
 
-**Snapshots** — the ladder is node → network → all. The chamber has one pose, at a subtle angle, and
+**Snapshots** — the ladder is network → all (the node rung retired 2026-11-08: a node is a
+snapshot's signer here, a reading, never a committed subject). The chamber has one pose, at a subtle angle, and
 a commit moves neither it nor the lanes; floors and trays are visual aid, and the real subjects are
 the snapshots themselves.
 
@@ -271,6 +272,23 @@ down to **its own band** — the literal statement of which bytes came from wher
 identically so adjacent ribbons can't cross, and a **hidden lane draws no ribbon** (its old-position
 sheet would overlap the committed lane's field). Only FOUR rows get a sheet — lead, hot, hover
 preview, grace — because N networks × every row is a wall of glass.
+
+**Each register wears its own sheet** (user, 2026-11-09: "the ribbon for metagraph snapshots and data
+blocks to the global snapshot is identical"; `REGISTER_CARGO.anchors` → `Ribbons.setStriped`, two
+uniforms, no rewrite or recompile). The **Metagraph snapshots** sheet is LINED ("can we give it a outer
+lining?"): a hairline along both long sides at 1 + `liningLine` (1.8) = 2.8× the fill's level, so the
+sheet reads as a defined shape. The **Data blocks** sheet is STRIPED (design option A): fine stripes
+running along its fall, `round(top width / stripeSp)` of them (0.22 world units, at least 3),
+converging with the sheet on its own sweep, over a fill at `stripeFill` (0.6) of the snapshot sheet's
+level and peaking at 0.6 + `stripeLine` (1.6) = 2.2× it — items in a stream on a quieter film, against
+one continuous state. It takes no lining: the stripes already draw its shape, and the two registers stay
+apart. Both are **one fragment term over a per-vertex across-sheet coordinate** (0 → n), antialiased
+in screen space with `fwidth` — the triangular 1-device-pixel profile of `SoftLines` — because the
+renderer has no MSAA and the half-res bloom haloes a hard step into a crawling fringe. The lining sits
+one pixel INSIDE each edge, never on the polygon's own stepped edge; stripes closer than ~3 px hand
+over to their average and linings on a sheet under ~6 px wide hand over to the plain sheet, so nothing
+aliases as the camera moves. Both ride the sheet's alpha, so `inkPresence` on paper and the dims and
+row fades apply unchanged.
 
 ⚠️ **That cap answers the UNFILTERED chamber, and it used to be inherited by the filtered one.** This
 paragraph claimed for months that "older ticks keep a hairline strut"; there was no such strut — it had
@@ -541,6 +559,231 @@ common case of a signer whose machine isn't knowable, and a listed metagraph wit
 gets exactly the same answer. So no surface fabricates a node card, and no surface grows its own
 special-case for unlisted.
 
+### The Blocks register
+
+The chamber reads three REGISTERS (`store.ledgerRegister`, a setting of the view, never a Mode —
+`docs/superpowers/specs/2026-11-05-block-dag-view-design.md`): Metagraph snapshots, Transaction blocks
+(this section — "Blocks" in the code) and Data blocks (the next). It is the SAME chamber: floor, planes,
+bars, labels, the rewind and the pose. What differs answers through ONE keyed map, `LedgerView`'s
+`REGISTER_CARGO` (a new register is a compile error there):
+
+- **The trail's source.** `ledgerSource(live, register)` answers the block window
+  (`src/data/blockWindow.ts`) in Blocks, so the slots are the block-bearing ticks; the slot model is
+  unchanged. A register flip, a past window and a block window that does not CONTINUE the one held
+  (`blockWindowContinues` — a refold or one new block tick at the front advances like a live tick)
+  all re-seat the chamber through the Engine's one `_reseatLedger`. An EMPTY source is an empty trail
+  (`_emptyTrail`), so the Snapshots rows never stand in for a window still loading, and a shorter
+  trail clears the slots it leaves behind. The live edge stands down in Blocks (`liveEdge: false`):
+  the trail's newest tick is sealed, never forming. What the front says there instead is the FRONT
+  RUN (below).
+- **The cargo on top** (`blocks: true`): two `objects/BlockTier.ts` tiers (the DAG's and the
+  tokens', one material each) and `objects/SilentStretch.ts`, drawn per frame only in that register
+  and CLEARED at the switch, so nothing of theirs is left to write. The tiers' meshes join
+  `pickables` in that register only (the raycaster ignores `visible`).
+- **Anchors are SEAL LINES, not sheets** (`anchors: "lines"`, user, design rounds D1, D2 and D8:
+  the sheets' width states snapshot size, which the blocks have nothing to do with, and read as
+  noise). The four sheet rows stand empty and `Ribbons.setAnchorLines` draws the threads' hairline
+  geometry on its OWN material (`SEAL_LOOK`): one per metagraph snapshot that carries a block, from
+  ITS tile down to its network's band (the bar's centre while the tick's exact read has not landed),
+  one per TOKEN block, STRAIGHT down from the block to its tile (`AnchorLine.yBot`, 2026-11-08 —
+  block → metagraph snapshot, then the tile's line says snapshot → global, each step once),
+  and one per DAG block, from the block down to the CENTRE of its tick's data bar (the bar spec's own
+  band extent), the floor-bound ones on the sheets' eased sweep, a DAG block's line in the chamber's muted NEUTRAL (`SceneColors.muted`) and a token block's
+  and tile's lines in its NETWORK HUE (the tile's own lane colour), all at the thin seal weight dark 0.28 / paper 0.5. It is a different species from the block links on purpose (D8: "the line
+  that 'seals' the block … looks the same"): links are the blocks' cyan S-curves running along the
+  trail, seals thin threads falling to the floor (grey from a DAG block, the network's hue from a tile). Off the lens a seal takes the row's `dim`.
+  `_syncThreads` is the one dispatch, so a filter change redraws the seals, never the
+  committed-network threads.
+- **Bare tiles are not drawn** (`tiles: "blocks"` — the register's SUBJECTS, `ledgerMeasure.REGISTER_SUBJECTS`,
+  the one row the explorer's and the rail's tick levels read too, 2026-11-08; same round): a metagraph snapshot carrying no
+  block zero-scales and leaves the pick table (`_blockTiles`, rebuilt with the tier; `_tileDrawn` is
+  the one question every pass asks); a tile that carries a token block stands, with its line.
+
+**Where a block stands is layout data, placed at event time** (`_rebuildBlockTier`, on every slot
+rebuild and read; a window change reaches it through the refresh that follows): a DAG block above
+its tick's bar, a token block OVER the tile of the metagraph snapshot that accepted it — the k-th
+filled tile of that tick, `k` the tile resolver's own index (`_tileOf`). `_tileTop` is the ONE
+copy of the tile arithmetic: the per-frame tile draw, the selected tile's callout anchor and the
+token placement all read it, the first two adding the frame's offsets. The BLOCK CALLOUT's anchor
+(D3) reads the same placed items: `BlockTier.anchorOf` is a block's placed top plus the rewind offset
+the view wrote, false while its row is off the trail, and `LedgerView.selectedBlockAnchor` asks it for
+the committed block (live or pinned) — layout data, rule 6.
+
+**The DAG's blocks are a LAYERED DAG DRAWING that opens VERTICALLY over the floor's centre line**
+(user, design rounds D2 and D8: "a DAG is shaped differently usually — isn't there some algo for
+it?" — the Sugiyama method, held to the chamber's time axis; then "no horizontal space … use the
+height instead"). Along the trail a block stands over its own tick — time, which never moves; its
+FORK SPREAD (`blockBraid.forkSpread`, heights from the lowest up, so parents are placed first) is the
+vertical: a block takes the LATTICE place nearest the mean of its placed parents' places, a half
+rounding TOWARD the centre line so a merge above and its mirror below land alike and the main
+chain never drifts off its line (review N2) (a pure
+mean decays every fork into a sliver of a lane down a long chain, and the trail read flat — found
+live), and blocks of one height sharing that place split symmetrically around it, one unit above
+and one below for a pair. So the main chain is a straight line, a fork opens into a diamond and
+closes where the blocks rejoin. The braid stands at z = the floor's centre, its centre line MID-WAY
+in the band between the bars' top face and the metagraph planes (`BRAID_LO` = bar top + a block's
+edge, `BRAID_HI` = the planes' y − a block's edge, `BRAID_Y` their middle — all layout data), and
+the window's widest fork fills that band above and below (`_braidScale`, which only ever tightens
+when a wider fork arrives and starts afresh with a window that shares no block with the last). Each
+block is tied down to its bar by a seal line (above). **The spread is the FORK's, never the
+protocol's block height** (user: "ignore the height"). The blocks wear the global snapshot's own
+glass — normal-blended, translucent, no depth write, the chamber's neutral cyan (`SceneColors.core`)
+— at `BLOCK_GLASS` (dark 0.5, paper 0.85).
+
+**A block holds still** (rounds D1, D2). A block placed once KEEPS its place: the last layout is
+handed back to `forkSpread` as `prior` (`LedgerView._blockZ`, pruned to the window by every rebuild),
+so neither a newer block nor the window's oldest block leaving moves one already standing, and a
+re-seated window that overlaps the last (the live window's own 30 s refresh) keeps what both hold.
+**And it is laid out ONCE** (user, 2026-11-07: "the layout for the DAG shifts around before it
+finally settles; can't this just be calculated and once positions are determined draw it once
+properly"): a window sharing no block with the last starts UNLAID (`_laid`), and an unlaid window
+draws no block at all until every read it wants has landed or missed — `blockReads.windowReadsSettled`,
+handed with the reads by the Engine (`setBlockReads(reads, settled)`, re-handed on every read, miss
+and window change); the band's "N of M blocks read" is the wait's instrument. On that edge the whole
+window is laid out from every read at once and holds. After it, a block is drawn only once its own
+read has settled — a new live tick's lands onto the laid drawing, a missed one stands on the centre
+line with no links — so nothing placed ever moves. The reads themselves land `WINDOW_READ_POOL`
+(8) at a time (`ensureMany`; ~6 s for 52 ticks at 4, measured, against ~23 s one every 450 ms).
+⚠️ A layout recomputed from the window moves: D1's lane from the
+window's lowest height swung the whole braid as reads landed, and D2's first cut — a pure barycenter
+pass over the window — re-dealt every block whenever the window slid by one tick (found live both
+times). The prior is what holds it.
+
+**Every reference is drawn, always** (round D2: "each block in view draws the line in the direction
+of the child block … draw it always"). `blockBraid.referenceSegments` draws both of a block's
+references: to the parent where it is placed on the trail, else as a STUB toward the older side at
+the block's own place, ending one slot past the trail's deepest row with its far end faded to
+nothing (row −1 in `BlockTier`). **A link is an S-CURVE** (D8: "start horizontal, curve, end
+horizontal"): `blockBraid.sCurve`, a cubic whose control points lie along the trail only
+(`LINK_BEND` × the run), sampled into `LINK_SAMPLES` segments at event time, its alpha eased from one
+end's row weight to the other's per frame; at rest it draws at `BLOCK_LOOK.link` (dark 0.8, paper
+0.92) in the blocks' cyan, IN the bloom layer (user, 2026-11-07: "add a bit of bloom" — its alpha is
+what meters the glow). ⚠️ A link that needs both ends ON the trail draws only for a
+selected block: the trail holds only the visible rows until a selection grows its reach. Both ends
+must be READ facts, not both drawn — the stub is what keeps every reference on screen. A block whose
+read has not landed states no references and draws none.
+
+**A token block stands OVER its tile, laid out as the DAG blocks are, in a SHORT band** (user,
+2026-11-07: "identical to how they are laid out for $DAG, so vertical, no long horizontal" — it
+superseded the on-the-tile nudge; 2026-11-08: the band was the DAG band's height, re-based on the tile,
+and it climbed out of the chamber's frame while every block's line ran on to the floor, so the blocks
+read as hung off the GLOBAL snapshots — "it attached to the global snapshots … not shown correctly"):
+centred on the tile of the metagraph snapshot that accepted it, its fork's height in a band a QUARTER
+of the DAG's (`TOKEN_BRAID_HALF`), `TOKEN_GAP` of clear room above the tile's top (`forkSpread` over
+every token chain at once, the widest token fork fitted to that half — `_tokenBraidScale`, held as
+`_braidScale` is), siblings at one height stepping aside along the trail by `TOKEN_STEP`, in the
+lane's hue, opaque like the tile. The protocol's two steps are drawn once each: a seal line falls
+STRAIGHT from each block to its tile (block → metagraph snapshot), and one line per block-carrying
+tile falls on to its network's band (snapshot → global). The DAG braid keeps its floor-bound lines:
+a DAG block is accepted straight into the global snapshot. A snapshot whose tile is not drawn puts no
+block anywhere.
+
+**Honesty (rule 10).** A block is drawn from the FEED's hashes, so a tick whose full read has not
+landed, or failed (`blockReadMiss`), shows its blocks with no links; a link is drawn only from a
+landed read (`referenceSegments`), its far end a placed parent or a fading stub. A landed block
+with no parents is a data block and is not drawn. **A block has ONE resting look** (`BLOCK_LOOK.rest`;
+design round D5, user on breathing the open tips: "don't"): the chamber states no tip state, so no
+block breathes, and a block's only emphasis is the hover and the selection below. Nothing reads a
+snapshot's `tips`.
+
+**The marks' brightness is the snapshots' vocabulary**: `snapBright` (the ledger row's dim, boost
+and back — a block is data) and `inkMix`/`inkPresence` with an ink floor on paper, joined to the
+bloom layer; a token block is opaque and depth-writing like its tile, a DAG block glass like its bar.
+A row is one object: blocks and each link END ask the trail's boundaries at their ROW's x (a block
+offset along a tile grid must not fade apart from its tile; an end's row is handed in beside the
+endpoints from the same `referenceSegments` walk), dissolve by zero-scale, and drop with
+their slot's entry beat. Links are SOFT LINES (`objects/SoftLines.ts`, 2026-11-09 — user: "color/jagged artifacts for the lines
+from certain angles … more with the bloom"): each segment a screen-space strip whose alpha falls off
+linearly to 0 one DEVICE pixel from its centre, so a link carries a 1px line's light without the
+stair-step the MSAA-less renderer gave a GL line — the step the whole-frame bloom haloed into a
+crawling fringe. FXAA over the whole frame was tried and dropped the same day: it smeared every 1px
+mark (the floor's ordinals, the dotted anchor lines). Positions at event time, alpha per segment end
+per frame, ranged uploads, `glowBlend` on each ground. The silent stretch is one dashed `LineSegments` flush in the floor
+between two rows' bars, plus a flat edge label ("1,364 snapshots · 4h", `relativeAge` — the app's one
+short span) past 200 snapshots (`blockBraid.stretchLabel`, the one home for both stretches' words); flat, not a billboard, because the floor's text is flat everywhere.
+**The live edge is the silent stretch growing at the front** (spec 2): in the LIVE window one more
+stretch, the FRONT RUN, stands ahead of the lead row's bar (`FRONT_RUN_X0` to `FRONT_INK_X`) for the
+globals since the newest block tick up to the live global, worded by the same rule. The Engine hands
+the live global (`setLiveGlobal`, null for a pinned past window) before each refresh, so it is
+rebuilt at event time on every live tick and its words grow with the silence. It rides the lead row
+(`ledgerModel.frontRunAt`): whole at rest, and gone before its far end reaches the rim when the
+rewind pushes the trail forward — never `frontAt`, which reads anything ahead of the lead as pushed
+off. It sits in the strip `LiveEdge.ts` measured as crowded (the floor's name, the front rim), so
+its words read faintly at the resting pose. **Over a PINNED PAST window the front claims no NOW**
+(user, 2026-11-10): no front run and no live line (`LedgerView.setPastFront`, which the Engine hands
+the clock while the held window's own `around` is set; the line's phase reads it beside `_frozen`),
+and in their place ONE quiet label at the run's own place — the window's AGE, its newest tick's age
+in the app's one short span ("18h ago", `relativeAge`), words alone with no dash (`dash: false`), the
+stretch's own recipe, opacity and `frontRunAt` ride. `blockBraid.frontMark` is the one decision —
+run, age or nothing — and its test the spec; the label is re-laid at event time only when its words
+change. The other two registers already claim nothing over a past window (`setFrozen`: the live
+edge is off, and they draw no front run), so they carry no age label.
+
+**The selection** is a slot under the tick, no focus rung and no pose (camera principle 2):
+`blockSelectActions` pins the accepting global and commits the block; the same block releases it
+alone. **A block is in exactly one snapshot**, so EVERY builder that pins a tick (the tick, a tile,
+a band, a network inside a tick, the raw layer's arrival, the follow switch) releases a block of
+another tick first, through `pickActions.releaseBlock` (the tile, band, network, arrival and follow
+builders take the block as a REQUIRED argument, so no caller can forget it); resuming live releases
+it whatever tick is shown. Hover rides `hoverBlock` (a block, not its tick) and previews only; the
+explorer row, the Block card, RAW's row and the chamber pair on it (convention 9). The selection
+rules are `src/engine/domain/CLAUDE.md`'s.
+
+**Pinned by** `domain/blockBraid.test.ts` (`forkSpread`'s placement, its lattice and its prior, the
+S-curve, every reference `referenceSegments` draws, the silent run), `src/data/blockWindow.test.ts`
+(the source, when it continues, and a metagraph's window holding its own blocks only) and
+`domain/pickActions.test.ts`'s block cases.
+
+### The Data blocks register
+
+The third register (D6, 2026-11-07 — user: "a 3rd option 'data blocks' which can visualize the DED
+which would inherit the snapshot layout?" → "Threeway."). Its `REGISTER_CARGO` row says all of it:
+`blocks: false, liveEdge: true, anchors: "striped"` — the Metagraph snapshots chamber (the same
+source, ribbons, bands and live edge; its sheets striped, see *Each register wears its own sheet*) — and `tiles: "data"`: **only a snapshot whose exact read says
+it carried data blocks is drawn** (user, 2026-11-07: "a metagraph that anchored but had no datablock
+is still shown … don't show it"; `domain/dataMark.carriesData`, the rule's one home), its tile
+wearing the mark. A dataless snapshot has no tile, is not picked, and is tied to its tick by nothing:
+`Ribbons.setBandGate` takes the register's `_dataBandGate`, so a band none of whose snapshots carried
+data in that tick gets no sheet and no thread. A tick whose read has not landed is unknown, so none of
+its tiles stand yet (rule 10) — the chamber fills as the reads land, as the Transaction blocks trail
+fills from its window. The explorer and the Metagraph card's pager read the same rule
+(`ladderLevels.dataCarryingNetworks`, `REGISTER_MEASURES.data.dataOnly`). Data blocks have no
+parents, so there is no braid and no link; nothing else in `update` branches on the register.
+
+**A register switch plays the arrival beat at its own tempo** (user, 2026-11-07: "when switching
+modes within a view, I think we need a transition time as well, although shorter than the view in/out
+animation"): the Engine arms `beginEntry(REGISTER_BEAT)` (`domain/entryBeat.ts`, 2.2 — the one beat,
+~0.4–0.6 s instead of ~1.3 s) and releases it at once, since there is no choreography to wait out
+inside a view; the tiles, bars and the block tier all ride the same `_entryDrop` / `_entryFade`.
+
+**The mark** is one `InstancedMesh` beside the tiles (`_dataMarkMesh`, the tiles' own species: solid,
+normal-blended, depth-writing, in the bloom set, not pickable — the tile under it answers the click),
+one instance per tile in the tile draw's order — **the tile's own size** since 2026-11-08 (user: "the
+same size as the snapshot block"; `DATA_MARK` foot 1, height 1): a second tile standing on the
+first in the lane's hue, a presence mark; the count of updates is the card's and the explorer's.
+**It is LIFTED 2.5 tiles' height off its tile and TETHERED to it** (user, 2026-11-09: "raise the
+datablocks from their snapshots more, like 2x to 3x current distance with a line attaching the
+blocks"; `DATA_MARK.lift`, was 1): one `SoftLines` hairline per mark (`_dataTether`, the same
+antialiased strip as the Transaction blocks links, since a GL line steps and fringes under the bloom),
+from the tile's top to the mark's underside, in the mark's own ink each frame, its alpha
+`DATA_TETHER` per ground (dark 0.7, paper 0.9) times the entry fade; written and committed in the
+mark's slots with the same `count`, zeroed with it. Not in the bloom set, and not pickable — the tile
+under it answers the click, as for the mark. Its COUNT is resolved at event time with the pick table
+(`_rebuildTilePicks`): the tile resolver names the metagraph snapshot, and that snapshot's own row in
+its tick's exact read gives `dataMarkCount` (`domain/dataMark.ts`) — a mark only where the row says
+it carried data blocks; a tile whose read has not landed shows none (rule 10, never guessed). Per frame
+it stands on the tile's top as that frame draws it (`_tileTop` plus the rewind and the entry drop), its
+HEIGHT `dataMarkHeight(count)` (a floor at one update, a decade's step after, a ceiling — one network
+writes a handful per snapshot, another hundreds), its footprint `DATA_MARK.foot` of the tile's, in the
+lane's identity hue at the tile's own eased brightness lifted by `DATA_MARK_GAIN` — so the dim, the
+focus, the boundary fades and the entry beat all reach it through its tile. Every slot is written or
+zero-scaled each frame in the register; leaving it zero-scales every slot the last such frame wrote
+(rule 5's discipline). A switch between the two registers that read the same source re-lays the trail
+(`_refreshLedger`) rather than re-seating it; only a switch to or from Transaction blocks changes the
+source and re-seats (`Engine`, the register subscription).
+
+Pinned by `domain/dataMark.test.ts` (which snapshot is marked, the height scale).
+
 ### The unlisted network
 
 **`unlisted` is a first-class network with one home** (`src/data/unlisted.ts`): the module owns its
@@ -620,6 +863,28 @@ Four decisions are recorded in the file's header and worth knowing before touchi
   differently placed, differently scaled recharts plot areas, so the mark would miss its bucket on
   four planes out of five — a cursor that misstates the data (rule 10). It is drawn per plane, in the
   plane's own coordinate system, by the chart that owns the scale.
+
+## Uploads are ranged, pools draw their count
+
+**A pooled attribute uploads only the slots written** (perf review, 2026-11-07, applied the same
+day). three uploads a `BufferAttribute` WHOLE when it has no update range, and every pool here is
+sized for its cap (6,000 tiles, 1,200 links) while drawing a few dozen — so the chamber shipped
+~1 MB a frame doing nothing. Every per-frame or event-time write to a pooled attribute now adds its
+range before the flag (`clearUpdateRanges(); addUpdateRange(0, n × itemSize); needsUpdate = true` —
+three clears the range after each upload, so the flag re-adds it every time): the lane tiles and the
+data marks (`LedgerView`), the two block tiers' matrices, colours and link buffers (`BlockTier`), the
+silent stretch's positions, distances and alphas (`SilentStretch`, whose line distances are a
+preallocated attribute written at rebuild — `computeLineDistances` allocated a fresh one per rebuild).
+A pool at zero twice in a row uploads nothing. **And a pool DRAWS its `count`**: the data marks draw
+the tiles drawn in the Data blocks register and none elsewhere (`_dataMarkMesh.count = markTo` — the
+pool's 6,000 zero-scaled boxes were 45% of the chamber's submitted triangles in every register).
+Measured after: Transaction blocks 2 KB a pass against ~1 MB, one 50 ms task per 10 s against ten of
+113–236 ms (the RAW blocks table re-rendering while hidden — it mounts only while the layer is up
+now). The block tier REBUILDS ONCE PER FRAME (`_tierDirty`, set by `setBlockReads`, run at the top
+of `update`): a landing exact read reached it three ways. The window REFOLDS only when a tick IN it
+changed (`BlockWindowBridge`'s `foldSig`). `CalloutSync` resolves the Snapshots view's label
+subjects once per `sync` into reused structs. The Engine's three feed listeners come off with it and
+it disposes the chamber (dev: a recreated Engine used to leave the old one's handlers running).
 
 ## The instance audit (dev only)
 

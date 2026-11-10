@@ -100,8 +100,7 @@ export default function RailThread({
   // --muted-foreground). Either way it is set ONCE as the SVG's `color` style property and
   // every accent stroke/fill below rides `currentColor` — a native SVG keyword, so the var()
   // cases resolve through CSS instead of needing a resolved-hex mirror in JS. That retires the
-  // whole 2026-08-08 bug class (the one-size core-hex fallback repainting the unlisted thread),
-  // and it is what lets the accent track the per-network [data-net] --primary override.
+  // whole 2026-08-08 bug class (the one-size core-hex fallback repainting the unlisted thread).
   const accent = filterAccent(filter);
   const [g, setG] = useState<{ top: number; left: number; height: number; marks: Mark[] } | null>(null);
 

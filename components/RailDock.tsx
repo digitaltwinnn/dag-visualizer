@@ -9,6 +9,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { ListTree, ChevronLeft, ChevronRight, type LucideIcon } from "lucide-react";
 import { EXPLORE_ICON } from "@/components/icons";
+import { HANDOVER_SHEET_GROW_MS } from "@/src/engine/domain/briefing";
 import { useStore } from "@/src/store/store";
 import { useSceneYield } from "@/components/RailShade";
 
@@ -291,9 +292,13 @@ export default function RailDock({
   // from the dock (measured: 427 → 25 → 257). The render that flips `open` still saw the other
   // dock's height, and that is the value the entry starts from.
   const seedRef = useRef(0);
+  // The tour's hand-over opens the sheet on a slower grow (`HANDOVER_SHEET_GROW_MS`); read on the
+  // open flip like the seed, so a later tap on the dock keeps the usual 550ms.
+  const slowGrowRef = useRef(false);
   useLayoutEffect(() => {
     if (isBarHalf && open) {
       seedRef.current = seedPx ?? 0;
+      slowGrowRef.current = useStore.getState().handover;
       setEntry("pre");
     }
     // `seedPx` is read on the flip only, on purpose (the note above).
@@ -366,7 +371,7 @@ export default function RailDock({
     // run. The slower clock holds through the entry, then hands back to the snap tempo.
     let raf2 = 0;
     const raf1 = requestAnimationFrame(() => { raf2 = requestAnimationFrame(() => setEntry("grow")); });
-    const settle = setTimeout(() => setEntry(null), 750);
+    const settle = setTimeout(() => setEntry(null), slowGrowRef.current ? HANDOVER_SHEET_GROW_MS + 200 : 750);
     const ro = new ResizeObserver(apply);
     ro.observe(fitEl);
     return () => {
@@ -822,7 +827,16 @@ export default function RailDock({
           side={sheetSide ?? side}
           // The phone bottom sheet's height is always stated inline — the finger's while a drag
           // is live (`sheetPx`), else the content's fit — and both stay under `sectionCeilingPx`.
-          style={heightPx != null ? { ...style, height: heightPx, maxHeight: "none" } : style}
+          style={
+            heightPx != null
+              ? {
+                  ...style,
+                  height: heightPx,
+                  maxHeight: "none",
+                  ...(entry === "grow" && slowGrowRef.current ? { transitionDuration: `${HANDOVER_SHEET_GROW_MS}ms` } : null),
+                }
+              : style
+          }
           overlay={false}
           // The HUD's step-back while the camera moves (`useSceneYield`). Both tiers yield to the
           // user's own hand; only the PHONE half also yields to a commit flight (see the call site

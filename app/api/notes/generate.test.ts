@@ -18,8 +18,6 @@ const DAY_ISO = "2026-10-27";
 
 const FACTS: NoteFacts = {
   kind: "view",
-  common: false,
-  whole: false,
   facts: [
     fact("Snapshots anchored, per day, this span", 1200, "count"),
     fact("Snapshots anchored, ratio to previous span", 1.37, "ratio"),
@@ -37,8 +35,8 @@ const FACTS: NoteFacts = {
 const CLEAN = "NOTE: The hypergraph anchored 1,200 snapshots a day, up 37% on the span before.";
 const BAD = "NOTE: The hypergraph anchored 9,999 snapshots a day.";
 
-const REQ = { net: "mainnet", view: "trend" as const, subject: "dag", span: "7d" as const };
-const KEY = noteKeyOf("mainnet", "trend", "dag", "7d");
+const REQ = { view: "trend" as const, subject: "dag", span: "7d" as const };
+const KEY = noteKeyOf("trend", "dag", "7d");
 
 let store: NotesStore;
 
@@ -50,7 +48,7 @@ function deps(over: { facts?: typeof factsFor; chat?: (m: GateMessage[]) => Prom
 }
 
 async function stats(): Promise<Record<string, number>> {
-  const raw = await store.get(statsKeyOf("mainnet", DAY_ISO));
+  const raw = await store.get(statsKeyOf(DAY_ISO));
   return raw ? JSON.parse(raw) : {};
 }
 
@@ -278,9 +276,8 @@ describe("generateNote", () => {
     expect(await stats()).toEqual({ store: 1 });
   });
 
-  it("testnet gets no note, nor the unlisted set outside History", async () => {
+  it("the unlisted set gets no note outside History, nor an untracked network", async () => {
     const d = deps();
-    expect(await generateNote({ ...REQ, net: "testnet" }, d, "read")).toEqual({ state: "none" });
     expect(await generateNote({ ...REQ, view: "hyper", subject: "unlisted", span: "day" }, d, "read")).toEqual({ state: "none" });
     expect(await generateNote({ ...REQ, subject: "DAGnotTrackedAnywhere000000000000000000" }, d, "warm")).toEqual({ state: "none" });
     expect(d.facts).not.toHaveBeenCalled();
@@ -288,8 +285,8 @@ describe("generateNote", () => {
   });
 
   it("a subject note's facts kind reaches the prompt", async () => {
-    const d = deps({ facts: async () => ({ ...FACTS, kind: "country" as const, common: false }) });
-    await generateNote({ net: "mainnet", view: "geo", subject: "isp:hetzner", span: "day" }, d, "request");
+    const d = deps({ facts: async () => ({ ...FACTS, kind: "country" as const }) });
+    await generateNote({ view: "geo", subject: "isp:hetzner", span: "day" }, d, "request");
     expect(d.chat).toHaveBeenCalledTimes(1);
     const [system] = d.chat.mock.calls[0]![0];
     expect(system!.content).toContain(PROMPTS.geo.questions!.country!);
@@ -304,7 +301,7 @@ describe("generateNote", () => {
     expect(d.chat).not.toHaveBeenCalled();
     const set = vi.spyOn(store, "set");
     expect((await generateNote({ ...REQ, span: "1h" }, d, "request")).state).toBe("ok");
-    expect(set.mock.calls.find(([k]) => k === noteKeyOf("mainnet", "trend", "dag", "1h"))![2]).toBe(KIND_TIMING.trend1h.ttlS);
+    expect(set.mock.calls.find(([k]) => k === noteKeyOf("trend", "dag", "1h"))![2]).toBe(KIND_TIMING.trend1h.ttlS);
   });
 
   it("a stale record is served on a read and rewritten on a warm pass", async () => {
@@ -467,9 +464,9 @@ describe("generateNote", () => {
   });
 
   it("stores the hyper digest's setKey on the record", async () => {
-    const key = noteKeyOf("mainnet", "hyper", "all", "day");
+    const key = noteKeyOf("hyper", "all", "day");
     const d = deps({ facts: async () => ({ ...FACTS, label: "the whole network", setKey: "DAGa,dag" }) });
-    expect((await generateNote({ net: "mainnet", view: "hyper", subject: "all", span: "day" }, d, "warm")).state).toBe("ok");
+    expect((await generateNote({ view: "hyper", subject: "all", span: "day" }, d, "warm")).state).toBe("ok");
     expect(JSON.parse((await store.get(key))!).setKey).toBe("DAGa,dag");
   });
 
@@ -489,29 +486,31 @@ describe("the span length reaches the model and backs its window (R20)", () => {
     return { buckets, stepMs, now: NOW, series: { "g.ticks": buckets.map(() => 12), "g.globals": buckets.map(() => 12) } };
   }
   const reads: NoteReads = {
-    span: async (_n, tier, from, to) => covered(tier === "1d" ? D : tier === "1h" ? H : 300_000, from, to),
+    span: async (tier, from, to) => covered(tier === "1d" ? D : tier === "1h" ? H : 300_000, from, to),
     geoDays: async () => ({ geoDays: {}, providerNames: {} }),
     chainReads: async () => ({}),
   };
 
   it("a 7d History note saying \"the last 7 days\" passes the gate", async () => {
     const answer = "NOTE: Over the last 7 days the hypergraph held its pace.";
-    const d = deps({ facts: (net, view, subject, span, now) => factsFor(net, view, subject, span, now, reads), answers: [answer] });
+    const d = deps({ facts: (view, subject, span, now) => factsFor(view, subject, span, now, reads), answers: [answer] });
     const res = await generateNote(REQ, d, "read");
     expect(d.chat.mock.calls[0]![0][1]!.content).toContain("Span length: 7 days");
     expect(d.chat.mock.calls[0]![0][1]!.content).toContain("Span: the last 7 days");
     expect(res).toMatchObject({ state: "ok", text: "Over the last 7 days the hypergraph held its pace." });
     expect(d.chat).toHaveBeenCalledTimes(1);
-    const shown = await factsFor("mainnet", "trend", "dag", "7d", NOW, reads);
+    const shown = await factsFor("trend", "dag", "7d", NOW, reads);
     expect(checkNote("Over the last 7 days the hypergraph held its pace.", shown!.facts, shown!.names)).toEqual({ ok: true });
   });
 
-  it("the whole network's Hypergraph note is asked for the global snapshots the DAG produced, not was part of", async () => {
-    const d = deps({ facts: async () => ({ ...FACTS, label: "the whole network", common: true, whole: true }), answers: ["NOTE: Over the last 7 days the network held at 97 nodes."] });
-    await generateNote({ ...REQ, view: "hyper", subject: "all", span: "day" }, d, "read");
-    const sys = d.chat.mock.calls[0]![0][0]!.content;
-    expect(sys).toContain("the DAG produced <last week's figure> global snapshots per day last week");
-    expect(sys).not.toContain("it was part of per day");
+  it("neither Hypergraph nor Geography asks for an activity sentence (user, 2026-11-09)", async () => {
+    for (const view of ["hyper", "geo"] as const) {
+      const d = deps({ facts: async () => ({ ...FACTS, label: "the whole network" }), answers: ["NOTE: Over the last 7 days the network held at 97 nodes."] });
+      await generateNote({ ...REQ, view, subject: "all", span: "day" }, d, "read");
+      const sys = d.chat.mock.calls[0]![0][0]!.content;
+      expect(sys).not.toContain("Activity was");
+      expect(sys).not.toContain("global snapshots per day last week");
+    }
   });
 });
 
@@ -559,7 +558,7 @@ describe("a failed note holds its key for a while (no unbounded model calls, R38
     expect((await generateNote(REQ, d, "warm", { seenWrittenAt: null })).state).toBe("ok");
     expect(d.chat).toHaveBeenCalledTimes(1);
     // and a warm failure writes no hold: the next pass, or a reader, is not kept out by it
-    const k2 = noteKeyOf("mainnet", "trend", "dag", "30d");
+    const k2 = noteKeyOf("trend", "dag", "30d");
     const bad = deps({ chat: async () => { throw new GateError("rate"); } });
     await generateNote({ ...REQ, span: "30d" }, bad, "warm", { seenWrittenAt: null });
     expect(await store.get(`${k2}:fail`)).toBeNull();
@@ -710,8 +709,8 @@ describe("a whole group is said as all of it", () => {
 });
 
 describe("the Briefing's line", () => {
-  const BRIEF = { net: "mainnet", view: "trend" as const, subject: "dag", span: "30d" as const };
-  const stored = async () => JSON.parse((await store.get(noteKeyOf("mainnet", "trend", "dag", "30d")))!) as NoteRecord;
+  const BRIEF = { view: "trend" as const, subject: "dag", span: "30d" as const };
+  const stored = async () => JSON.parse((await store.get(noteKeyOf("trend", "dag", "30d")))!) as NoteRecord;
   const answer = (line: string) => [`${CLEAN}\nLINE: ${line}`];
   // The 30-day pill's facts state its own span length, so "the last 30 days" is a backed figure.
   const SPAN30: NoteFacts = { ...FACTS, facts: [...FACTS.facts.filter((f) => f.label !== "Span length"), fact("Span length", 30 * 86_400, "duration")] };
@@ -768,7 +767,7 @@ describe("the Briefing's line", () => {
 describe("an answer with a line gets more room", () => {
   it("so a line never costs its note", async () => {
     const d = deps();
-    await generateNote({ net: "mainnet", view: "trend", subject: "dag", span: "30d" }, d, "read");
+    await generateNote({ view: "trend", subject: "dag", span: "30d" }, d, "read");
     expect(d.chat.mock.calls[0]![1 as never]).toMatchObject({ maxTokens: expect.any(Number) });
   });
 
@@ -787,7 +786,7 @@ describe("the style slips are asked for once more, never edited", () => {
   it("a whole span written as a climb with nothing it is measured against", async () => {
     const d = deps({ facts: async () => structuredClone(BLOCKS), answers: ["NOTE: The hypergraph anchored 1,200 snapshots a day, and blocks fell 12% to 64 per day.", CLEAN] });
     await generateNote(REQ, d, "read");
-    expect(second(d)).toContain('"64" is a whole span\'s figure');
+    expect(second(d)).toContain('"64" is a whole range\'s figure');
   });
 
   it("but not when the comparison follows it", async () => {

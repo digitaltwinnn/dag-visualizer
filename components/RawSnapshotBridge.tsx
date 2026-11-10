@@ -1,6 +1,5 @@
 "use client";
 
-import { netUrl } from "@/src/net/current";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { feedInUse, onFeedUse } from "@/src/data/feedUse";
 import { useStore } from "@/src/store/store";
@@ -83,7 +82,7 @@ function scheduleRetry(ordinal: number) {
   retried.set(ordinal, spent + 1);
   const t = setTimeout(() => {
     retryTimers.delete(t);
-    ensure(ordinal, true);
+    void ensure(ordinal, true);
   }, delay);
   retryTimers.add(t);
 }
@@ -102,17 +101,40 @@ export function ensurePage(ordinals: number[]): () => void {
   let i = 0;
   const t = setInterval(() => {
     if (i >= ordinals.length) { clearInterval(t); return; }
-    ensure(ordinals[i++], true);
+    void ensure(ordinals[i++], true);
   }, BACKFILL_GAP_MS);
   return () => clearInterval(t);
 }
 
-function ensure(ordinal: number | null | undefined, retry = false) {
-  if (ordinal == null) return;
+/** How many of a WINDOW's reads run at once (`ensureMany`). Each ordinal is immutable and cached a
+ *  day on our own server, so a few in flight cost the upstream nothing it would not pay anyway; the
+ *  number only bounds the burst. */
+export const WINDOW_READ_POOL = 8;
+
+/** READ A WHOLE WINDOW OF ORDINALS, a few at a time with no gap (user, 2026-11-07: "do the exact
+ *  reads need to be sequential?" — they did not: the Transaction blocks window asks 52 ticks, and at
+ *  `ensurePage`'s one-every-450 ms that was ~23 s before its last read landed, each landing read
+ *  re-laying the DAG). `WINDOW_READ_POOL` in flight; the next starts as one settles. The same
+ *  `ensure` as every other read — dedupe, the miss, the bounded retry. The canceller stops what has
+ *  not started. */
+export function ensureMany(ordinals: number[], pool: number = WINDOW_READ_POOL): () => void {
+  let i = 0;
+  let live = true;
+  const next = (): void => {
+    if (!live || i >= ordinals.length) return;
+    void ensure(ordinals[i++], true).then(next);
+  };
+  for (let k = 0; k < pool; k++) next();
+  return () => { live = false; };
+}
+
+/** One exact read, settled (held, missed or deduped) when the promise resolves. */
+function ensure(ordinal: number | null | undefined, retry = false): Promise<void> {
+  if (ordinal == null) return Promise.resolve();
   const st = useStore.getState();
-  if (st.snapshotExact[ordinal] || inflight.has(ordinal)) return; // already have it / fetching
+  if (st.snapshotExact[ordinal] || inflight.has(ordinal)) return Promise.resolve(); // already have it / fetching
   inflight.add(ordinal);
-  fetch(netUrl(`/api/snapshot/${ordinal}`))
+  return fetch(`/api/snapshot/${ordinal}`)
     .then((r) => (r.ok ? (r.json() as Promise<SnapshotExact>) : null))
     .then((data) => {
       const ok = !!data && typeof data.totalFee === "number";
@@ -161,8 +183,8 @@ export default function RawSnapshotBridge() {
   const deepWanted = useStore((s) => s.deepWanted);
   const backfilled = useRef(false);
 
-  useEffect(() => { if (wanted) ensure(liveOrd); }, [liveOrd, wanted]);
-  useEffect(() => ensure(selOrd), [selOrd]);
+  useEffect(() => { if (wanted) void ensure(liveOrd); }, [liveOrd, wanted]);
+  useEffect(() => { void ensure(selOrd); }, [selOrd]);
 
   // One-shot, on the first live tick. The timer lives in a ref and is NOT cleaned per dep
   // change (2026-08-08, review fix): the queue takes ~3.6s+ and the next tick lands in ~4s,
@@ -188,7 +210,7 @@ export default function RawSnapshotBridge() {
         backfillTimer.current = null;
         return;
       }
-      ensure(queue[i++], true); // backfill misses retry; the live/selected ones do not
+      void ensure(queue[i++], true); // backfill misses retry; the live/selected ones do not
     }, BACKFILL_GAP_MS);
   }, [liveOrd, wanted]);
   useEffect(
@@ -238,7 +260,7 @@ export default function RawSnapshotBridge() {
     if (st.metaSnapDeep[key] || deepInflight.has(key)) return;
 
     deepInflight.add(key);
-    fetch(netUrl(`/api/snapshot/${deepSel.globalOrdinal}/channel/${deepSel.metaId}?snap=${deepSel.ordinal}`))
+    fetch(`/api/snapshot/${deepSel.globalOrdinal}/channel/${deepSel.metaId}?snap=${deepSel.ordinal}`)
       .then((r) => (r.ok ? (r.json() as Promise<ChannelSnapDeep>) : null))
       .then((d) => {
         // Store under the REQUESTED key: when the route fell back (an undecodable row asks

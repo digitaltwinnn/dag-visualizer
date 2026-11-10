@@ -37,6 +37,11 @@ export class ChromeBounds {
    *  `sceneCover*` channel is the tablet sheets' and single-publisher by rule. */
   railL = 0;
   railR = Infinity;
+  /** The free scene band's TOP for a label: the command bar's bottom edge, or — where the Snapshots
+   *  view's register switch stands on the scene under it (D3, `#register-switch`) — the switch's
+   *  bottom edge, so a callout never stands under the switch. Not the framing shift's `top`: the
+   *  switch is a control over the scene, not chrome the subject is framed away from. */
+  sceneTop = 0;
 
   private _in = 0;
   /** The row's open state at the last full read — an attribute read per call (no layout) that
@@ -88,6 +93,8 @@ export class ChromeBounds {
       if (cr.width <= 0 || cr.right <= 0 || cr.left >= w || getComputedStyle(el).visibility === "hidden") return null;
       return cr;
     };
+    const sw = document.getElementById("register-switch")?.getBoundingClientRect();
+    this.sceneTop = sw && sw.height > 0 ? Math.max(this.top, sw.bottom) : this.top;
     const lc = col("leftcol");
     const rc = col("rightcol");
     this.railL = lc ? lc.right : 0;

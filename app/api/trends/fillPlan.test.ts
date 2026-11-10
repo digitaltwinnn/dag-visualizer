@@ -11,16 +11,14 @@ const day = (s: string) => Date.parse(`${s}T00:00:00Z`);
 
 describe("parseCommand — fill", () => {
   it("an extension names only --from; its --to is derived later", () => {
-    expect(parseCommand(["fill", "--from=2023-11-13"])).toEqual({
-      net: "mainnet",
-      command: { kind: "fill", fromMs: day("2023-11-13"), toMs: null, recompute: false, chain: null, transfers: false, fresh: false, dryRun: false },
-    });
+    expect(parseCommand(["fill", "--from=2023-11-13"])).toEqual(
+      { kind: "fill", fromMs: day("2023-11-13"), toMs: null, recompute: false, chain: null, transfers: false, fresh: false, dryRun: false },
+    );
   });
   it("a recompute names both ends, and may name one chain, --fresh and --dry-run", () => {
-    expect(parseCommand(["--net=testnet", "fill", "--from=2026-09-01", "--to=2026-09-10", "--recompute", "--chain=DAG0Cy", "--fresh", "--dry-run"])).toEqual({
-      net: "testnet",
-      command: { kind: "fill", fromMs: day("2026-09-01"), toMs: day("2026-09-10"), recompute: true, chain: "DAG0Cy", transfers: false, fresh: true, dryRun: true },
-    });
+    expect(parseCommand(["fill", "--from=2026-09-01", "--to=2026-09-10", "--recompute", "--chain=DAG0Cy", "--fresh", "--dry-run"])).toEqual(
+      { kind: "fill", fromMs: day("2026-09-01"), toMs: day("2026-09-10"), recompute: true, chain: "DAG0Cy", transfers: false, fresh: true, dryRun: true },
+    );
   });
   it("refuses --to without --recompute: the extension derives its own", () => {
     expect(() => parseCommand(["fill", "--from=2026-09-01", "--to=2026-09-10"])).toThrow(/derives its own --to/);
@@ -60,16 +58,16 @@ describe("parseCommand — the old flags redirect to the three commands", () => 
 
 describe("parseCommand — rebuild and wipe", () => {
   it("rebuild takes --days (capped at 400) and --yes; wipe takes --yes", () => {
-    expect(parseCommand(["rebuild", "--days=90", "--yes"])).toEqual({ net: "mainnet", command: { kind: "rebuild", days: 90, yes: true } });
-    expect(parseCommand(["rebuild"])).toEqual({ net: "mainnet", command: { kind: "rebuild", days: 90, yes: false } });
+    expect(parseCommand(["rebuild", "--days=90", "--yes"])).toEqual({ kind: "rebuild", days: 90, yes: true });
+    expect(parseCommand(["rebuild"])).toEqual({ kind: "rebuild", days: 90, yes: false });
     expect(() => parseCommand(["rebuild", "--days=401"])).toThrow(/400/);
-    expect(parseCommand(["wipe"])).toEqual({ net: "mainnet", command: { kind: "wipe", yes: false } });
-    expect(parseCommand(["wipe", "--yes"]).command).toEqual({ kind: "wipe", yes: true });
+    expect(parseCommand(["wipe"])).toEqual({ kind: "wipe", yes: false });
+    expect(parseCommand(["wipe", "--yes"])).toEqual({ kind: "wipe", yes: true });
   });
   it("an unknown command or flag is a usage error", () => {
     expect(() => parseCommand(["walk"])).toThrow(UsageError);
     expect(() => parseCommand(["fill", "--from=2026-09-01", "--loud"])).toThrow(/--loud/);
-    expect(() => parseCommand(["--net=moonnet", "wipe"])).toThrow(/--net/);
+    expect(() => parseCommand(["--net=mainnet", "wipe"])).toThrow(/drop the flag/);
   });
 });
 
@@ -159,7 +157,7 @@ describe("coverageSuppressedBy — a skipped unlisted chain is remembered across
 describe("fill --transfers (2026-11-04)", () => {
   const day = (d: string) => Date.parse(`${d}T00:00:00Z`);
   it("narrows a recompute to the transfers", () => {
-    expect(parseCommand(["fill", "--from=2025-05-20", "--to=2026-11-04", "--recompute", "--transfers"]).command).toMatchObject({ kind: "fill", fromMs: day("2025-05-20"), toMs: day("2026-11-04"), recompute: true, transfers: true, chain: null });
+    expect(parseCommand(["fill", "--from=2025-05-20", "--to=2026-11-04", "--recompute", "--transfers"])).toMatchObject({ kind: "fill", fromMs: day("2025-05-20"), toMs: day("2026-11-04"), recompute: true, transfers: true, chain: null });
   });
   it("is a recompute's narrowing alone, and never beside --chain", () => {
     expect(() => parseCommand(["fill", "--from=2025-05-20", "--transfers"])).toThrow(/--recompute only/);

@@ -17,8 +17,6 @@ const D = 86_400_000;
 const NOW = Date.UTC(2026, 9, 27, 12, 30);
 const FACTS: NoteFacts = {
   kind: "view",
-  common: false,
-  whole: false,
   facts: [fact("Snapshots anchored, per day, this span", 1200, "count"), fact("Span length", 604_800, "duration")],
   names: ["DAG"],
   blurbs: [],
@@ -33,7 +31,7 @@ const PUBLIC = "public, s-maxage=300, stale-while-revalidate=600";
 const RANGE = { fromMs: NOW - 2 * D, toMs: NOW - D };
 const RANGE_SPAN = `r${RANGE.fromMs}-${RANGE.toMs}` as const;
 /** A mainnet network the catalog tracks, as a subject note's scope. */
-const anId = sampledIds("mainnet")[0]!;
+const anId = sampledIds()[0]!;
 /** The i-th of many distinct countries (each its own subject note, so each a miss). */
 const country = (i: number) => `${anId}/cc:${String.fromCharCode(65 + (i % 26))}${String.fromCharCode(90 - Math.floor(i / 26))}`;
 /** The i-th of many distinct brushes (each its own note, so each a miss). */
@@ -43,7 +41,7 @@ let store: NotesStore;
 function deps(over: Partial<WarmDeps> = {}): WarmDeps {
   return {
     store,
-    facts: vi.fn(async (_n: string, view: string, subject: string) => ({ ...FACTS, ...(view === "hyper" && subject === "all" ? { setKey: "DAGa,dag" } : {}) })),
+    facts: vi.fn(async (view: string, subject: string) => ({ ...FACTS, ...(view === "hyper" && subject === "all" ? { setKey: "DAGa,dag" } : {}) })),
     chat: vi.fn(async () => CLEAN),
     now: () => NOW,
     writable: true,
@@ -54,15 +52,15 @@ function deps(over: Partial<WarmDeps> = {}): WarmDeps {
   };
 }
 const get = (q: string) => new Request(`http://localhost/api/notes?${q}`);
-const post = (body: unknown, headers: Record<string, string> = {}, q = "") =>
-  new Request(`http://localhost/api/notes/request${q}`, {
+const post = (body: unknown, headers: Record<string, string> = {}) =>
+  new Request("http://localhost/api/notes/request", {
     method: "POST",
     headers: { "content-type": "application/json", ...headers },
     body: typeof body === "string" ? body : JSON.stringify(body),
   });
 const hash16 = (ip: string) => createHash("sha256").update(ip).digest("hex").slice(0, 16);
 async function stats(): Promise<Record<string, number>> {
-  const raw = await store.get(statsKeyOf("mainnet", "2026-10-27"));
+  const raw = await store.get(statsKeyOf("2026-10-27"));
   return raw ? JSON.parse(raw) : {};
 }
 
@@ -102,14 +100,8 @@ describe("GET /api/notes (read)", () => {
     expect(d.chat).not.toHaveBeenCalled();
   });
 
-  it("`none` is cacheable: another network than mainnet", async () => {
-    const res = await readNote(get("view=trend&subject=dag&span=7d&net=testnet"), () => deps());
-    expect(await res.json()).toEqual({ state: "none" });
-    expect(res.headers.get("Cache-Control")).toBe(PUBLIC);
-  });
-
   it("`pending` is never cached", async () => {
-    await store.lock(lockKeyOf(noteKeyOf("mainnet", "trend", "dag", "7d")), 60);
+    await store.lock(lockKeyOf(noteKeyOf("trend", "dag", "7d")), 60);
     const res = await readNote(get("view=trend&subject=dag&span=7d"), () => deps());
     expect(await res.json()).toEqual({ state: "pending" });
     expect(res.headers.get("Cache-Control")).toBe("no-store");
@@ -141,19 +133,19 @@ describe("POST /api/notes/request", () => {
     const res = await requestNote(post({ view: "trend", subject: "dag", ...RANGE }, { "x-forwarded-for": "1.2.3.4, 10.0.0.1" }), () => deps());
     expect(await res.json()).toMatchObject({ state: "ok" });
     expect(incr.mock.calls.map(([k]) => k)).toEqual([
-      rateKeyOf("mainnet", hash16("1.2.3.4"), "2026-10-27T12"),
-      capKeyOf("mainnet", "2026-10-27"),
+      rateKeyOf(hash16("1.2.3.4"), "2026-10-27T12"),
+      capKeyOf("2026-10-27"),
     ]);
     expect(incr.mock.calls.flat().join(" ")).not.toContain("1.2.3.4");
-    expect(await store.get(noteKeyOf("mainnet", "trend", "dag", RANGE_SPAN))).not.toBeNull();
+    expect(await store.get(noteKeyOf("trend", "dag", RANGE_SPAN))).not.toBeNull();
   });
 
   it("falls back to x-real-ip, then to one shared unknown visitor", async () => {
     const incr = vi.spyOn(store, "incr");
     await requestNote(post({ view: "trend", subject: "dag", ...RANGE }, { "x-real-ip": "5.6.7.8" }), () => deps());
     await requestNote(post({ view: "trend", subject: "dag", ...brush(1) }), () => deps());
-    expect(incr.mock.calls[0]![0]).toBe(rateKeyOf("mainnet", hash16("5.6.7.8"), "2026-10-27T12"));
-    expect(incr.mock.calls[2]![0]).toBe(rateKeyOf("mainnet", hash16("unknown"), "2026-10-27T12"));
+    expect(incr.mock.calls[0]![0]).toBe(rateKeyOf(hash16("5.6.7.8"), "2026-10-27T12"));
+    expect(incr.mock.calls[2]![0]).toBe(rateKeyOf(hash16("unknown"), "2026-10-27T12"));
   });
 
   it("a visitor's brushed range past the hour's limit is a 429, and another visitor is not held to it", async () => {
@@ -179,11 +171,11 @@ describe("POST /api/notes/request", () => {
     expect(await res.json()).toMatchObject({ state: "ok" });
     expect(res.headers.get("Cache-Control")).toBe("no-store");
     expect(incr.mock.calls.map(([k]) => k)).toEqual([
-      rateKeyOf("mainnet", hash16("1.2.3.4"), "2026-10-27T12"),
-      capKeyOf("mainnet", "2026-10-27"),
+      rateKeyOf(hash16("1.2.3.4"), "2026-10-27T12"),
+      capKeyOf("2026-10-27"),
     ]);
     expect(d.chat).toHaveBeenCalledTimes(1);
-    expect(await store.get(noteKeyOf("mainnet", "geo", `${anId}/cc:FI`, "day"))).not.toBeNull();
+    expect(await store.get(noteKeyOf("geo", `${anId}/cc:FI`, "day"))).not.toBeNull();
     // Written: the next request is the cached note, and counts nothing.
     const again = await requestNote(post({ view: "geo", subject: `${anId}/cc:FI` }, { "x-forwarded-for": "1.2.3.4" }), () => d);
     expect(await again.json()).toMatchObject({ state: "ok" });
@@ -197,7 +189,7 @@ describe("POST /api/notes/request", () => {
     const none = await requestNote(post({ view: "geo", subject: `${anId}/cc:FI` }, { "x-forwarded-for": "1.2.3.4" }), () => bare);
     expect(await none.json()).toEqual({ state: "none" });
     expect(bare.chat).not.toHaveBeenCalled();
-    await store.lock(lockKeyOf(noteKeyOf("mainnet", "trend", "dag", RANGE_SPAN)), 60);
+    await store.lock(lockKeyOf(noteKeyOf("trend", "dag", RANGE_SPAN)), 60);
     const pending = await requestNote(post({ view: "trend", subject: "dag", ...RANGE }, { "x-forwarded-for": "1.2.3.4" }), () => deps());
     expect(await pending.json()).toEqual({ state: "pending" });
     expect(incr).not.toHaveBeenCalled();
@@ -216,7 +208,7 @@ describe("POST /api/notes/request", () => {
   });
 
   it("past the day's 2,000 brushed ranges, answers unavailable and counts `capped`", async () => {
-    for (let i = 0; i < 2000; i++) await store.incr(capKeyOf("mainnet", "2026-10-27"), 86_400);
+    for (let i = 0; i < 2000; i++) await store.incr(capKeyOf("2026-10-27"), 86_400);
     const d = deps();
     const res = await requestNote(post({ view: "trend", subject: "dag", ...RANGE }, { "x-forwarded-for": "1.2.3.4" }), () => d);
     expect(await res.json()).toEqual({ state: "unavailable" });
@@ -226,7 +218,7 @@ describe("POST /api/notes/request", () => {
   });
 
   it("a cached brush is served without counting: 25 POSTs from one visitor never 429 and never touch the cap", async () => {
-    await store.set(noteKeyOf("mainnet", "trend", "dag", RANGE_SPAN), JSON.stringify({ text: "A cached range.", writtenAt: NOW - H, spanFrom: RANGE.fromMs, spanTo: RANGE.toMs, days: [] }), 3600);
+    await store.set(noteKeyOf("trend", "dag", RANGE_SPAN), JSON.stringify({ text: "A cached range.", writtenAt: NOW - H, spanFrom: RANGE.fromMs, spanTo: RANGE.toMs, days: [] }), 3600);
     const incr = vi.spyOn(store, "incr");
     const d = deps();
     for (let i = 0; i < 25; i++) {
@@ -257,31 +249,6 @@ describe("POST /api/notes/request", () => {
       expect(res.status).toBe(400);
       expect(res.headers.get("Cache-Control")).toBe("no-store");
     }
-  });
-
-  it("another network than mainnet is `none` and counts nothing", async () => {
-    const incr = vi.spyOn(store, "incr");
-    const res = await requestNote(post({ view: "trend", subject: "dag", ...RANGE }, {}, "?net=testnet"), () => deps());
-    expect(await res.json()).toEqual({ state: "none" });
-    expect(incr).not.toHaveBeenCalled();
-  });
-});
-
-describe("off mainnet, every note request is `none` (no card), never a 400 (R38)", () => {
-  it("a testnet network id is `none`, publicly cacheable, though mainnet's catalog does not track it", async () => {
-    const d = deps();
-    for (const subject of ["DAGnotTrackedOnMainnet0000000000000000", "dag", "all"]) {
-      const res = await readNote(get(`view=hyper&subject=${subject}&net=testnet`), () => d);
-      expect(res.status).toBe(200);
-      expect(await res.json()).toEqual({ state: "none" });
-      expect(res.headers.get("Cache-Control")).toBe(PUBLIC);
-    }
-    expect(d.facts).not.toHaveBeenCalled();
-  });
-  it("the request route answers `none` off mainnet before reading the body's subject", async () => {
-    const res = await requestNote(post({ view: "trend", subject: "DAGnotTrackedOnMainnet0000000000000000", span: "1h" }, {}, "?net=integrationnet"), () => deps());
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ state: "none" });
   });
 });
 
@@ -332,7 +299,7 @@ describe("the visitor hash is keyed when the server holds a secret", () => {
     const incr = vi.spyOn(store, "incr");
     await requestNote(post({ view: "trend", subject: "dag", ...RANGE }, { "x-forwarded-for": "1.2.3.4" }), () => deps());
     const keyed = createHmac("sha256", "s3cret").update("1.2.3.4").digest("hex").slice(0, 16);
-    expect(incr.mock.calls[0]![0]).toBe(rateKeyOf("mainnet", keyed, "2026-10-27T12"));
+    expect(incr.mock.calls[0]![0]).toBe(rateKeyOf(keyed, "2026-10-27T12"));
     expect(keyed).not.toBe(hash16("1.2.3.4"));
     expect(incr.mock.calls.flat().join(" ")).not.toContain("1.2.3.4");
   });
@@ -344,12 +311,12 @@ describe("the warm budget leaves the worst item room inside maxDuration 300 s", 
     expect(WARM_BUDGET_MS + WARM_SPACING_MS + 2 * 20_000).toBeLessThan(300_000);
   });
 
-  it("is paced for the paid model: a cold store of 121 notes fills in one pass", () => {
+  it("is paced for the paid model: a cold store of 123 notes fills in one pass", () => {
     expect(WARM_SPACING_MS).toBe(500);
     expect(WARM_CONCURRENCY).toBe(3);
     const secondsAWrite = 2.7; // measured on the model, 2026-11-01
     const callsAPass = Math.min(WARM_BUDGET_MS / WARM_SPACING_MS, (WARM_BUDGET_MS / 1000 / secondsAWrite) * WARM_CONCURRENCY);
-    expect(callsAPass).toBeGreaterThan(121 * 1.3); // a third of the notes take a second attempt
+    expect(callsAPass).toBeGreaterThan(123 * 1.3); // a third of the notes take a second attempt
   });
 });
 
@@ -377,10 +344,10 @@ describe("GET /api/notes/warm (cron)", () => {
     const body = await res.json();
     expect(body.planned).toBeGreaterThan(0);
     expect(body).toEqual({ planned: body.planned, done: body.planned, failed: 0 });
-    expect(await store.get(noteKeyOf("mainnet", "geo", "cc:DE", "day"))).not.toBeNull();
-    expect(await store.get(noteKeyOf("mainnet", "ledger", sampledIds("mainnet")[0]!, "hours"))).not.toBeNull();
-    expect(await store.get(noteKeyOf("mainnet", "trend", "dag", "all"))).not.toBeNull();
-    expect(JSON.parse((await store.get(noteKeyOf("mainnet", "hyper", "all", "day")))!).setKey).toBe("DAGa,dag");
+    expect(await store.get(noteKeyOf("geo", "cc:DE", "day"))).not.toBeNull();
+    expect(await store.get(noteKeyOf("ledger", sampledIds()[0]!, "hours"))).not.toBeNull();
+    expect(await store.get(noteKeyOf("trend", "dag", "all"))).not.toBeNull();
+    expect(JSON.parse((await store.get(noteKeyOf("hyper", "all", "day")))!).setKey).toBe("DAGa,dag");
     const again = await (await warmNotes(warmReq("Bearer s3cret"), () => d)).json();
     expect(again).toEqual({ planned: 0, done: 0, failed: 0 });
   });
@@ -391,9 +358,9 @@ describe("GET /api/notes/warm (cron)", () => {
     const d = deps({ now: () => NOW + H });
     vi.setSystemTime(NOW + H);
     const body = await (await warmNotes(warmReq("Bearer s3cret"), () => d)).json();
-    const facts = d.facts as unknown as { mock: { calls: [string, string, string, string][] } };
-    const kinds = new Set(facts.mock.calls.map(([, view, , span]) => `${view}:${span}`));
-    expect(kinds).toEqual(new Set(["ledger:hours", "trend:24h"]));
+    const facts = d.facts as unknown as { mock: { calls: [string, string, string][] } };
+    const kinds = new Set(facts.mock.calls.map(([view, , span]) => `${view}:${span}`));
+    expect(kinds).toEqual(new Set(["ledger:hours", "blocks:hours", "data:hours", "trend:24h"]));
     expect(body.done).toBe(body.planned);
   });
 
@@ -409,18 +376,18 @@ describe("GET /api/notes/warm (cron)", () => {
   // whose count moved, a good hour after it was written, and the new count stored for the next pass.
   it("a network's held count that moved rewrites its Hypergraph and Geography notes, an hour on", async () => {
     vi.stubEnv("CRON_SECRET", "s3cret");
-    const id = sampledIds("mainnet")[0]!;
+    const id = sampledIds()[0]!;
     const keys = (n: string) => ({ all: "x", [id]: n });
     const first = deps({ digest: async () => ({ setKey: "DAGa,dag", driftKeys: keys("8") }) });
     await warmNotes(warmReq("Bearer s3cret"), () => first);
-    expect(JSON.parse((await store.get(noteKeyOf("mainnet", "hyper", id, "day")))!).driftKey).toBe("8");
+    expect(JSON.parse((await store.get(noteKeyOf("hyper", id, "day")))!).driftKey).toBe("8");
     const sameHour = deps({ digest: async () => ({ setKey: "DAGa,dag", driftKeys: keys("7") }) });
     expect((await (await warmNotes(warmReq("Bearer s3cret"), () => sameHour)).json()).planned).toBe(0);
     vi.advanceTimersByTime(55 * 60_000);
     const later = deps({ digest: async () => ({ setKey: "DAGa,dag", driftKeys: keys("7") }), now: () => Date.now() } as never);
     await warmNotes(warmReq("Bearer s3cret"), () => later);
-    expect(JSON.parse((await store.get(noteKeyOf("mainnet", "geo", id, "day")))!).driftKey).toBe("7");
-    expect(JSON.parse((await store.get(noteKeyOf("mainnet", "hyper", id, "day")))!).driftKey).toBe("7");
+    expect(JSON.parse((await store.get(noteKeyOf("geo", id, "day")))!).driftKey).toBe("7");
+    expect(JSON.parse((await store.get(noteKeyOf("hyper", id, "day")))!).driftKey).toBe("7");
   });
 
   it("waits WARM_SPACING_MS before every Gate call but the first, and runs no more than WARM_CONCURRENCY at once", async () => {
@@ -455,7 +422,7 @@ describe("GET /api/notes/warm (cron)", () => {
   it("a due note another writer refreshed after the prefetch is served, not paid for twice", async () => {
     vi.stubEnv("CRON_SECRET", "s3cret");
     await warmNotes(warmReq("Bearer s3cret"), () => deps()); // everything written, fresh
-    const key = noteKeyOf("mainnet", "trend", "dag", "7d");
+    const key = noteKeyOf("trend", "dag", "7d");
     const note = (writtenAt: number) => JSON.stringify({ text: "A note.", writtenAt, spanFrom: NOW - 7 * D, spanTo: NOW, days: [] });
     await store.set(key, note(NOW - 25 * H), 72 * 3600); // due
     const mget = store.mget.bind(store);
@@ -508,7 +475,7 @@ describe("a warm pass reads the store once", () => {
     const span = vi.fn(async () => { throw new Error("stop here"); });
     const geoDays = vi.fn(async () => { throw new Error("stop here"); });
     const d = liveWarmDeps({ span, geoDays, chainReads: async () => ({}) });
-    await d.facts("mainnet", "ledger", "all", "hours", 1).catch(() => null);
+    await d.facts("ledger", "all", "hours", 1).catch(() => null);
     expect(span).toHaveBeenCalledTimes(2); // this note's two windows
     await d.digest(1).catch(() => null);
     expect(span.mock.calls.length).toBeGreaterThan(2);
@@ -532,7 +499,7 @@ describe("a preview deployment writes no notes (R66)", () => {
     const res = await readNote(get("view=trend&subject=dag&span=7d"), () => d);
     expect(await res.json()).toEqual({ state: "none" });
     expect(d.chat).not.toHaveBeenCalled();
-    expect(await store.get(noteKeyOf("mainnet", "trend", "dag", "7d"))).toBeNull();
+    expect(await store.get(noteKeyOf("trend", "dag", "7d"))).toBeNull();
     expect(await stats()).toEqual({});
   });
 
@@ -542,7 +509,7 @@ describe("a preview deployment writes no notes (R66)", () => {
   });
 
   it("GET: a cached note is still served", async () => {
-    await deps().store.set(noteKeyOf("mainnet", "trend", "dag", "7d"), JSON.stringify({ text: "Cached.", writtenAt: NOW - H, spanFrom: NOW - 7 * D, spanTo: NOW, days: [] }), 3600);
+    await deps().store.set(noteKeyOf("trend", "dag", "7d"), JSON.stringify({ text: "Cached.", writtenAt: NOW - H, spanFrom: NOW - 7 * D, spanTo: NOW, days: [] }), 3600);
     const res = await readNote(get("view=trend&subject=dag&span=7d"), () => deps({ writable: false }));
     expect(await res.json()).toMatchObject({ state: "ok", text: "Cached." });
   });
@@ -564,6 +531,6 @@ describe("a preview deployment writes no notes (R66)", () => {
     const res = await warmNotes(new Request("http://localhost/api/notes/warm", { headers: { authorization: "Bearer s3cret" } }), () => d);
     expect(await res.json()).toEqual({ state: "none" });
     expect(d.chat).not.toHaveBeenCalled();
-    expect(await store.get(noteKeyOf("mainnet", "hyper", "all", "day"))).toBeNull();
+    expect(await store.get(noteKeyOf("hyper", "all", "day"))).toBeNull();
   });
 });

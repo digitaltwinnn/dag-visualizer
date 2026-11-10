@@ -8,25 +8,23 @@ import { CC_TAIL_RE, ISP_TAIL_RE, KIND_TIMING, TYPE_TAIL_RE, isSubjectNote, snap
 // route and the CDN all see the same shapes. Bad input is an ERROR with a short fixed message,
 // never an echo of what was sent.
 //
-// A subject is `all`, `dag` (the ledger's is `all`: one whole network, one note), a network the catalog tracks (a FORMER address answers as its network's
+// A subject is `all`, `dag` (the ledger's and the block DAG's is `all`: one whole network, one note), a network the catalog tracks (a FORMER address answers as its network's
 // current id, so a re-registered network keeps one note), or a country `cc:XX` for Geography. A
 // SUBJECT NOTE is one selection's: Geography's `<net>/cc:XX`, `isp:<key>` and `<net>/isp:<key>`,
 // Hypergraph's `<net>/type:<roleKey>`, where `<net>` is `dag` or a tracked network resolved as
 // above, `<key>` a provider's slug (`providerKey`) and `<roleKey>` a make-up spelled as `roleKey`
 // spells it, so one make-up has one key. The span is fixed by the view except History's: a
 // pill, or a brushed `from`/`to` snapped by `snapSpan` so near-identical brushes share one key.
-// Notes exist for mainnet only, so the catalog asked is
-// mainnet's; whether this particular view writes a note for this subject is the generator's call
+// Whether this particular view writes a note for this subject is the generator's call
 // (`noteSupported`), which answers `none` rather than an error.
 
-const VIEWS: readonly NoteView[] = ["hyper", "geo", "ledger", "trend"];
-const FIXED_SPAN: Partial<Record<NoteView, NoteSpan>> = { hyper: "day", geo: "day", ledger: "hours" };
+const VIEWS: readonly NoteView[] = ["hyper", "geo", "ledger", "trend", "blocks", "data"];
+const FIXED_SPAN: Partial<Record<NoteView, NoteSpan>> = { hyper: "day", geo: "day", ledger: "hours", blocks: "hours", data: "hours" };
 const PILLS: readonly NoteSpan[] = ["1h", "24h", "7d", "30d", "90d", "1y", "all"];
 /** History's one on-request pill (`timingOf` says on-request); the request route writes it, a
  *  brushed range and the subject notes. */
 const ON_REQUEST_PILL: NoteSpan = "1h";
 const MS_RE = /^\d{1,15}$/;
-const NET = "mainnet";
 
 export interface NoteParams {
   view: NoteView;
@@ -40,9 +38,9 @@ type Parsed = NoteParams | { error: string } | { none: true };
 
 /** A tracked network as its current id; null for an address the catalog does not track. */
 function networkOf(raw: string): string | null {
-  if (!isTracked(NET, raw)) return null;
-  const current = currentIdOf(NET, raw);
-  return current && isTracked(NET, current) ? current : null;
+  if (!isTracked(raw)) return null;
+  const current = currentIdOf(raw);
+  return current && isTracked(current) ? current : null;
 }
 
 /** A subject note's selection, per view. A make-up must be its own `roleKey` (vocabulary order, no
@@ -59,7 +57,7 @@ function subjectOf(view: NoteView, raw: string | null): string | null {
   if (raw == null) return null;
   if (raw === "all") return raw;
   // The ledger reads `dag` as the whole network, the same facts as `all`: ONE subject, one note.
-  if (raw === "dag") return view === "ledger" ? "all" : raw;
+  if (raw === "dag") return view === "ledger" || view === "blocks" || view === "data" ? "all" : raw;
   // THE UNLISTED SET is History's alone: the sampler measures its chains, which publish no nodes.
   if (raw === UNLISTED_ID) return view === "trend" ? raw : null;
   if (CC_TAIL_RE.test(raw) || ISP_TAIL_RE.test(raw)) return view === "geo" ? raw : null;

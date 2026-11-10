@@ -48,6 +48,13 @@ describe("ageWords — the app's one long-form span", () => {
   });
 
   it("never rounds a real age down to zero", () => {
-    expect(ageWords(10_000)).toBe("1 minute");
+    expect(ageWords(200)).toBe("1 second");
+  });
+
+  it("says seconds under a minute — a block seconds old is not \"1 minute\" old (D6 carry)", () => {
+    expect(ageWords(10_000)).toBe("10 seconds");
+    expect(ageWords(1_000)).toBe("1 second");
+    expect(ageWords(59_000)).toBe("59 seconds");
+    expect(ageWords(59_600)).toBe("1 minute");
   });
 });

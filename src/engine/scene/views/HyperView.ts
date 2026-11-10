@@ -7,7 +7,7 @@
 // view by scaling `root` down.
 
 import * as THREE from "three";
-import { METAGRAPHS } from "@/src/net/current";
+import { METAGRAPHS } from "@/src/engine/config";
 import type { MetaConfig } from "../../config";
 import { metaAnchor, META_RING, META_LAYERS, HYPER_TILT, applyHyperRig } from "../../domain/hyperLayout";
 import { armillaryFrame, ringFramePos, ringNormal, type RingFrame } from "../../domain/nodeLayout";

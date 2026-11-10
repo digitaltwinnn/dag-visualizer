@@ -19,7 +19,7 @@ describe("assemble", () => {
     expect(WINDOWS["all"].ms).toBeGreaterThan(4 * 365 * 86400000);
   });
   it("null for uncovered buckets, 0 for covered-but-absent counters, null for absent gauges", () => {
-    const p = assemble("mainnet", "24h", now, {
+    const p = assemble("24h", now, {
       "t:mainnet:5m:2026-09-06": {
         "14:00|g.ticks": "2", "14:00|g.anchors": "5", "14:00|m.abc.snaps": "1",
         "14:05|g.ticks": "0", // covered, empty
@@ -36,7 +36,7 @@ describe("assemble", () => {
     expect(p.series["g.ticks"][k]).toBeNull();
   });
   it("gauges are value-or-null, never zero-filled", () => {
-    const p = assemble("mainnet", "7d", now, {
+    const p = assemble("7d", now, {
       "t:mainnet:1h:2026-09": { "06-14|g.ticks": "120", "06-14|f.nodes": "195", "06-13|g.ticks": "118" },
     });
     const i14 = p.buckets.indexOf(Date.UTC(2026, 8, 6, 14, 0));
@@ -45,7 +45,7 @@ describe("assemble", () => {
     expect(p.series["f.nodes"][i13]).toBeNull(); // covered hour, but the gauge wasn't sampled
   });
   it("spans window length at tier resolution with the newest bucket last", () => {
-    const p = assemble("mainnet", "24h", now, {});
+    const p = assemble("24h", now, {});
     expect(p.tier).toBe("5m");
     expect(p.stepMs).toBe(300000);
     expect(p.buckets.length).toBe(24 * 12 + 1);
@@ -56,7 +56,7 @@ describe("assemble", () => {
 describe("assembleSpan (the tile body)", () => {
   it("serves an arbitrary calendar unit with the same honesty contract", () => {
     const day = Date.UTC(2026, 8, 8);
-    const p = assembleSpan("mainnet", "tile", "5m", day, day + 86400000, Date.UTC(2026, 8, 10), {
+    const p = assembleSpan("tile", "5m", day, day + 86400000, Date.UTC(2026, 8, 10), {
       "t:mainnet:5m:2026-09-08": {
         "10:00|g.ticks": "3", "10:00|g.anchors": "9",
         "10:05|g.ticks": "0",
@@ -74,7 +74,7 @@ describe("assembleSpan (the tile body)", () => {
 describe("the unlisted coverage marker on the real read path (2026-10-08)", () => {
   it("a covered bucket WITHOUT u.cov reads null, never the zero-fill that would look measured", () => {
     const day = Date.UTC(2026, 8, 8);
-    const p = assembleSpan("mainnet", "tile", "5m", day, day + 86400000, Date.UTC(2026, 8, 10), {
+    const p = assembleSpan("tile", "5m", day, day + 86400000, Date.UTC(2026, 8, 10), {
       "t:mainnet:5m:2026-09-08": {
         "10:00|g.ticks": "3", "10:00|u.cov": "0", "10:00|m.UNL.snaps": "2",
         "10:05|g.ticks": "2", // the spine measured it; the unlisted chains were not read

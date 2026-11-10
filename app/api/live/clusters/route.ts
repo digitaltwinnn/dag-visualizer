@@ -1,6 +1,5 @@
-import { NextResponse } from "next/server";
-import { NETWORKS } from "@/src/engine/config";
-import { netOf } from "@/src/net/request";
+import { NextResponse, connection } from "next/server";
+import { HOSTS } from "@/src/engine/config";
 import { memo, readClusters } from "../upstream";
 import { CLUSTER_WINDOW, cacheControl } from "../windows";
 
@@ -9,11 +8,12 @@ import { CLUSTER_WINDOW, cacheControl } from "../windows";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
-export async function GET(req: Request) {
-  const net = netOf(req);
-  const { l0, l1 } = NETWORKS[net];
+export async function GET() {
+  // Per request, never prerendered: the CDN caches the answer by its own Cache-Control.
+  await connection();
+  const { l0, l1 } = HOSTS;
   try {
-    const { value, ageMs } = await memo(`clusters:${net}`, CLUSTER_WINDOW.memoMs, () => readClusters(l0, l1));
+    const { value, ageMs } = await memo(`clusters`, CLUSTER_WINDOW.memoMs, () => readClusters(l0, l1));
     return NextResponse.json(
       { ...value, memoAgeMs: ageMs },
       { headers: { "Cache-Control": cacheControl(CLUSTER_WINDOW) } },

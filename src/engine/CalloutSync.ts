@@ -8,6 +8,8 @@ import { calloutHangs, calloutPhonePlacement, calloutPlacement, CALLOUT_OFF_X, C
 import { R as GEO_R, LAND_H, latLonToVec3 } from "./domain/geoLayout";
 import { ledgerLens } from "@/src/data/ledgerStory";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
+import { glideMix } from "./domain/calloutGlide";
+import type { CalloutSubject } from "./domain/calloutSubjects";
 import type { SceneCtx } from "./scene/SceneContext";
 import type { Globe } from "./scene/Globe";
 import type { LedgerView } from "./scene/views/LedgerView";
@@ -71,8 +73,9 @@ export interface CalloutHost {
   dofMeta(): { group: THREE.Object3D } | null;
 }
 
-const isNodePick = (p: PickDescriptor | null): boolean =>
-  !!p && (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode");
+/** The anchor kind the label wrote (`data-kind`), or null — no label, no point. */
+const KINDS: ReadonlySet<string> = new Set(["global", "block", "dataBlock", "metaSnap", "lane"]);
+const kindOf = (k: string | undefined): CalloutSubject => (k != null && KINDS.has(k) ? (k as CalloutSubject) : null);
 
 export class CalloutSync {
   private readonly h: CalloutHost;
@@ -80,7 +83,6 @@ export class CalloutSync {
 
   // scratch — all of it was Engine-private and callout-only before the move
   private _calloutV = new THREE.Vector3();
-  private _calloutV2 = new THREE.Vector3();
   private _calloutSibs = [new THREE.Vector3(), new THREE.Vector3()];
   private _calloutNodeAnchor = false;
   private _geoNodePick: unknown = null;
@@ -121,14 +123,33 @@ export class CalloutSync {
   // `breakpointOf` is the ONE home for the tier (the component reads the same call through
   // `useBreakpoint`), so the two owners cannot drift apart at the boundary.
   private _syncCallout(): void {
+    // ONE LABEL (user, 2026-11-08: "Two callouts is too much in the snapshot view"): the second
+    // anchor the Snapshots pair carried from 2026-10-03, `callout-2` on the global's bar, is retired;
+    // the global's bar is now one of the subjects `callout` itself may point at.
     const el = document.getElementById("callout");
-    // THE SECOND ANCHOR (user, 2026-10-03: "2 callouts"). In Snapshots a committed metagraph
-    // snapshot stands with the global snapshot it is read against, and each gets its own label:
-    // `callout` is the metagraph snapshot's (or a boxed node's), `callout-2` the global
-    // snapshot's, at `_ledgerGlobalAnchor`. Either may be absent — a global snapshot alone
-    // renders only the second.
-    const el2 = document.getElementById("callout-2");
-    if (!el && !el2) return;
+    if (!el) return;
+    // THE SNAPSHOTS VIEW ANCHORS WHAT THE LABEL NAMES (user, 2026-11-09: the global snapshot's label
+    // "attached … to the metagraph snapshot? That's wrong and should never happen"). The subject was
+    // decided twice — the component for the words, this class for the point — from the same pure
+    // chain (`calloutSubject`), and two deciders drift: a hot-reloaded component beside this
+    // long-lived instance ran two versions of the rule at once. Now the component decides and writes
+    // its answer to `data-kind`; this reads it, so the words and the point are one decision.
+    if (this.h.mode === "ledger") this._subject = kindOf(el.dataset.kind);
+    // A NEW SUBJECT ON A STANDING LABEL GLIDES (user, 2026-11-09 — `domain/calloutGlide.ts`): the
+    // wrapper is no longer remounted per subject; React writes the subject's exact identity to
+    // `data-subject`, and a change while the label is shown moves the anchor from where it stood. A
+    // change while it is hidden (a camera flight, a view switch) rewinds the entrance instead, so the
+    // label draws in at its new subject when it appears, as a fresh mount did.
+    const subj = el.dataset.subject ?? null;
+    if (subj !== this._subjKey) {
+      this._subjKey = subj;
+      this._ppIn = 0; // the panel's words changed: re-measure its reach now, not on the cadence
+      if (el.dataset.on === "1" && this._placedEl === el) {
+        this._glideAt = performance.now();
+        this._glideFromX = this._placedX;
+        this._glideFromY = this._placedY;
+      } else this._replayEntrance(el);
+    }
     const allowed =
       this.h.calloutAllowed() &&
       !this.h.transitionActive() &&
@@ -139,32 +160,47 @@ export class CalloutSync {
       // camera leans, and the label tracks its unchanged subject per frame.
       (!this.h.flyingNow() || this.h.sameSubjectFlight());
     const phone = breakpointOf(window.innerWidth) === "phone";
-    if (el) {
-      const v = this._calloutV;
-      const on =
-        allowed &&
-        (this.h.mode === "geo"
-          ? this._geoCalloutAnchor(v)
-          : this.h.mode === "ledger"
-            ? this._ledgerCalloutAnchor(v)
-            : this._hyperCalloutAnchor(v)) &&
-        this._placeCallout(el, v, false, phone);
-      // The multi-leader on a phone fans from the VERTICAL leader's panel end (user, 2026-10-08: a
-      // hybrid node "should be multiple" spheres there too) — `_placePhone`'s own length, not the
-      // diagonal standoff's corner.
-      if (on) this._syncCalloutMulti(el, this._placedX, this._placedY, this._placedRect, this._placedFlip, this._placedDrop, phone ? this._ppLen : 0);
-      else this._syncCalloutMulti(el, 0, 0, null, false, false, 0);
-      // Guard on the ELEMENT's own attribute, not a cached flag: React remounts the wrapper on a
-      // subject change (fresh data-on="0"), so a field would go stale exactly then.
-      const flag = on ? "1" : "0";
-      if (el.dataset.on !== flag) el.dataset.on = flag;
+    const v = this._calloutV;
+    const on =
+      allowed &&
+      (this.h.mode === "geo"
+        ? this._geoCalloutAnchor(v)
+        : this.h.mode === "ledger"
+          ? this._ledgerCalloutAnchor(v)
+          : this._hyperCalloutAnchor(v)) &&
+      // The global snapshot's label HANGS below its bar where the strip has room (design A,
+      // 2026-10-03: standing up from the floor it covered the ribbons); every other subject stands.
+      this._placeCallout(el, v, this.h.mode === "ledger" && this._subject === "global", phone);
+    // The multi-leader on a phone fans from the VERTICAL leader's panel end (user, 2026-10-08: a
+    // hybrid node "should be multiple" spheres there too) — `_placePhone`'s own length, not the
+    // diagonal standoff's corner.
+    // A glide the label is hidden through (the commit's flight began a frame after the change) ends,
+    // and the label draws in fresh where it reappears.
+    if (!on && this._glideAt >= 0) {
+      this._glideAt = -1;
+      this._replayEntrance(el);
     }
-    if (el2) {
-      const v = this._calloutV2;
-      const on = allowed && this.h.mode === "ledger" && this._ledgerGlobalAnchor(v) && this._placeCallout(el2, v, true, phone);
-      const flag = on ? "1" : "0";
-      if (el2.dataset.on !== flag) el2.dataset.on = flag;
-    }
+    if (on) this._syncCalloutMulti(el, this._placedX, this._placedY, this._placedRect, this._placedFlip, this._placedDrop, phone ? this._ppLen : 0);
+    else this._syncCalloutMulti(el, 0, 0, null, false, false, 0);
+    // Guard on the ELEMENT's own attribute, not a cached flag: React mounts the wrapper fresh
+    // (data-on="0") whenever the label returns from absence, so a field would go stale exactly then.
+    const flag = on ? "1" : "0";
+    if (el.dataset.on !== flag) el.dataset.on = flag;
+  }
+
+  // The glide's state: the subject identity last seen, and when the running glide began (−1: none).
+  // It starts from `_placedX/_placedY`, the anchor as last drawn.
+  private _subjKey: string | null = null;
+  private _glideAt = -1;
+  private _glideFromX = 0;
+  private _glideFromY = 0;
+  private _placedEl: HTMLElement | null = null;
+
+  /** Rewind the label's entrance (panel roll, leader draw, ring landing) to its start: the CSS
+   *  animations hold paused while `data-on` is 0 (globals.css), so they play from the top when the
+   *  label is next shown. Event-time (a subject change), never per frame. */
+  private _replayEntrance(el: HTMLElement): void {
+    for (const a of el.getAnimations({ subtree: true })) if (a instanceof CSSAnimation) a.currentTime = 0;
   }
 
   // Where the last `_placeCallout` put its anchor — read back by the multi-leader, which draws
@@ -182,8 +218,16 @@ export class CalloutSync {
     if (v.z > -0.1) return false; // behind (or grazing) the camera plane
     v.applyMatrix4(this.h.ctx.camera.projectionMatrix); // view → NDC (w-divide included)
     const r = this.h.ctx.renderer.domElement.getBoundingClientRect();
-    const x = r.left + (v.x * 0.5 + 0.5) * r.width;
-    const y = r.top + (-v.y * 0.5 + 0.5) * r.height;
+    let x = r.left + (v.x * 0.5 + 0.5) * r.width;
+    let y = r.top + (-v.y * 0.5 + 0.5) * r.height;
+    // GLIDING: the label stands between where it was and its subject's anchor this frame (the target
+    // keeps moving with the scene, so the glide closes on it rather than on a stale point).
+    if (this._glideAt >= 0) {
+      const k = glideMix((performance.now() - this._glideAt) / 1000);
+      x = this._glideFromX + (x - this._glideFromX) * k;
+      y = this._glideFromY + (y - this._glideFromY) * k;
+      if (k >= 1) this._glideAt = -1;
+    }
     // Placement is `domain/calloutPlacement.ts` — the flip/drop rules and the panel's reach
     // live there with their test, and globals.css mirrors the geometry off the attributes
     // written below (guarded writes, like data-on).
@@ -232,6 +276,7 @@ export class CalloutSync {
       if (hang) el.dataset.hang = "";
       else delete el.dataset.hang;
     }
+    this._placedEl = el;
     this._placedX = x;
     this._placedY = y;
     this._placedRect = r;
@@ -284,6 +329,7 @@ export class CalloutSync {
         line.setAttribute(line.classList.contains("co-draw") ? "y1" : "y2", end);
       }
     }
+    this._placedEl = el;
     this._placedX = x;
     this._placedY = y;
     this._placedRect = r;
@@ -310,7 +356,8 @@ export class CalloutSync {
     return this.h.chrome.read().dockTop - 4;
   }
   private _freeTop(): number {
-    return this.h.chrome.read().top;
+    // Under the bar — and under the register switch where it stands on the scene (D3).
+    return this.h.chrome.read().sceneTop;
   }
 
   // THE MULTI-LEADER (user, 2026-08-30): a machine is SEVERAL beads in hyper — one per layer it
@@ -327,8 +374,8 @@ export class CalloutSync {
   // flip/drop the placement just decided), so the primary's leader and the sibling legs all
   // meet at one point and the beads read as peers.
   // The legs are STATIC children React renders once per wrapper mount, so the DOM refs are
-  // cached per element identity (a subject change remounts the wrapper — fresh element, fresh
-  // cache, every leg back at its hidden default) and the hidden steady state — most frames, in
+  // cached per element identity (a label returning from absence mounts a fresh wrapper — fresh
+  // cache, every leg back at its hidden default; a subject change keeps it) and the hidden steady state — most frames, in
   // every view — costs one flag check with NO DOM reads. querySelectorAll ran here per frame
   // before, on the !on path included (review, 2026-08-31 — rule-5 discipline applied to DOM).
   private _mlegHost: HTMLElement | null = null;
@@ -477,34 +524,27 @@ export class CalloutSync {
   // global tick's byte-bar lead one storey down. The rewind brings a committed row to the lead
   // position, so the lead slot IS where the subject settles (LedgerView.calloutAnchor is pure
   // layout data). An uncataloged channel's rows live on the unlisted lane.
+  private _subject: CalloutSubject = null;
+
   private _ledgerCalloutAnchor(v: THREE.Vector3): boolean {
     const st = this.st;
-    // THE BOX LEADS (user, 2026-08-15/16): the boxed NODE card anchors the node's own tray chip.
-    if (st.boxedCard === "node" && isNodePick(st.inspect)) return this._ledgerNodeAnchor(st, v);
-    // Otherwise this anchor is the UPPER STOREY's — `SceneCallout`'s chain, mirrored term for
-    // term: the metagraph snapshot's tile, or its network's LANE when the Metagraph card is the
-    // box or no snapshot of that network is committed (user, 2026-10-03: "the dossier on
-    // snapshots page has no callout on the scene"). The global snapshot's label has an anchor of
-    // its own (`_ledgerGlobalAnchor`).
-    const net = this.h.ledgerNet;
-    const lane = net !== "all" && net !== "dag" && net !== UNLISTED_ID;
-    if (lane && (st.boxedCard === "context" || !st.metaSnap)) {
-      // The lane's head — layout data, fixed for the session; false when the lane isn't in the
-      // field, and then the label stays down rather than borrow another subject's point.
-      if (!this.h.ledger.calloutAnchor(net, v)) return false;
-      this.h.ledger.group.localToWorld(v); // the rendered chamber transform — a label read. render-state OK
-      return true;
-    }
-    if (st.metaSnap) {
-      // A snapshot's label waits until its row is FIXED on the plane (LedgerView.calloutSettled
-      // — the chamber's own clocks; the tray-node paths stay exempt, chips don't ride the trail).
-      if (!this.h.ledger.calloutSettled(st.following)) return false;
-      if (!this._ledgerTileAnchor(st.metaSnap, v)) return false;
-      this.h.ledger.group.localToWorld(v); // the rendered chamber transform — a label read. render-state OK
-      return true;
-    }
-    if (st.snap) return false;
-    return this._ledgerNodeAnchor(st, v);
+    const subject = this._subject;
+    if (subject === null) return false;
+    // Every label rides the chamber's trail: it waits until its row is FIXED on the plane
+    // (LedgerView.calloutSettled — the chamber's own clocks).
+    if (!this.h.ledger.calloutSettled(st.following)) return false;
+    // The GLOBAL SNAPSHOT's bar (or the resolved network's own segment of it); the TRANSACTION BLOCK
+    // (D3) at its own place in the chamber; the DATA BLOCK on its snapshot's tile (one label per tile
+    // — the snapshot's steps aside); the METAGRAPH SNAPSHOT's tile; the network's LANE head (user,
+    // 2026-10-03: "the dossier on snapshots page has no callout on the scene") — layout data, fixed
+    // for the session; false when the lane isn't in the field, and then the label stays down rather
+    // than borrow another subject's point.
+    if (subject === "global") this._ledgerBarAnchor(v);
+    else if (subject === "block") { if (!this.h.ledger.selectedBlockAnchor(v)) return false; }
+    else if (subject === "dataBlock" || subject === "metaSnap") { if (!st.metaSnap || !this._ledgerTileAnchor(st.metaSnap, v)) return false; }
+    else if (!this.h.ledger.calloutAnchor(this.h.ledgerNet, v)) return false;
+    this.h.ledger.group.localToWorld(v); // the rendered chamber transform — a label read. render-state OK
+    return true;
   }
 
   // THE committed snapshot's tile (user, 2026-08-15), rewind offsets included; the lane lead
@@ -515,32 +555,11 @@ export class CalloutSync {
     return this.h.ledger.calloutAnchor(sel.metaId, v) || this.h.ledger.calloutAnchor(UNLISTED_ID, v);
   }
 
-  // The GLOBAL SNAPSHOT's label — the second anchor, `SceneCallout`'s `m2` gate mirrored: a
-  // global snapshot is shown and the box is not a node (its own label owns the scene). It
-  // points at the snapshot's bar, or at the resolved network's own segment of it.
-  private _ledgerGlobalAnchor(v: THREE.Vector3): boolean {
-    const st = this.st;
-    if (!st.snap) return false;
-    if (st.boxedCard === "node" && isNodePick(st.inspect)) return false;
-    if (!this.h.ledger.calloutSettled(st.following)) return false;
-    this._ledgerBarAnchor(v);
-    this.h.ledger.group.localToWorld(v); // the rendered chamber transform — a label read. render-state OK
-    return true;
-  }
-
+  // The GLOBAL SNAPSHOT's bar, or the resolved network's own segment of it.
   private _ledgerBarAnchor(v: THREE.Vector3): void {
     const lens = ledgerLens(this.h.ledgerNet);
     if (lens !== "all" && this.h.ledger.bandAnchor(lens, v)) return;
     this.h.ledger.calloutAnchor(null, v);
   }
 
-  // The committed node's tray chip — the same `ledgerPos` its instance lerps to. The chips
-  // live in the GLOBE group's space (the fabric is shared), so the lift goes through it.
-  private _ledgerNodeAnchor(st: CalloutState, v: THREE.Vector3): boolean {
-    const p = st.inspect;
-    if (!p || (p.kind !== "l0" && p.kind !== "l1" && p.kind !== "metanode")) return false;
-    if (!this.h.globe.selectedNodeLedgerAnchor(v)) return false;
-    this.h.globe.group.localToWorld(v); // render-state OK
-    return true;
-  }
 }

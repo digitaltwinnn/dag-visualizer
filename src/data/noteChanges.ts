@@ -36,6 +36,15 @@ const row = (kind: NoteChange["kind"], subject: NoteChangeSubject, size: number,
   return { kind, subject, size, text: "", brief };
 };
 
+/** THE RANGE A ROW SPEAKS OF, IN THE READER'S WORDS (user, 2026-11-08: "notables say 'the span's
+ *  longest gap' … replace 'range' with the actual value, 'its longest gap in the last 24 hours'"):
+ *  the fixed ranges the notes read — a week of the fleet for Hypergraph and Geography (R72), the
+ *  chamber's day for Snapshots (R79) — as the range itself, and as its two ends for a before/after
+ *  pair. The prompt's `spanWords` says the same words, so a row and the note agree. */
+export interface RangeWords { range: string; start: string; end: string }
+export const WEEK_WORDS: RangeWords = { range: "the last 7 days", start: "7 days ago", end: "now" };
+export const DAY_WORDS: RangeWords = { range: "the last 24 hours", start: "24 hours ago", end: "now" };
+
 /** A gap far past a chain's usual widest one (`isPause`), stated against its NORMAL SPACING (user,
  *  2026-11-03: "don't compare gaps against other gaps; compare gaps against the normal spacing between
  *  snapshots"). `what` names the kind of snapshot that paused. */
@@ -74,7 +83,8 @@ export function countChange(
   from: number,
   to: number,
   subject: NoteChangeSubject,
-  place?: { city: string; was: number } | null,
+  place: { city: string; was: number } | null | undefined,
+  words: RangeWords,
 ): NoteChange | null {
   if (from === to) return null;
   const size = Math.abs(to - from);
@@ -87,14 +97,14 @@ export function countChange(
   const now = place ? place.was + to - from : to;
   return row(to > from ? "gained" : "lost", subject, size, `${name}'s nodes${where}`, [
     moved,
-    fact(`Nodes${where} at the start of the span`, was, "count"),
-    fact(`Nodes${where} at the end of the span`, now, "count"),
+    fact(`Nodes${where} ${words.start}`, was, "count"),
+    fact(`Nodes${where} ${words.end}`, now, "count"),
   ], name);
 }
 
 /** A network starting or stopping. Outranks any count: nothing else says it. */
-export function eventChange(name: string, kind: "active" | "quiet", subject: NoteChangeSubject): NoteChange {
-  return row(kind, subject, Number.MAX_SAFE_INTEGER, `${name} ${kind === "active" ? "became active" : "went quiet"} over the span`, [], name);
+export function eventChange(name: string, kind: "active" | "quiet", subject: NoteChangeSubject, words: RangeWords): NoteChange {
+  return row(kind, subject, Number.MAX_SAFE_INTEGER, `${name} ${kind === "active" ? "became active" : "went quiet"} in ${words.range}`, [], name);
 }
 
 /** A network's pace against its usual one, seconds between snapshots: null under the threshold and
@@ -108,15 +118,15 @@ export function rhythmChange(name: string, usualS: number, recentS: number, subj
   return row(recentS < usualS ? "faster" : "slower", subject, size, `${name} ${recentS < usualS ? "sped up" : "slowed down"}`, [now, usual], name);
 }
 
-/** The span's largest global snapshot, by the snapshots it anchored (user, 2026-11-02: "more
+/** The range's largest global snapshot, by the snapshots it anchored (user, 2026-11-02: "more
  *  interesting" than a metagraph's). Its record is found with the note. */
-export function largestGlobalChange(anchored: number): NoteChange {
-  return row("peak", { kind: "self" }, 0, "The span's largest global snapshot", [fact("Metagraph snapshots it anchored", anchored, "count")]);
+export function largestGlobalChange(anchored: number, words: RangeWords): NoteChange {
+  return row("peak", { kind: "self" }, 0, `The largest global snapshot in ${words.range}`, [fact("Metagraph snapshots it anchored", anchored, "count")]);
 }
 
-/** Who held the span's longest gap between snapshots. Below the largest snapshot on a tie of kinds. */
-export function longestGapChange(name: string, seconds: number, subject: NoteChangeSubject): NoteChange {
-  return row("longest", subject, -1, `${name} had the span's longest gap`, [fact("Longest gap", seconds, "duration")], name);
+/** Who held the range's longest gap between snapshots. Below the largest snapshot on a tie of kinds. */
+export function longestGapChange(name: string, seconds: number, subject: NoteChangeSubject, words: RangeWords): NoteChange {
+  return row("longest", subject, -1, `${name} had the longest gap in ${words.range}`, [fact("Longest gap", seconds, "duration")], name);
 }
 
 type Sites = Readonly<Record<string, number>>;

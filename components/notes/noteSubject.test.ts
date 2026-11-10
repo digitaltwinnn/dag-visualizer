@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { noteSpanWords, noteSubjectOf, type NoteSubjectState } from "./noteSubject";
+import { noteModeOf, noteSpanWords, noteSubjectOf, type NoteSubjectState } from "./noteSubject";
 
 const base: NoteSubjectState = {
   metagraphNetwork: "all",
@@ -49,6 +49,28 @@ describe("noteSubjectOf", () => {
   });
 });
 
+// THE REGISTER'S NOTE (controller ruling, 2026-11-06): the top card in the Blocks register is the
+// block DAG's note, the whole network's; the Snapshots register keeps the ledger's.
+describe("the note a register carries", () => {
+  it("differs by register in the Snapshots view", () => {
+    expect(noteSubjectOf("ledger", s({ register: "blocks" }))).toEqual({ view: "blocks", subject: "all" });
+    expect(noteSubjectOf("ledger", s({ register: "snapshots" }))).toEqual({ view: "ledger", subject: "all" });
+    // The Data blocks register's own note (2026-11-07): the data blocks', the whole network's.
+    expect(noteSubjectOf("ledger", s({ register: "data" }))).toEqual({ view: "data", subject: "all" });
+    expect(noteSubjectOf("ledger", s({ register: "data", metagraphNetwork: "DAG123" }))).toEqual({ view: "data", subject: "all" });
+    expect(noteSubjectOf("ledger", s({}))).toEqual({ view: "ledger", subject: "all" });
+  });
+  it("is the block DAG's whole network whatever the rung stands on", () => {
+    expect(noteSubjectOf("ledger", s({ register: "blocks", metagraphNetwork: "DAG123" }))).toEqual({ view: "blocks", subject: "all" });
+    expect(noteSubjectOf("ledger", s({ register: "snapshots", metagraphNetwork: "DAG123" }))).toEqual({ view: "ledger", subject: "DAG123" });
+  });
+  it("is read only where the view offers the register: elsewhere a held register changes nothing", () => {
+    for (const m of ["hyper", "geo"] as const) expect(noteSubjectOf(m, s({ register: "blocks" }))).toEqual({ view: m, subject: "all" });
+    expect(noteSubjectOf("trend", s({ register: "blocks" }))).toEqual({ view: "trend", subject: "dag" });
+    expect(noteSubjectOf("soon", s({ register: "blocks" }))).toBeNull();
+  });
+});
+
 // The span under the one title (user, 2026-10-29): the explorer's own span words for the three
 // fixed reads; History's is the span on screen, so none here.
 describe("noteSpanWords", () => {
@@ -57,5 +79,13 @@ describe("noteSpanWords", () => {
     expect(noteSpanWords("geo")).toBe("last 7 days");
     expect(noteSpanWords("ledger")).toBe("last 24 hours");
     expect(noteSpanWords("trend")).toBeNull();
+    expect(noteSpanWords("blocks")).toBe("last 24 hours");
+  });
+});
+
+describe("noteModeOf", () => {
+  it("is the note's own view, and the block DAG's is the Snapshots view it is a register of", () => {
+    for (const v of ["hyper", "geo", "ledger", "trend"] as const) expect(noteModeOf(v)).toBe(v);
+    expect(noteModeOf("blocks")).toBe("ledger");
   });
 });

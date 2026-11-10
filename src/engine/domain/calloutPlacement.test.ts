@@ -4,6 +4,8 @@ import {
   CALLOUT_OFF_X,
   CALLOUT_OFF_Y,
   CALLOUT_REACH_X,
+  CALLOUT_W,
+  CALLOUT_H,
   CALLOUT_REACH_Y,
   CALLOUT_HANG_K,
   CALLOUT_HANG_REACH_X,
@@ -24,6 +26,14 @@ const TABLET_BOTH = { l: 300, r: 580 };
 
 const at = (x: number, band: { l: number; r: number }, y = 500, top = 0) =>
   calloutPlacement(x, y, band.l, band.r, top);
+
+// The one size (user, 2026-11-09: "give callouts a fixed width and height to avoid the resize").
+describe("the panel's one size", () => {
+  it("the reach is the standoff plus the size, so placement and the drawn box agree", () => {
+    expect(CALLOUT_REACH_X).toBe(CALLOUT_OFF_X + CALLOUT_W);
+    expect(CALLOUT_REACH_Y).toBe(CALLOUT_OFF_Y + CALLOUT_H);
+  });
+});
 
 describe("callout standoff", () => {
   it("derives the reach from the standoff, never the other way round", () => {
@@ -94,13 +104,13 @@ describe("calloutPlacement against an overlaying sheet", () => {
 
   it("flips into the room the sheet leaves instead of declining", () => {
     // Explore open, anchor near the right of a wide-enough band: no room right, plenty left.
-    expect(at(700, TABLET_EXPLORE)).toEqual({ show: true, flip: true, drop: false });
+    expect(at(700, TABLET_EXPLORE)).toEqual({ show: true, flip: true, drop: false }); // 700 − 372 = 328 ≥ 300
   });
 
   it("never flips into the sheet it just avoided", () => {
-    const p = at(450, { l: 300, r: 820 });
+    const p = at(440, { l: 300, r: 820 });
     expect(p.show).toBe(true);
-    expect(p.flip).toBe(false); // 450 + 360 = 810 fits right; flipping would land at 90, under the sheet
+    expect(p.flip).toBe(false); // 440 + 372 = 812 fits right; flipping would land at 68, under the sheet
   });
 
   it("on the desktop rails' SOFT band a panel that fits on neither side takes the roomier side", () => {
@@ -183,13 +193,16 @@ describe("calloutPhonePlacement — the label in the free strip above or below i
   const rise = Math.round(CALLOUT_OFF_Y * CALLOUT_PHONE_K);
   const place = (x: number, y: number) => calloutPhonePlacement(x, y, 0, W, TOP, BOTTOM, PW, PH);
 
-  it("stands the panel just under the command bar when the top edge is nearer", () => {
-    const p = place(195, 200);
-    expect(p).toEqual({ show: true, drop: false, left: -PW / 2, leader: 200 - (TOP + AIR + PH) });
-  });
-  it("drops the panel just above the dock when the bottom edge is nearer", () => {
+  // BELOW FIRST (user, 2026-11-09): the top strip holds the controls, so the label drops wherever
+  // the bottom strip has room, even when the top one is nearer.
+  it("drops the panel toward the dock whenever the bottom strip has room, even when the top is nearer", () => {
+    expect(place(195, 200)).toMatchObject({ show: true, drop: true, leader: rise * CALLOUT_PHONE_MAX_K });
     const p = place(195, 350);
     expect(p).toMatchObject({ show: true, drop: true, leader: BOTTOM - AIR - PH - 350 });
+  });
+  it("stands the panel just under the command bar only when the bottom strip has no room", () => {
+    const y = BOTTOM - AIR - PH - rise + 1;
+    expect(place(195, y)).toEqual({ show: true, drop: false, left: -PW / 2, leader: Math.min(y - (TOP + AIR + PH), rise * CALLOUT_PHONE_MAX_K) });
   });
   it("…but never further than twice the old standoff — the label stays attached", () => {
     const p = calloutPhonePlacement(195, 300, 0, W, TOP, 900, PW, PH);

@@ -66,7 +66,11 @@ never overridden.
 
 That pane is the metagraph-snapshot card's **two-step disclosure** — the CARD states the SHAPE of the
 application state, the pane renders the PAYLOAD one level down **on a second deliberate gesture, because
-one anchoring channel publishes personal records.** Arriving here IS that gesture, so the pane reads its
+one anchoring channel publishes personal records.** The gate guards payload RENDERING, not counting
+(ruling, 2026-11-07): the card's "Data updates" COUNT comes from the tick's exact read
+(`ChannelSnapRow.dataTxCount`, `app/api/snapshot/exactRow.ts`), so the card states it with no
+Decompress and no `/channel/` request (`components/inspector/metaSnapDataCount.test.ts`); the deep read
+serves the payload, the state's shape and the dL1 signers. Arriving here IS that gesture, so the pane reads its
 own subject's payload on arrival (the surface gate, in `src/engine/scene/CLAUDE.md`). Its shape is
 **ONE LANE AXIS** (2026-08-09): the
 snapshot's facts stay pinned at the top, and the payload sits behind `STATE · DATA · SIGNERS` tabs whose
@@ -100,6 +104,99 @@ for when; `components/PastWindowBridge.tsx` is the one writer, and the store car
 status. A switch starts the chamber on a fresh history and the pin's rewind lands it; while past
 the live edge stands down. The vitals band and the raw log stay live: the band is the live
 instrument, and the raw log pages any depth itself.
+
+**The Blocks register reads a THIRD ledger source: the block window** (2026-11-06,
+`blockWindow.ts`; the chamber side is in `src/engine/scene/CLAUDE.md`). WHICH source a register reads
+is ONE keyed row, `viewPolicy.REGISTER_SOURCE` (asked as `readsBlockWindow(register)` by the data
+layer, the pick table, the feed set and every component — never a `register === "blocks"` compare;
+it sits in the domain because the domain asks it too, rule 1), and `useLedgerSource` calls
+`ledgerSource()` rather than re-deriving it. `ledgerSource(live,
+register)` answers it ALONE in that register — the live buffer's ticks are the wrong set, so with no
+window yet the chamber draws nothing — and the past window or the live buffer in the Snapshots
+register (`pastWanted` stands down in Blocks). The window is the newest 52 global snapshots at or
+below the pin that HOLD a block (a DAG block, or an anchored metagraph snapshot carrying token
+blocks), from `/api/blocks/trail`, folded pure by `foldBlockWindow` into the live buffer's own
+shapes, so the slot model is unchanged. `blockWanted` is the one rule for when (entering the
+view — the Snapshots register reads and holds the LIVE window too, for the register switch's Blocks
+span (D3), and only the Blocks register re-centres it on a pin outside the held range); `components/BlockWindowBridge.tsx` is the one writer, and the store carries only
+`blockWindowStatus` (`loading | failed | ready | beyond | unread`) — the REQUEST's state. The held
+window carries its OWN provenance, `BlockWindow.around` (null: the live edge) and `.chain`, stamped by
+the bridge on every answer (review M1/M2): the follow, the Engine's front run, the band and the tip
+append ask the WINDOW, never the request in flight, which says "live" through a resume while the
+pinned window is still the one held; and a read that spends its retries keeps the window only when it
+is the live window of the network asked (`failedReadKeeps`) — a filter's failed refetch clears the
+other network's window (and the live block with it) rather than drawing its numbers under this
+filter. While the LIVE window is held (`liveWindowRuns`: following, or a pin the held live
+window covers or lies NEWER than — the band is the live instrument, and a block or tick clicked inside
+the live window never freezes it) it refreshes on `blockRefreshMs` — every 30 s in Transaction blocks,
+every 5 minutes in the other registers, whose switch half needs only
+the window's reach (review M3) — and takes a tick the feed announces at once. **A pin newer than the
+held live window's newest block tick KEEPS the live window** (`blockWanted`, review I1): it lies in
+the live edge's silence, the front run, not in the past, so a seconds-old pin carried into
+Transaction blocks never reads as "a past time". A pin older than it is a past window, which holds
+still; **a live refresh never drops a newer tick it
+already holds** (`mergeLiveAnswer` — the edge cache and the explorer's lagging index can answer an
+older trail), while a pinned answer replaces. A pin deeper than the trail can walk is **beyond
+reach**: an answer, stated, never retried (`beyond: true`). **Under a network filter the window is
+THAT network's** (2026-11-07, user: "when I filter on a metagraph it should get the blocks to
+populate the furniture"): `blockChainOf(filter)` asks the trail for the filter's network
+(`trailPath`'s `&chain=`), so the window is its newest 52 block ticks however far back they lie. **A
+metagraph's window holds its own blocks ONLY** (design round D8, user: "If we filter on a metagraph,
+does it make sense to show the DAG blocks? They are unrelated right"): the trail may carry the DAG
+blocks its ticks also accepted, and `foldBlockWindow` drops them (and a tick left with nothing), so
+the chamber, the explorer, RAW and the band — all of which read the window — state no DAG block
+there; the DAG's window is the braid alone, and All keeps both. A filter change refetches (`blockWanted` holds
+only a window read for the same network) and the answer replaces the window (`mergeLiveAnswer` never
+merges two networks'); the live feed's announced tick joins only a window holding the DAG's ticks
+(`tipJoins`). Under All it is every network's, as before. The unlisted filter reads nothing
+(`blockWanted`'s `unread`, status `unread`): the explorer, the band and RAW state the floor, never
+"no blocks". A token chain cut by its walk's page cap is named in the window's `partial`, and the
+band's readings count the window's own network's blocks, a cut window read like a full one — CUT only
+by the chain that drives it (`blockStats.blockScopeOf`: any chain under All, the filter's own under a
+filter). **Live in DATA BLOCKS follows the newest tick that carried data** (2026-11-08, user: "similar to a
+metagraph filter … keep the global snapshot that actually has a data block as the live element; fast
+forward when there is a new snapshot with a data block"): `follow.ts`'s `followNewestData` seats the
+newest buffered global whose exact read holds a data-carrying snapshot in the filter's scope, and that
+tick's newest such snapshot (so the rung below is always open — the Metagraph ghost's step had nothing
+to open under a dataless live tick), through the non-bumping advances; a landing exact read is a beat
+there (`FollowController`), since a tick is known to carry data only once read. With no read tick
+carrying data the plain follow stands. **Live in the Blocks register follows the newest block** (D3): `follow.ts`'s `followLatest` seats
+`blockWindow.newestBlock` — the window's newest block of the network it was read for — and its
+accepting global through the non-bumping `advanceBlock` / `advanceSnap`, never from a window read for
+another network or around a pin (pinned by `src/store/followFlow.test.ts`). Pinned by `blockWindow.test.ts` and `blockStats.test.ts`.
+
+**The exact row carries the state's SHAPE and the dL1 signers too** (`stateKeys`, `dataBlockSigners`;
+2026-11-07, user: "'decompress this snapshot', is it still needed?" — no: the decoder had both, so
+the metagraph snapshot card states its State tab, Data tab and dL1 signer count off the row and its
+"Decompress this snapshot" door went; `snapshot-exact-v9`). The deep channel read is the RAW pane's
+payload alone, read on arrival there. **And ONE SUMMARY PER DATA BLOCK** (`ChannelSnapRow.dataBlockRows`,
+`DataBlockSummary`: updates by kind — `payloadKinds`' mechanical names, "records" for a flat record —
+dL1 signers, bytes, and a sha256 DIGEST the decoder takes over the block's bytes, never called a hash
+since the chain publishes none; `snapshot-exact-v10`): the Data block card reads it, so no surface
+reads deep for a data block. **A data block the decoder cannot read is UNREAD** (`unread: true`,
+review M3, 2026-11-09; `snapshot-exact-v11`): its snapshot's `dataTxCount` is absent (unknown), so
+every sum of data updates and the register switch's data-block count read that tick as unread, never
+a 0.
+
+**A block's parents come only from a FULL READ** of the snapshot that accepted it
+(`blockReads.ts`, `components/BlockReadsBridge.tsx`): one read per block-bearing snapshot in the
+window, newest first, `WINDOW_READ_POOL` (8) in flight with no gap (user, 2026-11-07: "do the exact
+reads need to be sequential?" — the paced one-per-450 ms queue took ~23 s over a 52-tick window) —
+the DAG's through the chamber's own exact read (`ensureMany`, mirrored into `store.blockReads`), a
+token chain's through the metagraph blocks route — pruned with the window. The exact-read queue asks EVERY window tick (`wantedExactReads`), a token-only tick too, so
+every bar on the trail is measured — and the bounded exact cache never evicts a HELD window's ordinal
+(`blockReads.exactEvictions` over `pastWindow.heldOrdinals`, review I3 2026-11-09: it dropped the lowest
+ordinals, which a window's ticks always are, so its bars decayed to a block-only floor within half an
+hour, and nothing re-asked). A read carries each transfer (`BlockRead.transfers`: from, to,
+amount, fee) beside the totals; MOVED sums the read's own `amount` (the decoder's transfer sum), so a
+read cached before `transfers` was carried still counts (review M4). A failed read is a MISS (`blockReadMiss`, rule 10: blocks with no links, never invented
+ones); a DAG miss is displayed but never excluded, so a DAG ordinal is always re-asked of
+`ensurePage`, which bounds its own retries. A read is the blocks alone — a snapshot's `tips` are
+not read anywhere (design round D5, 2026-11-07: open tips left every surface), so retention keeps
+exactly the window's reads and nothing beside them. The band's MOVED sums only landed reads and
+states how many it read. The DAG's HEIGHT has
+ONE source on every surface — the global snapshot's own `height`/`subHeight`; a Block card states
+the block's own height, a different subject. Pinned by `blockReads.test.ts` and `blockStats.test.ts`.
 
 ## Anchoring, fees & the metagraph data layer
 
@@ -188,6 +285,22 @@ The snapshot card renders the breakdown as colour-coded pills with the authorita
 from the exact read when available. It deliberately shows **no block count**, since blocks aren't the
 activity signal here. (A snapshot's `content` is the serialized snapshot as a *byte array*, not a list
 of records — don't surface its length as an update count.)
+
+**The Data blocks register reads the data updates off the same exact reads** (D6, 2026-11-07). Its
+source is the Metagraph snapshots register's own (`ledgerSource(live, "data")` answers as for
+`snapshots`: the live buffer or a past window, never the block window), and its numbers are the rows'
+`dataTxCount` — the count of data transactions in a snapshot's data blocks, which IS an update count
+(unlike `content`'s length above). The explorer's lead measure (`ledgerMeasure.tickDataUpdates`, the
+`DATA_*` measure lists — Data updates · Fees · Metagraphs · Size, Data updates in Anchors' place — the
+store's own `dataMeasure` pick; each register's lists, pick and fade are ONE keyed row,
+`ledgerMeasure.REGISTER_MEASURES`, which the explorer reads instead of choosing per register) and the band's
+three readings (`dataStats.ts`: DATA UPDATES over the ticks read with "N of M snapshots read" as its
+floor, BY NETWORK, LAST DATA BLOCK) are pure arithmetic over them; a tick whose read has not landed is
+a gap, never a zero (rule 10). **Every sum of the counts asks ONE rule, `ledgerMeasure.dataUpdatesOf`**
+(the exact route's per-network figure, the tick row, the band's three): a row the decoder could not
+read makes its sum UNKNOWN, so a tick holding one reads as unread on every surface — never as 0. The explorer index lists no data blocks (DED's records carry
+`blocks: []`), and a data chain anchors data in nearly every snapshot, so the snapshot trail IS the
+data trail — no window of its own is read.
 
 **A data metagraph's real payload rides in its blocks' `dataTransactions`, not necessarily in
 `onChainState`** — verified live. DED anchors fingerprint batch commitments (a batch id and a Merkle

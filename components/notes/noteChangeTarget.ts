@@ -2,11 +2,12 @@ import { compositionGroups, compositionKey, roleKeyLabel } from "@/src/data/comp
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { cohortOfProvider } from "@/src/data/ladderLevels";
 import type { NoteChange, NoteChangeSubject, NoteGlobal, NoteView } from "@/src/data/noteTypes";
-import { metaSnapHoverKey, type GlobalSnapshot, type MetaSnapSel, type NodeRow, type PickDescriptor, type TickNetSel } from "@/src/data/types";
+import { metaSnapHoverKey, type GlobalSnapshot, type MetaSnapSel, type NodeRow, type TickNetSel, type BlockSel } from "@/src/data/types";
 import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder";
 import {
   compositionToggleActions,
   countryToggleActions,
+  globalPick,
   metaSnapSelectActions,
   noteCohortActions,
   railNetActions,
@@ -16,6 +17,7 @@ import {
 } from "@/src/engine/domain/pickActions";
 import { heldOut, viewNetwork } from "@/src/engine/domain/viewNetwork";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
+import { noteModeOf } from "./noteSubject";
 
 // WHAT A NOTABLE CHANGE'S ROW IS ABOUT (user, 2026-10-31: "related to a clickable subject"): the
 // row commits what the view's own explorer row for that subject commits, through the same table
@@ -27,20 +29,20 @@ export interface ChangeState {
   /** Snapshots: the tick and the follow state its rows commit against. */
   following?: boolean;
   pinnedOrdinal?: number | null;
-  inspect?: PickDescriptor | null;
   tickNet?: TickNetSel | null;
+  /** Snapshots: the committed block, which a commit on another tick releases. */
+  block?: BlockSel | null;
   railNet: string | null;
   country: string | null;
   cohort: CohortSel | null;
   composition: CompositionSel | null;
   hasInspect: boolean;
   metaSnap: MetaSnapSel | null;
-  /** The network the Snapshots card stands on (`ledgerNetwork`). */
-  ledgerNet: string | null;
 }
 
-/** A global snapshot as a pick: the record a row carries, the road the raw log takes to an old tick. */
-const globalPick = (g: NoteGlobal): Extract<PickDescriptor, { kind: "snapshot" }> => ({ kind: "snapshot", title: `Global snapshot #${g.ordinal}`, data: g as GlobalSnapshot });
+/** A global snapshot as a pick (`pickActions.globalPick`): the record a row carries, the road the raw
+ *  log takes to an old tick. */
+const notePick = (g: NoteGlobal) => globalPick(g as GlobalSnapshot);
 
 const compKeyOf = (type: string): string => {
   const { label, codes } = roleKeyLabel(type);
@@ -58,13 +60,12 @@ export function changeActions(
 ): ClickAction[] | null {
   switch (subject.kind) {
     case "network":
-      if (!VIEW_POLICIES[view].tickScoped)
+      if (!VIEW_POLICIES[noteModeOf(view)].tickScoped)
         return subject.id === viewNetwork(s) || heldOut(s.filter, subject.id) ? null : railNetActions(subject.id, s.filter);
       if (!tick || subject.id === "dag") return null; // the chamber's own row names no network to open
-      return tickNetSelectActions(subject.id, { kind: "snapshot", title: `Global snapshot #${tick.ordinal}`, data: tick }, {
+      return tickNetSelectActions(subject.id, globalPick(tick), {
         metaSnap: s.metaSnap,
-        hasInspect: s.hasInspect,
-        net: s.ledgerNet,
+        block: s.block ?? null,
       });
     case "type":
       return compositionToggleActions({ netId: subject.netId, key: compKeyOf(subject.type) }, { ...s, filter: s.railNet ?? s.filter });
@@ -75,13 +76,13 @@ export function changeActions(
       return c ? noteCohortActions({ cc: c.cc, city: c.city, isp: c.isp }, s) : null;
     }
     case "metaSnap":
-      return metaSnapSelectActions(subject.sel, globalPick(subject.global), { metaSnap: s.metaSnap, following: s.following, inspect: s.inspect ?? null });
+      return metaSnapSelectActions(subject.sel, notePick(subject.global), { metaSnap: s.metaSnap, following: s.following, block: s.block ?? null });
     case "global":
-      return snapshotSelectActions(globalPick(subject.global), false, {
+      return snapshotSelectActions(notePick(subject.global), false, {
         pinnedOrdinal: s.pinnedOrdinal ?? null,
         metaSnap: s.metaSnap,
-        hasInspect: s.hasInspect,
         tickNet: s.tickNet,
+        block: s.block,
       });
     case "self":
       return null;

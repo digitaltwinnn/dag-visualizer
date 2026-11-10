@@ -61,28 +61,47 @@ export function sparkPoints(
  *  lowest measured point on the floor, the highest on the ceiling; a moment whose points are all
  *  equal sits flat across the middle. A point measured alone between two gaps has no segment, so
  *  it is drawn as a dot of its own (`dots`) rather than silently vanishing. */
+export interface SparkGeometry {
+  path: string;
+  /** The area under each run of the line, down to the floor (one closed sub-path per run; a lone
+   *  point has none) — the line's fill, so the measured stretch reads as a shape. */
+  area: string;
+  peak: { x: number; y: number } | null;
+  dots: { x: number; y: number }[];
+}
+
 export function sparkGeometry(
   points: readonly (number | null)[],
   w: number,
   h: number,
-): { path: string; peak: { x: number; y: number } | null; dots: { x: number; y: number }[] } {
+  /** A SHARED SCALE, for two lines drawn as one (the Range card's in-range and context parts,
+   *  `rangeSpark.ts`): they stretch against the whole frame, while the peak stays this line's own. */
+  scale?: { lo: number; hi: number },
+): SparkGeometry {
   const vals = points.filter((v): v is number => v != null);
-  if (!vals.length) return { path: "", peak: null, dots: [] };
-  const lo = Math.min(...vals);
-  const hi = Math.max(...vals);
+  if (!vals.length) return { path: "", area: "", peak: null, dots: [] };
+  const top = Math.max(...vals);
+  const lo = scale?.lo ?? Math.min(...vals);
+  const hi = scale?.hi ?? top;
   const x = (i: number) => (points.length > 1 ? (i / (points.length - 1)) * w : w / 2);
   const y = (v: number) => (hi === lo ? h / 2 : h - ((v - lo) / (hi - lo)) * h);
   const r = (n: number) => Math.round(n * 100) / 100;
   let path = "";
+  let area = "";
   const dots: { x: number; y: number }[] = [];
   let peak: { x: number; y: number } | null = null;
   points.forEach((v, i) => {
     if (v == null) return;
     const px = r(x(i));
     const py = r(y(v));
-    path += `${i > 0 && points[i - 1] != null ? "L" : "M"}${px},${py}`;
+    const joins = i > 0 && points[i - 1] != null;
+    path += `${joins ? "L" : "M"}${px},${py}`;
+    area += joins ? `L${px},${py}` : `M${px},${h}L${px},${py}`;
+    if (i === points.length - 1 || points[i + 1] == null) area += `L${px},${h}Z`;
     if ((i === 0 || points[i - 1] == null) && (i === points.length - 1 || points[i + 1] == null)) dots.push({ x: px, y: py });
-    if (peak == null && v === hi) peak = { x: px, y: py };
+    if (peak == null && v === top) peak = { x: px, y: py };
   });
-  return { path, peak, dots };
+  // A run of one point has no width: its area is dropped rather than drawn as a sliver.
+  area = area.replace(/M([\d.]+),[\d.]+L\1,[\d.]+L\1,[\d.]+Z/g, "");
+  return { path, area, peak, dots };
 }

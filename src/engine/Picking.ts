@@ -7,7 +7,9 @@ import { metaSnapHoverKey, type PickDescriptor } from "@/src/data/types";
 import { VIEW_POLICIES } from "./domain/viewPolicy";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { tickLocked } from "@/src/data/ledgerStory";
-import { clickActions, pickActive, metaSnapSelectActions, bandSelectActions } from "./domain/pickActions";
+import { clickActions, pickActive, metaSnapSelectActions, bandSelectActions, blockSelectActions, tickContextOf } from "./domain/pickActions";
+import { blockMetaSnap, windowBlocks } from "@/src/data/blockWindow";
+import { getBlockWindow } from "@/src/data/pastWindow";
 import type { CohortSel, CompositionSel } from "./domain/focusLadder";
 import type { SceneCtx } from "./scene/SceneContext";
 import type { Globe } from "./scene/Globe";
@@ -41,8 +43,6 @@ export interface PickHost {
   /** Metagraphs with a located node — `pickActive` skips the others' hubs. */
   activeMetaIds: Set<string> | null;
   cohortSel: CohortSel | null;
-  /** The network the LEDGER resolves against — `domain/tickNet.ledgerNetwork`, one home. */
-  ledgerNet(): string;
   /** The composition group a node pick belongs to in the current view's ladder. */
   compositionOf(p: PickDescriptor | null): CompositionSel | null;
 }
@@ -113,7 +113,7 @@ export class Picking {
   /** The tile or band of a tick the filter's network is not in answers nothing, as its explorer
    *  row does (`ledgerStory.tickLocked`). The tick on screen always answers: it is the way back. */
   private tickHeldOut(p: PickDescriptor, st: ReturnType<typeof useStore.getState>): boolean {
-    const ordinal = p.kind === "snapshot" ? p.data.ordinal : p.kind === "metaSnap" ? p.global.data.ordinal : null;
+    const ordinal = p.kind === "snapshot" ? p.data.ordinal : p.kind === "metaSnap" || p.kind === "block" ? p.global.data.ordinal : null;
     return ordinal != null && ordinal !== st.snap?.data.ordinal && tickLocked(st.filter, st.snapshotExact[ordinal]);
   }
 
@@ -136,6 +136,8 @@ export class Picking {
     if (st.hoverNodeId != null) st.setHoverNodeId(null);
     if (st.hoverSnapOrd != null) st.setHoverSnapOrd(null);
     if (st.hoverMetaSnap != null) st.setHoverMetaSnap(null);
+    if (st.hoverBlock != null) st.setHoverBlock(null);
+    if (st.hoverDataBlock != null) st.setHoverDataBlock(null);
     if (st.hoverFilter != null) st.setHoverFilter(null);
     if (st.hoverCountry != null) st.setHoverCountry(null);
     if (st.hoverCohort != null) st.setHoverCohort(null);
@@ -163,6 +165,8 @@ export class Picking {
     // sibling that anchored into the same global tick — in the scene OR in the explorer/raw rows.
     const snapOrd = p?.kind === "snapshot" ? p.data.ordinal : null;
     const metaSnapKey = p?.kind === "metaSnap" ? metaSnapHoverKey(p.sel.metaId, p.sel.ordinal) : null;
+    // A BLOCK (the Blocks register) hovers on its own channel, by hash: one block, not its tick.
+    const blockHash = p?.kind === "block" ? p.sel.hash : null;
     const metaId = p?.kind === "meta" ? p.cfg?.id ?? null : null;    // hub → metagraph dim preview
     // Country under the cursor (policy-gated): the SCENE side of the bidirectional country
     // pairing — writes the same hoverCountry channel the explorer rows use, so the border
@@ -181,6 +185,7 @@ export class Picking {
     if (nodeKey !== st.hoverNodeId) st.setHoverNodeId(nodeKey);
     if (snapOrd !== st.hoverSnapOrd) st.setHoverSnapOrd(snapOrd);
     if (metaSnapKey !== st.hoverMetaSnap) st.setHoverMetaSnap(metaSnapKey);
+    if (blockHash !== st.hoverBlock) st.setHoverBlock(blockHash);
     if (metaId !== st.hoverFilter) st.setHoverFilter(metaId);
     if (countryCc !== st.hoverCountry) st.setHoverCountry(countryCc);
 
@@ -218,7 +223,7 @@ export class Picking {
     // A metagraph-snapshot TILE: commit the tile AND pin the global tick it anchored into.
     if (p?.kind === "metaSnap") {
       applyClickActions(
-        metaSnapSelectActions(p.sel, p.global, { metaSnap: st.metaSnap, following: st.following, inspect: st.inspect }),
+        metaSnapSelectActions(p.sel, p.global, { metaSnap: st.metaSnap, following: st.following, block: st.block }),
       );
       return;
     }
@@ -229,11 +234,24 @@ export class Picking {
       applyClickActions(
         bandSelectActions(bandKey, p, {
           metaSnap: st.metaSnap,
-          hasInspect: st.inspect != null,
-          net: this.h.ledgerNet(),
+          block: st.block,
         }),
       );
       return;
+    }
+    // IN TRANSACTION BLOCKS A BAR IS ITS FIRST BLOCK (user, 2026-11-07: "transaction blocks still
+    // loses its block card often" — a bar click pinned the tick and released the block, so the
+    // register's subject vanished): the trail draws only block-bearing ticks, so a tick there IS a
+    // block's tick, and clicking its bar commits the tick AND its first block, the Block ghost's own
+    // step (`railSiblings.blockStep`), a token block's snapshot with it. A band click stays a band's.
+    if (p?.kind === "snapshot" && this.h.ledger.readsBlockWindow) {
+      const w = getBlockWindow();
+      const first = windowBlocks(w).find((b) => b.anchorOrd === p.data.ordinal);
+      if (first) {
+        const sel = { chain: first.chain, hash: first.hash, ordinal: first.ordinal, anchorOrd: first.anchorOrd };
+        applyClickActions(blockSelectActions(sel, p, tickContextOf(st), blockMetaSnap(w, sel)));
+        return;
+      }
     }
     applyClickActions(
       clickActions({
@@ -249,9 +267,7 @@ export class Picking {
           country: st.country,
           hasInspect: !!st.inspect,
           cohort: this.h.cohortSel,
-          pinnedOrdinal: !st.following ? st.snap?.data?.ordinal ?? null : null,
-          metaSnap: st.metaSnap,
-          tickNet: st.tickNet,
+          ...tickContextOf(st),
         },
       }),
     );

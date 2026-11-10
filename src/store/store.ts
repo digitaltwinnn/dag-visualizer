@@ -1,6 +1,6 @@
 import { sameTickNet } from "@/src/engine/domain/tickNet";
 import { create } from "zustand";
-import type { GlobalSnapshot, LeaderboardData, MetaInfo, NodeRow, PickDescriptor, SnapshotExact, MetaSnapSel, TickNetSel, ChannelSnapDeep } from "@/src/data/types";
+import type { GlobalSnapshot, LeaderboardData, MetaInfo, NodeRow, PickDescriptor, SnapshotExact, MetaSnapSel, TickNetSel, ChannelSnapDeep, BlockSel, DataBlockSel } from "@/src/data/types";
 import { metaSnapDeepKey } from "@/src/data/types";
 import type { HoverSubject } from "@/src/data/hoverSubject";
 // Type-only — the store may not import domain VALUES (layerBoundaries rule), but a type-only
@@ -14,8 +14,8 @@ import type { ZoomId } from "@/src/data/trendWindow";
 import { entryFocus, focusOnReturn, planeOfChain, scrollToKeep } from "@/src/engine/domain/trendStack";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 // The catalog and the unlisted id, for the one fold the return path needs (`planeOfChain`): both
-// are static data — `src/net/current` reads config, `unlistedId` is the import-free leaf.
-import { METAGRAPHS } from "@/src/net/current";
+// are static data — the catalog is config's, `unlistedId` is the import-free leaf.
+import { METAGRAPHS } from "@/src/engine/config";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
 
 // The active view. `hyper`/`geo`/`ledger`/`trend` all drive the 3D scene (every switch among
@@ -23,11 +23,14 @@ import { UNLISTED_ID } from "@/src/data/unlistedId";
 // 2026-09-04 — three separate soon modes said the same nothing three times; the Blueprint
 // gallery inside it still previews each coming feature). `trend` (2026-09-18) is the measured
 // history view — chart planes as the scene, convention 12's MEASURED HISTORY rung made a view.
-import type { Mode } from "@/src/store/mode";
-export type { Mode };
+import type { Mode, LedgerRegister } from "@/src/store/mode";
+export type { Mode, LedgerRegister };
 
 // The stored metric every trend plane draws — one picker, one column (see `trendMetric` below).
 import type { LedgerMeasure } from "@/src/data/ledgerMeasure";
+import type { BlockMeasure } from "@/src/data/blockMeasure";
+import { exactEvictions, type HeldBlockRead } from "@/src/data/blockReads";
+import { heldOrdinals } from "@/src/data/pastWindow";
 import type { GeoMeasure } from "@/src/data/geoMeasure";
 import type { HyperMeasure } from "@/src/data/hyperMeasure";
 // WHY the scene is moving — the motion hint's cause (2026-09-26), stamped by the gesture's owner
@@ -43,12 +46,16 @@ export type MotionCause =
   | { kind: "node"; title: string | null; sub?: string | null }
   | { kind: "snapshot"; ordinal: number | null }
   | { kind: "metaSnap"; metaId: string | null; ordinal?: number }
+  // A block in the Blocks register — a slot under its tick, so the cause says only on or off.
+  | { kind: "block"; on: boolean }
+  | { kind: "dataBlock"; on: boolean }
   | { kind: "country"; cc: string | null }
   | { kind: "cohort"; on: boolean }
   | { kind: "composition"; on: boolean }
   | { kind: "range"; span: { fromMs: number; toMs: number } | null }
   | { kind: "window"; id: ZoomId }
   | { kind: "measure"; id: TrendMetric }
+  | { kind: "register"; id: LedgerRegister }
   | { kind: "page" }
   | { kind: "orbit" }
   // A rail card asking to be framed (`requestFocusRung`): the ladder rung, named by the reader.
@@ -56,10 +63,13 @@ export type MotionCause =
 // `globals` = the GLOBAL snapshots (2026-10-26): the DAG's own L0 count (dagscan's "snapshots"), and
 // per network the global snapshots that carried its snapshots. `snapshots` stays the metagraph
 // snapshots anchored — the two differ ~10× on the DAG row, which is why both are measures.
+// One block the Snapshots view's Blocks register has selected — homed in `src/data/types.ts` beside
+// the block pick that carries it.
+export type { BlockSel, DataBlockSel } from "@/src/data/types";
 export type TrendMetric = "snapshots" | "globals" | "blocks" | "fees" | "kb" | "nodes" | "continuity" | "transfers";
 
 // One slot in the right-rail card stack (extend with future card types — e.g. "tx").
-export type SelSlot = "network" | "node" | "snap" | "metaSnap" | "country" | "cohort" | "composition" | "range" | "instant";
+export type SelSlot = "network" | "node" | "snap" | "metaSnap" | "block" | "dataBlock" | "country" | "cohort" | "composition" | "range" | "instant";
 
 // Move `slot` to the FRONT of the recency stack when it becomes active, or drop it when cleared.
 //
@@ -69,6 +79,9 @@ export type SelSlot = "network" | "node" | "snap" | "metaSnap" | "country" | "co
 // click and it is not free for `setTrendCursor`, which writes at BUCKET frequency during a scrub
 // with `instant` already at the front. Returning the incoming array unchanged when nothing moved
 // costs one comparison over a list that is never longer than the ladder.
+const sameDataBlockSel = (a: DataBlockSel, b: DataBlockSel): boolean =>
+  a.snap.metaId === b.snap.metaId && a.snap.ordinal === b.snap.ordinal && a.index === b.index;
+
 function bumpStack(stack: SelSlot[], slot: SelSlot, active: boolean): SelSlot[] {
   const without = stack.filter((s) => s !== slot);
   const next = active ? [slot, ...without] : without;
@@ -200,6 +213,9 @@ interface AppState {
   /** THE SNAPSHOTS VIEW'S PAST WINDOW — its status only (`src/data/pastWindow.ts` holds the data;
    *  `components/PastWindowBridge.tsx` is the one writer). `ordinal` is the pin it was asked for;
    *  `from`/`to` the global snapshots it holds once ready. Null while the view reads the live feed. */
+  /** The Blocks register's window status (`BlockWindowBridge` alone writes it; the data lives in
+   *  `pastWindow.ts`). `unread`: the filter is the unlisted set, whose blocks the trail does not read. */
+  blockWindowStatus: { around: number | null; status: "loading" | "ready" | "failed" | "beyond" | "unread" } | null;
   pastWindow: { ordinal: number; from: number | null; to: number | null; status: "loading" | "ready" | "failed" } | null;
   // Deep channel reads (full decode of one metagraph snapshot), keyed by metaSnapDeepKey(globalOrdinal, metaId).
   // Immutably cached — fetched from /api/snapshot/[ordinal]/channel/[address] on explicit gesture,
@@ -231,7 +247,7 @@ interface AppState {
   // navigation bridge, not a selection (the network commit itself rides the pickActions table).
   /** A door's hand-off to the anchor log: a span to land in, or — with `snapshot` — one metagraph
    *  snapshot to find (its card's "Show the raw data", 2026-10-04). */
-  logSeek: { metaId: string | null; fromMs: number; toMs: number; snapshot?: number; label?: string } | null;
+  logSeek: { metaId: string | null; fromMs: number; toMs: number; snapshot?: number; tick?: number; label?: string } | null;
   /** THE SPAN THE RAW LOG IS CUT TO BY THE READER'S OWN DATE SEARCH (2026-10-09) — the reverse of
    *  `logSeek`: the log writes it, and closing a log a History door opened takes it back as the
    *  committed RANGE, the way a committed network comes back as the plane in front (one selection,
@@ -401,6 +417,30 @@ interface AppState {
   // What the Snapshots explorer's tick rows lead with — fee, anchors, metagraphs or size
   // (`src/data/ledgerMeasure.ts`). A setting, like `trendMetric`; its control is the card's heading.
   ledgerMeasure: LedgerMeasure;
+  // What the Data blocks register's rows lead with — the Snapshots measures with "Data updates" first
+  // (`DATA_MEASURE_ORDER`, D6). Its own pick, as the Blocks register's is, so entering the register
+  // reads its data updates whatever the Snapshots register was left on. A setting.
+  dataMeasure: LedgerMeasure;
+  // Which REGISTER the Snapshots view reads — its metagraph snapshots, the transaction blocks inside
+  // them or the data blocks they carry (`viewPolicy.registers`). A setting, like the measures: it moves the scene, so it stamps a cause.
+  ledgerRegister: LedgerRegister;
+  // What the Blocks register's rows lead with (`src/data/blockMeasure.ts`). A setting.
+  blockMeasure: BlockMeasure;
+  // The committed block — a SELECTION (written by the click executor only). Cleared on leaving the view.
+  block: BlockSel | null;
+  // The committed DATA block (the Data blocks register, 2026-11-07) — a selection under its metagraph
+  // snapshot, in exactly one snapshot: it goes when that snapshot does (`advanceMetaSnap`, the
+  // builders' release, the view switch).
+  dataBlock: DataBlockSel | null;
+  // The block the cursor is hovering (its hash) — a hover channel: previews, never commits.
+  hoverBlock: string | null;
+  // The DATA BLOCK the cursor is hovering (`dataBlockHoverKey`) — its own channel (2026-11-09): the
+  // Data block card hovered its snapshot's, so the snapshot lit for a data block.
+  hoverDataBlock: string | null;
+  // Block reads, keyed `${chain}:${ordinal}`; "dag:<ord>" mirrors `snapshotExact`'s blocks.
+  blockReads: Record<string, HeldBlockRead>;
+  // Block reads that FAILED (retry spent): the tick stays, its blocks draw with no links (rule 10).
+  blockReadMiss: Record<string, true>;
   // What the Geography explorer's country rows count — nodes, metagraphs or providers
   // (`src/data/geoMeasure.ts`). A setting, like the two above.
   geoMeasure: GeoMeasure;
@@ -468,7 +508,7 @@ interface AppState {
   setActivity: (activity: Activity | null) => void;
   setMode: (mode: Mode) => void;
   setDocPage: (docPage: "about" | null) => void;
-  setLogSeek: (logSeek: { metaId: string | null; fromMs: number; toMs: number; snapshot?: number; label?: string } | null) => void;
+  setLogSeek: (logSeek: { metaId: string | null; fromMs: number; toMs: number; snapshot?: number; tick?: number; label?: string } | null) => void;
   setLogCut: (logCut: { fromMs: number; toMs: number | null } | null) => void;
   setDocStageReady: (ready: boolean) => void;
   setDocClosing: (closing: boolean) => void;
@@ -504,6 +544,7 @@ interface AppState {
   /** Record a FAILED exact read for this ordinal — the acquiring states' give-up signal. */
   setExactMiss: (ordinal: number) => void;
   setPastWindowStatus: (w: AppState["pastWindow"]) => void;
+  setBlockWindowStatus: (w: AppState["blockWindowStatus"]) => void;
   /** `key` defaults to the decode's own identity; the bridge passes the REQUESTED key when
    *  the route fell back to another entry (an undecodable row asks with ordinal 0). */
   setMetaSnapDeep: (d: ChannelSnapDeep, key?: string) => void;
@@ -533,7 +574,24 @@ interface AppState {
   requestFocusRung: (level: FocusLevel) => void;
   setTrendCursor: (ms: number | null) => void;
   setTrendMetric: (metric: TrendMetric) => void;
+  setLedgerRegister: (r: LedgerRegister) => void;
+  setBlockMeasure: (m: BlockMeasure) => void;
+  setBlock: (b: BlockSel | null) => void;
+  setDataBlock: (b: DataBlockSel | null) => void;
+  /** The follow system's heartbeat advance for the Block card (the Blocks register's LIVE, D3) —
+   *  non-bumping, like advanceSnap: a block arriving is never a "new selection". */
+  advanceBlock: (b: BlockSel | null) => void;
+  /** The Data blocks register's heartbeat advance for the Data block card — non-bumping likewise:
+   *  the live snapshot's first data block arriving is no reader's pick (2026-11-08). */
+  advanceDataBlock: (b: DataBlockSel | null) => void;
+  setHoverBlock: (hash: string | null) => void;
+  setHoverDataBlock: (key: string | null) => void;
+  setBlockRead: (key: string, v: HeldBlockRead) => void;
+  setBlockReadMiss: (key: string) => void;
+  /** Drop every block read and miss outside `keep`. Data-bridge setter. */
+  retainBlockReads: (keep: Set<string>) => void;
   setLedgerMeasure: (measure: LedgerMeasure) => void;
+  setDataMeasure: (measure: LedgerMeasure) => void;
   setGeoMeasure: (measure: GeoMeasure) => void;
   setHyperMeasure: (measure: HyperMeasure) => void;
   setTrendScroll: (offset: number) => void;
@@ -632,6 +690,8 @@ export const useStore = create<AppState>((set) => ({
   exactMiss: {},
   pastWindow: null,
   setPastWindowStatus: (pastWindow) => set({ pastWindow }),
+  blockWindowStatus: null,
+  setBlockWindowStatus: (blockWindowStatus) => set({ blockWindowStatus }),
   metaSnapDeep: {},
   deepWanted: null,
   phoneDock: null,
@@ -654,6 +714,15 @@ export const useStore = create<AppState>((set) => ({
   trendCursorMs: null,
   trendMetric: "snapshots",
   ledgerMeasure: "fee",
+  dataMeasure: "data",
+  ledgerRegister: "snapshots",
+  blockMeasure: "amount",
+  block: null,
+  dataBlock: null,
+  hoverBlock: null,
+  hoverDataBlock: null,
+  blockReads: {},
+  blockReadMiss: {},
   geoMeasure: "nodes",
   hyperMeasure: "nodes",
   trendScroll: 0,
@@ -704,7 +773,10 @@ export const useStore = create<AppState>((set) => ({
     set((s) => {
       const nav = { mode, navQuiet: false, docPage: null, docClosing: s.docPage != null || s.docClosing, rawReturnMode: null, motionCause: { kind: "view" as const, from: s.mode, to: mode } };
       if (mode === s.mode) return nav;
-      return { ...nav, trendRotation: 0, trendScroll: 0, ...focusPatch(s, entryFocus(VIEW_POLICIES[mode].entryPlane, s.filter), false) };
+      // The block leaves with its view, and its recency rank with it (the way `setBlock(null)` drops
+      // it) — the focus patch reads the stack it is handed, so it is handed the stack without it.
+      const selStack = bumpStack(bumpStack(s.selStack, "block", false), "dataBlock", false);
+      return { ...nav, block: null, dataBlock: null, hoverBlock: null, hoverDataBlock: null, trendRotation: 0, trendScroll: 0, ...focusPatch({ ...s, selStack }, entryFocus(VIEW_POLICIES[mode].entryPlane, s.filter), false) };
     }),
   // Opening a doc also SURFACES THE SCENE POSE: the overlay sits at z-8, under the raw layer's
   // z-9 — a doc opened from the RAW pose rendered beneath the still-interactive table, with the
@@ -745,7 +817,15 @@ export const useStore = create<AppState>((set) => ({
       navQuiet: snap && s.snap?.data.ordinal !== snap.data.ordinal ? false : s.navQuiet,
       selStack: !snap ? s.selStack.filter((x) => x !== "snap") : s.selStack,
     })),
-  setMetaSnap: (metaSnap) => set((s) => ({ metaSnap, selStack: bumpStack(s.selStack, "metaSnap", !!metaSnap) })),
+  // A data block is in exactly one snapshot (the `advanceMetaSnap` rule, 2026-11-08: a pin from the
+  // explorer released the snapshot and left its live-seated data block in the store): a snapshot
+  // commit, or release, that is not the data block's own drops it, and its rank.
+  setMetaSnap: (metaSnap) =>
+    set((s) => {
+      const keeps = !!(s.dataBlock && metaSnap && metaSnap.metaId === s.dataBlock.snap.metaId && metaSnap.ordinal === s.dataBlock.snap.ordinal);
+      const selStack = bumpStack(s.selStack, "metaSnap", !!metaSnap);
+      return { metaSnap, dataBlock: keeps ? s.dataBlock : null, selStack: keeps ? selStack : selStack.filter((x) => x !== "dataBlock") };
+    }),
   // A NO-OP WRITE IS A NO-OP REFERENCE: the Engine's subscription re-resolves the chamber's lens
   // and the camera on a change, so re-committing the same network in the same tick (a tile under
   // an already-open network) must not hand it a fresh object.
@@ -762,14 +842,18 @@ export const useStore = create<AppState>((set) => ({
   advanceMetaSnap: (metaSnap) =>
     set((s) => ({
       metaSnap,
+      // A data block is in exactly one snapshot: a live advance onto another drops it.
+      dataBlock: s.dataBlock && metaSnap && metaSnap.metaId === s.dataBlock.snap.metaId && metaSnap.ordinal === s.dataBlock.snap.ordinal ? s.dataBlock : null,
       // Same arrival rule as advanceSnap above — identity is metaId+ordinal (sameMetaSnap's).
       navQuiet:
         metaSnap && !(s.metaSnap && s.metaSnap.metaId === metaSnap.metaId && s.metaSnap.ordinal === metaSnap.ordinal)
           ? false
           : s.navQuiet,
       // …and the same stack rule (R70): a live advance never enters the stack; a pin
-      // (`setMetaSnap`) ranks, and a snapshot going away drops its pin.
-      selStack: !metaSnap ? s.selStack.filter((x) => x !== "metaSnap") : s.selStack,
+      // (`setMetaSnap`) ranks, and a snapshot going away drops its pin — and its data block's.
+      selStack: (!metaSnap ? s.selStack.filter((x) => x !== "metaSnap") : s.selStack).filter(
+        (x) => x !== "dataBlock" || !!(s.dataBlock && metaSnap && metaSnap.metaId === s.dataBlock.snap.metaId && metaSnap.ordinal === s.dataBlock.snap.ordinal),
+      ),
     })),
   setHoverSnapOrd: (hoverSnapOrd) => set({ hoverSnapOrd }),
   setHoverMetaSnap: (hoverMetaSnap) => set({ hoverMetaSnap }),
@@ -792,16 +876,8 @@ export const useStore = create<AppState>((set) => ({
     set((s) => {
       if (s.snapshotExact[data.ordinal]) return {}; // immutable per ordinal — keep the first
       const next = { ...s.snapshotExact, [data.ordinal]: data };
-      const keys = Object.keys(next);
-      if (keys.length > EXACT_MAX) {
-        // Integer-like object keys iterate in numeric order, not insertion order — sort to be safe.
-        for (const k of keys
-          .map(Number)
-          .sort((a, b) => a - b)
-          .slice(0, keys.length - EXACT_MAX)) {
-          delete next[k];
-        }
-      }
+      // Bounded, but never past a HELD window's ordinals (review I3, `exactEvictions`).
+      for (const k of exactEvictions(Object.keys(next).map(Number), EXACT_MAX, heldOrdinals())) delete next[k];
       // A landed read supersedes any recorded miss for its ordinal — the give-up state must
       // never outlive the data it was giving up on.
       if (s.exactMiss[data.ordinal] == null) return { snapshotExact: next };
@@ -940,6 +1016,60 @@ export const useStore = create<AppState>((set) => ({
   // The settings that MOVE the scene stamp their cause (the hint reads it while the stack eases).
   setTrendMetric: (metric) => set({ trendMetric: metric, motionCause: { kind: "measure", id: metric } }),
   setLedgerMeasure: (measure) => set({ ledgerMeasure: measure }),
+  setDataMeasure: (dataMeasure) => set({ dataMeasure }),
+  // A REGISTER IS ENTERED ON ITS NOTE, AND THE NOTE FOLDS ONTO ITS SEAT (user, 2026-11-08 and
+  // 2026-11-09 — `REGISTER_SEAT`): a tick ranked in another register (a pin, a row click) loses its
+  // rank here, so the card under the note is the register's own subject, not a Global snapshot card
+  // carried in; the pin itself stays. The switch is an ENTRY (Inspector's, like a view's).
+  setLedgerRegister: (ledgerRegister) =>
+    set((s) => ({
+      ledgerRegister,
+      motionCause: { kind: "register", id: ledgerRegister },
+      selStack: bumpStack(s.selStack, "snap", false),
+    })),
+  setBlockMeasure: (blockMeasure) => set({ blockMeasure }),
+  // A block is a committed subject like the tile: it ranks in the recency stack, so its card is the
+  // box once committed (`focusSlotId`).
+  setBlock: (block) => set((s) => ({ block, selStack: bumpStack(s.selStack, "block", !!block) })),
+  // A data block ranks like the block: its card is the box once committed.
+  setDataBlock: (dataBlock) => set((s) => ({ dataBlock, selStack: bumpStack(s.selStack, "dataBlock", !!dataBlock) })),
+  // LIVE IN THE BLOCKS REGISTER FOLLOWS THE NEWEST BLOCK (D3, user 2026-11-07: "live mode should be
+  // applied to the block and not the snapshot"). `followLatest`'s heartbeat write, advanceSnap's
+  // twin: the arrival rule (a NEW block lifts a stale quiet gesture, a re-point does not) and the
+  // stack rule (a live block never enters it; a block going away drops a pin that named it).
+  advanceBlock: (block) =>
+    set((s) => ({
+      block,
+      navQuiet: block && !(s.block && s.block.chain === block.chain && s.block.hash === block.hash) ? false : s.navQuiet,
+      selStack: !block ? s.selStack.filter((x) => x !== "block") : s.selStack,
+    })),
+  advanceDataBlock: (dataBlock) =>
+    set((s) => ({
+      dataBlock,
+      navQuiet: dataBlock && !(s.dataBlock && sameDataBlockSel(s.dataBlock, dataBlock)) ? false : s.navQuiet,
+      selStack: !dataBlock ? s.selStack.filter((x) => x !== "dataBlock") : s.selStack,
+    })),
+  setHoverBlock: (hoverBlock) => set({ hoverBlock }),
+  setHoverDataBlock: (hoverDataBlock) => set({ hoverDataBlock }),
+  setBlockRead: (key, v) =>
+    set((s) => {
+      if (s.blockReadMiss[key] == null) return { blockReads: { ...s.blockReads, [key]: v } };
+      const miss = { ...s.blockReadMiss };
+      delete miss[key];
+      return { blockReads: { ...s.blockReads, [key]: v }, blockReadMiss: miss };
+    }),
+  setBlockReadMiss: (key) => set((s) => ({ blockReadMiss: { ...s.blockReadMiss, [key]: true } })),
+  retainBlockReads: (keep) =>
+    set((s) => {
+      const reads = Object.keys(s.blockReads).filter((k) => !keep.has(k));
+      const miss = Object.keys(s.blockReadMiss).filter((k) => !keep.has(k));
+      if (!reads.length && !miss.length) return {};
+      const blockReads = { ...s.blockReads };
+      const blockReadMiss = { ...s.blockReadMiss };
+      for (const k of reads) delete blockReads[k];
+      for (const k of miss) delete blockReadMiss[k];
+      return { blockReads, blockReadMiss };
+    }),
   setGeoMeasure: (measure) => set({ geoMeasure: measure }),
   setHyperMeasure: (measure) => set({ hyperMeasure: measure }),
   setTrendScroll: (offset) => set({ trendScroll: offset, motionCause: { kind: "page" } }),

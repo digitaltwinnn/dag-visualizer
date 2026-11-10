@@ -83,6 +83,15 @@ describe("ladder↔lane boundary — the lane still agrees with the rung tables"
 // tick used to reach TWO levels down (straight to a metagraph snapshot) and drag the filter — a
 // coarser rung — along with it. `CHILD_OF` declares each step's destination, so both halves are
 // checkable: a step that skips a rung fails here, and so does one that reaches back up.
+// The slots a child step may pass over, EXPLICIT with a reason (the allow-list way). A step lands
+// on the first slot of its kind below (Inspector's `nextStep`), so a slot listed here sits between a
+// parent and its child without being either.
+const PASSES_OVER: Partial<Record<string, Partial<Record<string, readonly string[]>>>> = {
+  // (The ledger's metagraph snapshot passed over the block and the data block to its signers' node
+  // slot until 2026-11-08, when the node card left the Snapshots view; the snapshot is the last rung
+  // there now and declares no child, and the block and data block keep their own steps.)
+};
+
 describe("child steps descend exactly one rung of the lane", () => {
   for (const [view, slots] of Object.entries(CHILD_OF)) {
     const lane = ladderSlotIds(view as RailManifestState["mode"]);
@@ -90,10 +99,25 @@ describe("child steps descend exactly one rung of the lane", () => {
       it(`${view}: ${from} → ${entry!.to} is the next slot down`, () => {
         const at = lane.indexOf(from);
         expect(at, `"${from}" is not in ${view}'s lane at all`).toBeGreaterThanOrEqual(0);
-        expect(lane[at + 1], `${view}: ${from}'s child should be ${lane[at + 1]}, not ${entry!.to}`).toBe(entry!.to);
+        const over = PASSES_OVER[view]?.[from] ?? [];
+        const next = lane.slice(at + 1).find((id) => !over.includes(id));
+        expect(next, `${view}: ${from}'s child should be ${next}, not ${entry!.to}`).toBe(entry!.to);
       });
     }
   }
+
+  it("every slot a step passes over is in the lane between the two", () => {
+    for (const [view, froms] of Object.entries(PASSES_OVER)) {
+      const lane = ladderSlotIds(view as RailManifestState["mode"]);
+      for (const [from, over] of Object.entries(froms ?? {})) {
+        const to = CHILD_OF[view as RailManifestState["mode"]]?.[from as keyof NonNullable<(typeof CHILD_OF)[RailManifestState["mode"]]>]?.to;
+        for (const id of over ?? []) {
+          expect(lane.indexOf(id), `${view}: ${id} is not below ${from}`).toBeGreaterThan(lane.indexOf(from));
+          expect(lane.indexOf(id), `${view}: ${id} is not above ${to}`).toBeLessThan(lane.indexOf(to ?? ""));
+        }
+      }
+    }
+  });
 
   it("every lane slot with something below it is reachable, or is a deliberate leaf", () => {
     // Not every slot needs a child — a leaf is a leaf — but a slot that HAS one must not be

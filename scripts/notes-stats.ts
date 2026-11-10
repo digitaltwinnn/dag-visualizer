@@ -11,7 +11,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const NET = "mainnet";
 const DAYS = 14;
 const DAY_MS = 86_400_000;
 
@@ -50,7 +49,7 @@ async function main(): Promise<void> {
   const days = Array.from({ length: DAYS }, (_, i) => new Date(today - i * DAY_MS).toISOString().slice(0, 10));
   const rows = await Promise.all(
     days.map(async (day) => {
-      const h = (await redis.hgetall<Record<string, number | string>>(statsKeyOf(NET, day))) ?? {};
+      const h = (await redis.hgetall<Record<string, number | string>>(statsKeyOf(day))) ?? {};
       return { day, counts: NOTE_STATS.map((f) => Number(h[f] ?? 0)) };
     }),
   );

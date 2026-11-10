@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from "
 import { viewNetwork } from "@/src/engine/domain/viewNetwork";
 import { useStore } from "@/src/store/store";
 import { cn } from "@/lib/utils";
-import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
+import { VIEW_POLICIES, registerOf } from "@/src/engine/domain/viewPolicy";
 import { displayNetwork } from "@/src/data/unlisted";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { filterAccent } from "@/src/data/network";
@@ -13,7 +13,6 @@ import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { compositionGroups } from "@/src/data/composition";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import CardHead, { RailFold, RailPane } from "@/components/CardHead";
-import { useNodeHere } from "@/components/useNodeHere";
 import { useTickHasFilter } from "@/components/useTickHasFilter";
 import InspectorCard from "@/components/InspectorCard";
 import ContextCard from "@/components/ContextCard";
@@ -25,16 +24,18 @@ import HeightEase from "@/components/HeightEase";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { useTouch } from "@/components/useTouch";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { detailsCards, ladderSlotIds, noteCardAbsent, type RailCard } from "@/components/railCards";
-import { CHILD_OF, childStep, rootOf, rootStep, type SiblingStep } from "@/components/railSiblings";
-import { displayOrder, hasFoldControl, isCollapsed, boxedSlotOf, overridesOnNoteStandDown, overridesOnSelection, overridesOnViewEntry, railSelectionKey, subjectRunEnd, type LaneCollapseState } from "@/components/railCollapse";
+import { detailsCards, isSubjectSlot, ladderSlotIds, noteCardAbsent, type RailCard } from "@/components/railCards";
+import { CHILD_OF, childStep, rootOf, rootStep, type SiblingStep, blockStep, dataBlockStep } from "@/components/railSiblings";
+import { displayOrder, hasFoldControl, isCollapsed, boxedSlotOf, overridesOnNoteFold, overridesOnNoteStandDown, overridesOnSelection, overridesOnViewEntry, railSelectionKey, subjectRunEnd, type LaneCollapseState } from "@/components/railCollapse";
 import { useSiblingState } from "@/components/useSiblingState";
 import { openRailCard } from "@/components/railOpen";
 import { useLadderFocus } from "@/components/useLadderFocus";
 import { useTrayActives } from "@/components/useTrayActives";
-import { countryClearActions, cohortToggleActions, compositionToggleActions, snapshotClearActions } from "@/src/engine/domain/pickActions";
+import { blockClearActions, countryClearActions, cohortToggleActions, compositionToggleActions, metaSnapClearActions, snapshotClearActions, dataBlockClearActions } from "@/src/engine/domain/pickActions";
 import { CountryTitle, CountryAside, CountryCard, ProviderTitle, ProviderCard, ProviderAside, CompositionTitle, CompositionCard, CompositionAside } from "@/components/inspector/cards";
 import MetaSnapPane from "@/components/inspector/MetaSnapPane";
+import BlockPane from "@/components/inspector/BlockPane";
+import DataBlockPane from "@/components/inspector/DataBlockPane";
 import TrendRangePane from "@/components/inspector/TrendRangePane";
 import TrendInstantPane from "@/components/inspector/TrendInstantPane";
 import NotesCard from "@/components/notes/NotesCard";
@@ -299,7 +300,7 @@ function CompositionPane({ sel, onClose, collapsed, onToggle }: { sel: Compositi
 // same single source of truth the dock trays read.
 const GHOST_EYEBROW: Record<string, string> = {
   context: "Metagraph", country: "Country", cohort: "Provider", composition: "Composition", node: "Node", snap: "Global snapshot",
-  metaSnap: "Metagraph snapshot", range: "Range", instant: "Moment",
+  metaSnap: "Metagraph snapshot", block: "Transaction block", dataBlock: "Data block", range: "Range", instant: "Moment",
 };
 /** An EMPTY RUNG, drawn as a card like every other (user, 2026-10-04 — option A of
  *  `docs/superpowers/design/2026-10-04-ghost-cards`, with "like any other card it can be expanded
@@ -400,6 +401,9 @@ export default function Inspector() {
   const inspect = useStore((s) => s.inspect);
   const snap = useStore((s) => s.snap);
   const metaSnap = useStore((s) => s.metaSnap);
+  const ledgerRegister = useStore((s) => s.ledgerRegister);
+  const block = useStore((s) => s.block);
+  const dataBlock = useStore((s) => s.dataBlock);
   const tickNet = useStore((s) => s.tickNet);
   const country = useStore((s) => s.country);
   const cohort = useStore((s) => s.cohort);
@@ -437,15 +441,14 @@ export default function Inspector() {
   const trendFront = useStore((s) => s.trendFront);
   const trendWindow = useStore((s) => s.trendWindow);
   const tickHasFilter = useTickHasFilter();
-  const nodeHere = useNodeHere();
   // The AI note on screen (the card shares this fetch): its card — the top slot of the lane —
-  // stands down when the view's subject has no note (off mainnet none has) or when the server
+  // stands down when the view's subject has no note or when the server
   // answered `none`, or `unavailable` to a read (R67; to the reader's own "Write notes" it stays and
   // says so, R68); while its first answer is read it stands, reading (`noteCardAbsent`).
   const aiNote = useAiNote();
   const noteAbsent = noteCardAbsent(aiNote.req != null, aiNote.note.res, aiNote.note.via);
   const manifest = detailsCards({
-    mode, filter, railNet, tickNet, tickHasFilter, nodeHere, inspect, snap, country, cohort, composition, metaSnap, coarse, trendCursorMs, trendRange, trendFocus, trendFront, trendWindow,
+    mode, filter, railNet, tickNet, tickHasFilter, inspect, snap, country, cohort, composition, metaSnap, ledgerRegister, block, dataBlock, coarse, trendCursorMs, trendRange, trendFocus, trendFront, trendWindow,
     noteAbsent,
     selNodesCount: selNodes.length,
     filterLabel: displayNetwork(railNet ?? filter)?.ticker ?? null, // one lookup — catalog + the unlisted pseudo-network
@@ -474,6 +477,9 @@ export default function Inspector() {
   // The decision itself is pure (`railCollapse.ts`, tested by outcome): the default card, the auto
   // fold, the box.
   const collapseState: LaneCollapseState = { lane: ladderIds, present: presentOf, focusId, overrides: railCollapse };
+  // …and the focus the lane has WITHOUT its note: the card folding the note opens (user, 2026-11-09 —
+  // `overridesOnNoteFold`), the subject the callout names while the note is the box.
+  const underNote = useLadderFocus(true);
   const effCollapsed = (id: string) => isCollapsed(collapseState, id);
   // Publish which slot is the BOX (store.boxedCard) — the same `present && !effCollapsed` that
   // renders it, so channel and render can't disagree (the data-tier lesson). The subject
@@ -505,14 +511,18 @@ export default function Inspector() {
   // gap with no step). The run begins at the first present card and ends at the first gap after it.
   // …and the run is a run of SUBJECT cards: the AI notes card tops the lane (R57) but is no
   // subject, so it neither starts the run nor leaves a gap that ends it (`subjectRunEnd`).
-  const deepestId = subjectRunEnd(ladderIds, presentOf);
+  const deepestId = subjectRunEnd(ladderIds, presentOf, (id) => manifest.find((c) => c.id === id)?.hint != null);
   const deepestKind = deepestId ? (manifest.find((c) => c.id === deepestId)?.kind ?? null) : null;
   const siblingState = useSiblingState(deepestKind);
   const nextStep = useMemo(() => {
     if (!deepestId || !deepestKind) return null;
-    const below = ladderIds[ladderIds.indexOf(deepestId) + 1];
+    // The CHILD'S slot is the first lane slot below of the kind the table names — the next one, but
+    // for the slots a step passes over (`railLadderBoundary`'s list: the Blocks register's block
+    // sits between a metagraph snapshot and its signers). The step's ghost leads the ghosts
+    // (`displayOrder`), so it still draws directly under the card it steps down from.
     const to = CHILD_OF[mode]?.[deepestKind]?.to;
-    if (!below || presentOf(below) || manifest.find((c) => c.id === below)?.kind !== to) return null;
+    const below = to ? ladderIds.slice(ladderIds.indexOf(deepestId) + 1).find((id) => manifest.find((c) => c.id === id)?.kind === to) : undefined;
+    if (!below || presentOf(below)) return null;
     const step = childStep(deepestKind, siblingState);
     return step ? { id: below, step } : null;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `manifest`/`ladderIds` derive from the same store slices
@@ -521,7 +531,14 @@ export default function Inspector() {
   // to step from, so it would only open its hint.
   const rootId = rootOf(mode)?.to ?? null;
   const rootGhost = rootId && !presentOf(rootId) ? rootStep(siblingState) : null;
-  const ghostStep = (id: string) => (id === nextStep?.id ? nextStep.step : id === rootId ? (rootGhost ?? undefined) : undefined);
+  // THE BLOCK GHOST'S OWN STEP (user, 2026-11-07: "when clicked nothing happens"): the shown tick's
+  // first block (`blockStep`) — its own, not `CHILD_OF`'s, since a block is the tick's sibling subject.
+  const blockGhost = !presentOf("block") && manifest.find((c) => c.id === "block")?.hint != null ? blockStep(siblingState) : null;
+  // …and the DATA BLOCK ghost's (2026-11-07): the pinned metagraph snapshot's first data block.
+  const dataBlockGhost = !presentOf("dataBlock") && manifest.find((c) => c.id === "dataBlock")?.hint != null ? dataBlockStep(siblingState) : null;
+  const ghostStep = (id: string) =>
+    id === nextStep?.id ? nextStep.step : id === rootId ? (rootGhost ?? undefined) : id === "block" ? (blockGhost ?? undefined) : id === "dataBlock" ? (dataBlockGhost ?? undefined) : undefined;
+  const stepIds = [nextStep?.id, blockGhost ? "block" : null, dataBlockGhost ? "dataBlock" : null].filter((x): x is string => !!x);
   // An entry's stretched toggle OPENS `id` (single-open folds the rest). The box's − FOLDS it, and
   // that may leave no box open: the − exists only where `RailFold` puts it (the AI card, every card
   // on the phone — user, 2026-11-03), and folding is the reader's own choice, an override like any
@@ -530,7 +547,10 @@ export default function Inspector() {
     effCollapsed(id)
       // The one open-a-card routine (railOpen.ts). A non-ladder card (the snapshot slots) folds nothing.
       ? openRailCard(id, ladderIds.includes(id) ? presentLadderIds : [])
-      : setRailCollapse(id, true);
+      // FOLDING THE NOTE OPENS ITS SUBJECT (user, 2026-11-09): the card under it, never a lane of folds.
+      : !isSubjectSlot(id) && ladderIds.includes(id)
+        ? setRailCollapseMany(overridesOnNoteFold({ ...collapseState, overrides: useStore.getState().railCollapse }, id, underNote))
+        : setRailCollapse(id, true);
   const cx = (id: string) => ({ collapsed: effCollapsed(id), onToggle: () => toggleCollapse(id) });
   // A GHOST's disclosure (GhostCard's header has the why): its own override, outside the
   // single-open accordion — folded by default, `false` = open, cleared back to folded.
@@ -548,7 +568,7 @@ export default function Inspector() {
   // "only the focus rung is open" default governs again. Within one selection the +/− still holds.
   const following = useStore((s) => s.following);
   // One pure key (`railCollapse.railSelectionKey` carries every member's reason).
-  const selectionKey = railSelectionKey({ mode, filter, railNet, country, cohort, composition, inspect, trendCursorMs, trendRange, trendFocus, tickNet, following, snap, metaSnap });
+  const selectionKey = railSelectionKey({ mode, filter, railNet, country, cohort, composition, inspect, trendCursorMs, trendRange, trendFocus, tickNet, following, snap, metaSnap, block, dataBlock, ledgerRegister });
   // Arms HeightEase's growIn for slots that JOIN the lane after boot (false on the first
   // render pass, true on every later one — a mounting slot's wrapper then eases from 0
   // instead of shoving the pile in one frame). DESKTOP ONLY, as ExploreRail's (its note has
@@ -560,13 +580,17 @@ export default function Inspector() {
   }, []);
   const lastSelection = useRef(selectionKey);
   const lastMode = useRef(mode);
+  // A REGISTER is entered like a view (user, 2026-11-09: "each sub-view should do the same"): on its note.
+  const lastRegister = useRef(ledgerRegister);
   const modeEnteredAt = useRef(0);
   const lastCommits = useRef(0);
   useEffect(() => {
     if (lastSelection.current === selectionKey) return;
     lastSelection.current = selectionKey;
-    const modeChanged = lastMode.current !== mode;
+    // A register switch is a change of what the view shows, in the views that offer one (`registerOf`).
+    const modeChanged = lastMode.current !== mode || registerOf(mode, lastRegister.current) !== registerOf(mode, ledgerRegister);
     lastMode.current = mode;
+    lastRegister.current = ledgerRegister;
     // The reader's commits, counted ahead of the entry's return: the window below is for what ARRIVAL
     // commits, and a reader's commit inside it has to drop the pins, or the note the view was entered
     // on stands open beside the new card.
@@ -661,7 +685,7 @@ export default function Inspector() {
       <CardPane key="node" pick={{ kind: "geoLive" }} eyebrow="Node" onClose={() => applyClickActions([{ kind: "inspect", pick: null }])} {...cx("node")} />
     ),
     snap: snap ? (
-      <CardPane key="snap" pick={snap} eyebrow="Global snapshot" onClose={() => applyClickActions(snapshotClearActions({ metaSnap, hasInspect: inspect != null, tickNet }))} {...cx("snap")} />
+      <CardPane key="snap" pick={snap} eyebrow="Global snapshot" onClose={() => applyClickActions(snapshotClearActions({ metaSnap, tickNet, block: useStore.getState().block }))} {...cx("snap")} />
     ) : null,
     // History's committed INSTANT: a card slot with no ladder rung, so its × clears its own
     // channel and nothing cascades. It is NOT a selection write (`setTrendCursor` is deliberately
@@ -680,7 +704,17 @@ export default function Inspector() {
     // The metagraph-snapshot tile: a card slot with no ladder rung (spec §7.1), so its × just
     // clears its own channel — there is no coarser rung for it to step back to.
     metaSnap: metaSnap ? (
-      <MetaSnapPane key="metaSnap" onClose={() => applyClickActions([{ kind: "metaSnap", sel: null }])} {...cx("metaSnap")} />
+      <MetaSnapPane key="metaSnap" onClose={() => applyClickActions(metaSnapClearActions({ metaSnap, block: useStore.getState().block, dataBlock }))} {...cx("metaSnap")} />
+    ) : null,
+    // The Blocks register's BLOCK: a card slot with no rung, under its tick; its × releases the
+    // block alone (`blockClearActions`) — the tick it hangs under stays pinned.
+    block: block ? (
+      <BlockPane key="block" onClose={() => applyClickActions(blockClearActions({ block: useStore.getState().block }))} {...cx("block")} />
+    ) : null,
+    // The Data blocks register's DATA BLOCK: a slot under its metagraph snapshot; its × releases the
+    // data block alone (`dataBlockClearActions`).
+    dataBlock: dataBlock ? (
+      <DataBlockPane key="dataBlock" onClose={() => applyClickActions(dataBlockClearActions({ dataBlock: useStore.getState().dataBlock }))} {...cx("dataBlock")} />
     ) : null,
     // The AI notes card: the lane's top slot, no rung, no ×, no ghost — it renders while the
     // manifest says a note stands.
@@ -711,8 +745,12 @@ export default function Inspector() {
     return Math.max(ENTRY_DIM_FLOOR, 1 - ENTRY_DIM_STEP * dist);
   };
   const ladderLane = (
-    <div className="rail-ladder flex flex-col" style={{ ["--entry-col"]: VIEW_POLICIES[mode].entryColumn } as CSSProperties}>
-      {displayOrder(ladderIds, presentOf, nextStep?.id ?? null).map((id, depth) => {
+    // NO TEXT SELECTION ANYWHERE IN THE LANE (user, 2026-11-09: "all text elements are selectable,
+    // while in other cards I get the regular mousepointer"): the pager's swipe turned selection off
+    // on a card WITH siblings (`RailPager`), so a card without one — a lone block — answered the
+    // pointer with a text caret. One rule for the lane: a value worth taking has its copy control.
+    <div className="rail-ladder flex flex-col select-none" style={{ ["--entry-col"]: VIEW_POLICIES[mode].entryColumn } as CSSProperties}>
+      {displayOrder(ladderIds, presentOf, stepIds).map((id, depth) => {
         const card = manifest.find((c) => c.id === id);
         if (!card) return null;
         const body: ReactNode =

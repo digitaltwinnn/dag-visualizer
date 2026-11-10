@@ -1,6 +1,7 @@
-import type { PickDescriptor, MetaSnapSel, TickNetSel } from "@/src/data/types";
+import type { BlockSel, DataBlockSel, PickDescriptor, MetaSnapSel, TickNetSel } from "@/src/data/types";
 import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder";
 import type { Mode } from "@/src/store/store";
+import type { LedgerRegister } from "@/src/store/mode";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { isSubjectSlot } from "@/components/railCards";
 
@@ -77,7 +78,7 @@ export function overridesOnSelection(s: Pick<LaneCollapseState, "overrides">): R
  *  (2026-09-04), whose point was the collapse-and-reopen cycle on every switch; the note arriving
  *  open folds a subject card once and leaves it, so that cycle does not return.
  *
- *  WITHOUT A NOTE (a view with none, off mainnet, a subject the server answered `none` for) the
+ *  WITHOUT A NOTE (a view with none, a subject the server answered `none` for) the
  *  earlier rule holds: the departing open/closed state is pinned on the present SUBJECT cards, so
  *  the arrival's re-derive can shuffle the focus under an unchanged pile — except when the departing
  *  box was no subject card — read off the overrides, an open pin on a non-subject slot — where
@@ -86,6 +87,8 @@ export function overridesOnSelection(s: Pick<LaneCollapseState, "overrides">): R
  *  live tick pinned shut stayed shut). */
 export function overridesOnViewEntry(s: LaneCollapseState): Record<string, boolean | null> {
   const cleared = overridesOnSelection(s);
+  // A REGISTER is entered here too (user, 2026-11-09: "each sub-view should do the same"); its live
+  // subject lands a beat later with no pin, and the auto rule folds it under the note (`focusSlotId`).
   const subjects = s.lane.filter((id) => isSubjectSlot(id) && s.present(id));
   const note = s.lane.find((id) => !isSubjectSlot(id) && s.present(id));
   if (note != null) return { ...cleared, [note]: false, ...Object.fromEntries(subjects.map((id) => [id, true])) };
@@ -93,6 +96,15 @@ export function overridesOnViewEntry(s: LaneCollapseState): Record<string, boole
   // lane has none: pin nothing (I1).
   if (Object.entries(s.overrides).some(([id, v]) => v === false && !isSubjectSlot(id))) return cleared;
   return { ...cleared, ...Object.fromEntries(subjects.map((id) => [id, isCollapsed(s, id)])) };
+}
+
+/** WHAT FOLDING THE NOTE WRITES (user, 2026-11-09: "when we close the AI card … the actual called
+ *  out subject should be shown"). The note is the box on arrival and the callout meanwhile names the
+ *  subject under it — a register's seat, a chosen card — so the fold OPENS that card: the entry's pins
+ *  drop, the note is pinned folded, and `next` (the focus the lane has without its note,
+ *  `focusSlotId` with `noteAbsent`) is pinned open. With nothing under the note it only folds. */
+export function overridesOnNoteFold(s: LaneCollapseState, note: string, next: string | null): Record<string, boolean | null> {
+  return { ...overridesOnSelection(s), [note]: true, ...(next && next !== note && s.present(next) ? { [next]: false } : {}) };
 }
 
 /** WHAT THE NOTE'S STAND-DOWN WRITES (review 2026-10-29). A view is entered while its note is still
@@ -111,11 +123,15 @@ export function overridesOnNoteStandDown(s: LaneCollapseState): Record<string, n
 
 /** The deepest card of the UNBROKEN RUN OF SUBJECT CARDS from the first present one (Inspector's
  *  next-rung step: the ghost directly below it opens its first child). The AI notes card tops the
- *  lane but is no subject, so it neither starts the run nor leaves a gap that ends it. */
-export function subjectRunEnd(lane: readonly string[], present: (id: string) => boolean): string | null {
+ *  lane but is no subject, so it neither starts the run nor leaves a gap that ends it.
+ *  `ghosted` says which empty slots the rail DRAWS (as a ghost): a slot that is neither present nor
+ *  ghosted is not on screen at all — the Blocks register's block slot in the Snapshots register —
+ *  so it is no gap either. Omitted, every empty slot is one. */
+export function subjectRunEnd(lane: readonly string[], present: (id: string) => boolean, ghosted: (id: string) => boolean = () => true): string | null {
   let deepest: string | null = null;
   for (const id of lane) {
     if (!isSubjectSlot(id)) continue;
+    if (!present(id) && !ghosted(id)) continue;
     if (present(id)) deepest = id;
     else if (deepest !== null) break;
   }
@@ -124,12 +140,23 @@ export function subjectRunEnd(lane: readonly string[], present: (id: string) => 
 
 /** THE ORDER THE LANE IS DRAWN IN (user, 2026-10-31, option B of four: a Node card "detached from
  *  the stack"). Chosen cards close up in lane order and the ghosts wait below them, so a ghost can
- *  never split the stack. `stepId`, the ghost that is the next step, leads the ghosts: it opens the
- *  deepest card's first child, so it belongs directly under the stack. The lane stays the one order
- *  of the ladder; this is only how it is laid out. */
-export function displayOrder(lane: readonly string[], present: (id: string) => boolean, stepId: string | null): string[] {
+ *  never split the stack. The NEXT STEP's ghost (`stepIds[0]`, the deepest card's next rung) leads
+ *  the ghosts — it opens that card's first child, so it belongs directly under the stack — but it
+ *  never passes another ghost that is itself a step (`stepIds[1…]`: the Transaction blocks
+ *  register's Block ghost, which opens the tick's first block — user, 2026-11-07: the node "sits
+ *  above it"); those keep their lane place. The lane stays the one order of the ladder; this is only
+ *  how it is laid out. */
+export function displayOrder(lane: readonly string[], present: (id: string) => boolean, stepIds: readonly string[]): string[] {
   const waiting = lane.filter((id) => !present(id));
-  return [...lane.filter(present), ...waiting.filter((id) => id === stepId), ...waiting.filter((id) => id !== stepId)];
+  const primary = stepIds[0];
+  const at = primary ? waiting.indexOf(primary) : -1;
+  if (at < 0) return [...lane.filter(present), ...waiting];
+  // The last step ghost ahead of the primary in the lane: the primary moves up to just after it.
+  let floor = -1;
+  for (let i = 0; i < at; i++) if (stepIds.includes(waiting[i]!)) floor = i;
+  const rest = waiting.filter((id) => id !== primary);
+  rest.splice(floor + 1, 0, primary);
+  return [...lane.filter(present), ...rest];
 }
 
 /** The slice of the store a SELECTION MOMENT is made of. */
@@ -148,6 +175,13 @@ export interface SelectionKeyState {
   following: boolean;
   snap: { data: { ordinal: number } } | null;
   metaSnap: MetaSnapSel | null;
+  /** The committed block (the Blocks register). Optional: every other caller has none. */
+  block?: BlockSel | null;
+  /** The committed data block (the Data blocks register). Optional likewise. */
+  dataBlock?: DataBlockSel | null;
+  /** The Snapshots view's register (2026-11-08): a switch is a new moment, so a hand-opened box in
+   *  one register does not hold the next register's own card folded. Optional likewise. */
+  ledgerRegister?: LedgerRegister;
 }
 
 /** THE SELECTION MOMENT — when this key changes, the rail's +/− overrides are dropped (after a view
@@ -190,5 +224,21 @@ export function railSelectionKey(s: SelectionKeyState): string {
     // unguarded ordinal re-materialized the focus card on every heartbeat in live metagraph mode).
     s.following ? (s.snap ? "live" : "") : (s.snap?.data.ordinal ?? ""),
     s.following ? (s.metaSnap ? "live" : "") : s.metaSnap ? `${s.metaSnap.metaId}:${s.metaSnap.ordinal}` : "",
+    // THE BLOCK (2026-11-05): a commit like the tile's. Missing, a hand-opened Global snapshot box
+    // stayed open beside the arriving Block card. Guarded while following like the two above (D3):
+    // in the Blocks register LIVE advances the block itself (`advanceBlock`), and a heartbeat must
+    // not drop the reader's +/−; a pinned block is a new moment.
+    s.following ? (s.block ? "live" : "") : s.block ? `${s.block.chain}:${s.block.hash}` : "",
+    // THE DATA BLOCK (user, 2026-11-08: "when I click a data block it does not collapse its parent
+    // metagraph snapshot"): a commit like the block's. Missing, the ghost's own open override and a
+    // hand-opened snapshot box survived the commit, and the Data block card arrived beside them. A
+    // data block is picked — and since 2026-11-08 also ADVANCED by the Data blocks register's live
+    // follow, so it takes the same follow guard (user, 2026-11-09: "Live mode, click the global
+    // snapshot card, the callout leaves the global snapshot and goes to the sub-view's default card
+    // anchor when a new live tick arrives" — the heartbeat's data block dropped the reader's open card).
+    s.following ? (s.dataBlock ? "live" : "") : s.dataBlock ? `${s.dataBlock.snap.metaId}:${s.dataBlock.snap.ordinal}:${s.dataBlock.index}` : "",
+    // THE REGISTER (user, 2026-11-08: entering Transaction blocks showed the Global snapshot card
+    // where the block's was due): a switch is a new moment — the register seats its own box.
+    s.ledgerRegister ?? "",
   ].join("§");
 }

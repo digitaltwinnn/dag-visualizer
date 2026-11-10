@@ -9,6 +9,8 @@ import {
   HORIZON_SPAN,
   horizonAt,
   frontAt,
+  frontRunAt,
+  FRONT_RUN_X0,
   rowOnChamber,
   ROW_HALF_D,
   FRONT_INK_X,
@@ -18,7 +20,7 @@ import {
   anchorTiles,
   LedgerModel,
   LEAD_SETTLE_MS, LANE_IDS } from "./ledgerModel";
-import { METAGRAPHS } from "@/src/net/current";
+import { METAGRAPHS } from "@/src/engine/config";
 import { lanePlaneHalf } from "./ledgerLayout";
 import { UNLISTED_KEY } from "./ledgerBands";
 import { ledgerSite, LEAD_X, FLOOR_BACK_X, FLOOR_FRONT_X } from "./ledgerLayout";
@@ -123,6 +125,21 @@ describe("the horizon (user, 2026-08-09: the chamber must read as continuing int
   it("sits beyond the last slot but in FRONT of the floor's own back edge, so the glass ends first", () => {
     expect(HORIZON_X).toBeLessThan(LEAD_X - (SLOT_N - 1) * SLOT_SP);
     expect(HORIZON_X).toBeGreaterThan(-33); // LedgerView's FLOOR_CX - FLOOR_W / 2
+  });
+});
+
+describe("the front run (the Blocks register's live-edge silence, ahead of the lead row)", () => {
+  it("starts just ahead of the lead row's bar and ends where a row's ink must, inside the glass", () => {
+    expect(FRONT_RUN_X0).toBeGreaterThan(LEAD_X + ROW_HALF_D);
+    expect(FRONT_RUN_X0).toBeLessThan(FRONT_INK_X);
+  });
+  it("is whole at rest, and gone by the time the rewind has pushed its far end to the rim", () => {
+    expect(frontRunAt(FRONT_INK_X, 0)).toBe(1);
+    const mid = frontRunAt(FRONT_INK_X, (FLOOR_FRONT_X - FRONT_INK_X) / 2);
+    expect(mid).toBeGreaterThan(0);
+    expect(mid).toBeLessThan(1);
+    expect(frontRunAt(FRONT_INK_X, FLOOR_FRONT_X - FRONT_INK_X)).toBe(0);
+    expect(frontRunAt(FRONT_INK_X, SLOT_SP * 3)).toBe(0);
   });
 });
 

@@ -218,3 +218,65 @@ describe("setRailNet", () => {
     useStore.setState({ railNet: null, selStack: [] });
   });
 });
+
+describe("store.ledgerRegister / block", () => {
+  it("holds the ledger register as a setting with a motion cause, and a block selection", () => {
+    useStore.getState().setLedgerRegister("blocks");
+    expect(useStore.getState().ledgerRegister).toBe("blocks");
+    expect(useStore.getState().motionCause).toEqual({ kind: "register", id: "blocks" });
+    useStore.getState().setBlock({ chain: "dag", hash: "h", ordinal: 7241523, anchorOrd: 7241523 });
+    expect(useStore.getState().block?.hash).toBe("h");
+    useStore.getState().setBlockRead("dag:7241523", { blocks: [] });
+    expect(useStore.getState().blockReads["dag:7241523"]).toEqual({ blocks: [] });
+  });
+  it("leaving the view takes the block's rank with it", () => {
+    useStore.setState({ mode: "ledger", block: null, selStack: ["snap"] });
+    useStore.getState().setBlock({ chain: "dag", hash: "h", ordinal: 1, anchorOrd: 1 });
+    useStore.getState().setMode("geo");
+    expect(useStore.getState().block).toBeNull();
+    expect(useStore.getState().selStack).not.toContain("block");
+    useStore.setState({ selStack: [] });
+  });
+  it("a block commit ranks in the recency stack, and its release leaves it", () => {
+    useStore.setState({ block: null, selStack: ["snap"] });
+    useStore.getState().setBlock({ chain: "dag", hash: "h", ordinal: 1, anchorOrd: 1 });
+    expect(useStore.getState().selStack).toEqual(["block", "snap"]);
+    useStore.getState().setBlock(null);
+    expect(useStore.getState().selStack).toEqual(["snap"]);
+    useStore.setState({ selStack: [] });
+  });
+  it("retainBlockReads drops every read and miss outside the window — no key is exempt", () => {
+    const st = useStore.getState();
+    for (const k of ["dag:1", "dag:2", "DOR:frontier"]) st.setBlockRead(k, { blocks: [] });
+    st.setBlockReadMiss("dag:2");
+    useStore.getState().retainBlockReads(new Set(["dag:1"]));
+    const n = useStore.getState();
+    expect(Object.keys(n.blockReads).sort()).toEqual(["dag:1"]);
+    expect(n.blockReadMiss["dag:2"]).toBeUndefined();
+  });
+  it("leaving the Snapshots view clears the block, as it clears the pin", () => {
+    useStore.getState().setMode("ledger");
+    useStore.getState().setBlock({ chain: "dag", hash: "h", ordinal: 1, anchorOrd: 1 });
+    useStore.getState().setHoverBlock("h");
+    useStore.getState().setMode("geo");
+    expect(useStore.getState().block).toBeNull();
+    expect(useStore.getState().hoverBlock).toBeNull();
+  });
+  it("the block measure is a plain setting", () => {
+    useStore.getState().setBlockMeasure("height");
+    expect(useStore.getState().blockMeasure).toBe("height");
+  });
+  it("the Data blocks register's measure is its own plain setting, and starts on its data updates (D6)", () => {
+    expect(useStore.getInitialState().dataMeasure).toBe("data");
+    useStore.getState().setDataMeasure("fee");
+    expect(useStore.getState().dataMeasure).toBe("fee");
+    expect(useStore.getState().ledgerMeasure).toBe(useStore.getInitialState().ledgerMeasure);
+    useStore.getState().setDataMeasure("data");
+  });
+  it("the block window's status is a plain data-bridge setting", () => {
+    useStore.getState().setBlockWindowStatus({ around: 5, status: "beyond" });
+    expect(useStore.getState().blockWindowStatus).toEqual({ around: 5, status: "beyond" });
+    useStore.getState().setBlockWindowStatus(null);
+    expect(useStore.getState().blockWindowStatus).toBeNull();
+  });
+});

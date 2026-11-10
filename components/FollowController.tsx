@@ -3,7 +3,9 @@
 import { useEffect } from "react";
 import { getNetwork } from "@/src/data/network";
 import { useStore } from "@/src/store/store";
+import { drawsDataBlocks, registerOf } from "@/src/engine/domain/viewPolicy";
 import { followLatest } from "@/src/data/follow";
+import { onBlockWindow } from "@/src/data/pastWindow";
 
 // Drives the "live" (auto-advancing) snapshot card. While following, re-point the inspector at
 // the latest relevant snapshot on each new global snapshot and as the anchor index fills in. The
@@ -24,9 +26,20 @@ export default function FollowController() {
     };
     net.on("global", tick);
     net.on("anchor", onAnchor);
+    // IN THE BLOCKS REGISTER LIVE FOLLOWS THE NEWEST BLOCK (D3): a new block tick arrives as a new
+    // block WINDOW (the bridge's 30 s refresh, the live feed's announced tick, a filter's refetch),
+    // so the window's change is a heartbeat too. `followLatest` decides what a beat moves.
+    const offBlocks = onBlockWindow(tick);
+    // IN DATA BLOCKS a landing EXACT READ is a beat too (2026-11-08): a tick is known to carry data
+    // only once its read lands, so the follow moves as the reads do (`followNewestData`).
+    const offExact = useStore.subscribe((s, p) => {
+      if (s.snapshotExact !== p.snapshotExact && s.following && drawsDataBlocks(registerOf(s.mode, s.ledgerRegister))) tick();
+    });
     return () => {
+      offExact();
       net.off("global", tick);
       net.off("anchor", onAnchor);
+      offBlocks();
       cancelAnimationFrame(raf);
     };
   }, []);
@@ -34,6 +47,7 @@ export default function FollowController() {
   const mode = useStore((s) => s.mode);
   const following = useStore((s) => s.following);
   const filter = useStore((s) => s.filter);
+  const register = useStore((s) => s.ledgerRegister);
   const setFollowing = useStore((s) => s.setFollowing);
 
   // Live-following (the snapshot card auto-advancing to the tip) is a *ledger* behaviour, and
@@ -53,11 +67,12 @@ export default function FollowController() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, setFollowing]);
 
-  // When following (enter ledger) or the filter changes while in it, jump to the
-  // latest relevant snapshot for the selection.
+  // When following (enter ledger), the filter changes while in it, or the register switches (live
+  // follows the newest GLOBAL in Snapshots and the newest BLOCK in Blocks), jump to the latest
+  // relevant subject for the selection.
   useEffect(() => {
     if (following) followLatest();
-  }, [following, filter]);
+  }, [following, filter, register]);
 
   return null;
 }

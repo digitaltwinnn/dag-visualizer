@@ -14,16 +14,20 @@ import { formatVital, formatVitalInt } from "@/src/util/odometer";
 // MIN_ROLL_MS, with intermediate values COALESCED into the next roll — the shown number lags
 // by at most the hold, which for an extrapolated rate is nothing, and the roll stays the
 // punctuation it is on /design (whose 1.5s demo cadence is unaffected).
+// `text` rolls a string the caller has already worded (a callout title — an ordinal, a block's short
+// hash — user, 2026-11-09: "use the odometer on the callout headers"), in place of a formatted number.
 export default function Odometer({
   value,
+  text,
   className,
   int = false,
 }: {
-  value: number | null | undefined;
+  value?: number | null;
+  text?: string;
   className?: string;
   int?: boolean;
 }) {
-  const next = int ? formatVitalInt(value) : formatVital(value);
+  const next = text ?? (int ? formatVitalInt(value) : formatVital(value));
   const [shown, setShown] = useState(next);
   const [prev, setPrev] = useState<string | null>(null);
   const first = useRef(true);

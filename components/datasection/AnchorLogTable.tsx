@@ -1,6 +1,5 @@
 "use client";
 
-import { METAGRAPHS, netUrl } from "@/src/net/current";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, Search, X } from "lucide-react";
 import type { CSSProperties } from "react";
@@ -11,14 +10,14 @@ import { buildAnchorLog, snapsAtTick, sortAnchorLog, type AnchorLogRow, type Anc
 import { displayNetwork, unlistedLog, UNLISTED_ID } from "@/src/data/unlisted";
 import { ledgerLens } from "@/src/data/ledgerStory";
 import { metaSnapHoverKey, type GlobalSnapshot } from "@/src/data/types";
-import { metaSnapArrivalActions, metaSnapSelectActions, snapshotSelectActions } from "@/src/engine/domain/pickActions";
+import { globalPick, metaSnapArrivalActions, metaSnapSelectActions, snapshotSelectActions, tickContextOf } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { fmtDag, fmtKB } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { Empty, IdentityDot } from "@/components/inspector/parts";
 import { selectionHue } from "@/components/selection";
 import { cn } from "@/lib/utils";
-import GroupPlate from "@/components/datasection/GroupToggle";
+import GroupPlate, { GlobalGroupPlate } from "@/components/datasection/GroupToggle";
 import { useNowTick } from "@/components/useNowTick";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -26,7 +25,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import TablePager from "@/components/datasection/TablePager";
 import LogSearchBar from "@/components/datasection/LogSearchBar";
 import { pageOfOrdinal, seekSpan, tsInRange } from "@/src/data/chainSeek";
-import { POLL } from "@/src/engine/config";
+import { POLL, METAGRAPHS } from "@/src/engine/config";
 import { utcDayKey } from "@/src/util/localTime";
 import { dayWords } from "@/components/datasection/DateRange";
 import { useMergedLog, type MergedScope } from "@/components/datasection/useMergedLog";
@@ -38,7 +37,7 @@ import { useUnlistedChains } from "@/components/datasection/useUnlistedChains";
 import { useChainSpan } from "@/components/useArchive";
 import LiveDot from "@/components/LiveDot";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { NodeStars, PinnedMark } from "@/components/state/StateAtoms";
+import { NodeStars, StateMark } from "@/components/state/StateAtoms";
 import { isRetired } from "@/src/net/lineage";
 import { useFeedRead } from "@/components/useFeedRead";
 
@@ -533,7 +532,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     const before = rangePage(rangeSpan, page, PAGE).before;
     if (before == null || before < rangeSpan.first) return;
     pageFetch.current.add(key);
-    fetch(netUrl(`/api/network/${rangeSpan.addr}/snapshots?before=${before}`))
+    fetch(`/api/network/${rangeSpan.addr}/snapshots?before=${before}`)
       .then((r) => (r.ok ? (r.json() as Promise<{ rows: HistRow[] }>) : Promise.reject()))
       .then((d) => {
         rangeRows.current.set(key, d.rows.filter((r) => r.ordinal >= rangeSpan.first && r.ordinal <= before));
@@ -557,7 +556,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     if (pageFetch.current.has(key)) return;
     pageFetch.current.add(key);
     const gen = liveGen.current;
-    fetch(netUrl(`/api/network/${histAddr}/snapshots${page === 1 ? "" : `?before=${before}`}`))
+    fetch(`/api/network/${histAddr}/snapshots${page === 1 ? "" : `?before=${before}`}`)
       .then((r) => (r.ok ? (r.json() as Promise<{ rows: HistRow[] }>) : Promise.reject()))
       .then((d) => {
         if (hist.current.net !== histAddr) return; // the walk moved to another chain meanwhile
@@ -587,7 +586,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
         continue;
       }
       inFlight.current.add(r.ts);
-      fetch(netUrl(`/api/global/at?ts=${encodeURIComponent(r.ts)}`))
+      fetch(`/api/global/at?ts=${encodeURIComponent(r.ts)}`)
         .then((res) => (res.ok ? (res.json() as Promise<{ ordinal: number; hash: string; lastSnapshotHash?: string }>) : Promise.reject()))
         .then((g2) => {
           resolved.current.set(r.ts, { ordinal: g2.ordinal, hash: g2.hash, lastSnapshotHash: g2.lastSnapshotHash });
@@ -764,7 +763,8 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
         windowFirst.metaId == null
           ? null
           : { metaId: windowFirst.metaId, ordinal: windowFirst.ordinal, hash: windowFirst.hash, globalOrdinal: windowFirst.global.ordinal, ts: windowFirst.ts },
-        { kind: "snapshot", title: `Global snapshot #${windowFirst.global.ordinal}`, data: windowFirst.global },
+        globalPick(windowFirst.global),
+        useStore.getState().block,
       ),
     );
     // The first row advances with the feed; only its identity matters for re-running the guard.
@@ -791,7 +791,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     // pages it wants are the pages it already pulled.
     const hit = probes.current.get(before);
     if (hit) return hit;
-    const r = await fetch(netUrl(`/api/network/${netAddr}/snapshots?before=${before}`));
+    const r = await fetch(`/api/network/${netAddr}/snapshots?before=${before}`);
     if (!r.ok) throw new Error(`chain ${r.status}`);
     const d = (await r.json()) as { rows: { ordinal: number; ts: string }[] };
     // Bounded, and oldest-out: a long session of searches must not grow this without limit, and the
@@ -896,7 +896,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     if (mergedMode) {
       setSeeking(true);
       try {
-        const res = await fetch(netUrl(`/api/snapshot/${n}`));
+        const res = await fetch(`/api/snapshot/${n}`);
         if (!res.ok) {
           setJumpMiss(`global snapshot ${n.toLocaleString()} is no longer served — search by date instead`);
           return;
@@ -963,7 +963,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     const label = displayNetwork(histNet)?.ticker ?? "this network";
     setSeeking(true);
     try {
-      const res = await fetch(netUrl(`/api/snapshot/${n}`));
+      const res = await fetch(`/api/snapshot/${n}`);
       if (!res.ok) {
         setMarked(null);
         // The bound is the upstream's, not ours, and it moves — so the copy states the CONSEQUENCE
@@ -1165,7 +1165,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       const addr = lineage[i];
       if (!genesisOf.current.has(addr)) {
         try {
-          const r = await fetch(netUrl(`/api/network/${addr}/chain?v=3`));
+          const r = await fetch(`/api/network/${addr}/chain?v=3`);
           const j = r.ok ? ((await r.json()) as { genesisTs?: string | null }) : null;
           const t = j?.genesisTs ? Date.parse(j.genesisTs) : NaN;
           genesisOf.current.set(addr, Number.isFinite(t) ? t : null);
@@ -1235,6 +1235,31 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       return;
     }
     if (logSeek.snapshot != null) {
+      setLogSeek(null);
+      return;
+    }
+    // ONE GLOBAL SNAPSHOT (the Block card's door, 2026-11-05): the log's own global snapshot search,
+    // as its Global field runs it — the snapshots that global carried, under the log's lens. It runs
+    // once the log can answer (`pendingTick`, the standing search's own re-run).
+    if (logSeek.tick != null) {
+      // A global snapshot is no chain's: drop an earlier door's scope (a token block's door leaves
+      // its chain as `doorMeta`, which outranks even the lens), and the log's own pick under "all" —
+      // `clearSearch`'s own two lines — or the search would run against that chain.
+      setDoorMeta(null);
+      if (!lensNet) setSearchMeta(null);
+      setSearchOpen(true);
+      setQSnapshot("");
+      setQFrom("");
+      setQTo("");
+      setDoorLabel(null);
+      setDoorSpan(null);
+      setTimeCut(null);
+      setGlobalSpans(null);
+      setQTick(String(logSeek.tick));
+      setMarked(null);
+      setJumpMiss(null);
+      landCommit.current = null;
+      pendingTick.current = true;
       setLogSeek(null);
       return;
     }
@@ -1471,15 +1496,15 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       // A seam: nothing anchored here, so the only subject is the TICK — commit it alone rather
       // than inventing a metagraph snapshot the row does not have (rule 10).
       applyClickActions(
-        metaSnapArrivalActions(null, { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot }),
+        metaSnapArrivalActions(null, globalPick(r.global as GlobalSnapshot), useStore.getState().block),
       );
       return;
     }
     applyClickActions(
       metaSnapSelectActions(
         { metaId: r.metaId, ordinal: r.ordinal, hash: r.hash, globalOrdinal: r.global.ordinal, ts: r.ts },
-        { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot },
-        { metaSnap, following, inspect: useStore.getState().inspect },
+        globalPick(r.global as GlobalSnapshot),
+        { metaSnap, following, block: useStore.getState().block },
       ),
     );
   };
@@ -1656,7 +1681,8 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     applyClickActions(
       metaSnapArrivalActions(
         { metaId: hit.metaId, ordinal: hit.ordinal, hash: hit.hash, globalOrdinal: hit.global.ordinal, ts: hit.ts },
-        { kind: "snapshot", title: `Global snapshot #${hit.global.ordinal}`, data: hit.global as GlobalSnapshot },
+        globalPick(hit.global as GlobalSnapshot),
+        useStore.getState().block,
       ),
     );
   });
@@ -1875,53 +1901,28 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                   // global in the scene (rule 9: hover what a click commits).
                   <TableRow className="max-[700px]:block border-0 hover:bg-transparent">
                     <TableCell colSpan={columns.length} className="p-0 pt-2.5 max-[700px]:px-0 max-[700px]:block">
-                      {/* THE HEADER IS A PLATE (user, 2026-10-08, design B1): accent-tinted band +
-                          accent hairline; the SELECTED global deepens to the selection accent — the
-                          group's head carries that selection, never its rows. The plate lives on the
-                          cell's inner block, not the row: a <tr> takes neither margin nor radius, and
-                          the gap ABOVE it is what separates two groups. "17s ago" names itself. */}
-                      <GroupPlate
+                      {/* THE HEADER IS A PLATE (`GlobalGroupPlate`, shared with the Blocks table). It
+                          lives on the cell's inner block, not the row: a <tr> takes neither margin
+                          nor radius, and the gap ABOVE it is what separates two groups. */}
+                      <GlobalGroupPlate
+                        ordinal={r.global.ordinal}
+                        age={<LiveAge ts={r.ts} />}
+                        selected={inSelGroup}
+                        following={following}
                         open={!isFolded(String(r.global.ordinal))}
                         onToggle={() => toggleFold(String(r.global.ordinal))}
-                        selected={inSelGroup && !following}
                         onSelect={() => {
                           const st = useStore.getState();
                           applyClickActions(
                             snapshotSelectActions(
-                              { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot },
+                              globalPick(r.global as GlobalSnapshot),
                               getNetwork()?.latest?.ordinal === r.global.ordinal,
-                              { pinnedOrdinal: !st.following && st.snap ? st.snap.data.ordinal : null, metaSnap: st.metaSnap, tickNet: st.tickNet },
+                              tickContextOf(st),
                             ),
                           );
                         }}
                         onHover={(on) => setHoverSnapOrd(on ? r.global.ordinal : null)}
-                        className={cn(
-                          // px matches the rows' own cell inset, so "GLOBAL" stands on the identity dots' edge.
-                          "h-[34px] px-2 max-[700px]:px-1.5 rounded-t-md border-b text-label transition-colors",
-                          inSelGroup
-                            ? "bg-[color-mix(in_oklch,var(--primary)_20%,transparent)] border-[var(--primary)] text-primary-ink"
-                            : "bg-[color-mix(in_oklch,var(--primary)_9%,var(--panel-plate))] border-[color-mix(in_oklch,var(--primary)_35%,transparent)] hover:bg-[color-mix(in_oklch,var(--primary)_14%,var(--panel-plate))] text-muted-foreground",
-                        )}
-                      >
-                        <span className={cn("uppercase tracking-caps", inSelGroup ? "text-primary-ink" : "text-[color-mix(in_oklch,var(--primary-ink)_80%,var(--muted-foreground))]")}>Global</span>
-                        <span className={cn("font-mono tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground")}>{r.global.ordinal.toLocaleString()}</span>
-                        {/* The mark FOLLOWS THE NUMBER IT QUALIFIES, as the row's pin follows its
-                            snapshot number (user, same day: the plate's sat at the right edge while
-                            the row's sat by its number). */}
-                        {inSelGroup && (
-                          <span className="inline-flex items-center gap-1.5 text-label normal-case tracking-normal text-muted-foreground">
-                            {following ? (
-                              <>
-                                <LiveDot />
-                                live
-                              </>
-                            ) : (
-                              <PinnedMark className="text-muted-foreground" />
-                            )}
-                          </span>
-                        )}
-                        <span className={cn("ml-auto tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground-dim")}><LiveAge ts={r.ts} /></span>
-                      </GroupPlate>
+                      />
                     </TableCell>
                   </TableRow>
                 )}
@@ -2019,18 +2020,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                     <span className="inline-flex items-center gap-1.5">
                       {seam ? <Dash /> : r.ordinal.toLocaleString()}
                       {/* As the global plate says it: the live dot and word, or the pin alone. */}
-                      {rowSel && !seam && (
-                        <span className="inline-flex items-center gap-1.5 font-sans text-label text-muted-foreground">
-                          {following ? (
-                            <>
-                              <LiveDot />
-                              live
-                            </>
-                          ) : (
-                            <PinnedMark className="text-muted-foreground" />
-                          )}
-                        </span>
-                      )}
+                      {rowSel && !seam && <StateMark following={following} className="font-sans" />}
                     </span>
                   </TableCell>
                   <TableCell className={cn("text-right tabular-nums", PHONE_HIDDEN)}>{seam ? <Dash /> : fmtDag(r.fee)}</TableCell>

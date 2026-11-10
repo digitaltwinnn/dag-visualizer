@@ -74,19 +74,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
-        {/* Stamp the network on <html> BEFORE anything paints, so the [data-net] accent
-            override applies from the first frame. Inline because a layout cannot read
-            searchParams and middleware would make every page dynamic; the regex mirrors
-            src/net/parse.ts's validator (an inline script cannot import). CSP already
-            allows 'unsafe-inline' (next.config.mjs). suppressHydrationWarning on <html>
-            covers the pre-hydration dataset write. */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html:
-              '(function(){var m=/[?&]net=(integrationnet|testnet)(?:&|$)/.exec(location.search);if(m)document.documentElement.dataset.net=m[1];})();',
-          }}
-        />
-        {/* Theme stamp — the data-net script's twin: pin data-theme BEFORE first paint. A stored
+        {/* Theme stamp: pin data-theme BEFORE first paint. A stored
             light/dark stamps itself; a stored System leaves the attribute off (color-scheme: light
             dark lets the browser resolve); NOTHING STORED stamps the default, dark (user, 2026-10-30),
             so a light OS never flashes the sheet. Mirrors src/theme/resolve.ts. */}

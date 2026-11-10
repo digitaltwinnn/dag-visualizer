@@ -1,11 +1,6 @@
 import { NextResponse } from "next/server";
-import { unstable_cache } from "next/cache";
-import { type NetworkId } from "@/src/engine/config";
-import { lineageIds } from "@/src/net/lineage";
-import { netOf } from "@/src/net/request";
-import type { SnapshotExact, ChannelSnapRow } from "@/src/data/types";
-import { decodeChannelContent } from "../decodeChannel";
-import { fetchGlobalJson } from "../fetchGlobal";
+import { pairHashes } from "../decodeBlocks";
+import { cachedBlockHashes, cachedExact } from "../cachedExact";
 import { withinServedWindow } from "../ordinalWindow";
 
 // EXACT per-tick anchor totals, read straight from the raw L0 global snapshot. The block explorer
@@ -21,133 +16,32 @@ import { withinServedWindow } from "../ordinalWindow";
 
 export const maxDuration = 60;
 
-// Addresses we track (the public catalog, config.METAGRAPHS — the canonical list the
-// Hypergraph hubs are built from) — used to split listed vs unlisted.
-
-type StateChannelSnap = { value?: { fee?: number; content?: unknown[] } };
-
-async function fetchExact(net: NetworkId, ordinal: number): Promise<SnapshotExact> {
-  const LISTED = new Set(lineageIds(net));
-  // fetchGlobalJson throws on failure (LB and archival fallback both) so unstable_cache never
-  // caches a miss — a momentarily unavailable tick is retried on the next request.
-  const j = (await fetchGlobalJson(net, ordinal)) as { value?: Record<string, unknown>; proofs?: unknown } & Record<string, unknown>;
-  const v = (j.value ?? j) as {
-    stateChannelSnapshots?: Record<string, StateChannelSnap[]>;
-    rewards?: unknown;
-  };
-  // The global snapshot is the SAME Signed[] shape as the metagraph snapshots it anchors —
-  // `proofs` are its validator signatures (item 10, 2026-08-06). Count only; the ids are the
-  // near-full validator set, so a list adds nothing a count doesn't.
-  const signerCount = Array.isArray(j.proofs) ? j.proofs.length : 0;
-  const sc = v.stateChannelSnapshots;
-  if (!sc) throw new Error("no stateChannelSnapshots");
-
-  // Rewards this snapshot distributes (each reward carries an `amount` in datum). Defensive: only
-  // sum if it's an array of {amount}; anything else → 0 (never fabricate). Verified shape:
-  // `value.rewards` is an array (type confirmed live), but empty on every sampled mainnet snapshot
-  // (2026-07-02) — no reward transactions currently observed, so this consistently resolves to 0.
-  const rawRewards = v.rewards;
-  const rewardsDatum = Array.isArray(rawRewards)
-    ? rawRewards.reduce(
-        (s: number, r) => s + (typeof (r as { amount?: number })?.amount === "number" ? (r as { amount: number }).amount : 0),
-        0,
-      )
-    : 0;
-
-  let totalFee = 0,
-    totalBytes = 0,
-    listedFee = 0,
-    unlistedFee = 0,
-    anchored = 0,
-    listedCount = 0,
-    unlistedCount = 0;
-  const perMeta: Record<string, { count: number; fee: number; bytes: number }> = {};
-  const rows: ChannelSnapRow[] = [];
-  for (const [addr, snaps] of Object.entries(sc)) {
-    const listed = LISTED.has(addr);
-    let count = 0,
-      fee = 0,
-      metaBytes = 0;
-    for (const s of snaps) {
-      const f = s?.value?.fee ?? 0;
-      // Actual serialized size — `content` is the snapshot's content as a byte array, so its
-      // length is the real byte count anchored. NOT derived from the fee (the fee is computed by
-      // Constellation's own non-trivial fee logic — don't assume a formula).
-      const bytes = Array.isArray(s?.value?.content) ? s.value!.content!.length : 0;
-      count++;
-      fee += f;
-      metaBytes += bytes;
-      totalBytes += bytes;
-      anchored++;
-      totalFee += f;
-      if (listed) listedFee += f;
-      else unlistedFee += f;
-
-      const decoded = await decodeChannelContent(s?.value?.content);
-      rows.push({
-        metaId: addr,
-        ordinal: decoded?.ordinal ?? 0,
-        decoded: !!decoded,
-        fee: f,
-        bytes,
-        signers: decoded?.signers ?? [],
-        blocks: decoded?.blocks ?? 0,
-        hasState: decoded?.hasState ?? false,
-        stateBytes: decoded?.stateBytes ?? 0,
-        stateProof: decoded?.stateProof ?? null,
-        dataBytes: decoded?.dataBytes ?? 0,
-      });
-    }
-    // Per-metagraph size (bytes) alongside count + fee — the snapshot card reveals it as KB on the
-    // selected/expanded row. Measured from content byte length, same as the total (not fee-derived).
-    perMeta[addr] = { count, fee, bytes: metaBytes };
-    if (listed) listedCount += count;
-    else unlistedCount += count;
-  }
-  return {
-    ordinal,
-    anchored,
-    channels: Object.keys(sc).length,
-    totalFee,
-    totalSizeKB: totalBytes / 1024, // measured from content byte length, not the fee
-    rewardsDatum,
-    listedFee,
-    unlistedFee,
-    listedCount,
-    unlistedCount,
-    signerCount,
-    perMeta,
-    rows,
-  };
-}
-
-const cachedExact = (net: NetworkId, ordinal: number) =>
-  // The cache key is versioned WITH the payload shape (v3: rows carry dataBytes, 2026-08-13;
-  // v2: signerCount) — entries cached under an old key would otherwise miss fields for a day.
-  unstable_cache(() => fetchExact(net, ordinal), ["snapshot-exact-v3", net, String(ordinal)], {
-    revalidate: 86400, // ordinals are immutable; a day is plenty (success is cached, misses throw)
-  })();
-
-export async function GET(req: Request, ctx: { params: Promise<{ ordinal: string }> }) {
+export async function GET(_req: Request, ctx: { params: Promise<{ ordinal: string }> }) {
   const { ordinal } = await ctx.params;
-  const net = netOf(req);
   const n = Number(ordinal);
   if (!Number.isFinite(n) || n < 0) {
     return NextResponse.json({ error: "bad ordinal" }, { status: 400 });
   }
-  if (!(await withinServedWindow(net, n))) {
+  if (!(await withinServedWindow(n))) {
     // Outside the window this app can ever ask about (ordinalWindow.ts) — refuse without
     // touching the upstream, so the route isn't an anonymous walk over ~6.7M ordinals.
     return NextResponse.json({ available: false, ordinal: n }, { status: 404 });
   }
   try {
-    const data = await cachedExact(net, n);
+    const data = await cachedExact(n);
+    let complete = true;
+    if (data.blocks?.length) {
+      const hashes = await cachedBlockHashes(n).catch(() => [] as string[]);
+      ({ blocks: data.blocks, complete } = pairHashes(data.blocks, hashes));
+    }
     return NextResponse.json(data, {
       // `s-maxage` too (2026-10-18): the live tip and the cold-load backfill ask every visitor for
       // the SAME ordinals, and with `max-age` alone only each browser kept them — the CDN missed
       // 96% of the week's 5,233 calls and every one reached the load balancer. An ordinal is
       // immutable, so the edge may keep it as long as the browser does; a 404 carries no header.
-      headers: { "Cache-Control": "public, max-age=86400, s-maxage=86400, immutable" },
+      // Blocks the explorer has not named yet carry `hash: ""`: a short edge life, so the CDN and the
+      // browser ask again soon rather than keeping the hashless answer for a day.
+      headers: { "Cache-Control": complete ? "public, max-age=86400, s-maxage=86400, immutable" : "public, max-age=0, s-maxage=30" },
     });
   } catch {
     // Transiently unavailable (not yet finalized / upstream blip) — client keeps the polled floor.

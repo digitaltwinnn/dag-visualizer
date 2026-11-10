@@ -2,6 +2,7 @@
 
 import { Pin } from "lucide-react";
 import { cn } from "@/lib/utils";
+import LiveDot from "@/components/LiveDot";
 
 // Shared empty/loading-state ATOMS — built from the app's own marks (node-dot, ring, halo) so a
 // loading/absent state reads as part of the instrument, not a bolt-on. Motion keyframes live in
@@ -31,6 +32,20 @@ export function NodeStars({ count = 5, tone }: { count?: number; tone?: "ai" }) 
 
 // NO SIGNAL — the small breathing red dot next to "no signal" (Vitals + the snapshot card's
 // title row) — reuses the shared `breathe` beat, same treatment as the "live now" cyan dot.
+/** THE READ IN FLIGHT, ON THE LINE ITS WORDS WILL TAKE (user, 2026-11-09: "instead of 'reading' in
+ *  text can't we use the visual cue?", then "the global snapshot card should have the same treatment
+ *  … the 'resolving' text is missing in the callout"): the node-stars and the one word, in the
+ *  label's caps. One species for the card's lead and the scene callout's, never a sentence about
+ *  reading. Sits one text line tall (`h-[1lh]`), so it rides the line it stands in for. */
+export function Resolving({ count = 3, className }: { count?: number; className?: string }) {
+  return (
+    <span className={cn("inline-flex h-[1lh] items-center gap-2", className)}>
+      <NodeStars count={count} />
+      <span className="text-label tracking-[0.08em] uppercase text-muted-foreground">resolving</span>
+    </span>
+  );
+}
+
 export function NoSignalDot() {
   return (
     <span className="w-[7px] h-[7px] rounded-full flex-none bg-destructive shadow-[0_0_0_3px_color-mix(in_oklch,var(--destructive)_22%,transparent)] animate-breathe motion-reduce:animate-none" />
@@ -70,3 +85,23 @@ export function PinnedMark({ className }: { className?: string }) {
     </>
   );
 }
+
+/** THE LIVE / PINNED STATE MARK — the live dot and its word, or the pin alone (`PinnedMark`), in
+ *  muted ink. ONE atom for every place a selected row or plate says which it is (refactor round R1,
+ *  P5: RAW's two tables wrote it four times). `className` adds the caller's typography context (a
+ *  mono cell's `font-sans`, a caps plate's `normal-case tracking-normal`). */
+export function StateMark({ following, className }: { following: boolean; className?: string }) {
+  return (
+    <span className={cn("inline-flex items-center gap-1.5 text-label text-muted-foreground", className)}>
+      {following ? (
+        <>
+          <LiveDot />
+          live
+        </>
+      ) : (
+        <PinnedMark className="text-muted-foreground" />
+      )}
+    </span>
+  );
+}
+

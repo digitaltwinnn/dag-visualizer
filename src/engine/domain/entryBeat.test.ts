@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ENTRY_FALL, ENTRY_STAG, entryStep, entryTotal } from "./entryBeat";
+import { ENTRY_FALL, ENTRY_STAG, REGISTER_BEAT, entryStep, entryTotal } from "./entryBeat";
 
 describe("entryBeat — the arrival drop's shape, shared by the chamber and the base rings", () => {
   it("a row is held high and dark before its start, lands at its fall's end", () => {
@@ -17,5 +17,12 @@ describe("entryBeat — the arrival drop's shape, shared by the chamber and the 
     expect(entryTotal(1)).toBe(ENTRY_FALL);
     expect(entryTotal(21)).toBeCloseTo(ENTRY_FALL + ENTRY_STAG * 20, 9);
     expect(entryTotal(3, 0.12)).toBeCloseTo(ENTRY_FALL + 0.24, 9); // an instrument's own stagger (the rings)
+  });
+});
+
+describe("REGISTER_BEAT — a register switch plays the arrival beat faster, never slower", () => {
+  it("is above 1 and keeps the whole chamber beat under a second", () => {
+    expect(REGISTER_BEAT).toBeGreaterThan(1);
+    expect(entryTotal(22) / REGISTER_BEAT).toBeLessThan(1);
   });
 });

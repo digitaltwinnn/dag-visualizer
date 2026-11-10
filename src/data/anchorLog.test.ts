@@ -4,7 +4,7 @@ import type { MetaSnapRecord } from "@/src/data/api";
 import type { GlobalSnapshot } from "@/src/data/types";
 
 const g = (ordinal: number, timestamp: string): GlobalSnapshot => ({ ordinal, timestamp, hash: `h${ordinal}` });
-const r = (ordinal: number, ts: string, fee = 100): MetaSnapRecord => ({ ordinal, hash: `m${ordinal}`, parent: "", ts, fee, sizeInKB: 1, height: 0, subHeight: 0, blocks: 0, epochProgress: 0 });
+const r = (ordinal: number, ts: string, fee = 100): MetaSnapRecord => ({ ordinal, hash: `m${ordinal}`, parent: "", ts, fee, sizeInKB: 1, height: 0, subHeight: 0, blocks: 0, blockHashes: [], epochProgress: 0 });
 
 const globals = [g(1, "2026-08-01T10:00:00Z"), g(2, "2026-08-01T10:00:15Z")];
 const snaps = new Map<string, MetaSnapRecord[]>([
@@ -81,7 +81,7 @@ describe("buildAnchorLog", () => {
 describe("snapsAtTick", () => {
   const rec = (ordinal: number, ts: string) => ({
     ordinal, hash: `h${ordinal}`, parent: `p${ordinal}`, ts, fee: 1, sizeInKB: 2,
-    height: 8, subHeight: ordinal, blocks: 0, epochProgress: 100,
+    height: 8, subHeight: ordinal, blocks: 0, blockHashes: [], epochProgress: 100,
   });
   const map = new Map([["A", [rec(1, "t1"), rec(2, "t2"), rec(3, "t2")]]]);
 

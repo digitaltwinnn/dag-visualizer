@@ -12,7 +12,7 @@
 //
 // This lives in domain/ (pure data, no THREE / no scene / no store VALUE import) so it stays
 // testable and side-effect-free; it only imports the `Mode` string-union TYPE from the store.
-import type { Mode } from "@/src/store/mode";
+import type { Mode, LedgerRegister } from "@/src/store/mode";
 
 export interface ViewPolicy {
   // Is the 3D canvas shown at all? false = a flat placeholder view (Blueprint schematic); the
@@ -160,6 +160,9 @@ export interface ViewPolicy {
   // span on screen and the scope its cards stand on. (It was a door onto the anchor log for one
   // day, 2026-10-07; the cards' "Snapshot records" still is.)
   rawSurface: "records" | "buckets";
+  // The REGISTERS this view offers — ways of reading the same scene (2026-11-05). Only the
+  // Snapshots chamber has more — "blocks" and, since D6 (2026-11-07), "data"; every other row reads one.
+  registers: readonly LedgerRegister[];
   // Does this view carry an AI NOTE — the written context card (`components/notes/`) for the
   // subject on screen? The four 3D views do; the placeholder gallery shows no data, so no note.
   aiNotes: boolean;
@@ -247,6 +250,7 @@ const FLAT: ViewPolicy = {
   chipEnv: 1,
   fleet: "placed",
   rawSurface: "records",
+  registers: ["snapshots"],
   aiNotes: false,
   noteScope: "network",
   tickScoped: false,
@@ -304,6 +308,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     chipEnv: 1,
     fleet: "placed",
     rawSurface: "records",
+    registers: ["snapshots"],
     aiNotes: true,
     noteScope: "network",
     tickScoped: false,
@@ -354,6 +359,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     chipEnv: 0.35,
     fleet: "placed",
     rawSurface: "records",
+    registers: ["snapshots"],
     aiNotes: true,
     noteScope: "network",
     tickScoped: false,
@@ -384,7 +390,8 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     rotate: true,
     dragOrbitsSubject: false,
     metagraphCard: "tickNet",
-    // The Snapshots node browser (LedgerPanel's floor disclosures) reads store.selNodes.
+    // RAW's SIGNERS lane (ChannelStatePanel's signer roster) names a snapshot's signers against
+    // store.selNodes. LedgerPanel no longer reads it — its signer level left on 2026-11-09 (review M4).
     nodeList: true,
     vitalsLane: true,
     bandContent: "vitals",
@@ -394,6 +401,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     chipEnv: 0.5, // low, not zero — coplanar trays wash at full sheen, go bland at none (field note)
     fleet: "placed",
     rawSurface: "records",
+    registers: ["snapshots", "blocks", "data"],
     aiNotes: true,
     noteScope: "chamber",
     tickScoped: true,
@@ -444,6 +452,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     chipEnv: 1,
     fleet: "parked",
     rawSurface: "buckets",
+    registers: ["snapshots"],
     aiNotes: true,
     noteScope: "history",
     tickScoped: false,
@@ -461,3 +470,43 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
   },
   soon: FLAT,
 };
+
+/** THE REGISTER THE VIEW ON SCREEN READS (D3, 2026-11-07): the store's setting where the view's row
+ *  offers it, else the row's first — its only one. The register is a setting of the Snapshots view
+ *  that persists across views (the `/blocks` route seeds it), so a surface that behaves per register
+ *  asks this rather than comparing `mode` and the field itself (convention 7). */
+export function registerOf(mode: Mode, register: LedgerRegister): LedgerRegister {
+  const offered = VIEW_POLICIES[mode].registers;
+  return offered.includes(register) ? register : offered[0]!;
+}
+
+/** WHICH LEDGER SOURCE A REGISTER READS — the one behavioural question the three registers differ
+ *  on below presentation (refactor round R1, P2). Metagraph snapshots and Data blocks read the
+ *  snapshot source (the live buffer, or a past window around an old pin — `src/data/pastWindow.ts`);
+ *  Transaction blocks reads the block window (`src/data/blockWindow.ts`), and its subjects are
+ *  blocks. A keyed row, so a fourth register is a compile error here rather than a register that
+ *  silently inherits "not blocks, so act like snapshots" at every call site (convention 7). It lives
+ *  in the domain because the pick table and the scene's feed set ask it too, and the domain reads no
+ *  `src/data` value (rule 1); the scene keeps its own row (`LedgerView`'s `REGISTER_CARGO`). */
+export type RegisterSource = "snapshots" | "blocks";
+export const REGISTER_SOURCE: Readonly<Record<LedgerRegister, RegisterSource>> = {
+  snapshots: "snapshots",
+  blocks: "blocks",
+  data: "snapshots",
+};
+/** Does this register read the block window (and draw blocks as its subjects)? */
+export function readsBlockWindow(register: LedgerRegister): boolean {
+  return REGISTER_SOURCE[register] === "blocks";
+}
+/** WHICH REGISTERS DRAW DATA BLOCKS as subjects (review M8, 2026-11-09): a keyed row like
+ *  `REGISTER_SOURCE`, so the data-block release, the hover clear and the callout subject ask it
+ *  rather than comparing `register === "data"` — a fourth register is a compile error here. */
+export const REGISTER_DATA_BLOCKS: Readonly<Record<LedgerRegister, boolean>> = {
+  snapshots: false,
+  blocks: false,
+  data: true,
+};
+/** Does this register draw data blocks (and commit them as its subjects)? */
+export function drawsDataBlocks(register: LedgerRegister): boolean {
+  return REGISTER_DATA_BLOCKS[register];
+}

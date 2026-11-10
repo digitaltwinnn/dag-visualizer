@@ -35,7 +35,7 @@ import RailThread from "@/components/RailThread";
 // (client components server-render; the dynamic imports below default to SSR and only split the
 // chunks). A cold doc load fades in like any other appearance — one entrance, every path.
 //
-// The `initial` → store ADOPTION is the NetLink mount pattern: SSR and the first client render
+// The `initial` → store ADOPTION is the late-seed mount pattern: SSR and the first client render
 // draw from the prop (hydration sees no mismatch), one effect seeds the store and flips
 // `adopted`, and from then on the store owns it.
 // The doc components, keyed by the registry's own DocPage — the one place a new doc's component

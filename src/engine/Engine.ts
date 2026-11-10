@@ -3,7 +3,10 @@ import Stats from "stats.js";
 import { useStore, type Mode } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { metagraphById, initNetwork, getNetwork, DEFAULT_META_COLOR, resolveSignerIps } from "@/src/data/network";
-import { getPastWindow, ledgerSource, onPastWindow } from "@/src/data/pastWindow";
+import { getBlockWindow, getPastWindow, ledgerSource, onBlockWindow, onPastWindow } from "@/src/data/pastWindow";
+import { windowReadsSettled } from "@/src/data/blockReads";
+import { REGISTER_BEAT } from "@/src/engine/domain/entryBeat";
+import { blockWindowContinues } from "@/src/data/blockWindow";
 import { ledgerLens } from "@/src/data/ledgerStory";
 import { reportPoll, touchPoll } from "@/src/data/api";
 import { holdFeed } from "@/src/data/feedUse";
@@ -21,8 +24,7 @@ import { UNLISTED_KEY } from "./domain/ledgerBands";
 import { StageLight } from "./scene/objects/StageLight";
 import { SceneRig } from "./scene/objects/SceneRig";
 import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
-import { METAGRAPHS, NET, netUrl } from "@/src/net/current";
-import { COLORS, POLL } from "@/src/engine/config";
+import { COLORS, POLL, METAGRAPHS } from "@/src/engine/config";
 import { BYTE_SCALE_KB, type RailGroup } from "./domain/ledgerLayout";
 import { HYPER_TILT, HYPER_TILT_FOCUS } from "./domain/hyperLayout";
 import { readSceneColors, type SceneColors, LIGHT_LOOK } from "./sceneColors";
@@ -39,11 +41,11 @@ import { elevationCap, isDrag, orbitAbout, orbitAllowed, orbitAngles } from "./d
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { ledgerNetwork } from "./domain/tickNet";
-import { pickNetId, viewEntryActions } from "./domain/pickActions";
+import { globalPick, pickNetId, viewEntryActions } from "./domain/pickActions";
 import { viewNetwork } from "./domain/viewNetwork";
-import { ViewTransition, is3D, fleetFaded, fleetHolder, type FleetPlacement } from "./domain/viewTransition";
+import { ViewTransition, is3D, fleetFaded, fleetHolder, type FleetPlacement, type View3D } from "./domain/viewTransition";
 import { gatherBand, railGapPx, railGapShiftPx, type GatherBand } from "./domain/gatherLayout";
-import { LADDERS, LEVEL_CARRY, hasLevel, type CohortSel, type CompositionSel, type FocusLevel, type SelectionSnapshot, type ResolverKey } from "./domain/focusLadder";
+import { LADDERS, LEVEL_CARRY, hasLevel, sceneShowsNode, type CohortSel, type CompositionSel, type FocusLevel, type SelectionSnapshot, type ResolverKey } from "./domain/focusLadder";
 import { compositionGroups, compositionKey, compositionRows } from "@/src/data/composition";
 import { metaSnapDeepKey } from "@/src/data/types";
 import { snapsAtTick } from "@/src/data/anchorLog";
@@ -186,6 +188,7 @@ export class Engine {
   private _gatherU2 = new THREE.Vector3(); // scratch: staging-plane up (world)
   private _gatherBand: GatherBand = { topFrac: 0, halfWidthFrac: 0, heightFrac: 0 }; // scratch: the measured band
   private _pendingBoundary: Mode | null = null; // destination whose layout applies at the boundary
+  private _sceneView: View3D | null = null; // the 3D view whose layout the scene draws — adopted at the boundary (`_syncSceneNode`)
   // The DOC overlay's deferred bare-stage hide: armed by the doc fold, applied by the frame loop
   // the first frame the transition is past its OUT phase (see the tick site).
   private _docHideArmed = false;
@@ -587,12 +590,11 @@ export class Engine {
         Math.abs(((a >> 16) & 255) - ((b >> 16) & 255)) <= 2 &&
         Math.abs(((a >> 8) & 255) - ((b >> 8) & 255)) <= 2 &&
         Math.abs((a & 255) - (b & 255)) <= 2;
-      // The mirror mirrors :root — under a dev network the [data-net] override re-points
-      // --primary ON PURPOSE, so only mainnet checks core. dagCore/bg are never overridden.
-      // And config.COLORS stays the DARK mirror (spec §4) — its consumers (SSR, the bake scripts)
-      // have no DOM and no theme — so the whole comparison is gated on dark above: mainnet-dark is
-      // the one state `:root` fully describes, and on paper every row would "drift" by design.
-      const drift = ([...(NET === "mainnet" ? [["core", COLORS.core, colors.core] as const] : []),
+      // The mirror mirrors :root. config.COLORS stays the DARK mirror (spec §4) — its consumers
+      // (SSR, the bake scripts) have no DOM and no theme — so the whole comparison is gated on dark
+      // above: dark is the one state `:root` fully describes, and on paper every row would "drift"
+      // by design.
+      const drift = ([["core", COLORS.core, colors.core] as const,
         ["dagCore", COLORS.dagCore, colors.dagCore] as const,
         ["bg", COLORS.bg, colors.bg] as const])
         .filter(([, a, b]) => !near(a, b)).map(([k]) => k);
@@ -652,7 +654,6 @@ export class Engine {
       get morph() { return engineSelf.morph; },
       get activeMetaIds() { return engineSelf._activeMetaIds; },
       get cohortSel() { return engineSelf.cohortSel; },
-      ledgerNet: () => this._ledgerNet(),
       compositionOf: (p) => this._compositionOf(p),
     });
     this.callout = new CalloutSync({
@@ -716,15 +717,11 @@ export class Engine {
     // anonymous: drawn, but not pickable. `k` is the tile's index within ITS TICK.
     this.ledger.setTileResolver((metaId, ts, k) => {
       // The LEDGER SOURCE — the past window around an old pin, else the live buffer.
-      const net = ledgerSource(getNetwork());
+      const net = ledgerSource(getNetwork(), useStore.getState().ledgerRegister);
       if (!net) return null;
       const g = net.globalSnapshots.find((gs) => gs.timestamp === ts);
       if (!g) return null;
-      const global = {
-        kind: "snapshot",
-        data: g,
-        title: `Global snapshot #${g.ordinal}`,
-      } as Extract<PickDescriptor, { kind: "snapshot" }>;
+      const global = globalPick(g);
       if (metaId === UNLISTED_KEY) {
         // The UNKNOWN lane's tiles (user, 2026-08-07: inspectable like any other): tile `k` is
         // the k-th unlisted row of this tick — the polled rows united with the exact read's
@@ -747,6 +744,17 @@ export class Engine {
         global,
       };
     });
+    // The Blocks register's inputs as they stand at boot (a `/blocks` deep link seeds the register
+    // before the Engine exists); the subscriptions below carry every later change.
+    {
+      const st = useStore.getState();
+      this.ledger.setRegister(st.ledgerRegister);
+      this._blockTo = getBlockWindow()?.to ?? null;
+      this.ledger.setBlockWindow(getBlockWindow());
+      this.ledger.setBlockReads(st.blockReads, windowReadsSettled(getBlockWindow(), st.blockReads, st.blockReadMiss, st.exactMiss));
+      this.ledger.setSelectedBlock(st.block?.hash ?? null);
+      this.ledger.setHoveredBlock(st.hoverBlock);
+    }
     // The globe colours the DAG's own validator nodes (the L0/cL1 shells) with sceneColors["dag"]
     // (see globe.js setNodes) — seed it here, synchronously, so it's populated before the first
     // setNodes call (which can fire from the "cluster" event before refreshMeta's API round-trip
@@ -889,6 +897,24 @@ export class Engine {
         const eff = st.docPage || st.docClosing ? ("soon" as Mode) : st.mode;
         const prevEff = prev.docPage || prev.docClosing ? ("soon" as Mode) : prev.mode;
         if (eff !== prevEff) this.setMode(eff);
+        else if (st.ledgerRegister !== prev.ledgerRegister) this._holdSceneFeeds();
+        // THE REGISTER IS THE TRAIL'S SOURCE (`ledgerSource`): the live buffer's ticks or the block
+        // window's, two different stretches of the chain — the chamber switches its cargo and starts
+        // a fresh history on the new one, exactly as a past window's arrival does. Between the two
+        // registers that read the SAME source (Metagraph snapshots and Data blocks, D6) the trail is
+        // the one on screen: only the cargo changes, and a refresh re-lays it.
+        if (st.ledgerRegister !== prev.ledgerRegister) {
+          const wasBlockTrail = this.ledger.readsBlockWindow;
+          this.ledger.setRegister(st.ledgerRegister);
+          if (wasBlockTrail !== this.ledger.readsBlockWindow) this._reseatLedger();
+          else this._refreshLedger();
+          // THE SWITCH'S OWN BEAT (user, 2026-11-07): the chamber's arrival drop at `REGISTER_BEAT`
+          // tempo, released at once — there is no choreography to wait out inside a view.
+          if (this.mode === "ledger") {
+            this.ledger.beginEntry(REGISTER_BEAT);
+            this.ledger.releaseEntry();
+          }
+        }
         // The bare stage ARMS rather than hides (user, 2026-09-04: "shouldn't their nodes still
         // move to the gathering section at the top like they always do?"): the gather is the OUT
         // phase's job whatever the destination, and hiding the fleet is the DOC "view"'s own
@@ -1011,8 +1037,9 @@ export class Engine {
           this.globe.setSelectedGroup(this._compositionIds(st.composition, st.selNodes));
           if (st.composition !== prev.composition && st.mode === "hyper") this._resolveFocus();
         }
-        // The selected node card (geo or hyper) keeps that node's layer shells lit on the globe.
-        if (st.inspect !== prev.inspect) this.globe.setSelectedNode(this._pickNodeId(st.inspect));
+        // The selected node card (geo or hyper) keeps that node's layer shells lit on the globe —
+        // only where the scene's view has the node rung (`_syncSceneNode`).
+        if (st.inspect !== prev.inspect) this._syncSceneNode();
         // A PLANE FOCUS is the History view's commit, and the camera answers it like any other
         // (camera principle 3): the settled pose leans in toward the front of the stack, and
         // releasing it leans back out. Gated on the policy row for the view the behaviour is FOR
@@ -1094,6 +1121,18 @@ export class Engine {
         if (st.hoverMetaSnap !== prev.hoverMetaSnap) {
           this.ledger.setHoveredMetaSnap(st.hoverMetaSnap);
         }
+        // THE BLOCKS REGISTER'S CHANNELS, mirroring the metagraph snapshot's: the committed block and
+        // the hovered one (each its own channel — a hover previews, never commits), and the full
+        // reads its links and tip states are drawn from.
+        if (st.block !== prev.block) this.ledger.setSelectedBlock(st.block?.hash ?? null);
+        if (st.hoverBlock !== prev.hoverBlock) this.ledger.setHoveredBlock(st.hoverBlock);
+        // …and the hovered DATA BLOCK, which lights its snapshot's mark, never the tile (2026-11-09).
+        if (st.hoverDataBlock !== prev.hoverDataBlock) this.ledger.setHoveredDataBlock(st.hoverDataBlock);
+        // …with whether the window's reads are ALL in — the edge the DAG is laid out on, so a miss
+        // (either map) re-hands them too.
+        if (st.blockReads !== prev.blockReads || st.blockReadMiss !== prev.blockReadMiss || st.exactMiss !== prev.exactMiss) {
+          this.ledger.setBlockReads(st.blockReads, windowReadsSettled(getBlockWindow(), st.blockReads, st.blockReadMiss, st.exactMiss));
+        }
         // A landing EXACT read is what turns a tick from an unmeasured seam into a measured byte
         // bar (spec §6.3), so re-hand the map the moment it changes. Ledger-only: nothing else
         // reads it from the scene, and the view re-reads it on entry via _refreshLedger.
@@ -1164,40 +1203,65 @@ export class Engine {
     const net = initNetwork(); // idempotent; guarantees a NetworkData instance
     const n = net as unknown as { dagCore?: DagCore | null };
     if (n?.dagCore) this.dagCore = n.dagCore;
-    net?.on("cluster", ({ dag }: { l0: ClusterNode[]; l1: ClusterNode[]; dag: DagCore }) => {
+    // THE FEED LISTENERS COME OFF WITH THE ENGINE (perf review, 2026-11-07, dev-only: a recreated
+    // Engine — a Fast Refresh remount of the shell — left the old one's handlers running against the
+    // singleton, rebuilding its globe on every cluster poll and flashing its core on every tick).
+    const onCluster = ({ dag }: { l0: ClusterNode[]; l1: ClusterNode[]; dag: DagCore }) => {
       this.dagCore = dag;
       this._buildGlobe();
       this._publishMetaList(); // the DAG core lives in the metaList — refresh it when clusters change
-    });
+    };
+    net?.on("cluster", onCluster);
+    this.unsub.push(() => net?.off("cluster", onCluster));
     // Data-driven Hypergraph pulses: when a metagraph records a snapshot that anchored into a
     // global tick, fire a packet from its hub along the tether into the core; flash the core
     // itself on each new global snapshot (scaled by how many metagraphs it anchored).
-    net?.on("anchor", ({ metaId, timestamps, seed }: { metaId: string; timestamps: string[]; seed: boolean }) => {
+    const onAnchor = ({ metaId, timestamps, seed }: { metaId: string; timestamps: string[]; seed: boolean }) => {
       // One packet per snapshot that ARRIVED — not per snapshot a catch-up batch recorded (the
       // history seed, and the backlog a background tab's throttled polls pile up: `liveArrivals`).
       const arrived = seed ? 0 : liveArrivals(timestamps ?? []);
       if (arrived > 0) this.layers.pulseMeta(metaId, arrived);
       if (this.mode === "ledger") this._ledgerDirty = true; // the per-tick breakdown filled in
-    });
+    };
+    net?.on("anchor", onAnchor);
+    this.unsub.push(() => net?.off("anchor", onAnchor));
     // THE SOURCE SWITCH (`src/data/pastWindow.ts`, user 2026-11-03: an old pin goes "back in time"):
     // the live buffer ↔ a past window around the pin. A fresh chamber history (the model only ever
     // advances), the live edge frozen while past, and the pin re-applied so the rewind lands it.
     this.unsub.push(
-      onPastWindow(() => {
-        this.ledger.resetHistory();
-        this.ledger.setFrozen(!!getPastWindow());
-        this._refreshLedger();
-        this.ledger.setSelected(useStore.getState().snap?.data?.ordinal ?? null);
+      onPastWindow(() => this._reseatLedger()),
+    );
+    // THE BLOCK WINDOW (the Blocks register's trail, `components/BlockWindowBridge.tsx` its writer):
+    // a window that CONTINUES the one held (a refold, one new block tick at the front) advances the
+    // trail like a live tick; any other is another stretch, and the chamber starts fresh on it.
+    // `ledgerSource` answers the window only in the Blocks register, so in the other the refresh
+    // re-hands the live rows and moves nothing.
+    // Outside the Blocks register the window is only held: the chamber's source is the live buffer
+    // there, and the register flip itself re-seats (a Blocks → Snapshots flip used to re-seat twice).
+    this.unsub.push(
+      onBlockWindow(() => {
+        const w = getBlockWindow();
+        const continues = blockWindowContinues(this._blockTo, w);
+        this._blockTo = w?.to ?? null;
+        this.ledger.setBlockWindow(w);
+        // A new window wants new reads: re-hand the reads with their settledness against IT.
+        const st = useStore.getState();
+        this.ledger.setBlockReads(st.blockReads, windowReadsSettled(w, st.blockReads, st.blockReadMiss, st.exactMiss));
+        if (!this.ledger.readsBlockWindow) return;
+        if (continues) this._refreshLedger();
+        else this._reseatLedger();
       }),
     );
-    net?.on("global", (evt: { latest: GlobalSnapshot | null }) => {
+    const onGlobal = (evt: { latest: GlobalSnapshot | null }) => {
       if (this.mode === "ledger") this._ledgerDirty = true; // a new tick landed on the chain
       const ord = evt.latest?.ordinal;
       if (ord == null || ord === this._lastFlashOrdinal) return;
       this._lastFlashOrdinal = ord;
       const anchored = evt.latest?.metagraphSnapshotCount ?? 0;
       this.layers.flashCore(Math.min(1.3, 0.5 + anchored * 0.06)); // brighter when it anchored more
-    });
+    };
+    net?.on("global", onGlobal);
+    this.unsub.push(() => net?.off("global", onGlobal));
 
     // Validator geo seed (instant plot); merged, not replaced, so it doesn't clobber
     // the metagraph IP geo that arrives from /api/metagraphs.
@@ -1263,7 +1327,7 @@ export class Engine {
 
   private async refreshMeta(initial: boolean) {
     try {
-      const r = await fetch(netUrl("/api/metagraphs"));
+      const r = await fetch("/api/metagraphs");
       if (!r.ok) { reportPoll("api-metagraphs", false); return; }
       const { metagraphs, geo, ageMs } = await r.json();
       // A REACHED ROUTE IS NOT A FRESH FEED. Reporting `r.ok` counted a 200 as a success even when
@@ -1371,7 +1435,7 @@ export class Engine {
       const unbaked = data.filter((m) => !metagraphById(m.id));
       if (data.length && unbaked.length) {
         this._warnedUnbaked = true;
-        console.warn(`[catalog] the live directory lists ${unbaked.length} metagraph(s) missing from config CATALOG — bake them: ${unbaked.map((m) => `${m.name} ${m.id}`).join(", ")}`);
+        console.warn(`[catalog] the live directory lists ${unbaked.length} metagraph(s) missing from config METAGRAPHS — bake them: ${unbaked.map((m) => `${m.name} ${m.id}`).join(", ")}`);
       }
     }
     const metas = data.map((m) => {
@@ -1406,13 +1470,38 @@ export class Engine {
     this.layers.setMetaPresent(new Set(list.map((m) => m.id)));
   }
 
+  /** The newest tick of the block window last handed to the chamber (`blockWindowContinues`). */
+  private _blockTo: number | null = null;
+
+  /** A SOURCE SWITCH (a past window, a block window, a register flip): a fresh chamber history —
+   *  the model only ever advances — the live edge frozen while past, and the pin re-applied so the
+   *  rewind lands it. */
+  private _reseatLedger(): void {
+    this.ledger.resetHistory();
+    this.ledger.setFrozen(!!getPastWindow());
+    this._refreshLedger();
+    this.ledger.setSelected(useStore.getState().snap?.data?.ordinal ?? null);
+  }
+
   // Re-read the ledger's live tick from the Global L0 buffer + the per-tick anchor index. Cheap
   // enough to call on each new tick / anchor fill, but only while the ledger view is showing.
   private _refreshLedger() {
     // The LEDGER SOURCE (`src/data/pastWindow.ts`): the past window around an old pin, else the
     // live buffer. A past window is fixed, so a live event re-hands the same rows and moves nothing.
-    const src = ledgerSource(getNetwork());
+    const st = useStore.getState();
+    const src = ledgerSource(getNetwork(), st.ledgerRegister);
+    // The Blocks register's FRONT RUN reaches to the live global — only while the window HELD is the
+    // live one (a pinned past window, its own `around` set, makes no claim about now; asked of the
+    // window, never the request in flight — review M1). With none held yet, the request says.
+    // Under the unlisted filter no window is read, so there is no front run to draw either.
+    const bw = getBlockWindow();
+    const heldLive = bw ? bw.around == null : st.blockWindowStatus?.around == null;
+    const liveRun = this.ledger.readsBlockWindow && heldLive && st.blockWindowStatus?.status !== "unread";
+    this.ledger.setLiveGlobal(liveRun ? (getNetwork()?.latest ?? null) : null);
     this.ledger.setData(src?.globalSnapshots ?? [], (ts) => src?.getAnchor(ts) ?? null);
+    // …and over a PINNED PAST window (the held window's own `around`) the front claims no now: its
+    // age instead, read against this clock (user, 2026-11-10; `LedgerView.setPastFront`).
+    this.ledger.setPastFront(this.ledger.readsBlockWindow && bw != null && bw.around != null ? Date.now() : null);
     // The byte bar measures ticks from the EXACT reads (spec §6.3) — re-hand the map on each
     // refresh so a tick that landed since the last one gets measured instead of staying a seam.
     this.ledger.setExact(useStore.getState().snapshotExact);
@@ -1455,13 +1544,19 @@ export class Engine {
     this.globe.setFleetVisible(!fleetFaded(leaving, entering, this._docFleetFaded), snap);
   }
 
+  /** Holds the feeds the current view draws; the chamber's register is part of the answer, so a
+   *  register flip re-holds too (the Blocks register adds the block trail). */
+  private _holdSceneFeeds() {
+    for (const r of this._sceneFeedHolds) r();
+    this._sceneFeedHolds = sceneFeeds(VIEW_POLICIES[this.mode], useStore.getState().ledgerRegister).map((f) => holdFeed(f, "3D scene"));
+  }
+
   setMode(mode: Mode) {
     const prevMode = this.mode; // capture BEFORE the reassignment — the choreography branches on it
     this.mode = mode;
     // THE SCENE'S READS FOR THE PULSE STRIP (src/data/feedUse.ts): the feeds this view draws, from
     // the same policy flags that switch the drawing on (`domain/sceneFeeds.ts`).
-    for (const r of this._sceneFeedHolds) r();
-    this._sceneFeedHolds = sceneFeeds(VIEW_POLICIES[mode]).map((f) => holdFeed(f, "3D scene"));
+    this._holdSceneFeeds();
     // A view switch lands the camera on the destination's own pose (the boundary re-derive),
     // so a pre-switch free orbit no longer holds it — see _onControlsStart.
     this._freeOrbit = false;
@@ -1513,6 +1608,10 @@ export class Engine {
     // whole OUT phase. The same table, the same executor, one tick earlier — and the ONE call
     // (the boundary's `_applyDestLayout` no longer repeats it). Camera reframes a HUD commit asks
     // for are held through the OUT phase anyway (the boundary re-derives the pose).
+    // The scene's node emphasis answers the destination too, BEFORE its ancestry lands: entering a
+    // view with the node rung restores it now, so the provider the entry re-commits never borrows
+    // its members' glow first; leaving for one without it holds the node until the boundary.
+    this._syncSceneNode();
     if (dest3D) this._commitViewEntryAncestry(mode);
     // The snapshot card is LEDGER-SCOPED too (spec 2026-08-01): the pin no longer carries out
     // of the view — leaving ledger clears it. `following` stays with the FollowController,
@@ -1637,6 +1736,10 @@ export class Engine {
     const inLedger = mode === "ledger";
     this.layers.setLedger(inLedger);
     this.globe.applyLedgerLayout(inLedger);
+    // The scene now draws THIS view, so the node emphasis is its ladder's alone (`_syncSceneNode`):
+    // leaving Geography for Snapshots, the carried node stands down here, with every chip gathered.
+    this._sceneView = is3D(mode) ? mode : null;
+    this._syncSceneNode();
     // The Snapshots view: keep the reused meshes visible (the render loop places them into the
     // planar rows + shows the centered live snapshot); just dim non-selected columns and frame it.
     if (mode === "ledger") {
@@ -1830,11 +1933,11 @@ export class Engine {
     //     aid: machines FILLING the chamber, not the actors in it. The snapshots are the subjects,
     //     so a node pick commits its cards and leaves the room where it is.
     //
-    // Kept as their own resolver keys rather than dropped from LADDERS.ledger — the rungs still
-    // drive deselect stepping and their rail slots — and they return TRUE so the walk stops here.
+    // The network rung keeps its own resolver key rather than leaving LADDERS.ledger — the rung
+    // still drives deselect stepping and its rail slot — and it returns TRUE so the walk stops here.
     // View entry runs through `_resolveFocus`, so falling through would reach this very pose under
     // another name, and a `false` would read as "no pose available" when there is exactly one.
-    ledgerNode: () => this._resolvers.ledgerOverview(),
+    // (The node rung left the ledger's ladder on 2026-11-08 with its card; it has no key.)
     ledgerNetwork: () => this._resolvers.ledgerOverview(),
     ledgerOverview: () => {
       this.cam.focus("ledger");
@@ -1951,6 +2054,19 @@ export class Engine {
   // pick that passes them to `Picking`, which owns the raycast, the hover channels and the click's
   // decision table. `_pickSuppressed` stays here because the render loop and the tap recogniser
   // read it too.
+  // THE SCENE'S NODE SELECTION (final review 4, I1; user 2026-11-10): a node carried into a view
+  // whose ladder has no node rung — Snapshots — is shown nowhere there, though its selection holds
+  // for the views that have it. So the globe gets the committed node only while the view the scene
+  // draws (`_sceneView`, adopted at the boundary) or the one it is entering has the rung
+  // (`focusLadder.sceneShowsNode`) — and with it go the chip's boost and swell, the trays'
+  // dim-back and the signer glow's yield (`Globe._frameCtx`'s `ancestryGlow`). Re-run on an
+  // `inspect` change, at the switch and at the boundary.
+  private _syncSceneNode(): void {
+    const entering = is3D(this.mode) ? this.mode : null;
+    const id = sceneShowsNode(this._sceneView, entering) ? this._pickNodeId(useStore.getState().inspect) : null;
+    this.globe.setSelectedNode(id);
+  }
+
   // The stable per-machine id of a node pick (a validator by its node id, a metagraph node by
   // its ip) — keys the persistent selection glow, matching the hover-pairing in _handleMove.
   private _pickNodeId(p: PickDescriptor | null): string | null {
@@ -2607,6 +2723,7 @@ export class Engine {
     if (useStore.getState().cameraFlying) useStore.getState().setCameraFlying(false);
     this.stats?.dom.remove();
     this.trends.dispose();
+    this.ledger.dispose(); // the chamber's pools (two block tiers, the marks) go with the engine
     this.devTune.dispose();
     this.unsub.forEach((u) => u());
     cancelAnimationFrame(this.raf);

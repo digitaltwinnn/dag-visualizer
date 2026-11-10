@@ -67,7 +67,7 @@ export default function ContextCard({
         ? [{ kind: "railNet", id: null }]
         : VIEW_POLICIES[st.mode].metagraphCard === "plane"
           ? [{ kind: "trendFocus", id: null }]
-          : tickNetClearActions({ metaSnap: st.metaSnap, hasInspect: !!st.inspect }),
+          : tickNetClearActions({ metaSnap: st.metaSnap }),
     );
   };
   // THE CARD'S EFFECTS WEAR THE NETWORK'S HUE ONLY WHILE IT IS THE FILTER (user, 2026-10-03: "a

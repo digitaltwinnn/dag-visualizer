@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  boxedSlotOf, displayOrder, hasFoldControl, isCollapsed, openBoxes, openDefaultOf, overridesOnNoteStandDown, overridesOnSelection, overridesOnViewEntry, railSelectionKey, subjectRunEnd,
+  boxedSlotOf, displayOrder, hasFoldControl, isCollapsed, openBoxes, openDefaultOf, overridesOnNoteFold, overridesOnNoteStandDown, overridesOnSelection, overridesOnViewEntry, railSelectionKey, subjectRunEnd,
   type LaneCollapseState, type SelectionKeyState,
 } from "@/components/railCollapse";
 import { detailsCards, focusSlotId, ladderSlotIds, type RailManifestState } from "@/components/railCards";
@@ -118,7 +118,17 @@ describe("a view switch (`overridesOnViewEntry`)", () => {
     const pinnedTick = rail(manifest({ mode: "ledger", snap: snapPick }), after, ["snap"]);
     expect(openBoxes(rail(manifest({ mode: "ledger", snap: snapPick }), apply(after, overridesOnSelection(pinnedTick)), ["snap"]))).toEqual(["snap"]);
   });
-  it("without a note (off mainnet, or none for the subject), a subject box the reader opened survives the switch, and nothing is pinned when the departing box was no subject", () => {
+  // User, 2026-11-09: "each sub-view should do the same" — a register is entered on its note like a
+  // view; its live subject lands a beat later, unpinned, and the auto rule folds it under the note.
+  it("a register is entered on its note: the note alone, then the live block lands folded beneath it", () => {
+    const block = { chain: "dag", hash: "h", ordinal: 42, anchorOrd: 42 };
+    const blocks = (over: Partial<RailManifestState>) => manifest({ mode: "ledger", ledgerRegister: "blocks", ...over });
+    const hyper = rail(manifest({}), {});
+    const after = apply(hyper.overrides, overridesOnViewEntry(rail(blocks({}), hyper.overrides)));
+    expect(openBoxes(rail(blocks({}), after))).toEqual(["notes"]);
+    expect(openBoxes(rail(blocks({ snap: snapPick, block }), after))).toEqual(["notes"]);
+  });
+  it("without a note (none for the subject), a subject box the reader opened survives the switch, and nothing is pinned when the departing box was no subject", () => {
     const m = manifest({ filter: "dor", inspect: nodePick, noteAbsent: true });
     const hyper = rail(m, {}, ["node", "network"]);
     const opened = openByHand(hyper, "context");
@@ -129,6 +139,25 @@ describe("a view switch (`overridesOnViewEntry`)", () => {
     const noteOpen = openByHand(withNote, "notes");
     const arrivingBare = (o: Overrides) => rail(manifest({ mode: "geo", filter: "dor", noteAbsent: true }), o, ["network"]);
     expect(openBoxes(arrivingBare(apply(noteOpen, overridesOnViewEntry(arrivingBare(noteOpen)))))).toEqual(["context"]);
+  });
+});
+
+// User, 2026-11-09: "when we close the AI card … the actual called out subject should be shown".
+describe("folding the note (`overridesOnNoteFold`)", () => {
+  const block = { chain: "dag", hash: "h", ordinal: 42, anchorOrd: 42 };
+  const blocks = manifest({ mode: "ledger", ledgerRegister: "blocks", snap: snapPick, block });
+  it("opens the card under it — the register's seat — and drops the entry's pins: one box, the subject's", () => {
+    const entered = apply({}, overridesOnViewEntry(rail(blocks, {})));
+    const r = rail(blocks, entered);
+    expect(openBoxes(r)).toEqual(["notes"]);
+    const folded = apply(entered, overridesOnNoteFold(r, "notes", "block"));
+    expect(openBoxes(rail(blocks, folded))).toEqual(["block"]);
+    expect(folded.notes).toBe(true);
+  });
+  it("with nothing under the note (or the note itself named) it only folds", () => {
+    const r = rail(manifest({ mode: "ledger" }), { notes: false });
+    expect(overridesOnNoteFold(r, "notes", null)).toEqual({ notes: true });
+    expect(overridesOnNoteFold(r, "notes", "notes")).toEqual({ notes: true });
   });
 });
 
@@ -176,9 +205,30 @@ describe("a new selection moment (`railSelectionKey` + `overridesOnSelection`)",
     const after = apply(opened, overridesOnSelection({ overrides: opened }));
     expect(openBoxes(stepped(after))).toEqual(["context"]);
   });
+  it("a data block's commit is a new selection moment, and so is its neighbour (user, 2026-11-08: the snapshot box stayed open)", () => {
+    const snap = { metaId: "dor", ordinal: 7, hash: "h", globalOrdinal: 42, ts: "t" };
+    const d1 = { snap, index: 0, digest: "d1", updates: 3, kinds: {}, signers: 1, bytes: 10 } as unknown as NonNullable<SelectionKeyState["dataBlock"]>;
+    const d2 = { ...d1, index: 1 };
+    expect(key({ dataBlock: d1 })).not.toBe(key({}));
+    expect(key({ dataBlock: d2 })).not.toBe(key({ dataBlock: d1 }));
+  });
+  // User, 2026-11-09: in Data blocks, live, the reader opened the Global snapshot card and the next
+  // tick's data block dropped it — the callout fell back to the register's seat.
+  it("while following in Data blocks, the live DATA BLOCK advancing is not a new moment; a pinned one's is", () => {
+    const d1 = { snap: { metaId: "dor", ordinal: 7, hash: "h", globalOrdinal: 42, ts: "t" }, index: 0 } as unknown as NonNullable<SelectionKeyState["dataBlock"]>;
+    const d2 = { snap: { metaId: "dor", ordinal: 8, hash: "h2", globalOrdinal: 43, ts: "t2" }, index: 0 } as unknown as NonNullable<SelectionKeyState["dataBlock"]>;
+    expect(key({ following: true, dataBlock: d1 })).toBe(key({ following: true, dataBlock: d2 }));
+    expect(key({ following: false, dataBlock: d1 })).not.toBe(key({ following: false, dataBlock: d2 }));
+  });
   it("while following, the live ordinals are not a new moment", () => {
     expect(key({ following: true, snap: snapPick })).toBe(key({ following: true, snap: { data: { ordinal: 43 } } }));
     expect(key({ following: false, snap: snapPick })).not.toBe(key({ following: false, snap: { data: { ordinal: 43 } } }));
+  });
+  it("while following in the Blocks register, the live BLOCK advancing is not a new moment either (D3); a pinned block's is", () => {
+    const a = { chain: "dag", hash: "a", ordinal: 1, anchorOrd: 1 };
+    const b = { ...a, hash: "b" };
+    expect(key({ following: true, block: a })).toBe(key({ following: true, block: b }));
+    expect(key({ following: false, block: a })).not.toBe(key({ following: false, block: b }));
   });
   it("clears every standing override", () => {
     expect(overridesOnSelection({ overrides: { notes: false, snap: true } })).toEqual({ notes: null, snap: null });
@@ -194,6 +244,19 @@ describe("subjectRunEnd — the run the next-rung step reads", () => {
     // A gap after the run still ends it.
     expect(subjectRunEnd(ladderSlotIds("geo"), present(["notes", "context", "node"]))).toBe("context");
   });
+  it("a slot the rail does not draw at all is no gap: the Snapshots register's block slot", () => {
+    const metaSnap = { metaId: "dor", ordinal: 7, hash: "h", globalOrdinal: 42, ts: "t" };
+    const m = manifest({ mode: "ledger", filter: "dor", snap: snapPick, metaSnap, inspect: nodePick, noteAbsent: true });
+    const cards = detailsCards(m);
+    const present = (id: string) => cards.find((c) => c.id === id)?.present ?? false;
+    const ghosted = (id: string) => cards.find((c) => c.id === id)?.hint != null;
+    for (const id of ["snap", "context", "metaSnap"]) expect(present(id), id).toBe(true);
+    expect(present("block") || ghosted("block")).toBe(false);
+    expect(subjectRunEnd(ladderSlotIds("ledger"), present, ghosted)).toBe("metaSnap");
+    // In the Blocks register the same empty slot is a ghost, so it is a gap there.
+    const b = detailsCards({ ...m, ledgerRegister: "blocks" });
+    expect(subjectRunEnd(ladderSlotIds("ledger"), (id) => b.find((c) => c.id === id)?.present ?? false, (id) => b.find((c) => c.id === id)?.hint != null)).toBe("metaSnap");
+  });
 });
 
 // GHOSTS SINK (user, 2026-10-31, option B of four): a ghost holding its ladder slot could sit above
@@ -203,18 +266,24 @@ describe("displayOrder", () => {
   const present = (ids: string[]) => (id: string) => ids.includes(id);
   const geo = ladderSlotIds("geo");
   it("draws the chosen cards first, in lane order, then the ghosts", () => {
-    expect(displayOrder(geo, present(["notes", "country"]), null)).toEqual(["notes", "country", "context", "cohort", "node"]);
+    expect(displayOrder(geo, present(["notes", "country"]), [])).toEqual(["notes", "country", "context", "cohort", "node"]);
   });
   it("the next step's ghost leads the ghosts", () => {
-    expect(displayOrder(geo, present(["notes", "country"]), "cohort")).toEqual(["notes", "country", "cohort", "context", "node"]);
+    expect(displayOrder(geo, present(["notes", "country"]), ["cohort"])).toEqual(["notes", "country", "cohort", "context", "node"]);
   });
   it("closes a gap in the stack", () => {
     const lane = ladderSlotIds("ledger");
-    expect(displayOrder(lane, present(["notes", "snap", "node"]), "context")).toEqual(["notes", "snap", "node", "context", "metaSnap"]);
+    expect(displayOrder(lane, present(["notes", "snap", "metaSnap"]), ["context"])).toEqual(["notes", "snap", "metaSnap", "context", "block", "dataBlock"]);
+  });
+  it("the next step never passes another step ghost: the Block ghost keeps its place under the snapshot", () => {
+    const lane = ladderSlotIds("ledger");
+    expect(displayOrder(lane, present(["notes", "snap", "context"]), ["metaSnap", "block"])).toEqual(["notes", "snap", "context", "metaSnap", "block", "dataBlock"]);
+    expect(displayOrder(lane, present(["notes", "snap"]), ["context", "block"])).toEqual(["notes", "snap", "context", "metaSnap", "block", "dataBlock"]);
+    expect(displayOrder(lane, present(["notes", "snap"]), ["dataBlock", "block"])).toEqual(["notes", "snap", "context", "metaSnap", "block", "dataBlock"]);
   });
   it("is the lane itself with nothing chosen, and with everything", () => {
-    expect(displayOrder(geo, present([]), null)).toEqual(geo);
-    expect(displayOrder(geo, present(geo), null)).toEqual(geo);
+    expect(displayOrder(geo, present([]), [])).toEqual(geo);
+    expect(displayOrder(geo, present(geo), [])).toEqual(geo);
   });
 });
 
@@ -238,5 +307,42 @@ describe("hasFoldControl — who wears the −", () => {
     expect(hasFoldControl("node", false)).toBe(false);
     expect(hasFoldControl("context", true)).toBe(true);
     expect(hasFoldControl("snap", true)).toBe(true);
+  });
+});
+
+// THE BLOCK CARD (the Blocks register, 2026-11-05): a block commit pins its tick and commits the
+// block, and the block's card is the box — under a folded Global snapshot entry, the note folded
+// above both. And the commit is a selection moment, so a hand-opened card above does not stay open
+// beside it.
+describe("a block commit opens its card", () => {
+  const block = { chain: "dag", hash: "abc", ordinal: 42, anchorOrd: 42 };
+  const blocks = (over: Partial<RailManifestState> = {}) => manifest({ mode: "ledger", ledgerRegister: "blocks", snap: snapPick, ...over });
+  it("the block slot is the box", () => {
+    const s = rail(blocks({ block }), {}, ["block", "snap"]);
+    expect(openBoxes(s)).toEqual(["block"]);
+    expect(boxedSlotOf(s)).toBe("block");
+    expect(isCollapsed(s, "snap")).toBe(true);
+    expect(isCollapsed(s, "notes")).toBe(true);
+  });
+  it("it stands under the Global snapshot card, ahead of every ghost", () => {
+    const s = rail(blocks({ block }), {}, ["block", "snap"]);
+    const order = displayOrder(s.lane, s.present, []);
+    expect(order.slice(0, 3)).toEqual(["notes", "snap", "block"]);
+  });
+  it("the commit is a new selection moment, and so is another block", () => {
+    const key = (b: typeof block | null): string =>
+      railSelectionKey({
+        mode: "ledger", filter: "all", railNet: null, country: null, cohort: null, composition: null, inspect: null,
+        trendCursorMs: null, trendRange: null, trendFocus: null, tickNet: null, following: false, snap: snapPick, metaSnap: null, block: b,
+      });
+    expect(key(block)).not.toBe(key(null));
+    expect(key({ ...block, hash: "def" })).not.toBe(key(block));
+  });
+  it("with the box opened by hand on the tick, the commit's moment drops the pin and the block opens", () => {
+    const before = rail(blocks(), {}, ["snap"]);
+    const opened = openByHand(before, "snap");
+    const after = rail(blocks({ block }), opened, ["block", "snap"]);
+    const dropped = apply(opened, overridesOnSelection(after));
+    expect(openBoxes(rail(blocks({ block }), dropped, ["block", "snap"]))).toEqual(["block"]);
   });
 });

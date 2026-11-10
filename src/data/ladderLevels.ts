@@ -18,6 +18,8 @@ import { providerKey } from "./providerKey";
 import type { CountryStat, GlobalSnapshot, MetaInfo, NodeRow } from "./types";
 import { UNLISTED_HUE, UNLISTED_ID, UNLISTED_LABEL } from "./unlisted";
 import { identityHudCss } from "@/src/palette/identity";
+import { carriesData } from "@/src/engine/domain/dataMark";
+import type { RegisterSubjects } from "./ledgerMeasure";
 
 // ── Geography ───────────────────────────────────────────────────────────────────────────────
 
@@ -223,4 +225,66 @@ export function tickNetworksLevel(
     .map(snapOf)
     .sort(newestFirst);
   return unl.length ? [...listed, { id: UNLISTED_ID, name: UNLISTED_LABEL, hue: UNLISTED_HUE, unlisted: true, snaps: unl }] : listed;
+}
+
+/** THE DATA BLOCKS REGISTER'S TICK NETWORKS (user, 2026-11-07: a snapshot that anchored but carried no
+ *  data block is not shown): the level above, kept to the snapshots whose exact row says they carried
+ *  data blocks (`domain/dataMark.carriesData`, the rule's one home), a network with none dropped. The
+ *  exact read is the ONLY source of that fact, so before it lands nothing is known to carry data and
+ *  the level is empty — unknown, never a guess (rule 10). */
+export function dataCarryingNetworks(
+  nets: readonly TickNetwork[],
+  exactRows: readonly { metaId: string; ordinal: number; dataBlocks?: number; dataTxCount?: number }[] | null | undefined,
+): TickNetwork[] {
+  if (!exactRows) return [];
+  const out: TickNetwork[] = [];
+  for (const n of nets) {
+    const snaps = n.snaps.filter((s) => carriesData(exactRows.find((r) => r.metaId === s.metaId && r.ordinal === s.ordinal)));
+    if (snaps.length) out.push({ ...n, snaps });
+  }
+  return out;
+}
+
+/** THE TRANSACTION BLOCKS REGISTER'S TICK NETWORKS (2026-11-08): the level kept to the snapshots the
+ *  block window says carried a block (`blockWindow.tickBlockSnaps`), a network with none dropped —
+ *  the register's tiles, so a Global snapshot holding only DAG blocks opens no metagraph. The window
+ *  is the only source of that fact: before it lands (`null`) nothing is known, and the level is empty. */
+export function blockCarryingNetworks(nets: readonly TickNetwork[], blockSnaps: readonly { metaId: string; ordinal: number }[] | null): TickNetwork[] {
+  if (!blockSnaps) return [];
+  const out: TickNetwork[] = [];
+  for (const n of nets) {
+    const snaps = n.snaps.filter((s) => blockSnaps.some((b) => b.metaId === s.metaId && b.ordinal === s.ordinal));
+    if (snaps.length) out.push({ ...n, snaps });
+  }
+  return out;
+}
+
+/** IS THIS METAGRAPH SNAPSHOT A SUBJECT OF THE REGISTER (2026-11-08)? Every anchored one in Metagraph
+ *  snapshots; a block-carrying one in Transaction blocks (the window's word); a data-carrying one in
+ *  Data blocks (the exact read's). UNKNOWN KEEPS: with no read or window to judge by, `undefined` — a
+ *  register switch releases only a snapshot KNOWN not to be its subject (`registerSwitchActions`),
+ *  never one whose read has not landed. */
+export function snapshotIsSubject(
+  subjects: RegisterSubjects,
+  sel: { metaId: string; ordinal: number },
+  exactRow: { dataBlocks?: number; dataTxCount?: number } | null | undefined,
+  blockSnaps: readonly { metaId: string; ordinal: number }[] | null,
+): boolean | undefined {
+  if (subjects === "all") return true;
+  if (subjects === "data") return exactRow === undefined || exactRow === null ? undefined : carriesData(exactRow);
+  return blockSnaps ? blockSnaps.some((b) => b.metaId === sel.metaId && b.ordinal === sel.ordinal) : undefined;
+}
+
+/** ONE TICK LEVEL PER REGISTER (`REGISTER_SUBJECTS`): every anchored snapshot, the block-carrying
+ *  ones, or the data-carrying ones — the explorer's level and the rail's steps and pagers all ask
+ *  this, so they list what the chamber draws. */
+export function registerNetworks(
+  subjects: RegisterSubjects,
+  nets: readonly TickNetwork[],
+  exactRows: readonly { metaId: string; ordinal: number; dataBlocks?: number; dataTxCount?: number }[] | null | undefined,
+  blockSnaps: readonly { metaId: string; ordinal: number }[] | null,
+): TickNetwork[] {
+  if (subjects === "data") return dataCarryingNetworks(nets, exactRows);
+  if (subjects === "blocks") return blockCarryingNetworks(nets, blockSnaps);
+  return [...nets];
 }

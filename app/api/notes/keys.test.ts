@@ -7,19 +7,20 @@ const DAY = 86_400_000;
 
 describe("keys", () => {
   it("writes a note key in its own family", () => {
-    expect(NOTES_VERSION).toBe(71);
-    expect(noteKeyOf("mainnet", "trend", "dag", "7d")).toBe("ai:mainnet:v71:trend:dag:7d");
-    expect(noteKeyOf("mainnet", "hyper", "all", "day")).toBe("ai:mainnet:v71:hyper:all:day");
+    expect(NOTES_VERSION).toBe(82);
+    expect(noteKeyOf("trend", "dag", "7d")).toBe("ai:mainnet:v82:trend:dag:7d");
+    expect(noteKeyOf("hyper", "all", "day")).toBe("ai:mainnet:v82:hyper:all:day");
+    expect(noteKeyOf("blocks", "all", "hours")).toBe("ai:mainnet:v82:blocks:all:hours");
   });
 
   it("keeps lock, stats, rate and cap keys inside the ai: family and apart from note keys", () => {
-    const note = noteKeyOf("mainnet", "geo", "all", "day");
+    const note = noteKeyOf("geo", "all", "day");
     expect(lockKeyOf(note)).toBe(`${note}:lock`);
     expect(failKeyOf(note)).toBe(`${note}:fail`);
-    expect(statsKeyOf("mainnet", "2026-10-27")).toBe("ai:mainnet:stats:2026-10-27");
-    expect(rateKeyOf("mainnet", "0123456789abcdef", "2026-10-27T12")).toBe("ai:mainnet:rate:0123456789abcdef:2026-10-27T12");
-    expect(capKeyOf("mainnet", "2026-10-27")).toBe("ai:mainnet:cap:2026-10-27");
-    for (const k of [lockKeyOf(note), failKeyOf(note), statsKeyOf("mainnet", "d"), rateKeyOf("mainnet", "h", "x"), capKeyOf("mainnet", "d")]) {
+    expect(statsKeyOf("2026-10-27")).toBe("ai:mainnet:stats:2026-10-27");
+    expect(rateKeyOf("0123456789abcdef", "2026-10-27T12")).toBe("ai:mainnet:rate:0123456789abcdef:2026-10-27T12");
+    expect(capKeyOf("2026-10-27")).toBe("ai:mainnet:cap:2026-10-27");
+    for (const k of [lockKeyOf(note), failKeyOf(note), statsKeyOf("d"), rateKeyOf("h", "x"), capKeyOf("d")]) {
       expect(k.startsWith("ai:")).toBe(true);
       expect(k.startsWith("t:") || k.startsWith("geo:")).toBe(false);
     }
@@ -90,6 +91,8 @@ describe("keys", () => {
       expect(KIND_TIMING.hyper).toEqual({ refreshMs: 86_400_000, ttlS: 259_200 });
       expect(KIND_TIMING.geo).toEqual({ refreshMs: 86_400_000, ttlS: 259_200 });
       expect(KIND_TIMING.ledger).toEqual({ refreshMs: 3_600_000, ttlS: 21_600 });
+      // The block DAG's note keeps the ledger's clock: the live chamber's other register.
+      expect(KIND_TIMING.blocks).toEqual(KIND_TIMING.ledger);
       expect(KIND_TIMING.trend24h).toEqual({ refreshMs: 3_600_000, ttlS: 21_600 });
       expect(KIND_TIMING.trendDaily).toEqual({ refreshMs: 86_400_000, ttlS: 259_200 });
       expect(KIND_TIMING.trend1h).toEqual({ refreshMs: null, ttlS: 900 });
@@ -105,6 +108,7 @@ describe("keys", () => {
       expect(timingOf("hyper", "day")).toBe(KIND_TIMING.hyper);
       expect(timingOf("geo", "day")).toBe(KIND_TIMING.geo);
       expect(timingOf("ledger", "hours")).toBe(KIND_TIMING.ledger);
+      expect(timingOf("blocks", "hours")).toBe(KIND_TIMING.blocks);
     });
 
     it("a subject note is never warmed and lives a day; the warmed country kind is not one", () => {
@@ -133,7 +137,7 @@ describe("keys", () => {
 });
 
 describe("the notes the Briefing reads", () => {
-  it("are every view's widest note and History's resting window", () => {
+  it("are the three views' widest notes and History's resting window", () => {
     expect(isBriefingNote("hyper", "all", "day")).toBe(true);
     expect(isBriefingNote("geo", "all", "day")).toBe(true);
     expect(isBriefingNote("ledger", "all", "hours")).toBe(true);
@@ -141,6 +145,7 @@ describe("the notes the Briefing reads", () => {
   });
 
   it("are no other note, so no other write pays for a line", () => {
+    expect(isBriefingNote("blocks", "all", "hours")).toBe(false);
     expect(isBriefingNote("hyper", "dor", "day")).toBe(false);
     expect(isBriefingNote("trend", "dag", "7d")).toBe(false);
     expect(isBriefingNote("trend", "dor", "30d")).toBe(false);

@@ -222,6 +222,8 @@ export default function Explorer({ id, title, hint, placeholder, levels: selecte
           value: levelMeasure?.value ?? "",
           onPick: levelMeasure?.onPick ?? (() => {}),
           inactive: new Set(rootOptions.filter((o) => !levelMeasure?.options.some((l) => l.id === o.id)).map((o) => o.id)),
+          // The root's own row plan holds on every level, as its options do.
+          rows: rootMeasure && "options" in rootMeasure ? rootMeasure.rows : undefined,
         }
       : null;
   return (
@@ -259,8 +261,16 @@ export default function Explorer({ id, title, hint, placeholder, levels: selecte
           {/* TIGHTER since 2026-10-25 (design pass, proposal C): no hairline between the control and
               the path — the segmented control's own frame already bounds it — and a 6px rhythm
               (was 8). 15px shorter, the same three pieces. */}
-          <div className={cn("-mt-1.5 mb-2 pt-1.5 pb-1.5 bg-[var(--panel-plate)] border-b border-border flex flex-col gap-1.5", SHELL_BLEED_X, SHELL_INSET_X)}>
-            {measure && measure.options.length > 1 && <MeasureTiles measure={measure} />}
+          {/* THE PATH LEFT THE BAND (user, 2026-11-08: "the section sits now attached to the controls
+              but I think it should be below the divider and attached to the row section"): the band
+              holds what the reader SETS — the measure tiles alone — and the path, which names the
+              list below it, stands on the glass directly above that list, with the rows. */}
+          {measure && measure.options.length > 1 && (
+            <div className={cn("-mt-1.5 mb-2 pt-1.5 pb-1.5 bg-[var(--panel-plate)] border-b border-border flex flex-col gap-1.5", SHELL_BLEED_X, SHELL_INSET_X)}>
+              <MeasureTiles measure={measure} />
+            </div>
+          )}
+          <div className="mb-1.5">
             <ExplorerPath
               bare
               crumbs={crumbs}

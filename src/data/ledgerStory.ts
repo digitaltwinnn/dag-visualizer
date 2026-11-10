@@ -78,3 +78,17 @@ export function tickInStory(
  *  with no read the tick stays open: unknown is not none. */
 export const tickLocked = (filter: string, exact: SnapshotExact | undefined): boolean =>
   !!exact?.perMeta && storyCount(filter, null, exact) === 0;
+
+/** A FILTER HOLDS THE CHAMBER, AND THE BLOCK ROWS WITH IT (the Blocks register): a block whose
+ *  accepting global the filter's network is not in answers nothing — no commit, no hover — in the
+ *  explorer and in RAW, exactly as that tick's own row (`tickLocked`) and the chamber's pick
+ *  (`Picking.tickHeldOut`) do. The committed block and a block on the tick on screen always
+ *  answer: they are the way back. */
+export function blockRowLocked(
+  filter: string,
+  exact: SnapshotExact | undefined,
+  b: { anchorOrd: number },
+  at: { on: boolean; shownOrd: number | null },
+): boolean {
+  return !at.on && b.anchorOrd !== at.shownOrd && tickLocked(filter, exact);
+}

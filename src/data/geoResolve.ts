@@ -3,7 +3,6 @@
 // in localStorage so the globe fills in over time.
 
 import { reportPoll } from "./api";
-import { netUrl } from "@/src/net/current";
 import type { GeoMap } from "@/src/data/types";
 
 const LS_KEY = "dag-geo-cache-v2"; // v2: +isp/asn (old entries lack the provider fields)
@@ -12,7 +11,7 @@ export async function loadGeoCache(): Promise<GeoMap> {
   const map: GeoMap = {};
   // baked validator geo seed, served on-disk by the Next /api/geo route
   try {
-    const res = await fetch(netUrl("/api/geo"));
+    const res = await fetch("/api/geo");
     reportPoll("api-geo", res.ok);
     if (res.ok) Object.assign(map, await res.json());
   } catch (e) {

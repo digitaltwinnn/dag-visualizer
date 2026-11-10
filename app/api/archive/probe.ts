@@ -1,5 +1,5 @@
 import { unstable_cache } from "next/cache";
-import { CATALOG, NETWORKS, type NetworkId } from "@/src/engine/config";
+import { HOSTS, METAGRAPHS } from "@/src/engine/config";
 
 // WHO KEEPS THE CHAIN'S HISTORY — the one home for the archive census (user, 2026-08-14: "can
 // we know how many nodes have the full history?", then "mention time and/or snapshots, and
@@ -193,12 +193,12 @@ async function latestCurrency(be: string, metaId: string): Promise<number | null
   }
 }
 
-async function probeArchive(net: NetworkId): Promise<ArchiveInfo> {
-  const BE = NETWORKS[net].be;
-  const DIRECTORY = `${NETWORKS[net].directory}/metagraphs?limit=100`;
-  const LISTED = new Set(CATALOG[net].map((m) => m.id));
+async function probeArchive(): Promise<ArchiveInfo> {
+  const BE = HOSTS.be;
+  const DIRECTORY = `${HOSTS.directory}/metagraphs?limit=100`;
+  const LISTED = new Set(METAGRAPHS.map((m) => m.id));
   const gLatest = await latestGlobal(BE);
-  const globalNodes = await readyNodes(`${NETWORKS[net].l0}/cluster/info`);
+  const globalNodes = await readyNodes(`${HOSTS.l0}/cluster/info`);
 
   // Each catalog metagraph's own l0 cluster, from the same directory /api/metagraphs reads.
   const dirMetas: { id: string; l0: string }[] = [];
@@ -266,6 +266,6 @@ async function probeArchive(net: NetworkId): Promise<ArchiveInfo> {
 }
 
 // Archival membership changes on operator timescales, not tick timescales — 6h is generous.
-export const getArchiveInfo = (net: NetworkId): Promise<ArchiveInfo> =>
+export const getArchiveInfo = (): Promise<ArchiveInfo> =>
   // v3: global entries carry `port` (2026-10-18) — the key moves with the field set.
-  unstable_cache(() => probeArchive(net), ["archive-probe-v3", net], { revalidate: 21600 })();
+  unstable_cache(() => probeArchive(), ["archive-probe-v3"], { revalidate: 21600 })();
