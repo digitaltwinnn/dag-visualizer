@@ -154,6 +154,12 @@ const LANE_FILL_BOOST = 3;
  *  that is where the dotted tie starts. Raise one without the other and the tie is drawn straight
  *  through the text it is supposed to lead away from. */
 const ORD_H = 1.02;
+/** The FRONT'S AGE over a pinned past window (Transaction blocks): standing at the head of the
+ *  ordinal column, larger and firmer than a row's ordinal — it is the one statement about the whole
+ *  chamber ("17h ago"), and at the ordinals' own size it read as a smudge at the resting pose
+ *  (user, 2026-11-10: "fix the age label"). */
+const FRONT_AGE_H = ORD_H * 1.6;
+const FRONT_AGE_OP = 0.85;
 /** The label's text anchor — just outside the widest bar's screen-left end, reading inward. */
 const ORD_Z = LANE_HALF_Z + 0.35;
 /** Where the text visually ends (≈ the digits' extent) — the dotted anchor line starts here. */
@@ -1390,14 +1396,15 @@ export class LedgerView implements SceneView {
     // stretch growing at the front"): the globals after the newest block tick up to the live one,
     // ahead of the lead row's bar (none while the live global is itself the newest block tick).
     // Over a PINNED PAST window (user, 2026-11-10) nothing claims "now": no run, and in its place
-    // one quiet label, the window's age, words alone (no dash) on the run's own place and fade.
+    // one label, the window's age, words alone (no dash) on the run's own place and fade, STANDING at
+    // the head of the ordinal column (`FRONT_AGE_H`), facing the camera.
     const lead = this._slotSnap[0];
     const front = frontMark(lead ?? null, this._liveGlobal, this._pastNow);
     this._frontWords = front ? `${front.kind}|${front.label}` : "";
     if (lead && front?.kind === "run") {
       stretches.push({ key: `${lead.ordinal}-live`, x0: FRONT_RUN_X0, x1: FRONT_INK_X, y, label: front.label, front: true });
     } else if (lead && front?.kind === "age") {
-      stretches.push({ key: `${lead.ordinal}-age`, x0: FRONT_RUN_X0, x1: FRONT_INK_X, y, label: front.label, front: true, dash: false });
+      stretches.push({ key: `${lead.ordinal}-age`, x0: FRONT_RUN_X0, x1: FRONT_INK_X, y, label: front.label, front: true, dash: false, column: { z: ORD_Z, h: FRONT_AGE_H, op: FRONT_AGE_OP } });
     }
     this._stretch.rebuild(stretches);
   }

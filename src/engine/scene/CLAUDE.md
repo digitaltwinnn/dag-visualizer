@@ -712,9 +712,13 @@ off. It sits in the strip `LiveEdge.ts` measured as crowded (the floor's name, t
 its words read faintly at the resting pose. **Over a PINNED PAST window the front claims no NOW**
 (user, 2026-11-10): no front run and no live line (`LedgerView.setPastFront`, which the Engine hands
 the clock while the held window's own `around` is set; the line's phase reads it beside `_frozen`),
-and in their place ONE quiet label at the run's own place — the window's AGE, its newest tick's age
-in the app's one short span ("18h ago", `relativeAge`), words alone with no dash (`dash: false`), the
-stretch's own recipe, opacity and `frontRunAt` ride. `blockBraid.frontMark` is the one decision —
+and in their place ONE label at the run's own place — the window's AGE, its newest tick's age
+in the app's one short span ("18h ago", `relativeAge`), words alone with no dash (`dash: false`) on
+the stretch's `frontRunAt` ride. It STANDS UP at the head of the ordinal column, facing the camera,
+larger and firmer than a row's ordinal (`FRONT_AGE_H`/`FRONT_AGE_OP`, `StretchItem.column`; user,
+2026-11-10: "fix the age label") — lying flat in the front strip at the stretch's size it was a few
+foreshortened pixels beside the rim and the floor's name. It is the chamber's one upright word,
+because it is the one statement about the whole chamber rather than about a row. `blockBraid.frontMark` is the one decision —
 run, age or nothing — and its test the spec; the label is re-laid at event time only when its words
 change. The other two registers already claim nothing over a past window (`setFrozen`: the live
 edge is off, and they draw no front run), so they carry no age label.

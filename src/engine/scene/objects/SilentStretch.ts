@@ -17,7 +17,12 @@
 // since the newest block tick up to the live global — rebuilt on each live tick, so its words grow
 // with the silence. It rides the lead row (`frontRunAt`), never the front boundary it stands past.
 // Over a PINNED PAST window (user, 2026-11-10) the front claims no now: the same place carries the
-// window's AGE ("3h ago") as words alone, an item with `dash: false`, on the same fade.
+// window's AGE ("3h ago") as words alone, an item with `dash: false`, on the same fade. Those words
+// STAND UP at the front of the floor's ORDINAL COLUMN, at its size and ink (`column`), facing the
+// camera: lying flat beside the dash they were unreadable at the resting pose (user, 2026-11-10: "fix
+// the age label" — the camera grazes the floor, so flat text there is foreshortened to a few pixels,
+// and the strip already holds the rim and the floor's own name). The one upright word in the
+// chamber, because it is the one statement about the chamber as a whole rather than a row.
 
 import * as THREE from "three";
 import { frontAt, frontRunAt, horizonAt } from "../../domain/ledgerModel";
@@ -39,6 +44,10 @@ export interface StretchItem {
   /** `false`: words alone, no dash — the FRONT over a pinned past window, its age (`frontMark`),
    *  which states no silence up to now and so draws no run. */
   dash?: boolean;
+  /** Where the words stand when they are not the stretch's own — UPRIGHT at the floor's ordinal
+   *  column (its z, text height and resting opacity), for the front's age. Absent: flat beside the
+   *  dash, quiet. */
+  column?: { z: number; h: number; op: number };
 }
 
 /** The dash's and the words' resting opacity (dark-ground values; `inkPresence` asks the paper). */
@@ -48,6 +57,11 @@ const LABEL_OP = 0.5;
 const LABEL_H = 0.5;
 /** Where the words start across the floor — just right of the dash, reading away from it. */
 const LABEL_Z = -0.35;
+/** An upright label's turn: the text runs along −Z as the flat labels' does, its up is +Y and it
+ *  faces +X — the camera's side of the chamber. */
+const UPRIGHT = new THREE.Quaternion().setFromRotationMatrix(
+  new THREE.Matrix4().makeBasis(new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 1, 0), new THREE.Vector3(1, 0, 0)),
+);
 
 export class SilentStretch {
   /** Rides the trail rewind (`setOffset` writes its x). */
@@ -63,7 +77,7 @@ export class SilentStretch {
   private readonly _mat: THREE.LineDashedMaterial;
   private readonly _lines: THREE.LineSegments;
   private _items: StretchItem[] = [];
-  private _labels = new Map<string, { mesh: THREE.Mesh; xMid: number; front: boolean; x1: number }>();
+  private _labels = new Map<string, { mesh: THREE.Mesh; xMid: number; front: boolean; x1: number; op: number }>();
   private _colors: SceneColors;
   private _paper: boolean;
   private _off = 0;
@@ -130,10 +144,15 @@ export class SilentStretch {
       const xMid = (s.x0 + s.x1) / 2;
       let l = this._labels.get(key);
       if (!l) {
-        const mesh = makeEdgeLabel(this._colors, s.label, 0, s.y, LABEL_Z, LABEL_H, "left", "readout");
+        const mesh = makeEdgeLabel(this._colors, s.label, 0, s.y, s.column?.z ?? LABEL_Z, s.column?.h ?? LABEL_H, "left", "readout");
         (mesh.material as THREE.MeshBasicMaterial).opacity = 0;
+        if (s.column) {
+          // Standing on the floor: its foot on the glass, its face to the camera.
+          mesh.quaternion.copy(UPRIGHT);
+          mesh.position.y = s.y + s.column.h / 2;
+        }
         this.group.add(mesh);
-        l = { mesh, xMid, front: false, x1: s.x1 };
+        l = { mesh, xMid, front: false, x1: s.x1, op: s.column?.op ?? LABEL_OP };
         this._labels.set(key, l);
       }
       l.xMid = xMid;
@@ -168,7 +187,6 @@ export class SilentStretch {
   /** Per frame: each stretch and its words ride the trail's two boundaries. No allocation. */
   update(alpha: number): void {
     const dashOp = inkPresence(DASH_OP, this._paper);
-    const labelOp = inkPresence(LABEL_OP, this._paper);
     const col = this._col.array as Float32Array;
     for (let i = 0; i < this._items.length; i++) {
       const s = this._items[i];
@@ -189,7 +207,7 @@ export class SilentStretch {
     for (const l of this._labels.values()) {
       const x = l.xMid + this._off;
       const a = l.front ? frontRunAt(l.x1, this._off) : frontAt(x) * horizonAt(x);
-      (l.mesh.material as THREE.MeshBasicMaterial).opacity = labelOp * a * alpha;
+      (l.mesh.material as THREE.MeshBasicMaterial).opacity = inkPresence(l.op, this._paper) * a * alpha;
     }
   }
 
