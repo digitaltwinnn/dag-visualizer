@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CATALOG } from "@/src/engine/config";
+import { METAGRAPHS } from "@/src/engine/config";
 
 // The blocks route: one numeric ordinal, immutable, a day — and nothing else (the `latest` frontier
 // read left with the open tips, design round D5). The platform cache is a pass-through here and
@@ -8,7 +8,7 @@ vi.mock("next/cache", () => ({ unstable_cache: (fn: () => unknown) => fn }));
 
 const { GET } = await import("./route");
 
-const ADDRESS = CATALOG.mainnet[0]!.id;
+const ADDRESS = METAGRAPHS[0]!.id;
 const L0 = "http://l0.example:7000";
 const VALUE = {
   ordinal: 2973,

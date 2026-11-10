@@ -78,7 +78,7 @@ export function overridesOnSelection(s: Pick<LaneCollapseState, "overrides">): R
  *  (2026-09-04), whose point was the collapse-and-reopen cycle on every switch; the note arriving
  *  open folds a subject card once and leaves it, so that cycle does not return.
  *
- *  WITHOUT A NOTE (a view with none, off mainnet, a subject the server answered `none` for) the
+ *  WITHOUT A NOTE (a view with none, a subject the server answered `none` for) the
  *  earlier rule holds: the departing open/closed state is pinned on the present SUBJECT cards, so
  *  the arrival's re-derive can shuffle the focus under an unchanged pile — except when the departing
  *  box was no subject card — read off the overrides, an open pin on a non-subject slot — where

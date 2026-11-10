@@ -14,14 +14,10 @@ describe("isQuiet", () => {
 });
 
 describe("quietSetFor", () => {
-  it("keeps a network's set until the hour is up, then rebuilds it empty", () => {
-    const a = quietSetFor("t-net", now);
+  it("keeps the set until the hour is up, then rebuilds it empty", () => {
+    const a = quietSetFor(now);
     a.add("X");
-    expect(quietSetFor("t-net", now + QUIET_REBUILD_MS - 1).has("X")).toBe(true);
-    expect(quietSetFor("t-net", now + QUIET_REBUILD_MS).has("X")).toBe(false);
-  });
-  it("is per network", () => {
-    quietSetFor("n1", now).add("Y");
-    expect(quietSetFor("n2", now).has("Y")).toBe(false);
+    expect(quietSetFor(now + QUIET_REBUILD_MS - 1).has("X")).toBe(true);
+    expect(quietSetFor(now + QUIET_REBUILD_MS).has("X")).toBe(false);
   });
 });

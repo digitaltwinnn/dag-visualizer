@@ -19,7 +19,7 @@ import {
 import { followLatest } from "@/src/data/follow";
 import { getBlockWindow, setBlockWindow } from "@/src/data/pastWindow";
 import { blockWanted, foldBlockWindow, liveControlCard } from "@/src/data/blockWindow";
-import { METAGRAPHS } from "@/src/net/current";
+import { METAGRAPHS } from "@/src/engine/config";
 import type { GlobalSnapshot, MetaSnapSel, PickDescriptor, RawMetaSnapshot, SnapshotExact } from "@/src/data/types";
 
 // The FOLLOW FLOW as a tested decision table (2026-08-08 — the retrospective's ask: the

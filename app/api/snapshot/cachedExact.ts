@@ -1,5 +1,5 @@
 import { unstable_cache } from "next/cache";
-import { NETWORKS, type NetworkId } from "@/src/engine/config";
+import { HOSTS } from "@/src/engine/config";
 import { lineageIds } from "@/src/net/lineage";
 import type { SnapshotExact, ChannelSnapRow } from "@/src/data/types";
 import { decodeBlocks, recordBlockHashes } from "./decodeBlocks";
@@ -15,11 +15,11 @@ import { fetchGlobalJson } from "./fetchGlobal";
 // Addresses we track (the public catalog, config.METAGRAPHS — the canonical list the
 // Hypergraph hubs are built from) — used to split listed vs unlisted.
 
-async function fetchExact(net: NetworkId, ordinal: number): Promise<SnapshotExact> {
-  const LISTED = new Set(lineageIds(net));
+async function fetchExact(ordinal: number): Promise<SnapshotExact> {
+  const LISTED = new Set(lineageIds());
   // fetchGlobalJson throws on failure (LB and archival fallback both) so unstable_cache never
   // caches a miss — a momentarily unavailable tick is retried on the next request.
-  const j = (await fetchGlobalJson(net, ordinal)) as { value?: Record<string, unknown>; proofs?: unknown } & Record<string, unknown>;
+  const j = (await fetchGlobalJson(ordinal)) as { value?: Record<string, unknown>; proofs?: unknown } & Record<string, unknown>;
   const v = (j.value ?? j) as {
     stateChannelSnapshots?: Record<string, StateChannelSnap[]>;
     rewards?: unknown;
@@ -104,8 +104,8 @@ async function fetchExact(net: NetworkId, ordinal: number): Promise<SnapshotExac
 // hashes). Read apart from the exact fetch and cached only on success: a tick the indexer has not
 // reached yet must not pin empty hashes for a day inside the exact answer — it throws here, and the
 // answer goes out with `hash: ""` (rule 10) until a later read finds the record.
-async function fetchBlockHashes(net: NetworkId, ordinal: number): Promise<string[]> {
-  const r = await fetch(`${NETWORKS[net].be}/global-snapshots/${ordinal}`, {
+async function fetchBlockHashes(ordinal: number): Promise<string[]> {
+  const r = await fetch(`${HOSTS.be}/global-snapshots/${ordinal}`, {
     headers: { Accept: "application/json" },
     cache: "no-store",
     signal: AbortSignal.timeout(6000),
@@ -114,12 +114,12 @@ async function fetchBlockHashes(net: NetworkId, ordinal: number): Promise<string
   return recordBlockHashes(((await r.json()) as { data?: { blocks?: unknown } }).data);
 }
 
-export const cachedBlockHashes = (net: NetworkId, ordinal: number) =>
-  unstable_cache(() => fetchBlockHashes(net, ordinal), ["snapshot-block-hashes-v1", net, String(ordinal)], {
+export const cachedBlockHashes = (ordinal: number) =>
+  unstable_cache(() => fetchBlockHashes(ordinal), ["snapshot-block-hashes-v1", String(ordinal)], {
     revalidate: 86400,
   })();
 
-export const cachedExact = (net: NetworkId, ordinal: number) =>
+export const cachedExact = (ordinal: number) =>
   // The cache key is versioned WITH the payload shape (v11: an unreadable data block is `unread` and
   // its snapshot's data updates unknown, review M3 2026-11-09; v10: one summary per data block; v9:
   // the state's shape and the dL1 signers; v8: an undecodable row's data updates unknown rather than
@@ -127,7 +127,7 @@ export const cachedExact = (net: NetworkId, ordinal: number) =>
   // D6 2026-11-07; v6: no tips, 2026-11-07; v5: each block's
   // transfers; v4: blocks + tips; v3: rows carry dataBytes, 2026-08-13; v2: signerCount) — entries
   // cached under an old key would otherwise carry a shape the client no longer reads for a day.
-  unstable_cache(() => fetchExact(net, ordinal), ["snapshot-exact-v11", net, String(ordinal)], {
+  unstable_cache(() => fetchExact(ordinal), ["snapshot-exact-v11", String(ordinal)], {
     revalidate: 86400, // ordinals are immutable; a day is plenty (success is cached, misses throw)
   })();
 

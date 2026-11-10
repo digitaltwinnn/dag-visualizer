@@ -14,8 +14,8 @@ import type { ZoomId } from "@/src/data/trendWindow";
 import { entryFocus, focusOnReturn, planeOfChain, scrollToKeep } from "@/src/engine/domain/trendStack";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 // The catalog and the unlisted id, for the one fold the return path needs (`planeOfChain`): both
-// are static data — `src/net/current` reads config, `unlistedId` is the import-free leaf.
-import { METAGRAPHS } from "@/src/net/current";
+// are static data — the catalog is config's, `unlistedId` is the import-free leaf.
+import { METAGRAPHS } from "@/src/engine/config";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
 
 // The active view. `hyper`/`geo`/`ledger`/`trend` all drive the 3D scene (every switch among

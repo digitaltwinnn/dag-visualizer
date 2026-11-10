@@ -9,14 +9,11 @@ import { useStore } from "@/src/store/store";
 import { DOC_PATHS } from "@/components/views";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import ThemeRows from "@/components/topbar/ThemeToggle";
-import NetworkRows, { NET_ROWS } from "@/components/topbar/NetworkSwitch";
-import { useNet } from "@/components/topbar/useNet";
 import { cn } from "@/lib/utils";
 
 // THE SETTINGS MENU (user, 2026-09-08: "the right section gets busy with many icons — keep
-// the HUD/scene toggle and RAW, move the rest underneath a settings button"). The shared pair
-// — theme, network — folds into ONE popover of labeled sections, each section the rows its
-// standalone popover used to carry (ThemeRows / NetworkRows are those files, popovers shed).
+// the HUD/scene toggle and RAW, move the rest underneath a settings button"). App-wide settings
+// fold into ONE popover of labeled sections (ThemeRows is the theme section's rows).
 // The bar's right zone then reads exactly as the 2026-09-04 divider regrouping wanted: the
 // view-scoped island (SCENE⇄HUD + RAW + ABOUT), then one control for everything app-wide.
 //
@@ -25,11 +22,7 @@ import { cn } from "@/lib/utils";
 // consolidation, one rank below the view switch; the footer's About · Design row is their one
 // door now, and `InfoMenu.tsx` retired with the section.
 //
-// ONE STATE SURFACES ON THE TRIGGER, because folding a control away must not fold its state:
-// "which chain am I looking at" must never go missing (the old network face's own rule) — on
-// any network but mainnet the gear carries the network CODE in the live accent; absence means
-// the default chain, presence shouts the dev one. (The doc-open tint went with the pages.)
-// …and ON THE PHONE THE MENU CARRIES ABOUT AND THE LINKS (user, 2026-10-08, design A1). The
+// ON THE PHONE THE MENU CARRIES ABOUT AND THE LINKS (user, 2026-10-08, design A1). The
 // phone bar's middle became the view's name, which took the ⓘ's room, and the footer row above the
 // dock stood down — so "About" (this view's strip, this site's page) and the footer's two external
 // links have their phone home here, in their own sections above Theme. Desktop keeps the ⓘ in the
@@ -38,14 +31,12 @@ export default function SettingsMenu({ onAboutView }: { onAboutView?: () => void
   const [open, setOpen] = useState(false);
   const setDocPage = useStore((s) => s.setDocPage);
   const dag = metagraphById("dag");
-  const net = useNet();
-  const code = NET_ROWS.find((r) => r.id === net)!.code;
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label={`Settings — theme, network (current: ${code})`}
+          aria-label="Settings"
           className={cn(
             // px + chevron trimmed on phone: the gear is the one addition the phone bar
             // absorbed from the consolidation, and the filter face is the first thing a
@@ -55,9 +46,6 @@ export default function SettingsMenu({ onAboutView }: { onAboutView?: () => void
           )}
         >
           <Settings aria-hidden className="size-4" />
-          {net !== "mainnet" && (
-            <span className="text-label tracking-caps uppercase text-[var(--primary)]">{code}</span>
-          )}
           <ChevronDown aria-hidden className="size-3.5 opacity-70 max-[700px]:hidden" />
         </button>
       </PopoverTrigger>
@@ -85,9 +73,6 @@ export default function SettingsMenu({ onAboutView }: { onAboutView?: () => void
         </div>
         <SectionLabel>Theme</SectionLabel>
         <ThemeRows onDone={() => setOpen(false)} />
-        <SectionRule />
-        <SectionLabel>Network</SectionLabel>
-        <NetworkRows />
         <div className="min-[700px]:hidden">
           <SectionRule />
           <SectionLabel>Links</SectionLabel>
@@ -115,9 +100,9 @@ function SectionRule() {
   return <div aria-hidden className="mx-2.5 mt-1.5 h-px bg-border/60" />;
 }
 
-/** A menu row on the theme/network rows' own footprint, as a button or a link. */
+/** A menu row on the theme rows' own footprint, as a button or a link. */
 function MenuRow({ children, href, external, onClick }: { children: React.ReactNode; href?: string; external?: boolean; onClick?: (e: React.MouseEvent) => void }) {
-  // The theme rows' own recipe (ThemeToggle), so the four sections read as one list.
+  // The theme rows' own recipe (ThemeToggle), so the sections read as one list.
   const cls = "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-label bg-transparent border-0 cursor-pointer text-muted-foreground hover:text-foreground hover:bg-wash-soft focus-visible:outline-2 focus-visible:outline-[var(--primary)] [&>svg]:opacity-80";
   return href ? (
     <a href={href} className={cls} onClick={onClick} {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}>

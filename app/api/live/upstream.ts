@@ -9,8 +9,8 @@ type Entry = { at: number; ttlMs: number; value: unknown };
 const done = new Map<string, Entry>();
 const inflight = new Map<string, Promise<unknown>>();
 
-/** Past this many entries, a write first drops every expired one. The keys are bounded (per network,
- *  per chain, per quantized limit), so this is a backstop, not the working set. */
+/** Past this many entries, a write first drops every expired one. The keys are bounded (per chain,
+ *  per quantized limit), so this is a backstop, not the working set. */
 export const MEMO_SWEEP_AT = 256;
 
 /** How many answers the memo holds (expired ones included until a read or a sweep drops them). */

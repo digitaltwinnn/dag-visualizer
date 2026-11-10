@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { useStore } from "@/src/store/store";
-import { netUrl } from "@/src/net/current";
 import { POLL } from "@/src/engine/config";
 import { reportPoll } from "@/src/data/api";
 import { getBlockWindow, onBlockWindow, pastRetryDelay, setBlockWindow } from "@/src/data/pastWindow";
@@ -80,7 +79,7 @@ export default function BlockWindowBridge() {
   const read = (around: number | null, ch: string | null, g: number, attempt: number) => {
     if (g !== gen.current) return;
     if (around == null) lastLiveRead.current = Date.now();
-    fetch(netUrl(trailPath(around, ch)))
+    fetch(trailPath(around, ch))
       .then((r) => (r.ok ? (r.json() as Promise<BlockWindowAnswer>) : null))
       .then((a) => {
         if (g !== gen.current) return;

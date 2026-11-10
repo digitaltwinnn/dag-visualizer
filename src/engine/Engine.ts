@@ -24,8 +24,7 @@ import { UNLISTED_KEY } from "./domain/ledgerBands";
 import { StageLight } from "./scene/objects/StageLight";
 import { SceneRig } from "./scene/objects/SceneRig";
 import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
-import { METAGRAPHS, NET, netUrl } from "@/src/net/current";
-import { COLORS, POLL } from "@/src/engine/config";
+import { COLORS, POLL, METAGRAPHS } from "@/src/engine/config";
 import { BYTE_SCALE_KB, type RailGroup } from "./domain/ledgerLayout";
 import { HYPER_TILT, HYPER_TILT_FOCUS } from "./domain/hyperLayout";
 import { readSceneColors, type SceneColors, LIGHT_LOOK } from "./sceneColors";
@@ -590,12 +589,11 @@ export class Engine {
         Math.abs(((a >> 16) & 255) - ((b >> 16) & 255)) <= 2 &&
         Math.abs(((a >> 8) & 255) - ((b >> 8) & 255)) <= 2 &&
         Math.abs((a & 255) - (b & 255)) <= 2;
-      // The mirror mirrors :root — under a dev network the [data-net] override re-points
-      // --primary ON PURPOSE, so only mainnet checks core. dagCore/bg are never overridden.
-      // And config.COLORS stays the DARK mirror (spec §4) — its consumers (SSR, the bake scripts)
-      // have no DOM and no theme — so the whole comparison is gated on dark above: mainnet-dark is
-      // the one state `:root` fully describes, and on paper every row would "drift" by design.
-      const drift = ([...(NET === "mainnet" ? [["core", COLORS.core, colors.core] as const] : []),
+      // The mirror mirrors :root. config.COLORS stays the DARK mirror (spec §4) — its consumers
+      // (SSR, the bake scripts) have no DOM and no theme — so the whole comparison is gated on dark
+      // above: dark is the one state `:root` fully describes, and on paper every row would "drift"
+      // by design.
+      const drift = ([["core", COLORS.core, colors.core] as const,
         ["dagCore", COLORS.dagCore, colors.dagCore] as const,
         ["bg", COLORS.bg, colors.bg] as const])
         .filter(([, a, b]) => !near(a, b)).map(([k]) => k);
@@ -1328,7 +1326,7 @@ export class Engine {
 
   private async refreshMeta(initial: boolean) {
     try {
-      const r = await fetch(netUrl("/api/metagraphs"));
+      const r = await fetch("/api/metagraphs");
       if (!r.ok) { reportPoll("api-metagraphs", false); return; }
       const { metagraphs, geo, ageMs } = await r.json();
       // A REACHED ROUTE IS NOT A FRESH FEED. Reporting `r.ok` counted a 200 as a success even when
@@ -1436,7 +1434,7 @@ export class Engine {
       const unbaked = data.filter((m) => !metagraphById(m.id));
       if (data.length && unbaked.length) {
         this._warnedUnbaked = true;
-        console.warn(`[catalog] the live directory lists ${unbaked.length} metagraph(s) missing from config CATALOG — bake them: ${unbaked.map((m) => `${m.name} ${m.id}`).join(", ")}`);
+        console.warn(`[catalog] the live directory lists ${unbaked.length} metagraph(s) missing from config METAGRAPHS — bake them: ${unbaked.map((m) => `${m.name} ${m.id}`).join(", ")}`);
       }
     }
     const metas = data.map((m) => {

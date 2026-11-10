@@ -1,4 +1,4 @@
-import { NETWORKS, type NetworkId } from "@/src/engine/config";
+import { HOSTS } from "@/src/engine/config";
 
 // The SERVED ORDINAL WINDOW — the bound that turns the snapshot routes from a walkable surface
 // into an instrument.
@@ -49,10 +49,10 @@ const REF_TTL_MS = 60_000;
 // burst of refusals shares a single read — which loses nothing, because the case the force exists
 // for is a reference stale by MINUTES, not by five seconds.
 const REF_FLOOR_MS = 5_000;
-const refCache = new Map<NetworkId, { value: number; at: number }>();
+let refCache: { value: number; at: number } | null = null;
 
-async function readLatest(net: NetworkId): Promise<number> {
-  const r = await fetch(`${NETWORKS[net].l0}/global-snapshots/latest/ordinal`, {
+async function readLatest(): Promise<number> {
+  const r = await fetch(`${HOSTS.l0}/global-snapshots/latest/ordinal`, {
     headers: { Accept: "application/json" },
     cache: "no-store",
     signal: AbortSignal.timeout(4000),
@@ -64,12 +64,12 @@ async function readLatest(net: NetworkId): Promise<number> {
 }
 
 /** The reference, refreshed past its TTL. Throwing keeps a blip from being stored (caller fails open). */
-async function latestOrdinal(net: NetworkId, force = false): Promise<number> {
-  const hit = refCache.get(net);
+async function latestOrdinal(force = false): Promise<number> {
+  const hit = refCache;
   const age = hit ? Date.now() - hit.at : Infinity;
   if (hit && age < (force ? REF_FLOOR_MS : REF_TTL_MS)) return hit.value;
-  const value = await readLatest(net);
-  refCache.set(net, { value, at: Date.now() });
+  const value = await readLatest();
+  refCache = { value, at: Date.now() };
   return value;
 }
 
@@ -81,11 +81,11 @@ async function latestOrdinal(net: NetworkId, force = false): Promise<number> {
  *  normal traffic is inside the window and never reaches it, and a genuine walk over nonsense
  *  ordinals pays one tiny read per request, not the ~400 KB snapshot pull the gate exists to
  *  prevent. It also makes the gate self-healing whatever the cache underneath it does. */
-export async function withinServedWindow(net: NetworkId, ordinal: number): Promise<boolean> {
+export async function withinServedWindow(ordinal: number): Promise<boolean> {
   let latest: number | null = null;
   try {
-    latest = await latestOrdinal(net);
-    if (!inServedWindow(ordinal, latest)) latest = await latestOrdinal(net, true);
+    latest = await latestOrdinal();
+    if (!inServedWindow(ordinal, latest)) latest = await latestOrdinal(true);
   } catch {
     // FAIL OPEN, and that means DISCARDING what we had. Leaving the first read's value here would
     // refuse the ordinal on the very reference the forced re-read was called to distrust — a

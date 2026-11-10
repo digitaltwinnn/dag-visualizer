@@ -1,11 +1,12 @@
 import type { NoteView } from "@/src/data/noteTypes";
 import { pickRangeTier } from "@/src/data/trendWindow";
+import { STORE_NS } from "@/app/api/trends/keys";
 
 // THE KEY GRAMMAR OF AI NOTES — one home. Notes live in their OWN key family, `ai:*`, never under
 // `t:` (a trends rebuild wipes that prefix) or `geo:` (a location gauge cannot be re-derived): a
 // note is a cache entry, losable and rewritable, and the families must not share a fate.
 //
-// A note's key is `ai:{net}:v{NOTES_VERSION}:{view}:{subject}:{span}`. Changing a prompt or a facts
+// A note's key is `ai:mainnet:v{NOTES_VERSION}:{view}:{subject}:{span}`. Changing a prompt or a facts
 // shape bumps NOTES_VERSION, which orphans every stored note at once (their TTLs reap them).
 //
 // Everything is UTC and the caller supplies the date strings; nothing here reads a clock.
@@ -17,8 +18,8 @@ export const NOTES_VERSION = 80; // 80: the Transaction blocks note's subject is
  *  `snapSpan`, so two brushes of the same buckets share one key. */
 export type NoteSpan = "day" | "hours" | "1h" | "24h" | "7d" | "30d" | "90d" | "1y" | "all" | `r${number}-${number}`;
 
-export function noteKeyOf(net: string, view: NoteView, subject: string, span: NoteSpan): string {
-  return `ai:${net}:v${NOTES_VERSION}:${view}:${subject}:${span}`;
+export function noteKeyOf(view: NoteView, subject: string, span: NoteSpan): string {
+  return `ai:${STORE_NS}:v${NOTES_VERSION}:${view}:${subject}:${span}`;
 }
 
 /** THE FOUR NOTES THE BRIEFING READS (`components/notes/briefingNote.ts`), which also carry its one
@@ -43,20 +44,20 @@ export function failKeyOf(noteKey: string): string {
 }
 
 /** The day's counters (a hash: generated, rejected, capped, ...), by UTC day `YYYY-MM-DD`. */
-export function statsKeyOf(net: string, dayIso: string): string {
-  return `ai:${net}:stats:${dayIso}`;
+export function statsKeyOf(dayIso: string): string {
+  return `ai:${STORE_NS}:stats:${dayIso}`;
 }
 
 /** One visitor's count of limited notes (a brushed range, a subject note) for one UTC hour (`YYYY-MM-DDTHH`); `ipHash` is the first
  *  16 hex characters of HMAC-SHA256(CRON_SECRET, ip), or sha256(ip) with no secret. The raw IP
  *  is never a key. */
-export function rateKeyOf(net: string, ipHash: string, hourIso: string): string {
-  return `ai:${net}:rate:${ipHash}:${hourIso}`;
+export function rateKeyOf(ipHash: string, hourIso: string): string {
+  return `ai:${STORE_NS}:rate:${ipHash}:${hourIso}`;
 }
 
 /** The global tripwire for the limited notes (a brushed range, a subject note) for one UTC day. */
-export function capKeyOf(net: string, dayIso: string): string {
-  return `ai:${net}:cap:${dayIso}`;
+export function capKeyOf(dayIso: string): string {
+  return `ai:${STORE_NS}:cap:${dayIso}`;
 }
 
 export type NoteKind = "hyper" | "geo" | "ledger" | "blocks" | "data" | "trend24h" | "trendDaily" | "trend1h" | "range" | "subject";

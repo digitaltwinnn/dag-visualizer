@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
-import { NETWORKS, type NetworkId } from "@/src/engine/config";
+import { HOSTS } from "@/src/engine/config";
 import { isTracked } from "@/src/net/lineage";
-import { netOf } from "@/src/net/request";
 import { unlistedChains } from "../../../../unlistedChains";
 import { decodeBlocks, pairHashes, recordBlockHashes } from "../../../../../snapshot/decodeBlocks";
 import { cachedL0Url, getJson } from "../../../../metaL0";
@@ -17,41 +16,40 @@ import { cachedL0Url, getJson } from "../../../../metaL0";
 // block hashes (6 s) — so a slow chain answers the route's own 503, never a platform 504 (review M7).
 export const maxDuration = 25;
 
-async function fetchBlocks(net: NetworkId, address: string, ordinal: number) {
-  const l0 = await cachedL0Url(net, address);
+async function fetchBlocks(address: string, ordinal: number) {
+  const l0 = await cachedL0Url(address);
   const snap = (await getJson(`${l0}/snapshots/${ordinal}`, 8000)) as { value?: unknown };
   if (snap.value == null) throw new Error("no value"); // an empty body is a failed read, not "no blocks"
   return { ordinal, ...decodeBlocks(snap.value) };
 }
 
-const cachedBlocks = (net: NetworkId, address: string, ordinal: number) =>
-  unstable_cache(() => fetchBlocks(net, address, ordinal), ["metagraph-snap-blocks-v3", net, address, String(ordinal)], {
+const cachedBlocks = (address: string, ordinal: number) =>
+  unstable_cache(() => fetchBlocks(address, ordinal), ["metagraph-snap-blocks-v3", address, String(ordinal)], {
     revalidate: 86400,
   })();
 
 // The hashes are read apart and cached only on success, so a record the indexer has not reached
 // yet cannot pin empty hashes for a day inside the decoded answer; it throws, and the answer goes
 // out with `hash: ""` (rule 10) until a later read finds the record.
-async function fetchHashes(net: NetworkId, address: string, ordinal: number): Promise<string[]> {
-  return recordBlockHashes(((await getJson(`${NETWORKS[net].be}/currency/${address}/snapshots/${ordinal}`, 6000)) as { data?: { blocks?: unknown } }).data);
+async function fetchHashes(address: string, ordinal: number): Promise<string[]> {
+  return recordBlockHashes(((await getJson(`${HOSTS.be}/currency/${address}/snapshots/${ordinal}`, 6000)) as { data?: { blocks?: unknown } }).data);
 }
 
-const cachedHashes = (net: NetworkId, address: string, ordinal: number) =>
-  unstable_cache(() => fetchHashes(net, address, ordinal), ["metagraph-snap-block-hashes-v1", net, address, String(ordinal)], {
+const cachedHashes = (address: string, ordinal: number) =>
+  unstable_cache(() => fetchHashes(address, ordinal), ["metagraph-snap-block-hashes-v1", address, String(ordinal)], {
     revalidate: 86400,
   })();
 
-export async function GET(req: Request, ctx: { params: Promise<{ address: string; ordinal: string }> }) {
+export async function GET(_req: Request, ctx: { params: Promise<{ address: string; ordinal: string }> }) {
   const { address, ordinal: ordStr } = await ctx.params;
-  const net = netOf(req);
   const ordinal = Number(ordStr);
   if (ordStr === "" || !Number.isInteger(ordinal) || ordinal < 0) return NextResponse.json({ error: "bad ordinal" }, { status: 400 });
-  if (!isTracked(net, address) && !(await unlistedChains(net).catch(() => [] as string[])).includes(address)) {
+  if (!isTracked(address) && !(await unlistedChains().catch(() => [] as string[])).includes(address)) {
     return NextResponse.json({ error: "unknown network" }, { status: 404 });
   }
   try {
-    const read = await cachedBlocks(net, address, ordinal);
-    const hashes = read.blocks.length ? await cachedHashes(net, address, ordinal).catch(() => [] as string[]) : [];
+    const read = await cachedBlocks(address, ordinal);
+    const hashes = read.blocks.length ? await cachedHashes(address, ordinal).catch(() => [] as string[]) : [];
     const { blocks, complete } = pairHashes(read.blocks, hashes);
     return NextResponse.json({ ...read, blocks }, {
       // Unnamed blocks (`hash: ""`) get a short edge life so they are asked again soon, not kept a day.

@@ -2,11 +2,9 @@
 
 import { useRef } from "react";
 import { metagraphCardNetwork } from "@/components/railCards";
-import { useNet } from "@/components/topbar/useNet";
 import { useTickHasFilter } from "@/components/useTickHasFilter";
 import { UNLISTED_ID } from "@/src/data/unlisted";
 import type { NoteResponse } from "@/src/data/noteTypes";
-import { NET } from "@/src/net/current";
 import { viewNetwork } from "@/src/engine/domain/viewNetwork";
 import { useStore } from "@/src/store/store";
 import { noteSubjectOf, type NoteSubject } from "./noteSubject";
@@ -24,20 +22,6 @@ import useNote, { type NoteState } from "./useNote";
  *  counting everything. The note is scoped as its lead is, so the two never read in two frames. */
 export function useNoteScopeNetwork(): string {
   return useStore(viewNetwork);
-}
-
-/** THE MAINNET GATE, one home for the top card and every subject card's note. Notes are written
- *  for mainnet only (the routes answer `none` everywhere else), so off mainnet nothing is asked and
- *  no card stands — never a card that reads, then vanishes.
- *  ⚠️ HYDRATION (I2): the server always renders mainnet, so a card's PRESENCE reads the network
- *  through `useNet()` — mainnet until mounted, on the client too — and server and client agree on
- *  the first render (a mismatch makes React 19 regenerate the tree and strip <html data-net>). The
- *  caller gates its `req` on that (`net === "mainnet"`). The FETCH, here, reads the real network,
- *  so a dev network's one mainnet-faced frame asks nothing: its card reads for that frame, under
- *  the boot overlay, then stands down. */
-export function useMainnetNote(req: NoteReq | null): NoteState {
-  const net = useNet();
-  return useNote(NET === net ? req : null);
 }
 
 /** Whether the reader watched this answer arrive: true once the note has been seen waiting, so a
@@ -72,8 +56,6 @@ export function useAiNote(): { subject: NoteSubject | null; req: NoteReq | null;
   // History's note is over the WINDOW pill on screen, brushed or not: a brushed range's note is
   // the Range card's own (`SubjectNote`), so a brush never takes this card over.
   const span = subject?.view === "trend" ? trendWindow : null;
-  // Presence through `useNet()`, the fetch through the gate (`useMainnetNote`, the hydration rule).
-  const net = useNet();
-  const req: NoteReq | null = subject && net === "mainnet" ? { view: subject.view, subject: subject.subject, span } : null;
-  return { subject, req, note: useMainnetNote(req) };
+  const req: NoteReq | null = subject ? { view: subject.view, subject: subject.subject, span } : null;
+  return { subject, req, note: useNote(req) };
 }

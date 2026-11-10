@@ -99,8 +99,6 @@ export default function TopBar() {
     if (!viewControls) setStrip((cur) => (cur === "about" ? null : cur));
   }, [viewControls]);
 
-  // (The NetworkSwitch's one-shot view handoff is consumed by RouteSync's seed — `consumeNetSwitch`.)
-
   const face = filterFace(filter);
 
   // Publish the strip's rendered height as `--topbar-extra` (globals.css) so the RAILS slide
@@ -307,8 +305,7 @@ export default function TopBar() {
           // A 3-zone grid at EVERY width (left cluster | view switch | right cluster) so the
           // switch is TRULY centred in the bar. Flex spacers only centre it when the side
           // clusters are equal-width — they never are (the phone measured the symptom first:
-          // ECG + filter ≈ 100px vs a 44px toggle pushed the switch ~28px right of centre) —
-          // and the NetworkSwitch made the right zone heavier still. THE SIDES ARE
+          // ECG + filter ≈ 100px vs a 44px toggle pushed the switch ~28px right of centre). THE SIDES ARE
           // `minmax(0,1fr)`, NOT `1fr` (user, 2026-09-28: "the view control must always be
           // centered by design"): a bare `1fr` is minmax(auto,1fr), which lets a heavier side
           // grow past its share and shove the switch off centre — the phone showed it the day
@@ -611,15 +608,12 @@ export default function TopBar() {
         </div>
         <span className={cn("w-px self-stretch bg-border my-1 max-[860px]:hidden", !viewControls && "hidden")} />
 
-        {/* SETTINGS — the shared trio (theme · pages · network) folded under ONE control
-            (user, 2026-09-08: "the right section gets busy with many icons; keep the
-            HUD/scene toggle and RAW, move the rest underneath a settings button"). The
-            2026-09-04 divider regrouping already said the scope split in hairlines; this says
-            it in weight — the view-scoped island, then one app-wide button at the bar's edge.
-            The network face's "never goes missing" rule survives on the trigger: the gear
-            carries the network CODE in the live accent off mainnet. One mount at EVERY width —
-            a single icon fits the phone bar, which the trio never did (the old strip-row
-            homes retired with this). */}
+        {/* SETTINGS — the app-wide settings folded under ONE control (user, 2026-09-08: "the
+            right section gets busy with many icons; keep the HUD/scene toggle and RAW, move the
+            rest underneath a settings button"). The 2026-09-04 divider regrouping already said
+            the scope split in hairlines; this says it in weight — the view-scoped island, then
+            one app-wide button at the bar's edge. One mount at EVERY width — a single icon fits
+            the phone bar. */}
         <SettingsMenu onAboutView={viewControls ? () => setStrip("about") : undefined} />
         </div>
       </div>

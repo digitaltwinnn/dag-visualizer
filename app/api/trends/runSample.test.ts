@@ -45,7 +45,6 @@ const iso = (h: number, m: number, sec = 0) => new Date(Date.UTC(2026, 8, 6, h, 
 
 function deps(store: TrendsStore, over: Partial<SampleDeps> = {}): SampleDeps {
   return {
-    net: "mainnet",
     metaIds: ["abc"],
     store,
     pageGlobals: async () => ({ data: [

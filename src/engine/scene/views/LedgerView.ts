@@ -38,7 +38,7 @@
 // the lane field at negative Z.
 
 import * as THREE from "three";
-import { METAGRAPHS } from "@/src/net/current";
+import { METAGRAPHS } from "@/src/engine/config";
 import {
   LEDGER,
   FLOOR_CX,

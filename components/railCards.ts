@@ -523,10 +523,8 @@ export type NoteVia = "read" | "request";
  *  request route after "Write notes for this hour / range") keeps the card, which says so on its
  *  surface and offers the door again (R68): a click must never be answered by the card vanishing.
  *  A first fetch still in flight is PRESENT, reading (user, 2026-10-27: the card "is missing and
- *  then suddenly appears — it should use the reading animation"; this retires ruling R36). The
- *  flash R36 guarded against was off mainnet, where every subject answers `none`: there
- *  `useAiNote` asks nothing, so there is no request and no card. On mainnet `none` is rare (a
- *  subject with nothing measured), and "writing…" stays the server's own `pending`. */
+ *  then suddenly appears — it should use the reading animation"; this retires ruling R36). `none`
+ *  is rare (a subject with nothing measured), and "writing…" stays the server's own `pending`. */
 export function noteCardAbsent(hasRequest: boolean, res: NoteResponse | null, via: NoteVia = "read"): boolean {
   return !hasRequest || res?.state === "none" || (res?.state === "unavailable" && via === "read");
 }

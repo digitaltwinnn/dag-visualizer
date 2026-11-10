@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
-import { NETWORKS } from "@/src/engine/config";
+import { HOSTS } from "@/src/engine/config";
 import { currentIdOf, isTracked, lineageIds } from "@/src/net/lineage";
-import { netOf } from "@/src/net/request";
 import type { GlobalSnapshot, RawMetaSnapshot } from "@/src/data/types";
 import { BLOCK_WINDOW_TICKS } from "@/src/data/blockWindow";
 import { BeyondReach, absentIsEmpty, assembleTrail, trailCacheControl, type TrailRow } from "../trail";
 
-// GET /api/blocks/trail?net=&around=<ordinal|live>&n=52&chain=<id> — the Blocks register's window:
+// GET /api/blocks/trail?around=<ordinal|live>&n=52&chain=<id> — the Blocks register's window:
 // the newest `n` global snapshots at or below `around` that hold a block (`../trail.ts`). `chain`
 // (the top bar's network filter: `dag`, or a listed network's id — a former address maps to its
 // network's current one; absent = every network) makes it THAT network's newest `n` block ticks,
@@ -52,7 +51,6 @@ const cachedRecord = <T,>(url: string): Promise<T> =>
   unstable_cache(() => getRecord<T>(url), ["trail-record-v1", url], { revalidate: 86_400 })();
 
 export async function GET(req: Request) {
-  const net = netOf(req);
   const q = new URL(req.url).searchParams;
   const aroundQ = q.get("around") ?? "live";
   const around = aroundQ === "live" ? null : Number(aroundQ);
@@ -60,9 +58,9 @@ export async function GET(req: Request) {
   const n = BLOCK_WINDOW_TICKS;
   if (q.get("n") != null && Number(q.get("n")) !== n) return NextResponse.json({ error: "n" }, { status: 400 });
   const chainQ = q.get("chain");
-  if (chainQ != null && chainQ !== "dag" && !isTracked(net, chainQ)) return NextResponse.json({ error: "chain" }, { status: 400 });
-  const chain = chainQ == null || chainQ === "dag" ? chainQ : currentIdOf(net, chainQ);
-  const be = NETWORKS[net].be;
+  if (chainQ != null && chainQ !== "dag" && !isTracked(chainQ)) return NextResponse.json({ error: "chain" }, { status: 400 });
+  const chain = chainQ == null || chainQ === "dag" ? chainQ : currentIdOf(chainQ);
+  const be = HOSTS.be;
   try {
     // THE PIN'S OWN RECORD first (review I1): its age is what settles the window, and a pin past the
     // tip has none — the read fails, and the request answers 503, never cached.
@@ -76,9 +74,9 @@ export async function GET(req: Request) {
         },
         global: (o) => cachedRecord<GlobalSnapshot>(`${be}/global-snapshots/${o}`),
         metaSnap: (c, o) => cachedRecord<RawMetaSnapshot>(`${be}/currency/${c}/snapshots/${o}`),
-        chains: async () => lineageIds(net),
+        chains: async () => lineageIds(),
         // A former chain address folds under its network's current id here, so the client keys one family.
-        currentId: (id) => currentIdOf(net, id),
+        currentId: (id) => currentIdOf(id),
       },
       around,
       n,

@@ -128,7 +128,7 @@ describe("a view switch (`overridesOnViewEntry`)", () => {
     expect(openBoxes(rail(blocks({}), after))).toEqual(["notes"]);
     expect(openBoxes(rail(blocks({ snap: snapPick, block }), after))).toEqual(["notes"]);
   });
-  it("without a note (off mainnet, or none for the subject), a subject box the reader opened survives the switch, and nothing is pinned when the departing box was no subject", () => {
+  it("without a note (none for the subject), a subject box the reader opened survives the switch, and nothing is pinned when the departing box was no subject", () => {
     const m = manifest({ filter: "dor", inspect: nodePick, noteAbsent: true });
     const hyper = rail(m, {}, ["node", "network"]);
     const opened = openByHand(hyper, "context");

@@ -8,19 +8,19 @@ const DAY = 86_400_000;
 describe("keys", () => {
   it("writes a note key in its own family", () => {
     expect(NOTES_VERSION).toBe(80);
-    expect(noteKeyOf("mainnet", "trend", "dag", "7d")).toBe("ai:mainnet:v80:trend:dag:7d");
-    expect(noteKeyOf("mainnet", "hyper", "all", "day")).toBe("ai:mainnet:v80:hyper:all:day");
-    expect(noteKeyOf("mainnet", "blocks", "all", "hours")).toBe("ai:mainnet:v80:blocks:all:hours");
+    expect(noteKeyOf("trend", "dag", "7d")).toBe("ai:mainnet:v80:trend:dag:7d");
+    expect(noteKeyOf("hyper", "all", "day")).toBe("ai:mainnet:v80:hyper:all:day");
+    expect(noteKeyOf("blocks", "all", "hours")).toBe("ai:mainnet:v80:blocks:all:hours");
   });
 
   it("keeps lock, stats, rate and cap keys inside the ai: family and apart from note keys", () => {
-    const note = noteKeyOf("mainnet", "geo", "all", "day");
+    const note = noteKeyOf("geo", "all", "day");
     expect(lockKeyOf(note)).toBe(`${note}:lock`);
     expect(failKeyOf(note)).toBe(`${note}:fail`);
-    expect(statsKeyOf("mainnet", "2026-10-27")).toBe("ai:mainnet:stats:2026-10-27");
-    expect(rateKeyOf("mainnet", "0123456789abcdef", "2026-10-27T12")).toBe("ai:mainnet:rate:0123456789abcdef:2026-10-27T12");
-    expect(capKeyOf("mainnet", "2026-10-27")).toBe("ai:mainnet:cap:2026-10-27");
-    for (const k of [lockKeyOf(note), failKeyOf(note), statsKeyOf("mainnet", "d"), rateKeyOf("mainnet", "h", "x"), capKeyOf("mainnet", "d")]) {
+    expect(statsKeyOf("2026-10-27")).toBe("ai:mainnet:stats:2026-10-27");
+    expect(rateKeyOf("0123456789abcdef", "2026-10-27T12")).toBe("ai:mainnet:rate:0123456789abcdef:2026-10-27T12");
+    expect(capKeyOf("2026-10-27")).toBe("ai:mainnet:cap:2026-10-27");
+    for (const k of [lockKeyOf(note), failKeyOf(note), statsKeyOf("d"), rateKeyOf("h", "x"), capKeyOf("d")]) {
       expect(k.startsWith("ai:")).toBe(true);
       expect(k.startsWith("t:") || k.startsWith("geo:")).toBe(false);
     }

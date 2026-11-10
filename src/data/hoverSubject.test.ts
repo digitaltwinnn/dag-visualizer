@@ -71,7 +71,7 @@ describe("tooltipSubject — a metagraph snapshot tile", () => {
   });
 
   it("hovers a listed network's tile in that network's identity hue", async () => {
-    const { METAGRAPHS } = await import("@/src/net/current");
+    const { METAGRAPHS } = await import("@/src/engine/config");
     const listed = METAGRAPHS.find((m) => m.id !== "dag")!;
     const s = tooltipSubject({ kind: "metaSnap", sel: { metaId: listed.id, ordinal: 7 } } as never);
     expect(s?.color).toMatch(/^oklch\(var\(--ident-l\)/);

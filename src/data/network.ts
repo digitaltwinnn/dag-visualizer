@@ -2,8 +2,7 @@ import { useStore } from "@/src/store/store";
 import { getPastWindow } from "@/src/data/pastWindow";
 import type { Anchor, ChannelSnapRow, GlobalSnapshot, MetaInfo, NodeRow } from "@/src/data/types";
 import { NetworkData, shortHash } from "@/src/data/api";
-import { METAGRAPHS } from "@/src/net/current";
-import { COLORS as RAW_COLORS, DEFAULT_META_COLOR as RAW_DEFAULT_META } from "@/src/engine/config";
+import { COLORS as RAW_COLORS, DEFAULT_META_COLOR as RAW_DEFAULT_META, METAGRAPHS } from "@/src/engine/config";
 import { identityHudCss, identityHudNumber } from "@/src/palette/identity";
 import { UNLISTED_ID, UNLISTED_HUE } from "@/src/data/unlistedId";  // the LEAF, not unlisted.ts: importing the
 // network module here would close an import cycle (see src/data/unlistedId.ts).

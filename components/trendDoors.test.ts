@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { openRecords } from "@/components/trendDoors";
 import { useStore } from "@/src/store/store";
 import { UNLISTED_ID } from "@/src/data/unlisted";
-import { METAGRAPHS } from "@/src/net/current";
+import { METAGRAPHS } from "@/src/engine/config";
 import { snapRange } from "@/src/data/trendWindow";
 
 // THE DOOR CARRIES THE CARD'S OWN WORDS FOR ITS SPAN (user, 2026-10-07). A daily Moment is a UTC

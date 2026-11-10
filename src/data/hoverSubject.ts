@@ -1,5 +1,5 @@
 import type { PickDescriptor } from "./types";
-import { METAGRAPHS } from "@/src/net/current";
+import { METAGRAPHS } from "@/src/engine/config";
 import { identityHudCss } from "@/src/palette/identity";
 import { UNLISTED_HUE } from "@/src/data/unlistedId";
 import { shortBlockHash } from "@/src/util/format";
@@ -12,7 +12,7 @@ import { shortBlockHash } from "@/src/util/format";
 // module stays Node-test-safe (no DOM read).
 const DAG = identityHudCss("dag");
 // A country belongs to no network: its hover keeps the structural accent its border preview
-// is drawn in. `var(--primary)` tracks the network's [data-net] accent override by itself.
+// is drawn in.
 const CORE = "var(--primary)";
 
 // The stable hover-pairing KEY for a NODE pick: a validator by its MACHINE id (so a hybrid's

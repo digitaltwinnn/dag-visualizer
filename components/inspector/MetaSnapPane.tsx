@@ -24,7 +24,6 @@ import type { ChannelSnapDeep, ChannelSnapRow } from "@/src/data/types";
 import { getNetwork, SIGNER_GROUPS, metagraphById } from "@/src/data/network";
 import { getBlockWindow, getPastWindow, ledgerSource, onBlockWindow, onPastWindow } from "@/src/data/pastWindow";
 import { currentIdOf } from "@/src/net/lineage";
-import { NET } from "@/src/net/current";
 import { UNLISTED_HUE } from "@/src/data/unlisted";
 import { snapsAtTick } from "@/src/data/anchorLog";
 import { PAYLOAD_LANES } from "@/src/data/payloadKinds";
@@ -104,7 +103,7 @@ export default function MetaSnapPane({
     const own = snapsAtTick(net.metaSnaps, sel.metaId, sel.ts).find((r) => r.ordinal === sel.ordinal);
     if (own) return own;
     // A former address a past window filed under its network's current id (`MetaSnapRecord.chain`).
-    return snapsAtTick(net.metaSnaps, currentIdOf(NET, sel.metaId), sel.ts).find((r) => r.chain === sel.metaId && r.ordinal === sel.ordinal) ?? null;
+    return snapsAtTick(net.metaSnaps, currentIdOf(sel.metaId), sel.ts).find((r) => r.chain === sel.metaId && r.ordinal === sel.ordinal) ?? null;
   }, [sel, past, register, blockWin]);
 
   // Tier 2 — this snapshot's own row inside the tick's exact read.

@@ -25,7 +25,6 @@
 // ⚠️ NO DONATE LINK. The user asked for one and the project carries no donation destination — an
 // invented address is a fabricated fact of the worst kind (rule 10). Add the entry here the moment
 // a real one exists.
-import NetLink from "@/components/NetLink";
 import FooterViewLinks from "@/components/FooterViewLinks";
 import { useStore } from "@/src/store/store";
 import { DOC_PATHS, type DocPage } from "@/components/views";
@@ -39,7 +38,7 @@ function DocToggle({ page, href, children }: { page: DocPage; href: string; chil
   const doc = useStore((s) => s.docPage);
   const setDocPage = useStore((s) => s.setDocPage);
   return (
-    <NetLink
+    <a
       href={href}
       aria-current={doc === page ? "page" : undefined}
       className={cn("hover:text-foreground transition-colors", doc === page && "text-foreground")}
@@ -50,7 +49,7 @@ function DocToggle({ page, href, children }: { page: DocPage; href: string; chil
       }}
     >
       {children}
-    </NetLink>
+    </a>
   );
 }
 

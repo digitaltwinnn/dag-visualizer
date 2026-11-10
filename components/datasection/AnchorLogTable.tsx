@@ -1,6 +1,5 @@
 "use client";
 
-import { METAGRAPHS, netUrl } from "@/src/net/current";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, Search, X } from "lucide-react";
 import type { CSSProperties } from "react";
@@ -26,7 +25,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import TablePager from "@/components/datasection/TablePager";
 import LogSearchBar from "@/components/datasection/LogSearchBar";
 import { pageOfOrdinal, seekSpan, tsInRange } from "@/src/data/chainSeek";
-import { POLL } from "@/src/engine/config";
+import { POLL, METAGRAPHS } from "@/src/engine/config";
 import { utcDayKey } from "@/src/util/localTime";
 import { dayWords } from "@/components/datasection/DateRange";
 import { useMergedLog, type MergedScope } from "@/components/datasection/useMergedLog";
@@ -533,7 +532,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     const before = rangePage(rangeSpan, page, PAGE).before;
     if (before == null || before < rangeSpan.first) return;
     pageFetch.current.add(key);
-    fetch(netUrl(`/api/network/${rangeSpan.addr}/snapshots?before=${before}`))
+    fetch(`/api/network/${rangeSpan.addr}/snapshots?before=${before}`)
       .then((r) => (r.ok ? (r.json() as Promise<{ rows: HistRow[] }>) : Promise.reject()))
       .then((d) => {
         rangeRows.current.set(key, d.rows.filter((r) => r.ordinal >= rangeSpan.first && r.ordinal <= before));
@@ -557,7 +556,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     if (pageFetch.current.has(key)) return;
     pageFetch.current.add(key);
     const gen = liveGen.current;
-    fetch(netUrl(`/api/network/${histAddr}/snapshots${page === 1 ? "" : `?before=${before}`}`))
+    fetch(`/api/network/${histAddr}/snapshots${page === 1 ? "" : `?before=${before}`}`)
       .then((r) => (r.ok ? (r.json() as Promise<{ rows: HistRow[] }>) : Promise.reject()))
       .then((d) => {
         if (hist.current.net !== histAddr) return; // the walk moved to another chain meanwhile
@@ -587,7 +586,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
         continue;
       }
       inFlight.current.add(r.ts);
-      fetch(netUrl(`/api/global/at?ts=${encodeURIComponent(r.ts)}`))
+      fetch(`/api/global/at?ts=${encodeURIComponent(r.ts)}`)
         .then((res) => (res.ok ? (res.json() as Promise<{ ordinal: number; hash: string; lastSnapshotHash?: string }>) : Promise.reject()))
         .then((g2) => {
           resolved.current.set(r.ts, { ordinal: g2.ordinal, hash: g2.hash, lastSnapshotHash: g2.lastSnapshotHash });
@@ -792,7 +791,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     // pages it wants are the pages it already pulled.
     const hit = probes.current.get(before);
     if (hit) return hit;
-    const r = await fetch(netUrl(`/api/network/${netAddr}/snapshots?before=${before}`));
+    const r = await fetch(`/api/network/${netAddr}/snapshots?before=${before}`);
     if (!r.ok) throw new Error(`chain ${r.status}`);
     const d = (await r.json()) as { rows: { ordinal: number; ts: string }[] };
     // Bounded, and oldest-out: a long session of searches must not grow this without limit, and the
@@ -897,7 +896,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     if (mergedMode) {
       setSeeking(true);
       try {
-        const res = await fetch(netUrl(`/api/snapshot/${n}`));
+        const res = await fetch(`/api/snapshot/${n}`);
         if (!res.ok) {
           setJumpMiss(`global snapshot ${n.toLocaleString()} is no longer served — search by date instead`);
           return;
@@ -964,7 +963,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     const label = displayNetwork(histNet)?.ticker ?? "this network";
     setSeeking(true);
     try {
-      const res = await fetch(netUrl(`/api/snapshot/${n}`));
+      const res = await fetch(`/api/snapshot/${n}`);
       if (!res.ok) {
         setMarked(null);
         // The bound is the upstream's, not ours, and it moves — so the copy states the CONSEQUENCE
@@ -1166,7 +1165,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       const addr = lineage[i];
       if (!genesisOf.current.has(addr)) {
         try {
-          const r = await fetch(netUrl(`/api/network/${addr}/chain?v=3`));
+          const r = await fetch(`/api/network/${addr}/chain?v=3`);
           const j = r.ok ? ((await r.json()) as { genesisTs?: string | null }) : null;
           const t = j?.genesisTs ? Date.parse(j.genesisTs) : NaN;
           genesisOf.current.set(addr, Number.isFinite(t) ? t : null);

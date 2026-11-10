@@ -2,7 +2,6 @@
 
 import { useEffect, useRef } from "react";
 import { useStore } from "@/src/store/store";
-import { netUrl } from "@/src/net/current";
 import { reportPoll } from "@/src/data/api";
 import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
 import { blockReadKey, wantedBlockReads, wantedExactReads, windowBlockKeys, type BlockReadWant } from "@/src/data/blockReads";
@@ -57,7 +56,7 @@ export default function BlockReadsBridge() {
 
     const readToken = async (x: BlockReadWant, mine: number): Promise<boolean> => {
       try {
-        const r = await fetch(netUrl(`/api/network/${x.chain}/snapshots/${x.ordinal}/blocks`));
+        const r = await fetch(`/api/network/${x.chain}/snapshots/${x.ordinal}/blocks`);
         if (!r.ok) return false;
         const d = (await r.json()) as { blocks: BlockRead[] };
         if (mine !== gen.current) return false; // a cancelled read writes nothing

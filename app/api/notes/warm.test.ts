@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { CATALOG } from "@/src/engine/config";
+import { METAGRAPHS } from "@/src/engine/config";
 import { noteKeyOf } from "./keys";
 import { executePass, pacedChat, planPass, warmCandidates, WARM_SLACK_MS, type WarmItem } from "./warm";
 
 const H = 3_600_000;
 const NOW = Date.UTC(2026, 9, 27, 12, 7);
-const [a, b] = CATALOG.mainnet.map((m) => m.id);
+const [a, b] = METAGRAPHS.map((m) => m.id);
 const SUBJECTS = [a!, b!];
 const SET = "DAGa,dag";
 
 type Rec = { writtenAt: number; setKey?: string; driftKey?: string };
 const cacheOf = (records: Record<string, Rec>) => (key: string) => records[key] ?? null;
-const keyOf = (i: WarmItem) => noteKeyOf("mainnet", i.view, i.subject, i.span);
+const keyOf = (i: WarmItem) => noteKeyOf(i.view, i.subject, i.span);
 /** Every candidate written at `writtenAt` (hyper `all` carrying the current set). */
 function allCached(subjects: string[], countries: string[], writtenAt: number): Record<string, Rec> {
   return Object.fromEntries(warmCandidates(subjects, countries).map((i) => [keyOf(i), { writtenAt, setKey: SET }]));
@@ -32,7 +32,7 @@ describe("warmCandidates and the unlisted set", () => {
 // network's held node count moved is due, at most hourly per note.
 describe("planPass — a note follows its numbers", () => {
   const NET_ID = a!;
-  const item = (view: "hyper" | "geo") => noteKeyOf("mainnet", view, NET_ID, "day");
+  const item = (view: "hyper" | "geo") => noteKeyOf(view, NET_ID, "day");
   const fresh = (rec: Rec, view: "hyper" | "geo" = "hyper") => {
     const all = allCached([NET_ID], ["DE"], NOW - 2 * H);
     return cacheOf({ ...all, [item(view)]: rec });
@@ -142,7 +142,7 @@ describe("planPass", () => {
   it("a fresh hyper `all` record with a different setKey is re-planned", () => {
     const subjects = ["all", ...SUBJECTS];
     const records = allCached(subjects, [], NOW - 2 * H);
-    const allKey = noteKeyOf("mainnet", "hyper", "all", "day");
+    const allKey = noteKeyOf("hyper", "all", "day");
     expect(planPass(NOW, subjects, [], SET, cacheOf(records)).some((i) => i.view === "hyper")).toBe(false);
     records[allKey] = { writtenAt: NOW - 2 * H, setKey: "dag" };
     expect(planPass(NOW, subjects, [], SET, cacheOf(records)).filter((i) => i.view === "hyper")).toEqual([

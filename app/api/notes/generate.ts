@@ -41,7 +41,7 @@ import type { NotesStore } from "./store";
 // SECRETS: nothing here sees the Gate key; a log line carries the view, subject, span and an error
 // KIND, never a message or a model answer.
 
-/** A stored note (`ai:{net}:v{N}:{view}:{subject}:{span}`, JSON). */
+/** A stored note (`ai:mainnet:v{N}:{view}:{subject}:{span}`, JSON). */
 export interface NoteRecord {
   text: string;
   writtenAt: number;
@@ -81,7 +81,6 @@ export const LOCK_TTL_S = 90;
 export const FAIL_TTL_S = 15 * 60;
 
 export interface NoteRequest {
-  net: string;
   view: NoteView;
   subject: string;
   span: NoteSpan;
@@ -124,9 +123,9 @@ const REQUEST: NoteResponse = { state: "request" };
 
 
 /** Count one outcome in the day's stats. Best effort: a stats write never changes the answer. */
-export async function countStat(store: NotesStore, net: string, nowMs: number, field: NoteStat): Promise<void> {
+export async function countStat(store: NotesStore, nowMs: number, field: NoteStat): Promise<void> {
   try {
-    await store.hincr(statsKeyOf(net, utcDayKey(nowMs)), field, STATS_TTL_S);
+    await store.hincr(statsKeyOf(utcDayKey(nowMs)), field, STATS_TTL_S);
   } catch {
     // The store is down; the answer already says so where it matters.
   }
@@ -341,17 +340,17 @@ async function write(
 export async function generateNote(
   req: NoteRequest, deps: GenerateDeps, mode: GenerateMode, opts: GenerateOptions = {},
 ): Promise<NoteResponse> {
-  const { net, view, subject, span } = req;
+  const { view, subject, span } = req;
   const { store } = deps;
   const seen = opts.seenWrittenAt;
   /** Warm: a record other than the one planned (see `GenerateOptions`). */
   const writtenSincePlan = (r: NoteRecord | null): r is NoteRecord =>
     mode === "warm" && seen !== undefined && r != null && r.writtenAt !== seen;
 
-  // 1. A note exists only for mainnet and the view's own, listed subjects.
-  if (net !== "mainnet" || !noteSupported(view, subject, span, net)) return NONE;
+  // 1. A note exists only for the view's own, listed subjects.
+  if (!noteSupported(view, subject, span)) return NONE;
 
-  const key = noteKeyOf(net, view, subject, span);
+  const key = noteKeyOf(view, subject, span);
   const timing = timingOf(view, span, subject);
   const now = deps.now();
 
@@ -361,7 +360,7 @@ export async function generateNote(
     cached = parseRecord(await store.get(key));
   } catch {
     warn(req, "store");
-    if (deps.writable) await countStat(store, net, now, "store");
+    if (deps.writable) await countStat(store, now, "store");
     return UNAVAILABLE;
   }
   if (cached && (mode !== "warm" || writtenSincePlan(cached))) return okOf(cached);
@@ -376,7 +375,7 @@ export async function generateNote(
       if ((await store.get(failKey)) != null) return UNAVAILABLE;
     } catch {
       warn(req, "store");
-      await countStat(store, net, now, "store");
+      await countStat(store, now, "store");
       return UNAVAILABLE;
     }
   }
@@ -399,7 +398,7 @@ export async function generateNote(
     if (!(await store.lock(lock, LOCK_TTL_S))) return PENDING;
   } catch {
     warn(req, "store");
-    await countStat(store, net, now, "store");
+    await countStat(store, now, "store");
     return UNAVAILABLE;
   }
 
@@ -412,7 +411,7 @@ export async function generateNote(
         held = parseRecord(await store.get(key));
       } catch {
         warn(req, "store");
-        await countStat(store, net, now, "store");
+        await countStat(store, now, "store");
         return UNAVAILABLE;
       }
       if (writtenSincePlan(held)) return okOf(held);
@@ -421,10 +420,10 @@ export async function generateNote(
     // 5. The facts. Nothing to describe: nothing stored, no model call.
     let input: Awaited<ReturnType<typeof factsFor>>;
     try {
-      input = await deps.facts(net, view, subject, span, now);
+      input = await deps.facts(view, subject, span, now);
     } catch {
       warn(req, "store");
-      await countStat(store, net, now, "store");
+      await countStat(store, now, "store");
       await hold();
       return UNAVAILABLE;
     }
@@ -437,9 +436,9 @@ export async function generateNote(
     }
 
     // 6–7. The model, held to the facts.
-    const written = await write(req, input, deps.chat, (field) => countStat(store, net, now, field));
+    const written = await write(req, input, deps.chat, (field) => countStat(store, now, field));
     if (!written.ok) {
-      await countStat(store, net, now, written.stat);
+      await countStat(store, now, written.stat);
       await hold();
       return UNAVAILABLE;
     }
@@ -460,16 +459,16 @@ export async function generateNote(
       await store.set(key, JSON.stringify(record), timing.ttlS);
     } catch {
       warn(req, "store");
-      await countStat(store, net, now, "store");
+      await countStat(store, now, "store");
       await hold();
       return UNAVAILABLE;
     }
-    await countStat(store, net, now, "ok");
+    await countStat(store, now, "ok");
     return okOf(record);
   } catch {
     // Anything else that threw once the lock was taken: an instrument state, counted, never a dump.
     warn(req, "error");
-    await countStat(store, net, now, "error");
+    await countStat(store, now, "error");
     await hold();
     return UNAVAILABLE;
   } finally {

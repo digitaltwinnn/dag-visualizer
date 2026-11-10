@@ -6,10 +6,9 @@
 import { dataTime } from "./liveAge";
 import { META_CATCHUP_MAX, chainNeedsCatchUp, chainToRecord, globalsToAppend, missedGlobals, nextCatchUpLimit } from "./liveMerge";
 import type { LiveAnswer } from "@/src/data/types";
-import { METAGRAPHS, netUrl } from "@/src/net/current";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
 import { mergeDagClusters } from "@/src/data/dagCore";
-import { COLORS, POLL } from "@/src/engine/config";
+import { COLORS, POLL, METAGRAPHS } from "@/src/engine/config";
 import type { Anchor, ClusterNode, DagCore, GlobalSnapshot, RawMetaSnapshot } from "@/src/data/types";
 import { activeRows } from "@/src/net/lineage";
 
@@ -332,7 +331,7 @@ export class NetworkData {
     // chains a round trip after their list), so a slow upstream answers late rather than flapping.
     const t = setTimeout(() => ctrl.abort(), 10_000);
     try {
-      const res = await fetch(netUrl(path), { signal: ctrl.signal });
+      const res = await fetch(path, { signal: ctrl.signal });
       if (!res.ok) throw new Error(String(res.status));
       const json = await res.json();
       return { json, at: dataTime(Date.now(), res.headers.get("age"), json?.memoAgeMs) };

@@ -2,7 +2,6 @@
 
 import { useEffect, useRef } from "react";
 import { useStore } from "@/src/store/store";
-import { NET, netUrl } from "@/src/net/current";
 import { POLL } from "@/src/engine/config";
 import { buildPastWindow, getPastWindow, pastRetryDelay, pastWanted, setPastWindow, type PastWindowAnswer } from "@/src/data/pastWindow";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
@@ -71,11 +70,11 @@ export default function PastWindowBridge() {
     };
     const read = (attempt: number) => {
       if (!current()) return;
-      fetch(netUrl(`/api/ledger/window?ordinal=${ordinal}`))
+      fetch(`/api/ledger/window?ordinal=${ordinal}`)
         .then((r) => (r.ok ? (r.json() as Promise<PastWindowAnswer>) : null))
         .then((answer) => {
           if (!current()) return;
-          const w = answer ? buildPastWindow(answer, NET) : null;
+          const w = answer ? buildPastWindow(answer) : null;
           if (!w) return failed(attempt);
           setPastWindow(w);
           setStatus({ ordinal, from: w.from, to: w.to, status: "ready" });

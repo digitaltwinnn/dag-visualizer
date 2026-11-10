@@ -15,7 +15,6 @@ import { BLOCKS_PAGE, VIEWS } from "@/components/views";
 import { breakpointOf } from "@/src/data/breakpoint";
 import { SITE_ORIGIN } from "@/src/data/site";
 import { BRIEFING_STOPS, stopRegister, type BriefingStop, BRIEFING_TYPE_SLOW, BRIEFING_WORDS_OUT_MS, SCENE_WAIT_MS, STOP_MS, briefsOn, hasLanded, mayAdvance, nextStop, prevStop } from "@/src/engine/domain/briefing";
-import { NET } from "@/src/net/current";
 import { switchLedgerRegister } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 
@@ -98,7 +97,7 @@ export default function Briefing() {
   }, [stop, shown]);
 
   useEffect(() => {
-    if (!briefsOn({ pathname: location.pathname, net: NET, seen: seenThisSession() })) return;
+    if (!briefsOn({ pathname: location.pathname, seen: seenThisSession() })) return;
     markSeen();
     useStore.getState().setBriefing(0);
   }, []);

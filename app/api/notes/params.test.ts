@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CATALOG } from "@/src/engine/config";
+import { METAGRAPHS } from "@/src/engine/config";
 import { isLimitedNote, parseNoteParams, parseNoteRequest } from "./params";
 import { snapSpan } from "./keys";
 
@@ -10,8 +10,8 @@ const sp = (q: string) => new URLSearchParams(q);
 /** A subject note's query as the client writes it (`URLSearchParams`, so a make-up's `+` is `%2B`). */
 const sq = (view: string, subject: string) => new URLSearchParams({ view, subject });
 // The catalog's own re-registered network: a former address must read as its current id.
-const relisted = CATALOG.mainnet.find((m) => m.formerIds?.length)!;
-const anId = CATALOG.mainnet[0]!.id;
+const relisted = METAGRAPHS.find((m) => m.formerIds?.length)!;
+const anId = METAGRAPHS[0]!.id;
 
 describe("parseNoteParams", () => {
   it("Geography takes a country subject; its span is fixed to the day", () => {

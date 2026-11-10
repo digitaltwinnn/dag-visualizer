@@ -1,6 +1,5 @@
 "use client";
 
-import { netUrl } from "@/src/net/current";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { feedInUse, onFeedUse } from "@/src/data/feedUse";
 import { useStore } from "@/src/store/store";
@@ -135,7 +134,7 @@ function ensure(ordinal: number | null | undefined, retry = false): Promise<void
   const st = useStore.getState();
   if (st.snapshotExact[ordinal] || inflight.has(ordinal)) return Promise.resolve(); // already have it / fetching
   inflight.add(ordinal);
-  return fetch(netUrl(`/api/snapshot/${ordinal}`))
+  return fetch(`/api/snapshot/${ordinal}`)
     .then((r) => (r.ok ? (r.json() as Promise<SnapshotExact>) : null))
     .then((data) => {
       const ok = !!data && typeof data.totalFee === "number";
@@ -261,7 +260,7 @@ export default function RawSnapshotBridge() {
     if (st.metaSnapDeep[key] || deepInflight.has(key)) return;
 
     deepInflight.add(key);
-    fetch(netUrl(`/api/snapshot/${deepSel.globalOrdinal}/channel/${deepSel.metaId}?snap=${deepSel.ordinal}`))
+    fetch(`/api/snapshot/${deepSel.globalOrdinal}/channel/${deepSel.metaId}?snap=${deepSel.ordinal}`)
       .then((r) => (r.ok ? (r.json() as Promise<ChannelSnapDeep>) : null))
       .then((d) => {
         // Store under the REQUESTED key: when the route fell back (an undecodable row asks

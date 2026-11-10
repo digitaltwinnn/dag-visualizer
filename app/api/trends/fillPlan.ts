@@ -6,14 +6,10 @@ import { TIER_SINCE } from "@/src/data/trendWindow";
 // that stands in for a sampler lock, the fine-tier floor and the one-chain resolver. The script
 // imports these and does I/O; nothing here reads the store or the network.
 
-export type Net = "mainnet" | "integrationnet" | "testnet";
-const NETS: readonly Net[] = ["mainnet", "integrationnet", "testnet"];
-
 export type Command =
   | { kind: "fill"; fromMs: number; toMs: number | null; recompute: boolean; chain: string | null; transfers: boolean; fresh: boolean; dryRun: boolean }
   | { kind: "rebuild"; days: number; yes: boolean }
   | { kind: "wipe"; yes: boolean };
-export interface Parsed { net: Net; command: Command }
 
 /** A usage mistake; the message is what to run instead. */
 export class UsageError extends Error {}
@@ -31,7 +27,6 @@ const USAGE = [
   "  fill … [--fresh] [--dry-run]",
   "  rebuild [--days=N] [--yes]                              wipe and rebuild N days (asks first)",
   "  wipe [--yes]                                            wipe alone (asks first)",
-  "  (--net=mainnet|integrationnet|testnet before the command)",
 ].join("\n");
 
 /** The one-off flags the fill replaced: each names the command that does its work now. */
@@ -55,16 +50,9 @@ const dayOf = (flag: string, v: string): number => {
   return Date.UTC(+m[1]!, +m[2]! - 1, +m[3]!);
 };
 
-export function parseCommand(argv: readonly string[]): Parsed {
-  let net: Net = "mainnet";
-  const rest: string[] = [];
-  for (const a of argv) {
-    if (a.startsWith("--net=")) {
-      const n = a.slice(6);
-      if (!(NETS as readonly string[]).includes(n)) throw new UsageError(`--net: unknown network "${n}" (mainnet | integrationnet | testnet)`);
-      net = n as Net;
-    } else rest.push(a);
-  }
+export function parseCommand(argv: readonly string[]): Command {
+  const rest = [...argv];
+  for (const a of rest) if (a.startsWith("--net=")) throw new UsageError("--net: the store holds one network, mainnet — drop the flag");
   const cmd = rest[0];
   if (cmd == null || cmd.startsWith("--")) {
     for (const a of rest) for (const [re, say] of REDIRECTS) { const m = re.exec(a); if (m) throw new UsageError(say(m)); }
@@ -99,7 +87,7 @@ export function parseCommand(argv: readonly string[]): Parsed {
     if (transfers && chain != null) throw new UsageError("fill: --transfers rewrites every chain's transfers — drop --chain");
     const toMs = to != null ? dayOf("--to", to) : null;
     if (toMs != null && toMs < fromMs) throw new UsageError("fill: --to is before --from (--from is the oldest day, --to the newest)");
-    return { net, command: { kind: "fill", fromMs, toMs, recompute, chain, transfers, fresh, dryRun } };
+    return { kind: "fill", fromMs, toMs, recompute, chain, transfers, fresh, dryRun };
   }
   if (cmd === "rebuild") {
     const days = take("days");
@@ -107,12 +95,12 @@ export function parseCommand(argv: readonly string[]): Parsed {
     noneLeft();
     const n = days == null ? 90 : Number(days);
     if (!Number.isInteger(n) || n < 1 || n > REBUILD_MAX_DAYS) throw new UsageError(`rebuild: --days wants 1..${REBUILD_MAX_DAYS} (older history is the fill's)`);
-    return { net, command: { kind: "rebuild", days: n, yes } };
+    return { kind: "rebuild", days: n, yes };
   }
   if (cmd === "wipe") {
     const yes = has("yes");
     noneLeft();
-    return { net, command: { kind: "wipe", yes } };
+    return { kind: "wipe", yes };
   }
   throw new UsageError(`unknown command "${cmd}"\n${USAGE}`);
 }

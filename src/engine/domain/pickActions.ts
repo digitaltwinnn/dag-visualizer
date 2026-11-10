@@ -17,7 +17,7 @@ import { heldOut } from "./viewNetwork";
 import type { Mode } from "@/src/store/store";
 import type { LedgerRegister } from "@/src/store/mode";
 import type { GlobalSnapshot, PickDescriptor, MetaSnapSel, TickNetSel, BlockSel, DataBlockSel } from "@/src/data/types";
-import { METAGRAPHS } from "@/src/net/current";
+import { METAGRAPHS } from "@/src/engine/config";
 import { hasLevel, type CohortSel, type CompositionSel } from "./focusLadder";
 import { is3D } from "./viewTransition";
 import { UNLISTED_KEY } from "./ledgerBands";

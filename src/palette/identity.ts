@@ -1,8 +1,7 @@
 // Identity-lane colour map: ONE deterministic source of a metagraph's identity hue, resolved for
 // each medium (HUD flat-on-glass vs the 3D scene under emissive+bloom). Built on the palette
 // generator; precedence = brand hue > config colour > hash fallback (CLAUDE.md "Two colour lanes").
-import { METAGRAPHS } from "@/src/net/current";
-import { COLORS } from "@/src/engine/config";
+import { COLORS, METAGRAPHS } from "@/src/engine/config";
 import { assignPalette, oklchToHex } from "./palette";
 import { hexToOklch } from "./brand";
 import brandHues from "@/data/brand-hues.json";
@@ -56,11 +55,7 @@ let _pins: Record<string, number> | null = null;
 export function configPins(): Record<string, number> {
   if (_pins) return _pins;
   const pins: Record<string, number> = {};
-  // color: 0 is the "no seed" sentinel (dev-network catalog rows all carry it): skip, so
-  // those metagraphs resolve through their baked brand pin or the hash fallback — 23 rows
-  // sharing one seed would otherwise pin two whole networks to one hue. No mainnet row
-  // carries 0 (DEFAULT_META_COLOR would NOT work as the sentinel — Common Crawl seeds it).
-  for (const m of CONFIG) if (m.color !== 0) pins[m.id] = hexToHueDeg(m.color);
+  for (const m of CONFIG) pins[m.id] = hexToHueDeg(m.color);
   _pins = Object.freeze(pins);
   return _pins;
 }

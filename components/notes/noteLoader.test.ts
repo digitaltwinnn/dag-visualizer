@@ -12,7 +12,6 @@ function rig(answers: Array<Response | Error>, wait?: (ms: number) => Promise<vo
   const sleeps: number[] = [];
   let clock = 1_000;
   const loader = createNoteLoader({
-    urlOf: (p) => p,
     fetchImpl: async (url, init) => {
       calls.push({ url, init });
       const a = answers.shift();

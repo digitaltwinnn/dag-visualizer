@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { netOf } from "@/src/net/request";
 import { assemble, WINDOWS, type WindowId } from "./assemble";
 import { slotsInWindow } from "./keys";
 import { readStore } from "./store";
@@ -12,7 +11,6 @@ export const runtime = "nodejs";
 export const maxDuration = 15;
 
 export async function GET(req: Request) {
-  const net = netOf(req);
   const w = new URL(req.url).searchParams.get("window") ?? "24h";
   if (!Object.prototype.hasOwnProperty.call(WINDOWS, w)) {
     return NextResponse.json({ error: `window must be one of ${Object.keys(WINDOWS).join(", ")}` }, { status: 400 });
@@ -22,13 +20,13 @@ export async function GET(req: Request) {
     const store = readStore();
     const now = Date.now();
     const { tier, ms } = WINDOWS[window];
-    const keys = [...new Set(slotsInWindow(net, tier, now - ms, now).map((s) => s.key))];
+    const keys = [...new Set(slotsInWindow(tier, now - ms, now).map((s) => s.key))];
     const hashes: Record<string, Record<string, string>> = {};
     await Promise.all(keys.map(async (k) => {
       const h = await store.hgetall(k);
       if (h) hashes[k] = h;
     }));
-    return NextResponse.json(assemble(net, window, now, hashes), {
+    return NextResponse.json(assemble(window, now, hashes), {
       headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" },
     });
   } catch {

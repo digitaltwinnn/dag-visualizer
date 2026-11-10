@@ -90,14 +90,12 @@ export const SCENE_WAIT_MS = 8000;
 
 export interface BriefingEntry {
   pathname: string;
-  /** The network on screen: the notes are mainnet's alone. */
-  net: string;
   /** Whether this browser session has already had the tour. */
   seen: boolean;
 }
 
 /** Only the landing URL plays it, so a deep link stays the way straight in. */
-export const briefsOn = ({ pathname, net, seen }: BriefingEntry): boolean => pathname === "/" && net === "mainnet" && !seen;
+export const briefsOn = ({ pathname, seen }: BriefingEntry): boolean => pathname === "/" && !seen;
 
 /** The stop after this one, or null at the end of the route. */
 export const nextStop = (stop: number): number | null => (stop + 1 < BRIEFING_STOPS.length ? stop + 1 : null);

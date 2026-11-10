@@ -8,8 +8,8 @@ const get = (inc: IncMap, key: string, field: string) => inc.get(key)?.get(field
 describe("addInc", () => {
   it("increments fields across all tiers using merge semantics", () => {
     const inc: IncMap = new Map();
-    addInc(inc, "mainnet", Date.UTC(2026, 8, 6, 14, 2), "g.ticks", 1);
-    addInc(inc, "mainnet", Date.UTC(2026, 8, 6, 14, 2), "g.ticks", 1); // same series in same bucket
+    addInc(inc, Date.UTC(2026, 8, 6, 14, 2), "g.ticks", 1);
+    addInc(inc, Date.UTC(2026, 8, 6, 14, 2), "g.ticks", 1); // same series in same bucket
     expect(get(inc, "t:mainnet:5m:2026-09-06", "14:00|g.ticks")).toBe(2);
     expect(get(inc, "t:mainnet:1h:2026-09", "06-14|g.ticks")).toBe(2);
     expect(get(inc, "t:mainnet:1d:2026", "09-06|g.ticks")).toBe(2);
@@ -20,7 +20,7 @@ describe("bucketGlobals", () => {
   it("sums ticks/anchors/blocks into every tier and computes gaps incl. the cross-run boundary", () => {
     const inc: IncMap = new Map();
     const prev = Date.UTC(2026, 8, 6, 13, 59, 40); // last tick of the PREVIOUS run
-    bucketGlobals(inc, "mainnet", [
+    bucketGlobals(inc, [
       { ordinal: 101, timestamp: ts(14, 0, 8), metagraphSnapshotCount: 3, blocks: [] },
       { ordinal: 102, timestamp: ts(14, 0, 36), metagraphSnapshotCount: 0, blocks: [{}, {}] },
       { ordinal: 103, timestamp: ts(14, 6, 2), metagraphSnapshotCount: 24 },
@@ -41,7 +41,7 @@ describe("bucketGlobals", () => {
   });
   it("zero-fills g.ticks across the covered range so coverage is distinguishable from absence", () => {
     const inc: IncMap = new Map();
-    bucketGlobals(inc, "mainnet", [
+    bucketGlobals(inc, [
       { ordinal: 1, timestamp: ts(14, 1) },
       { ordinal: 2, timestamp: ts(14, 14) }, // nothing lands in 14:05
     ], null);
@@ -51,7 +51,7 @@ describe("bucketGlobals", () => {
   });
   it("with no prev cursor the first record opens the gap chain without inventing one", () => {
     const inc: IncMap = new Map();
-    bucketGlobals(inc, "mainnet", [
+    bucketGlobals(inc, [
       { ordinal: 1, timestamp: ts(14, 0, 0) },
       { ordinal: 2, timestamp: ts(14, 0, 30) },
     ], null);
@@ -62,7 +62,7 @@ describe("bucketGlobals", () => {
 describe("bucketMetas", () => {
   it("sums snaps/fee/kb per metagraph into every tier", () => {
     const inc: IncMap = new Map();
-    bucketMetas(inc, "mainnet", "abc", [
+    bucketMetas(inc, "abc", [
       { ordinal: 9, timestamp: ts(14, 2), fee: 400000, sizeInKB: 12.5 },
       { ordinal: 10, timestamp: ts(14, 3), fee: 100000, sizeInKB: 2.5 },
     ]);
@@ -75,7 +75,7 @@ describe("bucketMetas", () => {
   it("computes per-network gap stats only when a chain is opted in", () => {
     const inc: IncMap = new Map();
     const prev = Date.UTC(2026, 8, 6, 13, 59, 30);
-    bucketMetas(inc, "mainnet", "abc", [
+    bucketMetas(inc, "abc", [
       { ordinal: 9, timestamp: ts(14, 0, 0), fee: 0, sizeInKB: 0 },
       { ordinal: 10, timestamp: ts(14, 0, 45), fee: 0, sizeInKB: 0 },
     ], prev);
@@ -84,11 +84,11 @@ describe("bucketMetas", () => {
     expect(get(inc, day, "14:00|m.abc.gapMax")).toBe(45);
     // no opt-in → no gap series, no invented values
     const inc2: IncMap = new Map();
-    bucketMetas(inc2, "mainnet", "abc", [{ ordinal: 9, timestamp: ts(14, 0), fee: 0, sizeInKB: 0 }]);
+    bucketMetas(inc2, "abc", [{ ordinal: 9, timestamp: ts(14, 0), fee: 0, sizeInKB: 0 }]);
     expect(get(inc2, day, "14:00|m.abc.gapSum")).toBeUndefined();
     // null opens a fresh chain: the first record contributes no gap
     const inc3: IncMap = new Map();
-    bucketMetas(inc3, "mainnet", "abc", [
+    bucketMetas(inc3, "abc", [
       { ordinal: 9, timestamp: ts(14, 0, 0), fee: 0, sizeInKB: 0 },
       { ordinal: 10, timestamp: ts(14, 0, 20), fee: 0, sizeInKB: 0 },
     ], null);
@@ -99,20 +99,20 @@ describe("bucketMetas", () => {
     const rec = (ordinal: number, t: string) => ({ ordinal, timestamp: t, fee: 0, sizeInKB: 0 });
     // Three snapshots in two global ticks: two anchorings.
     const inc: IncMap = new Map();
-    bucketMetas(inc, "mainnet", "abc", [rec(9, ts(14, 0, 0)), rec(10, ts(14, 0, 0)), rec(11, ts(14, 0, 30))], null);
+    bucketMetas(inc, "abc", [rec(9, ts(14, 0, 0)), rec(10, ts(14, 0, 0)), rec(11, ts(14, 0, 30))], null);
     expect(get(inc, day, "14:00|m.abc.ticks")).toBe(2);
     // The previous run's newest stamp IS this batch's first tick: it straddled the runs.
     const inc2: IncMap = new Map();
-    bucketMetas(inc2, "mainnet", "abc", [rec(12, ts(14, 0, 30)), rec(13, ts(14, 1, 0))], Date.parse(ts(14, 0, 30)));
+    bucketMetas(inc2, "abc", [rec(12, ts(14, 0, 30)), rec(13, ts(14, 1, 0))], Date.parse(ts(14, 0, 30)));
     expect(get(inc2, day, "14:00|m.abc.ticks")).toBe(1);
     // Unordered streams (no opt-in) count nothing rather than guess.
     const inc3: IncMap = new Map();
-    bucketMetas(inc3, "mainnet", "abc", [rec(9, ts(14, 0, 0))]);
+    bucketMetas(inc3, "abc", [rec(9, ts(14, 0, 0))]);
     expect(get(inc3, day, "14:00|m.abc.ticks")).toBeUndefined();
   });
   it("also feeds the global floors", () => {
     const inc: IncMap = new Map();
-    bucketMetas(inc, "mainnet", "abc", [{ ordinal: 9, timestamp: ts(14, 2), fee: 400000, sizeInKB: 12.5 }]);
+    bucketMetas(inc, "abc", [{ ordinal: 9, timestamp: ts(14, 2), fee: 400000, sizeInKB: 12.5 }]);
     expect(get(inc, "t:mainnet:5m:2026-09-06", "14:00|g.feeFloor")).toBe(400000);
     expect(get(inc, "t:mainnet:5m:2026-09-06", "14:00|g.kbFloor")).toBe(12.5);
   });
@@ -121,7 +121,7 @@ describe("bucketMetas", () => {
 describe("bucketFleet", () => {
   it("writes gauges to hourly+daily only, countries daily only", () => {
     const inc: IncMap = new Map();
-    bucketFleet(inc, "mainnet", Date.UTC(2026, 8, 6, 14, 30), {
+    bucketFleet(inc, Date.UTC(2026, 8, 6, 14, 30), {
       total: 195, perNet: { dag: 160, abc: 16 }, layers: { l0: 177, cl1: 150, dl1: 23 },
       countries: { DE: 60, US: 40 },
     });
@@ -140,38 +140,38 @@ describe("bucketFleet", () => {
 describe("coverage zero-fill reaches every tier", () => {
   it("a batch bracketing hours of silence marks the empty hourly buckets with g.ticks 0", () => {
     const inc: IncMap = new Map();
-    bucketGlobals(inc, "mainnet", [
+    bucketGlobals(inc, [
       { ordinal: 1, timestamp: "2026-09-08T10:40:00Z", metagraphSnapshotCount: 0, blocks: [] },
       { ordinal: 2, timestamp: "2026-09-08T14:47:00Z", metagraphSnapshotCount: 0, blocks: [] },
     ], null);
-    const hourKey = slotOf("mainnet", "1h", Date.parse("2026-09-08T12:00:00Z"));
+    const hourKey = slotOf("1h", Date.parse("2026-09-08T12:00:00Z"));
     const hourField = fieldOf(hourKey.bucket, "g.ticks");
     expect(inc.get(hourKey.key)?.get(hourField)).toBe(0);
     // both records share this DAY, so its bucket holds their real count — the daily
     // zero-fill only speaks when a batch brackets a wholly-silent day
-    const dayKey = slotOf("mainnet", "1d", Date.parse("2026-09-08T12:00:00Z"));
+    const dayKey = slotOf("1d", Date.parse("2026-09-08T12:00:00Z"));
     expect(inc.get(dayKey.key)?.get(fieldOf(dayKey.bucket, "g.ticks"))).toBe(2);
     // the record-bearing hours carry real counts, not zeros
-    const h1 = slotOf("mainnet", "1h", Date.parse("2026-09-08T10:40:00Z"));
+    const h1 = slotOf("1h", Date.parse("2026-09-08T10:40:00Z"));
     expect(inc.get(h1.key)?.get(fieldOf(h1.bucket, "g.ticks"))).toBe(1);
   });
   it("the fill starts at the cross-run boundary: a stall straddling two runs is covered by the SECOND run's batch (Sep 10's 13.5-min stall read gray because neither batch spanned it)", () => {
     const inc: IncMap = new Map();
     // previous run ended at 10:22; this run's first record is 10:35 — the silent buckets
     // between belong to THIS run's measurement
-    bucketGlobals(inc, "mainnet", [
+    bucketGlobals(inc, [
       { ordinal: 2, timestamp: "2026-09-10T10:35:58Z", metagraphSnapshotCount: 0, blocks: [] },
     ], Date.parse("2026-09-10T10:22:25Z"));
     for (const hhmm of ["10:25", "10:30"]) {
-      const k = slotOf("mainnet", "5m", Date.parse(`2026-09-10T${hhmm}:00Z`));
+      const k = slotOf("5m", Date.parse(`2026-09-10T${hhmm}:00Z`));
       expect(inc.get(k.key)?.get(fieldOf(k.bucket, "g.ticks"))).toBe(0);
     }
     // and a single-record batch with NO boundary still fills nothing (cold cursor rule)
     const inc2: IncMap = new Map();
-    bucketGlobals(inc2, "mainnet", [
+    bucketGlobals(inc2, [
       { ordinal: 2, timestamp: "2026-09-10T10:35:58Z", metagraphSnapshotCount: 0, blocks: [] },
     ], null);
-    const k2 = slotOf("mainnet", "5m", Date.parse("2026-09-10T10:25:00Z"));
+    const k2 = slotOf("5m", Date.parse("2026-09-10T10:25:00Z"));
     expect(inc2.get(k2.key)?.get(fieldOf(k2.bucket, "g.ticks"))).toBeUndefined();
   });
 });
@@ -182,8 +182,8 @@ describe("bucketFleet without a fleet total (the DAG's clusters unread)", () => 
   it("writes no f.nodes and no f.nodes.dag — an absent gauge, never a lower count — and the rest still", () => {
     const inc: IncMap = new Map();
     const t = Date.parse("2026-10-29T10:00:00Z");
-    bucketFleet(inc, "mainnet", t, { perNet: { up: 3 }, layers: { l0: 3 }, perNetTypes: { up: { l0: 3 } }, countries: { DE: 3 } });
-    const k = slotOf("mainnet", "1h", t);
+    bucketFleet(inc, t, { perNet: { up: 3 }, layers: { l0: 3 }, perNetTypes: { up: { l0: 3 } }, countries: { DE: 3 } });
+    const k = slotOf("1h", t);
     expect(inc.get(k.key)?.get(fieldOf(k.bucket, "f.nodes"))).toBeUndefined();
     expect(inc.get(k.key)?.get(fieldOf(k.bucket, "f.nodes.dag"))).toBeUndefined();
     expect(inc.get(k.key)?.get(fieldOf(k.bucket, "f.nodes.up"))).toBe(3);
@@ -194,11 +194,11 @@ describe("bucketFleet without a fleet total (the DAG's clusters unread)", () => 
 describe("bucketFleet per-network layers", () => {
   it("writes f.layer.{id}.{role} for every network's tally", () => {
     const inc: IncMap = new Map();
-    bucketFleet(inc, "mainnet", Date.parse("2026-09-11T10:00:00Z"), {
+    bucketFleet(inc, Date.parse("2026-09-11T10:00:00Z"), {
       total: 5, perNet: { dag: 2, up: 3 }, layers: { l0: 3, cl1: 3 },
       perNetLayers: { up: { l0: 3, cl1: 3 } }, countries: {},
     });
-    const k = slotOf("mainnet", "1h", Date.parse("2026-09-11T10:00:00Z"));
+    const k = slotOf("1h", Date.parse("2026-09-11T10:00:00Z"));
     expect(inc.get(k.key)?.get(fieldOf(k.bucket, "f.layer.up.l0"))).toBe(3);
     expect(inc.get(k.key)?.get(fieldOf(k.bucket, "f.layer.up.cl1"))).toBe(3);
   });
@@ -210,18 +210,18 @@ describe("bucketFleet per-network types", () => {
   it("writes f.type.{id}.{key} as hourly and daily gauges, and the types sum to the total", () => {
     const inc: IncMap = new Map();
     const t = Date.parse("2026-09-29T10:00:00Z");
-    bucketFleet(inc, "mainnet", t, {
+    bucketFleet(inc, t, {
       total: 18, perNet: { dor: 18 }, layers: {},
       perNetTypes: { dor: { "l0+cl1+dl1": 3, dl1: 15 } }, countries: {},
     });
     for (const tier of ["1h", "1d"] as const) {
-      const k = slotOf("mainnet", tier, t);
+      const k = slotOf(tier, t);
       const h = inc.get(k.key)!;
       expect(h.get(fieldOf(k.bucket, "f.type.dor.l0+cl1+dl1"))).toBe(3);
       expect(h.get(fieldOf(k.bucket, "f.type.dor.dl1"))).toBe(15);
       expect(h.get(fieldOf(k.bucket, "f.type.dor.l0+cl1+dl1"))! + h.get(fieldOf(k.bucket, "f.type.dor.dl1"))!).toBe(h.get(fieldOf(k.bucket, "f.nodes.dor")));
     }
-    const fine = slotOf("mainnet", "5m", t);
+    const fine = slotOf("5m", t);
     expect(inc.get(fine.key)?.get(fieldOf(fine.bucket, "f.type.dor.dl1"))).toBeUndefined();
   });
 });
@@ -231,11 +231,11 @@ describe("bucketFleet per-network types", () => {
 describe("bucketMetas blocks", () => {
   it("counts each record's blocks array into m.{id}.blocks", () => {
     const inc: IncMap = new Map();
-    bucketMetas(inc, "mainnet", "up", [
+    bucketMetas(inc, "up", [
       { ordinal: 1, timestamp: "2026-09-11T10:00:00Z", fee: 0, sizeInKB: 2, blocks: ["a", "b"] },
       { ordinal: 2, timestamp: "2026-09-11T10:01:00Z", fee: 0, sizeInKB: 2 },
     ]);
-    const k = slotOf("mainnet", "1h", Date.parse("2026-09-11T10:00:00Z"));
+    const k = slotOf("1h", Date.parse("2026-09-11T10:00:00Z"));
     expect(inc.get(k.key)?.get(fieldOf(k.bucket, "m.up.blocks"))).toBe(2);
   });
 });
@@ -304,9 +304,9 @@ describe("bucketFleetGeo", () => {
   it("writes the day's sites to their own monthly hash, beside the family's yearly one", () => {
     const inc: IncMap = new Map();
     const geo = { countries: {}, providers: {}, perNetCountries: {}, perNetProviders: {}, providerNames: {}, sites: { "DE.Falkenstein.hetzner": 4 } };
-    bucketFleetGeo(inc, "mainnet", Date.UTC(2026, 9, 27, 14, 30), geo);
+    bucketFleetGeo(inc, Date.UTC(2026, 9, 27, 14, 30), geo);
     expect(inc.get("geo:mainnet:sites:2026-10")?.get("10-27|f.site.DE.Falkenstein.hetzner")).toBe(4);
-    bucketFleetGeo(inc, "mainnet", Date.UTC(2026, 9, 27, 15, 30), { ...geo, sites: { "DE.Falkenstein.hetzner": 3 } });
+    bucketFleetGeo(inc, Date.UTC(2026, 9, 27, 15, 30), { ...geo, sites: { "DE.Falkenstein.hetzner": 3 } });
     expect(inc.get("geo:mainnet:sites:2026-10")?.get("10-27|f.site.DE.Falkenstein.hetzner")).toBe(3); // the day's last reading
     expect([...(inc.get("geo:mainnet:2026")?.keys() ?? [])]).toEqual([]);
   });
@@ -320,7 +320,7 @@ describe("bucketFleetGeo", () => {
   };
   it("writes the day's gauges into the geo family only — never a t:{net}:* tier", () => {
     const inc: IncMap = new Map();
-    bucketFleetGeo(inc, "mainnet", Date.UTC(2026, 9, 27, 14, 30), geo);
+    bucketFleetGeo(inc, Date.UTC(2026, 9, 27, 14, 30), geo);
     expect([...inc.keys()]).toEqual(["geo:mainnet:2026"]);
     expect(get(inc, "geo:mainnet:2026", "10-27|f.cc.DE")).toBe(60);
     expect(get(inc, "geo:mainnet:2026", "10-27|f.isp.hetzner-online-gmbh")).toBe(70);
@@ -329,8 +329,8 @@ describe("bucketFleetGeo", () => {
   });
   it("keeps the LAST reading of the day, as every f.* gauge does", () => {
     const inc: IncMap = new Map();
-    bucketFleetGeo(inc, "mainnet", Date.UTC(2026, 9, 27, 1), geo);
-    bucketFleetGeo(inc, "mainnet", Date.UTC(2026, 9, 27, 2), { ...geo, countries: { DE: 61 } });
+    bucketFleetGeo(inc, Date.UTC(2026, 9, 27, 1), geo);
+    bucketFleetGeo(inc, Date.UTC(2026, 9, 27, 2), { ...geo, countries: { DE: 61 } });
     expect(get(inc, "geo:mainnet:2026", "10-27|f.cc.DE")).toBe(61);
   });
 });
@@ -341,7 +341,7 @@ describe("bucketGlobals: the largest global snapshot", () => {
   const rec = (s: number, n: number) => ({ ordinal: s, timestamp: ts(14, 0, s), metagraphSnapshotCount: n });
   it("keeps the bucket's largest beside the sum", () => {
     const inc: IncMap = new Map();
-    bucketGlobals(inc, "mainnet", [rec(1, 4), rec(30, 11), rec(60, 7)], null);
+    bucketGlobals(inc, [rec(1, 4), rec(30, 11), rec(60, 7)], null);
     expect(get(inc, "t:mainnet:5m:2026-09-06", "14:00|g.anchorsMax")).toBe(11);
     expect(get(inc, "t:mainnet:5m:2026-09-06", "14:00|g.anchors")).toBe(22);
   });
@@ -351,7 +351,7 @@ describe("bucketTransfers", () => {
   const t = (h: number, m: number) => new Date(Date.UTC(2026, 10, 4, h, m)).toISOString();
   it("counts the DAG's transfers on the global row, its amount in DAG and its fee in datum", () => {
     const inc: IncMap = new Map();
-    bucketTransfers(inc, "mainnet", "dag", [
+    bucketTransfers(inc, "dag", [
       { snapshotOrdinal: 10, timestamp: t(9, 1), amount: 150_00000000, fee: 1_000_000 },
       { snapshotOrdinal: 10, timestamp: t(9, 1), amount: 50_00000000 },
     ]);
@@ -363,7 +363,7 @@ describe("bucketTransfers", () => {
   });
   it("counts a network's token transfers on its own row", () => {
     const inc: IncMap = new Map();
-    bucketTransfers(inc, "mainnet", "DAGabc", [{ snapshotOrdinal: 3, timestamp: t(9, 7), amount: 1e8 }]);
+    bucketTransfers(inc, "DAGabc", [{ snapshotOrdinal: 3, timestamp: t(9, 7), amount: 1e8 }]);
     expect(inc.get("t:mainnet:5m:2026-11-04")!.get("09:05|m.DAGabc.tx")).toBe(1);
     expect(inc.get("t:mainnet:5m:2026-11-04")!.get("09:05|m.DAGabc.txAmt")).toBe(1);
   });
@@ -372,7 +372,7 @@ describe("bucketTransfers", () => {
 describe("markTransferCoverage", () => {
   it("marks every bucket of the span in every tier, both ends included", () => {
     const inc: IncMap = new Map();
-    markTransferCoverage(inc, "mainnet", Date.UTC(2026, 10, 4, 9, 3), Date.UTC(2026, 10, 4, 9, 31));
+    markTransferCoverage(inc, Date.UTC(2026, 10, 4, 9, 3), Date.UTC(2026, 10, 4, 9, 31));
     const five = [...inc.get("t:mainnet:5m:2026-11-04")!.keys()].sort();
     expect(five).toEqual(["09:00", "09:05", "09:10", "09:15", "09:20", "09:25", "09:30"].map((b) => `${b}|x.cov`));
     expect(inc.get("t:mainnet:1h:2026-11")!.get("04-09|x.cov")).toBe(0);
@@ -380,7 +380,7 @@ describe("markTransferCoverage", () => {
   });
   it("marks nothing for an empty or reversed span", () => {
     const inc: IncMap = new Map();
-    markTransferCoverage(inc, "mainnet", 2, 1);
+    markTransferCoverage(inc, 2, 1);
     expect(inc.size).toBe(0);
   });
 });
@@ -389,7 +389,7 @@ describe("bucketStake", () => {
   it("writes the registry's totals as hourly and daily gauges, and each validator into the stake family", () => {
     const inc: IncMap = new Map();
     const ts = Date.UTC(2026, 10, 4, 14, 20);
-    bucketStake(inc, "mainnet", ts, {
+    bucketStake(inc, ts, {
       total: 300, live: 250, delegations: 5, validators: 2,
       perValidator: [{ key: "aaaaaaaaaaaaaaaa", id: "a", name: "EUROPA", dag: 250, addrs: 4, live: true }],
     });

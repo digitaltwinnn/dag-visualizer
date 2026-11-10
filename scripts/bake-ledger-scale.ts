@@ -9,15 +9,12 @@
 // `meta.next` cursor) back to one shared cutoff, and quantiles run only over ticks younger than
 // the oldest fully-covered timestamp.
 //
-// Run manually whenever the metagraph set or a network's traffic changes:
-//   npx tsx scripts/bake-ledger-scale.ts [mainnet|integrationnet|testnet]
-// One run per network — the result lands in BYTE_SCALE_KB_BY_NET (domain/ledgerLayout.ts).
-import { CATALOG, NETWORKS } from "../src/engine/config";
-import { parseNet } from "../src/net/parse";
+// Run manually whenever the metagraph set or the network's traffic changes:
+//   npx tsx scripts/bake-ledger-scale.ts
+// The result lands in BYTE_SCALE_KB (domain/ledgerLayout.ts).
+import { HOSTS, METAGRAPHS } from "../src/engine/config";
 
-const NET = parseNet("?net=" + (process.argv[2] ?? ""));
-const METAGRAPHS = CATALOG[NET];
-const BE = NETWORKS[NET].be;
+const BE = HOSTS.be;
 const WINDOW_HOURS = 12;
 const MAX_PAGES = 30; // safety valve — ~30k snapshots per metagraph
 
@@ -65,9 +62,9 @@ async function main() {
     console.warn(`only ${ticks.length} complete ticks — raise WINDOW_HOURS/MAX_PAGES for a trustworthy p99`);
   }
   if (!ticks.length) {
-    // A quiet chain set (dev networks idle for days) has no honest quantile to state — fall
-    // back to mainnet's reference rather than baking a number measured over nothing.
-    console.log("no complete ticks in the window — keep the mainnet reference for this network");
+    // A quiet window has no honest quantile to state — keep the baked reference rather than
+    // baking a number measured over nothing.
+    console.log("no complete ticks in the window — keep the baked reference");
     return;
   }
   const at = (q: number) => ticks[Math.min(ticks.length - 1, Math.floor(ticks.length * q))];

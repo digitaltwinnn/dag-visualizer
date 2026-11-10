@@ -33,7 +33,6 @@ import { noteSupported } from "./sources";
 // (`noteSupported`): History has no `all` subject, and the unlisted set has a note in History alone.
 // On-request kinds (the 1h pill, a brushed range) are never warmed.
 
-const NET = "mainnet";
 /** How early a warmed note is due: more than a pass's length (300 s at most), and under the
  *  15-minute cron step (see the header), so its shortest refresh is never cut a step short. */
 export const WARM_SLACK_MS = 10 * 60_000;
@@ -69,13 +68,13 @@ export function warmCandidates(subjects: string[], countries: string[]): WarmIte
   const out: WarmItem[] = [];
   for (const [view, span] of [...HOURLY, ...DAILY]) {
     const subs = view === "geo" ? [...subjects, ...countries.map((cc) => `cc:${cc}`)] : subjects;
-    for (const subject of subs) if (noteSupported(view, subject, span, NET)) out.push({ view, subject, span });
+    for (const subject of subs) if (noteSupported(view, subject, span)) out.push({ view, subject, span });
   }
   return out;
 }
 
 export function warmKeyOf(item: WarmItem): string {
-  return noteKeyOf(NET, item.view, item.subject, item.span);
+  return noteKeyOf(item.view, item.subject, item.span);
 }
 
 /** THE PASS: the candidates that are due. `setKey` is the current networks-with-nodes key (sorted

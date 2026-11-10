@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BRIEFING_COVER, BRIEFING_LAND_MAX_MS, BRIEFING_NO_MOTION_MS, BRIEFING_PACE, BRIEFING_RELEASE_MS, BRIEFING_SETTLE_MS, BRIEFING_STOPS, BRIEFING_TYPE_SLOW, BRIEFING_WORDS_OUT_MS, HANDOVER_MS, HANDOVER_SHEET_GROW_MS, LINE_MAX, SCENE_WAIT_MS, STOP_MS, briefsOn, handoverHand, handoverPulses, hasLanded, liftSettling, mayAdvance, nextStop, prevStop, stopRegister } from "./briefing";
 
-const on = { pathname: "/", net: "mainnet", seen: false };
+const on = { pathname: "/", seen: false };
 
 describe("how long a stop stands", () => {
   // user, 2026-11-02: 4.9 seconds asked 21 to 25 characters a second of the live lines, past a subtitle's
@@ -39,7 +39,7 @@ describe("the tour's route", () => {
 });
 
 describe("when the tour plays", () => {
-  it("plays on the landing URL, once a session, on mainnet", () => {
+  it("plays on the landing URL, once a session", () => {
     expect(briefsOn(on)).toBe(true);
   });
 
@@ -50,10 +50,6 @@ describe("when the tour plays", () => {
 
   it("a second landing in the session does not replay it", () => {
     expect(briefsOn({ ...on, seen: true })).toBe(false);
-  });
-
-  it("the notes are mainnet's, so another network has no briefing", () => {
-    expect(briefsOn({ ...on, net: "testnet" })).toBe(false);
   });
 });
 

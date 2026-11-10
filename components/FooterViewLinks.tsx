@@ -1,7 +1,6 @@
 "use client";
 import { switchLedgerRegister } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
-import NetLink from "@/components/NetLink";
 import { LISTED_VIEWS, REGISTER_PAGES } from "@/components/views";
 import type { LedgerRegister } from "@/src/store/mode";
 
@@ -34,7 +33,7 @@ export default function FooterViewLinks() {
               ·
             </span>
           )}
-          <NetLink
+          <a
             href={`/${v.slug}`}
             className="hover:text-foreground transition-colors"
             onClick={(e) => {
@@ -49,7 +48,7 @@ export default function FooterViewLinks() {
             }}
           >
             {v.name}
-          </NetLink>
+          </a>
         </span>
       ))}
       {/* The group's trailing BETWEEN-GROUPS hairline rides inside the phone-hidden span, so

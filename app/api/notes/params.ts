@@ -15,8 +15,7 @@ import { CC_TAIL_RE, ISP_TAIL_RE, KIND_TIMING, TYPE_TAIL_RE, isSubjectNote, snap
 // above, `<key>` a provider's slug (`providerKey`) and `<roleKey>` a make-up spelled as `roleKey`
 // spells it, so one make-up has one key. The span is fixed by the view except History's: a
 // pill, or a brushed `from`/`to` snapped by `snapSpan` so near-identical brushes share one key.
-// Notes exist for mainnet only, so the catalog asked is
-// mainnet's; whether this particular view writes a note for this subject is the generator's call
+// Whether this particular view writes a note for this subject is the generator's call
 // (`noteSupported`), which answers `none` rather than an error.
 
 const VIEWS: readonly NoteView[] = ["hyper", "geo", "ledger", "trend", "blocks", "data"];
@@ -26,7 +25,6 @@ const PILLS: readonly NoteSpan[] = ["1h", "24h", "7d", "30d", "90d", "1y", "all"
  *  brushed range and the subject notes. */
 const ON_REQUEST_PILL: NoteSpan = "1h";
 const MS_RE = /^\d{1,15}$/;
-const NET = "mainnet";
 
 export interface NoteParams {
   view: NoteView;
@@ -40,9 +38,9 @@ type Parsed = NoteParams | { error: string } | { none: true };
 
 /** A tracked network as its current id; null for an address the catalog does not track. */
 function networkOf(raw: string): string | null {
-  if (!isTracked(NET, raw)) return null;
-  const current = currentIdOf(NET, raw);
-  return current && isTracked(NET, current) ? current : null;
+  if (!isTracked(raw)) return null;
+  const current = currentIdOf(raw);
+  return current && isTracked(current) ? current : null;
 }
 
 /** A subject note's selection, per view. A make-up must be its own `roleKey` (vocabulary order, no

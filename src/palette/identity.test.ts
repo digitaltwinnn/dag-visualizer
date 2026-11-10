@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { hexToHueDeg, configPins, identityPins, identityMap, identityHudHex, identityHudCss, identitySceneHex, SCENE_L, SCENE_C, HUD_L, HUD_C } from "./identity";
-import { METAGRAPHS } from "@/src/net/current";
-import { COLORS } from "@/src/engine/config";
+import { COLORS, METAGRAPHS } from "@/src/engine/config";
 import { oklchToHex } from "./palette";
 import brandHues from "@/data/brand-hues.json";
 

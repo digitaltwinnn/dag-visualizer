@@ -967,25 +967,9 @@
      at 10+:1, on paper its L 0.56 is a lamp, not an ink — the inspector's external link measured
      2.3:1 and the chart's inspect link under 3. A link or a ticker set in the accent takes this
      token instead: the same hue mixed two-thirds toward black on paper (L ≈ 0.39, 5+:1), and the
-     accent itself on dark. Stated against `--primary`, so a `[data-net]` re-point carries it. */
+     accent itself on dark. Stated against `--primary`, so it follows the accent token. */
   --primary-ink: light-dark(color-mix(in oklch, var(--primary) 68%, black), var(--primary));
   --ring: light-dark(oklch(0.56 0.094 195), oklch(0.88 0.13 195));
-  /* The three network accents — ONE home (multi-network design §2). All three are always
-     defined so the NetworkSwitch popover can render every network's dot on any network; the
-     [data-net] rules after this block only re-point --primary/--ring. Mainnet gets NO
-     [data-net] rule, so the bare URL's rendered CSS stays byte-identical. Chroma 0.13 on all
-     three (matching --primary, deliberately below cyan's 0.150 gamut ceiling); lightness
-     differs per hue because each hue's in-gamut chroma peaks at a different brightness.
-     Guard-band kin: ACCENT_HUE in src/palette/palette.ts mirrors these hues — keep in sync.
-     The light sides share L 0.50 and NOTHING ELSE (user, 2026-08-21: "the colors can still pop").
-     They were briefly pinned to cyan's chroma as well, on the reasoning that cyan's ink-lightness
-     ceiling binds all three — but a ceiling is not a style: at L 0.50 cyan 195 tops out at C 0.085
-     while violet 300 reaches 0.266 and magenta 327 reaches 0.231 (measured), so matching them to
-     the tightest hue spent two-thirds of their gamut buying a uniformity nobody sees. Each takes
-     what its own hue affords; cyan alone is at its ceiling and must not be raised. */
-  --net-mainnet: light-dark(oklch(0.56 0.094 195), oklch(0.88 0.13 195));
-  --net-integrationnet: light-dark(oklch(0.50 0.19 300), oklch(0.78 0.13 300));
-  --net-testnet: light-dark(oklch(0.50 0.18 327), oklch(0.84 0.13 327));
   /* The sole --accent definition (the legacy literal in app/styles/00-base.css was dropped
      when that file was retired in Task 10) — points at --primary so it stays the single
      source of truth. Consumed by CardHead's `var(--filter-accent, var(--accent))` bullet. */
@@ -1067,18 +1051,6 @@
   :root:not([data-theme="dark"]) { --trend-fill-top: 0.12; }
 }
 :root[data-theme="light"] { --trend-fill-top: 0.12; }
-
-/* Network accent override — stamped on <html> before first paint by the inline script in
-   app/layout.tsx. Mainnet has no rule on purpose (byte-identical CSS). --primary-foreground
-   is unchanged for all three (contrast verified in the design). */
-:root[data-net="integrationnet"] {
-  --primary: var(--net-integrationnet);
-  --ring: var(--net-integrationnet);
-}
-:root[data-net="testnet"] {
-  --primary: var(--net-testnet);
-  --ring: var(--net-testnet);
-}
 
 /* ── Structural / layout lane (was app/styles/00-base.css, retired in Task 10) ──
    Names carried over from the pre-migration stylesheet. Layout/spacing + instrument-thread
@@ -1187,9 +1159,9 @@
      not have the same width"): one token, so the two columns can never drift apart again. It was
      clamp(264px, 16vw, 340px) — 56px narrower at 1400px. */
   --rail-w: var(--detail-w);
-  /* THE ACCENT, like the wash ladder (review, 2026-09-26): these were the cyan spelled out, so on
-     a network whose `--primary` is violet or magenta the committed row stayed cyan beside a
-     violet path plate — two accents on one card. `--primary` is light-dark() already. */
+  /* THE ACCENT, like the wash ladder (review, 2026-09-26): stated against `--primary`, never the
+     cyan spelled out, so the committed row and the path plate can never carry two accents on one
+     card. `--primary` is light-dark() already. */
   --sel-bg: color-mix(in oklch, var(--primary) 12%, transparent);   /* selected/active fill, reused everywhere */
   --sel-border: color-mix(in oklch, var(--primary) 52%, transparent);
   --sel-bg-dim: color-mix(in oklch, var(--primary) 6%, transparent);  /* the same mark at ANCESTOR strength: an explorer row

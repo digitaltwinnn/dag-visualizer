@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { METAGRAPHS } from "@/src/net/current";
+import { METAGRAPHS } from "@/src/engine/config";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
 import { scopeEmptyCopy, stackRoster, trendRoster, trendScope, viewScope } from "./trendScope";
 

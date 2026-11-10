@@ -20,9 +20,6 @@ import {
   Coins,
   CircleHelp,
   Shapes,
-  BadgeCheck,
-  GitMerge,
-  FlaskConical,
   ChartSpline,
   CalendarRange,
   Crosshair,
@@ -43,7 +40,6 @@ import {
   Plus,
 } from "lucide-react";
 import type { NotableKind, NoteChangeKind } from "@/src/data/noteTypes";
-import type { NetworkId } from "@/src/engine/config";
 import type { Mode } from "@/src/store/store";
 import type { PickDescriptor } from "@/src/data/types";
 import type { TrendMetric } from "@/src/store/store";
@@ -187,17 +183,6 @@ export const METATYPE_ICONS: Record<"data" | "currency" | "unknown" | "mixed", L
   currency: Coins,
   unknown: CircleHelp,
   mixed: Shapes,
-};
-
-/** The CONSTELLATION NETWORKS' marks (the NetworkSwitch, 2026-08-30) — the dev-lifecycle family:
- *  mainnet is the canonical, verified chain (BadgeCheck), integrationnet is where branches meet
- *  (GitMerge — integration, literally), testnet is the lab (FlaskConical). Monochrome via
- *  currentColor like every glyph; the switch tints each with its network's own accent token, so
- *  colour and glyph are one mark. */
-export const NET_ICONS: Record<NetworkId, LucideIcon> = {
-  mainnet: BadgeCheck,
-  integrationnet: GitMerge,
-  testnet: FlaskConical,
 };
 
 // The inspector card KINDS map onto one glyph set shared with the dock icon trays: the metagraph

@@ -12,12 +12,7 @@ import {
   registerForPath,
   titleNameFor,
   viewTitle,
-  VIEWS,
 } from "@/components/views";
-import { consumeNetSwitch } from "@/components/topbar/NetworkSwitch";
-import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
-import type { Mode } from "@/src/store/store";
-import type { LedgerRegister } from "@/src/store/mode";
 
 // The URL↔state bridge (2026-09-04, extended for the doc overlay): the four 3D views AND the
 // two doc pages are real routes (/hypergraph, /geography, /snapshots, /trends, /about, /design) so
@@ -34,7 +29,7 @@ import type { LedgerRegister } from "@/src/store/mode";
 //     and the effect lands before the engine's dynamic import resolves). The DOC seed lives in
 //     DocLayer, whose `initial` prop is what the route server-rendered — one owner per axis.
 //  2. PUBLISH — a store subscription pushes the derived path whenever mode or docPage changes
-//     (search string preserved — ?net= and the dev flags ride along), skipped when the URL
+//     (search string preserved — the dev flags ride along), skipped when the URL
 //     already says it, while the Briefing runs, and when the change came from popstate. Every view has a path since
 //     2026-10-03 (the placeholder is `/soon`); the no-path branch below stays for a mode that
 //     ever lacks one. `/` is only ever the landing URL.
@@ -42,31 +37,11 @@ import type { LedgerRegister } from "@/src/store/mode";
 //     views and docs alike (view granularity only — the focus ladder stays out of history).
 //
 // The document title follows the same beat: pushState doesn't retitle a tab, so the bridge does.
-/** A network switch's view was carried into this page load (see the seed below). */
-let carriedThisLoad = false;
-
 export default function RouteSync() {
   const setMode = useStore((s) => s.setMode);
   const setDocPage = useStore((s) => s.setDocPage);
 
   useEffect(() => {
-    // A NETWORK SWITCH CARRIES ITS VIEW (NetworkSwitch's handoff): it lands on `/?net=…`, which would
-    // seed Geography, so the carried view and register win — register first, then the view, the
-    // footer's order (one URL write).
-    // Once per page load: the dev StrictMode re-run finds the handoff spent and would seed `/` over it.
-    if (carriedThisLoad) return;
-    const carried = consumeNetSwitch((v) => VIEWS.some((x) => x.id === v));
-    if (carried) {
-      carriedThisLoad = true;
-      const mode = carried.mode as Mode;
-      const offered = VIEW_POLICIES[mode].registers as readonly string[];
-      if (carried.register != null && offered.length > 1 && offered.includes(carried.register)) switchLedgerRegister(carried.register as LedgerRegister);
-      setMode(mode);
-      // The address bar says the carried view, keeping `?net=` (the publish below is not yet listening).
-      const path = pathFor(mode, useStore.getState().ledgerRegister);
-      if (path) history.replaceState(history.state, "", path + location.search);
-      return;
-    }
     const seeded = modeForPath(location.pathname);
     if (seeded && seeded !== useStore.getState().mode) setMode(seeded);
     // `/blocks` and `/data-blocks` are the Snapshots view in a register: the register seeds with the mode.

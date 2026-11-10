@@ -12,7 +12,7 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 // slot and so surfaced under WHICHEVER strip opened (the pulse strip included) — unrelated
 // content in a dropdown. The dock is the honest parallel: vitals live on the BOTTOM edge on
 // every tier (the desktop band, and now this sheet), and the strip keeps only what belongs to
-// it (the phone homes of NetworkSwitch/ThemeToggle).
+// it (the phone home of ThemeToggle).
 //
 // It rides the same RailDock machinery as its two neighbours — one-sheet-at-a-time via
 // `store.phoneDock`, drag-resize, flick-dismiss, the tap-outside collapse — passing only the

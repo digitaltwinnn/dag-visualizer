@@ -1,5 +1,5 @@
 import { unstable_cache } from "next/cache";
-import { NETWORKS, type NetworkId } from "@/src/engine/config";
+import { HOSTS } from "@/src/engine/config";
 import { geolocate } from "@/src/server/ipGeolocate";
 import type { GeoMap } from "@/src/data/types";
 
@@ -54,8 +54,8 @@ async function clusterNodes(base: string): Promise<Array<{ ip: string; state: st
   }
 }
 
-async function fetchLive(net: NetworkId): Promise<{ metagraphs: Metagraph[]; geo: GeoMap; builtAt: number }> {
-  const API = NETWORKS[net].directory;
+async function fetchLive(): Promise<{ metagraphs: Metagraph[]; geo: GeoMap; builtAt: number }> {
+  const API = HOSTS.directory;
   const list = ((await getJson(`${API}/metagraphs?limit=100`)) as { data?: unknown[] }).data ?? [];
   const ips = new Set<string>();
 
@@ -127,13 +127,13 @@ async function fetchLive(net: NetworkId): Promise<{ metagraphs: Metagraph[]; geo
 // every visitor's mount (inner fetches use `no-store`, which otherwise makes the route
 // dynamic and re-runs the whole fan-out per request). Throwing on empty keeps a network
 // blip from being cached: GET answers 503 and the next request retries.
-export const getLive = (net: NetworkId) =>
+export const getLive = () =>
   unstable_cache(
   async () => {
-    const live = await fetchLive(net);
+    const live = await fetchLive();
     if (!live.metagraphs.length) throw new Error("empty live result");
     return live;
   },
-  ["metagraphs-live-v4", net], // v4: +builtAt (v3 was +per-layer node `ids`, v2 +isp/asn geo)
+  ["metagraphs-live-v4"], // v4: +builtAt (v3 was +per-layer node `ids`, v2 +isp/asn geo)
   { revalidate },
   )();

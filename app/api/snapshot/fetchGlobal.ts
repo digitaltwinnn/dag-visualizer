@@ -1,5 +1,5 @@
 import { getArchiveInfo } from "../archive/probe";
-import { NETWORKS, type NetworkId } from "@/src/engine/config";
+import { HOSTS } from "@/src/engine/config";
 
 // ONE HOME for the raw global-snapshot pull (user, 2026-08-14 — old pages "should be sure to
 // pick a node that serves the history for that specific range"). The LB routes each request to
@@ -18,9 +18,9 @@ import { NETWORKS, type NetworkId } from "@/src/engine/config";
 // steady traffic that keeps a WAF block in place. A block, a 5xx or no answer at all now sends reads
 // straight to the archives for `LB_BACKOFF_MS`; the first read after it asks the LB again, so a lifted
 // block heals itself. A 404 trips nothing: it is the LB's depth lottery (above), not a failing LB.
-// Per network and per server instance — a cold function simply starts by asking the LB.
+// Per server instance — a cold function simply starts by asking the LB.
 export const LB_BACKOFF_MS = 10 * 60_000;
-const lbSkipUntil = new Map<NetworkId, number>();
+let lbSkipUntil = 0;
 /** How many fallback nodes one read asks at most, and how long the walk may take in all. */
 export const WALK_MAX = 12;
 const WALK_BUDGET_MS = 24_000;
@@ -44,12 +44,12 @@ export function forgetRecentGlobals(): void {
   recentGlobals.clear();
 }
 
-export async function fetchGlobalJson(net: NetworkId, ordinal: number): Promise<unknown> {
-  const key = `${net}:${ordinal}`;
+export async function fetchGlobalJson(ordinal: number): Promise<unknown> {
+  const key = String(ordinal);
   const now = Date.now();
   const kept = recentGlobals.get(key);
   if (kept && now - kept.at < GLOBAL_KEEP_MS) return kept.json;
-  const json = pullGlobalJson(net, ordinal);
+  const json = pullGlobalJson(ordinal);
   recentGlobals.set(key, { at: now, json });
   // A failed pull is forgotten at once — the callers' no-cache-on-throw contract retries it.
   json.catch(() => {
@@ -64,9 +64,9 @@ export async function fetchGlobalJson(net: NetworkId, ordinal: number): Promise<
 
 /** One attempt at the LB: the parsed snapshot, or why not. The BODY is read inside the try — a
  *  body that stalls or fails to parse is a failing LB like any other (review, 2026-10-04). */
-async function tryLb(net: NetworkId, ordinal: number): Promise<{ ok: true; json: unknown } | { ok: false; why: string; trip: boolean }> {
+async function tryLb(ordinal: number): Promise<{ ok: true; json: unknown } | { ok: false; why: string; trip: boolean }> {
   try {
-    const r = await fetch(`${NETWORKS[net].l0}/global-snapshots/${ordinal}`, {
+    const r = await fetch(`${HOSTS.l0}/global-snapshots/${ordinal}`, {
       headers: { Accept: "application/json" },
       cache: "no-store",
       signal: AbortSignal.timeout(8000),
@@ -87,21 +87,21 @@ function shuffle<T>(a: T[]): T[] {
   return a;
 }
 
-async function pullGlobalJson(net: NetworkId, ordinal: number): Promise<unknown> {
+async function pullGlobalJson(ordinal: number): Promise<unknown> {
   let lb: string;
-  const skipping = (lbSkipUntil.get(net) ?? 0) > Date.now();
+  const skipping = lbSkipUntil > Date.now();
   if (skipping) {
     lb = "skipped (backing off)";
   } else {
-    const a = await tryLb(net, ordinal);
+    const a = await tryLb(ordinal);
     if (a.ok) {
-      lbSkipUntil.delete(net);
+      lbSkipUntil = 0;
       return a.json;
     }
     lb = a.why;
-    if (a.trip) lbSkipUntil.set(net, Date.now() + LB_BACKOFF_MS);
+    if (a.trip) lbSkipUntil = Date.now() + LB_BACKOFF_MS;
   }
-  const info = await getArchiveInfo(net).catch(() => null);
+  const info = await getArchiveInfo().catch(() => null);
   // Random order so the handful of archival nodes share the deep-read load — then try them ALL:
   // the archives have GAPS (measured 2026-08-14: ~2.4–2.8M missing on every node, ~3.5M held by
   // one of nine — largely shared holes, so they synced from a common source), and coverage
@@ -148,9 +148,9 @@ async function pullGlobalJson(net: NetworkId, ordinal: number): Promise<unknown>
   // failed too, ask the LB after all — one blip must not cost ten minutes of reads the LB could
   // have answered. A success there lifts the backoff.
   if (skipping) {
-    const a = await tryLb(net, ordinal);
+    const a = await tryLb(ordinal);
     if (a.ok) {
-      lbSkipUntil.delete(net);
+      lbSkipUntil = 0;
       return a.json;
     }
     lb = `${a.why} (after backing off)`;

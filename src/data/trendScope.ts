@@ -1,4 +1,4 @@
-import { METAGRAPHS } from "@/src/net/current";
+import { METAGRAPHS } from "@/src/engine/config";
 import { metagraphById } from "@/src/data/network";
 
 // WHAT THE COMMITTED FILTER DOES TO THE MEASURED HISTORY — ONE HOME (2026-09-19).

@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { netOf } from "@/src/net/request";
 import { pairHashes } from "../decodeBlocks";
 import { cachedBlockHashes, cachedExact } from "../cachedExact";
 import { withinServedWindow } from "../ordinalWindow";
@@ -17,23 +16,22 @@ import { withinServedWindow } from "../ordinalWindow";
 
 export const maxDuration = 60;
 
-export async function GET(req: Request, ctx: { params: Promise<{ ordinal: string }> }) {
+export async function GET(_req: Request, ctx: { params: Promise<{ ordinal: string }> }) {
   const { ordinal } = await ctx.params;
-  const net = netOf(req);
   const n = Number(ordinal);
   if (!Number.isFinite(n) || n < 0) {
     return NextResponse.json({ error: "bad ordinal" }, { status: 400 });
   }
-  if (!(await withinServedWindow(net, n))) {
+  if (!(await withinServedWindow(n))) {
     // Outside the window this app can ever ask about (ordinalWindow.ts) — refuse without
     // touching the upstream, so the route isn't an anonymous walk over ~6.7M ordinals.
     return NextResponse.json({ available: false, ordinal: n }, { status: 404 });
   }
   try {
-    const data = await cachedExact(net, n);
+    const data = await cachedExact(n);
     let complete = true;
     if (data.blocks?.length) {
-      const hashes = await cachedBlockHashes(net, n).catch(() => [] as string[]);
+      const hashes = await cachedBlockHashes(n).catch(() => [] as string[]);
       ({ blocks: data.blocks, complete } = pairHashes(data.blocks, hashes));
     }
     return NextResponse.json(data, {

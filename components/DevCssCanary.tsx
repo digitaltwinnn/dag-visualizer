@@ -1,6 +1,5 @@
 "use client";
 
-import { netUrl } from "@/src/net/current";
 
 import { useEffect } from "react";
 
@@ -39,7 +38,7 @@ export default function DevCssCanary() {
       // the hash of the source it was built from (postcss/cssStamp.mjs); the file on disk has its
       // own. Different hashes = a stale compile, whatever the rule.
       const served = getComputedStyle(document.documentElement).getPropertyValue("--css-stamp").trim().replace(/"/g, "");
-      void fetch(netUrl("/api/dev/css-stamp"), { cache: "no-store" })
+      void fetch("/api/dev/css-stamp", { cache: "no-store" })
         .then((r) => (r.ok ? (r.json() as Promise<{ stamp: string }>) : null))
         .then((j) => {
           if (!j || j.stamp === served) return;

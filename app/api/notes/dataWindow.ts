@@ -1,4 +1,4 @@
-import { NETWORKS, type NetworkId } from "@/src/engine/config";
+import { HOSTS } from "@/src/engine/config";
 import { cachedExact } from "../snapshot/cachedExact";
 import { DATA_NOTE_TICKS, type DataTickRead } from "@/src/data/noteFactsData";
 
@@ -22,9 +22,9 @@ export interface DataWindowRead {
 
 const POOL = 8;
 
-async function globalAt(net: NetworkId, ordinal: number | "latest"): Promise<{ ordinal: number; timestamp: string } | null> {
+async function globalAt(ordinal: number | "latest"): Promise<{ ordinal: number; timestamp: string } | null> {
   try {
-    const r = await fetch(`${NETWORKS[net].be}/global-snapshots/${ordinal}`, { headers: { Accept: "application/json" }, cache: "no-store", signal: AbortSignal.timeout(6000) });
+    const r = await fetch(`${HOSTS.be}/global-snapshots/${ordinal}`, { headers: { Accept: "application/json" }, cache: "no-store", signal: AbortSignal.timeout(6000) });
     if (!r.ok) return null;
     const d = ((await r.json()) as { data?: { ordinal?: unknown; timestamp?: unknown } }).data;
     return typeof d?.ordinal === "number" && typeof d?.timestamp === "string" ? { ordinal: d.ordinal, timestamp: d.timestamp } : null;
@@ -34,9 +34,8 @@ async function globalAt(net: NetworkId, ordinal: number | "latest"): Promise<{ o
 }
 
 /** The newest window's exact reads, newest first. */
-export async function readDataWindow(net: string, ticks: number = DATA_NOTE_TICKS): Promise<DataWindowRead> {
-  const id = net as NetworkId;
-  const latest = await globalAt(id, "latest");
+export async function readDataWindow(ticks: number = DATA_NOTE_TICKS): Promise<DataWindowRead> {
+  const latest = await globalAt("latest");
   if (!latest) return { ticks: [], fromMs: null, toMs: null };
   const ordinals = Array.from({ length: ticks }, (_, i) => latest.ordinal - i).filter((o) => o > 0);
   const out: DataTickRead[] = [];
@@ -44,7 +43,7 @@ export async function readDataWindow(net: string, ticks: number = DATA_NOTE_TICK
     const batch = await Promise.all(
       ordinals.slice(i, i + POOL).map(async (ordinal) => {
         try {
-          return { ordinal, rows: (await cachedExact(id, ordinal)).rows };
+          return { ordinal, rows: (await cachedExact(ordinal)).rows };
         } catch {
           return { ordinal, rows: null };
         }
@@ -52,6 +51,6 @@ export async function readDataWindow(net: string, ticks: number = DATA_NOTE_TICK
     );
     out.push(...batch);
   }
-  const oldest = ordinals.length ? await globalAt(id, ordinals[ordinals.length - 1]!) : null;
+  const oldest = ordinals.length ? await globalAt(ordinals[ordinals.length - 1]!) : null;
   return { ticks: out, fromMs: oldest ? Date.parse(oldest.timestamp) : null, toMs: Date.parse(latest.timestamp) };
 }

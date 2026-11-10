@@ -4,11 +4,11 @@ import { useEffect, useRef } from "react";
 
 import { AI_NOTES_ICON } from "@/components/icons";
 import { NodeStars } from "@/components/state/StateAtoms";
-import { useNet } from "@/components/topbar/useNet";
 import { queryOf, type NoteReq } from "./noteLoader";
 import { NoteFoot } from "./NoteRows";
 import TypedNote from "./TypedNote";
-import { useMainnetNote, useWaited } from "./useAiNote";
+import { useWaited } from "./useAiNote";
+import useNote from "./useNote";
 
 // A SUBJECT CARD'S OWN NOTE (spec 2026-10-29-subject-notes): one note per card, scoped as the
 // card's lead — the Country, Provider and Composition cards and the Range card mount this IN THE
@@ -25,7 +25,7 @@ import { useMainnetNote, useWaited } from "./useAiNote";
 // The mark and the writing say AI (`TypedNote`). The place shows its own "reading…" while the note
 // is in flight (one word, user 2026-10-30: whether the note is held or still being written is the
 // cache's business, not the reader's), and nothing at all when there is no note to have (`none`:
-// nothing measured; off mainnet). `unavailable` IS shown, as an instrument state (rule 10): "no note
+// nothing measured). `unavailable` IS shown, as an instrument state (rule 10): "no note
 // right now", muted, no door (user, 2026-10-30: a brushed range's note was simply missing — the Gate
 // had refused the write, which `FAIL_TTL_S` remembers for 15 minutes, and a card with no lead and no
 // reason read as broken; the next range's note then appeared and said nothing about the first). The
@@ -39,10 +39,8 @@ const ASK_DWELL_MS = 1500;
 /** 14px, its 1px inset and the row's 9px gap land the words on the title's column: the kind mark's 16 and 8. */
 const MARK = <AI_NOTES_ICON aria-hidden className="ml-px mt-[3px] size-3.5 shrink-0 text-[var(--ai-mark)]" />;
 
-export default function SubjectNote({ req }: { req: NoteReq | null }) {
-  // Presence through `useNet()`, the fetch through the gate (`useMainnetNote`'s hydration rule).
-  const asked = useNet() === "mainnet" ? req : null;
-  const note = useMainnetNote(asked);
+export default function SubjectNote({ req: asked }: { req: NoteReq | null }) {
+  const note = useNote(asked);
   const res = note.res;
   const key = asked ? queryOf(asked) : null;
   const waited = useWaited(res);
