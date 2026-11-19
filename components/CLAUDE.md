@@ -1085,6 +1085,13 @@ control 'snapshots' should be 'metagraph snapshots'"; the VIEW stays "Snapshots"
 below is the Transaction blocks register). The explorer's title is the ACTIVE REGISTER's name, the
 switch's own (`REGISTER_NAMES`; user, 2026-11-19: "Explorer should show the label of the active
 switch" — the D6 carry ruling had kept the view's axis word "Snapshots" in every register). The register
+switch is LAYERED since 2026-11-19 (user: "show that container concept in the view switcher itself";
+design round options A → A4 → A4·1, then readings option 2 — `RegisterSwitch.tsx`'s header): the tiles
+stand as the protocol stacks them — Transaction blocks a tall tile down to the base (the DAG's blocks go
+straight into the global snapshot), Data blocks on the Metagraph snapshots bar, a fixed, unpressable
+"Global snapshot" base — and they are NAMES ONLY; the lit register's readings (span, count, live /
+pinned / n/a) are ONE line under the face, above the register's sentence, on the phone face too.
+Where the paragraphs below speak of "halves" and their second line, read the tiles and that line. The register
 switch stands ON THE SCENE (D3, 2026-11-07 — option A of the user's mock,
 `components/RegisterSwitch.tsx`): one glass segmented control centred under the command bar, each
 half carrying its own SPAN ("Metagraph snapshots · last 11 min", "Transaction blocks · last 14 h",

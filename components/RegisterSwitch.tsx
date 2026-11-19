@@ -54,25 +54,33 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 // (`PastWindowBridge`), and the block window (`BlockWindowBridge`, which reads it from either register
 // for this reason).
 
-/** The switch FACE's height (two lines a half and the rule between them, a touch target). */
-const SWITCH_FACE_H = 58;
-
-/** THE RULE BETWEEN A HALF'S TWO ROWS (user, 2026-11-19: "the top and bottom row are quite close to
- *  each other and it makes the control look dense … some separation or visual cue"): the cards' own
- *  head-to-body hairline, the label row above it and the readings below. The lit half draws it in the
- *  selection's border tone, so it stays visible on the wash; the phone face draws the same rule. */
-const ROW_RULE = "my-1.5 h-px w-full self-stretch bg-border group-aria-pressed:bg-[var(--sel-border)]";
-/** THE LINE under the face (`registerLine`, user 2026-11-19: "under the switch, extra line, subtle
- *  text"; and on the phone, the same day: "I also want the hint there"): one line of the label step,
- *  TWO on the phone, where the sentence wraps under the narrower face. Its room is reserved on each
- *  tier, so the block below never moves. */
-const NOTE_H = 22;
-const NOTE_H_PHONE = 38;
-/** The switch block's whole height on a tier, face and note — the one number the motion hint's drop
- *  reads, and what `#register-switch` measures, so the callout's free band starts under the note. */
+/** THE LAYERED FACE (user, 2026-11-19 — option A4·1 of the design round, then readings option 2): the
+ *  registers drawn as the protocol stacks them, not three equals side by side. Transaction blocks a
+ *  tall tile reaching the global base (the DAG's blocks go straight into the global snapshot, a token's
+ *  into its metagraph snapshot first); Data blocks on the Metagraph snapshots bar (a data block is only
+ *  ever carried in one); the Global snapshot the base everything lands in, never pressable. The tiles
+ *  are NAMES ONLY; the lit register's readings are stated once, in the line under the face. */
+const FACE_H = 100;
+/** The phone's face: the lit register's name alone, ‹ › either side. */
+const FACE_H_PHONE = 40;
+/** The readings line under the face (the lit register's span, count and state). */
+const READINGS_H = 22;
+/** THE NOTE under the readings (`registerLine`): one line of the label step, TWO on the phone, where
+ *  the sentence wraps under the narrower face. Its room is reserved on each tier, so the block below
+ *  never moves. */
+const NOTE_H = 20;
+const NOTE_H_PHONE = 36;
+/** The switch block's whole height on a tier — the one number the motion hint's drop reads, and what
+ *  `#register-switch` measures, so the callout's free band starts under it. */
 export function registerSwitchH(phone: boolean): number {
-  return SWITCH_FACE_H + (phone ? NOTE_H_PHONE : NOTE_H);
+  return (phone ? FACE_H_PHONE : FACE_H) + READINGS_H + (phone ? NOTE_H_PHONE : NOTE_H);
 }
+/** Where each register's tile stands in the layered face (two columns, three rows). */
+const PLACE: Readonly<Record<LedgerRegister, string>> = {
+  blocks: "col-start-1 row-start-1 row-span-2",
+  data: "col-start-2 row-start-1",
+  snapshots: "col-start-2 row-start-2",
+};
 
 export default function RegisterSwitch() {
   const mode = useStore((s) => s.mode);
@@ -247,108 +255,75 @@ export default function RegisterSwitch() {
         sceneOnly && "-translate-y-[calc(100%+var(--rail-top)+var(--topbar-extra,0px))] opacity-0 pointer-events-none duration-300 ease-[ease]",
       )}
     >
-      <div style={{ height: SWITCH_FACE_H }}>
-      {/* THE PHONE FACE (option A): the lit register whole, ‹ › stepping the others. CSS picks the
-          presentation, both stay in the DOM (the view switch's precedent). */}
+      <div style={{ height: phone ? FACE_H_PHONE : FACE_H }}>
+      {/* THE PHONE FACE (option A): the lit register's NAME, ‹ › stepping the others. CSS picks the
+          presentation, both stay in the DOM (the view switch's precedent). Its readings are the line
+          under it, as on the desktop. */}
       <div role="group" aria-label="Register" className={cn("hidden max-[700px]:flex h-full items-center gap-0.5 px-1", FRAME)}>
         {chevron(-1)}
-        {/* THE FACE RESTS UNWASHED (user, 2026-11-09: "it keeps the focus while idle"): the selection
-            wash marks the lit station among three on the desktop; on a lone face it only read as a
-            pressed button that never let go. The view face above it wears none either — the glyph in
-            the accent and the name in the foreground ink say which one is shown. */}
-        <SlideFace
-          id={register}
-          from={slideFrom}
-          clipClassName="px-2 py-1"
-          className="flex flex-col items-center justify-center"
-        >
+        {/* THE FACE RESTS UNWASHED (user, 2026-11-09: "it keeps the focus while idle"): the glyph in
+            the accent and the name in the foreground ink say which register is shown. */}
+        <SlideFace id={register} from={slideFrom} clipClassName="px-2 py-1" className="flex items-center justify-center">
           <span className="flex items-center justify-center gap-1.5 text-body font-semibold leading-none whitespace-nowrap text-foreground">
             <LitIcon aria-hidden className="size-3.5 flex-none text-primary" />
             {REGISTER_NAMES[register]}
-          </span>
-          <span aria-hidden className={ROW_RULE} />
-          <span className="flex items-center justify-center gap-1 font-mono text-label leading-none tabular-nums whitespace-nowrap text-foreground">
-            <Clock aria-hidden className="size-3 flex-none opacity-80" />
-            <span aria-hidden>{bareSpan[register]}</span>
-            {figure[register] && (
-              <span aria-hidden className="ml-2 inline-flex items-center gap-1">
-                <LitIcon aria-hidden className="size-3 flex-none opacity-80" />
-                {figure[register]}
-              </span>
-            )}
-            {/* The state, the row's third column — the desktop half's own order (2026-11-09). */}
-            <StateMark following={following} na={paused} className="ml-2 font-sans leading-none" />
-            {/* The readings in words for assistive tech (the desktop half's own accessible name). */}
-            <span className="sr-only">{count[register] ? `${span[register]}, ${count[register]}` : span[register]}</span>
           </span>
         </SlideFace>
         {chevron(1)}
       </div>
 
-      {/* FROM 700px UP: the segmented control, one half per register. EQUAL halves as wide as the
-          widest one's content (implicit `1fr` columns keep their content minimum, and the frame sizes
-          to content); the lit half in the selection fill — the view switch's own on-state. */}
-      <div role="group" aria-label="Register" className={cn("max-[700px]:hidden h-full grid grid-flow-col auto-cols-fr gap-1 p-1", FRAME)}>
-      {registers.map((r) => {
-        const Icon = REGISTER_ICONS[r];
-        const lit = register === r;
-        return (
-          <button
-            key={r}
-            type="button"
-            aria-pressed={lit}
-            // NO aria-label (review, 2026-11-09): one overrode the content and dropped the lit half's
-            // LIVE / PINNED state; the content is the name, the readings and the state mark, whose
-            // screen-reader word lives in `PinnedMark` alone (`pinnedMark.test.ts`).
-            onClick={() => switchLedgerRegister(r)}
-            className={cn(
-              // THE LIT STATION IS A WASH, NOT A FRAME (user, 2026-11-07, option 5 without the underline):
-              // the unlit halves recede a step, the lit one carries the selection wash alone — no inset
-              // ring — with its name and count in the accent and its span in the foreground ink.
-              // CENTRED (user, 2026-11-08: "centre 'metagraph snapshots' / 'transaction blocks' … and the section
-              // below as well"): both lines sit on the half's own axis.
-              "group flex flex-col items-center justify-center rounded-md px-3 text-center cursor-pointer border-0",
-              "bg-transparent text-muted-foreground hover:text-foreground hover:bg-wash-soft",
-              "aria-pressed:bg-[var(--sel-bg)] aria-pressed:text-primary-ink aria-pressed:hover:bg-[var(--sel-bg)]",
-              "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
-            )}
-          >
-            <span className="flex items-center justify-center gap-1.5 text-body font-semibold leading-none whitespace-nowrap">
+      {/* FROM 700px UP: THE LAYERED FACE (A4·1). Two columns, three rows: Transaction blocks the tall
+          tile at the left, down to the base; Data blocks over Metagraph snapshots at the right; the
+          Global snapshot the base across both, a plate, not a control. The lit tile in the selection
+          fill — the view switch's own on-state. */}
+      <div role="group" aria-label="Register" className={cn("max-[700px]:hidden h-full grid grid-cols-2 grid-rows-[1fr_1fr_auto] gap-[3px] p-1", FRAME)}>
+        {registers.map((r) => {
+          const Icon = REGISTER_ICONS[r];
+          return (
+            <button
+              key={r}
+              type="button"
+              aria-pressed={register === r}
+              onClick={() => switchLedgerRegister(r)}
+              className={cn(
+                PLACE[r],
+                "group flex items-center justify-center gap-1.5 rounded-md px-4 cursor-pointer border-0",
+                "text-body font-semibold leading-none whitespace-nowrap",
+                "bg-transparent text-muted-foreground hover:text-foreground hover:bg-wash-soft",
+                "aria-pressed:bg-[var(--sel-bg)] aria-pressed:text-primary-ink aria-pressed:hover:bg-[var(--sel-bg)]",
+                "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
+              )}
+            >
               <Icon aria-hidden className="size-3.5 flex-none group-aria-pressed:text-primary" />
-              <span>{REGISTER_NAMES[r]}</span>
-            </span>
-            {/* THE READINGS ROW (user, 2026-11-09: "give bottom section some margin; it almost touches the
-                title; if live mode (3rd column) is not applicable (mode not selected) have the 2 columns
-                centered instead of 3"). Two layers in one grid cell: an invisible SIZER holding all
-                three columns — so every half is as wide as its widest form and the control never moves
-                (2026-11-08: its width shifted "a bit because of live indicator") — and the visible row,
-                centred over it, with the state mark on the lit half only. */}
-            <span aria-hidden className={ROW_RULE} />
-            <span className="grid font-mono text-label leading-none tabular-nums whitespace-nowrap">
-              <span aria-hidden className="invisible [grid-area:1/1] flex items-center gap-1">
-                {readings(r, Icon)}
-                <StateMark following={following} className="ml-2 font-sans leading-none" />
-              </span>
-              <span className="[grid-area:1/1] justify-self-center flex items-center gap-1 opacity-75 group-aria-pressed:opacity-100 group-aria-pressed:text-foreground">
-                {readings(r, Icon)}
-                {/* THE STATE IS THE ROW'S THIRD COLUMN, on the lit half only (user, 2026-11-09), on the
-                    row's line (`leading-none`: its 17px line box rode low beside the readings). */}
-                {lit && <StateMark following={following} na={paused} className="ml-2 font-sans leading-none" />}
-              </span>
-            </span>
-          </button>
-        );
-      })}
+              {REGISTER_NAMES[r]}
+            </button>
+          );
+        })}
+        {/* THE GROUND: where every register's subject lands, so it is drawn and never pressed. */}
+        <span className="col-span-2 row-start-3 flex items-center justify-center rounded-md py-1 bg-[var(--panel-plate)] shadow-[inset_0_0_0_1px_var(--border)] text-label uppercase tracking-caps text-muted-foreground leading-none select-none">
+          Global snapshot
+        </span>
       </div>
       </div>
-      {/* THE NOTE: where the lit register's subject sits in a global snapshot, in one shape for all
-          three, the filter's own network named (`registerLine`). Subtle: the label step, muted, no plate of its own. ABSOLUTE, so it
-          never sizes the switch (a wider note stretched the phone face past the screen); its room is
-          the block's height. On the phone it wraps, balanced, in the screen's width less the gutters. */}
+
+      {/* THE READINGS, ONCE (readings option 2): the lit register's span, count and state, under the
+          face — or, where the filtered network runs no such layer, the layer it lacks and "n/a". */}
+      <div
+        style={{ top: phone ? FACE_H_PHONE : FACE_H, height: READINGS_H }}
+        className="absolute left-1/2 -translate-x-1/2 flex items-end justify-center gap-1 font-mono text-label leading-none tabular-nums whitespace-nowrap text-foreground"
+      >
+        {readings(register, LitIcon)}
+        <StateMark following={following} na={paused} className="ml-2 font-sans leading-none" />
+        <span className="sr-only">{count[register] ? `${span[register]}, ${count[register]}` : span[register]}</span>
+      </div>
+
+      {/* THE NOTE: where the lit register's subject sits in a global snapshot, the filter's own network
+          named (`registerLine`). Subtle: the label step, muted, no plate. ABSOLUTE, so it never sizes
+          the switch; on the phone it wraps, balanced, in the screen's width less the gutters. */}
       <p
-        style={{ top: SWITCH_FACE_H }}
+        style={{ top: (phone ? FACE_H_PHONE : FACE_H) + READINGS_H }}
         className={cn(
-          "absolute left-1/2 -translate-x-1/2 pt-2 text-center text-label text-muted-foreground",
+          "absolute left-1/2 -translate-x-1/2 m-0 pt-1.5 text-center text-label text-muted-foreground",
           "leading-none whitespace-nowrap",
           "max-[700px]:w-[min(340px,calc(100vw-32px))] max-[700px]:whitespace-normal max-[700px]:text-balance max-[700px]:leading-tight",
         )}
