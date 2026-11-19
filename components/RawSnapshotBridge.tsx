@@ -108,8 +108,10 @@ export function ensurePage(ordinals: number[]): () => void {
 
 /** How many of a WINDOW's reads run at once (`ensureMany`). Each ordinal is immutable and cached a
  *  day on our own server, so a few in flight cost the upstream nothing it would not pay anyway; the
- *  number only bounds the burst. */
-export const WINDOW_READ_POOL = 8;
+ *  number only bounds the burst. 16 since 2026-11-19 (user: "can we go from 8 to 16 in parallel?" —
+ *  the Transaction blocks braid waits for every read). Production's HTTP/2 runs all 16; local dev's
+ *  HTTP/1.1 caps a host at 6 connections, so the gain does not show there. */
+export const WINDOW_READ_POOL = 16;
 
 /** READ A WHOLE WINDOW OF ORDINALS, a few at a time with no gap (user, 2026-11-07: "do the exact
  *  reads need to be sequential?" — they did not: the Transaction blocks window asks 52 ticks, and at
