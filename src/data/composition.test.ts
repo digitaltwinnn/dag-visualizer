@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { compareComposition, roleKey, rolesOf, roleKeyLabel, roleKeyOfCodes, compositionRows, nodeCompositionLabel, compositionKey, parseCompositionKey, compositionClause, ROLE_SHORT, layerCodesOf, compositionGroups, machineKey, LAYER_WORD } from "./composition";
+import { compareComposition, roleKey, rolesOf, roleKeyLabel, roleKeyOfCodes, compositionRows, nodeCompositionLabel, compositionKey, parseCompositionKey, compositionClause, ROLE_SHORT, layerCodesOf, compositionGroups, machineKey, LAYER_WORD, networkLayers, filterLayers } from "./composition";
 import type { NodeInfo, NodeRow } from "@/src/data/types";
 
 const n = (roles: string[]): NodeInfo => ({ ip: "x", state: "Ready", layer: roles[0], roles }) as NodeInfo;
@@ -180,5 +180,21 @@ describe("rolesOf (the one roles fallback)", () => {
     expect(rolesOf({ roles: ["l0", "cl1"], layer: "l0" })).toEqual(["l0", "cl1"]);
     expect(rolesOf({ layer: "dl1" })).toEqual(["dl1"]);
     expect(rolesOf({})).toEqual([]);
+  });
+});
+
+describe("networkLayers / filterLayers — the layers a network's located nodes run (2026-11-19)", () => {
+  it("reads every node's roles, in the vocabulary order; none located is empty (unknown)", () => {
+    expect(networkLayers([{ roles: ["cl1", "l0"] }, { layer: "dl1" }])).toEqual(["l0", "cl1", "dl1"]);
+    expect(networkLayers([{ roles: ["l0", "cl1"] }])).toEqual(["l0", "cl1"]);
+    expect(networkLayers([])).toEqual([]);
+  });
+  it("the filter's network from the metagraph list; null under All, the unlisted set, or an unknown id", () => {
+    const list = [{ id: "up", nodes: [{ roles: ["l0", "cl1"] }] }, { id: "ded", nodes: [{ roles: ["l0", "dl1"] }] }];
+    expect(filterLayers("up", list)).toEqual(["l0", "cl1"]);
+    expect(filterLayers("ded", list)).toEqual(["l0", "dl1"]);
+    expect(filterLayers("all", list)).toBeNull();
+    expect(filterLayers("unlisted", list)).toBeNull();
+    expect(filterLayers("nope", list)).toBeNull();
   });
 });

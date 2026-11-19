@@ -4,7 +4,7 @@ import { useStore } from "@/src/store/store";
 import { displayNetwork, UNLISTED_ID } from "@/src/data/unlisted";
 import { registerRuns } from "@/src/engine/domain/viewPolicy";
 import type { LedgerRegister } from "@/src/store/mode";
-import { networkLayers } from "@/components/inspector/parts";
+import { filterLayers } from "@/src/data/composition";
 import { useFeedRead } from "@/components/useFeedRead";
 import type { RegisterLineScope } from "@/components/views";
 
@@ -15,13 +15,13 @@ import type { RegisterLineScope } from "@/components/views";
  *  explorer and RAW cannot disagree about which register has no subject. */
 export function useRegisterScope(who: string): { scope: RegisterLineScope; runs: (r: LedgerRegister) => boolean } {
   const filter = useStore((s) => s.filter);
-  const nodes = useStore((s) => (filter === "all" || filter === UNLISTED_ID ? null : s.metaList.find((m) => m.id === filter)?.nodes ?? null));
+  const metaList = useStore((s) => s.metaList);
   useFeedRead(["api-metagraphs"], who, filter !== "all" && filter !== UNLISTED_ID);
   const scope: RegisterLineScope =
     filter === "all" ? "all"
     : filter === "dag" ? "dag"
     : filter === UNLISTED_ID ? { ticker: "Unlisted networks", plural: true }
     : { ticker: displayNetwork(filter)?.ticker ?? filter };
-  const layers = nodes ? networkLayers(nodes) : null;
+  const layers = filterLayers(filter, metaList);
   return { scope, runs: (r) => registerRuns(r, layers) };
 }

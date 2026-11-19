@@ -6,6 +6,8 @@ import { REGISTER_ICONS } from "@/components/icons";
 import { REGISTER_NAMES, registerLine } from "@/components/views";
 import { REGISTER_LAYER } from "@/src/engine/domain/viewPolicy";
 import { useRegisterScope } from "@/components/useRegisterScope";
+import { netKeyOf } from "@/src/engine/domain/pickActions";
+import { ledgerAnchor } from "@/src/data/network";
 import { useFeedRead } from "@/components/useFeedRead";
 import { useNowTick } from "@/components/useNowTick";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
@@ -76,7 +78,7 @@ export default function RegisterSwitch() {
   const mode = useStore((s) => s.mode);
   const registers = VIEW_POLICIES[mode].registers;
   const on = registers.length > 1;
-  useFeedRead(["global", "api-blocks", "exact"], "RegisterSwitch", on); // the data-block count reads the exact reads
+  useFeedRead(["global", "api-blocks", "exact", "metasnaps"], "RegisterSwitch", on); // the data-block count reads the exact reads, a network's snapshot count the anchor index
   const register = useStore((s) => s.ledgerRegister);
   const phone = useBreakpoint() === "phone";
   // The line under the face speaks for the filter (user, 2026-11-19), and a register the filtered
@@ -85,6 +87,7 @@ export default function RegisterSwitch() {
   // the vitals section + 'no dL1' in the switcher + the hint text is clear enough"). Opened, the line,
   // the band and the explorer say why; a filter never moves the register.
   const { scope: lineScope, runs } = useRegisterScope("RegisterSwitch");
+  const filter = useStore((s) => s.filter);
   // THE LIT HALF SAYS LIVE OR PINNED (user, 2026-11-07, design round option 2 "with the 'live' text
   // also"): one live mode per view, read per register — the newest global (and the filtered
   // network's newest snapshot) in Metagraph snapshots and Data blocks, the newest block (and its
@@ -137,8 +140,22 @@ export default function RegisterSwitch() {
   // "31+", while reads are still landing — rule 10), the window's BLOCKS.
   const sourceTicks = past ? past.globalSnapshots : [...snaps].reverse();
   const reading = pastStatus === "loading" || pastStatus === "failed";
-  const metaSnaps = sourceTicks.reduce((n, g) => n + (g.metagraphSnapshotCount ?? 0), 0);
-  const data = dataBlocksInWindow(sourceTicks, snapshotExact, () => true);
+  // …UNDER THE FILTER (user, 2026-11-19: "the metrics inside the switcher are not updated when we
+  // filter"): a network's own metagraph snapshots (the anchor index's per-address counts, its former
+  // addresses folded in by `netKeyOf` — the band's own read) and its own data blocks; the DAG's
+  // snapshots ARE the global snapshots, so under its filter the half counts those. Transaction blocks
+  // needs nothing here: its window is already read for the filter's network.
+  const inScope = (metaId: string): boolean => filter === "all" || netKeyOf(metaId) === filter;
+  const metaSnaps =
+    filter === "all" ? sourceTicks.reduce((n, g) => n + (g.metagraphSnapshotCount ?? 0), 0)
+    : filter === "dag" ? sourceTicks.length
+    : sourceTicks.reduce((n, g) => {
+        const mc = ledgerAnchor(g.timestamp)?.metaCounts;
+        if (!mc) return n;
+        for (const [id, c] of mc) if (inScope(id)) n += c;
+        return n;
+      }, 0);
+  const data = dataBlocksInWindow(sourceTicks, snapshotExact, inScope);
   const blockCount = blockStatus?.status === "ready" && blocks?.globalSnapshots.length ? windowBlocks(blocks).length : null;
   const count: Record<LedgerRegister, string | null> = {
     snapshots: reading ? null : countWord(metaSnaps, "snapshot"),
@@ -257,7 +274,7 @@ export default function RegisterSwitch() {
               </span>
             )}
             {/* The state, the row's third column — the desktop half's own order (2026-11-09). */}
-            <StateMark following={following} className="ml-2 font-sans leading-none" />
+            {runs(register) && <StateMark following={following} className="ml-2 font-sans leading-none" />}
             {/* The readings in words for assistive tech (the desktop half's own accessible name). */}
             <span className="sr-only">{count[register] ? `${span[register]}, ${count[register]}` : span[register]}</span>
           </span>
@@ -313,7 +330,7 @@ export default function RegisterSwitch() {
                 {readings(r, Icon)}
                 {/* THE STATE IS THE ROW'S THIRD COLUMN, on the lit half only (user, 2026-11-09), on the
                     row's line (`leading-none`: its 17px line box rode low beside the readings). */}
-                {lit && <StateMark following={following} className="ml-2 font-sans leading-none" />}
+                {lit && runs(r) && <StateMark following={following} className="ml-2 font-sans leading-none" />}
               </span>
             </span>
           </button>

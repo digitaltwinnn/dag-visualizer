@@ -1,4 +1,5 @@
 import type { NodeInfo, NodeRow } from "@/src/data/types";
+import { UNLISTED_ID } from "@/src/data/unlistedId";
 
 // The shared composition vocabulary: group a metagraph's nodes into rows that sum to the total.
 // Hybrids (nodes running >1 layer) group by their EXACT code set, so two make-ups render as two
@@ -19,6 +20,19 @@ export const ROLE_SHORT: Record<string, string> = { l0: "L0", cl1: "cL1", dl1: "
  *  per-role and per-type counts of one node list can never disagree. */
 export const rolesOf = (n: { roles?: string[]; layer?: string | null }): string[] =>
   n.roles && n.roles.length ? n.roles : n.layer ? [n.layer] : [];
+/** THE LAYERS A NETWORK'S LOCATED NODES RUN ("l0" / "cl1" / "dl1", in the vocabulary order) — the
+ *  kind word's own read; empty when no node is located (unknown, never "none"). */
+export function networkLayers(nodes: readonly { roles?: string[]; layer?: string | null }[]): string[] {
+  return ROLE_ORDER.filter((r) => nodes.some((n) => rolesOf(n).includes(r)));
+}
+/** THE FILTERED NETWORK'S LAYERS (2026-11-19, `viewPolicy.registerRuns`' input): null under All and
+ *  the unlisted set (no one network), else its located nodes' layers from the metagraph list. One
+ *  home for the Engine (the chamber's source) and the HUD (`useRegisterScope`). */
+export function filterLayers(filter: string, metaList: readonly { id: string; nodes?: readonly { roles?: string[]; layer?: string | null }[] }[]): string[] | null {
+  if (filter === "all" || filter === UNLISTED_ID) return null;
+  const nodes = metaList.find((m) => m.id === filter)?.nodes;
+  return nodes ? networkLayers(nodes) : null;
+}
 /** WHAT A LAYER DOES, one word each — the composition rows' dedicated labels and, since
  *  2026-10-30, the Hypergraph explorer's measure control (user: "instead of L0 use words like
  *  'consensus layer'"); the codes (`ROLE_SHORT`) stay the chips' and a sentence's. One home. */

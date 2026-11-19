@@ -559,12 +559,6 @@ function nodeComposition(nodes: NodeInfo[]): Composition {
   return { present, hybrid, dedBy, parts, total, hasCurrency: present.includes("cl1") };
 }
 
-/** THE LAYERS A NETWORK'S LOCATED NODES RUN ("l0" / "cl1" / "dl1"), the same read the kind word
- *  makes — empty when no node is located (unknown, never "none"). */
-export function networkLayers(nodes: NodeInfo[]): string[] {
-  return nodeComposition(nodes).present;
-}
-
 // The network-type descriptor for the dossier ticker row (subtle, behind the ticker) — derived
 // from the SAME composition read as the old "data metagraph · no token" body line (reused, not
 // re-derived): a metagraph is a "data"/"currency"/"data and currency" metagraph by whether it

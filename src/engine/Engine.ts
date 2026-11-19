@@ -30,7 +30,7 @@ import { HYPER_TILT, HYPER_TILT_FOCUS } from "./domain/hyperLayout";
 import { readSceneColors, type SceneColors, LIGHT_LOOK } from "./sceneColors";
 import { setNodeDimTarget, setNodeEnv } from "./scene/objects/NodeFabric";
 import { THEME_KEY, parseThemePref, resolveTheme, type Theme } from "@/src/theme/resolve";
-import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
+import { VIEW_POLICIES, registerRuns, type ViewPolicy } from "./domain/viewPolicy";
 import { sceneFeeds } from "./domain/sceneFeeds";
 import { liveArrivals } from "./domain/arrivals";
 import { BRIEFING_COVER, BRIEFING_PACE, BRIEFING_RELEASE_MS, BRIEFING_SETTLE_MS, liftSettling } from "./domain/briefing";
@@ -46,7 +46,8 @@ import { viewNetwork } from "./domain/viewNetwork";
 import { ViewTransition, is3D, fleetFaded, fleetHolder, type FleetPlacement, type View3D } from "./domain/viewTransition";
 import { gatherBand, railGapPx, railGapShiftPx, type GatherBand } from "./domain/gatherLayout";
 import { LADDERS, LEVEL_CARRY, hasLevel, sceneShowsNode, type CohortSel, type CompositionSel, type FocusLevel, type SelectionSnapshot, type ResolverKey } from "./domain/focusLadder";
-import { compositionGroups, compositionKey, compositionRows } from "@/src/data/composition";
+import { compositionGroups, compositionKey, compositionRows, filterLayers } from "@/src/data/composition";
+import type { LedgerRegister } from "@/src/store/mode";
 import { metaSnapDeepKey } from "@/src/data/types";
 import { snapsAtTick } from "@/src/data/anchorLog";
 // The tap RECOGNIZER stays here — it is input plumbing. The step it triggers is the
@@ -717,7 +718,7 @@ export class Engine {
     // anonymous: drawn, but not pickable. `k` is the tile's index within ITS TICK.
     this.ledger.setTileResolver((metaId, ts, k) => {
       // The LEDGER SOURCE — the past window around an old pin, else the live buffer.
-      const net = ledgerSource(getNetwork(), useStore.getState().ledgerRegister);
+      const net = this._ledgerHasSubject ? ledgerSource(getNetwork(), useStore.getState().ledgerRegister) : null;
       if (!net) return null;
       const g = net.globalSnapshots.find((gs) => gs.timestamp === ts);
       if (!g) return null;
@@ -1156,6 +1157,9 @@ export class Engine {
         // carries them too, so the glow lands before the deep fetch resolves and simply sharpens
         // after. The scene keys metagraph nodes by IP, not id (see resolveSignerIps), so the
         // prefixes are resolved against the live metaList before reaching the glow set.
+        // A filter or a metagraph-list change can take a register's subject away (or give it back):
+        // the chamber re-seats on the flip rather than drawing the other register's trail.
+        if (this.mode === "ledger" && (st.filter !== prev.filter || st.metaList !== prev.metaList) && this._registerHasSubject(st) !== this._ledgerHasSubject) this._refreshLedger();
         if (st.metaSnap !== prev.metaSnap || st.metaSnapDeep !== prev.metaSnapDeep || st.metaList !== prev.metaList) {
           const sel = st.metaSnap;
           // The callout's tile anchor rides the same commit (see LedgerView.setSelectedTile).
@@ -1476,6 +1480,14 @@ export class Engine {
   /** A SOURCE SWITCH (a past window, a block window, a register flip): a fresh chamber history —
    *  the model only ever advances — the live edge frozen while past, and the pin re-applied so the
    *  rewind lands it. */
+  /** Does the filtered network make this register's subject (`viewPolicy.registerRuns` over its
+   *  located nodes' layers, `composition.filterLayers`)? The HUD's `useRegisterScope` reads the same. */
+  private _registerHasSubject(st: { ledgerRegister: LedgerRegister; filter: string; metaList: readonly { id: string; nodes?: readonly { roles?: string[]; layer?: string | null }[] }[] }): boolean {
+    return registerRuns(st.ledgerRegister, filterLayers(st.filter, st.metaList));
+  }
+  /** The answer the chamber was last laid with — a flip re-seats it (a fresh, empty or full, trail). */
+  private _ledgerHasSubject = true;
+
   private _reseatLedger(): void {
     this.ledger.resetHistory();
     this.ledger.setFrozen(!!getPastWindow());
@@ -1489,7 +1501,16 @@ export class Engine {
     // The LEDGER SOURCE (`src/data/pastWindow.ts`): the past window around an old pin, else the
     // live buffer. A past window is fixed, so a live event re-hands the same rows and moves nothing.
     const st = useStore.getState();
-    const src = ledgerSource(getNetwork(), st.ledgerRegister);
+    // A REGISTER WITH NO SUBJECT UNDER THE FILTER (user, 2026-11-19: Data blocks under UP stayed "in
+    // live mode and view animated which makes no sense") has no trail: the chamber stands still and
+    // empty, as Transaction blocks does for a network that runs no cL1 (no window read).
+    const has = this._registerHasSubject(st);
+    if (has !== this._ledgerHasSubject) {
+      // The flip starts a fresh trail either way (a register switch or a filter change reaches here).
+      this._ledgerHasSubject = has;
+      this.ledger.resetHistory();
+    }
+    const src = has ? ledgerSource(getNetwork(), st.ledgerRegister) : null;
     // The Blocks register's FRONT RUN reaches to the live global — only while the window HELD is the
     // live one (a pinned past window, its own `around` set, makes no claim about now; asked of the
     // window, never the request in flight — review M1). With none held yet, the request says.
