@@ -179,10 +179,13 @@ export function blockWanted(s: {
   held: { from: number; to: number; chain?: string | null; around?: number | null } | null;
   liveNewest: number | null;
   chain?: string | null;
+  /** Does the filtered network make transaction blocks (`viewPolicy.registerRuns`, a cL1)? `false`
+   *  is no window to read, like the unlisted set's (user, 2026-11-19). Omitted: yes. */
+  makesBlocks?: boolean;
 }): { kind: "clear" } | { kind: "keep" } | { kind: "unread" } | { kind: "fetch"; around: number | null } {
   const chain = s.chain ?? null;
   if (!s.ledger) return { kind: "clear" };
-  if (chain === UNLISTED_ID) return { kind: "unread" };
+  if (chain === UNLISTED_ID || s.makesBlocks === false) return { kind: "unread" };
   const held = s.held && (s.held.chain ?? null) === chain ? s.held : null;
   // The Snapshots register (D3: the register switch on the scene names the Blocks
   // register's span from either side) wants the window the register would open on — held, else

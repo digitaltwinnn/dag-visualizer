@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { Mode } from "@/src/store/store";
 import type { LedgerRegister } from "@/src/store/mode";
-import { REGISTER_DATA_BLOCKS, REGISTER_SOURCE, VIEW_POLICIES, drawsDataBlocks, readsBlockWindow, registerOf } from "./viewPolicy";
+import { REGISTER_DATA_BLOCKS, REGISTER_LAYER, REGISTER_SOURCE, VIEW_POLICIES, drawsDataBlocks, readsBlockWindow, registerOf, registerRuns } from "./viewPolicy";
 import { is3D } from "./viewTransition";
 
 const MODES: Mode[] = ["hyper", "geo", "ledger", "trend", "soon"];
@@ -259,5 +259,24 @@ describe("the trends view is registered and inert", () => {
     expect(Object.keys(REGISTER_DATA_BLOCKS).sort()).toEqual(Object.keys(REGISTER_SOURCE).sort());
     expect(readsBlockWindow("snapshots")).toBe(false);
     expect(readsBlockWindow("data")).toBe(false);
+  });
+});
+
+describe("REGISTER_LAYER / registerRuns — a register's subject needs a layer (user, 2026-11-19)", () => {
+  it("Transaction blocks needs a cL1, Data blocks a dL1; Metagraph snapshots is never gated", () => {
+    expect(REGISTER_LAYER).toEqual({ snapshots: null, blocks: "cl1", data: "dl1" });
+    expect(registerRuns("snapshots", ["cl1"])).toBe(true); // BioFi: its L0 is not located, it still anchors
+  });
+  it("a network without the layer makes none: UP (L0 + cL1) has no data blocks, Digital Evidence (L0 + dL1) no transaction blocks", () => {
+    expect(registerRuns("data", ["l0", "cl1"])).toBe(false);
+    expect(registerRuns("blocks", ["l0", "cl1"])).toBe(true);
+    expect(registerRuns("blocks", ["l0", "dl1"])).toBe(false);
+    expect(registerRuns("data", ["l0", "dl1"])).toBe(true);
+  });
+  it("unknown layers (no node located) are never a guessed absence", () => {
+    for (const r of ["snapshots", "blocks", "data"] as const) {
+      expect(registerRuns(r, null)).toBe(true);
+      expect(registerRuns(r, [])).toBe(true);
+    }
   });
 });

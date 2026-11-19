@@ -141,7 +141,8 @@ export type RegisterLineScope = "all" | "dag" | { ticker: string; plural?: boole
  *  the network and its own path. The verbs are the app's own: ANCHORED (the anchor log), ACCEPTED
  *  (Constellation's term for a block in a snapshot), CARRIED (the Global card's "Carried N data
  *  blocks"). The DAG's own snapshots carry no data blocks — the band's words for it. */
-export function registerLine(register: LedgerRegister, scope: RegisterLineScope): string {
+export function registerLine(register: LedgerRegister, scope: RegisterLineScope, runs = true): string {
+  if (!runs) return registerAbsence(register, scope);
   if (scope === "all") {
     if (register === "snapshots") return "Each metagraph's L0 snapshots, anchored into the global snapshot";
     if (register === "blocks") return "The DAG's cL1 blocks accepted into the global snapshot, a metagraph's into its snapshot first";
@@ -157,6 +158,19 @@ export function registerLine(register: LedgerRegister, scope: RegisterLineScope)
   if (register === "snapshots") return `${whose} L0 snapshots, anchored into the global snapshot`;
   if (register === "blocks") return `${whose} cL1 blocks, accepted into ${its} and then the global snapshot`;
   return `${whose} dL1 blocks, carried in ${its} into the global snapshot`;
+}
+
+/** THE REGISTER HAS NO SUBJECT UNDER THIS FILTER (user, 2026-11-19 — UP runs no dL1, Digital Evidence
+ *  no cL1): ONE sentence, said by the line under the switch, the band, the explorer and RAW alike, and
+ *  the register stays where it is (a filter never moves the view). `viewPolicy.registerRuns` decides;
+ *  this is only the words. The DAG's keeps the band's own sentence. */
+export function registerAbsence(register: LedgerRegister, scope: RegisterLineScope): string {
+  if (scope === "dag" && register === "data") return "The DAG's own snapshots carry no data blocks";
+  const who = scope === "all" ? "This network" : scope === "dag" ? "The DAG" : scope.ticker;
+  const runs = scope !== "all" && scope !== "dag" && scope.plural ? "run" : "runs";
+  if (register === "blocks") return `${who} ${runs} no cL1, so it makes no transaction blocks`;
+  if (register === "data") return `${who} ${runs} no dL1, so it makes no data blocks`;
+  return `${who} anchors no snapshots`;
 }
 
 /** Paths that name a mode AND a register of it. */

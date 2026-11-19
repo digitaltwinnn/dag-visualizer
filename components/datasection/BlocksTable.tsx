@@ -1,5 +1,7 @@
 "use client";
 
+import { registerAbsence } from "@/components/views";
+import { useRegisterScope } from "@/components/useRegisterScope";
 import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useStore } from "@/src/store/store";
 import { getNetwork } from "@/src/data/network";
@@ -55,6 +57,9 @@ const COLUMNS: { label: string; right?: boolean; phone?: false }[] = [
 const rowAddr = (a: string, phone: boolean) => midHash(a, phone ? 9 : 14);
 
 export default function BlocksTable() {
+  // Where the filtered network makes no transaction blocks, the register's own sentence (`registerAbsence`).
+  const { scope: lineScope, runs } = useRegisterScope("BlocksTable");
+  const makesBlocks = runs("blocks");
   useFeedRead(["api-blocks", "global", "exact"], "BlocksTable");
   const win = useSyncExternalStore(onBlockWindow, getBlockWindow, () => null);
   const reads = useStore((s) => s.blockReads);
@@ -120,7 +125,7 @@ export default function BlocksTable() {
 
   if (!rows.length) {
     // The instrument state, in the explorer's and the band's own sentence (`blockAbsence`).
-    const why = blockAbsence(status, !!win);
+    const why = makesBlocks ? blockAbsence(status, !!win) : registerAbsence("blocks", lineScope);
     return <p className="m-auto text-label text-muted-foreground uppercase tracking-caps">{why}</p>;
   }
 

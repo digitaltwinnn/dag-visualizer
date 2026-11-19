@@ -498,6 +498,23 @@ export const REGISTER_SOURCE: Readonly<Record<LedgerRegister, RegisterSource>> =
 export function readsBlockWindow(register: LedgerRegister): boolean {
   return REGISTER_SOURCE[register] === "blocks";
 }
+/** THE LAYER A REGISTER'S SUBJECT NEEDS (user, 2026-11-19: "what to do when we filter on … UP and are
+ *  looking at transaction blocks … or use the switcher?"). A transaction block is a cL1's, a data
+ *  block a dL1's; a network that runs neither makes none, so under its filter the register has no
+ *  subject. Metagraph snapshots need no row: every metagraph has an L0 by definition, and the app
+ *  cannot always SEE it (BioFi's nodes are located only as cL1), so it is never gated. */
+export const REGISTER_LAYER: Readonly<Record<LedgerRegister, "cl1" | "dl1" | null>> = {
+  snapshots: null,
+  blocks: "cl1",
+  data: "dl1",
+};
+/** DOES A NETWORK RUNNING `layers` MAKE THIS REGISTER'S SUBJECT? `null` or no layers at all is
+ *  UNKNOWN (no node located), and unknown is yes: the register stays open and states what it finds,
+ *  never a guessed absence (rule 10). */
+export function registerRuns(register: LedgerRegister, layers: readonly string[] | null): boolean {
+  const need = REGISTER_LAYER[register];
+  return need == null || layers == null || layers.length === 0 || layers.includes(need);
+}
 /** WHICH REGISTERS DRAW DATA BLOCKS as subjects (review M8, 2026-11-09): a keyed row like
  *  `REGISTER_SOURCE`, so the data-block release, the hover clear and the callout subject ask it
  *  rather than comparing `register === "data"` — a fourth register is a compile error here. */

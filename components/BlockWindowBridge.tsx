@@ -8,6 +8,7 @@ import { getBlockWindow, onBlockWindow, pastRetryDelay, setBlockWindow } from "@
 import { BLOCK_WINDOW_TICKS, blockChainOf, blockRefreshMs, blockWanted, failedReadKeeps, foldBlockWindow, liveWindowRuns, mergeLiveAnswer, tipJoins, trailPath, type BlockWindowAnswer } from "@/src/data/blockWindow";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
+import { useRegisterScope } from "@/components/useRegisterScope";
 
 // THE ONE WRITER OF THE BLOCKS REGISTER'S WINDOW (`src/data/blockWindow.ts`), PastWindowBridge's
 // sibling. It asks the one rule (`blockWanted`) whenever the view, the register, the pin or the live
@@ -47,6 +48,8 @@ export default function BlockWindowBridge() {
   const liveWanted = ledger;
   // The network the window is read for: the top bar's committed filter (null under All).
   const chain = blockChainOf(useStore((s) => s.filter));
+  // A network that runs no cL1 makes no transaction blocks: no window to read (`registerRuns`).
+  const makesBlocks = useRegisterScope("BlockWindowBridge").runs("blocks");
   const setStatus = useStore((s) => s.setBlockWindowStatus);
   const exact = useStore((s) => s.snapshotExact);
   const { snaps } = useSnapshotFeed(POLL.maxSnapshots, liveWanted);
@@ -126,7 +129,7 @@ export default function BlockWindowBridge() {
 
   useEffect(() => {
     const held = getBlockWindow();
-    const want = blockWanted({ ledger, register, pin, held: held ? { from: held.from, to: held.to, chain: held.chain, around: held.around } : null, liveNewest, chain });
+    const want = blockWanted({ ledger, register, pin, held: held ? { from: held.from, to: held.to, chain: held.chain, around: held.around } : null, liveNewest, chain, makesBlocks });
     const chainKey = chain ?? "all";
     // Unpinning back to the live edge: the held window is the pin's, so ask for live at once.
     const backToLive = want.kind === "keep" && pin == null && asked.current != null && asked.current !== `${chainKey}@live`;
@@ -162,7 +165,7 @@ export default function BlockWindowBridge() {
     dropRetry();
     read(around, chain, gen.current, 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ledger, register, pin, liveNewest, chain]);
+  }, [ledger, register, pin, liveNewest, chain, makesBlocks]);
 
   // The exact reads change what a tick's anchor says: fold the same answer again (O(ticks)) — but
   // only when a read for a tick IN the window changed (perf review, 2026-11-07: every exact read in

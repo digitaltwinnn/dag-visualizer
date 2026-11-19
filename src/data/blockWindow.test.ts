@@ -188,6 +188,11 @@ describe("the window under a network filter (D4)", () => {
   it("an unlisted network is not read: the window is the stated floor, never fetched", () => {
     expect(blockWanted({ ledger: true, register: "blocks", pin: null, held: null, liveNewest: 900, chain: UNLISTED_ID })).toEqual({ kind: "unread" });
     expect(blockWanted({ ledger: true, register: "blocks", pin: 50, held: null, liveNewest: 900, chain: UNLISTED_ID })).toEqual({ kind: "unread" });
+    // A network that runs no cL1 makes no transaction blocks (user, 2026-11-19): nothing to read either,
+    // from either register (the switch's half reads the window from Metagraph snapshots too).
+    expect(blockWanted({ ledger: true, register: "blocks", pin: null, held: null, liveNewest: 900, chain: "ded", makesBlocks: false })).toEqual({ kind: "unread" });
+    expect(blockWanted({ ledger: true, register: "snapshots", pin: null, held: null, liveNewest: 900, chain: "ded", makesBlocks: false })).toEqual({ kind: "unread" });
+    expect(blockWanted({ ledger: true, register: "blocks", pin: null, held: null, liveNewest: 900, chain: "dor", makesBlocks: true })).toEqual({ kind: "fetch", around: null });
     // Outside the register nothing is wanted, unlisted or not.
     expect(blockWanted({ ledger: false, register: "blocks", pin: null, held: null, liveNewest: 900, chain: UNLISTED_ID })).toEqual({ kind: "clear" });
   });

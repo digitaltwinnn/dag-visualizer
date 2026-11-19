@@ -43,7 +43,8 @@ import { blockReadOf } from "@/src/data/blockReads";
 import { BLOCK_MEASURE_ROWS, blockMeasureCounts, blockMeasureOptions, blockMeasureText, blockMeasureValue, type BlockMeasure } from "@/src/data/blockMeasure";
 import { NO_MEASURE } from "@/src/data/ledgerMeasure";
 import { blockSelectActions, globalPick, tickContextOf } from "@/src/engine/domain/pickActions";
-import { VIEWS } from "@/components/views";
+import { VIEWS, registerAbsence } from "@/components/views";
+import { useRegisterScope } from "@/components/useRegisterScope";
 
 // The explorer's title: the Snapshots VIEW's own name, its axis word.
 const LEDGER_AXIS_TITLE = VIEWS.find((v) => v.id === "ledger")!.name;
@@ -146,6 +147,10 @@ function blocksFloor(partial: readonly string[]): ReactNode {
 }
 
 export default function LedgerPanel() {
+  // Where the filtered network makes no transaction blocks (`registerRuns`), the Blocks level says
+  // so in the register's own sentence (`registerAbsence`), the band's and RAW's too.
+  const { scope: lineScope, runs: registerRunsFor } = useRegisterScope("LedgerPanel");
+  const makesBlocks = registerRunsFor("blocks");
   useFeedRead(["global", "metasnaps", "clusters", "api-metagraphs", "api-geo", "exact"], "LedgerPanel");
   const filter = useStore((s) => s.filter);
   const mode = useStore((s) => s.mode);
@@ -671,7 +676,7 @@ export default function LedgerPanel() {
     // An honest instrument state for each way the window is not here (rule 10) — the band's and
     // RAW's own sentences (`blockAbsence`, one home). While a window is read the list says so, even
     // over a held one that happens to hold no block.
-    empty: blockAbsence(blockStatus, !!blockWin),
+    empty: makesBlocks ? blockAbsence(blockStatus, !!blockWin) : registerAbsence("blocks", lineScope),
     rows: pagedBlocks.map((b, i): ExplorerRowSpec => {
       const hue = identityHudCss(b.chain);
       const on = block != null && block.chain === b.chain && block.hash === b.hash;

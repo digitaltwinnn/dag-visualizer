@@ -1,5 +1,7 @@
 "use client";
 
+import { registerAbsence } from "@/components/views";
+import { useRegisterScope } from "@/components/useRegisterScope";
 import { viewNetwork } from "@/src/engine/domain/viewNetwork";
 // THE VITALS BAND'S PER-VIEW CELL SETS — what each 3D view says in the bottom lane: hyper leads
 // with the composition DONUT (four counts that are shares of one fleet — the one honest home for
@@ -937,7 +939,9 @@ export function BlocksCells({ accent }: { accent: string }) {
   const endMs = pinned && ticks.length ? Math.max(...ticks.map((t) => Date.parse(t.ts))) : now;
   const span = blockSpanWord({ status, globals: win?.globalSnapshots ?? [], nowMs: now, around: win ? win.around : undefined });
   // No window held: the instrument state, in the explorer's and RAW's own sentence (`blockAbsence`).
-  const absent = blockAbsence(status, !!win);
+  // …and where the filtered network makes no transaction blocks, the register's own sentence first.
+  const { scope: lineScope, runs } = useRegisterScope("BlocksCells");
+  const absent = runs("blocks") ? blockAbsence(status, !!win) : registerAbsence("blocks", lineScope);
   const stateLine = (text: string) => <span className="flex items-center self-stretch text-label text-muted-foreground">{text}</span>;
 
   // BLOCKS — every block the window holds (DAG + token, or the filter's network's).
@@ -965,7 +969,7 @@ export function BlocksCells({ accent }: { accent: string }) {
       <BandCard
         label="Blocks"
         aside={win ? span : undefined}
-        lead={<StackedLead figure={held ? <Odometer value={held.count} int /> : null} prefix={held?.floor ? "at least" : undefined} unit="blocks" empty={held == null} />}
+        lead={!runs("blocks") ? undefined : <StackedLead figure={held ? <Odometer value={held.count} int /> : null} prefix={held?.floor ? "at least" : undefined} unit="blocks" empty={held == null} />}
       >
         {win ? (
           <span className="flex-1 min-w-0 self-center">
@@ -980,7 +984,7 @@ export function BlocksCells({ accent }: { accent: string }) {
       <BandCard
         label="Moved"
         aside={win ? span : undefined}
-        lead={<StackedLead figure={moved?.amount != null ? compactDag(moved.amount) : null} unit={unit} note={movedNote} empty={moved?.amount == null} />}
+        lead={!runs("blocks") ? undefined : <StackedLead figure={moved?.amount != null ? compactDag(moved.amount) : null} unit={unit} note={movedNote} empty={moved?.amount == null} />}
       >
         {win ? (
           moved && moved.total > 0 ? (
@@ -1001,7 +1005,7 @@ export function BlocksCells({ accent }: { accent: string }) {
       </BandCard>
       <BandCard
         label="Last block"
-        lead={pinned ? undefined : <StackedLead figure={last ? ageWords(Math.max(0, now - Date.parse(last.ts))) : null} unit="ago" empty={last == null} />}
+        lead={pinned || !runs("blocks") ? undefined : <StackedLead figure={last ? ageWords(Math.max(0, now - Date.parse(last.ts))) : null} unit="ago" empty={last == null} />}
       >
         {pinned ? (
           stateLine(BLOCK_PINNED)
@@ -1036,7 +1040,10 @@ export function DataCells({ accent, filter }: { accent: string; filter: string }
   // included — `netKeyOf`), the unlisted set's, or every network under All.
   const inScope = (metaId: string): boolean => filter === "all" || netKeyOf(metaId) === filter;
   const stateLine = (text: string) => <span className="flex items-center self-stretch text-label text-muted-foreground">{text}</span>;
-  const noData = filter === "dag" ? "The DAG's own snapshots carry no data blocks" : null;
+  // A network that runs no dL1 makes no data blocks — the DAG among them (`registerRuns`): the cells
+  // say so in the register's one sentence instead of a zero (`registerAbsence`).
+  const { scope: lineScope, runs } = useRegisterScope("DataCells");
+  const noData = runs("data") ? null : registerAbsence("data", lineScope);
   const empty = snaps.length === 0;
 
   const held = dataInWindow(snaps, reads, inScope);

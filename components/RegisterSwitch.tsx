@@ -3,8 +3,9 @@
 import { ChevronLeft, ChevronRight, Clock } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
 import { REGISTER_ICONS } from "@/components/icons";
-import { REGISTER_NAMES, registerLine, type RegisterLineScope } from "@/components/views";
-import { displayNetwork, UNLISTED_ID } from "@/src/data/unlisted";
+import { REGISTER_NAMES, registerLine } from "@/components/views";
+import { REGISTER_LAYER } from "@/src/engine/domain/viewPolicy";
+import { useRegisterScope } from "@/components/useRegisterScope";
 import { useFeedRead } from "@/components/useFeedRead";
 import { useNowTick } from "@/components/useNowTick";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
@@ -78,14 +79,11 @@ export default function RegisterSwitch() {
   useFeedRead(["global", "api-blocks", "exact"], "RegisterSwitch", on); // the data-block count reads the exact reads
   const register = useStore((s) => s.ledgerRegister);
   const phone = useBreakpoint() === "phone";
-  // The line under the face speaks for the filter (user, 2026-11-19): everything, the DAG, or one
-  // network by its ticker (the unlisted set as "Unlisted networks", several — the notes' own name).
-  const filter = useStore((s) => s.filter);
-  const lineScope: RegisterLineScope =
-    filter === "all" ? "all"
-    : filter === "dag" ? "dag"
-    : filter === UNLISTED_ID ? { ticker: "Unlisted networks", plural: true }
-    : { ticker: displayNetwork(filter)?.ticker ?? filter };
+  // The line under the face speaks for the filter (user, 2026-11-19), and a register the filtered
+  // network makes no subject for (`registerRuns`: UP runs no dL1) stands INACTIVE — kept, dimmed, not
+  // pressable, its readings naming the layer it lacks (the explorer's measure tiles' rule: inactive,
+  // never gone). A filter never moves the register: one already open stays and says why.
+  const { scope: lineScope, runs } = useRegisterScope("RegisterSwitch");
   // THE LIT HALF SAYS LIVE OR PINNED (user, 2026-11-07, design round option 2 "with the 'live' text
   // also"): one live mode per view, read per register — the newest global (and the filtered
   // network's newest snapshot) in Metagraph snapshots and Data blocks, the newest block (and its
@@ -161,15 +159,21 @@ export default function RegisterSwitch() {
   // No pip row: the view face retired its pips for the chevrons (user, 2026-10-18: "has both … the
   // <> is more intuitive"), and this is that control.
   const at = registers.indexOf(register);
+  // The next register in that direction the filtered network makes a subject for (an inactive one
+  // is stepped over, as the desktop half cannot be pressed).
+  const nextOf = (dir: -1 | 1): LedgerRegister | undefined => {
+    for (let i = at + dir; i >= 0 && i < registers.length; i += dir) if (runs(registers[i]!)) return registers[i];
+    return undefined;
+  };
   const step = (dir: -1 | 1) => {
-    const to = registers[at + dir];
+    const to = nextOf(dir);
     if (!to) return;
     setSlide({ to, from: dir === 1 ? "right" : "left" });
     switchLedgerRegister(to);
   };
   const slideFrom = slide && slide.to === register ? slide.from : null;
   const chevron = (dir: -1 | 1) => {
-    const to = registers[at + dir];
+    const to = nextOf(dir);
     const Glyph = dir === -1 ? ChevronLeft : ChevronRight;
     return (
       <button
@@ -194,7 +198,10 @@ export default function RegisterSwitch() {
   // TWO GLYPHED READINGS, NO DIVIDER (option A, 2026-11-08): the clock says "the last", the register's
   // glyph says what is counted; a gap parts them. NOT COLOUR-CODED (user, 2026-11-09): the count reads
   // in the row's own ink, as the span beside it.
-  const readings = (r: LedgerRegister, Icon: (typeof REGISTER_ICONS)[LedgerRegister]) => (
+  const readings = (r: LedgerRegister, Icon: (typeof REGISTER_ICONS)[LedgerRegister]) => !runs(r) ? (
+    // No subject under this filter: the layer it lacks, in the app's own layer words.
+    <span>no {REGISTER_LAYER[r] === "cl1" ? "cL1" : "dL1"}</span>
+  ) : (
     <>
       <Clock aria-hidden className="size-3 flex-none opacity-80" />
       <span>{bareSpan[r]}</span>
@@ -277,6 +284,9 @@ export default function RegisterSwitch() {
             // NO aria-label (review, 2026-11-09): one overrode the content and dropped the lit half's
             // LIVE / PINNED state; the content is the name, the readings and the state mark, whose
             // screen-reader word lives in `PinnedMark` alone (`pinnedMark.test.ts`).
+            // INACTIVE where the filtered network makes no subject for it (`registerRuns`); the lit
+            // half is never disabled — a register already open stays, and its line says why.
+            disabled={!lit && !runs(r)}
             onClick={() => switchLedgerRegister(r)}
             className={cn(
               // THE LIT STATION IS A WASH, NOT A FRAME (user, 2026-11-07, option 5 without the underline):
@@ -287,6 +297,7 @@ export default function RegisterSwitch() {
               "group flex flex-col items-center justify-center rounded-md px-3 text-center cursor-pointer border-0",
               "bg-transparent text-muted-foreground hover:text-foreground hover:bg-wash-soft",
               "aria-pressed:bg-[var(--sel-bg)] aria-pressed:text-primary-ink aria-pressed:hover:bg-[var(--sel-bg)]",
+              "disabled:opacity-45 disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-muted-foreground",
               "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
             )}
           >
@@ -330,7 +341,7 @@ export default function RegisterSwitch() {
           "max-[700px]:w-[min(340px,calc(100vw-32px))] max-[700px]:whitespace-normal max-[700px]:text-balance max-[700px]:leading-tight",
         )}
       >
-        {registerLine(register, lineScope)}
+        {registerLine(register, lineScope, runs(register))}
       </p>
     </div>
   );
