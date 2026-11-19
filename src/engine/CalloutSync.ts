@@ -350,10 +350,13 @@ export class CalloutSync {
   // a top measured from y = 0 let a 220px label stand up into it (user, 2026-10-03, suggestion 5 of
   // the callout review). On a phone the floor is the dock bar's top edge.
   private _freeBottom(): number {
-    return this.h.chrome.read().bandTop - 4;
+    const c = this.h.chrome.read();
+    // …and above the Snapshots register's caption, which stands just above the band (2026-11-19).
+    return Math.min(c.bandTop, c.captionTop) - 4;
   }
   private _phoneBottom(): number {
-    return this.h.chrome.read().dockTop - 4;
+    const c = this.h.chrome.read();
+    return Math.min(c.dockTop, c.captionTop) - 4;
   }
   private _freeTop(): number {
     // Under the bar — and under the register switch where it stands on the scene (D3).

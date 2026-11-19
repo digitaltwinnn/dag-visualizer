@@ -1,7 +1,7 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Clock } from "lucide-react";
-import { useState, useSyncExternalStore } from "react";
+import { Clock } from "lucide-react";
+import { useSyncExternalStore } from "react";
 import { REGISTER_ICONS } from "@/components/icons";
 import { REGISTER_NAMES, layerPhrase, registerLine } from "@/components/views";
 import { REGISTER_LAYER } from "@/src/engine/domain/viewPolicy";
@@ -23,7 +23,6 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { cn, TOUCH_HIT } from "@/lib/utils";
 import { StateMark } from "@/components/state/StateAtoms";
 import { useSceneYield } from "@/components/RailShade";
-import { SlideFace } from "@/components/SlideFace";
 import { useBreakpoint } from "@/components/useBreakpoint";
 
 // THE REGISTER SWITCH, ON THE SCENE (D3, user 2026-11-07 — option A of
@@ -61,19 +60,15 @@ import { useBreakpoint } from "@/components/useBreakpoint";
  *  ever carried in one); the Global snapshot the base everything lands in, never pressable. The tiles
  *  are NAMES ONLY; the lit register's readings are stated once, in the line under the face. */
 const FACE_H = 100;
-/** The phone's face: the lit register's name alone, ‹ › either side. */
-const FACE_H_PHONE = 40;
+/** The phone's face: the same layered face at the label step. */
+const FACE_H_PHONE = 92;
 /** The readings line under the face (the lit register's span, count and state). */
 const READINGS_H = 22;
-/** THE NOTE under the readings (`registerLine`): one line of the label step, TWO on the phone, where
- *  the sentence wraps under the narrower face. Its room is reserved on each tier, so the block below
- *  never moves. */
-const NOTE_H = 20;
-const NOTE_H_PHONE = 36;
-/** The switch block's whole height on a tier — the one number the motion hint's drop reads, and what
- *  `#register-switch` measures, so the callout's free band starts under it. */
+/** The switch block's whole height on a tier — face and readings; the register's sentence is the
+ *  caption at the scene's bottom now (`#register-caption`). The one number the motion hint's drop
+ *  reads, and what `#register-switch` measures, so the callout's free band starts under it. */
 export function registerSwitchH(phone: boolean): number {
-  return (phone ? FACE_H_PHONE : FACE_H) + READINGS_H + (phone ? NOTE_H_PHONE : NOTE_H);
+  return (phone ? FACE_H_PHONE : FACE_H) + READINGS_H;
 }
 /** Where each register's tile stands in the layered face (two columns, three rows). */
 const PLACE: Readonly<Record<LedgerRegister, string>> = {
@@ -123,10 +118,6 @@ export default function RegisterSwitch() {
   // and the view switch it belongs beside leaves with the bar, so the scene stands alone with the one
   // toggle back. It slides out through the top on the bar's own tempos (0.3s away, 0.18s back).
   const sceneOnly = useStore((s) => s.railsHidden);
-  // WHERE THE PHONE FACE'S NAME ARRIVES FROM — the view face's own rule (TopBar's `faceSlide`): a ›
-  // brings the next register in from the right, ‹ from the left, keyed by the register it was armed
-  // for, so a switch from anywhere else (the desktop grid, a footer link) rolls in plainly.
-  const [slide, setSlide] = useState<{ to: LedgerRegister; from: "left" | "right" } | null>(null);
   if (!on) return null;
 
   // The Data blocks register reads the Metagraph snapshots register's own source (the live buffer or
@@ -179,46 +170,6 @@ export default function RegisterSwitch() {
     blocks: countFigure(blockCount),
     data: reading ? null : countFigure(data.count, data.read < data.total),
   };
-  // ON A PHONE: ONE FACE, ‹ › EITHER SIDE (user, 2026-11-08, option A of
-  // `.superpowers/brainstorm/…/phone-register-switch.html` — the phone view switch's own grammar one
-  // row down). Three halves never fit 360px: the unlit ones were cut to a glyph and a short span and
-  // still crowded the row. The face carries the lit register whole — glyph, name, live / pinned, the
-  // clock span and the count, the desktop half's exact content — and the chevrons step the registers
-  // in the view's order through the one door, dimmed at an end (the plank's rule, never vanishing).
-  // No pip row: the view face retired its pips for the chevrons (user, 2026-10-18: "has both … the
-  // <> is more intuitive"), and this is that control.
-  const at = registers.indexOf(register);
-  const nextOf = (dir: -1 | 1): LedgerRegister | undefined => registers[at + dir];
-  const step = (dir: -1 | 1) => {
-    const to = nextOf(dir);
-    if (!to) return;
-    setSlide({ to, from: dir === 1 ? "right" : "left" });
-    switchLedgerRegister(to);
-  };
-  const slideFrom = slide && slide.to === register ? slide.from : null;
-  const chevron = (dir: -1 | 1) => {
-    const to = nextOf(dir);
-    const Glyph = dir === -1 ? ChevronLeft : ChevronRight;
-    return (
-      <button
-        type="button"
-        disabled={!to}
-        aria-label={to ? REGISTER_NAMES[to] : dir === -1 ? "First register" : "Last register"}
-        onClick={() => step(dir)}
-        className={cn(
-          // The view face's chevron exactly (TopBar's `viewChevron`): a 24px box, a 16px muted glyph,
-          // dimmed at an end, `TOUCH_HIT`'s invisible pad for a thumb, flush to the face.
-          "inline-flex items-center justify-center size-6 flex-none rounded-btn bg-transparent border-0 cursor-pointer",
-          "text-muted-foreground hover:text-foreground hover:bg-wash-soft",
-          "disabled:opacity-30 disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-muted-foreground",
-          "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
-          TOUCH_HIT,
-        )}
-      >
-        <Glyph aria-hidden className="size-4" />
-      </button>
-    );
-  };
   // TWO GLYPHED READINGS, NO DIVIDER (option A, 2026-11-08): the clock says "the last", the register's
   // glyph says what is counted; a gap parts them. NOT COLOUR-CODED (user, 2026-11-09): the count reads
   // in the row's own ink, as the span beside it.
@@ -241,42 +192,38 @@ export default function RegisterSwitch() {
   // The scene's glass (`SCENE_GLASS`'s ground and blur), as a control — both presentations wear it.
   const FRAME = "rounded-lg border border-border bg-[var(--panel-solid)] backdrop-blur-[8px]";
 
+  // THE CAPTION'S VISIBILITY follows the switch's own (the transition, a drag, scene mode).
+  const away = cn(
+    "transition-[opacity,translate] duration-200 data-[on='0']:opacity-0 data-[on='0']:pointer-events-none motion-reduce:transition-none",
+    yielding && "opacity-40 duration-300",
+  );
+
   return (
+    <>
     <div
       // A marker contract: the callout's free band starts under it (`ChromeBounds.sceneTop`).
       id="register-switch"
       data-on={phase ? "0" : "1"}
       style={{ top: "calc(var(--rail-top) + var(--topbar-extra, 0px))", height: registerSwitchH(phone) }}
       className={cn(
-        "absolute left-1/2 z-[5] -translate-x-1/2 w-max",
-        "transition-[opacity,translate] duration-200 data-[on='0']:opacity-0 data-[on='0']:pointer-events-none motion-reduce:transition-none",
-        // Off (data-on 0) still wins: its attribute variant outranks the plain utility.
-        yielding && "opacity-40 duration-300",
+        "absolute left-1/2 z-[5] -translate-x-1/2 w-max max-[700px]:w-[min(360px,calc(100vw-32px))]",
+        away,
         sceneOnly && "-translate-y-[calc(100%+var(--rail-top)+var(--topbar-extra,0px))] opacity-0 pointer-events-none duration-300 ease-[ease]",
       )}
     >
-      <div style={{ height: phone ? FACE_H_PHONE : FACE_H }}>
-      {/* THE PHONE FACE (option A): the lit register's NAME, ‹ › stepping the others. CSS picks the
-          presentation, both stay in the DOM (the view switch's precedent). Its readings are the line
-          under it, as on the desktop. */}
-      <div role="group" aria-label="Register" className={cn("hidden max-[700px]:flex h-full items-center gap-0.5 px-1", FRAME)}>
-        {chevron(-1)}
-        {/* THE FACE RESTS UNWASHED (user, 2026-11-09: "it keeps the focus while idle"): the glyph in
-            the accent and the name in the foreground ink say which register is shown. */}
-        <SlideFace id={register} from={slideFrom} clipClassName="px-2 py-1" className="flex items-center justify-center">
-          <span className="flex items-center justify-center gap-1.5 text-body font-semibold leading-none whitespace-nowrap text-foreground">
-            <LitIcon aria-hidden className="size-3.5 flex-none text-primary" />
-            {REGISTER_NAMES[register]}
-          </span>
-        </SlideFace>
-        {chevron(1)}
-      </div>
-
-      {/* FROM 700px UP: THE LAYERED FACE (A4·1). Two columns, three rows: Transaction blocks the tall
-          tile at the left, down to the base; Data blocks over Metagraph snapshots at the right; the
-          Global snapshot the base across both, a plate, not a control. The lit tile in the selection
-          fill — the view switch's own on-state. */}
-      <div role="group" aria-label="Register" className={cn("max-[700px]:hidden h-full grid grid-cols-2 grid-rows-[1fr_1fr_auto] gap-[3px] p-1", FRAME)}>
+      {/* THE LAYERED FACE (A4·1), ON EVERY TIER (user, 2026-11-19: "I want the layered switcher also on
+          phone" — the phone's single face with ‹ › went). Two columns, three rows: Transaction blocks
+          the tall tile at the left, down to the base; Data blocks over Metagraph snapshots at the
+          right; the Global snapshot the base across both, a plate, not a control. On the phone the
+          names take the label step and may wrap, never shortened. */}
+      <div
+        role="group"
+        aria-label="Register"
+        style={{ height: phone ? FACE_H_PHONE : FACE_H }}
+        // On the phone the right column takes more of the width, so "Metagraph snapshots" stays one
+        // line; "Transaction blocks" wraps in its tall tile instead, where two lines have room.
+        className={cn("grid grid-cols-2 max-[700px]:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] grid-rows-[1fr_1fr_auto] gap-[3px] p-1", FRAME)}
+      >
         {registers.map((r) => {
           const Icon = REGISTER_ICONS[r];
           return (
@@ -287,49 +234,58 @@ export default function RegisterSwitch() {
               onClick={() => switchLedgerRegister(r)}
               className={cn(
                 PLACE[r],
-                "group flex items-center justify-center gap-1.5 rounded-md px-4 cursor-pointer border-0",
-                "text-body font-semibold leading-none whitespace-nowrap",
+                "group flex items-center justify-center gap-1.5 rounded-md px-4 max-[700px]:px-2 cursor-pointer border-0",
+                "text-body max-[700px]:text-label font-semibold leading-none whitespace-nowrap max-[700px]:whitespace-normal max-[700px]:text-center max-[700px]:leading-tight",
                 "bg-transparent text-muted-foreground hover:text-foreground hover:bg-wash-soft",
                 "aria-pressed:bg-[var(--sel-bg)] aria-pressed:text-primary-ink aria-pressed:hover:bg-[var(--sel-bg)]",
                 "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
+                TOUCH_HIT,
               )}
             >
               <Icon aria-hidden className="size-3.5 flex-none group-aria-pressed:text-primary" />
-              {REGISTER_NAMES[r]}
+              <span>{REGISTER_NAMES[r]}</span>
             </button>
           );
         })}
         {/* THE GROUND: where every register's subject lands, so it is drawn and never pressed. */}
-        <span className="col-span-2 row-start-3 flex items-center justify-center rounded-md py-1 bg-[var(--panel-plate)] shadow-[inset_0_0_0_1px_var(--border)] text-label uppercase tracking-caps text-muted-foreground leading-none select-none">
+        <span className="col-span-2 row-start-3 flex items-center justify-center rounded-md py-1 bg-[var(--panel-plate)] shadow-[inset_0_0_0_1px_var(--border)] text-label max-[700px]:text-[10px] uppercase tracking-caps text-muted-foreground leading-none select-none">
           Global snapshot
         </span>
       </div>
-      </div>
 
       {/* THE READINGS, ONCE (readings option 2): the lit register's span, count and state, under the
-          face — or, where the filtered network runs no such layer, the layer it lacks and "n/a". */}
+          face — or, where the filtered network runs no such layer, the layer it lacks and "n/a". They
+          stay with the switch (user, 2026-11-19, layout option 3): they say which register is lit and
+          whether it is live. */}
       <div
-        style={{ top: phone ? FACE_H_PHONE : FACE_H, height: READINGS_H }}
-        className="absolute left-1/2 -translate-x-1/2 flex items-end justify-center gap-1 font-mono text-label leading-none tabular-nums whitespace-nowrap text-foreground"
+        style={{ height: READINGS_H }}
+        className="flex items-end justify-center gap-1 font-mono text-label leading-none tabular-nums whitespace-nowrap text-foreground"
       >
         {readings(register, LitIcon)}
         <StateMark following={following} na={paused} className="ml-2 font-sans leading-none" />
         <span className="sr-only">{count[register] ? `${span[register]}, ${count[register]}` : span[register]}</span>
       </div>
-
-      {/* THE NOTE: where the lit register's subject sits in a global snapshot, the filter's own network
-          named (`registerLine`). Subtle: the label step, muted, no plate. ABSOLUTE, so it never sizes
-          the switch; on the phone it wraps, balanced, in the screen's width less the gutters. */}
-      <p
-        style={{ top: (phone ? FACE_H_PHONE : FACE_H) + READINGS_H }}
-        className={cn(
-          "absolute left-1/2 -translate-x-1/2 m-0 pt-1.5 text-center text-label text-muted-foreground",
-          "leading-none whitespace-nowrap",
-          "max-[700px]:w-[min(340px,calc(100vw-32px))] max-[700px]:whitespace-normal max-[700px]:text-balance max-[700px]:leading-tight",
-        )}
-      >
-        {registerLine(register, lineScope, runs(register))}
-      </p>
     </div>
+
+    {/* THE CAPTION (layout option 3): the register's sentence (`registerLine`) moved off the top to the
+        scene's bottom, just above the vitals band (the dock on the phone), a caption under the picture.
+        A marker contract like the switch's: the callout's free band ends above it
+        (`ChromeBounds.captionTop`). */}
+    <p
+      id="register-caption"
+      data-on={phase ? "0" : "1"}
+      className={cn(
+        "absolute left-1/2 z-[5] -translate-x-1/2 m-0 pointer-events-none select-none",
+        "bottom-[calc(var(--bottom-reserve,0px)+8px)] max-[700px]:bottom-[calc(var(--phone-dock-h,0px)+10px)]",
+        "rounded-full px-3.5 py-1.5 max-[700px]:rounded-xl bg-[color-mix(in_oklch,var(--background)_82%,transparent)] backdrop-blur-[6px]",
+        "text-center text-label text-muted-foreground leading-snug whitespace-nowrap",
+        "max-[700px]:w-[min(340px,calc(100vw-32px))] max-[700px]:whitespace-normal max-[700px]:text-balance",
+        away,
+        sceneOnly && "opacity-0",
+      )}
+    >
+      {registerLine(register, lineScope, runs(register))}
+    </p>
+    </>
   );
 }

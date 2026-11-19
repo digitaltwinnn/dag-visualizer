@@ -1090,8 +1090,14 @@ design round options A → A4 → A4·1, then readings option 2 — `RegisterSwi
 stand as the protocol stacks them — Transaction blocks a tall tile down to the base (the DAG's blocks go
 straight into the global snapshot), Data blocks on the Metagraph snapshots bar, a fixed, unpressable
 "Global snapshot" base — and they are NAMES ONLY; the lit register's readings (span, count, live /
-pinned / n/a) are ONE line under the face, above the register's sentence, on the phone face too.
-Where the paragraphs below speak of "halves" and their second line, read the tiles and that line. The register
+pinned / n/a) are ONE line under the face. **The same layered face on the phone** (same day: "I want the
+layered switcher also on phone"; the single face with ‹ › went), its names at the label step, the right
+column wider so "Metagraph snapshots" stays one line. **The register's sentence is a CAPTION at the
+scene's bottom** (layout option 3: the readings stay with the switch, the sentence moves down), above
+the vitals band or the phone's dock, `#register-caption` — a marker contract like the switch's: the
+callout's free band ends above it (`ChromeBounds.captionTop`), so the label moves up with it.
+Where the paragraphs below speak of "halves", their second line or the phone's one face, read the tiles,
+that line and the layered face. The register
 switch stands ON THE SCENE (D3, 2026-11-07 — option A of the user's mock,
 `components/RegisterSwitch.tsx`): one glass segmented control centred under the command bar, each
 half carrying its own SPAN ("Metagraph snapshots · last 11 min", "Transaction blocks · last 14 h",
