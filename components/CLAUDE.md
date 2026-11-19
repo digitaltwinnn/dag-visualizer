@@ -1277,16 +1277,16 @@ place, the Data block's mark, the Metagraph card's lane (else the snapshot insid
 with no subject card open, the register's live subject — the newest block in Transaction blocks (no
 global is drawn there, D3), the global snapshot in the other two. Its test is the matrix.
 
-**A register the filtered network makes no subject for stands INACTIVE, and one already open stays
-and says why** (user, 2026-11-19: "what to do when we filter on … UP and are looking at transaction
+**A register the filtered network makes no subject for says so, and stays selectable** (user, 2026-11-19: "what to do when we filter on … UP and are looking at transaction
 blocks … or use the switcher?"). A transaction block is a cL1's, a data block a dL1's
 (`viewPolicy.REGISTER_LAYER`); `registerRuns` asks the layers the network's located nodes run (the kind
 word's own read, `networkLayers`), and no node located is UNKNOWN, never a guessed absence. Metagraph
 snapshots is never gated: every metagraph has an L0, and the app cannot always see it (BioFi's nodes
-locate as cL1 only). `components/useRegisterScope.ts` is the one reading: the switch's half goes
-inactive (dimmed, not pressable, its readings "no cL1" / "no dL1"; the phone's ‹ › step over it — the
-explorer tiles' rule, inactive, never gone), and where the register is already open the filter does
-not move it — the line under the switch, the band, the explorer and RAW all say ONE sentence
+locate as cL1 only). `components/useRegisterScope.ts` is the one reading: the switch's half keeps
+its full strength and stays pressable, its readings "no cL1" / "no dL1" (user, same day: "don't gray
+out the switcher … 'no dL1' in the switcher + the hint text is clear enough"), and opened — or open
+when the filter is set, which never moves it — the line under the switch, the band (one card), the
+explorer and RAW all say ONE sentence
 (`views.registerAbsence`: "UP runs no dL1, so it makes no data blocks"; the DAG's keeps "The DAG's own
 snapshots carry no data blocks"), and Transaction blocks reads no window for it (`blockWanted`'s
 `makesBlocks`, status `unread`).
