@@ -9,7 +9,7 @@ describe("forkSpread — a layered DAG drawing on the chamber's time axis, its f
   });
   it("splits two siblings symmetrically around their parent, one spacing above and one below", () => {
     const z = forkSpread([b("a", 1, 10), b("s1", 2, 11, ["a"]), b("s2", 2, 12, ["a"])], 1.5);
-    expect([z.get("s1"), z.get("s2")]).toEqual([-1.5, 1.5]);
+    expect([z.get("s1"), z.get("s2")].sort((x, y) => x! - y!)).toEqual([-1.5, 1.5]);
   });
   it("brings a child of both siblings back to the centre line (the diamond closes)", () => {
     const z = forkSpread([b("a", 1, 10), b("s1", 2, 11, ["a"]), b("s2", 2, 12, ["a"]), b("c", 3, 13, ["s1", "s2"])], 1);
@@ -17,7 +17,8 @@ describe("forkSpread — a layered DAG drawing on the chamber's time axis, its f
   });
   it("takes the barycenter of the parents it can place, and the centre line with none", () => {
     const z = forkSpread([b("a", 1, 10), b("s1", 2, 11, ["a"]), b("s2", 2, 12, ["a"]), b("c", 3, 13, ["s2", "gone"]), b("o", 5, 14, ["away"])], 1);
-    expect(z.get("c")).toBe(1);
+    expect(Math.abs(z.get("s2")!)).toBe(1);
+    expect(z.get("c")).toBe(z.get("s2"));
     expect(z.get("o")).toBe(0);
   });
   it("keeps every block it placed before where it stands, so a newer block moves no older one", () => {
@@ -36,7 +37,34 @@ describe("forkSpread — a layered DAG drawing on the chamber's time axis, its f
     const before = forkSpread([b("a", 1, 10), b("s1", 2, 11, ["a"])], 1);
     expect(before.get("s1")).toBe(0);
     const after = forkSpread([b("a", 1, 10), b("s1", 2, 11, ["a"]), b("s2", 2, 12, ["a"])], 1, before);
-    expect([after.get("s1"), after.get("s2")]).toEqual([0, 1]);
+    expect(after.get("s1")).toBe(0);
+    expect(Math.abs(after.get("s2")!)).toBe(1);
+  });
+  // User, 2026-11-19: "is the most front cube always shown at the top? … should be random right?"
+  // Siblings of one height are concurrent: neither their tick order nor a fixed side may say where
+  // they stand. The block's own hash decides both, so the drawing is stable and unbiased.
+  it("neither TIME nor a fixed side places a sibling: a late sibling lands above as often as below", () => {
+    let up = 0;
+    let down = 0;
+    for (let i = 0; i < 400; i++) {
+      const prior = new Map([["a", 0], ["s0", 0]]);
+      const z = forkSpread([b("a", 1, 10), b("s0", 2, 11, ["a"]), b(`late${i}`, 2, 12 + i, ["a"])], 1, prior).get(`late${i}`)!;
+      if (z > 0) up++;
+      else if (z < 0) down++;
+    }
+    expect(up + down).toBe(400);
+    expect(Math.abs(up - down)).toBeLessThan(80);
+  });
+  it("the NEWEST of several siblings is not the outermost by construction", () => {
+    let outermost = 0;
+    for (let i = 0; i < 200; i++) {
+      const sibs = Array.from({ length: 5 }, (_, k) => b(`h${i}x${k}`, 2, 11 + k, ["a"]));
+      const z = forkSpread([b("a", 1, 10), ...sibs], 1);
+      const newest = Math.abs(z.get(sibs[4]!.hash)!);
+      if (sibs.every((x) => Math.abs(z.get(x.hash)!) <= newest)) outermost++;
+    }
+    // Five siblings, two outermost places: by chance about 2 in 5; by construction it was every time.
+    expect(outermost).toBeLessThan(140);
   });
   it("seats a block on the LATTICE nearest its parents' mean, so the spread never decays into fractions", () => {
     // Two parents a lane apart: the mean (0.5) rounds to a lattice place, and repeated averaging
@@ -48,8 +76,10 @@ describe("forkSpread — a layered DAG drawing on the chamber's time axis, its f
   });
   it("rounds a merge SYMMETRICALLY: a merge with the lane above and its mirror below land the same distance from the centre (N2)", () => {
     // s1 stands below (−1), s2 above (+1). The centre block `a` merges with each in turn.
-    const up = forkSpread([b("a", 1, 10), b("s1", 2, 11, ["a"]), b("s2", 2, 12, ["a"]), b("c", 3, 13, ["s2", "a"])], 1);
-    const down = forkSpread([b("a", 1, 10), b("s1", 2, 11, ["a"]), b("s2", 2, 12, ["a"]), b("c", 3, 13, ["s1", "a"])], 1);
+    // Which sibling stands above is the hash's call: seat them through `prior` so the case is fixed.
+    const seated = new Map([["a", 0], ["s1", -1], ["s2", 1]]);
+    const up = forkSpread([b("a", 1, 10), b("s1", 2, 11, ["a"]), b("s2", 2, 12, ["a"]), b("c", 3, 13, ["s2", "a"])], 1, seated);
+    const down = forkSpread([b("a", 1, 10), b("s1", 2, 11, ["a"]), b("s2", 2, 12, ["a"]), b("c", 3, 13, ["s1", "a"])], 1, seated);
     expect([up.get("s1"), up.get("s2")]).toEqual([-1, 1]);
     expect(Math.abs(up.get("c")!)).toBe(Math.abs(down.get("c")!));
     expect(up.get("c")).toBe(0);

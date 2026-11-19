@@ -50,7 +50,12 @@ export interface BlockTransfer {
  *    line) — the mean alone decays every fork into a fraction of a lane down a chain; new blocks of one
  *    height sharing that barycenter split symmetrically around it — `spacing` to each side for a
  *    pair — and where siblings already stand there, each new one takes the nearest free place
- *    (0, +1, −1, +2, … spacings), in tick order (hash on a tie).
+ *    (0, then ±1, ±2, … spacings).
+ *  - SIBLINGS ARE CONCURRENT, so neither time nor a fixed side places one (user, 2026-11-19: "is the
+ *    most front cube always shown at the top? … should be random right?"): in tick order with "+"
+ *    first, the newest block of a height always took the outermost place, and mostly the top one —
+ *    and the front block is exactly that. The block's own HASH orders siblings and picks which side a
+ *    free place is tried first (`hashSide`): stable, the same for every reader, and with no bias.
  */
 /** The lattice place nearest `m`, a half rounding TOWARD THE CENTRE LINE (review N2): `Math.round`
  *  sends +0.5 up to 1 but −0.5 up to 0, so a merge with the lane above rose off the centre while
@@ -59,6 +64,29 @@ export interface BlockTransfer {
  *  as its mirror. `+ 0` turns a −0 into 0. */
 function latticeOf(m: number): number {
   return Math.sign(m) * Math.ceil(Math.abs(m) - 0.5) + 0;
+}
+
+/** A block's mixed hash: an FNV-1a fold, then murmur3's final avalanche, so hashes that differ only in
+ *  their last character still land far apart (a plain fold kept them in order). Any string works. */
+function hashMix(hash: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < hash.length; i++) h = Math.imul(h ^ hash.charCodeAt(i), 0x01000193);
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x85ebca6b);
+  h ^= h >>> 13;
+  h = Math.imul(h, 0xc2b2ae35);
+  h ^= h >>> 16;
+  return h >>> 0;
+}
+
+/** A block's coin: which side its free place is tried on first, a stable ±1 with no bias. */
+function hashSide(hash: string): 1 | -1 {
+  return hashMix(hash) & 1 ? 1 : -1;
+}
+
+/** The order siblings are seated in: by the mixed hash, never by time (see `forkSpread`). */
+function hashOrder(x: { hash: string }, y: { hash: string }): number {
+  return hashMix(x.hash) - hashMix(y.hash) || (x.hash < y.hash ? -1 : x.hash > y.hash ? 1 : 0);
 }
 
 export function forkSpread(
@@ -94,7 +122,7 @@ export function forkSpread(
       (groups.get(key) ?? groups.set(key, { bary, list: [] }).get(key)!).list.push(b);
     }
     for (const { bary, list } of groups.values()) {
-      list.sort((x, y) => x.ord - y.ord || (x.hash < y.hash ? -1 : x.hash > y.hash ? 1 : 0));
+      list.sort(hashOrder);
       // The places already taken on this height's lattice around the barycenter.
       const taken = new Set<number>();
       for (const o of all) {
@@ -109,9 +137,11 @@ export function forkSpread(
       }
       let k = 0;
       for (const b of list) {
+        // The side tried first is the block's own coin: 0, then ±1 in its order, ±2, …
+        const side = hashSide(b.hash);
         let j = 0;
-        for (;; k++) {
-          j = k === 0 ? 0 : k % 2 ? (k + 1) / 2 : -k / 2;
+        for (k = 0; ; k++) {
+          j = k === 0 ? 0 : (k % 2 ? 1 : -1) * side * Math.ceil(k / 2);
           if (!taken.has(j)) break;
         }
         taken.add(j);
