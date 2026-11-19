@@ -3,7 +3,7 @@
 import { ChevronLeft, ChevronRight, Clock } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
 import { REGISTER_ICONS } from "@/components/icons";
-import { REGISTER_NAMES } from "@/components/views";
+import { REGISTER_NAMES, REGISTER_NOTES } from "@/components/views";
 import { useFeedRead } from "@/components/useFeedRead";
 import { useNowTick } from "@/components/useNowTick";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
@@ -48,8 +48,15 @@ import { SlideFace } from "@/components/SlideFace";
 // (`PastWindowBridge`), and the block window (`BlockWindowBridge`, which reads it from either register
 // for this reason).
 
-/** The switch's height — one number the motion hint's drop reads (two lines a half, a touch target). */
-export const REGISTER_SWITCH_H = 52;
+/** The switch FACE's height (two lines a half, a touch target). */
+const SWITCH_FACE_H = 52;
+/** THE NOTE LINE under the face (`REGISTER_NOTES`, user 2026-11-19: "under the switch, extra line,
+ *  subtle text"): one line of the label step, its room reserved on every tier so the block below
+ *  never moves; the phone hides the words (a 360px face has no width for them). */
+const NOTE_H = 22;
+/** The switch block's whole height, face and note — the one number the motion hint's drop reads, and
+ *  what `#register-switch` measures, so the callout's free band starts under the note too. */
+export const REGISTER_SWITCH_H = SWITCH_FACE_H + NOTE_H;
 
 export default function RegisterSwitch() {
   const mode = useStore((s) => s.mode);
@@ -195,6 +202,7 @@ export default function RegisterSwitch() {
         sceneOnly && "-translate-y-[calc(100%+var(--rail-top)+var(--topbar-extra,0px))] opacity-0 pointer-events-none duration-300 ease-[ease]",
       )}
     >
+      <div style={{ height: SWITCH_FACE_H }}>
       {/* THE PHONE FACE (option A): the lit register whole, ‹ › stepping the others. CSS picks the
           presentation, both stay in the DOM (the view switch's precedent). */}
       <div role="group" aria-label="Register" className={cn("hidden max-[700px]:flex h-full items-center gap-0.5 px-1", FRAME)}>
@@ -285,6 +293,15 @@ export default function RegisterSwitch() {
         );
       })}
       </div>
+      </div>
+      {/* THE NOTE: where the lit register's subject sits in a global snapshot, in one shape for all
+          three (`REGISTER_NOTES`). Subtle: the label step, muted, no plate of its own. */}
+      <p
+        style={{ height: NOTE_H }}
+        className="max-[700px]:invisible flex items-end justify-center text-label leading-none whitespace-nowrap text-muted-foreground"
+      >
+        {REGISTER_NOTES[register]}
+      </p>
     </div>
   );
 }

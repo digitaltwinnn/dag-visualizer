@@ -126,6 +126,21 @@ export const REGISTER_NAMES: Readonly<Record<LedgerRegister, string>> = {
   data: REGISTER_PAGES.data!.name,
 };
 
+/** WHERE EACH REGISTER'S SUBJECT SITS IN A GLOBAL SNAPSHOT, one subtle line under the switch (user,
+ *  2026-11-19: "how can we have uniform consistent naming for the three sections … add an extra subtle
+ *  hint line to explain accepted vs stored vs anchored"; then "I feel something is out of balance").
+ *  The balance is the protocol's, so each line states it in ONE shape — whose layer made it, its verb,
+ *  where it lands — rather than pretending three equals: a metagraph snapshot is the L0's output, the
+ *  container; transaction blocks (every network's cL1) and data blocks (a metagraph's dL1) are what the
+ *  snapshots hold. The verbs are the app's own: ANCHORED (the anchor log, "N metagraphs anchored"),
+ *  ACCEPTED (Constellation's term for a block in a snapshot), CARRIED (the Global card's "Carried N
+ *  data blocks"). */
+export const REGISTER_NOTES: Readonly<Record<LedgerRegister, string>> = {
+  snapshots: "Each metagraph's L0 snapshots, anchored into the global snapshot",
+  blocks: "Each network's cL1 blocks, accepted into the global or a metagraph snapshot",
+  data: "Each metagraph's dL1 blocks, carried in its snapshot into the global snapshot",
+};
+
 /** Paths that name a mode AND a register of it. */
 const REGISTER_PATHS: Record<string, { mode: Mode; register: LedgerRegister }> = Object.fromEntries(
   (Object.entries(REGISTER_PAGES) as [LedgerRegister, RegisterPage | null][])
