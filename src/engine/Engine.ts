@@ -6,7 +6,7 @@ import { metagraphById, initNetwork, getNetwork, DEFAULT_META_COLOR, resolveSign
 import { getBlockWindow, getPastWindow, ledgerSource, onBlockWindow, onPastWindow } from "@/src/data/pastWindow";
 import { windowReadsSettled } from "@/src/data/blockReads";
 import { REGISTER_BEAT } from "@/src/engine/domain/entryBeat";
-import { blockWindowContinues } from "@/src/data/blockWindow";
+import { blockChainOf, blockWindowContinues } from "@/src/data/blockWindow";
 import { ledgerLens } from "@/src/data/ledgerStory";
 import { reportPoll, touchPoll } from "@/src/data/api";
 import { holdFeed } from "@/src/data/feedUse";
@@ -2583,6 +2583,7 @@ export class Engine {
     // The chart planes ride the SETTLED camera, so they are placed here in the scene-write phase —
     // last, beside the callout, for the same reason: both project this frame's final pose.
     this._syncTrendStack();
+    this._syncBraidHint();
     if (AUDIT_ON) this._auditPass();
   }
   // ---- the instance audit (dev only) -------------------------------------------------------
@@ -2643,6 +2644,50 @@ export class Engine {
     c.sceneCoverL = st.sceneCoverL; c.sceneCoverR = st.sceneCoverR;
     c.sceneCoverB = Math.max(st.sceneCoverBExplore, st.sceneCoverBDetails, st.sceneCoverBVitals);
     this.callout.sync(c);
+  }
+
+  // ---- the braid hint ----------------------------------------------------------------------
+  // THE DAG BRAID IS ON ITS WAY (user, 2026-11-19: "the dag appeared many seconds later without a
+  // hint … give a hint that it's coming"). The braid is laid out once, when every read has landed, so
+  // the Transaction blocks register's pane stands empty meanwhile and one quiet label sits on it
+  // (`components/BraidHint.tsx` owns the words; this places it, the callout's split). The Engine reads
+  // the store once — whether a window that can hold DAG blocks is being read — and the view answers
+  // whether the braid waits (`LedgerView.braidHintAnchor`, layout data). Projected like the callout,
+  // and written only on a change: no allocation unless the label moves (rule 5).
+  private _braidHintV = new THREE.Vector3();
+  private _braidHintEl: HTMLElement | null = null;
+  private _braidHintOn = false;
+  private _braidHintX = NaN;
+  private _braidHintY = NaN;
+  private _syncBraidHint(): void {
+    let el = this._braidHintEl;
+    if (!el || !el.isConnected) el = this._braidHintEl = document.getElementById("braid-hint"); // event-time: a cache miss only
+    if (!el) return;
+    const st = useStore.getState();
+    this.ledger.setBraidExpected(st.blockWindowStatus?.status === "loading" && (blockChainOf(st.filter) ?? "dag") === "dag");
+    const v = this._braidHintV;
+    // The view's own furniture fade gates it: zero outside the Snapshots view and mid-transition.
+    let on = this.ledger.braidHintAnchor(v) > 0.5;
+    if (on) {
+      this.ledger.group.localToWorld(v); // the rendered chamber transform — a label read. render-state OK
+      v.applyMatrix4(this.ctx.camera.matrixWorldInverse);
+      if (v.z > -0.1) on = false; // behind the camera
+      else {
+        v.applyMatrix4(this.ctx.camera.projectionMatrix);
+        const r = this.ctx.renderer.domElement.getBoundingClientRect();
+        const x = Math.round(r.left + (v.x * 0.5 + 0.5) * r.width);
+        const y = Math.round(r.top + (-v.y * 0.5 + 0.5) * r.height);
+        if (x !== this._braidHintX || y !== this._braidHintY) {
+          this._braidHintX = x;
+          this._braidHintY = y;
+          el.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+        }
+      }
+    }
+    if (on !== this._braidHintOn) {
+      this._braidHintOn = on;
+      el.dataset.on = on ? "1" : "0";
+    }
   }
 
   // ---- the trend stack ---------------------------------------------------------------------

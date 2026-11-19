@@ -25,6 +25,7 @@ import Tooltip from "@/components/Tooltip";
 import MotionHint from "@/components/MotionHint";
 import RegisterSwitch from "@/components/RegisterSwitch";
 import SceneCallout from "@/components/SceneCallout";
+import BraidHint from "@/components/BraidHint";
 import TrendStack from "@/components/TrendStack";
 import DevCssCanary from "@/components/DevCssCanary";
 import SectionShell from "@/components/SectionShell";
@@ -102,6 +103,8 @@ export default function AppShell({ doc }: { doc?: DocPage }) {
           <TrendStack />
           <StageGate>
             <SceneCallout />
+            {/* The Transaction blocks register's "the braid is coming" line, on its empty pane. */}
+            <BraidHint />
             {/* The Snapshots view's register switch (D3): on the scene, centred under the bar. */}
             <RegisterSwitch />
             <MotionHint />

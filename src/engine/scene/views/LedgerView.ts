@@ -269,11 +269,15 @@ const TOKEN_BLOCK = 0.36;
 const BRAID_GAP = 1.2;
 const BRAID_LO = FLOOR_Y.gl0 + BAR_LIFT + BAR_H + BRAID_GAP + DAG_BLOCK / 2;
 const BRAID_HI = FLOOR_Y.msnap - BRAID_GAP - DAG_BLOCK / 2;
-const BRAID_Y = (BRAID_LO + BRAID_HI) / 2;
+/** The braid's centre line is the MIDDLE OF THE TWO PLANES (user, 2026-11-19: "too high, should be
+ *  right in the middle of both horizontal panes") — not of the room above the bars, which sat it the
+ *  bars' height high. */
+const BRAID_Y = (FLOOR_Y.gl0 + FLOOR_Y.msnap) / 2;
 /** The band's reach about its centre line, a FIFTH short of the room (user, 2026-11-08: "make the
- *  braid glass sheet and DAG 20 narrower"); the token band and the pane derive from it. */
+ *  braid glass sheet and DAG 20 narrower"); the token band and the pane derive from it. Never past
+ *  `BRAID_LO`/`BRAID_HI`, so the gap to a bar and a tile holds about the lowered centre. */
 const BRAID_FIT = 0.8;
-const BRAID_HALF = ((BRAID_HI - BRAID_LO) / 2) * BRAID_FIT;
+const BRAID_HALF = Math.min(((BRAID_HI - BRAID_LO) / 2) * BRAID_FIT, BRAID_Y - BRAID_LO, BRAID_HI - BRAID_Y);
 /** Blocks that share a tick and a place step aside along the trail by this much, alternately. */
 const BLOCK_STEP = 0.7;
 /** THE TOKEN BRAID is a SHORT band stood on the TILE (user, 2026-11-07: "identical to how they are
@@ -697,9 +701,10 @@ export class LedgerView implements SceneView {
       this._spot.claim("ledger", this._stageSubject, this._stageNormal, STAGE_LIGHTS.ledger.height, a);
     }
     for (const p of this._globalPlanes) p.applyAlpha(GLOBAL_PLANE_LOOK, a, FLOOR_D / 2);
-    // The braid pane stands only while DAG blocks do (the register's, and not under a token filter,
-    // whose window holds no DAG block); it fades with the furniture.
-    this._braidPane.apply(this._cargo.blocks && this._dagTier.count > 0, a);
+    // The braid pane stands while DAG blocks do (the register's, and not under a token filter,
+    // whose window holds no DAG block) — and, EMPTY, while they are on their way (`_braidWaiting`,
+    // user 2026-11-19: "show its panel directly"); it fades with the furniture.
+    this._braidPane.apply(this._cargo.blocks && (this._dagTier.count > 0 || this._braidWaiting()), a);
     // The committed (or hover-previewed) network's OWN plane glows a step brighter — the
     // plane-level twin of the colored dim (user, 2026-08-07).
     const netKey = this._netDimKey();
@@ -1087,6 +1092,34 @@ export class LedgerView implements SceneView {
    *  change re-runs `setData`, whose slot rebuild draws the tier — one rebuild per window. */
   setBlockWindow(w: BlockWindow | null): void {
     this._blockWindow = w;
+    this._windowDag = !!w && w.ticks.some((t) => t.blocks.length > 0);
+  }
+  /** Does the held window hold a DAG block — will a braid stand once its reads settle? */
+  private _windowDag = false;
+
+  /** THE BRAID IS ON ITS WAY with no window held yet (the Engine's reading of the request: the window
+   *  is loading, for a scope whose window can hold DAG blocks — All or the DAG, never a token filter's
+   *  window, which holds none). */
+  setBraidExpected(on: boolean): void {
+    this._braidExpected = on;
+  }
+  private _braidExpected = false;
+
+  /** IS THE DAG BRAID WAITING (user, 2026-11-19: "the dag appeared many seconds later without a hint")?
+   *  The braid is laid out ONCE, when every read has landed (`_laid`), so until then the pane stands
+   *  empty and the hint names the wait: a held window holding DAG blocks not yet laid, or none held
+   *  yet while one that can hold them is being read. */
+  private _braidWaiting(): boolean {
+    if (!this._cargo.blocks || this._laid) return false;
+    return this._blockWindow ? this._windowDag : this._braidExpected;
+  }
+
+  /** THE BRAID HINT's anchor, chamber-LOCAL: the pane's centre — layout data. Returns the label's
+   *  alpha (the view's furniture fade), 0 while the braid is not waiting. */
+  braidHintAnchor(out: THREE.Vector3): number {
+    if (!this._braidWaiting()) return 0;
+    out.set(FLOOR_CX, BRAID_Y, 0);
+    return this._fades.alpha;
   }
 
   /** THE LIVE GLOBAL the Blocks register's front run reaches to (`SilentStretch`'s front run), or

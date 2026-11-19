@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { blockReadKey, blockReadOf, exactEvictions, wantedBlockReads, wantedExactReads, windowBlockKeys, windowReadsSettled } from "@/src/data/blockReads";
+import { blockReadKey, blockReadOf, exactEvictions, wantedBlockReads, wantedExactReads, windowBlockKeys, windowReadProgress, windowReadsSettled } from "@/src/data/blockReads";
 import type { BlockRead } from "@/src/engine/domain/blockBraid";
 import { foldBlockWindow } from "@/src/data/blockWindow";
 import type { RawMetaSnapshot } from "@/src/data/types";
@@ -42,6 +42,21 @@ describe("windowReadsSettled — the DAG is laid out once, when every read has l
     expect(windowReadsSettled(w, { "dag:100": { blocks: [] }, "dag:300": { blocks: [] } }, {}, {})).toBe(false);
     expect(windowReadsSettled(w, held, {}, {})).toBe(true);
     expect(windowReadsSettled(null, held, {}, {})).toBe(false);
+  });
+});
+
+describe("windowReadProgress — the braid's wait, counted in blocks (user, 2026-11-19)", () => {
+  it("counts every block of the window, and those whose read landed or missed; reaches the total exactly when the reads settle", () => {
+    expect(windowReadProgress(w, {}, {}, {})).toEqual({ read: 0, total: 3 });
+    expect(windowReadProgress(w, { "dag:300": { blocks: [] } }, {}, {})).toEqual({ read: 1, total: 3 });
+    // A miss settles its blocks too: the braid draws them with no links.
+    expect(windowReadProgress(w, { "dag:300": { blocks: [] } }, { "DOR:51": true }, { 100: true })).toEqual({ read: 3, total: 3 });
+    const held = { "dag:100": { blocks: [] }, "dag:300": { blocks: [] }, "DOR:51": { blocks: [] } };
+    const p = windowReadProgress(w, held, {}, {});
+    expect(p.read === p.total).toBe(windowReadsSettled(w, held, {}, {}));
+  });
+  it("has nothing to count without a window", () => {
+    expect(windowReadProgress(null, {}, {}, {})).toEqual({ read: 0, total: 0 });
   });
 });
 

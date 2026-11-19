@@ -92,7 +92,44 @@ export function windowReadsSettled(
   exactMiss: Readonly<Record<number, unknown>>,
 ): boolean {
   if (!w) return false;
-  return allWants(w).every((x) => have[x.key] != null || (x.chain === "dag" ? exactMiss[x.ordinal] != null : miss[x.key] != null));
+  return allWants(w).every((x) => readSettled(x, have, miss, exactMiss));
+}
+
+/** Has one wanted read landed or missed? (A DAG read's miss is its tick's exact miss.) */
+function readSettled(
+  x: BlockReadWant,
+  have: Readonly<Record<string, unknown>>,
+  miss: Readonly<Record<string, true>>,
+  exactMiss: Readonly<Record<number, unknown>>,
+): boolean {
+  return have[x.key] != null || (x.chain === "dag" ? exactMiss[x.ordinal] != null : miss[x.key] != null);
+}
+
+/** HOW FAR THE WINDOW'S READS HAVE COME, in BLOCKS (user, 2026-11-19: the DAG "appeared many seconds
+ *  later without a hint"): the window's blocks, and how many of them sit in a read that has landed or
+ *  missed — the same settling `windowReadsSettled` waits for, so `read === total` is the edge the
+ *  chamber lays the braid out on. Counted in blocks, the vitals band's own unit ("12 of 30 blocks
+ *  read"). No window: nothing to count yet. */
+export function windowReadProgress(
+  w: BlockWindow | null,
+  have: Readonly<Record<string, unknown>>,
+  miss: Readonly<Record<string, true>>,
+  exactMiss: Readonly<Record<number, unknown>>,
+): { read: number; total: number } {
+  let read = 0;
+  let total = 0;
+  if (!w) return { read, total };
+  for (const t of w.ticks) {
+    const count = (x: BlockReadWant, n: number) => {
+      total += n;
+      if (readSettled(x, have, miss, exactMiss)) read += n;
+    };
+    if (t.blocks.length) count({ key: blockReadKey("dag", t.ord), chain: "dag", ordinal: t.ord }, t.blocks.length);
+    for (const [chain, rows] of Object.entries(t.metaSnaps)) {
+      for (const r of rows) if (r.blocks?.length) count({ key: blockReadKey(chain, r.ordinal), chain, ordinal: r.ordinal }, r.blocks.length);
+    }
+  }
+  return { read, total };
 }
 
 /** Every key the window could want, held or not (what retention keeps). */
