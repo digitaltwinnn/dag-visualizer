@@ -15,6 +15,7 @@ import {
   Server,
   Component,
   Database,
+  NotebookText,
   Blocks,
   Signature,
   Coins,
@@ -104,13 +105,15 @@ export const METASNAP_ICON: LucideIcon = Boxes;
 export const BLOCK_ICON: LucideIcon = Blocks;
 
 /** THE SNAPSHOTS VIEW'S THREE REGISTERS, one mark each (the register switch on the scene): Metagraph
- *  snapshots wears the view's own strata, Transaction blocks the block's mark, Data blocks the
+ *  snapshots wears the metagraph snapshot's cubes, Transaction blocks the block's mark, Data blocks the
  *  database (D6, 2026-11-07 — the metagraph kind "data" already wears `Blocks`, the transaction
  *  block's own glyph, so the two halves would read alike; `Database` is the app's mark for what a
  *  chain stores). Typed on the register vocabulary, so a new register without a glyph is a compile
  *  error here. */
 export const REGISTER_ICONS: Readonly<Record<LedgerRegister, LucideIcon>> = {
-  snapshots: VIEW_ICONS.ledger,
+  // The metagraph snapshot's own cubes (user, 2026-11-19: "cubes everywhere") — the card, its rail
+  // entry and the register wear one mark; the stacked layers stay the Snapshots VIEW's.
+  snapshots: METASNAP_ICON,
   blocks: BLOCK_ICON,
   data: Database,
 };
@@ -152,24 +155,23 @@ export const PROVIDER_ICON: LucideIcon = Server;
 // confused with, since both talk about layers.
 export const COMPOSITION_ICON: LucideIcon = Component;
 
+/** THE PAYLOAD TABS' MARKS (the metagraph snapshot card's tabs and the raw pane's lanes, one map):
+ *  Data blocks wears the REGISTER SWITCH's own glyph (user, 2026-11-19: "in the tabs etc use the same
+ *  icon as in the view switcher" — it wore Blocks, which is Transaction blocks' mark, while State wore
+ *  the switch's Data blocks glyph, Database); State a notebook, the metagraph's own record; Signers the
+ *  signature. */
+export const LANE_ICONS: Record<"state" | "data" | "signers", LucideIcon> = {
+  state: NotebookText,
+  data: Database,
+  signers: Signature,
+};
+
 // The ONE size every card-head/title KIND MARK renders at — About's Info, the tool cards'
 // Compass, the node card's hexagon, the snapshot card's Box (CardHead's panel `icon` + the inspector
 // titles in inspector/cards.tsx). 16px (`size-4`): the old 14px read timid next to the 15px
 // text-title headline (user follow-up on Task 23). Single-sourced here so the heads can't drift;
 // the dock TRAYS and the top-bar view switch deliberately keep their own sizes (this constant is
 // only the head/title mark).
-/** The raw pane's LANE icons (user, 2026-08-14): the payload tabs and the signers tab each get
- *  a mark — the accumulated STORE, the carried records, the signatures. Monochrome via
- *  currentColor like every glyph, so the tab's own on/off colour carries them. */
-export const LANE_ICONS: Record<"state" | "data" | "signers", LucideIcon> = {
-  state: Database,
-  // Blocks, not a file (user, 2026-08-14): the lane's records ride in DATA BLOCKS — the mark
-  // says what the chain actually carries. Distinct from Box (the global snapshot) and Boxes
-  // (the metagraph snapshot tile).
-  data: Blocks,
-  signers: Signature,
-};
-
 export const KIND_MARK_CLASS = "flex-none size-4";
 
 /** A METAGRAPH TYPE's mark (the vitals band's metagraphs card, 2026-08-30): what the network

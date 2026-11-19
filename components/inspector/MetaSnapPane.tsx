@@ -36,7 +36,7 @@ import { CONTENT_EASE } from "@/components/RollSwap";
 import { useNowTick } from "@/components/useNowTick";
 import { identityHudCss } from "@/src/palette/identity";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { METASNAP_ICON, KIND_MARK_CLASS } from "@/components/icons";
+import { LANE_ICONS, METASNAP_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { netKeyOf } from "@/src/engine/domain/pickActions";
 import { cn } from "@/lib/utils";
 import { selectedRow, selectionHue } from "@/components/selection";
@@ -548,10 +548,13 @@ function PayloadBlock({
           two stacked caps headers, which read as eyebrows with nothing under them until a read. */}
       <Tabs defaultValue="state" className="gap-0">
         <TabsList variant="line" className={CABINET_LIST} aria-label="Which part of the snapshot's payload to read">
+          {/* The raw pane's own lane marks (`LANE_ICONS`): Data blocks wears the register switch's glyph. */}
           <TabsTrigger value="state" className={cn(CABINET_TRIGGER, "h-7 text-label")}>
+            <LANE_ICONS.state aria-hidden className="size-3.5 flex-none" />
             {PAYLOAD_LANES.state.name}
           </TabsTrigger>
           <TabsTrigger value="data" className={cn(CABINET_TRIGGER, "h-7 text-label")}>
+            <LANE_ICONS.data aria-hidden className="size-3.5 flex-none" />
             {PAYLOAD_LANES.data.name}
           </TabsTrigger>
         </TabsList>
