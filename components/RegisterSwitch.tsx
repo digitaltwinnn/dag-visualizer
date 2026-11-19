@@ -50,8 +50,14 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 // (`PastWindowBridge`), and the block window (`BlockWindowBridge`, which reads it from either register
 // for this reason).
 
-/** The switch FACE's height (two lines a half, a touch target). */
-const SWITCH_FACE_H = 52;
+/** The switch FACE's height (two lines a half and the rule between them, a touch target). */
+const SWITCH_FACE_H = 58;
+
+/** THE RULE BETWEEN A HALF'S TWO ROWS (user, 2026-11-19: "the top and bottom row are quite close to
+ *  each other and it makes the control look dense … some separation or visual cue"): the cards' own
+ *  head-to-body hairline, the label row above it and the readings below. The lit half draws it in the
+ *  selection's border tone, so it stays visible on the wash; the phone face draws the same rule. */
+const ROW_RULE = "my-1.5 h-px w-full self-stretch bg-border group-aria-pressed:bg-[var(--sel-border)]";
 /** THE NOTE under the face (`REGISTER_NOTES`, user 2026-11-19: "under the switch, extra line, subtle
  *  text"; and on the phone, the same day: "I also want the hint there"): one line of the label step,
  *  TWO on the phone, where the sentence wraps under the narrower face. Its room is reserved on each
@@ -222,12 +228,13 @@ export default function RegisterSwitch() {
           id={register}
           from={slideFrom}
           clipClassName="px-2 py-1"
-          className="flex flex-col items-center justify-center gap-1"
+          className="flex flex-col items-center justify-center"
         >
           <span className="flex items-center justify-center gap-1.5 text-body font-semibold leading-none whitespace-nowrap text-foreground">
             <LitIcon aria-hidden className="size-3.5 flex-none text-primary" />
             {REGISTER_NAMES[register]}
           </span>
+          <span aria-hidden className={ROW_RULE} />
           <span className="flex items-center justify-center gap-1 font-mono text-label leading-none tabular-nums whitespace-nowrap text-foreground">
             <Clock aria-hidden className="size-3 flex-none opacity-80" />
             <span aria-hidden>{bareSpan[register]}</span>
@@ -284,7 +291,8 @@ export default function RegisterSwitch() {
                 three columns — so every half is as wide as its widest form and the control never moves
                 (2026-11-08: its width shifted "a bit because of live indicator") — and the visible row,
                 centred over it, with the state mark on the lit half only. */}
-            <span className="mt-1 grid font-mono text-label leading-none tabular-nums whitespace-nowrap">
+            <span aria-hidden className={ROW_RULE} />
+            <span className="grid font-mono text-label leading-none tabular-nums whitespace-nowrap">
               <span aria-hidden className="invisible [grid-area:1/1] flex items-center gap-1">
                 {readings(r, Icon)}
                 <StateMark following={following} className="ml-2 font-sans leading-none" />
