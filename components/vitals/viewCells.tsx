@@ -1,6 +1,6 @@
 "use client";
 
-import { registerAbsence } from "@/components/views";
+import { REGISTER_NAMES, registerAbsence } from "@/components/views";
 import { useRegisterScope } from "@/components/useRegisterScope";
 import { viewNetwork } from "@/src/engine/domain/viewNetwork";
 // THE VITALS BAND'S PER-VIEW CELL SETS — what each 3D view says in the bottom lane: hyper leads
@@ -964,12 +964,16 @@ export function BlocksCells({ accent }: { accent: string }) {
   // long-form age), and whose it is: the name beside the dot, never colour alone.
   const last = win && !pinned ? lastBlockAt(ticks, scope.chain) : null;
 
+  // NO SUBJECT UNDER THIS FILTER (the network runs no cL1): ONE card across the band, saying it once
+  // (user, 2026-11-19) — four cells repeating one sentence read as four readings.
+  if (!runs("blocks")) return <BandCard label={REGISTER_NAMES.blocks}>{stateLine(absent)}</BandCard>;
+
   return (
     <>
       <BandCard
         label="Blocks"
         aside={win ? span : undefined}
-        lead={!runs("blocks") ? undefined : <StackedLead figure={held ? <Odometer value={held.count} int /> : null} prefix={held?.floor ? "at least" : undefined} unit="blocks" empty={held == null} />}
+        lead={<StackedLead figure={held ? <Odometer value={held.count} int /> : null} prefix={held?.floor ? "at least" : undefined} unit="blocks" empty={held == null} />}
       >
         {win ? (
           <span className="flex-1 min-w-0 self-center">
@@ -984,7 +988,7 @@ export function BlocksCells({ accent }: { accent: string }) {
       <BandCard
         label="Moved"
         aside={win ? span : undefined}
-        lead={!runs("blocks") ? undefined : <StackedLead figure={moved?.amount != null ? compactDag(moved.amount) : null} unit={unit} note={movedNote} empty={moved?.amount == null} />}
+        lead={<StackedLead figure={moved?.amount != null ? compactDag(moved.amount) : null} unit={unit} note={movedNote} empty={moved?.amount == null} />}
       >
         {win ? (
           moved && moved.total > 0 ? (
@@ -1005,7 +1009,7 @@ export function BlocksCells({ accent }: { accent: string }) {
       </BandCard>
       <BandCard
         label="Last block"
-        lead={pinned || !runs("blocks") ? undefined : <StackedLead figure={last ? ageWords(Math.max(0, now - Date.parse(last.ts))) : null} unit="ago" empty={last == null} />}
+        lead={pinned ? undefined : <StackedLead figure={last ? ageWords(Math.max(0, now - Date.parse(last.ts))) : null} unit="ago" empty={last == null} />}
       >
         {pinned ? (
           stateLine(BLOCK_PINNED)
@@ -1055,16 +1059,17 @@ export function DataCells({ accent, filter }: { accent: string; filter: string }
   const pinned = past != null || pastStatus != null;
   const last = !pinned ? lastDataTick(snaps, reads, inScope) : null;
 
+  // No subject (the network runs no dL1, the DAG among them): one card, the sentence once.
+  if (noData) return <BandCard label={REGISTER_NAMES.data}>{stateLine(noData)}</BandCard>;
+
   return (
     <>
       <BandCard
         label="Data updates"
         aside={!empty ? span : undefined}
-        lead={noData ? undefined : <StackedLead figure={<Odometer value={held.count} int />} unit="updates" note={heldNote} empty={empty || held.read === 0} />}
+        lead={<StackedLead figure={<Odometer value={held.count} int />} unit="updates" note={heldNote} empty={empty || held.read === 0} />}
       >
-        {noData ? (
-          stateLine(noData)
-        ) : !empty ? (
+        {!empty ? (
           <span className="flex-1 min-w-0 self-center">
             {/* One point per global snapshot across the window (its natural bin — the window spans
                 minutes); a snapshot whose exact read has not landed is a gap, never a dip. */}
@@ -1075,15 +1080,13 @@ export function DataCells({ accent, filter }: { accent: string; filter: string }
         )}
       </BandCard>
       <BandCard label="By network">
-        {noData ? stateLine(noData) : netRows.length ? <MicroBars accent={accent} labelW={64} rows={netRows} /> : stateLine(held.read ? "No data updates in the window" : "Reading the window…")}
+        {netRows.length ? <MicroBars accent={accent} labelW={64} rows={netRows} /> : stateLine(held.read ? "No data updates in the window" : "Reading the window…")}
       </BandCard>
       <BandCard
         label="Last data block"
-        lead={pinned || noData ? undefined : <StackedLead figure={last ? ageWords(Math.max(0, now - Date.parse(last.ts))) : null} unit="ago" empty={last == null} />}
+        lead={pinned ? undefined : <StackedLead figure={last ? ageWords(Math.max(0, now - Date.parse(last.ts))) : null} unit="ago" empty={last == null} />}
       >
-        {noData ? (
-          stateLine(noData)
-        ) : pinned ? (
+        {pinned ? (
           stateLine(BLOCK_PINNED)
         ) : last ? (
           <span className="flex items-center self-stretch gap-1.5 text-body whitespace-nowrap">

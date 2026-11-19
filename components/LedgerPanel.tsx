@@ -758,7 +758,9 @@ export default function LedgerPanel() {
       // "anchors" is also a tile's name, so under Fees it read as stale; the networks that
       // anchored are what a snapshot row opens whatever the figure column shows).
       placeholder={inBlocks ? "Select a block to view the snapshot that accepted it." : "Select a snapshot to view the networks that anchored into it."}
-      levels={inBlocks ? [blockLevel] : levels}
+      // A register the filtered network makes no subject for (Data blocks under a network that runs no
+      // dL1) lists nothing and says why, the band's and the line's one sentence (`registerAbsence`).
+      levels={inBlocks ? [blockLevel] : registerRunsFor(register) ? levels : [{ ...levels[0]!, rows: [], pager: undefined, empty: registerAbsence(register, lineScope) }]}
       onLeave={() => {
         // Container-level hover backstop: leaving the card clears every channel its rows write.
         setHoverFilter(null);
