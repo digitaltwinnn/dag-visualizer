@@ -12,7 +12,8 @@ import { cardNetwork } from "@/src/engine/domain/trendStack";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { useStore } from "@/src/store/store";
 import { cn } from "@/lib/utils";
-import { REGISTER_SWITCH_H } from "@/components/RegisterSwitch";
+import { registerSwitchH } from "@/components/RegisterSwitch";
+import { useBreakpoint } from "@/components/useBreakpoint";
 
 // THE MOTION HINT (user, 2026-09-26): one quiet sentence, in the scene a little under its centre —
 // where the work is being done — for exactly as long as the scene is moving. "Bringing Dor
@@ -73,6 +74,7 @@ export default function MotionHint() {
   const moving = useStore((s) => s.sceneMoving);
   const cause = useStore((s) => s.motionCause);
   const phase = useStore((s) => s.motionPhase);
+  const phone = useBreakpoint() === "phone";
   const gatherBottom = useStore((s) => s.gatherBottom);
   // The rung names read the selection the rail card stands for — resolved here, at render, so the
   // domain module stays a function of its arguments.
@@ -141,7 +143,7 @@ export default function MotionHint() {
           phase && gatherBottom != null
             ? `calc(${gatherBottom + GATHER_GAP_PX}px + var(--topbar-extra, 0px))`
             : switchShown
-              ? `calc(var(--rail-top) + var(--topbar-extra, 0px) + ${REGISTER_SWITCH_H + SWITCH_GAP_PX}px)`
+              ? `calc(var(--rail-top) + var(--topbar-extra, 0px) + ${registerSwitchH(phone) + SWITCH_GAP_PX}px)`
               : "calc(var(--rail-top) + var(--topbar-extra, 0px))",
         ["--hint-ease" as string]: `${phase ? EASE_MS.transition : EASE_MS.flight}ms`,
       }}

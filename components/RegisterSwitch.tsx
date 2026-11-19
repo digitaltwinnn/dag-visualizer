@@ -20,6 +20,7 @@ import { cn, TOUCH_HIT } from "@/lib/utils";
 import { StateMark } from "@/components/state/StateAtoms";
 import { useSceneYield } from "@/components/RailShade";
 import { SlideFace } from "@/components/SlideFace";
+import { useBreakpoint } from "@/components/useBreakpoint";
 
 // THE REGISTER SWITCH, ON THE SCENE (D3, user 2026-11-07 — option A of
 // `.superpowers/brainstorm/521282-1794046091/content/register-switch-v2.html`: "a glass switch at the
@@ -41,22 +42,27 @@ import { SlideFace } from "@/components/SlideFace";
 // follows the field (`RouteSync`: /snapshots, /blocks, /data-blocks).
 //
 // Shown only where the view's row offers more than one register (`viewPolicy.registers`, convention
-// 7), in the view's own order. It stands where the motion hint used to, so the hint drops by
-// `REGISTER_SWITCH_H` beneath it (`MotionHint`). During a view transition the staging band gathers on
-// the same line, so the switch waits out the choreography (`motionPhase`) and fades in with the room.
+// 7), in the view's own order. It stands where the motion hint used to, so the hint drops by the
+// switch block's height (`registerSwitchH`) beneath it (`MotionHint`). During a view transition the
+// staging band gathers on the same line, so the switch waits out the choreography (`motionPhase`) and
+// fades in with the room.
 // The span halves read the two windows the bridges hold: the live buffer or a past window
 // (`PastWindowBridge`), and the block window (`BlockWindowBridge`, which reads it from either register
 // for this reason).
 
 /** The switch FACE's height (two lines a half, a touch target). */
 const SWITCH_FACE_H = 52;
-/** THE NOTE LINE under the face (`REGISTER_NOTES`, user 2026-11-19: "under the switch, extra line,
- *  subtle text"): one line of the label step, its room reserved on every tier so the block below
- *  never moves; the phone hides the words (a 360px face has no width for them). */
+/** THE NOTE under the face (`REGISTER_NOTES`, user 2026-11-19: "under the switch, extra line, subtle
+ *  text"; and on the phone, the same day: "I also want the hint there"): one line of the label step,
+ *  TWO on the phone, where the sentence wraps under the narrower face. Its room is reserved on each
+ *  tier, so the block below never moves. */
 const NOTE_H = 22;
-/** The switch block's whole height, face and note — the one number the motion hint's drop reads, and
- *  what `#register-switch` measures, so the callout's free band starts under the note too. */
-export const REGISTER_SWITCH_H = SWITCH_FACE_H + NOTE_H;
+const NOTE_H_PHONE = 38;
+/** The switch block's whole height on a tier, face and note — the one number the motion hint's drop
+ *  reads, and what `#register-switch` measures, so the callout's free band starts under the note. */
+export function registerSwitchH(phone: boolean): number {
+  return SWITCH_FACE_H + (phone ? NOTE_H_PHONE : NOTE_H);
+}
 
 export default function RegisterSwitch() {
   const mode = useStore((s) => s.mode);
@@ -64,6 +70,7 @@ export default function RegisterSwitch() {
   const on = registers.length > 1;
   useFeedRead(["global", "api-blocks", "exact"], "RegisterSwitch", on); // the data-block count reads the exact reads
   const register = useStore((s) => s.ledgerRegister);
+  const phone = useBreakpoint() === "phone";
   // THE LIT HALF SAYS LIVE OR PINNED (user, 2026-11-07, design round option 2 "with the 'live' text
   // also"): one live mode per view, read per register — the newest global (and the filtered
   // network's newest snapshot) in Metagraph snapshots and Data blocks, the newest block (and its
@@ -193,7 +200,7 @@ export default function RegisterSwitch() {
       // A marker contract: the callout's free band starts under it (`ChromeBounds.sceneTop`).
       id="register-switch"
       data-on={phase ? "0" : "1"}
-      style={{ top: "calc(var(--rail-top) + var(--topbar-extra, 0px))", height: REGISTER_SWITCH_H }}
+      style={{ top: "calc(var(--rail-top) + var(--topbar-extra, 0px))", height: registerSwitchH(phone) }}
       className={cn(
         "absolute left-1/2 z-[5] -translate-x-1/2 w-max",
         "transition-[opacity,translate] duration-200 data-[on='0']:opacity-0 data-[on='0']:pointer-events-none motion-reduce:transition-none",
@@ -295,10 +302,16 @@ export default function RegisterSwitch() {
       </div>
       </div>
       {/* THE NOTE: where the lit register's subject sits in a global snapshot, in one shape for all
-          three (`REGISTER_NOTES`). Subtle: the label step, muted, no plate of its own. */}
+          three (`REGISTER_NOTES`). Subtle: the label step, muted, no plate of its own. ABSOLUTE, so it
+          never sizes the switch (a wider note stretched the phone face past the screen); its room is
+          the block's height. On the phone it wraps, balanced, in the screen's width less the gutters. */}
       <p
-        style={{ height: NOTE_H }}
-        className="max-[700px]:invisible flex items-end justify-center text-label leading-none whitespace-nowrap text-muted-foreground"
+        style={{ top: SWITCH_FACE_H }}
+        className={cn(
+          "absolute left-1/2 -translate-x-1/2 pt-2 text-center text-label text-muted-foreground",
+          "leading-none whitespace-nowrap",
+          "max-[700px]:w-[min(340px,calc(100vw-32px))] max-[700px]:whitespace-normal max-[700px]:text-balance max-[700px]:leading-tight",
+        )}
       >
         {REGISTER_NOTES[register]}
       </p>
