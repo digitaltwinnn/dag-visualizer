@@ -1,29 +1,16 @@
 # src/net — working notes
 
-Network selection (?net=).
+A metagraph's address lineage and its retirement.
 
 Split out of the root `CLAUDE.md` (2026-08-31) so it loads when you work here rather
 than on every session. The root file holds what this is, the twelve rules, run & test,
 the architecture map and the dev workflow; **its rules govern this file too**.
 
-## The three networks
-
-**The Constellation network is a PAGE PARAMETER, not state** — `?net=integrationnet` /
-`?net=testnet` select a dev network; the bare URL is mainnet, byte-identical in CSS, `/api/*`
-URLs and palette to the single-network app. `src/net/` is the one resolver home: `parse.ts` the
-validator (query string ONLY, never the hash), `current.ts` the client side (frozen at first
-import; Node/vitest/SSR always resolve mainnet, which is what keeps the suite green),
-`request.ts` the per-request server side. `config.ts` carries `NETWORKS` (hosts) and `CATALOG`
-(one metagraph list per network); `METAGRAPHS` is imported from `src/net/current`, never config.
-Every client `/api/` fetch rides `netUrl()` — `src/net/netUrlBoundary.test.ts` is the fence —
-and every server route resolves `netOf(req)` and keys its `unstable_cache` entries with the net.
-The accent is CSS alone: `--net-*` tokens in `:root`, two `[data-net]` overrides re-pointing
-`--primary`/`--ring`, stamped on `<html>` before first paint by layout.tsx's inline script
-(mainnet gets no rule). The NetworkSwitch is the bar's rightmost control (the strip's second
-row on phone). ⚠️ Anything network-dependent that SSR renders must start as mainnet and swap
-in a mount effect (NetLink, NetworkSwitch): a hydration mismatch makes React 19 regenerate the
-tree, which strips the `data-net` stamp — and `suppressHydrationWarning` is not the tool, it
-KEEPS the server value.
+The app reads the Constellation MAINNET alone: one host set (`HOSTS`) and one metagraph catalog
+(`METAGRAPHS`), both in `src/engine/config.ts`, the catalog's one home. What lives here is how a
+catalog row stays one network across a re-registration (`lineage.ts`) and how a network that
+stopped keeps its row (`retire.ts`). The shared store's keys embed a fixed `mainnet` segment
+(`STORE_NS`, `app/api/trends/keys.ts` — see `app/api/CLAUDE.md`).
 
 ## A network can change its address — the lineage
 
@@ -77,7 +64,7 @@ both. Then:
   skip it;
 - History keeps its row and its plane; where it measured nothing in the span its figure says
   "retired" instead of a dash, and the row's hover gives the date;
-- the raw log under All still pages its chain (the merged log reads the CATALOG's chains, former
+- the raw log under All still pages its chain (the merged log reads the catalog's chains, former
   addresses included), and the search's network picker lists it as "TICKER (retired)";
 - `scripts/bake-brand-hues.ts` carries its existing colour pin over even though the live directory
   no longer lists it;

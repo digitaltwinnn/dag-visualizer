@@ -296,7 +296,7 @@ export function geoFraming(R: number, out: CameraFraming): void {
 
 // ---- the Snapshots view's ONE pose, and its ONE commit-time variation -----------------------
 // ⚠️ The Snapshots view has exactly ONE camera POSE — `FOCI.ledger`, which every rung on its ladder
-// resolves to (Engine's `ledgerNode`/`ledgerNetwork` both delegate to `ledgerOverview`). FIVE framings
+// resolves to (the Engine's `ledgerNetwork` delegates to `ledgerOverview`). FIVE framings
 // have been tried in this view and all five are RETIRED, which is why the fact is recorded here
 // rather than left to be inferred from an empty file:
 //

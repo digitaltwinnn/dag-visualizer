@@ -1,15 +1,17 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { MetaSnapRecord } from "@/src/data/api";
 import type { GlobalSnapshot, RawMetaSnapshot } from "@/src/data/types";
-import { CATALOG } from "@/src/engine/config";
+import { METAGRAPHS } from "@/src/engine/config";
 import { tickPolledRows } from "@/src/data/ladderLevels";
-import { PAST_RETRY_MS, buildPastWindow, foldAnchors, pastRetryDelay, getPastWindow, ledgerSource, onPastWindow, pastWanted, setPastWindow, type LedgerSource } from "@/src/data/pastWindow";
+import { PAST_RETRY_MS, buildPastWindow, foldAnchors, pastRetryDelay, getPastWindow, ledgerSource, getBlockWindow, heldOrdinals, onBlockWindow, onPastWindow, pastWanted, setBlockWindow, setPastWindow, type LedgerSource } from "@/src/data/pastWindow";
 
 const g = (o: number): GlobalSnapshot => ({ ordinal: o, timestamp: `t${o}`, hash: `g${o}` });
 const raw = (o: number, ts: string, fee = 10): RawMetaSnapshot => ({ ordinal: o, timestamp: ts, hash: `m${o}`, lastSnapshotHash: `m${o - 1}`, fee, sizeInKB: 1 } as RawMetaSnapshot);
-const rec = (o: number, ts: string, fee = 10): MetaSnapRecord => ({ ordinal: o, hash: `m${o}`, parent: "", ts, fee, sizeInKB: 1, height: 0, subHeight: 0, blocks: 0, epochProgress: 0 });
+const rec = (o: number, ts: string, fee = 10): MetaSnapRecord => ({ ordinal: o, hash: `m${o}`, parent: "", ts, fee, sizeInKB: 1, height: 0, subHeight: 0, blocks: 0, blockHashes: [], epochProgress: 0 });
 
-afterEach(() => setPastWindow(null));
+afterEach(() => { setPastWindow(null); setBlockWindow(null); });
+
+const LIVE_STUB: LedgerSource = { globalSnapshots: [], metaSnaps: new Map(), unlistedSnaps: new Map(), getAnchor: () => null };
 
 describe("foldAnchors", () => {
   it("folds each chain's records per anchoring timestamp, fees summed and each network counted", () => {
@@ -22,7 +24,7 @@ describe("foldAnchors", () => {
 
 describe("buildPastWindow", () => {
   it("answers the live buffer's questions: globals oldest first, records oldest first, anchors by timestamp", () => {
-    const w = buildPastWindow({ globals: [g(12), g(10), g(11)], chains: { dor: [raw(3, "t11"), raw(2, "t10")] } }, "mainnet")!;
+    const w = buildPastWindow({ globals: [g(12), g(10), g(11)], chains: { dor: [raw(3, "t11"), raw(2, "t10")] } })!;
     expect([w.from, w.to]).toEqual([10, 12]);
     expect(w.globalSnapshots.map((x) => x.ordinal)).toEqual([10, 11, 12]);
     expect(w.metaSnaps.get("dor")!.map((r) => r.ordinal)).toEqual([2, 3]);
@@ -32,9 +34,9 @@ describe("buildPastWindow", () => {
     expect(w.unlistedSnaps.size).toBe(0);
   });
   it("files a former address under its network's current id, each record keeping its own chain", () => {
-    const row = CATALOG.mainnet.find((m) => m.formerIds?.length)!;
+    const row = METAGRAPHS.find((m) => m.formerIds?.length)!;
     const former = row.formerIds![0]!;
-    const w = buildPastWindow({ globals: [g(10)], chains: { [former]: [raw(7, "t10")], [row.id]: [raw(3, "t10")] } }, "mainnet")!;
+    const w = buildPastWindow({ globals: [g(10)], chains: { [former]: [raw(7, "t10")], [row.id]: [raw(3, "t10")] } })!;
     expect(w.metaSnaps.has(former)).toBe(false);
     expect(w.metaSnaps.get(row.id)!.map((r) => [r.ordinal, r.chain])).toEqual([[3, undefined], [7, former]]);
     // A selection names the real chain: ordinals are per chain.
@@ -42,7 +44,7 @@ describe("buildPastWindow", () => {
     expect(w.getAnchor("t10")!.metaCounts.get(row.id)).toBe(2);
   });
   it("is nothing with no global snapshots", () => {
-    expect(buildPastWindow({ globals: [], chains: {} }, "mainnet")).toBeNull();
+    expect(buildPastWindow({ globals: [], chains: {} })).toBeNull();
   });
 });
 
@@ -63,7 +65,7 @@ describe("pastWanted", () => {
 describe("the held window", () => {
   it("is the ledger source while held, the live buffer otherwise, and tells its listeners", () => {
     const live = { globalSnapshots: [g(9000)] } as unknown as LedgerSource;
-    const w = buildPastWindow({ globals: [g(1)], chains: {} }, "mainnet")!;
+    const w = buildPastWindow({ globals: [g(1)], chains: {} })!;
     let heard = 0;
     const off = onPastWindow(() => heard++);
     expect(ledgerSource(live)).toBe(live);
@@ -78,10 +80,42 @@ describe("the held window", () => {
   });
 });
 
+describe("heldOrdinals — what the exact cache keeps (review I3)", () => {
+  afterEach(() => {
+    setPastWindow(null);
+    setBlockWindow(null);
+  });
+  it("is every global a held window draws: the past window's and the block window's ticks", () => {
+    expect([...heldOrdinals()]).toEqual([]);
+    setPastWindow(buildPastWindow({ globals: [g(7), g(8)], chains: {} })!);
+    setBlockWindow({ ticks: [{ ord: 3 }, { ord: 5 }] } as unknown as Parameters<typeof setBlockWindow>[0]);
+    expect([...heldOrdinals()].sort((a, b) => a - b)).toEqual([3, 5, 7, 8]);
+  });
+});
+
 describe("pastRetryDelay", () => {
   it("spaces three retries further apart, then gives up", () => {
     expect([0, 1, 2].map(pastRetryDelay)).toEqual([...PAST_RETRY_MS]);
     expect(PAST_RETRY_MS[0]! < PAST_RETRY_MS[1]! && PAST_RETRY_MS[1]! < PAST_RETRY_MS[2]!).toBe(true);
     expect(pastRetryDelay(3)).toBeNull();
   });
+});
+
+it("pastWanted never fetches a past window in the Blocks register", () => {
+  expect(pastWanted({ ledger: true, following: false, pin: 5, liveOldest: 100, held: null, register: "blocks" })).toEqual({ kind: "clear" });
+});
+it("ledgerSource answers the block window alone in the Blocks register, never the live buffer", () => {
+  setBlockWindow(null);
+  expect(ledgerSource(LIVE_STUB, "blocks")).toBeNull();
+  expect(ledgerSource(LIVE_STUB, "snapshots")).toBe(LIVE_STUB);
+});
+it("the block window is held and announced like the past window", () => {
+  let n = 0;
+  const off = onBlockWindow(() => n++);
+  const w = { ...LIVE_STUB, ticks: [], chain: null, around: null, partial: [], from: 0, to: 0, holds: () => false, blockTick: () => null };
+  setBlockWindow(w);
+  expect(getBlockWindow()).toBe(w);
+  expect(ledgerSource(LIVE_STUB, "blocks")).toBe(w);
+  off();
+  expect(n).toBe(1);
 });

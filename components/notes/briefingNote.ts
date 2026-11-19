@@ -1,5 +1,5 @@
 import type { NoteResponse, NoteView } from "@/src/data/noteTypes";
-import { BRIEFING_STOPS, LINE_MAX } from "@/src/engine/domain/briefing";
+import { LINE_MAX, stopRegister, type BriefingStop } from "@/src/engine/domain/briefing";
 import type { NoteReq } from "./noteLoader";
 import { noteSubjectOf } from "./noteSubject";
 
@@ -10,9 +10,11 @@ import { noteSubjectOf } from "./noteSubject";
 /** The window History rests on. A visitor on the tour has not chosen one. */
 const TREND_SPAN = "30d";
 
-/** The note a stop reads: the view at its widest, as a visitor with no filter would see it. */
-export function briefingReq(view: (typeof BRIEFING_STOPS)[number]): NoteReq {
-  const subject = noteSubjectOf(view, { metagraphNetwork: "all", unlisted: () => false })!;
+/** The note a stop reads: the view at its widest, in the stop's register, as a visitor with no
+ *  filter would see it — the same note the top card shows there . */
+export function briefingReq(stop: BriefingStop): NoteReq {
+  const view = stop.mode;
+  const subject = noteSubjectOf(view, { metagraphNetwork: "all", unlisted: () => false, register: stopRegister(stop) })!;
   return { view: subject.view, subject: subject.subject, span: view === "trend" ? TREND_SPAN : null };
 }
 
@@ -21,6 +23,8 @@ const PLAIN: Record<NoteView, string> = {
   ledger: "Every snapshot, anchored as it happens.",
   hyper: "Every network, by the nodes that run it.",
   trend: "The measured record of the network.",
+  blocks: "Every block, built on two before it.",
+  data: "Every data block, as its network writes it.",
 };
 
 const SENTENCE_RE = /.*?[.!?](?=\s|$)/gs;

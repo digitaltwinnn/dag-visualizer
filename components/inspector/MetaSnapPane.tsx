@@ -5,16 +5,18 @@
 // is the application state — disclosed as a SHAPE here and as a payload in the raw layer.
 // Like the global snapshot card this is a card SLOT, not a focus-ladder rung: it has its own
 // store channel (`store.metaSnap`) and a fixed rail slot, and appears in no ladder.
+import { StateMark } from "@/components/state/StateAtoms";
+import { useFollowPaused } from "@/components/useRegisterScope";
 import { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties } from "react";
 import LiveDot from "@/components/LiveDot";
 import { PinnedMark } from "@/components/state/StateAtoms";
 import CardHead, { RailPane } from "@/components/CardHead";
 import { DEEP_GIVE_UP_MS } from "@/components/RawSnapshotBridge";
 import { subjectPairing } from "@/components/useSubjectPairing";
-import { Door, Empty, Fact, FactGroup, Foot, FootRow, LayerWho, Lead } from "@/components/inspector/parts";
+import { CopyButton, Door, Empty, Fact, FactGroup, Foot, FootRow, LayerWho, Lead } from "@/components/inspector/parts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CABINET_BODY, CABINET_LIST, CABINET_TRIGGER } from "@/components/cabinetTabs";
-import { ArrowDownToLine, ArrowUpRight } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { useSnapRecord } from "@/components/useArchive";
 import { Separator } from "@/components/ui/separator";
 import { useStore } from "@/src/store/store";
@@ -22,12 +24,11 @@ import { openSnapshotRecord } from "@/components/trendDoors";
 import { metaSnapDeepKey, metaSnapHoverKey } from "@/src/data/types";
 import type { ChannelSnapDeep, ChannelSnapRow } from "@/src/data/types";
 import { getNetwork, SIGNER_GROUPS, metagraphById } from "@/src/data/network";
-import { getPastWindow, ledgerSource, onPastWindow } from "@/src/data/pastWindow";
+import { getBlockWindow, getPastWindow, ledgerSource, onBlockWindow, onPastWindow } from "@/src/data/pastWindow";
 import { currentIdOf } from "@/src/net/lineage";
-import { NET } from "@/src/net/current";
 import { UNLISTED_HUE } from "@/src/data/unlisted";
 import { snapsAtTick } from "@/src/data/anchorLog";
-import { PAYLOAD_LANES } from "@/src/data/payloadKinds";
+import { PAYLOAD_LANES, STATE_LANE_LEAD, STATE_PROOF_LABEL, dataLaneLead } from "@/src/data/payloadKinds";
 import { fmtDagShort, fmtKB, midHash } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { useMinHold } from "@/components/useMinHold";
@@ -35,12 +36,12 @@ import { CONTENT_EASE } from "@/components/RollSwap";
 import { useNowTick } from "@/components/useNowTick";
 import { identityHudCss } from "@/src/palette/identity";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { METASNAP_ICON, KIND_MARK_CLASS } from "@/components/icons";
-import { metaSnapSelectActions, netKeyOf } from "@/src/engine/domain/pickActions";
-import { applyClickActions } from "@/src/store/applyClickActions";
+import { LANE_ICONS, METASNAP_ICON, KIND_MARK_CLASS } from "@/components/icons";
+import { netKeyOf } from "@/src/engine/domain/pickActions";
 import { cn } from "@/lib/utils";
 import { selectedRow, selectionHue } from "@/components/selection";
 import { useFeedRead } from "@/components/useFeedRead";
+import { readsBlockWindow } from "@/src/engine/domain/viewPolicy";
 
 // The body's row grammar and its three weights live in ./parts (`Fact` / `FactGroup` / `Foot`)
 // — shared with every other rail card, so this one can't drift into a dialect of its own. The
@@ -68,6 +69,7 @@ export default function MetaSnapPane({
   const deepKey = sel ? metaSnapDeepKey(sel.globalOrdinal, sel.metaId, sel.ordinal) : null;
   const deep = useStore((s) => (deepKey ? s.metaSnapDeep[deepKey] : undefined));
   const following = useStore((s) => s.following);
+  const paused = useFollowPaused("MetaSnapPane");
   // Rule 9's missing consumer (user, 2026-08-15 — "a gray edge effect even though it's filtered
   // on DOR; happens when I swipe"): this card never paired, so its edge could only ever show
   // the grey whisper — hovering now rides `hoverMetaSnap`, the SAME channel the anchor-log row,
@@ -79,7 +81,6 @@ export default function MetaSnapPane({
   const snap = useStore((s) => s.snap);
   const appFilter = useStore((s) => s.filter);
   const setSection = useStore((s) => s.setSection);
-  const setDeepWanted = useStore((s) => s.setDeepWanted);
   const deepWanted = useStore((s) => s.deepWanted);
   // Has a deep read been ASKED FOR for this exact snapshot? Selecting one is not asking — the card
   // states the SHAPE and only reads on its button, so a pager skim costs nothing (user, 2026-08-10;
@@ -91,18 +92,22 @@ export default function MetaSnapPane({
 
 
   const past = useSyncExternalStore(onPastWindow, getPastWindow, () => null);
+  const register = useStore((s) => s.ledgerRegister);
+  const blockWin = useSyncExternalStore(onBlockWindow, getBlockWindow, () => null);
+  // The Blocks register's records come from its window: reading it holds the block feed.
+  useFeedRead(["api-blocks"], "MetaSnapPane blocks", readsBlockWindow(register));
   // Tier 1 — the polled record this tile was named from (free: the metagraph snapshot buffers
   // are already in memory, keyed by the anchoring tick's timestamp).
   const polled = useMemo(() => {
     if (!sel) return null;
     // The LEDGER SOURCE: an old pin's records are in its past window.
-    const net = ledgerSource(getNetwork());
+    const net = ledgerSource(getNetwork(), register);
     if (!net) return null;
     const own = snapsAtTick(net.metaSnaps, sel.metaId, sel.ts).find((r) => r.ordinal === sel.ordinal);
     if (own) return own;
     // A former address a past window filed under its network's current id (`MetaSnapRecord.chain`).
-    return snapsAtTick(net.metaSnaps, currentIdOf(NET, sel.metaId), sel.ts).find((r) => r.chain === sel.metaId && r.ordinal === sel.ordinal) ?? null;
-  }, [sel, past]);
+    return snapsAtTick(net.metaSnaps, currentIdOf(sel.metaId), sel.ts).find((r) => r.chain === sel.metaId && r.ordinal === sel.ordinal) ?? null;
+  }, [sel, past, register, blockWin]);
 
   // Tier 2 — this snapshot's own row inside the tick's exact read.
   const row = useMemo(() => {
@@ -156,9 +161,6 @@ export default function MetaSnapPane({
   // hue only while that network IS the filter. The mark that names it keeps its hue.
   const pairHue = netKeyOf(sel.metaId) === appFilter ? hue : "var(--primary)";
   const pair = subjectPairing<string>(hoverMetaSnap, metaSnapHoverKey(sel.metaId, sel.ordinal), setHoverMetaSnap, pairHue);
-  // Hoisted out of the state tier so the FOOT can reach it — it is a hash, and hashes are looked
-  // up, not read. The deep read wins where it exists; the exact row carries it otherwise.
-  const stateProof = deep?.stateProof ?? row?.stateProof;
   const polledHash = sel.hash || polled?.hash || "";
   // The polled buffers track only the catalog, so an UNLISTED snapshot arrived hash-less — a
   // hash is not a field of the thing it hashes; the indexer computes it. The explorer indexes
@@ -190,7 +192,7 @@ export default function MetaSnapPane({
   // restates its ancestor (the pile rule — the same reason the ticker left this head on
   // 2026-08-10).
   // The AGE is the lead's chip, not a clause after a mid-dot (user, 2026-10-03).
-  const lead = `${following && !sameTick ? "Following live, anchored" : "Anchored"} to ${anchor}`;
+  const lead = `${following && !paused && !sameTick ? "Following live, anchored" : "Anchored"} to ${anchor}`;
 
   return (
     <RailPane
@@ -217,7 +219,9 @@ export default function MetaSnapPane({
           // never a control: the switch stays the Global snapshot card's. It wears THAT card's chip
           // (user, 2026-10-25: the global's "pinned" is a tag, this one was bare text) — one box in
           // both states, the selection wash when pinned, here in this snapshot's own hue.
-          aside={
+          // N/A (no subject in this register under the filter — the network runs no such layer):
+          // the state mark says so, never LIVE.
+          aside={following && paused ? <StateMark following na /> : (
             <span
               data-pill=""
               className={cn(
@@ -235,7 +239,7 @@ export default function MetaSnapPane({
                 <PinnedMark className="text-foreground" />
               )}
             </span>
-          }
+          )}
           titleKey={`${sel.metaId}:${sel.ordinal}`}
           onClose={onClose}
           collapsed={collapsed}
@@ -363,7 +367,7 @@ export default function MetaSnapPane({
                 button. With the basis named, the verb closes the loop the old copy left open
                 (WHY a read is needed at all).
                 "Read"/"decoding" made three word families for one action. */}
-            {deep != null ? (
+            {deep != null || (row?.decoded === true && snap && sel) ? (
               <div className="mt-2.5">
                 <Door
                   // THE LOG OPENS ON THIS SNAPSHOT (user, 2026-10-04: "it should filter on that
@@ -378,25 +382,10 @@ export default function MetaSnapPane({
                   Show the raw data
                 </Door>
               </div>
-            ) : !deepAsked && row?.decoded === true && snap && sel ? (
-              <div className="mt-2.5">
-                <Door
-                  glyph={<ArrowDownToLine className="size-3.5" />}
-                  flushFoot
-                  onClick={() => {
-                  // Pin FIRST, and only while following — the read must not answer about a
-                  // snapshot the next heartbeat has already replaced. Pinned already, the pin is
-                  // not just unnecessary but wrong: `metaSnapSelectActions`' deselect early-return
-                  // needs `!current.following`, so re-committing the selected snapshot would CLEAR
-                  // it, on a button that says `read this`.
-                  if (following) applyClickActions(metaSnapSelectActions(sel, snap, { metaSnap: sel, following, inspect: useStore.getState().inspect }));
-                  setDeepWanted(metaSnapDeepKey(sel.globalOrdinal, sel.metaId, sel.ordinal));
-                }}
-                >
-                  Decompress this snapshot
-                </Door>
-              </div>
             ) : null}
+            {/* The card's own "Decompress this snapshot" door went on 2026-11-07 (user: "is it still
+                needed? … it already did it"): everything the card states is on the exact row now,
+                and the RAW pane reads the payload on arrival, so the door above is the only step. */}
 
             {/* ── FOOT: the artifact's CHAIN IDENTITY ─────────────────────────────────────
                 What it is, what it links to, what it proves — and nothing else. The three
@@ -407,9 +396,9 @@ export default function MetaSnapPane({
                 the asymmetry was an accident of history rather than a difference in the data
                 (GlobalSnapshot carries height/blocks too). Reconciled DOWN, not up — CLAUDE.md
                 already rules that a tick's block count is the wrong activity signal, and the
-                facts that answer a question about this snapshot are all above. `State hash` is
-                the one asymmetry that STAYS: only a metagraph snapshot proves an application
-                state, so it's a real difference in the artifact, not an inconsistency. */}
+                facts that answer a question about this snapshot are all above. The state's proof
+                (only a metagraph snapshot carries one) lives in the State tab since 2026-11-19,
+                under the record it vouches for. */}
             <Foot>
               {/* The descriptor's hash is not the only source, and for a PAGER step it isn't a
                   source at all: `railSiblings` builds its siblings from the tick's exact read,
@@ -423,11 +412,8 @@ export default function MetaSnapPane({
               {parent && (
                 <FootRow label="Previous" value={midHash(parent, 18)} copy={parent} copyName="previous hash" />
               )}
-              {stateProof && (
-                // "State HASH" (user, 2026-08-14 — "state proof" collided with the signers tab's
-                // "snapshot proof", a signature set; this is a DIGEST, kin to Hash/Parent above).
-                <FootRow label="State" copyName="state hash" value={midHash(stateProof, 22)} copy={stateProof} />
-              )}
+              {/* (The state's proof moved into the State tab, under the record it vouches for —
+                  user, 2026-11-19.) */}
             </Foot>
           </div>
         )}
@@ -500,20 +486,33 @@ function PayloadBlock({
 }) {
   // State's shape is computed server-side (`stateKeys`); Data's is the same mechanical read the
   // raw layer's data lane uses, so the two sections' rows mean the same thing.
+  // THE SHAPE IS THE EXACT ROW'S (2026-11-07, user: "'decompress this snapshot' — is it still
+  // needed? for data blocks it already did it"): the tick's exact read inflates every channel, so
+  // the row carries the state's keys and the dL1 signers, and the card asks no deep read at all. The
+  // deep read (the RAW pane's) still wins where it is held.
+  const stateKeys = deep?.stateKeys ?? row?.stateKeys;
   const stateRows = useMemo(
-    () =>
-      deep
-        ? [...deep.stateKeys].sort((a, b) => b.count - a.count).map((k) => ({ name: k.key, count: k.count }))
-        : [],
-    [deep],
+    () => (stateKeys ? [...stateKeys].sort((a, b) => b.count - a.count).map((k) => ({ name: k.key, count: k.count })) : []),
+    [stateKeys],
   );
-  // Data's one shape row is the RECORD COUNT (user, 2026-08-13 — "instead of showing the data
-  // attributes just say 'records'"): the attribute kinds are the raw layer's reading, where the
-  // payload actually renders; on the card they were a truncated field list nobody could finish.
-  const dataRows = useMemo(
-    () => (deep && deep.dataTxCount > 0 ? [{ name: "records", count: deep.dataTxCount }] : []),
-    [deep],
-  );
+  const dataBlockSigners = deep?.dataBlockSigners ?? row?.dataBlockSigners ?? [];
+  /** The payload is READ once the row states its shape (or the deep read has landed). */
+  const shapeRead = stateKeys != null || !!deep;
+  // Data's one shape row is the COUNT, never the attribute kinds (user, 2026-08-13 — "instead of
+  // showing the data attributes just say 'records'"): the kinds are the raw layer's reading, where
+  // the payload actually renders. THE COUNT IS THE EXACT READ'S (D6, 2026-11-07 — the ruling on the
+  // two-step gate: it guards payload RENDERING, not counting): the tick's exact read already inflates
+  // every anchored channel, so the row carries the data updates and the card states them with no
+  // Decompress at all. "Data updates", the protocol's word for what a dL1 validates (`composition.ts`).
+  // A snapshot whose data blocks carry no update still names its blocks; none of either is `none`.
+  // THE COUNTS RIDE THE LANE'S SENTENCE now (user, 2026-11-19, `dataLaneLead`: "12 updates in 3
+  // blocks"), so the tab lists no count row of its own — the same figure twice.
+  const dataTx = row?.dataTxCount;
+  const dataBlocks = row?.dataBlocks;
+  // The state's proof — the deep read wins where it exists; the exact row carries it otherwise.
+  const stateProof = deep?.stateProof ?? row?.stateProof;
+  /** The data section is READ once the exact row states its count, or the deep read has landed. */
+  const dataRead = dataTx != null || !!deep;
 
   if (row && !row.decoded && !deep) {
     // An undecodable exact row is a terminal for the whole block (both surfaces apply one
@@ -532,7 +531,7 @@ function PayloadBlock({
 
   return (
     <div className="mt-1.5">
-      {deep && stateRows.length === 0 && dataRows.length === 0 && deep.dataBlockSigners.length === 0 && deep.stateBytes === 0 && (
+      {shapeRead && stateRows.length === 0 && !dataTx && !dataBlocks && dataBlockSigners.length === 0 && (deep?.stateBytes ?? row?.stateBytes ?? 0) === 0 && (
         // THE IDLE SNAPSHOT, NAMED — and FIRST (user, 2026-08-13: "it should be the 1st thing
         // to read so that the rest of the card is easy to ignore"). Post-read only: idleness is
         // a verified whole-snapshot reading — the anchored bytes are the envelope (chain header
@@ -549,29 +548,29 @@ function PayloadBlock({
           two stacked caps headers, which read as eyebrows with nothing under them until a read. */}
       <Tabs defaultValue="state" className="gap-0">
         <TabsList variant="line" className={CABINET_LIST} aria-label="Which part of the snapshot's payload to read">
+          {/* The raw pane's own lane marks (`LANE_ICONS`): Data blocks wears the register switch's glyph. */}
           <TabsTrigger value="state" className={cn(CABINET_TRIGGER, "h-7 text-label")}>
+            <LANE_ICONS.state aria-hidden className="size-3.5 flex-none" />
             {PAYLOAD_LANES.state.name}
           </TabsTrigger>
           <TabsTrigger value="data" className={cn(CABINET_TRIGGER, "h-7 text-label")}>
+            <LANE_ICONS.data aria-hidden className="size-3.5 flex-none" />
             {PAYLOAD_LANES.data.name}
           </TabsTrigger>
         </TabsList>
         <div className={cn(CABINET_BODY, "pt-2")}>
           <TabsContent value="state">
-            <PayloadSection rows={stateRows} read={!!deep} pending={pending} />
+            <PayloadSection rows={stateRows} read={shapeRead} pending={pending} lead={STATE_LANE_LEAD} proof={stateProof} />
           </TabsContent>
           <TabsContent value="data">
             <PayloadSection
-              rows={dataRows}
-              read={!!deep}
+              rows={[]}
+              read={dataRead}
+              lead={dataLaneLead(dataTx, dataBlocks)}
               pending={pending}
               // "Signed by" here as in the body (user, 2026-08-13): the layer word carries the
               // difference (dL1 vs the body's L0), SIGNER_GROUPS owns the words.
-              signers={
-                deep && deep.dataBlockSigners.length > 0
-                  ? { label: "Signed by", count: deep.dataBlockSigners.length, who: SIGNER_GROUPS.dataBlocks.who }
-                  : null
-              }
+              signers={dataBlockSigners.length > 0 ? { label: "Signed by", count: dataBlockSigners.length, who: SIGNER_GROUPS.dataBlocks.who } : null}
             />
           </TabsContent>
         </div>
@@ -591,6 +590,8 @@ function PayloadSection({
   read,
   pending,
   signers,
+  lead,
+  proof,
 }: {
   rows: { name: string; count: number }[];
   /** The deep read has landed — an empty section may now say `none` as a verified fact; before
@@ -599,6 +600,11 @@ function PayloadSection({
   /** The one read's in-flight/give-up word, rendered under EVERY section it is decompressing. */
   pending?: string | null;
   signers?: { label: string; count: number; who: string } | null;
+  /** WHAT THE LANE IS, its one sentence at the top once read (`payloadKinds`' lane sentences). */
+  lead?: string;
+  /** The state's PROOF — a fingerprint of the record the metagraph keeps off chain — shown under the
+   *  record it vouches for (user, 2026-11-19: it moved here from the card's foot). */
+  proof?: string | null;
 }) {
   return (
     <div className="flex flex-col gap-1">
@@ -608,7 +614,8 @@ function PayloadSection({
           when this snapshot can be read, and a sentence pointing at an absent door is a dead end. */}
       {!read && !pending && <p className="m-0 text-label text-muted-foreground">Not decompressed yet.</p>}
       {pending && <p className="m-0 text-label text-muted-foreground italic">{pending}</p>}
-      {read && rows.length === 0 && !signers && (
+      {read && lead && <p className={cn("m-0 mb-1 text-label text-muted-foreground", CONTENT_EASE)}>{lead}</p>}
+      {read && rows.length === 0 && !signers && !proof && !lead && (
         // MEASURED empty — the deep read landed and this section carries nothing. A reading,
         // not a state, so it takes the section rows' own register; the italic-muted treatment
         // is `pending`'s (unread / reading…), and "unread and none are different facts".
@@ -622,6 +629,15 @@ function PayloadSection({
           <span className="shrink-0 text-label text-foreground-dim tabular-nums">{r.count.toLocaleString()}</span>
         </div>
       ))}
+      {read && proof && (
+        <div className={cn("flex items-center justify-between gap-2.5", CONTENT_EASE)}>
+          <span className="min-w-0 truncate text-label text-muted-foreground">{STATE_PROOF_LABEL}</span>
+          <span className="shrink-0 inline-flex items-center gap-1 font-mono text-label text-foreground-dim">
+            {midHash(proof, 14)}
+            <CopyButton value={proof} subject="state proof" always className="my-0" />
+          </span>
+        </div>
+      )}
       {signers && (
         <div className={cn("flex items-start justify-between gap-2.5", CONTENT_EASE)}>
           <span className="min-w-0 truncate text-label text-muted-foreground">{signers.label}</span>

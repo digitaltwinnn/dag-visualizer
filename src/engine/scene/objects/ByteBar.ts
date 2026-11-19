@@ -10,7 +10,7 @@
 import * as THREE from "three";
 import { isLightGround, inkPresence, type SceneColors } from "../../sceneColors";
 import type { PickDescriptor } from "@/src/data/types";
-import { METAGRAPHS } from "@/src/net/current";
+import { METAGRAPHS } from "@/src/engine/config";
 import { BAR_H, BAR_D, BAR_LIFT, FLOOR_Y, LEAD_X, SEED_W } from "../../domain/ledgerLayout";
 import { type Band, type BarSpec } from "../../domain/ledgerBands";
 import { SLOT_SP, SLOT_N, horizonAt, frontAt, rowOnChamber } from "../../domain/ledgerModel";

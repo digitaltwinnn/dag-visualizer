@@ -1,6 +1,10 @@
 import { metaSnapRecord, type MetaSnapRecord } from "@/src/data/api";
 import type { Anchor, GlobalSnapshot, RawMetaSnapshot } from "@/src/data/types";
 import { currentIdOf } from "@/src/net/lineage";
+import type { LedgerSource } from "@/src/data/ledgerSourceType";
+import type { BlockWindow } from "@/src/data/blockWindow";
+import type { LedgerRegister } from "@/src/store/mode";
+import { readsBlockWindow } from "@/src/engine/domain/viewPolicy";
 
 // THE SNAPSHOTS VIEW'S PAST WINDOW (user, 2026-11-03: pinning an old snapshot should "go back in time";
 // `docs/superpowers/specs/2026-11-03-snapshots-past-window-design.md`). Every Snapshots surface reads
@@ -13,13 +17,7 @@ import { currentIdOf } from "@/src/net/lineage";
 // store carries only its status (`store.pastWindow`), which `components/PastWindowBridge.tsx`, the one
 // writer, keeps in step with what is held here.
 
-/** What the Snapshots surfaces read, live or past. `NetworkData` has the same fields. */
-export interface LedgerSource {
-  globalSnapshots: GlobalSnapshot[];
-  metaSnaps: Map<string, MetaSnapRecord[]>;
-  unlistedSnaps: Map<string, MetaSnapRecord[]>;
-  getAnchor(ts: string): Anchor | null;
-}
+export type { LedgerSource };
 
 export interface PastWindow extends LedgerSource {
   from: number;
@@ -55,12 +53,12 @@ export function foldAnchors(chains: ReadonlyMap<string, readonly MetaSnapRecord[
 /** The window as a ledger source. A chain's former address joins its network's current one, the lane
  *  the chamber draws it on (each record keeping its `chain`); records are kept oldest → newest, as
  *  the live buffer keeps them. */
-export function buildPastWindow(answer: PastWindowAnswer, net: string): PastWindow | null {
+export function buildPastWindow(answer: PastWindowAnswer): PastWindow | null {
   const globals = [...answer.globals].sort((a, b) => a.ordinal - b.ordinal);
   if (!globals.length) return null;
   const metaSnaps = new Map<string, MetaSnapRecord[]>();
   for (const [id, rows] of Object.entries(answer.chains)) {
-    const key = currentIdOf(net, id);
+    const key = currentIdOf(id);
     // A former address files under its network's current id (the lane), each record keeping its own
     // chain, so a selection names the real one (ordinals are per chain).
     const recs = rows.map((r) => (key === id ? metaSnapRecord(r) : { ...metaSnapRecord(r), chain: id }));
@@ -86,8 +84,8 @@ export type PastWant = { kind: "clear" } | { kind: "keep" } | { kind: "fetch"; o
 /** THE ONE RULE for when the view goes back in time: in the Snapshots view, pinned on a snapshot older
  *  than the live buffer's oldest. A pin the held window holds keeps it (the pager stepping inside);
  *  following live, leaving the view, or a pin the live buffer holds releases it. */
-export function pastWanted(s: { ledger: boolean; following: boolean; pin: number | null; liveOldest: number | null; held: { from: number; to: number } | null }): PastWant {
-  if (!s.ledger || s.following || s.pin == null || s.liveOldest == null) return { kind: "clear" };
+export function pastWanted(s: { ledger: boolean; following: boolean; pin: number | null; liveOldest: number | null; held: { from: number; to: number } | null; register?: LedgerRegister }): PastWant {
+  if (!s.ledger || (s.register != null && readsBlockWindow(s.register)) || s.following || s.pin == null || s.liveOldest == null) return { kind: "clear" };
   if (s.pin >= s.liveOldest) return { kind: "clear" };
   if (s.held && s.pin >= s.held.from && s.pin <= s.held.to) return { kind: "keep" };
   return { kind: "fetch", ordinal: s.pin };
@@ -125,7 +123,39 @@ export function onPastWindow(l: () => void): () => void {
   return () => listeners.delete(l);
 }
 
-/** THE LEDGER SOURCE: the held past window, else the live buffer. */
-export function ledgerSource(live: LedgerSource | null): LedgerSource | null {
-  return held ?? live;
+let heldBlocks: BlockWindow | null = null;
+const blockListeners = new Set<() => void>();
+
+/** The Blocks register's window, or null while none has landed. */
+export function getBlockWindow(): BlockWindow | null {
+  return heldBlocks;
+}
+
+/** Every global ordinal a held window draws — the past window's globals and the block window's
+ *  ticks: the exact-read cache keeps these (`blockReads.exactEvictions`, review I3). */
+export function heldOrdinals(): Set<number> {
+  const out = new Set<number>();
+  for (const g of held?.globalSnapshots ?? []) out.add(g.ordinal);
+  for (const t of heldBlocks?.ticks ?? []) out.add(t.ord);
+  return out;
+}
+
+/** Hold a block window, or none. The bridge is the one caller. */
+export function setBlockWindow(w: BlockWindow | null): void {
+  if (w === heldBlocks) return;
+  heldBlocks = w;
+  for (const l of blockListeners) l();
+}
+
+/** Listen for the block window changing; returns the unsubscribe. */
+export function onBlockWindow(l: () => void): () => void {
+  blockListeners.add(l);
+  return () => blockListeners.delete(l);
+}
+
+/** THE LEDGER SOURCE: in the Snapshots register the held past window, else the live buffer; in the
+ *  Blocks register the block window alone (the live buffer's ticks are the wrong set, so with no
+ *  window yet the chamber draws nothing). */
+export function ledgerSource(live: LedgerSource | null, register: LedgerRegister = "snapshots"): LedgerSource | null {
+  return readsBlockWindow(register) ? (heldBlocks ?? null) : (held ?? live);
 }

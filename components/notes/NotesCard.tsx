@@ -124,8 +124,7 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
               moment its subject is known. ONE WAITING WORD (user, 2026-10-30: "the reading/writing
               distinction is not really relevant to the user, writing is purely technical for our
               cache strategy"): a held note and one the model is still writing (the server's
-              `pending`, M3) both read as the card reading its note. `none` and a read's
-              `unavailable` never reach here: the slot stands down (R67). */}
+              `pending`, M3) both read as the card reading its note. */}
           {res == null || res.state === "pending" ? (
             <p className="m-0 flex items-center gap-2 text-body text-muted-foreground">
               <NodeStars tone="ai" />
@@ -134,13 +133,18 @@ export default function NotesCard({ collapsed, onToggle }: { collapsed: boolean;
           ) : res.state === "request" ? (
             // The on-request window (the 1H pill): written only on the reader's ask.
             <RequestDoor onClick={note.request} />
-          ) : res.state === "unavailable" ? (
-            // Only the reader's own ask reaches here (a read's `unavailable` stands the slot down,
-            // `noteCardAbsent`): the gesture is answered on the card, with the same door again (R68).
+          ) : res.state === "unavailable" && note.via === "request" ? (
+            // The reader's own ask failed: the gesture is answered on the card, with the same door
+            // again (R68).
             <>
               <p className="m-0 mb-2.5 text-body text-muted-foreground">Couldn&apos;t write notes just now</p>
               <RequestDoor onClick={note.request} />
             </>
+          ) : res.state === "none" || res.state === "unavailable" ? (
+            // NO NOTE, SAID (user, 2026-11-19: "each view has a note, if no data you can just mention
+            // that"): nothing written for this subject, or a read that failed — the subject cards'
+            // own words for it, muted, no door (the note is written on its own cadence).
+            <p className="m-0 text-body text-muted-foreground">No note right now</p>
           ) : res.state === "ok" ? (
             <>
               {/* The text alone (user, 2026-10-29): no Written row — the span under the title says

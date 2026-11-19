@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { NETWORKS } from "@/src/engine/config";
-import { netOf } from "@/src/net/request";
+import { HOSTS } from "@/src/engine/config";
 import { isTracked } from "@/src/net/lineage";
 import { unlistedChains } from "../../../network/unlistedChains";
 import { META_LADDER, clampLimit } from "../../limit";
@@ -17,13 +16,12 @@ const NO_STORE = { "Cache-Control": "no-store" };
 
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
-  const net = netOf(req);
   const limit = clampLimit(new URL(req.url).searchParams.get("limit"), META_LADDER);
 
-  if (!isTracked(net, id)) {
+  if (!isTracked(id)) {
     let unlisted: string[];
     try {
-      unlisted = await unlistedChains(net);
+      unlisted = await unlistedChains();
     } catch (e) {
       console.error("live/meta: cannot verify chain id", e);
       return NextResponse.json({ error: "cannot verify chain" }, { status: 503, headers: NO_STORE });
@@ -32,7 +30,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   }
 
   try {
-    const { value, ageMs } = await memo(`meta:${net}:${id}:${limit}`, SNAPSHOT_WINDOW.memoMs, () => readChain(NETWORKS[net].be, id, limit));
+    const { value, ageMs } = await memo(`meta:${id}:${limit}`, SNAPSHOT_WINDOW.memoMs, () => readChain(HOSTS.be, id, limit));
     return NextResponse.json(
       { snapshots: value, memoAgeMs: ageMs },
       { headers: { "Cache-Control": cacheControl(SNAPSHOT_WINDOW) } },

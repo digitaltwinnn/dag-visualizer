@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { metaSnapDeepKey, metaSnapHoverKey } from "./types";
+import { dataBlockHoverKey, dataBlockSnapKey, metaSnapDeepKey, metaSnapHoverKey } from "./types";
 
 // The two keys the store's snapshot channels are addressed by. `types.ts` is otherwise pure type
 // declarations; these are its only value exports, and both encode a DISTINCTION that a bug already
@@ -35,5 +35,17 @@ describe("metaSnapHoverKey", () => {
     // whenever one of them knew the tick and the other didn't.
     expect(metaSnapHoverKey("dor", 7)).toBe(metaSnapHoverKey("dor", 7));
     expect(metaSnapHoverKey("dor", 7)).not.toBe(metaSnapDeepKey(100, "dor", 7));
+  });
+});
+
+// 2026-11-09: the Data block card hovered its snapshot's channel; a data block has its own key now.
+describe("dataBlockHoverKey / dataBlockSnapKey", () => {
+  it("names one data block, distinct from its snapshot and its siblings", () => {
+    expect(dataBlockHoverKey("dor", 7, 0)).not.toBe(metaSnapHoverKey("dor", 7));
+    expect(dataBlockHoverKey("dor", 7, 0)).not.toBe(dataBlockHoverKey("dor", 7, 1));
+  });
+  it("gives back exactly its snapshot's hover key", () => {
+    expect(dataBlockSnapKey(dataBlockHoverKey("dor", 7, 3))).toBe(metaSnapHoverKey("dor", 7));
+    expect(dataBlockSnapKey(dataBlockHoverKey("dor", 71, 0))).not.toBe(metaSnapHoverKey("dor", 7));
   });
 });

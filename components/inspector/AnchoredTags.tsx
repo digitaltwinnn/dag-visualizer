@@ -6,10 +6,10 @@ import { ledgerNetwork } from "@/src/engine/domain/tickNet";
 import { UNLISTED_ID } from "@/src/data/unlisted";
 import { metagraphById } from "@/src/data/network";
 import { identityHudCss } from "@/src/palette/identity";
-import { NodeStars } from "@/components/state/StateAtoms";
+import { NodeStars, Resolving } from "@/components/state/StateAtoms";
 import { useMinHold } from "@/components/useMinHold";
 import { CONTENT_EASE } from "@/components/RollSwap";
-import { Lead, SectionLabel, UnitMarks, CUT_ROW, countable, figWidth } from "@/components/inspector/parts";
+import { Lead, SectionLabel, TableHead, TABLE_ROW, UnitMarks, CUT_ROW, countable, figWidth } from "@/components/inspector/parts";
 import { Separator } from "@/components/ui/separator";
 import { useFeedRead } from "@/components/useFeedRead";
 
@@ -25,14 +25,54 @@ import { useFeedRead } from "@/components/useFeedRead";
 // second, smaller card inside the card, restating what the rung below it is for. The row says who
 // anchored and how many; the network's own card, one step down the ladder, says the rest. The
 // network the chamber is resolved against stays highlighted in place, in its hue.
+/** THE BREAKDOWN TABLE'S ROWS (`visuals.html`, user 2026-10-02): name, one square per unit while the
+ *  total is countable (a share bar above that), count — in the dossier's columns. Shared by the
+ *  anchored breakdown and the Data blocks register's section of the Global snapshot card (its data
+ *  updates by network — user, 2026-11-07: "work on the global snapshot body also"). `focusId` is the row the chamber resolves against: highlighted in place
+ *  by a faint identity-hue wash, its name in the hue. Unlisted (no hue) wears the CORE tone. */
+export function BreakdownRows({ rows, denom, focusId, head = { name: "Network", figure: "#" } }: {
+  rows: readonly { id: string; label: string; hue: string | null; n: number }[];
+  denom: number;
+  focusId: string | null;
+  /** The card table's column row (option A, 2026-11-09) — a count by network unless said. */
+  head?: { name: string; figure: string };
+}) {
+  const pct = (n: number) => (denom > 0 ? (n / denom) * 100 : 0);
+  const units = countable(denom);
+  return (
+    <div className={cn("flex flex-col text-label", CONTENT_EASE)} style={figWidth(rows.map((r) => r.n))}>
+      <TableHead name={head.name} figure={head.figure} />
+      {rows.map((r) => {
+        const isSel = r.id === focusId;
+        return (
+          // The wash overhangs the content by 6px on both sides (`w-[calc(100%+12px)]`, never
+          // `w-full` under a negative margin — that stops the counts 12px short of the total).
+          <div
+            key={r.id}
+            className={cn(CUT_ROW, TABLE_ROW, "w-[calc(100%+12px)] -mx-1.5 px-1.5 rounded-sm")}
+            style={isSel ? ({ background: `color-mix(in oklch, ${r.hue ?? "var(--primary)"} 16%, transparent)` } as const) : undefined}
+          >
+            <span
+              className={cn("min-w-0 truncate", !r.hue ? "italic text-muted-foreground" : isSel ? "font-semibold" : "text-foreground-dim")}
+              style={isSel && r.hue ? { color: r.hue } : undefined}
+            >
+              {r.label}
+            </span>
+            <UnitMarks count={r.n} color={r.hue ?? "var(--core)"} units={units} frac={pct(r.n) / 100} />
+            <span className="font-mono tabular-nums text-right text-foreground">{r.n}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function AnchoredTags({
   ordinal,
   anchored,
-  awaiting,
 }: {
   ordinal: number;
   anchored: number | null;
-  awaiting?: boolean;
 }) {
   useFeedRead(["exact"], "AnchoredTags");
   // The highlighted row is the network the chamber resolves against: the one picked INSIDE this
@@ -80,10 +120,14 @@ export default function AnchoredTags({
               ? // Two words (user, 2026-10-04: "why so much text, just say 'read failed'"); the
                 // lead is the failure's one statement, so the line under the label is gone.
                 "Read failed"
-              : "Reading which metagraphs anchored into it"}
+              : // THE READ IN FLIGHT IS THE LEAD'S OWN CUE (user, 2026-11-09: "the same treatment" as the
+                // scene callout): the shared `Resolving` atom where the sentence will land — it was a
+                // sentence here and a second stars-and-word row under the section label, two cues
+                // for one read. It holds one calm cycle (`resolveHold`) and fades out, as the row did.
+                <Resolving className={cn(resolveHold.fading && "animate-hold-fade-out motion-reduce:animate-none")} />}
       </Lead>
       <Separator className="mb-2" />
-      <SectionLabel label="Snapshots anchored" total={total != null ? total : <NodeStars count={3} />} className="mb-1.5" />
+      <SectionLabel label="Snapshots anchored" total={total != null ? total : <NodeStars count={3} />} className="mb-0.5" />
     </>
   );
 
@@ -91,13 +135,6 @@ export default function AnchoredTags({
     return (
       <div className="mt-1">
         {header}
-        {/* A failed read is stated once, by the lead above; only a read in flight draws here. */}
-        {!(missed && !resolveHold.show) && (awaiting || resolveHold.show) && (
-          <div className={cn("flex items-center gap-2 mt-1", resolveHold.fading && "animate-hold-fade-out motion-reduce:animate-none")}>
-            <NodeStars count={4} />
-            <span className="text-label tracking-[0.08em] uppercase text-muted-foreground">resolving</span>
-          </div>
-        )}
       </div>
     );
   }
@@ -117,48 +154,15 @@ export default function AnchoredTags({
   const rows: Row[] = [...listed];
   if (exact.unlistedCount > 0) rows.push({ id: UNLISTED_ID, label: UNLISTED_ID, hue: null, n: exact.unlistedCount });
 
-  const denom = total ?? exact.anchored;
-  const pct = (n: number) => (denom > 0 ? (n / denom) * 100 : 0);
-  // One square per anchored snapshot while the tick's total is countable, a share bar above that.
-  const units = countable(denom);
-
   return (
     <div className="mt-1">
       {header}
-
       {/* The list EASES IN on every reveal (the no-pop rule's arrival ease): following live,
           each tick swaps this block to "resolving" and back, and the rows popped with slightly
           different members every ~4s — the container mounts fresh at each acquiring→rows flip,
           so the mount entrance is exactly per-reveal. Bar widths carry no transition: the
           remount means there is never an old width to ease from. */}
-      <div className={cn("flex flex-col gap-y-1", CONTENT_EASE)} style={figWidth(rows.map((r) => r.n))}>
-        {rows.map((r) => {
-          const isSel = r.id === focusId;
-          return (
-            // THE BREAKDOWN TABLE'S ROW (`visuals.html`, user 2026-10-02): name, one square per
-            // anchored snapshot, count — in the dossier's columns. Unlisted wears the CORE tone
-            // (2026-08-07), the same neutral-blue it carries on the filter chip. The wash overhangs
-            // the content by 6px on both sides (`w-[calc(100%+12px)]`, never `w-full` under a
-            // negative margin — that stops the counts 12px short of the section's total).
-            <div
-              key={r.id}
-              className={cn(CUT_ROW, "w-[calc(100%+12px)] -mx-1.5 px-1.5 py-[3px] rounded-sm")}
-              // The network the chamber resolves against: highlighted in place by a faint
-              // identity-hue wash and its name in the hue.
-              style={isSel ? ({ background: `color-mix(in oklch, ${r.hue ?? "var(--primary)"} 16%, transparent)` } as const) : undefined}
-            >
-              <span
-                className={cn("min-w-0 truncate", !r.hue ? "italic text-muted-foreground" : isSel ? "font-semibold" : "text-foreground-dim")}
-                style={isSel && r.hue ? { color: r.hue } : undefined}
-              >
-                {r.label}
-              </span>
-              <UnitMarks count={r.n} color={r.hue ?? "var(--core)"} units={units} frac={pct(r.n) / 100} />
-              <span className="font-mono tabular-nums text-right text-foreground">{r.n}</span>
-            </div>
-          );
-        })}
-      </div>
+      <BreakdownRows rows={rows} denom={total ?? exact.anchored} focusId={focusId} />
     </div>
   );
 }

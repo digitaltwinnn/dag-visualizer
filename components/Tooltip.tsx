@@ -101,6 +101,8 @@ function markOf(h: HoverSubject, liveLogo: string | undefined): SceneMarkSpec {
       return { icon: iconForPick("metanode"), hue: h.color };
     case "metaSnap":
       return { icon: iconForPick("metaSnap"), hue: h.color };
+    case "block":
+      return { icon: iconForPick("block"), hue: h.color };
     case "country":
       return { icon: iconForPick("country"), hue: h.color };
     case "snapshot":

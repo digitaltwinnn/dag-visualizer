@@ -15,12 +15,33 @@
  *  levels — as SECTIONS on the metagraph-snapshot card (the shape) and as LANES in the raw
  *  layer's channel pane (the payload) — and a card whose sections disagreed with the pane's tabs
  *  would read as two different subjects rather than one subject twice. `State` is the accumulated
- *  on-chain state, `Data` is what THIS snapshot's blocks carried. (Their hover titles — the size
+ *  on-chain state, `Data blocks` is what THIS snapshot's data blocks carried. (Their hover titles — the size
  *  distinction between decoded content and the anchored KB — went with the tooltips, 2026-10-08.) */
 export const PAYLOAD_LANES = {
   state: { name: "State" },
-  data: { name: "Data" },
+  // "Data blocks" since 2026-11-19 (user: the tab holds the snapshot's data blocks and the updates in
+  // them, the same subject the Data blocks register is named for).
+  data: { name: "Data blocks" },
 } as const;
+
+/** WHAT EACH LANE IS, ONE SENTENCE AT ITS TOP (user, 2026-11-19: "explain to me in more simple terms,
+ *  I feel we need to clarify this in our app as well"). A snapshot's data blocks are the new data it
+ *  received this round; its state is the metagraph's own record, written into the snapshot after
+ *  processing that data — and, where the metagraph keeps a larger record off chain, a fingerprint of it
+ *  (`STATE_PROOF_LABEL`). Said the same on the card's tabs and the raw pane's lanes. */
+export const STATE_LANE_LEAD = "The metagraph's own record, saved in this snapshot after processing the new data.";
+/** The state proof's name where it is shown, in the State lane under the record. */
+export const STATE_PROOF_LABEL = "Proof of the off-chain record";
+/** The Data blocks lane's sentence, its counts from the read that fills the lane; unknown counts (the
+ *  read has not landed, or a block could not be decoded) leave the figures out, never a guessed 0. */
+export function dataLaneLead(updates: number | null | undefined, blocks: number | null | undefined): string {
+  if (updates == null || blocks == null) return "The new data this snapshot received, from its data layer (dL1).";
+  if (blocks === 0) return "This snapshot received no new data.";
+  if (updates === 0) return `This snapshot received ${blocks.toLocaleString("en-US")} data block${blocks === 1 ? "" : "s"} with no updates.`;
+  const u = `${updates.toLocaleString("en-US")} update${updates === 1 ? "" : "s"}`;
+  const b = `${blocks.toLocaleString("en-US")} block${blocks === 1 ? "" : "s"}`;
+  return `The new data this snapshot received: ${u} in ${b}, from its data layer (dL1).`;
+}
 
 /** A decoded payload string → a tree-renderable value, tolerating an undecodable one (which
  *  renders as a single string value rather than being hidden). */

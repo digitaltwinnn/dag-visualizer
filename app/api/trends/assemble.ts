@@ -28,7 +28,6 @@ export const WINDOWS: Record<WindowId, { tier: Tier; ms: number }> = {
 
 export interface TrendsPayload {
   v: 1;
-  net: string;
   /** "tile" for the map-tile route's unit payloads (2026-09-10). */
   window: WindowId | "tile";
   tier: Tier;
@@ -42,11 +41,11 @@ export interface TrendsPayload {
 }
 
 export function assemble(
-  net: string, window: WindowId, nowMs: number,
+  window: WindowId, nowMs: number,
   hashes: Record<string, Record<string, string>>,
 ): TrendsPayload {
   const { tier, ms } = WINDOWS[window];
-  return assembleSpan(net, window, tier, nowMs - ms, nowMs, nowMs, hashes);
+  return assembleSpan(window, tier, nowMs - ms, nowMs, nowMs, hashes);
 }
 
 /** The window body over an ARBITRARY [startMs, endMs) span — assemble() delegates here, and
@@ -54,13 +53,13 @@ export function assemble(
  *  unit's own bounds. Same honesty contract: uncovered bucket → null everywhere, covered +
  *  absent counter → 0, covered + absent gauge → null. */
 export function assembleSpan(
-  net: string, window: WindowId | "tile", tier: Tier, startMs: number, endMs: number, nowMs: number,
+  window: WindowId | "tile", tier: Tier, startMs: number, endMs: number, nowMs: number,
   hashes: Record<string, Record<string, string>>,
 ): TrendsPayload {
   // slotsInWindow is END-INCLUSIVE (the rolling windows want their newest bucket); a SPAN is
   // half-open [start, end) so adjacent tiles can never share a boundary bucket — stitching
   // duplicates it otherwise.
-  const slots = slotsInWindow(net, tier, startMs, endMs - 1);
+  const slots = slotsInWindow(tier, startMs, endMs - 1);
 
   // Collect every series name present in any hash of this window.
   const names = new Set<string>();
@@ -90,5 +89,5 @@ export function assembleSpan(
   // ONE HISTORY PER NETWORK: the store keeps each chain under its own address; a re-registered
   // network's former addresses fold into its current one here, on the read path, so every
   // consumer of this payload sees the network's whole life (`src/net/lineage.ts`).
-  return { v: 1, net, window, tier, stepMs: stepMsOf(tier), now: nowMs, buckets, series: foldLineage(net, series, opOf) };
+  return { v: 1, window, tier, stepMs: stepMsOf(tier), now: nowMs, buckets, series: foldLineage(series, opOf) };
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { staleTickKeys, isGlobalActivityScope, shortHash, fanOut, cycleOk, touchPoll, reportPoll, pollHealthRows, BEAT_CAP, BEAT_KEEP_MS, NetworkData } from "./api";
+import { staleTickKeys, isGlobalActivityScope, shortHash, fanOut, cycleOk, touchPoll, reportPoll, pollHealthRows, BEAT_CAP, BEAT_KEEP_MS, NetworkData, metaSnapRecord, blockHashesOf } from "./api";
 import { vi, afterEach } from "vitest";
 
 // api.ts is exempt from dataExportCoverage (it IS the live feed). These cover the PURE parts only
@@ -17,7 +17,7 @@ describe("staleTickKeys", () => {
     // The real ordering: a dormant metagraph seeds its year-old ticks AFTER a live one's recent
     // ticks, so insertion order puts the OLD entries last. An insertion-order cap would evict the
     // recent ones — the only ones any consumer reads, since every lookup is by a global snapshot's
-    // timestamp and that buffer holds the 52 most recent ticks.
+    // timestamp and that buffer holds the 50 most recent ticks.
     const insertionOrder = [
       t("2026-08-31T15:05:00.000Z"), // live metagraph responded first
       t("2026-08-31T15:04:00.000Z"),
@@ -316,5 +316,16 @@ describe("init (the seed)", () => {
     expect(nd.globalSnapshots.map((s) => s.ordinal)).toEqual(Array.from({ length: 12 }, (_, i) => 101 + i));
     expect(nd.latest?.ordinal).toBe(112);
     expect(nd.live).toBe(true);
+  });
+});
+
+describe("block hashes", () => {
+  it("keeps a snapshot's block hashes, and reads an absent or empty list as none", () => {
+    const base = { ordinal: 1, hash: "h", lastSnapshotHash: "p", timestamp: "2026-11-05T00:00:00Z" };
+    expect(metaSnapRecord({ ...base, blocks: ["abc", "def"] }).blockHashes).toEqual(["abc", "def"]);
+    expect(metaSnapRecord({ ...base, blocks: ["abc", "def"] }).blocks).toBe(2);
+    expect(metaSnapRecord({ ...base, blocks: [] }).blockHashes).toEqual([]);
+    expect(metaSnapRecord(base).blockHashes).toEqual([]);
+    expect(blockHashesOf({ blocks: ["x", 7, null] })).toEqual(["x"]); // only strings are hashes
   });
 });

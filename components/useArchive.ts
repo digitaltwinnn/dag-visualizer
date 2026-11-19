@@ -1,7 +1,6 @@
 "use client";
 
 import { ageWords } from "@/src/util/relativeAge";
-import { netUrl } from "@/src/net/current";
 import { useEffect, useState } from "react";
 
 // The archive census, client side (user, 2026-08-14 — the node card's Archive fact). One fetch
@@ -319,7 +318,7 @@ async function load(): Promise<ArchiveCensus | null> {
   try {
     // The ?v rides the URL so a response-shape change can never be served from a browser
     // cache of the previous shape (the route is public, max-age 1h).
-    const r = await fetch(netUrl("/api/archive?v=2"));
+    const r = await fetch("/api/archive?v=2");
     if (!r.ok) return null;
     const j = (await r.json()) as { entries: ArchiveEntry[]; total: number; archivalCount: number; since: string };
     const entries = new Map<string, ArchiveEntry>();
@@ -351,7 +350,7 @@ const spanInflight = new Map<string, Promise<ChainSpan | null>>();
 async function loadSpan(address: string): Promise<ChainSpan | null> {
   try {
     // ?v busts any browser-cached previous response shape (the route is public, max-age 5m).
-    const r = await fetch(netUrl(`/api/network/${address}/chain?v=3`));
+    const r = await fetch(`/api/network/${address}/chain?v=3`);
     if (!r.ok) return null;
     const j = (await r.json()) as { genesisTs: string | null; latestOrdinal: number; latestTs?: string | null; owner: string | null };
     return { genesisTs: j.genesisTs, latestOrdinal: j.latestOrdinal, latestTs: j.latestTs ?? null, owner: j.owner ?? null };
@@ -409,7 +408,7 @@ export function useSnapRecord(metaId: string | null, ordinal: number, skip: bool
     let dead = false;
     (async () => {
       try {
-        const r = await fetch(netUrl(`/api/network/${metaId}/snapshots/${ordinal}`));
+        const r = await fetch(`/api/network/${metaId}/snapshots/${ordinal}`);
         const v = r.ok ? ((await r.json()) as { hash?: string; parent?: string }) : null;
         const rec = v ? { hash: v.hash ?? "", parent: v.parent ?? "" } : null;
         records.set(key, rec);

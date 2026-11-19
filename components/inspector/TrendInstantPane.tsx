@@ -7,7 +7,7 @@ import { useAiNote } from "@/components/notes/useAiNote";
 
 import CardHead, { RailPane } from "@/components/CardHead";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { Lead, FactGroup, QualifierChip, UnitMarks, CUT_ROW, figWidth } from "@/components/inspector/parts";
+import { Lead, FactGroup, QualifierChip, SectionLabel, TABLE_ROW, TableHead, UnitMarks, CUT_ROW, figWidth } from "@/components/inspector/parts";
 import { Separator } from "@/components/ui/separator";
 import { SELECTED_ROW, selectionHue } from "@/components/selection";
 import { spanOfWindow } from "@/components/trendDoors";
@@ -259,7 +259,7 @@ export default function TrendInstantPane({
           )}
           {/* THE MOMENT'S SHAPE (user, 2026-11-05): the lead's reading in the next finer buckets,
               where a finer tier holds it — steady or up and down, at a glance. */}
-          {bucket != null && lead != null && <MomentSpark metric={metric} subject={subject} stepMs={stepMs} bucket={bucket} />}
+          {bucket != null && lead != null && <MomentSpark metric={metric} subject={subject} stepMs={stepMs} bucket={bucket} hue={subject ? rows.get(subject)?.hue : roster.total?.hue} />}
           {bucket != null && <Separator className="mb-2" />}
           {bucket == null ? (
             // AN HONEST TERMINAL, not an empty card. The sentence is `instantNote`'s: only the
@@ -277,11 +277,12 @@ export default function TrendInstantPane({
                   {/* WHAT THE LIST IS ABOUT, said once (design A): these are readings AT THE
                       INSTANT, in the bucket's own unit — the Networks list beside it averages a
                       span, and the two looked identical without this line. */}
-                  <p className="mt-0 mb-0 flex items-baseline justify-between text-label tracking-caps uppercase text-muted-foreground">
-                    <span>At that moment</span>
-                    {unit ? <span className="normal-case tracking-normal">{unit}</span> : null}
-                  </p>
-                  <FactGroup className="mt-1">
+                  {/* THE CARD TABLE (option A, 2026-11-09): the shared section label on its rule —
+                      this header was the one hand-built copy — and the column row, the unit on the
+                      figure column. READINGS: each row's bar against the busiest network. */}
+                  <SectionLabel label="At that moment" className="mb-0.5" />
+                  <TableHead name="Network" figure={unit ?? ""} style={figWidth(readings.map((r) => (r.value != null ? format(r.value) : "—")))} />
+                  <FactGroup className="gap-0">
                   {orderAt(readings).map((id) => {
                     const row = rows.get(id);
                     if (!row) return null;
@@ -301,7 +302,8 @@ export default function TrendInstantPane({
                           // `block w-full`: this is the one `.nb-row` whose content is a single
                           // flex row rather than its own flex children, so it has to claim the
                           // width the row grammar assumes (label left, value right, one line).
-                          "nb-row block w-[calc(100%+8px)] -mx-1 px-1 py-[3px] rounded-sm cursor-pointer text-left bg-transparent border-0",
+                          "nb-row block w-[calc(100%+8px)] -mx-1 px-1 rounded-sm cursor-pointer text-left bg-transparent border-0",
+                          TABLE_ROW,
                           "hover:bg-wash-hover focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
                           on && SELECTED_ROW,
                           pair.paired && pair.className,

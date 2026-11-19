@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { StateMark } from "@/components/state/StateAtoms";
 
 // THE RAW LISTS' GROUP PLATE AND ITS DISCLOSURE (user, 2026-10-25: "give the option to collapse and
 // expand a group? Use the correct shadcn controls"). A group is a header ROW inside a table, and
@@ -91,3 +92,57 @@ export default function GroupPlate({
     </div>
   );
 }
+
+/** THE GLOBAL SNAPSHOT'S PLATE — the head of a RAW group that is one global snapshot (the anchor log
+ *  grouped by tick, the Blocks table grouped by the accepting global): "GLOBAL", its number, the
+ *  LIVE / PINNED mark following the number it qualifies, and its age at the right. The plate is an
+ *  accent-tinted band with an accent hairline (user, 2026-10-08, design B1); the SELECTED global
+ *  deepens to the selection accent — the group's head carries that selection, never its rows. ONE
+ *  home for the markup both tables share (refactor round R1, P5), so the two RAW lists can never
+ *  drift in their plate grammar. The plate SELECTS the global (a second click releases it) and its
+ *  chevron folds the group (`GroupPlate`'s selecting shape); hovering it previews the global. */
+export function GlobalGroupPlate({
+  ordinal,
+  age,
+  selected,
+  following,
+  open,
+  onToggle,
+  onSelect,
+  onHover,
+}: {
+  ordinal: number;
+  /** The age, already worded ("17s ago" names itself). */
+  age: ReactNode;
+  /** Is this global the committed one (live or pinned)? */
+  selected: boolean;
+  following: boolean;
+  open: boolean;
+  onToggle: () => void;
+  onSelect?: () => void;
+  onHover: (on: boolean) => void;
+}) {
+  return (
+    <GroupPlate
+      open={open}
+      onToggle={onToggle}
+      selected={selected && !following}
+      onSelect={onSelect}
+      onHover={onHover}
+      className={cn(
+        // px matches the rows' own cell inset, so "GLOBAL" stands on the identity dots' edge.
+        "h-[34px] px-2 max-[700px]:px-1.5 rounded-t-md border-b text-label transition-colors",
+        selected
+          ? "bg-[color-mix(in_oklch,var(--primary)_20%,transparent)] border-[var(--primary)] text-primary-ink"
+          : "bg-[color-mix(in_oklch,var(--primary)_9%,var(--panel-plate))] border-[color-mix(in_oklch,var(--primary)_35%,transparent)] hover:bg-[color-mix(in_oklch,var(--primary)_14%,var(--panel-plate))] text-muted-foreground",
+      )}
+    >
+      <span className={cn("uppercase tracking-caps", selected ? "text-primary-ink" : "text-[color-mix(in_oklch,var(--primary-ink)_80%,var(--muted-foreground))]")}>Global</span>
+      <span className={cn("font-mono tabular-nums", selected ? "text-primary-ink" : "text-foreground")}>{ordinal.toLocaleString()}</span>
+      {/* The mark FOLLOWS THE NUMBER IT QUALIFIES, as a row's pin follows its snapshot number. */}
+      {selected && <StateMark following={following} className="normal-case tracking-normal" />}
+      <span className={cn("ml-auto tabular-nums", selected ? "text-primary-ink" : "text-foreground-dim")}>{age}</span>
+    </GroupPlate>
+  );
+}
+

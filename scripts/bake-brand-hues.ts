@@ -4,7 +4,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { Jimp } from "jimp";
 import { parseSvgFills, pickBrandColor, snapToAllowedZone, hexToOklch, spreadColliding } from "../src/palette/brand";
-import { CATALOG, NETWORKS, type NetworkId } from "../src/engine/config";
+import { HOSTS, METAGRAPHS } from "../src/engine/config";
 import { lineageIds, retiredAtOf } from "../src/net/lineage";
 import { proposeRetirement } from "../src/net/retire";
 
@@ -16,23 +16,20 @@ const overrides = JSON.parse(readFileSync("data/brand-hue-overrides.json", "utf8
 // worse than an honest error"), which left this script unrunnable and is why a metagraph added to
 // the catalog later had no baked hue at all. `data/` holds build ARTIFACTS, and an input the app
 // itself refuses to keep stale is not one of them.
-// ALL THREE networks bake into the ONE flat id-keyed file — ids are globally unique across
-// networks (multi-network design §4), so no network key is needed and mainnet entries are
-// untouched by a dev-network row.
-async function fetchDirectory(net: NetworkId): Promise<Meta[]> {
-  const r = await fetch(`${NETWORKS[net].directory}/metagraphs?limit=100`, { signal: AbortSignal.timeout(15000) });
-  if (!r.ok) throw new Error(`${net} directory ${r.status} — nothing baked (a partial roster would silently drop rows)`);
+async function fetchDirectory(): Promise<Meta[]> {
+  const r = await fetch(`${HOSTS.directory}/metagraphs?limit=100`, { signal: AbortSignal.timeout(15000) });
+  if (!r.ok) throw new Error(`directory ${r.status} — nothing baked (a partial roster would silently drop rows)`);
   const list = ((await r.json()) as { data?: Array<Record<string, string>> }).data ?? [];
-  if (!list.length) throw new Error(`${net} directory returned no metagraphs — nothing baked`);
+  if (!list.length) throw new Error("directory returned no metagraphs — nothing baked");
   return list.filter((m) => m.id).map((m) => ({
     id: m.id, name: m.name || m.id, iconUrl: m.iconUrl || "", siteUrl: m.siteUrl || "",
   }));
 }
 
-/** A chain's newest snapshot (epoch ms) from the network's block explorer, or null when unreadable. */
-async function lastSnapshotMs(net: NetworkId, id: string): Promise<number | null> {
+/** A chain's newest snapshot (epoch ms) from the block explorer, or null when unreadable. */
+async function lastSnapshotMs(id: string): Promise<number | null> {
   try {
-    const r = await fetch(`${NETWORKS[net].be}/currency/${id}/snapshots?limit=1`, { signal: AbortSignal.timeout(10000), headers: { Accept: "application/json" } });
+    const r = await fetch(`${HOSTS.be}/currency/${id}/snapshots?limit=1`, { signal: AbortSignal.timeout(10000), headers: { Accept: "application/json" } });
     if (!r.ok) return null;
     const ts = ((await r.json()) as { data?: { timestamp?: string }[] }).data?.[0]?.timestamp;
     const ms = ts ? Date.parse(ts) : NaN;
@@ -103,8 +100,8 @@ async function brandHueFor(m: Meta): Promise<{ hueDeg: number; srcHex: string; s
 async function main() {
   // The DAG itself is modelled as a metagraph-shaped "core" (see src/data/network.ts's DAG_CFG) and
   // gets its own brand hue too, distinct from the structural cyan used for the core sphere / "All"
-  // filter. Not in any directory (it isn't a listed metagraph) — appended to EVERY network's group
-  // so each spread sees it alongside that network's real metagraphs. Uses the official $DAG mark
+  // filter. Not in the directory (it isn't a listed metagraph) — appended to it so the spread sees
+  // it alongside the real metagraphs. Uses the official $DAG mark
   // (same Stargazer asset bucket DAG_CFG's iconUrl points at) + the Constellation site fallback.
   const dag: Meta = {
     id: "dag", name: "DAG",
@@ -112,51 +109,37 @@ async function main() {
     siteUrl: "https://constellationnetwork.io",
   };
 
-  // ALL THREE networks bake into the ONE flat id-keyed file — ids are globally unique across
-  // networks (multi-network design §4), so no network key is needed. ⚠️ spreadColliding runs
-  // PER NETWORK: collisions only matter between chips that can appear TOGETHER, and the same
-  // brand runs on several networks — one merged spread made dev copies of DED/PacaSwap push
-  // their own mainnet entries off their hues (caught 2026-08-21: six mainnet hueDegs moved
-  // while every srcHex stayed identical). Per-network groups keep mainnet's spread inputs
-  // byte-identical to the single-network bake, and a brand keeps (near-)one hue everywhere.
   const out: Record<string, { hueDeg: number; srcHex: string; source: string }> = {};
   const hueCache = new Map<string, { hueDeg: number; srcHex: string; source: string } | null>();
-  let total = 0;
   // RETIREMENTS (user, 2026-10-07: "can it be done when we bake/rebake the network?"). Added, never
   // removed: a written retirement stands until a person edits the file.
   const retired: Record<string, string> = existsSync("data/retired.json") ? JSON.parse(readFileSync("data/retired.json", "utf8")) : {};
   const warnings: string[] = [];
-  for (const net of Object.keys(NETWORKS) as NetworkId[]) {
-    console.log(`--- ${net} ---`);
-    const directory = await fetchDirectory(net);
-    // A catalog network the directory no longer lists, whose chain has also gone silent for a week,
-    // is retired on the day of its last snapshot (`proposeRetirement` — both facts, never one).
-    const listedIds = new Set(directory.map((m) => m.id));
-    for (const m of CATALOG[net]) {
-      if (!m.id || retiredAtOf(m) || retired[m.id]) continue;
-      const last = await lastSnapshotMs(net, m.id);
-      const p = proposeRetirement({ listed: listedIds.has(m.id), lastSnapshotMs: last, nowMs: Date.now() });
-      if (p.retireOn) { retired[m.id] = p.retireOn; console.log(`RETIRED ${m.name} (${m.id}) on ${p.retireOn}`); }
-      if (p.warn) warnings.push(`${net} ${m.name} (${m.id}): ${p.warn}`);
-    }
-    const metas = [...directory, dag];
-    total += metas.length;
-    const group: Record<string, { hueDeg: number; srcHex: string; source: string }> = {};
-    for (const m of metas) {
-      // The dag pseudo-entry (and any shared icon) resolves once; the raw read is per BRAND.
-      const key = `${m.iconUrl}|${m.siteUrl}`;
-      const r = hueCache.has(key) ? hueCache.get(key)! : await brandHueFor(m);
-      hueCache.set(key, r);
-      if (r) { group[m.id] = { ...r }; console.log(`${m.name.padEnd(22)} ${r.source.padEnd(11)} hue ${r.hueDeg.toFixed(1)}  ${r.srcHex}`); }
-      else console.log(`${m.name.padEnd(22)} (no usable brand colour — will fall back to config)`);
-    }
-    // De-collide WITHIN this network: several brands genuinely share the same snapped zone edge
-    // (e.g. multiple blues all land on 248.999°) — deterministic, sorted by id.
-    const spread = spreadColliding(Object.entries(group).map(([id, r]) => ({ id, hueDeg: r.hueDeg })));
-    for (const [id, hueDeg] of spread) group[id].hueDeg = hueDeg;
-    // "dag" is shared by every group; its mainnet spread wins (first written stays).
-    for (const [id, r] of Object.entries(group)) if (!(id in out)) out[id] = r;
+  const directory = await fetchDirectory();
+  // A catalog network the directory no longer lists, whose chain has also gone silent for a week,
+  // is retired on the day of its last snapshot (`proposeRetirement` — both facts, never one).
+  const listedIds = new Set(directory.map((m) => m.id));
+  for (const m of METAGRAPHS) {
+    if (!m.id || retiredAtOf(m) || retired[m.id]) continue;
+    const last = await lastSnapshotMs(m.id);
+    const p = proposeRetirement({ listed: listedIds.has(m.id), lastSnapshotMs: last, nowMs: Date.now() });
+    if (p.retireOn) { retired[m.id] = p.retireOn; console.log(`RETIRED ${m.name} (${m.id}) on ${p.retireOn}`); }
+    if (p.warn) warnings.push(`${m.name} (${m.id}): ${p.warn}`);
   }
+  const metas = [...directory, dag];
+  const total = metas.length;
+  for (const m of metas) {
+    // The dag pseudo-entry (and any shared icon) resolves once; the raw read is per BRAND.
+    const key = `${m.iconUrl}|${m.siteUrl}`;
+    const r = hueCache.has(key) ? hueCache.get(key)! : await brandHueFor(m);
+    hueCache.set(key, r);
+    if (r) { out[m.id] = { ...r }; console.log(`${m.name.padEnd(22)} ${r.source.padEnd(11)} hue ${r.hueDeg.toFixed(1)}  ${r.srcHex}`); }
+    else console.log(`${m.name.padEnd(22)} (no usable brand colour — will fall back to config)`);
+  }
+  // De-collide: several brands genuinely share the same snapped zone edge (e.g. multiple blues all
+  // land on 248.999°) — deterministic, sorted by id.
+  const spread = spreadColliding(Object.entries(out).map(([id, r]) => ({ id, hueDeg: r.hueDeg })));
+  for (const [id, hueDeg] of spread) out[id].hueDeg = hueDeg;
 
   // ⚠️ A NETWORK THE DIRECTORY NO LONGER LISTS KEEPS ITS COLOUR (2026-10-07 — retirement). This
   // bake reads the LIVE directory, so a removed network would silently lose its pin and fall back
@@ -166,10 +149,8 @@ async function main() {
     ? JSON.parse(readFileSync("data/brand-hues.json", "utf8"))
     : {};
   let kept = 0;
-  for (const net of Object.keys(NETWORKS) as NetworkId[]) {
-    for (const id of lineageIds(net)) {
-      if (!(id in out) && prior[id]) { out[id] = prior[id]; kept++; console.log(`kept the pin of ${id} (no longer in the directory)`); }
-    }
+  for (const id of lineageIds()) {
+    if (!(id in out) && prior[id]) { out[id] = prior[id]; kept++; console.log(`kept the pin of ${id} (no longer in the directory)`); }
   }
   if (kept) console.log(`${kept} pin(s) carried over for catalog networks the directory no longer lists`);
 

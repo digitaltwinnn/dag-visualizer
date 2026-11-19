@@ -2,7 +2,6 @@
 
 import { useStore } from "@/src/store/store";
 import { focusSlotId } from "@/components/railCards";
-import { useNodeHere } from "@/components/useNodeHere";
 import { useTickHasFilter } from "@/components/useTickHasFilter";
 
 // Which ladder rung currently holds the FOCUS, for the EXPLORE rail (the facts rail derives the
@@ -28,6 +27,10 @@ export function useLadderFocus(noteAbsent: boolean): string | null {
   const inspect = useStore((s) => s.inspect);
   const snap = useStore((s) => s.snap);
   const metaSnap = useStore((s) => s.metaSnap);
+  // The Blocks register's slot: its presence reads the register, so the focus must see both.
+  const ledgerRegister = useStore((s) => s.ledgerRegister);
+  const block = useStore((s) => s.block);
+  const dataBlock = useStore((s) => s.dataBlock);
   const selStack = useStore((s) => s.selStack);
   // History's own slot: the committed time cursor (`instant`). It is in the lane, so the focus
   // derivation has to see it or the cursor card can never be the box.
@@ -35,6 +38,5 @@ export function useLadderFocus(noteAbsent: boolean): string | null {
   const trendRange = useStore((s) => s.trendRange);
   const trendFocus = useStore((s) => s.trendFocus);
   const tickHasFilter = useTickHasFilter();
-  const nodeHere = useNodeHere();
-  return focusSlotId({ mode, filter, railNet, tickNet, tickHasFilter, nodeHere, country, cohort, composition, inspect, snap, metaSnap, trendCursorMs, trendRange, trendFocus, noteAbsent, selStack });
+  return focusSlotId({ mode, filter, railNet, tickNet, tickHasFilter, country, cohort, composition, inspect, snap, metaSnap, ledgerRegister, block, dataBlock, trendCursorMs, trendRange, trendFocus, noteAbsent, selStack });
 }

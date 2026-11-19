@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { MetaInfo, NodeRow } from "@/src/data/types";
 import {  HYPER_MEASURE_LABELS,
+  HYPER_MEASURE_ROWS,
   HYPER_MEASURE_OPTIONS,
   HYPER_MEASURE_ORDER,
   groupMeasure,
@@ -26,7 +27,10 @@ describe("the order and its labels", () => {
   // rows already use (`LAYER_WORD`), one home with the chips' dedicated labels.
   it("leads with nodes, then the layers in the vocabulary's own order, each by what it does", () => {
     expect(HYPER_MEASURE_ORDER).toEqual(["nodes", "l0", "cl1", "dl1"]);
-    expect(HYPER_MEASURE_LABELS).toEqual({ nodes: "Nodes", l0: "Consensus", cl1: "Currency", dl1: "Data" });
+    expect(HYPER_MEASURE_LABELS).toEqual({ nodes: "All nodes", l0: "Consensus", cl1: "Currency", dl1: "Data" });
+    // Whole over parts: All nodes alone on the top row, the three layers under it.
+    expect(HYPER_MEASURE_ROWS).toEqual([1, 3]);
+    expect(HYPER_MEASURE_ROWS.reduce((a, b) => a + b, 0)).toBe(HYPER_MEASURE_ORDER.length);
     expect(HYPER_MEASURE_LABELS.l0).toBe(LAYER_WORD.l0);
   });
   it("lists every measure for the heading control, in order, each counted in nodes", () => {

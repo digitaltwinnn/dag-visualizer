@@ -1,6 +1,5 @@
 "use client";
 
-import { netUrl } from "@/src/net/current";
 import { useEffect, useState } from "react";
 
 // The validator-name registry, client side (user, 2026-08-16 — identity enrichment): one fetch
@@ -16,7 +15,7 @@ let inflight: Promise<Record<string, string> | null> | null = null;
 
 async function load(): Promise<Record<string, string> | null> {
   try {
-    const r = await fetch(netUrl("/api/node-names"));
+    const r = await fetch("/api/node-names");
     if (!r.ok) return null;
     const j = (await r.json()) as { names: Record<string, string> };
     cached = j.names;

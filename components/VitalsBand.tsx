@@ -25,13 +25,14 @@
 // jobs. Splitting it changed no behaviour: the three cell sets were already separate components.
 
 import { useStore, type Mode } from "@/src/store/store";
-import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
+import { VIEW_POLICIES, registerOf } from "@/src/engine/domain/viewPolicy";
+import type { LedgerRegister } from "@/src/store/mode";
 import RollSwap from "@/components/RollSwap";
 import { filterAccent } from "@/src/data/network";
 import { NoSignalDot } from "@/components/state/StateAtoms";
 import { useSceneYield } from "@/components/RailShade";
 import { cn } from "@/lib/utils";
-import { HyperCells, GeoCells, LedgerCells } from "@/components/vitals/viewCells";
+import { HyperCells, GeoCells, LedgerCells, BlocksCells, DataCells } from "@/components/vitals/viewCells";
 import TrendTimeline from "@/components/TrendTimeline";
 import { QualifierChip } from "@/components/inspector/parts";
 import { spanPhrase } from "@/src/data/trendWindow";
@@ -55,7 +56,10 @@ function useVitalsScope() {
  *  lane for", and a view that never answers it would inherit "vitals" by silence. It belongs in
  *  this dispatch for the same reason the cells do — both presentations render it, so the band and
  *  the phone sheet can never hold different things. */
-function ViewCells({ mode, accent, filter, paused = false }: { mode: Mode; accent: string; filter: string; paused?: boolean }) {
+function ViewCells({ cells, accent, filter, paused = false }: { cells: CellsKey; accent: string; filter: string; paused?: boolean }) {
+  if (cells === "ledger:blocks") return <BlocksCells accent={accent} />;
+  if (cells === "ledger:data") return <DataCells accent={accent} filter={filter} />;
+  const mode = cells;
   if (VIEW_POLICIES[mode].bandContent === "timeline") return <TrendTimeline />;
   return (
     <>
@@ -64,6 +68,16 @@ function ViewCells({ mode, accent, filter, paused = false }: { mode: Mode; accen
       {mode === "ledger" && <LedgerCells accent={accent} filter={filter} paused={paused} />}
     </>
   );
+}
+
+/** What the band's cells are swapped on: the view, and in the Snapshots view its REGISTER — the
+ *  Transaction blocks and Data blocks registers say different things in the same lane, so the swap
+ *  rolls on it too. The Metagraph snapshots register IS the view's own cells. */
+type CellsKey = Mode | "ledger:blocks" | "ledger:data";
+const REGISTER_CELLS: Readonly<Record<LedgerRegister, CellsKey | null>> = { snapshots: null, blocks: "ledger:blocks", data: "ledger:data" };
+function useCellsKey(mode: Mode): CellsKey {
+  const register = registerOf(mode, useStore((s) => s.ledgerRegister));
+  return REGISTER_CELLS[register] ?? mode;
 }
 
 // ⚠️ THE BAND CARRIES NO LINK TO THE HISTORY VIEW (user, 2026-09-19: "remove the 'history' pill
@@ -88,7 +102,9 @@ export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
   // — the same one read the RailShade dims on, at the recipe's own tempos (away 0.3s, the return
   // faster: it answers a gesture already finished).
   const yielding = useSceneYield();
-  const bandWindow = VIEW_POLICIES[mode].bandWindow;
+  const cells = useCellsKey(mode);
+  // A register's cells state their own reach ("last hour", "last 11 min"), not the band's 24 hours.
+  const bandWindow = bandWindowOf(mode, cells);
   const dead = useNoSignal() && VIEW_POLICIES[mode].bandContent === "vitals";
   // THE BAND NEVER PAINTS UNDER AN OPEN SHEET (user, 2026-09-04 — "sometimes I see flickering
   // when the explore and bottom bar overlap"). The overlay decision above stands: the sheets
@@ -212,8 +228,8 @@ export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
           section above no longer carries them: an element between a `[&>*]` and its subjects
           silently retargets it at the wrapper. */}
       <RollSwap
-        swapKey={mode as Mode}
-        render={(m) => <ViewCells mode={m} accent={accent} filter={filter} paused={hidden} />}
+        swapKey={cells}
+        render={(c) => <ViewCells cells={c} accent={accent} filter={filter} paused={hidden} />}
         className={cn(
           "flex-1 min-w-0 flex items-stretch justify-center gap-0",
           "[&>*]:rounded-none [&>*]:border-0 [&>*]:backdrop-blur-none [&>*]:[background:none]",
@@ -238,8 +254,17 @@ export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
  *  because the sheet has height to spend and a stacked read beats a sideways thumb-scroll; the
  *  band's equal horizontal share is overridden — in a column every card takes the sheet's full
  *  width, which is what `[&>*]:flex-none [&>*]:basis-auto` on the wrapper below says. */
+/** The band's shared window chip, or null where the cells state their own reach — ONE rule for the
+ *  desktop band and the phone sheet (review, 2026-11-09: the sheet excluded Transaction blocks only,
+ *  so Data blocks' minute-span cells sat under "last 24 hours"). */
+function bandWindowOf(mode: Mode, cells: CellsKey) {
+  return cells === "ledger:blocks" || cells === "ledger:data" ? null : VIEW_POLICIES[mode].bandWindow;
+}
+
 export function VitalsSheetBody() {
   const { mode, live, filter, accent } = useVitalsScope();
+  const cells = useCellsKey(mode);
+  const sheetWindow = bandWindowOf(mode, cells);
   const dead = useNoSignal() && VIEW_POLICIES[mode].bandContent === "vitals";
   // The band's own rule (see the desktop section): never-answered → one statement, no cells.
   if (dead) {
@@ -261,14 +286,14 @@ export function VitalsSheetBody() {
     >
       {!live && <span className="self-center flex-none mb-2"><NoSignalDot /></span>}
       {/* The band's shared window, once, at the sheet's top right — the desktop chip's phone home. */}
-      {VIEW_POLICIES[mode].bandWindow && (
-        <span className="self-end flex-none mb-2"><QualifierChip>{spanPhrase(VIEW_POLICIES[mode].bandWindow, null)}</QualifierChip></span>
+      {sheetWindow && (
+        <span className="self-end flex-none mb-2"><QualifierChip>{spanPhrase(sheetWindow, null)}</QualifierChip></span>
       )}
       {/* The no-pop swap — the cell-targeting `[&>*]` rules ride the wrapper for the same
           retargeting reason the band's do (see the desktop section above). */}
       <RollSwap
-        swapKey={mode as Mode}
-        render={(m) => <ViewCells mode={m} accent={accent} filter={filter} />}
+        swapKey={cells}
+        render={(c) => <ViewCells cells={c} accent={accent} filter={filter} />}
         className={cn(
           "flex flex-col items-stretch gap-2 min-w-0",
           "[&>*]:w-full [&>*]:max-w-none [&>*]:flex-none [&>*]:basis-auto",

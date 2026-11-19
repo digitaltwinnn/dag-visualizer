@@ -1,10 +1,9 @@
 import { ROLE_SHORT, roleKeyLabel } from "@/src/data/composition";
 import { fact, gaugeChange, heldLevel, networksAnchored, observedLevel } from "@/src/data/noteFacts";
-import { WHOLE_ACTIVITY_LABEL, activityFacts, lastWeekMean, weekStart } from "@/src/data/noteFactsActivity";
 import { notableDays } from "@/src/data/notableDays";
-import { countChange, eventChange, pickChanges } from "@/src/data/noteChanges";
+import { WEEK_WORDS, countChange, eventChange, pickChanges } from "@/src/data/noteChanges";
 import type { Fact, NoteChange } from "@/src/data/noteTypes";
-import { anchorSeries, typeBands, withUnlisted } from "@/src/data/trendSeries";
+import { typeBands, withUnlisted } from "@/src/data/trendSeries";
 import { trimNewestPartial, type TrendsWindowData } from "@/src/data/trendWindow";
 import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 
@@ -12,14 +11,12 @@ import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 // WHAT, and the note leads with what CHANGED (user, 2026-10-27: a note that restates the breakdown
 // the card already shows "just describes the raw data in words"). The default note (subject `all`)
 // is the daily digest of the whole network — how many networks have nodes, which anchored lately
-// and which were quiet, the biggest by nodes and the most active, the up-to-three MOVERS (the
+// and which were quiet, the biggest by nodes, the up-to-three MOVERS (the
 // networks whose node count changed most over the span, start and end), anything that started or
-// stopped, how the node count moved, and global snapshots per day last week against the weeks
-// before. A network's note says who that network is (its catalog blurb, a non-numeric line),
+// stopped and how the node count moved. A network's note says who that network is (its catalog blurb, a non-numeric line),
 // how its SHAPE CHANGED (the layers and node combinations whose count differs between the span's
 // start and its end, both ends stated, plus how many layers changed — an exact 0 when the shape
-// held), how its node count moved, how its activity compares with the weeks before, and how
-// it ranks. A MAKE-UP'S note (a subject note: `{ net, type }`, the node-type card's selection) says
+// held), how its node count moved, and how it ranks by nodes. A MAKE-UP'S note (a subject note: `{ net, type }`, the node-type card's selection) says
 // how many of one network's nodes run that make-up over the span, beside the network's own level,
 // the make-up's share of it and how many make-ups the network has. `noteFactsTrend.ts` is the
 // reference builder and this one mirrors its idiom.
@@ -63,18 +60,10 @@ import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 //     role at all (unread); a combination band null at a sample (no type recorded) is unread; a
 //     level read from fewer than three samples is unknown and states nothing. Only the layers and
 //     combinations whose count DIFFERS are stated; an unchanged breakdown is the card's, not news;
-//   · activity is the global snapshots a network WAS PART OF per day (`m.<id>.ticks` through
-//     `anchorSeries`, which reads a pre-2026-10-08 zero as "not measured") over the last week of
-//     COMPLETE days, at least 4 of them measured, else no last-week reading, comparison or rank;
-//     "anchored" reads `m.<id>.snaps`. A network with no row is not ranked. "The
-//     weeks before" is the mean over the 21 complete days before that week, measured days
-//     only and at least 7 of them, else no fact; the ratio is stated only when both are above 0
-//     and differ. The whole network's is `g.ticks` (one per global snapshot), covered days only,
-//     under the same floors;
-//   · THE VIEW'S OWN FACTS FIRST, THE COMMON READING LAST (user, 2026-10-29; R74): a note "starts
-//     from its key view focus, then adds info about more app-common topics like snapshots". The
-//     structure (nodes, layers, movers, started / stopped) is this view's; the activity facts are
-//     the shared `noteFactsActivity.ts` and are appended after it, where the prompt asks for them;
+//   · NO ACTIVITY SENTENCE (user, 2026-11-09; the R74 common reading is retired): activity belongs
+//     to the Snapshots and History views, and here it repeated the same sentence. "anchored" reads
+//     `m.<id>.snaps` over the last week of complete days (WEEK_DAYS); the facts hold no global
+//     snapshots per day, no activity rank and no "most active network";
 //   · HOW MANY NETWORKS ANCHORED goes through `networksAnchored` on the folded series, so measured
 //     unlisted activity makes the count a floor (", at least");
 //   · "started" and "stopped" are Task 2's `first` / `last` read for every id, with the 30-day
@@ -89,8 +78,8 @@ import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 //     network's level and the make-up count are held levels, and the share is the make-up's end
 //     level over the network's, stated only when it is one (the level above 0, the part within it).
 //     Null when the make-up has no change to read (no sample, too few, or still moving at the end)
-//     or ends at 0: a make-up the network no longer runs is no subject. No activity, rank or
-//     common reading: the note is one card's, never the network's;
+//     or ends at 0: a make-up the network no longer runs is no subject. No activity or rank:
+//     the note is one card's, never the network's;
 //   · null when the fleet has no measured sample (and, for a network, none of its own).
 //
 // Pure: no store values, react or I/O (the colocated test is the specification — rule 4).
@@ -137,6 +126,9 @@ const SHAPE_TOLERANCE = 0.1;
 const SHAPE_SAMPLES = 6;
 const SHAPE_MIN_SAMPLES = 3;
 const RANK_WORD = ["", "second ", "third "] as const;
+
+/** "The last week": the complete days the who-anchored week reads. */
+const WEEK_DAYS = 7;
 
 type Points = readonly (number | null)[];
 
@@ -203,7 +195,7 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
   const d = trimNewestPartial({ ...input.daily, series: withUnlisted(input.daily.series, isListed, UNLISTED_ID) });
   const n = d.buckets.length;
   const covered = d.series["g.ticks"] ?? [];
-  const weekFrom = weekStart(n);
+  const weekFrom = Math.max(0, n - WEEK_DAYS);
   const coveredFrom = (lo: number) => covered.slice(lo).some((v) => v != null);
 
   /** A network's nodes on the last WHOLE day before the span (`throughEdgeOutage`): a daily gauge
@@ -213,15 +205,6 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
     for (let i = n - 1; i >= 0; i--) if (d.buckets[i]! + d.stepMs <= span.fromMs && pts[i] != null) return pts[i]!;
     return null;
   };
-
-  /** Activity per network over the last week: global snapshots it was part of, per day — the
-   *  COMMON reading (`noteFactsActivity.ts`), so the rank and the change fact read one figure. */
-  const activity = new Map<string, number>();
-  for (const id of ids) {
-    const v = lastWeekMean(anchorSeries(id, d.series));
-    if (v != null) activity.set(id, v);
-  }
-  const byActivity = [...activity].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 
   const facts: Fact[] = [];
   /** The card's rows, per kind of move (`pickChanges`): what started or stopped, then the counts. */
@@ -237,11 +220,11 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
     const ch = read && start(read);
     if (!ch) return;
     if (!spanChange(points)) {
-      facts.push(fact(`${label} at the end of the span`, ch.to, "count"));
+      facts.push(fact(`${label} ${WEEK_WORDS.end}`, ch.to, "count"));
       return;
     }
-    facts.push(fact(`${label} at the start of the span`, ch.from, "count", undefined, { key: label, end: "from" }));
-    facts.push(fact(`${label} at the end of the span`, ch.to, "count", undefined, { key: label, end: "to" }));
+    facts.push(fact(`${label} ${WEEK_WORDS.start}`, ch.from, "count", undefined, { key: label, end: "from" }));
+    facts.push(fact(`${label} ${WEEK_WORDS.end}`, ch.to, "count", undefined, { key: label, end: "to" }));
     if (ch.from > 0 && ch.to !== ch.from) facts.push(fact(`${label}, ratio end to start`, ch.to / ch.from, "ratio"));
   };
 
@@ -269,10 +252,6 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
       named.push(id);
       facts.push(fact(`${mention(id)}, nodes (${RANK_WORD[i]}biggest network)`, levelOf(id)!, "count"));
     });
-    byActivity.slice(0, TOP).forEach(([id, v], i) => {
-      named.push(id);
-      facts.push(fact(`${mention(id)}, global snapshots it was part of per day, last week (${RANK_WORD[i]}most active network)`, v, "count"));
-    });
 
     // THE MOVERS: the networks whose node count changed most over the span, by how many nodes.
     // HOW MANY MOVED is stated even at 0 (user, 2026-10-30: a quiet week is SAID, "no changes in
@@ -286,16 +265,16 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
     const movers = reads
       .filter((m): m is typeof m & { ch: GaugeChange } => !!m.ch && m.ch.to !== m.ch.from)
       .sort((a, b) => Math.abs(b.ch.to - b.ch.from) - Math.abs(a.ch.to - a.ch.from) || a.id.localeCompare(b.id));
-    facts.push(fact("Networks whose node count changed over the span", movers.length, "count"));
-    counts = movers.flatMap(({ id, ch }) => countChange(nameOf(id), ch.from, ch.to, { kind: "network", id }) ?? []);
+    facts.push(fact(`Networks whose node count changed in ${WEEK_WORDS.range}`, movers.length, "count"));
+    counts = movers.flatMap(({ id, ch }) => countChange(nameOf(id), ch.from, ch.to, { kind: "network", id }, null, WEEK_WORDS) ?? []);
     movers
       .slice(0, TOP)
       .forEach(({ id, ch }) => {
         named.push(id);
         const name = mention(id);
         const key = `${name} nodes`;
-        facts.push(fact(`${key} at the start of the span`, ch.from, "count", undefined, { key, end: "from" }));
-        facts.push(fact(`${key} at the end of the span`, ch.to, "count", undefined, { key, end: "to" }));
+        facts.push(fact(`${key} ${WEEK_WORDS.start}`, ch.from, "count", undefined, { key, end: "from" }));
+        facts.push(fact(`${key} ${WEEK_WORDS.end}`, ch.to, "count", undefined, { key, end: "to" }));
       });
 
     // THE WHOLE NETWORK'S START, with each restored network's nodes put back: the rest of the
@@ -322,8 +301,10 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
         cap: ids.length * 2, // a network has at most one first and one last
         from: from < 0 ? n : from,
       }).filter((day) => (day.kind === "first" || day.kind === "last") && day.networkId);
-      facts.push(fact("Networks that became active or went quiet over the span", days.length, "count"));
-      events = days.map((day) => eventChange(nameOf(day.networkId!), day.kind === "first" ? "active" : "quiet", { kind: "network", id: day.networkId! }));
+      // Only when one did (user, 2026-11-09): a 0 here came back as "no network became active or went
+      // quiet", a sentence about nothing. The node-count movers above still count a quiet week at 0.
+      if (days.length) facts.push(fact(`Networks that became active or went quiet in ${WEEK_WORDS.range}`, days.length, "count"));
+      events = days.map((day) => eventChange(nameOf(day.networkId!), day.kind === "first" ? "active" : "quiet", { kind: "network", id: day.networkId! }, WEEK_WORDS));
       for (const day of days) {
         const id = day.networkId!;
         named.push(id);
@@ -331,9 +312,6 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
       }
     }
 
-    // THE COMMON READING, LAST (R74): the whole network's global snapshots per day (`g.ticks`
-    // counts them, one per global snapshot), covered days only — an uncovered day is null.
-    facts.push(...activityFacts(WHOLE_ACTIVITY_LABEL, covered));
   } else if (typeof subject === "object") {
     // ONE LAYER GROUP OF ONE NETWORK ("layer group" in every label a reader meets, never the code's
     // "make-up" — user, 2026-10-30: "not understandable for a human"; the rail's ghost hint already
@@ -349,7 +327,7 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
     const words = comboWords(type);
     gaugeFacts(`${name} nodes ${words}`, points);
     const level = levelOf(net)!; // measured: the network's own samples were checked above
-    facts.push(fact(`${name} nodes at the end of the span`, level, "count"));
+    facts.push(fact(`${name} nodes ${WEEK_WORDS.end}`, level, "count"));
     const held = bands.map((b) => heldLevel(b.points) ?? 0);
     const groups = held.filter((v) => v > 0).length;
     // A share is a part of a whole: a make-up read above the network's level (a partial hour at
@@ -363,8 +341,8 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
     if (groups > 1) facts.push(fact(`${name}, rank among its layer groups by nodes`, 1 + held.filter((v) => v > own).length, "count"));
     // A group whose series began inside the week has no start of the span's to move from.
     const moved = spanChange(points);
-    if (moved) counts = [countChange(`${roleKeyLabel(type).label} group`, moved.from, moved.to, { kind: "self" })].filter((c) => c != null);
-    else unread = `${name} nodes ${words} has no reading from the start of the span: say nothing about whether it moved or held.`;
+    if (moved) counts = [countChange(`${roleKeyLabel(type).label} group`, moved.from, moved.to, { kind: "self" }, null, WEEK_WORDS)].filter((c) => c != null);
+    else unread = `${name} nodes ${words} has no reading from ${WEEK_WORDS.start}: say nothing about whether it moved or held.`;
   } else {
     const name = mention(subject);
     named.push(subject);
@@ -400,12 +378,12 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
         const is = roles.map((_, k) => held(endAt, "end", layerAt(k)));
         if (was.every((v) => v != null) && is.every((v) => v != null)) {
           const moved = roles.filter((_, k) => was[k] !== is[k]);
-          facts.push(fact(`${name} layers whose node count changed over the span`, moved.length, "count"));
+          facts.push(fact(`${name} layers whose node count changed in ${WEEK_WORDS.range}`, moved.length, "count"));
           for (const role of moved) {
             const k = roles.indexOf(role);
             const key = `${name} nodes on the ${ROLE_SHORT[role]} layer`;
-            facts.push(fact(`${key} at the start of the span`, was[k]!, "count", undefined, { key, end: "from" }));
-            facts.push(fact(`${key} at the end of the span`, is[k]!, "count", undefined, { key, end: "to" }));
+            facts.push(fact(`${key} ${WEEK_WORDS.start}`, was[k]!, "count", undefined, { key, end: "from" }));
+            facts.push(fact(`${key} ${WEEK_WORDS.end}`, is[k]!, "count", undefined, { key, end: "to" }));
           }
         }
         // The make-ups read at both ends, and how many of them changed, stated even at 0 so a quiet
@@ -418,14 +396,14 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
           }))
           .filter((b): b is { key: string; from: number; to: number } => b.from != null && b.to != null);
         const changedBands = bands.filter((b) => b.from !== b.to);
-        facts.push(fact(`${name} layer groups whose node count changed over the span`, changedBands.length, "count"));
+        facts.push(fact(`${name} layer groups whose node count changed in ${WEEK_WORDS.range}`, changedBands.length, "count"));
         counts = changedBands.flatMap(({ key: type, from, to }) =>
-          countChange(`${roleKeyLabel(type).label} group`, from, to, { kind: "type", netId: subject, type }) ?? [],
+          countChange(`${roleKeyLabel(type).label} group`, from, to, { kind: "type", netId: subject, type }, null, WEEK_WORDS) ?? [],
         );
         for (const { key: type, from, to } of changedBands) {
           const key = `${name} nodes ${comboWords(type)}`;
-          facts.push(fact(`${key} at the start of the span`, from, "count", undefined, { key, end: "from" }));
-          facts.push(fact(`${key} at the end of the span`, to, "count", undefined, { key, end: "to" }));
+          facts.push(fact(`${key} ${WEEK_WORDS.start}`, from, "count", undefined, { key, end: "from" }));
+          facts.push(fact(`${key} ${WEEK_WORDS.end}`, to, "count", undefined, { key, end: "to" }));
         }
       }
     }
@@ -435,13 +413,6 @@ export function hyperFacts(input: HyperFactsInput): HyperFacts | null {
     if (own != null && own > 0) {
       facts.push(fact(`${name} rank by nodes`, 1 + byNodes.filter((id) => levelOf(id)! > own).length, "count"));
       facts.push(fact("Networks with nodes", withNodes.length, "count"));
-    }
-    // THE COMMON READING, LAST (R74): its activity, the same facts Geography appends.
-    const mine = activity.get(subject);
-    facts.push(...activityFacts(`${name} global snapshots it was part of per day`, anchorSeries(subject, d.series)));
-    if (mine != null && mine > 0) {
-      facts.push(fact(`${name} rank by global snapshots it was part of`, 1 + byActivity.filter(([, v]) => v > mine).length, "count"));
-      facts.push(fact("Networks that were part of global snapshots in the last week", byActivity.length, "count"));
     }
   }
 

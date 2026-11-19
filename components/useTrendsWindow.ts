@@ -3,7 +3,6 @@ import { useFeedRead } from "@/components/useFeedRead";
 import { withUnlisted } from "@/src/data/trendSeries";
 import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 
-import { netUrl } from "@/src/net/current";
 import { reportPoll, touchPoll } from "@/src/data/api";
 import { POLL } from "@/src/engine/config";
 import { stitchWindows, tilesFor, type TrendApiWindow, type TrendsWindowData } from "@/src/data/trendWindow";
@@ -67,7 +66,7 @@ function fresh(url: string): TrendsWindowData | null {
 /** The measured window plus the failure signal. A null `window` skips the fetch entirely —
  *  for consumers whose need is conditional, since a hook cannot be called conditionally. */
 export default function useTrendsWindow(window: TrendApiWindow | null, who: string): TrendsWindowState {
-  const url = window ? netUrl(`/api/trends?window=${window}`) : null;
+  const url = window ? `/api/trends?window=${window}` : null;
   // The reader holds the feed while it asks for data (src/data/feedUse.ts) — required, so no
   // surface can read the measured history without the pulse strip knowing it is in use.
   useFeedRead(["api-trends"], who, url != null);
@@ -128,7 +127,7 @@ export function useTrendsRange(
     }
     touchPoll("api-trends");
     const [tier, units] = key.split(":");
-    const urls = units.split(",").map((u) => netUrl(`/api/trends/tile/${tier}/${u}`));
+    const urls = units.split(",").map((u) => `/api/trends/tile/${tier}/${u}`);
     let dead = false;
     const pull = () => {
       void Promise.all(

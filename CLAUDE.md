@@ -15,9 +15,11 @@ Present tense only. Git carries the history; `.superpowers/sdd/progress.md` carr
 An interactive 3D visualizer of the Constellation Network ($DAG). Next.js (App Router) + React +
 TypeScript + Zustand for the page and panels, driving a **vanilla Three.js engine** (not
 react-three-fiber) on one persistent canvas. The active view is `mode` in the store — and the four
-3D views are also real URLs (`/hypergraph` / `/geography` / `/snapshots` / `/trends`):
-`components/views.ts` is the one view-vocabulary home and `components/RouteSync.tsx` the URL↔mode
-bridge (shallow pushState, so a switch never reboots the engine; analytics see per-view routes).
+3D views are also real URLs (`/hypergraph` / `/geography` / `/snapshots` / `/trends`, plus `/blocks`,
+the Snapshots view's second register): `components/views.ts` is the one view-vocabulary home (the
+views, and `BLOCKS_PAGE` with `pathFor`/`registerForPath` for the register) and
+`components/RouteSync.tsx` the URL↔mode bridge (shallow pushState, so a switch never reboots the
+engine; analytics see per-view routes).
 
 Four views drive the 3D scene:
 
@@ -31,7 +33,22 @@ Four views drive the 3D scene:
   themselves; there is no heatmap layer.
 - **Snapshots** (`ledger`) — a 3D anchoring chamber: one global-ledger floor below, one narrow plane
   per metagraph above it. The gap between planes is the point — metagraphs are unrelated and only
-  come together on the global plane.
+  come together on the global plane. **It reads three REGISTERS** (`store.ledgerRegister`; the switch
+  on the scene says **Metagraph snapshots | Transaction blocks | Data blocks** — the VIEW stays
+  "Snapshots"; `docs/superpowers/specs/2026-11-05-block-dag-view-design.md`): **Metagraph snapshots**
+  is the chamber as described; **Transaction blocks** (`/blocks`, 2026-11-06) the same chamber read as
+  the block DAG inside the snapshots — the trail is the global snapshots that hold a block, the DAG's
+  blocks stand above the floor as a layered DAG drawing, token blocks on their metagraph snapshot's
+  tile; **Data blocks** (`/data-blocks`, D6 2026-11-07 — user: "Threeway.") the Metagraph snapshots
+  chamber as it stands, same source, plus a mark on each tile whose exact read says it carried data
+  blocks, its height the count of data updates (a cL1 block holds transactions, a dL1 block data
+  updates — the protocol's own split). A register is a setting of a view, never a Mode
+  (`viewPolicy.registers` lists them; the view switch holds no sixth button), its pages live in ONE map
+  (`components/views.ts`' `REGISTER_PAGES`, pinned by `views.test.ts`), the chamber dispatches on ONE
+  keyed map (`LedgerView`'s `REGISTER_CARGO`), and `switchLedgerRegister`
+  (`src/store/applyClickActions.ts`) is its one door. The area files carry it: the chamber in
+  `src/engine/scene/CLAUDE.md`, the block window in `src/data/CLAUDE.md`, the routes in
+  `app/api/CLAUDE.md`, the HUD in `components/CLAUDE.md`, the selection in `src/engine/domain/CLAUDE.md`.
 - **History** (`trend`) — the measured past: one CHART PLANE per network, receding into depth over a
   ground that draws each plane's footprint, with a shared time cursor marking one instant on every
   plane at once. The planes are DOM, not WebGL — `TrendChart`, the app's one chart —
@@ -39,8 +56,9 @@ Four views drive the 3D scene:
 
 **The Briefing** (2026-10-31, `domain/briefing.ts`, `components/Briefing.tsx`,
 `docs/superpowers/specs/2026-10-31-briefing-design.md`): `/` opens on Geography and plays every 3D
-view once, one AI line per stop, on a cleared stage; a drag orbits the scene and holds the stop, and
-only Skip or Escape ends the tour. Only on `/`, on mainnet, once per browser session. `store.briefing` is the one channel: `useBootStage` stands the HUD
+view once — four stops, one per view, the Snapshots view in its Metagraph snapshots register (`BRIEFING_STOPS`; a register inside a view is not a stop) —
+one AI line per stop, on a cleared stage; a drag orbits the scene and holds the stop, and
+only Skip or Escape ends the tour. Only on `/`, once per browser session. `store.briefing` is the one channel: `useBootStage` stands the HUD
 down on it, `RouteSync` holds the URL so a stop is never a page view, and the Engine reads it for the
 tour's pace and a phone's lift.
 
@@ -50,7 +68,8 @@ wireframe GALLERY of the coming features, with no numbers, so it never reads as 
 doc page (/about) is an overlay over the same bare stage, not a Mode.
 
 **The four 3D views are complementary projections of the same network: hyper = who/what, geo =
-where, ledger = when, trend = how it changed.** Structure belongs to hyper. Activity belongs to the
+where, ledger = when, trend = how it changed.** The ledger's Blocks register is the same WHEN one
+level down — the blocks a snapshot accepts — not a fifth projection. Structure belongs to hyper. Activity belongs to the
 time pair, split by TENSE: the ledger is the live instrument — this tick, this anchoring, right now —
 and History is the measured record of the same quantities — one bucket per day, hour or five
 minutes, back to where the store's samples start. A rate you watch arrive is the ledger's; the
@@ -84,7 +103,7 @@ growing: a mechanical purity classifier was tried and rejected (its regex matche
 TEST-ONLY helpers shared by sibling tests (never imported by app code) and sits outside the scan,
 which reads `src/data/*.ts` only.
 
-Eighteen narrower boundary tests work the same way: `components/feedReadBoundary.test.ts` (every HUD read of a feed's data holds that feed, so the pulse strip's "in use here" is measured, not declared — `src/data/feedUse.ts`), `components/unlistedBoundary.test.ts` (the `"unlisted"`
+Eighteen narrower boundary tests work the same way: `components/cardHoverBoundary.test.ts` (every rail subject card pairs on its own subject's hover channel, never a parent's — convention 9), `components/feedReadBoundary.test.ts` (every HUD read of a feed's data holds that feed, so the pulse strip's "in use here" is measured, not declared — `src/data/feedUse.ts`), `components/unlistedBoundary.test.ts` (the `"unlisted"`
 id literal has exactly two homes), `components/railLadderBoundary.test.ts` (every committable focus
 rung maps to a hinted rail card slot), `components/railTierBoundary.test.ts` (`data-focus` has two
 homes and the slab's geometry — the pager included — keys on `data-tier`),
@@ -110,9 +129,8 @@ container), `components/breakpointArmBoundary.test.ts` (CSS trap 8 — a tier bo
 number on both arms), `src/data/signerMatchBoundary.test.ts` (a peer-id prefix comparison lives only
 in `src/data/network.ts`), `src/engine/scene/rowBoundary.test.ts` (a scene module that places a
 ledger row consults the trail's boundaries), `src/engine/entryBeatBoundary.test.ts` (every 3D view's
-entry owner still defines the arrival beat's begin/release pair — the wiring was silently lost once)
-`src/net/netUrlBoundary.test.ts` (every own-server fetch goes through `netUrl()`, or carries an
-exemption with a reason), `components/tooltipBoundary.test.ts` (no hover-only text: no `title=`
+entry owner still defines the arrival beat's begin/release pair — the wiring was silently lost once),
+`components/tooltipBoundary.test.ts` (no hover-only text: no `title=`
 on any HUD element — the UI explains itself on its surface, or not at all),
 `src/engine/tunePanelBoundary.test.ts` (the `?tune` panel is one sealed corner: only its three files
 import the tune contract or tweakpane, so a look stays a plain constant and its knob lives in
@@ -136,13 +154,15 @@ scope from the table.
    click semantics → `domain/pickActions.ts`, the unlisted network → `src/data/unlisted.ts`, the stage
    light → `scene/objects/StageLight.ts`. Don't grow a second copy in the Engine or a component.
 9. **The scene↔HUD hover pairing is sacrosanct.** The shared store channels (`hoverFilter`,
-   `hoverNodeId`, `hoverSnapOrd`, `hoverMetaSnap`, `hoverCountry`, `hoverCohort`, `hoverNoteDay`),
+   `hoverNodeId`, `hoverSnapOrd`, `hoverMetaSnap`, `hoverBlock`, `hoverDataBlock`, `hoverCountry`, `hoverCohort`, `hoverNoteDay`),
    `.subject-paired`
    and the marker classes survive every refactor. Hovers preview, never commit. **A surface hovers the
    subject it would COMMIT** — `hoverSnapOrd` is a global tick, `hoverMetaSnap` one metagraph
    snapshot (keyed by `metaSnapHoverKey(metaId, ordinal)`), so the anchor-log row, the explorer's leaf
    row and the scene's tile all ride `hoverMetaSnap`: a row is a snapshot, not its tick, and the tick
-   channel would light every band of the anchoring global.
+   channel would light every band of the anchoring global. A data block rides `hoverDataBlock`
+   (2026-11-09), lighting its snapshot's data mark, never the tile; every subject card's channel is
+   pinned by `components/cardHoverBoundary.test.ts`.
 10. **Honesty over decoration.** Every visual quantity comes from live data; absent data is an
     instrument state (NO SIGNAL / acquiring / standby), never a fabricated number; floors are labelled
     floors. Don't "fix" an honest gap.
@@ -212,7 +232,7 @@ error is this trap, nothing else.
 
 `next build` and `next dev` don't conflict (dev outputs to `.next/dev`), so the production check can
 run alongside the dev server. Do it at phase boundaries: the build should be clean;
-`/api/metagraphs` is `ƒ` (Dynamic — it reads `?net=`) and must answer with
+`/api/metagraphs` is `ƒ` (Dynamic — it calls `connection()`) and must answer with
 `Cache-Control: public, s-maxage=300` so the CDN still caches it per URL.
 
 ### Verifying changes
@@ -246,7 +266,7 @@ Gotchas worth knowing before you burn time on them:
   setters the executor would; to test a real gesture, dispatch real pointer events.
 
 - **The four 3D views ARE URL deep links** (2026-09-04): `/hypergraph`, `/geography`, `/snapshots`,
-  `/trends` boot straight into their view (`components/RouteSync.tsx` seeds the store from the pathname), so a
+  `/trends` boot straight into their view, and `/blocks` into the Snapshots view's Blocks register (`components/RouteSync.tsx` seeds the store from the pathname), so a
   one-shot screenshot of a view needs no store edit. In-app switches publish those paths by shallow
   pushState — never a navigation, the engine must survive. The placeholder is a URL too since
   2026-10-03 (`/soon` — a real static route, kept out of the sitemap and the footer's view links
@@ -538,7 +558,10 @@ of the busiest chain) with no hole; beyond that the gap is accepted and
 (learned 2026-10-08). A backfill run from a branch wrote new fields the deployed code then
 misread (its derivation subtracted them), and production's History was wrong until the branch
 shipped. Order: deploy the code that READS the new fields (and tolerates their absence), then run
-the backfill; or keep the new fields invisible to the deployed reader.
+the backfill; or keep the new fields invisible to the deployed reader. For the same reason every
+key keeps its fixed `mainnet` segment (`t:mainnet:…`, `geo:mainnet:…`, `stake:mainnet:…`,
+`ai:mainnet:…`): it is one constant, `STORE_NS` in `app/api/trends/keys.ts`, and both families'
+`keys.test.ts` pin the strings — a changed segment orphans years of history.
 
 ⚠️ Web Vitals do NOT capture the WebGL frame rate — use the engine's stats.js for that (dev-only, or in
 prod via `?stats`, so it never shows for real users).
@@ -570,7 +593,7 @@ file, and the rules above govern them.
 | Pure logic | `src/engine/domain/CLAUDE.md` | the 3D↔3D transition, selection semantics |
 | Engine | `src/engine/CLAUDE.md` | the look rows, emphasis knobs and the empty `?tune` panel framework |
 | Data layer | `src/data/CLAUDE.md` | the snapshot stream, anchoring & fees, the tick lifecycle, the measured-history path the History view reads |
-| Networks | `src/net/CLAUDE.md` | `?net=` and the three networks |
+| Networks | `src/net/CLAUDE.md` | a metagraph's address lineage and its retirement |
 | Theme | `src/theme/CLAUDE.md` | light/dark and the ground questions it forces |
 | Server routes | `app/api/CLAUDE.md` | every `/api/*` route and its caching |
 

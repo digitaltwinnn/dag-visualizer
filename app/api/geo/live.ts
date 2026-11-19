@@ -1,5 +1,5 @@
 import { unstable_cache } from "next/cache";
-import { NETWORKS, type NetworkId } from "@/src/engine/config";
+import { HOSTS } from "@/src/engine/config";
 import { geolocate } from "@/src/server/ipGeolocate";
 import type { GeoMap } from "@/src/data/types";
 
@@ -20,14 +20,13 @@ async function clusterIps(url: string): Promise<string[]> {
   }
 }
 
-// Per-network cached fetch (the repo's inline unstable_cache factory idiom — global/at):
-// the key carries `net`, so each network warms its own entry.
-export const getLiveGeo = (net: NetworkId) =>
+// The cached fetch (the repo's inline unstable_cache factory idiom — global/at).
+export const getLiveGeo = () =>
   unstable_cache(
     async (): Promise<GeoMap> => {
       const [l0, l1] = await Promise.all([
-        clusterIps(NETWORKS[net].l0 + "/cluster/info"),
-        clusterIps(NETWORKS[net].l1 + "/cluster/info"),
+        clusterIps(HOSTS.l0 + "/cluster/info"),
+        clusterIps(HOSTS.l1 + "/cluster/info"),
       ]);
       const ips = [...new Set([...l0, ...l1])];
       if (!ips.length) throw new Error("no validator ips");
@@ -35,6 +34,6 @@ export const getLiveGeo = (net: NetworkId) =>
       if (!Object.keys(map).length) throw new Error("geolocation empty");
       return map;
     },
-    ["validator-geo-live-v2", net], // v2: +isp/asn fields (a key bump busts the pre-provider cache)
+    ["validator-geo-live-v2"], // v2: +isp/asn fields (a key bump busts the pre-provider cache)
     { revalidate },
   )();

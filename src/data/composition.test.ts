@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { compareComposition, roleKey, rolesOf, roleKeyLabel, roleKeyOfCodes, compositionRows, nodeCompositionLabel, compositionKey, parseCompositionKey, compositionClause, ROLE_SHORT, layerCodesOf, compositionGroups, machineKey, LAYER_WORD } from "./composition";
+import { compareComposition, roleKey, rolesOf, roleKeyLabel, roleKeyOfCodes, compositionRows, nodeCompositionLabel, compositionKey, parseCompositionKey, compositionClause, ROLE_SHORT, layerCodesOf, compositionGroups, machineKey, LAYER_WORD, filterLayers, registerHasSubject } from "./composition";
 import type { NodeInfo, NodeRow } from "@/src/data/types";
 
 const n = (roles: string[]): NodeInfo => ({ ip: "x", state: "Ready", layer: roles[0], roles }) as NodeInfo;
@@ -180,5 +180,31 @@ describe("rolesOf (the one roles fallback)", () => {
     expect(rolesOf({ roles: ["l0", "cl1"], layer: "l0" })).toEqual(["l0", "cl1"]);
     expect(rolesOf({ layer: "dl1" })).toEqual(["dl1"]);
     expect(rolesOf({})).toEqual([]);
+  });
+});
+
+describe("filterLayers / registerHasSubject — the layers a network DECLARES (2026-11-19, review I1)", () => {
+  const list = [
+    { id: "dag", layers: ["l0", "cl1"] },
+    { id: "up", layers: ["l0", "cl1"] },
+    { id: "ded", layers: ["l0", "dl1"] },
+    { id: "cold" }, // an older cached payload: nothing declared
+    { id: "failed", layers: [] }, // the directory's record could not be read
+  ];
+  it("reads the declared layers; null under All, the unlisted set, an unknown id, or nothing declared", () => {
+    expect(filterLayers("up", list)).toEqual(["l0", "cl1"]);
+    expect(filterLayers("all", list)).toBeNull();
+    expect(filterLayers("unlisted", list)).toBeNull();
+    expect(filterLayers("nope", list)).toBeNull();
+    expect(filterLayers("cold", list)).toBeNull();
+    expect(filterLayers("failed", list)).toBeNull();
+  });
+  it("a register has a subject unless the network declares the layers and lacks its one", () => {
+    expect(registerHasSubject("data", "up", list)).toBe(false);
+    expect(registerHasSubject("data", "dag", list)).toBe(false);
+    expect(registerHasSubject("blocks", "ded", list)).toBe(false);
+    expect(registerHasSubject("blocks", "up", list)).toBe(true);
+    // Unknown is never an absence (rule 10): a failed or missing declaration keeps the register open.
+    for (const id of ["cold", "failed", "all"]) expect(registerHasSubject("data", id, list)).toBe(true);
   });
 });

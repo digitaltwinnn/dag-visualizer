@@ -30,12 +30,15 @@ export function relativeAge(ageMs: number, bare = false): string {
  *  here so a third ad-hoc formatter is never written: `fmtReach` (components/useArchive.ts) and the
  *  vitals' idle card are the two consumers, and they now agree by construction.
  *
- *  Tiers match `relativeAge`'s and the archive census's: whole days to two months, whole months to
+ *  Tiers match `relativeAge`'s and the archive census's: seconds under a minute, whole days to two months, whole months to
  *  ~two years, then years. One rounded unit throughout — a compound "2 years 9 months" reads as a
  *  measurement where this is a characterisation, and the archive card says "~" for that reason. */
 export function ageWords(ageMs: number): string {
   if (Number.isNaN(ageMs) || ageMs < 0) return "";
   const unit = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  // Seconds under a minute, `relativeAge`'s own first tier spelled out (D6 carry: LAST BLOCK and LAST
+  // DATA BLOCK read "1 minute" for a block seconds old).
+  if (ageMs < 59_500) return unit(Math.max(1, Math.round(ageMs / 1000)), "second");
   if (ageMs < 3_600_000) return unit(Math.max(1, Math.round(ageMs / 60_000)), "minute");
   if (ageMs < 2 * DAY) return unit(Math.round(ageMs / 3_600_000), "hour");
   if (ageMs < 60 * DAY) return unit(Math.round(ageMs / DAY), "day");

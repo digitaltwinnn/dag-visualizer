@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { NETWORKS } from "@/src/engine/config";
+import { HOSTS } from "@/src/engine/config";
 import { lineageIds } from "@/src/net/lineage";
-import { netOf } from "@/src/net/request";
 import { explorerReader } from "../../notes/snapshotAt";
 import { readWindow } from "../window";
 
@@ -24,11 +23,10 @@ async function getJson(url: string): Promise<{ data?: unknown; meta?: { next?: s
 }
 
 export async function GET(req: Request) {
-  const net = netOf(req);
   const ordinal = Number(new URL(req.url).searchParams.get("ordinal"));
   if (!Number.isInteger(ordinal) || ordinal < 1) return NextResponse.json({ error: "ordinal" }, { status: 400 });
   try {
-    const answer = await readWindow({ be: NETWORKS[net].be, reader: explorerReader(net), getJson, chainIds: lineageIds(net) }, ordinal);
+    const answer = await readWindow({ be: HOSTS.be, reader: explorerReader(), getJson, chainIds: lineageIds() }, ordinal);
     if (!answer) return NextResponse.json({ error: "unavailable" }, { status: 503, headers: { "Cache-Control": "no-store" } });
     const newest = Date.parse(answer.globals[answer.globals.length - 1]!.timestamp);
     const settled = Date.now() - newest > SETTLED_MS;

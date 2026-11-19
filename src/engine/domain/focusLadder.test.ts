@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { LADDERS, LEVEL_CARRY, finerLevels, finestRung, hasLevel, type SelectionSnapshot } from "./focusLadder";
+import { LADDERS, LEVEL_CARRY, finerLevels, finestRung, hasLevel, sceneShowsNode, type SelectionSnapshot } from "./focusLadder";
 
 const sel = (over: Partial<SelectionSnapshot> = {}): SelectionSnapshot => ({
   inspectIsNode: false, cohort: null, composition: null, country: null, filter: "all", ...over,
@@ -11,9 +11,10 @@ describe("focusLadder — the per-view rung tables (spec 2026-07-18)", () => {
   it("pins each view's rung order, finest→coarsest", () => {
     expect(LADDERS.geo.map((r) => r.level)).toEqual(["node", "cohort", "country", "network", "all"]);
     expect(LADDERS.hyper.map((r) => r.level)).toEqual(["node", "composition", "network", "all"]);
-    // The ledger's LAYER rung is retired (2026-08-06): floors/containers are visual aid, so the
-    // ledger's committable levels are the universal node + network alone.
-    expect(LADDERS.ledger.map((r) => r.level)).toEqual(["node", "network", "all"]);
+    // The ledger's LAYER rung is retired (2026-08-06): floors/containers are visual aid; its NODE
+    // rung too (2026-11-08: the node card left the Snapshots view), so its one committable level is
+    // the network.
+    expect(LADDERS.ledger.map((r) => r.level)).toEqual(["network", "all"]);
   });
 
   it("every ladder ends in an unconditional 'all' rung (the walk always resolves)", () => {
@@ -42,9 +43,8 @@ describe("focusLadder — the per-view rung tables (spec 2026-07-18)", () => {
     expect(LADDERS.hyper[1].active(sel())).toBe(false);
     expect(LADDERS.hyper[2].active(sel({ filter: "dag" }))).toBe(true);
     expect(LADDERS.hyper[2].active(sel())).toBe(false);
-    expect(LADDERS.ledger[0].active(sel({ inspectIsNode: true }))).toBe(true);
-    expect(LADDERS.ledger[1].active(sel({ filter: "dor" }))).toBe(true);
-    expect(LADDERS.ledger[1].active(sel({ filter: "all" }))).toBe(false);
+    expect(LADDERS.ledger[0].active(sel({ filter: "dor" }))).toBe(true);
+    expect(LADDERS.ledger[0].active(sel({ filter: "all" }))).toBe(false);
   });
 
   it("resolver keys are view-prefixed and unique within a view", () => {
@@ -59,7 +59,7 @@ describe("focusLadder — the per-view rung tables (spec 2026-07-18)", () => {
     expect(finerLevels("geo", "country")).toEqual(["node", "cohort"]);
     expect(finerLevels("geo", "cohort")).toEqual(["node"]);
     expect(finerLevels("geo", "node")).toEqual([]);
-    expect(finerLevels("ledger", "network")).toEqual(["node"]);
+    expect(finerLevels("ledger", "network")).toEqual([]);
     expect(finerLevels("hyper", "network")).toEqual(["node", "composition"]);
     expect(finerLevels("hyper", "composition")).toEqual(["node"]);
   });
@@ -69,7 +69,7 @@ describe("focusLadder — the per-view rung tables (spec 2026-07-18)", () => {
     expect(hasLevel("geo", "composition")).toBe(false);
     expect(hasLevel("ledger", "composition")).toBe(false);
     expect(hasLevel("geo", "cohort")).toBe(true);
-    expect(hasLevel("ledger", "node")).toBe(true);
+    expect(hasLevel("ledger", "node")).toBe(false);
   });
 
   it("carry policy — universal subjects carry, view-scoped rungs clear (spec Part 2)", () => {
@@ -89,5 +89,34 @@ describe("finestRung — where a deselect lands", () => {
     expect(finestRung("geo", sel({ country: "DE" }))).toBe("country");
     expect(finestRung("ledger", sel({ filter: "dor" }))).toBe("network");
     expect(finestRung("trend", sel())).toBe("all");
+  });
+});
+
+// A NODE CARRIED INTO SNAPSHOTS IS SHOWN NOWHERE THERE (user, 2026-11-10; final review 4, I1): the
+// selection survives (LEVEL_CARRY.node), but the scene emphasises it only in a view whose ladder has
+// the node rung — the same allow-list the click table reads, never a view name.
+describe("sceneShowsNode — the scene's node emphasis follows the ladder", () => {
+  it("a settled view shows the node exactly when its ladder has the node rung", () => {
+    for (const v of Object.keys(LADDERS) as (keyof typeof LADDERS)[]) {
+      expect(sceneShowsNode(v, v)).toBe(hasLevel(v, "node"));
+    }
+    expect(sceneShowsNode("geo", "geo")).toBe(true);
+    expect(sceneShowsNode("hyper", "hyper")).toBe(true);
+    expect(sceneShowsNode("ledger", "ledger")).toBe(false);
+    expect(sceneShowsNode("trend", "trend")).toBe(false);
+  });
+  it("leaving a node view keeps the node until the boundary hands the scene over", () => {
+    expect(sceneShowsNode("geo", "ledger")).toBe(true); // the OUT phase: geo's layout is still drawn
+    expect(sceneShowsNode("ledger", "ledger")).toBe(false); // the boundary: the chamber holds it
+  });
+  it("entering a node view restores it at the click, beside the ancestry it re-commits", () => {
+    expect(sceneShowsNode("ledger", "geo")).toBe(true);
+    expect(sceneShowsNode("ledger", "hyper")).toBe(true);
+    expect(sceneShowsNode("ledger", "trend")).toBe(false);
+  });
+  it("a flat destination enters nothing: the parked grids keep what the view that left them showed", () => {
+    expect(sceneShowsNode("geo", null)).toBe(true);
+    expect(sceneShowsNode("ledger", null)).toBe(false);
+    expect(sceneShowsNode(null, null)).toBe(false); // boot, before any 3D layout
   });
 });

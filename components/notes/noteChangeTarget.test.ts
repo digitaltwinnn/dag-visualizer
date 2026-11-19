@@ -6,7 +6,7 @@ import type { GlobalSnapshot, NodeRow } from "@/src/data/types";
 import { changeActions, changeHover, staysOnCard, type ChangeState } from "./noteChangeTarget";
 
 const change = (subject: NoteChangeSubject): NoteChange => ({ kind: "lost", size: 1, text: "", subject });
-const STATE: ChangeState = { filter: "all", railNet: null, country: null, cohort: null, composition: null, hasInspect: false, metaSnap: null, ledgerNet: null };
+const STATE: ChangeState = { filter: "all", railNet: null, country: null, cohort: null, composition: null, hasInspect: false, metaSnap: null };
 const row = (ip: string, isp: string, cc = "DE", city = "Falkenstein") =>
   ({ cc, city, id: ip, label: ip, pick: { kind: "metanode", node: { ip }, geo: { isp } } }) as unknown as NodeRow;
 const TICK = { ordinal: 7, timestamp: "t" } as GlobalSnapshot;

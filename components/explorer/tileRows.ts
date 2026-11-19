@@ -22,6 +22,14 @@ export function tileRows(n: number): number[] {
   return rows;
 }
 
+/** A measure set may state its OWN plan (Hypergraph's "All nodes" over its three layers, `[1, 3]`,
+ *  2026-11-08): used when it places every tile once in rows the six-column grid divides, else the
+ *  count's default. */
+export function planFor(n: number, plan?: readonly number[] | null): number[] {
+  if (plan && plan.reduce((a, b) => a + b, 0) === n && plan.every((r) => r > 0 && 6 % r === 0)) return [...plan];
+  return tileRows(n);
+}
+
 /** One cell's place in the plan: its row, whether it starts or ends that row, and the row count. */
 export interface TileCell {
   row: number;
@@ -31,8 +39,8 @@ export interface TileCell {
   rows: number;
 }
 
-export function tileCells(n: number): TileCell[] {
-  const plan = tileRows(n);
+export function tileCells(n: number, own?: readonly number[] | null): TileCell[] {
+  const plan = planFor(n, own);
   return plan.flatMap((size, row) =>
     Array.from({ length: size }, (_, k) => ({ row, rowSize: size, first: k === 0, last: k === size - 1, rows: plan.length })),
   );

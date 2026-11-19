@@ -30,7 +30,6 @@ import { stakeValidatorsKeyOf } from "./keys";
 import type { TrendsStore, TrendsWrite } from "./store";
 
 export interface SampleDeps {
-  net: string;
   metaIds: string[];
   /** The UNLISTED chains to sample for their own count (the explorer's list less every tracked
    *  address), or null when that list could not be read — then no unlisted coverage is marked. */
@@ -65,15 +64,15 @@ const ttlOfKey = (key: string): number | null => (key.split(":")[0] !== "t" ? nu
 const txKey = (r: TxRec): number => r.snapshotOrdinal;
 
 export async function runSample(deps: SampleDeps): Promise<SampleResult> {
-  const { net, store } = deps;
+  const { store } = deps;
   // Lock TTL 900 s — WELL above the route's maxDuration (300 s), per the releaseLock
   // invariant in store.ts: an unconditional DEL is only safe while no run can outlive its
   // own lock.
-  if (!(await store.acquireLock(lockKeyOf(net), 900))) {
+  if (!(await store.acquireLock(lockKeyOf(), 900))) {
     return { skipped: "locked", wroteFields: 0, gap: false, metaErrors: [] };
   }
   try {
-    const cursorKey = cursorKeyOf(net);
+    const cursorKey = cursorKeyOf();
     const cur = (await store.hgetall(cursorKey)) ?? {};
     const gSince = cur.g != null ? Number(cur.g) : -1;
     const gTs = cur.gTs != null ? Number(cur.gTs) : null;
@@ -84,7 +83,7 @@ export async function runSample(deps: SampleDeps): Promise<SampleResult> {
     // Global spine.
     const g = await listSince(deps.pageGlobals, gSince);
     if (g.recs.length) {
-      bucketGlobals(inc, net, g.recs, g.gap ? null : gTs); // an accepted gap breaks the gap chain too
+      bucketGlobals(inc, g.recs, g.gap ? null : gTs); // an accepted gap breaks the gap chain too
       const newest = g.recs[g.recs.length - 1];
       cursorNext.g = newest.ordinal;
       cursorNext.gTs = Date.parse(newest.timestamp);
@@ -105,10 +104,10 @@ export async function runSample(deps: SampleDeps): Promise<SampleResult> {
       } else if (gNew > x) {
         try {
           const r = await listBetween((limit, next) => deps.pageTransfers!("dag", limit, next), txKey, x, gNew);
-          bucketTransfers(inc, net, "dag", r.recs);
+          bucketTransfers(inc, "dag", r.recs);
           // Past the self-heal depth only what was read is claimed (rule 10).
           const from = r.gap ? (r.recs.length ? Date.parse(r.recs[0].timestamp) : gNewTs) : xTs;
-          markTransferCoverage(inc, net, from, gNewTs);
+          markTransferCoverage(inc, from, gNewTs);
           cursorNext.x = gNew;
           cursorNext.xTs = gNewTs;
         } catch {
@@ -162,7 +161,7 @@ export async function runSample(deps: SampleDeps): Promise<SampleResult> {
           if (tx.fromTs != null) cursorNext[`xTs.${id}`] = tx.fromTs;
         }
       } else if (tx) {
-        bucketTransfers(inc, net, id, tx.recs);
+        bucketTransfers(inc, id, tx.recs);
         cursorNext[`x.${id}`] = tx.upTo;
         if (tx.upToTs != null) cursorNext[`xTs.${id}`] = tx.upToTs;
       }
@@ -171,7 +170,7 @@ export async function runSample(deps: SampleDeps): Promise<SampleResult> {
         // The per-chain gap chain rides its own timestamp cursor; an accepted gap breaks the
         // chain (null) exactly as the global spine's does.
         const prevTs = cur[`mTs.${id}`] != null ? Number(cur[`mTs.${id}`]) : null;
-        bucketMetas(inc, net, id, r.recs, r.gap ? null : prevTs, !unlistedSet.has(id));
+        bucketMetas(inc, id, r.recs, r.gap ? null : prevTs, !unlistedSet.has(id));
         cursorNext[`m.${id}`] = r.recs[r.recs.length - 1].ordinal;
         cursorNext[`mTs.${id}`] = Date.parse(r.recs[r.recs.length - 1].timestamp);
       }
@@ -183,14 +182,14 @@ export async function runSample(deps: SampleDeps): Promise<SampleResult> {
 
     // Fleet gauge, once per hour: sample only when the CURRENT hour slot has no reading yet
     // (idempotent across runs and restarts — no boundary bookkeeping).
-    const hourSlot = slotOf(net, "1h", deps.now());
+    const hourSlot = slotOf("1h", deps.now());
     const [hasFleet] = await store.hmget(hourSlot.key, [fieldOf(hourSlot.bucket, "f.nodes")]);
     let ispNames: Record<string, string> = {};
     if (hasFleet == null) {
       const fleet = await deps.fleet();
-      if (fleet) bucketFleet(inc, net, deps.now(), fleet);
+      if (fleet) bucketFleet(inc, deps.now(), fleet);
       if (fleet?.geo) {
-        bucketFleetGeo(inc, net, deps.now(), fleet.geo);
+        bucketFleetGeo(inc, deps.now(), fleet.geo);
         ispNames = fleet.geo.providerNames;
       }
     }
@@ -202,7 +201,7 @@ export async function runSample(deps: SampleDeps): Promise<SampleResult> {
       if (hasStake == null) {
         const reading = await deps.stake().catch(() => null);
         if (reading) {
-          bucketStake(inc, net, deps.now(), reading);
+          bucketStake(inc, deps.now(), reading);
           validators = Object.fromEntries(reading.perValidator.map((v) => [v.key, JSON.stringify({ id: v.id, name: v.name })]));
         }
       }
@@ -226,12 +225,12 @@ export async function runSample(deps: SampleDeps): Promise<SampleResult> {
     }
 
     // Provider names ride the same transaction: a stored key is never written without its name.
-    if (Object.keys(ispNames).length) writes.push({ key: ispNamesKeyOf(net), map: ispNames, ttlS: null });
-    if (Object.keys(validators).length) writes.push({ key: stakeValidatorsKeyOf(net), map: validators, ttlS: null });
-    if (Object.keys(cursorNext).length > 1) writes.push({ key: cursorKeyOf(net), map: cursorNext, ttlS: null });
+    if (Object.keys(ispNames).length) writes.push({ key: ispNamesKeyOf(), map: ispNames, ttlS: null });
+    if (Object.keys(validators).length) writes.push({ key: stakeValidatorsKeyOf(), map: validators, ttlS: null });
+    if (Object.keys(cursorNext).length > 1) writes.push({ key: cursorKeyOf(), map: cursorNext, ttlS: null });
     if (writes.length) await store.applyWrites(writes);
     return { wroteFields, gap: g.gap, metaErrors, txErrors };
   } finally {
-    await store.releaseLock(lockKeyOf(net));
+    await store.releaseLock(lockKeyOf());
   }
 }

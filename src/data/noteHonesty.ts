@@ -33,8 +33,9 @@ import type { Fact } from "@/src/data/noteTypes";
 // WHAT IT STRIPS FIRST: the currency unit after a number ("1.2K DAG"), so it is never read as the
 // DAG network; then, so they are never read as numbers: the names it is handed (they carry dots
 // and digits), the layer tokens (L0, L1, cL1, dL1, L0s), and any date phrase a `date` fact holds
-// ("Oct 19", "October 19, 2026", "19 Oct", "2026-10-19"). A date NO fact holds is left in, and its
-// day-of-month then has to back itself as a number — which it cannot.
+// ("Oct 19", "October 19, 2026", "19 Oct", "2026-10-19"), and the clock time a `time` fact holds
+// ("14:05 UTC", "14:05", "2:05 PM UTC" — the same minute, in UTC). A date or time NO fact holds is
+// left in, and its digits then have to back themselves as numbers — which they cannot.
 //
 // DIRECTION: a sentence with a falling verb (fell, dropped, down, slowed ...) reads a `%` against a
 // ratio as (1-r)*100 only; a rising verb (rose, grew, up, climbed ...) as (r-1)*100 or r*100; with
@@ -290,6 +291,25 @@ function rankBacked(word: string, facts: readonly Fact[]): boolean {
 function datePhrases(facts: readonly Fact[]): RegExp[] {
   const out: RegExp[] = [];
   for (const f of facts) {
+    if (f.kind === "time") {
+      // A clock time is UTC (`fact`'s "time"): its 24-hour form, the hour with or without a leading
+      // zero, or the 12-hour form in the fact's OWN half of the day (a 14:05 fact backs "2:05 PM",
+      // never "2:05 AM"; a 00:30 fact "12:30 AM", never "PM" — review M1), each with an optional
+      // "UTC" after it. The 24-hour form takes no meridiem after it, or "12:30" and "9:00" would back
+      // either half. No seconds: the fact states its minute ("14:05 UTC"), so a ":ss" after it is a
+      // figure no fact holds, and the lookahead leaves it to be checked as numbers.
+      const d = new Date(f.value);
+      const h = d.getUTCHours();
+      const mm = String(d.getUTCMinutes()).padStart(2, "0");
+      const h12 = h % 12 === 0 ? 12 : h % 12;
+      const half = h < 12 ? "a" : "p";
+      const utc = "(?:\\s*UTC)?";
+      out.push(
+        new RegExp(`(?<![\\d:])0?${h}:${mm}${utc}(?![\\d:]|\\s*[ap]\\.?m\\b)`, "gi"),
+        new RegExp(`(?<![\\d:])${h12}:${mm}\\s*${half}\\.?m\\.?${utc}(?!\\w)`, "gi"),
+      );
+      continue;
+    }
     if (f.kind !== "date") continue;
     const d = new Date(f.value);
     const [short, long] = MONTHS[d.getUTCMonth()];

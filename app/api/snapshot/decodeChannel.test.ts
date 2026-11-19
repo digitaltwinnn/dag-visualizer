@@ -57,6 +57,18 @@ describe("decodeChannelContent", () => {
     expect(d.stateKeys).toEqual([{ key: "latestOrdinal", count: 0 }, { key: "latestUpdates", count: 0 }]);
   });
 
+  it("marks a data block it cannot read as unread, and the snapshot's update count unknown — never 0 (review M3)", async () => {
+    const odd = {
+      value: { ordinal: 2, dataApplication: { onChainState: [], blocks: [Array.from(Buffer.from("not json")), Array.from(Buffer.from(JSON.stringify({ value: { updates: [{ value: 1 }] } })))] } },
+      proofs: [],
+    };
+    const d = (await decodeChannelContent(Array.from(brotliCompressSync(Buffer.from(JSON.stringify(odd))))))!;
+    expect(d.dataBlocks).toBe(2);
+    expect(d.dataTxCount).toBeUndefined();
+    expect(d.dataBlockRows.map((r) => r.unread ?? false)).toEqual([true, false]);
+    expect(d.dataBlockRows[1]!.updates).toBe(1);
+  });
+
   it("returns null rather than throwing on anything it cannot read", async () => {
     expect(await decodeChannelContent(null)).toBeNull();
     expect(await decodeChannelContent([1, 2, 3])).toBeNull();

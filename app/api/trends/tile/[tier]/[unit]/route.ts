@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { netOf } from "@/src/net/request";
 import { assembleSpan } from "../../../assemble";
 import { slotsInWindow, type Tier } from "../../../keys";
 import { readStore } from "../../../store";
@@ -33,7 +32,7 @@ function unitSpan(tier: Tier, unit: string): { startMs: number; endMs: number } 
   return { startMs: Date.UTC(+m[1], +m[2] - 1, 1), endMs: Date.UTC(+m[1], +m[2], 1) };
 }
 
-export async function GET(req: Request, ctx: { params: Promise<{ tier: string; unit: string }> }) {
+export async function GET(_req: Request, ctx: { params: Promise<{ tier: string; unit: string }> }) {
   const { tier, unit } = await ctx.params;
   if (tier !== "5m" && tier !== "1h") {
     return NextResponse.json({ error: "tier must be 5m or 1h" }, { status: 400 });
@@ -42,17 +41,16 @@ export async function GET(req: Request, ctx: { params: Promise<{ tier: string; u
   if (!span) return NextResponse.json({ error: "bad unit" }, { status: 400 });
   const now = Date.now();
   if (span.startMs > now) return NextResponse.json({ error: "future unit" }, { status: 400 });
-  const net = netOf(req);
   try {
     const store = readStore();
-    const keys = [...new Set(slotsInWindow(net, tier, span.startMs, span.endMs).map((s) => s.key))];
+    const keys = [...new Set(slotsInWindow(tier, span.startMs, span.endMs).map((s) => s.key))];
     const hashes: Record<string, Record<string, string>> = {};
     await Promise.all(keys.map(async (k) => {
       const h = await store.hgetall(k);
       if (h) hashes[k] = h;
     }));
     const complete = span.endMs <= now;
-    return NextResponse.json(assembleSpan(net, "tile", tier, span.startMs, span.endMs, now, hashes), {
+    return NextResponse.json(assembleSpan("tile", tier, span.startMs, span.endMs, now, hashes), {
       headers: {
         "Cache-Control": complete
           ? "public, s-maxage=31536000, stale-while-revalidate=86400"

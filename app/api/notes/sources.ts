@@ -5,13 +5,17 @@ import { fact, type ChainReads } from "@/src/data/noteFacts";
 import { bannedWords, undash } from "@/src/data/noteHonesty";
 import { geoFacts } from "@/src/data/noteFactsGeo";
 import { comboWords, hyperFacts } from "@/src/data/noteFactsHyper";
-import { commonIsWhole, hasCommonReading } from "@/src/data/noteFactsActivity";
 import { ledgerFacts } from "@/src/data/noteFactsLedger";
+import { BLOCK_NOTE_HOURS, blocksFacts } from "@/src/data/noteFactsBlocks";
+import { dataFacts } from "@/src/data/noteFactsData";
+import { readDataWindow, type DataWindowRead } from "./dataWindow";
+import { currentIdOf, isTracked } from "@/src/net/lineage";
 import { rangeNotableCap } from "@/src/data/notableDays";
 import { trendFacts, trendSilent, type TrendFactsInput } from "@/src/data/noteFactsTrend";
 import type { Fact, NotableDay, NoteChange, NoteView, NoteLead } from "@/src/data/noteTypes";
 import { leadingTrim, pickRangeTier, type TrendsWindowData } from "@/src/data/trendWindow";
-import { CATALOG, type NetworkId } from "@/src/engine/config";
+import { measuredTx } from "@/src/data/trendSeries";
+import { METAGRAPHS } from "@/src/engine/config";
 import { assembleSpan, WINDOWS } from "../trends/assemble";
 import { explorerReader, locateRows, type ChainReader } from "./snapshotAt";
 import { chainReadsOf, cursorKeyOf, geoSitesSlotOf, geoSlotOf, ispNamesKeyOf, slotsInWindow, type Tier } from "../trends/keys";
@@ -45,7 +49,7 @@ export type HashReader = Pick<TrendsStore, "hgetall">;
 export interface GeoDaysRead {
   /** "YYYY-MM-DD" → that day's geo fields (`f.cc.*`, `f.isp.*`, per network `f.cc.<id>.*`, `f.isp.<id>.*`). */
   geoDays: Record<string, Record<string, number>>;
-  /** provider key → display name (`geo:{net}:isp`). */
+  /** provider key → display name (`geo:mainnet:isp`). */
   providerNames: Record<string, string>;
   /** "YYYY-MM-DD" → that day's `f.site.<cc>.<city>.<key>` (`geoSitesSlotOf`), where it was sampled. */
   siteDays?: Record<string, Record<string, number>>;
@@ -56,36 +60,38 @@ const NO_CHAIN: ChainReader = { latest: async () => null, at: async () => null }
 
 /** What `factsFor` reads through. The default is the trends store's read client. */
 export interface NoteReads {
-  span(net: string, tier: Tier, fromMs: number, toMs: number): Promise<TrendsWindowData>;
-  geoDays(net: string, fromMs: number, toMs: number): Promise<GeoDaysRead>;
+  span(tier: Tier, fromMs: number, toMs: number): Promise<TrendsWindowData>;
+  geoDays(fromMs: number, toMs: number): Promise<GeoDaysRead>;
   /** When the sampler last read each chain. */
-  chainReads(net: string): Promise<ChainReads>;
+  chainReads(): Promise<ChainReads>;
   /** The explorer's records, for a row that names one snapshot. Absent, a row keeps its network. */
-  chain?(net: string): ChainReader;
+  chain?(): ChainReader;
+  /** The newest window of exact reads (`dataWindow.ts`). Absent, the data note is not written. */
+  dataWindow?(): Promise<DataWindowRead>;
 }
 
 /** ONE TIER over [fromMs, toMs): the tile route's body, at any span. */
 export async function readSpan(
-  net: string, tier: Tier, fromMs: number, toMs: number,
+  tier: Tier, fromMs: number, toMs: number,
   store: HashReader = readStore(), nowMs: number = Date.now(),
 ): Promise<TrendsWindowData> {
   // `slotsInWindow` is end-INCLUSIVE and the span half-open, as `assembleSpan` reads it.
-  const keys = [...new Set(slotsInWindow(net, tier, fromMs, toMs - 1).map((s) => s.key))];
+  const keys = [...new Set(slotsInWindow(tier, fromMs, toMs - 1).map((s) => s.key))];
   const hashes: Record<string, Record<string, string>> = {};
   await Promise.all(keys.map(async (k) => {
     const h = await store.hgetall(k);
     if (h) hashes[k] = h;
   }));
-  const { buckets, stepMs, series, now } = assembleSpan(net, "tile", tier, fromMs, toMs, nowMs, hashes);
+  const { buckets, stepMs, series, now } = assembleSpan("tile", tier, fromMs, toMs, nowMs, hashes);
   return { buckets, stepMs, series, now };
 }
 
 
-/** THE GEO FAMILY over the UTC days [fromMs's day, toMs]: one `geo:{net}:{YYYY}` hash per year the
+/** THE GEO FAMILY over the UTC days [fromMs's day, toMs]: one `geo:mainnet:{YYYY}` hash per year the
  *  window touches and one sites hash per month (fields `MM-DD|<series>`), regrouped by day, plus the
  *  provider names. */
 export async function readGeoDays(
-  net: string, fromMs: number, toMs: number, store: HashReader = readStore(),
+  fromMs: number, toMs: number, store: HashReader = readStore(),
 ): Promise<GeoDaysRead> {
   const firstDay = Math.floor(fromMs / D) * D;
   const years: number[] = [];
@@ -93,9 +99,9 @@ export async function readGeoDays(
   const months: number[] = [];
   for (const d = new Date(firstDay); d.getTime() <= toMs; d.setUTCMonth(d.getUTCMonth() + 1, 1)) months.push(d.getTime());
   const [names, yearHashes, monthHashes] = await Promise.all([
-    store.hgetall(ispNamesKeyOf(net)),
-    Promise.all(years.map((y) => store.hgetall(geoSlotOf(net, Date.UTC(y, 0, 1)).key))),
-    Promise.all(months.map((m) => store.hgetall(geoSitesSlotOf(net, m).key))),
+    store.hgetall(ispNamesKeyOf()),
+    Promise.all(years.map((y) => store.hgetall(geoSlotOf(Date.UTC(y, 0, 1)).key))),
+    Promise.all(months.map((m) => store.hgetall(geoSitesSlotOf(m).key))),
   ]);
   /** A hash's fields into `out`, by day, inside the window. */
   const regroup = (h: Record<string, string> | null, year: number, out: Record<string, Record<string, number>>) => {
@@ -121,11 +127,11 @@ export async function readGeoDays(
 /** GEOGRAPHY'S READ — the geo family's days and the tiers' daily fleet `f.cc` (`ccDays`, pivoted by
  *  day) over `GEO_READ_MS`. The geo note's facts and the warm pass's country plan both read through
  *  it, so the countries warmed are the countries a note states (M5). */
-export async function geoInputs(net: string, nowMs: number, reads: NoteReads): Promise<GeoDaysRead & { ccDays: Record<string, Record<string, number>>; daily: TrendsWindowData }> {
+export async function geoInputs(nowMs: number, reads: NoteReads): Promise<GeoDaysRead & { ccDays: Record<string, Record<string, number>> }> {
   const from = nowMs - GEO_READ_MS;
   const [{ geoDays, providerNames, siteDays }, tiers] = await Promise.all([
-    reads.geoDays(net, from, nowMs),
-    reads.span(net, "1d", from, nowMs),
+    reads.geoDays(from, nowMs),
+    reads.span("1d", from, nowMs),
   ]);
   const ccDays: Record<string, Record<string, number>> = {};
   tiers.buckets.forEach((b, i) => {
@@ -134,8 +140,7 @@ export async function geoInputs(net: string, nowMs: number, reads: NoteReads): P
       if (k.startsWith("f.cc.") && v != null) (ccDays[utcDayKey(b)] ??= {})[k] = v;
     }
   });
-  // The same daily read is the common activity reading's (R74), unfolded, as the builder wants it.
-  return { geoDays, providerNames, ...(siteDays ? { siteDays } : {}), ccDays, daily: tiers };
+  return { geoDays, providerNames, ...(siteDays ? { siteDays } : {}), ccDays };
 }
 
 /** The default reads for ONE note, or one warm pass: the trends store's read client, each hash read
@@ -151,10 +156,11 @@ export function storeReads(nowMs: number, store: HashReader = readStore()): Note
     },
   };
   return {
-    span: (net, tier, fromMs, toMs) => readSpan(net, tier, fromMs, toMs, once, nowMs),
-    geoDays: (net, fromMs, toMs) => readGeoDays(net, fromMs, toMs, once),
-    chainReads: async (net) => chainReadsOf(await once.hgetall(cursorKeyOf(net))),
+    span: (tier, fromMs, toMs) => readSpan(tier, fromMs, toMs, once, nowMs),
+    geoDays: (fromMs, toMs) => readGeoDays(fromMs, toMs, once),
+    chainReads: async () => chainReadsOf(await once.hgetall(cursorKeyOf())),
     chain: explorerReader,
+    dataWindow: readDataWindow,
   };
 }
 
@@ -164,12 +170,10 @@ export function storeReads(nowMs: number, store: HashReader = readStore()): Note
  *  a client module: it imports the store). */
 const DAG_NAME = "DAG";
 
-const catalogOf = (net: string) => CATALOG[net as NetworkId] ?? [];
-
 /** catalog id → display name, the DAG core included. Current ids only: a former address is folded
  *  into its network on the read path (`assembleSpan`), so it never needs a name of its own. */
-function namesOf(net: string): Record<string, string> {
-  return { dag: DAG_NAME, ...Object.fromEntries(catalogOf(net).map((m) => [m.id, m.name])) };
+function namesOf(): Record<string, string> {
+  return { dag: DAG_NAME, ...Object.fromEntries(METAGRAPHS.map((m) => [m.id, m.name])) };
 }
 /** A catalog blurb as the model may see it. Blurbs are the networks' own copy (the live
  *  directory's descriptions) and do not follow the house voice: a dash clause becomes a comma and a
@@ -183,13 +187,13 @@ export function cleanBlurb(blurb: string): string {
     .trim();
 }
 
-function blurbsOf(net: string): Record<string, string> {
-  return Object.fromEntries(catalogOf(net).map((m) => [m.id, cleanBlurb(m.blurb)]).filter(([, b]) => b));
+function blurbsOf(): Record<string, string> {
+  return Object.fromEntries(METAGRAPHS.map((m) => [m.id, cleanBlurb(m.blurb)]).filter(([, b]) => b));
 }
 
-const isNetwork = (net: string, id: string) => id === "dag" || catalogOf(net).some((m) => m.id === id);
+const isNetwork = (id: string) => id === "dag" || METAGRAPHS.some((m) => m.id === id);
 /** A subject History can describe: a network, or the unlisted set the sampler measures. */
-const isTrendSubject = (net: string, id: string) => id === UNLISTED_ID || isNetwork(net, id);
+const isTrendSubject = (id: string) => id === UNLISTED_ID || isNetwork(id);
 /** History's subject without its span facet: `dor/span` → `dor` (keys.ts `SubjectKind` "span"). */
 const trendBaseOf = (subject: string) => (subject.endsWith("/span") ? subject.slice(0, -"/span".length) : subject);
 const RANGE_RE = /^r(\d+)-(\d+)$/;
@@ -217,10 +221,10 @@ type GeoSelection = { cc: string; net?: string } | { isp: string; net?: string }
  *  `<net>/cc:XX`, `isp:<key>`, `<net>/isp:<key>`, whose scope is `dag` or a network this catalog
  *  tracks (`params.ts` validates the request; this says whether the view writes it). Null for
  *  anything else, a network's own note included. */
-function geoSelectionOf(net: string, subject: string): GeoSelection | null {
+function geoSelectionOf(subject: string): GeoSelection | null {
   const scoped = isSubjectNote(subject) && subject.includes("/");
   const scope = scoped ? subject.slice(0, subject.indexOf("/")) : undefined;
-  if (scope != null && !isNetwork(net, scope)) return null;
+  if (scope != null && !isNetwork(scope)) return null;
   const tail = scope != null ? subject.slice(scope.length + 1) : subject;
   const cc = CC_TAIL_RE.exec(tail)?.[1];
   const isp = ISP_TAIL_RE.exec(tail)?.[1];
@@ -247,12 +251,12 @@ type HyperSelection = { net: string; type: string };
  *  network's make-up, scoped to `dag` or a network this catalog tracks and spelled as `roleKey`
  *  spells it (one make-up, one key). Null for anything else, a network's own note included.
  *  `dag/type:*` is accepted: the sampler has written `f.type.dag.*` since PR #80. */
-function hyperSelectionOf(net: string, subject: string): HyperSelection | null {
+function hyperSelectionOf(subject: string): HyperSelection | null {
   if (!isSubjectNote(subject) || subjectKindOf(subject) !== "type") return null;
   const scope = subject.slice(0, subject.indexOf("/"));
   const type = TYPE_TAIL_RE.exec(subject.slice(scope.length + 1))?.[1];
   // The DAG core's groups included (2026-10-30; `f.type.dag.*` is stored since 2026-10-29, PR #80).
-  if (!type || !isNetwork(net, scope) || roleKey({ roles: type.split("+") }) !== type) return null;
+  if (!type || !isNetwork(scope) || roleKey({ roles: type.split("+") }) !== type) return null;
   return { net: scope, type };
 }
 
@@ -286,7 +290,6 @@ interface Read {
 }
 
 interface Ctx {
-  net: string;
   subject: string;
   span: NoteSpan;
   nowMs: number;
@@ -297,7 +300,7 @@ interface Ctx {
 
 interface ViewSource {
   /** Whether this view writes a note for this subject over this span. */
-  accepts(net: string, subject: string, span: NoteSpan): boolean;
+  accepts(subject: string, span: NoteSpan): boolean;
   /** The prompt's subject label. */
   label(subject: string, names: Record<string, string>): string;
   /** Is this subject the whole network? Its own ratios are then the unattributed ones; any other
@@ -309,9 +312,8 @@ interface ViewSource {
 
 const WHOLE = "the whole network";
 /** Geography's read: the week its changes are read over, its one-day slack, and the 6 days the
- *  earliest candidate's own week needs before it (R29) — and, longer, the four weeks the common
- *  activity reading compares (R74: last week against the three before; `noteFactsActivity.ts`). */
-const GEO_READ_MS = Math.max((7 + 1 + 6) * D, 28 * D);
+ *  earliest candidate's own week needs before it (R29). */
+const GEO_READ_MS = (7 + 1 + 6) * D;
 const secondsOf = (fromMs: number, toMs: number) => (toMs - fromMs) / 1000;
 
 type TrendPill = "1h" | "24h" | "7d" | "30d" | "90d" | "1y";
@@ -330,7 +332,7 @@ const LEAD_IN_MS = 30 * D;
 const isPill = (span: string): span is TrendPill => span in TREND_PILLS;
 
 async function readTrend(c: Ctx): Promise<Read | null> {
-  const { net, span, nowMs, reads } = c;
+  const { span, nowMs, reads } = c;
   // THE SPAN FACET reads the base network's facts in their `shape`: no notable days to caption.
   const subject = trendBaseOf(c.subject);
   const facet = subject !== c.subject;
@@ -345,7 +347,7 @@ async function readTrend(c: Ctx): Promise<Read | null> {
     // EVERYTHING THE STORE HOLDS, from where measuring began (the History page's leading trim):
     // the window opens years before the first measured day, and those years are not the span.
     zoom = "all";
-    const raw = await reads.span(net, "1d", nowMs - WINDOWS.all.ms, nowMs);
+    const raw = await reads.span("1d", nowMs - WINDOWS.all.ms, nowMs);
     cur = leadingTrim(raw);
     if (!cur.buckets.length) return null;
     fromMs = cur.buckets[0]!;
@@ -362,18 +364,18 @@ async function readTrend(c: Ctx): Promise<Read | null> {
     const tier = pill ? pill.tier : pickRangeTier(fromMs, toMs);
     const len = toMs - fromMs;
     [cur, prev, daily] = await Promise.all([
-      reads.span(net, tier, fromMs, toMs),
-      reads.span(net, tier, fromMs - len, fromMs),
+      reads.span(tier, fromMs, toMs),
+      reads.span(tier, fromMs - len, fromMs),
       // Through today, even for a range that ended before it: what came after says who really stopped.
-      pill?.daily || rangeNotableCap(len) > 0 ? reads.span(net, "1d", fromMs - LEAD_IN_MS, nowMs) : Promise.resolve(null),
+      pill?.daily || rangeNotableCap(len) > 0 ? reads.span("1d", fromMs - LEAD_IN_MS, nowMs) : Promise.resolve(null),
     ]);
   }
   // The whole daily record, for what a silent span can still say (`trendFacts`): always the unlisted
   // set's, and a network's only when its span is silent, so an active note reads nothing more.
   const silent = trendSilent(subject, cur);
   const [history, chainReads] = await Promise.all([
-    subject === UNLISTED_ID || silent ? reads.span(net, "1d", nowMs - WINDOWS.all.ms, nowMs) : null,
-    silent ? reads.chainReads(net) : null,
+    subject === UNLISTED_ID || silent ? reads.span("1d", nowMs - WINDOWS.all.ms, nowMs) : null,
+    silent ? reads.chainReads() : null,
   ]);
   const built = trendFacts({ subject, zoom, span: { fromMs, toMs }, cur, prev, daily, history, chainReads, shape: facet, names: c.names, blurbs: c.blurbs });
   return {
@@ -390,15 +392,15 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
   // WHO / WHAT: the fleet's hourly gauges over the last WEEK (user, 2026-10-29: one change range for
   // Hypergraph and Geography); the daily tier over 37 days (a 30-day lead-in, so a start is a start).
   hyper: {
-    accepts: (net, subject, span) => span === "day" && (subject === "all" || isNetwork(net, subject) || hyperSelectionOf(net, subject) != null),
+    accepts: (subject, span) => span === "day" && (subject === "all" || isNetwork(subject) || hyperSelectionOf(subject) != null),
     label: (subject, names) => (subject === "all" ? WHOLE : (names[subject] ?? subject)),
     whole: (subject) => subject === "all",
-    async read({ net, subject, nowMs, reads, names, blurbs }) {
-      const sel = hyperSelectionOf(net, subject);
+    async read({ subject, nowMs, reads, names, blurbs }) {
+      const sel = hyperSelectionOf(subject);
       const span = { fromMs: nowMs - 7 * D, toMs: nowMs };
       const [fleet, daily] = await Promise.all([
-        reads.span(net, "1h", span.fromMs, nowMs),
-        reads.span(net, "1d", span.fromMs - LEAD_IN_MS, nowMs),
+        reads.span("1h", span.fromMs, nowMs),
+        reads.span("1d", span.fromMs - LEAD_IN_MS, nowMs),
       ]);
       const built = hyperFacts({ subject: sel ?? subject, fleet, daily, span, names, blurbs });
       // The facts speak of the last day and the last week (the span, activity, started / stopped),
@@ -416,26 +418,23 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
   // (R22), so the earliest day the comparison may use, 8 days back, needs the 6 days before it,
   // or a partial outage at the read's head is judged against itself and becomes the week-ago anchor.
   geo: {
-    accepts: (net, subject, span) => span === "day" && (subject === "all" || isNetwork(net, subject) || geoSelectionOf(net, subject) != null),
+    accepts: (subject, span) => span === "day" && (subject === "all" || isNetwork(subject) || geoSelectionOf(subject) != null),
     label: (subject, names) => {
       const cc = CC_TAIL_RE.exec(subject)?.[1];
       return subject === "all" ? WHOLE : cc ? countryName(cc) : (names[subject] ?? subject);
     },
     whole: (subject) => subject === "all",
-    async read({ net, subject, nowMs, reads, names }) {
-      const { geoDays, providerNames, siteDays, ccDays, daily } = await geoInputs(net, nowMs, reads);
+    async read({ subject, nowMs, reads, names }) {
+      const { geoDays, providerNames, siteDays, ccDays } = await geoInputs(nowMs, reads);
       const ccs = new Set<string>();
       for (const day of [...Object.values(geoDays), ...Object.values(ccDays)])
         for (const k of Object.keys(day)) if (k.startsWith("f.cc.")) ccs.add(k.slice(k.lastIndexOf(".") + 1));
-      const sel = geoSelectionOf(net, subject);
+      const sel = geoSelectionOf(subject);
       if (sel && "cc" in sel) ccs.add(sel.cc);
       const countryNames = Object.fromEntries([...ccs].map((c) => [c, countryName(c)]));
-      // A subject note is handed no daily read: the common reading is a network's or the whole
-      // network's, never one card's.
       const subjectNote = isSubjectNote(subject);
-      const built = geoFacts({ subject: sel ?? subject, geoDays, siteDays, ccDays, providerNames, countryNames, names, ...(subjectNote ? {} : { daily }) });
+      const built = geoFacts({ subject: sel ?? subject, geoDays, siteDays, ccDays, providerNames, countryNames, names });
       const spanFrom = nowMs - 7 * D;
-      // The common reading speaks of the last week (R74), so that window is stated beside the span.
       const windows: [string, number][] = [["Span length", secondsOf(spanFrom, nowMs)], ["Week", (7 * D) / 1000]];
       return { built, spanFrom, spanTo: nowMs, windows, ...(subjectNote && sel ? geoSubjectLabel(sel, names, built?.subjectName) : {}) };
     },
@@ -445,19 +444,19 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
   ledger: {
     // Its whole network is `all` alone: `dag` here would be the same facts under a second key, so a
     // second identical note an hour (the routes and the client fold `dag` into `all`).
-    accepts: (net, subject, span) => span === "hours" && (subject === "all" || (subject !== "dag" && isNetwork(net, subject))),
+    accepts: (subject, span) => span === "hours" && (subject === "all" || (subject !== "dag" && isNetwork(subject))),
     label: (subject, names) => (subject === "all" ? WHOLE : (names[subject] ?? subject)),
     whole: (subject) => subject === "all",
-    async read({ net, subject, nowMs, reads, names }) {
+    async read({ subject, nowMs, reads, names }) {
       const recentFrom = nowMs - 24 * H;
       const weekFrom = nowMs - 7 * D;
       const [recent, week, chainReads] = await Promise.all([
-        reads.span(net, "5m", recentFrom, nowMs),
-        reads.span(net, "1h", weekFrom, nowMs),
-        reads.chainReads(net),
+        reads.span("5m", recentFrom, nowMs),
+        reads.span("1h", weekFrom, nowMs),
+        reads.chainReads(),
       ]);
       const built = ledgerFacts({ subject, recent, week, names, chainReads });
-      if (built?.changes) built.changes = await locateRows(built.changes, reads.chain?.(net) ?? NO_CHAIN);
+      if (built?.changes) built.changes = await locateRows(built.changes, reads.chain?.() ?? NO_CHAIN);
       return {
         built,
         spanFrom: recentFrom,
@@ -466,14 +465,59 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
       };
     },
   },
+  // THE BLOCK DAG (the Snapshots view's Blocks register): the blocks each chain accepted over the
+  // last 24 WHOLE hours of the hourly tier — the sampler's own `g.blocks` / `m.<id>.blocks`, the
+  // series History's Blocks measure draws — and the transfers they carried (`g.tx` / `m.<id>.tx`).
+  blocks: {
+    accepts: (subject, span) => span === "hours" && subject === "all",
+    // The blocks, not "the block DAG": the label is the prompt's Subject, and the model echoed it as
+    // the sentence's actor (user, 2026-11-09). The DAG accepts them, as the question says.
+    label: () => "transaction blocks",
+    whole: () => true,
+    async read({ nowMs, reads, names }) {
+      const toMs = Math.floor(nowMs / H) * H;
+      const fromMs = toMs - BLOCK_NOTE_HOURS * H;
+      const { series } = await reads.span("1h", fromMs, toMs);
+      // The DAG's blocks are a field of each global's record: a covered hour (`g.ticks`, the store's
+      // one marker) without the field read none; an uncovered one was not measured.
+      const ticks = series["g.ticks"] ?? [];
+      const blocks: Record<string, (number | null)[]> = { dag: ticks.map((t, i) => (t == null ? null : (series["g.blocks"]?.[i] ?? 0))) };
+      for (const id of Object.keys(names)) {
+        const points = id === "dag" ? null : series[`m.${id}.blocks`];
+        if (points) blocks[id] = points;
+      }
+      // Their transfers, counted where the sampler read the transfer lists (`measuredTx`, `x.cov`).
+      const transfers: Record<string, (number | null)[]> = {};
+      for (const id of Object.keys(blocks)) transfers[id] = measuredTx(series[id === "dag" ? "g.tx" : `m.${id}.tx`], series);
+      const built = blocksFacts({ blocks, transfers, names });
+      return { built, spanFrom: fromMs, spanTo: toMs, windows: [["Span length", secondsOf(fromMs, toMs)]] };
+    },
+  },
+  // THE DATA BLOCKS (the Snapshots view's Data blocks register, 2026-11-07): the live window the
+  // chamber holds — its newest ticks' exact reads — which networks carried data blocks over those
+  // minutes, how many, with how many updates. Read live when the note is written (option 2: no
+  // sampled series holds a data-block count).
+  data: {
+    accepts: (subject, span) => span === "hours" && subject === "all",
+    label: () => "the data blocks",
+    whole: () => true,
+    async read({ nowMs, reads, names }) {
+      if (!reads.dataWindow) return null;
+      const w = await reads.dataWindow();
+      const built = dataFacts({ ticks: w.ticks, names, keyOf: (id) => (isTracked(id) ? currentIdOf(id) : null), endMs: w.toMs });
+      const spanFrom = w.fromMs ?? nowMs;
+      const spanTo = w.toMs ?? nowMs;
+      return { built, spanFrom, spanTo, windows: [["Span length", secondsOf(spanFrom, spanTo)]] };
+    },
+  },
   // HOW IT CHANGED: the pill's (or the brushed range's) span, the equal span before it, and for the
   // long pills the daily tier the notable days are picked from.
   trend: {
     // …or a network's SPAN FACET (`<net>/span`, keys.ts), over a pill only: a brush has its own note.
-    accepts: (net, subject, span) =>
+    accepts: (subject, span) =>
       subject.endsWith("/span")
-        ? (isPill(span) || span === "all") && isTrendSubject(net, trendBaseOf(subject))
-        : (isPill(span) || span === "all" || rangeOf(span) != null) && isTrendSubject(net, subject),
+        ? (isPill(span) || span === "all") && isTrendSubject(trendBaseOf(subject))
+        : (isPill(span) || span === "all" || rangeOf(span) != null) && isTrendSubject(subject),
     label: (subject, names) => {
       const base = trendBaseOf(subject);
       return base === "dag" ? "the hypergraph" : base === UNLISTED_ID ? "the unlisted networks" : (names[base] ?? base);
@@ -485,8 +529,8 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
 
 /** Whether a note exists for this request at all: the view's own subjects and spans, never an
  *  unlisted network (its identity is unknown; the model would invent one). */
-export function noteSupported(view: NoteView, subject: string, span: NoteSpan, net = "mainnet"): boolean {
-  return VIEW_SOURCES[view]?.accepts(net, subject, span) ?? false;
+export function noteSupported(view: NoteView, subject: string, span: NoteSpan): boolean {
+  return VIEW_SOURCES[view]?.accepts(subject, span) ?? false;
 }
 
 export interface NoteFacts {
@@ -517,24 +561,18 @@ export interface NoteFacts {
   driftKeys?: Record<string, string>;
   /** Snapshots only (R71): "change" when a pair moved, else "now" — the prompt's question follows. */
   lead?: NoteLead;
-  /** Whether the facts hold the COMMON reading (R74, `noteFactsActivity.ts`): the prompt asks for
-   *  its last sentence only then. */
-  common: boolean;
-  /** Whether that common reading is the WHOLE network's (`commonIsWhole`): it produces its global
-   *  snapshots rather than being "part of" them, and the prompt asks for it in those words. */
-  whole: boolean;
 }
 
 /** THE FACTS FOR ONE NOTE: that view's reads, its builder, and the span's length. Null when the
  *  request is not one a note exists for, or the builder has nothing to describe. */
 export async function factsFor(
-  net: string, view: NoteView, subject: string, span: NoteSpan, nowMs: number,
+  view: NoteView, subject: string, span: NoteSpan, nowMs: number,
   reads?: NoteReads,
 ): Promise<NoteFacts | null> {
   const row = VIEW_SOURCES[view];
-  if (!row?.accepts(net, subject, span)) return null;
-  const names = namesOf(net);
-  const r = await row.read({ net, subject, span, nowMs, reads: reads ?? storeReads(nowMs), names, blurbs: blurbsOf(net) });
+  if (!row?.accepts(subject, span)) return null;
+  const names = namesOf();
+  const r = await row.read({ subject, span, nowMs, reads: reads ?? storeReads(nowMs), names, blurbs: blurbsOf() });
   if (!r?.built) return null;
   const { built } = r;
   const subjectName = r.subjectName ?? (row.whole(subject) ? undefined : row.label(subject, names));
@@ -559,8 +597,6 @@ export async function factsFor(
     // with the network's figures. Its facts are the country's place in the whole network, which is what
     // the country question asks for.
     kind: isSubjectNote(subject) || subjectKindOf(subject) === "country" ? subjectKindOf(subject) : "view",
-    common: hasCommonReading(built.facts),
-    whole: commonIsWhole(built.facts),
     ...(subjectName != null ? { subjectName } : {}),
     ...(built.setKey != null ? { setKey: built.setKey } : {}),
     ...(built.driftKeys != null ? { driftKeys: built.driftKeys } : {}),

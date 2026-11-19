@@ -1,11 +1,15 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import { useStore } from "@/src/store/store";
 import type { SiblingState } from "@/components/railSiblings";
 import { useLedgerSource } from "@/components/useLedgerSource";
 import { latestRelevant } from "@/src/data/follow";
-import { tickNetworksLevel, tickPolledRows } from "@/src/data/ladderLevels";
+import { registerNetworks, tickNetworksLevel, tickPolledRows } from "@/src/data/ladderLevels";
+import { blockMetaSnap, tickBlockSnaps, windowBlocks } from "@/src/data/blockWindow";
+import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
+import { readsBlockWindow, registerOf } from "@/src/engine/domain/viewPolicy";
+import { REGISTER_SUBJECTS } from "@/src/data/ledgerMeasure";
 import { LISTED_IDS } from "@/src/data/unlisted";
 import { tickInStory, tickLocked } from "@/src/data/ledgerStory";
 import { POLL } from "@/src/engine/config";
@@ -24,7 +28,9 @@ export function useSiblingState(slot: RailCardKind | null): SiblingState {
   // snapshot chain steps the global window, the metagraph snapshot its tick's reads, the place
   // and node rungs the located fleet.
   useFeedRead(["global", "metasnaps", "exact"], "Card pager", slot === "snap");
-  useFeedRead(["metasnaps", "exact"], "Card pager", slot === "metaSnap");
+  useFeedRead(["metasnaps", "exact"], "Card pager", slot === "metaSnap" || slot === "dataBlock");
+  // The Block ghost's step reads the tick's blocks off the window (`tickBlocks`).
+  useFeedRead(["api-blocks"], "Block ghost step", slot === "snap");
   useFeedRead(["clusters", "api-metagraphs", "api-geo"], "Card pager", slot === "context" || slot === "country" || slot === "cohort" || slot === "composition" || slot === "node");
   const mode = useStore((s) => s.mode);
   const filter = useStore((s) => s.filter);
@@ -34,12 +40,16 @@ export function useSiblingState(slot: RailCardKind | null): SiblingState {
   const inspect = useStore((s) => s.inspect);
   const snap = useStore((s) => s.snap);
   const metaSnap = useStore((s) => s.metaSnap);
+  const block = useStore((s) => s.block);
+  const dataBlock = useStore((s) => s.dataBlock);
   const tickNet = useStore((s) => s.tickNet);
   const railNet = useStore((s) => s.railNet);
   const selNodes = useStore((s) => s.selNodes);
   const metaList = useStore((s) => s.metaList);
   const leaderboard = useStore((s) => s.leaderboard);
   const snapshotExact = useStore((s) => s.snapshotExact);
+  const ledgerRegister = useStore((s) => s.ledgerRegister);
+  const blockWin = useSyncExternalStore(onBlockWindow, getBlockWindow, () => null);
   const following = useStore((s) => s.following);
   const geoMeasure = useStore((s) => s.geoMeasure);
   const hyperMeasure = useStore((s) => s.hyperMeasure);
@@ -73,7 +83,9 @@ export function useSiblingState(slot: RailCardKind | null): SiblingState {
     const wantsTick = slot === "snap" || slot === "context" || slot === "metaSnap";
     const tickGlobal = mode === "ledger" && wantsTick ? (snap?.data ?? null) : null;
     const net = tickGlobal ? source : null;
-    const tickNets = tickGlobal
+    // …kept to the REGISTER'S SUBJECTS (`REGISTER_SUBJECTS`, 2026-11-08): the data-carrying snapshots in
+    // Data blocks, the block-carrying ones in Transaction blocks — the same list the explorer's level is.
+    const tickNetsAll = tickGlobal
       ? tickNetworksLevel(
           tickGlobal,
           net ? [...tickPolledRows(net.metaSnaps, tickGlobal), ...tickPolledRows(net.unlistedSnaps, tickGlobal)] : [],
@@ -81,6 +93,15 @@ export function useSiblingState(slot: RailCardKind | null): SiblingState {
           (id) => LISTED_IDS.has(id),
         )
       : null;
+    const tickNets = tickNetsAll && tickGlobal ? registerNetworks(REGISTER_SUBJECTS[ledgerRegister], tickNetsAll, snapshotExact[tickGlobal.ordinal]?.rows, tickBlockSnaps(blockWin, tickGlobal.ordinal)) : tickNetsAll;
+    // THE SHOWN TICK'S BLOCKS (the Block ghost's step, `blockStep`): the window's blocks on that tick,
+    // each with its accepting snapshot — only where the register reads the window.
+    const tickBlocks =
+      snap && readsBlockWindow(registerOf(mode, ledgerRegister))
+        ? windowBlocks(blockWin)
+            .filter((b) => b.anchorOrd === snap.data.ordinal)
+            .map((b) => ({ sel: { chain: b.chain, hash: b.hash, ordinal: b.ordinal, anchorOrd: b.anchorOrd }, snap: blockMetaSnap(blockWin, b) }))
+        : null;
     return {
       mode,
       filter,
@@ -92,6 +113,9 @@ export function useSiblingState(slot: RailCardKind | null): SiblingState {
       tickNet,
       railNet,
       metaSnap,
+      block,
+      dataBlock,
+      tickBlocks,
       selNodes,
       metaList,
       isListed: (id: string) => LISTED_IDS.has(id),
@@ -112,5 +136,5 @@ export function useSiblingState(slot: RailCardKind | null): SiblingState {
       trendCursorMs,
       trendWindow,
     };
-  }, [slot, mode, filter, country, cohort, composition, inspect, snap, tickNet, railNet, metaSnap, selNodes, metaList, leaderboard, snapshotExact, following, snapsForTicks, source, geoMeasure, hyperMeasure, allNodes, trendRange, trendCursorMs, trendWindow]);
+  }, [slot, mode, filter, country, cohort, composition, inspect, snap, tickNet, railNet, metaSnap, block, selNodes, metaList, leaderboard, snapshotExact, ledgerRegister, blockWin, dataBlock, following, snapsForTicks, source, geoMeasure, hyperMeasure, allNodes, trendRange, trendCursorMs, trendWindow]);
 }

@@ -7,6 +7,7 @@ import { RoleChips } from "@/components/inspector/parts";
 import { layerCodesOf } from "@/src/data/composition";
 import { coLocatedNetworks, metagraphById } from "@/src/data/network";
 import { identityHudCss } from "@/src/palette/identity";
+import { UNLISTED_HUE, UNLISTED_ID, UNLISTED_LABEL } from "@/src/data/unlisted";
 import { nodeStatus } from "@/src/data/nodeStatus";
 import type { MetaInfo, NodeRow } from "@/src/data/types";
 import { midHash } from "@/src/util/format";
@@ -63,6 +64,12 @@ export const NODE_GLYPH_W = 82; // 56 → 74 → 82 (user, 2026-10-24: "give it 
 
 /** A network's ticker — the DAG core's is "DAG". Shared with the raw node roster. */
 export const tickerOf = (id: string): string => metagraphById(id)?.ticker ?? (id === "dag" ? "DAG" : id);
+/** A NETWORK'S MARK — the word and the hue a surface names a network key by: its ticker in its
+ *  identity hue, or the unlisted set's label in its mandated neutral (no single identity can speak
+ *  for a mixed set — `identityHudCss` would hash-assign a saturated hue to the "unlisted" id). One
+ *  home for the rule the band's rows, the cards' titles and the note chips each wrote inline. */
+export const networkMark = (key: string): { label: string; hue: string } =>
+  key === UNLISTED_ID ? { label: UNLISTED_LABEL, hue: UNLISTED_HUE } : { label: tickerOf(key), hue: identityHudCss(key) };
 
 /** One length for every node id, in every explorer. */
 // Twelve (was 14 until the ticker moved into its own first column, 2026-09-29): beside that column
@@ -103,7 +110,8 @@ export function nodeRowSpec(args: {
    *  ALL of it, never a filtered list, so a committed filter cannot hide a co-tenant. */
   metaList: readonly MetaInfo[];
   on: boolean;
-  onClick: () => void;
+  /** Absent for a READING row (the Snapshots signer level, 2026-11-08): no door, hover pairing only. */
+  onClick?: () => void;
   pair: ExplorerRowSpec["pair"];
 }): ExplorerRowSpec {
   const { row, hue } = args;

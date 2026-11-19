@@ -3,6 +3,15 @@
 import type { Mode, MotionCause, TrendMetric } from "@/src/store/store";
 import type { FocusLevel } from "./focusLadder";
 import type { ZoomId } from "@/src/data/trendWindow";
+import type { LedgerRegister } from "@/src/store/mode";
+
+/** What a register switch says the chamber is showing — the switch's own names, in the clause's case
+ *  (`components/views.ts`' `REGISTER_NAMES`; a new register is a compile error here). */
+const REGISTER_CLAUSE: Readonly<Record<LedgerRegister, string>> = {
+  snapshots: "the metagraph snapshots",
+  blocks: "the transaction blocks",
+  data: "the data blocks",
+};
 
 // THE MOTION HINT'S COPY — what the scene is doing while it moves, in one sentence (user,
 // 2026-09-26: "during the time the trend cards re-order, give a subtle hint somewhere on screen to
@@ -79,6 +88,13 @@ export function motionHint(cause: MotionCause, mode: Mode, names: HintNames, pha
       return cause.metaId === null
         ? "Back to the global snapshot"
         : `Framing ${names.network(cause.metaId)}'s snapshot${cause.ordinal != null ? ` ${cause.ordinal.toLocaleString()}` : ""}`;
+    case "block":
+      // A block is a slot under its tick (no rung, no pose of its own): the release lands on the
+      // global snapshot that carries it, in the metaSnap release's own words.
+      return cause.on ? "Framing the block" : "Back to the global snapshot";
+    case "dataBlock":
+      // A data block is a slot under its metagraph snapshot; its release lands back on that snapshot.
+      return cause.on ? "Framing the data block" : "Back to the metagraph snapshot";
     case "country":
       return cause.cc === null ? "Back to the whole globe" : `Drilling into ${names.country(cause.cc)}`;
     case "cohort":
@@ -96,6 +112,8 @@ export function motionHint(cause: MotionCause, mode: Mode, names: HintNames, pha
       // The measure as a NAME, not lowercased into the clause (PR review, 2026-10-26: "Reordering
       // by in global snapshots" — a label that starts with a preposition reads as broken grammar).
       return mode === "trend" ? `Reordering by ${names.measure(cause.id)}, busiest network first` : null;
+    case "register":
+      return `Showing ${REGISTER_CLAUSE[cause.id]}`;
     case "page":
       return "Paging the stack";
     case "rung":

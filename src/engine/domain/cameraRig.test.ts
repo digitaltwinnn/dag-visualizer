@@ -400,7 +400,6 @@ describe("FOCI.ledger, the chamber's one pose (user, 2026-11-01)", () => {
   it("is the pose of every rung: the view keeps no second pose for a commit", () => {
     const engine = readFileSync("src/engine/Engine.ts", "utf8");
     expect(engine).toMatch(/ledgerOverview: \(\) => \{\s*(\/\/[^\n]*\n\s*)*this\.cam\.focus\("ledger"\);\s*return true;\s*\}/);
-    expect(engine).toMatch(/ledgerNode: \(\) => this\._resolvers\.ledgerOverview\(\)/);
     expect(engine).toMatch(/ledgerNetwork: \(\) => this\._resolvers\.ledgerOverview\(\)/);
   });
 });

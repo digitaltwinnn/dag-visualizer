@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { METAGRAPHS } from "@/src/net/current";
+import { METAGRAPHS } from "@/src/engine/config";
 import { R, LAND_H } from "../../domain/geoLayout";
 import { ringPresence, ringWedge, type RingLevels, type RingSegment, type RingTier, type WedgeState } from "../../domain/baseRing";
 import { FOCUS_ROWS } from "../../domain/dimModel";

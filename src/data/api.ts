@@ -6,10 +6,9 @@
 import { dataTime } from "./liveAge";
 import { META_CATCHUP_MAX, chainNeedsCatchUp, chainToRecord, globalsToAppend, missedGlobals, nextCatchUpLimit } from "./liveMerge";
 import type { LiveAnswer } from "@/src/data/types";
-import { METAGRAPHS, netUrl } from "@/src/net/current";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
 import { mergeDagClusters } from "@/src/data/dagCore";
-import { COLORS, POLL } from "@/src/engine/config";
+import { COLORS, POLL, METAGRAPHS } from "@/src/engine/config";
 import type { Anchor, ClusterNode, DagCore, GlobalSnapshot, RawMetaSnapshot } from "@/src/data/types";
 import { activeRows } from "@/src/net/lineage";
 
@@ -82,6 +81,13 @@ const FEEDS = {
   // "per snapshot", not "each tick" (user, 2026-10-25: "what does 'each tick' mean?") — the read
   // fires once for every new global snapshot, and "tick" is code vocabulary no reader sees.
   exact: { label: "Snapshot reads", everyMs: null, when: "per snapshot", tempoMs: POLL.pollMs },
+  // The Blocks register's reads — its trail (/api/blocks/trail) and the block-bearing snapshots' full
+  // reads: read only while the Snapshots view is shown (either register: the switch states the Blocks
+  // span), the trail refreshed at the live edge every 30 s in Transaction blocks
+  // and every 5 min in the other registers (`blockRefreshMs`; the tempo below is the fast one, for
+  // the lane order alone), so it has no cadence of its own to go STALE on. Nothing polls beside it (the per-chain frontier read left with the open
+  // tips, D5 2026-11-07).
+  "api-blocks": { label: "Block reads", everyMs: null, when: "while shown", tempoMs: 30_000 },
 } as const;
 export type FeedId = keyof typeof FEEDS;
 const POLL_HEALTH = new Map<string, PollHealth>();
@@ -181,11 +187,19 @@ export interface MetaSnapRecord {
   height: number;        // the metagraph's OWN block-DAG depth
   subHeight: number;     // orders snapshots that share a height
   blocks: number;        // rare on mainnet; an honest 0 beats omitting it
+  /** The block hashes this snapshot accepted: the explorer lists them, the Blocks register draws them. */
+  blockHashes: string[];
   epochProgress: number;
   /** The chain the record is from, set only when it is not the map key it is filed under: a past
    *  window files a network's FORMER address under its current id (the chamber's lane), and a
    *  selection must still name the real chain (`src/data/pastWindow.ts`, review 2026-11-03). */
   chain?: string;
+}
+
+/** The block hashes a snapshot record carries. Only strings are hashes: an absent list, or a
+ *  non-string entry, is no hash rather than a fabricated one. */
+export function blockHashesOf(r: { blocks?: unknown }): string[] {
+  return Array.isArray(r.blocks) ? r.blocks.filter((b): b is string => typeof b === "string") : [];
 }
 
 /** One explorer metagraph snapshot as the rolling buffer records it (fee/size kept, blocks counted). */
@@ -195,6 +209,7 @@ export function metaSnapRecord(s: RawMetaSnapshot): MetaSnapRecord {
     ts: s.timestamp, fee: s.fee || 0, sizeInKB: s.sizeInKB || 0,
     height: s.height || 0, subHeight: s.subHeight || 0,
     blocks: Array.isArray(s.blocks) ? s.blocks.length : 0,
+    blockHashes: blockHashesOf(s),
     epochProgress: s.epochProgress || 0,
   };
 }
@@ -207,7 +222,7 @@ export interface Activity {
   /** The window every rate above is extrapolated FROM: how many snapshots, over how long. The
    *  numbers are shown to the user (the vitals state their own basis) — a rate is honest only
    *  while you can see the span it was measured over. Measured 2026-08-12 over 60 live ticks,
-   *  mainnet global L0 averages ~28 s between ticks but ranges 4.6 s to 115 s, so the 52-tick
+   *  mainnet global L0 averages ~28 s between ticks but ranges 4.6 s to 115 s, so the 50-tick
    *  buffer spans ~24 min and /hr is a ×2.5 reach. Read from the buffer's own timestamps, never
    *  assumed, so the sentence survives a cadence change — and the VARIANCE is why it must be. */
   samples: number;
@@ -316,7 +331,7 @@ export class NetworkData {
     // chains a round trip after their list), so a slow upstream answers late rather than flapping.
     const t = setTimeout(() => ctrl.abort(), 10_000);
     try {
-      const res = await fetch(netUrl(path), { signal: ctrl.signal });
+      const res = await fetch(path, { signal: ctrl.signal });
       if (!res.ok) throw new Error(String(res.status));
       const json = await res.json();
       return { json, at: dataTime(Date.now(), res.headers.get("age"), json?.memoAgeMs) };
@@ -602,7 +617,7 @@ export class NetworkData {
     // an insertion-order cap then evicts the recent ticks and keeps the year-old ones. Measured
     // the same day: the seed inserts 428 distinct timestamps against a 400 cap spanning ~8,600
     // hours, so this evicts on every cold load. Every consumer looks the index up by a GLOBAL
-    // SNAPSHOT's timestamp, and that buffer is the 52 most recent ticks — so the evicted entries
+    // SNAPSHOT's timestamp, and that buffer is the 50 most recent ticks — so the evicted entries
     // were the only ones anyone would ever read, and the tick went on to read as unidentified
     // while we were holding its anchors (rule 10).
     for (const k of staleTickKeys(this.anchorIndex.keys(), POLL.anchorIndexMax)) {
@@ -628,7 +643,7 @@ export class NetworkData {
   // ⚠️ THE WINDOW IS MEASURED, NEVER ASSUMED, and the UI states it. POLL.maxSnapshots ticks
   // is a duration only once you know the cadence, and the cadence is not what a reading of
   // the poll interval suggests: measured 2026-08-12 over 60 live ticks, mainnet's global L0
-  // averages ~28 s between ticks (the tab polls every POLL.pollMs to catch each one promptly), so 52 ticks
+  // averages ~28 s between ticks (the tab polls every POLL.pollMs to catch each one promptly), so 50 ticks
   // is a ~24-MINUTE window and a /hr figure is a ×2.5 extrapolation, not a leap. But that is
   // today's chain, not a law — and it is not even a STEADY cadence today: those same 60 ticks
   // ran 4.6 s to 115 s apart. That variance is exactly why `spanHr` and `samples` ride the

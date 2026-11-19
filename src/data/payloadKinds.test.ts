@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { kindOf, PAYLOAD_LANES, parsePayload, payloadKinds, stateSchema, unifyFieldKinds } from "./payloadKinds";
+import { dataLaneLead, kindOf, PAYLOAD_LANES, parsePayload, payloadKinds, STATE_LANE_LEAD, STATE_PROOF_LABEL, stateSchema, unifyFieldKinds } from "./payloadKinds";
 
 describe("kindOf", () => {
   it("names a single-key wrapper by its key — the shape mainnet actually anchors", () => {
@@ -59,6 +59,23 @@ describe("PAYLOAD_LANES", () => {
   it("names both lanes, distinctly", () => {
     for (const lane of [PAYLOAD_LANES.state, PAYLOAD_LANES.data]) expect(lane.name.length).toBeGreaterThan(0);
     expect(PAYLOAD_LANES.state.name).not.toBe(PAYLOAD_LANES.data.name);
+    expect(PAYLOAD_LANES.data.name).toBe("Data blocks");
+  });
+});
+
+// User, 2026-11-19: each lane says what it is, in plain words, at its top.
+describe("the lanes' sentences", () => {
+  it("the Data blocks lane counts what came in, singular and plural, and never guesses an unknown count", () => {
+    expect(dataLaneLead(12, 3)).toBe("The new data this snapshot received: 12 updates in 3 blocks, from its data layer (dL1).");
+    expect(dataLaneLead(1, 1)).toBe("The new data this snapshot received: 1 update in 1 block, from its data layer (dL1).");
+    expect(dataLaneLead(0, 0)).toBe("This snapshot received no new data.");
+    // Blocks with no updates keep their count (review): an empty block is still a block.
+    expect(dataLaneLead(0, 2)).toBe("This snapshot received 2 data blocks with no updates.");
+    expect(dataLaneLead(undefined, 3)).toBe("The new data this snapshot received, from its data layer (dL1).");
+  });
+  it("the State lane names the record and its off-chain proof", () => {
+    expect(STATE_LANE_LEAD).toMatch(/own record/);
+    expect(STATE_PROOF_LABEL).toBe("Proof of the off-chain record");
   });
 });
 

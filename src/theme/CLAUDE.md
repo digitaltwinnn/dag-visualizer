@@ -13,16 +13,15 @@ stored is the dark instrument whatever the OS says; `System` is a stored CHOICE 
 and the pre-paint script stamps `dark` when nothing is stored. Before that day absence meant System.
 
 **Theme is a two-way pref (`system` / `light` / `dark`), not a boolean** — `src/theme/resolve.ts`
-is the one resolver (`ThemePref`, `Theme`, `THEME_KEY`, `parseThemePref`, `resolveTheme`), the
-`src/net/parse.ts` pattern mirrored for theme. Almost every token is a single `light-dark(light,
-dark)` call at its ONE definition site in `:root` — no second `[data-theme]` override block the
-way the network accent needs, because CSS itself carries both values. `color-scheme: light dark`
+is the one resolver (`ThemePref`, `Theme`, `THEME_KEY`, `parseThemePref`, `resolveTheme`), and the
+pre-paint script mirrors it textually. Almost every token is a single `light-dark(light,
+dark)` call at its ONE definition site in `:root` — no second `[data-theme]` override block,
+because CSS itself carries both values. `color-scheme: light dark`
 on `:root` is what makes `light-dark()` resolve at all; an explicit choice stamps
 `[data-theme="light"|"dark"]` on `<html>`, narrowing `color-scheme` to just that value, and
 `System` leaves the attribute off so the browser's own `prefers-color-scheme` decides — confirmed
 live: flipping the OS scheme with no reload repaints every token with zero JS, because nothing
-but CSS is involved while `data-theme` is absent. layout.tsx's inline pre-paint script (the same
-device the network accent uses) reads `localStorage['dagviz:theme']` and stamps `data-theme`
+but CSS is involved while `data-theme` is absent. layout.tsx's inline pre-paint script reads `localStorage['dagviz:theme']` and stamps `data-theme`
 synchronously before first paint, so a stored explicit choice never flashes the wrong scheme.
 **The NUMBER exception**: `light-dark()` is `<color>`-only, so a token whose value is a number
 cannot use it and takes the guarded override TRIPLE instead — `:root` bakes the dark value,
@@ -43,10 +42,11 @@ mount, adopts what the pre-paint script already stamped, and is the app's only
 `matchMedia("(prefers-color-scheme: dark)")` listener — it resolves against the CURRENT pref on
 every OS change, so a flip is a no-op unless the pref is `system`. `applyThemePref()` is the one
 write path (stamps or removes `data-theme`, persists or clears `localStorage`, writes the store's
-`theme`/`themePref` pair); `ThemeToggle` calls it and renders nothing of its own — same
-React-19 mount-state rule "The three networks" states for `NetLink`/`NetworkSwitch`: it boots
+`theme`/`themePref` pair); `ThemeToggle` calls it and renders nothing of its own. It boots
 `system` on server AND first client render, so hydration sees no mismatch and the icon corrects
-itself once `ThemeController`'s effect adopts the stored choice.
+itself once `ThemeController`'s effect adopts the stored choice (React 19 answers a hydration
+mismatch by regenerating the tree, and `suppressHydrationWarning` is not the tool: it KEEPS the
+server value).
 
 **The Engine swaps colours in place, never rebuilds.** `_colors` (the structural `SceneColors`)
 and `_sceneColorMap` (the identity hex map) are both mutated by `_refreshTheme()`, so every

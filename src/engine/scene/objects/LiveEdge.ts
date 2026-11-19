@@ -41,7 +41,7 @@ const EDGE_H = 0.14 * BAR_H;
  *  clearly darkens rather than the whole line pinning bright. */
 const BREATHE_BASE = 0.62;
 const BREATHE_AMP = 0.26;
-const BREATHE_RATE = 2.4;
+const BREATHE_RATE = 2.4; // the calm beat
 /** Standby: still, and now well under the breath's own trough (user, 2026-08-18: "dim the front
  *  line that 'settles' a bit more while it is at rest"). Raising the breath raised the contrast the
  *  resting state has to clear — at 0.2 the still line read as a quiet moment of the same signal

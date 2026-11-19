@@ -15,14 +15,12 @@ import {
   Server,
   Component,
   Database,
+  NotebookText,
   Blocks,
   Signature,
   Coins,
   CircleHelp,
   Shapes,
-  BadgeCheck,
-  GitMerge,
-  FlaskConical,
   ChartSpline,
   CalendarRange,
   Crosshair,
@@ -37,18 +35,20 @@ import {
   Hourglass,
   Network,
   Clock,
+  Ruler,
   type LucideIcon,
   Minus,
   Plus,
 } from "lucide-react";
 import type { NotableKind, NoteChangeKind } from "@/src/data/noteTypes";
-import type { NetworkId } from "@/src/engine/config";
 import type { Mode } from "@/src/store/store";
 import type { PickDescriptor } from "@/src/data/types";
 import type { TrendMetric } from "@/src/store/store";
 import type { HyperMeasure } from "@/src/data/hyperMeasure";
 import type { GeoMeasure } from "@/src/data/geoMeasure";
 import type { LedgerMeasure } from "@/src/data/ledgerMeasure";
+import type { BlockMeasure } from "@/src/data/blockMeasure";
+import type { LedgerRegister } from "@/src/store/mode";
 
 // ONE source of truth for the interface's VOCABULARY glyphs — each view kind → its lucide icon.
 // Consumed by the top-bar view switch (TopBar), the card-head kind marks (inspector/cards.tsx),
@@ -99,6 +99,25 @@ export const SNAPSHOT_ICON: LucideIcon = Box;
 // wears the plural cube — distinct from SNAPSHOT_ICON (the ONE global block it anchors into).
 export const METASNAP_ICON: LucideIcon = Boxes;
 
+// A BLOCK's mark (the Blocks register's card, ghost and dock tray, 2026-11-05): the same glyph the
+// History view's Blocks measure wears — one subject, one mark. Not the cubes: Box is the global
+// snapshot's, Boxes the metagraph snapshot's, and both stand in the same rail.
+export const BLOCK_ICON: LucideIcon = Blocks;
+
+/** THE SNAPSHOTS VIEW'S THREE REGISTERS, one mark each (the register switch on the scene): Metagraph
+ *  snapshots wears the metagraph snapshot's cubes, Transaction blocks the block's mark, Data blocks the
+ *  database (D6, 2026-11-07 — the metagraph kind "data" already wears `Blocks`, the transaction
+ *  block's own glyph, so the two halves would read alike; `Database` is the app's mark for what a
+ *  chain stores). Typed on the register vocabulary, so a new register without a glyph is a compile
+ *  error here. */
+export const REGISTER_ICONS: Readonly<Record<LedgerRegister, LucideIcon>> = {
+  // The metagraph snapshot's own cubes (user, 2026-11-19: "cubes everywhere") — the card, its rail
+  // entry and the register wear one mark; the stacked layers stay the Snapshots VIEW's.
+  snapshots: METASNAP_ICON,
+  blocks: BLOCK_ICON,
+  data: Database,
+};
+
 // THE COMMITTED INSTANT's mark (History's cursor card, 2026-09-19): the crosshair — one moment
 // marked across every plane at once, which is exactly what the timeline's cursor draws. Named
 // like ABOUT_ICON/EXPLORE_ICON: a dedicated non-view mark gets a constant here. Deliberately not
@@ -136,24 +155,23 @@ export const PROVIDER_ICON: LucideIcon = Server;
 // confused with, since both talk about layers.
 export const COMPOSITION_ICON: LucideIcon = Component;
 
+/** THE PAYLOAD TABS' MARKS (the metagraph snapshot card's tabs and the raw pane's lanes, one map):
+ *  Data blocks wears the REGISTER SWITCH's own glyph (user, 2026-11-19: "in the tabs etc use the same
+ *  icon as in the view switcher" — it wore Blocks, which is Transaction blocks' mark, while State wore
+ *  the switch's Data blocks glyph, Database); State a notebook, the metagraph's own record; Signers the
+ *  signature. */
+export const LANE_ICONS: Record<"state" | "data" | "signers", LucideIcon> = {
+  state: NotebookText,
+  data: Database,
+  signers: Signature,
+};
+
 // The ONE size every card-head/title KIND MARK renders at — About's Info, the tool cards'
 // Compass, the node card's hexagon, the snapshot card's Box (CardHead's panel `icon` + the inspector
 // titles in inspector/cards.tsx). 16px (`size-4`): the old 14px read timid next to the 15px
 // text-title headline (user follow-up on Task 23). Single-sourced here so the heads can't drift;
 // the dock TRAYS and the top-bar view switch deliberately keep their own sizes (this constant is
 // only the head/title mark).
-/** The raw pane's LANE icons (user, 2026-08-14): the payload tabs and the signers tab each get
- *  a mark — the accumulated STORE, the carried records, the signatures. Monochrome via
- *  currentColor like every glyph, so the tab's own on/off colour carries them. */
-export const LANE_ICONS: Record<"state" | "data" | "signers", LucideIcon> = {
-  state: Database,
-  // Blocks, not a file (user, 2026-08-14): the lane's records ride in DATA BLOCKS — the mark
-  // says what the chain actually carries. Distinct from Box (the global snapshot) and Boxes
-  // (the metagraph snapshot tile).
-  data: Blocks,
-  signers: Signature,
-};
-
 export const KIND_MARK_CLASS = "flex-none size-4";
 
 /** A METAGRAPH TYPE's mark (the vitals band's metagraphs card, 2026-08-30): what the network
@@ -169,17 +187,6 @@ export const METATYPE_ICONS: Record<"data" | "currency" | "unknown" | "mixed", L
   mixed: Shapes,
 };
 
-/** The CONSTELLATION NETWORKS' marks (the NetworkSwitch, 2026-08-30) — the dev-lifecycle family:
- *  mainnet is the canonical, verified chain (BadgeCheck), integrationnet is where branches meet
- *  (GitMerge — integration, literally), testnet is the lab (FlaskConical). Monochrome via
- *  currentColor like every glyph; the switch tints each with its network's own accent token, so
- *  colour and glyph are one mark. */
-export const NET_ICONS: Record<NetworkId, LucideIcon> = {
-  mainnet: BadgeCheck,
-  integrationnet: GitMerge,
-  testnet: FlaskConical,
-};
-
 // The inspector card KINDS map onto one glyph set shared with the dock icon trays: the metagraph
 // dossier is the Hypergraph subject (Orbit), a node is the honeycomb's cell (NODE_ICON), a snapshot
 // is the BLOCK (SNAPSHOT_ICON), a layer is one stratum (LAYER_ICON).
@@ -191,6 +198,8 @@ export function iconForPick(
       return SNAPSHOT_ICON; // the block, not the whole-stack view mark (see its constant above)
     case "metaSnap":
       return METASNAP_ICON; // a metagraph snapshot tile (see its constant above)
+    case "block":
+      return BLOCK_ICON; // a block of the block DAG (the Blocks register, see its constant above)
     case "country":
       return COUNTRY_ICON; // the geo drill rung (see its constant above)
     case "cohort":
@@ -221,7 +230,7 @@ export function iconForPick(
  *  snapshot's boxes. Data and size (bytes) are the drive, not the state lane's database; nodes
  *  the honeycomb's hexagon — the geo view stacks them as cells — never the provider's server (a
  *  node is not its host). Cadence (`continuity`) is a heartbeat: the chain's rhythm. */
-export type MeasureId = TrendMetric | HyperMeasure | GeoMeasure | LedgerMeasure;
+export type MeasureId = TrendMetric | HyperMeasure | GeoMeasure | LedgerMeasure | BlockMeasure;
 /** Typed on the four measure vocabularies (review, 2026-10-24), so a new measure id without a glyph
  *  is a compile error here — the tune-schema idiom — while `measureIcon` keeps the lookup by the
  *  option's string id lenient for the tiles. */
@@ -250,6 +259,12 @@ export const MEASURE_ICONS: Readonly<Record<MeasureId, LucideIcon>> = {
   fee: Coins,
   anchors: Boxes,
   size: HardDrive,
+  // The Data blocks register's lead measure (D6): its register's own mark, what a chain stores.
+  data: Database,
+  // The Blocks register (`BlockMeasure`): fees above, then the amount a block moved — a move from
+  // one address to another, the transfers' own mark — and its height in its chain.
+  amount: ArrowLeftRight,
+  height: Ruler,
 };
 
 /** A measure option's glyph by its id — undefined for an id no vocabulary declares. */

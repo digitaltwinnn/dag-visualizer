@@ -1,5 +1,5 @@
 import type { NoteChange, NoteChangeFind, NoteChangeSubject } from "@/src/data/noteTypes";
-import { NETWORKS, type NetworkId } from "@/src/engine/config";
+import { HOSTS } from "@/src/engine/config";
 
 // A NOTABLE ROW'S EXACT SNAPSHOT (user, 2026-11-02: "largest snapshot could open the snapshot
 // cards"). The store keeps the largest global and a chain's widest gap per 5-minute bucket, not
@@ -181,8 +181,8 @@ async function readRecord(url: string, cached: boolean, given?: AbortSignal): Pr
 }
 
 /** The explorer's own records: ~330 B each, by ordinal. */
-export function explorerReader(net: string): ChainReader {
-  const be = NETWORKS[net as NetworkId].be;
+export function explorerReader(): ChainReader {
+  const be = HOSTS.be;
   return {
     latest: (chain, signal) => readRecord(chain == null ? `${be}/global-snapshots/latest` : `${be}/currency/${chain}/snapshots?limit=1`, false, signal),
     at: (chain, ordinal, signal) => readRecord(chain == null ? `${be}/global-snapshots/${ordinal}` : `${be}/currency/${chain}/snapshots/${ordinal}`, true, signal),

@@ -1,4 +1,7 @@
 import type { NodeInfo, NodeRow } from "@/src/data/types";
+import { UNLISTED_ID } from "@/src/data/unlistedId";
+import { registerRuns } from "@/src/engine/domain/viewPolicy";
+import type { LedgerRegister } from "@/src/store/mode";
 
 // The shared composition vocabulary: group a metagraph's nodes into rows that sum to the total.
 // Hybrids (nodes running >1 layer) group by their EXACT code set, so two make-ups render as two
@@ -19,6 +22,22 @@ export const ROLE_SHORT: Record<string, string> = { l0: "L0", cl1: "cL1", dl1: "
  *  per-role and per-type counts of one node list can never disagree. */
 export const rolesOf = (n: { roles?: string[]; layer?: string | null }): string[] =>
   n.roles && n.roles.length ? n.roles : n.layer ? [n.layer] : [];
+/** THE FILTERED NETWORK'S DECLARED LAYERS (2026-11-19, `viewPolicy.registerRuns`' input): null under
+ *  All and the unlisted set (no one network), else what the network DECLARES — the directory's layer
+ *  URLs for a metagraph, the protocol's own for the DAG (`MetaInfo.layers`). Never read off the node
+ *  roster (review I1): a cluster read that failed comes back as no nodes, and an absence inferred from
+ *  it would state a fact nobody observed (rule 10). Not declared yet (an older cached payload, the
+ *  list still loading) is null: unknown, so every register stays open. */
+export function filterLayers(filter: string, metaList: readonly { id: string; layers?: readonly string[] }[]): string[] | null {
+  if (filter === "all" || filter === UNLISTED_ID) return null;
+  const layers = metaList.find((m) => m.id === filter)?.layers;
+  return layers && layers.length ? [...layers] : null;
+}
+/** DOES THE FILTERED NETWORK MAKE THIS REGISTER'S SUBJECT — the ONE question the Engine (the chamber's
+ *  trail), the follow (`followLatest`'s pause) and the HUD (`useRegisterScope`) ask. */
+export function registerHasSubject(register: LedgerRegister, filter: string, metaList: readonly { id: string; layers?: readonly string[] }[]): boolean {
+  return registerRuns(register, filterLayers(filter, metaList));
+}
 /** WHAT A LAYER DOES, one word each — the composition rows' dedicated labels and, since
  *  2026-10-30, the Hypergraph explorer's measure control (user: "instead of L0 use words like
  *  'consensus layer'"); the codes (`ROLE_SHORT`) stay the chips' and a sentence's. One home. */

@@ -52,6 +52,13 @@ export function midHash(v: string, max = 46): string {
   return `${v.slice(0, max - 1 - tail)}…${v.slice(-tail)}`;
 }
 
+/** THE ONE SHORT FORM OF A BLOCK HASH (D5 carry, D6 2026-11-07): the Block card's head, the explorer
+ *  and RAW rows and the block callout name a block alike — the card's measured ten characters, which
+ *  fit beside its height chip and live control at 1600 (twelve ran under the chip). Its foot keeps the
+ *  long `midHash` forms, where a hash is looked up rather than recognised. */
+export const BLOCK_HASH_GLYPHS = 10;
+export const shortBlockHash = (hash: string): string => midHash(hash, BLOCK_HASH_GLYPHS);
+
 // A COUNT AT MAGNITUDE SCALE → "~27.9M" (user, 2026-09-02: "1–25 of 27,851,696" and "1 /
 // 1,114,068" on one pager row — "can we use a more readable format?"). Best practice splits the
 // row's numbers by what they are: the visible row range and the CURRENT page stay exact (one

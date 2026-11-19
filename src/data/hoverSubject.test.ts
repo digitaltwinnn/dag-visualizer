@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { countrySubject, hoverKeyOf, tooltipSubject } from "./hoverSubject";
+import type { PickDescriptor } from "./types";
 
 // A hover takes the hovered object's own colour (user, 2026-10-03). What belongs to the DAG — its
 // nodes, its core, a global snapshot — takes the DAG's identity hue; only a country, which
@@ -70,7 +71,7 @@ describe("tooltipSubject — a metagraph snapshot tile", () => {
   });
 
   it("hovers a listed network's tile in that network's identity hue", async () => {
-    const { METAGRAPHS } = await import("@/src/net/current");
+    const { METAGRAPHS } = await import("@/src/engine/config");
     const listed = METAGRAPHS.find((m) => m.id !== "dag")!;
     const s = tooltipSubject({ kind: "metaSnap", sel: { metaId: listed.id, ordinal: 7 } } as never);
     expect(s?.color).toMatch(/^oklch\(var\(--ident-l\)/);
@@ -92,5 +93,18 @@ describe("the hover subject's kind", () => {
 describe("countrySubject", () => {
   it("is a country hover carrying the ISO code, with no ticker", () => {
     expect(countrySubject("DE")).toEqual({ kind: "country", ident: "", name: "DE", color: CORE, mono: false });
+  });
+});
+
+describe("tooltipSubject — a block (the Transaction blocks register, 2026-11-07)", () => {
+  it("labels a DAG block as DAG in the DAG's hue with its short hash, mono; a token block in its chain's hue", () => {
+    const global = { kind: "snapshot", data: { ordinal: 1 } } as unknown as PickDescriptor;
+    const dag = tooltipSubject({ kind: "block", sel: { chain: "dag", hash: "e4d9329baa15123456789abcdef34fb5239", ordinal: 1, anchorOrd: 1 }, global, title: "Transaction block" } as unknown as PickDescriptor)!;
+    expect(dag.kind).toBe("block");
+    expect(dag.ident).toBe("DAG");
+    expect(dag.mono).toBe(true);
+    expect(dag.name).toMatch(/…/);
+    const tok = tooltipSubject({ kind: "block", sel: { chain: "DAGnoSuchChain", hash: "abcdef0123456789", ordinal: 1, anchorOrd: 1 }, global, title: "Transaction block" } as unknown as PickDescriptor)!;
+    expect(tok.ident).toMatch(/…$/); // an uncataloged chain: its short address
   });
 });

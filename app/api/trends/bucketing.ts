@@ -34,9 +34,9 @@ export interface FleetCounts {
 /** redis key → field → value (merge-folded within this run). */
 export type IncMap = Map<string, Map<string, number>>;
 
-export function addInc(inc: IncMap, net: string, tsMs: number, series: string, value: number, tiers: Tier[] = TIERS): void {
+export function addInc(inc: IncMap, tsMs: number, series: string, value: number, tiers: Tier[] = TIERS): void {
   for (const tier of tiers) {
-    const { key, bucket } = slotOf(net, tier, tsMs);
+    const { key, bucket } = slotOf(tier, tsMs);
     const field = fieldOf(bucket, series);
     let m = inc.get(key);
     if (!m) { m = new Map(); inc.set(key, m); }
@@ -47,19 +47,19 @@ export function addInc(inc: IncMap, net: string, tsMs: number, series: string, v
 /** Global spine: ticks/anchors/blocks sums, gap stats, and the g.ticks COVERAGE zero-fill.
  *  `prevTickTsMs` is the previous run's newest tick — the cross-run gap boundary; null on
  *  a cold cursor (first gap starts at the first in-batch pair, nothing is invented). */
-export function bucketGlobals(inc: IncMap, net: string, recs: GlobalRec[], prevTickTsMs: number | null): void {
+export function bucketGlobals(inc: IncMap, recs: GlobalRec[], prevTickTsMs: number | null): void {
   let prev = prevTickTsMs;
   for (const r of recs) {
     const t = Date.parse(r.timestamp);
-    addInc(inc, net, t, "g.ticks", 1);
+    addInc(inc, t, "g.ticks", 1);
     const anchored = typeof r.metagraphSnapshotCount === "number" ? r.metagraphSnapshotCount : 0;
-    addInc(inc, net, t, "g.anchors", anchored);
-    addInc(inc, net, t, "g.anchorsMax", anchored); // the largest global snapshot, the Snapshots card's row
-    addInc(inc, net, t, "g.blocks", Array.isArray(r.blocks) ? r.blocks.length : 0);
+    addInc(inc, t, "g.anchors", anchored);
+    addInc(inc, t, "g.anchorsMax", anchored); // the largest global snapshot, the Snapshots card's row
+    addInc(inc, t, "g.blocks", Array.isArray(r.blocks) ? r.blocks.length : 0);
     if (prev != null) {
       const gap = Math.max(0, Math.round((t - prev) / 1000));
-      addInc(inc, net, t, "g.gapMax", gap);
-      addInc(inc, net, t, "g.gapSum", gap);
+      addInc(inc, t, "g.gapMax", gap);
+      addInc(inc, t, "g.gapSum", gap);
     }
     prev = t;
   }
@@ -79,9 +79,9 @@ export function bucketGlobals(inc: IncMap, net: string, recs: GlobalRec[], prevT
   const fillFrom = prevTickTsMs ?? (recs.length >= 2 ? Date.parse(recs[0].timestamp) : null);
   if (fillFrom != null && recs.length >= 1) {
     const to = Date.parse(recs[recs.length - 1].timestamp);
-    for (let t = fillFrom; t <= to; t += 300000) addInc(inc, net, t, "g.ticks", 0, ["5m"]);
-    for (let t = fillFrom; t <= to; t += 3600000) addInc(inc, net, t, "g.ticks", 0, ["1h"]);
-    for (let t = fillFrom; t <= to; t += 86400000) addInc(inc, net, t, "g.ticks", 0, ["1d"]);
+    for (let t = fillFrom; t <= to; t += 300000) addInc(inc, t, "g.ticks", 0, ["5m"]);
+    for (let t = fillFrom; t <= to; t += 3600000) addInc(inc, t, "g.ticks", 0, ["1h"]);
+    for (let t = fillFrom; t <= to; t += 86400000) addInc(inc, t, "g.ticks", 0, ["1d"]);
   }
 }
 
@@ -91,27 +91,27 @@ export function bucketGlobals(inc: IncMap, net: string, recs: GlobalRec[], prevT
  *  Continuity reading, 2026-09-07) and the anchoring count (m.{id}.ticks, 2026-10-08): pass the previous run's newest record timestamp (null to
  *  open a fresh chain, e.g. after an accepted gap). Omit it entirely when record order isn't
  *  guaranteed oldest→newest — the rebuild script's page streams — and no gap is invented. */
-export function bucketMetas(inc: IncMap, net: string, id: string, recs: MetaRec[], gapChain?: number | null, floors = true): void {
+export function bucketMetas(inc: IncMap, id: string, recs: MetaRec[], gapChain?: number | null, floors = true): void {
   let prev = gapChain === undefined ? undefined : gapChain;
   for (const r of recs) {
     const t = Date.parse(r.timestamp);
-    addInc(inc, net, t, `m.${id}.snaps`, 1);
-    addInc(inc, net, t, `m.${id}.fee`, r.fee || 0);
-    addInc(inc, net, t, `m.${id}.kb`, r.sizeInKB || 0);
+    addInc(inc, t, `m.${id}.snaps`, 1);
+    addInc(inc, t, `m.${id}.fee`, r.fee || 0);
+    addInc(inc, t, `m.${id}.kb`, r.sizeInKB || 0);
     // Each network's own sealed blocks (2026-09-11 — transfers of its token and a data
     // network's application records ride in blocks; the raw cron records carry the array).
-    addInc(inc, net, t, `m.${id}.blocks`, Array.isArray(r.blocks) ? r.blocks.length : 0);
+    addInc(inc, t, `m.${id}.blocks`, Array.isArray(r.blocks) ? r.blocks.length : 0);
     // The floors are the CATALOG's (the fee card's "every network summed" lower bound): an unlisted
     // chain sampled for its own count stays out of them (`floors: false`).
     if (floors) {
-      addInc(inc, net, t, "g.feeFloor", r.fee || 0);
-      addInc(inc, net, t, "g.kbFloor", r.sizeInKB || 0);
+      addInc(inc, t, "g.feeFloor", r.fee || 0);
+      addInc(inc, t, "g.kbFloor", r.sizeInKB || 0);
     }
     if (prev !== undefined) {
       if (prev != null) {
         const gap = Math.max(0, Math.round((t - prev) / 1000));
-        addInc(inc, net, t, `m.${id}.gapSum`, gap);
-        addInc(inc, net, t, `m.${id}.gapMax`, gap);
+        addInc(inc, t, `m.${id}.gapSum`, gap);
+        addInc(inc, t, `m.${id}.gapMax`, gap);
       }
       // ANCHORINGS — the global ticks that carried this chain's snapshots (user, 2026-10-08: "I
       // think they created one every 3s, but anchored to global only ~30s"). A metagraph snapshot
@@ -119,7 +119,7 @@ export function bucketMetas(inc: IncMap, net: string, id: string, recs: MetaRec[
       // new anchoring; a stamp equal to the previous run's newest is a tick that straddled two
       // runs and was counted by the first. Rides the gap chain's ordering guarantee, for the same
       // reason the gaps do.
-      if (t !== prev) addInc(inc, net, t, `m.${id}.ticks`, 1);
+      if (t !== prev) addInc(inc, t, `m.${id}.ticks`, 1);
       prev = t;
     }
   }
@@ -127,22 +127,22 @@ export function bucketMetas(inc: IncMap, net: string, id: string, recs: MetaRec[
 
 /** Fleet gauges: hourly + daily tiers only (point samples), per-country daily only
  *  (cardinality control — spec). */
-export function bucketFleet(inc: IncMap, net: string, tsMs: number, fleet: FleetCounts): void {
+export function bucketFleet(inc: IncMap, tsMs: number, fleet: FleetCounts): void {
   const tiers: Tier[] = ["1h", "1d"];
-  if (fleet.total != null) addInc(inc, net, tsMs, "f.nodes", fleet.total, tiers);
-  for (const [id, n] of Object.entries(fleet.perNet)) addInc(inc, net, tsMs, `f.nodes.${id}`, n, tiers);
-  for (const [layer, n] of Object.entries(fleet.layers)) addInc(inc, net, tsMs, `f.layer.${layer}`, n, tiers);
+  if (fleet.total != null) addInc(inc, tsMs, "f.nodes", fleet.total, tiers);
+  for (const [id, n] of Object.entries(fleet.perNet)) addInc(inc, tsMs, `f.nodes.${id}`, n, tiers);
+  for (const [layer, n] of Object.entries(fleet.layers)) addInc(inc, tsMs, `f.layer.${layer}`, n, tiers);
   for (const [id, roles] of Object.entries(fleet.perNetLayers ?? {}))
-    for (const [layer, n] of Object.entries(roles)) addInc(inc, net, tsMs, `f.layer.${id}.${layer}`, n, tiers);
+    for (const [layer, n] of Object.entries(roles)) addInc(inc, tsMs, `f.layer.${id}.${layer}`, n, tiers);
   for (const [id, types] of Object.entries(fleet.perNetTypes ?? {}))
-    for (const [key, n] of Object.entries(types)) addInc(inc, net, tsMs, `f.type.${id}.${key}`, n, tiers);
-  for (const [cc, n] of Object.entries(fleet.countries)) addInc(inc, net, tsMs, `f.cc.${cc}`, n, ["1d"]);
+    for (const [key, n] of Object.entries(types)) addInc(inc, tsMs, `f.type.${id}.${key}`, n, tiers);
+  for (const [cc, n] of Object.entries(fleet.countries)) addInc(inc, tsMs, `f.cc.${cc}`, n, ["1d"]);
 }
 
 /** The geo family's daily gauges (`keys.ts` `geoSlotOf`): the day's LAST hourly reading, as
  *  every `f.*` gauge merges ("set"). Written beside, not instead of, the tiers' `f.cc.<cc>`. */
-export function bucketFleetGeo(inc: IncMap, net: string, tsMs: number, geo: FleetGeo): void {
-  const { key, bucket } = geoSlotOf(net, tsMs);
+export function bucketFleetGeo(inc: IncMap, tsMs: number, geo: FleetGeo): void {
+  const { key, bucket } = geoSlotOf(tsMs);
   let m = inc.get(key);
   if (!m) { m = new Map(); inc.set(key, m); }
   const put = (series: string, v: number) => m.set(fieldOf(bucket, series), mergeVals(series, m.get(fieldOf(bucket, series)), v));
@@ -152,7 +152,7 @@ export function bucketFleetGeo(inc: IncMap, net: string, tsMs: number, geo: Flee
   for (const [id, by] of Object.entries(geo.perNetProviders)) for (const [k, n] of Object.entries(by)) put(`f.isp.${id}.${k}`, n);
   const sites = Object.entries(geo.sites);
   if (!sites.length) return;
-  const slot = geoSitesSlotOf(net, tsMs);
+  const slot = geoSitesSlotOf(tsMs);
   let own = inc.get(slot.key);
   if (!own) { own = new Map(); inc.set(slot.key, own); }
   for (const [site, n] of sites) {
@@ -165,13 +165,13 @@ export function bucketFleetGeo(inc: IncMap, net: string, tsMs: number, geo: Flee
  *  a chain's list holds, bucketed by its snapshot's time: the DAG's own as `g.tx` (count),
  *  `g.txAmt` (DAG moved) and `g.txFee` (datum), a network's token as `m.<id>.tx` / `.txAmt` (in its
  *  own token, so never summed across networks) / `.txFee`. Counters, every tier. */
-export function bucketTransfers(inc: IncMap, net: string, chain: "dag" | string, recs: readonly TxRec[]): void {
+export function bucketTransfers(inc: IncMap, chain: "dag" | string, recs: readonly TxRec[]): void {
   const p = chain === "dag" ? "g" : `m.${chain}`;
   for (const r of recs) {
     const t = Date.parse(r.timestamp);
-    addInc(inc, net, t, `${p}.tx`, 1);
-    addInc(inc, net, t, `${p}.txAmt`, (Number(r.amount) || 0) / 1e8);
-    addInc(inc, net, t, `${p}.txFee`, Number(r.fee) || 0);
+    addInc(inc, t, `${p}.tx`, 1);
+    addInc(inc, t, `${p}.txAmt`, (Number(r.amount) || 0) / 1e8);
+    addInc(inc, t, `${p}.txFee`, Number(r.fee) || 0);
   }
 }
 
@@ -181,12 +181,12 @@ export function bucketTransfers(inc: IncMap, net: string, chain: "dag" | string,
  *  sampler shipped, before the fill reached, a failed read) as not measured. History's
  *  covered-counter zero-fill would otherwise claim every `g.ticks` bucket since 2025 transferred
  *  nothing. A presence marker, so "set" (`merge.ts`). */
-export function markTransferCoverage(inc: IncMap, net: string, fromMs: number, toMs: number, tiers: Tier[] = TIERS): void {
+export function markTransferCoverage(inc: IncMap, fromMs: number, toMs: number, tiers: Tier[] = TIERS): void {
   if (!(toMs >= fromMs)) return;
   for (const tier of tiers) {
     const step = tier === "5m" ? 300_000 : tier === "1h" ? 3_600_000 : 86_400_000;
-    for (let t = fromMs; t <= toMs; t += step) addInc(inc, net, t, "x.cov", 0, [tier]);
-    addInc(inc, net, toMs, "x.cov", 0, [tier]);
+    for (let t = fromMs; t <= toMs; t += step) addInc(inc, t, "x.cov", 0, [tier]);
+    addInc(inc, toMs, "x.cov", 0, [tier]);
   }
 }
 
@@ -194,13 +194,13 @@ export function markTransferCoverage(inc: IncMap, net: string, fromMs: number, t
  *  `f.stake` (DAG delegated), `f.stake.live` (to validators in the cluster), `f.stake.delegations`,
  *  `f.stake.validators` — and each validator's own reading in the stake family (`stakeSlotOf`),
  *  the day's last hourly reading. */
-export function bucketStake(inc: IncMap, net: string, tsMs: number, s: StakeReading): void {
+export function bucketStake(inc: IncMap, tsMs: number, s: StakeReading): void {
   const tiers: Tier[] = ["1h", "1d"];
-  addInc(inc, net, tsMs, "f.stake", s.total, tiers);
-  addInc(inc, net, tsMs, "f.stake.live", s.live, tiers);
-  addInc(inc, net, tsMs, "f.stake.delegations", s.delegations, tiers);
-  addInc(inc, net, tsMs, "f.stake.validators", s.validators, tiers);
-  const { key, bucket } = stakeSlotOf(net, tsMs);
+  addInc(inc, tsMs, "f.stake", s.total, tiers);
+  addInc(inc, tsMs, "f.stake.live", s.live, tiers);
+  addInc(inc, tsMs, "f.stake.delegations", s.delegations, tiers);
+  addInc(inc, tsMs, "f.stake.validators", s.validators, tiers);
+  const { key, bucket } = stakeSlotOf(tsMs);
   let m = inc.get(key);
   if (!m) { m = new Map(); inc.set(key, m); }
   for (const v of s.perValidator) {

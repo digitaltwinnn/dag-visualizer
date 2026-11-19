@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
-import { NETWORKS, type NetworkId } from "@/src/engine/config";
+import { HOSTS } from "@/src/engine/config";
 import { isTracked } from "@/src/net/lineage";
-import { netOf } from "@/src/net/request";
 import { unlistedChains } from "../../unlistedChains";
 
 // A NETWORK'S SNAPSHOT HISTORY, ordinal-addressed (user, 2026-08-14 — "the pagination should be
@@ -43,8 +42,8 @@ const mapRow = (s: BeSnap) => ({
   sizeInKB: s.sizeInKB ?? 0,
 });
 
-async function fetchLive(net: NetworkId, address: string) {
-  const r = await fetch(`${NETWORKS[net].be}/currency/${address}/snapshots?limit=${PAGE}`, {
+async function fetchLive(address: string) {
+  const r = await fetch(`${HOSTS.be}/currency/${address}/snapshots?limit=${PAGE}`, {
     headers: { Accept: "application/json" },
     cache: "no-store",
     signal: AbortSignal.timeout(8000),
@@ -54,8 +53,8 @@ async function fetchLive(net: NetworkId, address: string) {
   return { rows: (j.data ?? []).map(mapRow) };
 }
 
-async function fetchOne(net: NetworkId, address: string, ordinal: number) {
-  const r = await fetch(`${NETWORKS[net].be}/currency/${address}/snapshots/${ordinal}`, {
+async function fetchOne(address: string, ordinal: number) {
+  const r = await fetch(`${HOSTS.be}/currency/${address}/snapshots/${ordinal}`, {
     headers: { Accept: "application/json" },
     cache: "no-store",
     signal: AbortSignal.timeout(8000),
@@ -66,25 +65,24 @@ async function fetchOne(net: NetworkId, address: string, ordinal: number) {
   return mapRow(j.data);
 }
 
-async function fetchBefore(net: NetworkId, address: string, before: number) {
+async function fetchBefore(address: string, before: number) {
   const lo = Math.max(1, before - PAGE + 1);
   const ordinals: number[] = [];
   for (let o = before; o >= lo; o--) ordinals.push(o);
-  const rows = await Promise.all(ordinals.map((o) => fetchOne(net, address, o)));
+  const rows = await Promise.all(ordinals.map((o) => fetchOne(address, o)));
   return { rows };
 }
 
 // An ordinal range in the past is immutable — cache the assembled page for a day.
-const cachedBefore = (net: NetworkId, address: string, before: number) =>
-  unstable_cache(() => fetchBefore(net, address, before), ["network-snapshots-before-v1", net, address, String(before)], {
+const cachedBefore = (address: string, before: number) =>
+  unstable_cache(() => fetchBefore(address, before), ["network-snapshots-before-v1", address, String(before)], {
     revalidate: 86400,
   })();
 
 export async function GET(req: Request, ctx: { params: Promise<{ address: string }> }) {
   const { address } = await ctx.params;
-  const net = netOf(req);
   // Former addresses are served too: a re-registered network's first chain is still its history.
-  if (!isTracked(net, address) && !(await unlistedChains(net).catch(() => [] as string[])).includes(address)) {
+  if (!isTracked(address) && !(await unlistedChains().catch(() => [] as string[])).includes(address)) {
     return NextResponse.json({ error: "unknown network" }, { status: 404 });
   }
   const beforeRaw = new URL(req.url).searchParams.get("before");
@@ -93,7 +91,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ address: string
     return NextResponse.json({ error: "bad before" }, { status: 400 });
   }
   try {
-    const data = before != null ? await cachedBefore(net, address, Math.floor(before)) : await fetchLive(net, address);
+    const data = before != null ? await cachedBefore(address, Math.floor(before)) : await fetchLive(address);
     return NextResponse.json(data, {
       headers:
         before != null

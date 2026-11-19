@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 
 import { measureIcon } from "@/components/icons";
 import { tileCells } from "@/components/explorer/tileRows";
+import { showsTileUnit } from "@/src/data/explorerMeasure";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 
@@ -41,6 +42,8 @@ export interface MeasureControl {
    *  inactive? I don't like it just disappears" — the plank's rule, an exhausted control dims).
    *  The band always shows the explorer's whole set; a node level shows every tile inactive. */
   inactive?: ReadonlySet<string>;
+  /** The set's own row plan (`tileRows.planFor`) — Hypergraph's "All nodes" over its three layers. */
+  rows?: readonly number[];
 }
 
 /** A single measure: the caps word, muted, in the head's aside — a label, not a control. */
@@ -60,7 +63,7 @@ export function MeasureLabel({ label }: { label: string }) {
 export function MeasureTiles({ measure }: { measure: MeasureControl }) {
   // THE ROW PLAN (`tileRows`): four two by two, seven 2 · 3 · 2, else rows of three, on a six-column
   // grid — so the corner and divider rules below read each cell's ROW, not one fixed column count.
-  const cells = tileCells(measure.options.length);
+  const cells = tileCells(measure.options.length, measure.rows);
   const SPAN: Record<number, string> = { 1: "col-span-6", 2: "col-span-3", 3: "col-span-2" };
   return (
     <ToggleGroup
@@ -122,6 +125,14 @@ export function MeasureTiles({ measure }: { measure: MeasureControl }) {
           >
             {Icon && <Icon aria-hidden className="size-3.5 flex-none group-data-[state=on]:text-primary" />}
             <span className="truncate">{o.label}</span>
+            {/* A UNIT SYMBOL rides its tile (user, 2026-11-08: "size control should say also 'kb' not
+                just the number"): the rows state bare figures and the tile is their one heading, so a
+                measure in a real unit — a ticker or bytes (`explorerMeasure.showsTileUnit`) — shows it, small and
+                muted, at the tile's RIGHT edge (user, same day: "right align the kb / dag element"), so
+                the units line up down the column as the figures do; a count says nothing more. A
+                symbol may carry "only" (user, 2026-11-10: "DAG only" — a Transaction blocks list under
+                All counts the DAG's own blocks' amounts alone, `blockMeasure.blockMeasureUnit`). */}
+            {showsTileUnit(o.unit) && <span className="ml-auto flex-none pl-1 text-[0.85em] opacity-70 tabular-nums whitespace-nowrap">{o.unit}</span>}
           </ToggleGroupItem>
         );
       })}

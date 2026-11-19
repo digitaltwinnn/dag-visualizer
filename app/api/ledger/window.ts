@@ -1,10 +1,11 @@
+import { POLL } from "@/src/engine/config";
 import type { GlobalSnapshot, RawMetaSnapshot } from "@/src/data/types";
 import { ordinalAtOrAfter, type ChainReader } from "../notes/snapshotAt";
 
 // A PAST WINDOW OF THE SNAPSHOTS VIEW (user, 2026-11-03: pinning an old snapshot should "go back in
 // time": the chamber rebuilds for the pin's own window, frozen, and the explorer shows the same
 // window; `docs/superpowers/specs/2026-11-03-snapshots-past-window-design.md`). The live buffer
-// holds the newest 52 global snapshots and each chain's newest records; this reads the same two
+// holds the newest 50 global snapshots and each chain's newest records; this reads the same two
 // things around an ordinal in the past, in the live answer's own shapes, so the client folds them
 // exactly as it folds the live feed.
 //
@@ -12,10 +13,11 @@ import { ordinalAtOrAfter, type ChainReader } from "../notes/snapshotAt";
 // where the list does not serve (its 2025-05-20 floor), and each catalog chain's records from its
 // newest one inside the span, found by the same ordinal search a notable row's snapshot uses.
 
-/** The window around a pin: this many global snapshots before it… */
-export const WINDOW_BEFORE = 41;
-/** …and up to this many after it, so the pin lands at the front with context behind it. */
+/** …up to this many global snapshots after the pin, so it lands at the front with context behind it… */
 export const WINDOW_AFTER = 10;
+/** …and this many before it: the window is the live buffer's own length (`POLL.maxSnapshots`, 50 since
+ *  2026-11-19, review), so a pinned trail and the live one are one length. */
+export const WINDOW_BEFORE = POLL.maxSnapshots - WINDOW_AFTER - 1;
 /** A chain's records read per page of its list, and the most pages one chain may take. */
 const CHAIN_PAGE = 500;
 const CHAIN_PAGES_MAX = 6;

@@ -1,7 +1,6 @@
-import { NextResponse } from "next/server";
-import { NETWORKS, POLL } from "@/src/engine/config";
+import { NextResponse, connection } from "next/server";
+import { HOSTS, POLL } from "@/src/engine/config";
 import type { LiveAnswer } from "@/src/data/types";
-import { netOf } from "@/src/net/request";
 import { sampledIds } from "@/src/net/lineage";
 import { unlistedChains } from "../network/unlistedChains";
 import { assembleWithUnlisted } from "./assemble";
@@ -15,16 +14,17 @@ import { SNAPSHOT_WINDOW, cacheControl } from "./windows";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
-export async function GET(req: Request) {
-  const net = netOf(req);
-  const be = NETWORKS[net].be;
+export async function GET() {
+  // Per request, never prerendered: the CDN caches the answer by its own Cache-Control.
+  await connection();
+  const be = HOSTS.be;
   try {
-    const { value, ageMs } = await memo(`live:${net}`, SNAPSHOT_WINDOW.memoMs, async () => {
+    const { value, ageMs } = await memo(`live`, SNAPSHOT_WINDOW.memoMs, async () => {
       return assembleWithUnlisted(
         { globals: () => readGlobals(be, LIVE_GLOBALS), chain: (id) => readChain(be, id, POLL.metaSnapTail) },
-        sampledIds(net),
-        () => unlistedChains(net),
-        quietSetFor(net),
+        sampledIds(),
+        () => unlistedChains(),
+        quietSetFor(),
       );
     });
     const body: LiveAnswer = { ...value, memoAgeMs: ageMs };

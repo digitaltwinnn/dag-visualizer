@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { netUrl } from "@/src/net/current";
 import { seekSpan } from "@/src/data/chainSeek";
 import { lastPageSize, mergePage, type ChainSpan, type LogRow } from "@/src/data/mergedLog";
 
@@ -65,7 +64,7 @@ export function useMergedLog(active: boolean, chains: readonly string[], scope: 
       // BOUNDED (the branch review, 2026-10-07): a long session added an entry per chain per page
       // and never let one go. Oldest out, like the chain log's probe cache.
       if (runs.current.size >= RUNS_MAX) runs.current.delete(runs.current.keys().next().value as string);
-      p = fetch(netUrl(`/api/network/${addr}/snapshots${before == null ? "" : `?before=${before}`}`))
+      p = fetch(`/api/network/${addr}/snapshots${before == null ? "" : `?before=${before}`}`)
         .then((r) => (r.ok ? (r.json() as Promise<{ rows: LogRow[] }>) : Promise.reject(new Error(String(r.status)))))
         .then((d) => d.rows)
         .catch((e) => {

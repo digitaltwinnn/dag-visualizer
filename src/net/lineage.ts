@@ -16,10 +16,8 @@
 //     into the current one's, so a chart shows the network's whole life.
 //
 // Pure: plain data in, plain data out. It reads the catalog and nothing else.
-import { CATALOG, type NetworkId } from "@/src/engine/config";
+import { METAGRAPHS } from "@/src/engine/config";
 import RETIRED from "@/data/retired.json";
-
-const catalogOf = (net: string) => CATALOG[net as NetworkId] ?? [];
 
 /** When a network stopped: its catalog row's own `retiredAt`, else the date the brand bake wrote
  *  for it (`data/retired.json` — `scripts/bake-brand-hues.ts`, from two facts at once: gone from
@@ -39,32 +37,32 @@ export function activeRows<T extends { id?: string; retiredAt?: string }>(rows: 
 }
 
 /** The current ids the trends sampler reads — every catalog network that is not retired. */
-export function sampledIds(net: string): string[] {
-  return activeRows(catalogOf(net)).map((m) => m.id).filter((id): id is string => !!id);
+export function sampledIds(): string[] {
+  return activeRows(METAGRAPHS).map((m) => m.id).filter((id): id is string => !!id);
 }
 
-/** Every address the network's catalog has ever tracked — current ids and former ones. */
-export function lineageIds(net: string): string[] {
-  return catalogOf(net).flatMap((m) => [m.id, ...(m.formerIds ?? [])]).filter((id): id is string => !!id);
+/** Every address the catalog has ever tracked — current ids and former ones. */
+export function lineageIds(): string[] {
+  return METAGRAPHS.flatMap((m) => [m.id, ...(m.formerIds ?? [])]).filter((id): id is string => !!id);
 }
 
 /** The chains among `ids` (the explorer's own list, `/currency`) that the catalog does not track —
  *  neither a current id nor a former one. These are the UNLISTED channels (user, 2026-10-08: their
  *  count is MEASURED from their own chains, never derived as anchors minus the listed networks). */
-export function untrackedIds(net: string, ids: readonly string[]): string[] {
-  return ids.filter((id) => !!id && !isTracked(net, id));
+export function untrackedIds(ids: readonly string[]): string[] {
+  return ids.filter((id) => !!id && !isTracked(id));
 }
 
 /** The CURRENT id of the network an address belongs to; an address the catalog does not know is
  *  returned unchanged (and is, to every caller, unlisted). */
-export function currentIdOf(net: string, id: string): string {
-  for (const m of catalogOf(net)) if (m.id === id || m.formerIds?.includes(id)) return m.id;
+export function currentIdOf(id: string): string {
+  for (const m of METAGRAPHS) if (m.id === id || m.formerIds?.includes(id)) return m.id;
   return id;
 }
 
 /** Is this address one the catalog tracks — as a current id or a former one? */
-export function isTracked(net: string, id: string): boolean {
-  return catalogOf(net).some((m) => m.id === id || m.formerIds?.includes(id) === true);
+export function isTracked(id: string): boolean {
+  return METAGRAPHS.some((m) => m.id === id || m.formerIds?.includes(id) === true);
 }
 
 /** Fold every FORMER address's series into its network's current one.
@@ -76,11 +74,10 @@ export function isTracked(net: string, id: string): boolean {
  *  empty; where both hold a value the series' own operator decides (`opOf`: counters add, maxima
  *  take the larger, gauges keep the current chain's). A bucket neither measured stays null. */
 export function foldLineage(
-  net: string,
   series: Record<string, (number | null)[]>,
   opOf: (name: string) => "add" | "max" | "set",
 ): Record<string, (number | null)[]> {
-  const formers = catalogOf(net).flatMap((m) => (m.formerIds ?? []).map((f) => [f, m.id] as const));
+  const formers = METAGRAPHS.flatMap((m) => (m.formerIds ?? []).map((f) => [f, m.id] as const));
   if (formers.length === 0) return series;
   const out = { ...series };
   for (const [former, current] of formers) {

@@ -11,7 +11,7 @@ import { subjectPairing } from "@/components/useSubjectPairing";
 import { compositionClause, compositionGroups } from "@/src/data/composition";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { viewNetwork } from "@/src/engine/domain/viewNetwork";
-import { HYPER_MEASURE_OPTIONS, groupMeasure, type HyperMeasure } from "@/src/data/hyperMeasure";
+import { HYPER_MEASURE_OPTIONS, HYPER_MEASURE_ROWS, groupMeasure, type HyperMeasure } from "@/src/data/hyperMeasure";
 import { metagraphById } from "@/src/data/network";
 import type { NodeRow } from "@/src/data/types";
 import { compositionToggleActions, nodeSelectActions, railNetActions } from "@/src/engine/domain/pickActions";
@@ -95,7 +95,7 @@ export default function HyperExplore() {
       key: "networks",
       // Home ends a browse. A filter is the top bar's to leave, so standing on one has no home.
       crumb: { label: "Networks", onRelease: railNet ? () => applyClickActions([{ kind: "railNet", id: null }]) : undefined },
-      measure: { options: HYPER_MEASURE_OPTIONS, value: hyperMeasure, onPick: (id) => setHyperMeasure(id as HyperMeasure) },
+      measure: { options: HYPER_MEASURE_OPTIONS, rows: HYPER_MEASURE_ROWS, value: hyperMeasure, onPick: (id) => setHyperMeasure(id as HyperMeasure) },
       hasFigure: true,
       // The live foot on every level (components/explorer/LiveFoot.tsx has the argument).
       pager: <LiveFoot total={listTotal(measured.map(({ v }) => v))} />,
@@ -142,7 +142,7 @@ export default function HyperExplore() {
         onRelease: () => (openGroup ? toggleComposition(openGroup.key) : undefined),
       },
       meaning: "Which layers each node runs",
-      measure: { options: HYPER_MEASURE_OPTIONS, value: hyperMeasure, onPick: (id) => setHyperMeasure(id as HyperMeasure) },
+      measure: { options: HYPER_MEASURE_OPTIONS, rows: HYPER_MEASURE_ROWS, value: hyperMeasure, onPick: (id) => setHyperMeasure(id as HyperMeasure) },
       hasFigure: true,
       // The live foot on every level (components/explorer/LiveFoot.tsx has the argument).
       pager: <LiveFoot total={listTotal(groupValues)} />,

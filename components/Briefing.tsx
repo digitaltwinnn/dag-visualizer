@@ -10,11 +10,12 @@ import TypedNote from "@/components/notes/TypedNote";
 import useNote from "@/components/notes/useNote";
 import EcgMark from "@/components/topbar/EcgMark";
 import { useBreakpoint } from "@/components/useBreakpoint";
-import { VIEWS } from "@/components/views";
+import type { NoteView } from "@/src/data/noteTypes";
+import { BLOCKS_PAGE, VIEWS } from "@/components/views";
 import { breakpointOf } from "@/src/data/breakpoint";
 import { SITE_ORIGIN } from "@/src/data/site";
-import { BRIEFING_STOPS, BRIEFING_TYPE_SLOW, BRIEFING_WORDS_OUT_MS, SCENE_WAIT_MS, STOP_MS, briefsOn, hasLanded, mayAdvance, nextStop, prevStop } from "@/src/engine/domain/briefing";
-import { NET } from "@/src/net/current";
+import { BRIEFING_STOPS, stopRegister, type BriefingStop, BRIEFING_TYPE_SLOW, BRIEFING_WORDS_OUT_MS, SCENE_WAIT_MS, STOP_MS, briefsOn, hasLanded, mayAdvance, nextStop, prevStop } from "@/src/engine/domain/briefing";
+import { switchLedgerRegister } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 
 // THE BRIEFING (`domain/briefing.ts` has the tour as data, the design is in docs/superpowers/specs):
@@ -51,7 +52,7 @@ type End = "done" | "skip" | "key" | "back" | "unready";
 
 function endBriefing(stop: number, how: End): void {
   const s = useStore.getState();
-  if (how === "done") s.setMode(BRIEFING_STOPS[0]);
+  if (how === "done") s.setMode(BRIEFING_STOPS[0]!.mode);
   // A tour played to its end hands the live view over (`components/TourHandover.tsx`); any other
   // ending is the reader already taking it.
   if (how === "done") s.setHandover(true);
@@ -61,13 +62,25 @@ function endBriefing(stop: number, how: End): void {
   // their own, and a bare globe over a closed dock left them to find the list. Not a pick, so the
   // no-auto-open rule (a selection never opens a sheet) is untouched.
   if (breakpointOf(window.innerWidth) === "phone") s.setPhoneDock("explore");
-  track("briefing-end", { how, at: BRIEFING_STOPS[stop] });
+  track("briefing-end", { how, at: stopLabel(BRIEFING_STOPS[stop]!) });
+}
+
+/** What a stop is called: its view, or the register that makes the Snapshots view a second stop. */
+const stopLabel = (stop: BriefingStop): string => (stop.register === "blocks" ? "blocks" : stop.mode);
+const stopName = (stop: BriefingStop): string => (stop.register === "blocks" ? BLOCKS_PAGE.name : VIEWS.find((v) => v.id === stop.mode)!.name);
+
+/** Show a stop: its view, then its register (a stop with none puts the Snapshots view back in its
+ *  own, so a stop that carries a register never leaves the next one showing it). */
+function showStop(stop: BriefingStop): void {
+  // The register first, then the view (review I2): one URL write, the view's motion cause kept.
+  switchLedgerRegister(stopRegister(stop));
+  useStore.getState().setMode(stop.mode);
 }
 
 /** Move the tour to a stop: the clock starts over there, so a stop stepped to gets its full time. */
 const goTo = (i: number) => {
   const s = useStore.getState();
-  s.setMode(BRIEFING_STOPS[i]!);
+  showStop(BRIEFING_STOPS[i]!);
   s.setBriefing(i);
 };
 
@@ -84,7 +97,7 @@ export default function Briefing() {
   }, [stop, shown]);
 
   useEffect(() => {
-    if (!briefsOn({ pathname: location.pathname, net: NET, seen: seenThisSession() })) return;
+    if (!briefsOn({ pathname: location.pathname, seen: seenThisSession() })) return;
     markSeen();
     useStore.getState().setBriefing(0);
   }, []);
@@ -96,13 +109,17 @@ function Tour({ stop, leaving }: { stop: number; leaving: boolean }) {
   const phone = useBreakpoint() === "phone";
   const ready = useStore((s) => s.sceneReady);
   // Every stop's note is asked for at the start, so a line is on hand when its view arrives.
-  const geo = useNote(briefingReq("geo"));
-  const ledger = useNote(briefingReq("ledger"));
-  const hyper = useNote(briefingReq("hyper"));
-  const trend = useNote(briefingReq("trend"));
-  const view = BRIEFING_STOPS[stop]!;
-  const words = briefingWords(view, { geo, ledger, hyper, trend }[view].res);
-  const name = VIEWS.find((v) => v.id === view)!.name;
+  const geo = useNote(briefingReq({ mode: "geo" }));
+  const ledger = useNote(briefingReq({ mode: "ledger" }));
+  const hyper = useNote(briefingReq({ mode: "hyper" }));
+  const trend = useNote(briefingReq({ mode: "trend" }));
+  const at = BRIEFING_STOPS[stop]!;
+  const view = stopLabel(at);
+  // Every stop has its own note.
+  const noteView = briefingReq(at).view;
+  const notes: Partial<Record<NoteView, ReturnType<typeof useNote>>> = { geo, ledger, hyper, trend };
+  const words = briefingWords(noteView, notes[noteView]?.res ?? null);
+  const name = stopName(at);
   const fill = useRef<HTMLElement | null>(null);
   // The last stop's time is up: the ending's three beats run from here.
   const [ending, setEnding] = useState(false);
@@ -156,7 +173,7 @@ function Tour({ stop, leaving }: { stop: number; leaving: boolean }) {
       const s = useStore.getState();
       if (!moved && since >= BRIEFING_WORDS_OUT_MS) {
         moved = true;
-        s.setMode(BRIEFING_STOPS[0]);
+        s.setMode(BRIEFING_STOPS[0]!.mode);
         s.setBriefingLanding(true);
       } else if (moved) {
         saw ||= s.motionPhase != null;
@@ -212,14 +229,14 @@ function Tour({ stop, leaving }: { stop: number; leaving: boolean }) {
           clock writes it by hand, and React would not repaint one stepped back past. */}
       {BRIEFING_STOPS.map((v, i) => (
         <button
-          key={v}
+          key={stopLabel(v)}
           type="button"
           tabIndex={-1}
-          aria-label={`Go to ${VIEWS.find((x) => x.id === v)!.name}`}
+          aria-label={`Go to ${stopName(v)}`}
           onClick={() => goTo(i)}
           className="group -my-3 flex-1 py-3 touch:-my-5 touch:py-5"
         >
-          <span className="block h-[3px] overflow-hidden rounded-full bg-foreground/20 group-hover:bg-foreground/40">
+          <span className="block h-[5px] overflow-hidden rounded-full bg-foreground/20 group-hover:bg-foreground/40">
             <i
               key={stop}
               ref={i === stop ? fill : undefined}
@@ -235,7 +252,10 @@ function Tour({ stop, leaving }: { stop: number; leaving: boolean }) {
     <button
       type="button"
       onClick={() => endBriefing(stop, "skip")}
-      className={cn("h-10 rounded-full bg-foreground px-6 text-body font-semibold text-background hover:bg-foreground/85 max-[700px]:px-3 touch:min-h-11", live)}
+      // A PILL, never a circle (user, 2026-11-08: "give the 'skip' button a minimal width, it becomes a
+      // circle sometimes"): the row it sits in squeezed it to its padding — a fixed minimum width and
+      // no shrink hold its shape at every tier.
+      className={cn("h-10 min-w-[5.5rem] shrink-0 rounded-full bg-foreground px-6 text-body font-semibold text-background hover:bg-foreground/85 max-[700px]:px-3 touch:min-h-11", live)}
     >
       Skip
     </button>

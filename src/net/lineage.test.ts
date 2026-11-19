@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { CATALOG } from "@/src/engine/config";
+import { METAGRAPHS } from "@/src/engine/config";
 import { activeRows, currentIdOf, foldLineage, isRetired, isTracked, lineageIds, retiredAtOf, sampledIds, untrackedIds } from "./lineage";
 
 const op = (n: string) => (n.endsWith("gapMax") ? "max" : n.startsWith("f.") ? "set" : "add") as "add" | "max" | "set";
 // The catalog's own re-registered network — the fact these rules exist for.
-const row = CATALOG.mainnet.find((m) => m.formerIds?.length)!;
+const row = METAGRAPHS.find((m) => m.formerIds?.length)!;
 const [former] = row.formerIds!;
 
 describe("address lineage", () => {
@@ -13,31 +13,26 @@ describe("address lineage", () => {
     expect(former).not.toBe(row.id);
   });
   it("a former address belongs to its network; an unknown one is itself", () => {
-    expect(currentIdOf("mainnet", former)).toBe(row.id);
-    expect(currentIdOf("mainnet", row.id)).toBe(row.id);
-    expect(currentIdOf("mainnet", "DAGnobody")).toBe("DAGnobody");
-    expect(isTracked("mainnet", former)).toBe(true);
-    expect(isTracked("mainnet", "DAGnobody")).toBe(false);
+    expect(currentIdOf(former)).toBe(row.id);
+    expect(currentIdOf(row.id)).toBe(row.id);
+    expect(currentIdOf("DAGnobody")).toBe("DAGnobody");
+    expect(isTracked(former)).toBe(true);
+    expect(isTracked("DAGnobody")).toBe(false);
   });
   it("lineageIds lists current and former addresses", () => {
-    const ids = lineageIds("mainnet");
+    const ids = lineageIds();
     expect(ids).toContain(row.id);
     expect(ids).toContain(former);
-    expect(ids.length).toBe(CATALOG.mainnet.length + CATALOG.mainnet.reduce((n, m) => n + (m.formerIds?.length ?? 0), 0));
+    expect(ids.length).toBe(METAGRAPHS.length + METAGRAPHS.reduce((n, m) => n + (m.formerIds?.length ?? 0), 0));
   });
   it("untrackedIds keeps only the chains the catalog knows by no address — current or former", () => {
-    expect(untrackedIds("mainnet", [row.id, former, "DAGnotInTheCatalog", ""])).toEqual(["DAGnotInTheCatalog"]);
-  });
-  it("an unknown network folds nothing and lists nothing", () => {
-    expect(lineageIds("nope")).toEqual([]);
-    const s = { "m.x.snaps": [1] };
-    expect(foldLineage("nope", s, op)).toBe(s);
+    expect(untrackedIds([row.id, former, "DAGnotInTheCatalog", ""])).toEqual(["DAGnotInTheCatalog"]);
   });
 });
 
 describe("foldLineage (one history per network)", () => {
   it("joins the retired chain's buckets to the current chain's and drops the former family", () => {
-    const out = foldLineage("mainnet", {
+    const out = foldLineage({
       [`m.${former}.snaps`]: [5, 7, 0, null],
       [`m.${row.id}.snaps`]: [null, 0, 3, 4],
       "g.ticks": [1, 1, 1, 1],
@@ -47,18 +42,18 @@ describe("foldLineage (one history per network)", () => {
     expect(out["g.ticks"]).toEqual([1, 1, 1, 1]);
   });
   it("a metric only the former chain has becomes the network's", () => {
-    const out = foldLineage("mainnet", { [`m.${former}.fee`]: [2, null] }, op);
+    const out = foldLineage({ [`m.${former}.fee`]: [2, null] }, op);
     expect(out[`m.${row.id}.fee`]).toEqual([2, null]);
   });
   it("maxima take the larger; a bucket neither measured stays null", () => {
-    const out = foldLineage("mainnet", {
+    const out = foldLineage({
       [`m.${former}.gapMax`]: [9, null, null],
       [`m.${row.id}.gapMax`]: [4, 6, null],
     }, op);
     expect(out[`m.${row.id}.gapMax`]).toEqual([9, 6, null]);
   });
   it("folds every family that names the address — the fleet gauges too", () => {
-    const out = foldLineage("mainnet", {
+    const out = foldLineage({
       [`f.nodes.${former}`]: [3, null],
       [`f.nodes.${row.id}`]: [null, 3],
       [`f.layer.${former}.l0`]: [3, null],
@@ -90,7 +85,7 @@ describe("retired networks", () => {
     expect(activeRows(rows).map((m) => m.id)).toEqual(["A"]);
   });
   it("the sampler reads every catalog network that is not retired", () => {
-    const ids = sampledIds("mainnet");
-    expect(ids).toEqual(CATALOG.mainnet.filter((m) => !m.retiredAt).map((m) => m.id));
+    const ids = sampledIds();
+    expect(ids).toEqual(METAGRAPHS.filter((m) => !m.retiredAt).map((m) => m.id));
   });
 });

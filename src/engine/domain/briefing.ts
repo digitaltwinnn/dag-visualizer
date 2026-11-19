@@ -1,4 +1,4 @@
-import type { Mode } from "@/src/store/mode";
+import type { LedgerRegister, Mode } from "@/src/store/mode";
 import { easeInOutQuad } from "./cameraRig";
 
 // THE BRIEFING (user, 2026-10-31): the tour every entry to `/` plays, one stop per 3D view, each
@@ -6,8 +6,21 @@ import { easeInOutQuad } from "./cameraRig";
 // Skip ends it. The design is `docs/superpowers/specs/2026-10-31-briefing-design.md`. This
 // module is the tour as data; `components/Briefing.tsx` runs it and `store.briefing` carries it.
 
-/** The route: where, then now, then who, then how it changed. */
-export const BRIEFING_STOPS = ["geo", "ledger", "hyper", "trend"] as const satisfies readonly Mode[];
+/** A stop: a view, and for the Snapshots view the register it stands in. */
+export type BriefingStop = { mode: Mode; register?: LedgerRegister };
+
+/** The route: where, then now (the Snapshots view in its own register), then who, then how it
+ *  changed. One stop per view: a register inside a view is not a stop of its own. */
+export const BRIEFING_STOPS: readonly BriefingStop[] = [
+  { mode: "geo" },
+  { mode: "ledger" },
+  { mode: "hyper" },
+  { mode: "trend" },
+];
+
+/** The register a stop leaves the Snapshots view in. A stop with none names the Snapshots register,
+ *  so a stop that carries a register never leaves the next one showing it. */
+export const stopRegister = (stop: BriefingStop): LedgerRegister => stop.register ?? "snapshots";
 
 /** How long a stop stands, its scene's transition included. A quarter under 6500 went too far (user
  *  2026-11-01: "25% shorter"; 2026-11-02, after reading it against the live lines of 102 to 122
@@ -77,14 +90,12 @@ export const SCENE_WAIT_MS = 8000;
 
 export interface BriefingEntry {
   pathname: string;
-  /** The network on screen: the notes are mainnet's alone. */
-  net: string;
   /** Whether this browser session has already had the tour. */
   seen: boolean;
 }
 
 /** Only the landing URL plays it, so a deep link stays the way straight in. */
-export const briefsOn = ({ pathname, net, seen }: BriefingEntry): boolean => pathname === "/" && net === "mainnet" && !seen;
+export const briefsOn = ({ pathname, seen }: BriefingEntry): boolean => pathname === "/" && !seen;
 
 /** The stop after this one, or null at the end of the route. */
 export const nextStop = (stop: number): number | null => (stop + 1 < BRIEFING_STOPS.length ? stop + 1 : null);
@@ -106,6 +117,11 @@ export const mayAdvance = (elapsedMs: number, phase: "out" | "in" | null): boole
 /** How long the hand-over stands, unless the reader moves first (8 → 6 seconds, user 2026-11-03:
  *  "remove the text a bit earlier"). */
 export const HANDOVER_MS = 6000;
+
+/** The phone Explore sheet's grow, when the tour hands over (user, 2026-11-05: "animate in like it
+ *  usually does but a bit slower"). The sheet's usual entry is the 550 ms navigation tempo; this
+ *  arrival, onto a cleared stage, takes a touch longer. */
+export const HANDOVER_SHEET_GROW_MS = 750;
 
 /** A surface that pulses its edge on the hand-over: the desktop's explore card, card rail and vitals
  *  band, or the phone's open sheet and its dock bar. */

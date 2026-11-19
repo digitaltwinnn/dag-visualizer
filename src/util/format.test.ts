@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { compactDag, compactNumber, fmtDagShort, fmtBytes, fmtKB, midHash, fmtShareKB } from "./format";
+import { compactDag, compactNumber, fmtDagShort, fmtBytes, fmtKB, midHash, fmtShareKB, shortBlockHash, BLOCK_HASH_GLYPHS } from "./format";
 
 // The sub-KB boundary is the whole reason `fmtBytes` exists, so it is pinned here: the
 // metagraph-snapshot card states an application state's size, and mainnet states routinely
@@ -101,5 +101,14 @@ describe("compactDag — a DAG amount, shortened", () => {
   });
   it("fmtDagShort reads datums", () => {
     expect(fmtDagShort(4_800_000).replace(",", ".")).toBe("0.05"); // 0.048 DAG
+  });
+});
+
+describe("shortBlockHash — the one short form of a block hash", () => {
+  it("is midHash at the block budget: head and tail, ten characters", () => {
+    const h = "c0ffee1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
+    expect(shortBlockHash(h)).toBe(midHash(h, BLOCK_HASH_GLYPHS));
+    expect(shortBlockHash(h)).toHaveLength(BLOCK_HASH_GLYPHS);
+    expect(shortBlockHash("abc")).toBe("abc");
   });
 });

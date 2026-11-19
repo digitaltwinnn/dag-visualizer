@@ -13,31 +13,18 @@ export interface PaletteEntry {
   hex: string;
 }
 
-// The reserved structural hue centres, ±16° each — PER NETWORK (multi-network design §2).
-// Five are guarded on EVERY network (red warn 25 · amber 90 · green ready 165 · --core blue
-// 265 · violet 300); the sixth is the network's OWN accent — cyan 195 on mainnet, violet 300
-// on integrationnet (already in the base five, so its guard list is just shorter), magenta
-// 327 on testnet. ACCENT_HUE mirrors the --net-* tokens in app/globals.css: this module is
-// Node-safe and cannot read CSS, so keep the two in sync by hand.
-import { NET } from "@/src/net/current";
-import type { NetworkId } from "@/src/engine/config";
-
+// The reserved structural hue centres, ±16° each: red warn 25 · amber 90 · green ready 165 · the
+// accent cyan 195 · --core blue 265 · violet 300. The accent's 195 mirrors --primary in
+// app/globals.css: this module is Node-safe and cannot read CSS, so keep the two in sync by hand.
 const GUARD = 16;
-const BASE_GUARDS = [25, 90, 165, 265, 300];
-const ACCENT_HUE: Record<NetworkId, number> = { mainnet: 195, integrationnet: 300, testnet: 327 };
+export const GUARDS = [25, 90, 165, 195, 265, 300];
 export const SLOT_STEP = 8;
 
-export function guardsFor(net: NetworkId): number[] {
-  return [...new Set([...BASE_GUARDS, ACCENT_HUE[net]])].sort((a, b) => a - b);
-}
-
-// The allowed identity ranges are DERIVED: the gaps between consecutive guard bands (the
-// last one wrapping past 360; normalised on read), dropping any gap narrower than one slot
-// step. Derived-for-mainnet is pinned equal to the historical literal by palette.test.ts —
-// [[41,74],[106,149],[211,249],[316,369]] — so mainnet's hue assignments are byte-identical
-// to the single-network app (the 41–149 band split by the amber guard included).
-export function allowedFor(net: NetworkId): [number, number][] {
-  const g = guardsFor(net);
+// The allowed identity ranges are DERIVED: the gaps between consecutive guard bands (the last one
+// wrapping past 360; normalised on read), dropping any gap narrower than one slot step. Pinned
+// equal to the literal [[41,74],[106,149],[211,249],[316,369]] by palette.test.ts (the 41–149 band
+// split by the amber guard included).
+function allowedOf(g: number[]): [number, number][] {
   const out: [number, number][] = [];
   for (let i = 0; i < g.length; i++) {
     const a = g[i] + GUARD;
@@ -46,7 +33,7 @@ export function allowedFor(net: NetworkId): [number, number][] {
   }
   return out;
 }
-export const ALLOWED: [number, number][] = allowedFor(NET);
+export const ALLOWED: [number, number][] = allowedOf(GUARDS);
 
 // Discrete slots stepped ~8° through the allowed zones (~20 distinct at fixed L/C).
 function slotsOf(allowed: [number, number][]): number[] {
@@ -56,7 +43,7 @@ function slotsOf(allowed: [number, number][]): number[] {
   }
   return out;
 }
-const DEFAULT_SLOTS: number[] = slotsOf(ALLOWED);
+const SLOTS: number[] = slotsOf(ALLOWED);
 
 // FNV-1a 32-bit — stable hash of a metagraph id.
 function hash32(s: string): number {
@@ -79,15 +66,10 @@ function entry(id: string, hueDeg: number): PaletteEntry {
 
 // Deterministic assignment: process ids in a stable order (by id), each takes its
 // hashed slot, or linear-probes to the next free slot (de-collision). Pins win outright.
-// The optional `allowed` parameter exists for the SERVER: app/api/metagraphs/route.ts runs
-// where NET is always mainnet, so it passes the REQUEST's ranges (allowedFor(net)) — or the
-// server and the client would assign different hues to the same unpinned dev-network id.
 export function assignPalette(
   ids: string[],
   pins: Record<string, number> = {},
-  allowed: [number, number][] = ALLOWED,
 ): Map<string, PaletteEntry> {
-  const SLOTS = allowed === ALLOWED ? DEFAULT_SLOTS : slotsOf(allowed);
   const out = new Map<string, PaletteEntry>();
   const taken = new Set<number>();
 

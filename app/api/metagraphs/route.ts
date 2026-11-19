@@ -1,7 +1,5 @@
-import { NextResponse } from "next/server";
-import { assignPalette, allowedFor } from "@/src/palette/palette";
-import { type NetworkId } from "@/src/engine/config";
-import { netOf } from "@/src/net/request";
+import { NextResponse, connection } from "next/server";
+import { assignPalette } from "@/src/palette/palette";
 import { identityPins } from "@/src/palette/identity";
 import { getLive, type Metagraph } from "./live";
 
@@ -21,21 +19,19 @@ export const revalidate = 300; // re-fetch at most every 5 minutes (was 10 — u
 // well under).
 export const maxDuration = 60;
 
-function withHues(list: Metagraph[], net: NetworkId): Metagraph[] {
-  // The REQUEST's allowed ranges, not the module default: this runs on the server, where the
-  // frozen client resolver always answers mainnet — passing them keeps server-assigned hues
-  // identical to what the client's own palette would assign for this network.
-  const palette = assignPalette(list.map((m) => m.id), identityPins(), allowedFor(net));
+function withHues(list: Metagraph[]): Metagraph[] {
+  const palette = assignPalette(list.map((m) => m.id), identityPins());
   return list.map((m) => {
     const e = palette.get(m.id);
     return e ? { ...m, hue: { deg: e.hueDeg, oklch: e.oklch, hex: e.hex } } : m;
   });
 }
 
-export async function GET(req: Request) {
-  const net = netOf(req);
+export async function GET() {
+  // Per request, never prerendered: the CDN caches the answer by its own Cache-Control.
+  await connection();
   try {
-    const live = await getLive(net);
+    const live = await getLive();
     // AGE, NOT A TIMESTAMP. The client needs to know whether this payload is current, and the only
     // reliable subtraction is one done on a single clock: `builtAt` is server time, and a viewer's
     // clock can be minutes off, which would invent staleness that isn't there. Both terms here are
@@ -55,7 +51,7 @@ export async function GET(req: Request) {
     // already means "fail open, treat as fresh" on the client, so omission is the honest signal.
     const ageMs = typeof live.builtAt === "number" ? Math.max(0, Date.now() - live.builtAt) : undefined;
     return NextResponse.json(
-      { ...live, ageMs, metagraphs: withHues(live.metagraphs, net) },
+      { ...live, ageMs, metagraphs: withHues(live.metagraphs) },
       { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } },
     );
   } catch {

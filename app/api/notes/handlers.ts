@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import { fleetCountries } from "@/src/data/noteFactsGeo";
 import type { NoteResponse } from "@/src/data/noteTypes";
 import { sampledIds } from "@/src/net/lineage";
-import { netOf } from "@/src/net/request";
 import { countStat, generateNote, type GenerateDeps } from "./generate";
 import { gateChat } from "./gate";
 import { capKeyOf, rateKeyOf } from "./keys";
@@ -21,10 +20,6 @@ import { driftKeyOf, executePass, pacedChat, planPass, warmCandidates, warmKeyOf
 //
 // Every answer that is not a note's own (`pending`, `unavailable`, a 400, a 429) is `no-store`,
 // so the CDN never holds an instrument state past the moment. Only the read route is public.
-//
-// MAINNET ONLY, answered FIRST: off mainnet both routes answer `none` before parsing the subject,
-// because the subject is checked against mainnet's catalog and a testnet network would otherwise
-// be a 400 the card reads as "unavailable".
 //
 // PREVIEWS WRITE NOTHING (R66): the deps carry `notesWritable()` (store.ts), and where it is false
 // a cached note is still served, a miss (warmable or on request) is `none`, and the warm pass
@@ -44,7 +39,6 @@ import { driftKeyOf, executePass, pacedChat, planPass, warmCandidates, warmKeyOf
 
 type WarmRecord = { writtenAt: number; setKey?: string; driftKey?: string };
 
-const NET = "mainnet";
 export const RATE_PER_HOUR = 60;
 export const CAP_PER_DAY = 2_000;
 const RATE_TTL_S = 2 * 3600;
@@ -53,7 +47,8 @@ const CAP_TTL_S = 2 * 86_400;
  *  Gate attempts at their 20 s timeout plus its reads and row lookups, so 210 s leaves it room to finish. */
 export const WARM_BUDGET_MS = 210_000;
 /** Paced for the paid model, whose calls take under 3 s and which never refused three at once in the
- *  trial (2026-11-01): the whole set of 121 notes fills in one pass. */
+ *  trial (2026-11-01): the whole set of 123 notes fills in one pass (122 until the data blocks' joined, 2026-11-07; 121
+ *  until the block DAG's, 2026-11-06). */
 export const WARM_CONCURRENCY = 3;
 export const WARM_SPACING_MS = 500;
 
@@ -74,14 +69,13 @@ export function liveDeps(): GenerateDeps {
 
 /** GET /api/notes?view=…&subject=…&span=… (or &from=…&to=… for a brushed range). */
 export async function readNote(req: Request, deps: () => GenerateDeps): Promise<Response> {
-  if (netOf(req) !== NET) return json(NONE, PUBLIC);
   const d = settle(deps);
   const parsed = parseNoteParams(new URL(req.url).searchParams, d ? d.now() : Date.now());
   if ("error" in parsed) return json({ error: parsed.error }, NO_STORE, 400);
   if ("none" in parsed) return json(NONE, PUBLIC);
   if (!d) return json(UNAVAILABLE, NO_STORE);
   try {
-    const res = await generateNote({ net: netOf(req), ...parsed }, d, "read");
+    const res = await generateNote(parsed, d, "read");
     // `request` is NOT held (review 2026-10-29): a CDN copy would show the 1h pill's door to every
     // other visitor for 15 minutes after one of them wrote the note. The read behind it is one
     // store GET, so there is nothing to shield.
@@ -103,7 +97,6 @@ function visitorHash(req: Request): string {
 /** POST /api/notes/request — the on-request kinds: History's 1h pill and brushed range, and the
  *  subject notes of Hypergraph and Geography. */
 export async function requestNote(req: Request, deps: () => GenerateDeps): Promise<Response> {
-  if (netOf(req) !== NET) return json(NONE, NO_STORE);
   let body: unknown;
   try {
     body = await req.json();
@@ -116,13 +109,11 @@ export async function requestNote(req: Request, deps: () => GenerateDeps): Promi
   if ("error" in parsed) return json({ error: parsed.error }, NO_STORE, 400);
   if ("none" in parsed) return json(NONE, NO_STORE);
   if (!d) return json(UNAVAILABLE, NO_STORE);
-  const note = { net: netOf(req), ...parsed };
-  const { net } = note;
   try {
     // ONLY A MISS IS COUNTED. A read answers first: `none` for a note that does not exist (another
     // network, a subject the view has no note for: `noteSupported`), the cached note when there is
     // one; `request` means a miss, and only then do the limits count and the model write.
-    const cached = await generateNote(note, d, "read");
+    const cached = await generateNote(parsed, d, "read");
     if (cached.state !== "request") return json(cached, NO_STORE);
     // THE LIMITS ARE SPENT ONLY ON A WRITE (`GenerateOptions.spend`, review 2026-10-29): the
     // generator asks once the facts are in hand, so a subject with nothing measured (`none`) and a
@@ -132,21 +123,21 @@ export async function requestNote(req: Request, deps: () => GenerateDeps): Promi
     let status = 200;
     let spend: (() => Promise<NoteResponse | null>) | undefined;
     if (isLimitedNote(parsed.view, parsed.subject, parsed.span)) {
-      const rateKey = rateKeyOf(net, visitorHash(req), isoHour(now));
+      const rateKey = rateKeyOf(visitorHash(req), isoHour(now));
       if (Number((await d.store.get(rateKey)) ?? 0) >= RATE_PER_HOUR) return json(UNAVAILABLE, NO_STORE, 429);
       spend = async () => {
         if ((await d.store.incr(rateKey, RATE_TTL_S)) > RATE_PER_HOUR) {
           status = 429;
           return UNAVAILABLE;
         }
-        if ((await d.store.incr(capKeyOf(net, utcDayKey(now)), CAP_TTL_S)) > CAP_PER_DAY) {
-          await countStat(d.store, net, now, "capped");
+        if ((await d.store.incr(capKeyOf(utcDayKey(now)), CAP_TTL_S)) > CAP_PER_DAY) {
+          await countStat(d.store, now, "capped");
           return UNAVAILABLE;
         }
         return null;
       };
     }
-    return json(await generateNote(note, d, "request", { spend }), NO_STORE, status);
+    return json(await generateNote(parsed, d, "request", { spend }), NO_STORE, status);
   } catch {
     return json(UNAVAILABLE, NO_STORE);
   }
@@ -167,13 +158,13 @@ export function liveWarmDeps(reads: NoteReads = storeReads(Date.now())): WarmDep
   const base = liveDeps();
   return {
     ...base,
-    facts: (net, view, subject, span, nowMs) => factsFor(net, view, subject, span, nowMs, reads),
+    facts: (view, subject, span, nowMs) => factsFor(view, subject, span, nowMs, reads),
     // The geo note's own read and reading (M5): the countries planned are the countries stated, so
     // none is generated unpaced by a visitor and none is planned only to answer `none`.
-    countries: async (nowMs) => fleetCountries(await geoInputs(NET, nowMs, reads)),
+    countries: async (nowMs) => fleetCountries(await geoInputs(nowMs, reads)),
     // The digest's own builder decides which networks have nodes, so the two keys cannot disagree.
     digest: async (nowMs) => {
-      const f = await factsFor(NET, "hyper", "all", "day", nowMs, reads);
+      const f = await factsFor("hyper", "all", "day", nowMs, reads);
       return { setKey: f?.setKey ?? null, driftKeys: f?.driftKeys ?? null };
     },
     sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
@@ -193,7 +184,7 @@ export async function warmNotes(req: Request, deps: () => WarmDeps): Promise<Res
     if (!d.writable) return json(NONE, NO_STORE); // a preview holding the secret still writes nothing (R66)
     const now = d.now(); // the budget's clock starts here: the prefetch spends it too
     // The unlisted set is one more subject: `noteSupported` keeps it to History's pills.
-    const subjects = ["all", "dag", UNLISTED_ID, ...sampledIds(NET)];
+    const subjects = ["all", "dag", UNLISTED_ID, ...sampledIds()];
     const [countries, { setKey, driftKeys }] = await Promise.all([
       d.countries(now).catch(() => [] as string[]),
       d.digest(now).catch(() => ({ setKey: null, driftKeys: null })),
@@ -211,7 +202,7 @@ export async function warmNotes(req: Request, deps: () => WarmDeps): Promise<Res
     const paced = { ...d, chat: pacedChat(d.chat, WARM_SPACING_MS, d.now, d.sleep) };
     const result = await executePass(
       plan,
-      (item) => generateNote({ net: NET, ...item }, paced, "warm", { driftKey: driftKeyOf(item, driftKeys) ?? undefined, seenWrittenAt: records.get(warmKeyOf(item))?.writtenAt ?? null }),
+      (item) => generateNote(item, paced, "warm", { driftKey: driftKeyOf(item, driftKeys) ?? undefined, seenWrittenAt: records.get(warmKeyOf(item))?.writtenAt ?? null }),
       { now: d.now, start: now, budgetMs: WARM_BUDGET_MS, concurrency: WARM_CONCURRENCY },
     );
     return json(result, NO_STORE);

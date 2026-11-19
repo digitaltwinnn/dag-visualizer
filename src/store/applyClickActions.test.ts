@@ -25,6 +25,21 @@ beforeEach(() => {
 });
 
 describe("applyClickActions", () => {
+  it("a block action writes store.block and nothing else", () => {
+    const sel = { chain: "dag", hash: "h1", ordinal: 7241523, anchorOrd: 7241523 };
+    const before = useStore.getState();
+    applyClickActions([{ kind: "block", sel }]);
+    const st = useStore.getState();
+    expect(st.block).toEqual(sel);
+    expect(st.snap).toBe(before.snap);
+    expect(st.metaSnap).toBe(before.metaSnap);
+    expect(st.following).toBe(before.following);
+    expect(st.filter).toBe(before.filter);
+    expect(st.motionCause).toEqual({ kind: "block", on: true });
+    applyClickActions([{ kind: "block", sel: null }]);
+    expect(useStore.getState().block).toBeNull();
+  });
+
   it("applies each action kind to its one store effect", () => {
     applyClickActions([
       { kind: "filter", id: "dor" },

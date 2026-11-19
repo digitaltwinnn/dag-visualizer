@@ -6,7 +6,13 @@
 import { heldOut } from "@/src/engine/domain/viewNetwork";
 import { useStore } from "./store";
 import { finestRung } from "@/src/engine/domain/focusLadder";
-import type { ClickAction } from "@/src/engine/domain/pickActions";
+import { registerSwitchActions, type ClickAction } from "@/src/engine/domain/pickActions";
+import type { LedgerRegister } from "@/src/store/mode";
+import { drawsDataBlocks, readsBlockWindow } from "@/src/engine/domain/viewPolicy";
+import { snapshotIsSubject } from "@/src/data/ladderLevels";
+import { REGISTER_SUBJECTS } from "@/src/data/ledgerMeasure";
+import { tickBlockSnaps } from "@/src/data/blockWindow";
+import { getBlockWindow } from "@/src/data/pastWindow";
 import { is3D } from "@/src/engine/domain/viewTransition";
 import { scrollToShow } from "@/src/engine/domain/trendStack";
 import { viewNetwork } from "@/src/engine/domain/viewNetwork";
@@ -88,6 +94,15 @@ export function applyClickActions(actions: ClickAction[], opts?: { quiet?: boole
       case "metaSnap":
         st.setMetaSnap(a.sel);
         break;
+      case "block":
+        // THE BLOCKS REGISTER'S SUBJECT — the one writer of `store.block` (rule 2). Its tick is
+        // pinned by the table's own snapshot action ahead of it, never here.
+        st.setBlock(a.sel);
+        break;
+      case "dataBlock":
+        // THE DATA BLOCKS REGISTER'S SUBJECT — the one writer of `store.dataBlock` (rule 2).
+        st.setDataBlock(a.sel);
+        break;
       case "trendFocus":
         // THE HISTORY VIEW'S PLANE FOCUS — one store effect, plus the paging that makes it
         // visible. `stackPoses` moves nothing for a focus outside the visible window (its own
@@ -155,10 +170,36 @@ function motionCauseOf(actions: readonly ClickAction[]): MotionCause | null {
       case "tickNet": return { kind: "filter", id: a.sel?.metaId ?? "all" };
       case "railNet": return { kind: "network", id: viewNetwork(useStore.getState()) };
       case "metaSnap": return a.sel ? { kind: "metaSnap", metaId: a.sel.metaId, ordinal: a.sel.ordinal } : { kind: "metaSnap", metaId: null };
+      case "block": return { kind: "block", on: a.sel != null };
+      case "dataBlock": return { kind: "dataBlock", on: a.sel != null };
       case "trendFocus": return { kind: "focus", id: a.id };
       // A cursor step moves no scene — the planes' line and the card answer it.
       case "trendCursor": return null;
     }
   }
   return null;
+}
+
+/** SWITCH THE SNAPSHOTS VIEW'S REGISTER (the one door: the footer, the URL and the tour all come
+ *  here). A register is a setting, but it RELEASES what the one it leaves drew and the other cannot
+ *  (`registerSwitchActions`), so the release goes through the executor BEFORE the field is set. The
+ *  store's own setter cannot do it: the executor imports the store, and the store importing it back
+ *  would be a cycle. The hover preview of a block goes with its register (a channel, not a commit);
+ *  the pin and the committed network stay. */
+export function switchLedgerRegister(to: LedgerRegister): void {
+  const st = useStore.getState();
+  if (st.ledgerRegister === to) return;
+  // Whether the held metagraph snapshot is a subject the register entered draws (`REGISTER_SUBJECTS`):
+  // judged against the exact read and the block window the store and the window singleton hold.
+  const ms = st.metaSnap;
+  const isSubject = ms
+    ? snapshotIsSubject(REGISTER_SUBJECTS[to], ms, st.snapshotExact[ms.globalOrdinal]?.rows.find((r) => r.metaId === ms.metaId && r.ordinal === ms.ordinal), tickBlockSnaps(getBlockWindow(), ms.globalOrdinal))
+    : undefined;
+  const actions = registerSwitchActions(to, { block: st.block, metaSnap: st.metaSnap, dataBlock: st.dataBlock }, isSubject);
+  if (actions.length) applyClickActions(actions);
+  // Only Transaction blocks draws a block, so every other register drops its hover preview.
+  if (!readsBlockWindow(to) && st.hoverBlock) st.setHoverBlock(null);
+  // …and only Data blocks draws a data block's mark.
+  if (!drawsDataBlocks(to) && st.hoverDataBlock) st.setHoverDataBlock(null);
+  st.setLedgerRegister(to);
 }

@@ -1,4 +1,4 @@
-import { CATALOG } from "@/src/engine/config";
+import { METAGRAPHS } from "@/src/engine/config";
 
 // THE NETWORKS A NOTE NAMES (user, 2026-10-31: "should/could it color code the metagraph text when
 // mentioned?"). A note is plain text from a model, so code finds the names afterwards, against the
@@ -19,7 +19,7 @@ export interface NoteSegment {
 const SHORT_FORMS: Record<string, string> = { "Dor Technologies": "Dor", "The Upsider AI": "Upsider AI" };
 
 const FORMS = new Map<string, string>([["DAG", "dag"]]);
-for (const m of CATALOG.mainnet) {
+for (const m of METAGRAPHS) {
   FORMS.set(m.name, m.id);
   if (m.ticker.length >= 3) FORMS.set(m.ticker, m.id);
   const short = SHORT_FORMS[m.name];

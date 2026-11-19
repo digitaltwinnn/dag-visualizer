@@ -15,6 +15,16 @@ import {
   NO_MEASURE,
   snapMeasure,
   tickMeasure,
+  DATA_MEASURE_OPTIONS,
+  DATA_MEASURE_ORDER,
+  DATA_TICK_NET_MEASURES,
+  DATA_TICK_NET_MEASURE_OPTIONS,
+  DATA_SNAP_MEASURES,
+  DATA_SNAP_MEASURE_OPTIONS,
+  tickDataUpdates,
+  dataUpdatesOf,
+  REGISTER_MEASURES,
+  REGISTER_SUBJECTS,
 } from "./ledgerMeasure";
 
 // The Snapshots explorer's tick-row figure, as a vocabulary (2026-09-26). The stepper walks the
@@ -106,3 +116,98 @@ describe("the levels' lists and their numbers (design 2026-09-26: each level has
     expect(snapMeasureValue("size", { fee: 0 })).toBeNull();
   });
 });
+
+// THE DATA BLOCKS REGISTER'S MEASURE (D6, 2026-11-07): the Snapshots measures with "Data updates"
+// added, and leading — every level's figure the data updates the exact read counts.
+describe("the Data blocks register's measure", () => {
+  const rows = [
+    { metaId: "DED", ordinal: 1, decoded: true, fee: 0, bytes: 0, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null, dataTxCount: 40, dataBlocks: 1 },
+    { metaId: "DOR", ordinal: 9, decoded: true, fee: 0, bytes: 0, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null, dataTxCount: 2, dataBlocks: 1 },
+    { metaId: "NDT", ordinal: 3, decoded: true, fee: 0, bytes: 0, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null, dataTxCount: 0, dataBlocks: 0 },
+  ];
+  const ex: SnapshotExact = { ...EXACT, rows };
+
+  it("is Data updates · Fees · Metagraphs · Size — Data updates in Anchors' place, leading (D7)", () => {
+    expect(DATA_MEASURE_ORDER).toEqual(["data", "fee", "metagraphs", "size"]);
+    expect(DATA_MEASURE_OPTIONS.map((o) => o.label)).toEqual(["Data updates", "Fees", "Metagraphs", "Size"]);
+    expect(DATA_MEASURE_ORDER).not.toContain("anchors");
+    // Four tiles, which `explorer/tileRows` lays two by two, so the long word has a half-row.
+    expect(DATA_MEASURE_ORDER).toHaveLength(4);
+    // The Metagraph snapshots register keeps its own four.
+    expect(LEDGER_MEASURE_OPTIONS.map((o) => o.label)).toEqual(["Fees", "Anchors", "Metagraphs", "Size"]);
+    expect(DATA_MEASURE_OPTIONS[0]).toEqual({ id: "data", label: "Data updates", unit: "count" });
+    expect(DATA_MEASURE_OPTIONS.map((o) => o.id)).toEqual([...DATA_MEASURE_ORDER]);
+    // The Snapshots register's list does not grow.
+    expect(LEDGER_MEASURE_ORDER).not.toContain("data");
+    expect(DATA_TICK_NET_MEASURES).toEqual(["data", "fee", "size"]);
+    expect(DATA_TICK_NET_MEASURE_OPTIONS.map((o) => o.label)).toEqual(["Data updates", "Fees", "Size"]);
+    expect(DATA_SNAP_MEASURES).toEqual(["data", ...SNAP_MEASURES]);
+    expect(DATA_SNAP_MEASURE_OPTIONS.map((o) => o.label)).toEqual(["Data updates", "Fees", "Size"]);
+  });
+
+  it("a tick's figure is its snapshots' data updates summed, from the exact read or the dash", () => {
+    expect(tickDataUpdates(ex)).toBe(42);
+    expect(tickDataUpdates(undefined)).toBeNull();
+    // A tick holding a snapshot the decoder could not read is UNKNOWN — the dash, never 0 (N1).
+    const odd = { ...rows[2], metaId: "odd", decoded: false, dataTxCount: undefined, dataBlocks: undefined };
+    expect(tickDataUpdates({ rows: [rows[0], odd] })).toBeNull();
+    expect(tickMeasure("data", {}, { ...EXACT, rows: [rows[0], odd] })).toBe(NO_MEASURE);
+    expect(tickMeasureValue("data", {}, { ...EXACT, rows: [odd] })).toBeNull();
+    expect(tickMeasure("data", {}, ex)).toBe("42");
+    expect(tickMeasureValue("data", {}, ex)).toBe(42);
+    expect(tickMeasure("data", { metagraphSnapshotCount: 8 }, undefined)).toBe(NO_MEASURE);
+    // A tick whose snapshots carried none states 0 — measured, not absent.
+    expect(tickMeasure("data", {}, { ...EXACT, rows: [rows[2]] })).toBe("0");
+  });
+
+  it("a network and a snapshot under a tick state their own data updates", () => {
+    expect(tickNetMeasure("data", 2, { fee: 0, bytes: 0, dataTxCount: 40 })).toEqual({ value: 40, text: "40" });
+    expect(tickNetMeasure("data", 2, { fee: 0, bytes: 0 })).toEqual({ value: null, text: NO_MEASURE });
+    expect(tickNetMeasure("data", 2, undefined)).toEqual({ value: null, text: NO_MEASURE });
+    expect(snapMeasure("data", { fee: 0, dataTxCount: 7 })).toBe("7");
+    expect(snapMeasure("data", { fee: 0 })).toBe(NO_MEASURE);
+    expect(snapMeasureValue("data", { fee: 0, dataTxCount: 7 })).toBe(7);
+    expect(snapMeasureValue("data", { fee: 0 })).toBeNull();
+  });
+});
+
+describe("dataUpdatesOf — the one data-updates sum (the exact read's perMeta, the tick row, the band)", () => {
+  it("sums the rows' counts", () => {
+    expect(dataUpdatesOf([{ dataTxCount: 2 }, { dataTxCount: 0 }, { dataTxCount: 5 }])).toBe(7);
+    expect(dataUpdatesOf([])).toBe(0);
+  });
+  it("is UNKNOWN when any row could not be decoded — never the decodable rows' sum, never 0 (M5, N1)", () => {
+    expect(dataUpdatesOf([{ dataTxCount: 2 }, {}])).toBeUndefined();
+    expect(dataUpdatesOf([{}])).toBeUndefined();
+  });
+});
+
+describe("REGISTER_SUBJECTS — which snapshots a register is about (2026-11-08)", () => {
+  it("every anchored snapshot, the block-carrying ones, the data-carrying ones — and Data blocks' measures agree", () => {
+    expect(REGISTER_SUBJECTS).toEqual({ snapshots: "all", blocks: "blocks", data: "data" });
+    expect(REGISTER_MEASURES.data.dataOnly).toBe(REGISTER_SUBJECTS.data === "data");
+  });
+});
+
+describe("REGISTER_MEASURES — each register's measure set, one keyed row (R1, L2)", () => {
+  it("Metagraph snapshots and Data blocks each carry their own lists, pick and fade", () => {
+    expect(REGISTER_MEASURES.snapshots.order).toBe(LEDGER_MEASURE_ORDER);
+    expect(REGISTER_MEASURES.snapshots.tickOptions).toBe(LEDGER_MEASURE_OPTIONS);
+    expect(REGISTER_MEASURES.snapshots.netMeasures).toBe(TICK_NET_MEASURES);
+    expect(REGISTER_MEASURES.snapshots.netOptions).toBe(TICK_NET_MEASURE_OPTIONS);
+    expect(REGISTER_MEASURES.snapshots.snapMeasures).toBe(SNAP_MEASURES);
+    expect(REGISTER_MEASURES.snapshots.snapOptions).toBe(SNAP_MEASURE_OPTIONS);
+    expect([REGISTER_MEASURES.snapshots.pick, REGISTER_MEASURES.snapshots.setPick, REGISTER_MEASURES.snapshots.dataOnly]).toEqual(["ledgerMeasure", "setLedgerMeasure", false]);
+    expect(REGISTER_MEASURES.data.order).toBe(DATA_MEASURE_ORDER);
+    expect(REGISTER_MEASURES.data.tickOptions).toBe(DATA_MEASURE_OPTIONS);
+    expect(REGISTER_MEASURES.data.netMeasures).toBe(DATA_TICK_NET_MEASURES);
+    expect(REGISTER_MEASURES.data.netOptions).toBe(DATA_TICK_NET_MEASURE_OPTIONS);
+    expect(REGISTER_MEASURES.data.snapMeasures).toBe(DATA_SNAP_MEASURES);
+    expect(REGISTER_MEASURES.data.snapOptions).toBe(DATA_SNAP_MEASURE_OPTIONS);
+    expect([REGISTER_MEASURES.data.pick, REGISTER_MEASURES.data.setPick, REGISTER_MEASURES.data.dataOnly]).toEqual(["dataMeasure", "setDataMeasure", true]);
+  });
+  it("Transaction blocks' tick levels (never shown — it lists blocks) read the Metagraph snapshots set", () => {
+    expect(REGISTER_MEASURES.blocks).toBe(REGISTER_MEASURES.snapshots);
+  });
+});
+

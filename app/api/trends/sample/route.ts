@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { NETWORKS } from "@/src/engine/config";
+import { HOSTS } from "@/src/engine/config";
 import { sampledIds, untrackedIds } from "@/src/net/lineage";
-import { netOf } from "@/src/net/request";
 import { getLive } from "@/app/api/metagraphs/live";
 import { fetchChainIds } from "@/app/api/network/chainList";
 import { getLiveGeo } from "@/app/api/geo/live";
@@ -42,9 +41,9 @@ async function getJson(url: string, ms = 7000): Promise<unknown> {
  *  its own hour-cached list because its product is locations. A failure is LOGGED (review
  *  2026-10-29): the DAG's fields go absent for the sample, and a cluster host that stays
  *  unreadable must read as an outage in the function logs, not as a quiet gap. */
-async function clusterNodes(net: ReturnType<typeof netOf>): Promise<DagNode[] | null> {
+async function clusterNodes(): Promise<DagNode[] | null> {
   try {
-    const { l0, l1 } = NETWORKS[net];
+    const { l0, l1 } = HOSTS;
     const { l0: a, l1: b } = await readClusters(l0, l1);
     return mergeDagClusters(a as ClusterNode[], b as ClusterNode[]);
   } catch (e) {
@@ -56,9 +55,9 @@ async function clusterNodes(net: ReturnType<typeof netOf>): Promise<DagNode[] | 
 // Fleet counts from the SAME cached loaders the /api/metagraphs and /api/geo routes serve —
 // shared unstable_cache entries, so sampling the fleet adds no upstream traffic. Null on
 // failure: an absent gauge is an honest gap (rule 10), a zeroed fleet is a fabrication.
-async function fleetCounts(net: ReturnType<typeof netOf>): Promise<FleetCounts | null> {
+async function fleetCounts(): Promise<FleetCounts | null> {
   try {
-    const [{ metagraphs, geo: metaGeo }, dagGeo, dagNodes] = await Promise.all([getLive(net), getLiveGeo(net), clusterNodes(net)]);
+    const [{ metagraphs, geo: metaGeo }, dagGeo, dagNodes] = await Promise.all([getLive(), getLiveGeo(), clusterNodes()]);
     const dagIps = Object.keys(dagGeo);
     // THE DAG'S LINE AND ITS STACK COME FROM ONE READ, AND ONE FIELD HAS ONE DEFINITION (review
     // 2026-10-29): `f.nodes.dag` is the merged cluster list's length — the same list its types are
@@ -101,20 +100,18 @@ export async function GET(req: Request) {
   if (!process.env.CRON_SECRET || req.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-  const net = netOf(req);
-  const be = NETWORKS[net].be;
+  const be = HOSTS.be;
   try {
     const res = await runSample({
-      net,
       // Every catalog network that is NOT RETIRED (`sampledIds`): a retired network keeps its stored
       // past and its row, and stops being read — paging a stopped chain every 15 minutes is waste.
-      metaIds: sampledIds(net),
+      metaIds: sampledIds(),
       // THE UNLISTED CHAINS, MEASURED (2026-10-08): the explorer lists every chain it indexes
       // (`/currency`), so the ones the catalog does not track are sampled for their own count — the
       // History "unlisted" figure was anchors minus the listed networks, which turned a global's
       // snapshots stamped into the NEXT bucket (an explorer skew, found on 2026-09-29 19:59) into
       // phantom unlisted snapshots.
-      unlistedIds: async () => untrackedIds(net, await fetchChainIds(be)),
+      unlistedIds: async () => untrackedIds(await fetchChainIds(be)),
       store: writeStore(),
       // Catch-up pages ride the explorer's own `meta.next` cursor — one request can't go
       // past ~10K records (probed live: the global list returns EMPTY above 10K and the
@@ -127,7 +124,7 @@ export async function GET(req: Request) {
         const j = (await getJson(`${be}/currency/${id}/snapshots?limit=${limit}${next ? `&next=${encodeURIComponent(next)}` : ""}`)) as { data?: MetaRec[]; meta?: { next?: string } };
         return { data: j.data ?? [], next: j.meta?.next } satisfies ChainPage<MetaRec>;
       },
-      fleet: () => fleetCounts(net),
+      fleet: () => fleetCounts(),
       // TRANSFERS (2026-11-04): the DAG's own list and each network's token list, read only for the
       // snapshots the walks above passed (`runSample`), so a quiet chain costs no request.
       pageTransfers: async (chain, limit, next) => {
@@ -138,7 +135,7 @@ export async function GET(req: Request) {
       // DELEGATED STAKE (2026-11-04): the Global L0's registry, once an hour — the list the
       // node-names route reads for operator names, read uncached here so the hour's reading is the
       // hour's (`stake.ts`).
-      stake: async () => stakeReading(await getJson(`${NETWORKS[net].l0}/node-params`, 10000)),
+      stake: async () => stakeReading(await getJson(`${HOSTS.l0}/node-params`, 10000)),
       now: () => Date.now(),
     });
     return NextResponse.json(res);

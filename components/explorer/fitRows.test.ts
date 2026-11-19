@@ -66,6 +66,14 @@ describe("what the fit measures", () => {
     expect(hook).not.toMatch(/card\.getBoundingClientRect\(\)\.bottom/);
     expect(hook).toMatch(/card\.lastElementChild/);
   });
+  // The rail's cap is a calc over root custom properties (the filter strip's `--topbar-extra`, the
+  // band's `--bottom-reserve`); a cap that grows back resizes nothing, so without this the page
+  // only ever shrank (user, 2026-11-09: 6 rows with room left).
+  it("re-measures when the root's style (the rail's cap variables) changes, not only on a resize", () => {
+    expect(hook).toMatch(/new MutationObserver\(measure\)/);
+    expect(hook).toMatch(/observe\(document\.documentElement, \{ attributes: true, attributeFilter: \["style"\] \}\)/);
+    expect(hook).toMatch(/mo\.disconnect\(\)/);
+  });
   it("converges from either side while the box stands anywhere", () => {
     const pitch = 31.7;
     const top = 100;

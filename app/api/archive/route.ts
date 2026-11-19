@@ -1,6 +1,5 @@
-import { NextResponse } from "next/server";
+import { NextResponse, connection } from "next/server";
 import { ARCHIVE_SINCE, getArchiveInfo } from "./probe";
-import { netOf } from "@/src/net/request";
 
 // The archive census for the client (the node card's Archive fact): what depth of its own
 // chain each probed node serves — the global L0 cluster and every catalog metagraph's L0
@@ -8,9 +7,11 @@ import { netOf } from "@/src/net/request";
 
 export const maxDuration = 60;
 
-export async function GET(req: Request) {
+export async function GET() {
+  // Per request, never prerendered: the CDN caches the answer by its own Cache-Control.
+  await connection();
   try {
-    const info = await getArchiveInfo(netOf(req));
+    const info = await getArchiveInfo();
     return NextResponse.json(
       {
         entries: info.entries.map((e) => ({

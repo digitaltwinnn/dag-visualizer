@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { READ_SLACK_MS, chainReadThrough, fact, factsBlock, gaugeChange, heldLevel, median, networksAnchored, observedLevel, spanMeasured, pairChange, spellDurations, withChangeFacts, changeShare } from "@/src/data/noteFacts";
+import { READ_SLACK_MS, chainReadThrough, durationWords, fact, factsBlock, gaugeChange, heldLevel, median, networksAnchored, observedLevel, spanMeasured, pairChange, spellDurations, withChangeFacts, changeShare, wholeMean } from "@/src/data/noteFacts";
 import { checkNote } from "@/src/data/noteHonesty";
 import { formatDag } from "@/src/data/trendSeries";
 
@@ -94,6 +94,9 @@ describe("fact", () => {
 
   it("reads a date in UTC, whatever the zone", () => {
     expect(fact("x", Date.UTC(2026, 0, 1, 23, 59), "date").text).toBe("Jan 1");
+    // A clock time is UTC with its zone named, to the minute (the Data blocks note's window end).
+    expect(fact("x", Date.UTC(2026, 0, 1, 23, 59, 59), "time").text).toBe("23:59 UTC");
+    expect(fact("x", Date.UTC(2026, 0, 1, 0, 5), "time").text).toBe("00:05 UTC");
   });
 });
 
@@ -238,7 +241,16 @@ describe("networksAnchored", () => {
 describe("a duration in a note is written out", () => {
   it("as a fact the model can copy", () => {
     expect(fact("x", 10, "duration").text).toBe("10 seconds");
-    expect(fact("x", 66, "duration").text).toBe("1.1 minutes");
+    expect(fact("x", 66, "duration").text).toBe("about 1 minute");
+    expect(fact("x", 45, "duration").text).toBe("45 seconds");
+    expect(fact("x", 60, "duration").text).toBe("1 minute");
+    expect(fact("x", 114, "duration").text).toBe("about 2 minutes");
+    expect(fact("x", 120, "duration").text).toBe("2 minutes");
+    expect(fact("x", 8280, "duration").text).toBe("about 2 hours");
+    expect(durationWords(90)).toBe("about 2 minutes");
+    expect(durationWords(3570)).toBe("1 hour");
+    expect(durationWords(36 * 3600)).toBe("36 hours");
+    expect(durationWords(53 * 3600)).toBe("about 2 days");
     expect(fact("x", 3600, "duration").text).toBe("1 hour");
     expect(fact("x", 604_800, "duration").text).toBe("7 days");
   });
@@ -281,5 +293,30 @@ describe("withChangeFacts", () => {
   it("adds nothing for a pair that rounds to no change, or has nothing to move from", () => {
     expect(withChangeFacts(pair("k", "k before", 1000, "k now", 1002))).toHaveLength(2);
     expect(withChangeFacts(pair("k", "k before", 0, "k now", 5))).toHaveLength(2);
+  });
+});
+
+describe("wholeMean", () => {
+  it("states an average of whole things rounded, with about in the label", () => {
+    const six = wholeMean("Metagraph snapshots anchored per global snapshot, recent", 5.9);
+    expect(six.label).toBe("Metagraph snapshots anchored per global snapshot, recent, about");
+    expect(six.value).toBe(6);
+    expect(six.text).toBe("6");
+    expect(wholeMean("x", 5.4).text).toBe("5");
+    expect(wholeMean("x", 7).text).toBe("7");
+  });
+  it("states a mean below one half as under 1, never about 0 — something did anchor (M6)", () => {
+    const quiet = wholeMean("Metagraph snapshots anchored per global snapshot, recent", 0.3);
+    expect(quiet.label).toBe("Metagraph snapshots anchored per global snapshot, recent, under");
+    expect(quiet.value).toBe(1);
+    expect(quiet.text).toBe("1");
+    expect(checkNote("Each global snapshot anchored under 1 metagraph snapshot.", [quiet], []).ok).toBe(true);
+    // None at all is a plain zero, and one half up rounds as before.
+    expect(wholeMean("x", 0)).toMatchObject({ label: "x", value: 0 });
+    expect(wholeMean("x", 0.5)).toMatchObject({ label: "x, about", value: 1 });
+  });
+  it("lets the gate accept the house-style note", () => {
+    const f = wholeMean("Metagraph snapshots anchored per global snapshot, recent", 5.9);
+    expect(checkNote("Each global snapshot anchored about 6 metagraph snapshots.", [f], []).ok).toBe(true);
   });
 });
