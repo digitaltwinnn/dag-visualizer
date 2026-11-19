@@ -29,20 +29,20 @@ export type ViewDef = {
 
 export const VIEWS: readonly ViewDef[] = [
   {
-    id: "hyper",
-    name: "Hypergraph",
-    slug: "hypergraph",
-    desc:
-      "The Constellation Network's architecture as a living 3D structure: the Global L0 core, " +
-      "its validator shells, and every metagraph orbiting with its own layers.",
-  },
-  {
     id: "geo",
     name: "Geography",
     slug: "geography",
     desc:
       "Every Constellation Network validator node on a 3D globe at its real location — explore " +
       "the countries, cities and hosting providers behind the $DAG hypergraph.",
+  },
+  {
+    id: "hyper",
+    name: "Hypergraph",
+    slug: "hypergraph",
+    desc:
+      "The Constellation Network's architecture as a living 3D structure: the Global L0 core, " +
+      "its validator shells, and every metagraph orbiting with its own layers.",
   },
   {
     id: "ledger",
