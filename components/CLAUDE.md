@@ -1096,8 +1096,8 @@ column wider so "Metagraph snapshots" stays one line. **The register's sentence 
 scene's bottom** (layout option 3: the readings stay with the switch, the sentence moves down), above
 the vitals band or the phone's dock, `#register-caption` — a marker contract like the switch's: the
 callout's free band ends above it (`ChromeBounds.captionTop`), so the label moves up with it.
-Where the paragraphs below speak of "halves", their second line or the phone's one face, read the tiles,
-that line and the layered face. The register
+Where the paragraphs below speak of "halves" and their second line, read the tiles and the readings
+line. The register
 switch stands ON THE SCENE (D3, 2026-11-07 — option A of the user's mock,
 `components/RegisterSwitch.tsx`): one glass segmented control centred under the command bar, each
 half carrying its own SPAN ("Metagraph snapshots · last 11 min", "Transaction blocks · last 14 h",
@@ -1132,25 +1132,16 @@ Transaction blocks — so the register's own half says which state its subject i
 SUBJECT** (user, same day: "its subject is metagraph snapshots, count those instead of global, same
 for data blocks"): the metagraph snapshots the source's ticks anchored (the feed's per-tick count,
 "333 snapshots"), the data blocks their exact reads carry (`dataStats.dataBlocksInWindow`, a labelled
-floor "77+ data blocks" while reads are landing — rule 10), the window's blocks ("52 blocks"). **On a phone the switch is ONE FACE with ‹ › either side** (user, 2026-11-08, option A of the
-brainstorm's `phone-register-switch.html` — the phone view switch's own grammar one row down): three
-halves never fit 360px (from D6 to then the unlit ones were cut to a glyph and a short span and still
-crowded the row), so the face carries the lit register WHOLE — glyph, name, live / pinned, the clock
-span and the count, the desktop half's exact content — and the chevrons step the registers in the
-view's order through the one door, dimmed at an end, the view face's own chevron (`TopBar`'s
-`viewChevron`: 24px box, 16px muted glyph, `TOUCH_HIT`), the face rolling in from the side it came
-from on the view face's horizontal odometer (`SlideFace`). **The face rests UNWASHED** (user,
-2026-11-09: "it keeps the focus while idle"): the selection wash marks the lit station among three
-on the desktop; on a lone face it read as a pressed button that never let go — the glyph in the
-accent and the name in the foreground ink, as the view face. No pip row: the view face retired its pips for the chevrons (user, 2026-10-18: "has both … the
-<> is more intuitive"). Both presentations stay in the DOM and CSS picks at 700px. The glyphs are `REGISTER_ICONS` (Data blocks wears `Database`: the metagraph
+floor "77+ data blocks" while reads are landing — rule 10), the window's blocks ("52 blocks"). **On a phone the switch is the same layered face** (2026-11-19, replacing the one face with ‹ › of
+2026-11-08): names at the label step, the right column wider so "Metagraph snapshots" stays one line,
+no touch pads on the tiles (they would reach past the 3px gaps into the neighbours). The glyphs are `REGISTER_ICONS` (Data blocks wears `Database`: the metagraph
 kind "data" wears `Blocks`, the transaction block's own mark). The span words are
 `src/data/ledgerSpan.ts`'s, the ONE home the explorer's foot reads too
 (`ledgerSpan.test.ts`), and the Transaction blocks half reads the block window from every register
 (`blockWanted` holds the live window across the whole view — read again every 5 minutes outside
 Transaction blocks, where the half needs only its reach, every 30 s inside it: `blockRefreshMs`). Its cells are the view's
 `viewPolicy.registers`, shown only where the row offers more than one; it waits out a view transition
-(`motionPhase`), the motion hint drops `REGISTER_SWITCH_H` beneath it, and `#register-switch` is a
+(`motionPhase`), the motion hint drops the switch block's height (`registerSwitchH`) beneath it, and `#register-switch` is a
 marker contract — a callout's free band starts under it (`ChromeBounds.sceneTop`). The explorer card's
 control band holds only the measure tiles (its `control` slot went with the switch). A press goes
 through `switchLedgerRegister`, the one door (`selectionBoundary.test.ts` holds every surface to it),
@@ -1292,10 +1283,13 @@ global is drawn there, D3), the global snapshot in the other two. Its test is th
 
 **A register the filtered network makes no subject for says so, and stays selectable** (user, 2026-11-19: "what to do when we filter on … UP and are looking at transaction
 blocks … or use the switcher?"). A transaction block is a cL1's, a data block a dL1's
-(`viewPolicy.REGISTER_LAYER`); `registerRuns` asks the layers the network's located nodes run (the kind
-word's own read, `networkLayers`), and no node located is UNKNOWN, never a guessed absence. Metagraph
-snapshots is never gated: every metagraph has an L0, and the app cannot always see it (BioFi's nodes
-locate as cL1 only). `components/useRegisterScope.ts` is the one reading: the switch's half keeps
+(`viewPolicy.REGISTER_LAYER`); `composition.registerHasSubject` — the ONE question the Engine, the
+follow and the HUD ask — reads the layers the network DECLARES (`MetaInfo.layers`: the directory's layer
+URLs for a metagraph, the protocol's own L0 + cL1 for the DAG), never its node roster: a cluster read that
+failed comes back as no nodes, and an absence inferred from it would state what nobody observed (review
+I1). Nothing declared is UNKNOWN, never a guessed absence. Metagraph snapshots is never gated. Under a
+no-subject register the follow is paused and releases the seat it held under the previous lens (the live
+block or data block). `components/useRegisterScope.ts` is the HUD's reading: the switch's half keeps
 its full strength and stays pressable, its readings "no currency layer (cL1)" / "no data layer (dL1)"
 (user, same day: "don't gray out the switcher … 'no dL1' in the switcher + the hint text is clear
 enough", then "say no currency layer (cL1) and no data layer (dL1)" — `views.layerPhrase`, one home), and opened — or open

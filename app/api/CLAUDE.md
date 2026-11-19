@@ -5,7 +5,7 @@
 > blocks note's live-window reader (`app/api/notes/dataWindow.ts`, 50 ticks, 8 in flight) and the
 > route fill ONE cache per ordinal. The notes' hourly warm (`warm.ts`) writes four kinds now: the
 > ledger's, the block DAG's, the data blocks' (`data:hours`, `KIND_TIMING.data` = the ledger's clock)
-> and History's 24h. Cost of the data note: one model call an hour plus up to 52 exact reads, most of
+> and History's 24h. Cost of the data note: one model call an hour plus up to 50 exact reads, most of
 > them already cached by visitors' tabs (3.5 s cold, measured locally). — working notes
 
 The server-side routes.

@@ -311,7 +311,8 @@ function nodeAncestryActions(
 // destination rail with every parent slot back on its ghost, and a deselect would step straight
 // to the network (user, 2026-08-02: every card up to the selection belongs on the rail, in every
 // view). So the entry re-derives exactly the ancestry a click on that node IN the destination
-// view would have committed, no inspect (it's already open). EXCEPT THE NETWORK (user, 2026-11-02: "as
+// view would have committed, and then the node itself again, LAST (2026-11-19: the rail opens the most
+// recently committed card, so an ancestry landing after the node outranked it). EXCEPT THE NETWORK (user, 2026-11-02: "as
 // they fly between the views their focus should be kept"): a browse clears on leaving and the node
 // carries, so a view whose node stands on its network does so again, and the node commits after it,
 // because a network change clears what was picked under the old one. A non-node pick (a dossier, a

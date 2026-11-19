@@ -330,6 +330,34 @@ describe("the follow flow in the Blocks register (D3)", () => {
     followLatest();
     expect(st().block).toBeNull();
   });
+  // A REGISTER WITH NO SUBJECT IS PAUSED (2026-11-19; review I2): under a network that declares no cL1
+  // the follow moves nothing and releases the seat it held under the previous lens.
+  it("a filter onto a network that runs no cL1 pauses the follow and releases the live block from All", () => {
+    useStore.setState({ metaList: [{ id: LISTED, name: "x", color: 0, nodes: [], located: 0, countriesCount: 0, layers: ["l0", "dl1"] }] });
+    win([tick(300, ["b3"])]);
+    followLatest();
+    expect(st().block?.hash).toBe("b3");
+    useStore.setState({ filter: LISTED });
+    followLatest();
+    expect(st().block).toBeNull();
+    expect(st().following).toBe(true);
+    // Back to All: the follow resumes and seats the newest block again.
+    useStore.setState({ filter: "all" });
+    followLatest();
+    expect(st().block?.hash).toBe("b3");
+  });
+  it("the pause never touches a block the reader PINNED (it runs only while following)", () => {
+    useStore.setState({ metaList: [{ id: LISTED, name: "x", color: 0, nodes: [], located: 0, countriesCount: 0, layers: ["l0", "dl1"] }] });
+    useStore.setState({ following: false, block: { chain: "dag", hash: "b1", ordinal: 100, anchorOrd: 100 }, filter: LISTED });
+    expect(st().block?.hash).toBe("b1");
+  });
+  it("a network that declares nothing (unknown) is never paused", () => {
+    useStore.setState({ metaList: [{ id: LISTED, name: "x", color: 0, nodes: [], located: 0, countriesCount: 0 }] });
+    win([tick(300, [], { [LISTED]: [tokenSnap(51, ["t1"])] })], LISTED);
+    useStore.setState({ filter: LISTED });
+    followLatest();
+    expect(st().block?.hash).toBe("t1");
+  });
 });
 
 // THE DATA BLOCKS REGISTER'S LIVE (2026-11-08): the newest read tick that carried data, and its newest

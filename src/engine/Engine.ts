@@ -30,7 +30,7 @@ import { HYPER_TILT, HYPER_TILT_FOCUS } from "./domain/hyperLayout";
 import { readSceneColors, type SceneColors, LIGHT_LOOK } from "./sceneColors";
 import { setNodeDimTarget, setNodeEnv } from "./scene/objects/NodeFabric";
 import { THEME_KEY, parseThemePref, resolveTheme, type Theme } from "@/src/theme/resolve";
-import { VIEW_POLICIES, registerRuns, type ViewPolicy } from "./domain/viewPolicy";
+import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
 import { sceneFeeds } from "./domain/sceneFeeds";
 import { liveArrivals } from "./domain/arrivals";
 import { BRIEFING_COVER, BRIEFING_PACE, BRIEFING_RELEASE_MS, BRIEFING_SETTLE_MS, liftSettling } from "./domain/briefing";
@@ -46,7 +46,7 @@ import { viewNetwork } from "./domain/viewNetwork";
 import { ViewTransition, is3D, fleetFaded, fleetHolder, type FleetPlacement, type View3D } from "./domain/viewTransition";
 import { gatherBand, railGapPx, railGapShiftPx, type GatherBand } from "./domain/gatherLayout";
 import { LADDERS, LEVEL_CARRY, hasLevel, sceneShowsNode, type CohortSel, type CompositionSel, type FocusLevel, type SelectionSnapshot, type ResolverKey } from "./domain/focusLadder";
-import { compositionGroups, compositionKey, compositionRows, filterLayers } from "@/src/data/composition";
+import { compositionGroups, compositionKey, compositionRows, registerHasSubject } from "@/src/data/composition";
 import type { LedgerRegister } from "@/src/store/mode";
 import { metaSnapDeepKey } from "@/src/data/types";
 import { snapsAtTick } from "@/src/data/anchorLog";
@@ -1449,6 +1449,8 @@ export class Engine {
         siteUrl: m.siteUrl, iconUrl: m.iconUrl,
         color: metagraphById(m.id)?.color ?? DEFAULT_META_COLOR,
         nodes, located: located(nodes), countriesCount: countriesOf(nodes),
+        // The directory's declared layers (absent from an older cached payload: unknown).
+        layers: (m as { layers?: string[] }).layers,
       };
     });
     // The DAG is the root CORE — prepended so it's just another entry in the metaList that the
@@ -1462,6 +1464,8 @@ export class Engine {
           siteUrl: undefined, color: metagraphById("dag")?.color ?? this.dagCore.color, isRoot: true,
           nodes: this.dagCore.nodes, located: located(this.dagCore.nodes),
           countriesCount: countriesOf(this.dagCore.nodes),
+          // STRUCTURAL, not read: the DAG runs a Global L0 and a currency L1, never a data L1.
+          layers: ["l0", "cl1"],
         }]
       : [];
     const list = [...dag, ...metas];
@@ -1477,17 +1481,17 @@ export class Engine {
   /** The newest tick of the block window last handed to the chamber (`blockWindowContinues`). */
   private _blockTo: number | null = null;
 
-  /** A SOURCE SWITCH (a past window, a block window, a register flip): a fresh chamber history —
-   *  the model only ever advances — the live edge frozen while past, and the pin re-applied so the
-   *  rewind lands it. */
-  /** Does the filtered network make this register's subject (`viewPolicy.registerRuns` over its
-   *  located nodes' layers, `composition.filterLayers`)? The HUD's `useRegisterScope` reads the same. */
-  private _registerHasSubject(st: { ledgerRegister: LedgerRegister; filter: string; metaList: readonly { id: string; nodes?: readonly { roles?: string[]; layer?: string | null }[] }[] }): boolean {
-    return registerRuns(st.ledgerRegister, filterLayers(st.filter, st.metaList));
+  /** Does the filtered network make this register's subject (`composition.registerHasSubject`, over
+   *  the layers it declares)? The follow and the HUD's `useRegisterScope` ask the same question. */
+  private _registerHasSubject(st: { ledgerRegister: LedgerRegister; filter: string; metaList: readonly { id: string; layers?: readonly string[] }[] }): boolean {
+    return registerHasSubject(st.ledgerRegister, st.filter, st.metaList);
   }
   /** The answer the chamber was last laid with — a flip re-seats it (a fresh, empty or full, trail). */
   private _ledgerHasSubject = true;
 
+  /** A SOURCE SWITCH (a past window, a block window, a register flip): a fresh chamber history —
+   *  the model only ever advances — the live edge frozen while past, and the pin re-applied so the
+   *  rewind lands it. */
   private _reseatLedger(): void {
     this.ledger.resetHistory();
     this.ledger.setFrozen(!!getPastWindow());
@@ -2681,6 +2685,9 @@ export class Engine {
   private _braidHintX = NaN;
   private _braidHintY = NaN;
   private _syncBraidHint(): void {
+    // Where the view offers no registers, or the register reads no block window, there is no hint to
+    // place — and no per-frame lookup for an element that is not mounted (review).
+    if (!this._braidHintOn && (this._policy.registers.length < 2 || !this.ledger.readsBlockWindow)) return;
     let el = this._braidHintEl;
     if (!el || !el.isConnected) el = this._braidHintEl = document.getElementById("braid-hint"); // event-time: a cache miss only
     if (!el) return;
@@ -2713,6 +2720,8 @@ export class Engine {
     if (on !== this._braidHintOn) {
       this._braidHintOn = on;
       el.dataset.on = on ? "1" : "0";
+      // An invisible status is not announced (review): it is read only while it shows.
+      el.setAttribute("aria-hidden", on ? "false" : "true");
     }
   }
 

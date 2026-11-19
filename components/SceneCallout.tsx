@@ -75,6 +75,7 @@ import { PinnedMark, Resolving } from "@/components/state/StateAtoms";
 import { IDENT_INK } from "@/components/identInk";
 import { ledgerNetwork } from "@/src/engine/domain/tickNet";
 import { useFeedRead } from "@/components/useFeedRead";
+import { useFollowPaused } from "@/components/useRegisterScope";
 
 // The panel's standoff from the anchor lives in `src/engine/domain/calloutPlacement.ts`, with the
 // reach thresholds derived from it and the placement rules that read them. It used to be a local
@@ -300,6 +301,11 @@ export default function SceneCallout() {
   const resolving = (exact == null && !exactMissed) || resolveHold.show;
   const following = useStore((s) => s.following);
   const liveFeed = useStore((s) => s.live);
+  // A PAUSED FOLLOW (the register makes no subject under the filter) is neither live nor a missing
+  // feed: the label says "n/a", as the card's follow control does (`useFollowPaused`).
+  const paused = useFollowPaused("SceneCallout");
+  const liveAside = (chip: string | undefined) =>
+    paused ? { text: "n/a", chip } : liveFeed ? { text: "live", live: true, chip } : { text: "no signal" };
   // THE BLOCKS REGISTER'S SUBJECT (D3): the Block card's — the live newest block or the pinned one.
   const inBlocks = useStore((s) => readsBlockWindow(registerOf(s.mode, s.ledgerRegister)));
   // THE SNAPSHOT'S LABEL SPEAKS THE REGISTER'S SUBJECT (user, 2026-11-07: "snapshot anchor should
@@ -558,9 +564,7 @@ export default function SceneCallout() {
         // behind a beating dot — two surfaces a hand's width apart disagreeing about whether the
         // network was answering. A pin is unaffected: a held snapshot is not a claim about now.
         aside: following
-          ? liveFeed
-            ? { text: "live", live: true, chip: rel || undefined }
-            : { text: "no signal" }
+          ? liveAside(rel || undefined)
           : { text: "", pinned: true, chip: rel || undefined },
         // Unneted the ring marks the whole bar (core cyan); under a filter the anchor
         // points at the committed network's own SEGMENT, so the ring takes its accent
@@ -653,9 +657,7 @@ export default function SceneCallout() {
         title: shortBlockHash(block.hash),
         titleMono: true,
         aside: following
-          ? liveFeed
-            ? { text: "live", live: true, chip: height }
-            : { text: "no signal" }
+          ? liveAside(height)
           : { text: "", pinned: true, chip: height },
         ring: hue,
         mark: { icon: iconForPick("block"), hue },
@@ -679,9 +681,7 @@ export default function SceneCallout() {
         title: b ? shortBlockHash(b.digest) : `${dataBlock.index + 1}`,
         titleMono: true,
         aside: following
-          ? liveFeed
-            ? { text: "live", live: true, chip: updatesChip }
-            : { text: "no signal" } // the global's and the block's third state (review, 2026-11-09)
+          ? liveAside(updatesChip) // the global's and the block's third state (review, 2026-11-09)
           : { text: "", pinned: true, chip: updatesChip },
         ring: hue,
         mark: { icon: REGISTER_ICONS.data, hue },

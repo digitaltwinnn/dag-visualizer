@@ -268,6 +268,9 @@ export interface MetaInfo {
   located: number;
   countriesCount: number;
   isRoot?: boolean; // the DAG core (the root every metagraph anchors into)
+  /** The layers the network DECLARES ("l0" / "cl1" / "dl1"): the directory's layer URLs for a
+   *  metagraph, the protocol's own for the DAG. Absent or empty = unknown (2026-11-19). */
+  layers?: string[];
 }
 
 export interface CountryStat {

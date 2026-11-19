@@ -160,10 +160,6 @@ export function registerLine(register: LedgerRegister, scope: RegisterLineScope,
   return `${whose} dL1 blocks, carried in ${its} into the global snapshot`;
 }
 
-/** THE REGISTER HAS NO SUBJECT UNDER THIS FILTER (user, 2026-11-19 — UP runs no dL1, Digital Evidence
- *  no cL1): ONE sentence, said by the line under the switch, the band, the explorer and RAW alike, and
- *  the register stays where it is (a filter never moves the view). `viewPolicy.registerRuns` decides;
- *  this is only the words. The DAG's keeps the band's own sentence. */
 /** A LAYER, NAMED FOR A READER (user, 2026-11-19: "say no currency layer (cL1) and no data layer
  *  (dL1)"): the word for what it does and its code, the one phrase the switch's readings and the
  *  register's sentence share. */
@@ -171,6 +167,11 @@ export function layerPhrase(layer: "cl1" | "dl1"): string {
   return layer === "cl1" ? "currency layer (cL1)" : "data layer (dL1)";
 }
 
+/** THE REGISTER HAS NO SUBJECT UNDER THIS FILTER (user, 2026-11-19 — UP runs no dL1, Digital Evidence
+ *  no cL1): ONE sentence, said by the caption, the band, the explorer and Transaction blocks' RAW alike
+ *  (Data blocks' RAW stays the anchor log: its records are metagraph snapshots, which exist), and the
+ *  register stays where it is (a filter never moves the view). `composition.registerHasSubject`
+ *  decides; this is only the words. The DAG's keeps the band's own sentence. */
 export function registerAbsence(register: LedgerRegister, scope: RegisterLineScope): string {
   if (scope === "dag" && register === "data") return "The DAG's own snapshots carry no data blocks";
   const who = scope === "all" ? "This network" : scope === "dag" ? "The DAG" : scope.ticker;

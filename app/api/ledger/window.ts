@@ -1,3 +1,4 @@
+import { POLL } from "@/src/engine/config";
 import type { GlobalSnapshot, RawMetaSnapshot } from "@/src/data/types";
 import { ordinalAtOrAfter, type ChainReader } from "../notes/snapshotAt";
 
@@ -12,10 +13,11 @@ import { ordinalAtOrAfter, type ChainReader } from "../notes/snapshotAt";
 // where the list does not serve (its 2025-05-20 floor), and each catalog chain's records from its
 // newest one inside the span, found by the same ordinal search a notable row's snapshot uses.
 
-/** The window around a pin: this many global snapshots before it… */
-export const WINDOW_BEFORE = 41;
-/** …and up to this many after it, so the pin lands at the front with context behind it. */
+/** …up to this many global snapshots after the pin, so it lands at the front with context behind it… */
 export const WINDOW_AFTER = 10;
+/** …and this many before it: the window is the live buffer's own length (`POLL.maxSnapshots`, 50 since
+ *  2026-11-19, review), so a pinned trail and the live one are one length. */
+export const WINDOW_BEFORE = POLL.maxSnapshots - WINDOW_AFTER - 1;
 /** A chain's records read per page of its list, and the most pages one chain may take. */
 const CHAIN_PAGE = 500;
 const CHAIN_PAGES_MAX = 6;

@@ -69,6 +69,8 @@ describe("the lanes' sentences", () => {
     expect(dataLaneLead(12, 3)).toBe("The new data this snapshot received: 12 updates in 3 blocks, from its data layer (dL1).");
     expect(dataLaneLead(1, 1)).toBe("The new data this snapshot received: 1 update in 1 block, from its data layer (dL1).");
     expect(dataLaneLead(0, 0)).toBe("This snapshot received no new data.");
+    // Blocks with no updates keep their count (review): an empty block is still a block.
+    expect(dataLaneLead(0, 2)).toBe("This snapshot received 2 data blocks with no updates.");
     expect(dataLaneLead(undefined, 3)).toBe("The new data this snapshot received, from its data layer (dL1).");
   });
   it("the State lane names the record and its off-chain proof", () => {

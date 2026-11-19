@@ -36,7 +36,8 @@ export const STATE_PROOF_LABEL = "Proof of the off-chain record";
  *  read has not landed, or a block could not be decoded) leave the figures out, never a guessed 0. */
 export function dataLaneLead(updates: number | null | undefined, blocks: number | null | undefined): string {
   if (updates == null || blocks == null) return "The new data this snapshot received, from its data layer (dL1).";
-  if (updates === 0 || blocks === 0) return "This snapshot received no new data.";
+  if (blocks === 0) return "This snapshot received no new data.";
+  if (updates === 0) return `This snapshot received ${blocks.toLocaleString("en-US")} data block${blocks === 1 ? "" : "s"} with no updates.`;
   const u = `${updates.toLocaleString("en-US")} update${updates === 1 ? "" : "s"}`;
   const b = `${blocks.toLocaleString("en-US")} block${blocks === 1 ? "" : "s"}`;
   return `The new data this snapshot received: ${u} in ${b}, from its data layer (dL1).`;

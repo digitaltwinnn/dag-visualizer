@@ -102,8 +102,8 @@ count column out of view and defeated the cell's own `truncate`.
 **An old pin goes BACK IN TIME** (user, 2026-11-03; `docs/superpowers/specs/2026-11-03-snapshots-past-window-design.md`).
 The live buffer holds the newest 50 global snapshots (`POLL.maxSnapshots`), so a pin older than that (a notable row's
 longest gap) used to leave the chamber and the explorer on the live feed. Every Snapshots surface
-now reads ONE ledger source — `pastWindow.ts`'s held window around the pin (41 before, the pin, up
-to 10 after, from `/api/ledger/window`), else the live buffer — through `ledgerSource()` (the
+now reads ONE ledger source — `pastWindow.ts`'s held window around the pin (39 before, the pin, up
+to 10 after — the live buffer's own 50 — from `/api/ledger/window`), else the live buffer — through `ledgerSource()` (the
 Engine) and `useLedgerSource` (the explorer, the global card's ‹ ›). `pastWanted` is the one rule
 for when; `components/PastWindowBridge.tsx` is the one writer, and the store carries only the
 status. A switch starts the chamber on a fresh history and the pin's rewind lands it; while past

@@ -358,6 +358,9 @@ export class LedgerView implements SceneView {
    *  `BraidPane` sized to the short token band over that lane's tiles and tinted its hue. Each stands
    *  while its braid's blocks do, or while they are on their way (`_paneShown`). */
   private readonly _tokenPanes = new Map<string, BraidPane>();
+  /** The same panes as two parallel arrays, for the per-frame pass (no iterator per frame). */
+  private readonly _tokenPaneKeys: string[] = [];
+  private readonly _tokenPaneList: BraidPane[] = [];
   /** The chains whose blocks the last tier rebuild drew (`_rebuildBlockTier`). */
   private readonly _braidsDrawn = new Set<string>();
   private _metaPlanes = new Map<string, SnapshotPlane>();
@@ -693,6 +696,8 @@ export class LedgerView implements SceneView {
       pane.setHorizon(HORIZON_X, HORIZON_SPAN);
       pane.setTint(this._laneColor(key).getHex());
       this._tokenPanes.set(key, pane);
+      this._tokenPaneKeys.push(key);
+      this._tokenPaneList.push(pane);
     }
 
   }
@@ -727,7 +732,8 @@ export class LedgerView implements SceneView {
     // whose window holds no DAG block) — and, EMPTY, while they are on their way (`_braidWaiting`,
     // user 2026-11-19: "show its panel directly"); it fades with the furniture.
     this._braidPane.apply(this._paneShown("dag"), a);
-    for (const [key, pane] of this._tokenPanes) pane.apply(this._paneShown(key), a);
+    // Indexed, not a Map iterator: this runs every frame (rule 5's intent — no per-frame garbage).
+    for (let i = 0; i < this._tokenPaneKeys.length; i++) this._tokenPaneList[i]!.apply(this._paneShown(this._tokenPaneKeys[i]!), a);
     // The committed (or hover-previewed) network's OWN plane glows a step brighter — the
     // plane-level twin of the colored dim (user, 2026-08-07).
     const netKey = this._netDimKey();
@@ -1118,11 +1124,18 @@ export class LedgerView implements SceneView {
   setBlockWindow(w: BlockWindow | null): void {
     this._blockWindow = w;
     this._windowChains.clear();
+    this._firstTokenChain = null;
     if (w) for (const t of w.ticks) {
       if (t.blocks.length) this._windowChains.add("dag");
-      for (const [chain, rows] of Object.entries(t.metaSnaps)) if (rows.some((r) => r.blocks?.length)) this._windowChains.add(chain);
+      for (const [chain, rows] of Object.entries(t.metaSnaps)) {
+        if (!rows.some((r) => r.blocks?.length)) continue;
+        this._windowChains.add(chain);
+        this._firstTokenChain ??= chain;
+      }
     }
   }
+  /** The window's first token chain, kept at event time so the per-frame wait check needs no iterator. */
+  private _firstTokenChain: string | null = null;
   /** The chains whose braids the held window holds blocks for — a braid stands once its reads settle. */
   private readonly _windowChains = new Set<string>();
 
@@ -1149,7 +1162,7 @@ export class LedgerView implements SceneView {
   private _waitingChain(): string | null {
     if (!this._braidWaiting()) return null;
     if (this._braidExpected != null) return this._braidExpected;
-    return this._windowChains.has("dag") ? "dag" : (this._windowChains.values().next().value ?? null);
+    return this._windowChains.has("dag") ? "dag" : this._firstTokenChain;
   }
 
   /** Does `chain`'s braid pane stand: its blocks are drawn, or they are on their way. */

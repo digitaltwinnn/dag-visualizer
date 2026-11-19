@@ -18,6 +18,10 @@ interface MetaNode { ip: string; state: string; layer: string; roles: string[]; 
 export interface Metagraph {
   id: string; name: string; symbol: string; description: string;
   siteUrl: string; iconUrl: string; nodes: MetaNode[];
+  /** THE LAYERS THE DIRECTORY DECLARES for this metagraph — one per layer URL it lists (2026-11-19,
+   *  review I1: a layer's absence must be a stated fact, never a cluster read that failed and came
+   *  back empty). Empty when the directory's own record could not be read: unknown, not none. */
+  layers: string[];
   hue?: { deg: number; oklch: string; hex: string };
 }
 
@@ -113,6 +117,7 @@ async function fetchLive(): Promise<{ metagraphs: Metagraph[]; geo: GeoMap; buil
         id, name: m.name || id, symbol: m.symbol || "",
         description: m.description || "", siteUrl: m.siteUrl || "",
         iconUrl: m.iconUrl || "", nodes,
+        layers: present.map(([, layer]) => layer),
       };
     }),
   );

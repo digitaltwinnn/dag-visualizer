@@ -20,7 +20,7 @@ import type { LedgerRegister } from "@/src/store/mode";
 import { switchLedgerRegister } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
-import { cn, TOUCH_HIT } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { StateMark } from "@/components/state/StateAtoms";
 import { useSceneYield } from "@/components/RailShade";
 import { useBreakpoint } from "@/components/useBreakpoint";
@@ -148,25 +148,27 @@ export default function RegisterSwitch() {
   // snapshots ARE the global snapshots, so under its filter the half counts those. Transaction blocks
   // needs nothing here: its window is already read for the filter's network.
   const inScope = (metaId: string): boolean => filter === "all" || netKeyOf(metaId) === filter;
+  // A tick whose per-network counts have not landed is UNKNOWN for a network: the sum is a floor then.
+  let metaSnapsFloor = false;
   const metaSnaps =
     filter === "all" ? sourceTicks.reduce((n, g) => n + (g.metagraphSnapshotCount ?? 0), 0)
     : filter === "dag" ? sourceTicks.length
     : sourceTicks.reduce((n, g) => {
         const mc = ledgerAnchor(g.timestamp)?.metaCounts;
-        if (!mc) return n;
+        if (!mc) { metaSnapsFloor = true; return n; }
         for (const [id, c] of mc) if (inScope(id)) n += c;
         return n;
       }, 0);
   const data = dataBlocksInWindow(sourceTicks, snapshotExact, inScope);
   const blockCount = blockStatus?.status === "ready" && blocks?.globalSnapshots.length ? windowBlocks(blocks).length : null;
   const count: Record<LedgerRegister, string | null> = {
-    snapshots: reading ? null : countWord(metaSnaps, "snapshot"),
+    snapshots: reading ? null : countWord(metaSnaps, "snapshot", metaSnapsFloor),
     blocks: countWord(blockCount, "block"),
     data: reading ? null : countWord(data.count, "data block", data.read < data.total),
   };
   // The bare figure on the glass (option A): the register's glyph before it names the unit.
   const figure: Record<LedgerRegister, string | null> = {
-    snapshots: reading ? null : countFigure(metaSnaps),
+    snapshots: reading ? null : countFigure(metaSnaps, metaSnapsFloor),
     blocks: countFigure(blockCount),
     data: reading ? null : countFigure(data.count, data.read < data.total),
   };
@@ -239,7 +241,8 @@ export default function RegisterSwitch() {
                 "bg-transparent text-muted-foreground hover:text-foreground hover:bg-wash-soft",
                 "aria-pressed:bg-[var(--sel-bg)] aria-pressed:text-primary-ink aria-pressed:hover:bg-[var(--sel-bg)]",
                 "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
-                TOUCH_HIT,
+                // NO `TOUCH_HIT` (review I3): its pad reaches 10px past a tile, so on the phone's 3px
+                // gaps it covered a quarter of the neighbour's tile and mis-routed a tap.
               )}
             >
               <Icon aria-hidden className="size-3.5 flex-none group-aria-pressed:text-primary" />
@@ -248,7 +251,7 @@ export default function RegisterSwitch() {
           );
         })}
         {/* THE GROUND: where every register's subject lands, so it is drawn and never pressed. */}
-        <span className="col-span-2 row-start-3 flex items-center justify-center rounded-md py-1 bg-[var(--panel-plate)] shadow-[inset_0_0_0_1px_var(--border)] text-label max-[700px]:text-[10px] uppercase tracking-caps text-muted-foreground leading-none select-none">
+        <span className="col-span-2 row-start-3 flex items-center justify-center rounded-md py-1 bg-[var(--panel-plate)] shadow-[inset_0_0_0_1px_var(--border)] text-label uppercase tracking-caps text-muted-foreground leading-none select-none">
           Global snapshot
         </span>
       </div>
