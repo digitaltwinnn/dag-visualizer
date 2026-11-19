@@ -11,7 +11,6 @@ import type { BlockSel, DataBlockSel, MetaSnapSel, PickDescriptor } from "@/src/
 import { REGISTER_ICONS } from "@/components/icons";
 import type { LedgerRegister } from "@/src/store/mode";
 import { REGISTER_REST, REGISTER_SEAT } from "@/src/store/mode";
-import type { NoteResponse } from "@/src/data/noteTypes";
 // LADDERS is plain DATA (the domain focus-ladder rung tables) — importing it keeps this module
 // data-only; CohortSel rides along type-only (the store mirrors the same import).
 import { type FocusLevel, type CohortSel, type CompositionSel } from "@/src/engine/domain/focusLadder";
@@ -515,18 +514,14 @@ export function parentHolds(s: Pick<RailManifestState, "snap" | "metaSnap" | "ti
  *  gesture (the POST, and its poll). */
 export type NoteVia = "read" | "request";
 
-/** IS THE AI NOTE ABSENT? — no request (the view's subject has no note), the server's `none`, or
- *  `unavailable` answering a READ (R67: the notes card is the resting focus in Hypergraph and
- *  Geography, so a missing key, a Gate outage or a cold store's failure hold would otherwise make
- *  "unavailable" the first open box a visitor sees; the loader never caches it, so the next subject
- *  change asks again). `unavailable` answering the reader's OWN GESTURE (`via: "request"`, the
- *  request route after "Write notes for this hour / range") keeps the card, which says so on its
- *  surface and offers the door again (R68): a click must never be answered by the card vanishing.
- *  A first fetch still in flight is PRESENT, reading (user, 2026-10-27: the card "is missing and
- *  then suddenly appears — it should use the reading animation"; this retires ruling R36). `none`
- *  is rare (a subject with nothing measured), and "writing…" stays the server's own `pending`. */
-export function noteCardAbsent(hasRequest: boolean, res: NoteResponse | null, via: NoteVia = "read"): boolean {
-  return !hasRequest || res?.state === "none" || (res?.state === "unavailable" && via === "read");
+/** IS THE AI NOTE ABSENT? — only where the view's subject has NO NOTE AT ALL (no request: the
+ *  unlisted set outside History, a subject `noteSubjectOf` answers none for). Every view has a note
+ *  (user, 2026-11-19: "each view has a note, if no data you can just mention that right?"), so the
+ *  server's `none` and an `unavailable` read keep the card, which says "No note right now" on its
+ *  surface (`NotesCard`) — retiring R67, where those stood the slot down and the view arrived with
+ *  no note card and no word about why. A first fetch in flight stands, reading (2026-10-27). */
+export function noteCardAbsent(hasRequest: boolean): boolean {
+  return !hasRequest;
 }
 
 export function detailsCards(s: RailManifestState): RailCard[] {

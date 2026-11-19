@@ -442,11 +442,11 @@ export default function Inspector() {
   const trendWindow = useStore((s) => s.trendWindow);
   const tickHasFilter = useTickHasFilter();
   // The AI note on screen (the card shares this fetch): its card — the top slot of the lane —
-  // stands down when the view's subject has no note or when the server
-  // answered `none`, or `unavailable` to a read (R67; to the reader's own "Write notes" it stays and
-  // says so, R68); while its first answer is read it stands, reading (`noteCardAbsent`).
+  // stands down only when the view's subject has no note at all; a `none` or a failed read keeps it,
+  // saying "No note right now" (user, 2026-11-19, retiring R67), and while its first answer is read
+  // it stands, reading (`noteCardAbsent`).
   const aiNote = useAiNote();
-  const noteAbsent = noteCardAbsent(aiNote.req != null, aiNote.note.res, aiNote.note.via);
+  const noteAbsent = noteCardAbsent(aiNote.req != null);
   const manifest = detailsCards({
     mode, filter, railNet, tickNet, tickHasFilter, inspect, snap, country, cohort, composition, metaSnap, ledgerRegister, block, dataBlock, coarse, trendCursorMs, trendRange, trendFocus, trendFront, trendWindow,
     noteAbsent,

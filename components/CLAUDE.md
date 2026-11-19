@@ -894,11 +894,13 @@ and the note folds to an ENTRY above the subject box; a card the VIEW seated by 
 Range card on the window's span and its Metagraph card on the front plane, Snapshots' live tick
 (`advanceSnap` bumps nothing) — leaves the note the box, so the note never arrives folded and a
 notable-day hover on History's timeline lights a row the reader can see.
-It has **no ghost**: an absent note is no card at all (`noteCardAbsent` — no request, `none`, or
-`unavailable` answering a READ; R67, so a degraded model never owns the resting box), while a first
-fetch in flight stands, reading. `unavailable` answering the reader's own "Write notes" gesture is
-the exception (R68, `useNote`'s `via`): the card stays and says "Couldn't write notes just now"
-above the same door, so a click is never answered by the card vanishing. And it is **outside every subject rule** of `railCollapse.ts`: a view switch pins it OPEN and
+It has **no ghost**, and **every view has its note** (user, 2026-11-19: "each view has a note, if no
+data you can just mention that right?" — retiring R67): the card is absent only where the view's
+subject has no note at all (`noteCardAbsent` — no request, the unlisted set outside History). The
+server's `none` and a failed READ keep it, saying "No note right now", muted, with no door — the
+subject cards' own words; a first fetch in flight stands, reading. `unavailable` answering the
+reader's own "Write notes" gesture says "Couldn't write notes just now" above the same door (R68,
+`useNote`'s `via`), so a click is never answered by a dead end. And it is **outside every subject rule** of `railCollapse.ts`: a view switch pins it OPEN and
 the subject cards folded (R78, above — the one pin it ever gets), and where no note stands pins
 nothing at all when it was the departing box (else every subject card arrived folded beside an
 unpinned note: no box); the step ghost's run skips it.

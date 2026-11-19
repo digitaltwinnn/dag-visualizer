@@ -91,25 +91,12 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
     const notes = detailsCards(details({ mode: "hyper", noteAbsent: true })).find((c) => c.id === "notes")!;
     expect(notes.present).toBe(false);
   });
-  it("the AI note is absent with no request, `none` or `unavailable`; a first fetch in flight is present, reading", () => {
-    expect(noteCardAbsent(false, { state: "pending" })).toBe(true);
-    expect(noteCardAbsent(false, null)).toBe(true);
-    // The card stands while its first answer is read (user, 2026-10-27), never popping in late.
-    expect(noteCardAbsent(true, null)).toBe(false);
-    expect(noteCardAbsent(true, { state: "none" })).toBe(true);
-    // A degraded model never owns the resting box (R67): `unavailable` answering a READ stands the
-    // slot down too…
-    expect(noteCardAbsent(true, { state: "unavailable" })).toBe(true);
-    expect(noteCardAbsent(true, { state: "unavailable" }, "read")).toBe(true);
-    // …but answering the reader's own gesture ("Write notes for this range"), the card stays and
-    // says so, with the door to try again (R68).
-    expect(noteCardAbsent(true, { state: "unavailable" }, "request")).toBe(false);
-    // The gesture keeps nothing else alive: `none` and no request are absent on either path.
-    expect(noteCardAbsent(true, { state: "none" }, "request")).toBe(true);
-    expect(noteCardAbsent(false, { state: "unavailable" }, "request")).toBe(true);
-    for (const res of [{ state: "pending" }, { state: "request" }] as const)
-      expect(noteCardAbsent(true, res)).toBe(false);
-    expect(noteCardAbsent(true, { state: "ok", text: "t", writtenAt: 0, spanFrom: 0, spanTo: 1, days: [] })).toBe(false);
+  // User, 2026-11-19: "each view has a note, if no data you can just mention that" — retiring R67's
+  // stand-down. The card is absent only where the view's subject has no note at all (no request);
+  // `none` and an `unavailable` read keep it, and it says "No note right now" on its surface.
+  it("the AI note is absent only with no request; `none`, `unavailable`, a first fetch and an answer all keep the card", () => {
+    expect(noteCardAbsent(false)).toBe(true);
+    expect(noteCardAbsent(true)).toBe(false);
   });
   it("the placeholder hosts no AI notes card", () => {
     expect(detailsCards(details({ mode: "soon", noteAbsent: false })).some((c) => c.id === "notes")).toBe(false);

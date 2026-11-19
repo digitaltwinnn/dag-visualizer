@@ -284,7 +284,7 @@ describe("the notes card's own behaviour", () => {
 
 describe("a failed write answers the gesture on the card's surface (R68)", () => {
   it("Inspector states which path the answer came by", () => {
-    expect(read("components/Inspector.tsx")).toMatch(/noteCardAbsent\(aiNote\.req != null, aiNote\.note\.res, aiNote\.note\.via\)/);
+    expect(read("components/Inspector.tsx")).toMatch(/noteCardAbsent\(aiNote\.req != null\)/);
   });
 
   it("useNote marks the request route's answer as the gesture's, and every GET answer as a read's", () => {
