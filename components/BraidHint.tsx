@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useStore } from "@/src/store/store";
 import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
 import { windowReadProgress } from "@/src/data/blockReads";
+import { blockChainOf } from "@/src/data/blockWindow";
 import { readsBlockWindow, registerOf } from "@/src/engine/domain/viewPolicy";
 import { SCENE_GLASS } from "@/components/selection";
 import { useFeedRead } from "@/components/useFeedRead";
@@ -27,11 +28,14 @@ export default function BraidHint() {
   const reads = useStore((s) => s.blockReads);
   const miss = useStore((s) => s.blockReadMiss);
   const exactMiss = useStore((s) => s.exactMiss);
+  const filter = useStore((s) => s.filter);
   useFeedRead(["api-blocks", "exact"], "BraidHint", on);
   const [w, setW] = useState(getBlockWindow);
   useEffect(() => onBlockWindow(() => setW(getBlockWindow())), []);
   if (!on) return null;
-  const { read, total } = windowReadProgress(w, reads, miss, exactMiss);
+  // The count is the WINDOW BEING READ's: across a filter change the held window is still the old
+  // network's, so until the new one answers the line says only that the blocks are being read.
+  const { read, total } = windowReadProgress(w && w.chain === blockChainOf(filter) ? w : null, reads, miss, exactMiss);
   return (
     <div
       id="braid-hint"

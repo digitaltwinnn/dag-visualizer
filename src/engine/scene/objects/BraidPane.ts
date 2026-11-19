@@ -28,10 +28,16 @@ export class BraidPane {
   private readonly _u: PaneUniforms;
   private readonly _mat: THREE.ShaderMaterial;
   private _paper: boolean;
+  private _core: number;
+  /** THE BRAID'S OWN HUE (2026-11-19, user: the token braids "should" use the DAG's component and
+   *  panel): a token braid's pane wears its network's hue on the dark ground, as its blocks do; null
+   *  is the DAG's core tone. Paper keeps the muted ink for every pane. */
+  private _tint: number | null = null;
 
   /** A sheet `w` wide (x) and `h` tall (y) in the x–y plane, centred at (cx, cy, cz), facing +z. */
   constructor(parent: THREE.Object3D, colors: SceneColors, o: { w: number; h: number; cx: number; cy: number; cz: number }) {
     this._paper = isLightGround(colors);
+    this._core = colors.core;
     this._mat = new THREE.ShaderMaterial({
       transparent: true,
       depthWrite: false,
@@ -88,9 +94,16 @@ export class BraidPane {
     this._u.uAlpha.value = (this._paper ? BRAID_PANE_LOOK.alphaPaper : BRAID_PANE_LOOK.alpha) * alpha;
   }
 
+  /** The braid's hue (a network's identity colour), or null for the DAG's core tone. Event-time. */
+  setTint(hex: number | null): void {
+    this._tint = hex;
+    if (!this._paper) this._u.uColor.value.setHex(hex ?? this._core);
+  }
+
   setColors(c: SceneColors): void {
     this._paper = isLightGround(c);
-    this._u.uColor.value.setHex(this._paper ? c.muted : c.core);
+    this._core = c.core;
+    this._u.uColor.value.setHex(this._paper ? c.muted : (this._tint ?? c.core));
     this._mat.blending = glowBlend(c);
     this._mat.needsUpdate = true; // blending is a program flag, not a uniform
   }

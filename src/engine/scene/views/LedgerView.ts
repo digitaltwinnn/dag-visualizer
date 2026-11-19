@@ -293,6 +293,9 @@ const TOKEN_BRAID_LIFT = TOKEN_GAP + TOKEN_BLOCK / 2 + TOKEN_BRAID_HALF;
 const TOKEN_STEP = BLOCK_STEP * (TOKEN_BLOCK / DAG_BLOCK);
 /** The tile mesh's own depth (the BoxGeometry's z, which becomes height under the -90° X spin). */
 const TILE_D = 0.35;
+/** The tallest tile's top above its plane (a tile is 0.48 at most): a token pane spans the band over
+ *  the shortest tile's top to the tallest's. */
+const TILE_TOP_MAX = 0.48;
 
 // The view-entry drop's shape (see the VIEW-ENTRY DROP note in the class): fall height and
 // per-slot timing. The TOTAL is derived so _entryT in [0,1] maps onto real seconds.
@@ -350,6 +353,13 @@ export class LedgerView implements SceneView {
   /** THE BRAID PANE (2026-11-08): a soft sheet in the DAG braid's plane, just behind the blocks,
    *  drawn in Transaction blocks while DAG blocks stand (`objects/BraidPane.ts`). */
   private _braidPane!: BraidPane;
+  /** ONE PANE PER BRAID (user, 2026-11-19: the metagraphs' transaction blocks should use "the same
+   *  component to show the DAG and its panel"): the DAG's above, and one per metagraph lane, the same
+   *  `BraidPane` sized to the short token band over that lane's tiles and tinted its hue. Each stands
+   *  while its braid's blocks do, or while they are on their way (`_paneShown`). */
+  private readonly _tokenPanes = new Map<string, BraidPane>();
+  /** The chains whose blocks the last tier rebuild drew (`_rebuildBlockTier`). */
+  private readonly _braidsDrawn = new Set<string>();
   private _metaPlanes = new Map<string, SnapshotPlane>();
 
   // ── the adapters (spec §4.2–§4.4)
@@ -672,6 +682,18 @@ export class LedgerView implements SceneView {
       w: W, h: BRAID_HALF * 2 + DAG_BLOCK * 2, cx, cy: BRAID_Y, cz: -(DAG_BLOCK / 2 + 0.15),
     });
     this._braidPane.setHorizon(HORIZON_X, HORIZON_SPAN);
+    // …and a token braid's over each metagraph lane: the band its blocks open in over a tile, a block's
+    // edge of room either side, from the shortest tile's top to the tallest's (`TILE_TOP_MAX`).
+    for (let i = 0; i < n; i++) {
+      const key = this._laneOrder[i];
+      const pane = new BraidPane(this.group, this._colors, {
+        w: W, h: TOKEN_BRAID_HALF * 2 + TOKEN_BLOCK * 2 + TILE_TOP_MAX,
+        cx, cy: FLOOR_Y.msnap + TILE_LIFT + TILE_TOP_MAX / 2 + TOKEN_BRAID_LIFT, cz: laneSpan(i, n).cz - (TOKEN_BLOCK / 2 + 0.1),
+      });
+      pane.setHorizon(HORIZON_X, HORIZON_SPAN);
+      pane.setTint(this._laneColor(key).getHex());
+      this._tokenPanes.set(key, pane);
+    }
 
   }
 
@@ -704,7 +726,8 @@ export class LedgerView implements SceneView {
     // The braid pane stands while DAG blocks do (the register's, and not under a token filter,
     // whose window holds no DAG block) — and, EMPTY, while they are on their way (`_braidWaiting`,
     // user 2026-11-19: "show its panel directly"); it fades with the furniture.
-    this._braidPane.apply(this._cargo.blocks && (this._dagTier.count > 0 || this._braidWaiting()), a);
+    this._braidPane.apply(this._paneShown("dag"), a);
+    for (const [key, pane] of this._tokenPanes) pane.apply(this._paneShown(key), a);
     // The committed (or hover-previewed) network's OWN plane glows a step brighter — the
     // plane-level twin of the colored dim (user, 2026-08-07).
     const netKey = this._netDimKey();
@@ -737,6 +760,7 @@ export class LedgerView implements SceneView {
   setSceneColors(map: Record<string, number>): void {
     this.sceneColors = map;
     this._laneColors.clear();
+    for (const [key, pane] of this._tokenPanes) pane.setTint(this._laneColor(key).getHex());
     this._bar.setSceneColors(map);
     this._ribbons.setSceneColors(map);
     this._rebuildBlockTier(); // the blocks carry their chain's hue, baked at placement
@@ -756,6 +780,7 @@ export class LedgerView implements SceneView {
     this._coreCol.setHex(c.core);
     for (const p of [...this._globalPlanes, ...this._metaPlanes.values()]) p.setColors(c);
     this._braidPane.setColors(c);
+    for (const p of this._tokenPanes.values()) p.setColors(c);
     this._bar.setColors(c);
     this._ribbons.setColors(c);
     this._dataTether?.setColors(c);
@@ -1092,33 +1117,61 @@ export class LedgerView implements SceneView {
    *  change re-runs `setData`, whose slot rebuild draws the tier — one rebuild per window. */
   setBlockWindow(w: BlockWindow | null): void {
     this._blockWindow = w;
-    this._windowDag = !!w && w.ticks.some((t) => t.blocks.length > 0);
+    this._windowChains.clear();
+    if (w) for (const t of w.ticks) {
+      if (t.blocks.length) this._windowChains.add("dag");
+      for (const [chain, rows] of Object.entries(t.metaSnaps)) if (rows.some((r) => r.blocks?.length)) this._windowChains.add(chain);
+    }
   }
-  /** Does the held window hold a DAG block — will a braid stand once its reads settle? */
-  private _windowDag = false;
+  /** The chains whose braids the held window holds blocks for — a braid stands once its reads settle. */
+  private readonly _windowChains = new Set<string>();
 
-  /** THE BRAID IS ON ITS WAY with no window held yet (the Engine's reading of the request: the window
-   *  is loading, for a scope whose window can hold DAG blocks — All or the DAG, never a token filter's
-   *  window, which holds none). */
-  setBraidExpected(on: boolean): void {
-    this._braidExpected = on;
+  /** THE BRAID ON ITS WAY (the Engine's reading of the request): the chain whose window is being read
+   *  while the window held is another one or none — the DAG's under All — else null. A filter change
+   *  keeps the old window on screen until the new one answers, so this, not the held window, says a
+   *  braid is coming. */
+  setBraidExpected(chain: string | null): void {
+    this._braidExpected = chain;
   }
-  private _braidExpected = false;
+  private _braidExpected: string | null = null;
 
-  /** IS THE DAG BRAID WAITING (user, 2026-11-19: "the dag appeared many seconds later without a hint")?
-   *  The braid is laid out ONCE, when every read has landed (`_laid`), so until then the pane stands
-   *  empty and the hint names the wait: a held window holding DAG blocks not yet laid, or none held
-   *  yet while one that can hold them is being read. */
+  /** ARE THE BRAIDS WAITING (user, 2026-11-19: "the dag appeared many seconds later without a hint")?
+   *  The braids are laid out ONCE, when every read has landed (`_laid`), so until then their panes
+   *  stand empty and the hint names the wait: a held window holding blocks not yet laid, or none held
+   *  yet while one is being read. */
   private _braidWaiting(): boolean {
-    if (!this._cargo.blocks || this._laid) return false;
-    return this._blockWindow ? this._windowDag : this._braidExpected;
+    if (!this._cargo.blocks) return false;
+    return this._braidExpected != null || (!this._laid && this._windowChains.size > 0);
   }
 
-  /** THE BRAID HINT's anchor, chamber-LOCAL: the pane's centre — layout data. Returns the label's
-   *  alpha (the view's furniture fade), 0 while the braid is not waiting. */
+  /** The chain whose braid is on its way: the window being read, else the held window's DAG braid,
+   *  else its first token braid. Null while nothing waits. */
+  private _waitingChain(): string | null {
+    if (!this._braidWaiting()) return null;
+    if (this._braidExpected != null) return this._braidExpected;
+    return this._windowChains.has("dag") ? "dag" : (this._windowChains.values().next().value ?? null);
+  }
+
+  /** Does `chain`'s braid pane stand: its blocks are drawn, or they are on their way. */
+  private _paneShown(chain: string): boolean {
+    if (!this._cargo.blocks) return false;
+    if (this._braidsDrawn.has(chain)) return true;
+    if (this._braidExpected != null) return this._braidExpected === chain;
+    return !this._laid && this._windowChains.has(chain);
+  }
+
+  /** THE BRAID HINT's anchor, chamber-LOCAL: the centre of the pane of the braid on its way
+   *  (`_waitingChain`) — layout data. Returns the label's alpha (the view's furniture fade), 0 while
+   *  nothing waits. */
   braidHintAnchor(out: THREE.Vector3): number {
-    if (!this._braidWaiting()) return 0;
-    out.set(FLOOR_CX, BRAID_Y, 0);
+    const chain = this._waitingChain();
+    if (chain == null) return 0;
+    if (chain === "dag") out.set(FLOOR_CX, BRAID_Y, 0);
+    else {
+      const pane = chain != null ? this._tokenPanes.get(chain) : undefined;
+      if (!pane) return 0;
+      out.copy(pane.mesh.position);
+    }
     return this._fades.alpha;
   }
 
@@ -1213,6 +1266,7 @@ export class LedgerView implements SceneView {
     if (!this._tiers.length || !this._stretch) return;
     if (!this._cargo.blocks || !w) {
       // Already empty (the Snapshots register rebuilds slots every tick): nothing to clear.
+      this._braidsDrawn.clear();
       if (this._dagTier.count === 0 && this._tokenTier.count === 0 && this._stretch.count === 0 && !this._anchorLines.length) return;
       for (const t of this._tiers) t.clear();
       this._stretch.clear();
@@ -1288,6 +1342,7 @@ export class LedgerView implements SceneView {
     const slotAt = new Map<string, number>(); // event-time: the ROW each placed block stands in
     const taken = new Map<string, number>(); // event-time: blocks already standing per place
     this._blockTiles.clear();
+    this._braidsDrawn.clear();
     const anchors: AnchorLine[] = []; // event-time
     // A block comes from the FEED's hash, so a failed or unlanded read still draws it, with no links;
     // its height is unknown, so it stands on the centre line. A landed read with no parents is a data
@@ -1304,6 +1359,7 @@ export class LedgerView implements SceneView {
       const key = `${chain}:${hash}`;
       at.set(key, [x, y, z]);
       slotAt.set(key, slot);
+      this._braidsDrawn.add(chain);
       tiers[tier].items.push({ hash, chain, x, y, z, slot, size, pick, hue });
     };
     let deepest = -1;
@@ -2237,6 +2293,7 @@ export class LedgerView implements SceneView {
     this._ordLabels.clear();
     for (const p of [...this._globalPlanes, ...this._metaPlanes.values()]) p.dispose();
     this._braidPane.dispose();
+    for (const p of this._tokenPanes.values()) p.dispose();
     this._globalPlanes.length = 0;
     this._metaPlanes.clear();
     this._bar.dispose();

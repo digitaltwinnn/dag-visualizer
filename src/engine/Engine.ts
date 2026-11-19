@@ -2651,8 +2651,8 @@ export class Engine {
   // hint … give a hint that it's coming"). The braid is laid out once, when every read has landed, so
   // the Transaction blocks register's pane stands empty meanwhile and one quiet label sits on it
   // (`components/BraidHint.tsx` owns the words; this places it, the callout's split). The Engine reads
-  // the store once — whether a window that can hold DAG blocks is being read — and the view answers
-  // whether the braid waits (`LedgerView.braidHintAnchor`, layout data). Projected like the callout,
+  // the store once — which network's window is being read — and the view answers whether a braid
+  // waits and where (`LedgerView.braidHintAnchor`, layout data: the DAG's pane, else the lane's). Projected like the callout,
   // and written only on a change: no allocation unless the label moves (rule 5).
   private _braidHintV = new THREE.Vector3();
   private _braidHintEl: HTMLElement | null = null;
@@ -2664,7 +2664,12 @@ export class Engine {
     if (!el || !el.isConnected) el = this._braidHintEl = document.getElementById("braid-hint"); // event-time: a cache miss only
     if (!el) return;
     const st = useStore.getState();
-    this.ledger.setBraidExpected(st.blockWindowStatus?.status === "loading" && (blockChainOf(st.filter) ?? "dag") === "dag");
+    // The window being read, when it is not the one held (a first read, a filter change): a live
+    // refresh of the held window is no braid on its way.
+    const asked = blockChainOf(st.filter);
+    const held = getBlockWindow();
+    const coming = st.blockWindowStatus?.status === "loading" && (held == null || held.chain !== asked);
+    this.ledger.setBraidExpected(coming ? (asked ?? "dag") : null);
     const v = this._braidHintV;
     // The view's own furniture fade gates it: zero outside the Snapshots view and mid-transition.
     let on = this.ledger.braidHintAnchor(v) > 0.5;
