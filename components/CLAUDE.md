@@ -1082,9 +1082,9 @@ from 2026-10-02; `src/data/ledgerHold.ts`.
 (2026-11-07, user: "Threeway."), named on the switch **Metagraph snapshots | Transaction blocks | Data
 blocks** (`REGISTER_NAMES`, `components/views.ts` — user: "Since they all converge into snapshots, the
 control 'snapshots' should be 'metagraph snapshots'"; the VIEW stays "Snapshots"; "Blocks" in code and
-below is the Transaction blocks register). The explorer's title is the VIEW's axis word, "Snapshots"
-(the global snapshots it lists), in every register — the switch names the register's subject, the
-title does not repeat it (D6 carry ruling). The register
+below is the Transaction blocks register). The explorer's title is the ACTIVE REGISTER's name, the
+switch's own (`REGISTER_NAMES`; user, 2026-11-19: "Explorer should show the label of the active
+switch" — the D6 carry ruling had kept the view's axis word "Snapshots" in every register). The register
 switch stands ON THE SCENE (D3, 2026-11-07 — option A of the user's mock,
 `components/RegisterSwitch.tsx`): one glass segmented control centred under the command bar, each
 half carrying its own SPAN ("Metagraph snapshots · last 11 min", "Transaction blocks · last 14 h",

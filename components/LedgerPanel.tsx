@@ -43,11 +43,8 @@ import { blockReadOf } from "@/src/data/blockReads";
 import { BLOCK_MEASURE_ROWS, blockMeasureCounts, blockMeasureOptions, blockMeasureText, blockMeasureValue, type BlockMeasure } from "@/src/data/blockMeasure";
 import { NO_MEASURE } from "@/src/data/ledgerMeasure";
 import { blockSelectActions, globalPick, tickContextOf } from "@/src/engine/domain/pickActions";
-import { VIEWS, registerAbsence } from "@/components/views";
+import { REGISTER_NAMES, registerAbsence } from "@/components/views";
 import { useRegisterScope } from "@/components/useRegisterScope";
-
-// The explorer's title: the Snapshots VIEW's own name, its axis word.
-const LEDGER_AXIS_TITLE = VIEWS.find((v) => v.id === "ledger")!.name;
 
 // THE SNAPSHOTS VIEW'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session
 // 2026-09-26; read `docs/superpowers/design/2026-09-26-explorer-card/README.md` first). This file
@@ -740,10 +737,10 @@ export default function LedgerPanel() {
   return (
     <Explorer
       id="ledger-view"
-      // The card says what it BROWSES by, the view's AXIS word in every register: "Snapshots", the
-      // global snapshots in time (D6 carry ruling, 2026-11-07). The register switch on the scene names
-      // the register's subject (`REGISTER_NAMES`); the title does not repeat it.
-      title={LEDGER_AXIS_TITLE}
+      // The card is titled by the ACTIVE REGISTER (user, 2026-11-19: "Explorer should show the label of
+      // the active switch, it's now hardcoded to snapshots" — reversing the D6 carry ruling, which kept
+      // the view's axis word "Snapshots" in every register): the switch's own name (`REGISTER_NAMES`).
+      title={REGISTER_NAMES[register]}
       // (The register switch rides the scene, D3 — `components/RegisterSwitch.tsx`; this card's
       // control band holds only the measure tiles.)
       // The sentence is the path's own placeholder now (user, 2026-10-08): one line beside the house.
