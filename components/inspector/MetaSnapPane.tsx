@@ -13,7 +13,7 @@ import { PinnedMark } from "@/components/state/StateAtoms";
 import CardHead, { RailPane } from "@/components/CardHead";
 import { DEEP_GIVE_UP_MS } from "@/components/RawSnapshotBridge";
 import { subjectPairing } from "@/components/useSubjectPairing";
-import { Door, Empty, Fact, FactGroup, Foot, FootRow, LayerWho, Lead } from "@/components/inspector/parts";
+import { CopyButton, Door, Empty, Fact, FactGroup, Foot, FootRow, LayerWho, Lead } from "@/components/inspector/parts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CABINET_BODY, CABINET_LIST, CABINET_TRIGGER } from "@/components/cabinetTabs";
 import { ArrowUpRight } from "lucide-react";
@@ -28,7 +28,7 @@ import { getBlockWindow, getPastWindow, ledgerSource, onBlockWindow, onPastWindo
 import { currentIdOf } from "@/src/net/lineage";
 import { UNLISTED_HUE } from "@/src/data/unlisted";
 import { snapsAtTick } from "@/src/data/anchorLog";
-import { PAYLOAD_LANES } from "@/src/data/payloadKinds";
+import { PAYLOAD_LANES, STATE_LANE_LEAD, STATE_PROOF_LABEL, dataLaneLead } from "@/src/data/payloadKinds";
 import { fmtDagShort, fmtKB, midHash } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { useMinHold } from "@/components/useMinHold";
@@ -161,9 +161,6 @@ export default function MetaSnapPane({
   // hue only while that network IS the filter. The mark that names it keeps its hue.
   const pairHue = netKeyOf(sel.metaId) === appFilter ? hue : "var(--primary)";
   const pair = subjectPairing<string>(hoverMetaSnap, metaSnapHoverKey(sel.metaId, sel.ordinal), setHoverMetaSnap, pairHue);
-  // Hoisted out of the state tier so the FOOT can reach it — it is a hash, and hashes are looked
-  // up, not read. The deep read wins where it exists; the exact row carries it otherwise.
-  const stateProof = deep?.stateProof ?? row?.stateProof;
   const polledHash = sel.hash || polled?.hash || "";
   // The polled buffers track only the catalog, so an UNLISTED snapshot arrived hash-less — a
   // hash is not a field of the thing it hashes; the indexer computes it. The explorer indexes
@@ -399,9 +396,9 @@ export default function MetaSnapPane({
                 the asymmetry was an accident of history rather than a difference in the data
                 (GlobalSnapshot carries height/blocks too). Reconciled DOWN, not up — CLAUDE.md
                 already rules that a tick's block count is the wrong activity signal, and the
-                facts that answer a question about this snapshot are all above. `State hash` is
-                the one asymmetry that STAYS: only a metagraph snapshot proves an application
-                state, so it's a real difference in the artifact, not an inconsistency. */}
+                facts that answer a question about this snapshot are all above. The state's proof
+                (only a metagraph snapshot carries one) lives in the State tab since 2026-11-19,
+                under the record it vouches for. */}
             <Foot>
               {/* The descriptor's hash is not the only source, and for a PAGER step it isn't a
                   source at all: `railSiblings` builds its siblings from the tick's exact read,
@@ -415,11 +412,8 @@ export default function MetaSnapPane({
               {parent && (
                 <FootRow label="Previous" value={midHash(parent, 18)} copy={parent} copyName="previous hash" />
               )}
-              {stateProof && (
-                // "State HASH" (user, 2026-08-14 — "state proof" collided with the signers tab's
-                // "snapshot proof", a signature set; this is a DIGEST, kin to Hash/Parent above).
-                <FootRow label="State" copyName="state hash" value={midHash(stateProof, 22)} copy={stateProof} />
-              )}
+              {/* (The state's proof moved into the State tab, under the record it vouches for —
+                  user, 2026-11-19.) */}
             </Foot>
           </div>
         )}
@@ -511,17 +505,12 @@ function PayloadBlock({
   // every anchored channel, so the row carries the data updates and the card states them with no
   // Decompress at all. "Data updates", the protocol's word for what a dL1 validates (`composition.ts`).
   // A snapshot whose data blocks carry no update still names its blocks; none of either is `none`.
+  // THE COUNTS RIDE THE LANE'S SENTENCE now (user, 2026-11-19, `dataLaneLead`: "12 updates in 3
+  // blocks"), so the tab lists no count row of its own — the same figure twice.
   const dataTx = row?.dataTxCount;
   const dataBlocks = row?.dataBlocks;
-  const dataRows = useMemo(
-    () =>
-      dataTx != null && dataTx > 0
-        ? [{ name: "Data updates", count: dataTx }]
-        : dataBlocks != null && dataBlocks > 0
-          ? [{ name: "Data blocks", count: dataBlocks }]
-          : [],
-    [dataTx, dataBlocks],
-  );
+  // The state's proof — the deep read wins where it exists; the exact row carries it otherwise.
+  const stateProof = deep?.stateProof ?? row?.stateProof;
   /** The data section is READ once the exact row states its count, or the deep read has landed. */
   const dataRead = dataTx != null || !!deep;
 
@@ -542,7 +531,7 @@ function PayloadBlock({
 
   return (
     <div className="mt-1.5">
-      {shapeRead && stateRows.length === 0 && dataRows.length === 0 && dataBlockSigners.length === 0 && (deep?.stateBytes ?? row?.stateBytes ?? 0) === 0 && (
+      {shapeRead && stateRows.length === 0 && !dataTx && !dataBlocks && dataBlockSigners.length === 0 && (deep?.stateBytes ?? row?.stateBytes ?? 0) === 0 && (
         // THE IDLE SNAPSHOT, NAMED — and FIRST (user, 2026-08-13: "it should be the 1st thing
         // to read so that the rest of the card is easy to ignore"). Post-read only: idleness is
         // a verified whole-snapshot reading — the anchored bytes are the envelope (chain header
@@ -568,12 +557,13 @@ function PayloadBlock({
         </TabsList>
         <div className={cn(CABINET_BODY, "pt-2")}>
           <TabsContent value="state">
-            <PayloadSection rows={stateRows} read={shapeRead} pending={pending} />
+            <PayloadSection rows={stateRows} read={shapeRead} pending={pending} lead={STATE_LANE_LEAD} proof={stateProof} />
           </TabsContent>
           <TabsContent value="data">
             <PayloadSection
-              rows={dataRows}
+              rows={[]}
               read={dataRead}
+              lead={dataLaneLead(dataTx, dataBlocks)}
               pending={pending}
               // "Signed by" here as in the body (user, 2026-08-13): the layer word carries the
               // difference (dL1 vs the body's L0), SIGNER_GROUPS owns the words.
@@ -597,6 +587,8 @@ function PayloadSection({
   read,
   pending,
   signers,
+  lead,
+  proof,
 }: {
   rows: { name: string; count: number }[];
   /** The deep read has landed — an empty section may now say `none` as a verified fact; before
@@ -605,6 +597,11 @@ function PayloadSection({
   /** The one read's in-flight/give-up word, rendered under EVERY section it is decompressing. */
   pending?: string | null;
   signers?: { label: string; count: number; who: string } | null;
+  /** WHAT THE LANE IS, its one sentence at the top once read (`payloadKinds`' lane sentences). */
+  lead?: string;
+  /** The state's PROOF — a fingerprint of the record the metagraph keeps off chain — shown under the
+   *  record it vouches for (user, 2026-11-19: it moved here from the card's foot). */
+  proof?: string | null;
 }) {
   return (
     <div className="flex flex-col gap-1">
@@ -614,7 +611,8 @@ function PayloadSection({
           when this snapshot can be read, and a sentence pointing at an absent door is a dead end. */}
       {!read && !pending && <p className="m-0 text-label text-muted-foreground">Not decompressed yet.</p>}
       {pending && <p className="m-0 text-label text-muted-foreground italic">{pending}</p>}
-      {read && rows.length === 0 && !signers && (
+      {read && lead && <p className={cn("m-0 mb-1 text-label text-muted-foreground", CONTENT_EASE)}>{lead}</p>}
+      {read && rows.length === 0 && !signers && !proof && !lead && (
         // MEASURED empty — the deep read landed and this section carries nothing. A reading,
         // not a state, so it takes the section rows' own register; the italic-muted treatment
         // is `pending`'s (unread / reading…), and "unread and none are different facts".
@@ -628,6 +626,15 @@ function PayloadSection({
           <span className="shrink-0 text-label text-foreground-dim tabular-nums">{r.count.toLocaleString()}</span>
         </div>
       ))}
+      {read && proof && (
+        <div className={cn("flex items-center justify-between gap-2.5", CONTENT_EASE)}>
+          <span className="min-w-0 truncate text-label text-muted-foreground">{STATE_PROOF_LABEL}</span>
+          <span className="shrink-0 inline-flex items-center gap-1 font-mono text-label text-foreground-dim">
+            {midHash(proof, 14)}
+            <CopyButton value={proof} subject="state proof" always className="my-0" />
+          </span>
+        </div>
+      )}
       {signers && (
         <div className={cn("flex items-start justify-between gap-2.5", CONTENT_EASE)}>
           <span className="min-w-0 truncate text-label text-muted-foreground">{signers.label}</span>

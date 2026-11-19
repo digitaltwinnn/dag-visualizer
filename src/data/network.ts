@@ -333,16 +333,16 @@ export const SIGNER_GROUPS = {
         it references the pane's own TABS (user, 2026-08-14, twice: the header names what got
         signed, the chip says who; and the groups should speak the tab names — the seal covers
         both payload tabs, which the parenthetical states). */
-    label: "snapshot (state & data)",
+    label: "snapshot (state & data blocks)",
     /** The producing cluster, terse enough for an instrument note. */
     layer: "L0 cluster",
     /** What the counted things ARE, read after a number ("3 L0 validators"). */
     who: "L0 validators",
   },
   dataBlocks: {
-    /** Matches the DATA tab's name 1:1 (user, 2026-08-14 — consistency in the tabs' direction);
+    /** Matches the DATA BLOCKS tab's name 1:1 (user, 2026-08-14 — consistency in the tabs' direction);
         the label stays the tab's word. */
-    label: "data",
+    label: "data blocks",
     layer: "dL1, rotating",
     who: "dL1 validators",
   },

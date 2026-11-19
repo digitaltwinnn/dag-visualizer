@@ -60,7 +60,7 @@ import type { NodeRow } from "@/src/data/types";
 import { getNetwork, metagraphById, shortHash, SIGNER_GROUPS, SIGNER_UNKNOWN, signerRoster } from "@/src/data/network";
 import { snapsAtTick } from "@/src/data/anchorLog";
 import { UNLISTED_HUE } from "@/src/data/unlisted";
-import { PAYLOAD_LANES, parsePayload, payloadKinds, stateSchema, unifyFieldKinds } from "@/src/data/payloadKinds";
+import { PAYLOAD_LANES, STATE_LANE_LEAD, STATE_PROOF_LABEL, dataLaneLead, parsePayload, payloadKinds, stateSchema, unifyFieldKinds } from "@/src/data/payloadKinds";
 import { identityHudCss } from "@/src/palette/identity";
 import { CopyButton, Fact, FactGroup, FootRow, IdentityDot, Lead, TickerChip } from "@/components/inspector/parts";
 import { fmtDag, fmtKB, midHash } from "@/src/util/format";
@@ -440,6 +440,9 @@ export function ChannelStatePanel() {
   const phone = useBreakpoint() === "phone";
   const hashFor = (v: string, phoneChars: number): string => (phone ? midHash(v, phoneChars) : paneHash(v));
   const deep = useStore((s) => (sel ? s.metaSnapDeep[metaSnapDeepKey(sel.globalOrdinal, sel.metaId, sel.ordinal)] : undefined));
+  // The tick's exact row, for the Data blocks lane's block count (the deep read carries the updates,
+  // not how many blocks they rode in) — the same row the card's sentence reads.
+  const exactRow = useStore((s) => (sel ? s.snapshotExact[sel.globalOrdinal]?.rows.find((r) => r.metaId === sel.metaId && r.ordinal === sel.ordinal) : undefined));
   const following = useStore((s) => s.following);
   const selNodes = useStore((s) => s.selNodes);
   // The pinned decode's give-up timer (2026-08-08): "reading…" must terminate honestly when
@@ -469,7 +472,8 @@ export function ChannelStatePanel() {
   const lanes = useMemo<Lane[]>(() => {
     if (!deep) return [];
     const out: Lane[] = [];
-    if (deep.stateKeys.length > 0 || nonEmpty(state)) {
+    // The state lane stands for its PROOF alone too (it moved here from the foot, 2026-11-19).
+    if (deep.stateKeys.length > 0 || nonEmpty(state) || !!deep.stateProof) {
       out.push({ id: "state", name: PAYLOAD_LANES.state.name });
     }
     if (deep.dataTxCount > 0 || nonEmpty(dataTx)) {
@@ -709,6 +713,8 @@ export function ChannelStatePanel() {
                     an unbroken column, and a single default `block` in the middle hands the
                     scrolling straight back to the box. */}
                 <TabsContent value="state" className="min-h-0 flex flex-col gap-2">
+                    {/* WHAT THE LANE IS, in plain words (user, 2026-11-19 — `payloadKinds`' lane sentences). */}
+                    <p className="m-0 text-label text-muted-foreground">{STATE_LANE_LEAD}</p>
                     {stateRows.length > 0 && (
                       <div className={schemaBox(state != null && raw)}>
                         <SchemaRows
@@ -718,8 +724,20 @@ export function ChannelStatePanel() {
                       </div>
                     )}
                     {state != null && <RawSection open={raw} onToggle={() => setRaw((o) => !o)} data={state} />}
+                    {/* THE STATE'S PROOF, under the record it vouches for (it was the foot's "State
+                        hash" until 2026-11-19): a fingerprint of the record kept off chain. */}
+                    {deep.stateProof && (
+                      <div className="flex items-center justify-between gap-2.5">
+                        <span className="min-w-0 truncate text-label text-muted-foreground">{STATE_PROOF_LABEL}</span>
+                        <span className="shrink-0 inline-flex items-center gap-1 font-mono text-label text-foreground-dim">
+                          {hashFor(deep.stateProof, 14)}
+                          <CopyButton value={deep.stateProof} subject="state proof" always className="my-0" />
+                        </span>
+                      </div>
+                    )}
                 </TabsContent>
                 <TabsContent value="data" className="min-h-0 flex flex-col gap-2">
+                    <p className="m-0 text-label text-muted-foreground">{dataLaneLead(deep.dataTxCount, exactRow?.dataBlocks)}</p>
                     {/* The data lane's NOTE: the payload's own weight, the same fact the state
                         lane leads with (the tab's count is the record COUNT, a different number).
                         Without it this lane opened on a bare table header while its two siblings
@@ -783,19 +801,12 @@ export function ChannelStatePanel() {
                   they take no copy control. */}
               <FootRow label="Height" value={deep.height.toLocaleString()} />
               <FootRow label="Sub-height" value={deep.subHeight.toLocaleString()} />
-              {(hash || deep.lastSnapshotHash || deep.stateProof) && <div aria-hidden className="h-px my-1 bg-border/50" />}
+              {(hash || deep.lastSnapshotHash) && <div aria-hidden className="h-px my-1 bg-border/50" />}
               {hash && <FootRow label="Hash" value={hashFor(hash, 24)} copy={hash} />}
               {deep.lastSnapshotHash && (
                 <FootRow label="Previous hash" value={hashFor(deep.lastSnapshotHash, 15)} copy={deep.lastSnapshotHash} />
               )}
-              {deep.stateProof && (
-                // "State HASH", not "state proof" (user, 2026-08-14 — the SIGNERS tab says
-                // "snapshot proof" for the L0 SIGNATURE SET, so two unrelated species shared the
-                // word one screen apart and read as kin). It is a digest, the same species as
-                // its Hash/Parent siblings; the chain field stays calculatedStateProof (internal
-                // identifiers keep their names).
-                <FootRow label="State hash" value={hashFor(deep.stateProof, 18)} copy={deep.stateProof} />
-              )}
+              {/* (The state's proof moved into the State lane, under the record — 2026-11-19.) */}
             </div>
           )}
         </>

@@ -73,7 +73,7 @@ Decompress and no `/channel/` request (`components/inspector/metaSnapDataCount.t
 serves the payload, the state's shape and the dL1 signers. Arriving here IS that gesture, so the pane reads its
 own subject's payload on arrival (the surface gate, in `src/engine/scene/CLAUDE.md`). Its shape is
 **ONE LANE AXIS** (2026-08-09): the
-snapshot's facts stay pinned at the top, and the payload sits behind `STATE · DATA · SIGNERS` tabs whose
+snapshot's facts stay pinned at the top, and the payload sits behind `STATE · DATA BLOCKS · SIGNERS` tabs whose
 labels carry their own counts. **An empty lane gets no tab** — a tab that opens onto "nothing here" is
 chrome pretending to be data — and the first available lane opens by default, so the pane is never
 parked on a chooser.
@@ -84,7 +84,12 @@ so the instruction was unfollowable from where it was read. It names the anchor-
 is right there and commits the same selection.
 
 Every lane renders the **same body grammar: note → shape table → collapsed `RAW JSON`.** The note is the
-lane's one-line summary (bytes and proof for state, record and block counts for data), the table is the
+lane's one plain sentence, the card's tab says the same (`payloadKinds`' `STATE_LANE_LEAD` /
+`dataLaneLead`, user 2026-11-19: "explain to me in more simple terms … clarify this in our app as well"):
+DATA BLOCKS is the new data the snapshot received this round, STATE the metagraph's own record written
+into the snapshot after processing it — and the state's PROOF, a fingerprint of the record the metagraph
+keeps off chain, is the State lane's last row ("Proof of the off-chain record"; it was the foot's "State
+hash" until then), the table is the
 shape (`src/data/payloadKinds.ts` is the data lane's shape read — kinds and counts, never a guess at
 meaning), and the raw tree is the last tier, collapsed, its open state living on the PANE so switching
 lanes doesn't smuggle a disclosure across. **SIGNERS gets no disclosure**: a signer list is already the
