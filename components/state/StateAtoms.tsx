@@ -90,10 +90,14 @@ export function PinnedMark({ className }: { className?: string }) {
  *  muted ink. ONE atom for every place a selected row or plate says which it is (refactor round R1,
  *  P5: RAW's two tables wrote it four times). `className` adds the caller's typography context (a
  *  mono cell's `font-sans`, a caps plate's `normal-case tracking-normal`). */
-export function StateMark({ following, className }: { following: boolean; className?: string }) {
+export function StateMark({ following, na = false, className }: { following: boolean; na?: boolean; className?: string }) {
   return (
     <span className={cn("inline-flex items-center gap-1.5 text-label text-muted-foreground", className)}>
-      {following ? (
+      {/* N/A: the register has no subject — the network runs no such layer — so it is neither live
+          nor pinned (user, 2026-11-19). */}
+      {na ? (
+        "n/a"
+      ) : following ? (
         <>
           <LiveDot />
           live

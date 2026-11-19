@@ -3,9 +3,9 @@
 import { ChevronLeft, ChevronRight, Clock } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
 import { REGISTER_ICONS } from "@/components/icons";
-import { REGISTER_NAMES, registerLine } from "@/components/views";
+import { REGISTER_NAMES, layerPhrase, registerLine } from "@/components/views";
 import { REGISTER_LAYER } from "@/src/engine/domain/viewPolicy";
-import { useRegisterScope } from "@/components/useRegisterScope";
+import { useFollowPaused, useRegisterScope } from "@/components/useRegisterScope";
 import { netKeyOf } from "@/src/engine/domain/pickActions";
 import { ledgerAnchor } from "@/src/data/network";
 import { useFeedRead } from "@/components/useFeedRead";
@@ -87,6 +87,9 @@ export default function RegisterSwitch() {
   // the vitals section + 'no dL1' in the switcher + the hint text is clear enough"). Opened, the line,
   // the band and the explorer say why; a filter never moves the register.
   const { scope: lineScope, runs } = useRegisterScope("RegisterSwitch");
+  // The lit register's follow is N/A where the network runs no such layer (`useFollowPaused`): its
+  // half's state mark says "n/a", never live.
+  const paused = useFollowPaused("RegisterSwitch");
   const filter = useStore((s) => s.filter);
   // THE LIT HALF SAYS LIVE OR PINNED (user, 2026-11-07, design round option 2 "with the 'live' text
   // also"): one live mode per view, read per register — the newest global (and the filtered
@@ -212,8 +215,8 @@ export default function RegisterSwitch() {
   // glyph says what is counted; a gap parts them. NOT COLOUR-CODED (user, 2026-11-09): the count reads
   // in the row's own ink, as the span beside it.
   const readings = (r: LedgerRegister, Icon: (typeof REGISTER_ICONS)[LedgerRegister]) => !runs(r) ? (
-    // No subject under this filter: the layer it lacks, in the app's own layer words.
-    <span>no {REGISTER_LAYER[r] === "cl1" ? "cL1" : "dL1"}</span>
+    // No subject under this filter: the layer it lacks, named as the register's sentence names it.
+    <span className="font-sans">no {layerPhrase(REGISTER_LAYER[r] ?? "dl1")}</span>
   ) : (
     <>
       <Clock aria-hidden className="size-3 flex-none opacity-80" />
@@ -274,7 +277,7 @@ export default function RegisterSwitch() {
               </span>
             )}
             {/* The state, the row's third column — the desktop half's own order (2026-11-09). */}
-            {runs(register) && <StateMark following={following} className="ml-2 font-sans leading-none" />}
+            <StateMark following={following} na={paused} className="ml-2 font-sans leading-none" />
             {/* The readings in words for assistive tech (the desktop half's own accessible name). */}
             <span className="sr-only">{count[register] ? `${span[register]}, ${count[register]}` : span[register]}</span>
           </span>
@@ -330,7 +333,7 @@ export default function RegisterSwitch() {
                 {readings(r, Icon)}
                 {/* THE STATE IS THE ROW'S THIRD COLUMN, on the lit half only (user, 2026-11-09), on the
                     row's line (`leading-none`: its 17px line box rode low beside the readings). */}
-                {lit && runs(r) && <StateMark following={following} className="ml-2 font-sans leading-none" />}
+                {lit && <StateMark following={following} na={paused} className="ml-2 font-sans leading-none" />}
               </span>
             </span>
           </button>

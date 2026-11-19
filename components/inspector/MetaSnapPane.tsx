@@ -5,6 +5,8 @@
 // is the application state — disclosed as a SHAPE here and as a payload in the raw layer.
 // Like the global snapshot card this is a card SLOT, not a focus-ladder rung: it has its own
 // store channel (`store.metaSnap`) and a fixed rail slot, and appears in no ladder.
+import { StateMark } from "@/components/state/StateAtoms";
+import { useFollowPaused } from "@/components/useRegisterScope";
 import { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties } from "react";
 import LiveDot from "@/components/LiveDot";
 import { PinnedMark } from "@/components/state/StateAtoms";
@@ -67,6 +69,7 @@ export default function MetaSnapPane({
   const deepKey = sel ? metaSnapDeepKey(sel.globalOrdinal, sel.metaId, sel.ordinal) : null;
   const deep = useStore((s) => (deepKey ? s.metaSnapDeep[deepKey] : undefined));
   const following = useStore((s) => s.following);
+  const paused = useFollowPaused("MetaSnapPane");
   // Rule 9's missing consumer (user, 2026-08-15 — "a gray edge effect even though it's filtered
   // on DOR; happens when I swipe"): this card never paired, so its edge could only ever show
   // the grey whisper — hovering now rides `hoverMetaSnap`, the SAME channel the anchor-log row,
@@ -192,7 +195,7 @@ export default function MetaSnapPane({
   // restates its ancestor (the pile rule — the same reason the ticker left this head on
   // 2026-08-10).
   // The AGE is the lead's chip, not a clause after a mid-dot (user, 2026-10-03).
-  const lead = `${following && !sameTick ? "Following live, anchored" : "Anchored"} to ${anchor}`;
+  const lead = `${following && !paused && !sameTick ? "Following live, anchored" : "Anchored"} to ${anchor}`;
 
   return (
     <RailPane
@@ -219,7 +222,9 @@ export default function MetaSnapPane({
           // never a control: the switch stays the Global snapshot card's. It wears THAT card's chip
           // (user, 2026-10-25: the global's "pinned" is a tag, this one was bare text) — one box in
           // both states, the selection wash when pinned, here in this snapshot's own hue.
-          aside={
+          // N/A (no subject in this register under the filter — the network runs no such layer):
+          // the state mark says so, never LIVE.
+          aside={following && paused ? <StateMark following na /> : (
             <span
               data-pill=""
               className={cn(
@@ -237,7 +242,7 @@ export default function MetaSnapPane({
                 <PinnedMark className="text-foreground" />
               )}
             </span>
-          }
+          )}
           titleKey={`${sel.metaId}:${sel.ordinal}`}
           onClose={onClose}
           collapsed={collapsed}

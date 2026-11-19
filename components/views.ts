@@ -164,12 +164,19 @@ export function registerLine(register: LedgerRegister, scope: RegisterLineScope,
  *  no cL1): ONE sentence, said by the line under the switch, the band, the explorer and RAW alike, and
  *  the register stays where it is (a filter never moves the view). `viewPolicy.registerRuns` decides;
  *  this is only the words. The DAG's keeps the band's own sentence. */
+/** A LAYER, NAMED FOR A READER (user, 2026-11-19: "say no currency layer (cL1) and no data layer
+ *  (dL1)"): the word for what it does and its code, the one phrase the switch's readings and the
+ *  register's sentence share. */
+export function layerPhrase(layer: "cl1" | "dl1"): string {
+  return layer === "cl1" ? "currency layer (cL1)" : "data layer (dL1)";
+}
+
 export function registerAbsence(register: LedgerRegister, scope: RegisterLineScope): string {
   if (scope === "dag" && register === "data") return "The DAG's own snapshots carry no data blocks";
   const who = scope === "all" ? "This network" : scope === "dag" ? "The DAG" : scope.ticker;
   const runs = scope !== "all" && scope !== "dag" && scope.plural ? "run" : "runs";
-  if (register === "blocks") return `${who} ${runs} no cL1, so it makes no transaction blocks`;
-  if (register === "data") return `${who} ${runs} no dL1, so it makes no data blocks`;
+  if (register === "blocks") return `${who} ${runs} no ${layerPhrase("cl1")}, so it makes no transaction blocks`;
+  if (register === "data") return `${who} ${runs} no ${layerPhrase("dl1")}, so it makes no data blocks`;
   return `${who} anchors no snapshots`;
 }
 

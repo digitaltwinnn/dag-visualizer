@@ -160,7 +160,9 @@ describe("the folded entry drops its qualifier pill (design D, 2026-10-30)", () 
     for (const fn of ["function StatusPill(", "export function RoleChips("]) {
       expect(parts.slice(parts.indexOf(fn)).slice(0, 700), fn).toMatch(/data-pill=""/);
     }
-    expect(readFileSync("components/inspector/MetaSnapPane.tsx", "utf8")).toMatch(/aside=\{\s*<span\s+data-pill=""/);
+    // (Since 2026-11-19 the aside is conditional — none while the view is paused — so the pill is
+    // matched as the aside's span wherever the condition puts it.)
+    expect(readFileSync("components/inspector/MetaSnapPane.tsx", "utf8")).toMatch(/aside=\{[^}]*?\(\s*<span\s+data-pill=""/);
     const head = readFileSync("components/CardHead.tsx", "utf8");
     expect(head).toMatch(/entryMode && cn\("\[&_\[data-yields\]\]:hidden \[&_\[data-pill\]\]:hidden", ENTRY_LINE\)/);
   });

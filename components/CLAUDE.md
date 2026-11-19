@@ -1283,11 +1283,12 @@ blocks … or use the switcher?"). A transaction block is a cL1's, a data block 
 word's own read, `networkLayers`), and no node located is UNKNOWN, never a guessed absence. Metagraph
 snapshots is never gated: every metagraph has an L0, and the app cannot always see it (BioFi's nodes
 locate as cL1 only). `components/useRegisterScope.ts` is the one reading: the switch's half keeps
-its full strength and stays pressable, its readings "no cL1" / "no dL1" (user, same day: "don't gray
-out the switcher … 'no dL1' in the switcher + the hint text is clear enough"), and opened — or open
+its full strength and stays pressable, its readings "no currency layer (cL1)" / "no data layer (dL1)"
+(user, same day: "don't gray out the switcher … 'no dL1' in the switcher + the hint text is clear
+enough", then "say no currency layer (cL1) and no data layer (dL1)" — `views.layerPhrase`, one home), and opened — or open
 when the filter is set, which never moves it — the line under the switch, the band (one card), the
 explorer and RAW all say ONE sentence
-(`views.registerAbsence`: "UP runs no dL1, so it makes no data blocks"; the DAG's keeps "The DAG's own
+(`views.registerAbsence`: "UP runs no data layer (dL1), so it makes no data blocks"; the DAG's keeps "The DAG's own
 snapshots carry no data blocks"), and Transaction blocks reads no window for it (`blockWanted`'s
 `makesBlocks`, status `unread`).
 

@@ -25,3 +25,14 @@ export function useRegisterScope(who: string): { scope: RegisterLineScope; runs:
   const layers = filterLayers(filter, metaList);
   return { scope, runs: (r) => registerRuns(r, layers) };
 }
+
+/** IS THE SNAPSHOTS VIEW'S FOLLOW N/A — the register open has no subject under the filter, the
+ *  network running no such layer at all (UP in Data blocks)? The heartbeat stands still there
+ *  (`followLatest`), and every live / pinned mark says "n/a" (user, 2026-11-19: "it can't be live but
+ *  should be n/a"). Only the missing LAYER: a network that runs it but shows no block is still live. */
+export function useFollowPaused(who: string): boolean {
+  const mode = useStore((s) => s.mode);
+  const register = useStore((s) => s.ledgerRegister);
+  const { runs } = useRegisterScope(who);
+  return mode === "ledger" && !runs(register);
+}

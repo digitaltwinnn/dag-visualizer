@@ -5,7 +5,8 @@ import { useStore } from "@/src/store/store";
 import type { GlobalSnapshot } from "@/src/data/types";
 import { getBlockWindow } from "@/src/data/pastWindow";
 import { blockChainOf, blockMetaSnap, newestBlock } from "@/src/data/blockWindow";
-import { readsBlockWindow, registerOf } from "@/src/engine/domain/viewPolicy";
+import { readsBlockWindow, registerOf, registerRuns } from "@/src/engine/domain/viewPolicy";
+import { filterLayers } from "@/src/data/composition";
 import { blockInPlace, globalPick, netKeyOf } from "@/src/engine/domain/pickActions";
 import { REGISTER_MEASURES } from "@/src/data/ledgerMeasure";
 import { carriesData } from "@/src/engine/domain/dataMark";
@@ -44,6 +45,13 @@ export function latestRelevant(rawFilter: string): GlobalSnapshot | null {
 // metagraph with no recent snapshots), clear a stale snapshot card rather than show a
 // misleading one — the metagraph context pane still conveys the selection.
 export function followLatest() {
+  // A REGISTER WITH NO SUBJECT UNDER THE FILTER IS PAUSED (user, 2026-11-19: "don't say 'live' when
+  // it's not live anymore"): its chamber stands still and empty, so the heartbeat moves nothing. The
+  // follow itself is kept (`following`, no pin): a network that has the subject resumes at the newest.
+  {
+    const st = useStore.getState();
+    if (st.mode === "ledger" && !registerRuns(st.ledgerRegister, filterLayers(st.filter, st.metaList))) return;
+  }
   // IN THE BLOCKS REGISTER LIVE FOLLOWS THE NEWEST BLOCK (D3), not the newest global: the chamber
   // draws only the block-bearing ticks, so the live global is not even on screen there.
   {

@@ -1,5 +1,7 @@
 "use client";
 
+import { StateMark } from "@/components/state/StateAtoms";
+import { useFollowPaused } from "@/components/useRegisterScope";
 import LiveDot from "@/components/LiveDot";
 import { selectedRow, selectionHue } from "@/components/selection";
 import { NoSignalDot, PinMark, PinnedMark } from "@/components/state/StateAtoms";
@@ -65,9 +67,20 @@ export default function FollowControl({ className, subject = "snapshot" }: { cla
   const latestSnapshot = useStore((s) => s.latestSnapshot);
   const filter = useStore((s) => s.filter);
   const register = useStore((s) => registerOf(s.mode, s.ledgerRegister));
+  const paused = useFollowPaused("FollowControl");
 
   // The Global snapshot card while a Block card stands in Transaction blocks: its age, no control
   // (the Block card has it). With no Block card it carries the control again (`liveControlCard`).
+  // …and while the register has no subject under the filter (the network runs no such layer) its
+  // state is N/A: the age and "n/a", neither live nor pinned, and no control (`useFollowPaused`).
+  if (paused && following) {
+    return (
+      <span className={cn("inline-flex items-center gap-1.5 whitespace-nowrap", className)}>
+        {snap && <Age ts={snap.data.timestamp} />}
+        <StateMark following={following} na />
+      </span>
+    );
+  }
   if (subject === "snapshot" && liveControlCard(register, block) === "block") {
     return snap ? (
       <span className={cn("inline-flex items-center gap-1.5 whitespace-nowrap", className)}>
