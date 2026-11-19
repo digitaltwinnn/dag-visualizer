@@ -3,7 +3,8 @@
 import { ChevronLeft, ChevronRight, Clock } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
 import { REGISTER_ICONS } from "@/components/icons";
-import { REGISTER_NAMES, REGISTER_NOTES } from "@/components/views";
+import { REGISTER_NAMES, registerLine, type RegisterLineScope } from "@/components/views";
+import { displayNetwork, UNLISTED_ID } from "@/src/data/unlisted";
 import { useFeedRead } from "@/components/useFeedRead";
 import { useNowTick } from "@/components/useNowTick";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
@@ -58,7 +59,7 @@ const SWITCH_FACE_H = 58;
  *  head-to-body hairline, the label row above it and the readings below. The lit half draws it in the
  *  selection's border tone, so it stays visible on the wash; the phone face draws the same rule. */
 const ROW_RULE = "my-1.5 h-px w-full self-stretch bg-border group-aria-pressed:bg-[var(--sel-border)]";
-/** THE NOTE under the face (`REGISTER_NOTES`, user 2026-11-19: "under the switch, extra line, subtle
+/** THE LINE under the face (`registerLine`, user 2026-11-19: "under the switch, extra line, subtle
  *  text"; and on the phone, the same day: "I also want the hint there"): one line of the label step,
  *  TWO on the phone, where the sentence wraps under the narrower face. Its room is reserved on each
  *  tier, so the block below never moves. */
@@ -77,6 +78,14 @@ export default function RegisterSwitch() {
   useFeedRead(["global", "api-blocks", "exact"], "RegisterSwitch", on); // the data-block count reads the exact reads
   const register = useStore((s) => s.ledgerRegister);
   const phone = useBreakpoint() === "phone";
+  // The line under the face speaks for the filter (user, 2026-11-19): everything, the DAG, or one
+  // network by its ticker (the unlisted set as "Unlisted networks", several — the notes' own name).
+  const filter = useStore((s) => s.filter);
+  const lineScope: RegisterLineScope =
+    filter === "all" ? "all"
+    : filter === "dag" ? "dag"
+    : filter === UNLISTED_ID ? { ticker: "Unlisted networks", plural: true }
+    : { ticker: displayNetwork(filter)?.ticker ?? filter };
   // THE LIT HALF SAYS LIVE OR PINNED (user, 2026-11-07, design round option 2 "with the 'live' text
   // also"): one live mode per view, read per register — the newest global (and the filtered
   // network's newest snapshot) in Metagraph snapshots and Data blocks, the newest block (and its
@@ -310,7 +319,7 @@ export default function RegisterSwitch() {
       </div>
       </div>
       {/* THE NOTE: where the lit register's subject sits in a global snapshot, in one shape for all
-          three (`REGISTER_NOTES`). Subtle: the label step, muted, no plate of its own. ABSOLUTE, so it
+          three, the filter's own network named (`registerLine`). Subtle: the label step, muted, no plate of its own. ABSOLUTE, so it
           never sizes the switch (a wider note stretched the phone face past the screen); its room is
           the block's height. On the phone it wraps, balanced, in the screen's width less the gutters. */}
       <p
@@ -321,7 +330,7 @@ export default function RegisterSwitch() {
           "max-[700px]:w-[min(340px,calc(100vw-32px))] max-[700px]:whitespace-normal max-[700px]:text-balance max-[700px]:leading-tight",
         )}
       >
-        {REGISTER_NOTES[register]}
+        {registerLine(register, lineScope)}
       </p>
     </div>
   );

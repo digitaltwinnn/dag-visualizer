@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BLOCKS_PAGE, REGISTER_NAMES, REGISTER_PAGE_LIST, REGISTER_PAGES, modeForPath, pathFor, pathForMode, registerForPath, titleNameFor } from "./views";
+import { BLOCKS_PAGE, REGISTER_NAMES, registerLine, REGISTER_PAGE_LIST, REGISTER_PAGES, modeForPath, pathFor, pathForMode, registerForPath, titleNameFor } from "./views";
 
 describe("the Snapshots view's register URLs", () => {
   it("publishes /blocks and /data-blocks for the ledger in those registers, and /snapshots otherwise", () => {
@@ -42,5 +42,21 @@ describe("the Snapshots view's register URLs", () => {
     expect(titleNameFor("ledger", "blocks")).toBe("Transaction blocks");
     expect(titleNameFor("ledger", "data")).toBe("Data blocks");
     expect(titleNameFor("geo", "data")).toBe("Geography");
+  });
+
+  // User, 2026-11-19: one shape per line (whose layer, the verb, where it lands, in order), specific to
+  // the filter, and no "or".
+  it("the register line speaks for the filter: everything, the DAG, or one network's own path, never 'or'", () => {
+    const scopes = ["all", "dag", { ticker: "DOR" }, { ticker: "Unlisted networks", plural: true }] as const;
+    for (const r of ["snapshots", "blocks", "data"] as const) for (const s of scopes) expect(registerLine(r, s)).not.toMatch(/\bor\b/);
+    expect(registerLine("blocks", { ticker: "DOR" })).toBe("DOR's cL1 blocks, accepted into its metagraph snapshot and then the global snapshot");
+    expect(registerLine("blocks", "dag")).toBe("The DAG's cL1 blocks, accepted into the global snapshot");
+    expect(registerLine("data", { ticker: "Unlisted networks", plural: true })).toBe("Unlisted networks' dL1 blocks, carried in their metagraph snapshots into the global snapshot");
+    // The verbs are one per register, whatever the scope.
+    for (const s of scopes.filter((x) => x !== "dag")) {
+      expect(registerLine("snapshots", s)).toMatch(/anchored into/);
+      expect(registerLine("blocks", s)).toMatch(/accepted into/);
+      expect(registerLine("data", s)).toMatch(/carried in/);
+    }
   });
 });

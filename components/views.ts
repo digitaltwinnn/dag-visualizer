@@ -126,20 +126,38 @@ export const REGISTER_NAMES: Readonly<Record<LedgerRegister, string>> = {
   data: REGISTER_PAGES.data!.name,
 };
 
-/** WHERE EACH REGISTER'S SUBJECT SITS IN A GLOBAL SNAPSHOT, one subtle line under the switch (user,
+/** The scope a register's line speaks for: everything, the DAG, or one network (its ticker; `plural`
+ *  for the unlisted set, which is several). */
+export type RegisterLineScope = "all" | "dag" | { ticker: string; plural?: boolean };
+
+/** WHERE THE REGISTER'S SUBJECT SITS IN A GLOBAL SNAPSHOT, one subtle line under the switch (user,
  *  2026-11-19: "how can we have uniform consistent naming for the three sections … add an extra subtle
- *  hint line to explain accepted vs stored vs anchored"; then "I feel something is out of balance").
- *  The balance is the protocol's, so each line states it in ONE shape — whose layer made it, its verb,
- *  where it lands — rather than pretending three equals: a metagraph snapshot is the L0's output, the
- *  container; transaction blocks (every network's cL1) and data blocks (a metagraph's dL1) are what the
- *  snapshots hold. The verbs are the app's own: ANCHORED (the anchor log, "N metagraphs anchored"),
- *  ACCEPTED (Constellation's term for a block in a snapshot), CARRIED (the Global card's "Carried N
- *  data blocks"). */
-export const REGISTER_NOTES: Readonly<Record<LedgerRegister, string>> = {
-  snapshots: "Each metagraph's L0 snapshots, anchored into the global snapshot",
-  blocks: "Each network's cL1 blocks, accepted into the global or a metagraph snapshot",
-  data: "Each metagraph's dL1 blocks, carried in its snapshot into the global snapshot",
-};
+ *  hint line to explain accepted vs stored vs anchored"; then "I feel something is out of balance";
+ *  then "can we make the text specific to the filter? … no 'or' in the text anymore but perhaps 'into
+ *  metagraph snapshot and then global snapshot'"). The balance is the protocol's, so every line has
+ *  ONE shape — whose layer made it, its verb, where it lands, in the order it lands — rather than
+ *  pretending three equals: a metagraph snapshot is the L0's output, the container; transaction blocks
+ *  (cL1) and data blocks (a metagraph's dL1) are what the snapshots hold. Under a filter the line names
+ *  the network and its own path. The verbs are the app's own: ANCHORED (the anchor log), ACCEPTED
+ *  (Constellation's term for a block in a snapshot), CARRIED (the Global card's "Carried N data
+ *  blocks"). The DAG's own snapshots carry no data blocks — the band's words for it. */
+export function registerLine(register: LedgerRegister, scope: RegisterLineScope): string {
+  if (scope === "all") {
+    if (register === "snapshots") return "Each metagraph's L0 snapshots, anchored into the global snapshot";
+    if (register === "blocks") return "The DAG's cL1 blocks accepted into the global snapshot, a metagraph's into its snapshot first";
+    return "Each metagraph's dL1 blocks, carried in its snapshot into the global snapshot";
+  }
+  if (scope === "dag") {
+    if (register === "snapshots") return "The DAG's L0 makes the global snapshots the metagraphs anchor into";
+    if (register === "blocks") return "The DAG's cL1 blocks, accepted into the global snapshot";
+    return "The DAG's own snapshots carry no data blocks";
+  }
+  const whose = scope.plural ? `${scope.ticker}'` : `${scope.ticker}'s`;
+  const its = scope.plural ? "their metagraph snapshots" : "its metagraph snapshot";
+  if (register === "snapshots") return `${whose} L0 snapshots, anchored into the global snapshot`;
+  if (register === "blocks") return `${whose} cL1 blocks, accepted into ${its} and then the global snapshot`;
+  return `${whose} dL1 blocks, carried in ${its} into the global snapshot`;
+}
 
 /** Paths that name a mode AND a register of it. */
 const REGISTER_PATHS: Record<string, { mode: Mode; register: LedgerRegister }> = Object.fromEntries(
