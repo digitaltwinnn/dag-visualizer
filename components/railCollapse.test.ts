@@ -140,6 +140,21 @@ describe("a view switch (`overridesOnViewEntry`)", () => {
     const arrivingBare = (o: Overrides) => rail(manifest({ mode: "geo", filter: "dor", noteAbsent: true }), o, ["network"]);
     expect(openBoxes(arrivingBare(apply(noteOpen, overridesOnViewEntry(arrivingBare(noteOpen)))))).toEqual(["context"]);
   });
+  // User, 2026-11-19: "open de node card, go back to geo: both provider AND node card are opened". The
+  // departing open pin and the arriving default named two different cards, and both were pinned open.
+  const geoNode = (over: Partial<RailManifestState> = {}) =>
+    manifest({ mode: "geo", inspect: nodePick, country: "DE", cohort: { cc: "DE", city: null, isp: "Hetzner" }, noteAbsent: true, ...over });
+  it("without a note, a card the reader opened by hand survives as the ONE box, even where the arriving default is another card", () => {
+    const departing: Overrides = { context: true, composition: true, node: false };
+    const arriving = (o: Overrides) => rail(geoNode(), o, ["cohort", "country", "node"]);
+    expect(openBoxes(arriving(apply(departing, overridesOnViewEntry(arriving(departing)))))).toEqual(["node"]);
+  });
+  it("without a note, a hand-opened card the arriving lane does not hold leaves the arriving default the box, never none", () => {
+    // Hypergraph's Composition opened by hand, the node folded: Geography has no composition slot.
+    const departing: Overrides = { context: true, composition: false, node: true };
+    const arriving = (o: Overrides) => rail(geoNode(), o, ["node", "cohort", "country"]);
+    expect(openBoxes(arriving(apply(departing, overridesOnViewEntry(arriving(departing)))))).toEqual(["node"]);
+  });
 });
 
 // User, 2026-11-09: "when we close the AI card … the actual called out subject should be shown".

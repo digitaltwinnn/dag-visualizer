@@ -95,7 +95,12 @@ export function overridesOnViewEntry(s: LaneCollapseState): Record<string, boole
   // The departing box was the note (its open pin, `false`, stands on a non-subject slot) and this
   // lane has none: pin nothing (I1).
   if (Object.entries(s.overrides).some(([id, v]) => v === false && !isSubjectSlot(id))) return cleared;
-  return { ...cleared, ...Object.fromEntries(subjects.map((id) => [id, isCollapsed(s, id)])) };
+  // EXACTLY ONE BOX (user, 2026-11-19: "both provider AND node card are opened"). The departing open
+  // pin and the arriving default could name two different cards, and a pin on a card the arriving
+  // lane does not hold could leave none: the card the reader opened survives when it stands here,
+  // else the arriving default is the box, and every other subject folds.
+  const open = subjects.find((id) => s.overrides[id] === false) ?? openDefaultOf(s);
+  return { ...cleared, ...Object.fromEntries(subjects.map((id) => [id, id !== open])) };
 }
 
 /** WHAT FOLDING THE NOTE WRITES (user, 2026-11-09: "when we close the AI card … the actual called

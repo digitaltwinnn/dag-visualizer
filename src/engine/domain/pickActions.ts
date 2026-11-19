@@ -330,7 +330,11 @@ export function viewEntryActions(opts: {
   if (VIEW_POLICIES[opts.mode].railBrowses && held && heldOut(opts.filter, held)) return [{ kind: "inspect", pick: null }];
   const ancestry = nodeAncestryActions(pick, opts);
   const netId = VIEW_POLICIES[opts.mode].nodeCommitsNetwork ? pickNetId(pick) : null;
-  return netId && netId !== opts.filter ? [{ kind: "railNet", id: netId }, ...ancestry, { kind: "inspect", pick }] : ancestry;
+  // THE NODE COMES LAST, as a node click in this view commits it (user, 2026-11-19): the rail opens
+  // the most recently committed card (`selStack`), so an ancestry landing after the carried node
+  // outranked it — Geography opened the provider card, Hypergraph the composition.
+  const browse: ClickAction[] = netId && netId !== opts.filter ? [{ kind: "railNet", id: netId }] : [];
+  return browse.length || ancestry.length ? [...browse, ...ancestry, { kind: "inspect", pick }] : [];
 }
 
 // The network-filter TOGGLE — the FilterPicker's committed-row rule: picking the committed

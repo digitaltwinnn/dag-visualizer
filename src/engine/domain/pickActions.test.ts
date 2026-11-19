@@ -351,7 +351,7 @@ describe("viewEntryActions (a carried node's ancestry in the destination view)",
     ]);
   });
   it("no browse where the filter already stands on it", () => {
-    expect(viewEntryActions({ filter: "dor", mode: "hyper", pick: nodePick(), compositionSel: COMP }).map((a) => a.kind)).toEqual(["composition"]);
+    expect(viewEntryActions({ filter: "dor", mode: "hyper", pick: nodePick(), compositionSel: COMP }).map((a) => a.kind)).toEqual(["composition", "inspect"]);
   });
   it("a view that does not commit a node's network stays out of it", () => {
     expect(viewEntryActions({ filter: "all", mode: "ledger", pick: nodePick() })).toEqual([]);
@@ -365,13 +365,26 @@ describe("viewEntryActions (a carried node's ancestry in the destination view)",
     expect(viewEntryActions({ filter: "dor", mode: "geo", pick: p })).toEqual([
       { kind: "country", cc: "DE" },
       { kind: "cohort", sel: { cc: "DE", city: null, isp: null } },
+      { kind: "inspect", pick: p },
     ]);
   });
 
   it("hyper: re-commits the node's composition group", () => {
-    expect(viewEntryActions({ filter: "dor", mode: "hyper", pick: nodePick(), compositionSel: COMP })).toEqual([
+    const p = nodePick();
+    expect(viewEntryActions({ filter: "dor", mode: "hyper", pick: p, compositionSel: COMP })).toEqual([
       { kind: "composition", sel: COMP },
+      { kind: "inspect", pick: p },
     ]);
+  });
+
+  // The rail opens the most recently committed card (`selStack`), so an ancestry committed after
+  // the carried node outranked it: Geography opened the provider card, Hypergraph the composition
+  // (user, 2026-11-19). The entry ends on the node, as a node click in that view does.
+  it("re-commits the carried node LAST, so it outranks the ancestry it re-derives", () => {
+    for (const mode of ["geo", "hyper"] as const) {
+      const acts = viewEntryActions({ filter: "dor", mode, pick: nodePick("DE"), compositionSel: COMP });
+      expect(acts.at(-1)?.kind).toBe("inspect");
+    }
   });
 
   it("ledger: contributes nothing — its floors/containers are visual aid (layer retired 2026-08-06)", () => {
@@ -381,7 +394,7 @@ describe("viewEntryActions (a carried node's ancestry in the destination view)",
   it("names exactly the rungs a node CLICK in that view commits (no drift)", () => {
     const p = nodePick("DE");
     for (const mode of ["geo", "hyper", "ledger"] as const) {
-      expect(viewEntryActions({ filter: "dor", mode, pick: p, compositionSel: COMP })).toEqual(
+      expect(ancestryOf(viewEntryActions({ filter: "dor", mode, pick: p, compositionSel: COMP }))).toEqual(
         ancestryOf(nodeSelectActions(p, { mode, currentFilter: "dor", compositionSel: COMP })),
       );
     }
