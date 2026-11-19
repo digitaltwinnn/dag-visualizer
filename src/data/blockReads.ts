@@ -72,7 +72,7 @@ export function wantedExactReads(w: BlockWindow | null, exact: Readonly<Record<n
  *  on every new global), so within half an hour on /blocks every window tick older than the live
  *  buffer lost its read and its bar fell to a block-only floor, unlabelled — and nothing re-asked,
  *  since the window's reads are asked only when its key set changes. Held ordinals cost at most a
- *  window over the cap (52 + the past window's 52), which the cap's "one small object per ordinal"
+ *  window over the cap (50 + the past window's 50), which the cap's "one small object per ordinal"
  *  affords. */
 export function exactEvictions(ords: readonly number[], max: number, keep: ReadonlySet<number>): number[] {
   if (ords.length <= max) return [];

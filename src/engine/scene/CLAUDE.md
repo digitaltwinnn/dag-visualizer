@@ -643,7 +643,7 @@ and window change); the band's "N of M blocks read" is the wait's instrument. On
 window is laid out from every read at once and holds. After it, a block is drawn only once its own
 read has settled — a new live tick's lands onto the laid drawing, a missed one stands on the centre
 line with no links — so nothing placed ever moves. The reads themselves land `WINDOW_READ_POOL`
-(8) at a time (`ensureMany`; ~6 s for 52 ticks at 4, measured, against ~23 s one every 450 ms).
+(16 since 2026-11-19) at a time (`ensureMany`; ~6 s for 52 ticks at 4, measured, against ~23 s one every 450 ms).
 ⚠️ A layout recomputed from the window moves: D1's lane from the
 window's lowest height swung the whole braid as reads landed, and D2's first cut — a pure barycenter
 pass over the window — re-dealt every block whenever the window slid by one tick (found live both

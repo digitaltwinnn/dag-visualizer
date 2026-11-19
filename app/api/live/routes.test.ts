@@ -39,16 +39,16 @@ describe("/api/live/globals", () => {
   it("clamps limit to POLL.maxSnapshots", async () => {
     const res = await globalsGET(req("/api/live/globals?limit=999"));
     expect(res.status).toBe(200);
-    expect(String(fetchMock.mock.calls[0][0])).toContain("limit=52");
+    expect(String(fetchMock.mock.calls[0][0])).toContain("limit=50");
     expect(res.headers.get("Cache-Control")).toBe("public, s-maxage=4, stale-while-revalidate=2");
     expect(await res.json()).toMatchObject({ globals: [], memoAgeMs: 0 });
   });
 
-  it("rounds a low or junk limit to the smallest rung (12), and a mid one up to 52", async () => {
+  it("rounds a low or junk limit to the smallest rung (12), and a mid one up to 50", async () => {
     await globalsGET(req("/api/live/globals?limit=0"));
     expect(String(fetchMock.mock.calls[0][0])).toContain("limit=12");
     await globalsGET(req("/api/live/globals?limit=13"));
-    expect(String(fetchMock.mock.calls[1][0])).toContain("limit=52");
+    expect(String(fetchMock.mock.calls[1][0])).toContain("limit=50");
   });
 
   it("503 no-store on upstream failure", async () => {

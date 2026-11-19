@@ -1,3 +1,4 @@
+import { POLL } from "@/src/engine/config";
 import { metaSnapRecord, type MetaSnapRecord } from "@/src/data/api";
 import type { LedgerSource } from "@/src/data/ledgerSourceType";
 import type { Anchor, BlockSel, GlobalSnapshot, RawMetaSnapshot, SnapshotExact, MetaSnapSel } from "@/src/data/types";
@@ -54,8 +55,9 @@ export interface BlockWindow extends LedgerSource {
   blockTick(ord: number): BlockTick | null;
 }
 
-/** Ticks a block window holds (matches the live buffer's 52). */
-export const BLOCK_WINDOW_TICKS = 52;
+/** Ticks a block window holds: the live buffer's own depth (`POLL.maxSnapshots`, 50), so the chamber's
+ *  trail keeps one length in every register. */
+export const BLOCK_WINDOW_TICKS = POLL.maxSnapshots;
 
 /** A LIVE REFRESH NEVER MOVES THE WINDOW BACKWARD. The route's edge cache and the explorer's lagging
  *  index can answer with a trail older than a tick the bridge already holds (appended from the live

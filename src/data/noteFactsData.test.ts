@@ -43,7 +43,7 @@ describe("dataFacts", () => {
     expect(dataFacts({ ticks: [{ ordinal: 1, rows: null }], names, keyOf })).toBeNull();
     const out = dataFacts({ ticks: [{ ordinal: 1, rows: [row("ndt", 0, 0)] }], names, keyOf })!;
     expect(text(out.facts)).toEqual(["Data blocks: 0", "Data updates: 0"]);
-    expect(DATA_NOTE_TICKS).toBe(52);
+    expect(DATA_NOTE_TICKS).toBe(50);
   });
   it("every tick read: the read count is no news and is not stated (user, 2026-11-09)", () => {
     const out = dataFacts({ ticks: [{ ordinal: 1, rows: [row("dor", 2, 30)] }, { ordinal: 2, rows: [row("ded", 1, 4)] }], names, keyOf })!;

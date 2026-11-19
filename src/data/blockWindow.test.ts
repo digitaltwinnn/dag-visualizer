@@ -22,8 +22,8 @@ describe("foldBlockWindow", () => {
     expect(a?.metaCounts.get("dor")).toBe(2);
     expect(a?.touched).toBe(0);
   });
-  it("holds the live buffer's 52 ticks", () => {
-    expect(BLOCK_WINDOW_TICKS).toBe(52);
+  it("holds the live buffer's 50 ticks", () => {
+    expect(BLOCK_WINDOW_TICKS).toBe(50);
   });
 });
 describe("blockWanted", () => {

@@ -13,9 +13,9 @@ import { cn } from "@/lib/utils";
 // THE DAG BRAID IS ON ITS WAY (user, 2026-11-19: "the dag appeared many seconds later without a hint
 // … give a hint that it's coming" — option "on the pane"). The Transaction blocks register lays the
 // braid out ONCE, when every read the window wants has landed (2026-11-07: "draw it once properly"),
-// and on a cold window that is many seconds: the window itself, then ~52 snapshot reads. So the pane
+// and on a cold window that is many seconds: the window itself, then ~50 snapshot reads. So the pane
 // stands empty from the moment the register is entered and this one quiet line sits on it, its count
-// rising — "Reading the blocks… 24 of 52", the words the explorer and the band already say — until
+// rising — "Reading the blocks… 24 of 50", the words the explorer and the band already say — until
 // the braid draws in and it fades.
 //
 // THE CALLOUT'S SPLIT: this owns the words; the Engine (`_syncBraidHint`) places it on the pane's

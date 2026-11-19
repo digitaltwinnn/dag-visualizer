@@ -1,3 +1,4 @@
+import { BLOCK_WINDOW_TICKS } from "@/src/data/blockWindow";
 import { fact } from "@/src/data/noteFacts";
 import type { Fact, NoteLead } from "@/src/data/noteTypes";
 import type { ChannelSnapRow } from "@/src/data/types";
@@ -28,8 +29,8 @@ import { UNLISTED_ID } from "@/src/data/unlistedId";
 //
 // Pure: no store values, react or I/O (the colocated test is the specification — rule 4).
 
-/** The global snapshots the note reads: the chamber's own window (`BLOCK_WINDOW_TICKS`, 52). */
-export const DATA_NOTE_TICKS = 52;
+/** The global snapshots the note reads: the chamber's own window (`BLOCK_WINDOW_TICKS`, 50). */
+export const DATA_NOTE_TICKS = BLOCK_WINDOW_TICKS;
 
 export interface DataTickRead {
   ordinal: number;

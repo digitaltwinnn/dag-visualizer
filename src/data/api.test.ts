@@ -17,7 +17,7 @@ describe("staleTickKeys", () => {
     // The real ordering: a dormant metagraph seeds its year-old ticks AFTER a live one's recent
     // ticks, so insertion order puts the OLD entries last. An insertion-order cap would evict the
     // recent ones — the only ones any consumer reads, since every lookup is by a global snapshot's
-    // timestamp and that buffer holds the 52 most recent ticks.
+    // timestamp and that buffer holds the 50 most recent ticks.
     const insertionOrder = [
       t("2026-08-31T15:05:00.000Z"), // live metagraph responded first
       t("2026-08-31T15:04:00.000Z"),

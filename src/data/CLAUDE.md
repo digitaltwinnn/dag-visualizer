@@ -95,7 +95,7 @@ auto-layout table sizes to its content, so one long field list widened the table
 count column out of view and defeated the cell's own `truncate`.
 
 **An old pin goes BACK IN TIME** (user, 2026-11-03; `docs/superpowers/specs/2026-11-03-snapshots-past-window-design.md`).
-The live buffer holds the newest 52 global snapshots, so a pin older than that (a notable row's
+The live buffer holds the newest 50 global snapshots (`POLL.maxSnapshots`), so a pin older than that (a notable row's
 longest gap) used to leave the chamber and the explorer on the live feed. Every Snapshots surface
 now reads ONE ledger source — `pastWindow.ts`'s held window around the pin (41 before, the pin, up
 to 10 after, from `/api/ledger/window`), else the live buffer — through `ledgerSource()` (the
@@ -113,7 +113,7 @@ it sits in the domain because the domain asks it too, rule 1), and `useLedgerSou
 `ledgerSource()` rather than re-deriving it. `ledgerSource(live,
 register)` answers it ALONE in that register — the live buffer's ticks are the wrong set, so with no
 window yet the chamber draws nothing — and the past window or the live buffer in the Snapshots
-register (`pastWanted` stands down in Blocks). The window is the newest 52 global snapshots at or
+register (`pastWanted` stands down in Blocks). The window is the newest 50 global snapshots at or
 below the pin that HOLD a block (a DAG block, or an anchored metagraph snapshot carrying token
 blocks), from `/api/blocks/trail`, folded pure by `foldBlockWindow` into the live buffer's own
 shapes, so the slot model is unchanged. `blockWanted` is the one rule for when (entering the
@@ -140,7 +140,7 @@ older trail), while a pinned answer replaces. A pin deeper than the trail can wa
 reach**: an answer, stated, never retried (`beyond: true`). **Under a network filter the window is
 THAT network's** (2026-11-07, user: "when I filter on a metagraph it should get the blocks to
 populate the furniture"): `blockChainOf(filter)` asks the trail for the filter's network
-(`trailPath`'s `&chain=`), so the window is its newest 52 block ticks however far back they lie. **A
+(`trailPath`'s `&chain=`), so the window is its newest 50 block ticks however far back they lie. **A
 metagraph's window holds its own blocks ONLY** (design round D8, user: "If we filter on a metagraph,
 does it make sense to show the DAG blocks? They are unrelated right"): the trail may carry the DAG
 blocks its ticks also accepted, and `foldBlockWindow` drops them (and a tick left with nothing), so

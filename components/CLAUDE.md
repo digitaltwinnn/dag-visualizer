@@ -1327,7 +1327,7 @@ Data tab states "Data updates N" from the exact read with no Decompress (`metaSn
 RAW is the Metagraph snapshots register's anchor log (its records are metagraph snapshots). **The
 note is the register's own** (2026-11-07, user: "AI card content for each sub-view … focus on each
 separately" → option 2): `noteSubject`'s `REGISTER_NOTES.data` is the `data` NoteView — the DATA
-BLOCKS note, written from the LIVE WINDOW (the newest 52 global snapshots' exact reads,
+BLOCKS note, written from the LIVE WINDOW (the newest 50 global snapshots' exact reads,
 `app/api/notes/dataWindow.ts` through the route's own day-long cache, `app/api/snapshot/cachedExact.ts`)
 when the note is written, hourly with the ledger's and the block DAG's (`warm.ts` HOURLY): which
 networks carried data blocks over those minutes, how many, with how many updates, over the ticks

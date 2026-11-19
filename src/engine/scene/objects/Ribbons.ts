@@ -40,7 +40,7 @@ import { snapBright } from "../../domain/dimModel";
 const RIBBON_ROWS = 4;
 /** Trail slots a thread can be drawn for — the retained window, so every visible row can carry one. */
 // 128 → 512 (review M4, 2026-11-09): the Transaction blocks seal lines are one per DAG block, per
-// token block and per block-carrying tile over the 52-tick block window — about two a tick and more
+// token block and per block-carrying tile over the 50-tick block window — about two a tick and more
 // on a burst tick, so 128 cut the oldest rows' seals with no sign. 512 is ~10 a tick across the
 // whole window; geometry is event-time, so the cost is buffer size alone.
 const MAX_THREADS = 512;

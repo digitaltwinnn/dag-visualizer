@@ -114,7 +114,7 @@ export function ensurePage(ordinals: number[]): () => void {
 export const WINDOW_READ_POOL = 16;
 
 /** READ A WHOLE WINDOW OF ORDINALS, a few at a time with no gap (user, 2026-11-07: "do the exact
- *  reads need to be sequential?" — they did not: the Transaction blocks window asks 52 ticks, and at
+ *  reads need to be sequential?" — they did not: the Transaction blocks window asks 50 ticks, and at
  *  `ensurePage`'s one-every-450 ms that was ~23 s before its last read landed, each landing read
  *  re-laying the DAG). `WINDOW_READ_POOL` in flight; the next starts as one settles. The same
  *  `ensure` as every other read — dedupe, the miss, the bounded retry. The canceller stops what has

@@ -131,8 +131,10 @@ export const METAGRAPHS: MetaConfig[] = [
 
 // Data polling cadence + retention (was `VIS`, renamed: this group is DATA tuning, not visuals).
 export const POLL = {
-  maxSnapshots: 52,        // how many global snapshots to keep in the stream (also caps the
+  maxSnapshots: 50,        // how many global snapshots to keep in the stream (also caps the
                            // LiveStrip bar count — the strip fills with this whole retained window)
+                           // 50 since 2026-11-19 (user: "Why did we decide on 52 blocks? Why not 50?" —
+                           // 52 had no recorded reason); the block window and the Data blocks note read it.
   pollMs: 5000,            // how often to poll for new snapshots — 4000 until 2026-10-25 (user:
                            // "5s and 30s … are more common values"); global snapshots land every
                            // ~4–30s, so a poll is at most 5s behind the newest

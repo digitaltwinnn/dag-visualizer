@@ -6,7 +6,7 @@ import type { GlobalSnapshot, RawMetaSnapshot } from "@/src/data/types";
 import { BLOCK_WINDOW_TICKS } from "@/src/data/blockWindow";
 import { BeyondReach, absentIsEmpty, assembleTrail, trailCacheControl, type TrailRow } from "../trail";
 
-// GET /api/blocks/trail?around=<ordinal|live>&n=52&chain=<id> — the Blocks register's window:
+// GET /api/blocks/trail?around=<ordinal|live>&n=50&chain=<id> — the Blocks register's window:
 // the newest `n` global snapshots at or below `around` that hold a block (`../trail.ts`). `chain`
 // (the top bar's network filter: `dag`, or a listed network's id — a former address maps to its
 // network's current one; absent = every network) makes it THAT network's newest `n` block ticks,

@@ -19,7 +19,7 @@ describe("the limit ladders", () => {
   });
   it("globals: the shared window and the whole retained buffer", () => {
     expect(GLOBALS_LADDER).toEqual([LIVE_GLOBALS, POLL.maxSnapshots]);
-    expect(GLOBALS_LADDER).toEqual([12, 52]);
+    expect(GLOBALS_LADDER).toEqual([12, 50]);
   });
 });
 
@@ -29,12 +29,12 @@ describe("clampLimit", () => {
     expect(clampLimit("8", META_LADDER)).toBe(50);
     expect(clampLimit("51", META_LADDER)).toBe(60);
     expect(clampLimit("60", META_LADDER)).toBe(60);
-    expect(clampLimit("13", GLOBALS_LADDER)).toBe(52);
+    expect(clampLimit("13", GLOBALS_LADDER)).toBe(50);
     expect(clampLimit("3", GLOBALS_LADDER)).toBe(12);
   });
   it("caps above the top rung", () => {
     expect(clampLimit("9999", META_LADDER)).toBe(600);
-    expect(clampLimit("999", GLOBALS_LADDER)).toBe(52);
+    expect(clampLimit("999", GLOBALS_LADDER)).toBe(50);
   });
   it("answers the smallest rung for an absent, zero, negative or junk limit", () => {
     for (const raw of [null, "", "0", "-5", "abc", "NaN", "Infinity"]) {

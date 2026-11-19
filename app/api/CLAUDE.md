@@ -2,7 +2,7 @@
 
 > 2026-11-07 — `app/api/snapshot/cachedExact.ts` holds the exact read's fetcher and its day-long
 > `unstable_cache` (moved out of `[ordinal]/route.ts`, which stays route exports only), so the Data
-> blocks note's live-window reader (`app/api/notes/dataWindow.ts`, 52 ticks, 8 in flight) and the
+> blocks note's live-window reader (`app/api/notes/dataWindow.ts`, 50 ticks, 8 in flight) and the
 > route fill ONE cache per ordinal. The notes' hourly warm (`warm.ts`) writes four kinds now: the
 > ledger's, the block DAG's, the data blocks' (`data:hours`, `KIND_TIMING.data` = the ledger's clock)
 > and History's 24h. Cost of the data note: one model call an hour plus up to 52 exact reads, most of
@@ -264,7 +264,7 @@ holds years of history under it, and both `keys.test.ts` files pin the strings.
   catalog chain's records anchored in that span. Cached a year once its newest global is an hour old,
   a minute before; a hole in the global chain or ANY chain read that fails answers 503 `no-store`, so
   one upstream timeout is never cached as "that network anchored nothing".
-- **`/api/blocks/trail?around=<ordinal|live>&n=52&chain=<id>`** (2026-11-05) is the Snapshots view's BLOCKS
+- **`/api/blocks/trail?around=<ordinal|live>&n=50&chain=<id>`** (2026-11-05) is the Snapshots view's BLOCKS
   REGISTER window (`blocks/trail.ts`; the client side is in `src/data/CLAUDE.md`): the newest `n`
   global snapshots at or below `around` that hold a block, each with its DAG block hashes and the
   block-bearing metagraph snapshots anchored into it (a former chain address folded under its

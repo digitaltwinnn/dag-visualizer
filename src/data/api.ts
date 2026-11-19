@@ -222,7 +222,7 @@ export interface Activity {
   /** The window every rate above is extrapolated FROM: how many snapshots, over how long. The
    *  numbers are shown to the user (the vitals state their own basis) — a rate is honest only
    *  while you can see the span it was measured over. Measured 2026-08-12 over 60 live ticks,
-   *  mainnet global L0 averages ~28 s between ticks but ranges 4.6 s to 115 s, so the 52-tick
+   *  mainnet global L0 averages ~28 s between ticks but ranges 4.6 s to 115 s, so the 50-tick
    *  buffer spans ~24 min and /hr is a ×2.5 reach. Read from the buffer's own timestamps, never
    *  assumed, so the sentence survives a cadence change — and the VARIANCE is why it must be. */
   samples: number;
@@ -617,7 +617,7 @@ export class NetworkData {
     // an insertion-order cap then evicts the recent ticks and keeps the year-old ones. Measured
     // the same day: the seed inserts 428 distinct timestamps against a 400 cap spanning ~8,600
     // hours, so this evicts on every cold load. Every consumer looks the index up by a GLOBAL
-    // SNAPSHOT's timestamp, and that buffer is the 52 most recent ticks — so the evicted entries
+    // SNAPSHOT's timestamp, and that buffer is the 50 most recent ticks — so the evicted entries
     // were the only ones anyone would ever read, and the tick went on to read as unidentified
     // while we were holding its anchors (rule 10).
     for (const k of staleTickKeys(this.anchorIndex.keys(), POLL.anchorIndexMax)) {
@@ -643,7 +643,7 @@ export class NetworkData {
   // ⚠️ THE WINDOW IS MEASURED, NEVER ASSUMED, and the UI states it. POLL.maxSnapshots ticks
   // is a duration only once you know the cadence, and the cadence is not what a reading of
   // the poll interval suggests: measured 2026-08-12 over 60 live ticks, mainnet's global L0
-  // averages ~28 s between ticks (the tab polls every POLL.pollMs to catch each one promptly), so 52 ticks
+  // averages ~28 s between ticks (the tab polls every POLL.pollMs to catch each one promptly), so 50 ticks
   // is a ~24-MINUTE window and a /hr figure is a ×2.5 extrapolation, not a leap. But that is
   // today's chain, not a law — and it is not even a STEADY cadence today: those same 60 ticks
   // ran 4.6 s to 115 s apart. That variance is exactly why `spanHr` and `samples` ride the

@@ -4,7 +4,7 @@ import { ordinalAtOrAfter, type ChainReader } from "../notes/snapshotAt";
 // A PAST WINDOW OF THE SNAPSHOTS VIEW (user, 2026-11-03: pinning an old snapshot should "go back in
 // time": the chamber rebuilds for the pin's own window, frozen, and the explorer shows the same
 // window; `docs/superpowers/specs/2026-11-03-snapshots-past-window-design.md`). The live buffer
-// holds the newest 52 global snapshots and each chain's newest records; this reads the same two
+// holds the newest 50 global snapshots and each chain's newest records; this reads the same two
 // things around an ordinal in the past, in the live answer's own shapes, so the client folds them
 // exactly as it folds the live feed.
 //
