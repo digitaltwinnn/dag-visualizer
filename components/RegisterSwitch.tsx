@@ -192,7 +192,11 @@ export default function RegisterSwitch() {
               onClick={() => switchLedgerRegister(r)}
               className={cn(
                 PLACE[r],
-                "group flex items-center justify-center gap-1.5 rounded-md px-4 max-[700px]:px-2 cursor-pointer border-0",
+                // H1 (user, 2026-11-20: "a hairline … to show it's a 'layer'", no extra height): every tile
+                // stands on its own hairline ledge, the lit one's in the accent — a slab resting on the
+                // layer below, the base's own rule repeated up the stack.
+                "group flex items-center justify-center gap-1.5 rounded-t-md rounded-b-[2px] px-4 max-[700px]:px-2 cursor-pointer border-0 border-b border-border",
+                "aria-pressed:border-[color-mix(in_oklch,var(--primary)_60%,transparent)]",
                 "text-body max-[700px]:text-label font-semibold leading-none whitespace-nowrap",
                 "bg-transparent text-muted-foreground hover:text-foreground hover:bg-wash-soft",
                 "aria-pressed:bg-[var(--sel-bg)] aria-pressed:text-primary-ink aria-pressed:hover:bg-[var(--sel-bg)]",

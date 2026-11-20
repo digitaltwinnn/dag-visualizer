@@ -36,13 +36,13 @@ import { unlistedUnmeasured } from "@/src/data/trendSeries";
 import { nodesBySubregion } from "@/src/data/subregions";
 import { useFeedRead } from "@/components/useFeedRead";
 import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
-import { blockScopeOf, blocksByNetwork, blocksInWindow, blocksPerHourBins, lastBlockAt, movedChainOf, movedInWindow, movedPerHourBins } from "@/src/data/blockStats";
+import { blockScopeOf, blockTickTimes, blocksByNetwork, blocksInWindow, blocksPerHourBins, lastBlockAt, movedChainOf, movedInWindow, movedPerHourBins, usualGap, usualGapWords } from "@/src/data/blockStats";
 import { blockAbsence, blockSpanWord, snapshotSpanWord } from "@/src/data/ledgerSpan";
 import { compactDag } from "@/src/util/format";
 import { networkMark, tickerOf } from "@/components/explorer/nodeRow";
 import { useNowTick } from "@/components/useNowTick";
 import { useLedgerSource } from "@/components/useLedgerSource";
-import { dataBlocksByNetwork, dataBlocksInWindow, dataInWindow, dataPerTick, lastDataTick } from "@/src/data/dataStats";
+import { dataBlocksByNetwork, dataBlocksInWindow, dataInWindow, dataPerTick, dataTickTimes, lastDataTick } from "@/src/data/dataStats";
 import { netKeyOf } from "@/src/engine/domain/pickActions";
 
 export function HyperCells({ accent }: { accent: string }) {
@@ -921,6 +921,50 @@ function StackedLead({ figure, unit, prefix, note, empty = false }: { figure: Re
   );
 }
 
+
+/** LAST BLOCK, AGAINST THE USUAL GAP (user, 2026-11-20, design A2 of the round): the age as the lead,
+ *  the network under it, and a track with the window's USUAL RANGE shaded — the middle half of its own
+ *  gaps (`blockStats.usualGap`) — and a needle at the age. Inside or under the range the needle wears
+ *  the band's accent; past it, the warning amber and the words "longer than usual" (never "overdue": a
+ *  block exists only when someone transacts). The track runs to twice the range's top, and an age past
+ *  that pins the needle to the end. With too few gaps there is no range: the age and the network alone. */
+function LastSubject({ label, ageMs, chainKey, range, accent }: { label: string; ageMs: number; chainKey: string; range: { lo: number; hi: number } | null; accent: string }) {
+  const mark = networkMark(chainKey);
+  const longer = range != null && ageMs > range.hi;
+  const max = range ? range.hi * 2 : 1;
+  const at = (ms: number) => `${Math.min(100, (ms / max) * 100)}%`;
+  const ink = longer ? "var(--warn-soft)" : accent;
+  return (
+    <BandCard
+      label={label}
+      aside={range ? <span className={cn(longer && "text-[var(--warn-soft)]")}>{longer ? "longer than usual" : `usual ${usualGapWords(range)}`}</span> : undefined}
+      lead={
+        <span className="flex flex-col items-start">
+          <span className={cn(STACKED_LEAD, "text-foreground")}>{ageWords(ageMs)}</span>
+          <span className="inline-flex items-center gap-1 text-label text-muted-foreground leading-none whitespace-nowrap">
+            ago <IdentityDot hue={mark.hue} /> {mark.label}
+          </span>
+        </span>
+      }
+    >
+      {range ? (
+        <span className="relative flex-1 min-w-0 self-center h-7" aria-hidden>
+          <span className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-[var(--border)]" />
+          <span
+            className="absolute top-1/2 h-2.5 -translate-y-1/2 rounded-sm"
+            style={{ left: at(range.lo), width: `calc(${at(range.hi)} - ${at(range.lo)})`, background: `color-mix(in oklch, ${accent} 28%, transparent)` }}
+          />
+          <span className="absolute top-0.5 bottom-0.5 w-0.5 -translate-x-1/2 rounded-full" style={{ left: at(ageMs), background: ink }} />
+        </span>
+      ) : null}
+      <span className="sr-only">
+        {`${label}: ${ageWords(ageMs)} ago, ${mark.label}.`}
+        {range ? ` The usual gap is ${usualGapWords(range)}${longer ? "; this one is longer than usual" : ""}.` : ""}
+      </span>
+    </BandCard>
+  );
+}
+
 export function BlocksCells({ accent }: { accent: string }) {
   useFeedRead(["api-blocks", "global"], "BlocksCells");
   const win = useSyncExternalStore(onBlockWindow, getBlockWindow, () => null);
@@ -976,21 +1020,11 @@ export function BlocksCells({ accent }: { accent: string }) {
   // opens the band — leftmost on the desktop band, first in the phone sheet (one `ViewCells` list).
   return (
     <>
-      <BandCard
-        label="Last block"
-        lead={pinned ? undefined : <StackedLead figure={last ? ageWords(Math.max(0, now - Date.parse(last.ts))) : null} unit="ago" empty={last == null} />}
-      >
-        {pinned ? (
-          stateLine(BLOCK_PINNED)
-        ) : last ? (
-          <span className="flex items-center self-stretch gap-1.5 text-body whitespace-nowrap">
-            <IdentityDot hue={networkMark(last.chain).hue} />
-            <span className="text-muted-foreground">{networkMark(last.chain).label}</span>
-          </span>
-        ) : (
-          stateLine(win ? "No block in the window" : absent)
-        )}
-      </BandCard>
+      {!pinned && last ? (
+        <LastSubject label="Last block" ageMs={Math.max(0, now - Date.parse(last.ts))} chainKey={last.chain} range={usualGap(blockTickTimes(ticks, scope.chain))} accent={accent} />
+      ) : (
+        <BandCard label="Last block">{pinned ? stateLine(BLOCK_PINNED) : stateLine(win ? "No block in the window" : absent)}</BandCard>
+      )}
       <BandCard
         label="Blocks"
         aside={win ? span : undefined}
@@ -1078,21 +1112,11 @@ export function DataCells({ accent, filter }: { accent: string; filter: string }
 
   return (
     <>
-      <BandCard
-        label="Last data block"
-        lead={pinned ? undefined : <StackedLead figure={last ? ageWords(Math.max(0, now - Date.parse(last.ts))) : null} unit="ago" empty={last == null} />}
-      >
-        {pinned ? (
-          stateLine(BLOCK_PINNED)
-        ) : last ? (
-          <span className="flex items-center self-stretch gap-1.5 text-body whitespace-nowrap">
-            <IdentityDot hue={networkMark(netKeyOf(last.metaId)).hue} />
-            <span className="text-muted-foreground">{networkMark(netKeyOf(last.metaId)).label}</span>
-          </span>
-        ) : (
-          stateLine(held.read ? "No data block in the window" : "Reading the window…")
-        )}
-      </BandCard>
+      {!pinned && last ? (
+        <LastSubject label="Last data block" ageMs={Math.max(0, now - Date.parse(last.ts))} chainKey={netKeyOf(last.metaId)} range={usualGap(dataTickTimes(snaps, reads, inScope))} accent={accent} />
+      ) : (
+        <BandCard label="Last data block">{pinned ? stateLine(BLOCK_PINNED) : stateLine(held.read ? "No data block in the window" : "Reading the window…")}</BandCard>
+      )}
       <BandCard
         label="Data updates"
         aside={!empty ? span : undefined}
