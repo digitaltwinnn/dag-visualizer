@@ -51,7 +51,8 @@ describe("only the top bar writes the filter", () => {
   it("gives a card standing on the filter no close, while a finer commit on the same network keeps one", () => {
     const src = read("components/ContextCard.tsx");
     expect(src).toMatch(/const finer = chartStack \? trendFocus != null : tickNet != null;/);
-    expect(src).toMatch(/const clearable = !onNode && \(finer \|\| \(filter !== appFilter && !chartStack\)\);/);
+    // …and a card standing on a DAG block's network has none either: it is derived, nothing of its own (2026-11-20).
+    expect(src).toMatch(/const clearable = !onNode && !\(onDagBlock && filter !== appFilter\) && \(finer \|\| \(filter !== appFilter && !chartStack\)\);/);
   });
   it("gives Hypergraph's explorer no home under a filter", () => {
     expect(read("components/HyperExplore.tsx")).toMatch(/onRelease: railNet \? \(\) => applyClickActions\(\[\{ kind: "railNet", id: null \}\]\) : undefined/);
