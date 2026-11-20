@@ -16,7 +16,7 @@ import { ensurePage } from "@/components/RawSnapshotBridge";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { useLedgerSource } from "@/components/useLedgerSource";
 import { BLOCKS_UNREAD, blockAbsence, blockSpanWord, countFigure, metaSnapsInWindow, snapshotSpanWord } from "@/src/data/ledgerSpan";
-import { dataBlocksInWindow } from "@/src/data/dataStats";
+import { dataBlocksInWindow, settledTicks } from "@/src/data/dataStats";
 import { REGISTER_ICONS } from "@/components/icons";
 import { ledgerAnchor } from "@/src/data/network";
 import { cn } from "@/lib/utils";
@@ -195,6 +195,7 @@ export default function LedgerPanel() {
   const metaSnap = useStore((s) => s.metaSnap);
   const tickNet = useStore((s) => s.tickNet);
   const snapshotExact = useStore((s) => s.snapshotExact);
+  const exactMiss = useStore((s) => s.exactMiss);
   // ONE PICK FOR EVERY LEVEL (user, 2026-09-29 — `src/data/explorerMeasure.ts`): the lower levels
   // show the tick level's `ledgerMeasure` where they can state it and their own first measure where
   // they can't, and a pick at any level writes that one value — so stepping down and back up never
@@ -365,7 +366,7 @@ export default function LedgerPanel() {
   // (`metaSnapsInWindow`), the data blocks its exact reads carry in Data blocks; a floor says "+".
   const inLens = (metaId: string): boolean => filter === "all" || netKeyOf(metaId) === filter;
   const footCount = pastStatus === "loading" || pastStatus === "failed" ? null : measures.dataOnly
-    ? ((d) => countFigure(d.count, d.read < d.total))(dataBlocksInWindow(orderedSnaps, snapshotExact, inLens))
+    ? ((d) => countFigure(d.count, d.read < d.total))(dataBlocksInWindow(settledTicks(orderedSnaps, snapshotExact, exactMiss), snapshotExact, inLens))
     : ((m) => countFigure(m.count, m.floor))(metaSnapsInWindow(orderedSnaps, filter, (ts) => ledgerAnchor(ts)?.metaCounts, inLens));
   const RegisterGlyph = REGISTER_ICONS[register];
   const countAfter = (figure: string | null) =>
