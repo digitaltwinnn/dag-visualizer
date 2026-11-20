@@ -305,7 +305,7 @@ a gap, never a zero (rule 10). **Every sum of the counts asks ONE rule, `ledgerM
 (the exact route's per-network figure, the tick row, the band's three): a row the decoder could not
 read makes its sum UNKNOWN, so a tick holding one reads as unread on every surface — never as 0. The explorer index lists no data blocks (DED's records carry
 `blocks: []`), and a data chain anchors data in nearly every snapshot, so the snapshot trail IS the
-data trail — no window of its own is read.
+data trail — no window of its own is read. **But its whole window IS read on arrival** (user, 2026-11-20: "why it says 'at least'?"): the backfill covered only the newest `BACKFILL_N`, so for ~20 minutes the older tiles drew no data mark and every count was a floor. While the register is on screen, `RawSnapshotBridge` reads every unread snapshot of its window (`dataStats.unreadOrdinals`, `ensureMany`, the Transaction blocks window's own pool) — measured, 49 of 50 in 3 s, most served from the route's day cache the hourly Data blocks note warms.
 
 **A data metagraph's real payload rides in its blocks' `dataTransactions`, not necessarily in
 `onChainState`** — verified live. DED anchors fingerprint batch commitments (a batch id and a Merkle
