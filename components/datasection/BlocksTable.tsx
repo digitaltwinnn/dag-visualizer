@@ -17,7 +17,7 @@ import { compactDag, midHash, shortBlockHash } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { identityHudCss } from "@/src/palette/identity";
 import { Empty, IdentityDot } from "@/components/inspector/parts";
-import { tickerOf } from "@/components/explorer/nodeRow";
+import { unitOf } from "@/components/explorer/nodeRow";
 import { selectionHue } from "@/components/selection";
 import { GlobalGroupPlate } from "@/components/datasection/GroupToggle";
 import { StateMark } from "@/components/state/StateAtoms";
@@ -153,7 +153,7 @@ export default function BlocksTable() {
             const locked = blockRowLocked(filter, exact[b.anchorOrd], b, { on, shownOrd: snap?.data.ordinal ?? null });
             const pair = locked ? subjectPairing<string>(null, null, () => {}, hue) : subjectPairing(hoverBlock, b.hash, setHoverBlock, hue);
             const read = blockReadOf(reads, b);
-            const unit = tickerOf(b.chain);
+            const unit = unitOf(b.chain);
             const missed = miss[`${b.chain}:${b.ordinal}`] != null;
             const pick = () => {
               if (!g || locked) return;

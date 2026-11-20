@@ -126,7 +126,7 @@ export function snapMeasure(m: SnapLevelMeasure, row: { fee: number; bytes?: num
 }
 
 /** The heading control's list for the TICK level — each measure with the unit its figure is in. */
-const LEDGER_MEASURE_UNITS: Readonly<Record<LedgerMeasure, string>> = { fee: "DAG", anchors: "count", metagraphs: "count", size: "KB", data: "count" };
+const LEDGER_MEASURE_UNITS: Readonly<Record<LedgerMeasure, string>> = { fee: "$DAG", anchors: "count", metagraphs: "count", size: "KB", data: "count" };
 const optionsOf = (order: readonly LedgerMeasure[]): readonly { id: LedgerMeasure; label: string; unit: string }[] =>
   order.map((id) => ({ id, label: LEDGER_MEASURE_LABELS[id], unit: LEDGER_MEASURE_UNITS[id] }));
 export const LEDGER_MEASURE_OPTIONS = optionsOf(LEDGER_MEASURE_ORDER);

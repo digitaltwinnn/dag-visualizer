@@ -33,7 +33,7 @@ import { Door, Empty, Fact, FactGroup, Foot, FootRow, Lead, QualifierChip, Secti
 
 /** A transfer row's three columns: from, to, the amount on the card's right edge. */
 const TRANSFER_ROW = "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-baseline gap-x-3";
-import { tickerOf } from "@/components/explorer/nodeRow";
+import { unitOf } from "@/components/explorer/nodeRow";
 import { openBlockRecord } from "@/components/trendDoors";
 import { blockLead } from "@/components/inspector/blockLead";
 import { useFeedRead } from "@/components/useFeedRead";
@@ -70,7 +70,7 @@ export default function BlockPane({ onClose, collapsed, onToggle }: { onClose: (
   const pair = subjectPairing<string>(hoverBlock, sel.hash, setHoverBlock, hue);
   const read = blockReadOf(reads, sel);
   // The amount is in the CHAIN's unit: DAG for the DAG's own blocks, the token's ticker otherwise.
-  const unit = tickerOf(sel.chain);
+  const unit = unitOf(sel.chain);
   // The read's own transfers (a read cached before they were carried has none to list).
   const transfers = read?.transfers ?? [];
   const lead = blockLead(sel, read);

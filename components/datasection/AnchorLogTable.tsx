@@ -74,7 +74,7 @@ const PROBE_CACHE = 64;
 const COLUMNS: { key: AnchorLogSortKey; label: string; phone?: false; phoneLabel?: string }[] = [
   { key: "net", label: "Network" },
   { key: "ordinal", label: "Snapshot" },
-  { key: "fee", label: "Fee (DAG)", phone: false },
+  { key: "fee", label: "Fee ($DAG)", phone: false },
   { key: "size", label: "Size", phone: false },
   // `phoneLabel` — the same axis under its shorter name where the wide one alone kept the four
   // surviving columns in sideways scroll (2026-09-02: measured 366px of columns in a 309px pane,

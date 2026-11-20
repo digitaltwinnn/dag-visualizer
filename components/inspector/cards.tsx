@@ -300,7 +300,7 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
               anchored" hung under the fee as a note about a different quantity. */}
           {exact.totalFee > 0 && (
             <Fact label="Fees paid">
-              <span className="animate-resolve-in motion-reduce:animate-none whitespace-nowrap">{fmtDagShort(exact.totalFee)} DAG</span>
+              <span className="animate-resolve-in motion-reduce:animate-none whitespace-nowrap">{fmtDagShort(exact.totalFee)} $DAG</span>
             </Fact>
           )}
           {exact.totalSizeKB > 0 && (
@@ -310,7 +310,7 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
           )}
           {exact.rewardsDatum > 0 && (
             <Fact label="Rewards out">
-              <span className="animate-resolve-in motion-reduce:animate-none whitespace-nowrap">{fmtDagShort(exact.rewardsDatum)} DAG</span>
+              <span className="animate-resolve-in motion-reduce:animate-none whitespace-nowrap">{fmtDagShort(exact.rewardsDatum)} $DAG</span>
             </Fact>
           )}
           {/* The signer count is a FACT about this tick — it reads. Its two hashes don't, so

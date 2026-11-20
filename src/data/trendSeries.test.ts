@@ -100,7 +100,7 @@ describe("the unit word", () => {
     expect(perPhrase(3600000)).toBe("per hour");
     expect(perPhrase(300000)).toBe("per 5 min");
     expect(metricUnit("snapshots", DAY)).toBe("per day");
-    expect(metricUnit("fees", 3600000)).toBe("DAG per hour");
+    expect(metricUnit("fees", 3600000)).toBe("$DAG per hour");
   });
 
   it("is cadence-free where the quantity is not a rate", () => {
@@ -547,7 +547,7 @@ describe("metricCaption — what a card says it is showing", () => {
     expect(metricCaption("blocks", HOUR)).toBe("Blocks per hour");
   });
   it("sets off a unit that carries its own noun", () => {
-    expect(metricCaption("fees", DAY)).toBe("Fees in DAG per day");
+    expect(metricCaption("fees", DAY)).toBe("Fees in $DAG per day");
     expect(metricCaption("continuity", DAY)).toBe("Cadence between snapshots");
   });
   it("drops a unit that only repeats the name", () => {
@@ -689,7 +689,7 @@ describe("momentPhrase — a moment's reading as a sentence about its network (u
   it("says what the network did in the moment's bucket", () => {
     expect(say("snapshots", 300_000, "7")).toBe("DED anchored 7 snapshots in those 5 minutes");
     expect(say("blocks", 3_600_000, "120")).toBe("DED produced 120 blocks in that hour");
-    expect(say("fees", DAY, "0.42")).toBe("DED paid 0.42 DAG in fees on that day");
+    expect(say("fees", DAY, "0.42")).toBe("DED paid 0.42 $DAG in fees on that day");
   });
   it("leaves the noun to a formatter that carries it, and a gauge to what stood", () => {
     expect(say("kb", DAY, "1.2 MB")).toBe("DED anchored 1.2 MB of data on that day");

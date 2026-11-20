@@ -8,7 +8,7 @@ import { METAGRAPHS } from "@/src/engine/config";
 // level, and if a value has been selected and is still relevant it stays on that value").
 describe("levelOptions / levelMeasure", () => {
   const ALL = [
-    { id: "fee", label: "Fees", unit: "DAG" },
+    { id: "fee", label: "Fees", unit: "$DAG" },
     { id: "anchors", label: "Anchors", unit: "count" },
     { id: "metagraphs", label: "Metagraphs", unit: "count" },
     { id: "size", label: "Size", unit: "KB" },
@@ -35,13 +35,13 @@ describe("listTotal — the explorer foot's total", () => {
 // 2026-11-10: "USDC.dag" failed an all-caps test, so its Amount and Fees tiles lost their unit).
 describe("showsTileUnit", () => {
   it("shows the DAG, bytes and every catalog ticker — USDC.dag's lowercase part included", () => {
-    expect(showsTileUnit("DAG")).toBe(true);
+    expect(showsTileUnit("$DAG")).toBe(true);
     expect(showsTileUnit("KB")).toBe(true);
     expect(showsTileUnit("USDC.dag")).toBe(true);
     for (const m of METAGRAPHS) expect(showsTileUnit(m.ticker)).toBe(true);
   });
   it("shows a symbol with 'only', and says nothing more for a count, a word or nothing", () => {
-    expect(showsTileUnit("DAG only")).toBe(true);
+    expect(showsTileUnit("$DAG only")).toBe(true);
     expect(showsTileUnit("count")).toBe(false);
     expect(showsTileUnit("nodes")).toBe(false);
     expect(showsTileUnit("height")).toBe(false);

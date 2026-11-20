@@ -272,7 +272,7 @@ export default function MetaSnapPane({
                   {/* Fee leads, size rides under it — the global card's own two-line value, so
                       the pair reads identically on both storeys of the chain. */}
                   <Fact label="Fees paid">
-                    <span className="whitespace-nowrap">{fmtDagShort(row.fee)} DAG</span>
+                    <span className="whitespace-nowrap">{fmtDagShort(row.fee)} $DAG</span>
                   </Fact>
                   <Fact label="Size">
                     <span className="flex flex-col items-end">
