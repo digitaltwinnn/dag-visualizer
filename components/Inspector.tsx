@@ -24,7 +24,7 @@ import HeightEase from "@/components/HeightEase";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { useTouch } from "@/components/useTouch";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { detailsCards, isSubjectSlot, ladderSlotIds, noteCardAbsent, type RailCard } from "@/components/railCards";
+import { detailsCards, isSubjectSlot, ladderSlotIds, laneFootOf, noteCardAbsent, type RailCard } from "@/components/railCards";
 import { CHILD_OF, childStep, rootOf, rootStep, type SiblingStep, blockStep, contextStep, dataBlockStep } from "@/components/railSiblings";
 import { displayOrder, hasFoldControl, isCollapsed, boxedSlotOf, overridesOnNoteFold, overridesOnNoteStandDown, overridesOnSelection, overridesOnViewEntry, railSelectionKey, subjectRunEnd, type LaneCollapseState } from "@/components/railCollapse";
 import { useSiblingState } from "@/components/useSiblingState";
@@ -540,7 +540,7 @@ export default function Inspector() {
   // network is a reading about the snapshots above it, no rung between them), that card's own step —
   // the network of the subject on screen (`contextStep`). Elsewhere the Metagraph card heads the lane
   // and is a CHILD_OF parent, or the view's root step.
-  const contextAtFoot = ladderIds[ladderIds.length - 1] === "context";
+  const contextAtFoot = laneFootOf(mode) === "context";
   const contextGhost = contextAtFoot && !presentOf("context") && manifest.find((c) => c.id === "context")?.hint != null ? contextStep(siblingState) : null;
   const ghostStep = (id: string) =>
     id === nextStep?.id ? nextStep.step : id === rootId ? (rootGhost ?? undefined) : id === "block" ? (blockGhost ?? undefined) : id === "dataBlock" ? (dataBlockGhost ?? undefined) : id === "context" ? (contextGhost ?? undefined) : undefined;
@@ -756,7 +756,7 @@ export default function Inspector() {
     // on a card WITH siblings (`RailPager`), so a card without one — a lone block — answered the
     // pointer with a text caret. One rule for the lane: a value worth taking has its copy control.
     <div className="rail-ladder flex flex-col select-none" style={{ ["--entry-col"]: VIEW_POLICIES[mode].entryColumn } as CSSProperties}>
-      {displayOrder(ladderIds, presentOf, stepIds).map((id, depth) => {
+      {displayOrder(ladderIds, presentOf, stepIds, laneFootOf(mode)).map((id, depth) => {
         const card = manifest.find((c) => c.id === id);
         if (!card) return null;
         const body: ReactNode =

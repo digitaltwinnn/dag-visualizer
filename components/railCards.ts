@@ -143,6 +143,14 @@ export function ladderSlotIds(mode: Mode): string[] {
   return [...(DISPLAY_LANE[mode] ?? [])];
 }
 
+/** THE LANE'S FOOT — a card that is a reading ABOUT the subject chain above it rather than a rung
+ *  of it, drawn last whatever is chosen (`railCollapse.displayOrder`), with a ghost step of its own
+ *  (`railSiblings.contextStep`). Snapshots' Metagraph card (2026-11-20); every other lane has none. */
+const LANE_FOOT: Partial<Record<Mode, string>> = { ledger: "context" };
+export function laneFootOf(mode: Mode): string | null {
+  return LANE_FOOT[mode] ?? null;
+}
+
 /** The lane slot the AI notes card stands in (R57). */
 const NOTES_SLOT = "notes";
 /** The lane slots that are NOT SUBJECT CARDS — written context, not a subject anything committed
