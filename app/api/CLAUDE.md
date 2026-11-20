@@ -179,7 +179,7 @@ holds years of history under it, and both `keys.test.ts` files pin the strings.
   brushed range and a subject note), and
   `GET /api/notes/warm` is the quarter-hourly cron (three items at a time, 0.5 s between call
   starts, so the 122 warmed notes fill in one pass).
-  **The block DAG's note** (view `blocks`, subject `all`, span `hours`, 2026-11-06) is the Snapshots view's Blocks register's own card note, warmed beside the ledger's and not a Briefing note (the tour is one stop per view, so `isBriefingNote` drops it and it carries no tour `line`; the key family and `NOTES_VERSION` are untouched): a
+  **The block DAG's note** (view `blocks`, subject `all` — or ONE network since 2026-11-20, its own token blocks alone with the one-network question `questionOne`, no note when it accepted none, warmed hourly with the rest; the Data blocks note the same, its window read once per pass — span `hours`, 2026-11-06) is the Snapshots view's Blocks register's own card note, warmed beside the ledger's and not a Briefing note (the tour is one stop per view, so `isBriefingNote` drops it and it carries no tour `line`; the key family and `NOTES_VERSION` are untouched): a
   register, not a Mode, so it is its own `NoteView` with the ledger's timing and is warmed beside
   it (`dag` folds into `all`, as the ledger's). Its facts (`src/data/noteFactsBlocks.ts`) are the
   blocks each chain accepted over the last 24 whole hours of the hourly tier — the sampler's own

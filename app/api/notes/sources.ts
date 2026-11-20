@@ -9,6 +9,7 @@ import { ledgerFacts } from "@/src/data/noteFactsLedger";
 import { BLOCK_NOTE_HOURS, blocksFacts } from "@/src/data/noteFactsBlocks";
 import { dataFacts } from "@/src/data/noteFactsData";
 import { readDataWindow, type DataWindowRead } from "./dataWindow";
+import { BLOCKS_WHOLE, DATA_WHOLE } from "./prompts";
 import { currentIdOf, isTracked } from "@/src/net/lineage";
 import { rangeNotableCap } from "@/src/data/notableDays";
 import { trendFacts, trendSilent, type TrendFactsInput } from "@/src/data/noteFactsTrend";
@@ -155,12 +156,15 @@ export function storeReads(nowMs: number, store: HashReader = readStore()): Note
       return p;
     },
   };
+  // ONE live window per pass (2026-11-20): every network's Data blocks note in a warm pass reads the
+  // same newest window, so the per-network notes cost no read beyond the whole network's.
+  let dataWin: Promise<DataWindowRead> | null = null;
   return {
     span: (tier, fromMs, toMs) => readSpan(tier, fromMs, toMs, once, nowMs),
     geoDays: (fromMs, toMs) => readGeoDays(fromMs, toMs, once),
     chainReads: async () => chainReadsOf(await once.hgetall(cursorKeyOf())),
     chain: explorerReader,
-    dataWindow: readDataWindow,
+    dataWindow: () => (dataWin ??= readDataWindow()),
   };
 }
 
@@ -468,21 +472,27 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
   // THE BLOCK DAG (the Snapshots view's Blocks register): the blocks each chain accepted over the
   // last 24 WHOLE hours of the hourly tier — the sampler's own `g.blocks` / `m.<id>.blocks`, the
   // series History's Blocks measure draws — and the transfers they carried (`g.tx` / `m.<id>.tx`).
+  // ONE NETWORK'S TOO (user, 2026-11-20: the Gate AI card "should respond to the filter" in every
+  // register): a network's note reads its own token blocks alone, and a network that accepted none
+  // over the span has no note (no model call) — a network running no currency layer among them.
+  // The DAG folds into `all` (params), as the ledger's.
   blocks: {
-    accepts: (subject, span) => span === "hours" && subject === "all",
+    accepts: (subject, span) => span === "hours" && (subject === "all" || (subject !== "dag" && isNetwork(subject))),
     // The blocks, not "the block DAG": the label is the prompt's Subject, and the model echoed it as
     // the sentence's actor (user, 2026-11-09). The DAG accepts them, as the question says.
-    label: () => "transaction blocks",
-    whole: () => true,
-    async read({ nowMs, reads, names }) {
+    label: (subject, names) => (subject === "all" ? BLOCKS_WHOLE : (names[subject] ?? subject)),
+    whole: (subject) => subject === "all",
+    async read({ subject, nowMs, reads, names }) {
       const toMs = Math.floor(nowMs / H) * H;
       const fromMs = toMs - BLOCK_NOTE_HOURS * H;
       const { series } = await reads.span("1h", fromMs, toMs);
       // The DAG's blocks are a field of each global's record: a covered hour (`g.ticks`, the store's
       // one marker) without the field read none; an uncovered one was not measured.
       const ticks = series["g.ticks"] ?? [];
-      const blocks: Record<string, (number | null)[]> = { dag: ticks.map((t, i) => (t == null ? null : (series["g.blocks"]?.[i] ?? 0))) };
+      const one = subject === "all" ? null : subject;
+      const blocks: Record<string, (number | null)[]> = one ? {} : { dag: ticks.map((t, i) => (t == null ? null : (series["g.blocks"]?.[i] ?? 0))) };
       for (const id of Object.keys(names)) {
+        if (one && id !== one) continue;
         const points = id === "dag" ? null : series[`m.${id}.blocks`];
         if (points) blocks[id] = points;
       }
@@ -490,6 +500,8 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
       const transfers: Record<string, (number | null)[]> = {};
       for (const id of Object.keys(blocks)) transfers[id] = measuredTx(series[id === "dag" ? "g.tx" : `m.${id}.tx`], series);
       const built = blocksFacts({ blocks, transfers, names });
+      // A network whose token blocks were all zero states nothing: no note rather than one about nothing.
+      if (one && !built?.facts.length) return null;
       return { built, spanFrom: fromMs, spanTo: toMs, windows: [["Span length", secondsOf(fromMs, toMs)]] };
     },
   },
@@ -498,13 +510,15 @@ const VIEW_SOURCES: Record<NoteView, ViewSource> = {
   // minutes, how many, with how many updates. Read live when the note is written (option 2: no
   // sampled series holds a data-block count).
   data: {
-    accepts: (subject, span) => span === "hours" && subject === "all",
-    label: () => "the data blocks",
-    whole: () => true,
-    async read({ nowMs, reads, names }) {
+    accepts: (subject, span) => span === "hours" && (subject === "all" || (subject !== "dag" && isNetwork(subject))),
+    label: (subject, names) => (subject === "all" ? DATA_WHOLE : (names[subject] ?? subject)),
+    whole: (subject) => subject === "all",
+    async read({ subject, nowMs, reads, names }) {
       if (!reads.dataWindow) return null;
       const w = await reads.dataWindow();
-      const built = dataFacts({ ticks: w.ticks, names, keyOf: (id) => (isTracked(id) ? currentIdOf(id) : null), endMs: w.toMs });
+      // ONE NETWORK'S (2026-11-20): its own data blocks over the same window, and no note when it
+      // carried none — a network running no data layer among them (`dataFacts`' `only`).
+      const built = dataFacts({ ticks: w.ticks, names, keyOf: (id) => (isTracked(id) ? currentIdOf(id) : null), endMs: w.toMs, ...(subject === "all" ? {} : { only: subject }) });
       const spanFrom = w.fromMs ?? nowMs;
       const spanTo = w.toMs ?? nowMs;
       return { built, spanFrom, spanTo, windows: [["Span length", secondsOf(spanFrom, spanTo)]] };

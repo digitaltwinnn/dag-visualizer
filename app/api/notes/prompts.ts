@@ -90,7 +90,14 @@ export function spanFigures(spanBefore?: string | null): string {
   return `A figure for "this range" or the "previous range" is that whole range, as an average per day or a total, never a point in it: never say it rose or fell over the range. Give its change against ${before}, in one of two shapes: "<what> averaged <this range's figure> per day, up <change> on ${before}", or "<what> rose <change> to <this range's figure> per day on ${before}", with "down" or "fell" for a fall and the change from its "change against" fact, never the previous range's figure. After the first time, "on the range before" will do, or the averaged shape alone. A total or a spacing takes the same shapes without "averaged" and "per day". Figures "at the start of the range" and "at the end of the range" did move inside the span: write those as "<what> rose <change> to <end figure>" or "fell <change> to". A ratio is for reading: never write it as a figure. Count nothing yourself: a count the facts do not give, such as how many days are listed, is not written.`;
 }
 
-export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuestions; questionNow?: string; system: (subjectLabel: string, lead?: NoteLead, kind?: SubjectKind, spanBefore?: string | null) => string }> = {
+/** THE WHOLE NETWORK'S SUBJECT LABELS for the two register notes (`sources.ts` writes them): a
+ *  one-network note's label is the network's own name, so its prompt asks the one-network question
+ *  (`questionOne`, 2026-11-20 — the card follows the filter in every register). The whole network's
+ *  prompts are untouched, so no stored note changes meaning and `NOTES_VERSION` stands. */
+export const BLOCKS_WHOLE = "transaction blocks";
+export const DATA_WHOLE = "the data blocks";
+
+export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuestions; questionNow?: string; questionOne?: string; system: (subjectLabel: string, lead?: NoteLead, kind?: SubjectKind, spanBefore?: string | null) => string }> = {
   hyper: {
     // A QUIET WEEK IS SAID (user, 2026-10-30): the facts count what changed even at 0, so the note
     // says the composition held. The node count and its move are this note's alone (Geography says where).
@@ -149,7 +156,9 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
     // sentence's subject. The label is the blocks now, and the question names the DAG as the one
     // that accepts them, a network's token blocks the same way.
     question: "How many transaction blocks were accepted, and what did they carry? This note does not lead with what changed, whatever the rules above say: the facts hold no earlier figure, so never say anything rose or fell. Say how many transaction blocks the DAG accepted over the range and the transfers they carried, first, as \"the DAG accepted N transaction blocks carrying M transfers\", then each network's token blocks the same way, as \"<network>'s token blocks carried M transfers in N blocks\" or your own plain words with the network as the actor. Never write \"the block DAG\". A block carries transfers: never call a block a snapshot or a transfer.",
-    system: (subjectLabel) => `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${PROMPTS.blocks.question}`,
+    // ONE NETWORK'S TOKEN BLOCKS (2026-11-20): its facts hold that network's blocks alone, no DAG figure.
+    questionOne: "How many token blocks did this network accept, and what did they carry? This note does not lead with what changed, whatever the rules above say: the facts hold no earlier figure, so never say anything rose or fell. Say how many token blocks the network accepted over the range and the transfers they carried, as \"<network>'s token blocks carried M transfers in N blocks\" or your own plain words with the network as the actor. Say nothing about the DAG or other networks: the facts hold none. Never write \"the block DAG\". A block carries transfers: never call a block a snapshot or a transfer.",
+    system: (subjectLabel) => `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${subjectLabel === BLOCKS_WHOLE ? PROMPTS.blocks.question : PROMPTS.blocks.questionOne}`,
   },
   // THE DATA BLOCKS (the Snapshots view's Data blocks register, 2026-11-07): the live window, read
   // when the note is written — a few minutes of the chamber, no earlier figure, so nothing moved.
@@ -157,7 +166,9 @@ export const PROMPTS: Record<NoteView, { question: string; questions?: KindQuest
   // so it names the window the Span line gives and its end, the "Window end" fact, as a UTC clock time.
   data: {
     question: "What data did the networks write over the window? Open with the window in the Span line's own words and its end as the Window end fact gives it, as \"Over the last N minutes to HH:MM UTC\", where HH:MM is that fact's own time. Never say \"now\", \"right now\" or \"currently\": the note is read up to an hour after the window. This note does not lead with what changed, whatever the rules above say: the facts hold no earlier figure, so never say anything rose or fell. Say how many data blocks were carried over the window and how many updates they held, then each network that carried any, as \"<network> carried N data blocks with M updates\". Only when the facts say how many of the window's global snapshots were read, add in one clause that the counts cover those; otherwise say nothing about reading. A data block carries updates, never transactions or transfers.",
-    system: (subjectLabel) => `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${PROMPTS.data.question}`,
+    // ONE NETWORK'S DATA BLOCKS (2026-11-20): the same window, that network's blocks alone.
+    questionOne: "What data did this network write over the window? Open with the window in the Span line's own words and its end as the Window end fact gives it, as \"Over the last N minutes to HH:MM UTC\", where HH:MM is that fact's own time. Never say \"now\", \"right now\" or \"currently\": the note is read up to an hour after the window. This note does not lead with what changed, whatever the rules above say: the facts hold no earlier figure, so never say anything rose or fell. Say how many data blocks the network carried over the window and how many updates they held, as \"<network> carried N data blocks with M updates\". Say nothing about other networks: the facts hold none. Only when the facts say how many of the window's global snapshots were read, add in one clause that the counts cover those; otherwise say nothing about reading. A data block carries updates, never transactions or transfers.",
+    system: (subjectLabel) => `${VOICE}\n\nSubject: ${subjectLabel}.\nQuestion: ${subjectLabel === DATA_WHOLE ? PROMPTS.data.question : PROMPTS.data.questionOne}`,
   },
   trend: {
     question: "Say what changed over the range: what rose, what fell and when, as the numbers show it.",

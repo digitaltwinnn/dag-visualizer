@@ -73,11 +73,12 @@ describe("planPass", () => {
   it("with nothing cached, the hourly kinds come first: ledger and trend24h before hyper", () => {
     const plan = planPass(NOW, SUBJECTS, [], SET, () => null);
     const kinds = plan.map((i) => `${i.view}:${i.span}`);
-    expect(kinds.slice(0, 4)).toEqual(["ledger:hours", "ledger:hours", "trend:24h", "trend:24h"]);
-    expect(kinds.slice(4, 6)).toEqual(["hyper:day", "hyper:day"]);
+    // Every network's register notes too (2026-11-20: the Gate AI card follows the filter there).
+    expect(kinds.slice(0, 8)).toEqual(["ledger:hours", "ledger:hours", "blocks:hours", "blocks:hours", "data:hours", "data:hours", "trend:24h", "trend:24h"]);
+    expect(kinds.slice(8, 10)).toEqual(["hyper:day", "hyper:day"]);
     expect(plan.slice(0, 2).map((i) => i.subject)).toEqual(SUBJECTS);
     // Every warmable kind, and no on-request one.
-    expect(new Set(kinds)).toEqual(new Set(["ledger:hours", "trend:24h", "hyper:day", "geo:day", "trend:7d", "trend:30d", "trend:90d", "trend:1y", "trend:all"]));
+    expect(new Set(kinds)).toEqual(new Set(["ledger:hours", "blocks:hours", "data:hours", "trend:24h", "hyper:day", "geo:day", "trend:7d", "trend:30d", "trend:90d", "trend:1y", "trend:all"]));
   });
 
   it("lists only what a note exists for: History has no `all` subject", () => {
@@ -91,9 +92,9 @@ describe("planPass", () => {
     expect(plan.filter((i) => i.view === "ledger").map((i) => i.subject)).toEqual(["all", ...SUBJECTS]);
   });
 
-  it("the block DAG's note is warmed once, as `all`, with the ledger's and before History's 24h", () => {
+  it("the block DAG's note is warmed for the whole network (`all`, its `dag` folded) and each network, with the ledger's and before History's 24h", () => {
     const plan = planPass(NOW, ["all", "dag", ...SUBJECTS], [], SET, () => null);
-    expect(plan.filter((i) => i.view === "blocks")).toEqual([{ view: "blocks", subject: "all", span: "hours" }]);
+    expect(plan.filter((i) => i.view === "blocks").map((i) => i.subject)).toEqual(["all", ...SUBJECTS]);
     const kinds = plan.map((i) => `${i.view}:${i.span}`);
     expect(kinds.indexOf("blocks:hours")).toBeGreaterThan(kinds.lastIndexOf("ledger:hours"));
     expect(kinds.indexOf("blocks:hours")).toBeLessThan(kinds.indexOf("trend:24h"));

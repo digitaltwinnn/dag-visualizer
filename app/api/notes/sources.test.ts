@@ -587,10 +587,35 @@ describe("the store reads", () => {
 describe("the block DAG's note", () => {
   const hours = (f: (i: number) => number | null) => Array.from({ length: 24 }, (_, i) => f(i));
 
-  it("is the whole network's over the recent hours, nothing else", () => {
+  it("is the whole network's or one network's over the recent hours (2026-11-20), nothing else", () => {
     expect(noteSupported("blocks", "all", "hours")).toBe(true);
-    expect(noteSupported("blocks", USDC, "hours")).toBe(false);
+    expect(noteSupported("blocks", USDC, "hours")).toBe(true);
+    expect(noteSupported("blocks", "dag", "hours")).toBe(false); // folded into `all`
     expect(noteSupported("blocks", "all", "day")).toBe(false);
+    expect(noteSupported("data", USDC, "hours")).toBe(true);
+    expect(noteSupported("data", "dag", "hours")).toBe(false);
+  });
+
+  it("one network's note reads its own token blocks alone, and none when it accepted none", async () => {
+    const mk = (usdc: number) =>
+      fakeReads({
+        async span(_tier, from) {
+          return payload("1h", hours((i) => from + i * H) as number[], {
+            "g.ticks": hours(() => 360),
+            "g.blocks": hours(() => 2),
+            [`m.${USDC}.blocks`]: hours((i) => (i < 5 ? usdc : 0)),
+            "x.cov": hours(() => 1),
+            "g.tx": hours(() => 3),
+            [`m.${USDC}.tx`]: hours((i) => (i < 5 ? 2 : 0)),
+          });
+        },
+      });
+    const n = await factsFor("blocks", USDC, "hours", NOW, mk(1));
+    expect(n).not.toBeNull();
+    expect(n!.facts.some((f) => f.label.startsWith("DAG"))).toBe(false);
+    expect(n!.facts.find((f) => f.label.endsWith("token blocks"))?.value).toBe(5);
+    expect(n!.subjectName).toBeDefined();
+    expect(await factsFor("blocks", USDC, "hours", NOW, mk(0))).toBeNull();
   });
 
   it("reads 24 whole hours of the hourly tier, blocks and transfers, and states no open tips or height", async () => {

@@ -36,8 +36,10 @@ export interface NoteSubjectState {
 /** THE NOTE A REGISTER CARRIES IN PLACE OF ITS VIEW'S (controller ruling, 2026-11-06: "in the Blocks
  *  register the top Gate AI card is the blocks note … the Snapshots register keeps the ledger note").
  *  Keyed by the register, read only where the view's policy offers it (`registers`), so no view is
- *  named here. The block DAG's note is the whole network's alone (`sources.ts`): its subject is `all`
- *  whatever the rung stands on — a filter is a lens on the chamber, and the note reads every chain. */
+ *  named here. A register's note STANDS ON THE METAGRAPH CARD'S NETWORK as the chamber's does (user,
+ *  2026-11-20: the Gate AI card "should respond to the filter" in every register — it read every chain
+ *  whatever the rung stood on until then): the whole network's, else that network's own token blocks
+ *  or data blocks (`sources.ts`), the DAG folding into `all` and the unlisted set having none. */
 // Each register its own note (user, 2026-11-07: "it makes a lot of sense to focus on each separately"):
 // the block DAG's for Transaction blocks, the data blocks' for Data blocks (the live window, read
 // when written — option 2), the ledger's for Metagraph snapshots.
@@ -80,9 +82,12 @@ export function noteSubjectOf(mode: Mode, s: NoteSubjectState): NoteSubject | nu
   const { aiNotes, noteScope, registers } = VIEW_POLICIES[mode];
   if (!aiNotes) return null;
   const registerNote = s.register && registers.includes(s.register) ? REGISTER_NOTES[s.register] : null;
-  if (registerNote) return { view: registerNote, subject: "all" };
-  const view = mode as NoteView; // aiNotes is true exactly on the four note views
   const net = s.metagraphNetwork ?? "all";
+  if (registerNote) {
+    if (net === "all" || net === "dag") return { view: registerNote, subject: "all" };
+    return s.unlisted(net) ? null : { view: registerNote, subject: net };
+  }
+  const view = mode as NoteView; // aiNotes is true exactly on the four note views
   if (noteScope === "history") {
     if (net === "all" || net === "dag") return { view, subject: "dag" };
     return { view, subject: net }; // the unlisted set included: History alone has its record (above)

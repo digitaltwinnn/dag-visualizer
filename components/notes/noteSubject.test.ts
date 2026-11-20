@@ -55,14 +55,21 @@ describe("the note a register carries", () => {
   it("differs by register in the Snapshots view", () => {
     expect(noteSubjectOf("ledger", s({ register: "blocks" }))).toEqual({ view: "blocks", subject: "all" });
     expect(noteSubjectOf("ledger", s({ register: "snapshots" }))).toEqual({ view: "ledger", subject: "all" });
-    // The Data blocks register's own note (2026-11-07): the data blocks', the whole network's.
+    // The Data blocks register's own note (2026-11-07): the data blocks'.
     expect(noteSubjectOf("ledger", s({ register: "data" }))).toEqual({ view: "data", subject: "all" });
-    expect(noteSubjectOf("ledger", s({ register: "data", metagraphNetwork: "DAG123" }))).toEqual({ view: "data", subject: "all" });
     expect(noteSubjectOf("ledger", s({}))).toEqual({ view: "ledger", subject: "all" });
   });
-  it("is the block DAG's whole network whatever the rung stands on", () => {
-    expect(noteSubjectOf("ledger", s({ register: "blocks", metagraphNetwork: "DAG123" }))).toEqual({ view: "blocks", subject: "all" });
-    expect(noteSubjectOf("ledger", s({ register: "snapshots", metagraphNetwork: "DAG123" }))).toEqual({ view: "ledger", subject: "DAG123" });
+  // EVERY REGISTER'S NOTE FOLLOWS THE METAGRAPH CARD'S NETWORK (user, 2026-11-20: the Gate AI card
+  // "should respond to the filter"), the chamber's rule: the DAG folds into the whole network's, and
+  // the unlisted set has none.
+  it("stands on the Metagraph card's network in every register", () => {
+    for (const [register, view] of [["snapshots", "ledger"], ["blocks", "blocks"], ["data", "data"]] as const) {
+      expect(noteSubjectOf("ledger", s({ register, metagraphNetwork: "DAG123" }))).toEqual({ view, subject: "DAG123" });
+      expect(noteSubjectOf("ledger", s({ register, metagraphNetwork: "dag" }))).toEqual({ view, subject: "all" });
+      expect(noteSubjectOf("ledger", s({ register, metagraphNetwork: "all" }))).toEqual({ view, subject: "all" });
+    }
+    expect(noteSubjectOf("ledger", s({ register: "blocks", metagraphNetwork: "unlisted", unlisted: (id: string) => id === "unlisted" }))).toBeNull();
+    expect(noteSubjectOf("ledger", s({ register: "data", metagraphNetwork: "unlisted", unlisted: (id: string) => id === "unlisted" }))).toBeNull();
   });
   it("is read only where the view offers the register: elsewhere a held register changes nothing", () => {
     for (const m of ["hyper", "geo"] as const) expect(noteSubjectOf(m, s({ register: "blocks" }))).toEqual({ view: m, subject: "all" });
