@@ -299,8 +299,9 @@ source is the Metagraph snapshots register's own (`ledgerSource(live, "data")` a
 `DATA_*` measure lists — Data updates · Fees · Metagraphs · Size, Data updates in Anchors' place — the
 store's own `dataMeasure` pick; each register's lists, pick and fade are ONE keyed row,
 `ledgerMeasure.REGISTER_MEASURES`, which the explorer reads instead of choosing per register) and the band's
-three readings (`dataStats.ts`: DATA UPDATES over the ticks read with "N of M snapshots read" as its
-floor, BY NETWORK, LAST DATA BLOCK) are pure arithmetic over them; a tick whose read has not landed is
+two cards (`dataStats.ts`, 2026-11-20: METAGRAPHS WRITING DATA — each metagraph's data blocks with
+the age of its last one beside the count, `dataBlocksByNetwork` / `lastDataByNetwork`; DATA UPDATES
+over the ticks read, a floor said "at least") are pure arithmetic over them; a tick whose read has not landed is
 a gap, never a zero (rule 10). **Every sum of the counts asks ONE rule, `ledgerMeasure.dataUpdatesOf`**
 (the exact route's per-network figure, the tick row, the band's three): a row the decoder could not
 read makes its sum UNKNOWN, so a tick holding one reads as unread on every surface — never as 0. The explorer index lists no data blocks (DED's records carry
