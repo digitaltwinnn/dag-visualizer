@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { ChannelSnapRow, SnapshotExact } from "@/src/data/types";
-import { dataBlocksInWindow, dataByNetwork, dataInWindow, dataPerTick, lastDataTick } from "./dataStats";
+import { dataBlocksByNetwork, dataBlocksInWindow, dataByNetwork, dataInWindow, dataPerTick, lastDataTick } from "./dataStats";
 
 // THE DATA BLOCKS REGISTER'S BAND (D6, 2026-11-07): DATA UPDATES · BY NETWORK · LAST DATA BLOCK, read
 // off the exact reads of the ticks the ledger source holds. A tick whose read has not landed is
@@ -47,6 +47,16 @@ describe("dataBlocksInWindow — the switch's count", () => {
     expect(dataBlocksInWindow(ticks, reads, all)).toEqual({ count: 2, read: 2, total: 4 });
     expect(dataBlocksInWindow(ticks, reads, (id) => id === "DED")).toEqual({ count: 2, read: 3, total: 4 });
     expect(dataBlocksInWindow(ticks, {}, all)).toEqual({ count: 0, read: 0, total: 4 });
+  });
+});
+
+describe("dataBlocksByNetwork — the card's rows (2026-11-20)", () => {
+  it("per network over the ticks dataBlocksInWindow reads, busiest first, summing to its count", () => {
+    const key = (id: string) => id.toLowerCase();
+    expect(dataBlocksByNetwork(ticks, reads, all, key)).toEqual([{ key: "ded", count: 1 }, { key: "dor", count: 1 }]);
+    expect(dataBlocksByNetwork(ticks, reads, (id) => id === "DED", key)).toEqual([{ key: "ded", count: 2 }]);
+    const sum = dataBlocksByNetwork(ticks, reads, all, key).reduce((n, r) => n + r.count, 0);
+    expect(sum).toBe(dataBlocksInWindow(ticks, reads, all).count);
   });
 });
 

@@ -91,6 +91,27 @@ export function dataByNetwork(
   return [...by.entries()].sort((a, b) => rank(a[0]) - rank(b[0])).map(([key, count]) => ({ key, count }));
 }
 
+/** THE DATA BLOCKS PER NETWORK (2026-11-20, the "Metagraphs writing data" card counts data blocks,
+ *  the register switch's own count, where it repeated DATA UPDATES' total): the ticks
+ *  `dataBlocksInWindow` reads — a tick holding an unreadable in-scope row adds to no network — busiest
+ *  first, a network with none left out. Their sum is `dataBlocksInWindow`'s count. */
+export function dataBlocksByNetwork(
+  ticks: readonly Tick[],
+  reads: Reads,
+  inScope: (metaId: string) => boolean,
+  keyOf: (metaId: string) => string,
+): { key: string; count: number }[] {
+  const by = new Map<string, number>();
+  for (const t of ticks) {
+    const ex = reads[t.ordinal];
+    if (!ex) continue;
+    const rows = ex.rows.filter((r) => inScope(r.metaId));
+    if (rows.some((r) => r.dataBlocks == null)) continue;
+    for (const r of rows) if (r.dataBlocks! > 0) by.set(keyOf(r.metaId), (by.get(keyOf(r.metaId)) ?? 0) + r.dataBlocks!);
+  }
+  return [...by.entries()].sort((a, b) => b[1] - a[1]).map(([key, count]) => ({ key, count }));
+}
+
 /** LAST DATA BLOCK — the newest read tick holding an in-scope snapshot that carried data blocks, and
  *  whose snapshot it was; null when the window read holds none. */
 export function lastDataTick(ticks: readonly Tick[], reads: Reads, inScope: (metaId: string) => boolean): { ordinal: number; ts: string; metaId: string } | null {
