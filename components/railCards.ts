@@ -706,8 +706,12 @@ export function detailsCards(s: RailManifestState): RailCard[] {
   // running off the rail). The SELECTION IS UNTOUCHED, the placeholder views' own rule above: this
   // only stops the view speaking for it, so going back restores the card in place.
   const lane = ladderSlotIds(s.mode);
-  return [notes, snap, context, range, instant, country, cohort, composition, metaSnap, block, dataBlock, node].map((c) =>
+  const cards = [notes, snap, context, range, instant, country, cohort, composition, metaSnap, block, dataBlock, node].map((c) =>
     c.present && !lane.includes(c.id) ? { ...c, present: false } : c,
   );
+  // …and a lane's FOOT is the manifest's last card too (review, 2026-11-20: the tray and the flat
+  // stack listed Snapshots' Metagraph card second while the lane drew it last).
+  const foot = laneFootOf(s.mode);
+  return foot ? [...cards.filter((c) => c.id !== foot), ...cards.filter((c) => c.id === foot)] : cards;
 }
 

@@ -137,8 +137,11 @@ export function lastDataByNetwork(
  *  holds 50 global snapshots and only the newest few were read on arrival, so every count was a floor
  *  for ~20 minutes and older tiles showed no data mark). The ordinals whose exact read is not held,
  *  newest first: what the bridge reads, a pool at a time, while the register is on screen. */
-export function unreadOrdinals(ticks: readonly { ordinal: number }[], reads: Readonly<Record<number, unknown>>): number[] {
-  return ticks.map((t) => t.ordinal).filter((o) => reads[o] == null).sort((a, b) => b - a);
+export function unreadOrdinals(ticks: readonly { ordinal: number }[], reads: Readonly<Record<number, unknown>>, missed: Readonly<Record<number, unknown>> = {}): number[] {
+  // A MISSED read is not asked again here (review, 2026-11-20): its bounded retry owns it, and
+  // re-asking every miss on every new tick turned a window the host no longer serves into up to 50
+  // failing requests every ~28 s.
+  return ticks.map((t) => t.ordinal).filter((o) => reads[o] == null && missed[o] == null).sort((a, b) => b - a);
 }
 
 /** THE WINDOW AS FAR AS ITS READS HAVE SETTLED (user, 2026-11-20: "i still see an 'at least' in the

@@ -65,7 +65,9 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
     // metagraph snapshot → node (user, 2026-09-15). This order also drives the phone flat stack
     // and the tray icons, so the two can never disagree.
     const ids = detailsCards(details({ filter: "dor", inspect: nodePick, snap: snapPick })).map((c) => c.id);
-    expect(ids).toEqual(["notes", "snap", "context", "range", "instant", "country", "cohort", "composition", "metaSnap", "block", "dataBlock", "node"]);
+    // …with Snapshots' Metagraph card at the FOOT, as its lane draws it (2026-11-20).
+    expect(ids).toEqual(["notes", "snap", "range", "instant", "country", "cohort", "composition", "metaSnap", "block", "dataBlock", "node", "context"]);
+    expect(detailsCards(details({ mode: "geo", filter: "dor" })).map((c) => c.id)[1]).toBe("snap"); // no foot elsewhere: the fixed order
   });
   // THE AI NOTES CARD (2026-10-27): its own card, first, in every view whose policy opts in
   // (`aiNotes`) — present unless the note is absent (no subject, or the server answered `none`).
@@ -108,7 +110,7 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
     expect(new Set(keys).size).toBe(1);
   });
   it("ledger ghosts: snapshot + context + metaSnap — no node (the card left the Snapshots view, 2026-11-08)", () => {
-    expect(ghostIds(detailsCards(details({})))).toEqual(["snap", "context", "metaSnap"]);
+    expect(ghostIds(detailsCards(details({})))).toEqual(["snap", "metaSnap", "context"]);
   });
   it("hyper ghosts: context + composition + node (the snapshot slot is ledger-scoped, spec 2026-08-01)", () => {
     expect(ghostIds(detailsCards(details({ mode: "hyper" })))).toEqual(["context", "composition", "node"]);
@@ -181,10 +183,10 @@ describe("the metagraph snapshot slot", () => {
     metaSnap: null, selNodesCount: 0, filterLabel: "All networks",
     country: null, cohort: null, composition: null,
   };
-  it("sits between the network and the node slots", () => {
+  it("sits under the tick and above the Metagraph card at the lane's foot (2026-11-20)", () => {
     const ids = detailsCards(base).map((c) => c.id);
-    expect(ids.indexOf("metaSnap")).toBeGreaterThan(ids.indexOf("context"));
-    expect(ids.indexOf("metaSnap")).toBeLessThan(ids.indexOf("node"));
+    expect(ids.indexOf("metaSnap")).toBeGreaterThan(ids.indexOf("snap"));
+    expect(ids.indexOf("metaSnap")).toBeLessThan(ids.indexOf("context"));
   });
   it("is ledger-scoped, and its hint names the STOREY that separates it from the byte bar", () => {
     const inLedger = detailsCards(base).find((c) => c.id === "metaSnap")!;
@@ -271,7 +273,7 @@ describe("the block slot", () => {
     expect(focusSlotId(s)).toBe("context");
   });
   it("Blocks' ghosts: the tick's, the network's, the tile's and the block's — no node's", () => {
-    expect(ghostIds(detailsCards(blocks()))).toEqual(["snap", "context", "metaSnap", "block"]); // no node (no signer rung there); the data block ghosts in its own register alone
+    expect(ghostIds(detailsCards(blocks()))).toEqual(["snap", "metaSnap", "block", "context"]); // no node (no signer rung there); the data block ghosts in its own register alone
   });
 });
 

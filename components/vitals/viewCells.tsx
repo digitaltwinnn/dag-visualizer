@@ -1077,7 +1077,8 @@ export function BlocksCells({ accent }: { accent: string }) {
         aside={win ? span : undefined}
         lead={win ? <StackedLead figure={netTotal > 0 ? <Odometer int value={netTotal} /> : null} unit={netTotal === 1 ? "block" : "blocks"} empty={netTotal === 0} /> : undefined}
       >
-        {win ? <MicroBars accent={accent} labelW={64} rows={netRows} /> : stateLine(absent)}
+        {/* A window read and holding no block says so — never MicroBars' "acquiring…" (review). */}
+        {win ? (netRows.length ? <MicroBars accent={accent} labelW={64} rows={netRows} /> : stateLine("No block in the window")) : stateLine(absent)}
       </BandCard>
     </>
   );

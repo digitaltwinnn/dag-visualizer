@@ -13,7 +13,7 @@ import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { POLL } from "@/src/engine/config";
 import { blockSpanWord, countWord, metaSnapsInWindow, snapshotSpanWord } from "@/src/data/ledgerSpan";
 import { windowBlocks } from "@/src/data/blockWindow";
-import { dataBlocksInWindow } from "@/src/data/dataStats";
+import { dataBlocksInWindow, settledTicks } from "@/src/data/dataStats";
 import { getBlockWindow, getPastWindow, onBlockWindow, onPastWindow } from "@/src/data/pastWindow";
 import type { LedgerRegister } from "@/src/store/mode";
 import { switchLedgerRegister } from "@/src/store/applyClickActions";
@@ -108,6 +108,7 @@ export default function RegisterSwitch() {
   const pastStatus = useStore((s) => s.pastWindow?.status ?? null);
   const blockStatus = useStore((s) => s.blockWindowStatus);
   const snapshotExact = useStore((s) => s.snapshotExact);
+  const exactMiss = useStore((s) => s.exactMiss);
   const { snaps } = useSnapshotFeed(POLL.maxSnapshots, on);
   const past = useSyncExternalStore(onPastWindow, getPastWindow, () => null);
   const blocks = useSyncExternalStore(onBlockWindow, getBlockWindow, () => null);
@@ -138,7 +139,8 @@ export default function RegisterSwitch() {
   const reading = pastStatus === "loading" || pastStatus === "failed";
   const inScope = (metaId: string): boolean => filter === "all" || netKeyOf(metaId) === filter;
   const metaSnaps = metaSnapsInWindow(sourceTicks, filter, (ts) => ledgerAnchor(ts)?.metaCounts, inScope);
-  const data = dataBlocksInWindow(sourceTicks, snapshotExact, inScope);
+  // The settled window, as the band and the explorer foot count it: a read in flight is arriving.
+  const data = dataBlocksInWindow(settledTicks(sourceTicks, snapshotExact, exactMiss), snapshotExact, inScope);
   const blockCount = blockStatus?.status === "ready" && blocks?.globalSnapshots.length ? windowBlocks(blocks).length : null;
   const count: Record<LedgerRegister, string | null> = {
     snapshots: reading ? null : countWord(metaSnaps.count, "snapshot", metaSnaps.floor),
@@ -179,7 +181,8 @@ export default function RegisterSwitch() {
         aria-label="Register"
         style={{ height: phone ? FACE_H_PHONE : FACE_H }}
         // On the phone the right column takes more of the width, so "Metagraph snapshots" stays one
-        // line; "Transaction blocks" wraps in its tall tile instead, where two lines have room.
+        // line; every name holds ONE line since 2026-11-20 (option A), the live dot alone beside the
+        // lit one, and the phone's tile padding is 6px so the lit "Transaction blocks" fits at 360px.
         className={cn("grid grid-cols-2 max-[700px]:grid-cols-[minmax(0,0.88fr)_minmax(0,1.12fr)] grid-rows-[1fr_1fr_auto] max-[700px]:grid-rows-[24px_24px_1fr] gap-[3px] p-1", FRAME)}
       >
         {registers.map((r) => {
@@ -195,7 +198,7 @@ export default function RegisterSwitch() {
                 // H1 (user, 2026-11-20: "a hairline … to show it's a 'layer'", no extra height): every tile
                 // stands on its own hairline ledge, the lit one's in the accent — a slab resting on the
                 // layer below, the base's own rule repeated up the stack.
-                "group flex items-center justify-center gap-1.5 rounded-t-md rounded-b-[2px] px-4 max-[700px]:px-2 cursor-pointer border-0 border-b border-border",
+                "group flex items-center justify-center gap-1.5 max-[700px]:gap-1 rounded-t-md rounded-b-[2px] px-4 max-[700px]:px-1.5 cursor-pointer border-0 border-b border-border",
                 "aria-pressed:border-[color-mix(in_oklch,var(--primary)_60%,transparent)]",
                 "text-body max-[700px]:text-label font-semibold leading-none whitespace-nowrap",
                 "bg-transparent text-muted-foreground hover:text-foreground hover:bg-wash-soft",
@@ -210,7 +213,7 @@ export default function RegisterSwitch() {
               {/* LIVE RIDES THE LIT TILE (2026-11-20): the register's follow state, where its readings
                   line said it — the live dot (its word on the desktop), the pin, or n/a. */}
               {register === r && (
-                <StateMark following={following} na={paused} bare={phone} className="ml-1 font-normal leading-none" />
+                <StateMark following={following} na={paused} bare={phone} className="ml-1 max-[700px]:ml-0 font-normal leading-none" />
               )}
               {register === r && <span className="sr-only">, {spoken(r)}</span>}
             </button>

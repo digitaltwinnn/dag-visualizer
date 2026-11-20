@@ -202,7 +202,8 @@ export default function RawSnapshotBridge() {
   useEffect(() => {
     if (!wanted || !dataOn) return;
     const src = ledgerSource(getNetwork(), "data");
-    const want = unreadOrdinals(src?.globalSnapshots ?? [], useStore.getState().snapshotExact);
+    const st = useStore.getState();
+    const want = unreadOrdinals(src?.globalSnapshots ?? [], st.snapshotExact, st.exactMiss);
     return want.length ? ensureMany(want) : undefined;
   }, [wanted, dataOn, liveOrd, past]);
   useEffect(() => { void ensure(selOrd); }, [selOrd]);
