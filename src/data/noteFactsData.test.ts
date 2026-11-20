@@ -33,6 +33,19 @@ describe("dataFacts", () => {
     expect(out.lead).toEqual({ kind: "now" });
     expect(out.names).toContain("Dor Technologies");
   });
+  // ONE NETWORK'S NOTE (2026-11-20: the Gate AI card follows the filter in Data blocks): its own
+  // blocks over the same window, no whole-network totals, and no note when it carried none.
+  it("one network's note states its own data blocks alone, and is null when it carried none", () => {
+    const ticks: DataTickRead[] = [
+      { ordinal: 1, rows: [row("dor", 2, 30), row("ded", 1, 4), row("ndt", 0, 0)] },
+      { ordinal: 2, rows: [row("formerDor", 1, 5)] },
+    ];
+    expect(text(dataFacts({ ticks, names, keyOf, only: "dor" })!.facts)).toEqual([
+      "Dor Technologies data blocks: 3",
+      "Dor Technologies data updates: 35",
+    ]);
+    expect(dataFacts({ ticks, names, keyOf, only: "ndt" })).toBeNull();
+  });
   it("an undecodable row makes its network's and the whole's counts a floor; an uncataloged chain is the unlisted set", () => {
     const out = dataFacts({ ticks: [{ ordinal: 1, rows: [row("dor", 1, 2), row("dor", undefined, undefined, false), row("DAGxyz", 2, 9)] }], names, keyOf })!;
     expect(text(out.facts)).toContain("Data blocks, at least: 3");

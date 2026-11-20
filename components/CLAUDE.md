@@ -892,9 +892,11 @@ the slot. **The top card is the VIEW's note on the metagraph card's network** (`
 everything, the filtered network, or the network a committed node or tick belongs to) and does not follow a drill — a country, a provider or a
 brushed range is a subject with a card of its own, below (user, 2026-10-29); History's top card is
 the window pill's note always. **A register reads its own note** (2026-11-06): in the Snapshots view's
-Blocks register the top card is the block DAG's note (view `blocks`, the whole network's whatever the
-rung stands on), the Metagraph snapshots and Data blocks registers keep the ledger's (Data blocks' records
-ARE metagraph snapshots, D6) — `REGISTER_NOTES` in `noteSubject.ts`,
+Blocks register the top card is the block DAG's note (view `blocks`), the Data blocks register's the data
+blocks' (view `data`), the Metagraph snapshots register's the ledger's — and **every register's note stands on
+the Metagraph card's network** (user, 2026-11-20: "should respond to the filter"; the block and data notes
+read every chain whatever the rung stood on until then): the whole network's, else that network's own token
+blocks or data blocks, warmed hourly per network, a network with none having no note — `REGISTER_NOTES` in `noteSubject.ts`,
 read only where the view's policy offers the register, and the Briefing's stops ask through the same
 derivation. Every view that has a note (`viewPolicy.aiNotes`) leads its
 display lane with the `notes` slot (`DISPLAY_LANE` in `railCards.ts`), and the manifest leads with it

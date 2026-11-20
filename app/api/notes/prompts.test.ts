@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { NoteView, NotableDay } from "@/src/data/noteTypes";
-import { CAPTION_FORMAT, LINE_FORMAT, PROMPTS, VOICE, buildMessages, parseAnswer, spanBeforeWords, spanFigures, spanWords } from "./prompts";
+import { BLOCKS_WHOLE, CAPTION_FORMAT, DATA_WHOLE, LINE_FORMAT, PROMPTS, VOICE, buildMessages, parseAnswer, spanBeforeWords, spanFigures, spanWords } from "./prompts";
 
 const VIEWS: NoteView[] = ["hyper", "geo", "ledger", "trend", "blocks"];
 
@@ -55,7 +55,18 @@ describe("PROMPTS", () => {
       const sys = p.system("Mainnet");
       expect(sys).toContain(VOICE);
       expect(sys).toContain("Mainnet");
-      expect(sys).toContain(p.question);
+      // A register note asks a network label its one-network question (2026-11-20).
+      expect(sys).toContain(p.questionOne ?? p.question);
+    }
+  });
+
+  it("the register notes ask the whole network's question only of the whole network's label", () => {
+    expect(PROMPTS.blocks.system(BLOCKS_WHOLE)).toContain(PROMPTS.blocks.question);
+    expect(PROMPTS.data.system(DATA_WHOLE)).toContain(PROMPTS.data.question);
+    for (const v of ["blocks", "data"] as const) {
+      const one = PROMPTS[v].system("Dor Technologies");
+      expect(one).toContain(PROMPTS[v].questionOne!);
+      expect(one).not.toContain(PROMPTS[v].question);
     }
   });
 
