@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { exploreCards, detailsCards, isSubjectSlot, metagraphCardNetwork, noteCardAbsent, parentHolds, focusSlotId, ladderLevelOfSlot, ladderSlotIds, type RailManifestState } from "@/components/railCards";
+import { cardOnDagBlock, exploreCards, detailsCards, isSubjectSlot, metagraphCardNetwork, noteCardAbsent, parentHolds, focusSlotId, ladderLevelOfSlot, ladderSlotIds, type RailManifestState } from "@/components/railCards";
 import { LADDERS } from "@/src/engine/domain/focusLadder";
 import type { PickDescriptor } from "@/src/data/types";
 
@@ -748,5 +748,24 @@ describe("the metagraph snapshot slot under a committed block", () => {
   });
   it("the other registers keep their ghost whatever is held", () => {
     expect(slot(details({ mode: "ledger", ledgerRegister: "snapshots", snap: snapPick, block })).hint).not.toBeNull();
+  });
+});
+
+// THE METAGRAPH CARD ON A DAG BLOCK (user, 2026-11-20): under All, Transaction blocks' DAG block names
+// the DAG — derived, never committed, and never over a network the reader committed in the tick.
+describe("metagraphCardNetwork — a DAG block names the DAG", () => {
+  const snap = { data: { ordinal: 42 } };
+  const dagBlock = { chain: "dag", hash: "h", ordinal: 0, anchorOrd: 42 };
+  it("stands on the DAG under All with a DAG block in its own tick", () => {
+    expect(cardOnDagBlock({ snap, block: dagBlock })).toBe(true);
+    expect(metagraphCardNetwork({ mode: "ledger", filter: "all", snap, block: dagBlock })).toBe("dag");
+  });
+  it("not for a token block, another tick's block, or under a network committed in the tick", () => {
+    expect(metagraphCardNetwork({ mode: "ledger", filter: "all", snap, block: { ...dagBlock, chain: "dor" } })).toBe("all");
+    expect(metagraphCardNetwork({ mode: "ledger", filter: "all", snap, block: { ...dagBlock, anchorOrd: 41 } })).toBe("all");
+    expect(metagraphCardNetwork({ mode: "ledger", filter: "all", snap, block: dagBlock, tickNet: { metaId: "dor", globalOrdinal: 42 } })).toBe("dor");
+  });
+  it("a filter keeps its own card", () => {
+    expect(metagraphCardNetwork({ mode: "ledger", filter: "dor", snap, block: dagBlock })).toBe("dor");
   });
 });

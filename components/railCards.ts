@@ -489,12 +489,15 @@ export function metagraphCardNetwork(s: {
   trendFocus?: string | null;
   trendFront?: string | null;
   inspect?: PickDescriptor | null;
+  block?: BlockSel | null;
 }): string {
   // A network the rail is browsing is the card's in the views that browse (`viewNetwork.ts`).
   if (s.railNet) return s.railNet;
   const from = VIEW_POLICIES[s.mode].metagraphCard;
-  if (from === "tickNet")
-    return ledgerCardNetwork({ filter: s.filter, tickNet: s.tickNet ?? null, snapOrdinal: s.snap?.data.ordinal ?? null, tickHasFilter: s.tickHasFilter });
+  if (from === "tickNet") {
+    const net = ledgerCardNetwork({ filter: s.filter, tickNet: s.tickNet ?? null, snapOrdinal: s.snap?.data.ordinal ?? null, tickHasFilter: s.tickHasFilter });
+    return net === "all" && cardOnDagBlock(s) ? "dag" : net;
+  }
   if (from === "plane") return cardNetwork(s.filter, s.trendFocus ?? null, s.trendFront ?? null);
   // IN GEOGRAPHY it is the committed NODE's network while the filter is All (2026-10-18, user:
   // "click a node: it should also populate the dossier card"). A geo node never writes the filter
@@ -504,6 +507,16 @@ export function metagraphCardNetwork(s: {
   // them (`siblingSet("context")`).
   if (from === "node" && s.filter === "all" && s.inspect) return pickNetId(s.inspect) ?? s.filter;
   return s.filter;
+}
+
+/** THE METAGRAPH CARD STANDS ON A DAG BLOCK'S NETWORK, THE DAG (user, 2026-11-20: "transaction blocks,
+ *  for all we have the $DAG tx snapshots so we can also populate the metagraph card already"): under
+ *  All, with no network committed inside the tick, a committed DAG block in its own tick names its
+ *  network — the DAG — the way a token block's commit names its own through its snapshot. DERIVED,
+ *  never committed: the live follow seats the block alone, and the filter is never written. The card
+ *  has no × there (nothing of its own to clear; the block's × releases the block). */
+export function cardOnDagBlock(s: { tickNet?: TickNetSel | null; snap?: { data: { ordinal: number } } | null; block?: BlockSel | null }): boolean {
+  return !s.tickNet && s.block?.chain === "dag" && s.snap?.data.ordinal === s.block.anchorOrd;
 }
 
 /** A CHILD CARD STATES ITS PARENT OR IT DOES NOT RENDER (user, 2026-10-08: "I had a metagraph
