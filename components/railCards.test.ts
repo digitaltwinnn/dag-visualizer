@@ -390,7 +390,9 @@ describe("ladderSlotIds — the descent-spine lane (display order = reversed run
     // The Blocks register's BLOCK slot sits under the metagraph snapshot: a block stands on its
     // accepting snapshot, the tile's or the tick's own (2026-11-05). A slot, no rung. NO NODE SLOT
     // (user, 2026-11-08): a node is a snapshot's signer here, the explorer's and the card's reading.
-    expect(ladderSlotIds("ledger")).toEqual(["notes", "snap", "context", "metaSnap", "block", "dataBlock"]);
+    // THE METAGRAPH CARD STANDS AT THE FOOT (user, 2026-11-20): the network is a reading about the
+    // snapshots and blocks above it, not a rung between them.
+    expect(ladderSlotIds("ledger")).toEqual(["notes", "snap", "metaSnap", "block", "dataBlock", "context"]);
   });
   it("flat views have no ladder", () => {
     expect(ladderSlotIds("soon")).toEqual([]);
@@ -569,10 +571,10 @@ describe("the ledger lane leads with the tick", () => {
     }
   });
 
-  it("the dossier sits UNDER the tick, where the tick's own anchor list points", () => {
-    const lane = ladderSlotIds("ledger");
-    expect(lane.indexOf("context")).toBeGreaterThan(lane.indexOf("snap"));
-    expect(lane.indexOf("metaSnap")).toBeGreaterThan(lane.indexOf("context"));
+  it("the snapshot chain runs unbroken from the tick, and the Metagraph card stands at the foot (2026-11-20)", () => {
+    const lane = ladderSlotIds("ledger").filter(isSubjectSlot);
+    expect(lane.slice(0, 2)).toEqual(["snap", "metaSnap"]);
+    expect(lane[lane.length - 1]).toBe("context");
   });
 
   it("hyper and geo are untouched — their coarsest subject still needs a commit", () => {
