@@ -96,6 +96,8 @@ describe("unreadOrdinals — what the Data blocks register reads on arrival (202
   it("the window's ticks with no exact read, newest first", () => {
     expect(unreadOrdinals(ticks, reads)).toEqual([3]);
     expect(unreadOrdinals(ticks, {})).toEqual([4, 3, 2, 1]);
+    // A missed read is its retry's to re-ask, never this list's (review, 2026-11-20).
+    expect(unreadOrdinals(ticks, {}, { 3: 1 })).toEqual([4, 2, 1]);
   });
 });
 

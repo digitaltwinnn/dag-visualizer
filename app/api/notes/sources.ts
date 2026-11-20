@@ -164,7 +164,13 @@ export function storeReads(nowMs: number, store: HashReader = readStore()): Note
     geoDays: (fromMs, toMs) => readGeoDays(fromMs, toMs, once),
     chainReads: async () => chainReadsOf(await once.hgetall(cursorKeyOf())),
     chain: explorerReader,
-    dataWindow: () => (dataWin ??= readDataWindow()),
+    // …but only a window that READ (review, 2026-11-20): a failed or empty read is dropped, so one
+    // upstream blip does not cost every network's Data blocks note in the pass.
+    dataWindow: () =>
+      (dataWin ??= readDataWindow().then(
+        (w) => { if (!w.ticks.length) dataWin = null; return w; },
+        (e) => { dataWin = null; throw e; },
+      )),
   };
 }
 

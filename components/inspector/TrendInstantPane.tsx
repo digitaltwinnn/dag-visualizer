@@ -139,7 +139,8 @@ export default function TrendInstantPane({
   // TRANSFERS SAY WHAT THEY MOVED (2026-11-04): the moment's volume in the subject's own token —
   // the DAG's in DAG when no network is the subject (its row is the hypergraph's own transfers).
   const volumeAt = metric === "transfers" && cursorMs != null ? valueAt(rows.get(subject ?? "dag")?.volumePoints ?? [], buckets, stepMs, cursorMs) : null;
-  const worth = volumeAt != null && volumeAt > 0 ? `${formatDag(volumeAt)} ${displayNetwork(subject ?? "dag")?.ticker ?? ""}`.trim() : undefined;
+  // "$DAG" for the DAG's own token (2026-11-20, `unitOf`), a token's ticker otherwise.
+  const worth = volumeAt != null && volumeAt > 0 ? `${formatDag(volumeAt)} ${(subject ?? "dag") === "dag" ? "$DAG" : (displayNetwork(subject!)?.ticker ?? "")}`.trim() : undefined;
   const phrase = momentPhrase(metric, stepMs, !subject, worth);
   // The SECOND CADENCE beside the spacing (2026-10-08): how many global snapshots carried this
   // chain in the moment. Only a network has it (the global row IS the ticks), and only where the
