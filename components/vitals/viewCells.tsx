@@ -957,8 +957,12 @@ export function BlocksCells({ accent }: { accent: string }) {
 
   // BY NETWORK — the share of the window's blocks per network, the catalog's order, one row under a
   // filter; past three networks the rest fold into "other" so the rows still partition the count.
-  const nets = win ? blocksByNetwork(ticks, scope.chain, CATALOG_ORDER) : [];
+  // IN THE METAGRAPHS ANCHORING CARD'S SHAPE (user, 2026-11-20: "adjust the 'by network' vitals
+  // according to the metagraph snapshot's 'metagraphs anchoring' (wording and visuals)"): the total on
+  // the left, each network's count busiest first (catalog order breaks a tie), folded past four.
+  const nets = win ? [...blocksByNetwork(ticks, scope.chain, CATALOG_ORDER)].filter((r) => r.count > 0).sort((a, b) => b.count - a.count) : [];
   const netRows = foldOther(nets.map((r) => ({ key: r.chain, ...networkMark(r.chain), count: r.count })), BY_NETWORK_ROWS);
+  const netTotal = nets.reduce((n, r) => n + r.count, 0);
 
   // LAST BLOCK — the age of the window's newest block of its network (`ageWords`, the app's one
   // long-form age), and whose it is: the name beside the dot, never colour alone.
@@ -968,8 +972,25 @@ export function BlocksCells({ accent }: { accent: string }) {
   // (user, 2026-11-19) — four cells repeating one sentence read as four readings.
   if (!runs("blocks")) return <BandCard label={REGISTER_NAMES.blocks}>{stateLine(absent)}</BandCard>;
 
+  // LAST BLOCK LEADS (user, 2026-11-20: "move it to the top of the list"): the one claim about NOW
+  // opens the band — leftmost on the desktop band, first in the phone sheet (one `ViewCells` list).
   return (
     <>
+      <BandCard
+        label="Last block"
+        lead={pinned ? undefined : <StackedLead figure={last ? ageWords(Math.max(0, now - Date.parse(last.ts))) : null} unit="ago" empty={last == null} />}
+      >
+        {pinned ? (
+          stateLine(BLOCK_PINNED)
+        ) : last ? (
+          <span className="flex items-center self-stretch gap-1.5 text-body whitespace-nowrap">
+            <IdentityDot hue={networkMark(last.chain).hue} />
+            <span className="text-muted-foreground">{networkMark(last.chain).label}</span>
+          </span>
+        ) : (
+          stateLine(win ? "No block in the window" : absent)
+        )}
+      </BandCard>
       <BandCard
         label="Blocks"
         aside={win ? span : undefined}
@@ -1004,23 +1025,11 @@ export function BlocksCells({ accent }: { accent: string }) {
           stateLine(absent)
         )}
       </BandCard>
-      <BandCard label="By network">
-        {win ? <MicroBars accent={accent} labelW={64} rows={netRows} /> : stateLine(absent)}
-      </BandCard>
       <BandCard
-        label="Last block"
-        lead={pinned ? undefined : <StackedLead figure={last ? ageWords(Math.max(0, now - Date.parse(last.ts))) : null} unit="ago" empty={last == null} />}
+        label="Networks transacting"
+        lead={win ? <StackedLead figure={netTotal > 0 ? <Odometer int value={netTotal} /> : null} unit={netTotal === 1 ? "block" : "blocks"} empty={netTotal === 0} /> : undefined}
       >
-        {pinned ? (
-          stateLine(BLOCK_PINNED)
-        ) : last ? (
-          <span className="flex items-center self-stretch gap-1.5 text-body whitespace-nowrap">
-            <IdentityDot hue={networkMark(last.chain).hue} />
-            <span className="text-muted-foreground">{networkMark(last.chain).label}</span>
-          </span>
-        ) : (
-          stateLine(win ? "No block in the window" : absent)
-        )}
+        {win ? <MicroBars accent={accent} labelW={64} rows={netRows} /> : stateLine(absent)}
       </BandCard>
     </>
   );
@@ -1053,8 +1062,10 @@ export function DataCells({ accent, filter }: { accent: string; filter: string }
   const held = dataInWindow(snaps, reads, inScope);
   // The floor says itself under the unit, MOVED's grammar: the count covers the snapshots read so far.
   const heldNote = held.read < held.total ? `${held.read.toLocaleString()} of ${held.total.toLocaleString()} snapshots read` : undefined;
-  const nets = dataByNetwork(snaps, reads, inScope, netKeyOf, CATALOG_ORDER);
+  // The Metagraphs anchoring card's shape (2026-11-20): the total on the left, busiest first.
+  const nets = [...dataByNetwork(snaps, reads, inScope, netKeyOf, CATALOG_ORDER)].sort((a, b) => b.count - a.count);
   const netRows = foldOther(nets.map((r) => ({ key: r.key, ...networkMark(r.key), count: r.count })), BY_NETWORK_ROWS);
+  const netTotal = nets.reduce((n, r) => n + r.count, 0);
   // A past window makes no claim about now: LAST DATA BLOCK, the one claim about now, says so.
   const pinned = past != null || pastStatus != null;
   const last = !pinned ? lastDataTick(snaps, reads, inScope) : null;
@@ -1064,6 +1075,21 @@ export function DataCells({ accent, filter }: { accent: string; filter: string }
 
   return (
     <>
+      <BandCard
+        label="Last data block"
+        lead={pinned ? undefined : <StackedLead figure={last ? ageWords(Math.max(0, now - Date.parse(last.ts))) : null} unit="ago" empty={last == null} />}
+      >
+        {pinned ? (
+          stateLine(BLOCK_PINNED)
+        ) : last ? (
+          <span className="flex items-center self-stretch gap-1.5 text-body whitespace-nowrap">
+            <IdentityDot hue={networkMark(netKeyOf(last.metaId)).hue} />
+            <span className="text-muted-foreground">{networkMark(netKeyOf(last.metaId)).label}</span>
+          </span>
+        ) : (
+          stateLine(held.read ? "No data block in the window" : "Reading the window…")
+        )}
+      </BandCard>
       <BandCard
         label="Data updates"
         aside={!empty ? span : undefined}
@@ -1079,23 +1105,11 @@ export function DataCells({ accent, filter }: { accent: string; filter: string }
           stateLine("Waiting for snapshots…")
         )}
       </BandCard>
-      <BandCard label="By network">
-        {netRows.length ? <MicroBars accent={accent} labelW={64} rows={netRows} /> : stateLine(held.read ? "No data updates in the window" : "Reading the window…")}
-      </BandCard>
       <BandCard
-        label="Last data block"
-        lead={pinned ? undefined : <StackedLead figure={last ? ageWords(Math.max(0, now - Date.parse(last.ts))) : null} unit="ago" empty={last == null} />}
+        label="Metagraphs writing data"
+        lead={netRows.length ? <StackedLead figure={<Odometer int value={netTotal} />} unit={netTotal === 1 ? "update" : "updates"} /> : undefined}
       >
-        {pinned ? (
-          stateLine(BLOCK_PINNED)
-        ) : last ? (
-          <span className="flex items-center self-stretch gap-1.5 text-body whitespace-nowrap">
-            <IdentityDot hue={networkMark(netKeyOf(last.metaId)).hue} />
-            <span className="text-muted-foreground">{networkMark(netKeyOf(last.metaId)).label}</span>
-          </span>
-        ) : (
-          stateLine(held.read ? "No data block in the window" : "Reading the window…")
-        )}
+        {netRows.length ? <MicroBars accent={accent} labelW={64} rows={netRows} /> : stateLine(held.read ? "No data updates in the window" : "Reading the window…")}
       </BandCard>
     </>
   );
