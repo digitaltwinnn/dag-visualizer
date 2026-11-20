@@ -31,13 +31,13 @@ describe("blockMeasure", () => {
     expect(blockMeasureCounts("amount", "dor", null)).toBe(false);
     expect(blockMeasureCounts("fee", "dor", null)).toBe(false);
     expect(blockMeasureCounts("height", "dor", null)).toBe(true); // a count, no unit
-    expect(blockMeasureUnit("amount", null, ticker)).toBe("DAG only");
-    expect(blockMeasureUnit("fee", null, ticker)).toBe("DAG only");
+    expect(blockMeasureUnit("amount", null, ticker)).toBe("$DAG only");
+    expect(blockMeasureUnit("fee", null, ticker)).toBe("$DAG only");
     expect(blockMeasureUnit("height", null, ticker)).toBe("height");
   });
   it("under a filter the window's own chain counts, in its ticker", () => {
     expect(blockMeasureCounts("amount", "dag", "dag")).toBe(true);
-    expect(blockMeasureUnit("amount", "dag", ticker)).toBe("DAG");
+    expect(blockMeasureUnit("amount", "dag", ticker)).toBe("$DAG");
     expect(blockMeasureCounts("amount", "dor", "dor")).toBe(true);
     expect(blockMeasureCounts("amount", "dag", "dor")).toBe(false);
     expect(blockMeasureUnit("fee", "dor", ticker)).toBe("DOR");

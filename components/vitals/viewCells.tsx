@@ -39,7 +39,7 @@ import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
 import { blockScopeOf, blockTickTimes, blocksByNetwork, blocksInWindow, blocksPerHourBins, lastBlockAt, movedChainOf, movedInWindow, movedPerHourBins, usualGap, usualGapWords } from "@/src/data/blockStats";
 import { blockAbsence, blockSpanWord, snapshotSpanWord } from "@/src/data/ledgerSpan";
 import { compactDag } from "@/src/util/format";
-import { networkMark, tickerOf } from "@/components/explorer/nodeRow";
+import { networkMark, unitOf } from "@/components/explorer/nodeRow";
 import { useNowTick } from "@/components/useNowTick";
 import { useLedgerSource } from "@/components/useLedgerSource";
 import { dataBlocksByNetwork, dataBlocksInWindow, dataInWindow, dataPerTick, dataTickTimes, lastDataTick } from "@/src/data/dataStats";
@@ -995,7 +995,7 @@ export function BlocksCells({ accent }: { accent: string }) {
   // sum across tokens would add unlike units), the token's under its filter (`tickerOf`, the one home
   // the Block card's amounts read). Only landed reads are summed; a pending or missed read is stated.
   const movedChain = movedChainOf(scope.chain);
-  const unit = tickerOf(movedChain);
+  const unit = unitOf(movedChain);
   const moved = win ? movedInWindow(ticks, reads, movedChain) : null;
   const movedNote = moved && moved.read < moved.total ? `${moved.read.toLocaleString()} of ${moved.total.toLocaleString()} blocks read` : undefined;
 

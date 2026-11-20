@@ -64,6 +64,10 @@ export const NODE_GLYPH_W = 82; // 56 → 74 → 82 (user, 2026-10-24: "give it 
 
 /** A network's ticker — the DAG core's is "DAG". Shared with the raw node roster. */
 export const tickerOf = (id: string): string => metagraphById(id)?.ticker ?? (id === "dag" ? "DAG" : id);
+/** A chain's AMOUNT UNIT — "$DAG" for the DAG's own token (user, 2026-11-20: "when you refer to DAG in
+ *  fees etc, say $DAG"), a token's ticker otherwise. `tickerOf` names the NETWORK; this names the unit
+ *  an amount is in, so "DAG" alone never means both. */
+export const unitOf = (id: string): string => (id === "dag" ? "$DAG" : tickerOf(id));
 /** A NETWORK'S MARK — the word and the hue a surface names a network key by: its ticker in its
  *  identity hue, or the unlisted set's label in its mandated neutral (no single identity can speak
  *  for a mixed set — `identityHudCss` would hash-assign a saturated hue to the "unlisted" id). One

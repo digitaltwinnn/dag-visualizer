@@ -45,7 +45,7 @@ export function listTotal(values: readonly number[]): number | null {
  *  or a catalog network's own ticker — shows it at the tile's right edge; a count says nothing more.
  *  Read from the catalog rather than from the symbol's shape (review M2, 2026-11-10): an all-caps
  *  test dropped USDC.dag's unit, the one ticker with a lowercase part. */
-const TILE_UNITS: ReadonlySet<string> = new Set(["DAG", "KB", ...METAGRAPHS.map((m) => m.ticker)]);
+const TILE_UNITS: ReadonlySet<string> = new Set(["$DAG", "KB", ...METAGRAPHS.map((m) => m.ticker)]);
 
 /** Does a measure tile show `unit`? A symbol, or a symbol with "only" (a Transaction blocks list under
  *  All counts the DAG's own blocks alone — `blockMeasure.blockMeasureUnit`'s "DAG only"). */

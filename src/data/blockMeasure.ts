@@ -36,7 +36,7 @@ export function blockMeasureCounts(m: BlockMeasure, blockChain: string, windowCh
  *  ("DAG" for the DAG's), "height" for the height. */
 export function blockMeasureUnit(m: BlockMeasure, windowChain: string | null, ticker: (id: string) => string): string {
   if (!unitBound(m)) return "height";
-  return windowChain == null ? "DAG only" : ticker(windowChain);
+  return windowChain == null ? "$DAG only" : windowChain === "dag" ? "$DAG" : ticker(windowChain);
 }
 
 /** THE TILES' ROW PLAN (`tileRows.planFor`): the two unit-bearing measures on a half-width row, Height

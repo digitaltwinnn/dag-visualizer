@@ -608,7 +608,7 @@ export function ChannelStatePanel() {
               {/* The reader's own clock, drawn as date · time · zone tag; UTC on hover (2026-10-07). */}
               {Number.isFinite(Date.parse(sel.ts)) ? <Stamp ms={Date.parse(sel.ts)} seconds className="text-foreground-dim" /> : <span className="text-muted-foreground">—</span>}
             </Fact>
-            <Fact label="Fee paid"><span className="tabular-nums">{fmtDag(deep.fee)} DAG</span></Fact>
+            <Fact label="Fee paid"><span className="tabular-nums">{fmtDag(deep.fee)} $DAG</span></Fact>
             {/* "compressed" names the wire figure's basis against the lanes' decoded sizes. */}
             <Fact label="Size"><span className="tabular-nums text-foreground-dim">{fmtKB(deep.bytes / 1024)} compressed</span></Fact>
             {/* BLOCKS IS A FACT about what the snapshot carries (user, 2026-10-08: "blocks as fact,
