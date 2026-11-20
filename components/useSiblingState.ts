@@ -80,7 +80,9 @@ export function useSiblingState(slot: RailCardKind | null): SiblingState {
     // (read at derivation time, as the tick window's live reads are); the exact read is the store's.
     // Only the slots whose steps read it — the tick's ghost, the Metagraph card and its snapshot's
     // pager — and only that tick's records (final review, 2026-10-07: every slot rebuilt the whole log).
-    const wantsTick = slot === "snap" || slot === "context" || slot === "metaSnap";
+    // The block and the data block too (2026-11-20): the Metagraph card stands at the ledger lane's
+    // FOOT, so its ghost's step (`contextStep`) hangs off whichever of the tick's cards is deepest.
+    const wantsTick = slot === "snap" || slot === "context" || slot === "metaSnap" || slot === "block" || slot === "dataBlock";
     const tickGlobal = mode === "ledger" && wantsTick ? (snap?.data ?? null) : null;
     const net = tickGlobal ? source : null;
     // …kept to the REGISTER'S SUBJECTS (`REGISTER_SUBJECTS`, 2026-11-08): the data-carrying snapshots in

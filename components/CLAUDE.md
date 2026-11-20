@@ -439,6 +439,18 @@ dossier, country, provider, composition, then the snapshot chain (global snapsho
 snapshot it anchors), then node. `components/railCards.ts` is the manifest and
 `components/railCards.test.ts` pins the order, the availability and every hint.
 
+**In Snapshots the Metagraph card stands at the lane's FOOT** (user, 2026-11-20: "we're looking at
+blocks/snapshots as the main subjects, so metagraph is additional information and should not be at
+the top levels of the rung"): Global snapshot · Metagraph snapshot · Transaction block · Data block ·
+Metagraph, one lane for all three registers. It sat between the tick and its snapshot from 2026-09-15
+— and since the live follow seats the snapshot chain without its network, its ghost waited below the
+chosen cards and jumped up between them on a click. The tick's ∨ ghost opens its first snapshot
+(`CHILD_OF.ledger`), whose builder commits the network inside the tick with it (`tickNetOf`), so the
+card fills at the foot; the card's own ghost is a step like the block's (`railSiblings.contextStep`):
+the network of the snapshot or token block on screen, else the tick's first, and none under a DAG
+block (the global's own — opening a network would release it). Selection ancestry is unchanged:
+tick → network → snapshot.
+
 **A vertical swipe TURNS THE DECK, and so does Shift + ↑/↓ from inside a card** (2026-10-24; `src/engine/domain/CLAUDE.md` has the rule): the
 rotation (`trendRotation`) sits under the held order and the focus re-deal in `TrendStack`, and a
 swipe releases a standing focus and rewinds the window first, so the deck's front is the rotation's.

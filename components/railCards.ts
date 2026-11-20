@@ -117,7 +117,14 @@ const DISPLAY_LANE: Partial<Record<Mode, readonly string[]>> = {
   // chamber's subjects are the snapshots and what they carry; a node is a signer, read on the
   // explorer's signer level and the snapshot card's "Signed by". The selection is untouched (a
   // carried node returns with its view); the ladder has no node rung here either (`LADDERS.ledger`).
-  ledger: ["notes", "snap", "context", "metaSnap", "block", "dataBlock"],
+  // THE METAGRAPH CARD STANDS AT THE FOOT (user, 2026-11-20: "we're looking at blocks/snapshots as
+  // the main subjects, so metagraph is additional information and should not be at the top levels of
+  // the rung"). It sat between the tick and its snapshot (2026-09-15) — but a network is no record in
+  // time, and as the one card the live follow leaves a ghost, it waited below the chosen cards and
+  // then jumped up between them on a click. At the foot it is the network the snapshot or block above
+  // belongs to, read last, in every register; the tick's child is its snapshot (`CHILD_OF.ledger`) and
+  // the card's ghost has its own step (`railSiblings.contextStep`).
+  ledger: ["notes", "snap", "metaSnap", "block", "dataBlock", "context"],
   // HISTORY: the network dossier, then the INSTANT (2026-09-19). `instant` is a card slot with no
   // focus rung — the two snapshot slots' precedent, and `railLadderBoundary.test.ts` asserts
   // rung → slot rather than the reverse. It sits UNDER the dossier because the lane is a
@@ -194,7 +201,7 @@ export function focusSlotId(s: LadderState): string | null {
     // "filter on DOR, transaction blocks, live → the right card rung layout breaks" — the Metagraph
     // dossier opened as the box, 550px tall, and pushed the register's own subject, the live block,
     // out of the rail). The seated card stays the box while the filter's network card stands folded
-    // above it; a card chosen INSIDE the view (a pin, a snapshot, a network inside a tick — `tickNet`,
+    // at the lane's foot; a card chosen INSIDE the view (a pin, a snapshot, a network inside a tick — `tickNet`,
     // the reader's own) still ranks as it does everywhere.
     if (id === "context" && seat && !s.tickNet && present.includes(seat)) continue;
     if (present.includes(id)) return id;

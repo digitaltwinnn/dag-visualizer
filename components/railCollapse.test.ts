@@ -265,9 +265,10 @@ describe("subjectRunEnd — the run the next-rung step reads", () => {
     const cards = detailsCards(m);
     const present = (id: string) => cards.find((c) => c.id === id)?.present ?? false;
     const ghosted = (id: string) => cards.find((c) => c.id === id)?.hint != null;
-    for (const id of ["snap", "context", "metaSnap"]) expect(present(id), id).toBe(true);
+    for (const id of ["snap", "metaSnap", "context"]) expect(present(id), id).toBe(true);
     expect(present("block") || ghosted("block")).toBe(false);
-    expect(subjectRunEnd(ladderSlotIds("ledger"), present, ghosted)).toBe("metaSnap");
+    // The run passes the undrawn block and data block slots to the Metagraph card at the foot.
+    expect(subjectRunEnd(ladderSlotIds("ledger"), present, ghosted)).toBe("context");
     // In the Blocks register the same empty slot is a ghost, so it is a gap there.
     const b = detailsCards({ ...m, ledgerRegister: "blocks" });
     expect(subjectRunEnd(ladderSlotIds("ledger"), (id) => b.find((c) => c.id === id)?.present ?? false, (id) => b.find((c) => c.id === id)?.hint != null)).toBe("metaSnap");
@@ -288,13 +289,15 @@ describe("displayOrder", () => {
   });
   it("closes a gap in the stack", () => {
     const lane = ladderSlotIds("ledger");
-    expect(displayOrder(lane, present(["notes", "snap", "metaSnap"]), ["context"])).toEqual(["notes", "snap", "metaSnap", "context", "block", "dataBlock"]);
+    expect(displayOrder(lane, present(["notes", "snap", "dataBlock"]), ["metaSnap"])).toEqual(["notes", "snap", "dataBlock", "metaSnap", "block", "context"]);
   });
   it("the next step never passes another step ghost: the Block ghost keeps its place under the snapshot", () => {
     const lane = ladderSlotIds("ledger");
     expect(displayOrder(lane, present(["notes", "snap", "context"]), ["metaSnap", "block"])).toEqual(["notes", "snap", "context", "metaSnap", "block", "dataBlock"]);
-    expect(displayOrder(lane, present(["notes", "snap"]), ["context", "block"])).toEqual(["notes", "snap", "context", "metaSnap", "block", "dataBlock"]);
-    expect(displayOrder(lane, present(["notes", "snap"]), ["dataBlock", "block"])).toEqual(["notes", "snap", "context", "metaSnap", "block", "dataBlock"]);
+    expect(displayOrder(lane, present(["notes", "snap"]), ["metaSnap", "block", "context"])).toEqual(["notes", "snap", "metaSnap", "block", "dataBlock", "context"]);
+    expect(displayOrder(lane, present(["notes", "snap"]), ["dataBlock", "block"])).toEqual(["notes", "snap", "metaSnap", "block", "dataBlock", "context"]);
+    // The Metagraph ghost's own step never climbs past a step ghost above it in the lane.
+    expect(displayOrder(lane, present(["notes", "snap", "metaSnap"]), ["context", "block"])).toEqual(["notes", "snap", "metaSnap", "block", "context", "dataBlock"]);
   });
   it("is the lane itself with nothing chosen, and with everything", () => {
     expect(displayOrder(geo, present([]), [])).toEqual(geo);
