@@ -29,10 +29,11 @@ for (const m of METAGRAPHS) {
 const escaped = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 /** Longest first, so "The Upsider AI" is one name and never "Upsider AI" inside it. */
 const NAMES = new RegExp(
-  `(?<![\\p{L}\\p{N}])(?:${[...FORMS.keys()].sort((a, b) => b.length - a.length).map(escaped).join("|")})(?![\\p{L}\\p{N}])`,
+  `(?<![\\p{L}\\p{N}$])(?:${[...FORMS.keys()].sort((a, b) => b.length - a.length).map(escaped).join("|")})(?![\\p{L}\\p{N}])`,
   "gu",
 );
-/** "333 DAG" is an amount of the token, not the network: fees are stated in it. */
+/** "333 DAG" is an amount of the token, not the network: fees are stated in it. ("333 $DAG", the
+ *  notes' own spelling since 2026-11-20, is never a name at all: a name never follows "$".) */
 const AMOUNT_BEFORE = /\d[\d,.]*[KMBT]?\s*$/;
 
 export function noteSegments(text: string): NoteSegment[] {

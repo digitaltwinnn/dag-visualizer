@@ -90,7 +90,7 @@ export function PinnedMark({ className }: { className?: string }) {
  *  muted ink. ONE atom for every place a selected row or plate says which it is (refactor round R1,
  *  P5: RAW's two tables wrote it four times). `className` adds the caller's typography context (a
  *  mono cell's `font-sans`, a caps plate's `normal-case tracking-normal`). */
-export function StateMark({ following, na = false, className }: { following: boolean; na?: boolean; className?: string }) {
+export function StateMark({ following, na = false, bare = false, className }: { following: boolean; na?: boolean; /** The live dot without its word (the word stays for a screen reader) — the phone's lit register tile, 2026-11-20. */ bare?: boolean; className?: string }) {
   return (
     <span className={cn("inline-flex items-center gap-1.5 text-label text-muted-foreground", className)}>
       {/* N/A: the register has no subject — the network runs no such layer — so it is neither live
@@ -100,7 +100,7 @@ export function StateMark({ following, na = false, className }: { following: boo
       ) : following ? (
         <>
           <LiveDot />
-          live
+          {bare ? <span className="sr-only">live</span> : "live"}
         </>
       ) : (
         <PinnedMark className="text-muted-foreground" />

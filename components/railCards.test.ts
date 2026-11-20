@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { exploreCards, detailsCards, isSubjectSlot, metagraphCardNetwork, noteCardAbsent, parentHolds, focusSlotId, ladderLevelOfSlot, ladderSlotIds, type RailManifestState } from "@/components/railCards";
+import { cardOnDagBlock, exploreCards, detailsCards, isSubjectSlot, metagraphCardNetwork, noteCardAbsent, parentHolds, focusSlotId, ladderLevelOfSlot, ladderSlotIds, type RailManifestState } from "@/components/railCards";
 import { LADDERS } from "@/src/engine/domain/focusLadder";
 import type { PickDescriptor } from "@/src/data/types";
 
@@ -65,7 +65,9 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
     // metagraph snapshot → node (user, 2026-09-15). This order also drives the phone flat stack
     // and the tray icons, so the two can never disagree.
     const ids = detailsCards(details({ filter: "dor", inspect: nodePick, snap: snapPick })).map((c) => c.id);
-    expect(ids).toEqual(["notes", "snap", "context", "range", "instant", "country", "cohort", "composition", "metaSnap", "block", "dataBlock", "node"]);
+    // …with Snapshots' Metagraph card at the FOOT, as its lane draws it (2026-11-20).
+    expect(ids).toEqual(["notes", "snap", "range", "instant", "country", "cohort", "composition", "metaSnap", "block", "dataBlock", "node", "context"]);
+    expect(detailsCards(details({ mode: "geo", filter: "dor" })).map((c) => c.id)[1]).toBe("snap"); // no foot elsewhere: the fixed order
   });
   // THE AI NOTES CARD (2026-10-27): its own card, first, in every view whose policy opts in
   // (`aiNotes`) — present unless the note is absent (no subject, or the server answered `none`).
@@ -108,7 +110,7 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
     expect(new Set(keys).size).toBe(1);
   });
   it("ledger ghosts: snapshot + context + metaSnap — no node (the card left the Snapshots view, 2026-11-08)", () => {
-    expect(ghostIds(detailsCards(details({})))).toEqual(["snap", "context", "metaSnap"]);
+    expect(ghostIds(detailsCards(details({})))).toEqual(["snap", "metaSnap", "context"]);
   });
   it("hyper ghosts: context + composition + node (the snapshot slot is ledger-scoped, spec 2026-08-01)", () => {
     expect(ghostIds(detailsCards(details({ mode: "hyper" })))).toEqual(["context", "composition", "node"]);
@@ -181,10 +183,10 @@ describe("the metagraph snapshot slot", () => {
     metaSnap: null, selNodesCount: 0, filterLabel: "All networks",
     country: null, cohort: null, composition: null,
   };
-  it("sits between the network and the node slots", () => {
+  it("sits under the tick and above the Metagraph card at the lane's foot (2026-11-20)", () => {
     const ids = detailsCards(base).map((c) => c.id);
-    expect(ids.indexOf("metaSnap")).toBeGreaterThan(ids.indexOf("context"));
-    expect(ids.indexOf("metaSnap")).toBeLessThan(ids.indexOf("node"));
+    expect(ids.indexOf("metaSnap")).toBeGreaterThan(ids.indexOf("snap"));
+    expect(ids.indexOf("metaSnap")).toBeLessThan(ids.indexOf("context"));
   });
   it("is ledger-scoped, and its hint names the STOREY that separates it from the byte bar", () => {
     const inLedger = detailsCards(base).find((c) => c.id === "metaSnap")!;
@@ -271,7 +273,7 @@ describe("the block slot", () => {
     expect(focusSlotId(s)).toBe("context");
   });
   it("Blocks' ghosts: the tick's, the network's, the tile's and the block's — no node's", () => {
-    expect(ghostIds(detailsCards(blocks()))).toEqual(["snap", "context", "metaSnap", "block"]); // no node (no signer rung there); the data block ghosts in its own register alone
+    expect(ghostIds(detailsCards(blocks()))).toEqual(["snap", "metaSnap", "block", "context"]); // no node (no signer rung there); the data block ghosts in its own register alone
   });
 });
 
@@ -390,7 +392,9 @@ describe("ladderSlotIds — the descent-spine lane (display order = reversed run
     // The Blocks register's BLOCK slot sits under the metagraph snapshot: a block stands on its
     // accepting snapshot, the tile's or the tick's own (2026-11-05). A slot, no rung. NO NODE SLOT
     // (user, 2026-11-08): a node is a snapshot's signer here, the explorer's and the card's reading.
-    expect(ladderSlotIds("ledger")).toEqual(["notes", "snap", "context", "metaSnap", "block", "dataBlock"]);
+    // THE METAGRAPH CARD STANDS AT THE FOOT (user, 2026-11-20): the network is a reading about the
+    // snapshots and blocks above it, not a rung between them.
+    expect(ladderSlotIds("ledger")).toEqual(["notes", "snap", "metaSnap", "block", "dataBlock", "context"]);
   });
   it("flat views have no ladder", () => {
     expect(ladderSlotIds("soon")).toEqual([]);
@@ -569,10 +573,10 @@ describe("the ledger lane leads with the tick", () => {
     }
   });
 
-  it("the dossier sits UNDER the tick, where the tick's own anchor list points", () => {
-    const lane = ladderSlotIds("ledger");
-    expect(lane.indexOf("context")).toBeGreaterThan(lane.indexOf("snap"));
-    expect(lane.indexOf("metaSnap")).toBeGreaterThan(lane.indexOf("context"));
+  it("the snapshot chain runs unbroken from the tick, and the Metagraph card stands at the foot (2026-11-20)", () => {
+    const lane = ladderSlotIds("ledger").filter(isSubjectSlot);
+    expect(lane.slice(0, 2)).toEqual(["snap", "metaSnap"]);
+    expect(lane[lane.length - 1]).toBe("context");
   });
 
   it("hyper and geo are untouched — their coarsest subject still needs a commit", () => {
@@ -746,5 +750,24 @@ describe("the metagraph snapshot slot under a committed block", () => {
   });
   it("the other registers keep their ghost whatever is held", () => {
     expect(slot(details({ mode: "ledger", ledgerRegister: "snapshots", snap: snapPick, block })).hint).not.toBeNull();
+  });
+});
+
+// THE METAGRAPH CARD ON A DAG BLOCK (user, 2026-11-20): under All, Transaction blocks' DAG block names
+// the DAG — derived, never committed, and never over a network the reader committed in the tick.
+describe("metagraphCardNetwork — a DAG block names the DAG", () => {
+  const snap = { data: { ordinal: 42 } };
+  const dagBlock = { chain: "dag", hash: "h", ordinal: 0, anchorOrd: 42 };
+  it("stands on the DAG under All with a DAG block in its own tick", () => {
+    expect(cardOnDagBlock({ snap, block: dagBlock })).toBe(true);
+    expect(metagraphCardNetwork({ mode: "ledger", filter: "all", snap, block: dagBlock })).toBe("dag");
+  });
+  it("not for a token block, another tick's block, or under a network committed in the tick", () => {
+    expect(metagraphCardNetwork({ mode: "ledger", filter: "all", snap, block: { ...dagBlock, chain: "dor" } })).toBe("all");
+    expect(metagraphCardNetwork({ mode: "ledger", filter: "all", snap, block: { ...dagBlock, anchorOrd: 41 } })).toBe("all");
+    expect(metagraphCardNetwork({ mode: "ledger", filter: "all", snap, block: dagBlock, tickNet: { metaId: "dor", globalOrdinal: 42 } })).toBe("dor");
+  });
+  it("a filter keeps its own card", () => {
+    expect(metagraphCardNetwork({ mode: "ledger", filter: "dor", snap, block: dagBlock })).toBe("dor");
   });
 });

@@ -117,7 +117,14 @@ const DISPLAY_LANE: Partial<Record<Mode, readonly string[]>> = {
   // chamber's subjects are the snapshots and what they carry; a node is a signer, read on the
   // explorer's signer level and the snapshot card's "Signed by". The selection is untouched (a
   // carried node returns with its view); the ladder has no node rung here either (`LADDERS.ledger`).
-  ledger: ["notes", "snap", "context", "metaSnap", "block", "dataBlock"],
+  // THE METAGRAPH CARD STANDS AT THE FOOT (user, 2026-11-20: "we're looking at blocks/snapshots as
+  // the main subjects, so metagraph is additional information and should not be at the top levels of
+  // the rung"). It sat between the tick and its snapshot (2026-09-15) — but a network is no record in
+  // time, and as the one card the live follow leaves a ghost, it waited below the chosen cards and
+  // then jumped up between them on a click. At the foot it is the network the snapshot or block above
+  // belongs to, read last, in every register; the tick's child is its snapshot (`CHILD_OF.ledger`) and
+  // the card's ghost has its own step (`railSiblings.contextStep`).
+  ledger: ["notes", "snap", "metaSnap", "block", "dataBlock", "context"],
   // HISTORY: the network dossier, then the INSTANT (2026-09-19). `instant` is a card slot with no
   // focus rung — the two snapshot slots' precedent, and `railLadderBoundary.test.ts` asserts
   // rung → slot rather than the reverse. It sits UNDER the dossier because the lane is a
@@ -134,6 +141,14 @@ const DISPLAY_LANE: Partial<Record<Mode, readonly string[]>> = {
 
 export function ladderSlotIds(mode: Mode): string[] {
   return [...(DISPLAY_LANE[mode] ?? [])];
+}
+
+/** THE LANE'S FOOT — a card that is a reading ABOUT the subject chain above it rather than a rung
+ *  of it, drawn last whatever is chosen (`railCollapse.displayOrder`), with a ghost step of its own
+ *  (`railSiblings.contextStep`). Snapshots' Metagraph card (2026-11-20); every other lane has none. */
+const LANE_FOOT: Partial<Record<Mode, string>> = { ledger: "context" };
+export function laneFootOf(mode: Mode): string | null {
+  return LANE_FOOT[mode] ?? null;
 }
 
 /** The lane slot the AI notes card stands in (R57). */
@@ -194,7 +209,7 @@ export function focusSlotId(s: LadderState): string | null {
     // "filter on DOR, transaction blocks, live → the right card rung layout breaks" — the Metagraph
     // dossier opened as the box, 550px tall, and pushed the register's own subject, the live block,
     // out of the rail). The seated card stays the box while the filter's network card stands folded
-    // above it; a card chosen INSIDE the view (a pin, a snapshot, a network inside a tick — `tickNet`,
+    // at the lane's foot; a card chosen INSIDE the view (a pin, a snapshot, a network inside a tick — `tickNet`,
     // the reader's own) still ranks as it does everywhere.
     if (id === "context" && seat && !s.tickNet && present.includes(seat)) continue;
     if (present.includes(id)) return id;
@@ -474,12 +489,15 @@ export function metagraphCardNetwork(s: {
   trendFocus?: string | null;
   trendFront?: string | null;
   inspect?: PickDescriptor | null;
+  block?: BlockSel | null;
 }): string {
   // A network the rail is browsing is the card's in the views that browse (`viewNetwork.ts`).
   if (s.railNet) return s.railNet;
   const from = VIEW_POLICIES[s.mode].metagraphCard;
-  if (from === "tickNet")
-    return ledgerCardNetwork({ filter: s.filter, tickNet: s.tickNet ?? null, snapOrdinal: s.snap?.data.ordinal ?? null, tickHasFilter: s.tickHasFilter });
+  if (from === "tickNet") {
+    const net = ledgerCardNetwork({ filter: s.filter, tickNet: s.tickNet ?? null, snapOrdinal: s.snap?.data.ordinal ?? null, tickHasFilter: s.tickHasFilter });
+    return net === "all" && cardOnDagBlock(s) ? "dag" : net;
+  }
   if (from === "plane") return cardNetwork(s.filter, s.trendFocus ?? null, s.trendFront ?? null);
   // IN GEOGRAPHY it is the committed NODE's network while the filter is All (2026-10-18, user:
   // "click a node: it should also populate the dossier card"). A geo node never writes the filter
@@ -489,6 +507,16 @@ export function metagraphCardNetwork(s: {
   // them (`siblingSet("context")`).
   if (from === "node" && s.filter === "all" && s.inspect) return pickNetId(s.inspect) ?? s.filter;
   return s.filter;
+}
+
+/** THE METAGRAPH CARD STANDS ON A DAG BLOCK'S NETWORK, THE DAG (user, 2026-11-20: "transaction blocks,
+ *  for all we have the $DAG tx snapshots so we can also populate the metagraph card already"): under
+ *  All, with no network committed inside the tick, a committed DAG block in its own tick names its
+ *  network — the DAG — the way a token block's commit names its own through its snapshot. DERIVED,
+ *  never committed: the live follow seats the block alone, and the filter is never written. The card
+ *  has no × there (nothing of its own to clear; the block's × releases the block). */
+export function cardOnDagBlock(s: { tickNet?: TickNetSel | null; snap?: { data: { ordinal: number } } | null; block?: BlockSel | null }): boolean {
+  return !s.tickNet && s.block?.chain === "dag" && s.snap?.data.ordinal === s.block.anchorOrd;
 }
 
 /** A CHILD CARD STATES ITS PARENT OR IT DOES NOT RENDER (user, 2026-10-08: "I had a metagraph
@@ -678,8 +706,12 @@ export function detailsCards(s: RailManifestState): RailCard[] {
   // running off the rail). The SELECTION IS UNTOUCHED, the placeholder views' own rule above: this
   // only stops the view speaking for it, so going back restores the card in place.
   const lane = ladderSlotIds(s.mode);
-  return [notes, snap, context, range, instant, country, cohort, composition, metaSnap, block, dataBlock, node].map((c) =>
+  const cards = [notes, snap, context, range, instant, country, cohort, composition, metaSnap, block, dataBlock, node].map((c) =>
     c.present && !lane.includes(c.id) ? { ...c, present: false } : c,
   );
+  // …and a lane's FOOT is the manifest's last card too (review, 2026-11-20: the tray and the flat
+  // stack listed Snapshots' Metagraph card second while the lane drew it last).
+  const foot = laneFootOf(s.mode);
+  return foot ? [...cards.filter((c) => c.id !== foot), ...cards.filter((c) => c.id === foot)] : cards;
 }
 

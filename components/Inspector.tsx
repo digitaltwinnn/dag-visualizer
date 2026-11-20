@@ -24,8 +24,8 @@ import HeightEase from "@/components/HeightEase";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { useTouch } from "@/components/useTouch";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { detailsCards, isSubjectSlot, ladderSlotIds, noteCardAbsent, type RailCard } from "@/components/railCards";
-import { CHILD_OF, childStep, rootOf, rootStep, type SiblingStep, blockStep, dataBlockStep } from "@/components/railSiblings";
+import { detailsCards, isSubjectSlot, ladderSlotIds, laneFootOf, noteCardAbsent, type RailCard } from "@/components/railCards";
+import { CHILD_OF, childStep, rootOf, rootStep, type SiblingStep, blockStep, contextStep, dataBlockStep } from "@/components/railSiblings";
 import { displayOrder, hasFoldControl, isCollapsed, boxedSlotOf, overridesOnNoteFold, overridesOnNoteStandDown, overridesOnSelection, overridesOnViewEntry, railSelectionKey, subjectRunEnd, type LaneCollapseState } from "@/components/railCollapse";
 import { useSiblingState } from "@/components/useSiblingState";
 import { openRailCard } from "@/components/railOpen";
@@ -536,9 +536,15 @@ export default function Inspector() {
   const blockGhost = !presentOf("block") && manifest.find((c) => c.id === "block")?.hint != null ? blockStep(siblingState) : null;
   // …and the DATA BLOCK ghost's (2026-11-07): the pinned metagraph snapshot's first data block.
   const dataBlockGhost = !presentOf("dataBlock") && manifest.find((c) => c.id === "dataBlock")?.hint != null ? dataBlockStep(siblingState) : null;
+  // …and, in the views whose Metagraph card stands at the lane's FOOT (Snapshots, 2026-11-20: the
+  // network is a reading about the snapshots above it, no rung between them), that card's own step —
+  // the network of the subject on screen (`contextStep`). Elsewhere the Metagraph card heads the lane
+  // and is a CHILD_OF parent, or the view's root step.
+  const contextAtFoot = laneFootOf(mode) === "context";
+  const contextGhost = contextAtFoot && !presentOf("context") && manifest.find((c) => c.id === "context")?.hint != null ? contextStep(siblingState) : null;
   const ghostStep = (id: string) =>
-    id === nextStep?.id ? nextStep.step : id === rootId ? (rootGhost ?? undefined) : id === "block" ? (blockGhost ?? undefined) : id === "dataBlock" ? (dataBlockGhost ?? undefined) : undefined;
-  const stepIds = [nextStep?.id, blockGhost ? "block" : null, dataBlockGhost ? "dataBlock" : null].filter((x): x is string => !!x);
+    id === nextStep?.id ? nextStep.step : id === rootId ? (rootGhost ?? undefined) : id === "block" ? (blockGhost ?? undefined) : id === "dataBlock" ? (dataBlockGhost ?? undefined) : id === "context" ? (contextGhost ?? undefined) : undefined;
+  const stepIds = [nextStep?.id, blockGhost ? "block" : null, dataBlockGhost ? "dataBlock" : null, contextGhost ? "context" : null].filter((x): x is string => !!x);
   // An entry's stretched toggle OPENS `id` (single-open folds the rest). The box's − FOLDS it, and
   // that may leave no box open: the − exists only where `RailFold` puts it (the AI card, every card
   // on the phone — user, 2026-11-03), and folding is the reader's own choice, an override like any
@@ -750,7 +756,7 @@ export default function Inspector() {
     // on a card WITH siblings (`RailPager`), so a card without one — a lone block — answered the
     // pointer with a text caret. One rule for the lane: a value worth taking has its copy control.
     <div className="rail-ladder flex flex-col select-none" style={{ ["--entry-col"]: VIEW_POLICIES[mode].entryColumn } as CSSProperties}>
-      {displayOrder(ladderIds, presentOf, stepIds).map((id, depth) => {
+      {displayOrder(ladderIds, presentOf, stepIds, laneFootOf(mode)).map((id, depth) => {
         const card = manifest.find((c) => c.id === id);
         if (!card) return null;
         const body: ReactNode =

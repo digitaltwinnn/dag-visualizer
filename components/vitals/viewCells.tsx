@@ -29,20 +29,20 @@ import { POLL, METAGRAPHS } from "@/src/engine/config";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import useTrendsWindow from "@/components/useTrendsWindow";
 import { sliceWindow, trimNewestPartial, type TrendsWindowData } from "@/src/data/trendWindow";
-import { ageWords } from "@/src/util/relativeAge";
+import { ageWords, relativeAge } from "@/src/util/relativeAge";
 import { cn } from "@/lib/utils";
 import { useMemo, useSyncExternalStore } from "react";
 import { unlistedUnmeasured } from "@/src/data/trendSeries";
 import { nodesBySubregion } from "@/src/data/subregions";
 import { useFeedRead } from "@/components/useFeedRead";
 import { getBlockWindow, onBlockWindow } from "@/src/data/pastWindow";
-import { blockScopeOf, blocksByNetwork, blocksInWindow, blocksPerHourBins, lastBlockAt, movedChainOf, movedInWindow, movedPerHourBins } from "@/src/data/blockStats";
+import { blockScopeOf, blockTickTimes, blocksByNetwork, blocksInWindow, blocksPerHourBins, lastBlockAt, movedChainOf, movedInWindow, movedPerHourBins, usualGap, usualGapWords } from "@/src/data/blockStats";
 import { blockAbsence, blockSpanWord, snapshotSpanWord } from "@/src/data/ledgerSpan";
 import { compactDag } from "@/src/util/format";
-import { networkMark, tickerOf } from "@/components/explorer/nodeRow";
+import { networkMark, unitOf } from "@/components/explorer/nodeRow";
 import { useNowTick } from "@/components/useNowTick";
 import { useLedgerSource } from "@/components/useLedgerSource";
-import { dataByNetwork, dataInWindow, dataPerTick, lastDataTick } from "@/src/data/dataStats";
+import { dataBlocksByNetwork, dataBlocksInWindow, dataInWindow, dataUpdatesStack, lastDataByNetwork, settledTicks } from "@/src/data/dataStats";
 import { netKeyOf } from "@/src/engine/domain/pickActions";
 
 export function HyperCells({ accent }: { accent: string }) {
@@ -376,6 +376,48 @@ const STORE_DOWN = "history not answering";
 type Snaps = ReturnType<typeof useSnapshotFeed>["snaps"];
 interface StackSeg { key: string; n: number; color: string }
 
+/** THE STACKED COLUMNS THEMSELVES — one row of bars, each a total split into hued segments in the
+ *  caller's order, an unmeasured one a neutral 2px stub (`v` null), a measured zero nothing; a bar
+ *  with no segments paints whole in the accent (a scoped reading). Shared by "Anchors by metagraph"
+ *  (the stored history's buckets) and the Data blocks band's "Data updates" (one bar per global
+ *  snapshot, 2026-11-20), so the two read as one instrument. Its rules are `StackBars`' header's. */
+function StackColumns({ bars, accent, zeroWords }: { bars: { key: string; v: number | null; segs: StackSeg[] | null }[]; accent: string; zeroWords: string | null }) {
+  const max = Math.max(1, ...bars.map((b) => b.v ?? 0));
+  return (
+    <div className="flex items-end justify-center gap-[2px] flex-1 min-h-0 pb-0.5">
+      {zeroWords && <span className="text-label text-muted-foreground self-center">{zeroWords}</span>}
+      {bars.map((b) => {
+        if (b.v == null) {
+          // Unmeasured — the neutral stub (see the header). It keeps its flex slot so the
+          // window's rhythm (position = time) survives the hole.
+          return <span key={b.key} className="flex-1 max-w-[22px] h-[2px] rounded-t-[2px]" style={{ background: "var(--border)", opacity: 0.6 }} />;
+        }
+        return (
+          <span
+            key={b.key}
+            // `flex-col-reverse`: segments are written in catalog order and stack UP from the
+            // baseline, so the first listed network is the foot of every bar in the window.
+            className="flex-1 max-w-[22px] rounded-t-[2px] overflow-hidden flex flex-col-reverse"
+            style={{
+              height: b.v > 0 ? `${Math.max(8, (b.v / max) * 100)}%` : "0",
+              // A stacked bar's colour comes from its segments; a scoped one paints whole.
+              background: b.v > 0 && !b.segs ? accent : "none",
+              // ONE weight for every bar (user, 2026-09-08): the tick chart's glowing head
+              // meant "the newest live tick"; here the last bar is just the newest COMPLETE
+              // bucket — nothing an emphasis would be ABOUT.
+              opacity: b.v > 0 ? 0.7 : 0,
+            }}
+          >
+            {b.segs?.map((sg) => (
+              <span key={sg.key} className="w-full flex-none" style={{ height: `${(sg.n / b.v!) * 100}%`, background: sg.color }} />
+            ))}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 function StackBars({ accent, isMeta, filter, data, down }: { accent: string; isMeta: boolean; filter: string; data: TrendsWindowData | null; /** The history store failed and nothing is held — see `STORE_DOWN`. */ down?: boolean }) {
   if (!data) {
     return <span className="flex items-center justify-center w-full self-center text-label text-muted-foreground" aria-hidden={!down}>{down ? STORE_DOWN : "acquiring…"}</span>;
@@ -412,7 +454,6 @@ function StackBars({ accent, isMeta, filter, data, down }: { accent: string; isM
     }
     return { v: total, ts, segs };
   });
-  const max = Math.max(1, ...bars.map((b) => b.v ?? 0));
   const anyMeasured = bars.some((b) => b.v != null);
   // "none" is a whole-window claim and may only be said over a fully-measured window
   // (review, 2026-09-09: with 23 of 24 buckets unmeasured and one measured zero, the old
@@ -448,37 +489,7 @@ function StackBars({ accent, isMeta, filter, data, down }: { accent: string; isM
           cannot fill the row, and end-alignment parked them in a corner. Full windows shrink
           their slots to fit, so the justification is a no-op everywhere else; time still
           reads left-old → right-new inside the cluster. */}
-      <div className="flex items-end justify-center gap-[2px] flex-1 min-h-0 pb-0.5">
-        {allZero && <span className="text-label text-muted-foreground self-center">no anchors in this window</span>}
-        {bars.map((b) => {
-          if (b.v == null) {
-            // Unmeasured — the neutral stub (see the header). It keeps its flex slot so the
-            // window's rhythm (position = time) survives the hole.
-            return <span key={b.ts} className="flex-1 max-w-[22px] h-[2px] rounded-t-[2px]" style={{ background: "var(--border)", opacity: 0.6 }} />;
-          }
-          return (
-            <span
-              key={b.ts}
-              // `flex-col-reverse`: segments are written in catalog order and stack UP from the
-              // baseline, so the first listed network is the foot of every bar in the window.
-              className="flex-1 max-w-[22px] rounded-t-[2px] overflow-hidden flex flex-col-reverse"
-              style={{
-                height: b.v > 0 ? `${Math.max(8, (b.v / max) * 100)}%` : "0",
-                // A stacked bar's colour comes from its segments; a scoped one paints whole.
-                background: b.v > 0 && !b.segs ? accent : "none",
-                // ONE weight for every bar (user, 2026-09-08): the tick chart's glowing head
-                // meant "the newest live tick"; here the last bar is just the newest COMPLETE
-                // bucket — nothing an emphasis would be ABOUT.
-                opacity: b.v > 0 ? 0.7 : 0,
-              }}
-            >
-              {b.segs?.map((sg) => (
-                <span key={sg.key} className="w-full flex-none" style={{ height: `${(sg.n / b.v!) * 100}%`, background: sg.color }} />
-              ))}
-            </span>
-          );
-        })}
-      </div>
+      <StackColumns bars={bars.map((b) => ({ key: String(b.ts), v: b.v, segs: b.segs }))} accent={accent} zeroWords={allZero ? "no anchors in this window" : null} />
       {(monthly || weekly) && (
         <div className="flex justify-center gap-[2px] leading-none">
           {bars.map((b, i) => (
@@ -921,6 +932,50 @@ function StackedLead({ figure, unit, prefix, note, empty = false }: { figure: Re
   );
 }
 
+
+/** LAST BLOCK, AGAINST THE USUAL GAP (user, 2026-11-20, design A2 of the round): the age as the lead,
+ *  the network under it, and a track with the window's USUAL RANGE shaded — the middle half of its own
+ *  gaps (`blockStats.usualGap`) — and a needle at the age. Inside or under the range the needle wears
+ *  the band's accent; past it, the warning amber and the words "longer than usual" (never "overdue": a
+ *  block exists only when someone transacts). The track runs to twice the range's top, and an age past
+ *  that pins the needle to the end. With too few gaps there is no range: the age and the network alone. */
+function LastSubject({ label, ageMs, chainKey, range, accent }: { label: string; ageMs: number; chainKey: string; range: { lo: number; hi: number } | null; accent: string }) {
+  const mark = networkMark(chainKey);
+  const longer = range != null && ageMs > range.hi;
+  const max = range ? range.hi * 2 : 1;
+  const at = (ms: number) => `${Math.min(100, (ms / max) * 100)}%`;
+  const ink = longer ? "var(--warn-soft)" : accent;
+  return (
+    <BandCard
+      label={label}
+      aside={range ? <span className={cn(longer && "text-[var(--warn-soft)]")}>{longer ? "longer than usual" : `usual ${usualGapWords(range)}`}</span> : undefined}
+      lead={
+        <span className="flex flex-col items-start">
+          <span className={cn(STACKED_LEAD, "text-foreground")}>{ageWords(ageMs)}</span>
+          <span className="inline-flex items-center gap-1 text-label text-muted-foreground leading-none whitespace-nowrap">
+            ago <IdentityDot hue={mark.hue} /> {mark.label}
+          </span>
+        </span>
+      }
+    >
+      {range ? (
+        <span className="relative flex-1 min-w-0 self-center h-7" aria-hidden>
+          <span className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-[var(--border)]" />
+          <span
+            className="absolute top-1/2 h-2.5 -translate-y-1/2 rounded-sm"
+            style={{ left: at(range.lo), width: `calc(${at(range.hi)} - ${at(range.lo)})`, background: `color-mix(in oklch, ${accent} 28%, transparent)` }}
+          />
+          <span className="absolute top-0.5 bottom-0.5 w-0.5 -translate-x-1/2 rounded-full" style={{ left: at(ageMs), background: ink }} />
+        </span>
+      ) : null}
+      <span className="sr-only">
+        {`${label}: ${ageWords(ageMs)} ago, ${mark.label}.`}
+        {range ? ` The usual gap is ${usualGapWords(range)}${longer ? "; this one is longer than usual" : ""}.` : ""}
+      </span>
+    </BandCard>
+  );
+}
+
 export function BlocksCells({ accent }: { accent: string }) {
   useFeedRead(["api-blocks", "global"], "BlocksCells");
   const win = useSyncExternalStore(onBlockWindow, getBlockWindow, () => null);
@@ -951,14 +1006,18 @@ export function BlocksCells({ accent }: { accent: string }) {
   // sum across tokens would add unlike units), the token's under its filter (`tickerOf`, the one home
   // the Block card's amounts read). Only landed reads are summed; a pending or missed read is stated.
   const movedChain = movedChainOf(scope.chain);
-  const unit = tickerOf(movedChain);
+  const unit = unitOf(movedChain);
   const moved = win ? movedInWindow(ticks, reads, movedChain) : null;
   const movedNote = moved && moved.read < moved.total ? `${moved.read.toLocaleString()} of ${moved.total.toLocaleString()} blocks read` : undefined;
 
   // BY NETWORK — the share of the window's blocks per network, the catalog's order, one row under a
   // filter; past three networks the rest fold into "other" so the rows still partition the count.
-  const nets = win ? blocksByNetwork(ticks, scope.chain, CATALOG_ORDER) : [];
+  // IN THE METAGRAPHS ANCHORING CARD'S SHAPE (user, 2026-11-20: "adjust the 'by network' vitals
+  // according to the metagraph snapshot's 'metagraphs anchoring' (wording and visuals)"): the total on
+  // the left, each network's count busiest first (catalog order breaks a tie), folded past four.
+  const nets = win ? [...blocksByNetwork(ticks, scope.chain, CATALOG_ORDER)].filter((r) => r.count > 0).sort((a, b) => b.count - a.count) : [];
   const netRows = foldOther(nets.map((r) => ({ key: r.chain, ...networkMark(r.chain), count: r.count })), BY_NETWORK_ROWS);
+  const netTotal = nets.reduce((n, r) => n + r.count, 0);
 
   // LAST BLOCK — the age of the window's newest block of its network (`ageWords`, the app's one
   // long-form age), and whose it is: the name beside the dot, never colour alone.
@@ -968,8 +1027,15 @@ export function BlocksCells({ accent }: { accent: string }) {
   // (user, 2026-11-19) — four cells repeating one sentence read as four readings.
   if (!runs("blocks")) return <BandCard label={REGISTER_NAMES.blocks}>{stateLine(absent)}</BandCard>;
 
+  // LAST BLOCK LEADS (user, 2026-11-20: "move it to the top of the list"): the one claim about NOW
+  // opens the band — leftmost on the desktop band, first in the phone sheet (one `ViewCells` list).
   return (
     <>
+      {!pinned && last ? (
+        <LastSubject label="Last block" ageMs={Math.max(0, now - Date.parse(last.ts))} chainKey={last.chain} range={usualGap(blockTickTimes(ticks, scope.chain))} accent={accent} />
+      ) : (
+        <BandCard label="Last block">{pinned ? stateLine(BLOCK_PINNED) : stateLine(win ? "No block in the window" : absent)}</BandCard>
+      )}
       <BandCard
         label="Blocks"
         aside={win ? span : undefined}
@@ -1004,23 +1070,15 @@ export function BlocksCells({ accent }: { accent: string }) {
           stateLine(absent)
         )}
       </BandCard>
-      <BandCard label="By network">
-        {win ? <MicroBars accent={accent} labelW={64} rows={netRows} /> : stateLine(absent)}
-      </BandCard>
       <BandCard
-        label="Last block"
-        lead={pinned ? undefined : <StackedLead figure={last ? ageWords(Math.max(0, now - Date.parse(last.ts))) : null} unit="ago" empty={last == null} />}
+        label="Networks transacting"
+        // THE WINDOW'S REACH, as BLOCKS and MOVED state it (user, 2026-11-20: "can we add the range like
+        // other vitals have?").
+        aside={win ? span : undefined}
+        lead={win ? <StackedLead figure={netTotal > 0 ? <Odometer int value={netTotal} /> : null} unit={netTotal === 1 ? "block" : "blocks"} empty={netTotal === 0} /> : undefined}
       >
-        {pinned ? (
-          stateLine(BLOCK_PINNED)
-        ) : last ? (
-          <span className="flex items-center self-stretch gap-1.5 text-body whitespace-nowrap">
-            <IdentityDot hue={networkMark(last.chain).hue} />
-            <span className="text-muted-foreground">{networkMark(last.chain).label}</span>
-          </span>
-        ) : (
-          stateLine(win ? "No block in the window" : absent)
-        )}
+        {/* A window read and holding no block says so — never MicroBars' "acquiring…" (review). */}
+        {win ? (netRows.length ? <MicroBars accent={accent} labelW={64} rows={netRows} /> : stateLine("No block in the window")) : stateLine(absent)}
       </BandCard>
     </>
   );
@@ -1035,9 +1093,13 @@ export function BlocksCells({ accent }: { accent: string }) {
  *  data block, so under the DAG filter the cells say so instead of a zero. */
 export function DataCells({ accent, filter }: { accent: string; filter: string }) {
   useFeedRead(["global", "exact"], "DataCells");
-  const { snaps, past } = useLedgerSource(POLL.maxSnapshots);
+  const { snaps: arriving, past } = useLedgerSource(POLL.maxSnapshots);
   const pastStatus = useStore((s) => s.pastWindow?.status ?? null);
   const reads = useStore((s) => s.snapshotExact);
+  // A new tick whose read is still in flight is ARRIVING, not unread: the window is the ticks up to
+  // the newest settled read (`settledTicks`), so a fresh global snapshot never flashes "at least".
+  const missed = useStore((s) => s.exactMiss);
+  const snaps = settledTicks(arriving, reads, missed);
   const now = useNowTick(1000);
   const span = snapshotSpanWord({ pastStatus, past: past?.globalSnapshots ?? null, live: [...snaps].reverse(), nowMs: now });
   // The filter's lens as a predicate over an address: one network's addresses (its former ones
@@ -1051,50 +1113,66 @@ export function DataCells({ accent, filter }: { accent: string; filter: string }
   const empty = snaps.length === 0;
 
   const held = dataInWindow(snaps, reads, inScope);
-  // The floor says itself under the unit, MOVED's grammar: the count covers the snapshots read so far.
-  const heldNote = held.read < held.total ? `${held.read.toLocaleString()} of ${held.total.toLocaleString()} snapshots read` : undefined;
-  const nets = dataByNetwork(snaps, reads, inScope, netKeyOf, CATALOG_ORDER);
-  const netRows = foldOther(nets.map((r) => ({ key: r.key, ...networkMark(r.key), count: r.count })), BY_NETWORK_ROWS);
-  // A past window makes no claim about now: LAST DATA BLOCK, the one claim about now, says so.
+  // The Metagraphs anchoring card's shape (2026-11-20): the total on the left, busiest first — in DATA
+  // BLOCKS, the register's own subject and the count the switch's readings carried (the updates are
+  // DATA UPDATES' reading beside it, which the card used to repeat).
+  const blocksHeld = dataBlocksInWindow(snaps, reads, inScope);
+  const nets = dataBlocksByNetwork(snaps, reads, inScope, netKeyOf);
+  // A past window makes no claim about now: the rows' last-block ages, the one claim about now, go.
   const pinned = past != null || pastStatus != null;
-  const last = !pinned ? lastDataTick(snaps, reads, inScope) : null;
+  const lastAt = new Map((!pinned ? lastDataByNetwork(snaps, reads, inScope, netKeyOf) : []).map((r) => [r.key, r.ts]));
+  const netRows = foldOther(nets.map((r) => ({ key: r.key, ...networkMark(r.key), count: r.count })), BY_NETWORK_ROWS).map((r) => {
+    const ts = lastAt.get(r.key);
+    return ts ? { ...r, trail: relativeAge(Math.max(0, now - Date.parse(ts))) } : r;
+  });
+  const netTotal = blocksHeld.count;
 
   // No subject (the network runs no dL1, the DAG among them): one card, the sentence once.
   if (noData) return <BandCard label={REGISTER_NAMES.data}>{stateLine(noData)}</BandCard>;
 
   return (
     <>
+      {/* WHO WROTE DATA, HOW MUCH AND HOW LATELY — ONE CARD (user, 2026-11-20: "'last data block' and
+          'metagraphs writing data' can be combined"): each metagraph's data blocks over the window as
+          the bars, the age of its last one in the column after the count (none in a past window,
+          which makes no claim about now), the total on the left. It leads the band, the place the
+          last-block card held. */}
+      <BandCard
+        label="Metagraphs writing data"
+        // The window's reach, as DATA UPDATES states it (2026-11-20); a past window names its own
+        // stretch in the same words, and its rows carry no age (a claim about now).
+        aside={!empty ? span : undefined}
+        lead={netRows.length ? <StackedLead figure={<Odometer int value={netTotal} />} prefix={blocksHeld.read < blocksHeld.total ? "at least" : undefined} unit={netTotal === 1 ? "data block" : "data blocks"} /> : undefined}
+      >
+        {netRows.length ? <MicroBars accent={accent} labelW={64} rows={netRows} /> : stateLine(held.read ? "No data block in the window" : "Reading the window…")}
+      </BandCard>
       <BandCard
         label="Data updates"
         aside={!empty ? span : undefined}
-        lead={<StackedLead figure={<Odometer value={held.count} int />} unit="updates" note={heldNote} empty={empty || held.read === 0} />}
+        // THE FLOOR SAYS "AT LEAST" (user, 2026-11-20: "in data updates sometimes there is a text
+        // underneath? it's confusing" — "14 of 50 snapshots read" explained the floor in the read's
+        // own terms): the card beside it states its floor the same way.
+        lead={<StackedLead figure={<Odometer value={held.count} int />} prefix={held.read < held.total ? "at least" : undefined} unit="updates" empty={empty || held.read === 0} />}
       >
         {!empty ? (
-          <span className="flex-1 min-w-0 self-center">
-            {/* One point per global snapshot across the window (its natural bin — the window spans
-                minutes); a snapshot whose exact read has not landed is a gap, never a dip. */}
-            <Sparkline data={dataPerTick(snaps, reads, inScope)} color={accent} height={42} maxPoints={24} stretch />
+          <span className="flex flex-col flex-1 min-w-0 min-h-12 self-stretch">
+            {/* AS "ANCHORS BY METAGRAPH" DRAWS IT (user, 2026-11-20: "vitals 'data updates' show as
+                'anchors by metagraph' chart?"): one column per global snapshot across the window, its
+                data updates stacked by metagraph in the catalog's order, the hue the explorer and the
+                card beside it name; under a filter that network's own, painted whole. A snapshot whose
+                read has not landed is the neutral stub, never a dip (`dataUpdatesStack`). */}
+            <StackColumns
+              bars={dataUpdatesStack(snaps, reads, inScope, netKeyOf, CATALOG_ORDER).map((b) => ({
+                key: String(b.ordinal),
+                v: b.v,
+                segs: filter === "all" ? b.segs.map((g) => ({ key: g.key, n: g.n, color: g.key === UNLISTED_ID ? UNLISTED_HUE : identityHudCss(g.key) })) : null,
+              }))}
+              accent={accent}
+              zeroWords={held.read > 0 && held.count === 0 ? "no data updates in this window" : null}
+            />
           </span>
         ) : (
           stateLine("Waiting for snapshots…")
-        )}
-      </BandCard>
-      <BandCard label="By network">
-        {netRows.length ? <MicroBars accent={accent} labelW={64} rows={netRows} /> : stateLine(held.read ? "No data updates in the window" : "Reading the window…")}
-      </BandCard>
-      <BandCard
-        label="Last data block"
-        lead={pinned ? undefined : <StackedLead figure={last ? ageWords(Math.max(0, now - Date.parse(last.ts))) : null} unit="ago" empty={last == null} />}
-      >
-        {pinned ? (
-          stateLine(BLOCK_PINNED)
-        ) : last ? (
-          <span className="flex items-center self-stretch gap-1.5 text-body whitespace-nowrap">
-            <IdentityDot hue={networkMark(netKeyOf(last.metaId)).hue} />
-            <span className="text-muted-foreground">{networkMark(netKeyOf(last.metaId)).label}</span>
-          </span>
-        ) : (
-          stateLine(held.read ? "No data block in the window" : "Reading the window…")
         )}
       </BandCard>
     </>

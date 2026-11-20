@@ -439,6 +439,18 @@ dossier, country, provider, composition, then the snapshot chain (global snapsho
 snapshot it anchors), then node. `components/railCards.ts` is the manifest and
 `components/railCards.test.ts` pins the order, the availability and every hint.
 
+**In Snapshots the Metagraph card stands at the lane's FOOT** (user, 2026-11-20: "we're looking at
+blocks/snapshots as the main subjects, so metagraph is additional information and should not be at
+the top levels of the rung"): Global snapshot · Metagraph snapshot · Transaction block · Data block ·
+Metagraph, one lane for all three registers. It sat between the tick and its snapshot from 2026-09-15
+— and since the live follow seats the snapshot chain without its network, its ghost waited below the
+chosen cards and jumped up between them on a click. The tick's ∨ ghost opens its first snapshot
+(`CHILD_OF.ledger`), whose builder commits the network inside the tick with it (`tickNetOf`), so the
+card fills at the foot; the card's own ghost is a step like the block's (`railSiblings.contextStep`):
+the network of the snapshot or token block on screen, else the tick's first, and none under a DAG
+block (the global's own — opening a network would release it). Selection ancestry is unchanged:
+tick → network → snapshot.
+
 **A vertical swipe TURNS THE DECK, and so does Shift + ↑/↓ from inside a card** (2026-10-24; `src/engine/domain/CLAUDE.md` has the rule): the
 rotation (`trendRotation`) sits under the held order and the focus re-deal in `TrendStack`, and a
 swipe releases a standing focus and rewinds the window first, so the deck's front is the rotation's.
@@ -880,9 +892,11 @@ the slot. **The top card is the VIEW's note on the metagraph card's network** (`
 everything, the filtered network, or the network a committed node or tick belongs to) and does not follow a drill — a country, a provider or a
 brushed range is a subject with a card of its own, below (user, 2026-10-29); History's top card is
 the window pill's note always. **A register reads its own note** (2026-11-06): in the Snapshots view's
-Blocks register the top card is the block DAG's note (view `blocks`, the whole network's whatever the
-rung stands on), the Metagraph snapshots and Data blocks registers keep the ledger's (Data blocks' records
-ARE metagraph snapshots, D6) — `REGISTER_NOTES` in `noteSubject.ts`,
+Blocks register the top card is the block DAG's note (view `blocks`), the Data blocks register's the data
+blocks' (view `data`), the Metagraph snapshots register's the ledger's — and **every register's note stands on
+the Metagraph card's network** (user, 2026-11-20: "should respond to the filter"; the block and data notes
+read every chain whatever the rung stood on until then): the whole network's, else that network's own token
+blocks or data blocks, warmed hourly per network, a network with none having no note — `REGISTER_NOTES` in `noteSubject.ts`,
 read only where the view's policy offers the register, and the Briefing's stops ask through the same
 derivation. Every view that has a note (`viewPolicy.aiNotes`) leads its
 display lane with the `notes` slot (`DISPLAY_LANE` in `railCards.ts`), and the manifest leads with it
@@ -1073,7 +1087,10 @@ snapshot is the lane's last rung (no child step). The SELECTION is untouched, so
 the card, as the placeholder views do; a pinned snapshot needs no such rule, since leaving Snapshots
 clears the pin. **Ghosts sink** (same day, option B of four): chosen cards close up
 at the top and the ghosts wait below in lane order, the next step's ghost first (`displayOrder`), so
-a ghost can never split the stack. The lane stays the ladder's one order; this is only its layout.
+a ghost can never split the stack — **except at a lane's FOOT** (`laneFootOf`, Snapshots' Metagraph
+card, 2026-11-20): the foot is drawn last, card or ghost, so a gap in the snapshot chain above it shows
+as that chain's ghosts between the Global card and the Metagraph card, never as the Metagraph card
+closed up into the chain. The lane stays the ladder's one order; this is only its layout.
 **And the Snapshots explorer's held head is the PIN itself** (same
 day: "put it on the 1st row and directly show x newer") — it froze at the newest tick on screen
 from 2026-10-02; `src/data/ledgerHold.ts`.
@@ -1089,10 +1106,17 @@ switch is LAYERED since 2026-11-19 (user: "show that container concept in the vi
 design round options A → A4 → A4·1, then readings option 2 — `RegisterSwitch.tsx`'s header): the tiles
 stand as the protocol stacks them — Transaction blocks a tall tile down to the base (the DAG's blocks go
 straight into the global snapshot), Data blocks on the Metagraph snapshots bar, a fixed, unpressable
-"Global snapshot" base — and they are NAMES ONLY; the lit register's readings (span, count, live /
-pinned / n/a) are ONE line under the face. **The same layered face on the phone** (same day: "I want the
-layered switcher also on phone"; the single face with ‹ › went), its names at the label step, the right
-column wider so "Metagraph snapshots" stays one line. **The register's sentence is a CAPTION at the
+"Global snapshot" base — and they are NAMES ONLY. **No readings line since 2026-11-20** (user: "we can
+remove the 9 min | 326 | live if we move live to the button and ensure the other two can be included
+somewhere"): the lit tile wears the state mark (live dot and word; the dot alone on the phone; the pin;
+n/a), its accessible name keeps the span and count, and the span and the register's count are the
+explorer foot's ("LAST 8 MIN ◈ 326", `ledgerSpan.metaSnapsInWindow` — the paragraphs below that speak
+of the halves' readings describe that state before it moved). Every tile stands on a hairline LEDGE
+(H1, the lit one's in the accent), and the base is a RULED LABEL — the hairline with "Global snapshot"
+set into it, no plate (option A, the same day). **The same layered face on the phone** (2026-11-19: "I
+want the layered switcher also on phone"; the single face with ‹ › went), 78px since 2026-11-20 (134
+before): two 24px tile rows, every name on one line at the label step, the right column wider so
+"Metagraph snapshots" fits, 6px padding and a 4px gap so the lit "Transaction blocks" fits at 360px. **The register's sentence is a CAPTION at the
 scene's bottom** (layout option 3: the readings stay with the switch, the sentence moves down), above
 the vitals band or the phone's dock, `#register-caption` — a marker contract like the switch's: the
 callout's free band ends above it (`ChromeBounds.captionTop`), so the label moves up with it.
@@ -1250,7 +1274,12 @@ share of the window's blocks per network in the catalog's order, named and hued 
 the one label-and-hue rule, the unlisted set's neutral included), past four rows folded by
 `bandParts.foldOther` (Geography's regions and Data blocks' BY NETWORK fold through it too), one row under a
 filter; **LAST BLOCK**, the age of the window's newest block in `ageWords` (seconds under a minute) beside
-its network. BLOCKS and
+its network. **Since 2026-11-20 LAST BLOCK leads the band** (user: "move it to the top of the list"; the
+phone sheet's first card, the desktop's leftmost) and reads against the window's USUAL GAP (design A2:
+the middle half of the gaps between its block-bearing ticks, `blockStats.usualGap`, shaded on a track
+with a needle at the age; past it amber, "longer than usual", never "overdue"; under eight gaps no
+range), and BY NETWORK is **NETWORKS TRANSACTING** in the Metagraphs anchoring card's shape — the total on
+the left, busiest first, the window's reach in its aside. BLOCKS and
 MOVED state the window's reach in the aside, the register switch's own span words (`blockSpanWord`); a
 window pinned around a past time is read as that window (its frame ends at its newest tick), and only
 LAST BLOCK, a claim about now, says "Window pinned to a past time". The window lists only
@@ -1359,13 +1388,17 @@ window"; the note names the minutes itself and the window's END, never "right no
 07:21 UTC, …", the end a `time` fact (a UTC clock time, the zone named, since a note is written for
 every reader) that the honesty gate reads as a phrase, not as numbers. No sampled series holds a
 data-block count, which is why it is the live window and not the last 24 hours. The band swaps to `DataCells` (`"ledger:data"`, `REGISTER_CELLS` in `VitalsBand.tsx`)
-— THREE cells, `src/data/dataStats.ts`'s arithmetic over the ledger source's ticks: **DATA UPDATES**
-(the count over the snapshots read, "N of M snapshots read" under the unit as its floor, and a line
-of one point per global snapshot — the window spans minutes, so a tick is its bin, an unread tick a
-gap), **BY NETWORK** (`MicroBars` share of the data updates per network), **LAST DATA BLOCK** (the age
-of the newest read tick holding a data block in `ageWords` — "12 seconds" under a minute, never
-"1 minute" for a block seconds old (D6 carry), beside its network; "Window pinned to a past time" in a
-past window). The Snapshots band's "Anchors by metagraph" chart is NOT a fourth cell: it plots the
+— TWO cells since 2026-11-20, `src/data/dataStats.ts`'s arithmetic over the ledger source's ticks as far
+as their reads have SETTLED (`settledTicks`: a tick whose read is in flight is arriving, not unread, so a
+new global never flashes a floor): **METAGRAPHS WRITING DATA** (user: "'last data block' and 'metagraphs
+writing data' can be combined") — each metagraph's data blocks as the bars, busiest first, the age of its
+last one in a column after the count (`MicroBars`' `trail`, `relativeAge`; none in a past window), the
+total on the left, the window's reach in the aside; and **DATA UPDATES** — the count, a floor said "at
+least" (user: "in data updates sometimes there is a text underneath? it's confusing"), drawn as the
+Anchors by metagraph chart (`StackColumns`, one column per global snapshot, its updates stacked by
+metagraph, `dataUpdatesStack`; an unread tick the neutral stub). The register reads its WHOLE window on
+arrival (`RawSnapshotBridge`, `dataStats.unreadOrdinals` — a missed read is its own retry's, never
+re-asked per tick). The Snapshots band's "Anchors by metagraph" chart is NOT a fourth cell: it plots the
 measured history's 24 hours, and the band states one window — here the source's minutes. Under the
 DAG filter every cell says "The DAG's own snapshots carry no data blocks".
 

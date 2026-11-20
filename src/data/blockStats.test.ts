@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { BLOCK_WINDOW_TICKS, type BlockTick } from "@/src/data/blockWindow";
-import { blockScopeOf, blocksByNetwork, blocksInTick, blocksInWindow, blocksPerHourBins, BLOCK_BINS_MAX, lastBlockAt, movedChainOf, movedInWindow, movedPerHourBins } from "@/src/data/blockStats";
+import { blockScopeOf, blocksByNetwork, blocksInTick, blocksInWindow, blocksPerHourBins, BLOCK_BINS_MAX, lastBlockAt, movedChainOf, movedInWindow, movedPerHourBins, usualGap, usualGapWords, blockTickTimes, USUAL_GAP_MIN } from "@/src/data/blockStats";
 import { blockReadKey } from "@/src/data/blockReads";
 import type { BlockRead } from "@/src/engine/domain/blockBraid";
 import type { RawMetaSnapshot } from "@/src/data/types";
@@ -166,5 +166,29 @@ describe("lastBlockAt — LAST BLOCK", () => {
   it("is null with no such block", () => {
     expect(lastBlockAt([])).toBeNull();
     expect(lastBlockAt([tick(1, 1, ["a"])], "DOR")).toBeNull();
+  });
+});
+
+// THE USUAL GAP (2026-11-20, LAST BLOCK A2): the middle half of the window's own gaps.
+describe("usualGap / blockTickTimes / usualGapWords", () => {
+  const M = 60_000;
+  it("is the 25th–75th percentile of the gaps, in any order", () => {
+    const times = [0, 1, 2, 4, 8, 9, 20, 21, 40].map((m) => m * M).reverse(); // gaps 1,1,2,4,1,11,1,19
+    expect(usualGap(times)).toEqual({ lo: 1 * M, hi: 5.75 * M, n: 8 });
+  });
+  it("states nothing on too few gaps (rule 10)", () => {
+    expect(usualGap(Array.from({ length: USUAL_GAP_MIN }, (_, i) => i * M))).toBeNull();
+    expect(usualGap([])).toBeNull();
+  });
+  it("reads only the ticks carrying the chain's blocks", () => {
+    const ticks = [tick(1, 30, ["a"]), tick(2, 20, []), tick(3, 10, [], { dor: [snap(["b"])] })];
+    expect(blockTickTimes(ticks, "dag")).toEqual([Date.parse(ticks[0]!.ts)]);
+    expect(blockTickTimes(ticks, null).length).toBe(2);
+  });
+  it("says the range in the unit its top reads in", () => {
+    expect(usualGapWords({ lo: 90_000, hi: 16 * M })).toBe("2–16 min");
+    expect(usualGapWords({ lo: 12_000, hi: 40_000 })).toBe("12–40 s");
+    expect(usualGapWords({ lo: 60 * M, hi: 3 * 60 * M })).toBe("1–3 h");
+    expect(usualGapWords({ lo: 3.8 * M, hi: 4.2 * M })).toBe("about 4 min");
   });
 });

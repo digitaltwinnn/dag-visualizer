@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BLOCKS_UNREAD, blockAbsence, blockSpanWord, countFigure, countWord, snapshotSpanWord, spanWords, windowWords } from "@/src/data/ledgerSpan";
+import { BLOCKS_UNREAD, blockAbsence, blockSpanWord, countFigure, countWord, metaSnapsInWindow, snapshotSpanWord, spanWords, windowWords } from "@/src/data/ledgerSpan";
 import type { GlobalSnapshot } from "@/src/data/types";
 
 const at = (ms: number, ordinal = ms) => ({ ordinal, timestamp: new Date(ms).toISOString(), hash: "h" }) as GlobalSnapshot;
@@ -126,5 +126,23 @@ describe("countWord — the switch's count beside a span", () => {
     expect(countWord(31, "data block", true)).toBe("31+ data blocks");
     expect(countWord(0, "block")).toBeNull();
     expect(countWord(null, "snapshot")).toBeNull();
+  });
+});
+
+// The count the switch stated and the explorer's foot states (2026-11-20).
+describe("metaSnapsInWindow", () => {
+  const ticks = [
+    { timestamp: "a", metagraphSnapshotCount: 5 },
+    { timestamp: "b", metagraphSnapshotCount: 3 },
+  ];
+  const counts: Record<string, Map<string, number>> = { a: new Map([["dor", 4], ["ded", 1]]), b: new Map([["dor", 2], ["old-dor", 1]]) };
+  const inDor = (id: string) => id === "dor" || id === "old-dor";
+  it("everyone's under All, the global snapshots under the DAG", () => {
+    expect(metaSnapsInWindow(ticks, "all", (t) => counts[t], () => true)).toEqual({ count: 8, floor: false });
+    expect(metaSnapsInWindow(ticks, "dag", (t) => counts[t], () => true)).toEqual({ count: 2, floor: false });
+  });
+  it("a network's own under its filter, former addresses folded in; an unread tick makes a floor", () => {
+    expect(metaSnapsInWindow(ticks, "dor", (t) => counts[t], inDor)).toEqual({ count: 7, floor: false });
+    expect(metaSnapsInWindow(ticks, "dor", (t) => (t === "a" ? counts[t] : undefined), inDor)).toEqual({ count: 4, floor: true });
   });
 });

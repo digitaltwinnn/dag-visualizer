@@ -152,7 +152,13 @@ export function subjectRunEnd(lane: readonly string[], present: (id: string) => 
  *  register's Block ghost, which opens the tick's first block — user, 2026-11-07: the node "sits
  *  above it"); those keep their lane place. The lane stays the one order of the ladder; this is only
  *  how it is laid out. */
-export function displayOrder(lane: readonly string[], present: (id: string) => boolean, stepIds: readonly string[]): string[] {
+export function displayOrder(lane: readonly string[], present: (id: string) => boolean, stepIds: readonly string[], foot: string | null = null): string[] {
+  // THE LANE'S FOOT IS DRAWN LAST, card or ghost (user, 2026-11-20: "data blocks still has metagraph
+  // card right under global snapshot" — a full rung carried in from Metagraph snapshots lost its
+  // snapshot, which carried no data, and the Metagraph card closed up under the Global card while
+  // the ghosts sank beneath it). The foot is a reading ABOUT the chain above (`laneFootOf`), so it
+  // never closes up into a gap in that chain: the chain's own ghosts stand between them.
+  if (foot && lane.includes(foot)) return [...displayOrder(lane.filter((id) => id !== foot), present, stepIds.filter((id) => id !== foot)), foot];
   const waiting = lane.filter((id) => !present(id));
   const primary = stepIds[0];
   const at = primary ? waiting.indexOf(primary) : -1;

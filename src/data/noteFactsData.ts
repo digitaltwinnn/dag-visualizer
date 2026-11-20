@@ -47,6 +47,9 @@ export interface DataFactsInput {
   keyOf: (metaId: string) => string | null;
   /** The window's END: the newest global snapshot's time (epoch ms), or null when it is unknown. */
   endMs?: number | null;
+  /** ONE NETWORK'S NOTE (catalog id, 2026-11-20): its own data blocks alone — no whole-network totals,
+   *  no count of networks — and null when it carried none over the window (no note about nothing). */
+  only?: string;
 }
 
 export function dataFacts(input: DataFactsInput): { facts: Fact[]; names: string[]; lead: NoteLead } | null {
@@ -80,16 +83,20 @@ export function dataFacts(input: DataFactsInput): { facts: Fact[]; names: string
       by.set(key, e);
     }
   }
-  facts.push(fact(anyFloor ? "Data blocks, at least" : "Data blocks", blocks, "count"));
-  facts.push(fact(anyFloor ? "Data updates, at least" : "Data updates", updates, "count"));
+  const only = input.only ?? null;
+  if (only && !((by.get(only)?.blocks ?? 0) > 0)) return null;
+  if (!only) {
+    facts.push(fact(anyFloor ? "Data blocks, at least" : "Data blocks", blocks, "count"));
+    facts.push(fact(anyFloor ? "Data updates, at least" : "Data updates", updates, "count"));
+  }
   const order = Object.keys(input.names);
-  const ids = [...by.keys()].filter((id) => by.get(id)!.blocks > 0).sort((a, b) => (order.indexOf(a) + 1 || 1e9) - (order.indexOf(b) + 1 || 1e9));
+  const ids = [...by.keys()].filter((id) => by.get(id)!.blocks > 0 && (!only || id === only)).sort((a, b) => (order.indexOf(a) + 1 || 1e9) - (order.indexOf(b) + 1 || 1e9));
   for (const id of ids) {
     const e = by.get(id)!;
     const name = input.names[id] ?? "unlisted networks";
     facts.push(fact(e.floor ? `${name} data blocks, at least` : `${name} data blocks`, e.blocks, "count"));
     facts.push(fact(e.floor ? `${name} data updates, at least` : `${name} data updates`, e.updates, "count"));
   }
-  if (ids.length) facts.push(fact("Networks that carried data blocks", ids.length, "count"));
+  if (ids.length && !only) facts.push(fact("Networks that carried data blocks", ids.length, "count"));
   return { facts, names: Object.values(input.names), lead: { kind: "now" } };
 }

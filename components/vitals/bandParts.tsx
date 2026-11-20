@@ -206,7 +206,7 @@ export function foldOther<R extends { key: string; count: number }>(rows: readon
   return [...rows.slice(0, max - 1), ...(rest > 0 ? [{ key: "other" as const, label: "other" as const, count: rest, hue: "var(--muted-foreground)" }] : [])];
 }
 
-export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key: string; label: React.ReactNode; count: number; hue?: string }[]; accent: string; labelW?: number; dashZero?: boolean }) {
+export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key: string; label: React.ReactNode; count: number; hue?: string; /** A second reading after the count, in a muted column of its own — the Data blocks band's last-block age (2026-11-20). */ trail?: React.ReactNode }[]; accent: string; labelW?: number; dashZero?: boolean }) {
   // ⚠️ THE CALLER'S ORDER STANDS — see `Donut` for the full reasoning. In short: a magnitude sort
   // here would re-shuffle the structural cards (type, composition, layers) every time the subject
   // changes, and a row that moves cannot be followed; the ranked cards already arrive sorted from
@@ -217,6 +217,7 @@ export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key
     return <span className="flex items-center self-stretch text-label text-muted-foreground">acquiring…</span>;
   }
   const max = Math.max(1, ...rows.map((r) => r.count));
+  const trails = rows.some((r) => r.trail != null);
   return (
     // `justify-evenly` over the full height rather than a fixed gap: a four-row card already
     // filled its body, but a two-row one sat as a small block with 15px of dead space above and
@@ -238,7 +239,7 @@ export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key
       // `max-[700px]:gap-1.5`: in the phone sheet a card is content-height, so `justify-evenly` has
       // nothing to distribute and the leading-none rows sat on each other.
       className="flex flex-col justify-evenly self-stretch w-[var(--bar-block-w)] max-[700px]:w-full max-[700px]:gap-1.5 max-w-full min-w-0"
-      style={{ ["--bar-block-w" as string]: `calc(${labelW}px + var(--bar-track-max, ${BAR_TRACK_MAX}px) + 40px + 12px)` }}
+      style={{ ["--bar-block-w" as string]: `calc(${labelW}px + var(--bar-track-max, ${BAR_TRACK_MAX}px) + 40px + 12px${trails ? " + 62px" : ""})` }}
     >
       {rows.map((r) => (
         // LEFT-ALIGNED, so the breakdown starts immediately after the card's hairline (user,
@@ -298,6 +299,7 @@ export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key
             {/* Grouped (2026-11-09): the Snapshots band's per-network counts run to tens of thousands. */}
             {dashZero && r.count === 0 ? <span className="text-muted-foreground italic opacity-60">—</span> : r.count.toLocaleString()}
           </span>
+          {trails && <span className="text-label leading-none tabular-nums text-muted-foreground flex-none text-right min-w-[56px] whitespace-nowrap">{r.trail}</span>}
         </span>
       ))}
     </div>

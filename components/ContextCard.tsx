@@ -16,7 +16,7 @@ import { MetaCard } from "@/components/inspector/cards";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { KIND_MARK_CLASS } from "@/components/icons";
 import type { PickDescriptor } from "@/src/data/types";
-import { metagraphCardNetwork } from "@/components/railCards";
+import { cardOnDagBlock, metagraphCardNetwork } from "@/components/railCards";
 
 // The Context (parent) card at the top of the right-rail subject stack. It mirrors the
 // top-bar filter: a metagraph selected there shows its dossier here; on "all" (no selection)
@@ -56,10 +56,12 @@ export default function ContextCard({
   const cardFrom = useStore((s) => VIEW_POLICIES[s.mode].metagraphCard);
   const railNet = useStore((s) => s.railNet);
   const onNode = cardFrom === "node" && filter !== appFilter && !railNet;
+  // …nor in Snapshots when it stands on a committed DAG block's network (`cardOnDagBlock`, 2026-11-20).
+  const onDagBlock = useStore((s) => VIEW_POLICIES[s.mode].metagraphCard === "tickNet" && cardOnDagBlock(s));
   // A commit finer than the filter has its × even on the filter's own network.
   const tickNet = useStore((s) => (VIEW_POLICIES[s.mode].tickScoped ? s.tickNet : null));
   const finer = chartStack ? trendFocus != null : tickNet != null;
-  const clearable = !onNode && (finer || (filter !== appFilter && !chartStack));
+  const clearable = !onNode && !(onDagBlock && filter !== appFilter) && (finer || (filter !== appFilter && !chartStack));
   const close = () => {
     const st = useStore.getState();
     applyClickActions(

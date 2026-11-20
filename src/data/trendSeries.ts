@@ -100,7 +100,7 @@ export const TREND_METRICS: Record<TrendMetric, MetricSpec> = {
   // not one unit. Measured only where the sampler read the transfer lists (`x.cov`, `measuredTx`).
   transfers: { kind: "counter", key: (id) => `m.${id}.tx`, scale: 1, unit: rate },
   // Stored in DATUMS, the chain's own integer unit; read in DAG.
-  fees: { kind: "counter", key: (id) => `m.${id}.fee`, scale: 1e-8, unit: (per) => `DAG ${per}`, format: formatDag },
+  fees: { kind: "counter", key: (id) => `m.${id}.fee`, scale: 1e-8, unit: (per) => `$DAG ${per}`, format: formatDag },
   // Stored in KB; read in MB, which is the scale a day of anchoring actually reaches.
   kb: { kind: "counter", key: (id) => `m.${id}.kb`, scale: 1 / 1024, unit: rate, format: formatMb },
   // The fleet gauge: sampled live, never backfillable (no historical record of the fleet exists
@@ -669,7 +669,7 @@ export function momentPhrase(metric: TrendMetric, stepMs: number, hypergraph = f
     // WORTH, in the sentence (2026-11-04): what they moved, in the network's own token, already
     // formatted by the caller ("worth 120K DOR"); absent where the volume was not measured.
     case "transfers": return { verb: "recorded", rest: `transfers ${worth ? `worth ${worth} ` : ""}${inBucket}` };
-    case "fees": return { verb: "paid", rest: `DAG in fees ${inBucket}` };
+    case "fees": return { verb: "paid", rest: `$DAG in fees ${inBucket}` };
     case "kb": return { verb: "anchored", rest: `of data ${inBucket}` };
     case "nodes": return { verb: "ran", rest: "nodes" };
     case "continuity": return { verb: "created a snapshot every", rest: inBucket };

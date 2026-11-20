@@ -1,4 +1,4 @@
-import { tickerOf } from "@/components/explorer/nodeRow";
+import { unitOf } from "@/components/explorer/nodeRow";
 import type { BlockRead } from "@/src/engine/domain/blockBraid";
 import type { BlockSel } from "@/src/data/types";
 import { compactDag } from "@/src/util/format";
@@ -13,7 +13,7 @@ const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} 
  *  and just say how much moved (no 'from' 'to')", then the card's lead "already shown in the table
  *  below"): the transfers table is where from and to are read. */
 export function blockLead(sel: BlockSel, read: BlockRead | null | undefined, short = false): string {
-  const unit = tickerOf(sel.chain);
+  const unit = unitOf(sel.chain);
   return read && read.txCount > 0 && read.amount > 0
     ? short || read.txCount === 1
       ? `Moved ${compactDag(read.amount)} ${unit}`

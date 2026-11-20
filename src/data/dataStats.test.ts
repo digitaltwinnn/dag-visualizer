@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { ChannelSnapRow, SnapshotExact } from "@/src/data/types";
-import { dataBlocksInWindow, dataByNetwork, dataInWindow, dataPerTick, lastDataTick } from "./dataStats";
+import { dataBlocksByNetwork, dataBlocksInWindow, dataByNetwork, dataUpdatesStack, lastDataByNetwork, settledTicks, unreadOrdinals, dataInWindow } from "./dataStats";
 
 // THE DATA BLOCKS REGISTER'S BAND (D6, 2026-11-07): DATA UPDATES · BY NETWORK · LAST DATA BLOCK, read
 // off the exact reads of the ticks the ledger source holds. A tick whose read has not landed is
@@ -50,10 +50,13 @@ describe("dataBlocksInWindow — the switch's count", () => {
   });
 });
 
-describe("dataPerTick", () => {
-  it("one point per tick, oldest first, a gap where the read has not landed or a row is undecodable", () => {
-    expect(dataPerTick(ticks, reads, all)).toEqual([42, 0, null, null]);
-    expect(dataPerTick(ticks, reads, (id) => id === "DED")).toEqual([40, 0, null, 8]);
+describe("dataBlocksByNetwork — the card's rows (2026-11-20)", () => {
+  it("per network over the ticks dataBlocksInWindow reads, busiest first, summing to its count", () => {
+    const key = (id: string) => id.toLowerCase();
+    expect(dataBlocksByNetwork(ticks, reads, all, key)).toEqual([{ key: "ded", count: 1 }, { key: "dor", count: 1 }]);
+    expect(dataBlocksByNetwork(ticks, reads, (id) => id === "DED", key)).toEqual([{ key: "ded", count: 2 }]);
+    const sum = dataBlocksByNetwork(ticks, reads, all, key).reduce((n, r) => n + r.count, 0);
+    expect(sum).toBe(dataBlocksInWindow(ticks, reads, all).count);
   });
 });
 
@@ -76,10 +79,48 @@ describe("dataByNetwork", () => {
   });
 });
 
-describe("lastDataTick", () => {
-  it("is the newest read tick holding a snapshot that carried data blocks, and whose", () => {
-    expect(lastDataTick(ticks, reads, all)).toEqual({ ordinal: 4, ts: "2026-11-07T10:01:00.000Z", metaId: "DED" });
-    expect(lastDataTick(ticks, reads, (id) => id === "DOR")).toEqual({ ordinal: 1, ts: "2026-11-07T10:00:00.000Z", metaId: "DOR" });
-    expect(lastDataTick(ticks, reads, (id) => id === "NDT")).toBeNull();
+
+
+describe("lastDataByNetwork — LAST DATA BLOCK under All (2026-11-20)", () => {
+  it("each network's newest read tick that carried its data, newest first", () => {
+    const key = (id: string) => id.toLowerCase();
+    expect(lastDataByNetwork(ticks, reads, all, key)).toEqual([
+      { key: "ded", ts: ticks[3]!.timestamp, ordinal: 4 },
+      { key: "dor", ts: ticks[0]!.timestamp, ordinal: 1 },
+    ]);
+    expect(lastDataByNetwork(ticks, reads, (id) => id === "DOR", key)).toEqual([{ key: "dor", ts: ticks[0]!.timestamp, ordinal: 1 }]);
+  });
+});
+
+describe("unreadOrdinals — what the Data blocks register reads on arrival (2026-11-20)", () => {
+  it("the window's ticks with no exact read, newest first", () => {
+    expect(unreadOrdinals(ticks, reads)).toEqual([3]);
+    expect(unreadOrdinals(ticks, {})).toEqual([4, 3, 2, 1]);
+    // A missed read is its retry's to re-ask, never this list's (review, 2026-11-20).
+    expect(unreadOrdinals(ticks, {}, { 3: 1 })).toEqual([4, 2, 1]);
+  });
+});
+
+describe("settledTicks — a read in flight is arriving, not unread (2026-11-20)", () => {
+  it("drops the ticks newer than the newest settled read; keeps an unread one below it", () => {
+    // reads hold 1, 2, 4 (3 unread below the edge); a newer tick 5 is in flight.
+    const t5 = [...ticks, { ordinal: 5, timestamp: "2026-11-07T10:01:20.000Z" }];
+    expect(settledTicks(t5, reads).map((t) => t.ordinal)).toEqual([1, 2, 3, 4]);
+    // A MISSED read settles too: its tick stays, counted as unread.
+    expect(settledTicks(t5, reads, { 5: 1 }).map((t) => t.ordinal)).toEqual([1, 2, 3, 4, 5]);
+    expect(settledTicks(ticks, {})).toEqual([]);
+  });
+});
+
+describe("dataUpdatesStack — the Data updates chart (2026-11-20)", () => {
+  it("one column per tick, oldest first, split by network in order; unread is null", () => {
+    const key = (id: string) => id.toLowerCase();
+    expect(dataUpdatesStack(ticks, reads, all, key, ["dor", "ded"])).toEqual([
+      { ordinal: 1, v: 42, segs: [{ key: "dor", n: 2 }, { key: "ded", n: 40 }] },
+      { ordinal: 2, v: 0, segs: [] },
+      { ordinal: 3, v: null, segs: [] },
+      { ordinal: 4, v: null, segs: [] }, // an undecodable in-scope row: unknown, never a zero
+    ]);
+    expect(dataUpdatesStack(ticks, reads, (id) => id === "DED", key, [])[3]).toEqual({ ordinal: 4, v: 8, segs: [{ key: "ded", n: 8 }] });
   });
 });

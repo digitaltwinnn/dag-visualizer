@@ -15,7 +15,10 @@ import { IdentityDot } from "@/components/inspector/parts";
 import { ensurePage } from "@/components/RawSnapshotBridge";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { useLedgerSource } from "@/components/useLedgerSource";
-import { BLOCKS_UNREAD, blockAbsence, blockSpanWord, snapshotSpanWord } from "@/src/data/ledgerSpan";
+import { BLOCKS_UNREAD, blockAbsence, blockSpanWord, countFigure, metaSnapsInWindow, snapshotSpanWord } from "@/src/data/ledgerSpan";
+import { dataBlocksInWindow, settledTicks } from "@/src/data/dataStats";
+import { REGISTER_ICONS } from "@/components/icons";
+import { ledgerAnchor } from "@/src/data/network";
 import { cn } from "@/lib/utils";
 import { latestRelevant } from "@/src/data/follow";
 import { REGISTER_MEASURES, tickDataUpdates, snapMeasure, snapMeasureValue, tickMeasure, tickMeasureValue, tickNetMeasure, type LedgerMeasure, REGISTER_SUBJECTS } from "@/src/data/ledgerMeasure";
@@ -24,7 +27,7 @@ import { filterAccent } from "@/src/data/network";
 import { metaSnapHoverKey, type GlobalSnapshot, type SnapshotExact } from "@/src/data/types";
 import { displayNetwork, LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 import { POLL } from "@/src/engine/config";
-import { followToggleActions, metaSnapSelectActions, sameMetaSnap, snapshotSelectActions, tickNetSelectActions } from "@/src/engine/domain/pickActions";
+import { followToggleActions, metaSnapSelectActions, netKeyOf, sameMetaSnap, snapshotSelectActions, tickNetSelectActions } from "@/src/engine/domain/pickActions";
 import { heldTicks, nextHoldTop } from "@/src/data/ledgerHold";
 import { CLOSED_PATH, pathViewChanged, syncLedgerPath, type LedgerPath, type LedgerPathView } from "@/src/data/ledgerPath";
 import LiveDot from "@/components/LiveDot";
@@ -192,6 +195,7 @@ export default function LedgerPanel() {
   const metaSnap = useStore((s) => s.metaSnap);
   const tickNet = useStore((s) => s.tickNet);
   const snapshotExact = useStore((s) => s.snapshotExact);
+  const exactMiss = useStore((s) => s.exactMiss);
   // ONE PICK FOR EVERY LEVEL (user, 2026-09-29 — `src/data/explorerMeasure.ts`): the lower levels
   // show the tick level's `ledgerMeasure` where they can state it and their own first measure where
   // they can't, and a pick at any level writes that one value — so stepping down and back up never
@@ -356,14 +360,31 @@ export default function LedgerPanel() {
   // and left with the About page's copy; how the site holds data is not the reader's vocabulary).
   // A PAST WINDOW states its own stretch of time, not "last N min" (which would be a claim about now);
   // while it is read, and if the read fails, the foot says that instead.
+  // …AND WHAT FILLS IT (user, 2026-11-20: the register switch's readings left the face — "ensure the
+  // other two can be included somewhere"): the register's own subject counted over the span, the
+  // glyph naming the unit as it did on the switch — the metagraph snapshots the window anchored
+  // (`metaSnapsInWindow`), the data blocks its exact reads carry in Data blocks; a floor says "+".
+  const inLens = (metaId: string): boolean => filter === "all" || netKeyOf(metaId) === filter;
+  const footCount = pastStatus === "loading" || pastStatus === "failed" ? null : measures.dataOnly
+    ? ((d) => countFigure(d.count, d.read < d.total))(dataBlocksInWindow(settledTicks(orderedSnaps, snapshotExact, exactMiss), snapshotExact, inLens))
+    : ((m) => countFigure(m.count, m.floor))(metaSnapsInWindow(orderedSnaps, filter, (ts) => ledgerAnchor(ts)?.metaCounts, inLens));
+  const RegisterGlyph = REGISTER_ICONS[register];
+  const countAfter = (figure: string | null) =>
+    figure ? (
+      <span className="ml-2.5 inline-flex items-center gap-1 font-mono normal-case tracking-normal tabular-nums">
+        <RegisterGlyph aria-hidden className="size-3 flex-none opacity-80" />
+        {figure}
+      </span>
+    ) : null;
   const spanScope = {
     // The status first: while another window loads, or after a read failed, the held window (if
     // any) is not what the reader asked for.
     word: snapshotSpanWord({ pastStatus, past: past?.globalSnapshots ?? null, live: orderedSnaps }),
+    after: countAfter(footCount),
   };
   const spanFooter =
     (live || past || pastStatus) && orderedSnaps.length > 0 ? (
-      <ExplorerFoot left={spanScope.word} />
+      <ExplorerFoot left={<>{spanScope.word}{spanScope.after}</>} />
     ) : undefined;
   const levels: ExplorerLevelSpec[] = [
     {
@@ -728,7 +749,7 @@ export default function LedgerPanel() {
           to={Math.min(bPage * pageSize, allBlocks.length)}
           total={allBlocks.length}
           compact
-          scope={{ word: blockSpan }}
+          scope={{ word: blockSpan, after: countAfter(countFigure(allBlocks.length)) }}
           onPage={(p) => setBlockPage(p)}
         />
       ) : undefined,

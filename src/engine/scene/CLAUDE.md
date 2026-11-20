@@ -663,13 +663,16 @@ selected block: the trail holds only the visible rows until a selection grows it
 must be READ facts, not both drawn — the stub is what keeps every reference on screen. A block whose
 read has not landed states no references and draws none.
 
-**A token block stands OVER its tile, laid out as the DAG blocks are, in a SHORT band** (user,
+**A token block stands OVER its tile, laid out as the DAG blocks are, in a pane the DAG pane's height** (user,
 2026-11-07: "identical to how they are laid out for $DAG, so vertical, no long horizontal" — it
 superseded the on-the-tile nudge; 2026-11-08: the band was the DAG band's height, re-based on the tile,
 and it climbed out of the chamber's frame while every block's line ran on to the floor, so the blocks
 read as hung off the GLOBAL snapshots — "it attached to the global snapshots … not shown correctly"):
-centred on the tile of the metagraph snapshot that accepted it, its fork's height in a band a QUARTER
-of the DAG's (`TOKEN_BRAID_HALF`), `TOKEN_GAP` of clear room above the tile's top (`forkSpread` over
+centred on the tile of the metagraph snapshot that accepted it, its fork's height in the band its pane
+holds (`TOKEN_BRAID_HALF`) — the pane the DAG pane's own height, `BRAID_PANE_H` (user, 2026-11-20: "does
+the vertical plane for metagraph transaction blocks have the same height as the hypergraph (DAG) plane?
+looks smaller, should be same"; it was a quarter of it from 2026-11-08, and the user kept the full height
+with a tall fork reaching up behind the register switch at the resting camera), `TOKEN_GAP` of clear room above the tile's top (`forkSpread` over
 every token chain at once, the widest token fork fitted to that half — `_tokenBraidScale`, held as
 `_braidScale` is), siblings at one height stepping aside along the trail by `TOKEN_STEP`, in the
 lane's hue, opaque like the tile. The protocol's two steps are drawn once each: a seal line falls

@@ -8,6 +8,10 @@ import { metaSnapDeepKey } from "@/src/data/types";
 import { reportPoll } from "@/src/data/api";
 import { probableLineage } from "@/src/data/network";
 import { LISTED_IDS } from "@/src/data/unlisted";
+import { getNetwork } from "@/src/data/network";
+import { getPastWindow, ledgerSource, onPastWindow } from "@/src/data/pastWindow";
+import { unreadOrdinals } from "@/src/data/dataStats";
+import { drawsDataBlocks, registerOf } from "@/src/engine/domain/viewPolicy";
 
 // Addresses already named this session — the warning says each once.
 const warnedLineage = new Set<string>();
@@ -186,6 +190,22 @@ export default function RawSnapshotBridge() {
   const backfilled = useRef(false);
 
   useEffect(() => { if (wanted) void ensure(liveOrd); }, [liveOrd, wanted]);
+
+  // THE DATA BLOCKS REGISTER READS ITS WHOLE WINDOW (user, 2026-11-20: "why it says 'at least'?" →
+  // "yes"): its tiles' data marks and every count in its band and explorer are read off the exact
+  // reads, and the backfill above covers only the newest BACKFILL_N — so for ~20 minutes the older
+  // tiles drew no mark and every figure was a floor. While the register is on screen, every unread
+  // snapshot of its window (the live buffer or a past window) is read, `WINDOW_READ_POOL` at a time,
+  // the Transaction blocks window's own mechanism; each new tick re-asks only what is missing.
+  const dataOn = useStore((s) => drawsDataBlocks(registerOf(s.mode, s.ledgerRegister)));
+  const past = useSyncExternalStore(onPastWindow, getPastWindow, () => null);
+  useEffect(() => {
+    if (!wanted || !dataOn) return;
+    const src = ledgerSource(getNetwork(), "data");
+    const st = useStore.getState();
+    const want = unreadOrdinals(src?.globalSnapshots ?? [], st.snapshotExact, st.exactMiss);
+    return want.length ? ensureMany(want) : undefined;
+  }, [wanted, dataOn, liveOrd, past]);
   useEffect(() => { void ensure(selOrd); }, [selOrd]);
 
   // One-shot, on the first live tick. The timer lives in a ref and is NOT cleaned per dep

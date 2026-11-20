@@ -1,6 +1,5 @@
 "use client";
 
-import { Clock } from "lucide-react";
 import { useSyncExternalStore } from "react";
 import { REGISTER_ICONS } from "@/components/icons";
 import { REGISTER_NAMES, layerPhrase, registerLine } from "@/components/views";
@@ -12,9 +11,9 @@ import { useFeedRead } from "@/components/useFeedRead";
 import { useNowTick } from "@/components/useNowTick";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { POLL } from "@/src/engine/config";
-import { blockSpanWord, countFigure, countWord, snapshotSpanWord } from "@/src/data/ledgerSpan";
+import { blockSpanWord, countWord, metaSnapsInWindow, snapshotSpanWord } from "@/src/data/ledgerSpan";
 import { windowBlocks } from "@/src/data/blockWindow";
-import { dataBlocksInWindow } from "@/src/data/dataStats";
+import { dataBlocksInWindow, settledTicks } from "@/src/data/dataStats";
 import { getBlockWindow, getPastWindow, onBlockWindow, onPastWindow } from "@/src/data/pastWindow";
 import type { LedgerRegister } from "@/src/store/mode";
 import { switchLedgerRegister } from "@/src/store/applyClickActions";
@@ -60,15 +59,20 @@ import { useBreakpoint } from "@/components/useBreakpoint";
  *  ever carried in one); the Global snapshot the base everything lands in, never pressable. The tiles
  *  are NAMES ONLY; the lit register's readings are stated once, in the line under the face. */
 const FACE_H = 100;
-/** The phone's face: the same layered face at the label step. */
-const FACE_H_PHONE = 92;
-/** The readings line under the face (the lit register's span, count and state). */
-const READINGS_H = 22;
-/** The switch block's whole height on a tier — face and readings; the register's sentence is the
- *  caption at the scene's bottom now (`#register-caption`). The one number the motion hint's drop
- *  reads, and what `#register-switch` measures, so the callout's free band starts under it. */
+/** THE PHONE'S FACE IS LOWER, THE LAYERS KEPT (user, 2026-11-20, option A of the design round: "too
+ *  high in phone mode. I like the hierarchy but can we lower the height? … 'global snapshot' needs no
+ *  box because it's not clickable"): two 24px tile rows, every name on one line, and the base a RULED
+ *  LABEL — a hairline with "Global snapshot" set into it, no plate. (Option B, the readings in the
+ *  base row, shipped for an hour and was reversed.)
+ *  NO READINGS LINE, ON ANY TIER (user, the same day: "we can remove the 9 min | 326 | live if we move
+ *  live to the button and ensure the other two can be included somewhere"): the lit tile wears the
+ *  state mark, and the span and count are the explorer foot's (and the Data blocks band's). */
+const FACE_H_PHONE = 78;
+/** The switch block's whole height on a tier; the register's sentence is the caption at the scene's
+ *  bottom (`#register-caption`). The one number the motion hint's drop reads, and what
+ *  `#register-switch` measures, so the callout's free band starts under it. */
 export function registerSwitchH(phone: boolean): number {
-  return (phone ? FACE_H_PHONE : FACE_H) + READINGS_H;
+  return phone ? FACE_H_PHONE : FACE_H;
 }
 /** Where each register's tile stands in the layered face (two columns, three rows). */
 const PLACE: Readonly<Record<LedgerRegister, string>> = {
@@ -104,6 +108,7 @@ export default function RegisterSwitch() {
   const pastStatus = useStore((s) => s.pastWindow?.status ?? null);
   const blockStatus = useStore((s) => s.blockWindowStatus);
   const snapshotExact = useStore((s) => s.snapshotExact);
+  const exactMiss = useStore((s) => s.exactMiss);
   const { snaps } = useSnapshotFeed(POLL.maxSnapshots, on);
   const past = useSyncExternalStore(onPastWindow, getPastWindow, () => null);
   const blocks = useSyncExternalStore(onBlockWindow, getBlockWindow, () => null);
@@ -121,76 +126,29 @@ export default function RegisterSwitch() {
   if (!on) return null;
 
   // The Data blocks register reads the Metagraph snapshots register's own source (the live buffer or
-  // a past window), so its half says the same span in the same words.
-  const spans = (short: boolean, bare = false): Record<LedgerRegister, string> => {
-    const snapshotSpan = snapshotSpanWord({ pastStatus, past: past?.globalSnapshots ?? null, live: [...snaps].reverse(), nowMs: now, short, bare });
-    return {
-      snapshots: snapshotSpan,
-      blocks: blockSpanWord({ status: blockStatus, globals: blocks?.globalSnapshots ?? [], nowMs: now, around: blocks ? blocks.around : undefined, short, bare }),
-      data: snapshotSpan,
-    };
+  // a past window), so its span is the same words.
+  const snapshotSpan = snapshotSpanWord({ pastStatus, past: past?.globalSnapshots ?? null, live: [...snaps].reverse(), nowMs: now });
+  const span: Record<LedgerRegister, string> = {
+    snapshots: snapshotSpan,
+    blocks: blockSpanWord({ status: blockStatus, globals: blocks?.globalSnapshots ?? [], nowMs: now, around: blocks ? blocks.around : undefined }),
+    data: snapshotSpan,
   };
-  const span = spans(false); // the full words: the accessible name
-  const bareSpan = spans(false, true); // on the glass: the clock glyph says "last"
-  // THE COUNT beside the span (user, 2026-11-07): what fills the stretch — the source's ticks (the
-  // live buffer's fixed depth, or the past window's) for the two snapshot registers, the window's
-  // blocks for Transaction blocks; none while a half says a read state. Desktop only: on a phone the
-  // lit half's full words already run to the gutters.
-  // Each half counts ITS OWN SUBJECT (user, 2026-11-07: "its subject is metagraph snapshots, count
-  // those instead of global, same for data blocks"): the METAGRAPH SNAPSHOTS the source's ticks
-  // anchored (the feed's own per-tick count), the DATA BLOCKS their exact reads carry (a floor,
-  // "31+", while reads are still landing — rule 10), the window's BLOCKS.
+  // THE LIT TILE'S ACCESSIBLE NAME keeps the readings the face no longer draws — each register's own
+  // subject counted under the filter, the explorer foot's own figures (`metaSnapsInWindow`).
   const sourceTicks = past ? past.globalSnapshots : [...snaps].reverse();
   const reading = pastStatus === "loading" || pastStatus === "failed";
-  // …UNDER THE FILTER (user, 2026-11-19: "the metrics inside the switcher are not updated when we
-  // filter"): a network's own metagraph snapshots (the anchor index's per-address counts, its former
-  // addresses folded in by `netKeyOf` — the band's own read) and its own data blocks; the DAG's
-  // snapshots ARE the global snapshots, so under its filter the half counts those. Transaction blocks
-  // needs nothing here: its window is already read for the filter's network.
   const inScope = (metaId: string): boolean => filter === "all" || netKeyOf(metaId) === filter;
-  // A tick whose per-network counts have not landed is UNKNOWN for a network: the sum is a floor then.
-  let metaSnapsFloor = false;
-  const metaSnaps =
-    filter === "all" ? sourceTicks.reduce((n, g) => n + (g.metagraphSnapshotCount ?? 0), 0)
-    : filter === "dag" ? sourceTicks.length
-    : sourceTicks.reduce((n, g) => {
-        const mc = ledgerAnchor(g.timestamp)?.metaCounts;
-        if (!mc) { metaSnapsFloor = true; return n; }
-        for (const [id, c] of mc) if (inScope(id)) n += c;
-        return n;
-      }, 0);
-  const data = dataBlocksInWindow(sourceTicks, snapshotExact, inScope);
+  const metaSnaps = metaSnapsInWindow(sourceTicks, filter, (ts) => ledgerAnchor(ts)?.metaCounts, inScope);
+  // The settled window, as the band and the explorer foot count it: a read in flight is arriving.
+  const data = dataBlocksInWindow(settledTicks(sourceTicks, snapshotExact, exactMiss), snapshotExact, inScope);
   const blockCount = blockStatus?.status === "ready" && blocks?.globalSnapshots.length ? windowBlocks(blocks).length : null;
   const count: Record<LedgerRegister, string | null> = {
-    snapshots: reading ? null : countWord(metaSnaps, "snapshot", metaSnapsFloor),
+    snapshots: reading ? null : countWord(metaSnaps.count, "snapshot", metaSnaps.floor),
     blocks: countWord(blockCount, "block"),
     data: reading ? null : countWord(data.count, "data block", data.read < data.total),
   };
-  // The bare figure on the glass (option A): the register's glyph before it names the unit.
-  const figure: Record<LedgerRegister, string | null> = {
-    snapshots: reading ? null : countFigure(metaSnaps, metaSnapsFloor),
-    blocks: countFigure(blockCount),
-    data: reading ? null : countFigure(data.count, data.read < data.total),
-  };
-  // TWO GLYPHED READINGS, NO DIVIDER (option A, 2026-11-08): the clock says "the last", the register's
-  // glyph says what is counted; a gap parts them. NOT COLOUR-CODED (user, 2026-11-09): the count reads
-  // in the row's own ink, as the span beside it.
-  const readings = (r: LedgerRegister, Icon: (typeof REGISTER_ICONS)[LedgerRegister]) => !runs(r) ? (
-    // No subject under this filter: the layer it lacks, named as the register's sentence names it.
-    <span className="font-sans">no {layerPhrase(REGISTER_LAYER[r] ?? "dl1")}</span>
-  ) : (
-    <>
-      <Clock aria-hidden className="size-3 flex-none opacity-80" />
-      <span>{bareSpan[r]}</span>
-      {figure[r] && (
-        <span className="ml-2 inline-flex items-center gap-1">
-          <Icon aria-hidden className="size-3 flex-none opacity-80" />
-          {figure[r]}
-        </span>
-      )}
-    </>
-  );
-  const LitIcon = REGISTER_ICONS[register];
+  const spoken = (r: LedgerRegister): string =>
+    !runs(r) ? `no ${layerPhrase(REGISTER_LAYER[r] ?? "dl1")}` : count[r] ? `${span[r]}, ${count[r]}` : span[r];
   // The scene's glass (`SCENE_GLASS`'s ground and blur), as a control — both presentations wear it.
   const FRAME = "rounded-lg border border-border bg-[var(--panel-solid)] backdrop-blur-[8px]";
 
@@ -223,8 +181,9 @@ export default function RegisterSwitch() {
         aria-label="Register"
         style={{ height: phone ? FACE_H_PHONE : FACE_H }}
         // On the phone the right column takes more of the width, so "Metagraph snapshots" stays one
-        // line; "Transaction blocks" wraps in its tall tile instead, where two lines have room.
-        className={cn("grid grid-cols-2 max-[700px]:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] grid-rows-[1fr_1fr_auto] gap-[3px] p-1", FRAME)}
+        // line; every name holds ONE line since 2026-11-20 (option A), the live dot alone beside the
+        // lit one, and the phone's tile padding is 6px so the lit "Transaction blocks" fits at 360px.
+        className={cn("grid grid-cols-2 max-[700px]:grid-cols-[minmax(0,0.88fr)_minmax(0,1.12fr)] grid-rows-[1fr_1fr_auto] max-[700px]:grid-rows-[24px_24px_1fr] gap-[3px] p-1", FRAME)}
       >
         {registers.map((r) => {
           const Icon = REGISTER_ICONS[r];
@@ -236,8 +195,12 @@ export default function RegisterSwitch() {
               onClick={() => switchLedgerRegister(r)}
               className={cn(
                 PLACE[r],
-                "group flex items-center justify-center gap-1.5 rounded-md px-4 max-[700px]:px-2 cursor-pointer border-0",
-                "text-body max-[700px]:text-label font-semibold leading-none whitespace-nowrap max-[700px]:whitespace-normal max-[700px]:text-center max-[700px]:leading-tight",
+                // H1 (user, 2026-11-20: "a hairline … to show it's a 'layer'", no extra height): every tile
+                // stands on its own hairline ledge, the lit one's in the accent — a slab resting on the
+                // layer below, the base's own rule repeated up the stack.
+                "group flex items-center justify-center gap-1.5 max-[700px]:gap-1 rounded-t-md rounded-b-[2px] px-4 max-[700px]:px-1.5 cursor-pointer border-0 border-b border-border",
+                "aria-pressed:border-[color-mix(in_oklch,var(--primary)_60%,transparent)]",
+                "text-body max-[700px]:text-label font-semibold leading-none whitespace-nowrap",
                 "bg-transparent text-muted-foreground hover:text-foreground hover:bg-wash-soft",
                 "aria-pressed:bg-[var(--sel-bg)] aria-pressed:text-primary-ink aria-pressed:hover:bg-[var(--sel-bg)]",
                 "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
@@ -247,27 +210,31 @@ export default function RegisterSwitch() {
             >
               <Icon aria-hidden className="size-3.5 flex-none group-aria-pressed:text-primary" />
               <span>{REGISTER_NAMES[r]}</span>
+              {/* LIVE RIDES THE LIT TILE (2026-11-20): the register's follow state, where its readings
+                  line said it — the live dot (its word on the desktop), the pin, or n/a. */}
+              {register === r && (
+                <StateMark following={following} na={paused} bare={phone} className="ml-1 max-[700px]:ml-0 font-normal leading-none" />
+              )}
+              {register === r && <span className="sr-only">, {spoken(r)}</span>}
             </button>
           );
         })}
-        {/* THE GROUND: where every register's subject lands, so it is drawn and never pressed. */}
-        <span className="col-span-2 row-start-3 flex items-center justify-center rounded-md py-1 bg-[var(--panel-plate)] shadow-[inset_0_0_0_1px_var(--border)] text-label uppercase tracking-caps text-muted-foreground leading-none select-none">
-          Global snapshot
-        </span>
+        {/* THE GROUND: where every register's subject lands, so it is drawn and never pressed. On the
+            phone it is no plate but a ruled label: the hairline the tiles stand on, the ground's name
+            set into it (option A, 2026-11-20). */}
+        {phone ? (
+          <div className="col-span-2 row-start-3 flex items-center gap-2 px-1 select-none">
+            <span aria-hidden className="h-px flex-1 bg-border" />
+            <span className="text-label uppercase tracking-caps text-muted-foreground leading-none">Global snapshot</span>
+            <span aria-hidden className="h-px flex-1 bg-border" />
+          </div>
+        ) : (
+          <span className="col-span-2 row-start-3 flex items-center justify-center rounded-md py-1 bg-[var(--panel-plate)] shadow-[inset_0_0_0_1px_var(--border)] text-label uppercase tracking-caps text-muted-foreground leading-none select-none">
+            Global snapshot
+          </span>
+        )}
       </div>
 
-      {/* THE READINGS, ONCE (readings option 2): the lit register's span, count and state, under the
-          face — or, where the filtered network runs no such layer, the layer it lacks and "n/a". They
-          stay with the switch (user, 2026-11-19, layout option 3): they say which register is lit and
-          whether it is live. */}
-      <div
-        style={{ height: READINGS_H }}
-        className="flex items-end justify-center gap-1 font-mono text-label leading-none tabular-nums whitespace-nowrap text-foreground"
-      >
-        {readings(register, LitIcon)}
-        <StateMark following={following} na={paused} className="ml-2 font-sans leading-none" />
-        <span className="sr-only">{count[register] ? `${span[register]}, ${count[register]}` : span[register]}</span>
-      </div>
     </div>
 
     {/* THE CAPTION (layout option 3): the register's sentence (`registerLine`) moved off the top to the

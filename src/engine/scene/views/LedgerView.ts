@@ -283,19 +283,24 @@ const BLOCK_STEP = 0.7;
 /** THE TOKEN BRAID is a SHORT band stood on the TILE (user, 2026-11-07: "identical to how they are
  *  laid out for $DAG"; 2026-11-08: a fork the DAG band's height climbed out of the chamber's frame and
  *  read as hung off the global floor — "it attached to the global snapshots … not shown correctly"):
- *  a quarter of the DAG band, `TOKEN_GAP` of clear room above the tile's top, so the blocks visibly sit
+ *  the DAG pane's height since 2026-11-20 (`BRAID_PANE_H`), `TOKEN_GAP` of clear room above the tile's top, so the blocks visibly sit
  *  on the snapshot that accepted them; blocks sharing a tile and a height step aside along the trail by
  *  `TOKEN_STEP` (`BLOCK_STEP` at the token block's scale). A block's seal line ends at ITS TILE; the
  *  tile's own line carries on to the global band, one per tile. */
+/** The tallest tile's top above its plane (a tile is 0.48 at most): a token pane spans the band over
+ *  the shortest tile's top to the tallest's. */
+const TILE_TOP_MAX = 0.48;
 const TOKEN_GAP = 0.6;
-const TOKEN_BRAID_HALF = BRAID_HALF / 4;
+/** ONE PANE HEIGHT FOR BOTH BRAIDS (user, 2026-11-20: "does the vertical plane for metagraph
+ *  transaction blocks have the same height as the hypergraph (DAG) plane? looks smaller, should be
+ *  same" — superseding 2026-11-08's quarter band): a token pane is the DAG pane's height, its band what
+ *  the pane holds once a token block's edge either side and the tallest tile's top are taken out. */
+const BRAID_PANE_H = BRAID_HALF * 2 + DAG_BLOCK * 2;
+const TOKEN_BRAID_HALF = (BRAID_PANE_H - TOKEN_BLOCK * 2 - TILE_TOP_MAX) / 2;
 const TOKEN_BRAID_LIFT = TOKEN_GAP + TOKEN_BLOCK / 2 + TOKEN_BRAID_HALF;
 const TOKEN_STEP = BLOCK_STEP * (TOKEN_BLOCK / DAG_BLOCK);
 /** The tile mesh's own depth (the BoxGeometry's z, which becomes height under the -90° X spin). */
 const TILE_D = 0.35;
-/** The tallest tile's top above its plane (a tile is 0.48 at most): a token pane spans the band over
- *  the shortest tile's top to the tallest's. */
-const TILE_TOP_MAX = 0.48;
 
 // The view-entry drop's shape (see the VIEW-ENTRY DROP note in the class): fall height and
 // per-slot timing. The TOTAL is derived so _entryT in [0,1] maps onto real seconds.
@@ -682,7 +687,7 @@ export class LedgerView implements SceneView {
     // The braid pane: the band the DAG braid opens in (`BRAID_HALF` about `BRAID_Y`, a block's edge of
     // room either side), standing just behind the blocks on the camera's far side of their centre line.
     this._braidPane = new BraidPane(this.group, this._colors, {
-      w: W, h: BRAID_HALF * 2 + DAG_BLOCK * 2, cx, cy: BRAID_Y, cz: -(DAG_BLOCK / 2 + 0.15),
+      w: W, h: BRAID_PANE_H, cx, cy: BRAID_Y, cz: -(DAG_BLOCK / 2 + 0.15),
     });
     this._braidPane.setHorizon(HORIZON_X, HORIZON_SPAN);
     // …and a token braid's over each metagraph lane: the band its blocks open in over a tile, a block's
@@ -690,7 +695,7 @@ export class LedgerView implements SceneView {
     for (let i = 0; i < n; i++) {
       const key = this._laneOrder[i];
       const pane = new BraidPane(this.group, this._colors, {
-        w: W, h: TOKEN_BRAID_HALF * 2 + TOKEN_BLOCK * 2 + TILE_TOP_MAX,
+        w: W, h: BRAID_PANE_H, // the DAG pane's own height (2026-11-20)
         cx, cy: FLOOR_Y.msnap + TILE_LIFT + TILE_TOP_MAX / 2 + TOKEN_BRAID_LIFT, cz: laneSpan(i, n).cz - (TOKEN_BLOCK / 2 + 0.1),
       });
       pane.setHorizon(HORIZON_X, HORIZON_SPAN);

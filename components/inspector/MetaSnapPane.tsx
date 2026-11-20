@@ -187,12 +187,17 @@ export default function MetaSnapPane({
   // a control in the slot that is a qualifier or a state everywhere else. The control is the
   // GLOBAL snapshot card's alone now (B1: the card that owns the tick owns live / pinned), and
   // this card says what it is to that tick in its first sentence.
-  // ⚠️ NO TICKER CHIP in the aside, although the proposal drew one: the Metagraph card sits
-  // directly above since the tick-local network landed (`store.tickNet`), and a card never
-  // restates its ancestor (the pile rule — the same reason the ticker left this head on
-  // 2026-08-10).
+  // ⚠️ NO TICKER CHIP in the aside, although the proposal drew one: a pill there yields in the
+  // fold anyway, and the network has its sentence now (below).
+  // THE LEAD NAMES THE NETWORK (user, 2026-11-20: "add a row … about which network it belongs to …
+  // 'anchored to N' + 'by <metagraph>'"). The Metagraph card stood directly above this one and
+  // stated it, so the pile rule kept it out (2026-08-10); since the Metagraph card moved to the
+  // lane's FOOT (the same day) nothing above says whose snapshot this is, and the relation sentence
+  // is where it reads: anchored to that global, by this network. An uncatalogued channel is one of
+  // the unlisted set, named as such.
   // The AGE is the lead's chip, not a clause after a mid-dot (user, 2026-10-03).
-  const lead = `${following && !paused && !sameTick ? "Following live, anchored" : "Anchored"} to ${anchor}`;
+  const by = cfg?.name ?? "an unlisted network";
+  const lead = `${following && !paused && !sameTick ? "Following live, anchored" : "Anchored"} to ${anchor} by ${by}`;
 
   return (
     <RailPane
@@ -267,7 +272,7 @@ export default function MetaSnapPane({
                   {/* Fee leads, size rides under it — the global card's own two-line value, so
                       the pair reads identically on both storeys of the chain. */}
                   <Fact label="Fees paid">
-                    <span className="whitespace-nowrap">{fmtDagShort(row.fee)} DAG</span>
+                    <span className="whitespace-nowrap">{fmtDagShort(row.fee)} $DAG</span>
                   </Fact>
                   <Fact label="Size">
                     <span className="flex flex-col items-end">

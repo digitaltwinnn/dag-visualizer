@@ -674,16 +674,23 @@ const anchoringNetworkChildren = (s: SiblingState, n: number): SiblingStep[] => 
     actions: tickNetSelectActions(meta.id, snap, { metaSnap: s.metaSnap, block: s.block ?? null }),
   }));
 };
-/** ledger: the committed network's OWN snapshots in the shown tick — never the tick's first rows,
- *  which would re-commit the filter to whichever network leads the exact read and release the
- *  committed story (review find, 2026-09-11). None → the network did not anchor here, which is
- *  the honest answer. */
+/** ledger: THE TICK'S CHILD IS ITS METAGRAPH SNAPSHOT (user, 2026-11-20: "we're looking at
+ *  blocks/snapshots as the main subjects, so metagraph is additional information and should not be
+ *  at the top levels of the rung" — the Metagraph card left the slot between the two snapshots for
+ *  the lane's foot). The network the tick resolves against (`ledgerNetwork`: the one committed
+ *  inside the tick, else the filter) opens its OWN newest snapshot here — never another network's
+ *  row, so a lens is never stepped out of (review find, 2026-09-11). Under All, the DAG, or a filter
+ *  this tick holds nothing of (its card stood down — `ledgerCardNetwork`), the tick opens whole:
+ *  its first row as the explorer lists it. The builder commits the snapshot's network inside the
+ *  tick with it (`tickNetOf`), so the Metagraph card fills at the lane's foot — never the filter. */
 const metaSnapOfTickChildren = (s: SiblingState, n: number): SiblingStep[] => {
-  const net = netOf(s);
-  if (net === "all" || !s.snap) return [];
+  if (!s.snap) return [];
   const snap = s.snap;
-  // The DAG core's card opens the tick's first snapshot, whichever network's (`tickWideRows`).
-  if (net === DAG_CORE) {
+  const stoodDown = s.tickNet == null && s.ticks.find((t) => t.data.ordinal === snap.data.ordinal)?.inStory === false;
+  const net = stoodDown ? "all" : netOf(s);
+  // The DAG core's card, and a tick with no network resolved, open the tick's first snapshot,
+  // whichever network's (`tickWideRows`).
+  if (net === "all" || net === DAG_CORE) {
     return tickWideRows(s).slice(0, n).map(({ r, who }) => ({
       key: `${r.metaId}:${r.ordinal}`,
       label: `${who} ${ordinalLabel(r)}`,
@@ -713,10 +720,10 @@ export const CHILD_OF: Partial<Record<Mode, Partial<Record<RailCardKind, ChildEn
     composition: { to: "node", steps: nodeOfCompositionChildren },
   },
   ledger: {
-    snap: { to: "context", steps: anchoringNetworkChildren },
-    context: { to: "metaSnap", steps: metaSnapOfTickChildren },
+    snap: { to: "metaSnap", steps: metaSnapOfTickChildren },
     // The metagraph snapshot is the ledger's last rung: its signers are the explorer's reading and the
-    // card's fact, no card of their own (2026-11-08); the block and the data block have steps of their own.
+    // card's fact, no card of their own (2026-11-08); the block and the data block have steps of their
+    // own, and so does the Metagraph card at the lane's foot (`contextStep`, 2026-11-20).
   },
   trend: {
     range: { to: "instant", steps: momentOfRangeChildren },
@@ -751,6 +758,24 @@ export function blockStep(s: SiblingState): SiblingStep | null {
     label: `${tickerOf(first.sel.chain)} ${shortBlockHash(first.sel.hash)}`,
     actions: blockSelectActions(first.sel, s.snap, { ...tickContextOf({ following: s.following, snap: s.snap, metaSnap: s.metaSnap, tickNet: s.tickNet, block: s.block }) }, first.snap),
   };
+}
+
+/** THE METAGRAPH GHOST'S STEP IN THE LEDGER (2026-11-20): the card stands at the lane's foot — the
+ *  network is a reading ABOUT the subject chain above it, not a rung of it — so its ghost is a step of
+ *  its own, like the block's, never `CHILD_OF`'s. It opens the network of the subject on screen: the
+ *  metagraph snapshot's (the live follow seats one without its network), else a token block's chain;
+ *  with the tick alone, the tick's first network (`anchoringNetworkChildren`, the explorer's order).
+ *  A DAG block is the global's own and has no network between (`blockInPlace`), and opening one would
+ *  release it, so there is no step. Null with no tick, or a network already standing. */
+export function contextStep(s: SiblingState): SiblingStep | null {
+  if (!s.snap) return null;
+  const ord = s.snap.data.ordinal;
+  const ms = s.metaSnap && s.metaSnap.globalOrdinal === ord ? s.metaSnap : null;
+  const block = s.block && s.block.anchorOrd === ord ? s.block : null;
+  if (!ms && block?.chain === DAG_CORE) return null;
+  const own = ms ? keyOf(s, ms.metaId) : block ? keyOf(s, block.chain) : null;
+  const nets = anchoringNetworkChildren(s, Number.POSITIVE_INFINITY);
+  return (own ? nets.find((x) => x.key === own) : nets[0]) ?? null;
 }
 
 /** THE COMMITTED METAGRAPH SNAPSHOT'S DATA BLOCKS, as its exact row summarises them (the Data block
