@@ -524,7 +524,10 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   const tickExact = useStore((s) => (underTick && s.snap ? s.snapshotExact[s.snap.data.ordinal] : undefined));
   let tickCount = 0;
   if (tickExact) for (const [addr, v] of Object.entries(tickExact.perMeta)) if (netKeyOf(addr) === cfg.id) tickCount += v.count;
-  const tickLead = tickExact && tickCount > 0 ? `Anchored ${tickCount} of ${tickExact.anchored} metagraph snapshots` : null;
+  // …and it NAMES that global snapshot (user, 2026-11-20: "anchored 3 of 3 metagraph snapshots in
+  // global snapshot N"): the card stands at the lane's foot since the same day, below the snapshot
+  // chain, so the tick it counts against is no longer the card directly above it. Bare ordinal.
+  const tickLead = tickExact && tickCount > 0 ? `Anchored ${tickCount} of ${tickExact.anchored} metagraph snapshots in global snapshot ${tickExact.ordinal.toLocaleString()}` : null;
   // The UNLISTED dossier is THIS component (user, 2026-08-14 — shared components, not shared
   // grammar): its members are the distinct uncataloged addresses observed in the window's
   // exact reads, subscribed only while unlisted IS the subject so every other dossier pays
