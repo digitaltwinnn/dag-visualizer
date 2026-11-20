@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { ChannelSnapRow, SnapshotExact } from "@/src/data/types";
-import { dataBlocksByNetwork, dataBlocksInWindow, dataByNetwork, lastDataByNetwork, settledTicks, unreadOrdinals, dataInWindow, dataPerTick } from "./dataStats";
+import { dataBlocksByNetwork, dataBlocksInWindow, dataByNetwork, dataUpdatesStack, lastDataByNetwork, settledTicks, unreadOrdinals, dataInWindow } from "./dataStats";
 
 // THE DATA BLOCKS REGISTER'S BAND (D6, 2026-11-07): DATA UPDATES · BY NETWORK · LAST DATA BLOCK, read
 // off the exact reads of the ticks the ledger source holds. A tick whose read has not landed is
@@ -60,13 +60,6 @@ describe("dataBlocksByNetwork — the card's rows (2026-11-20)", () => {
   });
 });
 
-describe("dataPerTick", () => {
-  it("one point per tick, oldest first, a gap where the read has not landed or a row is undecodable", () => {
-    expect(dataPerTick(ticks, reads, all)).toEqual([42, 0, null, null]);
-    expect(dataPerTick(ticks, reads, (id) => id === "DED")).toEqual([40, 0, null, 8]);
-  });
-});
-
 describe("dataByNetwork", () => {
   it("shares the updates by network, in the given order, leaving out networks with none", () => {
     const key = (id: string) => (id === "odd" ? "unlisted" : id);
@@ -114,5 +107,18 @@ describe("settledTicks — a read in flight is arriving, not unread (2026-11-20)
     // A MISSED read settles too: its tick stays, counted as unread.
     expect(settledTicks(t5, reads, { 5: 1 }).map((t) => t.ordinal)).toEqual([1, 2, 3, 4, 5]);
     expect(settledTicks(ticks, {})).toEqual([]);
+  });
+});
+
+describe("dataUpdatesStack — the Data updates chart (2026-11-20)", () => {
+  it("one column per tick, oldest first, split by network in order; unread is null", () => {
+    const key = (id: string) => id.toLowerCase();
+    expect(dataUpdatesStack(ticks, reads, all, key, ["dor", "ded"])).toEqual([
+      { ordinal: 1, v: 42, segs: [{ key: "dor", n: 2 }, { key: "ded", n: 40 }] },
+      { ordinal: 2, v: 0, segs: [] },
+      { ordinal: 3, v: null, segs: [] },
+      { ordinal: 4, v: null, segs: [] }, // an undecodable in-scope row: unknown, never a zero
+    ]);
+    expect(dataUpdatesStack(ticks, reads, (id) => id === "DED", key, [])[3]).toEqual({ ordinal: 4, v: 8, segs: [{ key: "ded", n: 8 }] });
   });
 });
