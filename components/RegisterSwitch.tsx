@@ -60,15 +60,20 @@ import { useBreakpoint } from "@/components/useBreakpoint";
  *  ever carried in one); the Global snapshot the base everything lands in, never pressable. The tiles
  *  are NAMES ONLY; the lit register's readings are stated once, in the line under the face. */
 const FACE_H = 100;
-/** The phone's face: the same layered face at the label step. */
-const FACE_H_PHONE = 92;
-/** The readings line under the face (the lit register's span, count and state). */
+/** THE PHONE'S FACE IS LOWER, THE LAYERS KEPT (user, 2026-11-20, option B of the design round: "too
+ *  high in phone mode. I like the hierarchy but can we lower the height? … 'global snapshot' needs no
+ *  box because it's not clickable"): two 24px tile rows, every name on one line, and the base row is
+ *  the switch's FOOT — "Global snapshot" set at its left under a hairline, no plate, and the lit
+ *  register's readings at its right, so there is no readings line under the face (134px → 84px). */
+const FACE_H_PHONE = 84;
+/** The readings line under the face (the lit register's span, count and state) — desktop; the phone
+ *  states them in the base row. */
 const READINGS_H = 22;
 /** The switch block's whole height on a tier — face and readings; the register's sentence is the
  *  caption at the scene's bottom now (`#register-caption`). The one number the motion hint's drop
  *  reads, and what `#register-switch` measures, so the callout's free band starts under it. */
 export function registerSwitchH(phone: boolean): number {
-  return (phone ? FACE_H_PHONE : FACE_H) + READINGS_H;
+  return phone ? FACE_H_PHONE : FACE_H + READINGS_H;
 }
 /** Where each register's tile stands in the layered face (two columns, three rows). */
 const PLACE: Readonly<Record<LedgerRegister, string>> = {
@@ -191,6 +196,14 @@ export default function RegisterSwitch() {
     </>
   );
   const LitIcon = REGISTER_ICONS[register];
+  // The lit register's readings and state — under the face on the desktop, in the base row on the phone.
+  const litReadings = (
+    <>
+      {readings(register, LitIcon)}
+      <StateMark following={following} na={paused} className="ml-2 font-sans leading-none" />
+      <span className="sr-only">{count[register] ? `${span[register]}, ${count[register]}` : span[register]}</span>
+    </>
+  );
   // The scene's glass (`SCENE_GLASS`'s ground and blur), as a control — both presentations wear it.
   const FRAME = "rounded-lg border border-border bg-[var(--panel-solid)] backdrop-blur-[8px]";
 
@@ -224,7 +237,7 @@ export default function RegisterSwitch() {
         style={{ height: phone ? FACE_H_PHONE : FACE_H }}
         // On the phone the right column takes more of the width, so "Metagraph snapshots" stays one
         // line; "Transaction blocks" wraps in its tall tile instead, where two lines have room.
-        className={cn("grid grid-cols-2 max-[700px]:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] grid-rows-[1fr_1fr_auto] gap-[3px] p-1", FRAME)}
+        className={cn("grid grid-cols-2 max-[700px]:grid-cols-[minmax(0,0.88fr)_minmax(0,1.12fr)] grid-rows-[1fr_1fr_auto] max-[700px]:grid-rows-[24px_24px_1fr] gap-[3px] p-1 max-[700px]:pb-0", FRAME)}
       >
         {registers.map((r) => {
           const Icon = REGISTER_ICONS[r];
@@ -237,7 +250,7 @@ export default function RegisterSwitch() {
               className={cn(
                 PLACE[r],
                 "group flex items-center justify-center gap-1.5 rounded-md px-4 max-[700px]:px-2 cursor-pointer border-0",
-                "text-body max-[700px]:text-label font-semibold leading-none whitespace-nowrap max-[700px]:whitespace-normal max-[700px]:text-center max-[700px]:leading-tight",
+                "text-body max-[700px]:text-label font-semibold leading-none whitespace-nowrap",
                 "bg-transparent text-muted-foreground hover:text-foreground hover:bg-wash-soft",
                 "aria-pressed:bg-[var(--sel-bg)] aria-pressed:text-primary-ink aria-pressed:hover:bg-[var(--sel-bg)]",
                 "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
@@ -250,24 +263,33 @@ export default function RegisterSwitch() {
             </button>
           );
         })}
-        {/* THE GROUND: where every register's subject lands, so it is drawn and never pressed. */}
-        <span className="col-span-2 row-start-3 flex items-center justify-center rounded-md py-1 bg-[var(--panel-plate)] shadow-[inset_0_0_0_1px_var(--border)] text-label uppercase tracking-caps text-muted-foreground leading-none select-none">
-          Global snapshot
-        </span>
+        {/* THE GROUND: where every register's subject lands, so it is drawn and never pressed. On the
+            phone it is no plate but the switch's foot: a hairline, the ground's name at the left and the
+            lit register's readings at the right (option B, 2026-11-20). */}
+        {phone ? (
+          <div className="col-span-2 row-start-3 -mx-1 flex items-center justify-between gap-2 border-t border-border px-2.5 select-none">
+            <span className="text-label uppercase tracking-caps text-muted-foreground leading-none">Global snapshot</span>
+            <span className="flex items-center gap-1 font-mono text-label leading-none tabular-nums whitespace-nowrap text-foreground">{litReadings}</span>
+          </div>
+        ) : (
+          <span className="col-span-2 row-start-3 flex items-center justify-center rounded-md py-1 bg-[var(--panel-plate)] shadow-[inset_0_0_0_1px_var(--border)] text-label uppercase tracking-caps text-muted-foreground leading-none select-none">
+            Global snapshot
+          </span>
+        )}
       </div>
 
       {/* THE READINGS, ONCE (readings option 2): the lit register's span, count and state, under the
           face — or, where the filtered network runs no such layer, the layer it lacks and "n/a". They
           stay with the switch (user, 2026-11-19, layout option 3): they say which register is lit and
           whether it is live. */}
-      <div
-        style={{ height: READINGS_H }}
-        className="flex items-end justify-center gap-1 font-mono text-label leading-none tabular-nums whitespace-nowrap text-foreground"
-      >
-        {readings(register, LitIcon)}
-        <StateMark following={following} na={paused} className="ml-2 font-sans leading-none" />
-        <span className="sr-only">{count[register] ? `${span[register]}, ${count[register]}` : span[register]}</span>
-      </div>
+      {!phone && (
+        <div
+          style={{ height: READINGS_H }}
+          className="flex items-end justify-center gap-1 font-mono text-label leading-none tabular-nums whitespace-nowrap text-foreground"
+        >
+          {litReadings}
+        </div>
+      )}
     </div>
 
     {/* THE CAPTION (layout option 3): the register's sentence (`registerLine`) moved off the top to the
