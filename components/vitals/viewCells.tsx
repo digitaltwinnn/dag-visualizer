@@ -1061,6 +1061,9 @@ export function BlocksCells({ accent }: { accent: string }) {
       </BandCard>
       <BandCard
         label="Networks transacting"
+        // THE WINDOW'S REACH, as BLOCKS and MOVED state it (user, 2026-11-20: "can we add the range like
+        // other vitals have?").
+        aside={win ? span : undefined}
         lead={win ? <StackedLead figure={netTotal > 0 ? <Odometer int value={netTotal} /> : null} unit={netTotal === 1 ? "block" : "blocks"} empty={netTotal === 0} /> : undefined}
       >
         {win ? <MicroBars accent={accent} labelW={64} rows={netRows} /> : stateLine(absent)}
@@ -1120,7 +1123,9 @@ export function DataCells({ accent, filter }: { accent: string; filter: string }
           last-block card held. */}
       <BandCard
         label="Metagraphs writing data"
-        aside={pinned ? BLOCK_PINNED : undefined}
+        // The window's reach, as DATA UPDATES states it (2026-11-20); a past window names its own
+        // stretch in the same words, and its rows carry no age (a claim about now).
+        aside={!empty ? span : undefined}
         lead={netRows.length ? <StackedLead figure={<Odometer int value={netTotal} />} prefix={blocksHeld.read < blocksHeld.total ? "at least" : undefined} unit={netTotal === 1 ? "data block" : "data blocks"} /> : undefined}
       >
         {netRows.length ? <MicroBars accent={accent} labelW={64} rows={netRows} /> : stateLine(held.read ? "No data block in the window" : "Reading the window…")}
