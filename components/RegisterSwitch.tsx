@@ -60,20 +60,20 @@ import { useBreakpoint } from "@/components/useBreakpoint";
  *  ever carried in one); the Global snapshot the base everything lands in, never pressable. The tiles
  *  are NAMES ONLY; the lit register's readings are stated once, in the line under the face. */
 const FACE_H = 100;
-/** THE PHONE'S FACE IS LOWER, THE LAYERS KEPT (user, 2026-11-20, option B of the design round: "too
+/** THE PHONE'S FACE IS LOWER, THE LAYERS KEPT (user, 2026-11-20, option A of the design round: "too
  *  high in phone mode. I like the hierarchy but can we lower the height? … 'global snapshot' needs no
- *  box because it's not clickable"): two 24px tile rows, every name on one line, and the base row is
- *  the switch's FOOT — "Global snapshot" set at its left under a hairline, no plate, and the lit
- *  register's readings at its right, so there is no readings line under the face (134px → 84px). */
-const FACE_H_PHONE = 84;
-/** The readings line under the face (the lit register's span, count and state) — desktop; the phone
- *  states them in the base row. */
+ *  box because it's not clickable"): two 24px tile rows, every name on one line, and the base a RULED
+ *  LABEL — a hairline with "Global snapshot" set into it, no plate. The readings keep their line
+ *  (134px → 98px). (Option B, the readings in the base row, shipped for an hour and was reversed.) */
+const FACE_H_PHONE = 78;
+/** The readings line under the face (the lit register's span, count and state). */
 const READINGS_H = 22;
+const READINGS_H_PHONE = 20;
 /** The switch block's whole height on a tier — face and readings; the register's sentence is the
  *  caption at the scene's bottom now (`#register-caption`). The one number the motion hint's drop
  *  reads, and what `#register-switch` measures, so the callout's free band starts under it. */
 export function registerSwitchH(phone: boolean): number {
-  return phone ? FACE_H_PHONE : FACE_H + READINGS_H;
+  return phone ? FACE_H_PHONE + READINGS_H_PHONE : FACE_H + READINGS_H;
 }
 /** Where each register's tile stands in the layered face (two columns, three rows). */
 const PLACE: Readonly<Record<LedgerRegister, string>> = {
@@ -196,7 +196,7 @@ export default function RegisterSwitch() {
     </>
   );
   const LitIcon = REGISTER_ICONS[register];
-  // The lit register's readings and state — under the face on the desktop, in the base row on the phone.
+  // The lit register's readings and state, the one line under the face.
   const litReadings = (
     <>
       {readings(register, LitIcon)}
@@ -237,7 +237,7 @@ export default function RegisterSwitch() {
         style={{ height: phone ? FACE_H_PHONE : FACE_H }}
         // On the phone the right column takes more of the width, so "Metagraph snapshots" stays one
         // line; "Transaction blocks" wraps in its tall tile instead, where two lines have room.
-        className={cn("grid grid-cols-2 max-[700px]:grid-cols-[minmax(0,0.88fr)_minmax(0,1.12fr)] grid-rows-[1fr_1fr_auto] max-[700px]:grid-rows-[24px_24px_1fr] gap-[3px] p-1 max-[700px]:pb-0", FRAME)}
+        className={cn("grid grid-cols-2 max-[700px]:grid-cols-[minmax(0,0.88fr)_minmax(0,1.12fr)] grid-rows-[1fr_1fr_auto] max-[700px]:grid-rows-[24px_24px_1fr] gap-[3px] p-1", FRAME)}
       >
         {registers.map((r) => {
           const Icon = REGISTER_ICONS[r];
@@ -264,12 +264,13 @@ export default function RegisterSwitch() {
           );
         })}
         {/* THE GROUND: where every register's subject lands, so it is drawn and never pressed. On the
-            phone it is no plate but the switch's foot: a hairline, the ground's name at the left and the
-            lit register's readings at the right (option B, 2026-11-20). */}
+            phone it is no plate but a ruled label: the hairline the tiles stand on, the ground's name
+            set into it (option A, 2026-11-20). */}
         {phone ? (
-          <div className="col-span-2 row-start-3 -mx-1 flex items-center justify-between gap-2 border-t border-border px-2.5 select-none">
+          <div className="col-span-2 row-start-3 flex items-center gap-2 px-1 select-none">
+            <span aria-hidden className="h-px flex-1 bg-border" />
             <span className="text-label uppercase tracking-caps text-muted-foreground leading-none">Global snapshot</span>
-            <span className="flex items-center gap-1 font-mono text-label leading-none tabular-nums whitespace-nowrap text-foreground">{litReadings}</span>
+            <span aria-hidden className="h-px flex-1 bg-border" />
           </div>
         ) : (
           <span className="col-span-2 row-start-3 flex items-center justify-center rounded-md py-1 bg-[var(--panel-plate)] shadow-[inset_0_0_0_1px_var(--border)] text-label uppercase tracking-caps text-muted-foreground leading-none select-none">
@@ -282,14 +283,12 @@ export default function RegisterSwitch() {
           face — or, where the filtered network runs no such layer, the layer it lacks and "n/a". They
           stay with the switch (user, 2026-11-19, layout option 3): they say which register is lit and
           whether it is live. */}
-      {!phone && (
-        <div
-          style={{ height: READINGS_H }}
-          className="flex items-end justify-center gap-1 font-mono text-label leading-none tabular-nums whitespace-nowrap text-foreground"
-        >
-          {litReadings}
-        </div>
-      )}
+      <div
+        style={{ height: phone ? READINGS_H_PHONE : READINGS_H }}
+        className="flex items-end justify-center gap-1 font-mono text-label leading-none tabular-nums whitespace-nowrap text-foreground"
+      >
+        {litReadings}
+      </div>
     </div>
 
     {/* THE CAPTION (layout option 3): the register's sentence (`registerLine`) moved off the top to the
