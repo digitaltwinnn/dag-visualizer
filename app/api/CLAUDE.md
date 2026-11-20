@@ -202,7 +202,7 @@ holds years of history under it, and both `keys.test.ts` files pin the strings.
   as a fact (`noteFactsData`'s "Window end", the `time` kind: a UTC clock time, "14:05 UTC") and its
   question asks for the window and that end, never "right now" — it is written hourly and read for up
   to an hour after (user, 2026-11-10; `NOTES_VERSION` 81). The gate strips a clock time a `time` fact
-  holds, as it strips a fact's date. **The honesty gate (rule 10) is mechanical**
+  holds, as it strips a fact's date. **An amount of the token is "$DAG"** (user, 2026-11-20, `NOTES_VERSION` 84): the facts label fees "Fees in $DAG per hour", "$DAG per day", "$DAG in fees that day", VOICE asks the model to write it so, the gate reads `$?DAG` after a number as the unit, and `noteNames` never colours a name after "$"; bare "DAG" is the network. **The honesty gate (rule 10) is mechanical**
   (`src/data/noteHonesty.ts`, the colocated test is its specification): every number the note
   states must match a fact the model was shown, within the precision it was written to, and a
   failing note is asked for once more with the reasons, then dropped and counted. A note that

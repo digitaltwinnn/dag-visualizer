@@ -46,6 +46,7 @@ export const VOICE = [
   "The DAG produces global snapshots and each metagraph produces its own metagraph snapshots: never say the whole network, or a metagraph, produced global snapshots. A network's share of global snapshots is what it \"was part of\"; the DAG is part of nothing: it produces them. A fact that says a network is \"in global snapshots\" is said as \"<network> was part of <figure> global snapshots per day\", with its change after it, never with another noun such as placements or appearances.",
   "A network creates its metagraph snapshots and anchors them into global snapshots. A network that creates metagraph snapshots is an active network, never an \"anchoring network\". A note about one network says nothing about other networks being active.",
   "L0, currency L1 and data L1 are layers.",
+  "An amount of the DAG token is written with a dollar sign, as the facts write it: \"N $DAG per day\", \"$DAG in fees\". DAG without it is the network.",
   "Make no claim about how decentralised or distributed anything is.",
   "Never say which lost or gained the most: give the figures and let the reader compare them.",
   "Use no noun more than twice in a sentence: name a thing once and let the sentence carry it.",

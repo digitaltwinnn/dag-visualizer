@@ -33,6 +33,9 @@ describe("noteSegments", () => {
   it("leaves DAG the unit", () => {
     expect(named("Fees of 333 DAG, or 1,204.5 DAG a day.")).toEqual([]);
     expect(named("The DAG took 333 DAG in fees.").map(([t]) => t)).toEqual(["DAG"]);
+    // The notes' own spelling since 2026-11-20: a name never follows "$".
+    expect(named("The DAG took 333 $DAG in fees.").map(([t]) => t)).toEqual(["DAG"]);
+    expect(named("Fees ran at $DAG 12.").map(([t]) => t)).toEqual([]);
   });
   it("is case-sensitive: the word is not the name", () => {
     expect(named("a dag of snapshots")).toEqual([]);

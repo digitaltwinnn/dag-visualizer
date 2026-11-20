@@ -84,8 +84,8 @@ describe("ledgerFacts on the whole chamber", () => {
     expect(per!.label).toBe("Metagraph snapshots anchored per global snapshot, recent, about");
     expect(per!.value).toBe(3);
     expect(per!.text).toBe("3");
-    expect(find(r, /^Fees in DAG per hour, recent/)).toHaveLength(1);
-    expect(find(r, /^Fees in DAG per hour, usual/)).toHaveLength(1);
+    expect(find(r, /^Fees in \$DAG per hour, recent/)).toHaveLength(1);
+    expect(find(r, /^Fees in \$DAG per hour, usual/)).toHaveLength(1);
     expect(find(r, /^Data in MB per hour, recent/)).toHaveLength(1);
     expect(find(r, /^Data in MB per hour, usual/)).toHaveLength(1);
     const [n] = find(r, /^Networks that anchored metagraph snapshots, recent/);
@@ -100,9 +100,9 @@ describe("ledgerFacts on the whole chamber", () => {
 
   it("labels fees and data a floor, with no wrong ratio, where the unlisted channels went unmeasured", () => {
     const r = ledgerFacts(input({ recent: side(74, 5 * MIN, 20, { "u.cov": row(74, () => null) }) }))!;
-    const [fees] = find(r, /^Fees in DAG per hour, recent/);
+    const [fees] = find(r, /^Fees in \$DAG per hour, recent/);
     expect(fees!.label).toContain(", at least");
-    expect(find(r, /^Fees in DAG per hour, usual/)[0]!.label).not.toContain("at least");
+    expect(find(r, /^Fees in \$DAG per hour, usual/)[0]!.label).not.toContain("at least");
     expect(r.facts.some((f) => f.kind === "ratio" && /Fees|Data/.test(f.label))).toBe(false);
   });
 
@@ -191,14 +191,14 @@ describe("ledgerFacts tags each change as a pair (R54)", () => {
     expect([...p.keys()]).toEqual([
       "Global snapshots per hour",
       "Mean spacing between global snapshots",
-      "Fees in DAG per hour",
+      "Fees in $DAG per hour",
       "Data in MB per hour",
     ]);
     expect(p.get("Global snapshots per hour")).toEqual(["Global snapshots per hour, usual", 120, "Global snapshots per hour, recent", 240]);
     for (const [k, [from, fv, to, tv]] of p) {
       expect([from, to], k).toEqual([`${k}, usual`, `${k}, recent`]);
-      expect(fv, k).toBe(find(r, new RegExp(`^${k}, usual$`))[0]!.value);
-      expect(tv, k).toBe(find(r, new RegExp(`^${k}, recent$`))[0]!.value);
+      expect(fv, k).toBe(find(r, new RegExp(`^${k.replace(/[$.*+?^()|[\]\\{}]/g, "\\$&")}, usual$`))[0]!.value);
+      expect(tv, k).toBe(find(r, new RegExp(`^${k.replace(/[$.*+?^()|[\]\\{}]/g, "\\$&")}, recent$`))[0]!.value);
     }
   });
 
@@ -222,7 +222,7 @@ describe("ledgerFacts tags each change as a pair (R54)", () => {
 // R71 (user, 2026-10-29: "change, else now"): the builder says which question the prompt asks.
 describe("ledgerFacts says what the note leads with", () => {
   it("leads with change when a pair moved a tenth or more, naming every pair that did: recent at twice the usual moves the rate, the fees and the data, not the spacing", () => {
-    expect(ledgerFacts(input())!.lead).toEqual({ kind: "change", moved: ["Global snapshots per hour", "Fees in DAG per hour", "Data in MB per hour"] });
+    expect(ledgerFacts(input())!.lead).toEqual({ kind: "change", moved: ["Global snapshots per hour", "Fees in $DAG per hour", "Data in MB per hour"] });
   });
   it("leads with the reading itself when every pair held: the week at the recent rate", () => {
     expect(ledgerFacts(input({ week: side(168, HOUR, 240) }))!.lead).toEqual({ kind: "now" });
@@ -233,7 +233,7 @@ describe("ledgerFacts says what the note leads with", () => {
   });
   it("names only the pair that moved: the fees alone", () => {
     const week = side(168, HOUR, 240, { "g.feeFloor": row(168, () => 240 * 2e7) });
-    expect(ledgerFacts(input({ week }))!.lead).toEqual({ kind: "change", moved: ["Fees in DAG per hour"] });
+    expect(ledgerFacts(input({ week }))!.lead).toEqual({ kind: "change", moved: ["Fees in $DAG per hour"] });
   });
   it("with nothing usual to measure there is no pair, so the reading itself", () => {
     expect(ledgerFacts(input({ week: side(168, HOUR, 0, { "g.ticks": row(168, () => null) }) }))!.lead).toEqual({ kind: "now" });

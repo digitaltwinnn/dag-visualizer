@@ -91,7 +91,7 @@ const UNIT_PHRASE: Record<TrendMetric, { day: string; total: string }> = {
   globals: { day: "per day", total: "" },
   blocks: { day: "per day", total: "" },
   transfers: { day: "per day", total: "" },
-  fees: { day: "DAG per day", total: "DAG" },
+  fees: { day: "$DAG per day", total: "$DAG" },
   kb: { day: "MB per day", total: "MB" },
   nodes: { day: "", total: "" },
   continuity: { day: "between snapshots", total: "between snapshots" },
@@ -390,7 +390,7 @@ export function trendFacts(input: TrendFactsInput): TrendFacts | null {
         : day.measure === "globals" ? "global snapshots that day"
         // The whole network's fees and data are read from the stored floors (`notableDays`), which
         // leave out what the unlisted chains paid and wrote.
-        : day.measure === "fees" ? `DAG in fees that day${dag ? ", at least" : ""}`
+        : day.measure === "fees" ? `$DAG in fees that day${dag ? ", at least" : ""}`
         : day.measure === "kb" ? `MB of data that day${dag ? ", at least" : ""}`
         : "metagraph snapshots anchored that day";
       const metric = day.measure === "fees" || day.measure === "kb" ? TREND_METRICS[day.measure] : null;

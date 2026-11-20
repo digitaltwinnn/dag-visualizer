@@ -197,7 +197,7 @@ export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: st
 
     // FEES AND DATA, per hour. The whole totals are only a floor where the unlisted channels were
     // not measured: labelled so, and given no ratio and no pair.
-    for (const [metric, word, format] of [["fees", "Fees in DAG", formatDag], ["kb", "Data in MB", undefined]] as const) {
+    for (const [metric, word, format] of [["fees", "Fees in $DAG", formatDag], ["kb", "Data in MB", undefined]] as const) {
       const label = `${word} per hour`;
       const sides = ([["recent", recent], ["usual", week]] as const)
         .filter(([side]) => side === "recent" || weekCovered)
@@ -284,7 +284,7 @@ export function ledgerFacts(input: LedgerFactsInput): { facts: Fact[]; names: st
       const normal = spacing(week);
       if (gap && normal && !(stall && gap.gap <= STALL_SHARED * stall.gap)) paused.push({ ...pauseChange(`${name}'s anchoring`, gap.gap, normal, "its metagraph snapshots", at), find: gap.find });
       if (!sure) continue;
-      for (const [metric, word, unit, floor] of [["fees", "fees", "DAG", 1 / HOURS_PER_DAY], ["kb", "data", "MB", 1 / HOURS_PER_DAY]] as const) {
+      for (const [metric, word, unit, floor] of [["fees", "fees", "$DAG", 1 / HOURS_PER_DAY], ["kb", "data", "MB", 1 / HOURS_PER_DAY]] as const) {
         const nowRate = perHour(metric, metricSeries(metric, id, recent.series).points, recent);
         const usualRate = perHour(metric, metricSeries(metric, id, week.series).points, week);
         if (nowRate == null || usualRate == null || Math.max(nowRate, usualRate) < floor) continue;
