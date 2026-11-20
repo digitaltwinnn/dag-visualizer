@@ -29,7 +29,7 @@ import { POLL, METAGRAPHS } from "@/src/engine/config";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import useTrendsWindow from "@/components/useTrendsWindow";
 import { sliceWindow, trimNewestPartial, type TrendsWindowData } from "@/src/data/trendWindow";
-import { ageWords } from "@/src/util/relativeAge";
+import { ageWords, relativeAge } from "@/src/util/relativeAge";
 import { cn } from "@/lib/utils";
 import { useMemo, useSyncExternalStore } from "react";
 import { unlistedUnmeasured } from "@/src/data/trendSeries";
@@ -1094,61 +1094,44 @@ export function DataCells({ accent, filter }: { accent: string; filter: string }
   const empty = snaps.length === 0;
 
   const held = dataInWindow(snaps, reads, inScope);
-  // The floor says itself under the unit, MOVED's grammar: the count covers the snapshots read so far.
-  const heldNote = held.read < held.total ? `${held.read.toLocaleString()} of ${held.total.toLocaleString()} snapshots read` : undefined;
   // The Metagraphs anchoring card's shape (2026-11-20): the total on the left, busiest first — in DATA
   // BLOCKS, the register's own subject and the count the switch's readings carried (the updates are
   // DATA UPDATES' reading beside it, which the card used to repeat).
   const blocksHeld = dataBlocksInWindow(snaps, reads, inScope);
   const nets = dataBlocksByNetwork(snaps, reads, inScope, netKeyOf);
-  const netRows = foldOther(nets.map((r) => ({ key: r.key, ...networkMark(r.key), count: r.count })), BY_NETWORK_ROWS);
-  const netTotal = blocksHeld.count;
-  // A past window makes no claim about now: LAST DATA BLOCK, the one claim about now, says so.
+  // A past window makes no claim about now: the rows' last-block ages, the one claim about now, go.
   const pinned = past != null || pastStatus != null;
-  const lastRows = !pinned ? lastDataByNetwork(snaps, reads, inScope, netKeyOf) : [];
+  const lastAt = new Map((!pinned ? lastDataByNetwork(snaps, reads, inScope, netKeyOf) : []).map((r) => [r.key, r.ts]));
+  const netRows = foldOther(nets.map((r) => ({ key: r.key, ...networkMark(r.key), count: r.count })), BY_NETWORK_ROWS).map((r) => {
+    const ts = lastAt.get(r.key);
+    return ts ? { ...r, trail: relativeAge(Math.max(0, now - Date.parse(ts))) } : r;
+  });
+  const netTotal = blocksHeld.count;
 
   // No subject (the network runs no dL1, the DAG among them): one card, the sentence once.
   if (noData) return <BandCard label={REGISTER_NAMES.data}>{stateLine(noData)}</BandCard>;
 
   return (
     <>
-      {/* LAST DATA BLOCK PER METAGRAPH (user, 2026-11-20: "'usual' makes little sense when we're on
-          'all' … just list each metagraph and their last block, if filtered just show that one, no
-          'usual' visual"): a data chain writes in nearly every snapshot, so the window's gaps say
-          little. Under All one row per metagraph, newest first — its mark, its name, its age; under a
-          filter that metagraph's age as the lead. */}
-      {pinned || !lastRows.length ? (
-        <BandCard label="Last data block">{pinned ? stateLine(BLOCK_PINNED) : stateLine(held.read ? "No data block in the window" : "Reading the window…")}</BandCard>
-      ) : filter === "all" ? (
-        <BandCard label="Last data block">
-          <span className="flex flex-1 min-w-0 flex-col justify-evenly self-stretch gap-0.5">
-            {lastRows.slice(0, BY_NETWORK_ROWS).map((r) => {
-              const mark = networkMark(r.key);
-              return (
-                <span key={r.key} className="flex items-center gap-1.5 text-label leading-none whitespace-nowrap">
-                  <IdentityDot hue={mark.hue} />
-                  <span className="text-muted-foreground">{mark.label}</span>
-                  <span className="ml-auto font-mono tabular-nums text-foreground">{ageWords(Math.max(0, now - Date.parse(r.ts)))} ago</span>
-                </span>
-              );
-            })}
-          </span>
-        </BandCard>
-      ) : (
-        <BandCard
-          label="Last data block"
-          lead={<StackedLead figure={ageWords(Math.max(0, now - Date.parse(lastRows[0]!.ts)))} unit="ago" />}
-        >
-          <span className="flex items-center self-stretch gap-1.5 text-body whitespace-nowrap">
-            <IdentityDot hue={networkMark(lastRows[0]!.key).hue} />
-            <span className="text-muted-foreground">{networkMark(lastRows[0]!.key).label}</span>
-          </span>
-        </BandCard>
-      )}
+      {/* WHO WROTE DATA, HOW MUCH AND HOW LATELY — ONE CARD (user, 2026-11-20: "'last data block' and
+          'metagraphs writing data' can be combined"): each metagraph's data blocks over the window as
+          the bars, the age of its last one in the column after the count (none in a past window,
+          which makes no claim about now), the total on the left. It leads the band, the place the
+          last-block card held. */}
+      <BandCard
+        label="Metagraphs writing data"
+        aside={pinned ? BLOCK_PINNED : undefined}
+        lead={netRows.length ? <StackedLead figure={<Odometer int value={netTotal} />} prefix={blocksHeld.read < blocksHeld.total ? "at least" : undefined} unit={netTotal === 1 ? "data block" : "data blocks"} /> : undefined}
+      >
+        {netRows.length ? <MicroBars accent={accent} labelW={64} rows={netRows} /> : stateLine(held.read ? "No data block in the window" : "Reading the window…")}
+      </BandCard>
       <BandCard
         label="Data updates"
         aside={!empty ? span : undefined}
-        lead={<StackedLead figure={<Odometer value={held.count} int />} unit="updates" note={heldNote} empty={empty || held.read === 0} />}
+        // THE FLOOR SAYS "AT LEAST" (user, 2026-11-20: "in data updates sometimes there is a text
+        // underneath? it's confusing" — "14 of 50 snapshots read" explained the floor in the read's
+        // own terms): the card beside it states its floor the same way.
+        lead={<StackedLead figure={<Odometer value={held.count} int />} prefix={held.read < held.total ? "at least" : undefined} unit="updates" empty={empty || held.read === 0} />}
       >
         {!empty ? (
           <span className="flex-1 min-w-0 self-center">
@@ -1159,12 +1142,6 @@ export function DataCells({ accent, filter }: { accent: string; filter: string }
         ) : (
           stateLine("Waiting for snapshots…")
         )}
-      </BandCard>
-      <BandCard
-        label="Metagraphs writing data"
-        lead={netRows.length ? <StackedLead figure={<Odometer int value={netTotal} />} prefix={blocksHeld.read < blocksHeld.total ? "at least" : undefined} unit={netTotal === 1 ? "data block" : "data blocks"} /> : undefined}
-      >
-        {netRows.length ? <MicroBars accent={accent} labelW={64} rows={netRows} /> : stateLine(held.read ? "No data updates in the window" : "Reading the window…")}
       </BandCard>
     </>
   );
