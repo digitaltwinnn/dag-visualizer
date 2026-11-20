@@ -55,11 +55,6 @@ export function dataBlocksInWindow(ticks: readonly Tick[], reads: Reads, inScope
   return { count, read, total: ticks.length };
 }
 
-/** The line under it: one point per tick, oldest first — the window spans minutes, so a tick is its
- *  natural bin — and null where the tick's read has not landed. */
-export function dataPerTick(ticks: readonly Tick[], reads: Reads, inScope: (metaId: string) => boolean): (number | null)[] {
-  return ticks.map((t) => tickData(reads[t.ordinal], inScope) ?? null);
-}
 
 /** BY NETWORK — the window's data updates per network (`keyOf` folds an address to its network's
  *  key), in `order` and then any network outside it, leaving out a network with none. It reads the
@@ -155,4 +150,30 @@ export function settledTicks<T extends { ordinal: number }>(ticks: readonly T[],
   let edge = -Infinity;
   for (const t of ticks) if ((reads[t.ordinal] != null || missed[t.ordinal] != null) && t.ordinal > edge) edge = t.ordinal;
   return ticks.filter((t) => t.ordinal <= edge);
+}
+
+/** DATA UPDATES AS A STACKED COLUMN PER GLOBAL SNAPSHOT (user, 2026-11-20: "vitals 'data updates'
+ *  show as 'anchors by metagraph' chart?"): oldest first, each tick's in-scope data updates, split by
+ *  network in `order` (then any network outside it). `v` null where the tick is unread (the same
+ *  rule as every data sum: never a zero), and the segments sum to `v`. */
+export function dataUpdatesStack(
+  ticks: readonly Tick[],
+  reads: Reads,
+  inScope: (metaId: string) => boolean,
+  keyOf: (metaId: string) => string,
+  order: readonly string[],
+): { ordinal: number; v: number | null; segs: { key: string; n: number }[] }[] {
+  const rank = (k: string) => {
+    const i = order.indexOf(k);
+    return i < 0 ? order.length : i;
+  };
+  return [...ticks].sort((a, b) => a.ordinal - b.ordinal).map((t) => {
+    const ex = reads[t.ordinal];
+    const v = tickData(ex, inScope);
+    if (v == null || !ex) return { ordinal: t.ordinal, v: null, segs: [] };
+    const by = new Map<string, number>();
+    for (const r of ex.rows) if (inScope(r.metaId) && (r.dataTxCount ?? 0) > 0) by.set(keyOf(r.metaId), (by.get(keyOf(r.metaId)) ?? 0) + r.dataTxCount!);
+    const segs = [...by.entries()].sort((a, b) => rank(a[0]) - rank(b[0])).map(([key, n]) => ({ key, n }));
+    return { ordinal: t.ordinal, v, segs };
+  });
 }

@@ -42,7 +42,7 @@ import { compactDag } from "@/src/util/format";
 import { networkMark, unitOf } from "@/components/explorer/nodeRow";
 import { useNowTick } from "@/components/useNowTick";
 import { useLedgerSource } from "@/components/useLedgerSource";
-import { dataBlocksByNetwork, dataBlocksInWindow, dataInWindow, dataPerTick, lastDataByNetwork, settledTicks } from "@/src/data/dataStats";
+import { dataBlocksByNetwork, dataBlocksInWindow, dataInWindow, dataUpdatesStack, lastDataByNetwork, settledTicks } from "@/src/data/dataStats";
 import { netKeyOf } from "@/src/engine/domain/pickActions";
 
 export function HyperCells({ accent }: { accent: string }) {
@@ -376,6 +376,48 @@ const STORE_DOWN = "history not answering";
 type Snaps = ReturnType<typeof useSnapshotFeed>["snaps"];
 interface StackSeg { key: string; n: number; color: string }
 
+/** THE STACKED COLUMNS THEMSELVES — one row of bars, each a total split into hued segments in the
+ *  caller's order, an unmeasured one a neutral 2px stub (`v` null), a measured zero nothing; a bar
+ *  with no segments paints whole in the accent (a scoped reading). Shared by "Anchors by metagraph"
+ *  (the stored history's buckets) and the Data blocks band's "Data updates" (one bar per global
+ *  snapshot, 2026-11-20), so the two read as one instrument. Its rules are `StackBars`' header's. */
+function StackColumns({ bars, accent, zeroWords }: { bars: { key: string; v: number | null; segs: StackSeg[] | null }[]; accent: string; zeroWords: string | null }) {
+  const max = Math.max(1, ...bars.map((b) => b.v ?? 0));
+  return (
+    <div className="flex items-end justify-center gap-[2px] flex-1 min-h-0 pb-0.5">
+      {zeroWords && <span className="text-label text-muted-foreground self-center">{zeroWords}</span>}
+      {bars.map((b) => {
+        if (b.v == null) {
+          // Unmeasured — the neutral stub (see the header). It keeps its flex slot so the
+          // window's rhythm (position = time) survives the hole.
+          return <span key={b.key} className="flex-1 max-w-[22px] h-[2px] rounded-t-[2px]" style={{ background: "var(--border)", opacity: 0.6 }} />;
+        }
+        return (
+          <span
+            key={b.key}
+            // `flex-col-reverse`: segments are written in catalog order and stack UP from the
+            // baseline, so the first listed network is the foot of every bar in the window.
+            className="flex-1 max-w-[22px] rounded-t-[2px] overflow-hidden flex flex-col-reverse"
+            style={{
+              height: b.v > 0 ? `${Math.max(8, (b.v / max) * 100)}%` : "0",
+              // A stacked bar's colour comes from its segments; a scoped one paints whole.
+              background: b.v > 0 && !b.segs ? accent : "none",
+              // ONE weight for every bar (user, 2026-09-08): the tick chart's glowing head
+              // meant "the newest live tick"; here the last bar is just the newest COMPLETE
+              // bucket — nothing an emphasis would be ABOUT.
+              opacity: b.v > 0 ? 0.7 : 0,
+            }}
+          >
+            {b.segs?.map((sg) => (
+              <span key={sg.key} className="w-full flex-none" style={{ height: `${(sg.n / b.v!) * 100}%`, background: sg.color }} />
+            ))}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 function StackBars({ accent, isMeta, filter, data, down }: { accent: string; isMeta: boolean; filter: string; data: TrendsWindowData | null; /** The history store failed and nothing is held — see `STORE_DOWN`. */ down?: boolean }) {
   if (!data) {
     return <span className="flex items-center justify-center w-full self-center text-label text-muted-foreground" aria-hidden={!down}>{down ? STORE_DOWN : "acquiring…"}</span>;
@@ -412,7 +454,6 @@ function StackBars({ accent, isMeta, filter, data, down }: { accent: string; isM
     }
     return { v: total, ts, segs };
   });
-  const max = Math.max(1, ...bars.map((b) => b.v ?? 0));
   const anyMeasured = bars.some((b) => b.v != null);
   // "none" is a whole-window claim and may only be said over a fully-measured window
   // (review, 2026-09-09: with 23 of 24 buckets unmeasured and one measured zero, the old
@@ -448,37 +489,7 @@ function StackBars({ accent, isMeta, filter, data, down }: { accent: string; isM
           cannot fill the row, and end-alignment parked them in a corner. Full windows shrink
           their slots to fit, so the justification is a no-op everywhere else; time still
           reads left-old → right-new inside the cluster. */}
-      <div className="flex items-end justify-center gap-[2px] flex-1 min-h-0 pb-0.5">
-        {allZero && <span className="text-label text-muted-foreground self-center">no anchors in this window</span>}
-        {bars.map((b) => {
-          if (b.v == null) {
-            // Unmeasured — the neutral stub (see the header). It keeps its flex slot so the
-            // window's rhythm (position = time) survives the hole.
-            return <span key={b.ts} className="flex-1 max-w-[22px] h-[2px] rounded-t-[2px]" style={{ background: "var(--border)", opacity: 0.6 }} />;
-          }
-          return (
-            <span
-              key={b.ts}
-              // `flex-col-reverse`: segments are written in catalog order and stack UP from the
-              // baseline, so the first listed network is the foot of every bar in the window.
-              className="flex-1 max-w-[22px] rounded-t-[2px] overflow-hidden flex flex-col-reverse"
-              style={{
-                height: b.v > 0 ? `${Math.max(8, (b.v / max) * 100)}%` : "0",
-                // A stacked bar's colour comes from its segments; a scoped one paints whole.
-                background: b.v > 0 && !b.segs ? accent : "none",
-                // ONE weight for every bar (user, 2026-09-08): the tick chart's glowing head
-                // meant "the newest live tick"; here the last bar is just the newest COMPLETE
-                // bucket — nothing an emphasis would be ABOUT.
-                opacity: b.v > 0 ? 0.7 : 0,
-              }}
-            >
-              {b.segs?.map((sg) => (
-                <span key={sg.key} className="w-full flex-none" style={{ height: `${(sg.n / b.v!) * 100}%`, background: sg.color }} />
-              ))}
-            </span>
-          );
-        })}
-      </div>
+      <StackColumns bars={bars.map((b) => ({ key: String(b.ts), v: b.v, segs: b.segs }))} accent={accent} zeroWords={allZero ? "no anchors in this window" : null} />
       {(monthly || weekly) && (
         <div className="flex justify-center gap-[2px] leading-none">
           {bars.map((b, i) => (
@@ -1143,10 +1154,21 @@ export function DataCells({ accent, filter }: { accent: string; filter: string }
         lead={<StackedLead figure={<Odometer value={held.count} int />} prefix={held.read < held.total ? "at least" : undefined} unit="updates" empty={empty || held.read === 0} />}
       >
         {!empty ? (
-          <span className="flex-1 min-w-0 self-center">
-            {/* One point per global snapshot across the window (its natural bin — the window spans
-                minutes); a snapshot whose exact read has not landed is a gap, never a dip. */}
-            <Sparkline data={dataPerTick(snaps, reads, inScope)} color={accent} height={42} maxPoints={24} stretch />
+          <span className="flex flex-col flex-1 min-w-0 min-h-12 self-stretch">
+            {/* AS "ANCHORS BY METAGRAPH" DRAWS IT (user, 2026-11-20: "vitals 'data updates' show as
+                'anchors by metagraph' chart?"): one column per global snapshot across the window, its
+                data updates stacked by metagraph in the catalog's order, the hue the explorer and the
+                card beside it name; under a filter that network's own, painted whole. A snapshot whose
+                read has not landed is the neutral stub, never a dip (`dataUpdatesStack`). */}
+            <StackColumns
+              bars={dataUpdatesStack(snaps, reads, inScope, netKeyOf, CATALOG_ORDER).map((b) => ({
+                key: String(b.ordinal),
+                v: b.v,
+                segs: filter === "all" ? b.segs.map((g) => ({ key: g.key, n: g.n, color: g.key === UNLISTED_ID ? UNLISTED_HUE : identityHudCss(g.key) })) : null,
+              }))}
+              accent={accent}
+              zeroWords={held.read > 0 && held.count === 0 ? "no data updates in this window" : null}
+            />
           </span>
         ) : (
           stateLine("Waiting for snapshots…")
