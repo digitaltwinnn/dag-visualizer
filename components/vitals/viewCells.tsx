@@ -42,7 +42,7 @@ import { compactDag } from "@/src/util/format";
 import { networkMark, tickerOf } from "@/components/explorer/nodeRow";
 import { useNowTick } from "@/components/useNowTick";
 import { useLedgerSource } from "@/components/useLedgerSource";
-import { dataByNetwork, dataInWindow, dataPerTick, lastDataTick } from "@/src/data/dataStats";
+import { dataBlocksByNetwork, dataBlocksInWindow, dataInWindow, dataPerTick, lastDataTick } from "@/src/data/dataStats";
 import { netKeyOf } from "@/src/engine/domain/pickActions";
 
 export function HyperCells({ accent }: { accent: string }) {
@@ -1062,10 +1062,13 @@ export function DataCells({ accent, filter }: { accent: string; filter: string }
   const held = dataInWindow(snaps, reads, inScope);
   // The floor says itself under the unit, MOVED's grammar: the count covers the snapshots read so far.
   const heldNote = held.read < held.total ? `${held.read.toLocaleString()} of ${held.total.toLocaleString()} snapshots read` : undefined;
-  // The Metagraphs anchoring card's shape (2026-11-20): the total on the left, busiest first.
-  const nets = [...dataByNetwork(snaps, reads, inScope, netKeyOf, CATALOG_ORDER)].sort((a, b) => b.count - a.count);
+  // The Metagraphs anchoring card's shape (2026-11-20): the total on the left, busiest first — in DATA
+  // BLOCKS, the register's own subject and the count the switch's readings carried (the updates are
+  // DATA UPDATES' reading beside it, which the card used to repeat).
+  const blocksHeld = dataBlocksInWindow(snaps, reads, inScope);
+  const nets = dataBlocksByNetwork(snaps, reads, inScope, netKeyOf);
   const netRows = foldOther(nets.map((r) => ({ key: r.key, ...networkMark(r.key), count: r.count })), BY_NETWORK_ROWS);
-  const netTotal = nets.reduce((n, r) => n + r.count, 0);
+  const netTotal = blocksHeld.count;
   // A past window makes no claim about now: LAST DATA BLOCK, the one claim about now, says so.
   const pinned = past != null || pastStatus != null;
   const last = !pinned ? lastDataTick(snaps, reads, inScope) : null;
@@ -1107,7 +1110,7 @@ export function DataCells({ accent, filter }: { accent: string; filter: string }
       </BandCard>
       <BandCard
         label="Metagraphs writing data"
-        lead={netRows.length ? <StackedLead figure={<Odometer int value={netTotal} />} unit={netTotal === 1 ? "update" : "updates"} /> : undefined}
+        lead={netRows.length ? <StackedLead figure={<Odometer int value={netTotal} />} prefix={blocksHeld.read < blocksHeld.total ? "at least" : undefined} unit={netTotal === 1 ? "data block" : "data blocks"} /> : undefined}
       >
         {netRows.length ? <MicroBars accent={accent} labelW={64} rows={netRows} /> : stateLine(held.read ? "No data updates in the window" : "Reading the window…")}
       </BandCard>

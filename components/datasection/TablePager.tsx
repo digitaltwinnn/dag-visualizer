@@ -57,7 +57,7 @@ export default function TablePager({
    *  A scope WITHOUT a `title` is a plain label (user, 2026-10-03, on the Snapshots explorer's
    *  "last 12 min": "remove the explanatory text section") — no button, no dotted underline, no
    *  line under the strip. The span is a fact a reader can use; how the explorer holds it is not. */
-  scope?: { word: string; title?: string };
+  scope?: { word: string; title?: string; /** A reading after the word — the Snapshots explorer's glyphed count (2026-11-20). */ after?: ReactNode };
   /** RAIL WIDTH (2026-09-13, the Snapshots explorer's pager). The strip was drawn for a raw-layer
    *  table with hundreds of pixels to spend; in a ~264px rail card the range words and the
    *  four-button cluster fought for the same line and "1 / 4" wrapped onto two. Compact keeps
@@ -99,7 +99,7 @@ export default function TablePager({
         <>
           {compact ? null : " "}
           {!scope.title ? (
-            <span className="inline-flex items-center min-h-6">{scope.word}</span>
+            <span className="inline-flex items-center min-h-6">{scope.word}{scope.after}</span>
           ) : (
           <button
             type="button"

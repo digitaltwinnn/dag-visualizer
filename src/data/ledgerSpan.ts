@@ -116,6 +116,30 @@ export function countFigure(n: number | null, floor = false): string | null {
   return `${n.toLocaleString("en-US")}${floor ? "+" : ""}`;
 }
 
+/** THE METAGRAPH SNAPSHOTS A WINDOW'S GLOBAL SNAPSHOTS ANCHORED, under the filter's lens — the count
+ *  the register switch stated beside its span, and the explorer's foot states now (user, 2026-11-20:
+ *  the readings left the switch). Everyone's under All (each global's own `metagraphSnapshotCount`);
+ *  the global snapshots themselves under the DAG (its snapshots ARE them); a network's own under its
+ *  filter, from the anchor index's per-address counts (`metaCountsOf`, its former addresses folded in
+ *  by `inScope`) — a tick whose counts have not landed makes the sum a FLOOR (rule 10). */
+export function metaSnapsInWindow(
+  ticks: readonly Pick<GlobalSnapshot, "timestamp" | "metagraphSnapshotCount">[],
+  filter: string,
+  metaCountsOf: (timestamp: string) => ReadonlyMap<string, number> | undefined,
+  inScope: (metaId: string) => boolean,
+): { count: number; floor: boolean } {
+  if (filter === "all") return { count: ticks.reduce((n, g) => n + (g.metagraphSnapshotCount ?? 0), 0), floor: false };
+  if (filter === "dag") return { count: ticks.length, floor: false };
+  let floor = false;
+  let count = 0;
+  for (const g of ticks) {
+    const mc = metaCountsOf(g.timestamp);
+    if (!mc) { floor = true; continue; }
+    for (const [id, c] of mc) if (inScope(id)) count += c;
+  }
+  return { count, floor };
+}
+
 /** Under the unlisted filter the block window reads nothing: every surface says the floor, never
  *  "no blocks". */
 export const BLOCKS_UNREAD = "Unlisted networks' blocks are not read";
