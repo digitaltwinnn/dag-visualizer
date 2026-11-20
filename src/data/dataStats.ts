@@ -122,3 +122,15 @@ export function lastDataTick(ticks: readonly Tick[], reads: Reads, inScope: (met
   }
   return null;
 }
+
+/** THE INSTANTS OF THE READ TICKS THAT CARRIED DATA in scope — LAST DATA BLOCK's usual gap is measured
+ *  over them (`blockStats.usualGap`, 2026-11-20). An unread tick is no instant: it is not known to
+ *  have carried data, so it neither starts nor ends a gap. */
+export function dataTickTimes(ticks: readonly Tick[], reads: Reads, inScope: (metaId: string) => boolean): number[] {
+  const out: number[] = [];
+  for (const t of ticks) {
+    const ex = reads[t.ordinal];
+    if (ex && ex.rows.some((r) => inScope(r.metaId) && (r.dataBlocks ?? 0) > 0)) out.push(Date.parse(t.timestamp));
+  }
+  return out;
+}

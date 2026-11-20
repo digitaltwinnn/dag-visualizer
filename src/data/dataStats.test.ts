@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { ChannelSnapRow, SnapshotExact } from "@/src/data/types";
-import { dataBlocksByNetwork, dataBlocksInWindow, dataByNetwork, dataInWindow, dataPerTick, lastDataTick } from "./dataStats";
+import { dataBlocksByNetwork, dataBlocksInWindow, dataByNetwork, dataTickTimes, dataInWindow, dataPerTick, lastDataTick } from "./dataStats";
 
 // THE DATA BLOCKS REGISTER'S BAND (D6, 2026-11-07): DATA UPDATES · BY NETWORK · LAST DATA BLOCK, read
 // off the exact reads of the ticks the ledger source holds. A tick whose read has not landed is
@@ -91,5 +91,12 @@ describe("lastDataTick", () => {
     expect(lastDataTick(ticks, reads, all)).toEqual({ ordinal: 4, ts: "2026-11-07T10:01:00.000Z", metaId: "DED" });
     expect(lastDataTick(ticks, reads, (id) => id === "DOR")).toEqual({ ordinal: 1, ts: "2026-11-07T10:00:00.000Z", metaId: "DOR" });
     expect(lastDataTick(ticks, reads, (id) => id === "NDT")).toBeNull();
+  });
+});
+
+describe("dataTickTimes — LAST DATA BLOCK's usual gap reads these (2026-11-20)", () => {
+  it("the read ticks that carried data in scope, an unread tick none", () => {
+    expect(dataTickTimes(ticks, reads, all)).toEqual([Date.parse(ticks[0]!.timestamp), Date.parse(ticks[3]!.timestamp)]);
+    expect(dataTickTimes(ticks, reads, (id) => id === "DOR")).toEqual([Date.parse(ticks[0]!.timestamp)]);
   });
 });

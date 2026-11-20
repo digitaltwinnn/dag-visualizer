@@ -188,3 +188,43 @@ export function lastBlockAt(ticks: readonly BlockTick[], chain: string | null = 
   const which = best.blocks.length ? "dag" : Object.keys(best.metaSnaps).find((c) => blocksInTick(best!, c) > 0)!;
   return { ts: best.ts, chain: which };
 }
+
+// ── THE USUAL GAP (user, 2026-11-20, LAST BLOCK design A2: "how do you determine what is usual?") ──
+// The window's own gaps between consecutive ticks that carry the subject — the same window the
+// age beside it is read from — so "usual" is measured, never assumed. The usual RANGE is the middle
+// half of those gaps (the 25th to the 75th percentile): blocks come in bursts, so one figure would
+// hide the spread, and a gap past the range is "longer than usual", never "overdue" (a block only
+// exists when someone transacts). Too few gaps to say anything is no range at all (rule 10).
+
+/** Fewer measured gaps than this states no usual range. */
+export const USUAL_GAP_MIN = 8;
+
+/** The middle half of the gaps between the given instants (epoch ms, any order), or null when fewer
+ *  than `USUAL_GAP_MIN` gaps are measured. Linear-interpolated percentiles. */
+export function usualGap(timesMs: readonly number[]): { lo: number; hi: number; n: number } | null {
+  const t = [...timesMs].filter(Number.isFinite).sort((a, b) => a - b);
+  const gaps: number[] = [];
+  for (let i = 1; i < t.length; i++) gaps.push(t[i]! - t[i - 1]!);
+  if (gaps.length < USUAL_GAP_MIN) return null;
+  gaps.sort((a, b) => a - b);
+  const q = (p: number) => {
+    const x = p * (gaps.length - 1);
+    const i = Math.floor(x);
+    return gaps[i]! + (gaps[Math.min(i + 1, gaps.length - 1)]! - gaps[i]!) * (x - i);
+  };
+  return { lo: q(0.25), hi: q(0.75), n: gaps.length };
+}
+
+/** The window's ticks that hold a block of `chain` (any network's under null), as instants. */
+export function blockTickTimes(ticks: readonly BlockTick[], chain: string | null = null): number[] {
+  return ticks.filter((t) => blocksInTick(t, chain) > 0).map((t) => Date.parse(t.ts));
+}
+
+/** A usual range in short words: "2–16 min", "12–40 s", "1–3 h" — the unit the range's top reads in,
+ *  "about 4 min" when both ends round alike. */
+export function usualGapWords(r: { lo: number; hi: number }): string {
+  const [div, unit] = r.hi < 90_000 ? [1_000, "s"] : r.hi < 90 * 60_000 ? [60_000, "min"] : [3_600_000, "h"];
+  const lo = Math.max(1, Math.round(r.lo / div));
+  const hi = Math.max(1, Math.round(r.hi / div));
+  return lo === hi ? `about ${hi} ${unit}` : `${lo}–${hi} ${unit}`;
+}
