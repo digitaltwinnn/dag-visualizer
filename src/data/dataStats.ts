@@ -112,25 +112,28 @@ export function dataBlocksByNetwork(
   return [...by.entries()].sort((a, b) => b[1] - a[1]).map(([key, count]) => ({ key, count }));
 }
 
-/** LAST DATA BLOCK — the newest read tick holding an in-scope snapshot that carried data blocks, and
- *  whose snapshot it was; null when the window read holds none. */
-export function lastDataTick(ticks: readonly Tick[], reads: Reads, inScope: (metaId: string) => boolean): { ordinal: number; ts: string; metaId: string } | null {
-  for (let i = ticks.length - 1; i >= 0; i--) {
-    const t = ticks[i]!;
-    const hit = reads[t.ordinal]?.rows.find((r) => inScope(r.metaId) && (r.dataBlocks ?? 0) > 0);
-    if (hit) return { ordinal: t.ordinal, ts: t.timestamp, metaId: hit.metaId };
-  }
-  return null;
-}
 
-/** THE INSTANTS OF THE READ TICKS THAT CARRIED DATA in scope — LAST DATA BLOCK's usual gap is measured
- *  over them (`blockStats.usualGap`, 2026-11-20). An unread tick is no instant: it is not known to
- *  have carried data, so it neither starts nor ends a gap. */
-export function dataTickTimes(ticks: readonly Tick[], reads: Reads, inScope: (metaId: string) => boolean): number[] {
-  const out: number[] = [];
+
+/** LAST DATA BLOCK PER NETWORK (user, 2026-11-20: "'usual' makes little sense when we're on 'all' … just
+ *  list each metagraph and their last block, if filtered just show that one"): for every network in
+ *  scope that carried a data block in a READ tick of the window, the newest such tick's time — newest
+ *  first. A network seen only in unread ticks is not listed (unknown, never "none"). */
+export function lastDataByNetwork(
+  ticks: readonly Tick[],
+  reads: Reads,
+  inScope: (metaId: string) => boolean,
+  keyOf: (metaId: string) => string,
+): { key: string; ts: string; ordinal: number }[] {
+  const by = new Map<string, { ts: string; ordinal: number }>();
   for (const t of ticks) {
     const ex = reads[t.ordinal];
-    if (ex && ex.rows.some((r) => inScope(r.metaId) && (r.dataBlocks ?? 0) > 0)) out.push(Date.parse(t.timestamp));
+    if (!ex) continue;
+    for (const r of ex.rows) {
+      if (!inScope(r.metaId) || !((r.dataBlocks ?? 0) > 0)) continue;
+      const k = keyOf(r.metaId);
+      const cur = by.get(k);
+      if (!cur || t.ordinal > cur.ordinal) by.set(k, { ts: t.timestamp, ordinal: t.ordinal });
+    }
   }
-  return out;
+  return [...by.entries()].map(([key, v]) => ({ key, ...v })).sort((a, b) => b.ordinal - a.ordinal);
 }
