@@ -42,7 +42,7 @@ import { compactDag } from "@/src/util/format";
 import { networkMark, unitOf } from "@/components/explorer/nodeRow";
 import { useNowTick } from "@/components/useNowTick";
 import { useLedgerSource } from "@/components/useLedgerSource";
-import { dataBlocksByNetwork, dataBlocksInWindow, dataInWindow, dataPerTick, dataTickTimes, lastDataTick } from "@/src/data/dataStats";
+import { dataBlocksByNetwork, dataBlocksInWindow, dataInWindow, dataPerTick, lastDataByNetwork } from "@/src/data/dataStats";
 import { netKeyOf } from "@/src/engine/domain/pickActions";
 
 export function HyperCells({ accent }: { accent: string }) {
@@ -1105,17 +1105,45 @@ export function DataCells({ accent, filter }: { accent: string; filter: string }
   const netTotal = blocksHeld.count;
   // A past window makes no claim about now: LAST DATA BLOCK, the one claim about now, says so.
   const pinned = past != null || pastStatus != null;
-  const last = !pinned ? lastDataTick(snaps, reads, inScope) : null;
+  const lastRows = !pinned ? lastDataByNetwork(snaps, reads, inScope, netKeyOf) : [];
 
   // No subject (the network runs no dL1, the DAG among them): one card, the sentence once.
   if (noData) return <BandCard label={REGISTER_NAMES.data}>{stateLine(noData)}</BandCard>;
 
   return (
     <>
-      {!pinned && last ? (
-        <LastSubject label="Last data block" ageMs={Math.max(0, now - Date.parse(last.ts))} chainKey={netKeyOf(last.metaId)} range={usualGap(dataTickTimes(snaps, reads, inScope))} accent={accent} />
-      ) : (
+      {/* LAST DATA BLOCK PER METAGRAPH (user, 2026-11-20: "'usual' makes little sense when we're on
+          'all' … just list each metagraph and their last block, if filtered just show that one, no
+          'usual' visual"): a data chain writes in nearly every snapshot, so the window's gaps say
+          little. Under All one row per metagraph, newest first — its mark, its name, its age; under a
+          filter that metagraph's age as the lead. */}
+      {pinned || !lastRows.length ? (
         <BandCard label="Last data block">{pinned ? stateLine(BLOCK_PINNED) : stateLine(held.read ? "No data block in the window" : "Reading the window…")}</BandCard>
+      ) : filter === "all" ? (
+        <BandCard label="Last data block">
+          <span className="flex flex-1 min-w-0 flex-col justify-evenly self-stretch gap-0.5">
+            {lastRows.slice(0, BY_NETWORK_ROWS).map((r) => {
+              const mark = networkMark(r.key);
+              return (
+                <span key={r.key} className="flex items-center gap-1.5 text-label leading-none whitespace-nowrap">
+                  <IdentityDot hue={mark.hue} />
+                  <span className="text-muted-foreground">{mark.label}</span>
+                  <span className="ml-auto font-mono tabular-nums text-foreground">{ageWords(Math.max(0, now - Date.parse(r.ts)))} ago</span>
+                </span>
+              );
+            })}
+          </span>
+        </BandCard>
+      ) : (
+        <BandCard
+          label="Last data block"
+          lead={<StackedLead figure={ageWords(Math.max(0, now - Date.parse(lastRows[0]!.ts)))} unit="ago" />}
+        >
+          <span className="flex items-center self-stretch gap-1.5 text-body whitespace-nowrap">
+            <IdentityDot hue={networkMark(lastRows[0]!.key).hue} />
+            <span className="text-muted-foreground">{networkMark(lastRows[0]!.key).label}</span>
+          </span>
+        </BandCard>
       )}
       <BandCard
         label="Data updates"
