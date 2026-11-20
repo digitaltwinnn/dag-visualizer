@@ -226,6 +226,10 @@ describe("checkNote — the DAG currency is a unit, not a network, and labels ma
   it("passes History's commonest note: the hypergraph's own fall, priced in DAG", () => {
     expect(checkNote(probe, fees(0.6, 0.9), hgNames).ok).toBe(true);
   });
+  it("reads \"$DAG\", the notes' spelling since 2026-11-20, as the same unit", () => {
+    expect(checkNote("Fees fell by 40% to 1.2K $DAG per day.", fees(0.6, 0.9), hgNames).ok).toBe(true);
+    expect(checkNote("Fees fell by 40% to 1.2K $DAG per day.", fees(0.9, 0.6), hgNames).ok).toBe(false);
+  });
   it("never lets the unit borrow USDC.dag's ratio (substring 'dag')", () => {
     expect(checkNote(probe, fees(0.9, 0.6), hgNames).ok).toBe(false);
   });

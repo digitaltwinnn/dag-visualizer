@@ -483,7 +483,7 @@ describe("trendFacts on the unlisted set", () => {
 describe("trendFacts reads the STORE payload and folds it (fees and data)", () => {
   it("a store-shaped fixture (floors + per-network fields + u.cov) yields Fees and Data facts, the fee in the chart's notation", () => {
     const r = trendFacts(input())!;
-    const fee = r.facts.find((f) => f.label === "Fees, DAG per day, this span")!;
+    const fee = r.facts.find((f) => f.label === "Fees, $DAG per day, this span")!;
     expect(fee.value).toBeCloseTo(10, 9); // 5e8 datums x 2 = 10 DAG a day
     expect(fee.text).toBe(formatDag(fee.value));
     const data = r.facts.find((f) => f.label === "Data, MB per day, this span")!;
@@ -494,9 +494,9 @@ describe("trendFacts reads the STORE payload and folds it (fees and data)", () =
 
   it("a bucket without u.cov makes the totals floors: labelled 'at least', no fee or data ratio", () => {
     const r = trendFacts(input({ cur: win(7, week(2, { "u.cov": row(7, (i) => (i === 3 ? null : 0)) })) }))!;
-    expect(r.facts.some((f) => f.label === "Fees, DAG per day, this span, at least")).toBe(true);
+    expect(r.facts.some((f) => f.label === "Fees, $DAG per day, this span, at least")).toBe(true);
     expect(r.facts.some((f) => f.label === "Data, MB per day, this span, at least")).toBe(true);
-    expect(r.facts.some((f) => f.label === "Fees, DAG per day, previous span")).toBe(true);
+    expect(r.facts.some((f) => f.label === "Fees, $DAG per day, previous span")).toBe(true);
     expect(r.facts.some((f) => f.kind === "ratio" && /^(Fees|Data)/.test(f.label))).toBe(false);
     // Everything else still compares.
     expect(r.facts.some((f) => f.label === "Blocks, ratio to previous span")).toBe(true);
@@ -583,12 +583,12 @@ describe("a notable day of another measure", () => {
   const daily = (over: Record<string, (number | null)[]>) => win(40, { "g.ticks": row(40, () => 288), "m.bio.snaps": row(40, () => 50), ...over }, T0 - 0 * DAY);
   it("states it in that measure's own unit", () => {
     const r = trendFacts(input({ subject: "bio", zoom: "30d", span, daily: daily({ "m.bio.fee": row(40, (i) => (i === 30 ? 40e8 : 5e8)) }), cur: win(7, week(2)), prev: null }))!;
-    expect(r.facts.find((f) => /spike, DAG in fees that day/.test(f.label))?.text).toBe("40");
+    expect(r.facts.find((f) => /spike, \$DAG in fees that day/.test(f.label))?.text).toBe("40");
     expect(r.facts.find((f) => /spike, usual level/.test(f.label))?.text).toBe("5");
   });
   it("marks the whole network's as a floor, since the unlisted chains may not be in it", () => {
     const r = trendFacts(input({ zoom: "30d", span, daily: daily({ "g.anchors": row(40, () => 100), "g.feeFloor": row(40, (i) => (i === 30 ? 40e8 : 5e8)) }), cur: win(7, week(2)), prev: null }))!;
-    expect(r.facts.some((f) => /spike, DAG in fees that day, at least/.test(f.label))).toBe(true);
+    expect(r.facts.some((f) => /spike, \$DAG in fees that day, at least/.test(f.label))).toBe(true);
   });
 });
 
