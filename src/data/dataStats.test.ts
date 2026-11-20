@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { ChannelSnapRow, SnapshotExact } from "@/src/data/types";
-import { dataBlocksByNetwork, dataBlocksInWindow, dataByNetwork, lastDataByNetwork, dataInWindow, dataPerTick } from "./dataStats";
+import { dataBlocksByNetwork, dataBlocksInWindow, dataByNetwork, lastDataByNetwork, unreadOrdinals, dataInWindow, dataPerTick } from "./dataStats";
 
 // THE DATA BLOCKS REGISTER'S BAND (D6, 2026-11-07): DATA UPDATES · BY NETWORK · LAST DATA BLOCK, read
 // off the exact reads of the ticks the ledger source holds. A tick whose read has not landed is
@@ -96,5 +96,12 @@ describe("lastDataByNetwork — LAST DATA BLOCK under All (2026-11-20)", () => {
       { key: "dor", ts: ticks[0]!.timestamp, ordinal: 1 },
     ]);
     expect(lastDataByNetwork(ticks, reads, (id) => id === "DOR", key)).toEqual([{ key: "dor", ts: ticks[0]!.timestamp, ordinal: 1 }]);
+  });
+});
+
+describe("unreadOrdinals — what the Data blocks register reads on arrival (2026-11-20)", () => {
+  it("the window's ticks with no exact read, newest first", () => {
+    expect(unreadOrdinals(ticks, reads)).toEqual([3]);
+    expect(unreadOrdinals(ticks, {})).toEqual([4, 3, 2, 1]);
   });
 });

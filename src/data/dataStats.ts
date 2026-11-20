@@ -137,3 +137,11 @@ export function lastDataByNetwork(
   }
   return [...by.entries()].map(([key, v]) => ({ key, ...v })).sort((a, b) => b.ordinal - a.ordinal);
 }
+
+/** THE DATA BLOCKS WINDOW'S UNREAD SNAPSHOTS (user, 2026-11-20: "why it says 'at least'?" — the window
+ *  holds 50 global snapshots and only the newest few were read on arrival, so every count was a floor
+ *  for ~20 minutes and older tiles showed no data mark). The ordinals whose exact read is not held,
+ *  newest first: what the bridge reads, a pool at a time, while the register is on screen. */
+export function unreadOrdinals(ticks: readonly { ordinal: number }[], reads: Readonly<Record<number, unknown>>): number[] {
+  return ticks.map((t) => t.ordinal).filter((o) => reads[o] == null).sort((a, b) => b - a);
+}
