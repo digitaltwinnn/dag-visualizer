@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { ChannelSnapRow, SnapshotExact } from "@/src/data/types";
-import { dataBlocksByNetwork, dataBlocksInWindow, dataByNetwork, lastDataByNetwork, unreadOrdinals, dataInWindow, dataPerTick } from "./dataStats";
+import { dataBlocksByNetwork, dataBlocksInWindow, dataByNetwork, lastDataByNetwork, settledTicks, unreadOrdinals, dataInWindow, dataPerTick } from "./dataStats";
 
 // THE DATA BLOCKS REGISTER'S BAND (D6, 2026-11-07): DATA UPDATES · BY NETWORK · LAST DATA BLOCK, read
 // off the exact reads of the ticks the ledger source holds. A tick whose read has not landed is
@@ -103,5 +103,16 @@ describe("unreadOrdinals — what the Data blocks register reads on arrival (202
   it("the window's ticks with no exact read, newest first", () => {
     expect(unreadOrdinals(ticks, reads)).toEqual([3]);
     expect(unreadOrdinals(ticks, {})).toEqual([4, 3, 2, 1]);
+  });
+});
+
+describe("settledTicks — a read in flight is arriving, not unread (2026-11-20)", () => {
+  it("drops the ticks newer than the newest settled read; keeps an unread one below it", () => {
+    // reads hold 1, 2, 4 (3 unread below the edge); a newer tick 5 is in flight.
+    const t5 = [...ticks, { ordinal: 5, timestamp: "2026-11-07T10:01:20.000Z" }];
+    expect(settledTicks(t5, reads).map((t) => t.ordinal)).toEqual([1, 2, 3, 4]);
+    // A MISSED read settles too: its tick stays, counted as unread.
+    expect(settledTicks(t5, reads, { 5: 1 }).map((t) => t.ordinal)).toEqual([1, 2, 3, 4, 5]);
+    expect(settledTicks(ticks, {})).toEqual([]);
   });
 });

@@ -42,7 +42,7 @@ import { compactDag } from "@/src/util/format";
 import { networkMark, unitOf } from "@/components/explorer/nodeRow";
 import { useNowTick } from "@/components/useNowTick";
 import { useLedgerSource } from "@/components/useLedgerSource";
-import { dataBlocksByNetwork, dataBlocksInWindow, dataInWindow, dataPerTick, lastDataByNetwork } from "@/src/data/dataStats";
+import { dataBlocksByNetwork, dataBlocksInWindow, dataInWindow, dataPerTick, lastDataByNetwork, settledTicks } from "@/src/data/dataStats";
 import { netKeyOf } from "@/src/engine/domain/pickActions";
 
 export function HyperCells({ accent }: { accent: string }) {
@@ -1081,9 +1081,13 @@ export function BlocksCells({ accent }: { accent: string }) {
  *  data block, so under the DAG filter the cells say so instead of a zero. */
 export function DataCells({ accent, filter }: { accent: string; filter: string }) {
   useFeedRead(["global", "exact"], "DataCells");
-  const { snaps, past } = useLedgerSource(POLL.maxSnapshots);
+  const { snaps: arriving, past } = useLedgerSource(POLL.maxSnapshots);
   const pastStatus = useStore((s) => s.pastWindow?.status ?? null);
   const reads = useStore((s) => s.snapshotExact);
+  // A new tick whose read is still in flight is ARRIVING, not unread: the window is the ticks up to
+  // the newest settled read (`settledTicks`), so a fresh global snapshot never flashes "at least".
+  const missed = useStore((s) => s.exactMiss);
+  const snaps = settledTicks(arriving, reads, missed);
   const now = useNowTick(1000);
   const span = snapshotSpanWord({ pastStatus, past: past?.globalSnapshots ?? null, live: [...snaps].reverse(), nowMs: now });
   // The filter's lens as a predicate over an address: one network's addresses (its former ones

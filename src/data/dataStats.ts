@@ -145,3 +145,14 @@ export function lastDataByNetwork(
 export function unreadOrdinals(ticks: readonly { ordinal: number }[], reads: Readonly<Record<number, unknown>>): number[] {
   return ticks.map((t) => t.ordinal).filter((o) => reads[o] == null).sort((a, b) => b - a);
 }
+
+/** THE WINDOW AS FAR AS ITS READS HAVE SETTLED (user, 2026-11-20: "i still see an 'at least' in the
+ *  vitals" — every new global snapshot made every count a floor for the second or two its exact read
+ *  was in flight). The ticks NEWER than the newest one whose read has landed or missed are still
+ *  arriving, not unread: they join the window when their read settles. A tick at or below it whose
+ *  read is absent is genuinely unread (it failed, or never asked), and still makes a floor (rule 10). */
+export function settledTicks<T extends { ordinal: number }>(ticks: readonly T[], reads: Readonly<Record<number, unknown>>, missed: Readonly<Record<number, unknown>> = {}): T[] {
+  let edge = -Infinity;
+  for (const t of ticks) if ((reads[t.ordinal] != null || missed[t.ordinal] != null) && t.ordinal > edge) edge = t.ordinal;
+  return ticks.filter((t) => t.ordinal <= edge);
+}
