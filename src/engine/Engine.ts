@@ -2567,6 +2567,7 @@ export class Engine {
     this.trends.group.visible = trendActive && trendAlpha > 0.001;
     if (ledgerActive) {
       if (this._ledgerDirty) this._refreshLedger();
+      this.ledger.setStill(this._reduceMotion.matches);
       this.ledger.update(dt);
     }
     // Resolve the frame's stage-light claim (hyper/geo made theirs in their update above): stage,

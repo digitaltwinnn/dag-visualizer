@@ -90,7 +90,6 @@ import type { ViewPolicy } from "../../domain/viewPolicy";
 type LedgerRegister = ViewPolicy["registers"][number];
 import { fmtKB } from "@/src/util/format"; // the HUD's own size vocabulary — one formatter, so scene and cards can't disagree
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers"; // shared display copy — floor labels = panel rows
-import { SoftLines } from "../objects/SoftLines";
 import { ByteBar, SEED_W } from "../objects/ByteBar";
 import { LiveEdge } from "../objects/LiveEdge";
 import { snapBright, snapFocusOf, focusWeightOf, emphasisK } from "../../domain/dimModel";
@@ -109,6 +108,7 @@ import { joinBloom, inMarkPass } from "../SceneContext";
 import { faceShade } from "../objects/faceShade";
 import { FloorMirror, joinMirror } from "../objects/FloorMirror";
 import { Glint } from "../objects/Glint";
+import { LiftMist } from "../objects/LiftMist";
 
 /** The lane-tile instance budget.
  *
@@ -256,16 +256,11 @@ const REGISTER_CARGO: Record<LedgerRegister, { blocks: boolean; liveEdge: boolea
 };
 /** A data mark's brightness over its tile's: a footnote on the tile, but one that must read on it. */
 const DATA_MARK_GAIN = 2.2;
-/** THE LIFT, DRAWN (user, 2026-11-23: "instead of a boring line, can we have some nice visual effect
- *  to link/relate them to the snapshot?"). A block was tied to its snapshot by one hairline up the
- *  middle (2026-11-09, "with a line attaching the blocks"). It is four now, one from each corner of
- *  the tile to the matching corner of the block: the snapshot's footprint drawn narrowing to the
- *  block's, the way a drawing shows a part pulled out of its seat — the block is not near the
- *  snapshot, it came off it. Hairlines, like the rest of the chamber's ties (`SoftLines`), in the
- *  block's own ink. `alpha` is their level where they leave the tile, per ground (on paper an ink
- *  line needs more presence to read at all), and `thin` the share of it left where they reach the
- *  block, so the eye is led up without a cage around the lift. */
-const DATA_LIFT: Readonly<{ alpha: number; alphaPaper: number; thin: number }> = { alpha: 0.75, alphaPaper: 0.9, thin: 0.3 };
+/** THE BLOCKS HOVER (user, 2026-11-23: "levitating"): a data column rides up and down a little
+ *  over its snapshot — `rise` of the tile's size either way, one cycle every `seconds`, each column
+ *  on its own phase so the trail breathes instead of marching. Held still under reduced motion
+ *  (`setStill`). What ties the column to its tile is the mist under it (`objects/LiftMist.ts`). */
+const DATA_HOVER: Readonly<{ rise: number; seconds: number }> = { rise: 0.07, seconds: 4.6 };
 
 /** A block's edge above the floor (a DAG block) and on a tile (a token block — a tile is 0.48 at most). */
 const DAG_BLOCK = 0.62;
@@ -528,8 +523,11 @@ export class LedgerView implements SceneView {
   private readonly _dataMarkN = new Float32Array(META_TRAIL_MAX).fill(-1);
   /** How many boxes each tile's column holds (`dataMark.dataStackBoxes`), resolved with the count. */
   private readonly _dataBoxN = new Uint8Array(META_TRAIL_MAX);
-  /** The lift lines (`DATA_LIFT`), packed: four per drawn column, a fifth for a column of several boxes. */
-  private _dataTether!: SoftLines;
+  /** The mist each data column hangs over (`objects/LiftMist.ts`), one per drawn column, packed. */
+  private _liftMist!: LiftMist;
+  /** The hover's clock, and whether motion is held still (reduced motion; the Engine says). */
+  private _hoverT = 0;
+  private _still = false;
 
   constructor(
     scene: THREE.Scene,
@@ -652,8 +650,7 @@ export class LedgerView implements SceneView {
     // before any data, and the pool would submit all META_TRAIL_MAX zero-scaled boxes every frame.
     this._dataMarkMesh.count = 0;
     this.group.add(this._dataMarkMesh);
-    this._dataTether = new SoftLines(META_TRAIL_MAX, this._colors);
-    this.group.add(this._dataTether.mesh);
+    this._liftMist = new LiftMist(this.group, META_TRAIL_MAX, DATA_MARK.foot, TILE_D * DATA_MARK.lift, this._paper);
   }
 
   private _laneColor(id: string): THREE.Color {
@@ -821,7 +818,7 @@ export class LedgerView implements SceneView {
     for (const p of this._tokenPanes.values()) p.setColors(c);
     this._bar.setColors(c);
     this._ribbons.setColors(c);
-    this._dataTether?.setColors(c);
+    this._liftMist?.setGround(this._paper);
     for (const t of this._tiers) t.setColors(c);
     this._stretch.setColors(c);
     this._rebuildBlockTier(); // the DAG's blocks and links bake the structural cyan (`_core`)
@@ -1651,6 +1648,12 @@ export class LedgerView implements SceneView {
     this._hoverTile = -1;
   }
 
+  /** REDUCED MOTION, from the Engine (plain data): the data columns' hover and their mist's drift
+   *  hold still. */
+  setStill(still: boolean): void {
+    this._still = still;
+  }
+
   /** The COMMITTED (clicked) or followed snapshot — the only thing the trail rewind tracks. */
   setPinned(ordinal: number | null) {
     this._rewind.setPinned(ordinal);
@@ -2151,12 +2154,14 @@ export class LedgerView implements SceneView {
     // The data columns' own cursor: a tile's boxes take the next slots of the mark pool, so the
     // pool is packed and `count` draws exactly the boxes standing this frame.
     let si = 0;
-    let li = 0; // …and the lift lines' cursor, packed the same way
+    let li = 0; // …and the mist's cursor, packed the same way
     // Hoisted per frame (the hoist rule): one read for every lane's every tile.
     const dimNet = this._netDimKey();
     const tileRest = TILE_LOOK.rest;
     const tileInk = TILE_LOOK.ink;
     const dataMarks = this._cargo.tiles === "data";
+    if (dataMarks && !this._still) this._hoverT = (this._hoverT + dt / DATA_HOVER.seconds) % 1000;
+    const hoverPh = this._hoverT * Math.PI * 2;
     // A focus is a SELECTED row (pinned or live-followed — how it was reached is not what it is),
     // a hovered row or a hovered tile. The bare lead is none of them: with nothing selected the
     // chamber is simply running, and stepping the whole trail back against a row it advanced onto
@@ -2292,7 +2297,10 @@ export class LedgerView implements SceneView {
             // Each box is a cube inside the tile's footprint; the column rises from the lift.
             const w = b.size * DATA_MARK.foot;
             const h = w;
-            const under = _tileV.y + tileH * DATA_MARK.lift;
+            // The hover: each column on its own phase (its tile's place in the trail), still under
+            // reduced motion.
+            const bob = this._still ? 0 : Math.sin(hoverPh + mi * 1.7) * b.size * DATA_HOVER.rise;
+            const under = _tileV.y + tileH * DATA_MARK.lift + bob;
             const pitch = h * (1 + DATA_STACK.gap);
             // A hovered data block's column takes the subject's full weight (its tile keeps its own).
             inkMix(_col.copy(laneColor), mi === this._hoverMark ? 1 : Math.min(1, bright * DATA_MARK_GAIN), this._colors);
@@ -2305,28 +2313,15 @@ export class LedgerView implements SceneView {
               this._dataMarkMesh.setColorAt(si, _col);
               si++;
             }
-            // THE LIFT, DRAWN (`DATA_LIFT`): four hairlines from the tile's corners up to the first
-            // box's, so the block reads as raised OUT of its snapshot — the snapshot's footprint
-            // narrowing to the block's — firm where they leave the tile and thinning as they rise.
-            // A column of several boxes carries one more, its spine, box to box. The lines' pool
-            // is packed like the boxes' (`li`).
-            if (li + 5 <= META_TRAIL_MAX) {
-              const ta = (this._paper ? DATA_LIFT.alphaPaper : DATA_LIFT.alpha) * entryF;
-              const ht = b.size / 2, hb = w / 2;
-              for (let c = 0; c < 4; c++) {
-                const sx = c & 1 ? 1 : -1, sz = c & 2 ? 1 : -1;
-                this._dataTether.setSegment(li, _tileV.x + sx * ht, _tileV.y, _tileV.z + sz * ht, _tileV.x + sx * hb, under, _tileV.z + sz * hb);
-                this._dataTether.setColor(li, _col.r, _col.g, _col.b);
-                this._dataTether.setAlpha(li, ta, ta * DATA_LIFT.thin);
-                li++;
-              }
-              if (boxes > 1) {
-                this._dataTether.setSegment(li, _tileV.x, under + h, _tileV.z, _tileV.x, under + (boxes - 1) * pitch, _tileV.z);
-                this._dataTether.setColor(li, _col.r, _col.g, _col.b);
-                this._dataTether.setAlpha(li, ta * DATA_LIFT.thin, ta * DATA_LIFT.thin);
-                li++;
-              }
-            }
+            // THE MIST it hangs over: the shell stands on the tile's top at the tile's size, in the
+            // column's ink at the tile's entry fade (a colour multiply: it is added light on dark,
+            // and the instance colour is its only per-column channel).
+            _dummy.position.set(_tileV.x, _tileV.y, _tileV.z);
+            _dummy.scale.setScalar(b.size);
+            _dummy.updateMatrix();
+            this._liftMist.mesh.setMatrixAt(li, _dummy.matrix);
+            this._liftMist.mesh.setColorAt(li, this._paper ? _col : _col.multiplyScalar(entryF));
+            li++;
           }
         }
         mi++;
@@ -2372,9 +2367,9 @@ export class LedgerView implements SceneView {
         this._dataMarkMesh.instanceColor.needsUpdate = true;
       }
     }
-    // The lift lines are packed too: positions and colours move with the trail every frame, so both
-    // upload, ranged to the lines drawn (`SoftLines.commit`); 0 draws none.
-    this._dataTether.commit(dataMarks ? li : 0, true, true);
+    // The mist is packed too, ranged to the columns drawn; 0 draws none. Its band holds still with
+    // the hover.
+    this._liftMist.commit(dataMarks ? li : 0, this._fades.alpha, this._still ? 0 : dt);
   }
 
   dispose() {
@@ -2392,7 +2387,7 @@ export class LedgerView implements SceneView {
     this._bar.dispose();
     this._live.dispose();
     this._ribbons.dispose();
-    this._dataTether.dispose();
+    this._liftMist.dispose();
     for (const t of this._tiers) t.dispose();
     this._stretch.dispose();
     for (const o of this.group.children.slice()) {

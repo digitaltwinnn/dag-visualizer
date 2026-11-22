@@ -775,14 +775,19 @@ own size from 2026-11-08, and a column of those slabs still read as flat.
 One `InstancedMesh` (`_dataMarkMesh`, the tiles' own species: solid, normal-blended, depth-writing,
 in the bloom set, not pickable — the tile under it answers the click). **Its pool is PACKED**: a
 tile's boxes take the next slots (`si`), so `count` draws exactly the boxes standing this frame and
-nothing past them needs zeroing; a tile the register does not draw writes none. **The lift is
-DRAWN** (`DATA_LIFT`; user, 2026-11-23: "instead of a boring line, can we have some nice visual
-effect to link/relate them to the snapshot?"): four `SoftLines` hairlines, one from each corner of
-the tile to the matching corner of the first box, so the snapshot's footprint is seen narrowing to
-the block's and the block reads as pulled out of its snapshot; firm at the tile and thinning to
-`thin` of that at the box, in the column's ink, per ground (dark 0.75, paper 0.9) times the entry
-fade. A column of several boxes carries one more line, its spine. The lines' pool is packed like
-the boxes' (`li`). It was one hairline up the middle from 2026-11-09. The row behind both numbers is resolved at event time
+nothing past them needs zeroing; a tile the register does not draw writes none. **The column HOVERS OVER A MIST**
+(`objects/LiftMist.ts`, `MIST_LOOK`; `DATA_HOVER`; user, 2026-11-23: "what about some levitating /
+glow / mist from the snapshot instead of hard lines?"). One instanced shell per drawn column stands
+on the tile: the tile's footprint narrowing to the block's, with no edge anywhere (each face fades
+out at its own sides), strongest where it leaves the tile and gone before it reaches the block, a
+slow band drifting up it; the column's ink, added light on dark and a thin wash on paper. The
+shell's proportions are `DATA_MARK`'s, fractions of the tile, so one unit geometry serves every
+column at its tile's size; its pool is packed like the boxes' (`li`). The column itself rides up
+and down `DATA_HOVER.rise` of its tile's size, each on its own phase. Reduced motion holds both
+still (`LedgerView.setStill`, from the Engine). A drawn tie was tried twice the same day — one
+hairline up the middle (from 2026-11-09), then four from the tile's corners — and a drawn tie reads
+as a strut: the block stood on a frame instead of hanging over its snapshot.
+The row behind both numbers is resolved at event time
 with the pick table (`_rebuildTilePicks` → `_dataRowOf`, the snapshot's own row in its tick's exact
 read): `dataMarkCount` gates the tile (a mark only where the row says it carried data blocks) and
 `dataStackBoxes` sizes the column; a tile whose read has not landed shows none (rule 10, never
