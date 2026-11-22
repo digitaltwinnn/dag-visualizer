@@ -1020,8 +1020,10 @@ were agreed; four are built, each tied to something real, each a plain `Readonly
 
 **The subject's air** (`SceneContext.setBackdropTint`, `BACKDROP_LOOK.subject`; user, 2026-11-22:
 use Hypergraph's blur more, "maybe combine it with a subtle background color change"). While one
-network is the subject in Hypergraph, the backdrop takes a breath of its identity colour: added to
-the pool on dark, a faint tint of the page toward it on paper. It rides the SAME eased number as the
+network is the subject in Hypergraph, the dark backdrop's pool TURNS to its identity colour (it
+replaces the pool's blue; added on top, an orange landed as grey-brown). Dark only: a tint of the
+page was tried on paper and read as paper of two colours, warm under one network and cool under
+the next. It rides the SAME eased number as the
 depth-of-field blur (`Engine._dofMix`), so the structure falling out of focus and the air changing
 colour are one move — and the blur, which used to snap on, eases with it. The DAG as subject takes
 the colour and no blur: its shells are far wider than the blur's sharp zone, and its own nodes
