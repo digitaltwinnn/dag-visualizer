@@ -1211,7 +1211,15 @@ const TrendPlot = memo(function TrendPlot({
               {fill && (
                 <defs>
                   <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={hue0} style={{ stopOpacity: "var(--trend-fill-top)" }} />
+                    {/* THE FILL CARRIES THE SHAPE (user, 2026-11-23: "play around with the fill" —
+                        the dense hourly line read as thick, and he did not want buckets merged). A
+                        bright lip just under the series, falling off fast into a long faint tail:
+                        the lit band says where the level runs, so the stroke over it can be a
+                        hairline. Every stop is a multiple of the one token, so the two grounds keep
+                        their ratio. */}
+                    <stop offset="0%" stopColor={hue0} style={{ stopOpacity: "calc(var(--trend-fill-top) * 2.1)" }} />
+                    <stop offset="14%" stopColor={hue0} style={{ stopOpacity: "calc(var(--trend-fill-top) * 0.95)" }} />
+                    <stop offset="45%" stopColor={hue0} style={{ stopOpacity: "calc(var(--trend-fill-top) * 0.3)" }} />
                     <stop offset="100%" stopColor={hue0} stopOpacity={0} />
                   </linearGradient>
                 </defs>

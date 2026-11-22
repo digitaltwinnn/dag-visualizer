@@ -801,7 +801,9 @@ export default function TrendStack() {
                 // landed at 2.6 (see `lineWidth`). 1.25 → 1 (user, 2026-11-23: "too thick and/or
                 // spikey?"): hundreds of hourly buckets on a few hundred pixels fold back on
                 // themselves, and every extra tenth of stroke thickens each fold into a blade.
-                lineWidth={1}
+                // 0.75 with the fill's lit lip under it (`TrendChart`'s gradient): the band carries
+                // the level, the stroke only its edge.
+                lineWidth={0.75}
                 // THE HEADLINE IS THE ROSTER'S `head` (user, 2026-09-29: "keep it consistent") —
                 // the same number the Networks list states: the span's average per day over a
                 // window of a day or more, the latest full day under one.

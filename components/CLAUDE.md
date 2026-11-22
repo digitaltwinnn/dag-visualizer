@@ -533,7 +533,10 @@ hour"). That unit is what separates the plot's buckets from the head's per-day r
 are DOM beside the memoised plot, placed by the cursor's own box arithmetic, each on a chip of the
 card's ground (a plane takes no shadow). A hover reads its bucket two digits finer than the head
 (`useTrendRoster.formatFine`: "2.03K"). The series line takes round joins, the plot has a floor
-line, and the tether's axis mark under it is a hairline.
+line, and the tether's axis mark under it is a hairline. **The fill carries the shape and the
+stroke is a hairline** (user, 2026-11-23: the dense hourly line read as thick, and no bucket was to
+be merged away): the area's gradient has a bright lip just under the series and a long faint tail
+(four stops, each a multiple of `--trend-fill-top`), and the stack draws the line at 0.75.
 
 **The plane's head is NETWORK · MEASURE · READINGS — on the FRONT card; a rear card's head is the
 NETWORK ALONE** (user, 2026-10-19, later the same day: the title and values "repeated on each
