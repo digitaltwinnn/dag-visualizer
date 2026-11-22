@@ -1026,10 +1026,12 @@ hairline at every zoom, the tip-fade profile on the strips' alpha, so the ground
 blend mode's and nothing is baked toward black or the page. The hoops stay GL lines (dashed
 `LineLoop`s); under the multisampled target they render clean.
 
-**The Snapshots floor names no rows** (`LedgerView`'s `ROW_COLUMNS`, false; user: "remove texts"): the
-ordinal and size columns were specks at the resting pose, and their dotted leaders went with them.
-⚠️ The "Labels" paragraph above describes those columns as they were; their code is still in
-`_syncOrdLabels`, which returns at once.
+**The Snapshots floor states no row figures** (`LedgerView`'s `ROW_TEXT`, false; user: "remove
+texts", then "keep the dotted lines as texture"): the ordinal and size texts were specks at the
+resting pose, so they are off, and the dotted lines that tied them to their rows stay as the floor's
+texture — each still ends at its row's bar edge, the size side only for a measured row.
+⚠️ The "Labels" paragraph above describes the texts as they were; their code is still in
+`_syncOrdLabels`, behind `ROW_TEXT`.
 
 **The chamber's boxes are FACE-SHADED** (`objects/faceShade.ts`): the bars, lane tiles, data marks and
 blocks stay unlit, and a per-vertex multiplier by face direction is baked into the geometry (the

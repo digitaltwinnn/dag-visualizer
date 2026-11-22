@@ -146,10 +146,11 @@ const ORD_OP = 0.55;
  *  attached to snapshot id/size"): at the resting pose eight rows of dashes ran the full width of
  *  the chamber on both sides, which is a lot of ink for a joining mark. ONE constant, because both
  *  columns tie their rows with the same recipe and must not drift. */
-/** Whether the floor names each row at both ends (ordinal left, size right, each on a dotted
- *  leader). Off since 2026-11-22 — see `_syncOrdLabels`. */
-const ROW_COLUMNS: boolean = false;
 const ORD_LINE_MUL = 0.26;
+/** Whether the floor states each row's ordinal and size in TEXT at the ends of its dotted lines.
+ *  Off (user, 2026-11-22: "remove texts", then "keep the dotted lines as texture") — the lines
+ *  stay, the figures are the explorer's rows and the Global snapshot card. See `_syncOrdLabels`. */
+const ROW_TEXT: boolean = false;
 /** The committed lane's plane edge-fill multiplier (its plane leads with its snapshots). */
 const LANE_FILL_BOOST = 3;
 /** The floor's edge-readout text height (user, 2026-09-01: "make the texts with the snapshot #
@@ -774,7 +775,7 @@ export class LedgerView implements SceneView {
       // The size column rides the same two boundaries. Its line goes with its number: with no
       // measurement to state there is nothing for the line to tie to.
       if (o.kb) (o.kb.material as THREE.MeshBasicMaterial).opacity = ordOp * front * a;
-      (o.kbLine.material as THREE.LineDashedMaterial).opacity = o.kb ? ordOp * ORD_LINE_MUL * front * a : 0;
+      (o.kbLine.material as THREE.LineDashedMaterial).opacity = o.kbText ? ordOp * ORD_LINE_MUL * front * a : 0;
     }
   }
 
@@ -1791,11 +1792,11 @@ export class LedgerView implements SceneView {
    *  label rides its row down the trail; one new canvas per tick (event-time — recycled labels
    *  only move, and the line end tracks the bar's live width as the exact read lands). */
   private _syncOrdLabels(): void {
-    // ⚠️ THE ROW COLUMNS ARE OFF (`ROW_COLUMNS`, user, 2026-11-22: "remove texts"). At the resting
-    // pose the ordinal and size columns were specks, and the exact figures they stated are the
-    // explorer's rows and the Global snapshot card. The dotted leader lines went with them: a
-    // leader with no label points at nothing. Nothing below runs, so no canvas is made per tick.
-    if (!ROW_COLUMNS) return;
+    // ⚠️ THE ROW TEXT IS OFF (`ROW_TEXT`, user, 2026-11-22: "remove texts"). At the resting pose
+    // the ordinal and size columns were specks, and the exact figures they stated are the
+    // explorer's rows and the Global snapshot card. The dotted lines STAY as the floor's texture
+    // (user, same day), running where they ran: each still ends at its row's bar edge, and the
+    // size side still draws only for a measured row. The ordinal's mesh is built hidden.
     const seen = _ordSeen;
     seen.clear();
     const y = FLOOR_Y.gl0 + 0.06;
@@ -1814,6 +1815,7 @@ export class LedgerView implements SceneView {
         // event-time: one canvas + two 2-point dashed lines per new tick
         const mesh = makeEdgeLabel(this._colors, snap.ordinal.toLocaleString(), 0, FLOOR_Y.gl0, ORD_Z, ORD_H, "left", "readout");
         (mesh.material as THREE.MeshBasicMaterial).opacity = 0;
+        mesh.visible = ROW_TEXT;
         const line = this._makeDashLine(y, ORD_LINE_Z0);
         const kbLine = this._makeDashLine(y, KB_Z0);
         o = { mesh, line, slot: s, kb: null, kbLine, kbText: "" };
@@ -1841,7 +1843,7 @@ export class LedgerView implements SceneView {
           km.dispose();
           o.kb = null;
         }
-        if (kbText) {
+        if (kbText && ROW_TEXT) {
           // event-time: one canvas when a row's measurement arrives or changes
           o.kb = makeEdgeLabel(this._colors, kbText, 0, FLOOR_Y.gl0, KB_Z0, ORD_H, "left", "readout");
           (o.kb.material as THREE.MeshBasicMaterial).opacity = 0;
