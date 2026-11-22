@@ -26,6 +26,7 @@ import type { PickDescriptor } from "@/src/data/types";
 import { joinBloom } from "../SceneContext";
 import { SoftLines } from "./SoftLines";
 import { faceShade } from "./faceShade";
+import { joinMirror } from "./FloorMirror";
 
 /** One block, placed by the view (chamber-local, before the rewind offset). */
 export interface BlockItem {
@@ -138,6 +139,7 @@ export class BlockTier {
     this.mesh.count = 0;
     this.mesh.userData.picks = this._picks;
     joinBloom(this.mesh); // identity marks, like the lane tiles they stand on
+    joinMirror(this.mesh);
     this.group.add(this.mesh);
 
     // Two parents per block: a link budget of twice the blocks.
@@ -148,6 +150,7 @@ export class BlockTier {
     // read thin beside the blocks it ties); its alpha (`BLOCK_LOOK.link`) is what meters the glow.
     this._links = new SoftLines(this._maxLinks * LINK_SAMPLES, colors);
     joinBloom(this._links.mesh);
+    joinMirror(this._links.mesh);
     this.group.add(this._links.mesh);
   }
 

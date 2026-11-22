@@ -17,6 +17,7 @@ import { SLOT_SP, SLOT_N, horizonAt, frontAt, rowOnChamber } from "../../domain/
 import { snapBright, snapFocusOf, emphasisK } from "../../domain/dimModel";
 import { joinBloom, inMarkPass } from "../SceneContext";
 import { faceShade } from "./faceShade";
+import { joinMirror } from "./FloorMirror";
 
 const BANDS_PER_SLOT = METAGRAPHS.length + 1;
 
@@ -145,6 +146,7 @@ export class ByteBar {
         mesh.scale.set(0, 0, 0);
         mesh.visible = false;
         joinBloom(mesh); // a band is the tick's own ink — see BLOOM_LAYER
+        joinMirror(mesh); // it stands on the floor
         // The paper halo's input lift (BarLook.halo): the material colour rides above its own
         // value only while the selective mark pass renders, un-multiplied inside the same pass —
         // the main frame always draws the band's true colour. ⚠️ MULTIPLY, never set: a band's

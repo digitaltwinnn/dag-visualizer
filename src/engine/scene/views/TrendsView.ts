@@ -61,7 +61,7 @@ import {
   stepX,
   type PlaneFormat,
 } from "../../domain/trendStack";
-import { glowBlend, inkMix, isLightGround, type SceneColors } from "../../sceneColors";
+import { glowBlend, inkMix, isLightGround, structureInk, type SceneColors } from "../../sceneColors";
 import { FadeSet } from "../objects/FadeSet";
 import type { SceneView } from "./SceneView";
 
@@ -138,7 +138,30 @@ const groundY = (centre: number, f: PlaneFormat): number => PLANE_Y - centre * f
 // stood on almost nothing on paper, while dark's bands read plainly under its deck.
 // Dark is 0.16 in the card's identity hue (was 0.07 in the foreground's white): a saturated hue
 // carries a fraction of white's luminance, and the level is what keeps the footprint legible.
-const GROUND_PRESENCE = { dark: 0.16, paper: 0.5 } as const;
+//
+// ⚠️ BOTH ARE 0 SINCE 2026-11-22: THE BANDS DRAW NOTHING. Grey, then hued, then hugging the card,
+// a soft band under a crisp DOM card read as a smudge every time, and a DOM mirror of the front
+// chart did no better (user, four rounds: "drop mirror and wash and come with a completely
+// different but subtle scene background"). The view's ground is the DOT FLOOR below. The bands,
+// their hues and their geometry are intact; raising these two numbers brings them back.
+const GROUND_PRESENCE = { dark: 0, paper: 0 } as const;
+
+/** THE DOT FLOOR — History's scene background: a lattice of small dots on a level floor under the
+ *  deck, receding to nothing. It is TEXTURE, not a mark: a dot states no line, no row and no edge,
+ *  so nothing in it can be read as a gridline or a reading (the rule the accent hairlines broke),
+ *  and being crisp at every size it sits with the cards' own type instead of smearing under them.
+ *  Perspective does the work: the lattice is even in the world, so on screen its rows close up
+ *  toward the horizon, which is the depth axis the stack recedes along.
+ *
+ *  `spacing` is the lattice pitch in world units (the card is 58 wide), `dot` a dot's radius as a
+ *  fraction of the pitch (`paperDot` times that on paper), `reach` the radius of the pool the field fades out over, `drop` how far
+ *  below the front card's foot the floor lies (a fraction of the card's height), and the two
+ *  presences are the dots' level per ground — the structure ink, added light on dark, ink on paper. */
+export const DOT_FLOOR: Readonly<{ spacing: number; dot: number; paperDot: number; reach: number; drop: number; dark: number; paper: number }> = {
+  spacing: 2.0, dot: 0.055, paperDot: 1.7, reach: 85, drop: 0.16, dark: 0.3, paper: 1,
+};
+/** The floor plane's side: comfortably past `reach`, so its edge is never on screen. */
+const DOT_FIELD = 320;
 
 /** The shadow band's height in world units — how far below the floor line the soft falloff runs.
  *  A little over a tenth of the card: enough to read as a shadow's spread, not a second card. */
@@ -218,6 +241,8 @@ export class TrendsView implements SceneView {
   private readonly _mesh: THREE.Mesh;
   private readonly _alpha: THREE.Texture;
   private readonly _fades = new FadeSet();
+  private readonly _dots: THREE.Mesh;
+  private readonly _dotMat: THREE.ShaderMaterial;
   private _colors: SceneColors;
   /** One entry per band VERTEX, in buffer order — the SLOT its colour is baked from. The slot,
    *  not the resolved presence: the presence depends on the ground, so a theme flip re-bakes from
@@ -306,6 +331,54 @@ export class TrendsView implements SceneView {
     // (see `_restyle`) — which is what lets the theme change a mark's weight without touching the
     // registration this contract asks to happen exactly once.
     this._fades.register(this._mat, 1);
+
+    // THE DOT FLOOR (see DOT_FLOOR). One level plane; the lattice is a fragment term over the
+    // world position, antialiased in screen space (`fwidth`) so a dot is round at any distance,
+    // and handed over to nothing where the pitch falls under a few pixels, so the far field
+    // dissolves instead of shimmering.
+    this._dotMat = new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false, side: THREE.DoubleSide,
+      uniforms: {
+        uColor: { value: new THREE.Color() },
+        uOp: { value: 0 },
+        uPresence: { value: 0 },
+        uLattice: { value: new THREE.Vector3(DOT_FLOOR.spacing, DOT_FLOOR.dot, DOT_FLOOR.reach) },
+        // Centred well BEHIND the deck: the pool then thins toward the viewer, where a lattice
+        // seen close up turns into large stretched dots (seen live at the first cut).
+        uCentre: { value: new THREE.Vector2(0, -34) },
+      },
+      vertexShader: /* glsl */ `
+        varying vec2 vXZ;
+        void main() {
+          vec4 w = modelMatrix * vec4(position, 1.0);
+          vXZ = w.xz;
+          gl_Position = projectionMatrix * viewMatrix * w;
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        uniform vec3 uColor; uniform float uOp; uniform float uPresence;
+        uniform vec3 uLattice; uniform vec2 uCentre;
+        varying vec2 vXZ;
+        void main() {
+          vec2 g = vXZ / uLattice.x;
+          vec2 fw = fwidth(g);
+          float aa = max(fw.x, fw.y);
+          float d = length(fract(g) - 0.5);
+          float dotA = 1.0 - smoothstep(uLattice.y - aa, uLattice.y + aa, d);
+          float crowd = 1.0 - smoothstep(0.16, 0.4, aa);
+          float far = 1.0 - smoothstep(0.0, uLattice.z, length(vXZ - uCentre));
+          gl_FragColor = vec4(uColor, dotA * crowd * far * far * uPresence * uOp);
+        }
+      `,
+    });
+    this._dots = new THREE.Mesh(new THREE.PlaneGeometry(DOT_FIELD, DOT_FIELD), this._dotMat);
+    this._dots.rotation.x = -Math.PI / 2;
+    this._dots.frustumCulled = false;
+    this._dots.renderOrder = -1;
+    // The fade set drives `opacity`; a ShaderMaterial has no opacity uniform of its own.
+    this._dots.onBeforeRender = () => { this._dotMat.uniforms.uOp.value = this._dotMat.opacity; };
+    this.group.add(this._dots);
+    this._fades.register(this._dotMat, 1);
     this._restyle();
   }
 
@@ -397,6 +470,8 @@ export class TrendsView implements SceneView {
     const pxPerUnitAt1 = this._viewH / (2 * Math.tan((camera.fov * Math.PI) / 360));
     const c = this._centre;
     const y = groundY(c, fmt);
+    // The dot floor lies a little under the front card's foot, and follows the deck's ease.
+    this._dots.position.y = y - fmt.worldH * DOT_FLOOR.drop;
     const band = shadowH(fmt);
     const shift = this._shift;
     const attr = this._mesh.geometry.getAttribute("position") as THREE.BufferAttribute;
@@ -454,9 +529,20 @@ export class TrendsView implements SceneView {
     attr.needsUpdate = true;
     this._mat.blending = glowBlend(this._colors);
     this._mat.needsUpdate = true;
+    // The dot floor: the structure ink (what the hoops and the graticule are made of) at its
+    // ground's level, blended the way that ground needs.
+    (this._dotMat.uniforms.uColor.value as THREE.Color).setHex(structureInk(this._colors));
+    this._dotMat.uniforms.uPresence.value = paper ? DOT_FLOOR.paper : DOT_FLOOR.dark;
+    // Ink has no bloom and no glow to carry a two-pixel dot: on paper the dot is drawn larger
+    // (measured live — at the dark radius the lattice was all but invisible on the plate).
+    (this._dotMat.uniforms.uLattice.value as THREE.Vector3).y = DOT_FLOOR.dot * (paper ? DOT_FLOOR.paperDot : 1);
+    this._dotMat.blending = glowBlend(this._colors);
+    this._dotMat.needsUpdate = true;
   }
 
   dispose(): void {
+    this._dots.geometry.dispose();
+    this._dotMat.dispose();
     this._mesh.geometry.dispose();
     this._mat.dispose();
     this._alpha.dispose();

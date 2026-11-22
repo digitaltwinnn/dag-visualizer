@@ -106,7 +106,7 @@ import { SilentStretch, type StretchItem } from "../objects/SilentStretch";
 import type { SceneView } from "./SceneView";
 import { joinBloom, inMarkPass } from "../SceneContext";
 import { faceShade } from "../objects/faceShade";
-import { FloorMirror } from "../objects/FloorMirror";
+import { FloorMirror, joinMirror } from "../objects/FloorMirror";
 
 /** The lane-tile instance budget.
  *
@@ -593,6 +593,7 @@ export class LedgerView implements SceneView {
       META_TRAIL_MAX,
     );
     joinBloom(this._metaTrailMesh); // the lane tiles are the trail's identity marks — see BLOOM_LAYER
+    joinMirror(this._metaTrailMesh);
     // The paper halo's input lift (TileLook.halo, the bar's twin): multiplied up only while the
     // selective mark pass renders, un-multiplied inside the same pass — the main frame always
     // draws the tiles at their true colour (multiply, never set — the bar's rule).
@@ -622,6 +623,7 @@ export class LedgerView implements SceneView {
     // is part of its tile, and the tile under it answers the click.
     this._dataMarkMesh = new THREE.InstancedMesh(faceShade(new THREE.BoxGeometry(1, 1, 1)), new THREE.MeshBasicMaterial({ vertexColors: true }), META_TRAIL_MAX);
     joinBloom(this._dataMarkMesh);
+    joinMirror(this._dataMarkMesh);
     this._dataMarkMesh.frustumCulled = false;
     this._dataMarkMesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e4);
     this._dataMarkMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);

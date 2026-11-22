@@ -969,26 +969,35 @@ twice).
 **The base ring's pie takes a hairline gap** (`WEDGE_GAP_W`, 0.07, against the rings' `RING_GAP_W`):
 over the pie's faint fill a ring-width gap was the darkest thing on the disc.
 
-**The global floor MIRRORS what stands on it, on dark** (`objects/FloorMirror.ts`, `MIRROR_LOOK`):
-three's planar `Reflector`, drawn as added light at a fraction of its level and feathered at the
-floor's edges. The mirror plane sits a little ABOVE the glass so nothing lying in the floor (the
-label columns, the dotted lines, the live edge) is reflected under itself. One more scene render at
-1024×640, only while the chamber is on screen. **Paper MULTIPLIES it** (user, same day: "light mode
-is missing the mirror"): the reflection divided by the plate's colour is 1 where the mirror sees the
-page and the mark's ink where it sees a mark, so the floor darkens toward the mark and cannot blow
-out. Levels are per ground and the user's (image 0.2 on both, after "too strong" twice; spill 1.1 dark / 0.8 paper, after "too subtle"). **And the
-floor takes LIGHT as well as an image** (user: "also some light effect?"): the same reflection read
-at two coarse mips is a soft pool of each mark's colour around its reflection (`spill`), so the
-light is the marks' own and follows their emphasis with no lamp.
+**The global floor MIRRORS what stands on it** (`objects/FloorMirror.ts`, `MIRROR_LOOK`): three's
+planar `Reflector`, feathered at the floor's edges; one more scene render at 1024×640, only while
+the chamber is on screen. Four rules, each a user round the same day:
+- **Membership, like bloom** (`MIRROR_LAYER`, `joinMirror`): the mirror's camera sees only the bars,
+  lane tiles, data marks, blocks, links and anchor sheets. A plain mirror also reflected the labels
+  and dotted lines lying in the floor (ghost copies under their own text) and the metagraph planes a
+  storey up ("too much of the top metagraph plane in the mirror"). A new mark that should appear in
+  the glass must join. ⚠️ `renderer.clippingPlanes` set around the Reflector's nested render LEAKS
+  into the outer render (the tray chips under the floor vanished); do not clip that way.
+- **The plane sits `depth` BELOW the glass**, so a block's image starts a gap under its base and
+  the block reads as standing ON the surface ("it kinda transitions into its mirror"); the image is
+  also read one mip down (`soft`).
+- **Dark adds it, paper MULTIPLIES it**: the reflection divided by the plate's colour is 1 where the
+  mirror sees the page and the mark's ink where it sees a mark. Levels are the user's (image 0.2 on
+  both grounds after "too strong" twice).
+- **The floor takes LIGHT as well as an image** (`spill`, 1.1 dark / 0.8 paper after "too subtle"):
+  the same reflection at two coarse mips is a soft pool of each mark's colour around its
+  reflection, so the light is the marks' own and follows their emphasis with no lamp.
 
-**History's floor wears its cards' hues and hugs the deck** (`TrendsView.setSlotHues`, fed by
-`Engine._syncTrendHues` from `stackPoses`, the projector's own deck): each rung takes the identity
-hue of the network whose card stands on it, the muted ink where none is known. Neutral read as a
-grey smear on both grounds (user, of dark and then of paper: "still ugly gray"). The floor starts a
-hair under the front card's bottom edge (`groundDrop`; user: "bring it closer to the card") — the
-card is DOM in front of the canvas, so the floor cannot cross its plot. Dark adds every rung's
-light; on paper ONLY the front card casts, because overlapping inks mixed to mauve, and the rungs
-are drawn far to near so a zero-presence rear rung cannot paint the page back over the wash.
+**History's ground is a DOT FLOOR** (`TrendsView`, `DOT_FLOOR`; user, 2026-11-22, after four rounds
+on the bands — grey, hued, hugging the card, then a DOM mirror of the front chart: "drop mirror and
+wash and come with a completely different but subtle scene background"). One level plane under the
+deck draws a lattice of small dots in the structure ink, antialiased in screen space, fading out
+over a pool centred behind the deck and dissolving where the pitch falls under a few pixels. It is
+texture, not a mark: a dot states no line or row, so nothing in it reads as a gridline, and
+perspective closing the rows up toward the horizon is the depth cue. Paper draws the dot larger
+(`paperDot`) because ink has no glow to carry a two-pixel dot. ⚠️ The shadow BANDS described under
+"The History view's ground" above still exist in the file at presence 0 (`GROUND_PRESENCE`), with
+their per-slot hues (`setSlotHues`, `Engine._syncTrendHues`); they draw nothing.
 
 **The chamber's boxes are FACE-SHADED** (`objects/faceShade.ts`): the bars, lane tiles, data marks and
 blocks stay unlit, and a per-vertex multiplier by face direction is baked into the geometry (the

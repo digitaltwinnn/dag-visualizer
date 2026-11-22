@@ -13,9 +13,20 @@
 // no lamp and no second number to keep in step with the emphasis system.
 //
 // Three decisions:
-//  · The mirror plane sits `lift` ABOVE the glass. Everything lying IN the floor — the ordinal and
-//    size columns, their dotted lines, the live edge, the silent stretch — is below the clip, so
-//    none of it is reflected: a mirrored copy would land exactly under its own text and blur it.
+//  · THE MIRROR PLANE SITS `depth` BELOW THE GLASS — the floor is a slab, and the image is in it.
+//    Mirrored about the glass's own top face, a block's reflection began exactly where the block
+//    did, in the same hue, and the two read as one shape (user, 2026-11-22: "it feels like the
+//    block doesn't really sit on the surface and kinda transitions into its mirror"). Mirrored
+//    about a plane a little under the surface, the image starts a clear gap below the block's
+//    base: the block stands ON the glass, its reflection lies IN it. The image is also read one
+//    mip down (`soft`), so the thing is crisp and its reflection is not.
+//  · THE MIRROR SHOWS ITS MEMBERS AND NOTHING ELSE (`MIRROR_LAYER`, `joinMirror` — the bloom
+//    layers' idiom). A plain mirror reflects everything above it: the labels and dotted lines
+//    lying in the floor came back as ghost copies under their own text, and the metagraph planes
+//    a whole storey up lay across the floor as grey sheets (user, of light mode: "too much of the
+//    top metagraph plane in the mirror … even though its quite far away"). What a reader expects
+//    in the glass is what STANDS on it or FALLS to it: the bars, the lane tiles, the data marks,
+//    the blocks and their links, the anchor sheets. Those join; nothing else is drawn.
 //  · The two grounds composite it in opposite directions (the ground rule every additive site here
 //    answers). Dark ADDS the reflected light. Light added to a printed sheet is a bleach, so paper
 //    MULTIPLIES: the reflection is divided by the plate's own colour, which leaves 1 wherever the
@@ -27,17 +38,25 @@
 import * as THREE from "three";
 import { Reflector } from "three/addons/objects/Reflector.js";
 
-/** The mirror's look: `strength` the share of the reflected light that is added, `lift` how far
- *  above the glass the mirror plane (and so its clip) sits, `feather` the fraction of each side
+/** The mirror's look: `strength` the share of the reflected light that is added, `depth` how far
+ *  below the glass the mirror plane sits (the gap under a block is twice it), `soft` the mip the
+ *  image is read at, `feather` the fraction of each side
  *  over which it fades out, `back` the same for the far end, where the floor itself dissolves. */
 export const MIRROR_LOOK: Readonly<{
   strength: number; strengthPaper: number; spill: number; spillPaper: number;
-  lift: number; feather: number; back: number;
+  depth: number; soft: number; feather: number; back: number;
 }> = {
   strength: 0.2, strengthPaper: 0.2,
   spill: 1.1, spillPaper: 0.8, // the soft pool's level, per ground (it is spread thin, so it reads above the image's number)
-  lift: 0.12, feather: 0.08, back: 0.4,
+  depth: 0.3, soft: 1.2, feather: 0.08, back: 0.4,
 };
+/** THE MIRROR LAYER — membership in the floor's reflection. `joinMirror` only ENABLES the layer,
+ *  so a member still draws on layer 0 exactly as before; the mirror's camera sees this layer alone. */
+export const MIRROR_LAYER = 4;
+export function joinMirror(o: THREE.Object3D): void {
+  o.layers.enable(MIRROR_LAYER);
+}
+
 const MIRROR_RES = { w: 1024, h: 640 } as const;
 
 const MIRROR_SHADER = {
@@ -51,6 +70,7 @@ const MIRROR_SHADER = {
     uPaper: { value: 0 },
     uGround: { value: new THREE.Color() },
     uFeather: { value: new THREE.Vector2(MIRROR_LOOK.feather, MIRROR_LOOK.back) },
+    uSoft: { value: MIRROR_LOOK.soft },
   },
   vertexShader: /* glsl */ `
     uniform mat4 textureMatrix;
@@ -69,10 +89,11 @@ const MIRROR_SHADER = {
     uniform float uPaper;
     uniform vec3 uGround;
     uniform vec2 uFeather;
+    uniform float uSoft;
     varying vec4 vUv;
     varying vec2 vP;
     void main() {
-      vec3 r = texture2DProj(tDiffuse, vUv).rgb;
+      vec3 r = texture2DProj(tDiffuse, vUv, uSoft).rgb;
       // uv.x runs back -> front along the trail, uv.y across the lanes.
       float f = smoothstep(0.0, uFeather.y, vP.x) * smoothstep(0.0, uFeather.x, 1.0 - vP.x)
               * smoothstep(0.0, uFeather.x, vP.y) * smoothstep(0.0, uFeather.x, 1.0 - vP.y);
@@ -110,8 +131,16 @@ export class FloorMirror {
     mat.blendSrc = THREE.DstColorFactor;
     mat.blendDst = THREE.ZeroFactor;
     this.mesh.rotation.x = -Math.PI / 2;
-    this.mesh.position.set(cx, y + MIRROR_LOOK.lift, 0);
+    this.mesh.position.set(cx, y - MIRROR_LOOK.depth, 0);
     this.mesh.renderOrder = -1; // over the glass (-2), under everything that stands on it
+    // The mirror's render sees the MEMBERS alone (see MIRROR_LAYER). The Reflector clones the
+    // viewing camera once and keeps it, so the mask is re-stated on that clone each time: one
+    // integer write.
+    const mirrorRender = this.mesh.onBeforeRender;
+    this.mesh.onBeforeRender = (renderer, scene, camera, geometry, material, group) => {
+      this.mesh.getReflectionCamera(camera).layers.set(MIRROR_LAYER);
+      mirrorRender.call(this.mesh, renderer, scene, camera, geometry, material, group);
+    };
     parent.add(this.mesh);
     this.setGround(paper, ground);
   }
