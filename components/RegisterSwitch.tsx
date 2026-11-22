@@ -174,7 +174,7 @@ export default function RegisterSwitch() {
       {/* THE LAYERED FACE (A4·1), ON EVERY TIER (user, 2026-11-19: "I want the layered switcher also on
           phone" — the phone's single face with ‹ › went). Two columns, three rows: Transaction blocks
           the tall tile at the left, down to the base; Data blocks over Metagraph snapshots at the
-          right; the Global snapshot the base across both, a plate, not a control. On the phone the
+          right; the Global snapshot the base across both, a ruled label, not a control. On the phone the
           names take the label step and may wrap, never shortened. */}
       <div
         role="group"
@@ -219,20 +219,15 @@ export default function RegisterSwitch() {
             </button>
           );
         })}
-        {/* THE GROUND: where every register's subject lands, so it is drawn and never pressed. On the
-            phone it is no plate but a ruled label: the hairline the tiles stand on, the ground's name
-            set into it (option A, 2026-11-20). */}
-        {phone ? (
-          <div className="col-span-2 row-start-3 flex items-center gap-2 px-1 select-none">
-            <span aria-hidden className="h-px flex-1 bg-border" />
-            <span className="text-label uppercase tracking-caps text-muted-foreground leading-none">Global snapshot</span>
-            <span aria-hidden className="h-px flex-1 bg-border" />
-          </div>
-        ) : (
-          <span className="col-span-2 row-start-3 flex items-center justify-center rounded-md py-1 bg-[var(--panel-plate)] shadow-[inset_0_0_0_1px_var(--border)] text-label uppercase tracking-caps text-muted-foreground leading-none select-none">
-            Global snapshot
-          </span>
-        )}
+        {/* THE GROUND: where every register's subject lands, so it is drawn and never pressed — a
+            ruled label on every tier: the hairline the tiles stand on, the ground's name set into it
+            (the phone's option A, 2026-11-20; the desktop's plate went the same way on 2026-11-23,
+            user: "give the … global snapshot section the style of phone (hairline)"). */}
+        <div className="col-span-2 row-start-3 flex items-center gap-2 px-1 py-1 max-[700px]:py-0 select-none">
+          <span aria-hidden className="h-px flex-1 bg-border" />
+          <span className="text-label uppercase tracking-caps text-muted-foreground leading-none">Global snapshot</span>
+          <span aria-hidden className="h-px flex-1 bg-border" />
+        </div>
       </div>
 
     </div>
