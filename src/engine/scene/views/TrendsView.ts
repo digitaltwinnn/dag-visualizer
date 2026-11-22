@@ -164,7 +164,7 @@ const GROUND_PRESENCE = { dark: 0, paper: 0 } as const;
  *  the card's height), and the two presences are the lines' level per ground (a gain on the pool's
  *  falloff, capped at a full line). */
 export const LINE_FLOOR: Readonly<{ spacing: number; width: number; paperWidth: number; band: number; reach: number; drop: number; dark: number; paper: number }> = {
-  spacing: 2.5, width: 1, paperWidth: 1.5, band: 2.5, reach: 85, drop: 0.16, dark: 0.3, paper: 1.2,
+  spacing: 2.5, width: 1, paperWidth: 1.5, band: 2.5, reach: 85, drop: 0.16, dark: 0.16, paper: 0.6,
 };
 /** The floor plane's side: comfortably past `reach`, so its edge is never on screen. */
 const FLOOR_FIELD = 320;
