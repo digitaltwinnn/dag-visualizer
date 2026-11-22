@@ -161,6 +161,54 @@ const SEL_MIX_SHADER = {
   `,
 };
 
+/**
+ * THE FINISH — two things every frame gets last, after the tone map and the sRGB encode.
+ *
+ * THE POOL. The dark ground is one flat near-black, so the subject hung in a void with nothing
+ * behind it to say where the stage is. The pool is a soft radial lift toward the HUD's own panel
+ * navy (`SceneColors.panel`), centred on the canvas, SCREEN-blended: it lifts the ground most and a
+ * lit mark least, which over a scene made of additive light is the same picture as a lit backdrop
+ * behind it. It is screen-space, so it never changes with the camera's distance — the fault the
+ * old scene fog was removed for (see createScene).
+ *
+ * THE DITHER. Soft halos over near-black quantise into visible rings at 8 bits. One LSB of
+ * triangular noise (two interleaved-gradient samples) trades the rings for grain below the
+ * threshold of sight. It has to come after the encode, which is why this is its own pass and not
+ * a term in the composite.
+ */
+export const BACKDROP_LOOK: Readonly<{ pool: number; reach: number }> = {
+  pool: 0.7, // the pool's peak, as a fraction of the panel token's own display value
+  reach: 0.95, // its radius, in canvas heights
+};
+const FINISH_SHADER = {
+  uniforms: {
+    tDiffuse: { value: null as THREE.Texture | null },
+    uPool: { value: new THREE.Vector3() },
+    uReach: { value: 0.95 },
+    uAspect: { value: 1 },
+  },
+  vertexShader: /* glsl */ `
+    varying vec2 vUv;
+    void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D tDiffuse;
+    uniform vec3 uPool;
+    uniform float uReach;
+    uniform float uAspect;
+    varying vec2 vUv;
+    float ign(vec2 p) { return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715)))); }
+    void main() {
+      vec4 base = texture2D(tDiffuse, vUv);
+      vec2 p = (vUv - 0.5) * vec2(uAspect, 1.0);
+      float f = 1.0 - smoothstep(0.0, uReach, length(p));
+      vec3 rgb = 1.0 - (1.0 - base.rgb) * (1.0 - uPool * f * f);
+      float n = ign(gl_FragCoord.xy) + ign(gl_FragCoord.xy + vec2(47.0, 17.0)) - 1.0;
+      gl_FragColor = vec4(rgb + n / 255.0, base.a);
+    }
+  `,
+};
+
 // @types/three types BokehPass.uniforms as a bare `object`; the engine reads
 // uniforms.focus/maxblur .value, so refine just those.
 type DofPass = BokehPass & {
@@ -241,9 +289,9 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   const renderer = new THREE.WebGLRenderer({
     // antialias:false ON PURPOSE — an EffectComposer renders the scene into offscreen targets and
     // only the final full-screen OutputPass quad reaches the default framebuffer (no geometry edges
-    // there to multisample), so renderer MSAA was pure wasted allocation. Composer-target MSAA was
-    // tried and reverted (a real perf hit for little gain on this bloom-heavy scene — user). stencil
-    // is never used, so drop it too.
+    // there to multisample), so renderer MSAA is pure wasted allocation. The antialiasing lives on
+    // the composer's own scene target instead (see `msaa` below). stencil is never used, so drop
+    // it too.
     canvas, antialias: false, stencil: false, powerPreference: "high-performance",
   });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -294,7 +342,24 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   // stays the render pipeline's home and nothing else) — see the note above the imports.
 
   // Postprocessing — depth of field then bloom.
-  const composer = new EffectComposer(renderer);
+  //
+  // THE SCENE TARGET IS MULTISAMPLED (2026-11-22, user: "make it look more refined", lifting the
+  // earlier no-MSAA decision). Measured live at 2540×1628: the coast walls, the chips' and tiles'
+  // edges and every 1px GL line (hyper's tethers and hoops, the graticule, the borders) stair-step
+  // without it, and the bloom haloes each step into a fringe. The composer's own targets carry the
+  // samples — renderer `antialias` stays false, since only the final quad reaches the default
+  // framebuffer. FOUR samples at a low pixel ratio, where a step is a whole CSS pixel; TWO at 2×,
+  // where the buffer already holds four device pixels per CSS pixel. `clone()` (the composer's
+  // second target) and `setSize` both keep the count.
+  const msaa = renderer.getPixelRatio() <= 1.5 ? 4 : 2;
+  const pr0 = renderer.getPixelRatio();
+  const sceneTarget = new THREE.WebGLRenderTarget(box0.w * pr0, box0.h * pr0, {
+    type: THREE.HalfFloatType, samples: msaa,
+  });
+  const composer = new EffectComposer(renderer, sceneTarget);
+  // Handed a target, the composer reads its logical size off the target's DEVICE size; say the
+  // CSS size, as `resize` does, so every pass added below is sized once and correctly.
+  composer.setSize(box0.w, box0.h);
   composer.addPass(new RenderPass(scene, camera));
 
   // Depth of field: keeps whatever the camera is looking at (the selection) crisp
@@ -339,6 +404,20 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   const outputPass = new OutputPass();
   composer.addPass(outputPass);
 
+  // The FINISH — the frame's last pass, in display space (see FINISH_SHADER).
+  const finish = new ShaderPass(FINISH_SHADER);
+  composer.addPass(finish);
+  function applyFinish(light: boolean) {
+    // The pool is the dark ground's alone: the Print plate is one flat colour by design, and a
+    // screen blend over a near-white page would do nothing but bleach it.
+    // The token's own BYTES, not a THREE.Color: the pass runs after the sRGB encode, and a Color
+    // would hand back the linear value — a third of the level, measured.
+    const k = (light ? 0 : BACKDROP_LOOK.pool) / 255;
+    const hex = colors.panel;
+    finish.uniforms.uPool.value.set(((hex >> 16) & 255) * k, ((hex >> 8) & 255) * k, (hex & 255) * k);
+    finish.uniforms.uReach.value = BACKDROP_LOOK.reach;
+  }
+
   // ── The selective-bloom sub-pipeline (see BLOOM_LAYER above) ────────────────────────────────
   //
   // Built LAZILY on the first paper frame, so the dark ground allocates no second composer and no
@@ -378,7 +457,7 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
    * ONE render call for the frame, so the ground question is asked in exactly one place.
    *
    * On dark this is `composer.render()` and nothing else — the mix pass does not exist, so the
-   * chain is the same four passes it has always been and the output is byte-identical.
+   * dark ground pays nothing for the paper halo.
    *
    * On paper the members are rendered first into their own black target. Three saves make that
    * safe, and each is load-bearing: the BACKGROUND is nulled (the studio backdrop would otherwise
@@ -448,6 +527,7 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     // updateStyle=false — same reason as construction: CSS owns the canvas box.
     renderer.setSize(box.w, box.h, false);
     composer.setSize(box.w, box.h);
+    finish.uniforms.uAspect.value = box.w / box.h;
     if (sel) {
       sel.composer.setSize(
         Math.max(1, Math.round(box.w * SEL_SCALE)),
@@ -462,6 +542,7 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     sel?.composer.dispose();
     sel?.bloom.dispose();
     composer.dispose();
+    finish.dispose();
     nodeEnvTex?.dispose(); // the chips' PMREM studio env (null if no chip material ever built)
   }
 
@@ -483,6 +564,7 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     renderer.toneMappingExposure = light ? 1 : 0.82;
     isPaper = light;
     applyBackground();
+    applyFinish(light);
   }
 
   // THE NODE ENVIRONMENT — the stock three.js studio (RoomEnvironment) the chip materials mirror
@@ -521,6 +603,8 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   }
 
   applyBackground(); // construction honours the current ground (a light boot starts on the backdrop)
+  finish.uniforms.uAspect.value = box0.w / box0.h;
+  applyFinish(isPaper);
 
   return {
     scene, camera, renderer, controls, composer, dof, bloom,
