@@ -62,6 +62,21 @@ export function joinBloom(o: THREE.Object3D): void {
 }
 
 /**
+ * THE GLOW LAYER — the marks that bloom on the DARK ground only.
+ *
+ * Dark blooms by membership too (see `renderFrame`): the mark pass draws the bloom layer AND this
+ * one. It holds the light that is not an identity mark but is the dark look's own glow — the coast
+ * walls, the packets' trails, the anchor sheets — which paper's ink halo must never take (a wide
+ * sheet in that target is a smear across the page; see `joinBloom`). Everything else the scene
+ * draws — the text, the glass, the graticule, the land fill, the atmosphere — is in neither set and
+ * stays as crisp as it was drawn.
+ */
+export const GLOW_LAYER = 3;
+export function joinGlow(o: THREE.Object3D): void {
+  o.layers.enable(GLOW_LAYER);
+}
+
+/**
  * THE OVERLAY LAYER — scene text that must NOT bloom (2026-09-28, user: "I don't want the text to
  * bloom", on the gather legend). On the dark ground the bloom is a whole-frame pass, so anything
  * the main chain draws above the threshold halos, text included. A member of this layer is left
@@ -92,7 +107,8 @@ function overlayShowing(): boolean {
   return false;
 }
 
-// True only while the selective MARK pass is rendering (paper frames; see renderFrame). A member
+// True only while the PAPER mark pass is rendering (see renderFrame; dark's mark pass leaves it
+// false — its members go in at their true light). A member
 // whose main-pass ink is too dark to halo — the chamber's bands and tiles are ink on paper, where
 // geo's chips get free sub-pass brightness from their env sheen — checks this in onBeforeRender
 // and raises its own contribution for that render alone (restored in onAfterRender), so the
@@ -135,6 +151,7 @@ const SEL_MIX_SHADER = {
     bloomTexture: { value: null as THREE.Texture | null },
     bleed: { value: 1 },
     glow: { value: 0.25 },
+    cap: { value: 1 },
   },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
@@ -145,6 +162,7 @@ const SEL_MIX_SHADER = {
     uniform sampler2D bloomTexture;
     uniform float bleed;
     uniform float glow;
+    uniform float cap;
     varying vec2 vUv;
     void main() {
       vec4 base = texture2D(tDiffuse, vUv);
@@ -155,7 +173,9 @@ const SEL_MIX_SHADER = {
       // The glow input is CAPPED like the bleed's: the mark-pass input lifts (BarLook/TileLook
       // .halo) push b past 1 at a boosted lead, and an uncapped add there climbs to white — the
       // one thing paper emphasis must never do. Below 1 the term is byte-identical to before.
-      vec3 rgb = base.rgb * mix(vec3(1.0), ink, a) + glow * min(b, vec3(1.0));
+      // (cap is 1 on paper; dark lifts it out of the way — there the term is plain added light,
+      // and the tone map that follows is what rolls it off.)
+      vec3 rgb = base.rgb * mix(vec3(1.0), ink, a) + glow * min(b, vec3(cap));
       gl_FragColor = vec4(rgb, base.a);
     }
   `,
@@ -215,6 +235,8 @@ type DofPass = BokehPass & {
   uniforms: Record<"focus" | "maxblur", { value: number }>;
 };
 
+export interface BloomKnobs { strength: number; radius: number; threshold: number; enabled: boolean }
+
 // js/scene.js createScene() return.
 export interface SceneCtx {
   scene: THREE.Scene;
@@ -223,7 +245,9 @@ export interface SceneCtx {
   controls: OrbitControls;
   composer: EffectComposer;
   dof: DofPass;
-  bloom: UnrealBloomPass; // per-view strength/radius/threshold, driven by the Engine from ViewPolicy
+  /** The bloom's knobs — per-view strength/radius/threshold, driven by the Engine from ViewPolicy
+   *  each frame. Plain numbers: `renderFrame` hands them to the mark pass's blur (dark). */
+  bloom: BloomKnobs;
   /**
    * Draw one frame. The ONE home for the ground question in the render chain: dark runs the
    * original composer alone, paper runs the selective-bloom sub-pipeline first (see BLOOM_LAYER).
@@ -383,19 +407,12 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   dof.enabled = false;
   composer.addPass(dof);
 
-  const bloom = new UnrealBloomPass(
-    new THREE.Vector2(box0.w, box0.h),
-    0.30,  // strength — the dominant "overpowering" lever; well down from the r0.161 default. The
-           // whole-scene glow, the geo node "dark halo" (a bloom mip/tonemap ring, not a radius
-           // artifact — it survives radius cuts but vanishes with strength), and the fuzzy selected
-           // hub all trace back to over-strong bloom.
-    0.35,  // radius — tight halos: keeps hubs/core crisp discs (not overpowering washes) and
-           // shrinks the bloom-mip "dark ring" that saturated hues cast on the dimmed globe
-    0.13   // threshold — low so every identity HUE clears it (bloom thresholds on luminance, and
-           // low-luma hues like the blue/green metagraphs would be cut out at a higher value; the
-           // node/structure separation comes from the emissive gap, not the threshold)
-  );
-  composer.addPass(bloom);
+  // BLOOM IS BY MEMBERSHIP ON BOTH GROUNDS (dark since 2026-11-22; see `renderFrame`), so no
+  // whole-frame pass sits in this chain. These are its knobs, written per frame by the Engine
+  // from ViewPolicy: strength is the dominant lever (the halo vanishes with it), radius the
+  // spread, and threshold stays low so every identity HUE clears it — it reads luminance, and a
+  // low-luma blue or green would be cut out at a higher value.
+  const bloom: BloomKnobs = { strength: 0.3, radius: 0.35, threshold: 0.13, enabled: true };
 
   // Terminal pass: applies the renderer's toneMapping + exposure and the sRGB output
   // conversion to the composited result. Without it an EffectComposer bypasses the renderer's
@@ -420,10 +437,10 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
 
   // ── The selective-bloom sub-pipeline (see BLOOM_LAYER above) ────────────────────────────────
   //
-  // Built LAZILY on the first paper frame, so the dark ground allocates no second composer and no
-  // extra render targets — it pays literally nothing for a feature it does not use. The mix pass
-  // sits BEFORE the OutputPass so the composite happens in linear space, on the same numbers the
-  // tone map and the sRGB encode are about to read.
+  // Built on the first frame that blooms. The mix pass sits BEFORE the OutputPass so the composite
+  // happens in linear space, on the same numbers the tone map and the sRGB encode are about to
+  // read. Its target is multisampled: the marks are drawn at half resolution, and an aliased edge
+  // going into a blur comes out as a halo that crawls.
   let sel: {
     composer: EffectComposer;
     render: RenderPass;
@@ -436,7 +453,7 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     const box = boxOf();
     const w = Math.max(1, Math.round(box.w * SEL_SCALE));
     const h = Math.max(1, Math.round(box.h * SEL_SCALE));
-    const c = new EffectComposer(renderer);
+    const c = new EffectComposer(renderer, new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, samples: 4 }));
     c.renderToScreen = false;
     const rp = new RenderPass(scene, camera);
     rp.clearColor = new THREE.Color(0x000000);
@@ -447,8 +464,7 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     const bp = new UnrealBloomPass(new THREE.Vector2(w, h), 1, LIGHT_LOOK.selRadius, 0);
     c.addPass(bp);
     c.setSize(w, h);
-    const mx = new ShaderPass(SEL_MIX_SHADER);
-    mx.uniforms.bloomTexture.value = c.renderTarget2.texture;
+    const mx = new ShaderPass(SEL_MIX_SHADER); // its texture is pointed per frame, by ground
     composer.insertPass(mx, composer.passes.indexOf(outputPass));
     sel = { composer: c, render: rp, bloom: bp, mix: mx };
   }
@@ -456,22 +472,27 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   /**
    * ONE render call for the frame, so the ground question is asked in exactly one place.
    *
-   * On dark this is `composer.render()` and nothing else — the mix pass does not exist, so the
-   * dark ground pays nothing for the paper halo.
+   * Both grounds bloom by MEMBERSHIP: the members are rendered first into their own black target
+   * at half resolution, blurred, and mixed in before the OutputPass. Paper reads the result as a
+   * bleed (the ink halo, BLOOM_LAYER's note); dark reads the blur as added light, thresholded and
+   * weighted by the view's own knobs. Dark came off the whole-frame highpass on 2026-11-22: that
+   * pass haloed whatever was bright — the text, the glass rims, the globe's atmosphere — and ran
+   * its five blurs at full resolution. Selected, the halo belongs to the marks alone.
    *
-   * On paper the members are rendered first into their own black target. Three saves make that
-   * safe, and each is load-bearing: the BACKGROUND is nulled (the studio backdrop would otherwise
-   * fill the target and every pixel would clear the threshold — the layer would select nothing);
-   * the camera LAYER MASK is narrowed to the bloom layer alone (`layers.set`, not `enable`, so
-   * layer 0 is excluded and the target holds the marks and only the marks); and the AUTOCLEAR is
-   * left to the RenderPass's own black clear. All three are restored before the main chain runs,
-   * so the visible frame is drawn from exactly the state the rest of the engine set up.
+   * Three saves make the mark pass safe, and each is load-bearing: the BACKGROUND is nulled (it
+   * would otherwise fill the target and, on paper, every pixel would clear the threshold); the
+   * camera LAYER MASK is narrowed to the member layers (`layers.set`, not `enable`, so layer 0
+   * is excluded and the target holds the marks and only the marks); and the AUTOCLEAR is left
+   * to the RenderPass's own black clear. All three are restored before the main chain runs, so
+   * the visible frame is drawn from exactly the state the rest of the engine set up.
    */
   function renderFrame() {
-    // Both knobs at zero IS off, and off must cost nothing — the mark pass is a whole extra scene
-    // render plus a blur, so disabling only the mix pass would leave the expensive half running to
-    // feed a texture nobody samples. Same shape as the dark path below: skip, don't neutralise.
-    const on = isPaper && (LIGHT_LOOK.selBleed > 0 || LIGHT_LOOK.selGlow > 0);
+    // Off must cost nothing — the mark pass is a whole extra scene render plus a blur, so
+    // disabling only the mix pass would leave the expensive half running to feed a texture
+    // nobody samples. Skip, don't neutralise.
+    const on = isPaper
+      ? LIGHT_LOOK.selBleed > 0 || LIGHT_LOOK.selGlow > 0
+      : bloom.enabled && bloom.strength > 0;
     if (!on) {
       if (sel) sel.mix.enabled = false;
       composer.render();
@@ -480,16 +501,38 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     }
     ensureSel();
     const s = sel!;
-    s.bloom.radius = LIGHT_LOOK.selRadius;
-    s.mix.uniforms.bleed.value = LIGHT_LOOK.selBleed;
-    s.mix.uniforms.glow.value = LIGHT_LOOK.selGlow;
+    const u = s.mix.uniforms;
+    if (isPaper) {
+      // PAPER: every member is above the floor by construction (threshold 0), and the composite
+      // is the bleed with a whisper of glow, reading the marks WITH their blur.
+      s.bloom.strength = 1;
+      s.bloom.threshold = 0;
+      s.bloom.radius = LIGHT_LOOK.selRadius;
+      u.bloomTexture.value = s.composer.renderTarget2.texture;
+      u.bleed.value = LIGHT_LOOK.selBleed;
+      u.glow.value = LIGHT_LOOK.selGlow;
+      u.cap.value = 1;
+    } else {
+      // DARK: the view's own knobs, and the composite is plain added light. It reads the blur
+      // ALONE (the pass's own composite target, strength already in it) — the marks themselves
+      // are in the main frame at full resolution, and adding their half-res copy would double
+      // them.
+      s.bloom.strength = bloom.strength;
+      s.bloom.threshold = bloom.threshold;
+      s.bloom.radius = bloom.radius;
+      u.bloomTexture.value = s.bloom.renderTargetsHorizontal[0].texture;
+      u.bleed.value = 0;
+      u.glow.value = 1;
+      u.cap.value = 1e4;
+    }
     s.mix.enabled = true;
 
     const bg = scene.background;
     const mask = camera.layers.mask;
     scene.background = null;
     camera.layers.set(BLOOM_LAYER);
-    markPass = true;
+    if (!isPaper) camera.layers.enable(GLOW_LAYER);
+    markPass = isPaper;
     s.composer.render();
     markPass = false;
     camera.layers.mask = mask;
@@ -533,8 +576,6 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
         Math.max(1, Math.round(box.w * SEL_SCALE)),
         Math.max(1, Math.round(box.h * SEL_SCALE)),
       );
-      // setSize rebuilds the composer's targets, so the mix pass's captured texture is stale.
-      sel.mix.uniforms.bloomTexture.value = sel.composer.renderTarget2.texture;
     }
   }
 

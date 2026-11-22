@@ -22,6 +22,7 @@
 // Two meshes, both preallocated and rewritten event-time: the sheets, and the committed network's
 // hairline threads.
 import * as THREE from "three";
+import { joinGlow } from "../SceneContext";
 import { glowBlend, inkMix, inkPresence, isLightGround, type SceneColors } from "../../sceneColors";
 import { METAGRAPHS } from "@/src/engine/config";
 import { BAR_H, BAR_LIFT, FLOOR_Y, LEAD_X, TILE_LIFT } from "../../domain/ledgerLayout";
@@ -266,6 +267,7 @@ export class Ribbons {
     };
     this._mat.customProgramCacheKey = () => "ribbon-striped";
     this._mesh = new THREE.Mesh(this._geo, this._mat);
+    joinGlow(this._mesh); // dark only: the sheet is light falling to the floor (paper: see joinBloom)
     this._mesh.frustumCulled = false;
     this.group.add(this._mesh);
 

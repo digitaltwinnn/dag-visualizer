@@ -16,7 +16,7 @@
 import * as THREE from "three";
 import { ARC_SAMPLES, ARC_TAIL, ARC_TAIL_FRAC, TRAIL_VERTS, type ArcAgent, type ArcSim, type ArcEndpoint } from "../../domain/arcSim";
 import { glowBlend, isLightGround, type SceneColors } from "../../sceneColors";
-import { joinBloom } from "../SceneContext";
+import { joinBloom, joinGlow } from "../SceneContext";
 import { occlusionGlsl } from "../occlusion";
 
 /** The path trace's `aTail` FLAG (see the field note): above 1 marks a path vertex, and the shader
@@ -353,7 +353,9 @@ export class Arcs {
           gl_FragColor = vec4(vColor * mix(0.5 + vB, 0.74 + 0.16 * vB, uInk), a);
         }`,
     });
-    this.arcGroup.add(new THREE.LineSegments(geo, this.mat));
+    const trails = new THREE.LineSegments(geo, this.mat);
+    joinGlow(trails); // dark only: a comet's tail is light (paper keeps it out — see the head)
+    this.arcGroup.add(trails);
 
     // ── The path traces ─────────────────────────────────────────────────────────────────────
     const pathVerts = agents.length * PATH_VERTS;

@@ -19,7 +19,7 @@ import { offNetMul } from "../../domain/dimModel";
 import { makeRadialGradientTexture } from "../objects/gradientTexture";
 import { glowBlend, inkMix, inkPresence, isLightGround, structureInk, type SceneColors } from "../../sceneColors";
 import type { SceneView } from "./SceneView";
-import { joinBloom } from "../SceneContext";
+import { joinBloom, joinGlow } from "../SceneContext";
 
 const _pos = new THREE.Vector3(); // scratch for hub orbit positions (reused each frame)
 const _tcol = new THREE.Color(); // scratch for the tether colour bake (event-time, reused)
@@ -502,6 +502,7 @@ export class HyperView implements SceneView {
         );
         pk.renderOrder = 4;
         pk.visible = false;
+        joinGlow(pk); // dark only: an anchor in flight is a spark, and it blooms like one
         this.root.add(pk);
         pool.push(pk);
       }

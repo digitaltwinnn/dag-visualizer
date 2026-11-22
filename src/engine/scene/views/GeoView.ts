@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { joinGlow } from "../SceneContext";
 import { feature } from "topojson-client";
 import { R, LAND_H, latLonToVec3 } from "../../domain/geoLayout";
 import { ringsToSegments, type Ring } from "../../domain/countryShape";
@@ -148,7 +149,7 @@ const FAR_SIDE = 0.14;
  *  sea level in world units, `inner` the exponent of the limb light's falloff toward the disc's
  *  centre (higher = a thinner rim), `night`/`day` the sun's multipliers across the limb. */
 export const ATMO_LOOK = {
-  rim: 0.1, reach: 0.55, inner: 12, night: 0.35, day: 1.3,
+  rim: 0.1, reach: 0.35, inner: 14, night: 0.35, day: 1.3,
 } as const;
 /** The shell the halo is drawn on: far enough out that the falloff has reached nothing. */
 const ATMO_SHELL = R + 5;
@@ -669,7 +670,9 @@ async function buildLand(globe: GeoViewHost) {
       transparent: true, depthWrite: false, side: THREE.BackSide,
     });
     blendReg(globe, wallMat);
-    globe.surface.add(new THREE.Mesh(wallGeo, wallMat));
+    const walls = new THREE.Mesh(wallGeo, wallMat);
+    joinGlow(walls); // the lit coastline is the dark globe's signature stroke
+    globe.surface.add(walls);
 
     // HOLOGRAPHIC LAND. The surface is the geo view's "ledger pane": a faint, CALM structural skin
     // in the SAME accent hue as the ledger tiles (globe.geoColor = --primary), so the two views match
