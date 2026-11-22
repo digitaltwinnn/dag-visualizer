@@ -2,6 +2,7 @@ import { unstable_cache } from "next/cache";
 import { HOSTS } from "@/src/engine/config";
 import { geolocate } from "@/src/server/ipGeolocate";
 import type { GeoMap } from "@/src/data/types";
+import { peerRosterUrls } from "./peerRoster";
 
 const revalidate = 300; // re-fetch at most every 5 minutes (was 10 — user, 2026-08-14:
 // a DOR restart left its signers reading "unknown node" for most of a cycle; halving the cadence
@@ -42,10 +43,14 @@ async function getJson(url: string, ms = 5000): Promise<unknown> {
   }
 }
 
-async function clusterNodes(base: string): Promise<Array<{ ip: string; state: string; id: string }>> {
+type RosterNode = { ip: string; state: string; id: string };
+
+/** One layer's node list, or NULL when the address did not answer with one — a failed read is not
+ *  an empty layer, and the caller asks a peer before it settles for nothing. */
+async function clusterNodes(base: string, ms?: number): Promise<RosterNode[] | null> {
   try {
-    const nodes = (await getJson(base.replace(/\/$/, "") + "/cluster/info")) as unknown;
-    if (!Array.isArray(nodes)) return [];
+    const nodes = (await getJson(base.replace(/\/$/, "") + "/cluster/info", ms)) as unknown;
+    if (!Array.isArray(nodes)) return null;
     return nodes
       .filter((n) => n && (n as { ip?: string }).ip)
       .map((n) => ({
@@ -54,7 +59,7 @@ async function clusterNodes(base: string): Promise<Array<{ ip: string; state: st
         id: (n as { id?: string }).id ?? "",
       }));
   } catch {
-    return [];
+    return null;
   }
 }
 
@@ -77,7 +82,22 @@ async function fetchLive(): Promise<{ metagraphs: Metagraph[]; geo: GeoMap; buil
       // loop — one slow cluster LB serially stacked up to 3×timeout). `present` keeps
       // LAYERS order, so the primary-layer priority (l0 > dl1 > cl1) is unchanged.
       const present = LAYERS.filter(([key]) => urls[key]);
-      const nodesByLayer = await Promise.all(present.map(([key]) => clusterNodes(urls[key])));
+      const listed = await Promise.all(present.map(([key]) => clusterNodes(urls[key])));
+      // A LAYER WHOSE LISTED ADDRESS DID NOT ANSWER IS ASKED OF A PEER (`peerRoster.ts`): the
+      // machines the answering layers named, on the failed layer's own port, one after another
+      // with a short timeout. Still nothing is an unread layer, drawn as no nodes — the declared
+      // `layers` below is what keeps that from reading as "this layer does not exist".
+      const peers = [...new Set(listed.flatMap((l) => (l ?? []).map((n) => n.ip)))];
+      const nodesByLayer = await Promise.all(
+        present.map(async ([key], i): Promise<RosterNode[]> => {
+          if (listed[i]) return listed[i]!;
+          for (const url of peerRosterUrls(urls[key], peers)) {
+            const got = await clusterNodes(url, 2500);
+            if (got) return got;
+          }
+          return [];
+        }),
+      );
       const primary: Record<string, string> = {};
       const roles: Record<string, string[]> = {};
       const stateOf: Record<string, string> = {};
@@ -139,6 +159,6 @@ export const getLive = () =>
     if (!live.metagraphs.length) throw new Error("empty live result");
     return live;
   },
-  ["metagraphs-live-v4"], // v4: +builtAt (v3 was +per-layer node `ids`, v2 +isp/asn geo)
+  ["metagraphs-live-v5"], // v5: a failed layer is asked of a peer (re-keyed so the fix is not held behind a cached answer); v4: +builtAt (v3 was +per-layer node `ids`, v2 +isp/asn geo)
   { revalidate },
   )();
