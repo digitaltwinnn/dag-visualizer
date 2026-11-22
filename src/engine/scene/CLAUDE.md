@@ -1011,6 +1011,26 @@ the line wider (`paperWidth`) and at a gain above 1, because ink has no glow to 
 presence 0 (`GROUND_PRESENCE`) and their mesh is hidden; only their per-slot hue plumbing is in use,
 by the lines.
 
+**The dark ground HOLDS A BRIGHT MARK'S HUE** (`SceneContext`, `HUE_HOLD`): one pass after the bloom
+mix and before the tone map scales a pixel's channels together so its brightest stays under a soft
+ceiling. The filmic curve rolls channels off one by one, so a boosted bar came out peach and a hub's
+core near-white. Below the knee nothing changes; paper runs neither. Khronos Neutral, which holds
+hue by design, was tried again (2026-11-22) and still casts dark halos around the globe's nodes.
+
+**The chamber's tray chips rest quieter** (`dimModel.FOCUS_ROWS[view].rest`, a per-view gain on the
+nodes' resting glow: 1 where nodes are the subject, 0.45 in Snapshots, where the row of chips was the
+brightest thing in a view about snapshots).
+
+**Hypergraph's tethers are SOFT LINES** (`objects/SoftLines.ts`, the block links' strips): an even
+hairline at every zoom, the tip-fade profile on the strips' alpha, so the ground question is the
+blend mode's and nothing is baked toward black or the page. The hoops stay GL lines (dashed
+`LineLoop`s); under the multisampled target they render clean.
+
+**The Snapshots floor names no rows** (`LedgerView`'s `ROW_COLUMNS`, false; user: "remove texts"): the
+ordinal and size columns were specks at the resting pose, and their dotted leaders went with them.
+⚠️ The "Labels" paragraph above describes those columns as they were; their code is still in
+`_syncOrdLabels`, which returns at once.
+
 **The chamber's boxes are FACE-SHADED** (`objects/faceShade.ts`): the bars, lane tiles, data marks and
 blocks stay unlit, and a per-vertex multiplier by face direction is baked into the geometry (the
 material sets `vertexColors`). It multiplies the instance colour, so every emphasis tier keeps its

@@ -146,6 +146,9 @@ const ORD_OP = 0.55;
  *  attached to snapshot id/size"): at the resting pose eight rows of dashes ran the full width of
  *  the chamber on both sides, which is a lot of ink for a joining mark. ONE constant, because both
  *  columns tie their rows with the same recipe and must not drift. */
+/** Whether the floor names each row at both ends (ordinal left, size right, each on a dotted
+ *  leader). Off since 2026-11-22 — see `_syncOrdLabels`. */
+const ROW_COLUMNS: boolean = false;
 const ORD_LINE_MUL = 0.26;
 /** The committed lane's plane edge-fill multiplier (its plane leads with its snapshots). */
 const LANE_FILL_BOOST = 3;
@@ -1788,6 +1791,11 @@ export class LedgerView implements SceneView {
    *  label rides its row down the trail; one new canvas per tick (event-time — recycled labels
    *  only move, and the line end tracks the bar's live width as the exact read lands). */
   private _syncOrdLabels(): void {
+    // ⚠️ THE ROW COLUMNS ARE OFF (`ROW_COLUMNS`, user, 2026-11-22: "remove texts"). At the resting
+    // pose the ordinal and size columns were specks, and the exact figures they stated are the
+    // explorer's rows and the Global snapshot card. The dotted leader lines went with them: a
+    // leader with no label points at nothing. Nothing below runs, so no canvas is made per tick.
+    if (!ROW_COLUMNS) return;
     const seen = _ordSeen;
     seen.clear();
     const y = FLOOR_Y.gl0 + 0.06;
