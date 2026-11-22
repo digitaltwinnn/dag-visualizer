@@ -605,9 +605,18 @@ describe("FOCUS_ROWS", () => {
   });
 
   // Every row carries the same fields — one shape, every view.
+  // The resting glow is a per-view gain on the shared base: whole where the nodes are the
+  // subject, lower in the chamber, where they are context beside the snapshots.
+  it("rests the chamber's nodes below the views whose subject they are", () => {
+    expect(FOCUS_ROWS.hyper.rest).toBe(1);
+    expect(FOCUS_ROWS.geo.rest).toBe(1);
+    expect(FOCUS_ROWS.ledger.rest).toBeGreaterThan(0);
+    expect(FOCUS_ROWS.ledger.rest).toBeLessThan(1);
+  });
+
   it("gives every 3D view a complete row", () => {
     for (const row of Object.values(FOCUS_ROWS)) {
-      expect(Object.keys(row).sort()).toEqual(["back", "boost", "dim", "elem", "grow", "hide"]);
+      expect(Object.keys(row).sort()).toEqual(["back", "boost", "dim", "elem", "grow", "hide", "rest"]);
     }
   });
 

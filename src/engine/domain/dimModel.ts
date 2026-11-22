@@ -219,6 +219,10 @@ export interface FocusRow {
   boost: number;
   /** How far the focused node GROWS, as a fraction of its own size — `focusGrow`. */
   grow: number;
+  /** The nodes' RESTING glow in this view, as a gain on the shared base — `nodeGlow`. 1 where the
+   *  nodes are the subject; under 1 where they are context beside it (the Snapshots chamber's
+   *  trays, whose row of chips was the brightest thing in a view about snapshots — 2026-11-22). */
+  rest: number;
 }
 
 /** Genuinely cross-view: it ranks focus TIERS, which every view shares. */
@@ -254,14 +258,14 @@ export const FOCUS_ROWS: Readonly<Record<View3D, Readonly<FocusRow>>> = {
   // wanted app-wide. Values: hyper pulled 0.45 → 0.28 (was "a bit too much"); geo/ledger
   // smaller still — their chips sit in dense stacks/trays where a large swell collides
   // with neighbours.
-  hyper: { dim: 0.42, hide: 0, elem: 0.44, back: 0.41, boost: 1.1, grow: 0.28 }, // dim 0.32 → 0.5 → 0.42, elem 0.38 → 0.5 → 0.44 (user, 2026-10-24: a hovered or committed network's others were "not very clear"; then the committed one "pops" too much against the darker field — a step back, beside a dimmer stage light)
+  hyper: { dim: 0.42, hide: 0, elem: 0.44, back: 0.41, boost: 1.1, grow: 0.28, rest: 1 }, // dim 0.32 → 0.5 → 0.42, elem 0.38 → 0.5 → 0.44 (user, 2026-10-24: a hovered or committed network's others were "not very clear"; then the committed one "pops" too much against the darker field — a step back, beside a dimmer stage light)
   // dim 0.5 → 0.75 and hide 0 → 1 (user, 2026-11-03: a browsed network should dim the others "more than it does now", and a filter should hide them; hide reads only under a held filter, `hideFrac`). grow 0.16 → 0.24 (user, 2026-08-30: "same as hyper"); hyper stays loudest
-  geo: { dim: 0.75, hide: 1, elem: 0, back: 0.65, boost: 0.7, grow: 0.24 },
-  ledger: { dim: 0.67, hide: 0, elem: 0, back: 0.55, boost: 0.7, grow: 0.24 }, // dim 0.5 → 0.67 (user export, 2026-08-30): a deeper coloured dim on the other lanes, paired then with a DAG core that never dimmed here
+  geo: { dim: 0.75, hide: 1, elem: 0, back: 0.65, boost: 0.7, grow: 0.24, rest: 1 },
+  ledger: { dim: 0.67, hide: 0, elem: 0, back: 0.55, boost: 0.7, grow: 0.24, rest: 0.45 }, // dim 0.5 → 0.67 (user export, 2026-08-30): a deeper coloured dim on the other lanes, paired then with a DAG core that never dimmed here
   // trend: no shared nodes reach this view at all (the fleet parks), so the row is inert in
   // practice but required to compile — ledger's row COPIED VERBATIM as the starting point
   // (2026-09-18), same as sceneRig's trend row.
-  trend: { dim: 0.67, hide: 0, elem: 0, back: 0.55, boost: 0.7, grow: 0.24 },
+  trend: { dim: 0.67, hide: 0, elem: 0, back: 0.55, boost: 0.7, grow: 0.24, rest: 0.45 },
 };
 
 // Measured, not guessed (2026-09-01): the bar rests at 0.12 and the ledger's boost is 0.7, so a
@@ -308,7 +312,7 @@ const BASE_GLOBE = 0.26;
 // A node's glow before the floor and the focus terms — the dim's own suppression of the base.
 // Exported for its own spec (the resting base both pools share); nodeEmissive composes on it.
 export const nodeGlow = (c: DimContext, d: number): number =>
-  lerp(BASE_HYPER, BASE_GLOBE, c.morph) * (1 - d * 0.92);
+  lerp(BASE_HYPER, BASE_GLOBE, c.morph) * (1 - d * 0.92) * viewMix(c, "rest");
 
 // Node emissive glow. `flash` is the node's raw (undecayed) arc-arrival flash. `focus` = this
 // node's focus WEIGHT from focusWeightOf (1 = it is the hovered/selected subject, GROUP_FOCUS = it
