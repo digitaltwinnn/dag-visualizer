@@ -158,7 +158,10 @@ export function QualifierChip({ children, className, style }: { children: ReactN
       data-pill=""
       style={style}
       className={cn(
-        "inline-flex items-center max-w-full rounded-xs border border-border bg-wash-faint px-[6px] py-[3px] text-label leading-none text-muted-foreground",
+        "inline-flex items-center max-w-full rounded-xs border border-border bg-wash-faint px-[6px] py-[3px] text-label leading-none",
+        // A step toward the foreground: the muted ink on the chip's own wash measured 4.46:1 on
+        // dark (2026-11-22), a hair under the line the rest of the card clears.
+        "text-[color-mix(in_oklch,var(--muted-foreground)_82%,var(--foreground))]",
         className,
       )}
     >

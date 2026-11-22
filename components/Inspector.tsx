@@ -50,7 +50,9 @@ import { useFeedRead } from "@/components/useFeedRead";
 // from the materialized box — the nearest parent is almost lit, the coarsest faintest — so the
 // path reads as a dimmer→bright run ending at the box. (The old RUNG_STEP width step-back is
 // retired: all slots share ONE fixed width, and depth moved to the thread's connector reach.)
-const ENTRY_DIM_STEP = 0.14;
+// 0.12 (was 0.14): two rungs from the box an entry's caps label measured 4.37:1 on paper at 0.72;
+// at 0.76 it clears 4.5.
+const ENTRY_DIM_STEP = 0.12;
 const ENTRY_DIM_FLOOR = 0.55;
 
 // One pane in the right-rail **card stack**. Each pane is its own panel with its own
