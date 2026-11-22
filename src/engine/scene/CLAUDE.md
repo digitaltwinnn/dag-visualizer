@@ -757,6 +757,14 @@ fills from its window. The explorer and the Metagraph card's pager read the same
 (`ladderLevels.dataCarryingNetworks`, `REGISTER_MEASURES.data.dataOnly`). Data blocks have no
 parents, so there is no braid and no link; nothing else in `update` branches on the register.
 
+**Between Metagraph snapshots and Data blocks only the COLUMNS arrive** (user, 2026-11-23: "the
+whole elements drop from the sky but in fact we could just drop the blocks on the snapshots, keep
+the rest stable"). The two read one source and draw one chamber, so the Engine arms the whole beat
+below only when the source changes (to or from Transaction blocks); entering Data blocks from
+Metagraph snapshots it calls `LedgerView.beginDataArrival` instead, and the columns come down onto
+snapshots that never moved (`DATA_ARRIVAL`: from above, growing in, their mist rising under them).
+Leaving Data blocks the columns simply go.
+
 **A register switch plays the arrival beat at its own tempo** (user, 2026-11-07: "when switching
 modes within a view, I think we need a transition time as well, although shorter than the view in/out
 animation"): the Engine arms `beginEntry(REGISTER_BEAT)` (`domain/entryBeat.ts`, 2.2 — the one beat,

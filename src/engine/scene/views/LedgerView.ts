@@ -261,6 +261,13 @@ const DATA_MARK_GAIN = 2.2;
  *  on its own phase so the trail breathes instead of marching. Held still under reduced motion
  *  (`setStill`). What ties the column to its tile is the mist under it (`objects/LiftMist.ts`). */
 const DATA_HOVER: Readonly<{ rise: number; seconds: number }> = { rise: 0.07, seconds: 4.6 };
+/** THE COLUMNS' OWN ARRIVAL (user, 2026-11-23: switching between Metagraph snapshots and Data blocks
+ *  "the whole elements drop from the sky but in fact we could just drop the blocks on the
+ *  snapshots, keep the rest stable"). Those two registers read the same source and draw the same
+ *  chamber, so nothing in it has moved: the columns alone come down onto their snapshots, from
+ *  `drop` tile sizes above, over `seconds`, growing in as they fall with their mist rising under
+ *  them. A switch to or from Transaction blocks changes the source and keeps the whole beat. */
+const DATA_ARRIVAL: Readonly<{ drop: number; seconds: number }> = { drop: 3.2, seconds: 0.6 };
 
 /** A block's edge above the floor (a DAG block) and on a tile (a token block — a tile is 0.48 at most). */
 const DAG_BLOCK = 0.62;
@@ -528,6 +535,8 @@ export class LedgerView implements SceneView {
   /** The hover's clock, and whether motion is held still (reduced motion; the Engine says). */
   private _hoverT = 0;
   private _still = false;
+  /** The columns' arrival, 0 to 1 (`DATA_ARRIVAL`); 1 = standing. */
+  private _dataIn = 1;
 
   constructor(
     scene: THREE.Scene,
@@ -1648,6 +1657,12 @@ export class LedgerView implements SceneView {
     this._hoverTile = -1;
   }
 
+  /** Bring the data columns down onto their snapshots (`DATA_ARRIVAL`) — the Engine's answer to a
+   *  switch between the two registers that share a source. Event-time. */
+  beginDataArrival(): void {
+    this._dataIn = this._still ? 1 : 0;
+  }
+
   /** REDUCED MOTION, from the Engine (plain data): the data columns' hover and their mist's drift
    *  hold still. */
   setStill(still: boolean): void {
@@ -2162,6 +2177,9 @@ export class LedgerView implements SceneView {
     const dataMarks = this._cargo.tiles === "data";
     if (dataMarks && !this._still) this._hoverT = (this._hoverT + dt / DATA_HOVER.seconds) % 1000;
     const hoverPh = this._hoverT * Math.PI * 2;
+    // The columns' arrival, eased out so they settle onto the lift rather than stop on it.
+    if (this._dataIn < 1) this._dataIn = Math.min(1, this._dataIn + dt / DATA_ARRIVAL.seconds);
+    const dataIn = 1 - (1 - this._dataIn) * (1 - this._dataIn) * (1 - this._dataIn);
     // A focus is a SELECTED row (pinned or live-followed — how it was reached is not what it is),
     // a hovered row or a hovered tile. The bare lead is none of them: with nothing selected the
     // chamber is simply running, and stepping the whole trail back against a row it advanced onto
@@ -2295,12 +2313,12 @@ export class LedgerView implements SceneView {
           const boxes = this._dataBoxN[mi];
           if (boxes > 0 && si + boxes <= META_TRAIL_MAX) {
             // Each box is a cube inside the tile's footprint; the column rises from the lift.
-            const w = b.size * DATA_MARK.foot;
+            const w = b.size * DATA_MARK.foot * dataIn;
             const h = w;
             // The hover: each column on its own phase (its tile's place in the trail), still under
             // reduced motion.
             const bob = this._still ? 0 : Math.sin(hoverPh + mi * 1.7) * b.size * DATA_HOVER.rise;
-            const under = _tileV.y + tileH * DATA_MARK.lift + bob;
+            const under = _tileV.y + tileH * DATA_MARK.lift + bob + (1 - dataIn) * b.size * DATA_ARRIVAL.drop;
             const pitch = h * (1 + DATA_STACK.gap);
             // A hovered data block's column takes the subject's full weight (its tile keeps its own).
             inkMix(_col.copy(laneColor), mi === this._hoverMark ? 1 : Math.min(1, bright * DATA_MARK_GAIN), this._colors);
@@ -2317,7 +2335,7 @@ export class LedgerView implements SceneView {
             // column's ink at the tile's entry fade (a colour multiply: it is added light on dark,
             // and the instance colour is its only per-column channel).
             _dummy.position.set(_tileV.x, _tileV.y, _tileV.z);
-            _dummy.scale.setScalar(b.size);
+            _dummy.scale.set(b.size, b.size * dataIn, b.size); // it rises under the arriving column
             _dummy.updateMatrix();
             this._liftMist.mesh.setMatrixAt(li, _dummy.matrix);
             this._liftMist.mesh.setColorAt(li, this._paper ? _col : _col.multiplyScalar(entryF));

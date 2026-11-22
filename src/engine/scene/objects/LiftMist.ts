@@ -90,6 +90,9 @@ export class LiftMist {
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.mesh.count = 0;
     this.mesh.frustumCulled = false;
+    // Bounds three cannot reject with: the columns move with the trail every frame, and a sphere
+    // computed once would go stale (see NodeFabric.openBounds). Not a pick target either way.
+    this.mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e4);
     this.mesh.renderOrder = 1; // over the planes and the tiles it rises from
     this.mesh.raycast = () => {}; // never a pick target: the tile under it answers the click
     parent.add(this.mesh);
