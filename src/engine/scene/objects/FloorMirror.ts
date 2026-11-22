@@ -6,6 +6,12 @@
 // fraction of its level and feathered to nothing at the floor's edges — a sheen, never a second
 // chamber. What it shows is the scene itself, so it states nothing the chamber does not.
 //
+// And it is glass that takes LIGHT as well as an image (user, 2026-11-22: "besides mirror (glass)
+// perhaps also some light effect?"): the same reflection read again at two coarse mip levels is a
+// soft pool of each mark's colour on the floor around its reflection — the SPILL. It is the marks'
+// own light, from the same render, so a brighter bar lights more floor and a dimmed one less, with
+// no lamp and no second number to keep in step with the emphasis system.
+//
 // Three decisions:
 //  · The mirror plane sits `lift` ABOVE the glass. Everything lying IN the floor — the ordinal and
 //    size columns, their dotted lines, the live edge, the silent stretch — is below the clip, so
@@ -24,8 +30,13 @@ import { Reflector } from "three/addons/objects/Reflector.js";
 /** The mirror's look: `strength` the share of the reflected light that is added, `lift` how far
  *  above the glass the mirror plane (and so its clip) sits, `feather` the fraction of each side
  *  over which it fades out, `back` the same for the far end, where the floor itself dissolves. */
-export const MIRROR_LOOK: Readonly<{ strength: number; strengthPaper: number; lift: number; feather: number; back: number }> = {
-  strength: 0.2, strengthPaper: 0.4, lift: 0.12, feather: 0.08, back: 0.4,
+export const MIRROR_LOOK: Readonly<{
+  strength: number; strengthPaper: number; spill: number; spillPaper: number;
+  lift: number; feather: number; back: number;
+}> = {
+  strength: 0.2, strengthPaper: 0.4,
+  spill: 0.5, spillPaper: 0.45, // the soft pool's level, per ground (it is spread thin, so it reads above the image's number)
+  lift: 0.12, feather: 0.08, back: 0.4,
 };
 const MIRROR_RES = { w: 1024, h: 640 } as const;
 
@@ -36,6 +47,7 @@ const MIRROR_SHADER = {
     tDiffuse: { value: null },
     textureMatrix: { value: null },
     uOp: { value: 0 },
+    uSpill: { value: 0 },
     uPaper: { value: 0 },
     uGround: { value: new THREE.Color() },
     uFeather: { value: new THREE.Vector2(MIRROR_LOOK.feather, MIRROR_LOOK.back) },
@@ -53,6 +65,7 @@ const MIRROR_SHADER = {
   fragmentShader: /* glsl */ `
     uniform sampler2D tDiffuse;
     uniform float uOp;
+    uniform float uSpill;
     uniform float uPaper;
     uniform vec3 uGround;
     uniform vec2 uFeather;
@@ -63,9 +76,13 @@ const MIRROR_SHADER = {
       // uv.x runs back -> front along the trail, uv.y across the lanes.
       float f = smoothstep(0.0, uFeather.y, vP.x) * smoothstep(0.0, uFeather.x, 1.0 - vP.x)
               * smoothstep(0.0, uFeather.x, vP.y) * smoothstep(0.0, uFeather.x, 1.0 - vP.y);
+      // The spill: the same image at two coarse mips, a wide soft pool around each reflection.
+      vec3 soft = 0.5 * (texture2DProj(tDiffuse, vUv, 3.0).rgb + texture2DProj(tDiffuse, vUv, 5.0).rgb);
       // Dark: light to add. Paper: a factor to multiply the floor by (1 = the bare page).
-      vec3 ink = mix(vec3(1.0), clamp(r / max(uGround, vec3(1e-3)), 0.0, 1.0), uOp * f);
-      gl_FragColor = vec4(mix(r * uOp * f, ink, uPaper), 1.0);
+      vec3 g = max(uGround, vec3(1e-3));
+      vec3 ink = mix(vec3(1.0), clamp(r / g, 0.0, 1.0), uOp * f)
+               * mix(vec3(1.0), clamp(soft / g, 0.0, 1.0), uSpill * f);
+      gl_FragColor = vec4(mix((r * uOp + soft * uSpill) * f, ink, uPaper), 1.0);
     }
   `,
 };
@@ -81,6 +98,10 @@ export class FloorMirror {
     this.mesh = new Reflector(new THREE.PlaneGeometry(w, d), {
       textureWidth: MIRROR_RES.w, textureHeight: MIRROR_RES.h, multisample: 2, shader: MIRROR_SHADER,
     });
+    // Mips for the spill's coarse reads (three regenerates them after each mirror render).
+    const tex = this.mesh.getRenderTarget().texture;
+    tex.generateMipmaps = true;
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
     const mat = this.mesh.material as THREE.ShaderMaterial;
     mat.transparent = true;
     mat.depthWrite = false;
@@ -97,8 +118,9 @@ export class FloorMirror {
 
   /** The chamber's furniture alpha, per frame. At 0 the mesh hides, and its render with it. */
   setAlpha(a: number): void {
-    (this.mesh.material as THREE.ShaderMaterial).uniforms.uOp.value =
-      a * (this._paper ? MIRROR_LOOK.strengthPaper : MIRROR_LOOK.strength);
+    const u = (this.mesh.material as THREE.ShaderMaterial).uniforms;
+    u.uOp.value = a * (this._paper ? MIRROR_LOOK.strengthPaper : MIRROR_LOOK.strength);
+    u.uSpill.value = a * (this._paper ? MIRROR_LOOK.spillPaper : MIRROR_LOOK.spill);
     this.mesh.visible = a > 0.001;
   }
 

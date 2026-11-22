@@ -963,7 +963,9 @@ never changes with the camera's distance. The overlay layer draws after it and i
 additive shell shaded by how close each line of sight passes to the centre — a halo outside the limb,
 a rim light inside — leaning on the rig's sun. The limb carries the roundness, so the far side's walls
 and graticule rest at `FAR_SIDE` (0.14). Paper never draws it and keeps its ocean plate. It is in
-neither bloom layer on purpose: bloomed, the limb read as fuzz (user, same day).
+neither bloom layer on purpose, and its inner term is a HAIRLINE (exponent 120): bloomed, and then
+as a band a tenth of the disc wide, it read as fuzz over the limb's coast walls (user, same day,
+twice).
 
 **The base ring's pie takes a hairline gap** (`WEDGE_GAP_W`, 0.07, against the rings' `RING_GAP_W`):
 over the pie's faint fill a ring-width gap was the darkest thing on the disc.
@@ -975,7 +977,10 @@ label columns, the dotted lines, the live edge) is reflected under itself. One m
 1024×640, only while the chamber is on screen. **Paper MULTIPLIES it** (user, same day: "light mode
 is missing the mirror"): the reflection divided by the plate's colour is 1 where the mirror sees the
 page and the mark's ink where it sees a mark, so the floor darkens toward the mark and cannot blow
-out. Levels are per ground (0.2 dark, 0.4 paper — the user took both down from 0.3 / 0.6).
+out. Levels are per ground (0.2 dark, 0.4 paper — the user took both down from 0.3 / 0.6). **And the
+floor takes LIGHT as well as an image** (user: "also some light effect?"): the same reflection read
+at two coarse mips is a soft pool of each mark's colour around its reflection (`spill`), so the
+light is the marks' own and follows their emphasis with no lamp.
 
 **History's floor wears its cards' hues on dark** (`TrendsView.setSlotHues`, fed by
 `Engine._syncTrendHues` from `stackPoses`, the projector's own deck): each rung takes the identity

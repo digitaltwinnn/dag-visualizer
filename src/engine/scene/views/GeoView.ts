@@ -145,11 +145,16 @@ export function buildGeoView(globe: GeoViewHost): void {
  *  limb now carries the roundness they used to. */
 const FAR_SIDE = 0.14;
 
+// A LINE, NOT A HAZE (user, 2026-11-22, twice: "a bit too fuzzy", then "still too fuzzy"). Toggled
+// off one at a time in the live scene, the fuzz was neither the land fill nor the walls' bloom: it
+// was this shell's inner term at exponent 14, a teal band a tenth of the disc wide lying over the
+// coast walls where they stack up edge-on at the limb. At 120 it is a hairline of light on the
+// limb itself, and the halo outside it is a few pixels.
 /** THE ATMOSPHERE's look: `rim` the level at the limb, `reach` the halo's e-folding height above
  *  sea level in world units, `inner` the exponent of the limb light's falloff toward the disc's
  *  centre (higher = a thinner rim), `night`/`day` the sun's multipliers across the limb. */
 export const ATMO_LOOK = {
-  rim: 0.1, reach: 0.35, inner: 14, night: 0.35, day: 1.3,
+  rim: 0.14, reach: 0.12, inner: 120, night: 0.35, day: 1.3,
 } as const;
 /** The shell the halo is drawn on: far enough out that the falloff has reached nothing. */
 const ATMO_SHELL = R + 5;
